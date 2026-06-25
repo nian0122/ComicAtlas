@@ -1,7 +1,9 @@
 package com.comicatlas.worker.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Data
@@ -12,6 +14,11 @@ public class WorkerConfig {
     private String tempDir;
     private String metadataDir;
     private Torrent torrent = new Torrent();
+
+    @Bean
+    public ObjectMapper objectMapper() {
+        return new ObjectMapper();
+    }
 
     @Data
     public static class Torrent {
