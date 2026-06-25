@@ -81,7 +81,7 @@ services:
       - nacos
 
   nginx:
-    image: nginx:alpine
+    build: ./frontend
     container_name: comicatlas-nginx
     restart: unless-stopped
     ports:
