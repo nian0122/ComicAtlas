@@ -27,6 +27,10 @@ spring:
     port: 5672
     username: ${RABBITMQ_USER:guest}
     password: ${RABBITMQ_PASS:guest}
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:db/schema.sql
 
 mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml
