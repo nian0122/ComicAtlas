@@ -227,7 +227,7 @@ CREATE TABLE chapter (
   page_count  INT DEFAULT 0,
   created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
 
-  INDEX idx_comic_chapter (comic_id, chapter_no),
+  UNIQUE INDEX uk_comic_chapter (comic_id, chapter_no),   -- 防重复消费产生重复章节
   FOREIGN KEY (comic_id) REFERENCES comic(id) ON DELETE CASCADE
 );
 ```
@@ -666,18 +666,23 @@ metadata.json 内容:
 
 API 消费（整个方法 @Transactional，任一步骤失败则全部回滚）：
 1. 幂等检查 (Redis SETNX mq:msg:{messageId} EX 86400)
+   → 若已存在，直接 ACK 跳过（消息幂等第一层）
 2. 读取 metadata.json → UPDATE comic (filled metadata)
-3. INSERT chapter (comic_id, title, chapter_no='1')
-4. BATCH INSERT page (500 条/批, lq_status='PENDING')
-   → UNIQUE uk_chapter_page 约束防止重复消费导致脏数据
-5. INSERT tags + comic_tag
+3. INSERT IGNORE chapter (comic_id, title, chapter_no='1')
+   → uk_comic_chapter 唯一约束保证重复消费不产生脏章节
+4. INSERT IGNORE page (chapter_id, page_number, image_name, ...)
+   → uk_chapter_page 唯一约束保证重复消费不产生脏页
+5. INSERT IGNORE tag + INSERT IGNORE comic_tag
+   → 主键冲突自动跳过
 6. UPDATE comic SET status='READY', file_size=totalSize, total_pages=pageCount
 7. UPDATE import_task SET status='LQ_GENERATING', end_time=NOW()
 8. INSERT operation_log (trace_id=import-{taskId}, action=COMIC_IMPORTED)
 9. Publish LQGenerateTask (per chapter)
 
-> 注意：事务覆盖步骤 2-9。若步骤 4 的 UNIQUE 约束冲突（重复消费），
-> 不抛异常——直接跳过 INSERT page 继续执行，保证幂等。
+> 幂等策略三层防护：
+> (1) Redis SETNX（快速拦截）
+> (2) INSERT IGNORE + 唯一约束（chapter/page/tag 防重复插入）
+> (3) 整体 @Transactional（任一步骤异常则回滚，MQ 重投走 INSERT IGNORE 安全通过）
 
 #### ComicImportedProcessed (API → Worker)
 
