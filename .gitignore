@@ -1,0 +1,43 @@
+# Maven
+target/
+!.mvn/wrapper/maven-wrapper.jar
+*.jar
+*.war
+
+# IDE
+.idea/
+*.iml
+*.iws
+.vscode/
+.settings/
+.project
+.classpath
+.factorypath
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Docker volumes
+mysql-data/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Manga storage (local dev)
+/manga/
+
+# OpenCode
+.sisyphus/
+.omo/run-continuation/
+
+# Logs
+*.log
