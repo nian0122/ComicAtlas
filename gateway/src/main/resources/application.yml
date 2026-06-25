@@ -1,0 +1,20 @@
+server:
+  port: 8000
+
+spring:
+  application:
+    name: comic-gateway
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_ADDR:localhost:8848}
+    gateway:
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
+      routes:
+        - id: api-service
+          uri: lb://comic-api-service
+          predicates:
+            - Path=/api/**

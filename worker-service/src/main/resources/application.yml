@@ -1,0 +1,24 @@
+server:
+  port: 8020
+
+spring:
+  application:
+    name: comic-worker-service
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_ADDR:localhost:8848}
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: 5672
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASS:guest}
+
+worker:
+  manga-root: ${MANGA_ROOT:/manga}
+  temp-dir: ${MANGA_ROOT:/manga}/temp
+  metadata-dir: ${MANGA_ROOT:/manga}/metadata
+  torrent:
+    peer-detect-timeout: 30
+    min-speed-threshold: 10240
+    speed-check-duration: 300
