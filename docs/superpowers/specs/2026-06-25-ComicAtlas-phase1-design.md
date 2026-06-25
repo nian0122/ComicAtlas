@@ -182,12 +182,13 @@ CREATE TABLE comic (
   hq_size             BIGINT DEFAULT 0,
   lq_size             BIGINT DEFAULT 0,
   source_type         VARCHAR(16),   -- E_HENTAI / LOCAL
-  source_gallery_id   INT,
+  source_gallery_id   VARCHAR(64),
   source_gallery_token VARCHAR(32),
   source_url          VARCHAR(512),
   status              VARCHAR(16) DEFAULT 'IMPORTING',  -- IMPORTING / READY / DELETING / DELETED / ERROR
   lq_status           VARCHAR(16) DEFAULT NULL,         -- NULL / PENDING / GENERATING / READY / PARTIAL / FAILED
   category            VARCHAR(64),
+  deleted_at          DATETIME,                         -- 物理删除时间，定时任务每日凌晨清理 DELETED 记录
   created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
@@ -218,7 +219,7 @@ CREATE TABLE chapter (
   id          BIGINT PRIMARY KEY AUTO_INCREMENT,
   comic_id    BIGINT NOT NULL,
   title       VARCHAR(255),
-  chapter_no  INT DEFAULT 1,
+  chapter_no  VARCHAR(32) DEFAULT '1',
   page_count  INT DEFAULT 0,
   created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
 
@@ -351,7 +352,7 @@ CREATE TABLE operation_log (
   module      VARCHAR(32),            -- IMPORT / DELETE / LQ / SYSTEM
   action      VARCHAR(64),            -- TASK_CREATED / DOWNLOAD_COMPLETED / COMIC_IMPORTED / LQ_COMPLETED / ERROR
   business_id VARCHAR(64),            -- taskId 或 comicId
-  detail      VARCHAR(1024),
+  detail      TEXT,
   created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
 
   INDEX idx_trace_id (trace_id),
@@ -547,6 +548,8 @@ SQL: INSERT INTO reading_history (...)
 
 `storageUsed = SUM(comic.hq_size + comic.lq_size)`，从 comic 表聚合而非 page 表。
 
+**Dashboard 只读 Redis 缓存**（key: `dashboard:statistics`，TTL 30min），不实时 SQL 聚合。API 在导入完成、LQ 完成、漫画删除时主动刷新缓存。
+
 #### 其他
 
 | 方法 | 路径 | 说明 |
@@ -567,7 +570,7 @@ API Service                              Worker Service
     │── ImportTaskCreated (含 comicId) ─────▶  │  下载 → 解压 → 解析 → 写入 metadata.json
     │                                          │
     │  ◀── TaskStatusChanged ──────────────── │  DOWNLOADING/EXTRACTING/PARSING
-    │  ◀── ComicImported (只传引用) ───────── │  { metadataFile: "/manga/metadata/1.json" }
+    │  ◀── ComicImported ─────────────────── │  只传 taskId + comicId，路径约定规则生成
     │── ComicImportedProcessed ───────────▶  │  通知 Worker 清理 metadata + temp
     │                                          │
     │── LQGenerateTask (per chapter) ──────▶  │  Go image-optimizer
@@ -618,7 +621,7 @@ Payload:
 Worker 在 DOWNLOADING、EXTRACTING、PARSING、CANCELLED 节点发送。FAILED 由 DLQ 监听器发送。
 API 消费后 UPDATE import_task 状态 + 时间戳 + 速度数据，速度/ETA 直接写入供前端轮询。
 
-#### ComicImported (Worker → API，只传引用不传 body)
+#### ComicImported (Worker → API，约定路径)
 
 ```
 Exchange: comic.import
@@ -627,14 +630,15 @@ Payload:
 {
   "messageId": "uuid",
   "taskId": 1,
-  "comicId": 1001,
-  "metadataFile": "/manga/metadata/1.json"
+  "comicId": 1001
 }
+```
+> 注意：不传绝对路径。metadata 文件路径由约定规则生成：`/manga/metadata/{taskId}.json`，API 根据 taskId 自行定位。
 
 metadata.json 内容:
 {
   "comic": { "title": "xxx", "author": "xxx", "category": "doujinshi",
-    "sourceGalleryId": 12345, "sourceGalleryToken": "abc123", "tags": [...] },
+    "sourceGalleryId": "12345", "sourceGalleryToken": "abc123", "tags": [...] },
   "pages": [
     {"pageNumber": 1, "imageName": "001.jpg", "width": 1200, "height": 1800, "fileSize": 1234567},
     ...
@@ -644,11 +648,16 @@ metadata.json 内容:
 ```
 
 API 消费：
-1. 幂等检查 (Redis SETNX)
-2. 读取 metadata.json → UPDATE comic + INSERT chapter + BATCH INSERT page + tags
-3. comic.status = READY（用户可立即阅读 HQ）
-4. import_task.status = LQ_GENERATING, end_time=NOW(), duration_ms 自动计算
-5. Publish LQGenerateTask (per chapter)
+1. 幂等检查
+2. 读取 metadata.json → UPDATE comic (filled metadata)
+3. INSERT chapter (chapter_no 默认 '1')
+4. BATCH INSERT page (500 条/批, lq_status='PENDING')
+5. INSERT tags + comic_tag
+6. @Transactional 一次事务:
+   UPDATE comic.status=READY, file_size=totalSize, total_pages=pageCount
+   UPDATE import_task.status=LQ_GENERATING, end_time=NOW()
+7. INSERT operation_log (trace_id=import-{taskId}, action=COMIC_IMPORTED)
+8. Publish LQGenerateTask (per chapter)
 
 #### ComicImportedProcessed (API → Worker)
 
@@ -682,10 +691,11 @@ Payload: {
 ```
 
 API 消费：
-- 所有 page 默认 lq_status=READY（insert 时的初始值）
-- BATCH UPDATE: 仅 `failedPages` 对应行 SET lq_status='FAILED'
-- 有失败 → comic.lq_status = PARTIAL; 无失败 → READY
-- 所有章节 LQ 完成 → import_task.status = SUCCESS
+  @Transactional
+  - BATCH UPDATE: 成功页 lq_status 从 PENDING → READY
+  - BATCH UPDATE: 仅 `failedPages` 对应行 lq_status 从 PENDING → FAILED
+  - 统计失败数 → 有失败 comic.lq_status = PARTIAL; 全部成功 → READY
+  - 所有章节 LQ 完成 → import_task.status = SUCCESS
 
 #### ComicDeleteRequested (API → Worker，只传 comicId)
 
