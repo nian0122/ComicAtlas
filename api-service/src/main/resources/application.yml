@@ -9,6 +9,9 @@ spring:
       discovery:
         server-addr: ${NACOS_ADDR:localhost:8848}
       config:
+        import-check:
+          enabled: false
+      config:
         server-addr: ${NACOS_ADDR:localhost:8848}
         file-extension: yaml
   datasource:
