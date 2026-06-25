@@ -17,7 +17,7 @@ services:
     container_name: comicatlas-redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "6380:6379"
 
   rabbitmq:
     image: rabbitmq:3.13-management-alpine
