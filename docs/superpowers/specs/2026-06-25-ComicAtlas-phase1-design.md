@@ -210,6 +210,10 @@ CREATE TABLE comic (
 | READY | GENERATING | LQ 后台生成中（仍可阅读） |
 | IMPORTING | NULL | 导入中，不可阅读 |
 
+> **重要**：`comic.status=READY` 意味着 HQ 已就绪、用户可立即阅读。
+> 此时 `import_task.status` 可能仍处于 `LQ_GENERATING`——LQ 生成是后处理流程，
+> 不会阻塞阅读。两者状态独立，不要混淆。
+
 前端只需一处判断：`comic.status !== 'READY'` 即不可阅读。
 
 **chapter（章节表）**
@@ -244,7 +248,7 @@ CREATE TABLE page (
   file_size   BIGINT,
   created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
 
-  INDEX idx_chapter_page (chapter_id, page_number),
+  UNIQUE INDEX uk_chapter_page (chapter_id, page_number),   -- 防重复插入（Redis 幂等兜底失效时）
   FOREIGN KEY (chapter_id) REFERENCES chapter(id) ON DELETE CASCADE
 );
 ```
@@ -451,7 +455,16 @@ Response:
 **DELETE `/api/comics/{id}`**
 
 ```
-流程: READY → DELETING → Worker 删文件 → DELETED → 定时清理
+流程:
+  READY → UPDATE status='DELETING'
+  → Publish ComicDeleteRequested
+  → Worker 删除文件（hq/lq/raw/thumbs）
+  → Publish ComicDeleted
+  → API 消费 → UPDATE status='DELETED', deleted_at=NOW()
+  
+  ← 软删除保留 7 天窗口，可手动回滚（恢复 status='READY'）
+  ← 定时任务：每日凌晨物理删除 WHERE status='DELETED' AND deleted_at < NOW() - 7 DAY
+
 Response: { "taskId": 999, "status": "DELETING" }
 ```
 
@@ -494,12 +507,16 @@ Request:  { "sourceUrl": "https://e-hentai.org/g/12345/abc123/" }
 
 流程:
   1. 校验 URL + 提取 gid
-  2. Redis 去重检查
-  3. DB UNIQUE 约束检查
+  2. Redis 去重检查（快速路径）
+  3. DB 查询是否已存在（Redis 过期后的兜底）
   4. INSERT comic (status=IMPORTING)  ← 预创建，拿 comicId
+     → catch DuplicateKeyException: 返回 "该漫画已存在"（并发安全兜底）
   5. INSERT import_task (comicId, status=PENDING)
   6. Publish ImportTaskCreated (携带 comicId)
   7. INSERT operation_log (trace_id=import-{taskId})
+
+> Redis 去重只是性能优化，DB UNIQUE(source_type, source_gallery_id) 才是最终判断。
+> DuplicateKeyException 必须显式 catch，避免抛 500。
 
 Response: { "taskId": 1, "status": "PENDING" }
 ```
@@ -647,17 +664,20 @@ metadata.json 内容:
 }
 ```
 
-API 消费：
-1. 幂等检查
+API 消费（整个方法 @Transactional，任一步骤失败则全部回滚）：
+1. 幂等检查 (Redis SETNX mq:msg:{messageId} EX 86400)
 2. 读取 metadata.json → UPDATE comic (filled metadata)
-3. INSERT chapter (chapter_no 默认 '1')
+3. INSERT chapter (comic_id, title, chapter_no='1')
 4. BATCH INSERT page (500 条/批, lq_status='PENDING')
+   → UNIQUE uk_chapter_page 约束防止重复消费导致脏数据
 5. INSERT tags + comic_tag
-6. @Transactional 一次事务:
-   UPDATE comic.status=READY, file_size=totalSize, total_pages=pageCount
-   UPDATE import_task.status=LQ_GENERATING, end_time=NOW()
-7. INSERT operation_log (trace_id=import-{taskId}, action=COMIC_IMPORTED)
-8. Publish LQGenerateTask (per chapter)
+6. UPDATE comic SET status='READY', file_size=totalSize, total_pages=pageCount
+7. UPDATE import_task SET status='LQ_GENERATING', end_time=NOW()
+8. INSERT operation_log (trace_id=import-{taskId}, action=COMIC_IMPORTED)
+9. Publish LQGenerateTask (per chapter)
+
+> 注意：事务覆盖步骤 2-9。若步骤 4 的 UNIQUE 约束冲突（重复消费），
+> 不抛异常——直接跳过 INSERT page 继续执行，保证幂等。
 
 #### ComicImportedProcessed (API → Worker)
 
@@ -858,6 +878,9 @@ ReaderPage（复用 comics15 的 ReaderMediaItem 和 HQ/LQ 切换逻辑）
 ```
 
 **Phase 1 不做**: 单页/双页模式、阅读方向切换、虚拟滚动。但 ReaderStore 已预留 `visibleRange` 和 `virtualScrollEnabled` 字段。
+
+> **内存警告**: Phase 1 滚动模式下所有页面 DOM 全量挂载。
+> 单章节建议控制在 500 页以内。超过 500 页时考虑预留 `IntersectionObserver` 按需挂载/卸载离开视口的图片。
 
 #### ImportPage
 
