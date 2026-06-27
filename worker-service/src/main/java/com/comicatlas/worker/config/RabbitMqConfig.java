@@ -25,6 +25,11 @@ public class RabbitMqConfig {
     }
 
     @Bean
+    public DirectExchange taskExchange() {
+        return new DirectExchange("comic.task");
+    }
+
+    @Bean
     public DirectExchange deleteExchange() {
         return new DirectExchange("comic.delete");
     }
