@@ -42,6 +42,24 @@ public record GalleryMetadata(
         long fsize
     ) {}
 
+    private static long toLong(Object v) {
+        if (v instanceof Number n) return n.longValue();
+        if (v instanceof String s) return Long.parseLong(s);
+        return 0L;
+    }
+
+    private static int toInt(Object v) {
+        if (v instanceof Number n) return n.intValue();
+        if (v instanceof String s) return Integer.parseInt(s);
+        return 0;
+    }
+
+    private static double toDouble(Object v) {
+        if (v instanceof Number n) return n.doubleValue();
+        if (v instanceof String s) return Double.parseDouble(s);
+        return 0.0;
+    }
+
     @SuppressWarnings("unchecked")
     public static GalleryMetadata fromApiResponse(Object gmetadata) {
         Map<String, Object> m = (Map<String, Object>) gmetadata;
@@ -51,20 +69,20 @@ public record GalleryMetadata(
         List<TorrentInfo> torrents = torrentsRaw.stream().map(t -> new TorrentInfo(
             (String) t.get("hash"), (String) t.get("added"),
             (String) t.get("name"), (String) t.get("tsize"),
-            ((Number) t.get("fsize")).longValue()
+            toLong(t.get("fsize"))
         )).toList();
 
         return new GalleryMetadata(
-            ((Number) m.get("gid")).longValue(),
+            toLong(m.get("gid")),
             (String) m.get("token"),
             (String) m.get("title"),
             (String) m.get("title_jpn"),
             (String) m.get("category"),
             (String) m.get("thumb"),
             (String) m.get("uploader"),
-            Integer.parseInt((String) m.get("filecount")),
-            ((Number) m.get("filesize")).longValue(),
-            ((Number) m.get("rating")).doubleValue(),
+            toInt(m.get("filecount")),
+            toLong(m.get("filesize")),
+            toDouble(m.get("rating")),
             (List<String>) m.getOrDefault("tags", List.of()),
             torrents
         );
