@@ -33,5 +33,6 @@ public class WorkerConfig {
     public static class Proxy {
         private String host;
         private int port = 7890;
+        private int socksPort = 7891;
     }
 }
