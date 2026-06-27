@@ -7,6 +7,9 @@ import org.springframework.stereotype.Component;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.List;
 
 @Slf4j
 @Component
@@ -18,13 +21,24 @@ public class TorrentDownloader implements DownloadStrategy {
     public DownloadContext.DownloadResult download(String magnetUrl, Path destDir) throws Exception {
         Files.createDirectories(destDir);
         log.info("Torrent: magnet={}, dest={}", magnetUrl, destDir);
-        ProcessBuilder pb = new ProcessBuilder(
-                config.getAria2cPath(), magnetUrl,
-                "--bt-stop-timeout=60", "--seed-time=0",
-                "--max-connection-per-server=16", "--split=8",
-                "-d", destDir.toString(),
-                "--stop-with-process=" + ProcessHandle.current().pid()
-        );
+        String proxyArg = config.getProxy().getHost() != null
+            ? "--all-proxy=http://" + config.getProxy().getHost() + ":" + config.getProxy().getPort()
+            : null;
+
+        var cmd = new java.util.ArrayList<>(List.of(
+            config.getAria2cPath(), magnetUrl,
+            "--bt-stop-timeout=60", "--seed-time=0",
+            "--max-connection-per-server=16", "--split=8",
+            "--bt-enable-lpd=false",
+            "--bt-tracker=udp://tracker.opentrackr.org:1337/announce",
+            "--bt-tracker=udp://open.demonii.com:1337/announce",
+            "-d", destDir.toString(),
+            "--stop-with-process=" + ProcessHandle.current().pid()
+        ));
+        if (proxyArg != null) {
+            cmd.add(1, proxyArg); // 插在 magnet 之后
+        }
+        ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.inheritIO();
         Process process = pb.start();
         int exitCode = process.waitFor();
