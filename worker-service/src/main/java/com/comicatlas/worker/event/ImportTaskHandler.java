@@ -25,7 +25,7 @@ public class ImportTaskHandler {
 
         try {
             publisher.publishStatus(taskId, "DOWNLOADING", 0, null, 0, 0);
-            fileService.processImport(taskId, comicId, sourceUrl, null, sourceType);
+            fileService.processImport(taskId, comicId, sourceUrl, sourceType);
             publisher.publishStatus(taskId, "PARSING", 100, "HTTP", 0, 0);
             publisher.publishImported(taskId, comicId);
         } catch (Exception e) {
