@@ -85,9 +85,12 @@ public class FileService {
             try { Files.copy(coverSrc, coverDest, StandardCopyOption.REPLACE_EXISTING); } catch (Exception e) { log.warn("Cover failed: {}", e.getMessage()); }
         }
 
-        // 5. Write metadata.json
+        // 5. Write metadata.json (from e-hentai API)
         Map<String, Object> metadata = new LinkedHashMap<>();
-        metadata.put("comic", Map.of("title", "Imported", "sourceGalleryId", "0", "tags", List.of()));
+        Map<String, Object> comicMeta = result.metadata() != null
+            ? new LinkedHashMap<>(result.metadata())
+            : Map.of("title", "Imported", "sourceGalleryId", "0", "tags", List.of());
+        metadata.put("comic", comicMeta);
         metadata.put("pages", pages);
         metadata.put("totalSize", totalSize);
         Path metadataPath = Path.of(config.getMangaRoot(), pathBuilder.metadataFile(taskId));

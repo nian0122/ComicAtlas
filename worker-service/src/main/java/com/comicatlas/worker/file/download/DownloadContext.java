@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Path;
+import java.util.Map;
 
 @Slf4j
 @Component
@@ -14,18 +15,39 @@ public class DownloadContext {
     private final TorrentDownloader torrentDownloader;
 
     public DownloadResult download(String sourceUrl, String magnetUrl, Path destDir) throws Exception {
+        // 先尝试 Torrent（如果有磁力链接）
         if (magnetUrl != null && !magnetUrl.isEmpty()) {
             try {
-                long bytes = torrentDownloader.download(magnetUrl, destDir);
-                log.info("Torrent download success: {} bytes", bytes);
-                return new DownloadResult(bytes, "TORRENT");
+                var torrentResult = torrentDownloader.download(magnetUrl, destDir);
+                log.info("Torrent: {} bytes", torrentResult.bytes());
+                return new DownloadResult(torrentResult.bytes(), "TORRENT", null);
             } catch (Exception e) {
                 log.warn("Torrent failed, fallback to HTTP: {}", e.getMessage());
             }
         }
-        long bytes = httpDownloader.download(sourceUrl, destDir);
-        return new DownloadResult(bytes, magnetUrl != null ? "TORRENT_FALLBACK_HTTP" : "HTTP");
+        // HTTP 下载（内部调 e-hentai API 获取 metadata + 爬取图片）
+        return httpDownloader.download(sourceUrl, destDir);
     }
 
-    public record DownloadResult(long bytes, String method) {}
+    /**
+     * 先调 e-hentai API 获取 metadata（含 torrent 信息），再决定下载策略
+     */
+    public DownloadResult downloadWithMetadata(String sourceUrl, Path destDir) throws Exception {
+        DownloadResult result = httpDownloader.download(sourceUrl, destDir);
+        // 如果有 torrent 且想用 torrent 加速，这里可以优化
+        return result;
+    }
+
+    public record DownloadResult(long bytes, String method, Map<String, Object> metadata) {
+        public String magnetUriFromMetadata() {
+            if (metadata == null) return null;
+            @SuppressWarnings("unchecked")
+            var torrents = (java.util.List<Map<String, Object>>) metadata.get("torrents");
+            if (torrents != null && !torrents.isEmpty()) {
+                var t = torrents.get(0);
+                return String.format("magnet:?xt=urn:btih:%s&dn=%s", t.get("hash"), t.get("name"));
+            }
+            return null;
+        }
+    }
 }
