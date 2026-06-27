@@ -26,11 +26,16 @@ public class HttpDownloader implements DownloadStrategy {
     public HttpDownloader(ObjectMapper objectMapper, WorkerConfig config) {
         var builder = HttpClient.newBuilder()
             .connectTimeout(java.time.Duration.ofSeconds(30));
+
         if (config.getProxy() != null && config.getProxy().getHost() != null) {
             builder.proxy(ProxySelector.of(
                 new InetSocketAddress(config.getProxy().getHost(), config.getProxy().getPort())));
             log.info("HTTP proxy: {}:{}", config.getProxy().getHost(), config.getProxy().getPort());
+        } else {
+            builder.proxy(ProxySelector.getDefault());
+            log.info("HTTP proxy: system default");
         }
+
         this.http = builder.build();
         this.objectMapper = objectMapper;
     }
