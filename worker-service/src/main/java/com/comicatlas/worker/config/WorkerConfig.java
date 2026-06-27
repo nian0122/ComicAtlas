@@ -6,6 +6,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 @Data
 @Configuration
 @ConfigurationProperties(prefix = "worker")
@@ -16,6 +19,7 @@ public class WorkerConfig {
     private Torrent torrent = new Torrent();
     private Proxy proxy = new Proxy();
     private String aria2cPath = "aria2c";
+    private Map<String, String> storageRoots = new LinkedHashMap<>();
 
     @Bean
     public ObjectMapper objectMapper() {

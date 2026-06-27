@@ -12,14 +12,14 @@ public class ImportEventPublisher {
 
     private final RabbitTemplate rabbitTemplate;
 
-    public void publishImportTaskCreated(Long taskId, Long comicId, String sourceUrl, String sourceType) {
-        Map<String, Object> msg = Map.of(
-            "messageId", UUID.randomUUID().toString(),
-            "taskId", taskId,
-            "comicId", comicId,
-            "sourceUrl", sourceUrl,
-            "sourceType", sourceType
-        );
+    public void publishImportTaskCreated(Long taskId, Long comicId, String sourceUrl, String sourceType, String sourcePath) {
+        var msg = new java.util.LinkedHashMap<String, Object>();
+        msg.put("messageId", UUID.randomUUID().toString());
+        msg.put("taskId", taskId);
+        msg.put("comicId", comicId);
+        msg.put("sourceType", sourceType);
+        if (sourceUrl != null) msg.put("sourceUrl", sourceUrl);
+        if (sourcePath != null) msg.put("sourcePath", sourcePath);
         rabbitTemplate.convertAndSend("comic.import", "task.created", msg);
     }
 

@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.nio.file.Path;
 
 @Slf4j
 @Service
@@ -37,57 +38,70 @@ public class ImportServiceImpl implements ImportService {
     @Override
     @Transactional
     public ImportTaskVO createImportTask(ImportRequest request) {
-        String url = request.getSourceUrl();
-        Matcher m = EH_PATTERN.matcher(url);
-        if (!m.find()) {
-            throw new BusinessException(400, "不支持的 URL 格式，请输入 e-hentai gallery 链接");
-        }
-        String gid = m.group(1);
-        String token = m.group(2);
+        String sourceType = request.getSourceType() != null ? request.getSourceType() : "EHENTAI";
+        String sourcePath = request.getSourcePath();
+        String sourceUrl = request.getSourceUrl();
 
-        // 1. Redis 去重（快速路径）
-        String dedupKey = "import:dedup:E_HENTAI:" + gid;
-        if (Boolean.TRUE.equals(redisTemplate.hasKey(dedupKey))) {
-            throw new BusinessException(409, "该漫画已存在或正在导入中");
-        }
-
-        // 2. DB 去重
-        var existing = comicMapper.selectOne(new LambdaQueryWrapper<Comic>()
-            .eq(Comic::getSourceType, "E_HENTAI")
-            .eq(Comic::getSourceGalleryId, gid));
-        if (existing != null) {
-            throw new BusinessException(409, "该漫画已导入 - 漫画ID: " + existing.getId());
-        }
-
-        // 3. 预创建 comic 行
+        // 1. 预创建 comic 行
         Comic comic = new Comic();
-        comic.setSourceType("E_HENTAI");
-        comic.setSourceGalleryId(gid);
-        comic.setSourceGalleryToken(token);
-        comic.setSourceUrl(url);
+        comic.setSourceType(sourceType);
         comic.setStatus("IMPORTING");
         comic.setTitle("导入中...");
 
-        try {
-            comicMapper.insert(comic);
-        } catch (DuplicateKeyException e) {
-            throw new BusinessException(409, "该漫画已存在（并发导入）");
+        switch (sourceType) {
+            case "EHENTAI" -> {
+                if (sourceUrl == null || !EH_PATTERN.matcher(sourceUrl).find()) {
+                    throw new BusinessException(400, "不支持的 URL 格式");
+                }
+                Matcher m = EH_PATTERN.matcher(sourceUrl);
+                m.find();
+                String gid = m.group(1);
+                String token = m.group(2);
+                comic.setSourceGalleryId(gid);
+                comic.setSourceGalleryToken(token);
+                comic.setSourceUrl(sourceUrl);
+                // Redis 去重
+                String dedupKey = "import:dedup:E_HENTAI:" + gid;
+                if (Boolean.TRUE.equals(redisTemplate.hasKey(dedupKey))) {
+                    throw new BusinessException(409, "该漫画已存在或正在导入中");
+                }
+                // DB 去重
+                var existing = comicMapper.selectOne(new LambdaQueryWrapper<Comic>()
+                    .eq(Comic::getSourceType, "EHENTAI")
+                    .eq(Comic::getSourceGalleryId, gid));
+                if (existing != null) {
+                    throw new BusinessException(409, "该漫画已导入 - 漫画ID: " + existing.getId());
+                }
+                try {
+                    comicMapper.insert(comic);
+                } catch (DuplicateKeyException e) {
+                    throw new BusinessException(409, "该漫画已存在（并发导入）");
+                }
+                redisTemplate.opsForValue().set(dedupKey, "1", Duration.ofDays(7));
+            }
+            case "ZIP", "DIRECTORY" -> {
+                if (sourcePath == null || sourcePath.isBlank()) {
+                    throw new BusinessException(400, "请提供 sourcePath");
+                }
+                String name = Path.of(sourcePath).getFileName().toString();
+                name = name.contains(".") ? name.substring(0, name.lastIndexOf('.')) : name;
+                comic.setTitle(name);
+                comicMapper.insert(comic);
+            }
+            default -> throw new BusinessException(400, "不支持的 sourceType: " + sourceType);
         }
 
-        // 4. 创建 import_task
+        // 2. 创建 import_task
         ImportTask task = new ImportTask();
         task.setComicId(comic.getId());
-        task.setSourceUrl(url);
+        task.setSourceUrl(sourceUrl);
         task.setStatus("PENDING");
         taskMapper.insert(task);
 
-        // 5. Redis 去重标记
-        redisTemplate.opsForValue().set(dedupKey, "1", Duration.ofDays(7));
+        // 3. 发 MQ
+        eventPublisher.publishImportTaskCreated(task.getId(), comic.getId(), sourceUrl, sourceType, sourcePath);
 
-        // 6. 发 MQ
-        eventPublisher.publishImportTaskCreated(task.getId(), comic.getId(), url, "E_HENTAI");
-
-        log.info("导入任务创建: taskId={}, comicId={}", task.getId(), comic.getId());
+        log.info("导入任务创建: taskId={}, comicId={}, sourceType={}", task.getId(), comic.getId(), sourceType);
         return toVO(task);
     }
 
@@ -142,7 +156,7 @@ public class ImportServiceImpl implements ImportService {
         t.setRetryCount(t.getRetryCount() + 1);
         t.setErrorMessage(null);
         taskMapper.updateById(t);
-        eventPublisher.publishImportTaskCreated(t.getId(), t.getComicId(), t.getSourceUrl(), "E_HENTAI");
+        eventPublisher.publishImportTaskCreated(t.getId(), t.getComicId(), t.getSourceUrl(), "EHENTAI", null);
     }
 
     private ImportTaskVO toVO(ImportTask t) {
