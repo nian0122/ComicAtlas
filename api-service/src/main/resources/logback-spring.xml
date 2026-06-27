@@ -10,7 +10,7 @@
             <fileNamePattern>${LOG_ARCHIVE}</fileNamePattern>
             <maxFileSize>10MB</maxFileSize>
             <maxHistory>7</maxHistory>
-            <totalSizeCap>100MB</totalSizeCap>
+            <totalSizeCap>200MB</totalSizeCap>
         </rollingPolicy>
         <encoder>
             <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
@@ -24,6 +24,12 @@
             <charset>UTF-8</charset>
         </encoder>
     </appender>
+
+    <logger name="com.comicatlas.api" level="DEBUG" />
+    <logger name="com.comicatlas.api.comic.mapper" level="DEBUG" />
+    <logger name="com.comicatlas.api.importer.mapper" level="DEBUG" />
+    <logger name="com.comicatlas.api.reader.mapper" level="DEBUG" />
+    <logger name="org.springframework.amqp" level="INFO" />
 
     <root level="INFO">
         <appender-ref ref="CONSOLE" />
