@@ -15,9 +15,9 @@ public class TorrentDownloader implements DownloadStrategy {
     private final WorkerConfig config;
 
     @Override
-    public long download(String magnetUrl, Path destDir) throws Exception {
+    public DownloadContext.DownloadResult download(String magnetUrl, Path destDir) throws Exception {
         Files.createDirectories(destDir);
-        log.info("Torrent download: magnet={}, dest={}", magnetUrl, destDir);
+        log.info("Torrent: magnet={}, dest={}", magnetUrl, destDir);
         ProcessBuilder pb = new ProcessBuilder(
                 "aria2c", magnetUrl, "--seed-time=0",
                 "--max-connection-per-server=16", "--split=8",
@@ -34,13 +34,10 @@ public class TorrentDownloader implements DownloadStrategy {
         }
         int exitCode = process.waitFor();
         if (exitCode != 0) throw new RuntimeException("aria2c exit: " + exitCode);
-        return Files.walk(destDir).filter(Files::isRegularFile).mapToLong(p -> {
-            try {
-                return Files.size(p);
-            } catch (Exception e) {
-                return 0;
-            }
+        long total = Files.walk(destDir).filter(Files::isRegularFile).mapToLong(p -> {
+            try { return Files.size(p); } catch (Exception e) { return 0; }
         }).sum();
+        return new DownloadContext.DownloadResult(total, "TORRENT", null);
     }
 
     @Override
