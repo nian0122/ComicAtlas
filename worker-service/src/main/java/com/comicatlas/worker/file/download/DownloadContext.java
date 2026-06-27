@@ -13,33 +13,46 @@ import java.util.Map;
 public class DownloadContext {
     private final HttpDownloader httpDownloader;
     private final TorrentDownloader torrentDownloader;
+    private final ArchiveDownloader archiveDownloader;
 
     /**
-     * 下载流程：
-     * 1. 调 e-hentai API 获取 metadata（含 torrent 信息）
-     * 2. 如果有 torrent → aria2c 下载
-     * 3. 无 torrent → 暂不支持（Phase 1 仅 Torrent 下载）
+     * 下载策略优先级：
+     * 1. Archiver 直链下载（走 HTTP 代理，最可靠）
+     * 2. Torrent 下载（aria2c，国内不通）
      */
     public DownloadResult download(String sourceUrl, Path destDir) throws Exception {
-        // 1. API 获取元数据
         DownloadResult metaResult = httpDownloader.download(sourceUrl, destDir);
         Map<String, Object> metadata = metaResult.metadata();
 
-        // 2. 检查 torrent
+        // 优先 Archiver
+        if (metadata != null && metadata.get("archiverKey") != null) {
+            try {
+                String archiverKey = (String) metadata.get("archiverKey");
+                Long gid = Long.valueOf(metadata.get("sourceGalleryId").toString());
+                String token = (String) metadata.get("sourceGalleryToken");
+
+                Path zipFile = destDir.resolve("archive.zip");
+                long bytes = archiveDownloader.download(gid, token, archiverKey, zipFile);
+                log.info("Archive downloaded: {} bytes", bytes);
+                return new DownloadResult(bytes, "ARCHIVER", metadata);
+            } catch (Exception e) {
+                log.warn("Archiver failed, fallback to torrent: {}", e.getMessage());
+            }
+        }
+
+        // 兜底 Torrent
         @SuppressWarnings("unchecked")
         var torrents = (java.util.List<Map<String, Object>>) metadata.get("torrents");
         if (torrents != null && !torrents.isEmpty()) {
             var t = torrents.get(0);
             String magnet = String.format("magnet:?xt=urn:btih:%s&dn=%s",
                 t.get("hash"), t.get("name"));
-            log.info("Torrent found: {}, starting aria2c download", t.get("name"));
-
+            log.info("Torrent fallback: {}", t.get("name"));
             DownloadResult torrentResult = torrentDownloader.download(magnet, destDir);
             return new DownloadResult(torrentResult.bytes(), "TORRENT", metadata);
         }
 
-        log.warn("No torrent available - Phase 1 only supports torrent download");
-        throw new RuntimeException("该 Gallery 无 torrent，暂不支持逐页下载（Phase 2）");
+        throw new RuntimeException("该 Gallery 无 Archiver 也无 Torrent，无法下载");
     }
 
     public record DownloadResult(long bytes, String method, Map<String, Object> metadata) {}
