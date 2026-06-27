@@ -19,7 +19,7 @@ public class TorrentDownloader implements DownloadStrategy {
         Files.createDirectories(destDir);
         log.info("Torrent: magnet={}, dest={}", magnetUrl, destDir);
         ProcessBuilder pb = new ProcessBuilder(
-                "aria2c", magnetUrl, "--seed-time=0",
+                config.getAria2cPath(), magnetUrl, "--seed-time=0",
                 "--max-connection-per-server=16", "--split=8",
                 "-d", destDir.toString(),
                 "--stop-with-process=" + ProcessHandle.current().pid()

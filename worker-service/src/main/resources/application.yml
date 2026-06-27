@@ -21,6 +21,7 @@ worker:
   manga-root: ${MANGA_ROOT:/manga}
   temp-dir: ${MANGA_ROOT:/manga}/temp
   metadata-dir: ${MANGA_ROOT:/manga}/metadata
+  aria2c-path: ${ARIA2C_PATH:aria2c}
   torrent:
     peer-detect-timeout: 30
     min-speed-threshold: 10240
