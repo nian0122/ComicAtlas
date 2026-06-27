@@ -12,7 +12,9 @@ public class Page {
     private Long chapterId;
     private Integer pageNumber;
     private String imageName;
+    private String hqStatus;
     private String lqStatus;
+    private Long lqSize;
     private Integer width;
     private Integer height;
     private Long fileSize;
