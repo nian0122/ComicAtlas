@@ -24,19 +24,19 @@ public class HttpDownloader implements DownloadStrategy {
     private final ObjectMapper objectMapper;
 
     public HttpDownloader(ObjectMapper objectMapper, WorkerConfig config) {
-        var builder = HttpClient.newBuilder()
-            .connectTimeout(java.time.Duration.ofSeconds(30));
-
+        // 配置代理（全局属性方式，最可靠）
         if (config.getProxy() != null && config.getProxy().getHost() != null) {
-            builder.proxy(ProxySelector.of(
-                new InetSocketAddress(config.getProxy().getHost(), config.getProxy().getPort())));
+            System.setProperty("https.proxyHost", config.getProxy().getHost());
+            System.setProperty("https.proxyPort", String.valueOf(config.getProxy().getPort()));
+            System.setProperty("http.proxyHost", config.getProxy().getHost());
+            System.setProperty("http.proxyPort", String.valueOf(config.getProxy().getPort()));
             log.info("HTTP proxy: {}:{}", config.getProxy().getHost(), config.getProxy().getPort());
-        } else {
-            builder.proxy(ProxySelector.getDefault());
-            log.info("HTTP proxy: system default");
         }
 
-        this.http = builder.build();
+        this.http = HttpClient.newBuilder()
+            .connectTimeout(java.time.Duration.ofSeconds(30))
+            .proxy(ProxySelector.getDefault())
+            .build();
         this.objectMapper = objectMapper;
     }
 
