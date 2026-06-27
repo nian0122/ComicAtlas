@@ -22,7 +22,7 @@ public class TorrentDownloader implements DownloadStrategy {
         Files.createDirectories(destDir);
         log.info("Torrent: magnet={}, dest={}", magnetUrl, destDir);
         String proxyArg = config.getProxy().getHost() != null
-            ? "--all-proxy=http://" + config.getProxy().getHost() + ":" + config.getProxy().getPort()
+            ? "--all-proxy=socks5://" + config.getProxy().getHost() + ":" + config.getProxy().getSocksPort()
             : null;
 
         var cmd = new java.util.ArrayList<>(List.of(
