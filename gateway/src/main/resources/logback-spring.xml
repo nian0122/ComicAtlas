@@ -25,6 +25,10 @@
         </encoder>
     </appender>
 
+    <logger name="com.alibaba.nacos" level="INFO" />
+    <logger name="org.springframework.cloud.gateway" level="DEBUG" />
+    <logger name="org.springframework.cloud.loadbalancer" level="DEBUG" />
+
     <root level="INFO">
         <appender-ref ref="CONSOLE" />
         <appender-ref ref="FILE" />
