@@ -59,8 +59,10 @@ public class ImportEventHandler {
                 new TypeReference<Map<String, Object>>() {});
 
             Map<String, Object> comicData = (Map<String, Object>) metadata.get("comic");
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> chaptersData = (List<Map<String, Object>>) metadata.get("chapters");
+            @SuppressWarnings("unchecked")
             List<Map<String, Object>> pagesData = (List<Map<String, Object>>) metadata.get("pages");
-            long totalSize = ((Number) metadata.get("totalSize")).longValue();
 
             // UPDATE comic
             Comic comic = comicMapper.selectById(comicId);
@@ -71,58 +73,89 @@ public class ImportEventHandler {
             if (comicData.get("sourceGalleryId") != null) {
                 comic.setSourceGalleryId(comicData.get("sourceGalleryId").toString());
             }
+            if (comicData.get("storageType") != null) {
+                comic.setStorageType((String) comicData.get("storageType"));
+                comic.setRootKey((String) comicData.get("rootKey"));
+                comic.setRelativePath((String) comicData.get("relativePath"));
+            }
             comic.setStatus("READY");
-            comic.setFileSize(totalSize);
-            comic.setHqSize(totalSize);
-            comicMapper.updateById(comic);
+            long totalSize = 0;
+            int totalPages = 0;
+            Chapter firstChapter = null;
 
-            // INSERT chapter (IGNORE on duplicate)
-            Chapter chapter = new Chapter();
-            chapter.setComicId(comicId);
-            chapter.setTitle(comic.getTitle());
-            chapter.setChapterNo("1");
-            chapter.setPageCount(pagesData.size());
-            try {
-                chapterMapper.insert(chapter);
-            } catch (Exception ignored) {
-                chapter = chapterMapper.selectOne(new LambdaQueryWrapper<Chapter>()
-                    .eq(Chapter::getComicId, comicId).eq(Chapter::getChapterNo, "1"));
+            // 新格式：chapters
+            if (chaptersData != null && !chaptersData.isEmpty()) {
+                for (Map<String, Object> chData : chaptersData) {
+                    Chapter chapter = new Chapter();
+                    chapter.setComicId(comicId);
+                    chapter.setTitle((String) chData.get("title"));
+                    chapter.setChapterNo((String) chData.get("chapterNo"));
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> pageList = (List<Map<String, Object>>) chData.get("pages");
+                    chapter.setPageCount(pageList != null ? pageList.size() : 0);
+                    try {
+                        chapterMapper.insert(chapter);
+                    } catch (Exception ignored) {
+                        chapter = chapterMapper.selectOne(new LambdaQueryWrapper<Chapter>()
+                            .eq(Chapter::getComicId, comicId).eq(Chapter::getChapterNo, (String) chData.get("chapterNo")));
+                    }
+                    if (firstChapter == null) firstChapter = chapter;
+
+                    if (pageList != null) {
+                        for (Map<String, Object> pd : pageList) {
+                            com.comicatlas.api.comic.entity.Page page =
+                                new com.comicatlas.api.comic.entity.Page();
+                            page.setChapterId(chapter.getId());
+                            page.setPageNumber(((Number) pd.get("pageNumber")).intValue());
+                            page.setImageName((String) pd.get("imageName"));
+                            page.setHqStatus(pd.get("hqStatus") != null ? (String) pd.get("hqStatus") : "PENDING");
+                            page.setLqStatus(pd.get("lqStatus") != null ? (String) pd.get("lqStatus") : "PENDING");
+                            if (pd.get("fileSize") != null) page.setFileSize(((Number) pd.get("fileSize")).longValue());
+                            if (pd.get("width") != null) page.setWidth(((Number) pd.get("width")).intValue());
+                            if (pd.get("height") != null) page.setHeight(((Number) pd.get("height")).intValue());
+                            try {
+                                pageMapper.insert(page);
+                            } catch (Exception ignored) {}
+                            totalSize += page.getFileSize() != null ? page.getFileSize() : 0;
+                            totalPages++;
+                        }
+                    }
+                }
             }
-
-            // BATCH INSERT page (IGNORE on duplicate)
-            for (Map<String, Object> pd : pagesData) {
-                com.comicatlas.api.comic.entity.Page page = new com.comicatlas.api.comic.entity.Page();
-                page.setChapterId(chapter.getId());
-                page.setPageNumber(((Number) pd.get("pageNumber")).intValue());
-                page.setImageName((String) pd.get("imageName"));
-                if (pd.get("width") != null) page.setWidth(((Number) pd.get("width")).intValue());
-                if (pd.get("height") != null) page.setHeight(((Number) pd.get("height")).intValue());
-                if (pd.get("fileSize") != null) page.setFileSize(((Number) pd.get("fileSize")).longValue());
-                page.setLqStatus("PENDING");
+            // 旧格式：pages（兼容）
+            else if (pagesData != null) {
+                totalSize = ((Number) metadata.getOrDefault("totalSize", 0)).longValue();
+                Chapter chapter = new Chapter();
+                chapter.setComicId(comicId);
+                chapter.setTitle(comic.getTitle());
+                chapter.setChapterNo("1");
+                chapter.setPageCount(pagesData.size());
+                firstChapter = chapter;
                 try {
-                    pageMapper.insert(page);
-                } catch (Exception ignored) { }
-            }
-
-            // INSERT IGNORE tags
-            List<Map<String, String>> tagsData = (List<Map<String, String>>) comicData.get("tags");
-            if (tagsData != null) {
-                for (Map<String, String> td : tagsData) {
-                    Tag tag = new Tag();
-                    tag.setName(td.get("name"));
-                    tag.setType(td.get("type"));
-                    try { tagMapper.insert(tag); } catch (Exception ignored) { }
-                    tag = tagMapper.selectOne(new LambdaQueryWrapper<Tag>()
-                        .eq(Tag::getName, td.get("name")).eq(Tag::getType, td.get("type")));
-                    ComicTag ct = new ComicTag();
-                    ct.setComicId(comicId);
-                    ct.setTagId(tag.getId());
-                    try { comicTagMapper.insert(ct); } catch (Exception ignored) { }
+                    chapterMapper.insert(chapter);
+                } catch (Exception ignored) {
+                    chapter = chapterMapper.selectOne(new LambdaQueryWrapper<Chapter>()
+                        .eq(Chapter::getComicId, comicId).eq(Chapter::getChapterNo, "1"));
+                }
+                for (Map<String, Object> pd : pagesData) {
+                    com.comicatlas.api.comic.entity.Page page =
+                        new com.comicatlas.api.comic.entity.Page();
+                    page.setChapterId(chapter.getId());
+                    page.setPageNumber(((Number) pd.get("pageNumber")).intValue());
+                    page.setImageName((String) pd.get("imageName"));
+                    page.setHqStatus("READY");
+                    page.setLqStatus("PENDING");
+                    if (pd.get("fileSize") != null) page.setFileSize(((Number) pd.get("fileSize")).longValue());
+                    if (pd.get("width") != null) page.setWidth(((Number) pd.get("width")).intValue());
+                    if (pd.get("height") != null) page.setHeight(((Number) pd.get("height")).intValue());
+                    try { pageMapper.insert(page); } catch (Exception ignored) {}
+                    totalPages = pagesData.size();
                 }
             }
 
             // UPDATE totals
-            comic.setTotalPages(pagesData.size());
+            if (totalSize > 0) { comic.setFileSize(totalSize); comic.setHqSize(totalSize); }
+            comic.setTotalPages(totalPages > 0 ? totalPages : comic.getTotalPages());
             comicMapper.updateById(comic);
 
             // UPDATE import_task
@@ -135,12 +168,14 @@ public class ImportEventHandler {
             taskMapper.updateById(task);
 
             // Publish LQGenerateTask (per chapter)
-            Map<String, Object> lqMsg = Map.of(
-                "messageId", UUID.randomUUID().toString(),
-                "comicId", comicId,
-                "chapterId", chapter.getId()
-            );
-            rabbitTemplate.convertAndSend("comic.image", "lq.generate", lqMsg);
+            if (firstChapter != null) {
+                Map<String, Object> lqMsg = Map.of(
+                    "messageId", UUID.randomUUID().toString(),
+                    "comicId", comicId,
+                    "chapterId", firstChapter.getId()
+                );
+                rabbitTemplate.convertAndSend("comic.image", "lq.generate", lqMsg);
+            }
 
             log.info("ComicImported 处理完成: comicId={}, pages={}", comicId, pagesData.size());
 
