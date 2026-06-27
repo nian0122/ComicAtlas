@@ -25,3 +25,6 @@ worker:
     peer-detect-timeout: 30
     min-speed-threshold: 10240
     speed-check-duration: 300
+  proxy:
+    host: ${PROXY_HOST:}
+    port: ${PROXY_PORT:7890}
