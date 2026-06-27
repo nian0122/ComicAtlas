@@ -19,24 +19,32 @@ public class TorrentDownloader implements DownloadStrategy {
         Files.createDirectories(destDir);
         log.info("Torrent: magnet={}, dest={}", magnetUrl, destDir);
         ProcessBuilder pb = new ProcessBuilder(
-                config.getAria2cPath(), magnetUrl, "--seed-time=0",
+                config.getAria2cPath(), magnetUrl,
+                "--bt-stop-timeout=60", "--seed-time=0",
                 "--max-connection-per-server=16", "--split=8",
                 "-d", destDir.toString(),
                 "--stop-with-process=" + ProcessHandle.current().pid()
         );
         pb.inheritIO();
         Process process = pb.start();
-        long start = System.currentTimeMillis();
-        long peerTimeout = config.getTorrent().getPeerDetectTimeout() * 1000L;
-        while (process.isAlive()) {
-            Thread.sleep(1000);
-            if (System.currentTimeMillis() - start > peerTimeout) { /* monitor speed */ }
-        }
         int exitCode = process.waitFor();
-        if (exitCode != 0) throw new RuntimeException("aria2c exit: " + exitCode);
-        long total = Files.walk(destDir).filter(Files::isRegularFile).mapToLong(p -> {
-            try { return Files.size(p); } catch (Exception e) { return 0; }
-        }).sum();
+        if (exitCode != 0 && exitCode != 143) { // 143 = SIGTERM
+            throw new RuntimeException("aria2c exit: " + exitCode);
+        }
+
+        // 检查是否有下载文件
+        boolean hasFiles = Files.list(destDir).anyMatch(f ->
+            !f.getFileName().toString().endsWith(".aria2"));
+
+        // 延时结束（守护进程），直接 kill
+        if (exitCode == 143 || !hasFiles) {
+            process.destroyForcibly();
+            throw new RuntimeException("Torrent 无做种者或下载失败");
+        }
+
+        long total = Files.walk(destDir).filter(Files::isRegularFile)
+            .filter(p -> !p.getFileName().toString().endsWith(".aria2"))
+            .mapToLong(p -> { try { return Files.size(p); } catch (Exception e) { return 0; } }).sum();
         return new DownloadContext.DownloadResult(total, "TORRENT", null);
     }
 
