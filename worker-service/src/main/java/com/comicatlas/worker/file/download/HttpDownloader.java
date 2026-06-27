@@ -1,10 +1,11 @@
 package com.comicatlas.worker.file.download;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.comicatlas.worker.config.WorkerConfig;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.net.URI;
+import java.net.*;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -22,10 +23,15 @@ public class HttpDownloader implements DownloadStrategy {
     private final HttpClient http;
     private final ObjectMapper objectMapper;
 
-    public HttpDownloader(ObjectMapper objectMapper) {
-        this.http = HttpClient.newBuilder()
-            .connectTimeout(java.time.Duration.ofSeconds(30))
-            .build();
+    public HttpDownloader(ObjectMapper objectMapper, WorkerConfig config) {
+        var builder = HttpClient.newBuilder()
+            .connectTimeout(java.time.Duration.ofSeconds(30));
+        if (config.getProxy() != null && config.getProxy().getHost() != null) {
+            builder.proxy(ProxySelector.of(
+                new InetSocketAddress(config.getProxy().getHost(), config.getProxy().getPort())));
+            log.info("HTTP proxy: {}:{}", config.getProxy().getHost(), config.getProxy().getPort());
+        }
+        this.http = builder.build();
         this.objectMapper = objectMapper;
     }
 

@@ -14,6 +14,7 @@ public class WorkerConfig {
     private String tempDir;
     private String metadataDir;
     private Torrent torrent = new Torrent();
+    private Proxy proxy = new Proxy();
 
     @Bean
     public ObjectMapper objectMapper() {
@@ -25,5 +26,11 @@ public class WorkerConfig {
         private int peerDetectTimeout = 30;
         private long minSpeedThreshold = 10240;
         private int speedCheckDuration = 300;
+    }
+
+    @Data
+    public static class Proxy {
+        private String host;
+        private int port = 7890;
     }
 }
