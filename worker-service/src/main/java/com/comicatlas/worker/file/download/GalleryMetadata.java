@@ -18,7 +18,8 @@ public record GalleryMetadata(
     long fileSize,
     double rating,
     List<String> tags,
-    List<TorrentInfo> torrents
+    List<TorrentInfo> torrents,
+    String archiverKey
 ) {
     public String magnetUri(TorrentInfo t) {
         // 构建磁力链接: magnet:?xt=urn:btih:{hash}&dn={name}
@@ -84,7 +85,8 @@ public record GalleryMetadata(
             toLong(m.get("filesize")),
             toDouble(m.get("rating")),
             (List<String>) m.getOrDefault("tags", List.of()),
-            torrents
+            torrents,
+            (String) m.get("archiver_key")
         );
     }
 }

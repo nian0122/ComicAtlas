@@ -115,6 +115,9 @@ public class HttpDownloader implements DownloadStrategy {
         comic.put("torrents", md.torrents().stream().map(t -> Map.of(
             "hash", t.hash(), "name", t.name(), "fsize", t.fsize()
         )).toList());
+        if (md.archiverKey() != null) {
+            comic.put("archiverKey", md.archiverKey());
+        }
         return comic;
     }
 
