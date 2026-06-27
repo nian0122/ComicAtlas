@@ -44,4 +44,4 @@ mysql-data/
 /logs/
 
 # tools
-worker-service\aria2-1.37.0-win-64bit-build1
+/worker-service/aria2-1.37.0-win-64bit-build1
