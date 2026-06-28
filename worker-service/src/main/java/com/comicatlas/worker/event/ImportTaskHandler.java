@@ -26,7 +26,7 @@ public class ImportTaskHandler {
     public void handle(Map<String, Object> msg) {
         Long taskId = Long.valueOf(msg.get("taskId").toString());
         Long comicId = Long.valueOf(msg.get("comicId").toString());
-        String sourceType = (String) msg.getOrDefault("sourceType", "EHENTAI");
+        String sourceType = (String) msg.getOrDefault("sourceType", "ZIP");
         String sourcePath = (String) msg.get("sourcePath");
         String sourceRef = (String) msg.get("sourceRef");
         log.info("ImportTaskHandler: taskId={}, comicId={}, sourceType={}", taskId, comicId, sourceType);
@@ -36,15 +36,12 @@ public class ImportTaskHandler {
             Path mangaRoot = Path.of(config.getMangaRoot());
 
             switch (sourceType) {
-                case "ZIP" -> {
-                    zipHandler.importZip(sourcePath, taskId, comicId, mangaRoot);
+                case "ZIP" -> zipHandler.importZip(sourcePath, taskId, comicId, mangaRoot);
+                case "REGISTER" -> {
+                    String path = sourcePath != null ? sourcePath : sourceRef;
+                    directoryHandler.importExternal(path, taskId, comicId, mangaRoot, "LOCAL", config.getStorageRoots());
                 }
-                case "DIRECTORY" -> {
-                    directoryHandler.importDirectory(sourcePath, taskId, comicId, mangaRoot);
-                }
-                case "EHENTAI" -> {
-                    fileService.processImport(taskId, comicId, sourceRef, sourceType);
-                }
+                case "EHENTAI" -> fileService.processImport(taskId, comicId, sourceRef, sourceType);
                 default -> throw new IllegalArgumentException("Unknown sourceType: " + sourceType);
             }
 

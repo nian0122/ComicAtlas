@@ -79,13 +79,13 @@ public class ImportServiceImpl implements ImportService {
                 }
                 redisTemplate.opsForValue().set(dedupKey, "1", Duration.ofDays(7));
             }
-            case "ZIP", "DIRECTORY" -> {
-                if (sourcePath == null || sourcePath.isBlank()) {
-                    throw new BusinessException(400, "请提供 sourcePath");
-                }
-                String name = Path.of(sourcePath).getFileName().toString();
+            case "ZIP", "REGISTER" -> {
+                String path = sourcePath != null ? sourcePath : sourceRef;
+                if (path == null || path.isBlank()) throw new BusinessException(400, "请提供 sourcePath");
+                String name = Path.of(path).getFileName().toString();
                 name = name.contains(".") ? name.substring(0, name.lastIndexOf('.')) : name;
                 comic.setTitle(name);
+                comic.setSourceRef(path);
                 comicMapper.insert(comic);
             }
             default -> throw new BusinessException(400, "不支持的 sourceType: " + sourceType);
