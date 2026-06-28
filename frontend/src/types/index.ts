@@ -33,7 +33,7 @@ export interface ComicDetailVO {
   pageCount: number
   fileSize: number
   sourceType: string
-  sourceUrl: string
+  sourceRef: string
   category: string
   status: string
   lqStatus: string
@@ -83,7 +83,7 @@ export interface ChapterPageVO {
 export interface ImportTaskVO {
   id: number
   comicId: number
-  sourceUrl: string
+  sourceRef: string
   status: string
   progress: number
   totalPages: number

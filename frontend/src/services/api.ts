@@ -11,7 +11,7 @@ export const comicApi = {
 }
 
 export const importApi = {
-  create: (sourceUrl: string) => api.post('/tasks/import', { sourceUrl }),
+  create: (sourceRef: string) => api.post('/tasks/import', { sourceRef }),
   list: (params: any) => api.get('/tasks/import', { params }),
   detail: (id: number) => api.get(`/tasks/import/${id}`),
   status: (id: number) => api.get(`/tasks/import/${id}/status`),

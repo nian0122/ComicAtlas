@@ -40,7 +40,7 @@ public class ImportServiceImpl implements ImportService {
     public ImportTaskVO createImportTask(ImportRequest request) {
         String sourceType = request.getSourceType() != null ? request.getSourceType() : "EHENTAI";
         String sourcePath = request.getSourcePath();
-        String sourceUrl = request.getSourceUrl();
+        String sourceRef = request.getSourceRef();
 
         // 1. 预创建 comic 行
         Comic comic = new Comic();
@@ -50,16 +50,16 @@ public class ImportServiceImpl implements ImportService {
 
         switch (sourceType) {
             case "EHENTAI" -> {
-                if (sourceUrl == null || !EH_PATTERN.matcher(sourceUrl).find()) {
+                if (sourceRef == null || !EH_PATTERN.matcher(sourceRef).find()) {
                     throw new BusinessException(400, "不支持的 URL 格式");
                 }
-                Matcher m = EH_PATTERN.matcher(sourceUrl);
+                Matcher m = EH_PATTERN.matcher(sourceRef);
                 m.find();
                 String gid = m.group(1);
                 String token = m.group(2);
                 comic.setSourceGalleryId(gid);
                 comic.setSourceGalleryToken(token);
-                comic.setSourceUrl(sourceUrl);
+                comic.setSourceRef(sourceRef);
                 // Redis 去重
                 String dedupKey = "import:dedup:E_HENTAI:" + gid;
                 if (Boolean.TRUE.equals(redisTemplate.hasKey(dedupKey))) {
@@ -94,12 +94,12 @@ public class ImportServiceImpl implements ImportService {
         // 2. 创建 import_task
         ImportTask task = new ImportTask();
         task.setComicId(comic.getId());
-        task.setSourceUrl(sourceUrl);
+        task.setSourceRef(sourceRef);
         task.setStatus("PENDING");
         taskMapper.insert(task);
 
         // 3. 发 MQ
-        eventPublisher.publishImportTaskCreated(task.getId(), comic.getId(), sourceUrl, sourceType, sourcePath);
+        eventPublisher.publishImportTaskCreated(task.getId(), comic.getId(), sourceRef, sourceType, sourcePath);
 
         log.info("导入任务创建: taskId={}, comicId={}, sourceType={}", task.getId(), comic.getId(), sourceType);
         return toVO(task);
@@ -156,14 +156,14 @@ public class ImportServiceImpl implements ImportService {
         t.setRetryCount(t.getRetryCount() + 1);
         t.setErrorMessage(null);
         taskMapper.updateById(t);
-        eventPublisher.publishImportTaskCreated(t.getId(), t.getComicId(), t.getSourceUrl(), "EHENTAI", null);
+        eventPublisher.publishImportTaskCreated(t.getId(), t.getComicId(), t.getSourceRef(), "EHENTAI", null);
     }
 
     private ImportTaskVO toVO(ImportTask t) {
         ImportTaskVO vo = new ImportTaskVO();
         vo.setId(t.getId());
         vo.setComicId(t.getComicId());
-        vo.setSourceUrl(t.getSourceUrl());
+        vo.setSourceRef(t.getSourceRef());
         vo.setStatus(t.getStatus());
         vo.setProgress(t.getProgress());
         vo.setTotalPages(t.getTotalPages());

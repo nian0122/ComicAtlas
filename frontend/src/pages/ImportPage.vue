@@ -24,8 +24,8 @@
     >
       <el-table-column label="URL" min-width="240">
         <template #default="{ row }">
-          <el-tooltip :content="row.sourceUrl" placement="top" :show-after="500">
-            <span class="url-cell">{{ truncateUrl(row.sourceUrl) }}</span>
+          <el-tooltip :content="row.sourceRef" placement="top" :show-after="500">
+            <span class="url-cell">{{ truncateUrl(row.sourceRef) }}</span>
           </el-tooltip>
         </template>
       </el-table-column>
@@ -113,7 +113,7 @@
       <template v-if="detailTask">
         <div class="detail-section">
           <h3 class="detail-label">URL</h3>
-          <p class="detail-value break-all">{{ detailTask.sourceUrl }}</p>
+          <p class="detail-value break-all">{{ detailTask.sourceRef }}</p>
         </div>
         <div class="detail-section">
           <h3 class="detail-label">状态</h3>

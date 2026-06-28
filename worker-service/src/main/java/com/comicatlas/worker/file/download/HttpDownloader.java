@@ -41,8 +41,8 @@ public class HttpDownloader implements DownloadStrategy {
     }
 
     @Override
-    public DownloadContext.DownloadResult download(String sourceUrl, Path destDir) throws Exception {
-        Matcher m = EH_PATTERN.matcher(sourceUrl);
+    public DownloadContext.DownloadResult download(String sourceRef, Path destDir) throws Exception {
+        Matcher m = EH_PATTERN.matcher(sourceRef);
         if (!m.find()) throw new IllegalArgumentException("Invalid e-hentai URL");
         long gid = Long.parseLong(m.group(1));
         String token = m.group(2);
@@ -50,7 +50,7 @@ public class HttpDownloader implements DownloadStrategy {
         // 调用 e-hentai API 获取元数据（含 torrent 信息）
         GalleryMetadata metadata = fetchMetadata(gid, token);
         if (metadata == null) {
-            throw new RuntimeException("Gallery not found: " + sourceUrl);
+            throw new RuntimeException("Gallery not found: " + sourceRef);
         }
         log.info("API metadata: title={}, pages={}, torrents={}, category={}",
             metadata.title(), metadata.fileCount(), metadata.torrents().size(), metadata.category());
@@ -61,8 +61,8 @@ public class HttpDownloader implements DownloadStrategy {
     /**
      * 获取 gallery 元数据（含 magnet 链接，如果有 torrent）
      */
-    public String getMagnetUri(String sourceUrl) throws Exception {
-        Matcher m = EH_PATTERN.matcher(sourceUrl);
+    public String getMagnetUri(String sourceRef) throws Exception {
+        Matcher m = EH_PATTERN.matcher(sourceRef);
         if (!m.find()) return null;
         long gid = Long.parseLong(m.group(1));
         String token = m.group(2);
@@ -122,8 +122,8 @@ public class HttpDownloader implements DownloadStrategy {
     }
 
     @Override
-    public boolean supports(String sourceUrl) {
-        return sourceUrl.contains("e-hentai.org/g/");
+    public boolean supports(String sourceRef) {
+        return sourceRef.contains("e-hentai.org/g/");
     }
 
     @Override

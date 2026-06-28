@@ -20,8 +20,8 @@ public class DownloadContext {
      * 1. Archiver 直链下载（走 HTTP 代理，最可靠）
      * 2. Torrent 下载（aria2c，国内不通）
      */
-    public DownloadResult download(String sourceUrl, Path destDir) throws Exception {
-        DownloadResult metaResult = httpDownloader.download(sourceUrl, destDir);
+    public DownloadResult download(String sourceRef, Path destDir) throws Exception {
+        DownloadResult metaResult = httpDownloader.download(sourceRef, destDir);
         Map<String, Object> metadata = metaResult.metadata();
 
         // 优先 Archiver

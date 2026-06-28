@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 public class ImportTaskVO {
     private Long id;
     private Long comicId;
-    private String sourceUrl;
+    private String sourceRef;
     private String status;
     private Integer progress;
     private Integer totalPages;

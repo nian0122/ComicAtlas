@@ -14,7 +14,7 @@ public class ComicDetailVO {
     private Integer pageCount;
     private Long fileSize;
     private String sourceType;
-    private String sourceUrl;
+    private String sourceRef;
     private String category;
     private String status;
     private String lqStatus;

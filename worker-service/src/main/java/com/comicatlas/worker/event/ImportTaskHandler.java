@@ -28,7 +28,7 @@ public class ImportTaskHandler {
         Long comicId = Long.valueOf(msg.get("comicId").toString());
         String sourceType = (String) msg.getOrDefault("sourceType", "EHENTAI");
         String sourcePath = (String) msg.get("sourcePath");
-        String sourceUrl = (String) msg.get("sourceUrl");
+        String sourceRef = (String) msg.get("sourceRef");
         log.info("ImportTaskHandler: taskId={}, comicId={}, sourceType={}", taskId, comicId, sourceType);
 
         try {
@@ -43,7 +43,7 @@ public class ImportTaskHandler {
                     directoryHandler.importDirectory(sourcePath, taskId, comicId, mangaRoot);
                 }
                 case "EHENTAI" -> {
-                    fileService.processImport(taskId, comicId, sourceUrl, sourceType);
+                    fileService.processImport(taskId, comicId, sourceRef, sourceType);
                 }
                 default -> throw new IllegalArgumentException("Unknown sourceType: " + sourceType);
             }
