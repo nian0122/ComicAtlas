@@ -22,8 +22,38 @@ public class DirectoryImportHandler {
         Path comicDir = Path.of(sourcePath);
         ComicMetadata metadata = parser.parse(comicDir);
 
+        // 把图片搬到 /manga/hq/{comicId}/{chapterNo}/
+        for (var ch : metadata.chapters()) {
+            Path hqChapterDir = mangaRoot.resolve("hq").resolve(String.valueOf(comicId)).resolve(ch.chapterNo());
+            Files.createDirectories(hqChapterDir);
+            for (var page : ch.pages()) {
+                Path src = comicDir.resolve(page.imageName());
+                if (Files.exists(src)) {
+                    Files.move(src, hqChapterDir.resolve(page.imageName()), StandardCopyOption.REPLACE_EXISTING);
+                }
+                // 如果是章节结构，图片在子目录里
+                Path srcInChapter = comicDir.resolve(ch.title()).resolve(page.imageName());
+                if (Files.exists(srcInChapter)) {
+                    Files.move(srcInChapter, hqChapterDir.resolve(page.imageName()), StandardCopyOption.REPLACE_EXISTING);
+                }
+            }
+        }
+
+        // 生成封面缩略图
+        if (!metadata.chapters().isEmpty() && !metadata.chapters().get(0).pages().isEmpty()) {
+            Path firstPage = mangaRoot.resolve("hq").resolve(String.valueOf(comicId))
+                .resolve(metadata.chapters().get(0).chapterNo())
+                .resolve(metadata.chapters().get(0).pages().get(0).imageName());
+            if (Files.exists(firstPage)) {
+                Path thumbsDir = mangaRoot.resolve("thumbs").resolve(String.valueOf(comicId));
+                Files.createDirectories(thumbsDir);
+                Files.copy(firstPage, thumbsDir.resolve("cover.webp"), StandardCopyOption.REPLACE_EXISTING);
+            }
+        }
+
         Path metadataPath = mangaRoot.resolve("metadata").resolve(taskId + ".json");
         Files.createDirectories(metadataPath.getParent());
+        // ... rest of metadata writing
 
         Map<String, Object> meta = new LinkedHashMap<>();
         meta.put("comic", Map.of(
