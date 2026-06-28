@@ -167,8 +167,8 @@ public class ImportEventHandler {
             }
             taskMapper.updateById(task);
 
-            // Publish LQGenerateTask (per chapter)
-            if (firstChapter != null) {
+            // Publish LQGenerateTask (per chapter) — only for MANAGED
+            if (firstChapter != null && !"EXTERNAL".equals(comic.getStorageType())) {
                 Map<String, Object> lqMsg = Map.of(
                     "messageId", UUID.randomUUID().toString(),
                     "comicId", comicId,
