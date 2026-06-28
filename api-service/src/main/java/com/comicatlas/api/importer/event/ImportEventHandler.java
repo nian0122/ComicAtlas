@@ -160,7 +160,7 @@ public class ImportEventHandler {
 
             // UPDATE import_task
             ImportTask task = taskMapper.selectById(taskId);
-            task.setStatus("LQ_GENERATING");
+            task.setStatus("SUCCESS");
             task.setEndTime(LocalDateTime.now());
             if (task.getStartTime() != null) {
                 task.setDurationMs(Duration.between(task.getStartTime(), task.getEndTime()).toMillis());
