@@ -18,9 +18,9 @@ spring:
     password: ${RABBITMQ_PASS:guest}
 
 worker:
-  manga-root: ${MANGA_ROOT:/manga}
-  temp-dir: ${MANGA_ROOT:/manga}/temp
-  metadata-dir: ${MANGA_ROOT:/manga}/metadata
+  manga-root: ${MANGA_ROOT:D:/manga}
+  temp-dir: ${MANGA_ROOT:D:/manga}/temp
+  metadata-dir: ${MANGA_ROOT:D:/manga}/metadata
   aria2c-path: ${ARIA2C_PATH:worker-service/aria2-1.37.0-win-64bit-build1/aria2c.exe}
   storage-roots:
     LOCAL: F:/games/comics
