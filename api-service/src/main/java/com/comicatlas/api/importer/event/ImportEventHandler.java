@@ -167,15 +167,8 @@ public class ImportEventHandler {
             }
             taskMapper.updateById(task);
 
-            // Publish LQGenerateTask (per chapter) — only for MANAGED
-            if (firstChapter != null && !"EXTERNAL".equals(comic.getStorageType())) {
-                Map<String, Object> lqMsg = Map.of(
-                    "messageId", UUID.randomUUID().toString(),
-                    "comicId", comicId,
-                    "chapterId", firstChapter.getId()
-                );
-                rabbitTemplate.convertAndSend("comic.image", "lq.generate", lqMsg);
-            }
+            // LQ 生成改为手动触发，不自动发送
+            // if (firstChapter != null && !"EXTERNAL".equals(comic.getStorageType())) { ... }
 
             log.info("ComicImported 处理完成: comicId={}, pages={}", comicId, pagesData.size());
 
