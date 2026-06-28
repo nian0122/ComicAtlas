@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS comic (
     source_type VARCHAR(16),
     source_gallery_id VARCHAR(64),
     source_gallery_token VARCHAR(32),
-    source_url VARCHAR(512),
+    source_ref VARCHAR(512),
     storage_type VARCHAR(16) DEFAULT 'FILESYSTEM',
     root_key VARCHAR(32) DEFAULT 'LOCAL',
     relative_path VARCHAR(512),
@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS comic_tag (
 CREATE TABLE IF NOT EXISTS import_task (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     comic_id BIGINT,
-    source_url VARCHAR(512),
+    source_ref VARCHAR(512),
     status VARCHAR(16) DEFAULT 'PENDING',
     progress INT DEFAULT 0,
     total_pages INT,

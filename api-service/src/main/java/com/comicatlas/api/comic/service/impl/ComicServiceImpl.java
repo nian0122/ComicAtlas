@@ -75,7 +75,7 @@ public class ComicServiceImpl implements ComicService {
         vo.setPageCount(c.getTotalPages());
         vo.setFileSize(c.getFileSize());
         vo.setSourceType(c.getSourceType());
-        vo.setSourceUrl(c.getSourceUrl());
+        vo.setSourceRef(c.getSourceRef());
         vo.setCategory(c.getCategory());
         vo.setStatus(c.getStatus());
         vo.setLqStatus(c.getLqStatus());

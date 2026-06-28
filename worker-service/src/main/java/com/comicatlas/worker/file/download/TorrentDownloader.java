@@ -55,8 +55,8 @@ public class TorrentDownloader implements DownloadStrategy {
     }
 
     @Override
-    public boolean supports(String sourceUrl) {
-        return sourceUrl.startsWith("magnet:");
+    public boolean supports(String sourceRef) {
+        return sourceRef.startsWith("magnet:");
     }
 
     @Override

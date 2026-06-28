@@ -28,12 +28,12 @@ public class FileService {
 
     private static final Set<String> IMAGE_EXT = Set.of(".jpg", ".jpeg", ".png", ".webp", ".gif");
 
-    public void processImport(Long taskId, Long comicId, String sourceUrl, String sourceType) throws Exception {
+    public void processImport(Long taskId, Long comicId, String sourceRef, String sourceType) throws Exception {
         Path tempDir = Path.of(config.getMangaRoot(), pathBuilder.tempDir(taskId));
         Files.createDirectories(tempDir);
 
         // 1. API 获取元数据 + Torrent 下载
-        DownloadContext.DownloadResult result = downloadContext.download(sourceUrl, tempDir);
+        DownloadContext.DownloadResult result = downloadContext.download(sourceRef, tempDir);
         log.info("Downloaded: {} bytes, method={}", result.bytes(), result.method());
 
         // 2. Extract if compressed

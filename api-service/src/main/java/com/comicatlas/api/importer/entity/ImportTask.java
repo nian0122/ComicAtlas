@@ -10,7 +10,7 @@ public class ImportTask {
     @TableId(type = IdType.AUTO)
     private Long id;
     private Long comicId;
-    private String sourceUrl;
+    private String sourceRef;
     private String status;
     private Integer progress;
     private Integer totalPages;
