@@ -1,7 +1,7 @@
 package com.comicatlas.worker.file.handler;
 
-import com.comicatlas.worker.file.parse.ComicMetadata;
-import com.comicatlas.worker.file.parse.DirectoryParser;
+import com.comicatlas.worker.file.parse.*;
+import com.comicatlas.worker.file.storage.LocalStorageService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,34 +16,32 @@ import java.util.*;
 public class DirectoryImportHandler {
 
     private final DirectoryParser parser;
+    private final MetadataAssembler assembler;
+    private final LocalStorageService storageService;
     private final ObjectMapper objectMapper;
 
-    /** Managed 模式：解析后把图片搬到 hq/{comicId}/{chapterNo}/ */
-    public Path importManaged(String sourcePath, Long taskId, Long comicId, Path mangaRoot) throws Exception {
-        Path inputDir = Path.of(sourcePath);
-        Path comicRoot = parser.findComicRoot(inputDir);
-        if (comicRoot == null) throw new RuntimeException("目录中没有图片: " + sourcePath);
+    /** Managed 模式：解析 → 搬文件到 HQ → 写 metadata */
+    public Path importManaged(ImportContext ctx, Long taskId, Long comicId, Path mangaRoot) throws Exception {
+        DirectoryTree tree = parser.parse(ctx.sourcePath());
+        ComicMetadata metadata = assembler.assemble(tree, ctx);
 
-        ComicMetadata metadata = parser.parse(comicRoot);
-
+        // 搬文件到 HQ（page 的相对路径在 Assembler 阶段尚未填充，这里补齐）
         for (var ch : metadata.chapters()) {
-            Path hqDir = mangaRoot.resolve("hq").resolve(String.valueOf(comicId)).resolve(ch.chapterNo());
-            Files.createDirectories(hqDir);
-            Path sourceChapterDir = comicRoot.resolve(ch.title());
-            if (!Files.exists(sourceChapterDir)) sourceChapterDir = comicRoot;
-
             for (var page : ch.pages()) {
-                Path src = sourceChapterDir.resolve(page.imageName());
+                Path src = tree.path().resolve(ch.title()).resolve(page.imageName());
+                if (!Files.exists(src)) src = tree.path().resolve(page.imageName());
                 if (Files.exists(src) && page.fileSize() > 0) {
-                    Files.move(src, hqDir.resolve(page.imageName()), StandardCopyOption.REPLACE_EXISTING);
+                    String relativePath = comicId + "/" + ch.globalOrder() + "/" + page.imageName();
+                    storageService.store(src, "HQ", relativePath);
                 }
             }
         }
 
+        // 封面
         var firstCh = metadata.chapters().get(0);
         if (!firstCh.pages().isEmpty()) {
-            Path firstImg = mangaRoot.resolve("hq").resolve(String.valueOf(comicId))
-                .resolve(firstCh.chapterNo()).resolve(firstCh.pages().get(0).imageName());
+            Path firstImg = storageService.resolve(new com.comicatlas.worker.file.storage.StorageRef("HQ",
+                comicId + "/" + firstCh.globalOrder() + "/" + firstCh.pages().get(0).imageName()));
             if (Files.exists(firstImg)) {
                 Path thumbsDir = mangaRoot.resolve("thumbs").resolve(String.valueOf(comicId));
                 Files.createDirectories(thumbsDir);
@@ -51,26 +49,17 @@ public class DirectoryImportHandler {
             }
         }
 
-        return writeMetadata(metadata, taskId, mangaRoot, "MANAGED", null, null);
+        return writeMetadata(metadata, taskId, mangaRoot);
     }
 
-    /** External 模式：只写 metadata，不动文件 */
-    public Path importExternal(String sourcePath, Long taskId, Long comicId, Path mangaRoot, String rootKey, Map<String,String> storageRoots) throws Exception {
-        Path inputDir = Path.of(sourcePath);
-        Path comicRoot = parser.findComicRoot(inputDir);
-        if (comicRoot == null) throw new RuntimeException("目录中没有图片: " + sourcePath);
-
-        ComicMetadata metadata = parser.parse(comicRoot);
-
-        String rootPath = storageRoots.getOrDefault(rootKey, "");
-        Path root = Path.of(rootPath);
-        String relativePath = root.relativize(comicRoot).toString().replace('\\', '/') + "/";
-
-        return writeMetadata(metadata, taskId, mangaRoot, "EXTERNAL", rootKey, relativePath);
+    /** External 模式：解析 → 写 metadata（不动文件） */
+    public Path importExternal(ImportContext ctx, Long taskId, Path mangaRoot) throws Exception {
+        DirectoryTree tree = parser.parse(ctx.sourcePath());
+        ComicMetadata metadata = assembler.assemble(tree, ctx);
+        return writeMetadata(metadata, taskId, mangaRoot);
     }
 
-    private Path writeMetadata(ComicMetadata metadata, Long taskId, Path mangaRoot,
-                                String storageType, String rootKey, String relativePath) throws Exception {
+    private Path writeMetadata(ComicMetadata metadata, Long taskId, Path mangaRoot) throws Exception {
         Path metaPath = mangaRoot.resolve("metadata").resolve(taskId + ".json");
         Files.createDirectories(metaPath.getParent());
 
@@ -78,23 +67,48 @@ public class DirectoryImportHandler {
         comic.put("title", metadata.title());
         comic.put("author", metadata.author() != null ? metadata.author() : "");
         comic.put("tags", metadata.tags());
-        comic.put("storageType", storageType);
-        if (rootKey != null) comic.put("rootKey", rootKey);
-        if (relativePath != null) comic.put("relativePath", relativePath);
+        comic.put("storagePolicy", metadata.storagePolicy());
+        if (metadata.rootKey() != null) comic.put("rootKey", metadata.rootKey());
+        if (metadata.relativePath() != null) comic.put("relativePath", metadata.relativePath());
 
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("comic", comic);
-        m.put("chapters", metadata.chapters().stream().map(ch -> Map.of(
-            "title", ch.title(), "chapterNo", ch.chapterNo(),
-            "pages", ch.pages().stream().map(p -> Map.of(
-                "imageName", p.imageName(), "pageNumber", p.pageNumber(),
-                "hqStatus", p.hqStatus(), "lqStatus", p.lqStatus(),
-                "fileSize", p.fileSize(), "width", p.width(), "height", p.height()
-            )).toList()
-        )).toList());
+        // catalogs
+        List<Map<String, Object>> catalogList = metadata.catalogs().stream().map(cat -> {
+            Map<String, Object> cm = new LinkedHashMap<>();
+            cm.put("title", cat.title());
+            cm.put("sortOrder", cat.sortOrder());
+            return cm;
+        }).toList();
 
-        objectMapper.writerWithDefaultPrettyPrinter().writeValue(metaPath.toFile(), m);
-        log.info("Metadata ({}) written: {}", storageType, metaPath);
+        // chapters
+        List<Map<String, Object>> chapterList = metadata.chapters().stream().map(ch -> {
+            Map<String, Object> chm = new LinkedHashMap<>();
+            chm.put("title", ch.title());
+            chm.put("chapterNo", ch.chapterNo());
+            chm.put("sortOrder", ch.sortOrder());
+            chm.put("globalOrder", ch.globalOrder());
+            chm.put("catalogId", ch.catalogId());
+            chm.put("pages", ch.pages().stream().map(p -> {
+                Map<String, Object> pm = new LinkedHashMap<>();
+                pm.put("imageName", p.imageName());
+                pm.put("pageNumber", p.pageNumber());
+                pm.put("hqStatus", p.hqStatus());
+                pm.put("lqStatus", p.lqStatus());
+                pm.put("fileSize", p.fileSize());
+                if (p.relativePath() != null) pm.put("relativePath", p.relativePath());
+                if (p.width() != null) pm.put("width", p.width());
+                if (p.height() != null) pm.put("height", p.height());
+                return pm;
+            }).toList());
+            return chm;
+        }).toList();
+
+        Map<String, Object> root = new LinkedHashMap<>();
+        root.put("comic", comic);
+        root.put("catalogs", catalogList);
+        root.put("chapters", chapterList);
+
+        objectMapper.writerWithDefaultPrettyPrinter().writeValue(metaPath.toFile(), root);
+        log.info("Metadata written: {}", metaPath);
         return metaPath;
     }
 }

@@ -1,5 +1,6 @@
 package com.comicatlas.worker.file.handler;
 
+import com.comicatlas.worker.file.parse.ImportContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -14,15 +15,20 @@ public class ZipImportHandler {
     private final com.comicatlas.worker.file.extract.ZipExtractor zipExtractor;
     private final DirectoryImportHandler directoryHandler;
 
-    public Path importZip(String zipPath, Long taskId, Long comicId, Path mangaRoot) throws Exception {
-        Path zipFile = Path.of(zipPath);
-        if (!Files.exists(zipFile)) throw new RuntimeException("ZIP 文件不存在: " + zipPath);
+    public Path importZip(ImportContext ctx, Long taskId, Long comicId, Path mangaRoot) throws Exception {
+        Path zipFile = ctx.sourcePath();
+        if (!Files.exists(zipFile)) throw new RuntimeException("ZIP 文件不存在: " + zipFile);
 
         Path extractDir = mangaRoot.resolve("temp").resolve(taskId.toString()).resolve("extracted");
         Files.createDirectories(extractDir);
         zipExtractor.extract(zipFile, extractDir);
-        log.info("ZIP extracted: {} -> {}", zipPath, extractDir);
+        log.info("ZIP extracted: {} -> {}", zipFile, extractDir);
 
-        return directoryHandler.importManaged(extractDir.toString(), taskId, comicId, mangaRoot);
+        // 解压后的目录作为新的 sourcePath
+        ImportContext extractCtx = new ImportContext(
+            "ZIP", "MANAGED", extractDir,
+            ctx.generateLq(), ctx.overwrite(), null, null
+        );
+        return directoryHandler.importManaged(extractCtx, taskId, comicId, mangaRoot);
     }
 }
