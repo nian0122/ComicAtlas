@@ -58,15 +58,39 @@ export interface TagRef {
   type: string
 }
 
+export interface CatalogNode {
+  id: number | null
+  title: string | null
+  children: CatalogNode[]
+  chapters: ChapterRef[]
+}
+
+export interface ChapterRef {
+  id: number
+  chapterNo: string
+  title: string
+  globalOrder: number
+  pageCount: number
+  status?: string
+}
+
 export interface PageInfo {
   id: number
   pageNumber: number
-  imageName: string
   hqUrl: string
   lqUrl: string
   lqStatus: string
   width: number
   height: number
+}
+
+export interface ReaderDTO {
+  chapterId: number
+  chapterTitle: string
+  pages: PageInfo[]
+  total: number
+  prevChapterId: number | null
+  nextChapterId: number | null
 }
 
 export interface ChapterPageVO {

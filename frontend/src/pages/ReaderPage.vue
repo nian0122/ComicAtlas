@@ -3,9 +3,11 @@
     <div class="reader-toolbar">
       <el-button :icon="ArrowLeft" circle @click="goBack" />
       <span class="toolbar-title">{{ comicTitle }}</span>
+      <el-button v-if="store.prevChapterId" size="small" @click="goChapter(store.prevChapterId!)">上一章</el-button>
       <span class="toolbar-page">
         {{ store.currentPage }} / {{ store.pages.length }}
       </span>
+      <el-button v-if="store.nextChapterId" size="small" @click="goChapter(store.nextChapterId!)">下一章</el-button>
       <el-button :icon="Setting" circle @click="drawerVisible = true" />
     </div>
 
@@ -103,6 +105,10 @@ function goBack() {
   }
 }
 
+function goChapter(chId: number) {
+  router.push(`/comics/${store.comicId}/read?chapterId=${chId}&page=1`)
+}
+
 function onImageLoad() {
   // placeholder for any image load tracking
 }
@@ -179,7 +185,8 @@ onMounted(async () => {
   }
 
   try {
-    await store.loadChapter(id, chapterId)
+    store.comicId = id
+    await store.loadChapter(chapterId)
     await store.restoreProgress()
 
     if (page > 1 && page <= store.pages.length) {
