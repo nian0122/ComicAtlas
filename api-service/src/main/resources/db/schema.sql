@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS comic (
     source_gallery_id VARCHAR(64),
     source_gallery_token VARCHAR(32),
     source_ref VARCHAR(512),
-    storage_type VARCHAR(16) DEFAULT 'FILESYSTEM',
+    storage_policy VARCHAR(16) DEFAULT 'MANAGED',
     root_key VARCHAR(32) DEFAULT 'LOCAL',
     relative_path VARCHAR(512),
     status VARCHAR(16) DEFAULT 'IMPORTING',
@@ -31,22 +31,46 @@ CREATE TABLE IF NOT EXISTS comic (
     INDEX idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS catalog (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    comic_id BIGINT NOT NULL,
+    parent_id BIGINT DEFAULT NULL,
+    title VARCHAR(255) NOT NULL,
+    sort_order INT DEFAULT 0,
+    path VARCHAR(512) DEFAULT NULL,
+    level INT DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE INDEX uk_comic_parent_title (comic_id, parent_id, title),
+    INDEX idx_comic_parent (comic_id, parent_id),
+    INDEX idx_path (path),
+    FOREIGN KEY (comic_id) REFERENCES comic(id) ON DELETE CASCADE,
+    FOREIGN KEY (parent_id) REFERENCES catalog(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS chapter (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     comic_id BIGINT NOT NULL,
+    catalog_id BIGINT DEFAULT NULL,
     title VARCHAR(255),
     chapter_no VARCHAR(32) DEFAULT '1',
     page_count INT DEFAULT 0,
+    sort_order INT DEFAULT 0,
+    global_order INT DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE INDEX uk_comic_chapter (comic_id, chapter_no),
-    FOREIGN KEY (comic_id) REFERENCES comic(id) ON DELETE CASCADE
+    UNIQUE INDEX uk_catalog_chapter (comic_id, catalog_id, chapter_no),
+    INDEX idx_comic_global (comic_id, global_order),
+    FOREIGN KEY (comic_id) REFERENCES comic(id) ON DELETE CASCADE,
+    FOREIGN KEY (catalog_id) REFERENCES catalog(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS page (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     chapter_id BIGINT NOT NULL,
     page_number INT NOT NULL,
-    image_name VARCHAR(255) NOT NULL,
+    hq_root VARCHAR(32) DEFAULT 'HQ',
+    hq_path VARCHAR(512),
+    lq_root VARCHAR(32) DEFAULT NULL,
+    lq_path VARCHAR(512),
     hq_status VARCHAR(16) DEFAULT 'PENDING',
     lq_status VARCHAR(16) DEFAULT 'PENDING',
     lq_size BIGINT DEFAULT 0,

@@ -5,16 +5,15 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("chapter")
-public class Chapter {
+@TableName("catalog")
+public class Catalog {
     @TableId(type = IdType.AUTO)
     private Long id;
     private Long comicId;
-    private Long catalogId;
+    private Long parentId;
     private String title;
-    private String chapterNo;
-    private Integer pageCount;
     private Integer sortOrder;
-    private Integer globalOrder;
+    private String path;
+    private Integer level;
     private LocalDateTime createdAt;
 }

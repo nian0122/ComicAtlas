@@ -21,7 +21,7 @@ public class Comic {
     private String sourceGalleryId;
     private String sourceGalleryToken;
     private String sourceRef;
-    private String storageType;
+    private String storagePolicy;
     private String rootKey;
     private String relativePath;
     private String status;

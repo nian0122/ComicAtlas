@@ -11,7 +11,10 @@ public class Page {
     private Long id;
     private Long chapterId;
     private Integer pageNumber;
-    private String imageName;
+    private String hqRoot;
+    private String hqPath;
+    private String lqRoot;
+    private String lqPath;
     private String hqStatus;
     private String lqStatus;
     private Long lqSize;
