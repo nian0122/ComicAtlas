@@ -32,3 +32,15 @@ worker:
     host: ${PROXY_HOST:127.0.0.1}
     port: ${PROXY_PORT:7897}
     socks-port: ${SOCKS_PORT:7897}
+
+storage:
+  roots:
+    HQ:
+      type: FILESYSTEM
+      path: ${MANGA_ROOT:D:/manga}/hq
+    LQ:
+      type: FILESYSTEM
+      path: ${MANGA_ROOT:D:/manga}/lq
+    LOCAL:
+      type: FILESYSTEM
+      path: F:/games/comics
