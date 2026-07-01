@@ -6,8 +6,14 @@ export const comicApi = {
   list: (params: any) => api.get('/comics', { params }),
   detail: (id: number) => api.get(`/comics/${id}`),
   delete: (id: number) => api.delete(`/comics/${id}`),
-  pages: (comicId: number, chapterId: number) =>
-    api.get(`/comics/${comicId}/chapters/${chapterId}/pages`),
+}
+
+export const catalogApi = {
+  tree: (comicId: number) => api.get(`/comics/${comicId}/catalog`),
+}
+
+export const readerApi = {
+  chapter: (chapterId: number) => api.get(`/chapters/${chapterId}`),
 }
 
 export const importApi = {
