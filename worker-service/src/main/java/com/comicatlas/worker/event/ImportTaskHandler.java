@@ -4,13 +4,13 @@ import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.file.FileService;
 import com.comicatlas.worker.file.handler.DirectoryImportHandler;
 import com.comicatlas.worker.file.handler.ZipImportHandler;
+import com.comicatlas.worker.file.parse.ImportContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Path;
-import java.util.Map;
 
 @Slf4j
 @Component
@@ -23,7 +23,7 @@ public class ImportTaskHandler {
     private final TaskStatusPublisher publisher;
 
     @RabbitListener(queues = "import.task.queue")
-    public void handle(Map<String, Object> msg) {
+    public void handle(java.util.Map<String, Object> msg) {
         Long taskId = Long.valueOf(msg.get("taskId").toString());
         Long comicId = Long.valueOf(msg.get("comicId").toString());
         String sourceType = (String) msg.getOrDefault("sourceType", "ZIP");
@@ -36,10 +36,16 @@ public class ImportTaskHandler {
             Path mangaRoot = Path.of(config.getMangaRoot());
 
             switch (sourceType) {
-                case "ZIP" -> zipHandler.importZip(sourcePath, taskId, comicId, mangaRoot);
+                case "ZIP" -> {
+                    ImportContext ctx = new ImportContext("ZIP", "MANAGED",
+                        Path.of(sourcePath), false, false, null, null);
+                    zipHandler.importZip(ctx, taskId, comicId, mangaRoot);
+                }
                 case "REGISTER" -> {
                     String path = sourcePath != null ? sourcePath : sourceRef;
-                    directoryHandler.importExternal(path, taskId, comicId, mangaRoot, "LOCAL", config.getStorageRoots());
+                    ImportContext ctx = new ImportContext("REGISTER", "EXTERNAL",
+                        Path.of(path), false, false, "LOCAL", path);
+                    directoryHandler.importExternal(ctx, taskId, mangaRoot);
                 }
                 case "EHENTAI" -> fileService.processImport(taskId, comicId, sourceRef, sourceType);
                 default -> throw new IllegalArgumentException("Unknown sourceType: " + sourceType);
