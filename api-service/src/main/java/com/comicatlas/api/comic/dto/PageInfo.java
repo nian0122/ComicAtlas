@@ -6,7 +6,6 @@ import lombok.Data;
 public class PageInfo {
     private Long id;
     private Integer pageNumber;
-    private String imageName;
     private String hqUrl;
     private String lqUrl;
     private String lqStatus;

@@ -137,12 +137,8 @@ public class ComicServiceImpl implements ComicService {
             PageInfo pi = new PageInfo();
             pi.setId(p.getId());
             pi.setPageNumber(p.getPageNumber());
-            pi.setImageName(p.getImageName());
-            String baseName = p.getImageName().contains(".")
-                ? p.getImageName().substring(0, p.getImageName().lastIndexOf('.'))
-                : p.getImageName();
-            pi.setHqUrl("/comic/hq/" + comicId + "/" + chNo + "/" + p.getImageName());
-            pi.setLqUrl("/comic/lq/" + comicId + "/" + chNo + "/" + baseName + ".webp");
+            pi.setHqUrl("/comic/files/" + p.getHqRoot().toLowerCase() + "/" + p.getHqPath());
+            pi.setLqUrl(p.getLqPath() != null ? "/comic/files/" + p.getLqRoot().toLowerCase() + "/" + p.getLqPath() : null);
             pi.setLqStatus(p.getLqStatus());
             pi.setWidth(p.getWidth());
             pi.setHeight(p.getHeight());
@@ -151,7 +147,7 @@ public class ComicServiceImpl implements ComicService {
 
         Long prevId = null, nextId = null;
         var allChapters = chapterMapper.selectList(
-            new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId).orderByAsc(Chapter::getChapterNo));
+            new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId).orderByAsc(Chapter::getGlobalOrder));
         for (int i = 0; i < allChapters.size(); i++) {
             if (allChapters.get(i).getId().equals(chapterId)) {
                 if (i > 0) prevId = allChapters.get(i - 1).getId();
