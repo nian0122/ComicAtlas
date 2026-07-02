@@ -44,7 +44,7 @@ public class ComicServiceImpl implements ComicService {
         vo.setId(c.getId());
         vo.setTitle(c.getTitle());
         vo.setAuthor(c.getAuthor());
-        vo.setCoverUrl("/comic/thumbs/" + c.getId() + "/cover.webp");
+        vo.setCoverUrl("/files/thumbs/" + c.getId() + "/cover.webp");
         vo.setPageCount(c.getTotalPages());
         vo.setCategory(c.getCategory());
         vo.setStatus(c.getStatus());
@@ -71,7 +71,7 @@ public class ComicServiceImpl implements ComicService {
         vo.setTitle(c.getTitle());
         vo.setTitleJpn(c.getTitleJpn());
         vo.setAuthor(c.getAuthor());
-        vo.setCoverUrl("/comic/thumbs/" + c.getId() + "/cover.webp");
+        vo.setCoverUrl("/files/thumbs/" + c.getId() + "/cover.webp");
         vo.setPageCount(c.getTotalPages());
         vo.setFileSize(c.getFileSize());
         vo.setSourceType(c.getSourceType());
@@ -137,8 +137,8 @@ public class ComicServiceImpl implements ComicService {
             PageInfo pi = new PageInfo();
             pi.setId(p.getId());
             pi.setPageNumber(p.getPageNumber());
-            pi.setHqUrl("/comic/files/" + p.getHqRoot().toLowerCase() + "/" + p.getHqPath());
-            pi.setLqUrl(p.getLqPath() != null ? "/comic/files/" + p.getLqRoot().toLowerCase() + "/" + p.getLqPath() : null);
+            pi.setHqUrl("/files/" + p.getHqRoot().toLowerCase() + "/" + p.getHqPath());
+            pi.setLqUrl(p.getLqPath() != null ? "/files/" + p.getLqRoot().toLowerCase() + "/" + p.getLqPath() : null);
             pi.setLqStatus(p.getLqStatus());
             pi.setWidth(p.getWidth());
             pi.setHeight(p.getHeight());

@@ -73,9 +73,14 @@ services:
     environment:
       NACOS_ADDR: nacos:8848
       RABBITMQ_HOST: rabbitmq
-      MANGA_ROOT: /manga
+      MANGA_ROOT: /storage
     volumes:
-      - ${MANGA_ROOT:-./manga}:/manga
+      - ${MANGA_ROOT:-./manga}/hq:/storage/hq
+      - ${MANGA_ROOT:-./manga}/lq:/storage/lq
+      - ${MANGA_ROOT:-./manga}/thumbs:/storage/thumbs
+      - ${MANGA_ROOT:-./manga}/temp:/storage/temp
+      - ${MANGA_ROOT:-./manga}/metadata:/storage/metadata
+      - ${LOCAL_ROOT:-F:/games/comics}:/storage/local:ro
     depends_on:
       - rabbitmq
       - nacos
@@ -88,7 +93,10 @@ services:
       - "80:80"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ${MANGA_ROOT:-./manga}:/manga:ro
+      - ${MANGA_ROOT:-./manga}/hq:/storage/hq:ro
+      - ${MANGA_ROOT:-./manga}/lq:/storage/lq:ro
+      - ${MANGA_ROOT:-./manga}/thumbs:/storage/thumbs:ro
+      - ${LOCAL_ROOT:-F:/games/comics}:/storage/local:ro
     depends_on:
       - gateway
 
