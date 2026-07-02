@@ -5,9 +5,13 @@
     </header>
 
     <div class="import-form">
+      <el-select v-model="sourceType" class="type-select">
+        <el-option label="ZIP 文件" value="ZIP" />
+        <el-option label="目录注册" value="REGISTER" />
+      </el-select>
       <el-input
-        v-model="importUrl"
-        placeholder="输入漫画URL..."
+        v-model="sourcePath"
+        :placeholder="sourceType === 'ZIP' ? 'ZIP 文件路径...' : '漫画目录路径...'"
         class="url-input"
         @keyup.enter="doImport"
       />
@@ -169,7 +173,8 @@ import type { ImportTaskVO } from '@/types'
 
 const store = useImportStore()
 
-const importUrl = ref('')
+const sourceType = ref('REGISTER')
+const sourcePath = ref('')
 const importing = ref(false)
 const drawerVisible = ref(false)
 const detailTask = ref<ImportTaskVO | null>(null)
@@ -181,7 +186,7 @@ const STATUS_LABELS: Record<string, string> = {
   DOWNLOADING: '下载中',
   EXTRACTING: '解压中',
   PARSING: '解析中',
-  LQ_GENERATING: '生成缩略图',
+  IMPORTING: '导入中',
   SUCCESS: '成功',
   FAILED: '失败',
   CANCELLED: '已取消',
@@ -217,15 +222,15 @@ function formatTime(ts: string): string {
 }
 
 async function doImport() {
-  const url = importUrl.value.trim()
-  if (!url) {
-    ElMessage.warning('请输入URL')
+  const path = sourcePath.value.trim()
+  if (!path) {
+    ElMessage.warning('请输入路径')
     return
   }
   importing.value = true
   try {
-    await store.create(url)
-    importUrl.value = ''
+    await store.create(sourceType.value, path)
+    sourcePath.value = ''
     ElMessage.success('导入任务已创建')
   } catch {
     ElMessage.error('创建导入任务失败')
@@ -310,6 +315,11 @@ onBeforeUnmount(() => {
   display: flex;
   gap: 12px;
   margin-bottom: 24px;
+}
+
+.type-select {
+  width: 140px;
+  flex-shrink: 0;
 }
 
 .url-input {
