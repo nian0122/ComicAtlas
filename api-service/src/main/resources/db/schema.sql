@@ -101,6 +101,8 @@ CREATE TABLE IF NOT EXISTS import_task (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     comic_id BIGINT,
     source_ref VARCHAR(512),
+    source_type VARCHAR(16) DEFAULT NULL,
+    source_path VARCHAR(1024) DEFAULT NULL,
     status VARCHAR(16) DEFAULT 'PENDING',
     progress INT DEFAULT 0,
     total_pages INT,
