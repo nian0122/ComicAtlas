@@ -95,6 +95,8 @@ public class ImportServiceImpl implements ImportService {
         ImportTask task = new ImportTask();
         task.setComicId(comic.getId());
         task.setSourceRef(sourceRef);
+        task.setSourceType(sourceType);
+        task.setSourcePath(sourcePath);
         task.setStatus("PENDING");
         taskMapper.insert(task);
 
@@ -156,7 +158,7 @@ public class ImportServiceImpl implements ImportService {
         t.setRetryCount(t.getRetryCount() + 1);
         t.setErrorMessage(null);
         taskMapper.updateById(t);
-        eventPublisher.publishImportTaskCreated(t.getId(), t.getComicId(), t.getSourceRef(), "EHENTAI", null);
+        eventPublisher.publishImportTaskCreated(t.getId(), t.getComicId(), t.getSourceRef(), t.getSourceType(), t.getSourcePath());
     }
 
     private ImportTaskVO toVO(ImportTask t) {

@@ -11,6 +11,8 @@ public class ImportTask {
     private Long id;
     private Long comicId;
     private String sourceRef;
+    private String sourceType;
+    private String sourcePath;
     private String status;
     private Integer progress;
     private Integer totalPages;

@@ -40,3 +40,8 @@ ALTER TABLE page
     ADD COLUMN hq_path VARCHAR(512) AFTER hq_root,
     ADD COLUMN lq_root VARCHAR(32) DEFAULT NULL AFTER hq_path,
     ADD COLUMN lq_path VARCHAR(512) AFTER lq_root;
+
+-- 5. import_task: 新增 source_type 和 source_path（修复 retry 硬编码问题）
+ALTER TABLE import_task
+    ADD COLUMN source_type VARCHAR(16) DEFAULT NULL AFTER source_ref,
+    ADD COLUMN source_path VARCHAR(1024) DEFAULT NULL AFTER source_type;
