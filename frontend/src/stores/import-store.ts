@@ -7,8 +7,8 @@ export const useImportStore = defineStore('import', () => {
   const tasks = ref<ImportTaskVO[]>([])
   const loading = ref(false)
 
-  async function create(sourceRef: string): Promise<ImportTaskVO> {
-    const res: any = await importApi.create(sourceRef)
+  async function create(sourceType: string, sourcePath: string): Promise<ImportTaskVO> {
+    const res: any = await importApi.create(sourceType, sourcePath)
     await fetchList()
     return res.data
   }

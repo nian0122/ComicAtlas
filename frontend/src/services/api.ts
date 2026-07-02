@@ -17,7 +17,8 @@ export const readerApi = {
 }
 
 export const importApi = {
-  create: (sourceRef: string) => api.post('/tasks/import', { sourceRef }),
+  create: (sourceType: string, sourcePath: string) =>
+    api.post('/tasks/import', { sourceType, sourcePath }),
   list: (params: any) => api.get('/tasks/import', { params }),
   detail: (id: number) => api.get(`/tasks/import/${id}`),
   status: (id: number) => api.get(`/tasks/import/${id}/status`),
