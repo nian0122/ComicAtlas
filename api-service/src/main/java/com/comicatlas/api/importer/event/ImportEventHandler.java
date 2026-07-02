@@ -177,7 +177,7 @@ public class ImportEventHandler {
             // LQ 生成改为手动触发，不自动发送
             // if (firstChapter != null && !"EXTERNAL".equals(comic.getStorageType())) { ... }
 
-            log.info("ComicImported 处理完成: comicId={}, pages={}", comicId, pagesData.size());
+            log.info("ComicImported 处理完成: comicId={}, chapters={}", comicId, chaptersData != null ? chaptersData.size() : pagesData != null ? pagesData.size() : 0);
 
         } catch (Exception e) {
             log.error("ComicImported 处理失败: taskId={}", taskId, e);
