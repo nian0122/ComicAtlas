@@ -16,9 +16,9 @@ public class LocalStorageService implements StorageService {
 
     @Override
     public StorageRef store(Path source, String rootKey, String relativePath) {
-        var root = properties.getRoots().get(rootKey);
+        StorageRoot root = properties.getRoots().get(rootKey);
         if (root == null) throw new IllegalArgumentException("未知存储根: " + rootKey);
-        Path target = Path.of(root.getPath(), relativePath);
+        Path target = root.resolve(relativePath);
         try {
             Files.createDirectories(target.getParent());
             Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
@@ -31,9 +31,9 @@ public class LocalStorageService implements StorageService {
 
     @Override
     public Path resolve(StorageRef ref) {
-        var root = properties.getRoots().get(ref.rootKey());
+        StorageRoot root = properties.getRoots().get(ref.rootKey());
         if (root == null) throw new IllegalArgumentException("未知存储根: " + ref.rootKey());
-        return Path.of(root.getPath(), ref.relativePath());
+        return root.resolve(ref.relativePath());
     }
 
     @Override

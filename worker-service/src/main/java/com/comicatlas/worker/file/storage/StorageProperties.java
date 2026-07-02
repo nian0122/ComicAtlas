@@ -10,11 +10,5 @@ import java.util.Map;
 @Component
 @ConfigurationProperties(prefix = "storage")
 public class StorageProperties {
-    private Map<String, RootConfig> roots;
-
-    @Data
-    public static class RootConfig {
-        private String type = "FILESYSTEM";
-        private String path;
-    }
+    private Map<String, StorageRoot> roots;
 }
