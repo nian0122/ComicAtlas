@@ -66,20 +66,13 @@
       </div>
 
       <div class="chapter-section">
-        <h2 class="section-title">章节列表 ({{ comic.chapters?.length || 0 }})</h2>
-        <div class="chapter-list">
-          <div
-            v-for="ch in comic.chapters"
-            :key="ch.id"
-            class="chapter-item"
-            @click="goReader(ch.id)"
-          >
-            <span class="chapter-no">第{{ ch.chapterNo }}话</span>
-            <span class="chapter-title">{{ ch.title }}</span>
-            <span class="chapter-pages">{{ ch.pageCount }}页</span>
-          </div>
-          <el-empty v-if="!comic.chapters || comic.chapters.length === 0" description="暂无章节" />
+        <h2 class="section-title">目录</h2>
+        <div class="chapter-list" v-if="catalogTree.length > 0">
+          <template v-for="node in catalogTree" :key="node.id ?? 'root'">
+            <CatalogNodeItem :node="node" @select="goReader" />
+          </template>
         </div>
+        <el-empty v-else description="暂无章节" />
       </div>
     </template>
 
@@ -88,18 +81,36 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { PictureFilled } from '@element-plus/icons-vue'
-import { comicApi } from '@/services/api'
-import type { ComicDetailVO } from '@/types'
+import { comicApi, catalogApi } from '@/services/api'
+import type { ComicDetailVO, CatalogNode, ChapterRef } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
 
 const comic = ref<ComicDetailVO | null>(null)
+const catalogTree = ref<CatalogNode[]>([])
 const loading = ref(true)
+
+const firstChapter = computed(() => {
+  for (const node of catalogTree.value) {
+    const ch = findFirstChapter(node)
+    if (ch) return ch
+  }
+  return null
+})
+
+function findFirstChapter(node: CatalogNode): ChapterRef | null {
+  if (node.chapters && node.chapters.length > 0) return node.chapters[0]
+  for (const child of node.children || []) {
+    const found = findFirstChapter(child)
+    if (found) return found
+  }
+  return null
+}
 
 function continueRead() {
   if (!comic.value) return
@@ -109,9 +120,9 @@ function continueRead() {
 }
 
 function startRead() {
-  if (!comic.value || !comic.value.chapters || comic.value.chapters.length === 0) return
-  const firstChapter = comic.value.chapters[0]
-  router.push(`/comics/${comic.value.id}/read?chapterId=${firstChapter.id}&page=1`)
+  const ch = firstChapter.value
+  if (!ch || !comic.value) return
+  router.push(`/comics/${comic.value.id}/read?chapterId=${ch.id}&page=1`)
 }
 
 function goReader(chapterId: number) {
@@ -137,13 +148,57 @@ onMounted(async () => {
     return
   }
   try {
-    const res = await comicApi.detail(id)
-    comic.value = res.data as ComicDetailVO
+    const [detailRes, catalogRes] = await Promise.all([
+      comicApi.detail(id),
+      catalogApi.tree(id),
+    ])
+    comic.value = detailRes.data as ComicDetailVO
+    catalogTree.value = (catalogRes.data || []) as CatalogNode[]
   } catch {
     ElMessage.error('加载漫画详情失败')
   } finally {
     loading.value = false
   }
+})
+</script>
+
+<script lang="ts">
+import { defineComponent } from 'vue'
+
+export const CatalogNodeItem = defineComponent({
+  name: 'CatalogNodeItem',
+  props: {
+    node: { type: Object, required: true },
+  },
+  emits: ['select'],
+  setup(_props, { emit }) {
+    return { emit }
+  },
+  template: `
+    <div class="catalog-node">
+      <div v-if="node.title" class="catalog-title">{{ node.title }}</div>
+      <div v-if="node.chapters?.length" class="catalog-chapters">
+        <div
+          v-for="ch in node.chapters"
+          :key="ch.id"
+          class="chapter-item"
+          @click="emit('select', ch.id)"
+        >
+          <span class="chapter-no">{{ ch.chapterNo ? '第' + ch.chapterNo + '话' : '' }}</span>
+          <span class="chapter-title">{{ ch.title }}</span>
+          <span class="chapter-pages">{{ ch.pageCount }}页</span>
+        </div>
+      </div>
+      <div v-if="node.children?.length" class="catalog-children">
+        <CatalogNodeItem
+          v-for="child in node.children"
+          :key="child.id ?? child.title"
+          :node="child"
+          @select="emit('select', $event)"
+        />
+      </div>
+    </div>
+  `,
 })
 </script>
 
@@ -306,5 +361,29 @@ onMounted(async () => {
   .tags-row {
     justify-content: center;
   }
+}
+
+.catalog-node {
+  margin-bottom: 4px;
+}
+
+.catalog-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-h);
+  padding: 10px 16px;
+  background: var(--social-bg);
+  border-radius: 6px 6px 0 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.catalog-chapters .chapter-item {
+  padding-left: 32px;
+}
+
+.catalog-children {
+  margin-left: 16px;
+  border-left: 1px solid var(--border);
+  padding-left: 8px;
 }
 </style>
