@@ -161,10 +161,10 @@ export interface OperationLogVO {
 
 export const STATUS_COLOR_MAP: Record<string, string> = {
   PENDING: 'info',
+  PARSING: 'warning',
+  IMPORTING: 'warning',
   DOWNLOADING: 'warning',
   EXTRACTING: 'warning',
-  PARSING: 'warning',
-  LQ_GENERATING: 'warning',
   SUCCESS: 'success',
   FAILED: 'danger',
   CANCELLED: 'info',
