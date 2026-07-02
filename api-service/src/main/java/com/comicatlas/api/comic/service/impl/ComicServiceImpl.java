@@ -8,6 +8,7 @@ import com.comicatlas.api.comic.entity.*;
 import com.comicatlas.api.comic.mapper.*;
 import com.comicatlas.api.comic.service.ComicService;
 import com.comicatlas.api.common.exception.BusinessException;
+import com.comicatlas.api.common.storage.FileUrlResolver;
 import com.comicatlas.api.reader.entity.ReadingHistory;
 import com.comicatlas.api.reader.mapper.ReadingHistoryMapper;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,7 @@ public class ComicServiceImpl implements ComicService {
     private final ComicTagMapper comicTagMapper;
     private final ReadingHistoryMapper historyMapper;
     private final RedisTemplate<String, Object> redisTemplate;
+    private final FileUrlResolver fileUrlResolver;
 
     @Override
     public IPage<ComicListVO> listComics(ComicListQuery query) {
@@ -137,8 +139,8 @@ public class ComicServiceImpl implements ComicService {
             PageInfo pi = new PageInfo();
             pi.setId(p.getId());
             pi.setPageNumber(p.getPageNumber());
-            pi.setHqUrl("/files/" + p.getHqRoot().toLowerCase() + "/" + p.getHqPath());
-            pi.setLqUrl(p.getLqPath() != null ? "/files/" + p.getLqRoot().toLowerCase() + "/" + p.getLqPath() : null);
+            pi.setHqUrl(fileUrlResolver.resolve(p));
+            pi.setLqUrl(fileUrlResolver.resolveLq(p));
             pi.setLqStatus(p.getLqStatus());
             pi.setWidth(p.getWidth());
             pi.setHeight(p.getHeight());
