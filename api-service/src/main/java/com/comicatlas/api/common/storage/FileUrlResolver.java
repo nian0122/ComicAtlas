@@ -7,16 +7,22 @@ import org.springframework.stereotype.Component;
 @Component
 public class FileUrlResolver {
 
-    @Value("${storage.url-prefix:/comic/files}")
+    @Value("${storage.url-prefix:/files}")
     private String urlPrefix;
 
     public String resolve(Page page) {
         if (page.getHqRoot() == null || page.getHqPath() == null) return null;
-        return urlPrefix + "/" + page.getHqRoot().toLowerCase() + "/" + page.getHqPath();
+        return urlPrefix + "/" + page.getHqRoot().toLowerCase()
+            + "/" + page.getHqPath().replace('\\', '/');
     }
 
     public String resolveLq(Page page) {
         if (page.getLqRoot() == null || page.getLqPath() == null) return null;
-        return urlPrefix + "/" + page.getLqRoot().toLowerCase() + "/" + page.getLqPath();
+        return urlPrefix + "/" + page.getLqRoot().toLowerCase()
+            + "/" + page.getLqPath().replace('\\', '/');
+    }
+
+    public String resolveCover(Long comicId) {
+        return urlPrefix + "/thumbs/" + comicId + "/cover.webp";
     }
 }
