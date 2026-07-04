@@ -32,11 +32,10 @@ public class MetadataAssembler {
         AtomicInteger globalOrder = new AtomicInteger(0);
         AtomicInteger catalogIndex = new AtomicInteger(0);
 
-        processNode(tree, null, catalogs, chapters, globalOrder, catalogIndex, ctx);
+        processNode(tree, null, catalogs, chapters, globalOrder, catalogIndex);
 
         if (chapters.isEmpty()) throw new RuntimeException("无可用章节: " + tree.path());
-        return new ComicMetadata(title, null, null, List.of(), catalogs, chapters,
-            ctx.storagePolicy(), ctx.rootKey(), ctx.relativePath());
+        return new ComicMetadata(title, null, null, List.of(), catalogs, chapters);
     }
 
     /**
@@ -47,12 +46,11 @@ public class MetadataAssembler {
     private void processNode(DirectoryTree node, Integer parentCatalogIndex,
             List<ComicMetadata.CatalogInfo> catalogs,
             List<ComicMetadata.ChapterInfo> chapters,
-            AtomicInteger globalOrder, AtomicInteger catalogIndex,
-            ImportContext ctx) {
+            AtomicInteger globalOrder, AtomicInteger catalogIndex) {
 
-        if (node.isLeaf()) {
+            if (node.isLeaf()) {
             // 含图片 → Chapter
-            var pages = scanPages(node, ctx);
+            var pages = scanPages(node);
             if (!pages.isEmpty()) {
                 Long catalogId = parentCatalogIndex != null ? (long) parentCatalogIndex : null;
                 chapters.add(new ComicMetadata.ChapterInfo(
@@ -70,59 +68,31 @@ public class MetadataAssembler {
             for (int i = 0; i < node.children().size(); i++) {
                 DirectoryTree child = node.children().get(i);
                 if (child.isLeaf()) {
-                    processNode(child, myIndex, catalogs, chapters, globalOrder, catalogIndex, ctx);
+                    processNode(child, myIndex, catalogs, chapters, globalOrder, catalogIndex);
                 } else {
-                    processNode(child, myIndex, catalogs, chapters, globalOrder, catalogIndex, ctx);
+                    processNode(child, myIndex, catalogs, chapters, globalOrder, catalogIndex);
                 }
             }
         }
     }
 
-    /**
-     * 扫描目录中所有图片，生成 PageInfo 列表。
-     * EXTERNAL 模式生成 relativePath（相对于漫画根），MANAGED 模式暂留空由 ImportWriter 填充。
-     */
-    private List<ComicMetadata.PageInfo> scanPages(DirectoryTree node, ImportContext ctx) {
+    private List<ComicMetadata.PageInfo> scanPages(DirectoryTree node) {
         List<ComicMetadata.PageInfo> pages = new ArrayList<>();
-        Path dir = node.path();
-
-        // EXTERNAL 模式：解析 LQ 目录（h_photograph → l_photograph）
-        Path lqDir = null;
-        if ("EXTERNAL".equals(ctx.storagePolicy()) && ctx.rootKey() != null) {
-            lqDir = resolveLqDir(dir);
-        }
 
         for (int i = 0; i < node.imageFiles().size(); i++) {
             Path img = node.imageFiles().get(i);
             String name = img.getFileName().toString();
             long size = safeFileSize(img);
-            String baseName = name.contains(".") ? name.substring(0, name.lastIndexOf('.')) : name;
-            boolean lqExists = lqDir != null && Files.exists(lqDir.resolve(baseName + ".webp"));
-
-            String relativePath = null;
-            if ("EXTERNAL".equals(ctx.storagePolicy()) && ctx.relativePath() != null) {
-                // 计算相对于 comic 根目录的路径
-                Path comicRoot = Path.of(ctx.relativePath());
-                Path imgRelative = comicRoot.relativize(img);
-                relativePath = imgRelative.toString().replace('\\', '/');
-            }
 
             pages.add(new ComicMetadata.PageInfo(
                 name, i + 1,
                 size > 0 ? "READY" : "MISSING",
-                lqExists ? "READY" : "PENDING",
-                size, relativePath,
+                "PENDING",
+                size,
                 safeImageWidth(img), safeImageHeight(img)
             ));
         }
         return pages;
-    }
-
-    private Path resolveLqDir(Path hqDir) {
-        String s = hqDir.toString().replace('\\', '/');
-        s = s.replaceFirst("/h_photograph/", "/l_photograph/");
-        Path lqDir = Path.of(s);
-        return Files.exists(lqDir) ? lqDir : null;
     }
 
     // ---- helpers ----

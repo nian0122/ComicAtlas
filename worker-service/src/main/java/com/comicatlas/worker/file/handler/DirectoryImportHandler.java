@@ -20,12 +20,15 @@ public class DirectoryImportHandler {
     private final LocalStorageService storageService;
     private final ObjectMapper objectMapper;
 
-    /** Managed 模式：解析 → 搬文件到 HQ → 写 metadata */
-    public Path importManaged(ImportContext ctx, Long taskId, Long comicId, Path mangaRoot) throws Exception {
+    /**
+     * 统一导入：解析目录 → 解析后把图片搬到 hq/{comicId}/{chapterId}/ → 写 metadata。
+     * ZIP 和 Directory 来源走同一逻辑。
+     */
+    public Path handle(ImportContext ctx, Long taskId, Long comicId, Path mangaRoot) throws Exception {
         DirectoryTree tree = parser.parse(ctx.sourcePath());
         ComicMetadata metadata = assembler.assemble(tree, ctx);
 
-        // 搬文件到 HQ（page 的相对路径在 Assembler 阶段尚未填充，这里补齐）
+        // 搬文件到 HQ
         for (var ch : metadata.chapters()) {
             for (var page : ch.pages()) {
                 Path src = tree.path().resolve(ch.title()).resolve(page.imageName());
@@ -52,13 +55,6 @@ public class DirectoryImportHandler {
         return writeMetadata(metadata, taskId, mangaRoot);
     }
 
-    /** External 模式：解析 → 写 metadata（不动文件） */
-    public Path importExternal(ImportContext ctx, Long taskId, Path mangaRoot) throws Exception {
-        DirectoryTree tree = parser.parse(ctx.sourcePath());
-        ComicMetadata metadata = assembler.assemble(tree, ctx);
-        return writeMetadata(metadata, taskId, mangaRoot);
-    }
-
     private Path writeMetadata(ComicMetadata metadata, Long taskId, Path mangaRoot) throws Exception {
         Path metaPath = mangaRoot.resolve("metadata").resolve(taskId + ".json");
         Files.createDirectories(metaPath.getParent());
@@ -67,11 +63,7 @@ public class DirectoryImportHandler {
         comic.put("title", metadata.title());
         comic.put("author", metadata.author() != null ? metadata.author() : "");
         comic.put("tags", metadata.tags());
-        comic.put("storagePolicy", metadata.storagePolicy());
-        if (metadata.rootKey() != null) comic.put("rootKey", metadata.rootKey());
-        if (metadata.relativePath() != null) comic.put("relativePath", metadata.relativePath());
 
-        // catalogs
         List<Map<String, Object>> catalogList = metadata.catalogs().stream().map(cat -> {
             Map<String, Object> cm = new LinkedHashMap<>();
             cm.put("title", cat.title());
@@ -79,7 +71,6 @@ public class DirectoryImportHandler {
             return cm;
         }).toList();
 
-        // chapters
         List<Map<String, Object>> chapterList = metadata.chapters().stream().map(ch -> {
             Map<String, Object> chm = new LinkedHashMap<>();
             chm.put("title", ch.title());
@@ -94,7 +85,6 @@ public class DirectoryImportHandler {
                 pm.put("hqStatus", p.hqStatus());
                 pm.put("lqStatus", p.lqStatus());
                 pm.put("fileSize", p.fileSize());
-                if (p.relativePath() != null) pm.put("relativePath", p.relativePath());
                 if (p.width() != null) pm.put("width", p.width());
                 if (p.height() != null) pm.put("height", p.height());
                 return pm;

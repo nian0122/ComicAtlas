@@ -41,6 +41,3 @@ storage:
     LQ:
       type: FILESYSTEM
       path: ${MANGA_ROOT:D:/manga}/lq
-    LOCAL:
-      type: FILESYSTEM
-      path: ${LOCAL_ROOT:F:/games/comics}

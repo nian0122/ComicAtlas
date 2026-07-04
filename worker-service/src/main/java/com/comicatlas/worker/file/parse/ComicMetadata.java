@@ -12,10 +12,7 @@ public record ComicMetadata(
     String category,
     List<String> tags,
     List<CatalogInfo> catalogs,
-    List<ChapterInfo> chapters,
-    String storagePolicy,
-    String rootKey,
-    String relativePath
+    List<ChapterInfo> chapters
 ) {
     public record CatalogInfo(
         String title,
@@ -38,7 +35,6 @@ public record ComicMetadata(
         String hqStatus,
         String lqStatus,
         long fileSize,
-        String relativePath,        // EXTERNAL 模式：相对于 comic 根的路径
         Integer width,
         Integer height
     ) {}

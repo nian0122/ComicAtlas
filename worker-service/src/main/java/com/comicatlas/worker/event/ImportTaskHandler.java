@@ -37,15 +37,15 @@ public class ImportTaskHandler {
 
             switch (sourceType) {
                 case "ZIP" -> {
-                    ImportContext ctx = new ImportContext("ZIP", "MANAGED",
-                        Path.of(sourcePath), false, false, null, null);
+                    ImportContext ctx = new ImportContext("ZIP",
+                        Path.of(sourcePath), false, false);
                     zipHandler.importZip(ctx, taskId, comicId, mangaRoot);
                 }
-                case "REGISTER" -> {
+                case "REGISTER", "DIRECTORY" -> {
                     String path = sourcePath != null ? sourcePath : sourceRef;
-                    ImportContext ctx = new ImportContext("REGISTER", "EXTERNAL",
-                        Path.of(path), false, false, "LOCAL", path);
-                    directoryHandler.importExternal(ctx, taskId, mangaRoot);
+                    ImportContext ctx = new ImportContext("DIRECTORY",
+                        Path.of(path), false, false);
+                    directoryHandler.handle(ctx, taskId, comicId, mangaRoot);
                 }
                 case "EHENTAI" -> fileService.processImport(taskId, comicId, sourceRef, sourceType);
                 default -> throw new IllegalArgumentException("Unknown sourceType: " + sourceType);
