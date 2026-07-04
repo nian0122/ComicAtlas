@@ -1,3 +1,3 @@
 package com.comicatlas.api.common.enums;
 
-public enum LqStatus { PENDING, READY, FAILED }
+public enum LqStatus { NOT_GENERATED, QUEUED, GENERATING, READY, FAILED }

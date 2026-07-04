@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS page (
     lq_root VARCHAR(32) DEFAULT NULL,
     lq_path VARCHAR(512),
     hq_status VARCHAR(16) DEFAULT 'PENDING',
-    lq_status VARCHAR(16) DEFAULT 'PENDING',
+    lq_status VARCHAR(16) DEFAULT 'NOT_GENERATED',
     lq_size BIGINT DEFAULT 0,
     width INT,
     height INT,
