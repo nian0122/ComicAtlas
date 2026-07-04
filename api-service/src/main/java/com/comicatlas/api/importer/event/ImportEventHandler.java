@@ -106,7 +106,7 @@ public class ImportEventHandler {
                             page.setHqRoot("HQ");
                             page.setHqPath(pd.get("hqPath") != null ? (String) pd.get("hqPath") : (String) pd.get("imageName"));
                             page.setHqStatus(pd.get("hqStatus") != null ? (String) pd.get("hqStatus") : "PENDING");
-                            page.setLqStatus(pd.get("lqStatus") != null ? (String) pd.get("lqStatus") : "PENDING");
+                            page.setLqStatus("NOT_GENERATED");
                             if (pd.get("fileSize") != null) page.setFileSize(((Number) pd.get("fileSize")).longValue());
                             if (pd.get("width") != null) page.setWidth(((Number) pd.get("width")).intValue());
                             if (pd.get("height") != null) page.setHeight(((Number) pd.get("height")).intValue());
@@ -142,7 +142,7 @@ public class ImportEventHandler {
                     page.setHqRoot("HQ");
                     page.setHqPath((String) pd.get("imageName"));
                     page.setHqStatus("READY");
-                    page.setLqStatus("PENDING");
+                    page.setLqStatus("NOT_GENERATED");
                     if (pd.get("fileSize") != null) page.setFileSize(((Number) pd.get("fileSize")).longValue());
                     if (pd.get("width") != null) page.setWidth(((Number) pd.get("width")).intValue());
                     if (pd.get("height") != null) page.setHeight(((Number) pd.get("height")).intValue());
