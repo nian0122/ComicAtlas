@@ -51,6 +51,9 @@
               继续阅读
             </el-button>
             <el-button @click="startRead">从头开始</el-button>
+            <el-button type="warning" plain :loading="lqGenerating" @click="generateLq">
+              生成LQ
+            </el-button>
             <el-popconfirm
               title="确定删除此漫画？"
               confirm-button-text="删除"
@@ -85,7 +88,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { PictureFilled } from '@element-plus/icons-vue'
-import { comicApi, catalogApi } from '@/services/api'
+import { comicApi, catalogApi, lqApi } from '@/services/api'
 import type { ComicDetailVO, CatalogNode, ChapterRef } from '@/types'
 
 const route = useRoute()
@@ -94,6 +97,7 @@ const router = useRouter()
 const comic = ref<ComicDetailVO | null>(null)
 const catalogTree = ref<CatalogNode[]>([])
 const loading = ref(true)
+const lqGenerating = ref(false)
 
 const firstChapter = computed(() => {
   for (const node of catalogTree.value) {
@@ -138,6 +142,19 @@ async function deleteComic() {
     router.push('/comics')
   } catch {
     ElMessage.error('删除失败')
+  }
+}
+
+async function generateLq() {
+  if (!comic.value) return
+  lqGenerating.value = true
+  try {
+    await lqApi.generateComic(comic.value.id)
+    ElMessage.success('LQ 生成任务已提交')
+  } catch {
+    ElMessage.error('提交失败')
+  } finally {
+    lqGenerating.value = false
   }
 }
 

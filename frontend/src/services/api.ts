@@ -39,4 +39,9 @@ export const operationApi = { list: (params: any) => api.get('/operations', { pa
 
 export const tagApi = { list: () => api.get('/tags') }
 
+export const lqApi = {
+  generateComic: (comicId: number) => api.post(`/comics/${comicId}/lq`),
+  generateChapter: (chapterId: number) => api.post(`/chapters/${chapterId}/lq`),
+}
+
 export default api
