@@ -80,7 +80,6 @@ services:
       - ${MANGA_ROOT:-./manga}/thumbs:/storage/thumbs
       - ${MANGA_ROOT:-./manga}/temp:/storage/temp
       - ${MANGA_ROOT:-./manga}/metadata:/storage/metadata
-      - ${LOCAL_ROOT:-F:/games/comics}:/storage/local:ro
     depends_on:
       - rabbitmq
       - nacos
@@ -96,7 +95,6 @@ services:
       - ${MANGA_ROOT:-./manga}/hq:/storage/hq:ro
       - ${MANGA_ROOT:-./manga}/lq:/storage/lq:ro
       - ${MANGA_ROOT:-./manga}/thumbs:/storage/thumbs:ro
-      - ${LOCAL_ROOT:-F:/games/comics}:/storage/local:ro
     depends_on:
       - gateway
 

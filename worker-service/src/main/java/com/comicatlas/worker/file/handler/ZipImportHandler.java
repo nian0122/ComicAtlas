@@ -26,9 +26,8 @@ public class ZipImportHandler {
 
         // 解压后的目录作为新的 sourcePath
         ImportContext extractCtx = new ImportContext(
-            "ZIP", "MANAGED", extractDir,
-            ctx.generateLq(), ctx.overwrite(), null, null
+            "DIRECTORY", extractDir, ctx.generateLq(), ctx.overwrite()
         );
-        return directoryHandler.importManaged(extractCtx, taskId, comicId, mangaRoot);
+        return directoryHandler.handle(extractCtx, taskId, comicId, mangaRoot);
     }
 }

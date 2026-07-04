@@ -79,7 +79,7 @@ public class ImportServiceImpl implements ImportService {
                 }
                 redisTemplate.opsForValue().set(dedupKey, "1", Duration.ofDays(7));
             }
-            case "ZIP", "REGISTER" -> {
+            case "ZIP", "REGISTER", "DIRECTORY" -> {
                 String path = sourcePath != null ? sourcePath : sourceRef;
                 if (path == null || path.isBlank()) throw new BusinessException(400, "请提供 sourcePath");
                 String name = Path.of(path).getFileName().toString();

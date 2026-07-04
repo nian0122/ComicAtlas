@@ -73,14 +73,7 @@ public class ImportEventHandler {
             if (comicData.get("sourceGalleryId") != null) {
                 comic.setSourceGalleryId(comicData.get("sourceGalleryId").toString());
             }
-            if (comicData.get("storagePolicy") != null || comicData.get("storageType") != null) {
-                String policy = comicData.get("storagePolicy") != null
-                    ? (String) comicData.get("storagePolicy")
-                    : (String) comicData.get("storageType");
-                comic.setStoragePolicy(policy);
-                comic.setRootKey((String) comicData.get("rootKey"));
-                comic.setRelativePath((String) comicData.get("relativePath"));
-            }
+            comic.setStoragePolicy("MANAGED");
             comic.setStatus("READY");
             long totalSize = 0;
             int totalPages = 0;
@@ -110,10 +103,8 @@ public class ImportEventHandler {
                                 new com.comicatlas.api.comic.entity.Page();
                             page.setChapterId(chapter.getId());
                             page.setPageNumber(((Number) pd.get("pageNumber")).intValue());
-                            page.setHqRoot(pd.get("hqRoot") != null ? (String) pd.get("hqRoot") : "HQ");
-                            page.setHqPath((String) pd.get("hqPath"));
-                            page.setLqRoot((String) pd.get("lqRoot"));
-                            page.setLqPath((String) pd.get("lqPath"));
+                            page.setHqRoot("HQ");
+                            page.setHqPath(pd.get("hqPath") != null ? (String) pd.get("hqPath") : (String) pd.get("imageName"));
                             page.setHqStatus(pd.get("hqStatus") != null ? (String) pd.get("hqStatus") : "PENDING");
                             page.setLqStatus(pd.get("lqStatus") != null ? (String) pd.get("lqStatus") : "PENDING");
                             if (pd.get("fileSize") != null) page.setFileSize(((Number) pd.get("fileSize")).longValue());

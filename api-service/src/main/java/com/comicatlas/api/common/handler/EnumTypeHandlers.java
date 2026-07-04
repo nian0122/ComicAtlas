@@ -24,14 +24,6 @@ public class EnumTypeHandlers {
         @Override public SourceType getNullableResult(CallableStatement cs, int c) throws SQLException { return safeValueOf(SourceType.class, cs.getString(c)); }
     }
 
-    @MappedTypes(StoragePolicy.class)
-    public static class StoragePolicyHandler extends BaseTypeHandler<StoragePolicy> {
-        @Override public void setNonNullParameter(PreparedStatement ps, int i, StoragePolicy p, JdbcType t) throws SQLException { ps.setString(i, p.name()); }
-        @Override public StoragePolicy getNullableResult(ResultSet rs, String c) throws SQLException { return safeValueOf(StoragePolicy.class, rs.getString(c)); }
-        @Override public StoragePolicy getNullableResult(ResultSet rs, int c) throws SQLException { return safeValueOf(StoragePolicy.class, rs.getString(c)); }
-        @Override public StoragePolicy getNullableResult(CallableStatement cs, int c) throws SQLException { return safeValueOf(StoragePolicy.class, cs.getString(c)); }
-    }
-
     @MappedTypes(ComicStatus.class)
     public static class ComicStatusHandler extends BaseTypeHandler<ComicStatus> {
         @Override public void setNonNullParameter(PreparedStatement ps, int i, ComicStatus p, JdbcType t) throws SQLException { ps.setString(i, p.name()); }

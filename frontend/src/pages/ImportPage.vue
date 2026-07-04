@@ -7,7 +7,7 @@
     <div class="import-form">
       <el-select v-model="sourceType" class="type-select">
         <el-option label="ZIP 文件" value="ZIP" />
-        <el-option label="目录注册" value="REGISTER" />
+        <el-option label="目录导入" value="DIRECTORY" />
       </el-select>
       <el-input
         v-model="sourcePath"
