@@ -7,6 +7,7 @@ import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.comic.mapper.PageMapper;
 import com.comicatlas.api.common.storage.FileUrlResolver;
 import com.comicatlas.api.reader.dto.ReaderDTO;
+import com.comicatlas.api.common.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -22,7 +23,7 @@ public class ReaderService {
 
     public ReaderDTO getChapter(Long chapterId) {
         Chapter ch = chapterMapper.selectById(chapterId);
-        if (ch == null) throw new RuntimeException("章节不存在");
+        if (ch == null) throw new BusinessException(404, "章节不存在");
 
         var pages = pageMapper.selectList(
             new LambdaQueryWrapper<Page>().eq(Page::getChapterId, chapterId).orderByAsc(Page::getPageNumber));
