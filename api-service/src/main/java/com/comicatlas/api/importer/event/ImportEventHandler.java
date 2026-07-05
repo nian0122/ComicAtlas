@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
@@ -37,6 +38,9 @@ public class ImportEventHandler {
     private final ComicTagMapper comicTagMapper;
     private final ImportTaskMapper taskMapper;
 
+    @Value("${MANGA_ROOT:D:/manga}")
+    private String mangaRoot;
+
     @Transactional
     @RabbitListener(queues = "import.result.queue")
     @SuppressWarnings("unchecked")
@@ -54,7 +58,7 @@ public class ImportEventHandler {
 
         try {
             // 读取 metadata.json
-            File metadataFile = new File("/manga/metadata/" + taskId + ".json");
+            File metadataFile = new File(mangaRoot + "/metadata/" + taskId + ".json");
             Map<String, Object> metadata = objectMapper.readValue(metadataFile,
                 new TypeReference<Map<String, Object>>() {});
 
