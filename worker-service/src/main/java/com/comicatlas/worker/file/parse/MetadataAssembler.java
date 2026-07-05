@@ -26,7 +26,7 @@ public class MetadataAssembler {
     private static final Set<String> IMAGE_EXT = Set.of(".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp");
 
     public ComicMetadata assemble(DirectoryTree tree, ImportContext ctx) {
-        String title = tree.name();
+        String title = ctx.titleHint() != null ? ctx.titleHint() : tree.name();
         List<ComicMetadata.CatalogInfo> catalogs = new ArrayList<>();
         List<ComicMetadata.ChapterInfo> chapters = new ArrayList<>();
         AtomicInteger globalOrder = new AtomicInteger(0);
