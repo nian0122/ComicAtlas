@@ -24,9 +24,11 @@ public class ZipImportHandler {
         zipExtractor.extract(zipFile, extractDir);
         log.info("ZIP extracted: {} -> {}", zipFile, extractDir);
 
-        // 解压后的目录作为新的 sourcePath
+        // 解压后的目录作为新的 sourcePath，ZIP 文件名作为 title 备选
+        String fileName = zipFile.getFileName().toString();
+        String titleHint = fileName.contains(".") ? fileName.substring(0, fileName.lastIndexOf('.')) : fileName;
         ImportContext extractCtx = new ImportContext(
-            "DIRECTORY", extractDir, ctx.generateLq(), ctx.overwrite()
+            "DIRECTORY", extractDir, ctx.generateLq(), ctx.overwrite(), titleHint
         );
         return directoryHandler.handle(extractCtx, taskId, comicId, mangaRoot);
     }

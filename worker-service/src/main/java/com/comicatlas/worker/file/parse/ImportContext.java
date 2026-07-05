@@ -7,8 +7,13 @@ import java.nio.file.Path;
  * 简化后统一使用 MANAGED 存储策略。
  */
 public record ImportContext(
-    String sourceType,          // ZIP / DIRECTORY
+    String sourceType,
     Path sourcePath,
     boolean generateLq,
-    boolean overwrite
-) {}
+    boolean overwrite,
+    String titleHint          // ZIP 文件名或目录名，title 的备选
+) {
+    public ImportContext(String sourceType, Path sourcePath, boolean generateLq, boolean overwrite) {
+        this(sourceType, sourcePath, generateLq, overwrite, null);
+    }
+}
