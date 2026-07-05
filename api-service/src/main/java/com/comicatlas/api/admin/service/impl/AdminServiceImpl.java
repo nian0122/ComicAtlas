@@ -10,6 +10,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,11 +33,14 @@ public class AdminServiceImpl implements AdminService {
     private final ComicTagMapper comicTagMapper;
     private final ImportTaskMapper taskMapper;
 
+    @Value("${MANGA_ROOT:D:/manga}")
+    private String mangaRoot;
+
     @Override
     @Transactional
     public Map<String, Object> rebuildFromHq() {
-        Path hqRoot = Path.of(System.getProperty("MANGA_ROOT", "D:/manga"), "hq");
-        Path metaDir = Path.of(System.getProperty("MANGA_ROOT", "D:/manga"), "metadata");
+        Path hqRoot = Path.of(mangaRoot, "hq");
+        Path metaDir = Path.of(mangaRoot, "metadata");
         if (!Files.exists(hqRoot)) throw new RuntimeException("HQ 目录不存在: " + hqRoot);
 
         // 收集已有 comicId（hq 目录名）
