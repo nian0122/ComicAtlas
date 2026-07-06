@@ -1,5 +1,6 @@
 package com.comicatlas.worker.event;
 
+import com.comicatlas.common.event.DeleteRequestedEvent;
 import com.comicatlas.worker.common.FilePathBuilder;
 import com.comicatlas.worker.config.WorkerConfig;
 import lombok.RequiredArgsConstructor;
@@ -20,8 +21,8 @@ public class DeleteHandler {
     private final RabbitTemplate rabbitTemplate;
 
     @RabbitListener(queues = "delete.task.queue")
-    public void handle(Map<String, Object> msg) {
-        Long comicId = Long.valueOf(msg.get("comicId").toString());
+    public void handle(DeleteRequestedEvent event) {
+        Long comicId = event.comicId();
         log.info("Delete: comicId={}", comicId);
 
         try {
@@ -32,7 +33,6 @@ public class DeleteHandler {
             deleteFile(mangaRoot.resolve(pathBuilder.rawPath(comicId)));
 
             Map<String, Object> result = Map.of(
-                "messageId", UUID.randomUUID().toString(),
                 "comicId", comicId
             );
             rabbitTemplate.convertAndSend("comic.delete", "delete.completed", result);

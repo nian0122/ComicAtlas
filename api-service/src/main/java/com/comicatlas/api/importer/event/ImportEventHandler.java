@@ -5,6 +5,8 @@ import com.comicatlas.api.comic.entity.*;
 import com.comicatlas.api.comic.mapper.*;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
+import com.comicatlas.common.event.ImportTaskCompletedEvent;
+import com.comicatlas.common.event.TaskStatusChangedEvent;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -39,16 +41,15 @@ public class ImportEventHandler {
     @Transactional
     @RabbitListener(queues = "import.result.queue")
     @SuppressWarnings("unchecked")
-    public void handleComicImported(Map<String, Object> msg) {
-        String messageId = (String) msg.get("messageId");
-        String idempKey = "mq:msg:" + messageId;
+    public void handleComicImported(ImportTaskCompletedEvent event) {
+        String idempKey = "mq:event:" + event.eventId();
         if (Boolean.FALSE.equals(redisTemplate.opsForValue().setIfAbsent(idempKey, "1", Duration.ofDays(1)))) {
-            log.info("消息已处理，跳过: messageId={}", messageId);
+            log.info("事件已处理，跳过: eventId={}", event.eventId());
             return;
         }
 
-        Long taskId = Long.valueOf(msg.get("taskId").toString());
-        Long comicId = Long.valueOf(msg.get("comicId").toString());
+        Long taskId = event.taskId();
+        Long comicId = event.comicId();
         log.info("ComicImported: taskId={}, comicId={}", taskId, comicId);
 
         try {
@@ -166,9 +167,9 @@ public class ImportEventHandler {
 
     @RabbitListener(queues = "task.status.queue")
     @Transactional
-    public void handleTaskStatusChanged(Map<String, Object> msg) {
-        Long taskId = Long.valueOf(msg.get("taskId").toString());
-        String newStatus = (String) msg.get("newStatus");
+    public void handleTaskStatusChanged(TaskStatusChangedEvent event) {
+        Long taskId = event.taskId();
+        String newStatus = event.status();
         ImportTask task = taskMapper.selectById(taskId);
         if (task == null) return;
 
@@ -176,10 +177,10 @@ public class ImportEventHandler {
         if ("DOWNLOADING".equals(newStatus) && task.getStartTime() == null) {
             task.setStartTime(LocalDateTime.now());
         }
-        if (msg.get("progress") != null) task.setProgress(((Number) msg.get("progress")).intValue());
-        if (msg.get("speedBytesPerSec") != null) task.setDownloadSpeed(((Number) msg.get("speedBytesPerSec")).longValue());
-        if (msg.get("etaSeconds") != null) task.setEtaSeconds(((Number) msg.get("etaSeconds")).intValue());
-        if (msg.get("downloadMethod") != null) task.setDownloadMethod((String) msg.get("downloadMethod"));
+        task.setProgress(event.progress());
+        if (event.speedBytesPerSec() > 0) task.setDownloadSpeed(event.speedBytesPerSec());
+        if (event.etaSeconds() > 0) task.setEtaSeconds(event.etaSeconds());
+        if (event.downloadMethod() != null) task.setDownloadMethod(event.downloadMethod());
         taskMapper.updateById(task);
     }
 }

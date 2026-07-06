@@ -15,6 +15,13 @@
     <description>动漫资源聚合平台 - API 服务层</description>
 
     <dependencies>
+        <!-- Comic Common -->
+        <dependency>
+            <groupId>com.comicatlas</groupId>
+            <artifactId>comic-common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- Web -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

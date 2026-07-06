@@ -101,7 +101,7 @@ public class ImportServiceImpl implements ImportService {
         taskMapper.insert(task);
 
         // 3. 发 MQ
-        eventPublisher.publishImportTaskCreated(task.getId(), comic.getId(), sourceRef, sourceType, sourcePath);
+        eventPublisher.publishImportTaskCreated(task.getId(), comic.getId(), sourceType, sourcePath);
 
         log.info("导入任务创建: taskId={}, comicId={}, sourceType={}", task.getId(), comic.getId(), sourceType);
         return toVO(task);
@@ -158,7 +158,7 @@ public class ImportServiceImpl implements ImportService {
         t.setRetryCount(t.getRetryCount() + 1);
         t.setErrorMessage(null);
         taskMapper.updateById(t);
-        eventPublisher.publishImportTaskCreated(t.getId(), t.getComicId(), t.getSourceRef(), t.getSourceType(), t.getSourcePath());
+        eventPublisher.publishImportTaskCreated(t.getId(), t.getComicId(), t.getSourceType(), t.getSourcePath());
     }
 
     private ImportTaskVO toVO(ImportTask t) {
