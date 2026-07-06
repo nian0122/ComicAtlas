@@ -39,6 +39,12 @@ public class RabbitMqConfig {
     }
 
     @Bean
+    public Binding importFailedBinding() {
+        return BindingBuilder.bind(importResultQueue())
+                .to(importExchange()).with("task.failed");
+    }
+
+    @Bean
     public Binding importResultDlqBinding() {
         return BindingBuilder.bind(importResultDlq())
                 .to(importDlxExchange()).with("import.result.dlq");
