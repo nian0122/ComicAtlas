@@ -15,6 +15,13 @@
     <description>动漫资源聚合平台 - 消息消费者服务</description>
 
     <dependencies>
+        <!-- Comic Common -->
+        <dependency>
+            <groupId>com.comicatlas</groupId>
+            <artifactId>comic-common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- Spring Boot 基础 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -1,5 +1,6 @@
 package com.comicatlas.worker.event;
 
+import com.comicatlas.common.event.LqGenerateEvent;
 import com.comicatlas.worker.image.ImageOptimizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,9 +18,9 @@ public class LqGenerateHandler {
     private final RabbitTemplate rabbitTemplate;
 
     @RabbitListener(queues = "lq.generate.queue")
-    public void handle(Map<String, Object> msg) {
-        Long comicId = Long.valueOf(msg.get("comicId").toString());
-        Long chapterId = Long.valueOf(msg.get("chapterId").toString());
+    public void handle(LqGenerateEvent event) {
+        Long comicId = event.comicId();
+        Long chapterId = event.chapterId();
         log.info("LQ generation: comicId={}, chapterId={}", comicId, chapterId);
 
         try {

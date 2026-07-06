@@ -19,6 +19,7 @@
     <description>动漫资源聚合平台 - 父工程</description>
 
     <modules>
+        <module>comic-common</module>
         <module>api-service</module>
         <module>worker-service</module>
         <module>gateway</module>

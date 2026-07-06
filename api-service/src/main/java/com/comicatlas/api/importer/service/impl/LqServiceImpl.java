@@ -6,13 +6,14 @@ import com.comicatlas.api.comic.entity.Page;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.comic.mapper.PageMapper;
 import com.comicatlas.api.importer.service.LqService;
+import com.comicatlas.common.event.LqGenerateEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Map;
+import java.time.Instant;
 import java.util.UUID;
 
 @Slf4j
@@ -49,11 +50,8 @@ public class LqServiceImpl implements LqService {
         }
 
         // 发 MQ
-        var msg = new java.util.LinkedHashMap<String, Object>();
-        msg.put("messageId", UUID.randomUUID().toString());
-        msg.put("chapterId", chapterId);
-        msg.put("comicId", ch.getComicId());
-        rabbitTemplate.convertAndSend("comic.image", "lq.generate", msg);
+        var event = new LqGenerateEvent(UUID.randomUUID(), Instant.now(), ch.getComicId(), chapterId);
+        rabbitTemplate.convertAndSend("comic.image", "lq.generate", event);
 
         log.info("LQ 生成任务已发布: chapterId={}, pages={}", chapterId, pages.size());
     }

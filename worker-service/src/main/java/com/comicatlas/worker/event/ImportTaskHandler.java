@@ -1,5 +1,6 @@
 package com.comicatlas.worker.event;
 
+import com.comicatlas.common.event.ImportTaskCreatedEvent;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.file.FileService;
 import com.comicatlas.worker.file.handler.DirectoryImportHandler;
@@ -23,12 +24,11 @@ public class ImportTaskHandler {
     private final TaskStatusPublisher publisher;
 
     @RabbitListener(queues = "import.task.queue")
-    public void handle(java.util.Map<String, Object> msg) {
-        Long taskId = Long.valueOf(msg.get("taskId").toString());
-        Long comicId = Long.valueOf(msg.get("comicId").toString());
-        String sourceType = (String) msg.getOrDefault("sourceType", "ZIP");
-        String sourcePath = (String) msg.get("sourcePath");
-        String sourceRef = (String) msg.get("sourceRef");
+    public void handle(ImportTaskCreatedEvent event) {
+        Long taskId = event.taskId();
+        Long comicId = event.comicId();
+        String sourceType = event.sourceType() != null ? event.sourceType() : "ZIP";
+        String sourcePath = event.sourcePath();
         log.info("ImportTaskHandler: taskId={}, comicId={}, sourceType={}", taskId, comicId, sourceType);
 
         try {
@@ -42,12 +42,12 @@ public class ImportTaskHandler {
                     zipHandler.importZip(ctx, taskId, comicId, mangaRoot);
                 }
                 case "REGISTER", "DIRECTORY" -> {
-                    String path = sourcePath != null ? sourcePath : sourceRef;
+                    if (sourcePath == null) throw new IllegalArgumentException("DIRECTORY 需要 sourcePath");
                     ImportContext ctx = new ImportContext("DIRECTORY",
-                        Path.of(path), false, false);
+                        Path.of(sourcePath), false, false);
                     directoryHandler.handle(ctx, taskId, comicId, mangaRoot);
                 }
-                case "EHENTAI" -> fileService.processImport(taskId, comicId, sourceRef, sourceType);
+                case "EHENTAI" -> fileService.processImport(taskId, comicId, sourcePath, sourceType);
                 default -> throw new IllegalArgumentException("Unknown sourceType: " + sourceType);
             }
 
