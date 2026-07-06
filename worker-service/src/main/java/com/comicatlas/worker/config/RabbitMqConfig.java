@@ -14,34 +14,27 @@ public class RabbitMqConfig {
         return new Jackson2JsonMessageConverter();
     }
 
-    // ===== Exchange 声明（幂等，已存在则复用）=====
+    // ===== Exchanges =====
 
     @Bean
-    public DirectExchange importExchange() {
-        return new DirectExchange("comic.import");
-    }
+    public DirectExchange importExchange() { return new DirectExchange("comic.import"); }
 
     @Bean
-    public DirectExchange importDlxExchange() {
-        return new DirectExchange("comic.import.dlx");
-    }
+    public DirectExchange importDlxExchange() { return new DirectExchange("comic.import.dlx"); }
 
     @Bean
-    public DirectExchange imageExchange() {
-        return new DirectExchange("comic.image");
-    }
+    public DirectExchange imageExchange() { return new DirectExchange("comic.image"); }
 
     @Bean
-    public DirectExchange taskExchange() {
-        return new DirectExchange("comic.task");
-    }
+    public DirectExchange imageDlxExchange() { return new DirectExchange("comic.image.dlx"); }
 
     @Bean
-    public DirectExchange deleteExchange() {
-        return new DirectExchange("comic.delete");
-    }
+    public DirectExchange taskExchange() { return new DirectExchange("comic.task"); }
 
-    // ===== Queue 声明 =====
+    @Bean
+    public DirectExchange deleteExchange() { return new DirectExchange("comic.delete"); }
+
+    // ===== Queues =====
 
     @Bean
     public Queue importTaskQueue() {
@@ -54,11 +47,6 @@ public class RabbitMqConfig {
     @Bean
     public Queue importTaskDlq() {
         return QueueBuilder.durable("import.task.dlq").build();
-    }
-
-    @Bean
-    public Queue importProcessedQueue() {
-        return QueueBuilder.durable("import.processed.queue").build();
     }
 
     @Bean
@@ -75,16 +63,11 @@ public class RabbitMqConfig {
     }
 
     @Bean
-    public DirectExchange imageDlxExchange() {
-        return new DirectExchange("comic.image.dlx");
-    }
-
-    @Bean
     public Queue deleteTaskQueue() {
         return QueueBuilder.durable("delete.task.queue").build();
     }
 
-    // ===== Binding =====
+    // ===== Bindings =====
 
     @Bean
     public Binding importTaskBinding() {
@@ -96,12 +79,6 @@ public class RabbitMqConfig {
     public Binding importTaskDlqBinding() {
         return BindingBuilder.bind(importTaskDlq())
                 .to(importDlxExchange()).with("import.task.dlq");
-    }
-
-    @Bean
-    public Binding importProcessedBinding() {
-        return BindingBuilder.bind(importProcessedQueue())
-                .to(importExchange()).with("task.processed");
     }
 
     @Bean

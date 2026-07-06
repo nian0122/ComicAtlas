@@ -64,36 +64,4 @@ public class RabbitMqConfig {
         return BindingBuilder.bind(taskStatusQueue())
                 .to(taskExchange()).with("status.changed");
     }
-
-    @Bean
-    public DirectExchange imageExchange() {
-        return new DirectExchange("comic.image");
-    }
-
-    @Bean
-    public Queue lqResultQueue() {
-        return QueueBuilder.durable("lq.result.queue").build();
-    }
-
-    @Bean
-    public Binding lqResultBinding() {
-        return BindingBuilder.bind(lqResultQueue())
-                .to(imageExchange()).with("lq.completed");
-    }
-
-    @Bean
-    public DirectExchange deleteExchange() {
-        return new DirectExchange("comic.delete");
-    }
-
-    @Bean
-    public Queue deleteResultQueue() {
-        return QueueBuilder.durable("delete.result.queue").build();
-    }
-
-    @Bean
-    public Binding deleteResultBinding() {
-        return BindingBuilder.bind(deleteResultQueue())
-                .to(deleteExchange()).with("delete.completed");
-    }
 }
