@@ -22,6 +22,11 @@ const router = createRouter({
       props: true,
     },
     {
+      path: '/tasks',
+      name: 'tasks',
+      component: () => import('@/pages/TaskCenterPage.vue'),
+    },
+    {
       path: '/import',
       name: 'import',
       component: () => import('@/pages/ImportPage.vue'),
