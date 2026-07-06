@@ -91,10 +91,24 @@ URL 统一由 `FileUrlResolver.resolve(page)` 生成，不手拼。
 |----------|-----------|-------|----------|
 | comic.import | task.created | import.task.queue | Worker ImportTaskHandler |
 | comic.import | task.completed | import.result.queue | API ImportEventHandler |
+| comic.import | task.failed | import.task.queue | Worker (待实现) |
 | comic.task | status.changed | task.status.queue | API ImportEventHandler |
-| comic.image | lq.generate | lq.generate.queue | Worker (手动触发) |
+| comic.image | lq.generate | lq.generate.queue | Worker LqGenerateHandler |
+| comic.delete | delete.requested | delete.task.queue | Worker DeleteHandler |
 
-序列化: Jackson2JsonMessageConverter
+**死信**: 所有主队列配置 DLX + DLQ（comic.import.dlx / comic.image.dlx / comic.delete.dlx）
+
+**序列化**: Jackson2JsonMessageConverter
+
+**事件命名规范（冻结）**:
+| Event | RoutingKey | DTO（Phase B） |
+|-------|-----------|----------------|
+| ImportTaskCreated | comic.import.task.created | ImportTaskCreatedEvent |
+| ImportTaskCompleted | comic.import.task.completed | ImportTaskCompletedEvent |
+| ImportTaskFailed | comic.import.task.failed | ImportTaskFailedEvent |
+| LqGenerate | comic.image.lq.generate | LqGenerateEvent |
+| DeleteRequested | comic.delete.requested | DeleteRequestedEvent |
+| TaskStatusChanged | comic.task.status.changed | TaskStatusChangedEvent |
 
 ## CONFIG / ENV
 | 变量 | 默认值 | 说明 |
