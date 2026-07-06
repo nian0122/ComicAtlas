@@ -31,6 +31,10 @@ spring:
     publisher-returns: true
     template:
       mandatory: true
+    listener:
+      simple:
+        prefetch: 1
+        acknowledge-mode: manual
   sql:
     init:
       mode: always

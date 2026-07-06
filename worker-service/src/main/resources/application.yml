@@ -20,6 +20,10 @@ spring:
     publisher-returns: true
     template:
       mandatory: true
+    listener:
+      simple:
+        prefetch: 1
+        acknowledge-mode: manual
 
 worker:
   manga-root: ${MANGA_ROOT:D:/manga}

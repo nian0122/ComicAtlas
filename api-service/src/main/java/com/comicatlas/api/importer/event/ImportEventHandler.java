@@ -7,6 +7,9 @@ import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
 import com.comicatlas.common.event.ImportTaskCompletedEvent;
 import com.comicatlas.common.event.TaskStatusChangedEvent;
+import com.rabbitmq.client.Channel;
+import org.springframework.amqp.support.AmqpHeaders;
+import org.springframework.messaging.handler.annotation.Header;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -41,7 +44,8 @@ public class ImportEventHandler {
     @Transactional
     @RabbitListener(queues = "import.result.queue")
     @SuppressWarnings("unchecked")
-    public void handleComicImported(ImportTaskCompletedEvent event) {
+    public void handleComicImported(ImportTaskCompletedEvent event,
+            Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         String idempKey = "mq:event:" + event.eventId();
         if (Boolean.FALSE.equals(redisTemplate.opsForValue().setIfAbsent(idempKey, "1", Duration.ofDays(1)))) {
             log.info("事件已处理，跳过: eventId={}", event.eventId());
@@ -100,12 +104,13 @@ public class ImportEventHandler {
             }
             taskMapper.updateById(task);
 
+            channel.basicAck(tag, false);
             log.info("ComicImported 完成: comicId={}, chapters={}, pages={}", comicId,
                 chaptersData != null ? chaptersData.size() : 0, totalPages);
 
         } catch (Exception e) {
             log.error("ComicImported 失败: taskId={}", taskId, e);
-            throw new RuntimeException("ComicImported 消费失败", e);
+            try { channel.basicReject(tag, false); } catch (Exception ignored) {}
         }
     }
 
@@ -167,20 +172,28 @@ public class ImportEventHandler {
 
     @RabbitListener(queues = "task.status.queue")
     @Transactional
-    public void handleTaskStatusChanged(TaskStatusChangedEvent event) {
-        Long taskId = event.taskId();
-        String newStatus = event.status();
-        ImportTask task = taskMapper.selectById(taskId);
-        if (task == null) return;
+    public void handleTaskStatusChanged(TaskStatusChangedEvent event,
+            Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
+        try {
+            Long taskId = event.taskId();
+            String newStatus = event.status();
+            ImportTask task = taskMapper.selectById(taskId);
+            if (task == null) { channel.basicAck(tag, false); return; }
 
-        task.setStatus(newStatus);
-        if ("DOWNLOADING".equals(newStatus) && task.getStartTime() == null) {
-            task.setStartTime(LocalDateTime.now());
+            task.setStatus(newStatus);
+            if ("DOWNLOADING".equals(newStatus) && task.getStartTime() == null) {
+                task.setStartTime(LocalDateTime.now());
+            }
+            task.setProgress(event.progress());
+            if (event.speedBytesPerSec() > 0) task.setDownloadSpeed(event.speedBytesPerSec());
+            if (event.etaSeconds() > 0) task.setEtaSeconds(event.etaSeconds());
+            if (event.downloadMethod() != null) task.setDownloadMethod(event.downloadMethod());
+            taskMapper.updateById(task);
+
+            channel.basicAck(tag, false);
+        } catch (Exception e) {
+            log.error("TaskStatusChanged 失败", e);
+            try { channel.basicReject(tag, false); } catch (Exception ignored) {}
         }
-        task.setProgress(event.progress());
-        if (event.speedBytesPerSec() > 0) task.setDownloadSpeed(event.speedBytesPerSec());
-        if (event.etaSeconds() > 0) task.setEtaSeconds(event.etaSeconds());
-        if (event.downloadMethod() != null) task.setDownloadMethod(event.downloadMethod());
-        taskMapper.updateById(task);
     }
 }
