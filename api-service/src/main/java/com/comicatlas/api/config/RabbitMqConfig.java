@@ -23,13 +23,30 @@ public class RabbitMqConfig {
     public Queue importResultQueue() {
         return QueueBuilder.durable("import.result.queue")
                 .deadLetterExchange("comic.import.dlx")
+                .deadLetterRoutingKey("import.result.dlq")
                 .build();
+    }
+
+    @Bean
+    public Queue importResultDlq() {
+        return QueueBuilder.durable("import.result.dlq").build();
     }
 
     @Bean
     public Binding importResultBinding() {
         return BindingBuilder.bind(importResultQueue())
                 .to(importExchange()).with("task.completed");
+    }
+
+    @Bean
+    public Binding importResultDlqBinding() {
+        return BindingBuilder.bind(importResultDlq())
+                .to(importDlxExchange()).with("import.result.dlq");
+    }
+
+    @Bean
+    public DirectExchange importDlxExchange() {
+        return new DirectExchange("comic.import.dlx");
     }
 
     @Bean
