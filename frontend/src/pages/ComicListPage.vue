@@ -10,6 +10,7 @@
           class="search-input"
           @clear="onSearch"
           @keyup.enter="onSearch"
+          @input="onKeywordInput"
         >
           <template #prefix>
             <el-icon><Search /></el-icon>
@@ -126,6 +127,12 @@ const keyword = ref('')
 const tagFilter = ref('')
 
 const tags = ref<{ name: string }[]>([])
+let debounceTimer: ReturnType<typeof setTimeout> | null = null
+
+function onKeywordInput() {
+  if (debounceTimer) clearTimeout(debounceTimer)
+  debounceTimer = setTimeout(onSearch, 300)
+}
 
 function onSearch() {
   store.query.keyword = keyword.value || undefined

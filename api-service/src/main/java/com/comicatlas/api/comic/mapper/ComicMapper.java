@@ -18,8 +18,10 @@ public interface ComicMapper extends BaseMapper<Comic> {
         <where>
             <if test='query.keyword != null and query.keyword != ""'>
                 AND (c.title LIKE CONCAT('%', #{query.keyword}, '%')
+                     OR c.title_jpn LIKE CONCAT('%', #{query.keyword}, '%')
+                     OR c.author LIKE CONCAT('%', #{query.keyword}, '%')
                      OR EXISTS (SELECT 1 FROM comic_tag ct JOIN tag t ON t.id = ct.tag_id
-                                WHERE ct.comic_id = c.id AND t.name LIKE CONCAT('%', #{query.keyword}, '%')))
+                                 WHERE ct.comic_id = c.id AND t.name LIKE CONCAT('%', #{query.keyword}, '%')))
             </if>
             <if test='query.tag != null and query.tag != ""'>
                 AND EXISTS (SELECT 1 FROM comic_tag ct JOIN tag t ON t.id = ct.tag_id
@@ -30,6 +32,9 @@ public interface ComicMapper extends BaseMapper<Comic> {
             </if>
             <if test='query.category != null and query.category != ""'>
                 AND c.category = #{query.category}
+            </if>
+            <if test='query.sourceType != null and query.sourceType != ""'>
+                AND c.source_type = #{query.sourceType}
             </if>
         </where>
         ORDER BY
