@@ -65,7 +65,18 @@ public class RabbitMqConfig {
     public Queue lqGenerateQueue() {
         return QueueBuilder.durable("lq.generate.queue")
                 .deadLetterExchange("comic.image.dlx")
+                .deadLetterRoutingKey("lq.generate.dlq")
                 .build();
+    }
+
+    @Bean
+    public Queue lqGenerateDlq() {
+        return QueueBuilder.durable("lq.generate.dlq").build();
+    }
+
+    @Bean
+    public DirectExchange imageDlxExchange() {
+        return new DirectExchange("comic.image.dlx");
     }
 
     @Bean
@@ -97,6 +108,12 @@ public class RabbitMqConfig {
     public Binding lqGenerateBinding() {
         return BindingBuilder.bind(lqGenerateQueue())
                 .to(imageExchange()).with("lq.generate");
+    }
+
+    @Bean
+    public Binding lqGenerateDlqBinding() {
+        return BindingBuilder.bind(lqGenerateDlq())
+                .to(imageDlxExchange()).with("lq.generate.dlq");
     }
 
     @Bean
