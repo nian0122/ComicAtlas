@@ -117,6 +117,7 @@ export interface ImportTaskVO {
   etaSeconds: number
   errorMessage: string
   retryCount: number
+  durationMs: number
   createdAt: string
 }
 
