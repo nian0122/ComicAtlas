@@ -91,7 +91,7 @@ URL 统一由 `FileUrlResolver.resolve(page)` 生成，不手拼。
 |----------|-----------|-------|----------|
 | comic.import | task.created | import.task.queue | Worker ImportTaskHandler |
 | comic.import | task.completed | import.result.queue | API ImportEventHandler |
-| comic.import | task.failed | import.task.queue | Worker (待实现) |
+| comic.import | task.failed | import.result.queue | API ImportEventHandler |
 | comic.task | status.changed | task.status.queue | API ImportEventHandler |
 | comic.image | lq.generate | lq.generate.queue | Worker LqGenerateHandler |
 | comic.delete | delete.requested | delete.task.queue | Worker DeleteHandler |

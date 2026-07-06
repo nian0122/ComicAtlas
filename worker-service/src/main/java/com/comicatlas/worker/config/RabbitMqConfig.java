@@ -115,10 +115,4 @@ public class RabbitMqConfig {
         return BindingBuilder.bind(deleteTaskDlq())
                 .to(deleteDlxExchange()).with("delete.task.dlq");
     }
-
-    @Bean
-    public Binding importFailedBinding() {
-        return BindingBuilder.bind(importTaskQueue())
-                .to(importExchange()).with("task.failed");
-    }
 }
