@@ -16,6 +16,10 @@ spring:
     port: 5672
     username: ${RABBITMQ_USER:guest}
     password: ${RABBITMQ_PASS:guest}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
 
 worker:
   manga-root: ${MANGA_ROOT:D:/manga}
