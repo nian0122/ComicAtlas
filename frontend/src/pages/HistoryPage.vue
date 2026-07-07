@@ -1,59 +1,125 @@
 <template>
   <div class="history-page">
     <header class="page-header">
-      <h1 class="page-title">阅读历史</h1>
+      <div class="header-left">
+        <h1 class="page-title">阅读中心</h1>
+        <p v-if="recentCount > 0" class="page-subtitle">
+          最近阅读 {{ recentCount }} 部漫画
+        </p>
+      </div>
+      <div class="header-actions">
+        <button class="ghost-btn" @click="store.refresh">刷新</button>
+        <button class="primary-btn" @click="router.push('/comics')">去漫画库</button>
+      </div>
     </header>
 
-    <div v-loading="loading" class="history-list">
-      <el-card
-        v-for="item in store.list"
-        :key="item.comicId"
-        shadow="hover"
-        class="history-card"
-        @click="continueRead(item)"
-      >
-        <div class="card-inner">
-          <div class="cover-wrapper">
-            <el-image :src="item.coverUrl" fit="cover" lazy class="cover-image">
-              <template #error>
-                <div class="cover-placeholder">
-                  <el-icon :size="28"><PictureFilled /></el-icon>
-                </div>
-              </template>
-            </el-image>
-          </div>
-          <div class="card-info">
-            <p class="comic-title">{{ item.comicTitle }}</p>
-            <p class="chapter-info">
-              第{{ item.chapterNo }}话 · {{ item.pageNumber }}/{{ item.totalPages }} · {{ item.progressPercent }}%
-            </p>
-            <p class="read-time">{{ formatTime(item.updatedAt) }}</p>
-            <div class="mini-progress">
-              <el-progress
-                :percentage="item.progressPercent"
-                :stroke-width="4"
-                :show-text="false"
-              />
-            </div>
-          </div>
-        </div>
-      </el-card>
-
-      <el-empty v-if="!loading && store.list.length === 0" description="暂无阅读历史" />
+    <!-- 加载 -->
+    <div v-if="store.loading && store.list.length === 0" class="state loading">
+      <div class="spinner" />
+      <span>加载中...</span>
     </div>
+
+    <!-- 错误 -->
+    <div v-else-if="store.error" class="state error">
+      <el-icon :size="32"><WarningFilled /></el-icon>
+      <span>{{ store.error }}</span>
+      <button class="ghost-btn" @click="store.refresh">重试</button>
+    </div>
+
+    <!-- 空状态 -->
+    <div v-else-if="store.list.length === 0" class="state empty">
+      <el-icon :size="56"><PictureFilled /></el-icon>
+      <h2 class="empty-title">还没有阅读记录</h2>
+      <p class="empty-desc">阅读任意漫画后，这里会显示你的最近进度</p>
+      <button class="primary-btn" @click="router.push('/comics')">开始阅读</button>
+    </div>
+
+    <!-- 列表 -->
+    <template v-else>
+      <!-- 今天 -->
+      <section v-if="today.length > 0" class="history-section">
+        <h2 class="section-title">
+          今天
+          <span class="section-count">{{ today.length }}</span>
+        </h2>
+        <div class="history-cards">
+          <HistoryCard
+            v-for="item in today"
+            :key="item.comicId"
+            :item="item"
+            @continue="continueRead(item)"
+            @detail="goDetail(item.comicId)"
+          />
+        </div>
+      </section>
+
+      <!-- 昨天 -->
+      <section v-if="yesterday.length > 0" class="history-section">
+        <h2 class="section-title">
+          昨天
+          <span class="section-count">{{ yesterday.length }}</span>
+        </h2>
+        <div class="history-cards">
+          <HistoryCard
+            v-for="item in yesterday"
+            :key="item.comicId"
+            :item="item"
+            @continue="continueRead(item)"
+            @detail="goDetail(item.comicId)"
+          />
+        </div>
+      </section>
+
+      <!-- 更早 -->
+      <section v-if="earlier.length > 0" class="history-section">
+        <h2 class="section-title">
+          更早
+          <span class="section-count">{{ earlier.length }}</span>
+        </h2>
+        <div class="history-cards">
+          <HistoryCard
+            v-for="item in earlier"
+            :key="item.comicId"
+            :item="item"
+            @continue="continueRead(item)"
+            @detail="goDetail(item.comicId)"
+          />
+        </div>
+      </section>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { PictureFilled } from '@element-plus/icons-vue'
+import { PictureFilled, WarningFilled } from '@element-plus/icons-vue'
 import { useHistoryStore } from '@/stores/history-store'
 import type { HistoryVO } from '@/types'
+import HistoryCard from '@/components/history/HistoryCard.vue'
 
 const router = useRouter()
 const store = useHistoryStore()
-const loading = ref(true)
+
+function bucketDate(ts: string): { today: boolean; yesterday: boolean } {
+  const d = new Date(ts)
+  const now = new Date()
+  const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000)
+  return {
+    today: diffDays === 0,
+    yesterday: diffDays === 1,
+  }
+}
+
+const today = computed(() => store.list.filter((i: HistoryVO) => bucketDate(i.updatedAt).today))
+const yesterday = computed(() => store.list.filter((i: HistoryVO) => bucketDate(i.updatedAt).yesterday))
+const earlier = computed(() =>
+  store.list.filter((i: HistoryVO) => {
+    const b = bucketDate(i.updatedAt)
+    return !b.today && !b.yesterday
+  })
+)
+const recentCount = computed(() => store.list.length)
 
 function continueRead(item: HistoryVO) {
   router.push(
@@ -61,36 +127,35 @@ function continueRead(item: HistoryVO) {
   )
 }
 
-function formatTime(ts: string): string {
-  if (!ts) return ''
-  const d = new Date(ts)
-  const now = new Date()
-  const diffMs = now.getTime() - d.getTime()
-  const diffMin = Math.floor(diffMs / 60000)
-
-  if (diffMin < 1) return '刚刚'
-  if (diffMin < 60) return `${diffMin}分钟前`
-  if (diffMin < 1440) return `${Math.floor(diffMin / 60)}小时前`
-  if (diffMin < 43200) return `${Math.floor(diffMin / 1440)}天前`
-  return d.toLocaleDateString('zh-CN')
+function goDetail(comicId: number) {
+  router.push(`/comics/${comicId}`)
 }
 
-onMounted(async () => {
-  loading.value = true
-  await store.fetchList()
-  loading.value = false
+onMounted(() => {
+  store.fetchList()
 })
 </script>
 
 <style scoped>
 .history-page {
-  padding: 24px;
   max-width: 900px;
   margin: 0 auto;
+  padding: var(--space-xl) var(--space-lg) var(--space-3xl);
 }
 
 .page-header {
-  margin-bottom: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--space-2xl);
+  gap: var(--space-base);
+  flex-wrap: wrap;
+}
+
+.header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .page-title {
@@ -100,84 +165,133 @@ onMounted(async () => {
   margin: 0;
 }
 
-.history-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-height: 200px;
+.page-subtitle {
+  font-size: 14px;
+  color: var(--text);
+  margin: 0;
 }
 
-.history-card {
-  cursor: pointer;
-  border-radius: 8px;
-  overflow: hidden;
-  transition: transform 0.2s;
-  background: var(--bg);
+.header-actions {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+/* Section */
+.history-section {
+  margin-bottom: var(--space-2xl);
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-h);
+  margin: 0 0 var(--space-base);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.section-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--surface);
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--border);
 }
 
-.history-card:hover {
-  transform: translateX(4px);
-}
-
-.card-inner {
+.history-cards {
   display: flex;
-  gap: 16px;
-  align-items: center;
+  flex-direction: column;
+  gap: var(--space-base);
 }
 
-.cover-wrapper {
-  flex-shrink: 0;
-  width: 80px;
-  height: 106px;
-  border-radius: 6px;
-  overflow: hidden;
-  background: var(--code-bg);
-}
-
-.cover-image {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-
-.cover-placeholder {
-  width: 100%;
-  height: 100%;
+/* States */
+.state {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: var(--space-base);
+  padding: var(--space-3xl) 0;
+  text-align: center;
+}
+
+.state.loading {
   color: var(--text);
 }
 
-.card-info {
-  flex: 1;
-  min-width: 0;
+.state.error {
+  color: var(--danger);
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  padding: var(--space-xl);
 }
 
-.comic-title {
-  font-size: 16px;
+.state.empty {
+  color: var(--text-muted);
+}
+
+.empty-title {
+  font-size: 18px;
   font-weight: 600;
   color: var(--text-h);
-  margin: 0 0 4px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  margin: 0;
 }
 
-.chapter-info {
+.empty-desc {
   font-size: 13px;
   color: var(--text);
-  margin: 0 0 4px;
+  margin: 0;
 }
 
-.read-time {
-  font-size: 12px;
-  color: var(--text);
-  margin: 0 0 6px;
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border-strong);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
 }
 
-.mini-progress {
-  max-width: 200px;
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Buttons */
+.primary-btn {
+  padding: 8px 16px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.primary-btn:hover {
+  background: var(--accent-hover);
+}
+
+.ghost-btn {
+  padding: 8px 16px;
+  background: transparent;
+  color: var(--text-h);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.ghost-btn:hover {
+  background: var(--surface);
+  border-color: var(--text-muted);
 }
 </style>
