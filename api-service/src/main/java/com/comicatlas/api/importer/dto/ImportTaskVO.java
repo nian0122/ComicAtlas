@@ -8,6 +8,8 @@ public class ImportTaskVO {
     private Long id;
     private Long comicId;
     private String sourceRef;
+    private String sourceType;
+    private String sourcePath;
     private String status;
     private Integer progress;
     private Integer totalPages;
@@ -17,5 +19,8 @@ public class ImportTaskVO {
     private Integer etaSeconds;
     private String errorMessage;
     private Integer retryCount;
+    private Long durationMs;
+    private LocalDateTime startTime;
+    private LocalDateTime endTime;
     private LocalDateTime createdAt;
 }

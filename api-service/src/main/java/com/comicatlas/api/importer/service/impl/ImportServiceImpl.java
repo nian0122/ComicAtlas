@@ -166,6 +166,8 @@ public class ImportServiceImpl implements ImportService {
         vo.setId(t.getId());
         vo.setComicId(t.getComicId());
         vo.setSourceRef(t.getSourceRef());
+        vo.setSourceType(t.getSourceType());
+        vo.setSourcePath(t.getSourcePath());
         vo.setStatus(t.getStatus());
         vo.setProgress(t.getProgress());
         vo.setTotalPages(t.getTotalPages());
@@ -175,6 +177,9 @@ public class ImportServiceImpl implements ImportService {
         vo.setEtaSeconds(t.getEtaSeconds());
         vo.setErrorMessage(t.getErrorMessage());
         vo.setRetryCount(t.getRetryCount());
+        vo.setDurationMs(t.getDurationMs());
+        vo.setStartTime(t.getStartTime());
+        vo.setEndTime(t.getEndTime());
         vo.setCreatedAt(t.getCreatedAt());
         return vo;
     }

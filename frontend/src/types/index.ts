@@ -108,6 +108,8 @@ export interface ImportTaskVO {
   id: number
   comicId: number
   sourceRef: string
+  sourceType: string
+  sourcePath: string
   status: string
   progress: number
   totalPages: number
@@ -118,6 +120,8 @@ export interface ImportTaskVO {
   errorMessage: string
   retryCount: number
   durationMs: number
+  startTime: string
+  endTime: string
   createdAt: string
 }
 
