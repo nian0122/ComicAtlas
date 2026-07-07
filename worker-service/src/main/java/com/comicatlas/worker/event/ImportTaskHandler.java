@@ -39,15 +39,19 @@ public class ImportTaskHandler {
         try {
             publisher.publishStatus(taskId, "PARSING", 0, null, 0, 0);
             Path mangaRoot = Path.of(config.getMangaRoot());
+            String normalizedPath = mapHostPathToContainer(sourcePath);
+            if (!normalizedPath.equals(sourcePath)) {
+                log.info("Source path normalized: {} -> {}", sourcePath, normalizedPath);
+            }
 
             switch (sourceType) {
                 case "ZIP" -> {
-                    ImportContext ctx = new ImportContext("ZIP", Path.of(sourcePath), false, false);
+                    ImportContext ctx = new ImportContext("ZIP", Path.of(normalizedPath), false, false);
                     zipHandler.importZip(ctx, taskId, comicId, mangaRoot);
                 }
                 case "REGISTER", "DIRECTORY" -> {
-                    if (sourcePath == null) throw new IllegalArgumentException("DIRECTORY 需要 sourcePath");
-                    ImportContext ctx = new ImportContext("DIRECTORY", Path.of(sourcePath), false, false);
+                    if (normalizedPath == null) throw new IllegalArgumentException("DIRECTORY 需要 sourcePath");
+                    ImportContext ctx = new ImportContext("DIRECTORY", Path.of(normalizedPath), false, false);
                     directoryHandler.handle(ctx, taskId, comicId, mangaRoot);
                 }
                 case "EHENTAI" -> fileService.processImport(taskId, comicId, sourcePath, sourceType);
@@ -62,5 +66,21 @@ public class ImportTaskHandler {
             publisher.publishStatus(taskId, "FAILED", 0, null, 0, 0);
             try { channel.basicReject(tag, false); } catch (Exception ignored) {}
         }
+    }
+
+    private String mapHostPathToContainer(String sourcePath) {
+        if (sourcePath == null || config.getHostMangaRoot() == null || config.getHostMangaRoot().isBlank()) {
+            return sourcePath;
+        }
+        String hostRoot = config.getHostMangaRoot().replace('\\', '/');
+        String containerRoot = config.getContainerMangaRoot() != null
+                ? config.getContainerMangaRoot().replace('\\', '/')
+                : "/storage";
+        String normalized = sourcePath.replace('\\', '/');
+        if (normalized.regionMatches(true, 0, hostRoot, 0, hostRoot.length())) {
+            String suffix = normalized.substring(hostRoot.length());
+            return containerRoot + suffix;
+        }
+        return sourcePath;
     }
 }

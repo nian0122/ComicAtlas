@@ -159,4 +159,11 @@ Reader 回到第 5 页
 
 | 日期 | 执行人 | 结果 | 发现问题 |
 |------|--------|------|----------|
-|      |        |      |          |
+| 2026-07-08 | Sisyphus | 通过 | BUG-006、BUG-007 已修复；Playwright E2E 4/4 通过；Reader 滚动页码跟踪暂时移除，依赖键盘翻页保存进度 |
+
+## 修复摘要
+
+- **BUG-006**: Worker `Jackson2JsonMessageConverter` 注册 `JavaTimeModule`，解决 `Instant` 反序列化失败。
+- **BUG-007**: Worker 增加宿主机路径到容器路径映射；`api-service` 挂载 `metadata`/`hq` 卷以读取 Worker 产出的 `metadata.json`。
+- **前端**: `api.ts` 增加响应拦截器，统一解包 `{code, message, data}`；`ReaderLayout` 改为 `<router-view>` 修复阅读器白屏；`ReaderPage` 移除滚动驱动页码、改用键盘翻页 + 300ms 防抖保存进度。
+- **E2E**: 新增 `smoke` / `import` / `reader` / `history` 四条用例，全部通过。

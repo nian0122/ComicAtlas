@@ -53,7 +53,6 @@
       v-else
       ref="scrollContainer"
       class="scroll-container"
-      @scroll="onScroll"
     >
       <div
         v-for="(page, index) in store.pages"
@@ -91,7 +90,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft, PictureFilled, WarningFilled } from '@element-plus/icons-vue'
@@ -107,6 +106,7 @@ const scrollContainer = ref<HTMLElement | null>(null)
 const pageRefs = ref<HTMLElement[]>([])
 const lastSyncedPage = ref(1)
 const comicTitle = ref('')
+const saveDebounceTimer = ref<number | null>(null)
 
 function setPageRef(el: HTMLElement, index: number) {
   if (el) pageRefs.value[index] = el
@@ -133,33 +133,6 @@ function onImageLoad() {
   // placeholder for future preload tracking
 }
 
-function onScroll() {
-  if (!scrollContainer.value || store.pages.length === 0) return
-
-  const container = scrollContainer.value
-  const containerHeight = container.clientHeight
-  let visibleIndex = 0
-
-  for (let i = 0; i < pageRefs.value.length; i++) {
-    const el = pageRefs.value[i]
-    if (!el) continue
-    const rect = el.getBoundingClientRect()
-    const containerRect = container.getBoundingClientRect()
-    const elMid = rect.top - containerRect.top + rect.height / 2
-    if (elMid <= containerHeight) visibleIndex = i
-  }
-
-  const currentPageNumber = visibleIndex + 1
-  if (currentPageNumber !== store.currentPage) {
-    store.currentPage = currentPageNumber
-  }
-
-  if (Math.abs(currentPageNumber - lastSyncedPage.value) >= 3 && store.comicId > 0) {
-    lastSyncedPage.value = currentPageNumber
-    store.saveProgress()
-  }
-}
-
 function onKeydown(e: KeyboardEvent) {
   if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
     e.preventDefault()
@@ -176,7 +149,7 @@ function scrollToCurrentPage() {
   if (!scrollContainer.value) return
   const el = pageRefs.value[store.currentPage - 1]
   if (el) {
-    el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    el.scrollIntoView({ behavior: 'auto', block: 'start' })
   }
 }
 
@@ -206,6 +179,10 @@ onMounted(async () => {
     await store.restoreProgress()
   }
 
+  if (scrollContainer.value) {
+    scrollContainer.value.scrollTop = 0
+  }
+
   try {
     const detail = await comicApi.detail(id)
     const detailData = detail.data as ComicDetailVO
@@ -215,10 +192,23 @@ onMounted(async () => {
   }
 
   lastSyncedPage.value = store.currentPage
+
+  watch(() => store.currentPage, (newPage) => {
+    if (store.comicId > 0 && newPage !== lastSyncedPage.value) {
+      if (saveDebounceTimer.value) clearTimeout(saveDebounceTimer.value)
+      saveDebounceTimer.value = window.setTimeout(() => {
+        lastSyncedPage.value = newPage
+        store.saveProgress()
+      }, 300)
+    }
+  })
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('keydown', onKeydown)
+  if (saveDebounceTimer.value) {
+    clearTimeout(saveDebounceTimer.value)
+  }
   if (store.comicId > 0 && store.currentPage !== lastSyncedPage.value) {
     store.saveProgress()
   }

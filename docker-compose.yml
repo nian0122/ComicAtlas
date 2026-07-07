@@ -41,7 +41,9 @@ services:
       - "9848:9848"
 
   gateway:
-    build: ./gateway
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
     container_name: comicatlas-gateway
     restart: unless-stopped
     ports:
@@ -52,7 +54,9 @@ services:
       - nacos
 
   api-service:
-    build: ./api-service
+    build:
+      context: .
+      dockerfile: api-service/Dockerfile
     container_name: comicatlas-api
     restart: unless-stopped
     environment:
@@ -60,6 +64,10 @@ services:
       MYSQL_HOST: mysql
       REDIS_HOST: redis
       RABBITMQ_HOST: rabbitmq
+      MANGA_ROOT: /storage
+    volumes:
+      - ${MANGA_ROOT:-./manga}/metadata:/storage/metadata:ro
+      - ${MANGA_ROOT:-./manga}/hq:/storage/hq:ro
     depends_on:
       - mysql
       - redis
@@ -67,13 +75,17 @@ services:
       - nacos
 
   worker-service:
-    build: ./worker-service
+    build:
+      context: .
+      dockerfile: worker-service/Dockerfile
     container_name: comicatlas-worker
     restart: unless-stopped
     environment:
       NACOS_ADDR: nacos:8848
       RABBITMQ_HOST: rabbitmq
       MANGA_ROOT: /storage
+      WORKER_HOST_MANGA_ROOT: ${MANGA_ROOT:-./manga}
+      WORKER_CONTAINER_MANGA_ROOT: /storage
     volumes:
       - ${MANGA_ROOT:-./manga}/hq:/storage/hq
       - ${MANGA_ROOT:-./manga}/lq:/storage/lq
