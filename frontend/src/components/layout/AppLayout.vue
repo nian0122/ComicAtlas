@@ -13,7 +13,15 @@ import TopNav from './TopNav.vue'
 
 <style scoped>
 .app-layout {
-  display: flex; flex-direction: column; min-height: 100vh; background: #0f0f0f;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--bg);
 }
-.main-content { flex: 1; overflow-y: auto; }
+
+.main-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-lg);
+}
 </style>
