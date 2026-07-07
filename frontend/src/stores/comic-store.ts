@@ -1,20 +1,74 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { reactive, computed, toRefs } from 'vue'
 import { comicApi } from '@/services/api'
 import type { ComicListVO, ComicListQuery } from '@/types'
 
+export interface ComicListState {
+  list: ComicListVO[]
+  total: number
+  loading: boolean
+  error: string | null
+  query: ComicListQuery
+}
+
 export const useComicStore = defineStore('comic', () => {
-  const list = ref<ComicListVO[]>([])
-  const total = ref(0)
-  const loading = ref(false)
-  const query = ref<ComicListQuery>({ page: 1, size: 20, sort: 'createdAt' })
+  const state = reactive<ComicListState>({
+    list: [],
+    total: 0,
+    loading: false,
+    error: null,
+    query: {
+      page: 1,
+      size: 24,
+      sort: 'createdAt',
+    },
+  })
+
+  const hasMore = computed(() => state.list.length < state.total)
+
+  function updateQuery(patch: Partial<ComicListQuery>) {
+    Object.assign(state.query, patch)
+  }
+
+  function resetQuery() {
+    state.query = { page: 1, size: 24, sort: 'createdAt' }
+  }
 
   async function fetchList() {
-    loading.value = true
-    const res: any = await comicApi.list(query.value)
-    list.value = res.data.records
-    total.value = res.data.total
-    loading.value = false
+    state.loading = true
+    state.error = null
+
+    try {
+      const res = await comicApi.list(state.query)
+      state.list = res.data.records || []
+      state.total = res.data.total || 0
+    } catch (err: any) {
+      state.error = err?.response?.data?.message || '加载漫画列表失败'
+      state.list = []
+      state.total = 0
+    } finally {
+      state.loading = false
+    }
   }
-  return { list, total, loading, query, fetchList }
+
+  async function search(patch: Partial<ComicListQuery>) {
+    updateQuery({ ...patch, page: 1 })
+    await fetchList()
+  }
+
+  async function nextPage() {
+    if (state.list.length >= state.total) return
+    state.query.page = (state.query.page || 1) + 1
+    await fetchList()
+  }
+
+  return {
+    ...toRefs(state),
+    hasMore,
+    updateQuery,
+    resetQuery,
+    fetchList,
+    search,
+    nextPage,
+  }
 })

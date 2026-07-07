@@ -3,130 +3,97 @@
     <header class="page-header">
       <h1 class="page-title">漫画库</h1>
       <div class="search-bar">
-        <el-input
-          v-model="keyword"
-          placeholder="搜索漫画..."
-          clearable
-          class="search-input"
-          @clear="onSearch"
-          @keyup.enter="onSearch"
-          @input="onKeywordInput"
-        >
-          <template #prefix>
-            <el-icon><Search /></el-icon>
-          </template>
-        </el-input>
-        <el-select
-          v-model="tagFilter"
-          placeholder="标签筛选"
-          clearable
-          class="tag-select"
-          @change="onSearch"
-        >
-          <el-option
-            v-for="t in tags"
-            :key="t.name"
-            :label="t.name"
-            :value="t.name"
-          />
-        </el-select>
-        <el-select
-          v-model="store.query.sort"
-          class="sort-select"
-          @change="onSearch"
-        >
-          <el-option label="创建时间" value="createdAt" />
-          <el-option label="更新时间" value="updatedAt" />
-          <el-option label="标题" value="title" />
-          <el-option label="页数" value="pageCount" />
-          <el-option label="最近阅读" value="lastReadTime" />
-        </el-select>
+        <div class="search-input">
+          <el-icon :size="18"><Search /></el-icon>
+          <input
+            v-model="keyword"
+            type="text"
+            placeholder="搜索漫画..."
+            @input="onKeywordInput"
+            @keyup.enter="onSearch"
+          >
+          <el-icon v-if="keyword" :size="16" class="clear-icon" @click="clearKeyword"><CircleClose /></el-icon>
+        </div>
+
+        <div class="filter-select">
+          <select v-model="statusFilter" @change="onSearch">
+            <option value="">全部状态</option>
+            <option value="READY">已就绪</option>
+            <option value="IMPORTING">导入中</option>
+            <option value="PENDING">等待中</option>
+            <option value="FAILED">失败</option>
+          </select>
+        </div>
+
+        <div class="filter-select">
+          <select v-model="sort" @change="onSearch">
+            <option value="createdAt">最新添加</option>
+            <option value="updatedAt">最近更新</option>
+            <option value="title">标题</option>
+            <option value="pageCount">页数</option>
+            <option value="lastReadTime">最近阅读</option>
+          </select>
+        </div>
       </div>
     </header>
 
-    <el-row :gutter="20" class="comic-grid">
-      <el-col
-        v-for="comic in store.list"
-        :key="comic.id"
-        :xs="12"
-        :sm="8"
-        :md="6"
-        :lg="6"
-        class="comic-col"
-      >
-        <el-card
-          shadow="hover"
-          class="comic-card"
-          :body-style="{ padding: '0' }"
-          @click="goDetail(comic.id)"
-        >
-          <div class="cover-wrapper">
-            <el-image
-              :src="comic.coverUrl"
-              fit="cover"
-              lazy
-              class="cover-image"
-            >
-              <template #error>
-                <div class="cover-placeholder">
-                  <el-icon :size="36"><PictureFilled /></el-icon>
-                </div>
-              </template>
-            </el-image>
-            <div
-              v-if="comic.progressPercent > 0 && comic.progressPercent < 100"
-              class="progress-badge"
-            >
-              继续阅读 {{ comic.lastReadPage }}/{{ comic.pageCount }} · {{ comic.progressPercent }}%
-            </div>
-            <div class="status-badges">
-              <el-tag
-                v-if="comic.status"
-                :type="comic.status === '完成' ? 'success' : 'warning'"
-                size="small"
-              >
-                {{ comic.status }}
-              </el-tag>
-            </div>
-          </div>
-          <div class="card-body">
-            <p class="comic-title">{{ comic.title }}</p>
-            <p class="comic-author">{{ comic.author || '未知作者' }}</p>
-          </div>
-        </el-card>
-      </el-col>
-    </el-row>
-
-    <el-empty v-if="!store.loading && store.list.length === 0" description="暂无漫画" />
-
-    <div class="pagination-wrapper">
-      <el-pagination
-        v-model:current-page="store.query.page"
-        :page-size="store.query.size"
-        :total="store.total"
-        layout="prev, pager, next"
-        background
-        @current-change="onPageChange"
-      />
+    <div v-if="store.loading && store.list.length === 0" class="state loading">
+      <div class="spinner" />
+      <span>加载中...</span>
     </div>
+
+    <div v-else-if="store.error" class="state error">
+      <el-icon :size="48"><WarningFilled /></el-icon>
+      <span>{{ store.error }}</span>
+      <button class="primary-btn" @click="store.fetchList()">重试</button>
+    </div>
+
+    <div v-else-if="store.list.length === 0" class="state empty">
+      <el-icon :size="48"><PictureFilled /></el-icon>
+      <span>暂无漫画</span>
+      <p>点击右上角导入按钮添加漫画</p>
+    </div>
+
+    <section v-else class="comic-section">
+      <div class="comic-grid">
+        <ComicCard
+          v-for="comic in store.list"
+          :key="comic.id"
+          :comic="comic"
+          @click="goDetail"
+          @continue="continueReading"
+        />
+      </div>
+
+      <div class="pagination-wrapper">
+        <el-pagination
+          v-model:current-page="store.query.page"
+          :page-size="store.query.size"
+          :total="store.total"
+          layout="prev, pager, next"
+          background
+          @current-change="onPageChange"
+        />
+      </div>
+    </section>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Search, PictureFilled } from '@element-plus/icons-vue'
+import { Search, PictureFilled, WarningFilled, CircleClose } from '@element-plus/icons-vue'
 import { useComicStore } from '@/stores/comic-store'
-import { useTagStore } from '@/stores/tag-store'
+import ComicCard from '@/components/comic/ComicCard.vue'
+import type { ComicListQuery } from '@/types'
 
 const router = useRouter()
 const store = useComicStore()
-const tagStore = useTagStore()
 
 const keyword = ref('')
-const tagFilter = ref('')
+const statusFilter = ref('')
+const sort = ref<NonNullable<ComicListQuery['sort']>>('createdAt')
 
-const tags = ref<{ name: string }[]>([])
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
 function onKeywordInput() {
@@ -134,15 +101,21 @@ function onKeywordInput() {
   debounceTimer = setTimeout(onSearch, 300)
 }
 
+function clearKeyword() {
+  keyword.value = ''
+  onSearch()
+}
+
 function onSearch() {
-  store.query.keyword = keyword.value || undefined
-  store.query.tag = tagFilter.value || undefined
-  store.query.page = 1
-  store.fetchList()
+  store.search({
+    keyword: keyword.value || undefined,
+    status: statusFilter.value || undefined,
+    sort: sort.value,
+  })
 }
 
 function onPageChange(page: number) {
-  store.query.page = page
+  store.updateQuery({ page })
   store.fetchList()
 }
 
@@ -150,134 +123,174 @@ function goDetail(id: number) {
   router.push(`/comics/${id}`)
 }
 
-onMounted(async () => {
-  await tagStore.fetch()
-  tags.value = tagStore.tags as { name: string }[]
+function continueReading(id: number) {
+  router.push(`/comics/${id}`)
+}
+
+onMounted(() => {
   store.fetchList()
 })
 </script>
 
 <style scoped>
 .comic-list-page {
-  padding: 24px;
-  max-width: 1400px;
+  max-width: 1600px;
   margin: 0 auto;
 }
 
 .page-header {
-  margin-bottom: 24px;
+  margin-bottom: var(--space-xl);
 }
 
 .page-title {
   font-size: 28px;
   font-weight: 700;
   color: var(--text-h);
-  margin: 0 0 16px;
+  margin: 0 0 var(--space-lg);
 }
 
 .search-bar {
   display: flex;
-  gap: 12px;
+  align-items: center;
+  gap: var(--space-base);
   flex-wrap: wrap;
 }
 
 .search-input {
   flex: 1;
-  min-width: 200px;
+  min-width: 240px;
+  max-width: 400px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  padding: 0 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-h);
+  transition: border-color 150ms ease;
 }
 
-.tag-select {
-  width: 160px;
+.search-input:focus-within {
+  border-color: var(--text-muted);
 }
 
-.sort-select {
-  width: 140px;
+.search-input input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-h);
+  font-size: 14px;
+}
+
+.search-input input::placeholder {
+  color: var(--text-muted);
+}
+
+.clear-icon {
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.clear-icon:hover {
+  color: var(--text-h);
+}
+
+.filter-select select {
+  height: 40px;
+  padding: 0 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-h);
+  font-size: 14px;
+  outline: none;
+  cursor: pointer;
+}
+
+.filter-select select:focus {
+  border-color: var(--text-muted);
+}
+
+.comic-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
 }
 
 .comic-grid {
-  margin-bottom: 24px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
 }
 
-.comic-col {
-  margin-bottom: 20px;
+@media (min-width: 640px) {
+  .comic-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 16px;
+  }
 }
 
-.comic-card {
-  cursor: pointer;
-  border-radius: 8px;
-  overflow: hidden;
-  transition: transform 0.2s, box-shadow 0.2s;
-  background: var(--bg);
-  border: 1px solid var(--border);
-}
-
-.comic-card:hover {
-  transform: translateY(-4px);
-}
-
-.cover-wrapper {
-  position: relative;
-  aspect-ratio: 3 / 4;
-  overflow: hidden;
-  background: var(--code-bg);
-}
-
-.cover-image {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-
-.cover-placeholder {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text);
-}
-
-.progress-badge {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
-  color: #fff;
-  font-size: 12px;
-  padding: 20px 8px 6px;
-  text-align: center;
-}
-
-.status-badges {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-}
-
-.card-body {
-  padding: 12px;
-}
-
-.comic-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-h);
-  margin: 0 0 4px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.comic-author {
-  font-size: 12px;
-  color: var(--text);
-  margin: 0;
+@media (min-width: 1024px) {
+  .comic-grid {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 20px;
+  }
 }
 
 .pagination-wrapper {
   display: flex;
   justify-content: center;
-  margin-top: 24px;
+  padding: var(--space-lg) 0;
+}
+
+.state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-base);
+  padding: var(--space-3xl) 0;
+  color: var(--text);
+}
+
+.state.empty p {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.state.error {
+  color: var(--danger);
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border-strong);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.primary-btn {
+  padding: 8px 20px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.primary-btn:hover {
+  background: var(--accent-hover);
 }
 </style>
