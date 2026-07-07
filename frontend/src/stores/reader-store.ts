@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { reactive, computed, toRefs } from 'vue'
 import { readerApi, historyApi } from '@/services/api'
+import { useHistoryStore } from '@/stores/history-store'
 import type { PageInfo, ReaderDTO } from '@/types'
 
 export interface ReaderState {
@@ -89,6 +90,7 @@ export const useReaderStore = defineStore('reader', () => {
         chapterId: state.chapterId,
         pageNumber: state.currentPage,
       })
+      useHistoryStore().fetchList().catch(() => {})
     } catch {
       // silent fail on progress sync
     }

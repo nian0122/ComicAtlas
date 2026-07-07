@@ -185,6 +185,7 @@ onMounted(async () => {
 
   const id = Number(route.params.id)
   const chapterId = Number(route.query.chapterId)
+  const pageFromQuery = Number(route.query.page)
 
   if (!id || !chapterId) {
     store.error = '参数不完整'
@@ -199,7 +200,11 @@ onMounted(async () => {
     return
   }
 
-  await store.restoreProgress()
+  if (pageFromQuery >= 1 && pageFromQuery <= store.totalPages) {
+    store.currentPage = pageFromQuery
+  } else {
+    await store.restoreProgress()
+  }
 
   try {
     const detail = await comicApi.detail(id)

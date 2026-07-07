@@ -143,8 +143,7 @@ const taskName = computed(() => {
 
 const canCancel = computed(() =>
   props.task.status === 'PENDING' ||
-  props.task.status === 'DOWNLOADING' ||
-  props.task.status === 'PARSING'
+  props.task.status === 'DOWNLOADING'
 )
 
 function formatTime(ts: string): string {
