@@ -1,18 +1,56 @@
 <template>
-  <div class="reader-page" v-loading="loading">
-    <div class="reader-toolbar">
-      <el-button :icon="ArrowLeft" circle @click="goBack" />
-      <span class="toolbar-title">{{ comicTitle }}</span>
-      <el-button v-if="store.prevChapterId" size="small" @click="goChapter(store.prevChapterId!)">上一章</el-button>
-      <span class="toolbar-page">
-        {{ store.currentPage }} / {{ store.pages.length }}
-      </span>
-      <el-button v-if="store.nextChapterId" size="small" @click="goChapter(store.nextChapterId!)">下一章</el-button>
-      <el-button :icon="Setting" circle @click="drawerVisible = true" />
+  <div class="reader-page">
+    <!-- Toolbar -->
+    <header class="reader-toolbar">
+      <div class="toolbar-left">
+        <button class="tool-btn" @click="goBack">
+          <el-icon :size="20"><ArrowLeft /></el-icon>
+        </button>
+        <span class="toolbar-title">{{ comicTitle }}</span>
+      </div>
+      <div class="toolbar-center">
+        <span class="page-indicator">{{ store.currentPage }} / {{ store.totalPages }}</span>
+      </div>
+      <div class="toolbar-right">
+        <button
+          v-if="store.prevChapterId"
+          class="tool-btn chapter-btn"
+          @click="goChapter(store.prevChapterId!)"
+        >
+          上一章
+        </button>
+        <button
+          v-if="store.nextChapterId"
+          class="tool-btn chapter-btn primary"
+          @click="goChapter(store.nextChapterId!)"
+        >
+          下一章
+        </button>
+      </div>
+    </header>
+
+    <!-- Loading -->
+    <div v-if="store.loading" class="reader-state">
+      <div class="spinner" />
+      <span>加载中...</span>
     </div>
 
+    <!-- Error -->
+    <div v-else-if="store.error" class="reader-state error">
+      <el-icon :size="48"><WarningFilled /></el-icon>
+      <span>{{ store.error }}</span>
+      <button class="primary-btn" @click="reload">重试</button>
+    </div>
+
+    <!-- Empty -->
+    <div v-else-if="store.pages.length === 0" class="reader-state">
+      <el-icon :size="48"><PictureFilled /></el-icon>
+      <span>暂无页面</span>
+    </div>
+
+    <!-- Pages -->
     <div
-      v-if="store.pages.length > 0"
+      v-else
       ref="scrollContainer"
       class="scroll-container"
       @scroll="onScroll"
@@ -24,7 +62,7 @@
         class="page-item"
       >
         <el-image
-          :src="hqMode ? page.hqUrl : page.lqUrl"
+          :src="store.hqMode ? page.hqUrl : page.lqUrl"
           :alt="`Page ${page.pageNumber}`"
           fit="contain"
           class="page-image"
@@ -49,49 +87,26 @@
         </el-image>
       </div>
     </div>
-
-    <el-empty v-else-if="!loading" description="暂无页面" />
-
-    <el-drawer
-      v-model="drawerVisible"
-      title="阅读设置"
-      direction="rtl"
-      size="280px"
-    >
-      <div class="drawer-content">
-        <div class="setting-item">
-          <span class="setting-label">高清模式</span>
-          <el-switch v-model="hqMode" />
-        </div>
-      </div>
-    </el-drawer>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { ArrowLeft, Setting, PictureFilled } from '@element-plus/icons-vue'
+import { ArrowLeft, PictureFilled, WarningFilled } from '@element-plus/icons-vue'
 import { useReaderStore } from '@/stores/reader-store'
-import { historyApi, comicApi } from '@/services/api'
+import { comicApi } from '@/services/api'
 import type { ComicDetailVO } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
 const store = useReaderStore()
 
-const loading = ref(true)
-const drawerVisible = ref(false)
 const scrollContainer = ref<HTMLElement | null>(null)
 const pageRefs = ref<HTMLElement[]>([])
-const lastSyncedPage = ref(0)
+const lastSyncedPage = ref(1)
 const comicTitle = ref('')
-
-const hqMode = computed({
-  get: () => store.hqMode,
-  set: (v: boolean) => (store.hqMode = v),
-})
 
 function setPageRef(el: HTMLElement, index: number) {
   if (el) pageRefs.value[index] = el
@@ -109,8 +124,13 @@ function goChapter(chId: number) {
   router.push(`/comics/${store.comicId}/read?chapterId=${chId}&page=1`)
 }
 
+function reload() {
+  const chapterId = Number(route.query.chapterId)
+  if (chapterId) store.loadChapter(chapterId)
+}
+
 function onImageLoad() {
-  // placeholder for any image load tracking
+  // placeholder for future preload tracking
 }
 
 function onScroll() {
@@ -118,17 +138,15 @@ function onScroll() {
 
   const container = scrollContainer.value
   const containerHeight = container.clientHeight
-
   let visibleIndex = 0
+
   for (let i = 0; i < pageRefs.value.length; i++) {
     const el = pageRefs.value[i]
     if (!el) continue
     const rect = el.getBoundingClientRect()
     const containerRect = container.getBoundingClientRect()
     const elMid = rect.top - containerRect.top + rect.height / 2
-    if (elMid <= containerHeight) {
-      visibleIndex = i
-    }
+    if (elMid <= containerHeight) visibleIndex = i
   }
 
   const currentPageNumber = visibleIndex + 1
@@ -136,28 +154,19 @@ function onScroll() {
     store.currentPage = currentPageNumber
   }
 
-  if (Math.abs(currentPageNumber - lastSyncedPage.value) >= 5 && store.comicId > 0) {
+  if (Math.abs(currentPageNumber - lastSyncedPage.value) >= 3 && store.comicId > 0) {
     lastSyncedPage.value = currentPageNumber
-    syncProgress(currentPageNumber)
-  }
-}
-
-async function syncProgress(pageNumber: number) {
-  try {
-    await historyApi.update(store.comicId, {
-      chapterId: store.chapterId,
-      pageNumber,
-    })
-  } catch {
-    // silent fail on progress sync
+    store.saveProgress()
   }
 }
 
 function onKeydown(e: KeyboardEvent) {
-  if (e.key === 'ArrowRight') {
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
+    e.preventDefault()
     store.nextPage()
     scrollToCurrentPage()
-  } else if (e.key === 'ArrowLeft') {
+  } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+    e.preventDefault()
     store.prevPage()
     scrollToCurrentPage()
   }
@@ -176,44 +185,37 @@ onMounted(async () => {
 
   const id = Number(route.params.id)
   const chapterId = Number(route.query.chapterId)
-  const page = Number(route.query.page) || 1
 
   if (!id || !chapterId) {
-    loading.value = false
-    ElMessage.warning('参数不完整')
+    store.error = '参数不完整'
     return
   }
 
-  try {
-    store.comicId = id
-    await store.loadChapter(chapterId)
-    await store.restoreProgress()
+  store.comicId = id
+  await store.loadChapter(chapterId)
 
-    if (page > 1 && page <= store.pages.length) {
-      store.currentPage = page
-    }
-
-    // Extract comic title for toolbar
-    try {
-      const detail = await comicApi.detail(id)
-      const detailData = detail.data as ComicDetailVO
-      comicTitle.value = detailData.title || `漫画 #${id}`
-    } catch {
-      comicTitle.value = `漫画 #${id}`
-    }
-
-    loading.value = false
-    lastSyncedPage.value = store.currentPage
-  } catch {
-    loading.value = false
-    ElMessage.error('加载章节失败')
+  if (store.error) {
+    ElMessage.error(store.error)
+    return
   }
+
+  await store.restoreProgress()
+
+  try {
+    const detail = await comicApi.detail(id)
+    const detailData = detail.data as ComicDetailVO
+    comicTitle.value = detailData.title || `漫画 #${id}`
+  } catch {
+    comicTitle.value = `漫画 #${id}`
+  }
+
+  lastSyncedPage.value = store.currentPage
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('keydown', onKeydown)
   if (store.comicId > 0 && store.currentPage !== lastSyncedPage.value) {
-    syncProgress(store.currentPage)
+    store.saveProgress()
   }
 })
 </script>
@@ -230,28 +232,109 @@ onBeforeUnmount(() => {
 .reader-toolbar {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 8px 16px;
-  background: var(--code-bg);
+  justify-content: space-between;
+  height: 56px;
+  padding: 0 var(--space-lg);
+  background: var(--surface);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
   z-index: 10;
 }
 
+.toolbar-left,
+.toolbar-right,
+.toolbar-center {
+  display: flex;
+  align-items: center;
+  gap: var(--space-base);
+}
+
 .toolbar-title {
-  flex: 1;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--text-h);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  max-width: 300px;
 }
 
-.toolbar-page {
+.page-indicator {
   font-size: 13px;
   color: var(--text);
   font-variant-numeric: tabular-nums;
+}
+
+.tool-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-h);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.tool-btn:hover {
+  background: var(--surface-elevated);
+}
+
+.chapter-btn.primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.chapter-btn.primary:hover {
+  background: var(--accent-hover);
+}
+
+.reader-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-base);
+  color: var(--text);
+}
+
+.reader-state.error {
+  color: var(--danger);
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border-strong);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.primary-btn {
+  padding: 8px 20px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.primary-btn:hover {
+  background: var(--accent-hover);
 }
 
 .scroll-container {
@@ -263,7 +346,7 @@ onBeforeUnmount(() => {
 .page-item {
   display: flex;
   justify-content: center;
-  padding: 8px 0;
+  padding: var(--space-sm) 0;
 }
 
 .page-image {
@@ -281,8 +364,8 @@ onBeforeUnmount(() => {
 
 .skeleton-box {
   width: 100%;
-  background: var(--code-bg);
-  border-radius: 4px;
+  background: var(--surface-elevated);
+  border-radius: var(--radius-sm);
   animation: pulse 1.5s ease-in-out infinite;
 }
 
@@ -296,25 +379,8 @@ onBeforeUnmount(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: var(--space-sm);
   color: var(--text);
-  padding: 40px;
-}
-
-.drawer-content {
-  padding-top: 8px;
-}
-
-.setting-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.setting-label {
-  font-size: 14px;
-  color: var(--text-h);
+  padding: var(--space-2xl);
 }
 </style>
