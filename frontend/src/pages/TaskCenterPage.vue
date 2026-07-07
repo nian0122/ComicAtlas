@@ -1,140 +1,294 @@
 <template>
   <div class="task-center-page">
     <header class="page-header">
-      <h1 class="page-title">任务中心</h1>
+      <div class="header-left">
+        <h1 class="page-title">任务中心</h1>
+        <p v-if="store.lastUpdated" class="page-subtitle">
+          最后更新 {{ formatRelative(store.lastUpdated) }}
+          <span v-if="store.polling" class="polling-dot" />
+        </p>
+      </div>
       <div class="header-actions">
-        <el-button type="primary" @click="router.push('/import')">新建导入</el-button>
-        <el-button @click="refresh">刷新</el-button>
+        <button class="ghost-btn" @click="refresh">刷新</button>
+        <button class="primary-btn" @click="router.push('/import')">+ 新建导入</button>
       </div>
     </header>
 
+    <div v-if="store.error" class="state error">
+      <el-icon :size="32"><WarningFilled /></el-icon>
+      <span>{{ store.error }}</span>
+      <button class="ghost-btn" @click="refresh">重试</button>
+    </div>
+
     <!-- 进行中 -->
-    <section class="task-section" v-if="activeTasks.length > 0">
-      <h2 class="section-title">进行中 ({{ activeTasks.length }})</h2>
+    <section v-if="store.activeTasks.length > 0" class="task-section">
+      <h2 class="section-title">
+        进行中
+        <span class="section-count">{{ store.activeTasks.length }}</span>
+      </h2>
       <div class="task-cards">
-        <el-card v-for="task in activeTasks" :key="task.id" class="task-card" shadow="hover">
-          <div class="task-header">
-            <span class="task-comic">{{ task.comicId ? '漫画#' + task.comicId : '新任务' }}</span>
-            <el-tag :type="STATUS_COLOR_MAP[task.status] || 'info'" size="small">
-              {{ statusLabel(task.status) }}
-            </el-tag>
-          </div>
-          <el-progress :percentage="task.progress" :stroke-width="8" class="task-progress" />
-          <div class="task-meta">
-            <span>{{ formatTime(task.createdAt) }}</span>
-            <el-button link type="danger" size="small" @click="cancelTask(task.id)">取消</el-button>
-          </div>
-        </el-card>
+        <TaskCard
+          v-for="task in store.activeTasks"
+          :key="task.id"
+          :task="task"
+          variant="active"
+          @cancel="onCancel"
+          @retry="onRetry"
+          @read="onRead"
+        />
       </div>
     </section>
 
     <!-- 失败 -->
-    <section class="task-section" v-if="failedTasks.length > 0">
-      <h2 class="section-title">失败 ({{ failedTasks.length }})</h2>
+    <section v-if="store.failedTasks.length > 0" class="task-section">
+      <h2 class="section-title">
+        失败
+        <span class="section-count">{{ store.failedTasks.length }}</span>
+      </h2>
       <div class="task-cards">
-        <el-card v-for="task in failedTasks" :key="task.id" class="task-card task-failed" shadow="hover">
-          <div class="task-header">
-            <span class="task-comic">{{ task.comicId ? '漫画#' + task.comicId : '' }}</span>
-            <el-tag type="danger" size="small">失败</el-tag>
-          </div>
-          <p class="task-error">{{ task.errorMessage || '未知错误' }}</p>
-          <div class="task-meta">
-            <span>{{ task.retryCount }} 次重试</span>
-            <el-button link type="primary" size="small" @click="retryTask(task.id)">重试</el-button>
-          </div>
-        </el-card>
+        <TaskCard
+          v-for="task in store.failedTasks"
+          :key="task.id"
+          :task="task"
+          variant="failed"
+          @cancel="onCancel"
+          @retry="onRetry"
+          @read="onRead"
+        />
       </div>
     </section>
 
     <!-- 已完成 -->
     <section class="task-section">
-      <h2 class="section-title">已完成 ({{ completedTasks.length }})</h2>
-      <div class="task-cards" v-if="completedTasks.length > 0">
-        <el-card v-for="task in completedTasks" :key="task.id" class="task-card task-done" shadow="hover">
-          <div class="task-header">
-            <span class="task-comic">{{ task.comicId ? '漫画#' + task.comicId : '' }}</span>
-            <el-tag type="success" size="small">完成</el-tag>
-          </div>
-          <div class="task-meta">
-            <span>{{ formatTime(task.createdAt) }}</span>
-            <span v-if="task.durationMs">{{ (task.durationMs / 1000).toFixed(1) }}s</span>
-          </div>
-        </el-card>
+      <h2 class="section-title">
+        已完成
+        <span class="section-count">{{ store.completedTasks.length }}</span>
+      </h2>
+      <div v-if="store.completedTasks.length > 0" class="task-cards">
+        <TaskCard
+          v-for="task in store.completedTasks.slice(0, 10)"
+          :key="task.id"
+          :task="task"
+          variant="done"
+          @cancel="onCancel"
+          @retry="onRetry"
+          @read="onRead"
+        />
       </div>
-      <el-empty v-else description="暂无已完成任务" />
+      <div v-else class="state empty">
+        <el-icon :size="48"><CircleCheckFilled /></el-icon>
+        <span>暂无已完成任务</span>
+        <button class="primary-btn" @click="router.push('/import')">开始第一次导入</button>
+      </div>
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { importApi } from '@/services/api'
-import { STATUS_COLOR_MAP } from '@/types'
+import { WarningFilled, CircleCheckFilled } from '@element-plus/icons-vue'
+import { useImportStore } from '@/stores/import-store'
 import type { ImportTaskVO } from '@/types'
+import TaskCard from '@/components/task/TaskCard.vue'
 
 const router = useRouter()
+const store = useImportStore()
 
-const tasks = ref<ImportTaskVO[]>([])
-let pollTimer: ReturnType<typeof setInterval> | null = null
-
-const STATUS_LABELS: Record<string, string> = {
-  PENDING: '等待中', PARSING: '解析中', IMPORTING: '导入中',
-  SUCCESS: '成功', FAILED: '失败', CANCELLED: '已取消',
-  DOWNLOADING: '下载中', EXTRACTING: '解压中',
-}
-
-const activeTasks = computed(() => tasks.value.filter(t =>
-  !['SUCCESS', 'FAILED', 'CANCELLED'].includes(t.status)))
-const failedTasks = computed(() => tasks.value.filter(t => t.status === 'FAILED'))
-const completedTasks = computed(() => tasks.value.filter(t => t.status === 'SUCCESS'))
-
-function statusLabel(s: string) { return STATUS_LABELS[s] || s }
-
-function formatTime(ts: string) {
-  if (!ts) return ''
-  return new Date(ts).toLocaleString('zh-CN')
+function formatRelative(ts: number): string {
+  const diff = Date.now() - ts
+  if (diff < 5000) return '刚刚'
+  if (diff < 60000) return `${Math.floor(diff / 1000)} 秒前`
+  return new Date(ts).toLocaleTimeString('zh-CN')
 }
 
 async function refresh() {
+  await store.fetchList()
+  if (store.hasActive) store.startPolling()
+}
+
+async function onCancel(id: number) {
   try {
-    const res = await importApi.list({ page: 1, size: 50 })
-    tasks.value = res.data.records || []
-  } catch { /* ignore */ }
+    await store.cancel(id)
+    ElMessage.success('已取消')
+  } catch {
+    ElMessage.error('取消失败')
+  }
 }
 
-async function cancelTask(id: number) {
-  try { await importApi.cancel(id); ElMessage.success('已取消'); refresh() }
-  catch { ElMessage.error('取消失败') }
+async function onRetry(id: number) {
+  try {
+    await store.retry(id)
+    ElMessage.success('已重新加入队列')
+  } catch {
+    ElMessage.error('重试失败')
+  }
 }
 
-async function retryTask(id: number) {
-  try { await importApi.retry(id); ElMessage.success('已重试'); refresh() }
-  catch { ElMessage.error('重试失败') }
+function onRead(task: ImportTaskVO) {
+  if (!task.comicId) return
+  router.push(`/comics/${task.comicId}`)
 }
 
 onMounted(async () => {
-  await refresh()
-  pollTimer = setInterval(refresh, 3000)
+  await store.fetchList()
+  if (store.hasActive) store.startPolling()
 })
 
-onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
+onBeforeUnmount(() => {
+  // 离开页面不停止轮询：TopNav 全局依赖此 store 维持红点徽章
+  // 轮询会在没有进行中任务时自动停止
+})
 </script>
 
 <style scoped>
-.task-center-page { padding: 24px; max-width: 900px; margin: 0 auto; }
-.page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-.page-title { font-size: 28px; font-weight: 700; color: var(--text-h); margin: 0; }
-.section-title { font-size: 16px; font-weight: 600; color: var(--text-h); margin: 0 0 12px; }
-.task-section { margin-bottom: 32px; }
-.task-cards { display: flex; flex-direction: column; gap: 10px; }
-.task-card { border-left: 4px solid var(--accent); }
-.task-failed { border-left-color: #f56c6c; }
-.task-done { border-left-color: #67c23a; }
-.task-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-.task-comic { font-weight: 600; color: var(--text-h); }
-.task-progress { margin-bottom: 10px; }
-.task-error { font-size: 13px; color: #f56c6c; margin: 0 0 8px; }
-.task-meta { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--text); }
+.task-center-page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--space-xl) var(--space-lg) var(--space-3xl);
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--space-2xl);
+  gap: var(--space-base);
+  flex-wrap: wrap;
+}
+
+.header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.page-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-h);
+  margin: 0;
+}
+
+.page-subtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.polling-dot {
+  width: 6px;
+  height: 6px;
+  background: var(--accent);
+  border-radius: 50%;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.7); }
+}
+
+.header-actions {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.task-section {
+  margin-bottom: var(--space-2xl);
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-h);
+  margin: 0 0 var(--space-base);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.section-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--surface);
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+}
+
+.task-cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-base);
+}
+
+/* States */
+.state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-base);
+  padding: var(--space-3xl) 0;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.state.error {
+  color: var(--danger);
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  padding: var(--space-xl);
+  margin-bottom: var(--space-xl);
+}
+
+.state.empty {
+  padding: var(--space-3xl) 0;
+}
+
+.state.empty span {
+  font-size: 14px;
+}
+
+/* Buttons */
+.primary-btn {
+  padding: 8px 16px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.primary-btn:hover {
+  background: var(--accent-hover);
+}
+
+.ghost-btn {
+  padding: 8px 16px;
+  background: transparent;
+  color: var(--text-h);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.ghost-btn:hover {
+  background: var(--surface);
+  border-color: var(--text-muted);
+}
 </style>

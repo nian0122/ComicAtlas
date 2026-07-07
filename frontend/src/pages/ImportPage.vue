@@ -1,224 +1,137 @@
 <template>
   <div class="import-page">
     <header class="page-header">
-      <h1 class="page-title">导入任务</h1>
+      <h1 class="page-title">导入漫画</h1>
+      <p class="page-subtitle">选择来源类型并输入路径，开始你的导入流程</p>
     </header>
 
-    <div class="import-form">
-      <el-select v-model="sourceType" class="type-select">
-        <el-option label="ZIP 文件" value="ZIP" />
-        <el-option label="目录导入" value="DIRECTORY" />
-      </el-select>
-      <el-input
-        v-model="sourcePath"
-        :placeholder="sourceType === 'ZIP' ? 'ZIP 文件路径...' : '漫画目录路径...'"
-        class="url-input"
-        @keyup.enter="doImport"
-      />
-      <el-button type="primary" :loading="importing" @click="doImport">
-        开始导入
-      </el-button>
-    </div>
-
-    <el-table
-      :data="store.tasks"
-      v-loading="store.loading"
-      class="task-table"
-      empty-text="暂无导入任务"
-    >
-      <el-table-column label="URL" min-width="240">
-        <template #default="{ row }">
-          <el-tooltip :content="row.sourceRef" placement="top" :show-after="500">
-            <span class="url-cell">{{ truncateUrl(row.sourceRef) }}</span>
-          </el-tooltip>
-        </template>
-      </el-table-column>
-
-      <el-table-column label="状态" width="110">
-        <template #default="{ row }">
-          <el-tag
-            :type="STATUS_COLOR_MAP[row.status] || 'info'"
-            size="small"
+    <section class="import-form-card">
+      <!-- 来源类型选择 -->
+      <div class="form-group">
+        <label class="form-label">来源类型</label>
+        <div class="source-types">
+          <label
+            v-for="opt in sourceTypeOptions"
+            :key="opt.value"
+            class="source-type-radio"
+            :class="{ active: sourceType === opt.value }"
           >
-            {{ statusLabel(row.status) }}
-          </el-tag>
-        </template>
-      </el-table-column>
+            <input
+              v-model="sourceType"
+              type="radio"
+              :value="opt.value"
+              class="radio-input"
+            />
+            <span class="radio-label">
+              <span class="radio-title">{{ opt.label }}</span>
+              <span class="radio-desc">{{ opt.desc }}</span>
+            </span>
+          </label>
+        </div>
+      </div>
 
-      <el-table-column label="进度" width="180">
-        <template #default="{ row }">
-          <el-progress
-            :percentage="row.progress"
-            :stroke-width="8"
-            :status="row.status === 'FAILED' ? 'exception' : undefined"
-          />
-        </template>
-      </el-table-column>
+      <!-- 路径输入 -->
+      <div class="form-group">
+        <label class="form-label">路径</label>
+        <input
+          v-model="sourcePath"
+          type="text"
+          class="path-input"
+          :placeholder="pathPlaceholder"
+          @keyup.enter="doImport"
+        />
+        <p class="form-hint">{{ pathHint }}</p>
+      </div>
 
-      <el-table-column label="下载方式" width="100">
-        <template #default="{ row }">
-          <span class="cell-text">{{ row.downloadMethod || '-' }}</span>
-        </template>
-      </el-table-column>
+      <!-- 提交 -->
+      <div class="form-actions">
+        <button
+          class="primary-btn large"
+          :disabled="!canSubmit || creating"
+          @click="doImport"
+        >
+          <span v-if="creating" class="spinner-sm" />
+          <span>{{ creating ? '创建中...' : '开始导入' }}</span>
+        </button>
+        <router-link to="/tasks" class="ghost-link">查看任务中心 →</router-link>
+      </div>
+    </section>
 
-      <el-table-column label="速度" width="100">
-        <template #default="{ row }">
-          <span class="cell-text">{{ formatSpeed(row.downloadSpeed) }}</span>
-        </template>
-      </el-table-column>
-
-      <el-table-column label="创建时间" width="160">
-        <template #default="{ row }">
-          <span class="cell-text">{{ formatTime(row.createdAt) }}</span>
-        </template>
-      </el-table-column>
-
-      <el-table-column label="操作" width="140" fixed="right">
-        <template #default="{ row }">
-          <div class="action-btns">
-            <el-button
-              link
-              type="primary"
-              size="small"
-              @click="showDetail(row)"
-            >
-              详情
-            </el-button>
-            <el-button
-              v-if="row.status === 'PENDING' || row.status === 'DOWNLOADING'"
-              link
-              type="warning"
-              size="small"
-              @click="cancelTask(row.id)"
-            >
-              取消
-            </el-button>
-            <el-button
-              v-if="row.status === 'FAILED'"
-              link
-              type="success"
-              size="small"
-              @click="retryTask(row.id)"
-            >
-              重试
-            </el-button>
+    <!-- 简易近期任务预览（最多 3 条进行中） -->
+    <section v-if="store.activeTasks.length > 0" class="recent-section">
+      <h2 class="section-title">进行中 ({{ store.activeTasks.length }})</h2>
+      <div class="recent-list">
+        <div v-for="task in store.activeTasks.slice(0, 3)" :key="task.id" class="recent-item">
+          <div class="recent-info">
+            <span class="recent-name">{{ taskName(task) }}</span>
+            <span class="recent-status">{{ statusLabel(task.status) }}</span>
           </div>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <!-- Detail Drawer -->
-    <el-drawer
-      v-model="drawerVisible"
-      title="任务详情"
-      direction="rtl"
-      size="400px"
-    >
-      <template v-if="detailTask">
-        <div class="detail-section">
-          <h3 class="detail-label">URL</h3>
-          <p class="detail-value break-all">{{ detailTask.sourceRef }}</p>
+          <div class="recent-bar">
+            <div class="recent-bar-fill" :style="{ width: `${task.progress}%` }" />
+          </div>
         </div>
-        <div class="detail-section">
-          <h3 class="detail-label">状态</h3>
-          <el-tag :type="STATUS_COLOR_MAP[detailTask.status] || 'info'">
-            {{ statusLabel(detailTask.status) }}
-          </el-tag>
-        </div>
-        <div class="detail-section">
-          <h3 class="detail-label">进度</h3>
-          <el-progress :percentage="detailTask.progress" :stroke-width="8" />
-        </div>
-        <div class="detail-section">
-          <h3 class="detail-label">下载进度</h3>
-          <p class="detail-value">
-            {{ detailTask.downloadedPages }} / {{ detailTask.totalPages }} 页
-          </p>
-        </div>
-        <div class="detail-section">
-          <h3 class="detail-label">下载方式</h3>
-          <p class="detail-value">{{ detailTask.downloadMethod || '-' }}</p>
-        </div>
-        <div class="detail-section">
-          <h3 class="detail-label">速度</h3>
-          <p class="detail-value">{{ formatSpeed(detailTask.downloadSpeed) }}</p>
-        </div>
-        <div class="detail-section">
-          <h3 class="detail-label">预计剩余时间</h3>
-          <p class="detail-value">{{ formatEta(detailTask.etaSeconds) }}</p>
-        </div>
-        <div class="detail-section">
-          <h3 class="detail-label">重试次数</h3>
-          <p class="detail-value">{{ detailTask.retryCount }}</p>
-        </div>
-        <div class="detail-section" v-if="detailTask.errorMessage">
-          <h3 class="detail-label">错误信息</h3>
-          <p class="detail-value detail-error">{{ detailTask.errorMessage }}</p>
-        </div>
-        <div class="detail-section">
-          <h3 class="detail-label">创建时间</h3>
-          <p class="detail-value">{{ formatTime(detailTask.createdAt) }}</p>
-        </div>
-      </template>
-    </el-drawer>
+      </div>
+      <router-link v-if="store.activeTasks.length > 3" to="/tasks" class="more-link">
+        查看全部 {{ store.activeTasks.length }} 个任务 →
+      </router-link>
+    </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useImportStore } from '@/stores/import-store'
-import { STATUS_COLOR_MAP } from '@/types'
 import type { ImportTaskVO } from '@/types'
 
+const router = useRouter()
 const store = useImportStore()
 
-const sourceType = ref('REGISTER')
+const sourceType = ref<'ZIP' | 'DIRECTORY'>('ZIP')
 const sourcePath = ref('')
-const importing = ref(false)
-const drawerVisible = ref(false)
-const detailTask = ref<ImportTaskVO | null>(null)
+const creating = ref(false)
 
-let pollTimer: ReturnType<typeof setInterval> | null = null
+const sourceTypeOptions = [
+  { value: 'ZIP' as const, label: 'ZIP 文件', desc: '压缩包，自动解压并解析目录结构' },
+  { value: 'DIRECTORY' as const, label: '本地目录', desc: '已存在的漫画目录，原样解析' },
+]
+
+const pathPlaceholder = computed(() =>
+  sourceType.value === 'ZIP'
+    ? 'D:/comics/my_comic.zip'
+    : 'D:/comics/my_comic_dir'
+)
+
+const pathHint = computed(() =>
+  sourceType.value === 'ZIP'
+    ? '完整 ZIP 文件路径，包含 .zip 扩展名'
+    : '漫画根目录绝对路径，包含章节子目录'
+)
+
+const canSubmit = computed(() => sourcePath.value.trim().length > 0)
 
 const STATUS_LABELS: Record<string, string> = {
   PENDING: '等待中',
-  DOWNLOADING: '下载中',
-  EXTRACTING: '解压中',
   PARSING: '解析中',
   IMPORTING: '导入中',
+  DOWNLOADING: '下载中',
+  EXTRACTING: '解压中',
   SUCCESS: '成功',
   FAILED: '失败',
   CANCELLED: '已取消',
 }
 
-function statusLabel(status: string): string {
-  return STATUS_LABELS[status] || status
+function statusLabel(s: string) {
+  return STATUS_LABELS[s] || s
 }
 
-function truncateUrl(url: string): string {
-  return url.length > 60 ? url.slice(0, 60) + '...' : url
-}
-
-function formatSpeed(speed: number): string {
-  if (!speed || speed <= 0) return '-'
-  if (speed > 1024 * 1024) return (speed / (1024 * 1024)).toFixed(1) + ' MB/s'
-  if (speed > 1024) return (speed / 1024).toFixed(1) + ' KB/s'
-  return speed.toFixed(0) + ' B/s'
-}
-
-function formatEta(seconds: number): string {
-  if (!seconds || seconds <= 0) return '-'
-  if (seconds < 60) return `${seconds}秒`
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}分${seconds % 60}秒`
-  const h = Math.floor(seconds / 3600)
-  const m = Math.floor((seconds % 3600) / 60)
-  return `${h}时${m}分`
-}
-
-function formatTime(ts: string): string {
-  if (!ts) return '-'
-  return new Date(ts).toLocaleString('zh-CN')
+function taskName(task: ImportTaskVO): string {
+  const path = task.sourcePath || task.sourceRef || ''
+  if (!path) return `任务 #${task.id}`
+  const parts = path.replace(/\\/g, '/').split('/')
+  const last = parts[parts.length - 1]
+  return last || path
 }
 
 async function doImport() {
@@ -227,148 +140,285 @@ async function doImport() {
     ElMessage.warning('请输入路径')
     return
   }
-  importing.value = true
+  creating.value = true
   try {
-    await store.create(sourceType.value, path)
+    const task = await store.create(sourceType.value, path)
+    ElMessage.success(`导入任务已创建：${taskName(task)}`)
     sourcePath.value = ''
-    ElMessage.success('导入任务已创建')
-  } catch {
-    ElMessage.error('创建导入任务失败')
+    // 工作流闭环：创建后直接跳到任务中心观察进度
+    router.push('/tasks')
+  } catch (err: any) {
+    ElMessage.error(err?.response?.data?.message || '创建导入任务失败')
   } finally {
-    importing.value = false
+    creating.value = false
   }
 }
-
-async function cancelTask(id: number) {
-  try {
-    await store.cancel(id)
-    ElMessage.success('已取消')
-  } catch {
-    ElMessage.error('取消失败')
-  }
-}
-
-async function retryTask(id: number) {
-  try {
-    await store.retry(id)
-    ElMessage.success('已重试')
-  } catch {
-    ElMessage.error('重试失败')
-  }
-}
-
-function showDetail(task: ImportTaskVO) {
-  detailTask.value = task
-  drawerVisible.value = true
-}
-
-function startPolling() {
-  stopPolling()
-  pollTimer = setInterval(async () => {
-    const activeTasks = store.tasks.filter(
-      t => t.status !== 'SUCCESS' && t.status !== 'FAILED' && t.status !== 'CANCELLED'
-    )
-    if (activeTasks.length === 0) {
-      stopPolling()
-      return
-    }
-    await store.fetchList()
-  }, 2000)
-}
-
-function stopPolling() {
-  if (pollTimer) {
-    clearInterval(pollTimer)
-    pollTimer = null
-  }
-}
-
-onMounted(async () => {
-  await store.fetchList()
-  startPolling()
-})
-
-onBeforeUnmount(() => {
-  stopPolling()
-})
 </script>
 
 <style scoped>
 .import-page {
-  padding: 24px;
-  max-width: 1400px;
+  max-width: 720px;
   margin: 0 auto;
+  padding: var(--space-xl) var(--space-lg) var(--space-3xl);
 }
 
 .page-header {
-  margin-bottom: 20px;
+  margin-bottom: var(--space-xl);
 }
 
 .page-title {
   font-size: 28px;
   font-weight: 700;
   color: var(--text-h);
+  margin: 0 0 8px;
+}
+
+.page-subtitle {
+  font-size: 14px;
+  color: var(--text);
   margin: 0;
 }
 
-.import-form {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 24px;
+/* Form card */
+.import-form-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-xl);
+  margin-bottom: var(--space-2xl);
 }
 
-.type-select {
-  width: 140px;
-  flex-shrink: 0;
+.form-group {
+  margin-bottom: var(--space-xl);
 }
 
-.url-input {
-  flex: 1;
-  min-width: 300px;
+.form-group:last-of-type {
+  margin-bottom: var(--space-lg);
 }
 
-.task-table {
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.url-cell {
+.form-label {
+  display: block;
   font-size: 13px;
-  color: var(--text-h);
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-sm);
 }
 
-.cell-text {
-  font-size: 13px;
-  color: var(--text);
+/* Source type radio cards */
+.source-types {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-base);
 }
 
-.action-btns {
+.source-type-radio {
   display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: var(--space-base);
+  background: var(--bg);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.source-type-radio:hover {
+  border-color: var(--border-strong);
+}
+
+.source-type-radio.active {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+
+.radio-input {
+  margin-top: 3px;
+  accent-color: var(--accent);
+}
+
+.radio-label {
+  display: flex;
+  flex-direction: column;
   gap: 4px;
 }
 
-.detail-section {
-  margin-bottom: 20px;
-}
-
-.detail-label {
-  font-size: 13px;
-  color: var(--text);
-  margin: 0 0 4px;
-  font-weight: 400;
-}
-
-.detail-value {
+.radio-title {
   font-size: 14px;
+  font-weight: 600;
   color: var(--text-h);
-  margin: 0;
 }
 
-.detail-error {
-  color: #f56c6c;
+.radio-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
 }
 
-.break-all {
-  word-break: break-all;
+/* Path input */
+.path-input {
+  width: 100%;
+  padding: 12px 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-h);
+  font-size: 14px;
+  font-family: 'JetBrains Mono', 'Cascadia Code', monospace;
+  transition: border-color 150ms ease;
+  box-sizing: border-box;
+}
+
+.path-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.path-input::placeholder {
+  color: var(--text-muted);
+}
+
+.form-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 6px 0 0;
+}
+
+/* Form actions */
+.form-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  margin-top: var(--space-lg);
+}
+
+.primary-btn.large {
+  font-size: 15px;
+  padding: 12px 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.primary-btn.large:disabled {
+  background: var(--border-strong);
+  cursor: not-allowed;
+}
+
+.spinner-sm {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.ghost-link {
+  color: var(--text);
+  text-decoration: none;
+  font-size: 14px;
+  transition: color 150ms ease;
+}
+
+.ghost-link:hover {
+  color: var(--text-h);
+}
+
+/* Recent tasks preview */
+.recent-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg) var(--space-xl);
+}
+
+.section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-h);
+  margin: 0 0 var(--space-base);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.recent-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-base);
+}
+
+.recent-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.recent-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.recent-name {
+  font-size: 13px;
+  color: var(--text-h);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 80%;
+}
+
+.recent-status {
+  font-size: 12px;
+  color: var(--text);
+}
+
+.recent-bar {
+  height: 3px;
+  background: var(--border);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.recent-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: var(--radius-pill);
+  transition: width 300ms ease;
+}
+
+.more-link {
+  display: inline-block;
+  margin-top: var(--space-base);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 13px;
+  transition: color 150ms ease;
+}
+
+.more-link:hover {
+  color: var(--text-h);
+}
+
+/* Shared */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 640px) {
+  .source-types {
+    grid-template-columns: 1fr;
+  }
+  .form-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .ghost-link {
+    text-align: center;
+  }
 }
 </style>
