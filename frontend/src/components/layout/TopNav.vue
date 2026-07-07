@@ -2,13 +2,15 @@
   <nav class="top-nav">
     <div class="nav-left">
       <router-link to="/comics" class="nav-logo">ComicAtlas</router-link>
+      <div class="nav-links">
+        <router-link to="/comics" class="nav-link" active-class="active">漫画库</router-link>
+        <router-link to="/tasks" class="nav-link" active-class="active">任务</router-link>
+        <router-link to="/history" class="nav-link" active-class="active">历史</router-link>
+        <router-link to="/dashboard" class="nav-link" active-class="active">仪表盘</router-link>
+      </div>
     </div>
-    <div class="nav-center" />
     <div class="nav-right">
-      <router-link to="/comics" class="nav-link" active-class="active">漫画库</router-link>
-      <router-link to="/tasks" class="nav-link" active-class="active">任务</router-link>
-      <router-link to="/history" class="nav-link" active-class="active">历史</router-link>
-      <router-link to="/dashboard" class="nav-link" active-class="active">仪表盘</router-link>
+      <span class="nav-avatar">U</span>
     </div>
   </nav>
 </template>
@@ -17,22 +19,67 @@
 .top-nav {
   display: flex;
   align-items: center;
-  height: 48px;
-  padding: 0 24px;
-  background: #1a1a1a;
-  border-bottom: 1px solid #2a2a2a;
+  justify-content: space-between;
+  height: 56px;
+  padding: 0 var(--space-lg);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
-.nav-left { display: flex; align-items: center; }
+
+.nav-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xl);
+}
+
 .nav-logo {
-  font-size: 18px; font-weight: 700; color: #e5e7eb; text-decoration: none;
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--accent);
+  text-decoration: none;
+  letter-spacing: -0.03em;
 }
-.nav-center { flex: 1; }
-.nav-right { display: flex; gap: 4px; }
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: var(--space-base);
+}
+
 .nav-link {
-  padding: 6px 14px; font-size: 14px; color: #9ca3af; text-decoration: none;
-  border-radius: 6px; transition: background .15s, color .15s;
+  padding: 4px 0;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text);
+  text-decoration: none;
+  transition: color 150ms ease;
 }
-.nav-link:hover { color: #e5e7eb; background: rgba(255,255,255,.06); }
-.nav-link.active { color: #6366f1; background: rgba(99,102,241,.12); }
+
+.nav-link:hover {
+  color: var(--text-h);
+}
+
+.nav-link.active {
+  color: var(--text-h);
+  font-weight: 600;
+}
+
+.nav-right {
+  display: flex;
+  align-items: center;
+}
+
+.nav-avatar {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
 </style>
