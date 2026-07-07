@@ -20,6 +20,8 @@ public class WorkerConfig {
     private Proxy proxy = new Proxy();
     private String aria2cPath = "aria2c";
     private Map<String, String> storageRoots = new LinkedHashMap<>();
+    private String hostMangaRoot;
+    private String containerMangaRoot = "/storage";
 
     @Bean
     public ObjectMapper objectMapper() {

@@ -2,6 +2,17 @@ import axios from 'axios'
 
 const api = axios.create({ baseURL: '/api' })
 
+api.interceptors.response.use(
+  (response) => {
+    const data = response.data
+    if (data && typeof data === 'object' && 'code' in data && 'data' in data) {
+      response.data = data.data
+    }
+    return response
+  },
+  (error) => Promise.reject(error)
+)
+
 export const comicApi = {
   list: (params: any) => api.get('/comics', { params }),
   detail: (id: number) => api.get(`/comics/${id}`),

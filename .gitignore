@@ -24,6 +24,10 @@ node_modules/
 dist/
 *.tsbuildinfo
 
+# Playwright
+e2e/test-results/
+e2e/playwright-report/
+
 # Docker volumes
 mysql-data/
 

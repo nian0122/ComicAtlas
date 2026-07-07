@@ -1,6 +1,6 @@
 <template>
   <div class="reader-layout">
-    <slot />
+    <router-view />
   </div>
 </template>
 
