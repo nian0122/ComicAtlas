@@ -69,7 +69,7 @@ public class HistoryServiceImpl implements HistoryService {
         Comic comic = comicMapper.selectById(h.getComicId());
         if (comic != null) {
             vo.setComicTitle(comic.getTitle());
-            vo.setCoverUrl("/comic/thumbs/" + comic.getId() + "/cover.webp");
+            vo.setCoverUrl("/files/thumbs/" + comic.getId() + "/cover.webp");
             if (comic.getTotalPages() != null && comic.getTotalPages() > 0) {
                 vo.setTotalPages(comic.getTotalPages());
                 if (h.getPageNumber() != null) {
