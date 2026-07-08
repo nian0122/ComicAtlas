@@ -40,6 +40,17 @@
         <el-option label="原始" value="ORIGINAL" />
       </el-select>
 
+      <!-- Direction -->
+      <el-select
+        v-model="settings.readingDirection"
+        size="small"
+        class="toolbar-select"
+        @change="settings.setReadingDirection"
+      >
+        <el-option label="纵向" value="vertical" />
+        <el-option label="横向" value="horizontal" />
+      </el-select>
+
       <!-- Zoom -->
       <div class="zoom-group">
         <button class="tool-btn zoom-btn" @click="settings.zoomOut">-</button>

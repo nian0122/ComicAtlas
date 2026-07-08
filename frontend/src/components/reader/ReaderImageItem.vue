@@ -5,6 +5,7 @@
       'fit-width': settings.fitMode === 'WIDTH',
       'fit-height': settings.fitMode === 'HEIGHT',
       'fit-original': settings.fitMode === 'ORIGINAL',
+      'direction-horizontal': direction === 'horizontal',
     }"
   >
     <ProgressiveImage
@@ -28,9 +29,13 @@ interface Props {
   item: PageInfo
   index: number
   active: boolean
+  direction?: 'vertical' | 'horizontal'
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  direction: 'vertical',
+})
+
 const settings = useReaderSettingsStore()
 
 const page = computed(() => props.item)
@@ -59,6 +64,10 @@ const imageClasses = computed(() => ({
   padding: var(--space-sm) 0;
 }
 
+.reader-image-item.direction-horizontal {
+  padding: 0 var(--space-sm);
+}
+
 .reader-image-item :deep(.progressive-image) {
   width: auto;
   height: auto;
@@ -83,7 +92,15 @@ const imageClasses = computed(() => ({
   max-height: none;
 }
 
-.reader-image-item :deep(.progressive-layer) {
-  transform-origin: center center;
+.reader-image-item.direction-horizontal.fit-width :deep(.progressive-image) {
+  width: 100%;
+  height: auto;
+  max-height: 100%;
+}
+
+.reader-image-item.direction-horizontal.fit-height :deep(.progressive-image) {
+  width: auto;
+  height: 100%;
+  max-width: 100%;
 }
 </style>

@@ -4,6 +4,7 @@
       v-if="containerWidth > 0 && containerHeight > 0"
       ref="scrollerRef"
       class="scroller"
+      :class="{ 'scroller-horizontal': isHorizontal }"
       :items="scrollerItems"
       :item-size="null"
       size-field="size"
@@ -17,6 +18,7 @@
           :item="item"
           :index="index"
           :active="active"
+          :direction="scrollerDirection"
         />
       </template>
     </RecycleScroller>
@@ -57,10 +59,9 @@ function updateContainerSize() {
   }
 }
 
+const isHorizontal = computed(() => settings.readingDirection === 'horizontal')
 const buffer = computed(() => Math.max(800, containerWidth.value))
-const scrollerDirection = computed(() =>
-  settings.readingDirection === 'horizontal' ? 'horizontal' : 'vertical'
-)
+const scrollerDirection = computed(() => (isHorizontal.value ? 'horizontal' : 'vertical'))
 
 function computeAspectRatio(page: PageInfo): number {
   if (page.width && page.height && page.height > 0) {
@@ -74,34 +75,56 @@ function computeItemSize(page: PageInfo): number {
   const zoom = settings.zoom / 100
   const padding = 16
 
+  if (isHorizontal.value) {
+    // In horizontal mode, sizeField represents item width
+    let baseWidth = 0
+    switch (settings.fitMode) {
+      case 'WIDTH':
+        baseWidth = containerWidth.value
+        break
+      case 'HEIGHT':
+        baseWidth = containerHeight.value * aspectRatio
+        break
+      case 'ORIGINAL':
+        baseWidth = page.width || containerWidth.value
+        break
+      case 'AUTO':
+      default: {
+        const containerRatio = containerWidth.value / containerHeight.value
+        if (aspectRatio > containerRatio) {
+          baseWidth = containerWidth.value
+        } else {
+          baseWidth = containerHeight.value * aspectRatio
+        }
+        break
+      }
+    }
+    return baseWidth * zoom + padding
+  }
+
+  // Vertical mode: sizeField represents item height
   let baseHeight = 0
   switch (settings.fitMode) {
     case 'WIDTH':
       baseHeight = containerWidth.value / aspectRatio
       break
-
     case 'HEIGHT':
       baseHeight = containerHeight.value
       break
-
     case 'ORIGINAL':
       baseHeight = page.height || containerHeight.value
       break
-
     case 'AUTO':
     default: {
       const containerRatio = containerWidth.value / containerHeight.value
       if (aspectRatio > containerRatio) {
-        // Image is wider relative to container -> fit width
         baseHeight = containerWidth.value / aspectRatio
       } else {
-        // Image is taller -> fit height
         baseHeight = containerHeight.value
       }
       break
     }
   }
-
   return baseHeight * zoom + padding
 }
 
@@ -114,6 +137,20 @@ const scrollerItems = computed<ScrollerItem[]>(() =>
 
 let scrollTimeout: number | null = null
 let isProgrammaticScroll = false
+
+function scrollOffset(): number {
+  if (!scrollerRef.value) return 0
+  return isHorizontal.value ? scrollerRef.value.scrollLeft || 0 : scrollerRef.value.scrollTop || 0
+}
+
+function setScrollOffset(offset: number) {
+  if (!scrollerRef.value) return
+  if (isHorizontal.value) {
+    scrollerRef.value.$el.scrollLeft = offset
+  } else {
+    scrollerRef.value.$el.scrollTop = offset
+  }
+}
 
 function onScroll() {
   if (isProgrammaticScroll) return
@@ -128,12 +165,11 @@ function onScroll() {
 
 function deriveCurrentPage(): number {
   if (!scrollerRef.value || props.pages.length === 0) return 1
-  const scroller = scrollerRef.value
-  const scrollTop = scroller.scrollTop || 0
+  const scroll = scrollOffset()
   let accumulated = 0
   for (let i = 0; i < props.pages.length; i++) {
     const size = computeItemSize(props.pages[i])
-    if (scrollTop < accumulated + size / 2) {
+    if (scroll < accumulated + size / 2) {
       return i + 1
     }
     accumulated += size
@@ -148,8 +184,7 @@ function scrollToPage(page: number) {
     offset += computeItemSize(props.pages[i])
   }
   isProgrammaticScroll = true
-  const scroller = scrollerRef.value
-  scroller.$el.scrollTop = offset
+  setScrollOffset(offset)
   nextTick(() => {
     window.setTimeout(() => {
       isProgrammaticScroll = false
@@ -220,6 +255,11 @@ watch(() => settings.readingDirection, () => {
   height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
+}
+
+.scroller.scroller-horizontal {
+  overflow-y: hidden;
+  overflow-x: auto;
 }
 
 :deep(.vue-recycle-scroller__item-wrapper) {
