@@ -100,6 +100,13 @@
 
 <script setup lang="ts">
 import { ArrowLeft, Setting } from '@element-plus/icons-vue'
+import {
+  ElSelect,
+  ElOption,
+  ElDropdown,
+  ElDropdownMenu,
+  ElDropdownItem,
+} from 'element-plus'
 import { useReaderSettingsStore } from '@/stores/reader-settings-store'
 
 interface Props {
