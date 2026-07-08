@@ -14,7 +14,6 @@ export interface ReaderState {
   comicId: number
   loading: boolean
   error: string | null
-  hqMode: boolean
 }
 
 export const useReaderStore = defineStore('reader', () => {
@@ -28,7 +27,6 @@ export const useReaderStore = defineStore('reader', () => {
     comicId: 0,
     loading: false,
     error: null,
-    hqMode: false,
   })
 
   const totalPages = computed(() => state.pages.length)

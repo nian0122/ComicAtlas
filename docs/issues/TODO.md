@@ -18,13 +18,15 @@
 
 拆分为两个子阶段，每个阶段独立可验收。详见 [`docs/superpowers/plans/2026-07-08-reader-enhancement-phase1.md`](../superpowers/plans/2026-07-08-reader-enhancement-phase1.md)。
 
-### Phase I-A：Reader Performance（P0）
+### Phase I-A：Reader 渲染层重构（性能）
 
 | 优先级 | 模块 | 标题 | 状态 |
 |--------|------|------|------|
-| P0 | Reader | 新增 ReaderSettings Store，拆分业务状态与用户偏好 | 待实现 |
-| P0 | Reader | 图片预加载（±2 页窗口） | 待实现 |
-| P0 | Reader | LQ → HQ 渐进加载，画质模式改为 AUTO/HQ_ONLY/LQ_ONLY | 待实现 |
+| P0 | Reader | 新增 ReaderSettings Store，拆分业务状态与用户偏好 | 已完成 |
+| P0 | Reader | 新增 `ReaderViewport` / `ReaderImageItem` / `ProgressiveImage` 组件 | 已完成 |
+| P0 | Reader | `ReaderPage` 改用 `vue-virtual-scroller` 的 `RecycleScroller` | 已完成 |
+| P0 | Reader | LQ → HQ 渐进加载，画质模式改为 AUTO/HQ_ONLY/LQ_ONLY | 已完成 |
+| P0 | Reader | 图片预加载：当前页 HQ、下一页后台 HQ、±2 页 LQ | 已完成 |
 
 ### Phase I-B：Reader Interaction（P0）
 
