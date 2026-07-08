@@ -5,6 +5,8 @@ export type QualityMode = 'AUTO' | 'HQ_ONLY' | 'LQ_ONLY'
 export type FitMode = 'AUTO' | 'WIDTH' | 'HEIGHT' | 'ORIGINAL'
 export type ReadingDirection = 'ltr' | 'rtl' | 'vertical' | 'horizontal'
 
+export const ZOOM_LEVELS = [50, 75, 100, 125, 150, 200] as const
+
 export interface ReaderSettingsState {
   qualityMode: QualityMode
   fitMode: FitMode
@@ -33,7 +35,7 @@ export const useReaderSettingsStore = defineStore('reader-settings', () => {
   const state = reactive<ReaderSettingsState>({
     qualityMode: saved.qualityMode ?? 'AUTO',
     fitMode: saved.fitMode ?? 'AUTO',
-    zoom: saved.zoom ?? 1,
+    zoom: saved.zoom ?? 100,
     readingDirection: saved.readingDirection ?? 'ltr',
     showToolbar: saved.showToolbar ?? true,
     preloadWindow: saved.preloadWindow ?? 2,
@@ -69,12 +71,33 @@ export const useReaderSettingsStore = defineStore('reader-settings', () => {
   }
 
   function setZoom(value: number) {
-    state.zoom = Math.max(0.25, Math.min(5, value))
+    const nearest = ZOOM_LEVELS.reduce((prev, curr) =>
+      Math.abs(curr - value) < Math.abs(prev - value) ? curr : prev
+    )
+    state.zoom = nearest
     save()
   }
 
+  function zoomIn() {
+    const current = state.zoom
+    const next = ZOOM_LEVELS.find((level) => level > current)
+    if (next) {
+      state.zoom = next
+      save()
+    }
+  }
+
+  function zoomOut() {
+    const current = state.zoom
+    const prev = [...ZOOM_LEVELS].reverse().find((level) => level < current)
+    if (prev) {
+      state.zoom = prev
+      save()
+    }
+  }
+
   function resetZoom() {
-    state.zoom = 1
+    state.zoom = 100
     save()
   }
 
@@ -103,6 +126,8 @@ export const useReaderSettingsStore = defineStore('reader-settings', () => {
     setQualityMode,
     setFitMode,
     setZoom,
+    zoomIn,
+    zoomOut,
     resetZoom,
     setReadingDirection,
     toggleToolbar,
