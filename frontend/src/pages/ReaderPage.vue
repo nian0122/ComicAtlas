@@ -1,43 +1,15 @@
 <template>
   <div class="reader-page">
-    <!-- Toolbar -->
-    <header class="reader-toolbar">
-      <div class="toolbar-left">
-        <button class="tool-btn" @click="goBack">
-          <el-icon :size="20"><ArrowLeft /></el-icon>
-        </button>
-        <span class="toolbar-title">{{ comicTitle }}</span>
-      </div>
-      <div class="toolbar-center">
-        <span class="page-indicator">{{ store.currentPage }} / {{ store.totalPages }}</span>
-      </div>
-      <div class="toolbar-right">
-        <el-select
-          v-model="settings.qualityMode"
-          size="small"
-          class="quality-select"
-          @change="settings.setQualityMode"
-        >
-          <el-option label="自动" value="AUTO" />
-          <el-option label="原图" value="HQ_ONLY" />
-          <el-option label="省流" value="LQ_ONLY" />
-        </el-select>
-        <button
-          v-if="store.prevChapterId"
-          class="tool-btn chapter-btn"
-          @click="goChapter(store.prevChapterId!)"
-        >
-          上一章
-        </button>
-        <button
-          v-if="store.nextChapterId"
-          class="tool-btn chapter-btn primary"
-          @click="goChapter(store.nextChapterId!)"
-        >
-          下一章
-        </button>
-      </div>
-    </header>
+    <ReaderToolbar
+      :title="comicTitle"
+      :current-page="store.currentPage"
+      :total-pages="store.totalPages"
+      :prev-chapter-id="store.prevChapterId"
+      :next-chapter-id="store.nextChapterId"
+      @back="goBack"
+      @prev-chapter="goChapter(store.prevChapterId!)"
+      @next-chapter="goChapter(store.nextChapterId!)"
+    />
 
     <!-- Loading -->
     <div v-if="store.loading" class="reader-state">
@@ -72,10 +44,11 @@
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { ArrowLeft, PictureFilled, WarningFilled } from '@element-plus/icons-vue'
+import { PictureFilled, WarningFilled } from '@element-plus/icons-vue'
 import { useReaderStore } from '@/stores/reader-store'
 import { useReaderSettingsStore } from '@/stores/reader-settings-store'
 import ReaderViewport from '@/components/reader/ReaderViewport.vue'
+import ReaderToolbar from '@/components/reader/ReaderToolbar.vue'
 import { comicApi } from '@/services/api'
 import type { ComicDetailVO } from '@/types'
 
@@ -118,6 +91,34 @@ function onKeydown(e: KeyboardEvent) {
   } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
     e.preventDefault()
     store.prevPage()
+  } else if (e.key === '+' || e.key === '=') {
+    e.preventDefault()
+    settings.zoomIn()
+  } else if (e.key === '-') {
+    e.preventDefault()
+    settings.zoomOut()
+  } else if (e.key === '0') {
+    e.preventDefault()
+    settings.resetZoom()
+  }
+}
+
+function onWheel(e: WheelEvent) {
+  if (e.ctrlKey || e.metaKey) {
+    e.preventDefault()
+    if (e.deltaY < 0) {
+      settings.zoomIn()
+    } else {
+      settings.zoomOut()
+    }
+  }
+}
+
+function onDblClick(e: MouseEvent) {
+  // Reset zoom on double click of the page area
+  const target = e.target as HTMLElement
+  if (target.closest('.reader-viewport') || target.closest('.reader-image-item')) {
+    settings.resetZoom()
   }
 }
 
@@ -134,11 +135,9 @@ function preloadPages() {
     if (!page) continue
 
     if (offset === 0 || offset === 1) {
-      // Current page and next page: preload HQ
       const img = new Image()
       img.src = page.hqUrl
     } else {
-      // Other nearby pages: preload LQ
       const img = new Image()
       img.src = page.lqUrl
     }
@@ -147,6 +146,8 @@ function preloadPages() {
 
 onMounted(async () => {
   document.addEventListener('keydown', onKeydown)
+  document.addEventListener('wheel', onWheel, { passive: false })
+  document.addEventListener('dblclick', onDblClick)
 
   const id = Number(route.params.id)
   const chapterId = Number(route.query.chapterId)
@@ -197,6 +198,8 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   document.removeEventListener('keydown', onKeydown)
+  document.removeEventListener('wheel', onWheel)
+  document.removeEventListener('dblclick', onDblClick)
   if (saveDebounceTimer.value) {
     clearTimeout(saveDebounceTimer.value)
   }
@@ -213,84 +216,6 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   background: var(--bg);
-}
-
-.reader-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 56px;
-  padding: 0 var(--space-lg);
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-  z-index: 10;
-}
-
-.toolbar-left,
-.toolbar-right,
-.toolbar-center {
-  display: flex;
-  align-items: center;
-  gap: var(--space-base);
-}
-
-.toolbar-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-h);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 300px;
-}
-
-.page-indicator {
-  font-size: 13px;
-  color: var(--text);
-  font-variant-numeric: tabular-nums;
-}
-
-.quality-select {
-  width: 90px;
-}
-
-:deep(.quality-select .el-input__wrapper) {
-  background: var(--surface-elevated);
-  box-shadow: 0 0 0 1px var(--border) inset;
-}
-
-:deep(.quality-select .el-input__inner) {
-  color: var(--text-h);
-}
-
-.tool-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 12px;
-  background: transparent;
-  border: none;
-  border-radius: var(--radius-sm);
-  color: var(--text-h);
-  font-size: 14px;
-  cursor: pointer;
-  transition: background 150ms ease;
-}
-
-.tool-btn:hover {
-  background: var(--surface-elevated);
-}
-
-.chapter-btn.primary {
-  background: var(--accent);
-  color: #fff;
-}
-
-.chapter-btn.primary:hover {
-  background: var(--accent-hover);
 }
 
 .reader-state {
