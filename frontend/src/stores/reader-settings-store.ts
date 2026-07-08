@@ -2,8 +2,8 @@ import { defineStore } from 'pinia'
 import { reactive, toRefs } from 'vue'
 
 export type QualityMode = 'AUTO' | 'HQ_ONLY' | 'LQ_ONLY'
-export type FitMode = 'auto' | 'fit-width' | 'fit-height' | 'fit-screen' | 'original'
-export type ReadingDirection = 'ltr' | 'rtl' | 'vertical'
+export type FitMode = 'AUTO' | 'WIDTH' | 'HEIGHT' | 'ORIGINAL'
+export type ReadingDirection = 'ltr' | 'rtl' | 'vertical' | 'horizontal'
 
 export interface ReaderSettingsState {
   qualityMode: QualityMode
@@ -32,7 +32,7 @@ export const useReaderSettingsStore = defineStore('reader-settings', () => {
 
   const state = reactive<ReaderSettingsState>({
     qualityMode: saved.qualityMode ?? 'AUTO',
-    fitMode: saved.fitMode ?? 'auto',
+    fitMode: saved.fitMode ?? 'AUTO',
     zoom: saved.zoom ?? 1,
     readingDirection: saved.readingDirection ?? 'ltr',
     showToolbar: saved.showToolbar ?? true,

@@ -1,11 +1,20 @@
 <template>
-  <div class="reader-image-item">
+  <div
+    class="reader-image-item"
+    :class="{
+      'fit-width': settings.fitMode === 'WIDTH',
+      'fit-height': settings.fitMode === 'HEIGHT',
+      'fit-original': settings.fitMode === 'ORIGINAL',
+    }"
+  >
     <ProgressiveImage
       :lq="page.lqUrl"
       :hq="page.hqUrl"
       :mode="settings.qualityMode"
       :aspect-ratio="aspectRatio"
       :enable-progressive="settings.enableProgressiveImage"
+      :class="imageClasses"
+      :style="imageStyle"
     />
   </div>
 </template>
@@ -32,13 +41,58 @@ const aspectRatio = computed(() => {
   }
   return 3 / 4
 })
+
+const imageClasses = computed(() => ({
+  'fit-width-image': settings.fitMode === 'WIDTH',
+  'fit-height-image': settings.fitMode === 'HEIGHT',
+  'fit-original-image': settings.fitMode === 'ORIGINAL',
+  'fit-auto-image': settings.fitMode === 'AUTO',
+}))
+
+const imageStyle = computed(() => {
+  const zoom = settings.zoom / 100
+  const scale = Math.max(0.25, Math.min(5, zoom))
+  return {
+    transform: `scale(${scale})`,
+  }
+})
 </script>
 
 <style scoped>
 .reader-image-item {
   width: 100%;
+  height: 100%;
   display: flex;
+  align-items: center;
   justify-content: center;
   padding: var(--space-sm) 0;
+}
+
+.reader-image-item :deep(.progressive-image) {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.reader-image-item.fit-width :deep(.progressive-image) {
+  width: 100%;
+  height: auto;
+  max-height: none;
+}
+
+.reader-image-item.fit-height :deep(.progressive-image) {
+  width: auto;
+  height: 100%;
+  max-width: none;
+}
+
+.reader-image-item.fit-original :deep(.progressive-image) {
+  max-width: none;
+  max-height: none;
+}
+
+.reader-image-item :deep(.progressive-layer) {
+  transform-origin: center center;
 }
 </style>

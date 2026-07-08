@@ -1,7 +1,7 @@
 <template>
   <div ref="viewportRef" class="reader-viewport">
     <RecycleScroller
-      v-if="containerWidth > 0"
+      v-if="containerWidth > 0 && containerHeight > 0"
       ref="scrollerRef"
       class="scroller"
       :items="scrollerItems"
@@ -9,6 +9,7 @@
       size-field="size"
       key-field="id"
       :buffer="buffer"
+      :direction="scrollerDirection"
       @scroll="onScroll"
     >
       <template #default="{ item, index, active }">
@@ -25,6 +26,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { RecycleScroller } from 'vue-virtual-scroller'
+import { useReaderSettingsStore } from '@/stores/reader-settings-store'
 import ReaderImageItem from './ReaderImageItem.vue'
 import type { PageInfo } from '@/types'
 
@@ -42,24 +44,60 @@ const emit = defineEmits<{
   (e: 'update:currentPage', page: number): void
 }>()
 
+const settings = useReaderSettingsStore()
 const viewportRef = ref<HTMLElement | null>(null)
 const scrollerRef = ref<any>(null)
 const containerWidth = ref(0)
+const containerHeight = ref(0)
 
-function updateContainerWidth() {
+function updateContainerSize() {
   if (viewportRef.value) {
     containerWidth.value = viewportRef.value.clientWidth
+    containerHeight.value = viewportRef.value.clientHeight
   }
 }
 
 const buffer = computed(() => Math.max(800, containerWidth.value))
+const scrollerDirection = computed(() =>
+  settings.readingDirection === 'horizontal' ? 'horizontal' : 'vertical'
+)
+
+function computeAspectRatio(page: PageInfo): number {
+  if (page.width && page.height && page.height > 0) {
+    return page.width / page.height
+  }
+  return 3 / 4
+}
 
 function computeItemSize(page: PageInfo): number {
-  const width = containerWidth.value || 800
-  if (page.width && page.height && page.width > 0) {
-    return (width / page.width) * page.height + 16 // 16px for vertical padding
+  const aspectRatio = computeAspectRatio(page)
+  const padding = 16
+
+  switch (settings.fitMode) {
+    case 'WIDTH':
+      return containerWidth.value / aspectRatio + padding
+
+    case 'HEIGHT': {
+      const height = containerHeight.value
+      return height + padding
+    }
+
+    case 'ORIGINAL': {
+      const originalHeight = page.height || containerHeight.value
+      return originalHeight + padding
+    }
+
+    case 'AUTO':
+    default: {
+      const containerRatio = containerWidth.value / containerHeight.value
+      if (aspectRatio > containerRatio) {
+        // Image is wider relative to container -> fit width
+        return containerWidth.value / aspectRatio + padding
+      }
+      // Image is taller -> fit height
+      return containerHeight.value + padding
+    }
   }
-  return (width / 3) * 4 + 16
 }
 
 const scrollerItems = computed<ScrollerItem[]>(() =>
@@ -114,13 +152,19 @@ function scrollToPage(page: number) {
   })
 }
 
+function forceUpdateScroller() {
+  if (scrollerRef.value) {
+    scrollerRef.value.updateItems(true)
+  }
+}
+
 onMounted(() => {
-  updateContainerWidth()
-  window.addEventListener('resize', updateContainerWidth)
+  updateContainerSize()
+  window.addEventListener('resize', updateContainerSize)
 })
 
 onBeforeUnmount(() => {
-  window.removeEventListener('resize', updateContainerWidth)
+  window.removeEventListener('resize', updateContainerSize)
   if (scrollTimeout) clearTimeout(scrollTimeout)
 })
 
@@ -132,13 +176,28 @@ watch(() => props.currentPage, (newPage, oldPage) => {
 
 watch(() => props.pages.length, () => {
   nextTick(() => {
-    updateContainerWidth()
+    updateContainerSize()
     scrollToPage(props.currentPage)
   })
 })
 
-watch(containerWidth, () => {
+watch([containerWidth, containerHeight], () => {
   nextTick(() => {
+    forceUpdateScroller()
+    scrollToPage(props.currentPage)
+  })
+})
+
+watch(() => [settings.fitMode, settings.zoom], () => {
+  nextTick(() => {
+    forceUpdateScroller()
+    scrollToPage(props.currentPage)
+  })
+}, { flush: 'post' })
+
+watch(() => settings.readingDirection, () => {
+  nextTick(() => {
+    forceUpdateScroller()
     scrollToPage(props.currentPage)
   })
 })
