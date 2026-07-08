@@ -32,8 +32,11 @@
 
 | 优先级 | 模块 | 标题 | 状态 |
 |--------|------|------|------|
-| P0 | Reader | Fit 模式：fit-width / fit-height / fit-screen / original / auto | 待实现 |
-| P0 | Reader | 缩放交互：Ctrl+滚轮、+/- 按钮、双击恢复 | 待实现 |
+| P0 | Reader | Fit 模式：AUTO / WIDTH / HEIGHT / ORIGINAL | 已完成 |
+| P0 | Reader | 离散 Zoom：50/75/100/125/150/200%，Ctrl+滚轮、+/-、双击恢复 | 已完成 |
+| P0 | Reader | ReaderToolbar：页码、画质、Fit、Zoom、方向、设置 | 已完成 |
+| P0 | Reader | 阅读方向：纵向 / 横向滚动 | 已完成 |
+| P0 | Reader | E2E：Zoom / Fit / 阅读方向 测试 | 已完成 |
 
 ### Phase II（后续规划）
 
