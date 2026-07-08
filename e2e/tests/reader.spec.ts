@@ -16,8 +16,10 @@ test('reader: flip pages and save progress', async ({ page }) => {
 
   await expect(page).toHaveURL(/\/comics\/\d+\/read/)
   await expect(page.locator('.reader-toolbar')).toBeVisible()
+  await expect(page.locator('.reader-state')).not.toBeVisible()
 
   const indicator = page.locator('.page-indicator')
+  await expect(indicator).toContainText(/\d+\s*\/\s*[1-9]\d*/)
   const startText = await indicator.textContent()
   const startMatch = startText?.match(/(\d+)\s*\/\s*(\d+)/)
   expect(startMatch).not.toBeNull()

@@ -12,6 +12,16 @@
         <span class="page-indicator">{{ store.currentPage }} / {{ store.totalPages }}</span>
       </div>
       <div class="toolbar-right">
+        <el-select
+          v-model="settings.qualityMode"
+          size="small"
+          class="quality-select"
+          @change="settings.setQualityMode"
+        >
+          <el-option label="自动" value="AUTO" />
+          <el-option label="原图" value="HQ_ONLY" />
+          <el-option label="省流" value="LQ_ONLY" />
+        </el-select>
         <button
           v-if="store.prevChapterId"
           class="tool-btn chapter-btn"
@@ -48,44 +58,13 @@
       <span>暂无页面</span>
     </div>
 
-    <!-- Pages -->
-    <div
+    <!-- Reader Viewport -->
+    <ReaderViewport
       v-else
-      ref="scrollContainer"
-      class="scroll-container"
-    >
-      <div
-        v-for="(page, index) in store.pages"
-        :key="page.id"
-        :ref="(el) => setPageRef(el as HTMLElement, index)"
-        class="page-item"
-      >
-        <el-image
-          :src="store.hqMode ? page.hqUrl : page.lqUrl"
-          :alt="`Page ${page.pageNumber}`"
-          fit="contain"
-          class="page-image"
-          @load="onImageLoad"
-        >
-          <template #placeholder>
-            <div class="page-skeleton">
-              <div
-                class="skeleton-box"
-                :style="{
-                  aspectRatio: page.width && page.height ? `${page.width}/${page.height}` : '3/4',
-                }"
-              />
-            </div>
-          </template>
-          <template #error>
-            <div class="page-error">
-              <el-icon :size="32"><PictureFilled /></el-icon>
-              <span>图片加载失败</span>
-            </div>
-          </template>
-        </el-image>
-      </div>
-    </div>
+      :pages="store.pages"
+      :current-page="store.currentPage"
+      @update:current-page="onPageChange"
+    />
   </div>
 </template>
 
@@ -95,22 +74,19 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft, PictureFilled, WarningFilled } from '@element-plus/icons-vue'
 import { useReaderStore } from '@/stores/reader-store'
+import { useReaderSettingsStore } from '@/stores/reader-settings-store'
+import ReaderViewport from '@/components/reader/ReaderViewport.vue'
 import { comicApi } from '@/services/api'
 import type { ComicDetailVO } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
 const store = useReaderStore()
+const settings = useReaderSettingsStore()
 
-const scrollContainer = ref<HTMLElement | null>(null)
-const pageRefs = ref<HTMLElement[]>([])
 const lastSyncedPage = ref(1)
 const comicTitle = ref('')
 const saveDebounceTimer = ref<number | null>(null)
-
-function setPageRef(el: HTMLElement, index: number) {
-  if (el) pageRefs.value[index] = el
-}
 
 function goBack() {
   if (store.comicId) {
@@ -129,27 +105,43 @@ function reload() {
   if (chapterId) store.loadChapter(chapterId)
 }
 
-function onImageLoad() {
-  // placeholder for future preload tracking
+function onPageChange(page: number) {
+  if (page >= 1 && page <= store.totalPages) {
+    store.currentPage = page
+  }
 }
 
 function onKeydown(e: KeyboardEvent) {
   if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
     e.preventDefault()
     store.nextPage()
-    scrollToCurrentPage()
   } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
     e.preventDefault()
     store.prevPage()
-    scrollToCurrentPage()
   }
 }
 
-function scrollToCurrentPage() {
-  if (!scrollContainer.value) return
-  const el = pageRefs.value[store.currentPage - 1]
-  if (el) {
-    el.scrollIntoView({ behavior: 'auto', block: 'start' })
+function preloadPages() {
+  if (!settings.enablePreload || store.pages.length === 0) return
+
+  const current = store.currentPage - 1
+  const windowSize = Math.max(0, settings.preloadWindow)
+
+  for (let offset = -windowSize; offset <= windowSize; offset++) {
+    const idx = current + offset
+    if (idx < 0 || idx >= store.pages.length) continue
+    const page = store.pages[idx]
+    if (!page) continue
+
+    if (offset === 0 || offset === 1) {
+      // Current page and next page: preload HQ
+      const img = new Image()
+      img.src = page.hqUrl
+    } else {
+      // Other nearby pages: preload LQ
+      const img = new Image()
+      img.src = page.lqUrl
+    }
   }
 }
 
@@ -179,9 +171,7 @@ onMounted(async () => {
     await store.restoreProgress()
   }
 
-  if (scrollContainer.value) {
-    scrollContainer.value.scrollTop = 0
-  }
+  preloadPages()
 
   try {
     const detail = await comicApi.detail(id)
@@ -201,6 +191,7 @@ onMounted(async () => {
         store.saveProgress()
       }, 300)
     }
+    preloadPages()
   })
 })
 
@@ -258,6 +249,19 @@ onBeforeUnmount(() => {
   font-size: 13px;
   color: var(--text);
   font-variant-numeric: tabular-nums;
+}
+
+.quality-select {
+  width: 90px;
+}
+
+:deep(.quality-select .el-input__wrapper) {
+  background: var(--surface-elevated);
+  box-shadow: 0 0 0 1px var(--border) inset;
+}
+
+:deep(.quality-select .el-input__inner) {
+  color: var(--text-h);
 }
 
 .tool-btn {
@@ -330,52 +334,5 @@ onBeforeUnmount(() => {
 
 .primary-btn:hover {
   background: var(--accent-hover);
-}
-
-.scroll-container {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-}
-
-.page-item {
-  display: flex;
-  justify-content: center;
-  padding: var(--space-sm) 0;
-}
-
-.page-image {
-  max-width: 100%;
-  width: auto;
-  display: block;
-}
-
-.page-skeleton {
-  width: 100%;
-  max-width: 800px;
-  display: flex;
-  justify-content: center;
-}
-
-.skeleton-box {
-  width: 100%;
-  background: var(--surface-elevated);
-  border-radius: var(--radius-sm);
-  animation: pulse 1.5s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
-.page-error {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-sm);
-  color: var(--text);
-  padding: var(--space-2xl);
 }
 </style>
