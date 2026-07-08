@@ -16,18 +16,33 @@
 
 ## Phase I：Reader Enhancement
 
-详见 [`docs/superpowers/plans/2026-07-08-reader-enhancement-phase1.md`](../superpowers/plans/2026-07-08-reader-enhancement-phase1.md)。
+拆分为两个子阶段，每个阶段独立可验收。详见 [`docs/superpowers/plans/2026-07-08-reader-enhancement-phase1.md`](../superpowers/plans/2026-07-08-reader-enhancement-phase1.md)。
+
+### Phase I-A：Reader Performance（P0）
 
 | 优先级 | 模块 | 标题 | 状态 |
 |--------|------|------|------|
-| P0 | Reader | 图片预加载 + LQ 优先渐进加载 | 待实现 |
-| P0 | Reader | 缩放 / fit 模式（fit-width / fit-height / fit-screen / actual） | 待实现 |
-| P1 | Reader | 阅读方向切换（LTR / RTL / vertical） | 待实现 |
-| P1 | Reader | 工具栏自动隐藏 / 显隐切换 | 待实现 |
-| P1 | Reader | 页码缩略图快速跳转 | 待实现 |
-| P2 | Reader | 全屏模式 | 待实现 |
-| P2 | Reader | 双页模式 | 待实现 |
-| P2 | Reader | 移动端触摸手势 | 待实现 |
+| P0 | Reader | 新增 ReaderSettings Store，拆分业务状态与用户偏好 | 待实现 |
+| P0 | Reader | 图片预加载（±2 页窗口） | 待实现 |
+| P0 | Reader | LQ → HQ 渐进加载，画质模式改为 AUTO/HQ_ONLY/LQ_ONLY | 待实现 |
+
+### Phase I-B：Reader Interaction（P0）
+
+| 优先级 | 模块 | 标题 | 状态 |
+|--------|------|------|------|
+| P0 | Reader | Fit 模式：fit-width / fit-height / fit-screen / original / auto | 待实现 |
+| P0 | Reader | 缩放交互：Ctrl+滚轮、+/- 按钮、双击恢复 | 待实现 |
+
+### Phase II（后续规划）
+
+| 优先级 | 模块 | 标题 | 状态 |
+|--------|------|------|------|
+| P1 | Reader | 阅读方向切换（LTR / RTL / vertical） | 待规划 |
+| P1 | Reader | 工具栏自动隐藏 / 显隐切换 | 待规划 |
+| P1 | Reader | 页码缩略图快速跳转 | 待规划 |
+| P2 | Reader | 全屏模式 | 待规划 |
+| P2 | Reader | 双页模式 | 待规划 |
+| P2 | Reader | 移动端触摸手势 | 待规划 |
 
 ## 后续阶段（待定）
 
