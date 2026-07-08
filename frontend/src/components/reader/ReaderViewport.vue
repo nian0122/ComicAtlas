@@ -71,33 +71,38 @@ function computeAspectRatio(page: PageInfo): number {
 
 function computeItemSize(page: PageInfo): number {
   const aspectRatio = computeAspectRatio(page)
+  const zoom = settings.zoom / 100
   const padding = 16
 
+  let baseHeight = 0
   switch (settings.fitMode) {
     case 'WIDTH':
-      return containerWidth.value / aspectRatio + padding
+      baseHeight = containerWidth.value / aspectRatio
+      break
 
-    case 'HEIGHT': {
-      const height = containerHeight.value
-      return height + padding
-    }
+    case 'HEIGHT':
+      baseHeight = containerHeight.value
+      break
 
-    case 'ORIGINAL': {
-      const originalHeight = page.height || containerHeight.value
-      return originalHeight + padding
-    }
+    case 'ORIGINAL':
+      baseHeight = page.height || containerHeight.value
+      break
 
     case 'AUTO':
     default: {
       const containerRatio = containerWidth.value / containerHeight.value
       if (aspectRatio > containerRatio) {
         // Image is wider relative to container -> fit width
-        return containerWidth.value / aspectRatio + padding
+        baseHeight = containerWidth.value / aspectRatio
+      } else {
+        // Image is taller -> fit height
+        baseHeight = containerHeight.value
       }
-      // Image is taller -> fit height
-      return containerHeight.value + padding
+      break
     }
   }
+
+  return baseHeight * zoom + padding
 }
 
 const scrollerItems = computed<ScrollerItem[]>(() =>
