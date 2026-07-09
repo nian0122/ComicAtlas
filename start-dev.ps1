@@ -9,15 +9,15 @@ Start-Sleep 5
 
 # 2. Gateway (8000)
 Write-Host "[2/4] 启动 Gateway (8000)..." -ForegroundColor Yellow
-Start-Process pwsh -WorkingDirectory "$PSScriptRoot\gateway" -ArgumentList "-NoExit", "-Command", "Write-Host 'Gateway starting...'; ./mvnw spring-boot:run"
+Start-Process pwsh -WorkingDirectory "$PSScriptRoot\gateway" -ArgumentList "-NoExit", "-Command", "Write-Host 'Gateway starting...'; .\mvnw.cmd spring-boot:run"
 
 # 3. API Service (8010)
 Write-Host "[3/4] 启动 API Service (8010)..." -ForegroundColor Yellow
-Start-Process pwsh -WorkingDirectory "$PSScriptRoot\api-service" -ArgumentList "-NoExit", "-Command", "Write-Host 'API starting...'; ./mvnw spring-boot:run"
+Start-Process pwsh -WorkingDirectory "$PSScriptRoot\api-service" -ArgumentList "-NoExit", "-Command", "Write-Host 'API starting...'; .\mvnw.cmd spring-boot:run"
 
 # 4. Worker Service (8020)
 Write-Host "[4/4] 启动 Worker Service (8020)..." -ForegroundColor Yellow
-Start-Process pwsh -WorkingDirectory "$PSScriptRoot\worker-service" -ArgumentList "-NoExit", "-Command", "Write-Host 'Worker starting...'; ./mvnw spring-boot:run"
+Start-Process pwsh -WorkingDirectory "$PSScriptRoot\worker-service" -ArgumentList "-NoExit", "-Command", "Write-Host 'Worker starting...'; .\mvnw.cmd spring-boot:run"
 
 Write-Host "`n=== 全部启动完成 ===" -ForegroundColor Green
 Write-Host "Gateway : http://localhost:8000"
