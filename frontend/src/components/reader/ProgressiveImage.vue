@@ -95,7 +95,7 @@ const showHq = computed(() => {
 const hqVisible = computed(() => {
   if (props.mode === 'HQ_ONLY') return hqLoaded.value
   if (props.mode === 'LQ_ONLY') return false
-  return hqLoaded.value && lqLoaded.value
+  return hqLoaded.value && (lqLoaded.value || !props.lq || lqError.value)
 })
 
 const containerStyle = computed(() => ({
