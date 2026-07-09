@@ -11,6 +11,7 @@
       class="progressive-layer"
       :class="{ 'img-show': imgLoaded }"
       alt=""
+      decoding="async"
       @load="onLoad"
       @error="onError"
     />
