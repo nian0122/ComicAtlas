@@ -10,8 +10,8 @@
       class="progressive-layer"
       :class="{ 'img-show': imgLoaded }"
       alt=""
-      @load="imgLoaded = true"
-      @error="imgError = true"
+      @load="onLoad"
+      @error="onError"
     />
     <div v-if="imgError" class="progressive-error">
       <el-icon :size="24"><PictureFilled /></el-icon>
@@ -36,6 +36,14 @@ defineProps<Props>()
 
 const imgLoaded = ref(false)
 const imgError = ref(false)
+
+function onLoad() {
+  imgLoaded.value = true
+}
+
+function onError() {
+  imgError.value = true
+}
 </script>
 
 <style scoped>
