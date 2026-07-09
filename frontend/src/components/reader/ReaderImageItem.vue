@@ -61,26 +61,18 @@ const imageClasses = computed(() => ({
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0;
+  padding: var(--space-sm) 0;
 }
 
 .reader-image-item.direction-horizontal {
-  width: auto;
-  height: 100%;
-  padding: 0;
+  padding: 0 var(--space-sm);
 }
 
 .reader-image-item :deep(.progressive-image) {
-  width: 100%;
+  width: auto;
   height: auto;
   max-width: 100%;
   max-height: 100%;
-}
-
-.reader-image-item.direction-horizontal :deep(.progressive-image) {
-  height: 100%;
-  width: auto;
-  max-width: none;
 }
 
 .reader-image-item.fit-width :deep(.progressive-image) {

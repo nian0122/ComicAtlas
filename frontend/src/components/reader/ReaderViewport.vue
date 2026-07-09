@@ -77,7 +77,6 @@ function computeItemSize(page: PageInfo): number {
 
   if (isHorizontal.value) {
     // In horizontal mode, sizeField represents item width
-    // Zoom is NOT applied here; it's handled via CSS transform
     let baseWidth = 0
     switch (settings.fitMode) {
       case 'WIDTH':
@@ -139,61 +138,9 @@ const scrollerItems = computed<ScrollerItem[]>(() =>
 let scrollTimeout: number | null = null
 let isProgrammaticScroll = false
 
-// --- Toolbar auto-hide ---
-let lastScrollTop = 0
-let scrollAccumulator = 0
-let lastScrollDirection: 'up' | 'down' | null = null
-let accumulatorTimer: number | null = null
-let internalToggle = false
-
-function resetAccumulator() {
-  scrollAccumulator = 0
-  lastScrollDirection = null
-  if (accumulatorTimer) {
-    clearTimeout(accumulatorTimer)
-    accumulatorTimer = null
-  }
-}
-
-function handleToolbarAutoHide(delta: number) {
-  const currentScrollTop = scrollOffset()
-
-  // Near top: always show
-  if (currentScrollTop < 50) {
-    resetAccumulator()
-    lastScrollTop = currentScrollTop
-    settings.showToolbar = true
-    return
-  }
-
-  // Reset on direction change
-  const direction: 'up' | 'down' = delta > 0 ? 'down' : 'up'
-  if (lastScrollDirection !== null && direction !== lastScrollDirection) {
-    resetAccumulator()
-  }
-  lastScrollDirection = direction
-
-  scrollAccumulator += Math.abs(delta)
-
-  if (scrollAccumulator >= 50) {
-    internalToggle = true
-    settings.showToolbar = direction === 'up'
-    internalToggle = false
-    resetAccumulator()
-  }
-
-  // Reset accumulator after 300ms idle
-  if (accumulatorTimer) clearTimeout(accumulatorTimer)
-  accumulatorTimer = window.setTimeout(resetAccumulator, 300)
-
-  lastScrollTop = currentScrollTop
-}
-// --- End toolbar auto-hide ---
-
 function scrollOffset(): number {
   if (!scrollerRef.value) return 0
-  const el = scrollerRef.value.$el
-  return isHorizontal.value ? el.scrollLeft || 0 : el.scrollTop || 0
+  return isHorizontal.value ? scrollerRef.value.scrollLeft || 0 : scrollerRef.value.scrollTop || 0
 }
 
 function setScrollOffset(offset: number) {
@@ -207,14 +154,6 @@ function setScrollOffset(offset: number) {
 
 function onScroll() {
   if (isProgrammaticScroll) return
-
-  // Toolbar auto-hide
-  const currentScrollTop = scrollOffset()
-  const delta = currentScrollTop - lastScrollTop
-  if (delta !== 0) {
-    handleToolbarAutoHide(delta)
-  }
-
   if (scrollTimeout) clearTimeout(scrollTimeout)
   scrollTimeout = window.setTimeout(() => {
     const page = deriveCurrentPage()
@@ -267,7 +206,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('resize', updateContainerSize)
   if (scrollTimeout) clearTimeout(scrollTimeout)
-  if (accumulatorTimer) clearTimeout(accumulatorTimer)
 })
 
 watch(() => props.currentPage, (newPage, oldPage) => {
@@ -286,6 +224,7 @@ watch(() => props.pages.length, () => {
 watch([containerWidth, containerHeight], () => {
   nextTick(() => {
     forceUpdateScroller()
+    scrollToPage(props.currentPage)
   })
 })
 
@@ -301,11 +240,6 @@ watch(() => settings.readingDirection, () => {
     forceUpdateScroller()
     scrollToPage(props.currentPage)
   })
-})
-
-// Manual toolbar toggle resets auto-hide accumulator
-watch(() => settings.showToolbar, () => {
-  if (!internalToggle) resetAccumulator()
 })
 </script>
 

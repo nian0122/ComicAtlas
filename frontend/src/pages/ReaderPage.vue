@@ -122,6 +122,28 @@ function onDblClick(e: MouseEvent) {
   }
 }
 
+function preloadPages() {
+  if (!settings.enablePreload || store.pages.length === 0) return
+
+  const current = store.currentPage - 1
+  const windowSize = Math.max(0, settings.preloadWindow)
+
+  for (let offset = -windowSize; offset <= windowSize; offset++) {
+    const idx = current + offset
+    if (idx < 0 || idx >= store.pages.length) continue
+    const page = store.pages[idx]
+    if (!page) continue
+
+    if (offset === 0 || offset === 1) {
+      const img = new Image()
+      img.src = page.hqUrl
+    } else {
+      const img = new Image()
+      img.src = page.lqUrl
+    }
+  }
+}
+
 onMounted(async () => {
   document.addEventListener('keydown', onKeydown)
   document.addEventListener('wheel', onWheel, { passive: false })
@@ -150,6 +172,8 @@ onMounted(async () => {
     await store.restoreProgress()
   }
 
+  preloadPages()
+
   try {
     const detail = await comicApi.detail(id)
     const detailData = detail.data as ComicDetailVO
@@ -168,6 +192,7 @@ onMounted(async () => {
         store.saveProgress()
       }, 300)
     }
+    preloadPages()
   })
 })
 
