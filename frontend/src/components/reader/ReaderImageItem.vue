@@ -71,7 +71,7 @@ const imageClasses = computed(() => ({
 }
 
 .reader-image-item :deep(.progressive-image) {
-  width: auto;
+  width: 100%;
   height: auto;
   max-width: 100%;
   max-height: 100%;
