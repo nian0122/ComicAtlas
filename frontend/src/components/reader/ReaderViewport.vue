@@ -191,7 +191,8 @@ function handleToolbarAutoHide(delta: number) {
 
 function scrollOffset(): number {
   if (!scrollerRef.value) return 0
-  return isHorizontal.value ? scrollerRef.value.scrollLeft || 0 : scrollerRef.value.scrollTop || 0
+  const el = scrollerRef.value.$el
+  return isHorizontal.value ? el.scrollLeft || 0 : el.scrollTop || 0
 }
 
 function setScrollOffset(offset: number) {
