@@ -311,8 +311,8 @@ watch(() => settings.showToolbar, () => {
 
 <style scoped>
 .reader-viewport {
-  position: absolute;
-  inset: 0;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
