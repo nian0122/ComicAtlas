@@ -77,6 +77,7 @@ function computeItemSize(page: PageInfo): number {
 
   if (isHorizontal.value) {
     // In horizontal mode, sizeField represents item width
+    // Zoom is NOT applied here; it's handled via CSS transform
     let baseWidth = 0
     switch (settings.fitMode) {
       case 'WIDTH':
@@ -99,7 +100,7 @@ function computeItemSize(page: PageInfo): number {
         break
       }
     }
-    return baseWidth * zoom + padding
+    return baseWidth + padding
   }
 
   // Vertical mode: sizeField represents item height
