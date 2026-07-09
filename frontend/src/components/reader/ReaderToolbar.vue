@@ -159,6 +159,7 @@ function onCommand(command: string) {
   border-bottom: 1px solid var(--border);
   z-index: 10;
   transition: transform 200ms ease, opacity 200ms ease;
+  will-change: transform, opacity;
 }
 
 .reader-toolbar.toolbar-hidden {
