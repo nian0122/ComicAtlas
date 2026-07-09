@@ -73,7 +73,7 @@ function computeAspectRatio(page: PageInfo): number {
 function computeItemSize(page: PageInfo): number {
   const aspectRatio = computeAspectRatio(page)
   const zoom = settings.zoom / 100
-  const padding = 0
+  const padding = 16
 
   if (isHorizontal.value) {
     // In horizontal mode, sizeField represents item width
