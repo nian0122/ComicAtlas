@@ -62,7 +62,7 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   width: 100%;
-  background: var(--surface);
+  background: transparent;
   overflow: hidden;
 }
 
