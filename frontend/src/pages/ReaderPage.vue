@@ -218,7 +218,8 @@ onBeforeUnmount(() => {
 }
 
 .reader-state {
-  flex: 1;
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
