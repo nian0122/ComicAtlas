@@ -6,6 +6,7 @@
     <div v-if="!imgLoaded && !imgError" class="progressive-skeleton" />
     <img
       v-if="hq"
+      ref="imgRef"
       :src="hq"
       class="progressive-layer"
       :class="{ 'img-show': imgLoaded }"
@@ -21,7 +22,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { PictureFilled } from '@element-plus/icons-vue'
 
 interface Props {
@@ -34,6 +35,7 @@ interface Props {
 
 defineProps<Props>()
 
+const imgRef = ref<HTMLImageElement | null>(null)
 const imgLoaded = ref(false)
 const imgError = ref(false)
 
@@ -44,6 +46,13 @@ function onLoad() {
 function onError() {
   imgError.value = true
 }
+
+onMounted(() => {
+  if (imgRef.value?.complete) {
+    imgLoaded.value = imgRef.value.naturalWidth > 0
+    imgError.value = imgRef.value.naturalWidth === 0
+  }
+})
 </script>
 
 <style scoped>
