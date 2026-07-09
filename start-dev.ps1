@@ -8,7 +8,7 @@ Write-Host "  等待就绪..." -ForegroundColor Gray
 Start-Sleep 5
 
 # 2-4. Java 服务（mvn spring-boot:run）
-@"gateway", "api-service", "worker-service" | ForEach-Object {
+"gateway", "api-service", "worker-service" | ForEach-Object {
     $name = $_
     Write-Host "启动 $name ..." -ForegroundColor Yellow
     Start-Process pwsh -WorkingDirectory "$PSScriptRoot\$name" -ArgumentList "-NoExit", "-Command", "mvn spring-boot:run"
