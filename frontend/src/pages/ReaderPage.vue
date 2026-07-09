@@ -135,11 +135,9 @@ function preloadPages() {
     if (!page) continue
 
     if (offset === 0 || offset === 1) {
-      const img = new Image()
-      img.src = page.hqUrl
+      if (page.hqUrl) new Image().src = page.hqUrl
     } else {
-      const img = new Image()
-      img.src = page.lqUrl
+      if (page.lqUrl) new Image().src = page.lqUrl
     }
   }
 }
