@@ -100,7 +100,7 @@ function computeItemSize(page: PageInfo): number {
         break
       }
     }
-    return baseWidth + padding
+    return baseWidth * zoom + padding
   }
 
   // Vertical mode: sizeField represents item height

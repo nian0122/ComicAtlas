@@ -15,7 +15,6 @@
       :aspect-ratio="aspectRatio"
       :enable-progressive="settings.enableProgressiveImage"
       :class="imageClasses"
-      :style="imageStyle"
     />
   </div>
 </template>
@@ -53,13 +52,6 @@ const imageClasses = computed(() => ({
   'fit-original-image': settings.fitMode === 'ORIGINAL',
   'fit-auto-image': settings.fitMode === 'AUTO',
 }))
-
-const imageStyle = computed(() => {
-  if (direction === 'horizontal' && settings.zoom !== 100) {
-    return { transform: `scale(${settings.zoom / 100})`, transformOrigin: 'center center' }
-  }
-  return {}
-})
 </script>
 
 <style scoped>
