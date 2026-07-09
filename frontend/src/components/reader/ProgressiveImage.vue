@@ -100,7 +100,6 @@ const hqVisible = computed(() => {
 
 const containerStyle = computed(() => ({
   aspectRatio: `${props.aspectRatio}`,
-  width: '100%',
 }))
 
 let hqLoader: HTMLImageElement | null = null
