@@ -109,3 +109,25 @@ test('reader: reading direction switching', async ({ page }) => {
   await page.waitForTimeout(300)
   await expect(indicator).toContainText(/\d+\s*\/\s*\d+/)
 })
+
+/**
+ * Reader test: 滚动驱动工具栏自动隐藏
+ */
+test('reader: toolbar auto-hide on scroll', async ({ page }) => {
+  await openReader(page)
+
+  const toolbar = page.locator('.reader-toolbar')
+  await expect(toolbar).not.toHaveClass(/toolbar-hidden/)
+
+  await page.mouse.wheel(0, 300)
+  await page.waitForTimeout(200)
+  await page.mouse.wheel(0, 200)
+  await page.waitForTimeout(200)
+  await expect(toolbar).toHaveClass(/toolbar-hidden/)
+
+  await page.mouse.wheel(0, -200)
+  await page.waitForTimeout(200)
+  await page.mouse.wheel(0, -200)
+  await page.waitForTimeout(200)
+  await expect(toolbar).not.toHaveClass(/toolbar-hidden/)
+})
