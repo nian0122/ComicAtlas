@@ -285,7 +285,6 @@ watch(() => props.pages.length, () => {
 watch([containerWidth, containerHeight], () => {
   nextTick(() => {
     forceUpdateScroller()
-    scrollToPage(props.currentPage)
   })
 })
 
