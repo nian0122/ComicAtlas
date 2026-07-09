@@ -146,6 +146,10 @@ function onCommand(command: string) {
 
 <style scoped>
 .reader-toolbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -153,19 +157,14 @@ function onCommand(command: string) {
   padding: 0 var(--space-lg);
   background: var(--surface);
   border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
   z-index: 10;
-  transition: height 200ms ease, padding 200ms ease, opacity 200ms ease;
+  transition: transform 200ms ease, opacity 200ms ease;
 }
 
 .reader-toolbar.toolbar-hidden {
-  height: 0;
-  padding-top: 0;
-  padding-bottom: 0;
-  overflow: hidden;
+  transform: translateY(-100%);
   opacity: 0;
   pointer-events: none;
-  border-bottom: none;
 }
 
 .toolbar-left,
