@@ -61,7 +61,7 @@ const imageClasses = computed(() => ({
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--space-sm) 0;
+  padding: 0;
 }
 
 .reader-image-item.direction-horizontal {
