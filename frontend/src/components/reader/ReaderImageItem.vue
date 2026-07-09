@@ -78,8 +78,9 @@ const imageClasses = computed(() => ({
 }
 
 .reader-image-item.direction-horizontal :deep(.progressive-image) {
-  width: 100%;
-  height: 100%;
+  width: 100% !important;
+  height: 100% !important;
+  aspect-ratio: auto !important;
   max-width: none;
 }
 
