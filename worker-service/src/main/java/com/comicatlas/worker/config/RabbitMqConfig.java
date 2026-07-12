@@ -57,6 +57,11 @@ public class RabbitMqConfig {
     }
 
     @Bean
+    public Queue cancelTaskQueue() {
+        return QueueBuilder.durable("cancel.task.queue").build();
+    }
+
+    @Bean
     public Queue lqGenerateQueue() {
         return QueueBuilder.durable("lq.generate.queue")
                 .deadLetterExchange("comic.image.dlx")
@@ -94,6 +99,12 @@ public class RabbitMqConfig {
     public Binding importTaskDlqBinding() {
         return BindingBuilder.bind(importTaskDlq())
                 .to(importDlxExchange()).with("import.task.dlq");
+    }
+
+    @Bean
+    public Binding cancelTaskBinding() {
+        return BindingBuilder.bind(cancelTaskQueue())
+                .to(taskExchange()).with("cancel.requested");
     }
 
     @Bean

@@ -2,10 +2,6 @@ package com.comicatlas.worker.file.parse;
 
 import java.util.List;
 
-/**
- * 统一的漫画元数据模型 - 所有导入来源最终汇聚为此结构。
- * 不可变 record，Parser 输出后由 ImportWriter 转换为实体。
- */
 public record ComicMetadata(
     String title,
     String author,
@@ -17,7 +13,7 @@ public record ComicMetadata(
     public record CatalogInfo(
         String title,
         int sortOrder,
-        List<CatalogInfo> children
+        Integer parentIndex
     ) {}
 
     public record ChapterInfo(
@@ -25,7 +21,8 @@ public record ComicMetadata(
         String chapterNo,
         int sortOrder,
         int globalOrder,
-        Long catalogId,             // 临时 ID（catalogs 列表索引），非 DB 主键
+        Integer catalogIndex,
+        String sourceDir,
         List<PageInfo> pages
     ) {}
 

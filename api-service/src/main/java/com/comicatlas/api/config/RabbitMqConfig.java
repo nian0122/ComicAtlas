@@ -1,5 +1,7 @@
 package com.comicatlas.api.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.springframework.amqp.core.*;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
@@ -11,7 +13,9 @@ public class RabbitMqConfig {
 
     @Bean
     public MessageConverter messageConverter() {
-        return new Jackson2JsonMessageConverter();
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.registerModule(new JavaTimeModule());
+        return new Jackson2JsonMessageConverter(mapper);
     }
 
     @Bean
@@ -39,9 +43,28 @@ public class RabbitMqConfig {
     }
 
     @Bean
+    public Queue importFailedQueue() {
+        return QueueBuilder.durable("import.failed.queue")
+                .deadLetterExchange("comic.import.dlx")
+                .deadLetterRoutingKey("import.failed.dlq")
+                .build();
+    }
+
+    @Bean
+    public Queue importFailedDlq() {
+        return QueueBuilder.durable("import.failed.dlq").build();
+    }
+
+    @Bean
     public Binding importFailedBinding() {
-        return BindingBuilder.bind(importResultQueue())
+        return BindingBuilder.bind(importFailedQueue())
                 .to(importExchange()).with("task.failed");
+    }
+
+    @Bean
+    public Binding importFailedDlqBinding() {
+        return BindingBuilder.bind(importFailedDlq())
+                .to(importDlxExchange()).with("import.failed.dlq");
     }
 
     @Bean
@@ -69,5 +92,40 @@ public class RabbitMqConfig {
     public Binding taskStatusBinding() {
         return BindingBuilder.bind(taskStatusQueue())
                 .to(taskExchange()).with("status.changed");
+    }
+
+    @Bean
+    public DirectExchange deleteExchange() {
+        return new DirectExchange("comic.delete");
+    }
+
+    @Bean
+    public Queue deleteResultQueue() {
+        return QueueBuilder.durable("delete.result.queue")
+                .deadLetterExchange("comic.delete.dlx")
+                .deadLetterRoutingKey("delete.result.dlq")
+                .build();
+    }
+
+    @Bean
+    public Queue deleteResultDlq() {
+        return QueueBuilder.durable("delete.result.dlq").build();
+    }
+
+    @Bean
+    public Binding deleteResultBinding() {
+        return BindingBuilder.bind(deleteResultQueue())
+                .to(deleteExchange()).with("delete.completed");
+    }
+
+    @Bean
+    public Binding deleteResultDlqBinding() {
+        return BindingBuilder.bind(deleteResultDlq())
+                .to(deleteDlxExchange()).with("delete.result.dlq");
+    }
+
+    @Bean
+    public DirectExchange deleteDlxExchange() {
+        return new DirectExchange("comic.delete.dlx");
     }
 }

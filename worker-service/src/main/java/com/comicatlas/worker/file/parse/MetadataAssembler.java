@@ -11,13 +11,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 将 DirectoryTree 转换为具有业务语义的 ComicMetadata。
- * 注入 Catalog/Chapter 区分、global_order、HQ/LQ 状态等。
+ * 注入 Catalog/Chapter 区分、global_order、HQ/LQ 状态、sourceDir 等。
  *
  * 递归算法：
  * - 叶子节点（含图片）→ Chapter
  * - 中间节点（只含子目录）→ Catalog，继续递归
- * - catalogRefIndex 用于跟踪 Catalog 在统计列表中的位置
- *   子节点通过此索引引用父 Catalog（metadata 阶段，非 DB ID）
+ * - parentIndex / catalogIndex 为 catalogs 列表索引，非 DB 主键
  */
 @Slf4j
 @Component
@@ -30,48 +29,39 @@ public class MetadataAssembler {
         List<ComicMetadata.CatalogInfo> catalogs = new ArrayList<>();
         List<ComicMetadata.ChapterInfo> chapters = new ArrayList<>();
         AtomicInteger globalOrder = new AtomicInteger(0);
-        AtomicInteger catalogIndex = new AtomicInteger(0);
+        AtomicInteger catalogCounter = new AtomicInteger(0);
+        Path root = tree.path();
 
-        processNode(tree, null, catalogs, chapters, globalOrder, catalogIndex);
+        processNode(tree, root, null, catalogs, chapters, globalOrder, catalogCounter);
 
         if (chapters.isEmpty()) throw new RuntimeException("无可用章节: " + tree.path());
         return new ComicMetadata(title, null, null, List.of(), catalogs, chapters);
     }
 
-    /**
-     * 递归处理目录树节点。
-     * @param node 当前节点
-     * @param parentCatalogIndex 父 Catalog 在 catalogs 列表中的索引（null=顶层）
-     */
-    private void processNode(DirectoryTree node, Integer parentCatalogIndex,
+    private void processNode(DirectoryTree node, Path root, Integer parentCatalogIndex,
             List<ComicMetadata.CatalogInfo> catalogs,
             List<ComicMetadata.ChapterInfo> chapters,
-            AtomicInteger globalOrder, AtomicInteger catalogIndex) {
+            AtomicInteger globalOrder, AtomicInteger catalogCounter) {
 
-            if (node.isLeaf()) {
-            // 含图片 → Chapter
+        if (node.isLeaf()) {
             var pages = scanPages(node);
             if (!pages.isEmpty()) {
-                Long catalogId = parentCatalogIndex != null ? (long) parentCatalogIndex : null;
+                String sourceDir = root.relativize(node.path()).toString().replace('\\', '/');
                 chapters.add(new ComicMetadata.ChapterInfo(
                     node.name(), String.valueOf(globalOrder.get() + 1),
                     chapters.size(), globalOrder.getAndIncrement(),
-                    catalogId, pages
+                    parentCatalogIndex,
+                    sourceDir,
+                    pages
                 ));
             }
         } else if (node.hasChildren()) {
-            // 只含子目录 → Catalog，递归
-            int myIndex = catalogIndex.getAndIncrement();
+            int myIndex = catalogCounter.getAndIncrement();
             int mySort = catalogs.size();
-            catalogs.add(new ComicMetadata.CatalogInfo(node.name(), mySort, new ArrayList<>()));
+            catalogs.add(new ComicMetadata.CatalogInfo(node.name(), mySort, parentCatalogIndex));
 
-            for (int i = 0; i < node.children().size(); i++) {
-                DirectoryTree child = node.children().get(i);
-                if (child.isLeaf()) {
-                    processNode(child, myIndex, catalogs, chapters, globalOrder, catalogIndex);
-                } else {
-                    processNode(child, myIndex, catalogs, chapters, globalOrder, catalogIndex);
-                }
+            for (DirectoryTree child : node.children()) {
+                processNode(child, root, myIndex, catalogs, chapters, globalOrder, catalogCounter);
             }
         }
     }
@@ -95,7 +85,6 @@ public class MetadataAssembler {
         return pages;
     }
 
-    // ---- helpers ----
     private long safeFileSize(Path p) { try { return Files.size(p); } catch (Exception e) { return 0; } }
     private Integer safeImageWidth(Path p) { try { BufferedImage bi = ImageIO.read(p.toFile()); return bi != null ? bi.getWidth() : null; } catch (Exception e) { return null; } }
     private Integer safeImageHeight(Path p) { try { BufferedImage bi = ImageIO.read(p.toFile()); return bi != null ? bi.getHeight() : null; } catch (Exception e) { return null; } }

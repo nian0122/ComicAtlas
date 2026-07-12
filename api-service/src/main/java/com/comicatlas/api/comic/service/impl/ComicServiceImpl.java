@@ -9,6 +9,7 @@ import com.comicatlas.api.comic.mapper.*;
 import com.comicatlas.api.comic.service.ComicService;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.common.storage.FileUrlResolver;
+import com.comicatlas.api.importer.event.ImportEventPublisher;
 import com.comicatlas.api.reader.entity.ReadingHistory;
 import com.comicatlas.api.reader.mapper.ReadingHistoryMapper;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +17,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -33,6 +36,7 @@ public class ComicServiceImpl implements ComicService {
     private final ReadingHistoryMapper historyMapper;
     private final RedisTemplate<String, Object> redisTemplate;
     private final FileUrlResolver fileUrlResolver;
+    private final ImportEventPublisher eventPublisher;
 
     @Override
     public IPage<ComicListVO> listComics(ComicListQuery query) {
@@ -180,6 +184,13 @@ public class ComicServiceImpl implements ComicService {
         }
         c.setStatus("DELETING");
         comicMapper.updateById(c);
-        // MQ publish added in later task
+
+        TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        eventPublisher.publishDeleteRequested(id);
+                    }
+                });
     }
 }

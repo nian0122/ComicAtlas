@@ -16,11 +16,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Duration;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.nio.file.Files;
 import java.nio.file.Path;
 
 @Slf4j
@@ -34,6 +38,9 @@ public class ImportServiceImpl implements ImportService {
     private final ComicMapper comicMapper;
     private final ImportEventPublisher eventPublisher;
     private final RedisTemplate<String, Object> redisTemplate;
+
+    @Value("${MANGA_ROOT:D:/manga}")
+    private String mangaRoot;
 
     @Override
     @Transactional
@@ -100,8 +107,14 @@ public class ImportServiceImpl implements ImportService {
         task.setStatus("PENDING");
         taskMapper.insert(task);
 
-        // 3. 发 MQ
-        eventPublisher.publishImportTaskCreated(task.getId(), comic.getId(), sourceType, sourcePath);
+        // 3. 事务提交后发 MQ，避免 DB 回滚但消息已发出的窗口
+        TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        eventPublisher.publishImportTaskCreated(task.getId(), comic.getId(), sourceType, sourcePath);
+                    }
+                });
 
         log.info("导入任务创建: taskId={}, comicId={}, sourceType={}", task.getId(), comic.getId(), sourceType);
         return toVO(task);
@@ -139,11 +152,22 @@ public class ImportServiceImpl implements ImportService {
     public void cancelTask(Long id) {
         ImportTask t = taskMapper.selectById(id);
         if (t == null) throw new BusinessException(404, "任务不存在");
-        if (!"PENDING".equals(t.getStatus()) && !"DOWNLOADING".equals(t.getStatus())) {
-            throw new BusinessException(400, "仅 PENDING/DOWNLOADING 状态可取消");
+        String status = t.getStatus();
+        if ("SUCCESS".equals(status) || "FAILED".equals(status) || "CANCELLED".equals(status)) {
+            throw new BusinessException(400, "终态任务不可取消");
         }
         t.setStatus("CANCELLED");
         taskMapper.updateById(t);
+
+        Long taskId = t.getId();
+        Long comicId = t.getComicId();
+        TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        eventPublisher.publishCancelTask(taskId, comicId);
+                    }
+                });
     }
 
     @Override
@@ -151,14 +175,31 @@ public class ImportServiceImpl implements ImportService {
     public void retryTask(Long id) {
         ImportTask t = taskMapper.selectById(id);
         if (t == null) throw new BusinessException(404, "任务不存在");
-        if (!"FAILED".equals(t.getStatus())) {
-            throw new BusinessException(400, "仅 FAILED 状态可重试");
+        String status = t.getStatus();
+        if (!"FAILED".equals(status) && !"CANCELLED".equals(status)) {
+            throw new BusinessException(400, "仅 FAILED/CANCELLED 状态可重试");
         }
         t.setStatus("PENDING");
         t.setRetryCount(t.getRetryCount() + 1);
         t.setErrorMessage(null);
         taskMapper.updateById(t);
-        eventPublisher.publishImportTaskCreated(t.getId(), t.getComicId(), t.getSourceType(), t.getSourcePath());
+
+        Long taskId = t.getId();
+        Long comicId = t.getComicId();
+        String sourceType = t.getSourceType();
+        String sourcePath = t.getSourcePath();
+        TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        try {
+                            Files.deleteIfExists(Path.of(mangaRoot, "metadata", taskId + ".json"));
+                        } catch (Exception e) {
+                            log.warn("Metadata cleanup failed for retry: taskId={}", taskId, e);
+                        }
+                        eventPublisher.publishImportTaskCreated(taskId, comicId, sourceType, sourcePath);
+                    }
+                });
     }
 
     private ImportTaskVO toVO(ImportTask t) {

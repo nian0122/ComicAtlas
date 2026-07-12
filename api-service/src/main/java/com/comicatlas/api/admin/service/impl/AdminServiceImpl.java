@@ -139,7 +139,7 @@ public class AdminServiceImpl implements AdminService {
                 chapter.setChapterNo((String) chData.get("chapterNo"));
                 chapter.setSortOrder((Integer) chData.getOrDefault("sortOrder", chCount));
                 chapter.setGlobalOrder((Integer) chData.getOrDefault("globalOrder", chCount));
-                Object cid = chData.get("catalogId");
+                Object cid = chData.get("catalogIndex");
                 if (cid != null) chapter.setCatalogId(catalogIdMap.get(((Number) cid).intValue()));
                 chapterMapper.insert(chapter);
                 chCount++;

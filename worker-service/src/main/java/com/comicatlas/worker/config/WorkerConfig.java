@@ -18,6 +18,7 @@ public class WorkerConfig {
     private String metadataDir;
     private Torrent torrent = new Torrent();
     private Proxy proxy = new Proxy();
+    private Zip zip = new Zip();
     private String aria2cPath = "aria2c";
     private Map<String, String> storageRoots = new LinkedHashMap<>();
     private String hostMangaRoot;
@@ -40,5 +41,13 @@ public class WorkerConfig {
         private String host;
         private int port = 7890;
         private int socksPort = 7897;
+    }
+
+    @Data
+    public static class Zip {
+        private int maxEntries = 100_000;
+        private int maxDepth = 200;
+        private long maxEntrySize = 2L * 1024 * 1024 * 1024;
+        private long maxTotalSize = 30L * 1024 * 1024 * 1024;
     }
 }

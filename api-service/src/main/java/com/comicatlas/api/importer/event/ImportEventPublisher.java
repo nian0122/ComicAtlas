@@ -1,5 +1,6 @@
 package com.comicatlas.api.importer.event;
 
+import com.comicatlas.common.event.CancelTaskEvent;
 import com.comicatlas.common.event.DeleteRequestedEvent;
 import com.comicatlas.common.event.ImportTaskCreatedEvent;
 import lombok.RequiredArgsConstructor;
@@ -24,5 +25,10 @@ public class ImportEventPublisher {
     public void publishDeleteRequested(Long comicId) {
         var event = new DeleteRequestedEvent(UUID.randomUUID(), Instant.now(), comicId);
         rabbitTemplate.convertAndSend("comic.delete", "delete.requested", event);
+    }
+
+    public void publishCancelTask(Long taskId, Long comicId) {
+        var event = new CancelTaskEvent(UUID.randomUUID(), Instant.now(), taskId, comicId);
+        rabbitTemplate.convertAndSend("comic.task", "cancel.requested", event);
     }
 }

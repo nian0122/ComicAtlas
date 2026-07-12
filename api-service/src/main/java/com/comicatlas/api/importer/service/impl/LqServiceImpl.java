@@ -12,6 +12,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -51,7 +53,13 @@ public class LqServiceImpl implements LqService {
 
         // 发 MQ
         var event = new LqGenerateEvent(UUID.randomUUID(), Instant.now(), ch.getComicId(), chapterId);
-        rabbitTemplate.convertAndSend("comic.image", "lq.generate", event);
+        TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        rabbitTemplate.convertAndSend("comic.image", "lq.generate", event);
+                    }
+                });
 
         log.info("LQ 生成任务已发布: chapterId={}, pages={}", chapterId, pages.size());
     }

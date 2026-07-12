@@ -38,6 +38,19 @@
 | P0 | Reader | 阅读方向：纵向 / 横向滚动 | 已完成 |
 | P0 | Reader | E2E：Zoom / Fit / 阅读方向 测试 | 已完成 |
 
+## 当前阶段：导入稳定性（Phase 1.1）
+
+当前交付只覆盖 ZIP/DIRECTORY → MANAGED → Library/Reader 的可靠闭环；EHENTAI、EXTERNAL 和 LQ 不在本阶段实现。
+
+| 优先级 | 模块 | 标题 | 状态 |
+|--------|------|------|------|
+| P0 | Import / MQ | 统一事件契约、事务后确认、失败可重试且终态不可回退 | 待实现 |
+| P0 | Import / Storage | MANAGED 路径统一为 `hq/{comicId}/{globalOrder}/`，平铺/树状目录一致 | 待实现 |
+| P0 | Import / Metadata | 多级 Catalog 父子关系、章节源路径、Page 引用完整落库 | 待实现 |
+| P0 | Import / ZIP | 保留压缩包目录结构，限制文件数与解压体积，拒绝异常归档 | 待实现 |
+| P0 | Import / Task | 取消、失败、重试与 Worker 实际执行状态一致 | 待实现 |
+| P1 | Delete | 发布 `delete.requested`、消费 `delete.completed`，仅在文件删除成功后落终态 | 待实现 |
+
 ### Phase II（后续规划）
 
 | 优先级 | 模块 | 标题 | 状态 |
@@ -53,7 +66,7 @@
 
 | 优先级 | 模块 | 标题 | 计划阶段 |
 |--------|------|------|----------|
-| ⭐⭐⭐⭐ | LQ | 手动触发体验优化、批量生成 | Phase II |
+| ⭐⭐⭐⭐ | LQ | 手动触发、批量生成、文件变化后的过期检测与重建策略 | Phase II |
 | ⭐⭐⭐ | Dashboard | 统计图表 | Phase III |
 | ⭐⭐ | Settings | 系统配置页面 | Phase IV |
 
