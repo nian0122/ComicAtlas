@@ -26,17 +26,24 @@ public class DirectoryParser {
         return buildTree(root);
     }
 
-    /** 沿目录树向下，找到第一个含图片或含图片子目录的层级 */
+    /**
+     * 沿目录树向下，找到漫画根目录。
+     * 若多个子目录各自包含图片（多卷平级），返回当前目录。
+     */
     public Path findComicRoot(Path dir) {
         if (!Files.exists(dir)) return null;
         if (hasImages(dir)) return dir;
         List<Path> subs = listSubDirs(dir);
         if (subs.isEmpty()) return null;
         if (subs.stream().anyMatch(this::hasImages)) return dir;
+
+        List<Path> resolved = new ArrayList<>();
         for (Path sub : subs) {
             Path deeper = findComicRoot(sub);
-            if (deeper != null) return deeper;
+            if (deeper != null) resolved.add(deeper);
         }
+        if (resolved.size() > 1) return dir;
+        if (resolved.size() == 1) return resolved.get(0);
         return null;
     }
 
