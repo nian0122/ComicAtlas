@@ -21,8 +21,8 @@ public class LocalStorageService implements StorageService {
         Path target = root.resolve(relativePath);
         try {
             Files.createDirectories(target.getParent());
-            Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
-            log.info("store: {} -> {}", source, target);
+            Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
+            log.info("store (copy): {} -> {}", source, target);
         } catch (IOException e) {
             throw new RuntimeException("文件存储失败: " + target, e);
         }
