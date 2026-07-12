@@ -1,13 +1,15 @@
 # ComicAtlas Core Architecture
 
-**版本**: v1.2 (Frozen)
-**日期**: 2026-07-01
-**状态**: Phase 1 基线架构 — 冻结，不再修改
+**版本**: v1.3 (Frozen)
+**日期**: 2026-07-12
+**状态**: Phase 1 基线架构 — 仅修正已确认的实现性设计缺陷
 **语言**: 中文
 
 > **冻结声明**：本文档为 ComicAtlas 核心架构基线。后续除非发现设计缺陷，否则只修改 Implementation Plan，不再修改本架构。
 >
 > **实现约定**：Java 全部使用 `enum`，DB 全部使用 `VARCHAR`，禁止使用 MySQL `ENUM` 类型。MyBatis 通过 `EnumTypeHandler` 映射。
+
+> **v1.3 修正**：当前产品只验收 ZIP/DIRECTORY 的 MANAGED 导入。目录树只影响 Catalog 组织；每个 Chapter 在一部漫画内由 DFS 生成唯一且稳定的 `global_order`，因此 MANAGED 文件统一存为 `{comicId}/{globalOrder}/{imageName}`。Worker 写文件时尚未拥有数据库自增的 `chapterId`，不能将其作为物理路径键。
 
 ---
 
@@ -112,7 +114,7 @@ ImportHandlerFactory
         │         │
         │         ▼ 解压到 temp
         │
-        └── RegisterImportHandler
+        └── DirectoryImportHandler
                   │
                   ▼
           DirectoryParser        → DirectoryTree（纯目录结构）
@@ -139,8 +141,8 @@ Handler 和 Parser 之间通过 `ImportContext` 统一传递上下文：
 
 ```java
 public record ImportContext(
-    SourceType sourceType,          // ZIP / REGISTER / SMB（未来）
-    StoragePolicy storagePolicy,    // MANAGED / EXTERNAL
+    SourceType sourceType,          // ZIP / DIRECTORY；其他来源后续扩展
+    StoragePolicy storagePolicy,    // 当前固定 MANAGED；EXTERNAL 后续扩展
     Path sourcePath,                // 原始来源路径
     boolean generateLq,             // 是否生成 LQ
     boolean overwrite,              // 是否覆盖已存在漫画
@@ -156,11 +158,11 @@ public record ImportContext(
 | SourceType | StoragePolicy | 说明 |
 |------------|---------------|------|
 | ZIP | MANAGED | 解压 → 搬入 HQ |
-| REGISTER | EXTERNAL | 不动文件，原地引用 |
-| SMB（未来） | EXTERNAL | 远程挂载，原地引用 |
-| NAS（未来） | EXTERNAL | 网络存储，原地引用 |
+| DIRECTORY | MANAGED | 扫描目录 → 搬入 HQ |
+| EHENTAI（未来） | 待定 | 独立来源适配器，不属于当前验收范围 |
+| REGISTER / SMB / NAS（未来） | EXTERNAL | 原地引用能力，后续阶段实现 |
 
-理论上允许 `REGISTER + MANAGED`（注册后搬入），但 Phase 1 不实现。
+`EXTERNAL` 保留为领域模型扩展点，但不属于当前 Phase 1 的 API、Worker 或验收范围。
 
 ### 2.4 组件分层
 
@@ -195,9 +197,9 @@ DirectoryParser（无敌业务语义）
 
 ### 2.6 ImportWriter 行为
 
-**MANAGED 模式**（ZIP → storage_policy=MANAGED）：
+**MANAGED 模式**（ZIP / DIRECTORY → storage_policy=MANAGED）：
 
-1. `StorageLayout.forPage(comicId, chapterId, imageName)` → 决定 relativePath
+1. `StorageLayout.forPage(comicId, globalOrder, imageName)` → 决定 relativePath
 2. `StorageService.store(sourceFile, "HQ", relativePath)` → 搬文件
 3. Page 写入 `hq_root=HQ, hq_path=relativePath`
 4. `ComicRepository.save(metadata)` → 聚合持久化
@@ -267,11 +269,11 @@ public interface FileUrlResolver {
 
 ```java
 public interface StorageLayout {
-    String forPage(Long comicId, Long chapterId, String imageName);
+    String forPage(Long comicId, int globalOrder, String imageName);
 }
 ```
 
-职责：决定 MANAGED 文件的目录结构。现为 `{comicId}/{chapterId}/{imageName}`。
+职责：决定 MANAGED 文件的目录结构。当前为 `{comicId}/{globalOrder}/{imageName}`；`globalOrder` 在同一漫画内唯一，适用于平铺和树状目录。
 
 版本预留：`StorageLayout` 可通过 `layout.version` 配置切换路径格式。
 
@@ -631,7 +633,7 @@ comic ──────────┬── catalog ── catalog (self-ref)
 ### 9.2 枚举定义
 
 ```java
-public enum SourceType { ZIP, REGISTER, EHENTAI, SMB }
+public enum SourceType { ZIP, DIRECTORY, EHENTAI, REGISTER, SMB }
 
 public enum StoragePolicy { MANAGED, EXTERNAL }
 
@@ -664,6 +666,7 @@ public enum OperationType { IMPORT, DELETE, RESCAN, UPDATE }
 | Catalog 为可选组织结构 | 普通漫画无需目录节点 |
 | CatalogTree 为 ViewModel | 运行时组装，不存 DB |
 | `global_order` 为全书线性阅读顺序 | 阅读器无需递归 Catalog |
+| `global_order` 作为当前 MANAGED 路径键 | Worker 先写文件、API 后生成自增 chapterId；树状与平铺目录均可复用同一布局 |
 | StorageService 不返回 URL | 文件与 HTTP 职责分离 |
 | EXTERNAL 路径固化为 relative_path | 避免每次请求扫描目录 |
 | `chapter_no` 仅作原始编号 | 排序由 `sort_order`/`global_order` 独立维护 |

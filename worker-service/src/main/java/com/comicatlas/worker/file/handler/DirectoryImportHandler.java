@@ -2,6 +2,7 @@ package com.comicatlas.worker.file.handler;
 
 import com.comicatlas.worker.file.parse.*;
 import com.comicatlas.worker.file.storage.LocalStorageService;
+import com.comicatlas.worker.event.CancelHandler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +20,7 @@ public class DirectoryImportHandler {
     private final MetadataAssembler assembler;
     private final LocalStorageService storageService;
     private final ObjectMapper objectMapper;
+    private final CancelHandler cancelHandler;
 
     /**
      * 统一导入：解析目录 → 解析后把图片搬到 hq/{comicId}/{chapterId}/ → 写 metadata。
@@ -28,11 +30,17 @@ public class DirectoryImportHandler {
         DirectoryTree tree = parser.parse(ctx.sourcePath());
         ComicMetadata metadata = assembler.assemble(tree, ctx);
 
+        if (cancelHandler.isCancelled(taskId)) {
+            log.info("Task cancelled after parse: taskId={}", taskId);
+            throw new RuntimeException("Task cancelled: " + taskId);
+        }
+
         // 搬文件到 HQ
+        Path importRoot = tree.path();
         for (var ch : metadata.chapters()) {
             for (var page : ch.pages()) {
-                Path src = tree.path().resolve(ch.title()).resolve(page.imageName());
-                if (!Files.exists(src)) src = tree.path().resolve(page.imageName());
+                Path src = importRoot.resolve(ch.sourceDir()).resolve(page.imageName());
+                if (!Files.exists(src)) src = importRoot.resolve(page.imageName());
                 if (Files.exists(src) && page.fileSize() > 0) {
                     String relativePath = comicId + "/" + ch.globalOrder() + "/" + page.imageName();
                     storageService.store(src, "HQ", relativePath);
@@ -68,6 +76,7 @@ public class DirectoryImportHandler {
             Map<String, Object> cm = new LinkedHashMap<>();
             cm.put("title", cat.title());
             cm.put("sortOrder", cat.sortOrder());
+            cm.put("parentIndex", cat.parentIndex());
             return cm;
         }).toList();
 
@@ -77,7 +86,8 @@ public class DirectoryImportHandler {
             chm.put("chapterNo", ch.chapterNo());
             chm.put("sortOrder", ch.sortOrder());
             chm.put("globalOrder", ch.globalOrder());
-            chm.put("catalogId", ch.catalogId());
+            chm.put("catalogIndex", ch.catalogIndex());
+            chm.put("sourceDir", ch.sourceDir());
             chm.put("pages", ch.pages().stream().map(p -> {
                 Map<String, Object> pm = new LinkedHashMap<>();
                 pm.put("imageName", p.imageName());
@@ -93,6 +103,7 @@ public class DirectoryImportHandler {
         }).toList();
 
         Map<String, Object> root = new LinkedHashMap<>();
+        root.put("version", 2);
         root.put("comic", comic);
         root.put("catalogs", catalogList);
         root.put("chapters", chapterList);

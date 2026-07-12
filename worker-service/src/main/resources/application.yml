@@ -38,6 +38,11 @@ worker:
     host: ${PROXY_HOST:127.0.0.1}
     port: ${PROXY_PORT:7897}
     socks-port: ${SOCKS_PORT:7897}
+  zip:
+    max-entries: 100000
+    max-depth: 200
+    max-entry-size: 2147483648
+    max-total-size: 32212254720
 
 storage:
   roots:
