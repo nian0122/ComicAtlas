@@ -16,12 +16,11 @@ import TopNav from './TopNav.vue'
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background: var(--bg);
+  background: var(--bg-primary);
 }
 
 .main-content {
   flex: 1;
-  overflow-y: auto;
-  padding: var(--space-lg);
+  padding: var(--nav-height) var(--page-padding) var(--page-padding);
 }
 </style>
