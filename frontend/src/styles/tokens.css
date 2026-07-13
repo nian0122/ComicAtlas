@@ -1,1 +1,58 @@
-/* CSS Custom Properties — will be filled by next task */
+/* Semantic Design Tokens — Netflix-style ComicAtlas theme
+ * Source: docs/superpowers/specs/2026-07-13-netflix-frontend-design.md §6.1
+ *
+ * Legacy tokens (--bg, --surface, --surface-elevated) are kept as aliases
+ * for backward compatibility with existing components.
+ */
+
+:root {
+  /* Background */
+  --bg-primary: #141414;
+  --bg-secondary: #181818;
+  --bg-surface: #232323;
+
+  /* Legacy aliases */
+  --bg: var(--bg-primary);
+  --surface: var(--bg-surface);
+  --surface-elevated: #222222;
+
+  /* Text */
+  --text-primary: #ffffff;
+  --text-secondary: #b3b3b3;
+  --text-muted: #808080;
+
+  /* Brand */
+  --accent: #e50914;
+  --accent-hover: #f6121d;
+  --accent-bg: rgba(229, 9, 20, 0.15);
+
+  /* Hero */
+  --hero-gradient: linear-gradient(
+    to top,
+    rgba(20, 20, 20, 1) 0%,
+    rgba(20, 20, 20, 0.6) 60%,
+    rgba(20, 20, 20, 0.2) 100%
+  );
+
+  /* Card */
+  --card-radius: 8px;
+  --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --card-shadow-hover: 0 16px 32px rgba(0, 0, 0, 0.75);
+  --card-hover-scale: 1.04;
+
+  /* Transition */
+  --transition-fast: 150ms ease;
+  --transition-normal: 250ms ease;
+  --transition-slow: 400ms ease;
+
+  /* Poster */
+  --poster-width-sm: 140px;
+  --poster-width-md: 200px;
+  --poster-width-lg: 240px;
+  --poster-gap: 16px;
+
+  /* Layout */
+  --page-width: 1600px;
+  --page-padding: 32px;
+  --nav-height: 56px;
+}
