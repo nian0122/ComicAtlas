@@ -9,26 +9,16 @@
       class="progressive-skeleton"
     />
 
-    <!-- LQ layer -->
+    <!-- Single image layer -->
     <img
-      v-if="lq && showLq"
-      :src="lq"
-      class="progressive-layer lq-layer"
-      :class="{ 'fade-out': hqVisible }"
-      alt=""
-      @load="onLqLoad"
-      @error="onLqError"
-    />
-
-    <!-- HQ layer -->
-    <img
-      v-if="hq && showHq"
-      :src="hq"
-      class="progressive-layer hq-layer"
-      :class="{ 'fade-in': hqVisible }"
-      alt=""
-      @load="onHqLoad"
-      @error="onHqError"
+      v-if="showImage"
+      :src="currentSrc"
+      :alt="alt"
+      class="progressive-layer"
+      :class="imageClasses"
+      decoding="async"
+      @load="onImageLoad"
+      @error="onImageError"
     />
 
     <!-- Retry / error state -->
@@ -44,28 +34,32 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { PictureFilled } from '@element-plus/icons-vue'
 import type { QualityMode } from '@/stores/reader-settings-store'
 
 interface Props {
   lq: string | null
   hq: string | null
+  alt?: string
   mode: QualityMode
   aspectRatio?: number
   enableProgressive?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  lq: null,
-  hq: null,
+  alt: '',
   aspectRatio: 3 / 4,
   enableProgressive: true,
 })
 
-const hqLoaded = ref(false)
+const currentSrc = ref<string | undefined>(undefined)
+const isHqLoaded = ref(false)
+const isHqLoading = ref(false)
 const hqError = ref(false)
 const lqError = ref(false)
+let hqLoader: HTMLImageElement | null = null
+
 const error = computed(() => {
   if (props.mode === 'HQ_ONLY') return hqError.value
   if (props.mode === 'LQ_ONLY') return lqError.value
@@ -73,111 +67,119 @@ const error = computed(() => {
 })
 
 const showSkeleton = computed(() => {
-  if (props.mode === 'HQ_ONLY') return !hqLoaded.value && !hqError.value
-  if (props.mode === 'LQ_ONLY') return !lqLoaded.value && !lqError.value
-  return !lqLoaded.value && !hqLoaded.value && !lqError.value && !hqError.value
+  if (props.mode === 'HQ_ONLY') return !currentSrc.value && !hqError.value
+  if (props.mode === 'LQ_ONLY') return !currentSrc.value && !lqError.value
+  return !currentSrc.value && !lqError.value && !hqError.value
 })
 
-const lqLoaded = ref(false)
-const showLq = computed(() => {
-  if (props.mode === 'HQ_ONLY') return false
-  if (props.mode === 'LQ_ONLY') return true
-  // AUTO: keep LQ visible until HQ is ready or LQ failed
-  return !lqError.value
-})
+const showImage = computed(() => currentSrc.value !== undefined && !error.value)
 
-const showHq = computed(() => {
-  if (props.mode === 'HQ_ONLY') return true
-  if (props.mode === 'LQ_ONLY') return false
-  return true
-})
-
-const hqVisible = computed(() => {
-  if (props.mode === 'HQ_ONLY') return hqLoaded.value
-  if (props.mode === 'LQ_ONLY') return false
-  return hqLoaded.value && lqLoaded.value
-})
+const imageClasses = computed(() => ({
+  'fade-in': props.mode === 'AUTO' && isHqLoaded.value && currentSrc.value === props.hq,
+}))
 
 const containerStyle = computed(() => ({
   aspectRatio: `${props.aspectRatio}`,
   width: '100%',
 }))
 
-let hqLoader: HTMLImageElement | null = null
-
-function loadHq() {
-  if (!props.hq || hqLoaded.value || hqError.value) return
-  if (!props.enableProgressive && props.mode === 'AUTO') return
-
-  hqLoader = new Image()
-  hqLoader.onload = () => {
-    hqLoaded.value = true
-    hqLoader = null
-  }
-  hqLoader.onerror = () => {
-    hqError.value = true
-    hqLoader = null
-  }
-  hqLoader.src = props.hq
-}
-
-function onLqLoad() {
-  lqLoaded.value = true
-  if (props.mode === 'AUTO') {
-    loadHq()
-  }
-}
-
-function onLqError() {
-  lqError.value = true
-  if (props.mode === 'AUTO') {
-    loadHq()
-  }
-}
-
-function onHqLoad() {
-  hqLoaded.value = true
-}
-
-function onHqError() {
-  hqError.value = true
-}
-
-function reset() {
-  hqLoaded.value = false
-  hqError.value = false
-  lqLoaded.value = false
-  lqError.value = false
+function cancelHqLoader() {
   if (hqLoader) {
     hqLoader.onload = null
     hqLoader.onerror = null
+    hqLoader.src = ''
     hqLoader = null
   }
+}
+
+function loadHq() {
+  if (!props.hq || isHqLoaded.value || hqError.value) return
+  if (!props.enableProgressive && props.mode === 'AUTO') return
+
+  cancelHqLoader()
+  isHqLoading.value = true
+
+  hqLoader = new Image()
+  hqLoader.decoding = 'async'
+
+  hqLoader.onload = () => {
+    isHqLoaded.value = true
+    isHqLoading.value = false
+    if ((props.mode === 'HQ_ONLY' || props.mode === 'AUTO') && props.hq) {
+      currentSrc.value = props.hq
+    }
+    cancelHqLoader()
+  }
+
+  hqLoader.onerror = () => {
+    hqError.value = true
+    isHqLoading.value = false
+    cancelHqLoader()
+  }
+
+  hqLoader.src = props.hq
+}
+
+function onImageLoad() {
+  // LQ 加载成功后，在 AUTO 模式下触发 HQ 加载
+  if (currentSrc.value === props.lq && props.mode === 'AUTO') {
+    loadHq()
+  }
+}
+
+function onImageError() {
+  if (currentSrc.value === props.lq) {
+    lqError.value = true
+    if (props.mode === 'AUTO') {
+      loadHq()
+    }
+  } else if (currentSrc.value === props.hq) {
+    hqError.value = true
+  }
+}
+
+function reset() {
+  cancelHqLoader()
+  isHqLoaded.value = false
+  isHqLoading.value = false
+  hqError.value = false
+  lqError.value = false
+  currentSrc.value = undefined
 }
 
 function retry() {
   reset()
+  applyInitialSrc()
+}
+
+function applyInitialSrc() {
   if (props.mode === 'HQ_ONLY') {
+    currentSrc.value = props.hq || undefined
     loadHq()
   } else if (props.mode === 'LQ_ONLY') {
-    lqLoaded.value = false
+    currentSrc.value = props.lq || undefined
   } else {
-    lqLoaded.value = false
-    loadHq()
+    // AUTO
+    if (props.lq) {
+      currentSrc.value = props.lq
+    } else if (props.hq) {
+      currentSrc.value = props.hq
+      loadHq()
+    }
   }
 }
 
 onMounted(() => {
-  if (props.mode === 'HQ_ONLY') {
-    loadHq()
-  }
+  applyInitialSrc()
+})
+
+onBeforeUnmount(() => {
+  cancelHqLoader()
 })
 
 watch(() => [props.lq, props.hq, props.mode], () => {
   reset()
-  if (props.mode === 'HQ_ONLY') {
-    loadHq()
-  }
+  applyInitialSrc()
 }, { flush: 'post' })
 </script>
 
@@ -205,25 +207,12 @@ watch(() => [props.lq, props.hq, props.mode], () => {
   width: 100%;
   height: 100%;
   object-fit: contain;
+  opacity: 1;
   transition: opacity 250ms ease;
 }
 
-.lq-layer {
-  opacity: 1;
-  z-index: 1;
-}
-
-.lq-layer.fade-out {
-  opacity: 0;
-}
-
-.hq-layer {
-  opacity: 0;
-  z-index: 2;
-}
-
-.hq-layer.fade-in {
-  opacity: 1;
+.progressive-layer.fade-in {
+  animation: fade-in 250ms ease;
 }
 
 .progressive-error {
@@ -243,5 +232,10 @@ watch(() => [props.lq, props.hq, props.mode], () => {
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 </style>
