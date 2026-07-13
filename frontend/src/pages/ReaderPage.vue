@@ -36,6 +36,7 @@
       :pages="store.pages"
       :current-page="store.currentPage"
       @update:current-page="onPageChange"
+      @visible-range="onVisibleRange"
     />
   </div>
 </template>
@@ -50,6 +51,7 @@ import { useReaderSettingsStore } from '@/stores/reader-settings-store'
 import ReaderViewport from '@/components/reader/ReaderViewport.vue'
 import ReaderToolbar from '@/components/reader/ReaderToolbar.vue'
 import { comicApi } from '@/services/api'
+import { preloadEngine } from '@/utils/preload-engine'
 import type { ComicDetailVO } from '@/types'
 
 const route = useRoute()
@@ -122,26 +124,9 @@ function onDblClick(e: MouseEvent) {
   }
 }
 
-function preloadPages() {
-  if (!settings.enablePreload || store.pages.length === 0) return
-
-  const current = store.currentPage - 1
-  const windowSize = Math.max(0, settings.preloadWindow)
-
-  for (let offset = -windowSize; offset <= windowSize; offset++) {
-    const idx = current + offset
-    if (idx < 0 || idx >= store.pages.length) continue
-    const page = store.pages[idx]
-    if (!page) continue
-
-    if (offset === 0 || offset === 1) {
-      const img = new Image()
-      img.src = page.hqUrl
-    } else {
-      const img = new Image()
-      img.src = page.lqUrl
-    }
-  }
+function onVisibleRange(range: { start: number; end: number; total: number }) {
+  if (!settings.enablePreload) return
+  preloadEngine.onVisibleChange(range.start, range.end, range.total)
 }
 
 onMounted(async () => {
@@ -166,13 +151,21 @@ onMounted(async () => {
     return
   }
 
+  preloadEngine.reset(store.totalPages)
+  preloadEngine.setUrlResolver((index: number, priority: 'immediate' | 'cascade') => {
+    const page = store.pages[index]
+    if (!page) return null
+    if (priority === 'immediate') {
+      return page.hqUrl || page.lqUrl || null
+    }
+    return page.lqUrl || page.hqUrl || null
+  })
+
   if (pageFromQuery >= 1 && pageFromQuery <= store.totalPages) {
     store.currentPage = pageFromQuery
   } else {
     await store.restoreProgress()
   }
-
-  preloadPages()
 
   try {
     const detail = await comicApi.detail(id)
@@ -192,7 +185,6 @@ onMounted(async () => {
         store.saveProgress()
       }, 300)
     }
-    preloadPages()
   })
 })
 
@@ -206,6 +198,7 @@ onBeforeUnmount(() => {
   if (store.comicId > 0 && store.currentPage !== lastSyncedPage.value) {
     store.saveProgress()
   }
+  preloadEngine.destroy()
 })
 </script>
 
