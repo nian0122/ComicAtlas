@@ -5,18 +5,13 @@
     @click="emit('click', props.id)"
   >
     <div class="poster-frame">
-      <el-image
-        :src="props.coverUrl"
-        fit="cover"
-        lazy
-        class="poster-image"
-      >
-        <template #error>
-          <div class="poster-placeholder">
-            <el-icon :size="sizeIcon"><PictureFilled /></el-icon>
-          </div>
-        </template>
-      </el-image>
+      <div
+        class="poster-image-bg"
+        :style="{ backgroundImage: props.coverUrl ? `url(${props.coverUrl})` : 'none' }"
+      />
+      <div v-if="!props.coverUrl" class="poster-placeholder">
+        <el-icon :size="sizeIcon"><PictureFilled /></el-icon>
+      </div>
 
       <div
         v-if="props.status && props.status !== 'ready'"
@@ -158,15 +153,17 @@ const sizeIcon = computed(() => {
   filter: brightness(1.08);
 }
 
-.poster-image {
-  width: 100%;
-  height: 100%;
-  display: block;
+.poster-image-bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
 .poster-placeholder {
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;

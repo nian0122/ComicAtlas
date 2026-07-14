@@ -10,7 +10,7 @@
 
     <div class="hero-content">
       <div v-if="posterUrl" class="hero-poster">
-        <img :src="posterUrl" :alt="title" loading="eager" />
+        <div class="hero-poster-bg" :style="{ backgroundImage: `url(${posterUrl})` }" />
       </div>
 
       <div class="hero-info">
@@ -135,12 +135,15 @@ const hasActions = computed(
   border-radius: var(--card-radius);
   overflow: hidden;
   box-shadow: var(--card-shadow);
+  background: var(--bg-surface);
 }
 
-.hero-poster img {
+.hero-poster-bg {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
 .hero-info {
