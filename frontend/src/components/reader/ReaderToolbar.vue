@@ -151,7 +151,7 @@ function onCommand(command: string) {
   justify-content: space-between;
   height: 56px;
   padding: 0 var(--space-lg);
-  background: var(--surface);
+  background: var(--bg-primary);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
   z-index: 10;
@@ -175,7 +175,7 @@ function onCommand(command: string) {
 .toolbar-title {
   font-size: 16px;
   font-weight: 600;
-  color: var(--text-h);
+  color: var(--text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -184,7 +184,7 @@ function onCommand(command: string) {
 
 .page-indicator {
   font-size: 13px;
-  color: var(--text);
+  color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
 }
 
@@ -193,19 +193,19 @@ function onCommand(command: string) {
 }
 
 :deep(.toolbar-select .el-input__wrapper) {
-  background: var(--surface-elevated);
+  background: var(--bg-surface);
   box-shadow: 0 0 0 1px var(--border) inset;
 }
 
 :deep(.toolbar-select .el-input__inner) {
-  color: var(--text-h);
+  color: var(--text-primary);
 }
 
 .zoom-group {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  background: var(--surface-elevated);
+  background: var(--bg-surface);
   border-radius: var(--radius-sm);
   padding: 0 4px;
 }
@@ -214,7 +214,7 @@ function onCommand(command: string) {
   min-width: 44px;
   text-align: center;
   font-size: 13px;
-  color: var(--text-h);
+  color: var(--text-primary);
   font-variant-numeric: tabular-nums;
 }
 
@@ -233,19 +233,19 @@ function onCommand(command: string) {
   background: transparent;
   border: none;
   border-radius: var(--radius-sm);
-  color: var(--text-h);
+  color: var(--text-primary);
   font-size: 14px;
   cursor: pointer;
   transition: background 150ms ease;
 }
 
 .tool-btn:hover {
-  background: var(--surface-elevated);
+  background: var(--bg-surface);
 }
 
 .chapter-btn.primary {
   background: var(--accent);
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .chapter-btn.primary:hover {
