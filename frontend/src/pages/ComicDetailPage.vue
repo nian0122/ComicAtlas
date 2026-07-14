@@ -1,5 +1,5 @@
 <template>
-  <div class="comic-detail-page">
+  <div class="comic-detail-page fade-in">
     <div v-if="loading" class="state loading">
       <div class="spinner" />
       <span>加载中...</span>
@@ -8,114 +8,118 @@
     <div v-else-if="error" class="state error">
       <el-icon :size="48"><WarningFilled /></el-icon>
       <span>{{ error }}</span>
-      <button class="primary-btn" @click="loadData">重试</button>
+      <button class="hero-btn hero-btn--primary" @click="loadData">重试</button>
     </div>
 
     <template v-else-if="comic">
-      <!-- 顶部 Hero 区 -->
-      <section class="hero-section">
-        <div class="hero-backdrop" :style="{ backgroundImage: `url(${comic.coverUrl})` }" />
-        <div class="hero-content">
-          <div class="cover-area">
-            <el-image :src="comic.coverUrl" fit="cover" class="cover">
-              <template #error>
-                <div class="cover-placeholder">
-                  <el-icon :size="48"><PictureFilled /></el-icon>
-                </div>
-              </template>
-            </el-image>
+      <!-- Hero -->
+      <HeroBanner
+        :background-url="comic.coverUrl"
+        :poster-url="comic.coverUrl"
+        :title="comic.title"
+        :subtitle="progressSubtitle"
+        :primary-action="primaryAction"
+        :secondary-action="secondaryAction"
+      >
+        <template #description>
+          <div class="progress-block">
+            <p class="progress-label">阅读进度</p>
+            <div class="progress-meta">
+              <span>{{ progressMetaText }}</span>
+              <span class="progress-percent">{{ comic.progressPercent || 0 }}%</span>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill" :style="{ width: progressWidth }" />
+            </div>
           </div>
+        </template>
+      </HeroBanner>
 
-          <div class="info-area">
-            <div class="info-top">
-              <h1 class="comic-title">{{ comic.title }}</h1>
-              <p v-if="comic.titleJpn" class="comic-title-jpn">{{ comic.titleJpn }}</p>
-              <p class="comic-author">{{ comic.author || '未知作者' }}</p>
-
-              <div class="meta-row">
-                <span v-if="comic.category" class="meta-item">{{ comic.category }}</span>
-                <span v-if="comic.pageCount" class="meta-item">{{ comic.pageCount }} 页</span>
-                <span v-if="comic.sourceType" class="meta-item">{{ comic.sourceType }}</span>
-                <span v-if="comic.updatedAt" class="meta-item">更新 {{ formatDate(comic.updatedAt) }}</span>
-              </div>
-
-              <div v-if="comic.tags && comic.tags.length > 0" class="tags-row">
-                <span v-for="tag in comic.tags" :key="tag.name" class="tag-chip">
-                  {{ tag.name }}
-                </span>
+      <!-- Information -->
+      <section class="information-section">
+        <div class="section-inner">
+          <div class="info-section-header">
+            <h2 class="section-title">信息</h2>
+            <div class="more-menu">
+              <button
+                class="more-btn"
+                @click="menuOpen = !menuOpen"
+              >
+                <el-icon :size="16"><MoreFilled /></el-icon>
+                <span>More</span>
+              </button>
+              <div v-if="menuOpen" class="more-dropdown" @click.stop>
+                <button
+                  class="menu-item"
+                  :disabled="lqGenerating"
+                  @click="generateLq"
+                >
+                  {{ lqGenerating ? '生成中...' : '生成 LQ' }}
+                </button>
+                <button class="menu-item danger" @click="confirmDelete">
+                  删除漫画
+                </button>
               </div>
             </div>
-
-            <div class="continue-reading">
-              <div v-if="comic.lastReadChapterId && comic.progressPercent > 0" class="progress-block">
-                <p class="progress-label">继续阅读</p>
-                <p class="progress-meta">
-                  <span>第 {{ comic.lastReadPage }} / {{ comic.pageCount }} 页</span>
-                  <span class="progress-percent">{{ comic.progressPercent }}%</span>
-                </p>
-                <div class="progress-bar">
-                  <div class="progress-fill" :style="{ width: `${comic.progressPercent}%` }" />
-                </div>
-              </div>
-
-              <div class="continue-actions">
-                <button
-                  v-if="comic.lastReadChapterId"
-                  class="primary-btn large continue-btn"
-                  @click="continueRead"
-                >
-                  继续阅读 ▶
-                </button>
-                <button
-                  v-else-if="firstChapter"
-                  class="primary-btn large continue-btn"
-                  @click="startRead"
-                >
-                  开始阅读 ▶
-                </button>
-                <button class="ghost-btn" @click="goBack">
-                  返回
-                </button>
-
-                <div class="more-menu">
-                  <button class="more-btn" @click="menuOpen = !menuOpen">
-                    <el-icon :size="20"><MoreFilled /></el-icon>
-                  </button>
-                  <div v-if="menuOpen" class="more-dropdown" @click.stop>
-                    <button
-                      class="menu-item"
-                      :disabled="lqGenerating"
-                      @click="generateLq"
-                    >
-                      {{ lqGenerating ? '生成中...' : '生成 LQ' }}
-                    </button>
-                    <button class="menu-item danger" @click="confirmDelete">
-                      删除漫画
-                    </button>
-                  </div>
-                </div>
-              </div>
+          </div>
+          <div class="info-grid">
+            <div class="info-item">
+              <span class="info-label">作者</span>
+              <span class="info-value">{{ comic.author || '未知作者' }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">页数</span>
+              <span class="info-value">{{ comic.pageCount }} 页</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">分类</span>
+              <span class="info-value">{{ comic.category || '-' }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">大小</span>
+              <span class="info-value">{{ formatBytes(comic.fileSize) }}</span>
+            </div>
+            <div class="info-item info-item--wide">
+              <span class="info-label">标签</span>
+              <span class="info-value">
+                <template v-if="comic.tags && comic.tags.length">
+                  <span v-for="tag in comic.tags" :key="tag.name" class="tag-chip">
+                    {{ tag.name }}
+                  </span>
+                </template>
+                <span v-else class="info-placeholder">-</span>
+              </span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">导入时间</span>
+              <span class="info-value">{{ formatDate(comic.createdAt) }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">来源类型</span>
+              <span class="info-value">{{ comic.sourceType || '-' }}</span>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- Catalog 主体 -->
+      <!-- Catalog -->
       <section class="catalog-section">
-        <div class="catalog-header">
-          <h2 class="section-title">目录</h2>
-          <span v-if="totalChapters > 0" class="section-count">{{ totalChapters }} 话</span>
-        </div>
+        <div class="section-inner">
+          <div class="catalog-header">
+            <h2 class="section-title">目录</h2>
+            <span v-if="totalChapters > 0" class="section-count">{{ totalChapters }} 话</span>
+          </div>
 
-        <CatalogTree
-          v-if="catalogTree.length > 0"
-          :tree="catalogTree"
-          :active-chapter-id="comic.lastReadChapterId"
-          @select="goReader"
-        />
-        <div v-else class="state empty small">
-          <el-icon :size="32"><PictureFilled /></el-icon>
-          <span>暂无章节</span>
+          <CatalogTree
+            v-if="catalogTree.length > 0"
+            :tree="catalogTree"
+            :active-chapter-id="comic.lastReadChapterId"
+            @select="goReader"
+          />
+          <div v-else class="state empty small">
+            <el-icon :size="32"><PictureFilled /></el-icon>
+            <span>暂无章节</span>
+          </div>
         </div>
       </section>
     </template>
@@ -135,6 +139,7 @@ import { PictureFilled, WarningFilled, MoreFilled } from '@element-plus/icons-vu
 import { comicApi, catalogApi, lqApi } from '@/services/api'
 import type { ComicDetailVO, CatalogNode, ChapterRef } from '@/types'
 import CatalogTree from '@/components/comic/CatalogTree.vue'
+import HeroBanner from '@/components/layout/HeroBanner.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -145,6 +150,11 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 const lqGenerating = ref(false)
 const menuOpen = ref(false)
+
+const lastReadChapter = computed<ChapterRef | null>(() => {
+  if (!comic.value?.lastReadChapterId) return null
+  return findChapterById(catalogTree.value, comic.value.lastReadChapterId)
+})
 
 const firstChapter = computed<ChapterRef | null>(() => {
   for (const node of catalogTree.value) {
@@ -161,6 +171,58 @@ const totalChapters = computed(() => {
   }
   return count
 })
+
+const progressSubtitle = computed(() => {
+  if (!comic.value) return ''
+  const ch = lastReadChapter.value
+  const pageText = `第 ${comic.value.lastReadPage || 1} / ${comic.value.pageCount || 0} 页`
+  if (ch) {
+    const chapterLabel = ch.title || `第${ch.chapterNo}话`
+    return `阅读至 ${chapterLabel} · ${pageText}`
+  }
+  return pageText
+})
+
+const progressMetaText = computed(() => {
+  if (!comic.value) return ''
+  const ch = lastReadChapter.value
+  const pageText = `第 ${comic.value.lastReadPage || 1} / ${comic.value.pageCount || 0} 页`
+  if (ch) {
+    const chapterLabel = ch.title || `第${ch.chapterNo}话`
+    return `${chapterLabel} · ${pageText}`
+  }
+  return pageText
+})
+
+const progressWidth = computed(
+  () => `${Math.min(100, Math.max(0, comic.value?.progressPercent || 0))}%`
+)
+
+const primaryAction = computed(() => {
+  if (!comic.value?.lastReadChapterId) return undefined
+  return {
+    label: '▶ 继续阅读',
+    onClick: continueRead,
+  }
+})
+
+const secondaryAction = computed(() => {
+  if (!firstChapter.value || !comic.value) return undefined
+  return {
+    label: '开始阅读',
+    onClick: startRead,
+  }
+})
+
+function findChapterById(nodes: CatalogNode[], id: number): ChapterRef | null {
+  for (const node of nodes) {
+    const found = node.chapters?.find((ch) => ch.id === id)
+    if (found) return found
+    const childFound = findChapterById(node.children || [], id)
+    if (childFound) return childFound
+  }
+  return null
+}
 
 function findFirstChapter(node: CatalogNode): ChapterRef | null {
   if (node.chapters && node.chapters.length > 0) return node.chapters[0]
@@ -181,8 +243,16 @@ function formatDate(s: string): string {
   return s?.slice(0, 10) || ''
 }
 
-function goBack() {
-  router.push('/comics')
+function formatBytes(bytes: number): string {
+  if (bytes == null || bytes === 0) return '-'
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  let i = 0
+  let size = bytes
+  while (size >= 1024 && i < units.length - 1) {
+    size /= 1024
+    i++
+  }
+  return `${size.toFixed(i === 0 ? 0 : 2)} ${units[i]}`
 }
 
 function continueRead() {
@@ -261,141 +331,63 @@ onMounted(loadData)
 
 <style scoped>
 .comic-detail-page {
-  max-width: 1200px;
-  margin: 0 auto;
+  min-height: calc(100vh - var(--nav-height));
   padding-bottom: var(--space-3xl);
+  background: var(--bg-primary);
+  color: var(--text-primary);
 }
 
-/* Hero */
-.hero-section {
-  position: relative;
-  margin: 0 calc(-1 * var(--space-lg)) var(--space-xl);
-  overflow: hidden;
-}
-
-.hero-backdrop {
-  position: absolute;
-  inset: 0;
-  background-size: cover;
-  background-position: center;
-  filter: blur(40px) brightness(0.4);
-  transform: scale(1.2);
-  z-index: 0;
-}
-
-.hero-backdrop::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(to top, var(--bg) 10%, rgba(20, 20, 20, 0.6) 50%, transparent);
-}
-
-.hero-content {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  gap: var(--space-xl);
-  padding: var(--space-2xl) var(--space-lg);
-}
-
-.cover-area {
-  flex-shrink: 0;
-  width: 200px;
-}
-
-.cover {
-  width: 100%;
-  aspect-ratio: 2 / 3;
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  background: var(--surface-elevated);
-  box-shadow: var(--shadow-lg);
-}
-
-.cover-placeholder {
-  width: 100%;
-  height: 100%;
-  display: flex;
+/* Hero action buttons (slotted, so styles live here) */
+.hero-btn {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  color: var(--text-muted);
-}
-
-.info-area {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding-top: var(--space-base);
-}
-
-.comic-title {
-  font-size: 32px;
-  font-weight: 700;
-  color: var(--text-h);
-  margin: 0 0 4px;
-  line-height: 1.1;
-}
-
-.comic-title-jpn {
-  font-size: 16px;
-  color: var(--text);
-  margin: 0 0 8px;
-}
-
-.comic-author {
+  gap: var(--space-xs);
+  padding: 10px 22px;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
   font-size: 14px;
-  color: var(--text);
-  margin: 0 0 var(--space-base);
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform var(--transition-fast), background-color var(--transition-fast);
 }
 
-.meta-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-sm);
-  margin-bottom: var(--space-base);
+.hero-btn:hover {
+  transform: translateY(-1px);
 }
 
-.meta-item {
-  font-size: 12px;
-  color: var(--text);
-  background: rgba(255, 255, 255, 0.1);
-  padding: 4px 10px;
-  border-radius: var(--radius-sm);
+.hero-btn--primary {
+  background: var(--accent);
+  color: var(--text-primary);
 }
 
-.tags-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: var(--space-lg);
+.hero-btn--primary:hover {
+  background: var(--accent-hover);
 }
 
-.tag-chip {
-  font-size: 12px;
-  color: var(--text-h);
-  background: var(--accent-bg);
-  padding: 3px 10px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--accent-border);
+.hero-btn--secondary {
+  background: rgba(255, 255, 255, 0.2);
+  color: var(--text-primary);
 }
 
-/* Continue Reading */
-.continue-reading {
-  margin-top: var(--space-lg);
+.hero-btn--secondary:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 
+/* Progress */
 .progress-block {
-  margin-bottom: var(--space-base);
-  max-width: 480px;
+  width: 100%;
+  max-width: 520px;
 }
 
 .progress-label {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
-  color: var(--text-h);
-  margin: 0 0 6px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 var(--space-xs);
 }
 
 .progress-meta {
@@ -403,8 +395,8 @@ onMounted(loadData)
   justify-content: space-between;
   align-items: center;
   font-size: 13px;
-  color: var(--text);
-  margin: 0 0 8px;
+  color: var(--text-secondary);
+  margin: 0 0 var(--space-sm);
 }
 
 .progress-percent {
@@ -414,7 +406,7 @@ onMounted(loadData)
 
 .progress-bar {
   height: 4px;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.15);
   border-radius: var(--radius-pill);
   overflow: hidden;
 }
@@ -423,76 +415,43 @@ onMounted(loadData)
   height: 100%;
   background: var(--accent);
   border-radius: var(--radius-pill);
-  transition: width 300ms ease;
-}
-
-.continue-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-base);
-  flex-wrap: wrap;
-}
-
-.primary-btn.large {
-  font-size: 16px;
-  padding: 12px 24px;
-}
-
-.continue-btn {
-  letter-spacing: 0.05em;
-}
-
-.ghost-btn {
-  padding: 12px 20px;
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--text-h);
-  border: none;
-  border-radius: var(--radius-sm);
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 150ms ease;
-}
-
-.ghost-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
+  transition: width var(--transition-normal);
 }
 
 /* More menu */
 .more-menu {
   position: relative;
-  margin-left: auto;
 }
 
 .more-btn {
-  width: 40px;
-  height: 40px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  background: transparent;
-  color: var(--text-h);
-  border: none;
-  border-radius: 50%;
+  gap: var(--space-xs);
+  padding: 8px 14px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
-  transition: background 150ms ease;
+  transition: background-color var(--transition-fast);
 }
 
 .more-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.18);
 }
 
 .more-dropdown {
   position: absolute;
-  top: 100%;
+  top: calc(100% + 8px);
   right: 0;
-  margin-top: 8px;
   min-width: 160px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-lg);
-  z-index: 20;
+  background: var(--bg-surface);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--card-radius);
+  box-shadow: var(--card-shadow-hover);
+  z-index: 30;
   overflow: hidden;
 }
 
@@ -502,19 +461,19 @@ onMounted(loadData)
   padding: 10px 16px;
   background: transparent;
   border: none;
-  color: var(--text-h);
+  color: var(--text-primary);
   font-size: 14px;
   text-align: left;
   cursor: pointer;
-  transition: background 150ms ease;
+  transition: background-color var(--transition-fast);
 }
 
 .menu-item:hover:not(:disabled) {
-  background: var(--surface-elevated);
+  background: var(--bg-secondary);
 }
 
 .menu-item.danger:hover {
-  color: var(--danger);
+  color: var(--accent);
 }
 
 .menu-item:disabled {
@@ -522,9 +481,81 @@ onMounted(loadData)
   cursor: not-allowed;
 }
 
-/* Catalog section */
+/* Information */
+.information-section {
+  padding: var(--space-2xl) var(--page-padding);
+}
+
+.section-inner {
+  max-width: var(--page-width);
+  margin: 0 auto;
+}
+
+.info-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-lg);
+}
+
+.section-title {
+  font-family: var(--heading);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-base);
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-base);
+  background: var(--bg-surface);
+  border-radius: var(--card-radius);
+}
+
+.info-item--wide {
+  grid-column: 1 / -1;
+}
+
+.info-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.info-value {
+  font-size: 14px;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.info-placeholder {
+  color: var(--text-muted);
+}
+
+.tag-chip {
+  display: inline-block;
+  font-size: 12px;
+  color: var(--text-primary);
+  background: var(--accent-bg);
+  padding: 3px 10px;
+  border-radius: var(--radius-sm);
+  margin-right: var(--space-xs);
+  margin-bottom: var(--space-xs);
+}
+
+/* Catalog */
 .catalog-section {
-  padding: 0 var(--space-lg);
+  padding: 0 var(--page-padding) var(--space-3xl);
 }
 
 .catalog-header {
@@ -532,13 +563,6 @@ onMounted(loadData)
   align-items: baseline;
   gap: var(--space-base);
   margin-bottom: var(--space-lg);
-}
-
-.section-title {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--text-h);
-  margin: 0;
 }
 
 .section-count {
@@ -554,7 +578,7 @@ onMounted(loadData)
   justify-content: center;
   gap: var(--space-base);
   padding: var(--space-3xl) 0;
-  color: var(--text);
+  color: var(--text-secondary);
 }
 
 .state.small {
@@ -562,18 +586,13 @@ onMounted(loadData)
 }
 
 .state.error {
-  color: var(--danger);
-}
-
-.state.empty p {
-  color: var(--text-muted);
-  font-size: 13px;
+  color: var(--accent);
 }
 
 .spinner {
   width: 40px;
   height: 40px;
-  border: 3px solid var(--border-strong);
+  border: 3px solid rgba(255, 255, 255, 0.15);
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 1s linear infinite;
@@ -583,63 +602,10 @@ onMounted(loadData)
   to { transform: rotate(360deg); }
 }
 
-.primary-btn {
-  padding: 8px 20px;
-  background: var(--accent);
-  color: #fff;
-  border: none;
-  border-radius: var(--radius-sm);
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 150ms ease;
-}
-
-.primary-btn:hover {
-  background: var(--accent-hover);
-}
-
 /* Responsive */
 @media (max-width: 768px) {
-  .hero-content {
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-    padding: var(--space-lg);
-  }
-
-  .cover-area {
-    width: 160px;
-  }
-
-  .info-top {
-    align-items: center;
-  }
-
-  .comic-title {
-    font-size: 24px;
-  }
-
-  .meta-row,
-  .tags-row {
-    justify-content: center;
-  }
-
-  .continue-reading {
-    width: 100%;
-  }
-
-  .progress-block {
-    margin-left: auto;
-    margin-right: auto;
-  }
-
-  .continue-actions {
-    justify-content: center;
-  }
-
-  .more-menu {
-    margin-left: 0;
+  .info-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

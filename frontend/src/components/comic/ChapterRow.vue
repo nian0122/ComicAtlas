@@ -7,6 +7,7 @@
   >
     <span class="chapter-no">{{ chapter.chapterNo ? `第${chapter.chapterNo}话` : '未知' }}</span>
     <span class="chapter-title">{{ chapter.title || '' }}</span>
+    <span v-if="active" class="chapter-status">上次阅读</span>
     <span class="chapter-pages">{{ chapter.pageCount }}p</span>
   </div>
 </template>
@@ -37,12 +38,16 @@ const emit = defineEmits<{
 }
 
 .chapter-row:hover {
-  background: var(--surface);
+  background: var(--bg-surface);
 }
 
 .chapter-row.active {
   background: var(--accent-bg);
   border-left: 3px solid var(--accent);
+}
+
+.chapter-row.active .chapter-title {
+  color: var(--text-primary);
 }
 
 .chapter-no {
@@ -55,7 +60,7 @@ const emit = defineEmits<{
 .chapter-title {
   flex: 1;
   font-size: 13px;
-  color: var(--text);
+  color: var(--text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -64,5 +69,14 @@ const emit = defineEmits<{
 .chapter-pages {
   font-size: 11px;
   color: var(--text-muted);
+}
+
+.chapter-status {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  padding: 2px 8px;
+  background: var(--accent-bg);
+  border-radius: var(--radius-sm);
 }
 </style>
