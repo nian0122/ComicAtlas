@@ -160,6 +160,8 @@ async function doImport() {
   max-width: 720px;
   margin: 0 auto;
   padding: var(--space-xl) var(--space-lg) var(--space-3xl);
+  background: var(--bg-primary);
+  min-height: 100%;
 }
 
 .page-header {
@@ -169,19 +171,19 @@ async function doImport() {
 .page-title {
   font-size: 28px;
   font-weight: 700;
-  color: var(--text-h);
+  color: var(--text-primary);
   margin: 0 0 8px;
 }
 
 .page-subtitle {
   font-size: 14px;
-  color: var(--text);
+  color: var(--text-secondary);
   margin: 0;
 }
 
 /* Form card */
 .import-form-card {
-  background: var(--surface);
+  background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: var(--space-xl);
@@ -218,7 +220,7 @@ async function doImport() {
   align-items: flex-start;
   gap: var(--space-sm);
   padding: var(--space-base);
-  background: var(--bg);
+  background: var(--bg-primary);
   border: 2px solid var(--border);
   border-radius: var(--radius-md);
   cursor: pointer;
@@ -248,7 +250,7 @@ async function doImport() {
 .radio-title {
   font-size: 14px;
   font-weight: 600;
-  color: var(--text-h);
+  color: var(--text-primary);
 }
 
 .radio-desc {
@@ -261,12 +263,12 @@ async function doImport() {
 .path-input {
   width: 100%;
   padding: 12px 16px;
-  background: var(--bg);
+  background: var(--bg-primary);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  color: var(--text-h);
+  color: var(--text-primary);
   font-size: 14px;
-  font-family: 'JetBrains Mono', 'Cascadia Code', monospace;
+  font-family: var(--mono);
   transition: border-color 150ms ease;
   box-sizing: border-box;
 }
@@ -294,6 +296,22 @@ async function doImport() {
   margin-top: var(--space-lg);
 }
 
+.primary-btn {
+  padding: 8px 16px;
+  background: var(--accent);
+  color: var(--text-primary);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.primary-btn:hover {
+  background: var(--accent-hover);
+}
+
 .primary-btn.large {
   font-size: 15px;
   padding: 12px 28px;
@@ -302,8 +320,8 @@ async function doImport() {
   gap: 8px;
 }
 
-.primary-btn.large:disabled {
-  background: var(--border-strong);
+.primary-btn:disabled {
+  background: var(--text-muted);
   cursor: not-allowed;
 }
 
@@ -317,19 +335,19 @@ async function doImport() {
 }
 
 .ghost-link {
-  color: var(--text);
+  color: var(--text-secondary);
   text-decoration: none;
   font-size: 14px;
   transition: color 150ms ease;
 }
 
 .ghost-link:hover {
-  color: var(--text-h);
+  color: var(--text-primary);
 }
 
 /* Recent tasks preview */
 .recent-section {
-  background: var(--surface);
+  background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: var(--space-lg) var(--space-xl);
@@ -338,7 +356,7 @@ async function doImport() {
 .section-title {
   font-size: 14px;
   font-weight: 600;
-  color: var(--text-h);
+  color: var(--text-primary);
   margin: 0 0 var(--space-base);
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -364,7 +382,7 @@ async function doImport() {
 
 .recent-name {
   font-size: 13px;
-  color: var(--text-h);
+  color: var(--text-primary);
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -374,7 +392,7 @@ async function doImport() {
 
 .recent-status {
   font-size: 12px;
-  color: var(--text);
+  color: var(--text-secondary);
 }
 
 .recent-bar {
@@ -394,14 +412,14 @@ async function doImport() {
 .more-link {
   display: inline-block;
   margin-top: var(--space-base);
-  color: var(--text);
+  color: var(--text-secondary);
   text-decoration: none;
   font-size: 13px;
   transition: color 150ms ease;
 }
 
 .more-link:hover {
-  color: var(--text-h);
+  color: var(--text-primary);
 }
 
 /* Shared */

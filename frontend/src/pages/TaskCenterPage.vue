@@ -147,6 +147,8 @@ onBeforeUnmount(() => {
   max-width: 960px;
   margin: 0 auto;
   padding: var(--space-xl) var(--space-lg) var(--space-3xl);
+  background: var(--bg-primary);
+  min-height: 100%;
 }
 
 .page-header {
@@ -167,7 +169,7 @@ onBeforeUnmount(() => {
 .page-title {
   font-size: 28px;
   font-weight: 700;
-  color: var(--text-h);
+  color: var(--text-primary);
   margin: 0;
 }
 
@@ -208,7 +210,7 @@ onBeforeUnmount(() => {
   gap: var(--space-sm);
   font-size: 14px;
   font-weight: 700;
-  color: var(--text-h);
+  color: var(--text-primary);
   margin: 0 0 var(--space-base);
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -218,7 +220,7 @@ onBeforeUnmount(() => {
   font-size: 12px;
   font-weight: 600;
   color: var(--text-muted);
-  background: var(--surface);
+  background: var(--bg-surface);
   padding: 2px 8px;
   border-radius: var(--radius-pill);
   border: 1px solid var(--border);
@@ -244,7 +246,7 @@ onBeforeUnmount(() => {
 
 .state.error {
   color: var(--danger);
-  background: var(--surface);
+  background: var(--bg-surface);
   border-radius: var(--radius-md);
   padding: var(--space-xl);
   margin-bottom: var(--space-xl);
@@ -262,7 +264,7 @@ onBeforeUnmount(() => {
 .primary-btn {
   padding: 8px 16px;
   background: var(--accent);
-  color: #fff;
+  color: var(--text-primary);
   border: none;
   border-radius: var(--radius-sm);
   font-size: 13px;
@@ -278,7 +280,7 @@ onBeforeUnmount(() => {
 .ghost-btn {
   padding: 8px 16px;
   background: transparent;
-  color: var(--text-h);
+  color: var(--text-primary);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
   font-size: 13px;
@@ -288,7 +290,7 @@ onBeforeUnmount(() => {
 }
 
 .ghost-btn:hover {
-  background: var(--surface);
+  background: var(--bg-surface);
   border-color: var(--text-muted);
 }
 </style>
