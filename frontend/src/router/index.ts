@@ -14,7 +14,12 @@ const router = createRouter({
       path: '/',
       component: AppLayout,
       children: [
-        { path: '/', redirect: '/comics' },
+        { path: '/', redirect: '/home' },
+        {
+          path: '/home',
+          name: 'home',
+          component: () => import('@/pages/HomePage.vue'),
+        },
         {
           path: '/comics',
           name: 'comic-list',
