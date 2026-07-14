@@ -192,7 +192,7 @@ function goLibrary() {
 <style scoped>
 .task-card {
   display: flex;
-  background: var(--surface);
+  background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   overflow: hidden;
@@ -236,7 +236,7 @@ function goLibrary() {
 .task-name {
   font-size: 16px;
   font-weight: 600;
-  color: var(--text-h);
+  color: var(--text-primary);
   margin: 0 0 6px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -252,8 +252,8 @@ function goLibrary() {
 
 .meta-chip {
   font-size: 11px;
-  color: var(--text);
-  background: var(--bg);
+  color: var(--text-secondary);
+  background: var(--bg-primary);
   padding: 2px 8px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
@@ -276,7 +276,7 @@ function goLibrary() {
   font-weight: 600;
   padding: 4px 10px;
   border-radius: var(--radius-pill);
-  background: var(--bg);
+  background: var(--bg-primary);
   border: 1px solid var(--border);
 }
 
@@ -289,13 +289,13 @@ function goLibrary() {
 .status-badge.status-extracting {
   color: var(--warning);
   border-color: var(--warning);
-  background: rgba(230, 162, 60, 0.1);
+  background: rgba(232, 124, 3, 0.1);
 }
 
 .status-badge.status-success {
   color: var(--success);
   border-color: var(--success);
-  background: rgba(67, 160, 71, 0.1);
+  background: rgba(70, 211, 105, 0.1);
 }
 
 .status-badge.status-failed {
@@ -319,7 +319,7 @@ function goLibrary() {
   display: flex;
   justify-content: space-between;
   font-size: 12px;
-  color: var(--text);
+  color: var(--text-secondary);
 }
 
 .meta-right {
@@ -328,7 +328,7 @@ function goLibrary() {
 
 .progress-bar {
   height: 4px;
-  background: var(--bg);
+  background: var(--bg-primary);
   border-radius: var(--radius-pill);
   overflow: hidden;
 }
@@ -376,7 +376,7 @@ function goLibrary() {
   display: flex;
   gap: var(--space-base);
   font-size: 12px;
-  color: var(--text);
+  color: var(--text-secondary);
 }
 
 .stat-item {
@@ -404,7 +404,7 @@ function goLibrary() {
 
 .action-btn.primary {
   background: var(--accent);
-  color: #fff;
+  color: var(--text-primary);
   border-color: var(--accent);
 }
 
@@ -419,12 +419,12 @@ function goLibrary() {
 
 .action-btn.ghost {
   background: transparent;
-  color: var(--text-h);
+  color: var(--text-primary);
   border-color: var(--border-strong);
 }
 
 .action-btn.ghost:hover {
-  background: var(--bg);
+  background: var(--bg-primary);
   border-color: var(--text-muted);
 }
 </style>
