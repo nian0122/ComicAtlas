@@ -42,7 +42,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject, onMounted } from 'vue'
+import { computed, inject, onMounted, type Ref } from 'vue'
 import { ArrowRight } from '@element-plus/icons-vue'
 import type { CatalogNode } from '@/types'
 import ChapterRow from './ChapterRow.vue'
@@ -61,7 +61,7 @@ const emit = defineEmits<{
   select: [chapterId: number]
 }>()
 
-const expandedIds = inject<Set<string>>('expandedIds', new Set())
+const expandedIds = inject<Ref<Set<string>>>('expandedIds')
 const toggleExpanded = inject<(key: string) => void>('toggleExpanded', () => {})
 const isExpanded = inject<(key: string) => boolean>('isExpanded', () => true)
 
@@ -73,8 +73,8 @@ function toggle() {
 }
 
 onMounted(() => {
-  if (props.depth === 0 && props.node.title) {
-    expandedIds.add(nodeKey.value)
+  if (props.depth === 0 && props.node.title && expandedIds) {
+    expandedIds.value.add(nodeKey.value)
   }
 })
 </script>
@@ -89,7 +89,7 @@ onMounted(() => {
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  background: var(--surface);
+  background: var(--bg-surface);
   border-radius: var(--radius-sm);
   cursor: default;
   user-select: none;
@@ -105,7 +105,7 @@ onMounted(() => {
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  transition: transform 150ms ease;
+  transition: transform var(--transition-fast);
 }
 
 .expand-btn.expanded {
@@ -116,7 +116,7 @@ onMounted(() => {
   flex: 1;
   font-size: 14px;
   font-weight: 600;
-  color: var(--text-h);
+  color: var(--text-primary);
 }
 
 .node-count {
