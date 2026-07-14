@@ -2,7 +2,7 @@
   <div class="comic-list-page">
     <header class="page-header">
       <h1 class="page-title">漫画库</h1>
-      <div class="search-bar">
+      <div class="toolbar">
         <div class="search-input">
           <el-icon :size="18"><Search /></el-icon>
           <input
@@ -56,12 +56,19 @@
 
     <section v-else class="comic-section">
       <div class="comic-grid">
-        <ComicCard
+        <ComicPoster
           v-for="comic in store.list"
           :key="comic.id"
-          :comic="comic"
+          :id="comic.id"
+          :cover-url="comic.coverUrl"
+          :title="comic.title"
+          :subtitle="posterSubtitle(comic)"
+          :progress="comic.progressPercent"
+          :status="toPosterStatus(comic.status)"
+          :size="posterSize"
           @click="goDetail"
           @continue="continueReading"
+          @detail="goDetail"
         />
       </div>
 
@@ -80,12 +87,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { Search, PictureFilled, WarningFilled, CircleClose } from '@element-plus/icons-vue'
 import { useComicStore } from '@/stores/comic-store'
-import ComicCard from '@/components/comic/ComicCard.vue'
-import type { ComicListQuery } from '@/types'
+import ComicPoster from '@/components/comic/ComicPoster.vue'
+import { toPosterStatus } from '@/components/comic/poster-status'
+import type { ComicListQuery, ComicListVO } from '@/types'
 
 const router = useRouter()
 const store = useComicStore()
@@ -93,8 +101,20 @@ const store = useComicStore()
 const keyword = ref('')
 const statusFilter = ref('')
 const sort = ref<NonNullable<ComicListQuery['sort']>>('createdAt')
+const posterSize = ref<'sm' | 'md' | 'lg'>('lg')
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
+
+function updatePosterSize() {
+  const width = window.innerWidth
+  if (width <= 640) {
+    posterSize.value = 'sm'
+  } else if (width <= 1024) {
+    posterSize.value = 'md'
+  } else {
+    posterSize.value = 'lg'
+  }
+}
 
 function onKeywordInput() {
   if (debounceTimer) clearTimeout(debounceTimer)
@@ -119,37 +139,57 @@ function onPageChange(page: number) {
   store.fetchList()
 }
 
-function goDetail(id: number) {
+function goDetail(id: string | number) {
   router.push(`/comics/${id}`)
 }
 
-function continueReading(id: number) {
+function continueReading(id: string | number) {
   router.push(`/comics/${id}`)
+}
+
+function posterSubtitle(comic: ComicListVO): string {
+  if (comic.progressPercent > 0) {
+    return `已读 ${comic.progressPercent}%`
+  }
+  return `${comic.pageCount} 页`
 }
 
 onMounted(() => {
+  updatePosterSize()
+  window.addEventListener('resize', updatePosterSize)
   store.fetchList()
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', updatePosterSize)
 })
 </script>
 
 <style scoped>
 .comic-list-page {
-  max-width: 1600px;
+  max-width: var(--page-width);
   margin: 0 auto;
 }
 
 .page-header {
-  margin-bottom: var(--space-xl);
+  position: sticky;
+  top: var(--nav-height);
+  z-index: 50;
+  padding: var(--space-lg) 0 var(--space-base);
+  margin-bottom: var(--space-base);
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border);
 }
 
 .page-title {
   font-size: 28px;
   font-weight: 700;
-  color: var(--text-h);
+  color: var(--text-primary);
   margin: 0 0 var(--space-lg);
+  letter-spacing: -0.02em;
 }
 
-.search-bar {
+.toolbar {
   display: flex;
   align-items: center;
   gap: var(--space-base);
@@ -162,18 +202,18 @@ onMounted(() => {
   max-width: 400px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-sm);
   height: 40px;
-  padding: 0 14px;
-  background: var(--surface);
+  padding: 0 var(--space-base);
+  background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  color: var(--text-h);
-  transition: border-color 150ms ease;
+  color: var(--text-primary);
+  transition: border-color var(--transition-fast);
 }
 
 .search-input:focus-within {
-  border-color: var(--text-muted);
+  border-color: var(--border-strong);
 }
 
 .search-input input {
@@ -181,7 +221,7 @@ onMounted(() => {
   background: transparent;
   border: none;
   outline: none;
-  color: var(--text-h);
+  color: var(--text-primary);
   font-size: 14px;
 }
 
@@ -192,51 +232,56 @@ onMounted(() => {
 .clear-icon {
   cursor: pointer;
   color: var(--text-muted);
+  transition: color var(--transition-fast);
 }
 
 .clear-icon:hover {
-  color: var(--text-h);
+  color: var(--text-primary);
 }
 
 .filter-select select {
   height: 40px;
-  padding: 0 12px;
-  background: var(--surface);
+  padding: 0 var(--space-base);
+  background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  color: var(--text-h);
+  color: var(--text-primary);
   font-size: 14px;
   outline: none;
   cursor: pointer;
+  transition: border-color var(--transition-fast);
 }
 
 .filter-select select:focus {
-  border-color: var(--text-muted);
+  border-color: var(--border-strong);
 }
 
 .comic-section {
   display: flex;
   flex-direction: column;
   gap: var(--space-xl);
+  padding-bottom: var(--space-xl);
 }
 
 .comic-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 10px;
+  gap: var(--poster-gap);
+  grid-template-columns: repeat(3, 1fr);
 }
 
-@media (min-width: 640px) {
+.comic-grid :deep(.comic-poster) {
+  width: 100%;
+}
+
+@media (min-width: 641px) {
   .comic-grid {
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-    gap: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(var(--poster-width-md), 1fr));
   }
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 1025px) {
   .comic-grid {
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 20px;
+    grid-template-columns: repeat(auto-fill, minmax(var(--poster-width-lg), 1fr));
   }
 }
 
@@ -253,7 +298,7 @@ onMounted(() => {
   justify-content: center;
   gap: var(--space-base);
   padding: var(--space-3xl) 0;
-  color: var(--text);
+  color: var(--text-secondary);
 }
 
 .state.empty p {
@@ -279,15 +324,15 @@ onMounted(() => {
 }
 
 .primary-btn {
-  padding: 8px 20px;
+  padding: var(--space-sm) var(--space-lg);
   background: var(--accent);
-  color: #fff;
+  color: var(--text-primary);
   border: none;
   border-radius: var(--radius-sm);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 150ms ease;
+  transition: background var(--transition-fast);
 }
 
 .primary-btn:hover {
