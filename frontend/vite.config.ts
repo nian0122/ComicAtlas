@@ -10,7 +10,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': 'http://localhost:8000',
-      '/comic': 'http://localhost:5000',
+      '^/comic/': 'http://localhost:5000',
       '/files': 'http://localhost',
     },
   },
