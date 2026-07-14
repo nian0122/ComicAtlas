@@ -42,11 +42,17 @@
           今天
           <span class="section-count">{{ today.length }}</span>
         </h2>
-        <div class="history-cards">
-          <HistoryCard
+        <div class="history-row">
+          <ComicPoster
             v-for="item in today"
             :key="item.comicId"
-            :item="item"
+            :id="item.comicId"
+            :cover-url="item.coverUrl"
+            :title="item.comicTitle || `漫画 #${item.comicId}`"
+            :subtitle="subtitleFor(item)"
+            :progress="item.progressPercent"
+            size="md"
+            @click="continueRead(item)"
             @continue="continueRead(item)"
             @detail="goDetail(item.comicId)"
           />
@@ -59,11 +65,17 @@
           昨天
           <span class="section-count">{{ yesterday.length }}</span>
         </h2>
-        <div class="history-cards">
-          <HistoryCard
+        <div class="history-row">
+          <ComicPoster
             v-for="item in yesterday"
             :key="item.comicId"
-            :item="item"
+            :id="item.comicId"
+            :cover-url="item.coverUrl"
+            :title="item.comicTitle || `漫画 #${item.comicId}`"
+            :subtitle="subtitleFor(item)"
+            :progress="item.progressPercent"
+            size="md"
+            @click="continueRead(item)"
             @continue="continueRead(item)"
             @detail="goDetail(item.comicId)"
           />
@@ -76,11 +88,17 @@
           更早
           <span class="section-count">{{ earlier.length }}</span>
         </h2>
-        <div class="history-cards">
-          <HistoryCard
+        <div class="history-row">
+          <ComicPoster
             v-for="item in earlier"
             :key="item.comicId"
-            :item="item"
+            :id="item.comicId"
+            :cover-url="item.coverUrl"
+            :title="item.comicTitle || `漫画 #${item.comicId}`"
+            :subtitle="subtitleFor(item)"
+            :progress="item.progressPercent"
+            size="md"
+            @click="continueRead(item)"
             @continue="continueRead(item)"
             @detail="goDetail(item.comicId)"
           />
@@ -96,7 +114,7 @@ import { useRouter } from 'vue-router'
 import { PictureFilled, WarningFilled } from '@element-plus/icons-vue'
 import { useHistoryStore } from '@/stores/history-store'
 import type { HistoryVO } from '@/types'
-import HistoryCard from '@/components/history/HistoryCard.vue'
+import ComicPoster from '@/components/comic/ComicPoster.vue'
 
 const router = useRouter()
 const store = useHistoryStore()
@@ -121,6 +139,10 @@ const earlier = computed(() =>
 )
 const recentCount = computed(() => store.list.length)
 
+function subtitleFor(item: HistoryVO): string {
+  return `第 ${item.chapterNo} 话 · ${item.pageNumber} / ${item.totalPages || '?'} 页 · ${item.progressPercent}%`
+}
+
 function continueRead(item: HistoryVO) {
   router.push(
     `/comics/${item.comicId}/read?chapterId=${item.chapterId}&page=${item.pageNumber}`
@@ -138,9 +160,12 @@ onMounted(() => {
 
 <style scoped>
 .history-page {
-  max-width: 900px;
+  min-height: 100vh;
+  max-width: var(--page-width);
   margin: 0 auto;
-  padding: var(--space-xl) var(--space-lg) var(--space-3xl);
+  padding: var(--space-xl) var(--page-padding) var(--space-3xl);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
 }
 
 .page-header {
@@ -155,19 +180,19 @@ onMounted(() => {
 .header-left {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-xs);
 }
 
 .page-title {
   font-size: 28px;
   font-weight: 700;
-  color: var(--text-h);
+  color: var(--text-primary);
   margin: 0;
 }
 
 .page-subtitle {
   font-size: 14px;
-  color: var(--text);
+  color: var(--text-secondary);
   margin: 0;
 }
 
@@ -187,7 +212,7 @@ onMounted(() => {
   gap: var(--space-sm);
   font-size: 14px;
   font-weight: 700;
-  color: var(--text-h);
+  color: var(--text-primary);
   margin: 0 0 var(--space-base);
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -197,16 +222,16 @@ onMounted(() => {
   font-size: 12px;
   font-weight: 600;
   color: var(--text-muted);
-  background: var(--surface);
+  background: var(--bg-surface);
   padding: 2px 8px;
   border-radius: var(--radius-pill);
   border: 1px solid var(--border);
 }
 
-.history-cards {
+.history-row {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-base);
+  flex-wrap: wrap;
+  gap: var(--poster-gap);
 }
 
 /* States */
@@ -221,13 +246,13 @@ onMounted(() => {
 }
 
 .state.loading {
-  color: var(--text);
+  color: var(--text-secondary);
 }
 
 .state.error {
   color: var(--danger);
-  background: var(--surface);
-  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  border-radius: var(--card-radius);
   padding: var(--space-xl);
 }
 
@@ -238,13 +263,13 @@ onMounted(() => {
 .empty-title {
   font-size: 18px;
   font-weight: 600;
-  color: var(--text-h);
+  color: var(--text-primary);
   margin: 0;
 }
 
 .empty-desc {
   font-size: 13px;
-  color: var(--text);
+  color: var(--text-secondary);
   margin: 0;
 }
 
@@ -265,13 +290,13 @@ onMounted(() => {
 .primary-btn {
   padding: 8px 16px;
   background: var(--accent);
-  color: #fff;
+  color: var(--text-primary);
   border: none;
   border-radius: var(--radius-sm);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 150ms ease;
+  transition: background var(--transition-fast);
 }
 
 .primary-btn:hover {
@@ -281,17 +306,31 @@ onMounted(() => {
 .ghost-btn {
   padding: 8px 16px;
   background: transparent;
-  color: var(--text-h);
+  color: var(--text-primary);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 150ms ease;
+  transition: all var(--transition-fast);
 }
 
 .ghost-btn:hover {
-  background: var(--surface);
+  background: var(--bg-surface);
   border-color: var(--text-muted);
+}
+
+@media (max-width: 640px) {
+  .history-page {
+    padding: var(--space-lg) var(--space-base) var(--space-2xl);
+  }
+
+  .page-title {
+    font-size: 22px;
+  }
+
+  .history-row {
+    gap: var(--space-sm);
+  }
 }
 </style>
