@@ -26,7 +26,28 @@ GET /api/comics?keyword=&tag=&status=&category=&sourceType=&sort=createdAt&page=
 ```
 GET /api/comics/{id}
 ```
-返回：title, author, coverUrl, pageCount, sourceType, tags
+返回：title, author, coverUrl, pageCount, sourceType, tags, description
+
+### 元数据编辑
+```
+GET  /api/comics/{id}/metadata
+PUT  /api/comics/{id}/metadata
+{ "title": "Title", "author": "Author", "description": "Description" }
+```
+
+### 标签绑定
+```
+GET /api/comics/{id}/tags
+PUT /api/comics/{id}/tags
+{ "tagIds": [1, 2, 3] }
+```
+
+### 封面
+```
+GET /api/comics/{id}/covers/candidates
+PUT /api/comics/{id}/cover
+{ "pageId": 123 }
+```
 
 ### 目录树
 ```
@@ -135,7 +156,9 @@ GET /api/operations?module=&action=&page=1&size=20
 ## 8. 标签
 
 ```
-GET /api/tags
+GET    /api/tags
+POST   /api/tags        { "name": "tag-name" }
+DELETE /api/tags/{id}
 ```
 
 ---
@@ -144,6 +167,33 @@ GET /api/tags
 
 ```
 POST /api/admin/rebuild              # metadata.json 恢复数据库
+POST /api/admin/storage/scan-recover # 扫描 HQ 目录并恢复/创建占位漫画
+DELETE /api/admin/comics/{id}?mode=DATABASE_ONLY  # 仅删除数据库记录
+```
+
+### 存储扫描恢复
+
+```
+POST /api/admin/storage/scan-recover
+```
+
+扫描 `MANGA_ROOT/hq/` 下的 `{comicId}/{chapterId}/*.jpg` 目录结构：
+- 若 comic 数据库记录已存在 → 计入 `existingComics`
+- 若目录存在 `metadata/{comicId}.json` → 恢复为完整漫画，状态 `READY`
+- 若无 metadata → 创建 `PLACEHOLDER` 漫画，状态 `PLACEHOLDER`，不参与普通列表
+
+响应：
+```json
+{
+  "scannedComics": 3,
+  "existingComics": 1,
+  "restoredComics": 1,
+  "placeholderComics": 1,
+  "restoredChapters": 2,
+  "restoredPages": 20,
+  "placeholders": ["漫画 999999"],
+  "errors": []
+}
 ```
 
 ---

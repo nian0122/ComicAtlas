@@ -40,27 +40,33 @@
         <div class="section-inner">
           <div class="info-section-header">
             <h2 class="section-title">信息</h2>
-            <div class="more-menu">
-              <button
-                class="more-btn"
-                @click="menuOpen = !menuOpen"
-              >
-                <el-icon :size="16"><MoreFilled /></el-icon>
-                <span>More</span>
+          <div class="more-menu">
+            <button
+              class="more-btn"
+              @click="menuOpen = !menuOpen"
+            >
+              <el-icon :size="16"><MoreFilled /></el-icon>
+              <span>More</span>
+            </button>
+            <div v-if="menuOpen" class="more-dropdown" @click.stop>
+              <button class="menu-item" @click="goEdit">
+                编辑信息
               </button>
-              <div v-if="menuOpen" class="more-dropdown" @click.stop>
-                <button
-                  class="menu-item"
-                  :disabled="lqGenerating"
-                  @click="generateLq"
-                >
-                  {{ lqGenerating ? '生成中...' : '生成 LQ' }}
-                </button>
-                <button class="menu-item danger" @click="confirmDelete">
-                  删除漫画
-                </button>
-              </div>
+              <button class="menu-item" @click="openCoverSelector">
+                更换封面
+              </button>
+              <button
+                class="menu-item"
+                :disabled="lqGenerating"
+                @click="generateLq"
+              >
+                {{ lqGenerating ? '生成中...' : '生成 LQ' }}
+              </button>
+              <button class="menu-item danger" @click="confirmDelete">
+                删除漫画
+              </button>
             </div>
+          </div>
           </div>
           <div class="info-grid">
             <div class="info-item">
@@ -78,6 +84,10 @@
             <div class="info-item">
               <span class="info-label">大小</span>
               <span class="info-value">{{ formatBytes(comic.fileSize) }}</span>
+            </div>
+            <div class="info-item info-item--wide">
+              <span class="info-label">描述</span>
+              <span class="info-value">{{ comic.description || '-' }}</span>
             </div>
             <div class="info-item info-item--wide">
               <span class="info-label">标签</span>
@@ -122,6 +132,46 @@
           </div>
         </div>
       </section>
+
+      <!-- Cover selector dialog -->
+      <el-dialog
+        v-model="coverDialogVisible"
+        title="选择封面"
+        width="800px"
+        class="cover-dialog"
+        destroy-on-close
+      >
+        <div v-if="coverLoading" class="state loading small">
+          <div class="spinner" />
+          <span>加载候选封面...</span>
+        </div>
+        <div v-else-if="coverCandidates.length === 0" class="state empty small">
+          <span>暂无可用封面</span>
+        </div>
+        <div v-else class="cover-grid">
+          <div
+            v-for="candidate in coverCandidates"
+            :key="candidate.pageId"
+            class="cover-item"
+            :class="{ active: selectedCoverPageId === candidate.pageId }"
+            @click="selectedCoverPageId = candidate.pageId"
+          >
+            <img :src="candidate.url" :alt="candidate.chapterTitle">
+            <span class="cover-label">{{ candidate.chapterTitle }}</span>
+          </div>
+        </div>
+        <template #footer>
+          <el-button @click="coverDialogVisible = false">取消</el-button>
+          <el-button
+            type="primary"
+            :loading="coverSaving"
+            :disabled="!selectedCoverPageId"
+            @click="saveCover"
+          >
+            保存
+          </el-button>
+        </template>
+      </el-dialog>
     </template>
 
     <div v-else class="state empty">
@@ -137,7 +187,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { PictureFilled, WarningFilled, MoreFilled } from '@element-plus/icons-vue'
 import { comicApi, catalogApi, lqApi } from '@/services/api'
-import type { ComicDetailVO, CatalogNode, ChapterRef } from '@/types'
+import type { ComicDetailVO, CatalogNode, ChapterRef, CoverCandidateDTO } from '@/types'
 import CatalogTree from '@/components/comic/CatalogTree.vue'
 import HeroBanner from '@/components/layout/HeroBanner.vue'
 
@@ -150,6 +200,11 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 const lqGenerating = ref(false)
 const menuOpen = ref(false)
+const coverDialogVisible = ref(false)
+const coverLoading = ref(false)
+const coverSaving = ref(false)
+const coverCandidates = ref<CoverCandidateDTO[]>([])
+const selectedCoverPageId = ref<number | null>(null)
 
 const lastReadChapter = computed<ChapterRef | null>(() => {
   if (!comic.value?.lastReadChapterId) return null
@@ -273,6 +328,48 @@ function goReader(chapterId: number) {
   router.push(`/comics/${comic.value.id}/read?chapterId=${chapterId}&page=1`)
 }
 
+function goEdit() {
+  if (!comic.value) return
+  menuOpen.value = false
+  router.push(`/comics/${comic.value.id}/edit`)
+}
+
+async function openCoverSelector() {
+  if (!comic.value) return
+  menuOpen.value = false
+  coverDialogVisible.value = true
+  coverLoading.value = true
+  selectedCoverPageId.value = null
+  try {
+    const res = await comicApi.listCoverCandidates(comic.value.id)
+    coverCandidates.value = (res.data || []) as CoverCandidateDTO[]
+  } catch (err: unknown) {
+    const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+    ElMessage.error(msg || '加载封面候选失败')
+    coverCandidates.value = []
+  } finally {
+    coverLoading.value = false
+  }
+}
+
+async function saveCover() {
+  if (!comic.value || !selectedCoverPageId.value) return
+  coverSaving.value = true
+  try {
+    const res = await comicApi.updateCover(comic.value.id, {
+      pageId: selectedCoverPageId.value,
+    })
+    comic.value = res.data as ComicDetailVO
+    ElMessage.success('封面已更新')
+    coverDialogVisible.value = false
+  } catch (err: unknown) {
+    const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+    ElMessage.error(msg || '封面更新失败')
+  } finally {
+    coverSaving.value = false
+  }
+}
+
 async function generateLq() {
   if (!comic.value) return
   menuOpen.value = false
@@ -319,8 +416,9 @@ async function loadData() {
     ])
     comic.value = detailRes.data as ComicDetailVO
     catalogTree.value = (catalogRes.data || []) as CatalogNode[]
-  } catch (err: any) {
-    error.value = err?.response?.data?.message || '加载漫画详情失败'
+  } catch (err: unknown) {
+    const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+    error.value = msg || '加载漫画详情失败'
   } finally {
     loading.value = false
   }
@@ -600,6 +698,60 @@ onMounted(loadData)
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+/* Cover selector */
+.cover-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--space-base);
+  max-height: 480px;
+  overflow-y: auto;
+  padding: var(--space-sm);
+}
+
+.cover-item {
+  position: relative;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 2px solid transparent;
+  transition: border-color var(--transition-fast);
+  background: var(--bg-secondary);
+}
+
+.cover-item:hover {
+  border-color: var(--border-strong);
+}
+
+.cover-item.active {
+  border-color: var(--accent);
+}
+
+.cover-item img {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  display: block;
+}
+
+.cover-label {
+  display: block;
+  padding: var(--space-xs) var(--space-sm);
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cover-dialog :deep(.el-dialog__header) {
+  margin-right: 0;
+}
+
+.cover-dialog :deep(.el-dialog__body) {
+  padding: var(--space-base);
 }
 
 /* Responsive */

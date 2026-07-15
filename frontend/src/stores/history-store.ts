@@ -22,8 +22,9 @@ export const useHistoryStore = defineStore('history', () => {
     try {
       const res: any = await historyApi.list()
       state.list = (res.data || []) as HistoryVO[]
-    } catch (err: any) {
-      state.error = err?.response?.data?.message || '加载阅读历史失败'
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      state.error = msg || '加载阅读历史失败'
       state.list = []
     } finally {
       state.loading = false

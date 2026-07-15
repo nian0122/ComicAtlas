@@ -50,7 +50,7 @@ public class ComicServiceImpl implements ComicService {
         vo.setId(c.getId());
         vo.setTitle(c.getTitle());
         vo.setAuthor(c.getAuthor());
-        vo.setCoverUrl("/files/thumbs/" + c.getId() + "/cover.webp");
+        vo.setCoverUrl(fileUrlResolver.resolveCover(c.getId(), c.getCoverPath()));
         vo.setPageCount(c.getTotalPages());
         vo.setCategory(c.getCategory());
         vo.setStatus(c.getStatus());
@@ -77,7 +77,8 @@ public class ComicServiceImpl implements ComicService {
         vo.setTitle(c.getTitle());
         vo.setTitleJpn(c.getTitleJpn());
         vo.setAuthor(c.getAuthor());
-        vo.setCoverUrl("/files/thumbs/" + c.getId() + "/cover.webp");
+        vo.setDescription(c.getDescription());
+        vo.setCoverUrl(fileUrlResolver.resolveCover(c.getId(), c.getCoverPath()));
         vo.setPageCount(c.getTotalPages());
         vo.setFileSize(c.getFileSize());
         vo.setSourceType(c.getSourceType());
@@ -192,5 +193,130 @@ public class ComicServiceImpl implements ComicService {
                         eventPublisher.publishDeleteRequested(id);
                     }
                 });
+    }
+
+    @Override
+    public ComicMetadataDTO getMetadata(Long id) {
+        Comic c = comicMapper.selectById(id);
+        if (c == null) throw new BusinessException(404, "漫画不存在");
+
+        ComicMetadataDTO dto = new ComicMetadataDTO();
+        dto.setTitle(c.getTitle());
+        dto.setAuthor(c.getAuthor());
+        dto.setDescription(c.getDescription());
+        return dto;
+    }
+
+    @Override
+    public ComicMetadataDTO updateMetadata(Long id, ComicMetadataUpdateDTO dto) {
+        Comic c = comicMapper.selectById(id);
+        if (c == null) throw new BusinessException(404, "漫画不存在");
+
+        c.setTitle(dto.getTitle());
+        c.setAuthor(dto.getAuthor());
+        c.setDescription(dto.getDescription());
+        comicMapper.updateById(c);
+
+        ComicMetadataDTO result = new ComicMetadataDTO();
+        result.setTitle(c.getTitle());
+        result.setAuthor(c.getAuthor());
+        result.setDescription(c.getDescription());
+        return result;
+    }
+
+    @Override
+    public List<Long> getComicTags(Long comicId) {
+        Comic c = comicMapper.selectById(comicId);
+        if (c == null) throw new BusinessException(404, "漫画不存在");
+
+        return comicTagMapper.selectList(
+                        new LambdaQueryWrapper<ComicTag>().eq(ComicTag::getComicId, comicId))
+                .stream()
+                .map(ComicTag::getTagId)
+                .toList();
+    }
+
+    @Override
+    public List<String> autocompleteTitles(String keyword) {
+        if (keyword == null || keyword.isBlank()) {
+            return List.of();
+        }
+        String pattern = "%" + keyword.trim() + "%";
+        return comicMapper.selectTitlesLike(pattern, 10);
+    }
+
+    @Override
+    @Transactional
+    public void updateComicTags(Long comicId, ComicTagUpdateDTO dto) {
+        Comic c = comicMapper.selectById(comicId);
+        if (c == null) throw new BusinessException(404, "漫画不存在");
+
+        List<Long> tagIds = dto.getTagIds();
+        if (tagIds != null && !tagIds.isEmpty()) {
+            List<Tag> existingTags = tagMapper.selectBatchIds(tagIds);
+            if (existingTags.size() != tagIds.size()) {
+                throw new BusinessException(400, "部分标签不存在");
+            }
+        }
+
+        comicTagMapper.delete(
+                new LambdaQueryWrapper<ComicTag>().eq(ComicTag::getComicId, comicId));
+
+        if (tagIds != null) {
+            for (Long tagId : tagIds) {
+                ComicTag ct = new ComicTag();
+                ct.setComicId(comicId);
+                ct.setTagId(tagId);
+                comicTagMapper.insert(ct);
+            }
+        }
+    }
+
+    @Override
+    public List<CoverCandidateDTO> listCoverCandidates(Long comicId) {
+        Comic c = comicMapper.selectById(comicId);
+        if (c == null) throw new BusinessException(404, "漫画不存在");
+
+        var chapters = chapterMapper.selectList(
+                new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId).orderByAsc(Chapter::getChapterNo));
+
+        List<CoverCandidateDTO> candidates = new ArrayList<>();
+        for (Chapter ch : chapters) {
+            var pages = pageMapper.selectList(
+                    new LambdaQueryWrapper<com.comicatlas.api.comic.entity.Page>()
+                            .eq(com.comicatlas.api.comic.entity.Page::getChapterId, ch.getId())
+                            .orderByAsc(com.comicatlas.api.comic.entity.Page::getPageNumber)
+                            .last("LIMIT 1"));
+            if (pages.isEmpty()) continue;
+            com.comicatlas.api.comic.entity.Page p = pages.get(0);
+            CoverCandidateDTO dto = new CoverCandidateDTO();
+            dto.setPageId(p.getId());
+            dto.setChapterId(ch.getId());
+            dto.setChapterTitle(ch.getTitle());
+            dto.setPageNumber(p.getPageNumber());
+            dto.setUrl(fileUrlResolver.resolve(p));
+            candidates.add(dto);
+        }
+        return candidates;
+    }
+
+    @Override
+    @Transactional
+    public ComicDetailVO updateCover(Long comicId, CoverUpdateDTO dto) {
+        Comic c = comicMapper.selectById(comicId);
+        if (c == null) throw new BusinessException(404, "漫画不存在");
+
+        com.comicatlas.api.comic.entity.Page p = pageMapper.selectById(dto.getPageId());
+        if (p == null) throw new BusinessException(404, "页面不存在");
+
+        Chapter ch = chapterMapper.selectById(p.getChapterId());
+        if (ch == null || !ch.getComicId().equals(comicId)) {
+            throw new BusinessException(400, "页面不属于该漫画");
+        }
+
+        c.setCoverPath(p.getHqPath());
+        comicMapper.updateById(c);
+
+        return getComicDetail(comicId);
     }
 }

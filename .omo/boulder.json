@@ -1,0 +1,30 @@
+{
+  "schema_version": 2,
+  "active_work_id": "comicatlas-management-features",
+  "works": {
+    "netflix-frontend-refactor": {
+      "work_id": "netflix-frontend-refactor",
+      "active_plan": ".omo/plans/netflix-frontend-refactor.md",
+      "plan_name": "netflix-frontend-refactor",
+      "session_ids": ["codex:netflix-frontend-refactor-main"],
+      "status": "completed",
+      "worktree_path": null
+    },
+    "admin-db-only-delete": {
+      "work_id": "admin-db-only-delete",
+      "active_plan": ".omo/plans/admin-db-only-delete.md",
+      "plan_name": "admin-db-only-delete",
+      "session_ids": ["codex:admin-db-only-delete-main"],
+      "status": "completed",
+      "worktree_path": null
+    },
+    "comicatlas-management-features": {
+      "work_id": "comicatlas-management-features",
+      "active_plan": ".omo/plans/comicatlas-management-features.md",
+      "plan_name": "ComicAtlas 管理功能实现",
+      "session_ids": [],
+      "status": "completed",
+      "worktree_path": null
+    }
+  }
+}

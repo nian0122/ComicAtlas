@@ -71,8 +71,9 @@ export const useImportStore = defineStore('import', () => {
       const res: any = await importApi.list({ page: 1, size: 50 })
       tasks.value = (res.data?.records || []) as ImportTaskVO[]
       lastUpdated.value = Date.now()
-    } catch (err: any) {
-      error.value = err?.response?.data?.message || '加载任务列表失败'
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      error.value = msg || '加载任务列表失败'
     }
   }
 

@@ -25,4 +25,11 @@ public class FileUrlResolver {
     public String resolveCover(Long comicId) {
         return urlPrefix + "/thumbs/" + comicId + "/cover.webp";
     }
+
+    public String resolveCover(Long comicId, String coverPath) {
+        if (coverPath != null && !coverPath.isBlank()) {
+            return urlPrefix + "/hq/" + coverPath.replace('\\', '/');
+        }
+        return resolveCover(comicId);
+    }
 }

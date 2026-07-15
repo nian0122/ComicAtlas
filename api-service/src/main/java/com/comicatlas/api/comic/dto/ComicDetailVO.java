@@ -10,6 +10,7 @@ public class ComicDetailVO {
     private String title;
     private String titleJpn;
     private String author;
+    private String description;
     private String coverUrl;
     private Integer pageCount;
     private Long fileSize;

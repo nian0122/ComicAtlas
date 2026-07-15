@@ -34,6 +34,31 @@
             <option value="lastReadTime">最近阅读</option>
           </select>
         </div>
+
+        <div class="filter-select tag-filter">
+          <el-select
+            v-model="selectedTags"
+            multiple
+            collapse-tags
+            placeholder="筛选标签"
+            class="tag-select"
+            @change="onSearch"
+          >
+            <el-option
+              v-for="tag in allTags"
+              :key="tag.id"
+              :label="tag.name"
+              :value="tag.name"
+            />
+          </el-select>
+        </div>
+
+        <div class="filter-select tag-mode-filter">
+          <select v-model="tagMode" @change="onSearch">
+            <option value="OR">任一标签</option>
+            <option value="AND">全部标签</option>
+          </select>
+        </div>
       </div>
     </header>
 
@@ -91,9 +116,10 @@ import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { Search, PictureFilled, WarningFilled, CircleClose } from '@element-plus/icons-vue'
 import { useComicStore } from '@/stores/comic-store'
+import { tagApi } from '@/services/api'
 import ComicPoster from '@/components/comic/ComicPoster.vue'
 import { toPosterStatus } from '@/components/comic/poster-status'
-import type { ComicListQuery, ComicListVO } from '@/types'
+import type { ComicListQuery, ComicListVO, TagDTO } from '@/types'
 
 const router = useRouter()
 const store = useComicStore()
@@ -101,6 +127,9 @@ const store = useComicStore()
 const keyword = ref('')
 const statusFilter = ref('')
 const sort = ref<NonNullable<ComicListQuery['sort']>>('createdAt')
+const selectedTags = ref<string[]>([])
+const tagMode = ref<'AND' | 'OR'>('OR')
+const allTags = ref<TagDTO[]>([])
 const posterSize = ref<'sm' | 'md' | 'lg'>('lg')
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
@@ -126,11 +155,22 @@ function clearKeyword() {
   onSearch()
 }
 
+async function loadTags() {
+  try {
+    const res = await tagApi.list()
+    allTags.value = (res.data as TagDTO[]) || []
+  } catch (err: unknown) {
+    allTags.value = []
+  }
+}
+
 function onSearch() {
   store.search({
     keyword: keyword.value || undefined,
     status: statusFilter.value || undefined,
     sort: sort.value,
+    tags: selectedTags.value.length > 0 ? selectedTags.value : undefined,
+    tagMode: selectedTags.value.length > 1 ? tagMode.value : undefined,
   })
 }
 
@@ -157,6 +197,7 @@ function posterSubtitle(comic: ComicListVO): string {
 onMounted(() => {
   updatePosterSize()
   window.addEventListener('resize', updatePosterSize)
+  loadTags()
   store.fetchList()
 })
 
@@ -254,6 +295,29 @@ onBeforeUnmount(() => {
 
 .filter-select select:focus {
   border-color: var(--border-strong);
+}
+
+.tag-filter {
+  min-width: 160px;
+}
+
+.tag-filter :deep(.el-input__wrapper) {
+  background: var(--bg-surface);
+  box-shadow: 0 0 0 1px var(--border) inset;
+  border-radius: var(--radius-sm);
+  min-height: 40px;
+}
+
+.tag-filter :deep(.el-input__inner) {
+  color: var(--text-primary);
+}
+
+.tag-filter :deep(.el-select__tags) {
+  color: var(--text-primary);
+}
+
+.tag-mode-filter {
+  min-width: 110px;
 }
 
 .comic-section {

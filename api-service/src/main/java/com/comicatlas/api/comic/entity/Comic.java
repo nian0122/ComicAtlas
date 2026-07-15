@@ -12,6 +12,7 @@ public class Comic {
     private String title;
     private String titleJpn;
     private String author;
+    private String description;
     private String coverPath;
     private Integer totalPages;
     private Long fileSize;
