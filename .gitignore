@@ -43,10 +43,17 @@ mysql-data/
 # OpenCode
 .sisyphus/
 .omo/run-continuation/
+.omo/evidence/
+.omo/drafts/
+frontend/.omo/
 
 # Logs
 *.log
 /logs/
+api-service/logs/
+
+# Test artifacts
+frontend/test-results/
 
 # tools
 /worker-service/aria2-1.37.0-win-64bit-build1

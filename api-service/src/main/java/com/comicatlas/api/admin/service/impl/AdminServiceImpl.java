@@ -1,11 +1,16 @@
 package com.comicatlas.api.admin.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.comicatlas.api.admin.dto.ComicDeleteStats;
+import com.comicatlas.api.admin.dto.ScanRecoverResultDTO;
+import com.comicatlas.api.admin.service.AdminService;
 import com.comicatlas.api.comic.entity.*;
 import com.comicatlas.api.comic.mapper.*;
+import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
-import com.comicatlas.api.admin.service.AdminService;
+import com.comicatlas.api.reader.entity.ReadingHistory;
+import com.comicatlas.api.reader.mapper.ReadingHistoryMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -31,10 +36,61 @@ public class AdminServiceImpl implements AdminService {
     private final PageMapper pageMapper;
     private final TagMapper tagMapper;
     private final ComicTagMapper comicTagMapper;
+    private final ReadingHistoryMapper historyMapper;
     private final ImportTaskMapper taskMapper;
+
+    /** 未结束（活跃）的导入任务状态 */
+    private static final Set<String> ACTIVE_STATUSES = Set.of("PENDING", "PARSING", "IMPORTING");
 
     @Value("${MANGA_ROOT:D:/manga}")
     private String mangaRoot;
+
+    @Override
+    @Transactional
+    public ComicDeleteStats deleteComic(Long comicId, String mode) {
+        if (!"DATABASE_ONLY".equals(mode)) {
+            throw new BusinessException(400, "不支持的模式: " + mode + "，当前仅支持 DATABASE_ONLY");
+        }
+
+        Comic comic = comicMapper.selectById(comicId);
+        if (comic == null) {
+            throw new BusinessException(404, "漫画不存在");
+        }
+
+        Long running = taskMapper.selectCount(new LambdaQueryWrapper<ImportTask>()
+                .eq(ImportTask::getComicId, comicId)
+                .in(ImportTask::getStatus, ACTIVE_STATUSES));
+        if (running > 0) {
+            throw new BusinessException(409, "该漫画存在运行中的导入任务，请等待任务完成后再删除数据库记录。");
+        }
+
+        ComicDeleteStats stats = new ComicDeleteStats();
+
+        List<Chapter> chapters = chapterMapper.selectList(
+                new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
+        List<Long> chapterIds = chapters.stream().map(Chapter::getId).toList();
+        if (!chapterIds.isEmpty()) {
+            stats.setPage((int) pageMapper.delete(
+                    new LambdaQueryWrapper<Page>().in(Page::getChapterId, chapterIds)));
+        }
+
+        stats.setChapter((int) chapterMapper.delete(
+                new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId)));
+
+        stats.setCatalog((int) catalogMapper.delete(
+                new LambdaQueryWrapper<Catalog>().eq(Catalog::getComicId, comicId)));
+
+        stats.setTag((int) comicTagMapper.delete(
+                new LambdaQueryWrapper<ComicTag>().eq(ComicTag::getComicId, comicId)));
+
+        stats.setHistory((int) historyMapper.delete(
+                new LambdaQueryWrapper<ReadingHistory>().eq(ReadingHistory::getComicId, comicId)));
+
+        stats.setComic(comicMapper.deleteById(comicId));
+
+        log.info("数据库删除完成: comicId={}, title={}, stats={}", comicId, comic.getTitle(), stats);
+        return stats;
+    }
 
     @Override
     @Transactional
@@ -68,7 +124,18 @@ public class AdminServiceImpl implements AdminService {
 
                         // 根据 title 模糊匹配 comicId（遍历 hq 子目录，对比章节数）
                         // 简化：取所有未恢复的 comicId
-                        var result = restoreComic(metadata, comicIds, chaptersRestored);
+                        Long comicId = null;
+                        for (Long id : comicIds) {
+                            if (comicMapper.selectById(id) == null) {
+                                comicId = id;
+                                break;
+                            }
+                        }
+                        if (comicId == null) {
+                            errors.add(metaFile.getFileName() + ": 无可用 comicId");
+                            continue;
+                        }
+                        var result = restoreComic(metadata, comicId);
                         if (result != null) {
                             comicsRestored++;
                             chaptersRestored += (int) result.get("chapters");
@@ -92,20 +159,67 @@ public class AdminServiceImpl implements AdminService {
         return result;
     }
 
-    private Map<String, Object> restoreComic(Map<String, Object> metadata, Set<Long> availableIds, int existingChapters) throws Exception {
+    @Override
+    @Transactional
+    public ScanRecoverResultDTO scanRecover() {
+        Path hqRoot = Path.of(mangaRoot, "hq");
+        Path metaDir = Path.of(mangaRoot, "metadata");
+        if (!Files.exists(hqRoot)) {
+            throw new RuntimeException("HQ 目录不存在: " + hqRoot);
+        }
+
+        ScanRecoverResultDTO result = new ScanRecoverResultDTO();
+
+        try (var dirs = Files.newDirectoryStream(hqRoot, Files::isDirectory)) {
+            for (Path comicDir : dirs) {
+                Long comicId;
+                try {
+                    comicId = Long.parseLong(comicDir.getFileName().toString());
+                } catch (NumberFormatException e) {
+                    continue;
+                }
+
+                result.setScannedComics(result.getScannedComics() + 1);
+
+                if (comicMapper.selectById(comicId) != null) {
+                    result.setExistingComics(result.getExistingComics() + 1);
+                    continue;
+                }
+
+                Path metaFile = metaDir.resolve(comicId + ".json");
+                if (Files.exists(metaFile)) {
+                    try {
+                        Map<String, Object> metadata = objectMapper.readValue(metaFile.toFile(), new TypeReference<>() {});
+                        Map<String, Object> restored = restoreComic(metadata, comicId);
+                        result.setRestoredComics(result.getRestoredComics() + 1);
+                        result.setRestoredChapters(result.getRestoredChapters() + (int) restored.get("chapters"));
+                        result.setRestoredPages(result.getRestoredPages() + (int) restored.get("pages"));
+                    } catch (Exception e) {
+                        log.error("恢复漫画失败: comicId={}", comicId, e);
+                        result.getErrors().add(comicId + ": " + e.getMessage());
+                    }
+                } else {
+                    Comic placeholder = new Comic();
+                    placeholder.setId(comicId);
+                    placeholder.setTitle("待恢复漫画 " + comicId);
+                    placeholder.setStatus("PLACEHOLDER");
+                    placeholder.setStoragePolicy("MANAGED");
+                    comicMapper.insert(placeholder);
+                    result.setPlaceholderComics(result.getPlaceholderComics() + 1);
+                    result.getPlaceholders().add("漫画 " + comicId);
+                }
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("扫描 HQ 目录失败", e);
+        }
+
+        return result;
+    }
+
+    private Map<String, Object> restoreComic(Map<String, Object> metadata, Long comicId) throws Exception {
         Map<String, Object> comicData = (Map<String, Object>) metadata.get("comic");
         List<Map<String, Object>> catalogsData = (List<Map<String, Object>>) metadata.get("catalogs");
         List<Map<String, Object>> chaptersData = (List<Map<String, Object>>) metadata.get("chapters");
-
-        // 找一个未使用的 comicId
-        Long comicId = null;
-        for (Long id : availableIds) {
-            if (comicMapper.selectById(id) == null) {
-                comicId = id;
-                break;
-            }
-        }
-        if (comicId == null) throw new RuntimeException("无可用 comicId");
 
         Comic comic = new Comic();
         comic.setId(comicId);

@@ -1,4 +1,10 @@
 import axios from 'axios'
+import type {
+  ComicMetadataUpdateDTO,
+  TagCreateDTO,
+  ComicTagUpdateDTO,
+  CoverUpdateDTO,
+} from '@/types'
 
 const api = axios.create({ baseURL: '/api' })
 
@@ -17,6 +23,15 @@ export const comicApi = {
   list: (params: any) => api.get('/comics', { params }),
   detail: (id: number) => api.get(`/comics/${id}`),
   delete: (id: number) => api.delete(`/comics/${id}`),
+  getMetadata: (id: number) => api.get(`/comics/${id}/metadata`),
+  updateMetadata: (id: number, data: ComicMetadataUpdateDTO) =>
+    api.put(`/comics/${id}/metadata`, data),
+  getTags: (id: number) => api.get(`/comics/${id}/tags`),
+  updateTags: (id: number, data: ComicTagUpdateDTO) =>
+    api.put(`/comics/${id}/tags`, data),
+  listCoverCandidates: (id: number) => api.get(`/comics/${id}/covers/candidates`),
+  updateCover: (id: number, data: CoverUpdateDTO) =>
+    api.put(`/comics/${id}/cover`, data),
 }
 
 export const catalogApi = {
@@ -48,7 +63,17 @@ export const dashboardApi = { statistics: () => api.get('/dashboard/statistics')
 
 export const operationApi = { list: (params: any) => api.get('/operations', { params }) }
 
-export const tagApi = { list: () => api.get('/tags') }
+export const tagApi = {
+  list: () => api.get('/tags'),
+  create: (data: TagCreateDTO) => api.post('/tags', data),
+  delete: (id: number) => api.delete(`/tags/${id}`),
+}
+
+export const adminApi = {
+  deleteComic: (id: number, mode: string = 'DATABASE_ONLY') =>
+    api.delete(`/admin/comics/${id}`, { params: { mode } }),
+  scanRecover: () => api.post('/admin/storage/scan-recover'),
+}
 
 export const lqApi = {
   generateComic: (comicId: number) => api.post(`/comics/${comicId}/lq`),

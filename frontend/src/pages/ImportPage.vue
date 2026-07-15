@@ -147,8 +147,9 @@ async function doImport() {
     sourcePath.value = ''
     // 工作流闭环：创建后直接跳到任务中心观察进度
     router.push('/tasks')
-  } catch (err: any) {
-    ElMessage.error(err?.response?.data?.message || '创建导入任务失败')
+  } catch (err: unknown) {
+    const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+    ElMessage.error(msg || '创建导入任务失败')
   } finally {
     creating.value = false
   }

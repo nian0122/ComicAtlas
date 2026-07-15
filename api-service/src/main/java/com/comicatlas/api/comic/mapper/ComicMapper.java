@@ -8,6 +8,8 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
+import java.util.List;
+
 @Mapper
 public interface ComicMapper extends BaseMapper<Comic> {
 
@@ -16,6 +18,7 @@ public interface ComicMapper extends BaseMapper<Comic> {
         SELECT DISTINCT c.* FROM comic c
         LEFT JOIN reading_history rh ON c.id = rh.comic_id
         <where>
+            AND c.status NOT IN ('PLACEHOLDER', 'DELETED')
             <if test='query.keyword != null and query.keyword != ""'>
                 AND (c.title LIKE CONCAT('%', #{query.keyword}, '%')
                      OR c.title_jpn LIKE CONCAT('%', #{query.keyword}, '%')
@@ -26,6 +29,22 @@ public interface ComicMapper extends BaseMapper<Comic> {
             <if test='query.tag != null and query.tag != ""'>
                 AND EXISTS (SELECT 1 FROM comic_tag ct JOIN tag t ON t.id = ct.tag_id
                             WHERE ct.comic_id = c.id AND t.name = #{query.tag})
+            </if>
+            <if test='query.tags != null and query.tags.size > 0'>
+                <choose>
+                    <when test='query.tagMode == "AND"'>
+                        AND (SELECT COUNT(DISTINCT t.name) FROM comic_tag ct JOIN tag t ON t.id = ct.tag_id
+                             WHERE ct.comic_id = c.id AND t.name IN
+                             <foreach collection='query.tags' item='tagName' open='(' separator=',' close=')'>#{tagName}</foreach>
+                            ) = #{query.tags.size}
+                    </when>
+                    <otherwise>
+                        AND EXISTS (SELECT 1 FROM comic_tag ct JOIN tag t ON t.id = ct.tag_id
+                                    WHERE ct.comic_id = c.id AND t.name IN
+                                    <foreach collection='query.tags' item='tagName' open='(' separator=',' close=')'>#{tagName}</foreach>
+                                   )
+                    </otherwise>
+                </choose>
             </if>
             <if test='query.status != null and query.status != ""'>
                 AND c.status = #{query.status}
@@ -48,4 +67,7 @@ public interface ComicMapper extends BaseMapper<Comic> {
         </script>
     """)
     IPage<Comic> selectPage(Page<Comic> page, @Param("query") Object query);
+
+    @Select("SELECT title FROM comic WHERE title LIKE #{pattern} OR title_jpn LIKE #{pattern} LIMIT #{limit}")
+    List<String> selectTitlesLike(@Param("pattern") String pattern, @Param("limit") int limit);
 }

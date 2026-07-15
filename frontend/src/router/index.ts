@@ -32,6 +32,12 @@ const router = createRouter({
           props: true,
         },
         {
+          path: '/comics/:id/edit',
+          name: 'comic-edit',
+          component: () => import('@/pages/ComicEditPage.vue'),
+          props: true,
+        },
+        {
           path: '/tasks',
           name: 'tasks',
           component: () => import('@/pages/TaskCenterPage.vue'),

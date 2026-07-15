@@ -60,8 +60,9 @@ export const useReaderStore = defineStore('reader', () => {
       state.pages = data.pages
       state.prevChapterId = data.prevChapterId
       state.nextChapterId = data.nextChapterId
-    } catch (err: any) {
-      state.error = err?.response?.data?.message || '加载章节失败'
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      state.error = msg || '加载章节失败'
       state.pages = []
     } finally {
       state.loading = false

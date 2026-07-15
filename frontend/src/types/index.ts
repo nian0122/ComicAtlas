@@ -1,6 +1,8 @@
 export interface ComicListQuery {
   keyword?: string
   tag?: string
+  tags?: string[]
+  tagMode?: 'AND' | 'OR'
   status?: string
   category?: string
   sourceType?: string
@@ -29,6 +31,7 @@ export interface ComicDetailVO {
   title: string
   titleJpn?: string
   author: string
+  description?: string
   coverUrl: string
   pageCount: number
   fileSize: number
@@ -56,6 +59,18 @@ export interface ChapterVO {
 export interface TagRef {
   name: string
   type: string
+}
+
+export interface CoverCandidateDTO {
+  pageId: number
+  chapterId: number
+  chapterTitle: string
+  pageNumber: number
+  url: string
+}
+
+export interface CoverUpdateDTO {
+  pageId: number
 }
 
 export interface CatalogNode {
@@ -162,6 +177,51 @@ export interface OperationLogVO {
   businessId: string
   detail: string
   createdAt: string
+}
+
+export interface ComicDeleteStats {
+  comic: number
+  catalog: number
+  chapter: number
+  page: number
+  tag: number
+  history: number
+}
+
+export interface ScanRecoverResultDTO {
+  scannedComics: number
+  existingComics: number
+  restoredComics: number
+  placeholderComics: number
+  restoredChapters: number
+  restoredPages: number
+  placeholders: string[]
+  errors: string[]
+}
+
+export interface ComicMetadataDTO {
+  title: string
+  author?: string
+  description?: string
+}
+
+export interface ComicMetadataUpdateDTO {
+  title: string
+  author?: string
+  description?: string
+}
+
+export interface TagDTO {
+  id: number
+  name: string
+}
+
+export interface TagCreateDTO {
+  name: string
+}
+
+export interface ComicTagUpdateDTO {
+  tagIds: number[]
 }
 
 export const STATUS_COLOR_MAP: Record<string, string> = {

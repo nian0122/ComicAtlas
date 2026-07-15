@@ -42,8 +42,9 @@ export const useComicStore = defineStore('comic', () => {
       const res = await comicApi.list(state.query)
       state.list = res.data.records || []
       state.total = res.data.total || 0
-    } catch (err: any) {
-      state.error = err?.response?.data?.message || '加载漫画列表失败'
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      state.error = msg || '加载漫画列表失败'
       state.list = []
       state.total = 0
     } finally {

@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS comic (
     title VARCHAR(255) NOT NULL,
     title_jpn VARCHAR(255),
     author VARCHAR(255),
+    description TEXT,
     cover_path VARCHAR(512),
     total_pages INT DEFAULT 0,
     file_size BIGINT DEFAULT 0,
@@ -30,6 +31,13 @@ CREATE TABLE IF NOT EXISTS comic (
     INDEX idx_status (status),
     INDEX idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+SET @exist := (SELECT COUNT(*) FROM information_schema.columns
+               WHERE table_schema = 'comic_atlas' AND table_name = 'comic' AND column_name = 'description');
+SET @sql := IF(@exist = 0, 'ALTER TABLE comic ADD COLUMN description TEXT', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 CREATE TABLE IF NOT EXISTS catalog (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
