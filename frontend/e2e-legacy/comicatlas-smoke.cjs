@@ -18,11 +18,11 @@ const UNCOVERED_SELECTORS = [
 ];
 
 const PAGES = [
-  { name: 'Home', path: '/home' },
-  { name: 'Library', path: '/comics' },
+  { name: 'Home', path: '/' },
+  { name: 'Library', path: '/library' },
   { name: 'History', path: '/history' },
-  { name: 'Import', path: '/import' },
-  { name: 'Task Center', path: '/tasks' },
+  { name: 'Import', path: '/manage/import' },
+  { name: 'Task Center', path: '/manage/import/tasks' },
 ];
 
 function screenshot(name) {
@@ -93,18 +93,18 @@ async function safeClick(page, selector) {
       console.log(`✅ ${p.name}: dark background OK`);
     }
 
-    await page.goto(`${TARGET_URL}/home`, { waitUntil: 'networkidle' });
+    await page.goto(`${TARGET_URL}/`, { waitUntil: 'networkidle' });
     results.flow.push('Home');
 
-    await safeClick(page, 'nav.top-nav a[href="/comics"]');
-    await page.waitForURL('**/comics', { timeout: 10000 });
+    await safeClick(page, 'nav.top-nav a[href="/library"]');
+    await page.waitForURL('**/library', { timeout: 10000 });
     results.flow.push('Library');
     console.log('➡️  Home → Library');
 
     const posterCount = await page.locator('.comic-poster').count();
     if (posterCount === 0) throw new Error('Library has no comic posters');
     await safeClick(page, '.comic-poster');
-    await page.waitForURL(/\/comics\/\d+$/, { timeout: 10000 });
+    await page.waitForURL(/\/comic\/\d+$/, { timeout: 10000 });
     results.flow.push('Detail');
     console.log('➡️  Library → Detail');
 
@@ -112,14 +112,14 @@ async function safeClick(page, selector) {
     try {
       await primaryBtn.waitFor({ state: 'visible', timeout: 10000 });
       await primaryBtn.click();
-      await page.waitForURL(/\/comics\/\d+\/read/, { timeout: 10000 });
+      await page.waitForURL(/\/reader\/\d+$/, { timeout: 10000 });
       results.flow.push('Reader');
       console.log('➡️  Detail → Reader');
     } catch {
       const chapterRow = page.locator('.chapter-row').first();
       if (await chapterRow.count() > 0) {
         await chapterRow.click();
-        await page.waitForURL(/\/comics\/\d+\/read/, { timeout: 10000 });
+        await page.waitForURL(/\/reader\/\d+$/, { timeout: 10000 });
         results.flow.push('Reader');
         console.log('➡️  Detail → Reader (via chapter row)');
       } else {
@@ -133,13 +133,13 @@ async function safeClick(page, selector) {
     results.flow.push('History');
     console.log('➡️  Reader → History');
 
-    await safeClick(page, 'nav.top-nav a[href="/import"]');
-    await page.waitForURL('**/import', { timeout: 10000 });
+    await safeClick(page, 'nav.top-nav a[href="/manage/import"]');
+    await page.waitForURL('**/manage/import', { timeout: 10000 });
     results.flow.push('Import');
     console.log('➡️  History → Import');
 
-    await safeClick(page, 'nav.top-nav a[href="/tasks"]');
-    await page.waitForURL('**/tasks', { timeout: 10000 });
+    await safeClick(page, 'a[href="/manage/import/tasks"]');
+    await page.waitForURL('**/manage/import/tasks', { timeout: 10000 });
     results.flow.push('Task Center');
     console.log('➡️  Import → Task Center');
 

@@ -1,31 +1,23 @@
 <template>
   <nav :class="['top-nav', { scrolled: isScrolled }]">
     <div class="nav-left">
-      <router-link to="/home" class="nav-logo">ComicAtlas</router-link>
+      <router-link to="/" class="nav-logo">ComicAtlas</router-link>
       <div class="nav-links">
-        <router-link to="/home" class="nav-link" active-class="active">Home</router-link>
-        <router-link to="/comics" class="nav-link" active-class="active">Library</router-link>
-        <router-link to="/history" class="nav-link" active-class="active">History</router-link>
-        <router-link to="/tasks" class="nav-link task-link" active-class="active">
-          Tasks
-          <span v-if="importStore.activeCount > 0" class="task-badge">
-            {{ importStore.activeCount > 99 ? '99+' : importStore.activeCount }}
-          </span>
-        </router-link>
+        <router-link to="/" class="nav-link" active-class="active">首页</router-link>
+        <router-link to="/library" class="nav-link" active-class="active">漫画库</router-link>
+        <router-link to="/history" class="nav-link" active-class="active">历史</router-link>
+        <router-link to="/manage" class="nav-link" active-class="active">管理</router-link>
       </div>
     </div>
     <div class="nav-right">
-      <router-link to="/import" class="import-btn">+ Import</router-link>
-      <span class="nav-avatar">U</span>
+      <router-link to="/manage/import" class="import-btn">+ 导入</router-link>
     </div>
   </nav>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from 'vue'
-import { useImportStore } from '@/stores/import-store'
 
-const importStore = useImportStore()
 const isScrolled = ref(false)
 
 function onScroll() {
@@ -33,10 +25,6 @@ function onScroll() {
 }
 
 onMounted(() => {
-  // 全局任务状态 bootstrap：拉一次列表，如有进行中任务自动启动轮询
-  // 任何页面进入都会经过 AppLayout → TopNav，因此这里是最合适的启动点
-  importStore.bootstrap()
-
   window.addEventListener('scroll', onScroll, { passive: true })
   onScroll()
 })

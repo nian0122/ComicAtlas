@@ -36,7 +36,7 @@ function mockComicsRoute(page: any) {
 test('desktop: renders library with posters, sticky toolbar, hover scale and pagination', async ({ page }) => {
   await mockComicsRoute(page)
   await page.setViewportSize({ width: 1280, height: 720 })
-  await page.goto('/comics')
+  await page.goto('/library')
   await page.waitForLoadState('networkidle')
 
   // 等待海报渲染
@@ -78,7 +78,7 @@ test('desktop: renders library with posters, sticky toolbar, hover scale and pag
 test('mobile: 3-column grid with sm posters', async ({ page }) => {
   await mockComicsRoute(page)
   await page.setViewportSize({ width: 375, height: 667 })
-  await page.goto('/comics')
+  await page.goto('/library')
 
   const posters = page.locator('.comic-poster')
   await expect(posters.first()).toBeVisible()

@@ -51,9 +51,9 @@ function screenshotPath(name) {
   let exitCode = 0;
 
   try {
-    // 1. Navigate to comic list and pick the first comic
-    console.log(`➡️  Navigating to ${TARGET_URL}/comics`);
-    await page.goto(`${TARGET_URL}/comics`, { waitUntil: 'networkidle', timeout: 30000 });
+    // 1. Navigate to comic library and pick the first comic
+    console.log(`➡️  Navigating to ${TARGET_URL}/library`);
+    await page.goto(`${TARGET_URL}/library`, { waitUntil: 'networkidle', timeout: 30000 });
     await page.waitForTimeout(800);
 
     const firstComic = page.locator('.comic-poster').first();
@@ -65,15 +65,15 @@ function screenshotPath(name) {
     }
 
     await firstComic.click();
-    await page.waitForURL(/\/comics\/\d+$/, { timeout: 10000 });
+    await page.waitForURL(/\/comic\/\d+$/, { timeout: 10000 });
     await page.waitForTimeout(500);
 
     const detailUrl = page.url();
-    const comicIdMatch = detailUrl.match(/\/comics\/(\d+)$/);
+    const comicIdMatch = detailUrl.match(/\/comic\/(\d+)$/);
     assert('已进入漫画详情页', comicIdMatch !== null, `URL: ${detailUrl}`);
 
-    // 2. Navigate to edit page
-    const editUrl = `${TARGET_URL}/comics/${comicIdMatch[1]}/edit`;
+    // 2. Navigate to management edit page
+    const editUrl = `${TARGET_URL}/manage/comics/${comicIdMatch[1]}/edit`;
     console.log(`➡️  Navigating to ${editUrl}`);
     await page.goto(editUrl, { waitUntil: 'networkidle', timeout: 10000 });
     await page.waitForTimeout(500);
@@ -107,7 +107,7 @@ function screenshotPath(name) {
     assert('保存按钮存在', await saveBtn.count() > 0, `Found ${await saveBtn.count()}`);
     await saveBtn.first().click();
 
-    await page.waitForURL(/\/comics\/\d+$/, { timeout: 10000 });
+    await page.waitForURL(/\/comic\/\d+$/, { timeout: 10000 });
     await page.waitForTimeout(800);
 
     assert('保存后返回详情页', page.url() === detailUrl, `Expected ${detailUrl}, got ${page.url()}`);
