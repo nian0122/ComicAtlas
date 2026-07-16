@@ -6,6 +6,7 @@ import java.util.List;
 @Data
 public class ReaderDTO {
     private Long chapterId;
+    private Long comicId;
     private String chapterTitle;
     private List<PageDTO> pages;
     private int total;

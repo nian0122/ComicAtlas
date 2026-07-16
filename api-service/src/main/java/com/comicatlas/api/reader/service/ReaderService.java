@@ -30,6 +30,7 @@ public class ReaderService {
 
         var dto = new ReaderDTO();
         dto.setChapterId(ch.getId());
+        dto.setComicId(ch.getComicId());
         dto.setChapterTitle(ch.getTitle());
         dto.setPages(pages.stream().map(p -> {
             var pd = new ReaderDTO.PageDTO();

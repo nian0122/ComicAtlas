@@ -43,23 +43,23 @@ const subtitle = computed(() => {
 const primaryAction = computed(() => {
   if (props.historyItem) {
     const { comicId, chapterId, pageNumber } = props.historyItem
-    return {
-      label: '继续阅读',
-      onClick: () => router.push(`/comics/${comicId}/read?chapterId=${chapterId}&page=${pageNumber}`),
+      return {
+        label: '继续阅读',
+        onClick: () => router.push(`/reader/${chapterId}?page=${pageNumber}`),
+      }
     }
-  }
-  return {
-    label: '浏览漫画库',
-    onClick: () => router.push('/comics'),
-  }
-})
+    return {
+      label: '浏览漫画库',
+      onClick: () => router.push('/library'),
+    }
+  })
 
 const secondaryAction = computed(() => {
   if (props.historyItem) {
-    return {
-      label: '详情',
-      onClick: () => router.push(`/comics/${props.historyItem!.comicId}`),
-    }
+      return {
+        label: '详情',
+        onClick: () => router.push(`/comic/${props.historyItem!.comicId}`),
+      }
   }
   return undefined
 })

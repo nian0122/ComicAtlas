@@ -166,7 +166,7 @@ Phase 0（架构冻结）→ Phase 1（Shell）→ Phase 2（阅读迁移）→ 
 
 ### Wave 2 — Phase 2: Reading Migration
 
-- [ ] 8. 迁移 HomePage 到 views/reading/
+- [x] 8. 迁移 HomePage 到 views/reading/
   What to do / Must NOT do: 将 `frontend/src/pages/HomePage.vue` 移动到 `frontend/src/views/reading/HomePage.vue`，更新路由引用。第一步只搬家，不改 UI。
   Parallelization: Wave 2 | Blocked by: 4, 5 | Blocks: 14
   References: `frontend/src/pages/HomePage.vue`, `frontend/src/router/index.ts`, `docs/architecture/03-reading.md`
@@ -174,7 +174,7 @@ Phase 0（架构冻结）→ Phase 1（Shell）→ Phase 2（阅读迁移）→ 
   QA scenarios: happy: Playwright 首页测试通过；failure: 首页白屏或 404，失败。Evidence `.omo/evidence/task-8-comicatlas-0-2-migration.txt`
   Commit: Y | refactor(frontend): 迁移 HomePage 到 views/reading
 
-- [ ] 9. 迁移 LibraryPage 到 views/reading/
+- [x] 9. 迁移 LibraryPage 到 views/reading/
   What to do / Must NOT do: 将 `frontend/src/pages/ComicListPage.vue` 移动到 `frontend/src/views/reading/LibraryPage.vue`。保留现有功能，不改 UI。
   Parallelization: Wave 2 | Blocked by: 4, 5 | Blocks: 14
   References: `frontend/src/pages/ComicListPage.vue`, `frontend/src/router/index.ts`, `docs/architecture/03-reading.md`
@@ -182,7 +182,7 @@ Phase 0（架构冻结）→ Phase 1（Shell）→ Phase 2（阅读迁移）→ 
   QA scenarios: happy: Playwright 漫画库测试通过；failure: 列表不渲染，失败。Evidence `.omo/evidence/task-9-comicatlas-0-2-migration.txt`
   Commit: Y | refactor(frontend): 迁移 LibraryPage 到 views/reading
 
-- [ ] 10. 迁移 ComicDetailPage 到 views/reading/ 并移除管理按钮
+- [x] 10. 迁移 ComicDetailPage 到 views/reading/ 并移除管理按钮
   What to do / Must NOT do: 将 `frontend/src/pages/ComicDetailPage.vue` 移动到 `frontend/src/views/reading/DetailPage.vue`，删除编辑、删除等管理按钮。不要修改业务逻辑。
   Parallelization: Wave 2 | Blocked by: 4, 5 | Blocks: 14
   References: `frontend/src/pages/ComicDetailPage.vue`, `docs/architecture/03-reading.md`
@@ -190,7 +190,7 @@ Phase 0（架构冻结）→ Phase 1（Shell）→ Phase 2（阅读迁移）→ 
   QA scenarios: happy: 详情页只有阅读相关按钮；failure: 仍存在编辑/删除入口，失败。Evidence `.omo/evidence/task-10-comicatlas-0-2-migration.txt`
   Commit: Y | refactor(frontend): 迁移 ComicDetailPage 并移除管理按钮
 
-- [ ] 11. 迁移 ReaderPage 到 views/reading/ 并适配新路由参数
+- [x] 11. 迁移 ReaderPage 到 views/reading/ 并适配新路由参数
   What to do / Must NOT do: 将 `frontend/src/pages/ReaderPage.vue` 移动到 `frontend/src/views/reading/ReaderPage.vue`。新路由 `/reader/:chapterId` 不再提供 `comicId`，需要后端 `ReaderDTO` 增加 `comicId` 字段（或使用已有 `ChapterPageVO`），并在 `reader-store.ts` 的 `loadChapter()` 中设置 `state.comicId`。同步更新 ComicDetailPage、HistoryPage 中跳转到阅读器的链接格式。不要修改翻页/阅读核心逻辑。
   Parallelization: Wave 2 | Blocked by: 3, 4, 5 | Blocks: 14
   References: `frontend/src/pages/ReaderPage.vue`, `frontend/src/stores/reader.ts`, `api-service/src/main/java/com/comicatlas/api/reader/dto/ReaderDTO.java`, `api-service/src/main/java/com/comicatlas/api/comic/dto/ChapterPageVO.java`, `docs/architecture/03-reading.md`
@@ -198,7 +198,7 @@ Phase 0（架构冻结）→ Phase 1（Shell）→ Phase 2（阅读迁移）→ 
   QA scenarios: happy: 从 ComicDetail 点击"继续阅读"进入 `/reader/:chapterId`，翻页后刷新页面可恢复进度；failure: 进度保存缺失 comicId 或阅读器 404，失败。Evidence `.omo/evidence/task-11-comicatlas-0-2-migration.txt`
   Commit: Y | refactor(frontend): 迁移 ReaderPage 并适配 /reader/:chapterId 路由
 
-- [ ] 12. 迁移 HistoryPage 到 views/reading/
+- [x] 12. 迁移 HistoryPage 到 views/reading/
   What to do / Must NOT do: 将 `frontend/src/pages/HistoryPage.vue` 移动到 `frontend/src/views/reading/HistoryPage.vue`。
   Parallelization: Wave 2 | Blocked by: 4, 5 | Blocks: 14
   References: `frontend/src/pages/HistoryPage.vue`, `docs/architecture/03-reading.md`
@@ -206,7 +206,7 @@ Phase 0（架构冻结）→ Phase 1（Shell）→ Phase 2（阅读迁移）→ 
   QA scenarios: happy: 历史记录渲染正确；failure: 历史为空或不渲染，失败。Evidence `.omo/evidence/task-12-comicatlas-0-2-migration.txt`
   Commit: Y | refactor(frontend): 迁移 HistoryPage 到 views/reading
 
-- [ ] 13. 重组阅读组件到 components/reading/
+- [x] 13. 重组阅读组件到 components/reading/
   What to do / Must NOT do: 将阅读相关组件从 `frontend/src/components/` 移动到 `frontend/src/components/reading/`。只移动，不改组件内部。
   Parallelization: Wave 2 | Blocked by: 8-12 | Blocks: 14
   References: `frontend/src/components/comic/`, `frontend/src/components/reader/`, `docs/architecture/07-frontend.md`
@@ -214,7 +214,7 @@ Phase 0（架构冻结）→ Phase 1（Shell）→ Phase 2（阅读迁移）→ 
   QA scenarios: happy: `npm run type-check` 通过；failure: 组件引用报错，失败。Evidence `.omo/evidence/task-13-comicatlas-0-2-migration.txt`
   Commit: Y | refactor(frontend): 重组阅读组件到 components/reading
 
-- [ ] 14. 验证 Phase 2 阅读链路
+- [x] 14. 验证 Phase 2 阅读链路
   What to do / Must NOT do: 运行 Playwright 阅读链路测试（Home → Library → Detail → Reader → History）。不要进入 Phase 3 直到通过。
   Parallelization: Wave 2 | Blocked by: 8-13 | Blocks: Wave 3
   References: `frontend/e2e/`, `docs/architecture/03-reading.md`

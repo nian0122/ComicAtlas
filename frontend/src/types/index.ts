@@ -101,6 +101,7 @@ export interface PageInfo {
 
 export interface ReaderDTO {
   chapterId: number
+  comicId: number
   chapterTitle: string
   pages: PageInfo[]
   total: number

@@ -13,7 +13,7 @@
 </template>
 
 <script setup lang="ts">
-import ComicPoster from '@/components/comic/ComicPoster.vue'
+import ComicPoster from '@/components/reading/comic/ComicPoster.vue'
 </script>
 
 <style scoped>
