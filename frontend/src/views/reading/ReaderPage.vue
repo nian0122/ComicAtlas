@@ -50,7 +50,7 @@ import { useReaderStore } from '@/stores/reader-store'
 import { useReaderSettingsStore } from '@/stores/reader-settings-store'
 import ReaderViewport from '@/components/reading/reader/ReaderViewport.vue'
 import ReaderToolbar from '@/components/reading/reader/ReaderToolbar.vue'
-import { comicApi } from '@/services/api'
+import { comicApi } from '@/services/reading'
 import { preloadEngine } from '@/utils/preload-engine'
 import type { ComicDetailVO } from '@/types'
 

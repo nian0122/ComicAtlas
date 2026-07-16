@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { reactive, toRefs } from 'vue'
-import { historyApi } from '@/services/api'
+import { historyApi } from '@/services/reading'
 import type { HistoryVO } from '@/types'
 
 export interface HistoryState {

@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { reactive, computed, toRefs } from 'vue'
-import { comicApi } from '@/services/api'
+import { comicApi } from '@/services/reading'
 import type { ComicListVO, ComicListQuery } from '@/types'
 
 export interface ComicListState {

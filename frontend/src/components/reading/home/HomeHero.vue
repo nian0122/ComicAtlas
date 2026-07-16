@@ -12,7 +12,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import HeroBanner from '@/components/layout/HeroBanner.vue'
+import HeroBanner from '@/components/reading/HeroBanner.vue'
 import type { HistoryVO } from '@/types'
 
 interface HomeHeroProps {

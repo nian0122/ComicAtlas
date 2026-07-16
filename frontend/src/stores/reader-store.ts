@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { reactive, computed, toRefs } from 'vue'
-import { readerApi, historyApi } from '@/services/api'
+import { readerApi, historyApi } from '@/services/reading'
 import { useHistoryStore } from '@/stores/history-store'
 import type { PageInfo, ReaderDTO } from '@/types'
 

@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { importApi } from '@/services/api'
+import { importApi } from '@/services/management'
 import type { ImportTaskVO, ImportStatusVO } from '@/types'
 
 /**
