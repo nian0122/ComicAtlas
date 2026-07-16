@@ -58,7 +58,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
-import ComicPoster from '@/components/comic/ComicPoster.vue'
+import ComicPoster from '@/components/reading/comic/ComicPoster.vue'
 
 export interface HomeRowItem {
   id: string | number

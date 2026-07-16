@@ -128,7 +128,7 @@ async function onRetry(id: number) {
 
 function onRead(task: ImportTaskVO) {
   if (!task.comicId) return
-  router.push(`/comics/${task.comicId}`)
+    router.push(`/comic/${task.comicId}`)
 }
 
 onMounted(async () => {

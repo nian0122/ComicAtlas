@@ -1,7 +1,7 @@
 <template>
   <section class="home-actions">
     <div class="actions-inner">
-      <router-link to="/comics" class="action-card hover-lift">
+      <router-link to="/library" class="action-card hover-lift">
         <div class="action-icon action-icon--library">
           <el-icon :size="28"><Collection /></el-icon>
         </div>
@@ -12,7 +12,7 @@
         <el-icon :size="18" class="action-arrow"><ArrowRight /></el-icon>
       </router-link>
 
-      <router-link to="/import" class="action-card hover-lift">
+      <router-link to="/manage/import" class="action-card hover-lift">
         <div class="action-icon action-icon--import">
           <el-icon :size="28"><Download /></el-icon>
         </div>

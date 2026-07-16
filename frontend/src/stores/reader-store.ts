@@ -56,6 +56,7 @@ export const useReaderStore = defineStore('reader', () => {
     try {
       const res = await readerApi.chapter(chId)
       const data = res.data as ReaderDTO
+      state.comicId = data.comicId
       state.chapterTitle = data.chapterTitle
       state.pages = data.pages
       state.prevChapterId = data.prevChapterId
