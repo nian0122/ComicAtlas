@@ -224,7 +224,7 @@ Phase 0（架构冻结）→ Phase 1（Shell）→ Phase 2（阅读迁移）→ 
 
 ### Wave 3 — Phase 3: Management Migration
 
-- [ ] 15. 创建管理侧 ComicListPage
+- [x] 15. 创建管理侧 ComicListPage
   What to do / Must NOT do: 在 `frontend/src/views/management/ComicListPage.vue` 创建管理侧漫画列表页，路由 `/manage/comics`，作为 `/manage` 的 redirect 目标。列表展示漫画、来源、状态、操作按钮，点击进入编辑页。
   Parallelization: Wave 3 | Blocked by: 4, 5 | Blocks: 19, 22
   References: `frontend/src/pages/ComicListPage.vue`, `frontend/src/views/management/`, `docs/architecture/02-navigation.md`, `docs/architecture/04-management.md`
@@ -232,7 +232,7 @@ Phase 0（架构冻结）→ Phase 1（Shell）→ Phase 2（阅读迁移）→ 
   QA scenarios: happy: 管理漫画列表渲染，点击编辑跳转正确；failure: `/manage` 重定向 404 或列表不渲染，失败。Evidence `.omo/evidence/task-15-comicatlas-0-2-migration.txt`
   Commit: Y | feat(frontend): 新增管理侧 ComicListPage
 
-- [ ] 16. 迁移 ComicEditPage 到 views/management/
+- [x] 16. 迁移 ComicEditPage 到 views/management/
   What to do / Must NOT do: 将 `frontend/src/pages/ComicEditPage.vue` 移动到 `frontend/src/views/management/ComicEditPage.vue`，路由改为 `/manage/comics/:id/edit`。保持现有编辑功能。
   Parallelization: Wave 3 | Blocked by: 4, 5 | Blocks: 23
   References: `frontend/src/pages/ComicEditPage.vue`, `frontend/src/router/index.ts`, `docs/architecture/04-management.md`
@@ -240,7 +240,7 @@ Phase 0（架构冻结）→ Phase 1（Shell）→ Phase 2（阅读迁移）→ 
   QA scenarios: happy: 编辑页可修改标题/作者；failure: 保存失败或 404，失败。Evidence `.omo/evidence/task-16-comicatlas-0-2-migration.txt`
   Commit: Y | refactor(frontend): 迁移 ComicEditPage 到 views/management
 
-- [ ] 17. 迁移 ImportPage 到 views/management/
+- [x] 17. 迁移 ImportPage 到 views/management/
   What to do / Must NOT do: 将 `frontend/src/pages/ImportPage.vue` 移动到 `frontend/src/views/management/ImportPage.vue`，路由改为 `/manage/import`。
   Parallelization: Wave 3 | Blocked by: 4, 5 | Blocks: 23
   References: `frontend/src/pages/ImportPage.vue`, `docs/architecture/04-management.md`
@@ -248,7 +248,7 @@ Phase 0（架构冻结）→ Phase 1（Shell）→ Phase 2（阅读迁移）→ 
   QA scenarios: happy: 可提交 ZIP/目录导入；failure: 导入请求失败，失败。Evidence `.omo/evidence/task-17-comicatlas-0-2-migration.txt`
   Commit: Y | refactor(frontend): 迁移 ImportPage 到 views/management
 
-- [ ] 18. 迁移 TaskPage 到 views/management/
+- [x] 18. 迁移 TaskPage 到 views/management/
   What to do / Must NOT do: 将 `frontend/src/pages/TaskCenterPage.vue` 移动到 `frontend/src/views/management/TaskPage.vue`，路由改为 `/manage/import/tasks`。
   Parallelization: Wave 3 | Blocked by: 4, 5 | Blocks: 23
   References: `frontend/src/pages/TaskCenterPage.vue`, `docs/architecture/04-management.md`
@@ -256,7 +256,7 @@ Phase 0（架构冻结）→ Phase 1（Shell）→ Phase 2（阅读迁移）→ 
   QA scenarios: happy: 任务列表渲染正确；failure: 任务为空或不渲染，失败。Evidence `.omo/evidence/task-18-comicatlas-0-2-migration.txt`
   Commit: Y | refactor(frontend): 迁移 TaskCenterPage 到 views/management
 
-- [ ] 19. 创建管理侧 SideNav
+- [x] 19. 创建管理侧 SideNav
   What to do / Must NOT do: 在 ManagementLayout 中实现左侧导航：漫画 / 导入 / 存储 / 元数据 / 设置。漫画入口指向 ComicListPage；导入/存储/元数据/设置可先 placeholder 或真实页面。
   Parallelization: Wave 3 | Blocked by: 2 | Blocks: 23
   References: `frontend/src/layouts/ManagementLayout.vue`, `docs/architecture/04-management.md`
@@ -264,7 +264,7 @@ Phase 0（架构冻结）→ Phase 1（Shell）→ Phase 2（阅读迁移）→ 
   QA scenarios: happy: 导航点击后 URL 正确；failure: 导航项缺失或 404，失败。Evidence `.omo/evidence/task-19-comicatlas-0-2-migration.txt`
   Commit: Y | feat(frontend): 实现管理侧 5 项 SideNav
 
-- [ ] 20. 重组管理组件到 components/management/
+- [x] 20. 重组管理组件到 components/management/
   What to do / Must NOT do: 将管理相关组件移动到 `frontend/src/components/management/`。只移动，不改逻辑。
   Parallelization: Wave 3 | Blocked by: 16-19 | Blocks: 23
   References: `frontend/src/components/task/`, `docs/architecture/07-frontend.md`
@@ -272,7 +272,7 @@ Phase 0（架构冻结）→ Phase 1（Shell）→ Phase 2（阅读迁移）→ 
   QA scenarios: happy: `npm run type-check` 通过；failure: 组件引用报错，失败。Evidence `.omo/evidence/task-20-comicatlas-0-2-migration.txt`
   Commit: Y | refactor(frontend): 重组管理组件到 components/management
 
-- [ ] 21. 重组管理 Store
+- [x] 21. 重组管理 Store
   What to do / Must NOT do: 将管理相关 store 拆分为 `frontend/src/stores/management/comic.ts`、`import.ts` 等。不修改 API 调用逻辑。
   Parallelization: Wave 3 | Blocked by: 16-19 | Blocks: 23
   References: `frontend/src/stores/`, `docs/architecture/07-frontend.md`
@@ -280,7 +280,7 @@ Phase 0（架构冻结）→ Phase 1（Shell）→ Phase 2（阅读迁移）→ 
   QA scenarios: happy: 管理页面状态正常；failure: store 引用报错，失败。Evidence `.omo/evidence/task-21-comicatlas-0-2-migration.txt`
   Commit: Y | refactor(frontend): 拆分管理模块 Store
 
-- [ ] 22. 验证 Phase 3 管理链路
+- [x] 22. 验证 Phase 3 管理链路
   What to do / Must NOT do: 运行 Playwright 管理链路测试（管理首页 → 漫画列表 → 漫画编辑 → 导入 → 任务）。不要进入 Phase 4 直到通过。
   Parallelization: Wave 3 | Blocked by: 16-21 | Blocks: Wave 4
   References: `frontend/e2e/`, `docs/architecture/04-management.md`

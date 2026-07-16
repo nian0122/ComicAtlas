@@ -23,7 +23,7 @@
 
 <script setup lang="ts">
 import { onMounted } from 'vue'
-import { useImportStore } from '@/stores/import-store'
+import { useImportStore } from '@/stores/management/import'
 
 const importStore = useImportStore()
 
