@@ -49,6 +49,17 @@
             />
           </el-form-item>
 
+          <el-form-item label="分类" prop="categoryId">
+            <el-select v-model="form.categoryId" placeholder="选择分类" clearable style="width: 240px">
+              <el-option
+                v-for="cat in categoryStore.list"
+                :key="cat.id"
+                :label="cat.name"
+                :value="cat.id"
+              />
+            </el-select>
+          </el-form-item>
+
           <el-form-item label="标签" prop="tags">
             <div class="tag-block">
               <el-tag
@@ -87,6 +98,12 @@
             </div>
           </el-form-item>
 
+          <el-form-item label="封面">
+            <div class="cover-block">
+              <el-button @click="openCoverSelector">选择封面</el-button>
+            </div>
+          </el-form-item>
+
           <div class="form-actions">
             <el-button @click="goBack">取消</el-button>
             <el-button type="primary" :loading="saving" @click="handleSave">
@@ -96,6 +113,44 @@
         </el-form>
       </div>
     </div>
+
+    <el-dialog
+      v-model="coverDialogVisible"
+      title="选择封面"
+      width="800px"
+      class="cover-dialog"
+      destroy-on-close
+    >
+      <div v-if="coverLoading" class="state loading small">
+        <div class="spinner" />
+        <span>加载候选封面...</span>
+      </div>
+      <div v-else-if="coverCandidates.length === 0" class="state empty small">
+        <span>暂无可用封面</span>
+      </div>
+      <div v-else class="cover-grid">
+        <div
+          v-for="candidate in coverCandidates"
+          :key="candidate.pageId"
+          class="cover-item"
+          :class="{ active: selectedCoverPageId === candidate.pageId }"
+          @click="selectedCoverPageId = candidate.pageId"
+        >
+          <img :src="candidate.url" :alt="candidate.chapterTitle">
+          <span class="cover-label">{{ candidate.chapterTitle }}</span>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="coverDialogVisible = false">取消</el-button>
+        <el-button
+          type="primary"
+          :disabled="!selectedCoverPageId"
+          @click="saveCover"
+        >
+          保存
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -104,17 +159,20 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft } from '@element-plus/icons-vue'
-import { comicApi, tagApi } from '@/services/management'
+import { comicApi, tagApi, categoryApi } from '@/services/management'
+import { useCategoryStore } from '@/stores/management/category'
 import type {
   ComicMetadataDTO,
   ComicMetadataUpdateDTO,
   TagDTO,
   TagCreateDTO,
   ComicTagUpdateDTO,
+  CoverCandidateDTO,
 } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
+const categoryStore = useCategoryStore()
 
 const comicId = Number(route.params.id)
 const formRef = ref()
@@ -125,12 +183,18 @@ const form = ref<ComicMetadataUpdateDTO>({
   title: '',
   author: '',
   description: '',
+  categoryId: null,
 })
 
 const selectedTagIds = ref<number[]>([])
 const allTags = ref<TagDTO[]>([])
 const tagInput = ref<number | undefined>(undefined)
 const newTagName = ref('')
+
+const coverDialogVisible = ref(false)
+const coverLoading = ref(false)
+const coverCandidates = ref<CoverCandidateDTO[]>([])
+const selectedCoverPageId = ref<number | null>(null)
 
 const selectedTags = computed<TagDTO[]>(() => {
   return selectedTagIds.value
@@ -164,12 +228,14 @@ async function loadData() {
       comicApi.getMetadata(comicId),
       comicApi.getTags(comicId),
       tagApi.list(),
+      categoryStore.fetchList(),
     ])
     const metadata = metadataRes.data as ComicMetadataDTO
     form.value = {
       title: metadata.title || '',
       author: metadata.author || '',
       description: metadata.description || '',
+      categoryId: metadata.categoryId ?? null,
     }
     selectedTagIds.value = (tagsRes.data as number[]) || []
     allTags.value = (allTagsRes.data as TagDTO[]) || []
@@ -179,6 +245,34 @@ async function loadData() {
     router.push('/manage/comics')
   } finally {
     loading.value = false
+  }
+}
+
+async function openCoverSelector() {
+  coverDialogVisible.value = true
+  coverLoading.value = true
+  selectedCoverPageId.value = null
+  try {
+    const res = await comicApi.listCoverCandidates(comicId)
+    coverCandidates.value = (res.data || []) as CoverCandidateDTO[]
+  } catch (err: unknown) {
+    const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+    ElMessage.error(msg || '加载封面候选失败')
+    coverCandidates.value = []
+  } finally {
+    coverLoading.value = false
+  }
+}
+
+async function saveCover() {
+  if (!selectedCoverPageId.value) return
+  try {
+    await comicApi.updateCover(comicId, { pageId: selectedCoverPageId.value })
+    ElMessage.success('封面已更新')
+    coverDialogVisible.value = false
+  } catch (err: unknown) {
+    const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+    ElMessage.error(msg || '封面更新失败')
   }
 }
 
@@ -387,5 +481,88 @@ onMounted(loadData)
     width: 100%;
     text-align: center;
   }
+}
+
+.cover-block {
+  padding: var(--space-sm);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.cover-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--space-base);
+  max-height: 480px;
+  overflow-y: auto;
+  padding: var(--space-sm);
+}
+
+.cover-item {
+  position: relative;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 2px solid transparent;
+  transition: border-color var(--transition-fast);
+  background: var(--bg-secondary);
+}
+
+.cover-item:hover {
+  border-color: var(--border-strong);
+}
+
+.cover-item.active {
+  border-color: var(--accent);
+}
+
+.cover-item img {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  display: block;
+}
+
+.cover-label {
+  display: block;
+  padding: var(--space-xs) var(--space-sm);
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cover-dialog :deep(.el-dialog__header) {
+  margin-right: 0;
+}
+
+.cover-dialog :deep(.el-dialog__body) {
+  padding: var(--space-base);
+}
+
+.state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-base);
+  padding: var(--space-xl) 0;
+  color: var(--text-secondary);
+}
+
+.state.loading .spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border-strong);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 </style>

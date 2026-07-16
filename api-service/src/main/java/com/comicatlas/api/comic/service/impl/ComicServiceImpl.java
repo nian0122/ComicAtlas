@@ -33,6 +33,7 @@ public class ComicServiceImpl implements ComicService {
     private final PageMapper pageMapper;
     private final TagMapper tagMapper;
     private final ComicTagMapper comicTagMapper;
+    private final CategoryMapper categoryMapper;
     private final ReadingHistoryMapper historyMapper;
     private final RedisTemplate<String, Object> redisTemplate;
     private final FileUrlResolver fileUrlResolver;
@@ -52,7 +53,8 @@ public class ComicServiceImpl implements ComicService {
         vo.setAuthor(c.getAuthor());
         vo.setCoverUrl(fileUrlResolver.resolveCover(c.getId(), c.getCoverPath()));
         vo.setPageCount(c.getTotalPages());
-        vo.setCategory(c.getCategory());
+        vo.setCategoryId(c.getCategoryId());
+        vo.setCategoryName(resolveCategoryName(c.getCategoryId()));
         vo.setStatus(c.getStatus());
         vo.setLqStatus(c.getLqStatus());
         vo.setCreatedAt(c.getCreatedAt());
@@ -83,7 +85,8 @@ public class ComicServiceImpl implements ComicService {
         vo.setFileSize(c.getFileSize());
         vo.setSourceType(c.getSourceType());
         vo.setSourceRef(c.getSourceRef());
-        vo.setCategory(c.getCategory());
+        vo.setCategoryId(c.getCategoryId());
+        vo.setCategoryName(resolveCategoryName(c.getCategoryId()));
         vo.setStatus(c.getStatus());
         vo.setLqStatus(c.getLqStatus());
         vo.setCreatedAt(c.getCreatedAt());
@@ -195,6 +198,12 @@ public class ComicServiceImpl implements ComicService {
                 });
     }
 
+    private String resolveCategoryName(Long categoryId) {
+        if (categoryId == null) return null;
+        Category category = categoryMapper.selectById(categoryId);
+        return category != null ? category.getName() : null;
+    }
+
     @Override
     public ComicMetadataDTO getMetadata(Long id) {
         Comic c = comicMapper.selectById(id);
@@ -204,6 +213,7 @@ public class ComicServiceImpl implements ComicService {
         dto.setTitle(c.getTitle());
         dto.setAuthor(c.getAuthor());
         dto.setDescription(c.getDescription());
+        dto.setCategoryId(c.getCategoryId());
         return dto;
     }
 
@@ -215,12 +225,21 @@ public class ComicServiceImpl implements ComicService {
         c.setTitle(dto.getTitle());
         c.setAuthor(dto.getAuthor());
         c.setDescription(dto.getDescription());
+        if (dto.getCategoryId() != null) {
+            Category category = categoryMapper.selectById(dto.getCategoryId());
+            if (category == null) {
+                throw new BusinessException(400, "分类不存在");
+            }
+            c.setCategoryId(dto.getCategoryId());
+            c.setCategory(category.getName());
+        }
         comicMapper.updateById(c);
 
         ComicMetadataDTO result = new ComicMetadataDTO();
         result.setTitle(c.getTitle());
         result.setAuthor(c.getAuthor());
         result.setDescription(c.getDescription());
+        result.setCategoryId(c.getCategoryId());
         return result;
     }
 

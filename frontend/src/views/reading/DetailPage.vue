@@ -52,7 +52,7 @@
             </div>
             <div class="info-item">
               <span class="info-label">分类</span>
-              <span class="info-value">{{ comic.category || '-' }}</span>
+              <span class="info-value">{{ comic.categoryName || '-' }}</span>
             </div>
             <div class="info-item">
               <span class="info-label">大小</span>

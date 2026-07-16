@@ -65,6 +65,13 @@ export const tagApi = {
   delete: (id: number) => api.delete(`/tags/${id}`),
 }
 
+export const categoryApi = {
+  list: () => api.get('/categories'),
+  create: (name: string) => api.post('/categories', null, { params: { name } }),
+  update: (id: number, name: string) => api.put(`/categories/${id}`, null, { params: { name } }),
+  delete: (id: number) => api.delete(`/categories/${id}`),
+}
+
 export const lqApi = {
   generateComic: (comicId: number) => api.post(`/comics/${comicId}/lq`),
   generateChapter: (chapterId: number) => api.post(`/chapters/${chapterId}/lq`),

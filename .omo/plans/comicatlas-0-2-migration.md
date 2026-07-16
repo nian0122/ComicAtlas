@@ -340,7 +340,7 @@ Phase 0（架构冻结）→ Phase 1（Shell）→ Phase 2（阅读迁移）→ 
 
 ### Wave 5 — Phase 5: New Features
 
-- [ ] 29. 新增 Category 表与实体
+- [x] 29. 新增 Category 表与实体
   What to do / Must NOT do: 在 `api-service` 中新增 `category` 表、实体 `Category`、Mapper、Service。插入默认 5 条分类。不要建 `parent_id` 或树形结构。
   Parallelization: Wave 5 | Blocked by: 28 | Blocks: 30, 31
   References: `docs/architecture/05-domain.md`, `api-service/src/main/java/com/comicatlas/api/comic/entity/`
@@ -348,7 +348,7 @@ Phase 0（架构冻结）→ Phase 1（Shell）→ Phase 2（阅读迁移）→ 
   QA scenarios: happy: `cd api-service && ./mvnw compile -q` 成功；failure: 编译失败，失败。Evidence `.omo/evidence/task-29-comicatlas-0-2-migration.txt`
   Commit: Y | feat(api): 新增 Category 表与实体
 
-- [ ] 30. 新增 CategoryController 与 Category API
+- [x] 30. 新增 CategoryController 与 Category API
   What to do / Must NOT do: 新增 `CategoryController` 提供 CRUD 接口。Comic 详情/列表返回 `categoryName` 或 `categoryId`。
   Parallelization: Wave 5 | Blocked by: 29 | Blocks: 32
   References: `api-service/src/main/java/com/comicatlas/api/comic/controller/`, `docs/architecture/06-api.md`
@@ -356,7 +356,7 @@ Phase 0（架构冻结）→ Phase 1（Shell）→ Phase 2（阅读迁移）→ 
   QA scenarios: happy: `GET /api/categories` 返回 5 条默认分类；failure: 接口 500，失败。Evidence `.omo/evidence/task-30-comicatlas-0-2-migration.txt`
   Commit: Y | feat(api): 新增 CategoryController
 
-- [ ] 31. 迁移 comic.category 到 category_id
+- [x] 31. 迁移 comic.category 到 category_id
   What to do / Must NOT do: 修改 `Comic` 实体，新增 `categoryId`，废弃 `category` 字段。提供数据库迁移脚本。
   Parallelization: Wave 5 | Blocked by: 29 | Blocks: 32
   References: `api-service/src/main/java/com/comicatlas/api/comic/entity/Comic.java`, `docs/architecture/05-domain.md`
@@ -364,7 +364,7 @@ Phase 0（架构冻结）→ Phase 1（Shell）→ Phase 2（阅读迁移）→ 
   QA scenarios: happy: 旧 category 值映射到新分类；failure: 迁移后数据丢失，失败。Evidence `.omo/evidence/task-31-comicatlas-0-2-migration.txt`
   Commit: Y | refactor(api): 迁移 comic.category 到 category_id
 
-- [ ] 32. 创建 MetadataPage（Category / Tag 双 Tab）
+- [x] 32. 创建 MetadataPage（Category / Tag 双 Tab）
   What to do / Must NOT do: 在 `frontend/src/views/management/MetadataPage.vue` 创建元数据管理页，包含 Category 和 Tag 两个 Tab。Category 支持 CRUD，Tag 复用现有功能。
   Parallelization: Wave 5 | Blocked by: 30, 31 | Blocks: 34
   References: `docs/architecture/04-management.md`, `frontend/src/views/management/`
@@ -372,7 +372,7 @@ Phase 0（架构冻结）→ Phase 1（Shell）→ Phase 2（阅读迁移）→ 
   QA scenarios: happy: 可新增/重命名/删除 Category；failure: Tab 切换或 CRUD 报错，失败。Evidence `.omo/evidence/task-32-comicatlas-0-2-migration.txt`
   Commit: Y | feat(frontend): 新增 MetadataPage 管理 Category/Tag
 
-- [ ] 33. 更新 ComicEditPage 绑定 Category
+- [x] 33. 更新 ComicEditPage 绑定 Category
   What to do / Must NOT do: 在漫画编辑页增加 Category 单选器。保存时更新 `categoryId`。不要在此阶段增加新功能。
   Parallelization: Wave 5 | Blocked by: 31 | Blocks: 35
   References: `frontend/src/views/management/ComicEditPage.vue`, `docs/architecture/05-domain.md`
@@ -380,7 +380,7 @@ Phase 0（架构冻结）→ Phase 1（Shell）→ Phase 2（阅读迁移）→ 
   QA scenarios: happy: 保存后 Category 正确更新；failure: 保存失败，失败。Evidence `.omo/evidence/task-33-comicatlas-0-2-migration.txt`
   Commit: Y | feat(frontend): 漫画编辑页支持 Category 绑定
 
-- [ ] 34. 迁移 Tag 管理到 Metadata 模块
+- [x] 34. 迁移 Tag 管理到 Metadata 模块
   What to do / Must NOT do: 将现有 Tag 管理入口从旧位置迁移到 `/manage/metadata` 的 Tag Tab。保持现有 Tag CRUD 功能。
   Parallelization: Wave 5 | Blocked by: 32 | Blocks: 35
   References: `frontend/src/views/management/MetadataPage.vue`, `frontend/src/services/api.ts`, `docs/architecture/04-management.md`
@@ -388,7 +388,7 @@ Phase 0（架构冻结）→ Phase 1（Shell）→ Phase 2（阅读迁移）→ 
   QA scenarios: happy: Tag 增删改查正常；failure: Tag 功能丢失，失败。Evidence `.omo/evidence/task-34-comicatlas-0-2-migration.txt`
   Commit: Y | refactor(frontend): 将 Tag 管理迁移到 Metadata 模块
 
-- [ ] 35. 创建 StoragePage 基础框架
+- [x] 35. 创建 StoragePage 基础框架
   What to do / Must NOT do: 在 `frontend/src/views/management/StoragePage.vue` 创建存储管理页，包含统计、扫描、恢复、清理占位。本期只做框架和统计，具体功能后续迭代。
   Parallelization: Wave 5 | Blocked by: 28 | Blocks: Phase 5 完成
   References: `docs/architecture/04-management.md`, `frontend/src/views/management/`
@@ -396,7 +396,7 @@ Phase 0（架构冻结）→ Phase 1（Shell）→ Phase 2（阅读迁移）→ 
   QA scenarios: happy: 页面渲染正常，导航可进入；failure: 页面 404 或报错，失败。Evidence `.omo/evidence/task-35-comicatlas-0-2-migration.txt`
   Commit: Y | feat(frontend): 新增 StoragePage 基础框架
 
-- [ ] 36. 创建 SettingsPage 基础框架
+- [x] 36. 创建 SettingsPage 基础框架
   What to do / Must NOT do: 在 `frontend/src/views/management/SettingsPage.vue` 创建设置页，路由 `/manage/settings`。本期只做基础框架和占位，具体配置项后续迭代。
   Parallelization: Wave 5 | Blocked by: 28 | Blocks: Phase 5 完成
   References: `frontend/src/views/management/`, `docs/architecture/02-navigation.md`, `docs/architecture/04-management.md`
@@ -404,7 +404,7 @@ Phase 0（架构冻结）→ Phase 1（Shell）→ Phase 2（阅读迁移）→ 
   QA scenarios: happy: 设置页渲染正常；failure: 设置页 404，失败。Evidence `.omo/evidence/task-36-comicatlas-0-2-migration.txt`
   Commit: Y | feat(frontend): 新增 SettingsPage 基础框架
 
-- [ ] 37. 验证并确保 tag/comic_tag 表存在
+- [x] 37. 验证并确保 tag/comic_tag 表存在
   What to do / Must NOT do: 检查数据库中 `tag` 和 `comic_tag` 表是否存在；若不存在，按 `docs/architecture/05-domain.md` 创建。不要修改已有 tag 数据。
   Parallelization: Wave 5 | Blocked by: 28 | Blocks: 38
   References: `docs/architecture/05-domain.md`, `api-service/src/main/java/com/comicatlas/api/comic/entity/`
@@ -412,7 +412,7 @@ Phase 0（架构冻结）→ Phase 1（Shell）→ Phase 2（阅读迁移）→ 
   QA scenarios: happy: `./mvnw compile -q` 通过，SQL `SHOW TABLES LIKE 'tag'`/`'comic_tag'` 返回存在；failure: 表缺失或实体不一致，失败。Evidence `.omo/evidence/task-37-comicatlas-0-2-migration.txt`
   Commit: Y | chore(api): 确保 tag/comic_tag 表与实体存在
 
-- [ ] 38. ReadingHome 增强：继续阅读/最近阅读/最近加入
+- [x] 38. ReadingHome 增强：继续阅读/最近阅读/最近加入
   What to do / Must NOT do: 在 `views/reading/HomePage.vue` 增加继续阅读、最近阅读、最近加入区块，符合 `docs/architecture/03-reading.md`。不要添加推荐或社交功能。
   Parallelization: Wave 5 | Blocked by: 8, 28 | Blocks: Phase 5 完成
   References: `frontend/src/views/reading/HomePage.vue`, `docs/architecture/03-reading.md`
@@ -420,7 +420,7 @@ Phase 0（架构冻结）→ Phase 1（Shell）→ Phase 2（阅读迁移）→ 
   QA scenarios: happy: Playwright 断言首页存在"继续阅读"/"最近阅读"/"最近加入"区块；failure: 首页仍为旧 Netflix 首页，失败。Evidence `.omo/evidence/task-38-comicatlas-0-2-migration.txt`
   Commit: Y | feat(frontend): ReadingHome 增加阅读上下文区块
 
-- [ ] 39. 漫画编辑封面管理：从已有 page 选择封面
+- [x] 39. 漫画编辑封面管理：从已有 page 选择封面
   What to do / Must NOT do: 在漫画编辑页增加"封面"区块，支持从该漫画已有 page 中选择封面。不上传新图片、不裁切。
   Parallelization: Wave 5 | Blocked by: 16, 28 | Blocks: Phase 5 完成
   References: `frontend/src/views/management/ComicEditPage.vue`, `docs/architecture/04-management.md`

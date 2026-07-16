@@ -16,4 +16,6 @@ public class ComicMetadataUpdateDTO {
 
     @Size(max = 4000, message = "描述长度不能超过4000")
     private String description;
+
+    private Long categoryId;
 }

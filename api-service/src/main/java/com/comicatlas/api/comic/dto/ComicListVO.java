@@ -10,7 +10,8 @@ public class ComicListVO {
     private String author;
     private String coverUrl;
     private Integer pageCount;
-    private String category;
+    private Long categoryId;
+    private String categoryName;
     private String status;
     private String lqStatus;
     private Integer progressPercent;

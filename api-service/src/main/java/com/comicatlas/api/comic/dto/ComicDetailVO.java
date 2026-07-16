@@ -16,7 +16,8 @@ public class ComicDetailVO {
     private Long fileSize;
     private String sourceType;
     private String sourceRef;
-    private String category;
+    private Long categoryId;
+    private String categoryName;
     private String status;
     private String lqStatus;
     private Integer progressPercent;
