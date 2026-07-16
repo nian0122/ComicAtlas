@@ -124,6 +124,36 @@ POST /api/tasks/import/{id}/cancel
 POST /api/tasks/import/{id}/retry
 ```
 
+### ImportTask 状态机
+
+```text
+PENDING
+   │
+   ▼
+PARSING        ──► FAILED
+   │                ▲
+   ▼                │
+IMPORTING      ─────┘
+   │
+   ▼
+SUCCESS
+
+任意非终态 ──► CANCELLED（用户取消）
+任意非终态 ──► FAILED（异常/超时）
+FAILED ──► PENDING（retry 重置）
+```
+
+| 状态 | 含义 |
+|------|------|
+| `PENDING` | 任务已创建，等待 Worker 消费 |
+| `PARSING` | Worker 正在解析来源（DirectoryParser / MetadataAssembler） |
+| `IMPORTING` | 文件搬运到 HQ 存储中 |
+| `SUCCESS` | 导入完成，metadata.json 已写入，API 侧已落库 |
+| `FAILED` | 导入失败，可通过 retry 重置回 PENDING |
+| `CANCELLED` | 用户主动取消 |
+
+> 完整导入流水线设计见 [`docs/architecture/02-import-pipeline.md`](architecture/02-import-pipeline.md)。
+
 ---
 
 ## 5. LQ 生成（手动触发）
@@ -195,6 +225,8 @@ POST /api/admin/storage/scan-recover
   "errors": []
 }
 ```
+
+> 存储模型与布局设计见 [`docs/architecture/03-storage.md`](architecture/03-storage.md)。
 
 ---
 
