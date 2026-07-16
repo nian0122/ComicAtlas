@@ -159,47 +159,6 @@ export interface HistoryVO {
   updatedAt: string
 }
 
-export interface StatisticsVO {
-  comicCount: number
-  pageCount: number
-  tagCount: number
-  todayImported: number
-  storageUsed: number
-  importSuccessCount: number
-  importFailedCount: number
-  successRate: number
-}
-
-export interface OperationLogVO {
-  id: number
-  traceId: string
-  module: string
-  action: string
-  businessId: string
-  detail: string
-  createdAt: string
-}
-
-export interface ComicDeleteStats {
-  comic: number
-  catalog: number
-  chapter: number
-  page: number
-  tag: number
-  history: number
-}
-
-export interface ScanRecoverResultDTO {
-  scannedComics: number
-  existingComics: number
-  restoredComics: number
-  placeholderComics: number
-  restoredChapters: number
-  restoredPages: number
-  placeholders: string[]
-  errors: string[]
-}
-
 export interface ComicMetadataDTO {
   title: string
   author?: string

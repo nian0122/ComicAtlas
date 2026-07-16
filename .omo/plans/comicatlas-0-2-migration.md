@@ -290,7 +290,7 @@ Phase 0（架构冻结）→ Phase 1（Shell）→ Phase 2（阅读迁移）→ 
 
 ### Wave 4 — Phase 4: Legacy Cleanup
 
-- [ ] 23. 删除 DashboardPage 与 OperationLogPage
+- [x] 23. 删除 DashboardPage 与 OperationLogPage
   What to do / Must NOT do: 删除 `frontend/src/pages/DashboardPage.vue` 和 `frontend/src/pages/OperationLogPage.vue`。同时删除相关路由、组件、store。不要误删其他页面。
   Parallelization: Wave 4 | Blocked by: 14, 22 | Blocks: 24, 27
   References: `frontend/src/pages/DashboardPage.vue`, `frontend/src/pages/OperationLogPage.vue`, `frontend/src/router/index.ts`
@@ -298,7 +298,7 @@ Phase 0（架构冻结）→ Phase 1（Shell）→ Phase 2（阅读迁移）→ 
   QA scenarios: happy: 旧路由不再存在；failure: 旧路由仍能访问，失败。Evidence `.omo/evidence/task-23-comicatlas-0-2-migration.txt`
   Commit: Y | refactor(frontend): 删除 Dashboard 与 OperationLog 页面
 
-- [ ] 24. 删除旧 Router 与旧 pages/ 目录
+- [x] 24. 删除旧 Router 与旧 pages/ 目录
   What to do / Must NOT do: 当所有页面迁移完成后，删除 `frontend/src/pages/` 目录。删除旧路由定义（`/comics`、`/comics/:id`、`/comics/:id/edit` 等）。
   Parallelization: Wave 4 | Blocked by: 14, 22, 23 | Blocks: 25, 27
   References: `frontend/src/pages/`, `frontend/src/router/index.ts`, `docs/architecture/02-navigation.md`
@@ -306,7 +306,7 @@ Phase 0（架构冻结）→ Phase 1（Shell）→ Phase 2（阅读迁移）→ 
   QA scenarios: happy: 新路由正常，旧路由 404；failure: 仍有旧路由可访问，失败。Evidence `.omo/evidence/task-24-comicatlas-0-2-migration.txt`
   Commit: Y | refactor(frontend): 删除旧 pages 目录与旧路由
 
-- [ ] 25. 清理废弃组件
+- [x] 25. 清理废弃组件
   What to do / Must NOT do: 删除不再使用的管理/统计组件（如 `HeroBanner.vue`）以及旧 Layout 组件。保留 `common/` 中真正通用的组件。
   Parallelization: Wave 4 | Blocked by: 23 | Blocks: 26, 27
   References: `frontend/src/components/`, `frontend/src/components/layout/HeroBanner.vue`
@@ -314,7 +314,7 @@ Phase 0（架构冻结）→ Phase 1（Shell）→ Phase 2（阅读迁移）→ 
   QA scenarios: happy: `npm run type-check` 通过；failure: 引用已删除组件报错，失败。Evidence `.omo/evidence/task-25-comicatlas-0-2-migration.txt`
   Commit: Y | refactor(frontend): 清理废弃组件
 
-- [ ] 26. 清理 Legacy Store、API、DTO、CSS
+- [x] 26. 清理 Legacy Store、API、DTO、CSS
   What to do / Must NOT do: 删除旧的 dashboard store、operation store、未使用的 API 方法、废弃 DTO、未引用的 CSS。不要删除仍在使用的 API。
   Parallelization: Wave 4 | Blocked by: 23-25 | Blocks: 27
   References: `frontend/src/stores/`, `frontend/src/services/`, `frontend/src/assets/`
@@ -322,7 +322,7 @@ Phase 0（架构冻结）→ Phase 1（Shell）→ Phase 2（阅读迁移）→ 
   QA scenarios: happy: `npm run type-check` 通过，全局搜索 `legacy|_old` 无结果；failure: 存在遗留文件，失败。Evidence `.omo/evidence/task-26-comicatlas-0-2-migration.txt`
   Commit: Y | refactor(frontend): 清理 Legacy Store、API、DTO、CSS
 
-- [ ] 28. 运行全量 Playwright 验证 0.2 架构
+- [x] 28. 运行全量 Playwright 验证 0.2 架构
   What to do / Must NOT do: 运行完整 Playwright 测试套件，确认 0.2 架构成型。不要进入 Phase 5 直到通过。
   Parallelization: Wave 4 | Blocked by: 23-27 | Blocks: Wave 5
   References: `frontend/e2e/`, `frontend/playwright.config.ts`
@@ -330,7 +330,7 @@ Phase 0（架构冻结）→ Phase 1（Shell）→ Phase 2（阅读迁移）→ 
   QA scenarios: happy: 全部测试 pass；failure: 任一 fail，失败。Evidence `.omo/evidence/task-28-comicatlas-0-2-migration.txt`
   Commit: N | —
 
-- [ ] 27. 重组阅读侧 Store 与 API Service
+- [x] 27. 重组阅读侧 Store 与 API Service
   What to do / Must NOT do: 按 `docs/architecture/07-frontend.md` 创建 `frontend/src/stores/reading.ts`（合并现有阅读相关 store）和 `frontend/src/services/reading.ts`、`frontend/src/services/management.ts`。不修改 API 调用逻辑，只重组文件归属。
   Parallelization: Wave 4 | Blocked by: 25, 26 | Blocks: 28
   References: `frontend/src/stores/`, `frontend/src/services/api.ts`, `docs/architecture/07-frontend.md`

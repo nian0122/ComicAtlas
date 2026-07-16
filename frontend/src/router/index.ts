@@ -9,7 +9,7 @@ const router = createRouter({
     {
       path: '/poster-test',
       name: 'poster-test',
-      component: () => import('@/pages/PosterTestPage.vue'),
+      component: () => import('@/views/reading/PosterTestPage.vue'),
     },
     {
       path: '/',
@@ -93,15 +93,7 @@ const router = createRouter({
         },
       ],
     },
-    // 旧路由兼容重定向，Phase 4 清理
-    { path: '/home', redirect: '/' },
-    { path: '/comics', redirect: '/library' },
-    { path: '/comics/:id', redirect: (to) => `/comic/${to.params.id}` },
-    { path: '/comics/:id/edit', redirect: (to) => `/manage/comics/${to.params.id}/edit` },
-    { path: '/tasks', redirect: '/manage/import/tasks' },
-    { path: '/import', redirect: '/manage/import' },
-    { path: '/dashboard', redirect: '/manage' },
-    { path: '/operations', redirect: '/manage' },
+
   ],
 })
 

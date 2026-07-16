@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { tagApi } from '@/services/api'
+import { tagApi } from '@/services/management'
 
 export const useTagStore = defineStore('tag', () => {
   const tags = ref<any[]>([])

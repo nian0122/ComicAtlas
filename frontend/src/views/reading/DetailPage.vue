@@ -119,10 +119,10 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { PictureFilled, WarningFilled } from '@element-plus/icons-vue'
-import { comicApi, catalogApi } from '@/services/api'
+import { comicApi, catalogApi } from '@/services/reading'
 import type { ComicDetailVO, CatalogNode, ChapterRef } from '@/types'
 import CatalogTree from '@/components/reading/comic/CatalogTree.vue'
-import HeroBanner from '@/components/layout/HeroBanner.vue'
+import HeroBanner from '@/components/reading/HeroBanner.vue'
 
 const route = useRoute()
 const router = useRouter()

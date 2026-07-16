@@ -59,20 +59,10 @@ export const historyApi = {
     api.put(`/history/${comicId}`, data),
 }
 
-export const dashboardApi = { statistics: () => api.get('/dashboard/statistics') }
-
-export const operationApi = { list: (params: any) => api.get('/operations', { params }) }
-
 export const tagApi = {
   list: () => api.get('/tags'),
   create: (data: TagCreateDTO) => api.post('/tags', data),
   delete: (id: number) => api.delete(`/tags/${id}`),
-}
-
-export const adminApi = {
-  deleteComic: (id: number, mode: string = 'DATABASE_ONLY') =>
-    api.delete(`/admin/comics/${id}`, { params: { mode } }),
-  scanRecover: () => api.post('/admin/storage/scan-recover'),
 }
 
 export const lqApi = {
