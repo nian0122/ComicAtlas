@@ -11,13 +11,20 @@ export interface ComicListQuery {
   size?: number
 }
 
+export interface CategoryDTO {
+  id: number
+  name: string
+  sortOrder: number
+}
+
 export interface ComicListVO {
   id: number
   title: string
   author: string
   coverUrl: string
   pageCount: number
-  category: string
+  categoryId: number | null
+  categoryName: string | null
   status: string
   lqStatus: string
   progressPercent: number
@@ -37,7 +44,8 @@ export interface ComicDetailVO {
   fileSize: number
   sourceType: string
   sourceRef: string
-  category: string
+  categoryId: number | null
+  categoryName: string | null
   status: string
   lqStatus: string
   progressPercent: number
@@ -163,12 +171,14 @@ export interface ComicMetadataDTO {
   title: string
   author?: string
   description?: string
+  categoryId?: number | null
 }
 
 export interface ComicMetadataUpdateDTO {
   title: string
   author?: string
   description?: string
+  categoryId?: number | null
 }
 
 export interface TagDTO {

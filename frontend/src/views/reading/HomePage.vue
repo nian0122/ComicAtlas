@@ -10,6 +10,13 @@
     />
 
     <HomeRow
+      v-if="recentReadingItems.length"
+      title="最近阅读"
+      :items="recentReadingItems"
+      more-link="/history"
+    />
+
+    <HomeRow
       v-if="recentlyAddedItems.length"
       title="最近加入"
       :items="recentlyAddedItems"
@@ -48,6 +55,10 @@ function toHistoryRowItem(h: HistoryVO): HomeRowItem {
 }
 
 const continueReadingItems = computed<HomeRowItem[]>(() =>
+  historyStore.list.filter((h) => h.progressPercent > 0 && h.progressPercent < 100).slice(0, 8).map(toHistoryRowItem)
+)
+
+const recentReadingItems = computed<HomeRowItem[]>(() =>
   historyStore.list.slice(0, 8).map(toHistoryRowItem)
 )
 
