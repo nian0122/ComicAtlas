@@ -431,22 +431,22 @@ Phase 0（架构冻结）→ Phase 1（Shell）→ Phase 2（阅读迁移）→ 
 ## Final verification wave
 > 所有 todo 完成后并行运行；必须全部通过，才能向用户报告完成。
 
-- [ ] F1. Plan compliance audit
+- [x] F1. Plan compliance audit
   检查：每个 todo 是否完成、是否有遗留 Legacy 文件、路由是否与 `docs/architecture/02-navigation.md` 一致。
   工具：`grep -r "legacy\|_old\|pages/Dashboard\|pages/OperationLog" frontend/src` 应无结果。
   证据：`.omo/evidence/f1-comicatlas-0-2-migration.txt`
 
-- [ ] F2. Code quality review
+- [x] F2. Code quality review
   检查：前端类型检查通过、后端编译通过、无未使用 import。
   工具：`cd frontend && npm run type-check`；`cd api-service && ./mvnw compile -q`。
   证据：`.omo/evidence/f2-comicatlas-0-2-migration.txt`
 
-- [ ] F3. Real manual QA
+- [x] F3. Real manual QA
   检查：Playwright 全量测试通过。
   工具：`cd frontend && npx playwright test`。
   证据：`.omo/evidence/f3-comicatlas-0-2-migration.txt`
 
-- [ ] F4. Scope fidelity
+- [x] F4. Scope fidelity
   检查：0.2 范围边界是否被遵守（无 Dashboard、无 OperationLog、阅读与管理分离、Category 为一级）。
   工具：
     - `grep -rE "DashboardPage|OperationLogPage" frontend/src/views frontend/src/router frontend/src/components` 应无结果。
