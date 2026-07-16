@@ -67,7 +67,7 @@ ComicAtlas 由四个运行时模块和一组基础设施组成。
 | `ReaderService` | API | 按 `global_order` 取 prev / next 章节，组装阅读器 DTO | 不生成图片，不管理物理文件 |
 | `FileUrlResolver` | API | 将 `Page` 实体转换为 HTTP URL（`/files/{root}/{path}`） | 不管理物理文件 |
 
-> **关于 spec 中的概念映射**：设计文档中提到的 `HandlerFactory` 概念在当前实现中由 `ImportTaskHandler` 内部的 `switch (sourceType)` 直接承担，没有独立的 Factory 类。`StorageManager` 概念对应 `StorageService` 接口及其实现 `LocalStorageService`，加上 `DirectoryImportHandler` 中协调文件搬运和 metadata.json 写入的逻辑。
+> **关于设计概念的说明**：设计文档中提到的"按来源路由"概念在当前实现中由 `ImportTaskHandler` 内部的 `switch (sourceType)` 直接承担，没有独立的路由类。"文件生命周期管理"概念对应 `StorageService` 接口及其实现 `LocalStorageService`，加上 `DirectoryImportHandler` 中协调文件搬运和 metadata.json 写入的逻辑。
 
 ---
 
