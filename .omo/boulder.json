@@ -1,12 +1,14 @@
 {
   "schema_version": 2,
-  "active_work_id": "comicatlas-management-features",
+  "active_work_id": null,
   "works": {
     "netflix-frontend-refactor": {
       "work_id": "netflix-frontend-refactor",
       "active_plan": ".omo/plans/netflix-frontend-refactor.md",
       "plan_name": "netflix-frontend-refactor",
-      "session_ids": ["codex:netflix-frontend-refactor-main"],
+      "session_ids": [
+        "codex:netflix-frontend-refactor-main"
+      ],
       "status": "completed",
       "worktree_path": null
     },
@@ -14,7 +16,9 @@
       "work_id": "admin-db-only-delete",
       "active_plan": ".omo/plans/admin-db-only-delete.md",
       "plan_name": "admin-db-only-delete",
-      "session_ids": ["codex:admin-db-only-delete-main"],
+      "session_ids": [
+        "codex:admin-db-only-delete-main"
+      ],
       "status": "completed",
       "worktree_path": null
     },
@@ -25,6 +29,16 @@
       "session_ids": [],
       "status": "completed",
       "worktree_path": null
+    },
+    "comicatlas-docs-refresh-phase1": {
+      "session_ids": [
+        "codex:comicatlas-docs-refresh-phase1-main"
+      ],
+      "work_id": "comicatlas-docs-refresh-phase1",
+      "active_plan": ".omo/plans/comicatlas-docs-refresh-phase1.md",
+      "plan_name": "comicatlas-docs-refresh-phase1",
+      "worktree_path": null,
+      "status": "completed"
     }
   }
 }

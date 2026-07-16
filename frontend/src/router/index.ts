@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import AppLayout from '@/components/layout/AppLayout.vue'
-import ReaderLayout from '@/components/layout/ReaderLayout.vue'
+import ReadingLayout from '@/layouts/ReadingLayout.vue'
+import ReaderLayout from '@/layouts/ReaderLayout.vue'
+import ManagementLayout from '@/layouts/ManagementLayout.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -12,70 +13,95 @@ const router = createRouter({
     },
     {
       path: '/',
-      component: AppLayout,
+      component: ReadingLayout,
       children: [
-        { path: '/', redirect: '/home' },
         {
-          path: '/home',
+          path: '',
           name: 'home',
-          component: () => import('@/pages/HomePage.vue'),
+          component: () => import('@/views/reading/HomePage.vue'),
         },
         {
-          path: '/comics',
-          name: 'comic-list',
-          component: () => import('@/pages/ComicListPage.vue'),
+          path: 'library',
+          name: 'library',
+          component: () => import('@/views/reading/LibraryPage.vue'),
         },
         {
-          path: '/comics/:id',
-          name: 'comic-detail',
-          component: () => import('@/pages/ComicDetailPage.vue'),
-          props: true,
-        },
-        {
-          path: '/comics/:id/edit',
-          name: 'comic-edit',
-          component: () => import('@/pages/ComicEditPage.vue'),
-          props: true,
-        },
-        {
-          path: '/tasks',
-          name: 'tasks',
-          component: () => import('@/pages/TaskCenterPage.vue'),
-        },
-        {
-          path: '/import',
-          name: 'import',
-          component: () => import('@/pages/ImportPage.vue'),
-        },
-        {
-          path: '/history',
+          path: 'history',
           name: 'history',
-          component: () => import('@/pages/HistoryPage.vue'),
+          component: () => import('@/views/reading/HistoryPage.vue'),
         },
         {
-          path: '/dashboard',
-          name: 'dashboard',
-          component: () => import('@/pages/DashboardPage.vue'),
-        },
-        {
-          path: '/operations',
-          name: 'operations',
-          component: () => import('@/pages/OperationLogPage.vue'),
+          path: 'comic/:id',
+          name: 'comic-detail',
+          component: () => import('@/views/reading/DetailPage.vue'),
+          props: true,
         },
       ],
     },
     {
-      path: '/comics/:id/read',
-      name: 'reader',
+      path: '/reader/:chapterId',
       component: ReaderLayout,
       children: [
         {
           path: '',
-          component: () => import('@/pages/ReaderPage.vue'),
+          name: 'reader',
+          component: () => import('@/views/reading/ReaderPage.vue'),
           props: true,
         },
       ],
     },
+    {
+      path: '/manage',
+      component: ManagementLayout,
+      children: [
+        { path: '', redirect: '/manage/comics' },
+        {
+          path: 'comics',
+          name: 'manage-comics',
+          component: () => import('@/views/management/ComicListPage.vue'),
+        },
+        {
+          path: 'comics/:id/edit',
+          name: 'manage-comic-edit',
+          component: () => import('@/views/management/ComicEditPage.vue'),
+          props: true,
+        },
+        {
+          path: 'import',
+          name: 'manage-import',
+          component: () => import('@/views/management/ImportPage.vue'),
+        },
+        {
+          path: 'import/tasks',
+          name: 'manage-import-tasks',
+          component: () => import('@/views/management/TaskPage.vue'),
+        },
+        {
+          path: 'storage',
+          name: 'manage-storage',
+          component: () => import('@/views/management/StoragePage.vue'),
+        },
+        {
+          path: 'metadata',
+          name: 'manage-metadata',
+          component: () => import('@/views/management/MetadataPage.vue'),
+        },
+        {
+          path: 'settings',
+          name: 'manage-settings',
+          component: () => import('@/views/management/SettingsPage.vue'),
+        },
+      ],
+    },
+    // 旧路由兼容重定向，Phase 4 清理
+    { path: '/home', redirect: '/' },
+    { path: '/comics', redirect: '/library' },
+    { path: '/comics/:id', redirect: (to) => `/comic/${to.params.id}` },
+    { path: '/comics/:id/edit', redirect: (to) => `/manage/comics/${to.params.id}/edit` },
+    { path: '/tasks', redirect: '/manage/import/tasks' },
+    { path: '/import', redirect: '/manage/import' },
+    { path: '/dashboard', redirect: '/manage' },
+    { path: '/operations', redirect: '/manage' },
   ],
 })
 

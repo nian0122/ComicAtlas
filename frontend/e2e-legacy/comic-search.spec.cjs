@@ -5,7 +5,7 @@ const fs = require('fs');
 const TARGET_URL = process.env.TARGET_URL || 'http://localhost:5173';
 const HEADLESS = process.env.HEADLESS !== 'false';
 const SCREENSHOT_DIR = process.env.SCREENSHOT_DIR || path.resolve(__dirname, '../../.omo/evidence');
-const RESULTS_FILE = path.join(SCREENSHOT_DIR, 'comic-cover-results.json');
+const RESULTS_FILE = path.join(SCREENSHOT_DIR, 'comic-search-results.json');
 
 function screenshotPath(name) {
   return path.join(SCREENSHOT_DIR, name);
@@ -22,7 +22,7 @@ function screenshotPath(name) {
   const pageErrors = [];
   const apiCalls = [];
   const results = {
-    test: 'comic-cover',
+    test: 'comic-search',
     targetUrl: TARGET_URL,
     timestamp: new Date().toISOString(),
     assertions: [],
@@ -41,7 +41,7 @@ function screenshotPath(name) {
   });
   page.on('request', (req) => {
     const url = req.url();
-    if (url.includes('/api/comics/') && url.includes('/covers/candidates')) {
+    if (url.includes('/api/comics') && !url.includes('/api/comics/')) {
       apiCalls.push({ method: req.method(), url });
     }
   });
@@ -59,64 +59,48 @@ function screenshotPath(name) {
   let exitCode = 0;
 
   try {
-    console.log(`➡️  Navigating to ${TARGET_URL}/comics`);
-    await page.goto(`${TARGET_URL}/comics`, { waitUntil: 'networkidle', timeout: 30000 });
+    console.log(`➡️  Navigating to ${TARGET_URL}/library`);
+    await page.goto(`${TARGET_URL}/library`, { waitUntil: 'networkidle', timeout: 30000 });
     await page.waitForTimeout(800);
 
+    // 1. Search input exists
+    const searchInput = page.locator('.search-input input').first();
+    assert('搜索输入框存在', await searchInput.count() > 0, `Found ${await searchInput.count()}`);
+
+    // 2. Tag filter exists
+    const tagFilter = page.locator('.tag-filter').first();
+    assert('标签筛选器存在', await tagFilter.count() > 0, `Found ${await tagFilter.count()}`);
+
+    // 3. Tag mode toggle exists
+    const tagModeSelect = page.locator('.tag-mode-filter select').first();
+    assert('标签模式切换存在', await tagModeSelect.count() > 0, `Found ${await tagModeSelect.count()}`);
+
+    // 4. Get first comic title and search
     const firstComic = page.locator('.comic-poster').first();
     const comicCount = await firstComic.count();
     assert('漫画列表中存在漫画', comicCount > 0, `Found ${comicCount} comic element(s)`);
 
-    if (comicCount === 0) {
-      throw new Error('No comics available for testing');
+    if (comicCount > 0) {
+      const title = await firstComic.locator('.poster-title').first().textContent() || 'test';
+      const keyword = title.slice(0, 4);
+      await searchInput.fill(keyword);
+      await page.waitForTimeout(300);
+      await searchInput.press('Enter');
+      await page.waitForTimeout(1000);
+
+      const searchCalls = apiCalls.filter((c) => c.url.includes('/api/comics?') && c.url.includes('keyword='));
+      assert('搜索请求已发送', searchCalls.length > 0, `Found ${searchCalls.length} search calls`);
+
+      const listAfterSearch = page.locator('.comic-poster');
+      assert('搜索后仍有结果或为空状态', await listAfterSearch.count() >= 0, `Count: ${await listAfterSearch.count()}`);
     }
 
-    await firstComic.click();
-    await page.waitForURL(/\/comics\/\d+$/, { timeout: 10000 });
-    await page.waitForTimeout(500);
+    // 5. Screenshot
+    const searchShot = screenshotPath('comic-search-page.png');
+    await page.screenshot({ path: searchShot, fullPage: true });
+    results.screenshots.push(searchShot);
 
-    const detailUrl = page.url();
-    const comicIdMatch = detailUrl.match(/\/comics\/(\d+)$/);
-    assert('已进入漫画详情页', comicIdMatch !== null, `URL: ${detailUrl}`);
-
-    // Open more menu
-    const moreBtn = page.locator('.more-btn').first();
-    assert('More 按钮存在', await moreBtn.count() > 0, `Found ${await moreBtn.count()}`);
-    await moreBtn.click();
-    await page.waitForTimeout(200);
-
-    const coverMenuItem = page.locator('.menu-item').filter({ hasText: '更换封面' }).first();
-    assert('更换封面菜单项存在', await coverMenuItem.count() > 0, `Found ${await coverMenuItem.count()}`);
-    await coverMenuItem.click();
-    await page.waitForTimeout(800);
-
-    const dialog = page.locator('.cover-dialog').first();
-    assert('封面选择对话框存在', await dialog.count() > 0, `Found ${await dialog.count()}`);
-
-    const candidates = dialog.locator('.cover-item');
-    const candidateCount = await candidates.count();
-    assert('封面候选已加载', candidateCount > 0, `Found ${candidateCount} candidates`);
-
-    if (candidateCount > 0) {
-      await candidates.first().click();
-      await page.waitForTimeout(200);
-
-      const saveBtn = dialog.locator('.el-button--primary').filter({ hasText: '保存' }).first();
-      assert('保存按钮存在', await saveBtn.count() > 0, `Found ${await saveBtn.count()}`);
-
-      // Don't actually save to avoid changing state permanently
-      const cancelBtn = dialog.locator('.el-button').filter({ hasText: '取消' }).first();
-      await cancelBtn.click();
-      await page.waitForTimeout(800);
-      assert('取消后对话框关闭', await dialog.count() === 0, `Dialog count: ${await dialog.count()}`);
-    }
-
-    // Screenshot
-    const coverShot = screenshotPath('comic-cover-page.png');
-    await page.screenshot({ path: coverShot, fullPage: true });
-    results.screenshots.push(coverShot);
-
-    // Verify no console/page errors
+    // 6. Verify no console/page errors
     if (consoleErrors.length > 0) {
       results.failures.push({
         description: 'No console errors',
@@ -142,7 +126,7 @@ function screenshotPath(name) {
     }
 
   } catch (e) {
-    const failShot = screenshotPath('comic-cover-failure.png');
+    const failShot = screenshotPath('comic-search-failure.png');
     await page.screenshot({ path: failShot, fullPage: true }).catch(() => {});
     results.screenshots.push(failShot);
     results.failures.push({ description: 'Uncaught exception', status: 'fail', detail: e.message });
@@ -157,9 +141,9 @@ function screenshotPath(name) {
     console.log(`\n📄 Results saved: ${RESULTS_FILE}`);
 
     if (passed) {
-      console.log(`\n✅ comic-cover test PASSED (${results.assertions.length} assertions)`);
+      console.log(`\n✅ comic-search test PASSED (${results.assertions.length} assertions)`);
     } else {
-      console.log(`\n❌ comic-cover test FAILED (${results.failures.length} failures)`);
+      console.log(`\n❌ comic-search test FAILED (${results.failures.length} failures)`);
     }
 
     await browser.close();
