@@ -10,6 +10,53 @@
       </div>
     </header>
 
+    <div class="filter-toolbar">
+      <el-input
+        v-model="filters.keyword"
+        placeholder="搜索标题/作者/标签"
+        clearable
+        class="filter-input"
+        @keyup.enter="applyFilters"
+        @clear="applyFilters"
+      />
+      <el-select v-model="filters.category" placeholder="分类" clearable class="filter-select" @change="applyFilters">
+        <el-option
+          v-for="c in categoryStore.list"
+          :key="c.id"
+          :label="c.name"
+          :value="c.name"
+        />
+      </el-select>
+      <el-select v-model="filters.status" placeholder="状态" clearable class="filter-select" @change="applyFilters">
+        <el-option v-for="s in STATUS_OPTIONS" :key="s.value" :label="s.label" :value="s.value" />
+      </el-select>
+      <el-select
+        v-model="filters.tags"
+        multiple
+        collapse-tags
+        collapse-tags-tooltip
+        placeholder="标签"
+        clearable
+        class="filter-select--wide"
+        @change="applyFilters"
+      >
+        <el-option
+          v-for="t in tagStore.list"
+          :key="t.id"
+          :label="t.name"
+          :value="t.name"
+        />
+      </el-select>
+      <el-select v-if="filters.tags.length > 1" v-model="filters.tagMode" class="filter-select--mini" @change="applyFilters">
+        <el-option label="任一" value="OR" />
+        <el-option label="全部" value="AND" />
+      </el-select>
+      <el-select v-model="filters.sort" placeholder="排序" class="filter-select" @change="applyFilters">
+        <el-option v-for="s in SORT_OPTIONS" :key="s.value" :label="s.label" :value="s.value" />
+      </el-select>
+      <el-button text @click="resetFilters">重置</el-button>
+    </div>
+
     <div v-if="store.loading && store.list.length === 0" class="state loading">
       <div class="spinner" />
       <span>加载中...</span>
@@ -67,13 +114,18 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { PictureFilled, WarningFilled } from '@element-plus/icons-vue'
 import { useManagementComicStore } from '@/stores/management/comic'
+import { useCategoryStore } from '@/stores/management/category'
+import { useTagStore } from '@/stores/tag-store'
+import type { ComicListQuery } from '@/types'
 
 const router = useRouter()
 const store = useManagementComicStore()
+const categoryStore = useCategoryStore()
+const tagStore = useTagStore()
 
 const STATUS_LABELS: Record<string, string> = {
   READY: '已就绪',
@@ -81,6 +133,30 @@ const STATUS_LABELS: Record<string, string> = {
   PENDING: '等待中',
   FAILED: '失败',
 }
+
+const STATUS_OPTIONS = [
+  { label: '已就绪', value: 'READY' },
+  { label: '导入中', value: 'IMPORTING' },
+  { label: '等待中', value: 'PENDING' },
+  { label: '失败', value: 'FAILED' },
+]
+
+const SORT_OPTIONS = [
+  { label: '创建时间', value: 'createdAt' },
+  { label: '更新时间', value: 'updatedAt' },
+  { label: '标题', value: 'title' },
+  { label: '页数', value: 'pageCount' },
+  { label: '上次阅读', value: 'lastReadTime' },
+]
+
+const filters = reactive({
+  keyword: '',
+  category: '',
+  status: '',
+  tags: [] as string[],
+  tagMode: 'OR' as 'AND' | 'OR',
+  sort: 'createdAt',
+})
 
 function statusLabel(s: string) {
   return STATUS_LABELS[s] || s
@@ -90,12 +166,36 @@ function goEdit(id: number) {
   router.push(`/manage/comics/${id}/edit`)
 }
 
+function applyFilters() {
+  store.search({
+    keyword: filters.keyword || undefined,
+    category: filters.category || undefined,
+    status: filters.status || undefined,
+    tags: filters.tags.length > 0 ? filters.tags : undefined,
+    tagMode: filters.tagMode,
+    sort: filters.sort as ComicListQuery['sort'],
+  })
+}
+
+function resetFilters() {
+  filters.keyword = ''
+  filters.category = ''
+  filters.status = ''
+  filters.tags = []
+  filters.tagMode = 'OR'
+  filters.sort = 'createdAt'
+  store.resetQuery()
+  store.fetchList()
+}
+
 function onPageChange(page: number) {
   store.updateQuery({ page })
   store.fetchList()
 }
 
 onMounted(() => {
+  categoryStore.fetchList()
+  tagStore.fetchList()
   store.fetchList()
 })
 </script>
@@ -170,6 +270,30 @@ onMounted(() => {
 .ghost-btn:hover {
   background: var(--bg-surface);
   border-color: var(--text-muted);
+}
+
+.filter-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-lg);
+  flex-wrap: wrap;
+}
+
+.filter-input {
+  width: 200px;
+}
+
+.filter-select {
+  width: 120px;
+}
+
+.filter-select--wide {
+  width: 180px;
+}
+
+.filter-select--mini {
+  width: 90px;
 }
 
 .comic-grid {

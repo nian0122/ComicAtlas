@@ -77,4 +77,16 @@ export const lqApi = {
   generateChapter: (chapterId: number) => api.post(`/chapters/${chapterId}/lq`),
 }
 
+export const adminApi = {
+  deleteComic: (id: number, mode: string) => api.delete(`/admin/comics/${id}`, { params: { mode } }),
+  rebuild: () => api.post('/admin/rebuild'),
+  scanRecover: () => api.post('/admin/storage/scan-recover'),
+  stats: () => api.get('/admin/storage/stats'),
+}
+
+export const settingsApi = {
+  get: () => api.get('/settings'),
+  update: (data: any) => api.put('/settings', data),
+}
+
 export default api

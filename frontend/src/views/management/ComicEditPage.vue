@@ -49,6 +49,14 @@
             />
           </el-form-item>
 
+          <el-form-item label="来源" prop="source">
+            <div class="source-display">
+              <span v-if="sourceType" class="source-tag">{{ sourceType }}</span>
+              <span v-if="sourceRef" class="source-ref">{{ sourceRef }}</span>
+              <span v-if="!sourceType && !sourceRef" class="source-empty">—</span>
+            </div>
+          </el-form-item>
+
           <el-form-item label="分类" prop="categoryId">
             <el-select v-model="form.categoryId" placeholder="选择分类" clearable style="width: 240px">
               <el-option
@@ -112,6 +120,15 @@
           </div>
         </el-form>
       </div>
+
+      <div class="danger-zone">
+        <h3 class="danger-zone-title">⚠ 危险操作</h3>
+        <div class="danger-zone-actions">
+          <el-button type="danger" plain @click="onDeleteDatabase">删除数据库记录</el-button>
+          <el-button type="danger" @click="onDeleteAll">删除数据库 + 本地文件</el-button>
+          <el-button type="warning" plain @click="onRebuild">重建元数据</el-button>
+        </div>
+      </div>
     </div>
 
     <el-dialog
@@ -157,13 +174,14 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft } from '@element-plus/icons-vue'
-import { comicApi, tagApi } from '@/services/management'
+import { comicApi, tagApi, adminApi } from '@/services/management'
 import { useCategoryStore } from '@/stores/management/category'
 import type {
   ComicMetadataDTO,
   ComicMetadataUpdateDTO,
+  ComicDetailVO,
   TagDTO,
   TagCreateDTO,
   ComicTagUpdateDTO,
@@ -190,6 +208,9 @@ const selectedTagIds = ref<number[]>([])
 const allTags = ref<TagDTO[]>([])
 const tagInput = ref<number | undefined>(undefined)
 const newTagName = ref('')
+
+const sourceType = ref('')
+const sourceRef = ref('')
 
 const coverDialogVisible = ref(false)
 const coverLoading = ref(false)
@@ -239,6 +260,12 @@ async function loadData() {
     }
     selectedTagIds.value = (tagsRes.data as number[]) || []
     allTags.value = (allTagsRes.data as TagDTO[]) || []
+    try {
+      const detailRes = await comicApi.detail(comicId)
+      const detail = detailRes.data as ComicDetailVO
+      sourceType.value = detail.sourceType || ''
+      sourceRef.value = detail.sourceRef || ''
+    } catch { /* non-critical */ }
   } catch (err: unknown) {
     const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
     ElMessage.error(msg || '加载漫画信息失败')
@@ -340,6 +367,60 @@ async function handleSave() {
 
 function goBack() {
   router.push('/manage/comics')
+}
+
+async function onDeleteDatabase() {
+  try {
+    await ElMessageBox.confirm(
+      '确定仅删除数据库记录？所有章节、页面、标签关联将被移除，本地文件保留。',
+      '删除数据库记录',
+      { type: 'warning', confirmButtonText: '确定删除' }
+    )
+    await adminApi.deleteComic(comicId, 'DATABASE_ONLY')
+    ElMessage.success('数据库记录已删除')
+    router.push('/manage/comics')
+  } catch (err: unknown) {
+    if (err === 'cancel') return
+    const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+    ElMessage.error(msg || '删除失败')
+  }
+}
+
+async function onDeleteAll() {
+  try {
+    await ElMessageBox.confirm(
+      '确定删除数据库记录和所有本地文件？包括 HQ / LQ / 缩略图。此操作不可恢复！',
+      '删除数据库 + 本地文件',
+      { type: 'warning', confirmButtonText: '全部删除' }
+    )
+    await adminApi.deleteComic(comicId, 'DELETE_FILES')
+    ElMessage.success('数据库记录和本地文件已删除')
+    router.push('/manage/comics')
+  } catch (err: unknown) {
+    if (err === 'cancel') return
+    const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+    ElMessage.error(msg || '删除失败')
+  }
+}
+
+async function onRebuild() {
+  try {
+    await ElMessageBox.confirm(
+      '将从 HQ 目录和 metadata 文件重建所有漫画数据。当前数据不会丢失。',
+      '重建元数据',
+      { type: 'info', confirmButtonText: '开始重建' }
+    )
+    const res = await adminApi.rebuild()
+    const data = res.data as { comics: number; chapters: number; pages: number; errors?: string[] }
+    let msg = `重建完成：${data.comics} 部漫画、${data.chapters} 个章节、${data.pages} 页`
+    if (data.errors?.length) msg += `\n${data.errors.length} 个错误`
+    ElMessage.success(msg)
+    router.push('/manage/comics')
+  } catch (err: unknown) {
+    if (err === 'cancel') return
+    const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+    ElMessage.error(msg || '重建失败')
+  }
 }
 
 onMounted(loadData)
@@ -464,6 +545,59 @@ onMounted(loadData)
   justify-content: flex-end;
   gap: var(--space-base);
   margin-top: var(--space-xl);
+}
+
+.source-display {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  min-height: 32px;
+}
+
+.source-tag {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  background: var(--accent-bg);
+  border-radius: var(--radius-xs);
+  color: var(--text-primary);
+}
+
+.source-ref {
+  font-size: 12px;
+  color: var(--text-secondary);
+  word-break: break-all;
+}
+
+.source-empty {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.danger-zone {
+  max-width: 640px;
+  margin: var(--space-2xl) auto 0;
+  padding: var(--space-lg);
+  border: 1px solid var(--danger);
+  border-radius: var(--card-radius);
+  background: rgba(220, 50, 50, 0.06);
+}
+
+.danger-zone-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--danger);
+  margin: 0 0 var(--space-base);
+}
+
+.danger-zone-actions {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
 }
 
 @media (max-width: 768px) {

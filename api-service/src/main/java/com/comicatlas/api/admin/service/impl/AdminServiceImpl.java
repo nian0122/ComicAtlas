@@ -3,6 +3,7 @@ package com.comicatlas.api.admin.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.admin.dto.ComicDeleteStats;
 import com.comicatlas.api.admin.dto.ScanRecoverResultDTO;
+import com.comicatlas.api.admin.dto.StorageStatsDTO;
 import com.comicatlas.api.admin.service.AdminService;
 import com.comicatlas.api.comic.entity.*;
 import com.comicatlas.api.comic.mapper.*;
@@ -48,8 +49,8 @@ public class AdminServiceImpl implements AdminService {
     @Override
     @Transactional
     public ComicDeleteStats deleteComic(Long comicId, String mode) {
-        if (!"DATABASE_ONLY".equals(mode)) {
-            throw new BusinessException(400, "不支持的模式: " + mode + "，当前仅支持 DATABASE_ONLY");
+        if (!"DATABASE_ONLY".equals(mode) && !"DELETE_FILES".equals(mode)) {
+            throw new BusinessException(400, "不支持的模式: " + mode + "，当前支持 DATABASE_ONLY 和 DELETE_FILES");
         }
 
         Comic comic = comicMapper.selectById(comicId);
@@ -89,7 +90,61 @@ public class AdminServiceImpl implements AdminService {
         stats.setComic(comicMapper.deleteById(comicId));
 
         log.info("数据库删除完成: comicId={}, title={}, stats={}", comicId, comic.getTitle(), stats);
+
+        if ("DELETE_FILES".equals(mode)) {
+            deleteRecursively(Path.of(mangaRoot, "hq", String.valueOf(comicId)));
+            deleteRecursively(Path.of(mangaRoot, "thumbs", String.valueOf(comicId)));
+            deleteRecursively(Path.of(mangaRoot, "lq", String.valueOf(comicId)));
+            try { Files.deleteIfExists(Path.of(mangaRoot, "metadata", comicId + ".json")); } catch (Exception ignored) {}
+            log.info("本地文件删除完成: comicId={}", comicId);
+        }
+
         return stats;
+    }
+
+    private void deleteRecursively(Path dir) {
+        if (!Files.exists(dir)) return;
+        try (var stream = Files.walk(dir)) {
+            stream.sorted(java.util.Comparator.reverseOrder())
+                  .map(Path::toFile)
+                  .forEach(f -> { if (!f.delete()) f.deleteOnExit(); });
+        } catch (Exception e) {
+            log.warn("删除目录失败: {}", dir, e);
+        }
+    }
+
+    @Override
+    public StorageStatsDTO getStorageStats() {
+        StorageStatsDTO stats = new StorageStatsDTO();
+        Path hqRoot = Path.of(mangaRoot, "hq");
+        Path lqRoot = Path.of(mangaRoot, "lq");
+        Path thumbRoot = Path.of(mangaRoot, "thumbs");
+
+        stats.setHqBytes(dirSize(hqRoot));
+        stats.setLqBytes(dirSize(lqRoot));
+        stats.setThumbBytes(dirSize(thumbRoot));
+
+        try (var dirs = Files.newDirectoryStream(hqRoot, Files::isDirectory)) {
+            int count = 0;
+            for (Path ignored : dirs) count++;
+            stats.setComicCount(count);
+        } catch (Exception e) {
+            log.warn("统计漫画数量失败", e);
+        }
+
+        return stats;
+    }
+
+    private long dirSize(Path dir) {
+        if (!Files.exists(dir)) return 0;
+        try (var stream = Files.walk(dir)) {
+            return stream.filter(Files::isRegularFile)
+                         .mapToLong(p -> { try { return Files.size(p); } catch (Exception e) { return 0; } })
+                         .sum();
+        } catch (Exception e) {
+            log.warn("计算目录大小失败: {}", dir, e);
+            return 0;
+        }
     }
 
     @Override

@@ -45,10 +45,10 @@
         <div class="tag-list">
           <el-tag
             v-for="tag in tagStore.list"
-            :key="tag.id"
+            :key="tag?.id ?? Math.random()"
             closable
             class="tag-item"
-            @close="onDeleteTag(tag.id)"
+            @close="onDeleteTag(tag)"
           >
             {{ tag.name }}
           </el-tag>
@@ -71,7 +71,7 @@ import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useCategoryStore } from '@/stores/management/category'
 import { useTagStore } from '@/stores/tag-store'
-import type { CategoryDTO } from '@/types'
+import type { CategoryDTO, TagDTO } from '@/types'
 
 const activeTab = ref('category')
 const categoryStore = useCategoryStore()
@@ -102,7 +102,8 @@ async function onCreateCategory() {
   }
 }
 
-function startEditCategory(row: CategoryDTO) {
+function startEditCategory(row: CategoryDTO | null | undefined) {
+  if (!row) return
   editCategoryId.value = row.id
   editCategoryName.value = row.name
   categoryEditVisible.value = true
@@ -122,7 +123,8 @@ async function onUpdateCategory() {
   }
 }
 
-async function onDeleteCategory(id: number) {
+async function onDeleteCategory(id: number | null | undefined) {
+  if (id == null) return
   try {
     await ElMessageBox.confirm('确定删除该分类？', '删除分类', { type: 'warning' })
     await categoryStore.remove(id)
@@ -147,10 +149,11 @@ async function onCreateTag() {
   }
 }
 
-async function onDeleteTag(id: number) {
+async function onDeleteTag(tag: TagDTO | null | undefined) {
+  if (!tag || tag.id == null) return
   try {
     await ElMessageBox.confirm('确定删除该标签？', '删除标签', { type: 'warning' })
-    await tagStore.delete(id)
+    await tagStore.delete(tag.id)
     ElMessage.success('标签已删除')
   } catch (err: unknown) {
     if (err === 'cancel') return
