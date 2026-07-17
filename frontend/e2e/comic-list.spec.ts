@@ -37,7 +37,7 @@ test('desktop: renders library with posters, sticky toolbar, hover scale and pag
   await mockComicsRoute(page)
   await page.setViewportSize({ width: 1280, height: 720 })
   await page.goto('/library')
-  await page.waitForLoadState('networkidle')
+  await page.waitForLoadState('load')
 
   // 等待海报渲染
   const posters = page.locator('.comic-poster')
