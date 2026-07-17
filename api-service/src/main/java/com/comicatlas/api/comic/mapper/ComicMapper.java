@@ -50,7 +50,7 @@ public interface ComicMapper extends BaseMapper<Comic> {
                 AND c.status = #{query.status}
             </if>
             <if test='query.category != null and query.category != ""'>
-                AND c.category = #{query.category}
+                AND EXISTS (SELECT 1 FROM category cat WHERE cat.id = c.category_id AND cat.name = #{query.category})
             </if>
             <if test='query.sourceType != null and query.sourceType != ""'>
                 AND c.source_type = #{query.sourceType}

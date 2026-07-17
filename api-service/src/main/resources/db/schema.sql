@@ -23,21 +23,15 @@ CREATE TABLE IF NOT EXISTS comic (
     relative_path VARCHAR(512),
     status VARCHAR(16) DEFAULT 'IMPORTING',
     lq_status VARCHAR(16) DEFAULT NULL,
-    category VARCHAR(64),
+    category_id BIGINT,
     deleted_at DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE INDEX idx_source (source_type, source_gallery_id),
     INDEX idx_status (status),
+    INDEX idx_category_id (category_id),
     INDEX idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-SET @exist := (SELECT COUNT(*) FROM information_schema.columns
-               WHERE table_schema = 'comic_atlas' AND table_name = 'comic' AND column_name = 'description');
-SET @sql := IF(@exist = 0, 'ALTER TABLE comic ADD COLUMN description TEXT', 'SELECT 1');
-PREPARE stmt FROM @sql;
-EXECUTE stmt;
-DEALLOCATE PREPARE stmt;
 
 CREATE TABLE IF NOT EXISTS catalog (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -105,6 +99,14 @@ CREATE TABLE IF NOT EXISTS comic_tag (
     FOREIGN KEY (tag_id) REFERENCES tag(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS category (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(64) NOT NULL UNIQUE,
+    sort_order INT DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS import_task (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     comic_id BIGINT,
@@ -143,15 +145,4 @@ CREATE TABLE IF NOT EXISTS reading_history (
     FOREIGN KEY (chapter_id) REFERENCES chapter(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS operation_log (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    trace_id VARCHAR(64),
-    module VARCHAR(32),
-    action VARCHAR(64),
-    business_id VARCHAR(64),
-    detail TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_trace_id (trace_id),
-    INDEX idx_module_business (module, business_id),
-    INDEX idx_created_at (created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+

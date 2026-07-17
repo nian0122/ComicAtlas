@@ -21,7 +21,7 @@ export const useCategoryStore = defineStore('category', () => {
     state.error = null
     try {
       const res = await categoryApi.list()
-      state.list = (res.data as CategoryDTO[]) || []
+      state.list = ((res.data as CategoryDTO[]) || []).filter((c): c is CategoryDTO => c != null)
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
       state.error = msg || '加载分类失败'
@@ -33,14 +33,16 @@ export const useCategoryStore = defineStore('category', () => {
 
   async function create(name: string) {
     const res = await categoryApi.create(name)
-    state.list.push(res.data as CategoryDTO)
-    return res.data as CategoryDTO
+    const dto = res.data as CategoryDTO | null
+    if (dto) state.list.push(dto)
+    return dto
   }
 
   async function update(id: number, name: string) {
     const res = await categoryApi.update(id, name)
-    const updated = res.data as CategoryDTO
-    const idx = state.list.findIndex((c) => c.id === id)
+    const updated = res.data as CategoryDTO | null
+    if (!updated) return
+    const idx = state.list.findIndex((c) => c && c.id === id)
     if (idx >= 0) {
       state.list[idx] = updated
     }
@@ -49,7 +51,7 @@ export const useCategoryStore = defineStore('category', () => {
 
   async function remove(id: number) {
     await categoryApi.delete(id)
-    state.list = state.list.filter((c) => c.id !== id)
+    state.list = state.list.filter((c) => c && c.id !== id)
   }
 
   return {

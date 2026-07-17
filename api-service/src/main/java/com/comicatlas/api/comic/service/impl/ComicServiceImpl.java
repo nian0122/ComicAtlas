@@ -43,15 +43,16 @@ public class ComicServiceImpl implements ComicService {
     public IPage<ComicListVO> listComics(ComicListQuery query) {
         Page<Comic> page = new Page<>(query.getPage(), query.getSize());
         IPage<Comic> result = comicMapper.selectPage(page, query);
-        return result.convert(this::toListVO);
+        Map<Long, String> fallbackCoverMap = buildFallbackCoverMap(result.getRecords());
+        return result.convert(c -> toListVO(c, fallbackCoverMap.get(c.getId())));
     }
 
-    private ComicListVO toListVO(Comic c) {
+    private ComicListVO toListVO(Comic c, String fallbackCoverUrl) {
         ComicListVO vo = new ComicListVO();
         vo.setId(c.getId());
         vo.setTitle(c.getTitle());
         vo.setAuthor(c.getAuthor());
-        vo.setCoverUrl(fileUrlResolver.resolveCover(c.getId(), c.getCoverPath()));
+        vo.setCoverUrl(resolveCoverUrl(c, fallbackCoverUrl));
         vo.setPageCount(c.getTotalPages());
         vo.setCategoryId(c.getCategoryId());
         vo.setCategoryName(resolveCategoryName(c.getCategoryId()));
@@ -80,7 +81,8 @@ public class ComicServiceImpl implements ComicService {
         vo.setTitleJpn(c.getTitleJpn());
         vo.setAuthor(c.getAuthor());
         vo.setDescription(c.getDescription());
-        vo.setCoverUrl(fileUrlResolver.resolveCover(c.getId(), c.getCoverPath()));
+        String fallbackCoverUrl = resolveFirstPageCoverUrl(c.getId());
+        vo.setCoverUrl(resolveCoverUrl(c, fallbackCoverUrl));
         vo.setPageCount(c.getTotalPages());
         vo.setFileSize(c.getFileSize());
         vo.setSourceType(c.getSourceType());
@@ -202,6 +204,59 @@ public class ComicServiceImpl implements ComicService {
         if (categoryId == null) return null;
         Category category = categoryMapper.selectById(categoryId);
         return category != null ? category.getName() : null;
+    }
+
+    private String resolveCoverUrl(Comic c, String fallbackCoverUrl) {
+        if (c.getCoverPath() != null && !c.getCoverPath().isBlank()) {
+            return fileUrlResolver.resolveCover(c.getId(), c.getCoverPath());
+        }
+        if (fallbackCoverUrl != null && !fallbackCoverUrl.isBlank()) {
+            return fallbackCoverUrl;
+        }
+        return fileUrlResolver.resolveCover(c.getId());
+    }
+
+    private String resolveFirstPageCoverUrl(Long comicId) {
+        var chapters = chapterMapper.selectList(
+                new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId)
+                        .orderByAsc(Chapter::getGlobalOrder).last("LIMIT 1"));
+        if (chapters.isEmpty()) return null;
+        var pages = pageMapper.selectList(
+                new LambdaQueryWrapper<com.comicatlas.api.comic.entity.Page>()
+                        .eq(com.comicatlas.api.comic.entity.Page::getChapterId, chapters.get(0).getId())
+                        .orderByAsc(com.comicatlas.api.comic.entity.Page::getPageNumber).last("LIMIT 1"));
+        if (pages.isEmpty()) return null;
+        return fileUrlResolver.resolve(pages.get(0));
+    }
+
+    private Map<Long, String> buildFallbackCoverMap(List<Comic> comics) {
+        if (comics == null || comics.isEmpty()) return Map.of();
+        List<Long> comicIds = comics.stream().map(Comic::getId).filter(Objects::nonNull).distinct().toList();
+        var chapters = chapterMapper.selectList(
+                new LambdaQueryWrapper<Chapter>().in(Chapter::getComicId, comicIds)
+                        .orderByAsc(Chapter::getGlobalOrder));
+        Map<Long, Chapter> firstChapterMap = new HashMap<>();
+        for (Chapter ch : chapters) {
+            firstChapterMap.putIfAbsent(ch.getComicId(), ch);
+        }
+        if (firstChapterMap.isEmpty()) return Map.of();
+        List<Long> chapterIds = firstChapterMap.values().stream().map(Chapter::getId).toList();
+        var pages = pageMapper.selectList(
+                new LambdaQueryWrapper<com.comicatlas.api.comic.entity.Page>()
+                        .in(com.comicatlas.api.comic.entity.Page::getChapterId, chapterIds)
+                        .orderByAsc(com.comicatlas.api.comic.entity.Page::getPageNumber));
+        Map<Long, com.comicatlas.api.comic.entity.Page> firstPageMap = new HashMap<>();
+        for (com.comicatlas.api.comic.entity.Page p : pages) {
+            firstPageMap.putIfAbsent(p.getChapterId(), p);
+        }
+        Map<Long, String> coverMap = new HashMap<>();
+        for (Map.Entry<Long, Chapter> e : firstChapterMap.entrySet()) {
+            com.comicatlas.api.comic.entity.Page p = firstPageMap.get(e.getValue().getId());
+            if (p != null) {
+                coverMap.put(e.getKey(), fileUrlResolver.resolve(p));
+            }
+        }
+        return coverMap;
     }
 
     @Override

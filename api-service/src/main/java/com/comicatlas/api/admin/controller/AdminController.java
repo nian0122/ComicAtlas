@@ -2,6 +2,7 @@ package com.comicatlas.api.admin.controller;
 
 import com.comicatlas.api.admin.dto.ComicDeleteStats;
 import com.comicatlas.api.admin.dto.ScanRecoverResultDTO;
+import com.comicatlas.api.admin.dto.StorageStatsDTO;
 import com.comicatlas.api.common.Result;
 import com.comicatlas.api.admin.service.AdminService;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +16,11 @@ import java.util.Map;
 public class AdminController {
 
     private final AdminService adminService;
+
+    @GetMapping("/storage/stats")
+    public Result<StorageStatsDTO> storageStats() {
+        return Result.ok(adminService.getStorageStats());
+    }
 
     @PostMapping("/rebuild")
     public Result<Map<String, Object>> rebuildFromHq() {
