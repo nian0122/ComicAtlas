@@ -159,7 +159,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft } from '@element-plus/icons-vue'
-import { comicApi, tagApi, categoryApi } from '@/services/management'
+import { comicApi, tagApi } from '@/services/management'
 import { useCategoryStore } from '@/stores/management/category'
 import type {
   ComicMetadataDTO,

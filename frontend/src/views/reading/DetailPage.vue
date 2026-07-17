@@ -105,8 +105,7 @@
           </div>
         </div>
       </section>
-
-
+    </template>
 
     <div v-else class="state empty">
       <el-icon :size="48"><PictureFilled /></el-icon>
