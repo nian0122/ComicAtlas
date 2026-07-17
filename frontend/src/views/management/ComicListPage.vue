@@ -43,7 +43,6 @@
             <p class="comic-meta">
               <span>{{ comic.author || '未知作者' }}</span>
               <span>· {{ comic.pageCount }} 页</span>
-              <span>· {{ comic.sourceType || '-' }}</span>
               <span>· {{ statusLabel(comic.status) }}</span>
             </p>
           </div>

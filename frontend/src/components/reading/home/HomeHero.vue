@@ -42,7 +42,7 @@ const subtitle = computed(() => {
 
 const primaryAction = computed(() => {
   if (props.historyItem) {
-    const { comicId, chapterId, pageNumber } = props.historyItem
+    const { chapterId, pageNumber } = props.historyItem
       return {
         label: '继续阅读',
         onClick: () => router.push(`/reader/${chapterId}?page=${pageNumber}`),
