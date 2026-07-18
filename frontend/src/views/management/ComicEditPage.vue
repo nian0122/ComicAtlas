@@ -352,6 +352,7 @@ async function handleSave() {
         title: form.value.title.trim(),
         author: form.value.author?.trim() || '',
         description: form.value.description?.trim() || '',
+        categoryId: form.value.categoryId,
       }),
       comicApi.updateTags(comicId, { tagIds: selectedTagIds.value } as ComicTagUpdateDTO),
     ])
