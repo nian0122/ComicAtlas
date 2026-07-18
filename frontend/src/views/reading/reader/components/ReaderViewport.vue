@@ -224,7 +224,7 @@ function scrollToPage(page: number) {
 
 function forceUpdateScroller() {
   if (scrollerRef.value) {
-    scrollerRef.value.updateItems(true)
+    scrollerRef.value.updateVisibleItems(true)
   }
 }
 
