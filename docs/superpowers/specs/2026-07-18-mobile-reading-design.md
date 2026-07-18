@@ -254,7 +254,7 @@ ReaderPage.vue （唯一的组合者）
 **事件流**：
 
 ```
-Gesture → emit(TapCenter) → ReaderPage → dispatch(ShowToolbar) → Toolbar State → UI
+Gesture → emit(TapCenter) → ReaderPage → dispatch(TapCenter) → State Machine → TOOLBAR → UI render
 ```
 
 Gesture 不直接操作 Toolbar 状态，全部经由 ReaderPage 协调。
@@ -620,7 +620,7 @@ frontend/src/
 
 | 工具 | 位置 | 说明 |
 |------|------|------|
-| `useBreakpoint()` | `frontend/src/composables/useBreakpoint.ts` | 统一断点检测（768 / 1024 / 1440），返回 `Ref<number>` |
+| `useBreakpoint()` | `frontend/src/composables/useBreakpoint.ts` | 返回当前窗口宽度 `Ref<number>`，供组件与断点值（768 / 1024 / 1440）比较 |
 | `useMediaQuery()` | `frontend/src/composables/useMediaQuery.ts` | 响应式 MediaQuery 封装，返回 `Ref<boolean>` |
 | `isMobileReadingDevice()` | `frontend/src/utils/device.ts` | 纯函数，用于 Router Guard 等非 Vue 上下文 |
 
