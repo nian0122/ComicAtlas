@@ -9,9 +9,10 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': 'http://localhost:8010',
-      '^/comic/': 'http://localhost:5000',
-      '/files': 'http://localhost:8090',
+      // 后端统一走网关（docker 发布 8000），api 容器不对宿主机开放端口
+      '/api': 'http://localhost:8000',
+      // 图片静态资源由 nginx 容器提供（docker 发布 80）
+      '/files': 'http://localhost:80',
     },
   },
 })
