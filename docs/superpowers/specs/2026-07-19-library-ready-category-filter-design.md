@@ -30,8 +30,8 @@ const res = await comicApi.list({ ...state.query, status: 'READY' })
 ```
 
 - 硬编码在请求处而非 query 初始值,任何 `search()` patch 都无法覆盖
-- LibraryPage / HomePage 共用此 store,自动生效
-- 管理端使用独立的 `stores/management/comic.ts`,不受影响
+- LibraryPage / HomePage 共用此 store,自动生效(HomePage 经 `comicStore.search({ sort: 'createdAt' })` 触发,不传 status,无冲突)
+- 管理端使用独立的 `stores/management/comic.ts`(store id `'management-comic'`,阅读端为 `'comic'`),不受影响
 
 ### 2. LibraryPage 筛选调整 — `frontend/src/views/reading/LibraryPage.vue`
 
@@ -45,7 +45,7 @@ const res = await comicApi.list({ ...state.query, status: 'READY' })
 **新增**:分类筛选下拉,放在原状态筛选的位置(移动端筛选行第一个,桌面端 order 2):
 
 - 原生 `<select>`,与现有筛选控件样式一致:`全部分类` + 各分类选项
-- 数据来源:`categoryApi.list()`,加载模式与现有 `loadTags()` 一致(直调 API,失败时置空数组)
+- 数据来源:`categoryApi.list()`,**从 `@/services/management` import**(`services/reading.ts` 未导出 categoryApi;跟随 LibraryPage 现有 `tagApi` 同源先例),加载模式与现有 `loadTags()` 一致(直调 API,失败时置空数组)
 - 选中后 `onSearch` 传 `category: 分类名`(后端按 `cat.name` 精确匹配),空值传 `undefined`
 
 ### 3. 类型与接口
@@ -58,6 +58,7 @@ const res = await comicApi.list({ ...state.query, status: 'READY' })
 
 - 不加"未分类"选项(后端不支持按 `category_id IS NULL` 筛选,有需要时另行设计)
 - 不动 HomePage 的展示逻辑、管理端页面、后端接口
+- 不修 `poster-status.ts` 的 `toPosterStatus`:其 `SUCCESS` 分支是死代码(后端只写 `READY`),`READY` 目前靠 `default` 兜底返回 `'ready'`,行为正确;本次不顺带重构,实施时也不要误改此文件
 
 ## 权衡记录
 
