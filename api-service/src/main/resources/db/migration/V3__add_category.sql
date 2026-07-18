@@ -18,7 +18,10 @@ INSERT INTO category (name, sort_order) VALUES
 ON DUPLICATE KEY UPDATE sort_order = VALUES(sort_order);
 
 -- 新增 comic.category_id 列
-ALTER TABLE comic ADD COLUMN IF NOT EXISTS category_id BIGINT NULL;
+-- 注意: MySQL 8 不支持 ADD COLUMN IF NOT EXISTS（MariaDB 专有语法），
+-- 该语法会导致迁移在此行中断。迁移工具保证每个脚本只执行一次，直接 ADD 即可。
+ALTER TABLE comic ADD COLUMN category_id BIGINT NULL;
+ALTER TABLE comic ADD INDEX idx_category_id (category_id);
 
 -- 将旧 category 字符串映射到 category_id
 UPDATE comic c
