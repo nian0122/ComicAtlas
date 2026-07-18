@@ -34,18 +34,18 @@
       <button class="primary-btn" @click="router.push('/library')">开始阅读</button>
     </div>
 
-    <!-- 列表 -->
-    <template v-else>
-      <!-- 今天 -->
-      <section v-if="today.length > 0" class="history-section">
-        <h2 class="section-title">
-          今天
-          <span class="section-count">{{ today.length }}</span>
-        </h2>
-        <div class="history-row">
+    <!-- 列表（虚拟滚动：500+ 条记录仅渲染可视区行） -->
+    <RecycleScroller
+      v-else
+      class="history-scroller"
+      :items="store.list"
+      :item-size="72"
+      key-field="comicId"
+      :buffer="200"
+    >
+      <template #default="{ item }">
+        <div class="history-item">
           <ComicPoster
-            v-for="item in today"
-            :key="item.comicId"
             :id="item.comicId"
             :cover-url="item.coverUrl"
             :title="item.comicTitle || `漫画 #${item.comicId}`"
@@ -57,60 +57,15 @@
             @detail="goDetail(item.comicId)"
           />
         </div>
-      </section>
-
-      <!-- 昨天 -->
-      <section v-if="yesterday.length > 0" class="history-section">
-        <h2 class="section-title">
-          昨天
-          <span class="section-count">{{ yesterday.length }}</span>
-        </h2>
-        <div class="history-row">
-          <ComicPoster
-            v-for="item in yesterday"
-            :key="item.comicId"
-            :id="item.comicId"
-            :cover-url="item.coverUrl"
-            :title="item.comicTitle || `漫画 #${item.comicId}`"
-            :subtitle="subtitleFor(item)"
-            :progress="item.progressPercent"
-            size="md"
-            @click="continueRead(item)"
-            @continue="continueRead(item)"
-            @detail="goDetail(item.comicId)"
-          />
-        </div>
-      </section>
-
-      <!-- 更早 -->
-      <section v-if="earlier.length > 0" class="history-section">
-        <h2 class="section-title">
-          更早
-          <span class="section-count">{{ earlier.length }}</span>
-        </h2>
-        <div class="history-row">
-          <ComicPoster
-            v-for="item in earlier"
-            :key="item.comicId"
-            :id="item.comicId"
-            :cover-url="item.coverUrl"
-            :title="item.comicTitle || `漫画 #${item.comicId}`"
-            :subtitle="subtitleFor(item)"
-            :progress="item.progressPercent"
-            size="md"
-            @click="continueRead(item)"
-            @continue="continueRead(item)"
-            @detail="goDetail(item.comicId)"
-          />
-        </div>
-      </section>
-    </template>
+      </template>
+    </RecycleScroller>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { RecycleScroller } from 'vue-virtual-scroller'
 import { PictureFilled, WarningFilled } from '@element-plus/icons-vue'
 import { useHistoryStore } from '@/stores/history-store'
 import type { HistoryVO } from '@/types'
@@ -119,24 +74,6 @@ import ComicPoster from '@/components/reading/comic/ComicPoster.vue'
 const router = useRouter()
 const store = useHistoryStore()
 
-function bucketDate(ts: string): { today: boolean; yesterday: boolean } {
-  const d = new Date(ts)
-  const now = new Date()
-  const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000)
-  return {
-    today: diffDays === 0,
-    yesterday: diffDays === 1,
-  }
-}
-
-const today = computed(() => store.list.filter((i: HistoryVO) => bucketDate(i.updatedAt).today))
-const yesterday = computed(() => store.list.filter((i: HistoryVO) => bucketDate(i.updatedAt).yesterday))
-const earlier = computed(() =>
-  store.list.filter((i: HistoryVO) => {
-    const b = bucketDate(i.updatedAt)
-    return !b.today && !b.yesterday
-  })
-)
 const recentCount = computed(() => store.list.length)
 
 function subtitleFor(item: HistoryVO): string {
@@ -158,12 +95,15 @@ onMounted(() => {
 
 <style scoped>
 .history-page {
-  min-height: 100vh;
+  height: 100vh;
   max-width: var(--page-width);
   margin: 0 auto;
-  padding: var(--space-xl) var(--page-padding) var(--space-3xl);
+  padding: var(--space-xl) var(--page-padding) var(--space-lg);
   background: var(--bg-primary);
   color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .page-header {
@@ -199,37 +139,53 @@ onMounted(() => {
   gap: var(--space-sm);
 }
 
-/* Section */
-.history-section {
-  margin-bottom: var(--space-2xl);
+/* 虚拟列表容器：必须有确定高度，RecycleScroller 才能计算可视区 */
+.history-scroller {
+  flex: 1;
+  min-height: 0;
 }
 
-.section-title {
+/* 单行：72px 固定高，与 :item-size 一致 */
+.history-item {
+  --history-thumb-height: 60px;
+  --history-thumb-width: 40px; /* 2:3 封面比例 */
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0 0 var(--space-base);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  height: 72px;
+  box-sizing: border-box;
+  border-bottom: 1px solid var(--border);
 }
 
-.section-count {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-muted);
-  background: var(--bg-surface);
-  padding: 2px 8px;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--border);
+/* 将 ComicPoster 从竖版卡片适配为 72px 横向行，组件本身不改 */
+.history-item :deep(.comic-poster) {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-base);
+  width: 100%;
+  min-width: 0;
 }
 
-.history-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--poster-gap);
+.history-item :deep(.comic-poster.is-hoverable:hover) {
+  transform: none;
+}
+
+.history-item :deep(.poster-frame) {
+  width: var(--history-thumb-width);
+  height: var(--history-thumb-height);
+  aspect-ratio: auto;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+}
+
+.history-item :deep(.poster-info) {
+  margin-top: 0;
+  flex: 1;
+  min-width: 0;
+}
+
+/* 72px 行内空间不足以容纳悬浮按钮，点击整行即继续阅读 */
+.history-item :deep(.poster-overlay) {
+  display: none;
 }
 
 /* States */
@@ -320,15 +276,11 @@ onMounted(() => {
 
 @media (max-width: 640px) {
   .history-page {
-    padding: var(--space-lg) var(--space-base) var(--space-2xl);
+    padding: var(--space-lg) var(--space-base) var(--space-base);
   }
 
   .page-title {
     font-size: 22px;
-  }
-
-  .history-row {
-    gap: var(--space-sm);
   }
 }
 </style>
