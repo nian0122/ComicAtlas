@@ -30,16 +30,6 @@
 
         <!-- 移动端第二行：筛选 chips 横向滚动 -->
         <div class="toolbar-filters">
-          <div class="filter-select status-select">
-            <select v-model="statusFilter" @change="onSearch">
-              <option value="">全部状态</option>
-              <option value="READY">已就绪</option>
-              <option value="IMPORTING">导入中</option>
-              <option value="PENDING">等待中</option>
-              <option value="FAILED">失败</option>
-            </select>
-          </div>
-
           <div class="filter-select tag-filter">
             <el-select
               v-model="selectedTags"
@@ -132,7 +122,6 @@ const router = useRouter()
 const store = useComicStore()
 
 const keyword = ref('')
-const statusFilter = ref('')
 const sort = ref<NonNullable<ComicListQuery['sort']>>('createdAt')
 const selectedTags = ref<string[]>([])
 const tagMode = ref<'AND' | 'OR'>('OR')
@@ -172,7 +161,6 @@ async function loadTags() {
 function onSearch() {
   store.search({
     keyword: keyword.value || undefined,
-    status: statusFilter.value || undefined,
     sort: sort.value,
     tags: selectedTags.value.length > 0 ? selectedTags.value : undefined,
     tagMode: selectedTags.value.length > 1 ? tagMode.value : undefined,
@@ -320,7 +308,7 @@ onMounted(() => {
 }
 
 /* 桌面端（>768px）：包装层不参与布局，控件直接平铺进 toolbar，
- * 并用 order 恢复原有控件顺序：搜索 → 状态 → 排序 → 标签 → 标签模式 */
+ * 并用 order 恢复原有控件顺序：搜索 → 分类 → 排序 → 标签 → 标签模式 */
 @media (min-width: 769px) {
   .toolbar-main,
   .toolbar-filters {
@@ -328,7 +316,6 @@ onMounted(() => {
   }
 
   .search-input { order: 1; }
-  .status-select { order: 2; }
   .sort-select { order: 3; }
   .tag-filter { order: 4; }
   .tag-mode-filter { order: 5; }
