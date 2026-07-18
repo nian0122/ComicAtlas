@@ -15,8 +15,7 @@ public interface ComicMapper extends BaseMapper<Comic> {
 
     @Select("""
         <script>
-        SELECT DISTINCT c.* FROM comic c
-        LEFT JOIN reading_history rh ON c.id = rh.comic_id
+        SELECT c.* FROM comic c
         <where>
             AND c.status NOT IN ('PLACEHOLDER', 'DELETED')
             <if test='query.keyword != null and query.keyword != ""'>
@@ -58,9 +57,9 @@ public interface ComicMapper extends BaseMapper<Comic> {
         </where>
         ORDER BY
         <choose>
-            <when test='query.sort == "lastReadTime"'>rh.updated_at DESC</when>
+            <when test='query.sort == "lastReadTime"'>(SELECT MAX(rh.updated_at) FROM reading_history rh WHERE rh.comic_id = c.id) DESC</when>
             <when test='query.sort == "title"'>c.title ASC</when>
-            <when test='query.sort == "pageCount"'>c.page_count DESC</when>
+            <when test='query.sort == "pageCount"'>c.total_pages DESC</when>
             <when test='query.sort == "updatedAt"'>c.updated_at DESC</when>
             <otherwise>c.created_at DESC</otherwise>
         </choose>
