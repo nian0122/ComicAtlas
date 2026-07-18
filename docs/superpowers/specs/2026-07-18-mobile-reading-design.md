@@ -312,6 +312,10 @@ Gesture 不直接操作 Toolbar 状态，全部经由 ReaderPage 协调。
 ├──────────────────────────────┤
 │  画质      ○ 自动  ○ 原图     │  ← 低频
 │            ○ 省流             │
+├──────────────────────────────┤
+│  ─── 高级 ───                │
+│  预加载    [══════●══] 开     │  ← enablePreload
+│  渐进加载  [══════●══] 开     │  ← enableProgressiveImage
 └──────────────────────────────┘
 ```
 
@@ -576,15 +580,20 @@ frontend/src/
 │               ├── ReaderToolbarMobile.vue   # 移动极简工具栏（← 标题 ⋯）
 │               ├── ReaderBottomNav.vue       # 移动端底部导航
 │               ├── ReaderSettingsDrawer.vue  # 底部抽屉设置面板
-│               └── ReaderViewport.vue        # 纯渲染（不变）
+│               ├── ReaderViewport.vue        # 纯渲染（从 components/reading/reader/ 迁移）
+│               ├── ReaderImageItem.vue       # 随 ReaderViewport 迁移
+│               └── ProgressiveImage.vue      # 随 ReaderViewport 迁移
 ```
 
 ### 现有组件调整
 
 | 组件 | 调整 |
 |------|------|
-| `ReaderPage.vue` | 注入 composables，按 mode 条件渲染子组件 |
-| `ReaderToolbar.vue` | 改为入口组件，内部 `<ReaderToolbarDesktop v-if="mode==='desktop'" />` |
+| `ReaderPage.vue` | 更新 import 路径，注入 composables，按 mode 条件渲染子组件 |
+| `ReaderToolbar.vue` | 改为入口组件（从 `components/reading/reader/` 迁移至 `views/reading/reader/components/`） |
+| `ReaderViewport.vue` | 随 ReaderToolbar 一同迁移至 `views/reading/reader/components/` |
+| `ReaderImageItem.vue` | 随 ReaderViewport 迁移（相对 import 依赖） |
+| `ProgressiveImage.vue` | 随 ReaderViewport 迁移（相对 import 依赖） |
 | `DetailPage.vue` | CSS：info-grid 单列，封面居中，按钮全宽 |
 | `HomePage.vue` | HomeRow 增加 scroll-snap 模式 |
 | `LibraryPage.vue` | 自适应网格，Category 横滚 |
