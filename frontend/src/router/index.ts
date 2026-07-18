@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import ReadingLayout from '@/layouts/ReadingLayout.vue'
 import ReaderLayout from '@/layouts/ReaderLayout.vue'
 import ManagementLayout from '@/layouts/ManagementLayout.vue'
+import { isMobileReadingDevice } from '@/utils/device'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -100,6 +101,29 @@ const router = createRouter({
     },
 
   ],
+})
+
+// 移动端管理后台拦截守卫：
+// 移动阅读设备访问 /manage/* 时重定向到拦截提示页，其余路由零开销直接放行。
+router.beforeEach((to) => {
+  // 1. 非 /manage 路由直接放行（前缀检查放最前，保证阅读端路由零额外开销）
+  if (!to.path.startsWith('/manage')) {
+    return true
+  }
+  // 2. 目标已是拦截页本身（也在 /manage/ 下），放行以避免无限重定向循环
+  if (to.name === 'manage-intercept') {
+    return true
+  }
+  // 3. DEV 旁路：开发环境下带 ?force-desktop=1 可强制进入管理后台，方便调试
+  if (import.meta.env.DEV && to.query['force-desktop'] === '1') {
+    return true
+  }
+  // 4. 移动阅读设备 → 重定向到拦截页
+  if (isMobileReadingDevice()) {
+    return { name: 'manage-intercept' }
+  }
+  // 5. 桌面设备正常放行
+  return true
 })
 
 export default router
