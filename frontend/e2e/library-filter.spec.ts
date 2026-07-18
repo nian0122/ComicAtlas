@@ -72,3 +72,13 @@ test('漫画库请求恒带 status=READY', async ({ page }) => {
   expect(captured.status.length).toBeGreaterThan(0)
   expect(captured.status.every((s) => s === 'READY')).toBe(true)
 })
+
+test('工具栏不含状态筛选下拉', async ({ page }) => {
+  const captured: CapturedParams = { status: [], category: [] }
+  await mockRoutes(page, captured)
+
+  await page.goto('/library')
+  await expect(page.locator('.comic-poster').first()).toBeVisible({ timeout: 10000 })
+
+  await expect(page.locator('.status-select')).toHaveCount(0)
+})
