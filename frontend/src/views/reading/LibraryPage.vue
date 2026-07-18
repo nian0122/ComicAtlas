@@ -30,6 +30,13 @@
 
         <!-- 移动端第二行：筛选 chips 横向滚动 -->
         <div class="toolbar-filters">
+          <div class="filter-select category-select">
+            <select v-model="categoryFilter" @change="onSearch">
+              <option value="">全部分类</option>
+              <option v-for="c in allCategories" :key="c.id" :value="c.name">{{ c.name }}</option>
+            </select>
+          </div>
+
           <div class="filter-select tag-filter">
             <el-select
               v-model="selectedTags"
@@ -112,11 +119,11 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Search, PictureFilled, WarningFilled, CircleClose } from '@element-plus/icons-vue'
 import { useComicStore } from '@/stores/comic-store'
-import { tagApi } from '@/services/management'
+import { tagApi, categoryApi } from '@/services/management'
 import { useBreakpoint, BREAKPOINTS } from '@/composables/useBreakpoint'
 import ComicPoster from '@/components/reading/comic/ComicPoster.vue'
 import { toPosterStatus } from '@/components/reading/comic/poster-status'
-import type { ComicListQuery, ComicListVO, TagDTO } from '@/types'
+import type { CategoryDTO, ComicListQuery, ComicListVO, TagDTO } from '@/types'
 
 const router = useRouter()
 const store = useComicStore()
@@ -126,6 +133,8 @@ const sort = ref<NonNullable<ComicListQuery['sort']>>('createdAt')
 const selectedTags = ref<string[]>([])
 const tagMode = ref<'AND' | 'OR'>('OR')
 const allTags = ref<TagDTO[]>([])
+const categoryFilter = ref('')
+const allCategories = ref<CategoryDTO[]>([])
 
 // 响应式视口宽度（resize 防抖更新，组件卸载时自动清理监听）
 const viewportWidth = useBreakpoint()
@@ -158,9 +167,19 @@ async function loadTags() {
   }
 }
 
+async function loadCategories() {
+  try {
+    const res = await categoryApi.list()
+    allCategories.value = (res.data as CategoryDTO[]) || []
+  } catch (err: unknown) {
+    allCategories.value = []
+  }
+}
+
 function onSearch() {
   store.search({
     keyword: keyword.value || undefined,
+    category: categoryFilter.value || undefined,
     sort: sort.value,
     tags: selectedTags.value.length > 0 ? selectedTags.value : undefined,
     tagMode: selectedTags.value.length > 1 ? tagMode.value : undefined,
@@ -189,6 +208,7 @@ function posterSubtitle(comic: ComicListVO): string {
 
 onMounted(() => {
   loadTags()
+  loadCategories()
   store.fetchList()
 })
 </script>
@@ -316,6 +336,7 @@ onMounted(() => {
   }
 
   .search-input { order: 1; }
+  .category-select { order: 2; }
   .sort-select { order: 3; }
   .tag-filter { order: 4; }
   .tag-mode-filter { order: 5; }
