@@ -68,6 +68,8 @@ services:
     volumes:
       - ${MANGA_ROOT:-./manga}/metadata:/storage/metadata:ro
       - ${MANGA_ROOT:-./manga}/hq:/storage/hq:ro
+      - ${MANGA_ROOT:-./manga}/lq:/storage/lq:ro
+      - ${MANGA_ROOT:-./manga}/thumbs:/storage/thumbs:ro
     depends_on:
       - mysql
       - redis
