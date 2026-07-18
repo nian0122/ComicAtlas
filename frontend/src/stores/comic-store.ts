@@ -39,7 +39,7 @@ export const useComicStore = defineStore('comic', () => {
     state.error = null
 
     try {
-      const res = await comicApi.list(state.query)
+      const res = await comicApi.list({ ...state.query, status: 'READY' })
       state.list = res.data.records || []
       state.total = res.data.total || 0
     } catch (err: unknown) {
