@@ -166,6 +166,14 @@ enum ReaderUiState {
   TOOLBAR,     // 工具栏 + 底部导航可见
   SETTINGS,    // 设置抽屉打开（暂停自动隐藏）
 }
+
+enum ReaderAction {
+  TapCenter,       // 点击页面中央
+  OpenSettings,    // 点击 ⋯ 按钮
+  CloseSettings,   // 关闭设置（× / 遮罩点击 / 下滑）
+  AutoHideTimeout, // 4s 无操作超时
+  AndroidBack,     // Android 返回键
+}
 ```
 
 ### 状态转换表
@@ -174,7 +182,7 @@ enum ReaderUiState {
 |---------------|--------|------------|
 | IMMERSIVE | TapCenter | TOOLBAR |
 | TOOLBAR | TapCenter | IMMERSIVE |
-| TOOLBAR | Timeout (4s) | IMMERSIVE |
+| TOOLBAR | AutoHideTimeout | IMMERSIVE |
 | TOOLBAR | OpenSettings | SETTINGS |
 | SETTINGS | CloseSettings | TOOLBAR |
 | TOOLBAR | AndroidBack | IMMERSIVE |
