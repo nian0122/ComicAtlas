@@ -3,61 +3,67 @@
     <header class="page-header">
       <h1 class="page-title">漫画库</h1>
       <div class="toolbar">
-        <div class="search-input">
-          <el-icon :size="18"><Search /></el-icon>
-          <input
-            v-model="keyword"
-            type="text"
-            placeholder="搜索漫画..."
-            @input="onKeywordInput"
-            @keyup.enter="onSearch"
-          >
-          <el-icon v-if="keyword" :size="16" class="clear-icon" @click="clearKeyword"><CircleClose /></el-icon>
+        <!-- 移动端第一行：搜索 + 排序合并为一行；桌面端 display:contents 平铺回单行布局 -->
+        <div class="toolbar-main">
+          <div class="search-input">
+            <el-icon :size="18"><Search /></el-icon>
+            <input
+              v-model="keyword"
+              type="text"
+              placeholder="搜索漫画..."
+              @input="onKeywordInput"
+              @keyup.enter="onSearch"
+            >
+            <el-icon v-if="keyword" :size="16" class="clear-icon" @click="clearKeyword"><CircleClose /></el-icon>
+          </div>
+
+          <div class="filter-select sort-select">
+            <select v-model="sort" @change="onSearch">
+              <option value="createdAt">最新添加</option>
+              <option value="updatedAt">最近更新</option>
+              <option value="title">标题</option>
+              <option value="pageCount">页数</option>
+              <option value="lastReadTime">最近阅读</option>
+            </select>
+          </div>
         </div>
 
-        <div class="filter-select">
-          <select v-model="statusFilter" @change="onSearch">
-            <option value="">全部状态</option>
-            <option value="READY">已就绪</option>
-            <option value="IMPORTING">导入中</option>
-            <option value="PENDING">等待中</option>
-            <option value="FAILED">失败</option>
-          </select>
-        </div>
+        <!-- 移动端第二行：筛选 chips 横向滚动 -->
+        <div class="toolbar-filters">
+          <div class="filter-select status-select">
+            <select v-model="statusFilter" @change="onSearch">
+              <option value="">全部状态</option>
+              <option value="READY">已就绪</option>
+              <option value="IMPORTING">导入中</option>
+              <option value="PENDING">等待中</option>
+              <option value="FAILED">失败</option>
+            </select>
+          </div>
 
-        <div class="filter-select">
-          <select v-model="sort" @change="onSearch">
-            <option value="createdAt">最新添加</option>
-            <option value="updatedAt">最近更新</option>
-            <option value="title">标题</option>
-            <option value="pageCount">页数</option>
-            <option value="lastReadTime">最近阅读</option>
-          </select>
-        </div>
+          <div class="filter-select tag-filter">
+            <el-select
+              v-model="selectedTags"
+              multiple
+              collapse-tags
+              placeholder="筛选标签"
+              class="tag-select"
+              @change="onSearch"
+            >
+              <el-option
+                v-for="tag in allTags"
+                :key="tag.id"
+                :label="tag.name"
+                :value="tag.name"
+              />
+            </el-select>
+          </div>
 
-        <div class="filter-select tag-filter">
-          <el-select
-            v-model="selectedTags"
-            multiple
-            collapse-tags
-            placeholder="筛选标签"
-            class="tag-select"
-            @change="onSearch"
-          >
-            <el-option
-              v-for="tag in allTags"
-              :key="tag.id"
-              :label="tag.name"
-              :value="tag.name"
-            />
-          </el-select>
-        </div>
-
-        <div class="filter-select tag-mode-filter">
-          <select v-model="tagMode" @change="onSearch">
-            <option value="OR">任一标签</option>
-            <option value="AND">全部标签</option>
-          </select>
+          <div class="filter-select tag-mode-filter">
+            <select v-model="tagMode" @change="onSearch">
+              <option value="OR">任一标签</option>
+              <option value="AND">全部标签</option>
+            </select>
+          </div>
         </div>
       </div>
     </header>
@@ -112,11 +118,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Search, PictureFilled, WarningFilled, CircleClose } from '@element-plus/icons-vue'
 import { useComicStore } from '@/stores/comic-store'
 import { tagApi } from '@/services/management'
+import { useBreakpoint, BREAKPOINTS } from '@/composables/useBreakpoint'
 import ComicPoster from '@/components/reading/comic/ComicPoster.vue'
 import { toPosterStatus } from '@/components/reading/comic/poster-status'
 import type { ComicListQuery, ComicListVO, TagDTO } from '@/types'
@@ -130,20 +137,18 @@ const sort = ref<NonNullable<ComicListQuery['sort']>>('createdAt')
 const selectedTags = ref<string[]>([])
 const tagMode = ref<'AND' | 'OR'>('OR')
 const allTags = ref<TagDTO[]>([])
-const posterSize = ref<'sm' | 'md' | 'lg'>('lg')
+
+// 响应式视口宽度（resize 防抖更新，组件卸载时自动清理监听）
+const viewportWidth = useBreakpoint()
+
+// 海报尺寸随断点响应式推导（替代原先读取一次视口宽度、手动挂 resize 监听的写法）
+const posterSize = computed<'sm' | 'md' | 'lg'>(() => {
+  if (viewportWidth.value <= BREAKPOINTS.mobile) return 'sm'
+  if (viewportWidth.value <= BREAKPOINTS.tablet) return 'md'
+  return 'lg'
+})
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
-
-function updatePosterSize() {
-  const width = window.innerWidth
-  if (width <= 640) {
-    posterSize.value = 'sm'
-  } else if (width <= 1024) {
-    posterSize.value = 'md'
-  } else {
-    posterSize.value = 'lg'
-  }
-}
 
 function onKeywordInput() {
   if (debounceTimer) clearTimeout(debounceTimer)
@@ -195,14 +200,8 @@ function posterSubtitle(comic: ComicListVO): string {
 }
 
 onMounted(() => {
-  updatePosterSize()
-  window.addEventListener('resize', updatePosterSize)
   loadTags()
   store.fetchList()
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('resize', updatePosterSize)
 })
 </script>
 
@@ -320,6 +319,21 @@ onBeforeUnmount(() => {
   min-width: 110px;
 }
 
+/* 桌面端（>768px）：包装层不参与布局，控件直接平铺进 toolbar，
+ * 并用 order 恢复原有控件顺序：搜索 → 状态 → 排序 → 标签 → 标签模式 */
+@media (min-width: 769px) {
+  .toolbar-main,
+  .toolbar-filters {
+    display: contents;
+  }
+
+  .search-input { order: 1; }
+  .status-select { order: 2; }
+  .sort-select { order: 3; }
+  .tag-filter { order: 4; }
+  .tag-mode-filter { order: 5; }
+}
+
 .comic-section {
   display: flex;
   flex-direction: column;
@@ -330,17 +344,11 @@ onBeforeUnmount(() => {
 .comic-grid {
   display: grid;
   gap: var(--poster-gap);
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(var(--poster-width-md), 1fr));
 }
 
 .comic-grid :deep(.comic-poster) {
   width: 100%;
-}
-
-@media (min-width: 641px) {
-  .comic-grid {
-    grid-template-columns: repeat(auto-fill, minmax(var(--poster-width-md), 1fr));
-  }
 }
 
 @media (min-width: 1025px) {
@@ -401,5 +409,59 @@ onBeforeUnmount(() => {
 
 .primary-btn:hover {
   background: var(--accent-hover);
+}
+
+/* ===== 移动端（≤768px）===== */
+@media (max-width: 768px) {
+  /* 抵消 ReadingLayout 的 32px 页面留白，移动端收窄为 8px，
+   * 保证 375px 宽度下网格容纳 3 列（110px × 3 + 8px 间距 × 2 = 346px ≤ 359px） */
+  .comic-list-page {
+    margin: 0 calc(var(--space-sm) - var(--page-padding));
+  }
+
+  .toolbar {
+    gap: var(--space-sm);
+  }
+
+  /* 搜索 + 排序合并为一行，空间不足时自动换行 */
+  .toolbar-main {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    width: 100%;
+  }
+
+  .search-input {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* 筛选 chips 行：横向滚动，不换行，隐藏滚动条 */
+  .toolbar-filters {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: var(--space-sm);
+    width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .toolbar-filters::-webkit-scrollbar {
+    display: none;
+  }
+
+  .toolbar-filters .filter-select {
+    flex: 0 0 auto;
+  }
+
+  /* 最小宽度驱动的自适应网格（设计稿 §5）：375px 宽度下呈现 3 列 */
+  .comic-grid {
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: var(--space-sm);
+  }
 }
 </style>
