@@ -82,3 +82,19 @@ test('工具栏不含状态筛选下拉', async ({ page }) => {
 
   await expect(page.locator('.status-select')).toHaveCount(0)
 })
+
+test('分类筛选:选中传 category,切回全部不传', async ({ page }) => {
+  const captured: CapturedParams = { status: [], category: [] }
+  await mockRoutes(page, captured)
+
+  await page.goto('/library')
+  const select = page.locator('.category-select select')
+  await expect(select).toBeVisible({ timeout: 10000 })
+  await expect(select.locator('option')).toHaveCount(3) // 全部分类 + 少年 + 青年
+
+  await select.selectOption({ label: '少年' })
+  await expect.poll(() => captured.category[captured.category.length - 1]).toBe('少年')
+
+  await select.selectOption({ label: '全部分类' })
+  await expect.poll(() => captured.category[captured.category.length - 1]).toBe(null)
+})
