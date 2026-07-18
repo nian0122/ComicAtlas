@@ -127,8 +127,9 @@ interface InteractionContext {
 }
 
 function useInteractionMode(): InteractionContext {
-  const width = useBreakpoint()         // 统一断点，不硬编码
+  const width = useBreakpoint()             // 统一断点，不硬编码
   const coarsePointer = useMediaQuery('(pointer: coarse)')
+  const supportsHover = useMediaQuery('(hover: hover)')
 
   const mode = computed(() =>
     width.value <= 768 && coarsePointer.value ? 'mobile' : 'desktop'
@@ -227,9 +228,10 @@ enum ReaderUiState {
 ReaderPage.vue （唯一的组合者）
     │
     ├── useInteractionMode()     → { mode, coarsePointer, supportsHover }
-    ├── useReaderGesture()       → { onTap, onSwipe, onPinch }
-    │       ↑ 监听 viewport 的 pointer/touch 事件
+    ├── useReaderGesture(viewportRef)  → { onTap, onSwipe, onPinch }
+    │       ↑ 接收 viewport 的 template ref，绑定 pointer/touch 事件
     │       ↑ emit 标准化事件：TapCenter / SwipeLeft / PinchZoom
+    │       ↑ 仅负责事件标准化，不操作任何状态
     │
     ├── useAutoHide(timeout=4000) → { visible, show, hide, pause, resume }
     │       ↑ 纯计时器逻辑，不感知 gesture 或 toolbar
@@ -238,6 +240,8 @@ ReaderPage.vue （唯一的组合者）
             ↑ 内部使用 useAutoHide
             ↑ 暴露 dispatch 而非直接 setState
 ```
+
+**依赖说明**：`useReaderGesture` 需要接收 `viewportRef: Ref<HTMLElement | null>`，在 `onMounted` 后绑定事件。除此之外，所有 composable 保持平级——gesture 不调用 toolbar，toolbar 不调用 gesture，全部由 ReaderPage 协调。
 
 **事件流**：
 
@@ -312,6 +316,8 @@ Gesture 不直接操作 Toolbar 状态，全部经由 ReaderPage 协调。
 ```
 
 **设置排序原则**：按使用频率排列——阅读方向 > 适配模式 > 缩放 > 画质。
+
+**阅读方向说明**：Store 中 `ReadingDirection` 类型为 `'ltr' | 'rtl' | 'vertical' | 'horizontal'`，但移动端只暴露 `vertical` 和 `horizontal` 两个选项。`ltr`/`rtl` 仅桌面端可用，移动端无需暴露。
 
 **抽屉交互**：
 - 从底部滑入，高度约 60% 视口
@@ -593,6 +599,14 @@ frontend/src/
 - Management 所有页面
 - 后端任何代码
 
+### 新增共享工具
+
+| 工具 | 位置 | 说明 |
+|------|------|------|
+| `useBreakpoint()` | `frontend/src/composables/useBreakpoint.ts` | 统一断点检测（768 / 1024 / 1440），返回 `Ref<number>` |
+| `useMediaQuery()` | `frontend/src/composables/useMediaQuery.ts` | 响应式 MediaQuery 封装，返回 `Ref<boolean>` |
+| `isMobileReadingDevice()` | `frontend/src/utils/device.ts` | 纯函数，用于 Router Guard 等非 Vue 上下文 |
+
 ---
 
 ## 10. 范围边界
@@ -602,11 +616,12 @@ frontend/src/
 - ✅ Reader 状态机 + 移动端沉浸式交互
 - ✅ ReaderToolbarMobile + ReaderBottomNav + SettingsDrawer
 - ✅ ReaderGesture（tap/swipe）composable
-- ✅ HomePage / LibraryPage / DetailPage / HistoryPage 移动端响应式布局
+- ✅ HomePage / LibraryPage / DetailPage 移动端响应式布局
+- ✅ CatalogTree 虚拟列表（vue-virtual-scroller）
+- ✅ HistoryPage 虚拟列表（vue-virtual-scroller）
 - ✅ `/manage/*` 路由守卫 + 拦截页
 - ✅ Device Policy 文档
 - ✅ Virtualization Policy 文档
-- ✅ CatalogTree 虚拟列表（vue-virtual-scroller）
 
 ### 0.3 不包含
 
