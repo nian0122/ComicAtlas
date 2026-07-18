@@ -370,6 +370,8 @@ watch(() => settings.readingDirection, () => {
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  /* 移动端：消除 300ms 点击延迟并禁用双击缩放，滚动/平移不受影响 */
+  touch-action: manipulation;
 }
 
 .scroller {
