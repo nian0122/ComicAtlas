@@ -1,5 +1,5 @@
 <template>
-  <div class="home-page fade-in">
+  <div class="home-page fade-in" :class="{ 'is-mobile': mode === 'mobile' }">
     <HomeHero :history-item="heroHistory" />
 
     <HomeRow
@@ -34,11 +34,15 @@ import HomeRow from '@/components/reading/home/HomeRow.vue'
 import HomeActionGrid from '@/components/reading/home/HomeActionGrid.vue'
 import { useHistoryStore } from '@/stores/history-store'
 import { useComicStore } from '@/stores/comic-store'
+import { useInteractionMode } from '@/views/reading/reader/composables/useInteractionMode'
 import type { HomeRowItem } from '@/components/reading/home/HomeRow.vue'
 import type { HistoryVO, ComicListVO } from '@/types'
 
 const historyStore = useHistoryStore()
 const comicStore = useComicStore()
+
+// 交互模式检测：mobile 时给根容器加 is-mobile 类，驱动下方移动端布局
+const { mode } = useInteractionMode()
 
 const heroHistory = computed<HistoryVO | undefined>(() => historyStore.list[0])
 
@@ -94,4 +98,50 @@ onMounted(() => {
   color: var(--text-primary);
 }
 
+/* ==========================================================================
+   移动端布局（由 useInteractionMode 驱动；桌面端无 is-mobile 类，完全不受影响）
+   遵循设计规范 §5：Layout 负责响应式，业务组件保持设备无关，故统一从父级 :deep() 覆盖
+   ========================================================================== */
+
+/* HomeHero：保持全宽，页面留白从 --page-padding(32px) 收紧到 --space-base(16px) */
+.home-page.is-mobile :deep(.hero-content) {
+  padding: calc(var(--nav-height) + var(--space-lg)) var(--space-base) var(--space-lg);
+}
+
+/* HomeRow：横向滚动 + scroll-snap，逐张封面吸附 */
+.home-page.is-mobile :deep(.row-track) {
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+}
+
+.home-page.is-mobile :deep(.row-header) {
+  padding: 0 var(--space-base);
+}
+
+.home-page.is-mobile :deep(.row-items) {
+  padding-left: var(--space-base);
+  padding-right: var(--space-base);
+}
+
+/* 每张封面：吸附起点对齐；flex-basis 70vw 覆盖固定宽度，max-width 收口到 160px */
+.home-page.is-mobile :deep(.row-items .comic-poster) {
+  scroll-snap-align: start;
+  flex: 0 0 70vw;
+  max-width: 160px;
+}
+
+/* HomeActionGrid：3 列改 2 列网格，收紧留白，触控目标 ≥ 44px */
+.home-page.is-mobile :deep(.home-actions) {
+  padding: 0 var(--space-base);
+}
+
+.home-page.is-mobile :deep(.actions-inner) {
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-base);
+}
+
+.home-page.is-mobile :deep(.action-card) {
+  min-height: 44px;
+  padding: var(--space-base);
+}
 </style>
