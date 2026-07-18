@@ -1,5 +1,5 @@
 <template>
-  <div class="comic-detail-page fade-in">
+  <div class="comic-detail-page fade-in" :class="{ 'is-mobile': mode === 'mobile' }">
     <div v-if="loading" class="state loading">
       <div class="spinner" />
       <span>加载中...</span>
@@ -122,9 +122,13 @@ import { comicApi, catalogApi } from '@/services/reading'
 import type { ComicDetailVO, CatalogNode, ChapterRef } from '@/types'
 import CatalogTree from '@/components/reading/comic/CatalogTree.vue'
 import HeroBanner from '@/components/reading/HeroBanner.vue'
+import { useInteractionMode } from '@/views/reading/reader/composables/useInteractionMode'
 
 const route = useRoute()
 const router = useRouter()
+
+// 交互模式检测：mobile 时给根容器加 is-mobile 类，驱动下方移动端布局
+const { mode } = useInteractionMode()
 
 const comic = ref<ComicDetailVO | null>(null)
 const catalogTree = ref<CatalogNode[]>([])
@@ -179,14 +183,26 @@ const progressWidth = computed(
 )
 
 const primaryAction = computed(() => {
-  if (!comic.value?.lastReadChapterId) return undefined
-  return {
-    label: '▶ 继续阅读',
-    onClick: continueRead,
+  // 有阅读历史 → 继续阅读（桌面端与移动端一致）
+  if (comic.value?.lastReadChapterId) {
+    return {
+      label: '▶ 继续阅读',
+      onClick: continueRead,
+    }
   }
+  // 移动端同时只显示一个主按钮：无历史时把"开始阅读"提升为主按钮
+  if (mode.value === 'mobile' && firstChapter.value) {
+    return {
+      label: '开始阅读',
+      onClick: startRead,
+    }
+  }
+  return undefined
 })
 
 const secondaryAction = computed(() => {
+  // 移动端只保留一个主操作按钮，不渲染次按钮
+  if (mode.value === 'mobile') return undefined
   if (!firstChapter.value || !comic.value) return undefined
   return {
     label: '开始阅读',
@@ -491,5 +507,62 @@ onMounted(loadData)
   .info-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* ==============================
+   移动端布局（由 useInteractionMode 驱动；桌面端无 is-mobile 类，完全不受影响）
+   ============================== */
+
+/* Hero：PC 左右两栏 → 移动端纵向堆叠（stretch 让 hero-info 撑满，主按钮才能真正全宽） */
+.comic-detail-page.is-mobile :deep(.hero-content) {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-lg);
+}
+
+/* 封面居中，宽度不超过 50% 且最大 220px */
+.comic-detail-page.is-mobile :deep(.hero-poster) {
+  width: min(50%, 220px);
+  margin: 0 auto;
+}
+
+/* 标题与进度信息居中展示 */
+.comic-detail-page.is-mobile :deep(.hero-info) {
+  max-width: 100%;
+  align-items: center;
+  text-align: center;
+}
+
+/* 长标题最多两行，超出省略 */
+.comic-detail-page.is-mobile :deep(.hero-title) {
+  font-size: 24px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* 单一主操作按钮：全宽、触控高度 ≥ 48px（次按钮已在 secondaryAction 中按 mode 置空） */
+.comic-detail-page.is-mobile :deep(.hero-actions) {
+  width: 100%;
+}
+
+.comic-detail-page.is-mobile :deep(.hero-btn--primary) {
+  width: 100%;
+  min-height: 48px;
+  font-size: 16px;
+}
+
+/* 信息网格单列：与上方 768px 媒体查询结果一致（is-mobile 必然 ≤768px），两机制不冲突 */
+.comic-detail-page.is-mobile .info-grid {
+  grid-template-columns: 1fr;
+}
+
+/* 目录区块占满全宽（CatalogTree 内部已自带虚拟滚动与高度约束） */
+.comic-detail-page.is-mobile .catalog-section .section-inner {
+  width: 100%;
+  max-width: none;
 }
 </style>
