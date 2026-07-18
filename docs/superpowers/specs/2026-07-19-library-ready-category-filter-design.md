@@ -59,6 +59,15 @@ const res = await comicApi.list({ ...state.query, status: 'READY' })
 - 不加"未分类"选项(后端不支持按 `category_id IS NULL` 筛选,有需要时另行设计)
 - 不动 HomePage 的展示逻辑、管理端页面、后端接口
 - 不修 `poster-status.ts` 的 `toPosterStatus`:其 `SUCCESS` 分支是死代码(后端只写 `READY`),`READY` 目前靠 `default` 兜底返回 `'ready'`,行为正确;本次不顺带重构,实施时也不要误改此文件
+- 不修 e2e mock 的历史偏离:`e2e/comic-list.spec.ts` mock 数据用 `status: 'SUCCESS'`(后端从不产生该值,与上条死分支同源),现有断言不受本次改动影响;新增测试断言不得依赖 `SUCCESS`
+
+## 验证方式
+
+- 现有 e2e(`comic-list.spec.ts` / `comic-poster.spec.ts`)已逐条核对:mock 路由为 `/api/comics**` 通配、断言不涉及状态下拉,本次改动不会打断
+- 新增 e2e 沿用现有 playwright + route mock 模式,至少断言:
+  1. `/library` 请求恒带 `status=READY`
+  2. 工具栏无状态下拉、有分类下拉
+  3. 选择分类后请求带 `category=分类名`,切回"全部分类"后不带 `category`
 
 ## 权衡记录
 
