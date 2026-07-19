@@ -86,7 +86,8 @@ function computeItemSize(page: PageInfo): number {
       break
     }
   }
-  return baseHeight * zoom
+  // 整数取整消除 translateY 浮点定位的亚像素缝隙
+  return Math.round(baseHeight * zoom)
 }
 
 const sizes = computed<number[]>(() => {
