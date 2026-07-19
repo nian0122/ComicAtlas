@@ -135,12 +135,12 @@
               @click="togglePath(item.path)"
             >
               <el-checkbox
-                :model-value="selectedPaths.includes(item.path)"
-                :label="item.path"
+                v-model="selectedPaths"
+                :value="item.path"
                 class="scan-checkbox"
                 @click.stop
               />
-              <div class="scan-item-info" @click="togglePath(item.path)">
+              <div class="scan-item-info">
                 <span class="scan-item-name">{{ item.name }}</span>
                 <span class="scan-item-count">{{ item.imageCount }} 张</span>
               </div>
