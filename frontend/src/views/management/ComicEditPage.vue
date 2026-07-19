@@ -7,6 +7,7 @@
           <span>返回</span>
         </button>
         <h1 class="page-title">编辑漫画信息</h1>
+        <span class="comic-id-badge">ID: {{ comicId }}</span>
         <div class="header-spacer" />
       </div>
     </div>
@@ -473,6 +474,17 @@ onMounted(loadData)
   margin: 0;
 }
 
+.comic-id-badge {
+  font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: var(--bg-surface);
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+
 .header-spacer {
   width: 80px;
 }
@@ -615,6 +627,11 @@ onMounted(loadData)
     order: 3;
     width: 100%;
     text-align: center;
+  }
+
+  .comic-id-badge {
+    order: 4;
+    margin: 0 auto;
   }
 }
 
