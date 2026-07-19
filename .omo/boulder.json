@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "active_work_id": null,
+  "active_work_id": "refresh-metadata-phase2",
   "works": {
     "netflix-frontend-refactor": {
       "work_id": "netflix-frontend-refactor",
@@ -39,6 +39,34 @@
       "plan_name": "comicatlas-docs-refresh-phase1",
       "worktree_path": null,
       "status": "completed"
+    },
+    "mobile-reading-2026-07-18": {
+      "work_id": "mobile-reading-2026-07-18",
+      "active_plan": ".omo/plans/2026-07-18-mobile-reading.md",
+      "plan_name": "2026-07-18-mobile-reading",
+      "session_ids": [],
+      "status": "completed",
+      "worktree_path": null
+    },
+    "refresh-metadata-api": {
+      "session_ids": [
+        "codex:refresh-metadata-api-main"
+      ],
+      "status": "active",
+      "active_plan": ".omo/plans/refresh-metadata-api.md",
+      "plan_name": "refresh-metadata-api",
+      "worktree_path": null,
+      "work_id": "refresh-metadata-api"
+    },
+    "refresh-metadata-phase2": {
+      "worktree_path": null,
+      "work_id": "refresh-metadata-phase2",
+      "plan_name": "refresh-metadata-phase2",
+      "session_ids": [
+        "codex:refresh-metadata-phase2-main"
+      ],
+      "status": "active",
+      "active_plan": ".omo/plans/refresh-metadata-phase2.md"
     }
   }
 }

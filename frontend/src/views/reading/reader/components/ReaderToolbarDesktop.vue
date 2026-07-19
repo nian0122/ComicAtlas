@@ -90,6 +90,9 @@
             <el-dropdown-item command="toggleToolbar">
               {{ settings.showToolbar ? '隐藏工具栏' : '显示工具栏' }}
             </el-dropdown-item>
+            <el-dropdown-item command="togglePreload">
+              {{ settings.enablePreload ? '关闭预加载' : '开启预加载' }}
+            </el-dropdown-item>
             <el-dropdown-item divided command="resetZoom">重置缩放</el-dropdown-item>
           </el-dropdown-menu>
         </template>
@@ -163,6 +166,9 @@ function onCommand(command: string) {
   switch (command) {
     case 'toggleToolbar':
       settings.toggleToolbar()
+      break
+    case 'togglePreload':
+      settings.togglePreload()
       break
     case 'resetZoom':
       settings.resetZoom()
