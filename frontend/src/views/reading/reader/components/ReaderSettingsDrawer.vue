@@ -144,35 +144,6 @@
               </label>
             </div>
           </div>
-
-          <!-- 高级 -->
-          <div class="advanced-divider" role="separator">高级</div>
-
-          <label class="toggle-row">
-            <input
-              class="visually-hidden"
-              type="checkbox"
-              :checked="settings.enablePreload"
-              @change="settings.togglePreload()"
-            />
-            <span class="toggle-label">预加载</span>
-            <span class="toggle" :class="{ on: settings.enablePreload }" aria-hidden="true">
-              <span class="toggle-thumb" />
-            </span>
-          </label>
-
-          <label class="toggle-row">
-            <input
-              class="visually-hidden"
-              type="checkbox"
-              :checked="settings.enableProgressiveImage"
-              @change="settings.toggleProgressiveImage()"
-            />
-            <span class="toggle-label">渐进加载</span>
-            <span class="toggle" :class="{ on: settings.enableProgressiveImage }" aria-hidden="true">
-              <span class="toggle-thumb" />
-            </span>
-          </label>
         </div>
       </section>
     </div>
@@ -216,9 +187,9 @@ const fitOptions: ReadonlyArray<{ value: FitMode; label: string }> = [
 ]
 
 const qualityOptions: ReadonlyArray<{ value: QualityMode; label: string }> = [
-  { value: 'AUTO', label: '自动' },
-  { value: 'HQ_ONLY', label: '原图' },
   { value: 'LQ_ONLY', label: '省流' },
+  { value: 'AUTO', label: '智能' },
+  { value: 'HQ_ONLY', label: '原图' },
 ]
 
 // 缩放范围取自 store 的 ZOOM_LEVELS（50–200）。

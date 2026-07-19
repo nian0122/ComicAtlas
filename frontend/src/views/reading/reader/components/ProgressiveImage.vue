@@ -45,15 +45,20 @@ interface Props {
   alt?: string
   mode: QualityMode
   aspectRatio?: number
-  enableProgressive?: boolean
+  /** LQ 生成状态：GENERATED 可用，其他视为不可用（降级 HQ） */
+  lqStatus: string
+  /** 双击强制切换：true → 显示 HQ，false → 恢复画质模式决定 */
+  forceHq: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   alt: '',
   aspectRatio: DEFAULT_ASPECT_RATIO,
-  enableProgressive: true,
+  lqStatus: 'NOT_GENERATED',
+  forceHq: false,
 })
 
+// ── 响应式状态 ──
 const currentSrc = ref<string | undefined>(undefined)
 const isHqLoaded = ref(false)
 const isHqLoading = ref(false)
@@ -61,28 +66,42 @@ const hqError = ref(false)
 const lqError = ref(false)
 let hqLoader: HTMLImageElement | null = null
 
+// ── 派生：实际生效模式（forceHq 覆盖）──
+const effectiveMode = computed<QualityMode>(() => {
+  if (props.forceHq) return 'HQ_ONLY'
+  return props.mode
+})
+
+const lqAvailable = computed(() => props.lqStatus === 'GENERATED')
+
+// ── UI 状态 ──
 const error = computed(() => {
-  if (props.mode === 'HQ_ONLY') return hqError.value
-  if (props.mode === 'LQ_ONLY') return lqError.value
+  const m = effectiveMode.value
+  if (m === 'HQ_ONLY') return hqError.value
+  if (m === 'LQ_ONLY') return lqError.value
   return lqError.value && hqError.value
 })
 
 const showSkeleton = computed(() => {
-  if (props.mode === 'HQ_ONLY') return !currentSrc.value && !hqError.value
-  if (props.mode === 'LQ_ONLY') return !currentSrc.value && !lqError.value
-  return !currentSrc.value && !lqError.value && !hqError.value
+  if (currentSrc.value) return false
+  const m = effectiveMode.value
+  if (m === 'HQ_ONLY') return !hqError.value
+  if (m === 'LQ_ONLY') return !lqError.value
+  return !lqError.value && !hqError.value
 })
 
 const showImage = computed(() => currentSrc.value !== undefined && !error.value)
 
 const imageClasses = computed(() => ({
-  'fade-in': props.mode === 'AUTO' && isHqLoaded.value && currentSrc.value === props.hq,
+  'fade-in': effectiveMode.value === 'AUTO' && isHqLoaded.value && currentSrc.value === props.hq,
 }))
 
 const containerStyle = computed(() => ({
   aspectRatio: `${props.aspectRatio}`,
   width: '100%',
 }))
+
+// ── 图片加载 ──
 
 function cancelHqLoader(): void {
   if (hqLoader) {
@@ -95,7 +114,6 @@ function cancelHqLoader(): void {
 
 function loadHq(): void {
   if (!props.hq || isHqLoaded.value || hqError.value) return
-  if (!props.enableProgressive && props.mode === 'AUTO') return
 
   cancelHqLoader()
   isHqLoading.value = true
@@ -105,15 +123,10 @@ function loadHq(): void {
   hqLoader = loader
 
   loader.onload = () => {
-    /*
-     * 身份校验：虚拟滚动组件复用时 props 可能已切换，
-     * 旧 loader 的回调触发时 hqLoader 已指向新实例。
-     * 不匹配则丢弃，防止错误取消当前加载。
-     */
     if (hqLoader !== loader) return
     isHqLoaded.value = true
     isHqLoading.value = false
-    if ((props.mode === 'HQ_ONLY' || props.mode === 'AUTO') && props.hq) {
+    if (props.hq) {
       currentSrc.value = props.hq
     }
     cancelHqLoader()
@@ -130,8 +143,8 @@ function loadHq(): void {
 }
 
 function onImageLoad(): void {
-  // LQ 加载成功后，在 AUTO 模式下触发 HQ 加载
-  if (currentSrc.value === props.lq && props.mode === 'AUTO') {
+  // LQ 加载完成后，智能模式自动触发 HQ 渐进加载
+  if (currentSrc.value === props.lq && effectiveMode.value === 'AUTO') {
     loadHq()
   }
 }
@@ -139,7 +152,8 @@ function onImageLoad(): void {
 function onImageError(): void {
   if (currentSrc.value === props.lq) {
     lqError.value = true
-    if (props.mode === 'AUTO') {
+    // LQ 失败，智能模式降级尝试 HQ
+    if (effectiveMode.value === 'AUTO') {
       loadHq()
     }
   } else if (currentSrc.value === props.hq) {
@@ -162,21 +176,29 @@ function retry(): void {
 }
 
 function applyInitialSrc(): void {
-  if (props.mode === 'HQ_ONLY') {
-    currentSrc.value = props.hq || undefined
-    loadHq()
-  } else if (props.mode === 'LQ_ONLY') {
-    currentSrc.value = props.lq || undefined
-  } else {
-    // AUTO
-    if (props.lq) {
+  const m = effectiveMode.value
+
+  if (m === 'HQ_ONLY') {
+    // 原图：优先 HQ，HQ 失败降级 LQ
+    currentSrc.value = props.hq ?? props.lq ?? undefined
+  } else if (m === 'LQ_ONLY') {
+    // 省流：优先 LQ，LQ 不可用降级 HQ
+    if (lqAvailable.value && props.lq) {
       currentSrc.value = props.lq
     } else if (props.hq) {
       currentSrc.value = props.hq
-      loadHq()
+    }
+  } else {
+    // 智能：LQ 可用先显示 LQ 再渐进 HQ；LQ 不可用直接 HQ
+    if (lqAvailable.value && props.lq) {
+      currentSrc.value = props.lq
+    } else if (props.hq) {
+      currentSrc.value = props.hq
     }
   }
 }
+
+// ── 生命周期 ──
 
 onMounted(() => {
   applyInitialSrc()
@@ -186,7 +208,7 @@ onBeforeUnmount(() => {
   cancelHqLoader()
 })
 
-watch(() => [props.lq, props.hq, props.mode], () => {
+watch(() => [props.lq, props.hq, props.mode, props.lqStatus, props.forceHq], () => {
   reset()
   applyInitialSrc()
 }, { flush: 'post' })

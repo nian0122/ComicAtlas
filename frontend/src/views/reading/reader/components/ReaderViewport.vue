@@ -12,7 +12,7 @@
       @scroll="onScroll"
     >
       <template #default="{ item, index, active }">
-        <div class="reader-item-wrapper"><ReaderImageItem :item="item" :index="index" :active="active" :item-height="item.size" /></div>
+        <div class="reader-item-wrapper"><ReaderImageItem :item="item" :index="index" :active="active" :item-height="item.size" :force-hq="props.forceHqPages.has(index)" /></div>
       </template>
     </RecycleScroller>
   </div>
@@ -38,6 +38,8 @@ interface ScrollerItem extends PageInfo {
 interface Props {
   pages: PageInfo[]
   currentPage: number
+  /** 被双击强制切到 HQ 的页面索引（0-based）集合 */
+  forceHqPages: ReadonlySet<number>
 }
 
 const props = defineProps<Props>()

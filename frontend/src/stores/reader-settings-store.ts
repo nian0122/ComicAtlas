@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { reactive, toRefs } from 'vue'
 
+/** 画质模式：省流(LQ) / 智能(LQ→HQ渐进) / 原图(HQ) */
 export type QualityMode = 'AUTO' | 'HQ_ONLY' | 'LQ_ONLY'
 export type FitMode = 'AUTO' | 'WIDTH' | 'HEIGHT' | 'ORIGINAL'
 export type ReadingDirection = 'ltr' | 'rtl' | 'vertical' | 'horizontal'
@@ -15,7 +16,6 @@ export interface ReaderSettingsState {
   showToolbar: boolean
   preloadWindow: number
   enablePreload: boolean
-  enableProgressiveImage: boolean
 }
 
 const STORAGE_KEY = 'comicatlas.reader.settings'
@@ -40,7 +40,6 @@ export const useReaderSettingsStore = defineStore('reader-settings', () => {
     showToolbar: saved.showToolbar ?? true,
     preloadWindow: saved.preloadWindow ?? 2,
     enablePreload: saved.enablePreload ?? true,
-    enableProgressiveImage: saved.enableProgressiveImage ?? true,
   })
 
   function save() {
@@ -53,7 +52,6 @@ export const useReaderSettingsStore = defineStore('reader-settings', () => {
         showToolbar: state.showToolbar,
         preloadWindow: state.preloadWindow,
         enablePreload: state.enablePreload,
-        enableProgressiveImage: state.enableProgressiveImage,
       }))
     } catch {
       // ignore storage errors
@@ -116,11 +114,6 @@ export const useReaderSettingsStore = defineStore('reader-settings', () => {
     save()
   }
 
-  function toggleProgressiveImage() {
-    state.enableProgressiveImage = !state.enableProgressiveImage
-    save()
-  }
-
   return {
     ...toRefs(state),
     setQualityMode,
@@ -132,6 +125,5 @@ export const useReaderSettingsStore = defineStore('reader-settings', () => {
     setReadingDirection,
     toggleToolbar,
     togglePreload,
-    toggleProgressiveImage,
   }
 })
