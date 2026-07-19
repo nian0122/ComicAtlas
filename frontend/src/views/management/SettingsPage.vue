@@ -38,6 +38,27 @@
         <el-button type="primary" :loading="saving" @click="handleSave">保存设置</el-button>
       </div>
     </section>
+
+    <section class="settings-card">
+      <h2 class="section-title">阅读增强</h2>
+      <p class="section-desc">即时生效，与阅读器内设置同步</p>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <label class="setting-label">预加载</label>
+          <span class="setting-hint">提前加载邻近页面，滚动更流畅</span>
+        </div>
+        <el-switch v-model="readerSettings.enablePreload" />
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <label class="setting-label">渐进加载</label>
+          <span class="setting-hint">先显示低清预览再加载高清原图</span>
+        </div>
+        <el-switch v-model="readerSettings.enableProgressiveImage" />
+      </div>
+    </section>
   </div>
 </template>
 
@@ -45,6 +66,9 @@
 import { reactive, ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { settingsApi } from '@/services/management'
+import { useReaderSettingsStore } from '@/stores/reader-settings-store'
+
+const readerSettings = useReaderSettingsStore()
 
 interface SettingsForm {
   defaultQuality: string
@@ -103,11 +127,21 @@ onMounted(loadSettings)
   padding: var(--space-xl);
 }
 
+.settings-card + .settings-card {
+  margin-top: var(--space-lg);
+}
+
 .section-title {
   font-size: 14px;
   font-weight: 700;
   color: var(--text-primary);
   margin: 0 0 var(--space-lg);
+}
+
+.section-desc {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin: calc(-1 * var(--space-base)) 0 var(--space-lg);
 }
 
 .setting-row {
@@ -122,10 +156,21 @@ onMounted(loadSettings)
   border-bottom: none;
 }
 
+.setting-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .setting-label {
   font-size: 14px;
   color: var(--text-secondary);
   font-weight: 600;
+}
+
+.setting-hint {
+  font-size: 12px;
+  color: var(--text-tertiary);
 }
 
 .setting-select {
