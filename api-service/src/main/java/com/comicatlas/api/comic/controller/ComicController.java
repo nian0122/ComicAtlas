@@ -65,6 +65,14 @@ public class ComicController {
         return Result.ok();
     }
 
+    @PostMapping("/comics/batch/update")
+    public Result<BatchUpdateResultVO> batchUpdate(@Valid @RequestBody BatchComicUpdateDTO dto) {
+        if (dto.getCategoryId() == null && (dto.getAddTagIds() == null || dto.getAddTagIds().isEmpty())) {
+            return Result.fail(400, "至少需要提供 categoryId 或 addTagIds");
+        }
+        return Result.ok(comicService.batchUpdate(dto));
+    }
+
     @GetMapping("/comics/autocomplete")
     public Result<List<String>> autocompleteTitles(@RequestParam String keyword) {
         return Result.ok(comicService.autocompleteTitles(keyword));

@@ -227,6 +227,26 @@ export interface ComicTagUpdateDTO {
   tagIds: number[]
 }
 
+/** 批量更新漫画分类和标签 */
+export interface BatchComicUpdateDTO {
+  comicIds: number[]
+  categoryId?: number | null
+  addTagIds?: number[]
+}
+
+/** 批量更新结果 */
+export interface BatchUpdateResultVO {
+  total: number
+  succeeded: number
+  failed: FailedItem[]
+}
+
+export interface FailedItem {
+  comicId: number
+  title: string | null
+  reason: string
+}
+
 export const STATUS_COLOR_MAP: Record<string, string> = {
   PENDING: 'info',
   PARSING: 'warning',
