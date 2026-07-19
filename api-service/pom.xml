@@ -78,6 +78,13 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- 图片元数据读取（javax.imageio） -->
+        <dependency>
+            <groupId>org.sejda.imageio</groupId>
+            <artifactId>webp-imageio</artifactId>
+            <version>0.1.6</version>
+        </dependency>
+
         <!-- 测试 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
