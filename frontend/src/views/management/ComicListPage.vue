@@ -228,10 +228,9 @@ function goEdit(id: number) {
 }
 
 watch(() => filters.tags, (val) => {
-  if (!val.includes('_NONE')) return
-  if (val.length > 1) {
+  if (val.includes('_NONE') && val.length > 1) {
     nextTick(() => {
-      filters.tags = val.filter(v => v !== '_NONE')
+      filters.tags = ['_NONE']
     })
   }
 }, { deep: true })

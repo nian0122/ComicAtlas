@@ -179,10 +179,9 @@ async function loadCategories() {
 }
 
 watch(selectedTags, (val) => {
-  if (!val.includes('_NONE')) return
-  if (val.length > 1) {
+  if (val.includes('_NONE') && val.length > 1) {
     nextTick(() => {
-      selectedTags.value = val.filter(v => v !== '_NONE')
+      selectedTags.value = ['_NONE']
     })
   }
 }, { deep: true })

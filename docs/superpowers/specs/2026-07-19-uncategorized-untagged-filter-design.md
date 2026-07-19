@@ -72,15 +72,15 @@
 
 ```typescript
 watch(selectedTags, (val) => {
-  if (val.includes('_NONE')) {
-    // 选了无标签 → 清空正常标签
-    selectedTags.value = ['_NONE']
-  } else if (val.length > 1) {
-    // 选了正常标签(可能有多个) → 移除无标签
-    selectedTags.value = val.filter(v => v !== '_NONE')
+  if (val.includes('_NONE') && val.length > 1) {
+    nextTick(() => {
+      selectedTags.value = ['_NONE']
+    })
   }
 }, { deep: true })
 ```
+
+当 `_NONE` 与其他标签同时存在时,保留 `_NONE`、清除正常标签(哨兵值优先)。`_NONE` 单独选中时不触发。多选正常标签时(`_NONE` 不在数组中)不进入分支。`nextTick` 避免 Element Plus 内部 set 回冲。
 
 ### 前端管理端 — `ComicListPage.vue`
 
