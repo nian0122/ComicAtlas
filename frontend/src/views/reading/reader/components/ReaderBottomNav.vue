@@ -1,16 +1,20 @@
 <template>
-  <!-- 移动端底部导航：进度条 + 上一话 / 目录 / 下一话 -->
+  <!-- 移动端底部导航：可拖进度条(跳页) + 上一话 / 目录 / 下一话 -->
   <nav class="reader-bottom-nav" aria-label="章节导航">
-    <!-- 阅读进度条（非精确页码，仅示意位置） -->
-    <div
-      class="nav-progress"
-      role="progressbar"
-      aria-label="阅读进度"
-      :aria-valuenow="currentPage"
-      :aria-valuemin="0"
-      :aria-valuemax="totalPages"
-    >
-      <div class="nav-progress-fill" :style="{ width: progressPercent + '%' }" />
+    <div class="nav-progress-wrap">
+      <span v-if="dragging" class="nav-progress-tip">{{ dragPage }} / {{ totalPages }}</span>
+      <input
+        class="nav-progress-slider"
+        type="range"
+        :min="1"
+        :max="Math.max(1, totalPages)"
+        step="1"
+        :value="displayPage"
+        :style="sliderStyle"
+        aria-label="阅读进度"
+        @input="onSliderInput"
+        @change="onSliderChange"
+      />
     </div>
 
     <div class="nav-buttons">
@@ -43,7 +47,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 
 // 哑组件：只负责导航展示，不接触 store / composable。
 // 显示与隐藏由父级（ReaderPage）通过 v-if 控制。
@@ -64,13 +68,32 @@ const emit = defineEmits<{
   (e: 'prevChapter'): void
   (e: 'catalog'): void
   (e: 'nextChapter'): void
+  (e: 'jumpToPage', page: number): void
 }>()
 
-/** 阅读进度百分比（0-100，防御除零与越界） */
-const progressPercent = computed(() => {
+const dragging = ref(false)
+const dragPage = ref(1)
+
+const displayPage = computed(() => (dragging.value ? dragPage.value : props.currentPage))
+
+const fillPercent = computed(() => {
   if (props.totalPages <= 0) return 0
-  return Math.min(100, Math.max(0, (props.currentPage / props.totalPages) * 100))
+  return Math.min(100, Math.max(0, (displayPage.value / props.totalPages) * 100))
 })
+
+const sliderStyle = computed(() => ({
+  background: `linear-gradient(to right, var(--accent) ${fillPercent.value}%, var(--bg-surface) ${fillPercent.value}%)`,
+}))
+
+function onSliderInput(e: Event) {
+  dragging.value = true
+  dragPage.value = Number((e.target as HTMLInputElement).value)
+}
+
+function onSliderChange(e: Event) {
+  dragging.value = false
+  emit('jumpToPage', Number((e.target as HTMLInputElement).value))
+}
 </script>
 
 <style scoped>
@@ -102,16 +125,54 @@ const progressPercent = computed(() => {
   }
 }
 
-/* 顶部细进度条 */
-.nav-progress {
-  height: 3px;
-  background: var(--bg-surface);
+/* 可拖进度条:轨道 3px 视觉 + 上下 padding 扩大触控热区,thumb 14px */
+.nav-progress-wrap {
+  position: relative;
+  padding: 10px 12px 2px;
 }
 
-.nav-progress-fill {
-  height: 100%;
+.nav-progress-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 3px;
+  border-radius: 2px;
+  border: none;
+  outline: none;
+  cursor: pointer;
+}
+
+.nav-progress-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
   background: var(--accent);
-  transition: width 200ms ease;
+  border: none;
+}
+
+.nav-progress-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: none;
+}
+
+.nav-progress-tip {
+  position: absolute;
+  top: -26px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .nav-buttons {
@@ -149,10 +210,6 @@ const progressPercent = computed(() => {
 @media (prefers-reduced-motion: reduce) {
   .reader-bottom-nav {
     animation: none;
-  }
-
-  .nav-progress-fill {
-    transition: none;
   }
 }
 </style>

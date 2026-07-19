@@ -4,6 +4,12 @@ import type { Ref } from 'vue'
 /** 横向滑动方向（按手指移动方向命名：向左划为 'left'） */
 export type SwipeDirection = 'left' | 'right'
 
+/** tap 触点坐标（viewport 坐标系，即 clientX/clientY） */
+export interface TapPoint {
+  x: number
+  y: number
+}
+
 /**
  * 手势注册 API。
  *
@@ -12,8 +18,8 @@ export type SwipeDirection = 'left' | 'right'
  * 不访问 store、不操作任何状态。
  */
 export interface ReaderGestureControls {
-  /** 注册 tap（轻点）回调，可多次调用注册多个 */
-  onTap: (handler: () => void) => void
+  /** 注册 tap（轻点）回调，可多次调用注册多个；回调收到触点坐标（可忽略） */
+  onTap: (handler: (point: TapPoint) => void) => void
   /** 注册横向 swipe（滑动）回调，参数为手指移动方向 */
   onSwipe: (handler: (direction: SwipeDirection) => void) => void
 }
@@ -54,7 +60,7 @@ interface PointerSnapshot {
  * @param viewportRef 视口元素的 template ref，允许初始为 null
  */
 export function useReaderGesture(viewportRef: Ref<HTMLElement | null>): ReaderGestureControls {
-  const tapHandlers: Array<() => void> = []
+  const tapHandlers: Array<(point: TapPoint) => void> = []
   const swipeHandlers: Array<(direction: SwipeDirection) => void> = []
 
   /** 当前按下中的主指针快照，null 表示无按下 */
@@ -86,7 +92,8 @@ export function useReaderGesture(viewportRef: Ref<HTMLElement | null>): ReaderGe
     if (duration <= TAP_MAX_DURATION_MS && Math.hypot(deltaX, deltaY) < TAP_MAX_MOVEMENT_PX) {
       if (event.timeStamp - lastTapTime < TAP_GUARD_MS) return
       lastTapTime = event.timeStamp
-      for (const handler of tapHandlers) handler()
+      const point: TapPoint = { x: event.clientX, y: event.clientY }
+      for (const handler of tapHandlers) handler(point)
       return
     }
 
@@ -138,7 +145,7 @@ export function useReaderGesture(viewportRef: Ref<HTMLElement | null>): ReaderGe
   // 卸载前移除全部监听器
   onBeforeUnmount(unbind)
 
-  const onTap = (handler: () => void): void => {
+  const onTap = (handler: (point: TapPoint) => void): void => {
     tapHandlers.push(handler)
   }
 

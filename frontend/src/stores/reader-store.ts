@@ -47,7 +47,12 @@ export const useReaderStore = defineStore('reader', () => {
     state.error = null
   }
 
+  let loadSeq = 0
+
   async function loadChapter(chId: number) {
+    // 请求序号闸:快速连续切章时 HTTP 响应可能乱序返回,
+    // 只允许最新一次请求写入 state,过期响应直接丢弃
+    const seq = ++loadSeq
     state.loading = true
     state.error = null
     state.chapterId = chId
@@ -55,6 +60,7 @@ export const useReaderStore = defineStore('reader', () => {
 
     try {
       const res = await readerApi.chapter(chId)
+      if (seq !== loadSeq) return
       const data = res.data as ReaderDTO
       state.comicId = data.comicId
       state.chapterTitle = data.chapterTitle
@@ -62,11 +68,14 @@ export const useReaderStore = defineStore('reader', () => {
       state.prevChapterId = data.prevChapterId
       state.nextChapterId = data.nextChapterId
     } catch (err: unknown) {
+      if (seq !== loadSeq) return
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
       state.error = msg || '加载章节失败'
       state.pages = []
     } finally {
-      state.loading = false
+      if (seq === loadSeq) {
+        state.loading = false
+      }
     }
   }
 
