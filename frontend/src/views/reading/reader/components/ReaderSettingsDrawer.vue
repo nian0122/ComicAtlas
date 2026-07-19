@@ -202,10 +202,10 @@ const emit = defineEmits<{
 
 const settings = useReaderSettingsStore()
 
-/** 移动端只暴露 纵向/横向（ltr/rtl 仅桌面端可用） */
+/** 移动端只暴露 纵向滚动/横向翻页（ltr/rtl 仅桌面端可用） */
 const directionOptions: ReadonlyArray<{ value: ReadingDirection; label: string }> = [
-  { value: 'vertical', label: '纵向' },
-  { value: 'horizontal', label: '横向' },
+  { value: 'vertical', label: '纵向滚动' },
+  { value: 'horizontal', label: '横向翻页' },
 ]
 
 const fitOptions: ReadonlyArray<{ value: FitMode; label: string }> = [

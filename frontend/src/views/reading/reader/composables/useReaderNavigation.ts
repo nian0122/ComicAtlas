@@ -17,16 +17,16 @@ export function useReaderNavigation() {
     router.push({ name: 'comic-detail', params: { id: store.comicId } })
   }
 
-  /** 跳转指定章节的阅读器路由（内部工具，query.page=1 与旧逻辑保持一致） */
-  function goChapter(chapterId: number | null) {
+  /** 跳转指定章节的阅读器路由（内部工具）；page 支持 'last' 哨兵 = 落到该章最后一页 */
+  function goChapter(chapterId: number | null, page: number | 'last' = 1) {
     // null/undefined 守卫：无相邻章节时静默不跳转
     if (chapterId == null) return
-    router.push({ name: 'reader', params: { chapterId }, query: { page: '1' } })
+    router.push({ name: 'reader', params: { chapterId }, query: { page: String(page) } })
   }
 
-  /** 上一章；prevChapterId 为 null 时静默不跳转 */
-  function goPrevChapter() {
-    goChapter(store.prevChapterId)
+  /** 上一章；prevChapterId 为 null 时静默不跳转；page 缺省落到第 1 页 */
+  function goPrevChapter(page: number | 'last' = 1) {
+    goChapter(store.prevChapterId, page)
   }
 
   /** 下一章；nextChapterId 为 null 时静默不跳转 */

@@ -17,6 +17,7 @@
     @back="emit('back')"
     @prev-chapter="emit('prevChapter')"
     @next-chapter="emit('nextChapter')"
+    @jump-to-page="emit('jumpToPage', $event)"
   />
   <ReaderToolbarMobile
     v-else
@@ -63,5 +64,7 @@ const emit = defineEmits<{
   (e: 'nextChapter'): void
   /** 打开设置抽屉——移动变体发出 */
   (e: 'openSettings'): void
+  /** 页码跳转——桌面变体发出 */
+  (e: 'jumpToPage', page: number): void
 }>()
 </script>

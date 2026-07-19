@@ -11,7 +11,29 @@
     </div>
 
     <div class="toolbar-center">
-      <span class="page-indicator">{{ currentPage }} / {{ totalPages }}</span>
+      <el-popover
+        v-model:visible="jumpVisible"
+        placement="bottom"
+        :width="220"
+        trigger="click"
+      >
+        <template #reference>
+          <button class="tool-btn page-indicator" title="点击跳转页码">
+            {{ currentPage }} / {{ totalPages }}
+          </button>
+        </template>
+        <div class="jump-panel">
+          <el-input-number
+            v-model="jumpPage"
+            :min="1"
+            :max="Math.max(1, totalPages)"
+            size="small"
+            class="jump-input"
+            @keyup.enter="confirmJump"
+          />
+          <el-button type="primary" size="small" @click="confirmJump">跳转</el-button>
+        </div>
+      </el-popover>
     </div>
 
     <div class="toolbar-right">
@@ -47,8 +69,8 @@
         class="toolbar-select"
         @change="settings.setReadingDirection"
       >
-        <el-option label="纵向" value="vertical" />
-        <el-option label="横向" value="horizontal" />
+        <el-option label="纵向滚动" value="vertical" />
+        <el-option label="横向翻页" value="horizontal" />
       </el-select>
 
       <!-- Zoom -->
@@ -99,6 +121,7 @@
 </template>
 
 <script setup lang="ts">
+import { ref, watch } from 'vue'
 import { ArrowLeft, Setting } from '@element-plus/icons-vue'
 import {
   ElSelect,
@@ -106,6 +129,9 @@ import {
   ElDropdown,
   ElDropdownMenu,
   ElDropdownItem,
+  ElPopover,
+  ElInputNumber,
+  ElButton,
 } from 'element-plus'
 import { useReaderSettingsStore } from '@/stores/reader-settings-store'
 
@@ -117,14 +143,27 @@ interface Props {
   nextChapterId: number | null
 }
 
-defineProps<Props>()
+const props = defineProps<Props>()
 const emit = defineEmits<{
   (e: 'back'): void
   (e: 'prevChapter'): void
   (e: 'nextChapter'): void
+  (e: 'jumpToPage', page: number): void
 }>()
 
 const settings = useReaderSettingsStore()
+
+const jumpVisible = ref(false)
+const jumpPage = ref(1)
+
+watch(jumpVisible, (visible) => {
+  if (visible) jumpPage.value = props.currentPage
+})
+
+function confirmJump() {
+  jumpVisible.value = false
+  emit('jumpToPage', jumpPage.value)
+}
 
 function onCommand(command: string) {
   switch (command) {
@@ -186,6 +225,18 @@ function onCommand(command: string) {
   font-size: 13px;
   color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
+}
+
+.jump-panel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.jump-panel .jump-input {
+  flex: 1;
+  width: auto;
+  min-width: 0;
 }
 
 .toolbar-select {

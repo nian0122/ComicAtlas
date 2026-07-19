@@ -12,6 +12,7 @@
       @back="goBack"
       @prev-chapter="goChapter(store.prevChapterId!)"
       @next-chapter="goChapter(store.nextChapterId!)"
+      @jump-to-page="onPageChange"
     />
 
     <!-- Loading -->
@@ -33,7 +34,15 @@
       <span>暂无页面</span>
     </div>
 
-    <!-- Reader Viewport -->
+    <!-- Reader Viewport:纵向=连续滚动,横向=单页翻页(§需求 2026-07) -->
+    <ReaderPagedViewport
+      v-else-if="isPagedMode"
+      ref="viewportComponentRef"
+      :pages="store.pages"
+      :current-page="store.currentPage"
+      @page-request="onPageRequest"
+      @visible-range="onVisibleRange"
+    />
     <ReaderViewport
       v-else
       ref="viewportComponentRef"
@@ -58,9 +67,10 @@
         :total-pages="store.totalPages"
         :has-prev="store.prevChapterId !== null"
         :has-next="store.nextChapterId !== null"
-        @prev-chapter="nav.goPrevChapter"
+        @prev-chapter="nav.goPrevChapter()"
         @catalog="nav.goToCatalog"
         @next-chapter="nav.goNextChapter"
+        @jump-to-page="onPageChange"
       />
       <ReaderSettingsDrawer
         :visible="isSettings"
@@ -78,6 +88,7 @@ import { PictureFilled, WarningFilled } from '@element-plus/icons-vue'
 import { useReaderStore } from '@/stores/reader-store'
 import { useReaderSettingsStore } from '@/stores/reader-settings-store'
 import ReaderViewport from '@/views/reading/reader/components/ReaderViewport.vue'
+import ReaderPagedViewport from '@/views/reading/reader/components/ReaderPagedViewport.vue'
 import ReaderToolbar from '@/views/reading/reader/components/ReaderToolbar.vue'
 import ReaderBottomNav from '@/views/reading/reader/components/ReaderBottomNav.vue'
 import ReaderSettingsDrawer from '@/views/reading/reader/components/ReaderSettingsDrawer.vue'
@@ -103,8 +114,8 @@ const nav = useReaderNavigation()
 // EXIT 哨兵（IMMERSIVE 下 AndroidBack）→ 返回详情页
 const { dispatch, toolbarVisible, isSettings } = useReaderToolbar({ onExit: nav.goBack })
 
-// ReaderViewport 组件实例 → 根元素（.reader-viewport），供手势绑定。
-// 组件经 v-else 晚挂载，useReaderGesture 内部 watch 会补绑。
+// ReaderViewport / ReaderPagedViewport 组件实例 → 根元素，供手势绑定。
+// 两组件互斥渲染共用同一 ref 位；v-if 切换时 useReaderGesture 内部 watch 会重绑。
 const viewportComponentRef = ref<InstanceType<typeof ReaderViewport> | null>(null)
 const viewportElRef = computed<HTMLElement | null>(() => {
   const el: unknown = viewportComponentRef.value?.$el
@@ -112,12 +123,52 @@ const viewportElRef = computed<HTMLElement | null>(() => {
 })
 const gesture = useReaderGesture(viewportElRef)
 
-// 手势 → 状态机：tap 仅移动端派发（桌面工具栏走 settings.showToolbar 布尔，
-// 不进状态机）。swipe 不注册——章节切换由 BottomNav 负责（设计规范 §10 0.3）。
-gesture.onTap(() => {
+// 横向 = 单页翻页模式；其余方向（vertical/ltr/rtl）沿用纵向连续滚动
+const isPagedMode = computed(() => settings.readingDirection === 'horizontal')
+
+// 翻页请求统一决策：页内步进，越界自动跳章（上一章落到最后一页）
+function onPageRequest(direction: 'next' | 'prev') {
+  if (direction === 'next') {
+    if (store.currentPage < store.totalPages) {
+      store.currentPage++
+    } else {
+      nav.goNextChapter()
+    }
+  } else {
+    if (store.currentPage > 1) {
+      store.currentPage--
+    } else {
+      nav.goPrevChapter('last')
+    }
+  }
+}
+
+// 手势路由：翻页模式下 tap 三分区（左 30% 上一页 / 右 30% 下一页 / 中央唤工具栏）；
+// 纵向模式 tap 仅移动端派发状态机（桌面工具栏走 settings.showToolbar 布尔）。
+gesture.onTap((point) => {
+  if (isPagedMode.value && viewportElRef.value) {
+    const rect = viewportElRef.value.getBoundingClientRect()
+    if (rect.width > 0) {
+      const ratio = (point.x - rect.left) / rect.width
+      if (ratio < 0.3) {
+        onPageRequest('prev')
+        return
+      }
+      if (ratio > 0.7) {
+        onPageRequest('next')
+        return
+      }
+    }
+  }
   if (mode.value === 'mobile') {
     dispatch(ReaderAction.TapCenter)
   }
+})
+
+// swipe 仅翻页模式响应：内容随手指方向前进（左划=下一页）
+gesture.onSwipe((direction) => {
+  if (!isPagedMode.value) return
+  onPageRequest(direction === 'left' ? 'next' : 'prev')
 })
 
 const lastSyncedPage = ref(1)
@@ -138,8 +189,59 @@ function goChapter(chId: number) {
 }
 
 function reload() {
+  loadCurrentChapter()
+}
+
+async function loadCurrentChapter() {
   const chapterId = Number(route.params.chapterId)
-  if (chapterId) store.loadChapter(chapterId)
+  const rawPage = route.query.page
+
+  if (!chapterId) {
+    store.error = '参数不完整'
+    return
+  }
+
+  await store.loadChapter(chapterId)
+
+  // 竞态闸:等待期间用户又切了章(HTTP 乱序),丢弃本次过期结果,
+  // 由更新导航触发的 loadCurrentChapter 接管
+  if (Number(route.params.chapterId) !== chapterId) return
+
+  if (store.error) {
+    ElMessage.error(store.error)
+    return
+  }
+
+  preloadEngine.reset(store.totalPages)
+  preloadEngine.setUrlResolver((index: number, priority: 'immediate' | 'cascade') => {
+    const page = store.pages[index]
+    if (!page) return null
+    if (priority === 'immediate') {
+      return page.hqUrl || page.lqUrl || null
+    }
+    return page.lqUrl || page.hqUrl || null
+  })
+
+  if (rawPage === 'last') {
+    store.currentPage = Math.max(1, store.totalPages)
+  } else {
+    const pageFromQuery = Number(rawPage)
+    if (pageFromQuery >= 1 && pageFromQuery <= store.totalPages) {
+      store.currentPage = pageFromQuery
+    } else {
+      await store.restoreProgress()
+    }
+  }
+
+  try {
+    const detail = await comicApi.detail(store.comicId)
+    const detailData = detail.data as ComicDetailVO
+    comicTitle.value = detailData.title || `漫画 #${store.comicId}`
+  } catch {
+    comicTitle.value = `漫画 #${store.comicId}`
+  }
+
+  lastSyncedPage.value = store.currentPage
 }
 
 function onPageChange(page: number) {
@@ -151,10 +253,18 @@ function onPageChange(page: number) {
 function onKeydown(e: KeyboardEvent) {
   if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
     e.preventDefault()
-    store.nextPage()
+    if (isPagedMode.value) {
+      onPageRequest('next')
+    } else {
+      store.nextPage()
+    }
   } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
     e.preventDefault()
-    store.prevPage()
+    if (isPagedMode.value) {
+      onPageRequest('prev')
+    } else {
+      store.prevPage()
+    }
   } else if (e.key === '+' || e.key === '=') {
     e.preventDefault()
     settings.zoomIn()
@@ -181,7 +291,11 @@ function onWheel(e: WheelEvent) {
 function onDblClick(e: MouseEvent) {
   // Reset zoom on double click of the page area
   const target = e.target as HTMLElement
-  if (target.closest('.reader-viewport') || target.closest('.reader-image-item')) {
+  if (
+    target.closest('.reader-viewport') ||
+    target.closest('.paged-viewport') ||
+    target.closest('.reader-image-item')
+  ) {
     settings.resetZoom()
   }
 }
@@ -200,46 +314,7 @@ onMounted(async () => {
     document.addEventListener('dblclick', onDblClick)
   }
 
-  const chapterId = Number(route.params.chapterId)
-  const pageFromQuery = Number(route.query.page)
-
-  if (!chapterId) {
-    store.error = '参数不完整'
-    return
-  }
-
-  await store.loadChapter(chapterId)
-
-  if (store.error) {
-    ElMessage.error(store.error)
-    return
-  }
-
-  preloadEngine.reset(store.totalPages)
-  preloadEngine.setUrlResolver((index: number, priority: 'immediate' | 'cascade') => {
-    const page = store.pages[index]
-    if (!page) return null
-    if (priority === 'immediate') {
-      return page.hqUrl || page.lqUrl || null
-    }
-    return page.lqUrl || page.hqUrl || null
-  })
-
-  if (pageFromQuery >= 1 && pageFromQuery <= store.totalPages) {
-    store.currentPage = pageFromQuery
-  } else {
-    await store.restoreProgress()
-  }
-
-  try {
-    const detail = await comicApi.detail(store.comicId)
-    const detailData = detail.data as ComicDetailVO
-    comicTitle.value = detailData.title || `漫画 #${store.comicId}`
-  } catch {
-    comicTitle.value = `漫画 #${store.comicId}`
-  }
-
-  lastSyncedPage.value = store.currentPage
+  await loadCurrentChapter()
 
   watch(() => store.currentPage, (newPage) => {
     if (store.comicId > 0 && newPage !== lastSyncedPage.value) {
@@ -250,6 +325,22 @@ onMounted(async () => {
       }, 300)
     }
   })
+})
+
+// 同名路由仅换参数时 Vue Router 复用组件实例,onMounted 不会重跑——
+// 章节切换(工具栏/BottomNav/自动跳章)必须显式监听 chapterId 重载。
+watch(() => route.params.chapterId, (newId, oldId) => {
+  if (!newId || newId === oldId) return
+  // 清掉挂起的进度 debounce,防其在新章加载后用旧章页码写脏数据;
+  // 再同步落袋旧章进度(payload 同步构造,读到的仍是旧 chapterId)
+  if (saveDebounceTimer.value) {
+    clearTimeout(saveDebounceTimer.value)
+    saveDebounceTimer.value = null
+  }
+  if (store.comicId > 0 && store.currentPage !== lastSyncedPage.value) {
+    store.saveProgress()
+  }
+  loadCurrentChapter()
 })
 
 onBeforeUnmount(() => {
