@@ -65,10 +65,10 @@ export const useImportStore = defineStore('import', () => {
 
   // —— Actions ——
 
-  async function fetchList() {
+  async function fetchList(params?: { batchId?: string }) {
     error.value = null
     try {
-      const res: any = await importApi.list({ page: 1, size: 50 })
+      const res: any = await importApi.list({ page: 1, size: 50, ...params })
       tasks.value = (res.data?.records || []) as ImportTaskVO[]
       lastUpdated.value = Date.now()
     } catch (err: unknown) {
@@ -85,6 +85,23 @@ export const useImportStore = defineStore('import', () => {
       // 创建后立刻启动轮询（如果还没启动）
       if (!polling.value) startPolling()
       return res.data as ImportTaskVO
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function scan(parentPath: string, sourceType: string) {
+    const res: any = await importApi.scan(parentPath, sourceType)
+    return res.data
+  }
+
+  async function createBatch(sourceType: string, sourcePaths: string[]): Promise<ImportTaskVO[]> {
+    loading.value = true
+    try {
+      const res: any = await importApi.createBatch({ sourceType, sourcePaths })
+      await fetchList()
+      if (!polling.value) startPolling()
+      return res.data as ImportTaskVO[]
     } finally {
       loading.value = false
     }
@@ -160,6 +177,8 @@ export const useImportStore = defineStore('import', () => {
     // actions
     fetchList,
     create,
+    scan,
+    createBatch,
     pollStatus,
     cancel,
     retry,

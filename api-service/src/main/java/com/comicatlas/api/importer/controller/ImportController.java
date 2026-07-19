@@ -23,8 +23,20 @@ public class ImportController {
     public Result<IPage<ImportTaskVO>> listTasks(
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "20") Integer size,
-            @RequestParam(required = false) String status) {
-        return Result.ok(importService.listTasks(page, size, status));
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String batchId) {
+        return Result.ok(importService.listTasks(page, size, status, batchId));
+    }
+
+    @GetMapping("/scan")
+    public Result<ScanResultVO> scan(@RequestParam String parentPath,
+                                      @RequestParam(defaultValue = "DIRECTORY") String sourceType) {
+        return Result.ok(importService.scanDirectories(parentPath, sourceType));
+    }
+
+    @PostMapping("/batch")
+    public Result<BatchImportResultVO> createBatch(@RequestBody BatchImportRequest request) {
+        return Result.ok(importService.createBatchImportTasks(request));
     }
 
     @GetMapping("/{id}")

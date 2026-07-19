@@ -99,6 +99,7 @@ CREATE INDEX idx_import_task_batch_id ON import_task(batch_id);
 | `BatchImportRequest` | `sourceType: String`, `sourcePaths: List<String>` |
 | `BatchImportResultVO` | `batchId: String`, `total: int`, `succeeded: List<ImportTaskVO>`, `failed: List<FailedItem>` |
 | `FailedItem` | `sourcePath: String`, `errorMessage: String` |
+| `ScanResultVO` | `parentPath: String`, `total: int`, `items: List<ScanItemVO>` |
 | `ScanItemVO` | `name: String`, `path: String`, `imageCount: int` |
 
 ## 5. 后端实现
@@ -119,8 +120,8 @@ BatchImportResultVO createBatchImportTasks(BatchImportRequest request);
 
 **`createBatchImportTasks`**:
 - 生成 UUID 作为 `batchId`
-- 遍历 `sourcePaths`，每个 path 调用独立的 `@Transactional` 方法（避免循环内自调用导致 AOP 失效，所有迭代共享同一事务）
-- 独立事务方法：预创建 comic + import_task + `task.setBatchId(batchId)` → 事务提交后发 MQ
+- 遍历 `sourcePaths`，每个 path 通过 `TransactionTemplate.executeWithoutResult()` 开启独立事务（避免 `@Transactional` 自调用失效）
+- 独立事务逻辑：预创建 comic + import_task + `task.setBatchId(batchId)` → 事务提交后发 MQ
 - 单个失败 → `try/catch` → 记录到 `failed` 列表 → 继续下一个
 - 所有任务创建完毕 → 返回汇总结果
 
@@ -128,8 +129,8 @@ BatchImportResultVO createBatchImportTasks(BatchImportRequest request);
 
 ```java
 @GetMapping("/scan")
-Result<List<ScanItemVO>> scan(@RequestParam String parentPath,
-                               @RequestParam(defaultValue = "DIRECTORY") String sourceType);
+Result<ScanResultVO> scan(@RequestParam String parentPath,
+                           @RequestParam(defaultValue = "DIRECTORY") String sourceType);
 
 @PostMapping("/batch")
 Result<BatchImportResultVO> createBatch(@RequestBody BatchImportRequest request);
@@ -140,13 +141,16 @@ Result<BatchImportResultVO> createBatch(@RequestBody BatchImportRequest request)
 | 文件 | 变更 |
 |------|------|
 | `api-service/.../dto/ScanItemVO.java` | 新增 |
+| `api-service/.../dto/ScanResultVO.java` | 新增 |
 | `api-service/.../dto/BatchImportRequest.java` | 新增 |
 | `api-service/.../dto/BatchImportResultVO.java` | 新增 |
 | `api-service/.../dto/FailedItem.java` | 新增 |
 | `api-service/.../service/ImportService.java` | 新增 2 个方法签名 |
 | `api-service/.../service/impl/ImportServiceImpl.java` | 实现 2 个方法 |
 | `api-service/.../controller/ImportController.java` | 新增 2 个端点 |
-| `api-service/.../mapper/ImportTaskMapper.java` | 扩展查询支持 `batchId` 参数 |
+| `api-service/.../entity/ImportTask.java` | 新增 `batchId` 字段 |
+| `api-service/.../dto/ImportTaskVO.java` | 新增 `batchId` 字段 |
+| `api-service/.../mapper/ImportTaskMapper.java` | `listTasks` 扩展 `batchId` 参数 |
 | DB migration | `batch_id` 字段 |
 
 ## 6. 前端实现

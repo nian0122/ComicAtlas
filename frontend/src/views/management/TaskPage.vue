@@ -14,6 +14,11 @@
       </div>
     </header>
 
+    <div v-if="batchId" class="batch-filter-banner">
+      <span class="batch-label">批次导入 {{ batchId.slice(0, 8) }}{{ batchId.length > 8 ? '...' : '' }}</span>
+      <router-link to="/manage/import/tasks" class="batch-clear-link">返回全部任务</router-link>
+    </div>
+
     <div v-if="store.error" class="state error">
       <el-icon :size="32"><WarningFilled /></el-icon>
       <span>{{ store.error }}</span>
@@ -85,8 +90,8 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount } from 'vue'
-import { useRouter } from 'vue-router'
+import { onMounted, onBeforeUnmount, computed, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { WarningFilled, CircleCheckFilled } from '@element-plus/icons-vue'
 import { useImportStore } from '@/stores/management/import'
@@ -94,7 +99,10 @@ import type { ImportTaskVO } from '@/types'
 import TaskCard from '@/components/management/task/TaskCard.vue'
 
 const router = useRouter()
+const route = useRoute()
 const store = useImportStore()
+
+const batchId = computed(() => (route.query.batchId as string) || '')
 
 function formatRelative(ts: number): string {
   const diff = Date.now() - ts
@@ -104,7 +112,7 @@ function formatRelative(ts: number): string {
 }
 
 async function refresh() {
-  await store.fetchList()
+  await store.fetchList(batchId.value ? { batchId: batchId.value } : undefined)
   if (store.hasActive) store.startPolling()
 }
 
@@ -128,11 +136,16 @@ async function onRetry(id: number) {
 
 function onRead(task: ImportTaskVO) {
   if (!task.comicId) return
-    router.push(`/comic/${task.comicId}`)
+  router.push(`/comic/${task.comicId}`)
 }
 
 onMounted(async () => {
-  await store.fetchList()
+  await store.fetchList(batchId.value ? { batchId: batchId.value } : undefined)
+  if (store.hasActive) store.startPolling()
+})
+
+watch(batchId, async () => {
+  await store.fetchList(batchId.value ? { batchId: batchId.value } : undefined)
   if (store.hasActive) store.startPolling()
 })
 
@@ -198,6 +211,34 @@ onBeforeUnmount(() => {
 .header-actions {
   display: flex;
   gap: var(--space-sm);
+}
+
+/* Batch filter */
+.batch-filter-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-base);
+  margin-bottom: var(--space-2xl);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.batch-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.batch-clear-link {
+  font-size: 13px;
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.batch-clear-link:hover {
+  text-decoration: underline;
 }
 
 .task-section {

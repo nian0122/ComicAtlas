@@ -50,6 +50,10 @@ export const importApi = {
   status: (id: number) => api.get(`/tasks/import/${id}/status`),
   cancel: (id: number) => api.post(`/tasks/import/${id}/cancel`),
   retry: (id: number) => api.post(`/tasks/import/${id}/retry`),
+  scan: (parentPath: string, sourceType: string) =>
+    api.get('/tasks/import/scan', { params: { parentPath, sourceType } }),
+  createBatch: (data: { sourceType: string; sourcePaths: string[] }) =>
+    api.post('/tasks/import/batch', data),
 }
 
 export const historyApi = {

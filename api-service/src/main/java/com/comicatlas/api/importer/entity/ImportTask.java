@@ -13,6 +13,7 @@ public class ImportTask {
     private String sourceRef;
     private String sourceType;
     private String sourcePath;
+    private String batchId;
     private String status;
     private Integer progress;
     private Integer totalPages;

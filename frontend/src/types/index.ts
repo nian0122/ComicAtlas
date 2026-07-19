@@ -141,6 +141,7 @@ export interface ImportTaskVO {
   downloadMethod: string
   downloadSpeed: number
   etaSeconds: number
+  batchId?: string
   errorMessage: string
   retryCount: number
   durationMs: number
@@ -153,6 +154,35 @@ export interface ImportStatusVO {
   taskId: number
   status: string
   progress: number
+}
+
+export interface ScanItemVO {
+  name: string
+  path: string
+  imageCount: number
+}
+
+export interface ScanResultVO {
+  parentPath: string
+  total: number
+  items: ScanItemVO[]
+}
+
+export interface BatchImportRequest {
+  sourceType: string
+  sourcePaths: string[]
+}
+
+export interface FailedItem {
+  sourcePath: string
+  errorMessage: string
+}
+
+export interface BatchImportResultVO {
+  batchId: string
+  total: number
+  succeeded: ImportTaskVO[]
+  failed: FailedItem[]
 }
 
 export interface HistoryVO {
