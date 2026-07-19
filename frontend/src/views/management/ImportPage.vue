@@ -318,7 +318,7 @@ async function doBatchImport() {
   if (paths.length === 0) return
   batchCreating.value = true
   try {
-    const result = await store.createBatch('DIRECTORY', paths)
+    const result: any = await store.createBatch('DIRECTORY', paths)
     ElMessage.success(`批量导入已创建，共 ${paths.length} 个任务`)
     batchParentPath.value = ''
     scanResult.value = null

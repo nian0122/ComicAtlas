@@ -413,8 +413,8 @@ async function onRebuild() {
       { type: 'info', confirmButtonText: '开始重建' }
     )
     refreshing.value = true
-    const data = await adminApi.refreshMetadata(comicId)
-    ElMessage.success(`刷新完成：${data.chapters} 章节，${data.pages} 页`)
+    const data: any = await adminApi.refreshMetadata(comicId)
+    ElMessage.success(`刷新完成：${data.data.chapters} 章节，${data.data.pages} 页`)
   } catch (err: unknown) {
     if (err === 'cancel') return
     const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message

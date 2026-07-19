@@ -12,7 +12,7 @@
       @scroll="onScroll"
     >
       <template #default="{ item, index, active }">
-        <div class="reader-item-wrapper"><ReaderImageItem :item="item" :index="index" :active="active" /></div>
+        <div class="reader-item-wrapper"><ReaderImageItem :item="item" :index="index" :active="active" :item-height="item.size" /></div>
       </template>
     </RecycleScroller>
   </div>
@@ -21,9 +21,15 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { RecycleScroller } from 'vue-virtual-scroller'
+import type { RecycleScrollerExposed } from 'vue-virtual-scroller'
 import { useReaderSettingsStore } from '@/stores/reader-settings-store'
 import ReaderImageItem from './ReaderImageItem.vue'
 import type { PageInfo } from '@/types'
+import { DEFAULT_ASPECT_RATIO } from '@/types'
+/** 虚拟滚动缓冲区最小高度（px） */
+const MIN_BUFFER_PX = 800
+/** 程序化滚动锁定时长（ms），防止自身滚动事件触发页码回写 */
+const SCROLL_LOCK_DURATION_MS = 100
 
 interface ScrollerItem extends PageInfo {
   size: number
@@ -42,24 +48,32 @@ const emit = defineEmits<{
 
 const settings = useReaderSettingsStore()
 const viewportRef = ref<HTMLElement | null>(null)
-const scrollerRef = ref<any>(null)
+const scrollerRef = ref<RecycleScrollerExposed<ScrollerItem> | null>(null)
 const containerWidth = ref(0)
 const containerHeight = ref(0)
 
 function updateContainerSize() {
-  if (viewportRef.value) {
-    containerWidth.value = viewportRef.value.clientWidth
-    containerHeight.value = viewportRef.value.clientHeight
-  }
+  /*
+   * 两阶段获取宽度：
+   * 1. viewportRef.clientWidth 用于初始化（触发 RecycleScroller 渲染）
+   * 2. scrollerEl.clientWidth 用于修正：scroller 的 overflow-y:auto 在
+   *    内容超长时自动扣除垂直滚动条宽度，与 ProgressiveImage 的 width:100%
+   *    参照一致。差距 ≈ 滚动条宽度（Win ~17px），不修正会导致 size 偏差
+   *    ~25px → 图片在容器中大量留白 → 视觉间隙。
+   */
+  const baseW = viewportRef.value?.clientWidth ?? 0
+  const scrollerEl = (scrollerRef.value as Record<string, unknown> | null)?.$el as HTMLElement | undefined
+  containerWidth.value = scrollerEl?.clientWidth ?? baseW
+  containerHeight.value = viewportRef.value?.clientHeight ?? 0
 }
 
-const buffer = computed(() => Math.max(800, containerHeight.value))
+const buffer = computed(() => Math.max(MIN_BUFFER_PX, containerHeight.value))
 
 function computeAspectRatio(page: PageInfo): number {
   if (page.width && page.height && page.height > 0) {
     return page.width / page.height
   }
-  return 3 / 4
+  return DEFAULT_ASPECT_RATIO
 }
 
 function computeItemSize(page: PageInfo): number {
@@ -129,6 +143,7 @@ function upperBound(arr: number[], value: number): number {
 
 let scrollRafId: number | null = null
 let isProgrammaticScroll = false
+let programmaticScrollTimer: number | null = null
 let lastRangeStart = -1
 let lastRangeEnd = -1
 
@@ -183,17 +198,25 @@ function onScroll() {
   })
 }
 
-function scrollToPage(page: number) {
+function scrollToPage(page: number): void {
   if (!scrollerRef.value || props.pages.length === 0) return
   const targetPage = Math.max(1, Math.min(page, props.pages.length))
   const offset = targetPage === 1 ? 0 : prefixSums.value[targetPage - 2]
   isProgrammaticScroll = true
   setScrollOffset(offset)
+
+  // 取消旧计时器，防止新旧 scrollToPage 调用互相干扰
+  if (programmaticScrollTimer != null) {
+    window.clearTimeout(programmaticScrollTimer)
+    programmaticScrollTimer = null
+  }
+
   nextTick(() => {
     emitVisibleRange()
-    window.setTimeout(() => {
+    programmaticScrollTimer = window.setTimeout(() => {
+      programmaticScrollTimer = null
       isProgrammaticScroll = false
-    }, 100)
+    }, SCROLL_LOCK_DURATION_MS)
   })
 }
 
@@ -211,6 +234,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('resize', updateContainerSize)
   if (scrollRafId != null) cancelAnimationFrame(scrollRafId)
+  if (programmaticScrollTimer != null) window.clearTimeout(programmaticScrollTimer)
 })
 
 watch(() => props.currentPage, (newPage) => {
@@ -264,23 +288,29 @@ watch(() => [settings.fitMode, settings.zoom], () => {
 
 .reader-item-wrapper {
   width: 100%;
-  /*
-   * 内容区比 item-view 高 1px，向下溢出覆盖虚拟滚动
-   * translateY 浮点定位产生的亚像素缝隙。
-   * item-view（position:absolute, will-change:transform）
-   * 各自形成独立层叠上下文，后续 item 天然覆盖前序溢出。
-   */
-  height: calc(100% + 1px);
 }
 
 :deep(.vue-recycle-scroller__item-wrapper) {
   width: 100%;
 }
 
-/* 消除 item-view 之间的任何间隙：margin/padding/border 归零 */
-:deep(.vue-recycle-scroller__item-view) {
+/*
+ * 消除 item-view 之间的亚像素缝隙。
+ *
+ * 根因：vue-virtual-scroller 的 .vue-recycle-scroller.ready .item-view
+ * 设置了 will-change:transform（特异性 0,3,0），浏览器为每个 item-view
+ * 创建独立 GPU 合成层，相邻层间出现 <1px 渲染裂缝。
+ *
+ * 修复：用更高特异性（0,3,1）选择器设置 will-change:auto
+ * + backface-visibility:hidden，双保险消除合成层边界裂缝。
+ * 配合 ReaderImageItem 的明确像素高度（= scroller size），
+ * 内容高度与 slot 高度数学上严格一致。
+ */
+:deep(.vue-recycle-scroller.ready .vue-recycle-scroller__item-view) {
   margin: 0;
   padding: 0;
   border: none;
+  will-change: auto;
+  backface-visibility: hidden;
 }
 </style>

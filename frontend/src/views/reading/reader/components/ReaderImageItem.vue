@@ -1,6 +1,7 @@
 <template>
   <div
     class="reader-image-item"
+    :style="containerStyle"
     :class="{
       'fit-width': settings.fitMode === 'WIDTH',
       'fit-height': settings.fitMode === 'HEIGHT',
@@ -23,11 +24,13 @@ import { computed } from 'vue'
 import { useReaderSettingsStore } from '@/stores/reader-settings-store'
 import ProgressiveImage from './ProgressiveImage.vue'
 import type { PageInfo } from '@/types'
+import { DEFAULT_ASPECT_RATIO } from '@/types'
 
 interface Props {
   item: PageInfo
   index: number
   active: boolean
+  itemHeight: number
 }
 
 const props = defineProps<Props>()
@@ -39,8 +42,17 @@ const aspectRatio = computed(() => {
   if (page.value.width && page.value.height && page.value.height > 0) {
     return page.value.width / page.value.height
   }
-  return 3 / 4
+  return DEFAULT_ASPECT_RATIO
 })
+
+/*
+ * 用明确的像素高度（= scroller 的 size 字段）替代 CSS aspect-ratio 控制
+ * .reader-image-item 的高度。所有子元素的 height: 100% 此时有了确定参照，
+ * 不再退化为 auto，内容高度与 slot 高度严格一致。
+ */
+const containerStyle = computed(() => ({
+  height: `${props.itemHeight}px`,
+}))
 
 const imageClasses = computed(() => ({
   'fit-width-image': settings.fitMode === 'WIDTH',

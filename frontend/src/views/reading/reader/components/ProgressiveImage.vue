@@ -37,6 +37,7 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { PictureFilled } from '@element-plus/icons-vue'
 import type { QualityMode } from '@/stores/reader-settings-store'
+import { DEFAULT_ASPECT_RATIO } from '@/types'
 
 interface Props {
   lq: string | null
@@ -49,7 +50,7 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   alt: '',
-  aspectRatio: 3 / 4,
+  aspectRatio: DEFAULT_ASPECT_RATIO,
   enableProgressive: true,
 })
 
@@ -83,7 +84,7 @@ const containerStyle = computed(() => ({
   width: '100%',
 }))
 
-function cancelHqLoader() {
+function cancelHqLoader(): void {
   if (hqLoader) {
     hqLoader.onload = null
     hqLoader.onerror = null
@@ -92,17 +93,24 @@ function cancelHqLoader() {
   }
 }
 
-function loadHq() {
+function loadHq(): void {
   if (!props.hq || isHqLoaded.value || hqError.value) return
   if (!props.enableProgressive && props.mode === 'AUTO') return
 
   cancelHqLoader()
   isHqLoading.value = true
 
-  hqLoader = new Image()
-  hqLoader.decoding = 'async'
+  const loader = new Image()
+  loader.decoding = 'async'
+  hqLoader = loader
 
-  hqLoader.onload = () => {
+  loader.onload = () => {
+    /*
+     * 身份校验：虚拟滚动组件复用时 props 可能已切换，
+     * 旧 loader 的回调触发时 hqLoader 已指向新实例。
+     * 不匹配则丢弃，防止错误取消当前加载。
+     */
+    if (hqLoader !== loader) return
     isHqLoaded.value = true
     isHqLoading.value = false
     if ((props.mode === 'HQ_ONLY' || props.mode === 'AUTO') && props.hq) {
@@ -111,23 +119,24 @@ function loadHq() {
     cancelHqLoader()
   }
 
-  hqLoader.onerror = () => {
+  loader.onerror = () => {
+    if (hqLoader !== loader) return
     hqError.value = true
     isHqLoading.value = false
     cancelHqLoader()
   }
 
-  hqLoader.src = props.hq
+  loader.src = props.hq
 }
 
-function onImageLoad() {
+function onImageLoad(): void {
   // LQ 加载成功后，在 AUTO 模式下触发 HQ 加载
   if (currentSrc.value === props.lq && props.mode === 'AUTO') {
     loadHq()
   }
 }
 
-function onImageError() {
+function onImageError(): void {
   if (currentSrc.value === props.lq) {
     lqError.value = true
     if (props.mode === 'AUTO') {
@@ -138,7 +147,7 @@ function onImageError() {
   }
 }
 
-function reset() {
+function reset(): void {
   cancelHqLoader()
   isHqLoaded.value = false
   isHqLoading.value = false
@@ -147,12 +156,12 @@ function reset() {
   currentSrc.value = undefined
 }
 
-function retry() {
+function retry(): void {
   reset()
   applyInitialSrc()
 }
 
-function applyInitialSrc() {
+function applyInitialSrc(): void {
   if (props.mode === 'HQ_ONLY') {
     currentSrc.value = props.hq || undefined
     loadHq()
