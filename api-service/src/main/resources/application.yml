@@ -24,7 +24,7 @@ spring:
       port: ${REDIS_PORT:6379}
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
-    port: 5672
+    port: ${RABBITMQ_PORT:15673}
     username: ${RABBITMQ_USER:guest}
     password: ${RABBITMQ_PASS:guest}
     publisher-confirm-type: correlated
