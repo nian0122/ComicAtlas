@@ -158,6 +158,10 @@ function onImageError(): void {
     }
   } else if (currentSrc.value === props.hq) {
     hqError.value = true
+    // HQ 失败，降级尝试 LQ（原图模式 / forceHq / 智能模式 HQ 加载失败时）
+    if (props.lq && !lqError.value) {
+      currentSrc.value = props.lq
+    }
   }
 }
 
