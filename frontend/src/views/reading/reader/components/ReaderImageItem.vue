@@ -5,7 +5,6 @@
       'fit-width': settings.fitMode === 'WIDTH',
       'fit-height': settings.fitMode === 'HEIGHT',
       'fit-original': settings.fitMode === 'ORIGINAL',
-      'direction-horizontal': direction === 'horizontal',
     }"
   >
     <ProgressiveImage
@@ -29,12 +28,9 @@ interface Props {
   item: PageInfo
   index: number
   active: boolean
-  direction?: 'vertical' | 'horizontal'
 }
 
-const props = withDefaults(defineProps<Props>(), {
-  direction: 'vertical',
-})
+const props = defineProps<Props>()
 
 const settings = useReaderSettingsStore()
 
@@ -61,46 +57,45 @@ const imageClasses = computed(() => ({
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--space-sm) 0;
+  padding: 0;
 }
 
-.reader-image-item.direction-horizontal {
-  padding: 0 var(--space-sm);
-}
-
+/*
+ * ProgressiveImage 容器统一填满虚拟滚动 slot，由 object-fit: contain
+ * 处理图片在容器内的适配。zoom 放大时 slot 变高，图片在 taller 容器中
+ * 居中显示——用户滚动查看不同区域。此规则同时消除了"图片间缝隙"问题
+ * （容器高度严格等于 slot 高度，不存在 flexbox 居中产生的间隙）。
+ */
 .reader-image-item :deep(.progressive-image) {
-  width: auto;
-  height: auto;
-  max-width: 100%;
-  max-height: 100%;
+  width: 100%;
+  height: 100%;
 }
 
+/* WIDTH 模式：与默认一致，填满 slot */
 .reader-image-item.fit-width :deep(.progressive-image) {
   width: 100%;
-  height: auto;
-  max-height: none;
+  height: 100%;
 }
 
+/*
+ * HEIGHT 模式：高度填满 slot，宽度由 aspect-ratio 自动推导。
+ * max-width: 100% 防止超宽图片溢出视口。
+ */
 .reader-image-item.fit-height :deep(.progressive-image) {
   width: auto;
   height: 100%;
-  max-width: none;
+  max-width: 100%;
 }
 
+/*
+ * ORIGINAL 模式：保持原逻辑（图片按原始尺寸渲染，允许溢出）。
+ * 注意：zoom ≠ 100% 时可能与 slot 尺寸不一致，属于已知局限。
+ * overflow: hidden 由 .progressive-image 基类提供。
+ */
 .reader-image-item.fit-original :deep(.progressive-image) {
+  width: auto;
+  height: auto;
   max-width: none;
   max-height: none;
-}
-
-.reader-image-item.direction-horizontal.fit-width :deep(.progressive-image) {
-  width: 100%;
-  height: auto;
-  max-height: 100%;
-}
-
-.reader-image-item.direction-horizontal.fit-height :deep(.progressive-image) {
-  width: auto;
-  height: 100%;
-  max-width: 100%;
 }
 </style>
