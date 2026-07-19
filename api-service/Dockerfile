@@ -1,5 +1,6 @@
 FROM maven:3.9-eclipse-temurin-21-alpine AS builder
 WORKDIR /build
+COPY settings.xml /root/.m2/settings.xml
 COPY pom.xml .
 COPY comic-common ./comic-common
 COPY api-service ./api-service
