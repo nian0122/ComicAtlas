@@ -80,6 +80,7 @@ export const lqApi = {
 export const adminApi = {
   deleteComic: (id: number, mode: string) => api.delete(`/admin/comics/${id}`, { params: { mode } }),
   rebuild: () => api.post('/admin/rebuild'),
+  refreshMetadata: (id: number) => api.post(`/admin/comics/${id}/refresh-metadata`),
   scanRecover: () => api.post('/admin/storage/scan-recover'),
   stats: () => api.get('/admin/storage/stats'),
 }

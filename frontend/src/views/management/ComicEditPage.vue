@@ -126,7 +126,7 @@
         <div class="danger-zone-actions">
           <el-button type="danger" plain @click="onDeleteDatabase">删除数据库记录</el-button>
           <el-button type="danger" @click="onDeleteAll">删除数据库 + 本地文件</el-button>
-          <el-button type="warning" plain @click="onRebuild">重建元数据</el-button>
+          <el-button type="warning" plain :loading="refreshing" @click="onRebuild">重建元数据</el-button>
         </div>
       </div>
     </div>
@@ -196,6 +196,7 @@ const comicId = Number(route.params.id)
 const formRef = ref()
 const loading = ref(false)
 const saving = ref(false)
+const refreshing = ref(false)
 
 const form = ref<ComicMetadataUpdateDTO>({
   title: '',
@@ -407,20 +408,19 @@ async function onDeleteAll() {
 async function onRebuild() {
   try {
     await ElMessageBox.confirm(
-      '将从 HQ 目录和 metadata 文件重建所有漫画数据。当前数据不会丢失。',
+      '将从 HQ 目录和 metadata 文件刷新当前漫画的元数据。',
       '重建元数据',
       { type: 'info', confirmButtonText: '开始重建' }
     )
-    const res = await adminApi.rebuild()
-    const data = res.data as { comics: number; chapters: number; pages: number; errors?: string[] }
-    let msg = `重建完成：${data.comics} 部漫画、${data.chapters} 个章节、${data.pages} 页`
-    if (data.errors?.length) msg += `\n${data.errors.length} 个错误`
-    ElMessage.success(msg)
-    router.push('/manage/comics')
+    refreshing.value = true
+    const data = await adminApi.refreshMetadata(comicId)
+    ElMessage.success(`刷新完成：${data.chapters} 章节，${data.pages} 页`)
   } catch (err: unknown) {
     if (err === 'cancel') return
     const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-    ElMessage.error(msg || '重建失败')
+    ElMessage.error(msg || '刷新失败')
+  } finally {
+    refreshing.value = false
   }
 }
 

@@ -1,6 +1,7 @@
 package com.comicatlas.api.admin.controller;
 
 import com.comicatlas.api.admin.dto.ComicDeleteStats;
+import com.comicatlas.api.admin.dto.RefreshMetadataResult;
 import com.comicatlas.api.admin.dto.ScanRecoverResultDTO;
 import com.comicatlas.api.admin.dto.StorageStatsDTO;
 import com.comicatlas.api.common.Result;
@@ -35,5 +36,10 @@ public class AdminController {
     @DeleteMapping("/comics/{id}")
     public Result<ComicDeleteStats> deleteComic(@PathVariable Long id, @RequestParam String mode) {
         return Result.ok(adminService.deleteComic(id, mode));
+    }
+
+    @PostMapping("/comics/{comicId}/refresh-metadata")
+    public Result<RefreshMetadataResult> refreshMetadata(@PathVariable Long comicId) {
+        return Result.ok(adminService.refreshMetadata(comicId));
     }
 }

@@ -2,9 +2,14 @@ package com.comicatlas.api.importer.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.comicatlas.api.comic.entity.Catalog;
+import com.comicatlas.api.comic.entity.Chapter;
 import com.comicatlas.api.comic.entity.Comic;
+import com.comicatlas.api.comic.entity.Page;
+import com.comicatlas.api.comic.mapper.CatalogMapper;
+import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.comic.mapper.ComicMapper;
+import com.comicatlas.api.comic.mapper.PageMapper;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.importer.dto.*;
 import com.comicatlas.api.importer.entity.ImportTask;
@@ -22,6 +27,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.nio.file.Files;
@@ -36,6 +42,9 @@ public class ImportServiceImpl implements ImportService {
 
     private final ImportTaskMapper taskMapper;
     private final ComicMapper comicMapper;
+    private final CatalogMapper catalogMapper;
+    private final ChapterMapper chapterMapper;
+    private final PageMapper pageMapper;
     private final ImportEventPublisher eventPublisher;
     private final RedisTemplate<String, Object> redisTemplate;
 
@@ -125,7 +134,7 @@ public class ImportServiceImpl implements ImportService {
         var wrapper = new LambdaQueryWrapper<ImportTask>()
             .eq(status != null, ImportTask::getStatus, status)
             .orderByDesc(ImportTask::getCreatedAt);
-        Page<ImportTask> p = new Page<>(page != null ? page : 1, size != null ? size : 20);
+        var p = new com.baomidou.mybatisplus.extension.plugins.pagination.Page<ImportTask>(page != null ? page : 1, size != null ? size : 20);
         return taskMapper.selectPage(p, wrapper).convert(this::toVO);
     }
 
@@ -179,13 +188,24 @@ public class ImportServiceImpl implements ImportService {
         if (!"FAILED".equals(status) && !"CANCELLED".equals(status)) {
             throw new BusinessException(400, "仅 FAILED/CANCELLED 状态可重试");
         }
+
+        Long comicId = t.getComicId();
+
+        List<Long> chapterIds = chapterMapper.selectList(
+                new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId))
+                .stream().map(Chapter::getId).toList();
+        if (!chapterIds.isEmpty()) {
+            pageMapper.delete(new LambdaQueryWrapper<Page>().in(Page::getChapterId, chapterIds));
+        }
+        chapterMapper.delete(new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
+        catalogMapper.delete(new LambdaQueryWrapper<Catalog>().eq(Catalog::getComicId, comicId));
+
         t.setStatus("PENDING");
         t.setRetryCount(t.getRetryCount() + 1);
         t.setErrorMessage(null);
         taskMapper.updateById(t);
 
         Long taskId = t.getId();
-        Long comicId = t.getComicId();
         String sourceType = t.getSourceType();
         String sourcePath = t.getSourcePath();
         TransactionSynchronizationManager.registerSynchronization(
