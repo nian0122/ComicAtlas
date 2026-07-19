@@ -64,5 +64,12 @@
         </dependency>
 
 
+        <!-- 图片元数据读取（javax.imageio） -->
+        <dependency>
+            <groupId>org.sejda.imageio</groupId>
+            <artifactId>webp-imageio</artifactId>
+            <version>0.1.6</version>
+        </dependency>
+
     </dependencies>
 </project>

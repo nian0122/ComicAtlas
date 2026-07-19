@@ -4,7 +4,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
 import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -73,19 +74,40 @@ public class MetadataAssembler {
             Path img = node.imageFiles().get(i);
             String name = img.getFileName().toString();
             long size = safeFileSize(img);
+            var dims = getImageDimensions(img);
 
             pages.add(new ComicMetadata.PageInfo(
                 name, i + 1,
                 size > 0 ? "READY" : "MISSING",
-                "PENDING",
+                "NOT_GENERATED",
                 size,
-                safeImageWidth(img), safeImageHeight(img)
+                dims.width(), dims.height()
             ));
         }
         return pages;
     }
 
-    private long safeFileSize(Path p) { try { return Files.size(p); } catch (Exception e) { return 0; } }
-    private Integer safeImageWidth(Path p) { try { BufferedImage bi = ImageIO.read(p.toFile()); return bi != null ? bi.getWidth() : null; } catch (Exception e) { return null; } }
-    private Integer safeImageHeight(Path p) { try { BufferedImage bi = ImageIO.read(p.toFile()); return bi != null ? bi.getHeight() : null; } catch (Exception e) { return null; } }
+    private long safeFileSize(Path p) {
+        try { return Files.size(p); } catch (Exception e) { return 0; }
+    }
+
+    private record ImageDimensions(Integer width, Integer height) {}
+
+    private ImageDimensions getImageDimensions(Path p) {
+        try (ImageInputStream in = ImageIO.createImageInputStream(p.toFile())) {
+            if (in == null) return new ImageDimensions(null, null);
+            var readers = ImageIO.getImageReaders(in);
+            if (!readers.hasNext()) return new ImageDimensions(null, null);
+            ImageReader reader = readers.next();
+            try {
+                reader.setInput(in);
+                return new ImageDimensions(reader.getWidth(0), reader.getHeight(0));
+            } finally {
+                reader.dispose();
+            }
+        } catch (Exception e) {
+            log.debug("无法读取图片尺寸: {}", p, e);
+            return new ImageDimensions(null, null);
+        }
+    }
 }
