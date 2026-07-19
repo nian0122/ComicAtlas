@@ -31,17 +31,24 @@ public interface ComicMapper extends BaseMapper<Comic> {
             </if>
             <if test='query.tags != null and query.tags.size > 0'>
                 <choose>
-                    <when test='query.tagMode == "AND"'>
-                        AND (SELECT COUNT(DISTINCT t.name) FROM comic_tag ct JOIN tag t ON t.id = ct.tag_id
-                             WHERE ct.comic_id = c.id AND t.name IN
-                             <foreach collection='query.tags' item='tagName' open='(' separator=',' close=')'>#{tagName}</foreach>
-                            ) = #{query.tags.size}
+                    <when test='query.tags.contains(&quot;_NONE&quot;)'>
+                        AND NOT EXISTS (SELECT 1 FROM comic_tag ct WHERE ct.comic_id = c.id)
                     </when>
                     <otherwise>
-                        AND EXISTS (SELECT 1 FROM comic_tag ct JOIN tag t ON t.id = ct.tag_id
-                                    WHERE ct.comic_id = c.id AND t.name IN
-                                    <foreach collection='query.tags' item='tagName' open='(' separator=',' close=')'>#{tagName}</foreach>
-                                   )
+                        <choose>
+                            <when test='query.tagMode == &quot;AND&quot;'>
+                                AND (SELECT COUNT(DISTINCT t.name) FROM comic_tag ct JOIN tag t ON t.id = ct.tag_id
+                                     WHERE ct.comic_id = c.id AND t.name IN
+                                     <foreach collection='query.tags' item='tagName' open='(' separator=',' close=')'>#{tagName}</foreach>
+                                    ) = #{query.tags.size}
+                            </when>
+                            <otherwise>
+                                AND EXISTS (SELECT 1 FROM comic_tag ct JOIN tag t ON t.id = ct.tag_id
+                                            WHERE ct.comic_id = c.id AND t.name IN
+                                            <foreach collection='query.tags' item='tagName' open='(' separator=',' close=')'>#{tagName}</foreach>
+                                           )
+                            </otherwise>
+                        </choose>
                     </otherwise>
                 </choose>
             </if>
@@ -49,7 +56,14 @@ public interface ComicMapper extends BaseMapper<Comic> {
                 AND c.status = #{query.status}
             </if>
             <if test='query.category != null and query.category != ""'>
-                AND EXISTS (SELECT 1 FROM category cat WHERE cat.id = c.category_id AND cat.name = #{query.category})
+                <choose>
+                    <when test='query.category == &quot;_NONE&quot;'>
+                        AND c.category_id IS NULL
+                    </when>
+                    <otherwise>
+                        AND EXISTS (SELECT 1 FROM category cat WHERE cat.id = c.category_id AND cat.name = #{query.category})
+                    </otherwise>
+                </choose>
             </if>
             <if test='query.sourceType != null and query.sourceType != ""'>
                 AND c.source_type = #{query.sourceType}
