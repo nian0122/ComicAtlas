@@ -7,7 +7,8 @@
         :hq="page.hqUrl"
         :mode="settings.qualityMode"
         :aspect-ratio="aspectRatio"
-        :enable-progressive="settings.enableProgressiveImage"
+        :lq-status="page.lqStatus"
+        :force-hq="forceHq"
       />
     </div>
   </div>
@@ -22,6 +23,8 @@ import type { PageInfo } from '@/types'
 interface Props {
   pages: PageInfo[]
   currentPage: number
+  /** 被双击强制切到 HQ 的页面索引（pageNumber - 1）集合 */
+  forceHqPages: ReadonlySet<number>
 }
 
 const props = defineProps<Props>()
@@ -50,6 +53,8 @@ const page = computed<PageInfo | null>(() => {
   const idx = Math.min(Math.max(props.currentPage - 1, 0), props.pages.length - 1)
   return props.pages[idx]
 })
+
+const forceHq = computed(() => props.forceHqPages.has(props.currentPage - 1))
 
 const aspectRatio = computed(() => {
   const p = page.value

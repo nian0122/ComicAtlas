@@ -50,14 +50,6 @@
         </div>
         <el-switch v-model="readerSettings.enablePreload" />
       </div>
-
-      <div class="setting-row">
-        <div class="setting-info">
-          <label class="setting-label">渐进加载</label>
-          <span class="setting-hint">先显示低清预览再加载高清原图</span>
-        </div>
-        <el-switch v-model="readerSettings.enableProgressiveImage" />
-      </div>
     </section>
   </div>
 </template>

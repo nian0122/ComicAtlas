@@ -40,6 +40,7 @@
       ref="viewportComponentRef"
       :pages="store.pages"
       :current-page="store.currentPage"
+      :force-hq-pages="forceHqPages"
       @page-request="onPageRequest"
       @visible-range="onVisibleRange"
     />
@@ -48,6 +49,7 @@
       ref="viewportComponentRef"
       :pages="store.pages"
       :current-page="store.currentPage"
+      :force-hq-pages="forceHqPages"
       @update:current-page="onPageChange"
       @visible-range="onVisibleRange"
     />
@@ -81,7 +83,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { PictureFilled, WarningFilled } from '@element-plus/icons-vue'
@@ -174,6 +176,8 @@ gesture.onSwipe((direction) => {
 const lastSyncedPage = ref(1)
 const comicTitle = ref('')
 const saveDebounceTimer = ref<number | null>(null)
+/** 被双击切到 HQ 的页面索引（0-based），使用 reactive Set 保持响应性 */
+const forceHqPages = reactive(new Set<number>())
 
 // 桌面端返回/章节跳转：保留迁移前实现（含 /library 兜底），移动端走 nav.*
 function goBack() {
@@ -212,13 +216,14 @@ async function loadCurrentChapter() {
     return
   }
 
+  forceHqPages.clear()
   preloadEngine.reset(store.totalPages)
-  preloadEngine.setUrlResolver((index: number, priority: 'immediate' | 'cascade') => {
+  preloadEngine.setUrlResolver((index: number, _priority: 'immediate' | 'cascade') => {
     const page = store.pages[index]
     if (!page) return null
-    if (priority === 'immediate') {
-      return page.hqUrl || page.lqUrl || null
-    }
+    // 智能/原图模式 & 强制 HQ 页 → 预加载 HQ；省流模式 → 预加载 LQ
+    const wantHq = settings.qualityMode !== 'LQ_ONLY' || forceHqPages.has(index)
+    if (wantHq) return page.hqUrl || page.lqUrl || null
     return page.lqUrl || page.hqUrl || null
   })
 
@@ -289,13 +294,23 @@ function onWheel(e: WheelEvent) {
 }
 
 function onDblClick(e: MouseEvent) {
-  // Reset zoom on double click of the page area
   const target = e.target as HTMLElement
-  if (
-    target.closest('.reader-viewport') ||
-    target.closest('.paged-viewport') ||
-    target.closest('.reader-image-item')
-  ) {
+  const isViewport = target.closest('.reader-viewport') || target.closest('.paged-viewport')
+  const isImage = target.closest('.reader-image-item')
+
+  if (isImage) {
+    // 双击图片区域：切换当前页 HQ/LQ
+    const idx = store.currentPage - 1
+    if (forceHqPages.has(idx)) {
+      forceHqPages.delete(idx)
+    } else {
+      forceHqPages.add(idx)
+    }
+    return
+  }
+
+  if (isViewport) {
+    // 双击 viewport 空白区域：重置缩放
     settings.resetZoom()
   }
 }

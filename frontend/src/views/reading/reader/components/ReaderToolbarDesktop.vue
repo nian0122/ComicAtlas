@@ -44,9 +44,9 @@
         class="toolbar-select"
         @change="settings.setQualityMode"
       >
-        <el-option label="自动" value="AUTO" />
-        <el-option label="原图" value="HQ_ONLY" />
         <el-option label="省流" value="LQ_ONLY" />
+        <el-option label="智能" value="AUTO" />
+        <el-option label="原图" value="HQ_ONLY" />
       </el-select>
 
       <!-- Fit -->
@@ -89,12 +89,6 @@
           <el-dropdown-menu>
             <el-dropdown-item command="toggleToolbar">
               {{ settings.showToolbar ? '隐藏工具栏' : '显示工具栏' }}
-            </el-dropdown-item>
-            <el-dropdown-item command="togglePreload">
-              {{ settings.enablePreload ? '关闭预加载' : '开启预加载' }}
-            </el-dropdown-item>
-            <el-dropdown-item command="toggleProgressive">
-              {{ settings.enableProgressiveImage ? '关闭渐进加载' : '开启渐进加载' }}
             </el-dropdown-item>
             <el-dropdown-item divided command="resetZoom">重置缩放</el-dropdown-item>
           </el-dropdown-menu>
@@ -169,12 +163,6 @@ function onCommand(command: string) {
   switch (command) {
     case 'toggleToolbar':
       settings.toggleToolbar()
-      break
-    case 'togglePreload':
-      settings.togglePreload()
-      break
-    case 'toggleProgressive':
-      settings.toggleProgressiveImage()
       break
     case 'resetZoom':
       settings.resetZoom()

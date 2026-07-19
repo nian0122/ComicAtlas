@@ -13,7 +13,8 @@
       :hq="page.hqUrl"
       :mode="settings.qualityMode"
       :aspect-ratio="aspectRatio"
-      :enable-progressive="settings.enableProgressiveImage"
+      :lq-status="page.lqStatus"
+      :force-hq="forceHq"
       :class="imageClasses"
     />
   </div>
@@ -31,6 +32,7 @@ interface Props {
   index: number
   active: boolean
   itemHeight: number
+  forceHq: boolean
 }
 
 const props = defineProps<Props>()
