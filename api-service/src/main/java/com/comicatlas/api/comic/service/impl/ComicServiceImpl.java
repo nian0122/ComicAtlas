@@ -347,6 +347,88 @@ public class ComicServiceImpl implements ComicService {
     }
 
     @Override
+    public BatchUpdateResultVO batchUpdate(BatchComicUpdateDTO dto) {
+        List<BatchUpdateResultVO.FailedItem> failed = new ArrayList<>();
+        int succeeded = 0;
+
+        // Step 1: Dedup comicIds
+        Set<Long> uniqueIds = new LinkedHashSet<>(dto.getComicIds());
+
+        // Step 2: Loop through each comic
+        for (Long comicId : uniqueIds) {
+            try {
+                Comic comic = comicMapper.selectById(comicId);
+                if (comic == null) {
+                    failed.add(new BatchUpdateResultVO.FailedItem(comicId, null, "漫画不存在"));
+                    continue;
+                }
+                if (!"READY".equals(comic.getStatus())) {
+                    failed.add(new BatchUpdateResultVO.FailedItem(comicId, comic.getTitle(),
+                            "漫画状态为 " + comic.getStatus() + "，无法编辑"));
+                    continue;
+                }
+
+                // Step 3: Update category if provided
+                if (dto.getCategoryId() != null) {
+                    Category category = categoryMapper.selectById(dto.getCategoryId());
+                    if (category == null) {
+                        failed.add(new BatchUpdateResultVO.FailedItem(comicId, comic.getTitle(), "分类不存在"));
+                        continue; // Skip tag processing for this comic
+                    }
+                    comic.setCategoryId(dto.getCategoryId());
+                    comic.setCategory(category.getName());
+                    comicMapper.updateById(comic);
+                }
+
+                // Step 4: Append tags if provided
+                if (dto.getAddTagIds() != null && !dto.getAddTagIds().isEmpty()) {
+                    // Validate tag existence (skip invalid tags, don't fail the comic)
+                    List<Tag> existingTags = tagMapper.selectBatchIds(dto.getAddTagIds());
+                    Set<Long> validTagIds = existingTags.stream()
+                            .map(Tag::getId).collect(Collectors.toSet());
+                    List<Long> invalidTagIds = dto.getAddTagIds().stream()
+                            .filter(id -> !validTagIds.contains(id)).toList();
+                    if (!invalidTagIds.isEmpty()) {
+                        log.warn("批量更新漫画 {} 时跳过不存在的标签: {}", comicId, invalidTagIds);
+                    }
+
+                    // Query existing comic tags
+                    List<Long> existingComicTagIds = comicTagMapper.selectList(
+                                    new LambdaQueryWrapper<ComicTag>()
+                                            .eq(ComicTag::getComicId, comicId))
+                            .stream().map(ComicTag::getTagId).toList();
+
+                    // Insert only non-existing tag associations
+                    for (Long tagId : validTagIds) {
+                        if (!existingComicTagIds.contains(tagId)) {
+                            ComicTag ct = new ComicTag();
+                            ct.setComicId(comicId);
+                            ct.setTagId(tagId);
+                            comicTagMapper.insert(ct);
+                        }
+                    }
+                }
+
+                succeeded++;
+            } catch (Exception e) {
+                log.error("批量更新漫画 {} 失败", comicId, e);
+                String title = null;
+                try {
+                    Comic c = comicMapper.selectById(comicId);
+                    if (c != null) title = c.getTitle();
+                } catch (Exception ignored) {}
+                failed.add(new BatchUpdateResultVO.FailedItem(comicId, title, "系统错误"));
+            }
+        }
+
+        BatchUpdateResultVO result = new BatchUpdateResultVO();
+        result.setTotal(uniqueIds.size());
+        result.setSucceeded(succeeded);
+        result.setFailed(failed.isEmpty() ? List.of() : failed);
+        return result;
+    }
+
+    @Override
     public List<CoverCandidateDTO> listCoverCandidates(Long comicId) {
         Comic c = comicMapper.selectById(comicId);
         if (c == null) throw new BusinessException(404, "漫画不存在");

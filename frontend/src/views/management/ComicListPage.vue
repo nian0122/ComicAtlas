@@ -57,6 +57,19 @@
       <el-button text @click="resetFilters">重置</el-button>
     </div>
 
+    <div v-if="selectedIds.length > 0" class="batch-toolbar">
+      <el-checkbox
+        v-model="selectAll"
+        :indeterminate="isIndeterminate"
+        @change="handleSelectAll"
+      >
+        全选 ({{ selectedIds.length }} / {{ store.list.length }})
+      </el-checkbox>
+      <el-button type="primary" @click="showBatchDialog = true">
+        批量编辑
+      </el-button>
+    </div>
+
     <div v-if="store.loading && store.list.length === 0" class="state loading">
       <div class="spinner" />
       <span>加载中...</span>
@@ -82,6 +95,12 @@
           class="comic-row"
           @click="goEdit(comic.id)"
         >
+          <el-checkbox
+            class="comic-checkbox"
+            :model-value="selectedIds.includes(comic.id)"
+            @change="() => toggleSelect(comic.id)"
+            @click.stop
+          />
           <div class="comic-cover">
             <img :src="comic.coverUrl" :alt="comic.title">
           </div>
@@ -110,16 +129,23 @@
         />
       </div>
     </section>
+
+    <BatchEditDialog
+      v-model:visible="showBatchDialog"
+      :comic-ids="selectedIds"
+      @saved="onBatchSaved"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { reactive, onMounted } from 'vue'
+import { reactive, ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { PictureFilled, WarningFilled } from '@element-plus/icons-vue'
 import { useManagementComicStore } from '@/stores/management/comic'
 import { useCategoryStore } from '@/stores/management/category'
 import { useTagStore } from '@/stores/tag-store'
+import BatchEditDialog from './BatchEditDialog.vue'
 import type { ComicListQuery } from '@/types'
 
 const router = useRouter()
@@ -157,6 +183,39 @@ const filters = reactive({
   tagMode: 'OR' as 'AND' | 'OR',
   sort: 'createdAt',
 })
+
+const selectedIds = ref<number[]>([])
+const showBatchDialog = ref(false)
+
+const selectAll = computed(() =>
+  store.list.length > 0 && selectedIds.value.length === store.list.length
+)
+const isIndeterminate = computed(() =>
+  selectedIds.value.length > 0 && selectedIds.value.length < store.list.length
+)
+
+function toggleSelect(id: number) {
+  const idx = selectedIds.value.indexOf(id)
+  if (idx >= 0) {
+    selectedIds.value.splice(idx, 1)
+  } else {
+    selectedIds.value.push(id)
+  }
+}
+
+function handleSelectAll(val: string | number | boolean) {
+  if (val) {
+    selectedIds.value = store.list.map(c => c.id)
+  } else {
+    selectedIds.value = []
+  }
+}
+
+function onBatchSaved() {
+  selectedIds.value = []
+  showBatchDialog.value = false
+  store.fetchList()
+}
 
 function statusLabel(s: string) {
   return STATUS_LABELS[s] || s

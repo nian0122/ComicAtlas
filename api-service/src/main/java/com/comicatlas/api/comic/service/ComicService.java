@@ -14,6 +14,7 @@ public interface ComicService {
     ComicMetadataDTO updateMetadata(Long id, ComicMetadataUpdateDTO dto);
     List<Long> getComicTags(Long comicId);
     void updateComicTags(Long comicId, ComicTagUpdateDTO dto);
+    BatchUpdateResultVO batchUpdate(BatchComicUpdateDTO dto);
     List<String> autocompleteTitles(String keyword);
     List<CoverCandidateDTO> listCoverCandidates(Long comicId);
     ComicDetailVO updateCover(Long comicId, CoverUpdateDTO dto);

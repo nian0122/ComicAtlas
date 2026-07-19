@@ -4,6 +4,8 @@ import type {
   TagCreateDTO,
   ComicTagUpdateDTO,
   CoverUpdateDTO,
+  BatchComicUpdateDTO,
+  BatchUpdateResultVO,
 } from '@/types'
 
 const api = axios.create({ baseURL: '/api' })
@@ -32,6 +34,9 @@ export const comicApi = {
   listCoverCandidates: (id: number) => api.get(`/comics/${id}/covers/candidates`),
   updateCover: (id: number, data: CoverUpdateDTO) =>
     api.put(`/comics/${id}/cover`, data),
+  /** 批量更新漫画分类和标签 */
+  batchUpdate: (data: BatchComicUpdateDTO) =>
+    api.post('/comics/batch/update', data),
 }
 
 export const catalogApi = {
