@@ -20,6 +20,7 @@
         @clear="applyFilters"
       />
       <el-select v-model="filters.category" placeholder="分类" clearable class="filter-select" @change="applyFilters">
+        <el-option label="未分类" value="_NONE" />
         <el-option
           v-for="c in categoryStore.list"
           :key="c.id"
@@ -46,6 +47,7 @@
           :label="t.name"
           :value="t.name"
         />
+        <el-option label="无标签" value="_NONE" />
       </el-select>
       <el-select v-if="filters.tags.length > 1" v-model="filters.tagMode" class="filter-select--mini" @change="applyFilters">
         <el-option label="任一" value="OR" />
@@ -139,7 +141,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { PictureFilled, WarningFilled } from '@element-plus/icons-vue'
 import { useManagementComicStore } from '@/stores/management/comic'
@@ -224,6 +226,15 @@ function statusLabel(s: string) {
 function goEdit(id: number) {
   router.push(`/manage/comics/${id}/edit`)
 }
+
+watch(() => filters.tags, (val) => {
+  if (!val.includes('_NONE')) return
+  if (val.length > 1) {
+    nextTick(() => {
+      filters.tags = val.filter(v => v !== '_NONE')
+    })
+  }
+}, { deep: true })
 
 function applyFilters() {
   store.search({
