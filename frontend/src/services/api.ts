@@ -5,7 +5,6 @@ import type {
   ComicTagUpdateDTO,
   CoverUpdateDTO,
   BatchComicUpdateDTO,
-  BatchUpdateResultVO,
 } from '@/types'
 
 const api = axios.create({ baseURL: '/api' })
