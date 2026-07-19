@@ -45,7 +45,7 @@ interface Props {
   alt?: string
   mode: QualityMode
   aspectRatio?: number
-  /** LQ 生成状态：GENERATED 可用，其他视为不可用（降级 HQ） */
+  /** LQ 生成状态：READY 可用，其他视为不可用（降级 HQ） */
   lqStatus: string
   /** 双击强制切换：true → 显示 HQ，false → 恢复画质模式决定 */
   forceHq: boolean
@@ -72,7 +72,7 @@ const effectiveMode = computed<QualityMode>(() => {
   return props.mode
 })
 
-const lqAvailable = computed(() => props.lqStatus === 'GENERATED')
+const lqAvailable = computed(() => props.lqStatus === 'READY')
 
 // ── UI 状态 ──
 const error = computed(() => {

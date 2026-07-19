@@ -144,6 +144,22 @@
               </label>
             </div>
           </div>
+
+          <!-- 高级 -->
+          <div class="advanced-divider" role="separator">高级</div>
+
+          <label class="toggle-row">
+            <input
+              class="visually-hidden"
+              type="checkbox"
+              :checked="settings.enablePreload"
+              @change="settings.togglePreload()"
+            />
+            <span class="toggle-label">预加载</span>
+            <span class="toggle" :class="{ on: settings.enablePreload }" aria-hidden="true">
+              <span class="toggle-thumb" />
+            </span>
+          </label>
         </div>
       </section>
     </div>
