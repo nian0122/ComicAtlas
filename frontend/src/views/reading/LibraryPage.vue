@@ -33,6 +33,7 @@
           <div class="filter-select category-select">
             <select v-model="categoryFilter" @change="onSearch">
               <option value="">全部分类</option>
+              <option value="_NONE">未分类</option>
               <option v-for="c in allCategories" :key="c.id" :value="c.name">{{ c.name }}</option>
             </select>
           </div>
@@ -52,6 +53,7 @@
                 :label="tag.name"
                 :value="tag.name"
               />
+              <el-option label="无标签" value="_NONE" />
             </el-select>
           </div>
 
@@ -115,7 +117,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { Search, PictureFilled, WarningFilled, CircleClose } from '@element-plus/icons-vue'
 import { useComicStore } from '@/stores/comic-store'
@@ -175,6 +177,15 @@ async function loadCategories() {
     allCategories.value = []
   }
 }
+
+watch(selectedTags, (val) => {
+  if (!val.includes('_NONE')) return
+  if (val.length > 1) {
+    nextTick(() => {
+      selectedTags.value = val.filter(v => v !== '_NONE')
+    })
+  }
+}, { deep: true })
 
 function onSearch() {
   store.search({

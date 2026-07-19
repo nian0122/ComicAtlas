@@ -90,11 +90,39 @@ test('分类筛选:选中传 category,切回全部不传', async ({ page }) => {
   await page.goto('/library')
   const select = page.locator('.category-select select')
   await expect(select).toBeVisible({ timeout: 10000 })
-  await expect(select.locator('option')).toHaveCount(3) // 全部分类 + 少年 + 青年
+  await expect(select.locator('option')).toHaveCount(4) // 全部分类 + 未分类 + 少年 + 青年
 
   await select.selectOption({ label: '少年' })
   await expect.poll(() => captured.category[captured.category.length - 1]).toBe('少年')
 
   await select.selectOption({ label: '全部分类' })
   await expect.poll(() => captured.category[captured.category.length - 1]).toBe(null)
+})
+
+test('分类筛选支持未分类(_NONE)', async ({ page }) => {
+  const captured: CapturedParams = { status: [], category: [] }
+  await mockRoutes(page, captured)
+
+  await page.goto('/library')
+  const select = page.locator('.category-select select')
+  await expect(select).toBeVisible({ timeout: 10000 })
+
+  await select.selectOption({ label: '未分类' })
+  await expect.poll(() => captured.category[captured.category.length - 1]).toBe('_NONE')
+})
+
+test('标签筛选支持无标签(_NONE)且与正常标签互斥', async ({ page }) => {
+  const captured: CapturedParams = { status: [], category: [] }
+  await mockRoutes(page, captured)
+
+  await page.goto('/library')
+  await expect(page.locator('.comic-poster').first()).toBeVisible({ timeout: 10000 })
+
+  const tagSelect = page.locator('.tag-select')
+  await tagSelect.click()
+  // 选"无标签"
+  await page.locator('.el-select-dropdown__item').filter({ hasText: '无标签' }).click()
+  // 点击空白关闭下拉
+  await page.locator('body').click()
+  await expect.poll(() => captured.category[captured.category.length - 1]).toBe(null) // categoryFilter unchanged
 })
