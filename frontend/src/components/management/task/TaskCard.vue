@@ -87,9 +87,9 @@
         <button
           v-if="variant === 'done' && task.comicId"
           class="action-btn ghost"
-          @click="goLibrary"
+          @click="goDetail"
         >
-          漫画库
+          查看详情
         </button>
       </div>
     </div>
@@ -181,10 +181,9 @@ function formatDuration(ms: number): string {
   return `${m}分${s}秒`
 }
 
-function goLibrary() {
-  // 用 window.location 跳转避免依赖 useRouter（保持组件无路由耦合）
+function goDetail() {
   if (props.task.comicId) {
-    window.location.href = `/comics/${props.task.comicId}`
+    window.location.href = `/comic/${props.task.comicId}`
   }
 }
 </script>
