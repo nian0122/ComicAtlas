@@ -15,12 +15,15 @@ import java.util.UUID;
     @JsonSubTypes.Type(value = DeleteRequestedEvent.class, name = "DeleteRequested"),
     @JsonSubTypes.Type(value = CancelTaskEvent.class, name = "CancelTask"),
     @JsonSubTypes.Type(value = DeleteCompletedEvent.class, name = "DeleteCompleted"),
-    @JsonSubTypes.Type(value = LqCompletedEvent.class, name = "LqCompleted")
+    @JsonSubTypes.Type(value = LqCompletedEvent.class, name = "LqCompleted"),
+    @JsonSubTypes.Type(value = DeleteHqRequestedEvent.class, name = "DeleteHqRequested"),
+    @JsonSubTypes.Type(value = HqDeletedEvent.class, name = "HqDeleted")
 })
 public sealed interface ComicEvent
     permits ImportTaskCreatedEvent, ImportTaskCompletedEvent, ImportTaskFailedEvent,
             TaskStatusChangedEvent, LqGenerateEvent, DeleteRequestedEvent,
-            CancelTaskEvent, DeleteCompletedEvent, LqCompletedEvent {
+            CancelTaskEvent, DeleteCompletedEvent, LqCompletedEvent,
+            DeleteHqRequestedEvent, HqDeletedEvent {
 
     UUID eventId();
     Instant occurredAt();
