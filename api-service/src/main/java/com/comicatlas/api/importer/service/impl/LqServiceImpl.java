@@ -53,7 +53,7 @@ public class LqServiceImpl implements LqService {
         }
 
         // 发 MQ
-        var event = new LqGenerateEvent(UUID.randomUUID(), Instant.now(), ch.getComicId(), chapterId);
+        var event = new LqGenerateEvent(UUID.randomUUID(), Instant.now(), ch.getComicId(), chapterId, ch.getChapterNo());
         TransactionSynchronizationManager.registerSynchronization(
                 new TransactionSynchronization() {
                     @Override

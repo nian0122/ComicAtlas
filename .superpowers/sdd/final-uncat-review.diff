@@ -1,0 +1,1059 @@
+=== COMMITS 51aa597..b3f3a5e === 
+b3f3a5e feat(管理端): 漫画列表支持未分类与无标签筛选,无标签与正常标签互斥
+09881f3 feat(阅读端): 漫画库支持未分类与无标签筛选,无标签与正常标签互斥
+1306ef9 fix: 移除 api.ts 中未使用的 BatchUpdateResultVO 导入
+e4fae4f feat(后端): ComicMapper 支持未分类(_NONE→IS NULL)和无标签(_NONE→NOT EXISTS)筛选
+3994651 feat: 漫画批量分类标签编辑
+ 
+=== STAT === 
+ .omo/plans/batch-category-tag-edit.md              | 190 +++++++++++++++++++++
+ .../api/comic/controller/ComicController.java      |   8 +
+ .../api/comic/dto/BatchComicUpdateDTO.java         |  23 +++
+ .../api/comic/dto/BatchUpdateResultVO.java         |  20 +++
+ .../comicatlas/api/comic/mapper/ComicMapper.java   |  34 ++--
+ .../comicatlas/api/comic/service/ComicService.java |   1 +
+ .../api/comic/service/impl/ComicServiceImpl.java   |  82 +++++++++
+ frontend/e2e/library-filter.spec.ts                |  30 +++-
+ frontend/src/services/api.ts                       |   4 +
+ frontend/src/types/index.ts                        |  20 +++
+ frontend/src/views/management/BatchEditDialog.vue  |  99 +++++++++++
+ frontend/src/views/management/ComicListPage.vue    |  72 +++++++-
+ frontend/src/views/reading/LibraryPage.vue         |  13 +-
+ 13 files changed, 583 insertions(+), 13 deletions(-)
+ 
+=== FULL DIFF U10 === 
+diff --git a/.omo/plans/batch-category-tag-edit.md b/.omo/plans/batch-category-tag-edit.md
+new file mode 100644
+index 0000000..83df7b3
+--- /dev/null
++++ b/.omo/plans/batch-category-tag-edit.md
+@@ -0,0 +1,190 @@
++# batch-category-tag-edit - Work Plan
++
++## TL;DR (For humans)
++<!-- Fill this LAST, after the detailed plan below is written, so it summarizes the REAL plan. -->
++<!-- Plain English for a non-engineer: NO file paths, NO todo numbers, NO wave/agent/tool names. -->
++
++**What you'll get:** 漫画管理列表支持勾选多本漫画，通过弹窗统一设置分类和追加标签，一次保存批量生效。
++
++**Why this approach:** 复用现有 Service 的逐条处理逻辑做批量 best-effort 更新（部分失败不影响其他），前端仿照导入页已有的复选框模式。后端只新增 1 个端点，改动最小。
++
++**What it will NOT do:** 不会批量修改标题/作者/描述；不会覆盖式替换已有标签（只追加）；不会改动现有单漫画编辑流程。
++
++**Effort:** Short（8 个 todo，3-4 波并行）
++**Risk:** Low - 新增端点独立，不触碰现有编辑流程
++**Decisions to sanity-check:** 标签只追加不替换是否够用？分类覆盖式设置是否接受？
++
++Your next move: approve to generate plan, or run a high-accuracy review. Full execution detail follows below.
++
++---
++
++> TL;DR (machine): Short effort, Low risk, 4 waves: 8 todos — 4 backend + 4 frontend, deliver batch category/tag editing via ComicListPage checkboxes + dialog
++
++## Scope
++### Must have
++- Backend: `POST /api/comics/batch/update` — 接收 comicIds + categoryId? + addTagIds?，逐条 best-effort 更新，返回 succeeded/failed
++- Backend DTOs: `BatchComicUpdateDTO`（校验 comicIds 非空 ≤100，categoryId/addTagIds 至少一个非空），`BatchUpdateResultVO`（total + succeeded + failed[]）
++- Backend Service: `ComicServiceImpl.batchUpdate()` — 遍历 comicIds，只处理 READY 状态；categoryId 直接设 comic entity；addTagIds 去重追加（不删已有）
++- Frontend: `ComicListPage.vue` 加复选框列 + 全选 + 底部浮动「批量编辑」按钮（选中 ≥1 时显示）
++- Frontend: 新建 `BatchEditDialog.vue` — 分类下拉（含"不修改"）+ 标签多选 + 确认按钮
++- Frontend: API 服务 `comicApi.batchUpdate()` + TypeScript 类型扩展
++- 校验：后端验证 comicIds 非空 ≤100、至少一个修改项；前端弹窗确认前检查至少选了一个字段
++
++### Must NOT have (guardrails, anti-slop, scope boundaries)
++- 不修改标题/作者/描述
++- 不支持标签覆盖式替换——只做追加
++- 不新增数据库表或字段
++- 不改动现有单漫画编辑流程（ComicEditPage, ComicController 现有端点）
++- 不在导入完成后自动弹窗
++- 不做批量删除标签
++
++## Verification strategy
++> Zero human intervention - all verification is agent-executed.
++- Test decision: tests-after — 后端复用现有 Service 模式（MyBatis Plus + LambdaQueryWrapper），手工验证；前端用 Playwright 端到端
++- Framework: 后端 Spring Boot Test + MockMvc；前端 Playwright
++- Evidence: .omo/evidence/task-<N>-batch-category-tag-edit.<ext>
++
++## Execution strategy
++### Parallel execution waves
++> Target 5-8 todos per wave. Fewer than 3 (except the final) means you under-split.
++
++**Wave 1** — Backend（无内部依赖，4 个 todo 可并行）
++- T1: 新建 BatchComicUpdateDTO.java
++- T2: 新建 BatchUpdateResultVO.java
++- T3: 新建 ComicService.batchUpdate() 接口 + ComicServiceImpl 实现
++- T4: ComicController 新增 POST /comics/batch/update
++
++**Wave 2** — Frontend 基础层（依赖 Wave 1，T5+T6 可并行）
++- T5: TypeScript 类型扩展
++- T6: API 服务 comicApi.batchUpdate()
++
++**Wave 3** — Frontend 组件层（依赖 Wave 2，1 个 todo）
++- T7: 新建 BatchEditDialog.vue
++
++**Wave 4** — Frontend 集成（依赖 Wave 3，1 个 todo）
++- T8: ComicListPage.vue 加复选框 + 全选 + 批量编辑按钮 + 集成弹窗
++
++### Dependency matrix
++| Todo | Depends on | Blocks | Can parallelize with |
++| --- | --- | --- | --- |
++| T1 | — | T3, T5, T6 | T2, T4 |
++| T2 | — | T3, T5 | T1, T4 |
++| T3 | T1, T2 | T4 | — |
++| T4 | T3 | T5, T6 | — |
++| T5 | T1, T2 | T7, T8 | T6 |
++| T6 | T1, T2 | T7, T8 | T5 |
++| T7 | T5, T6 | T8 | — |
++| T8 | T7 | — | — |
++
++## Todos
++> Implementation + Test = ONE todo. Never separate.
++
++- [ ] 1. 新建 BatchComicUpdateDTO.java
++  What to do: 在 `api-service/.../dto/` 下创建 `BatchComicUpdateDTO`，三个字段：`@NotEmpty @Size(max=100) List<Long> comicIds`、`Long categoryId`（可选）、`List<Long> addTagIds`（可选）。在 Controller 层加手动校验：categoryId 和 addTagIds 不能同时为空（跨字段校验，Bean Validation 不支持直接表达），返回 400 "至少需要提供 categoryId 或 addTagIds"。
++  Must NOT do: 不加 title/author/description 字段；不修改现有 DTO。
++  Parallelization: Wave 1 | Blocked by: — | Blocks: T3, T5, T6
++  References: `api-service/.../dto/ComicMetadataUpdateDTO.java`（参考现有 DTO 风格）、`api-service/.../dto/BatchImportRequest.java`（参考 @Size 校验）、设计文档 §4.1
++  Acceptance criteria (agent-executable): `javac` 编译通过；controller 能接收 JSON `{"comicIds":[1,2],"categoryId":5,"addTagIds":[10,11]}`；comicIds 为空返回 400；comicIds >100 返回 400；categoryId 和 addTagIds 均为空返回 400
++  QA scenarios: happy — 正常 JSON 反序列化；failure — comicIds=[] 校验失败、comicIds 101个 校验失败、两个字段都 null 校验失败。Evidence: 编译日志 + curl 测试
++  Commit: Y | feat(api): 新增 BatchComicUpdateDTO 批量更新请求 DTO
++
++- [ ] 2. 新建 BatchUpdateResultVO.java
++  What to do: 在 `api-service/.../dto/` 下创建 `BatchUpdateResultVO`，含 `int total`、`int succeeded`、`List<FailedItem> failed`，内部类 `FailedItem` 含 `Long comicId`、`String title`、`String reason`。
++  Must NOT do: 不加 Lombok @Builder（保持与项目风格一致的 @Data）；不引入额外依赖。
++  Parallelization: Wave 1 | Blocked by: — | Blocks: T3, T5
++  References: `api-service/.../dto/BatchImportResultVO.java`（仿照其 succeed/fail 结构）、设计文档 §4.1
++  Acceptance criteria: 编译通过；controller 中能被 `Result<BatchUpdateResultVO>` 包装返回
++  QA scenarios: happy — new 对象设值后 getter 正确；failure — N/A（纯数据类）。Evidence: 编译日志
++  Commit: Y | feat(api): 新增 BatchUpdateResultVO 批量更新响应 VO
++
++- [ ] 3. 实现 ComicService.batchUpdate() + ComicServiceImpl
++  What to do: 
++    1. `ComicService.java` 新增 `BatchUpdateResultVO batchUpdate(BatchComicUpdateDTO dto);`
++    2. `ComicServiceImpl.java` 实现：
++       a. **去重 comicIds**：`new LinkedHashSet<>(dto.getComicIds())` 去重，防止同一漫画被计数多次
++       b. 遍历去重后的 comicIds → 查 comic → 校验 status=="READY"（否则记录 failed "漫画状态为 X，无法编辑" → continue）
++       c. 有 categoryId 时：先 `categoryMapper.selectById()` 校验分类存在 → 不存在则记录 failed "分类不存在" → continue（跳过本漫画的标签处理）；存在则设 `comic.categoryId` 和 `comic.category` → `comicMapper.updateById(comic)`
++       d. 有 addTagIds 时：先 `tagMapper.selectBatchIds()` 校验所有标签 → 不存在的 tagId **单独跳过并记录日志**（不阻止本漫画，因为个别标签不存在不影响其他标签的追加）；查已有 comic_tag 取 tagId 列表 → 过滤去重 → 逐个 insert ComicTag（不删已有的）
++       e. 每条异常被 catch 记录为 failed（含具体原因），不中断其他漫画
++  Must NOT do: 不调 updateMetadata()（它要求 @NotBlank title）；不包 @Transactional（best-effort 逐条）；不调 updateComicTags()（它是全量替换）；不静默接受无效 categoryId/tagId。
++  Parallelization: Wave 1 | Blocked by: T1, T2 | Blocks: T4
++  References: `ComicServiceImpl.java:275-299`（updateMetadata 的分目录逻辑）、`:323-347`（updateComicTags 的 comicTagMapper 用法）、`:30-40`（注入的 mapper 列表：comicMapper, categoryMapper, comicTagMapper）、设计文档 §5.2
++  Acceptance criteria: comicIds=[1,1,2]（含重复）→ 去重后仅处理 1 和 2，total=2；categoryId=999（不存在）→ 该 comic 记录 failed "分类不存在"，该 comic 的 addTagIds 不处理；addTagIds=[10,999]，其中 999 不存在 → 999 跳过（日志记录），10 正常追加，该 comic 仍计为 succeeded；漫画状态 IMPORTING → failed "漫画状态为 IMPORTING，无法编辑"；全部成功 → succeeded=2, total=2
++  QA scenarios: happy — 2本READY漫画设分类+标签，验证 DB categoryId/category/comic_tag；failure — 重复 comicIds 不膨胀 succeeded、无效 categoryId 记录具体原因、无效 tagId 记录具体原因、IMPORTING 状态跳过、异常被 catch 记录 "系统错误"。Evidence: comicMapper + comicTagMapper + categoryMapper 查询结果
++  Commit: Y | feat(api): 实现 ComicService.batchUpdate 批量更新分类和标签
++
++- [ ] 4. ComicController 新增 POST /comics/batch/update
++  What to do: `ComicController.java` 新增 `@PostMapping("/comics/batch/update") public Result<BatchUpdateResultVO> batchUpdate(@Valid @RequestBody BatchComicUpdateDTO dto)`。先手动校验 categoryId 和 addTagIds 不能同时为空（返回 400），再调 `comicService.batchUpdate(dto)` 返回。
++  Must NOT do: 不加 GET/PUT/DELETE 端点；不修改现有 controller 方法。
++  Parallelization: Wave 1 | Blocked by: T3 | Blocks: T5, T6
++  References: `ComicController.java:48-66`（参考 @PutMapping 的 @Valid + Result 模式）、设计文档 §5.1
++  Acceptance criteria: POST /api/comics/batch/update with valid JSON → 200 + BatchUpdateResultVO；invalid JSON（comicIds 空）→ 400；categoryId 和 addTagIds 均为空 → 400 "至少需要提供 categoryId 或 addTagIds"
++  QA scenarios: happy — curl POST 正常请求返回 200；failure — curl POST 空 comicIds 返回 400、两个字段都空返回 400。Evidence: curl 输出
++  Commit: Y | feat(api): ComicController 新增批量更新分类标签端点
++
++- [ ] 5. 扩展 Frontend TypeScript 类型
++  What to do: `frontend/src/types/index.ts` 新增 `BatchComicUpdateDTO`（comicIds: number[], categoryId?: number | null, addTagIds?: number[]）、`BatchUpdateResultVO`（total, succeeded, failed: FailedItem[]）、`FailedItem`（comicId, title: string | null, reason）。
++  Must NOT do: 不修改现有类型定义；不引入新依赖。
++  Parallelization: Wave 2 | Blocked by: T1, T2 | Blocks: T7, T8
++  References: `frontend/src/types/index.ts:210-228`（现有 ComicMetadataUpdateDTO、ComicTagUpdateDTO 风格）、设计文档 §6.4
++  Acceptance criteria: TypeScript 编译通过（`npx vue-tsc --noEmit`）
++  QA scenarios: happy — import 新类型无报错；failure — 类型与后端 DTO 不匹配时的编译错误。Evidence: tsc 输出
++  Commit: Y | feat(frontend): 新增批量编辑相关 TypeScript 类型
++
++- [ ] 6. 扩展 API 服务 comicApi.batchUpdate()
++  What to do: `frontend/src/services/api.ts` 在 `comicApi` 对象中新增 `batchUpdate: (data: BatchComicUpdateDTO) => api.post('/comics/batch/update', data)`。
++  Must NOT do: 不修改现有 comicApi 方法；不改变 api 实例的配置。
++  Parallelization: Wave 2 | Blocked by: T1, T2 | Blocks: T7, T8
++  References: `frontend/src/services/api.ts:22-35`（现有 comicApi 风格）、设计文档 §6.3
++  Acceptance criteria: 调用 `comicApi.batchUpdate({ comicIds: [1], categoryId: 5 })` 发送 POST 到 `/comics/batch/update`
++  QA scenarios: happy — 函数存在且签名正确；failure — N/A。Evidence: 代码检查
++  Commit: Y | feat(frontend): API 服务新增 comicApi.batchUpdate()
++
++- [ ] 7. 新建 BatchEditDialog.vue 弹窗组件
++  What to do: 创建 `frontend/src/views/management/BatchEditDialog.vue`。结构：`el-dialog`（title="批量编辑", width=480px, destroy-on-close）→ `el-form` → 分类 `el-select`（placeholder="不修改", clearable, 数据源 categoryStore.list）→ 标签 `el-select`（multiple, filterable, placeholder="选择要追加的标签", 数据源 tagStore.list）→ 底部提示"将为选中的 N 本漫画统一设置" → footer 取消/确认按钮。确认前校验至少选了一个字段。关键行为：
++    - `destroy-on-close` 确保每次打开弹窗时 ref 重置（categoryId=null, addTagIds=[]）
++    - 确认前校验 `categoryId === null && addTagIds.length === 0` → warning
++    - API 返回后：succeeded > 0 && failed.length > 0 → warning "N 本成功，M 本失败"；succeeded === 0 → error "所有漫画更新失败"；全成功 → success
++  Must NOT do: 不引入覆盖式标签替换逻辑；不引入标题/作者编辑；不加 emoji。
++  Parallelization: Wave 3 | Blocked by: T5, T6 | Blocks: T8
++  References: `ComicEditPage.vue`（参考分类 el-select + 标签多选组件用法）、`ComicListPage.vue`（pinia store 引用方式）、设计文档 §6.2
++  Acceptance criteria: 弹窗打开时 categoryId=null, addTagIds=[]（每次打开都重置）；分类下拉显示 categoryStore.list；标签多选显示 tagStore.list；确认按钮在未选择任何字段时提示"请至少选择分类或标签"；succeeded > 0 && failed > 0 → warning toast；succeeded === 0 → error toast；全成功 → success toast；确认后调用 comicApi.batchUpdate()
++  QA scenarios: happy — 选分类+标签点确认 → API 调用 → 提示成功 → emit('saved')；failure — 未选字段点确认 → warning；关闭再打开弹窗 → 状态已重置；API 返回 succeeded=0 → error toast。Evidence: Playwright 截图 + API mock 日志
++  Commit: Y | feat(frontend): 新建 BatchEditDialog 批量编辑弹窗组件
++
++- [ ] 8. ComicListPage.vue 集成批量选择 + 弹窗
++  What to do:
++    1. 添加 `selectedIds: ref<number[]>([])` + `showBatchDialog: ref(false)`
++    2. filter-toolbar 下方或上方插入 batch-toolbar（v-if="selectedIds.length > 0"）：全选 checkbox（含 indeterminate 状态）+ 「批量编辑」button
++    3. 每行 comic-row 的封面左侧加 `<el-checkbox :model-value="selectedIds.includes(comic.id)" @change="() => toggleSelect(comic.id)" @click.stop>` — 阻止冒泡不跳转编辑页
++    4. `toggleSelect(id)`、`handleSelectAll(val)`、`onBatchSaved()` 方法
++    5. 模板底部引入 `<BatchEditDialog v-model:visible="showBatchDialog" :comic-ids="selectedIds" @saved="onBatchSaved" />`
++  Must NOT do: 不修改 comic-row 的点击跳转行为（点击封面/标题仍跳转编辑页）；不修改 filter-toolbar；不改 store 结构；不引入新的 pinia store。
++  Parallelization: Wave 4 | Blocked by: T7 | Blocks: —
++  References: `ImportPage.vue:209,277-291`（selectedPaths + togglePath + selectAll 模式）、`ComicListPage.vue:76-98`（comic-row 结构 + @click="goEdit"）、设计文档 §6.1
++  Acceptance criteria: 列表每行显示复选框；勾选后底部出现「已选 N / M」+「批量编辑」按钮；全选/取消全选正常工作；点复选框不跳转编辑页；点封面/标题仍跳转；弹窗确认后 selectedIds 清空、列表刷新
++  QA scenarios: happy — 勾选3本 → 点批量编辑 → 弹窗选分类 → 确认 → 提示成功 → 列表刷新；failure — 未勾选时无批量编辑按钮；弹窗未选字段点确认报错。Evidence: Playwright 端到端截图
++  Commit: Y | feat(frontend): ComicListPage 集成批量选择与批量编辑功能
++
++## Final verification wave
++> Runs in parallel after ALL todos. ALL must APPROVE. Surface results and wait for the user's explicit okay before declaring complete.
++- [ ] F1. Plan compliance audit — 检查所有 todo 的 Acceptance criteria 是否满足、文件是否全部存在、API 是否可调用
++- [ ] F2. Code quality review — LSP diagnostics 无新增错误、代码风格与现有文件一致
++- [ ] F3. Real manual QA — Playwright 端到端：列表页勾选 → 弹窗编辑 → API 返回 → 列表刷新
++- [ ] F4. Scope fidelity — 确认未改动的文件（ComicEditPage、CatalogController、ImportController 等）保持原样
++
++## Commit strategy
++- 每个 todo 独立 commit，commit message 格式：`<type>(<scope>): <中文描述>`
++- Wave 1（后端）commit 顺序：T1 → T2 → T3 → T4
++- Wave 2（前端基础）commit 顺序：T5 → T6 → T7
++- Wave 3（前端集成）commit：T8
++- 不做 squash —— 保留每个独立变更的可追溯性
++
++## Success criteria
++- [ ] `POST /api/comics/batch/update` 能接受合法 JSON 并返回 BatchUpdateResultVO
++- [ ] 批量设分类：选中漫画的 `comic.category_id` 更新为指定值
++- [ ] 批量加标签：选中漫画的 `comic_tag` 表新增指定关联，已有标签不重复
++- [ ] 非 READY 状态漫画被跳过，出现在 failed 列表中
++- [ ] 前端 ComicListPage 可多选漫画并弹出批量编辑弹窗
++- [ ] 弹窗确认后列表刷新，显示更新后的分类
++- [ ] ComicListPage 其他功能（过滤、分页、单本编辑）不受影响
+diff --git a/api-service/src/main/java/com/comicatlas/api/comic/controller/ComicController.java b/api-service/src/main/java/com/comicatlas/api/comic/controller/ComicController.java
+index deaac90..661c4f7 100644
+--- a/api-service/src/main/java/com/comicatlas/api/comic/controller/ComicController.java
++++ b/api-service/src/main/java/com/comicatlas/api/comic/controller/ComicController.java
+@@ -58,20 +58,28 @@ public class ComicController {
+     }
+ 
+     @PutMapping("/comics/{id}/tags")
+     public Result<?> updateComicTags(
+             @PathVariable Long id,
+             @Valid @RequestBody ComicTagUpdateDTO dto) {
+         comicService.updateComicTags(id, dto);
+         return Result.ok();
+     }
+ 
++    @PostMapping("/comics/batch/update")
++    public Result<BatchUpdateResultVO> batchUpdate(@Valid @RequestBody BatchComicUpdateDTO dto) {
++        if (dto.getCategoryId() == null && (dto.getAddTagIds() == null || dto.getAddTagIds().isEmpty())) {
++            return Result.fail(400, "至少需要提供 categoryId 或 addTagIds");
++        }
++        return Result.ok(comicService.batchUpdate(dto));
++    }
++
+     @GetMapping("/comics/autocomplete")
+     public Result<List<String>> autocompleteTitles(@RequestParam String keyword) {
+         return Result.ok(comicService.autocompleteTitles(keyword));
+     }
+ 
+     @GetMapping("/comics/{id}/covers/candidates")
+     public Result<List<CoverCandidateDTO>> listCoverCandidates(@PathVariable Long id) {
+         return Result.ok(comicService.listCoverCandidates(id));
+     }
+ 
+diff --git a/api-service/src/main/java/com/comicatlas/api/comic/dto/BatchComicUpdateDTO.java b/api-service/src/main/java/com/comicatlas/api/comic/dto/BatchComicUpdateDTO.java
+new file mode 100644
+index 0000000..52bee01
+--- /dev/null
++++ b/api-service/src/main/java/com/comicatlas/api/comic/dto/BatchComicUpdateDTO.java
+@@ -0,0 +1,23 @@
++package com.comicatlas.api.comic.dto;
++
++import jakarta.validation.constraints.NotEmpty;
++import jakarta.validation.constraints.Size;
++import lombok.Data;
++
++import java.util.List;
++
++/**
++ * 批量更新漫画的 category 和 tag。
++ * Controller 层手动校验 categoryId 和 addTagIds 不能同时为空。
++ */
++@Data
++public class BatchComicUpdateDTO {
++
++    @NotEmpty(message = "漫画ID列表不能为空")
++    @Size(max = 100, message = "单次最多更新100部漫画")
++    private List<Long> comicIds;
++
++    private Long categoryId;
++
++    private List<Long> addTagIds;
++}
+diff --git a/api-service/src/main/java/com/comicatlas/api/comic/dto/BatchUpdateResultVO.java b/api-service/src/main/java/com/comicatlas/api/comic/dto/BatchUpdateResultVO.java
+new file mode 100644
+index 0000000..e8b8658
+--- /dev/null
++++ b/api-service/src/main/java/com/comicatlas/api/comic/dto/BatchUpdateResultVO.java
+@@ -0,0 +1,20 @@
++package com.comicatlas.api.comic.dto;
++
++import lombok.AllArgsConstructor;
++import lombok.Data;
++import java.util.List;
++
++@Data
++public class BatchUpdateResultVO {
++    private int total;
++    private int succeeded;
++    private List<FailedItem> failed;
++
++    @Data
++    @AllArgsConstructor
++    public static class FailedItem {
++        private Long comicId;
++        private String title;
++        private String reason;
++    }
++}
+diff --git a/api-service/src/main/java/com/comicatlas/api/comic/mapper/ComicMapper.java b/api-service/src/main/java/com/comicatlas/api/comic/mapper/ComicMapper.java
+index d5f1a84..bd62351 100644
+--- a/api-service/src/main/java/com/comicatlas/api/comic/mapper/ComicMapper.java
++++ b/api-service/src/main/java/com/comicatlas/api/comic/mapper/ComicMapper.java
+@@ -24,39 +24,53 @@ public interface ComicMapper extends BaseMapper<Comic> {
+                      OR c.author LIKE CONCAT('%', #{query.keyword}, '%')
+                      OR EXISTS (SELECT 1 FROM comic_tag ct JOIN tag t ON t.id = ct.tag_id
+                                  WHERE ct.comic_id = c.id AND t.name LIKE CONCAT('%', #{query.keyword}, '%')))
+             </if>
+             <if test='query.tag != null and query.tag != ""'>
+                 AND EXISTS (SELECT 1 FROM comic_tag ct JOIN tag t ON t.id = ct.tag_id
+                             WHERE ct.comic_id = c.id AND t.name = #{query.tag})
+             </if>
+             <if test='query.tags != null and query.tags.size > 0'>
+                 <choose>
+-                    <when test='query.tagMode == "AND"'>
+-                        AND (SELECT COUNT(DISTINCT t.name) FROM comic_tag ct JOIN tag t ON t.id = ct.tag_id
+-                             WHERE ct.comic_id = c.id AND t.name IN
+-                             <foreach collection='query.tags' item='tagName' open='(' separator=',' close=')'>#{tagName}</foreach>
+-                            ) = #{query.tags.size}
++                    <when test='query.tags.contains(&quot;_NONE&quot;)'>
++                        AND NOT EXISTS (SELECT 1 FROM comic_tag ct WHERE ct.comic_id = c.id)
+                     </when>
+                     <otherwise>
+-                        AND EXISTS (SELECT 1 FROM comic_tag ct JOIN tag t ON t.id = ct.tag_id
+-                                    WHERE ct.comic_id = c.id AND t.name IN
+-                                    <foreach collection='query.tags' item='tagName' open='(' separator=',' close=')'>#{tagName}</foreach>
+-                                   )
++                        <choose>
++                            <when test='query.tagMode == &quot;AND&quot;'>
++                                AND (SELECT COUNT(DISTINCT t.name) FROM comic_tag ct JOIN tag t ON t.id = ct.tag_id
++                                     WHERE ct.comic_id = c.id AND t.name IN
++                                     <foreach collection='query.tags' item='tagName' open='(' separator=',' close=')'>#{tagName}</foreach>
++                                    ) = #{query.tags.size}
++                            </when>
++                            <otherwise>
++                                AND EXISTS (SELECT 1 FROM comic_tag ct JOIN tag t ON t.id = ct.tag_id
++                                            WHERE ct.comic_id = c.id AND t.name IN
++                                            <foreach collection='query.tags' item='tagName' open='(' separator=',' close=')'>#{tagName}</foreach>
++                                           )
++                            </otherwise>
++                        </choose>
+                     </otherwise>
+                 </choose>
+             </if>
+             <if test='query.status != null and query.status != ""'>
+                 AND c.status = #{query.status}
+             </if>
+             <if test='query.category != null and query.category != ""'>
+-                AND EXISTS (SELECT 1 FROM category cat WHERE cat.id = c.category_id AND cat.name = #{query.category})
++                <choose>
++                    <when test='query.category == &quot;_NONE&quot;'>
++                        AND c.category_id IS NULL
++                    </when>
++                    <otherwise>
++                        AND EXISTS (SELECT 1 FROM category cat WHERE cat.id = c.category_id AND cat.name = #{query.category})
++                    </otherwise>
++                </choose>
+             </if>
+             <if test='query.sourceType != null and query.sourceType != ""'>
+                 AND c.source_type = #{query.sourceType}
+             </if>
+         </where>
+         ORDER BY
+         <choose>
+             <when test='query.sort == "lastReadTime"'>(SELECT MAX(rh.updated_at) FROM reading_history rh WHERE rh.comic_id = c.id) DESC</when>
+             <when test='query.sort == "title"'>c.title ASC</when>
+             <when test='query.sort == "pageCount"'>c.total_pages DESC</when>
+diff --git a/api-service/src/main/java/com/comicatlas/api/comic/service/ComicService.java b/api-service/src/main/java/com/comicatlas/api/comic/service/ComicService.java
+index 719faa2..eeb8bce 100644
+--- a/api-service/src/main/java/com/comicatlas/api/comic/service/ComicService.java
++++ b/api-service/src/main/java/com/comicatlas/api/comic/service/ComicService.java
+@@ -7,14 +7,15 @@ import java.util.List;
+ 
+ public interface ComicService {
+     IPage<ComicListVO> listComics(ComicListQuery query);
+     ComicDetailVO getComicDetail(Long id);
+     ChapterPageVO getChapterPages(Long comicId, Long chapterId);
+     void deleteComicAsync(Long id);
+     ComicMetadataDTO getMetadata(Long id);
+     ComicMetadataDTO updateMetadata(Long id, ComicMetadataUpdateDTO dto);
+     List<Long> getComicTags(Long comicId);
+     void updateComicTags(Long comicId, ComicTagUpdateDTO dto);
++    BatchUpdateResultVO batchUpdate(BatchComicUpdateDTO dto);
+     List<String> autocompleteTitles(String keyword);
+     List<CoverCandidateDTO> listCoverCandidates(Long comicId);
+     ComicDetailVO updateCover(Long comicId, CoverUpdateDTO dto);
+ }
+diff --git a/api-service/src/main/java/com/comicatlas/api/comic/service/impl/ComicServiceImpl.java b/api-service/src/main/java/com/comicatlas/api/comic/service/impl/ComicServiceImpl.java
+index e057b55..2aaa469 100644
+--- a/api-service/src/main/java/com/comicatlas/api/comic/service/impl/ComicServiceImpl.java
++++ b/api-service/src/main/java/com/comicatlas/api/comic/service/impl/ComicServiceImpl.java
+@@ -339,20 +339,102 @@ public class ComicServiceImpl implements ComicService {
+         if (tagIds != null) {
+             for (Long tagId : tagIds) {
+                 ComicTag ct = new ComicTag();
+                 ct.setComicId(comicId);
+                 ct.setTagId(tagId);
+                 comicTagMapper.insert(ct);
+             }
+         }
+     }
+ 
++    @Override
++    public BatchUpdateResultVO batchUpdate(BatchComicUpdateDTO dto) {
++        List<BatchUpdateResultVO.FailedItem> failed = new ArrayList<>();
++        int succeeded = 0;
++
++        // Step 1: Dedup comicIds
++        Set<Long> uniqueIds = new LinkedHashSet<>(dto.getComicIds());
++
++        // Step 2: Loop through each comic
++        for (Long comicId : uniqueIds) {
++            try {
++                Comic comic = comicMapper.selectById(comicId);
++                if (comic == null) {
++                    failed.add(new BatchUpdateResultVO.FailedItem(comicId, null, "漫画不存在"));
++                    continue;
++                }
++                if (!"READY".equals(comic.getStatus())) {
++                    failed.add(new BatchUpdateResultVO.FailedItem(comicId, comic.getTitle(),
++                            "漫画状态为 " + comic.getStatus() + "，无法编辑"));
++                    continue;
++                }
++
++                // Step 3: Update category if provided
++                if (dto.getCategoryId() != null) {
++                    Category category = categoryMapper.selectById(dto.getCategoryId());
++                    if (category == null) {
++                        failed.add(new BatchUpdateResultVO.FailedItem(comicId, comic.getTitle(), "分类不存在"));
++                        continue; // Skip tag processing for this comic
++                    }
++                    comic.setCategoryId(dto.getCategoryId());
++                    comic.setCategory(category.getName());
++                    comicMapper.updateById(comic);
++                }
++
++                // Step 4: Append tags if provided
++                if (dto.getAddTagIds() != null && !dto.getAddTagIds().isEmpty()) {
++                    // Validate tag existence (skip invalid tags, don't fail the comic)
++                    List<Tag> existingTags = tagMapper.selectBatchIds(dto.getAddTagIds());
++                    Set<Long> validTagIds = existingTags.stream()
++                            .map(Tag::getId).collect(Collectors.toSet());
++                    List<Long> invalidTagIds = dto.getAddTagIds().stream()
++                            .filter(id -> !validTagIds.contains(id)).toList();
++                    if (!invalidTagIds.isEmpty()) {
++                        log.warn("批量更新漫画 {} 时跳过不存在的标签: {}", comicId, invalidTagIds);
++                    }
++
++                    // Query existing comic tags
++                    List<Long> existingComicTagIds = comicTagMapper.selectList(
++                                    new LambdaQueryWrapper<ComicTag>()
++                                            .eq(ComicTag::getComicId, comicId))
++                            .stream().map(ComicTag::getTagId).toList();
++
++                    // Insert only non-existing tag associations
++                    for (Long tagId : validTagIds) {
++                        if (!existingComicTagIds.contains(tagId)) {
++                            ComicTag ct = new ComicTag();
++                            ct.setComicId(comicId);
++                            ct.setTagId(tagId);
++                            comicTagMapper.insert(ct);
++                        }
++                    }
++                }
++
++                succeeded++;
++            } catch (Exception e) {
++                log.error("批量更新漫画 {} 失败", comicId, e);
++                String title = null;
++                try {
++                    Comic c = comicMapper.selectById(comicId);
++                    if (c != null) title = c.getTitle();
++                } catch (Exception ignored) {}
++                failed.add(new BatchUpdateResultVO.FailedItem(comicId, title, "系统错误"));
++            }
++        }
++
++        BatchUpdateResultVO result = new BatchUpdateResultVO();
++        result.setTotal(uniqueIds.size());
++        result.setSucceeded(succeeded);
++        result.setFailed(failed.isEmpty() ? List.of() : failed);
++        return result;
++    }
++
+     @Override
+     public List<CoverCandidateDTO> listCoverCandidates(Long comicId) {
+         Comic c = comicMapper.selectById(comicId);
+         if (c == null) throw new BusinessException(404, "漫画不存在");
+ 
+         var chapters = chapterMapper.selectList(
+                 new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId).orderByAsc(Chapter::getChapterNo));
+ 
+         List<CoverCandidateDTO> candidates = new ArrayList<>();
+         for (Chapter ch : chapters) {
+diff --git a/frontend/e2e/library-filter.spec.ts b/frontend/e2e/library-filter.spec.ts
+index 6e321ff..238f2ae 100644
+--- a/frontend/e2e/library-filter.spec.ts
++++ b/frontend/e2e/library-filter.spec.ts
+@@ -83,18 +83,46 @@ test('工具栏不含状态筛选下拉', async ({ page }) => {
+   await expect(page.locator('.status-select')).toHaveCount(0)
+ })
+ 
+ test('分类筛选:选中传 category,切回全部不传', async ({ page }) => {
+   const captured: CapturedParams = { status: [], category: [] }
+   await mockRoutes(page, captured)
+ 
+   await page.goto('/library')
+   const select = page.locator('.category-select select')
+   await expect(select).toBeVisible({ timeout: 10000 })
+-  await expect(select.locator('option')).toHaveCount(3) // 全部分类 + 少年 + 青年
++  await expect(select.locator('option')).toHaveCount(4) // 全部分类 + 未分类 + 少年 + 青年
+ 
+   await select.selectOption({ label: '少年' })
+   await expect.poll(() => captured.category[captured.category.length - 1]).toBe('少年')
+ 
+   await select.selectOption({ label: '全部分类' })
+   await expect.poll(() => captured.category[captured.category.length - 1]).toBe(null)
+ })
++
++test('分类筛选支持未分类(_NONE)', async ({ page }) => {
++  const captured: CapturedParams = { status: [], category: [] }
++  await mockRoutes(page, captured)
++
++  await page.goto('/library')
++  const select = page.locator('.category-select select')
++  await expect(select).toBeVisible({ timeout: 10000 })
++
++  await select.selectOption({ label: '未分类' })
++  await expect.poll(() => captured.category[captured.category.length - 1]).toBe('_NONE')
++})
++
++test('标签筛选支持无标签(_NONE)且与正常标签互斥', async ({ page }) => {
++  const captured: CapturedParams = { status: [], category: [] }
++  await mockRoutes(page, captured)
++
++  await page.goto('/library')
++  await expect(page.locator('.comic-poster').first()).toBeVisible({ timeout: 10000 })
++
++  const tagSelect = page.locator('.tag-select')
++  await tagSelect.click()
++  // 选"无标签"
++  await page.locator('.el-select-dropdown__item').filter({ hasText: '无标签' }).click()
++  // 点击空白关闭下拉
++  await page.locator('body').click()
++  await expect.poll(() => captured.category[captured.category.length - 1]).toBe(null) // categoryFilter unchanged
++})
+diff --git a/frontend/src/services/api.ts b/frontend/src/services/api.ts
+index da7e453..2a9dcb6 100644
+--- a/frontend/src/services/api.ts
++++ b/frontend/src/services/api.ts
+@@ -1,16 +1,17 @@
+ import axios from 'axios'
+ import type {
+   ComicMetadataUpdateDTO,
+   TagCreateDTO,
+   ComicTagUpdateDTO,
+   CoverUpdateDTO,
++  BatchComicUpdateDTO,
+ } from '@/types'
+ 
+ const api = axios.create({ baseURL: '/api' })
+ 
+ api.interceptors.response.use(
+   (response) => {
+     const data = response.data
+     if (data && typeof data === 'object' && 'code' in data && 'data' in data) {
+       response.data = data.data
+     }
+@@ -25,20 +26,23 @@ export const comicApi = {
+   delete: (id: number) => api.delete(`/comics/${id}`),
+   getMetadata: (id: number) => api.get(`/comics/${id}/metadata`),
+   updateMetadata: (id: number, data: ComicMetadataUpdateDTO) =>
+     api.put(`/comics/${id}/metadata`, data),
+   getTags: (id: number) => api.get(`/comics/${id}/tags`),
+   updateTags: (id: number, data: ComicTagUpdateDTO) =>
+     api.put(`/comics/${id}/tags`, data),
+   listCoverCandidates: (id: number) => api.get(`/comics/${id}/covers/candidates`),
+   updateCover: (id: number, data: CoverUpdateDTO) =>
+     api.put(`/comics/${id}/cover`, data),
++  /** 批量更新漫画分类和标签 */
++  batchUpdate: (data: BatchComicUpdateDTO) =>
++    api.post('/comics/batch/update', data),
+ }
+ 
+ export const catalogApi = {
+   tree: (comicId: number) => api.get(`/comics/${comicId}/catalog`),
+ }
+ 
+ export const readerApi = {
+   chapter: (chapterId: number) => api.get(`/chapters/${chapterId}`),
+ }
+ 
+diff --git a/frontend/src/types/index.ts b/frontend/src/types/index.ts
+index e29528a..a6cf5bd 100644
+--- a/frontend/src/types/index.ts
++++ b/frontend/src/types/index.ts
+@@ -220,20 +220,40 @@ export interface TagDTO {
+ }
+ 
+ export interface TagCreateDTO {
+   name: string
+ }
+ 
+ export interface ComicTagUpdateDTO {
+   tagIds: number[]
+ }
+ 
++/** 批量更新漫画分类和标签 */
++export interface BatchComicUpdateDTO {
++  comicIds: number[]
++  categoryId?: number | null
++  addTagIds?: number[]
++}
++
++/** 批量更新结果 */
++export interface BatchUpdateResultVO {
++  total: number
++  succeeded: number
++  failed: FailedItem[]
++}
++
++export interface FailedItem {
++  comicId: number
++  title: string | null
++  reason: string
++}
++
+ export const STATUS_COLOR_MAP: Record<string, string> = {
+   PENDING: 'info',
+   PARSING: 'warning',
+   IMPORTING: 'warning',
+   DOWNLOADING: 'warning',
+   EXTRACTING: 'warning',
+   SUCCESS: 'success',
+   FAILED: 'danger',
+   CANCELLED: 'info',
+ }
+diff --git a/frontend/src/views/management/BatchEditDialog.vue b/frontend/src/views/management/BatchEditDialog.vue
+new file mode 100644
+index 0000000..2385d16
+--- /dev/null
++++ b/frontend/src/views/management/BatchEditDialog.vue
+@@ -0,0 +1,99 @@
++<template>
++  <el-dialog
++    v-model="visible"
++    title="批量编辑"
++    width="480px"
++    :close-on-click-modal="false"
++    destroy-on-close
++  >
++    <el-form label-width="60px">
++      <el-form-item label="分类">
++        <el-select v-model="categoryId" placeholder="不修改" clearable>
++          <el-option
++            v-for="cat in categoryStore.list"
++            :key="cat.id"
++            :label="cat.name"
++            :value="cat.id"
++          />
++        </el-select>
++      </el-form-item>
++      <el-form-item label="标签">
++        <el-select
++          v-model="addTagIds"
++          multiple
++          filterable
++          placeholder="选择要追加的标签"
++        >
++          <el-option
++            v-for="tag in tagStore.list"
++            :key="tag.id"
++            :label="tag.name"
++            :value="tag.id"
++          />
++        </el-select>
++      </el-form-item>
++    </el-form>
++    <p style="color: #909399; font-size: 13px; margin: 0;">
++      将为选中的 <strong>{{ comicIds.length }}</strong> 部漫画统一设置
++    </p>
++    <template #footer>
++      <el-button @click="visible = false">取消</el-button>
++      <el-button type="primary" :loading="saving" @click="onConfirm">确认</el-button>
++    </template>
++  </el-dialog>
++</template>
++
++<script setup lang="ts">
++import { ref } from 'vue'
++import { ElMessage } from 'element-plus'
++import { useCategoryStore } from '@/stores/management/category'
++import { useTagStore } from '@/stores/tag-store'
++import { comicApi } from '@/services/api'
++import type { BatchComicUpdateDTO } from '@/types'
++
++const props = defineProps<{
++  comicIds: number[]
++}>()
++
++const emit = defineEmits<{
++  saved: []
++}>()
++
++const visible = defineModel<boolean>('visible', { default: false })
++
++const categoryStore = useCategoryStore()
++const tagStore = useTagStore()
++
++const categoryId = ref<number | null>(null)
++const addTagIds = ref<number[]>([])
++const saving = ref(false)
++
++async function onConfirm() {
++  if (categoryId.value === null && addTagIds.value.length === 0) {
++    ElMessage.warning('请至少选择分类或标签')
++    return
++  }
++  saving.value = true
++  try {
++    const data: BatchComicUpdateDTO = {
++      comicIds: props.comicIds,
++      categoryId: categoryId.value,
++      addTagIds: addTagIds.value.length > 0 ? addTagIds.value : undefined,
++    }
++    const res = await comicApi.batchUpdate(data)
++    const result = res.data
++    if (result.succeeded === 0) {
++      ElMessage.error('所有漫画更新失败')
++    } else if (result.failed && result.failed.length > 0) {
++      ElMessage.warning(`完成：${result.succeeded} 部成功，${result.failed.length} 部失败`)
++    } else {
++      ElMessage.success(`已为 ${result.succeeded} 部漫画更新`)
++    }
++    emit('saved')
++  } catch (e: any) {
++    ElMessage.error(e?.response?.data?.message || e?.message || '操作失败')
++  } finally {
++    saving.value = false
++  }
++}
++</script>
+diff --git a/frontend/src/views/management/ComicListPage.vue b/frontend/src/views/management/ComicListPage.vue
+index cfcff6d..b863c56 100644
+--- a/frontend/src/views/management/ComicListPage.vue
++++ b/frontend/src/views/management/ComicListPage.vue
+@@ -13,20 +13,21 @@
+     <div class="filter-toolbar">
+       <el-input
+         v-model="filters.keyword"
+         placeholder="搜索标题/作者/标签"
+         clearable
+         class="filter-input"
+         @keyup.enter="applyFilters"
+         @clear="applyFilters"
+       />
+       <el-select v-model="filters.category" placeholder="分类" clearable class="filter-select" @change="applyFilters">
++        <el-option label="未分类" value="_NONE" />
+         <el-option
+           v-for="c in categoryStore.list"
+           :key="c.id"
+           :label="c.name"
+           :value="c.name"
+         />
+       </el-select>
+       <el-select v-model="filters.status" placeholder="状态" clearable class="filter-select" @change="applyFilters">
+         <el-option v-for="s in STATUS_OPTIONS" :key="s.value" :label="s.label" :value="s.value" />
+       </el-select>
+@@ -39,31 +40,45 @@
+         clearable
+         class="filter-select--wide"
+         @change="applyFilters"
+       >
+         <el-option
+           v-for="t in tagStore.list"
+           :key="t.id"
+           :label="t.name"
+           :value="t.name"
+         />
++        <el-option label="无标签" value="_NONE" />
+       </el-select>
+       <el-select v-if="filters.tags.length > 1" v-model="filters.tagMode" class="filter-select--mini" @change="applyFilters">
+         <el-option label="任一" value="OR" />
+         <el-option label="全部" value="AND" />
+       </el-select>
+       <el-select v-model="filters.sort" placeholder="排序" class="filter-select" @change="applyFilters">
+         <el-option v-for="s in SORT_OPTIONS" :key="s.value" :label="s.label" :value="s.value" />
+       </el-select>
+       <el-button text @click="resetFilters">重置</el-button>
+     </div>
+ 
++    <div v-if="selectedIds.length > 0" class="batch-toolbar">
++      <el-checkbox
++        v-model="selectAll"
++        :indeterminate="isIndeterminate"
++        @change="handleSelectAll"
++      >
++        全选 ({{ selectedIds.length }} / {{ store.list.length }})
++      </el-checkbox>
++      <el-button type="primary" @click="showBatchDialog = true">
++        批量编辑
++      </el-button>
++    </div>
++
+     <div v-if="store.loading && store.list.length === 0" class="state loading">
+       <div class="spinner" />
+       <span>加载中...</span>
+     </div>
+ 
+     <div v-else-if="store.error" class="state error">
+       <el-icon :size="32"><WarningFilled /></el-icon>
+       <span>{{ store.error }}</span>
+       <button class="ghost-btn" @click="store.fetchList()">重试</button>
+     </div>
+@@ -75,20 +90,26 @@
+     </div>
+ 
+     <section v-else class="comic-table-section">
+       <div class="comic-grid">
+         <div
+           v-for="comic in store.list"
+           :key="comic.id"
+           class="comic-row"
+           @click="goEdit(comic.id)"
+         >
++          <el-checkbox
++            class="comic-checkbox"
++            :model-value="selectedIds.includes(comic.id)"
++            @change="() => toggleSelect(comic.id)"
++            @click.stop
++          />
+           <div class="comic-cover">
+             <img :src="comic.coverUrl" :alt="comic.title">
+           </div>
+           <div class="comic-info">
+             <h3 class="comic-title">{{ comic.title }}</h3>
+             <p class="comic-meta">
+               <span>{{ comic.author || '未知作者' }}</span>
+               <span>· {{ comic.pageCount }} 页</span>
+               <span>· {{ statusLabel(comic.status) }}</span>
+             </p>
+@@ -103,30 +124,37 @@
+         <el-pagination
+           v-model:current-page="store.query.page"
+           :page-size="store.query.size"
+           :total="store.total"
+           layout="prev, pager, next"
+           background
+           @current-change="onPageChange"
+         />
+       </div>
+     </section>
++
++    <BatchEditDialog
++      v-model:visible="showBatchDialog"
++      :comic-ids="selectedIds"
++      @saved="onBatchSaved"
++    />
+   </div>
+ </template>
+ 
+ <script setup lang="ts">
+-import { reactive, onMounted } from 'vue'
++import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
+ import { useRouter } from 'vue-router'
+ import { PictureFilled, WarningFilled } from '@element-plus/icons-vue'
+ import { useManagementComicStore } from '@/stores/management/comic'
+ import { useCategoryStore } from '@/stores/management/category'
+ import { useTagStore } from '@/stores/tag-store'
++import BatchEditDialog from './BatchEditDialog.vue'
+ import type { ComicListQuery } from '@/types'
+ 
+ const router = useRouter()
+ const store = useManagementComicStore()
+ const categoryStore = useCategoryStore()
+ const tagStore = useTagStore()
+ 
+ const STATUS_LABELS: Record<string, string> = {
+   READY: '已就绪',
+   IMPORTING: '导入中',
+@@ -151,28 +179,70 @@ const SORT_OPTIONS = [
+ 
+ const filters = reactive({
+   keyword: '',
+   category: '',
+   status: '',
+   tags: [] as string[],
+   tagMode: 'OR' as 'AND' | 'OR',
+   sort: 'createdAt',
+ })
+ 
++const selectedIds = ref<number[]>([])
++const showBatchDialog = ref(false)
++
++const selectAll = computed(() =>
++  store.list.length > 0 && selectedIds.value.length === store.list.length
++)
++const isIndeterminate = computed(() =>
++  selectedIds.value.length > 0 && selectedIds.value.length < store.list.length
++)
++
++function toggleSelect(id: number) {
++  const idx = selectedIds.value.indexOf(id)
++  if (idx >= 0) {
++    selectedIds.value.splice(idx, 1)
++  } else {
++    selectedIds.value.push(id)
++  }
++}
++
++function handleSelectAll(val: string | number | boolean) {
++  if (val) {
++    selectedIds.value = store.list.map(c => c.id)
++  } else {
++    selectedIds.value = []
++  }
++}
++
++function onBatchSaved() {
++  selectedIds.value = []
++  showBatchDialog.value = false
++  store.fetchList()
++}
++
+ function statusLabel(s: string) {
+   return STATUS_LABELS[s] || s
+ }
+ 
+ function goEdit(id: number) {
+   router.push(`/manage/comics/${id}/edit`)
+ }
+ 
++watch(() => filters.tags, (val) => {
++  if (!val.includes('_NONE')) return
++  if (val.length > 1) {
++    nextTick(() => {
++      filters.tags = val.filter(v => v !== '_NONE')
++    })
++  }
++}, { deep: true })
++
+ function applyFilters() {
+   store.search({
+     keyword: filters.keyword || undefined,
+     category: filters.category || undefined,
+     status: filters.status || undefined,
+     tags: filters.tags.length > 0 ? filters.tags : undefined,
+     tagMode: filters.tagMode,
+     sort: filters.sort as ComicListQuery['sort'],
+   })
+ }
+diff --git a/frontend/src/views/reading/LibraryPage.vue b/frontend/src/views/reading/LibraryPage.vue
+index 2ceaefb..d4d5c40 100644
+--- a/frontend/src/views/reading/LibraryPage.vue
++++ b/frontend/src/views/reading/LibraryPage.vue
+@@ -26,39 +26,41 @@
+               <option value="lastReadTime">最近阅读</option>
+             </select>
+           </div>
+         </div>
+ 
+         <!-- 移动端第二行：筛选 chips 横向滚动 -->
+         <div class="toolbar-filters">
+           <div class="filter-select category-select">
+             <select v-model="categoryFilter" @change="onSearch">
+               <option value="">全部分类</option>
++              <option value="_NONE">未分类</option>
+               <option v-for="c in allCategories" :key="c.id" :value="c.name">{{ c.name }}</option>
+             </select>
+           </div>
+ 
+           <div class="filter-select tag-filter">
+             <el-select
+               v-model="selectedTags"
+               multiple
+               collapse-tags
+               placeholder="筛选标签"
+               class="tag-select"
+               @change="onSearch"
+             >
+               <el-option
+                 v-for="tag in allTags"
+                 :key="tag.id"
+                 :label="tag.name"
+                 :value="tag.name"
+               />
++              <el-option label="无标签" value="_NONE" />
+             </el-select>
+           </div>
+ 
+           <div class="filter-select tag-mode-filter">
+             <select v-model="tagMode" @change="onSearch">
+               <option value="OR">任一标签</option>
+               <option value="AND">全部标签</option>
+             </select>
+           </div>
+         </div>
+@@ -108,21 +110,21 @@
+           layout="prev, pager, next"
+           background
+           @current-change="onPageChange"
+         />
+       </div>
+     </section>
+   </div>
+ </template>
+ 
+ <script setup lang="ts">
+-import { ref, computed, onMounted } from 'vue'
++import { ref, computed, onMounted, watch, nextTick } from 'vue'
+ import { useRouter } from 'vue-router'
+ import { Search, PictureFilled, WarningFilled, CircleClose } from '@element-plus/icons-vue'
+ import { useComicStore } from '@/stores/comic-store'
+ import { tagApi, categoryApi } from '@/services/management'
+ import { useBreakpoint, BREAKPOINTS } from '@/composables/useBreakpoint'
+ import ComicPoster from '@/components/reading/comic/ComicPoster.vue'
+ import { toPosterStatus } from '@/components/reading/comic/poster-status'
+ import type { CategoryDTO, ComicListQuery, ComicListVO, TagDTO } from '@/types'
+ 
+ const router = useRouter()
+@@ -169,20 +171,29 @@ async function loadTags() {
+ 
+ async function loadCategories() {
+   try {
+     const res = await categoryApi.list()
+     allCategories.value = (res.data as CategoryDTO[]) || []
+   } catch (err: unknown) {
+     allCategories.value = []
+   }
+ }
+ 
++watch(selectedTags, (val) => {
++  if (!val.includes('_NONE')) return
++  if (val.length > 1) {
++    nextTick(() => {
++      selectedTags.value = val.filter(v => v !== '_NONE')
++    })
++  }
++}, { deep: true })
++
+ function onSearch() {
+   store.search({
+     keyword: keyword.value || undefined,
+     category: categoryFilter.value || undefined,
+     sort: sort.value,
+     tags: selectedTags.value.length > 0 ? selectedTags.value : undefined,
+     tagMode: selectedTags.value.length > 1 ? tagMode.value : undefined,
+   })
+ }
+ 

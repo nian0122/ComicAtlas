@@ -1,0 +1,185 @@
+=== COMMITS e4fae4f..09881f3 === 
+09881f3 feat(阅读端): 漫画库支持未分类与无标签筛选,无标签与正常标签互斥
+1306ef9 fix: 移除 api.ts 中未使用的 BatchUpdateResultVO 导入
+ 
+=== STAT === 
+ frontend/e2e/library-filter.spec.ts        | 30 +++++++++++++++++++++++++++++-
+ frontend/src/services/api.ts               |  1 -
+ frontend/src/views/reading/LibraryPage.vue | 13 ++++++++++++-
+ 3 files changed, 41 insertions(+), 3 deletions(-)
+ 
+=== FULL DIFF U10 === 
+diff --git a/frontend/e2e/library-filter.spec.ts b/frontend/e2e/library-filter.spec.ts
+index 6e321ff..238f2ae 100644
+--- a/frontend/e2e/library-filter.spec.ts
++++ b/frontend/e2e/library-filter.spec.ts
+@@ -83,18 +83,46 @@ test('工具栏不含状态筛选下拉', async ({ page }) => {
+   await expect(page.locator('.status-select')).toHaveCount(0)
+ })
+ 
+ test('分类筛选:选中传 category,切回全部不传', async ({ page }) => {
+   const captured: CapturedParams = { status: [], category: [] }
+   await mockRoutes(page, captured)
+ 
+   await page.goto('/library')
+   const select = page.locator('.category-select select')
+   await expect(select).toBeVisible({ timeout: 10000 })
+-  await expect(select.locator('option')).toHaveCount(3) // 全部分类 + 少年 + 青年
++  await expect(select.locator('option')).toHaveCount(4) // 全部分类 + 未分类 + 少年 + 青年
+ 
+   await select.selectOption({ label: '少年' })
+   await expect.poll(() => captured.category[captured.category.length - 1]).toBe('少年')
+ 
+   await select.selectOption({ label: '全部分类' })
+   await expect.poll(() => captured.category[captured.category.length - 1]).toBe(null)
+ })
++
++test('分类筛选支持未分类(_NONE)', async ({ page }) => {
++  const captured: CapturedParams = { status: [], category: [] }
++  await mockRoutes(page, captured)
++
++  await page.goto('/library')
++  const select = page.locator('.category-select select')
++  await expect(select).toBeVisible({ timeout: 10000 })
++
++  await select.selectOption({ label: '未分类' })
++  await expect.poll(() => captured.category[captured.category.length - 1]).toBe('_NONE')
++})
++
++test('标签筛选支持无标签(_NONE)且与正常标签互斥', async ({ page }) => {
++  const captured: CapturedParams = { status: [], category: [] }
++  await mockRoutes(page, captured)
++
++  await page.goto('/library')
++  await expect(page.locator('.comic-poster').first()).toBeVisible({ timeout: 10000 })
++
++  const tagSelect = page.locator('.tag-select')
++  await tagSelect.click()
++  // 选"无标签"
++  await page.locator('.el-select-dropdown__item').filter({ hasText: '无标签' }).click()
++  // 点击空白关闭下拉
++  await page.locator('body').click()
++  await expect.poll(() => captured.category[captured.category.length - 1]).toBe(null) // categoryFilter unchanged
++})
+diff --git a/frontend/src/services/api.ts b/frontend/src/services/api.ts
+index 7ec85d4..2a9dcb6 100644
+--- a/frontend/src/services/api.ts
++++ b/frontend/src/services/api.ts
+@@ -1,18 +1,17 @@
+ import axios from 'axios'
+ import type {
+   ComicMetadataUpdateDTO,
+   TagCreateDTO,
+   ComicTagUpdateDTO,
+   CoverUpdateDTO,
+   BatchComicUpdateDTO,
+-  BatchUpdateResultVO,
+ } from '@/types'
+ 
+ const api = axios.create({ baseURL: '/api' })
+ 
+ api.interceptors.response.use(
+   (response) => {
+     const data = response.data
+     if (data && typeof data === 'object' && 'code' in data && 'data' in data) {
+       response.data = data.data
+     }
+diff --git a/frontend/src/views/reading/LibraryPage.vue b/frontend/src/views/reading/LibraryPage.vue
+index 2ceaefb..d4d5c40 100644
+--- a/frontend/src/views/reading/LibraryPage.vue
++++ b/frontend/src/views/reading/LibraryPage.vue
+@@ -26,39 +26,41 @@
+               <option value="lastReadTime">最近阅读</option>
+             </select>
+           </div>
+         </div>
+ 
+         <!-- 移动端第二行：筛选 chips 横向滚动 -->
+         <div class="toolbar-filters">
+           <div class="filter-select category-select">
+             <select v-model="categoryFilter" @change="onSearch">
+               <option value="">全部分类</option>
++              <option value="_NONE">未分类</option>
+               <option v-for="c in allCategories" :key="c.id" :value="c.name">{{ c.name }}</option>
+             </select>
+           </div>
+ 
+           <div class="filter-select tag-filter">
+             <el-select
+               v-model="selectedTags"
+               multiple
+               collapse-tags
+               placeholder="筛选标签"
+               class="tag-select"
+               @change="onSearch"
+             >
+               <el-option
+                 v-for="tag in allTags"
+                 :key="tag.id"
+                 :label="tag.name"
+                 :value="tag.name"
+               />
++              <el-option label="无标签" value="_NONE" />
+             </el-select>
+           </div>
+ 
+           <div class="filter-select tag-mode-filter">
+             <select v-model="tagMode" @change="onSearch">
+               <option value="OR">任一标签</option>
+               <option value="AND">全部标签</option>
+             </select>
+           </div>
+         </div>
+@@ -108,21 +110,21 @@
+           layout="prev, pager, next"
+           background
+           @current-change="onPageChange"
+         />
+       </div>
+     </section>
+   </div>
+ </template>
+ 
+ <script setup lang="ts">
+-import { ref, computed, onMounted } from 'vue'
++import { ref, computed, onMounted, watch, nextTick } from 'vue'
+ import { useRouter } from 'vue-router'
+ import { Search, PictureFilled, WarningFilled, CircleClose } from '@element-plus/icons-vue'
+ import { useComicStore } from '@/stores/comic-store'
+ import { tagApi, categoryApi } from '@/services/management'
+ import { useBreakpoint, BREAKPOINTS } from '@/composables/useBreakpoint'
+ import ComicPoster from '@/components/reading/comic/ComicPoster.vue'
+ import { toPosterStatus } from '@/components/reading/comic/poster-status'
+ import type { CategoryDTO, ComicListQuery, ComicListVO, TagDTO } from '@/types'
+ 
+ const router = useRouter()
+@@ -169,20 +171,29 @@ async function loadTags() {
+ 
+ async function loadCategories() {
+   try {
+     const res = await categoryApi.list()
+     allCategories.value = (res.data as CategoryDTO[]) || []
+   } catch (err: unknown) {
+     allCategories.value = []
+   }
+ }
+ 
++watch(selectedTags, (val) => {
++  if (!val.includes('_NONE')) return
++  if (val.length > 1) {
++    nextTick(() => {
++      selectedTags.value = val.filter(v => v !== '_NONE')
++    })
++  }
++}, { deep: true })
++
+ function onSearch() {
+   store.search({
+     keyword: keyword.value || undefined,
+     category: categoryFilter.value || undefined,
+     sort: sort.value,
+     tags: selectedTags.value.length > 0 ? selectedTags.value : undefined,
+     tagMode: selectedTags.value.length > 1 ? tagMode.value : undefined,
+   })
+ }
+ 

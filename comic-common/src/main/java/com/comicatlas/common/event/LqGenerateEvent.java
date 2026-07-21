@@ -7,5 +7,6 @@ public record LqGenerateEvent(
     UUID eventId,
     Instant occurredAt,
     Long comicId,
-    Long chapterId
+    Long chapterId,
+    String chapterNo
 ) implements ComicEvent {}
