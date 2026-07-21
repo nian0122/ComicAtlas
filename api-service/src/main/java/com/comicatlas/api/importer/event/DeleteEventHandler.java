@@ -23,7 +23,7 @@ public class DeleteEventHandler {
     private final ComicMapper comicMapper;
     private final CatalogMapper catalogMapper;
     private final ChapterMapper chapterMapper;
-    private final PageMapper pageMapper;
+    private final MediaMapper mediaMapper;
     private final TransactionTemplate transactionTemplate;
 
     @RabbitListener(queues = "delete.result.queue")
@@ -38,8 +38,8 @@ public class DeleteEventHandler {
                 List<Chapter> chapters = chapterMapper.selectList(
                     new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
                 for (Chapter ch : chapters) {
-                    pageMapper.delete(
-                        new LambdaQueryWrapper<Page>().eq(Page::getChapterId, ch.getId()));
+                    mediaMapper.delete(
+                        new LambdaQueryWrapper<Media>().eq(Media::getChapterId, ch.getId()));
                 }
 
                 chapterMapper.delete(

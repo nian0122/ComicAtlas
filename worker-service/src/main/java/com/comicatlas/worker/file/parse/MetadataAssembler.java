@@ -1,13 +1,12 @@
 package com.comicatlas.worker.file.parse;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import javax.imageio.ImageIO;
-import javax.imageio.ImageReader;
-import javax.imageio.stream.ImageInputStream;
-import java.nio.file.*;
-import java.util.*;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -15,15 +14,17 @@ import java.util.concurrent.atomic.AtomicInteger;
  * 注入 Catalog/Chapter 区分、global_order、HQ/LQ 状态、sourceDir 等。
  *
  * 递归算法：
- * - 叶子节点（含图片）→ Chapter
+ * - 叶子节点（含媒体文件）→ Chapter
  * - 中间节点（只含子目录）→ Catalog，继续递归
  * - parentIndex / catalogIndex 为 catalogs 列表索引，非 DB 主键
+ * - 每个媒体文件的元数据（图片宽高 / 视频时长/编码）由 MediaAnalyzer 读取
  */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class MetadataAssembler {
 
-    private static final Set<String> IMAGE_EXT = Set.of(".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp");
+    private final MediaAnalyzer mediaAnalyzer;
 
     public ComicMetadata assemble(DirectoryTree tree, ImportContext ctx) {
         String title = ctx.titleHint() != null ? ctx.titleHint() : tree.name();
@@ -45,15 +46,15 @@ public class MetadataAssembler {
             AtomicInteger globalOrder, AtomicInteger catalogCounter) {
 
         if (node.isLeaf()) {
-            var pages = scanPages(node);
-            if (!pages.isEmpty()) {
+            var mediaItems = scanMediaItems(node);
+            if (!mediaItems.isEmpty()) {
                 String sourceDir = root.relativize(node.path()).toString().replace('\\', '/');
                 chapters.add(new ComicMetadata.ChapterInfo(
                     node.name(), String.valueOf(globalOrder.get() + 1),
                     chapters.size(), globalOrder.getAndIncrement(),
                     parentCatalogIndex,
                     sourceDir,
-                    pages
+                    mediaItems
                 ));
             }
         } else if (node.hasChildren()) {
@@ -67,47 +68,18 @@ public class MetadataAssembler {
         }
     }
 
-    private List<ComicMetadata.PageInfo> scanPages(DirectoryTree node) {
-        List<ComicMetadata.PageInfo> pages = new ArrayList<>();
+    /**
+     * 扫描叶子节点下的所有媒体文件（图片 + 视频），由 MediaAnalyzer 读取元数据，
+     * 并按出现顺序填入 pageNumber。
+     */
+    private List<ComicMetadata.MediaInfo> scanMediaItems(DirectoryTree node) {
+        List<ComicMetadata.MediaInfo> mediaItems = new ArrayList<>();
+        List<Path> files = node.mediaFiles();
 
-        for (int i = 0; i < node.imageFiles().size(); i++) {
-            Path img = node.imageFiles().get(i);
-            String name = img.getFileName().toString();
-            long size = safeFileSize(img);
-            var dims = getImageDimensions(img);
-
-            pages.add(new ComicMetadata.PageInfo(
-                name, i + 1,
-                size > 0 ? "READY" : "MISSING",
-                "NOT_GENERATED",
-                size,
-                dims.width(), dims.height()
-            ));
+        for (int i = 0; i < files.size(); i++) {
+            Path file = files.get(i);
+            mediaItems.add(mediaAnalyzer.analyze(file).withPageNumber(i + 1));
         }
-        return pages;
-    }
-
-    private long safeFileSize(Path p) {
-        try { return Files.size(p); } catch (Exception e) { return 0; }
-    }
-
-    private record ImageDimensions(Integer width, Integer height) {}
-
-    private ImageDimensions getImageDimensions(Path p) {
-        try (ImageInputStream in = ImageIO.createImageInputStream(p.toFile())) {
-            if (in == null) return new ImageDimensions(null, null);
-            var readers = ImageIO.getImageReaders(in);
-            if (!readers.hasNext()) return new ImageDimensions(null, null);
-            ImageReader reader = readers.next();
-            try {
-                reader.setInput(in);
-                return new ImageDimensions(reader.getWidth(0), reader.getHeight(0));
-            } finally {
-                reader.dispose();
-            }
-        } catch (Exception e) {
-            log.debug("无法读取图片尺寸: {}", p, e);
-            return new ImageDimensions(null, null);
-        }
+        return mediaItems;
     }
 }

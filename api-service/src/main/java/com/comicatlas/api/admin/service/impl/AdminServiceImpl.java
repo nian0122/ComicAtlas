@@ -28,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.File;
+import java.math.BigDecimal;
 import java.nio.file.*;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
@@ -44,7 +45,7 @@ public class AdminServiceImpl implements AdminService {
     private final ComicMapper comicMapper;
     private final CatalogMapper catalogMapper;
     private final ChapterMapper chapterMapper;
-    private final PageMapper pageMapper;
+    private final MediaMapper mediaMapper;
     private final TagMapper tagMapper;
     private final ComicTagMapper comicTagMapper;
     private final ReadingHistoryMapper historyMapper;
@@ -54,6 +55,9 @@ public class AdminServiceImpl implements AdminService {
 
     /** 未结束（活跃）的导入任务状态 */
     private static final Set<String> ACTIVE_STATUSES = Set.of("PENDING", "PARSING", "IMPORTING");
+
+    /** 视频文件扩展名（用于 scanChapterPages 扫描和 mediaType 判断） */
+    private static final Set<String> VIDEO_EXTENSIONS = Set.of(".mp4", ".webm", ".mkv", ".mov", ".avi");
 
     @Value("${MANGA_ROOT:D:/manga}")
     private String mangaRoot;
@@ -83,8 +87,8 @@ public class AdminServiceImpl implements AdminService {
                 new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
         List<Long> chapterIds = chapters.stream().map(Chapter::getId).toList();
         if (!chapterIds.isEmpty()) {
-            stats.setPage((int) pageMapper.delete(
-                    new LambdaQueryWrapper<Page>().in(Page::getChapterId, chapterIds)));
+            stats.setPage((int) mediaMapper.delete(
+                    new LambdaQueryWrapper<Media>().in(Media::getChapterId, chapterIds)));
         }
 
         stats.setChapter((int) chapterMapper.delete(
@@ -314,6 +318,10 @@ public class AdminServiceImpl implements AdminService {
         Map<String, Object> comicData = (Map<String, Object>) metadata.get("comic");
         List<Map<String, Object>> catalogsData = (List<Map<String, Object>>) metadata.get("catalogs");
         List<Map<String, Object>> chaptersData = (List<Map<String, Object>>) metadata.get("chapters");
+        // metadata version：v2=legacy（pages/imageName/仅图片），v3=current（mediaItems/fileName/支持视频）
+        int version = metadata.get("version") instanceof Number n ? n.intValue() : 2;
+        String mediaListKey = version >= 3 ? "mediaItems" : "pages";
+        String mediaNameKey = version >= 3 ? "fileName" : "imageName";
 
         Long comicId = ctx.comicId();
         Comic comic;
@@ -328,7 +336,7 @@ public class AdminServiceImpl implements AdminService {
                     new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId))
                     .stream().map(Chapter::getId).toList();
             if (!existingChapterIds.isEmpty()) {
-                pageMapper.delete(new LambdaQueryWrapper<Page>().in(Page::getChapterId, existingChapterIds));
+                mediaMapper.delete(new LambdaQueryWrapper<Media>().in(Media::getChapterId, existingChapterIds));
             }
             chapterMapper.delete(new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
             catalogMapper.delete(new LambdaQueryWrapper<Catalog>().eq(Catalog::getComicId, comicId));
@@ -372,16 +380,16 @@ public class AdminServiceImpl implements AdminService {
                 chapterMapper.insert(chapter);
                 chCount++;
 
-                List<Map<String, Object>> pageList = (List<Map<String, Object>>) chData.get("pages");
+                List<Map<String, Object>> pageList = (List<Map<String, Object>>) chData.get(mediaListKey);
                 if (pageList != null) {
                     chapter.setPageCount(pageList.size());
                     chapterMapper.updateById(chapter);
                     for (Map<String, Object> pd : pageList) {
-                        Page page = new Page();
+                        Media page = new Media();
                         page.setChapterId(chapter.getId());
                         page.setPageNumber(((Number) pd.get("pageNumber")).intValue());
                         page.setHqRoot("HQ");
-                        String imageName = (String) pd.get("imageName");
+                        String imageName = (String) pd.get(mediaNameKey);
                         String hqPath = comicId + "/" + chapter.getGlobalOrder() + "/" + imageName;
                         page.setHqPath(hqPath);
                         page.setHqStatus(pd.get("hqStatus") != null ? (String) pd.get("hqStatus") : "READY");
@@ -389,7 +397,17 @@ public class AdminServiceImpl implements AdminService {
                         if (pd.get("fileSize") != null) page.setFileSize(((Number) pd.get("fileSize")).longValue());
                         if (pd.get("width") != null) page.setWidth(((Number) pd.get("width")).intValue());
                         if (pd.get("height") != null) page.setHeight(((Number) pd.get("height")).intValue());
-                        pageMapper.insert(page);
+                        if (version >= 3) {
+                            page.setMediaType(pd.get("mediaType") != null ? (String) pd.get("mediaType") : "IMAGE");
+                            BigDecimal duration = toBigDecimal(pd.get("duration"));
+                            if (duration != null) page.setDuration(duration);
+                            if (pd.get("container") != null) page.setContainer((String) pd.get("container"));
+                            if (pd.get("videoCodec") != null) page.setVideoCodec((String) pd.get("videoCodec"));
+                            if (pd.get("audioCodec") != null) page.setAudioCodec((String) pd.get("audioCodec"));
+                        } else {
+                            page.setMediaType("IMAGE");
+                        }
+                        mediaMapper.insert(page);
                         totalSize += page.getFileSize() != null ? page.getFileSize() : 0;
                         pgCount++;
 
@@ -473,7 +491,7 @@ public class AdminServiceImpl implements AdminService {
                 new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId))
                 .stream().map(Chapter::getId).toList();
         if (!chapterIds.isEmpty()) {
-            pageMapper.delete(new LambdaQueryWrapper<Page>().in(Page::getChapterId, chapterIds));
+            mediaMapper.delete(new LambdaQueryWrapper<Media>().in(Media::getChapterId, chapterIds));
         }
         chapterMapper.delete(new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
         catalogMapper.delete(new LambdaQueryWrapper<Catalog>().eq(Catalog::getComicId, comicId));
@@ -493,11 +511,21 @@ public class AdminServiceImpl implements AdminService {
                 LocalDateTime.now());
     }
 
+    private BigDecimal toBigDecimal(Object o) {
+        if (o == null) return null;
+        if (o instanceof BigDecimal bd) return bd;
+        if (o instanceof Number n) return BigDecimal.valueOf(n.doubleValue());
+        if (o instanceof String s) {
+            try { return new BigDecimal(s); } catch (Exception e) { return null; }
+        }
+        return null;
+    }
+
     // === HQ scan utilities ===
 
     private record ImageDimensions(Integer width, Integer height) {}
 
-    private record PageInfo(String imageName, long fileSize, Integer width, Integer height) {}
+    private record ScannedMediaInfo(String imageName, long fileSize, Integer width, Integer height, String mediaType) {}
 
     private ImageDimensions getImageDimensions(Path p) {
         try (ImageInputStream in = ImageIO.createImageInputStream(p.toFile())) {
@@ -517,19 +545,27 @@ public class AdminServiceImpl implements AdminService {
         }
     }
 
-    private List<PageInfo> scanChapterPages(Long comicId, int globalOrder) {
+    private List<ScannedMediaInfo> scanChapterPages(Long comicId, int globalOrder) {
         Path dir = Path.of(mangaRoot, "hq", String.valueOf(comicId), String.valueOf(globalOrder));
         if (!Files.exists(dir)) return Collections.emptyList();
 
-        List<PageInfo> pages = new ArrayList<>();
+        List<ScannedMediaInfo> pages = new ArrayList<>();
         try (var stream = Files.newDirectoryStream(dir)) {
             for (Path file : stream) {
                 String name = file.getFileName().toString();
                 if (name.startsWith(".")) continue;
 
                 String lower = name.toLowerCase();
-                if (!(lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".png")
-                        || lower.endsWith(".webp") || lower.endsWith(".gif") || lower.endsWith(".bmp"))) {
+                int dotIdx = lower.lastIndexOf('.');
+                if (dotIdx < 0) continue;
+                String ext = lower.substring(dotIdx);
+                String mediaType;
+                if (VIDEO_EXTENSIONS.contains(ext)) {
+                    mediaType = "VIDEO";
+                } else if (ext.equals(".jpg") || ext.equals(".jpeg") || ext.equals(".png")
+                        || ext.equals(".webp") || ext.equals(".gif") || ext.equals(".bmp")) {
+                    mediaType = "IMAGE";
+                } else {
                     continue;
                 }
 
@@ -540,15 +576,15 @@ public class AdminServiceImpl implements AdminService {
                     fileSize = 0;
                 }
 
-                ImageDimensions dims = getImageDimensions(file);
-                pages.add(new PageInfo(name, fileSize, dims.width(), dims.height()));
+                ImageDimensions dims = "IMAGE".equals(mediaType) ? getImageDimensions(file) : new ImageDimensions(null, null);
+                pages.add(new ScannedMediaInfo(name, fileSize, dims.width(), dims.height(), mediaType));
             }
         } catch (Exception e) {
             log.warn("扫描章节页面失败: comicId={}, globalOrder={}", comicId, globalOrder, e);
             return Collections.emptyList();
         }
 
-        pages.sort(Comparator.comparing(PageInfo::imageName));
+        pages.sort(Comparator.comparing(ScannedMediaInfo::imageName));
         return pages;
     }
 
@@ -586,13 +622,13 @@ public class AdminServiceImpl implements AdminService {
 
                 for (Chapter chapter : chapters) {
                     // Scan HQ directory for this chapter
-                    List<PageInfo> hqImages = scanChapterPages(comicId, chapter.getGlobalOrder());
+                    List<ScannedMediaInfo> hqImages = scanChapterPages(comicId, chapter.getGlobalOrder());
 
                     // Load existing DB pages for this chapter, keyed by imageName
-                    List<Page> dbPagesList = pageMapper.selectList(
-                            new LambdaQueryWrapper<Page>().eq(Page::getChapterId, chapter.getId()));
-                    Map<String, Page> dbPageMap = new LinkedHashMap<>();
-                    for (Page p : dbPagesList) {
+                    List<Media> dbPagesList = mediaMapper.selectList(
+                            new LambdaQueryWrapper<Media>().eq(Media::getChapterId, chapter.getId()));
+                    Map<String, Media> dbPageMap = new LinkedHashMap<>();
+                    for (Media p : dbPagesList) {
                         String hqPath = p.getHqPath();
                         if (hqPath != null && hqPath.contains("/")) {
                             dbPageMap.put(hqPath.substring(hqPath.lastIndexOf('/') + 1), p);
@@ -601,22 +637,25 @@ public class AdminServiceImpl implements AdminService {
 
                     // Calculate nextPageNumber for new pages
                     int nextPageNumber = dbPagesList.isEmpty() ? 1 :
-                            dbPagesList.stream().mapToInt(Page::getPageNumber).max().orElse(0) + 1;
+                            dbPagesList.stream().mapToInt(Media::getPageNumber).max().orElse(0) + 1;
 
                     // Process HQ images: UPDATE existing, INSERT new
-                    for (PageInfo pi : hqImages) {
+                    for (ScannedMediaInfo pi : hqImages) {
                         if (dbPageMap.containsKey(pi.imageName())) {
                             // UPDATE: refresh fileSize, width, height, hqStatus (preserve lqStatus)
-                            Page existing = dbPageMap.get(pi.imageName());
+                            // 视频记录的 width/height 来自 worker (ffprobe)，api-service 无法重新读取，需保留
+                            Media existing = dbPageMap.get(pi.imageName());
                             existing.setFileSize(pi.fileSize());
-                            existing.setWidth(pi.width());
-                            existing.setHeight(pi.height());
+                            if (!"VIDEO".equals(existing.getMediaType())) {
+                                existing.setWidth(pi.width());
+                                existing.setHeight(pi.height());
+                            }
                             existing.setHqStatus("READY");
-                            pageMapper.updateById(existing);
+                            mediaMapper.updateById(existing);
                             dbPageMap.remove(pi.imageName());
                         } else {
                             // INSERT new page
-                            Page newPage = new Page();
+                            Media newPage = new Media();
                             newPage.setChapterId(chapter.getId());
                             newPage.setPageNumber(nextPageNumber++);
                             newPage.setHqRoot("HQ");
@@ -626,14 +665,20 @@ public class AdminServiceImpl implements AdminService {
                             newPage.setFileSize(pi.fileSize());
                             newPage.setWidth(pi.width());
                             newPage.setHeight(pi.height());
-                            pageMapper.insert(newPage);
+                            newPage.setMediaType(pi.mediaType());
+                            mediaMapper.insert(newPage);
                         }
                         totalSize += pi.fileSize();
                     }
 
                     // DELETE remaining DB pages (not found in HQ directory)
-                    for (Page leftover : dbPageMap.values()) {
-                        pageMapper.deleteById(leftover.getId());
+                    for (Media leftover : dbPageMap.values()) {
+                        if ("VIDEO".equals(leftover.getMediaType())) {
+                            log.debug("跳过视频 DB 记录删除（HQ 未找到）: comicId={}, chapter={}, hqPath={}",
+                                    comicId, chapter.getTitle(), leftover.getHqPath());
+                            continue;
+                        }
+                        mediaMapper.deleteById(leftover.getId());
                     }
 
                     // Update chapter pageCount

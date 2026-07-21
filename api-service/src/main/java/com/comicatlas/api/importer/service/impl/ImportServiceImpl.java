@@ -5,11 +5,11 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.comicatlas.api.comic.entity.Catalog;
 import com.comicatlas.api.comic.entity.Chapter;
 import com.comicatlas.api.comic.entity.Comic;
-import com.comicatlas.api.comic.entity.Page;
+import com.comicatlas.api.comic.entity.Media;
 import com.comicatlas.api.comic.mapper.CatalogMapper;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.comic.mapper.ComicMapper;
-import com.comicatlas.api.comic.mapper.PageMapper;
+import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.importer.dto.*;
 import com.comicatlas.api.importer.entity.ImportTask;
@@ -48,7 +48,7 @@ public class ImportServiceImpl implements ImportService {
     private final ComicMapper comicMapper;
     private final CatalogMapper catalogMapper;
     private final ChapterMapper chapterMapper;
-    private final PageMapper pageMapper;
+    private final MediaMapper mediaMapper;
     private final ImportEventPublisher eventPublisher;
     private final RedisTemplate<String, Object> redisTemplate;
     private final TransactionTemplate transactionTemplate;
@@ -319,7 +319,7 @@ public class ImportServiceImpl implements ImportService {
                 new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId))
                 .stream().map(Chapter::getId).toList();
         if (!chapterIds.isEmpty()) {
-            pageMapper.delete(new LambdaQueryWrapper<Page>().in(Page::getChapterId, chapterIds));
+            mediaMapper.delete(new LambdaQueryWrapper<Media>().in(Media::getChapterId, chapterIds));
         }
         chapterMapper.delete(new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
         catalogMapper.delete(new LambdaQueryWrapper<Catalog>().eq(Catalog::getComicId, comicId));

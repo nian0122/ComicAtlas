@@ -10,14 +10,19 @@ import java.util.List;
 public record DirectoryTree(
     Path path,
     String name,
-    List<Path> imageFiles,           // 当前目录下的图片文件（叶子节点有值）
+    List<Path> mediaFiles,           // 当前目录下的媒体文件（图片 + 视频，叶子节点有值）
     List<DirectoryTree> children     // 子目录
 ) {
     public boolean isLeaf() {
-        return imageFiles != null && !imageFiles.isEmpty();
+        return mediaFiles != null && !mediaFiles.isEmpty();
     }
 
     public boolean hasChildren() {
         return children != null && !children.isEmpty();
+    }
+
+    @Deprecated
+    public List<Path> imageFiles() {
+        return mediaFiles;
     }
 }

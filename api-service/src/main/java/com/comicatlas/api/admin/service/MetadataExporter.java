@@ -22,7 +22,7 @@ public class MetadataExporter {
     private final ComicMapper comicMapper;
     private final CatalogMapper catalogMapper;
     private final ChapterMapper chapterMapper;
-    private final PageMapper pageMapper;
+    private final MediaMapper mediaMapper;
     private final ComicTagMapper comicTagMapper;
     private final TagMapper tagMapper;
     private final ObjectMapper objectMapper;
@@ -93,28 +93,32 @@ public class MetadataExporter {
         List<Map<String, Object>> chapterList = new ArrayList<>();
         for (Chapter ch : chapters) {
             // 4. For each chapter: SELECT pages ordered by pageNumber
-            List<Page> pages = pageMapper.selectList(
-                    new LambdaQueryWrapper<Page>()
-                            .eq(Page::getChapterId, ch.getId())
-                            .orderByAsc(Page::getPageNumber));
+            List<Media> pages = mediaMapper.selectList(
+                    new LambdaQueryWrapper<Media>()
+                            .eq(Media::getChapterId, ch.getId())
+                            .orderByAsc(Media::getPageNumber));
 
-            List<Map<String, Object>> pageList = new ArrayList<>();
-            for (Page p : pages) {
+            List<Map<String, Object>> mediaItemList = new ArrayList<>();
+            for (Media p : pages) {
                 Map<String, Object> pm = new LinkedHashMap<>();
-                // 5. imageName = hq_path last segment after '/'
                 String hqPath = p.getHqPath();
-                String imageName = "";
+                String fileName = "";
                 if (hqPath != null && hqPath.contains("/")) {
-                    imageName = hqPath.substring(hqPath.lastIndexOf('/') + 1);
+                    fileName = hqPath.substring(hqPath.lastIndexOf('/') + 1);
                 }
-                pm.put("imageName", imageName);
+                pm.put("fileName", fileName);
+                pm.put("mediaType", p.getMediaType() != null ? p.getMediaType() : "IMAGE");
                 pm.put("pageNumber", p.getPageNumber());
                 pm.put("hqStatus", p.getHqStatus() != null ? p.getHqStatus() : "READY");
                 pm.put("lqStatus", p.getLqStatus() != null ? p.getLqStatus() : "NOT_GENERATED");
                 pm.put("fileSize", p.getFileSize() != null ? p.getFileSize() : 0);
                 if (p.getWidth() != null) pm.put("width", p.getWidth());
                 if (p.getHeight() != null) pm.put("height", p.getHeight());
-                pageList.add(pm);
+                if (p.getDuration() != null) pm.put("duration", p.getDuration());
+                if (p.getContainer() != null) pm.put("container", p.getContainer());
+                if (p.getVideoCodec() != null) pm.put("videoCodec", p.getVideoCodec());
+                if (p.getAudioCodec() != null) pm.put("audioCodec", p.getAudioCodec());
+                mediaItemList.add(pm);
             }
 
             Map<String, Object> chm = new LinkedHashMap<>();
@@ -124,13 +128,13 @@ public class MetadataExporter {
             chm.put("globalOrder", ch.getGlobalOrder() != null ? ch.getGlobalOrder() : 0);
             chm.put("catalogIndex", ch.getCatalogId() != null ? catalogIdToIndex.get(ch.getCatalogId()) : null);
             chm.put("sourceDir", "");
-            chm.put("pages", pageList);
+            chm.put("mediaItems", mediaItemList);
             chapterList.add(chm);
         }
 
         // 6. 组装根结构，匹配 DirectoryImportHandler.writeMetadata() 格式
         Map<String, Object> root = new LinkedHashMap<>();
-        root.put("version", 2);
+        root.put("version", 3);
         root.put("comic", comicMap);
         root.put("catalogs", catalogList);
         root.put("chapters", chapterList);
