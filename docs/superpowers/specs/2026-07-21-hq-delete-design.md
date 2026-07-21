@@ -13,7 +13,8 @@
 **核心目标**:
 - 提供用户主动触发删除 HQ 的功能（整本或按章）
 - 删除前强制校验：所有图片页的 LQ 必须 `READY`
-- 删除后前端自动降级画质设置，禁用 HQ_ONLY 模式
+- 删除操作幂等：已删除的 HQ 再次触发时直接返回成功，不重复执行
+- 删除后前端自然降级（`hq=null` 时 ProgressiveImage 自动使用 LQ），不污染全局画质设置
 - 视频页（无 LQ）不被误删
 
 **非目标**:
@@ -86,15 +87,15 @@ Worker HqDeleteHandler 接收事件
 API HqDeletedHandler 接收事件
   └─ 更新 DB：IMAGE 页 hqStatus=DELETED, hqRoot=null, hqPath=null
   ↓
-前端检测到 hqStatus='DELETED'
-  └─ 自动降级 qualityMode（HQ_ONLY → AUTO），禁用 HQ_ONLY 选项
+前端 ProgressiveImage 检测到 hq=null
+  └─ 自然降级到 LQ（已有逻辑），UI 显示轻量提示 tag
 ```
 
 ---
 
 ## 5. 详细数据流
 
-### 5.1 前置校验逻辑
+### 5.1 前置校验逻辑（含幂等检查）
 
 ```java
 // HqDeleteService 校验流程
@@ -103,13 +104,25 @@ List<Media> imagePages = mediaMapper.selectList(
         .eq(Media::getChapterId, chapterId)
         .eq(Media::getMediaType, "IMAGE"));
 
+// 幂等检查：全部已删除？
+boolean allDeleted = imagePages.stream()
+    .allMatch(p -> "DELETED".equals(p.getHqStatus()));
+if (allDeleted) {
+    return Response.ok().build(); // 200，已删除，无需操作
+}
+
+// LQ 就绪检查
 List<Media> notReady = imagePages.stream()
     .filter(p -> !"READY".equals(p.getLqStatus()))
     .toList();
 
 if (!notReady.isEmpty()) {
-    // 返回 409，附未就绪页号
-    throw new HqDeletePreconditionException(notReady);
+    // 返回 409，附未就绪页的具体信息
+    List<String> details = notReady.stream()
+        .map(p -> String.format("第 %d 页 (pageNumber=%d, lqStatus=%s)",
+            p.getId(), p.getPageNumber(), p.getLqStatus()))
+        .toList();
+    throw new HqDeletePreconditionException(details);
 }
 ```
 
@@ -123,14 +136,33 @@ String hqDir = Path.of(config.getMangaRoot(),
     pathBuilder.hqDir(comicId, chapterNo)).toString();
 
 long freedBytes = 0;
+int deletedCount = 0;
+List<Path> deletedFiles = new ArrayList<>();
+
 try (var stream = Files.walk(Path.of(hqDir))) {
-    for (Path file : stream.filter(Files::isRegularFile).toList()) {
+    stream.filter(Files::isRegularFile).forEach(file -> {
         String name = file.getFileName().toString().toLowerCase();
         if (isImageFile(name)) {
-            freedBytes += Files.size(file);
-            Files.delete(file);
+            try {
+                long size = Files.size(file);
+                Files.delete(file);
+                freedBytes += size;
+                deletedCount++;
+                deletedFiles.add(file);
+            } catch (IOException e) {
+                log.error("删除文件失败: {}, 拒绝 ACK 触发重试", file, e);
+                throw new RuntimeException("删除文件失败: " + file, e);
+                // 抛出异常 → Worker 不 ACK → MQ 重试
+            }
         }
-    }
+    });
+}
+
+// 尝试删除空目录（如果该章所有文件都被删完）
+try {
+    Files.deleteIfExists(Path.of(hqDir));
+} catch (IOException e) {
+    log.warn("删除空目录失败: {}", hqDir);
 }
 ```
 
@@ -141,15 +173,21 @@ try (var stream = Files.walk(Path.of(hqDir))) {
 | `.jpg`, `.jpeg`, `.png`, `.webp`, `.gif` | `.mp4`, `.mkv`, `.webm`, `.mov`, `.avi`（视频） |
 | | `.txt`, `.json`, `.aria2`（元数据/临时文件） |
 
+### 5.4 空目录清理
+
+Worker 删除所有图片文件后，尝试删除 `hq/{comicId}/{chapterNo}/` 目录本身。如果目录非空（含视频或其他文件），保留目录。
+
 ---
 
 ## 6. 错误处理
 
 | 场景 | 行为 |
 |------|------|
-| 前置校验失败（LQ 未全部 READY） | API 返回 409 + 未就绪页列表，前端展示具体原因 |
+| 前置校验失败（LQ 未全部 READY） | API 返回 409 + 具体未就绪页信息（pageId, pageNumber, lqStatus） |
+| 前置校验幂等命中（全部已 DELETED） | API 返回 200，不发布 MQ 事件 |
 | HQ 目录不存在 | Worker 直接发 `HqDeletedEvent`（freedBytes=0），API 正常更新 DB |
-| 删除部分文件时 IO 错误 | Worker 记录错误日志，继续删除剩余文件，最后发 `HqDeletedEvent`（带实际 freedBytes） |
+| 删除部分文件时 IO 错误 | **Worker 抛出异常，拒绝 ACK，MQ 自动重试**（不继续删除剩余文件） |
+| 重试 3 次仍失败 | 进 DLQ，API 侧无状态更新，前端展示"删除失败" |
 | MQ 事件丢失 | DLQ 捕获，API 侧无状态更新，前端展示"删除中..."超时后提示失败 |
 | Worker 崩溃 | MQ 重试（manual ACK + DLQ），最多 3 次后进死信队列 |
 
@@ -177,19 +215,31 @@ try (var stream = Files.walk(Path.of(hqDir))) {
 
 ### 7.3 阅读器自适应
 
+**原则**：不修改全局 `qualityMode` 设置，只在渲染层做自适应。
+
 当 `ProgressiveImage` 的 `hq` prop 为 null（`hqStatus=DELETED` 导致 `FileUrlResolver.resolve()` 返回 null）时：
 
 ```
 applyInitialSrc() {
-  HQ_ONLY: currentSrc = props.hq ?? props.lq  → 自动降级到 LQ
+  HQ_ONLY: currentSrc = props.hq ?? props.lq  → 自动降级到 LQ（已有逻辑）
   AUTO:    lqAvailable && props.lq → LQ       → 不受影响
   LQ_ONLY: lqAvailable && props.lq → LQ       → 不受影响
 }
 ```
 
-**额外**：`ReaderSettingsDrawer` 检测到当前漫画/章节 `hqStatus='DELETED'` 时：
-- `HQ_ONLY` 选项置灰，tooltip 提示"HQ 已删除"
-- 如果当前模式是 `HQ_ONLY`，自动切换为 `AUTO`
+**UI 提示**（新增）：当 `mode === 'HQ_ONLY'` 且 `hq === null` 时，在图片上方显示轻量 tag：
+
+```
+┌─────────────────────┐
+│  HQ 已删除 · 当前为 LQ │  ← 灰色小标签，不影响阅读
+├─────────────────────┤
+│                     │
+│    [图片内容]        │
+│                     │
+└─────────────────────┘
+```
+
+**不修改全局 store**：`reader-settings-store.ts` 的 `qualityMode` 保持用户选择，切换到其他漫画时仍生效。
 
 ---
 
@@ -247,10 +297,25 @@ public record HqDeletedEvent(
 POST /api/comics/{comicId}/delete-hq
 ```
 
-**前置校验**：所有 IMAGE 页 `lqStatus == 'READY'`  
-**成功响应**：`202 Accepted`（任务已提交）  
+**前置校验**：
+1. 幂等检查：所有 IMAGE 页 `hqStatus == 'DELETED'` → `200 OK`（已删除）
+2. LQ 就绪检查：所有 IMAGE 页 `lqStatus == 'READY'` → 通过
+
+**成功响应**：
+- `200 OK`：全部已删除（幂等命中）
+- `202 Accepted`：任务已提交
+
 **失败响应**：
-- `409 CONFLICT`：部分 IMAGE 页 LQ 未就绪，body 含未就绪页列表
+- `409 CONFLICT`：部分 IMAGE 页 LQ 未就绪，body 示例：
+  ```json
+  {
+    "message": "以下页面 LQ 未就绪，无法删除 HQ",
+    "pages": [
+      {"pageId": 123, "pageNumber": 5, "lqStatus": "FAILED"},
+      {"pageId": 124, "pageNumber": 6, "lqStatus": "NOT_GENERATED"}
+    ]
+  }
+  ```
 - `404 NOT FOUND`：漫画不存在
 
 ### 9.2 删除单章 HQ
@@ -277,12 +342,13 @@ POST /api/chapters/{chapterId}/delete-hq
 | `comic-common/event/HqDeletedEvent.java` | 新建 | MQ 事件 DTO |
 | `comic-common/event/ComicEvent.java` | 修改 | 新增两个事件到 sealed interface + @JsonSubTypes |
 | `worker/event/HqDeleteHandler.java` | 新建 | MQ 消费者 + 文件删除 |
-| `worker/config/WorkerConfig.java` | 修改 | 无需新增字段，复用现有 mangaRoot |
+| `worker/config/WorkerConfig.java` | 修改 | 新增 `hqDeleteTimeoutSeconds` 配置（默认 60s）|
 | `worker/common/FilePathBuilder.java` | 无需修改 | 复用 hqDir() |
 | `frontend/services/api.ts` | 修改 | 新增 `hqApi.deleteComic(id)` / `deleteChapter(id)` |
 | `frontend/views/reading/DetailPage.vue` | 修改 | 新增"删除 HQ"按钮 |
-| `frontend/views/reading/reader/components/ReaderSettingsDrawer.vue` | 修改 | 禁用 HQ_ONLY 当 hqStatus=DELETED |
-| `frontend/stores/reader-settings-store.ts` | 修改 | 自动降级 qualityMode |
+| `frontend/views/reading/reader/components/ReaderSettingsDrawer.vue` | 修改 | HQ 已删除时显示提示 tag |
+| `frontend/views/reading/reader/components/ProgressiveImage.vue` | 无需修改 | `hq=null` 时自动降级到 LQ，已有逻辑 |
+| `frontend/stores/reader-settings-store.ts` | **无需修改** | 全局 qualityMode 不自动降级 |
 
 ---
 
@@ -319,8 +385,12 @@ page.hqStatus = READY, page.lqStatus = NOT_GENERATED
   ↓
 page.lqStatus = READY
   ↓
-用户触发删除 HQ
+用户触发删除 HQ（第一次）
+  ├─ 前置校验通过 → 发 MQ → Worker 删文件 → API 更新 DB
   ↓
 page.hqStatus = DELETED, page.hqRoot = null, page.hqPath = null
   （VIDEO 页状态不变）
+  ↓
+用户再次触发删除 HQ（第二次）
+  ├─ 幂等检查命中 → API 直接返回 200，不走 MQ
 ```
