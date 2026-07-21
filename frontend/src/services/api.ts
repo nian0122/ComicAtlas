@@ -85,6 +85,11 @@ export const lqApi = {
   generateChapter: (chapterId: number) => api.post(`/chapters/${chapterId}/lq`),
 }
 
+export const hqApi = {
+  deleteComic: (comicId: number) => api.post(`/comics/${comicId}/delete-hq`),
+  deleteChapter: (chapterId: number) => api.post(`/chapters/${chapterId}/delete-hq`),
+}
+
 export const adminApi = {
   deleteComic: (id: number, mode: string) => api.delete(`/admin/comics/${id}`, { params: { mode } }),
   rebuild: () => api.post('/admin/rebuild'),
