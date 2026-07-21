@@ -96,6 +96,16 @@ export const adminApi = {
   refreshMetadata: (id: number) => api.post(`/admin/comics/${id}/refresh-metadata`),
   scanRecover: () => api.post('/admin/storage/scan-recover'),
   stats: () => api.get('/admin/storage/stats'),
+  storageComics: (params: {
+    page?: number
+    size?: number
+    hqStatus?: 'ALL' | 'HAS_HQ' | 'NO_HQ'
+    lqStatus?: 'ALL' | 'NEEDS_LQ' | 'READY'
+    sort?: 'totalSize' | 'hqSize' | 'lqSize' | 'title'
+    order?: 'asc' | 'desc'
+    keyword?: string
+  }) => api.get('/admin/storage/comics', { params }),
+  storageChapters: (comicId: number) => api.get(`/admin/storage/comics/${comicId}/chapters`),
 }
 
 export const settingsApi = {

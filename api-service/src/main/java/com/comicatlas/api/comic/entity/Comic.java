@@ -23,10 +23,7 @@ public class Comic {
     private String sourceGalleryToken;
     private String sourceRef;
     private String storagePolicy;
-    private String rootKey;
-    private String relativePath;
     private String status;
-    private String lqStatus;
     private Long categoryId;
     private String category;
     private LocalDateTime deletedAt;

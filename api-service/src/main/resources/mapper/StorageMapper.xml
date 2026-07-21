@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.comicatlas.api.admin.mapper.StorageMapper">
+
+    <select id="selectComicStorageList" resultType="com.comicatlas.api.admin.dto.ComicStorageDTO">
+        SELECT
+            c.id as comic_id,
+            c.title,
+            c.cover_path as cover_url,
+            COUNT(DISTINCT ch.id) as chapter_count,
+            COUNT(m.id) as page_count,
+            SUM(CASE WHEN m.media_type = 'IMAGE' AND m.hq_status = 'READY' THEN m.file_size ELSE 0 END) as hq_size,
+            SUM(CASE WHEN m.media_type = 'IMAGE' AND m.lq_status = 'READY' THEN m.lq_size ELSE 0 END) as lq_size,
+            GROUP_CONCAT(DISTINCT m.hq_status) as hq_statuses,
+            GROUP_CONCAT(DISTINCT m.lq_status) as lq_statuses
+        FROM comic c
+        LEFT JOIN chapter ch ON ch.comic_id = c.id
+        LEFT JOIN page m ON m.chapter_id = ch.id AND m.media_type = 'IMAGE'
+        WHERE c.deleted_at IS NULL
+        <if test="query.keyword != null and query.keyword != ''">
+            AND c.title LIKE CONCAT('%', #{query.keyword}, '%')
+        </if>
+        GROUP BY c.id
+        <choose>
+            <when test="query.sort == 'hqSize'">ORDER BY hq_size</when>
+            <when test="query.sort == 'lqSize'">ORDER BY lq_size</when>
+            <when test="query.sort == 'title'">ORDER BY c.title</when>
+            <otherwise>ORDER BY (hq_size + lq_size)</otherwise>
+        </choose>
+        <choose>
+            <when test="query.order == 'desc'">DESC</when>
+            <otherwise>ASC</otherwise>
+        </choose>
+        LIMIT #{offset}, #{size}
+    </select>
+
+    <select id="countComicStorageList" resultType="long">
+        SELECT COUNT(DISTINCT c.id)
+        FROM comic c
+        LEFT JOIN chapter ch ON ch.comic_id = c.id
+        LEFT JOIN page m ON m.chapter_id = ch.id AND m.media_type = 'IMAGE'
+        WHERE c.deleted_at IS NULL
+        <if test="query.keyword != null and query.keyword != ''">
+            AND c.title LIKE CONCAT('%', #{query.keyword}, '%')
+        </if>
+    </select>
+
+    <select id="selectChapterStorageList" resultType="com.comicatlas.api.admin.dto.ChapterStorageDTO">
+        SELECT
+            ch.id as chapter_id,
+            ch.chapter_no,
+            ch.title,
+            COUNT(m.id) as page_count,
+            SUM(CASE WHEN m.media_type = 'IMAGE' AND m.hq_status = 'READY' THEN m.file_size ELSE 0 END) as hq_size,
+            SUM(CASE WHEN m.media_type = 'IMAGE' AND m.lq_status = 'READY' THEN m.lq_size ELSE 0 END) as lq_size,
+            GROUP_CONCAT(DISTINCT m.hq_status) as hq_statuses,
+            GROUP_CONCAT(DISTINCT m.lq_status) as lq_statuses
+        FROM chapter ch
+        LEFT JOIN page m ON m.chapter_id = ch.id AND m.media_type = 'IMAGE'
+        WHERE ch.comic_id = #{comicId}
+        GROUP BY ch.id
+        ORDER BY ch.sort_order
+    </select>
+
+</mapper>

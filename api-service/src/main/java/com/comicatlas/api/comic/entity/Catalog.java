@@ -13,7 +13,5 @@ public class Catalog {
     private Long parentId;
     private String title;
     private Integer sortOrder;
-    private String path;
-    private Integer level;
     private LocalDateTime createdAt;
 }
