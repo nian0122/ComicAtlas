@@ -91,6 +91,16 @@
           <div class="catalog-header">
             <h2 class="section-title">目录</h2>
             <span v-if="totalChapters > 0" class="section-count">{{ totalChapters }} 话</span>
+            <el-button
+              v-if="comic"
+              type="warning"
+              plain
+              size="small"
+              class="catalog-header__action"
+              @click="deleteComicHq"
+            >
+              删除 HQ
+            </el-button>
           </div>
 
           <CatalogTree
@@ -118,7 +128,9 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { PictureFilled, WarningFilled } from '@element-plus/icons-vue'
+import { ElMessageBox, ElMessage } from 'element-plus'
 import { comicApi, catalogApi } from '@/services/reading'
+import { hqApi } from '@/services/api'
 import type { ComicDetailVO, CatalogNode, ChapterRef } from '@/types'
 import CatalogTree from '@/components/reading/comic/CatalogTree.vue'
 import HeroBanner from '@/components/reading/HeroBanner.vue'
@@ -286,6 +298,25 @@ async function loadData() {
     error.value = msg || '加载漫画详情失败'
   } finally {
     loading.value = false
+  }
+}
+
+async function deleteComicHq() {
+  try {
+    await ElMessageBox.confirm(
+      '此操作将删除所有章节的 HQ 原图，删除后无法恢复，LQ 画质仍可正常阅读。',
+      '删除 HQ 确认',
+      { confirmButtonText: '确认删除', cancelButtonText: '取消', type: 'warning' }
+    )
+    await hqApi.deleteComic(comic.value!.id)
+    ElMessage.success('HQ 删除任务已提交')
+  } catch (error: any) {
+    if (error.response?.status === 409) {
+      const data = error.response.data
+      ElMessage.error(`${data.message}: ${data.pages.join(', ')}`)
+    } else if (error !== 'cancel') {
+      ElMessage.error('删除失败')
+    }
   }
 }
 
@@ -463,6 +494,10 @@ onMounted(loadData)
   align-items: baseline;
   gap: var(--space-base);
   margin-bottom: var(--space-lg);
+}
+
+.catalog-header__action {
+  margin-left: auto;
 }
 
 .section-count {
