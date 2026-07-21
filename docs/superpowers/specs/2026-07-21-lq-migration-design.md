@@ -1,4 +1,4 @@
-# LQ 迁移导入设计
+# 旧系统存储结构导入新系统设计
 
 **日期**: 2026-07-21
 **状态**: 待实现
@@ -8,13 +8,21 @@
 
 ## 背景
 
-部分漫画在旧系统中以 LQ（低质量/优化后）形式存储，对应的 HQ（高质量）文件大小为 0（空白占位），实际内容仅在 LQ 目录下存在。需将这些漫画导入 ComicAtlas 新系统。
+旧系统的漫画仓库采用 HQ（高质量）+ LQ（低质量/已优化）双目录存储结构。将旧系统漫画导入 ComicAtlas 新系统时，需要处理三种存储状态：
+
+| 状态 | 说明 | 示例 |
+|------|------|------|
+| **只存在 HQ** | HQ 有内容，无对应 LQ | 正常漫画，走 `DIRECTORY` 导入 |
+| **HQ + LQ 同时存在** | HQ 有内容，LQ 也有已优化内容 | 正常漫画，走 `DIRECTORY` 导入（HQ 搬运到系统 HQ，LQ 后续由系统重新生成） |
+| **不存在 HQ，只存在 LQ** | HQ 文件大小为 0（空白占位），实际内容仅在 LQ | **需要特殊处理**，即本文档核心方案 |
 
 **示例目录结构**:
 ```
 F:\games\comics\h_photograph\写真\陆萱萱\   ← HQ 文件存在但大小为 0
 F:\games\comics\l_photograph\写真\陆萱萱\   ← LQ 文件存在，内容完整（已优化图片）
 ```
+
+**本文档范围**：本文档只解决第三种状态（**不存在 HQ，只存在 LQ**）的导入问题。前两种状态直接复用现有 `DIRECTORY` sourceType，无需特殊设计。
 
 **关键约束**：LQ 文件是**已优化的图片**，导入后不需要系统再执行 LQ 压缩。
 
@@ -60,7 +68,20 @@ page.setLqStatus("NOT_GENERATED"); // 硬编码，lqRoot/lqPath 从不设置
 
 ---
 
-## 方案选择
+## 旧系统三种存储状态的导入策略
+
+| 状态 | 导入方式 | 说明 |
+|------|---------|------|
+| **只存在 HQ** | `sourceType: "DIRECTORY"` | 复用现有导入，HQ 搬运到系统 HQ |
+| **HQ + LQ 同时存在** | `sourceType: "DIRECTORY"` | 复用现有导入，HQ 搬运到系统 HQ；旧系统 LQ 丢弃，后续由系统基于 HQ 重新生成 |
+| **不存在 HQ，只存在 LQ** | `sourceType: "MIGRATE_LQ"` | **本文档核心方案**：前置合并 + 标准导入 |
+
+**为什么前两种状态不需要特殊设计**：
+- 现有 `DIRECTORY` sourceType 已经能正确处理 HQ 有内容的漫画
+- 导入后系统 HQ 有内容，LQ 后续可手动触发生成
+- 不需要修改任何导入链路
+
+## 方案选择（针对"不存在 HQ，只存在 LQ"状态）
 
 采用 **前置合并 + 标准导入** 方案：
 
@@ -117,7 +138,7 @@ API ImportEventHandler: 零改动
 
 | 模块 | 改动 | 说明 |
 |------|------|------|
-| `ImportServiceImpl` | 增加 `case "MIGRATE_LQ"` | 验证 sourcePath，创建 comic + task |
+| `ImportServiceImpl` | 修改现有 case | `case "ZIP", "REGISTER", "DIRECTORY"` 扩展为包含 `"MIGRATE_LQ"`，共用同一逻辑（验证 sourcePath，创建 comic + task） |
 | `ImportTaskHandler` | 增加路由分支 | `case "MIGRATE_LQ" -> lqMigrationHandler.migrate(...)` |
 | **新增 `LqMigrationHandler`** | **核心新增** | 推断 LQ 路径、创建临时合并目录、回填空文件、调用 DirectoryImportHandler |
 | `DirectoryImportHandler` | **零改动** | 处理的是已合并的临时目录，完全无感知 |
@@ -139,7 +160,13 @@ API ImportEventHandler: 零改动
 private Path inferLqPath(Path hqPath) {
     String hqStr = hqPath.toString();
     // 将路径中第一个 h_ 前缀段替换为 l_（不区分大小写）
-    String lqStr = hqStr.replaceFirst("(?i)\\h_([^\\]+)", "\\\\l_$1");
+    // [\\/] 同时匹配 Windows (\) 和 Unix (/) 路径分隔符
+    String lqStr = hqStr.replaceFirst("(?i)([\\/])h_([^\\/]+)", "$1l_$2");
+    // 检测替换是否实际发生（路径中必须存在 h_ 前缀）
+    if (lqStr.equals(hqStr)) {
+        throw new RuntimeException(
+            "LQ 路径推断失败: 路径 '" + hqStr + "' 中未找到 h_ 前缀目录，无法推断对应的 LQ 路径");
+    }
     Path lqPath = Path.of(lqStr);
     if (!Files.exists(lqPath)) {
         throw new RuntimeException("LQ 路径不存在: " + lqPath);
@@ -150,6 +177,12 @@ private Path inferLqPath(Path hqPath) {
     return lqPath;
 }
 ```
+
+**关键点**：
+- `([\\/])` 同时匹配 Windows (`\`) 和 Unix (`/`) 路径分隔符
+- 使用捕获组 `$1` 保留原始分隔符类型
+- `replaceFirst` 只替换第一个匹配，符合"目录命名规则统一"的约束
+- 如果路径中不存在 `h_` 前缀，`replaceFirst` 返回原字符串，必须显式检测并拒绝
 
 ### 2. 创建临时合并目录
 
@@ -206,10 +239,11 @@ private void mergeDirectories(Path hqDir, Path lqDir, Path targetDir) throws IOE
 ```
 
 **说明**：
-- `Files.walk(hqDir)` 遍历 HQ 目录完整结构。
+- `Files.walk(hqDir)` 遍历 HQ 目录完整结构（深度优先，父目录先于子项）。
 - 子目录在 HQ 中一定存在（即使是空文件也会有目录结构），所以按 HQ 结构复制。
-- LQ 中不存在的文件（如视频）会被跳过。
-- 临时目录中的文件大小是实际大小（来自 LQ），`MediaAnalyzer` 和 `DirectoryImportHandler` 完全正常处理。
+- LQ 中不存在的文件（如视频）会被跳过，不进入临时目录。
+- 临时目录中只包含实际有内容的文件（来自 HQ 或 LQ），不存在大小为 0 的文件。
+- `MediaAnalyzer` 和 `DirectoryImportHandler` 完全正常处理，无需任何特殊逻辑。
 
 ### 4. 临时目录清理
 
@@ -277,49 +311,65 @@ private void cleanupTemp(Path tempDir) {
 1. **混合场景**：某目录下部分 HQ 文件非空，部分为空 → 非空直接复制，空文件 LQ 回填。
 2. **空章节**：某目录下所有文件都为空且 LQ 缺失 → 该章节在临时目录中无文件，`DirectoryImportHandler` 按空章节处理（跳过或报错，取决于现有逻辑）。
 3. **嵌套目录**：深层子目录结构 → `Files.walk` 递归正确处理。
+4. **路径分隔符混合**：Windows 路径可能传入 `/` 或 `\` 格式 → `[\\/]` 同时处理两种分隔符。
+5. **推断失败**：路径中无 `h_` 前缀（如用户误传 LQ 路径或其他目录）→ 显式检测并拒绝，避免用 HQ 路径冒充 LQ 路径。
 
 ---
 
 ## 后续清理
 
-此功能标记为 **临时**。当所有旧系统漫画迁移完成后：
+此功能标记为 **临时**。当旧系统中"不存在 HQ，只存在 LQ"状态的漫画全部迁移完成后：
 - **移除 `LqMigrationHandler`** 及其路由
-- **移除 `ImportServiceImpl` 中的 `case "MIGRATE_LQ"`**
+- **移除 `ImportServiceImpl` 中的 `"MIGRATE_LQ"`**
 - **保留已导入漫画数据**：导入的漫画数据（catalog/chapter/page/文件）不受影响，正常可用。
+- **前两种状态（只存在 HQ、HQ+LQ）** 的导入不受影响，继续使用 `DIRECTORY` sourceType。
 
 ---
 
-## 自审：HQ + LQ 同时存在的场景
+## 自审：三种存储状态的覆盖度
 
-旧系统中部分漫画的 HQ 和 LQ **同时存在**（HQ 有内容，LQ 也有已优化的内容）。当前方案的 `mergeDirectories` 逻辑对这类漫画的处理：
+### 状态 1：只存在 HQ
 
-- **HQ 非空文件** → 直接复制 HQ 到临时目录 → `DirectoryImportHandler` 搬运到系统 HQ（正确）
-- **HQ 为空文件** → 从 LQ 回填到临时目录 → `DirectoryImportHandler` 搬运到系统 HQ（正确）
+**处理方式**：直接走 `sourceType: "DIRECTORY"`。
 
-**结论：导入过程本身已覆盖混合场景，无需修改 `mergeDirectories` 逻辑。**
+现有导入流程完全支持：扫描 HQ 目录 → MediaAnalyzer 读取 HQ 内容 → DirectoryImportHandler 搬运到系统 HQ → DB 记录 HQ。
 
-### 但存在 LQ 丢失问题
+**无需任何改动。**
 
-`DirectoryImportHandler` 只搬运到系统 HQ 目录，`ImportEventHandler` 设置 `lq_root=null, lq_path=null, lq_status=NOT_GENERATED`。这意味着：
+### 状态 2：HQ + LQ 同时存在
 
-| 漫画类型 | 导入后状态 | 影响 |
-|----------|-----------|------|
-| HQ 为空 | HQ 目录有内容（实际是 LQ），LQ 目录无内容 | 阅读器加载 HQ URL 正常显示；`lqUrl=null` 不影响（没有更高质量版本）。但用户若手动触发 LQ 生成，会对已优化图片二次压缩（无意义但无害）。 |
-| HQ + LQ 同时存在 | 系统 HQ 有真 HQ，系统 LQ 无内容 | 阅读器加载 `lqUrl` 返回 null，前端可能回退 HQ（正常）。但旧系统优化的 LQ 丢失了，用户失去了"LQ 模式"的选择。 |
+**处理方式**：直接走 `sourceType: "DIRECTORY"`。
+
+现有导入流程会搬运 HQ 到系统 HQ，DB 中 LQ 字段为 null。旧系统 LQ 在导入过程中**不被搬运**，导入后丢失。
+
+**影响**：
+- 阅读器加载 HQ URL 正常显示
+- `lqUrl` 为 null，前端可能回退到 HQ（正常）
+- 用户失去了"LQ 模式"（低带宽/快速加载）的选择
+- 但 LQ 可后续由系统基于 HQ 重新生成（手动触发 `/comics/{id}/lq`）
+
+**如果必须保留旧 LQ**：
+需要开发独立的后置脚本，将旧系统 LQ 搬运到系统 LQ 目录并更新 DB。不修改任何导入链路。**超出本文档范围。**
+
+### 状态 3：不存在 HQ，只存在 LQ（本文档核心）
+
+**处理方式**：`sourceType: "MIGRATE_LQ"`，前置合并层将 LQ 伪装为 HQ。
+
+**影响**：
+- 阅读器加载 HQ URL，实际返回 LQ 内容（已优化图片）
+- `lqUrl` 为 null
+- 手动触发 LQ 生成会二次压缩已优化图片（无意义但无害）
+- 用户应避免对这些漫画触发 LQ 生成
 
 ### 自审决策
 
-**保持当前设计，明确 MIGRATE_LQ 的定位**：
+| 状态 | sourceType | 说明 |
+|------|-----------|------|
+| 只存在 HQ | `DIRECTORY` | 无需改动，现有流程直接支持 |
+| HQ + LQ | `DIRECTORY` | 无需改动，LQ 后续由系统重新生成 |
+| 不存在 HQ，只存在 LQ | `MIGRATE_LQ` | 本文档方案，前置合并层处理 |
 
-1. **MIGRATE_LQ 只解决"HQ 为空 → LQ 回填"的核心问题。**
-2. **HQ + LQ 同时存在的漫画，建议走正常 `DIRECTORY` sourceType 导入。**
-   - 系统搬运 HQ 到系统 HQ 目录。
-   - LQ 在导入后由用户手动触发 `/comics/{id}/lq` 生成，系统会基于 HQ 重新压缩生成 LQ。
-   - 虽然新 LQ 和旧系统 LQ 可能质量不同，但这是不修改核心导入链路的代价。
-3. **HQ 为空的漫画，导入后应避免手动触发 LQ 生成。** 系统会将已优化的 LQ 图片再次压缩（无意义）。
-
-**替代方案（如果需要保留旧 LQ）**：
-可为 HQ + LQ 同时存在的漫画，导入后用独立脚本将旧系统 LQ 搬运到系统 LQ 目录并更新 DB 的 `lq_root`/`lq_path`/`lq_status`。这是一个**独立的后置工具**，不修改任何导入链路。超出本次临时功能的范围，如需实现另开任务。
+**本文档只解决状态 3，前两种状态直接复用现有导入流程。**
 
 ---
 
