@@ -1,7 +1,20 @@
 <template>
   <div ref="viewportRef" class="paged-viewport" @wheel="onWheel">
     <div v-if="page" class="paged-page" :style="pageStyle">
+      <VideoPlayer
+        v-if="isVideo"
+        :key="page.id"
+        :hq-url="page.hqUrl"
+        :media-type="page.mediaType ?? 'VIDEO'"
+        :width="page.width"
+        :height="page.height"
+        :duration="page.duration"
+        :container="page.container"
+        :video-codec="page.videoCodec"
+        :audio-codec="page.audioCodec"
+      />
       <ProgressiveImage
+        v-else
         :key="page.id"
         :lq="page.lqUrl"
         :hq="page.hqUrl"
@@ -18,10 +31,11 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useReaderSettingsStore } from '@/stores/reader-settings-store'
 import ProgressiveImage from './ProgressiveImage.vue'
-import type { PageInfo } from '@/types'
+import VideoPlayer from './VideoPlayer.vue'
+import type { MediaItemInfo } from '@/types'
 
 interface Props {
-  pages: PageInfo[]
+  pages: MediaItemInfo[]
   currentPage: number
   /** 被双击强制切到 HQ 的页面索引（pageNumber - 1）集合 */
   forceHqPages: ReadonlySet<number>
@@ -48,13 +62,15 @@ function updateContainerSize() {
   }
 }
 
-const page = computed<PageInfo | null>(() => {
+const page = computed<MediaItemInfo | null>(() => {
   if (props.pages.length === 0) return null
   const idx = Math.min(Math.max(props.currentPage - 1, 0), props.pages.length - 1)
   return props.pages[idx]
 })
 
 const forceHq = computed(() => props.forceHqPages.has(props.currentPage - 1))
+
+const isVideo = computed(() => page.value?.mediaType === 'VIDEO')
 
 const aspectRatio = computed(() => {
   const p = page.value

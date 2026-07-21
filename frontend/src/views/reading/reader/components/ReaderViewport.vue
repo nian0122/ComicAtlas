@@ -24,19 +24,19 @@ import { RecycleScroller } from 'vue-virtual-scroller'
 import type { RecycleScrollerExposed } from 'vue-virtual-scroller'
 import { useReaderSettingsStore } from '@/stores/reader-settings-store'
 import ReaderImageItem from './ReaderImageItem.vue'
-import type { PageInfo } from '@/types'
+import type { MediaItemInfo } from '@/types'
 import { DEFAULT_ASPECT_RATIO } from '@/types'
 /** 虚拟滚动缓冲区最小高度（px） */
 const MIN_BUFFER_PX = 800
 /** 程序化滚动锁定时长（ms），防止自身滚动事件触发页码回写 */
 const SCROLL_LOCK_DURATION_MS = 100
 
-interface ScrollerItem extends PageInfo {
+interface ScrollerItem extends MediaItemInfo {
   size: number
 }
 
 interface Props {
-  pages: PageInfo[]
+  pages: MediaItemInfo[]
   currentPage: number
   /** 被双击强制切到 HQ 的页面索引（0-based）集合 */
   forceHqPages: ReadonlySet<number>
@@ -71,14 +71,14 @@ function updateContainerSize() {
 
 const buffer = computed(() => Math.max(MIN_BUFFER_PX, containerHeight.value))
 
-function computeAspectRatio(page: PageInfo): number {
+function computeAspectRatio(page: MediaItemInfo): number {
   if (page.width && page.height && page.height > 0) {
     return page.width / page.height
   }
   return DEFAULT_ASPECT_RATIO
 }
 
-function computeItemSize(page: PageInfo): number {
+function computeItemSize(page: MediaItemInfo): number {
   const aspectRatio = computeAspectRatio(page)
   const zoom = settings.zoom / 100
 

@@ -8,7 +8,20 @@
       'fit-original': settings.fitMode === 'ORIGINAL',
     }"
   >
+    <VideoPlayer
+      v-if="isVideo"
+      :hq-url="page.hqUrl"
+      :media-type="page.mediaType ?? 'VIDEO'"
+      :width="page.width"
+      :height="page.height"
+      :duration="page.duration"
+      :container="page.container"
+      :video-codec="page.videoCodec"
+      :audio-codec="page.audioCodec"
+      :class="imageClasses"
+    />
     <ProgressiveImage
+      v-else
       :lq="page.lqUrl"
       :hq="page.hqUrl"
       :mode="settings.qualityMode"
@@ -24,11 +37,12 @@
 import { computed } from 'vue'
 import { useReaderSettingsStore } from '@/stores/reader-settings-store'
 import ProgressiveImage from './ProgressiveImage.vue'
-import type { PageInfo } from '@/types'
+import VideoPlayer from './VideoPlayer.vue'
+import type { MediaItemInfo } from '@/types'
 import { DEFAULT_ASPECT_RATIO } from '@/types'
 
 interface Props {
-  item: PageInfo
+  item: MediaItemInfo
   index: number
   active: boolean
   itemHeight: number
@@ -46,6 +60,7 @@ const aspectRatio = computed(() => {
   }
   return DEFAULT_ASPECT_RATIO
 })
+const isVideo = computed(() => page.value.mediaType === 'VIDEO')
 
 /*
  * 用明确的像素高度（= scroller 的 size 字段）替代 CSS aspect-ratio 控制

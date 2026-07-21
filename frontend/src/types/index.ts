@@ -100,7 +100,10 @@ export interface ChapterRef {
   status?: string
 }
 
-export interface PageInfo {
+/** 媒体类型：图片或视频 */
+export type MediaType = 'IMAGE' | 'VIDEO'
+
+export interface MediaItemInfo {
   id: number
   pageNumber: number
   hqUrl: string
@@ -108,13 +111,23 @@ export interface PageInfo {
   lqStatus: string
   width: number
   height: number
+  /** 媒体类型，缺失时默认按 IMAGE 处理 */
+  mediaType?: MediaType
+  /** 视频时长（秒），仅 VIDEO 有意义 */
+  duration?: number
+  /** 视频容器格式，如 mp4/webm/mkv */
+  container?: string
+  /** 视频编码，如 h264/h265/vp9 */
+  videoCodec?: string
+  /** 音频编码，如 aac/opus */
+  audioCodec?: string
 }
 
 export interface ReaderDTO {
   chapterId: number
   comicId: number
   chapterTitle: string
-  pages: PageInfo[]
+  pages: MediaItemInfo[]
   total: number
   prevChapterId: number | null
   nextChapterId: number | null
@@ -125,7 +138,7 @@ export interface ChapterPageVO {
   chapterId: number
   chapterNo: string
   chapterTitle: string
-  pages: PageInfo[]
+  pages: MediaItemInfo[]
   total: number
   prevChapterId: number | null
   nextChapterId: number | null
