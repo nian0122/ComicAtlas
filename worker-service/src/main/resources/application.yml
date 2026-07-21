@@ -31,6 +31,10 @@ worker:
   metadata-dir: ${MANGA_ROOT:D:/manga}/metadata
   aria2c-path: ${ARIA2C_PATH:worker-service/aria2-1.37.0-win-64bit-build1/aria2c.exe}
   ffprobe-path: ${FFPROBE_PATH:worker-service/ffmpeg/ffprobe.exe}
+  image-optimizer-path: ${IMAGE_OPTIMIZER_PATH:worker-service/tools/image-optimizer/image-optimizer.exe}
+  lq-quality: ${LQ_QUALITY:15}
+  lq-workers: ${LQ_WORKERS:4}
+  hq-delete-timeout-seconds: ${HQ_DELETE_TIMEOUT_SECONDS:60}
   torrent:
     peer-detect-timeout: 30
     min-speed-threshold: 10240

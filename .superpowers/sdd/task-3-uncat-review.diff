@@ -1,0 +1,109 @@
+=== COMMITS 09881f3..b3f3a5e === 
+b3f3a5e feat(管理端): 漫画列表支持未分类与无标签筛选,无标签与正常标签互斥
+ 
+=== STAT === 
+ frontend/src/views/management/ComicListPage.vue | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
+ 
+=== FULL DIFF U10 === 
+diff --git a/frontend/src/views/management/ComicListPage.vue b/frontend/src/views/management/ComicListPage.vue
+index 9d9421e..b863c56 100644
+--- a/frontend/src/views/management/ComicListPage.vue
++++ b/frontend/src/views/management/ComicListPage.vue
+@@ -13,20 +13,21 @@
+     <div class="filter-toolbar">
+       <el-input
+         v-model="filters.keyword"
+         placeholder="搜索标题/作者/标签"
+         clearable
+         class="filter-input"
+         @keyup.enter="applyFilters"
+         @clear="applyFilters"
+       />
+       <el-select v-model="filters.category" placeholder="分类" clearable class="filter-select" @change="applyFilters">
++        <el-option label="未分类" value="_NONE" />
+         <el-option
+           v-for="c in categoryStore.list"
+           :key="c.id"
+           :label="c.name"
+           :value="c.name"
+         />
+       </el-select>
+       <el-select v-model="filters.status" placeholder="状态" clearable class="filter-select" @change="applyFilters">
+         <el-option v-for="s in STATUS_OPTIONS" :key="s.value" :label="s.label" :value="s.value" />
+       </el-select>
+@@ -39,20 +40,21 @@
+         clearable
+         class="filter-select--wide"
+         @change="applyFilters"
+       >
+         <el-option
+           v-for="t in tagStore.list"
+           :key="t.id"
+           :label="t.name"
+           :value="t.name"
+         />
++        <el-option label="无标签" value="_NONE" />
+       </el-select>
+       <el-select v-if="filters.tags.length > 1" v-model="filters.tagMode" class="filter-select--mini" @change="applyFilters">
+         <el-option label="任一" value="OR" />
+         <el-option label="全部" value="AND" />
+       </el-select>
+       <el-select v-model="filters.sort" placeholder="排序" class="filter-select" @change="applyFilters">
+         <el-option v-for="s in SORT_OPTIONS" :key="s.value" :label="s.label" :value="s.value" />
+       </el-select>
+       <el-button text @click="resetFilters">重置</el-button>
+     </div>
+@@ -132,21 +134,21 @@
+ 
+     <BatchEditDialog
+       v-model:visible="showBatchDialog"
+       :comic-ids="selectedIds"
+       @saved="onBatchSaved"
+     />
+   </div>
+ </template>
+ 
+ <script setup lang="ts">
+-import { reactive, ref, computed, onMounted } from 'vue'
++import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
+ import { useRouter } from 'vue-router'
+ import { PictureFilled, WarningFilled } from '@element-plus/icons-vue'
+ import { useManagementComicStore } from '@/stores/management/comic'
+ import { useCategoryStore } from '@/stores/management/category'
+ import { useTagStore } from '@/stores/tag-store'
+ import BatchEditDialog from './BatchEditDialog.vue'
+ import type { ComicListQuery } from '@/types'
+ 
+ const router = useRouter()
+ const store = useManagementComicStore()
+@@ -218,20 +220,29 @@ function onBatchSaved() {
+ }
+ 
+ function statusLabel(s: string) {
+   return STATUS_LABELS[s] || s
+ }
+ 
+ function goEdit(id: number) {
+   router.push(`/manage/comics/${id}/edit`)
+ }
+ 
++watch(() => filters.tags, (val) => {
++  if (!val.includes('_NONE')) return
++  if (val.length > 1) {
++    nextTick(() => {
++      filters.tags = val.filter(v => v !== '_NONE')
++    })
++  }
++}, { deep: true })
++
+ function applyFilters() {
+   store.search({
+     keyword: filters.keyword || undefined,
+     category: filters.category || undefined,
+     status: filters.status || undefined,
+     tags: filters.tags.length > 0 ? filters.tags : undefined,
+     tagMode: filters.tagMode,
+     sort: filters.sort as ComicListQuery['sort'],
+   })
+ }

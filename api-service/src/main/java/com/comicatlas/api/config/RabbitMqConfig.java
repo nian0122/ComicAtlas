@@ -128,4 +128,39 @@ public class RabbitMqConfig {
     public DirectExchange deleteDlxExchange() {
         return new DirectExchange("comic.delete.dlx");
     }
+
+    @Bean
+    public DirectExchange imageExchange() {
+        return new DirectExchange("comic.image");
+    }
+
+    @Bean
+    public Queue lqResultQueue() {
+        return QueueBuilder.durable("lq.result.queue")
+                .deadLetterExchange("comic.image.dlx")
+                .deadLetterRoutingKey("lq.result.dlq")
+                .build();
+    }
+
+    @Bean
+    public Queue lqResultDlq() {
+        return QueueBuilder.durable("lq.result.dlq").build();
+    }
+
+    @Bean
+    public Binding lqResultBinding() {
+        return BindingBuilder.bind(lqResultQueue())
+                .to(imageExchange()).with("lq.completed");
+    }
+
+    @Bean
+    public Binding lqResultDlqBinding() {
+        return BindingBuilder.bind(lqResultDlq())
+                .to(imageDlxExchange()).with("lq.result.dlq");
+    }
+
+    @Bean
+    public DirectExchange imageDlxExchange() {
+        return new DirectExchange("comic.image.dlx");
+    }
 }

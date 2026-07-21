@@ -1,0 +1,189 @@
+=== COMMITS e1edbef..3f4e3a8 === 
+3f4e3a8 feat(阅读端): 漫画库新增分类筛选下拉
+ 
+=== STAT === 
+ frontend/e2e/library-filter.spec.ts        | 16 ++++++++++++++++
+ frontend/src/views/reading/LibraryPage.vue | 25 +++++++++++++++++++++++--
+ 2 files changed, 39 insertions(+), 2 deletions(-)
+ 
+=== FULL DIFF U10 === 
+diff --git a/frontend/e2e/library-filter.spec.ts b/frontend/e2e/library-filter.spec.ts
+index 83c48ba..6e321ff 100644
+--- a/frontend/e2e/library-filter.spec.ts
++++ b/frontend/e2e/library-filter.spec.ts
+@@ -75,10 +75,26 @@ test('漫画库请求恒带 status=READY', async ({ page }) => {
+ 
+ test('工具栏不含状态筛选下拉', async ({ page }) => {
+   const captured: CapturedParams = { status: [], category: [] }
+   await mockRoutes(page, captured)
+ 
+   await page.goto('/library')
+   await expect(page.locator('.comic-poster').first()).toBeVisible({ timeout: 10000 })
+ 
+   await expect(page.locator('.status-select')).toHaveCount(0)
+ })
++
++test('分类筛选:选中传 category,切回全部不传', async ({ page }) => {
++  const captured: CapturedParams = { status: [], category: [] }
++  await mockRoutes(page, captured)
++
++  await page.goto('/library')
++  const select = page.locator('.category-select select')
++  await expect(select).toBeVisible({ timeout: 10000 })
++  await expect(select.locator('option')).toHaveCount(3) // 全部分类 + 少年 + 青年
++
++  await select.selectOption({ label: '少年' })
++  await expect.poll(() => captured.category[captured.category.length - 1]).toBe('少年')
++
++  await select.selectOption({ label: '全部分类' })
++  await expect.poll(() => captured.category[captured.category.length - 1]).toBe(null)
++})
+diff --git a/frontend/src/views/reading/LibraryPage.vue b/frontend/src/views/reading/LibraryPage.vue
+index 4786972..2ceaefb 100644
+--- a/frontend/src/views/reading/LibraryPage.vue
++++ b/frontend/src/views/reading/LibraryPage.vue
+@@ -23,20 +23,27 @@
+               <option value="updatedAt">最近更新</option>
+               <option value="title">标题</option>
+               <option value="pageCount">页数</option>
+               <option value="lastReadTime">最近阅读</option>
+             </select>
+           </div>
+         </div>
+ 
+         <!-- 移动端第二行：筛选 chips 横向滚动 -->
+         <div class="toolbar-filters">
++          <div class="filter-select category-select">
++            <select v-model="categoryFilter" @change="onSearch">
++              <option value="">全部分类</option>
++              <option v-for="c in allCategories" :key="c.id" :value="c.name">{{ c.name }}</option>
++            </select>
++          </div>
++
+           <div class="filter-select tag-filter">
+             <el-select
+               v-model="selectedTags"
+               multiple
+               collapse-tags
+               placeholder="筛选标签"
+               class="tag-select"
+               @change="onSearch"
+             >
+               <el-option
+@@ -105,34 +112,36 @@
+       </div>
+     </section>
+   </div>
+ </template>
+ 
+ <script setup lang="ts">
+ import { ref, computed, onMounted } from 'vue'
+ import { useRouter } from 'vue-router'
+ import { Search, PictureFilled, WarningFilled, CircleClose } from '@element-plus/icons-vue'
+ import { useComicStore } from '@/stores/comic-store'
+-import { tagApi } from '@/services/management'
++import { tagApi, categoryApi } from '@/services/management'
+ import { useBreakpoint, BREAKPOINTS } from '@/composables/useBreakpoint'
+ import ComicPoster from '@/components/reading/comic/ComicPoster.vue'
+ import { toPosterStatus } from '@/components/reading/comic/poster-status'
+-import type { ComicListQuery, ComicListVO, TagDTO } from '@/types'
++import type { CategoryDTO, ComicListQuery, ComicListVO, TagDTO } from '@/types'
+ 
+ const router = useRouter()
+ const store = useComicStore()
+ 
+ const keyword = ref('')
+ const sort = ref<NonNullable<ComicListQuery['sort']>>('createdAt')
+ const selectedTags = ref<string[]>([])
+ const tagMode = ref<'AND' | 'OR'>('OR')
+ const allTags = ref<TagDTO[]>([])
++const categoryFilter = ref('')
++const allCategories = ref<CategoryDTO[]>([])
+ 
+ // 响应式视口宽度（resize 防抖更新，组件卸载时自动清理监听）
+ const viewportWidth = useBreakpoint()
+ 
+ // 海报尺寸随断点响应式推导（替代原先读取一次视口宽度、手动挂 resize 监听的写法）
+ const posterSize = computed<'sm' | 'md' | 'lg'>(() => {
+   if (viewportWidth.value <= BREAKPOINTS.mobile) return 'sm'
+   if (viewportWidth.value <= BREAKPOINTS.tablet) return 'md'
+   return 'lg'
+ })
+@@ -151,23 +160,33 @@ function clearKeyword() {
+ 
+ async function loadTags() {
+   try {
+     const res = await tagApi.list()
+     allTags.value = (res.data as TagDTO[]) || []
+   } catch (err: unknown) {
+     allTags.value = []
+   }
+ }
+ 
++async function loadCategories() {
++  try {
++    const res = await categoryApi.list()
++    allCategories.value = (res.data as CategoryDTO[]) || []
++  } catch (err: unknown) {
++    allCategories.value = []
++  }
++}
++
+ function onSearch() {
+   store.search({
+     keyword: keyword.value || undefined,
++    category: categoryFilter.value || undefined,
+     sort: sort.value,
+     tags: selectedTags.value.length > 0 ? selectedTags.value : undefined,
+     tagMode: selectedTags.value.length > 1 ? tagMode.value : undefined,
+   })
+ }
+ 
+ function onPageChange(page: number) {
+   store.updateQuery({ page })
+   store.fetchList()
+ }
+@@ -182,20 +201,21 @@ function continueReading(id: string | number) {
+ 
+ function posterSubtitle(comic: ComicListVO): string {
+   if (comic.progressPercent > 0) {
+     return `已读 ${comic.progressPercent}%`
+   }
+   return `${comic.pageCount} 页`
+ }
+ 
+ onMounted(() => {
+   loadTags()
++  loadCategories()
+   store.fetchList()
+ })
+ </script>
+ 
+ <style scoped>
+ .comic-list-page {
+   max-width: var(--page-width);
+   margin: 0 auto;
+ }
+ 
+@@ -309,20 +329,21 @@ onMounted(() => {
+ 
+ /* 桌面端（>768px）：包装层不参与布局，控件直接平铺进 toolbar，
+  * 并用 order 恢复原有控件顺序：搜索 → 分类 → 排序 → 标签 → 标签模式 */
+ @media (min-width: 769px) {
+   .toolbar-main,
+   .toolbar-filters {
+     display: contents;
+   }
+ 
+   .search-input { order: 1; }
++  .category-select { order: 2; }
+   .sort-select { order: 3; }
+   .tag-filter { order: 4; }
+   .tag-mode-filter { order: 5; }
+ }
+ 
+ .comic-section {
+   display: flex;
+   flex-direction: column;
+   gap: var(--space-xl);
+   padding-bottom: var(--space-xl);

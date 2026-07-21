@@ -1,0 +1,310 @@
+=== COMMITS 400a800..3f4e3a8 === 
+3f4e3a8 feat(阅读端): 漫画库新增分类筛选下拉
+e1edbef feat(阅读端): 漫画库移除状态筛选下拉
+8ed0f53 feat(阅读端): 漫画列表固定只请求 READY 漫画
+ 
+=== STAT === 
+ frontend/e2e/library-filter.spec.ts        | 100 +++++++++++++++++++++++++++++
+ frontend/src/stores/comic-store.ts         |   2 +-
+ frontend/src/views/reading/LibraryPage.vue |  34 ++++++----
+ 3 files changed, 122 insertions(+), 14 deletions(-)
+ 
+=== FULL DIFF U10 === 
+diff --git a/frontend/e2e/library-filter.spec.ts b/frontend/e2e/library-filter.spec.ts
+new file mode 100644
+index 0000000..6e321ff
+--- /dev/null
++++ b/frontend/e2e/library-filter.spec.ts
+@@ -0,0 +1,100 @@
++import { test, expect, type Page } from '@playwright/test'
++
++interface CapturedParams {
++  status: (string | null)[]
++  category: (string | null)[]
++}
++
++/**
++ * 拦截漫画库页面用到的三个接口:
++ * - /api/comics**    记录 status/category 请求参数并返回 24 条 READY 漫画
++ * - /api/categories** 返回两个分类(少年/青年)
++ * - /api/tags**       返回空标签列表
++ * 响应包裹 { code, data } 形状以配合 axios 拦截器解包。
++ */
++async function mockRoutes(page: Page, captured: CapturedParams) {
++  await page.route('/api/comics**', async (route, request) => {
++    const url = new URL(request.url())
++    captured.status.push(url.searchParams.get('status'))
++    captured.category.push(url.searchParams.get('category'))
++    const records = Array.from({ length: 24 }, (_, i) => ({
++      id: i + 1,
++      title: `漫画 ${i + 1}`,
++      author: '作者',
++      coverUrl: `https://example.com/cover-${i + 1}.jpg`,
++      pageCount: 100,
++      categoryId: null,
++      categoryName: null,
++      status: 'READY',
++      lqStatus: 'NOT_GENERATED',
++      progressPercent: 0,
++      lastReadChapterId: 0,
++      lastReadPage: 0,
++      createdAt: new Date().toISOString(),
++    }))
++    await route.fulfill({
++      status: 200,
++      contentType: 'application/json',
++      body: JSON.stringify({ code: 0, data: { records, total: 24 } }),
++    })
++  })
++
++  await page.route('/api/categories**', async (route) => {
++    await route.fulfill({
++      status: 200,
++      contentType: 'application/json',
++      body: JSON.stringify({
++        code: 0,
++        data: [
++          { id: 1, name: '少年', sortOrder: 1 },
++          { id: 2, name: '青年', sortOrder: 2 },
++        ],
++      }),
++    })
++  })
++
++  await page.route('/api/tags**', async (route) => {
++    await route.fulfill({
++      status: 200,
++      contentType: 'application/json',
++      body: JSON.stringify({ code: 0, data: [] }),
++    })
++  })
++}
++
++test('漫画库请求恒带 status=READY', async ({ page }) => {
++  const captured: CapturedParams = { status: [], category: [] }
++  await mockRoutes(page, captured)
++
++  await page.goto('/library')
++  await expect(page.locator('.comic-poster').first()).toBeVisible({ timeout: 10000 })
++
++  expect(captured.status.length).toBeGreaterThan(0)
++  expect(captured.status.every((s) => s === 'READY')).toBe(true)
++})
++
++test('工具栏不含状态筛选下拉', async ({ page }) => {
++  const captured: CapturedParams = { status: [], category: [] }
++  await mockRoutes(page, captured)
++
++  await page.goto('/library')
++  await expect(page.locator('.comic-poster').first()).toBeVisible({ timeout: 10000 })
++
++  await expect(page.locator('.status-select')).toHaveCount(0)
++})
++
++test('分类筛选:选中传 category,切回全部不传', async ({ page }) => {
++  const captured: CapturedParams = { status: [], category: [] }
++  await mockRoutes(page, captured)
++
++  await page.goto('/library')
++  const select = page.locator('.category-select select')
++  await expect(select).toBeVisible({ timeout: 10000 })
++  await expect(select.locator('option')).toHaveCount(3) // 全部分类 + 少年 + 青年
++
++  await select.selectOption({ label: '少年' })
++  await expect.poll(() => captured.category[captured.category.length - 1]).toBe('少年')
++
++  await select.selectOption({ label: '全部分类' })
++  await expect.poll(() => captured.category[captured.category.length - 1]).toBe(null)
++})
+diff --git a/frontend/src/stores/comic-store.ts b/frontend/src/stores/comic-store.ts
+index 9da74f8..4d2d421 100644
+--- a/frontend/src/stores/comic-store.ts
++++ b/frontend/src/stores/comic-store.ts
+@@ -32,21 +32,21 @@ export const useComicStore = defineStore('comic', () => {
+ 
+   function resetQuery() {
+     state.query = { page: 1, size: 24, sort: 'createdAt' }
+   }
+ 
+   async function fetchList() {
+     state.loading = true
+     state.error = null
+ 
+     try {
+-      const res = await comicApi.list(state.query)
++      const res = await comicApi.list({ ...state.query, status: 'READY' })
+       state.list = res.data.records || []
+       state.total = res.data.total || 0
+     } catch (err: unknown) {
+       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+       state.error = msg || '加载漫画列表失败'
+       state.list = []
+       state.total = 0
+     } finally {
+       state.loading = false
+     }
+diff --git a/frontend/src/views/reading/LibraryPage.vue b/frontend/src/views/reading/LibraryPage.vue
+index 4f3ae10..2ceaefb 100644
+--- a/frontend/src/views/reading/LibraryPage.vue
++++ b/frontend/src/views/reading/LibraryPage.vue
+@@ -23,27 +23,24 @@
+               <option value="updatedAt">最近更新</option>
+               <option value="title">标题</option>
+               <option value="pageCount">页数</option>
+               <option value="lastReadTime">最近阅读</option>
+             </select>
+           </div>
+         </div>
+ 
+         <!-- 移动端第二行：筛选 chips 横向滚动 -->
+         <div class="toolbar-filters">
+-          <div class="filter-select status-select">
+-            <select v-model="statusFilter" @change="onSearch">
+-              <option value="">全部状态</option>
+-              <option value="READY">已就绪</option>
+-              <option value="IMPORTING">导入中</option>
+-              <option value="PENDING">等待中</option>
+-              <option value="FAILED">失败</option>
++          <div class="filter-select category-select">
++            <select v-model="categoryFilter" @change="onSearch">
++              <option value="">全部分类</option>
++              <option v-for="c in allCategories" :key="c.id" :value="c.name">{{ c.name }}</option>
+             </select>
+           </div>
+ 
+           <div class="filter-select tag-filter">
+             <el-select
+               v-model="selectedTags"
+               multiple
+               collapse-tags
+               placeholder="筛选标签"
+               class="tag-select"
+@@ -115,35 +112,36 @@
+       </div>
+     </section>
+   </div>
+ </template>
+ 
+ <script setup lang="ts">
+ import { ref, computed, onMounted } from 'vue'
+ import { useRouter } from 'vue-router'
+ import { Search, PictureFilled, WarningFilled, CircleClose } from '@element-plus/icons-vue'
+ import { useComicStore } from '@/stores/comic-store'
+-import { tagApi } from '@/services/management'
++import { tagApi, categoryApi } from '@/services/management'
+ import { useBreakpoint, BREAKPOINTS } from '@/composables/useBreakpoint'
+ import ComicPoster from '@/components/reading/comic/ComicPoster.vue'
+ import { toPosterStatus } from '@/components/reading/comic/poster-status'
+-import type { ComicListQuery, ComicListVO, TagDTO } from '@/types'
++import type { CategoryDTO, ComicListQuery, ComicListVO, TagDTO } from '@/types'
+ 
+ const router = useRouter()
+ const store = useComicStore()
+ 
+ const keyword = ref('')
+-const statusFilter = ref('')
+ const sort = ref<NonNullable<ComicListQuery['sort']>>('createdAt')
+ const selectedTags = ref<string[]>([])
+ const tagMode = ref<'AND' | 'OR'>('OR')
+ const allTags = ref<TagDTO[]>([])
++const categoryFilter = ref('')
++const allCategories = ref<CategoryDTO[]>([])
+ 
+ // 响应式视口宽度（resize 防抖更新，组件卸载时自动清理监听）
+ const viewportWidth = useBreakpoint()
+ 
+ // 海报尺寸随断点响应式推导（替代原先读取一次视口宽度、手动挂 resize 监听的写法）
+ const posterSize = computed<'sm' | 'md' | 'lg'>(() => {
+   if (viewportWidth.value <= BREAKPOINTS.mobile) return 'sm'
+   if (viewportWidth.value <= BREAKPOINTS.tablet) return 'md'
+   return 'lg'
+ })
+@@ -162,24 +160,33 @@ function clearKeyword() {
+ 
+ async function loadTags() {
+   try {
+     const res = await tagApi.list()
+     allTags.value = (res.data as TagDTO[]) || []
+   } catch (err: unknown) {
+     allTags.value = []
+   }
+ }
+ 
++async function loadCategories() {
++  try {
++    const res = await categoryApi.list()
++    allCategories.value = (res.data as CategoryDTO[]) || []
++  } catch (err: unknown) {
++    allCategories.value = []
++  }
++}
++
+ function onSearch() {
+   store.search({
+     keyword: keyword.value || undefined,
+-    status: statusFilter.value || undefined,
++    category: categoryFilter.value || undefined,
+     sort: sort.value,
+     tags: selectedTags.value.length > 0 ? selectedTags.value : undefined,
+     tagMode: selectedTags.value.length > 1 ? tagMode.value : undefined,
+   })
+ }
+ 
+ function onPageChange(page: number) {
+   store.updateQuery({ page })
+   store.fetchList()
+ }
+@@ -194,20 +201,21 @@ function continueReading(id: string | number) {
+ 
+ function posterSubtitle(comic: ComicListVO): string {
+   if (comic.progressPercent > 0) {
+     return `已读 ${comic.progressPercent}%`
+   }
+   return `${comic.pageCount} 页`
+ }
+ 
+ onMounted(() => {
+   loadTags()
++  loadCategories()
+   store.fetchList()
+ })
+ </script>
+ 
+ <style scoped>
+ .comic-list-page {
+   max-width: var(--page-width);
+   margin: 0 auto;
+ }
+ 
+@@ -313,29 +321,29 @@ onMounted(() => {
+ 
+ .tag-filter :deep(.el-select__tags) {
+   color: var(--text-primary);
+ }
+ 
+ .tag-mode-filter {
+   min-width: 110px;
+ }
+ 
+ /* 桌面端（>768px）：包装层不参与布局，控件直接平铺进 toolbar，
+- * 并用 order 恢复原有控件顺序：搜索 → 状态 → 排序 → 标签 → 标签模式 */
++ * 并用 order 恢复原有控件顺序：搜索 → 分类 → 排序 → 标签 → 标签模式 */
+ @media (min-width: 769px) {
+   .toolbar-main,
+   .toolbar-filters {
+     display: contents;
+   }
+ 
+   .search-input { order: 1; }
+-  .status-select { order: 2; }
++  .category-select { order: 2; }
+   .sort-select { order: 3; }
+   .tag-filter { order: 4; }
+   .tag-mode-filter { order: 5; }
+ }
+ 
+ .comic-section {
+   display: flex;
+   flex-direction: column;
+   gap: var(--space-xl);
+   padding-bottom: var(--space-xl);

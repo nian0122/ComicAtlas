@@ -1,0 +1,114 @@
+=== COMMITS 400a800..8ed0f53 ===
+8ed0f53 feat(闃呰绔?: 婕敾鍒楄〃鍥哄畾鍙姹?READY 婕敾
+
+=== STAT ===
+ frontend/e2e/library-filter.spec.ts | 74 +++++++++++++++++++++++++++++++++++++
+ frontend/src/stores/comic-store.ts  |  2 +-
+ 2 files changed, 75 insertions(+), 1 deletion(-)
+
+=== FULL DIFF (U10) ===
+diff --git a/frontend/e2e/library-filter.spec.ts b/frontend/e2e/library-filter.spec.ts
+new file mode 100644
+index 0000000..9e34194
+--- /dev/null
++++ b/frontend/e2e/library-filter.spec.ts
+@@ -0,0 +1,74 @@
++import { test, expect, type Page } from '@playwright/test'
++
++interface CapturedParams {
++  status: (string | null)[]
++  category: (string | null)[]
++}
++
++/**
++ * 鎷︽埅婕敾搴撻〉闈㈢敤鍒扮殑涓変釜鎺ュ彛:
++ * - /api/comics**    璁板綍 status/category 璇锋眰鍙傛暟骞惰繑鍥?24 鏉?READY 婕敾
++ * - /api/categories** 杩斿洖涓や釜鍒嗙被(灏戝勾/闈掑勾)
++ * - /api/tags**       杩斿洖绌烘爣绛惧垪琛?+ * 鍝嶅簲鍖呰９ { code, data } 褰㈢姸浠ラ厤鍚?axios 鎷︽埅鍣ㄨВ鍖呫€?+ */
++async function mockRoutes(page: Page, captured: CapturedParams) {
++  await page.route('/api/comics**', async (route, request) => {
++    const url = new URL(request.url())
++    captured.status.push(url.searchParams.get('status'))
++    captured.category.push(url.searchParams.get('category'))
++    const records = Array.from({ length: 24 }, (_, i) => ({
++      id: i + 1,
++      title: `婕敾 ${i + 1}`,
++      author: '浣滆€?,
++      coverUrl: `https://example.com/cover-${i + 1}.jpg`,
++      pageCount: 100,
++      categoryId: null,
++      categoryName: null,
++      status: 'READY',
++      lqStatus: 'NOT_GENERATED',
++      progressPercent: 0,
++      lastReadChapterId: 0,
++      lastReadPage: 0,
++      createdAt: new Date().toISOString(),
++    }))
++    await route.fulfill({
++      status: 200,
++      contentType: 'application/json',
++      body: JSON.stringify({ code: 0, data: { records, total: 24 } }),
++    })
++  })
++
++  await page.route('/api/categories**', async (route) => {
++    await route.fulfill({
++      status: 200,
++      contentType: 'application/json',
++      body: JSON.stringify({
++        code: 0,
++        data: [
++          { id: 1, name: '灏戝勾', sortOrder: 1 },
++          { id: 2, name: '闈掑勾', sortOrder: 2 },
++        ],
++      }),
++    })
++  })
++
++  await page.route('/api/tags**', async (route) => {
++    await route.fulfill({
++      status: 200,
++      contentType: 'application/json',
++      body: JSON.stringify({ code: 0, data: [] }),
++    })
++  })
++}
++
++test('婕敾搴撹姹傛亽甯?status=READY', async ({ page }) => {
++  const captured: CapturedParams = { status: [], category: [] }
++  await mockRoutes(page, captured)
++
++  await page.goto('/library')
++  await expect(page.locator('.comic-poster').first()).toBeVisible({ timeout: 10000 })
++
++  expect(captured.status.length).toBeGreaterThan(0)
++  expect(captured.status.every((s) => s === 'READY')).toBe(true)
++})
+diff --git a/frontend/src/stores/comic-store.ts b/frontend/src/stores/comic-store.ts
+index 9da74f8..4d2d421 100644
+--- a/frontend/src/stores/comic-store.ts
++++ b/frontend/src/stores/comic-store.ts
+@@ -32,21 +32,21 @@ export const useComicStore = defineStore('comic', () => {
+ 
+   function resetQuery() {
+     state.query = { page: 1, size: 24, sort: 'createdAt' }
+   }
+ 
+   async function fetchList() {
+     state.loading = true
+     state.error = null
+ 
+     try {
+-      const res = await comicApi.list(state.query)
++      const res = await comicApi.list({ ...state.query, status: 'READY' })
+       state.list = res.data.records || []
+       state.total = res.data.total || 0
+     } catch (err: unknown) {
+       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+       state.error = msg || '鍔犺浇婕敾鍒楄〃澶辫触'
+       state.list = []
+       state.total = 0
+     } finally {
+       state.loading = false
+     }
