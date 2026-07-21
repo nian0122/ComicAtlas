@@ -1,6 +1,7 @@
 package com.comicatlas.api.reader.dto;
 
 import lombok.Data;
+import java.math.BigDecimal;
 import java.util.List;
 
 @Data
@@ -8,13 +9,13 @@ public class ReaderDTO {
     private Long chapterId;
     private Long comicId;
     private String chapterTitle;
-    private List<PageDTO> pages;
+    private List<MediaItemDTO> pages;
     private int total;
     private Long prevChapterId;
     private Long nextChapterId;
 
     @Data
-    public static class PageDTO {
+    public static class MediaItemDTO {
         private Long id;
         private int pageNumber;
         private String hqUrl;
@@ -22,5 +23,10 @@ public class ReaderDTO {
         private String lqStatus;
         private Integer width;
         private Integer height;
+        private String mediaType;
+        private BigDecimal duration;
+        private String container;
+        private String videoCodec;
+        private String audioCodec;
     }
 }

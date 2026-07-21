@@ -2,9 +2,9 @@ package com.comicatlas.api.reader.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.comic.entity.Chapter;
-import com.comicatlas.api.comic.entity.Page;
+import com.comicatlas.api.comic.entity.Media;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
-import com.comicatlas.api.comic.mapper.PageMapper;
+import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.api.common.storage.FileUrlResolver;
 import com.comicatlas.api.reader.dto.ReaderDTO;
 import com.comicatlas.api.common.exception.BusinessException;
@@ -18,27 +18,37 @@ import java.util.stream.Collectors;
 public class ReaderService {
 
     private final ChapterMapper chapterMapper;
-    private final PageMapper pageMapper;
+    private final MediaMapper mediaMapper;
     private final FileUrlResolver fileUrlResolver;
 
     public ReaderDTO getChapter(Long chapterId) {
         Chapter ch = chapterMapper.selectById(chapterId);
         if (ch == null) throw new BusinessException(404, "章节不存在");
 
-        var pages = pageMapper.selectList(
-            new LambdaQueryWrapper<Page>().eq(Page::getChapterId, chapterId).orderByAsc(Page::getPageNumber));
+        var pages = mediaMapper.selectList(
+            new LambdaQueryWrapper<Media>().eq(Media::getChapterId, chapterId).orderByAsc(Media::getPageNumber));
 
         var dto = new ReaderDTO();
         dto.setChapterId(ch.getId());
         dto.setComicId(ch.getComicId());
         dto.setChapterTitle(ch.getTitle());
         dto.setPages(pages.stream().map(p -> {
-            var pd = new ReaderDTO.PageDTO();
+            var pd = new ReaderDTO.MediaItemDTO();
             pd.setId(p.getId());
             pd.setPageNumber(p.getPageNumber());
             pd.setHqUrl(fileUrlResolver.resolve(p));
-            pd.setLqUrl(fileUrlResolver.resolveLq(p));
-            pd.setLqStatus(p.getLqStatus());
+            pd.setMediaType(p.getMediaType());
+            pd.setDuration(p.getDuration());
+            pd.setContainer(p.getContainer());
+            pd.setVideoCodec(p.getVideoCodec());
+            pd.setAudioCodec(p.getAudioCodec());
+            if ("VIDEO".equals(p.getMediaType())) {
+                pd.setLqUrl(null);
+                pd.setLqStatus("NOT_APPLICABLE");
+            } else {
+                pd.setLqUrl(fileUrlResolver.resolveLq(p));
+                pd.setLqStatus(p.getLqStatus());
+            }
             pd.setWidth(p.getWidth());
             pd.setHeight(p.getHeight());
             return pd;
