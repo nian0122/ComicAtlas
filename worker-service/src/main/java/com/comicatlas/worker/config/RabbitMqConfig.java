@@ -87,6 +87,19 @@ public class RabbitMqConfig {
         return QueueBuilder.durable("delete.task.dlq").build();
     }
 
+    @Bean
+    public Queue hqDeleteQueue() {
+        return QueueBuilder.durable("hq.delete.queue")
+                .deadLetterExchange("comic.image.dlx")
+                .deadLetterRoutingKey("hq.delete.dlq")
+                .build();
+    }
+
+    @Bean
+    public Queue hqDeleteDlq() {
+        return QueueBuilder.durable("hq.delete.dlq").build();
+    }
+
     // ===== Bindings =====
 
     @Bean
@@ -129,5 +142,17 @@ public class RabbitMqConfig {
     public Binding deleteTaskDlqBinding() {
         return BindingBuilder.bind(deleteTaskDlq())
                 .to(deleteDlxExchange()).with("delete.task.dlq");
+    }
+
+    @Bean
+    public Binding hqDeleteBinding() {
+        return BindingBuilder.bind(hqDeleteQueue())
+                .to(imageExchange()).with("hq.delete.requested");
+    }
+
+    @Bean
+    public Binding hqDeleteDlqBinding() {
+        return BindingBuilder.bind(hqDeleteDlq())
+                .to(imageDlxExchange()).with("hq.delete.dlq");
     }
 }
