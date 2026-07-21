@@ -34,7 +34,7 @@ class AdminServiceImplTest {
     @Mock
     private ChapterMapper chapterMapper;
     @Mock
-    private PageMapper pageMapper;
+    private MediaMapper mediaMapper;
     @Mock
     private TagMapper tagMapper;
     @Mock
@@ -99,7 +99,7 @@ class AdminServiceImplTest {
         when(chapterMapper.selectList(any(LambdaQueryWrapper.class)))
                 .thenReturn(List.of(ch1, ch2));
 
-        when(pageMapper.delete(any(LambdaQueryWrapper.class))).thenReturn(50);
+        when(mediaMapper.delete(any(LambdaQueryWrapper.class))).thenReturn(50);
         when(chapterMapper.delete(any(LambdaQueryWrapper.class))).thenReturn(2);
         when(catalogMapper.delete(any(LambdaQueryWrapper.class))).thenReturn(3);
         when(comicTagMapper.delete(any(LambdaQueryWrapper.class))).thenReturn(5);
@@ -154,7 +154,7 @@ class AdminServiceImplTest {
         when(chapterMapper.selectList(any(LambdaQueryWrapper.class)))
                 .thenReturn(List.of(ch));
 
-        when(pageMapper.delete(any(LambdaQueryWrapper.class))).thenReturn(10);
+        when(mediaMapper.delete(any(LambdaQueryWrapper.class))).thenReturn(10);
         when(chapterMapper.delete(any(LambdaQueryWrapper.class))).thenReturn(1);
         when(catalogMapper.delete(any(LambdaQueryWrapper.class))).thenReturn(1);
         when(comicTagMapper.delete(any(LambdaQueryWrapper.class))).thenReturn(0);
