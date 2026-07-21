@@ -160,6 +160,56 @@ public class RabbitMqConfig {
     }
 
     @Bean
+    public Queue hqDeleteQueue() {
+        return QueueBuilder.durable("hq.delete.queue")
+                .deadLetterExchange("comic.image.dlx")
+                .deadLetterRoutingKey("hq.delete.dlq")
+                .build();
+    }
+
+    @Bean
+    public Queue hqDeleteDlq() {
+        return QueueBuilder.durable("hq.delete.dlq").build();
+    }
+
+    @Bean
+    public Binding hqDeleteBinding() {
+        return BindingBuilder.bind(hqDeleteQueue())
+                .to(imageExchange()).with("hq.delete.requested");
+    }
+
+    @Bean
+    public Binding hqDeleteDlqBinding() {
+        return BindingBuilder.bind(hqDeleteDlq())
+                .to(imageDlxExchange()).with("hq.delete.dlq");
+    }
+
+    @Bean
+    public Queue hqDeleteResultQueue() {
+        return QueueBuilder.durable("hq.delete.result.queue")
+                .deadLetterExchange("comic.image.dlx")
+                .deadLetterRoutingKey("hq.delete.result.dlq")
+                .build();
+    }
+
+    @Bean
+    public Queue hqDeleteResultDlq() {
+        return QueueBuilder.durable("hq.delete.result.dlq").build();
+    }
+
+    @Bean
+    public Binding hqDeleteResultBinding() {
+        return BindingBuilder.bind(hqDeleteResultQueue())
+                .to(imageExchange()).with("hq.delete.completed");
+    }
+
+    @Bean
+    public Binding hqDeleteResultDlqBinding() {
+        return BindingBuilder.bind(hqDeleteResultDlq())
+                .to(imageDlxExchange()).with("hq.delete.result.dlq");
+    }
+
+    @Bean
     public DirectExchange imageDlxExchange() {
         return new DirectExchange("comic.image.dlx");
     }
