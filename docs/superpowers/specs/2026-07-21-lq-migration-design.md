@@ -22,7 +22,9 @@ F:\games\comics\h_photograph\写真\陆萱萱\   ← HQ 文件存在但大小为
 F:\games\comics\l_photograph\写真\陆萱萱\   ← LQ 文件存在，内容完整（已优化图片）
 ```
 
-**本文档范围**：只解决第三种状态（**不存在 HQ，只存在 LQ**）的导入问题。前两种状态直接复用现有 `DIRECTORY` sourceType。
+**本文档范围**：**包含旧系统所有存储状态的导入策略**。三种状态分别采用不同的 sourceType 处理：
+- 状态 1（只存在 HQ）和状态 2（HQ + LQ）→ 直接复用现有 `DIRECTORY` sourceType
+- 状态 3（不存在 HQ，只存在 LQ）→ 本文档设计的 `MIGRATE_LQ` sourceType（核心方案）
 
 ---
 
