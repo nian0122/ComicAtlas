@@ -9,7 +9,7 @@ public class ChapterPageVO {
     private Long chapterId;
     private String chapterNo;
     private String chapterTitle;
-    private List<PageInfo> pages;
+    private List<MediaItemInfo> pages;
     private Integer total;
     private Long prevChapterId;
     private Long nextChapterId;
