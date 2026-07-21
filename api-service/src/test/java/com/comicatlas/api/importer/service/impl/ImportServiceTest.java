@@ -4,7 +4,7 @@ import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.mapper.CatalogMapper;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.comic.mapper.ComicMapper;
-import com.comicatlas.api.comic.mapper.PageMapper;
+import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.importer.dto.BatchImportRequest;
 import com.comicatlas.api.importer.dto.BatchImportResultVO;
@@ -37,7 +37,7 @@ class ImportServiceTest {
     @Mock private ComicMapper comicMapper;
     @Mock private CatalogMapper catalogMapper;
     @Mock private ChapterMapper chapterMapper;
-    @Mock private PageMapper pageMapper;
+    @Mock private MediaMapper mediaMapper;
     @Mock private ImportEventPublisher eventPublisher;
     @Mock private RedisTemplate<String, Object> redisTemplate;
     @Mock private TransactionTemplate transactionTemplate;
