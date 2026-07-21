@@ -250,14 +250,50 @@ private void cleanupTemp(Path tempDir) {
 
 ---
 
+## 自审：HQ + LQ 同时存在的场景
+
+旧系统中部分漫画的 HQ 和 LQ **同时存在**（HQ 有内容，LQ 也有已优化的内容）。当前方案的 `mergeDirectories` 逻辑对这类漫画的处理：
+
+- **HQ 非空文件** → 直接复制 HQ 到临时目录 → `DirectoryImportHandler` 搬运到系统 HQ（正确）
+- **HQ 为空文件** → 从 LQ 回填到临时目录 → `DirectoryImportHandler` 搬运到系统 HQ（正确）
+
+**结论：导入过程本身已覆盖混合场景，无需修改 `mergeDirectories` 逻辑。**
+
+### 但存在 LQ 丢失问题
+
+`DirectoryImportHandler` 只搬运到系统 HQ 目录，`ImportEventHandler` 设置 `lq_root=null, lq_path=null, lq_status=NOT_GENERATED`。这意味着：
+
+| 漫画类型 | 导入后状态 | 影响 |
+|----------|-----------|------|
+| HQ 为空 | HQ 目录有内容（实际是 LQ），LQ 目录无内容 | 阅读器加载 HQ URL 正常显示；`lqUrl=null` 不影响（没有更高质量版本）。但用户若手动触发 LQ 生成，会对已优化图片二次压缩（无意义但无害）。 |
+| HQ + LQ 同时存在 | 系统 HQ 有真 HQ，系统 LQ 无内容 | 阅读器加载 `lqUrl` 返回 null，前端可能回退 HQ（正常）。但旧系统优化的 LQ 丢失了，用户失去了"LQ 模式"的选择。 |
+
+### 自审决策
+
+**保持当前设计，明确 MIGRATE_LQ 的定位**：
+
+1. **MIGRATE_LQ 只解决"HQ 为空 → LQ 回填"的核心问题。**
+2. **HQ + LQ 同时存在的漫画，建议走正常 `DIRECTORY` sourceType 导入。**
+   - 系统搬运 HQ 到系统 HQ 目录。
+   - LQ 在导入后由用户手动触发 `/comics/{id}/lq` 生成，系统会基于 HQ 重新压缩生成 LQ。
+   - 虽然新 LQ 和旧系统 LQ 可能质量不同，但这是不修改核心导入链路的代价。
+3. **HQ 为空的漫画，导入后应避免手动触发 LQ 生成。** 系统会将已优化的 LQ 图片再次压缩（无意义）。
+
+**替代方案（如果需要保留旧 LQ）**：
+可为 HQ + LQ 同时存在的漫画，导入后用独立脚本将旧系统 LQ 搬运到系统 LQ 目录并更新 DB 的 `lq_root`/`lq_path`/`lq_status`。这是一个**独立的后置工具**，不修改任何导入链路。超出本次临时功能的范围，如需实现另开任务。
+
+---
+
 ## 设计评审记录
 
 | 问题 | 决策 |
 |------|------|
 | 是否修改 FileUrlResolver fallback 逻辑？ | **否**。临时功能不应改动通用链路。 |
 | 是否修改 DirectoryImportHandler？ | **否**。新增前置 Handler 完成合并，核心链路零改动。 |
-| 是否生成 LQ 副本？ | **否**。LQ 内容直接存入系统 HQ 目录，DB 标记为 READY。 |
+| 是否修改 ImportEventHandler？ | **否**。metadata 格式兼容，DB 写入逻辑不变。 |
+| 是否生成 LQ 副本？ | **否**。LQ 内容直接存入系统 HQ 目录（HQ 为空场景），或走正常 DIRECTORY 导入后系统生成（HQ+LQ 同时存在场景）。 |
 | 空文件阈值？ | **严格等于 0**。用户确认 HQ 文件大小严格为 0。 |
 | 是否支持批量？ | **是**。复用现有 `createBatchImportTasks`，sourceType 传 "MIGRATE_LQ"。 |
 | 前端是否增加 UI？ | **否**。临时功能，只提供后端 API，手动调用。 |
-| LQ 已优化，导入后是否会被再压缩？ | **不会自动触发**。`lq_status` = NOT_GENERATED，手动触发 LQ 会无意义再压缩，用户应避免。 |
+| HQ+LQ 同时存在的漫画如何处理？ | **走正常 DIRECTORY 导入**。MIGRATE_LQ 只处理 HQ 为空的漫画。 |
+| LQ 已优化，导入后是否会被再压缩？ | **不会自动触发**。但手动触发 LQ 生成会对已优化图片二次压缩（HQ 为空的漫画应避免）。 |
