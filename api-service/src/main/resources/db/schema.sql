@@ -14,10 +14,7 @@ CREATE TABLE IF NOT EXISTS comic (
     source_gallery_token VARCHAR(32),
     source_ref VARCHAR(512),
     storage_policy VARCHAR(16) DEFAULT 'MANAGED',
-    root_key VARCHAR(32) DEFAULT 'LOCAL',
-    relative_path VARCHAR(512),
     status VARCHAR(16) DEFAULT 'IMPORTING',
-    lq_status VARCHAR(16) DEFAULT NULL,
     category_id BIGINT,
     deleted_at DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -34,12 +31,9 @@ CREATE TABLE IF NOT EXISTS catalog (
     parent_id BIGINT DEFAULT NULL,
     title VARCHAR(255) NOT NULL,
     sort_order INT DEFAULT 0,
-    path VARCHAR(512) DEFAULT NULL,
-    level INT DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE INDEX uk_comic_parent_title (comic_id, parent_id, title),
     INDEX idx_comic_parent (comic_id, parent_id),
-    INDEX idx_path (path),
     FOREIGN KEY (comic_id) REFERENCES comic(id) ON DELETE CASCADE,
     FOREIGN KEY (parent_id) REFERENCES catalog(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

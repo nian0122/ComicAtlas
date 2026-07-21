@@ -18,8 +18,6 @@ public class ImportTask {
     private Integer progress;
     private Integer totalPages;
     private Integer downloadedPages;
-    private Integer currentPage;
-    private Long downloadedBytes;
     private String downloadMethod;
     private Long downloadSpeed;
     private Integer etaSeconds;

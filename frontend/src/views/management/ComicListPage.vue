@@ -115,6 +115,7 @@
             </p>
           </div>
           <div class="comic-actions">
+            <button class="action-btn" @click.stop="goStorage(comic.id)">存储</button>
             <button class="action-btn" @click.stop="goEdit(comic.id)">编辑</button>
           </div>
         </div>
@@ -225,6 +226,13 @@ function statusLabel(s: string) {
 
 function goEdit(id: number) {
   router.push(`/manage/comics/${id}/edit`)
+}
+
+function goStorage(id: number) {
+  router.push({
+    path: '/manage/storage',
+    query: { highlight: id.toString() }
+  })
 }
 
 watch(() => filters.tags, (val) => {
