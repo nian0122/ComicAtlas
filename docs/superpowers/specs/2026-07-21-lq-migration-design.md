@@ -25,8 +25,38 @@ F:\games\comics\l_photograph\写真\陆萱萱\   ← LQ 文件存在，内容完
 1. **HQ 文件严格大小为 0**：判断条件明确，无需模糊阈值。
 2. **目录命名规则统一**：所有目录遵循 `h_*` / `l_*` 前缀规则。
 3. **临时功能**：仅提供后端 API，不修改前端批量导入 UI。
-4. **不修改核心导入代码**：`DirectoryImportHandler` 等通用导入链路不得改动。
+4. **不修改核心导入代码**：`DirectoryImportHandler`、`ImportEventHandler` 等通用导入链路不得改动。
 5. **LQ 已优化**：不需要触发 LQ 生成，导入后系统不应再对这些漫画执行 LQ 压缩。
+
+---
+
+## 系统 HQ/LQ 状态支持度分析
+
+### 前端 `ProgressiveImage`
+
+前端阅读器已内置 fallback 逻辑：
+- `HQ_ONLY` 模式：`currentSrc = hq ?? lq ?? undefined`（HQ 缺失时尝试 LQ）
+- `LQ_ONLY` / `AUTO` 模式：LQ 不可用时降级 HQ
+
+### 后端 `ImportEventHandler`
+
+```java
+page.setHqRoot("HQ");        // 硬编码
+page.setHqStatus("READY");   // 硬编码
+page.setLqStatus("NOT_GENERATED"); // 硬编码，lqRoot/lqPath 从不设置
+```
+
+**关键发现**：导入链路**硬编码 HQ 字段**，导入后的 page **永远不可能出现 `hqRoot=null`**。这意味着：
+- 前端 fallback 逻辑在标准导入流程下**永远不会被触发**
+- 要让导入后 `hqRoot=null` 且 `lqRoot="LQ"`，必须修改 `ImportEventHandler`，突破"不修改核心代码"约束
+
+### 三种状态支持度
+
+| 状态 | 系统支持 | 说明 |
+|------|---------|------|
+| **HQ 不存在，LQ 存在** | 前端支持，导入链路不支持 | 前端有 fallback，但 `ImportEventHandler` 硬编码 HQ |
+| **HQ 存在，LQ 存在** | 导入后 HQ 有，LQ 无 | LQ 需后续手动触发生成（基于 HQ 重新压缩） |
+| **HQ 不存在，LQ 不存在** | 前端显示 error | 导入链路应避免 |
 
 ---
 
@@ -36,7 +66,16 @@ F:\games\comics\l_photograph\写真\陆萱萱\   ← LQ 文件存在，内容完
 
 - **不修改核心导入链路**：新增独立的 `LqMigrationHandler`，在调用 `DirectoryImportHandler` 前完成 LQ 回填，生成临时合并目录。
 - `DirectoryImportHandler` 看到的已经是完整目录，无需任何感知 LQ 回填逻辑。
-- **零改动通用阅读链路**：`FileUrlResolver` 和 `ReaderService` 无需任何修改。
+- **零改动通用阅读链路**：`FileUrlResolver`、`ReaderService`、`ImportEventHandler` 均无需修改。
+
+**为什么不利用前端 fallback（HQ 缺失时 fallback 到 LQ）**：
+
+理论上最优雅的方案是让 `LqMigrationHandler` 把 LQ 文件搬运到**系统 LQ 目录**，并修改 `ImportEventHandler` 写入 `lqRoot="LQ"`、`hqRoot=null`。这样前端会自动 fallback，数据模型也最诚实。
+
+但这需要修改 `ImportEventHandler`（目前硬编码 `hqRoot="HQ"`，且从不设置 `lqRoot`），**突破"不修改核心代码"的约束**。临时功能不应侵入核心 DB 写入逻辑，避免引入回归风险。
+
+**前置合并方案的本质**：
+利用临时目录做一层"欺骗"——把 LQ 文件伪装成 HQ 文件喂给标准导入流程。导入完成后系统认为这些是正常 HQ，阅读器无需任何 fallback 即可正常显示。这是临时功能在"零改动核心链路"约束下的务实妥协。
 
 **为什么不修改 DirectoryImportHandler**：
 - `DirectoryImportHandler` 是 ZIP、DIRECTORY、REGISTER 三种 sourceType 的共同处理核心，修改它会影响所有导入场景。
