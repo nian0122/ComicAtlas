@@ -74,8 +74,14 @@ CREATE TABLE IF NOT EXISTS page (
     width INT,
     height INT,
     file_size BIGINT,
+    media_type VARCHAR(32) NOT NULL DEFAULT 'IMAGE',
+    duration DECIMAL(10,3) DEFAULT NULL,
+    container VARCHAR(32) DEFAULT NULL,
+    video_codec VARCHAR(32) DEFAULT NULL,
+    audio_codec VARCHAR(32) DEFAULT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE INDEX uk_chapter_page (chapter_id, page_number),
+    INDEX idx_media_type (media_type),
     FOREIGN KEY (chapter_id) REFERENCES chapter(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

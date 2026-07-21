@@ -22,6 +22,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.File;
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -36,7 +37,7 @@ public class ImportEventHandler {
     private final ComicMapper comicMapper;
     private final CatalogMapper catalogMapper;
     private final ChapterMapper chapterMapper;
-    private final PageMapper pageMapper;
+    private final MediaMapper mediaMapper;
     private final ImportTaskMapper taskMapper;
     private final TransactionTemplate transactionTemplate;
 
@@ -106,6 +107,19 @@ public class ImportEventHandler {
         List<Map<String, Object>> catalogsData = (List<Map<String, Object>>) metadata.get("catalogs");
         List<Map<String, Object>> chaptersData = (List<Map<String, Object>>) metadata.get("chapters");
 
+        // metadata 版本：v2（默认，pages/imageName 全部 IMAGE）；v3（mediaItems/fileName，含 mediaType/视频字段）
+        int metadataVersion = 2;
+        Object verObj = metadata.get("version");
+        if (verObj instanceof Number) {
+            metadataVersion = ((Number) verObj).intValue();
+        } else if (verObj != null) {
+            try {
+                metadataVersion = Integer.parseInt(verObj.toString());
+            } catch (NumberFormatException ignored) {
+                // 解析失败时保持默认 2
+            }
+        }
+
         // 1. UPDATE comic
         comic.setTitle((String) comicData.get("title"));
         comic.setTitleJpn((String) comicData.get("titleJpn"));
@@ -125,7 +139,7 @@ public class ImportEventHandler {
         long totalSize = 0;
         if (chaptersData != null) {
             for (Map<String, Object> chData : chaptersData) {
-                var result = insertChapter(chData, comicId, catalogIdMap);
+                var result = insertChapter(chData, comicId, catalogIdMap, metadataVersion);
                 totalPages += result.pages();
                 totalSize += result.size();
             }
@@ -209,7 +223,7 @@ public class ImportEventHandler {
     private record ChapterResult(int pages, long size) {}
 
     private ChapterResult insertChapter(Map<String, Object> chData, Long comicId,
-                                         Map<Integer, Long> catalogIdMap) {
+                                         Map<Integer, Long> catalogIdMap, int version) {
         Chapter chapter = new Chapter();
         chapter.setComicId(comicId);
         chapter.setTitle((String) chData.get("title"));
@@ -219,31 +233,70 @@ public class ImportEventHandler {
         Object cid = chData.get("catalogIndex");
         if (cid != null) chapter.setCatalogId(catalogIdMap.get(((Number) cid).intValue()));
 
-        List<Map<String, Object>> pageList = (List<Map<String, Object>>) chData.get("pages");
-        chapter.setPageCount(pageList != null ? pageList.size() : 0);
+        // v2: pages + imageName; v3: mediaItems + fileName
+        boolean isV3 = version >= 3;
+        String itemsKey = isV3 ? "mediaItems" : "pages";
+        String nameKey = isV3 ? "fileName" : "imageName";
+        List<Map<String, Object>> itemList = (List<Map<String, Object>>) chData.get(itemsKey);
+        chapter.setPageCount(itemList != null ? itemList.size() : 0);
         chapterMapper.insert(chapter);
 
         int pgCount = 0;
         long totalSize = 0;
-        if (pageList != null) {
-            for (Map<String, Object> pd : pageList) {
-                Page page = new Page();
+        if (itemList != null) {
+            for (Map<String, Object> md : itemList) {
+                Media page = new Media();
                 page.setChapterId(chapter.getId());
-                page.setPageNumber(((Number) pd.get("pageNumber")).intValue());
+                page.setPageNumber(((Number) md.get("pageNumber")).intValue());
                 page.setHqRoot("HQ");
-                page.setHqPath((String) pd.getOrDefault("hqPath",
-                    comicId + "/" + chapter.getGlobalOrder() + "/" + pd.get("imageName")));
-                page.setHqStatus(pd.get("hqStatus") != null ? (String) pd.get("hqStatus") : "READY");
+                page.setHqPath((String) md.getOrDefault("hqPath",
+                    comicId + "/" + chapter.getGlobalOrder() + "/" + md.get(nameKey)));
+                page.setHqStatus(md.get("hqStatus") != null ? (String) md.get("hqStatus") : "READY");
                 page.setLqStatus("NOT_GENERATED");
-                if (pd.get("fileSize") != null) page.setFileSize(((Number) pd.get("fileSize")).longValue());
-                if (pd.get("width") != null) page.setWidth(((Number) pd.get("width")).intValue());
-                if (pd.get("height") != null) page.setHeight(((Number) pd.get("height")).intValue());
-                pageMapper.insert(page);
+                if (md.get("fileSize") != null) page.setFileSize(((Number) md.get("fileSize")).longValue());
+                if (md.get("width") != null) page.setWidth(((Number) md.get("width")).intValue());
+                if (md.get("height") != null) page.setHeight(((Number) md.get("height")).intValue());
+
+                // mediaType: v2 强制 IMAGE；v3 读取 metadata 中的 mediaType
+                String mediaType = isV3 ? (String) md.get("mediaType") : "IMAGE";
+                if (mediaType == null || mediaType.isBlank()) {
+                    mediaType = "IMAGE";
+                }
+                page.setMediaType(mediaType);
+
+                // VIDEO 专属字段
+                if ("VIDEO".equalsIgnoreCase(mediaType)) {
+                    if (md.get("duration") != null) {
+                        page.setDuration(toBigDecimal(md.get("duration")));
+                    }
+                    if (md.get("container") != null) {
+                        page.setContainer((String) md.get("container"));
+                    }
+                    if (md.get("videoCodec") != null) {
+                        page.setVideoCodec((String) md.get("videoCodec"));
+                    }
+                    if (md.get("audioCodec") != null) {
+                        page.setAudioCodec((String) md.get("audioCodec"));
+                    }
+                }
+
+                mediaMapper.insert(page);
                 totalSize += page.getFileSize() != null ? page.getFileSize() : 0;
                 pgCount++;
             }
         }
         return new ChapterResult(pgCount, totalSize);
+    }
+
+    private static BigDecimal toBigDecimal(Object value) {
+        if (value == null) return null;
+        if (value instanceof BigDecimal bd) return bd;
+        if (value instanceof Number n) return BigDecimal.valueOf(n.doubleValue());
+        try {
+            return new BigDecimal(value.toString());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     @RabbitListener(queues = "task.status.queue")

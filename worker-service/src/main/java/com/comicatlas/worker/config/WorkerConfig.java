@@ -20,6 +20,7 @@ public class WorkerConfig {
     private Proxy proxy = new Proxy();
     private Zip zip = new Zip();
     private String aria2cPath = "aria2c";
+    private String ffprobePath = "worker-service/ffmpeg/ffprobe.exe";
     private Map<String, String> storageRoots = new LinkedHashMap<>();
     private String hostMangaRoot;
     private String containerMangaRoot = "/storage";

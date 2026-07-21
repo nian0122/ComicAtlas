@@ -2,9 +2,9 @@ package com.comicatlas.api.importer.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.comic.entity.Chapter;
-import com.comicatlas.api.comic.entity.Page;
+import com.comicatlas.api.comic.entity.Media;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
-import com.comicatlas.api.comic.mapper.PageMapper;
+import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.api.importer.service.LqService;
 import com.comicatlas.common.event.LqGenerateEvent;
 import lombok.RequiredArgsConstructor;
@@ -24,7 +24,7 @@ import java.util.UUID;
 public class LqServiceImpl implements LqService {
 
     private final ChapterMapper chapterMapper;
-    private final PageMapper pageMapper;
+    private final MediaMapper mediaMapper;
     private final RabbitTemplate rabbitTemplate;
 
     @Override
@@ -43,12 +43,13 @@ public class LqServiceImpl implements LqService {
         Chapter ch = chapterMapper.selectById(chapterId);
         if (ch == null) return;
 
-        // 更新该章节所有 page 的 lq_status → QUEUED
-        var pages = pageMapper.selectList(
-            new LambdaQueryWrapper<Page>().eq(Page::getChapterId, chapterId));
-        for (Page p : pages) {
+        var pages = mediaMapper.selectList(
+            new LambdaQueryWrapper<Media>()
+                .eq(Media::getChapterId, chapterId)
+                .eq(Media::getMediaType, "IMAGE"));
+        for (Media p : pages) {
             p.setLqStatus("QUEUED");
-            pageMapper.updateById(p);
+            mediaMapper.updateById(p);
         }
 
         // 发 MQ

@@ -1,6 +1,6 @@
 package com.comicatlas.api.common.storage;
 
-import com.comicatlas.api.comic.entity.Page;
+import com.comicatlas.api.comic.entity.Media;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -10,16 +10,16 @@ public class FileUrlResolver {
     @Value("${storage.url-prefix:/files}")
     private String urlPrefix;
 
-    public String resolve(Page page) {
-        if (page.getHqRoot() == null || page.getHqPath() == null) return null;
-        return urlPrefix + "/" + page.getHqRoot().toLowerCase()
-            + "/" + page.getHqPath().replace('\\', '/');
+    public String resolve(Media media) {
+        if (media.getHqRoot() == null || media.getHqPath() == null) return null;
+        return urlPrefix + "/" + media.getHqRoot().toLowerCase()
+            + "/" + media.getHqPath().replace('\\', '/');
     }
 
-    public String resolveLq(Page page) {
-        if (page.getLqRoot() == null || page.getLqPath() == null) return null;
-        return urlPrefix + "/" + page.getLqRoot().toLowerCase()
-            + "/" + page.getLqPath().replace('\\', '/');
+    public String resolveLq(Media media) {
+        if (media.getLqRoot() == null || media.getLqPath() == null) return null;
+        return urlPrefix + "/" + media.getLqRoot().toLowerCase()
+            + "/" + media.getLqPath().replace('\\', '/');
     }
 
     public String resolveCover(Long comicId) {

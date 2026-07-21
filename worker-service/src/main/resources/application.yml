@@ -30,6 +30,7 @@ worker:
   temp-dir: ${MANGA_ROOT:D:/manga}/temp
   metadata-dir: ${MANGA_ROOT:D:/manga}/metadata
   aria2c-path: ${ARIA2C_PATH:worker-service/aria2-1.37.0-win-64bit-build1/aria2c.exe}
+  ffprobe-path: ${FFPROBE_PATH:worker-service/ffmpeg/ffprobe.exe}
   torrent:
     peer-detect-timeout: 30
     min-speed-threshold: 10240

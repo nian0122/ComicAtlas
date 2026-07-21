@@ -2,11 +2,12 @@ package com.comicatlas.api.comic.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
 @TableName("page")
-public class Page {
+public class Media {
     @TableId(type = IdType.AUTO)
     private Long id;
     private Long chapterId;
@@ -21,5 +22,10 @@ public class Page {
     private Integer width;
     private Integer height;
     private Long fileSize;
+    private String mediaType;
+    private BigDecimal duration;
+    private String container;
+    private String videoCodec;
+    private String audioCodec;
     private LocalDateTime createdAt;
 }
