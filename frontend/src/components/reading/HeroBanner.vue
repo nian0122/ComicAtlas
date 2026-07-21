@@ -9,8 +9,15 @@
     </div>
 
     <div class="hero-content">
-      <div v-if="posterUrl" class="hero-poster">
-        <div class="hero-poster-bg" :style="{ backgroundImage: `url(${posterUrl})` }" />
+      <div class="hero-poster">
+        <div
+          v-if="posterUrl"
+          class="hero-poster-bg"
+          :style="{ backgroundImage: `url(${posterUrl})` }"
+        />
+        <div v-else class="hero-poster-placeholder">
+          <el-icon :size="64"><VideoPlay /></el-icon>
+        </div>
       </div>
 
       <div class="hero-info">
@@ -48,6 +55,7 @@
 
 <script setup lang="ts">
 import { computed, useSlots } from 'vue'
+import { VideoPlay } from '@element-plus/icons-vue'
 
 interface HeroAction {
   label: string
@@ -144,6 +152,16 @@ const hasActions = computed(
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
+}
+
+.hero-poster-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  background: var(--bg-surface);
 }
 
 .hero-info {

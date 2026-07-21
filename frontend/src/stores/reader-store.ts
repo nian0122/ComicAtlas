@@ -2,12 +2,12 @@ import { defineStore } from 'pinia'
 import { reactive, computed, toRefs } from 'vue'
 import { readerApi, historyApi } from '@/services/reading'
 import { useHistoryStore } from '@/stores/history-store'
-import type { PageInfo, ReaderDTO } from '@/types'
+import type { MediaItemInfo, ReaderDTO } from '@/types'
 
 export interface ReaderState {
   chapterId: number
   chapterTitle: string
-  pages: PageInfo[]
+  pages: MediaItemInfo[]
   currentPage: number
   prevChapterId: number | null
   nextChapterId: number | null
