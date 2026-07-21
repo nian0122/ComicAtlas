@@ -19,7 +19,6 @@ public class ComicDetailVO {
     private Long categoryId;
     private String categoryName;
     private String status;
-    private String lqStatus;
     private Integer progressPercent;
     private Long lastReadChapterId;
     private Integer lastReadPage;
