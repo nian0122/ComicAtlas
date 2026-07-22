@@ -463,20 +463,15 @@ public class AdminServiceImpl implements AdminService {
             if (cat == null) continue;
             Map<String, Object> cd = catalogsData.get(i);
             Object pi = cd.get("parentIndex");
-            if (pi == null) {
-                cat.setLevel(0);
-                cat.setPath(cat.getTitle());
-            } else {
+            if (pi != null) {
                 int parentIdx = ((Number) pi).intValue();
                 if (parentIdx < 0 || parentIdx >= size || !idMap.containsKey(parentIdx)) continue;
                 Long parentId = idMap.get(parentIdx);
                 Catalog parent = inserted.get(parentId);
                 if (parent == null) continue;
                 cat.setParentId(parentId);
-                cat.setLevel(parent.getLevel() + 1);
-                cat.setPath(parent.getPath() + "/" + cat.getTitle());
+                catalogMapper.updateById(cat);
             }
-            catalogMapper.updateById(cat);
         }
 
         return idMap;

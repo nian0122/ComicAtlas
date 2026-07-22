@@ -118,7 +118,6 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { PictureFilled, WarningFilled } from '@element-plus/icons-vue'
-import { ElMessageBox, ElMessage } from 'element-plus'
 import { comicApi, catalogApi } from '@/services/reading'
 
 import type { ComicDetailVO, CatalogNode, ChapterRef } from '@/types'
