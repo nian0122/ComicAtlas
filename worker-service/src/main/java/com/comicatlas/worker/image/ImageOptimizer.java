@@ -85,30 +85,42 @@ public class ImageOptimizer {
             throw new RuntimeException("启动图片优化工具失败: " + e.getMessage(), e);
         }
 
+        // 必须在 waitFor() 之前消费 stdout，否则管道满后 Go 进程阻塞写 → 死锁
+        StringBuilder stdout = new StringBuilder();
+        Thread reader = new Thread(() -> {
+            try (BufferedReader r = new BufferedReader(
+                    new InputStreamReader(proc.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = r.readLine()) != null) {
+                    stdout.append(line).append('\n');
+                }
+            } catch (Exception e) {
+                stdout.append("__READ_ERROR__:").append(e.getMessage());
+            }
+        }, "lq-stdout-reader");
+        reader.start();
+
         boolean finished;
         try {
             finished = proc.waitFor(LQ_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            reader.interrupt();
             proc.destroyForcibly();
             throw new RuntimeException("等待图片优化被中断: comicId=" + comicId + ", chapterId=" + chapterId);
         }
 
         if (!finished) {
+            reader.interrupt();
             proc.destroyForcibly();
             throw new RuntimeException(
                     "图片优化超时 (" + LQ_TIMEOUT_SECONDS + "s): comicId=" + comicId + ", chapterId=" + chapterId);
         }
 
-        StringBuilder stdout = new StringBuilder();
-        try (BufferedReader r = new BufferedReader(
-                new InputStreamReader(proc.getInputStream(), StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = r.readLine()) != null) {
-                stdout.append(line).append('\n');
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("读取图片优化输出失败: " + e.getMessage(), e);
+        try {
+            reader.join(5000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
 
         int exitCode = proc.exitValue();

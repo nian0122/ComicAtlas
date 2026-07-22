@@ -85,7 +85,7 @@ const router = createRouter({
         {
           path: 'storage',
           name: 'manage-storage',
-          component: () => import('@/views/management/StoragePage.vue'),
+          component: () => import('@/views/management/storage/StoragePage.vue'),
         },
         {
           path: 'metadata',

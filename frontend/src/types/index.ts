@@ -268,3 +268,70 @@ export const STATUS_COLOR_MAP: Record<string, string> = {
   FAILED: 'danger',
   CANCELLED: 'info',
 }
+
+// ========== Storage Management Domain ==========
+
+/** HQ 状态 */
+export type HqStatus = 'READY' | 'DELETED' | 'MIXED' | 'EMPTY' | 'PENDING' | 'MISSING'
+
+/** LQ 状态 */
+export type LqStatus = 'READY' | 'NOT_GENERATED' | 'MIXED' | 'EMPTY' | 'FAILED' | 'QUEUED' | 'GENERATING'
+
+/** 存储漫画列表项 */
+export interface ComicStorageItem {
+  comicId: number
+  title: string
+  coverUrl: string
+  totalSize: number
+  hqSize: number
+  lqSize: number
+  hqStatus: HqStatus
+  lqStatus: LqStatus
+  chapterCount: number
+  pageCount: number
+}
+
+/** 存储章节列表项 */
+export interface ChapterStorageItem {
+  chapterId: number
+  chapterNo: string
+  title: string
+  pageCount: number
+  hqSize: number
+  lqSize: number
+  hqStatus: HqStatus
+  lqStatus: LqStatus
+}
+
+/** 存储统计摘要 */
+export interface StorageStats {
+  totalBytes: number
+  hqBytes: number
+  lqBytes: number
+  thumbBytes: number
+  comicCount: number
+}
+
+/** 存储漫画查询参数 */
+export interface ComicStorageQuery {
+  page?: number
+  size?: number
+  hqStatus?: 'ALL' | 'HAS_HQ' | 'NO_HQ'
+  lqStatus?: 'ALL' | 'NEEDS_LQ' | 'READY'
+  sort?: 'totalSize' | 'hqSize' | 'lqSize' | 'title'
+  order?: 'asc' | 'desc'
+  keyword?: string
+}
+
+/** 存储操作类型 */
+export enum StorageOperationType {
+  DeleteHQ = 'DELETE_HQ',
+  GenerateLQ = 'GENERATE_LQ',
+}
+
+/** 存储操作参数 */
+export interface StorageOperation {
+  type: StorageOperationType
+  comicId: number
+  chapterId?: number
+}
