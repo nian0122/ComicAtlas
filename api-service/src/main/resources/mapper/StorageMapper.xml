@@ -11,8 +11,8 @@
             COUNT(m.id) as page_count,
             SUM(CASE WHEN m.media_type = 'IMAGE' AND m.hq_status = 'READY' THEN m.file_size ELSE 0 END) as hq_size,
             SUM(CASE WHEN m.media_type = 'IMAGE' AND m.lq_status = 'READY' THEN m.lq_size ELSE 0 END) as lq_size,
-            GROUP_CONCAT(DISTINCT m.hq_status) as hq_statuses,
-            GROUP_CONCAT(DISTINCT m.lq_status) as lq_statuses
+            GROUP_CONCAT(DISTINCT m.hq_status) as hq_status,
+            GROUP_CONCAT(DISTINCT m.lq_status) as lq_status
         FROM comic c
         LEFT JOIN chapter ch ON ch.comic_id = c.id
         LEFT JOIN page m ON m.chapter_id = ch.id AND m.media_type = 'IMAGE'
@@ -53,8 +53,8 @@
             COUNT(m.id) as page_count,
             SUM(CASE WHEN m.media_type = 'IMAGE' AND m.hq_status = 'READY' THEN m.file_size ELSE 0 END) as hq_size,
             SUM(CASE WHEN m.media_type = 'IMAGE' AND m.lq_status = 'READY' THEN m.lq_size ELSE 0 END) as lq_size,
-            GROUP_CONCAT(DISTINCT m.hq_status) as hq_statuses,
-            GROUP_CONCAT(DISTINCT m.lq_status) as lq_statuses
+            GROUP_CONCAT(DISTINCT m.hq_status) as hq_status,
+            GROUP_CONCAT(DISTINCT m.lq_status) as lq_status
         FROM chapter ch
         LEFT JOIN page m ON m.chapter_id = ch.id AND m.media_type = 'IMAGE'
         WHERE ch.comic_id = #{comicId}

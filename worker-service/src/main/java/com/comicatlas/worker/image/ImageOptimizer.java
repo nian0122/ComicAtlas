@@ -29,7 +29,7 @@ public class ImageOptimizer {
     private final FilePathBuilder pathBuilder;
     private final ObjectMapper objectMapper;
 
-    private static final long LQ_TIMEOUT_SECONDS = 300;
+    private static final long LQ_TIMEOUT_SECONDS = 600;
 
     /**
      * 对指定章节的 HQ 图片生成 LQ WebP。
@@ -57,8 +57,12 @@ public class ImageOptimizer {
                 ? config.getLqWorkers()
                 : Runtime.getRuntime().availableProcessors();
 
+        Path optimizerPath = Path.of(config.getImageOptimizerPath());
+        if (!optimizerPath.isAbsolute()) {
+            optimizerPath = Path.of(System.getProperty("user.dir")).resolve(optimizerPath);
+        }
         List<String> cmd = new ArrayList<>(List.of(
-                config.getImageOptimizerPath(),
+                optimizerPath.toString(),
                 "-scan-dir", hqDir,
                 "-output-dir", lqDir,
                 "-comic-id", comicId.toString(),

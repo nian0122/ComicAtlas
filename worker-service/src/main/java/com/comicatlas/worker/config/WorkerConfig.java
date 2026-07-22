@@ -21,7 +21,7 @@ public class WorkerConfig {
     private Zip zip = new Zip();
     private String aria2cPath = "aria2c";
     private String ffprobePath = "worker-service/ffmpeg/ffprobe.exe";
-    private String imageOptimizerPath = "worker-service/tools/image-optimizer/image-optimizer.exe";
+    private String imageOptimizerPath = "tools/image-optimizer/image-optimizer.exe";
     private int lqQuality = 15;
     private int lqWorkers = 0;
     private int hqDeleteTimeoutSeconds = 60;
