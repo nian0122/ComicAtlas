@@ -1,72 +1,14 @@
 {
   "schema_version": 2,
-  "active_work_id": "refresh-metadata-phase2",
+  "active_work_id": "hq-delete-2026-07-21",
   "works": {
-    "netflix-frontend-refactor": {
-      "work_id": "netflix-frontend-refactor",
-      "active_plan": ".omo/plans/netflix-frontend-refactor.md",
-      "plan_name": "netflix-frontend-refactor",
-      "session_ids": [
-        "codex:netflix-frontend-refactor-main"
-      ],
+    "hq-delete-2026-07-21": {
+      "work_id": "hq-delete-2026-07-21",
+      "active_plan": ".omo/plans/2026-07-21-hq-delete.md",
+      "plan_name": "2026-07-21-hq-delete",
+      "session_ids": ["codex:current"],
       "status": "completed",
       "worktree_path": null
-    },
-    "admin-db-only-delete": {
-      "work_id": "admin-db-only-delete",
-      "active_plan": ".omo/plans/admin-db-only-delete.md",
-      "plan_name": "admin-db-only-delete",
-      "session_ids": [
-        "codex:admin-db-only-delete-main"
-      ],
-      "status": "completed",
-      "worktree_path": null
-    },
-    "comicatlas-management-features": {
-      "work_id": "comicatlas-management-features",
-      "active_plan": ".omo/plans/comicatlas-management-features.md",
-      "plan_name": "ComicAtlas 管理功能实现",
-      "session_ids": [],
-      "status": "completed",
-      "worktree_path": null
-    },
-    "comicatlas-docs-refresh-phase1": {
-      "session_ids": [
-        "codex:comicatlas-docs-refresh-phase1-main"
-      ],
-      "work_id": "comicatlas-docs-refresh-phase1",
-      "active_plan": ".omo/plans/comicatlas-docs-refresh-phase1.md",
-      "plan_name": "comicatlas-docs-refresh-phase1",
-      "worktree_path": null,
-      "status": "completed"
-    },
-    "mobile-reading-2026-07-18": {
-      "work_id": "mobile-reading-2026-07-18",
-      "active_plan": ".omo/plans/2026-07-18-mobile-reading.md",
-      "plan_name": "2026-07-18-mobile-reading",
-      "session_ids": [],
-      "status": "completed",
-      "worktree_path": null
-    },
-    "refresh-metadata-api": {
-      "session_ids": [
-        "codex:refresh-metadata-api-main"
-      ],
-      "status": "active",
-      "active_plan": ".omo/plans/refresh-metadata-api.md",
-      "plan_name": "refresh-metadata-api",
-      "worktree_path": null,
-      "work_id": "refresh-metadata-api"
-    },
-    "refresh-metadata-phase2": {
-      "worktree_path": null,
-      "work_id": "refresh-metadata-phase2",
-      "plan_name": "refresh-metadata-phase2",
-      "session_ids": [
-        "codex:refresh-metadata-phase2-main"
-      ],
-      "status": "active",
-      "active_plan": ".omo/plans/refresh-metadata-phase2.md"
     }
   }
 }

@@ -57,7 +57,6 @@ public class ComicServiceImpl implements ComicService {
         vo.setCategoryId(c.getCategoryId());
         vo.setCategoryName(resolveCategoryName(c.getCategoryId()));
         vo.setStatus(c.getStatus());
-        vo.setLqStatus(c.getLqStatus());
         vo.setCreatedAt(c.getCreatedAt());
 
         var history = historyMapper.selectOne(
@@ -90,7 +89,6 @@ public class ComicServiceImpl implements ComicService {
         vo.setCategoryId(c.getCategoryId());
         vo.setCategoryName(resolveCategoryName(c.getCategoryId()));
         vo.setStatus(c.getStatus());
-        vo.setLqStatus(c.getLqStatus());
         vo.setCreatedAt(c.getCreatedAt());
         vo.setUpdatedAt(c.getUpdatedAt());
 

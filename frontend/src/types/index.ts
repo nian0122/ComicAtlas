@@ -29,7 +29,6 @@ export interface ComicListVO {
   categoryId: number | null
   categoryName: string | null
   status: string
-  lqStatus: string
   progressPercent: number
   lastReadChapterId: number
   lastReadPage: number
@@ -50,7 +49,6 @@ export interface ComicDetailVO {
   categoryId: number | null
   categoryName: string | null
   status: string
-  lqStatus: string
   progressPercent: number
   lastReadChapterId: number
   lastReadPage: number

@@ -7,6 +7,7 @@ import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.api.importer.exception.HqDeletePreconditionException;
 import com.comicatlas.api.importer.service.HqDeleteResult;
 import com.comicatlas.api.importer.service.HqDeleteService;
+import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.common.event.DeleteHqRequestedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -48,7 +49,7 @@ public class HqDeleteServiceImpl implements HqDeleteService {
     public HqDeleteResult deleteForChapter(Long chapterId) {
         Chapter ch = chapterMapper.selectById(chapterId);
         if (ch == null) {
-            throw new IllegalArgumentException("章节不存在: " + chapterId);
+            throw new BusinessException(404, "章节不存在: " + chapterId);
         }
         return deleteForChapterInternal(ch);
     }

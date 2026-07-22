@@ -40,23 +40,23 @@
       <h2 class="section-title">存储优化</h2>
 
       <div class="filter-bar">
-        <el-select v-model="filters.hqStatus" placeholder="HQ 状态" style="width: 120px" @change="onFilterChange">
+        <el-select v-model="filters.hqStatus" placeholder="HQ 状态" class="filter-select" @change="onFilterChange">
           <el-option label="全部" value="ALL" />
           <el-option label="还有 HQ" value="HAS_HQ" />
           <el-option label="HQ 已删" value="NO_HQ" />
         </el-select>
-        <el-select v-model="filters.lqStatus" placeholder="LQ 状态" style="width: 120px" @change="onFilterChange">
+        <el-select v-model="filters.lqStatus" placeholder="LQ 状态" class="filter-select" @change="onFilterChange">
           <el-option label="全部" value="ALL" />
           <el-option label="需要生成" value="NEEDS_LQ" />
           <el-option label="LQ 就绪" value="READY" />
         </el-select>
-        <el-select v-model="filters.sort" placeholder="排序" style="width: 120px" @change="onFilterChange">
+        <el-select v-model="filters.sort" placeholder="排序" class="filter-select" @change="onFilterChange">
           <el-option label="HQ 大小" value="hqSize" />
           <el-option label="LQ 大小" value="lqSize" />
           <el-option label="总大小" value="totalSize" />
           <el-option label="标题" value="title" />
         </el-select>
-        <el-select v-model="filters.order" style="width: 100px" @change="onFilterChange">
+        <el-select v-model="filters.order" class="filter-select--mini" @change="onFilterChange">
           <el-option label="降序" value="desc" />
           <el-option label="升序" value="asc" />
         </el-select>
@@ -64,7 +64,7 @@
           v-model="filters.keyword"
           placeholder="搜索标题"
           clearable
-          style="width: 180px"
+          class="filter-input"
           @keyup.enter="onFilterChange"
           @clear="onFilterChange"
         />
@@ -105,23 +105,19 @@
             <el-tag :type="lqTagType(row.lqStatus)" size="small">{{ lqTagText(row.lqStatus) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="160" fixed="right">
+        <el-table-column label="操作" width="180" fixed="right">
           <template #default="{ row }">
-            <el-button
+            <button
               v-if="row.hqStatus === 'READY' || row.hqStatus === 'MIXED'"
-              type="danger"
-              text
-              size="small"
+              class="action-btn danger"
               @click="deleteComicHq(row.comicId, row.title)"
-            >删HQ</el-button>
-            <el-button
+            >删HQ</button>
+            <button
               v-if="row.lqStatus === 'NOT_GENERATED' || row.lqStatus === 'MIXED'"
-              type="primary"
-              text
-              size="small"
+              class="action-btn primary"
               @click="generateComicLq(row.comicId, row.title)"
-            >生LQ</el-button>
-            <el-button type="info" text size="small" @click="openDrawer(row.comicId)">详情</el-button>
+            >生LQ</button>
+            <button class="action-btn" @click="openDrawer(row.comicId)">详情</button>
           </template>
         </el-table-column>
       </el-table>
@@ -182,23 +178,19 @@
           <el-table-column label="LQ" width="80" align="right">
             <template #default="{ row }">{{ formatSize(row.lqSize) }}</template>
           </el-table-column>
-          <el-table-column label="操作" width="120">
-          <template #default="{ row }">
-            <el-button
-              v-if="row.hqStatus === 'READY' || row.hqStatus === 'MIXED'"
-              type="danger"
-              text
-              size="small"
-              @click="deleteChapterHq(row.chapterId, row.title)"
-            >删HQ</el-button>
-            <el-button
-              v-if="row.lqStatus === 'NOT_GENERATED' || row.lqStatus === 'MIXED'"
-              type="primary"
-              text
-              size="small"
-              @click="generateChapterLq(row.chapterId, row.title)"
-            >生LQ</el-button>
-          </template>
+          <el-table-column label="操作" width="140">
+            <template #default="{ row }">
+              <button
+                v-if="row.hqStatus === 'READY' || row.hqStatus === 'MIXED'"
+                class="action-btn danger"
+                @click="deleteChapterHq(row.chapterId, row.title)"
+              >删HQ</button>
+              <button
+                v-if="row.lqStatus === 'NOT_GENERATED' || row.lqStatus === 'MIXED'"
+                class="action-btn primary"
+                @click="generateChapterLq(row.chapterId, row.title)"
+              >生LQ</button>
+            </template>
           </el-table-column>
         </el-table>
 
@@ -309,6 +301,8 @@ function hqTagType(status: string) {
     case 'READY': return 'success'
     case 'DELETED': return 'info'
     case 'MIXED': return 'warning'
+    case 'PENDING': return 'warning'
+    case 'MISSING': return 'danger'
     case 'EMPTY': return ''
     default: return ''
   }
@@ -319,6 +313,8 @@ function hqTagText(status: string) {
     case 'READY': return 'HQ 就绪'
     case 'DELETED': return 'HQ 已删'
     case 'MIXED': return '部分已删'
+    case 'PENDING': return '待处理'
+    case 'MISSING': return 'HQ 缺失'
     case 'EMPTY': return '无数据'
     default: return status
   }
@@ -329,6 +325,7 @@ function lqTagType(status: string) {
     case 'READY': return 'success'
     case 'NOT_GENERATED': return 'warning'
     case 'MIXED': return 'danger'
+    case 'FAILED': return 'danger'
     case 'EMPTY': return ''
     default: return ''
   }
@@ -339,6 +336,7 @@ function lqTagText(status: string) {
     case 'READY': return 'LQ 就绪'
     case 'NOT_GENERATED': return '未生成'
     case 'MIXED': return '部分失败'
+    case 'FAILED': return '生成失败'
     case 'EMPTY': return '无数据'
     default: return status
   }
@@ -802,12 +800,29 @@ onMounted(async () => {
   border-color: var(--danger);
 }
 
+.action-btn.primary {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
 .filter-bar {
   display: flex;
   gap: var(--space-sm);
   margin-bottom: var(--space-base);
   flex-wrap: wrap;
   align-items: center;
+}
+
+.filter-select {
+  width: 120px;
+}
+
+.filter-select--mini {
+  width: 100px;
+}
+
+.filter-input {
+  width: 180px;
 }
 
 .cover-thumb {
@@ -881,8 +896,9 @@ onMounted(async () => {
     align-items: stretch;
   }
 
-  .filter-bar .el-select,
-  .filter-bar .el-input {
+  .filter-select,
+  .filter-select--mini,
+  .filter-input {
     width: 100% !important;
   }
 }

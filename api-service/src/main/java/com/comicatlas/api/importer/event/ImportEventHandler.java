@@ -180,7 +180,7 @@ public class ImportEventHandler {
             idMap.put(i, cat.getId());
         }
 
-        // 第二遍：恢复 parent_id / level / path
+        // 第二遍：恢复 parent_id
         Map<Long, Catalog> inserted = new LinkedHashMap<>();
         for (int i = 0; i < size; i++) {
             Catalog cat = catalogMapper.selectById(idMap.get(i));
@@ -193,10 +193,7 @@ public class ImportEventHandler {
             if (cat == null) continue;
             Map<String, Object> cd = catalogsData.get(i);
             Object pi = cd.get("parentIndex");
-            if (pi == null) {
-                cat.setLevel(0);
-                cat.setPath(cat.getTitle());
-            } else {
+            if (pi != null) {
                 int parentIdx = ((Number) pi).intValue();
                 if (parentIdx < 0 || parentIdx >= size) {
                     throw new IllegalStateException(
@@ -211,10 +208,8 @@ public class ImportEventHandler {
                     throw new IllegalStateException("父 catalog 数据缺失: id=" + parentId);
                 }
                 cat.setParentId(parentId);
-                cat.setLevel(parent.getLevel() + 1);
-                cat.setPath(parent.getPath() + "/" + cat.getTitle());
+                catalogMapper.updateById(cat);
             }
-            catalogMapper.updateById(cat);
         }
 
         return idMap;

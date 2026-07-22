@@ -1,10 +1,15 @@
 package com.comicatlas.api.comic.dto;
 
-public record ChapterRef(
-    Long id,
-    String chapterNo,
-    String title,
-    int globalOrder,
-    int pageCount,
-    String status
-) {}
+import lombok.AllArgsConstructor;
+import lombok.Data;
+
+@Data
+@AllArgsConstructor
+public class ChapterRef {
+    private Long id;
+    private String chapterNo;
+    private String title;
+    private int globalOrder;
+    private int pageCount;
+    private String status;
+}
