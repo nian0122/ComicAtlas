@@ -17,9 +17,9 @@ GET /api/comics?keyword=&tag=&status=&category=&sourceType=&sort=createdAt&page=
 |------|------|
 | keyword | 全文搜索：title / titleJpn / author / 标签 |
 | tag | 精确标签名筛选 |
-| status | IMPORTING / READY / DELETING |
+| status | IMPORTING / READY / REFRESHING / DELETING / DELETED / RESCANNING |
 | category | 分类 |
-| sourceType | ZIP / DIRECTORY / EHENTAI |
+| sourceType | ZIP / REGISTER / EHENTAI |
 | sort | createdAt / updatedAt / title / pageCount / lastReadTime |
 
 ### 详情
@@ -104,7 +104,8 @@ PUT    /api/history/{comicId}    # 更新进度 { chapterId, pageNumber }
 ```
 POST /api/tasks/import
 { "sourceType": "ZIP", "sourcePath": "D:/downloads/comic.zip" }
-{ "sourceType": "DIRECTORY", "sourcePath": "D:/manga/temp/ComicA" }
+{ "sourceType": "REGISTER", "sourcePath": "D:/manga/temp/ComicA" }
+{ "sourceType": "EHENTAI", "sourcePath": "https://e-hentai.org/g/123456/abc123" }
 ```
 
 ### 任务列表（Dashboard）
@@ -167,7 +168,32 @@ POST /api/chapters/{chapterId}/lq   # 单章
 
 ---
 
-## 6. 仪表盘
+## 6. HQ 删除
+
+```
+POST /api/comics/{comicId}/delete-hq       # 整本删除 HQ
+POST /api/chapters/{chapterId}/delete-hq   # 单章删除 HQ
+```
+
+删除漫画/章节的 HQ 高清图片以释放磁盘空间。LQ 缩略图不受影响。
+状态：READY → DELETED（通过 MQ 异步完成）
+
+---
+
+## 7. 批量导入
+
+```
+POST /api/tasks/import/batch
+{ "items": [{ "sourceType": "ZIP", "sourcePath": "..." }, { "sourceType": "REGISTER", "sourcePath": "..." }] }
+
+GET  /api/tasks/import/scan?path=D:/downloads  # 扫描目录
+```
+
+批量导入支持一次提交多个来源。`scan` 接口预扫描目录结构，返回可导入项列表。
+
+---
+
+## 8. 统计
 
 ```
 GET /api/dashboard/statistics
@@ -175,7 +201,7 @@ GET /api/dashboard/statistics
 
 ---
 
-## 7. 操作日志
+## 9. 操作日志
 
 ```
 GET /api/operations?module=&action=&page=1&size=20
@@ -183,7 +209,7 @@ GET /api/operations?module=&action=&page=1&size=20
 
 ---
 
-## 8. 标签
+## 10. 标签
 
 ```
 GET    /api/tags
@@ -193,13 +219,24 @@ DELETE /api/tags/{id}
 
 ---
 
-## 9. 管理
+## 11. 管理
 
 ```
-POST /api/admin/rebuild              # metadata.json 恢复数据库
-POST /api/admin/storage/scan-recover # 扫描 HQ 目录并恢复/创建占位漫画
+POST /api/admin/rebuild                       # metadata.json 恢复数据库
+POST /api/admin/comics/{id}/refresh-metadata  # 刷新漫画元数据（重新解析目录）
+POST /api/admin/storage/scan-recover          # 扫描 HQ 目录并恢复/创建占位漫画
 DELETE /api/admin/comics/{id}?mode=DATABASE_ONLY  # 仅删除数据库记录
 ```
+
+### 存储查询
+
+```
+GET /api/admin/storage/stats                   # 存储统计摘要（total/hq/lq/thumb/comicCount）
+GET /api/admin/storage/comics?hqStatus=&lqStatus=&sort=&keyword=  # 漫画级存储列表
+GET /api/admin/storage/comics/{id}/chapters    # 章节级存储详情
+```
+
+返回每个漫画/章节的 HQ/LQ 大小和状态，支持按 HQ/LQ 状态筛选和排序。
 
 ### 存储扫描恢复
 

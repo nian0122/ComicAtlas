@@ -1,7 +1,7 @@
 # 数据库 Schema 文档
 
 > 基于 `api-service/src/main/resources/db/schema.sql` 及 Java 实体/枚举生成。
-> 最后更新: 2026-07-16
+> 最后更新: 2026-07-22
 
 ---
 
@@ -12,6 +12,9 @@ erDiagram
     comic ||--o{ catalog : "1:N"
     comic ||--o{ chapter : "1:N"
     comic ||--o{ import_task : "1:N"
+    category ||--o{ comic : "1:N"
+    comic ||--o{ comic_tag : "1:N"
+    tag ||--o{ comic_tag : "1:N"
     catalog ||--o{ catalog : "parent_id 自引用"
     catalog ||--o{ chapter : "1:N"
     chapter ||--o{ page : "1:N"
@@ -32,11 +35,8 @@ erDiagram
         varchar source_gallery_token
         varchar source_ref
         varchar storage_policy
-        varchar root_key
-        varchar relative_path
+        bigint category_id FK
         varchar status
-        varchar lq_status
-        varchar category
         datetime deleted_at
         datetime created_at
         datetime updated_at
@@ -48,8 +48,6 @@ erDiagram
         bigint parent_id FK
         varchar title
         int sort_order
-        varchar path
-        int level
         datetime created_at
     }
 
@@ -79,6 +77,11 @@ erDiagram
         int width
         int height
         bigint file_size
+        varchar media_type
+        decimal duration
+        varchar container
+        varchar video_codec
+        varchar audio_codec
         datetime created_at
     }
 
@@ -92,8 +95,6 @@ erDiagram
         int progress
         int total_pages
         int downloaded_pages
-        int current_page
-        bigint downloaded_bytes
         varchar download_method
         bigint download_speed
         int eta_seconds
@@ -132,11 +133,8 @@ erDiagram
 | `source_gallery_token` | VARCHAR(32) | NULL | 来源画廊 Token |
 | `source_ref` | VARCHAR(512) | NULL | 来源引用 (URL 或路径) |
 | `storage_policy` | VARCHAR(16) | `'MANAGED'` | 存储策略 |
-| `root_key` | VARCHAR(32) | `'LOCAL'` | 存储根键 |
-| `relative_path` | VARCHAR(512) | NULL | 相对路径 |
+| `category_id` | BIGINT | NULL | 分类，FK → category(id) |
 | `status` | VARCHAR(16) | `'IMPORTING'` | 漫画状态，见 [ComicStatus](#comicstatus) |
-| `lq_status` | VARCHAR(16) | NULL | LQ 生成状态，见 [LqStatus](#lqstatus) |
-| `category` | VARCHAR(64) | NULL | 分类 |
 | `deleted_at` | DATETIME | NULL | 软删除时间 |
 | `created_at` | DATETIME | CURRENT_TIMESTAMP | 创建时间 |
 | `updated_at` | DATETIME | CURRENT_TIMESTAMP ON UPDATE | 更新时间 |
@@ -144,6 +142,7 @@ erDiagram
 **索引**:
 - `UNIQUE idx_source (source_type, source_gallery_id)`
 - `INDEX idx_status (status)`
+- `INDEX idx_category_id (category_id)`
 - `INDEX idx_created_at (created_at)`
 
 ---
@@ -159,14 +158,11 @@ erDiagram
 | `parent_id` | BIGINT | NULL | 父目录，FK → catalog(id)，自引用 |
 | `title` | VARCHAR(255) | NOT NULL | 目录标题 |
 | `sort_order` | INT | 0 | 同级排序序号 |
-| `path` | VARCHAR(512) | NULL | 目录路径 (用于快速查找) |
-| `level` | INT | 0 | 层级深度 |
 | `created_at` | DATETIME | CURRENT_TIMESTAMP | 创建时间 |
 
 **索引**:
 - `UNIQUE uk_comic_parent_title (comic_id, parent_id, title)`
 - `INDEX idx_comic_parent (comic_id, parent_id)`
-- `INDEX idx_path (path)`
 
 **外键**:
 - `comic_id` → `comic(id)` ON DELETE CASCADE
@@ -219,15 +215,21 @@ erDiagram
 | `width` | INT | NULL | 图片宽度 (像素) |
 | `height` | INT | NULL | 图片高度 (像素) |
 | `file_size` | BIGINT | NULL | HQ 文件大小 (字节) |
+| `media_type` | VARCHAR(32) | `'IMAGE'` | 媒体类型: IMAGE / VIDEO |
+| `duration` | DECIMAL(10,3) | NULL | 视频时长 (秒) |
+| `container` | VARCHAR(32) | NULL | 视频容器格式 (mp4/webm/mkv 等) |
+| `video_codec` | VARCHAR(32) | NULL | 视频编码 |
+| `audio_codec` | VARCHAR(32) | NULL | 音频编码 |
 | `created_at` | DATETIME | CURRENT_TIMESTAMP | 创建时间 |
 
 **索引**:
 - `UNIQUE uk_chapter_page (chapter_id, page_number)`
+- `INDEX idx_media_type (media_type)`
 
 **外键**:
 - `chapter_id` → `chapter(id)` ON DELETE CASCADE
 
-> **注意**: Page 实体中文件大小字段为 `fileSize` (对应 DDL `file_size`) 和 `lqSize` (对应 DDL `lq_size`)。Page 不包含 HQ 总大小字段。
+> **注意**: 视频元数据由 Worker 端 `MediaAnalyzer` 通过 `ffprobe` 提取，不可用时优雅降级。
 
 ---
 
@@ -246,8 +248,6 @@ erDiagram
 | `progress` | INT | 0 | 进度百分比 (0-100) |
 | `total_pages` | INT | NULL | 总页数 |
 | `downloaded_pages` | INT | 0 | 已下载页数 |
-| `current_page` | INT | 0 | 当前处理页 |
-| `downloaded_bytes` | BIGINT | 0 | 已下载字节数 |
 | `download_method` | VARCHAR(32) | `'HTTP'` | 下载方式 |
 | `download_speed` | BIGINT | 0 | 下载速度 (字节/秒) |
 | `eta_seconds` | INT | 0 | 预计剩余时间 (秒) |
@@ -279,12 +279,13 @@ erDiagram
 |----|------|
 | `IMPORTING` | 导入中 |
 | `READY` | 就绪 (导入完成) |
+| `REFRESHING` | 元数据刷新中 |
 | `DELETING` | 删除中 |
 | `DELETED` | 已删除 |
 | `RESCANNING` | 重新扫描中 |
 
 ```java
-public enum ComicStatus { IMPORTING, READY, DELETING, DELETED, RESCANNING }
+public enum ComicStatus { IMPORTING, READY, REFRESHING, DELETING, DELETED, RESCANNING }
 ```
 
 ---
@@ -295,12 +296,13 @@ HQ (高清) 图片状态。
 
 | 值 | 说明 |
 |----|------|
-| `PENDING` | 待处理 |
-| `READY` | 就绪 |
-| `MISSING` | 缺失 |
+| `PENDING` | 待处理 (文件复制前) |
+| `READY` | 就绪 (文件已就位) |
+| `MISSING` | 丢失 (文件缺失) |
+| `DELETED` | 已删除 (HQ 已被清理) |
 
 ```java
-public enum HqStatus { PENDING, READY, MISSING }
+public enum HqStatus { PENDING, READY, MISSING, DELETED }
 ```
 
 ---

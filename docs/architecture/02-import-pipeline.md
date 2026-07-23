@@ -24,7 +24,7 @@ Acquire → ImportTask → Handler routing → DirectoryParser → DirectoryTree
 
 ## 2. 为什么统一导入流水线
 
-不同来源（ZIP、DIRECTORY、EHENTAI、未来 Torrent）最终都需要：
+不同来源（ZIP、REGISTER、EHENTAI、未来 Torrent）最终都需要：
 
 1. 解析来源（文件系统或网络）
 2. 生成结构化元数据（catalog/chapter/page）
@@ -73,7 +73,7 @@ Worker ImportTaskHandler (消费 MQ)
          │  (或 "DIRECTORY" 别名)           │
          │                                  ▼ DirectoryParser
          │
-         └─ sourceType="EHENTAI" ─────► FileService (独立流程)
+          └─ sourceType="EHENTAI" ─────► FileService (下载→解压→委托 DirectoryImportHandler)
          
 所有路径最终汇聚到 DirectoryImportHandler:
          │
@@ -85,11 +85,14 @@ DirectoryTree (纯目录结构，无业务语义)
          │
          ▼
 MetadataAssembler.assemble(tree, ctx)
-         │
-         ▼
-ComicMetadata (包含 catalogs + chapters + pages)
-         │
-         ▼
+          │
+          ▼
+ComicMetadata (包含 catalogs + chapters + mediaItems)
+          │
+          ▼
+MediaAnalyzer.analyze(): 图片尺寸 + ffprobe 视频元数据
+          │
+          ▼
 StorageService.store(): 搬文件到 HQ/{comicId}/{chapterId}/
          │
          ▼
@@ -102,7 +105,7 @@ MQ: task.success → import.result.queue
 API ImportEventHandler (消费 MQ)
          │
          ▼
-读取 metadata.json → INSERT catalog/chapter/page → UPDATE comic(READY)
+读取 metadata.json → INSERT catalog/chapter/media(IMAGE/VIDEO) → UPDATE comic(READY)
 ```
 
 ---

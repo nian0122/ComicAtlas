@@ -83,7 +83,7 @@ storage:
 
 ```
 {Frieren}/                            ← rootDirName = ComicTitleSanitizer.sanitize(comic.title)
-├── metadata.json                     ← v2 格式，与 Import 完全一致（MetadataExporter 同款）
+├── metadata.json                     ← v3 格式（mediaItems + mediaType，支持 IMAGE/VIDEO）
 ├── 第1话/                            ← catalog 树 + chapter.title（无 catalog 时按 chapter.title 建一级文件夹）
 │   ├── 001.jpg
 │   ├── 002.jpg
@@ -98,7 +98,7 @@ storage:
 
 | 包含 | 不包含 |
 |------|--------|
-| metadata.json (v2) | 封面缩略图 (thumbs/) |
+| metadata.json (v3) | 封面缩略图 (thumbs/) |
 | HQ 原图 / 视频 | LQ 缓存（除非 HQ 已删除做降级） |
 | HQ 删除后降级的 LQ | 阅读历史 / 收藏状态 |
 | catalog 目录结构 | 数据库 ID |
@@ -368,46 +368,87 @@ public sealed interface ComicEvent
 ```java
 // Exchange
 @Bean
-public TopicExchange exportExchange() {
-    return new TopicExchange("comic.export");
+public DirectExchange exportExchange() {
+    return new DirectExchange("comic.export");
 }
 
-// Queue
+// Result Queues（3 个独立队列，与 Import 分队列模式一致）
 @Bean
-public Queue exportTaskQueue() {
-    return QueueBuilder.durable("export.task.queue")
+public Queue exportStartedResultQueue() {
+    return QueueBuilder.durable("export.started.result.queue")
         .deadLetterExchange("comic.export.dlx")
-        .deadLetterRoutingKey("export.task.dlq")
+        .deadLetterRoutingKey("export.started.result.dlq")
         .build();
 }
 
 @Bean
-public Queue exportResultQueue() {
-    return QueueBuilder.durable("export.result.queue")
+public Queue exportCompletedResultQueue() {
+    return QueueBuilder.durable("export.completed.result.queue")
         .deadLetterExchange("comic.export.dlx")
-        .deadLetterRoutingKey("export.result.dlq")
+        .deadLetterRoutingKey("export.completed.result.dlq")
         .build();
 }
 
-// Binding
 @Bean
-public Binding exportTaskBinding() {
-    return BindingBuilder.bind(exportTaskQueue()).to(exportExchange()).with("task.created");
+public Queue exportFailedResultQueue() {
+    return QueueBuilder.durable("export.failed.result.queue")
+        .deadLetterExchange("comic.export.dlx")
+        .deadLetterRoutingKey("export.failed.result.dlq")
+        .build();
+}
+
+// Bindings
+@Bean
+public Binding exportStartedResultBinding() {
+    return BindingBuilder.bind(exportStartedResultQueue()).to(exportExchange()).with("task.started");
 }
 
 @Bean
-public Binding exportResultStartedBinding() {
-    return BindingBuilder.bind(exportResultQueue()).to(exportExchange()).with("task.started");
+public Binding exportCompletedResultBinding() {
+    return BindingBuilder.bind(exportCompletedResultQueue()).to(exportExchange()).with("task.completed");
 }
 
 @Bean
-public Binding exportResultCompletedBinding() {
-    return BindingBuilder.bind(exportResultQueue()).to(exportExchange()).with("task.completed");
+public Binding exportFailedResultBinding() {
+    return BindingBuilder.bind(exportFailedResultQueue()).to(exportExchange()).with("task.failed");
+}
+
+// DLQ Queues
+@Bean
+public Queue exportStartedResultDlq() {
+    return QueueBuilder.durable("export.started.result.dlq").build();
 }
 
 @Bean
-public Binding exportResultFailedBinding() {
-    return BindingBuilder.bind(exportResultQueue()).to(exportExchange()).with("task.failed");
+public Queue exportCompletedResultDlq() {
+    return QueueBuilder.durable("export.completed.result.dlq").build();
+}
+
+@Bean
+public Queue exportFailedResultDlq() {
+    return QueueBuilder.durable("export.failed.result.dlq").build();
+}
+
+// DLQ Bindings
+@Bean
+public Binding exportStartedResultDlqBinding() {
+    return BindingBuilder.bind(exportStartedResultDlq()).to(exportDlxExchange()).with("export.started.result.dlq");
+}
+
+@Bean
+public Binding exportCompletedResultDlqBinding() {
+    return BindingBuilder.bind(exportCompletedResultDlq()).to(exportDlxExchange()).with("export.completed.result.dlq");
+}
+
+@Bean
+public Binding exportFailedResultDlqBinding() {
+    return BindingBuilder.bind(exportFailedResultDlq()).to(exportDlxExchange()).with("export.failed.result.dlq");
+}
+
+// DLX Exchange
+@Bean
+public DirectExchange exportDlxExchange() {
+    return new DirectExchange("comic.export.dlx");
 }
 ```
 
@@ -537,7 +578,7 @@ POST /api/export/{taskId}/open
 │ 导出内容：                                │
 │  ✓ HQ 原图                               │
 │  ✓ HQ 已删除时自动降级为 LQ               │
-│  ✓ metadata.json (v2)                   │
+│  ✓ metadata.json (v3)                   │
 │                                          │
 │ 输出路径：D:\manga\export\                │
 │                                          │
