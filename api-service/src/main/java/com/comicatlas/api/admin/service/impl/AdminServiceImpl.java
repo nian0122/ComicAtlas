@@ -59,7 +59,7 @@ public class AdminServiceImpl implements AdminService {
     /** 视频文件扩展名（用于 scanChapterPages 扫描和 mediaType 判断） */
     private static final Set<String> VIDEO_EXTENSIONS = Set.of(".mp4", ".webm", ".mkv", ".mov", ".avi");
 
-    @Value("${MANGA_ROOT:D:/manga}")
+    @Value("${MANGA_ROOT:F:/manga}")
     private String mangaRoot;
 
     @Override

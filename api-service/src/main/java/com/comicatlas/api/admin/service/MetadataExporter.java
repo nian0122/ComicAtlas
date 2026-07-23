@@ -27,7 +27,7 @@ public class MetadataExporter {
     private final TagMapper tagMapper;
     private final ObjectMapper objectMapper;
 
-    @Value("${MANGA_ROOT:D:/manga}")
+    @Value("${MANGA_ROOT:F:/manga}")
     private String mangaRoot;
 
     /**

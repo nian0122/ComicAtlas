@@ -44,7 +44,7 @@ public class ImportEventHandler {
     /** 终态集合：到达这些状态后不可回退到非终态 */
     private static final Set<String> TERMINAL_STATUSES = Set.of("SUCCESS", "FAILED");
 
-    @Value("${MANGA_ROOT:D:/manga}")
+    @Value("${MANGA_ROOT:F:/manga}")
     private String mangaRoot;
 
     @RabbitListener(queues = "import.result.queue")
