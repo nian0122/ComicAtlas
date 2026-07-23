@@ -1,14 +1,14 @@
 # ComicAtlas 0.2 前端结构
 
-**版本**: 0.2  
-**日期**: 2026-07-16  
+**版本**: 0.3
+**日期**: 2026-07-22
 **状态**: Canonical
 
 ---
 
 ## 目录结构
 
-```
+``` 
 frontend/src/
 ├── layouts/
 │   ├── ReadingLayout.vue
@@ -20,57 +20,86 @@ frontend/src/
 │   │   ├── LibraryPage.vue
 │   │   ├── DetailPage.vue
 │   │   ├── ReaderPage.vue
-│   │   └── HistoryPage.vue
+│   │   ├── HistoryPage.vue
+│   │   ├── PosterTestPage.vue
+│   │   └── reader/
+│   │       └── components/
+│   │           ├── ReaderViewport.vue
+│   │           ├── ReaderPagedViewport.vue
+│   │           ├── ReaderImageItem.vue
+│   │           ├── ProgressiveImage.vue
+│   │           ├── VideoPlayer.vue
+│   │           ├── ReaderToolbar.vue
+│   │           ├── ReaderToolbarDesktop.vue
+│   │           ├── ReaderToolbarMobile.vue
+│   │           ├── ReaderBottomNav.vue
+│   │           └── ReaderSettingsDrawer.vue
 │   └── management/
 │       ├── ComicListPage.vue
 │       ├── ComicEditPage.vue
+│       ├── BatchEditDialog.vue
 │       ├── ImportPage.vue
 │       ├── TaskPage.vue
-│       ├── StoragePage.vue
 │       ├── MetadataPage.vue
-│       └── SettingsPage.vue
+│       ├── SettingsPage.vue
+│       ├── InterceptPage.vue
+│       └── storage/
+│           ├── StoragePage.vue
+│           ├── StorageSummary.vue
+│           ├── StorageTable.vue
+│           ├── StorageChapterDrawer.vue
+│           ├── StorageToolbar.vue
+│           ├── StorageBatchBar.vue
+│           └── StorageStatusTag.vue
 ├── components/
 │   ├── reading/
-│   │   ├── ContinueReadingCard.vue
-│   │   ├── RecentReadingList.vue
-│   │   ├── RecentlyAddedList.vue
-│   │   ├── ComicGrid.vue
-│   │   ├── ComicCard.vue
-│   │   ├── CatalogTree.vue
-│   │   └── ReaderViewport.vue
+│   │   ├── HeroBanner.vue
+│   │   ├── comic/
+│   │   │   ├── CatalogTree.vue
+│   │   │   ├── CatalogTreeNode.vue
+│   │   │   ├── ChapterRow.vue
+│   │   │   ├── ComicCard.vue
+│   │   │   └── ComicPoster.vue
+│   │   └── home/
+│   │       ├── HomeHero.vue
+│   │       ├── HomeRow.vue
+│   │       └── HomeActionGrid.vue
 │   ├── management/
-│   │   ├── ComicTable.vue
-│   │   ├── ComicEditForm.vue
-│   │   ├── CategoryEditor.vue
-│   │   ├── TagEditor.vue
-│   │   ├── ImportForm.vue
-│   │   ├── TaskList.vue
-│   │   ├── StorageStats.vue
-│   │   └── SettingsForm.vue
-│   └── common/
-│       ├── TopNav.vue
-│       ├── SideNav.vue
-│       ├── Footer.vue
-│       ├── ProgressiveImage.vue
-│       └── LoadingState.vue
+│   │   └── task/
+│   │       └── TaskCard.vue
+│   └── layout/
+│       └── TopNav.vue
+├── composables/
+│   ├── useBreakpoint.ts
+│   ├── useMediaQuery.ts
+│   └── storage/
+│       ├── useStorageFilter.ts
+│       ├── useStorageSelection.ts
+│       └── useStoragePolling.ts
 ├── stores/
-│   ├── reading.ts
-│   ├── management/
-│   │   ├── comic.ts
-│   │   ├── import.ts
-│   │   ├── storage.ts
-│   │   ├── metadata.ts
-│   │   └── settings.ts
-│   └── common/
-│       └── app.ts
+│   ├── comic-store.ts
+│   ├── reader-store.ts
+│   ├── reader-settings-store.ts
+│   ├── history-store.ts
+│   ├── tag-store.ts
+│   ├── app-store.ts
+│   └── management/
+│       ├── comic.ts
+│       ├── import.ts
+│       ├── category.ts
+│       └── storage.ts
 ├── services/
 │   ├── api.ts
+│   ├── management.ts
 │   ├── reading.ts
-│   └── management.ts
+│   ├── storage.ts
+│   └── media-url.ts
 ├── router/
 │   └── index.ts
-└── types/
-    └── index.ts
+├── types/
+│   └── index.ts
+├── App.vue
+└── main.ts
 ```
 
 ---

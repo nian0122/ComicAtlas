@@ -11,7 +11,7 @@ ComicAtlas 由四个运行时模块和一组基础设施组成。
 ```
 +-----------------------------------------------------------+
 |                      Frontend (Vue3)                       |
-|   列表 / 详情 / 阅读器 / 导入管理 / 仪表盘 / 标签管理       |
+|   列表 / 详情 / 阅读器 / 导入管理 / 管理后台 / 存储管理       |
 +----------------------------+------------------------------+
                              |
                              | HTTP (REST)
@@ -40,7 +40,7 @@ ComicAtlas 由四个运行时模块和一组基础设施组成。
 
 ### 各层说明
 
-- **Frontend**: Vue3 + Vite 单页应用。提供漫画列表、详情页（CatalogTree）、阅读器、导入管理、仪表盘等界面。通过 Gateway 访问后端 API。
+- **Frontend**: Vue3 + Vite 单页应用。提供漫画列表、详情页（CatalogTree）、阅读器、导入管理、管理后台等界面。通过 Gateway 访问后端 API。
 - **Gateway**: Spring Cloud Gateway。负责路由转发和 Nacos 服务发现。前端所有请求经 Gateway 分发到 API Service。
 - **API Service**: 核心业务服务。提供 HTTP API、消费 Worker 发回的 MQ 结果事件、写入 MySQL 数据库。不碰文件系统。
 - **Worker Service**: 文件处理服务。消费 MQ 任务消息、解析来源文件、搬运图片到存储根目录、写 metadata.json。不写数据库业务表。

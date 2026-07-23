@@ -7,13 +7,11 @@
 
 ## 1. 存储策略 (StoragePolicy)
 
-| 策略 | 说明 | 当前状态 |
-|------|------|----------|
-| `MANAGED` | 文件由 ComicAtlas 统一管理，导入时搬入 HQ/LQ 根目录 | **当前唯一使用** |
-| `EXTERNAL` | 文件由外部系统管理，DB 只存引用路径 | 未来预留 |
-| `OBJECT_STORAGE` | 对象存储后端（S3/MinIO 等） | 未来预留 |
+| 策略 | 说明 |
+|------|------|
+| `MANAGED` | 文件由 ComicAtlas 统一管理，导入时搬入 HQ/LQ 根目录 |
 
-当前所有漫画均使用 `MANAGED` 策略。`comic.storage_policy` 字段值为 `MANAGED`。
+当前所有漫画均使用 `MANAGED` 策略。`comic.storage_policy` 字段固定为 `MANAGED`。
 
 ---
 

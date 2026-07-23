@@ -40,8 +40,6 @@ CREATE TABLE category (
     id          BIGINT PRIMARY KEY AUTO_INCREMENT,
     name        VARCHAR(64) NOT NULL,
     sort_order  INT DEFAULT 0,
-    color       VARCHAR(16) DEFAULT NULL,
-    icon        VARCHAR(64) DEFAULT NULL,
     created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE INDEX uk_category_name (name)
 );

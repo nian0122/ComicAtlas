@@ -112,8 +112,6 @@ CREATE TABLE IF NOT EXISTS import_task (
     progress INT DEFAULT 0,
     total_pages INT,
     downloaded_pages INT DEFAULT 0,
-    current_page INT DEFAULT 0,
-    downloaded_bytes BIGINT DEFAULT 0,
     download_method VARCHAR(32) DEFAULT 'HTTP',
     download_speed BIGINT DEFAULT 0,
     eta_seconds INT DEFAULT 0,
