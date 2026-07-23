@@ -577,7 +577,7 @@ TaskPage 任务列表新增 `EXPORT` 类型行：
 | `comic-common/event/ExportTaskCompletedEvent.java` | 新建 | Worker → API |
 | `comic-common/event/ExportTaskFailedEvent.java` | 新建 | Worker → API |
 | `comic-common/event/ComicEvent.java` | 修改 | 新增 4 个子类型 |
-| `api/export/controller/ExportController.java` | 新建 | 4 个端点（创建/查询/下载/打开目录） |
+| `api/export/controller/ExportController.java` | 新建 | 5 个端点（创建/列表/单任务/下载/打开目录） |
 | `api/export/service/ExportService.java` | 新建 | 校验 + 创建任务 + 发事件 |
 | `api/export/event/ExportStartedHandler.java` | 新建 | 消费 → UPDATE RUNNING |
 | `api/export/event/ExportCompletedHandler.java` | 新建 | 消费 → UPDATE SUCCESS |
