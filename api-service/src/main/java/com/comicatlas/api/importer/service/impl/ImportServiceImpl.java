@@ -53,7 +53,7 @@ public class ImportServiceImpl implements ImportService {
     private final RedisTemplate<String, Object> redisTemplate;
     private final TransactionTemplate transactionTemplate;
 
-    @Value("${MANGA_ROOT:D:/manga}")
+    @Value("${MANGA_ROOT:F:/manga}")
     private String mangaRoot;
 
     @Override

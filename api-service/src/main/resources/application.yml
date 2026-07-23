@@ -49,4 +49,4 @@ mybatis-plus:
       id-type: auto
 
 export:
-  output-dir: ${MANGA_ROOT:D:/manga}/export
+  output-dir: ${MANGA_ROOT:F:/manga}/export
