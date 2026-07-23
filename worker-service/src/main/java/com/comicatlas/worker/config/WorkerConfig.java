@@ -19,6 +19,7 @@ public class WorkerConfig {
     private Torrent torrent = new Torrent();
     private Proxy proxy = new Proxy();
     private Zip zip = new Zip();
+    private Cover cover = new Cover();
     private String aria2cPath = "aria2c";
     private String ffprobePath = "worker-service/ffmpeg/ffprobe.exe";
     private String imageOptimizerPath = "tools/image-optimizer/image-optimizer.exe";
@@ -46,6 +47,11 @@ public class WorkerConfig {
         private String host;
         private int port = 7890;
         private int socksPort = 7897;
+    }
+
+    @Data
+    public static class Cover {
+        private int quality = 25;
     }
 
     @Data

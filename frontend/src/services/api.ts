@@ -4,7 +4,6 @@ import type {
   ExportTaskVO,
   TagCreateDTO,
   ComicTagUpdateDTO,
-  CoverUpdateDTO,
   BatchComicUpdateDTO,
 } from '@/types'
 
@@ -31,9 +30,6 @@ export const comicApi = {
   getTags: (id: number) => api.get(`/comics/${id}/tags`),
   updateTags: (id: number, data: ComicTagUpdateDTO) =>
     api.put(`/comics/${id}/tags`, data),
-  listCoverCandidates: (id: number) => api.get(`/comics/${id}/covers/candidates`),
-  updateCover: (id: number, data: CoverUpdateDTO) =>
-    api.put(`/comics/${id}/cover`, data),
   /** 批量更新漫画分类和标签 */
   batchUpdate: (data: BatchComicUpdateDTO) =>
     api.post('/comics/batch/update', data),

@@ -43,16 +43,15 @@ public class ComicServiceImpl implements ComicService {
     public IPage<ComicListVO> listComics(ComicListQuery query) {
         Page<Comic> page = new Page<>(query.getPage(), query.getSize());
         IPage<Comic> result = comicMapper.selectPage(page, query);
-        Map<Long, String> fallbackCoverMap = buildFallbackCoverMap(result.getRecords());
-        return result.convert(c -> toListVO(c, fallbackCoverMap.get(c.getId())));
+        return result.convert(this::toListVO);
     }
 
-    private ComicListVO toListVO(Comic c, String fallbackCoverUrl) {
+    private ComicListVO toListVO(Comic c) {
         ComicListVO vo = new ComicListVO();
         vo.setId(c.getId());
         vo.setTitle(c.getTitle());
         vo.setAuthor(c.getAuthor());
-        vo.setCoverUrl(resolveCoverUrl(c, fallbackCoverUrl));
+        vo.setCoverUrl(resolveCoverUrl(c.getId()));
         vo.setPageCount(c.getTotalPages());
         vo.setCategoryId(c.getCategoryId());
         vo.setCategoryName(resolveCategoryName(c.getCategoryId()));
@@ -80,8 +79,7 @@ public class ComicServiceImpl implements ComicService {
         vo.setTitleJpn(c.getTitleJpn());
         vo.setAuthor(c.getAuthor());
         vo.setDescription(c.getDescription());
-        String fallbackCoverUrl = resolveFirstPageCoverUrl(c.getId());
-        vo.setCoverUrl(resolveCoverUrl(c, fallbackCoverUrl));
+        vo.setCoverUrl(resolveCoverUrl(c.getId()));
         vo.setPageCount(c.getTotalPages());
         vo.setFileSize(c.getFileSize());
         vo.setSourceType(c.getSourceType());
@@ -204,62 +202,8 @@ public class ComicServiceImpl implements ComicService {
         return category != null ? category.getName() : null;
     }
 
-    private String resolveCoverUrl(Comic c, String fallbackCoverUrl) {
-        if (c.getCoverPath() != null && !c.getCoverPath().isBlank()) {
-            return fileUrlResolver.resolveCover(c.getId(), c.getCoverPath());
-        }
-        if (fallbackCoverUrl != null && !fallbackCoverUrl.isBlank()) {
-            return fallbackCoverUrl;
-        }
-        return fileUrlResolver.resolveCover(c.getId());
-    }
-
-    private String resolveFirstPageCoverUrl(Long comicId) {
-        var chapters = chapterMapper.selectList(
-                new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId)
-                        .orderByAsc(Chapter::getGlobalOrder).last("LIMIT 1"));
-        if (chapters.isEmpty()) return null;
-        var pages = mediaMapper.selectList(
-                new LambdaQueryWrapper<com.comicatlas.api.comic.entity.Media>()
-                        .eq(com.comicatlas.api.comic.entity.Media::getChapterId, chapters.get(0).getId())
-                        .orderByAsc(com.comicatlas.api.comic.entity.Media::getPageNumber));
-        for (com.comicatlas.api.comic.entity.Media p : pages) {
-            if ("VIDEO".equals(p.getMediaType())) continue;
-            return fileUrlResolver.resolve(p);
-        }
-        return null;
-    }
-
-    private Map<Long, String> buildFallbackCoverMap(List<Comic> comics) {
-        if (comics == null || comics.isEmpty()) return Map.of();
-        List<Long> comicIds = comics.stream().map(Comic::getId).filter(Objects::nonNull).distinct().toList();
-        var chapters = chapterMapper.selectList(
-                new LambdaQueryWrapper<Chapter>().in(Chapter::getComicId, comicIds)
-                        .orderByAsc(Chapter::getGlobalOrder));
-        Map<Long, Chapter> firstChapterMap = new HashMap<>();
-        for (Chapter ch : chapters) {
-            firstChapterMap.putIfAbsent(ch.getComicId(), ch);
-        }
-        if (firstChapterMap.isEmpty()) return Map.of();
-        List<Long> chapterIds = firstChapterMap.values().stream().map(Chapter::getId).toList();
-        var pages = mediaMapper.selectList(
-                new LambdaQueryWrapper<com.comicatlas.api.comic.entity.Media>()
-                        .in(com.comicatlas.api.comic.entity.Media::getChapterId, chapterIds)
-                        .orderByAsc(com.comicatlas.api.comic.entity.Media::getPageNumber));
-        Map<Long, com.comicatlas.api.comic.entity.Media> firstPageMap = new HashMap<>();
-        for (com.comicatlas.api.comic.entity.Media p : pages) {
-            if (firstPageMap.containsKey(p.getChapterId())) continue;
-            if ("VIDEO".equals(p.getMediaType())) continue;
-            firstPageMap.put(p.getChapterId(), p);
-        }
-        Map<Long, String> coverMap = new HashMap<>();
-        for (Map.Entry<Long, Chapter> e : firstChapterMap.entrySet()) {
-            com.comicatlas.api.comic.entity.Media p = firstPageMap.get(e.getValue().getId());
-            if (p != null) {
-                coverMap.put(e.getKey(), fileUrlResolver.resolve(p));
-            }
-        }
-        return coverMap;
+    private String resolveCoverUrl(Long comicId) {
+        return fileUrlResolver.resolveCover(comicId);
     }
 
     @Override
@@ -431,52 +375,4 @@ public class ComicServiceImpl implements ComicService {
         return result;
     }
 
-    @Override
-    public List<CoverCandidateDTO> listCoverCandidates(Long comicId) {
-        Comic c = comicMapper.selectById(comicId);
-        if (c == null) throw new BusinessException(404, "漫画不存在");
-
-        var chapters = chapterMapper.selectList(
-                new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId).orderByAsc(Chapter::getChapterNo));
-
-        List<CoverCandidateDTO> candidates = new ArrayList<>();
-        for (Chapter ch : chapters) {
-            var pages = mediaMapper.selectList(
-                    new LambdaQueryWrapper<com.comicatlas.api.comic.entity.Media>()
-                            .eq(com.comicatlas.api.comic.entity.Media::getChapterId, ch.getId())
-                            .orderByAsc(com.comicatlas.api.comic.entity.Media::getPageNumber)
-                            .last("LIMIT 1"));
-            if (pages.isEmpty()) continue;
-            com.comicatlas.api.comic.entity.Media p = pages.get(0);
-            if ("VIDEO".equals(p.getMediaType())) continue;
-            CoverCandidateDTO dto = new CoverCandidateDTO();
-            dto.setPageId(p.getId());
-            dto.setChapterId(ch.getId());
-            dto.setChapterTitle(ch.getTitle());
-            dto.setPageNumber(p.getPageNumber());
-            dto.setUrl(fileUrlResolver.resolve(p));
-            candidates.add(dto);
-        }
-        return candidates;
-    }
-
-    @Override
-    @Transactional
-    public ComicDetailVO updateCover(Long comicId, CoverUpdateDTO dto) {
-        Comic c = comicMapper.selectById(comicId);
-        if (c == null) throw new BusinessException(404, "漫画不存在");
-
-        com.comicatlas.api.comic.entity.Media p = mediaMapper.selectById(dto.getPageId());
-        if (p == null) throw new BusinessException(404, "页面不存在");
-
-        Chapter ch = chapterMapper.selectById(p.getChapterId());
-        if (ch == null || !ch.getComicId().equals(comicId)) {
-            throw new BusinessException(400, "页面不属于该漫画");
-        }
-
-        c.setCoverPath(p.getHqPath());
-        comicMapper.updateById(c);
-
-        return getComicDetail(comicId);
-    }
 }

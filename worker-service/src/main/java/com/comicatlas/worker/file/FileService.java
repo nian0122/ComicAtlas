@@ -4,6 +4,7 @@ import com.comicatlas.worker.common.FilePathBuilder;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.file.download.DownloadContext;
 import com.comicatlas.worker.file.extract.ZipExtractor;
+import com.comicatlas.worker.image.ImageOptimizer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,6 +26,7 @@ public class FileService {
     private final DownloadContext downloadContext;
     private final ZipExtractor zipExtractor;
     private final ObjectMapper objectMapper;
+    private final ImageOptimizer imageOptimizer;
 
     private static final Set<String> IMAGE_EXT = Set.of(".jpg", ".jpeg", ".png", ".webp", ".gif");
 
@@ -76,13 +78,14 @@ public class FileService {
             totalSize += Files.size(dest);
         }
 
-        // 4. Generate cover
+        // 封面：调用 ImageOptimizer 生成优化封面
         if (!imageFiles.isEmpty()) {
-            Path thumbsDir = Path.of(config.getMangaRoot(), "thumbs", String.valueOf(comicId));
-            Files.createDirectories(thumbsDir);
             Path coverSrc = hqDir.resolve(imageFiles.get(0).getFileName().toString());
-            Path coverDest = thumbsDir.resolve("cover.webp");
-            try { Files.copy(coverSrc, coverDest, StandardCopyOption.REPLACE_EXISTING); } catch (Exception e) { log.warn("Cover failed: {}", e.getMessage()); }
+            try {
+                imageOptimizer.generateCover(comicId, coverSrc);
+            } catch (Exception e) {
+                log.warn("封面生成失败: comicId={}, {}", comicId, e.getMessage());
+            }
         }
 
         // 5. Write metadata.json (from e-hentai API)
