@@ -11,7 +11,7 @@ spring:
       config:
         import-check:
           enabled: false
-    rabbitmq:
+  rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
     port: ${RABBITMQ_PORT:15673}
     username: ${RABBITMQ_USER:guest}
@@ -25,7 +25,7 @@ spring:
         prefetch: 1
         acknowledge-mode: manual
   datasource:
-    url: jdbc:mysql://localhost:3306/comicatlas?useUnicode=true&characterEncoding=utf8mb4&serverTimezone=Asia/Shanghai
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:3306/comicatlas?useUnicode=true&characterEncoding=utf8mb4&serverTimezone=Asia/Shanghai
     username: root
     password: root
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -40,9 +40,9 @@ mybatis-plus:
       id-type: auto
 
 worker:
-  manga-root: ${MANGA_ROOT:D:/manga}
-  temp-dir: ${MANGA_ROOT:D:/manga}/temp
-  metadata-dir: ${MANGA_ROOT:D:/manga}/metadata
+  manga-root: ${MANGA_ROOT:F:/manga}
+  temp-dir: ${MANGA_ROOT:F:/manga}/temp
+  metadata-dir: ${MANGA_ROOT:F:/manga}/metadata
   aria2c-path: ${ARIA2C_PATH:worker-service/aria2-1.37.0-win-64bit-build1/aria2c.exe}
   ffprobe-path: ${FFPROBE_PATH:worker-service/ffmpeg/ffprobe.exe}
   image-optimizer-path: ${IMAGE_OPTIMIZER_PATH:tools/image-optimizer/image-optimizer.exe}
@@ -69,10 +69,10 @@ storage:
   roots:
     HQ:
       type: FILESYSTEM
-      path: ${MANGA_ROOT:D:/manga}/hq
+      path: ${MANGA_ROOT:F:/manga}/hq
     LQ:
       type: FILESYSTEM
-      path: ${MANGA_ROOT:D:/manga}/lq
+      path: ${MANGA_ROOT:F:/manga}/lq
     EXPORT:
       type: FILESYSTEM
-      path: ${MANGA_ROOT:D:/manga}/export
+      path: ${MANGA_ROOT:F:/manga}/export
