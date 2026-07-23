@@ -41,6 +41,12 @@ public class RabbitMqConfig {
     @Bean
     public DirectExchange deleteDlxExchange() { return new DirectExchange("comic.delete.dlx"); }
 
+    @Bean
+    public DirectExchange exportExchange() { return new DirectExchange("comic.export"); }
+
+    @Bean
+    public DirectExchange exportDlxExchange() { return new DirectExchange("comic.export.dlx"); }
+
     // ===== Queues =====
 
     @Bean
@@ -100,6 +106,19 @@ public class RabbitMqConfig {
         return QueueBuilder.durable("hq.delete.dlq").build();
     }
 
+    @Bean
+    public Queue exportTaskQueue() {
+        return QueueBuilder.durable("export.task.queue")
+                .deadLetterExchange("comic.export.dlx")
+                .deadLetterRoutingKey("export.task.dlq")
+                .build();
+    }
+
+    @Bean
+    public Queue exportTaskDlq() {
+        return QueueBuilder.durable("export.task.dlq").build();
+    }
+
     // ===== Bindings =====
 
     @Bean
@@ -154,5 +173,17 @@ public class RabbitMqConfig {
     public Binding hqDeleteDlqBinding() {
         return BindingBuilder.bind(hqDeleteDlq())
                 .to(imageDlxExchange()).with("hq.delete.dlq");
+    }
+
+    @Bean
+    public Binding exportTaskBinding() {
+        return BindingBuilder.bind(exportTaskQueue())
+                .to(exportExchange()).with("task.created");
+    }
+
+    @Bean
+    public Binding exportTaskDlqBinding() {
+        return BindingBuilder.bind(exportTaskDlq())
+                .to(exportDlxExchange()).with("export.task.dlq");
     }
 }

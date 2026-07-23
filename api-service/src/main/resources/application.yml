@@ -47,3 +47,6 @@ mybatis-plus:
   global-config:
     db-config:
       id-type: auto
+
+export:
+  output-dir: ${MANGA_ROOT:D:/manga}/export

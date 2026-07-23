@@ -335,3 +335,25 @@ export interface StorageOperation {
   comicId: number
   chapterId?: number
 }
+
+// ========== Export Domain ==========
+
+export interface ExportTaskVO {
+  taskId: number
+  comicId: number
+  status: string // PENDING | RUNNING | SUCCESS | FAILED
+  outputRoot?: string
+  outputPath?: string
+  outputSize: number
+  physicalPath?: string
+  errorMessage?: string
+  createdAt: string
+  completedAt?: string
+}
+
+export const EXPORT_STATUS_COLOR_MAP: Record<string, string> = {
+  PENDING: 'info',
+  RUNNING: 'warning',
+  SUCCESS: 'success',
+  FAILED: 'danger',
+}

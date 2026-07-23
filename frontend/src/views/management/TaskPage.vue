@@ -86,17 +86,73 @@
         <button class="primary-btn" @click="router.push('/manage/import')">开始第一次导入</button>
       </div>
     </section>
+
+    <!-- 导出任务分隔 -->
+    <hr class="section-divider" />
+
+    <!-- 导出进行中 -->
+    <section v-if="activeExportTasks.length > 0" class="task-section">
+      <h2 class="section-title">
+        导出进行中
+        <span class="section-count">{{ activeExportTasks.length }}</span>
+      </h2>
+      <div class="task-cards">
+        <ExportTaskCard
+          v-for="task in activeExportTasks"
+          :key="task.taskId"
+          :task="task"
+          variant="active"
+        />
+      </div>
+    </section>
+
+    <!-- 导出失败 -->
+    <section v-if="failedExportTasks.length > 0" class="task-section">
+      <h2 class="section-title">
+        导出失败
+        <span class="section-count">{{ failedExportTasks.length }}</span>
+      </h2>
+      <div class="task-cards">
+        <ExportTaskCard
+          v-for="task in failedExportTasks"
+          :key="task.taskId"
+          :task="task"
+          variant="failed"
+        />
+      </div>
+    </section>
+
+    <!-- 导出已完成 -->
+    <section class="task-section">
+      <h2 class="section-title">
+        导出已完成
+        <span class="section-count">{{ completedExportTasks.length }}</span>
+      </h2>
+      <div v-if="completedExportTasks.length > 0" class="task-cards">
+        <ExportTaskCard
+          v-for="task in completedExportTasks.slice(0, 10)"
+          :key="task.taskId"
+          :task="task"
+          variant="done"
+        />
+      </div>
+      <div v-else class="state empty">
+        <span>暂无导出任务</span>
+      </div>
+    </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount, computed, watch } from 'vue'
+import { onMounted, onBeforeUnmount, computed, watch, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { WarningFilled, CircleCheckFilled } from '@element-plus/icons-vue'
 import { useImportStore } from '@/stores/management/import'
-import type { ImportTaskVO } from '@/types'
+import type { ImportTaskVO, ExportTaskVO } from '@/types'
+import { exportApi } from '@/services/api'
 import TaskCard from '@/components/management/task/TaskCard.vue'
+import ExportTaskCard from '@/components/management/task/ExportTaskCard.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -149,9 +205,85 @@ watch(batchId, async () => {
   if (store.hasActive) store.startPolling()
 })
 
+// ========== Export tasks ==========
+
+const exportTasks = ref<ExportTaskVO[]>([])
+const exportPollTimer = ref<ReturnType<typeof setInterval> | null>(null)
+
+const TERMINAL_EXPORT_STATUSES = new Set(['SUCCESS', 'FAILED'])
+
+const activeExportTasks = computed(() =>
+  exportTasks.value.filter(t => !TERMINAL_EXPORT_STATUSES.has(t.status))
+)
+const failedExportTasks = computed(() =>
+  exportTasks.value.filter(t => t.status === 'FAILED')
+)
+const completedExportTasks = computed(() =>
+  exportTasks.value.filter(t => t.status === 'SUCCESS')
+)
+
+function hasActiveExports(): boolean {
+  return exportTasks.value.some(t => !TERMINAL_EXPORT_STATUSES.has(t.status))
+}
+
+async function fetchExportTasks() {
+  // 收集已知的 comicId
+  const comicIds = [...new Set(exportTasks.value.map(t => t.comicId))]
+  if (comicIds.length === 0) return
+
+  try {
+    const results = await Promise.allSettled(
+      comicIds.map(id => exportApi.listExports(id))
+    )
+    const allTasks: ExportTaskVO[] = []
+    for (const r of results) {
+      if (r.status === 'fulfilled') {
+        const data = (r.value as { data?: ExportTaskVO[] })?.data
+        if (Array.isArray(data)) {
+          allTasks.push(...data)
+        }
+      }
+    }
+    // 去重：同一 taskId 取最新
+    const map = new Map<number, ExportTaskVO>()
+    for (const t of allTasks) {
+      map.set(t.taskId, t)
+    }
+    exportTasks.value = [...map.values()]
+  } catch {
+    // 静默处理轮询错误
+  }
+}
+
+function startExportPolling() {
+  if (exportPollTimer.value) return
+  exportPollTimer.value = setInterval(() => {
+    fetchExportTasks().then(() => {
+      if (!hasActiveExports()) {
+        stopExportPolling()
+      }
+    })
+  }, 5000)
+}
+
+function stopExportPolling() {
+  if (exportPollTimer.value) {
+    clearInterval(exportPollTimer.value)
+    exportPollTimer.value = null
+  }
+}
+
+// 初始拉取一次，有进行中任务则启动轮询
+fetchExportTasks().then(() => {
+  if (hasActiveExports()) {
+    startExportPolling()
+  }
+})
+
 onBeforeUnmount(() => {
   // 离开页面不停止轮询：TopNav 全局依赖此 store 维持红点徽章
   // 轮询会在没有进行中任务时自动停止
+  stopExportPolling()
 })
 </script>
 
@@ -211,6 +343,13 @@ onBeforeUnmount(() => {
 .header-actions {
   display: flex;
   gap: var(--space-sm);
+}
+
+/* Section divider */
+.section-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: var(--space-xl) 0;
 }
 
 /* Batch filter */
