@@ -70,18 +70,6 @@ export interface TagRef {
   type: string
 }
 
-export interface CoverCandidateDTO {
-  pageId: number
-  chapterId: number
-  chapterTitle: string
-  pageNumber: number
-  url: string
-}
-
-export interface CoverUpdateDTO {
-  pageId: number
-}
-
 export interface CatalogNode {
   id: number | null
   title: string | null

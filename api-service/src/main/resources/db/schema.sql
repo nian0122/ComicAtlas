@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS comic (
     title_jpn VARCHAR(255),
     author VARCHAR(255),
     description TEXT,
-    cover_path VARCHAR(512),
+    cover_path VARCHAR(512),  -- DEPRECATED: 封面统一用 thumbs/{comicId}/cover.webp，不再存路径
     total_pages INT DEFAULT 0,
     file_size BIGINT DEFAULT 0,
     hq_size BIGINT DEFAULT 0,

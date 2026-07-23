@@ -13,6 +13,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -142,6 +143,125 @@ public class ImageOptimizer {
                 comicId, chapterId, result.getTotal(), result.getProcessed(),
                 result.getSkipped(), result.getFailed(), result.getElapsedMs());
         return result;
+    }
+
+    /**
+     * 为漫画生成优化封面 WebP，调用 Go 工具处理单张源图片，
+     * 输出到 thumbs/{comicId}/cover.webp。
+     *
+     * @param comicId     漫画 ID
+     * @param sourceImage 源封面图片路径（HQ 中已存在的文件）
+     * @throws RuntimeException Go 工具超时、异常退出或 IO 错误
+     */
+    public void generateCover(Long comicId, Path sourceImage) {
+        Path tempDir = Path.of(config.getMangaRoot(), "temp", "cover-" + comicId);
+        Path thumbsDir = Path.of(config.getMangaRoot(), "thumbs", String.valueOf(comicId));
+
+        try {
+            Files.createDirectories(tempDir);
+            Files.copy(sourceImage, tempDir.resolve(sourceImage.getFileName()), StandardCopyOption.REPLACE_EXISTING);
+
+            Files.createDirectories(thumbsDir);
+
+            Path optimizerPath = Path.of(config.getImageOptimizerPath());
+            if (!optimizerPath.isAbsolute()) {
+                optimizerPath = Path.of(System.getProperty("user.dir")).resolve(optimizerPath);
+            }
+
+            List<String> cmd = new ArrayList<>(List.of(
+                    optimizerPath.toString(),
+                    "-scan-dir", tempDir.toString(),
+                    "-output-dir", thumbsDir.toString(),
+                    "-comic-id", comicId.toString(),
+                    "-chapter-id", "0",
+                    "-chapter-no", "cover",
+                    "-quality", String.valueOf(config.getCover().getQuality()),
+                    "-workers", "1",
+                    "-json"
+            ));
+
+            log.info("生成封面: comicId={}, quality={}", comicId, config.getCover().getQuality());
+
+            ProcessBuilder pb = new ProcessBuilder(cmd);
+            pb.redirectErrorStream(true);
+            Process proc;
+            try {
+                proc = pb.start();
+            } catch (Exception e) {
+                throw new RuntimeException("启动封面优化工具失败: " + e.getMessage(), e);
+            }
+
+            // 必须在 waitFor() 之前消费 stdout，否则管道满后 Go 进程阻塞写 → 死锁
+            StringBuilder stdout = new StringBuilder();
+            Thread reader = new Thread(() -> {
+                try (BufferedReader r = new BufferedReader(
+                        new InputStreamReader(proc.getInputStream(), StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = r.readLine()) != null) {
+                        stdout.append(line).append('\n');
+                    }
+                } catch (Exception e) {
+                    stdout.append("__READ_ERROR__:").append(e.getMessage());
+                }
+            }, "cover-stdout-reader");
+            reader.start();
+
+            boolean finished;
+            try {
+                finished = proc.waitFor(LQ_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                reader.interrupt();
+                proc.destroyForcibly();
+                throw new RuntimeException("等待封面优化被中断: comicId=" + comicId);
+            }
+
+            if (!finished) {
+                reader.interrupt();
+                proc.destroyForcibly();
+                throw new RuntimeException("封面优化超时 (" + LQ_TIMEOUT_SECONDS + "s): comicId=" + comicId);
+            }
+
+            try {
+                reader.join(5000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+
+            int exitCode = proc.exitValue();
+            if (exitCode != 0) {
+                throw new RuntimeException(
+                        "封面优化工具异常退出 exitCode=" + exitCode + ", comicId=" + comicId + ", stdout=" + stdout);
+            }
+
+            Path coverFile = thumbsDir.resolve("cover.webp");
+            try (var stream = Files.list(thumbsDir)) {
+                Path webpFile = stream
+                        .filter(f -> f.getFileName().toString().endsWith(".webp")
+                                && !f.getFileName().toString().equals("cover.webp"))
+                        .findFirst()
+                        .orElse(null);
+                if (webpFile != null) {
+                    Files.move(webpFile, coverFile, StandardCopyOption.REPLACE_EXISTING);
+                }
+            }
+
+            log.info("封面优化完成: comicId={}, output={}", comicId, coverFile);
+        } catch (Exception e) {
+            throw new RuntimeException("封面优化失败: comicId=" + comicId + ", " + e.getMessage(), e);
+        } finally {
+            try {
+                if (Files.exists(tempDir)) {
+                    try (var stream = Files.walk(tempDir)) {
+                        stream.sorted(java.util.Comparator.reverseOrder())
+                                .map(Path::toFile)
+                                .forEach(java.io.File::delete);
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("清理封面临时目录失败: {}", tempDir, e);
+            }
+        }
     }
 
     @Data

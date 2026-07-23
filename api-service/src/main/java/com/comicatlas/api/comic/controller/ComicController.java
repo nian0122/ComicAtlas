@@ -78,15 +78,4 @@ public class ComicController {
         return Result.ok(comicService.autocompleteTitles(keyword));
     }
 
-    @GetMapping("/comics/{id}/covers/candidates")
-    public Result<List<CoverCandidateDTO>> listCoverCandidates(@PathVariable Long id) {
-        return Result.ok(comicService.listCoverCandidates(id));
-    }
-
-    @PutMapping("/comics/{id}/cover")
-    public Result<ComicDetailVO> updateCover(
-            @PathVariable Long id,
-            @Valid @RequestBody CoverUpdateDTO dto) {
-        return Result.ok(comicService.updateCover(id, dto));
-    }
 }

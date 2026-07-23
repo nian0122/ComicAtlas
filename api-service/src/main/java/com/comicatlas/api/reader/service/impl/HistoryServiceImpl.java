@@ -3,6 +3,7 @@ package com.comicatlas.api.reader.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.comic.entity.*;
 import com.comicatlas.api.comic.mapper.*;
+import com.comicatlas.api.common.storage.FileUrlResolver;
 import com.comicatlas.api.reader.dto.*;
 import com.comicatlas.api.reader.entity.ReadingHistory;
 import com.comicatlas.api.reader.mapper.ReadingHistoryMapper;
@@ -22,6 +23,7 @@ public class HistoryServiceImpl implements HistoryService {
     private final ReadingHistoryMapper historyMapper;
     private final ComicMapper comicMapper;
     private final ChapterMapper chapterMapper;
+    private final FileUrlResolver fileUrlResolver;
 
     @Override
     public List<HistoryVO> listHistory() {
@@ -69,7 +71,7 @@ public class HistoryServiceImpl implements HistoryService {
         Comic comic = comicMapper.selectById(h.getComicId());
         if (comic != null) {
             vo.setComicTitle(comic.getTitle());
-            vo.setCoverUrl("/files/thumbs/" + comic.getId() + "/cover.webp");
+            vo.setCoverUrl(fileUrlResolver.resolveCover(comic.getId()));
             if (comic.getTotalPages() != null && comic.getTotalPages() > 0) {
                 vo.setTotalPages(comic.getTotalPages());
                 if (h.getPageNumber() != null) {

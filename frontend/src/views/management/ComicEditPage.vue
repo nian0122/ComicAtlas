@@ -107,12 +107,6 @@
             </div>
           </el-form-item>
 
-          <el-form-item label="封面">
-            <div class="cover-block">
-              <el-button @click="openCoverSelector">选择封面</el-button>
-            </div>
-          </el-form-item>
-
           <div class="form-actions">
             <el-button @click="goBack">取消</el-button>
             <el-button type="primary" :loading="saving" @click="handleSave">
@@ -132,43 +126,6 @@
       </div>
     </div>
 
-    <el-dialog
-      v-model="coverDialogVisible"
-      title="选择封面"
-      width="800px"
-      class="cover-dialog"
-      destroy-on-close
-    >
-      <div v-if="coverLoading" class="state loading small">
-        <div class="spinner" />
-        <span>加载候选封面...</span>
-      </div>
-      <div v-else-if="coverCandidates.length === 0" class="state empty small">
-        <span>暂无可用封面</span>
-      </div>
-      <div v-else class="cover-grid">
-        <div
-          v-for="candidate in coverCandidates"
-          :key="candidate.pageId"
-          class="cover-item"
-          :class="{ active: selectedCoverPageId === candidate.pageId }"
-          @click="selectedCoverPageId = candidate.pageId"
-        >
-          <img :src="candidate.url" :alt="candidate.chapterTitle">
-          <span class="cover-label">{{ candidate.chapterTitle }}</span>
-        </div>
-      </div>
-      <template #footer>
-        <el-button @click="coverDialogVisible = false">取消</el-button>
-        <el-button
-          type="primary"
-          :disabled="!selectedCoverPageId"
-          @click="saveCover"
-        >
-          保存
-        </el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
@@ -186,7 +143,6 @@ import type {
   TagDTO,
   TagCreateDTO,
   ComicTagUpdateDTO,
-  CoverCandidateDTO,
 } from '@/types'
 
 const route = useRoute()
@@ -213,11 +169,6 @@ const newTagName = ref('')
 
 const sourceType = ref('')
 const sourceRef = ref('')
-
-const coverDialogVisible = ref(false)
-const coverLoading = ref(false)
-const coverCandidates = ref<CoverCandidateDTO[]>([])
-const selectedCoverPageId = ref<number | null>(null)
 
 const selectedTags = computed<TagDTO[]>(() => {
   return selectedTagIds.value
@@ -274,34 +225,6 @@ async function loadData() {
     router.push('/manage/comics')
   } finally {
     loading.value = false
-  }
-}
-
-async function openCoverSelector() {
-  coverDialogVisible.value = true
-  coverLoading.value = true
-  selectedCoverPageId.value = null
-  try {
-    const res = await comicApi.listCoverCandidates(comicId)
-    coverCandidates.value = (res.data || []) as CoverCandidateDTO[]
-  } catch (err: unknown) {
-    const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-    ElMessage.error(msg || '加载封面候选失败')
-    coverCandidates.value = []
-  } finally {
-    coverLoading.value = false
-  }
-}
-
-async function saveCover() {
-  if (!selectedCoverPageId.value) return
-  try {
-    await comicApi.updateCover(comicId, { pageId: selectedCoverPageId.value })
-    ElMessage.success('封面已更新')
-    coverDialogVisible.value = false
-  } catch (err: unknown) {
-    const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-    ElMessage.error(msg || '封面更新失败')
   }
 }
 
@@ -633,88 +556,5 @@ onMounted(loadData)
     order: 4;
     margin: 0 auto;
   }
-}
-
-.cover-block {
-  padding: var(--space-sm);
-  background: var(--bg-secondary);
-  border-radius: var(--radius-sm);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.cover-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: var(--space-base);
-  max-height: 480px;
-  overflow-y: auto;
-  padding: var(--space-sm);
-}
-
-.cover-item {
-  position: relative;
-  cursor: pointer;
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  border: 2px solid transparent;
-  transition: border-color var(--transition-fast);
-  background: var(--bg-secondary);
-}
-
-.cover-item:hover {
-  border-color: var(--border-strong);
-}
-
-.cover-item.active {
-  border-color: var(--accent);
-}
-
-.cover-item img {
-  width: 100%;
-  height: 180px;
-  object-fit: cover;
-  display: block;
-}
-
-.cover-label {
-  display: block;
-  padding: var(--space-xs) var(--space-sm);
-  font-size: 12px;
-  color: var(--text-secondary);
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.cover-dialog :deep(.el-dialog__header) {
-  margin-right: 0;
-}
-
-.cover-dialog :deep(.el-dialog__body) {
-  padding: var(--space-base);
-}
-
-.state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-base);
-  padding: var(--space-xl) 0;
-  color: var(--text-secondary);
-}
-
-.state.loading .spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid var(--border-strong);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
 }
 </style>

@@ -3,6 +3,7 @@ package com.comicatlas.worker.file.handler;
 import com.comicatlas.worker.file.parse.*;
 import com.comicatlas.worker.file.storage.LocalStorageService;
 import com.comicatlas.worker.event.CancelHandler;
+import com.comicatlas.worker.image.ImageOptimizer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +21,7 @@ public class DirectoryImportHandler {
     private final MetadataAssembler assembler;
     private final LocalStorageService storageService;
     private final ObjectMapper objectMapper;
+    private final ImageOptimizer imageOptimizer;
     private final CancelHandler cancelHandler;
 
     /**
@@ -48,7 +50,7 @@ public class DirectoryImportHandler {
             }
         }
 
-        // 封面：跳过 VIDEO 首项，找第一张图片；若章节全为视频则跳过封面生成
+        // 封面：跳过 VIDEO 首项，找第一张图片；调用 ImageOptimizer 生成优化封面
         var firstCh = metadata.chapters().get(0);
         var firstImage = firstCh.pages().stream()
                 .filter(p -> !"VIDEO".equals(p.mediaType()))
@@ -58,9 +60,11 @@ public class DirectoryImportHandler {
             Path firstImg = storageService.resolve(new com.comicatlas.worker.file.storage.StorageRef("HQ",
                 comicId + "/" + firstCh.globalOrder() + "/" + firstImage.fileName()));
             if (Files.exists(firstImg)) {
-                Path thumbsDir = mangaRoot.resolve("thumbs").resolve(String.valueOf(comicId));
-                Files.createDirectories(thumbsDir);
-                Files.copy(firstImg, thumbsDir.resolve("cover.webp"), StandardCopyOption.REPLACE_EXISTING);
+                try {
+                    imageOptimizer.generateCover(comicId, firstImg);
+                } catch (Exception e) {
+                    log.error("封面生成失败: comicId={}, {}", comicId, e.getMessage());
+                }
             }
         }
 

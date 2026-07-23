@@ -57,6 +57,8 @@ worker:
     host: ${PROXY_HOST:127.0.0.1}
     port: ${PROXY_PORT:7897}
     socks-port: ${SOCKS_PORT:7897}
+  cover:
+    quality: ${COVER_QUALITY:25}
   zip:
     max-entries: 100000
     max-depth: 200
