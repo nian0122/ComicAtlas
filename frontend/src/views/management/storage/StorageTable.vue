@@ -19,6 +19,7 @@ const emit = defineEmits<{
   'update:pageSize': [size: number]
   deleteHq: [comicId: number]
   generateLq: [comicId: number]
+  exportZip: [comicId: number]
   showChapters: [comicId: number]
   pageChange: []
 }>()
@@ -71,10 +72,11 @@ function rowClassName({ row }: { row: ComicStorageItem }) {
     <el-table-column label="LQ 状态" width="100">
       <template #default="{ row }"><StorageStatusTag :status="row.lqStatus" type="lq" /></template>
     </el-table-column>
-    <el-table-column label="操作" width="180" fixed="right">
+    <el-table-column label="操作" width="260" fixed="right">
       <template #default="{ row }">
         <el-button v-if="row.hqStatus === 'READY' || row.hqStatus === 'MIXED'" type="danger" size="small" :disabled="busyState[row.comicId]" @click="emit('deleteHq', row.comicId)">删HQ</el-button>
         <el-button v-if="row.lqStatus === 'NOT_GENERATED' || row.lqStatus === 'MIXED'" type="primary" size="small" :disabled="busyState[row.comicId]" @click="emit('generateLq', row.comicId)">生LQ</el-button>
+        <el-button size="small" type="success" :disabled="busyState[row.comicId]" @click="emit('exportZip', row.comicId)">导出 ZIP</el-button>
         <el-button size="small" @click="emit('showChapters', row.comicId)">详情</el-button>
       </template>
     </el-table-column>

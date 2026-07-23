@@ -82,7 +82,7 @@ Your next move: approve the plan, or run a high-accuracy dual Momus review befor
 ## Todos
 > Implementation + Test = ONE todo. Never separate.
 
-- [ ] 1. comic-common: 新增 4 个 export 事件 DTO + 修改 ComicEvent sealed interface
+- [x] 1. comic-common: 新增 4 个 export 事件 DTO + 修改 ComicEvent sealed interface
   What to do: 在 `comic-common/src/main/java/com/comicatlas/common/event/` 下创建 ExportTaskCreatedEvent、ExportTaskStartedEvent、ExportTaskCompletedEvent、ExportTaskFailedEvent 四个 Java record。每个 record 实现 ComicEvent，首两个字段固定 UUID eventId + Instant occurredAt。在 ComicEvent.java 的 @JsonSubTypes 和 permits 中注册 4 个新子类型（注册后共 15 个子类型）。
   Must NOT do: 不要创建超过4个事件DTO、不要修改现有11个事件的字段、不要忘记 permits 子句。
   Parallelization: Wave 1 | Blocked by: — | Blocks: T6,T7,T12
@@ -103,7 +103,7 @@ Your next move: approve the plan, or run a high-accuracy dual Momus review befor
     - Failure: 故意在 permits 子句中遗漏一个类 → 编译失败
   Commit: Y | feat(comic-common): 新增导出事件 DTO（ExportTaskCreated/Started/Completed/Failed）
 
-- [ ] 2. DB: 创建 export_task 表（含索引）
+- [x] 2. DB: 创建 export_task 表（含索引）
   What to do: 在 api-service 的 Flyway 迁移中添加下一个版本 SQL（如 V14__create_export_task.sql，执行前通过目录列表确认版本号），创建 export_task 表。字段：id(BIGINT AUTO_INCREMENT PK), comic_id(BIGINT NOT NULL), status(VARCHAR(20) DEFAULT 'PENDING'), progress(SMALLINT DEFAULT 0), output_root(VARCHAR(20)), output_path(VARCHAR(500)), output_size(BIGINT DEFAULT 0), error_msg(VARCHAR(500)), created_at(DATETIME DEFAULT CURRENT_TIMESTAMP), completed_at(DATETIME)。索引：comic_id、status、created_at。
   Must NOT do: 不要修改 import_task 表、不要添加 source_type/source_path 等导入专用字段、不要遗漏索引。
   Parallelization: Wave 1 | Blocked by: — | Blocks: T7,T9
@@ -119,7 +119,7 @@ Your next move: approve the plan, or run a high-accuracy dual Momus review befor
     - Failure: 重复执行迁移 → Flyway 幂等跳过
   Commit: Y | feat(db): 创建 export_task 表（含 comic_id/status/created_at 索引）
 
-- [ ] 3. Worker: 添加 MyBatis Plus 依赖 + 数据源配置
+- [x] 3. Worker: 添加 MyBatis Plus 依赖 + 数据源配置
   What to do: 在 worker-service/pom.xml 中添加 mybatis-plus-spring-boot3-starter 和 mysql-connector-j 依赖（版本从 api-service/pom.xml 复制）。在 worker-service/application.yml 中添加 spring.datasource（同 api-service 配置）和 mybatis-plus 基础配置（map-underscore-to-camel-case: true, id-type: auto）。设置 HikariCP maximum-pool-size=2（Worker 单线程消费，2 足够）。在 Worker 启动类添加 @MapperScan("com.comicatlas.worker.mapper")。
   Must NOT do: 不要添加 spring-boot-starter-web、不要设置过大的连接池（>5）、不要遗漏 @MapperScan。
   Parallelization: Wave 1 | Blocked by: — | Blocks: T8
@@ -139,7 +139,7 @@ Your next move: approve the plan, or run a high-accuracy dual Momus review befor
     - Failure: 错误的数据源配置 → Worker 启动失败，日志显示 SQLException
   Commit: Y | feat(worker): 添加 MyBatis Plus + MySQL 数据源只读访问
 
-- [ ] 4. Frontend: 新增 exportApi + ExportTaskVO 类型定义
+- [x] 4. Frontend: 新增 exportApi + ExportTaskVO 类型定义
   What to do: 在 frontend/src/types/index.ts 中新增 ExportTaskVO 接口（字段：taskId, comicId, status, outputPath, outputSize, physicalPath, errorMessage, createdAt, completedAt）。新增 STATUS_COLOR_MAP 条目（PENDING: 'info', RUNNING: 'warning', SUCCESS: 'success', FAILED: 'danger'）。在 frontend/src/services/api.ts 中新增 exportApi 对象：createExport(comicId) → POST /api/comics/{comicId}/export, getTask(taskId) → GET /api/export/{taskId}, listExports(comicId) → GET /api/comics/{comicId}/exports, download(taskId) → GET /api/export/{taskId}/download, openDir(taskId) → POST /api/export/{taskId}/open。
   Must NOT do: 不要修改现有 ImportTaskVO 类型、不要遗漏物理路径字段 physicalPath。
   Parallelization: Wave 1 | Blocked by: — | Blocks: T15,T16
@@ -156,7 +156,7 @@ Your next move: approve the plan, or run a high-accuracy dual Momus review befor
     - Failure: 故意调用不存在的端点 → TypeScript 编译时错误
   Commit: Y | feat(frontend): 新增 exportApi + ExportTaskVO 类型
 
-- [ ] 5. API: RabbitMQ 配置 — comic.export exchange + queues + DLX
+- [x] 5. API: RabbitMQ 配置 — comic.export exchange + queues + DLX
   What to do: 在 api-service/.../config/RabbitMqConfig.java 中新增 comic.export exchange（DirectExchange，与现有一致）。创建 3 个独立 result queue：export.started.result.queue、export.completed.result.queue、export.failed.result.queue，各含 DLX → comic.export.dlx 及对应 DLQ。每个 queue 绑定到 comic.export 的对应 routingKey（task.started / task.completed / task.failed）。创建 export.task.dlq（Worker 侧失败的 DLQ）。遵循现有 DirectExchange + QueueBuilder.durable + deadLetterExchange/deadLetterRoutingKey 模式。与现有 import.image.delete exchange 的声明风格完全一致。
   Must NOT do: 不要使用 TopicExchange（现有全部使用 DirectExchange）、不要用单个 export.result.queue（3 个 handler 同队列会导致消息轮询到错误的 handler）、不要忘记声明 DLQ + DLX。
   Parallelization: Wave 2 | Blocked by: T1 | Blocks: T9,T10
@@ -175,7 +175,7 @@ Your next move: approve the plan, or run a high-accuracy dual Momus review befor
     - Failure: 绑定错误 → RabbitMQ 启动时 channel 异常
   Commit: Y | feat(api): 新增 comic.export MQ 配置（exchange/queue/DLX）
 
-- [ ] 6. Worker: RabbitMQ 配置 — comic.export exchange + export.task.queue + DLX
+- [x] 6. Worker: RabbitMQ 配置 — comic.export exchange + export.task.queue + DLX
   What to do: 在 worker-service/.../config/RabbitMqConfig.java 中新增 comic.export exchange（TopicExchange，与 API 侧完全一致）、export.task.queue（含 DLX）、export.task.dlq、task.created binding、DLX exchange + DLQ binding。声明参数必须与 API 侧完全一致（durable, DLX, DLQ name）。
   Must NOT do: 不要修改 exchange 的 durable 属性（必须 true）、不要遗漏 DLX/DLQ、不要新增不属于 Worker 的 result queue。
   Parallelization: Wave 2 | Blocked by: T1 | Blocks: T12
@@ -192,7 +192,7 @@ Your next move: approve the plan, or run a high-accuracy dual Momus review befor
     - Failure: 与 API 侧声明不一致 → RabbitMQ PRECONDITION_FAILED
   Commit: Y | feat(worker): 新增 comic.export MQ 配置（exchange/task.queue/DLX）
 
-- [ ] 7. API: export_task Entity + Mapper + Flyway 迁移验证
+- [x] 7. API: export_task Entity + Mapper + Flyway 迁移验证
   What to do: 在 api-service 创建 ExportTask entity 类（@TableName("export_task")，字段对应 DDL），创建 ExportTaskMapper 接口（extends BaseMapper<ExportTask>，使用 @Mapper 注解）。在 ExportTask 中提供便利方法 isPending()/isRunning()/isSuccess()/isFailed()。
   Must NOT do: 不要放在 import_task 的包路径下（新建 `api/export/entity/` 和 `api/export/mapper/`）、不要使用 MyBatis XML（用注解/BaseMapper 默认方法）。
   Parallelization: Wave 2 | Blocked by: T2 | Blocks: T10,T11
@@ -208,7 +208,7 @@ Your next move: approve the plan, or run a high-accuracy dual Momus review befor
     - Failure: @TableName 拼写错误 → 运行时 TableNotFoundException
   Commit: Y | feat(api): 新增 ExportTask Entity + Mapper
 
-- [ ] 8. Worker: 创建只读 Entity 类（ExportComic/Chapter/Catalog/Media）+ Mapper
+- [x] 8. Worker: 创建只读 Entity 类（ExportComic/Chapter/Catalog/Media）+ Mapper
   What to do: 在 worker-service 创建 4 个只读 entity（ExportComic、ExportChapter、ExportCatalog、ExportMedia），使用 Export 前缀避免与 API Entity 冲突。每个 entity 仅含导出所需字段。ExportMedia 必须包含 lqRoot/lqPath/lqStatus（降级逻辑依赖）。创建对应 4 个 Mapper 接口。Worker Media 字段：id, chapterId, pageNumber, mediaType, fileName, hqRoot, hqPath, hqStatus, lqRoot, lqPath, lqStatus, fileSize, width, height, duration, container, videoCodec, audioCodec。
   Must NOT do: 不要在 Worker entity 中定义 API 侧才用的字段（如 comic.category、chapter.catalogId 详细）、不要遗漏 lqRoot/lqPath/lqStatus（降级关键）、不要使用与 API Entity 相同的类名（必须 Export 前缀）。
   Parallelization: Wave 2 | Blocked by: T3 | Blocks: T12,T13
@@ -229,7 +229,7 @@ Your next move: approve the plan, or run a high-accuracy dual Momus review befor
     - Failure: 与 API Entity 同名 → IDE 导入歧义（验证无同名类在 classpath 上）
   Commit: Y | feat(worker): 新增只读 Export Entity（Comic/Chapter/Catalog/Media）+ Mapper
 
-- [ ] 9. API: ExportStartedHandler + ExportCompletedHandler + ExportFailedHandler
+- [x] 9. API: ExportStartedHandler + ExportCompletedHandler + ExportFailedHandler
   What to do: 在 api-service/.../export/event/ 下创建 3 个 @RabbitListener handler，各自监听独立队列。ExportStartedHandler：监听 export.started.result.queue → UPDATE export_task SET status='RUNNING'。ExportCompletedHandler：监听 export.completed.result.queue → UPDATE status='SUCCESS', output_root, output_path, output_size, progress=100, completed_at=NOW()。ExportFailedHandler：监听 export.failed.result.queue → UPDATE status='FAILED', error_msg, progress=-1。均使用 manual ACK（basicAck/basicReject），遵循 ImportEventHandler 的分队列模式（每个消息类型独立队列）。
   Must NOT do: 不要 3 个 handler 监听同一队列（轮询导致反序列化失败）、不要忘记设置 progress=-1（ExportFailedHandler）、不要忘记 basicAck、不要使用 auto ACK。
   Parallelization: Wave 3 | Blocked by: T5,T7 | Blocks: T16
@@ -248,7 +248,7 @@ Your next move: approve the plan, or run a high-accuracy dual Momus review befor
     - Failure: 事件缺少字段 → 反序列化失败，进入 DLQ
   Commit: Y | feat(api): 新增导出事件处理器（Started/Completed/Failed）
 
-- [ ] 10. API: ExportController + ExportService
+- [x] 10. API: ExportController + ExportService
   What to do: 创建 ExportController（5 个端点）和 ExportService（校验+创建任务+发MQ）。POST /api/comics/{comicId}/export：校验 comic.status==READY、幂等检查 PENDING/RUNNING 任务 → INSERT export_task(PENDING) → afterCommit 发送 ExportTaskCreatedEvent → 202。GET /api/comics/{comicId}/exports：列表查询（按 created_at 倒序）→ physicalPath 由 StorageProperties 计算。GET /api/export/{taskId}：单任务查询 → 含 physicalPath。GET /api/export/{taskId}/download：StreamingResponseBody → Content-Type: application/zip。POST /api/export/{taskId}/open：Desktop.open() → 无桌面环境返回 501。
   Must NOT do: 不要忘记 afterCommit 事务同步、不要遗漏幂等检查、不要缺失 physicalPath 计算。
   Parallelization: Wave 3 | Blocked by: T6,T9 | Blocks: T17
@@ -274,7 +274,7 @@ Your next move: approve the plan, or run a high-accuracy dual Momus review befor
     - Failure: comicId 不存在 → 404
   Commit: Y | feat(api): 新增 ExportController + ExportService（5 端点 + MQ 发布）
 
-- [ ] 11. Worker: ExportTaskHandler（MQ 消费入口，路由编排）
+- [x] 11. Worker: ExportTaskHandler（MQ 消费入口，路由编排）
   What to do: 创建 ExportTaskHandler，@RabbitListener(queues="export.task.queue")。处理流程：①Publish ExportTaskStartedEvent → ②ExportCollector.collect() → ③ZipBuilder.build() → ④Publish ExportTaskCompletedEvent（含 outputPath+outputSize）→ ⑤basicAck。异常时 publish ExportTaskFailedEvent + basicReject。注入 RabbitTemplate（用于发布回复事件）。
   Must NOT do: 不要在 Handler 中包含业务逻辑（仅路由编排）、不要忘记 basicAck/basicReject、不要直接在 Handler 中写 ZIP 代码。
   Parallelization: Wave 3 | Blocked by: T1,T7,T8 | Blocks: T17
@@ -292,7 +292,7 @@ Your next move: approve the plan, or run a high-accuracy dual Momus review befor
     - Failure: 导出过程中 IO 异常 → ExportTaskFailedEvent 发布 → 消息 reject（进 DLQ）
   Commit: Y | feat(worker): 新增 ExportTaskHandler（MQ 消费+路由编排）
 
-- [ ] 12. Worker: ExportCollector + ExportFileResolver + ExportManifest + ZipBuilder + ComicTitleSanitizer（5 个组件）
+- [x] 12. Worker: ExportCollector + ExportFileResolver + ExportManifest + ZipBuilder + ComicTitleSanitizer（5 个组件）
   What to do: 一次性实现 Worker 的 5 个导出核心组件：
     - **ExportCollector**：只读查询 comic/chapter/catalog/media（按 globalOrder 排序），组装原始数据。在 Worker 中自建元数据 JSON 组装逻辑（参考 api-service MetadataExporter 的输出格式，但 Worker 独立实现，不跨服务调用），生成 metadata.json 字符串。格式使用 v3（`mediaItems` + `fileName` + `mediaType`，支持 VIDEO 类型），与现有 Import 兼容。
     - **ExportFileResolver**：逐页决策 HQ/LQ，返回 StorageRef。逻辑：VIDEO → 始终 HQ；IMAGE + hqStatus==READY → HQ；IMAGE + hqStatus==DELETED + lqStatus==READY → LQ；否则抛 ExportFileNotFoundException。
@@ -323,7 +323,7 @@ Your next move: approve the plan, or run a high-accuracy dual Momus review befor
     - Failure: ZipBuilder 磁盘满 → 异常 + 部分文件已删除
   Commit: Y | feat(worker): 新增导出核心组件（Collector/FileResolver/Manifest/ZipBuilder/Sanitizer）
 
-- [ ] 13. Config: application.yml 新增 EXPORT storage root（API + Worker 两侧）
+- [x] 13. Config: application.yml 新增 EXPORT storage root（API + Worker 两侧）
   What to do: 在 worker-service/application.yml 的 storage.roots 下新增 EXPORT root：{ type: FILESYSTEM, path: ${MANGA_ROOT:D:/manga}/export }。在 api-service/application.yml 中新增 export.output-dir 配置：`export.output-dir: ${MANGA_ROOT:D:/manga}/export`（API 侧不需要完整 StorageProperties，仅需一个 @Value 注入用于 physicalPath 拼接）。Worker 侧 StorageProperties 自动加载 EXPORT root。API 侧在 ExportService 中注入 `@Value("${export.output-dir}")` 拼接 physicalPath = outputDir + "/" + outputPath。
   Must NOT do: 不要修改 StorageLayout 类、不要修改现有 HQ/LQ root 配置、不要在 API 侧创建完整的 StorageProperties（过度设计）。
   Parallelization: Wave 4 | Blocked by: — | Blocks: T16
@@ -341,7 +341,7 @@ Your next move: approve the plan, or run a high-accuracy dual Momus review befor
     - Failure: 路径不存在 → Worker 启动不报错（运行时 resolve 时检查）
   Commit: Y | feat(config): 新增 EXPORT storage root（双方 application.yml）
 
-- [ ] 14. Frontend: StorageTable.vue 新增"导出 ZIP"按钮
+- [x] 14. Frontend: StorageTable.vue 新增"导出 ZIP"按钮
   What to do: 在 StorageTable.vue 操作列（"删HQ"/"生LQ"旁边）新增"导出 ZIP"按钮。按钮始终显示（所有漫画均可导出），点击 emit('exportZip', row.comicId)。当 busyState[row.comicId] 为 true 时 disabled。StoragePage 接收 exportZip 事件 → ElMessageBox.confirm 确认弹窗（显示漫画标题、章节数、预估大小）→ 调用 exportApi.createExport(comicId) → ElMessage.success('导出任务已提交') → 开始 useStoragePolling 轮询导出状态。确认弹窗数据复用已有的 ComicStorageItem 信息（chapterCount, pageCount, hqSize + lqSize 估算）。
   Must NOT do: 不要在 DetailPage 放导出按钮、不要用 v-if 条件隐藏导出按钮（始终显示，仅 disabled 控制）。
   Parallelization: Wave 4 | Blocked by: T4,T5 | Blocks: T17
@@ -361,7 +361,7 @@ Your next move: approve the plan, or run a high-accuracy dual Momus review befor
     - Failure: 网络错误 → ElMessage.error 显示错误信息
   Commit: Y | feat(frontend): StorageTable 新增导出 ZIP 按钮 + 确认弹窗
 
-- [ ] 15. Frontend: TaskPage.vue 支持 EXPORT 任务类型
+- [x] 15. Frontend: TaskPage.vue 支持 EXPORT 任务类型
   What to do: 扩展 TaskPage.vue 显示导出任务。在 onMounted 中调用 exportApi.listExports() 获取导出任务列表，合并到任务列表渲染。使用简单的 setInterval 轮询（复用 import store 的 pollingInterval 判断：有 RUNNING/PENDING → 5s 间隔，全部终态→停止）。创建独立的 ExportTaskCard.vue 组件（不修改现有 TaskCard，避免 ImportTaskVO 字段耦合）。EXPORT 类型任务行：PENDING → 灰色"等待中"、RUNNING → 旋转"导出中..."、SUCCESS → ✅ + [下载][复制路径][打开目录]、FAILED → ❌ + 错误信息 + [重试]。下载/复制路径/打开目录分别调用 exportApi.download/openDir 和 clipboard。Toast：导出完成 → "✅ 导出完成：xxx.zip · 324 MB"，导出失败 → "❌ 导出失败：xxx"。exportApi.listExports() 可直接在 TaskPage 组件内调用（无需单独 Pinia store，Phase I 简化）。
   Must NOT do: 不要修改 ImportTaskVO/ImportTaskCard（创建独立 ExportTaskCard）、不要删除现有导入任务功能。
   Parallelization: Wave 4 | Blocked by: T4,T13 | Blocks: T16

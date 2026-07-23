@@ -1,6 +1,7 @@
 import axios from 'axios'
 import type {
   ComicMetadataUpdateDTO,
+  ExportTaskVO,
   TagCreateDTO,
   ComicTagUpdateDTO,
   CoverUpdateDTO,
@@ -88,6 +89,14 @@ export const lqApi = {
 export const hqApi = {
   deleteComic: (comicId: number) => api.post(`/comics/${comicId}/delete-hq`),
   deleteChapter: (chapterId: number) => api.post(`/chapters/${chapterId}/delete-hq`),
+}
+
+export const exportApi = {
+  createExport: (comicId: number) => api.post(`/comics/${comicId}/export`),
+  listExports: (comicId: number) => api.get<ExportTaskVO[]>(`/comics/${comicId}/exports`),
+  getTask: (taskId: number) => api.get<ExportTaskVO>(`/export/${taskId}`),
+  download: (taskId: number) => api.get(`/export/${taskId}/download`, { responseType: 'blob' }),
+  openDir: (taskId: number) => api.post(`/export/${taskId}/open`),
 }
 
 export const adminApi = {

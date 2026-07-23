@@ -213,4 +213,91 @@ public class RabbitMqConfig {
     public DirectExchange imageDlxExchange() {
         return new DirectExchange("comic.image.dlx");
     }
+
+    // ==================== comic.export ====================
+
+    @Bean
+    public DirectExchange exportExchange() {
+        return new DirectExchange("comic.export");
+    }
+
+    @Bean
+    public DirectExchange exportDlxExchange() {
+        return new DirectExchange("comic.export.dlx");
+    }
+
+    @Bean
+    public Queue exportStartedResultQueue() {
+        return QueueBuilder.durable("export.started.result.queue")
+                .deadLetterExchange("comic.export.dlx")
+                .deadLetterRoutingKey("export.started.result.dlq")
+                .build();
+    }
+
+    @Bean
+    public Queue exportCompletedResultQueue() {
+        return QueueBuilder.durable("export.completed.result.queue")
+                .deadLetterExchange("comic.export.dlx")
+                .deadLetterRoutingKey("export.completed.result.dlq")
+                .build();
+    }
+
+    @Bean
+    public Queue exportFailedResultQueue() {
+        return QueueBuilder.durable("export.failed.result.queue")
+                .deadLetterExchange("comic.export.dlx")
+                .deadLetterRoutingKey("export.failed.result.dlq")
+                .build();
+    }
+
+    @Bean
+    public Queue exportStartedResultDlq() {
+        return QueueBuilder.durable("export.started.result.dlq").build();
+    }
+
+    @Bean
+    public Queue exportCompletedResultDlq() {
+        return QueueBuilder.durable("export.completed.result.dlq").build();
+    }
+
+    @Bean
+    public Queue exportFailedResultDlq() {
+        return QueueBuilder.durable("export.failed.result.dlq").build();
+    }
+
+    @Bean
+    public Binding exportStartedResultBinding() {
+        return BindingBuilder.bind(exportStartedResultQueue())
+                .to(exportExchange()).with("task.started");
+    }
+
+    @Bean
+    public Binding exportCompletedResultBinding() {
+        return BindingBuilder.bind(exportCompletedResultQueue())
+                .to(exportExchange()).with("task.completed");
+    }
+
+    @Bean
+    public Binding exportFailedResultBinding() {
+        return BindingBuilder.bind(exportFailedResultQueue())
+                .to(exportExchange()).with("task.failed");
+    }
+
+    @Bean
+    public Binding exportStartedResultDlqBinding() {
+        return BindingBuilder.bind(exportStartedResultDlq())
+                .to(exportDlxExchange()).with("export.started.result.dlq");
+    }
+
+    @Bean
+    public Binding exportCompletedResultDlqBinding() {
+        return BindingBuilder.bind(exportCompletedResultDlq())
+                .to(exportDlxExchange()).with("export.completed.result.dlq");
+    }
+
+    @Bean
+    public Binding exportFailedResultDlqBinding() {
+        return BindingBuilder.bind(exportFailedResultDlq())
+                .to(exportDlxExchange()).with("export.failed.result.dlq");
+    }
 }
