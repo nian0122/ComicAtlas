@@ -81,7 +81,7 @@ storage:
 ```
 {Frieren}/                            ← rootDirName = ComicTitleSanitizer.sanitize(comic.title)
 ├── metadata.json                     ← v2 格式，与 Import 完全一致（MetadataExporter 同款）
-├── 第1话/                            ← catalog 树 + chapter.title（无 catalog 时扁平）
+├── 第1话/                            ← catalog 树 + chapter.title（无 catalog 时按 chapter.title 建一级文件夹）
 │   ├── 001.jpg
 │   ├── 002.jpg
 │   └── 003.jpg
@@ -233,6 +233,7 @@ public record ExportManifest(
 ```java
 public class ZipBuilder {
     public long build(ExportManifest manifest, Path outputPath) throws IOException {
+        Files.createDirectories(outputPath.getParent());  // 确保 export/ 目录存在
         try (var zos = new ZipOutputStream(Files.newOutputStream(outputPath))) {
             // 1. 写入 metadata.json（根目录）
             writeEntry(zos, manifest.rootDirName() + "/metadata.json",
@@ -401,7 +402,28 @@ POST /api/comics/{comicId}/export
 **成功响应**：
 - `202 Accepted`: `{ "taskId": 42, "status": "PENDING" }`
 
-### 8.2 下载导出文件
+### 8.2 查询导出任务
+
+```http
+GET /api/export/{taskId}
+```
+
+**响应**：
+```json
+{
+  "taskId": 42,
+  "comicId": 12,
+  "status": "SUCCESS",
+  "outputRoot": "EXPORT",
+  "outputPath": "Frieren_20260723_102355.zip",
+  "outputSize": 339738624,
+  "physicalPath": "D:\\manga\\export\\Frieren_20260723_102355.zip"
+}
+```
+
+> `physicalPath` 由 API 服务端通过 `StorageProperties.roots["EXPORT"].resolve(outputPath)` 计算，前端直接使用无需拼接。
+
+### 8.3 下载导出文件
 
 ```http
 GET /api/export/{taskId}/download
@@ -413,7 +435,7 @@ GET /api/export/{taskId}/download
 
 > 此接口始终可用（不依赖平台），前端/浏览器直接下载 ZIP。
 
-### 8.3 打开导出目录
+### 8.4 打开导出目录
 
 ```http
 POST /api/export/{taskId}/open
@@ -485,7 +507,7 @@ TaskPage 任务列表新增 `EXPORT` 类型行：
 
 ### 10.5 "复制路径"实现
 
-点击复制 → 调用 `navigator.clipboard.writeText(fullPath)`（输出完整物理路径供用户使用）。
+点击复制 → 调用 `GET /api/export/{taskId}` 获取 `physicalPath` → `navigator.clipboard.writeText(physicalPath)`。
 
 ### 10.6 "打开目录"实现
 
@@ -502,7 +524,7 @@ TaskPage 任务列表新增 `EXPORT` 类型行：
 | `comic-common/event/ExportTaskCompletedEvent.java` | 新建 | Worker → API |
 | `comic-common/event/ExportTaskFailedEvent.java` | 新建 | Worker → API |
 | `comic-common/event/ComicEvent.java` | 修改 | 新增 4 个子类型 |
-| `api/export/controller/ExportController.java` | 新建 | 3 个端点 |
+| `api/export/controller/ExportController.java` | 新建 | 4 个端点（创建/查询/下载/打开目录） |
 | `api/export/service/ExportService.java` | 新建 | 校验 + 创建任务 + 发事件 |
 | `api/export/event/ExportStartedHandler.java` | 新建 | 消费 → UPDATE RUNNING |
 | `api/export/event/ExportCompletedHandler.java` | 新建 | 消费 → UPDATE SUCCESS |
@@ -514,6 +536,10 @@ TaskPage 任务列表新增 `EXPORT` 类型行：
 | `worker/export/ExportManifest.java` | 新建 | 纯数据 record |
 | `worker/export/ZipBuilder.java` | 新建 | 纯 IO ZIP 流 |
 | `worker/export/ComicTitleSanitizer.java` | 新建 | 文件名安全处理 |
+| `worker/mapper/ComicMapper.java` | 新建（如不存在） | Worker 只读查询 comic |
+| `worker/mapper/ChapterMapper.java` | 新建（如不存在） | Worker 只读查询 chapter |
+| `worker/mapper/CatalogMapper.java` | 新建（如不存在） | Worker 只读查询 catalog |
+| `worker/mapper/MediaMapper.java` | 新建（如不存在） | Worker 只读查询 media |
 | `worker/config/RabbitMqConfig.java` | 修改 | 声明 export exchange/queue/binding |
 | `frontend/services/api.ts` | 修改 | 新增 exportApi |
 | `frontend/types/index.ts` | 修改 | 新增 ExportTaskVO |
