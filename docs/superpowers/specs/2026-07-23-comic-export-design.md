@@ -50,7 +50,10 @@ CREATE TABLE export_task (
     output_size BIGINT      NOT NULL DEFAULT 0,          -- 输出文件大小（字节）
     error_msg   VARCHAR(500),
     created_at  DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    completed_at DATETIME
+    completed_at DATETIME,
+    INDEX idx_comic_id (comic_id),
+    INDEX idx_status (status),
+    INDEX idx_created_at (created_at)
 );
 ```
 
@@ -236,15 +239,30 @@ public class ZipBuilder {
         Files.createDirectories(outputPath.getParent());  // 确保 export/ 目录存在
         try (var zos = new ZipOutputStream(Files.newOutputStream(outputPath))) {
             // 1. 写入 metadata.json（根目录）
-            writeEntry(zos, manifest.rootDirName() + "/metadata.json",
-                       manifest.metadataJson().getBytes(StandardCharsets.UTF_8));
-            // 2. 逐文件写入
+            writeStringEntry(zos, manifest.rootDirName() + "/metadata.json",
+                       manifest.metadataJson());
+            // 2. 逐文件流式写入（零拷贝，避免 OOM）
             for (var entry : manifest.entries()) {
                 String zipPath = manifest.rootDirName() + "/" + entry.targetPath();
-                writeEntry(zos, zipPath, Files.readAllBytes(entry.sourceFile()));
+                writeFileEntry(zos, zipPath, entry.sourceFile());
             }
+        } catch (Exception e) {
+            Files.deleteIfExists(outputPath);  // 失败时清理不完整的 ZIP
+            throw e;
         }
         return Files.size(outputPath);
+    }
+
+    private void writeStringEntry(ZipOutputStream zos, String path, String content) throws IOException {
+        zos.putNextEntry(new ZipEntry(path));
+        zos.write(content.getBytes(StandardCharsets.UTF_8));
+        zos.closeEntry();
+    }
+
+    private void writeFileEntry(ZipOutputStream zos, String path, Path source) throws IOException {
+        zos.putNextEntry(new ZipEntry(path));
+        Files.copy(source, zos);  // 流式传输，零拷贝
+        zos.closeEntry();
     }
 }
 ```
@@ -330,7 +348,7 @@ public record ExportTaskFailedEvent(
 
 ```java
 @JsonSubTypes({
-    // ... existing 12 types ...
+    // ... existing 11 types ...
     @JsonSubTypes.Type(value = ExportTaskCreatedEvent.class, name = "ExportTaskCreated"),
     @JsonSubTypes.Type(value = ExportTaskStartedEvent.class, name = "ExportTaskStarted"),
     @JsonSubTypes.Type(value = ExportTaskCompletedEvent.class, name = "ExportTaskCompleted"),
@@ -378,8 +396,18 @@ public Binding exportTaskBinding() {
 }
 
 @Bean
-public Binding exportResultBinding() {
-    return BindingBuilder.bind(exportResultQueue()).to(exportExchange()).with("task.*");
+public Binding exportResultStartedBinding() {
+    return BindingBuilder.bind(exportResultQueue()).to(exportExchange()).with("task.started");
+}
+
+@Bean
+public Binding exportResultCompletedBinding() {
+    return BindingBuilder.bind(exportResultQueue()).to(exportExchange()).with("task.completed");
+}
+
+@Bean
+public Binding exportResultFailedBinding() {
+    return BindingBuilder.bind(exportResultQueue()).to(exportExchange()).with("task.failed");
 }
 ```
 
@@ -402,7 +430,32 @@ POST /api/comics/{comicId}/export
 **成功响应**：
 - `202 Accepted`: `{ "taskId": 42, "status": "PENDING" }`
 
-### 8.2 查询导出任务
+### 8.2 查询导出任务列表
+
+```http
+GET /api/comics/{comicId}/exports
+```
+
+**响应**：
+```json
+[
+  {
+    "taskId": 42,
+    "comicId": 12,
+    "status": "SUCCESS",
+    "outputRoot": "EXPORT",
+    "outputPath": "Frieren_20260723_102355.zip",
+    "outputSize": 339738624,
+    "physicalPath": "D:\\manga\\export\\Frieren_20260723_102355.zip",
+    "createdAt": "2026-07-23T10:23:55",
+    "completedAt": "2026-07-23T10:25:12"
+  }
+]
+```
+
+> 返回指定漫画的所有导出任务，按 `created_at` 倒序。TaskPage 通过此端点获取导出任务列表。
+
+### 8.3 查询单个导出任务
 
 ```http
 GET /api/export/{taskId}
@@ -423,7 +476,7 @@ GET /api/export/{taskId}
 
 > `physicalPath` 由 API 服务端通过 `StorageProperties.roots["EXPORT"].resolve(outputPath)` 计算，前端直接使用无需拼接。
 
-### 8.3 下载导出文件
+### 8.4 下载导出文件
 
 ```http
 GET /api/export/{taskId}/download
@@ -435,7 +488,7 @@ GET /api/export/{taskId}/download
 
 > 此接口始终可用（不依赖平台），前端/浏览器直接下载 ZIP。
 
-### 8.4 打开导出目录
+### 8.5 打开导出目录
 
 ```http
 POST /api/export/{taskId}/open
