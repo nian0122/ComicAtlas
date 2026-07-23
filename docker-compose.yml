@@ -64,6 +64,7 @@ services:
       MYSQL_HOST: mysql
       REDIS_HOST: redis
       RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
       MANGA_ROOT: /storage
     volumes:
       - ${MANGA_ROOT:-./manga}/metadata:/storage/metadata:ro
@@ -85,6 +86,8 @@ services:
     environment:
       NACOS_ADDR: nacos:8848
       RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      MYSQL_HOST: mysql
       MANGA_ROOT: /storage
       WORKER_HOST_MANGA_ROOT: ${MANGA_ROOT:-./manga}
       WORKER_CONTAINER_MANGA_ROOT: /storage
