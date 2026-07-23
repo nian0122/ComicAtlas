@@ -22,6 +22,7 @@ public class WorkerConfig {
     private Cover cover = new Cover();
     private String aria2cPath = "aria2c";
     private String ffprobePath = "worker-service/ffmpeg/ffprobe.exe";
+    private String ffmpegPath = "ffmpeg";
     private String imageOptimizerPath = "tools/image-optimizer/image-optimizer.exe";
     private int lqQuality = 15;
     private int lqWorkers = 0;

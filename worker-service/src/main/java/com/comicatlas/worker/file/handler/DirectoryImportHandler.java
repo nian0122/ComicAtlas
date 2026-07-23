@@ -66,6 +66,23 @@ public class DirectoryImportHandler {
                     log.error("封面生成失败: comicId={}, {}", comicId, e.getMessage());
                 }
             }
+        } else {
+            // 全视频漫画：从第一个视频抽帧做封面
+            var firstVideo = firstCh.pages().stream()
+                    .filter(p -> "VIDEO".equals(p.mediaType()))
+                    .findFirst()
+                    .orElse(null);
+            if (firstVideo != null) {
+                Path firstVideoFile = storageService.resolve(new com.comicatlas.worker.file.storage.StorageRef("HQ",
+                    comicId + "/" + firstCh.globalOrder() + "/" + firstVideo.fileName()));
+                if (Files.exists(firstVideoFile)) {
+                    try {
+                        imageOptimizer.generateCoverFromVideo(comicId, firstVideoFile);
+                    } catch (Exception e) {
+                        log.error("视频封面生成失败: comicId={}, {}", comicId, e.getMessage());
+                    }
+                }
+            }
         }
 
         return writeMetadata(metadata, taskId, mangaRoot);

@@ -264,6 +264,90 @@ public class ImageOptimizer {
         }
     }
 
+    /**
+     * 从视频文件提取首帧作为封面（全视频漫画回退方案）。
+     *
+     * @param comicId   漫画 ID
+     * @param videoPath 视频文件路径（HQ 中已存在的文件）
+     * @throws RuntimeException ffmpeg 不可用、超时或异常退出
+     */
+    public void generateCoverFromVideo(Long comicId, Path videoPath) {
+        Path tempDir = Path.of(config.getMangaRoot(), "temp", "cover-video-" + comicId);
+        try {
+            Files.createDirectories(tempDir);
+            Path frameFile = tempDir.resolve("frame.jpg");
+
+            Path ffmpegPath = Path.of(config.getFfmpegPath());
+            if (!ffmpegPath.isAbsolute()) {
+                ffmpegPath = Path.of(System.getProperty("user.dir")).resolve(ffmpegPath);
+            }
+            if (!Files.exists(ffmpegPath)) {
+                throw new RuntimeException("ffmpeg 不可用: " + ffmpegPath);
+            }
+
+            List<String> cmd = List.of(
+                    ffmpegPath.toString(),
+                    "-ss", "2",
+                    "-i", videoPath.toString(),
+                    "-vframes", "1",
+                    "-q:v", "2",
+                    frameFile.toString(),
+                    "-y"
+            );
+
+            log.info("抽取视频封面帧: comicId={}, video={}", comicId, videoPath.getFileName());
+
+            ProcessBuilder pb = new ProcessBuilder(cmd);
+            pb.redirectErrorStream(true);
+            Process proc = pb.start();
+
+            // 消费 stdout 防止管道死锁
+            StringBuilder stdout = new StringBuilder();
+            Thread reader = new Thread(() -> {
+                try (BufferedReader r = new BufferedReader(
+                        new InputStreamReader(proc.getInputStream(), StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = r.readLine()) != null) {
+                        stdout.append(line).append('\n');
+                    }
+                } catch (Exception ignored) {
+                }
+            }, "ffmpeg-stdout-reader");
+            reader.start();
+
+            boolean finished = proc.waitFor(120, TimeUnit.SECONDS);
+            if (!finished) {
+                reader.interrupt();
+                proc.destroyForcibly();
+                throw new RuntimeException("ffmpeg 抽帧超时: comicId=" + comicId);
+            }
+            reader.join(5000);
+
+            int exitCode = proc.exitValue();
+            if (exitCode != 0 || !Files.exists(frameFile) || Files.size(frameFile) == 0) {
+                throw new RuntimeException("ffmpeg 抽帧失败 exitCode=" + exitCode + ", comicId=" + comicId);
+            }
+
+            // 用 generateCover 优化抽出的帧
+            generateCover(comicId, frameFile);
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException("视频封面生成失败: comicId=" + comicId, e);
+        } finally {
+            try {
+                if (Files.exists(tempDir)) {
+                    try (var stream = Files.walk(tempDir)) {
+                        stream.sorted(java.util.Comparator.reverseOrder())
+                                .map(Path::toFile)
+                                .forEach(java.io.File::delete);
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
     @Data
     public static class RunResult {
         private Long comicId;
