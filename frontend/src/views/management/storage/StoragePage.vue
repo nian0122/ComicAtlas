@@ -85,8 +85,8 @@ const {
   pagination,
 } = useStorageFilter(() => store.comicList)
 
-const { selectedIds, hasSelection, count: selectionCount, toggle, selectAll, clear: selectionClear } =
-  useStorageSelection(() => filteredList)
+const { selectedIds, hasSelection, count: selectionCount, clear: selectionClear } =
+  useStorageSelection(() => filteredList.value)
 
 const polling = useStoragePolling(store)
 
@@ -139,15 +139,16 @@ async function handleGenerateLQChapter(chapterId: number) {
 }
 
 async function handleBatchDeleteHQ() {
-  if (selectedIds.length === 0) return
+  if (selectedIds.value.length === 0) return
   try {
-    await ElMessageBox.confirm(`确认删除 ${selectedIds.length} 部漫画的 HQ？`, '批量删除 HQ', { type: 'warning' })
+    await ElMessageBox.confirm(`确认删除 ${selectedIds.value.length} 部漫画的 HQ？`, '批量删除 HQ', { type: 'warning' })
   } catch { return }
-  for (const id of selectedIds) {
+  for (const id of selectedIds.value) {
     try {
       await executeAndPoll({ type: StorageOperationType.DeleteHQ, comicId: id })
-    } catch (err: any) {
-      ElMessage.warning(`ID:${id} — ${err.message}`)
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '未知错误'
+      ElMessage.warning(`ID:${id} — ${message}`)
     }
   }
   ElMessage.success('批量 HQ 删除任务已提交')
@@ -155,15 +156,16 @@ async function handleBatchDeleteHQ() {
 }
 
 async function handleBatchGenerateLQ() {
-  if (selectedIds.length === 0) return
+  if (selectedIds.value.length === 0) return
   try {
-    await ElMessageBox.confirm(`确认为 ${selectedIds.length} 部漫画生成 LQ？`, '批量生成 LQ', { type: 'info' })
+    await ElMessageBox.confirm(`确认为 ${selectedIds.value.length} 部漫画生成 LQ？`, '批量生成 LQ', { type: 'info' })
   } catch { return }
-  for (const id of selectedIds) {
+  for (const id of selectedIds.value) {
     try {
       await executeAndPoll({ type: StorageOperationType.GenerateLQ, comicId: id })
-    } catch (err: any) {
-      ElMessage.warning(`ID:${id} — ${err.message}`)
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '未知错误'
+      ElMessage.warning(`ID:${id} — ${message}`)
     }
   }
   ElMessage.success('批量 LQ 生成任务已提交')

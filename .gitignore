@@ -51,10 +51,14 @@ frontend/.omo/
 *.log
 /logs/
 api-service/logs/
+gateway/logs/
+worker-service/logs/
 
 # Test artifacts
 frontend/test-results/
 
 # tools
 /worker-service/aria2-1.37.0-win-64bit-build1
+worker-service/tools/aria2c/
+worker-service/tools/ffmpeg/
 worker-service/tools/image-optimizer/image-optimizer.exe

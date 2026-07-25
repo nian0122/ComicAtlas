@@ -30,6 +30,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useReaderSettingsStore } from '@/stores/reader-settings-store'
+import { isReaderInteractiveTarget } from '@/views/reading/reader/composables/useReaderGesture'
 import ProgressiveImage from './ProgressiveImage.vue'
 import VideoPlayer from './VideoPlayer.vue'
 import type { MediaItemInfo } from '@/types'
@@ -108,6 +109,7 @@ const pageStyle = computed(() => {
 // 或 deltaY=0)交给原生,防止 deltaY=0 被误判为上一页;页内可滚动方向优先原生滚动;
 // 滚到边界后再滚才翻页(带 300ms 冷却防连翻)。
 function onWheel(e: WheelEvent) {
+  if (isReaderInteractiveTarget(e.target)) return
   if (e.ctrlKey || e.metaKey) return
   if (Math.abs(e.deltaX) >= Math.abs(e.deltaY)) return
   const el = viewportRef.value

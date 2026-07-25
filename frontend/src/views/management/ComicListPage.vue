@@ -2,6 +2,7 @@
   <div class="manage-comic-list-page">
     <header class="page-header">
       <div class="header-left">
+        <p class="page-eyebrow">CATALOG / CONTROL</p>
         <h1 class="page-title">漫画管理</h1>
         <p class="page-subtitle">共 {{ store.total }} 部漫画</p>
       </div>
@@ -104,7 +105,12 @@
             @click.stop
           />
           <div class="comic-cover">
-            <img :src="comic.coverUrl" :alt="comic.title">
+            <img
+              v-if="comic.coverUrl"
+              :src="comic.coverUrl"
+              alt=""
+              @error="hideBrokenImage"
+            >
           </div>
           <div class="comic-info">
             <h3 class="comic-title">{{ comic.title }}</h3>
@@ -155,6 +161,11 @@ const router = useRouter()
 const store = useManagementComicStore()
 const categoryStore = useCategoryStore()
 const tagStore = useTagStore()
+
+function hideBrokenImage(event: Event) {
+  const image = event.currentTarget as HTMLImageElement
+  image.hidden = true
+}
 
 const STATUS_LABELS: Record<string, string> = {
   READY: '已就绪',
@@ -279,7 +290,7 @@ onMounted(() => {
 
 <style scoped>
 .manage-comic-list-page {
-  max-width: 960px;
+  max-width: 1120px;
   margin: 0 auto;
 }
 
@@ -298,8 +309,16 @@ onMounted(() => {
   gap: var(--space-xs);
 }
 
+.page-eyebrow {
+  margin-bottom: var(--space-1);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
 .page-title {
-  font-size: 28px;
+  font-size: var(--text-page);
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
@@ -376,40 +395,60 @@ onMounted(() => {
 .comic-grid {
   display: flex;
   flex-direction: column;
-  gap: var(--space-base);
+  gap: var(--space-2);
   margin-bottom: var(--space-xl);
 }
 
 .comic-row {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-base);
-  padding: var(--space-base);
-  background: var(--bg-surface);
+  min-height: 76px;
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: background-color var(--transition-fast);
 }
 
 .comic-row:hover {
-  background: var(--bg-secondary);
+  background: var(--bg-surface);
+  box-shadow: inset 2px 0 var(--accent);
 }
 
 .comic-cover {
-  width: 56px;
-  height: 84px;
+  position: relative;
+  width: 40px;
+  height: 60px;
   flex-shrink: 0;
   border-radius: var(--radius-sm);
   overflow: hidden;
   background: var(--bg-secondary);
 }
 
+.comic-cover::before {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  content: "CA";
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 800;
+}
+
 .comic-cover img {
+  position: relative;
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+.comic-cover img[hidden] {
+  display: none;
 }
 
 .comic-info {
@@ -422,9 +461,12 @@ onMounted(() => {
   font-weight: 600;
   color: var(--text-primary);
   margin: 0 0 var(--space-xs);
+  display: -webkit-box;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-break: strict;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .comic-meta {
@@ -442,10 +484,11 @@ onMounted(() => {
 }
 
 .action-btn {
-  padding: 6px 14px;
-  background: transparent;
-  color: var(--accent);
-  border: 1px solid var(--accent);
+  min-height: 36px;
+  padding: 6px 12px;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
   font-size: 13px;
   font-weight: 600;
@@ -454,7 +497,8 @@ onMounted(() => {
 }
 
 .action-btn:hover {
-  background: var(--accent);
+  border-color: var(--text-muted);
+  background: var(--surface-highlight);
   color: var(--text-primary);
 }
 

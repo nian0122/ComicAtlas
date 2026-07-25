@@ -12,34 +12,37 @@ services:
     volumes:
       - mysql-data:/var/lib/mysql
 
-  redis:
-    image: redis:7-alpine
-    container_name: comicatlas-redis
-    restart: unless-stopped
-    ports:
-      - "6380:6379"
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: comicatlas-redis
+  #   restart: unless-stopped
+  #   ports:
+  #     - "6379:6379"
 
-  rabbitmq:
-    image: rabbitmq:3.13-management-alpine
-    container_name: comicatlas-rabbitmq
-    restart: unless-stopped
-    environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
-    ports:
-      - "15673:5672"
-      - "15672:15672"
+  # rabbitmq:
+  #   image: rabbitmq:3.13-management-alpine
+  #   container_name: comicatlas-rabbitmq
+  #   restart: unless-stopped
+  #   environment:
+  #     RABBITMQ_DEFAULT_USER: guest
+  #     RABBITMQ_DEFAULT_PASS: guest
+  #     RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-rabbit consumer_timeout 86400000"
+  #   ports:
+  #     - "5672:5672"
+  #     - "15672:15672"
 
-  nacos:
-    image: nacos/nacos-server:v2.3.1
-    container_name: comicatlas-nacos
-    restart: unless-stopped
-    environment:
-      MODE: standalone
-    ports:
-      - "8848:8848"
-      - "9848:9848"
+  # nacos:
+  #   image: nacos/nacos-server:v2.3.1
+  #   container_name: comicatlas-nacos
+  #   restart: unless-stopped
+  #   environment:
+  #     MODE: standalone
+  #     NACOS_AUTH_ENABLE: "false"
+  #   ports:
+  #     - "8848:8848"
+  #     - "9848:9848"
 
+  # 远端中间件(redis/rabbitmq/nacos)通过 SSH 隧道访问，Gateway 连 host.docker.internal
   gateway:
     build:
       context: .
@@ -49,57 +52,57 @@ services:
     ports:
       - "8000:8000"
     environment:
-      NACOS_ADDR: nacos:8848
-    depends_on:
-      - nacos
+      NACOS_ADDR: host.docker.internal:8848
+      NACOS_USER: ${REMOTE_NACOS_USERNAME}
+      NACOS_PASS: ${REMOTE_NACOS_PASSWORD}
 
-  api-service:
-    build:
-      context: .
-      dockerfile: api-service/Dockerfile
-    container_name: comicatlas-api
-    restart: unless-stopped
-    environment:
-      NACOS_ADDR: nacos:8848
-      MYSQL_HOST: mysql
-      REDIS_HOST: redis
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: 5672
-      MANGA_ROOT: /storage
-    volumes:
-      - ${MANGA_ROOT:-./manga}/metadata:/storage/metadata:ro
-      - ${MANGA_ROOT:-./manga}/hq:/storage/hq:ro
-      - ${MANGA_ROOT:-./manga}/lq:/storage/lq:ro
-      - ${MANGA_ROOT:-./manga}/thumbs:/storage/thumbs:ro
-    depends_on:
-      - mysql
-      - redis
-      - rabbitmq
-      - nacos
+  # api-service:
+  #   build:
+  #     context: .
+  #     dockerfile: api-service/Dockerfile
+  #   container_name: comicatlas-api
+  #   restart: unless-stopped
+  #   environment:
+  #     NACOS_ADDR: nacos:8848
+  #     MYSQL_HOST: mysql
+  #     REDIS_HOST: redis
+  #     RABBITMQ_HOST: rabbitmq
+  #     RABBITMQ_PORT: 5672
+  #     MANGA_ROOT: /storage
+  #   volumes:
+  #     - ${MANGA_ROOT:-./manga}/metadata:/storage/metadata:ro
+  #     - ${MANGA_ROOT:-./manga}/hq:/storage/hq:ro
+  #     - ${MANGA_ROOT:-./manga}/lq:/storage/lq:ro
+  #     - ${MANGA_ROOT:-./manga}/thumbs:/storage/thumbs:ro
+  #   depends_on:
+  #     - mysql
+  #     - redis
+  #     - rabbitmq
+  #     - nacos
 
-  worker-service:
-    build:
-      context: .
-      dockerfile: worker-service/Dockerfile
-    container_name: comicatlas-worker
-    restart: unless-stopped
-    environment:
-      NACOS_ADDR: nacos:8848
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: 5672
-      MYSQL_HOST: mysql
-      MANGA_ROOT: /storage
-      WORKER_HOST_MANGA_ROOT: ${MANGA_ROOT:-./manga}
-      WORKER_CONTAINER_MANGA_ROOT: /storage
-    volumes:
-      - ${MANGA_ROOT:-./manga}/hq:/storage/hq
-      - ${MANGA_ROOT:-./manga}/lq:/storage/lq
-      - ${MANGA_ROOT:-./manga}/thumbs:/storage/thumbs
-      - ${MANGA_ROOT:-./manga}/temp:/storage/temp
-      - ${MANGA_ROOT:-./manga}/metadata:/storage/metadata
-    depends_on:
-      - rabbitmq
-      - nacos
+  # worker-service:
+  #   build:
+  #     context: .
+  #     dockerfile: worker-service/Dockerfile
+  #   container_name: comicatlas-worker
+  #   restart: unless-stopped
+  #   environment:
+  #     NACOS_ADDR: nacos:8848
+  #     RABBITMQ_HOST: rabbitmq
+  #     RABBITMQ_PORT: 5672
+  #     MYSQL_HOST: mysql
+  #     MANGA_ROOT: /storage
+  #     WORKER_HOST_MANGA_ROOT: ${MANGA_ROOT:-./manga}
+  #     WORKER_CONTAINER_MANGA_ROOT: /storage
+  #   volumes:
+  #     - ${MANGA_ROOT:-./manga}/hq:/storage/hq
+  #     - ${MANGA_ROOT:-./manga}/lq:/storage/lq
+  #     - ${MANGA_ROOT:-./manga}/thumbs:/storage/thumbs
+  #     - ${MANGA_ROOT:-./manga}/temp:/storage/temp
+  #     - ${MANGA_ROOT:-./manga}/metadata:/storage/metadata
+  #   depends_on:
+  #     - rabbitmq
+  #     - nacos
 
   nginx:
     build: ./frontend

@@ -111,6 +111,59 @@ export const adminApi = {
     keyword?: string
   }) => api.get('/admin/storage/comics', { params }),
   storageChapters: (comicId: number) => api.get(`/admin/storage/comics/${comicId}/chapters`),
+  dlqQueues: (credentials: DlqCredentials) =>
+    api.get<readonly DlqQueueVO[]>('/admin/dlq/queues', { auth: credentials }),
+  dlqMessages: (queueName: string, credentials: DlqCredentials, count = 20) =>
+    api.get<readonly DlqMessageVO[]>(
+      `/admin/dlq/queues/${encodeURIComponent(queueName)}/messages`,
+      { auth: credentials, params: { count } },
+    ),
+  dlqReplay: (queueName: string, credentials: DlqCredentials, maxMessages = 100) =>
+    api.post<DlqReplayResult>(
+      `/admin/dlq/queues/${encodeURIComponent(queueName)}/replay`,
+      undefined,
+      { auth: credentials, params: { maxMessages } },
+    ),
+  dlqPurge: (queueName: string, credentials: DlqCredentials) =>
+    api.delete<DlqPurgeResult>(
+      `/admin/dlq/queues/${encodeURIComponent(queueName)}/messages`,
+      { auth: credentials },
+    ),
+}
+
+export interface DlqQueueVO {
+  readonly name: string
+  readonly exchange: string
+  readonly routingKey: string
+  readonly originalQueue: string
+  readonly messages: number
+  readonly consumers: number
+}
+
+export interface DlqCredentials {
+  readonly username: string
+  readonly password: string
+}
+
+export interface DlqMessageVO {
+  readonly payload: string
+  readonly payloadEncoding: 'string' | 'base64'
+  readonly properties: Readonly<Record<string, unknown>>
+  readonly messagesRemaining: number
+}
+
+export interface DlqReplayResult {
+  readonly queue: string
+  readonly attempted: number
+  readonly replayed: number
+  readonly remaining: number
+  readonly completed: boolean
+  readonly error: string | null
+}
+
+export interface DlqPurgeResult {
+  readonly queue: string
+  readonly purged: number
 }
 
 export const settingsApi = {

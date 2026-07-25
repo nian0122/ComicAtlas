@@ -1,6 +1,7 @@
 package com.comicatlas.api.common.exception;
 
 import com.comicatlas.api.common.Result;
+import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -30,6 +31,16 @@ public class GlobalExceptionHandler {
                 .findFirst()
                 .orElse("验证失败");
         log.warn("验证异常: {}", message);
+        return Result.fail(400, message);
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public Result<?> handleConstraintViolation(ConstraintViolationException e) {
+        String message = e.getConstraintViolations().stream()
+                .map(violation -> violation.getPropertyPath() + ": " + violation.getMessage())
+                .findFirst()
+                .orElse("验证失败");
+        log.warn("参数验证异常: {}", message);
         return Result.fail(400, message);
     }
 

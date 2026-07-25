@@ -1,7 +1,11 @@
 <template>
   <div class="comic-list-page">
     <header class="page-header">
-      <h1 class="page-title">漫画库</h1>
+      <div class="title-block">
+        <p class="page-eyebrow">ARCHIVE / LIBRARY</p>
+        <h1 class="page-title">漫画库</h1>
+        <p class="page-count">当前收录 {{ store.total }} 部作品</p>
+      </div>
       <div class="toolbar">
         <!-- 移动端第一行：搜索 + 排序合并为一行；桌面端 display:contents 平铺回单行布局 -->
         <div class="toolbar-main">
@@ -11,6 +15,7 @@
               v-model="keyword"
               type="text"
               placeholder="搜索漫画..."
+              aria-label="搜索漫画"
               @input="onKeywordInput"
               @keyup.enter="onSearch"
             >
@@ -18,7 +23,7 @@
           </div>
 
           <div class="filter-select sort-select">
-            <select v-model="sort" @change="onSearch">
+            <select v-model="sort" aria-label="排序方式" @change="onSearch">
               <option value="createdAt">最新添加</option>
               <option value="updatedAt">最近更新</option>
               <option value="title">标题</option>
@@ -31,7 +36,7 @@
         <!-- 移动端第二行：筛选 chips 横向滚动 -->
         <div class="toolbar-filters">
           <div class="filter-select category-select">
-            <select v-model="categoryFilter" @change="onSearch">
+            <select v-model="categoryFilter" aria-label="漫画分类" @change="onSearch">
               <option value="">全部分类</option>
               <option value="_NONE">未分类</option>
               <option v-for="c in allCategories" :key="c.id" :value="c.name">{{ c.name }}</option>
@@ -58,7 +63,7 @@
           </div>
 
           <div class="filter-select tag-mode-filter">
-            <select v-model="tagMode" @change="onSearch">
+            <select v-model="tagMode" aria-label="标签匹配方式" @change="onSearch">
               <option value="OR">任一标签</option>
               <option value="AND">全部标签</option>
             </select>
@@ -225,7 +230,7 @@ onMounted(() => {
 
 <style scoped>
 .comic-list-page {
-  max-width: var(--page-width);
+  max-width: var(--content-max);
   margin: 0 auto;
 }
 
@@ -233,18 +238,36 @@ onMounted(() => {
   position: sticky;
   top: var(--nav-height);
   z-index: 50;
-  padding: var(--space-lg) 0 var(--space-base);
-  margin-bottom: var(--space-base);
-  background: var(--bg-primary);
+  padding: var(--space-8) 0 var(--space-5);
+  margin-bottom: var(--space-5);
+  background: linear-gradient(to bottom, var(--bg-primary) 86%, transparent);
   border-bottom: 1px solid var(--border);
 }
 
+.title-block {
+  margin-bottom: var(--space-6);
+}
+
+.page-eyebrow {
+  margin-bottom: var(--space-2);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
 .page-title {
-  font-size: 28px;
+  font-size: var(--text-page);
   font-weight: 700;
   color: var(--text-primary);
-  margin: 0 0 var(--space-lg);
+  margin: 0 0 var(--space-1);
   letter-spacing: -0.02em;
+}
+
+.page-count {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
 }
 
 .toolbar {
@@ -261,17 +284,18 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  height: 40px;
+  height: 44px;
   padding: 0 var(--space-base);
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   color: var(--text-primary);
   transition: border-color var(--transition-fast);
 }
 
 .search-input:focus-within {
-  border-color: var(--border-strong);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-bg);
 }
 
 .search-input input {
@@ -298,11 +322,11 @@ onMounted(() => {
 }
 
 .filter-select select {
-  height: 40px;
+  height: 44px;
   padding: 0 var(--space-base);
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   color: var(--text-primary);
   font-size: 14px;
   outline: none;
@@ -322,7 +346,7 @@ onMounted(() => {
   background: var(--bg-surface);
   box-shadow: 0 0 0 1px var(--border) inset;
   border-radius: var(--radius-sm);
-  min-height: 40px;
+  min-height: 44px;
 }
 
 .tag-filter :deep(.el-input__inner) {
@@ -362,17 +386,14 @@ onMounted(() => {
 .comic-grid {
   display: grid;
   gap: var(--poster-gap);
-  grid-template-columns: repeat(auto-fill, minmax(var(--poster-width-md), 1fr));
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(min(var(--poster-width-md), 100%), 1fr)
+  );
 }
 
 .comic-grid :deep(.comic-poster) {
   width: 100%;
-}
-
-@media (min-width: 1025px) {
-  .comic-grid {
-    grid-template-columns: repeat(auto-fill, minmax(var(--poster-width-lg), 1fr));
-  }
 }
 
 .pagination-wrapper {
@@ -431,10 +452,17 @@ onMounted(() => {
 
 /* ===== 移动端（≤768px）===== */
 @media (max-width: 768px) {
-  /* 抵消 ReadingLayout 的 32px 页面留白，移动端收窄为 8px，
-   * 保证 375px 宽度下网格容纳 3 列（110px × 3 + 8px 间距 × 2 = 346px ≤ 359px） */
   .comic-list-page {
-    margin: 0 calc(var(--space-sm) - var(--page-padding));
+    margin: 0;
+  }
+
+  .page-header {
+    top: var(--nav-height);
+    padding-top: var(--space-5);
+  }
+
+  .title-block {
+    margin-bottom: var(--space-4);
   }
 
   .toolbar {
@@ -476,10 +504,9 @@ onMounted(() => {
     flex: 0 0 auto;
   }
 
-  /* 最小宽度驱动的自适应网格（设计稿 §5）：375px 宽度下呈现 3 列 */
   .comic-grid {
-    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-    gap: var(--space-sm);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-4) var(--space-3);
   }
 }
 </style>

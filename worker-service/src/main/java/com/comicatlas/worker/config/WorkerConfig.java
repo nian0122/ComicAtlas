@@ -27,6 +27,7 @@ public class WorkerConfig {
     private int lqQuality = 15;
     private int lqWorkers = 0;
     private int hqDeleteTimeoutSeconds = 60;
+    private boolean ffprobeEnabled = true;
     private Map<String, String> storageRoots = new LinkedHashMap<>();
     private String hostMangaRoot;
     private String containerMangaRoot = "/storage";

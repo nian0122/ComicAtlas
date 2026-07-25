@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { reactive } from 'vue'
+import { Collection } from '@element-plus/icons-vue'
 import type { ComicStorageItem } from '@/types'
 import StorageStatusTag from './StorageStatusTag.vue'
 
@@ -23,6 +25,12 @@ const emit = defineEmits<{
   showChapters: [comicId: number]
   pageChange: []
 }>()
+
+const failedCoverIds = reactive(new Set<number>())
+
+function markCoverFailed(comicId: number) {
+  failedCoverIds.add(comicId)
+}
 
 function formatSize(bytes: number): string {
   if (!bytes || bytes < 0) return '0 B'
@@ -56,7 +64,17 @@ function rowClassName({ row }: { row: ComicStorageItem }) {
     <el-table-column type="selection" width="40" />
     <el-table-column label="封面" width="70">
       <template #default="{ row }">
-        <img :src="row.coverUrl || '/placeholder-cover.png'" class="cover-thumb" loading="lazy" alt="" />
+        <img
+          v-if="row.coverUrl && !failedCoverIds.has(row.comicId)"
+          :src="row.coverUrl"
+          class="cover-thumb"
+          loading="lazy"
+          alt=""
+          @error="markCoverFailed(row.comicId)"
+        >
+        <div v-else class="cover-placeholder" aria-label="暂无封面">
+          <el-icon :size="20"><Collection /></el-icon>
+        </div>
       </template>
     </el-table-column>
     <el-table-column prop="title" label="标题" min-width="150" show-overflow-tooltip />
@@ -101,6 +119,18 @@ function rowClassName({ row }: { row: ComicStorageItem }) {
   object-fit: cover;
   border-radius: var(--radius-sm);
   background: var(--bg-secondary);
+}
+
+.cover-placeholder {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 64px;
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-muted);
 }
 
 .pagination-bar {

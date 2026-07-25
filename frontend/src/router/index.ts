@@ -93,6 +93,11 @@ const router = createRouter({
           component: () => import('@/views/management/MetadataPage.vue'),
         },
         {
+          path: 'dlq',
+          name: 'manage-dlq',
+          component: () => import('@/views/management/DeadLetterPage.vue'),
+        },
+        {
           path: 'settings',
           name: 'manage-settings',
           component: () => import('@/views/management/SettingsPage.vue'),

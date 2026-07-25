@@ -1,11 +1,23 @@
 # ComicAtlas - 开发环境启动
 Write-Host "=== ComicAtlas 开发环境 ===" -ForegroundColor Cyan
 
-docker compose up -d
-docker stop comicatlas-worker comicatlas-api 2>$null
+# 从 .env 加载远端中间件凭证
+$envFile = Join-Path $PSScriptRoot ".env"
+if (Test-Path $envFile) {
+    Get-Content $envFile | Where-Object { $_ -match '^\s*([^#].+?)\s*=\s*(.+)$' } | ForEach-Object {
+        $key, $val = $Matches[1], $Matches[2]
+        [Environment]::SetEnvironmentVariable($key, $val, "Process")
+    }
+}
 
-Start-Process pwsh -WorkingDirectory "$PSScriptRoot\worker-service" -ArgumentList "-NoExit", "-Command", "mvn clean spring-boot:run"
-Start-Process pwsh -WorkingDirectory "$PSScriptRoot\api-service" -ArgumentList "-NoExit", "-Command", "mvn clean spring-boot:run"
+# 映射 .env 变量到 app 期望的变量名
+$env:RABBITMQ_USER = $env:REMOTE_RABBITMQ_USER
+$env:RABBITMQ_PASS = $env:REMOTE_RABBITMQ_PASSWORD
+$env:NACOS_USER    = $env:REMOTE_NACOS_USERNAME
+$env:NACOS_PASS    = $env:REMOTE_NACOS_PASSWORD
+$env:REDIS_PASS    = $env:REMOTE_REDIS_PASSWORD
 
+Start-Process pwsh -WorkingDirectory "$PSScriptRoot\worker-service" -ArgumentList "-NoExit", "-Command", "`$env:RABBITMQ_USER='$env:RABBITMQ_USER'; `$env:RABBITMQ_PASS='$env:RABBITMQ_PASS'; `$env:NACOS_USER='$env:NACOS_USER'; `$env:NACOS_PASS='$env:NACOS_PASS'; mvn clean spring-boot:run"
+Start-Process pwsh -WorkingDirectory "$PSScriptRoot\api-service" -ArgumentList "-NoExit", "-Command", "`$env:RABBITMQ_USER='$env:RABBITMQ_USER'; `$env:RABBITMQ_PASS='$env:RABBITMQ_PASS'; `$env:NACOS_USER='$env:NACOS_USER'; `$env:NACOS_PASS='$env:NACOS_PASS'; `$env:REDIS_PASS='$env:REDIS_PASS'; mvn clean spring-boot:run"
 
-Write-Host "Worker 已在本地启动，可直接导入任意路径的漫画。"
+Write-Host "Worker / API 已在独立窗口启动" -ForegroundColor Green

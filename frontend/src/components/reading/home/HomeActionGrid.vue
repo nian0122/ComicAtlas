@@ -2,6 +2,7 @@
   <section class="home-actions">
     <div class="actions-inner">
       <router-link to="/library" class="action-card hover-lift">
+        <span class="action-index" aria-hidden="true">01</span>
         <div class="action-icon action-icon--library">
           <el-icon :size="28"><Collection /></el-icon>
         </div>
@@ -13,6 +14,7 @@
       </router-link>
 
       <router-link to="/manage/import" class="action-card hover-lift">
+        <span class="action-index" aria-hidden="true">02</span>
         <div class="action-icon action-icon--import">
           <el-icon :size="28"><Download /></el-icon>
         </div>
@@ -24,6 +26,7 @@
       </router-link>
 
       <router-link to="/history" class="action-card hover-lift">
+        <span class="action-index" aria-hidden="true">03</span>
         <div class="action-icon action-icon--history">
           <el-icon :size="28"><Clock /></el-icon>
         </div>
@@ -43,56 +46,76 @@ import { Collection, Download, Clock, ArrowRight } from '@element-plus/icons-vue
 
 <style scoped>
 .home-actions {
-  margin-top: var(--space-2xl);
-  padding: 0 var(--page-padding);
+  margin-top: var(--space-12);
 }
 
 .actions-inner {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-base);
-  max-width: var(--page-width);
+  width: min(100%, var(--content-max));
+  border-block: 1px solid var(--border);
   margin: 0 auto;
 }
 
 .action-card {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: var(--space-base);
-  padding: var(--space-lg);
-  background: var(--bg-surface);
-  border-radius: var(--card-radius);
+  gap: var(--space-4);
+  min-width: 0;
+  min-height: 112px;
+  padding: var(--space-5);
+  border-right: 1px solid var(--border);
+  background: transparent;
   color: var(--text-primary);
   text-decoration: none;
   transition:
     background-color var(--transition-fast),
-    transform var(--transition-normal),
-    box-shadow var(--transition-normal);
+    transform var(--transition-fast);
+}
+
+.action-card:last-child {
+  border-right: 0;
 }
 
 .action-card:hover {
   background: var(--bg-secondary);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+.action-index {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-3);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
 }
 
 .action-icon {
   flex-shrink: 0;
-  width: 52px;
-  height: 52px;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-md);
   background: var(--accent-bg);
   color: var(--accent);
 }
 
 .action-icon--import {
-  background: rgba(70, 211, 105, 0.12);
+  border-color: var(--success);
+  background: var(--bg-surface);
   color: var(--success);
 }
 
 .action-icon--history {
-  background: rgba(179, 179, 179, 0.12);
+  border-color: var(--border-strong);
+  background: var(--bg-surface);
   color: var(--text-secondary);
 }
 
@@ -102,7 +125,8 @@ import { Collection, Download, Clock, ArrowRight } from '@element-plus/icons-vue
 }
 
 .action-title {
-  margin: 0 0 var(--space-xs);
+  margin: 0 0 var(--space-1);
+  font-family: var(--font-editorial);
   font-size: 16px;
   font-weight: 700;
 }
@@ -126,6 +150,13 @@ import { Collection, Download, Clock, ArrowRight } from '@element-plus/icons-vue
 @media (max-width: 768px) {
   .actions-inner {
     grid-template-columns: 1fr;
+    border-bottom: 0;
+  }
+
+  .action-card {
+    min-height: 92px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
   }
 }
 </style>

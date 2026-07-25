@@ -66,6 +66,9 @@ public class MediaAnalyzer {
     }
 
     private ComicMetadata.MediaInfo analyzeVideo(Path file, String name, String ext, long size) {
+        if (!workerConfig.isFfprobeEnabled()) {
+            return videoFallback(name, ext, size, "disabled");
+        }
         String ffprobe = workerConfig.getFfprobePath();
         if (!isFfprobeAvailable(ffprobe)) {
             log.debug("ffprobe 不可用 (path='{}'), 视频 {} 标记为 VIDEO 元数据为 null", ffprobe, name);

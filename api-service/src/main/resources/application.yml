@@ -8,6 +8,8 @@ spring:
     nacos:
       discovery:
         server-addr: ${NACOS_ADDR:localhost:8848}
+        username: ${NACOS_USER:nacos}
+        password: ${NACOS_PASS:nacos}
       config:
         import-check:
           enabled: false
@@ -22,9 +24,10 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASS:}
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
-    port: ${RABBITMQ_PORT:15673}
+    port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USER:guest}
     password: ${RABBITMQ_PASS:guest}
     publisher-confirm-type: correlated

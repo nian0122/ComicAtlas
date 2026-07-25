@@ -41,6 +41,10 @@ public class DirectoryImportHandler {
         Path importRoot = tree.path();
         for (var ch : metadata.chapters()) {
             for (var page : ch.pages()) {
+                if (cancelHandler.isCancelled(taskId)) {
+                    log.info("Task cancelled during file copy: taskId={}", taskId);
+                    throw new RuntimeException("Task cancelled: " + taskId);
+                }
                 Path src = importRoot.resolve(ch.sourceDir()).resolve(page.fileName());
                 if (!Files.exists(src)) src = importRoot.resolve(page.fileName());
                 if (Files.exists(src) && page.fileSize() > 0) {
