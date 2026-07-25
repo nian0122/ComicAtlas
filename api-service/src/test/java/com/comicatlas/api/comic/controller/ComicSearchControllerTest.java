@@ -6,6 +6,7 @@ import com.comicatlas.api.comic.dto.ComicListQuery;
 import com.comicatlas.api.comic.dto.ComicListVO;
 import com.comicatlas.api.comic.service.ComicService;
 import com.comicatlas.api.common.exception.GlobalExceptionHandler;
+import com.comicatlas.api.config.DlqSecurityConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,7 +24,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(ComicController.class)
-@Import(GlobalExceptionHandler.class)
+@Import({DlqSecurityConfig.class, GlobalExceptionHandler.class})
 class ComicSearchControllerTest {
 
     @Autowired

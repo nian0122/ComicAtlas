@@ -2,12 +2,18 @@
   <div class="video-player" :style="containerStyle">
     <video
       v-if="!error"
+      ref="videoRef"
       class="video-element"
       :src="hqUrl"
       :width="width"
       :height="height"
       controls
+      playsinline
       preload="metadata"
+      data-reader-interactive
+      @play="onPlay"
+      @pause="onPause"
+      @ended="onPause"
       @error="onError"
     />
     <div v-else class="video-error">
@@ -23,22 +29,28 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { VideoPlay } from '@element-plus/icons-vue'
+import {
+  activateVideo,
+  releaseVideo,
+} from '@/views/reading/reader/videoPlaybackCoordinator'
 
 interface Props {
-  hqUrl: string
-  mediaType: string
-  width?: number
-  height?: number
-  duration?: number
-  container?: string
-  videoCodec?: string
-  audioCodec?: string
+  readonly hqUrl: string
+  readonly mediaType: string
+  readonly width?: number
+  readonly height?: number
+  readonly duration?: number
+  readonly container?: string
+  readonly videoCodec?: string
+  readonly audioCodec?: string
 }
 
 const props = defineProps<Props>()
 const error = ref(false)
+const videoRef = ref<HTMLVideoElement | null>(null)
+let visibilityObserver: IntersectionObserver | null = null
 
 const aspectRatio = computed(() => {
   if (props.width && props.height && props.height > 0) {
@@ -58,6 +70,41 @@ const hasCodecInfo = computed(() => !!(props.container || props.videoCodec || pr
 function onError(): void {
   error.value = true
 }
+
+function onPlay(event: Event): void {
+  if (!(event.currentTarget instanceof HTMLVideoElement)) return
+  activateVideo(event.currentTarget)
+}
+
+function onPause(event: Event): void {
+  if (event.currentTarget instanceof HTMLVideoElement) releaseVideo(event.currentTarget)
+}
+
+onMounted(() => {
+  const video = videoRef.value
+  if (video === null) return
+
+  visibilityObserver = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (entry.target === video && !entry.isIntersecting) {
+          video.pause()
+        }
+      }
+    },
+    { threshold: 0.01 },
+  )
+  visibilityObserver.observe(video)
+})
+
+onBeforeUnmount(() => {
+  visibilityObserver?.disconnect()
+  visibilityObserver = null
+
+  const video = videoRef.value
+  video?.pause()
+  if (video !== null) releaseVideo(video)
+})
 </script>
 
 <style scoped>

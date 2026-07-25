@@ -145,7 +145,10 @@ URL 统一由 `FileUrlResolver.resolve(page)` 生成，不手拼。
 | `MANGA_ROOT` | `D:/manga` | 存储根目录，Worker 写 / Nginx 读 |
 | `PROXY_HOST` | `127.0.0.1` | HTTP 代理 |
 | `PROXY_PORT` | `7897` | HTTP 代理端口 |
-| `ARIA2C_PATH` | `worker-service/aria2-.../aria2c.exe` | aria2c 路径 |
+| `ARIA2C_PATH` | `tools/aria2c/aria2c.exe` | aria2c 路径 |
+| `FFMPEG_PATH` | `tools/ffmpeg/ffmpeg.exe` | ffmpeg 路径（视频封面抽取） |
+| `FFPROBE_PATH` | `tools/ffmpeg/ffprobe.exe` | ffprobe 路径（视频元数据提取） |
+| `IMAGE_OPTIMIZER_PATH` | `tools/image-optimizer/image-optimizer.exe` | LQ 图片优化工具路径 |
 
 ## DB SCHEMA 要点
 - `catalog` 表：comic_id, parent_id, title, sort_order（可选目录树）

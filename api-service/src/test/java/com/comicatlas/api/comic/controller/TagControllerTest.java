@@ -4,6 +4,7 @@ import com.comicatlas.api.comic.dto.TagDTO;
 import com.comicatlas.api.comic.service.TagService;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.common.exception.GlobalExceptionHandler;
+import com.comicatlas.api.config.DlqSecurityConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,7 +22,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(TagController.class)
-@Import(GlobalExceptionHandler.class)
+@Import({DlqSecurityConfig.class, GlobalExceptionHandler.class})
 class TagControllerTest {
 
     @Autowired

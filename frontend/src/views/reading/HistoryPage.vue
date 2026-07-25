@@ -2,6 +2,7 @@
   <div class="history-page">
     <header class="page-header">
       <div class="header-left">
+        <p class="page-eyebrow">LEDGER / RECENT</p>
         <h1 class="page-title">阅读中心</h1>
         <p v-if="recentCount > 0" class="page-subtitle">
           最近阅读 {{ recentCount }} 部漫画
@@ -39,7 +40,7 @@
       v-else
       class="history-scroller"
       :items="store.list"
-      :item-size="72"
+      :item-size="88"
       key-field="comicId"
       :buffer="200"
     >
@@ -95,11 +96,10 @@ onMounted(() => {
 
 <style scoped>
 .history-page {
-  height: 100vh;
-  max-width: var(--page-width);
+  height: calc(100dvh - var(--nav-height) - var(--space-10));
+  max-width: var(--content-max);
   margin: 0 auto;
-  padding: var(--space-xl) var(--page-padding) var(--space-lg);
-  background: var(--bg-primary);
+  padding: var(--space-8) 0 var(--space-6);
   color: var(--text-secondary);
   display: flex;
   flex-direction: column;
@@ -121,8 +121,16 @@ onMounted(() => {
   gap: var(--space-xs);
 }
 
+.page-eyebrow {
+  margin-bottom: var(--space-1);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
 .page-title {
-  font-size: 28px;
+  font-size: var(--text-page);
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
@@ -143,20 +151,31 @@ onMounted(() => {
 .history-scroller {
   flex: 1;
   min-height: 0;
+  border-block: 1px solid var(--border);
 }
 
-/* 单行：72px 固定高，与 :item-size 一致 */
+/* 单行：88px 固定高，与 :item-size 一致 */
 .history-item {
-  --history-thumb-height: 60px;
-  --history-thumb-width: 40px; /* 2:3 封面比例 */
+  --history-thumb-height: 72px;
+  --history-thumb-width: 48px;
   display: flex;
   align-items: center;
-  height: 72px;
+  height: 88px;
+  padding-inline: var(--space-3);
   box-sizing: border-box;
   border-bottom: 1px solid var(--border);
+  transition:
+    background-color var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 
-/* 将 ComicPoster 从竖版卡片适配为 72px 横向行，组件本身不改 */
+.history-item:hover,
+.history-item:focus-within {
+  background: var(--bg-secondary);
+  box-shadow: inset 2px 0 var(--accent);
+}
+
+/* 将 ComicPoster 适配为阅读账本行 */
 .history-item :deep(.comic-poster) {
   flex-direction: row;
   align-items: center;
@@ -183,7 +202,26 @@ onMounted(() => {
   min-width: 0;
 }
 
-/* 72px 行内空间不足以容纳悬浮按钮，点击整行即继续阅读 */
+.history-item :deep(.poster-title) {
+  min-height: auto;
+  margin-bottom: var(--space-1);
+  -webkit-line-clamp: 2;
+}
+
+.history-item :deep(.poster-subtitle) {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.history-item :deep(.poster-progress) {
+  height: 3px;
+}
+
+.history-item :deep(.poster-placeholder span:not(.placeholder-spine)) {
+  display: none;
+}
+
+/* 账本行整行点击继续阅读，不在有限高度内显示浮层按钮 */
 .history-item :deep(.poster-overlay) {
   display: none;
 }
@@ -276,11 +314,22 @@ onMounted(() => {
 
 @media (max-width: 640px) {
   .history-page {
-    padding: var(--space-lg) var(--space-base) var(--space-base);
+    height: calc(
+      100dvh - var(--nav-height) - var(--mobile-tabbar-height) - var(--space-8)
+    );
+    padding: var(--space-5) 0 var(--space-4);
   }
 
   .page-title {
-    font-size: 22px;
+    font-size: var(--text-page);
+  }
+
+  .page-header {
+    margin-bottom: var(--space-5);
+  }
+
+  .history-item {
+    padding-inline: 0;
   }
 }
 </style>

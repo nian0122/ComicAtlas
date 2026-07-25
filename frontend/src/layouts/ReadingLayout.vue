@@ -15,12 +15,23 @@ import TopNav from '@/components/layout/TopNav.vue'
 .reading-layout {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  min-height: 100dvh;
   background: var(--bg-primary);
 }
 
 .main-content {
   flex: 1;
-  padding: var(--nav-height) var(--page-padding) var(--page-padding);
+  min-width: 0;
+  padding: var(--nav-height) var(--content-gutter) var(--space-10);
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    padding-right: var(--space-4);
+    padding-bottom: calc(
+      var(--mobile-tabbar-height) + var(--space-8) + env(safe-area-inset-bottom)
+    );
+    padding-left: var(--space-4);
+  }
 }
 </style>

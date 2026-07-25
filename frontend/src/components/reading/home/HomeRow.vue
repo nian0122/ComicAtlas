@@ -147,7 +147,7 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .home-row {
-  margin-top: var(--space-xl);
+  margin-top: var(--space-12);
   color: var(--text-primary);
 }
 
@@ -156,25 +156,37 @@ onBeforeUnmount(() => {
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-base);
-  padding: 0 var(--page-padding);
-  max-width: var(--page-width);
-  margin: 0 auto var(--space-base);
+  width: min(100%, var(--content-max));
+  padding: 0;
+  margin: 0 auto var(--space-3);
 }
 
 .row-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
   margin: 0;
-  font-size: 20px;
+  font-family: var(--font-editorial);
+  font-size: var(--text-section);
   font-weight: 700;
   line-height: 1.2;
+}
+
+.row-title::before {
+  width: 2px;
+  height: 1em;
+  content: "";
+  background: var(--accent);
 }
 
 .row-more {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-xs);
-  font-size: 13px;
+  gap: var(--space-1);
+  min-height: 44px;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
   font-weight: 600;
-  color: var(--text-secondary);
   text-decoration: none;
   transition: color var(--transition-fast);
 }
@@ -186,6 +198,8 @@ onBeforeUnmount(() => {
 .row-track {
   position: relative;
   display: flex;
+  width: min(100%, var(--content-max));
+  margin: 0 auto;
   overflow-x: auto;
   overflow-y: hidden;
   scroll-behavior: smooth;
@@ -201,40 +215,48 @@ onBeforeUnmount(() => {
   display: flex;
   flex-shrink: 0;
   gap: var(--poster-gap);
-  padding: var(--space-md) var(--page-padding);
+  padding: var(--space-3) var(--space-1) var(--space-5);
 }
 
 .row-arrow {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 48px;
+  top: 38%;
+  width: 44px;
+  height: 64px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(20, 20, 20, 0.7);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
   color: var(--text-primary);
-  border: none;
   cursor: pointer;
-  z-index: 10;
-  opacity: 0;
-  transition: opacity var(--transition-fast), background-color var(--transition-fast);
+  z-index: var(--z-sticky);
+  opacity: 0.84;
+  box-shadow: var(--shadow);
+  transform: translateY(-50%);
+  transition:
+    opacity var(--transition-fast),
+    background-color var(--transition-fast),
+    transform var(--transition-fast);
 }
 
-.row-track:hover .row-arrow {
+.row-track:hover .row-arrow,
+.row-track:focus-within .row-arrow {
   opacity: 1;
 }
 
 .row-arrow:hover {
-  background: rgba(20, 20, 20, 0.9);
+  background: var(--surface-highlight);
+  transform: translateY(-50%) scale(1.03);
 }
 
 .row-arrow--left {
-  left: 0;
+  left: var(--space-2);
 }
 
 .row-arrow--right {
-  right: 0;
+  right: var(--space-2);
 }
 
 @media (max-width: 768px) {

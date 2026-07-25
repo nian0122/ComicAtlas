@@ -5,6 +5,7 @@ import com.comicatlas.api.admin.dto.ScanRecoverResultDTO;
 import com.comicatlas.api.admin.service.AdminService;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.common.exception.GlobalExceptionHandler;
+import com.comicatlas.api.config.DlqSecurityConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -19,7 +20,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(AdminController.class)
-@Import(GlobalExceptionHandler.class)
+@Import({DlqSecurityConfig.class, GlobalExceptionHandler.class})
 class AdminControllerTest {
 
     @Autowired

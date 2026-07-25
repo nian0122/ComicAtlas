@@ -10,13 +10,6 @@
     />
 
     <HomeRow
-      v-if="recentReadingItems.length"
-      title="最近阅读"
-      :items="recentReadingItems"
-      more-link="/history"
-    />
-
-    <HomeRow
       v-if="recentlyAddedItems.length"
       title="最近加入"
       :items="recentlyAddedItems"
@@ -62,10 +55,6 @@ const continueReadingItems = computed<HomeRowItem[]>(() =>
   historyStore.list.filter((h) => h.progressPercent > 0 && h.progressPercent < 100).slice(0, 8).map(toHistoryRowItem)
 )
 
-const recentReadingItems = computed<HomeRowItem[]>(() =>
-  historyStore.list.slice(0, 8).map(toHistoryRowItem)
-)
-
 function toComicRowItem(c: ComicListVO): HomeRowItem {
   return {
     id: c.id,
@@ -92,9 +81,8 @@ onMounted(() => {
 
 <style scoped>
 .home-page {
-  min-height: calc(100vh - var(--nav-height));
-  padding-bottom: var(--space-3xl);
-  background: var(--bg-primary);
+  min-height: calc(100dvh - var(--nav-height));
+  padding-bottom: var(--space-16);
   color: var(--text-primary);
 }
 
@@ -105,7 +93,7 @@ onMounted(() => {
 
 /* HomeHero：保持全宽，页面留白从 --page-padding(32px) 收紧到 --space-base(16px) */
 .home-page.is-mobile :deep(.hero-content) {
-  padding: calc(var(--nav-height) + var(--space-lg)) var(--space-base) var(--space-lg);
+  padding: var(--space-5);
 }
 
 /* HomeRow：横向滚动 + scroll-snap，逐张封面吸附 */
@@ -126,22 +114,22 @@ onMounted(() => {
 /* 每张封面：吸附起点对齐；flex-basis 70vw 覆盖固定宽度，max-width 收口到 160px */
 .home-page.is-mobile :deep(.row-items .comic-poster) {
   scroll-snap-align: start;
-  flex: 0 0 70vw;
-  max-width: 160px;
+  flex: 0 0 min(46vw, var(--poster-width-md));
+  max-width: var(--poster-width-md);
 }
 
-/* HomeActionGrid：3 列改 2 列网格，收紧留白，触控目标 ≥ 44px */
+/* HomeActionGrid：移动端保持单列，避免中日文在窄网格内逐字断行 */
 .home-page.is-mobile :deep(.home-actions) {
   padding: 0 var(--space-base);
 }
 
 .home-page.is-mobile :deep(.actions-inner) {
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--space-base);
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
 }
 
 .home-page.is-mobile :deep(.action-card) {
-  min-height: 44px;
-  padding: var(--space-base);
+  min-height: 88px;
+  padding: var(--space-4);
 }
 </style>

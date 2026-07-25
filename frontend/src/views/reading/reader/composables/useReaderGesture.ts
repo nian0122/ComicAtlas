@@ -24,6 +24,24 @@ export interface ReaderGestureControls {
   onSwipe: (handler: (direction: SwipeDirection) => void) => void
 }
 
+const READER_INTERACTIVE_SELECTOR = [
+  'video',
+  'audio',
+  'button',
+  'a[href]',
+  'input',
+  'select',
+  'textarea',
+  '[role="button"]',
+  '[contenteditable]:not([contenteditable="false"])',
+  '[data-reader-interactive]',
+].join(',')
+
+/** 判断事件是否来自需要保留浏览器原生交互的控件。 */
+export function isReaderInteractiveTarget(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest(READER_INTERACTIVE_SELECTOR) !== null
+}
+
 /** tap 判定：按下到抬起的最长毫秒数 */
 const TAP_MAX_DURATION_MS = 300
 /** tap 判定：按下到抬起允许的最大位移（px），滚动拖拽位移超限故天然不会误判为 tap */
@@ -73,6 +91,10 @@ export function useReaderGesture(viewportRef: Ref<HTMLElement | null>): ReaderGe
   const handlePointerDown = (event: PointerEvent): void => {
     // 仅跟踪主指针 + 主键：排除多指触摸的第二根手指与鼠标右键/中键
     if (!event.isPrimary || event.button !== 0) return
+    if (isReaderInteractiveTarget(event.target)) {
+      pressed = null
+      return
+    }
     pressed = {
       pointerId: event.pointerId,
       x: event.clientX,
@@ -82,6 +104,10 @@ export function useReaderGesture(viewportRef: Ref<HTMLElement | null>): ReaderGe
   }
 
   const handlePointerUp = (event: PointerEvent): void => {
+    if (isReaderInteractiveTarget(event.target)) {
+      pressed = null
+      return
+    }
     if (pressed === null || event.pointerId !== pressed.pointerId) return
     const deltaX = event.clientX - pressed.x
     const deltaY = event.clientY - pressed.y

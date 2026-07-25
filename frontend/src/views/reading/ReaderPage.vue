@@ -95,7 +95,10 @@ import ReaderToolbar from '@/views/reading/reader/components/ReaderToolbar.vue'
 import ReaderBottomNav from '@/views/reading/reader/components/ReaderBottomNav.vue'
 import ReaderSettingsDrawer from '@/views/reading/reader/components/ReaderSettingsDrawer.vue'
 import { useInteractionMode } from '@/views/reading/reader/composables/useInteractionMode'
-import { useReaderGesture } from '@/views/reading/reader/composables/useReaderGesture'
+import {
+  isReaderInteractiveTarget,
+  useReaderGesture,
+} from '@/views/reading/reader/composables/useReaderGesture'
 import {
   ReaderAction,
   useReaderToolbar,
@@ -256,6 +259,8 @@ function onPageChange(page: number) {
 }
 
 function onKeydown(e: KeyboardEvent) {
+  if (isReaderInteractiveTarget(e.target)) return
+
   if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
     e.preventDefault()
     if (isPagedMode.value) {
@@ -283,6 +288,7 @@ function onKeydown(e: KeyboardEvent) {
 }
 
 function onWheel(e: WheelEvent) {
+  if (isReaderInteractiveTarget(e.target)) return
   if (e.ctrlKey || e.metaKey) {
     e.preventDefault()
     if (e.deltaY < 0) {
@@ -294,7 +300,8 @@ function onWheel(e: WheelEvent) {
 }
 
 function onDblClick(e: MouseEvent) {
-  const target = e.target as HTMLElement
+  if (isReaderInteractiveTarget(e.target) || !(e.target instanceof Element)) return
+  const target = e.target
   const isViewport = target.closest('.reader-viewport') || target.closest('.paged-viewport')
   const isImage = target.closest('.reader-image-item')
 

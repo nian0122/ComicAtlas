@@ -8,12 +8,14 @@ spring:
     nacos:
       discovery:
         server-addr: ${NACOS_ADDR:localhost:8848}
+        username: ${NACOS_USER:nacos}
+        password: ${NACOS_PASS:nacos}
       config:
         import-check:
           enabled: false
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
-    port: ${RABBITMQ_PORT:15673}
+    port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USER:guest}
     password: ${RABBITMQ_PASS:guest}
     publisher-confirm-type: correlated
@@ -43,13 +45,14 @@ worker:
   manga-root: ${MANGA_ROOT:F:/manga}
   temp-dir: ${MANGA_ROOT:F:/manga}/temp
   metadata-dir: ${MANGA_ROOT:F:/manga}/metadata
-  aria2c-path: ${ARIA2C_PATH:worker-service/aria2-1.37.0-win-64bit-build1/aria2c.exe}
-  ffprobe-path: ${FFPROBE_PATH:worker-service/ffmpeg/ffprobe.exe}
-  ffmpeg-path: ${FFMPEG_PATH:ffmpeg}
+  aria2c-path: ${ARIA2C_PATH:tools/aria2c/aria2c.exe}
+  ffprobe-path: ${FFPROBE_PATH:tools/ffmpeg/ffprobe.exe}
+  ffmpeg-path: ${FFMPEG_PATH:tools/ffmpeg/ffmpeg.exe}
   image-optimizer-path: ${IMAGE_OPTIMIZER_PATH:tools/image-optimizer/image-optimizer.exe}
   lq-quality: ${LQ_QUALITY:15}
   lq-workers: ${LQ_WORKERS:4}
   hq-delete-timeout-seconds: ${HQ_DELETE_TIMEOUT_SECONDS:60}
+  ffprobe-enabled: false
   torrent:
     peer-detect-timeout: 30
     min-speed-threshold: 10240

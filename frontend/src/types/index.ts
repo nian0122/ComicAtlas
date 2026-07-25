@@ -312,10 +312,13 @@ export interface ComicStorageQuery {
 }
 
 /** 存储操作类型 */
-export enum StorageOperationType {
-  DeleteHQ = 'DELETE_HQ',
-  GenerateLQ = 'GENERATE_LQ',
-}
+export const StorageOperationType = {
+  DeleteHQ: 'DELETE_HQ',
+  GenerateLQ: 'GENERATE_LQ',
+} as const
+
+export type StorageOperationType =
+  (typeof StorageOperationType)[keyof typeof StorageOperationType]
 
 /** 存储操作参数 */
 export interface StorageOperation {

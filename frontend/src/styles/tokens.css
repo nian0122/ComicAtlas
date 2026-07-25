@@ -1,58 +1,149 @@
-/* Semantic Design Tokens — Netflix-style ComicAtlas theme
- * Source: docs/superpowers/specs/2026-07-13-netflix-frontend-design.md §6.1
- *
- * Legacy tokens (--bg, --surface, --surface-elevated) are kept as aliases
- * for backward compatibility with existing components.
+/* ComicAtlas — Midnight Index
+ * 设计契约：frontend/DESIGN.md
+ * 本文件是视觉 token 的唯一真源；组件只能消费 token，不得重复定义颜色。
  */
 
 :root {
-  /* Background */
-  --bg-primary: #141414;
-  --bg-secondary: #181818;
-  --bg-surface: #232323;
+  /* 基础色 */
+  --color-canvas: #0e0e0c;
+  --color-surface-1: #151513;
+  --color-surface-2: #1c1c19;
+  --color-surface-3: #25231f;
+  --color-text-1: #f4efe6;
+  --color-text-2: #bcb4a6;
+  --color-text-3: #8a8276;
+  --color-line-subtle: #2b2924;
+  --color-line-strong: #4b463e;
+  --color-brand: #f06a4d;
+  --color-brand-hover: #ff8065;
+  --color-brand-soft: rgb(240 106 77 / 12%);
+  --color-on-brand: #1a0d09;
+  --color-focus: #ffd2c7;
+  --color-success: #66c58b;
+  --color-warning: #d8a54f;
+  --color-danger: #f06b70;
+  --color-info: #70a6d8;
 
-  /* Legacy aliases */
+  /* 语义映射 */
+  --bg-primary: var(--color-canvas);
+  --bg-secondary: var(--color-surface-1);
+  --bg-surface: var(--color-surface-2);
+  --surface-highlight: var(--color-surface-3);
+  --text-primary: var(--color-text-1);
+  --text-secondary: var(--color-text-2);
+  --text-muted: var(--color-text-3);
+  --border: var(--color-line-subtle);
+  --border-strong: var(--color-line-strong);
+  --accent: var(--color-brand);
+  --accent-hover: var(--color-brand-hover);
+  --accent-bg: var(--color-brand-soft);
+  --accent-border: rgb(240 106 77 / 48%);
+  --success: var(--color-success);
+  --warning: var(--color-warning);
+  --danger: var(--color-danger);
+  --info: var(--color-info);
+
+  /* 旧组件兼容映射 */
   --bg: var(--bg-primary);
   --surface: var(--bg-surface);
-  --surface-elevated: #222222;
+  --surface-elevated: var(--surface-highlight);
+  --text-h: var(--text-primary);
+  --text: var(--text-secondary);
 
-  /* Text */
-  --text-primary: #ffffff;
-  --text-secondary: #b3b3b3;
-  --text-muted: #808080;
+  /* 字体 */
+  --font-ui: "Source Han Sans VF", "Noto Sans CJK SC", "Noto Sans JP",
+    "Microsoft YaHei", system-ui, sans-serif;
+  --font-editorial: "Source Han Serif VF", "Noto Serif CJK SC", "Noto Serif JP",
+    "Songti SC", "STSong", serif;
+  --mono: "JetBrains Mono", "Cascadia Code", ui-monospace, monospace;
+  --sans: var(--font-ui);
+  --heading: var(--font-editorial);
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.125rem;
+  --text-section: clamp(1.375rem, 2vw, 1.875rem);
+  --text-page: clamp(1.75rem, 3vw, 2.5rem);
+  --text-hero: clamp(2rem, 4.2vw, 3.75rem);
+  --leading-body: 1.7;
+  --tracking-kicker: 0.14em;
 
-  /* Brand */
-  --accent: #e50914;
-  --accent-hover: #f6121d;
-  --accent-bg: rgba(229, 9, 20, 0.15);
+  /* 间距 */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-xs: var(--space-1);
+  --space-sm: var(--space-2);
+  --space-md: var(--space-3);
+  --space-base: var(--space-4);
+  --space-lg: var(--space-6);
+  --space-xl: var(--space-8);
+  --space-2xl: var(--space-12);
+  --space-3xl: var(--space-16);
+
+  /* 几何与布局 */
+  --radius-xs: 2px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-pill: 999px;
+  --radius: var(--radius-sm);
+  --card-radius: var(--radius-md);
+  --content-max: 1440px;
+  --content-narrow: 420px;
+  --content-gutter: clamp(16px, 3vw, 40px);
+  --control-min-size: 44px;
+  --status-dot-size: 8px;
+  --disabled-opacity: 0.55;
+  --sidebar-width: 216px;
+  --nav-height: 64px;
+  --mobile-tabbar-height: 68px;
+  --page-width: var(--content-max);
+  --page-padding: var(--content-gutter);
+  --poster-width-sm: 136px;
+  --poster-width-md: 176px;
+  --poster-width-lg: 188px;
+  --poster-gap: var(--space-5);
+
+  /* 深度 */
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 28%);
+  --shadow: 0 8px 24px rgb(0 0 0 / 30%);
+  --shadow-lg: 0 16px 48px rgb(0 0 0 / 46%);
+  --shadow-mount:
+    inset 0 0 0 1px rgb(244 239 230 / 10%),
+    0 8px 24px rgb(0 0 0 / 30%);
+  --shadow-overlay: var(--shadow-lg);
+  --card-shadow: var(--shadow-mount);
+  --card-shadow-hover:
+    inset 0 0 0 1px rgb(244 239 230 / 16%),
+    0 14px 32px rgb(0 0 0 / 38%);
+  --card-hover-scale: 1;
+
+  /* 动效 */
+  --motion-fast: 120ms;
+  --motion-standard: 200ms;
+  --motion-emphasis: 320ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --transition-fast: var(--motion-fast) ease-out;
+  --transition-normal: var(--motion-standard) var(--ease-out);
+  --transition-slow: var(--motion-emphasis) var(--ease-out);
+
+  /* 层级 */
+  --z-base: 0;
+  --z-sticky: 20;
+  --z-nav: 40;
+  --z-popover: 60;
+  --z-dialog: 80;
 
   /* Hero */
-  --hero-gradient: linear-gradient(
-    to top,
-    rgba(20, 20, 20, 1) 0%,
-    rgba(20, 20, 20, 0.6) 60%,
-    rgba(20, 20, 20, 0.2) 100%
-  );
-
-  /* Card */
-  --card-radius: 8px;
-  --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-  --card-shadow-hover: 0 16px 32px rgba(0, 0, 0, 0.75);
-  --card-hover-scale: 1.04;
-
-  /* Transition */
-  --transition-fast: 150ms ease;
-  --transition-normal: 250ms ease;
-  --transition-slow: 400ms ease;
-
-  /* Poster */
-  --poster-width-sm: 140px;
-  --poster-width-md: 200px;
-  --poster-width-lg: 240px;
-  --poster-gap: 16px;
-
-  /* Layout */
-  --page-width: 1600px;
-  --page-padding: 32px;
-  --nav-height: 56px;
+  --hero-gradient:
+    linear-gradient(to right, rgb(14 14 12 / 98%) 0%, rgb(14 14 12 / 82%) 48%, rgb(14 14 12 / 28%) 100%),
+    linear-gradient(to top, var(--color-canvas) 0%, transparent 52%);
 }
