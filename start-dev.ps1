@@ -1,7 +1,19 @@
 # ComicAtlas - 开发环境启动
 Write-Host "=== ComicAtlas 开发环境 ===" -ForegroundColor Cyan
 
-# 从 .env 加载远端中间件凭证
+# 1. 启动 SSH 隧道（连接远端中间件）
+$tunnelScript = Join-Path $PSScriptRoot "tools\start-remote-infra-tunnel.ps1"
+if (Test-Path $tunnelScript) {
+    Write-Host "正在建立远端中间件 SSH 隧道..." -ForegroundColor DarkGray
+    & $tunnelScript
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "WARN: SSH 隧道启动失败，Worker 可能无法连接 RabbitMQ/Nacos" -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "WARN: 未找到隧道脚本 tools\start-remote-infra-tunnel.ps1" -ForegroundColor Yellow
+}
+
+# 2. 从 .env 加载远端中间件凭证
 $envFile = Join-Path $PSScriptRoot ".env"
 if (Test-Path $envFile) {
     Get-Content $envFile | Where-Object { $_ -match '^\s*([^#].+?)\s*=\s*(.+)$' } | ForEach-Object {
@@ -10,14 +22,30 @@ if (Test-Path $envFile) {
     }
 }
 
-# 映射 .env 变量到 app 期望的变量名
+# 3. 映射 .env 变量到 app 期望的变量名
+$env:RABBITMQ_HOST = "localhost"
+$env:RABBITMQ_PORT = "5672"
 $env:RABBITMQ_USER = $env:REMOTE_RABBITMQ_USER
 $env:RABBITMQ_PASS = $env:REMOTE_RABBITMQ_PASSWORD
+$env:NACOS_ADDR    = "localhost:8848"
 $env:NACOS_USER    = $env:REMOTE_NACOS_USERNAME
 $env:NACOS_PASS    = $env:REMOTE_NACOS_PASSWORD
 $env:REDIS_PASS    = $env:REMOTE_REDIS_PASSWORD
+$env:MANGA_ROOT    = if ($env:MANGA_ROOT) { $env:MANGA_ROOT } else { "F:/manga" }
 
-Start-Process pwsh -WorkingDirectory "$PSScriptRoot\worker-service" -ArgumentList "-NoExit", "-Command", "`$env:RABBITMQ_USER='$env:RABBITMQ_USER'; `$env:RABBITMQ_PASS='$env:RABBITMQ_PASS'; `$env:NACOS_USER='$env:NACOS_USER'; `$env:NACOS_PASS='$env:NACOS_PASS'; mvn clean spring-boot:run"
-Start-Process pwsh -WorkingDirectory "$PSScriptRoot\api-service" -ArgumentList "-NoExit", "-Command", "`$env:RABBITMQ_USER='$env:RABBITMQ_USER'; `$env:RABBITMQ_PASS='$env:RABBITMQ_PASS'; `$env:NACOS_USER='$env:NACOS_USER'; `$env:NACOS_PASS='$env:NACOS_PASS'; `$env:REDIS_PASS='$env:REDIS_PASS'; mvn clean spring-boot:run"
+# 4. 确保存储目录存在（HQ/LQ/EXPORT/thumb）
+@("$env:MANGA_ROOT/hq", "$env:MANGA_ROOT/lq", "$env:MANGA_ROOT/export", "$env:MANGA_ROOT/thumbs") | ForEach-Object {
+    if (-not (Test-Path $_)) { New-Item -ItemType Directory -Path $_ -Force | Out-Null }
+}
 
-Write-Host "Worker / API 已在独立窗口启动" -ForegroundColor Green
+# 5. 检查 RabbitMQ AMQP 端口是否可达
+$mqTest = Test-NetConnection -ComputerName 127.0.0.1 -Port 5672 -WarningAction SilentlyContinue -InformationLevel Quiet
+if (-not $mqTest) {
+    Write-Host "WARN: RabbitMQ 127.0.0.1:5672 不可达 — SSH 隧道可能未建立" -ForegroundColor Yellow
+}
+
+# 5. 启动 Worker
+Start-Process pwsh -WorkingDirectory "$PSScriptRoot\worker-service" -ArgumentList "-NoExit", "-Command", "`$env:MANGA_ROOT='$env:MANGA_ROOT'; `$env:RABBITMQ_HOST='$env:RABBITMQ_HOST'; `$env:RABBITMQ_PORT='$env:RABBITMQ_PORT'; `$env:RABBITMQ_USER='$env:RABBITMQ_USER'; `$env:RABBITMQ_PASS='$env:RABBITMQ_PASS'; `$env:NACOS_ADDR='$env:NACOS_ADDR'; `$env:NACOS_USER='$env:NACOS_USER'; `$env:NACOS_PASS='$env:NACOS_PASS'; mvn clean spring-boot:run"
+# Start-Process pwsh -WorkingDirectory "$PSScriptRoot\api-service" -ArgumentList "-NoExit", "-Command", "`$env:RABBITMQ_HOST='$env:RABBITMQ_HOST'; `$env:RABBITMQ_PORT='$env:RABBITMQ_PORT'; `$env:RABBITMQ_USER='$env:RABBITMQ_USER'; `$env:RABBITMQ_PASS='$env:RABBITMQ_PASS'; `$env:NACOS_ADDR='$env:NACOS_ADDR'; `$env:NACOS_USER='$env:NACOS_USER'; `$env:NACOS_PASS='$env:NACOS_PASS'; `$env:REDIS_PASS='$env:REDIS_PASS'; mvn clean spring-boot:run"
+
+Write-Host "Worker 已在独立窗口启动" -ForegroundColor Green

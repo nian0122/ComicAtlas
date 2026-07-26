@@ -9,6 +9,7 @@ import com.comicatlas.worker.entity.ExportMedia;
 import com.comicatlas.worker.export.ComicTitleSanitizer;
 import com.comicatlas.worker.export.ExportCollectResult;
 import com.comicatlas.worker.export.ExportCollector;
+import com.comicatlas.worker.export.ExportFileNotFoundException;
 import com.comicatlas.worker.export.ExportFileResolver;
 import com.comicatlas.worker.export.ExportManifest;
 import com.comicatlas.worker.export.ZipBuilder;
@@ -24,6 +25,7 @@ import org.springframework.amqp.support.AmqpHeaders;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -77,7 +79,7 @@ public class ExportTaskHandler {
                 throw new IllegalStateException("EXPORT 存储根未配置或路径不存在");
             }
 
-            String outputFileName = buildOutputFileName(comicId);
+            String outputFileName = buildOutputFileName(comicId, result.comic().getTitle());
             Path outputPath = exportRoot.resolve(outputFileName);
             long outputSize = zipBuilder.build(manifest, outputPath);
 
@@ -142,27 +144,28 @@ public class ExportTaskHandler {
                     .toList();
 
             for (ExportMedia media : sortedMedia) {
-                StorageRef ref = exportFileResolver.resolve(media);
-                Path sourceFile = exportFileResolver.resolveToPath(ref);
-                String fileName = media.getFileName() != null ? media.getFileName()
-                        : String.format("%03d.%s",
-                                media.getPageNumber() != null ? media.getPageNumber() : 0,
-                                getExtension(ref.relativePath()));
-                String targetPath = uniqueDir + "/" + fileName;
-                entries.add(new ExportManifest.Entry(targetPath, sourceFile));
+                try {
+                    StorageRef ref = exportFileResolver.resolve(media);
+                    Path sourceFile = exportFileResolver.resolveToPath(ref);
+                    if (!Files.exists(sourceFile)) {
+                        log.warn("导出跳过缺失文件: comicId={}, mediaId={}, path={}", result.comic().getId(), media.getId(), sourceFile);
+                        continue;
+                    }
+                    String fileName = Path.of(ref.relativePath()).getFileName().toString();
+                    String targetPath = uniqueDir + "/" + fileName;
+                    entries.add(new ExportManifest.Entry(targetPath, sourceFile));
+                } catch (ExportFileNotFoundException e) {
+                    log.warn("导出跳过无可用文件: comicId={}, mediaId={}", result.comic().getId(), media.getId());
+                }
             }
         }
         return new ExportManifest(rootDirName, result.metadataJson(), entries);
     }
 
-    private String getExtension(String path) {
-        int dot = path.lastIndexOf('.');
-        return dot >= 0 ? path.substring(dot + 1) : "jpg";
-    }
-
-    private String buildOutputFileName(Long comicId) {
+    private String buildOutputFileName(Long comicId, String title) {
         String timestamp = LocalDateTime.now().format(TIMESTAMP_FMT);
-        return "comic_" + comicId + "_" + timestamp + ".zip";
+        String safeTitle = ComicTitleSanitizer.sanitize(title);
+        return safeTitle + "_" + comicId + "_" + timestamp + ".zip";
     }
 
     private String classifyExportError(Exception e) {

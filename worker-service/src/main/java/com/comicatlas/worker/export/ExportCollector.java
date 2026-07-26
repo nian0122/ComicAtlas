@@ -46,9 +46,7 @@ public class ExportCollector {
                 new LambdaQueryWrapper<ExportCatalog>().eq(ExportCatalog::getComicId, comicId));
 
         List<Long> chapterIds = chapters.stream().map(ExportChapter::getId).toList();
-        List<ExportMedia> allMedia = chapterIds.isEmpty() ? List.of() : mediaMapper.selectList(
-                new LambdaQueryWrapper<ExportMedia>().in(ExportMedia::getChapterId, chapterIds)
-                        .orderByAsc(ExportMedia::getChapterId, ExportMedia::getPageNumber));
+        List<ExportMedia> allMedia = chapterIds.isEmpty() ? List.of() : mediaMapper.selectByComicId(comicId);
 
         String metadataJson = buildMetadataJson(comic, chapters, catalogs, allMedia);
         return new ExportCollectResult(comic, chapters, catalogs, allMedia, metadataJson);
@@ -95,7 +93,6 @@ public class ExportCollector {
                 List<ExportMedia> mediaList = mediaByChapter.getOrDefault(ch.getId(), List.of());
                 for (ExportMedia m : mediaList) {
                     var mNode = mediaArray.addObject();
-                    mNode.put("fileName", m.getFileName() != null ? m.getFileName() : "");
                     mNode.put("pageNumber", m.getPageNumber() != null ? m.getPageNumber() : 0);
                     mNode.put("hqStatus", m.getHqStatus() != null ? m.getHqStatus() : "");
                     mNode.put("lqStatus", m.getLqStatus() != null ? m.getLqStatus() : "");
