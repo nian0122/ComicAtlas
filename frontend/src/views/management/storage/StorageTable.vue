@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive } from 'vue'
+import { reactive, ref } from 'vue'
 import { Collection } from '@element-plus/icons-vue'
 import type { ComicStorageItem } from '@/types'
 import StorageStatusTag from './StorageStatusTag.vue'
@@ -23,8 +23,15 @@ const emit = defineEmits<{
   generateLq: [comicId: number]
   exportZip: [comicId: number]
   showChapters: [comicId: number]
-  pageChange: []
 }>()
+
+const tableRef = ref<InstanceType<typeof import('element-plus').ElTable> | null>(null)
+
+function clearSelection() {
+  tableRef.value?.clearSelection()
+}
+
+defineExpose({ clearSelection })
 
 const failedCoverIds = reactive(new Set<number>())
 
@@ -55,6 +62,7 @@ function rowClassName({ row }: { row: ComicStorageItem }) {
 
 <template>
   <el-table
+    ref="tableRef"
     v-loading="loading"
     :data="list"
     row-key="comicId"
@@ -108,7 +116,6 @@ function rowClassName({ row }: { row: ComicStorageItem }) {
     :page-size="pageSize"
     @update:current-page="emit('update:currentPage', $event)"
     @update:page-size="emit('update:pageSize', $event)"
-    @change="emit('pageChange')"
   />
 </template>
 

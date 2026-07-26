@@ -27,7 +27,7 @@ spring:
         prefetch: 1
         acknowledge-mode: manual
   datasource:
-    url: jdbc:mysql://${MYSQL_HOST:localhost}:3306/comicatlas?useUnicode=true&characterEncoding=utf8mb4&serverTimezone=Asia/Shanghai
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:3306/comic_atlas?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
     username: root
     password: root
     driver-class-name: com.mysql.cj.jdbc.Driver

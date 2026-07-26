@@ -18,8 +18,6 @@ public class ExportMedia {
 
     private String mediaType;   // IMAGE / VIDEO
 
-    private String fileName;
-
     private String hqRoot;
 
     private String hqPath;

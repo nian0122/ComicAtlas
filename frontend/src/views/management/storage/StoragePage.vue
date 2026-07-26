@@ -23,6 +23,7 @@
     />
 
     <StorageTable
+      ref="tableRef"
       :list="pagedList"
       :total="pagination.total"
       :current-page="page"
@@ -36,8 +37,8 @@
       @update:page-size="pageSize = $event"
       @delete-hq="handleDeleteHQ"
       @generate-lq="handleGenerateLQ"
+      @export-zip="handleExportZip"
       @show-chapters="handleShowChapters"
-      @page-change="store.loadComics()"
     />
 
     <StorageChapterDrawer
@@ -56,14 +57,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useStorageStore } from '@/stores/management/storage'
 import { useStorageFilter } from '@/composables/storage/useStorageFilter'
 import { useStorageSelection } from '@/composables/storage/useStorageSelection'
 import { useStoragePolling } from '@/composables/storage/useStoragePolling'
-import { storageService } from '@/services/storage'
+import { storageService, exportService } from '@/services/storage'
 import { StorageOperationType } from '@/types'
 import type { StorageOperation } from '@/types'
 import StorageSummary from './StorageSummary.vue'
@@ -83,12 +84,14 @@ const {
   filteredList,
   pagedList,
   pagination,
-} = useStorageFilter(() => store.comicList)
+  buildQuery,
+} = useStorageFilter(() => store.comicList, () => store.serverTotal)
 
 const { selectedIds, hasSelection, count: selectionCount, clear: selectionClear } =
   useStorageSelection(() => filteredList.value)
 
 const polling = useStoragePolling(store)
+const tableRef = ref<InstanceType<typeof StorageTable> | null>(null)
 
 const scanning = ref(false)
 const rebuilding = ref(false)
@@ -96,6 +99,16 @@ const highlightedId = ref<number | null>(null)
 const drawerVisible = ref(false)
 const drawerComicId = ref<number | null>(null)
 const drawerTitle = ref('')
+
+function reload() {
+  store.loadComics(buildQuery())
+}
+
+watch(
+  [() => filterState.hqStatus, () => filterState.lqStatus, () => filterState.keyword, sortState, page, pageSize],
+  reload,
+  { deep: true },
+)
 
 async function executeAndPoll(op: StorageOperation) {
   await store.executeOperation(op)
@@ -116,6 +129,16 @@ async function handleGenerateLQ(comicId: number) {
   } catch { return }
   await executeAndPoll({ type: StorageOperationType.GenerateLQ, comicId })
   ElMessage.success('LQ 生成任务已提交')
+}
+
+async function handleExportZip(comicId: number) {
+  try {
+    await exportService.createExport(comicId)
+    ElMessage.success('导出任务已提交，请在导出管理中查看')
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : '导出失败'
+    ElMessage.error(message)
+  }
 }
 
 async function handleDeleteHQChapter(chapterId: number) {
@@ -153,6 +176,7 @@ async function handleBatchDeleteHQ() {
   }
   ElMessage.success('批量 HQ 删除任务已提交')
   selectionClear()
+  tableRef.value?.clearSelection()
 }
 
 async function handleBatchGenerateLQ() {
@@ -170,6 +194,7 @@ async function handleBatchGenerateLQ() {
   }
   ElMessage.success('批量 LQ 生成任务已提交')
   selectionClear()
+  tableRef.value?.clearSelection()
 }
 
 async function handleBatchDeleteDrawerHq(chapterIds: number[]) {
@@ -209,10 +234,11 @@ async function handleScanRecover() {
   try {
     await storageService.scanRecover()
     ElMessage.success('扫描完成')
-    await store.loadComics()
+    reload()
     await store.loadSummary()
-  } catch (err: any) {
-    ElMessage.error(err.message || '扫描失败')
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : '扫描失败'
+    ElMessage.error(message)
   } finally {
     scanning.value = false
   }
@@ -223,17 +249,18 @@ async function handleRebuild() {
   try {
     await storageService.rebuild()
     ElMessage.success('重建完成')
-    await store.loadComics()
+    reload()
     await store.loadSummary()
-  } catch (err: any) {
-    ElMessage.error(err.message || '重建失败')
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : '重建失败'
+    ElMessage.error(message)
   } finally {
     rebuilding.value = false
   }
 }
 
 onMounted(async () => {
-  await store.loadComics()
+  reload()
   await store.loadSummary()
 
   const highlight = route.query.highlight

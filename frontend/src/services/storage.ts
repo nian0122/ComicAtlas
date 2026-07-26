@@ -1,4 +1,4 @@
-import { adminApi, hqApi, lqApi } from '@/services/management'
+import { adminApi, exportApi, hqApi, lqApi } from '@/services/api'
 import type { ComicStorageQuery, StorageOperation } from '@/types'
 import { StorageOperationType } from '@/types'
 
@@ -58,5 +58,11 @@ export const storageService = {
   async rebuild() {
     const res = await adminApi.rebuild()
     return res.data
+  },
+}
+
+export const exportService = {
+  async createExport(comicId: number) {
+    await exportApi.createExport(comicId)
   },
 }

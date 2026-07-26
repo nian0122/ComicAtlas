@@ -33,7 +33,7 @@ public class ExportFileResolver {
         if ("READY".equals(media.getHqStatus())) {
             return new StorageRef(media.getHqRoot(), media.getHqPath());
         }
-        if ("DELETED".equals(media.getHqStatus()) && "READY".equals(media.getLqStatus())) {
+        if ("READY".equals(media.getLqStatus())) {
             return new StorageRef(media.getLqRoot(), media.getLqPath());
         }
         throw new ExportFileNotFoundException("HQ 缺失且 LQ 未就绪：media=" + media.getId() + ", hqStatus=" + media.getHqStatus() + ", lqStatus=" + media.getLqStatus());
