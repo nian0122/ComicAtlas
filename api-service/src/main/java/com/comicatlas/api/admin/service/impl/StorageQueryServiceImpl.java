@@ -5,6 +5,7 @@ import com.comicatlas.api.admin.dto.ComicStorageDTO;
 import com.comicatlas.api.admin.dto.ComicStorageQuery;
 import com.comicatlas.api.admin.mapper.StorageMapper;
 import com.comicatlas.api.admin.service.StorageQueryService;
+import com.comicatlas.api.common.storage.FileUrlResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -17,11 +18,13 @@ import java.util.stream.Collectors;
 public class StorageQueryServiceImpl implements StorageQueryService {
 
     private final StorageMapper storageMapper;
+    private final FileUrlResolver fileUrlResolver;
 
     @Override
     public List<ComicStorageDTO> listComics(ComicStorageQuery query, int page, int size) {
         List<ComicStorageDTO> list = storageMapper.selectComicStorageList(query, (page - 1) * size, size);
         for (ComicStorageDTO dto : list) {
+            dto.setCoverUrl(fileUrlResolver.resolveCover(dto.getComicId()));
             boolean isEmpty = dto.getPageCount() == null || dto.getPageCount() == 0;
             dto.setHqStatus(aggregateHqStatus(dto.getHqStatus(), isEmpty));
             dto.setLqStatus(aggregateLqStatus(dto.getLqStatus(), isEmpty));
