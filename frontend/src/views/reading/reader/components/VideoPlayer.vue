@@ -11,6 +11,7 @@
       playsinline
       preload="metadata"
       data-reader-interactive
+      @loadedmetadata="onMetadata"
       @play="onPlay"
       @pause="onPause"
       @ended="onPause"
@@ -50,25 +51,40 @@ interface Props {
 const props = defineProps<Props>()
 const error = ref(false)
 const videoRef = ref<HTMLVideoElement | null>(null)
+/** 视频原生尺寸（loadedmetadata 后可用），优先于 props 中的宽高 */
+const nativeWidth = ref(0)
+const nativeHeight = ref(0)
 let visibilityObserver: IntersectionObserver | null = null
 
 const aspectRatio = computed(() => {
+  // 优先 props（后端 ffprobe 提取的准确尺寸）
   if (props.width && props.height && props.height > 0) {
     return props.width / props.height
   }
+  // 降级：视频元数据加载后的原生尺寸
+  if (nativeWidth.value && nativeHeight.value) {
+    return nativeWidth.value / nativeHeight.value
+  }
+  // 兜底
   return 16 / 9
 })
 
 const containerStyle = computed(() => ({
   aspectRatio: `${aspectRatio.value}`,
   width: '100%',
-  maxWidth: '100%',
 }))
 
 const hasCodecInfo = computed(() => !!(props.container || props.videoCodec || props.audioCodec))
 
 function onError(): void {
   error.value = true
+}
+
+function onMetadata(event: Event): void {
+  const video = event.currentTarget
+  if (!(video instanceof HTMLVideoElement)) return
+  nativeWidth.value = video.videoWidth
+  nativeHeight.value = video.videoHeight
 }
 
 function onPlay(event: Event): void {

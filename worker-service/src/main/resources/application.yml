@@ -52,7 +52,7 @@ worker:
   lq-quality: ${LQ_QUALITY:15}
   lq-workers: ${LQ_WORKERS:4}
   hq-delete-timeout-seconds: ${HQ_DELETE_TIMEOUT_SECONDS:60}
-  ffprobe-enabled: false
+  ffprobe-enabled: true
   torrent:
     peer-detect-timeout: 30
     min-speed-threshold: 10240
