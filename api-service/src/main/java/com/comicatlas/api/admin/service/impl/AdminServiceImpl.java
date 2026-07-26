@@ -9,6 +9,7 @@ import com.comicatlas.api.admin.dto.StorageStatsDTO;
 import com.comicatlas.api.admin.service.AdminService;
 import com.comicatlas.api.admin.service.MetadataExporter;
 import com.comicatlas.api.comic.entity.*;
+import com.comicatlas.common.event.MetadataRefreshEvent;
 import com.comicatlas.api.comic.mapper.*;
 import com.comicatlas.api.common.RestoreContext;
 import com.comicatlas.api.common.RestorePolicy;
@@ -22,6 +23,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,6 +57,7 @@ public class AdminServiceImpl implements AdminService {
     private final ImportTaskMapper taskMapper;
     private final TransactionTemplate transactionTemplate;
     private final MetadataExporter metadataExporter;
+    private final RabbitTemplate rabbitTemplate;
 
     /** 未结束（活跃）的导入任务状态 */
     private static final Set<String> ACTIVE_STATUSES = Set.of("PENDING", "PARSING", "IMPORTING");
@@ -702,11 +705,12 @@ public class AdminServiceImpl implements AdminService {
 
             int videoFixed = fixVideoMetadata(comicId);
 
-            // Export metadata.json AFTER transaction commit (best-effort)
+            // 通过 MQ 委托 Worker 导出 metadata.json
             try {
-                metadataExporter.export(comicId);
+                rabbitTemplate.convertAndSend("comic.export", "metadata.refresh.requested",
+                        new MetadataRefreshEvent(null, null, comicId));
             } catch (Exception e) {
-                log.error("导出 metadata 失败: comicId={}", comicId, e);
+                log.error("发送 metadata 刷新 MQ 消息失败: comicId={}", comicId, e);
             }
 
             return buildResult(comicId, stats, durationMs);

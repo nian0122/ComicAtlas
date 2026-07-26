@@ -311,6 +311,31 @@ public class RabbitMqConfig {
                 .to(exportDlxExchange()).with("export.failed.result.dlq");
     }
 
+    @Bean
+    public Queue metadataRefreshQueue() {
+        return QueueBuilder.durable("metadata.refresh.queue")
+                .deadLetterExchange("comic.export.dlx")
+                .deadLetterRoutingKey("metadata.refresh.dlq")
+                .build();
+    }
+
+    @Bean
+    public Queue metadataRefreshDlq() {
+        return QueueBuilder.durable("metadata.refresh.dlq").build();
+    }
+
+    @Bean
+    public Binding metadataRefreshBinding() {
+        return BindingBuilder.bind(metadataRefreshQueue())
+                .to(exportExchange()).with("metadata.refresh.requested");
+    }
+
+    @Bean
+    public Binding metadataRefreshDlqBinding() {
+        return BindingBuilder.bind(metadataRefreshDlq())
+                .to(exportDlxExchange()).with("metadata.refresh.dlq");
+    }
+
     // ==================== comic.video 视频转码结果 ====================
 
     @Bean
