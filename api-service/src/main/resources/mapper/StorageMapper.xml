@@ -7,7 +7,7 @@
             SELECT
                 c.id as comic_id,
                 c.title,
-                c.cover_path as cover_url,
+                NULL as cover_url,
                 COUNT(DISTINCT ch.id) as chapter_count,
                 COUNT(m.id) as page_count,
                 SUM(CASE WHEN m.media_type = 'IMAGE' AND m.hq_status = 'READY' THEN m.file_size ELSE 0 END) as hq_size,
