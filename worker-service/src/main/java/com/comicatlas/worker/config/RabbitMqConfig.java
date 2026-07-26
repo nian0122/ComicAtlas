@@ -126,6 +126,19 @@ public class RabbitMqConfig {
     }
 
     @Bean
+    public Queue metadataRefreshQueue() {
+        return QueueBuilder.durable("metadata.refresh.queue")
+                .deadLetterExchange("comic.export.dlx")
+                .deadLetterRoutingKey("metadata.refresh.dlq")
+                .build();
+    }
+
+    @Bean
+    public Queue metadataRefreshDlq() {
+        return QueueBuilder.durable("metadata.refresh.dlq").build();
+    }
+
+    @Bean
     public Queue videoTranscodeQueue() {
         return QueueBuilder.durable("video.transcode.queue")
                 .deadLetterExchange("comic.video.dlx")
@@ -204,6 +217,18 @@ public class RabbitMqConfig {
     public Binding exportTaskDlqBinding() {
         return BindingBuilder.bind(exportTaskDlq())
                 .to(exportDlxExchange()).with("export.task.dlq");
+    }
+
+    @Bean
+    public Binding metadataRefreshBinding() {
+        return BindingBuilder.bind(metadataRefreshQueue())
+                .to(exportExchange()).with("metadata.refresh.requested");
+    }
+
+    @Bean
+    public Binding metadataRefreshDlqBinding() {
+        return BindingBuilder.bind(metadataRefreshDlq())
+                .to(exportDlxExchange()).with("metadata.refresh.dlq");
     }
 
     @Bean
