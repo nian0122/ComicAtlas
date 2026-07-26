@@ -11,6 +11,7 @@ import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -102,19 +103,27 @@ public class MediaAnalyzer {
                     file.toAbsolutePath().toString());
             pb.redirectErrorStream(true);
             Process proc = pb.start();
+
+            // 必须在 waitFor() 之前消费 stdout，否则管道满后 ffprobe 阻塞写 → 死锁
+            StringBuilder sb = new StringBuilder();
+            Thread outputReader = new Thread(() -> {
+                try (BufferedReader r = new BufferedReader(
+                        new InputStreamReader(proc.getInputStream(), StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = r.readLine()) != null) {
+                        sb.append(line).append('\n');
+                    }
+                } catch (IOException ignored) {
+                }
+            }, "ffprobe-reader");
+            outputReader.start();
+
             boolean finished = proc.waitFor(FFPROBE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            outputReader.join(1000);
             if (!finished) {
                 proc.destroyForcibly();
                 log.warn("ffprobe 读取 {} 超时 ({}s)", file, FFPROBE_TIMEOUT_SECONDS);
                 return videoFallback(name, ext, size, "timeout");
-            }
-            StringBuilder sb = new StringBuilder();
-            try (BufferedReader r = new BufferedReader(
-                    new InputStreamReader(proc.getInputStream(), StandardCharsets.UTF_8))) {
-                String line;
-                while ((line = r.readLine()) != null) {
-                    sb.append(line).append('\n');
-                }
             }
             if (proc.exitValue() != 0) {
                 log.warn("ffprobe exit={} for {}", proc.exitValue(), file);
