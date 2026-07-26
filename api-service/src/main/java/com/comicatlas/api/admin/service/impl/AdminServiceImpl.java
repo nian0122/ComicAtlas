@@ -530,21 +530,29 @@ public class AdminServiceImpl implements AdminService {
     private record ScannedMediaInfo(String imageName, long fileSize, Integer width, Integer height, String mediaType) {}
 
     private ImageDimensions getImageDimensions(Path p) {
+        // 1. 优先尝试 ImageIO（支持 JVM 原生 + webp-imageio 插件）
         try (ImageInputStream in = ImageIO.createImageInputStream(p.toFile())) {
-            if (in == null) return new ImageDimensions(null, null);
-            var readers = ImageIO.getImageReaders(in);
-            if (!readers.hasNext()) return new ImageDimensions(null, null);
-            ImageReader reader = readers.next();
-            try {
-                reader.setInput(in);
-                return new ImageDimensions(reader.getWidth(0), reader.getHeight(0));
-            } finally {
-                reader.dispose();
+            if (in != null) {
+                var readers = ImageIO.getImageReaders(in);
+                if (readers.hasNext()) {
+                    ImageReader reader = readers.next();
+                    try {
+                        reader.setInput(in);
+                        return new ImageDimensions(reader.getWidth(0), reader.getHeight(0));
+                    } finally {
+                        reader.dispose();
+                    }
+                }
             }
         } catch (Exception e) {
-            log.debug("无法读取图片尺寸: {}", p, e);
-            return new ImageDimensions(null, null);
+            log.debug("ImageIO 读取尺寸失败: {}", p, e);
         }
+        // 2. 回退：直接解析文件头（JPEG/PNG/GIF/WebP/BMP），零依赖
+        int[] dims = com.comicatlas.common.util.ImageDimensionsReader.read(p);
+        if (dims[0] > 0 && dims[1] > 0) {
+            return new ImageDimensions(dims[0], dims[1]);
+        }
+        return new ImageDimensions(null, null);
     }
 
     private List<ScannedMediaInfo> scanChapterPages(Long comicId, int globalOrder) {
