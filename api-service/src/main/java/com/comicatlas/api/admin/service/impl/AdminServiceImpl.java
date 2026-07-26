@@ -28,7 +28,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.File;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
@@ -61,6 +64,9 @@ public class AdminServiceImpl implements AdminService {
 
     @Value("${MANGA_ROOT:F:/manga}")
     private String mangaRoot;
+
+    @Value("${FFPROBE_PATH:tools/ffmpeg/ffprobe.exe}")
+    private String ffprobePath;
 
     @Override
     @Transactional
@@ -694,6 +700,8 @@ public class AdminServiceImpl implements AdminService {
 
             long durationMs = System.currentTimeMillis() - start;
 
+            int videoFixed = fixVideoMetadata(comicId);
+
             // Export metadata.json AFTER transaction commit (best-effort)
             try {
                 metadataExporter.export(comicId);
@@ -710,4 +718,101 @@ public class AdminServiceImpl implements AdminService {
                             .set(Comic::getStatus, "READY"));
         }
     }
+
+    private int fixVideoMetadata(Long comicId) {
+        List<Media> videos = mediaMapper.selectList(new LambdaQueryWrapper<Media>()
+                .eq(Media::getMediaType, "VIDEO")
+                .isNull(Media::getWidth)
+                .apply("chapter_id IN (SELECT id FROM chapter WHERE comic_id = {0})", comicId));
+        if (videos.isEmpty()) return 0;
+
+        Path ffprobe = Path.of(ffprobePath);
+        if (!Files.exists(ffprobe)) {
+            log.warn("ffprobe 不可用，跳过视频元数据修复: path={}", ffprobePath);
+            return 0;
+        }
+
+        int fixed = 0;
+        for (Media video : videos) {
+            Path videoFile = Path.of(mangaRoot, video.getHqRoot().toLowerCase(), video.getHqPath());
+            if (!Files.exists(videoFile)) continue;
+
+            FfprobeResult result = runFfprobe(ffprobe, videoFile);
+            if (result == null) continue;
+
+            video.setWidth(result.width);
+            video.setHeight(result.height);
+            if (result.duration != null) video.setDuration(result.duration);
+            if (result.container != null) video.setContainer(result.container);
+            if (result.videoCodec != null) video.setVideoCodec(result.videoCodec);
+            if (result.audioCodec != null) video.setAudioCodec(result.audioCodec);
+            mediaMapper.updateById(video);
+            fixed++;
+        }
+        log.info("视频元数据修复完成: comicId={}, fixed={}/{}", comicId, fixed, videos.size());
+        return fixed;
+    }
+
+    private FfprobeResult runFfprobe(Path ffprobe, Path videoFile) {
+        try {
+            ProcessBuilder pb = new ProcessBuilder(
+                    ffprobe.toString(), "-v", "error",
+                    "-show_format", "-show_streams", "-of", "json",
+                    videoFile.toString());
+            pb.redirectErrorStream(true);
+            Process proc = pb.start();
+            if (!proc.waitFor(30, java.util.concurrent.TimeUnit.SECONDS)) {
+                proc.destroyForcibly();
+                return null;
+            }
+            StringBuilder sb = new StringBuilder();
+            try (BufferedReader r = new BufferedReader(
+                    new InputStreamReader(proc.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = r.readLine()) != null) sb.append(line).append('\n');
+            }
+            if (proc.exitValue() != 0) return null;
+            return parseFfprobeOutput(sb.toString());
+        } catch (Exception e) {
+            log.debug("ffprobe 失败: {}", videoFile, e);
+            return null;
+        }
+    }
+
+    private FfprobeResult parseFfprobeOutput(String json) {
+        try {
+            var root = objectMapper.readTree(json);
+            BigDecimal duration = null;
+            String d = root.path("format").path("duration").asText(null);
+            if (d != null && !d.isEmpty() && !"N/A".equals(d)) {
+                try { duration = new BigDecimal(d); } catch (Exception ignored) {}
+            }
+            Integer width = null, height = null;
+            String container = null, videoCodec = null, audioCodec = null;
+            String formatName = root.path("format").path("format_name").asText(null);
+            if (formatName != null && !formatName.isEmpty()) {
+                container = formatName.split(",")[0].trim();
+            }
+            for (var stream : root.path("streams")) {
+                String type = stream.path("codec_type").asText("");
+                String codec = stream.path("codec_name").asText(null);
+                if ("video".equals(type)) {
+                    if (videoCodec == null && codec != null) videoCodec = codec;
+                    int w = stream.path("width").asInt(0);
+                    if (w > 0) width = w;
+                    int h = stream.path("height").asInt(0);
+                    if (h > 0) height = h;
+                } else if ("audio".equals(type)) {
+                    if (audioCodec == null && codec != null) audioCodec = codec;
+                }
+            }
+            if (width == null || height == null) return null;
+            return new FfprobeResult(width, height, duration, container, videoCodec, audioCodec);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private record FfprobeResult(Integer width, Integer height, BigDecimal duration,
+                                  String container, String videoCodec, String audioCodec) {}
 }
