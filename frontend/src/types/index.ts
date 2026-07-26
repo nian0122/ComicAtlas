@@ -275,6 +275,7 @@ export interface ComicStorageItem {
   lqSize: number
   hqStatus: HqStatus
   lqStatus: LqStatus
+  transcodeStatus: 'NOT_NEEDED' | 'PENDING' | 'PROCESSING' | 'DONE' | 'FAILED'
   chapterCount: number
   pageCount: number
 }
@@ -315,6 +316,7 @@ export interface ComicStorageQuery {
 export const StorageOperationType = {
   DeleteHQ: 'DELETE_HQ',
   GenerateLQ: 'GENERATE_LQ',
+  TranscodeVideos: 'TRANSCODE_VIDEOS',
 } as const
 
 export type StorageOperationType =

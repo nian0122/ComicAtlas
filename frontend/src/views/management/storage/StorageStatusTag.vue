@@ -3,7 +3,7 @@ import { computed } from 'vue'
 
 const props = defineProps<{
   status: string
-  type: 'hq' | 'lq'
+  type: 'hq' | 'lq' | 'transcode'
 }>()
 
 const STATUS_MAP: Record<string, Record<string, { type: string; text: string }>> = {
@@ -23,6 +23,13 @@ const STATUS_MAP: Record<string, Record<string, { type: string; text: string }>>
     EMPTY: { type: '', text: '无数据' },
     QUEUED: { type: 'warning', text: '排队中' },
     GENERATING: { type: 'warning', text: '生成中' },
+  },
+  transcode: {
+    NOT_NEEDED: { type: '', text: '' },
+    PENDING: { type: 'warning', text: '待转码' },
+    PROCESSING: { type: 'warning', text: '转码中' },
+    DONE: { type: 'success', text: '已转码' },
+    FAILED: { type: 'danger', text: '失败' },
   },
 }
 

@@ -19,4 +19,6 @@ public interface StorageMapper {
     long countComicStorageList(@Param("query") ComicStorageQuery query);
 
     List<ChapterStorageDTO> selectChapterStorageList(@Param("comicId") Long comicId);
+
+    String selectTranscodeStatus(@Param("comicId") Long comicId);
 }

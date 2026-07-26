@@ -1,20 +1,12 @@
 {
   "schema_version": 2,
-  "active_work_id": "comic-export-2026-07-23",
+  "active_work_id": "video-transcode",
   "works": {
-    "hq-delete-2026-07-21": {
-      "work_id": "hq-delete-2026-07-21",
-      "active_plan": ".omo/plans/2026-07-21-hq-delete.md",
-      "plan_name": "2026-07-21-hq-delete",
-      "session_ids": ["codex:current"],
-      "status": "completed",
-      "worktree_path": null
-    },
-    "comic-export-2026-07-23": {
-      "work_id": "comic-export-2026-07-23",
-      "active_plan": ".omo/plans/comic-export.md",
-      "plan_name": "comic-export",
-      "session_ids": ["codex:current"],
+    "video-transcode": {
+      "work_id": "video-transcode",
+      "active_plan": ".omo/plans/video-transcode.md",
+      "plan_name": "video-transcode",
+      "session_ids": ["codex:ses_vt_main"],
       "status": "active",
       "worktree_path": null
     }

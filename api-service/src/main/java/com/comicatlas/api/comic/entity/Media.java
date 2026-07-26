@@ -18,6 +18,7 @@ public class Media {
     private String lqPath;
     private String hqStatus;
     private String lqStatus;
+    private String transcodeStatus;
     private Long lqSize;
     private Integer width;
     private Integer height;
