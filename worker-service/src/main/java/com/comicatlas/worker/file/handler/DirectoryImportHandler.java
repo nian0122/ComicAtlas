@@ -2,6 +2,7 @@ package com.comicatlas.worker.file.handler;
 
 import com.comicatlas.worker.file.parse.*;
 import com.comicatlas.worker.file.storage.LocalStorageService;
+import com.comicatlas.worker.file.transcode.VideoNormalizer;
 import com.comicatlas.worker.event.CancelHandler;
 import com.comicatlas.worker.image.ImageOptimizer;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -23,12 +24,18 @@ public class DirectoryImportHandler {
     private final ObjectMapper objectMapper;
     private final ImageOptimizer imageOptimizer;
     private final CancelHandler cancelHandler;
+    private final VideoNormalizer videoNormalizer;
 
     /**
-     * 统一导入：解析目录 → 解析后把图片搬到 hq/{comicId}/{chapterId}/ → 写 metadata。
+     * 统一导入：标准化视频 → 解析目录 → 搬文件到 hq/{comicId}/{chapterId}/ → 写 metadata。
      * ZIP 和 Directory 来源走同一逻辑。
      */
     public Path handle(ImportContext ctx, Long taskId, Long comicId, Path mangaRoot) throws Exception {
+        int normalized = videoNormalizer.normalize(ctx.sourcePath());
+        if (normalized > 0) {
+            log.info("视频标准化: {} 个文件已转码为 .mp4", normalized);
+        }
+
         DirectoryTree tree = parser.parse(ctx.sourcePath());
         ComicMetadata metadata = assembler.assemble(tree, ctx);
 
