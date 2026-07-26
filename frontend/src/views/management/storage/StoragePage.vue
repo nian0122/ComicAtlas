@@ -37,6 +37,7 @@
       @update:page-size="pageSize = $event"
       @delete-hq="handleDeleteHQ"
       @generate-lq="handleGenerateLQ"
+      @transcode-videos="handleTranscodeVideos"
       @export-zip="handleExportZip"
       @show-chapters="handleShowChapters"
     />
@@ -129,6 +130,20 @@ async function handleGenerateLQ(comicId: number) {
   } catch { return }
   await executeAndPoll({ type: StorageOperationType.GenerateLQ, comicId })
   ElMessage.success('LQ 生成任务已提交')
+}
+
+async function handleTranscodeVideos(comicId: number) {
+  try {
+    await ElMessageBox.confirm('确认为该漫画的视频进行转码？', '视频转码', { type: 'info' })
+  } catch { return }
+  try {
+    await storageService.transcodeVideos(comicId)
+    ElMessage.success('视频转码任务已提交')
+    polling.start(comicId, StorageOperationType.TranscodeVideos)
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : '转码失败'
+    ElMessage.error(message)
+  }
 }
 
 async function handleExportZip(comicId: number) {

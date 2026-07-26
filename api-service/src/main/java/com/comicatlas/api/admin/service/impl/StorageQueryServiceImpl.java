@@ -28,6 +28,8 @@ public class StorageQueryServiceImpl implements StorageQueryService {
             boolean isEmpty = dto.getPageCount() == null || dto.getPageCount() == 0;
             dto.setHqStatus(aggregateHqStatus(dto.getHqStatus(), isEmpty));
             dto.setLqStatus(aggregateLqStatus(dto.getLqStatus(), isEmpty));
+            dto.setTranscodeStatus(aggregateTranscodeStatus(
+                    storageMapper.selectTranscodeStatus(dto.getComicId())));
             long hqSize = dto.getHqSize() != null ? dto.getHqSize() : 0;
             long lqSize = dto.getLqSize() != null ? dto.getLqSize() : 0;
             dto.setTotalSize(hqSize + lqSize);
@@ -84,6 +86,16 @@ public class StorageQueryServiceImpl implements StorageQueryService {
         if (isEmpty) return "EMPTY";
         if (statuses == null || statuses.isEmpty()) return "NOT_GENERATED";
         Set<String> set = Set.of(statuses.split(","));
+        if (set.size() == 1) return set.iterator().next();
+        return "MIXED";
+    }
+
+    private String aggregateTranscodeStatus(String statuses) {
+        if (statuses == null || statuses.isBlank()) return "NOT_NEEDED";
+        Set<String> set = Set.of(statuses.split(","));
+        if (set.contains("PROCESSING")) return "PROCESSING";
+        if (set.contains("PENDING")) return "PENDING";
+        if (set.contains("FAILED")) return "FAILED";
         if (set.size() == 1) return set.iterator().next();
         return "MIXED";
     }

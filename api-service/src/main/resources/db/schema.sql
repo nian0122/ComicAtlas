@@ -64,6 +64,7 @@ CREATE TABLE IF NOT EXISTS page (
     lq_path VARCHAR(512),
     hq_status VARCHAR(16) DEFAULT 'PENDING',
     lq_status VARCHAR(16) DEFAULT 'NOT_GENERATED',
+    transcode_status VARCHAR(16) NOT NULL DEFAULT 'NOT_NEEDED',
     lq_size BIGINT DEFAULT 0,
     width INT,
     height INT,

@@ -64,4 +64,12 @@
         ORDER BY ch.sort_order
     </select>
 
+    <select id="selectTranscodeStatus" resultType="string">
+        SELECT GROUP_CONCAT(DISTINCT m.transcode_status)
+        FROM comic c
+        JOIN chapter ch ON ch.comic_id = c.id
+        JOIN page m ON m.chapter_id = ch.id AND m.media_type = 'VIDEO'
+        WHERE c.id = #{comicId}
+    </select>
+
 </mapper>

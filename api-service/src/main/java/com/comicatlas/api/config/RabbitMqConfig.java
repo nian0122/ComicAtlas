@@ -227,6 +227,16 @@ public class RabbitMqConfig {
     }
 
     @Bean
+    public DirectExchange videoExchange() {
+        return new DirectExchange("comic.video");
+    }
+
+    @Bean
+    public DirectExchange videoDlxExchange() {
+        return new DirectExchange("comic.video.dlx");
+    }
+
+    @Bean
     public Queue exportStartedResultQueue() {
         return QueueBuilder.durable("export.started.result.queue")
                 .deadLetterExchange("comic.export.dlx")
@@ -299,5 +309,38 @@ public class RabbitMqConfig {
     public Binding exportFailedResultDlqBinding() {
         return BindingBuilder.bind(exportFailedResultDlq())
                 .to(exportDlxExchange()).with("export.failed.result.dlq");
+    }
+
+    // ==================== comic.video 视频转码结果 ====================
+
+    @Bean
+    public Queue videoTranscodeResultQueue() {
+        return QueueBuilder.durable("video.transcode.result.queue")
+                .deadLetterExchange("comic.video.dlx")
+                .deadLetterRoutingKey("video.transcode.result.dlq")
+                .build();
+    }
+
+    @Bean
+    public Queue videoTranscodeResultDlq() {
+        return QueueBuilder.durable("video.transcode.result.dlq").build();
+    }
+
+    @Bean
+    public Binding videoTranscodeCompletedBinding() {
+        return BindingBuilder.bind(videoTranscodeResultQueue())
+                .to(videoExchange()).with("video.transcode.completed");
+    }
+
+    @Bean
+    public Binding videoTranscodeFailedBinding() {
+        return BindingBuilder.bind(videoTranscodeResultQueue())
+                .to(videoExchange()).with("video.transcode.failed");
+    }
+
+    @Bean
+    public Binding videoTranscodeResultDlqBinding() {
+        return BindingBuilder.bind(videoTranscodeResultDlq())
+                .to(videoDlxExchange()).with("video.transcode.result.dlq");
     }
 }

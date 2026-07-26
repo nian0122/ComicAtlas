@@ -45,6 +45,10 @@ export function useStoragePolling(store: ReturnType<typeof useStorageStore>) {
         if (comic && comic.lqStatus === 'READY') {
           shouldStop = true
         }
+      } else if (type === StorageOperationType.TranscodeVideos) {
+        if (comic && (comic.transcodeStatus === 'DONE' || comic.transcodeStatus === 'NOT_NEEDED' || comic.transcodeStatus === 'FAILED')) {
+          shouldStop = true
+        }
       }
 
       if (entry.retries >= MAX_RETRIES) {

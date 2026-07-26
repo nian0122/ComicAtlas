@@ -111,6 +111,8 @@ export const adminApi = {
     keyword?: string
   }) => api.get('/admin/storage/comics', { params }),
   storageChapters: (comicId: number) => api.get(`/admin/storage/comics/${comicId}/chapters`),
+  transcodeVideos: (comicId: number) =>
+    api.post(`/admin/storage/comics/${comicId}/transcode-videos`),
   dlqQueues: (credentials: DlqCredentials) =>
     api.get<readonly DlqQueueVO[]>('/admin/dlq/queues', { auth: credentials }),
   dlqMessages: (queueName: string, credentials: DlqCredentials, count = 20) =>

@@ -47,6 +47,12 @@ public class RabbitMqConfig {
     @Bean
     public DirectExchange exportDlxExchange() { return new DirectExchange("comic.export.dlx"); }
 
+    @Bean
+    public DirectExchange videoExchange() { return new DirectExchange("comic.video"); }
+
+    @Bean
+    public DirectExchange videoDlxExchange() { return new DirectExchange("comic.video.dlx"); }
+
     // ===== Queues =====
 
     @Bean
@@ -119,6 +125,19 @@ public class RabbitMqConfig {
         return QueueBuilder.durable("export.task.dlq").build();
     }
 
+    @Bean
+    public Queue videoTranscodeQueue() {
+        return QueueBuilder.durable("video.transcode.queue")
+                .deadLetterExchange("comic.video.dlx")
+                .deadLetterRoutingKey("video.transcode.dlq")
+                .build();
+    }
+
+    @Bean
+    public Queue videoTranscodeDlq() {
+        return QueueBuilder.durable("video.transcode.dlq").build();
+    }
+
     // ===== Bindings =====
 
     @Bean
@@ -185,5 +204,17 @@ public class RabbitMqConfig {
     public Binding exportTaskDlqBinding() {
         return BindingBuilder.bind(exportTaskDlq())
                 .to(exportDlxExchange()).with("export.task.dlq");
+    }
+
+    @Bean
+    public Binding videoTranscodeBinding() {
+        return BindingBuilder.bind(videoTranscodeQueue())
+                .to(videoExchange()).with("video.transcode.requested");
+    }
+
+    @Bean
+    public Binding videoTranscodeDlqBinding() {
+        return BindingBuilder.bind(videoTranscodeDlq())
+                .to(videoDlxExchange()).with("video.transcode.dlq");
     }
 }

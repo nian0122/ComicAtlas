@@ -23,6 +23,9 @@ import java.util.UUID;
     @JsonSubTypes.Type(value = ExportTaskStartedEvent.class, name = "ExportTaskStartedEvent"),
     @JsonSubTypes.Type(value = ExportTaskCompletedEvent.class, name = "ExportTaskCompletedEvent"),
     @JsonSubTypes.Type(value = ExportTaskFailedEvent.class, name = "ExportTaskFailedEvent"),
+    @JsonSubTypes.Type(value = VideoTranscodeRequestedEvent.class, name = "VIDEO_TRANSCODE_REQUESTED"),
+    @JsonSubTypes.Type(value = VideoTranscodeCompletedEvent.class, name = "VIDEO_TRANSCODE_COMPLETED"),
+    @JsonSubTypes.Type(value = VideoTranscodeFailedEvent.class, name = "VIDEO_TRANSCODE_FAILED"),
 })
 public sealed interface ComicEvent
     permits ImportTaskCreatedEvent, ImportTaskCompletedEvent, ImportTaskFailedEvent,
@@ -30,7 +33,9 @@ public sealed interface ComicEvent
             CancelTaskEvent, DeleteCompletedEvent, LqCompletedEvent,
             DeleteHqRequestedEvent, HqDeletedEvent,
             ExportTaskCreatedEvent, ExportTaskStartedEvent, ExportTaskCompletedEvent,
-            ExportTaskFailedEvent {
+            ExportTaskFailedEvent,
+            VideoTranscodeRequestedEvent, VideoTranscodeCompletedEvent,
+            VideoTranscodeFailedEvent {
 
     UUID eventId();
     Instant occurredAt();
