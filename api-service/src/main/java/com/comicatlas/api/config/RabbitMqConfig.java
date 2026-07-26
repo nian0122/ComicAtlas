@@ -210,6 +210,31 @@ public class RabbitMqConfig {
     }
 
     @Bean
+    public Queue videoMetadataFixResultQueue() {
+        return QueueBuilder.durable("video.metadata.fix.result.queue")
+                .deadLetterExchange("comic.image.dlx")
+                .deadLetterRoutingKey("video.metadata.fix.result.dlq")
+                .build();
+    }
+
+    @Bean
+    public Queue videoMetadataFixResultDlq() {
+        return QueueBuilder.durable("video.metadata.fix.result.dlq").build();
+    }
+
+    @Bean
+    public Binding videoMetadataFixCompletedBinding() {
+        return BindingBuilder.bind(videoMetadataFixResultQueue())
+                .to(imageExchange()).with("video.metadata.fix.completed");
+    }
+
+    @Bean
+    public Binding videoMetadataFixResultDlqBinding() {
+        return BindingBuilder.bind(videoMetadataFixResultDlq())
+                .to(imageDlxExchange()).with("video.metadata.fix.result.dlq");
+    }
+
+    @Bean
     public DirectExchange imageDlxExchange() {
         return new DirectExchange("comic.image.dlx");
     }
