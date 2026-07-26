@@ -139,6 +139,19 @@ public class RabbitMqConfig {
     }
 
     @Bean
+    public Queue videoMetadataFixQueue() {
+        return QueueBuilder.durable("video.metadata.fix.queue")
+                .deadLetterExchange("comic.image.dlx")
+                .deadLetterRoutingKey("video.metadata.fix.dlq")
+                .build();
+    }
+
+    @Bean
+    public Queue videoMetadataFixDlq() {
+        return QueueBuilder.durable("video.metadata.fix.dlq").build();
+    }
+
+    @Bean
     public Queue videoTranscodeQueue() {
         return QueueBuilder.durable("video.transcode.queue")
                 .deadLetterExchange("comic.video.dlx")
@@ -229,6 +242,18 @@ public class RabbitMqConfig {
     public Binding metadataRefreshDlqBinding() {
         return BindingBuilder.bind(metadataRefreshDlq())
                 .to(exportDlxExchange()).with("metadata.refresh.dlq");
+    }
+
+    @Bean
+    public Binding videoMetadataFixBinding() {
+        return BindingBuilder.bind(videoMetadataFixQueue())
+                .to(imageExchange()).with("video.metadata.fix.requested");
+    }
+
+    @Bean
+    public Binding videoMetadataFixDlqBinding() {
+        return BindingBuilder.bind(videoMetadataFixDlq())
+                .to(imageDlxExchange()).with("video.metadata.fix.dlq");
     }
 
     @Bean

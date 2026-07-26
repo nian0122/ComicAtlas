@@ -16,6 +16,7 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -63,6 +64,24 @@ public class MediaAnalyzer {
         return new ComicMetadata.MediaInfo(name, 0,
                 exists ? "READY" : "MISSING", "NOT_GENERATED",
                 size, dims.width(), dims.height());
+    }
+
+    /**
+     * 分析视频文件，返回元数据。
+     * 文件不存在或非视频类型时返回 empty。
+     */
+    public Optional<ComicMetadata.MediaInfo> analyzeVideo(Path videoFile) {
+        if (videoFile == null || !Files.exists(videoFile)) {
+            return Optional.empty();
+        }
+        String name = videoFile.getFileName().toString();
+        String ext = extensionOf(name).toLowerCase();
+        if (!VIDEO_EXT.contains(ext)) {
+            return Optional.empty();
+        }
+        long size = 0L;
+        try { size = Files.size(videoFile); } catch (Exception ignored) { }
+        return Optional.of(analyzeVideo(videoFile, name, ext, size));
     }
 
     private ComicMetadata.MediaInfo analyzeVideo(Path file, String name, String ext, long size) {
