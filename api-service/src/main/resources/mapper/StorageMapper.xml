@@ -16,7 +16,7 @@
                 GROUP_CONCAT(DISTINCT m.lq_status) as lq_status
             FROM comic c
             LEFT JOIN chapter ch ON ch.comic_id = c.id
-            LEFT JOIN page m ON m.chapter_id = ch.id AND m.media_type = 'IMAGE'
+            LEFT JOIN page m ON m.chapter_id = ch.id AND m.media_type IN ('IMAGE', 'VIDEO')
             WHERE c.deleted_at IS NULL
             <if test="query.keyword != null and query.keyword != ''">
                 AND c.title LIKE CONCAT('%', #{query.keyword}, '%')

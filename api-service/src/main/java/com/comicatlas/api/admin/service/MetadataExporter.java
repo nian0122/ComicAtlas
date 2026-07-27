@@ -106,6 +106,10 @@ public class MetadataExporter {
                 if (hqPath != null && hqPath.contains("/")) {
                     fileName = hqPath.substring(hqPath.lastIndexOf('/') + 1);
                 }
+                // 跳过无效文件名，防止 "null" 污染 metadata.json
+                if (fileName.isEmpty() || "null".equals(fileName)) {
+                    continue;
+                }
                 pm.put("fileName", fileName);
                 pm.put("mediaType", p.getMediaType() != null ? p.getMediaType() : "IMAGE");
                 pm.put("pageNumber", p.getPageNumber());

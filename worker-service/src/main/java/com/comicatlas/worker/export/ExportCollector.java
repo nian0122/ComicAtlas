@@ -93,6 +93,13 @@ public class ExportCollector {
                 List<ExportMedia> mediaList = mediaByChapter.getOrDefault(ch.getId(), List.of());
                 for (ExportMedia m : mediaList) {
                     var mNode = mediaArray.addObject();
+                    // 从 hqPath 提取文件名
+                    String fileName = "";
+                    String hqPath = m.getHqPath();
+                    if (hqPath != null && hqPath.contains("/")) {
+                        fileName = hqPath.substring(hqPath.lastIndexOf('/') + 1);
+                    }
+                    mNode.put("fileName", fileName);
                     mNode.put("pageNumber", m.getPageNumber() != null ? m.getPageNumber() : 0);
                     mNode.put("hqStatus", m.getHqStatus() != null ? m.getHqStatus() : "");
                     mNode.put("lqStatus", m.getLqStatus() != null ? m.getLqStatus() : "");

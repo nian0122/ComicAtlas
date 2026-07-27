@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { ElSelect, ElOption, ElInput } from 'element-plus'
 
 interface Filter {
@@ -27,10 +27,9 @@ const emit = defineEmits<{
   rebuild: []
 }>()
 
-const filterModel = computed({
-  get: () => props.filter,
-  set: (val) => emit('update:filter', val)
-})
+function setFilter(patch: Partial<Filter>) {
+  emit('update:filter', { ...props.filter, ...patch })
+}
 
 const sortModel = computed({
   get: () => props.sort,
@@ -52,12 +51,12 @@ const sortModel = computed({
     <section class="action-section">
       <h2 class="section-title">存储优化</h2>
       <div class="filter-bar">
-        <el-select v-model="filterModel.hqStatus" placeholder="HQ 状态" class="filter-select">
+        <el-select :model-value="props.filter.hqStatus" @update:model-value="setFilter({ hqStatus: $event })" placeholder="HQ 状态" class="filter-select">
           <el-option label="全部" value="ALL" />
           <el-option label="还有 HQ" value="HAS_HQ" />
           <el-option label="HQ 已删" value="NO_HQ" />
         </el-select>
-        <el-select v-model="filterModel.lqStatus" placeholder="LQ 状态" class="filter-select">
+        <el-select :model-value="props.filter.lqStatus" @update:model-value="setFilter({ lqStatus: $event })" placeholder="LQ 状态" class="filter-select">
           <el-option label="全部" value="ALL" />
           <el-option label="需要生成" value="NEEDS_LQ" />
           <el-option label="LQ 就绪" value="READY" />
@@ -72,7 +71,7 @@ const sortModel = computed({
           <el-option label="降序" value="desc" />
           <el-option label="升序" value="asc" />
         </el-select>
-        <el-input v-model="filterModel.keyword" placeholder="搜索标题" clearable class="filter-input" />
+        <el-input :model-value="props.filter.keyword" @update:model-value="setFilter({ keyword: $event })" placeholder="搜索标题" clearable class="filter-input" />
       </div>
     </section>
   </div>

@@ -67,17 +67,25 @@
     <section class="task-section">
       <h2 class="section-title">
         已完成
-        <span class="section-count">{{ store.completedTasks.length }}</span>
+        <span class="section-count">{{ store.completedTotal }}</span>
       </h2>
       <div v-if="store.completedTasks.length > 0" class="task-cards">
         <TaskCard
-          v-for="task in store.completedTasks.slice(0, 10)"
+          v-for="task in store.completedTasks"
           :key="task.id"
           :task="task"
           variant="done"
           @cancel="onCancel"
           @retry="onRetry"
           @read="onRead"
+        />
+        <el-pagination
+          class="pagination-bar"
+          layout="prev, pager, next"
+          :total="store.completedTotal"
+          :page-size="store.completedPageSize"
+          :current-page="store.completedPage"
+          @current-change="onCompletedPageChange"
         />
       </div>
       <div v-else class="state empty">
@@ -197,13 +205,19 @@ function onRead(task: ImportTaskVO) {
 
 onMounted(async () => {
   await store.fetchList(batchId.value ? { batchId: batchId.value } : undefined)
+  await store.fetchCompletedTasks(1)
   if (store.hasActive) store.startPolling()
 })
 
 watch(batchId, async () => {
   await store.fetchList(batchId.value ? { batchId: batchId.value } : undefined)
+  await store.fetchCompletedTasks(1)
   if (store.hasActive) store.startPolling()
 })
+
+function onCompletedPageChange(page: number) {
+  store.fetchCompletedTasks(page)
+}
 
 // ========== Export tasks ==========
 
@@ -472,5 +486,11 @@ onBeforeUnmount(() => {
 .ghost-btn:hover {
   background: var(--bg-surface);
   border-color: var(--text-muted);
+}
+
+.pagination-bar {
+  margin-top: var(--space-base);
+  display: flex;
+  justify-content: center;
 }
 </style>

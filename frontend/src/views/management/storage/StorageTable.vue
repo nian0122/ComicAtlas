@@ -21,6 +21,7 @@ const emit = defineEmits<{
   'update:pageSize': [size: number]
   deleteHq: [comicId: number]
   generateLq: [comicId: number]
+  refreshMetadata: [comicId: number]
   exportZip: [comicId: number]
   transcodeVideos: [comicId: number]
   showChapters: [comicId: number]
@@ -104,12 +105,13 @@ function rowClassName({ row }: { row: ComicStorageItem }) {
         <StorageStatusTag v-if="row.transcodeStatus !== 'NOT_NEEDED'" :status="row.transcodeStatus" type="transcode" />
       </template>
     </el-table-column>
-    <el-table-column label="操作" width="260" fixed="right">
+    <el-table-column label="操作" width="320" fixed="right">
       <template #default="{ row }">
         <el-button v-if="row.transcodeStatus === 'PENDING' || row.transcodeStatus === 'FAILED'" type="warning" size="small" :disabled="busyState[row.comicId]" @click="emit('transcodeVideos', row.comicId)">转码</el-button>
         <el-button v-if="row.hqStatus === 'READY' || row.hqStatus === 'MIXED'" type="danger" size="small" :disabled="busyState[row.comicId]" @click="emit('deleteHq', row.comicId)">删HQ</el-button>
         <el-button v-if="row.lqStatus === 'NOT_GENERATED' || row.lqStatus === 'MIXED'" type="primary" size="small" :disabled="busyState[row.comicId]" @click="emit('generateLq', row.comicId)">生LQ</el-button>
         <el-button size="small" type="success" :disabled="busyState[row.comicId]" @click="emit('exportZip', row.comicId)">导出 ZIP</el-button>
+        <el-button size="small" @click="emit('refreshMetadata', row.comicId)">刷新</el-button>
         <el-button size="small" @click="emit('showChapters', row.comicId)">详情</el-button>
       </template>
     </el-table-column>

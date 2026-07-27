@@ -325,10 +325,6 @@ public class AdminServiceImpl implements AdminService {
         Map<String, Object> comicData = (Map<String, Object>) metadata.get("comic");
         List<Map<String, Object>> catalogsData = (List<Map<String, Object>>) metadata.get("catalogs");
         List<Map<String, Object>> chaptersData = (List<Map<String, Object>>) metadata.get("chapters");
-        // metadata version：v2=legacy（pages/imageName/仅图片），v3=current（mediaItems/fileName/支持视频）
-        int version = metadata.get("version") instanceof Number n ? n.intValue() : 2;
-        String mediaListKey = version >= 3 ? "mediaItems" : "pages";
-        String mediaNameKey = version >= 3 ? "fileName" : "imageName";
 
         Long comicId = ctx.comicId();
         Comic comic;
@@ -373,7 +369,6 @@ public class AdminServiceImpl implements AdminService {
 
         int chCount = 0, pgCount = 0;
         long totalSize = 0;
-        Path hqRoot = Path.of(mangaRoot, "hq");
         if (chaptersData != null) {
             for (Map<String, Object> chData : chaptersData) {
                 Chapter chapter = new Chapter();
@@ -387,42 +382,27 @@ public class AdminServiceImpl implements AdminService {
                 chapterMapper.insert(chapter);
                 chCount++;
 
-                List<Map<String, Object>> pageList = (List<Map<String, Object>>) chData.get(mediaListKey);
-                if (pageList != null) {
-                    chapter.setPageCount(pageList.size());
-                    chapterMapper.updateById(chapter);
-                    for (Map<String, Object> pd : pageList) {
-                        Media page = new Media();
-                        page.setChapterId(chapter.getId());
-                        page.setPageNumber(((Number) pd.get("pageNumber")).intValue());
-                        page.setHqRoot("HQ");
-                        String imageName = (String) pd.get(mediaNameKey);
-                        String hqPath = comicId + "/" + chapter.getGlobalOrder() + "/" + imageName;
-                        page.setHqPath(hqPath);
-                        page.setHqStatus(pd.get("hqStatus") != null ? (String) pd.get("hqStatus") : "READY");
-                        page.setLqStatus("NOT_GENERATED");
-                        if (pd.get("fileSize") != null) page.setFileSize(((Number) pd.get("fileSize")).longValue());
-                        if (pd.get("width") != null) page.setWidth(((Number) pd.get("width")).intValue());
-                        if (pd.get("height") != null) page.setHeight(((Number) pd.get("height")).intValue());
-                        if (version >= 3) {
-                            page.setMediaType(pd.get("mediaType") != null ? (String) pd.get("mediaType") : "IMAGE");
-                            BigDecimal duration = toBigDecimal(pd.get("duration"));
-                            if (duration != null) page.setDuration(duration);
-                            if (pd.get("container") != null) page.setContainer((String) pd.get("container"));
-                            if (pd.get("videoCodec") != null) page.setVideoCodec((String) pd.get("videoCodec"));
-                            if (pd.get("audioCodec") != null) page.setAudioCodec((String) pd.get("audioCodec"));
-                        } else {
-                            page.setMediaType("IMAGE");
-                        }
-                        mediaMapper.insert(page);
-                        totalSize += page.getFileSize() != null ? page.getFileSize() : 0;
-                        pgCount++;
+                // 从 HQ 文件系统扫描页面，不依赖 JSON 中的 fileName
+                List<ScannedMediaInfo> scannedPages = scanChapterPages(comicId, chapter.getGlobalOrder());
+                chapter.setPageCount(scannedPages.size());
+                chapterMapper.updateById(chapter);
 
-                        if (!Files.exists(hqRoot.resolve(hqPath))) {
-                            log.warn("HQ 文件缺失: comicId={}, chapter={}, page={}, path={}",
-                                    comicId, chapter.getTitle(), page.getPageNumber(), hqPath);
-                        }
-                    }
+                int pageNum = 1;
+                for (ScannedMediaInfo pi : scannedPages) {
+                    Media page = new Media();
+                    page.setChapterId(chapter.getId());
+                    page.setPageNumber(pageNum++);
+                    page.setHqRoot("HQ");
+                    page.setHqPath(comicId + "/" + chapter.getGlobalOrder() + "/" + pi.imageName());
+                    page.setHqStatus(pi.fileSize() > 0 ? "READY" : "MISSING");
+                    page.setLqStatus("NOT_GENERATED");
+                    page.setFileSize(pi.fileSize());
+                    page.setWidth(pi.width());
+                    page.setHeight(pi.height());
+                    page.setMediaType(pi.mediaType());
+                    mediaMapper.insert(page);
+                    totalSize += pi.fileSize();
+                    pgCount++;
                 }
             }
         }
@@ -641,7 +621,11 @@ public class AdminServiceImpl implements AdminService {
                     for (Media p : dbPagesList) {
                         String hqPath = p.getHqPath();
                         if (hqPath != null && hqPath.contains("/")) {
-                            dbPageMap.put(hqPath.substring(hqPath.lastIndexOf('/') + 1), p);
+                            String fileName = hqPath.substring(hqPath.lastIndexOf('/') + 1);
+                            // 跳过无效文件名（如 "null"），这些记录将在后续作为 leftover 清理
+                            if (!fileName.isEmpty() && !"null".equals(fileName)) {
+                                dbPageMap.put(fileName, p);
+                            }
                         }
                     }
 
@@ -683,11 +667,6 @@ public class AdminServiceImpl implements AdminService {
 
                     // DELETE remaining DB pages (not found in HQ directory)
                     for (Media leftover : dbPageMap.values()) {
-                        if ("VIDEO".equals(leftover.getMediaType())) {
-                            log.debug("跳过视频 DB 记录删除（HQ 未找到）: comicId={}, chapter={}, hqPath={}",
-                                    comicId, chapter.getTitle(), leftover.getHqPath());
-                            continue;
-                        }
                         mediaMapper.deleteById(leftover.getId());
                     }
 
