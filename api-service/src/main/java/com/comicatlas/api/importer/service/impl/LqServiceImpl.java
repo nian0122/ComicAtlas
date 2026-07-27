@@ -1,6 +1,7 @@
 package com.comicatlas.api.importer.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.api.comic.entity.Chapter;
 import com.comicatlas.api.comic.entity.Media;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
@@ -53,10 +54,12 @@ public class LqServiceImpl implements LqService {
             return;
         }
 
-        for (Media p : pages) {
-            p.setLqStatus("QUEUED");
-            mediaMapper.updateById(p);
-        }
+        // 批量标记 QUEUED
+        mediaMapper.update(null,
+            new LambdaUpdateWrapper<Media>()
+                .eq(Media::getChapterId, chapterId)
+                .eq(Media::getMediaType, "IMAGE")
+                .set(Media::getLqStatus, "QUEUED"));
 
         // 发 MQ — 目录名用 globalOrder 而非 chapterNo
         var event = new LqGenerateEvent(UUID.randomUUID(), Instant.now(), ch.getComicId(), chapterId, String.valueOf(ch.getGlobalOrder()));
