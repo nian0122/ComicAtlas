@@ -38,6 +38,20 @@ public class StorageQueryServiceImpl implements StorageQueryService {
     }
 
     @Override
+    public ComicStorageDTO getComic(Long comicId) {
+        ComicStorageDTO dto = storageMapper.selectComicStorageById(comicId);
+        if (dto == null) return null;
+        boolean isEmpty = dto.getPageCount() == null || dto.getPageCount() == 0;
+        dto.setCoverUrl(fileUrlResolver.resolveCover(comicId));
+        dto.setHqStatus(aggregateHqStatus(dto.getHqStatus(), isEmpty));
+        dto.setLqStatus(aggregateLqStatus(dto.getLqStatus(), isEmpty));
+        long hqSize = dto.getHqSize() != null ? dto.getHqSize() : 0;
+        long lqSize = dto.getLqSize() != null ? dto.getLqSize() : 0;
+        dto.setTotalSize(hqSize + lqSize);
+        return dto;
+    }
+
+    @Override
     public long countComics(ComicStorageQuery query) {
         return storageMapper.countComicStorageList(query);
     }

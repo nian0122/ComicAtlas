@@ -59,6 +59,15 @@ public class AdminStorageController {
         return Result.ok(storageQueryService.listChapters(comicId));
     }
 
+    @GetMapping("/comics/{comicId}")
+    public Result<ComicStorageDTO> getComic(@PathVariable Long comicId) {
+        ComicStorageDTO dto = storageQueryService.getComic(comicId);
+        if (dto == null) {
+            return Result.fail(404, "漫画不存在");
+        }
+        return Result.ok(dto);
+    }
+
     @PostMapping("/comics/{comicId}/transcode-videos")
     @Transactional
     public Result<Map<String, Object>> transcodeVideos(@PathVariable Long comicId) {

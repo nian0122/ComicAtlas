@@ -109,6 +109,7 @@ export const adminApi = {
     order?: 'asc' | 'desc'
     keyword?: string
   }) => api.get('/admin/storage/comics', { params }),
+  storageComic: (comicId: number) => api.get(`/admin/storage/comics/${comicId}`),
   storageChapters: (comicId: number) => api.get(`/admin/storage/comics/${comicId}/chapters`),
   transcodeVideos: (comicId: number) =>
     api.post(`/admin/storage/comics/${comicId}/transcode-videos`),
