@@ -21,6 +21,11 @@ export const storageService = {
     return res.data as import('@/types').StorageStats
   },
 
+  async fetchComic(comicId: number) {
+    const res = await adminApi.storageComic(comicId)
+    return res.data as import('@/types').ComicStorageItem
+  },
+
   async fetchChapters(comicId: number) {
     const res = await adminApi.storageChapters(comicId)
     return res.data as import('@/types').ChapterStorageItem[]

@@ -36,6 +36,24 @@
         LIMIT #{offset}, #{size}
     </select>
 
+    <select id="selectComicStorageById" resultType="com.comicatlas.api.admin.dto.ComicStorageDTO">
+        SELECT
+            c.id as comic_id,
+            c.title,
+            NULL as cover_url,
+            COUNT(DISTINCT ch.id) as chapter_count,
+            COUNT(m.id) as page_count,
+            SUM(CASE WHEN m.hq_status = 'READY' THEN m.file_size ELSE 0 END) as hq_size,
+            SUM(CASE WHEN m.lq_status = 'READY' THEN m.lq_size ELSE 0 END) as lq_size,
+            GROUP_CONCAT(DISTINCT m.hq_status) as hq_status,
+            GROUP_CONCAT(DISTINCT m.lq_status) as lq_status
+        FROM comic c
+        LEFT JOIN chapter ch ON ch.comic_id = c.id
+        LEFT JOIN page m ON m.chapter_id = ch.id
+        WHERE c.id = #{comicId}
+        GROUP BY c.id
+    </select>
+
     <select id="countComicStorageList" resultType="long">
         SELECT COUNT(DISTINCT c.id)
         FROM comic c

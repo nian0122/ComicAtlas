@@ -9,4 +9,5 @@ public interface StorageQueryService {
     List<ComicStorageDTO> listComics(ComicStorageQuery query, int page, int size);
     long countComics(ComicStorageQuery query);
     List<ChapterStorageDTO> listChapters(Long comicId);
+    ComicStorageDTO getComic(Long comicId);
 }

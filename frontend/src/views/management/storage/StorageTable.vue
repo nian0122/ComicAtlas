@@ -6,25 +6,16 @@ import StorageStatusTag from './StorageStatusTag.vue'
 
 const props = defineProps<{
   list: ComicStorageItem[]
-  busyState: Record<number, boolean>
   loading: boolean
-  selectedIds: number[]
-  highlightedId: number | null
   total: number
   currentPage: number
   pageSize: number
 }>()
 
 const emit = defineEmits<{
-  'update:selectedIds': [ids: number[]]
   'update:currentPage': [page: number]
   'update:pageSize': [size: number]
-  deleteHq: [comicId: number]
-  generateLq: [comicId: number]
-  refreshMetadata: [comicId: number]
-  exportZip: [comicId: number]
-  transcodeVideos: [comicId: number]
-  showChapters: [comicId: number]
+  rowClick: [comicId: number]
 }>()
 
 const tableRef = ref<InstanceType<typeof import('element-plus').ElTable> | null>(null)
@@ -34,6 +25,10 @@ function clearSelection() {
 }
 
 defineExpose({ clearSelection })
+
+function onRowClick(row: ComicStorageItem) {
+  emit('rowClick', row.comicId)
+}
 
 const failedCoverIds = reactive(new Set<number>())
 
@@ -49,17 +44,6 @@ function formatSize(bytes: number): string {
   while (size >= 1024 && i < units.length - 1) { size /= 1024; i++ }
   return `${size.toFixed(i > 0 ? 1 : 0)} ${units[i]}`
 }
-
-function onSelectionChange(rows: ComicStorageItem[]) {
-  emit('update:selectedIds', rows.map(r => r.comicId))
-}
-
-function rowClassName({ row }: { row: ComicStorageItem }) {
-  if (props.highlightedId !== null && row.comicId === props.highlightedId) {
-    return 'highlighted-row'
-  }
-  return ''
-}
 </script>
 
 <template>
@@ -68,10 +52,9 @@ function rowClassName({ row }: { row: ComicStorageItem }) {
     v-loading="loading"
     :data="list"
     row-key="comicId"
-    :row-class-name="rowClassName"
-    @selection-change="onSelectionChange"
+    highlight-current-row
+    @row-click="onRowClick"
   >
-    <el-table-column type="selection" width="40" />
     <el-table-column label="封面" width="70">
       <template #default="{ row }">
         <img
@@ -87,33 +70,18 @@ function rowClassName({ row }: { row: ComicStorageItem }) {
         </div>
       </template>
     </el-table-column>
-    <el-table-column prop="title" label="标题" min-width="150" show-overflow-tooltip />
-    <el-table-column label="HQ" width="100" align="right">
-      <template #default="{ row }">{{ formatSize(row.hqSize) }}</template>
-    </el-table-column>
-    <el-table-column label="LQ" width="100" align="right">
-      <template #default="{ row }">{{ formatSize(row.lqSize) }}</template>
-    </el-table-column>
-    <el-table-column label="HQ 状态" width="100">
+    <el-table-column prop="title" label="漫画名称" min-width="180" show-overflow-tooltip />
+    <el-table-column label="HQ 状态" width="90">
       <template #default="{ row }"><StorageStatusTag :status="row.hqStatus" type="hq" /></template>
     </el-table-column>
-    <el-table-column label="LQ 状态" width="100">
-      <template #default="{ row }"><StorageStatusTag :status="row.lqStatus" type="lq" /></template>
+    <el-table-column label="章节数" width="70" align="center">
+      <template #default="{ row }">{{ row.chapterCount ?? '-' }}</template>
     </el-table-column>
-    <el-table-column label="转码" width="100">
-      <template #default="{ row }">
-        <StorageStatusTag v-if="row.transcodeStatus !== 'NOT_NEEDED'" :status="row.transcodeStatus" type="transcode" />
-      </template>
+    <el-table-column label="HQ 大小" width="100" align="right">
+      <template #default="{ row }">{{ formatSize(row.hqSize) }}</template>
     </el-table-column>
-    <el-table-column label="操作" width="320" fixed="right">
-      <template #default="{ row }">
-        <el-button v-if="row.transcodeStatus === 'PENDING' || row.transcodeStatus === 'FAILED'" type="warning" size="small" :disabled="busyState[row.comicId]" @click="emit('transcodeVideos', row.comicId)">转码</el-button>
-        <el-button v-if="row.hqStatus === 'READY' || row.hqStatus === 'MIXED'" type="danger" size="small" :disabled="busyState[row.comicId]" @click="emit('deleteHq', row.comicId)">删HQ</el-button>
-        <el-button v-if="row.lqStatus === 'NOT_GENERATED' || row.lqStatus === 'MIXED'" type="primary" size="small" :disabled="busyState[row.comicId]" @click="emit('generateLq', row.comicId)">生LQ</el-button>
-        <el-button size="small" type="success" :disabled="busyState[row.comicId]" @click="emit('exportZip', row.comicId)">导出 ZIP</el-button>
-        <el-button size="small" @click="emit('refreshMetadata', row.comicId)">刷新</el-button>
-        <el-button size="small" @click="emit('showChapters', row.comicId)">详情</el-button>
-      </template>
+    <el-table-column label="LQ 大小" width="100" align="right">
+      <template #default="{ row }">{{ formatSize(row.lqSize) }}</template>
     </el-table-column>
   </el-table>
   <el-pagination
@@ -153,10 +121,5 @@ function rowClassName({ row }: { row: ComicStorageItem }) {
   margin-top: var(--space-base);
   display: flex;
   justify-content: flex-end;
-}
-
-:deep(.highlighted-row) {
-  background-color: var(--bg-secondary) !important;
-  transition: background-color 0.5s ease;
 }
 </style>
