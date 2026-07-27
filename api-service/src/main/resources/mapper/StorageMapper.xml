@@ -10,8 +10,8 @@
                 NULL as cover_url,
                 COUNT(DISTINCT ch.id) as chapter_count,
                 COUNT(m.id) as page_count,
-                SUM(CASE WHEN m.media_type = 'IMAGE' AND m.hq_status = 'READY' THEN m.file_size ELSE 0 END) as hq_size,
-                SUM(CASE WHEN m.media_type = 'IMAGE' AND m.lq_status = 'READY' THEN m.lq_size ELSE 0 END) as lq_size,
+                SUM(CASE WHEN m.media_type = 'IMAGE' AND m.hq_status = 'READY' THEN COALESCE(m.file_size, 0) ELSE 0 END) as hq_size,
+                SUM(CASE WHEN m.media_type = 'IMAGE' AND m.lq_status = 'READY' THEN COALESCE(m.lq_size, 0) ELSE 0 END) as lq_size,
                 GROUP_CONCAT(DISTINCT m.hq_status) as hq_status,
                 GROUP_CONCAT(DISTINCT m.lq_status) as lq_status
             FROM comic c
@@ -43,8 +43,8 @@
             NULL as cover_url,
             COUNT(DISTINCT ch.id) as chapter_count,
             COUNT(m.id) as page_count,
-            SUM(CASE WHEN m.hq_status = 'READY' THEN m.file_size ELSE 0 END) as hq_size,
-            SUM(CASE WHEN m.lq_status = 'READY' THEN m.lq_size ELSE 0 END) as lq_size,
+            SUM(CASE WHEN m.hq_status = 'READY' THEN COALESCE(m.file_size, 0) ELSE 0 END) as hq_size,
+            SUM(CASE WHEN m.lq_status = 'READY' THEN COALESCE(m.lq_size, 0) ELSE 0 END) as lq_size,
             GROUP_CONCAT(DISTINCT m.hq_status) as hq_status,
             GROUP_CONCAT(DISTINCT m.lq_status) as lq_status
         FROM comic c
@@ -58,7 +58,7 @@
         SELECT COUNT(DISTINCT c.id)
         FROM comic c
         LEFT JOIN chapter ch ON ch.comic_id = c.id
-        LEFT JOIN page m ON m.chapter_id = ch.id AND m.media_type = 'IMAGE'
+        LEFT JOIN page m ON m.chapter_id = ch.id AND m.media_type IN ('IMAGE', 'VIDEO')
         WHERE c.deleted_at IS NULL
         <if test="query.keyword != null and query.keyword != ''">
             AND c.title LIKE CONCAT('%', #{query.keyword}, '%')
@@ -71,12 +71,12 @@
             ch.chapter_no,
             ch.title,
             COUNT(m.id) as page_count,
-            SUM(CASE WHEN m.media_type = 'IMAGE' AND m.hq_status = 'READY' THEN m.file_size ELSE 0 END) as hq_size,
-            SUM(CASE WHEN m.media_type = 'IMAGE' AND m.lq_status = 'READY' THEN m.lq_size ELSE 0 END) as lq_size,
+            SUM(CASE WHEN m.media_type = 'IMAGE' AND m.hq_status = 'READY' THEN COALESCE(m.file_size, 0) ELSE 0 END) as hq_size,
+            SUM(CASE WHEN m.media_type = 'IMAGE' AND m.lq_status = 'READY' THEN COALESCE(m.lq_size, 0) ELSE 0 END) as lq_size,
             GROUP_CONCAT(DISTINCT m.hq_status) as hq_status,
             GROUP_CONCAT(DISTINCT m.lq_status) as lq_status
         FROM chapter ch
-        LEFT JOIN page m ON m.chapter_id = ch.id AND m.media_type = 'IMAGE'
+        LEFT JOIN page m ON m.chapter_id = ch.id AND m.media_type IN ('IMAGE', 'VIDEO')
         WHERE ch.comic_id = #{comicId}
         GROUP BY ch.id
         ORDER BY ch.sort_order

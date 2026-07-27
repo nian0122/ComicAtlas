@@ -47,13 +47,19 @@ public class LqServiceImpl implements LqService {
             new LambdaQueryWrapper<Media>()
                 .eq(Media::getChapterId, chapterId)
                 .eq(Media::getMediaType, "IMAGE"));
+
+        if (pages.isEmpty()) {
+            log.info("章节无 IMAGE 页，跳过 LQ: chapterId={}", chapterId);
+            return;
+        }
+
         for (Media p : pages) {
             p.setLqStatus("QUEUED");
             mediaMapper.updateById(p);
         }
 
-        // 发 MQ
-        var event = new LqGenerateEvent(UUID.randomUUID(), Instant.now(), ch.getComicId(), chapterId, ch.getChapterNo());
+        // 发 MQ — 目录名用 globalOrder 而非 chapterNo
+        var event = new LqGenerateEvent(UUID.randomUUID(), Instant.now(), ch.getComicId(), chapterId, String.valueOf(ch.getGlobalOrder()));
         TransactionSynchronizationManager.registerSynchronization(
                 new TransactionSynchronization() {
                     @Override
