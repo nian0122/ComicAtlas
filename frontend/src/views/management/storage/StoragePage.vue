@@ -38,6 +38,7 @@
       @delete-hq="handleDeleteHQ"
       @generate-lq="handleGenerateLQ"
       @transcode-videos="handleTranscodeVideos"
+      @refresh-metadata="handleRefreshMetadata"
       @export-zip="handleExportZip"
       @show-chapters="handleShowChapters"
     />
@@ -106,9 +107,8 @@ function reload() {
 }
 
 watch(
-  [() => filterState.hqStatus, () => filterState.lqStatus, () => filterState.keyword, sortState, page, pageSize],
+  [() => filterState.value.hqStatus, () => filterState.value.lqStatus, () => filterState.value.keyword, sortState, page, pageSize],
   reload,
-  { deep: true },
 )
 
 async function executeAndPoll(op: StorageOperation) {
@@ -142,6 +142,20 @@ async function handleTranscodeVideos(comicId: number) {
     polling.start(comicId, StorageOperationType.TranscodeVideos)
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : '转码失败'
+    ElMessage.error(message)
+  }
+}
+
+async function handleRefreshMetadata(comicId: number) {
+  try {
+    await ElMessageBox.confirm('确认刷新该漫画的元数据？将重新扫描 HQ 文件并更新宽高。', '刷新元数据', { type: 'info' })
+  } catch { return }
+  try {
+    await storageService.refreshMetadata(comicId)
+    ElMessage.success('元数据刷新完成')
+    reload()
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : '刷新失败'
     ElMessage.error(message)
   }
 }

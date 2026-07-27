@@ -42,6 +42,12 @@ export const useImportStore = defineStore('import', () => {
   const polling = ref(false)
   const lastUpdated = ref<number | null>(null)
 
+  // 已完成任务独立分页
+  const completedTasks = ref<ImportTaskVO[]>([])
+  const completedTotal = ref(0)
+  const completedPage = ref(1)
+  const completedPageSize = ref(20)
+
   let pollTimer: ReturnType<typeof setInterval> | null = null
 
   // —— Getters ——
@@ -57,9 +63,6 @@ export const useImportStore = defineStore('import', () => {
   /** 失败任务列表 */
   const failedTasks = computed(() => tasks.value.filter(t => t.status === 'FAILED'))
 
-  /** 成功任务列表 */
-  const completedTasks = computed(() => tasks.value.filter(t => t.status === 'SUCCESS'))
-
   /** 进行中任务列表 */
   const activeTasks = computed(() => tasks.value.filter(t => !isTerminal(t.status)))
 
@@ -74,6 +77,22 @@ export const useImportStore = defineStore('import', () => {
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
       error.value = msg || '加载任务列表失败'
+    }
+  }
+
+  async function fetchCompletedTasks(page?: number) {
+    if (page !== undefined) completedPage.value = page
+    try {
+      const res: any = await importApi.list({
+        page: completedPage.value,
+        size: completedPageSize.value,
+        status: 'SUCCESS',
+      })
+      completedTasks.value = (res.data?.records || []) as ImportTaskVO[]
+      completedTotal.value = res.data?.total || 0
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      error.value = msg || '加载已完成任务失败'
     }
   }
 
@@ -168,14 +187,18 @@ export const useImportStore = defineStore('import', () => {
     error,
     polling,
     lastUpdated,
+    completedTasks,
+    completedTotal,
+    completedPage,
+    completedPageSize,
     // getters
     activeCount,
     hasActive,
     activeTasks,
     failedTasks,
-    completedTasks,
     // actions
     fetchList,
+    fetchCompletedTasks,
     create,
     scan,
     createBatch,
