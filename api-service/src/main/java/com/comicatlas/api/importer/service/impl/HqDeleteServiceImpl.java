@@ -57,7 +57,6 @@ public class HqDeleteServiceImpl implements HqDeleteService {
     private HqDeleteResult deleteForChapterInternal(Chapter ch) {
         Long chapterId = ch.getId();
         Long comicId = ch.getComicId();
-        String chapterNo = ch.getChapterNo();
 
         List<Media> imagePages = mediaMapper.selectList(
             new LambdaQueryWrapper<Media>()
@@ -88,9 +87,10 @@ public class HqDeleteServiceImpl implements HqDeleteService {
             throw new HqDeletePreconditionException(details);
         }
 
+        // 目录名用 globalOrder 而非 chapterNo，与导入时的路径一致
         var event = new DeleteHqRequestedEvent(
             UUID.randomUUID(), Instant.now(),
-            comicId, chapterId, chapterNo, "CHAPTER");
+            comicId, chapterId, String.valueOf(ch.getGlobalOrder()), "CHAPTER");
         
         TransactionSynchronizationManager.registerSynchronization(
             new TransactionSynchronization() {

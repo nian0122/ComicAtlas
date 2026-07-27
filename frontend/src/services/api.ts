@@ -113,23 +113,22 @@ export const adminApi = {
   storageChapters: (comicId: number) => api.get(`/admin/storage/comics/${comicId}/chapters`),
   transcodeVideos: (comicId: number) =>
     api.post(`/admin/storage/comics/${comicId}/transcode-videos`),
-  dlqQueues: (credentials: DlqCredentials) =>
-    api.get<readonly DlqQueueVO[]>('/admin/dlq/queues', { auth: credentials }),
-  dlqMessages: (queueName: string, credentials: DlqCredentials, count = 20) =>
+  dlqQueues: () =>
+    api.get<readonly DlqQueueVO[]>('/admin/dlq/queues'),
+  dlqMessages: (queueName: string, count = 20) =>
     api.get<readonly DlqMessageVO[]>(
       `/admin/dlq/queues/${encodeURIComponent(queueName)}/messages`,
-      { auth: credentials, params: { count } },
+      { params: { count } },
     ),
-  dlqReplay: (queueName: string, credentials: DlqCredentials, maxMessages = 100) =>
+  dlqReplay: (queueName: string, maxMessages = 100) =>
     api.post<DlqReplayResult>(
       `/admin/dlq/queues/${encodeURIComponent(queueName)}/replay`,
       undefined,
-      { auth: credentials, params: { maxMessages } },
+      { params: { maxMessages } },
     ),
-  dlqPurge: (queueName: string, credentials: DlqCredentials) =>
+  dlqPurge: (queueName: string) =>
     api.delete<DlqPurgeResult>(
       `/admin/dlq/queues/${encodeURIComponent(queueName)}/messages`,
-      { auth: credentials },
     ),
 }
 

@@ -240,10 +240,7 @@ function goEdit(id: number) {
 }
 
 function goStorage(id: number) {
-  router.push({
-    path: '/manage/storage',
-    query: { highlight: id.toString() }
-  })
+  router.push(`/manage/storage/${id}`)
 }
 
 watch(() => filters.tags, (val) => {

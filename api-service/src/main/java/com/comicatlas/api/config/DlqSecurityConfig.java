@@ -17,7 +17,6 @@ public class DlqSecurityConfig {
             .sessionManagement(session -> session
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(authorize -> authorize
-                .requestMatchers("/api/admin/dlq/**").authenticated()
                 .anyRequest().permitAll())
             .httpBasic(Customizer.withDefaults())
             .build();

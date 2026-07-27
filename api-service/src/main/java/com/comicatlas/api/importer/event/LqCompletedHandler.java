@@ -9,20 +9,27 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.support.AmqpHeaders;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 /**
  * LQ 完成事件处理器。
- * 接收 Worker 发来的 lq.completed 事件，更新 Media 的 lq_status 和 lq_path。
+ * 接收 Worker 发来的 lq.completed 事件，更新 Media 的 lq_status、lq_path 和 lq_size。
+ * 仅处理 IMAGE 类型的页面，VIDEO 页面跳过。
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class LqCompletedHandler {
     private final MediaMapper mediaMapper;
+
+    @Value("${MANGA_ROOT:F:/manga}")
+    private String mangaRoot;
 
     @RabbitListener(queues = "lq.result.queue")
     public void handle(LqCompletedEvent event,
@@ -35,7 +42,10 @@ public class LqCompletedHandler {
         try {
             var pages = mediaMapper.selectList(
                     new LambdaQueryWrapper<Media>()
-                            .eq(Media::getChapterId, chapterId));
+                            .eq(Media::getChapterId, chapterId)
+                            .eq(Media::getMediaType, "IMAGE"));
+
+            Path lqRoot = Path.of(mangaRoot, "lq");
 
             for (Media page : pages) {
                 Integer pageNum = page.getPageNumber();
@@ -51,6 +61,15 @@ public class LqCompletedHandler {
                     if (hqPath != null && !hqPath.isBlank()) {
                         String lqPath = hqPath.replaceAll("\\.[^.]+$", ".webp");
                         page.setLqPath(lqPath);
+                        // 读取 LQ 文件大小
+                        Path lqFile = lqRoot.resolve(lqPath.replace('\\', '/'));
+                        try {
+                            if (Files.exists(lqFile)) {
+                                page.setLqSize(Files.size(lqFile));
+                            }
+                        } catch (Exception e) {
+                            log.debug("无法读取 LQ 文件大小: {}", lqFile, e);
+                        }
                     }
                 }
                 mediaMapper.updateById(page);
