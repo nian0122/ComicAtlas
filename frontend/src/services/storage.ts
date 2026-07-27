@@ -55,11 +55,6 @@ export const storageService = {
     return res.data
   },
 
-  async rebuild() {
-    const res = await adminApi.rebuild()
-    return res.data
-  },
-
   async transcodeVideos(comicId: number) {
     const res = await adminApi.transcodeVideos(comicId)
     return res.data

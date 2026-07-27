@@ -17,14 +17,12 @@ const props = defineProps<{
   filter: Filter
   sort: Sort
   scanning?: boolean
-  rebuilding?: boolean
 }>()
 
 const emit = defineEmits<{
   'update:filter': [value: Filter]
   'update:sort': [value: Sort]
   scanRecover: []
-  rebuild: []
 }>()
 
 function setFilter(patch: Partial<Filter>) {
@@ -43,7 +41,6 @@ const sortModel = computed({
       <h2 class="section-title">操作</h2>
       <div class="action-list">
         <button class="action-btn" :disabled="scanning" @click="emit('scanRecover')">{{ scanning ? '扫描中...' : '扫描并恢复' }}</button>
-        <button class="action-btn" :disabled="rebuilding" @click="emit('rebuild')">{{ rebuilding ? '重建中...' : '重建元数据' }}</button>
         <button class="action-btn danger" disabled>清理未引用文件</button>
       </div>
     </section>
