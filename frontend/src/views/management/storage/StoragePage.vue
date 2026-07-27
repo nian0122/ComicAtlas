@@ -10,9 +10,7 @@
       v-model:filter="filterState"
       v-model:sort="sortState"
       :scanning="scanning"
-      :rebuilding="rebuilding"
       @scan-recover="handleScanRecover"
-      @rebuild="handleRebuild"
     />
 
     <StorageBatchBar
@@ -96,7 +94,6 @@ const polling = useStoragePolling(store)
 const tableRef = ref<InstanceType<typeof StorageTable> | null>(null)
 
 const scanning = ref(false)
-const rebuilding = ref(false)
 const highlightedId = ref<number | null>(null)
 const drawerVisible = ref(false)
 const drawerComicId = ref<number | null>(null)
@@ -270,21 +267,6 @@ async function handleScanRecover() {
     ElMessage.error(message)
   } finally {
     scanning.value = false
-  }
-}
-
-async function handleRebuild() {
-  rebuilding.value = true
-  try {
-    await storageService.rebuild()
-    ElMessage.success('重建完成')
-    reload()
-    await store.loadSummary()
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : '重建失败'
-    ElMessage.error(message)
-  } finally {
-    rebuilding.value = false
   }
 }
 

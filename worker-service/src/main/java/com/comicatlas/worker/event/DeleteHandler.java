@@ -49,6 +49,7 @@ public class DeleteHandler {
             deleteTree(hqRoot, deletedDirs, deletedFiles);
             deleteTree(mangaRoot.resolve("lq").resolve(comicId.toString()), deletedDirs, deletedFiles);
             deleteTree(mangaRoot.resolve("thumbs").resolve(comicId.toString()), deletedDirs, deletedFiles);
+            try { Files.deleteIfExists(mangaRoot.resolve("metadata").resolve(comicId + ".json")); } catch (Exception ignored) {}
 
             Path rawFile = mangaRoot.resolve("raw").resolve(comicId + ".zip");
             try {

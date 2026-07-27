@@ -115,11 +115,11 @@ public class AdminServiceImpl implements AdminService {
         log.info("数据库删除完成: comicId={}, title={}, stats={}", comicId, comic.getTitle(), stats);
 
         if ("DELETE_FILES".equals(mode)) {
-            deleteRecursively(Path.of(mangaRoot, "hq", String.valueOf(comicId)));
-            deleteRecursively(Path.of(mangaRoot, "thumbs", String.valueOf(comicId)));
-            deleteRecursively(Path.of(mangaRoot, "lq", String.valueOf(comicId)));
-            try { Files.deleteIfExists(Path.of(mangaRoot, "metadata", comicId + ".json")); } catch (Exception ignored) {}
-            log.info("本地文件删除完成: comicId={}", comicId);
+            // API 容器 hq/lq/thumbs 挂载为只读，委托 Worker 删除本地文件
+            var deleteEvent = new com.comicatlas.common.event.DeleteRequestedEvent(
+                    UUID.randomUUID(), java.time.Instant.now(), comicId);
+            rabbitTemplate.convertAndSend("comic.delete", "delete.requested", deleteEvent);
+            log.info("已发送文件删除任务: comicId={}", comicId);
         }
 
         return stats;
@@ -168,80 +168,6 @@ public class AdminServiceImpl implements AdminService {
             log.warn("计算目录大小失败: {}", dir, e);
             return 0;
         }
-    }
-
-    @Override
-    public Map<String, Object> rebuildFromHq() {
-        Path hqRoot = Path.of(mangaRoot, "hq");
-        Path metaDir = Path.of(mangaRoot, "metadata");
-        if (!Files.exists(hqRoot)) throw new RuntimeException("HQ 目录不存在: " + hqRoot);
-
-        // 收集已有 comicId（hq 目录名）
-        Set<Long> hqComicIds = new HashSet<>();
-        try (var dirs = Files.newDirectoryStream(hqRoot, Files::isDirectory)) {
-            for (Path d : dirs) {
-                try { hqComicIds.add(Long.parseLong(d.getFileName().toString())); } catch (NumberFormatException ignored) {}
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("扫描 HQ 目录失败", e);
-        }
-
-        int comicsRestored = 0, chaptersRestored = 0, pagesRestored = 0;
-        List<String> errors = new ArrayList<>();
-
-        if (Files.exists(metaDir)) {
-            try (var files = Files.newDirectoryStream(metaDir, "*.json")) {
-                for (Path metaFile : files) {
-                    String fileName = metaFile.getFileName().toString();
-                    Long comicId;
-                    try {
-                        comicId = Long.parseLong(fileName.substring(0, fileName.lastIndexOf('.')));
-                    } catch (NumberFormatException e) {
-                        errors.add(fileName + ": 文件名非数字格式，无法解析 comicId");
-                        continue;
-                    }
-
-                    try {
-                        Map<String, Object> metadata = objectMapper.readValue(metaFile.toFile(), new TypeReference<>() {});
-                        Map<String, Object> comicData = (Map<String, Object>) metadata.get("comic");
-                        if (comicData == null || comicData.get("title") == null || ((String) comicData.get("title")).isBlank()) {
-                            errors.add(fileName + ": comic.title 为空");
-                            continue;
-                        }
-
-                        if (!hqComicIds.contains(comicId)) {
-                            errors.add(fileName + ": comicId=" + comicId + " 在 HQ 目录中不存在，跳过");
-                            continue;
-                        }
-
-                        if (comicMapper.selectById(comicId) != null) {
-                            errors.add(fileName + ": comicId=" + comicId + " 在数据库中已存在，跳过");
-                            continue;
-                        }
-
-                        var result = restoreComic(metadata, comicId);
-                        if (result != null) {
-                            comicsRestored++;
-                            chaptersRestored += (int) result.get("chapters");
-                            pagesRestored += (int) result.get("pages");
-                        }
-                    } catch (Exception e) {
-                        log.error("恢复失败: {}", metaFile, e);
-                        errors.add(fileName + ": " + e.getMessage());
-                    }
-                }
-            } catch (Exception e) {
-                log.warn("metadata 目录扫描失败", e);
-                errors.add("metadata 目录扫描失败: " + e.getMessage());
-            }
-        }
-
-        var result = new LinkedHashMap<String, Object>();
-        result.put("comics", comicsRestored);
-        result.put("chapters", chaptersRestored);
-        result.put("pages", pagesRestored);
-        if (!errors.isEmpty()) result.put("errors", errors);
-        return result;
     }
 
     @Override

@@ -115,15 +115,6 @@
           </div>
         </el-form>
       </div>
-
-      <div class="danger-zone">
-        <h3 class="danger-zone-title">⚠ 危险操作</h3>
-        <div class="danger-zone-actions">
-          <el-button type="danger" plain @click="onDeleteDatabase">删除数据库记录</el-button>
-          <el-button type="danger" @click="onDeleteAll">删除数据库 + 本地文件</el-button>
-          <el-button type="warning" plain :loading="refreshing" @click="onRebuild">重建元数据</el-button>
-        </div>
-      </div>
     </div>
 
   </div>
@@ -153,7 +144,6 @@ const comicId = Number(route.params.id)
 const formRef = ref()
 const loading = ref(false)
 const saving = ref(false)
-const refreshing = ref(false)
 
 const form = ref<ComicMetadataUpdateDTO>({
   title: '',
@@ -293,59 +283,6 @@ async function handleSave() {
 
 function goBack() {
   router.push('/manage/comics')
-}
-
-async function onDeleteDatabase() {
-  try {
-    await ElMessageBox.confirm(
-      '确定仅删除数据库记录？所有章节、页面、标签关联将被移除，本地文件保留。',
-      '删除数据库记录',
-      { type: 'warning', confirmButtonText: '确定删除' }
-    )
-    await adminApi.deleteComic(comicId, 'DATABASE_ONLY')
-    ElMessage.success('数据库记录已删除')
-    router.push('/manage/comics')
-  } catch (err: unknown) {
-    if (err === 'cancel') return
-    const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-    ElMessage.error(msg || '删除失败')
-  }
-}
-
-async function onDeleteAll() {
-  try {
-    await ElMessageBox.confirm(
-      '确定删除数据库记录和所有本地文件？包括 HQ / LQ / 缩略图。此操作不可恢复！',
-      '删除数据库 + 本地文件',
-      { type: 'warning', confirmButtonText: '全部删除' }
-    )
-    await adminApi.deleteComic(comicId, 'DELETE_FILES')
-    ElMessage.success('数据库记录和本地文件已删除')
-    router.push('/manage/comics')
-  } catch (err: unknown) {
-    if (err === 'cancel') return
-    const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-    ElMessage.error(msg || '删除失败')
-  }
-}
-
-async function onRebuild() {
-  try {
-    await ElMessageBox.confirm(
-      '将从 HQ 目录和 metadata 文件刷新当前漫画的元数据。',
-      '重建元数据',
-      { type: 'info', confirmButtonText: '开始重建' }
-    )
-    refreshing.value = true
-    const data: any = await adminApi.refreshMetadata(comicId)
-    ElMessage.success(`刷新完成：${data.data.chapters} 章节，${data.data.pages} 页`)
-  } catch (err: unknown) {
-    if (err === 'cancel') return
-    const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-    ElMessage.error(msg || '刷新失败')
-  } finally {
-    refreshing.value = false
-  }
 }
 
 onMounted(loadData)
