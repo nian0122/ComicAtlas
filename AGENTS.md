@@ -169,6 +169,59 @@ URL 统一由 `FileUrlResolver.resolve(page)` 生成，不手拼。
 - 提交: 中文 commit message
 - 包名: `com.comicatlas.api.importer`（非 `import`，关键字冲突）
 
+## GIT 工作流
+
+### 分支职责
+
+- `main`：用户稳定版本，只允许合并已验证的发布内容；当前 1.0 版本使用标签 `v1.0.0`。
+- `develop`：日常开发和下一版本集成，必须保持可构建。
+- `feature/<名称>`：从 `develop` 创建的短期功能分支。
+- `fix/<名称>`：从 `develop` 创建的普通缺陷修复分支。
+- `hotfix/<名称>`：从 `main` 创建的线上紧急修复分支，修复后必须同时合并回 `main` 和 `develop`。
+
+禁止直接在 `main` 上开发。开始工作前先同步目标分支：
+
+```bash
+git switch develop
+git pull --rebase origin develop
+git switch -c feature/<功能名称>
+```
+
+### 提交规范
+
+- 对话、注释、提交信息始终使用中文。
+- 一个提交只解决一个完整问题，避免把功能、格式化、无关清理混在一起。
+- 提交信息使用“动作 + 内容”，例如：`修复阅读器章节切换`、`新增漫画批量导入`、`完善 1.0 用户指南`。
+- 提交前必须检查 `git status`、`git diff` 和 `git diff --cached`，确认没有 `.env`、日志、构建产物、漫画文件或无关修改。
+- 不提交宿主机绝对路径、数据库密码、远程服务凭据和个人漫画文件。
+
+### 合并和发布
+
+功能完成后先在功能分支验证，再合并到 `develop`：
+
+```bash
+git add <相关文件>
+git commit -m "完成 <功能名称>"
+git switch develop
+git merge --no-ff feature/<功能名称> -m "合入 <功能名称>"
+```
+
+发布流程：
+
+1. 在 `develop` 完成前端构建、后端测试和真实导入—阅读链路验证。
+2. 将 `develop` 合并到 `main`，提交信息使用 `发布 X.Y.Z`。
+3. 在 `main` 创建带注释标签：`git tag -a vX.Y.Z -m "ComicAtlas X.Y.Z 稳定版本"`。
+4. 发布后推送分支和标签：`git push origin main --follow-tags`、`git push origin develop`。
+5. 发布说明放在 `docs/release/vX.Y.Z.md`，用户操作说明维护在 `README.md` 和 `docs/user-guide.md`。
+
+### 安全和回滚
+
+- 禁止使用 `git push --force` 覆盖共享分支；确需改写历史时必须先确认。
+- 禁止未经明确授权执行 `git reset --hard`、批量删除或清理用户文件。
+- 撤销未提交的单个文件使用 `git restore <文件>`，执行前必须确认目标文件不含用户改动。
+- 发布问题优先从 `main` 创建 `hotfix/<名称>`，修复并验证后同时合并回 `main` 和 `develop`。
+- 合并前检查工作区干净；保留与任务无关的用户修改，不得擅自覆盖或丢弃。
+
 ## ANTI-PATTERNS
 - 禁止 Worker 直接写 MySQL → 全部通过 MQ 事件回 API
 - 禁止 LQ 自动生成 → 手动触发
