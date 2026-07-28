@@ -18,7 +18,7 @@ const emit = defineEmits<{
   rowClick: [comicId: number]
 }>()
 
-const tableRef = ref<InstanceType<typeof import('element-plus').ElTable> | null>(null)
+const tableRef = ref()
 
 function clearSelection() {
   tableRef.value?.clearSelection()

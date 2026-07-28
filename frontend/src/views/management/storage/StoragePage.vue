@@ -14,7 +14,6 @@
     />
 
     <StorageTable
-      ref="tableRef"
       :list="pagedList"
       :total="pagination.total"
       :current-page="page"
@@ -51,7 +50,6 @@ const {
   buildQuery,
 } = useStorageFilter(() => store.comicList, () => store.serverTotal)
 
-const tableRef = ref<InstanceType<typeof StorageTable> | null>(null)
 const scanning = ref(false)
 
 function reload() {
