@@ -23,8 +23,8 @@ public class TranscodeCompletedHandler {
             Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         try {
             Media media = mediaMapper.selectById(event.pageId());
-            if (media == null || !"PROCESSING".equals(media.getTranscodeStatus())) {
-                log.warn("TranscodeCompleted: page not in PROCESSING, skip. pageId={}", event.pageId());
+            if (media == null || !"PENDING".equals(media.getTranscodeStatus())) {
+                log.warn("TranscodeCompleted: page not in PENDING, skip. pageId={}", event.pageId());
                 channel.basicAck(tag, false);
                 return;
             }

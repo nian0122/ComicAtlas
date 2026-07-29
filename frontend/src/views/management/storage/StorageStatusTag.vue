@@ -26,7 +26,7 @@ const STATUS_MAP: Record<string, Record<string, { type: string; text: string }>>
   },
   transcode: {
     NOT_NEEDED: { type: '', text: '' },
-    PENDING: { type: 'warning', text: '待转码' },
+    PENDING: { type: 'warning', text: '转码中' },
     PROCESSING: { type: 'warning', text: '转码中' },
     DONE: { type: 'success', text: '已转码' },
     FAILED: { type: 'danger', text: '失败' },
