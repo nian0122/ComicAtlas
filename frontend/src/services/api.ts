@@ -98,7 +98,8 @@ export const exportApi = {
 export const adminApi = {
   deleteComic: (id: number, mode: string) => api.delete(`/admin/comics/${id}`, { params: { mode } }),
   refreshMetadata: (id: number) => api.post(`/admin/comics/${id}/refresh-metadata`),
-  scanRecover: () => api.post('/admin/storage/scan-recover'),
+  // scanRecover 已迁移至异步恢复任务中心 POST /api/tasks/recovery
+  // 旧同步接口 POST /admin/storage/scan-recover 后端保留供兼容
   stats: () => api.get('/admin/storage/stats'),
   storageComics: (params: {
     page?: number

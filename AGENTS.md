@@ -1,6 +1,6 @@
 # PROJECT KNOWLEDGE BASE - ComicAtlas
 
-**Updated:** 2026-07-22
+**Updated:** 2026-07-29
 **Branch:** main
 **语言**: 始终使用中文对话、注释、提交信息。
 
@@ -14,7 +14,7 @@ Spring Boot 3 + Vue3 + RabbitMQ + MySQL + Redis。
 comic-atlas/
 ├── api-service/             # 漫画CRUD + 导入 + Catalog + Reader + LQ/HQ删除 + MQ消费
 ├── worker-service/          # 文件处理 + MQ消费 + 下载 + 解压 + 解析 + LQ/HQ删除 + ffprobe
-├── comic-common/            # 共享事件 DTO（11 个 record + ComicEvent sealed interface，Jackson 多态序列化）
+├── comic-common/            # 共享事件 DTO（16 个 record + ComicEvent sealed interface，Jackson 多态序列化）
 ├── gateway/                 # Spring Cloud Gateway: 路由 + Nacos发现
 ├── frontend/                # Vue3/Vite: 列表 + 详情 + 阅读器 + 管理后台 + 存储管理
 ├── docs/                    # api.md + superpowers/specs|plans
@@ -38,7 +38,13 @@ comic-atlas/
 | LQ 完成处理 | `api-service/.../event/LqCompletedHandler.java` | 更新 media.lq_status + lq_path |
 | HQ 删除完成 | `api-service/.../event/HqDeletedHandler.java` | 更新 media.hq_status=DELETED |
 | 删除完成处理 | `api-service/.../event/DeleteEventHandler.java` | DB 级联删除 |
-| 事件 DTO | `comic-common/.../event/` | 12 个 record + ComicEvent sealed interface |
+| 恢复任务 API | `api-service/.../controller/RecoveryTaskController.java` | POST /api/tasks/recovery |
+| 恢复任务 Service | `api-service/.../service/impl/RecoveryTaskServiceImpl.java` | 创建/重试/列表 |
+| 恢复事件发布 | `api-service/.../event/RecoveryEventPublisher.java` | 发送恢复事件到 MQ |
+| 恢复事件处理 | `api-service/.../event/RecoveryEventHandler.java` | 消费 MQ 事件，逐本调用 RecoveryEngine |
+| 恢复引擎 | `api-service/.../recovery/RecoveryEngine.java` | 单本漫画的 DB 恢复逻辑 |
+| Worker 恢复入口 | `worker-service/.../event/RecoveryTaskHandler.java` | 扫描 HQ 目录，发布 comicId 列表 |
+| 事件 DTO | `comic-common/.../event/` | 16 个 record + ComicEvent sealed interface |
 | Worker 入口 | `worker-service/.../event/ImportTaskHandler.java` | sourceType 路由到统一 handler |
 | 取消任务 | `worker-service/.../event/CancelHandler.java` | ConcurrentHashMap 标记 |
 | LQ 生成 | `worker-service/.../event/LqGenerateHandler.java` | 调用 ImageOptimizer 外部工具 |
@@ -119,8 +125,12 @@ URL 统一由 `FileUrlResolver.resolve(page)` 生成，不手拼。
 | comic.image | hq.delete.completed | hq.delete.result.queue | API HqDeletedHandler |
 | comic.delete | delete.requested | delete.task.queue | Worker DeleteHandler |
 | comic.delete | delete.completed | delete.result.queue | API DeleteEventHandler |
+| comic.recovery | recovery.requested | recovery.task.queue | Worker RecoveryTaskHandler |
+| comic.recovery | recovery.progress | recovery.result.queue | API RecoveryEventHandler |
+| comic.recovery | recovery.completed | recovery.result.queue | API RecoveryEventHandler |
+| comic.recovery | recovery.failed | recovery.result.queue | API RecoveryEventHandler |
 
-**死信**: 所有主队列配置 DLX + DLQ（comic.import.dlx / comic.image.dlx / comic.delete.dlx）
+**死信**: 所有主队列配置 DLX + DLQ（comic.import.dlx / comic.image.dlx / comic.delete.dlx / comic.recovery.dlx）
 
 **序列化**: Jackson2JsonMessageConverter
 
@@ -138,6 +148,10 @@ URL 统一由 `FileUrlResolver.resolve(page)` 生成，不手拼。
 | HqDeleted | comic.image.hq.delete.completed | HqDeletedEvent |
 | CancelTask | comic.task.cancel.requested | CancelTaskEvent |
 | TaskStatusChanged | comic.task.status.changed | TaskStatusChangedEvent |
+| RecoveryRequested | comic.recovery.requested | RecoveryRequestedEvent |
+| RecoveryScanCompleted | comic.recovery.progress | RecoveryScanCompletedEvent |
+| RecoveryCompleted | comic.recovery.completed | RecoveryCompletedEvent |
+| RecoveryFailed | comic.recovery.failed | RecoveryFailedEvent |
 
 ## CONFIG / ENV
 | 变量 | 默认值 | 说明 |

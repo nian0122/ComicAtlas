@@ -344,6 +344,27 @@ export interface ExportTaskVO {
   completedAt?: string
 }
 
+// ========== Recovery Domain ==========
+
+/** 存储恢复任务 */
+export interface RecoveryTaskVO {
+  id: number
+  status: string // PENDING | RUNNING | SUCCESS | FAILED
+  totalComics: number
+  recoveredComics: number
+  skippedComics: number
+  placeholderComics: number
+  errorComics: number
+  errorMessage?: string
+  errorDetails?: string
+  retryCount: number
+  createdAt: string
+  startedAt?: string
+  endedAt?: string
+}
+
+// ========== Export Domain ==========
+
 export const EXPORT_STATUS_COLOR_MAP: Record<string, string> = {
   PENDING: 'info',
   RUNNING: 'warning',

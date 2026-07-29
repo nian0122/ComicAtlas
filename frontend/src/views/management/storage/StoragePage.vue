@@ -9,8 +9,6 @@
     <StorageToolbar
       v-model:filter="filterState"
       v-model:sort="sortState"
-      :scanning="scanning"
-      @scan-recover="handleScanRecover"
     />
 
     <StorageTable
@@ -27,12 +25,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
 import { useStorageStore } from '@/stores/management/storage'
 import { useStorageFilter } from '@/composables/storage/useStorageFilter'
-import { storageService } from '@/services/storage'
 import StorageSummary from './StorageSummary.vue'
 import StorageToolbar from './StorageToolbar.vue'
 import StorageTable from './StorageTable.vue'
@@ -50,8 +46,6 @@ const {
   buildQuery,
 } = useStorageFilter(() => store.comicList, () => store.serverTotal)
 
-const scanning = ref(false)
-
 function reload() {
   store.loadComics(buildQuery())
 }
@@ -63,21 +57,6 @@ watch(
 
 function handleShowDetail(comicId: number) {
   router.push(`/manage/storage/${comicId}`)
-}
-
-async function handleScanRecover() {
-  scanning.value = true
-  try {
-    await storageService.scanRecover()
-    ElMessage.success('扫描完成')
-    reload()
-    await store.loadSummary()
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : '扫描失败'
-    ElMessage.error(message)
-  } finally {
-    scanning.value = false
-  }
 }
 
 onMounted(async () => {
