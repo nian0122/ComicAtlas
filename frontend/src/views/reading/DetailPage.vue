@@ -29,7 +29,7 @@
               <span class="progress-percent">{{ comic.progressPercent || 0 }}%</span>
             </div>
             <div class="progress-bar">
-              <div class="progress-fill" :style="{ width: progressWidth }" />
+              <div class="progress-fill" :style="{ transform: `scaleX(${progressScale})` }" />
             </div>
           </div>
         </template>
@@ -179,15 +179,15 @@ const progressMetaText = computed(() => {
   return pageText
 })
 
-const progressWidth = computed(
-  () => `${Math.min(100, Math.max(0, comic.value?.progressPercent || 0))}%`
+const progressScale = computed(
+  () => Math.min(100, Math.max(0, comic.value?.progressPercent || 0)) / 100
 )
 
 const primaryAction = computed(() => {
   // 有阅读历史 → 继续阅读（桌面端与移动端一致）
   if (comic.value?.lastReadChapterId) {
     return {
-      label: '▶ 继续阅读',
+      label: '继续阅读',
       onClick: continueRead,
     }
   }
@@ -331,12 +331,12 @@ onMounted(loadData)
 }
 
 .hero-btn--secondary {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--color-overlay-soft);
   color: var(--text-primary);
 }
 
 .hero-btn--secondary:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: var(--color-overlay-hover);
 }
 
 /* Progress */
@@ -370,16 +370,18 @@ onMounted(loadData)
 
 .progress-bar {
   height: 4px;
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--color-progress-track);
   border-radius: var(--radius-pill);
   overflow: hidden;
 }
 
 .progress-fill {
+  width: 100%;
   height: 100%;
   background: var(--accent);
   border-radius: var(--radius-pill);
-  transition: width var(--transition-normal);
+  transform-origin: left center;
+  transition: transform var(--transition-normal);
 }
 
 /* Information */
@@ -497,7 +499,7 @@ onMounted(loadData)
 .spinner {
   width: 40px;
   height: 40px;
-  border: 3px solid rgba(255, 255, 255, 0.15);
+  border: 3px solid var(--color-progress-track);
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 1s linear infinite;

@@ -3,7 +3,7 @@
     <div class="nav-shell">
       <router-link to="/" class="nav-logo" aria-label="ComicAtlas 首页">
         <span class="logo-mark" aria-hidden="true">CA</span>
-        <span class="logo-wordmark">ComicAtlas</span>
+        <span class="logo-wordmark">COMICATLAS</span>
       </router-link>
 
       <nav class="desktop-nav" aria-label="主要导航">
@@ -11,14 +11,17 @@
         <router-link to="/library" class="nav-link" active-class="active">漫画库</router-link>
         <router-link to="/history" class="nav-link" active-class="active">阅读历史</router-link>
         <span class="nav-divider" aria-hidden="true" />
-        <router-link to="/manage" class="nav-link nav-link--quiet" active-class="active">
-          管理
+        <router-link to="/manage" class="nav-link nav-link--management" active-class="active">
+          仓库管理
         </router-link>
       </nav>
 
-      <router-link to="/manage/import" class="import-btn" aria-label="在桌面端导入漫画">
+      <router-link to="/manage/import" class="import-btn desktop-action" aria-label="在桌面端导入漫画">
         <el-icon :size="18"><UploadFilled /></el-icon>
         <span>导入漫画</span>
+      </router-link>
+      <router-link to="/library" class="mobile-search" aria-label="搜索漫画">
+        <el-icon :size="22"><Search /></el-icon>
       </router-link>
     </div>
   </header>
@@ -41,7 +44,7 @@
 
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
-import { Clock, Collection, House, UploadFilled } from '@element-plus/icons-vue'
+import { Clock, Collection, House, Search, UploadFilled } from '@element-plus/icons-vue'
 
 const isScrolled = ref(false)
 
@@ -66,7 +69,7 @@ onBeforeUnmount(() => {
   z-index: var(--z-nav);
   height: var(--nav-height);
   border-bottom: 1px solid transparent;
-  background: linear-gradient(to bottom, var(--bg-primary), transparent);
+  background: var(--nav-gradient);
   transition:
     background-color var(--transition-normal),
     border-color var(--transition-normal);
@@ -74,7 +77,8 @@ onBeforeUnmount(() => {
 
 .top-nav.scrolled {
   border-bottom-color: var(--border);
-  background: var(--bg-secondary);
+  background: var(--nav-solid);
+  box-shadow: var(--nav-shadow);
 }
 
 .nav-shell {
@@ -101,21 +105,20 @@ onBeforeUnmount(() => {
   place-items: center;
   width: 32px;
   height: 32px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-xs);
   background: var(--accent);
   color: var(--color-on-brand);
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 900;
   letter-spacing: -0.04em;
-  box-shadow: inset 0 0 0 1px var(--accent-hover);
+  box-shadow: var(--brand-shadow);
 }
 
 .logo-wordmark {
-  font-family: var(--font-editorial);
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: -0.035em;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.035em;
 }
 
 .desktop-nav {
@@ -159,8 +162,8 @@ onBeforeUnmount(() => {
   transform: scaleX(1);
 }
 
-.nav-link--quiet {
-  color: var(--text-muted);
+.nav-link--management {
+  color: var(--text-secondary);
 }
 
 .nav-divider {
@@ -176,10 +179,10 @@ onBeforeUnmount(() => {
   gap: var(--space-2);
   min-height: 44px;
   padding-inline: var(--space-4);
-  border: 1px solid var(--accent-border);
-  border-radius: var(--radius-sm);
-  background: var(--accent-bg);
-  color: var(--accent-hover);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--text-primary);
+  color: var(--bg-primary);
   font-size: var(--text-sm);
   font-weight: 700;
   transition:
@@ -189,10 +192,9 @@ onBeforeUnmount(() => {
 }
 
 .import-btn:hover {
-  border-color: var(--accent);
   background: var(--accent);
   color: var(--color-on-brand);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
 }
 
 .import-btn:active {
@@ -203,10 +205,14 @@ onBeforeUnmount(() => {
   display: none;
 }
 
+.mobile-search {
+  display: none;
+}
+
 @media (max-width: 768px) {
   .top-nav {
     border-bottom-color: var(--border);
-    background: var(--bg-secondary);
+    background: var(--nav-solid);
   }
 
   .nav-shell {
@@ -220,16 +226,20 @@ onBeforeUnmount(() => {
   }
 
   .logo-wordmark {
-    font-size: 18px;
+    font-size: 16px;
   }
 
-  .import-btn {
-    width: 44px;
-    padding: 0;
-  }
-
-  .import-btn span {
+  .desktop-action {
     display: none;
+  }
+
+  .mobile-search {
+    display: inline-grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    color: var(--text-primary);
   }
 
   .mobile-tabbar {
@@ -242,9 +252,9 @@ onBeforeUnmount(() => {
     grid-template-columns: repeat(3, 1fr);
     min-height: var(--mobile-tabbar-height);
     padding: var(--space-2);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-lg);
-    background: var(--bg-surface);
+    border: 1px solid var(--color-border-faint);
+    border-radius: var(--radius-pill);
+    background: var(--mobile-tabbar-bg);
     box-shadow: var(--shadow-overlay);
   }
 
@@ -264,8 +274,19 @@ onBeforeUnmount(() => {
   }
 
   .mobile-tab.active {
-    background: var(--accent-bg);
-    color: var(--accent-hover);
+    background: var(--surface-highlight);
+    color: var(--text-primary);
+  }
+
+  .mobile-tab.active::after {
+    position: absolute;
+    right: 28%;
+    bottom: 4px;
+    left: 28%;
+    height: 2px;
+    border-radius: var(--radius-pill);
+    content: "";
+    background: var(--accent);
   }
 }
 </style>
