@@ -251,9 +251,10 @@ POST /api/admin/storage/comics/{comicId}/transcode-videos
 {
   "comicId": 92,
   "totalVideoPages": 15,
+  "notNeededCount": 5,
+  "submittedCount": 3,
   "pendingCount": 3,
-  "alreadyDone": 10,
-  "processingCount": 2,
+  "doneCount": 7,
   "failedCount": 0
 }
 ```
@@ -261,10 +262,11 @@ POST /api/admin/storage/comics/{comicId}/transcode-videos
 | 字段 | 说明 |
 |------|------|
 | `totalVideoPages` | 漫画下所有 VIDEO 类型页面总数 |
-| `pendingCount` | 本次从 NOT_NEEDED/FAILED 标记为 PENDING 的数量 |
-| `alreadyDone` | 已完成的页面数（transcode_status = DONE） |
-| `processingCount` | 已是 PENDING 的页面数（跳过，不计入 pendingCount） |
-| `failedCount` | 转码失败的页面数（不计入 pendingCount，除非 container 仍需转码） |
+| `notNeededCount` | 无需转码的页面数（transcode_status = NOT_NEEDED） |
+| `submittedCount` | 本次从 NOT_NEEDED/FAILED 标记为 PENDING 并提交的数量 |
+| `pendingCount` | 当前待处理的页面总数，包含本次提交数量 |
+| `doneCount` | 已完成的页面数（transcode_status = DONE） |
+| `failedCount` | 当前转码失败的页面数 |
 
 **transcode_status 状态机**：
 ```

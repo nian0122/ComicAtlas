@@ -18,7 +18,7 @@ public class TranscodeFailedHandler {
 
     private final MediaMapper mediaMapper;
 
-    @RabbitListener(queues = "video.transcode.result.queue")
+    @RabbitListener(queues = "video.transcode.failed.queue")
     public void handleFailed(VideoTranscodeFailedEvent event,
             Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         try {

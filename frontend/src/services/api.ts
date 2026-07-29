@@ -7,6 +7,16 @@ import type {
   BatchComicUpdateDTO,
 } from '@/types'
 
+export type VideoTranscodeResult = {
+  readonly comicId: number
+  readonly totalVideoPages: number
+  readonly notNeededCount: number
+  readonly submittedCount: number
+  readonly pendingCount: number
+  readonly doneCount: number
+  readonly failedCount: number
+}
+
 const api = axios.create({ baseURL: '/api' })
 
 api.interceptors.response.use(
@@ -113,7 +123,7 @@ export const adminApi = {
   storageComic: (comicId: number) => api.get(`/admin/storage/comics/${comicId}`),
   storageChapters: (comicId: number) => api.get(`/admin/storage/comics/${comicId}/chapters`),
   transcodeVideos: (comicId: number) =>
-    api.post(`/admin/storage/comics/${comicId}/transcode-videos`),
+    api.post<VideoTranscodeResult>(`/admin/storage/comics/${comicId}/transcode-videos`),
   dlqQueues: () =>
     api.get<readonly DlqQueueVO[]>('/admin/dlq/queues'),
   dlqMessages: (queueName: string, count = 20) =>
