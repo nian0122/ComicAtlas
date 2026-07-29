@@ -86,8 +86,53 @@
 
 #### 恢复
 
-- 从 HQ 目录重建或补充数据库记录。
-- 处理 `PLACEHOLDER` 状态的漫画。
+异步任务驱动的存储恢复，通过任务中心统一管理。
+
+**流程概述**：
+
+```
+用户点击"从存储恢复数据库记录"
+  ↓
+API RecoveryTaskService: 检查无 PENDING/RUNNING 任务 → INSERT recovery_task(PENDING)
+  ↓ MQ recovery.requested
+Worker RecoveryTaskHandler: 扫描 MANGA_ROOT/hq/{comicId}/ 收集所有数字目录 ID
+  ↓ MQ recovery.progress（携带 comicId 列表）
+API RecoveryEventHandler: 标记 RUNNING → 逐本调用 RecoveryEngine.processComicDir()
+  ↓
+  ├─ metadata 文件存在 → 恢复完整漫画（comic/chapter/page/media），状态 READY
+  ├─ metadata 文件缺失 → 创建 PLACEHOLDER 漫画（标题为"未知漫画 {comicId}"），不参与普通列表
+  ├─ 数据库记录已存在 → skipped，不重复创建
+  └─ 异常 → error，记录错误信息，不中断整体流程
+  ↓
+全部处理完成 → SUCCESS（含 total/recovered/skipped/placeholder/error 计数器）
+基础设施故障 → FAILED
+```
+
+**RecoveryTask 模型**：
+
+| 字段 | 说明 |
+|------|------|
+| status | PENDING → RUNNING → SUCCESS / FAILED |
+| totalComics | 扫描到的漫画目录总数 |
+| recoveredComics | 成功恢复的漫画数 |
+| skippedComics | 已存在而跳过的漫画数 |
+| placeholderComics | 无 metadata 创建的 PLACEHOLDER 漫画数 |
+| errorComics | 处理失败的漫画数 |
+| errorMessage | 最新错误信息（单条） |
+| retryCount | 重试次数 |
+
+**状态机**：
+
+```text
+PENDING ──► RUNNING ──► SUCCESS
+   ▲           │
+   │           ▼
+   └── retry ◄── FAILED
+```
+
+- 不支持取消。
+- 仅 FAILED 状态可重试，重试时重置为 PENDING 并重新发送 MQ。
+- 同一时刻只允许一个恢复任务运行（创建时返回 409 冲突）。
 
 #### 清理
 

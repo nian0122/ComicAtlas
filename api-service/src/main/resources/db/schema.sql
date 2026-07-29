@@ -127,6 +127,24 @@ CREATE TABLE IF NOT EXISTS import_task (
     FOREIGN KEY (comic_id) REFERENCES comic(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS recovery_task (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    status VARCHAR(32) NOT NULL DEFAULT 'PENDING',
+    total_comics INT DEFAULT 0,
+    recovered_comics INT DEFAULT 0,
+    skipped_comics INT DEFAULT 0,
+    placeholder_comics INT DEFAULT 0,
+    error_comics INT DEFAULT 0,
+    error_message TEXT,
+    error_details TEXT,
+    retry_count INT DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    started_at DATETIME,
+    ended_at DATETIME,
+    INDEX idx_status (status),
+    INDEX idx_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS export_task (
     id          BIGINT AUTO_INCREMENT PRIMARY KEY,
     comic_id    BIGINT      NOT NULL,

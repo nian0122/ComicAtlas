@@ -10,6 +10,7 @@
   >
     <VideoPlayer
       v-if="isVideo"
+      :media-id="page.id"
       :hq-url="page.hqUrl"
       :media-type="page.mediaType ?? 'VIDEO'"
       :width="page.width"
@@ -18,6 +19,8 @@
       :container="page.container"
       :video-codec="page.videoCodec"
       :audio-codec="page.audioCodec"
+      :active="active"
+      :scroller-root="scrollerRoot"
       :class="imageClasses"
     />
     <ProgressiveImage
@@ -47,6 +50,7 @@ interface Props {
   active: boolean
   itemHeight: number
   forceHq: boolean
+  scrollerRoot: HTMLElement | null
 }
 
 const props = defineProps<Props>()

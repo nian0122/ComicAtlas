@@ -27,7 +27,7 @@ body,
 
 body {
   background:
-    radial-gradient(circle at 82% -10%, var(--accent-bg), transparent 30rem),
+    radial-gradient(circle at 86% -8%, var(--accent-bg), transparent 28rem),
     var(--bg-primary);
   color: var(--text-secondary);
 }
@@ -38,15 +38,8 @@ body::before {
   z-index: -1;
   pointer-events: none;
   content: "";
-  opacity: 0.26;
-  background-image: linear-gradient(
-    to bottom,
-    transparent 0,
-    transparent calc(100% - 1px),
-    var(--border) calc(100% - 1px)
-  );
-  background-size: 100% 32px;
-  mask-image: linear-gradient(to bottom, transparent, black 24%, transparent);
+  opacity: 0.18;
+  background: var(--page-atmosphere);
 }
 
 h1,
@@ -56,7 +49,7 @@ h4 {
   margin: 0;
   color: var(--text-primary);
   font-family: var(--font-editorial);
-  font-weight: 700;
+  font-weight: 800;
   text-wrap: balance;
 }
 
@@ -87,7 +80,7 @@ a {
 }
 
 a:hover {
-  color: var(--accent-hover);
+  color: var(--text-primary);
 }
 
 button,

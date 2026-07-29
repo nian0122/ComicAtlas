@@ -1,0 +1,130 @@
+package com.comicatlas.api.export.event;
+
+import com.comicatlas.api.comic.entity.Media;
+import com.comicatlas.api.comic.mapper.MediaMapper;
+import com.comicatlas.common.event.VideoTranscodeFailedEvent;
+import com.rabbitmq.client.Channel;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.Instant;
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class TranscodeFailedHandlerTest {
+
+    @Mock
+    private MediaMapper mediaMapper;
+
+    @Mock
+    private Channel channel;
+
+    private TranscodeFailedHandler handler;
+
+    @BeforeEach
+    void setUp() {
+        handler = new TranscodeFailedHandler(mediaMapper);
+    }
+
+    // ======================== 正向流程 ========================
+
+    @Test
+    void PENDING_to_FAILED() throws Exception {
+        // Given: PENDING 状态的页面
+        long pageId = 1L;
+
+        Media media = new Media();
+        media.setId(pageId);
+        media.setTranscodeStatus("PENDING");
+        when(mediaMapper.selectById(pageId)).thenReturn(media);
+        when(mediaMapper.updateById(any(Media.class))).thenReturn(1);
+
+        VideoTranscodeFailedEvent event = new VideoTranscodeFailedEvent(
+                UUID.randomUUID(), Instant.now(), pageId, 100L,
+                "ffmpeg returned exit code 1");
+
+        // When
+        handler.handleFailed(event, channel, 1L);
+
+        // Then: 变为 FAILED
+        assertEquals("FAILED", media.getTranscodeStatus());
+        verify(mediaMapper).updateById(media);
+        verify(channel).basicAck(1L, false);
+    }
+
+    // ======================== 幂等性 — DONE ========================
+
+    @Test
+    void DONE_page_failedEvent_idempotent_noChange() throws Exception {
+        // Given: 已经是 DONE 的页面，收到 failed 事件（乱序/重复投递）
+        long pageId = 2L;
+
+        Media media = new Media();
+        media.setId(pageId);
+        media.setTranscodeStatus("DONE");
+        when(mediaMapper.selectById(pageId)).thenReturn(media);
+
+        VideoTranscodeFailedEvent event = new VideoTranscodeFailedEvent(
+                UUID.randomUUID(), Instant.now(), pageId, 100L,
+                "late delivery");
+
+        // When
+        handler.handleFailed(event, channel, 1L);
+
+        // Then: 不更新，直接 ACK
+        verify(mediaMapper, never()).updateById(any(Media.class));
+        verify(channel).basicAck(1L, false);
+        assertEquals("DONE", media.getTranscodeStatus());
+    }
+
+    // ======================== 幂等性 — FAILED ========================
+
+    @Test
+    void FAILED_page_failedEvent_idempotent_noChange() throws Exception {
+        // Given: 已经是 FAILED
+        long pageId = 3L;
+
+        Media media = new Media();
+        media.setId(pageId);
+        media.setTranscodeStatus("FAILED");
+        when(mediaMapper.selectById(pageId)).thenReturn(media);
+
+        VideoTranscodeFailedEvent event = new VideoTranscodeFailedEvent(
+                UUID.randomUUID(), Instant.now(), pageId, 100L,
+                "duplicate delivery");
+
+        // When
+        handler.handleFailed(event, channel, 1L);
+
+        // Then: 不更新
+        verify(mediaMapper, never()).updateById(any(Media.class));
+        verify(channel).basicAck(1L, false);
+    }
+
+    // ======================== 不存在的 pageId ========================
+
+    @Test
+    void nonExistent_pageId_ackWithoutError() throws Exception {
+        // Given: 不存在的页面
+        long pageId = 999L;
+        when(mediaMapper.selectById(pageId)).thenReturn(null);
+
+        VideoTranscodeFailedEvent event = new VideoTranscodeFailedEvent(
+                UUID.randomUUID(), Instant.now(), pageId, 100L,
+                "page gone");
+
+        // When
+        handler.handleFailed(event, channel, 1L);
+
+        // Then: 不崩溃，直接 ACK
+        verify(mediaMapper, never()).updateById(any(Media.class));
+        verify(channel).basicAck(1L, false);
+    }
+}

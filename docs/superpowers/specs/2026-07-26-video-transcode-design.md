@@ -41,15 +41,24 @@
 ALTER TABLE page ADD COLUMN transcode_status VARCHAR(16) NOT NULL DEFAULT 'NOT_NEEDED';
 ```
 
-### 3.2 transcode_status 枚举
+### 3.2 transcode_status 枚举与状态机
 
-| 值 | 含义 | 设置时机 |
-|---|------|---------|
-| `NOT_NEEDED` | 不需要转码（图片 或 已是 mp4/webm） | 导入时 / 转码完成 |
-| `PENDING` | 待转码 | API 标记 |
-| `PROCESSING` | 转码中 | Worker 开始处理 |
-| `DONE` | 转码完成 | API 收到完成事件 |
-| `FAILED` | 转码失败 | API 收到失败事件 |
+**状态转移**：`NOT_NEEDED | FAILED → PENDING → DONE | FAILED`
+
+> 注意：没有独立的 `PROCESSING` 状态。`PENDING` 同时表示"已提交"和"Worker 正在处理"。Worker 是幂等的——它不写 DB，只处理文件并通过 MQ 回传结果。
+
+| 值 | 含义 | 设置时机 | UI 显示 |
+|---|------|---------|---------|
+| `NOT_NEEDED` | 不需要转码（图片 或 已是 mp4/webm） | 导入时 | — |
+| `PENDING` | 转码中（已提交，Worker 处理中） | API `transcodeVideos()` CAS 写入 | 转码中（warning） |
+| `DONE` | 转码完成，视频已替换为 mp4 | API `TranscodeCompletedHandler` | 已完成（success） |
+| `FAILED` | 转码失败，原文件保留 | API `TranscodeFailedHandler` | 失败（danger） |
+
+**PENDING 语义**：
+- PENDING = "任务已提交到 MQ，Worker 正在处理或等待处理"
+- 不支持取消。PENDING 记录会一直保持直到 Worker 返回 completed/failed 事件
+- re-trigger（重新调用 `transcodeVideos`）是安全的：CAS 保护确保已 PENDING 的记录不会被覆盖或重复入队
+- 历史 PENDING 记录：若 Worker 已完成但 completed 事件未持久化（如 DLQ 积压），可通过 DLQ 重放 completed 事件将 PENDING → DONE
 
 ### 3.3 历史数据迁移
 
@@ -79,8 +88,9 @@ WHERE media_type = 'VIDEO' AND container NOT IN ('mp4', 'webm');
 
 **业务规则**：
 - `container IN ('mp4', 'webm')` 的视频跳过
-- `transcode_status = 'PROCESSING'` 的视频跳过（防止重复）
-- 已标记 `PENDING/DONE` 的视频不重复入队，但前端可显示状态
+- CAS 保护：仅当 `transcode_status IN ('NOT_NEEDED', 'FAILED')` 时更新为 `PENDING`
+- 已是 `PENDING` 的视频跳过（计入 `processingCount`，防止重复入队）
+- 已是 `DONE` 的视频跳过（计入 `alreadyDone`）
 
 ---
 
@@ -151,6 +161,8 @@ Queues: video.transcode.queue → DLX comic.video.dlx → video.transcode.dlq
 
 消费 `completed` 事件，更新 `page` 表：
 
+**前置检查**：`transcode_status = 'PENDING'` 才处理，否则 ack 并跳过（幂等保护）。
+**更新**：
 ```sql
 UPDATE page SET
   hq_path = #{newHqPath},
@@ -161,6 +173,8 @@ UPDATE page SET
   transcode_status = 'DONE'
 WHERE id = #{pageId}
 ```
+
+> 由于 PENDING 状态本身既是"已提交"也是"处理中"，handler 只需要检查 `= 'PENDING'` 即可。历史 PENDING 记录（Worker 已完成但事件未持久化）可通过 DLQ 重放完成事件来收敛为 DONE。
 
 ### 7.2 TranscodeFailedHandler
 
@@ -178,7 +192,7 @@ UPDATE page SET transcode_status = 'FAILED' WHERE id = #{pageId}
 
 ```typescript
 // ComicStorageItem 新增
-transcodeStatus: 'NOT_NEEDED' | 'PENDING' | 'PROCESSING' | 'DONE' | 'FAILED'
+transcodeStatus: 'NOT_NEEDED' | 'PENDING' | 'DONE' | 'FAILED'
 ```
 
 ### 8.2 StorageTable.vue
@@ -188,7 +202,7 @@ transcodeStatus: 'NOT_NEEDED' | 'PENDING' | 'PROCESSING' | 'DONE' | 'FAILED'
 
 ### 8.3 StorageStatusTag.vue
 
-新增 `transcode` 类型标签映射：`PENDING`(warning) / `PROCESSING`(warning) / `DONE`(success) / `FAILED`(danger)
+新增 `transcode` 类型标签映射：`PENDING`(warning) / `DONE`(success) / `FAILED`(danger)
 
 ### 8.4 StoragePage.vue
 
@@ -210,8 +224,44 @@ transcodeVideos(comicId: number): Promise<TranscodeResult>
 
 - 所有视频页 `NOT_NEEDED` → `NOT_NEEDED`
 - 存在 `PENDING` → `PENDING`
-- 存在 `PROCESSING` → `PROCESSING`
 - 存在 `FAILED` 且无待处理 → `FAILED`
 - 全部 `DONE` → `DONE`
+
+---
+
+## 10. 历史 PENDING 记录处理
+
+### 10.1 问题背景
+
+初始设计中存在 `PROCESSING` 状态，后简化为 `NOT_NEEDED|FAILED → PENDING → DONE|FAILED`。历史数据迁移（`UPDATE page SET transcode_status = 'PENDING'`）直接产生了大量 PENDING 记录。
+
+### 10.2 收敛方案
+
+**方案 A：DLQ 重放已完成事件**
+
+若 Worker 已完成转码但 completed 事件因 DLX 路由进入死信队列未消费，可从 DLQ 重放：
+- `TranscodeCompletedHandler` 已接受 `PENDING` 状态（前置检查 `= 'PENDING'`）
+- 重放后 PENDING → DONE，幂等安全
+
+**方案 B：re-trigger（CAS 保护）**
+
+调用 `POST /api/admin/comics/{comicId}/transcode-videos`：
+- CAS 条件 `transcode_status IN ('NOT_NEEDED', 'FAILED')` → 已 PENDING 的记录**不会**被覆盖
+- 已 PENDING 的记录被计入 `processingCount`，不会重复发送 MQ
+- 因此 re-trigger 是安全的——不会创建重复任务
+
+### 10.3 验证方式
+
+```sql
+-- 查看当前 PENDING 记录数
+SELECT COUNT(*) FROM page WHERE transcode_status = 'PENDING';
+
+-- 确认 Worker 已完成（PENDING 但文件已是 mp4）
+SELECT p.id, p.hq_path, p.container
+FROM page p
+WHERE p.transcode_status = 'PENDING' AND p.container = 'mp4';
+```
+
+> 若 `container = 'mp4'` 但 `transcode_status = 'PENDING'`，说明 completed 事件未被消费，可通过 DLQ 重放修复。
 
 ---

@@ -4,24 +4,22 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.api.admin.dto.ComicDeleteStats;
 import com.comicatlas.api.admin.dto.RefreshMetadataResult;
+import com.comicatlas.api.admin.dto.RecoveryProgress;
 import com.comicatlas.api.admin.dto.ScanRecoverResultDTO;
 import com.comicatlas.api.admin.dto.StorageStatsDTO;
+import com.comicatlas.api.admin.recovery.RecoveryEngine;
+import com.comicatlas.api.admin.recovery.ScannedMediaInfo;
 import com.comicatlas.api.admin.service.AdminService;
 import com.comicatlas.api.admin.service.MetadataExporter;
 import com.comicatlas.api.comic.entity.*;
 import com.comicatlas.common.event.MetadataRefreshEvent;
 import com.comicatlas.common.event.VideoMetadataFixRequestedEvent;
 import com.comicatlas.api.comic.mapper.*;
-import com.comicatlas.api.common.RestoreContext;
-import com.comicatlas.api.common.RestorePolicy;
-import com.comicatlas.api.common.RestoreSource;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
 import com.comicatlas.api.reader.entity.ReadingHistory;
 import com.comicatlas.api.reader.mapper.ReadingHistoryMapper;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -33,9 +31,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.io.File;
 import java.math.BigDecimal;
 import java.nio.file.*;
-import javax.imageio.ImageIO;
-import javax.imageio.ImageReader;
-import javax.imageio.stream.ImageInputStream;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -44,7 +39,6 @@ import java.util.*;
 @RequiredArgsConstructor
 public class AdminServiceImpl implements AdminService {
 
-    private final ObjectMapper objectMapper;
     private final ComicMapper comicMapper;
     private final CatalogMapper catalogMapper;
     private final ChapterMapper chapterMapper;
@@ -56,14 +50,12 @@ public class AdminServiceImpl implements AdminService {
     private final TransactionTemplate transactionTemplate;
     private final MetadataExporter metadataExporter;
     private final RabbitTemplate rabbitTemplate;
+    private final RecoveryEngine recoveryEngine;
 
     /** 未结束（活跃）的导入任务状态 */
     private static final Set<String> ACTIVE_STATUSES = Set.of("PENDING", "PARSING", "IMPORTING");
 
-    /** 视频文件扩展名（用于 scanChapterPages 扫描和 mediaType 判断） */
-    private static final Set<String> VIDEO_EXTENSIONS = Set.of(".mp4", ".webm", ".mkv", ".mov", ".avi");
-
-    @Value("${MANGA_ROOT:F:/manga}")
+    @Value("${MANGA_ROOT:D:/manga}")
     private String mangaRoot;
 
     @Value("${FFPROBE_PATH:tools/ffmpeg/ffprobe.exe}")
@@ -115,7 +107,6 @@ public class AdminServiceImpl implements AdminService {
         log.info("数据库删除完成: comicId={}, title={}, stats={}", comicId, comic.getTitle(), stats);
 
         if ("DELETE_FILES".equals(mode)) {
-            // API 容器 hq/lq/thumbs 挂载为只读，委托 Worker 删除本地文件
             var deleteEvent = new com.comicatlas.common.event.DeleteRequestedEvent(
                     UUID.randomUUID(), java.time.Instant.now(), comicId);
             rabbitTemplate.convertAndSend("comic.delete", "delete.requested", deleteEvent);
@@ -173,12 +164,12 @@ public class AdminServiceImpl implements AdminService {
     @Override
     public ScanRecoverResultDTO scanRecover() {
         Path hqRoot = Path.of(mangaRoot, "hq");
-        Path metaDir = Path.of(mangaRoot, "metadata");
         if (!Files.exists(hqRoot)) {
             throw new RuntimeException("HQ 目录不存在: " + hqRoot);
         }
 
         ScanRecoverResultDTO result = new ScanRecoverResultDTO();
+        int totalSoFar = 0;
 
         try (var dirs = Files.newDirectoryStream(hqRoot, Files::isDirectory)) {
             for (Path comicDir : dirs) {
@@ -189,41 +180,21 @@ public class AdminServiceImpl implements AdminService {
                     continue;
                 }
 
-                result.setScannedComics(result.getScannedComics() + 1);
+                totalSoFar++;
+                RecoveryProgress progress = recoveryEngine.processComicDir(comicId, totalSoFar);
 
-                if (comicMapper.selectById(comicId) != null) {
-                    result.setExistingComics(result.getExistingComics() + 1);
-                    continue;
+                result.setScannedComics(totalSoFar);
+                result.setExistingComics(result.getExistingComics() + progress.skippedComics());
+                result.setRestoredComics(result.getRestoredComics() + progress.recoveredComics());
+                result.setRestoredChapters(result.getRestoredChapters() + progress.restoredChapters());
+                result.setRestoredPages(result.getRestoredPages() + progress.restoredPages());
+                result.setPlaceholderComics(result.getPlaceholderComics() + progress.placeholderComics());
+
+                if (progress.placeholderComics() > 0) {
+                    result.getPlaceholders().add("漫画 " + comicId);
                 }
-
-                Path metaFile = metaDir.resolve(comicId + ".json");
-                if (Files.exists(metaFile)) {
-                    try {
-                        Map<String, Object> metadata = objectMapper.readValue(metaFile.toFile(), new TypeReference<>() {});
-                        Map<String, Object> restored = restoreComic(metadata, comicId);
-                        result.setRestoredComics(result.getRestoredComics() + 1);
-                        result.setRestoredChapters(result.getRestoredChapters() + (int) restored.get("chapters"));
-                        result.setRestoredPages(result.getRestoredPages() + (int) restored.get("pages"));
-                    } catch (Exception e) {
-                        log.error("恢复漫画失败: comicId={}", comicId, e);
-                        result.getErrors().add(comicId + ": " + e.getMessage());
-                    }
-                } else {
-                    try {
-                        transactionTemplate.executeWithoutResult(s -> {
-                            Comic placeholder = new Comic();
-                            placeholder.setId(comicId);
-                            placeholder.setTitle("待恢复漫画 " + comicId);
-                            placeholder.setStatus("PLACEHOLDER");
-                            placeholder.setStoragePolicy("MANAGED");
-                            comicMapper.insert(placeholder);
-                        });
-                        result.setPlaceholderComics(result.getPlaceholderComics() + 1);
-                        result.getPlaceholders().add("漫画 " + comicId);
-                    } catch (Exception e) {
-                        log.error("创建占位漫画失败: comicId={}", comicId, e);
-                        result.getErrors().add(comicId + ": 创建占位失败 - " + e.getMessage());
-                    }
+                if (progress.errorComics() > 0 && progress.lastError() != null) {
+                    result.getErrors().add(comicId + ": " + progress.lastError());
                 }
             }
         } catch (Exception e) {
@@ -231,163 +202,6 @@ public class AdminServiceImpl implements AdminService {
         }
 
         return result;
-    }
-
-    private Map<String, Object> restoreComic(Map<String, Object> metadata, Long comicId) {
-        return restoreComic(metadata, new RestoreContext(comicId, false, RestorePolicy.IMPORT, RestoreSource.METADATA));
-    }
-
-    private Map<String, Object> restoreComic(Map<String, Object> metadata, RestoreContext ctx) {
-        return transactionTemplate.execute(status -> {
-            try {
-                return restoreComicInternal(metadata, ctx);
-            } catch (Exception e) {
-                throw new RuntimeException("恢复漫画失败: comicId=" + ctx.comicId(), e);
-            }
-        });
-    }
-
-    private Map<String, Object> restoreComicInternal(Map<String, Object> metadata, RestoreContext ctx) throws Exception {
-        Map<String, Object> comicData = (Map<String, Object>) metadata.get("comic");
-        List<Map<String, Object>> catalogsData = (List<Map<String, Object>>) metadata.get("catalogs");
-        List<Map<String, Object>> chaptersData = (List<Map<String, Object>>) metadata.get("chapters");
-
-        Long comicId = ctx.comicId();
-        Comic comic;
-
-        if (ctx.comicExists()) {
-            // 加载已有漫画，替换语义：先删除旧 catalog/chapter/page
-            comic = comicMapper.selectById(comicId);
-            if (comic == null) {
-                throw new RuntimeException("漫画不存在: comicId=" + comicId);
-            }
-            List<Long> existingChapterIds = chapterMapper.selectList(
-                    new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId))
-                    .stream().map(Chapter::getId).toList();
-            if (!existingChapterIds.isEmpty()) {
-                mediaMapper.delete(new LambdaQueryWrapper<Media>().in(Media::getChapterId, existingChapterIds));
-            }
-            chapterMapper.delete(new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
-            catalogMapper.delete(new LambdaQueryWrapper<Catalog>().eq(Catalog::getComicId, comicId));
-
-            comic.setStatus("READY");
-            comic.setStoragePolicy("MANAGED");
-            if (ctx.policy() == RestorePolicy.IMPORT) {
-                // 全量覆盖：写入所有字段
-                comic.setTitle((String) comicData.get("title"));
-                comic.setAuthor((String) comicData.get("author"));
-                if (comicData.get("category") != null) comic.setCategory((String) comicData.get("category"));
-            }
-            // REFRESH_METADATA：保留 title/author/category，不覆盖
-        } else {
-            comic = new Comic();
-            comic.setId(comicId);
-            comic.setTitle((String) comicData.get("title"));
-            comic.setAuthor((String) comicData.get("author"));
-            comic.setStatus("READY");
-            comic.setStoragePolicy("MANAGED");
-            if (comicData.get("category") != null) comic.setCategory((String) comicData.get("category"));
-            comicMapper.insert(comic);
-        }
-
-        int catalogCount = catalogsData != null ? catalogsData.size() : 0;
-        Map<Integer, Long> catalogIdMap = insertCatalogsWithHierarchy(catalogsData, comicId);
-
-        int chCount = 0, pgCount = 0;
-        long totalSize = 0;
-        if (chaptersData != null) {
-            for (Map<String, Object> chData : chaptersData) {
-                Chapter chapter = new Chapter();
-                chapter.setComicId(comicId);
-                chapter.setTitle((String) chData.get("title"));
-                chapter.setChapterNo((String) chData.get("chapterNo"));
-                chapter.setSortOrder((Integer) chData.getOrDefault("sortOrder", chCount));
-                chapter.setGlobalOrder((Integer) chData.getOrDefault("globalOrder", chCount));
-                Object cid = chData.get("catalogIndex");
-                if (cid != null) chapter.setCatalogId(catalogIdMap.get(((Number) cid).intValue()));
-                chapterMapper.insert(chapter);
-                chCount++;
-
-                // 从 HQ 文件系统扫描页面，不依赖 JSON 中的 fileName
-                List<ScannedMediaInfo> scannedPages = scanChapterPages(comicId, chapter.getGlobalOrder());
-                chapter.setPageCount(scannedPages.size());
-                chapterMapper.updateById(chapter);
-
-                int pageNum = 1;
-                for (ScannedMediaInfo pi : scannedPages) {
-                    Media page = new Media();
-                    page.setChapterId(chapter.getId());
-                    page.setPageNumber(pageNum++);
-                    page.setHqRoot("HQ");
-                    page.setHqPath(comicId + "/" + chapter.getGlobalOrder() + "/" + pi.imageName());
-                    page.setHqStatus(pi.fileSize() > 0 ? "READY" : "MISSING");
-                    page.setLqStatus("NOT_GENERATED");
-                    page.setFileSize(pi.fileSize());
-                    page.setWidth(pi.width());
-                    page.setHeight(pi.height());
-                    page.setMediaType(pi.mediaType());
-                    mediaMapper.insert(page);
-                    totalSize += pi.fileSize();
-                    pgCount++;
-                }
-            }
-        }
-
-        if (ctx.comicExists()) {
-            comic.setTotalPages(pgCount);
-            comic.setFileSize(totalSize);
-            comic.setHqSize(totalSize);
-            comicMapper.updateById(comic);
-        } else if (totalSize > 0) {
-            comic.setFileSize(totalSize);
-            comic.setHqSize(totalSize);
-            comicMapper.updateById(comic);
-        }
-
-        log.info("恢复完成: comicId={}, title={}, chapters={}, pages={}", comicId, comicData.get("title"), chCount, pgCount);
-        return Map.of("catalogs", catalogCount, "chapters", chCount, "pages", pgCount);
-    }
-
-    private Map<Integer, Long> insertCatalogsWithHierarchy(List<Map<String, Object>> catalogsData, Long comicId) {
-        Map<Integer, Long> idMap = new LinkedHashMap<>();
-        if (catalogsData == null || catalogsData.isEmpty()) return idMap;
-
-        int size = catalogsData.size();
-
-        for (int i = 0; i < size; i++) {
-            Map<String, Object> cd = catalogsData.get(i);
-            Catalog cat = new Catalog();
-            cat.setComicId(comicId);
-            cat.setTitle((String) cd.get("title"));
-            cat.setSortOrder((Integer) cd.getOrDefault("sortOrder", i));
-            catalogMapper.insert(cat);
-            idMap.put(i, cat.getId());
-        }
-
-        Map<Long, Catalog> inserted = new LinkedHashMap<>();
-        for (int i = 0; i < size; i++) {
-            Catalog cat = catalogMapper.selectById(idMap.get(i));
-            if (cat == null) continue;
-            inserted.put(idMap.get(i), cat);
-        }
-
-        for (int i = 0; i < size; i++) {
-            Catalog cat = inserted.get(idMap.get(i));
-            if (cat == null) continue;
-            Map<String, Object> cd = catalogsData.get(i);
-            Object pi = cd.get("parentIndex");
-            if (pi != null) {
-                int parentIdx = ((Number) pi).intValue();
-                if (parentIdx < 0 || parentIdx >= size || !idMap.containsKey(parentIdx)) continue;
-                Long parentId = idMap.get(parentIdx);
-                Catalog parent = inserted.get(parentId);
-                if (parent == null) continue;
-                cat.setParentId(parentId);
-                catalogMapper.updateById(cat);
-            }
-        }
-
-        return idMap;
     }
 
     /**
@@ -429,81 +243,6 @@ public class AdminServiceImpl implements AdminService {
         return null;
     }
 
-    // === HQ scan utilities ===
-
-    private record ImageDimensions(Integer width, Integer height) {}
-
-    private record ScannedMediaInfo(String imageName, long fileSize, Integer width, Integer height, String mediaType) {}
-
-    private ImageDimensions getImageDimensions(Path p) {
-        // 1. 优先尝试 ImageIO（支持 JVM 原生 + webp-imageio 插件）
-        try (ImageInputStream in = ImageIO.createImageInputStream(p.toFile())) {
-            if (in != null) {
-                var readers = ImageIO.getImageReaders(in);
-                if (readers.hasNext()) {
-                    ImageReader reader = readers.next();
-                    try {
-                        reader.setInput(in);
-                        return new ImageDimensions(reader.getWidth(0), reader.getHeight(0));
-                    } finally {
-                        reader.dispose();
-                    }
-                }
-            }
-        } catch (Exception e) {
-            log.debug("ImageIO 读取尺寸失败: {}", p, e);
-        }
-        // 2. 回退：直接解析文件头（JPEG/PNG/GIF/WebP/BMP），零依赖
-        int[] dims = com.comicatlas.common.util.ImageDimensionsReader.read(p);
-        if (dims[0] > 0 && dims[1] > 0) {
-            return new ImageDimensions(dims[0], dims[1]);
-        }
-        return new ImageDimensions(null, null);
-    }
-
-    private List<ScannedMediaInfo> scanChapterPages(Long comicId, int globalOrder) {
-        Path dir = Path.of(mangaRoot, "hq", String.valueOf(comicId), String.valueOf(globalOrder));
-        if (!Files.exists(dir)) return Collections.emptyList();
-
-        List<ScannedMediaInfo> pages = new ArrayList<>();
-        try (var stream = Files.newDirectoryStream(dir)) {
-            for (Path file : stream) {
-                String name = file.getFileName().toString();
-                if (name.startsWith(".")) continue;
-
-                String lower = name.toLowerCase();
-                int dotIdx = lower.lastIndexOf('.');
-                if (dotIdx < 0) continue;
-                String ext = lower.substring(dotIdx);
-                String mediaType;
-                if (VIDEO_EXTENSIONS.contains(ext)) {
-                    mediaType = "VIDEO";
-                } else if (ext.equals(".jpg") || ext.equals(".jpeg") || ext.equals(".png")
-                        || ext.equals(".webp") || ext.equals(".gif") || ext.equals(".bmp")) {
-                    mediaType = "IMAGE";
-                } else {
-                    continue;
-                }
-
-                long fileSize;
-                try {
-                    fileSize = Files.size(file);
-                } catch (Exception e) {
-                    fileSize = 0;
-                }
-
-                ImageDimensions dims = "IMAGE".equals(mediaType) ? getImageDimensions(file) : new ImageDimensions(null, null);
-                pages.add(new ScannedMediaInfo(name, fileSize, dims.width(), dims.height(), mediaType));
-            }
-        } catch (Exception e) {
-            log.warn("扫描章节页面失败: comicId={}, globalOrder={}", comicId, globalOrder, e);
-            return Collections.emptyList();
-        }
-
-        pages.sort(Comparator.comparing(ScannedMediaInfo::imageName));
-        return pages;
-    }
-
     @Override
     public RefreshMetadataResult refreshMetadata(Long comicId) {
         Comic comic = comicMapper.selectById(comicId);
@@ -527,7 +266,6 @@ public class AdminServiceImpl implements AdminService {
         long start = System.currentTimeMillis();
         try {
             Map<String, Object> stats = transactionTemplate.execute(status -> {
-                // Load all chapters for this comic from DB
                 List<Chapter> chapters = chapterMapper.selectList(
                         new LambdaQueryWrapper<Chapter>()
                                 .eq(Chapter::getComicId, comicId)
@@ -537,10 +275,8 @@ public class AdminServiceImpl implements AdminService {
                 long totalSize = 0;
 
                 for (Chapter chapter : chapters) {
-                    // Scan HQ directory for this chapter
-                    List<ScannedMediaInfo> hqImages = scanChapterPages(comicId, chapter.getGlobalOrder());
+                    List<ScannedMediaInfo> hqImages = recoveryEngine.scanChapterPages(comicId, chapter.getGlobalOrder());
 
-                    // Load existing DB pages for this chapter, keyed by imageName
                     List<Media> dbPagesList = mediaMapper.selectList(
                             new LambdaQueryWrapper<Media>().eq(Media::getChapterId, chapter.getId()));
                     Map<String, Media> dbPageMap = new LinkedHashMap<>();
@@ -548,22 +284,17 @@ public class AdminServiceImpl implements AdminService {
                         String hqPath = p.getHqPath();
                         if (hqPath != null && hqPath.contains("/")) {
                             String fileName = hqPath.substring(hqPath.lastIndexOf('/') + 1);
-                            // 跳过无效文件名（如 "null"），这些记录将在后续作为 leftover 清理
                             if (!fileName.isEmpty() && !"null".equals(fileName)) {
                                 dbPageMap.put(fileName, p);
                             }
                         }
                     }
 
-                    // Calculate nextPageNumber for new pages
                     int nextPageNumber = dbPagesList.isEmpty() ? 1 :
                             dbPagesList.stream().mapToInt(Media::getPageNumber).max().orElse(0) + 1;
 
-                    // Process HQ images: UPDATE existing, INSERT new
                     for (ScannedMediaInfo pi : hqImages) {
                         if (dbPageMap.containsKey(pi.imageName())) {
-                            // UPDATE: refresh fileSize, width, height, hqStatus (preserve lqStatus)
-                            // 视频记录的 width/height 来自 worker (ffprobe)，api-service 无法重新读取，需保留
                             Media existing = dbPageMap.get(pi.imageName());
                             existing.setFileSize(pi.fileSize());
                             if (!"VIDEO".equals(existing.getMediaType())) {
@@ -574,7 +305,6 @@ public class AdminServiceImpl implements AdminService {
                             mediaMapper.updateById(existing);
                             dbPageMap.remove(pi.imageName());
                         } else {
-                            // INSERT new page
                             Media newPage = new Media();
                             newPage.setChapterId(chapter.getId());
                             newPage.setPageNumber(nextPageNumber++);
@@ -591,19 +321,16 @@ public class AdminServiceImpl implements AdminService {
                         totalSize += pi.fileSize();
                     }
 
-                    // DELETE remaining DB pages (not found in HQ directory)
                     for (Media leftover : dbPageMap.values()) {
                         mediaMapper.deleteById(leftover.getId());
                     }
 
-                    // Update chapter pageCount
                     int actualPageCount = hqImages.size();
                     chapter.setPageCount(actualPageCount);
                     chapterMapper.updateById(chapter);
                     totalPages += actualPageCount;
                 }
 
-                // Update comic stats
                 comic.setTotalPages(totalPages);
                 comic.setFileSize(totalSize);
                 comic.setHqSize(totalSize);
@@ -616,7 +343,6 @@ public class AdminServiceImpl implements AdminService {
 
             int videoFixed = fixVideoMetadata(comicId);
 
-            // 通过 MQ 委托 Worker 导出 metadata.json
             try {
                 rabbitTemplate.convertAndSend("comic.export", "metadata.refresh.requested",
                         new MetadataRefreshEvent(null, null, comicId));
@@ -626,7 +352,6 @@ public class AdminServiceImpl implements AdminService {
 
             return buildResult(comicId, stats, durationMs);
         } finally {
-            // 解锁：无论如何都将状态恢复为 READY
             comicMapper.update(null,
                     new LambdaUpdateWrapper<Comic>()
                             .eq(Comic::getId, comicId)

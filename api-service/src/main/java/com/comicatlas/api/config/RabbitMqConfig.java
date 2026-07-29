@@ -393,4 +393,53 @@ public class RabbitMqConfig {
         return BindingBuilder.bind(videoTranscodeResultDlq())
                 .to(videoDlxExchange()).with("video.transcode.result.dlq");
     }
+
+    // ==================== comic.recovery ====================
+
+    @Bean
+    public DirectExchange recoveryExchange() {
+        return new DirectExchange("comic.recovery");
+    }
+
+    @Bean
+    public DirectExchange recoveryDlxExchange() {
+        return new DirectExchange("comic.recovery.dlx");
+    }
+
+    @Bean
+    public Queue recoveryResultQueue() {
+        return QueueBuilder.durable("recovery.result.queue")
+                .deadLetterExchange("comic.recovery.dlx")
+                .deadLetterRoutingKey("recovery.result.dlq")
+                .build();
+    }
+
+    @Bean
+    public Queue recoveryResultDlq() {
+        return QueueBuilder.durable("recovery.result.dlq").build();
+    }
+
+    @Bean
+    public Binding recoveryProgressBinding() {
+        return BindingBuilder.bind(recoveryResultQueue())
+                .to(recoveryExchange()).with("recovery.progress");
+    }
+
+    @Bean
+    public Binding recoveryCompletedBinding() {
+        return BindingBuilder.bind(recoveryResultQueue())
+                .to(recoveryExchange()).with("recovery.completed");
+    }
+
+    @Bean
+    public Binding recoveryFailedBinding() {
+        return BindingBuilder.bind(recoveryResultQueue())
+                .to(recoveryExchange()).with("recovery.failed");
+    }
+
+    @Bean
+    public Binding recoveryResultDlqBinding() {
+        return BindingBuilder.bind(recoveryResultDlq())
+                .to(recoveryDlxExchange()).with("recovery.result.dlq");
+    }
 }
