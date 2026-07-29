@@ -12,7 +12,7 @@
       @scroll="onScroll"
     >
       <template #default="{ item, index, active }">
-        <div class="reader-item-wrapper"><ReaderImageItem :item="item" :index="index" :active="active" :item-height="item.size" :force-hq="props.forceHqPages.has(index)" /></div>
+        <div class="reader-item-wrapper"><ReaderImageItem :item="item" :index="index" :active="active" :scroller-root="scrollerEl" :item-height="item.size" :force-hq="props.forceHqPages.has(index)" /></div>
       </template>
     </RecycleScroller>
   </div>
@@ -53,6 +53,8 @@ const viewportRef = ref<HTMLElement | null>(null)
 const scrollerRef = ref<RecycleScrollerExposed<ScrollerItem> | null>(null)
 const containerWidth = ref(0)
 const containerHeight = ref(0)
+/** Reactive reference to the scroller's root DOM element, passed to VideoPlayer for viewport-relative visibility tracking. */
+const scrollerEl = ref<HTMLElement | null>(null)
 
 function updateContainerSize() {
   /*
@@ -64,8 +66,9 @@ function updateContainerSize() {
    *    ~25px → 图片在容器中大量留白 → 视觉间隙。
    */
   const baseW = viewportRef.value?.clientWidth ?? 0
-  const scrollerEl = (scrollerRef.value as Record<string, unknown> | null)?.$el as HTMLElement | undefined
-  containerWidth.value = scrollerEl?.clientWidth ?? baseW
+  const scrollerElDom = (scrollerRef.value as Record<string, unknown> | null)?.$el as HTMLElement | undefined
+  scrollerEl.value = scrollerElDom ?? null
+  containerWidth.value = scrollerElDom?.clientWidth ?? baseW
   containerHeight.value = viewportRef.value?.clientHeight ?? 0
 }
 

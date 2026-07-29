@@ -29,6 +29,11 @@ import java.util.UUID;
     @JsonSubTypes.Type(value = MetadataRefreshEvent.class, name = "MetadataRefreshEvent"),
     @JsonSubTypes.Type(value = VideoMetadataFixRequestedEvent.class, name = "VideoMetadataFixRequestedEvent"),
     @JsonSubTypes.Type(value = VideoMetadataFixCompletedEvent.class, name = "VideoMetadataFixCompletedEvent"),
+    @JsonSubTypes.Type(value = RecoveryRequestedEvent.class, name = "RecoveryRequestedEvent"),
+    @JsonSubTypes.Type(value = RecoveryProgressEvent.class, name = "RecoveryProgressEvent"),
+    @JsonSubTypes.Type(value = RecoveryCompletedEvent.class, name = "RecoveryCompletedEvent"),
+    @JsonSubTypes.Type(value = RecoveryFailedEvent.class, name = "RecoveryFailedEvent"),
+    @JsonSubTypes.Type(value = RecoveryScanCompletedEvent.class, name = "RecoveryScanCompletedEvent"),
 })
 public sealed interface ComicEvent
     permits ImportTaskCreatedEvent, ImportTaskCompletedEvent, ImportTaskFailedEvent,
@@ -39,7 +44,9 @@ public sealed interface ComicEvent
             ExportTaskFailedEvent,
             VideoTranscodeRequestedEvent, VideoTranscodeCompletedEvent,
             VideoTranscodeFailedEvent, MetadataRefreshEvent,
-            VideoMetadataFixRequestedEvent, VideoMetadataFixCompletedEvent {
+            VideoMetadataFixRequestedEvent, VideoMetadataFixCompletedEvent,
+            RecoveryRequestedEvent, RecoveryProgressEvent, RecoveryCompletedEvent,
+            RecoveryFailedEvent, RecoveryScanCompletedEvent {
 
     UUID eventId();
     Instant occurredAt();

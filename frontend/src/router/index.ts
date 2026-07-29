@@ -52,14 +52,14 @@ const router = createRouter({
       ],
     },
     {
+      path: '/manage/intercept',
+      name: 'manage-intercept',
+      component: () => import('@/views/management/InterceptPage.vue'),
+    },
+    {
       path: '/manage',
       component: ManagementLayout,
       children: [
-        {
-          path: 'intercept',
-          name: 'manage-intercept',
-          component: () => import('@/views/management/InterceptPage.vue'),
-        },
         { path: '', redirect: '/manage/comics' },
         {
           path: 'comics',

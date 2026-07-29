@@ -104,7 +104,7 @@ public class AdminStorageController {
             String status = p.getTranscodeStatus();
             if ("DONE".equals(status)) {
                 alreadyDone++;
-            } else if ("PROCESSING".equals(status)) {
+            } else if ("PENDING".equals(status)) {
                 processingCount++;
             } else {
                 if ("FAILED".equals(status)) {
