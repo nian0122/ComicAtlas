@@ -3,13 +3,13 @@
     <header class="management-header">
       <router-link to="/" class="header-logo" aria-label="返回 ComicAtlas 阅读端">
         <span class="logo-mark" aria-hidden="true">CA</span>
-        <span>ComicAtlas</span>
+        <span>COMICATLAS</span>
+        <span class="console-label">仓库控制台</span>
       </router-link>
       <div class="header-context">
-        <span>管理工作台</span>
         <router-link to="/" class="back-link">
           <el-icon :size="16"><Back /></el-icon>
-          返回阅读
+          切换到阅读端
         </router-link>
       </div>
     </header>
@@ -60,8 +60,8 @@
 
         <div class="sidenav-footer">
           <span class="archive-line" aria-hidden="true" />
-          <p>PERSONAL ARCHIVE</p>
-          <span>Midnight Index</span>
+          <p>PRIVATE LIBRARY</p>
+          <span>仓库服务运行中</span>
         </div>
       </aside>
 
@@ -108,8 +108,8 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   padding-inline: var(--content-gutter);
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--color-border-faint);
+  background: var(--color-canvas);
 }
 
 .header-logo {
@@ -118,10 +118,9 @@ onMounted(() => {
   gap: var(--space-3);
   min-height: 44px;
   color: var(--text-primary);
-  font-family: var(--font-editorial);
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: -0.035em;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 0.035em;
 }
 
 .logo-mark {
@@ -129,12 +128,21 @@ onMounted(() => {
   place-items: center;
   width: 32px;
   height: 32px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-xs);
   background: var(--accent);
   color: var(--color-on-brand);
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 900;
+}
+
+.console-label {
+  padding-left: var(--space-3);
+  border-left: 1px solid var(--border-strong);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
 }
 
 .header-context {
@@ -152,6 +160,7 @@ onMounted(() => {
   min-height: 44px;
   color: var(--text-secondary);
   font-size: var(--text-sm);
+  font-weight: 600;
 }
 
 .management-body {
@@ -165,7 +174,7 @@ onMounted(() => {
   flex-direction: column;
   min-height: 0;
   padding: var(--space-6) var(--space-4);
-  border-right: 1px solid var(--border);
+  border-right: 1px solid var(--color-border-faint);
   background: var(--bg-secondary);
 }
 
@@ -194,7 +203,7 @@ onMounted(() => {
   gap: var(--space-3);
   min-height: var(--control-min-size);
   padding-inline: var(--space-3);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   color: var(--text-secondary);
   font-size: var(--text-sm);
   font-weight: 600;
@@ -207,8 +216,8 @@ onMounted(() => {
   position: absolute;
   top: 9px;
   bottom: 9px;
-  left: -17px;
-  width: 2px;
+  left: -16px;
+  width: 3px;
   content: "";
   background: var(--accent);
   opacity: 0;
@@ -220,7 +229,7 @@ onMounted(() => {
 }
 
 .sidenav-link.active {
-  background: var(--surface-highlight);
+  background: linear-gradient(90deg, var(--accent-bg), var(--surface-highlight));
   color: var(--text-primary);
 }
 
@@ -236,7 +245,7 @@ onMounted(() => {
   padding: var(--space-4);
   color: var(--text-muted);
   font-size: 10px;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
 }
 
 .sidenav-footer p {
@@ -258,5 +267,8 @@ onMounted(() => {
   min-height: 0;
   padding: var(--space-8) var(--content-gutter);
   overflow: auto;
+  background:
+    radial-gradient(circle at 100% 0, var(--accent-bg), transparent 26rem),
+    var(--bg-primary);
 }
 </style>

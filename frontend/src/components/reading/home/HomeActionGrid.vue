@@ -13,7 +13,7 @@
         <el-icon :size="18" class="action-arrow"><ArrowRight /></el-icon>
       </router-link>
 
-      <router-link to="/manage/import" class="action-card hover-lift">
+      <router-link to="/manage/import" class="action-card action-card--desktop-only hover-lift">
         <span class="action-index" aria-hidden="true">02</span>
         <div class="action-icon action-icon--import">
           <el-icon :size="28"><Download /></el-icon>
@@ -79,7 +79,7 @@ import { Collection, Download, Clock, ArrowRight } from '@element-plus/icons-vue
 }
 
 .action-card:hover {
-  background: var(--bg-secondary);
+  background: var(--bg-surface);
   color: var(--text-primary);
   transform: translateY(-1px);
 }
@@ -157,6 +157,10 @@ import { Collection, Download, Clock, ArrowRight } from '@element-plus/icons-vue
     min-height: 92px;
     border-right: 0;
     border-bottom: 1px solid var(--border);
+  }
+
+  .action-card--desktop-only {
+    display: none;
   }
 }
 </style>

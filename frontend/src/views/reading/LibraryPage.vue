@@ -2,7 +2,7 @@
   <div class="comic-list-page">
     <header class="page-header">
       <div class="title-block">
-        <p class="page-eyebrow">ARCHIVE / LIBRARY</p>
+        <p class="page-eyebrow">DISCOVER / LIBRARY</p>
         <h1 class="page-title">漫画库</h1>
         <p class="page-count">当前收录 {{ store.total }} 部作品</p>
       </div>
@@ -86,7 +86,7 @@
     <div v-else-if="store.list.length === 0" class="state empty">
       <el-icon :size="48"><PictureFilled /></el-icon>
       <span>暂无漫画</span>
-      <p>点击右上角导入按钮添加漫画</p>
+      <p>请在电脑端导入作品，然后回到这里阅读</p>
     </div>
 
     <section v-else class="comic-section">
@@ -237,7 +237,7 @@ onMounted(() => {
 .page-header {
   position: sticky;
   top: var(--nav-height);
-  z-index: 50;
+  z-index: var(--z-sticky);
   padding: var(--space-8) 0 var(--space-5);
   margin-bottom: var(--space-5);
   background: linear-gradient(to bottom, var(--bg-primary) 86%, transparent);
@@ -288,7 +288,7 @@ onMounted(() => {
   padding: 0 var(--space-base);
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-pill);
   color: var(--text-primary);
   transition: border-color var(--transition-fast);
 }
@@ -326,7 +326,7 @@ onMounted(() => {
   padding: 0 var(--space-base);
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-pill);
   color: var(--text-primary);
   font-size: 14px;
   outline: none;
@@ -345,7 +345,7 @@ onMounted(() => {
 .tag-filter :deep(.el-input__wrapper) {
   background: var(--bg-surface);
   box-shadow: 0 0 0 1px var(--border) inset;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-pill);
   min-height: 44px;
 }
 

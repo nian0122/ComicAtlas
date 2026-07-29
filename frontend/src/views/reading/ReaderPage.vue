@@ -383,7 +383,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .reader-page {
   width: 100%;
-  height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   background: var(--bg);
@@ -419,13 +419,13 @@ onBeforeUnmount(() => {
 .primary-btn {
   padding: 8px 20px;
   background: var(--accent);
-  color: #fff;
+  color: var(--color-on-brand);
   border: none;
   border-radius: var(--radius-sm);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 150ms ease;
+  transition: background-color var(--transition-fast);
 }
 
 .primary-btn:hover {

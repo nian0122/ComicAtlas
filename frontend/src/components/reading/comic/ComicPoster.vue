@@ -2,7 +2,11 @@
   <div
     class="comic-poster"
     :class="[`size--${props.size}`, { 'is-hoverable': props.showHover }]"
+    role="link"
+    tabindex="0"
     @click="emit('click', props.id)"
+    @keydown.enter="emit('click', props.id)"
+    @keydown.space.prevent="emit('click', props.id)"
   >
     <div class="poster-frame">
       <div
@@ -27,7 +31,9 @@
       >
         <div
           class="poster-progress__fill"
-          :style="{ width: `${Math.min(100, Math.max(0, props.progress))}%` }"
+          :style="{
+            transform: `scaleX(${Math.min(100, Math.max(0, props.progress)) / 100})`,
+          }"
         />
       </div>
 
@@ -144,7 +150,7 @@ const sizeIcon = computed(() => {
 }
 
 .is-hoverable:hover {
-  transform: scale(var(--card-hover-scale));
+  transform: translateY(-4px) scale(var(--card-hover-scale));
   z-index: 2;
 }
 
@@ -204,14 +210,16 @@ const sizeIcon = computed(() => {
   left: 0;
   right: 0;
   height: 3px;
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--color-progress-track);
   z-index: 3;
 }
 
 .poster-progress__fill {
+  width: 100%;
   height: 100%;
   background: var(--accent);
-  transition: width var(--transition-normal);
+  transform-origin: left center;
+  transition: transform var(--transition-normal);
 }
 
 .poster-overlay {
@@ -220,7 +228,7 @@ const sizeIcon = computed(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.55);
+  background: var(--color-overlay-scrim);
   opacity: 0;
   transition: opacity var(--transition-normal);
   border-radius: var(--card-radius);
@@ -243,20 +251,19 @@ const sizeIcon = computed(() => {
   min-width: 96px;
   padding: var(--space-sm) var(--space-base);
   border: none;
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-pill);
+  background: var(--color-overlay-soft);
   color: var(--text-primary);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  backdrop-filter: blur(4px);
   transition:
     background-color var(--transition-fast),
     transform var(--transition-fast);
 }
 
 .poster-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: var(--color-overlay-hover);
   transform: translateY(-1px);
 }
 
@@ -277,9 +284,13 @@ const sizeIcon = computed(() => {
   font-size: 14px;
   font-weight: 600;
   color: var(--text-primary);
+  display: -webkit-box;
+  min-height: 3em;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.5;
+  text-wrap: pretty;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .poster-subtitle {
@@ -289,5 +300,24 @@ const sizeIcon = computed(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .comic-poster {
+    scroll-snap-align: start;
+  }
+
+  .comic-poster:hover {
+    transform: none;
+  }
+
+  .poster-overlay {
+    display: none;
+  }
+
+  .poster-title {
+    min-height: 0;
+    font-size: var(--text-sm);
+  }
 }
 </style>
