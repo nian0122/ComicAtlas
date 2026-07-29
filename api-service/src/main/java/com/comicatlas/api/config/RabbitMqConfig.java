@@ -364,34 +364,53 @@ public class RabbitMqConfig {
     // ==================== comic.video 视频转码结果 ====================
 
     @Bean
-    public Queue videoTranscodeResultQueue() {
-        return QueueBuilder.durable("video.transcode.result.queue")
+    public Queue videoTranscodeCompletedQueue() {
+        return QueueBuilder.durable("video.transcode.completed.queue")
                 .deadLetterExchange("comic.video.dlx")
-                .deadLetterRoutingKey("video.transcode.result.dlq")
+                .deadLetterRoutingKey("video.transcode.completed.dlq")
                 .build();
     }
 
     @Bean
-    public Queue videoTranscodeResultDlq() {
-        return QueueBuilder.durable("video.transcode.result.dlq").build();
+    public Queue videoTranscodeCompletedDlq() {
+        return QueueBuilder.durable("video.transcode.completed.dlq").build();
+    }
+
+    @Bean
+    public Queue videoTranscodeFailedQueue() {
+        return QueueBuilder.durable("video.transcode.failed.queue")
+                .deadLetterExchange("comic.video.dlx")
+                .deadLetterRoutingKey("video.transcode.failed.dlq")
+                .build();
+    }
+
+    @Bean
+    public Queue videoTranscodeFailedDlq() {
+        return QueueBuilder.durable("video.transcode.failed.dlq").build();
     }
 
     @Bean
     public Binding videoTranscodeCompletedBinding() {
-        return BindingBuilder.bind(videoTranscodeResultQueue())
+        return BindingBuilder.bind(videoTranscodeCompletedQueue())
                 .to(videoExchange()).with("video.transcode.completed");
     }
 
     @Bean
     public Binding videoTranscodeFailedBinding() {
-        return BindingBuilder.bind(videoTranscodeResultQueue())
+        return BindingBuilder.bind(videoTranscodeFailedQueue())
                 .to(videoExchange()).with("video.transcode.failed");
     }
 
     @Bean
-    public Binding videoTranscodeResultDlqBinding() {
-        return BindingBuilder.bind(videoTranscodeResultDlq())
-                .to(videoDlxExchange()).with("video.transcode.result.dlq");
+    public Binding videoTranscodeCompletedDlqBinding() {
+        return BindingBuilder.bind(videoTranscodeCompletedDlq())
+                .to(videoDlxExchange()).with("video.transcode.completed.dlq");
+    }
+
+    @Bean
+    public Binding videoTranscodeFailedDlqBinding() {
+        return BindingBuilder.bind(videoTranscodeFailedDlq())
+                .to(videoDlxExchange()).with("video.transcode.failed.dlq");
     }
 
     // ==================== comic.recovery ====================

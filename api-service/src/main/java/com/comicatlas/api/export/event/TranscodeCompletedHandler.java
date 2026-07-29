@@ -18,7 +18,7 @@ public class TranscodeCompletedHandler {
 
     private final MediaMapper mediaMapper;
 
-    @RabbitListener(queues = "video.transcode.result.queue")
+    @RabbitListener(queues = "video.transcode.completed.queue")
     public void handleCompleted(VideoTranscodeCompletedEvent event,
             Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         try {

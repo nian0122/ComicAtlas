@@ -248,7 +248,7 @@ async function onTranscode() {
   } catch { return }
   try {
     const result = await storageService.transcodeVideos(comicId)
-    ElMessage.success(`已提交 ${result.pendingCount ?? 0} 个视频转码任务`)
+    ElMessage.success(`已提交 ${result.submittedCount} 个视频转码任务`)
     await loadData()
     startTranscodePolling()
   } catch (err: unknown) {
