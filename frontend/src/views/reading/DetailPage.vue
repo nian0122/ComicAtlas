@@ -530,7 +530,7 @@ onMounted(loadData)
 }
 
 /* Responsive */
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .info-grid {
     grid-template-columns: 1fr;
   }
@@ -582,7 +582,7 @@ onMounted(loadData)
   font-size: 16px;
 }
 
-/* 信息网格单列：与上方 768px 媒体查询结果一致（is-mobile 必然 ≤768px），两机制不冲突 */
+/* 信息网格单列：与上方平板媒体查询结果一致，两机制不冲突 */
 .comic-detail-page.is-mobile .info-grid {
   grid-template-columns: 1fr;
 }

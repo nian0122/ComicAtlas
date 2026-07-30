@@ -30,7 +30,7 @@ const routeClass = computed(() => `route-${String(route.name ?? 'unknown')}`)
   padding: var(--nav-height) var(--content-gutter) var(--space-10);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .reading-layout {
     background: var(--mobile-canvas);
   }

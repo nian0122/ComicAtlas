@@ -259,7 +259,7 @@ onBeforeUnmount(() => {
   right: var(--space-2);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .home-row {
     margin-top: var(--space-10);
   }

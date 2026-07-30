@@ -147,7 +147,7 @@ import { Collection, Download, Clock, ArrowRight } from '@element-plus/icons-vue
   transform: translateX(2px);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .actions-inner {
     grid-template-columns: 1fr;
     border-bottom: 0;
