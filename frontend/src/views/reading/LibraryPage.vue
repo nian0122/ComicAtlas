@@ -2,10 +2,8 @@
   <div class="comic-list-page">
     <header class="page-header">
       <div class="title-block">
-        <p class="page-eyebrow">DISCOVER / LIBRARY</p>
         <div class="title-row">
           <h1 class="page-title">
-            <span class="desktop-page-title">漫画库</span>
             <span class="mobile-page-title">我的收藏</span>
           </h1>
           <span class="mobile-recent">
@@ -14,7 +12,6 @@
           </span>
         </div>
         <p class="page-count">
-          <span class="desktop-page-count">当前收录 {{ store.total }} 部作品</span>
           <span class="mobile-page-count">{{ store.total }} 部作品 · {{ readingCount }} 部正在阅读</span>
         </p>
       </div>
@@ -207,8 +204,7 @@ const viewportWidth = useBreakpoint()
 
 // 海报尺寸随断点响应式推导（替代原先读取一次视口宽度、手动挂 resize 监听的写法）
 const posterSize = computed<'sm' | 'md' | 'lg'>(() => {
-  if (viewportWidth.value <= BREAKPOINTS.mobile) return 'sm'
-  if (viewportWidth.value <= BREAKPOINTS.tablet) return 'md'
+  if (viewportWidth.value <= BREAKPOINTS.tablet) return 'sm'
   return 'lg'
 })
 
@@ -317,8 +313,8 @@ onMounted(() => {
   position: sticky;
   top: var(--nav-height);
   z-index: var(--z-sticky);
-  padding: var(--space-8) 0 var(--space-5);
-  margin-bottom: var(--space-5);
+  padding: var(--space-2) 0 var(--space-3);
+  margin-bottom: var(--space-2);
   background: linear-gradient(to bottom, var(--bg-primary) 86%, transparent);
   border-bottom: 1px solid var(--border);
 }
@@ -546,8 +542,8 @@ onMounted(() => {
   background: var(--accent-hover);
 }
 
-/* ===== 移动端（≤768px）===== */
-@media (max-width: 768px) {
+/* ===== 移动阅读端（手机与平板，≤1024px）===== */
+@media (max-width: 1024px) {
   .comic-list-page {
     margin: 0;
   }

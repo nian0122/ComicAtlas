@@ -250,7 +250,7 @@ const hasActions = computed(
   transform: translateY(-2px);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .hero-banner {
     min-height: 0;
     aspect-ratio: 4 / 5;
@@ -311,7 +311,7 @@ const hasActions = computed(
   }
 }
 
-@media (min-width: 600px) and (max-width: 768px) {
+@media (min-width: 600px) and (max-width: 1024px) {
   .hero-banner {
     aspect-ratio: 16 / 10;
     max-height: var(--tablet-hero-max-height);

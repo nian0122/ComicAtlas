@@ -25,6 +25,25 @@
           <span class="mobile-header-spacer" aria-hidden="true" />
         </template>
 
+        <template v-else-if="mobileHeaderKind === 'history'">
+          <router-link to="/" class="mobile-brand" aria-label="ComicAtlas 首页">
+            <span class="logo-mark" aria-hidden="true">CA</span>
+            <span class="mobile-wordmark">COMICATLAS</span>
+          </router-link>
+          <button
+            type="button"
+            class="mobile-header-action"
+            :disabled="historyStore.loading"
+            aria-label="刷新阅读历史"
+            @click="historyStore.refresh()"
+          >
+            <MaterialSymbolIcon
+              name="refresh"
+              :class="['mobile-history-refresh-icon', { 'refresh-icon--loading': historyStore.loading }]"
+            />
+          </button>
+        </template>
+
         <template v-else>
           <router-link to="/" class="mobile-brand" aria-label="ComicAtlas 首页">
             <span class="logo-mark" aria-hidden="true">CA</span>
@@ -53,15 +72,15 @@
 
   <nav :class="['mobile-tabbar', `mobile-tabbar--${mobileHeaderKind}`]" aria-label="移动端主要导航">
     <router-link to="/" class="mobile-tab" exact-active-class="active">
-      <el-icon :size="21"><House /></el-icon>
+      <MaterialSymbolIcon name="home" class="mobile-tab-icon" />
       <span>首页</span>
     </router-link>
     <router-link to="/library" class="mobile-tab" active-class="active">
-      <el-icon :size="21"><Collection /></el-icon>
+      <MaterialSymbolIcon name="library" class="mobile-tab-icon" />
       <span>漫画库</span>
     </router-link>
     <router-link to="/history" class="mobile-tab" active-class="active">
-      <el-icon :size="21"><Clock /></el-icon>
+      <MaterialSymbolIcon name="history" class="mobile-tab-icon" />
       <span>历史</span>
     </router-link>
   </nav>
@@ -71,11 +90,19 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { ArrowLeft, Clock, Collection, House, Menu, Share, UploadFilled } from '@element-plus/icons-vue'
+import {
+  ArrowLeft,
+  Menu,
+  Share,
+  UploadFilled,
+} from '@element-plus/icons-vue'
+import MaterialSymbolIcon from '@/components/icons/MaterialSymbolIcon.vue'
+import { useHistoryStore } from '@/stores/history-store'
 
 const isScrolled = ref(false)
 const route = useRoute()
 const router = useRouter()
+const historyStore = useHistoryStore()
 
 const mobileHeaderKind = computed(() => {
   if (route.name === 'comic-detail') return 'detail'
@@ -267,7 +294,7 @@ onBeforeUnmount(() => {
   display: none;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .top-nav {
     height: var(--mobile-nav-height);
     border-bottom-color: transparent;
@@ -277,6 +304,10 @@ onBeforeUnmount(() => {
   .top-nav--home,
   .top-nav--detail {
     background: var(--mobile-header-scrim);
+  }
+
+  .top-nav--history {
+    border-bottom-color: var(--border);
   }
 
   .top-nav--home.scrolled,
@@ -347,6 +378,19 @@ onBeforeUnmount(() => {
     background: var(--color-overlay-soft);
   }
 
+  .mobile-header-action:disabled {
+    opacity: var(--disabled-opacity);
+  }
+
+  .refresh-icon--loading {
+    animation: refresh-history var(--motion-standard) linear infinite;
+  }
+
+  .mobile-history-refresh-icon {
+    width: var(--mobile-history-refresh-icon-size);
+    height: var(--mobile-history-refresh-icon-size);
+  }
+
   .mobile-header-spacer {
     width: 132px;
   }
@@ -366,6 +410,21 @@ onBeforeUnmount(() => {
   .mobile-brand .logo-mark {
     width: var(--mobile-brand-mark-size);
     height: var(--mobile-brand-mark-size);
+  }
+
+  .top-nav--history .mobile-brand {
+    gap: var(--space-3);
+  }
+
+  .top-nav--history .mobile-brand .logo-mark {
+    width: var(--mobile-history-brand-size);
+    height: var(--mobile-history-brand-size);
+    border-radius: var(--mobile-history-brand-radius);
+  }
+
+  .top-nav--history .mobile-wordmark {
+    font-size: var(--mobile-history-brand-font-size);
+    letter-spacing: -0.04em;
   }
 
   .mobile-tabbar {
@@ -396,6 +455,11 @@ onBeforeUnmount(() => {
     font-weight: 600;
   }
 
+  .mobile-tab-icon {
+    width: var(--mobile-tab-icon-size);
+    height: var(--mobile-tab-icon-size);
+  }
+
   .mobile-tab.active {
     color: var(--accent);
   }
@@ -421,7 +485,17 @@ onBeforeUnmount(() => {
   }
 
   .mobile-tabbar--history .mobile-tab.active::after {
+    right: auto;
+    left: 50%;
+    width: var(--mobile-history-tab-indicator-width);
     opacity: 1;
+    transform: translateX(-50%);
+  }
+
+  @keyframes refresh-history {
+    to {
+      transform: rotate(1turn);
+    }
   }
 }
 </style>

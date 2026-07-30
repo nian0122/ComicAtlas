@@ -302,7 +302,7 @@ const sizeIcon = computed(() => {
   white-space: nowrap;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .comic-poster {
     scroll-snap-align: start;
   }

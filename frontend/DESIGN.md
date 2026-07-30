@@ -8,7 +8,7 @@ ComicAtlas 是一座“私人放映馆”：打开应用先看到作品，而不
 
 - 移动端只提供首页、漫画库、历史、详情和阅读器，不展示导入、管理或存储入口。
 - PC 端同时提供阅读与漫画仓库管理，阅读导航与管理工作台使用不同壳层。
-- 768px 作为布局分界；设备能力守卫继续负责阻止粗指针移动设备访问 `/manage/*`。
+- 阅读端以 1024px 为手机/平板与 PC 的布局分界；设备能力守卫负责阻止该范围内的粗指针设备访问 `/manage/*`。窄窗口但使用精细指针的桌面浏览器仍可进入管理端。
 
 ### Stitch 移动端参考契约
 
@@ -16,7 +16,7 @@ ComicAtlas 是一座“私人放映馆”：打开应用先看到作品，而不
 
 - `comicatlas_apple_tv_infusion_4/code.html`：首页，4:5 电影海报 Hero、续读与最近更新横向片单。
 - `comicatlas_apple_tv_infusion_3/screen.png`：漫画库，双列 2:3 封面网格、顶部搜索、横向筛选胶囊。
-- `comicatlas_apple_tv_infusion_1/screen.png`：阅读历史，16:9 横向缩略图与账本式阅读信息。
+- `stitch_user_experience_enhancement/screen.png`（2026-07-30 历史页导出）：阅读历史，16:9 横向缩略图卡片、双进度表达、顶部刷新与完成提示。
 - `comicatlas_apple_tv_infusion_2/screen.png`：漫画详情，封面舞台、红色标题、元数据、续读动作、进度与简介。
 
 参考稿中首页的 `screen.png` 无有效图像数据，因此该页以同目录 `code.html` 为精确结构依据；内容图片、漫画名称与业务数据继续来自 ComicAtlas API，不把参考稿的示例内容硬编码进产品。
@@ -45,7 +45,7 @@ ComicAtlas 是一座“私人放映馆”：打开应用先看到作品，而不
 | Danger | `--color-danger` | `#f06b70` | 失败、危险操作 |
 | Info | `--color-info` | `#70a6d8` | 信息状态 |
 
-透明叠层与环境效果也必须由 token 提供：`--color-overlay-soft`、`--color-overlay-hover`、`--color-overlay-scrim`、`--color-progress-track`、`--color-border-faint`、`--nav-gradient`、`--nav-solid`、`--nav-shadow`、`--brand-shadow`、`--title-shadow`、`--hero-mobile-gradient`、`--page-atmosphere`。组件不得自行创建新的 `rgb()` 叠层。
+透明叠层与环境效果也必须由 token 提供：`--color-overlay-faint`、`--color-overlay-soft`、`--color-overlay-hover`、`--color-overlay-scrim`、`--color-progress-track`、`--color-border-faint`、`--nav-gradient`、`--nav-solid`、`--nav-shadow`、`--brand-shadow`、`--title-shadow`、`--hero-mobile-gradient`、`--page-atmosphere`。组件不得自行创建新的 `rgb()` 叠层。
 
 ### Rules
 
@@ -93,7 +93,7 @@ ComicAtlas 是一座“私人放映馆”：打开应用先看到作品，而不
 
 ### Navigation
 
-- **Structure**：桌面顶部品牌、阅读导航、管理入口与导入动作；移动顶部根据路由切换首页品牌头像、漫画库菜单搜索、历史品牌、详情返回分享，底部保留首页、漫画库、历史三项阅读导航。
+- **Structure**：桌面顶部品牌、阅读导航、管理入口与导入动作；移动顶部根据路由切换首页品牌头像、漫画库菜单搜索、历史品牌与刷新、详情返回分享，底部保留首页、漫画库、历史三项阅读导航。
 - **States**：default、hover、active、focus-visible。
 - **Layout**：桌面 fixed top bar；移动 fixed top + 贴合屏幕底边的全宽 safe-area tabbar，不使用悬浮胶囊。
 - **Motion**：只使用颜色、透明度和 `transform`。
@@ -125,9 +125,9 @@ ComicAtlas 是一座“私人放映馆”：打开应用先看到作品，而不
 
 ### Ledger row
 
-- **Structure**：移动端使用 16:9 横向缩略图、两行标题、章节页码、进度与播放入口；桌面保持紧凑账本行。
-- **States**：default、hover、focus-visible、missing。
-- **Layout**：由 History 独立负责，不用样式穿透扭曲 Poster card。
+- **Structure**：移动端使用暗场卡片，内含 160px 的 16:9 横向缩略图、封面底部进度、单行标题、章节页码、正文进度条、百分比与圆形播放入口；列表结束后显示中文完成提示。桌面保持紧凑账本行。
+- **States**：default、hover、active、focus-visible、loading、missing。
+- **Layout**：移动卡片高 124px、间隔 24px、内容列最大宽度 672px，卡片横向突破页面沟槽 8px；由 History 独立负责，不用样式穿透扭曲 Poster card。
 
 ### Management shell
 
