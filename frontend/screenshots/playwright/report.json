@@ -1,0 +1,182 @@
+[
+  {
+    "route": "home",
+    "viewport": "mobile",
+    "requestedUrl": "/",
+    "finalPath": "/",
+    "screenshotPath": "D:\\projects\\ComicAtlas\\frontend\\screenshots\\playwright\\home-mobile.png",
+    "horizontalOverflow": false,
+    "managementLinks": 3,
+    "consoleErrors": []
+  },
+  {
+    "route": "library",
+    "viewport": "mobile",
+    "requestedUrl": "/library",
+    "finalPath": "/library",
+    "screenshotPath": "D:\\projects\\ComicAtlas\\frontend\\screenshots\\playwright\\library-mobile.png",
+    "horizontalOverflow": false,
+    "managementLinks": 2,
+    "consoleErrors": []
+  },
+  {
+    "route": "history",
+    "viewport": "mobile",
+    "requestedUrl": "/history",
+    "finalPath": "/history",
+    "screenshotPath": "D:\\projects\\ComicAtlas\\frontend\\screenshots\\playwright\\history-mobile.png",
+    "horizontalOverflow": false,
+    "managementLinks": 2,
+    "consoleErrors": []
+  },
+  {
+    "route": "detail",
+    "viewport": "mobile",
+    "requestedUrl": "/comic/1",
+    "finalPath": "/comic/1",
+    "screenshotPath": "D:\\projects\\ComicAtlas\\frontend\\screenshots\\playwright\\detail-mobile.png",
+    "horizontalOverflow": false,
+    "managementLinks": 2,
+    "consoleErrors": []
+  },
+  {
+    "route": "reader",
+    "viewport": "mobile",
+    "requestedUrl": "/reader/11?page=1",
+    "finalPath": "/reader/11",
+    "screenshotPath": "D:\\projects\\ComicAtlas\\frontend\\screenshots\\playwright\\reader-mobile.png",
+    "horizontalOverflow": false,
+    "managementLinks": 0,
+    "consoleErrors": []
+  },
+  {
+    "route": "management",
+    "viewport": "mobile",
+    "requestedUrl": "/manage/comics",
+    "finalPath": "/manage/intercept",
+    "screenshotPath": "D:\\projects\\ComicAtlas\\frontend\\screenshots\\playwright\\management-mobile.png",
+    "horizontalOverflow": false,
+    "managementLinks": 0,
+    "consoleErrors": []
+  },
+  {
+    "route": "home",
+    "viewport": "tablet",
+    "requestedUrl": "/",
+    "finalPath": "/",
+    "screenshotPath": "D:\\projects\\ComicAtlas\\frontend\\screenshots\\playwright\\home-tablet.png",
+    "horizontalOverflow": false,
+    "managementLinks": 3,
+    "consoleErrors": []
+  },
+  {
+    "route": "library",
+    "viewport": "tablet",
+    "requestedUrl": "/library",
+    "finalPath": "/library",
+    "screenshotPath": "D:\\projects\\ComicAtlas\\frontend\\screenshots\\playwright\\library-tablet.png",
+    "horizontalOverflow": false,
+    "managementLinks": 2,
+    "consoleErrors": []
+  },
+  {
+    "route": "history",
+    "viewport": "tablet",
+    "requestedUrl": "/history",
+    "finalPath": "/history",
+    "screenshotPath": "D:\\projects\\ComicAtlas\\frontend\\screenshots\\playwright\\history-tablet.png",
+    "horizontalOverflow": false,
+    "managementLinks": 2,
+    "consoleErrors": []
+  },
+  {
+    "route": "detail",
+    "viewport": "tablet",
+    "requestedUrl": "/comic/1",
+    "finalPath": "/comic/1",
+    "screenshotPath": "D:\\projects\\ComicAtlas\\frontend\\screenshots\\playwright\\detail-tablet.png",
+    "horizontalOverflow": false,
+    "managementLinks": 2,
+    "consoleErrors": []
+  },
+  {
+    "route": "reader",
+    "viewport": "tablet",
+    "requestedUrl": "/reader/11?page=1",
+    "finalPath": "/reader/11",
+    "screenshotPath": "D:\\projects\\ComicAtlas\\frontend\\screenshots\\playwright\\reader-tablet.png",
+    "horizontalOverflow": false,
+    "managementLinks": 0,
+    "consoleErrors": []
+  },
+  {
+    "route": "management",
+    "viewport": "tablet",
+    "requestedUrl": "/manage/comics",
+    "finalPath": "/manage/intercept",
+    "screenshotPath": "D:\\projects\\ComicAtlas\\frontend\\screenshots\\playwright\\management-tablet.png",
+    "horizontalOverflow": false,
+    "managementLinks": 0,
+    "consoleErrors": []
+  },
+  {
+    "route": "home",
+    "viewport": "desktop",
+    "requestedUrl": "/",
+    "finalPath": "/",
+    "screenshotPath": "D:\\projects\\ComicAtlas\\frontend\\screenshots\\playwright\\home-desktop.png",
+    "horizontalOverflow": false,
+    "managementLinks": 3,
+    "consoleErrors": []
+  },
+  {
+    "route": "library",
+    "viewport": "desktop",
+    "requestedUrl": "/library",
+    "finalPath": "/library",
+    "screenshotPath": "D:\\projects\\ComicAtlas\\frontend\\screenshots\\playwright\\library-desktop.png",
+    "horizontalOverflow": false,
+    "managementLinks": 2,
+    "consoleErrors": []
+  },
+  {
+    "route": "history",
+    "viewport": "desktop",
+    "requestedUrl": "/history",
+    "finalPath": "/history",
+    "screenshotPath": "D:\\projects\\ComicAtlas\\frontend\\screenshots\\playwright\\history-desktop.png",
+    "horizontalOverflow": false,
+    "managementLinks": 2,
+    "consoleErrors": []
+  },
+  {
+    "route": "detail",
+    "viewport": "desktop",
+    "requestedUrl": "/comic/1",
+    "finalPath": "/comic/1",
+    "screenshotPath": "D:\\projects\\ComicAtlas\\frontend\\screenshots\\playwright\\detail-desktop.png",
+    "horizontalOverflow": false,
+    "managementLinks": 2,
+    "consoleErrors": []
+  },
+  {
+    "route": "reader",
+    "viewport": "desktop",
+    "requestedUrl": "/reader/11?page=1",
+    "finalPath": "/reader/11",
+    "screenshotPath": "D:\\projects\\ComicAtlas\\frontend\\screenshots\\playwright\\reader-desktop.png",
+    "horizontalOverflow": false,
+    "managementLinks": 0,
+    "consoleErrors": []
+  },
+  {
+    "route": "management",
+    "viewport": "desktop",
+    "requestedUrl": "/manage/comics",
+    "finalPath": "/manage/comics",
+    "screenshotPath": "D:\\projects\\ComicAtlas\\frontend\\screenshots\\playwright\\management-desktop.png",
+    "horizontalOverflow": false,
+    "managementLinks": 7,
+    "consoleErrors": []
+  }
+]
