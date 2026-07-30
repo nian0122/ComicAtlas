@@ -10,6 +10,17 @@ ComicAtlas 是一座“私人放映馆”：打开应用先看到作品，而不
 - PC 端同时提供阅读与漫画仓库管理，阅读导航与管理工作台使用不同壳层。
 - 768px 作为布局分界；设备能力守卫继续负责阻止粗指针移动设备访问 `/manage/*`。
 
+### Stitch 移动端参考契约
+
+移动端阅读端以 `stitch_user_experience_enhancement` 的四个交付页面为像素级参考：
+
+- `comicatlas_apple_tv_infusion_4/code.html`：首页，4:5 电影海报 Hero、续读与最近更新横向片单。
+- `comicatlas_apple_tv_infusion_3/screen.png`：漫画库，双列 2:3 封面网格、顶部搜索、横向筛选胶囊。
+- `comicatlas_apple_tv_infusion_1/screen.png`：阅读历史，16:9 横向缩略图与账本式阅读信息。
+- `comicatlas_apple_tv_infusion_2/screen.png`：漫画详情，封面舞台、红色标题、元数据、续读动作、进度与简介。
+
+参考稿中首页的 `screen.png` 无有效图像数据，因此该页以同目录 `code.html` 为精确结构依据；内容图片、漫画名称与业务数据继续来自 ComicAtlas API，不把参考稿的示例内容硬编码进产品。
+
 ## 2. Color
 
 ### Palette
@@ -26,6 +37,7 @@ ComicAtlas 是一座“私人放映馆”：打开应用先看到作品，而不
 | Line subtle | `--color-line-subtle` | `#292929` | 分隔线 |
 | Line strong | `--color-line-strong` | `#4a4a4a` | 控件边界 |
 | Brand | `--color-brand` | `#e50914` | 继续阅读、选中、进度 |
+| Brand pale | `--color-brand-pale` | `#ffb3b6` | 漫画库移动导航选中 |
 | Brand hover | `--color-brand-hover` | `#f6121d` | 品牌交互悬浮 |
 | Focus | `--color-focus` | `#ffffff` | 键盘焦点 |
 | Success | `--color-success` | `#66c58b` | 成功 |
@@ -54,7 +66,7 @@ ComicAtlas 是一座“私人放映馆”：打开应用先看到作品，而不
 | Small | `--text-sm` | `0.875rem` | 400–600 | 1.5 | 控件、元数据 |
 | Caption | `--text-xs` | `0.75rem` | 500 | 1.5 | 辅助信息 |
 
-- UI 与标题统一使用 `Source Han Sans VF` / `Noto Sans CJK SC` / `Noto Sans JP` / 系统无衬线，以粗细对比代替衬线/无衬线切换。
+- UI 与标题优先使用 `Plus Jakarta Sans`，中文回退到 `Source Han Sans VF` / `Noto Sans CJK SC` / `Microsoft YaHei` / 系统无衬线，以粗细对比代替衬线/无衬线切换。
 - Hero 与作品标题使用 700–800；导航与按钮使用 600–700；正文使用 400。
 - 数字使用 UI 字体与 `font-variant-numeric: tabular-nums`，不增加第三套字体。
 - 卡片标题固定两行；Hero 桌面最多两行、移动最多三行。
@@ -66,7 +78,8 @@ ComicAtlas 是一座“私人放映馆”：打开应用先看到作品，而不
 - 间距：`--space-1` 4px、`--space-2` 8px、`--space-3` 12px、`--space-4` 16px、`--space-5` 20px、`--space-6` 24px、`--space-8` 32px、`--space-10` 40px、`--space-12` 48px、`--space-16` 64px。
 - 最大内容宽度：`--content-max: 1440px`。
 - 页面边距：`--content-gutter: clamp(16px, 3vw, 40px)`。
-- 顶栏：68px；管理侧栏：232px。
+- 桌面顶栏：68px；移动顶栏与底部导航：64px；管理侧栏：232px。
+- 移动页面横向沟槽固定为 16px；首页和详情的影像舞台可突破沟槽到屏幕边缘。
 - 阅读端由文档滚动；管理端由主内容区独占纵向滚动。
 - 375px 下主内容必须单轴纵向阅读，不允许主区域出现水平溢出；横向 reel 和数据表必须显式声明自己的滚动职责。
 
@@ -80,9 +93,9 @@ ComicAtlas 是一座“私人放映馆”：打开应用先看到作品，而不
 
 ### Navigation
 
-- **Structure**：桌面顶部品牌、阅读导航、管理入口与导入动作；移动顶部仅保留品牌和搜索入口，底部保留三项阅读导航。
+- **Structure**：桌面顶部品牌、阅读导航、管理入口与导入动作；移动顶部根据路由切换首页品牌头像、漫画库菜单搜索、历史品牌、详情返回分享，底部保留首页、漫画库、历史三项阅读导航。
 - **States**：default、hover、active、focus-visible。
-- **Layout**：桌面 fixed top bar；移动 fixed top + safe-area bottom tabbar。
+- **Layout**：桌面 fixed top bar；移动 fixed top + 贴合屏幕底边的全宽 safe-area tabbar，不使用悬浮胶囊。
 - **Motion**：只使用颜色、透明度和 `transform`。
 
 ### Button / Icon button
@@ -112,7 +125,7 @@ ComicAtlas 是一座“私人放映馆”：打开应用先看到作品，而不
 
 ### Ledger row
 
-- **Structure**：48×72 封面、两行标题、章节页码、进度。
+- **Structure**：移动端使用 16:9 横向缩略图、两行标题、章节页码、进度与播放入口；桌面保持紧凑账本行。
 - **States**：default、hover、focus-visible、missing。
 - **Layout**：由 History 独立负责，不用样式穿透扭曲 Poster card。
 

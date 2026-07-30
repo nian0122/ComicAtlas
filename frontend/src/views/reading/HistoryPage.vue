@@ -2,8 +2,8 @@
   <div class="history-page">
     <header class="page-header">
       <div class="header-left">
-        <p class="page-eyebrow">LEDGER / RECENT</p>
-        <h1 class="page-title">阅读中心</h1>
+        <p class="page-eyebrow">LEDGER / HISTORY</p>
+        <h1 class="page-title">阅读历史</h1>
         <p v-if="recentCount > 0" class="page-subtitle">
           最近阅读 {{ recentCount }} 部漫画
         </p>
@@ -39,25 +39,31 @@
     <RecycleScroller
       v-else
       class="history-scroller"
-      :items="store.list"
-      :item-size="88"
-      key-field="comicId"
+      :items="historyItems"
+      :item-size="historyItemSize"
+      key-field="key"
       :buffer="200"
     >
       <template #default="{ item }">
-        <div class="history-item">
-          <ComicPoster
-            :id="item.comicId"
-            :cover-url="item.coverUrl"
-            :title="item.comicTitle || `漫画 #${item.comicId}`"
-            :subtitle="subtitleFor(item)"
-            :progress="item.progressPercent"
-            size="md"
-            @click="continueRead(item)"
-            @continue="continueRead(item)"
-            @detail="goDetail(item.comicId)"
-          />
+        <div v-if="item.kind === 'end'" class="history-end">
+          <el-icon :size="34"><Clock /></el-icon>
+          <span>END OF HISTORY</span>
         </div>
+        <article v-else class="history-item">
+          <button type="button" class="history-thumb" @click="continueRead(item.value)">
+            <img :src="item.value.coverUrl" :alt="item.value.comicTitle || `漫画 #${item.value.comicId}`">
+          </button>
+          <button type="button" class="history-copy" @click="continueRead(item.value)">
+            <span class="history-title">{{ item.value.comicTitle || `漫画 #${item.value.comicId}` }}</span>
+            <span class="history-meta">{{ subtitleFor(item.value) }}</span>
+            <span class="history-progress" aria-hidden="true">
+              <span :style="{ width: `${item.value.progressPercent}%` }" />
+            </span>
+          </button>
+          <button type="button" class="history-play" aria-label="继续阅读" @click="continueRead(item.value)">
+            <el-icon :size="20"><VideoPlay /></el-icon>
+          </button>
+        </article>
       </template>
     </RecycleScroller>
   </div>
@@ -67,15 +73,32 @@
 import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { RecycleScroller } from 'vue-virtual-scroller'
-import { PictureFilled, WarningFilled } from '@element-plus/icons-vue'
+import { Clock, PictureFilled, VideoPlay, WarningFilled } from '@element-plus/icons-vue'
 import { useHistoryStore } from '@/stores/history-store'
 import type { HistoryVO } from '@/types'
-import ComicPoster from '@/components/reading/comic/ComicPoster.vue'
+import { useInteractionMode } from '@/views/reading/reader/composables/useInteractionMode'
 
 const router = useRouter()
 const store = useHistoryStore()
+const { mode } = useInteractionMode()
 
 const recentCount = computed(() => store.list.length)
+const historyItemSize = computed(() =>
+  mode.value === 'mobile' ? 208 : 88
+)
+
+type HistoryScrollerItem =
+  | { kind: 'history'; key: string; value: HistoryVO }
+  | { kind: 'end'; key: 'history-end' }
+
+const historyItems = computed<HistoryScrollerItem[]>(() => [
+  ...store.list.map((value) => ({
+    kind: 'history' as const,
+    key: `history-${value.comicId}`,
+    value,
+  })),
+  { kind: 'end' as const, key: 'history-end' },
+])
 
 function subtitleFor(item: HistoryVO): string {
   return `第 ${item.chapterNo} 话 · ${item.pageNumber} / ${item.totalPages || '?'} 页 · ${item.progressPercent}%`
@@ -83,10 +106,6 @@ function subtitleFor(item: HistoryVO): string {
 
 function continueRead(item: HistoryVO) {
   router.push(`/reader/${item.chapterId}?page=${item.pageNumber}`)
-}
-
-function goDetail(comicId: number) {
-  router.push(`/comic/${comicId}`)
 }
 
 onMounted(() => {
@@ -156,10 +175,9 @@ onMounted(() => {
 
 /* 单行：88px 固定高，与 :item-size 一致 */
 .history-item {
-  --history-thumb-height: 72px;
-  --history-thumb-width: 48px;
   display: flex;
   align-items: center;
+  gap: var(--space-4);
   height: 88px;
   padding-inline: var(--space-3);
   box-sizing: border-box;
@@ -175,55 +193,93 @@ onMounted(() => {
   box-shadow: inset 2px 0 var(--accent);
 }
 
-/* 将 ComicPoster 适配为阅读账本行 */
-.history-item :deep(.comic-poster) {
-  flex-direction: row;
-  align-items: center;
-  gap: var(--space-base);
-  width: 100%;
-  min-width: 0;
-}
-
-.history-item :deep(.comic-poster.is-hoverable:hover) {
-  transform: none;
-}
-
-.history-item :deep(.poster-frame) {
-  width: var(--history-thumb-width);
-  height: var(--history-thumb-height);
-  aspect-ratio: auto;
-  flex-shrink: 0;
+.history-thumb {
+  width: 48px;
+  height: 72px;
+  flex: 0 0 auto;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
   border-radius: var(--radius-sm);
+  background: var(--bg-surface);
 }
 
-.history-item :deep(.poster-info) {
-  margin-top: 0;
+.history-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.history-copy {
+  display: flex;
   flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
   min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
 }
 
-.history-item :deep(.poster-title) {
-  min-height: auto;
-  margin-bottom: var(--space-1);
-  -webkit-line-clamp: 2;
+.history-title {
+  width: 100%;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: var(--text-md);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.history-item :deep(.poster-subtitle) {
-  color: var(--text-secondary);
-  font-variant-numeric: tabular-nums;
+.history-meta {
+  width: 100%;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.history-item :deep(.poster-progress) {
+.history-progress {
+  width: min(260px, 100%);
   height: 3px;
+  margin-top: var(--space-1);
+  overflow: hidden;
+  background: var(--color-progress-track);
 }
 
-.history-item :deep(.poster-placeholder span:not(.placeholder-spine)) {
-  display: none;
+.history-progress span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
 }
 
-/* 账本行整行点击继续阅读，不在有限高度内显示浮层按钮 */
-.history-item :deep(.poster-overlay) {
-  display: none;
+.history-play {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 1px solid var(--color-border-faint);
+  border-radius: 50%;
+  background: var(--color-overlay-soft);
+  color: var(--text-primary);
+}
+
+.history-end {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  height: 88px;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  letter-spacing: 0.24em;
 }
 
 /* States */
@@ -315,9 +371,9 @@ onMounted(() => {
 @media (max-width: 640px) {
   .history-page {
     height: calc(
-      100dvh - var(--nav-height) - var(--mobile-tabbar-height) - var(--space-8)
+      100dvh - var(--mobile-nav-height) - var(--mobile-tabbar-height) - var(--space-8)
     );
-    padding: var(--space-5) 0 var(--space-4);
+    padding: calc(var(--space-12) + var(--space-2)) 0 var(--space-4);
   }
 
   .page-title {
@@ -325,11 +381,61 @@ onMounted(() => {
   }
 
   .page-header {
-    margin-bottom: var(--space-5);
+    align-items: flex-end;
+    margin-bottom: var(--space-12);
+  }
+
+  .page-eyebrow {
+    color: var(--text-secondary);
+  }
+
+  .page-title {
+    color: var(--accent);
+  }
+
+  .page-subtitle,
+  .primary-btn {
+    display: none;
   }
 
   .history-item {
+    gap: var(--space-3);
+    height: var(--mobile-history-row-height);
     padding-inline: 0;
+  }
+
+  .history-thumb {
+    width: var(--mobile-history-thumb-width);
+    height: auto;
+    aspect-ratio: 16 / 9;
+    border-radius: var(--radius-md);
+  }
+
+  .history-title {
+    display: -webkit-box;
+    overflow: hidden;
+    font-size: 15px;
+    line-height: 1.35;
+    white-space: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .history-meta {
+    font-size: 11px;
+  }
+
+  .history-play {
+    width: 38px;
+    height: 38px;
+    border-color: var(--accent);
+    background: transparent;
+    color: var(--accent);
+  }
+
+  .history-end {
+    flex-direction: column;
+    height: var(--mobile-history-row-height);
   }
 }
 </style>

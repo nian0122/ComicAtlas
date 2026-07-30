@@ -6,7 +6,7 @@
       </div>
       <h1 class="intercept-title">管理功能面向桌面端设计</h1>
       <p class="intercept-body">
-        阅读功能支持手机和平板。管理功能为了更高的编辑效率，仅支持桌面浏览器。请使用电脑访问<span class="no-break">管理后台</span>。
+        阅读功能支持手机和平板。管理功能为了更高的编辑效率，仅支持<span class="no-break">桌面浏览器</span>。请使用电脑访问<span class="no-break">管理后台</span>。
       </p>
       <button class="intercept-button" type="button" @click="goHome">回到阅读首页</button>
     </div>

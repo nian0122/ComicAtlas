@@ -105,8 +105,8 @@ function onSliderChange(e: Event) {
   z-index: 30;
   display: flex;
   flex-direction: column;
-  /* 内容区高度 56px + 底部安全区（手势条） */
-  height: calc(56px + env(safe-area-inset-bottom));
+  /* 内容区与阅读端底栏一致，确保进度条和 48px 触控按钮不越出视口。 */
+  height: calc(var(--mobile-tabbar-height) + env(safe-area-inset-bottom));
   padding-bottom: env(safe-area-inset-bottom);
   /* 半透明深色背景 + 毛玻璃，与顶部工具栏一致 */
   background: var(--bg-primary);
@@ -137,6 +137,7 @@ function onSliderChange(e: Event) {
   display: block;
   width: 100%;
   height: 3px;
+  margin: 0;
   border-radius: 2px;
   border: none;
   outline: none;
