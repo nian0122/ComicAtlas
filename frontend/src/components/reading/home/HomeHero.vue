@@ -4,6 +4,7 @@
     :poster-url="posterUrl"
     :title="title"
     :subtitle="subtitle"
+    :description="description"
     :primary-action="primaryAction"
     :secondary-action="secondaryAction"
   />
@@ -39,6 +40,12 @@ const subtitle = computed(() => {
     : ''
   return `第 ${chapterNo} 章 · 第 ${pageNumber}/${totalPages} 页${progressText}`
 })
+
+const description = computed(() =>
+  props.historyItem
+    ? '继续上次的进度，在属于你的私人漫画仓库中沉浸阅读。'
+    : '从私人收藏中挑选一部作品，开启你的下一场漫画放映。'
+)
 
 const primaryAction = computed(() => {
   if (props.historyItem) {

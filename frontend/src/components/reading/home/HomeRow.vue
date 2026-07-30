@@ -260,6 +260,26 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 768px) {
+  .home-row {
+    margin-top: var(--space-10);
+  }
+
+  .row-header {
+    margin-bottom: var(--space-2);
+  }
+
+  .row-title {
+    font-size: 20px;
+  }
+
+  .row-title::before {
+    display: none;
+  }
+
+  .row-more {
+    min-height: 36px;
+  }
+
   .row-arrow {
     display: none;
   }
