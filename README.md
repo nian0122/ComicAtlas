@@ -33,6 +33,9 @@ ComicAtlas 是一个面向个人收藏的本地漫画仓库平台。它把 ZIP�
 
    ```dotenv
    MANGA_ROOT=D:/manga
+   MYSQL_ROOT_PASSWORD=请设置强密码
+   REMOTE_MYSQL_USER=comicatlas
+   REMOTE_MYSQL_PASSWORD=请设置强密码
    REMOTE_NACOS_USERNAME=nacos
    REMOTE_NACOS_PASSWORD=nacos
    REMOTE_REDIS_PORT=6379
@@ -43,15 +46,21 @@ ComicAtlas 是一个面向个人收藏的本地漫画仓库平台。它把 ZIP�
 
 2. 确认 `MANGA_ROOT` 下存在 `hq`、`lq`、`thumbs`、`metadata`、`temp` 目录。
 
-3. 启动应用：
+3. 如需在当前主机运行基础服务，单独启动 MySQL、Redis、RabbitMQ 和 Nacos：
 
    ```bash
-   docker compose up -d --build
+   docker compose -f docker-compose.infra.yml up -d
    ```
 
-4. 浏览器打开 [http://localhost](http://localhost)。管理后台位于 `/manage`。
+4. 启动 Gateway、API 和 Nginx：
 
-> 当前 `docker-compose.yml` 默认启动 MySQL、Gateway、API 和 Nginx；Redis、RabbitMQ、Nacos 需要提前运行，并通过配置或 SSH 隧道提供给应用。首次部署前请阅读 [用户指南](docs/user-guide.md) 的基础设施章节。
+   ```bash
+   docker compose -f docker-compose.yml up -d --build
+   ```
+
+5. 浏览器打开 [http://localhost](http://localhost)。管理后台位于 `/manage`。
+
+> `docker-compose.infra.yml` 只管理基础服务，`docker-compose.yml` 只管理项目服务。使用远端基础设施时，不要在本地启动基础服务文件，先运行 `tools/start-remote-infra-tunnel.ps1` 建立 SSH 隧道即可。首次部署前请阅读 [用户指南](docs/user-guide.md) 的基础设施章节。
 
 ### 源码开发
 
