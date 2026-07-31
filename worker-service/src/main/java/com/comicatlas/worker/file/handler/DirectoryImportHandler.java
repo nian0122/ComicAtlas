@@ -1,7 +1,7 @@
 package com.comicatlas.worker.file.handler;
 
 import com.comicatlas.worker.file.parse.*;
-import com.comicatlas.worker.file.storage.LocalStorageService;
+import com.comicatlas.worker.file.storage.StorageService;
 import com.comicatlas.worker.file.transcode.VideoNormalizer;
 import com.comicatlas.worker.event.CancelHandler;
 import com.comicatlas.worker.image.ImageOptimizer;
@@ -20,7 +20,7 @@ public class DirectoryImportHandler {
 
     private final DirectoryParser parser;
     private final MetadataAssembler assembler;
-    private final LocalStorageService storageService;
+    private final StorageService storageService;
     private final ObjectMapper objectMapper;
     private final ImageOptimizer imageOptimizer;
     private final CancelHandler cancelHandler;
@@ -56,7 +56,8 @@ public class DirectoryImportHandler {
                 if (!Files.exists(src)) src = importRoot.resolve(page.fileName());
                 if (Files.exists(src) && page.fileSize() > 0) {
                     String relativePath = comicId + "/" + ch.globalOrder() + "/" + page.fileName();
-                    storageService.store(src, "HQ", relativePath);
+                    storageService.transfer(src, new com.comicatlas.worker.file.storage.StorageRef("HQ", relativePath),
+                            com.comicatlas.worker.file.storage.TransferMode.COPY);
                 }
             }
         }
