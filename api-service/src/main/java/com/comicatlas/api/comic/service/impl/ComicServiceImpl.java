@@ -2,10 +2,10 @@ package com.comicatlas.api.comic.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.api.comic.dto.*;
 import com.comicatlas.api.comic.entity.*;
 import com.comicatlas.api.comic.mapper.*;
+import com.comicatlas.api.comic.service.ComicListQueryService;
 import com.comicatlas.api.comic.service.ComicService;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.common.storage.FileUrlResolver;
@@ -29,6 +29,7 @@ import java.util.stream.Collectors;
 public class ComicServiceImpl implements ComicService {
 
     private final ComicMapper comicMapper;
+    private final ComicListQueryService comicListQueryService;
     private final ChapterMapper chapterMapper;
     private final MediaMapper mediaMapper;
     private final TagMapper tagMapper;
@@ -41,31 +42,7 @@ public class ComicServiceImpl implements ComicService {
 
     @Override
     public IPage<ComicListVO> listComics(ComicListQuery query) {
-        Page<Comic> page = new Page<>(query.getPage(), query.getSize());
-        IPage<Comic> result = comicMapper.selectPage(page, query);
-        return result.convert(this::toListVO);
-    }
-
-    private ComicListVO toListVO(Comic c) {
-        ComicListVO vo = new ComicListVO();
-        vo.setId(c.getId());
-        vo.setTitle(c.getTitle());
-        vo.setAuthor(c.getAuthor());
-        vo.setCoverUrl(resolveCoverUrl(c.getId()));
-        vo.setPageCount(c.getTotalPages());
-        vo.setCategoryId(c.getCategoryId());
-        vo.setCategoryName(resolveCategoryName(c.getCategoryId()));
-        vo.setStatus(c.getStatus());
-        vo.setCreatedAt(c.getCreatedAt());
-
-        var history = historyMapper.selectOne(
-            new LambdaQueryWrapper<ReadingHistory>().eq(ReadingHistory::getComicId, c.getId()));
-        if (history != null && c.getTotalPages() != null && c.getTotalPages() > 0) {
-            vo.setLastReadChapterId(history.getChapterId());
-            vo.setLastReadPage(history.getPageNumber());
-            vo.setProgressPercent(history.getPageNumber() * 100 / c.getTotalPages());
-        }
-        return vo;
+        return comicListQueryService.listComics(query);
     }
 
     @Override
