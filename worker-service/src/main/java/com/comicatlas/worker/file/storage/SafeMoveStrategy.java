@@ -31,17 +31,22 @@ public class SafeMoveStrategy {
         Path tmp = target.resolveSibling(target.getFileName() + ".tmp");
         try {
             Files.copy(source, tmp, StandardCopyOption.REPLACE_EXISTING);
-            long srcSize = Files.size(source);
-            long tmpSize = Files.size(tmp);
-            if (tmpSize != srcSize) {
-                throw new IOException("跨卷复制大小校验失败: " + source
-                        + " expected=" + srcSize + " actual=" + tmpSize);
-            }
+            verifyCopySize(source, tmp);
             moveAtomically(tmp, target);
             Files.deleteIfExists(source);
             log.info("move (跨卷 copy+rename): {} -> {}", source, target);
         } finally {
             Files.deleteIfExists(tmp);
+        }
+    }
+
+    /** package-private：大小校验，供测试直接验证校验逻辑。 */
+    void verifyCopySize(Path source, Path tmp) throws IOException {
+        long srcSize = Files.size(source);
+        long tmpSize = Files.size(tmp);
+        if (tmpSize != srcSize) {
+            throw new IOException("跨卷复制大小校验失败: " + source
+                    + " expected=" + srcSize + " actual=" + tmpSize);
         }
     }
 
@@ -62,6 +67,7 @@ public class SafeMoveStrategy {
         try {
             return Files.getFileStore(a).equals(Files.getFileStore(b));
         } catch (IOException e) {
+            log.warn("无法判断文件存储是否同卷，将使用跨卷移动: {} / {}", a, b, e);
             return false;
         }
     }

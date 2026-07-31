@@ -75,7 +75,7 @@ class SafeMoveStrategyTest {
     }
 
     @Test
-    void moveCrossVolume_sizeMismatch_throwsAndKeepsTargetAbsent() throws Exception {
+    void moveCrossVolume_staleTmp_isCleanedUp() throws Exception {
         Path source = Files.writeString(tempRoot.resolve("a.jpg"), "0123456789");
         Path target = tempRoot.resolve("dst").resolve("a.jpg");
         Files.createDirectories(target.getParent());
@@ -86,6 +86,17 @@ class SafeMoveStrategyTest {
 
         assertTrue(Files.exists(target), "正常流程应成功");
         assertFalse(Files.exists(target.resolveSibling("a.jpg.tmp")), ".tmp 应被 finally 清理");
+    }
+
+    @Test
+    void verifyCopySize_sizeMismatch_throwsIOException() throws Exception {
+        Path source = Files.writeString(tempRoot.resolve("src.jpg"), "0123456789");
+        Path tmp = Files.writeString(tempRoot.resolve("dst.jpg.tmp"), "XYZ");
+
+        IOException ex = assertThrows(IOException.class,
+                () -> strategy.verifyCopySize(source, tmp));
+        assertTrue(ex.getMessage().contains("大小校验失败"),
+                "异常消息应包含 大小校验失败");
     }
 
     private static void deleteRecursively(Path dir) throws Exception {
