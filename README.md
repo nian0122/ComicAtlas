@@ -107,6 +107,7 @@ pnpm build
 ## 文档
 
 - [用户指南](docs/user-guide.md)：安装、配置、导入、阅读、管理和故障排查
+- [开发流程](docs/development-guide.md)：分支、提交、合并、推送与发布
 - [API 文档](docs/api.md)：HTTP 接口与事件状态
 - [发布说明](docs/release/v1.0.0.md)：1.0 功能范围与已知限制
 - [架构索引](docs/architecture/00-index.md)：系统设计与模块说明
