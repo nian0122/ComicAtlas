@@ -1,6 +1,7 @@
 package com.comicatlas.api.importer.event;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.comic.entity.*;
 import com.comicatlas.api.comic.mapper.*;
 import com.comicatlas.api.importer.entity.ImportTask;
@@ -40,6 +41,7 @@ public class ImportEventHandler {
     private final MediaMapper mediaMapper;
     private final ImportTaskMapper taskMapper;
     private final TransactionTemplate transactionTemplate;
+    private final CatalogCacheInvalidator catalogCacheInvalidator;
 
     /** 终态集合：到达这些状态后不可回退到非终态 */
     private static final Set<String> TERMINAL_STATUSES = Set.of("SUCCESS", "FAILED");
@@ -159,6 +161,7 @@ public class ImportEventHandler {
             task.setDurationMs(Duration.between(task.getStartTime(), task.getEndTime()).toMillis());
         }
         taskMapper.updateById(task);
+        catalogCacheInvalidator.evict(comicId);
 
         return new ImportResult(chaptersData != null ? chaptersData.size() : 0, totalPages, false);
     }

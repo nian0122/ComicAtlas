@@ -1,6 +1,7 @@
 package com.comicatlas.api.admin.recovery;
 
 import com.comicatlas.api.admin.dto.RecoveryProgress;
+import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.mapper.CatalogMapper;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
@@ -41,6 +42,8 @@ class RecoveryEngineTest {
     private MediaMapper mediaMapper;
     @Mock
     private TransactionTemplate transactionTemplate;
+    @Mock
+    private CatalogCacheInvalidator catalogCacheInvalidator;
 
     @InjectMocks
     private RecoveryEngine recoveryEngine;
