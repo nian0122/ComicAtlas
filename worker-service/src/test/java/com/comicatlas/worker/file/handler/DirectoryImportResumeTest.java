@@ -16,7 +16,6 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -118,6 +117,62 @@ class DirectoryImportResumeTest {
         assertEquals(2, meta.path("chapters").get(0).path("mediaItems").size());
         // 成功则清理恢复点
         assertFalse(manifestManager.exists(mangaRoot, 100L), "续搬完成后恢复点应清理");
+    }
+
+    @Test
+    void resumeImport_targetSizeMismatch_throws() throws Exception {
+        Files.writeString(sourceRoot.resolve("vol1/ch1/001.jpg"), "content-1");
+        Files.writeString(sourceRoot.resolve("vol1/ch1/002.jpg"), "content-2");
+        stubParseAndAssemble();
+
+        // 预置：目标 001 存在但大小不符（污染）
+        Path hqDir = mangaRoot.resolve("hq/10/1");
+        Files.createDirectories(hqDir);
+        Files.writeString(hqDir.resolve("001.jpg"), "corrupted!!!");
+        manifestManager.write(mangaRoot, 100L, rebuiltManifestWithOneMoved());
+
+        IOException ex = assertThrows(IOException.class,
+                () -> handler.handle(new ImportContext("DIRECTORY", sourceRoot, false, false), 100L, 10L, mangaRoot));
+        assertTrue(ex.getMessage().contains("大小不匹配"), "应报大小不匹配: " + ex.getMessage());
+        assertTrue(Files.exists(hqDir.resolve("001.jpg")), "污染目标不应被覆盖");
+    }
+
+    @Test
+    void resumeImport_sourceMissing_throws() throws Exception {
+        Files.writeString(sourceRoot.resolve("vol1/ch1/001.jpg"), "content-1");
+        Files.writeString(sourceRoot.resolve("vol1/ch1/002.jpg"), "content-2");
+        stubParseAndAssemble();
+        // 源 001 被外部删除，目标也不存在
+        Files.delete(sourceRoot.resolve("vol1/ch1/001.jpg"));
+        manifestManager.write(mangaRoot, 100L, rebuiltManifestWithOneMoved());
+
+        IOException ex = assertThrows(IOException.class,
+                () -> handler.handle(new ImportContext("DIRECTORY", sourceRoot, false, false), 100L, 10L, mangaRoot));
+        assertTrue(ex.getMessage().contains("源文件缺失"), "应报源文件缺失: " + ex.getMessage());
+    }
+
+    @Test
+    void interruptedThenRetry_resumesFromCheckpoint() throws Exception {
+        Files.writeString(sourceRoot.resolve("vol1/ch1/001.jpg"), "content-1");
+        Files.writeString(sourceRoot.resolve("vol1/ch1/002.jpg"), "content-2");
+        stubParseAndAssemble();
+
+        // 第一次执行：搬到第 2 个文件前"取消"（isCancelled 第 3 次调用返回 true）
+        AtomicInteger calls = new AtomicInteger();
+        when(cancelHandler.isCancelled(anyLong())).thenAnswer(inv -> calls.incrementAndGet() >= 3);
+        assertThrows(RuntimeException.class,
+                () -> handler.handle(new ImportContext("DIRECTORY", sourceRoot, false, false), 100L, 10L, mangaRoot));
+        assertTrue(manifestManager.exists(mangaRoot, 100L), "中断后恢复点应保留");
+
+        // 第二次执行：取消标记被 API 删除 → isCancelled 恒 false → 续搬
+        when(cancelHandler.isCancelled(anyLong())).thenReturn(false);
+        handler.handle(new ImportContext("DIRECTORY", sourceRoot, false, false), 100L, 10L, mangaRoot);
+
+        assertTrue(Files.exists(mangaRoot.resolve("hq/10/1/001.jpg")));
+        assertTrue(Files.exists(mangaRoot.resolve("hq/10/1/002.jpg")));
+        JsonNode meta = objectMapper.readTree(mangaRoot.resolve("metadata/100.json").toFile());
+        assertEquals(2, meta.path("chapters").get(0).path("mediaItems").size());
+        assertFalse(manifestManager.exists(mangaRoot, 100L));
     }
 
     // ---- helpers ----
