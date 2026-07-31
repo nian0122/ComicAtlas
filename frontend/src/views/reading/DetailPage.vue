@@ -12,6 +12,20 @@
     </div>
 
     <template v-else-if="comic">
+      <MobileComicDetail
+        v-if="mode === 'mobile'"
+        :comic="comic"
+        :catalog-tree="catalogTree"
+        :total-chapters="totalChapters"
+        :progress-text="progressMetaText"
+        :progress-scale="progressScale"
+        :read-label="primaryAction?.label || '开始阅读'"
+        :can-read="Boolean(primaryAction)"
+        @read="readComic"
+        @select="goReader"
+      />
+
+      <template v-else>
       <!-- Hero -->
       <HeroBanner
         :background-url="comic.coverUrl"
@@ -105,6 +119,7 @@
           </div>
         </div>
       </section>
+      </template>
     </template>
 
     <div v-else class="state empty">
@@ -122,6 +137,7 @@ import { comicApi, catalogApi } from '@/services/reading'
 
 import type { ComicDetailVO, CatalogNode, ChapterRef } from '@/types'
 import CatalogTree from '@/components/reading/comic/CatalogTree.vue'
+import MobileComicDetail from '@/components/reading/comic/MobileComicDetail.vue'
 import HeroBanner from '@/components/reading/HeroBanner.vue'
 import { useInteractionMode } from '@/views/reading/reader/composables/useInteractionMode'
 
@@ -261,6 +277,10 @@ function startRead() {
   const ch = firstChapter.value
   if (!ch) return
   router.push(`/reader/${ch.id}?page=1`)
+}
+
+function readComic() {
+  primaryAction.value?.onClick()
 }
 
 function goReader(chapterId: number) {
@@ -510,7 +530,7 @@ onMounted(loadData)
 }
 
 /* Responsive */
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .info-grid {
     grid-template-columns: 1fr;
   }
@@ -562,7 +582,7 @@ onMounted(loadData)
   font-size: 16px;
 }
 
-/* 信息网格单列：与上方 768px 媒体查询结果一致（is-mobile 必然 ≤768px），两机制不冲突 */
+/* 信息网格单列：与上方平板媒体查询结果一致，两机制不冲突 */
 .comic-detail-page.is-mobile .info-grid {
   grid-template-columns: 1fr;
 }

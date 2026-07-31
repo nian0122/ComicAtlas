@@ -10,6 +10,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.amqp.rabbit.annotation.RabbitListener;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -164,5 +165,19 @@ class TranscodeCompletedHandlerTest {
         // Then: 不更新
         verify(mediaMapper, never()).updateById(any(Media.class));
         verify(channel).basicAck(1L, false);
+    }
+
+    @Test
+    void 完成事件使用独立结果队列() throws Exception {
+        // Given
+        RabbitListener listener = TranscodeCompletedHandler.class
+                .getMethod("handleCompleted",
+                        VideoTranscodeCompletedEvent.class, Channel.class, long.class)
+                .getAnnotation(RabbitListener.class);
+
+        // When / Then
+        assertArrayEquals(
+                new String[]{"video.transcode.completed.queue"},
+                listener.queues());
     }
 }

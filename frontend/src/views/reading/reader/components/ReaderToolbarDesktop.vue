@@ -297,7 +297,7 @@ function onCommand(command: string) {
   background: var(--accent-hover);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .reader-toolbar {
     flex-wrap: wrap;
     height: auto;

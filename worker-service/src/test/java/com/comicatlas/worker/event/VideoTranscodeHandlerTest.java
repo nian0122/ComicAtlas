@@ -200,6 +200,32 @@ class VideoTranscodeHandlerTest {
         verify(channel).basicReject(eq(1L), eq(false));
     }
 
+    @Test
+    void 同名Mp4已存在时不覆盖其他页面文件() throws Exception {
+        Long pageId = 400L;
+        Long comicId = 4L;
+        Path chapterDir = Files.createDirectories(hqRoot.resolve("4/ch04"));
+        Path sourceFile = chapterDir.resolve("same.avi");
+        Path existingMp4 = chapterDir.resolve("same.mp4");
+        Files.writeString(sourceFile, "avi video");
+        Files.writeString(existingMp4, "existing mp4");
+        config.setFfmpegPath(createFakeFfmpeg(0).toString());
+        VideoTranscodeRequestedEvent event = new VideoTranscodeRequestedEvent(
+                UUID.randomUUID(), Instant.now(), comicId, pageId,
+                "HQ", "4/ch04/same.avi", "avi");
+
+        handler.handle(event, channel, 1L);
+
+        ArgumentCaptor<VideoTranscodeCompletedEvent> captor =
+                ArgumentCaptor.forClass(VideoTranscodeCompletedEvent.class);
+        verify(rabbitTemplate).convertAndSend(
+                eq("comic.video"), eq("video.transcode.completed"), captor.capture());
+        assertEquals("4/ch04/same.transcoded-400.mp4", captor.getValue().newHqPath());
+        assertEquals("existing mp4", Files.readString(existingMp4));
+        assertTrue(Files.exists(chapterDir.resolve("same.transcoded-400.mp4")));
+        assertFalse(Files.exists(sourceFile));
+    }
+
     // ==================== Test 4: 确认 Worker 零数据库依赖 ====================
 
     @Test
@@ -229,6 +255,9 @@ class VideoTranscodeHandlerTest {
         // 确认只使用允许的依赖
         assertTrue(source.contains("RabbitTemplate"), "must use RabbitTemplate for event publishing");
         assertTrue(source.contains("WorkerConfig"), "must use WorkerConfig");
+        assertTrue(
+                source.contains("redirectOutput(ProcessBuilder.Redirect.DISCARD)"),
+                "ffmpeg output must be consumed or discarded to prevent pipe deadlock");
     }
 
     // ==================== helpers ====================

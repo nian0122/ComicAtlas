@@ -250,14 +250,10 @@ const hasActions = computed(
   transform: translateY(-2px);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .hero-banner {
-    min-height: min(
-      680px,
-      calc(
-        100dvh - var(--nav-height) - var(--mobile-tabbar-height) - var(--space-4)
-      )
-    );
+    min-height: 0;
+    aspect-ratio: 4 / 5;
     align-items: end;
   }
 
@@ -275,8 +271,11 @@ const hasActions = computed(
   }
 
   .hero-content {
-    display: block;
-    padding: clamp(280px, 42dvh, 380px) var(--space-4) var(--space-8);
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: flex-end;
+    padding: 0 var(--mobile-page-gutter) var(--space-8);
   }
 
   .hero-info {
@@ -287,7 +286,7 @@ const hasActions = computed(
 
   .hero-title {
     max-width: 18ch;
-    font-size: clamp(2rem, 10vw, 3rem);
+    font-size: clamp(1.75rem, 8vw, 2.5rem);
     letter-spacing: -0.04em;
   }
 
@@ -309,6 +308,13 @@ const hasActions = computed(
   .hero-btn {
     width: 100%;
     padding-inline: var(--space-3);
+  }
+}
+
+@media (min-width: 600px) and (max-width: 1024px) {
+  .hero-banner {
+    aspect-ratio: 16 / 10;
+    max-height: var(--tablet-hero-max-height);
   }
 }
 </style>

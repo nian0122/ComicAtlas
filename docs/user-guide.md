@@ -23,6 +23,9 @@ Windows 用户建议使用正斜杠书写路径，例如 `D:/manga`，并确认 
 
 ```dotenv
 MANGA_ROOT=D:/manga
+MYSQL_ROOT_PASSWORD=请设置强密码
+REMOTE_MYSQL_USER=comicatlas
+REMOTE_MYSQL_PASSWORD=请设置强密码
 REMOTE_NACOS_USERNAME=nacos
 REMOTE_NACOS_PASSWORD=nacos
 REMOTE_REDIS_PORT=6379
@@ -41,11 +44,18 @@ D:/manga/metadata
 D:/manga/temp
 ```
 
-启动或准备好 Redis、RabbitMQ、Nacos 后，再启动应用：
+基础服务与项目服务使用不同的 Compose 文件。需要在当前主机运行基础服务时执行：
 
 ```bash
-docker compose up -d --build
-docker compose ps
+docker compose -f docker-compose.infra.yml up -d
+docker compose -f docker-compose.infra.yml ps
+```
+
+基础服务准备好后，再启动项目服务：
+
+```bash
+docker compose -f docker-compose.yml up -d --build
+docker compose -f docker-compose.yml ps
 ```
 
 访问地址：
@@ -54,7 +64,7 @@ docker compose ps
 - 管理后台：`http://localhost/manage`
 - Gateway/API：`http://localhost:8000`
 
-如果基础设施运行在远程主机，可使用仓库中的 `tools/start-remote-infra-tunnel.ps1` 建立 SSH 隧道，并让 Docker 容器通过 `host.docker.internal` 访问宿主机端口。
+`docker-compose.infra.yml` 包含 MySQL、Redis、RabbitMQ 和 Nacos，端口号保持为 3306、6379、5672、15672、8848、9848，并只绑定主机回环地址。如果基础设施运行在远程主机，本地不启动该文件；使用仓库中的 `tools/start-remote-infra-tunnel.ps1` 建立 SSH 隧道，让项目容器通过 `host.docker.internal` 访问宿主机映射端口。
 
 ## 三、导入漫画
 
