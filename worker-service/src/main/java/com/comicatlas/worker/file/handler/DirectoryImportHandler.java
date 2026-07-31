@@ -182,7 +182,7 @@ public class DirectoryImportHandler {
         JsonNode firstCh = chapters.get(0);
         JsonNode mediaItems = firstCh.path("mediaItems");
         if (mediaItems.isEmpty()) return;
-        String globalOrder = firstCh.path("globalOrder").asText();
+        int globalOrder = firstCh.path("globalOrder").asInt();
 
         // 跳过 VIDEO 首项，找第一张图片
         JsonNode firstImage = null;
