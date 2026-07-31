@@ -298,6 +298,8 @@ public class ImportServiceImpl implements ImportService {
                 new TransactionSynchronization() {
                     @Override
                     public void afterCommit() {
+                        redisTemplate.opsForValue().set(
+                                "import:cancel:" + taskId, "1", Duration.ofDays(7));
                         eventPublisher.publishCancelTask(taskId, comicId);
                     }
                 });
@@ -341,6 +343,7 @@ public class ImportServiceImpl implements ImportService {
                         } catch (Exception e) {
                             log.warn("Metadata cleanup failed for retry: taskId={}", taskId, e);
                         }
+                        redisTemplate.delete("import:cancel:" + taskId);
                         eventPublisher.publishImportTaskCreated(taskId, comicId, sourceType, sourcePath);
                     }
                 });
