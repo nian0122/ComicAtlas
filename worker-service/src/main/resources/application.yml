@@ -30,6 +30,7 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASS:}
   datasource:
     url: jdbc:mysql://${MYSQL_HOST:localhost}:3306/comic_atlas?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
     username: ${MYSQL_USER:root}
