@@ -14,7 +14,7 @@ import java.time.Duration;
 
 /**
  * 取消标记：以 Redis 为唯一事实来源。
- * API cancelTask 写 key、retryTask 删 key；Worker 只读，不修改取消意图。
+ * API cancelTask 写 key、retryTask 删 key；Worker handle() 消费取消 MQ 后幂等写 key，isCancelled() 只读，永不清除取消意图。
  */
 @Slf4j
 @Component

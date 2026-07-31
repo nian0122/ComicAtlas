@@ -36,8 +36,13 @@ public class ImportManifestManager {
         Path target = manifestPath(mangaRoot, taskId);
         Files.createDirectories(target.getParent());
         Path tmp = target.resolveSibling("manifest.json.tmp");
-        objectMapper.writerWithDefaultPrettyPrinter().writeValue(tmp.toFile(), manifest);
-        Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
+        try {
+            objectMapper.writerWithDefaultPrettyPrinter().writeValue(tmp.toFile(), manifest);
+            Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException e) {
+            Files.deleteIfExists(tmp);
+            throw e;
+        }
         log.info("清单已写入: {}", target);
     }
 
