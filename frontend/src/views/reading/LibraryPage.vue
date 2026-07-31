@@ -2,9 +2,18 @@
   <div class="comic-list-page">
     <header class="page-header">
       <div class="title-block">
-        <p class="page-eyebrow">DISCOVER / LIBRARY</p>
-        <h1 class="page-title">漫画库</h1>
-        <p class="page-count">当前收录 {{ store.total }} 部作品</p>
+        <div class="title-row">
+          <h1 class="page-title">
+            <span class="mobile-page-title">我的收藏</span>
+          </h1>
+          <span class="mobile-recent">
+            <el-icon :size="18"><Sort /></el-icon>
+            最近阅读
+          </span>
+        </div>
+        <p class="page-count">
+          <span class="mobile-page-count">{{ store.total }} 部作品 · {{ readingCount }} 部正在阅读</span>
+        </p>
       </div>
       <div class="toolbar">
         <!-- 移动端第一行：搜索 + 排序合并为一行；桌面端 display:contents 平铺回单行布局 -->
@@ -13,6 +22,7 @@
             <el-icon :size="18"><Search /></el-icon>
             <input
               v-model="keyword"
+              data-library-search
               type="text"
               placeholder="搜索漫画..."
               aria-label="搜索漫画"
@@ -70,6 +80,52 @@
           </div>
         </div>
       </div>
+
+      <div class="mobile-filter-stack" aria-label="漫画筛选">
+        <div class="mobile-filter-row">
+          <button
+            type="button"
+            :class="{ active: !categoryFilter }"
+            @click="selectCategory('')"
+          >
+            全部
+          </button>
+          <button
+            v-for="category in allCategories"
+            :key="category.id"
+            type="button"
+            :class="{ active: categoryFilter === category.name }"
+            @click="selectCategory(category.name)"
+          >
+            {{ category.name }}
+          </button>
+          <button
+            type="button"
+            :class="{ active: categoryFilter === '_NONE' }"
+            @click="selectCategory('_NONE')"
+          >
+            未分类
+          </button>
+        </div>
+        <div class="mobile-filter-row mobile-filter-row--secondary">
+          <button
+            v-for="tag in allTags"
+            :key="tag.id"
+            type="button"
+            :class="{ active: selectedTags.includes(tag.name) }"
+            @click="toggleTag(tag.name)"
+          >
+            {{ tag.name }}
+          </button>
+          <button
+            type="button"
+            :class="{ active: selectedTags.includes('_NONE') }"
+            @click="toggleTag('_NONE')"
+          >
+            无标签
+          </button>
+        </div>
+      </div>
     </header>
 
     <div v-if="store.loading && store.list.length === 0" class="state loading">
@@ -124,7 +180,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { Search, PictureFilled, WarningFilled, CircleClose } from '@element-plus/icons-vue'
+import { Search, PictureFilled, WarningFilled, CircleClose, Sort } from '@element-plus/icons-vue'
 import { useComicStore } from '@/stores/comic-store'
 import { tagApi, categoryApi } from '@/services/management'
 import { useBreakpoint, BREAKPOINTS } from '@/composables/useBreakpoint'
@@ -148,10 +204,13 @@ const viewportWidth = useBreakpoint()
 
 // 海报尺寸随断点响应式推导（替代原先读取一次视口宽度、手动挂 resize 监听的写法）
 const posterSize = computed<'sm' | 'md' | 'lg'>(() => {
-  if (viewportWidth.value <= BREAKPOINTS.mobile) return 'sm'
-  if (viewportWidth.value <= BREAKPOINTS.tablet) return 'md'
+  if (viewportWidth.value <= BREAKPOINTS.tablet) return 'sm'
   return 'lg'
 })
+
+const readingCount = computed(() =>
+  store.list.filter((comic) => comic.progressPercent > 0 && comic.progressPercent < 100).length
+)
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -162,6 +221,22 @@ function onKeywordInput() {
 
 function clearKeyword() {
   keyword.value = ''
+  onSearch()
+}
+
+function selectCategory(category: string) {
+  categoryFilter.value = category
+  onSearch()
+}
+
+function toggleTag(tagName: string) {
+  if (tagName === '_NONE') {
+    selectedTags.value = selectedTags.value.includes('_NONE') ? [] : ['_NONE']
+  } else {
+    selectedTags.value = selectedTags.value.includes(tagName)
+      ? selectedTags.value.filter((name) => name !== tagName)
+      : [...selectedTags.value.filter((name) => name !== '_NONE'), tagName]
+  }
   onSearch()
 }
 
@@ -238,8 +313,8 @@ onMounted(() => {
   position: sticky;
   top: var(--nav-height);
   z-index: var(--z-sticky);
-  padding: var(--space-8) 0 var(--space-5);
-  margin-bottom: var(--space-5);
+  padding: var(--space-2) 0 var(--space-3);
+  margin-bottom: var(--space-2);
   background: linear-gradient(to bottom, var(--bg-primary) 86%, transparent);
   border-bottom: 1px solid var(--border);
 }
@@ -262,6 +337,23 @@ onMounted(() => {
   color: var(--text-primary);
   margin: 0 0 var(--space-1);
   letter-spacing: -0.02em;
+}
+
+.mobile-page-title {
+  display: none;
+}
+
+.title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.mobile-recent,
+.mobile-page-count,
+.mobile-filter-stack {
+  display: none;
 }
 
 .page-count {
@@ -450,22 +542,62 @@ onMounted(() => {
   background: var(--accent-hover);
 }
 
-/* ===== 移动端（≤768px）===== */
-@media (max-width: 768px) {
+/* ===== 移动阅读端（手机与平板，≤1024px）===== */
+@media (max-width: 1024px) {
   .comic-list-page {
     margin: 0;
   }
 
   .page-header {
-    top: var(--nav-height);
-    padding-top: var(--space-5);
+    position: static;
+    display: flex;
+    flex-direction: column;
+    padding: var(--mobile-library-filter-offset) 0 var(--mobile-library-header-bottom);
+    background: var(--mobile-canvas);
+    border-bottom: 0;
   }
 
   .title-block {
-    margin-bottom: var(--space-4);
+    order: 2;
+    margin-top: var(--mobile-library-title-gap);
+    margin-bottom: 0;
+  }
+
+  .page-eyebrow,
+  .desktop-page-title {
+    display: none;
+  }
+
+  .mobile-page-title {
+    display: inline;
+  }
+
+  .desktop-page-count {
+    display: none;
+  }
+
+  .mobile-page-count,
+  .mobile-recent {
+    display: inline;
+  }
+
+  .mobile-recent {
+    align-items: center;
+    gap: var(--space-1);
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+  }
+
+  .mobile-recent {
+    display: inline-flex;
+  }
+
+  .page-title {
+    font-size: 24px;
   }
 
   .toolbar {
+    order: 0;
     gap: var(--space-sm);
   }
 
@@ -473,40 +605,99 @@ onMounted(() => {
   .toolbar-main {
     display: flex;
     align-items: center;
-    flex-wrap: wrap;
     gap: var(--space-sm);
-    width: 100%;
+    width: auto;
   }
 
   .search-input {
-    flex: 1;
-    min-width: 0;
+    position: fixed;
+    top: var(--mobile-search-top);
+    right: var(--mobile-page-gutter);
+    z-index: calc(var(--z-nav) + 1);
+    width: var(--mobile-search-width);
+    min-width: var(--mobile-search-width);
+    height: var(--mobile-search-height);
+    padding-inline: var(--space-3);
+    background: var(--color-surface-3);
+    border-color: transparent;
   }
 
-  /* 筛选 chips 行：横向滚动，不换行，隐藏滚动条 */
+  .search-input input {
+    min-width: 0;
+    font-size: 16px;
+  }
+
+  .sort-select,
   .toolbar-filters {
+    display: none;
+  }
+
+  .mobile-filter-stack {
+    display: flex;
+    flex-direction: column;
+    order: 1;
+    gap: var(--mobile-library-filter-gap);
+    width: calc(100% + var(--mobile-page-gutter) * 2);
+    margin-left: calc(var(--mobile-page-gutter) * -1);
+    overflow: hidden;
+  }
+
+  .mobile-filter-row {
     display: flex;
     align-items: center;
     flex-wrap: nowrap;
-    gap: var(--space-sm);
+    gap: var(--space-3);
     width: 100%;
     overflow-x: auto;
+    padding-inline: var(--mobile-page-gutter);
     white-space: nowrap;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
   }
 
-  .toolbar-filters::-webkit-scrollbar {
+  .mobile-filter-row::-webkit-scrollbar {
     display: none;
   }
 
-  .toolbar-filters .filter-select {
+  .mobile-filter-row button {
     flex: 0 0 auto;
+    min-width: 82px;
+    min-height: 44px;
+    padding-inline: var(--space-5);
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: var(--bg-surface);
+    color: var(--text-secondary);
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+
+  .mobile-filter-row--secondary button {
+    min-width: 72px;
+    min-height: 40px;
+  }
+
+  .mobile-filter-row button.active {
+    background: var(--text-primary);
+    color: var(--mobile-canvas);
   }
 
   .comic-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--space-4) var(--space-3);
+    gap: var(--space-8) var(--mobile-library-grid-gap);
+  }
+
+  .comic-grid :deep(.poster-frame) {
+    border-radius: var(--radius-md);
+  }
+
+  .comic-grid :deep(.poster-info) {
+    display: none;
+  }
+
+  .comic-grid :deep(.poster-progress) {
+    height: 4px;
   }
 }
 </style>

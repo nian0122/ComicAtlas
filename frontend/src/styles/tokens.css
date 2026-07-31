@@ -16,9 +16,11 @@
   --color-line-strong: #4a4a4a;
   --color-brand: #e50914;
   --color-brand-hover: #f6121d;
+  --color-brand-pale: #ffb3b6;
   --color-brand-soft: rgb(229 9 20 / 14%);
   --color-on-brand: #ffffff;
   --color-focus: #ffffff;
+  --color-overlay-faint: rgb(255 255 255 / 5%);
   --color-overlay-soft: rgb(255 255 255 / 14%);
   --color-overlay-hover: rgb(255 255 255 / 22%);
   --color-overlay-scrim: rgb(0 0 0 / 62%);
@@ -56,13 +58,14 @@
   --text: var(--text-secondary);
 
   /* 字体 */
-  --font-ui: "Source Han Sans VF", "Noto Sans CJK SC", "Noto Sans JP",
+  --font-ui: "Plus Jakarta Sans", "Source Han Sans VF", "Noto Sans CJK SC", "Noto Sans JP",
     "Microsoft YaHei", system-ui, sans-serif;
   --font-editorial: var(--font-ui);
   --mono: "JetBrains Mono", "Cascadia Code", ui-monospace, monospace;
   --sans: var(--font-ui);
   --heading: var(--font-editorial);
   --text-xs: 0.75rem;
+  --text-micro: 0.625rem;
   --text-sm: 0.875rem;
   --text-md: 1rem;
   --text-lg: 1.125rem;
@@ -108,7 +111,48 @@
   --disabled-opacity: 0.55;
   --sidebar-width: 232px;
   --nav-height: 68px;
-  --mobile-tabbar-height: 68px;
+  --mobile-nav-height: 64px;
+  --mobile-tabbar-height: 64px;
+  --mobile-page-gutter: clamp(16px, 4.1vw, 28px);
+  --mobile-search-top: 12px;
+  --mobile-search-width: clamp(138px, 33vw, 218px);
+  --mobile-search-height: 44px;
+  --mobile-library-grid-gap: clamp(12px, 6vw, 40px);
+  --mobile-library-filter-offset: clamp(24px, 15vw, 100px);
+  --mobile-library-filter-gap: clamp(16px, 5.7vw, 38px);
+  --mobile-library-title-gap: clamp(40px, 9vw, 60px);
+  --mobile-library-header-bottom: clamp(32px, 6.6vw, 44px);
+  --mobile-history-row-height: 148px;
+  --mobile-history-card-height: 124px;
+  --mobile-history-thumb-width: 160px;
+  --mobile-history-card-radius: 8px;
+  --mobile-history-play-size: 40px;
+  --mobile-history-play-target-size: 44px;
+  --mobile-history-play-inset: 2px;
+  --mobile-history-play-icon-size: 20px;
+  --mobile-history-end-icon-size: 34px;
+  --mobile-history-brand-size: 32px;
+  --mobile-history-brand-font-size: 24px;
+  --mobile-history-brand-radius: 4px;
+  --mobile-history-tab-indicator-width: 24px;
+  --mobile-history-content-max: 672px;
+  --mobile-history-refresh-icon-size: 24px;
+  --mobile-tab-icon-size: 21px;
+  --mobile-detail-stage-height: clamp(560px, 140vw, 700px);
+  --mobile-detail-poster-width: min(72vw, 350px);
+  --mobile-detail-backdrop-blur: 22px;
+  --mobile-detail-backdrop-scale: 1.12;
+  --mobile-detail-title-size: clamp(26px, 8vw, 38px);
+  --mobile-detail-action-height: 70px;
+  --mobile-detail-action-gap: 44px;
+  --mobile-detail-section-gap: 60px;
+  --mobile-detail-summary-gap: 120px;
+  --mobile-detail-summary-min-height: 230px;
+  --mobile-brand-mark-size: 40px;
+  --mobile-brand-font-size: clamp(17px, 4.5vw, 22px);
+  --mobile-detail-brand-font-size: clamp(15px, 5vw, 24px);
+  --mobile-profile-size: 34px;
+  --tablet-hero-max-height: 720px;
   --page-width: var(--content-max);
   --page-padding: var(--content-gutter);
   --poster-width-sm: 136px;
@@ -154,7 +198,12 @@
   /* Hero */
   --nav-gradient: linear-gradient(to bottom, rgb(8 8 8 / 92%), transparent);
   --nav-solid: rgb(8 8 8 / 96%);
-  --mobile-tabbar-bg: rgb(17 17 17 / 96%);
+  --mobile-canvas: #000000;
+  --mobile-tabbar-bg: rgb(0 0 0 / 98%);
+  --mobile-header-scrim: linear-gradient(to bottom, rgb(0 0 0 / 86%), transparent);
+  --mobile-detail-stage-scrim:
+    linear-gradient(to bottom, rgb(0 0 0 / 8%), transparent 45%),
+    linear-gradient(to top, var(--mobile-canvas), transparent 48%);
   --hero-gradient:
     linear-gradient(to right, rgb(8 8 8 / 98%) 0%, rgb(8 8 8 / 78%) 46%, rgb(8 8 8 / 24%) 100%),
     linear-gradient(to top, var(--color-canvas) 0%, transparent 56%),

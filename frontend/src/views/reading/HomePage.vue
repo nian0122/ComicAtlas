@@ -93,7 +93,7 @@ onMounted(() => {
 
 /* HomeHero：保持全宽，页面留白从 --page-padding(32px) 收紧到 --space-base(16px) */
 .home-page.is-mobile :deep(.hero-content) {
-  padding: var(--space-5);
+  padding: 0 var(--mobile-page-gutter) var(--space-8);
 }
 
 /* HomeRow：横向滚动 + scroll-snap，逐张封面吸附 */
@@ -103,33 +103,24 @@ onMounted(() => {
 }
 
 .home-page.is-mobile :deep(.row-header) {
-  padding: 0 var(--space-base);
+  padding: 0 var(--mobile-page-gutter);
 }
 
 .home-page.is-mobile :deep(.row-items) {
-  padding-left: var(--space-base);
-  padding-right: var(--space-base);
+  gap: var(--space-2);
+  padding-right: var(--mobile-page-gutter);
+  padding-left: var(--mobile-page-gutter);
 }
 
 /* 每张封面：吸附起点对齐；flex-basis 70vw 覆盖固定宽度，max-width 收口到 160px */
 .home-page.is-mobile :deep(.row-items .comic-poster) {
   scroll-snap-align: start;
-  flex: 0 0 min(46vw, var(--poster-width-md));
-  max-width: var(--poster-width-md);
+  flex: 0 0 min(43vw, 160px);
+  max-width: 160px;
 }
 
-/* HomeActionGrid：移动端保持单列，避免中日文在窄网格内逐字断行 */
+/* 移动端阅读入口保持内容优先，不展示仓库操作捷径。 */
 .home-page.is-mobile :deep(.home-actions) {
-  padding: 0 var(--space-base);
-}
-
-.home-page.is-mobile :deep(.actions-inner) {
-  grid-template-columns: minmax(0, 1fr);
-  gap: 0;
-}
-
-.home-page.is-mobile :deep(.action-card) {
-  min-height: 88px;
-  padding: var(--space-4);
+  display: none;
 }
 </style>
