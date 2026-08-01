@@ -2,25 +2,34 @@ package com.comicatlas.worker.event;
 
 import com.comicatlas.common.event.CancelTaskEvent;
 import com.rabbitmq.client.Channel;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.support.AmqpHeaders;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
-import java.time.Instant;
-import java.util.concurrent.ConcurrentHashMap;
+import java.time.Duration;
 
+/**
+ * 取消标记：以 Redis 为唯一事实来源。
+ * API cancelTask 写 key、retryTask 删 key；Worker handle() 消费取消 MQ 后幂等写 key，isCancelled() 只读，永不清除取消意图。
+ */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class CancelHandler {
 
-    private final ConcurrentHashMap<Long, Instant> cancelled = new ConcurrentHashMap<>();
+    public static final String KEY_PREFIX = "import:cancel:";
+    private static final Duration TTL = Duration.ofDays(7);
+
+    private final StringRedisTemplate redisTemplate;
 
     @RabbitListener(queues = "cancel.task.queue")
     public void handle(CancelTaskEvent event,
             Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
-        cancelled.put(event.taskId(), Instant.now());
+        redisTemplate.opsForValue().set(KEY_PREFIX + event.taskId(), "1", TTL);
         log.info("Cancel registered: taskId={}", event.taskId());
         try {
             channel.basicAck(tag, false);
@@ -30,12 +39,6 @@ public class CancelHandler {
     }
 
     public boolean isCancelled(Long taskId) {
-        Instant at = cancelled.get(taskId);
-        if (at == null) return false;
-        if (Instant.now().isAfter(at.plusSeconds(1800))) {
-            cancelled.remove(taskId);
-            return false;
-        }
-        return true;
+        return Boolean.TRUE.equals(redisTemplate.hasKey(KEY_PREFIX + taskId));
     }
 }
