@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -30,7 +31,23 @@ public class HistoryServiceImpl implements HistoryService {
         var histories = historyMapper.selectList(
             new LambdaQueryWrapper<ReadingHistory>()
                 .orderByDesc(ReadingHistory::getUpdatedAt));
-        return histories.stream().map(this::buildVO).toList();
+        if (histories.isEmpty()) return List.of();
+
+        List<Long> comicIds = histories.stream()
+                .map(ReadingHistory::getComicId).distinct().toList();
+        Map<Long, Comic> comicMap = comicMapper.selectBatchIds(comicIds).stream()
+                .collect(Collectors.toMap(Comic::getId, c -> c));
+
+        List<Long> chapterIds = histories.stream()
+                .map(ReadingHistory::getChapterId).filter(Objects::nonNull).distinct().toList();
+        Map<Long, Chapter> chapterMap = chapterIds.isEmpty()
+                ? Map.of()
+                : chapterMapper.selectBatchIds(chapterIds).stream()
+                        .collect(Collectors.toMap(Chapter::getId, c -> c));
+
+        return histories.stream()
+                .map(h -> buildVO(h, comicMap, chapterMap))
+                .toList();
     }
 
     @Override
@@ -39,7 +56,13 @@ public class HistoryServiceImpl implements HistoryService {
             new LambdaQueryWrapper<ReadingHistory>()
                 .eq(ReadingHistory::getComicId, comicId));
         if (history == null) return null;
-        return buildVO(history);
+        Comic comic = comicMapper.selectById(history.getComicId());
+        Chapter chapter = history.getChapterId() != null
+                ? chapterMapper.selectById(history.getChapterId())
+                : null;
+        return buildVO(history,
+                comic != null ? Map.of(comic.getId(), comic) : Map.of(),
+                chapter != null ? Map.of(chapter.getId(), chapter) : Map.of());
     }
 
     @Override
@@ -61,14 +84,14 @@ public class HistoryServiceImpl implements HistoryService {
         }
     }
 
-    private HistoryVO buildVO(ReadingHistory h) {
+    private HistoryVO buildVO(ReadingHistory h, Map<Long, Comic> comicMap, Map<Long, Chapter> chapterMap) {
         HistoryVO vo = new HistoryVO();
         vo.setComicId(h.getComicId());
         vo.setChapterId(h.getChapterId());
         vo.setPageNumber(h.getPageNumber());
         vo.setUpdatedAt(h.getUpdatedAt());
 
-        Comic comic = comicMapper.selectById(h.getComicId());
+        Comic comic = comicMap.get(h.getComicId());
         if (comic != null) {
             vo.setComicTitle(comic.getTitle());
             vo.setCoverUrl(fileUrlResolver.resolveCover(comic.getId()));
@@ -80,7 +103,7 @@ public class HistoryServiceImpl implements HistoryService {
             }
         }
 
-        Chapter chapter = chapterMapper.selectById(h.getChapterId());
+        Chapter chapter = h.getChapterId() != null ? chapterMap.get(h.getChapterId()) : null;
         if (chapter != null) {
             vo.setChapterNo(chapter.getChapterNo());
         }

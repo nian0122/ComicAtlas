@@ -6,6 +6,7 @@ import com.comicatlas.api.comic.entity.Catalog;
 import com.comicatlas.api.comic.entity.Chapter;
 import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.entity.Media;
+import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.comic.mapper.CatalogMapper;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.comic.mapper.ComicMapper;
@@ -52,6 +53,7 @@ public class ImportServiceImpl implements ImportService {
     private final ImportEventPublisher eventPublisher;
     private final RedisTemplate<String, Object> redisTemplate;
     private final TransactionTemplate transactionTemplate;
+    private final CatalogCacheInvalidator catalogCacheInvalidator;
 
     @Value("${MANGA_ROOT:F:/manga}")
     private String mangaRoot;
@@ -298,6 +300,8 @@ public class ImportServiceImpl implements ImportService {
                 new TransactionSynchronization() {
                     @Override
                     public void afterCommit() {
+                        redisTemplate.opsForValue().set(
+                                "import:cancel:" + taskId, "1", Duration.ofDays(7));
                         eventPublisher.publishCancelTask(taskId, comicId);
                     }
                 });
@@ -323,6 +327,7 @@ public class ImportServiceImpl implements ImportService {
         }
         chapterMapper.delete(new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
         catalogMapper.delete(new LambdaQueryWrapper<Catalog>().eq(Catalog::getComicId, comicId));
+        catalogCacheInvalidator.evict(comicId);
 
         t.setStatus("PENDING");
         t.setRetryCount(t.getRetryCount() + 1);
@@ -341,6 +346,7 @@ public class ImportServiceImpl implements ImportService {
                         } catch (Exception e) {
                             log.warn("Metadata cleanup failed for retry: taskId={}", taskId, e);
                         }
+                        redisTemplate.delete("import:cancel:" + taskId);
                         eventPublisher.publishImportTaskCreated(taskId, comicId, sourceType, sourcePath);
                     }
                 });

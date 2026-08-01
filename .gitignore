@@ -42,6 +42,8 @@ mysql-data/
 
 # OpenCode
 .sisyphus/
+.omo/boulder.json
+.omo/start-work/
 .omo/run-continuation/
 .omo/evidence/
 .omo/drafts/

@@ -267,4 +267,37 @@ public class RabbitMqConfig {
         return BindingBuilder.bind(videoTranscodeDlq())
                 .to(videoDlxExchange()).with("video.transcode.dlq");
     }
+
+    // ==================== comic.recovery ====================
+
+    @Bean
+    public DirectExchange recoveryExchange() { return new DirectExchange("comic.recovery"); }
+
+    @Bean
+    public DirectExchange recoveryDlxExchange() { return new DirectExchange("comic.recovery.dlx"); }
+
+    @Bean
+    public Queue recoveryTaskQueue() {
+        return QueueBuilder.durable("recovery.task.queue")
+                .deadLetterExchange("comic.recovery.dlx")
+                .deadLetterRoutingKey("recovery.task.dlq")
+                .build();
+    }
+
+    @Bean
+    public Queue recoveryTaskDlq() {
+        return QueueBuilder.durable("recovery.task.dlq").build();
+    }
+
+    @Bean
+    public Binding recoveryTaskBinding() {
+        return BindingBuilder.bind(recoveryTaskQueue())
+                .to(recoveryExchange()).with("recovery.requested");
+    }
+
+    @Bean
+    public Binding recoveryTaskDlqBinding() {
+        return BindingBuilder.bind(recoveryTaskDlq())
+                .to(recoveryDlxExchange()).with("recovery.task.dlq");
+    }
 }

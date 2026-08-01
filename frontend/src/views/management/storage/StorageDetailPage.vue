@@ -91,7 +91,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { storageService, exportService } from '@/services/storage'
@@ -108,6 +108,37 @@ const refreshing = ref(false)
 const comic = ref<ComicStorageItem | null>(null)
 const chapters = ref<ChapterStorageItem[]>([])
 const chapterKeyword = ref('')
+
+// --- 转码轮询 ---
+const TRANSCODE_POLL_INTERVAL = 5000
+const TRANSCODE_MAX_RETRIES = 12 // 60 秒
+const transcodePollTimer = ref<ReturnType<typeof setInterval> | null>(null)
+const transcodePollRetries = ref(0)
+
+function startTranscodePolling() {
+  stopTranscodePolling()
+  transcodePollRetries.value = 0
+  transcodePollTimer.value = setInterval(async () => {
+    transcodePollRetries.value++
+    await loadData()
+    const status = comic.value?.transcodeStatus
+    if (status === 'DONE' || status === 'FAILED' || status === 'NOT_NEEDED') {
+      stopTranscodePolling()
+      return
+    }
+    if (transcodePollRetries.value >= TRANSCODE_MAX_RETRIES) {
+      stopTranscodePolling()
+      ElMessage.warning('部分视频仍在后台处理，可稍后刷新页面查看结果')
+    }
+  }, TRANSCODE_POLL_INTERVAL)
+}
+
+function stopTranscodePolling() {
+  if (transcodePollTimer.value !== null) {
+    clearInterval(transcodePollTimer.value)
+    transcodePollTimer.value = null
+  }
+}
 
 const filteredChapters = computed(() => {
   if (!chapterKeyword.value) return chapters.value
@@ -216,8 +247,10 @@ async function onTranscode() {
     await ElMessageBox.confirm('确认为该漫画的所有视频进行转码？', '视频转码', { type: 'info' })
   } catch { return }
   try {
-    await storageService.transcodeVideos(comicId)
-    ElMessage.success('转码任务已提交')
+    const result = await storageService.transcodeVideos(comicId)
+    ElMessage.success(`已提交 ${result.submittedCount} 个视频转码任务`)
+    await loadData()
+    startTranscodePolling()
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : '转码失败'
     ElMessage.error(message)
@@ -280,6 +313,7 @@ async function onDeleteComic() {
 }
 
 onMounted(loadData)
+onBeforeUnmount(stopTranscodePolling)
 </script>
 
 <style scoped>

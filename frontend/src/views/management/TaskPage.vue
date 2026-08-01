@@ -11,6 +11,7 @@
       <div class="header-actions">
         <button class="ghost-btn" @click="refresh">刷新</button>
         <button class="primary-btn" @click="router.push('/manage/import')">+ 新建导入</button>
+        <button class="primary-btn recovery-btn" @click="onStartRecovery">从存储恢复数据库记录</button>
       </div>
     </header>
 
@@ -98,6 +99,59 @@
     <!-- 导出任务分隔 -->
     <hr class="section-divider" />
 
+    <!-- 存储恢复进行中 -->
+    <section v-if="recoveryStore.activeTasks.length > 0" class="task-section">
+      <h2 class="section-title">
+        存储恢复进行中
+        <span class="section-count">{{ recoveryStore.activeTasks.length }}</span>
+      </h2>
+      <div class="task-cards">
+        <RecoveryTaskCard
+          v-for="task in recoveryStore.activeTasks"
+          :key="task.id"
+          :task="task"
+          variant="active"
+          @retry="onRecoveryRetry"
+        />
+      </div>
+    </section>
+
+    <!-- 存储恢复失败 -->
+    <section v-if="recoveryStore.failedTasks.length > 0" class="task-section">
+      <h2 class="section-title">
+        存储恢复失败
+        <span class="section-count">{{ recoveryStore.failedTasks.length }}</span>
+      </h2>
+      <div class="task-cards">
+        <RecoveryTaskCard
+          v-for="task in recoveryStore.failedTasks"
+          :key="task.id"
+          :task="task"
+          variant="failed"
+          @retry="onRecoveryRetry"
+        />
+      </div>
+    </section>
+
+    <!-- 存储恢复已完成 -->
+    <section v-if="recoveryStore.completedTasks.length > 0" class="task-section">
+      <h2 class="section-title">
+        存储恢复已完成
+        <span class="section-count">{{ recoveryStore.completedTasks.length }}</span>
+      </h2>
+      <div class="task-cards">
+        <RecoveryTaskCard
+          v-for="task in recoveryStore.completedTasks"
+          :key="task.id"
+          :task="task"
+          variant="done"
+          @retry="onRecoveryRetry"
+        />
+      </div>
+    </section>
+
+    <hr class="section-divider" />
+
     <!-- 导出进行中 -->
     <section v-if="activeExportTasks.length > 0" class="task-section">
       <h2 class="section-title">
@@ -154,17 +208,20 @@
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount, computed, watch, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { WarningFilled, CircleCheckFilled } from '@element-plus/icons-vue'
 import { useImportStore } from '@/stores/management/import'
+import { useRecoveryStore } from '@/stores/management/recovery'
 import type { ImportTaskVO, ExportTaskVO } from '@/types'
 import { exportApi } from '@/services/api'
 import TaskCard from '@/components/management/task/TaskCard.vue'
 import ExportTaskCard from '@/components/management/task/ExportTaskCard.vue'
+import RecoveryTaskCard from '@/components/management/task/RecoveryTaskCard.vue'
 
 const router = useRouter()
 const route = useRoute()
 const store = useImportStore()
+const recoveryStore = useRecoveryStore()
 
 const batchId = computed(() => (route.query.batchId as string) || '')
 
@@ -207,6 +264,9 @@ onMounted(async () => {
   await store.fetchList(batchId.value ? { batchId: batchId.value } : undefined)
   await store.fetchCompletedTasks(1)
   if (store.hasActive) store.startPolling()
+
+  await recoveryStore.fetchTasks()
+  if (recoveryStore.hasActive) recoveryStore.startPolling()
 })
 
 watch(batchId, async () => {
@@ -217,6 +277,42 @@ watch(batchId, async () => {
 
 function onCompletedPageChange(page: number) {
   store.fetchCompletedTasks(page)
+}
+
+// ========== Recovery tasks ==========
+
+async function onStartRecovery() {
+  try {
+    await ElMessageBox.confirm(
+      '此操作将扫描 HQ 存储目录，恢复已从数据库删除但文件仍存在的漫画。已有记录的漫画将被跳过，无 metadata 的漫画将创建占位记录。此过程可能需要几分钟。是否继续？',
+      '从存储恢复数据库记录',
+      {
+        confirmButtonText: '开始恢复',
+        cancelButtonText: '取消',
+        type: 'info',
+      }
+    )
+  } catch {
+    return
+  }
+
+  try {
+    await recoveryStore.createTask()
+    ElMessage.success('恢复任务已创建，正在扫描存储目录')
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : '创建恢复任务失败'
+    ElMessage.error(msg)
+  }
+}
+
+async function onRecoveryRetry(id: number) {
+  try {
+    await recoveryStore.retryTask(id)
+    ElMessage.success('恢复任务已重新执行')
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : '重试失败'
+    ElMessage.error(msg)
+  }
 }
 
 // ========== Export tasks ==========
@@ -298,6 +394,7 @@ onBeforeUnmount(() => {
   // 离开页面不停止轮询：TopNav 全局依赖此 store 维持红点徽章
   // 轮询会在没有进行中任务时自动停止
   stopExportPolling()
+  recoveryStore.stopPolling()
 })
 </script>
 
@@ -469,6 +566,15 @@ onBeforeUnmount(() => {
 
 .primary-btn:hover {
   background: var(--accent-hover);
+}
+
+.recovery-btn {
+  background: var(--success);
+  border-color: var(--success);
+}
+
+.recovery-btn:hover {
+  background: color-mix(in srgb, var(--success) 85%, white);
 }
 
 .ghost-btn {

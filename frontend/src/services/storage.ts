@@ -55,11 +55,6 @@ export const storageService = {
     }
   },
 
-  async scanRecover() {
-    const res = await adminApi.scanRecover()
-    return res.data
-  },
-
   async transcodeVideos(comicId: number) {
     const res = await adminApi.transcodeVideos(comicId)
     return res.data
