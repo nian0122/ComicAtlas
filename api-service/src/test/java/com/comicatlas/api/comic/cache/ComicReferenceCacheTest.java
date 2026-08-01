@@ -3,6 +3,7 @@ package com.comicatlas.api.comic.cache;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.api.comic.dto.ComicListQuery;
+import com.comicatlas.api.comic.dto.ComicListVO;
 import com.comicatlas.api.comic.entity.Category;
 import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.entity.Tag;
@@ -195,6 +196,25 @@ class ComicReferenceCacheTest {
         comicListService.listComics(query);
 
         verify(comicMapper, times(2)).selectPage(any(Page.class), same(query));
+    }
+
+    @Test
+    void comicListDto_shouldSupportRedisJsonRoundTrip_withLocalDateTime() {
+        ComicListVO vo = new ComicListVO();
+        vo.setId(1L);
+        vo.setTitle("测试");
+        vo.setCreatedAt(java.time.LocalDateTime.of(2026, 8, 1, 10, 30));
+
+        var serializer = new org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer(
+                com.fasterxml.jackson.databind.json.JsonMapper.builder()
+                        .addModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
+                        .build());
+
+        java.util.List<ComicListVO> list = java.util.List.of(vo);
+        Object restored = serializer.deserialize(serializer.serialize(list));
+
+        assertNotNull(restored, "含 LocalDateTime 的漫画列表应可序列化往返");
+        assertEquals(1, ((java.util.List<?>) restored).size());
     }
 
     // ==================== helpers ====================

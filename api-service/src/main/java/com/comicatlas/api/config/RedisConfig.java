@@ -2,6 +2,9 @@ package com.comicatlas.api.config;
 
 import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.comic.cache.ComicReferenceCache;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.Cache;
@@ -27,12 +30,23 @@ import java.util.Map;
 @Configuration
 @Slf4j
 public class RedisConfig implements CachingConfigurer {
+
+    /** Redis 值序列化器：注册 JSR-310 模块以支持 LocalDateTime 等 Java 8 时间类型。 */
+    private static final GenericJackson2JsonRedisSerializer VALUE_SERIALIZER =
+            new GenericJackson2JsonRedisSerializer(cacheObjectMapper());
+
+    private static ObjectMapper cacheObjectMapper() {
+        return JsonMapper.builder()
+                .addModule(new JavaTimeModule())
+                .build();
+    }
+
     @Bean
     public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory factory) {
         RedisTemplate<String, Object> template = new RedisTemplate<>();
         template.setConnectionFactory(factory);
         template.setKeySerializer(new StringRedisSerializer());
-        template.setValueSerializer(new GenericJackson2JsonRedisSerializer());
+        template.setValueSerializer(VALUE_SERIALIZER);
         return template;
     }
 
@@ -47,7 +61,7 @@ public class RedisConfig implements CachingConfigurer {
                 .serializeKeysWith(RedisSerializationContext.SerializationPair
                         .fromSerializer(new StringRedisSerializer()))
                 .serializeValuesWith(RedisSerializationContext.SerializationPair
-                        .fromSerializer(new GenericJackson2JsonRedisSerializer()));
+                        .fromSerializer(VALUE_SERIALIZER));
 
         Map<String, RedisCacheConfiguration> cacheConfigs = new HashMap<>();
         cacheConfigs.put(CatalogCacheInvalidator.CACHE_NAME, baseConfig.entryTtl(catalogTtl));
