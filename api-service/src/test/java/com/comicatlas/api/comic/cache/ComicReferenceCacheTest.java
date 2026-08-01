@@ -2,6 +2,7 @@ package com.comicatlas.api.comic.cache;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.comicatlas.api.comic.dto.ComicListPage;
 import com.comicatlas.api.comic.dto.ComicListQuery;
 import com.comicatlas.api.comic.dto.ComicListVO;
 import com.comicatlas.api.comic.entity.Category;
@@ -32,6 +33,7 @@ import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
@@ -158,8 +160,8 @@ class ComicReferenceCacheTest {
         comicPage.setRecords(List.of(comic(1L)));
         when(comicMapper.selectPage(any(Page.class), same(query))).thenReturn(comicPage);
 
-        comicListService.listComics(query);
-        comicListService.listComics(query);
+        comicListService.loadPage(query);
+        comicListService.loadPage(query);
 
         verify(comicMapper).selectPage(any(Page.class), same(query));
     }
@@ -192,8 +194,8 @@ class ComicReferenceCacheTest {
         comicPage.setRecords(List.of());
         when(comicMapper.selectPage(any(Page.class), same(query))).thenReturn(comicPage);
 
-        comicListService.listComics(query);
-        comicListService.listComics(query);
+        comicListService.loadPage(query);
+        comicListService.loadPage(query);
 
         verify(comicMapper, times(2)).selectPage(any(Page.class), same(query));
     }
@@ -205,16 +207,64 @@ class ComicReferenceCacheTest {
         vo.setTitle("测试");
         vo.setCreatedAt(java.time.LocalDateTime.of(2026, 8, 1, 10, 30));
 
+        var ptv = com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator.builder()
+                .allowIfSubType("com.comicatlas.")
+                .allowIfSubType("java.util.")
+                .build();
         var serializer = new org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer(
                 com.fasterxml.jackson.databind.json.JsonMapper.builder()
                         .addModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
+                        .activateDefaultTyping(ptv, com.fasterxml.jackson.databind.ObjectMapper.DefaultTyping.NON_FINAL)
                         .build());
 
-        java.util.List<ComicListVO> list = java.util.List.of(vo);
-        Object restored = serializer.deserialize(serializer.serialize(list));
+        // 经 DTO 包装往返（缓存真实形态），验证 LocalDateTime 可序列化
+        ComicListPage page = new ComicListPage();
+        page.setRecords(java.util.List.of(vo));
+        page.setTotal(1);
+        page.setCurrent(1);
+        page.setSize(20);
 
-        assertNotNull(restored, "含 LocalDateTime 的漫画列表应可序列化往返");
-        assertEquals(1, ((java.util.List<?>) restored).size());
+        Object restored = serializer.deserialize(serializer.serialize(page));
+
+        assertInstanceOf(ComicListPage.class, restored);
+        assertEquals(1, ((ComicListPage) restored).getRecords().size());
+        assertEquals(java.time.LocalDateTime.of(2026, 8, 1, 10, 30),
+                ((ComicListPage) restored).getRecords().get(0).getCreatedAt(),
+                "LocalDateTime 字段应往返一致");
+    }
+
+    @Test
+    void comicListPage_shouldSupportRedisJsonRoundTrip_withoutDefaultTyping() {
+        ComicListVO vo = new ComicListVO();
+        vo.setId(1L);
+        vo.setTitle("测试");
+        vo.setCreatedAt(java.time.LocalDateTime.of(2026, 8, 1, 10, 30));
+        ComicListPage page = new ComicListPage();
+        page.setRecords(java.util.List.of(vo));
+        page.setTotal(1);
+        page.setCurrent(1);
+        page.setSize(20);
+
+        // 与 RedisConfig 相同的序列化器（default typing + JSR-310）
+        var ptv = com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator.builder()
+                .allowIfSubType("com.comicatlas.")
+                .allowIfSubType("java.util.")
+                .build();
+        var serializer = new org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer(
+                com.fasterxml.jackson.databind.json.JsonMapper.builder()
+                        .addModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
+                        .activateDefaultTyping(ptv, com.fasterxml.jackson.databind.ObjectMapper.DefaultTyping.NON_FINAL)
+                        .build());
+
+        Object restored = serializer.deserialize(serializer.serialize(page));
+
+        assertInstanceOf(ComicListPage.class, restored, "纯数据 DTO 经 default typing 应还原为具体类");
+        ComicListPage restoredPage = (ComicListPage) restored;
+        assertEquals(1, restoredPage.getRecords().size());
+        assertEquals("测试", restoredPage.getRecords().get(0).getTitle());
+        assertEquals(1, restoredPage.getTotal());
+        // toPage 组装后应可被调用方用作 IPage
+        assertEquals(1L, restoredPage.toPage().getCurrent());
     }
 
     // ==================== helpers ====================
