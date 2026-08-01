@@ -13,6 +13,7 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
@@ -29,11 +30,11 @@ public class CategoryServiceImpl implements CategoryService {
         key = "'" + ComicReferenceCache.ALL_KEY + "'",
         unless = "#result == null || #result.isEmpty()")
     public List<CategoryDTO> listCategories() {
-        return categoryMapper.selectList(new LambdaQueryWrapper<Category>().orderByAsc(Category::getSortOrder))
+        return new ArrayList<>(categoryMapper.selectList(new LambdaQueryWrapper<Category>().orderByAsc(Category::getSortOrder))
                 .stream()
                 .map(this::toDTO)
                 .sorted(Comparator.comparingInt(c -> c.getSortOrder() == null ? 0 : c.getSortOrder()))
-                .toList();
+                .toList());
     }
 
     @Override

@@ -179,7 +179,7 @@ class CatalogCacheTest {
                 RedisCacheManager.class,
                 redisConfig.cacheManager(
                         mock(RedisConnectionFactory.class), Duration.ofMinutes(12),
-                        Duration.ofMinutes(30), Duration.ofSeconds(60)));
+                        Duration.ofMinutes(30), Duration.ofSeconds(60), Duration.ofMinutes(5)));
         redisCacheManager.afterPropertiesSet();
 
         assertEquals(
