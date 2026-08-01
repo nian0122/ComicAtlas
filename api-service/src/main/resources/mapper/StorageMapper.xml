@@ -90,4 +90,18 @@
         WHERE c.id = #{comicId}
     </select>
 
+    <select id="selectTranscodeStatusList" resultType="com.comicatlas.api.admin.dto.ComicTranscodeStatus">
+        SELECT
+            c.id as comic_id,
+            GROUP_CONCAT(DISTINCT m.transcode_status) as transcode_status
+        FROM comic c
+        JOIN chapter ch ON ch.comic_id = c.id
+        JOIN page m ON m.chapter_id = ch.id AND m.media_type = 'VIDEO'
+        WHERE c.id IN
+        <foreach collection="comicIds" item="cid" open="(" separator="," close=")">
+            #{cid}
+        </foreach>
+        GROUP BY c.id
+    </select>
+
 </mapper>
