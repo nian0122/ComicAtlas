@@ -39,6 +39,8 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
 
     @Override
     public IPage<ComicListVO> listComics(ComicListQuery query) {
+        // 直接委托 loadPage（缓存方法）。注意：本方法内部调用不触发 @Cacheable（自调用绕过代理），
+        // 缓存生效路径是 ComicServiceImpl 通过代理调用 loadPage。
         return loadPage(query).toPage();
     }
 

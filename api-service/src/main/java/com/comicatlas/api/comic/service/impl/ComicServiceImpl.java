@@ -42,7 +42,8 @@ public class ComicServiceImpl implements ComicService {
 
     @Override
     public IPage<ComicListVO> listComics(ComicListQuery query) {
-        return comicListQueryService.listComics(query);
+        // 直接调用 loadPage（走代理，触发 @Cacheable），再组装为 IPage 返回
+        return comicListQueryService.loadPage(query).toPage();
     }
 
     @Override
