@@ -15,6 +15,7 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -32,7 +33,7 @@ public class TagServiceImpl implements TagService {
         unless = "#result == null || #result.isEmpty()")
     public List<TagDTO> listTags() {
         List<Tag> tags = tagMapper.selectList(null);
-        return tags.stream().map(this::toDTO).toList();
+        return new ArrayList<>(tags.stream().map(this::toDTO).toList());
     }
 
     @Override
