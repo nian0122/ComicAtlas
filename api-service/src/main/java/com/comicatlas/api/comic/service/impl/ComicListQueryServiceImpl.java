@@ -3,6 +3,7 @@ package com.comicatlas.api.comic.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.comicatlas.api.comic.cache.ComicReferenceCache;
 import com.comicatlas.api.comic.dto.ComicListQuery;
 import com.comicatlas.api.comic.dto.ComicListVO;
 import com.comicatlas.api.comic.entity.Category;
@@ -14,8 +15,13 @@ import com.comicatlas.api.common.storage.FileUrlResolver;
 import com.comicatlas.api.reader.entity.ReadingHistory;
 import com.comicatlas.api.reader.mapper.ReadingHistoryMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -31,6 +37,10 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
     private final FileUrlResolver fileUrlResolver;
 
     @Override
+    @Cacheable(
+        cacheNames = ComicReferenceCache.COMIC_LIST,
+        key = "#root.target.cacheKey(#query)",
+        unless = "#result == null || #result.getRecords().isEmpty()")
     public IPage<ComicListVO> listComics(ComicListQuery query) {
         Page<Comic> page = new Page<>(query.getPage(), query.getSize());
         IPage<Comic> result = comicMapper.selectPage(page, query);
@@ -45,7 +55,7 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
                 .distinct()
                 .toList();
         Map<Long, String> categoryNames = categoryIds.isEmpty()
-                ? Map.of()
+                ? new HashMap<>()
                 : categoryMapper.selectBatchIds(categoryIds).stream()
                         .collect(Collectors.toMap(Category::getId, Category::getName));
 
@@ -56,6 +66,44 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
                 .collect(Collectors.toMap(ReadingHistory::getComicId, history -> history));
 
         return result.convert(comic -> toListVO(comic, categoryNames, histories));
+    }
+
+    /**
+     * 生成查询缓存键：规范化全部查询条件后用 MD5 摘要，避免超长 key。
+     * 同条件同键、不同条件不同键；listComics 的 @Cacheable 引用此方法。
+     */
+    public String cacheKey(ComicListQuery query) {
+        String raw = String.join("|",
+                nz(query.getKeyword()),
+                nz(query.getTag()),
+                query.getTags() == null ? "" : String.join(",", query.getTags()),
+                nz(query.getTagMode()),
+                nz(query.getStatus()),
+                nz(query.getCategory()),
+                nz(query.getSourceType()),
+                nz(query.getSort()),
+                String.valueOf(query.getPage()),
+                String.valueOf(query.getSize()));
+        return md5(raw);
+    }
+
+    private static String nz(String s) {
+        return s == null ? "" : s.trim();
+    }
+
+    private static String md5(String input) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("MD5");
+            byte[] bytes = digest.digest(input.getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder(bytes.length * 2);
+            for (byte b : bytes) {
+                sb.append(Character.forDigit((b >> 4) & 0xF, 16));
+                sb.append(Character.forDigit(b & 0xF, 16));
+            }
+            return sb.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("MD5 不可用", e);
+        }
     }
 
     private ComicListVO toListVO(

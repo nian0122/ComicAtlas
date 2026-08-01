@@ -1,6 +1,7 @@
 package com.comicatlas.api.comic.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.comicatlas.api.comic.cache.CacheEvictor;
 import com.comicatlas.api.comic.dto.TagDTO;
 import com.comicatlas.api.comic.entity.ComicTag;
 import com.comicatlas.api.comic.entity.Tag;
@@ -29,6 +30,9 @@ class TagServiceTest {
 
     @Mock
     private ComicTagMapper comicTagMapper;
+
+    @Mock
+    private CacheEvictor cacheEvictor;
 
     @InjectMocks
     private TagServiceImpl service;
