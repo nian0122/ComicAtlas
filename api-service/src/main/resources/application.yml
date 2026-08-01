@@ -53,3 +53,7 @@ mybatis-plus:
 
 export:
   output-dir: ${MANGA_ROOT:F:/manga}/export
+
+comic:
+  cache:
+    catalog-ttl: ${CATALOG_CACHE_TTL:30m}

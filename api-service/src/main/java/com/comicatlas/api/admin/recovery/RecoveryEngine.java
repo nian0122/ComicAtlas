@@ -2,6 +2,7 @@ package com.comicatlas.api.admin.recovery;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.admin.dto.RecoveryProgress;
+import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.comic.entity.*;
 import com.comicatlas.api.comic.mapper.*;
 import com.comicatlas.api.common.RestoreContext;
@@ -39,6 +40,7 @@ public class RecoveryEngine {
     private final ChapterMapper chapterMapper;
     private final MediaMapper mediaMapper;
     private final TransactionTemplate transactionTemplate;
+    private final CatalogCacheInvalidator catalogCacheInvalidator;
 
     /** 视频文件扩展名 */
     private static final Set<String> VIDEO_EXTENSIONS = Set.of(".mp4", ".webm", ".mkv", ".mov", ".avi");
@@ -153,13 +155,15 @@ public class RecoveryEngine {
     }
 
     private Map<String, Object> restoreComic(Map<String, Object> metadata, RestoreContext ctx) {
-        return transactionTemplate.execute(status -> {
+        Map<String, Object> result = transactionTemplate.execute(status -> {
             try {
                 return restoreComicInternal(metadata, ctx);
             } catch (Exception e) {
                 throw new RuntimeException("恢复漫画失败: comicId=" + ctx.comicId(), e);
             }
         });
+        catalogCacheInvalidator.evict(ctx.comicId());
+        return result;
     }
 
     @SuppressWarnings("unchecked")

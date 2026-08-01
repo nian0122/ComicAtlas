@@ -1,12 +1,15 @@
 package com.comicatlas.api.comic.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.comicatlas.api.comic.cache.CacheEvictor;
+import com.comicatlas.api.comic.cache.ComicReferenceCache;
 import com.comicatlas.api.comic.dto.CategoryDTO;
 import com.comicatlas.api.comic.entity.Category;
 import com.comicatlas.api.comic.mapper.CategoryMapper;
 import com.comicatlas.api.comic.service.CategoryService;
 import com.comicatlas.api.common.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,8 +21,13 @@ import java.util.List;
 public class CategoryServiceImpl implements CategoryService {
 
     private final CategoryMapper categoryMapper;
+    private final CacheEvictor cacheEvictor;
 
     @Override
+    @Cacheable(
+        cacheNames = ComicReferenceCache.CATEGORIES,
+        key = "'" + ComicReferenceCache.ALL_KEY + "'",
+        unless = "#result == null || #result.isEmpty()")
     public List<CategoryDTO> listCategories() {
         return categoryMapper.selectList(new LambdaQueryWrapper<Category>().orderByAsc(Category::getSortOrder))
                 .stream()
@@ -44,6 +52,7 @@ public class CategoryServiceImpl implements CategoryService {
         category.setName(trimmed);
         category.setSortOrder((int) (categoryMapper.selectCount(new LambdaQueryWrapper<>()) + 1));
         categoryMapper.insert(category);
+        cacheEvictor.evict(ComicReferenceCache.CATEGORIES, ComicReferenceCache.ALL_KEY);
         return toDTO(category);
     }
 
@@ -65,6 +74,7 @@ public class CategoryServiceImpl implements CategoryService {
         }
         category.setName(trimmed);
         categoryMapper.updateById(category);
+        cacheEvictor.evict(ComicReferenceCache.CATEGORIES, ComicReferenceCache.ALL_KEY);
         return toDTO(category);
     }
 
@@ -76,6 +86,7 @@ public class CategoryServiceImpl implements CategoryService {
             throw new BusinessException(404, "分类不存在");
         }
         categoryMapper.deleteById(id);
+        cacheEvictor.evict(ComicReferenceCache.CATEGORIES, ComicReferenceCache.ALL_KEY);
     }
 
     private CategoryDTO toDTO(Category c) {

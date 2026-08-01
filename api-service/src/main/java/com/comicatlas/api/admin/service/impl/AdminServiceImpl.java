@@ -11,6 +11,7 @@ import com.comicatlas.api.admin.recovery.RecoveryEngine;
 import com.comicatlas.api.admin.recovery.ScannedMediaInfo;
 import com.comicatlas.api.admin.service.AdminService;
 import com.comicatlas.api.admin.service.MetadataExporter;
+import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.comic.entity.*;
 import com.comicatlas.common.event.MetadataRefreshEvent;
 import com.comicatlas.common.event.VideoMetadataFixRequestedEvent;
@@ -51,6 +52,7 @@ public class AdminServiceImpl implements AdminService {
     private final MetadataExporter metadataExporter;
     private final RabbitTemplate rabbitTemplate;
     private final RecoveryEngine recoveryEngine;
+    private final CatalogCacheInvalidator catalogCacheInvalidator;
 
     /** 未结束（活跃）的导入任务状态 */
     private static final Set<String> ACTIVE_STATUSES = Set.of("PENDING", "PARSING", "IMPORTING");
@@ -103,6 +105,7 @@ public class AdminServiceImpl implements AdminService {
                 new LambdaQueryWrapper<ReadingHistory>().eq(ReadingHistory::getComicId, comicId)));
 
         stats.setComic(comicMapper.deleteById(comicId));
+        catalogCacheInvalidator.evict(comicId);
 
         log.info("数据库删除完成: comicId={}, title={}, stats={}", comicId, comic.getTitle(), stats);
 
@@ -342,6 +345,7 @@ public class AdminServiceImpl implements AdminService {
             long durationMs = System.currentTimeMillis() - start;
 
             int videoFixed = fixVideoMetadata(comicId);
+            catalogCacheInvalidator.evict(comicId);
 
             try {
                 rabbitTemplate.convertAndSend("comic.export", "metadata.refresh.requested",
