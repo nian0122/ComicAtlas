@@ -1,6 +1,7 @@
 package com.comicatlas.api.comic.service.impl;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.comicatlas.api.comic.dto.ComicListPage;
 import com.comicatlas.api.comic.dto.ComicListQuery;
 import com.comicatlas.api.comic.dto.ComicListVO;
 import com.comicatlas.api.comic.service.ComicListQueryService;
@@ -10,7 +11,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import static org.junit.jupiter.api.Assertions.assertSame;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -24,14 +27,25 @@ class ComicServiceImplDelegationTest {
     private ComicServiceImpl service;
 
     @Test
-    void listComics_shouldDelegateQueryAndReturnSamePage() {
+    void listComics_shouldLoadPageAndReturnAssembledIPage() {
         ComicListQuery query = new ComicListQuery();
-        Page<ComicListVO> expected = new Page<>(1, 20, 0);
-        when(comicListQueryService.listComics(query)).thenReturn(expected);
+        ComicListVO vo = new ComicListVO();
+        vo.setId(1L);
+        vo.setTitle("测试");
+
+        ComicListPage page = new ComicListPage();
+        page.setRecords(List.of(vo));
+        page.setTotal(1);
+        page.setCurrent(1);
+        page.setSize(20);
+        when(comicListQueryService.loadPage(query)).thenReturn(page);
 
         var result = service.listComics(query);
 
-        assertSame(expected, result);
-        verify(comicListQueryService).listComics(query);
+        // 走 loadPage（缓存方法）并组装为 IPage
+        verify(comicListQueryService).loadPage(query);
+        assertEquals(1, result.getRecords().size());
+        assertEquals("测试", result.getRecords().get(0).getTitle());
+        assertEquals(1L, result.getTotal());
     }
 }
