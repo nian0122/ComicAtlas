@@ -79,9 +79,10 @@ public class AdminStorageController {
             Map<String, Object> result = new HashMap<>();
             result.put("comicId", comicId);
             result.put("totalVideoPages", 0);
+            result.put("notNeededCount", 0);
+            result.put("submittedCount", 0);
             result.put("pendingCount", 0);
-            result.put("alreadyDone", 0);
-            result.put("processingCount", 0);
+            result.put("doneCount", 0);
             result.put("failedCount", 0);
             return Result.ok(result);
         }
@@ -94,23 +95,11 @@ public class AdminStorageController {
                         .in(Media::getChapterId, chapterIds)
                         .eq(Media::getMediaType, "VIDEO"));
 
-        int totalVideoPages = allVideoPages.size();
-        int alreadyDone = 0;
-        int processingCount = 0;
-        int failedCount = 0;
         List<Media> toTranscode = new ArrayList<>();
 
         for (Media p : allVideoPages) {
             String status = p.getTranscodeStatus();
-            if ("DONE".equals(status)) {
-                alreadyDone++;
-            } else if ("PROCESSING".equals(status)) {
-                processingCount++;
-            } else {
-                if ("FAILED".equals(status)) {
-                    failedCount++;
-                }
-                // 检查容器是否需要转码（container IS NULL 或 container NOT IN mp4/webm）
+            if (!"DONE".equals(status) && !"PENDING".equals(status)) {
                 String container = p.getContainer();
                 if (container == null || (!"mp4".equals(container) && !"webm".equals(container))) {
                     toTranscode.add(p);
@@ -119,7 +108,7 @@ public class AdminStorageController {
         }
 
         // 乐观锁标记 PENDING：仅当 transcode_status IN ('NOT_NEEDED','FAILED')
-        int pendingCount = 0;
+        int submittedCount = 0;
         List<Media> pendingPages = new ArrayList<>();
 
         for (Media p : toTranscode) {
@@ -129,7 +118,8 @@ public class AdminStorageController {
                             .in(Media::getTranscodeStatus, "NOT_NEEDED", "FAILED")
                             .set(Media::getTranscodeStatus, "PENDING"));
             if (updated > 0) {
-                pendingCount++;
+                submittedCount++;
+                p.setTranscodeStatus("PENDING");
                 pendingPages.add(p);
             }
         }
@@ -148,15 +138,30 @@ public class AdminStorageController {
                     }
                 });
 
-        log.info("视频转码任务已发布: comicId={}, pending={}, alreadyDone={}, processing={}, failed={}",
-                comicId, pendingCount, alreadyDone, processingCount, failedCount);
+        int notNeededCount = 0;
+        int pendingCount = 0;
+        int doneCount = 0;
+        int failedCount = 0;
+        for (Media p : allVideoPages) {
+            switch (p.getTranscodeStatus()) {
+                case "NOT_NEEDED" -> notNeededCount++;
+                case "PENDING" -> pendingCount++;
+                case "DONE" -> doneCount++;
+                case "FAILED" -> failedCount++;
+                default -> failedCount++;
+            }
+        }
+
+        log.info("视频转码任务已发布: comicId={}, submitted={}, pending={}, done={}, failed={}",
+                comicId, submittedCount, pendingCount, doneCount, failedCount);
 
         Map<String, Object> result = new HashMap<>();
         result.put("comicId", comicId);
-        result.put("totalVideoPages", totalVideoPages);
+        result.put("totalVideoPages", allVideoPages.size());
+        result.put("notNeededCount", notNeededCount);
+        result.put("submittedCount", submittedCount);
         result.put("pendingCount", pendingCount);
-        result.put("alreadyDone", alreadyDone);
-        result.put("processingCount", processingCount);
+        result.put("doneCount", doneCount);
         result.put("failedCount", failedCount);
         return Result.ok(result);
     }

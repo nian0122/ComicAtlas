@@ -9,6 +9,7 @@ $ErrorActionPreference = "Stop"
 $keyPath = Join-Path $env:USERPROFILE ".ssh\comicatlas_infra_ed25519"
 $sshPath = (Get-Command ssh.exe).Source
 $tunnelMappings = @(
+    @{ Local = 3306; Remote = 3306 },
     @{ Local = 6379; Remote = 6379 },
     @{ Local = 5672; Remote = 5672 },
     @{ Local = 15672; Remote = 15672 },

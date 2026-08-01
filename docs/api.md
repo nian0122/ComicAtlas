@@ -238,7 +238,61 @@ GET /api/admin/storage/comics/{id}/chapters    # 章节级存储详情
 
 返回每个漫画/章节的 HQ/LQ 大小和状态，支持按 HQ/LQ 状态筛选和排序。
 
-### 存储扫描恢复
+### 视频转码补偿
+
+```
+POST /api/admin/storage/comics/{comicId}/transcode-videos
+```
+
+触发漫画的视频转码补偿任务。扫描漫画下所有非标准格式视频（非 mp4/webm），标记为 PENDING 并发送 MQ。
+
+**响应**：
+```json
+{
+  "comicId": 92,
+  "totalVideoPages": 15,
+  "notNeededCount": 5,
+  "submittedCount": 3,
+  "pendingCount": 3,
+  "doneCount": 7,
+  "failedCount": 0
+}
+```
+
+| 字段 | 说明 |
+|------|------|
+| `totalVideoPages` | 漫画下所有 VIDEO 类型页面总数 |
+| `notNeededCount` | 无需转码的页面数（transcode_status = NOT_NEEDED） |
+| `submittedCount` | 本次从 NOT_NEEDED/FAILED 标记为 PENDING 并提交的数量 |
+| `pendingCount` | 当前待处理的页面总数，包含本次提交数量 |
+| `doneCount` | 已完成的页面数（transcode_status = DONE） |
+| `failedCount` | 当前转码失败的页面数 |
+
+**transcode_status 状态机**：
+```
+NOT_NEEDED ──┐
+             ├──► PENDING ──► DONE
+FAILED ──────┘       │
+                     └──► FAILED
+```
+
+| 状态 | 含义 |
+|------|------|
+| `NOT_NEEDED` | 不需要转码（图片或已是 mp4/webm） |
+| `PENDING` | 已提交转码任务，Worker 正在处理或等待处理 |
+| `DONE` | 转码完成，视频已替换为 mp4（H.264/AAC） |
+| `FAILED` | 转码失败，原文件保留，可 re-trigger |
+
+**注意事项**：
+- 不支持取消。PENDING 记录会一直保持直到 Worker 返回结果。
+- re-trigger 是安全的：CAS 保护（`WHERE transcode_status IN ('NOT_NEEDED','FAILED')`）确保已 PENDING 的记录不会被覆盖或重复入队。
+- 已是 mp4/webm 的视频不会被标记为 PENDING。
+- 历史 PENDING 记录可通过 DLQ 重放已完成事件收敛为 DONE（handler 接受 PENDING 状态）。
+
+### 存储扫描恢复（已废弃）
+
+> **废弃**：`POST /api/admin/storage/scan-recover` 已废弃，请使用异步恢复任务接口（参见下方 [12. 恢复任务](#12-恢复任务)）。
+> 该端点同步阻塞，且在大量漫画时可能超时。目前仍保留以兼容旧版调用，未来版本将移除。
 
 ```
 POST /api/admin/storage/scan-recover
@@ -264,6 +318,116 @@ POST /api/admin/storage/scan-recover
 ```
 
 > 存储模型与布局设计见 [`docs/architecture/03-storage.md`](architecture/03-storage.md)。
+
+---
+
+## 12. 恢复任务
+
+异步任务驱动的存储恢复。Worker 扫描 HQ 目录结构，API 侧逐本调用恢复引擎重建数据库记录。
+
+### 创建恢复任务
+
+```
+POST /api/tasks/recovery
+```
+
+创建一个恢复任务。同一时刻只允许一个 PENDING 或 RUNNING 状态的任务，冲突时返回 409。
+
+响应 `RecoveryTaskVO`：
+
+```json
+{
+  "id": 1,
+  "status": "PENDING",
+  "totalComics": 0,
+  "recoveredComics": 0,
+  "skippedComics": 0,
+  "placeholderComics": 0,
+  "errorComics": 0,
+  "errorMessage": null,
+  "retryCount": 0,
+  "createdAt": "2026-07-29T10:00:00",
+  "startedAt": null,
+  "endedAt": null
+}
+```
+
+### 任务列表
+
+```
+GET /api/tasks/recovery?page=1&size=20
+```
+
+返回分页列表，按创建时间倒序排列。
+
+### 任务详情
+
+```
+GET /api/tasks/recovery/{id}
+```
+
+返回 `RecoveryTaskVO`，包含完整计数器字段。前端可通过轮询该接口查看进度（`totalComics` / `recoveredComics` 等字段实时更新）。
+
+### 重试
+
+```
+POST /api/tasks/recovery/{id}/retry
+```
+
+仅 `FAILED` 状态可重试。重试时状态重置为 `PENDING`，`retryCount` 递增，重新发送 MQ 到 Worker。
+
+### 恢复任务状态机
+
+```text
+PENDING ──► RUNNING ──► SUCCESS
+   ▲           │
+   │           ▼
+   └── retry ◄── FAILED
+```
+
+| 状态 | 含义 |
+|------|------|
+| `PENDING` | 任务已创建，等待 Worker 扫描 |
+| `RUNNING` | Worker 已扫描完成，API 正在逐本恢复数据库记录 |
+| `SUCCESS` | 全部漫画处理完成 |
+| `FAILED` | Worker 扫描失败或 API 处理异常 |
+
+> 恢复任务不支持取消。创建后必须等待至终态（SUCCESS/FAILED）。
+
+### 恢复流程
+
+1. API 创建 `recovery_task`（PENDING）→ 发送 `RecoveryRequestedEvent` 到 `comic.recovery`
+2. Worker `RecoveryTaskHandler` 扫描 `MANGA_ROOT/hq/` 下所有数字目录（comicId）→ 发送 `RecoveryScanCompletedEvent`
+3. API `RecoveryEventHandler` 标记 RUNNING → 逐本调用 `RecoveryEngine.processComicDir()`
+4. 每个漫画目录：
+   - 若数据库已有记录 → `skipped`
+   - 若 `metadata/{comicId}.json` 存在 → 恢复完整 comic/chapter/page/media 记录，状态 `READY` → `recovered`
+   - 若 metadata 缺失 → 创建 `PLACEHOLDER` 漫画（标题"未知漫画 {comicId}"），不参与普通列表 → `placeholder`
+   - 异常 → `error`，记录错误信息，不中断整体流程
+5. 全部处理完成 → `SUCCESS`；基础设施故障 → `FAILED`
+
+### 恢复结果解读
+
+| 计数 | 含义 |
+|------|------|
+| totalComics | HQ 目录下扫描到的漫画目录总数 |
+| recoveredComics | 有 metadata 且成功恢复的漫画数 |
+| skippedComics | 数据库已有记录，跳过的漫画数 |
+| placeholderComics | 无 metadata，创建占位漫画的数量 |
+| errorComics | 处理异常的数量 |
+
+成功恢复（`recovered`）的漫画会立即出现在漫画库中。`placeholder` 漫画可通过状态筛选 `PLACEHOLDER` 在管理后台查看，需手动补充元数据或重新导入。
+
+### 恢复任务与导入任务的区别
+
+| 特性 | 恢复任务 | 导入任务 |
+|------|---------|---------|
+| 触发方式 | POST /api/tasks/recovery | POST /api/tasks/import |
+| 输入 | 无（自动扫描 HQ 目录） | sourceType + sourcePath |
+| Worker 职责 | 扫描 HQ 目录，收集 comicId | 解析来源、搬文件、写 metadata |
+| API 职责 | 逐本调用 RecoveryEngine 恢复 DB | 读 metadata.json 落库 |
+| 取消 | 不支持 | 支持（非终态） |
+| 并发数 | 同一时刻仅 1 个 | 无限制 |
 
 ---
 

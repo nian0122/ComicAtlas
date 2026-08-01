@@ -36,6 +36,7 @@
               class="hero-btn hero-btn--primary btn-hover"
               @click="primaryAction.onClick"
             >
+              <el-icon :size="20"><VideoPlay /></el-icon>
               {{ primaryAction.label }}
             </button>
             <button
@@ -44,6 +45,7 @@
               class="hero-btn hero-btn--secondary"
               @click="secondaryAction.onClick"
             >
+              <el-icon :size="20"><InfoFilled /></el-icon>
               {{ secondaryAction.label }}
             </button>
           </slot>
@@ -55,7 +57,7 @@
 
 <script setup lang="ts">
 import { computed, useSlots } from 'vue'
-import { VideoPlay } from '@element-plus/icons-vue'
+import { InfoFilled, VideoPlay } from '@element-plus/icons-vue'
 
 interface HeroAction {
   label: string
@@ -95,10 +97,10 @@ const hasActions = computed(
 <style scoped>
 .hero-banner {
   position: relative;
-  width: 100%;
-  min-height: 70vh;
   display: flex;
   align-items: center;
+  width: 100%;
+  min-height: clamp(560px, 72dvh, 760px);
   overflow: hidden;
   color: var(--text-primary);
 }
@@ -108,11 +110,11 @@ const hasActions = computed(
   inset: 0;
   left: 50%;
   width: 100vw;
-  transform: translateX(-50%);
-  background-size: cover;
-  background-position: center top;
   background-repeat: no-repeat;
-  filter: blur(24px) brightness(0.6);
+  background-position: 72% 24%;
+  background-size: cover;
+  filter: saturate(0.92) brightness(0.7);
+  transform: translateX(-50%) scale(1.02);
   z-index: 0;
 }
 
@@ -126,24 +128,23 @@ const hasActions = computed(
 .hero-content {
   position: relative;
   z-index: 2;
+  display: grid;
+  grid-template-columns: minmax(180px, 260px) minmax(0, 1fr);
+  align-items: end;
+  gap: var(--space-12);
   width: 100%;
   max-width: var(--page-width);
   margin: 0 auto;
-  padding: calc(var(--nav-height) + var(--space-2xl)) var(--page-padding)
-    var(--space-3xl);
-  display: flex;
-  align-items: flex-end;
-  gap: var(--space-2xl);
+  padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-16);
 }
 
 .hero-poster {
-  flex-shrink: 0;
-  width: min(320px, 30vw);
+  width: 100%;
   aspect-ratio: 2 / 3;
-  border-radius: var(--card-radius);
   overflow: hidden;
-  box-shadow: var(--card-shadow);
+  border-radius: var(--radius-md);
   background: var(--bg-surface);
+  box-shadow: var(--card-shadow-hover);
 }
 
 .hero-poster-bg {
@@ -168,35 +169,39 @@ const hasActions = computed(
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: var(--space-base);
-  max-width: min(720px, 55%);
+  gap: var(--space-4);
+  max-width: 720px;
+  padding-bottom: var(--space-2);
 }
 
 .hero-title {
   margin: 0;
   font-family: var(--heading);
-  font-size: 48px;
-  font-weight: 700;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
   color: var(--text-primary);
+  font-size: var(--text-hero);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 1.02;
+  text-shadow: var(--title-shadow);
 }
 
 .hero-subtitle {
   margin: 0;
-  font-size: 18px;
+  font-size: var(--text-lg);
   font-weight: 500;
   color: var(--text-secondary);
+  text-wrap: pretty;
 }
 
 .hero-description {
-  font-size: 14px;
-  line-height: 1.5;
-  color: var(--text-secondary);
   display: -webkit-box;
+  max-width: 64ch;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.6;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 
 .hero-actions {
@@ -207,12 +212,17 @@ const hasActions = computed(
 }
 
 .hero-btn {
-  padding: 8px 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--control-min-size);
+  padding: 0 var(--space-5);
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-pill);
   font-family: inherit;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--text-sm);
+  font-weight: 700;
   line-height: 1;
   cursor: pointer;
   transition: transform var(--transition-fast),
@@ -220,40 +230,91 @@ const hasActions = computed(
 }
 
 .hero-btn--primary {
+  background: var(--text-primary);
+  color: var(--bg-primary);
+}
+
+.hero-btn--primary:hover {
   background: var(--accent);
-  color: var(--text-primary);
+  color: var(--color-on-brand);
+  transform: translateY(-2px);
 }
 
 .hero-btn--secondary {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--color-overlay-soft);
   color: var(--text-primary);
 }
 
 .hero-btn--secondary:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: var(--color-overlay-hover);
+  transform: translateY(-2px);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .hero-banner {
-    min-height: 50vh;
+    min-height: 0;
+    aspect-ratio: 4 / 5;
+    align-items: end;
   }
 
-  .hero-content {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--space-lg);
+  .hero-background {
+    background-position: center 16%;
+    filter: saturate(0.94) brightness(0.68);
   }
 
   .hero-poster {
-    width: min(200px, 45vw);
+    display: none;
+  }
+
+  .hero-overlay {
+    background: var(--hero-mobile-gradient);
+  }
+
+  .hero-content {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: flex-end;
+    padding: 0 var(--mobile-page-gutter) var(--space-8);
   }
 
   .hero-info {
     max-width: 100%;
+    gap: var(--space-3);
+    padding: 0;
   }
 
   .hero-title {
-    font-size: 32px;
+    max-width: 18ch;
+    font-size: clamp(1.75rem, 8vw, 2.5rem);
+    letter-spacing: -0.04em;
+  }
+
+  .hero-subtitle {
+    font-size: var(--text-sm);
+  }
+
+  .hero-description {
+    -webkit-line-clamp: 2;
+  }
+
+  .hero-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+    margin-top: var(--space-3);
+  }
+
+  .hero-btn {
+    width: 100%;
+    padding-inline: var(--space-3);
+  }
+}
+
+@media (min-width: 600px) and (max-width: 1024px) {
+  .hero-banner {
+    aspect-ratio: 16 / 10;
+    max-height: var(--tablet-hero-max-height);
   }
 }
 </style>

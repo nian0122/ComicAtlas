@@ -12,6 +12,20 @@
     </div>
 
     <template v-else-if="comic">
+      <MobileComicDetail
+        v-if="mode === 'mobile'"
+        :comic="comic"
+        :catalog-tree="catalogTree"
+        :total-chapters="totalChapters"
+        :progress-text="progressMetaText"
+        :progress-scale="progressScale"
+        :read-label="primaryAction?.label || '开始阅读'"
+        :can-read="Boolean(primaryAction)"
+        @read="readComic"
+        @select="goReader"
+      />
+
+      <template v-else>
       <!-- Hero -->
       <HeroBanner
         :background-url="comic.coverUrl"
@@ -29,7 +43,7 @@
               <span class="progress-percent">{{ comic.progressPercent || 0 }}%</span>
             </div>
             <div class="progress-bar">
-              <div class="progress-fill" :style="{ width: progressWidth }" />
+              <div class="progress-fill" :style="{ transform: `scaleX(${progressScale})` }" />
             </div>
           </div>
         </template>
@@ -105,6 +119,7 @@
           </div>
         </div>
       </section>
+      </template>
     </template>
 
     <div v-else class="state empty">
@@ -122,6 +137,7 @@ import { comicApi, catalogApi } from '@/services/reading'
 
 import type { ComicDetailVO, CatalogNode, ChapterRef } from '@/types'
 import CatalogTree from '@/components/reading/comic/CatalogTree.vue'
+import MobileComicDetail from '@/components/reading/comic/MobileComicDetail.vue'
 import HeroBanner from '@/components/reading/HeroBanner.vue'
 import { useInteractionMode } from '@/views/reading/reader/composables/useInteractionMode'
 
@@ -179,15 +195,15 @@ const progressMetaText = computed(() => {
   return pageText
 })
 
-const progressWidth = computed(
-  () => `${Math.min(100, Math.max(0, comic.value?.progressPercent || 0))}%`
+const progressScale = computed(
+  () => Math.min(100, Math.max(0, comic.value?.progressPercent || 0)) / 100
 )
 
 const primaryAction = computed(() => {
   // 有阅读历史 → 继续阅读（桌面端与移动端一致）
   if (comic.value?.lastReadChapterId) {
     return {
-      label: '▶ 继续阅读',
+      label: '继续阅读',
       onClick: continueRead,
     }
   }
@@ -263,6 +279,10 @@ function startRead() {
   router.push(`/reader/${ch.id}?page=1`)
 }
 
+function readComic() {
+  primaryAction.value?.onClick()
+}
+
 function goReader(chapterId: number) {
   router.push(`/reader/${chapterId}?page=1`)
 }
@@ -331,12 +351,12 @@ onMounted(loadData)
 }
 
 .hero-btn--secondary {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--color-overlay-soft);
   color: var(--text-primary);
 }
 
 .hero-btn--secondary:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: var(--color-overlay-hover);
 }
 
 /* Progress */
@@ -370,16 +390,18 @@ onMounted(loadData)
 
 .progress-bar {
   height: 4px;
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--color-progress-track);
   border-radius: var(--radius-pill);
   overflow: hidden;
 }
 
 .progress-fill {
+  width: 100%;
   height: 100%;
   background: var(--accent);
   border-radius: var(--radius-pill);
-  transition: width var(--transition-normal);
+  transform-origin: left center;
+  transition: transform var(--transition-normal);
 }
 
 /* Information */
@@ -497,7 +519,7 @@ onMounted(loadData)
 .spinner {
   width: 40px;
   height: 40px;
-  border: 3px solid rgba(255, 255, 255, 0.15);
+  border: 3px solid var(--color-progress-track);
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 1s linear infinite;
@@ -508,7 +530,7 @@ onMounted(loadData)
 }
 
 /* Responsive */
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .info-grid {
     grid-template-columns: 1fr;
   }
@@ -560,7 +582,7 @@ onMounted(loadData)
   font-size: 16px;
 }
 
-/* 信息网格单列：与上方 768px 媒体查询结果一致（is-mobile 必然 ≤768px），两机制不冲突 */
+/* 信息网格单列：与上方平板媒体查询结果一致，两机制不冲突 */
 .comic-detail-page.is-mobile .info-grid {
   grid-template-columns: 1fr;
 }

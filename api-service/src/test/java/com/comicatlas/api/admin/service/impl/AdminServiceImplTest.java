@@ -2,6 +2,8 @@ package com.comicatlas.api.admin.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.admin.dto.ComicDeleteStats;
+import com.comicatlas.api.admin.recovery.RecoveryEngine;
+import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.comic.entity.*;
 import com.comicatlas.api.comic.mapper.*;
 import com.comicatlas.api.common.exception.BusinessException;
@@ -9,7 +11,6 @@ import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
 import com.comicatlas.api.reader.entity.ReadingHistory;
 import com.comicatlas.api.reader.mapper.ReadingHistoryMapper;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -26,7 +27,9 @@ import static org.mockito.Mockito.*;
 class AdminServiceImplTest {
 
     @Mock
-    private ObjectMapper objectMapper;
+    private RecoveryEngine recoveryEngine;
+    @Mock
+    private CatalogCacheInvalidator catalogCacheInvalidator;
     @Mock
     private ComicMapper comicMapper;
     @Mock

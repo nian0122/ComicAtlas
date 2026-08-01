@@ -4,6 +4,7 @@
       <VideoPlayer
         v-if="isVideo"
         :key="page.id"
+        :media-id="page.id"
         :hq-url="page.hqUrl"
         :media-type="page.mediaType ?? 'VIDEO'"
         :width="page.width"
@@ -12,6 +13,8 @@
         :container="page.container"
         :video-codec="page.videoCodec"
         :audio-codec="page.audioCodec"
+        :active="true"
+        :scroller-root="viewportRef"
       />
       <ProgressiveImage
         v-else

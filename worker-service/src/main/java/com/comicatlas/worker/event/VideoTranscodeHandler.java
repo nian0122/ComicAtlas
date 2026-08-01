@@ -65,6 +65,7 @@ public class VideoTranscodeHandler {
             ProcessBuilder pb = new ProcessBuilder();
             pb.command(buildFfmpegCommand(config.getFfmpegPath(), hqFile.toString(), tempFile.toString()));
             pb.redirectErrorStream(true);
+            pb.redirectOutput(ProcessBuilder.Redirect.DISCARD);
             Process proc = pb.start();
 
             // 超时 10 分钟（Metis G9）
@@ -88,9 +89,14 @@ public class VideoTranscodeHandler {
             if (dotIdx > 0) {
                 newFileName = newFileName.substring(0, dotIdx);
             }
-            newFileName += ".mp4";
-            String newHqPath = oldPath.substring(0, oldPath.lastIndexOf('/') + 1) + newFileName;
+            String baseName = newFileName;
+            newFileName = baseName + ".mp4";
             Path newHqFile = hqDir.resolve(newFileName);
+            if (!hqFile.equals(newHqFile) && Files.exists(newHqFile)) {
+                newFileName = baseName + ".transcoded-" + pageId + ".mp4";
+                newHqFile = hqDir.resolve(newFileName);
+            }
+            String newHqPath = oldPath.substring(0, oldPath.lastIndexOf('/') + 1) + newFileName;
 
             // 5. 原子替换：临时文件搬入 HQ（Metis G2）
             Files.move(tempFile, newHqFile, java.nio.file.StandardCopyOption.ATOMIC_MOVE,

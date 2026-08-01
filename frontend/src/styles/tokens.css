@@ -1,24 +1,31 @@
-/* ComicAtlas — Midnight Index
+/* ComicAtlas — Private Screening Room
  * 设计契约：frontend/DESIGN.md
  * 本文件是视觉 token 的唯一真源；组件只能消费 token，不得重复定义颜色。
  */
 
 :root {
   /* 基础色 */
-  --color-canvas: #0e0e0c;
-  --color-surface-1: #151513;
-  --color-surface-2: #1c1c19;
-  --color-surface-3: #25231f;
-  --color-text-1: #f4efe6;
-  --color-text-2: #bcb4a6;
-  --color-text-3: #8a8276;
-  --color-line-subtle: #2b2924;
-  --color-line-strong: #4b463e;
-  --color-brand: #f06a4d;
-  --color-brand-hover: #ff8065;
-  --color-brand-soft: rgb(240 106 77 / 12%);
-  --color-on-brand: #1a0d09;
-  --color-focus: #ffd2c7;
+  --color-canvas: #080808;
+  --color-surface-1: #111111;
+  --color-surface-2: #181818;
+  --color-surface-3: #242424;
+  --color-text-1: #f5f5f1;
+  --color-text-2: #c6c6c2;
+  --color-text-3: #8c8c88;
+  --color-line-subtle: #292929;
+  --color-line-strong: #4a4a4a;
+  --color-brand: #e50914;
+  --color-brand-hover: #f6121d;
+  --color-brand-pale: #ffb3b6;
+  --color-brand-soft: rgb(229 9 20 / 14%);
+  --color-on-brand: #ffffff;
+  --color-focus: #ffffff;
+  --color-overlay-faint: rgb(255 255 255 / 5%);
+  --color-overlay-soft: rgb(255 255 255 / 14%);
+  --color-overlay-hover: rgb(255 255 255 / 22%);
+  --color-overlay-scrim: rgb(0 0 0 / 62%);
+  --color-progress-track: rgb(255 255 255 / 20%);
+  --color-border-faint: rgb(255 255 255 / 8%);
   --color-success: #66c58b;
   --color-warning: #d8a54f;
   --color-danger: #f06b70;
@@ -37,7 +44,7 @@
   --accent: var(--color-brand);
   --accent-hover: var(--color-brand-hover);
   --accent-bg: var(--color-brand-soft);
-  --accent-border: rgb(240 106 77 / 48%);
+  --accent-border: rgb(229 9 20 / 52%);
   --success: var(--color-success);
   --warning: var(--color-warning);
   --danger: var(--color-danger);
@@ -51,20 +58,20 @@
   --text: var(--text-secondary);
 
   /* 字体 */
-  --font-ui: "Source Han Sans VF", "Noto Sans CJK SC", "Noto Sans JP",
+  --font-ui: "Plus Jakarta Sans", "Source Han Sans VF", "Noto Sans CJK SC", "Noto Sans JP",
     "Microsoft YaHei", system-ui, sans-serif;
-  --font-editorial: "Source Han Serif VF", "Noto Serif CJK SC", "Noto Serif JP",
-    "Songti SC", "STSong", serif;
+  --font-editorial: var(--font-ui);
   --mono: "JetBrains Mono", "Cascadia Code", ui-monospace, monospace;
   --sans: var(--font-ui);
   --heading: var(--font-editorial);
   --text-xs: 0.75rem;
+  --text-micro: 0.625rem;
   --text-sm: 0.875rem;
   --text-md: 1rem;
   --text-lg: 1.125rem;
   --text-section: clamp(1.375rem, 2vw, 1.875rem);
   --text-page: clamp(1.75rem, 3vw, 2.5rem);
-  --text-hero: clamp(2rem, 4.2vw, 3.75rem);
+  --text-hero: clamp(2rem, 4.6vw, 4rem);
   --leading-body: 1.7;
   --tracking-kicker: 0.14em;
 
@@ -102,9 +109,50 @@
   --control-min-size: 44px;
   --status-dot-size: 8px;
   --disabled-opacity: 0.55;
-  --sidebar-width: 216px;
-  --nav-height: 64px;
-  --mobile-tabbar-height: 68px;
+  --sidebar-width: 232px;
+  --nav-height: 68px;
+  --mobile-nav-height: 64px;
+  --mobile-tabbar-height: 64px;
+  --mobile-page-gutter: clamp(16px, 4.1vw, 28px);
+  --mobile-search-top: 12px;
+  --mobile-search-width: clamp(138px, 33vw, 218px);
+  --mobile-search-height: 44px;
+  --mobile-library-grid-gap: clamp(12px, 6vw, 40px);
+  --mobile-library-filter-offset: clamp(24px, 15vw, 100px);
+  --mobile-library-filter-gap: clamp(16px, 5.7vw, 38px);
+  --mobile-library-title-gap: clamp(40px, 9vw, 60px);
+  --mobile-library-header-bottom: clamp(32px, 6.6vw, 44px);
+  --mobile-history-row-height: 148px;
+  --mobile-history-card-height: 124px;
+  --mobile-history-thumb-width: 160px;
+  --mobile-history-card-radius: 8px;
+  --mobile-history-play-size: 40px;
+  --mobile-history-play-target-size: 44px;
+  --mobile-history-play-inset: 2px;
+  --mobile-history-play-icon-size: 20px;
+  --mobile-history-end-icon-size: 34px;
+  --mobile-history-brand-size: 32px;
+  --mobile-history-brand-font-size: 24px;
+  --mobile-history-brand-radius: 4px;
+  --mobile-history-tab-indicator-width: 24px;
+  --mobile-history-content-max: 672px;
+  --mobile-history-refresh-icon-size: 24px;
+  --mobile-tab-icon-size: 21px;
+  --mobile-detail-stage-height: clamp(560px, 140vw, 700px);
+  --mobile-detail-poster-width: min(72vw, 350px);
+  --mobile-detail-backdrop-blur: 22px;
+  --mobile-detail-backdrop-scale: 1.12;
+  --mobile-detail-title-size: clamp(26px, 8vw, 38px);
+  --mobile-detail-action-height: 70px;
+  --mobile-detail-action-gap: 44px;
+  --mobile-detail-section-gap: 60px;
+  --mobile-detail-summary-gap: 120px;
+  --mobile-detail-summary-min-height: 230px;
+  --mobile-brand-mark-size: 40px;
+  --mobile-brand-font-size: clamp(17px, 4.5vw, 22px);
+  --mobile-detail-brand-font-size: clamp(15px, 5vw, 24px);
+  --mobile-profile-size: 34px;
+  --tablet-hero-max-height: 720px;
   --page-width: var(--content-max);
   --page-padding: var(--content-gutter);
   --poster-width-sm: 136px;
@@ -117,14 +165,19 @@
   --shadow: 0 8px 24px rgb(0 0 0 / 30%);
   --shadow-lg: 0 16px 48px rgb(0 0 0 / 46%);
   --shadow-mount:
-    inset 0 0 0 1px rgb(244 239 230 / 10%),
-    0 8px 24px rgb(0 0 0 / 30%);
+    inset 0 0 0 1px rgb(255 255 255 / 8%),
+    0 10px 28px rgb(0 0 0 / 46%);
   --shadow-overlay: var(--shadow-lg);
+  --nav-shadow: 0 10px 30px rgb(0 0 0 / 24%);
+  --brand-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 14%),
+    0 6px 18px rgb(229 9 20 / 24%);
+  --title-shadow: 0 3px 24px rgb(0 0 0 / 58%);
   --card-shadow: var(--shadow-mount);
   --card-shadow-hover:
-    inset 0 0 0 1px rgb(244 239 230 / 16%),
-    0 14px 32px rgb(0 0 0 / 38%);
-  --card-hover-scale: 1;
+    inset 0 0 0 1px rgb(255 255 255 / 14%),
+    0 18px 40px rgb(0 0 0 / 58%);
+  --card-hover-scale: 1.025;
 
   /* 动效 */
   --motion-fast: 120ms;
@@ -143,7 +196,22 @@
   --z-dialog: 80;
 
   /* Hero */
+  --nav-gradient: linear-gradient(to bottom, rgb(8 8 8 / 92%), transparent);
+  --nav-solid: rgb(8 8 8 / 96%);
+  --mobile-canvas: #000000;
+  --mobile-tabbar-bg: rgb(0 0 0 / 98%);
+  --mobile-header-scrim: linear-gradient(to bottom, rgb(0 0 0 / 86%), transparent);
+  --mobile-detail-stage-scrim:
+    linear-gradient(to bottom, rgb(0 0 0 / 8%), transparent 45%),
+    linear-gradient(to top, var(--mobile-canvas), transparent 48%);
   --hero-gradient:
-    linear-gradient(to right, rgb(14 14 12 / 98%) 0%, rgb(14 14 12 / 82%) 48%, rgb(14 14 12 / 28%) 100%),
-    linear-gradient(to top, var(--color-canvas) 0%, transparent 52%);
+    linear-gradient(to right, rgb(8 8 8 / 98%) 0%, rgb(8 8 8 / 78%) 46%, rgb(8 8 8 / 24%) 100%),
+    linear-gradient(to top, var(--color-canvas) 0%, transparent 56%),
+    linear-gradient(to bottom, rgb(8 8 8 / 26%) 0%, transparent 32%);
+  --hero-mobile-gradient:
+    linear-gradient(to top, var(--color-canvas) 4%, rgb(8 8 8 / 84%) 28%, transparent 68%),
+    linear-gradient(to right, rgb(8 8 8 / 24%), transparent 72%);
+  --page-atmosphere:
+    radial-gradient(circle at 20% 10%, rgb(255 255 255 / 5%), transparent 22rem),
+    linear-gradient(115deg, transparent 35%, rgb(255 255 255 / 2%) 50%, transparent 65%);
 }

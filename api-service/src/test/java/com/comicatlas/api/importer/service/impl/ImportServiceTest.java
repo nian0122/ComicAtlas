@@ -1,6 +1,7 @@
 package com.comicatlas.api.importer.service.impl;
 
 import com.comicatlas.api.comic.entity.Comic;
+import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.comic.mapper.CatalogMapper;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.comic.mapper.ComicMapper;
@@ -11,6 +12,7 @@ import com.comicatlas.api.importer.dto.BatchImportResultVO;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.event.ImportEventPublisher;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,9 +21,13 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
@@ -41,6 +47,7 @@ class ImportServiceTest {
     @Mock private ImportEventPublisher eventPublisher;
     @Mock private RedisTemplate<String, Object> redisTemplate;
     @Mock private TransactionTemplate transactionTemplate;
+    @Mock private CatalogCacheInvalidator catalogCacheInvalidator;
     @InjectMocks private ImportServiceImpl service;
 
     @BeforeEach
@@ -49,6 +56,15 @@ class ImportServiceTest {
             TransactionCallback<?> callback = invocation.getArgument(0);
             return callback.doInTransaction(null);
         });
+    }
+
+    @AfterEach
+    void tearDownSync() {
+        try {
+            TransactionSynchronizationManager.clearSynchronization();
+        } catch (IllegalStateException ignored) {
+            // 部分测试未初始化同步管理器
+        }
     }
 
     // Test 1: normal batch with 2 paths
@@ -245,5 +261,71 @@ class ImportServiceTest {
 
         ImportTask captured = taskCaptor.getValue();
         assertNotNull(captured.getBatchId());
+    }
+
+    // Test: cancelTask 写 Redis 取消标记
+    @Test
+    void cancelTask_writesRedisCancelKey() {
+        ImportTask t = new ImportTask();
+        t.setId(300L);
+        t.setComicId(100L);
+        t.setStatus("PENDING");
+        when(taskMapper.selectById(300L)).thenReturn(t);
+
+        @SuppressWarnings("unchecked")
+        ValueOperations<String, Object> ops =
+                mock(ValueOperations.class);
+        when(redisTemplate.opsForValue()).thenReturn(ops);
+
+        TransactionSynchronizationManager.initSynchronization();
+        service.cancelTask(300L);
+        TransactionSynchronizationManager.getSynchronizations()
+                .forEach(sync -> sync.afterCommit());
+
+        verify(ops).set(eq("import:cancel:300"), eq("1"), any(Duration.class));
+        verify(eventPublisher).publishCancelTask(300L, 100L);
+    }
+
+    // Test: retryTask 删除 Redis 取消标记
+    @Test
+    void retryTask_deletesRedisCancelKey() {
+        ImportTask t = new ImportTask();
+        t.setId(301L);
+        t.setComicId(100L);
+        t.setStatus("FAILED");
+        t.setSourceType("DIRECTORY");
+        t.setSourcePath("D:/manga/test/comic");
+        t.setRetryCount(0);
+        when(taskMapper.selectById(301L)).thenReturn(t);
+        when(chapterMapper.selectList(any())).thenReturn(List.of());
+
+        TransactionSynchronizationManager.initSynchronization();
+        service.retryTask(301L);
+        TransactionSynchronizationManager.getSynchronizations()
+                .forEach(sync -> sync.afterCommit());
+
+        verify(redisTemplate).delete("import:cancel:301");
+    }
+
+    @Test
+    void retryTask_shouldEvictCatalogCache_whenOldCatalogIsDeleted() {
+        ImportTask task = new ImportTask();
+        task.setId(10L);
+        task.setComicId(20L);
+        task.setStatus("FAILED");
+        task.setRetryCount(0);
+        task.setSourceType("DIRECTORY");
+        task.setSourcePath("D:/manga/test/retry");
+        when(taskMapper.selectById(10L)).thenReturn(task);
+        when(chapterMapper.selectList(any())).thenReturn(List.of());
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            service.retryTask(10L);
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+
+        verify(catalogCacheInvalidator).evict(20L);
     }
 }

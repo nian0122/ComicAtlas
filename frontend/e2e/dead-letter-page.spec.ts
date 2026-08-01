@@ -1,7 +1,5 @@
 import { expect, test, type Page, type Route } from '@playwright/test'
 
-const credentials = Buffer.from('user:secret').toString('base64')
-
 test.setTimeout(60_000)
 
 const queues = [
@@ -27,16 +25,8 @@ test.beforeEach(async ({ page }) => {
   await page.route('**/api/admin/dlq/**', handleDlqRequest)
 })
 
-test('需要凭据，并提供只读预览与受确认保护的批量重放', async ({ page }) => {
+test('无需凭据即可查看、预览和重放死信', async ({ page }) => {
   await page.goto('/manage/dlq?force-desktop=1')
-
-  await expect(page.getByRole('heading', { name: '验证管理凭据' })).toBeVisible()
-  await page.getByPlaceholder('输入服务启动时生成或配置的密码').fill('wrong')
-  await page.getByRole('button', { name: '连接管理接口' }).click()
-  await expect(page.getByRole('alert')).toContainText('凭据无效')
-
-  await page.getByPlaceholder('输入服务启动时生成或配置的密码').fill('secret')
-  await page.getByRole('button', { name: '连接管理接口' }).click()
 
   await expect(page.getByRole('heading', { name: '队列账册' })).toBeVisible()
   await expect(page.getByText('4', { exact: true })).toBeVisible()
@@ -53,11 +43,6 @@ test('需要凭据，并提供只读预览与受确认保护的批量重放', as
 
 async function handleDlqRequest(route: Route) {
   const request = route.request()
-  if (request.headers()['authorization'] !== `Basic ${credentials}`) {
-    await route.fulfill({ status: 401, body: '' })
-    return
-  }
-
   const url = new URL(request.url())
   if (request.method() === 'GET' && url.pathname.endsWith('/queues')) {
     await json(route, queues)

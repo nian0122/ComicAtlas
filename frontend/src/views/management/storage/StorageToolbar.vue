@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElSelect, ElOption, ElInput } from 'element-plus'
 
 interface Filter {
@@ -16,14 +17,18 @@ interface Sort {
 const props = defineProps<{
   filter: Filter
   sort: Sort
-  scanning?: boolean
 }>()
+
+const router = useRouter()
 
 const emit = defineEmits<{
   'update:filter': [value: Filter]
   'update:sort': [value: Sort]
-  scanRecover: []
 }>()
+
+function goToTaskCenter() {
+  router.push('/manage/import/tasks')
+}
 
 function setFilter(patch: Partial<Filter>) {
   emit('update:filter', { ...props.filter, ...patch })
@@ -40,7 +45,7 @@ const sortModel = computed({
     <section class="action-section">
       <h2 class="section-title">操作</h2>
       <div class="action-list">
-        <button class="action-btn" :disabled="scanning" @click="emit('scanRecover')">{{ scanning ? '扫描中...' : '扫描并恢复' }}</button>
+        <button class="action-btn primary" @click="goToTaskCenter">在任务中心中恢复</button>
         <button class="action-btn danger" disabled>清理未引用文件</button>
       </div>
     </section>

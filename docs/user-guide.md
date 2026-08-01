@@ -23,6 +23,9 @@ Windows 用户建议使用正斜杠书写路径，例如 `D:/manga`，并确认 
 
 ```dotenv
 MANGA_ROOT=D:/manga
+MYSQL_ROOT_PASSWORD=请设置强密码
+REMOTE_MYSQL_USER=comicatlas
+REMOTE_MYSQL_PASSWORD=请设置强密码
 REMOTE_NACOS_USERNAME=nacos
 REMOTE_NACOS_PASSWORD=nacos
 REMOTE_REDIS_PORT=6379
@@ -41,11 +44,18 @@ D:/manga/metadata
 D:/manga/temp
 ```
 
-启动或准备好 Redis、RabbitMQ、Nacos 后，再启动应用：
+基础服务与项目服务使用不同的 Compose 文件。需要在当前主机运行基础服务时执行：
 
 ```bash
-docker compose up -d --build
-docker compose ps
+docker compose -f docker-compose.infra.yml up -d
+docker compose -f docker-compose.infra.yml ps
+```
+
+基础服务准备好后，再启动项目服务：
+
+```bash
+docker compose -f docker-compose.yml up -d --build
+docker compose -f docker-compose.yml ps
 ```
 
 访问地址：
@@ -54,7 +64,7 @@ docker compose ps
 - 管理后台：`http://localhost/manage`
 - Gateway/API：`http://localhost:8000`
 
-如果基础设施运行在远程主机，可使用仓库中的 `tools/start-remote-infra-tunnel.ps1` 建立 SSH 隧道，并让 Docker 容器通过 `host.docker.internal` 访问宿主机端口。
+`docker-compose.infra.yml` 包含 MySQL、Redis、RabbitMQ 和 Nacos，端口号保持为 3306、6379、5672、15672、8848、9848，并只绑定主机回环地址。如果基础设施运行在远程主机，本地不启动该文件；使用仓库中的 `tools/start-remote-infra-tunnel.ps1` 建立 SSH 隧道，让项目容器通过 `host.docker.internal` 访问宿主机映射端口。
 
 ## 三、导入漫画
 
@@ -128,6 +138,62 @@ PENDING → PARSING → IMPORTING → SUCCESS
 MANGA_ROOT/hq/{comicId}/{chapterId}/文件名
 MANGA_ROOT/lq/{comicId}/{chapterId}/文件名
 ```
+
+### 从存储恢复数据库记录
+
+当数据库中的漫画记录被意外删除（例如通过"仅删除数据库"操作），但 HQ 磁盘文件仍然完好时，可以使用恢复任务从 HQ 文件重建数据库记录。这相当于"用文件反向恢复数据库"。
+
+#### 适用场景
+
+- 数据库记录被删除，但 `MANGA_ROOT/hq/` 下的漫画文件仍然存在。
+- 迁移存储后需要重建数据库目录。
+- 意外数据丢失后的批量恢复。
+
+> **不适用**：如果文件已通过 `DELETE_FILES` 模式删除，恢复任务无法找回已删除的文件。删除文件前请务必确认备份。
+
+#### 操作步骤
+
+1. 登录管理后台，进入**任务中心**（`/manage/import/tasks`）。
+2. 在任务中心页面找到并点击 **"从存储恢复数据库记录"** 按钮。
+3. 在弹出的确认对话框中点击"确认"。
+4. 任务创建后自动进入异步处理：
+   - PENDING：任务已创建，等待 Worker 扫描 HQ 目录。
+   - RUNNING：Worker 已完成扫描，API 正在逐本恢复数据库记录。
+   - SUCCESS：全部漫画处理完成。
+   - FAILED：扫描或恢复过程出现错误，可重试。
+
+处理过程中，任务详情页会实时更新计数器（total / recovered / skipped / placeholder / error），无需刷新页面即可查看进度。
+
+#### 处理结果解读
+
+| 计数 | 含义 |
+|------|------|
+| totalComics | HQ 目录下扫描到的漫画目录总数 |
+| recoveredComics | 有 metadata 文件且成功恢复的漫画数（状态 READY，可在漫画库查看） |
+| skippedComics | 数据库已有记录，跳过的漫画数 |
+| placeholderComics | 找不到 metadata 文件时创建的占位漫画数（标题为"未知漫画 {comicId}"，不参与普通列表） |
+| errorComics | 处理异常的漫画数（例如 metadata 文件损坏等） |
+
+成功恢复的漫画会立即出现在漫画库的漫画列表中。PLACEHOLDER 漫画可通过筛选状态 `PLACEHOLDER` 在管理后台查看，需要手动补全元数据后再在列表中正常显示。
+
+#### 限制与注意事项
+
+- **同一时刻仅允许一个恢复任务运行**。创建时若有 PENDING 或 RUNNING 状态的任务，会返回"已有恢复任务正在执行"提示。
+- **不支持取消**。恢复任务创建后必须等待至终态（SUCCESS 或 FAILED），无法中途取消。
+- **仅恢复有 HQ 文件的漫画**。PLACEHOLDER 漫画无封面图片和章节信息，不会出现在用户端列表中。
+- **不依赖 metadata 文件就能创建 PLACEHOLDER**，但完整信息（章节、页面顺序、视频元数据等）仅能通过 metadata 恢复。
+- 大量漫画时恢复流程可能耗时较长，请耐心等待。可以通过任务详情页的计数器观察进度。
+
+#### 重试
+
+失败的任务可以点击"重试"按钮重新执行。重试时状态从 FAILED 重置为 PENDING，`retryCount` 递增，并重新通过 MQ 下发到 Worker。
+
+如果重试后仍然失败，请检查 Worker 日志了解具体错误原因。常见失败原因包括：
+- HQ 目录不可读或权限不足。
+- RabbitMQ 连接异常。
+- metadata 文件格式损坏（针对部分漫画报 error，但不会阻塞其他漫画）。
+
+
 
 ## 六、常见问题
 

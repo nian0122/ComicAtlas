@@ -18,12 +18,13 @@ public class TranscodeFailedHandler {
 
     private final MediaMapper mediaMapper;
 
-    @RabbitListener(queues = "video.transcode.result.queue")
+    @RabbitListener(queues = "video.transcode.failed.queue")
     public void handleFailed(VideoTranscodeFailedEvent event,
             Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         try {
             Media media = mediaMapper.selectById(event.pageId());
-            if (media == null || !"PROCESSING".equals(media.getTranscodeStatus())) {
+            if (media == null || !"PENDING".equals(media.getTranscodeStatus())) {
+                log.warn("TranscodeFailed: page not in PENDING, skip. pageId={}", event.pageId());
                 channel.basicAck(tag, false);
                 return;
             }

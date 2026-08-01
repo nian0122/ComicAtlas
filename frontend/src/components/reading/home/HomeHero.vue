@@ -4,6 +4,7 @@
     :poster-url="posterUrl"
     :title="title"
     :subtitle="subtitle"
+    :description="description"
     :primary-action="primaryAction"
     :secondary-action="secondaryAction"
   />
@@ -40,26 +41,33 @@ const subtitle = computed(() => {
   return `第 ${chapterNo} 章 · 第 ${pageNumber}/${totalPages} 页${progressText}`
 })
 
+const description = computed(() =>
+  props.historyItem
+    ? '继续上次的进度，在属于你的私人漫画仓库中沉浸阅读。'
+    : '从私人收藏中挑选一部作品，开启你的下一场漫画放映。'
+)
+
 const primaryAction = computed(() => {
   if (props.historyItem) {
     const { chapterId, pageNumber } = props.historyItem
-      return {
-        label: '继续阅读',
-        onClick: () => router.push(`/reader/${chapterId}?page=${pageNumber}`),
-      }
-    }
     return {
-      label: '浏览漫画库',
-      onClick: () => router.push('/library'),
+      label: '继续阅读',
+      onClick: () => router.push(`/reader/${chapterId}?page=${pageNumber}`),
     }
-  })
+  }
+  return {
+    label: '浏览漫画库',
+    onClick: () => router.push('/library'),
+  }
+})
 
 const secondaryAction = computed(() => {
-  if (props.historyItem) {
-      return {
-        label: '详情',
-        onClick: () => router.push(`/comic/${props.historyItem!.comicId}`),
-      }
+  const historyItem = props.historyItem
+  if (historyItem) {
+    return {
+      label: '作品详情',
+      onClick: () => router.push(`/comic/${historyItem.comicId}`),
+    }
   }
   return undefined
 })

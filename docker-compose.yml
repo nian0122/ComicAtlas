@@ -1,48 +1,4 @@
 services:
-  mysql:
-    image: mysql:8.0
-    container_name: comicatlas-mysql
-    restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: comic_atlas
-    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
-    ports:
-      - "3306:3306"
-    volumes:
-      - mysql-data:/var/lib/mysql
-
-  # redis:
-  #   image: redis:7-alpine
-  #   container_name: comicatlas-redis
-  #   restart: unless-stopped
-  #   ports:
-  #     - "6379:6379"
-
-  # rabbitmq:
-  #   image: rabbitmq:3.13-management-alpine
-  #   container_name: comicatlas-rabbitmq
-  #   restart: unless-stopped
-  #   environment:
-  #     RABBITMQ_DEFAULT_USER: guest
-  #     RABBITMQ_DEFAULT_PASS: guest
-  #     RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-rabbit consumer_timeout 86400000"
-  #   ports:
-  #     - "5672:5672"
-  #     - "15672:15672"
-
-  # nacos:
-  #   image: nacos/nacos-server:v2.3.1
-  #   container_name: comicatlas-nacos
-  #   restart: unless-stopped
-  #   environment:
-  #     MODE: standalone
-  #     NACOS_AUTH_ENABLE: "false"
-  #   ports:
-  #     - "8848:8848"
-  #     - "9848:9848"
-
-  # 远端中间件(redis/rabbitmq/nacos)通过 SSH 隧道访问，Gateway 连 host.docker.internal
   gateway:
     build:
       context: .
@@ -66,7 +22,9 @@ services:
       NACOS_ADDR: host.docker.internal:8848
       NACOS_USER: ${REMOTE_NACOS_USERNAME}
       NACOS_PASS: ${REMOTE_NACOS_PASSWORD}
-      MYSQL_HOST: mysql
+      MYSQL_HOST: host.docker.internal
+      MYSQL_USER: ${REMOTE_MYSQL_USER}
+      MYSQL_PASS: ${REMOTE_MYSQL_PASSWORD}
       REDIS_HOST: host.docker.internal
       REDIS_PORT: ${REMOTE_REDIS_PORT}
       REDIS_PASS: ${REMOTE_REDIS_PASSWORD}
@@ -82,9 +40,6 @@ services:
       - ${MANGA_ROOT:-./manga}/hq:/storage/hq:ro
       - ${MANGA_ROOT:-./manga}/lq:/storage/lq:ro
       - ${MANGA_ROOT:-./manga}/thumbs:/storage/thumbs:ro
-    depends_on:
-      - mysql
-
   # worker-service:
   #   build:
   #     context: .
@@ -122,6 +77,3 @@ services:
       - ${MANGA_ROOT:-./manga}/thumbs:/storage/thumbs:ro
     depends_on:
       - gateway
-
-volumes:
-  mysql-data:
