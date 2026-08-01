@@ -1,6 +1,8 @@
 package com.comicatlas.api.comic.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.comicatlas.api.comic.cache.CacheEvictor;
+import com.comicatlas.api.comic.cache.ComicReferenceCache;
 import com.comicatlas.api.comic.dto.TagDTO;
 import com.comicatlas.api.comic.entity.ComicTag;
 import com.comicatlas.api.comic.entity.Tag;
@@ -9,6 +11,7 @@ import com.comicatlas.api.comic.mapper.TagMapper;
 import com.comicatlas.api.comic.service.TagService;
 import com.comicatlas.api.common.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,8 +23,13 @@ public class TagServiceImpl implements TagService {
 
     private final TagMapper tagMapper;
     private final ComicTagMapper comicTagMapper;
+    private final CacheEvictor cacheEvictor;
 
     @Override
+    @Cacheable(
+        cacheNames = ComicReferenceCache.TAGS,
+        key = "'" + ComicReferenceCache.ALL_KEY + "'",
+        unless = "#result == null || #result.isEmpty()")
     public List<TagDTO> listTags() {
         List<Tag> tags = tagMapper.selectList(null);
         return tags.stream().map(this::toDTO).toList();
@@ -40,6 +48,7 @@ public class TagServiceImpl implements TagService {
         Tag tag = new Tag();
         tag.setName(name);
         tagMapper.insert(tag);
+        cacheEvictor.evict(ComicReferenceCache.TAGS, ComicReferenceCache.ALL_KEY);
         return toDTO(tag);
     }
 
@@ -59,6 +68,7 @@ public class TagServiceImpl implements TagService {
         }
 
         tagMapper.deleteById(id);
+        cacheEvictor.evict(ComicReferenceCache.TAGS, ComicReferenceCache.ALL_KEY);
     }
 
     private TagDTO toDTO(Tag tag) {

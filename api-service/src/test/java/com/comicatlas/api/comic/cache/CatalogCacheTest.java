@@ -178,7 +178,8 @@ class CatalogCacheTest {
         RedisCacheManager redisCacheManager = assertInstanceOf(
                 RedisCacheManager.class,
                 redisConfig.cacheManager(
-                        mock(RedisConnectionFactory.class), Duration.ofMinutes(12)));
+                        mock(RedisConnectionFactory.class), Duration.ofMinutes(12),
+                        Duration.ofMinutes(30), Duration.ofSeconds(60)));
         redisCacheManager.afterPropertiesSet();
 
         assertEquals(
