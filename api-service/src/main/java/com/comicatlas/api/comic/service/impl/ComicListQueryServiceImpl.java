@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.api.comic.cache.ComicReferenceCache;
+import com.comicatlas.api.comic.dto.ComicListPage;
 import com.comicatlas.api.comic.dto.ComicListQuery;
 import com.comicatlas.api.comic.dto.ComicListVO;
 import com.comicatlas.api.comic.entity.Category;
@@ -37,16 +38,26 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
     private final FileUrlResolver fileUrlResolver;
 
     @Override
+    public IPage<ComicListVO> listComics(ComicListQuery query) {
+        return loadPage(query).toPage();
+    }
+
+    /**
+     * 查询一页漫画并缓存纯数据 DTO。
+     * 缓存的是 ComicListPage（records + 分页元数据），而非 MyBatis-Plus IPage，
+     * 避免把分页对象内部执行状态序列化进 Redis。
+     */
     @Cacheable(
         cacheNames = ComicReferenceCache.COMIC_LIST,
         key = "#root.target.cacheKey(#query)",
         unless = "#result == null || #result.getRecords().isEmpty()")
-    public IPage<ComicListVO> listComics(ComicListQuery query) {
+    public ComicListPage loadPage(ComicListQuery query) {
         Page<Comic> page = new Page<>(query.getPage(), query.getSize());
         IPage<Comic> result = comicMapper.selectPage(page, query);
         List<Comic> comics = result.getRecords();
         if (comics.isEmpty()) {
-            return result.convert(comic -> toListVO(comic, Map.of(), Map.of()));
+            IPage<ComicListVO> emptyPage = result.convert(comic -> toListVO(comic, Map.of(), Map.of()));
+            return ComicListPage.from(emptyPage);
         }
 
         List<Long> categoryIds = comics.stream()
@@ -65,7 +76,8 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
                 .stream()
                 .collect(Collectors.toMap(ReadingHistory::getComicId, history -> history));
 
-        return result.convert(comic -> toListVO(comic, categoryNames, histories));
+        IPage<ComicListVO> voPage = result.convert(comic -> toListVO(comic, categoryNames, histories));
+        return ComicListPage.from(voPage);
     }
 
     /**
