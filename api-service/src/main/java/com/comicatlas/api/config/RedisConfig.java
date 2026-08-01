@@ -4,6 +4,8 @@ import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.comic.cache.ComicReferenceCache;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
+import com.fasterxml.jackson.databind.jsontype.PolymorphicTypeValidator;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,13 +33,18 @@ import java.util.Map;
 @Slf4j
 public class RedisConfig implements CachingConfigurer {
 
-    /** Redis 值序列化器：注册 JSR-310 模块以支持 LocalDateTime 等 Java 8 时间类型。 */
+    /** Redis 值序列化器：启用默认类型信息（@class）+ JSR-310 模块。缓存值统一为纯数据 DTO，类型信息仅用于反序列化为具体类。 */
     private static final GenericJackson2JsonRedisSerializer VALUE_SERIALIZER =
             new GenericJackson2JsonRedisSerializer(cacheObjectMapper());
 
     private static ObjectMapper cacheObjectMapper() {
+        PolymorphicTypeValidator ptv = BasicPolymorphicTypeValidator.builder()
+                .allowIfSubType("com.comicatlas.")
+                .allowIfSubType("java.util.")
+                .build();
         return JsonMapper.builder()
                 .addModule(new JavaTimeModule())
+                .activateDefaultTyping(ptv, ObjectMapper.DefaultTyping.NON_FINAL)
                 .build();
     }
 
