@@ -7,11 +7,13 @@ import com.comicatlas.api.admin.dto.RefreshMetadataResult;
 import com.comicatlas.api.admin.dto.RecoveryProgress;
 import com.comicatlas.api.admin.dto.ScanRecoverResultDTO;
 import com.comicatlas.api.admin.dto.StorageStatsDTO;
+import com.comicatlas.api.admin.mapper.StorageMapper;
 import com.comicatlas.api.admin.recovery.RecoveryEngine;
 import com.comicatlas.api.admin.recovery.ScannedMediaInfo;
 import com.comicatlas.api.admin.service.AdminService;
 import com.comicatlas.api.admin.service.MetadataExporter;
 import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
+import com.comicatlas.api.comic.cache.ComicReferenceCache;
 import com.comicatlas.api.comic.entity.*;
 import com.comicatlas.common.event.MetadataRefreshEvent;
 import com.comicatlas.common.event.VideoMetadataFixRequestedEvent;
@@ -25,6 +27,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -48,6 +51,7 @@ public class AdminServiceImpl implements AdminService {
     private final ComicTagMapper comicTagMapper;
     private final ReadingHistoryMapper historyMapper;
     private final ImportTaskMapper taskMapper;
+    private final StorageMapper storageMapper;
     private final TransactionTemplate transactionTemplate;
     private final MetadataExporter metadataExporter;
     private final RabbitTemplate rabbitTemplate;
@@ -131,24 +135,18 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
+    @Cacheable(
+        cacheNames = ComicReferenceCache.STORAGE_STATS,
+        key = "'" + ComicReferenceCache.ALL_KEY + "'",
+        unless = "#result == null")
     public StorageStatsDTO getStorageStats() {
-        StorageStatsDTO stats = new StorageStatsDTO();
-        Path hqRoot = Path.of(mangaRoot, "hq");
-        Path lqRoot = Path.of(mangaRoot, "lq");
-        Path thumbRoot = Path.of(mangaRoot, "thumbs");
-
-        stats.setHqBytes(dirSize(hqRoot));
-        stats.setLqBytes(dirSize(lqRoot));
-        stats.setThumbBytes(dirSize(thumbRoot));
-
-        try (var dirs = Files.newDirectoryStream(hqRoot, Files::isDirectory)) {
-            int count = 0;
-            for (Path ignored : dirs) count++;
-            stats.setComicCount(count);
-        } catch (Exception e) {
-            log.warn("统计漫画数量失败", e);
+        StorageStatsDTO stats = storageMapper.selectStorageStats();
+        if (stats == null) {
+            stats = new StorageStatsDTO();
         }
-
+        Path thumbRoot = Path.of(mangaRoot, "thumbs");
+        stats.setThumbBytes(dirSize(thumbRoot));
+        stats.setComicCount((int) storageMapper.countActiveComics());
         return stats;
     }
 
