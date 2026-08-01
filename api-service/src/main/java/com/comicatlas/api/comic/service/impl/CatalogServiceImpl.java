@@ -1,6 +1,7 @@
 package com.comicatlas.api.comic.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.comic.dto.CatalogNode;
 import com.comicatlas.api.comic.dto.ChapterRef;
 import com.comicatlas.api.comic.entity.Catalog;
@@ -9,6 +10,7 @@ import com.comicatlas.api.comic.mapper.CatalogMapper;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.comic.service.CatalogService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -22,6 +24,10 @@ public class CatalogServiceImpl implements CatalogService {
     private final ChapterMapper chapterMapper;
 
     @Override
+    @Cacheable(
+        cacheNames = CatalogCacheInvalidator.CACHE_NAME,
+        key = "#comicId",
+        unless = "#result == null || #result.isEmpty()")
     public List<CatalogNode> buildTree(Long comicId) {
         var catalogs = catalogMapper.selectList(
             new LambdaQueryWrapper<Catalog>().eq(Catalog::getComicId, comicId).orderByAsc(Catalog::getSortOrder));
@@ -33,7 +39,12 @@ public class CatalogServiceImpl implements CatalogService {
                 ch.getId(), ch.getChapterNo(), ch.getTitle(),
                 ch.getGlobalOrder(), ch.getPageCount(), null
             )).collect(Collectors.toList());
-            return refs.isEmpty() ? List.of() : List.of(new CatalogNode(null, null, List.of(), refs));
+            if (refs.isEmpty()) {
+                return List.of();
+            }
+            List<CatalogNode> roots = new ArrayList<>();
+            roots.add(new CatalogNode(null, null, new ArrayList<>(), refs));
+            return roots;
         }
 
         Map<Long, CatalogNode> nodeMap = new HashMap<>();

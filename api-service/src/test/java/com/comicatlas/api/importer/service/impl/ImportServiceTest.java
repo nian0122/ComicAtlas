@@ -1,6 +1,7 @@
 package com.comicatlas.api.importer.service.impl;
 
 import com.comicatlas.api.comic.entity.Comic;
+import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.comic.mapper.CatalogMapper;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.comic.mapper.ComicMapper;
@@ -46,6 +47,7 @@ class ImportServiceTest {
     @Mock private ImportEventPublisher eventPublisher;
     @Mock private RedisTemplate<String, Object> redisTemplate;
     @Mock private TransactionTemplate transactionTemplate;
+    @Mock private CatalogCacheInvalidator catalogCacheInvalidator;
     @InjectMocks private ImportServiceImpl service;
 
     @BeforeEach
@@ -303,5 +305,27 @@ class ImportServiceTest {
                 .forEach(sync -> sync.afterCommit());
 
         verify(redisTemplate).delete("import:cancel:301");
+    }
+
+    @Test
+    void retryTask_shouldEvictCatalogCache_whenOldCatalogIsDeleted() {
+        ImportTask task = new ImportTask();
+        task.setId(10L);
+        task.setComicId(20L);
+        task.setStatus("FAILED");
+        task.setRetryCount(0);
+        task.setSourceType("DIRECTORY");
+        task.setSourcePath("D:/manga/test/retry");
+        when(taskMapper.selectById(10L)).thenReturn(task);
+        when(chapterMapper.selectList(any())).thenReturn(List.of());
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            service.retryTask(10L);
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+
+        verify(catalogCacheInvalidator).evict(20L);
     }
 }

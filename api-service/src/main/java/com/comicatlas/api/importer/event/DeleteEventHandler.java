@@ -1,6 +1,7 @@
 package com.comicatlas.api.importer.event;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.comic.entity.*;
 import com.comicatlas.api.comic.mapper.*;
 import com.comicatlas.common.event.DeleteCompletedEvent;
@@ -25,6 +26,7 @@ public class DeleteEventHandler {
     private final ChapterMapper chapterMapper;
     private final MediaMapper mediaMapper;
     private final TransactionTemplate transactionTemplate;
+    private final CatalogCacheInvalidator catalogCacheInvalidator;
 
     @RabbitListener(queues = "delete.result.queue")
     public void handleDeleteCompleted(DeleteCompletedEvent event,
@@ -54,6 +56,7 @@ public class DeleteEventHandler {
                     comicMapper.updateById(comic);
                 }
             });
+            catalogCacheInvalidator.evict(comicId);
 
             channel.basicAck(tag, false);
             log.info("DeleteCompleted DB cleaned: comicId={}", comicId);
