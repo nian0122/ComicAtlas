@@ -1,6 +1,7 @@
 package com.comicatlas.api.config;
 
 import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
+import com.comicatlas.api.comic.cache.ComicReferenceCache;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.Cache;
@@ -19,6 +20,7 @@ import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.Map;
 
 @EnableCaching
@@ -37,18 +39,24 @@ public class RedisConfig implements CachingConfigurer {
     @Bean
     public CacheManager cacheManager(
             RedisConnectionFactory factory,
-            @Value("${comic.cache.catalog-ttl:30m}") Duration catalogTtl) {
-        RedisCacheConfiguration catalogCache = RedisCacheConfiguration.defaultCacheConfig()
-                .entryTtl(catalogTtl)
+            @Value("${comic.cache.catalog-ttl:30m}") Duration catalogTtl,
+            @Value("${comic.cache.reference-ttl:30m}") Duration referenceTtl,
+            @Value("${comic.cache.list-ttl:60s}") Duration listTtl) {
+        RedisCacheConfiguration baseConfig = RedisCacheConfiguration.defaultCacheConfig()
                 .disableCachingNullValues()
                 .serializeKeysWith(RedisSerializationContext.SerializationPair
                         .fromSerializer(new StringRedisSerializer()))
                 .serializeValuesWith(RedisSerializationContext.SerializationPair
                         .fromSerializer(new GenericJackson2JsonRedisSerializer()));
 
+        Map<String, RedisCacheConfiguration> cacheConfigs = new HashMap<>();
+        cacheConfigs.put(CatalogCacheInvalidator.CACHE_NAME, baseConfig.entryTtl(catalogTtl));
+        cacheConfigs.put(ComicReferenceCache.CATEGORIES, baseConfig.entryTtl(referenceTtl));
+        cacheConfigs.put(ComicReferenceCache.TAGS, baseConfig.entryTtl(referenceTtl));
+        cacheConfigs.put(ComicReferenceCache.COMIC_LIST, baseConfig.entryTtl(listTtl));
+
         return RedisCacheManager.builder(factory)
-                .withInitialCacheConfigurations(Map.of(
-                        CatalogCacheInvalidator.CACHE_NAME, catalogCache))
+                .withInitialCacheConfigurations(cacheConfigs)
                 .build();
     }
 
