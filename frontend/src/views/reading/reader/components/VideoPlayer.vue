@@ -10,8 +10,25 @@
       @click="handleActivate"
       data-reader-interactive
     >
-      <el-icon :size="32"><VideoPlay /></el-icon>
-      <span v-if="duration" class="video-duration">{{ formatDuration(duration) }}</span>
+      <!-- 预览帧：静音、暂停的 <video> 加载首帧画面，仅取 metadata + 首帧，不持续下载 -->
+      <video
+        ref="previewRef"
+        class="video-preview"
+        :src="hqUrl"
+        muted
+        playsinline
+        preload="metadata"
+        @loadedmetadata="onPreviewMetadata"
+        @seeked="onPreviewSeeked"
+        @error="onPreviewError"
+      />
+      <div
+        class="video-placeholder-overlay"
+        :class="{ 'preview-ready': previewReady }"
+      >
+        <el-icon v-if="!previewReady" :size="32"><VideoPlay /></el-icon>
+        <span v-if="duration" class="video-duration">{{ formatDuration(duration) }}</span>
+      </div>
     </div>
 
     <!-- ============================================================
@@ -105,6 +122,12 @@ const error = ref(false)
 
 const videoRef = ref<HTMLVideoElement | null>(null)
 
+/** 预览用 <video>（placeholder 状态加载首帧画面）。 */
+const previewRef = ref<HTMLVideoElement | null>(null)
+
+/** 首帧是否已成功显示（用于控制占位 overlay 是否隐藏图标层）。 */
+const previewReady = ref(false)
+
 /** Video native dimensions populated by loadedmetadata (fallback aspect ratio). */
 const nativeWidth = ref(0)
 const nativeHeight = ref(0)
@@ -157,6 +180,14 @@ async function handleActivate(): Promise<void> {
   error.value = false
   activated.value = true
   playerState.value = 'loading'
+  previewReady.value = false
+
+  // 释放预览 <video> 资源（src 切走后 seek/播放帧不再占用内存）
+  const preview = previewRef.value
+  if (preview !== null) {
+    preview.removeAttribute('src')
+    preview.load()
+  }
 
   await nextTick()
 
@@ -210,6 +241,7 @@ function unloadVideo(reason: string, mediaIdToSave?: number): void {
   activated.value = false
   error.value = false
   playerState.value = 'placeholder'
+  previewReady.value = false
 }
 
 defineExpose({ unloadVideo })
@@ -231,6 +263,26 @@ async function handleRetry(): Promise<void> {
 function onError(): void {
   error.value = true
   playerState.value = 'error'
+}
+
+function onPreviewMetadata(): void {
+  const video = previewRef.value
+  if (video === null) return
+  // 定位到首帧（0.1s 而非 0，部分编码器在 0 处无关键帧）
+  try {
+    video.currentTime = 0.1
+  } catch {
+    // 某些容器不支持 seek，忽略——保持图标占位
+  }
+}
+
+function onPreviewSeeked(): void {
+  previewReady.value = true
+}
+
+function onPreviewError(): void {
+  // 预览帧加载失败不阻塞播放——用户仍可点击激活完整播放
+  previewReady.value = false
 }
 
 function onMetadata(event: Event): void {
@@ -404,6 +456,7 @@ watch(
 /* ------------------------------------------------------------------ */
 
 .video-placeholder {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -421,6 +474,35 @@ watch(
 
 .video-placeholder:hover {
   opacity: 0.8;
+}
+
+/* 预览帧：填满占位区，contain 保持完整画面 */
+.video-preview {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* 覆盖层：预览就绪后仅保留时长角标，隐藏播放图标 */
+.video-placeholder-overlay {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.video-placeholder-overlay.preview-ready {
+  justify-content: flex-end;
+  padding-bottom: var(--space-xs);
+  background: linear-gradient(transparent 60%, rgba(0, 0, 0, 0.45));
 }
 
 .video-duration {
