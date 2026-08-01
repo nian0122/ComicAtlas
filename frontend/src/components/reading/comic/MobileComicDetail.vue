@@ -13,7 +13,7 @@
           <span>{{ totalChapters }} 话</span>
           <span>{{ comic.pageCount }} 页</span>
         </div>
-        <div v-if="comic.tags.length" class="tags" aria-label="漫画标签">
+        <div v-if="comic.tags && comic.tags.length" class="tags" aria-label="漫画标签">
           <span v-for="tag in comic.tags" :key="tag.name">{{ tag.name }}</span>
         </div>
       </header>
