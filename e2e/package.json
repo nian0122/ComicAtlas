@@ -1,0 +1,17 @@
+{
+  "name": "comicatlas-e2e",
+  "version": "1.0.0",
+  "description": "ComicAtlas E2E tests with Playwright",
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "report": "playwright show-report report"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@playwright/test": "^1.61.1"
+  }
+}
