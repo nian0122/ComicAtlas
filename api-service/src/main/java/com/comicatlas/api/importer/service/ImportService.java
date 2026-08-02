@@ -6,7 +6,6 @@ import com.comicatlas.api.importer.dto.BatchImportResultVO;
 import com.comicatlas.api.importer.dto.ImportRequest;
 import com.comicatlas.api.importer.dto.ImportStatusVO;
 import com.comicatlas.api.importer.dto.ImportTaskVO;
-import com.comicatlas.api.importer.dto.ScanResultVO;
 
 public interface ImportService {
     ImportTaskVO createImportTask(ImportRequest request);
@@ -15,6 +14,5 @@ public interface ImportService {
     ImportStatusVO getTaskStatus(Long id);
     void cancelTask(Long id);
     void retryTask(Long id);
-    ScanResultVO scanDirectories(String parentPath, String sourceType);
     BatchImportResultVO createBatchImportTasks(BatchImportRequest request);
 }

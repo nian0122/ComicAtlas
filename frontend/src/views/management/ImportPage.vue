@@ -300,7 +300,7 @@ async function doScan() {
   scanError.value = ''
   selectedPaths.value = []
   try {
-    const result = await store.scan(path, 'DIRECTORY')
+    const result = await store.scan(path)
     scanResult.value = result as ScanResultVO
     if (!result || result.total === 0) {
       scanError.value = ''
