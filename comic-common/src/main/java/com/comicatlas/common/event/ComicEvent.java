@@ -34,6 +34,9 @@ import java.util.UUID;
     @JsonSubTypes.Type(value = RecoveryCompletedEvent.class, name = "RecoveryCompletedEvent"),
     @JsonSubTypes.Type(value = RecoveryFailedEvent.class, name = "RecoveryFailedEvent"),
     @JsonSubTypes.Type(value = RecoveryScanCompletedEvent.class, name = "RecoveryScanCompletedEvent"),
+    @JsonSubTypes.Type(value = DirectoryScanRequestedEvent.class, name = "DirectoryScanRequestedEvent"),
+    @JsonSubTypes.Type(value = DirectoryScanCompletedEvent.class, name = "DirectoryScanCompletedEvent"),
+    @JsonSubTypes.Type(value = DirectoryScanFailedEvent.class, name = "DirectoryScanFailedEvent"),
 })
 public sealed interface ComicEvent
     permits ImportTaskCreatedEvent, ImportTaskCompletedEvent, ImportTaskFailedEvent,
@@ -46,7 +49,8 @@ public sealed interface ComicEvent
             VideoTranscodeFailedEvent, MetadataRefreshEvent,
             VideoMetadataFixRequestedEvent, VideoMetadataFixCompletedEvent,
             RecoveryRequestedEvent, RecoveryProgressEvent, RecoveryCompletedEvent,
-            RecoveryFailedEvent, RecoveryScanCompletedEvent {
+            RecoveryFailedEvent, RecoveryScanCompletedEvent,
+            DirectoryScanRequestedEvent, DirectoryScanCompletedEvent, DirectoryScanFailedEvent {
 
     UUID eventId();
     Instant occurredAt();

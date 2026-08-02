@@ -186,10 +186,16 @@ POST /api/chapters/{chapterId}/delete-hq   # 单章删除 HQ
 POST /api/tasks/import/batch
 { "items": [{ "sourceType": "ZIP", "sourcePath": "..." }, { "sourceType": "REGISTER", "sourcePath": "..." }] }
 
-GET  /api/tasks/import/scan?path=D:/downloads  # 扫描目录
+# 目录扫描（异步任务：API 创建 → MQ → Worker 扫描 → 结果回写）
+POST /api/tasks/directory-scan
+{ "parentPath": "D:/downloads" }
+# → { "id": 1, "status": "PENDING", ... }
+
+GET  /api/tasks/directory-scan/{id}
+# → { "id": 1, "status": "SUCCESS", "result": { "parentPath": "...", "total": 5, "items": [...] } }
 ```
 
-批量导入支持一次提交多个来源。`scan` 接口预扫描目录结构，返回可导入项列表。
+批量导入支持一次提交多个来源。目录扫描为异步任务：Worker 在本机文件系统上校验路径并遍历子目录，前端轮询 `GET /api/tasks/directory-scan/{id}` 直到 `status` 为 `SUCCESS`/`FAILED` 后读取 `result`。
 
 ---
 

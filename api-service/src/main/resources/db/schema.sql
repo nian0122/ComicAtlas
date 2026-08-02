@@ -145,6 +145,20 @@ CREATE TABLE IF NOT EXISTS recovery_task (
     INDEX idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS directory_scan_task (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    status VARCHAR(32) NOT NULL DEFAULT 'PENDING',
+    directory_path VARCHAR(1024) NOT NULL,
+    total_items INT DEFAULT 0,
+    result_json MEDIUMTEXT,
+    error_message TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    started_at DATETIME,
+    ended_at DATETIME,
+    INDEX idx_status (status),
+    INDEX idx_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS export_task (
     id          BIGINT AUTO_INCREMENT PRIMARY KEY,
     comic_id    BIGINT      NOT NULL,

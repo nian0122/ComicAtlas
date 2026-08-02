@@ -363,6 +363,19 @@ export interface RecoveryTaskVO {
   endedAt?: string
 }
 
+/** 目录扫描异步任务 */
+export interface DirectoryScanTaskVO {
+  id: number
+  status: string // PENDING | SUCCESS | FAILED
+  directoryPath: string
+  totalItems: number
+  result?: ScanResultVO | null
+  errorMessage?: string
+  createdAt: string
+  startedAt?: string
+  endedAt?: string
+}
+
 // ========== Export Domain ==========
 
 export const EXPORT_STATUS_COLOR_MAP: Record<string, string> = {
