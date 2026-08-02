@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { importApi } from '@/services/management'
-import type { ImportTaskVO, ImportStatusVO } from '@/types'
+import { importApi, directoryScanApi } from '@/services/management'
+import type { ImportTaskVO, ImportStatusVO, DirectoryScanTaskVO, ScanResultVO } from '@/types'
 
 /**
  * 导入工作流统一 Store
@@ -109,9 +109,35 @@ export const useImportStore = defineStore('import', () => {
     }
   }
 
-  async function scan(parentPath: string, sourceType: string) {
-    const res: any = await importApi.scan(parentPath, sourceType)
-    return res.data
+  /**
+   * 发起目录扫描异步任务并轮询至终态。
+   * API 创建扫描任务 → MQ → Worker 扫描 → 结果回写 → 轮询 GET 拿结果。
+   * 返回最终 ScanResultVO，失败时抛错。
+   */
+  async function scan(parentPath: string): Promise<ScanResultVO> {
+    const created: any = await directoryScanApi.create(parentPath)
+    const taskId = (created.data as DirectoryScanTaskVO).id
+
+    for (let attempt = 0; attempt < 60; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      const res: any = await directoryScanApi.get(taskId)
+      const task = res.data as DirectoryScanTaskVO
+      if (task.status === 'SUCCESS') {
+        return task.result as ScanResultVO
+      }
+      if (task.status === 'FAILED') {
+        const err = new Error(task.errorMessage || '扫描目录失败') as Error & {
+          response?: { data?: { message?: string } }
+        }
+        err.response = { data: { message: task.errorMessage || '扫描目录失败' } }
+        throw err
+      }
+    }
+    const timeout = new Error('扫描超时') as Error & {
+      response?: { data?: { message?: string } }
+    }
+    timeout.response = { data: { message: '扫描超时，请稍后重试' } }
+    throw timeout
   }
 
   async function createBatch(sourceType: string, sourcePaths: string[]): Promise<ImportTaskVO[]> {

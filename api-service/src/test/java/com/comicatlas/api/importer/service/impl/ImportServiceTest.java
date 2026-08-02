@@ -175,15 +175,6 @@ class ImportServiceTest {
         assertEquals(400, ex.getCode());
     }
 
-    // Test 5: parentPath does not exist
-    @Test
-    void scanDirectories_shouldThrow400_whenParentPathNotExists() {
-        BusinessException ex = assertThrows(BusinessException.class,
-                () -> service.scanDirectories("D:/nonexistent_deadbeef1234/path", "DIRECTORY"));
-        assertEquals(400, ex.getCode());
-        assertTrue(ex.getMessage().contains("不存在"));
-    }
-
     // Test 6: batchId consistency
     @Test
     void createBatchImportTasks_shouldAllHaveSameBatchId() {

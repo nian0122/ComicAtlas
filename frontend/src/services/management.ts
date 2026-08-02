@@ -1,1 +1,1 @@
-export { comicApi, importApi, tagApi, categoryApi, lqApi, adminApi, settingsApi, hqApi } from './api'
+export { comicApi, importApi, directoryScanApi, tagApi, categoryApi, lqApi, adminApi, settingsApi, hqApi } from './api'
