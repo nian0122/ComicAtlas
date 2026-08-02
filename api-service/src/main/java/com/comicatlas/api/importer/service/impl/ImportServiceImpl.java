@@ -30,7 +30,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import java.util.regex.Matcher;
@@ -144,59 +143,6 @@ public class ImportServiceImpl implements ImportService {
             .orderByDesc(ImportTask::getCreatedAt);
         var p = new com.baomidou.mybatisplus.extension.plugins.pagination.Page<ImportTask>(page != null ? page : 1, size != null ? size : 20);
         return taskMapper.selectPage(p, wrapper).convert(this::toVO);
-    }
-
-    @Override
-    public ScanResultVO scanDirectories(String parentPath, String sourceType) {
-        Path parent;
-        try {
-            parent = Path.of(parentPath);
-        } catch (Exception e) {
-            throw new BusinessException(400, "父目录路径无效: " + parentPath);
-        }
-        if (!Files.exists(parent)) {
-            throw new BusinessException(400, "父目录不存在: " + parentPath);
-        }
-        if (!Files.isDirectory(parent)) {
-            throw new BusinessException(400, "路径不是目录: " + parentPath);
-        }
-        if (!Files.isReadable(parent)) {
-            throw new BusinessException(400, "目录无读取权限: " + parentPath);
-        }
-
-        List<ScanItemVO> items = new ArrayList<>();
-        try (var subdirs = Files.list(parent)) {
-            subdirs.filter(Files::isDirectory).forEach(subdir -> {
-                try (var files = Files.list(subdir)) {
-                    long count = files
-                        .filter(f -> {
-                            String name = f.getFileName().toString().toLowerCase();
-                            return name.endsWith(".jpg") || name.endsWith(".jpeg")
-                                || name.endsWith(".png") || name.endsWith(".webp")
-                                || name.endsWith(".bmp") || name.endsWith(".gif");
-                        })
-                        .count();
-                    ScanItemVO item = new ScanItemVO();
-                    item.setName(subdir.getFileName().toString());
-                    item.setPath(subdir.toString());
-                    item.setImageCount((int) count);
-                    items.add(item);
-                } catch (Exception ignored) {
-                    // Skip directories that can't be read
-                }
-            });
-        } catch (Exception e) {
-            throw new BusinessException(500, "扫描目录失败: " + e.getMessage());
-        }
-
-        items.sort(Comparator.comparing(ScanItemVO::getName));
-
-        log.info("扫描完成: parentPath={}, total={}", parentPath, items.size());
-        ScanResultVO result = new ScanResultVO();
-        result.setParentPath(parentPath);
-        result.setTotal(items.size());
-        result.setItems(items);
-        return result;
     }
 
     @Override

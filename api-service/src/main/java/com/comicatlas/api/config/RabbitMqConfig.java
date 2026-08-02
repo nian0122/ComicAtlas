@@ -461,4 +461,47 @@ public class RabbitMqConfig {
         return BindingBuilder.bind(recoveryResultDlq())
                 .to(recoveryDlxExchange()).with("recovery.result.dlq");
     }
+
+    // ==================== comic.scan 目录扫描 ====================
+
+    @Bean
+    public DirectExchange scanExchange() {
+        return new DirectExchange("comic.scan");
+    }
+
+    @Bean
+    public DirectExchange scanDlxExchange() {
+        return new DirectExchange("comic.scan.dlx");
+    }
+
+    @Bean
+    public Queue scanResultQueue() {
+        return QueueBuilder.durable("scan.result.queue")
+                .deadLetterExchange("comic.scan.dlx")
+                .deadLetterRoutingKey("scan.result.dlq")
+                .build();
+    }
+
+    @Bean
+    public Queue scanResultDlq() {
+        return QueueBuilder.durable("scan.result.dlq").build();
+    }
+
+    @Bean
+    public Binding scanCompletedBinding() {
+        return BindingBuilder.bind(scanResultQueue())
+                .to(scanExchange()).with("scan.completed");
+    }
+
+    @Bean
+    public Binding scanFailedBinding() {
+        return BindingBuilder.bind(scanResultQueue())
+                .to(scanExchange()).with("scan.failed");
+    }
+
+    @Bean
+    public Binding scanResultDlqBinding() {
+        return BindingBuilder.bind(scanResultDlq())
+                .to(scanDlxExchange()).with("scan.result.dlq");
+    }
 }

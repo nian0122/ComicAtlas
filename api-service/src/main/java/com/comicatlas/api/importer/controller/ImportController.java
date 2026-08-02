@@ -28,12 +28,6 @@ public class ImportController {
         return Result.ok(importService.listTasks(page, size, status, batchId));
     }
 
-    @GetMapping("/scan")
-    public Result<ScanResultVO> scan(@RequestParam String parentPath,
-                                      @RequestParam(defaultValue = "DIRECTORY") String sourceType) {
-        return Result.ok(importService.scanDirectories(parentPath, sourceType));
-    }
-
     @PostMapping("/batch")
     public Result<BatchImportResultVO> createBatch(@RequestBody BatchImportRequest request) {
         return Result.ok(importService.createBatchImportTasks(request));
