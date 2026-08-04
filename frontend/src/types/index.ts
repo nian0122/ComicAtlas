@@ -384,3 +384,13 @@ export const EXPORT_STATUS_COLOR_MAP: Record<string, string> = {
   SUCCESS: 'success',
   FAILED: 'danger',
 }
+
+// ========== Management Domain (T17) ==========
+// 注意：本文件的存储聚合 HqStatus/LqStatus 与 enums.ts 页面级同名，本文件导出优先（shadowing）；
+// 需要页面级（page.hq_status）状态时从 `@/types/management/enums` 导入。
+export * from './management/enums'
+export * from './management/task'
+export * from './management/operation'
+export * from './management/batch'
+export * from './management/upload'
+export * from './management/trash'

@@ -1,1 +1,8 @@
 export { comicApi, importApi, directoryScanApi, tagApi, categoryApi, lqApi, adminApi, settingsApi, hqApi } from './api'
+export { taskApi } from './management/task'
+export { operationApi } from './management/operation'
+export { batchApi } from './management/batch'
+export { uploadApi } from './management/upload'
+export { trashApi } from './management/trash'
+export { workspaceApi, workspaceErrorMessage } from './management/workspace'
+export { ApiError, isAbortError, request } from './management/http'
