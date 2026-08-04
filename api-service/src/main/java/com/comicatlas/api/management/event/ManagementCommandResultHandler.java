@@ -199,39 +199,39 @@ public class ManagementCommandResultHandler {
     }
 
     private void applyLqCompleted(Long chapterId) {
-        List<Media> pages = mediaMapper.selectList(
+        List<Media> mediaItems = mediaMapper.selectList(
                 new LambdaQueryWrapper<Media>()
                         .eq(Media::getChapterId, chapterId)
                         .eq(Media::getMediaType, "IMAGE"));
-        for (Media page : pages) {
-            LambdaUpdateWrapper<Media> uw = new LambdaUpdateWrapper<Media>()
-                    .eq(Media::getId, page.getId())
+        for (Media media : mediaItems) {
+            LambdaUpdateWrapper<Media> mediaUpdate = new LambdaUpdateWrapper<Media>()
+                    .eq(Media::getId, media.getId())
                     .set(Media::getLqStatus, "READY")
                     .set(Media::getLqRoot, "LQ");
-            String hqPath = page.getHqPath();
+            String hqPath = media.getHqPath();
             if (hqPath != null && !hqPath.isBlank()) {
-                uw.set(Media::getLqPath, deriveLqPath(hqPath));
+                mediaUpdate.set(Media::getLqPath, deriveLqPath(hqPath));
             }
-            mediaMapper.update(null, uw);
+            mediaMapper.update(null, mediaUpdate);
         }
-        log.info("LQ 完成业务更新: chapterId={}, pages={}", chapterId, pages.size());
+        log.info("LQ 完成业务更新: chapterId={}, pages={}", chapterId, mediaItems.size());
     }
 
     private void applyHqDeleteCompleted(Long chapterId) {
-        List<Media> pages = mediaMapper.selectList(
+        List<Media> mediaItems = mediaMapper.selectList(
                 new LambdaQueryWrapper<Media>()
                         .eq(Media::getChapterId, chapterId)
                         .eq(Media::getMediaType, "IMAGE")
                         .in(Media::getHqStatus, "READY", "DELETE_QUEUED", "DELETING", "MISSING"));
-        for (Media page : pages) {
+        for (Media media : mediaItems) {
             mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
-                    .eq(Media::getId, page.getId())
+                    .eq(Media::getId, media.getId())
                     .set(Media::getHqStatus, "DELETED")
                     .set(Media::getHqRoot, null)
                     .set(Media::getHqPath, null));
         }
         recomputeComicHqSize(chapterId);
-        log.info("HQ 删除完成业务更新: chapterId={}, pages={}", chapterId, pages.size());
+        log.info("HQ 删除完成业务更新: chapterId={}, pages={}", chapterId, mediaItems.size());
     }
 
     private void applyTranscodeCompleted(Long mediaId) {
@@ -240,16 +240,16 @@ public class ManagementCommandResultHandler {
             return;
         }
         String hqPath = media.getHqPath();
-        LambdaUpdateWrapper<Media> uw = new LambdaUpdateWrapper<Media>()
+        LambdaUpdateWrapper<Media> mediaUpdate = new LambdaUpdateWrapper<Media>()
                 .eq(Media::getId, mediaId)
                 .set(Media::getTranscodeStatus, "READY")
                 .set(Media::getContainer, "mp4")
                 .set(Media::getVideoCodec, "h264")
                 .set(Media::getAudioCodec, "aac");
         if (hqPath != null && !hqPath.isBlank()) {
-            uw.set(Media::getHqPath, deriveTranscodedPath(hqPath));
+            mediaUpdate.set(Media::getHqPath, deriveTranscodedPath(hqPath));
         }
-        mediaMapper.update(null, uw);
+        mediaMapper.update(null, mediaUpdate);
         log.info("转码完成业务更新: mediaId={}", mediaId);
     }
 
@@ -289,18 +289,18 @@ public class ManagementCommandResultHandler {
         }
         Long chapterId = media.getChapterId();
         String originalHqPath = media.getHqPath();
-        LambdaUpdateWrapper<Media> uw = new LambdaUpdateWrapper<Media>()
+        LambdaUpdateWrapper<Media> mediaUpdate = new LambdaUpdateWrapper<Media>()
                 .eq(Media::getId, mediaId)
                 .set(Media::getStatus, "TRASHED")
                 .set(Media::getTrashedAt, LocalDateTime.now())
                 .set(Media::getHqStatus, "DELETED");
         if (originalHqPath != null && !originalHqPath.isBlank()) {
             String trashRef = "media/" + mediaId + "/" + ev.taskId() + "/hq/" + originalHqPath;
-            uw.set(Media::getHqRoot, "TRASH").set(Media::getHqPath, trashRef);
+            mediaUpdate.set(Media::getHqRoot, "TRASH").set(Media::getHqPath, trashRef);
         } else {
-            uw.set(Media::getHqRoot, null).set(Media::getHqPath, null);
+            mediaUpdate.set(Media::getHqRoot, null).set(Media::getHqPath, null);
         }
-        mediaMapper.update(null, uw);
+        mediaMapper.update(null, mediaUpdate);
         refreshChapterAndComicStats(chapterId);
         Chapter chapter = chapterMapper.selectById(chapterId);
         if (chapter != null) {
@@ -439,7 +439,7 @@ public class ManagementCommandResultHandler {
             if (r.mediaId() == null) {
                 continue;
             }
-            LambdaUpdateWrapper<Media> uw = new LambdaUpdateWrapper<Media>()
+            LambdaUpdateWrapper<Media> mediaUpdate = new LambdaUpdateWrapper<Media>()
                     .eq(Media::getId, r.mediaId())
                     .set(Media::getStatus, "READY")
                     .set(Media::getHqStatus, "READY")
@@ -452,17 +452,17 @@ public class ManagementCommandResultHandler {
                     .set(Media::getVideoCodec, r.videoCodec())
                     .set(Media::getAudioCodec, r.audioCodec());
             if (r.hqRoot() != null && !r.hqRoot().isBlank()) {
-                uw.set(Media::getHqRoot, r.hqRoot());
+                mediaUpdate.set(Media::getHqRoot, r.hqRoot());
             }
             if (r.hqPath() != null && !r.hqPath().isBlank()) {
-                uw.set(Media::getHqPath, r.hqPath());
+                mediaUpdate.set(Media::getHqPath, r.hqPath());
             }
             if (replace) {
                 // 原子替换：保留 mediaId/pageNumber，重置 LQ/transcode
-                uw.set(Media::getLqStatus, "NOT_GENERATED")
+                mediaUpdate.set(Media::getLqStatus, "NOT_GENERATED")
                         .set(Media::getTranscodeStatus, "NOT_NEEDED");
             }
-            mediaMapper.update(null, uw);
+            mediaMapper.update(null, mediaUpdate);
         }
 
         UploadSession session = uploadSessionMapper.selectById(ev.targetId());
@@ -524,9 +524,9 @@ public class ManagementCommandResultHandler {
             return;
         }
         List<Long> chapterIds = chapters.stream().map(Chapter::getId).toList();
-        List<Media> pages = mediaMapper.selectList(
+        List<Media> mediaItems = mediaMapper.selectList(
                 new LambdaQueryWrapper<Media>().in(Media::getChapterId, chapterIds));
-        long hqSize = pages.stream()
+        long hqSize = mediaItems.stream()
                 .filter(p -> !"DELETED".equals(p.getHqStatus()))
                 .mapToLong(p -> p.getFileSize() != null ? p.getFileSize() : 0L)
                 .sum();
@@ -606,27 +606,27 @@ public class ManagementCommandResultHandler {
     private void revertToTrashed(String targetType, Long targetId) {
         switch (targetType) {
             case "COMIC" -> {
-                Comic c = comicMapper.selectById(targetId);
-                if (c != null && "RESTORING".equals(c.getStatus())) {
-                    c.setStatus("TRASHED");
-                    comicMapper.updateById(c);
-                } else if (c != null && "PURGING".equals(c.getStatus())) {
-                    c.setStatus("TRASHED");
-                    comicMapper.updateById(c);
+                Comic comic = comicMapper.selectById(targetId);
+                if (comic != null && "RESTORING".equals(comic.getStatus())) {
+                    comic.setStatus("TRASHED");
+                    comicMapper.updateById(comic);
+                } else if (comic != null && "PURGING".equals(comic.getStatus())) {
+                    comic.setStatus("TRASHED");
+                    comicMapper.updateById(comic);
                 }
             }
             case "CHAPTER" -> {
-                Chapter ch = chapterMapper.selectById(targetId);
-                if (ch != null && ("RESTORING".equals(ch.getStatus()) || "PURGING".equals(ch.getStatus()))) {
-                    ch.setStatus("TRASHED");
-                    chapterMapper.updateById(ch);
+                Chapter chapter = chapterMapper.selectById(targetId);
+                if (chapter != null && ("RESTORING".equals(chapter.getStatus()) || "PURGING".equals(chapter.getStatus()))) {
+                    chapter.setStatus("TRASHED");
+                    chapterMapper.updateById(chapter);
                 }
             }
             case "MEDIA" -> {
-                Media m = mediaMapper.selectById(targetId);
-                if (m != null && ("RESTORING".equals(m.getStatus()) || "PURGING".equals(m.getStatus()))) {
-                    m.setStatus("TRASHED");
-                    mediaMapper.updateById(m);
+                Media media = mediaMapper.selectById(targetId);
+                if (media != null && ("RESTORING".equals(media.getStatus()) || "PURGING".equals(media.getStatus()))) {
+                    media.setStatus("TRASHED");
+                    mediaMapper.updateById(media);
                 }
             }
             default -> { }
@@ -637,30 +637,30 @@ public class ManagementCommandResultHandler {
     private void revertToReady(String targetType, Long targetId) {
         switch (targetType) {
             case "COMIC" -> {
-                Comic c = comicMapper.selectById(targetId);
-                if (c != null && "TRASHING".equals(c.getStatus())) {
-                    c.setStatus("READY");
-                    c.setTrashedAt(null);
-                    comicMapper.updateById(c);
+                Comic comic = comicMapper.selectById(targetId);
+                if (comic != null && "TRASHING".equals(comic.getStatus())) {
+                    comic.setStatus("READY");
+                    comic.setTrashedAt(null);
+                    comicMapper.updateById(comic);
                 }
             }
             case "CHAPTER" -> {
-                Chapter ch = chapterMapper.selectById(targetId);
-                if (ch != null && "TRASHING".equals(ch.getStatus())) {
-                    ch.setStatus("READY");
-                    ch.setTrashedAt(null);
-                    chapterMapper.updateById(ch);
+                Chapter chapter = chapterMapper.selectById(targetId);
+                if (chapter != null && "TRASHING".equals(chapter.getStatus())) {
+                    chapter.setStatus("READY");
+                    chapter.setTrashedAt(null);
+                    chapterMapper.updateById(chapter);
                 }
             }
             case "MEDIA" -> {
-                Media m = mediaMapper.selectById(targetId);
-                if (m != null && "TRASHING".equals(m.getStatus())) {
-                    m.setStatus("READY");
-                    m.setTrashedAt(null);
-                    if (m.getOriginalPageNumber() != null) {
-                        m.setPageNumber(m.getOriginalPageNumber());
+                Media media = mediaMapper.selectById(targetId);
+                if (media != null && "TRASHING".equals(media.getStatus())) {
+                    media.setStatus("READY");
+                    media.setTrashedAt(null);
+                    if (media.getOriginalPageNumber() != null) {
+                        media.setPageNumber(media.getOriginalPageNumber());
                     }
-                    mediaMapper.updateById(m);
+                    mediaMapper.updateById(media);
                 }
             }
             default -> { }
@@ -718,9 +718,9 @@ public class ManagementCommandResultHandler {
                 .eq(Media::getChapterId, chapterId)
                 .select(Media::getId, Media::getPageNumber));
         java.util.Set<Integer> occupied = new java.util.HashSet<>();
-        for (Media m : existing) {
-            if (!m.getId().equals(mediaId) && m.getPageNumber() != null) {
-                occupied.add(m.getPageNumber());
+        for (Media media : existing) {
+            if (!media.getId().equals(mediaId) && media.getPageNumber() != null) {
+                occupied.add(media.getPageNumber());
             }
         }
         if (!occupied.contains(preferred)) {

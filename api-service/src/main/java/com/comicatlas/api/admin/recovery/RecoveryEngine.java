@@ -238,18 +238,18 @@ public class RecoveryEngine {
 
                 int pageNum = 1;
                 for (ScannedMediaInfo pi : scannedPages) {
-                    Media page = new Media();
-                    page.setChapterId(chapter.getId());
-                    page.setPageNumber(pageNum++);
-                    page.setHqRoot("HQ");
-                    page.setHqPath(comicId + "/" + chapter.getGlobalOrder() + "/" + pi.imageName());
-                    page.setHqStatus(pi.fileSize() > 0 ? "READY" : "MISSING");
-                    page.setLqStatus("NOT_GENERATED");
-                    page.setFileSize(pi.fileSize());
-                    page.setWidth(pi.width());
-                    page.setHeight(pi.height());
-                    page.setMediaType(pi.mediaType());
-                    mediaMapper.insert(page);
+                    Media media = new Media();
+                    media.setChapterId(chapter.getId());
+                    media.setPageNumber(pageNum++);
+                    media.setHqRoot("HQ");
+                    media.setHqPath(comicId + "/" + chapter.getGlobalOrder() + "/" + pi.imageName());
+                    media.setHqStatus(pi.fileSize() > 0 ? "READY" : "MISSING");
+                    media.setLqStatus("NOT_GENERATED");
+                    media.setFileSize(pi.fileSize());
+                    media.setWidth(pi.width());
+                    media.setHeight(pi.height());
+                    media.setMediaType(pi.mediaType());
+                    mediaMapper.insert(media);
                     totalSize += pi.fileSize();
                     pgCount++;
                 }

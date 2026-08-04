@@ -95,20 +95,20 @@ public class MediaAnalyzer {
             return videoFallback(name, ext, size, "ffprobe-unavailable");
         }
         try {
-            ProcessBuilder pb = new ProcessBuilder(
+            ProcessBuilder processBuilder = new ProcessBuilder(
                     ffprobe,
                     "-v", "error",
                     "-show_format", "-show_streams",
                     "-of", "json",
                     file.toAbsolutePath().toString());
-            pb.redirectErrorStream(true);
-            Process proc = pb.start();
+            processBuilder.redirectErrorStream(true);
+            Process process = processBuilder.start();
 
             // 必须在 waitFor() 之前消费 stdout，否则管道满后 ffprobe 阻塞写 → 死锁
             StringBuilder sb = new StringBuilder();
             Thread outputReader = new Thread(() -> {
                 try (BufferedReader r = new BufferedReader(
-                        new InputStreamReader(proc.getInputStream(), StandardCharsets.UTF_8))) {
+                        new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
                     String line;
                     while ((line = r.readLine()) != null) {
                         sb.append(line).append('\n');
@@ -117,16 +117,16 @@ public class MediaAnalyzer {
             }, "ffprobe-reader");
             outputReader.start();
 
-            boolean finished = proc.waitFor(FFPROBE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            boolean finished = process.waitFor(FFPROBE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
             outputReader.join(1000);
             if (!finished) {
-                proc.destroyForcibly();
+                process.destroyForcibly();
                 log.warn("ffprobe 读取 {} 超时 ({}s)", file, FFPROBE_TIMEOUT_SECONDS);
                 return videoFallback(name, ext, size, "timeout");
             }
-            if (proc.exitValue() != 0) {
-                log.warn("ffprobe exit={} for {}", proc.exitValue(), file);
-                return videoFallback(name, ext, size, "exit-" + proc.exitValue());
+            if (process.exitValue() != 0) {
+                log.warn("ffprobe exit={} for {}", process.exitValue(), file);
+                return videoFallback(name, ext, size, "exit-" + process.exitValue());
             }
             return parseFfprobeJson(name, ext, size, sb.toString());
         } catch (Exception e) {

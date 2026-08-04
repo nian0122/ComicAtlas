@@ -62,19 +62,19 @@ public class VideoTranscodeHandler {
             Files.createDirectories(tempRoot);
             tempFile = tempRoot.resolve(pageId + ".mp4");
 
-            ProcessBuilder pb = new ProcessBuilder();
-            pb.command(buildFfmpegCommand(config.getFfmpegPath(), hqFile.toString(), tempFile.toString()));
-            pb.redirectErrorStream(true);
-            pb.redirectOutput(ProcessBuilder.Redirect.DISCARD);
-            Process proc = pb.start();
+            ProcessBuilder processBuilder = new ProcessBuilder();
+            processBuilder.command(buildFfmpegCommand(config.getFfmpegPath(), hqFile.toString(), tempFile.toString()));
+            processBuilder.redirectErrorStream(true);
+            processBuilder.redirectOutput(ProcessBuilder.Redirect.DISCARD);
+            Process process = processBuilder.start();
 
             // 超时 10 分钟（Metis G9）
-            if (!proc.waitFor(10, TimeUnit.MINUTES)) {
-                proc.destroyForcibly();
+            if (!process.waitFor(10, TimeUnit.MINUTES)) {
+                process.destroyForcibly();
                 throw new IOException("ffmpeg 超时(10min): pageId=" + pageId);
             }
-            if (proc.exitValue() != 0) {
-                throw new IOException("ffmpeg exit code " + proc.exitValue() + ": pageId=" + pageId);
+            if (process.exitValue() != 0) {
+                throw new IOException("ffmpeg exit code " + process.exitValue() + ": pageId=" + pageId);
             }
 
             // 3. 验证临时文件

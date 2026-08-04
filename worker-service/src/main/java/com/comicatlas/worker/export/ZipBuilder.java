@@ -35,8 +35,8 @@ public class ZipBuilder {
             // 文件条目
             for (ExportManifest.Entry entry : manifest.entries()) {
                 String zipPath = manifest.rootDirName() + "/" + entry.targetPath();
-                ZipEntry ze = new ZipEntry(zipPath);
-                zos.putNextEntry(ze);
+                ZipEntry zipEntry = new ZipEntry(zipPath);
+                zos.putNextEntry(zipEntry);
                 Files.copy(entry.sourceFile(), zos);
                 zos.closeEntry();
             }

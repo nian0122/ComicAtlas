@@ -90,10 +90,10 @@ public class BatchMetadataExecutor {
                     .stream().map(ComicTag::getTagId).toList();
             for (Long tagId : payload.getAddTagIds()) {
                 if (!existing.contains(tagId)) {
-                    ComicTag ct = new ComicTag();
-                    ct.setComicId(comicId);
-                    ct.setTagId(tagId);
-                    comicTagMapper.insert(ct);
+                    ComicTag comicTag = new ComicTag();
+                    comicTag.setComicId(comicId);
+                    comicTag.setTagId(tagId);
+                    comicTagMapper.insert(comicTag);
                 }
             }
         }

@@ -40,43 +40,43 @@ public class LqCompletedHandler {
         log.info("LQ 完成事件: comicId={}, chapterId={}, failedPages={}", comicId, chapterId, failedPages);
 
         try {
-            var pages = mediaMapper.selectList(
+            var mediaItems = mediaMapper.selectList(
                     new LambdaQueryWrapper<Media>()
                             .eq(Media::getChapterId, chapterId)
                             .eq(Media::getMediaType, "IMAGE"));
 
             Path lqRoot = Path.of(mangaRoot, "lq");
 
-            for (Media page : pages) {
-                Integer pageNum = page.getPageNumber();
+            for (Media media : mediaItems) {
+                Integer pageNum = media.getPageNumber();
                 if (pageNum == null) pageNum = -1;
 
                 if (failedPages != null && failedPages.contains(pageNum)) {
-                    page.setLqStatus("FAILED");
+                    media.setLqStatus("FAILED");
                 } else {
-                    page.setLqStatus("READY");
-                    page.setLqRoot("LQ");
+                    media.setLqStatus("READY");
+                    media.setLqRoot("LQ");
                     // 从 hqPath 推断 lqPath：替换扩展名为 .webp
-                    String hqPath = page.getHqPath();
+                    String hqPath = media.getHqPath();
                     if (hqPath != null && !hqPath.isBlank()) {
                         String lqPath = hqPath.replaceAll("\\.[^.]+$", ".webp");
-                        page.setLqPath(lqPath);
+                        media.setLqPath(lqPath);
                         // 读取 LQ 文件大小
                         Path lqFile = lqRoot.resolve(lqPath.replace('\\', '/'));
                         try {
                             if (Files.exists(lqFile)) {
-                                page.setLqSize(Files.size(lqFile));
+                                media.setLqSize(Files.size(lqFile));
                             }
                         } catch (Exception e) {
                             log.debug("无法读取 LQ 文件大小: {}", lqFile, e);
                         }
                     }
                 }
-                mediaMapper.updateById(page);
+                mediaMapper.updateById(media);
             }
 
             channel.basicAck(tag, false);
-            log.info("LQ 状态更新完成: comicId={}, chapterId={}, pages={}", comicId, chapterId, pages.size());
+            log.info("LQ 状态更新完成: comicId={}, chapterId={}, pages={}", comicId, chapterId, mediaItems.size());
         } catch (Exception e) {
             log.error("LQ 状态更新失败: comicId={}, chapterId={}", comicId, chapterId, e);
             try {

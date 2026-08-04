@@ -62,25 +62,25 @@ public class ChapterManagementServiceImpl implements ChapterManagementService {
         if (catalogId != null) {
             requireCatalogInComic(comicId, catalogId);
         }
-        Chapter ch = new Chapter();
-        ch.setComicId(comicId);
-        ch.setCatalogId(catalogId);
-        ch.setTitle(request.getTitle());
-        ch.setChapterNo(request.getChapterNo() == null || request.getChapterNo().isBlank()
+        Chapter chapter = new Chapter();
+        chapter.setComicId(comicId);
+        chapter.setCatalogId(catalogId);
+        chapter.setTitle(request.getTitle());
+        chapter.setChapterNo(request.getChapterNo() == null || request.getChapterNo().isBlank()
                 ? "1" : request.getChapterNo());
-        ch.setGlobalOrder(maxGlobalOrder(comicId) + 1);
-        ch.setSortOrder(nextChapterSortOrder(comicId, catalogId));
-        ch.setStatus(ChapterLifecycleStatus.READY.name());
-        ch.setVersion(1);
+        chapter.setGlobalOrder(maxGlobalOrder(comicId) + 1);
+        chapter.setSortOrder(nextChapterSortOrder(comicId, catalogId));
+        chapter.setStatus(ChapterLifecycleStatus.READY.name());
+        chapter.setVersion(1);
         try {
-            chapterMapper.insert(ch);
+            chapterMapper.insert(chapter);
         } catch (DuplicateKeyException e) {
             throw new ConflictException("目录内已存在同编号章节");
         }
         catalogCacheInvalidator.evict(comicId);
         log.info("创建章节: comicId={}, chapterId={}, globalOrder={}, sortOrder={}",
-                comicId, ch.getId(), ch.getGlobalOrder(), ch.getSortOrder());
-        return ChapterVO.from(ch);
+                comicId, chapter.getId(), chapter.getGlobalOrder(), chapter.getSortOrder());
+        return ChapterVO.from(chapter);
     }
 
     // ======================== 重命名 ========================
@@ -88,23 +88,23 @@ public class ChapterManagementServiceImpl implements ChapterManagementService {
     @Override
     @Transactional
     public ChapterVO renameChapter(Long comicId, Long chapterId, ChapterRenameRequest request) {
-        Chapter ch = requireChapterInComic(comicId, chapterId);
+        Chapter chapter = requireChapterInComic(comicId, chapterId);
         if (request.getTitle() == null && request.getChapterNo() == null) {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "标题或编号至少提供一个");
         }
         if (request.getTitle() != null) {
-            ch.setTitle(request.getTitle());
+            chapter.setTitle(request.getTitle());
         }
         if (request.getChapterNo() != null) {
-            ch.setChapterNo(request.getChapterNo());
+            chapter.setChapterNo(request.getChapterNo());
         }
         try {
-            checkedUpdate(ch);
+            checkedUpdate(chapter);
         } catch (DuplicateKeyException e) {
             throw new ConflictException("目录内已存在同编号章节");
         }
         catalogCacheInvalidator.evict(comicId);
-        return ChapterVO.from(ch);
+        return ChapterVO.from(chapter);
     }
 
     // ======================== 移动（跨目录） ========================
@@ -112,25 +112,25 @@ public class ChapterManagementServiceImpl implements ChapterManagementService {
     @Override
     @Transactional
     public ChapterVO moveChapter(Long comicId, Long chapterId, Long catalogId) {
-        Chapter ch = requireChapterInComic(comicId, chapterId);
+        Chapter chapter = requireChapterInComic(comicId, chapterId);
         if (catalogId != null) {
             requireCatalogInComic(comicId, catalogId);
         }
-        if (Objects.equals(ch.getCatalogId(), catalogId)) {
-            return ChapterVO.from(ch);
+        if (Objects.equals(chapter.getCatalogId(), catalogId)) {
+            return ChapterVO.from(chapter);
         }
         // 原目录：其余章节 sort_order 重排连续
-        recompactChapterSortOrder(comicId, ch.getCatalogId(), chapterId);
+        recompactChapterSortOrder(comicId, chapter.getCatalogId(), chapterId);
         // 新目录：追加到末尾
-        ch.setCatalogId(catalogId);
-        ch.setSortOrder(nextChapterSortOrder(comicId, catalogId));
+        chapter.setCatalogId(catalogId);
+        chapter.setSortOrder(nextChapterSortOrder(comicId, catalogId));
         try {
-            checkedUpdate(ch); // 目标目录已有同 chapter_no → 唯一索引冲突
+            checkedUpdate(chapter); // 目标目录已有同 chapter_no → 唯一索引冲突
         } catch (DuplicateKeyException e) {
             throw new ConflictException("目标目录已存在同编号章节");
         }
         catalogCacheInvalidator.evict(comicId);
-        return ChapterVO.from(ch);
+        return ChapterVO.from(chapter);
     }
 
     // ======================== 全局重排（两阶段） ========================
@@ -146,9 +146,9 @@ public class ChapterManagementServiceImpl implements ChapterManagementService {
 
         // 计算新顺序：移除目标章节，按目标位置插入
         List<Chapter> reordered = new ArrayList<>(all.size());
-        for (Chapter ch : all) {
-            if (!ch.getId().equals(chapterId)) {
-                reordered.add(ch);
+        for (Chapter chapter : all) {
+            if (!chapter.getId().equals(chapterId)) {
+                reordered.add(chapter);
             }
         }
         int pos = Math.max(0, Math.min(targetGlobalOrder - 1, reordered.size()));
@@ -162,10 +162,10 @@ public class ChapterManagementServiceImpl implements ChapterManagementService {
         // 阶段二：按新顺序写回 1..N，并重算各目录内 sort_order
         Map<Long, Integer> sortCounter = new HashMap<>();
         for (int i = 0; i < reordered.size(); i++) {
-            Chapter ch = reordered.get(i);
-            ch.setGlobalOrder(i + 1);
-            ch.setSortOrder(sortCounter.merge(ch.getCatalogId(), 1, Integer::sum));
-            checkedUpdate(ch);
+            Chapter chapter = reordered.get(i);
+            chapter.setGlobalOrder(i + 1);
+            chapter.setSortOrder(sortCounter.merge(chapter.getCatalogId(), 1, Integer::sum));
+            checkedUpdate(chapter);
         }
         catalogCacheInvalidator.evict(comicId);
         log.info("重排章节: comicId={}, chapterId={}, targetGlobalOrder={}", comicId, chapterId, targetGlobalOrder);
@@ -177,9 +177,9 @@ public class ChapterManagementServiceImpl implements ChapterManagementService {
     @Override
     @Transactional
     public void trashChapter(Long comicId, Long chapterId) {
-        Chapter ch = requireChapterInComic(comicId, chapterId);
-        if (!ManagementStateMachine.canTransitionChapter(ch.getStatus(), "TRASHING")) {
-            throw new ConflictException("章节状态 " + ch.getStatus() + " 不允许回收");
+        Chapter chapter = requireChapterInComic(comicId, chapterId);
+        if (!ManagementStateMachine.canTransitionChapter(chapter.getStatus(), "TRASHING")) {
+            throw new ConflictException("章节状态 " + chapter.getStatus() + " 不允许回收");
         }
         trashLifecycleService.trashChapter(comicId, chapterId);
         catalogCacheInvalidator.evict(comicId);
@@ -218,14 +218,14 @@ public class ChapterManagementServiceImpl implements ChapterManagementService {
     }
 
     private Chapter requireChapterInComic(Long comicId, Long chapterId) {
-        Chapter ch = chapterMapper.selectById(chapterId);
-        if (ch == null) {
+        Chapter chapter = chapterMapper.selectById(chapterId);
+        if (chapter == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在");
         }
-        if (!ch.getComicId().equals(comicId)) {
+        if (!chapter.getComicId().equals(comicId)) {
             throw new ConflictException("章节不属于该漫画");
         }
-        return ch;
+        return chapter;
     }
 
     private int maxGlobalOrder(Long comicId) {
@@ -261,13 +261,13 @@ public class ChapterManagementServiceImpl implements ChapterManagementService {
             w.eq(Chapter::getCatalogId, catalogId);
         }
         int order = 1;
-        for (Chapter ch : chapterMapper.selectList(w)) {
-            if (ch.getId().equals(excludedId)) {
+        for (Chapter chapter : chapterMapper.selectList(w)) {
+            if (chapter.getId().equals(excludedId)) {
                 continue;
             }
-            if (!Objects.equals(ch.getSortOrder(), order)) {
-                ch.setSortOrder(order);
-                checkedUpdate(ch);
+            if (!Objects.equals(chapter.getSortOrder(), order)) {
+                chapter.setSortOrder(order);
+                checkedUpdate(chapter);
             }
             order++;
         }

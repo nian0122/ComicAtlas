@@ -96,15 +96,15 @@ public class MetadataExporter {
 
         // 组装 chapters 列表
         List<Map<String, Object>> chapterList = new ArrayList<>();
-        for (Chapter ch : chapters) {
+        for (Chapter chapter : chapters) {
             // 4. For each chapter: SELECT pages ordered by pageNumber
-            List<Media> pages = mediaMapper.selectList(
+            List<Media> mediaItems = mediaMapper.selectList(
                     new LambdaQueryWrapper<Media>()
-                            .eq(Media::getChapterId, ch.getId())
+                            .eq(Media::getChapterId, chapter.getId())
                             .orderByAsc(Media::getPageNumber));
 
             List<Map<String, Object>> mediaItemList = new ArrayList<>();
-            for (Media p : pages) {
+            for (Media p : mediaItems) {
                 Map<String, Object> pm = new LinkedHashMap<>();
                 String hqPath = p.getHqPath();
                 String fileName = "";
@@ -131,11 +131,11 @@ public class MetadataExporter {
             }
 
             Map<String, Object> chm = new LinkedHashMap<>();
-            chm.put("title", ch.getTitle());
-            chm.put("chapterNo", ch.getChapterNo() != null ? ch.getChapterNo() : "");
-            chm.put("sortOrder", ch.getSortOrder() != null ? ch.getSortOrder() : 0);
-            chm.put("globalOrder", ch.getGlobalOrder() != null ? ch.getGlobalOrder() : 0);
-            chm.put("catalogIndex", ch.getCatalogId() != null ? catalogIdToIndex.get(ch.getCatalogId()) : null);
+            chm.put("title", chapter.getTitle());
+            chm.put("chapterNo", chapter.getChapterNo() != null ? chapter.getChapterNo() : "");
+            chm.put("sortOrder", chapter.getSortOrder() != null ? chapter.getSortOrder() : 0);
+            chm.put("globalOrder", chapter.getGlobalOrder() != null ? chapter.getGlobalOrder() : 0);
+            chm.put("catalogIndex", chapter.getCatalogId() != null ? catalogIdToIndex.get(chapter.getCatalogId()) : null);
             chm.put("sourceDir", "");
             chm.put("mediaItems", mediaItemList);
             chapterList.add(chm);

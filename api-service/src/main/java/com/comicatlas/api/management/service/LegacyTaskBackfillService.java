@@ -62,12 +62,12 @@ public class LegacyTaskBackfillService {
                 new LambdaQueryWrapper<ImportTask>().isNull(ImportTask::getManagementTaskId));
         int count = 0;
         for (ImportTask t : rows) {
-            ManagementTask mt = baseTask(TaskType.IMPORT, "导入漫画", "COMIC",
+            ManagementTask managementTask = baseTask(TaskType.IMPORT, "导入漫画", "COMIC",
                     t.getBatchId(), t.getStatus(), t.getProgress(),
                     t.getStartTime(), t.getEndTime());
-            ManagementTaskItem item = baseItem(mt, "COMIC", t.getComicId(), TaskType.IMPORT, t.getStatus());
-            insertPair(mt, item);
-            t.setManagementTaskId(mt.getId());
+            ManagementTaskItem item = baseItem(managementTask, "COMIC", t.getComicId(), TaskType.IMPORT, t.getStatus());
+            insertPair(managementTask, item);
+            t.setManagementTaskId(managementTask.getId());
             importTaskMapper.updateById(t);
             count++;
         }
@@ -81,13 +81,13 @@ public class LegacyTaskBackfillService {
         List<RecoveryTask> rows = recoveryTaskMapper.selectList(
                 new LambdaQueryWrapper<RecoveryTask>().isNull(RecoveryTask::getManagementTaskId));
         int count = 0;
-        for (RecoveryTask t : rows) {
-            ManagementTask mt = baseTask(TaskType.RECOVERY, "存储恢复", "SYSTEM",
-                    null, t.getStatus(), null, t.getStartedAt(), t.getEndedAt());
-            ManagementTaskItem item = baseItem(mt, "SYSTEM", t.getId(), TaskType.RECOVERY, t.getStatus());
-            insertPair(mt, item);
-            t.setManagementTaskId(mt.getId());
-            recoveryTaskMapper.updateById(t);
+        for (RecoveryTask recoveryTask : rows) {
+            ManagementTask managementTask = baseTask(TaskType.RECOVERY, "存储恢复", "SYSTEM",
+                    null, recoveryTask.getStatus(), null, recoveryTask.getStartedAt(), recoveryTask.getEndedAt());
+            ManagementTaskItem item = baseItem(managementTask, "SYSTEM", recoveryTask.getId(), TaskType.RECOVERY, recoveryTask.getStatus());
+            insertPair(managementTask, item);
+            recoveryTask.setManagementTaskId(managementTask.getId());
+            recoveryTaskMapper.updateById(recoveryTask);
             count++;
         }
         if (count > 0) {
@@ -101,11 +101,11 @@ public class LegacyTaskBackfillService {
                 new LambdaQueryWrapper<ExportTask>().isNull(ExportTask::getManagementTaskId));
         int count = 0;
         for (ExportTask t : rows) {
-            ManagementTask mt = baseTask(TaskType.EXPORT, "导出漫画", "COMIC",
+            ManagementTask managementTask = baseTask(TaskType.EXPORT, "导出漫画", "COMIC",
                     null, t.getStatus(), t.getProgress(), null, t.getCompletedAt());
-            ManagementTaskItem item = baseItem(mt, "COMIC", t.getComicId(), TaskType.EXPORT, t.getStatus());
-            insertPair(mt, item);
-            t.setManagementTaskId(mt.getId());
+            ManagementTaskItem item = baseItem(managementTask, "COMIC", t.getComicId(), TaskType.EXPORT, t.getStatus());
+            insertPair(managementTask, item);
+            t.setManagementTaskId(managementTask.getId());
             exportTaskMapper.updateById(t);
             count++;
         }
@@ -120,11 +120,11 @@ public class LegacyTaskBackfillService {
                 new LambdaQueryWrapper<DirectoryScanTask>().isNull(DirectoryScanTask::getManagementTaskId));
         int count = 0;
         for (DirectoryScanTask t : rows) {
-            ManagementTask mt = baseTask(TaskType.DIRECTORY_SCAN, "目录扫描", "SYSTEM",
+            ManagementTask managementTask = baseTask(TaskType.DIRECTORY_SCAN, "目录扫描", "SYSTEM",
                     null, t.getStatus(), null, t.getStartedAt(), t.getEndedAt());
-            ManagementTaskItem item = baseItem(mt, "SYSTEM", t.getId(), TaskType.DIRECTORY_SCAN, t.getStatus());
-            insertPair(mt, item);
-            t.setManagementTaskId(mt.getId());
+            ManagementTaskItem item = baseItem(managementTask, "SYSTEM", t.getId(), TaskType.DIRECTORY_SCAN, t.getStatus());
+            insertPair(managementTask, item);
+            t.setManagementTaskId(managementTask.getId());
             directoryScanTaskMapper.updateById(t);
             count++;
         }
@@ -137,47 +137,47 @@ public class LegacyTaskBackfillService {
     private ManagementTask baseTask(TaskType type, String operation, String targetType,
                                     String batchId, String legacyStatus, Integer progress,
                                     LocalDateTime startedAt, LocalDateTime completedAt) {
-        ManagementTask mt = new ManagementTask();
-        mt.setTaskType(type);
-        mt.setOperation(operation);
-        mt.setTargetType(targetType);
-        mt.setBatchId(batchId);
-        mt.setIsBatch(false);
+        ManagementTask managementTask = new ManagementTask();
+        managementTask.setTaskType(type);
+        managementTask.setOperation(operation);
+        managementTask.setTargetType(targetType);
+        managementTask.setBatchId(batchId);
+        managementTask.setBatch(false);
         ManagementTaskStatus st = mapStatus(legacyStatus);
-        mt.setStatus(st);
-        mt.setProgress(progress != null ? progress : 0);
-        mt.setTotalCount(1);
-        mt.setSuccessCount(st == ManagementTaskStatus.SUCCEEDED ? 1 : 0);
-        mt.setFailureCount(st == ManagementTaskStatus.FAILED ? 1 : 0);
-        mt.setCancelledCount(st == ManagementTaskStatus.CANCELLED ? 1 : 0);
-        mt.setAttempt(1);
-        mt.setStartedAt(startedAt);
-        mt.setCompletedAt(completedAt);
-        return mt;
+        managementTask.setStatus(st);
+        managementTask.setProgress(progress != null ? progress : 0);
+        managementTask.setTotalCount(1);
+        managementTask.setSuccessCount(st == ManagementTaskStatus.SUCCEEDED ? 1 : 0);
+        managementTask.setFailureCount(st == ManagementTaskStatus.FAILED ? 1 : 0);
+        managementTask.setCancelledCount(st == ManagementTaskStatus.CANCELLED ? 1 : 0);
+        managementTask.setAttempt(1);
+        managementTask.setStartedAt(startedAt);
+        managementTask.setCompletedAt(completedAt);
+        return managementTask;
     }
 
-    private ManagementTaskItem baseItem(ManagementTask mt, String targetType, Long targetId,
+    private ManagementTaskItem baseItem(ManagementTask managementTask, String targetType, Long targetId,
                                         TaskType op, String legacyStatus) {
         ManagementTaskItem item = new ManagementTaskItem();
-        item.setTaskId(mt.getId());
+        item.setTaskId(managementTask.getId());
         item.setTargetType(targetType);
         item.setTargetId(targetId);
         item.setOperationType(op);
-        ManagementTaskStatus st = mt.getStatus();
+        ManagementTaskStatus st = managementTask.getStatus();
         item.setStatus(st);
         item.setAttempt(1);
-        item.setProgress(mt.getProgress());
+        item.setProgress(managementTask.getProgress());
         if (st.isProcessing()) {
             item.setLockKey(ManagementTaskItem.buildLockKey(targetType, targetId, op));
         }
-        item.setStartedAt(mt.getStartedAt());
-        item.setCompletedAt(mt.getCompletedAt());
+        item.setStartedAt(managementTask.getStartedAt());
+        item.setCompletedAt(managementTask.getCompletedAt());
         return item;
     }
 
-    private void insertPair(ManagementTask mt, ManagementTaskItem item) {
-        managementTaskMapper.insert(mt);
-        item.setTaskId(mt.getId());
+    private void insertPair(ManagementTask managementTask, ManagementTaskItem item) {
+        managementTaskMapper.insert(managementTask);
+        item.setTaskId(managementTask.getId());
         managementTaskItemMapper.insert(item);
     }
 

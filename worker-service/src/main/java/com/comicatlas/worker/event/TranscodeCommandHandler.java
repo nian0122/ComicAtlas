@@ -109,18 +109,18 @@ public class TranscodeCommandHandler {
             tempFile = tempRoot.resolve(pageId + ".mp4");
 
             publisher.progress(cmd, 10, "开始转码");
-            ProcessBuilder pb = new ProcessBuilder();
-            pb.command(buildFfmpegCommand(config.getFfmpegPath(), hqFile.toString(), tempFile.toString()));
-            pb.redirectErrorStream(true);
-            pb.redirectOutput(ProcessBuilder.Redirect.DISCARD);
-            Process proc = pb.start();
+            ProcessBuilder processBuilder = new ProcessBuilder();
+            processBuilder.command(buildFfmpegCommand(config.getFfmpegPath(), hqFile.toString(), tempFile.toString()));
+            processBuilder.redirectErrorStream(true);
+            processBuilder.redirectOutput(ProcessBuilder.Redirect.DISCARD);
+            Process process = processBuilder.start();
 
-            if (!proc.waitFor(10, TimeUnit.MINUTES)) {
-                proc.destroyForcibly();
+            if (!process.waitFor(10, TimeUnit.MINUTES)) {
+                process.destroyForcibly();
                 throw new IOException("ffmpeg 超时(10min): pageId=" + pageId);
             }
-            if (proc.exitValue() != 0) {
-                throw new IOException("ffmpeg exit code " + proc.exitValue() + ": pageId=" + pageId);
+            if (process.exitValue() != 0) {
+                throw new IOException("ffmpeg exit code " + process.exitValue() + ": pageId=" + pageId);
             }
             if (!Files.exists(tempFile) || Files.size(tempFile) == 0) {
                 throw new IOException("转码输出文件为空: " + tempFile);

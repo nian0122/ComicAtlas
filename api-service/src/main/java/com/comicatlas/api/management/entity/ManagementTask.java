@@ -32,8 +32,9 @@ public class ManagementTask {
     /** 批次ID */
     private String batchId;
 
-    /** 是否批量任务 */
-    private Boolean isBatch;
+    /** 是否批量任务（DB 列 is_batch，内部名 batch） */
+    @TableField("is_batch")
+    private Boolean batch;
 
     /** 任务状态 */
     private ManagementTaskStatus status;

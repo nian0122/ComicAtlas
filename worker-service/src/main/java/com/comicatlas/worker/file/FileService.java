@@ -75,9 +75,9 @@ public class FileService {
             page.put("pageNumber", pageNum++);
             page.put("imageName", name);
             try {
-                BufferedImage bi = ImageIO.read(dest.toFile());
-                page.put("width", bi != null ? bi.getWidth() : null);
-                page.put("height", bi != null ? bi.getHeight() : null);
+                BufferedImage image = ImageIO.read(dest.toFile());
+                page.put("width", image != null ? image.getWidth() : null);
+                page.put("height", image != null ? image.getHeight() : null);
             } catch (Exception e) { log.warn("读取图片尺寸失败: {}", dest, e); }
             page.put("fileSize", Files.size(dest));
             pages.add(page);
