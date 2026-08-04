@@ -13,7 +13,7 @@ import java.util.Comparator;
 
 /**
  * 导入清单管理器：位于 mangaRoot/imports/{taskId}/manifest.json。
- * 原子写入（tmp + move），读时校验版本；损坏/版本不符抛 IOException。
+ * 原子写入（临时文件 + 原子 move），读时校验版本；损坏/版本不符抛 IOException。
  */
 @Slf4j
 @Component
@@ -35,12 +35,12 @@ public class ImportManifestManager {
     public void write(Path mangaRoot, Long taskId, ImportManifest manifest) throws IOException {
         Path target = manifestPath(mangaRoot, taskId);
         Files.createDirectories(target.getParent());
-        Path tmp = target.resolveSibling("manifest.json.tmp");
+        Path tempPath = target.resolveSibling("manifest.json.tmp");
         try {
-            objectMapper.writerWithDefaultPrettyPrinter().writeValue(tmp.toFile(), manifest);
-            Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
+            objectMapper.writerWithDefaultPrettyPrinter().writeValue(tempPath.toFile(), manifest);
+            Files.move(tempPath, target, StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException e) {
-            Files.deleteIfExists(tmp);
+            Files.deleteIfExists(tempPath);
             throw e;
         }
         log.info("清单已写入: {}", target);

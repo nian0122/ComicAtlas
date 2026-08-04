@@ -12,11 +12,11 @@ public class Result<T> {
     private T data;
 
     public static <T> Result<T> ok(T data) {
-        Result<T> r = new Result<>();
-        r.code = HttpStatusCodes.OK;
-        r.message = "success";
-        r.data = data;
-        return r;
+        Result<T> result = new Result<>();
+        result.code = HttpStatusCodes.OK;
+        result.message = "success";
+        result.data = data;
+        return result;
     }
 
     public static <T> Result<T> ok() {
@@ -24,17 +24,17 @@ public class Result<T> {
     }
 
     public static <T> Result<T> ok(int code, String message) {
-        Result<T> r = new Result<>();
-        r.code = code;
-        r.message = message;
-        return r;
+        Result<T> result = new Result<>();
+        result.code = code;
+        result.message = message;
+        return result;
     }
 
     public static <T> Result<T> fail(int code, String message) {
-        Result<T> r = new Result<>();
-        r.code = code;
-        r.message = message;
-        return r;
+        Result<T> result = new Result<>();
+        result.code = code;
+        result.message = message;
+        return result;
     }
 
     public static <T> Result<T> fail(String message) {

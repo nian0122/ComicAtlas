@@ -12,7 +12,7 @@ import java.nio.file.StandardCopyOption;
 /**
  * 安全移动策略：
  * 同卷 → atomic rename（瞬时、原子）；
- * 跨卷 → copy 到 .tmp → size 校验 → atomic rename → 删除源（目标名永不见半截文件）。
+ * 跨卷 → copy 到临时文件（.tmp 后缀）→ size 校验 → atomic rename → 删除源（目标名永不见半截文件）。
  */
 @Slf4j
 @Component
@@ -28,25 +28,25 @@ public class SafeMoveStrategy {
 
     /** package-private：跨卷流程，供测试直接调用（同卷环境亦可验证逻辑）。 */
     void moveCrossVolume(Path source, Path target) throws IOException {
-        Path tmp = target.resolveSibling(target.getFileName() + ".tmp");
+        Path tempPath = target.resolveSibling(target.getFileName() + ".tmp");
         try {
-            Files.copy(source, tmp, StandardCopyOption.REPLACE_EXISTING);
-            verifyCopySize(source, tmp);
-            moveAtomically(tmp, target);
+            Files.copy(source, tempPath, StandardCopyOption.REPLACE_EXISTING);
+            verifyCopySize(source, tempPath);
+            moveAtomically(tempPath, target);
             Files.deleteIfExists(source);
             log.info("move (跨卷 copy+rename): {} -> {}", source, target);
         } finally {
-            Files.deleteIfExists(tmp);
+            Files.deleteIfExists(tempPath);
         }
     }
 
     /** package-private：大小校验，供测试直接验证校验逻辑。 */
-    void verifyCopySize(Path source, Path tmp) throws IOException {
+    void verifyCopySize(Path source, Path tempPath) throws IOException {
         long srcSize = Files.size(source);
-        long tmpSize = Files.size(tmp);
-        if (tmpSize != srcSize) {
+        long tempSize = Files.size(tempPath);
+        if (tempSize != srcSize) {
             throw new IOException("跨卷复制大小校验失败: " + source
-                    + " expected=" + srcSize + " actual=" + tmpSize);
+                    + " expected=" + srcSize + " actual=" + tempSize);
         }
     }
 
