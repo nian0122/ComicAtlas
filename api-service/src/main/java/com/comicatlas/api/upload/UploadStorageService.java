@@ -1,6 +1,7 @@
 package com.comicatlas.api.upload;
 
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.common.storage.ApiStorageProperties;
 import com.comicatlas.api.common.storage.ApiStorageRoot;
@@ -70,7 +71,7 @@ public class UploadStorageService {
         try {
             Files.createDirectories(sessionDir(session));
         } catch (IOException e) {
-            throw new BusinessException(500, "创建 STAGING 目录失败: " + e.getMessage());
+            throw new BusinessException(HttpStatusCodes.INTERNAL_ERROR, "创建 STAGING 目录失败: " + e.getMessage());
         }
     }
 
@@ -111,17 +112,17 @@ public class UploadStorageService {
                              long start, long end, long total,
                              String chunkSha256, InputStream in) {
         if (!UploadSessionStatus.ACTIVE.name().equals(session.getStatus())) {
-            throw new BusinessException(409, "会话状态 " + session.getStatus() + " 不允许上传分片");
+            throw new BusinessException(HttpStatusCodes.CONFLICT, "会话状态 " + session.getStatus() + " 不允许上传分片");
         }
         if (start < 0 || end < start || end >= total) {
-            throw new BusinessException(400, "非法 Content-Range: bytes " + start + "-" + end + "/" + total);
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "非法 Content-Range: bytes " + start + "-" + end + "/" + total);
         }
         long length = end - start + 1;
         if (length > uploadProperties.getChunkSize()) {
-            throw new BusinessException(400, "分片超出上限: " + length + " > " + uploadProperties.getChunkSize());
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "分片超出上限: " + length + " > " + uploadProperties.getChunkSize());
         }
         if (total != file.getSizeBytes()) {
-            throw new BusinessException(400, "Content-Range 总大小与清单不符: " + total + " != " + file.getSizeBytes());
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "Content-Range 总大小与清单不符: " + total + " != " + file.getSizeBytes());
         }
 
         ReentrantLock lock = fileLocks.computeIfAbsent(session.getSessionId() + ":" + file.getFileId(),
@@ -133,7 +134,7 @@ public class UploadStorageService {
             String actualHex = writePositional(path, start, in);
             if (chunkSha256 != null && !chunkSha256.isBlank()
                     && !chunkSha256.equalsIgnoreCase(actualHex)) {
-                throw new BusinessException(400,
+                throw new BusinessException(HttpStatusCodes.BAD_REQUEST,
                         "分片 SHA-256 校验失败: 声明=" + chunkSha256 + " 实际=" + actualHex);
             }
             String merged = RangeTracker.merge(file.getReceivedRanges(), start, end);
@@ -146,7 +147,7 @@ public class UploadStorageService {
             file.setReceivedRanges(merged);
             return merged;
         } catch (IOException e) {
-            throw new BusinessException(500, "分片写入失败: " + e.getMessage());
+            throw new BusinessException(HttpStatusCodes.INTERNAL_ERROR, "分片写入失败: " + e.getMessage());
         } finally {
             lock.unlock();
         }
@@ -181,8 +182,7 @@ public class UploadStorageService {
             if (dash > 0) {
                 try {
                     max = Math.max(max, Long.parseLong(part.substring(dash + 1)));
-                } catch (NumberFormatException ignored) {
-                }
+                } catch (NumberFormatException e) { log.warn("解析 range 结束位置失败: {}", part, e); }
             }
         }
         return max;
