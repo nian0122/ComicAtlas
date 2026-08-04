@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.comicatlas.api.common.Result;
 import com.comicatlas.api.comic.dto.*;
 import com.comicatlas.api.comic.service.ComicService;
+import com.comicatlas.api.management.dto.ManagementTaskResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -22,15 +23,31 @@ public class ComicController {
         return Result.ok(comicService.listComics(query));
     }
 
+    /** 创建空漫画（DRAFT） */
+    @PostMapping("/comics")
+    public Result<ComicDetailVO> createComic(@Valid @RequestBody CreateComicRequest request) {
+        return Result.ok(comicService.createComic(request));
+    }
+
+    /** 乐观锁更新漫画（version 冲突 → 409） */
+    @PutMapping("/comics/{id}")
+    public Result<ComicDetailVO> updateComic(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateComicRequest request) {
+        return Result.ok(comicService.updateComic(id, request));
+    }
+
     @GetMapping("/comics/{id}")
     public Result<ComicDetailVO> getComic(@PathVariable Long id) {
         return Result.ok(comicService.getComicDetail(id));
     }
 
+    /** 删除漫画：创建回收任务而非硬删 */
     @DeleteMapping("/comics/{id}")
-    public Result<?> deleteComic(@PathVariable Long id) {
-        comicService.deleteComicAsync(id);
-        return Result.ok();
+    public Result<ManagementTaskResponse> deleteComic(
+            @PathVariable Long id,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+        return Result.ok(comicService.deleteComic(id, idempotencyKey));
     }
 
     @GetMapping("/comics/{id}/chapters/{chapterId}/pages")

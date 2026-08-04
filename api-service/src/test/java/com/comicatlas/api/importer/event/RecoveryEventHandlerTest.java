@@ -4,6 +4,7 @@ import com.comicatlas.api.admin.dto.RecoveryProgress;
 import com.comicatlas.api.admin.recovery.RecoveryEngine;
 import com.comicatlas.api.importer.entity.RecoveryTask;
 import com.comicatlas.api.importer.mapper.RecoveryTaskMapper;
+import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.common.event.RecoveryFailedEvent;
 import com.comicatlas.common.event.RecoveryScanCompletedEvent;
 import com.rabbitmq.client.Channel;
@@ -42,16 +43,20 @@ class RecoveryEventHandlerTest {
     private ValueOperations<String, Object> valueOperations;
 
     @Mock
+    private ManagementTaskService managementTaskService;
+
+    @Mock
     private Channel channel;
 
     private RecoveryEventHandler handler;
 
     @BeforeEach
     void setUp() {
-        handler = new RecoveryEventHandler(recoveryEngine, recoveryTaskMapper, redisTemplate);
+        handler = new RecoveryEventHandler(recoveryEngine, recoveryTaskMapper, redisTemplate, managementTaskService);
         lenient().when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         lenient().when(redisTemplate.hasKey(anyString())).thenReturn(false);
         lenient().doNothing().when(valueOperations).set(anyString(), any(), any(Duration.class));
+        lenient().when(managementTaskService.findActiveItem(any(), any(), any())).thenReturn(null);
     }
 
     // ======================== handleScanCompleted ========================
@@ -84,11 +89,11 @@ class RecoveryEventHandlerTest {
         verify(recoveryEngine).processComicDir(eq(2L), anyInt());
         verify(recoveryEngine).processComicDir(eq(3L), anyInt());
 
-        // 验证任务状态更新为 SUCCESS
+        // 验证任务状态更新为 SUCCEEDED
         ArgumentCaptor<RecoveryTask> taskCaptor = ArgumentCaptor.forClass(RecoveryTask.class);
         verify(recoveryTaskMapper, atLeastOnce()).updateById(taskCaptor.capture());
         RecoveryTask lastUpdate = taskCaptor.getAllValues().get(taskCaptor.getAllValues().size() - 1);
-        assertEquals("SUCCESS", lastUpdate.getStatus());
+        assertEquals("SUCCEEDED", lastUpdate.getStatus());
         assertNotNull(lastUpdate.getEndedAt());
 
         // 验证 ack
@@ -169,11 +174,11 @@ class RecoveryEventHandlerTest {
         // 两个 comic 都应该被处理
         verify(recoveryEngine, times(2)).processComicDir(anyLong(), anyInt());
 
-        // 最终状态应该是 SUCCESS（单个失败不中断整体）
+        // 最终状态应该是 SUCCEEDED（单个失败不中断整体）
         ArgumentCaptor<RecoveryTask> taskCaptor = ArgumentCaptor.forClass(RecoveryTask.class);
         verify(recoveryTaskMapper, atLeastOnce()).updateById(taskCaptor.capture());
         RecoveryTask lastUpdate = taskCaptor.getAllValues().get(taskCaptor.getAllValues().size() - 1);
-        assertEquals("SUCCESS", lastUpdate.getStatus());
+        assertEquals("SUCCEEDED", lastUpdate.getStatus());
         assertEquals(1, lastUpdate.getErrorComics()); // 1 个 comic 出错
 
         verify(channel).basicAck(1L, false);

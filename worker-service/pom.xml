@@ -14,6 +14,11 @@
     <name>Worker Service</name>
     <description>动漫资源聚合平台 - 消息消费者服务</description>
 
+    <properties>
+        <!-- 覆盖 Spring Boot 管理的 Testcontainers 版本，修复 Docker Desktop 兼容性 -->
+        <testcontainers.version>1.21.4</testcontainers.version>
+    </properties>
+
     <dependencies>
         <!-- Comic Common -->
         <dependency>
@@ -97,5 +102,30 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- Testcontainers 集成测试 -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>mysql</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>rabbitmq</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>

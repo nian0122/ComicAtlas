@@ -6,9 +6,13 @@ import com.comicatlas.api.comic.dto.CatalogNode;
 import com.comicatlas.api.comic.dto.ChapterRef;
 import com.comicatlas.api.comic.entity.Catalog;
 import com.comicatlas.api.comic.entity.Chapter;
+import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.mapper.CatalogMapper;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
+import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.service.CatalogService;
+import com.comicatlas.api.common.exception.BusinessException;
+import com.comicatlas.common.enums.ChapterLifecycleStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -22,6 +26,7 @@ public class CatalogServiceImpl implements CatalogService {
 
     private final CatalogMapper catalogMapper;
     private final ChapterMapper chapterMapper;
+    private final ComicMapper comicMapper;
 
     @Override
     @Cacheable(
@@ -29,10 +34,17 @@ public class CatalogServiceImpl implements CatalogService {
         key = "#comicId",
         unless = "#result == null || #result.isEmpty()")
     public List<CatalogNode> buildTree(Long comicId) {
+        Comic comic = comicMapper.selectById(comicId);
+        if (comic == null || !"READY".equals(comic.getStatus())) {
+            throw new BusinessException(404, "漫画不存在或不可阅读");
+        }
         var catalogs = catalogMapper.selectList(
             new LambdaQueryWrapper<Catalog>().eq(Catalog::getComicId, comicId).orderByAsc(Catalog::getSortOrder));
         var chapters = chapterMapper.selectList(
-            new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId).orderByAsc(Chapter::getGlobalOrder));
+            new LambdaQueryWrapper<Chapter>()
+                .eq(Chapter::getComicId, comicId)
+                .eq(Chapter::getStatus, ChapterLifecycleStatus.READY.name())
+                .orderByAsc(Chapter::getGlobalOrder));
 
         if (catalogs.isEmpty()) {
             var refs = chapters.stream().map(ch -> new ChapterRef(

@@ -15,6 +15,14 @@ import java.time.Duration;
 /**
  * 取消标记：以 Redis 为唯一事实来源。
  * API cancelTask 写 key、retryTask 删 key；Worker handle() 消费取消 MQ 后幂等写 key，isCancelled() 只读，永不清除取消意图。
+ *
+ * QA 修复注记（task-21 run 6）：
+ * 原 WIP 在类上加了 @ConditionalOnBean(StringRedisTemplate.class)，但该条件作用于用户
+ * @Component 时在组件扫描阶段求值，而 StringRedisTemplate 由 auto-configuration 在
+ * 组件扫描之后才注册 bean 定义，导致条件恒不成立 → CancelHandler 缺失 →
+ * DirectoryImportHandler 构造注入失败 → Worker 独立启动必然失败（APPLICATION FAILED
+ * TO START）。StringRedisTemplate 随 spring-boot-starter-data-redis 必然存在，
+ * 移除该条件注解即恢复 worker 独立可启动性（与 git HEAD 行为一致）。
  */
 @Slf4j
 @Component

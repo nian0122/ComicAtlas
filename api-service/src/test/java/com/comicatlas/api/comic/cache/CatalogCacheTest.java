@@ -3,8 +3,10 @@ package com.comicatlas.api.comic.cache;
 import com.comicatlas.api.comic.dto.CatalogNode;
 import com.comicatlas.api.comic.controller.CatalogController;
 import com.comicatlas.api.comic.entity.Chapter;
+import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.mapper.CatalogMapper;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
+import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.service.CatalogService;
 import com.comicatlas.api.comic.service.impl.CatalogServiceImpl;
 import com.comicatlas.api.config.RedisConfig;
@@ -55,11 +57,17 @@ class CatalogCacheTest {
     @Autowired
     private ChapterMapper chapterMapper;
     @Autowired
+    private ComicMapper comicMapper;
+    @Autowired
     private CacheManager cacheManager;
 
     @BeforeEach
     void setUp() {
-        reset(catalogMapper, chapterMapper);
+        reset(catalogMapper, chapterMapper, comicMapper);
+        Comic comic = new Comic();
+        comic.setId(1L);
+        comic.setStatus("READY");
+        when(comicMapper.selectById(any())).thenReturn(comic);
         var cache = cacheManager.getCache(CatalogCacheInvalidator.CACHE_NAME);
         if (cache != null) {
             cache.clear();
@@ -205,8 +213,14 @@ class CatalogCacheTest {
         }
 
         @Bean
-        CatalogService catalogService(CatalogMapper catalogMapper, ChapterMapper chapterMapper) {
-            return new CatalogServiceImpl(catalogMapper, chapterMapper);
+        ComicMapper comicMapper() {
+            return mock(ComicMapper.class);
+        }
+
+        @Bean
+        CatalogService catalogService(CatalogMapper catalogMapper, ChapterMapper chapterMapper,
+                                      ComicMapper comicMapper) {
+            return new CatalogServiceImpl(catalogMapper, chapterMapper, comicMapper);
         }
 
         @Bean

@@ -1,0 +1,92 @@
+# ============================================================
+# ComicAtlas QA E2E 测试 Compose — 基础设施层
+# 启动 MySQL / Redis / RabbitMQ / Nacos / Nginx
+# API / Worker / Gateway 因 Worker 的 ffmpeg/image-optimizer 为
+# Windows 二进制，由 run-management-e2e.ps1 以宿主 java 进程启动。
+# 全部使用随机/独立端口与测试专用凭据，不触碰生产环境。
+# ============================================================
+name: comicatlas-qa
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: comicatlas-qa-mysql
+    restart: "no"
+    environment:
+      MYSQL_ROOT_PASSWORD: test_root_pass_2024
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --innodb-buffer-pool-size=64M
+      - --max-connections=40
+      - --performance-schema=OFF
+      - --skip-name-resolve
+    ports:
+      - "0:3306"   # 随机宿主端口，避免与生产 3306 冲突
+    volumes:
+      - ./init-qa.sql:/docker-entrypoint-initdb.d/00-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -ptest_root_pass_2024 --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  redis:
+    image: redis:7-alpine
+    container_name: comicatlas-qa-redis
+    restart: "no"
+    command: ["redis-server", "--appendonly", "no"]
+    ports:
+      - "0:6379"   # 随机宿主端口
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: comicatlas-qa-rabbitmq
+    restart: "no"
+    environment:
+      RABBITMQ_DEFAULT_USER: test_rabbit
+      RABBITMQ_DEFAULT_PASS: test_rabbit_pass
+      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-rabbit consumer_timeout 86400000"
+    ports:
+      - "0:5672"    # AMQP 随机端口
+      - "0:15672"   # Management 随机端口
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 15s
+
+  nacos:
+    image: nacos/nacos-server:v2.3.1
+    container_name: comicatlas-qa-nacos
+    restart: "no"
+    environment:
+      MODE: standalone
+      NACOS_AUTH_ENABLE: "false"
+    ports:
+      - "18848:8848"   # 固定宿主端口（gRPC 9848 = 8848+1000，客户端按端口推算）
+      - "19848:9848"
+
+  nginx:
+    image: nginx:alpine
+    container_name: comicatlas-qa-nginx
+    restart: "no"
+    depends_on:
+      - mysql
+    extra_hosts:
+      # host-gateway 强制解析为宿主 IPv4 网关（host.docker.internal 在 nginx 下可能
+      # 解析到 IPv6 导致连接失败）；nginx-e2e.conf 上游使用 gateway-host。
+      - "gateway-host:host-gateway"
+    ports:
+      - "18080:80"  # 固定宿主端口，root Playwright 通过 BASE_URL 访问
+    volumes:
+      - ./nginx-e2e.conf:/etc/nginx/nginx.conf:ro
+      - ${QA_DIST:-../../frontend/dist}:/usr/share/nginx/html:ro
+      - ${QA_MANGA_ROOT:-../qa-manga}:/storage

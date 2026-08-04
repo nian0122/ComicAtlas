@@ -1,0 +1,14 @@
+﻿{
+    "failures":  [
+                     "运行异常: System.Management.Automation.RuntimeException: mvnw.cmd 缺失"
+                 ],
+    "finishedAt":  "2026-08-03T18:01:06.9309852+08:00",
+    "evidenceDir":  "D:\\projects\\ComicAtlas\\scripts\\.omo\\evidence\\comic-management-console\\task-21-comic-management-console",
+    "overall":  "FAIL",
+    "failureCount":  1,
+    "profile":  "production-like",
+    "inject":  "",
+    "recon":  [
+
+              ]
+}

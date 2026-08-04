@@ -2,6 +2,10 @@ package com.comicatlas.api.export.event;
 
 import com.comicatlas.api.export.entity.ExportTask;
 import com.comicatlas.api.export.mapper.ExportTaskMapper;
+import com.comicatlas.api.management.entity.ManagementTaskItem;
+import com.comicatlas.api.management.service.ManagementTaskService;
+import com.comicatlas.common.enums.ManagementTaskStatus;
+import com.comicatlas.common.enums.TaskType;
 import com.comicatlas.common.event.ExportTaskStartedEvent;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +25,7 @@ import org.springframework.stereotype.Component;
 public class ExportStartedHandler {
 
     private final ExportTaskMapper exportTaskMapper;
+    private final ManagementTaskService managementTaskService;
 
     @RabbitListener(queues = "export.started.result.queue")
     public void handle(ExportTaskStartedEvent event,
@@ -34,6 +39,13 @@ public class ExportStartedHandler {
             if (task != null) {
                 task.setStatus("RUNNING");
                 exportTaskMapper.updateById(task);
+            }
+
+            // 同步统一任务项为 RUNNING
+            ManagementTaskItem mgmtItem = managementTaskService.findActiveItem("COMIC", comicId, TaskType.EXPORT);
+            if (mgmtItem != null) {
+                managementTaskService.updateItemStatus(mgmtItem.getId(), ManagementTaskStatus.RUNNING,
+                        null, "EXPORT_TASK", taskId);
             }
 
             channel.basicAck(tag, false);

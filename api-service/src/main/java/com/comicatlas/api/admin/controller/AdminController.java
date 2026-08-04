@@ -32,8 +32,9 @@ public class AdminController {
     }
 
     /**
-     * 删除漫画。mode=DATABASE_ONLY 仅删 DB 保留文件，
-     * mode=DELETE_FILES 删 DB 后发 MQ 委托 Worker 删除本地文件。
+     * 删除漫画。兼容旧 mode 参数（DATABASE_ONLY/DELETE_FILES 均视为回收重定向），
+     * 普通入口不再绕过回收站；永久清理走 POST /api/trash/comics/{id}/purge
+     * （只接受 TRASHED + 二次确认 token + 7 天保留期）。
      */
     @DeleteMapping("/comics/{id}")
     public Result<ComicDeleteStats> deleteComic(@PathVariable Long id, @RequestParam String mode) {

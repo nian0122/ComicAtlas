@@ -2,6 +2,7 @@ package com.comicatlas.api.importer.controller;
 
 import com.comicatlas.api.common.Result;
 import com.comicatlas.api.importer.service.LqService;
+import com.comicatlas.api.management.dto.OperationSubmitResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -13,14 +14,16 @@ public class LqController {
     private final LqService lqService;
 
     @PostMapping("/comics/{comicId}/lq")
-    public Result<?> generateComicLq(@PathVariable Long comicId) {
-        lqService.generateForComic(comicId);
-        return Result.ok();
+    public Result<OperationSubmitResult> generateComicLq(
+            @PathVariable Long comicId,
+            @RequestParam(defaultValue = "false") boolean regenerate) {
+        return Result.ok(lqService.generateForComic(comicId, regenerate));
     }
 
     @PostMapping("/chapters/{chapterId}/lq")
-    public Result<?> generateChapterLq(@PathVariable Long chapterId) {
-        lqService.generateForChapter(chapterId);
-        return Result.ok();
+    public Result<OperationSubmitResult> generateChapterLq(
+            @PathVariable Long chapterId,
+            @RequestParam(defaultValue = "false") boolean regenerate) {
+        return Result.ok(lqService.generateForChapter(chapterId, regenerate));
     }
 }

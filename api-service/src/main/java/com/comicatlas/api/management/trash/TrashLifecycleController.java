@@ -1,0 +1,80 @@
+package com.comicatlas.api.management.trash;
+
+import com.comicatlas.api.common.Result;
+import com.comicatlas.api.management.dto.OperationSubmitResult;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * 回收站生命周期端点 — 恢复 / 永久清理 / 对账。
+ * <p>
+ * 回收入口沿用既有端点：DELETE /api/comics/{id}、DELETE /api/comics/{comicId}/chapters/{chapterId}、
+ * DELETE /api/media/{mediaId}。永久清理只接受 TRASHED + 二次确认 token + 7 天保留期。
+ */
+@RestController
+@RequestMapping("/api/trash")
+@RequiredArgsConstructor
+public class TrashLifecycleController {
+
+    private final TrashLifecycleService trashLifecycleService;
+
+    // ======================== 恢复 ========================
+
+    @PostMapping("/comics/{comicId}/restore")
+    public Result<OperationSubmitResult> restoreComic(@PathVariable Long comicId) {
+        return Result.ok(trashLifecycleService.restoreComic(comicId));
+    }
+
+    @PostMapping("/comics/{comicId}/chapters/{chapterId}/restore")
+    public Result<OperationSubmitResult> restoreChapter(@PathVariable Long comicId,
+                                                        @PathVariable Long chapterId) {
+        return Result.ok(trashLifecycleService.restoreChapter(comicId, chapterId));
+    }
+
+    @PostMapping("/media/{mediaId}/restore")
+    public Result<OperationSubmitResult> restoreMedia(@PathVariable Long mediaId) {
+        return Result.ok(trashLifecycleService.restoreMedia(mediaId));
+    }
+
+    // ======================== 永久清理 ========================
+
+    @PostMapping("/comics/{comicId}/purge")
+    public Result<OperationSubmitResult> purgeComic(@PathVariable Long comicId,
+                                                    @Valid @RequestBody PurgeRequest request) {
+        return Result.ok(trashLifecycleService.purgeComic(comicId, request.getToken()));
+    }
+
+    @PostMapping("/comics/{comicId}/chapters/{chapterId}/purge")
+    public Result<OperationSubmitResult> purgeChapter(@PathVariable Long comicId,
+                                                      @PathVariable Long chapterId,
+                                                      @Valid @RequestBody PurgeRequest request) {
+        return Result.ok(trashLifecycleService.purgeChapter(comicId, chapterId, request.getToken()));
+    }
+
+    @PostMapping("/media/{mediaId}/purge")
+    public Result<OperationSubmitResult> purgeMedia(@PathVariable Long mediaId,
+                                                    @Valid @RequestBody PurgeRequest request) {
+        return Result.ok(trashLifecycleService.purgeMedia(mediaId, request.getToken()));
+    }
+
+    // ======================== 对账 ========================
+
+    @GetMapping("/{targetType}/{targetId}/reconcile")
+    public Result<TrashReconcileReport> reconcile(@PathVariable String targetType,
+                                                  @PathVariable Long targetId) {
+        return Result.ok(trashLifecycleService.reconcile(targetType, targetId));
+    }
+
+    /** 对账并修复可安全自动恢复的 DB 状态。 */
+    @PostMapping("/{targetType}/{targetId}/reconcile")
+    public Result<TrashReconcileReport> reconcileAndRepair(@PathVariable String targetType,
+                                                           @PathVariable Long targetId) {
+        return Result.ok(trashLifecycleService.reconcileAndRepair(targetType, targetId));
+    }
+}

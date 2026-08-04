@@ -57,6 +57,7 @@ public class AdminServiceImpl implements AdminService {
     private final RabbitTemplate rabbitTemplate;
     private final RecoveryEngine recoveryEngine;
     private final CatalogCacheInvalidator catalogCacheInvalidator;
+    private final com.comicatlas.api.management.operation.MediaOperationCommandService mediaOperationCommandService;
 
     /** 未结束（活跃）的导入任务状态 */
     private static final Set<String> ACTIVE_STATUSES = Set.of("PENDING", "PARSING", "IMPORTING");
@@ -86,40 +87,32 @@ public class AdminServiceImpl implements AdminService {
             throw new BusinessException(409, "该漫画存在运行中的导入任务，请等待任务完成后再删除数据库记录。");
         }
 
-        ComicDeleteStats stats = new ComicDeleteStats();
-
+        // 统计待处理数量（不再先删 DB，删除重定向到统一任务管线 → 回收/永久清理）
         List<Chapter> chapters = chapterMapper.selectList(
                 new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
         List<Long> chapterIds = chapters.stream().map(Chapter::getId).toList();
-        if (!chapterIds.isEmpty()) {
-            stats.setPage((int) mediaMapper.delete(
-                    new LambdaQueryWrapper<Media>().in(Media::getChapterId, chapterIds)));
-        }
+        int pageCount = chapterIds.isEmpty() ? 0
+                : mediaMapper.selectCount(new LambdaQueryWrapper<Media>().in(Media::getChapterId, chapterIds)).intValue();
+        int catalogCount = catalogMapper.selectCount(
+                new LambdaQueryWrapper<Catalog>().eq(Catalog::getComicId, comicId)).intValue();
+        int tagCount = comicTagMapper.selectCount(
+                new LambdaQueryWrapper<ComicTag>().eq(ComicTag::getComicId, comicId)).intValue();
+        int historyCount = historyMapper.selectCount(
+                new LambdaQueryWrapper<ReadingHistory>().eq(ReadingHistory::getComicId, comicId)).intValue();
 
-        stats.setChapter((int) chapterMapper.delete(
-                new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId)));
-
-        stats.setCatalog((int) catalogMapper.delete(
-                new LambdaQueryWrapper<Catalog>().eq(Catalog::getComicId, comicId)));
-
-        stats.setTag((int) comicTagMapper.delete(
-                new LambdaQueryWrapper<ComicTag>().eq(ComicTag::getComicId, comicId)));
-
-        stats.setHistory((int) historyMapper.delete(
-                new LambdaQueryWrapper<ReadingHistory>().eq(ReadingHistory::getComicId, comicId)));
-
-        stats.setComic(comicMapper.deleteById(comicId));
+        mediaOperationCommandService.requestComicDelete(comicId);
         catalogCacheInvalidator.evict(comicId);
 
-        log.info("数据库删除完成: comicId={}, title={}, stats={}", comicId, comic.getTitle(), stats);
+        ComicDeleteStats stats = new ComicDeleteStats();
+        stats.setComic(1);
+        stats.setCatalog(catalogCount);
+        stats.setChapter(chapters.size());
+        stats.setPage(pageCount);
+        stats.setTag(tagCount);
+        stats.setHistory(historyCount);
 
-        if ("DELETE_FILES".equals(mode)) {
-            var deleteEvent = new com.comicatlas.common.event.DeleteRequestedEvent(
-                    UUID.randomUUID(), java.time.Instant.now(), comicId);
-            rabbitTemplate.convertAndSend("comic.delete", "delete.requested", deleteEvent);
-            log.info("已发送文件删除任务: comicId={}", comicId);
-        }
-
+        log.info("整本删除已重定向到统一任务管线: comicId={}, title={}, pendingPage={}",
+                comicId, comic.getTitle(), pageCount);
         return stats;
     }
 
