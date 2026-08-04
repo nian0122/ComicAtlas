@@ -46,10 +46,10 @@ public class HttpDownloader implements DownloadStrategy {
 
     @Override
     public DownloadContext.DownloadResult download(String sourceRef, Path destDir) throws Exception {
-        Matcher m = EH_PATTERN.matcher(sourceRef);
-        if (!m.find()) throw new IllegalArgumentException("Invalid e-hentai URL");
-        long gid = Long.parseLong(m.group(1));
-        String token = m.group(2);
+        Matcher matcher = EH_PATTERN.matcher(sourceRef);
+        if (!matcher.find()) throw new IllegalArgumentException("Invalid e-hentai URL");
+        long gid = Long.parseLong(matcher.group(1));
+        String token = matcher.group(2);
 
         // 调用 e-hentai API 获取元数据（含 torrent 信息）
         GalleryMetadata metadata = fetchMetadata(gid, token);
@@ -66,10 +66,10 @@ public class HttpDownloader implements DownloadStrategy {
      * 获取 gallery 元数据（含 magnet 链接，如果有 torrent）
      */
     public String getMagnetUri(String sourceRef) throws Exception {
-        Matcher m = EH_PATTERN.matcher(sourceRef);
-        if (!m.find()) return null;
-        long gid = Long.parseLong(m.group(1));
-        String token = m.group(2);
+        Matcher matcher = EH_PATTERN.matcher(sourceRef);
+        if (!matcher.find()) return null;
+        long gid = Long.parseLong(matcher.group(1));
+        String token = matcher.group(2);
 
         GalleryMetadata metadata = fetchMetadata(gid, token);
         if (metadata == null || metadata.torrents().isEmpty()) return null;

@@ -110,13 +110,13 @@ public class TrashCommandHandler {
     private boolean compensateBack(List<TrashManifestActual.Entry> results, Path manifestDir) {
         boolean allOk = true;
         for (int i = 0; i < results.size(); i++) {
-            TrashManifestActual.Entry r = results.get(i);
-            if (!TrashManifestActual.Entry.STATE_TRASHED.equals(r.state())) {
+            TrashManifestActual.Entry resultEntry = results.get(i);
+            if (!TrashManifestActual.Entry.STATE_TRASHED.equals(resultEntry.state())) {
                 continue;
             }
-            StorageRoot sourceRoot = storageProperties.getRoots().get(r.rootKey());
-            Path src = manifestDir.resolve(r.trashRelativePath());
-            Path dst = sourceRoot.resolve(r.sourceRelativePath());
+            StorageRoot sourceRoot = storageProperties.getRoots().get(resultEntry.rootKey());
+            Path src = manifestDir.resolve(resultEntry.trashRelativePath());
+            Path dst = sourceRoot.resolve(resultEntry.sourceRelativePath());
             try {
                 if (!Files.exists(src)) {
                     continue;
@@ -128,8 +128,8 @@ public class TrashCommandHandler {
                 }
                 Files.createDirectories(dst.getParent());
                 Files.move(src, dst);
-                results.set(i, new TrashManifestActual.Entry(r.rootKey(), r.sourceRelativePath(),
-                        r.trashRelativePath(), TrashManifestActual.Entry.STATE_SOURCE, "已回滚"));
+                results.set(i, new TrashManifestActual.Entry(resultEntry.rootKey(), resultEntry.sourceRelativePath(),
+                        resultEntry.trashRelativePath(), TrashManifestActual.Entry.STATE_SOURCE, "已回滚"));
             } catch (Exception e) {
                 log.warn("补偿失败: {} -> {}", src, dst, e);
                 allOk = false;

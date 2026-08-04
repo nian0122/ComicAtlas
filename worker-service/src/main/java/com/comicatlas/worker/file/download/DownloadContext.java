@@ -44,10 +44,10 @@ public class DownloadContext {
         @SuppressWarnings("unchecked")
         var torrents = (java.util.List<Map<String, Object>>) metadata.get("torrents");
         if (torrents != null && !torrents.isEmpty()) {
-            var t = torrents.get(0);
+            var torrentCandidate = torrents.get(0);
             String magnet = String.format("magnet:?xt=urn:btih:%s&dn=%s",
-                t.get("hash"), t.get("name"));
-            log.info("Torrent fallback: {}", t.get("name"));
+                torrentCandidate.get("hash"), torrentCandidate.get("name"));
+            log.info("Torrent fallback: {}", torrentCandidate.get("name"));
             DownloadResult torrentResult = torrentDownloader.download(magnet, destDir);
             return new DownloadResult(torrentResult.bytes(), "TORRENT", metadata);
         }

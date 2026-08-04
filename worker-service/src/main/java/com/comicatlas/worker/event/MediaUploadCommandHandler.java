@@ -74,21 +74,21 @@ public class MediaUploadCommandHandler {
             List<MediaAnalysisResult> results = new ArrayList<>(files.size());
             String replaceNewTarget = null;
             for (int i = 0; i < files.size(); i++) {
-                ExportUploadFile uf = files.get(i);
-                Long mediaId = replace ? replaceMediaId : uf.getMediaId();
+                ExportUploadFile uploadFile = files.get(i);
+                Long mediaId = replace ? replaceMediaId : uploadFile.getMediaId();
                 if (mediaId == null) {
-                    throw new IOException("缺少 mediaId: file=" + uf.getFileId());
+                    throw new IOException("缺少 mediaId: file=" + uploadFile.getFileId());
                 }
                 String targetPath = session.getComicId() + "/" + session.getChapterId()
-                        + "/" + uf.getStorageName();
+                        + "/" + uploadFile.getStorageName();
                 if (replace) {
                     replaceNewTarget = targetPath;
                 }
                 Path staging = stagingRoot.resolve(session.getSessionId() + "/"
-                        + uf.getStorageName() + ".part");
+                        + uploadFile.getStorageName() + ".part");
                 Path hqTarget = hqRoot.resolve(targetPath);
 
-                Path sourceToAnalyze = ensureMoved(staging, hqTarget, targetPath, uf.getSizeBytes());
+                Path sourceToAnalyze = ensureMoved(staging, hqTarget, targetPath, uploadFile.getSizeBytes());
                 ComicMetadata.MediaInfo info = mediaAnalyzer.analyze(sourceToAnalyze);
                 results.add(new MediaAnalysisResult(mediaId,
                         info.mediaType() != null ? info.mediaType() : "IMAGE",
