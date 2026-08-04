@@ -8,6 +8,7 @@ import './style.css'
 import './styles/tokens.css'
 import './styles/theme.scss'
 import './styles/animation.css'
+import './styles/management-primitives.css'
 import App from './App.vue'
 import router from './router'
 

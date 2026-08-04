@@ -1,5 +1,5 @@
 <template>
-  <div class="manage-comic-list-page">
+  <div class="manage-comic-list-page" data-testid="comic-list-page">
     <header class="page-header">
       <div class="header-left">
         <p class="page-eyebrow">CATALOG / CONTROL</p>
@@ -7,7 +7,9 @@
         <p class="page-subtitle">共 {{ store.total }} 部漫画</p>
       </div>
       <div class="header-actions">
-        <button class="primary-btn" @click="router.push('/manage/import')">+ 导入漫画</button>
+        <button class="action-btn action-btn--primary" type="button" data-testid="list-import" @click="router.push('/manage/import')">
+          + 导入漫画
+        </button>
       </div>
     </header>
 
@@ -29,8 +31,8 @@
           :value="c.name"
         />
       </el-select>
-      <el-select v-model="filters.status" placeholder="状态" clearable class="filter-select" @change="applyFilters">
-        <el-option v-for="s in STATUS_OPTIONS" :key="s.value" :label="s.label" :value="s.value" />
+      <el-select v-model="filters.status" placeholder="生命周期" clearable class="filter-select" @change="applyFilters">
+        <el-option v-for="s in LIFECYCLE_OPTIONS" :key="s.value" :label="s.label" :value="s.value" />
       </el-select>
       <el-select
         v-model="filters.tags"
@@ -60,34 +62,48 @@
       <el-button text @click="resetFilters">重置</el-button>
     </div>
 
-    <div v-if="selectedIds.length > 0" class="batch-toolbar">
-      <el-checkbox
-        v-model="selectAll"
-        :indeterminate="isIndeterminate"
-        @change="handleSelectAll"
-      >
-        全选 ({{ selectedIds.length }} / {{ store.list.length }})
-      </el-checkbox>
-      <el-button type="primary" @click="showBatchDialog = true">
-        批量编辑
-      </el-button>
+    <!-- 批量选择栏（跨页保持 + 筛选全部） -->
+    <div
+      v-if="selection.hasSelection || selection.mode === 'FILTER'"
+      class="batch-bar"
+      :data-mode="selection.mode"
+      data-testid="batch-bar"
+    >
+      <div class="batch-bar-info">
+        <el-icon :size="16"><Check /></el-icon>
+        <span data-testid="batch-count">
+          已选 <strong>{{ batchCount }}</strong> 项
+        </span>
+        <span v-if="selection.mode === 'FILTER' && selection.excludedIds.length > 0" class="batch-excluded" data-testid="batch-excluded-count">
+          排除 {{ selection.excludedIds.length }} 项
+        </span>
+      </div>
+      <div class="batch-bar-actions">
+        <button class="batch-link" type="button" data-testid="select-current-page" @click="selectCurrentPage">
+          全选当前页
+        </button>
+        <button class="batch-link" type="button" data-testid="select-all-filtered" @click="selectAllFiltered">
+          选择筛选全部
+        </button>
+        <button class="batch-link batch-link--danger" type="button" @click="clearSelection">取消选择</button>
+      </div>
     </div>
 
-    <div v-if="store.loading && store.list.length === 0" class="state loading">
-      <div class="spinner" />
+    <div v-if="store.loading && store.list.length === 0" class="state loading" data-testid="list-loading">
+      <div class="action-btn-spinner" aria-hidden="true" />
       <span>加载中...</span>
     </div>
 
-    <div v-else-if="store.error" class="state error">
+    <div v-else-if="store.error" class="state error" data-testid="list-error">
       <el-icon :size="32"><WarningFilled /></el-icon>
       <span>{{ store.error }}</span>
-      <button class="ghost-btn" @click="store.fetchList()">重试</button>
+      <button class="action-btn action-btn--secondary" type="button" data-testid="list-retry" @click="store.fetchList()">重试</button>
     </div>
 
-    <div v-else-if="store.list.length === 0" class="state empty">
+    <div v-else-if="store.list.length === 0" class="state empty" data-testid="list-empty">
       <el-icon :size="48"><PictureFilled /></el-icon>
       <span>暂无漫画</span>
-      <button class="primary-btn" @click="router.push('/manage/import')">导入漫画</button>
+      <button class="action-btn action-btn--primary" type="button" data-testid="list-empty-import" @click="router.push('/manage/import')">导入漫画</button>
     </div>
 
     <section v-else class="comic-table-section">
@@ -96,14 +112,18 @@
           v-for="comic in store.list"
           :key="comic.id"
           class="comic-row"
-          @click="goEdit(comic.id)"
+          :data-testid="`comic-row-${comic.id}`"
+          @click="goWorkspace(comic.id)"
         >
-          <el-checkbox
-            class="comic-checkbox"
-            :model-value="selectedIds.includes(comic.id)"
-            @change="() => toggleSelect(comic.id)"
-            @click.stop
-          />
+          <label class="comic-checkbox" @click.stop>
+            <input
+              type="checkbox"
+              class="checkbox-input"
+              :checked="isSelected(comic.id)"
+              :data-testid="`comic-select-${comic.id}`"
+              @change="() => toggleSelect(comic.id)"
+            />
+          </label>
           <div class="comic-cover">
             <img
               v-if="comic.coverUrl"
@@ -117,20 +137,57 @@
             <p class="comic-meta">
               <span>{{ comic.author || '未知作者' }}</span>
               <span>· {{ comic.pageCount }} 页</span>
-              <span>· {{ statusLabel(comic.status) }}</span>
+              <span
+                class="status-tag"
+                :class="lifecycleTone(comic)"
+                :data-testid="`comic-lifecycle-${comic.id}`"
+                role="status"
+              >
+                {{ lifecycleLabel(comic) }}
+              </span>
             </p>
+            <div v-if="comic.activeTask" class="comic-task" :data-testid="`comic-active-task-${comic.id}`">
+              <span class="task-chip">{{ comic.activeTask.taskType.value }}</span>
+              <span class="task-pct">{{ comic.activeTask.progress }}%</span>
+            </div>
           </div>
           <div class="comic-actions">
-            <button class="action-btn" @click.stop="goStorage(comic.id)">存储</button>
-            <button class="action-btn" @click.stop="goEdit(comic.id)">编辑</button>
+            <button
+              v-for="action in ACTION_DEFS"
+              :key="action.op"
+              class="action-btn"
+              :class="action.variant"
+              :disabled="!comic.allowedOperations.allowed.includes(action.op)"
+              :data-testid="`comic-action-${comic.id}-${action.op}`"
+              @click.stop="runAction(comic, action.op)"
+            >
+              {{ action.label }}
+            </button>
+            <span
+              v-for="action in blockedActions(comic)"
+              :key="`blocked-${action.op}`"
+              class="blocked-reason"
+              :data-testid="`comic-blocked-${comic.id}-${action.op}`"
+            >
+              {{ action.reason }}
+            </span>
           </div>
+          <button
+            v-if="selection.mode === 'FILTER'"
+            class="exclude-btn"
+            type="button"
+            :data-testid="`comic-exclude-${comic.id}`"
+            @click.stop="toggleSelect(comic.id)"
+          >
+            排除
+          </button>
         </div>
       </div>
 
       <div class="pagination-wrapper">
         <el-pagination
-          v-model:current-page="store.query.page"
-          :page-size="store.query.size"
+          :current-page="store.page"
+          :page-size="24"
           :total="store.total"
           layout="prev, pager, next"
           background
@@ -138,47 +195,70 @@
         />
       </div>
     </section>
-
-    <BatchEditDialog
-      v-model:visible="showBatchDialog"
-      :comic-ids="selectedIds"
-      @saved="onBatchSaved"
-    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
+import { computed, reactive, onMounted, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { PictureFilled, WarningFilled } from '@element-plus/icons-vue'
-import { useManagementComicStore } from '@/stores/management/comic'
+import { Check, PictureFilled, WarningFilled } from '@element-plus/icons-vue'
+import { useComicListStore } from '@/stores/management/comicList'
+import { useBatchSelectionStore } from '@/stores/management/selection'
 import { useCategoryStore } from '@/stores/management/category'
 import { useTagStore } from '@/stores/tag-store'
-import BatchEditDialog from './BatchEditDialog.vue'
+import { ComicLifecycleStatus, OperationName } from '@/types/management/enums'
+import type { OperationName as OperationNameType } from '@/types/management/enums'
+import type { ComicListEntry } from '@/types/management/comic'
 import type { ComicListQuery } from '@/types'
+import { lqApi, hqApi } from '@/services/api'
+import { ElMessage } from 'element-plus'
 
 const router = useRouter()
-const store = useManagementComicStore()
+const store = useComicListStore()
+const selection = useBatchSelectionStore()
 const categoryStore = useCategoryStore()
 const tagStore = useTagStore()
 
-function hideBrokenImage(event: Event) {
+function hideBrokenImage(event: Event): void {
   const image = event.currentTarget as HTMLImageElement
   image.hidden = true
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  READY: '已就绪',
+const LIFECYCLE_LABELS: Readonly<Record<string, string>> = {
+  DRAFT: '草稿',
   IMPORTING: '导入中',
-  PENDING: '等待中',
-  FAILED: '失败',
+  IMPORT_FAILED: '导入失败',
+  READY: '已就绪',
+  RECOVERY_REQUIRED: '待恢复',
+  DELETING: '删除中',
+  TRASHING: '回收中',
+  TRASHED: '已回收',
+  RESTORING: '恢复中',
+  PURGING: '清除中',
+  DELETED: '已删除',
 }
 
-const STATUS_OPTIONS = [
-  { label: '已就绪', value: 'READY' },
-  { label: '导入中', value: 'IMPORTING' },
-  { label: '等待中', value: 'PENDING' },
-  { label: '失败', value: 'FAILED' },
+const LIFECYCLE_TONES: Readonly<Record<string, string>> = {
+  DRAFT: 'status-tag--neutral',
+  IMPORTING: 'status-tag--warning',
+  IMPORT_FAILED: 'status-tag--danger',
+  READY: 'status-tag--success',
+  RECOVERY_REQUIRED: 'status-tag--warning',
+  DELETING: 'status-tag--danger',
+  TRASHING: 'status-tag--warning',
+  TRASHED: 'status-tag--neutral',
+  RESTORING: 'status-tag--warning',
+  PURGING: 'status-tag--danger',
+  DELETED: 'status-tag--neutral',
+}
+
+const LIFECYCLE_OPTIONS = [
+  { label: '已就绪', value: ComicLifecycleStatus.READY },
+  { label: '导入中', value: ComicLifecycleStatus.IMPORTING },
+  { label: '导入失败', value: ComicLifecycleStatus.IMPORT_FAILED },
+  { label: '草稿', value: ComicLifecycleStatus.DRAFT },
+  { label: '待恢复', value: ComicLifecycleStatus.RECOVERY_REQUIRED },
+  { label: '已回收', value: ComicLifecycleStatus.TRASHED },
 ]
 
 const SORT_OPTIONS = [
@@ -195,52 +275,110 @@ const filters = reactive({
   status: '',
   tags: [] as string[],
   tagMode: 'OR' as 'AND' | 'OR',
-  sort: 'createdAt',
+  sort: 'createdAt' as NonNullable<ComicListQuery['sort']>,
 })
 
-const selectedIds = ref<number[]>([])
-const showBatchDialog = ref(false)
+const batchCount = computed(() => {
+  if (selection.mode === 'FILTER') {
+    return Math.max(0, store.total - selection.excludedIds.length)
+  }
+  return selection.ids.length
+})
 
-const selectAll = computed(() =>
-  store.list.length > 0 && selectedIds.value.length === store.list.length
-)
-const isIndeterminate = computed(() =>
-  selectedIds.value.length > 0 && selectedIds.value.length < store.list.length
-)
+function isSelected(id: number): boolean {
+  if (selection.mode === 'FILTER') {
+    return !selection.excludedIds.includes(id)
+  }
+  return selection.ids.includes(id)
+}
 
-function toggleSelect(id: number) {
-  const idx = selectedIds.value.indexOf(id)
-  if (idx >= 0) {
-    selectedIds.value.splice(idx, 1)
-  } else {
-    selectedIds.value.push(id)
+function toggleSelect(id: number): void {
+  if (selection.mode === 'FILTER') {
+    if (selection.excludedIds.includes(id)) {
+      const next = selection.excludedIds.filter((ex) => ex !== id)
+      selection.setFilter(store.filterQuery, next)
+    } else {
+      selection.addExcluded(id)
+    }
+    return
+  }
+  selection.toggle(id)
+}
+
+function selectCurrentPage(): void {
+  store.selectCurrentPage()
+}
+
+function selectAllFiltered(): void {
+  store.selectAllFiltered()
+}
+
+function clearSelection(): void {
+  store.clearSelection()
+}
+
+function lifecycleLabel(comic: ComicListEntry): string {
+  if (comic.lifecycle.kind === 'known') {
+    return LIFECYCLE_LABELS[comic.lifecycle.value] ?? comic.lifecycle.value
+  }
+  return `未知状态 (${comic.lifecycle.value})`
+}
+
+function lifecycleTone(comic: ComicListEntry): string {
+  if (comic.lifecycle.kind === 'known') {
+    return LIFECYCLE_TONES[comic.lifecycle.value] ?? 'status-tag--neutral'
+  }
+  return 'status-tag--neutral'
+}
+
+/** 允许操作 → 列表可见动作定义（顺序稳定） */
+const ACTION_DEFS: readonly { readonly op: OperationNameType; readonly label: string; readonly variant: string }[] = [
+  { op: OperationName.EDIT, label: '编辑', variant: 'action-btn--secondary' },
+  { op: OperationName.LQ_GENERATE, label: '生成LQ', variant: 'action-btn--secondary' },
+  { op: OperationName.HQ_DELETE, label: '删除HQ', variant: 'action-btn--danger-ghost' },
+  { op: OperationName.DELETE, label: '删除', variant: 'action-btn--danger-ghost' },
+  { op: OperationName.RECOVER, label: '恢复', variant: 'action-btn--secondary' },
+  { op: OperationName.PURGE, label: '彻底删除', variant: 'action-btn--danger-filled' },
+]
+
+/** 被阻塞的动作（显示原因） */
+function blockedActions(comic: ComicListEntry): readonly { readonly op: string; readonly reason: string }[] {
+  return ACTION_DEFS.flatMap((def) => {
+    if (comic.allowedOperations.allowed.includes(def.op)) return []
+    const reason =
+      comic.allowedOperations.blockedReasons[def.op] ??
+      comic.allowedOperations.blockedReasons['*'] ??
+      '当前状态不允许'
+    return [{ op: def.op, reason }]
+  })
+}
+
+async function runAction(comic: ComicListEntry, op: OperationNameType): Promise<void> {
+  if (op === OperationName.EDIT) {
+    router.push(`/manage/comics/${comic.id}`)
+    return
+  }
+  try {
+    if (op === OperationName.LQ_GENERATE) {
+      await lqApi.generateComic(comic.id)
+    } else if (op === OperationName.HQ_DELETE) {
+      await hqApi.deleteComic(comic.id)
+    } else if (op === OperationName.DELETE) {
+      router.push(`/manage/comics/${comic.id}?tab=danger`)
+      return
+    } else if (op === OperationName.RECOVER || op === OperationName.PURGE) {
+      router.push(`/manage/comics/${comic.id}?tab=danger`)
+      return
+    }
+    ElMessage.success('操作已提交')
+  } catch (err: unknown) {
+    const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+    ElMessage.error(msg || '操作失败')
   }
 }
 
-function handleSelectAll(val: string | number | boolean) {
-  if (val) {
-    selectedIds.value = store.list.map(c => c.id)
-  } else {
-    selectedIds.value = []
-  }
-}
-
-function onBatchSaved() {
-  selectedIds.value = []
-  showBatchDialog.value = false
-  store.fetchList()
-}
-
-function statusLabel(s: string) {
-  return STATUS_LABELS[s] || s
-}
-
-function goEdit(id: number) {
-  router.push(`/manage/comics/${id}/edit`)
-}
-
-function goStorage(id: number) {
-  router.push(`/manage/storage/${id}`)
+function goWorkspace(id: number): void {
+  router.push(`/manage/comics/${id}`)
 }
 
 watch(() => filters.tags, (val) => {
@@ -251,37 +389,36 @@ watch(() => filters.tags, (val) => {
   }
 }, { deep: true })
 
-function applyFilters() {
-  store.search({
+function applyFilters(): void {
+  void store.search({
     keyword: filters.keyword || undefined,
     category: filters.category || undefined,
     status: filters.status || undefined,
     tags: filters.tags.length > 0 ? filters.tags : undefined,
     tagMode: filters.tagMode,
-    sort: filters.sort as ComicListQuery['sort'],
+    sort: filters.sort,
   })
 }
 
-function resetFilters() {
+function resetFilters(): void {
   filters.keyword = ''
   filters.category = ''
   filters.status = ''
   filters.tags = []
   filters.tagMode = 'OR'
   filters.sort = 'createdAt'
-  store.resetQuery()
-  store.fetchList()
+  store.reset()
+  void store.fetchList()
 }
 
-function onPageChange(page: number) {
-  store.updateQuery({ page })
-  store.fetchList()
+function onPageChange(page: number): void {
+  void store.goToPage(page)
 }
 
 onMounted(() => {
   categoryStore.fetchList()
   tagStore.fetchList()
-  store.fetchList()
+  void store.fetchList()
 })
 </script>
 
@@ -289,25 +426,26 @@ onMounted(() => {
 .manage-comic-list-page {
   max-width: 1120px;
   margin: 0 auto;
+  min-width: 0;
 }
 
 .page-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: var(--space-2xl);
-  gap: var(--space-base);
+  margin-bottom: var(--space-6);
+  gap: var(--space-4);
   flex-wrap: wrap;
 }
 
 .header-left {
   display: flex;
   flex-direction: column;
-  gap: var(--space-xs);
+  gap: var(--space-1);
 }
 
 .page-eyebrow {
-  margin-bottom: var(--space-1);
+  margin: 0;
   color: var(--accent);
   font-size: 10px;
   font-weight: 700;
@@ -322,85 +460,50 @@ onMounted(() => {
 }
 
 .page-subtitle {
-  font-size: 14px;
+  font-size: var(--text-sm);
   color: var(--text-secondary);
   margin: 0;
 }
 
 .header-actions {
   display: flex;
-  gap: var(--space-sm);
-}
-
-.primary-btn {
-  padding: 8px 16px;
-  background: var(--accent);
-  color: var(--text-primary);
-  border: none;
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background var(--transition-fast);
-}
-
-.primary-btn:hover {
-  background: var(--accent-hover);
-}
-
-.ghost-btn {
-  padding: 8px 16px;
-  background: transparent;
-  color: var(--text-primary);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.ghost-btn:hover {
-  background: var(--bg-surface);
-  border-color: var(--text-muted);
+  gap: var(--space-2);
 }
 
 .filter-toolbar {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
-  margin-bottom: var(--space-lg);
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
   flex-wrap: wrap;
 }
 
-.filter-input {
-  width: 200px;
+.filter-input { width: 200px; }
+.filter-select { width: 120px; }
+.filter-select--wide { width: 180px; }
+.filter-select--mini { width: 90px; }
+
+.batch-bar {
+  margin-bottom: var(--space-4);
 }
 
-.filter-select {
-  width: 120px;
-}
-
-.filter-select--wide {
-  width: 180px;
-}
-
-.filter-select--mini {
-  width: 90px;
+.batch-excluded {
+  color: var(--warning);
+  font-size: var(--text-xs);
 }
 
 .comic-grid {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  margin-bottom: var(--space-xl);
+  margin-bottom: var(--space-4);
 }
 
 .comic-row {
   position: relative;
   display: flex;
   align-items: center;
-  gap: var(--space-base);
+  gap: var(--space-4);
   min-height: 76px;
   padding: var(--space-3) var(--space-4);
   background: var(--bg-secondary);
@@ -457,7 +560,7 @@ onMounted(() => {
   font-size: 15px;
   font-weight: 600;
   color: var(--text-primary);
-  margin: 0 0 var(--space-xs);
+  margin: 0 0 var(--space-1);
   display: -webkit-box;
   overflow: hidden;
   line-break: strict;
@@ -467,42 +570,110 @@ onMounted(() => {
 }
 
 .comic-meta {
-  font-size: 12px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
   color: var(--text-secondary);
   margin: 0;
 }
 
-.comic-meta span + span {
-  margin-left: 6px;
+.comic-meta .status-tag {
+  min-height: 20px;
+  padding: 0 8px;
+  font-size: 10px;
+}
+
+.comic-task {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.task-chip {
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-bg);
+  color: var(--accent-hover);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.task-pct {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--warning);
 }
 
 .comic-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   flex-shrink: 0;
+  flex-wrap: wrap;
+  max-width: 340px;
 }
 
-.action-btn {
-  min-height: 36px;
-  padding: 6px 12px;
-  background: var(--bg-surface);
-  color: var(--text-secondary);
+.comic-actions .action-btn {
+  min-height: 32px;
+  padding: 4px 10px;
+  font-size: var(--text-xs);
+}
+
+.blocked-reason {
+  display: block;
+  width: 100%;
+  font-size: 10px;
+  color: var(--warning);
+  line-break: strict;
+  overflow-wrap: anywhere;
+}
+
+.comic-checkbox {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.checkbox-input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.exclude-btn {
+  flex-shrink: 0;
+  min-height: 32px;
+  padding: 4px 10px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  font-size: 13px;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
   font-weight: 600;
   cursor: pointer;
   transition: all var(--transition-fast);
 }
 
-.action-btn:hover {
+.exclude-btn:hover {
   border-color: var(--text-muted);
-  background: var(--surface-highlight);
   color: var(--text-primary);
+}
+
+.exclude-btn:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
 }
 
 .pagination-wrapper {
   display: flex;
   justify-content: center;
-  padding: var(--space-lg) 0;
+  padding: var(--space-4) 0;
 }
 
 .state {
@@ -510,33 +681,12 @@ onMounted(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--space-base);
-  padding: var(--space-3xl) 0;
+  gap: var(--space-4);
+  padding: var(--space-16) 0;
   text-align: center;
 }
 
-.state.loading {
-  color: var(--text-secondary);
-}
-
-.state.error {
-  color: var(--danger);
-}
-
-.state.empty {
-  color: var(--text-muted);
-}
-
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid var(--border-strong);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+.state.loading { color: var(--text-secondary); }
+.state.error { color: var(--danger); }
+.state.empty { color: var(--text-muted); }
 </style>

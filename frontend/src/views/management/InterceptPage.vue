@@ -1,5 +1,5 @@
 <template>
-  <div class="intercept-page">
+  <div class="intercept-page" data-testid="intercept-page">
     <div class="intercept-content">
       <div class="intercept-icon" aria-hidden="true">
         <el-icon><Monitor /></el-icon>

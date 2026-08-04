@@ -29,7 +29,7 @@
             <span>新建导入</span>
           </router-link>
           <router-link
-            to="/manage/import/tasks"
+            to="/manage/tasks"
             class="sidenav-link"
             active-class="active"
           >
@@ -38,6 +38,10 @@
           </router-link>
 
           <p class="sidenav-label">维护</p>
+          <router-link to="/manage/console" class="sidenav-link" active-class="active">
+            <el-icon :size="18"><Tools /></el-icon>
+            <span>优化控制台</span>
+          </router-link>
           <router-link to="/manage/storage" class="sidenav-link" active-class="active">
             <el-icon :size="18"><Coin /></el-icon>
             <span>存储</span>
@@ -45,6 +49,10 @@
           <router-link to="/manage/metadata" class="sidenav-link" active-class="active">
             <el-icon :size="18"><Tickets /></el-icon>
             <span>元数据</span>
+          </router-link>
+          <router-link to="/manage/trash" class="sidenav-link" active-class="active">
+            <el-icon :size="18"><Delete /></el-icon>
+            <span>回收站</span>
           </router-link>
           <router-link to="/manage/dlq" class="sidenav-link" active-class="active">
             <el-icon :size="18"><WarningFilled /></el-icon>
@@ -78,9 +86,11 @@ import {
   Back,
   Coin,
   Collection,
+  Delete,
   List,
   Setting,
   Tickets,
+  Tools,
   UploadFilled,
   WarningFilled,
 } from '@element-plus/icons-vue'
@@ -167,6 +177,20 @@ onMounted(() => {
   display: grid;
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
   min-height: 0;
+}
+
+@media (max-width: 767px) {
+  .management-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .management-sidenav {
+    display: none;
+  }
+
+  .management-content {
+    padding: var(--space-6) var(--space-4);
+  }
 }
 
 .management-sidenav {

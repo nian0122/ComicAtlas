@@ -67,9 +67,22 @@ const router = createRouter({
           component: () => import('@/views/management/ComicListPage.vue'),
         },
         {
+          path: 'comics/:id',
+          name: 'manage-comic-workspace',
+          component: () => import('@/views/management/workspace/ComicWorkspacePage.vue'),
+          props: true,
+        },
+        {
           path: 'comics/:id/edit',
-          name: 'manage-comic-edit',
-          component: () => import('@/views/management/ComicEditPage.vue'),
+          redirect: (to) => ({
+            path: `/manage/comics/${String(to.params.id)}`,
+            query: { tab: 'overview' },
+          }),
+        },
+        {
+          path: 'comics/:id/media',
+          name: 'manage-comic-media',
+          component: () => import('@/views/management/media/MediaManagePage.vue'),
           props: true,
         },
         {
@@ -89,9 +102,10 @@ const router = createRouter({
         },
         {
           path: 'storage/:id',
-          name: 'manage-storage-detail',
-          component: () => import('@/views/management/storage/StorageDetailPage.vue'),
-          props: true,
+          redirect: (to) => ({
+            path: `/manage/comics/${String(to.params.id)}`,
+            query: { tab: 'optimization' },
+          }),
         },
         {
           path: 'metadata',
@@ -107,6 +121,31 @@ const router = createRouter({
           path: 'settings',
           name: 'manage-settings',
           component: () => import('@/views/management/SettingsPage.vue'),
+        },
+        {
+          path: 'console',
+          name: 'manage-console',
+          component: () => import('@/views/management/ConsolePage.vue'),
+        },
+        {
+          path: 'tasks',
+          name: 'manage-tasks',
+          component: () => import('@/views/management/TasksPage.vue'),
+        },
+        {
+          path: 'trash',
+          name: 'manage-trash',
+          component: () => import('@/views/management/TrashPage.vue'),
+        },
+        {
+          path: 'showcase',
+          name: 'manage-showcase',
+          component: () => import('@/views/management/ShowcasePage.vue'),
+        },
+        {
+          path: 'task-store-harness',
+          name: 'manage-task-store-harness',
+          component: () => import('@/views/management/TaskStoreHarnessPage.vue'),
         },
       ],
     },

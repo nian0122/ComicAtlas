@@ -46,7 +46,7 @@
         <el-button type="warning" plain @click="onTranscode">视频转码</el-button>
         <el-button type="success" plain @click="onExportZip">导出 ZIP</el-button>
         <el-button type="danger" @click="onDeleteComic">删除漫画（含本地文件）</el-button>
-        <el-button type="danger" plain @click="onDeleteDatabase">仅删除数据库</el-button>
+        <el-button type="danger" plain @click="onDeleteDatabase">删除（移入回收站）</el-button>
       </div>
     </section>
 
@@ -95,7 +95,7 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { storageService, exportService } from '@/services/storage'
-import { adminApi } from '@/services/api'
+import { adminApi, comicApi } from '@/services/api'
 import type { ComicStorageItem, ChapterStorageItem } from '@/types'
 import StorageStatusTag from './StorageStatusTag.vue'
 
@@ -271,14 +271,21 @@ async function onDeleteDatabase() {
   const title = comic.value?.title ?? ''
   try {
     await ElMessageBox.confirm(
-      `确定仅删除「${title}」的数据库记录？所有章节、页面、标签关联将被移除，本地文件保留。`,
-      '仅删除数据库',
+      `确定删除「${title}」？漫画将移入回收站（保留 7 天），可在回收站恢复或永久删除。`,
+      '删除漫画',
       { type: 'warning', confirmButtonText: '确定删除' }
     )
   } catch { return }
   try {
-    await adminApi.deleteComic(comicId, 'DATABASE_ONLY')
-    ElMessage.success('数据库记录已删除，本地文件保留')
+    await ElMessageBox.prompt(
+      `请输入漫画标题「${title}」以确认删除：`,
+      '二次确认',
+      { type: 'warning', confirmButtonText: '确认删除', inputValidator: (val) => val === title || '标题不匹配' }
+    )
+  } catch { return }
+  try {
+    await comicApi.delete(comicId)
+    ElMessage.success('已移入回收站，可在回收站恢复或永久删除')
     router.push('/manage/storage')
   } catch (err: unknown) {
     const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message

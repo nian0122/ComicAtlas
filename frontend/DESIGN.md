@@ -141,6 +141,65 @@ ComicAtlas 是一座“私人放映馆”：打开应用先看到作品，而不
 - **States**：default、hover、selected、loading、empty、error。
 - **Accessibility**：状态文字与颜色同时存在；横向溢出由表格容器自身承担。
 
+### Management status tag
+
+- **Structure**：8 种预设标签（HQ 就绪、HQ 已删、HQ 缺失、LQ 就绪、未生成、生成失败、已转码、转码中），由语义 token 驱动颜色。
+- **States**：default（success 绿 / warning 黄 / danger 红 / info 蓝 / neutral 灰）、focus-visible。
+- **Accessibility**：每种状态同时存在文字标签与语义颜色；`role="status"`。
+
+### Action button
+
+- **Variants**：primary（品牌红）、secondary（surface-3 填充）、ghost（透明 + 边框）、danger（危险红轮廓）、danger-filled（实心危险红）。
+- **States**：default、hover、active、focus-visible、disabled（opacity: 0.55）、loading（转圈替代文字）。
+- **Accessibility**：最小触控目标 44px；disabled 不可聚焦；loading 时 `aria-busy="true"`。
+
+### Batch selection bar
+
+- **Structure**：固定于表头下方的横条，显示已选数量、全选/反选操作、批量动作组。
+- **States**：hidden（无选中项）、active（显示数量与批量动作）、loading（批量操作进行中，按钮显示转圈）。
+- **Accessibility**：选中数量由 live region 播报；批量操作按钮不被 disabled 状态阻挡键盘到达。
+
+### Task progress indicator
+
+- **Structure**：横向进度条 + 左侧状态图标/标签 + 右侧百分比文字 + 可选 ETA/速度行。
+- **States**：queued（灰底色 + 等待文字）、running（品牌红进度条 + 进度文字）、completed（绿色标记 + 100%）、failed（红色标记 + 错误摘要）、cancelled（灰色标记 + 已取消文字）。
+- **Accessibility**：`role="progressbar"` + `aria-valuenow` + `aria-valuemin/max`；完成后状态文字与颜色双通道。
+
+### Catalog tree row
+
+- **Structure**：目录项行，包含展开/折叠箭头、标题文字、章节数徽章。支持多级缩进。
+- **States**：default、hover、active（选中高亮）、expanded（箭头旋转 90°）、collapsed（箭头朝右）、empty（无子节点文字提示）、loading（箭头位置转圈）、drag-over（上方/下方/内部放置线）。
+- **Accessibility**：`role="treeitem"` + `aria-expanded`；键盘 ArrowLeft/Right 折叠展开。
+
+### Media thumbnail grid item
+
+- **Structure**：固定 16:9 或 2:3 缩略图容器，底部叠加文件名/尺寸标签，右上角类型标记（图片/视频/缺失）。
+- **States**：default、hover（覆盖变亮 + 放大 1.025）、selected（品牌红边框）、loading（骨架占位）、broken（图片图标 + "无法加载" 文字）、video（播放图标叠加层）。
+- **Accessibility**：图片 `alt` 为文件名；video 带 `aria-label="视频：{文件名}"`。
+
+### Upload queue item
+
+- **Structure**：文件名 + 来源标签 + 进度条 + 状态标签 + 取消/重试操作。
+- **States**：queued（等待中标签）、uploading（进度条 + 取消按钮）、completed（已完成标签、可移除）、failed（失败标签 + 错误摘要 + 重试按钮）、cancelled（已取消标签）。
+- **Accessibility**：每个条目 `role="listitem"`；进度 `role="progressbar"`。
+
+### Recycle bin row
+
+- **Structure**：表行，包含类型图标、名称、删除时间、恢复/永久删除操作。
+- **States**：default、hover、selected（复选框选中）、restoring（操作中，按钮显示转圈）、deleting（永久删除进行中）。
+- **Layout**：横向溢出由表格容器自身承担，不得撑开主内容区。
+
+### Danger confirmation dialog
+
+- **Structure**：标题 + 红色强调警告文案 + 受影响实体摘要 + 二次输入确认（可选的文字域）+ 确认/取消按钮。
+- **States**：default、focused（确认输入获得焦点）、confirmable（输入匹配后确认按钮可点击）、executing（确认按钮显示转圈 + 对话框不可关闭）、completed（对话框关闭，外部 toast 或表格行消失反馈）。
+- **Accessibility**：`role="alertdialog"` + `aria-describedby` 指向警告文案；确认按钮在输入未匹配前为 disabled。
+
+### Management shell scroll contract
+
+- **Layout**：`.management-content` 是管理端唯一主滚动区（`overflow: auto`），内含表格、媒体网格等子区域自身负责横向溢出滚动（`overflow-x: auto; min-block-size: 0`）。
+- **Constraint**：子区域不得通过 flex/grid 撑开主内容区宽度；375/768/1280 禁止主内容区出现横向滚动条。
+
 ## 6. Motion & Interaction
 
 | Type | Token | Duration | Easing |
