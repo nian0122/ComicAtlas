@@ -3,7 +3,11 @@ package com.comicatlas.worker.file.handler;
 import com.comicatlas.worker.event.CancelHandler;
 import com.comicatlas.worker.file.manifest.ImportManifest;
 import com.comicatlas.worker.file.manifest.ImportManifestManager;
-import com.comicatlas.worker.file.parse.*;
+import com.comicatlas.worker.file.parse.ComicMetadata;
+import com.comicatlas.worker.file.parse.DirectoryParser;
+import com.comicatlas.worker.file.parse.DirectoryTree;
+import com.comicatlas.worker.file.parse.ImportContext;
+import com.comicatlas.worker.file.parse.MetadataAssembler;
 import com.comicatlas.worker.file.storage.StorageRef;
 import com.comicatlas.worker.file.storage.StorageService;
 import com.comicatlas.worker.file.storage.TransferMode;
@@ -16,8 +20,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.nio.file.*;
-import java.util.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 @Slf4j
 @Component
@@ -57,12 +66,12 @@ public class DirectoryImportHandler {
                 throw new RuntimeException("Task cancelled: " + taskId);
             }
 
-        // 构建清单（相对路径），原子写入后再动文件
-        Path importRoot = tree.path();
-        ManifestBuildResult mbr = buildManifestFiles(metadata, comicId, importRoot);
-        List<ImportManifest.ImportFile> files = mbr.files();
-        Map<String, String> generatedNames = mbr.nameMap();
-        JsonNode metadataNode = objectMapper.valueToTree(buildMetadataMap(metadata, comicId, generatedNames));
+// 构建清单（相对路径），原子写入后再动文件
+            Path importRoot = tree.path();
+            ManifestBuildResult mbr = buildManifestFiles(metadata, comicId, importRoot);
+            List<ImportManifest.ImportFile> files = mbr.files();
+            Map<String, String> generatedNames = mbr.nameMap();
+            JsonNode metadataNode = objectMapper.valueToTree(buildMetadataMap(metadata, comicId, generatedNames));
             manifest = new ImportManifest(1, taskId, ctx.sourceType(), importRoot.toString(),
                     metadataNode, files);
             manifestManager.write(mangaRoot, taskId, manifest);

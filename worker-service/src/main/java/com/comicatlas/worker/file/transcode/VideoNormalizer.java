@@ -8,9 +8,18 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.*;
-import java.util.*;
-import java.util.concurrent.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
@@ -167,7 +176,7 @@ public class VideoNormalizer {
         try (Stream<Path> stream = Files.walk(dir)) {
             stream.sorted(Comparator.reverseOrder())
                     .forEach(p -> {
-                        try { Files.deleteIfExists(p); } catch (IOException ignored) {}
+                        try { Files.deleteIfExists(p); } catch (IOException e) { log.warn("删除临时文件失败: {}", p, e); }
                     });
         } catch (IOException e) {
             log.warn("清理临时目录失败: {}", dir, e);

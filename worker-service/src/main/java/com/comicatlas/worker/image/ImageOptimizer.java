@@ -80,16 +80,6 @@ public class ImageOptimizer {
         return runOptimizer(cmd, comicId, chapterId);
     }
 
-    /**
-     * @deprecated 使用 {@link #generateLq(Long, Long, Path, Path)} 替代，禁止用 globalOrder 拼目录。
-     */
-    @Deprecated
-    public RunResult generateLq(Long comicId, Long chapterId, String chapterNo) {
-        Path hqDir = Path.of(config.getMangaRoot(), pathBuilder.hqDir(comicId, chapterNo));
-        Path lqDir = Path.of(config.getMangaRoot(), pathBuilder.lqDir(comicId, chapterNo));
-        return generateLq(comicId, chapterId, hqDir, lqDir);
-    }
-
     private RunResult runOptimizer(List<String> cmd, Long comicId, Long chapterId) {
         ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.redirectErrorStream(true);
@@ -324,8 +314,7 @@ public class ImageOptimizer {
                     while ((line = r.readLine()) != null) {
                         stdout.append(line).append('\n');
                     }
-                } catch (Exception ignored) {
-                }
+                } catch (Exception e) { log.warn("ffmpeg stdout 读取异常", e); }
             }, "ffmpeg-stdout-reader");
             reader.start();
 
@@ -357,8 +346,7 @@ public class ImageOptimizer {
                                 .forEach(java.io.File::delete);
                     }
                 }
-            } catch (Exception ignored) {
-            }
+            } catch (Exception e) { log.warn("清理临时目录失败: comicId={}", comicId, e); }
         }
     }
 

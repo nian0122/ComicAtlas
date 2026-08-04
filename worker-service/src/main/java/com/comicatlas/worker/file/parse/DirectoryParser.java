@@ -3,8 +3,15 @@ package com.comicatlas.worker.file.parse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.nio.file.*;
-import java.util.*;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * 纯目录解析器 — 只关心目录结构和媒体文件列表（图片 + 视频）。
@@ -76,14 +83,14 @@ public class DirectoryParser {
             for (Path f : s) {
                 if (MEDIA_EXT.stream().anyMatch(e -> f.getFileName().toString().toLowerCase().endsWith(e))) r.add(f);
             }
-        } catch (Exception e) { log.warn("read: {}", dir); }
+        } catch (Exception e) { log.warn("read: {}", dir, e); }
         r.sort(Comparator.comparing(p -> p.getFileName().toString(), String.CASE_INSENSITIVE_ORDER));
         return r;
     }
 
     public List<Path> listSubDirs(Path dir) {
         List<Path> r = new ArrayList<>();
-        try (DirectoryStream<Path> s = Files.newDirectoryStream(dir, Files::isDirectory)) { s.forEach(r::add); } catch (Exception e) {}
+        try (DirectoryStream<Path> s = Files.newDirectoryStream(dir, Files::isDirectory)) { s.forEach(r::add); } catch (Exception e) { log.warn("listSubDirs: {}", dir, e); }
         r.sort(Comparator.comparing(p -> p.getFileName().toString(), String.CASE_INSENSITIVE_ORDER));
         return r;
     }
