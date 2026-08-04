@@ -133,7 +133,9 @@ class ManagementTaskControllerIT {
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data.taskType").value("IMPORT"))
                     .andExpect(jsonPath("$.data.status").value("QUEUED"))
-                    .andExpect(jsonPath("$.data.attempt").value(1));
+                    .andExpect(jsonPath("$.data.attempt").value(1))
+                    .andExpect(jsonPath("$.data.isBatch").isBoolean())
+                    .andExpect(jsonPath("$.data.batch").doesNotExist());
         }
 
         @Test
