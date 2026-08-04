@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>视频播放器测试</title>
+    <title>视频播放器测试夹具</title>
     <style>
       html,
       body {
@@ -59,8 +59,12 @@
                 { class: 'tap-count', 'data-testid': 'tap-count' },
                 String(tapCount.value),
               ),
-              h('div', { class: 'video-shell' }, [h(VideoPlayer, videoProps)]),
-              h('div', { class: 'video-shell' }, [h(VideoPlayer, videoProps)]),
+              h('div', { class: 'video-shell' }, [
+                h(VideoPlayer, { ...videoProps, mediaId: 1 }),
+              ]),
+              h('div', { class: 'video-shell' }, [
+                h(VideoPlayer, { ...videoProps, mediaId: 2 }),
+              ]),
             ])
         },
       }).mount('#app')
