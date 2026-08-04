@@ -142,7 +142,7 @@ public class LegacyTaskBackfillService {
         mt.setOperation(operation);
         mt.setTargetType(targetType);
         mt.setBatchId(batchId);
-        mt.setIsBatch(false);
+        mt.setBatch(false);
         ManagementTaskStatus st = mapStatus(legacyStatus);
         mt.setStatus(st);
         mt.setProgress(progress != null ? progress : 0);
