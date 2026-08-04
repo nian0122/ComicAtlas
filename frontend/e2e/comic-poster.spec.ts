@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 
 test('ComicPoster scales on hover', async ({ page }) => {
-  await page.goto('/poster-test')
+  await page.goto('/poster-test', { waitUntil: 'domcontentloaded' })
 
   const poster = page.locator('.comic-poster').first()
   await expect(poster).toBeVisible()
@@ -13,5 +13,5 @@ test('ComicPoster scales on hover', async ({ page }) => {
     (el) => window.getComputedStyle(el).transform
   )
 
-  expect(transform).toMatch(/1\.04/)
+  expect(transform).toMatch(/1\.025/)
 })

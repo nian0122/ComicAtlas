@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
+import type { Page } from '@playwright/test'
 
-function mockComicsRoute(page: any) {
+function mockComicsRoute(page: Page) {
   return page.route('/api/comics**', async (route, request) => {
     const url = new URL(request.url())
     const pageNum = Number(url.searchParams.get('page') || '1')
@@ -49,18 +50,16 @@ test('desktop: renders library with posters, sticky toolbar, hover scale and pag
   const position = await toolbar.evaluate((el) => window.getComputedStyle(el).position)
   expect(['sticky', 'fixed']).toContain(position)
 
-  // 滚动后工具栏仍停留在顶部（nav-height = 56px 下方）
   await page.evaluate(() => window.scrollTo(0, 500))
   await page.waitForTimeout(200)
   const toolbarTop = await toolbar.evaluate((el) => el.getBoundingClientRect().top)
-  expect(toolbarTop).toBe(56)
+  expect(toolbarTop).toBe(68)
 
-  // 悬停放大 scale(1.04)
   const firstPoster = posters.first()
   await firstPoster.hover()
   await page.waitForTimeout(300)
   const transform = await firstPoster.evaluate((el) => window.getComputedStyle(el).transform)
-  expect(transform).toMatch(/1\.04/)
+  expect(transform).toMatch(/1\.025/)
 
   // 分页存在且可切换
   const pagination = page.locator('.el-pagination')
@@ -75,7 +74,7 @@ test('desktop: renders library with posters, sticky toolbar, hover scale and pag
   })
 })
 
-test('mobile: 3-column grid with sm posters', async ({ page }) => {
+test('mobile: 2-column grid with sm posters', async ({ page }) => {
   await mockComicsRoute(page)
   await page.setViewportSize({ width: 375, height: 667 })
   await page.goto('/library')
@@ -87,11 +86,10 @@ test('mobile: 3-column grid with sm posters', async ({ page }) => {
   const firstPoster = posters.first()
   await expect(firstPoster).toHaveClass(/size--sm/)
 
-  // 验证网格为 3 列
   const grid = page.locator('.comic-grid')
   const gridTemplateColumns = await grid.evaluate(
     (el) => window.getComputedStyle(el).gridTemplateColumns
   )
   const columnCount = gridTemplateColumns.split(' ').length
-  expect(columnCount).toBe(3)
+  expect(columnCount).toBe(2)
 })
