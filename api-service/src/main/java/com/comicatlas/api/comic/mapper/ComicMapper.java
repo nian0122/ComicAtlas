@@ -96,6 +96,9 @@ public interface ComicMapper extends BaseMapper<Comic> {
      * <p>
      * 与列表查询不同：不强制 READY（批量可作用于 TRASHED/DRAFT 等），
      * 按 {@code id ASC} 稳定排序，最多返回 limit 行（用于探测超限）。
+     * <p>
+     * 命名刻意避开 MyBatis-Plus 内置的 {@code selectBatchIds(Collection)}：
+     * 同名会抑制内置方法注入，导致按 id 集合批量查询的调用方在运行时崩溃。
      */
     @Select("""
         <script>
@@ -156,6 +159,6 @@ public interface ComicMapper extends BaseMapper<Comic> {
         LIMIT #{limit}
         </script>
     """)
-    List<Long> selectBatchIds(@Param("query") com.comicatlas.api.comic.dto.ComicListQuery query,
-                              @Param("limit") int limit);
+    List<Long> selectIdsByFilter(@Param("query") com.comicatlas.api.comic.dto.ComicListQuery query,
+                                 @Param("limit") int limit);
 }
