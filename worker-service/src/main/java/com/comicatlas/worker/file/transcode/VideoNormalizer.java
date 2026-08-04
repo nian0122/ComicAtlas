@@ -232,17 +232,17 @@ public class VideoNormalizer {
                 output.toAbsolutePath().toString()
         );
 
-        ProcessBuilder pb = new ProcessBuilder(cmd);
-        pb.redirectErrorStream(true);
-        Process proc = pb.start();
+        ProcessBuilder processBuilder = new ProcessBuilder(cmd);
+        processBuilder.redirectErrorStream(true);
+        Process process = processBuilder.start();
 
-        StringBuilder stderr = new StringBuilder();
+        StringBuilder processOutput = new StringBuilder();
         Thread reader = new Thread(() -> {
             try (var br = new BufferedReader(
-                    new InputStreamReader(proc.getInputStream(), StandardCharsets.UTF_8))) {
+                    new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
                 String line;
                 while ((line = br.readLine()) != null) {
-                    stderr.append(line).append('\n');
+                    processOutput.append(line).append('\n');
                 }
             } catch (IOException ignored) {
             }
@@ -250,13 +250,13 @@ public class VideoNormalizer {
         reader.setDaemon(true);
         reader.start();
 
-        int exitCode = proc.waitFor();
+        int exitCode = process.waitFor();
         reader.join(5000);
 
         if (exitCode != 0) {
-            String tail = stderr.length() > 500
-                    ? stderr.substring(stderr.length() - 500)
-                    : stderr.toString();
+            String tail = processOutput.length() > 500
+                    ? processOutput.substring(processOutput.length() - 500)
+                    : processOutput.toString();
             throw new RuntimeException("ffmpeg exit " + exitCode + ": " + tail.trim());
         }
 
