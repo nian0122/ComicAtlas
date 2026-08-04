@@ -69,11 +69,11 @@ public class ExportCollector {
             // catalogs
             var catsArray = root.putArray("catalogs");
             for (int i = 0; i < catalogs.size(); i++) {
-                ExportCatalog c = catalogs.get(i);
+                ExportCatalog catalog = catalogs.get(i);
                 var catNode = catsArray.addObject();
-                catNode.put("title", c.getTitle() != null ? c.getTitle() : "");
-                catNode.put("sortOrder", c.getSortOrder() != null ? c.getSortOrder() : i);
-                catNode.put("parentIndex", c.getParentId() != null ? findCatalogIndex(catalogs, c.getParentId()) : (Integer) null);
+                catNode.put("title", catalog.getTitle() != null ? catalog.getTitle() : "");
+                catNode.put("sortOrder", catalog.getSortOrder() != null ? catalog.getSortOrder() : i);
+                catNode.put("parentIndex", catalog.getParentId() != null ? findCatalogIndex(catalogs, catalog.getParentId()) : (Integer) null);
             }
 
             // chapters
@@ -81,36 +81,36 @@ public class ExportCollector {
             Map<Long, List<ExportMedia>> mediaByChapter = allMedia.stream()
                     .collect(Collectors.groupingBy(ExportMedia::getChapterId));
             for (int i = 0; i < chapters.size(); i++) {
-                ExportChapter ch = chapters.get(i);
+                ExportChapter chapter = chapters.get(i);
                 var chNode = chArray.addObject();
-                chNode.put("title", ch.getTitle() != null ? ch.getTitle() : "");
-                chNode.put("chapterNo", ch.getChapterNo() != null ? ch.getChapterNo() : "");
-                chNode.put("sortOrder", ch.getSortOrder() != null ? ch.getSortOrder() : i);
-                chNode.put("globalOrder", ch.getGlobalOrder() != null ? ch.getGlobalOrder() : i);
-                chNode.put("catalogIndex", ch.getCatalogId() != null ? findCatalogIndex(catalogs, ch.getCatalogId()) : (Integer) null);
+                chNode.put("title", chapter.getTitle() != null ? chapter.getTitle() : "");
+                chNode.put("chapterNo", chapter.getChapterNo() != null ? chapter.getChapterNo() : "");
+                chNode.put("sortOrder", chapter.getSortOrder() != null ? chapter.getSortOrder() : i);
+                chNode.put("globalOrder", chapter.getGlobalOrder() != null ? chapter.getGlobalOrder() : i);
+                chNode.put("catalogIndex", chapter.getCatalogId() != null ? findCatalogIndex(catalogs, chapter.getCatalogId()) : (Integer) null);
                 chNode.put("sourceDir", "");
                 var mediaArray = chNode.putArray("mediaItems");
-                List<ExportMedia> mediaList = mediaByChapter.getOrDefault(ch.getId(), List.of());
-                for (ExportMedia m : mediaList) {
+                List<ExportMedia> mediaList = mediaByChapter.getOrDefault(chapter.getId(), List.of());
+                for (ExportMedia mediaInfo : mediaList) {
                     var mNode = mediaArray.addObject();
                     // 从 hqPath 提取文件名
                     String fileName = "";
-                    String hqPath = m.getHqPath();
+                    String hqPath = mediaInfo.getHqPath();
                     if (hqPath != null && hqPath.contains("/")) {
                         fileName = hqPath.substring(hqPath.lastIndexOf('/') + 1);
                     }
                     mNode.put("fileName", fileName);
-                    mNode.put("pageNumber", m.getPageNumber() != null ? m.getPageNumber() : 0);
-                    mNode.put("hqStatus", m.getHqStatus() != null ? m.getHqStatus() : "");
-                    mNode.put("lqStatus", m.getLqStatus() != null ? m.getLqStatus() : "");
-                    mNode.put("fileSize", m.getFileSize() != null ? m.getFileSize() : 0);
-                    mNode.put("mediaType", m.getMediaType() != null ? m.getMediaType() : "IMAGE");
-                    mNode.put("width", m.getWidth());
-                    mNode.put("height", m.getHeight());
-                    mNode.put("duration", m.getDuration());
-                    mNode.put("container", m.getContainer());
-                    mNode.put("videoCodec", m.getVideoCodec());
-                    mNode.put("audioCodec", m.getAudioCodec());
+                    mNode.put("pageNumber", mediaInfo.getPageNumber() != null ? mediaInfo.getPageNumber() : 0);
+                    mNode.put("hqStatus", mediaInfo.getHqStatus() != null ? mediaInfo.getHqStatus() : "");
+                    mNode.put("lqStatus", mediaInfo.getLqStatus() != null ? mediaInfo.getLqStatus() : "");
+                    mNode.put("fileSize", mediaInfo.getFileSize() != null ? mediaInfo.getFileSize() : 0);
+                    mNode.put("mediaType", mediaInfo.getMediaType() != null ? mediaInfo.getMediaType() : "IMAGE");
+                    mNode.put("width", mediaInfo.getWidth());
+                    mNode.put("height", mediaInfo.getHeight());
+                    mNode.put("duration", mediaInfo.getDuration());
+                    mNode.put("container", mediaInfo.getContainer());
+                    mNode.put("videoCodec", mediaInfo.getVideoCodec());
+                    mNode.put("audioCodec", mediaInfo.getAudioCodec());
                 }
             }
             return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(root);

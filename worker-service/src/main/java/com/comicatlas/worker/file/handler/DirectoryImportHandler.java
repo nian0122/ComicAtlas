@@ -165,46 +165,46 @@ public class DirectoryImportHandler {
         comic.put("tags", metadata.tags());
 
         List<Map<String, Object>> catalogList = metadata.catalogs().stream().map(cat -> {
-            Map<String, Object> cm = new LinkedHashMap<>();
-            cm.put("title", cat.title());
-            cm.put("sortOrder", cat.sortOrder());
-            cm.put("parentIndex", cat.parentIndex());
-            return cm;
+            Map<String, Object> catalogMap = new LinkedHashMap<>();
+            catalogMap.put("title", cat.title());
+            catalogMap.put("sortOrder", cat.sortOrder());
+            catalogMap.put("parentIndex", cat.parentIndex());
+            return catalogMap;
         }).toList();
 
         List<Map<String, Object>> chapterList = metadata.chapters().stream().map(ch -> {
-            Map<String, Object> chm = new LinkedHashMap<>();
-            chm.put("title", ch.title());
-            chm.put("chapterNo", ch.chapterNo());
-            chm.put("sortOrder", ch.sortOrder());
-            chm.put("globalOrder", ch.globalOrder());
-            chm.put("catalogIndex", ch.catalogIndex());
-            chm.put("sourceDir", ch.sourceDir());
-            chm.put("mediaItems", ch.pages().stream().map(p -> {
-                Map<String, Object> pm = new LinkedHashMap<>();
-                pm.put("fileName", p.fileName());
-                pm.put("pageNumber", p.pageNumber());
-                pm.put("hqStatus", p.hqStatus());
-                pm.put("lqStatus", p.lqStatus());
-                pm.put("fileSize", p.fileSize());
+            Map<String, Object> chapterMap = new LinkedHashMap<>();
+            chapterMap.put("title", ch.title());
+            chapterMap.put("chapterNo", ch.chapterNo());
+            chapterMap.put("sortOrder", ch.sortOrder());
+            chapterMap.put("globalOrder", ch.globalOrder());
+            chapterMap.put("catalogIndex", ch.catalogIndex());
+            chapterMap.put("sourceDir", ch.sourceDir());
+            chapterMap.put("mediaItems", ch.pages().stream().map(p -> {
+                Map<String, Object> mediaMap = new LinkedHashMap<>();
+                mediaMap.put("fileName", p.fileName());
+                mediaMap.put("pageNumber", p.pageNumber());
+                mediaMap.put("hqStatus", p.hqStatus());
+                mediaMap.put("lqStatus", p.lqStatus());
+                mediaMap.put("fileSize", p.fileSize());
                 // 新布局：写入 hqPath = {comicId}/{globalOrder}/{generatedName}
                 String relKey = (ch.sourceDir() != null && !ch.sourceDir().isBlank())
                         ? ch.sourceDir() + "/" + p.fileName()
                         : p.fileName();
                 String generatedPath = generatedNames.get(relKey);
                 if (generatedPath != null) {
-                    pm.put("hqPath", generatedPath);
+                    mediaMap.put("hqPath", generatedPath);
                 }
-                if (p.width() != null) pm.put("width", p.width());
-                if (p.height() != null) pm.put("height", p.height());
-                pm.put("mediaType", p.mediaType());
-                if (p.duration() != null) pm.put("duration", p.duration());
-                if (p.container() != null) pm.put("container", p.container());
-                if (p.videoCodec() != null) pm.put("videoCodec", p.videoCodec());
-                if (p.audioCodec() != null) pm.put("audioCodec", p.audioCodec());
-                return pm;
+                if (p.width() != null) mediaMap.put("width", p.width());
+                if (p.height() != null) mediaMap.put("height", p.height());
+                mediaMap.put("mediaType", p.mediaType());
+                if (p.duration() != null) mediaMap.put("duration", p.duration());
+                if (p.container() != null) mediaMap.put("container", p.container());
+                if (p.videoCodec() != null) mediaMap.put("videoCodec", p.videoCodec());
+                if (p.audioCodec() != null) mediaMap.put("audioCodec", p.audioCodec());
+                return mediaMap;
             }).toList());
-            return chm;
+            return chapterMap;
         }).toList();
 
         Map<String, Object> root = new LinkedHashMap<>();

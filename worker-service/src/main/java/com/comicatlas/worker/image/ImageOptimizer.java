@@ -81,43 +81,43 @@ public class ImageOptimizer {
     }
 
     private RunResult runOptimizer(List<String> cmd, Long comicId, Long chapterId) {
-        ProcessBuilder pb = new ProcessBuilder(cmd);
-        pb.redirectErrorStream(true);
-        Process proc;
+        ProcessBuilder processBuilder = new ProcessBuilder(cmd);
+        processBuilder.redirectErrorStream(true);
+        Process process;
         try {
-            proc = pb.start();
+            process = processBuilder.start();
         } catch (Exception e) {
             throw new RuntimeException("启动图片优化工具失败: " + e.getMessage(), e);
         }
 
         // 必须在 waitFor() 之前消费 stdout，否则管道满后 Go 进程阻塞写 → 死锁
-        StringBuilder stdout = new StringBuilder();
+        StringBuilder processOutput = new StringBuilder();
         Thread reader = new Thread(() -> {
             try (BufferedReader r = new BufferedReader(
-                    new InputStreamReader(proc.getInputStream(), StandardCharsets.UTF_8))) {
+                    new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
                 String line;
                 while ((line = r.readLine()) != null) {
-                    stdout.append(line).append('\n');
+                    processOutput.append(line).append('\n');
                 }
             } catch (Exception e) {
-                stdout.append("__READ_ERROR__:").append(e.getMessage());
+                processOutput.append("__READ_ERROR__:").append(e.getMessage());
             }
         }, "lq-stdout-reader");
         reader.start();
 
         boolean finished;
         try {
-            finished = proc.waitFor(LQ_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            finished = process.waitFor(LQ_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             reader.interrupt();
-            proc.destroyForcibly();
+            process.destroyForcibly();
             throw new RuntimeException("等待图片优化被中断: comicId=" + comicId + ", chapterId=" + chapterId);
         }
 
         if (!finished) {
             reader.interrupt();
-            proc.destroyForcibly();
+            process.destroyForcibly();
             throw new RuntimeException(
                     "图片优化超时 (" + LQ_TIMEOUT_SECONDS + "s): comicId=" + comicId + ", chapterId=" + chapterId);
         }
@@ -128,19 +128,19 @@ public class ImageOptimizer {
             Thread.currentThread().interrupt();
         }
 
-        int exitCode = proc.exitValue();
+        int exitCode = process.exitValue();
         if (exitCode == 2) {
             throw new RuntimeException(
                     "图片优化参数错误或目录不存在: comicId=" + comicId + ", chapterId=" + chapterId
-                            + ", stdout=" + stdout);
+                            + ", stdout=" + processOutput);
         }
 
         RunResult result;
         try {
-            result = objectMapper.readValue(stdout.toString(), RunResult.class);
+            result = objectMapper.readValue(processOutput.toString(), RunResult.class);
         } catch (Exception e) {
             throw new RuntimeException(
-                    "解析图片优化 JSON 失败: comicId=" + comicId + ", stdout=" + stdout, e);
+                    "解析图片优化 JSON 失败: comicId=" + comicId + ", stdout=" + processOutput, e);
         }
 
         log.info("图片优化完成: comicId={}, chapterId={}, total={}, processed={}, skipped={}, failed={}, elapsed={}ms",
@@ -186,43 +186,43 @@ public class ImageOptimizer {
 
             log.info("生成封面: comicId={}, quality={}", comicId, config.getCover().getQuality());
 
-            ProcessBuilder pb = new ProcessBuilder(cmd);
-            pb.redirectErrorStream(true);
-            Process proc;
+            ProcessBuilder processBuilder = new ProcessBuilder(cmd);
+            processBuilder.redirectErrorStream(true);
+            Process process;
             try {
-                proc = pb.start();
+                process = processBuilder.start();
             } catch (Exception e) {
                 throw new RuntimeException("启动封面优化工具失败: " + e.getMessage(), e);
             }
 
             // 必须在 waitFor() 之前消费 stdout，否则管道满后 Go 进程阻塞写 → 死锁
-            StringBuilder stdout = new StringBuilder();
+            StringBuilder processOutput = new StringBuilder();
             Thread reader = new Thread(() -> {
                 try (BufferedReader r = new BufferedReader(
-                        new InputStreamReader(proc.getInputStream(), StandardCharsets.UTF_8))) {
+                        new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
                     String line;
                     while ((line = r.readLine()) != null) {
-                        stdout.append(line).append('\n');
+                        processOutput.append(line).append('\n');
                     }
                 } catch (Exception e) {
-                    stdout.append("__READ_ERROR__:").append(e.getMessage());
+                    processOutput.append("__READ_ERROR__:").append(e.getMessage());
                 }
             }, "cover-stdout-reader");
             reader.start();
 
             boolean finished;
             try {
-                finished = proc.waitFor(LQ_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                finished = process.waitFor(LQ_TIMEOUT_SECONDS, TimeUnit.SECONDS);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 reader.interrupt();
-                proc.destroyForcibly();
+                process.destroyForcibly();
                 throw new RuntimeException("等待封面优化被中断: comicId=" + comicId);
             }
 
             if (!finished) {
                 reader.interrupt();
-                proc.destroyForcibly();
+                process.destroyForcibly();
                 throw new RuntimeException("封面优化超时 (" + LQ_TIMEOUT_SECONDS + "s): comicId=" + comicId);
             }
 
@@ -232,10 +232,10 @@ public class ImageOptimizer {
                 Thread.currentThread().interrupt();
             }
 
-            int exitCode = proc.exitValue();
+            int exitCode = process.exitValue();
             if (exitCode != 0) {
                 throw new RuntimeException(
-                        "封面优化工具异常退出 exitCode=" + exitCode + ", comicId=" + comicId + ", stdout=" + stdout);
+                        "封面优化工具异常退出 exitCode=" + exitCode + ", comicId=" + comicId + ", stdout=" + processOutput);
             }
 
             Path coverFile = thumbsDir.resolve("cover.webp");
@@ -301,32 +301,32 @@ public class ImageOptimizer {
 
             log.info("抽取视频封面帧: comicId={}, video={}", comicId, videoPath.getFileName());
 
-            ProcessBuilder pb = new ProcessBuilder(cmd);
-            pb.redirectErrorStream(true);
-            Process proc = pb.start();
+            ProcessBuilder processBuilder = new ProcessBuilder(cmd);
+            processBuilder.redirectErrorStream(true);
+            Process process = processBuilder.start();
 
             // 消费 stdout 防止管道死锁
-            StringBuilder stdout = new StringBuilder();
+            StringBuilder processOutput = new StringBuilder();
             Thread reader = new Thread(() -> {
                 try (BufferedReader r = new BufferedReader(
-                        new InputStreamReader(proc.getInputStream(), StandardCharsets.UTF_8))) {
+                        new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
                     String line;
                     while ((line = r.readLine()) != null) {
-                        stdout.append(line).append('\n');
+                        processOutput.append(line).append('\n');
                     }
                 } catch (Exception e) { log.warn("ffmpeg stdout 读取异常", e); }
             }, "ffmpeg-stdout-reader");
             reader.start();
 
-            boolean finished = proc.waitFor(120, TimeUnit.SECONDS);
+            boolean finished = process.waitFor(120, TimeUnit.SECONDS);
             if (!finished) {
                 reader.interrupt();
-                proc.destroyForcibly();
+                process.destroyForcibly();
                 throw new RuntimeException("ffmpeg 抽帧超时: comicId=" + comicId);
             }
             reader.join(5000);
 
-            int exitCode = proc.exitValue();
+            int exitCode = process.exitValue();
             if (exitCode != 0 || !Files.exists(frameFile) || Files.size(frameFile) == 0) {
                 throw new RuntimeException("ffmpeg 抽帧失败 exitCode=" + exitCode + ", comicId=" + comicId);
             }

@@ -39,9 +39,9 @@ public class DeleteEventHandler {
             transactionTemplate.executeWithoutResult(status -> {
                 List<Chapter> chapters = chapterMapper.selectList(
                     new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
-                for (Chapter ch : chapters) {
+                for (Chapter chapter : chapters) {
                     mediaMapper.delete(
-                        new LambdaQueryWrapper<Media>().eq(Media::getChapterId, ch.getId()));
+                        new LambdaQueryWrapper<Media>().eq(Media::getChapterId, chapter.getId()));
                 }
 
                 chapterMapper.delete(

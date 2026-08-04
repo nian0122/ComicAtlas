@@ -2,6 +2,7 @@ package com.comicatlas.api.management.dto;
 
 import com.comicatlas.common.enums.ManagementTaskStatus;
 import com.comicatlas.common.enums.TaskType;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -17,7 +18,9 @@ public class ManagementTaskResponse {
     private String operation;
     private String targetType;
     private String batchId;
-    private Boolean isBatch;
+    /** 是否批量任务（REST 键 isBatch，内部名 batch） */
+    @JsonProperty("isBatch")
+    private Boolean batch;
     private ManagementTaskStatus status;
     private String stage;
     private Integer progress;

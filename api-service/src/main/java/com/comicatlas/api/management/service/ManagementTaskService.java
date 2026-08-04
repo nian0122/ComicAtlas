@@ -83,7 +83,7 @@ public class ManagementTaskService {
         task.setOperation(request.getOperation());
         task.setTargetType(request.getTargetType());
         task.setBatchId(request.getBatchId());
-        task.setIsBatch(request.getTargets() != null && request.getTargets().size() > 1);
+        task.setBatch(request.getTargets() != null && request.getTargets().size() > 1);
         task.setStatus(ManagementTaskStatus.QUEUED);
         task.setProgress(0);
         task.setAttempt(1);
@@ -702,7 +702,7 @@ public class ManagementTaskService {
         resp.setOperation(task.getOperation());
         resp.setTargetType(task.getTargetType());
         resp.setBatchId(task.getBatchId());
-        resp.setIsBatch(task.getIsBatch());
+        resp.setBatch(task.getBatch());
         resp.setStatus(task.getStatus());
         resp.setStage(task.getStage());
         resp.setProgress(task.getProgress());

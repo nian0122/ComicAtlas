@@ -16,17 +16,17 @@ public class ChapterVO {
     private Integer globalOrder;
     private String status;
 
-    public static ChapterVO from(Chapter ch) {
+    public static ChapterVO from(Chapter chapter) {
         ChapterVO vo = new ChapterVO();
-        vo.setId(ch.getId());
-        vo.setComicId(ch.getComicId());
-        vo.setCatalogId(ch.getCatalogId());
-        vo.setTitle(ch.getTitle());
-        vo.setChapterNo(ch.getChapterNo());
-        vo.setPageCount(ch.getPageCount());
-        vo.setSortOrder(ch.getSortOrder());
-        vo.setGlobalOrder(ch.getGlobalOrder());
-        vo.setStatus(ch.getStatus());
+        vo.setId(chapter.getId());
+        vo.setComicId(chapter.getComicId());
+        vo.setCatalogId(chapter.getCatalogId());
+        vo.setTitle(chapter.getTitle());
+        vo.setChapterNo(chapter.getChapterNo());
+        vo.setPageCount(chapter.getPageCount());
+        vo.setSortOrder(chapter.getSortOrder());
+        vo.setGlobalOrder(chapter.getGlobalOrder());
+        vo.setStatus(chapter.getStatus());
         return vo;
     }
 }
