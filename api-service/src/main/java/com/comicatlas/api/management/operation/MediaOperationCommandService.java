@@ -109,11 +109,11 @@ public class MediaOperationCommandService {
     }
 
     private List<Media> eligibleLqPages(Long chapterId, boolean regenerate) {
-        List<Media> pages = mediaMapper.selectList(
+        List<Media> mediaItems = mediaMapper.selectList(
                 new LambdaQueryWrapper<Media>()
                         .eq(Media::getChapterId, chapterId)
                         .eq(Media::getMediaType, "IMAGE"));
-        return pages.stream()
+        return mediaItems.stream()
                 .filter(p -> !"DELETED".equals(p.getHqStatus()))
                 .filter(p -> regenerate || !"READY".equals(p.getLqStatus()))
                 .toList();
@@ -190,12 +190,12 @@ public class MediaOperationCommandService {
      * HQ 删除前置条件：全部图片页 LQ 必须 READY。
      */
     private void validateHqDeletePrecondition(Long chapterId) {
-        List<Media> pages = mediaMapper.selectList(
+        List<Media> mediaItems = mediaMapper.selectList(
                 new LambdaQueryWrapper<Media>()
                         .eq(Media::getChapterId, chapterId)
                         .eq(Media::getMediaType, "IMAGE")
                         .in(Media::getHqStatus, "READY", "MISSING"));
-        List<Media> notReady = pages.stream()
+        List<Media> notReady = mediaItems.stream()
                 .filter(p -> !"READY".equals(p.getLqStatus()))
                 .toList();
         if (!notReady.isEmpty()) {

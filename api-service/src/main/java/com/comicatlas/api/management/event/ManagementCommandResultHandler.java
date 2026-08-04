@@ -199,39 +199,39 @@ public class ManagementCommandResultHandler {
     }
 
     private void applyLqCompleted(Long chapterId) {
-        List<Media> pages = mediaMapper.selectList(
+        List<Media> mediaItems = mediaMapper.selectList(
                 new LambdaQueryWrapper<Media>()
                         .eq(Media::getChapterId, chapterId)
                         .eq(Media::getMediaType, "IMAGE"));
-        for (Media page : pages) {
+        for (Media media : mediaItems) {
             LambdaUpdateWrapper<Media> uw = new LambdaUpdateWrapper<Media>()
-                    .eq(Media::getId, page.getId())
+                    .eq(Media::getId, media.getId())
                     .set(Media::getLqStatus, "READY")
                     .set(Media::getLqRoot, "LQ");
-            String hqPath = page.getHqPath();
+            String hqPath = media.getHqPath();
             if (hqPath != null && !hqPath.isBlank()) {
                 uw.set(Media::getLqPath, deriveLqPath(hqPath));
             }
             mediaMapper.update(null, uw);
         }
-        log.info("LQ 完成业务更新: chapterId={}, pages={}", chapterId, pages.size());
+        log.info("LQ 完成业务更新: chapterId={}, pages={}", chapterId, mediaItems.size());
     }
 
     private void applyHqDeleteCompleted(Long chapterId) {
-        List<Media> pages = mediaMapper.selectList(
+        List<Media> mediaItems = mediaMapper.selectList(
                 new LambdaQueryWrapper<Media>()
                         .eq(Media::getChapterId, chapterId)
                         .eq(Media::getMediaType, "IMAGE")
                         .in(Media::getHqStatus, "READY", "DELETE_QUEUED", "DELETING", "MISSING"));
-        for (Media page : pages) {
+        for (Media media : mediaItems) {
             mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
-                    .eq(Media::getId, page.getId())
+                    .eq(Media::getId, media.getId())
                     .set(Media::getHqStatus, "DELETED")
                     .set(Media::getHqRoot, null)
                     .set(Media::getHqPath, null));
         }
         recomputeComicHqSize(chapterId);
-        log.info("HQ 删除完成业务更新: chapterId={}, pages={}", chapterId, pages.size());
+        log.info("HQ 删除完成业务更新: chapterId={}, pages={}", chapterId, mediaItems.size());
     }
 
     private void applyTranscodeCompleted(Long mediaId) {
@@ -524,9 +524,9 @@ public class ManagementCommandResultHandler {
             return;
         }
         List<Long> chapterIds = chapters.stream().map(Chapter::getId).toList();
-        List<Media> pages = mediaMapper.selectList(
+        List<Media> mediaItems = mediaMapper.selectList(
                 new LambdaQueryWrapper<Media>().in(Media::getChapterId, chapterIds));
-        long hqSize = pages.stream()
+        long hqSize = mediaItems.stream()
                 .filter(p -> !"DELETED".equals(p.getHqStatus()))
                 .mapToLong(p -> p.getFileSize() != null ? p.getFileSize() : 0L)
                 .sum();

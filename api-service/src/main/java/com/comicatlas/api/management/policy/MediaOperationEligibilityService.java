@@ -130,9 +130,9 @@ public class MediaOperationEligibilityService {
     }
 
     private ChapterOps collectChapterAssetOps(Long chapterId) {
-        List<Media> pages = mediaMapper.selectList(
+        List<Media> mediaItems = mediaMapper.selectList(
                 new LambdaQueryWrapper<Media>().eq(Media::getChapterId, chapterId));
-        List<Media> imagePages = pages.stream()
+        List<Media> imagePages = mediaItems.stream()
                 .filter(p -> "IMAGE".equals(p.getMediaType()))
                 .toList();
         List<Media> deletableHq = imagePages.stream()
@@ -146,7 +146,7 @@ public class MediaOperationEligibilityService {
                 .anyMatch(p -> !"DELETED".equals(p.getHqStatus()));
         ops.hqDeleteBlocked = deletableHq.stream().anyMatch(p -> !"READY".equals(p.getLqStatus()));
         ops.hqDeleteAllowed = !deletableHq.isEmpty() && !ops.hqDeleteBlocked;
-        ops.transcodeAllowed = pages.stream().anyMatch(p ->
+        ops.transcodeAllowed = mediaItems.stream().anyMatch(p ->
                 "VIDEO".equals(p.getMediaType())
                         && !"DELETED".equals(p.getHqStatus())
                         && !"READY".equals(p.getTranscodeStatus())

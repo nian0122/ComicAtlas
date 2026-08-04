@@ -264,10 +264,10 @@ public class ImportEventHandler {
         long totalSize = 0;
         if (itemList != null) {
             for (Map<String, Object> md : itemList) {
-                Media page = new Media();
-                page.setChapterId(chapter.getId());
-                page.setPageNumber(((Number) md.get("pageNumber")).intValue());
-                page.setHqRoot("HQ");
+                Media media = new Media();
+                media.setChapterId(chapter.getId());
+                media.setPageNumber(((Number) md.get("pageNumber")).intValue());
+                media.setHqRoot("HQ");
                 // hqPath: 优先使用 metadata 中的值，fallback 构造旧格式路径
                 String hqPath = (String) md.get("hqPath");
                 if (hqPath == null || hqPath.isBlank()) {
@@ -275,38 +275,38 @@ public class ImportEventHandler {
                 }
                 // 新布局：将 globalOrder 目录替换为 chapterId
                 hqPath = normalizeToChapterIdLayout(hqPath, comicId, chapter.getId(), chapter.getGlobalOrder());
-                page.setHqPath(hqPath);
-                page.setHqStatus(md.get("hqStatus") != null ? (String) md.get("hqStatus") : "READY");
-                page.setLqStatus("NOT_GENERATED");
-                if (md.get("fileSize") != null) page.setFileSize(((Number) md.get("fileSize")).longValue());
-                if (md.get("width") != null) page.setWidth(((Number) md.get("width")).intValue());
-                if (md.get("height") != null) page.setHeight(((Number) md.get("height")).intValue());
+                media.setHqPath(hqPath);
+                media.setHqStatus(md.get("hqStatus") != null ? (String) md.get("hqStatus") : "READY");
+                media.setLqStatus("NOT_GENERATED");
+                if (md.get("fileSize") != null) media.setFileSize(((Number) md.get("fileSize")).longValue());
+                if (md.get("width") != null) media.setWidth(((Number) md.get("width")).intValue());
+                if (md.get("height") != null) media.setHeight(((Number) md.get("height")).intValue());
 
                 // mediaType: v2 强制 IMAGE；v3 读取 metadata 中的 mediaType
                 String mediaType = isV3 ? (String) md.get("mediaType") : "IMAGE";
                 if (mediaType == null || mediaType.isBlank()) {
                     mediaType = "IMAGE";
                 }
-                page.setMediaType(mediaType);
+                media.setMediaType(mediaType);
 
                 // VIDEO 专属字段
                 if ("VIDEO".equalsIgnoreCase(mediaType)) {
                     if (md.get("duration") != null) {
-                        page.setDuration(toBigDecimal(md.get("duration")));
+                        media.setDuration(toBigDecimal(md.get("duration")));
                     }
                     if (md.get("container") != null) {
-                        page.setContainer((String) md.get("container"));
+                        media.setContainer((String) md.get("container"));
                     }
                     if (md.get("videoCodec") != null) {
-                        page.setVideoCodec((String) md.get("videoCodec"));
+                        media.setVideoCodec((String) md.get("videoCodec"));
                     }
                     if (md.get("audioCodec") != null) {
-                        page.setAudioCodec((String) md.get("audioCodec"));
+                        media.setAudioCodec((String) md.get("audioCodec"));
                     }
                 }
 
-                mediaMapper.insert(page);
-                totalSize += page.getFileSize() != null ? page.getFileSize() : 0;
+                mediaMapper.insert(media);
+                totalSize += media.getFileSize() != null ? media.getFileSize() : 0;
                 pgCount++;
             }
         }
