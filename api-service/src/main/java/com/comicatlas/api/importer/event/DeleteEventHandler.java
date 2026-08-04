@@ -62,7 +62,7 @@ public class DeleteEventHandler {
             log.info("DeleteCompleted DB cleaned: comicId={}", comicId);
         } catch (Exception e) {
             log.error("DeleteCompleted DB cleanup failed: comicId={}", comicId, e);
-            try { channel.basicReject(tag, false); } catch (Exception ignored) {}
+            try { channel.basicReject(tag, false); } catch (Exception ex) { log.warn("消息 reject 失败: tag={}", tag, ex); }
         }
     }
 }

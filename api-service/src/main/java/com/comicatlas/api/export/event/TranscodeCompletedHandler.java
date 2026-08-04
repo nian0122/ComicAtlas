@@ -39,7 +39,7 @@ public class TranscodeCompletedHandler {
             log.info("TranscodeCompleted: pageId={}, newPath={}", event.pageId(), event.newHqPath());
         } catch (Exception e) {
             log.error("TranscodeCompleted failed: pageId={}", event.pageId(), e);
-            try { channel.basicReject(tag, false); } catch (Exception ignored) {}
+            try { channel.basicReject(tag, false); } catch (Exception ex) { log.warn("消息 reject 失败: tag={}", tag, ex); }
         }
     }
 }
