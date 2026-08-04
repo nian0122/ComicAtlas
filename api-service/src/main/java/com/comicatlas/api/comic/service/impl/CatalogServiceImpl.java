@@ -68,11 +68,11 @@ public class CatalogServiceImpl implements CatalogService {
             nodeMap.put(cat.getId(), new CatalogNode(cat.getId(), cat.getTitle(), new ArrayList<>(), new ArrayList<>()));
         }
 
-        for (Chapter ch : chapters) {
-            if (ch.getCatalogId() != null && nodeMap.containsKey(ch.getCatalogId())) {
-                nodeMap.get(ch.getCatalogId()).getChapters().add(new ChapterRef(
-                    ch.getId(), ch.getChapterNo(), ch.getTitle(),
-                    ch.getGlobalOrder(), ch.getPageCount(), null
+        for (Chapter chapter : chapters) {
+            if (chapter.getCatalogId() != null && nodeMap.containsKey(chapter.getCatalogId())) {
+                nodeMap.get(chapter.getCatalogId()).getChapters().add(new ChapterRef(
+                    chapter.getId(), chapter.getChapterNo(), chapter.getTitle(),
+                    chapter.getGlobalOrder(), chapter.getPageCount(), null
                 ));
             }
         }

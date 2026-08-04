@@ -55,8 +55,8 @@ public class MediaManagementService {
         List<Media> existing = mediaMapper.selectList(
                 new LambdaQueryWrapper<Media>().eq(Media::getChapterId, chapterId));
         Set<Long> existingIds = new HashSet<>();
-        for (Media m : existing) {
-            existingIds.add(m.getId());
+        for (Media media : existing) {
+            existingIds.add(media.getId());
         }
         for (Long id : mediaIds) {
             if (!existingIds.contains(id)) {

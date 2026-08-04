@@ -311,29 +311,29 @@ public class TrashLifecycleService {
     private boolean markTrashed(String targetType, Long targetId) {
         switch (targetType) {
             case "COMIC" -> {
-                Comic c = comicMapper.selectById(targetId);
-                if (c != null && "TRASHING".equals(c.getStatus())) {
-                    c.setStatus("TRASHED");
-                    c.setTrashedAt(LocalDateTime.now());
-                    comicMapper.updateById(c);
+                Comic comic = comicMapper.selectById(targetId);
+                if (comic != null && "TRASHING".equals(comic.getStatus())) {
+                    comic.setStatus("TRASHED");
+                    comic.setTrashedAt(LocalDateTime.now());
+                    comicMapper.updateById(comic);
                     return true;
                 }
             }
             case "CHAPTER" -> {
-                Chapter ch = chapterMapper.selectById(targetId);
-                if (ch != null && "TRASHING".equals(ch.getStatus())) {
-                    ch.setStatus("TRASHED");
-                    ch.setTrashedAt(LocalDateTime.now());
-                    chapterMapper.updateById(ch);
+                Chapter chapter = chapterMapper.selectById(targetId);
+                if (chapter != null && "TRASHING".equals(chapter.getStatus())) {
+                    chapter.setStatus("TRASHED");
+                    chapter.setTrashedAt(LocalDateTime.now());
+                    chapterMapper.updateById(chapter);
                     return true;
                 }
             }
             case "MEDIA" -> {
-                Media m = mediaMapper.selectById(targetId);
-                if (m != null && "TRASHING".equals(m.getStatus())) {
-                    m.setStatus("TRASHED");
-                    m.setTrashedAt(LocalDateTime.now());
-                    mediaMapper.updateById(m);
+                Media media = mediaMapper.selectById(targetId);
+                if (media != null && "TRASHING".equals(media.getStatus())) {
+                    media.setStatus("TRASHED");
+                    media.setTrashedAt(LocalDateTime.now());
+                    mediaMapper.updateById(media);
                     return true;
                 }
             }
@@ -345,30 +345,30 @@ public class TrashLifecycleService {
     private boolean markReady(String targetType, Long targetId) {
         switch (targetType) {
             case "COMIC" -> {
-                Comic c = comicMapper.selectById(targetId);
-                if (c != null && "TRASHING".equals(c.getStatus())) {
-                    c.setStatus("READY");
-                    c.setTrashedAt(null);
-                    comicMapper.updateById(c);
+                Comic comic = comicMapper.selectById(targetId);
+                if (comic != null && "TRASHING".equals(comic.getStatus())) {
+                    comic.setStatus("READY");
+                    comic.setTrashedAt(null);
+                    comicMapper.updateById(comic);
                     return true;
                 }
             }
             case "CHAPTER" -> {
-                Chapter ch = chapterMapper.selectById(targetId);
-                if (ch != null && "TRASHING".equals(ch.getStatus())) {
-                    ch.setStatus("READY");
-                    ch.setTrashedAt(null);
-                    chapterMapper.updateById(ch);
+                Chapter chapter = chapterMapper.selectById(targetId);
+                if (chapter != null && "TRASHING".equals(chapter.getStatus())) {
+                    chapter.setStatus("READY");
+                    chapter.setTrashedAt(null);
+                    chapterMapper.updateById(chapter);
                     return true;
                 }
             }
             case "MEDIA" -> {
-                Media m = mediaMapper.selectById(targetId);
-                if (m != null && "TRASHING".equals(m.getStatus())) {
-                    m.setStatus("READY");
-                    m.setTrashedAt(null);
-                    m.setPageNumber(m.getOriginalPageNumber());
-                    mediaMapper.updateById(m);
+                Media media = mediaMapper.selectById(targetId);
+                if (media != null && "TRASHING".equals(media.getStatus())) {
+                    media.setStatus("READY");
+                    media.setTrashedAt(null);
+                    media.setPageNumber(media.getOriginalPageNumber());
+                    mediaMapper.updateById(media);
                     return true;
                 }
             }
@@ -401,12 +401,12 @@ public class TrashLifecycleService {
             case "COMIC" -> comicMapper.selectById(targetId) == null ? null
                     : comicMapper.selectById(targetId).getStatus();
             case "CHAPTER" -> {
-                Chapter ch = chapterMapper.selectById(targetId);
-                yield ch == null ? null : ch.getStatus();
+                Chapter chapter = chapterMapper.selectById(targetId);
+                yield chapter == null ? null : chapter.getStatus();
             }
             case "MEDIA" -> {
-                Media m = mediaMapper.selectById(targetId);
-                yield m == null ? null : m.getStatus();
+                Media media = mediaMapper.selectById(targetId);
+                yield media == null ? null : media.getStatus();
             }
             default -> null;
         };
@@ -523,14 +523,14 @@ public class TrashLifecycleService {
     }
 
     private Chapter requireChapterInComic(Long comicId, Long chapterId) {
-        Chapter ch = chapterMapper.selectById(chapterId);
-        if (ch == null) {
+        Chapter chapter = chapterMapper.selectById(chapterId);
+        if (chapter == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在: " + chapterId);
         }
-        if (!ch.getComicId().equals(comicId)) {
+        if (!chapter.getComicId().equals(comicId)) {
             throw new ConflictException("章节不属于该漫画");
         }
-        return ch;
+        return chapter;
     }
 
     private void requireAllowed(AllowedOperations ops, String op, String message) {

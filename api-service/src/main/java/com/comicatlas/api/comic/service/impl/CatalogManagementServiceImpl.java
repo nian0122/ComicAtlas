@@ -178,10 +178,10 @@ public class CatalogManagementServiceImpl implements CatalogManagementService {
             catalogMapper.updateById(child);
         }
         // 章节重挂到 reparentTo 末尾
-        for (Chapter ch : chapters) {
-            ch.setCatalogId(reparentTo);
-            ch.setSortOrder(nextChapterSortOrder(comicId, reparentTo));
-            checkedChapterUpdate(ch);
+        for (Chapter chapter : chapters) {
+            chapter.setCatalogId(reparentTo);
+            chapter.setSortOrder(nextChapterSortOrder(comicId, reparentTo));
+            checkedChapterUpdate(chapter);
         }
         catalogMapper.deleteById(catalogId);
         catalogCacheInvalidator.evict(comicId);

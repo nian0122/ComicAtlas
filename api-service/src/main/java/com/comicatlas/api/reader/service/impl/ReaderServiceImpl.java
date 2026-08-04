@@ -30,14 +30,14 @@ public class ReaderServiceImpl implements ReaderService {
 
     @Override
     public ReaderDTO getChapter(Long chapterId) {
-        Chapter ch = chapterMapper.selectById(chapterId);
-        if (ch == null) throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在");
+        Chapter chapter = chapterMapper.selectById(chapterId);
+        if (chapter == null) throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在");
 
-        Comic comic = comicMapper.selectById(ch.getComicId());
+        Comic comic = comicMapper.selectById(chapter.getComicId());
         if (comic == null || !"READY".equals(comic.getStatus())) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在或不可阅读");
         }
-        if (!ChapterLifecycleStatus.READY.name().equals(ch.getStatus())) {
+        if (!ChapterLifecycleStatus.READY.name().equals(chapter.getStatus())) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在或不可阅读");
         }
 
@@ -48,9 +48,9 @@ public class ReaderServiceImpl implements ReaderService {
                 .orderByAsc(Media::getPageNumber));
 
         var dto = new ReaderDTO();
-        dto.setChapterId(ch.getId());
-        dto.setComicId(ch.getComicId());
-        dto.setChapterTitle(ch.getTitle());
+        dto.setChapterId(chapter.getId());
+        dto.setComicId(chapter.getComicId());
+        dto.setChapterTitle(chapter.getTitle());
         dto.setPages(mediaItems.stream().map(media -> {
             var pd = new ReaderDTO.MediaItemDTO();
             pd.setId(media.getId());
@@ -76,18 +76,18 @@ public class ReaderServiceImpl implements ReaderService {
 
         var prev = chapterMapper.selectList(
             new LambdaQueryWrapper<Chapter>()
-                .eq(Chapter::getComicId, ch.getComicId())
+                .eq(Chapter::getComicId, chapter.getComicId())
                 .eq(Chapter::getStatus, ChapterLifecycleStatus.READY.name())
-                .lt(Chapter::getGlobalOrder, ch.getGlobalOrder())
+                .lt(Chapter::getGlobalOrder, chapter.getGlobalOrder())
                 .orderByDesc(Chapter::getGlobalOrder)
                 .last("LIMIT 1"));
         dto.setPrevChapterId(prev.isEmpty() ? null : prev.get(0).getId());
 
         var next = chapterMapper.selectList(
             new LambdaQueryWrapper<Chapter>()
-                .eq(Chapter::getComicId, ch.getComicId())
+                .eq(Chapter::getComicId, chapter.getComicId())
                 .eq(Chapter::getStatus, ChapterLifecycleStatus.READY.name())
-                .gt(Chapter::getGlobalOrder, ch.getGlobalOrder())
+                .gt(Chapter::getGlobalOrder, chapter.getGlobalOrder())
                 .orderByAsc(Chapter::getGlobalOrder)
                 .last("LIMIT 1"));
         dto.setNextChapterId(next.isEmpty() ? null : next.get(0).getId());
