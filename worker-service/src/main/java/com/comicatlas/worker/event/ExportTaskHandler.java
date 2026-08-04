@@ -100,8 +100,8 @@ public class ExportTaskHandler {
                             taskId, comicId, errorCode, e.getMessage()));
             try {
                 channel.basicReject(tag, false);
-            } catch (Exception ignored) {
-                log.warn("basicReject 失败: taskId={}", taskId);
+            } catch (Exception ex) {
+                log.warn("消息 reject 失败: tag={}, taskId={}", tag, taskId, ex);
             }
         }
     }

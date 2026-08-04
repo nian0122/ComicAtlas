@@ -1,5 +1,6 @@
 package com.comicatlas.worker.export;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -12,6 +13,7 @@ import java.util.zip.ZipOutputStream;
 /**
  * 根据 {@link ExportManifest} 构建 ZIP 文件 — 流式写入，避免内存爆炸。
  */
+@Slf4j
 @Component
 public class ZipBuilder {
 
@@ -41,8 +43,7 @@ public class ZipBuilder {
         } catch (Exception e) {
             try {
                 Files.deleteIfExists(outputPath);
-            } catch (IOException ignored) {
-            }
+            } catch (IOException ex) { log.warn("清理失败 ZIP 文件失败: {}", outputPath, ex); }
             throw e;
         }
         return Files.size(outputPath);
