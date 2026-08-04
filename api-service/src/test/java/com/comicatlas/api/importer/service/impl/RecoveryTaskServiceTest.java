@@ -5,6 +5,9 @@ import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.importer.entity.RecoveryTask;
 import com.comicatlas.api.importer.event.RecoveryEventPublisher;
 import com.comicatlas.api.importer.mapper.RecoveryTaskMapper;
+import com.comicatlas.api.management.dto.ManagementTaskResponse;
+import com.comicatlas.api.management.service.ManagementTaskService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -25,8 +28,20 @@ class RecoveryTaskServiceTest {
     @Mock
     private RecoveryEventPublisher recoveryEventPublisher;
 
+    @Mock
+    private ManagementTaskService managementTaskService;
+
     @InjectMocks
     private RecoveryTaskServiceImpl service;
+
+    @BeforeEach
+    void setUp() {
+        lenient().when(managementTaskService.createTask(any(), any(), any())).thenAnswer(invocation -> {
+            ManagementTaskResponse resp = new ManagementTaskResponse();
+            resp.setId(500L);
+            return resp;
+        });
+    }
 
     // ======================== createRecoveryTask ========================
 
@@ -49,7 +64,7 @@ class RecoveryTaskServiceTest {
 
         verify(recoveryTaskMapper).insert(taskCaptor.capture());
         RecoveryTask captured = taskCaptor.getValue();
-        assertEquals("PENDING", captured.getStatus());
+        assertEquals("QUEUED", captured.getStatus());
         assertEquals(0, captured.getTotalComics());
         assertEquals(0, captured.getRecoveredComics());
         assertEquals(0, captured.getSkippedComics());
@@ -101,7 +116,7 @@ class RecoveryTaskServiceTest {
         ArgumentCaptor<RecoveryTask> taskCaptor = ArgumentCaptor.forClass(RecoveryTask.class);
         verify(recoveryTaskMapper).updateById(taskCaptor.capture());
         RecoveryTask updated = taskCaptor.getValue();
-        assertEquals("PENDING", updated.getStatus());
+        assertEquals("QUEUED", updated.getStatus());
         assertEquals(2, updated.getRetryCount());
         assertNull(updated.getErrorMessage());
         assertNull(updated.getStartedAt());

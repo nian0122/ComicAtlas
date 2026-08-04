@@ -11,6 +11,8 @@ import java.time.LocalDateTime;
 public class ExportTask {
     @TableId(type = IdType.AUTO)
     private Long id;
+    /** 关联 management_task.id 一对一扩展（V12 列） */
+    private Long managementTaskId;
     private Long comicId;
     private String status;      // PENDING, RUNNING, SUCCESS, FAILED
     private Integer progress;   // 0-100, -1 on FAILED

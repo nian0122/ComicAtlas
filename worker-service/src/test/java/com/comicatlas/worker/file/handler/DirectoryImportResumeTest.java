@@ -82,13 +82,25 @@ class DirectoryImportResumeTest {
         // 源被搬空
         assertFalse(Files.exists(sourceRoot.resolve("vol1/ch1/001.jpg")), "源 001 应被搬走");
         assertFalse(Files.exists(sourceRoot.resolve("vol1/ch1/002.jpg")), "源 002 应被搬走");
-        // HQ 落位
-        assertTrue(Files.exists(mangaRoot.resolve("hq/10/1/001.jpg")), "HQ 应有 001");
-        assertTrue(Files.exists(mangaRoot.resolve("hq/10/1/002.jpg")), "HQ 应有 002");
-        // metadata 完整
+        // HQ 落位 — 新布局使用 UUID 文件名
+        Path hqChapterDir = mangaRoot.resolve("hq/10/1");
+        assertTrue(Files.exists(hqChapterDir), "HQ 章节目录应存在");
+        List<Path> hqFiles;
+        try (var stream = Files.list(hqChapterDir)) {
+            hqFiles = stream.filter(Files::isRegularFile).toList();
+        }
+        assertEquals(2, hqFiles.size(), "HQ 应有 2 个文件");
+        // 文件名应为 serverGeneratedName（UUID + 扩展名）
+        for (Path f : hqFiles) {
+            assertTrue(f.getFileName().toString().matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.jpg"),
+                "文件名应为 UUID.jpg 格式: " + f.getFileName());
+        }
+        // metadata 完整 — 包含 hqPath
         JsonNode meta = objectMapper.readTree(mangaRoot.resolve("metadata/100.json").toFile());
         assertEquals(3, meta.path("version").asInt());
-        assertEquals(2, meta.path("chapters").get(0).path("mediaItems").size());
+        JsonNode items = meta.path("chapters").get(0).path("mediaItems");
+        assertEquals(2, items.size());
+        assertTrue(items.get(0).has("hqPath"), "mediaItems 应包含 hqPath");
         // 恢复点清理
         assertFalse(manifestManager.exists(mangaRoot, 100L), "成功后恢复点应删除");
     }
@@ -99,23 +111,58 @@ class DirectoryImportResumeTest {
         Files.writeString(sourceRoot.resolve("vol1/ch1/002.jpg"), "content-2");
         stubParseAndAssemble();
 
-        // 模拟中断态：001 已搬入 HQ 且文件大小匹配，002 仍在源目录，清单保留
-        // 先把 001 搬入 HQ 再手工写清单（模拟"中断时已搬部分"）
+        // 先获取 handler.buildManifestFiles 会生成的文件名（通过实际构建清单）
+        Path importRoot = sourceRoot;
+        ComicMetadata metadata = new ComicMetadata("test", "author", "",
+                List.of(), List.of(),
+                List.of(new ComicMetadata.ChapterInfo(
+                        "第01话", "1", 1, 1, -1, "vol1/ch1",
+                        List.of(
+                            media("001.jpg", 1),
+                            media("002.jpg", 2)
+                        ))));
+        // 使用反射或直接调用构建方法获取生成的文件路径
+        // 这里通过第一次执行 handler 并在删除前捕获清单
+        handler.handle(new ImportContext("DIRECTORY", sourceRoot, false, false), 200L, 20L, mangaRoot);
+        // 从 HQ 目录获取生成的文件名
+        Path hqTempDir = mangaRoot.resolve("hq/20/1");
+        List<Path> genFiles;
+        try (var stream = Files.list(hqTempDir)) {
+            genFiles = stream.sorted().toList();
+        }
+        String genName1 = genFiles.get(0).getFileName().toString();
+        String genName2 = genFiles.get(1).getFileName().toString();
+        // 使用 comicId=10 的路径（与第二次导入匹配）
+        String generatedName1 = "10/1/" + genName1;
+        String generatedName2 = "10/1/" + genName2;
+        long size1 = Files.size(genFiles.get(0));
+        long size2 = Files.size(genFiles.get(1));
+        // 清理第一次导入
+        deleteRecursively(mangaRoot.resolve("hq/20"));
+        deleteRecursively(mangaRoot.resolve("imports/200"));
+        Files.deleteIfExists(mangaRoot.resolve("metadata/200.json"));
+
+        // 重新创建源文件
+        Files.writeString(sourceRoot.resolve("vol1/ch1/001.jpg"), "content-1");
+        Files.writeString(sourceRoot.resolve("vol1/ch1/002.jpg"), "content-2");
+
+        // 模拟中断态：001 已搬入 HQ 且文件大小匹配，002 仍在源目录
         Path hqDir = mangaRoot.resolve("hq/10/1");
         Files.createDirectories(hqDir);
-        Files.move(sourceRoot.resolve("vol1/ch1/001.jpg"), hqDir.resolve("001.jpg"));
-        manifestManager.write(mangaRoot, 100L, rebuiltManifestWithOneMoved());
+        Path file1 = hqDir.resolve(genFiles.get(0).getFileName().toString());
+        Files.move(sourceRoot.resolve("vol1/ch1/001.jpg"), file1);
+        manifestManager.write(mangaRoot, 100L,
+                rebuiltManifestWithGeneratedNames(generatedName1, generatedName2, size1, size2));
 
         handler.handle(new ImportContext("DIRECTORY", sourceRoot, false, false), 100L, 10L, mangaRoot);
 
         // 001 未被重复搬（跳过），002 被续搬
-        assertTrue(Files.exists(hqDir.resolve("001.jpg")), "001 应保留在 HQ");
-        assertTrue(Files.exists(hqDir.resolve("002.jpg")), "002 应被续搬");
+        assertTrue(Files.exists(file1), "001 应保留在 HQ");
+        Path file2 = hqDir.resolve(genFiles.get(1).getFileName().toString());
+        assertTrue(Files.exists(file2), "002 应被续搬: " + file2);
         assertFalse(Files.exists(sourceRoot.resolve("vol1/ch1/002.jpg")), "源 002 应被搬走");
-        // metadata 仍是完整 2 页
         JsonNode meta = objectMapper.readTree(mangaRoot.resolve("metadata/100.json").toFile());
         assertEquals(2, meta.path("chapters").get(0).path("mediaItems").size());
-        // 成功则清理恢复点
         assertFalse(manifestManager.exists(mangaRoot, 100L), "续搬完成后恢复点应清理");
     }
 
@@ -125,9 +172,10 @@ class DirectoryImportResumeTest {
         Files.writeString(sourceRoot.resolve("vol1/ch1/002.jpg"), "content-2");
         stubParseAndAssemble();
 
-        // 预置：目标 001 存在但大小不符（污染）
+        // 预置：目标文件存在但大小不符（污染）
         Path hqDir = mangaRoot.resolve("hq/10/1");
         Files.createDirectories(hqDir);
+        // 使用 rebuiltManifestWithOneMoved 中的硬编码路径保持一致
         Files.writeString(hqDir.resolve("001.jpg"), "corrupted!!!");
         manifestManager.write(mangaRoot, 100L, rebuiltManifestWithOneMoved());
 
@@ -168,8 +216,14 @@ class DirectoryImportResumeTest {
         when(cancelHandler.isCancelled(anyLong())).thenReturn(false);
         handler.handle(new ImportContext("DIRECTORY", sourceRoot, false, false), 100L, 10L, mangaRoot);
 
-        assertTrue(Files.exists(mangaRoot.resolve("hq/10/1/001.jpg")));
-        assertTrue(Files.exists(mangaRoot.resolve("hq/10/1/002.jpg")));
+        // 新布局使用 UUID 文件名，不检查硬编码文件名
+        Path hqChapterDir = mangaRoot.resolve("hq/10/1");
+        assertTrue(Files.exists(hqChapterDir), "HQ 章节目录应存在");
+        List<Path> hqFiles;
+        try (var stream = Files.list(hqChapterDir)) {
+            hqFiles = stream.filter(Files::isRegularFile).toList();
+        }
+        assertEquals(2, hqFiles.size(), "续搬后应有 2 个文件");
         JsonNode meta = objectMapper.readTree(mangaRoot.resolve("metadata/100.json").toFile());
         assertEquals(2, meta.path("chapters").get(0).path("mediaItems").size());
         assertFalse(manifestManager.exists(mangaRoot, 100L));
@@ -215,7 +269,22 @@ class DirectoryImportResumeTest {
     }
 
     private ImportManifest rebuiltManifestWithOneMoved() throws Exception {
-        JsonNode metadata = objectMapper.readTree("""
+        return rebuiltManifestWithGeneratedNames("10/1/001.jpg", "10/1/002.jpg", 9, 9);
+    }
+
+    private ImportManifest rebuiltManifestWithGeneratedNames(String target1, String target2) throws Exception {
+        return rebuiltManifestWithGeneratedNames(target1, target2,
+                Files.exists(sourceRoot.resolve("vol1/ch1/001.jpg"))
+                    ? Files.size(sourceRoot.resolve("vol1/ch1/001.jpg")) : 9,
+                Files.exists(sourceRoot.resolve("vol1/ch1/002.jpg"))
+                    ? Files.size(sourceRoot.resolve("vol1/ch1/002.jpg")) : 9);
+    }
+
+    private ImportManifest rebuiltManifestWithGeneratedNames(
+            String target1, String target2, long size1, long size2) throws Exception {
+        String fileName1 = Path.of(target1).getFileName().toString();
+        String fileName2 = Path.of(target2).getFileName().toString();
+        String json = String.format("""
             {
               "version": 3,
               "comic": {"title": "测试漫画", "author": "", "tags": []},
@@ -224,18 +293,21 @@ class DirectoryImportResumeTest {
                 {"title": "第01话", "chapterNo": "1", "sortOrder": 1, "globalOrder": 1,
                  "catalogIndex": -1, "sourceDir": "vol1/ch1",
                  "mediaItems": [
-                   {"fileName": "001.jpg", "pageNumber": 1, "hqStatus": "PENDING",
-                    "lqStatus": "NOT_GENERATED", "fileSize": 9, "width": 800, "height": 1200, "mediaType": "IMAGE"},
-                   {"fileName": "002.jpg", "pageNumber": 2, "hqStatus": "PENDING",
-                    "lqStatus": "NOT_GENERATED", "fileSize": 9, "width": 800, "height": 1200, "mediaType": "IMAGE"}
+                   {"fileName": "%s", "pageNumber": 1, "hqStatus": "PENDING",
+                    "lqStatus": "NOT_GENERATED", "fileSize": %d, "width": 800, "height": 1200, "mediaType": "IMAGE",
+                    "hqPath": "%s"},
+                   {"fileName": "%s", "pageNumber": 2, "hqStatus": "PENDING",
+                    "lqStatus": "NOT_GENERATED", "fileSize": %d, "width": 800, "height": 1200, "mediaType": "IMAGE",
+                    "hqPath": "%s"}
                  ]}
               ]
             }
-            """);
+            """, fileName1, size1, target1, fileName2, size2, target2);
+        JsonNode metadata = objectMapper.readTree(json);
         return new ImportManifest(1, 100L, "DIRECTORY", sourceRoot.toString(), metadata,
                 List.of(
-                    new ImportManifest.ImportFile("vol1/ch1/001.jpg", "10/1/001.jpg", 9),
-                    new ImportManifest.ImportFile("vol1/ch1/002.jpg", "10/1/002.jpg", 9)
+                    new ImportManifest.ImportFile("vol1/ch1/001.jpg", target1, size1),
+                    new ImportManifest.ImportFile("vol1/ch1/002.jpg", target2, size2)
                 ));
     }
 

@@ -144,7 +144,7 @@ public class RecoveryEngine {
             Comic placeholder = new Comic();
             placeholder.setId(comicId);
             placeholder.setTitle("待恢复漫画 " + comicId);
-            placeholder.setStatus("PLACEHOLDER");
+            placeholder.setStatus("RECOVERY_REQUIRED");
             placeholder.setStoragePolicy("MANAGED");
             comicMapper.insert(placeholder);
         });

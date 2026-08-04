@@ -18,6 +18,21 @@ ComicAtlas 是一个面向个人收藏的本地漫画仓库平台。它把 ZIP�
 - 存储恢复（异步任务中心），从 HQ 文件重建数据库记录
 - 统一 MANAGED 存储，数据库只保存相对路径
 
+### 管理控制台（v1.0）
+
+管理后台位于 `/manage`，提供：
+
+- **漫画工作区**：列表、详情、编辑（乐观锁 `version`）、元数据、标签、封面
+- **目录/章节管理**：目录树的创建、重命名、移动、排序、删除；章节的创建、重排、回收
+- **媒体管理**：图片/视频上传（分块断点续传）、重排、回收
+- **任务中心**：管理任务列表/详情/逐项进度、取消、重试，Outbox 积压监控
+- **回收站**：删除进回收站（软删除），7 天保留期后可恢复或永久清理，支持对账修复
+- **批量操作**：跨页按筛选或 ID 选择，预览 + 二次确认，批量 LQ/HQ/转码/元数据/回收/恢复/清理
+- **允许操作查询**：按钮权限统一由后端 `OperationPolicyService` 判定，前端不自算
+- **危险区**：永久清理、存储恢复、DLQ 管理
+
+> 删除默认进入回收站而非直接物理删除；永久清理必须经过回收站并二次确认。详见[用户指南](docs/user-guide.md)的“管理后台”章节与[部署运维](docs/operations/management.md)。
+
 ## 快速开始
 
 ### 运行环境
@@ -100,13 +115,36 @@ pnpm build
 {MANGA_ROOT}/lq/{comicId}/{chapterId}/
 {MANGA_ROOT}/thumbs/
 {MANGA_ROOT}/metadata/
+{MANGA_ROOT}/staging/        # 上传临时目录（API 可写，不对外暴露）
+{MANGA_ROOT}/trash/          # 回收站文件卷（软删除后移入，7 天保留期）
+{MANGA_ROOT}/export/         # 导出产物目录
 ```
 
 数据库中的页面只保存 `hq_root`、`hq_path` 等相对引用，不保存宿主机绝对路径。迁移存储时优先修改 `MANGA_ROOT` 或 `storage.roots.HQ.path` 配置，不要手动改写页面路径。
 
+### 上传限制（默认）
+
+| 项 | 默认值 | 环境变量 |
+|----|--------|---------|
+| 分块大小 | 16 MiB | `UPLOAD_CHUNK_SIZE` |
+| 单文件上限 | 20 GiB | `UPLOAD_MAX_FILE_SIZE` |
+| 单会话上限 | 100 GiB | `UPLOAD_MAX_SESSION_SIZE` |
+| 单会话文件数 | 10000 | `UPLOAD_MAX_FILES` |
+| 会话过期 | 24 小时 | `UPLOAD_SESSION_TTL` |
+| 磁盘剩余下限 | 5 GiB 或 10% | `UPLOAD_FREE_SPACE_MIN_BYTES` / `UPLOAD_FREE_SPACE_MIN_RATIO` |
+
+### 可信本机部署
+
+ComicAtlas 面向单机个人仓库，管理端接口（回收站、永久清理、DLQ 等）默认不开启鉴权。请遵守：
+
+- 仅部署在可信本机环境；基础服务（`docker-compose.infra.yml`）只绑定 `127.0.0.1` 回环地址。
+- 不要把 8000/3306/15672/8848 等管理端口直接暴露到公网。
+- 在宿主机或防火墙层限制对管理后台 `/manage` 的访问，需要远程访问时使用 SSH 隧道。
+
 ## 文档
 
 - [用户指南](docs/user-guide.md)：安装、配置、导入、阅读、管理和故障排查
+- [部署运维](docs/operations/management.md)：数据库账号、存储卷、备份、升级与回滚
 - [开发流程](docs/development-guide.md)：分支、提交、合并、推送与发布
 - [API 文档](docs/api.md)：HTTP 接口与事件状态
 - [发布说明](docs/release/v1.0.0.md)：1.0 功能范围与已知限制

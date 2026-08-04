@@ -12,6 +12,8 @@ import com.comicatlas.api.importer.dto.BatchImportResultVO;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.event.ImportEventPublisher;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
+import com.comicatlas.api.management.dto.ManagementTaskResponse;
+import com.comicatlas.api.management.service.ManagementTaskService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -48,6 +50,7 @@ class ImportServiceTest {
     @Mock private RedisTemplate<String, Object> redisTemplate;
     @Mock private TransactionTemplate transactionTemplate;
     @Mock private CatalogCacheInvalidator catalogCacheInvalidator;
+    @Mock private ManagementTaskService managementTaskService;
     @InjectMocks private ImportServiceImpl service;
 
     @BeforeEach
@@ -55,6 +58,12 @@ class ImportServiceTest {
         lenient().when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
             TransactionCallback<?> callback = invocation.getArgument(0);
             return callback.doInTransaction(null);
+        });
+        AtomicLong mgmtIdGen = new AtomicLong(900);
+        lenient().when(managementTaskService.createTask(any(), any(), any())).thenAnswer(invocation -> {
+            ManagementTaskResponse resp = new ManagementTaskResponse();
+            resp.setId(mgmtIdGen.getAndIncrement());
+            return resp;
         });
     }
 

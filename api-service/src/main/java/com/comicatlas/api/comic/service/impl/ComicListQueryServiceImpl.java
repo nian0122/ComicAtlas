@@ -13,8 +13,12 @@ import com.comicatlas.api.comic.mapper.CategoryMapper;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.service.ComicListQueryService;
 import com.comicatlas.api.common.storage.FileUrlResolver;
+import com.comicatlas.api.management.dto.ManagementTaskResponse;
+import com.comicatlas.api.management.policy.OperationPolicyService;
+import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.reader.entity.ReadingHistory;
 import com.comicatlas.api.reader.mapper.ReadingHistoryMapper;
+import com.comicatlas.common.enums.ComicLifecycleStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -36,6 +40,8 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
     private final CategoryMapper categoryMapper;
     private final ReadingHistoryMapper historyMapper;
     private final FileUrlResolver fileUrlResolver;
+    private final OperationPolicyService operationPolicyService;
+    private final ManagementTaskService managementTaskService;
 
     @Override
     public IPage<ComicListVO> listComics(ComicListQuery query) {
@@ -58,7 +64,8 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
         IPage<Comic> result = comicMapper.selectPage(page, query);
         List<Comic> comics = result.getRecords();
         if (comics.isEmpty()) {
-            IPage<ComicListVO> emptyPage = result.convert(comic -> toListVO(comic, Map.of(), Map.of()));
+            IPage<ComicListVO> emptyPage = result.convert(comic ->
+                    toListVO(comic, new HashMap<>(), new HashMap<>(), new HashMap<>()));
             return ComicListPage.from(emptyPage);
         }
 
@@ -78,7 +85,11 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
                 .stream()
                 .collect(Collectors.toMap(ReadingHistory::getComicId, history -> history));
 
-        IPage<ComicListVO> voPage = result.convert(comic -> toListVO(comic, categoryNames, histories));
+        Map<Long, ManagementTaskResponse> activeTasks =
+                managementTaskService.findActiveTasksForComics(comicIds);
+
+        IPage<ComicListVO> voPage = result.convert(
+                comic -> toListVO(comic, categoryNames, histories, activeTasks));
         return ComicListPage.from(voPage);
     }
 
@@ -123,7 +134,8 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
     private ComicListVO toListVO(
             Comic comic,
             Map<Long, String> categoryNames,
-            Map<Long, ReadingHistory> histories) {
+            Map<Long, ReadingHistory> histories,
+            Map<Long, ManagementTaskResponse> activeTasks) {
         ComicListVO vo = new ComicListVO();
         vo.setId(comic.getId());
         vo.setTitle(comic.getTitle());
@@ -132,7 +144,9 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
         vo.setPageCount(comic.getTotalPages());
         vo.setCategoryId(comic.getCategoryId());
         vo.setCategoryName(categoryNames.get(comic.getCategoryId()));
-        vo.setStatus(comic.getStatus());
+        vo.setLifecycle(toLifecycle(comic.getStatus()));
+        vo.setActiveTask(activeTasks.get(comic.getId()));
+        vo.setAllowedOperations(operationPolicyService.forComic(comic.getStatus()));
         vo.setCreatedAt(comic.getCreatedAt());
 
         ReadingHistory history = histories.get(comic.getId());
@@ -142,5 +156,14 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
             vo.setProgressPercent(history.getPageNumber() * 100 / comic.getTotalPages());
         }
         return vo;
+    }
+
+    private static ComicLifecycleStatus toLifecycle(String status) {
+        if (status == null) return null;
+        try {
+            return ComicLifecycleStatus.valueOf(status);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 }

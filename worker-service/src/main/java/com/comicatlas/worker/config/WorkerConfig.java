@@ -34,7 +34,12 @@ public class WorkerConfig {
 
     @Bean
     public ObjectMapper objectMapper() {
-        return new ObjectMapper();
+        // QA 修复注记（task-21）：注册 JavaTimeModule。
+        // Worker 需读取 API 写入的 TrashManifest / metadata（含 Instant createdAt），
+        // 裸 ObjectMapper 无法反序列化 Instant → 回收清单读取失败、TRASH 命令失败。
+        return com.fasterxml.jackson.databind.json.JsonMapper.builder()
+                .addModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
+                .build();
     }
 
     @Data

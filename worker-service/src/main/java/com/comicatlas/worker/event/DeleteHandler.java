@@ -2,7 +2,8 @@ package com.comicatlas.worker.event;
 
 import com.comicatlas.common.event.DeleteCompletedEvent;
 import com.comicatlas.common.event.DeleteRequestedEvent;
-import com.comicatlas.worker.config.WorkerConfig;
+import com.comicatlas.worker.file.storage.StorageProperties;
+import com.comicatlas.worker.file.storage.StorageRoot;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,7 +13,6 @@ import org.springframework.amqp.support.AmqpHeaders;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.*;
 import java.time.Instant;
@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Component
 @RequiredArgsConstructor
 public class DeleteHandler {
-    private final WorkerConfig config;
+    private final StorageProperties storageProperties;
     private final RabbitTemplate rabbitTemplate;
 
     @RabbitListener(queues = "delete.task.queue")
@@ -34,42 +34,66 @@ public class DeleteHandler {
         log.info("Delete: comicId={}", comicId);
 
         try {
-            Path mangaRoot = Path.of(config.getMangaRoot());
-            Path hqRoot = mangaRoot.resolve("hq").resolve(comicId.toString());
+            StorageRoot hqRoot = storageProperties.getRoots().get("HQ");
+            StorageRoot lqRoot = storageProperties.getRoots().get("LQ");
+            StorageRoot thumbsRoot = storageProperties.getRoots().get("THUMBS");
+            StorageRoot trashRoot = storageProperties.getRoots().get("TRASH");
+            StorageRoot metadataRoot = storageProperties.getRoots().get("METADATA");
 
-            if (!Files.exists(hqRoot)) {
-                log.info("Delete skipped (already deleted): comicId={}", comicId);
-                channel.basicAck(tag, false);
+            if (hqRoot == null || lqRoot == null) {
+                log.error("HQ/LQ 存储根未配置");
+                channel.basicReject(tag, false);
                 return;
             }
+
+            Path comicHqDir = hqRoot.resolve(comicId.toString());
+            Path comicLqDir = lqRoot.resolve(comicId.toString());
+            Path comicTrashDir = trashRoot != null ? trashRoot.resolve(comicId.toString()) : null;
 
             AtomicInteger deletedDirs = new AtomicInteger(0);
             AtomicInteger deletedFiles = new AtomicInteger(0);
 
-            deleteTree(hqRoot, deletedDirs, deletedFiles);
-            deleteTree(mangaRoot.resolve("lq").resolve(comicId.toString()), deletedDirs, deletedFiles);
-            deleteTree(mangaRoot.resolve("thumbs").resolve(comicId.toString()), deletedDirs, deletedFiles);
-            try { Files.deleteIfExists(mangaRoot.resolve("metadata").resolve(comicId + ".json")); } catch (Exception ignored) {}
+            // 先移入 TRASH（软删除），再清理 TRASH
+            if (trashRoot != null && Files.exists(comicHqDir)) {
+                moveToTrash(comicHqDir, comicTrashDir, hqRoot, trashRoot);
+            }
+            deleteTree(comicHqDir, deletedDirs, deletedFiles);
+            deleteTree(comicLqDir, deletedDirs, deletedFiles);
 
-            Path rawFile = mangaRoot.resolve("raw").resolve(comicId + ".zip");
-            try {
-                Files.deleteIfExists(rawFile);
-                deletedFiles.incrementAndGet();
-            } catch (Exception ignored) {}
+            if (thumbsRoot != null) {
+                deleteTree(thumbsRoot.resolve(comicId.toString()), deletedDirs, deletedFiles);
+            }
+            if (metadataRoot != null) {
+                try { Files.deleteIfExists(metadataRoot.resolve(comicId + ".json")); } catch (Exception ignored) {}
+            }
 
             var completed = new DeleteCompletedEvent(
                 UUID.randomUUID(), Instant.now(), comicId,
                 deletedDirs.get(), deletedFiles.get());
             rabbitTemplate.convertAndSend("comic.delete", "delete.completed", completed);
-
             channel.basicAck(tag, false);
             log.info("Delete completed: comicId={}, dirs={}, files={}, elapsed={}ms",
                 comicId, deletedDirs.get(), deletedFiles.get(), System.currentTimeMillis() - start);
-
         } catch (Exception e) {
             log.error("Delete failed: comicId={}, elapsed={}ms",
                 comicId, System.currentTimeMillis() - start, e);
             try { channel.basicReject(tag, false); } catch (Exception ignored) {}
+        }
+    }
+
+    private void moveToTrash(Path sourceDir, Path trashDir, StorageRoot sourceRoot, StorageRoot trashRoot)
+            throws IOException {
+        if (!Files.exists(sourceDir)) return;
+        if (!sourceRoot.sameFileStore(trashRoot.getPath())) {
+            log.warn("跨卷删除，跳过 TRASH 软删除直接清理: source={}, trash={}", sourceDir, trashDir);
+            return;
+        }
+        Files.createDirectories(trashDir.getParent());
+        try {
+            Files.move(sourceDir, trashDir, StandardCopyOption.REPLACE_EXISTING);
+            log.info("已移入 TRASH: {} -> {}", sourceDir, trashDir);
+        } catch (IOException e) {
+            log.warn("移入 TRASH 失败（非致命）: {}", e.getMessage());
         }
     }
 

@@ -4,6 +4,8 @@ server:
 spring:
   application:
     name: comic-gateway
+  codec:
+    max-in-memory-size: 32MB
   cloud:
     nacos:
       discovery:
