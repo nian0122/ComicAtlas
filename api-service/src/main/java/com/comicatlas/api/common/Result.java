@@ -1,5 +1,6 @@
 package com.comicatlas.api.common;
 
+import com.comicatlas.api.common.constant.HttpStatusCodes;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -12,7 +13,7 @@ public class Result<T> {
 
     public static <T> Result<T> ok(T data) {
         Result<T> r = new Result<>();
-        r.code = 200;
+        r.code = HttpStatusCodes.OK;
         r.message = "success";
         r.data = data;
         return r;
@@ -37,6 +38,6 @@ public class Result<T> {
     }
 
     public static <T> Result<T> fail(String message) {
-        return fail(500, message);
+        return fail(HttpStatusCodes.INTERNAL_ERROR, message);
     }
 }
