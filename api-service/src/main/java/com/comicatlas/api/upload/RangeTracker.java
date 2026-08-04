@@ -12,7 +12,7 @@ import java.util.List;
  */
 public final class RangeTracker {
 
-    private static final Logger log = LoggerFactory.getLogger(RangeTracker.class);
+    private static final Logger LOG = LoggerFactory.getLogger(RangeTracker.class);
 
     private RangeTracker() {}
 
@@ -100,7 +100,7 @@ public final class RangeTracker {
                 long s = Long.parseLong(part.substring(0, dash));
                 long e = Long.parseLong(part.substring(dash + 1));
                 if (s <= e) out.add(new long[]{s, e});
-            } catch (NumberFormatException e) { log.warn("解析 range 段失败: {}", part, e); }
+            } catch (NumberFormatException e) { LOG.warn("解析 range 段失败: {}", part, e); }
         }
         return out;
     }

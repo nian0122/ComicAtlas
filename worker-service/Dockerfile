@@ -10,6 +10,6 @@ RUN mvn clean package -pl comic-common,worker-service -am -DskipTests
 
 FROM eclipse-temurin:21-jre-alpine-3.20
 WORKDIR /app
-COPY --from=builder /build/worker-service/target/*.jar app.jar
+COPY --from=builder /build/worker-service/target/*-exec.jar app.jar
 EXPOSE 8020
 ENTRYPOINT ["java", "-jar", "app.jar"]
