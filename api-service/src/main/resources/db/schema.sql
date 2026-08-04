@@ -232,3 +232,99 @@ CREATE TABLE IF NOT EXISTS inbox_receipt (
     INDEX idx_ir_task_id (task_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='结果Inbox收据表';
 
+-- ======================== 统一管理任务 ========================
+
+CREATE TABLE IF NOT EXISTS management_task (
+    id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+    task_type       VARCHAR(32)   NOT NULL COMMENT '任务类型: IMPORT/RECOVERY/EXPORT/DIRECTORY_SCAN',
+    operation       VARCHAR(64)   NOT NULL COMMENT '操作描述',
+    target_type     VARCHAR(32)   COMMENT '目标类型: COMIC/DIRECTORY/SYSTEM',
+    batch_id        VARCHAR(36)   COMMENT '批次ID',
+    is_batch        TINYINT(1)    NOT NULL DEFAULT 0 COMMENT '是否批量任务',
+    status          VARCHAR(32)   NOT NULL DEFAULT 'QUEUED' COMMENT '任务状态',
+    stage           VARCHAR(64)   COMMENT '当前阶段描述',
+    progress        INT           DEFAULT 0 COMMENT '聚合进度 0-100',
+    total_count     INT           DEFAULT 0 COMMENT '总目标数',
+    success_count   INT           DEFAULT 0 COMMENT '成功项数',
+    failure_count   INT           DEFAULT 0 COMMENT '失败项数',
+    cancelled_count INT           DEFAULT 0 COMMENT '取消项数',
+    idempotency_key VARCHAR(128)  COMMENT '幂等键（唯一）',
+    idempotency_payload_hash VARCHAR(64) COMMENT '幂等负载 SHA-256',
+    error_message   VARCHAR(4096) COMMENT '错误摘要',
+    error_detail    TEXT          COMMENT '错误详情 JSON',
+    attempt         INT           NOT NULL DEFAULT 1 COMMENT '当前第几次尝试',
+    version         INT           NOT NULL DEFAULT 0 COMMENT '@Version 乐观锁',
+    created_at      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    started_at      DATETIME      COMMENT '开始时间',
+    completed_at    DATETIME      COMMENT '完成时间',
+    INDEX idx_mt_task_type (task_type),
+    INDEX idx_mt_status (status),
+    INDEX idx_mt_batch_id (batch_id),
+    INDEX idx_mt_created_at (created_at),
+    UNIQUE INDEX uk_mt_idempotency_key (idempotency_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='统一管理任务主表';
+
+CREATE TABLE IF NOT EXISTS management_task_item (
+    id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+    task_id         BIGINT       NOT NULL COMMENT '关联 management_task.id',
+    target_type     VARCHAR(32)  NOT NULL COMMENT '目标类型: COMIC/DIRECTORY',
+    target_id       BIGINT       NOT NULL COMMENT '目标ID',
+    operation_type  VARCHAR(32)  NOT NULL COMMENT '操作类型',
+    status          VARCHAR(32)  NOT NULL DEFAULT 'QUEUED' COMMENT '项状态',
+    attempt         INT          NOT NULL DEFAULT 1 COMMENT '第几次尝试',
+    progress        INT          DEFAULT 0 COMMENT '进度 0-100',
+    result_ref_type VARCHAR(32)  COMMENT '结果引用表类型',
+    result_ref_id   BIGINT       COMMENT '结果引用表 ID',
+    error_message   VARCHAR(4096) COMMENT '错误信息',
+    lock_key        VARCHAR(128) COMMENT '活跃锁键，完成时设NULL释放唯一约束',
+    version         INT          NOT NULL DEFAULT 0 COMMENT '@Version 乐观锁',
+    created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    started_at      DATETIME     COMMENT '开始时间',
+    completed_at    DATETIME     COMMENT '完成时间',
+    INDEX idx_mti_task_id (task_id),
+    INDEX idx_mti_target (target_type, target_id),
+    INDEX idx_mti_status (status),
+    UNIQUE INDEX uk_mti_active_target_lock (lock_key),
+    CONSTRAINT fk_mti_task FOREIGN KEY (task_id) REFERENCES management_task(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='统一管理任务目标项表';
+
+-- ======================== 分片上传 ========================
+
+CREATE TABLE IF NOT EXISTS upload_session (
+    id               BIGINT AUTO_INCREMENT PRIMARY KEY,
+    session_id       VARCHAR(64)  NOT NULL COMMENT '对外 opaque 会话 ID（UUID）',
+    comic_id         BIGINT       NOT NULL COMMENT '目标漫画',
+    chapter_id       BIGINT       NOT NULL COMMENT '目标章节',
+    replace_media_id BIGINT       NULL     COMMENT '替换目标媒体 ID（replace 流程）',
+    status           VARCHAR(16)  NOT NULL DEFAULT 'ACTIVE' COMMENT 'ACTIVE/COMPLETED/CANCELLED/EXPIRED/FAILED',
+    total_bytes      BIGINT       NOT NULL DEFAULT 0 COMMENT '会话总字节数',
+    total_files      INT          NOT NULL DEFAULT 0 COMMENT '文件数',
+    expires_at       DATETIME     NOT NULL COMMENT '未完成过期时间',
+    completed_at     DATETIME     NULL     COMMENT 'complete 时间',
+    created_at       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE INDEX uk_upload_session_id (session_id),
+    INDEX idx_us_comic (comic_id),
+    INDEX idx_us_status_expires (status, expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='分片上传会话';
+
+CREATE TABLE IF NOT EXISTS upload_file (
+    id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+    session_id      BIGINT       NOT NULL COMMENT '关联 upload_session.id',
+    file_id         VARCHAR(64)  NOT NULL COMMENT '客户端 opaque 文件标识',
+    original_name   VARCHAR(255) NOT NULL COMMENT '客户端文件名（仅展示，不用于拼路径）',
+    content_type    VARCHAR(128) NOT NULL COMMENT '客户端声明 Content-Type',
+    size_bytes      BIGINT       NOT NULL COMMENT '声明文件大小',
+    sha256          VARCHAR(64)  NOT NULL COMMENT '声明文件总 SHA-256',
+    storage_name    VARCHAR(255) NOT NULL COMMENT '服务端生成文件名 uuid.ext',
+    received_bytes  BIGINT       NOT NULL DEFAULT 0 COMMENT '已接收最大末端字节',
+    received_ranges TEXT         NULL     COMMENT '已接收区间串 0-65535;131072-196607',
+    media_id        BIGINT       NULL     COMMENT 'complete 预建 STAGING media row id',
+    created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE INDEX uk_upload_file (session_id, file_id),
+    INDEX idx_uf_media (media_id),
+    CONSTRAINT fk_upload_file_session FOREIGN KEY (session_id) REFERENCES upload_session(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='上传会话内文件';
+
