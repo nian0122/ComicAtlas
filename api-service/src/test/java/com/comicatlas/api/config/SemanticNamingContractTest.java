@@ -1,0 +1,374 @@
+package com.comicatlas.api.config;
+
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * 固定语义短名守卫测试（阿里 Java 编码规范）。
+ *
+ * <p>扫描四个模块（comic-common / api-service / worker-service / gateway）的
+ * {@code src/main/java} 下全部 Java 源文件，基于「类型 + 变量名」的固定禁用表
+ * 检测违规短名声明，例如 {@code Comic c}、{@code Media page}、
+ * {@code List<Media> pages} 等。
+ *
+ * <p>规则基于<b>声明</b>而非普通字符串匹配：用 {@code \b类型\b\s+\b短名\b}
+ * （{@code List<Media>} 整体作为类型）的正则只匹配「类型 + 变量」相邻组合，
+ * 并在匹配前剥离注释与字符串字面量（含文本块），因此
+ * {@code @Select("SELECT c.* FROM comic c")} 这类 SQL 注解、日志消息与注释文本不会被误报。
+ *
+ * <p>测试运行时工作目录可能是各模块目录或项目根，因此通过 {@code user.dir}
+ * 向上定位项目根目录；某个模块目录不存在时容忍跳过。不依赖绝对工作区路径。
+ */
+@DisplayName("SemanticNamingContractTest — 固定语义短名守卫（阿里编码规范）")
+class SemanticNamingContractTest {
+
+    /** 固定禁用声明表：类型 + 变量名 → 推荐命名。 */
+    private static final List<BannedPattern> BANNED = List.of(
+            new BannedPattern("Comic", "c", "comic"),
+            new BannedPattern("Chapter", "ch", "chapter"),
+            new BannedPattern("Media", "m", "media"),
+            new BannedPattern("Media", "page", "media"),
+            new BannedPattern("List<Media>", "pages", "mediaItems"),
+            new BannedPattern("RecoveryTask", "t", "recoveryTask"),
+            new BannedPattern("ManagementTask", "mt", "managementTask"),
+            new BannedPattern("ComicTag", "ct", "comicTag"),
+            new BannedPattern("ProcessBuilder", "pb", "processBuilder"),
+            new BannedPattern("Process", "proc", "process"),
+            new BannedPattern("LambdaUpdateWrapper", "uw", "<领域>Update")
+    );
+
+    /** 待扫描的模块名。 */
+    private static final List<String> MODULES =
+            List.of("comic-common", "api-service", "worker-service", "gateway");
+
+    /** 一条固定禁用声明：类型 + 变量名 + 建议命名。 */
+    private record BannedPattern(String type, String variable, String expected) {
+
+        /**
+         * 生成声明匹配正则：类型与短名之间以空白分隔。
+         *
+         * <p>遵循任务给出的字面量声明模式（如 {@code \bComic\s+c\b}），
+         * 因此泛型实例化的写法（如 {@code LambdaUpdateWrapper<ManagementTask> uw}）
+         * 不在本规则匹配范围内 —— 它们之间隔着泛型实参而非空白。
+         */
+        Pattern regex() {
+            if (type.equals("List<Media>")) {
+                // List<Media> 自身就是泛型，直接匹配整体类型（允许括号间空白）
+                return Pattern.compile("\\bList\\s*<\\s*Media\\s*>\\s+\\b" + variable + "\\b");
+            }
+            return Pattern.compile("\\b" + type + "\\b\\s+\\b" + variable + "\\b");
+        }
+    }
+
+    /** 一次违规记录：文件、行号、类型、变量名、建议命名。 */
+    private record Violation(String file, int line, String type, String variable, String expected) {
+
+        @Override
+        public String toString() {
+            return file + ":" + line
+                    + "  类型 [" + type + "] 变量 [" + variable + "] → 应改为 [" + expected + "]";
+        }
+    }
+
+    // ======================== 负向：生产源码全量扫描 ========================
+
+    @Test
+    @DisplayName("四个模块 src/main/java 无固定禁用短名声明")
+    void productionSources_haveNoBannedShortNameDeclarations() {
+        Path root = locateProjectRoot();
+        List<String> scannedModules = new ArrayList<>();
+        List<Violation> all = new ArrayList<>();
+        for (String module : MODULES) {
+            if (!Files.isDirectory(root.resolve(module).resolve("src/main/java"))) {
+                continue; // 模块不存在则容忍跳过
+            }
+            scannedModules.add(module);
+            all.addAll(scanModule(root, module));
+        }
+
+        assertThat(scannedModules)
+                .as("应至少扫描到一个模块的 src/main/java（可能定位项目根失败）")
+                .isNotEmpty();
+
+        assertThat(all)
+                .withFailMessage(
+                        "检测到 %d 处固定语义短名违规，应按建议改全名：%n%s",
+                        all.size(),
+                        all.stream().map(Object::toString).collect(Collectors.joining(System.lineSeparator())))
+                .isEmpty();
+    }
+
+    // ======================== 负向：每个禁用声明都能被识别 ========================
+
+    @Test
+    @DisplayName("每个固定禁用声明均被识别（检测有效性）")
+    void eachBannedDeclaration_isDetected() {
+        for (BannedPattern bp : BANNED) {
+            String sample = sampleFor(bp);
+            List<Violation> found = findViolations(sample);
+            assertThat(found)
+                    .as("样本应触发检测: %s", sample)
+                    .anySatisfy(v -> {
+                        assertThat(v.type()).isEqualTo(bp.type());
+                        assertThat(v.variable()).isEqualTo(bp.variable());
+                    });
+        }
+    }
+
+    // ======================== 正向：合法命名不误报 ========================
+
+    @Test
+    @DisplayName("合法标识符正例不被误报")
+    void legitimateIdentifiers_areNotFlagged() {
+        String fixture = """
+                for (int i = 0; i < total; i++) { }
+                int w = 800;
+                int h = 600;
+                SomeDTO dto = new SomeDTO();
+                String hqPath = "hq/1/2/001.jpg";
+                String lqPath = "lq/1/2/001.webp";
+                Long id = 42L;
+                if (isTerminal()) { }
+                Comic comic = new Comic();
+                Chapter chapter = new Chapter();
+                Media media = new Media();
+                List<Media> mediaItems = new ArrayList<>();
+                RecoveryTask recoveryTask = new RecoveryTask();
+                ManagementTask managementTask = new ManagementTask();
+                ComicTag comicTag = new ComicTag();
+                ProcessBuilder processBuilder = new ProcessBuilder();
+                Process process = new Process();
+                LambdaUpdateWrapper<Comic> comicUpdate = new LambdaUpdateWrapper<>();
+                """;
+        assertThat(findViolations(fixture)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("注释与字符串/文本块中的禁用短名不被误报")
+    void commentsAndStrings_areIgnored() {
+        String fixture = """
+                // Comic c 在行注释中
+                /* 块注释: List<Media> pages、Chapter ch、ComicTag ct */
+                @Select(\"\"\"
+                        SELECT c.* FROM comic c
+                        JOIN chapter ch ON ch.comic_id = c.id
+                        FROM comic_tag ct WHERE ct.comic_id = c.id
+                        \"\"\")
+                String sql = "SELECT c.* FROM comic c";
+                System.out.println("Media page 在字符串中");
+                // for (Media page : pages) 注释掉的伪代码
+                """;
+        assertThat(findViolations(fixture)).isEmpty();
+    }
+
+    // ======================== 源码扫描实现 ========================
+
+    /** 从 user.dir 向上定位项目根目录（含 pom.xml 且含模块源码）。 */
+    private static Path locateProjectRoot() {
+        Path start = Path.of(System.getProperty("user.dir")).toAbsolutePath().normalize();
+        Path current = start;
+        for (int i = 0; i < 5 && current != null; i++) {
+            if (isProjectRoot(current)) {
+                return current;
+            }
+            current = current.getParent();
+        }
+        throw new IllegalStateException(
+                "无法定位项目根目录：从 user.dir=" + start + " 向上 5 层未找到"
+                        + "含 pom.xml 且含 api-service/ 与 comic-common/ 源码的目录");
+    }
+
+    private static boolean isProjectRoot(Path dir) {
+        return Files.isRegularFile(dir.resolve("pom.xml"))
+                && Files.isDirectory(dir.resolve("api-service/src/main/java"))
+                && Files.isDirectory(dir.resolve("comic-common/src/main/java"));
+    }
+
+    /** 扫描单个模块的 src/main/java，返回该模块全部违规。 */
+    private static List<Violation> scanModule(Path root, String module) {
+        Path src = root.resolve(module).resolve("src/main/java");
+        List<Violation> result = new ArrayList<>();
+        try (Stream<Path> files = Files.walk(src)) {
+            files.filter(p -> p.toString().endsWith(".java"))
+                    .sorted()
+                    .forEach(f -> result.addAll(scanFile(root, f)));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return result;
+    }
+
+    /** 扫描单个文件，返回命中违规。 */
+    private static List<Violation> scanFile(Path root, Path file) {
+        final String source;
+        try {
+            source = Files.readString(file, StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return findViolations(source, file, root);
+    }
+
+    /** 对纯文本代码片段检测禁用声明（供 fixture 测试使用，file 为 null）。 */
+    private static List<Violation> findViolations(String source) {
+        return findViolations(source, null, null);
+    }
+
+    /** 对代码片段检测禁用声明；file/root 为 null 时用于 fixture，不记行号。 */
+    private static List<Violation> findViolations(String source, Path file, Path root) {
+        String code = stripCommentsAndStrings(source);
+        String displayPath = (file != null && root != null)
+                ? root.relativize(file).toString().replace('\\', '/')
+                : "<fixture>";
+        List<Violation> violations = new ArrayList<>();
+        for (BannedPattern bp : BANNED) {
+            Matcher matcher = bp.regex().matcher(code);
+            while (matcher.find()) {
+                int line = (file != null) ? lineNumberAt(code, matcher.start()) : 0;
+                violations.add(new Violation(
+                        displayPath, line, bp.type(), bp.variable(), bp.expected()));
+            }
+        }
+        return violations;
+    }
+
+    /** 计算 code 中 offset 位置的行号（1 起）。 */
+    private static int lineNumberAt(String code, int offset) {
+        int line = 1;
+        for (int i = 0; i < offset && i < code.length(); i++) {
+            if (code.charAt(i) == '\n') {
+                line++;
+            }
+        }
+        return line;
+    }
+
+    /**
+     * 剥离注释与字符串字面量（含文本块、字符字面量），保留换行以维持行号。
+     * 注释内容与字符串内容被替换为空白，SQL/日志中的短名因此不会参与匹配。
+     */
+    static String stripCommentsAndStrings(String src) {
+        StringBuilder sb = new StringBuilder(src.length());
+        int i = 0;
+        int n = src.length();
+        while (i < n) {
+            char c = src.charAt(i);
+            char next = (i + 1 < n) ? src.charAt(i + 1) : '\0';
+            if (c == '/' && next == '/') {
+                // 行注释：跳过至行尾（保留换行）
+                while (i < n && src.charAt(i) != '\n') {
+                    i++;
+                }
+            } else if (c == '/' && next == '*') {
+                // 块注释 / Javadoc：跳过至 */，保留其中的换行
+                i += 2;
+                while (i + 1 < n && !(src.charAt(i) == '*' && src.charAt(i + 1) == '/')) {
+                    if (src.charAt(i) == '\n') {
+                        sb.append('\n');
+                    }
+                    i++;
+                }
+                i = Math.min(i + 2, n);
+            } else if (c == '"') {
+                boolean textBlock = i + 2 < n
+                        && src.charAt(i + 1) == '"' && src.charAt(i + 2) == '"';
+                sb.append('"');
+                i++;
+                if (textBlock) {
+                    sb.append("\"\"");
+                    i += 2;
+                    while (i + 2 < n) {
+                        if (src.charAt(i) == '"'
+                                && src.charAt(i + 1) == '"'
+                                && src.charAt(i + 2) == '"') {
+                            sb.append("\"\"\"");
+                            i += 3;
+                            break;
+                        }
+                        if (src.charAt(i) == '\\') {
+                            i++;
+                            if (i < n) {
+                                i++;
+                            }
+                            continue;
+                        }
+                        if (src.charAt(i) == '\n') {
+                            sb.append('\n');
+                        }
+                        i++;
+                    }
+                } else {
+                    while (i < n) {
+                        char sc = src.charAt(i);
+                        if (sc == '\\') {
+                            i += 2;
+                            continue;
+                        }
+                        if (sc == '"') {
+                            sb.append('"');
+                            i++;
+                            break;
+                        }
+                        if (sc == '\n') {
+                            sb.append('\n');
+                            i++;
+                            break;
+                        }
+                        sb.append(' ');
+                        i++;
+                    }
+                }
+            } else if (c == '\'') {
+                // 字符字面量
+                sb.append('\'');
+                i++;
+                while (i < n) {
+                    char sc = src.charAt(i);
+                    if (sc == '\\') {
+                        i += 2;
+                        continue;
+                    }
+                    if (sc == '\'') {
+                        sb.append('\'');
+                        i++;
+                        break;
+                    }
+                    if (sc == '\n') {
+                        sb.append('\n');
+                        i++;
+                        break;
+                    }
+                    sb.append(' ');
+                    i++;
+                }
+            } else {
+                sb.append(c);
+                i++;
+            }
+        }
+        return sb.toString();
+    }
+
+    /** 为禁用声明构造一段必然命中的示例代码。 */
+    private static String sampleFor(BannedPattern bp) {
+        return switch (bp.type()) {
+            case "List<Media>" -> "List<Media> " + bp.variable() + " = new ArrayList<>();";
+            case "LambdaUpdateWrapper" -> "LambdaUpdateWrapper " + bp.variable() + " = new LambdaUpdateWrapper();";
+            default -> bp.type() + " " + bp.variable() + " = new " + bp.type() + "();";
+        };
+    }
+}
