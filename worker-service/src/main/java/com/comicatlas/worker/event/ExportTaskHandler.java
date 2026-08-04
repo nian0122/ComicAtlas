@@ -119,15 +119,15 @@ public class ExportTaskHandler {
 
         // 构建章节标题映射
         Map<Long, String> chapterTitles = result.chapters().stream()
-                .collect(Collectors.toMap(ExportChapter::getId, ch ->
-                        ch.getTitle() != null && !ch.getTitle().isBlank()
-                                ? ComicTitleSanitizer.sanitize(ch.getTitle())
-                                : "chapter_" + ch.getId()));
+                .collect(Collectors.toMap(ExportChapter::getId, chapter ->
+                        chapter.getTitle() != null && !chapter.getTitle().isBlank()
+                                ? ComicTitleSanitizer.sanitize(chapter.getTitle())
+                                : "chapter_" + chapter.getId()));
 
         // 构建文件条目：按章节分组，去重目录名
         Set<String> usedPaths = new HashSet<>();
-        for (ExportChapter ch : result.chapters()) {
-            String chapterDir = chapterTitles.getOrDefault(ch.getId(), "chapter_" + ch.getId());
+        for (ExportChapter chapter : result.chapters()) {
+            String chapterDir = chapterTitles.getOrDefault(chapter.getId(), "chapter_" + chapter.getId());
             // 目录名去重
             String uniqueDir = chapterDir;
             int counter = 1;
@@ -137,7 +137,7 @@ public class ExportTaskHandler {
             }
             usedPaths.add(uniqueDir);
 
-            List<ExportMedia> chapterMedia = mediaByChapter.getOrDefault(ch.getId(), List.of());
+            List<ExportMedia> chapterMedia = mediaByChapter.getOrDefault(chapter.getId(), List.of());
             List<ExportMedia> sortedMedia = chapterMedia.stream()
                     .sorted(Comparator.comparing(ExportMedia::getPageNumber,
                             Comparator.nullsLast(Comparator.naturalOrder())))
