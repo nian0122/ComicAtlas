@@ -15,8 +15,10 @@ public class ImportController {
     private final ImportService importService;
 
     @PostMapping
-    public Result<ImportTaskVO> createTask(@RequestBody ImportRequest request) {
-        return Result.ok(importService.createImportTask(request));
+    public Result<ImportTaskVO> createTask(
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+            @RequestBody ImportRequest request) {
+        return Result.ok(importService.createImportTask(request, idempotencyKey));
     }
 
     @GetMapping

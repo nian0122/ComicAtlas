@@ -504,4 +504,53 @@ public class RabbitMqConfig {
         return BindingBuilder.bind(scanResultDlq())
                 .to(scanDlxExchange()).with("scan.result.dlq");
     }
+
+    // ==================== comic.management 管理命令结果 ====================
+
+    @Bean
+    public DirectExchange managementExchange() {
+        return new DirectExchange("comic.management");
+    }
+
+    @Bean
+    public DirectExchange managementDlxExchange() {
+        return new DirectExchange("comic.management.dlx");
+    }
+
+    @Bean
+    public Queue managementResultQueue() {
+        return QueueBuilder.durable("management.result.queue")
+                .deadLetterExchange("comic.management.dlx")
+                .deadLetterRoutingKey("management.result.dlq")
+                .build();
+    }
+
+    @Bean
+    public Queue managementResultDlq() {
+        return QueueBuilder.durable("management.result.dlq").build();
+    }
+
+    @Bean
+    public Binding managementCompletedBinding() {
+        return BindingBuilder.bind(managementResultQueue())
+                .to(managementExchange()).with("command.completed");
+    }
+
+    @Bean
+    public Binding managementFailedBinding() {
+        return BindingBuilder.bind(managementResultQueue())
+                .to(managementExchange()).with("command.failed");
+    }
+
+    @Bean
+    public Binding managementProgressBinding() {
+        return BindingBuilder.bind(managementResultQueue())
+                .to(managementExchange()).with("command.progress");
+    }
+
+    @Bean
+    public Binding managementResultDlqBinding() {
+        return BindingBuilder.bind(managementResultDlq())
+                .to(managementDlxExchange()).with("management.result.dlq");
+    }
 }

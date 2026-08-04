@@ -1,0 +1,564 @@
+package com.comicatlas.api.management.trash;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.comicatlas.api.comic.entity.Chapter;
+import com.comicatlas.api.comic.entity.Comic;
+import com.comicatlas.api.comic.entity.Media;
+import com.comicatlas.api.comic.mapper.ChapterMapper;
+import com.comicatlas.api.comic.mapper.ComicMapper;
+import com.comicatlas.api.comic.mapper.MediaMapper;
+import com.comicatlas.api.common.exception.BusinessException;
+import com.comicatlas.api.common.exception.ConflictException;
+import com.comicatlas.api.common.storage.ApiStorageProperties;
+import com.comicatlas.api.common.storage.ApiStorageRoot;
+import com.comicatlas.api.management.dto.CreateManagementTaskRequest;
+import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
+import com.comicatlas.api.management.dto.ManagementTaskResponse;
+import com.comicatlas.api.management.dto.OperationSubmitResult;
+import com.comicatlas.api.management.entity.ManagementTask;
+import com.comicatlas.api.management.entity.ManagementTaskItem;
+import com.comicatlas.api.management.mapper.ManagementTaskItemMapper;
+import com.comicatlas.api.management.policy.AllowedOperations;
+import com.comicatlas.api.management.policy.OperationPolicyService;
+import com.comicatlas.api.management.service.ManagementTaskService;
+import com.comicatlas.api.management.state.ManagementStateMachine;
+import com.comicatlas.api.outbox.service.OutboxService;
+import com.comicatlas.common.dto.TrashManifest;
+import com.comicatlas.common.dto.TrashManifestActual;
+import com.comicatlas.common.enums.ManagementTaskStatus;
+import com.comicatlas.common.enums.TaskType;
+import com.comicatlas.common.event.ManagementCommandRequestedEvent;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.UUID;
+
+/**
+ * 回收站生命周期编排服务 — 漫画/章节/媒体 7 天回收、恢复、对账与永久清理。
+ * <p>
+ * 回收：实体 READY→TRASHING，API 基于 DB refs 创建不可变 TRASH 清单，发布命令；
+ * Worker 按清单同卷移动（绝不覆盖）。恢复/清理命令携带 manifestTaskId 定位清单目录。
+ * 永久清理只接受 TRASHED + 二次确认 token + 7 天保留期。
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class TrashLifecycleService {
+
+    public static final String PURGE_CONFIRM_TOKEN = "PURGE";
+    public static final int RETENTION_DAYS = 7;
+
+    private static final String EXCHANGE = "comic.management";
+    private static final String ROUTING_REQUEST = "command.requested";
+
+    private final ComicMapper comicMapper;
+    private final ChapterMapper chapterMapper;
+    private final MediaMapper mediaMapper;
+    private final ManagementTaskService managementTaskService;
+    private final ManagementTaskItemMapper itemMapper;
+    private final OutboxService outboxService;
+    private final TrashManifestService trashManifestService;
+    private final OperationPolicyService policyService;
+    private final ApiStorageProperties storageProperties;
+
+    // ======================== 回收 ========================
+
+    @Transactional
+    public OperationSubmitResult trashComic(Long comicId, String idempotencyKey) {
+        Comic comic = comicMapper.selectById(comicId);
+        if (comic == null) {
+            throw new BusinessException(404, "漫画不存在: " + comicId);
+        }
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            OperationSubmitResult existing = idempotencyHit(idempotencyKey, "comic-delete:" + comicId);
+            if (existing != null) {
+                return existing;
+            }
+        }
+        requireAllowed(policyService.forComic(comic.getStatus()), OperationPolicyService.OP_DELETE,
+                "漫画状态 " + comic.getStatus() + " 不可回收");
+        ManagementStateMachine.validateComicTransition(comic.getStatus(), "TRASHING");
+
+        List<TrashManifest.Entry> entries = List.of(
+                entry("HQ", comicId.toString(), "hq/" + comicId),
+                entry("LQ", comicId.toString(), "lq/" + comicId),
+                entry("THUMBS", comicId.toString(), "thumbs/" + comicId),
+                entry("METADATA", comicId + ".json", "metadata/" + comicId + ".json"));
+
+        comic.setStatus("TRASHING");
+        comicMapper.updateById(comic);
+        return createTrashTask("COMIC", comicId, TaskType.COMIC_DELETE, "回收漫画", entries,
+                idempotencyKey, "comic-delete:" + comicId);
+    }
+
+    @Transactional
+    public OperationSubmitResult trashChapter(Long comicId, Long chapterId) {
+        Chapter chapter = requireChapterInComic(comicId, chapterId);
+        requireAllowed(policyService.forChapter(chapter.getStatus()), OperationPolicyService.OP_DELETE,
+                "章节状态 " + chapter.getStatus() + " 不可回收");
+        ManagementStateMachine.validateChapterTransition(chapter.getStatus(), "TRASHING");
+
+        String rel = comicId + "/" + chapter.getGlobalOrder();
+        List<TrashManifest.Entry> entries = List.of(
+                entry("HQ", rel, "hq/" + rel),
+                entry("LQ", rel, "lq/" + rel));
+
+        chapter.setStatus("TRASHING");
+        chapterMapper.updateById(chapter);
+        return createTrashTask("CHAPTER", chapterId, TaskType.CHAPTER_TRASH, "回收章节", entries,
+                null, null);
+    }
+
+    @Transactional
+    public OperationSubmitResult trashMedia(Long mediaId) {
+        Media media = mediaMapper.selectById(mediaId);
+        if (media == null) {
+            throw new BusinessException(404, "媒体不存在: " + mediaId);
+        }
+        requireAllowed(policyService.forMedia(media.getStatus()), OperationPolicyService.OP_DELETE,
+                "媒体状态 " + media.getStatus() + " 不可回收");
+        ManagementStateMachine.validateMediaTransition(media.getStatus(), "TRASHING");
+
+        List<TrashManifest.Entry> entries = new ArrayList<>();
+        if (media.getHqPath() != null && !media.getHqPath().isBlank()) {
+            entries.add(entry("HQ", media.getHqPath(), "hq/" + media.getHqPath()));
+        }
+
+        // 释放页码槽位：回收期间 pageNumber = -id（唯一负值），原页码存入 original_page_number
+        media.setStatus("TRASHING");
+        media.setOriginalPageNumber(media.getPageNumber());
+        media.setPageNumber(-media.getId().intValue());
+        mediaMapper.updateById(media);
+        return createTrashTask("MEDIA", mediaId, TaskType.MEDIA_TRASH, "回收媒体", entries,
+                null, null);
+    }
+
+    // ======================== 恢复 ========================
+
+    @Transactional
+    public OperationSubmitResult restoreComic(Long comicId) {
+        Comic comic = comicMapper.selectById(comicId);
+        if (comic == null) {
+            throw new BusinessException(404, "漫画不存在: " + comicId);
+        }
+        requireAllowed(policyService.forComic(comic.getStatus()), OperationPolicyService.OP_RECOVER,
+                "漫画状态 " + comic.getStatus() + " 不可恢复");
+        ManagementStateMachine.validateComicTransition(comic.getStatus(), "RESTORING");
+        Long manifestTaskId = findTrashTaskId("COMIC", comicId);
+
+        comic.setStatus("RESTORING");
+        comicMapper.updateById(comic);
+        return createCommandTask("COMIC", comicId, TaskType.COMIC_RESTORE, "恢复漫画", manifestTaskId);
+    }
+
+    @Transactional
+    public OperationSubmitResult restoreChapter(Long comicId, Long chapterId) {
+        Chapter chapter = requireChapterInComic(comicId, chapterId);
+        requireAllowed(policyService.forChapter(chapter.getStatus()), OperationPolicyService.OP_RECOVER,
+                "章节状态 " + chapter.getStatus() + " 不可恢复");
+        ManagementStateMachine.validateChapterTransition(chapter.getStatus(), "RESTORING");
+        Long manifestTaskId = findTrashTaskId("CHAPTER", chapterId);
+
+        chapter.setStatus("RESTORING");
+        chapterMapper.updateById(chapter);
+        return createCommandTask("CHAPTER", chapterId, TaskType.CHAPTER_RESTORE, "恢复章节", manifestTaskId);
+    }
+
+    @Transactional
+    public OperationSubmitResult restoreMedia(Long mediaId) {
+        Media media = mediaMapper.selectById(mediaId);
+        if (media == null) {
+            throw new BusinessException(404, "媒体不存在: " + mediaId);
+        }
+        requireAllowed(policyService.forMedia(media.getStatus()), OperationPolicyService.OP_RECOVER,
+                "媒体状态 " + media.getStatus() + " 不可恢复");
+        ManagementStateMachine.validateMediaTransition(media.getStatus(), "RESTORING");
+        Long manifestTaskId = findTrashTaskId("MEDIA", mediaId);
+
+        media.setStatus("RESTORING");
+        mediaMapper.updateById(media);
+        return createCommandTask("MEDIA", mediaId, TaskType.MEDIA_RESTORE, "恢复媒体", manifestTaskId);
+    }
+
+    // ======================== 永久清理 ========================
+
+    @Transactional
+    public OperationSubmitResult purgeComic(Long comicId, String token) {
+        Comic comic = comicMapper.selectById(comicId);
+        if (comic == null) {
+            throw new BusinessException(404, "漫画不存在: " + comicId);
+        }
+        return purge("COMIC", comicId, token,
+                () -> {
+                    requireAllowed(policyService.forComic(comic.getStatus()), OperationPolicyService.OP_PURGE,
+                            "漫画状态 " + comic.getStatus() + " 不可永久清理");
+                    ManagementStateMachine.validateComicTransition(comic.getStatus(), "PURGING");
+                    checkRetention(comic.getTrashedAt());
+                    comic.setStatus("PURGING");
+                    comicMapper.updateById(comic);
+                },
+                TaskType.COMIC_PURGE, "永久清理漫画");
+    }
+
+    @Transactional
+    public OperationSubmitResult purgeChapter(Long comicId, Long chapterId, String token) {
+        Chapter chapter = requireChapterInComic(comicId, chapterId);
+        return purge("CHAPTER", chapterId, token,
+                () -> {
+                    requireAllowed(policyService.forChapter(chapter.getStatus()), OperationPolicyService.OP_PURGE,
+                            "章节状态 " + chapter.getStatus() + " 不可永久清理");
+                    ManagementStateMachine.validateChapterTransition(chapter.getStatus(), "PURGING");
+                    checkRetention(chapter.getTrashedAt());
+                    chapter.setStatus("PURGING");
+                    chapterMapper.updateById(chapter);
+                },
+                TaskType.CHAPTER_PURGE, "永久清理章节");
+    }
+
+    @Transactional
+    public OperationSubmitResult purgeMedia(Long mediaId, String token) {
+        Media media = mediaMapper.selectById(mediaId);
+        if (media == null) {
+            throw new BusinessException(404, "媒体不存在: " + mediaId);
+        }
+        return purge("MEDIA", mediaId, token,
+                () -> {
+                    requireAllowed(policyService.forMedia(media.getStatus()), OperationPolicyService.OP_PURGE,
+                            "媒体状态 " + media.getStatus() + " 不可永久清理");
+                    ManagementStateMachine.validateMediaTransition(media.getStatus(), "PURGING");
+                    checkRetention(media.getTrashedAt());
+                    media.setStatus("PURGING");
+                    mediaMapper.updateById(media);
+                },
+                TaskType.MEDIA_PURGE, "永久清理媒体");
+    }
+
+    private OperationSubmitResult purge(String targetType, Long targetId, String token,
+                                        Runnable precondition, TaskType op, String operation) {
+        if (token == null || !PURGE_CONFIRM_TOKEN.equals(token)) {
+            throw new BusinessException(400, "二次确认 token 不匹配，必须为 " + PURGE_CONFIRM_TOKEN);
+        }
+        precondition.run();
+        Long manifestTaskId = findTrashTaskId(targetType, targetId);
+        return createCommandTask(targetType, targetId, op, operation, manifestTaskId);
+    }
+
+    // ======================== 对账 ========================
+
+    /** 生成对账报告（只读）。 */
+    public TrashReconcileReport reconcile(String targetType, Long targetId) {
+        Long taskId = findTrashTaskId(targetType, targetId);
+        String dbStatus = resolveDbStatus(targetType, targetId);
+        TrashManifest manifest = taskId != null
+                ? trashManifestService.readManifest(targetType, targetId, taskId) : null;
+        TrashManifestActual actual = taskId != null
+                ? trashManifestService.readActual(targetType, targetId, taskId) : null;
+
+        List<TrashReconcileReport.EntryReport> entries = new ArrayList<>();
+        if (manifest != null) {
+            for (TrashManifest.Entry e : manifest.entries()) {
+                boolean sourceExists = existsInRoot(e.rootKey(), e.sourceRelativePath());
+                boolean trashExists = existsInTrash(targetType, targetId, taskId, e.trashRelativePath());
+                String state = trashExists ? (sourceExists ? "BOTH" : "IN_TRASH")
+                        : (sourceExists ? "AT_SOURCE" : "MISSING");
+                entries.add(new TrashReconcileReport.EntryReport(
+                        e.rootKey(), e.sourceRelativePath(), sourceExists, trashExists, state));
+            }
+        }
+        boolean consistent = computeConsistency(dbStatus, actual, entries);
+        return new TrashReconcileReport(targetType, targetId, dbStatus, taskId,
+                actual != null ? actual.status() : null, consistent, entries);
+    }
+
+    /** 对账并修复可安全自动恢复的 DB 状态（迟到的结果事件恢复）。 */
+    @Transactional
+    public TrashReconcileReport reconcileAndRepair(String targetType, Long targetId) {
+        Long taskId = findTrashTaskId(targetType, targetId);
+        TrashManifestActual actual = taskId != null
+                ? trashManifestService.readActual(targetType, targetId, taskId) : null;
+        if (actual == null) {
+            return reconcile(targetType, targetId);
+        }
+        String dbStatus = resolveDbStatus(targetType, targetId);
+        String repaired = null;
+        if (TrashManifestActual.STATUS_TRASHED.equals(actual.status()) && "TRASHING".equals(dbStatus)) {
+            if (markTrashed(targetType, targetId)) {
+                repaired = "TRASHED";
+            }
+        } else if (TrashManifestActual.STATUS_COMPENSATED.equals(actual.status()) && "TRASHING".equals(dbStatus)) {
+            if (markReady(targetType, targetId)) {
+                repaired = "READY";
+            }
+        }
+        if (repaired != null) {
+            log.info("对账修复: {}/{} -> {}", targetType, targetId, repaired);
+        }
+        return reconcile(targetType, targetId);
+    }
+
+    private boolean markTrashed(String targetType, Long targetId) {
+        switch (targetType) {
+            case "COMIC" -> {
+                Comic c = comicMapper.selectById(targetId);
+                if (c != null && "TRASHING".equals(c.getStatus())) {
+                    c.setStatus("TRASHED");
+                    c.setTrashedAt(LocalDateTime.now());
+                    comicMapper.updateById(c);
+                    return true;
+                }
+            }
+            case "CHAPTER" -> {
+                Chapter ch = chapterMapper.selectById(targetId);
+                if (ch != null && "TRASHING".equals(ch.getStatus())) {
+                    ch.setStatus("TRASHED");
+                    ch.setTrashedAt(LocalDateTime.now());
+                    chapterMapper.updateById(ch);
+                    return true;
+                }
+            }
+            case "MEDIA" -> {
+                Media m = mediaMapper.selectById(targetId);
+                if (m != null && "TRASHING".equals(m.getStatus())) {
+                    m.setStatus("TRASHED");
+                    m.setTrashedAt(LocalDateTime.now());
+                    mediaMapper.updateById(m);
+                    return true;
+                }
+            }
+            default -> { }
+        }
+        return false;
+    }
+
+    private boolean markReady(String targetType, Long targetId) {
+        switch (targetType) {
+            case "COMIC" -> {
+                Comic c = comicMapper.selectById(targetId);
+                if (c != null && "TRASHING".equals(c.getStatus())) {
+                    c.setStatus("READY");
+                    c.setTrashedAt(null);
+                    comicMapper.updateById(c);
+                    return true;
+                }
+            }
+            case "CHAPTER" -> {
+                Chapter ch = chapterMapper.selectById(targetId);
+                if (ch != null && "TRASHING".equals(ch.getStatus())) {
+                    ch.setStatus("READY");
+                    ch.setTrashedAt(null);
+                    chapterMapper.updateById(ch);
+                    return true;
+                }
+            }
+            case "MEDIA" -> {
+                Media m = mediaMapper.selectById(targetId);
+                if (m != null && "TRASHING".equals(m.getStatus())) {
+                    m.setStatus("READY");
+                    m.setTrashedAt(null);
+                    m.setPageNumber(m.getOriginalPageNumber());
+                    mediaMapper.updateById(m);
+                    return true;
+                }
+            }
+            default -> { }
+        }
+        return false;
+    }
+
+    private boolean computeConsistency(String dbStatus, TrashManifestActual actual,
+                                       List<TrashReconcileReport.EntryReport> entries) {
+        boolean conflict = entries.stream().anyMatch(e -> "BOTH".equals(e.state()));
+        if (conflict) {
+            return false;
+        }
+        if (actual == null) {
+            // 无实际结果：TRASHING 且全部在源位置可视为待执行，一致
+            return "TRASHING".equals(dbStatus);
+        }
+        return switch (actual.status()) {
+            case TrashManifestActual.STATUS_TRASHED, TrashManifestActual.STATUS_PURGED
+                    -> "TRASHED".equals(dbStatus) || "PURGING".equals(dbStatus);
+            case TrashManifestActual.STATUS_COMPENSATED, TrashManifestActual.STATUS_RESTORED
+                    -> "READY".equals(dbStatus);
+            case TrashManifestActual.STATUS_PARTIAL -> "TRASHING".equals(dbStatus);
+            default -> false;
+        };    }
+
+    private String resolveDbStatus(String targetType, Long targetId) {
+        return switch (targetType) {
+            case "COMIC" -> comicMapper.selectById(targetId) == null ? null
+                    : comicMapper.selectById(targetId).getStatus();
+            case "CHAPTER" -> {
+                Chapter ch = chapterMapper.selectById(targetId);
+                yield ch == null ? null : ch.getStatus();
+            }
+            case "MEDIA" -> {
+                Media m = mediaMapper.selectById(targetId);
+                yield m == null ? null : m.getStatus();
+            }
+            default -> null;
+        };
+    }
+
+    private boolean existsInRoot(String rootKey, String relative) {
+        ApiStorageRoot root = storageProperties.getRoots().get(rootKey);
+        if (root == null || !root.isEnabled()) {
+            return false;
+        }
+        try {
+            return Files.exists(root.resolve(relative));
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private boolean existsInTrash(String targetType, Long targetId, Long taskId, String trashRelative) {
+        try {
+            return Files.exists(trashManifestService.manifestDir(targetType, targetId, taskId)
+                    .resolve(trashRelative));
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    // ======================== 内部辅助 ========================
+
+    private OperationSubmitResult createTrashTask(String targetType, Long targetId, TaskType op,
+                                                   String operation, List<TrashManifest.Entry> entries,
+                                                   String idempotencyKey, String payload) {
+        ManagementTaskResponse task = createTask(op, operation, targetType, targetId, idempotencyKey, payload);
+        Long taskId = task.getId();
+        trashManifestService.writeManifest(new TrashManifest(
+                TrashManifest.CURRENT_VERSION, targetType, targetId, taskId, Instant.now(), entries));
+        List<ManagementTaskItemResponse> items = managementTaskService.getTaskItems(taskId);
+        for (ManagementTaskItemResponse item : items) {
+            enqueueCommand(op, item, targetType, targetId, null);
+        }
+        log.info("回收命令已提交: {}/{} taskId={}, entries={}", targetType, targetId, taskId, entries.size());
+        return OperationSubmitResult.of(taskId, op.name(), task.getStatus().name(), items.size());
+    }
+
+    private OperationSubmitResult createCommandTask(String targetType, Long targetId, TaskType op,
+                                                    String operation, Long manifestTaskId) {
+        if (manifestTaskId == null) {
+            throw new ConflictException("未找到 " + targetType + ":" + targetId + " 的回收清单，无法执行 " + op);
+        }
+        ManagementTaskResponse task = createTask(op, operation, targetType, targetId, null, null);
+        List<ManagementTaskItemResponse> items = managementTaskService.getTaskItems(task.getId());
+        for (ManagementTaskItemResponse item : items) {
+            itemMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ManagementTaskItem>()
+                    .eq(ManagementTaskItem::getId, item.getId())
+                    .set(ManagementTaskItem::getResultRefType, "TRASH_MANIFEST")
+                    .set(ManagementTaskItem::getResultRefId, manifestTaskId));
+            enqueueCommand(op, item, targetType, targetId, manifestTaskId);
+        }
+        log.info("命令已提交: {}/{} taskId={}, manifestTaskId={}", targetType, targetId, task.getId(), manifestTaskId);
+        return OperationSubmitResult.of(task.getId(), op.name(), task.getStatus().name(), items.size());
+    }
+
+    private ManagementTaskResponse createTask(TaskType op, String operation, String targetType,
+                                              Long targetId, String idempotencyKey, String payload) {
+        CreateManagementTaskRequest req = new CreateManagementTaskRequest();
+        req.setTaskType(op);
+        req.setOperation(operation);
+        req.setTargetType(targetType);
+        CreateManagementTaskRequest.TaskTarget t = new CreateManagementTaskRequest.TaskTarget();
+        t.setTargetType(targetType);
+        t.setTargetId(targetId);
+        t.setOperationType(op);
+        req.setTargets(List.of(t));
+        return managementTaskService.createTask(req, idempotencyKey, payload);
+    }
+
+    private void enqueueCommand(TaskType op, ManagementTaskItemResponse item,
+                                String targetType, Long targetId, Long manifestTaskId) {
+        outboxService.enqueue(new ManagementCommandRequestedEvent(
+                UUID.randomUUID(), Instant.now(), 1,
+                item.getTaskId(), item.getId(), item.getAttempt(),
+                op.name(), targetType, targetId, manifestTaskId),
+                EXCHANGE, ROUTING_REQUEST,
+                item.getTaskId(), item.getId(), item.getAttempt());
+    }
+
+    /** 幂等命中检查：同键同 payload 返回已有任务结果。 */
+    private OperationSubmitResult idempotencyHit(String idempotencyKey, String payload) {
+        ManagementTask existing = managementTaskService.findByIdempotencyKey(idempotencyKey);
+        if (existing == null) {
+            return null;
+        }
+        if (!sha256(payload).equals(existing.getIdempotencyPayloadHash())) {
+            throw new ConflictException("幂等键 " + idempotencyKey + " 已存在但 payload 不匹配");
+        }
+        return OperationSubmitResult.of(existing.getId(), existing.getTaskType().name(),
+                existing.getStatus().name(), existing.getTotalCount());
+    }
+
+    /** 查找目标最近一次回收任务的 taskId（作为清单目录定位）。 */
+    private Long findTrashTaskId(String targetType, Long targetId) {
+        TaskType trashOp = switch (targetType) {
+            case "COMIC" -> TaskType.COMIC_DELETE;
+            case "CHAPTER" -> TaskType.CHAPTER_TRASH;
+            case "MEDIA" -> TaskType.MEDIA_TRASH;
+            default -> throw new BusinessException(400, "未知目标类型: " + targetType);
+        };
+        List<ManagementTaskItem> items = itemMapper.selectList(new LambdaQueryWrapper<ManagementTaskItem>()
+                .eq(ManagementTaskItem::getTargetType, targetType)
+                .eq(ManagementTaskItem::getTargetId, targetId)
+                .eq(ManagementTaskItem::getOperationType, trashOp)
+                .orderByDesc(ManagementTaskItem::getId)
+                .last("LIMIT 1"));
+        return items.isEmpty() ? null : items.get(0).getTaskId();
+    }
+
+    private Chapter requireChapterInComic(Long comicId, Long chapterId) {
+        Chapter ch = chapterMapper.selectById(chapterId);
+        if (ch == null) {
+            throw new BusinessException(404, "章节不存在: " + chapterId);
+        }
+        if (!ch.getComicId().equals(comicId)) {
+            throw new ConflictException("章节不属于该漫画");
+        }
+        return ch;
+    }
+
+    private void requireAllowed(AllowedOperations ops, String op, String message) {
+        if (!ops.isAllowed(op)) {
+            String reason = ops.blockedReasons().getOrDefault(op, ops.blockedReasons().getOrDefault("*", message));
+            throw new ConflictException(message + "：" + reason);
+        }
+    }
+
+    private void checkRetention(LocalDateTime trashedAt) {
+        if (trashedAt == null) {
+            return; // 旧数据无保留期信息，允许清理
+        }
+        LocalDateTime deadline = trashedAt.plusDays(RETENTION_DAYS);
+        if (LocalDateTime.now().isBefore(deadline)) {
+            throw new ConflictException("未到 7 天保留期（" + trashedAt + " + 7 天），暂不可永久清理");
+        }
+    }
+
+    private static TrashManifest.Entry entry(String rootKey, String source, String trash) {
+        return new TrashManifest.Entry(rootKey, source, trash);
+    }
+
+    private static String sha256(String input) {
+        try {
+            return HexFormat.of().formatHex(
+                    MessageDigest.getInstance("SHA-256").digest(input.getBytes(StandardCharsets.UTF_8)));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+}

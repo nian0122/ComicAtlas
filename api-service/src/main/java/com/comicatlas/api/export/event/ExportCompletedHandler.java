@@ -2,6 +2,10 @@ package com.comicatlas.api.export.event;
 
 import com.comicatlas.api.export.entity.ExportTask;
 import com.comicatlas.api.export.mapper.ExportTaskMapper;
+import com.comicatlas.api.management.entity.ManagementTaskItem;
+import com.comicatlas.api.management.service.ManagementTaskService;
+import com.comicatlas.common.enums.ManagementTaskStatus;
+import com.comicatlas.common.enums.TaskType;
 import com.comicatlas.common.event.ExportTaskCompletedEvent;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +27,7 @@ import java.time.LocalDateTime;
 public class ExportCompletedHandler {
 
     private final ExportTaskMapper exportTaskMapper;
+    private final ManagementTaskService managementTaskService;
 
     @RabbitListener(queues = "export.completed.result.queue")
     public void handle(ExportTaskCompletedEvent event,
@@ -42,6 +47,13 @@ public class ExportCompletedHandler {
                 task.setProgress(100);
                 task.setCompletedAt(LocalDateTime.now());
                 exportTaskMapper.updateById(task);
+            }
+
+            // 同步统一任务项为 SUCCEEDED
+            ManagementTaskItem mgmtItem = managementTaskService.findActiveItem("COMIC", comicId, TaskType.EXPORT);
+            if (mgmtItem != null) {
+                managementTaskService.updateItemStatus(mgmtItem.getId(), ManagementTaskStatus.SUCCEEDED,
+                        null, "EXPORT_TASK", taskId);
             }
 
             channel.basicAck(tag, false);

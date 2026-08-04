@@ -6,6 +6,11 @@ import com.comicatlas.api.comic.entity.*;
 import com.comicatlas.api.comic.mapper.*;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
+import com.comicatlas.api.management.entity.ManagementTaskItem;
+import com.comicatlas.api.management.service.ManagementTaskService;
+import com.comicatlas.api.management.state.ManagementStateMachine;
+import com.comicatlas.common.enums.ManagementTaskStatus;
+import com.comicatlas.common.enums.TaskType;
 import com.comicatlas.common.event.ImportTaskCompletedEvent;
 import com.comicatlas.common.event.ImportTaskFailedEvent;
 import com.comicatlas.common.event.TaskStatusChangedEvent;
@@ -23,7 +28,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.File;
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -42,9 +50,10 @@ public class ImportEventHandler {
     private final ImportTaskMapper taskMapper;
     private final TransactionTemplate transactionTemplate;
     private final CatalogCacheInvalidator catalogCacheInvalidator;
+    private final ManagementTaskService managementTaskService;
 
-    /** 终态集合：到达这些状态后不可回退到非终态 */
-    private static final Set<String> TERMINAL_STATUSES = Set.of("SUCCESS", "FAILED");
+    /** 终态集合：到达这些状态后不可回退到非终态（含 CANCELLED 真正终态） */
+    private static final Set<String> TERMINAL_STATUSES = Set.of("SUCCESS", "FAILED", "CANCELLED");
 
     @Value("${MANGA_ROOT:F:/manga}")
     private String mangaRoot;
@@ -59,8 +68,8 @@ public class ImportEventHandler {
         log.info("ComicImported: taskId={}, comicId={}", taskId, comicId);
 
         try {
-            if (isEventProcessed(idempKey) || isImportTaskSucceeded(taskId)) {
-                log.info("事件已处理，确认消息: eventId={}", event.eventId());
+            if (isEventProcessed(idempKey) || isImportTaskTerminal(taskId)) {
+                log.info("事件已处理或任务已处终态，确认消息: eventId={}", event.eventId());
                 markEventProcessed(idempKey);
                 ack(channel, tag);
                 return;
@@ -96,7 +105,7 @@ public class ImportEventHandler {
         if (task == null) {
             throw new IllegalStateException("导入任务不存在: " + taskId);
         }
-        if ("SUCCESS".equals(task.getStatus())) {
+        if (TERMINAL_STATUSES.contains(task.getStatus())) {
             return new ImportResult(0, 0, true);
         }
 
@@ -162,6 +171,14 @@ public class ImportEventHandler {
         }
         taskMapper.updateById(task);
         catalogCacheInvalidator.evict(comicId);
+
+        // 5. 标记管理任务项成功（若存在活跃导入任务）
+        ManagementTaskItem mgmtItem = managementTaskService.findActiveItem(
+                "COMIC", comicId, TaskType.IMPORT);
+        if (mgmtItem != null) {
+            managementTaskService.updateItemStatus(
+                    mgmtItem.getId(), ManagementTaskStatus.SUCCEEDED, null, "IMPORT_TASK", taskId);
+        }
 
         return new ImportResult(chaptersData != null ? chaptersData.size() : 0, totalPages, false);
     }
@@ -239,6 +256,9 @@ public class ImportEventHandler {
         chapter.setPageCount(itemList != null ? itemList.size() : 0);
         chapterMapper.insert(chapter);
 
+        // 新布局迁移：如果 hqPath 使用 globalOrder 目录，重命名为 chapterId
+        renameChapterDirIfNeeded(comicId, chapter.getId(), chapter.getGlobalOrder(), itemList);
+
         int pgCount = 0;
         long totalSize = 0;
         if (itemList != null) {
@@ -247,8 +267,14 @@ public class ImportEventHandler {
                 page.setChapterId(chapter.getId());
                 page.setPageNumber(((Number) md.get("pageNumber")).intValue());
                 page.setHqRoot("HQ");
-                page.setHqPath((String) md.getOrDefault("hqPath",
-                    comicId + "/" + chapter.getGlobalOrder() + "/" + md.get(nameKey)));
+                // hqPath: 优先使用 metadata 中的值，fallback 构造旧格式路径
+                String hqPath = (String) md.get("hqPath");
+                if (hqPath == null || hqPath.isBlank()) {
+                    hqPath = comicId + "/" + chapter.getGlobalOrder() + "/" + md.get(nameKey);
+                }
+                // 新布局：将 globalOrder 目录替换为 chapterId
+                hqPath = normalizeToChapterIdLayout(hqPath, comicId, chapter.getId(), chapter.getGlobalOrder());
+                page.setHqPath(hqPath);
                 page.setHqStatus(md.get("hqStatus") != null ? (String) md.get("hqStatus") : "READY");
                 page.setLqStatus("NOT_GENERATED");
                 if (md.get("fileSize") != null) page.setFileSize(((Number) md.get("fileSize")).longValue());
@@ -330,6 +356,32 @@ public class ImportEventHandler {
         if (event.etaSeconds() > 0) task.setEtaSeconds(event.etaSeconds());
         if (event.downloadMethod() != null) task.setDownloadMethod(event.downloadMethod());
         taskMapper.updateById(task);
+
+        // 阶段状态（DOWNLOADING/EXTRACTING/PARSING）同步到统一任务 stage 列（TaskStage 枚举）
+        if (task.getManagementTaskId() != null) {
+            com.comicatlas.common.enums.TaskStage stage =
+                    com.comicatlas.common.enums.TaskStage.fromStatus(newStatus);
+            if (stage != null) {
+                managementTaskService.updateStage(task.getManagementTaskId(), stage, event.progress());
+            }
+        }
+
+        // QA 修复注记（task-21）：Worker 导入失败只发 TaskStatusChangedEvent(FAILED)，
+        // 不发 ImportTaskFailedEvent，导致统一管理任务 item 滞留 RUNNING（导入任务已
+        // FAILED 但 management_task 仍 RUNNING）→ retryTask 校验非终态抛异常并把外层
+        // 事务标记 rollback-only → 重试 500。此处把 FAILED/CANCELLED 联动到管理任务 item。
+        if (task.getManagementTaskId() != null
+                && ("FAILED".equals(newStatus) || "CANCELLED".equals(newStatus))) {
+            ManagementTaskItem mgmtItem = managementTaskService.findActiveItem(
+                    "COMIC", task.getComicId(), TaskType.IMPORT);
+            if (mgmtItem != null) {
+                ManagementTaskStatus mgmtStatus = "CANCELLED".equals(newStatus)
+                        ? ManagementTaskStatus.CANCELLED
+                        : ManagementTaskStatus.FAILED;
+                managementTaskService.updateItemStatus(
+                        mgmtItem.getId(), mgmtStatus, null, "IMPORT_TASK", task.getId());
+            }
+        }
     }
 
     @RabbitListener(queues = "import.failed.queue")
@@ -340,28 +392,47 @@ public class ImportEventHandler {
                 taskId, event.errorCode(), event.errorMessage());
 
         try {
-            ImportTask task = taskMapper.selectById(taskId);
-            if (task == null) {
-                ack(channel, tag);
-                return;
-            }
-            if (TERMINAL_STATUSES.contains(task.getStatus())) {
-                log.info("任务已处终态，跳过失败事件: taskId={}, status={}", taskId, task.getStatus());
-                ack(channel, tag);
-                return;
-            }
-            task.setStatus("FAILED");
-            task.setEndTime(LocalDateTime.now());
-            if (event.errorCode() != null) {
-                task.setErrorMessage(event.errorCode() + ": " + event.errorMessage());
-            } else if (event.errorMessage() != null) {
-                task.setErrorMessage(event.errorMessage());
-            }
-            taskMapper.updateById(task);
+            transactionTemplate.executeWithoutResult(status -> {
+                ImportTask task = taskMapper.selectById(taskId);
+                if (task == null || TERMINAL_STATUSES.contains(task.getStatus())) {
+                    return;
+                }
+                task.setStatus("FAILED");
+                task.setEndTime(LocalDateTime.now());
+                if (event.errorCode() != null) {
+                    task.setErrorMessage(event.errorCode() + ": " + event.errorMessage());
+                } else if (event.errorMessage() != null) {
+                    task.setErrorMessage(event.errorMessage());
+                }
+                taskMapper.updateById(task);
+                markImportFailed(task);
+            });
             ack(channel, tag);
         } catch (Exception e) {
             log.error("ImportTaskFailed 处理失败: taskId={}", taskId, e);
             reject(channel, tag);
+        }
+    }
+
+    /**
+     * 导入失败：comic → IMPORT_FAILED（可重试），并标记管理任务项失败。
+     */
+    private void markImportFailed(ImportTask task) {
+        Comic comic = comicMapper.selectById(task.getComicId());
+        if (comic == null) {
+            return;
+        }
+        if ("IMPORTING".equals(comic.getStatus())) {
+            ManagementStateMachine.validateComicTransition(comic.getStatus(), "IMPORT_FAILED");
+            comic.setStatus("IMPORT_FAILED");
+            comicMapper.updateById(comic);
+        }
+        ManagementTaskItem mgmtItem = managementTaskService.findActiveItem(
+                "COMIC", comic.getId(), TaskType.IMPORT);
+        if (mgmtItem != null) {
+            managementTaskService.updateItemStatus(
+                    mgmtItem.getId(), ManagementTaskStatus.FAILED,
+                    task.getErrorMessage(), "IMPORT_TASK", task.getId());
         }
     }
 
@@ -374,9 +445,51 @@ public class ImportEventHandler {
         }
     }
 
-    private boolean isImportTaskSucceeded(Long taskId) {
+    private boolean isImportTaskTerminal(Long taskId) {
         ImportTask task = taskMapper.selectById(taskId);
-        return task != null && "SUCCESS".equals(task.getStatus());
+        return task != null && TERMINAL_STATUSES.contains(task.getStatus());
+    }
+
+    /**
+     * 新布局迁移：如果章节目录使用 globalOrder 命名，重命名为 chapterId。
+     * 仅在目录存在且使用 globalOrder 模式时执行重命名。
+     */
+    private void renameChapterDirIfNeeded(Long comicId, Long chapterId, int globalOrder,
+                                          List<Map<String, Object>> itemList) {
+        if (itemList == null || itemList.isEmpty()) return;
+        String firstHqPath = (String) itemList.get(0).get("hqPath");
+        if (firstHqPath == null || firstHqPath.isBlank()) return;
+
+        // 仅当 hqPath 包含 "/globalOrder/" 模式时执行迁移
+        String oldDirPattern = comicId + "/" + globalOrder + "/";
+        if (!firstHqPath.contains(oldDirPattern)) return;
+
+        Path hqRoot = Path.of(mangaRoot, "hq");
+        Path oldDir = hqRoot.resolve(comicId.toString()).resolve(String.valueOf(globalOrder));
+        Path newDir = hqRoot.resolve(comicId.toString()).resolve(String.valueOf(chapterId));
+
+        if (Files.exists(oldDir) && !Files.exists(newDir)) {
+            try {
+                Files.createDirectories(newDir.getParent());
+                Files.move(oldDir, newDir);
+                log.info("章节目录重命名: {} -> {}", oldDir, newDir);
+            } catch (IOException e) {
+                log.warn("章节目录重命名失败（非致命）: old={}, new={}, error={}",
+                        oldDir, newDir, e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * 将 hqPath 中的 globalOrder 目录替换为 chapterId 目录。
+     * 如果路径中不包含 globalOrder 模式，则原样返回（旧布局兼容）。
+     */
+    private String normalizeToChapterIdLayout(String hqPath, Long comicId, Long chapterId, int globalOrder) {
+        String oldDir = comicId + "/" + globalOrder + "/";
+        if (hqPath.contains(oldDir)) {
+            return hqPath.replace(oldDir, comicId + "/" + chapterId + "/");
+        }
+        return hqPath;
     }
 
     private void markEventProcessed(String idempKey) {

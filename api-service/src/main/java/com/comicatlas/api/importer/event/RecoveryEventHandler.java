@@ -4,6 +4,10 @@ import com.comicatlas.api.admin.dto.RecoveryProgress;
 import com.comicatlas.api.admin.recovery.RecoveryEngine;
 import com.comicatlas.api.importer.entity.RecoveryTask;
 import com.comicatlas.api.importer.mapper.RecoveryTaskMapper;
+import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
+import com.comicatlas.api.management.service.ManagementTaskService;
+import com.comicatlas.common.enums.ManagementTaskStatus;
+import com.comicatlas.common.enums.TaskType;
 import com.comicatlas.common.event.ComicEvent;
 import com.comicatlas.common.event.RecoveryFailedEvent;
 import com.comicatlas.common.event.RecoveryScanCompletedEvent;
@@ -40,8 +44,9 @@ public class RecoveryEventHandler {
     private final RecoveryEngine recoveryEngine;
     private final RecoveryTaskMapper recoveryTaskMapper;
     private final RedisTemplate<String, Object> redisTemplate;
+    private final ManagementTaskService managementTaskService;
 
-    private static final Set<String> TERMINAL_STATUSES = Set.of("SUCCESS", "FAILED");
+    private static final Set<String> TERMINAL_STATUSES = Set.of("SUCCEEDED", "FAILED", "CANCELLED");
 
     @RabbitListener(queues = "recovery.result.queue")
     public void handle(ComicEvent event,
@@ -103,6 +108,10 @@ public class RecoveryEventHandler {
             task.setErrorDetails(null);
             recoveryTaskMapper.updateById(task);
 
+            // 同步统一任务项为 RUNNING
+            ManagementTaskItemResponse mgmtItem = syncRecoveryItem(taskId, ManagementTaskStatus.RUNNING,
+                    null, null, 0L);
+
             // 逐本恢复
             int totalSoFar = 0;
             int recovered = 0, skipped = 0, placeholder = 0, errors = 0;
@@ -126,6 +135,13 @@ public class RecoveryEventHandler {
                     }
                     recoveryTaskMapper.updateById(task);
 
+                    // 同步统一任务项进度（0-100）
+                    if (mgmtItem != null && totalSoFar > 0) {
+                        int pct = Math.min(100,
+                                (recovered + skipped + placeholder + errors) * 100 / totalSoFar);
+                        managementTaskService.updateItemProgress(mgmtItem.getId(), 0, pct, "RECOVERY");
+                    }
+
                     log.debug("恢复进度: taskId={}, comicId={}, total={}, recovered={}, skipped={}, placeholder={}, error={}",
                             taskId, comicId, totalSoFar, recovered, skipped, placeholder, errors);
                 } catch (Exception e) {
@@ -140,9 +156,12 @@ public class RecoveryEventHandler {
             }
 
             // 全部处理完成
-            task.setStatus("SUCCESS");
+            task.setStatus("SUCCEEDED");
             task.setEndedAt(LocalDateTime.now());
             recoveryTaskMapper.updateById(task);
+
+            // 同步统一任务项为 SUCCEEDED
+            syncRecoveryItem(taskId, ManagementTaskStatus.SUCCEEDED, null, "RECOVERY_TASK", taskId);
 
             markEventProcessed(idempKey);
             ack(channel, tag);
@@ -160,6 +179,9 @@ public class RecoveryEventHandler {
                     task.setEndedAt(LocalDateTime.now());
                     task.setErrorMessage("事件处理异常: " + e.getMessage());
                     recoveryTaskMapper.updateById(task);
+                    // 同步统一任务项为 FAILED
+                    syncRecoveryItem(taskId, ManagementTaskStatus.FAILED,
+                            task.getErrorMessage(), "RECOVERY_TASK", taskId);
                 }
             } catch (Exception updateEx) {
                 log.error("RecoveryEventHandler: 标记任务失败时出错, taskId={}", taskId, updateEx);
@@ -200,6 +222,10 @@ public class RecoveryEventHandler {
             task.setEndedAt(LocalDateTime.now());
             task.setErrorMessage(event.errorMessage());
             recoveryTaskMapper.updateById(task);
+
+            // 同步统一任务项为 FAILED
+            syncRecoveryItem(taskId, ManagementTaskStatus.FAILED,
+                    event.errorMessage(), "RECOVERY_TASK", taskId);
 
             markEventProcessed(idempKey);
             ack(channel, tag);
@@ -242,5 +268,17 @@ public class RecoveryEventHandler {
         } catch (Exception e) {
             log.error("消息 reject 失败: tag={}", tag, e);
         }
+    }
+
+    /**
+     * 同步统一恢复任务项状态；无活跃项时跳过（终态/旧事件幂等）。
+     */
+    private ManagementTaskItemResponse syncRecoveryItem(Long recoveryTaskId, ManagementTaskStatus status,
+                                                        String errorMessage, String refType, Long refId) {
+        var item = managementTaskService.findActiveItem("SYSTEM", recoveryTaskId, TaskType.RECOVERY);
+        if (item != null) {
+            return managementTaskService.updateItemStatus(item.getId(), status, errorMessage, refType, refId);
+        }
+        return null;
     }
 }

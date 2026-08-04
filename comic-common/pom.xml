@@ -13,6 +13,11 @@
     <artifactId>comic-common</artifactId>
     <packaging>jar</packaging>
 
+    <properties>
+        <!-- 上游 -Dtest 指定 api-service 测试时，comic-common 无匹配测试不视为失败 -->
+        <surefire.failIfNoSpecifiedTests>false</surefire.failIfNoSpecifiedTests>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>

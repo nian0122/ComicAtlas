@@ -40,6 +40,8 @@ services:
       - ${MANGA_ROOT:-./manga}/hq:/storage/hq:ro
       - ${MANGA_ROOT:-./manga}/lq:/storage/lq:ro
       - ${MANGA_ROOT:-./manga}/thumbs:/storage/thumbs:ro
+      - ${MANGA_ROOT:-./manga}/staging:/storage/staging
+      - ${MANGA_ROOT:-./manga}/trash:/storage/trash:ro
   # worker-service:
   #   build:
   #     context: .

@@ -1,6 +1,7 @@
 package com.comicatlas.api.common.exception;
 
 import com.comicatlas.api.common.Result;
+import com.comicatlas.api.management.state.IllegalStateTransitionException;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -16,6 +17,12 @@ public class GlobalExceptionHandler {
     public Result<?> handleBusiness(BusinessException e) {
         log.warn("业务异常: {}", e.getMessage());
         return Result.fail(e.getCode(), e.getMessage());
+    }
+
+    @ExceptionHandler(IllegalStateTransitionException.class)
+    public Result<?> handleIllegalStateTransition(IllegalStateTransitionException e) {
+        log.warn("非法状态迁移: {}", e.getMessage());
+        return Result.fail(409, e.getMessage());
     }
 
     @ExceptionHandler(DuplicateKeyException.class)

@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS comic (
     status VARCHAR(16) DEFAULT 'IMPORTING',
     category_id BIGINT,
     deleted_at DATETIME,
+    trashed_at DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE INDEX idx_source (source_type, source_gallery_id),
@@ -47,9 +48,12 @@ CREATE TABLE IF NOT EXISTS chapter (
     page_count INT DEFAULT 0,
     sort_order INT DEFAULT 0,
     global_order INT DEFAULT 0,
+    status VARCHAR(16) DEFAULT 'READY',
+    trashed_at DATETIME,
+    version INT DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE INDEX uk_catalog_chapter (comic_id, catalog_id, chapter_no),
-    INDEX idx_comic_global (comic_id, global_order),
+    UNIQUE INDEX uk_comic_global (comic_id, global_order),
     FOREIGN KEY (comic_id) REFERENCES comic(id) ON DELETE CASCADE,
     FOREIGN KEY (catalog_id) REFERENCES catalog(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -58,6 +62,7 @@ CREATE TABLE IF NOT EXISTS page (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     chapter_id BIGINT NOT NULL,
     page_number INT NOT NULL,
+    original_page_number INT,
     hq_root VARCHAR(32) DEFAULT 'HQ',
     hq_path VARCHAR(512),
     lq_root VARCHAR(32) DEFAULT NULL,
@@ -65,6 +70,9 @@ CREATE TABLE IF NOT EXISTS page (
     hq_status VARCHAR(16) DEFAULT 'PENDING',
     lq_status VARCHAR(16) DEFAULT 'NOT_GENERATED',
     transcode_status VARCHAR(16) NOT NULL DEFAULT 'NOT_NEEDED',
+    status VARCHAR(16) DEFAULT 'READY',
+    trashed_at DATETIME,
+    version INT DEFAULT 1,
     lq_size BIGINT DEFAULT 0,
     width INT,
     height INT,
@@ -187,4 +195,40 @@ CREATE TABLE IF NOT EXISTS reading_history (
     FOREIGN KEY (chapter_id) REFERENCES chapter(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ======================== Outbox/Inbox 可靠消息 ========================
+
+CREATE TABLE IF NOT EXISTS outbox_message (
+    event_id        VARCHAR(36)   NOT NULL COMMENT '事件 UUID（PK）',
+    task_id         BIGINT        COMMENT '关联 management_task.id（可选）',
+    item_id         BIGINT        COMMENT '关联 management_task_item.id（可选）',
+    attempt         INT           NOT NULL DEFAULT 0 COMMENT 'task/item attempt 快照',
+    exchange        VARCHAR(128)  NOT NULL COMMENT '目标 exchange',
+    routing_key     VARCHAR(128)  NOT NULL COMMENT '目标 routing key',
+    event_type      VARCHAR(128)  NOT NULL COMMENT 'ComicEvent.eventType',
+    version         INT           NOT NULL DEFAULT 1 COMMENT 'ComicEvent.version()',
+    payload         MEDIUMTEXT    NOT NULL COMMENT 'JSON 序列化的事件体',
+    publish_attempts INT          NOT NULL DEFAULT 0 COMMENT 'relay 发布尝试次数',
+    status          VARCHAR(16)   NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING/PUBLISHED/FAILED',
+    available_at    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '最早可发布时间',
+    published_at    DATETIME      COMMENT '确认发布时间',
+    last_error      VARCHAR(2048) COMMENT '最后一次发布错误',
+    created_at      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_om_status_available (status, available_at),
+    INDEX idx_om_task_id (task_id),
+    INDEX idx_om_published_at (published_at),
+    INDEX idx_om_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='事务Outbox消息表';
+
+CREATE TABLE IF NOT EXISTS inbox_receipt (
+    event_id     VARCHAR(36)  NOT NULL COMMENT '事件 UUID（PK）',
+    payload_hash VARCHAR(64)  NOT NULL COMMENT 'payload SHA-256',
+    task_id      BIGINT       COMMENT '关联 management_task.id（可选）',
+    item_id      BIGINT       COMMENT '关联 management_task_item.id（可选）',
+    attempt      INT          NOT NULL DEFAULT 0 COMMENT 'task/item attempt 快照',
+    processed_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '处理时间',
+    created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (event_id),
+    INDEX idx_ir_processed_at (processed_at),
+    INDEX idx_ir_task_id (task_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='结果Inbox收据表';
 

@@ -1,6 +1,8 @@
 package com.comicatlas.api.importer.service;
 
+import com.comicatlas.api.management.dto.OperationSubmitResult;
+
 public interface LqService {
-    void generateForComic(Long comicId);
-    void generateForChapter(Long chapterId);
+    OperationSubmitResult generateForComic(Long comicId, boolean regenerate);
+    OperationSubmitResult generateForChapter(Long chapterId, boolean regenerate);
 }

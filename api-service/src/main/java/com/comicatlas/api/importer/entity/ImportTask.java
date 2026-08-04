@@ -9,6 +9,8 @@ import java.time.LocalDateTime;
 public class ImportTask {
     @TableId(type = IdType.AUTO)
     private Long id;
+    /** 关联 management_task.id 一对一扩展（V12 列） */
+    private Long managementTaskId;
     private Long comicId;
     private String sourceRef;
     private String sourceType;

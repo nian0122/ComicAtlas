@@ -9,6 +9,10 @@ import com.comicatlas.api.importer.entity.RecoveryTask;
 import com.comicatlas.api.importer.event.RecoveryEventPublisher;
 import com.comicatlas.api.importer.mapper.RecoveryTaskMapper;
 import com.comicatlas.api.importer.service.RecoveryTaskService;
+import com.comicatlas.api.management.dto.CreateManagementTaskRequest;
+import com.comicatlas.api.management.dto.ManagementTaskResponse;
+import com.comicatlas.api.management.service.ManagementTaskService;
+import com.comicatlas.common.enums.TaskType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -17,6 +21,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -25,6 +30,7 @@ public class RecoveryTaskServiceImpl implements RecoveryTaskService {
 
     private final RecoveryTaskMapper recoveryTaskMapper;
     private final RecoveryEventPublisher recoveryEventPublisher;
+    private final ManagementTaskService managementTaskService;
 
     @Override
     @Transactional
@@ -32,14 +38,14 @@ public class RecoveryTaskServiceImpl implements RecoveryTaskService {
         // 检查是否有正在执行或等待中的任务
         long runningCount = recoveryTaskMapper.selectCount(
             new LambdaQueryWrapper<RecoveryTask>()
-                .in(RecoveryTask::getStatus, "RUNNING", "PENDING")
+                .in(RecoveryTask::getStatus, "RUNNING", "QUEUED")
         );
         if (runningCount > 0) {
             throw new BusinessException(409, "已有恢复任务正在执行");
         }
 
         RecoveryTask task = new RecoveryTask();
-        task.setStatus("PENDING");
+        task.setStatus("QUEUED");
         task.setTotalComics(0);
         task.setRecoveredComics(0);
         task.setSkippedComics(0);
@@ -47,6 +53,11 @@ public class RecoveryTaskServiceImpl implements RecoveryTaskService {
         task.setErrorComics(0);
         task.setRetryCount(0);
         recoveryTaskMapper.insert(task);
+
+        // 同事务创建统一恢复任务并回填 management_task_id
+        ManagementTaskResponse mgmtResp = createManagementTaskForRecovery(task.getId());
+        task.setManagementTaskId(mgmtResp.getId());
+        recoveryTaskMapper.updateById(task);
 
         Long taskId = task.getId();
         TransactionSynchronizationManager.registerSynchronization(
@@ -89,12 +100,22 @@ public class RecoveryTaskServiceImpl implements RecoveryTaskService {
             throw new BusinessException(400, "仅 FAILED 状态可重试");
         }
 
-        t.setStatus("PENDING");
+        t.setStatus("QUEUED");
         t.setRetryCount(t.getRetryCount() + 1);
         t.setErrorMessage(null);
         t.setStartedAt(null);
         t.setEndedAt(null);
         recoveryTaskMapper.updateById(t);
+
+        // 同步统一任务：终态统一任务重置回 QUEUED（attempt 递增）
+        if (t.getManagementTaskId() != null) {
+            try {
+                managementTaskService.retryTask(t.getManagementTaskId());
+            } catch (com.comicatlas.api.common.exception.BusinessException e) {
+                log.warn("统一恢复任务重试跳过（非终态）: managementTaskId={}, error={}",
+                        t.getManagementTaskId(), e.getMessage());
+            }
+        }
 
         Long taskId = t.getId();
         TransactionSynchronizationManager.registerSynchronization(
@@ -127,6 +148,22 @@ public class RecoveryTaskServiceImpl implements RecoveryTaskService {
         if (vo.getEndedAt() != null) t.setEndedAt(vo.getEndedAt());
 
         recoveryTaskMapper.updateById(t);
+    }
+
+    /**
+     * 同事务创建统一恢复任务并返回其响应（target = SYSTEM:recoveryTaskId）。
+     */
+    private ManagementTaskResponse createManagementTaskForRecovery(Long recoveryTaskId) {
+        CreateManagementTaskRequest mgmtReq = new CreateManagementTaskRequest();
+        mgmtReq.setTaskType(TaskType.RECOVERY);
+        mgmtReq.setOperation("存储恢复");
+        mgmtReq.setTargetType("SYSTEM");
+        CreateManagementTaskRequest.TaskTarget target = new CreateManagementTaskRequest.TaskTarget();
+        target.setTargetType("SYSTEM");
+        target.setTargetId(recoveryTaskId);
+        target.setOperationType(TaskType.RECOVERY);
+        mgmtReq.setTargets(List.of(target));
+        return managementTaskService.createTask(mgmtReq, null, null);
     }
 
     private RecoveryTaskVO toVO(RecoveryTask t) {

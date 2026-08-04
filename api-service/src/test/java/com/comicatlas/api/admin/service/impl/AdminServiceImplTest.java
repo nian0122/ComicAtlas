@@ -9,7 +9,8 @@ import com.comicatlas.api.comic.mapper.*;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
-import com.comicatlas.api.reader.entity.ReadingHistory;
+import com.comicatlas.api.management.dto.OperationSubmitResult;
+import com.comicatlas.api.management.operation.MediaOperationCommandService;
 import com.comicatlas.api.reader.mapper.ReadingHistoryMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,6 +19,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.io.Serializable;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -46,6 +48,8 @@ class AdminServiceImplTest {
     private ReadingHistoryMapper historyMapper;
     @Mock
     private ImportTaskMapper taskMapper;
+    @Mock
+    private MediaOperationCommandService mediaOperationCommandService;
 
     @InjectMocks
     private AdminServiceImpl service;
@@ -88,7 +92,7 @@ class AdminServiceImplTest {
     }
 
     @Test
-    void deleteComic_shouldReturnStats_whenSuccessful() {
+    void deleteComic_shouldRedirectToUnifiedTaskPipeline_whenSuccessful() {
         Comic comic = new Comic();
         comic.setId(1L);
         comic.setTitle("Test Comic");
@@ -101,15 +105,14 @@ class AdminServiceImplTest {
         ch2.setId(102L);
         when(chapterMapper.selectList(any(LambdaQueryWrapper.class)))
                 .thenReturn(List.of(ch1, ch2));
+        when(mediaMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(50L);
+        when(catalogMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(3L);
+        when(comicTagMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(5L);
+        when(historyMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(10L);
+        when(mediaOperationCommandService.requestComicDelete(1L))
+                .thenReturn(OperationSubmitResult.of(9L, "COMIC_DELETE", "QUEUED", 1));
 
-        when(mediaMapper.delete(any(LambdaQueryWrapper.class))).thenReturn(50);
-        when(chapterMapper.delete(any(LambdaQueryWrapper.class))).thenReturn(2);
-        when(catalogMapper.delete(any(LambdaQueryWrapper.class))).thenReturn(3);
-        when(comicTagMapper.delete(any(LambdaQueryWrapper.class))).thenReturn(5);
-        when(historyMapper.delete(any(LambdaQueryWrapper.class))).thenReturn(10);
-        when(comicMapper.deleteById(1L)).thenReturn(1);
-
-        ComicDeleteStats stats = service.deleteComic(1L, "DATABASE_ONLY");
+        ComicDeleteStats stats = service.deleteComic(1L, "DELETE_FILES");
 
         assertEquals(50, stats.getPage());
         assertEquals(2, stats.getChapter());
@@ -118,7 +121,11 @@ class AdminServiceImplTest {
         assertEquals(10, stats.getHistory());
         assertEquals(1, stats.getComic());
 
-        verify(taskMapper, never()).delete(any());
+        verify(mediaOperationCommandService).requestComicDelete(1L);
+        // 不再先删 DB 后发 MQ
+        verify(comicMapper, never()).deleteById(anyLong());
+        verify(chapterMapper, never()).delete(any());
+        verify(mediaMapper, never()).delete(any());
     }
 
     @Test
@@ -129,11 +136,11 @@ class AdminServiceImplTest {
         when(taskMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
         when(chapterMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
 
-        when(chapterMapper.delete(any(LambdaQueryWrapper.class))).thenReturn(0);
-        when(catalogMapper.delete(any(LambdaQueryWrapper.class))).thenReturn(2);
-        when(comicTagMapper.delete(any(LambdaQueryWrapper.class))).thenReturn(3);
-        when(historyMapper.delete(any(LambdaQueryWrapper.class))).thenReturn(1);
-        when(comicMapper.deleteById(1L)).thenReturn(1);
+        when(catalogMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(2L);
+        when(comicTagMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(3L);
+        when(historyMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(1L);
+        when(mediaOperationCommandService.requestComicDelete(1L))
+                .thenReturn(OperationSubmitResult.of(10L, "COMIC_DELETE", "QUEUED", 1));
 
         ComicDeleteStats stats = service.deleteComic(1L, "DATABASE_ONLY");
 
@@ -143,52 +150,7 @@ class AdminServiceImplTest {
         assertEquals(3, stats.getTag());
         assertEquals(1, stats.getHistory());
         assertEquals(1, stats.getComic());
-    }
 
-    @Test
-    void deleteComic_shouldHandleComicWithNoTagsOrHistory() {
-        Comic comic = new Comic();
-        comic.setId(1L);
-        when(comicMapper.selectById(1L)).thenReturn(comic);
-        when(taskMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
-
-        Chapter ch = new Chapter();
-        ch.setId(201L);
-        when(chapterMapper.selectList(any(LambdaQueryWrapper.class)))
-                .thenReturn(List.of(ch));
-
-        when(mediaMapper.delete(any(LambdaQueryWrapper.class))).thenReturn(10);
-        when(chapterMapper.delete(any(LambdaQueryWrapper.class))).thenReturn(1);
-        when(catalogMapper.delete(any(LambdaQueryWrapper.class))).thenReturn(1);
-        when(comicTagMapper.delete(any(LambdaQueryWrapper.class))).thenReturn(0);
-        when(historyMapper.delete(any(LambdaQueryWrapper.class))).thenReturn(0);
-        when(comicMapper.deleteById(1L)).thenReturn(1);
-
-        ComicDeleteStats stats = service.deleteComic(1L, "DATABASE_ONLY");
-
-        assertEquals(10, stats.getPage());
-        assertEquals(1, stats.getChapter());
-        assertEquals(1, stats.getCatalog());
-        assertEquals(0, stats.getTag());
-        assertEquals(0, stats.getHistory());
-        assertEquals(1, stats.getComic());
-    }
-
-    @Test
-    void deleteComic_shouldProceed_whenTasksAreInTerminalStatus() {
-        Comic comic = new Comic();
-        comic.setId(1L);
-        when(comicMapper.selectById(1L)).thenReturn(comic);
-        when(taskMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
-
-        when(chapterMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
-        when(chapterMapper.delete(any(LambdaQueryWrapper.class))).thenReturn(0);
-        when(catalogMapper.delete(any(LambdaQueryWrapper.class))).thenReturn(0);
-        when(comicTagMapper.delete(any(LambdaQueryWrapper.class))).thenReturn(0);
-        when(historyMapper.delete(any(LambdaQueryWrapper.class))).thenReturn(0);
-        when(comicMapper.deleteById(1L)).thenReturn(1);
-
-        ComicDeleteStats stats = service.deleteComic(1L, "DATABASE_ONLY");
-        assertEquals(1, stats.getComic());
+        verify(mediaOperationCommandService).requestComicDelete(1L);
     }
 }

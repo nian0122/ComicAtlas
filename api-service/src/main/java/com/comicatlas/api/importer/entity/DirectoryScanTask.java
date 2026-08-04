@@ -9,6 +9,8 @@ import java.time.LocalDateTime;
 public class DirectoryScanTask {
     @TableId(type = IdType.AUTO)
     private Long id;
+    /** 关联 management_task.id 一对一扩展（V12 列） */
+    private Long managementTaskId;
     private String status;
     private String directoryPath;
     private Integer totalItems;

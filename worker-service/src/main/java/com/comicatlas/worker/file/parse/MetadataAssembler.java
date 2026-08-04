@@ -30,7 +30,12 @@ public class MetadataAssembler {
         String title = ctx.titleHint() != null ? ctx.titleHint() : tree.name();
         List<ComicMetadata.CatalogInfo> catalogs = new ArrayList<>();
         List<ComicMetadata.ChapterInfo> chapters = new ArrayList<>();
-        AtomicInteger globalOrder = new AtomicInteger(0);
+        // QA 修复注记（task-21）：globalOrder 必须从 1 开始分配。
+        // 原实现从 0 开始，导致 hq/{comicId}/{globalOrder} 目录为 0,1,2，而 API 落库后
+        // 把 globalOrder 目录迁移为 chapterId 目录（1,2,3），二者错位（ch1 目标 1 与
+        // ch2 源 1 重叠）→ Files.move 互相碰撞失败，文件停留在旧目录而 DB hq_path
+        // 指向新目录，LQ/HQ 删除按 hq_path 定位文件全部失败。
+        AtomicInteger globalOrder = new AtomicInteger(1);
         AtomicInteger catalogCounter = new AtomicInteger(0);
         Path root = tree.path();
 
@@ -50,7 +55,7 @@ public class MetadataAssembler {
             if (!mediaItems.isEmpty()) {
                 String sourceDir = root.relativize(node.path()).toString().replace('\\', '/');
                 chapters.add(new ComicMetadata.ChapterInfo(
-                    node.name(), String.valueOf(globalOrder.get() + 1),
+                    node.name(), String.valueOf(globalOrder.get()),
                     chapters.size(), globalOrder.getAndIncrement(),
                     parentCatalogIndex,
                     sourceDir,
