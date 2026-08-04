@@ -333,4 +333,62 @@ public class RabbitMqConfig {
         return BindingBuilder.bind(scanTaskDlq())
                 .to(scanDlxExchange()).with("scan.task.dlq");
     }
+
+    // ==================== comic.management 管理命令任务 ====================
+
+    @Bean
+    public DirectExchange managementExchange() { return new DirectExchange("comic.management"); }
+
+    @Bean
+    public DirectExchange managementDlxExchange() { return new DirectExchange("comic.management.dlx"); }
+
+    @Bean
+    public Queue managementCommandQueue() {
+        return QueueBuilder.durable("management.command.queue")
+                .deadLetterExchange("comic.management.dlx")
+                .deadLetterRoutingKey("management.command.dlq")
+                .build();
+    }
+
+    @Bean
+    public Queue managementCommandDlq() {
+        return QueueBuilder.durable("management.command.dlq").build();
+    }
+
+    @Bean
+    public Queue managementCancelQueue() {
+        return QueueBuilder.durable("management.cancel.queue")
+                .deadLetterExchange("comic.management.dlx")
+                .deadLetterRoutingKey("management.cancel.dlq")
+                .build();
+    }
+
+    @Bean
+    public Queue managementCancelDlq() {
+        return QueueBuilder.durable("management.cancel.dlq").build();
+    }
+
+    @Bean
+    public Binding managementCommandBinding() {
+        return BindingBuilder.bind(managementCommandQueue())
+                .to(managementExchange()).with("command.requested");
+    }
+
+    @Bean
+    public Binding managementCancelBinding() {
+        return BindingBuilder.bind(managementCancelQueue())
+                .to(managementExchange()).with("command.cancel");
+    }
+
+    @Bean
+    public Binding managementCommandDlqBinding() {
+        return BindingBuilder.bind(managementCommandDlq())
+                .to(managementDlxExchange()).with("management.command.dlq");
+    }
+
+    @Bean
+    public Binding managementCancelDlqBinding() {
+        return BindingBuilder.bind(managementCancelDlq())
+                .to(managementDlxExchange()).with("management.cancel.dlq");
+    }
 }

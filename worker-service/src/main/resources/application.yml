@@ -82,6 +82,19 @@ storage:
     LQ:
       type: FILESYSTEM
       path: ${MANGA_ROOT:F:/manga}/lq
+    THUMBS:
+      type: FILESYSTEM
+      path: ${MANGA_ROOT:F:/manga}/thumbs
+    METADATA:
+      type: FILESYSTEM
+      path: ${MANGA_ROOT:F:/manga}/metadata
+    STAGING:
+      type: FILESYSTEM
+      path: ${MANGA_ROOT:F:/manga}/staging
+      readOnly: false
+    TRASH:
+      type: FILESYSTEM
+      path: ${MANGA_ROOT:F:/manga}/trash
     EXPORT:
       type: FILESYSTEM
       path: ${MANGA_ROOT:F:/manga}/export

@@ -2,9 +2,13 @@ package com.comicatlas.api.reader.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.comic.entity.Chapter;
+import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.entity.Media;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
+import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.mapper.MediaMapper;
+import com.comicatlas.common.enums.ChapterLifecycleStatus;
+import com.comicatlas.common.enums.MediaLifecycleStatus;
 import com.comicatlas.api.common.storage.FileUrlResolver;
 import com.comicatlas.api.reader.dto.ReaderDTO;
 import com.comicatlas.api.common.exception.BusinessException;
@@ -20,6 +24,7 @@ public class ReaderServiceImpl implements ReaderService {
 
     private final ChapterMapper chapterMapper;
     private final MediaMapper mediaMapper;
+    private final ComicMapper comicMapper;
     private final FileUrlResolver fileUrlResolver;
 
     @Override
@@ -27,8 +32,19 @@ public class ReaderServiceImpl implements ReaderService {
         Chapter ch = chapterMapper.selectById(chapterId);
         if (ch == null) throw new BusinessException(404, "章节不存在");
 
+        Comic comic = comicMapper.selectById(ch.getComicId());
+        if (comic == null || !"READY".equals(comic.getStatus())) {
+            throw new BusinessException(404, "漫画不存在或不可阅读");
+        }
+        if (!ChapterLifecycleStatus.READY.name().equals(ch.getStatus())) {
+            throw new BusinessException(404, "章节不存在或不可阅读");
+        }
+
         var pages = mediaMapper.selectList(
-            new LambdaQueryWrapper<Media>().eq(Media::getChapterId, chapterId).orderByAsc(Media::getPageNumber));
+            new LambdaQueryWrapper<Media>()
+                .eq(Media::getChapterId, chapterId)
+                .eq(Media::getStatus, MediaLifecycleStatus.READY.name())
+                .orderByAsc(Media::getPageNumber));
 
         var dto = new ReaderDTO();
         dto.setChapterId(ch.getId());
@@ -60,6 +76,7 @@ public class ReaderServiceImpl implements ReaderService {
         var prev = chapterMapper.selectList(
             new LambdaQueryWrapper<Chapter>()
                 .eq(Chapter::getComicId, ch.getComicId())
+                .eq(Chapter::getStatus, ChapterLifecycleStatus.READY.name())
                 .lt(Chapter::getGlobalOrder, ch.getGlobalOrder())
                 .orderByDesc(Chapter::getGlobalOrder)
                 .last("LIMIT 1"));
@@ -68,6 +85,7 @@ public class ReaderServiceImpl implements ReaderService {
         var next = chapterMapper.selectList(
             new LambdaQueryWrapper<Chapter>()
                 .eq(Chapter::getComicId, ch.getComicId())
+                .eq(Chapter::getStatus, ChapterLifecycleStatus.READY.name())
                 .gt(Chapter::getGlobalOrder, ch.getGlobalOrder())
                 .orderByAsc(Chapter::getGlobalOrder)
                 .last("LIMIT 1"));

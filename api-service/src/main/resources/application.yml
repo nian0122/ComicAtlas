@@ -38,10 +38,13 @@ spring:
       simple:
         prefetch: 1
         acknowledge-mode: manual
-  sql:
-    init:
-      mode: always
-      schema-locations: classpath:db/schema.sql
+  # Flyway 数据库版本迁移（替代 spring.sql.init）
+  flyway:
+    enabled: true
+    locations: classpath:db/flyway
+    baseline-on-migrate: true
+    baseline-version: 1
+    # sql.init 已关闭，由 Flyway 统一管理 schema 版本
 
 mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml
@@ -51,9 +54,60 @@ mybatis-plus:
     db-config:
       id-type: auto
 
+storage:
+  url-prefix: /files
+  roots:
+    HQ:
+      type: FILESYSTEM
+      path: ${MANGA_ROOT:F:/manga}/hq
+      enabled: true
+      readOnly: true
+    LQ:
+      type: FILESYSTEM
+      path: ${MANGA_ROOT:F:/manga}/lq
+      enabled: true
+      readOnly: true
+    THUMBS:
+      type: FILESYSTEM
+      path: ${MANGA_ROOT:F:/manga}/thumbs
+      enabled: true
+      readOnly: true
+    METADATA:
+      type: FILESYSTEM
+      path: ${MANGA_ROOT:F:/manga}/metadata
+      enabled: true
+      readOnly: true
+    STAGING:
+      type: FILESYSTEM
+      path: ${MANGA_ROOT:F:/manga}/staging
+      enabled: true
+      readOnly: false
+    TRASH:
+      type: FILESYSTEM
+      path: ${MANGA_ROOT:F:/manga}/trash
+      enabled: true
+      readOnly: false
+    EXPORT:
+      type: FILESYSTEM
+      path: ${MANGA_ROOT:F:/manga}/export
+      enabled: true
+      readOnly: true
+  upload:
+    chunk-size: ${UPLOAD_CHUNK_SIZE:16777216}
+    max-file-size: ${UPLOAD_MAX_FILE_SIZE:21474836480}
+    max-session-size: ${UPLOAD_MAX_SESSION_SIZE:107374182400}
+    max-files: ${UPLOAD_MAX_FILES:10000}
+    session-ttl: ${UPLOAD_SESSION_TTL:24h}
+    free-space-min-bytes: ${UPLOAD_FREE_SPACE_MIN_BYTES:5368709120}
+    free-space-min-ratio: ${UPLOAD_FREE_SPACE_MIN_RATIO:0.10}
+    cleanup-interval-ms: ${UPLOAD_CLEANUP_INTERVAL_MS:3600000}
+
 export:
   output-dir: ${MANGA_ROOT:F:/manga}/export
 
 comic:
   cache:
     catalog-ttl: ${CATALOG_CACHE_TTL:30m}
+  batch:
+    max-items: ${BATCH_MAX_ITEMS:10000}
+    preview-ttl-seconds: ${BATCH_PREVIEW_TTL_SECONDS:300}

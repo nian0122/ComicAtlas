@@ -33,25 +33,25 @@ public class ImageOptimizer {
     private static final long LQ_TIMEOUT_SECONDS = 600;
 
     /**
-     * 对指定章节的 HQ 图片生成 LQ WebP。
+     * 对指定章节的 HQ 图片生成 LQ WebP（使用显式路径，禁止 globalOrder 拼目录）。
      *
      * @param comicId   漫画 ID
      * @param chapterId 章节 ID（仅用于日志和 JSON 回传）
-     * @param chapterNo 章节编号（用于拼文件路径）
+     * @param hqDir     HQ 源目录绝对路径
+     * @param lqDir     LQ 目标目录绝对路径
      * @return Go 工具返回的详细结果
-     * @throws RuntimeException Go 工具超时、异常退出或目录不存在
      */
-    public RunResult generateLq(Long comicId, Long chapterId, String chapterNo) {
-        String hqDir = Path.of(config.getMangaRoot(), pathBuilder.hqDir(comicId, chapterNo)).toString();
-        String lqDir = Path.of(config.getMangaRoot(), pathBuilder.lqDir(comicId, chapterNo)).toString();
+    public RunResult generateLq(Long comicId, Long chapterId, Path hqDir, Path lqDir) {
+        String hqDirStr = hqDir.toString();
+        String lqDirStr = lqDir.toString();
 
-        if (!Files.exists(Path.of(hqDir))) {
-            throw new RuntimeException("HQ 目录不存在: " + hqDir);
+        if (!Files.exists(hqDir)) {
+            throw new RuntimeException("HQ 目录不存在: " + hqDirStr);
         }
         try {
-            Files.createDirectories(Path.of(lqDir));
+            Files.createDirectories(lqDir);
         } catch (Exception e) {
-            throw new RuntimeException("创建 LQ 目录失败: " + lqDir, e);
+            throw new RuntimeException("创建 LQ 目录失败: " + lqDirStr, e);
         }
 
         int workers = config.getLqWorkers() > 0
@@ -62,10 +62,11 @@ public class ImageOptimizer {
         if (!optimizerPath.isAbsolute()) {
             optimizerPath = Path.of(System.getProperty("user.dir")).resolve(optimizerPath);
         }
+        String chapterNo = hqDir.getFileName().toString();
         List<String> cmd = new ArrayList<>(List.of(
                 optimizerPath.toString(),
-                "-scan-dir", hqDir,
-                "-output-dir", lqDir,
+                "-scan-dir", hqDirStr,
+                "-output-dir", lqDirStr,
                 "-comic-id", comicId.toString(),
                 "-chapter-id", chapterId.toString(),
                 "-chapter-no", chapterNo,
@@ -74,9 +75,22 @@ public class ImageOptimizer {
                 "-json"
         ));
 
-        log.info("启动图片优化: comicId={}, chapterId={}, chapterNo={}, workers={}, quality={}",
-                comicId, chapterId, chapterNo, workers, config.getLqQuality());
+        log.info("启动图片优化: comicId={}, chapterId={}, hqDir={}, lqDir={}, workers={}, quality={}",
+                comicId, chapterId, hqDirStr, lqDirStr, workers, config.getLqQuality());
+        return runOptimizer(cmd, comicId, chapterId);
+    }
 
+    /**
+     * @deprecated 使用 {@link #generateLq(Long, Long, Path, Path)} 替代，禁止用 globalOrder 拼目录。
+     */
+    @Deprecated
+    public RunResult generateLq(Long comicId, Long chapterId, String chapterNo) {
+        Path hqDir = Path.of(config.getMangaRoot(), pathBuilder.hqDir(comicId, chapterNo));
+        Path lqDir = Path.of(config.getMangaRoot(), pathBuilder.lqDir(comicId, chapterNo));
+        return generateLq(comicId, chapterId, hqDir, lqDir);
+    }
+
+    private RunResult runOptimizer(List<String> cmd, Long comicId, Long chapterId) {
         ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.redirectErrorStream(true);
         Process proc;

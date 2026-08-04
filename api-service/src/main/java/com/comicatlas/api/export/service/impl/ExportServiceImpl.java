@@ -9,6 +9,9 @@ import com.comicatlas.api.export.entity.ExportTask;
 import com.comicatlas.api.export.event.ExportEventPublisher;
 import com.comicatlas.api.export.mapper.ExportTaskMapper;
 import com.comicatlas.api.export.service.ExportService;
+import com.comicatlas.api.management.dto.CreateManagementTaskRequest;
+import com.comicatlas.api.management.dto.ManagementTaskResponse;
+import com.comicatlas.api.management.service.ManagementTaskService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -27,6 +30,7 @@ public class ExportServiceImpl implements ExportService {
     private final ComicMapper comicMapper;
     private final ExportTaskMapper exportTaskMapper;
     private final ExportEventPublisher eventPublisher;
+    private final ManagementTaskService managementTaskService;
 
     @Value("${export.output-dir}")
     private String exportDir;
@@ -58,6 +62,11 @@ public class ExportServiceImpl implements ExportService {
         task.setProgress(0);
         exportTaskMapper.insert(task);
 
+        // 3.5 同事务创建统一管理任务并回填 management_task_id
+        ManagementTaskResponse mgmtResp = createManagementTaskForExport(comicId);
+        task.setManagementTaskId(mgmtResp.getId());
+        exportTaskMapper.updateById(task);
+
         // 4. 事务提交后发送 MQ
         Long taskId = task.getId();
         TransactionSynchronizationManager.registerSynchronization(
@@ -87,6 +96,22 @@ public class ExportServiceImpl implements ExportService {
             throw new BusinessException(404, "导出任务不存在");
         }
         return toVO(task);
+    }
+
+    /**
+     * 同事务创建统一导出任务并返回其响应。
+     */
+    private ManagementTaskResponse createManagementTaskForExport(Long comicId) {
+        CreateManagementTaskRequest mgmtReq = new CreateManagementTaskRequest();
+        mgmtReq.setTaskType(com.comicatlas.common.enums.TaskType.EXPORT);
+        mgmtReq.setOperation("导出漫画");
+        mgmtReq.setTargetType("COMIC");
+        CreateManagementTaskRequest.TaskTarget target = new CreateManagementTaskRequest.TaskTarget();
+        target.setTargetType("COMIC");
+        target.setTargetId(comicId);
+        target.setOperationType(com.comicatlas.common.enums.TaskType.EXPORT);
+        mgmtReq.setTargets(List.of(target));
+        return managementTaskService.createTask(mgmtReq, null, null);
     }
 
     private ExportTaskVO toVO(ExportTask task) {

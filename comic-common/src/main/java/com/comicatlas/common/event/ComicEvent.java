@@ -37,6 +37,12 @@ import java.util.UUID;
     @JsonSubTypes.Type(value = DirectoryScanRequestedEvent.class, name = "DirectoryScanRequestedEvent"),
     @JsonSubTypes.Type(value = DirectoryScanCompletedEvent.class, name = "DirectoryScanCompletedEvent"),
     @JsonSubTypes.Type(value = DirectoryScanFailedEvent.class, name = "DirectoryScanFailedEvent"),
+    @JsonSubTypes.Type(value = ManagementCommandRequestedEvent.class, name = "ManagementCommandRequestedEvent"),
+    @JsonSubTypes.Type(value = ManagementCommandProgressEvent.class, name = "ManagementCommandProgressEvent"),
+    @JsonSubTypes.Type(value = ManagementCommandCompletedEvent.class, name = "ManagementCommandCompletedEvent"),
+    @JsonSubTypes.Type(value = ManagementCommandFailedEvent.class, name = "ManagementCommandFailedEvent"),
+    @JsonSubTypes.Type(value = ManagementCommandCancelRequestedEvent.class, name = "ManagementCommandCancelRequestedEvent"),
+    @JsonSubTypes.Type(value = MediaUploadCompletedEvent.class, name = "MediaUploadCompletedEvent"),
 })
 public sealed interface ComicEvent
     permits ImportTaskCreatedEvent, ImportTaskCompletedEvent, ImportTaskFailedEvent,
@@ -50,7 +56,11 @@ public sealed interface ComicEvent
             VideoMetadataFixRequestedEvent, VideoMetadataFixCompletedEvent,
             RecoveryRequestedEvent, RecoveryProgressEvent, RecoveryCompletedEvent,
             RecoveryFailedEvent, RecoveryScanCompletedEvent,
-            DirectoryScanRequestedEvent, DirectoryScanCompletedEvent, DirectoryScanFailedEvent {
+            DirectoryScanRequestedEvent, DirectoryScanCompletedEvent, DirectoryScanFailedEvent,
+            ManagementCommandRequestedEvent, ManagementCommandProgressEvent,
+            ManagementCommandCompletedEvent, ManagementCommandFailedEvent,
+            ManagementCommandCancelRequestedEvent,
+            MediaUploadCompletedEvent {
 
     UUID eventId();
     Instant occurredAt();

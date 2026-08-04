@@ -8,6 +8,7 @@ import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
+import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.common.event.ImportTaskCompletedEvent;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -46,6 +47,7 @@ class ImportEventHandlerCacheTest {
     @Mock private ImportTaskMapper taskMapper;
     @Mock private TransactionTemplate transactionTemplate;
     @Mock private CatalogCacheInvalidator catalogCacheInvalidator;
+    @Mock private ManagementTaskService managementTaskService;
     @Mock private Channel channel;
     @InjectMocks private ImportEventHandler handler;
 
@@ -72,6 +74,7 @@ class ImportEventHandlerCacheTest {
             TransactionCallback<?> callback = invocation.getArgument(0);
             return callback.doInTransaction(null);
         });
+        when(managementTaskService.findActiveItem(any(), any(), any())).thenReturn(null);
 
         handler.handleComicImported(event, channel, 1L);
 
