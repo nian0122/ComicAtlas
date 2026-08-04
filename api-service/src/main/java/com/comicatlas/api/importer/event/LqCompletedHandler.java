@@ -81,7 +81,8 @@ public class LqCompletedHandler {
             log.error("LQ 状态更新失败: comicId={}, chapterId={}", comicId, chapterId, e);
             try {
                 channel.basicReject(tag, false);
-            } catch (Exception ignored) {
+            } catch (Exception ex) {
+                log.warn("消息 reject 失败: tag={}", tag, ex);
             }
         }
     }

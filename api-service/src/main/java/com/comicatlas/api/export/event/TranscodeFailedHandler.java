@@ -34,7 +34,7 @@ public class TranscodeFailedHandler {
             log.warn("TranscodeFailed: pageId={}, error={}", event.pageId(), event.errorMessage());
         } catch (Exception e) {
             log.error("TranscodeFailed handler error: pageId={}", event.pageId(), e);
-            try { channel.basicReject(tag, false); } catch (Exception ignored) {}
+            try { channel.basicReject(tag, false); } catch (Exception ex) { log.warn("消息 reject 失败: tag={}", tag, ex); }
         }
     }
 }

@@ -11,6 +11,7 @@ import com.comicatlas.api.comic.mapper.CatalogMapper;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.mapper.MediaMapper;
+import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.common.exception.ConflictException;
 import com.comicatlas.api.importer.dto.*;
@@ -107,7 +108,7 @@ public class ImportServiceImpl implements ImportService {
         switch (sourceType) {
             case "EHENTAI" -> {
                 if (sourceRef == null || !EH_PATTERN.matcher(sourceRef).find()) {
-                    throw new BusinessException(400, "不支持的 URL 格式");
+                    throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "不支持的 URL 格式");
                 }
                 Matcher m = EH_PATTERN.matcher(sourceRef);
                 m.find();
@@ -119,32 +120,32 @@ public class ImportServiceImpl implements ImportService {
                 // Redis 去重
                 String dedupKey = "import:dedup:E_HENTAI:" + gid;
                 if (Boolean.TRUE.equals(redisTemplate.hasKey(dedupKey))) {
-                    throw new BusinessException(409, "该漫画已存在或正在导入中");
+                    throw new BusinessException(HttpStatusCodes.CONFLICT, "该漫画已存在或正在导入中");
                 }
                 // DB 去重
                 var existing = comicMapper.selectOne(new LambdaQueryWrapper<Comic>()
                     .eq(Comic::getSourceType, "EHENTAI")
                     .eq(Comic::getSourceGalleryId, gid));
                 if (existing != null) {
-                    throw new BusinessException(409, "该漫画已导入 - 漫画ID: " + existing.getId());
+                    throw new BusinessException(HttpStatusCodes.CONFLICT, "该漫画已导入 - 漫画ID: " + existing.getId());
                 }
                 try {
                     comicMapper.insert(comic);
                 } catch (DuplicateKeyException e) {
-                    throw new BusinessException(409, "该漫画已存在（并发导入）");
+                    throw new BusinessException(HttpStatusCodes.CONFLICT, "该漫画已存在（并发导入）");
                 }
                 redisTemplate.opsForValue().set(dedupKey, "1", Duration.ofDays(7));
             }
             case "ZIP", "REGISTER", "DIRECTORY" -> {
                 String path = sourcePath != null ? sourcePath : sourceRef;
-                if (path == null || path.isBlank()) throw new BusinessException(400, "请提供 sourcePath");
+                if (path == null || path.isBlank()) throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "请提供 sourcePath");
                 String name = Path.of(path).getFileName().toString();
                 name = name.contains(".") ? name.substring(0, name.lastIndexOf('.')) : name;
                 comic.setTitle(name);
                 comic.setSourceRef(path);
                 comicMapper.insert(comic);
             }
-            default -> throw new BusinessException(400, "不支持的 sourceType: " + sourceType);
+            default -> throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "不支持的 sourceType: " + sourceType);
         }
 
         // 2. 创建 import_task
@@ -187,7 +188,7 @@ public class ImportServiceImpl implements ImportService {
     public BatchImportResultVO createBatchImportTasks(BatchImportRequest request) {
         List<String> sourcePaths = request.getSourcePaths();
         if (sourcePaths == null || sourcePaths.isEmpty()) {
-            throw new BusinessException(400, "请至少选择一个目录");
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "请至少选择一个目录");
         }
 
         String sourceType = request.getSourceType() != null && !request.getSourceType().isBlank()
@@ -259,14 +260,14 @@ public class ImportServiceImpl implements ImportService {
     @Override
     public ImportTaskVO getTaskDetail(Long id) {
         ImportTask t = taskMapper.selectById(id);
-        if (t == null) throw new BusinessException(404, "任务不存在");
+        if (t == null) throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在");
         return toVO(t);
     }
 
     @Override
     public ImportStatusVO getTaskStatus(Long id) {
         ImportTask t = taskMapper.selectById(id);
-        if (t == null) throw new BusinessException(404, "任务不存在");
+        if (t == null) throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在");
         ImportStatusVO vo = new ImportStatusVO();
         vo.setTaskId(t.getId());
         vo.setStatus(t.getStatus());
@@ -278,10 +279,10 @@ public class ImportServiceImpl implements ImportService {
     @Transactional
     public void cancelTask(Long id) {
         ImportTask t = taskMapper.selectById(id);
-        if (t == null) throw new BusinessException(404, "任务不存在");
+        if (t == null) throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在");
         String status = t.getStatus();
         if ("SUCCESS".equals(status) || "FAILED".equals(status) || "CANCELLED".equals(status)) {
-            throw new BusinessException(400, "终态任务不可取消");
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "终态任务不可取消");
         }
         t.setStatus("CANCELLED");
         taskMapper.updateById(t);
@@ -321,10 +322,10 @@ public class ImportServiceImpl implements ImportService {
     @Transactional
     public void retryTask(Long id) {
         ImportTask t = taskMapper.selectById(id);
-        if (t == null) throw new BusinessException(404, "任务不存在");
+        if (t == null) throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在");
         String status = t.getStatus();
         if (!"FAILED".equals(status) && !"CANCELLED".equals(status)) {
-            throw new BusinessException(400, "仅 FAILED/CANCELLED 状态可重试");
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "仅 FAILED/CANCELLED 状态可重试");
         }
 
         Long comicId = t.getComicId();
