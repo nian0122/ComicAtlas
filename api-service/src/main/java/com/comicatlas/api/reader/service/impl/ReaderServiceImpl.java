@@ -41,7 +41,7 @@ public class ReaderServiceImpl implements ReaderService {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在或不可阅读");
         }
 
-        var pages = mediaMapper.selectList(
+        var mediaItems = mediaMapper.selectList(
             new LambdaQueryWrapper<Media>()
                 .eq(Media::getChapterId, chapterId)
                 .eq(Media::getStatus, MediaLifecycleStatus.READY.name())
@@ -51,25 +51,25 @@ public class ReaderServiceImpl implements ReaderService {
         dto.setChapterId(ch.getId());
         dto.setComicId(ch.getComicId());
         dto.setChapterTitle(ch.getTitle());
-        dto.setPages(pages.stream().map(p -> {
+        dto.setPages(mediaItems.stream().map(media -> {
             var pd = new ReaderDTO.MediaItemDTO();
-            pd.setId(p.getId());
-            pd.setPageNumber(p.getPageNumber());
-            pd.setHqUrl(fileUrlResolver.resolve(p));
-            pd.setMediaType(p.getMediaType());
-            pd.setDuration(p.getDuration());
-            pd.setContainer(p.getContainer());
-            pd.setVideoCodec(p.getVideoCodec());
-            pd.setAudioCodec(p.getAudioCodec());
-            if ("VIDEO".equals(p.getMediaType())) {
+            pd.setId(media.getId());
+            pd.setPageNumber(media.getPageNumber());
+            pd.setHqUrl(fileUrlResolver.resolve(media));
+            pd.setMediaType(media.getMediaType());
+            pd.setDuration(media.getDuration());
+            pd.setContainer(media.getContainer());
+            pd.setVideoCodec(media.getVideoCodec());
+            pd.setAudioCodec(media.getAudioCodec());
+            if ("VIDEO".equals(media.getMediaType())) {
                 pd.setLqUrl(null);
                 pd.setLqStatus("NOT_APPLICABLE");
             } else {
-                pd.setLqUrl(fileUrlResolver.resolveLq(p));
-                pd.setLqStatus(p.getLqStatus());
+                pd.setLqUrl(fileUrlResolver.resolveLq(media));
+                pd.setLqStatus(media.getLqStatus());
             }
-            pd.setWidth(p.getWidth());
-            pd.setHeight(p.getHeight());
+            pd.setWidth(media.getWidth());
+            pd.setHeight(media.getHeight());
             return pd;
         }).collect(Collectors.toList()));
         dto.setTotal(dto.getPages().size());

@@ -38,16 +38,16 @@ public class HqDeletedHandler {
 
         try {
             // 1. 更新 IMAGE 页
-            var pages = mediaMapper.selectList(
+            var mediaItems = mediaMapper.selectList(
                     new LambdaQueryWrapper<Media>()
                             .eq(Media::getChapterId, chapterId)
                             .eq(Media::getMediaType, "IMAGE"));
 
-            for (Media page : pages) {
-                page.setHqStatus("DELETED");
-                page.setHqRoot(null);
-                page.setHqPath(null);
-                mediaMapper.updateById(page);
+            for (Media media : mediaItems) {
+                media.setHqStatus("DELETED");
+                media.setHqRoot(null);
+                media.setHqPath(null);
+                mediaMapper.updateById(media);
             }
 
             // 2. 更新 Comic.hqSize
@@ -60,7 +60,7 @@ public class HqDeletedHandler {
 
             channel.basicAck(tag, false);
             log.info("HQ 状态更新完成: comicId={}, chapterId={}, pages={}, freedBytes={}",
-                    comicId, chapterId, pages.size(), event.freedBytes());
+                    comicId, chapterId, mediaItems.size(), event.freedBytes());
         } catch (Exception e) {
             log.error("HQ 状态更新失败: comicId={}, chapterId={}", comicId, chapterId, e);
             try {

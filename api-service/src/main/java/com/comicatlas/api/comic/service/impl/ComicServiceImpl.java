@@ -175,22 +175,22 @@ public class ComicServiceImpl implements ComicService {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在或不可阅读");
         }
 
-        var pages = mediaMapper.selectList(
+        var mediaItems = mediaMapper.selectList(
             new LambdaQueryWrapper<com.comicatlas.api.comic.entity.Media>()
                 .eq(com.comicatlas.api.comic.entity.Media::getChapterId, chapterId)
                 .eq(com.comicatlas.api.comic.entity.Media::getStatus, MediaLifecycleStatus.READY.name())
                 .orderByAsc(com.comicatlas.api.comic.entity.Media::getPageNumber));
 
         String chNo = ch.getChapterNo();
-        List<MediaItemInfo> pageInfos = pages.stream().map(p -> {
+        List<MediaItemInfo> pageInfos = mediaItems.stream().map(media -> {
             MediaItemInfo pi = new MediaItemInfo();
-            pi.setId(p.getId());
-            pi.setPageNumber(p.getPageNumber());
-            pi.setHqUrl(fileUrlResolver.resolve(p));
-            pi.setLqUrl(fileUrlResolver.resolveLq(p));
-            pi.setLqStatus(p.getLqStatus());
-            pi.setWidth(p.getWidth());
-            pi.setHeight(p.getHeight());
+            pi.setId(media.getId());
+            pi.setPageNumber(media.getPageNumber());
+            pi.setHqUrl(fileUrlResolver.resolve(media));
+            pi.setLqUrl(fileUrlResolver.resolveLq(media));
+            pi.setLqStatus(media.getLqStatus());
+            pi.setWidth(media.getWidth());
+            pi.setHeight(media.getHeight());
             return pi;
         }).collect(Collectors.toList());
 

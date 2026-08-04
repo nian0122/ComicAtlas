@@ -98,13 +98,13 @@ public class MetadataExporter {
         List<Map<String, Object>> chapterList = new ArrayList<>();
         for (Chapter ch : chapters) {
             // 4. For each chapter: SELECT pages ordered by pageNumber
-            List<Media> pages = mediaMapper.selectList(
+            List<Media> mediaItems = mediaMapper.selectList(
                     new LambdaQueryWrapper<Media>()
                             .eq(Media::getChapterId, ch.getId())
                             .orderByAsc(Media::getPageNumber));
 
             List<Map<String, Object>> mediaItemList = new ArrayList<>();
-            for (Media p : pages) {
+            for (Media p : mediaItems) {
                 Map<String, Object> pm = new LinkedHashMap<>();
                 String hqPath = p.getHqPath();
                 String fileName = "";
