@@ -6,7 +6,10 @@ import com.comicatlas.worker.file.manifest.ImportManifestManager;
 import com.comicatlas.worker.file.parse.ComicMetadata;
 import com.comicatlas.worker.file.parse.DirectoryTree;
 import com.comicatlas.worker.file.parse.ImportContext;
-import com.comicatlas.worker.file.storage.*;
+import com.comicatlas.worker.file.storage.SafeMoveStrategy;
+import com.comicatlas.worker.file.storage.StorageProperties;
+import com.comicatlas.worker.file.storage.StorageRoot;
+import com.comicatlas.worker.file.storage.TransferService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
@@ -19,10 +22,14 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * DirectoryImportHandler 清单驱动搬运集成测试。
