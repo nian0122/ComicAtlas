@@ -83,42 +83,42 @@ public class RecoveryTaskServiceImpl implements RecoveryTaskService {
 
     @Override
     public RecoveryTaskVO getTaskDetail(Long id) {
-        RecoveryTask t = recoveryTaskMapper.selectById(id);
-        if (t == null) {
+        RecoveryTask recoveryTask = recoveryTaskMapper.selectById(id);
+        if (recoveryTask == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在");
         }
-        return toVO(t);
+        return toVO(recoveryTask);
     }
 
     @Override
     @Transactional
     public RecoveryTaskVO retryTask(Long id) {
-        RecoveryTask t = recoveryTaskMapper.selectById(id);
-        if (t == null) {
+        RecoveryTask recoveryTask = recoveryTaskMapper.selectById(id);
+        if (recoveryTask == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在");
         }
-        if (!"FAILED".equals(t.getStatus())) {
+        if (!"FAILED".equals(recoveryTask.getStatus())) {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "仅 FAILED 状态可重试");
         }
 
-        t.setStatus("QUEUED");
-        t.setRetryCount(t.getRetryCount() + 1);
-        t.setErrorMessage(null);
-        t.setStartedAt(null);
-        t.setEndedAt(null);
-        recoveryTaskMapper.updateById(t);
+        recoveryTask.setStatus("QUEUED");
+        recoveryTask.setRetryCount(recoveryTask.getRetryCount() + 1);
+        recoveryTask.setErrorMessage(null);
+        recoveryTask.setStartedAt(null);
+        recoveryTask.setEndedAt(null);
+        recoveryTaskMapper.updateById(recoveryTask);
 
         // 同步统一任务：终态统一任务重置回 QUEUED（attempt 递增）
-        if (t.getManagementTaskId() != null) {
+        if (recoveryTask.getManagementTaskId() != null) {
             try {
-                managementTaskService.retryTask(t.getManagementTaskId());
+                managementTaskService.retryTask(recoveryTask.getManagementTaskId());
             } catch (com.comicatlas.api.common.exception.BusinessException e) {
                 log.warn("统一恢复任务重试跳过（非终态）: managementTaskId={}, error={}",
-                        t.getManagementTaskId(), e.getMessage());
+                        recoveryTask.getManagementTaskId(), e.getMessage());
             }
         }
 
-        Long taskId = t.getId();
+        Long taskId = recoveryTask.getId();
         TransactionSynchronizationManager.registerSynchronization(
             new TransactionSynchronization() {
                 @Override
@@ -128,27 +128,27 @@ public class RecoveryTaskServiceImpl implements RecoveryTaskService {
             });
 
         log.info("恢复任务重试: taskId={}", taskId);
-        return toVO(t);
+        return toVO(recoveryTask);
     }
 
     @Override
     @Transactional
     public void updateTask(RecoveryTaskVO vo) {
-        RecoveryTask t = recoveryTaskMapper.selectById(vo.getId());
-        if (t == null) return;
+        RecoveryTask recoveryTask = recoveryTaskMapper.selectById(vo.getId());
+        if (recoveryTask == null) return;
 
-        if (vo.getStatus() != null) t.setStatus(vo.getStatus());
-        if (vo.getTotalComics() != null) t.setTotalComics(vo.getTotalComics());
-        if (vo.getRecoveredComics() != null) t.setRecoveredComics(vo.getRecoveredComics());
-        if (vo.getSkippedComics() != null) t.setSkippedComics(vo.getSkippedComics());
-        if (vo.getPlaceholderComics() != null) t.setPlaceholderComics(vo.getPlaceholderComics());
-        if (vo.getErrorComics() != null) t.setErrorComics(vo.getErrorComics());
-        if (vo.getErrorMessage() != null) t.setErrorMessage(vo.getErrorMessage());
-        if (vo.getErrorDetails() != null) t.setErrorDetails(vo.getErrorDetails());
-        if (vo.getStartedAt() != null) t.setStartedAt(vo.getStartedAt());
-        if (vo.getEndedAt() != null) t.setEndedAt(vo.getEndedAt());
+        if (vo.getStatus() != null) recoveryTask.setStatus(vo.getStatus());
+        if (vo.getTotalComics() != null) recoveryTask.setTotalComics(vo.getTotalComics());
+        if (vo.getRecoveredComics() != null) recoveryTask.setRecoveredComics(vo.getRecoveredComics());
+        if (vo.getSkippedComics() != null) recoveryTask.setSkippedComics(vo.getSkippedComics());
+        if (vo.getPlaceholderComics() != null) recoveryTask.setPlaceholderComics(vo.getPlaceholderComics());
+        if (vo.getErrorComics() != null) recoveryTask.setErrorComics(vo.getErrorComics());
+        if (vo.getErrorMessage() != null) recoveryTask.setErrorMessage(vo.getErrorMessage());
+        if (vo.getErrorDetails() != null) recoveryTask.setErrorDetails(vo.getErrorDetails());
+        if (vo.getStartedAt() != null) recoveryTask.setStartedAt(vo.getStartedAt());
+        if (vo.getEndedAt() != null) recoveryTask.setEndedAt(vo.getEndedAt());
 
-        recoveryTaskMapper.updateById(t);
+        recoveryTaskMapper.updateById(recoveryTask);
     }
 
     /**
@@ -167,21 +167,21 @@ public class RecoveryTaskServiceImpl implements RecoveryTaskService {
         return managementTaskService.createTask(mgmtReq, null, null);
     }
 
-    private RecoveryTaskVO toVO(RecoveryTask t) {
+    private RecoveryTaskVO toVO(RecoveryTask recoveryTask) {
         RecoveryTaskVO vo = new RecoveryTaskVO();
-        vo.setId(t.getId());
-        vo.setStatus(t.getStatus());
-        vo.setTotalComics(t.getTotalComics());
-        vo.setRecoveredComics(t.getRecoveredComics());
-        vo.setSkippedComics(t.getSkippedComics());
-        vo.setPlaceholderComics(t.getPlaceholderComics());
-        vo.setErrorComics(t.getErrorComics());
-        vo.setErrorMessage(t.getErrorMessage());
-        vo.setErrorDetails(t.getErrorDetails());
-        vo.setRetryCount(t.getRetryCount());
-        vo.setCreatedAt(t.getCreatedAt());
-        vo.setStartedAt(t.getStartedAt());
-        vo.setEndedAt(t.getEndedAt());
+        vo.setId(recoveryTask.getId());
+        vo.setStatus(recoveryTask.getStatus());
+        vo.setTotalComics(recoveryTask.getTotalComics());
+        vo.setRecoveredComics(recoveryTask.getRecoveredComics());
+        vo.setSkippedComics(recoveryTask.getSkippedComics());
+        vo.setPlaceholderComics(recoveryTask.getPlaceholderComics());
+        vo.setErrorComics(recoveryTask.getErrorComics());
+        vo.setErrorMessage(recoveryTask.getErrorMessage());
+        vo.setErrorDetails(recoveryTask.getErrorDetails());
+        vo.setRetryCount(recoveryTask.getRetryCount());
+        vo.setCreatedAt(recoveryTask.getCreatedAt());
+        vo.setStartedAt(recoveryTask.getStartedAt());
+        vo.setEndedAt(recoveryTask.getEndedAt());
         return vo;
     }
 }

@@ -41,8 +41,8 @@ public class MediaOperationEligibilityService {
 
         List<Chapter> chapters = chapterMapper.selectList(
                 new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
-        for (Chapter ch : chapters) {
-            ChapterOps ops = collectChapterAssetOps(ch.getId());
+        for (Chapter chapter : chapters) {
+            ChapterOps ops = collectChapterAssetOps(chapter.getId());
             anyLqWork |= ops.lqGenerateAllowed;
             anyLqReady |= ops.lqRegenerateAllowed;
             anyHqWork |= ops.hqDeleteAllowed;

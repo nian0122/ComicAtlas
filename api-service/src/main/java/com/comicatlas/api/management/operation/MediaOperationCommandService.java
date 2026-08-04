@@ -61,10 +61,10 @@ public class MediaOperationCommandService {
         TaskType op = regenerate ? TaskType.LQ_REGENERATE : TaskType.LQ_GENERATE;
 
         List<CreateManagementTaskRequest.TaskTarget> targets = new ArrayList<>();
-        for (Chapter ch : chapters) {
-            List<Media> eligible = eligibleLqPages(ch.getId(), regenerate);
+        for (Chapter chapter : chapters) {
+            List<Media> eligible = eligibleLqPages(chapter.getId(), regenerate);
             if (!eligible.isEmpty()) {
-                targets.add(target("CHAPTER", ch.getId(), op));
+                targets.add(target("CHAPTER", chapter.getId(), op));
             }
         }
         if (targets.isEmpty()) {
@@ -85,8 +85,8 @@ public class MediaOperationCommandService {
     }
 
     public OperationSubmitResult requestLqForChapter(Long chapterId, boolean regenerate) {
-        Chapter ch = chapterMapper.selectById(chapterId);
-        if (ch == null) {
+        Chapter chapter = chapterMapper.selectById(chapterId);
+        if (chapter == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在: " + chapterId);
         }
         TaskType op = regenerate ? TaskType.LQ_REGENERATE : TaskType.LQ_GENERATE;
@@ -134,12 +134,12 @@ public class MediaOperationCommandService {
                 new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
 
         List<CreateManagementTaskRequest.TaskTarget> targets = new ArrayList<>();
-        for (Chapter ch : chapters) {
-            if (!hasDeletableHq(ch.getId())) {
+        for (Chapter chapter : chapters) {
+            if (!hasDeletableHq(chapter.getId())) {
                 continue;
             }
-            validateHqDeletePrecondition(ch.getId());
-            targets.add(target("CHAPTER", ch.getId(), TaskType.HQ_DELETE));
+            validateHqDeletePrecondition(chapter.getId());
+            targets.add(target("CHAPTER", chapter.getId(), TaskType.HQ_DELETE));
         }
         if (targets.isEmpty()) {
             log.info("漫画 {} 无可删除 HQ 的章节，跳过", comicId);
@@ -159,8 +159,8 @@ public class MediaOperationCommandService {
     }
 
     public OperationSubmitResult requestHqDeleteForChapter(Long chapterId) {
-        Chapter ch = chapterMapper.selectById(chapterId);
-        if (ch == null) {
+        Chapter chapter = chapterMapper.selectById(chapterId);
+        if (chapter == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在: " + chapterId);
         }
         if (!hasDeletableHq(chapterId)) {
