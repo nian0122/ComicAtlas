@@ -95,7 +95,7 @@ public class HqDeleteHandler {
                     comicId, chapterId, freedBytes.get(), deletedCount.get());
         } catch (Exception e) {
             log.error("HQ 删除失败: comicId={}, chapterId={}", comicId, chapterId, e);
-            try { channel.basicReject(tag, false); } catch (Exception ignored) {}
+            try { channel.basicReject(tag, false); } catch (Exception ex) { log.warn("消息 reject 失败: tag={}", tag, ex); }
         }
     }
 }

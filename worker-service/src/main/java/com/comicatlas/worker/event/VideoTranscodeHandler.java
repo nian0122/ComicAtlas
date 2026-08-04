@@ -124,16 +124,13 @@ public class VideoTranscodeHandler {
                     pageId, comicId, e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName()));
             try {
                 channel.basicReject(tag, false);
-            } catch (Exception ignored) {
-                // ack/nack 失败不重试
-            }
+            } catch (Exception ex) { log.warn("消息 reject 失败: tag={}", tag, ex); }
         } finally {
             // 清理临时文件
             if (tempFile != null) {
                 try {
                     Files.deleteIfExists(tempFile);
-                } catch (Exception ignored) {
-                }
+                } catch (Exception ex) { log.warn("清理转码临时文件失败: {}", tempFile, ex); }
             }
         }
     }

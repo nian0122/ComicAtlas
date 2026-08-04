@@ -39,7 +39,7 @@ public class ImportTaskHandler {
 
         if (cancelHandler.isCancelled(taskId)) {
             log.info("Task cancelled, skipping: taskId={}", taskId);
-            try { channel.basicAck(tag, false); } catch (Exception ignored) {}
+            try { channel.basicAck(tag, false); } catch (Exception ex) { log.warn("消息 ack 失败: tag={}", tag, ex); }
             return;
         }
 
@@ -74,7 +74,7 @@ public class ImportTaskHandler {
             log.error("Import failed: taskId={}, type={}, elapsed={}ms",
                 taskId, failureType, System.currentTimeMillis() - start, e);
             publisher.publishStatus(taskId, "FAILED", 0, null, 0, 0);
-            try { channel.basicReject(tag, false); } catch (Exception ignored) {}
+            try { channel.basicReject(tag, false); } catch (Exception ex) { log.warn("消息 reject 失败: tag={}", tag, ex); }
         }
     }
 

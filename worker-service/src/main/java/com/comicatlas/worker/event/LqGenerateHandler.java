@@ -85,7 +85,7 @@ public class LqGenerateHandler {
         } catch (Exception e) {
             log.error("LQ 生成失败: comicId={}, chapterId={}, elapsed={}ms",
                     comicId, chapterId, System.currentTimeMillis() - start, e);
-            try { channel.basicReject(tag, false); } catch (Exception ignored) {}
+            try { channel.basicReject(tag, false); } catch (Exception ex) { log.warn("消息 reject 失败: tag={}", tag, ex); }
         }
     }
 
