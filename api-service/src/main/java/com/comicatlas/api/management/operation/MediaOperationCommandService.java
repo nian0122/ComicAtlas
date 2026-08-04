@@ -2,6 +2,7 @@ package com.comicatlas.api.management.operation;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.common.exception.ConflictException;
 import com.comicatlas.api.comic.entity.Chapter;
@@ -86,7 +87,7 @@ public class MediaOperationCommandService {
     public OperationSubmitResult requestLqForChapter(Long chapterId, boolean regenerate) {
         Chapter ch = chapterMapper.selectById(chapterId);
         if (ch == null) {
-            throw new BusinessException(404, "章节不存在: " + chapterId);
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在: " + chapterId);
         }
         TaskType op = regenerate ? TaskType.LQ_REGENERATE : TaskType.LQ_GENERATE;
 
@@ -160,7 +161,7 @@ public class MediaOperationCommandService {
     public OperationSubmitResult requestHqDeleteForChapter(Long chapterId) {
         Chapter ch = chapterMapper.selectById(chapterId);
         if (ch == null) {
-            throw new BusinessException(404, "章节不存在: " + chapterId);
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在: " + chapterId);
         }
         if (!hasDeletableHq(chapterId)) {
             log.info("章节 {} 无可删除 HQ，跳过", chapterId);
@@ -257,7 +258,7 @@ public class MediaOperationCommandService {
     public OperationSubmitResult requestTranscodeForMedia(Long mediaId) {
         Media media = mediaMapper.selectById(mediaId);
         if (media == null) {
-            throw new BusinessException(404, "媒体页不存在: " + mediaId);
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "媒体页不存在: " + mediaId);
         }
         if (!isTranscodeEligible(media)) {
             log.info("媒体页 {} 无需转码，跳过", mediaId);
@@ -300,7 +301,7 @@ public class MediaOperationCommandService {
     public OperationSubmitResult requestMetadataRefresh(Long comicId) {
         Comic comic = comicMapper.selectById(comicId);
         if (comic == null) {
-            throw new BusinessException(404, "漫画不存在: " + comicId);
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在: " + comicId);
         }
         ManagementTaskResponse task = createTask(TaskType.METADATA_REFRESH, "刷新元数据", "COMIC",
                 List.of(target("COMIC", comicId, TaskType.METADATA_REFRESH)));

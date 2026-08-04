@@ -18,6 +18,7 @@ import com.comicatlas.api.comic.entity.*;
 import com.comicatlas.common.event.MetadataRefreshEvent;
 import com.comicatlas.common.event.VideoMetadataFixRequestedEvent;
 import com.comicatlas.api.comic.mapper.*;
+import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
@@ -34,9 +35,13 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.File;
 import java.math.BigDecimal;
-import java.nio.file.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -72,19 +77,19 @@ public class AdminServiceImpl implements AdminService {
     @Transactional
     public ComicDeleteStats deleteComic(Long comicId, String mode) {
         if (!"DATABASE_ONLY".equals(mode) && !"DELETE_FILES".equals(mode)) {
-            throw new BusinessException(400, "不支持的模式: " + mode + "，当前支持 DATABASE_ONLY 和 DELETE_FILES");
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "不支持的模式: " + mode + "，当前支持 DATABASE_ONLY 和 DELETE_FILES");
         }
 
         Comic comic = comicMapper.selectById(comicId);
         if (comic == null) {
-            throw new BusinessException(404, "漫画不存在");
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在");
         }
 
         Long running = taskMapper.selectCount(new LambdaQueryWrapper<ImportTask>()
                 .eq(ImportTask::getComicId, comicId)
                 .in(ImportTask::getStatus, ACTIVE_STATUSES));
         if (running > 0) {
-            throw new BusinessException(409, "该漫画存在运行中的导入任务，请等待任务完成后再删除数据库记录。");
+            throw new BusinessException(HttpStatusCodes.CONFLICT, "该漫画存在运行中的导入任务，请等待任务完成后再删除数据库记录。");
         }
 
         // 统计待处理数量（不再先删 DB，删除重定向到统一任务管线 → 回收/永久清理）
@@ -241,10 +246,10 @@ public class AdminServiceImpl implements AdminService {
     public RefreshMetadataResult refreshMetadata(Long comicId) {
         Comic comic = comicMapper.selectById(comicId);
         if (comic == null) {
-            throw new BusinessException(404, "漫画不存在");
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在");
         }
         if (!"READY".equals(comic.getStatus())) {
-            throw new BusinessException(409, "漫画状态异常，当前状态: " + comic.getStatus());
+            throw new BusinessException(HttpStatusCodes.CONFLICT, "漫画状态异常，当前状态: " + comic.getStatus());
         }
 
         // CAS 锁：READY → REFRESHING
@@ -254,7 +259,7 @@ public class AdminServiceImpl implements AdminService {
                         .eq(Comic::getStatus, "READY")
                         .set(Comic::getStatus, "REFRESHING"));
         if (updated == 0) {
-            throw new BusinessException(409, "该漫画正在刷新中");
+            throw new BusinessException(HttpStatusCodes.CONFLICT, "该漫画正在刷新中");
         }
 
         long start = System.currentTimeMillis();

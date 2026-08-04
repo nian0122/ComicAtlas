@@ -7,6 +7,7 @@ import com.comicatlas.api.comic.entity.Media;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.mapper.MediaMapper;
+import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.common.exception.ConflictException;
 import com.comicatlas.api.common.storage.ApiStorageProperties;
@@ -78,7 +79,7 @@ public class TrashLifecycleService {
     public OperationSubmitResult trashComic(Long comicId, String idempotencyKey) {
         Comic comic = comicMapper.selectById(comicId);
         if (comic == null) {
-            throw new BusinessException(404, "漫画不存在: " + comicId);
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在: " + comicId);
         }
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {
             OperationSubmitResult existing = idempotencyHit(idempotencyKey, "comic-delete:" + comicId);
@@ -124,7 +125,7 @@ public class TrashLifecycleService {
     public OperationSubmitResult trashMedia(Long mediaId) {
         Media media = mediaMapper.selectById(mediaId);
         if (media == null) {
-            throw new BusinessException(404, "媒体不存在: " + mediaId);
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "媒体不存在: " + mediaId);
         }
         requireAllowed(policyService.forMedia(media.getStatus()), OperationPolicyService.OP_DELETE,
                 "媒体状态 " + media.getStatus() + " 不可回收");
@@ -150,7 +151,7 @@ public class TrashLifecycleService {
     public OperationSubmitResult restoreComic(Long comicId) {
         Comic comic = comicMapper.selectById(comicId);
         if (comic == null) {
-            throw new BusinessException(404, "漫画不存在: " + comicId);
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在: " + comicId);
         }
         requireAllowed(policyService.forComic(comic.getStatus()), OperationPolicyService.OP_RECOVER,
                 "漫画状态 " + comic.getStatus() + " 不可恢复");
@@ -179,7 +180,7 @@ public class TrashLifecycleService {
     public OperationSubmitResult restoreMedia(Long mediaId) {
         Media media = mediaMapper.selectById(mediaId);
         if (media == null) {
-            throw new BusinessException(404, "媒体不存在: " + mediaId);
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "媒体不存在: " + mediaId);
         }
         requireAllowed(policyService.forMedia(media.getStatus()), OperationPolicyService.OP_RECOVER,
                 "媒体状态 " + media.getStatus() + " 不可恢复");
@@ -197,7 +198,7 @@ public class TrashLifecycleService {
     public OperationSubmitResult purgeComic(Long comicId, String token) {
         Comic comic = comicMapper.selectById(comicId);
         if (comic == null) {
-            throw new BusinessException(404, "漫画不存在: " + comicId);
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在: " + comicId);
         }
         return purge("COMIC", comicId, token,
                 () -> {
@@ -230,7 +231,7 @@ public class TrashLifecycleService {
     public OperationSubmitResult purgeMedia(Long mediaId, String token) {
         Media media = mediaMapper.selectById(mediaId);
         if (media == null) {
-            throw new BusinessException(404, "媒体不存在: " + mediaId);
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "媒体不存在: " + mediaId);
         }
         return purge("MEDIA", mediaId, token,
                 () -> {
@@ -247,7 +248,7 @@ public class TrashLifecycleService {
     private OperationSubmitResult purge(String targetType, Long targetId, String token,
                                         Runnable precondition, TaskType op, String operation) {
         if (token == null || !PURGE_CONFIRM_TOKEN.equals(token)) {
-            throw new BusinessException(400, "二次确认 token 不匹配，必须为 " + PURGE_CONFIRM_TOKEN);
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "二次确认 token 不匹配，必须为 " + PURGE_CONFIRM_TOKEN);
         }
         precondition.run();
         Long manifestTaskId = findTrashTaskId(targetType, targetId);
@@ -510,7 +511,7 @@ public class TrashLifecycleService {
             case "COMIC" -> TaskType.COMIC_DELETE;
             case "CHAPTER" -> TaskType.CHAPTER_TRASH;
             case "MEDIA" -> TaskType.MEDIA_TRASH;
-            default -> throw new BusinessException(400, "未知目标类型: " + targetType);
+            default -> throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "未知目标类型: " + targetType);
         };
         List<ManagementTaskItem> items = itemMapper.selectList(new LambdaQueryWrapper<ManagementTaskItem>()
                 .eq(ManagementTaskItem::getTargetType, targetType)
@@ -524,7 +525,7 @@ public class TrashLifecycleService {
     private Chapter requireChapterInComic(Long comicId, Long chapterId) {
         Chapter ch = chapterMapper.selectById(chapterId);
         if (ch == null) {
-            throw new BusinessException(404, "章节不存在: " + chapterId);
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在: " + chapterId);
         }
         if (!ch.getComicId().equals(comicId)) {
             throw new ConflictException("章节不属于该漫画");
