@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.common.exception.ConflictException;
 import com.comicatlas.api.management.dto.CreateManagementTaskRequest;
@@ -217,7 +218,7 @@ public class ManagementTaskService {
     public ManagementTaskResponse getTask(Long taskId) {
         ManagementTask task = taskMapper.selectById(taskId);
         if (task == null) {
-            throw new BusinessException(404, "任务不存在: " + taskId);
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在: " + taskId);
         }
         return toResponse(task);
     }
@@ -228,7 +229,7 @@ public class ManagementTaskService {
     public List<ManagementTaskItemResponse> getTaskItems(Long taskId) {
         // 验证任务存在
         if (taskMapper.selectById(taskId) == null) {
-            throw new BusinessException(404, "任务不存在: " + taskId);
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在: " + taskId);
         }
         List<ManagementTaskItem> items = itemMapper.selectList(
                 new LambdaQueryWrapper<ManagementTaskItem>()
@@ -249,7 +250,7 @@ public class ManagementTaskService {
     public ManagementTaskResponse cancelTask(Long taskId) {
         ManagementTask task = taskMapper.selectById(taskId);
         if (task == null) {
-            throw new BusinessException(404, "任务不存在: " + taskId);
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在: " + taskId);
         }
 
         if (task.getStatus() == ManagementTaskStatus.CANCELLED) {
@@ -257,7 +258,7 @@ public class ManagementTaskService {
         }
 
         if (task.getStatus().isTerminal()) {
-            throw new BusinessException(400,
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST,
                     "任务 " + taskId + " 已处于终态 " + task.getStatus() + "，无法取消");
         }
 
@@ -298,11 +299,11 @@ public class ManagementTaskService {
     public ManagementTaskResponse retryTask(Long taskId) {
         ManagementTask task = taskMapper.selectById(taskId);
         if (task == null) {
-            throw new BusinessException(404, "任务不存在: " + taskId);
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在: " + taskId);
         }
 
         if (!task.getStatus().isTerminal()) {
-            throw new BusinessException(400,
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST,
                     "任务 " + taskId + " 处于 " + task.getStatus() + "，仅终态可重试");
         }
 
@@ -457,7 +458,7 @@ public class ManagementTaskService {
                                                         int attempt) {
         ManagementTaskItem item = itemMapper.selectById(itemId);
         if (item == null) {
-            throw new BusinessException(404, "任务项不存在: " + itemId);
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务项不存在: " + itemId);
         }
 
         // 旧 attempt 结果：不覆盖当前 attempt 状态

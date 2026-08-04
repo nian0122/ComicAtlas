@@ -6,6 +6,7 @@ import com.comicatlas.api.admin.dto.ComicStorageDTO;
 import com.comicatlas.api.admin.dto.ComicStorageQuery;
 import com.comicatlas.api.admin.service.StorageQueryService;
 import com.comicatlas.api.common.Result;
+import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.management.dto.OperationSubmitResult;
 import com.comicatlas.api.management.operation.MediaOperationCommandService;
 import lombok.RequiredArgsConstructor;
@@ -50,7 +51,7 @@ public class AdminStorageController {
     public Result<ComicStorageDTO> getComic(@PathVariable Long comicId) {
         ComicStorageDTO dto = storageQueryService.getComic(comicId);
         if (dto == null) {
-            return Result.fail(404, "漫画不存在");
+            return Result.fail(HttpStatusCodes.NOT_FOUND, "漫画不存在");
         }
         return Result.ok(dto);
     }

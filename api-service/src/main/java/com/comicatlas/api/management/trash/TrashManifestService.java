@@ -1,5 +1,6 @@
 package com.comicatlas.api.management.trash;
 
+import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.common.storage.ApiStorageProperties;
 import com.comicatlas.api.common.storage.ApiStorageRoot;
@@ -35,11 +36,11 @@ public class TrashManifestService {
     /** 清单目录：TRASH/{targetType}/{targetId}/{taskId} */
     public Path manifestDir(String targetType, Long targetId, Long taskId) {
         if (taskId == null) {
-            throw new BusinessException(400, "缺少 TRASH 清单任务 ID");
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "缺少 TRASH 清单任务 ID");
         }
         ApiStorageRoot trash = storageProperties.getRoots().get("TRASH");
         if (trash == null || !trash.isEnabled()) {
-            throw new BusinessException(500, "TRASH 存储根未配置");
+            throw new BusinessException(HttpStatusCodes.INTERNAL_ERROR, "TRASH 存储根未配置");
         }
         return trash.resolve(targetType + "/" + targetId + "/" + taskId);
     }
@@ -54,7 +55,7 @@ public class TrashManifestService {
             log.info("写入 TRASH 清单: {}", file);
             return manifest;
         } catch (IOException e) {
-            throw new BusinessException(500, "写入 TRASH 清单失败: " + e.getMessage());
+            throw new BusinessException(HttpStatusCodes.INTERNAL_ERROR, "写入 TRASH 清单失败: " + e.getMessage());
         }
     }
 
@@ -93,7 +94,7 @@ public class TrashManifestService {
             Files.createDirectories(dir);
             Files.writeString(dir.resolve(ACTUAL_FILE), toJson(actual), StandardCharsets.UTF_8);
         } catch (IOException e) {
-            throw new BusinessException(500, "写入 TRASH 实际结果失败: " + e.getMessage());
+            throw new BusinessException(HttpStatusCodes.INTERNAL_ERROR, "写入 TRASH 实际结果失败: " + e.getMessage());
         }
     }
 
@@ -101,7 +102,7 @@ public class TrashManifestService {
         try {
             return objectMapper.writeValueAsString(obj);
         } catch (Exception e) {
-            throw new BusinessException(500, "TRASH 清单序列化失败: " + e.getMessage());
+            throw new BusinessException(HttpStatusCodes.INTERNAL_ERROR, "TRASH 清单序列化失败: " + e.getMessage());
         }
     }
 }
