@@ -13,9 +13,15 @@ import org.springframework.stereotype.Service;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.File;
-import java.nio.file.*;
-import java.util.*;
-import java.util.stream.Collectors;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -72,7 +78,7 @@ public class FileService {
                 BufferedImage bi = ImageIO.read(dest.toFile());
                 page.put("width", bi != null ? bi.getWidth() : null);
                 page.put("height", bi != null ? bi.getHeight() : null);
-            } catch (Exception ignored) { }
+            } catch (Exception e) { log.warn("读取图片尺寸失败: {}", dest, e); }
             page.put("fileSize", Files.size(dest));
             pages.add(page);
             totalSize += Files.size(dest);

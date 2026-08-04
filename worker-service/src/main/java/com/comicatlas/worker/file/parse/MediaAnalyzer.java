@@ -53,7 +53,7 @@ public class MediaAnalyzer {
         boolean exists = Files.exists(file);
         long size = 0L;
         if (exists) {
-            try { size = Files.size(file); } catch (Exception e) { size = 0L; }
+            try { size = Files.size(file); } catch (Exception e) { log.warn("读取文件大小失败: {}", file, e); size = 0L; }
         }
         String name = file.getFileName().toString();
         String ext = extensionOf(name).toLowerCase();
@@ -81,7 +81,7 @@ public class MediaAnalyzer {
             return Optional.empty();
         }
         long size = 0L;
-        try { size = Files.size(videoFile); } catch (Exception ignored) { }
+        try { size = Files.size(videoFile); } catch (Exception e) { log.warn("读取视频文件大小失败: {}", videoFile, e); }
         return Optional.of(analyzeVideo(videoFile, name, ext, size));
     }
 
@@ -113,8 +113,7 @@ public class MediaAnalyzer {
                     while ((line = r.readLine()) != null) {
                         sb.append(line).append('\n');
                     }
-                } catch (IOException ignored) {
-                }
+                } catch (IOException e) { log.warn("ffprobe 读取器异常", e); }
             }, "ffprobe-reader");
             outputReader.start();
 
@@ -131,7 +130,7 @@ public class MediaAnalyzer {
             }
             return parseFfprobeJson(name, ext, size, sb.toString());
         } catch (Exception e) {
-            log.warn("ffprobe 读取 {} 失败: {}", file, e.toString());
+            log.warn("ffprobe 读取 {} 失败", file, e);
             return videoFallback(name, ext, size, "exception");
         }
     }
@@ -150,7 +149,7 @@ public class MediaAnalyzer {
             JsonNode fmt = root.path("format");
             String d = fmt.path("duration").asText(null);
             if (d != null && !d.isEmpty() && !"N/A".equals(d)) {
-                try { duration = new BigDecimal(d); } catch (Exception ignored) { /* 非数字忽略 */ }
+                try { duration = new BigDecimal(d); } catch (Exception e) { log.warn("解析视频时长失败: {}", d, e); }
             }
             for (JsonNode stream : root.path("streams")) {
                 String type = stream.path("codec_type").asText("");
