@@ -31,6 +31,7 @@ public class TransferService implements StorageService {
             switch (mode) {
                 case COPY -> Files.copy(source, targetPath, StandardCopyOption.REPLACE_EXISTING);
                 case MOVE -> safeMoveStrategy.move(source, targetPath);
+                default -> throw new IllegalArgumentException("未知搬运模式: " + mode);
             }
             log.info("transfer ({}): {} -> {}", mode, source, targetPath);
         } catch (IOException e) {

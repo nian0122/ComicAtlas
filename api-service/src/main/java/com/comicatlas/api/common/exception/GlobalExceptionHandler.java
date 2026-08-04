@@ -1,6 +1,7 @@
 package com.comicatlas.api.common.exception;
 
 import com.comicatlas.api.common.Result;
+import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.management.state.IllegalStateTransitionException;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
@@ -22,13 +23,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalStateTransitionException.class)
     public Result<?> handleIllegalStateTransition(IllegalStateTransitionException e) {
         log.warn("非法状态迁移: {}", e.getMessage());
-        return Result.fail(409, e.getMessage());
+        return Result.fail(HttpStatusCodes.CONFLICT, e.getMessage());
     }
 
     @ExceptionHandler(DuplicateKeyException.class)
     public Result<?> handleDuplicateKey(DuplicateKeyException e) {
         log.warn("数据重复: {}", e.getMessage());
-        return Result.fail(409, "数据已存在");
+        return Result.fail(HttpStatusCodes.CONFLICT, "数据已存在");
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -38,7 +39,7 @@ public class GlobalExceptionHandler {
                 .findFirst()
                 .orElse("验证失败");
         log.warn("验证异常: {}", message);
-        return Result.fail(400, message);
+        return Result.fail(HttpStatusCodes.BAD_REQUEST, message);
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
@@ -48,7 +49,7 @@ public class GlobalExceptionHandler {
                 .findFirst()
                 .orElse("验证失败");
         log.warn("参数验证异常: {}", message);
-        return Result.fail(400, message);
+        return Result.fail(HttpStatusCodes.BAD_REQUEST, message);
     }
 
     @ExceptionHandler(Exception.class)

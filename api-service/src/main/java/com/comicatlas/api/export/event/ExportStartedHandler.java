@@ -54,7 +54,8 @@ public class ExportStartedHandler {
             log.error("导出启动状态更新失败: taskId={}, comicId={}", taskId, comicId, e);
             try {
                 channel.basicReject(tag, false);
-            } catch (Exception ignored) {
+} catch (Exception ex) {
+                log.warn("消息 reject 失败: tag={}", tag, e);
             }
         }
     }

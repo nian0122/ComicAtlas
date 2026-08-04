@@ -48,8 +48,8 @@ public class MetadataRefreshHandler {
             log.error("metadata 刷新失败: comicId={}", event.comicId(), e);
             try {
                 channel.basicNack(tag, false, false);
-            } catch (Exception ignored) {
-                log.warn("basicNack 失败: comicId={}", event.comicId());
+            } catch (Exception ex) {
+                log.warn("消息 nack 失败: tag={}, comicId={}", tag, event.comicId(), ex);
             }
         }
     }

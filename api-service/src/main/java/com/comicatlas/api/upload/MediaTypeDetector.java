@@ -1,5 +1,6 @@
 package com.comicatlas.api.upload;
 
+import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.common.exception.BusinessException;
 import org.springframework.stereotype.Component;
 
@@ -30,19 +31,19 @@ public class MediaTypeDetector {
      */
     public String validateAndExtractExtension(String name) {
         if (name == null || name.isBlank()) {
-            throw new BusinessException(400, "文件名不能为空");
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "文件名不能为空");
         }
         String base = name.replace('\\', '/');
         if (base.contains("/") || base.contains("..") || base.indexOf('\0') >= 0) {
-            throw new BusinessException(400, "非法文件名: " + name);
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "非法文件名: " + name);
         }
         int dot = base.lastIndexOf('.');
         if (dot < 0 || dot == base.length() - 1) {
-            throw new BusinessException(400, "文件缺少扩展名: " + name);
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "文件缺少扩展名: " + name);
         }
         String ext = base.substring(dot + 1).toLowerCase(Locale.ROOT);
         if (!IMAGE_EXT.contains(ext) && !VIDEO_EXT.contains(ext)) {
-            throw new BusinessException(400, "不支持的扩展名: ." + ext);
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "不支持的扩展名: ." + ext);
         }
         return ext;
     }
@@ -52,12 +53,12 @@ public class MediaTypeDetector {
      */
     public void validateContentType(String contentType) {
         if (contentType == null || contentType.isBlank()) {
-            throw new BusinessException(400, "Content-Type 不能为空");
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "Content-Type 不能为空");
         }
         String ct = contentType.toLowerCase(Locale.ROOT).split(";")[0].trim();
         boolean ok = ct.startsWith("image/") || ct.startsWith("video/");
         if (!ok) {
-            throw new BusinessException(400, "不支持的 Content-Type: " + contentType);
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "不支持的 Content-Type: " + contentType);
         }
     }
 
@@ -72,12 +73,12 @@ public class MediaTypeDetector {
         byte[] head = readHead(file);
         String magicMediaType = classifyMagic(head);
         if (magicMediaType == null) {
-            throw new BusinessException(400, "无法识别文件内容（魔数校验失败）: " + file.getFileName());
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "无法识别文件内容（魔数校验失败）: " + file.getFileName());
         }
         boolean extImage = IMAGE_EXT.contains(ext);
         boolean extVideo = VIDEO_EXT.contains(ext);
         if (("IMAGE".equals(magicMediaType) && !extImage) || ("VIDEO".equals(magicMediaType) && !extVideo)) {
-            throw new BusinessException(400,
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST,
                     "文件扩展名与内容类型不一致: ." + ext + " vs " + magicMediaType.toLowerCase(Locale.ROOT));
         }
         String container = "VIDEO".equals(magicMediaType) ? ext : null;
@@ -104,7 +105,7 @@ public class MediaTypeDetector {
 
     private byte[] readHead(Path file) {
         if (!Files.exists(file)) {
-            throw new BusinessException(400, "暂存文件不存在: " + file.getFileName());
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "暂存文件不存在: " + file.getFileName());
         }
         try (InputStream in = Files.newInputStream(file)) {
             byte[] buf = new byte[16];
@@ -116,7 +117,7 @@ public class MediaTypeDetector {
             System.arraycopy(buf, 0, head, 0, n);
             return head;
         } catch (IOException e) {
-            throw new BusinessException(400, "读取暂存文件失败: " + file.getFileName());
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "读取暂存文件失败: " + file.getFileName());
         }
     }
 

@@ -3,6 +3,7 @@ package com.comicatlas.api.export.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.mapper.ComicMapper;
+import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.export.dto.ExportTaskVO;
 import com.comicatlas.api.export.entity.ExportTask;
@@ -41,10 +42,10 @@ public class ExportServiceImpl implements ExportService {
         // 1. 校验漫画存在且状态为 READY
         Comic comic = comicMapper.selectById(comicId);
         if (comic == null) {
-            throw new BusinessException(404, "漫画不存在");
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在");
         }
         if (!"READY".equals(comic.getStatus())) {
-            throw new BusinessException(400, "漫画状态不允许导出，当前状态: " + comic.getStatus());
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "漫画状态不允许导出，当前状态: " + comic.getStatus());
         }
 
         // 2. 幂等检查：已存在 PENDING/RUNNING 的导出任务则拒绝
@@ -52,7 +53,7 @@ public class ExportServiceImpl implements ExportService {
             .eq(ExportTask::getComicId, comicId)
             .and(w -> w.eq(ExportTask::getStatus, "PENDING").or().eq(ExportTask::getStatus, "RUNNING")));
         if (existing != null) {
-            throw new BusinessException(409, "该漫画已有进行中的导出任务，任务ID: " + existing.getId());
+            throw new BusinessException(HttpStatusCodes.CONFLICT, "该漫画已有进行中的导出任务，任务ID: " + existing.getId());
         }
 
         // 3. 创建 export_task
@@ -93,7 +94,7 @@ public class ExportServiceImpl implements ExportService {
     public ExportTaskVO getTask(Long taskId) {
         ExportTask task = exportTaskMapper.selectById(taskId);
         if (task == null) {
-            throw new BusinessException(404, "导出任务不存在");
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "导出任务不存在");
         }
         return toVO(task);
     }

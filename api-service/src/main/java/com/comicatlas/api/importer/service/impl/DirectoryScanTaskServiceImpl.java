@@ -1,5 +1,6 @@
 package com.comicatlas.api.importer.service.impl;
 
+import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.importer.dto.DirectoryScanTaskVO;
 import com.comicatlas.api.importer.entity.DirectoryScanTask;
@@ -38,7 +39,7 @@ public class DirectoryScanTaskServiceImpl implements DirectoryScanTaskService {
     @Transactional
     public DirectoryScanTaskVO createScanTask(String directoryPath) {
         if (directoryPath == null || directoryPath.isBlank()) {
-            throw new BusinessException(400, "请提供目录路径");
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "请提供目录路径");
         }
 
         DirectoryScanTask task = new DirectoryScanTask();
@@ -69,7 +70,7 @@ public class DirectoryScanTaskServiceImpl implements DirectoryScanTaskService {
     public DirectoryScanTaskVO getTaskDetail(Long id) {
         DirectoryScanTask task = scanTaskMapper.selectById(id);
         if (task == null) {
-            throw new BusinessException(404, "扫描任务不存在");
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "扫描任务不存在");
         }
         return toVO(task);
     }

@@ -118,7 +118,8 @@ public class VideoMetadataFixHandler {
                     comicId, System.currentTimeMillis() - start, e);
             try {
                 channel.basicReject(tag, false);
-            } catch (Exception ignored) {
+            } catch (Exception ex) {
+                log.warn("消息 reject 失败: tag={}", tag, ex);
             }
         }
     }

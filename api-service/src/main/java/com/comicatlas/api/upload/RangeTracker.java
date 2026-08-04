@@ -1,5 +1,8 @@
 package com.comicatlas.api.upload;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -8,6 +11,8 @@ import java.util.List;
  * 支持乱序、重复分片（重叠合并）与缺口检测。
  */
 public final class RangeTracker {
+
+    private static final Logger log = LoggerFactory.getLogger(RangeTracker.class);
 
     private RangeTracker() {}
 
@@ -95,8 +100,7 @@ public final class RangeTracker {
                 long s = Long.parseLong(part.substring(0, dash));
                 long e = Long.parseLong(part.substring(dash + 1));
                 if (s <= e) out.add(new long[]{s, e});
-            } catch (NumberFormatException ignored) {
-            }
+            } catch (NumberFormatException e) { log.warn("解析 range 段失败: {}", part, e); }
         }
         return out;
     }

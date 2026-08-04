@@ -54,7 +54,8 @@ public class VideoMetadataFixCompletedHandler {
             log.error("视频元数据修复失败: comicId={}", comicId, e);
             try {
                 channel.basicNack(tag, false, false);
-            } catch (Exception ignored) {
+} catch (Exception ex) {
+                log.warn("消息 nack 失败: tag={}", tag, e);
             }
         }
     }
