@@ -3,6 +3,7 @@ package com.comicatlas.api.importer.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.importer.dto.RecoveryTaskVO;
 import com.comicatlas.api.importer.entity.RecoveryTask;
@@ -41,7 +42,7 @@ public class RecoveryTaskServiceImpl implements RecoveryTaskService {
                 .in(RecoveryTask::getStatus, "RUNNING", "QUEUED")
         );
         if (runningCount > 0) {
-            throw new BusinessException(409, "已有恢复任务正在执行");
+            throw new BusinessException(HttpStatusCodes.CONFLICT, "已有恢复任务正在执行");
         }
 
         RecoveryTask task = new RecoveryTask();
@@ -84,7 +85,7 @@ public class RecoveryTaskServiceImpl implements RecoveryTaskService {
     public RecoveryTaskVO getTaskDetail(Long id) {
         RecoveryTask t = recoveryTaskMapper.selectById(id);
         if (t == null) {
-            throw new BusinessException(404, "任务不存在");
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在");
         }
         return toVO(t);
     }
@@ -94,10 +95,10 @@ public class RecoveryTaskServiceImpl implements RecoveryTaskService {
     public RecoveryTaskVO retryTask(Long id) {
         RecoveryTask t = recoveryTaskMapper.selectById(id);
         if (t == null) {
-            throw new BusinessException(404, "任务不存在");
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在");
         }
         if (!"FAILED".equals(t.getStatus())) {
-            throw new BusinessException(400, "仅 FAILED 状态可重试");
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "仅 FAILED 状态可重试");
         }
 
         t.setStatus("QUEUED");

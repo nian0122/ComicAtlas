@@ -16,6 +16,7 @@ import com.comicatlas.api.comic.service.ChapterManagementService;
 import com.comicatlas.api.management.state.ManagementStateMachine;
 import com.comicatlas.api.management.trash.TrashLifecycleService;
 import com.comicatlas.common.enums.ChapterLifecycleStatus;
+import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.common.exception.ConflictException;
 import lombok.RequiredArgsConstructor;
@@ -89,7 +90,7 @@ public class ChapterManagementServiceImpl implements ChapterManagementService {
     public ChapterVO renameChapter(Long comicId, Long chapterId, ChapterRenameRequest request) {
         Chapter ch = requireChapterInComic(comicId, chapterId);
         if (request.getTitle() == null && request.getChapterNo() == null) {
-            throw new BusinessException(400, "标题或编号至少提供一个");
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "标题或编号至少提供一个");
         }
         if (request.getTitle() != null) {
             ch.setTitle(request.getTitle());
@@ -201,14 +202,14 @@ public class ChapterManagementServiceImpl implements ChapterManagementService {
     private void requireComic(Long comicId) {
         Comic comic = comicMapper.selectById(comicId);
         if (comic == null) {
-            throw new BusinessException(404, "漫画不存在");
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在");
         }
     }
 
     private Catalog requireCatalogInComic(Long comicId, Long catalogId) {
         Catalog cat = catalogMapper.selectById(catalogId);
         if (cat == null) {
-            throw new BusinessException(404, "目录不存在");
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "目录不存在");
         }
         if (!cat.getComicId().equals(comicId)) {
             throw new ConflictException("目录不属于该漫画");
@@ -219,7 +220,7 @@ public class ChapterManagementServiceImpl implements ChapterManagementService {
     private Chapter requireChapterInComic(Long comicId, Long chapterId) {
         Chapter ch = chapterMapper.selectById(chapterId);
         if (ch == null) {
-            throw new BusinessException(404, "章节不存在");
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在");
         }
         if (!ch.getComicId().equals(comicId)) {
             throw new ConflictException("章节不属于该漫画");

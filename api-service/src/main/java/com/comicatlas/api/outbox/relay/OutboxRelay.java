@@ -75,10 +75,6 @@ public class OutboxRelay {
     /**
      * 手动触发轮询（供测试和管理 API 调用）。
      */
-    /**
-     * 手动触发轮询（供测试和管理 API 调用）。
-     */
-    // 去掉 @Scheduled，独立方法供手动调用
     public void relay() {
         if (batchSize <= 0) return;
 

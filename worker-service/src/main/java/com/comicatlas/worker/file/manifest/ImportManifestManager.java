@@ -61,7 +61,7 @@ public class ImportManifestManager {
         try (var stream = Files.walk(dir)) {
             stream.sorted(Comparator.reverseOrder())
                     .forEach(p -> {
-                        try { Files.deleteIfExists(p); } catch (IOException ignored) {}
+                        try { Files.deleteIfExists(p); } catch (IOException e) { log.warn("清理 manifest 文件失败: {}", p, e); }
                     });
         }
         log.info("恢复点已清理: {}", dir);

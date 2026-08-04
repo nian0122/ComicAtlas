@@ -1,6 +1,7 @@
 package com.comicatlas.api.upload;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.comic.entity.Chapter;
 import com.comicatlas.api.comic.entity.Comic;
@@ -77,25 +78,25 @@ public class UploadSessionService {
 
         List<CreateUploadSessionRequest.FileManifest> manifest = request.getFiles();
         if (manifest.size() > uploadProperties.getMaxFiles()) {
-            throw new BusinessException(400,
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST,
                     "文件数超出上限: " + manifest.size() + " > " + uploadProperties.getMaxFiles());
         }
         long totalBytes = 0;
         for (var fm : manifest) {
             if (fm.getSize() > uploadProperties.getMaxFileSize()) {
-                throw new BusinessException(400,
+                throw new BusinessException(HttpStatusCodes.BAD_REQUEST,
                         "文件 " + fm.getName() + " 超出单文件上限: " + fm.getSize() + " > "
                                 + uploadProperties.getMaxFileSize());
             }
             totalBytes += fm.getSize();
             if (fm.getSha256() == null || !fm.getSha256().matches("^[0-9a-fA-F]{64}$")) {
-                throw new BusinessException(400, "文件 " + fm.getName() + " SHA-256 格式非法");
+                throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "文件 " + fm.getName() + " SHA-256 格式非法");
             }
             mediaTypeDetector.validateContentType(fm.getContentType());
             mediaTypeDetector.validateAndExtractExtension(fm.getName());
         }
         if (totalBytes > uploadProperties.getMaxSessionSize()) {
-            throw new BusinessException(400,
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST,
                     "会话总大小超出上限: " + totalBytes + " > " + uploadProperties.getMaxSessionSize());
         }
         storageService.ensureEnoughFreeSpace(totalBytes);
@@ -150,22 +151,22 @@ public class UploadSessionService {
     private Chapter validateTarget(Long comicId, Long chapterId, Long replaceMediaId) {
         Comic comic = comicMapper.selectById(comicId);
         if (comic == null) {
-            throw new BusinessException(404, "漫画不存在: " + comicId);
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在: " + comicId);
         }
         if (Set.of("DELETED", "DELETING", "TRASHED", "PURGING", "RESTORING").contains(comic.getStatus())) {
-            throw new BusinessException(409, "漫画状态 " + comic.getStatus() + " 不允许上传媒体");
+            throw new BusinessException(HttpStatusCodes.CONFLICT, "漫画状态 " + comic.getStatus() + " 不允许上传媒体");
         }
         Chapter chapter = chapterMapper.selectById(chapterId);
         if (chapter == null || !chapter.getComicId().equals(comicId)) {
-            throw new BusinessException(404, "章节不存在或不属于该漫画: " + chapterId);
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在或不属于该漫画: " + chapterId);
         }
         if (replaceMediaId != null) {
             Media media = mediaMapper.selectById(replaceMediaId);
             if (media == null || !media.getChapterId().equals(chapterId)) {
-                throw new BusinessException(404, "替换目标媒体不存在或不属于该章节: " + replaceMediaId);
+                throw new BusinessException(HttpStatusCodes.NOT_FOUND, "替换目标媒体不存在或不属于该章节: " + replaceMediaId);
             }
             if (!"READY".equals(media.getStatus())) {
-                throw new BusinessException(409, "替换目标媒体状态 " + media.getStatus() + " 不允许替换");
+                throw new BusinessException(HttpStatusCodes.CONFLICT, "替换目标媒体状态 " + media.getStatus() + " 不允许替换");
             }
         }
         return chapter;
@@ -177,7 +178,7 @@ public class UploadSessionService {
         UploadSession session = sessionMapper.selectOne(
                 new LambdaQueryWrapper<UploadSession>().eq(UploadSession::getSessionId, sessionId));
         if (session == null) {
-            throw new BusinessException(404, "上传会话不存在: " + sessionId);
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "上传会话不存在: " + sessionId);
         }
         return session;
     }
@@ -224,7 +225,7 @@ public class UploadSessionService {
                         .eq(UploadFile::getSessionId, session.getId())
                         .eq(UploadFile::getFileId, fileId));
         if (file == null) {
-            throw new BusinessException(404, "会话中不存在文件: " + fileId);
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "会话中不存在文件: " + fileId);
         }
         long[] range = parseContentRange(contentRange, file.getSizeBytes());
         String merged = storageService.writeChunk(session, file,
@@ -240,26 +241,26 @@ public class UploadSessionService {
 
     private long[] parseContentRange(String contentRange, long declaredSize) {
         if (contentRange == null || !contentRange.startsWith("bytes ")) {
-            throw new BusinessException(400, "缺少或非法 Content-Range 头: " + contentRange);
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "缺少或非法 Content-Range 头: " + contentRange);
         }
         String spec = contentRange.substring("bytes ".length()).trim();
         int slash = spec.indexOf('/');
         if (slash <= 0) {
-            throw new BusinessException(400, "非法 Content-Range 头: " + contentRange);
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "非法 Content-Range 头: " + contentRange);
         }
         try {
             long start = Long.parseLong(spec.substring(0, slash).split("-")[0]);
             long end = Long.parseLong(spec.substring(0, slash).split("-")[1]);
             long total = Long.parseLong(spec.substring(slash + 1));
             if (total != declaredSize) {
-                throw new BusinessException(400, "Content-Range 总大小与清单不符: " + total + " != " + declaredSize);
+                throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "Content-Range 总大小与清单不符: " + total + " != " + declaredSize);
             }
             if (start < 0 || end < start || end >= total) {
-                throw new BusinessException(400, "非法 Content-Range: " + spec);
+                throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "非法 Content-Range: " + spec);
             }
             return new long[]{start, end, total};
         } catch (NumberFormatException e) {
-            throw new BusinessException(400, "非法 Content-Range 头: " + contentRange);
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "非法 Content-Range 头: " + contentRange);
         }
     }
 
@@ -269,11 +270,11 @@ public class UploadSessionService {
     public UploadCompleteResponse complete(String sessionId) {
         UploadSession session = getBySessionId(sessionId);
         if (!UploadSessionStatus.ACTIVE.name().equals(session.getStatus())) {
-            throw new BusinessException(409, "会话状态 " + session.getStatus() + " 不允许 complete");
+            throw new BusinessException(HttpStatusCodes.CONFLICT, "会话状态 " + session.getStatus() + " 不允许 complete");
         }
         List<UploadFile> files = filesOf(session);
         if (files.isEmpty()) {
-            throw new BusinessException(400, "会话为空，无文件可提交");
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "会话为空，无文件可提交");
         }
 
         List<MediaTypeDetector.Detection> detections = new ArrayList<>();
@@ -282,12 +283,12 @@ public class UploadSessionService {
             if (!RangeTracker.isFullyReceived(uf.getReceivedRanges(), uf.getSizeBytes())) {
                 List<long[]> missing = RangeTracker.missingRanges(uf.getReceivedRanges(), uf.getSizeBytes());
                 String miss = missing.stream().map(r -> r[0] + "-" + r[1]).collect(Collectors.joining(";"));
-                throw new BusinessException(400, "文件 " + uf.getFileId() + " 未完整接收，缺失区间: " + miss);
+                throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "文件 " + uf.getFileId() + " 未完整接收，缺失区间: " + miss);
             }
             Path staging = storageService.stagingPath(session, uf);
             String actualSha = computeSha256(staging);
             if (!uf.getSha256().equalsIgnoreCase(actualSha)) {
-                throw new BusinessException(400,
+                throw new BusinessException(HttpStatusCodes.BAD_REQUEST,
                         "文件 " + uf.getFileId() + " 总校验失败: 声明=" + uf.getSha256() + " 实际=" + actualSha);
             }
             String ext = mediaTypeDetector.validateAndExtractExtension(uf.getStorageName());
@@ -392,7 +393,7 @@ public class UploadSessionService {
             }
             return HexFormat.of().formatHex(md.digest());
         } catch (Exception e) {
-            throw new BusinessException(500, "计算文件 SHA-256 失败: " + e.getMessage());
+            throw new BusinessException(HttpStatusCodes.INTERNAL_ERROR, "计算文件 SHA-256 失败: " + e.getMessage());
         }
     }
 
@@ -405,7 +406,7 @@ public class UploadSessionService {
             return;
         }
         if (UploadSessionStatus.COMPLETED.name().equals(session.getStatus())) {
-            throw new BusinessException(409, "会话已 complete，无法取消");
+            throw new BusinessException(HttpStatusCodes.CONFLICT, "会话已 complete，无法取消");
         }
         storageService.deleteStagingDir(session);
         fileMapper.delete(new LambdaQueryWrapper<UploadFile>()

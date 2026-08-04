@@ -34,7 +34,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Slf4j
 @Component
@@ -126,9 +129,7 @@ public class ImportEventHandler {
         } else if (verObj != null) {
             try {
                 metadataVersion = Integer.parseInt(verObj.toString());
-            } catch (NumberFormatException ignored) {
-                // 解析失败时保持默认 2
-            }
+            } catch (NumberFormatException e) { log.warn("解析 metadata version 失败: {}", verObj, e); }
         }
 
         // 1. UPDATE comic

@@ -46,7 +46,8 @@ public class ManagementCommandDispatcher {
             publisher.failed(cmd, e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
             try {
                 channel.basicNack(tag, false, false);
-            } catch (Exception ignored) {
+            } catch (Exception ex) {
+                log.warn("消息 nack 失败: tag={}", tag, ex);
             }
         }
     }

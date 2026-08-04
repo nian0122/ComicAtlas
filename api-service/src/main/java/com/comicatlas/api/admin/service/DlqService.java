@@ -1,5 +1,6 @@
 package com.comicatlas.api.admin.service;
 
+import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.common.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -81,7 +82,7 @@ public class DlqService {
     private static DlqRoute requireRoute(String queueName) {
         DlqRoute route = DLQ_ROUTES.get(queueName);
         if (route == null) {
-            throw new BusinessException(400, "未知 DLQ: " + queueName);
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "未知 DLQ: " + queueName);
         }
         return route;
     }

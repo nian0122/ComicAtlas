@@ -14,9 +14,14 @@ import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.nio.file.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
@@ -64,7 +69,7 @@ public class DeleteHandler {
                 deleteTree(thumbsRoot.resolve(comicId.toString()), deletedDirs, deletedFiles);
             }
             if (metadataRoot != null) {
-                try { Files.deleteIfExists(metadataRoot.resolve(comicId + ".json")); } catch (Exception ignored) {}
+                try { Files.deleteIfExists(metadataRoot.resolve(comicId + ".json")); } catch (Exception e) { log.warn("删除时清理文件失败", e); }
             }
 
             var completed = new DeleteCompletedEvent(
@@ -77,7 +82,7 @@ public class DeleteHandler {
         } catch (Exception e) {
             log.error("Delete failed: comicId={}, elapsed={}ms",
                 comicId, System.currentTimeMillis() - start, e);
-            try { channel.basicReject(tag, false); } catch (Exception ignored) {}
+            try { channel.basicReject(tag, false); } catch (Exception ex) { log.warn("消息 reject 失败: tag={}", tag, ex); }
         }
     }
 

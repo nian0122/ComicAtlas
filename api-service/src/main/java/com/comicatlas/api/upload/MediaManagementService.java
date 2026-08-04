@@ -2,6 +2,7 @@ package com.comicatlas.api.upload;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.common.exception.ConflictException;
 import com.comicatlas.api.comic.entity.Chapter;
@@ -45,11 +46,11 @@ public class MediaManagementService {
     public MediaReorderResponse reorder(Long chapterId, MediaReorderRequest request) {
         Chapter chapter = chapterMapper.selectById(chapterId);
         if (chapter == null) {
-            throw new BusinessException(404, "章节不存在: " + chapterId);
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在: " + chapterId);
         }
         List<Long> mediaIds = request.getMediaIds();
         if (new HashSet<>(mediaIds).size() != mediaIds.size()) {
-            throw new BusinessException(400, "媒体列表存在重复项");
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "媒体列表存在重复项");
         }
         List<Media> existing = mediaMapper.selectList(
                 new LambdaQueryWrapper<Media>().eq(Media::getChapterId, chapterId));
@@ -59,7 +60,7 @@ public class MediaManagementService {
         }
         for (Long id : mediaIds) {
             if (!existingIds.contains(id)) {
-                throw new BusinessException(400, "媒体 " + id + " 不属于章节 " + chapterId);
+                throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "媒体 " + id + " 不属于章节 " + chapterId);
             }
         }
         if (existingIds.size() != mediaIds.size()) {

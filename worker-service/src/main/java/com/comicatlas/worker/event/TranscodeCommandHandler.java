@@ -150,7 +150,8 @@ public class TranscodeCommandHandler {
             if (tempFile != null) {
                 try {
                     Files.deleteIfExists(tempFile);
-                } catch (Exception ignored) {
+                } catch (Exception e) {
+                    log.warn("转码临时文件清理失败: pageId={}, tempFile={}", pageId, tempFile, e);
                 }
             }
         }

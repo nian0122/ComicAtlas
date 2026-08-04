@@ -1,6 +1,7 @@
 package com.comicatlas.api.comic.controller;
 
 import com.comicatlas.api.common.Result;
+import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.comic.dto.TagDTO;
 import com.comicatlas.api.comic.service.TagService;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +26,7 @@ public class TagController {
     public Result<TagDTO> createTag(@RequestBody Map<String, String> body) {
         String name = body.get("name");
         if (name == null || name.isBlank()) {
-            return Result.fail(400, "标签名称不能为空");
+            return Result.fail(HttpStatusCodes.BAD_REQUEST, "标签名称不能为空");
         }
         return Result.ok(tagService.createTag(name.trim()));
     }

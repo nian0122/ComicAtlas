@@ -62,7 +62,8 @@ public class ExportCompletedHandler {
             log.error("导出完成状态更新失败: taskId={}, comicId={}", taskId, comicId, e);
             try {
                 channel.basicReject(tag, false);
-            } catch (Exception ignored) {
+} catch (Exception ex) {
+                log.warn("消息 reject 失败: tag={}", tag, e);
             }
         }
     }

@@ -10,6 +10,7 @@ import com.comicatlas.api.comic.service.ComicListQueryService;
 import com.comicatlas.api.comic.service.ComicService;
 import com.comicatlas.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.common.enums.MediaLifecycleStatus;
+import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.common.exception.ConflictException;
 import com.comicatlas.api.common.storage.FileUrlResolver;
@@ -28,7 +29,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -59,7 +63,7 @@ public class ComicServiceImpl implements ComicService {
     @Override
     public ComicDetailVO getComicDetail(Long id) {
         Comic c = comicMapper.selectById(id);
-        if (c == null) throw new BusinessException(404, "漫画不存在");
+        if (c == null) throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在");
         return toDetailVO(c);
     }
 
@@ -67,7 +71,7 @@ public class ComicServiceImpl implements ComicService {
     @Transactional
     public ComicDetailVO createComic(CreateComicRequest request) {
         if (request.getTitle() == null || request.getTitle().isBlank()) {
-            throw new BusinessException(400, "标题必填");
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "标题必填");
         }
 
         Comic c = new Comic();
@@ -82,7 +86,7 @@ public class ComicServiceImpl implements ComicService {
         if (request.getCategoryId() != null) {
             Category category = categoryMapper.selectById(request.getCategoryId());
             if (category == null) {
-                throw new BusinessException(400, "分类不存在");
+                throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "分类不存在");
             }
             c.setCategoryId(category.getId());
             c.setCategory(category.getName());
@@ -93,7 +97,7 @@ public class ComicServiceImpl implements ComicService {
         if (request.getTagIds() != null && !request.getTagIds().isEmpty()) {
             List<Tag> tags = tagMapper.selectBatchIds(request.getTagIds());
             if (tags.size() != request.getTagIds().size()) {
-                throw new BusinessException(400, "部分标签不存在");
+                throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "部分标签不存在");
             }
             for (Long tagId : request.getTagIds()) {
                 ComicTag ct = new ComicTag();
@@ -110,10 +114,10 @@ public class ComicServiceImpl implements ComicService {
     @Transactional
     public ComicDetailVO updateComic(Long id, UpdateComicRequest request) {
         Comic c = comicMapper.selectById(id);
-        if (c == null) throw new BusinessException(404, "漫画不存在");
+        if (c == null) throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在");
 
         if (request.getVersion() == null) {
-            throw new BusinessException(400, "缺少 version");
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "缺少 version");
         }
         if (!request.getVersion().equals(c.getVersion())) {
             throw new ConflictException(
@@ -122,7 +126,7 @@ public class ComicServiceImpl implements ComicService {
 
         if (request.getTitle() != null) {
             if (request.getTitle().isBlank()) {
-                throw new BusinessException(400, "标题不能为空");
+                throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "标题不能为空");
             }
             c.setTitle(request.getTitle().trim());
         }
@@ -132,7 +136,7 @@ public class ComicServiceImpl implements ComicService {
         if (request.getCategoryId() != null) {
             Category category = categoryMapper.selectById(request.getCategoryId());
             if (category == null) {
-                throw new BusinessException(400, "分类不存在");
+                throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "分类不存在");
             }
             c.setCategoryId(category.getId());
             c.setCategory(category.getName());
@@ -151,7 +155,7 @@ public class ComicServiceImpl implements ComicService {
         com.comicatlas.api.management.dto.OperationSubmitResult result =
                 trashLifecycleService.trashComic(id, idempotencyKey);
         if (result.getTaskId() == null) {
-            throw new BusinessException(500, "回收任务创建失败");
+            throw new BusinessException(HttpStatusCodes.INTERNAL_ERROR, "回收任务创建失败");
         }
         catalogCacheInvalidator.evict(id);
         return managementTaskService.getTask(result.getTaskId());
@@ -161,14 +165,14 @@ public class ComicServiceImpl implements ComicService {
     public ChapterPageVO getChapterPages(Long comicId, Long chapterId) {
         Chapter ch = chapterMapper.selectById(chapterId);
         if (ch == null || !ch.getComicId().equals(comicId)) {
-            throw new BusinessException(404, "章节不存在");
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在");
         }
         Comic comic = comicMapper.selectById(comicId);
         if (comic == null || !"READY".equals(comic.getStatus())) {
-            throw new BusinessException(404, "漫画不存在或不可阅读");
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在或不可阅读");
         }
         if (!ChapterLifecycleStatus.READY.name().equals(ch.getStatus())) {
-            throw new BusinessException(404, "章节不存在或不可阅读");
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在或不可阅读");
         }
 
         var pages = mediaMapper.selectList(
@@ -229,7 +233,7 @@ public class ComicServiceImpl implements ComicService {
     @Override
     public ComicMetadataDTO getMetadata(Long id) {
         Comic c = comicMapper.selectById(id);
-        if (c == null) throw new BusinessException(404, "漫画不存在");
+        if (c == null) throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在");
 
         ComicMetadataDTO dto = new ComicMetadataDTO();
         dto.setTitle(c.getTitle());
@@ -242,7 +246,7 @@ public class ComicServiceImpl implements ComicService {
     @Override
     public ComicMetadataDTO updateMetadata(Long id, ComicMetadataUpdateDTO dto) {
         Comic c = comicMapper.selectById(id);
-        if (c == null) throw new BusinessException(404, "漫画不存在");
+        if (c == null) throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在");
 
         c.setTitle(dto.getTitle());
         c.setAuthor(dto.getAuthor());
@@ -250,7 +254,7 @@ public class ComicServiceImpl implements ComicService {
         if (dto.getCategoryId() != null) {
             Category category = categoryMapper.selectById(dto.getCategoryId());
             if (category == null) {
-                throw new BusinessException(400, "分类不存在");
+                throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "分类不存在");
             }
             c.setCategoryId(dto.getCategoryId());
             c.setCategory(category.getName());
@@ -268,7 +272,7 @@ public class ComicServiceImpl implements ComicService {
     @Override
     public List<Long> getComicTags(Long comicId) {
         Comic c = comicMapper.selectById(comicId);
-        if (c == null) throw new BusinessException(404, "漫画不存在");
+        if (c == null) throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在");
 
         return comicTagMapper.selectList(
                         new LambdaQueryWrapper<ComicTag>().eq(ComicTag::getComicId, comicId))
@@ -290,13 +294,13 @@ public class ComicServiceImpl implements ComicService {
     @Transactional
     public void updateComicTags(Long comicId, ComicTagUpdateDTO dto) {
         Comic c = comicMapper.selectById(comicId);
-        if (c == null) throw new BusinessException(404, "漫画不存在");
+        if (c == null) throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在");
 
         List<Long> tagIds = dto.getTagIds();
         if (tagIds != null && !tagIds.isEmpty()) {
             List<Tag> existingTags = tagMapper.selectBatchIds(tagIds);
             if (existingTags.size() != tagIds.size()) {
-                throw new BusinessException(400, "部分标签不存在");
+                throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "部分标签不存在");
             }
         }
 
@@ -383,7 +387,7 @@ public class ComicServiceImpl implements ComicService {
                 try {
                     Comic c = comicMapper.selectById(comicId);
                     if (c != null) title = c.getTitle();
-                } catch (Exception ignored) {}
+                } catch (Exception ex) { log.warn("批量更新时查询漫画标题失败: comicId={}", comicId, ex); }
                 failed.add(new BatchUpdateResultVO.FailedItem(comicId, title, "系统错误"));
             }
         }
