@@ -2,6 +2,7 @@ package com.comicatlas.api.comic.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.comicatlas.api.common.Result;
+import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.comic.dto.*;
 import com.comicatlas.api.comic.service.ComicService;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
@@ -85,7 +86,7 @@ public class ComicController {
     @PostMapping("/comics/batch/update")
     public Result<BatchUpdateResultVO> batchUpdate(@Valid @RequestBody BatchComicUpdateDTO dto) {
         if (dto.getCategoryId() == null && (dto.getAddTagIds() == null || dto.getAddTagIds().isEmpty())) {
-            return Result.fail(400, "至少需要提供 categoryId 或 addTagIds");
+            return Result.fail(HttpStatusCodes.BAD_REQUEST, "至少需要提供 categoryId 或 addTagIds");
         }
         return Result.ok(comicService.batchUpdate(dto));
     }

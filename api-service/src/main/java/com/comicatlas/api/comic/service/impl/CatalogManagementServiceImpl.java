@@ -12,6 +12,7 @@ import com.comicatlas.api.comic.mapper.CatalogMapper;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.service.CatalogManagementService;
+import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.common.exception.ConflictException;
 import lombok.RequiredArgsConstructor;
@@ -192,14 +193,14 @@ public class CatalogManagementServiceImpl implements CatalogManagementService {
     private void requireComic(Long comicId) {
         Comic comic = comicMapper.selectById(comicId);
         if (comic == null) {
-            throw new BusinessException(404, "漫画不存在");
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在");
         }
     }
 
     private Catalog requireCatalogInComic(Long comicId, Long catalogId) {
         Catalog cat = catalogMapper.selectById(catalogId);
         if (cat == null) {
-            throw new BusinessException(404, "目录不存在");
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "目录不存在");
         }
         if (!cat.getComicId().equals(comicId)) {
             throw new ConflictException("目录不属于该漫画");
