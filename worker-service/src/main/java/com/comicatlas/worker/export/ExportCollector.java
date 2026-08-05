@@ -1,6 +1,5 @@
 package com.comicatlas.worker.export;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.worker.entity.ExportCatalog;
 import com.comicatlas.worker.entity.ExportChapter;
 import com.comicatlas.worker.entity.ExportComic;
@@ -42,8 +41,7 @@ public class ExportCollector {
         }
 
         List<ExportChapter> chapters = chapterMapper.selectByComicIdOrderByGlobalOrder(comicId);
-        List<ExportCatalog> catalogs = catalogMapper.selectList(
-                new LambdaQueryWrapper<ExportCatalog>().eq(ExportCatalog::getComicId, comicId));
+        List<ExportCatalog> catalogs = catalogMapper.selectByComicId(comicId);
 
         List<Long> chapterIds = chapters.stream().map(ExportChapter::getId).toList();
         List<ExportMedia> allMedia = chapterIds.isEmpty() ? List.of() : mediaMapper.selectByComicId(comicId);

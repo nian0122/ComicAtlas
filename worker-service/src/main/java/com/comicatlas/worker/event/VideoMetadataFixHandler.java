@@ -1,6 +1,5 @@
 package com.comicatlas.worker.event;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.common.event.VideoMetadataFixCompletedEvent;
 import com.comicatlas.common.event.VideoMetadataFixRequestedEvent;
 import com.comicatlas.common.event.VideoMetadataFixResult;
@@ -46,13 +45,7 @@ public class VideoMetadataFixHandler {
         log.info("视频元数据修复开始: comicId={}", comicId);
 
         try {
-            List<ExportMedia> videos = exportMediaMapper.selectList(
-                    new LambdaQueryWrapper<ExportMedia>()
-                            .eq(ExportMedia::getMediaType, "VIDEO")
-                            .isNull(ExportMedia::getWidth)
-                            // 参数化 apply：避免字符串拼接 SQL，{0} 占位符注入参数
-                            .apply("chapter_id IN (SELECT id FROM chapter WHERE comic_id = {0})",
-                                    comicId));
+            List<ExportMedia> videos = exportMediaMapper.selectVideosMissingMetadataByComicId(comicId);
 
             if (videos.isEmpty()) {
                 log.info("无需修复的视频元数据: comicId={}", comicId);
