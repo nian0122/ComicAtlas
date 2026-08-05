@@ -5,6 +5,8 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.common.enums.ComicStatus;
+import com.comicatlas.api.common.enums.ImportTaskStatus;
+import com.comicatlas.api.common.enums.SourceType;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.export.entity.ExportTask;
 import com.comicatlas.api.export.mapper.ExportTaskMapper;
@@ -195,7 +197,7 @@ class UnifiedTaskCompatibilityIT {
         importEventHandler.handleTaskStatusChanged(stageEvent, mock(Channel.class), 1L);
 
         ImportTask after = importTaskMapper.selectById(it.getId());
-        assertThat(after.getStatus()).isEqualTo("DOWNLOADING");
+        assertThat(after.getStatus()).isEqualTo(ImportTaskStatus.PENDING);
 
         ManagementTask mt = managementTaskMapper.selectById(it.getManagementTaskId());
         assertThat(mt.getStage()).isEqualTo("DOWNLOADING");
@@ -217,7 +219,7 @@ class UnifiedTaskCompatibilityIT {
         importService.cancelTask(it.getId());
 
         ImportTask cancelled = importTaskMapper.selectById(it.getId());
-        assertThat(cancelled.getStatus()).isEqualTo("CANCELLED");
+        assertThat(cancelled.getStatus()).isEqualTo(ImportTaskStatus.CANCELLED);
 
         ManagementTaskResponse mt = managementTaskService.getTask(cancelled.getManagementTaskId());
         assertThat(mt.getStatus()).isEqualTo(ManagementTaskStatus.CANCELLED);
@@ -226,7 +228,7 @@ class UnifiedTaskCompatibilityIT {
         var lateStage = new TaskStatusChangedEvent(
                 UUID.randomUUID(), Instant.now(), cancelled.getId(), "DOWNLOADING", 80, null, 0, 0);
         importEventHandler.handleTaskStatusChanged(lateStage, mock(Channel.class), 1L);
-        assertThat(importTaskMapper.selectById(cancelled.getId()).getStatus()).isEqualTo("CANCELLED");
+        assertThat(importTaskMapper.selectById(cancelled.getId()).getStatus()).isEqualTo(ImportTaskStatus.CANCELLED);
 
         // 迟到 item 进度 → 忽略
         List<ManagementTaskItemResponse> items = managementTaskService.getTaskItems(cancelled.getManagementTaskId());
@@ -337,8 +339,8 @@ class UnifiedTaskCompatibilityIT {
 
         ImportTask it = new ImportTask();
         it.setComicId(comic.getId());
-        it.setSourceType("DIRECTORY");
-        it.setStatus("SUCCESS");
+        it.setSourceType(SourceType.REGISTER);
+        it.setStatus(ImportTaskStatus.SUCCESS);
         it.setProgress(100);
         importTaskMapper.insert(it);
 

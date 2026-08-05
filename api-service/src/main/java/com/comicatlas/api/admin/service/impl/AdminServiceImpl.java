@@ -21,6 +21,7 @@ import com.comicatlas.api.comic.mapper.*;
 import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.common.enums.HqStatus;
+import com.comicatlas.api.common.enums.ImportTaskStatus;
 import com.comicatlas.api.common.enums.LqStatus;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.common.storage.ApiStorageProperties;
@@ -68,7 +69,8 @@ public class AdminServiceImpl implements AdminService {
     private final ApiStorageProperties storageProperties;
 
     /** 未结束（活跃）的导入任务状态 */
-    private static final Set<String> ACTIVE_STATUSES = Set.of("PENDING", "PARSING", "IMPORTING");
+    private static final Set<ImportTaskStatus> ACTIVE_STATUSES =
+            Set.of(ImportTaskStatus.PENDING, ImportTaskStatus.PARSING, ImportTaskStatus.IMPORTING);
 
     @Override
     @Transactional

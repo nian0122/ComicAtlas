@@ -13,6 +13,7 @@ import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.common.enums.ComicStatus;
+import com.comicatlas.api.common.enums.ImportTaskStatus;
 import com.comicatlas.api.common.enums.SourceType;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.common.exception.ConflictException;
@@ -163,9 +164,9 @@ public class ImportServiceImpl implements ImportService {
         ImportTask task = new ImportTask();
         task.setComicId(comic.getId());
         task.setSourceRef(sourceRef);
-        task.setSourceType(sourceType);
+        task.setSourceType(toSourceType(sourceType));
         task.setSourcePath(sourcePath);
-        task.setStatus("PENDING");
+        task.setStatus(ImportTaskStatus.PENDING);
         taskMapper.insert(task);
 
         // 3. 同事务创建 management task（预创建 comic 与统一任务绑定）
@@ -187,8 +188,9 @@ public class ImportServiceImpl implements ImportService {
 
     @Override
     public IPage<ImportTaskVO> listTasks(Integer page, Integer size, String status, String batchId) {
+        ImportTaskStatus statusEnum = status != null ? parseImportStatus(status) : null;
         var wrapper = new LambdaQueryWrapper<ImportTask>()
-            .eq(status != null, ImportTask::getStatus, status)
+            .eq(statusEnum != null, ImportTask::getStatus, statusEnum)
             .eq(batchId != null, ImportTask::getBatchId, batchId)
             .orderByDesc(ImportTask::getCreatedAt);
         var p = new com.baomidou.mybatisplus.extension.plugins.pagination.Page<ImportTask>(page != null ? page : 1, size != null ? size : 20);
@@ -224,10 +226,10 @@ public class ImportServiceImpl implements ImportService {
 
                     ImportTask task = new ImportTask();
                     task.setComicId(comic.getId());
-                    task.setSourceType(sourceType);
+                    task.setSourceType(toSourceType(sourceType));
                     task.setSourcePath(path);
                     task.setBatchId(batchId);
-                    task.setStatus("PENDING");
+                    task.setStatus(ImportTaskStatus.PENDING);
                     taskMapper.insert(task);
 
                     // 同步建立统一任务并回填 management_task_id
@@ -281,7 +283,7 @@ public class ImportServiceImpl implements ImportService {
         if (t == null) throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在");
         ImportStatusVO vo = new ImportStatusVO();
         vo.setTaskId(t.getId());
-        vo.setStatus(t.getStatus());
+        vo.setStatus(statusName(t.getStatus()));
         vo.setProgress(t.getProgress());
         return vo;
     }
@@ -291,11 +293,10 @@ public class ImportServiceImpl implements ImportService {
     public void cancelTask(Long id) {
         ImportTask t = taskMapper.selectById(id);
         if (t == null) throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在");
-        String status = t.getStatus();
-        if ("SUCCESS".equals(status) || "FAILED".equals(status) || "CANCELLED".equals(status)) {
+        if (t.getStatus() != null && t.getStatus().isTerminal()) {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "终态任务不可取消");
         }
-        t.setStatus("CANCELLED");
+        t.setStatus(ImportTaskStatus.CANCELLED);
         taskMapper.updateById(t);
 
         Long taskId = t.getId();
@@ -334,8 +335,8 @@ public class ImportServiceImpl implements ImportService {
     public void retryTask(Long id) {
         ImportTask t = taskMapper.selectById(id);
         if (t == null) throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在");
-        String status = t.getStatus();
-        if (!"FAILED".equals(status) && !"CANCELLED".equals(status)) {
+        ImportTaskStatus taskStatus = t.getStatus();
+        if (taskStatus != ImportTaskStatus.FAILED && taskStatus != ImportTaskStatus.CANCELLED) {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "仅 FAILED/CANCELLED 状态可重试");
         }
 
@@ -351,7 +352,7 @@ public class ImportServiceImpl implements ImportService {
         catalogMapper.delete(new LambdaQueryWrapper<Catalog>().eq(Catalog::getComicId, comicId));
         catalogCacheInvalidator.evict(comicId);
 
-        t.setStatus("PENDING");
+        t.setStatus(ImportTaskStatus.PENDING);
         t.setRetryCount(t.getRetryCount() + 1);
         t.setErrorMessage(null);
         taskMapper.updateById(t);
@@ -365,7 +366,7 @@ public class ImportServiceImpl implements ImportService {
         }
 
         Long taskId = t.getId();
-        String sourceType = t.getSourceType();
+        String sourceType = t.getSourceType() == null ? null : t.getSourceType().name();
         String sourcePath = t.getSourcePath();
 
         // 同步统一任务：终态统一任务重置回 QUEUED（attempt 递增，失败/取消 item 重新入队）
@@ -448,15 +449,28 @@ public class ImportServiceImpl implements ImportService {
         return comic.getStatus() == null ? null : comic.getStatus().name();
     }
 
+    private static String statusName(ImportTaskStatus status) {
+        return status == null ? null : status.name();
+    }
+
+    private static ImportTaskStatus parseImportStatus(String status) {
+        if (status == null) return null;
+        try {
+            return ImportTaskStatus.valueOf(status);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
     private ImportTaskVO toVO(ImportTask t) {
         ImportTaskVO vo = new ImportTaskVO();
         vo.setId(t.getId());
         vo.setComicId(t.getComicId());
         vo.setSourceRef(t.getSourceRef());
-        vo.setSourceType(t.getSourceType());
+        vo.setSourceType(t.getSourceType() == null ? null : t.getSourceType().name());
         vo.setSourcePath(t.getSourcePath());
         vo.setBatchId(t.getBatchId());
-        vo.setStatus(t.getStatus());
+        vo.setStatus(statusName(t.getStatus()));
         vo.setProgress(t.getProgress());
         vo.setTotalPages(t.getTotalPages());
         vo.setDownloadedPages(t.getDownloadedPages());

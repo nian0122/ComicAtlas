@@ -6,6 +6,8 @@ import com.comicatlas.api.comic.mapper.CatalogMapper;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.mapper.MediaMapper;
+import com.comicatlas.api.common.enums.ImportTaskStatus;
+import com.comicatlas.api.common.enums.SourceType;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.common.storage.ApiStorageProperties;
 import com.comicatlas.api.common.storage.ApiStorageRoot;
@@ -109,16 +111,16 @@ class ImportServiceTest {
         ImportTask saved1 = new ImportTask();
         saved1.setId(200L);
         saved1.setComicId(100L);
-        saved1.setSourceType("DIRECTORY");
+        saved1.setSourceType(SourceType.REGISTER);
         saved1.setSourcePath("D:/manga/test/comic1");
-        saved1.setStatus("PENDING");
+        saved1.setStatus(ImportTaskStatus.PENDING);
 
         ImportTask saved2 = new ImportTask();
         saved2.setId(201L);
         saved2.setComicId(101L);
-        saved2.setSourceType("DIRECTORY");
+        saved2.setSourceType(SourceType.REGISTER);
         saved2.setSourcePath("D:/manga/test/comic2");
-        saved2.setStatus("PENDING");
+        saved2.setStatus(ImportTaskStatus.PENDING);
 
         when(taskMapper.selectById(200L)).thenReturn(saved1);
         when(taskMapper.selectById(201L)).thenReturn(saved2);
@@ -155,9 +157,9 @@ class ImportServiceTest {
         ImportTask saved = new ImportTask();
         saved.setId(200L);
         saved.setComicId(100L);
-        saved.setSourceType("DIRECTORY");
+        saved.setSourceType(SourceType.REGISTER);
         saved.setSourcePath("D:/manga/test/valid");
-        saved.setStatus("PENDING");
+        saved.setStatus(ImportTaskStatus.PENDING);
 
         when(taskMapper.selectById(200L)).thenReturn(saved);
 
@@ -218,12 +220,12 @@ class ImportServiceTest {
         ImportTask saved1 = new ImportTask();
         saved1.setId(200L);
         saved1.setComicId(100L);
-        saved1.setStatus("PENDING");
+        saved1.setStatus(ImportTaskStatus.PENDING);
 
         ImportTask saved2 = new ImportTask();
         saved2.setId(201L);
         saved2.setComicId(101L);
-        saved2.setStatus("PENDING");
+        saved2.setStatus(ImportTaskStatus.PENDING);
 
         when(taskMapper.selectById(200L)).thenReturn(saved1);
         when(taskMapper.selectById(201L)).thenReturn(saved2);
@@ -262,7 +264,7 @@ class ImportServiceTest {
         ImportTask saved = new ImportTask();
         saved.setId(200L);
         saved.setComicId(100L);
-        saved.setStatus("PENDING");
+        saved.setStatus(ImportTaskStatus.PENDING);
 
         when(taskMapper.selectById(200L)).thenReturn(saved);
 
@@ -278,7 +280,7 @@ class ImportServiceTest {
         ImportTask t = new ImportTask();
         t.setId(300L);
         t.setComicId(100L);
-        t.setStatus("PENDING");
+        t.setStatus(ImportTaskStatus.PENDING);
         when(taskMapper.selectById(300L)).thenReturn(t);
 
         @SuppressWarnings("unchecked")
@@ -301,8 +303,8 @@ class ImportServiceTest {
         ImportTask t = new ImportTask();
         t.setId(301L);
         t.setComicId(100L);
-        t.setStatus("FAILED");
-        t.setSourceType("DIRECTORY");
+        t.setStatus(ImportTaskStatus.FAILED);
+        t.setSourceType(SourceType.REGISTER);
         t.setSourcePath("D:/manga/test/comic");
         t.setRetryCount(0);
         when(taskMapper.selectById(301L)).thenReturn(t);
@@ -321,9 +323,9 @@ class ImportServiceTest {
         ImportTask task = new ImportTask();
         task.setId(10L);
         task.setComicId(20L);
-        task.setStatus("FAILED");
+        task.setStatus(ImportTaskStatus.FAILED);
         task.setRetryCount(0);
-        task.setSourceType("DIRECTORY");
+        task.setSourceType(SourceType.REGISTER);
         task.setSourcePath("D:/manga/test/retry");
         when(taskMapper.selectById(10L)).thenReturn(task);
         when(chapterMapper.selectList(any())).thenReturn(List.of());
