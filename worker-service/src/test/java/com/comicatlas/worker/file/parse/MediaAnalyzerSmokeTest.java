@@ -2,6 +2,7 @@ package com.comicatlas.worker.file.parse;
 
 import com.comicatlas.worker.config.WorkerConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -49,10 +50,17 @@ public class MediaAnalyzerSmokeTest {
 
         ObjectMapper om = new ObjectMapper();
 
+        // 独立实例化托管线程池，供 MediaAnalyzer 的 stdout 读取任务使用
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(2);
+        executor.setThreadNamePrefix("smoke-test-process-io-");
+        executor.initialize();
+
         // 用反射调用构造（因为 @Component 类没有公开构造）
         MediaAnalyzer analyzer = (MediaAnalyzer) Class.forName("com.comicatlas.worker.file.parse.MediaAnalyzer")
                 .getDeclaredConstructors()[0]
-                .newInstance(cfg, om);
+                .newInstance(cfg, om, executor);
 
         // ---- 场景 1: jpg → IMAGE with dimensions ----
         System.out.println("\n== Scenario 1: analyze(jpg) ==");
@@ -92,7 +100,7 @@ public class MediaAnalyzerSmokeTest {
         cfg.setFfprobePath(fakeScript.toString());
         MediaAnalyzer analyzer2 = (MediaAnalyzer) Class.forName("com.comicatlas.worker.file.parse.MediaAnalyzer")
                 .getDeclaredConstructors()[0]
-                .newInstance(cfg, om);
+                .newInstance(cfg, om, executor);
         System.out.println("\n== Scenario 4: analyze(mp4) with mock-ffprobe ==");
         ComicMetadata.MediaInfo mp4WithFfprobe = analyzer2.analyze(mp4);
         printInfo("mp4+ffprobe", mp4WithFfprobe);
@@ -120,7 +128,7 @@ public class MediaAnalyzerSmokeTest {
         cfg.setFfprobePath("");
         MediaAnalyzer analyzer3 = (MediaAnalyzer) Class.forName("com.comicatlas.worker.file.parse.MediaAnalyzer")
                 .getDeclaredConstructors()[0]
-                .newInstance(cfg, om);
+                .newInstance(cfg, om, executor);
         System.out.println("\n== Scenario 6: analyze(mp4) with empty ffprobe path ==");
         ComicMetadata.MediaInfo emptyFfprobe = analyzer3.analyze(mp4);
         printInfo("mp4+empty-ffprobe", emptyFfprobe);
