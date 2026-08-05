@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.Version;
+import com.comicatlas.common.enums.ChapterLifecycleStatus;
 
 /**
  * 章节实体。
@@ -24,8 +25,8 @@ public class Chapter {
     private Integer sortOrder;
     private Integer globalOrder;
 
-    /** 章节生命周期状态，默认 READY */
-    private String status;
+    /** 章节生命周期状态 */
+    private ChapterLifecycleStatus status;
 
     /** 进入 TRASHED 的时间（7 天保留期起点） */
     private LocalDateTime trashedAt;

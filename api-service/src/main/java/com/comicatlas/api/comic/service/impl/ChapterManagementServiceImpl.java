@@ -70,7 +70,7 @@ public class ChapterManagementServiceImpl implements ChapterManagementService {
                 ? "1" : request.getChapterNo());
         chapter.setGlobalOrder(maxGlobalOrder(comicId) + 1);
         chapter.setSortOrder(nextChapterSortOrder(comicId, catalogId));
-        chapter.setStatus(ChapterLifecycleStatus.READY.name());
+        chapter.setStatus(ChapterLifecycleStatus.READY);
         chapter.setVersion(1);
         try {
             chapterMapper.insert(chapter);
@@ -178,7 +178,8 @@ public class ChapterManagementServiceImpl implements ChapterManagementService {
     @Transactional
     public void trashChapter(Long comicId, Long chapterId) {
         Chapter chapter = requireChapterInComic(comicId, chapterId);
-        if (!ManagementStateMachine.canTransitionChapter(chapter.getStatus(), "TRASHING")) {
+        if (!ManagementStateMachine.canTransitionChapter(
+                chapter.getStatus() == null ? null : chapter.getStatus().name(), "TRASHING")) {
             throw new ConflictException("章节状态 " + chapter.getStatus() + " 不允许回收");
         }
         trashLifecycleService.trashChapter(comicId, chapterId);
