@@ -36,7 +36,8 @@ import java.util.stream.Stream;
 public class VideoNormalizer {
 
     private final WorkerConfig config;
-    private final ThreadPoolTaskExecutor executor;
+    private final ThreadPoolTaskExecutor transcodeExecutor;
+    private final ThreadPoolTaskExecutor processIoExecutor;
     private final int ffmpegThreads;
 
     private static final Set<String> NON_STANDARD_EXT = Set.of(
@@ -45,9 +46,11 @@ public class VideoNormalizer {
     );
 
     public VideoNormalizer(WorkerConfig config,
-                           @Qualifier("videoNormalizeExecutor") ThreadPoolTaskExecutor executor) {
+                           @Qualifier("videoNormalizeExecutor") ThreadPoolTaskExecutor transcodeExecutor,
+                           @Qualifier("processIoExecutor") ThreadPoolTaskExecutor processIoExecutor) {
         this.config = config;
-        this.executor = executor;
+        this.transcodeExecutor = transcodeExecutor;
+        this.processIoExecutor = processIoExecutor;
         this.ffmpegThreads = 2; // ffmpeg 转码线程固定 2，并行度由托管线程池控制
     }
 
@@ -77,14 +80,14 @@ public class VideoNormalizer {
         }
 
         log.info("发现 {} 个非标准视频，转码到临时目录 (并行度={}, ffmpeg线程={})",
-                files.size(), executor.getCorePoolSize(), ffmpegThreads);
+                files.size(), transcodeExecutor.getCorePoolSize(), ffmpegThreads);
 
         ConcurrentHashMap<Path, Path> transcoded = new ConcurrentHashMap<>(); // source → temp-mp4
         AtomicInteger failed = new AtomicInteger(0);
 
         List<Future<?>> futures = new ArrayList<>();
         for (Path file : files) {
-            futures.add(executor.submit(() ->
+            futures.add(transcodeExecutor.submit(() ->
                     transcodeToTemp(file, sourceDir, tempDir, transcoded, failed)));
         }
 
@@ -212,7 +215,7 @@ public class VideoNormalizer {
     private void transcode(Path input, Path output) throws Exception {
         String ffmpeg = config.resolveToolPath(config.getFfmpegPath()).toString();
         log.info("转码: {} → {} (并行度={}, 线程={})",
-                input.getFileName(), output.getFileName(), executor.getCorePoolSize(), ffmpegThreads);
+                input.getFileName(), output.getFileName(), transcodeExecutor.getCorePoolSize(), ffmpegThreads);
 
         List<String> cmd = List.of(
                 ffmpeg,
@@ -243,7 +246,7 @@ public class VideoNormalizer {
             } catch (IOException e) {
                 log.warn("读取 ffmpeg 输出失败: {}", e.getMessage());
             }
-        }, executor);
+        }, processIoExecutor);
 
         int exitCode = process.waitFor();
 
