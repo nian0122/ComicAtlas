@@ -19,7 +19,7 @@ public final class ImageDimensionsReader {
     public static int[] read(Path file) {
         try {
             byte[] buf = Files.readAllBytes(file);
-            if (buf.length < 24) return EMPTY;
+            if (buf.length < 24) { return EMPTY; }
             return parse(buf);
         } catch (IOException e) {
             return EMPTY;
@@ -29,7 +29,7 @@ public final class ImageDimensionsReader {
     private static final int[] EMPTY = new int[]{0, 0};
 
     static int[] parse(byte[] buf) {
-        if (buf.length < 12) return EMPTY;
+        if (buf.length < 12) { return EMPTY; }
 
         // JPEG: FF D8 FF
         if ((buf[0] & 0xFF) == 0xFF && (buf[1] & 0xFF) == 0xD8) {
@@ -66,7 +66,7 @@ public final class ImageDimensionsReader {
         int len = buf.length;
         while (i < len - 9) {
             int b = buf[i] & 0xFF;
-            if (b != 0xFF) break;
+            if (b != 0xFF) { break; }
             int marker = buf[i + 1] & 0xFF;
             // SOF0, SOF1, SOF2 (baseline, extended, progressive)
             if (marker == 0xC0 || marker == 0xC1 || marker == 0xC2) {
@@ -75,7 +75,7 @@ public final class ImageDimensionsReader {
                 return w > 0 && h > 0 ? new int[]{w, h} : EMPTY;
             }
             // SOS marker (start of scan) — entropy-coded data follows, stop
-            if (marker == 0xDA) break;
+            if (marker == 0xDA) { break; }
             // Skip marker segment
             int segLen = readShortBE(buf, i + 2);
             i += 2 + segLen;
@@ -84,7 +84,7 @@ public final class ImageDimensionsReader {
     }
 
     private static int[] parseWebp(byte[] buf) {
-        if (buf.length < 30) return EMPTY;
+        if (buf.length < 30) { return EMPTY; }
         // VP8 (lossy): "VP8 " at offset 12
         if (buf[12] == 'V' && buf[13] == 'P' && buf[14] == '8' && buf[15] == ' ') {
             int w = readShortLE(buf, 26) & 0x3FFF;

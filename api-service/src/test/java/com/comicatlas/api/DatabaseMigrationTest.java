@@ -91,7 +91,7 @@ class DatabaseMigrationTest {
              ResultSet rs = s.executeQuery(
                      "SELECT version FROM flyway_schema_history ORDER BY installed_rank")) {
             List<String> list = new ArrayList<>();
-            while (rs.next()) list.add(rs.getString("version"));
+            while (rs.next()) { list.add(rs.getString("version")); }
             return list;
         } catch (Exception e) {
             throw new RuntimeException(e);

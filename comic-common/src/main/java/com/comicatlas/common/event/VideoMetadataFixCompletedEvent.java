@@ -12,8 +12,8 @@ public record VideoMetadataFixCompletedEvent(
     List<VideoMetadataFixResult> results
 ) implements ComicEvent {
     public VideoMetadataFixCompletedEvent {
-        if (eventId == null) eventId = UUID.randomUUID();
-        if (occurredAt == null) occurredAt = Instant.now();
-        if (results == null) results = Collections.emptyList();
+        if (eventId == null) { eventId = UUID.randomUUID(); }
+        if (occurredAt == null) { occurredAt = Instant.now(); }
+        if (results == null) { results = Collections.emptyList(); }
     }
 }

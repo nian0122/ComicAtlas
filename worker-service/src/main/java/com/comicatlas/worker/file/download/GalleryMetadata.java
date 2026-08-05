@@ -44,27 +44,27 @@ public record GalleryMetadata(
     ) {}
 
     private static long toLong(Object v) {
-        if (v instanceof Number n) return n.longValue();
-        if (v instanceof String s) return Long.parseLong(s);
+        if (v instanceof Number n) { return n.longValue(); }
+        if (v instanceof String s) { return Long.parseLong(s); }
         return 0L;
     }
 
     private static int toInt(Object v) {
-        if (v instanceof Number n) return n.intValue();
-        if (v instanceof String s) return Integer.parseInt(s);
+        if (v instanceof Number n) { return n.intValue(); }
+        if (v instanceof String s) { return Integer.parseInt(s); }
         return 0;
     }
 
     private static double toDouble(Object v) {
-        if (v instanceof Number n) return n.doubleValue();
-        if (v instanceof String s) return Double.parseDouble(s);
+        if (v instanceof Number n) { return n.doubleValue(); }
+        if (v instanceof String s) { return Double.parseDouble(s); }
         return 0.0;
     }
 
     @SuppressWarnings("unchecked")
     public static GalleryMetadata fromApiResponse(Object gmetadata) {
         Map<String, Object> m = (Map<String, Object>) gmetadata;
-        if (m.containsKey("error")) return null;
+        if (m.containsKey("error")) { return null; }
 
         List<Map<String, Object>> torrentsRaw = (List<Map<String, Object>>) m.getOrDefault("torrents", List.of());
         List<TorrentInfo> torrents = torrentsRaw.stream().map(t -> new TorrentInfo(

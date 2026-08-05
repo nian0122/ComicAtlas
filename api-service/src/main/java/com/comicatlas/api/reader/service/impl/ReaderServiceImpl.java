@@ -32,7 +32,7 @@ public class ReaderServiceImpl implements ReaderService {
     @Override
     public ReaderDTO getChapter(Long chapterId) {
         Chapter chapter = chapterMapper.selectById(chapterId);
-        if (chapter == null) throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在");
+        if (chapter == null) { throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在"); }
 
         Comic comic = comicMapper.selectById(chapter.getComicId());
         if (comic == null || comic.getStatus() != ComicStatus.READY) {

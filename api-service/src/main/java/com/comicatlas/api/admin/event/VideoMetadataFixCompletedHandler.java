@@ -38,12 +38,12 @@ public class VideoMetadataFixCompletedHandler {
                     log.warn("Media 不存在: pageId={}", result.pageId());
                     continue;
                 }
-                if (result.width() != null) media.setWidth(result.width());
-                if (result.height() != null) media.setHeight(result.height());
-                if (result.duration() != null) media.setDuration(result.duration());
-                if (result.container() != null) media.setContainer(result.container());
-                if (result.videoCodec() != null) media.setVideoCodec(result.videoCodec());
-                if (result.audioCodec() != null) media.setAudioCodec(result.audioCodec());
+                if (result.width() != null) { media.setWidth(result.width()); }
+                if (result.height() != null) { media.setHeight(result.height()); }
+                if (result.duration() != null) { media.setDuration(result.duration()); }
+                if (result.container() != null) { media.setContainer(result.container()); }
+                if (result.videoCodec() != null) { media.setVideoCodec(result.videoCodec()); }
+                if (result.audioCodec() != null) { media.setAudioCodec(result.audioCodec()); }
                 mediaMapper.updateById(media);
                 fixed++;
             }

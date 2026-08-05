@@ -138,10 +138,10 @@ class ComicManagementCrudIT {
 
     @AfterEach
     void tearDown() {
-        if (managementTaskItemMapper != null) managementTaskItemMapper.delete(new LambdaQueryWrapper<>());
-        if (managementTaskMapper != null) managementTaskMapper.delete(new LambdaQueryWrapper<>());
-        if (importTaskMapper != null) importTaskMapper.delete(new LambdaQueryWrapper<>());
-        if (comicMapper != null) comicMapper.delete(new LambdaQueryWrapper<>());
+        if (managementTaskItemMapper != null) { managementTaskItemMapper.delete(new LambdaQueryWrapper<>()); }
+        if (managementTaskMapper != null) { managementTaskMapper.delete(new LambdaQueryWrapper<>()); }
+        if (importTaskMapper != null) { importTaskMapper.delete(new LambdaQueryWrapper<>()); }
+        if (comicMapper != null) { comicMapper.delete(new LambdaQueryWrapper<>()); }
     }
 
     private static boolean checkDockerAvailable() {
@@ -340,8 +340,8 @@ class ComicManagementCrudIT {
                     MvcResult result = future.get();
                     JsonNode node = objectMapper.readTree(result.getResponse().getContentAsString());
                     int code = node.path("code").asInt();
-                    if (code == 200) ok++;
-                    else if (code == 409) conflict++;
+                    if (code == 200) { ok++; }
+                    else if (code == 409) { conflict++; }
                 }
                 assertThat(ok).isEqualTo(1);
                 assertThat(conflict).isEqualTo(1);

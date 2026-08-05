@@ -16,15 +16,15 @@ public class FileUrlResolver {
     private String urlPrefix;
 
     public String resolve(Media media) {
-        if (media.getHqRoot() == null || media.getHqPath() == null) return null;
-        if (!EXPOSED_ROOTS.contains(media.getHqRoot().toLowerCase())) return null;
+        if (media.getHqRoot() == null || media.getHqPath() == null) { return null; }
+        if (!EXPOSED_ROOTS.contains(media.getHqRoot().toLowerCase())) { return null; }
         return urlPrefix + "/" + media.getHqRoot().toLowerCase()
             + "/" + media.getHqPath().replace('\\', '/');
     }
 
     public String resolveLq(Media media) {
-        if (media.getLqRoot() == null || media.getLqPath() == null) return null;
-        if (!EXPOSED_ROOTS.contains(media.getLqRoot().toLowerCase())) return null;
+        if (media.getLqRoot() == null || media.getLqPath() == null) { return null; }
+        if (!EXPOSED_ROOTS.contains(media.getLqRoot().toLowerCase())) { return null; }
         return urlPrefix + "/" + media.getLqRoot().toLowerCase()
             + "/" + media.getLqPath().replace('\\', '/');
     }

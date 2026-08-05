@@ -25,7 +25,7 @@ public class StorageQueryServiceImpl implements StorageQueryService {
     @Override
     public List<ComicStorageDTO> listComics(ComicStorageQuery query, int page, int size) {
         List<ComicStorageDTO> list = storageMapper.selectComicStorageList(query, (page - 1) * size, size);
-        if (list.isEmpty()) return list;
+        if (list.isEmpty()) { return list; }
 
         List<Long> comicIds = list.stream().map(ComicStorageDTO::getComicId).toList();
         Map<Long, String> transcodeStatusMap = storageMapper.selectTranscodeStatusList(comicIds).stream()
@@ -47,7 +47,7 @@ public class StorageQueryServiceImpl implements StorageQueryService {
     @Override
     public ComicStorageDTO getComic(Long comicId) {
         ComicStorageDTO dto = storageMapper.selectComicStorageById(comicId);
-        if (dto == null) return null;
+        if (dto == null) { return null; }
         boolean isEmpty = dto.getPageCount() == null || dto.getPageCount() == 0;
         dto.setCoverUrl(fileUrlResolver.resolveCover(comicId));
         dto.setHqStatus(aggregateHqStatus(dto.getHqStatus(), isEmpty));
@@ -82,42 +82,42 @@ public class StorageQueryServiceImpl implements StorageQueryService {
     }
 
     private boolean matchesHqFilter(String status, String filter) {
-        if (filter == null || "ALL".equals(filter)) return true;
-        if ("HAS_HQ".equals(filter)) return "READY".equals(status) || "MIXED".equals(status);
-        if ("NO_HQ".equals(filter)) return "DELETED".equals(status);
+        if (filter == null || "ALL".equals(filter)) { return true; }
+        if ("HAS_HQ".equals(filter)) { return "READY".equals(status) || "MIXED".equals(status); }
+        if ("NO_HQ".equals(filter)) { return "DELETED".equals(status); }
         return true;
     }
 
     private boolean matchesLqFilter(String status, String filter) {
-        if (filter == null || "ALL".equals(filter)) return true;
-        if ("NEEDS_LQ".equals(filter)) return "NOT_GENERATED".equals(status) || "MIXED".equals(status);
-        if ("READY".equals(filter)) return "READY".equals(status);
+        if (filter == null || "ALL".equals(filter)) { return true; }
+        if ("NEEDS_LQ".equals(filter)) { return "NOT_GENERATED".equals(status) || "MIXED".equals(status); }
+        if ("READY".equals(filter)) { return "READY".equals(status); }
         return true;
     }
 
     private String aggregateHqStatus(String statuses, boolean isEmpty) {
-        if (isEmpty) return "EMPTY";
-        if (statuses == null || statuses.isEmpty()) return "DELETED";
+        if (isEmpty) { return "EMPTY"; }
+        if (statuses == null || statuses.isEmpty()) { return "DELETED"; }
         Set<String> set = Set.of(statuses.split(","));
-        if (set.size() == 1) return set.iterator().next();
+        if (set.size() == 1) { return set.iterator().next(); }
         return "MIXED";
     }
 
     private String aggregateLqStatus(String statuses, boolean isEmpty) {
-        if (isEmpty) return "EMPTY";
-        if (statuses == null || statuses.isEmpty()) return "NOT_GENERATED";
+        if (isEmpty) { return "EMPTY"; }
+        if (statuses == null || statuses.isEmpty()) { return "NOT_GENERATED"; }
         Set<String> set = Set.of(statuses.split(","));
-        if (set.size() == 1) return set.iterator().next();
+        if (set.size() == 1) { return set.iterator().next(); }
         return "MIXED";
     }
 
     private String aggregateTranscodeStatus(String statuses) {
-        if (statuses == null || statuses.isBlank()) return "NOT_NEEDED";
+        if (statuses == null || statuses.isBlank()) { return "NOT_NEEDED"; }
         Set<String> set = Set.of(statuses.split(","));
-        if (set.contains("PROCESSING")) return "PROCESSING";
-        if (set.contains("PENDING")) return "PENDING";
-        if (set.contains("FAILED")) return "FAILED";
-        if (set.size() == 1) return set.iterator().next();
+        if (set.contains("PROCESSING")) { return "PROCESSING"; }
+        if (set.contains("PENDING")) { return "PENDING"; }
+        if (set.contains("FAILED")) { return "FAILED"; }
+        if (set.size() == 1) { return set.iterator().next(); }
         return "MIXED";
     }
 }

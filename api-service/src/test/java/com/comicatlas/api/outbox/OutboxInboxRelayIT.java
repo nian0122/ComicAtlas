@@ -115,7 +115,7 @@ class OutboxInboxRelayIT {
         @Test @DisplayName("重复事件只处理一次")
         void dedup_processedOnce() {
             String eid = UUID.randomUUID().toString(); String h = sha256("{\"id\":1}");
-            for (int i=0; i<3; i++) { if (!inboxService.isProcessed(eid, h)) inboxService.markProcessed(eid, h); }
+            for (int i=0; i<3; i++) { if (!inboxService.isProcessed(eid, h)) { inboxService.markProcessed(eid, h); } }
             assertThat(inboxMapper.selectCount(new LambdaQueryWrapper<InboxReceipt>().eq(InboxReceipt::getEventId, eid))).isEqualTo(1);
         }
 
@@ -143,12 +143,12 @@ class OutboxInboxRelayIT {
     @Nested @DisplayName("Outbox 统计") class StatsTests {
         @Test @DisplayName("backlog/failed/total 计数正确")
         void stats_correct() {
-            for (int i=0; i<3; i++) outboxMapper.insert(new OutboxMessage().setEventId(UUID.randomUUID().toString())
+            for (int i=0; i<3; i++) { outboxMapper.insert(new OutboxMessage().setEventId(UUID.randomUUID().toString())
                 .setExchange("x").setRoutingKey("k").setEventType("T").setPayload("{}")
-                .setStatus("PENDING").setAvailableAt(LocalDateTime.now()).setCreatedAt(LocalDateTime.now()));
-            for (int i=0; i<2; i++) outboxMapper.insert(new OutboxMessage().setEventId(UUID.randomUUID().toString())
+                .setStatus("PENDING").setAvailableAt(LocalDateTime.now()).setCreatedAt(LocalDateTime.now())); }
+            for (int i=0; i<2; i++) { outboxMapper.insert(new OutboxMessage().setEventId(UUID.randomUUID().toString())
                 .setExchange("x").setRoutingKey("k").setEventType("T").setPayload("{}")
-                .setStatus("FAILED").setPublishAttempts(5).setAvailableAt(LocalDateTime.now()).setCreatedAt(LocalDateTime.now()));
+                .setStatus("FAILED").setPublishAttempts(5).setAvailableAt(LocalDateTime.now()).setCreatedAt(LocalDateTime.now())); }
 
             assertThat(outboxMapper.countPending()).isEqualTo(3);
             assertThat(outboxMapper.countFailed()).isEqualTo(2);
@@ -220,7 +220,7 @@ class OutboxInboxRelayIT {
                 for (int i = 0; i < 3; i++) {
                     outboxRelay.relay();
                     msg = outboxMapper.selectById(eid);
-                    if ("PUBLISHED".equals(msg.getStatus())) break;
+                    if ("PUBLISHED".equals(msg.getStatus())) { break; }
                     Thread.sleep(1000);
                 }
             }

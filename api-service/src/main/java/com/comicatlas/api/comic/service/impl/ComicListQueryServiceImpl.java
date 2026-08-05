@@ -160,7 +160,7 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
     }
 
     private static ComicLifecycleStatus toLifecycle(String status) {
-        if (status == null) return null;
+        if (status == null) { return null; }
         try {
             return ComicLifecycleStatus.valueOf(status);
         } catch (IllegalArgumentException e) {

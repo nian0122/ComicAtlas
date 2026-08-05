@@ -176,12 +176,12 @@ class TrashLifecycleIT {
 
     @AfterEach
     void tearDown() throws Exception {
-        if (itemMapper != null) itemMapper.delete(new LambdaQueryWrapper<>());
-        if (taskMapper != null) taskMapper.delete(new LambdaQueryWrapper<>());
-        if (historyMapper != null) historyMapper.delete(new LambdaQueryWrapper<>());
-        if (mediaMapper != null) mediaMapper.delete(new LambdaQueryWrapper<>());
-        if (chapterMapper != null) chapterMapper.delete(new LambdaQueryWrapper<>());
-        if (comicMapper != null) comicMapper.delete(new LambdaQueryWrapper<>());
+        if (itemMapper != null) { itemMapper.delete(new LambdaQueryWrapper<>()); }
+        if (taskMapper != null) { taskMapper.delete(new LambdaQueryWrapper<>()); }
+        if (historyMapper != null) { historyMapper.delete(new LambdaQueryWrapper<>()); }
+        if (mediaMapper != null) { mediaMapper.delete(new LambdaQueryWrapper<>()); }
+        if (chapterMapper != null) { chapterMapper.delete(new LambdaQueryWrapper<>()); }
+        if (comicMapper != null) { comicMapper.delete(new LambdaQueryWrapper<>()); }
         cleanDir(MANGA_ROOT.resolve("hq"));
         cleanDir(MANGA_ROOT.resolve("lq"));
         cleanDir(MANGA_ROOT.resolve("thumbs"));

@@ -157,20 +157,20 @@ class ReadingLifecycleCompatibilityIT {
 
     @AfterEach
     void tearDown() {
-        if (comicMapper == null) return;
-        if (managementTaskItemMapper != null) managementTaskItemMapper.delete(new LambdaQueryWrapper<>());
-        if (managementTaskMapper != null) managementTaskMapper.delete(new LambdaQueryWrapper<>());
-        if (importTaskMapper != null) importTaskMapper.delete(new LambdaQueryWrapper<>());
-        if (mediaMapper != null) mediaMapper.delete(new LambdaQueryWrapper<>());
-        if (chapterMapper != null) chapterMapper.delete(new LambdaQueryWrapper<>());
-        if (catalogMapper != null) catalogMapper.delete(new LambdaQueryWrapper<>());
-        if (readingHistoryMapper != null) readingHistoryMapper.delete(new LambdaQueryWrapper<>());
-        if (comicMapper != null) comicMapper.delete(new LambdaQueryWrapper<>());
+        if (comicMapper == null) { return; }
+        if (managementTaskItemMapper != null) { managementTaskItemMapper.delete(new LambdaQueryWrapper<>()); }
+        if (managementTaskMapper != null) { managementTaskMapper.delete(new LambdaQueryWrapper<>()); }
+        if (importTaskMapper != null) { importTaskMapper.delete(new LambdaQueryWrapper<>()); }
+        if (mediaMapper != null) { mediaMapper.delete(new LambdaQueryWrapper<>()); }
+        if (chapterMapper != null) { chapterMapper.delete(new LambdaQueryWrapper<>()); }
+        if (catalogMapper != null) { catalogMapper.delete(new LambdaQueryWrapper<>()); }
+        if (readingHistoryMapper != null) { readingHistoryMapper.delete(new LambdaQueryWrapper<>()); }
+        if (comicMapper != null) { comicMapper.delete(new LambdaQueryWrapper<>()); }
         // 清掉 catalog 缓存，避免跨测试残留
         try {
             if (cacheManager != null) {
                 Cache cache = cacheManager.getCache("comicCatalog");
-                if (cache != null) cache.clear();
+                if (cache != null) { cache.clear(); }
             }
         } catch (RuntimeException ignored) {
             // Redis 缓存清理失败不影响后续用例

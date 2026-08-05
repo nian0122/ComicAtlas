@@ -29,15 +29,15 @@ public final class RangeTracker {
      * 判断区间串是否完整覆盖 [0, size-1]。
      */
     public static boolean isFullyReceived(String ranges, long size) {
-        if (size <= 0) return false;
+        if (size <= 0) { return false; }
         List<long[]> list = parse(ranges);
-        if (list.isEmpty()) return false;
-        if (list.get(0)[0] != 0) return false;
+        if (list.isEmpty()) { return false; }
+        if (list.get(0)[0] != 0) { return false; }
         long expected = 0;
         for (long[] r : list) {
-            if (r[0] > expected) return false;
+            if (r[0] > expected) { return false; }
             expected = Math.max(expected, r[1] + 1);
-            if (expected >= size) return true;
+            if (expected >= size) { return true; }
         }
         return expected >= size;
     }
@@ -82,7 +82,7 @@ public final class RangeTracker {
     private static String serialize(List<long[]> ranges) {
         StringBuilder sb = new StringBuilder();
         for (long[] r : ranges) {
-            if (sb.length() > 0) sb.append(';');
+            if (sb.length() > 0) { sb.append(';'); }
             sb.append(r[0]).append('-').append(r[1]);
         }
         return sb.toString();
@@ -95,11 +95,11 @@ public final class RangeTracker {
         }
         for (String part : ranges.split(";")) {
             int dash = part.indexOf('-');
-            if (dash <= 0) continue;
+            if (dash <= 0) { continue; }
             try {
                 long s = Long.parseLong(part.substring(0, dash));
                 long e = Long.parseLong(part.substring(dash + 1));
-                if (s <= e) out.add(new long[]{s, e});
+                if (s <= e) { out.add(new long[]{s, e}); }
             } catch (NumberFormatException e) { LOG.warn("解析 range 段失败: {}", part, e); }
         }
         return out;

@@ -43,7 +43,7 @@ public class ApiStorageRoot {
      * 判断指定路径与此存储根是否在同一文件系统卷上。
      */
     public boolean sameFileStore(Path other) {
-        if (path == null || other == null) return false;
+        if (path == null || other == null) { return false; }
         try {
             return Files.getFileStore(path).equals(Files.getFileStore(other));
         } catch (Exception e) {

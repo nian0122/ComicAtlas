@@ -57,7 +57,7 @@ public class ImportManifestManager {
 
     public void delete(Path mangaRoot, Long taskId) throws IOException {
         Path dir = manifestPath(mangaRoot, taskId).getParent();
-        if (!Files.exists(dir)) return;
+        if (!Files.exists(dir)) { return; }
         try (var stream = Files.walk(dir)) {
             stream.sorted(Comparator.reverseOrder())
                     .forEach(p -> {

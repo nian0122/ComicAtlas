@@ -143,14 +143,14 @@ class UnifiedTaskCompatibilityIT {
 
     @AfterEach
     void tearDown() {
-        if (outboxMessageMapper != null) outboxMessageMapper.delete(new LambdaQueryWrapper<>());
-        if (inboxReceiptMapper != null) inboxReceiptMapper.delete(new LambdaQueryWrapper<>());
-        if (importTaskMapper != null) importTaskMapper.delete(new LambdaQueryWrapper<>());
-        if (recoveryTaskMapper != null) recoveryTaskMapper.delete(new LambdaQueryWrapper<>());
-        if (exportTaskMapper != null) exportTaskMapper.delete(new LambdaQueryWrapper<>());
-        if (directoryScanTaskMapper != null) directoryScanTaskMapper.delete(new LambdaQueryWrapper<>());
-        if (managementTaskMapper != null) managementTaskMapper.delete(new LambdaQueryWrapper<>());
-        if (comicMapper != null) comicMapper.delete(new LambdaQueryWrapper<>());
+        if (outboxMessageMapper != null) { outboxMessageMapper.delete(new LambdaQueryWrapper<>()); }
+        if (inboxReceiptMapper != null) { inboxReceiptMapper.delete(new LambdaQueryWrapper<>()); }
+        if (importTaskMapper != null) { importTaskMapper.delete(new LambdaQueryWrapper<>()); }
+        if (recoveryTaskMapper != null) { recoveryTaskMapper.delete(new LambdaQueryWrapper<>()); }
+        if (exportTaskMapper != null) { exportTaskMapper.delete(new LambdaQueryWrapper<>()); }
+        if (directoryScanTaskMapper != null) { directoryScanTaskMapper.delete(new LambdaQueryWrapper<>()); }
+        if (managementTaskMapper != null) { managementTaskMapper.delete(new LambdaQueryWrapper<>()); }
+        if (comicMapper != null) { comicMapper.delete(new LambdaQueryWrapper<>()); }
     }
 
     private static boolean checkDockerAvailable() {

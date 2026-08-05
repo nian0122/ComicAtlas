@@ -131,7 +131,7 @@ public class MediaAnalyzerSmokeTest {
         System.out.println("\n== Summary: " + (failures == 0 ? "ALL PASS" : (failures + " FAILURES")) + " ==");
         // 清理
         deleteRecursively(tmp);
-        if (failures > 0) System.exit(1);
+        if (failures > 0) { System.exit(1); }
     }
 
     private static void printInfo(String label, ComicMetadata.MediaInfo info) {
@@ -162,24 +162,24 @@ public class MediaAnalyzerSmokeTest {
     private static void assertEquals(Object expected, Object actual, String label) {
         boolean ok = (expected == null && actual == null) || (expected != null && expected.equals(actual));
         System.out.printf("  %s %s : expected=%s actual=%s%n", ok ? "OK" : "FAIL", label, expected, actual);
-        if (!ok) failures++;
+        if (!ok) { failures++; }
     }
 
     private static void assertNull(Object actual, String label) {
         boolean ok = (actual == null);
         System.out.printf("  %s %s : null? %s%n", ok ? "OK" : "FAIL", label, actual);
-        if (!ok) failures++;
+        if (!ok) { failures++; }
     }
 
     private static void assertTrue(boolean cond, String label) {
         System.out.printf("  %s %s : %s%n", cond ? "OK" : "FAIL", label, cond);
-        if (!cond) failures++;
+        if (!cond) { failures++; }
     }
 
     private static void assertNotNull(Object actual, String label) {
         boolean ok = (actual != null);
         System.out.printf("  %s %s : not-null? %s%n", ok ? "OK" : "FAIL", label, actual);
-        if (!ok) failures++;
+        if (!ok) { failures++; }
     }
 
     private static void deleteRecursively(Path dir) throws Exception {

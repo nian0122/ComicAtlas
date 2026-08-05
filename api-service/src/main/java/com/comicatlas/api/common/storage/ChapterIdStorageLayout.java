@@ -34,9 +34,9 @@ public class ChapterIdStorageLayout implements StorageLayout {
      * 从文件名提取扩展名（含点号）。
      */
     public static String extractExtension(String fileName) {
-        if (fileName == null || fileName.isBlank()) return "";
+        if (fileName == null || fileName.isBlank()) { return ""; }
         int dot = fileName.lastIndexOf('.');
-        if (dot < 0 || dot == fileName.length() - 1) return "";
+        if (dot < 0 || dot == fileName.length() - 1) { return ""; }
         return fileName.substring(dot).toLowerCase();
     }
 }

@@ -58,7 +58,7 @@ public class ImportTaskHandler {
                     zipHandler.importZip(ctx, taskId, comicId, mangaRoot);
                 }
                 case "REGISTER", "DIRECTORY" -> {
-                    if (normalizedPath == null) throw new IllegalArgumentException("DIRECTORY 需要 sourcePath");
+                    if (normalizedPath == null) { throw new IllegalArgumentException("DIRECTORY 需要 sourcePath"); }
                     ImportContext ctx = new ImportContext("DIRECTORY", Path.of(normalizedPath), false, false);
                     directoryHandler.handle(ctx, taskId, comicId, mangaRoot);
                 }
@@ -80,9 +80,9 @@ public class ImportTaskHandler {
 
     private String classifyFailure(Exception e) {
         String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
-        if (msg.contains("ZIP") || msg.contains("zip") || msg.contains("ZipEntry")) return "ZIP_ERROR";
-        if (msg.contains("parse") || msg.contains("Parse") || msg.contains("Directory")) return "PARSE_ERROR";
-        if (msg.contains("copy") || msg.contains("Copy") || msg.contains("store") || msg.contains("IO")) return "COPY_ERROR";
+        if (msg.contains("ZIP") || msg.contains("zip") || msg.contains("ZipEntry")) { return "ZIP_ERROR"; }
+        if (msg.contains("parse") || msg.contains("Parse") || msg.contains("Directory")) { return "PARSE_ERROR"; }
+        if (msg.contains("copy") || msg.contains("Copy") || msg.contains("store") || msg.contains("IO")) { return "COPY_ERROR"; }
         return "UNKNOWN_ERROR";
     }
 

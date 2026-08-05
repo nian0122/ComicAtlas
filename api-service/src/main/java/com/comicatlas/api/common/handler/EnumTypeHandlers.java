@@ -121,7 +121,7 @@ public class EnumTypeHandlers {
     // ======================== 安全解析 ========================
 
     private static <T extends Enum<T>> T safeValueOf(Class<T> clazz, String value) {
-        if (value == null) return null;
+        if (value == null) { return null; }
         try { return Enum.valueOf(clazz, value); } catch (IllegalArgumentException e) { return null; }
     }
 }

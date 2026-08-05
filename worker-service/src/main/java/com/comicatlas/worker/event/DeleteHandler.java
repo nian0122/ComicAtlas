@@ -88,7 +88,7 @@ public class DeleteHandler {
 
     private void moveToTrash(Path sourceDir, Path trashDir, StorageRoot sourceRoot, StorageRoot trashRoot)
             throws IOException {
-        if (!Files.exists(sourceDir)) return;
+        if (!Files.exists(sourceDir)) { return; }
         if (!sourceRoot.sameFileStore(trashRoot.getPath())) {
             log.warn("跨卷删除，跳过 TRASH 软删除直接清理: source={}, trash={}", sourceDir, trashDir);
             return;
@@ -103,15 +103,15 @@ public class DeleteHandler {
     }
 
     private void deleteTree(Path dir, AtomicInteger dirs, AtomicInteger files) throws Exception {
-        if (!Files.exists(dir)) return;
+        if (!Files.exists(dir)) { return; }
         try (var stream = Files.walk(dir)) {
             List<Path> paths = stream.sorted(Comparator.reverseOrder()).toList();
             List<String> failed = new ArrayList<>();
             for (Path p : paths) {
                 try {
                     Files.delete(p);
-                    if (Files.isDirectory(p)) dirs.incrementAndGet();
-                    else files.incrementAndGet();
+                    if (Files.isDirectory(p)) { dirs.incrementAndGet(); }
+                    else { files.incrementAndGet(); }
                 } catch (Exception e) {
                     failed.add(p.toString());
                 }

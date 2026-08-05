@@ -155,7 +155,7 @@ public class ImportServiceImpl implements ImportService {
             }
             case "ZIP", "REGISTER", "DIRECTORY" -> {
                 String path = sourcePath != null ? sourcePath : sourceRef;
-                if (path == null || path.isBlank()) throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "请提供 sourcePath");
+                if (path == null || path.isBlank()) { throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "请提供 sourcePath"); }
                 String name = Path.of(path).getFileName().toString();
                 name = name.contains(".") ? name.substring(0, name.lastIndexOf('.')) : name;
                 comic.setTitle(name);
@@ -278,14 +278,14 @@ public class ImportServiceImpl implements ImportService {
     @Override
     public ImportTaskVO getTaskDetail(Long id) {
         ImportTask t = taskMapper.selectById(id);
-        if (t == null) throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在");
+        if (t == null) { throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在"); }
         return toVO(t);
     }
 
     @Override
     public ImportStatusVO getTaskStatus(Long id) {
         ImportTask t = taskMapper.selectById(id);
-        if (t == null) throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在");
+        if (t == null) { throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在"); }
         ImportStatusVO vo = new ImportStatusVO();
         vo.setTaskId(t.getId());
         vo.setStatus(statusName(t.getStatus()));
@@ -297,7 +297,7 @@ public class ImportServiceImpl implements ImportService {
     @Transactional
     public void cancelTask(Long id) {
         ImportTask t = taskMapper.selectById(id);
-        if (t == null) throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在");
+        if (t == null) { throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在"); }
         if (t.getStatus() != null && t.getStatus().isTerminal()) {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "终态任务不可取消");
         }
@@ -339,7 +339,7 @@ public class ImportServiceImpl implements ImportService {
     @Transactional
     public void retryTask(Long id) {
         ImportTask t = taskMapper.selectById(id);
-        if (t == null) throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在");
+        if (t == null) { throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在"); }
         ImportTaskStatus taskStatus = t.getStatus();
         if (taskStatus != ImportTaskStatus.FAILED && taskStatus != ImportTaskStatus.CANCELLED) {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "仅 FAILED/CANCELLED 状态可重试");
@@ -441,8 +441,8 @@ public class ImportServiceImpl implements ImportService {
 
     /** 兼容历史 "DIRECTORY" 值：语义等同 REGISTER（本地目录导入）。 */
     private static SourceType toSourceType(String sourceType) {
-        if (sourceType == null) return null;
-        if ("DIRECTORY".equals(sourceType)) return SourceType.REGISTER;
+        if (sourceType == null) { return null; }
+        if ("DIRECTORY".equals(sourceType)) { return SourceType.REGISTER; }
         try {
             return SourceType.valueOf(sourceType);
         } catch (IllegalArgumentException e) {
@@ -464,7 +464,7 @@ public class ImportServiceImpl implements ImportService {
     }
 
     private static ImportTaskStatus parseImportStatus(String status) {
-        if (status == null) return null;
+        if (status == null) { return null; }
         try {
             return ImportTaskStatus.valueOf(status);
         } catch (IllegalArgumentException e) {

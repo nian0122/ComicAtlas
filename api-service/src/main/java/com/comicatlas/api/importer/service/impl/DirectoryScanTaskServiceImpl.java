@@ -97,7 +97,7 @@ public class DirectoryScanTaskServiceImpl implements DirectoryScanTaskService {
 
     public void applyResult(Long taskId, ScanResultVO result) {
         DirectoryScanTask task = scanTaskMapper.selectById(taskId);
-        if (task == null) return;
+        if (task == null) { return; }
         task.setStatus("SUCCESS");
         task.setTotalItems(result.total());
         try {
@@ -118,7 +118,7 @@ public class DirectoryScanTaskServiceImpl implements DirectoryScanTaskService {
 
     public void applyFailure(Long taskId, String errorMessage) {
         DirectoryScanTask task = scanTaskMapper.selectById(taskId);
-        if (task == null) return;
+        if (task == null) { return; }
         task.setStatus("FAILED");
         task.setErrorMessage(errorMessage);
         task.setEndedAt(LocalDateTime.now());

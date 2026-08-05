@@ -156,8 +156,8 @@ public final class ManagementStateMachine {
 
     private static boolean canTransition(Map<String, Set<String>> transitions,
                                           String current, String target) {
-        if (current == null || target == null) return false;
-        if (current.equals(target)) return true;
+        if (current == null || target == null) { return false; }
+        if (current.equals(target)) { return true; }
         Set<String> allowed = transitions.get(current);
         return allowed != null && allowed.contains(target);
     }

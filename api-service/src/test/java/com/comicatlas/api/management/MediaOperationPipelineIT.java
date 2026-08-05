@@ -167,13 +167,13 @@ class MediaOperationPipelineIT {
 
     private void cleanup() {
         try {
-            if (taskItemMapper != null) taskItemMapper.delete(new LambdaQueryWrapper<>());
-            if (taskMapper != null) taskMapper.delete(new LambdaQueryWrapper<>());
-            if (inboxMapper != null) inboxMapper.delete(new LambdaQueryWrapper<>());
-            if (outboxMapper != null) outboxMapper.delete(new LambdaQueryWrapper<>());
-            if (mediaMapper != null) mediaMapper.delete(new LambdaQueryWrapper<>());
-            if (chapterMapper != null) chapterMapper.delete(new LambdaQueryWrapper<>());
-            if (comicMapper != null) comicMapper.delete(new LambdaQueryWrapper<>());
+            if (taskItemMapper != null) { taskItemMapper.delete(new LambdaQueryWrapper<>()); }
+            if (taskMapper != null) { taskMapper.delete(new LambdaQueryWrapper<>()); }
+            if (inboxMapper != null) { inboxMapper.delete(new LambdaQueryWrapper<>()); }
+            if (outboxMapper != null) { outboxMapper.delete(new LambdaQueryWrapper<>()); }
+            if (mediaMapper != null) { mediaMapper.delete(new LambdaQueryWrapper<>()); }
+            if (chapterMapper != null) { chapterMapper.delete(new LambdaQueryWrapper<>()); }
+            if (comicMapper != null) { comicMapper.delete(new LambdaQueryWrapper<>()); }
         } catch (Exception ignored) {
         }
     }

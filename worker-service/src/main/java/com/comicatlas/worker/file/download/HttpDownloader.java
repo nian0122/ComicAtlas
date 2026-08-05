@@ -48,7 +48,7 @@ public class HttpDownloader implements DownloadStrategy {
     @Override
     public DownloadContext.DownloadResult download(String sourceRef, Path destDir) throws Exception {
         Matcher matcher = galleryPattern.matcher(sourceRef);
-        if (!matcher.find()) throw new IllegalArgumentException("Invalid e-hentai URL");
+        if (!matcher.find()) { throw new IllegalArgumentException("Invalid e-hentai URL"); }
         long gid = Long.parseLong(matcher.group(1));
         String token = matcher.group(2);
 
@@ -68,12 +68,12 @@ public class HttpDownloader implements DownloadStrategy {
      */
     public String getMagnetUri(String sourceRef) throws Exception {
         Matcher matcher = galleryPattern.matcher(sourceRef);
-        if (!matcher.find()) return null;
+        if (!matcher.find()) { return null; }
         long gid = Long.parseLong(matcher.group(1));
         String token = matcher.group(2);
 
         GalleryMetadata metadata = fetchMetadata(gid, token);
-        if (metadata == null || metadata.torrents().isEmpty()) return null;
+        if (metadata == null || metadata.torrents().isEmpty()) { return null; }
 
         return metadata.torrents().get(0).hash();
     }
@@ -92,7 +92,7 @@ public class HttpDownloader implements DownloadStrategy {
             .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
             .build();
         HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString());
-        if (resp.statusCode() != 200) return null;
+        if (resp.statusCode() != 200) { return null; }
 
         @SuppressWarnings("unchecked")
         Map<String, Object> result = objectMapper.readValue(resp.body(), Map.class);
