@@ -189,7 +189,7 @@ public class ComicServiceImpl implements ComicService {
         if (comic == null || comic.getStatus() != ComicStatus.READY) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在或不可阅读");
         }
-        if (!ChapterLifecycleStatus.READY.name().equals(chapter.getStatus())) {
+        if (chapter.getStatus() != ChapterLifecycleStatus.READY) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在或不可阅读");
         }
 

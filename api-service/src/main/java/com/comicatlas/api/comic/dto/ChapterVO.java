@@ -26,7 +26,7 @@ public class ChapterVO {
         vo.setPageCount(chapter.getPageCount());
         vo.setSortOrder(chapter.getSortOrder());
         vo.setGlobalOrder(chapter.getGlobalOrder());
-        vo.setStatus(chapter.getStatus());
+        vo.setStatus(chapter.getStatus() == null ? null : chapter.getStatus().name());
         return vo;
     }
 }

@@ -20,6 +20,7 @@ import com.comicatlas.api.outbox.service.InboxService;
 import com.comicatlas.api.reader.entity.ReadingHistory;
 import com.comicatlas.api.reader.mapper.ReadingHistoryMapper;
 import com.comicatlas.common.dto.TrashManifestActual;
+import com.comicatlas.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.common.enums.ManagementTaskStatus;
 import com.comicatlas.common.enums.MediaLifecycleStatus;
 import com.comicatlas.common.enums.TranscodeStatus;
@@ -273,8 +274,8 @@ public class ManagementCommandResultHandler {
      */
     private void applyChapterTrashCompleted(Long chapterId) {
         Chapter chapter = chapterMapper.selectById(chapterId);
-        if (chapter != null && !"DELETED".equals(chapter.getStatus())) {
-            chapter.setStatus("TRASHED");
+        if (chapter != null && chapter.getStatus() != ChapterLifecycleStatus.DELETED) {
+            chapter.setStatus(ChapterLifecycleStatus.TRASHED);
             chapter.setTrashedAt(LocalDateTime.now());
             chapterMapper.updateById(chapter);
             catalogCacheInvalidator.evict(chapter.getComicId());
@@ -328,8 +329,8 @@ public class ManagementCommandResultHandler {
 
     private void applyChapterRestoreCompleted(Long chapterId) {
         Chapter chapter = chapterMapper.selectById(chapterId);
-        if (chapter != null && "RESTORING".equals(chapter.getStatus())) {
-            chapter.setStatus("READY");
+        if (chapter != null && chapter.getStatus() == ChapterLifecycleStatus.RESTORING) {
+            chapter.setStatus(ChapterLifecycleStatus.READY);
             chapter.setTrashedAt(null);
             chapterMapper.updateById(chapter);
             catalogCacheInvalidator.evict(chapter.getComicId());
@@ -402,8 +403,8 @@ public class ManagementCommandResultHandler {
     private void applyChapterPurgeCompleted(Long chapterId) {
         mediaMapper.delete(new LambdaQueryWrapper<Media>().eq(Media::getChapterId, chapterId));
         Chapter chapter = chapterMapper.selectById(chapterId);
-        if (chapter != null && "PURGING".equals(chapter.getStatus())) {
-            chapter.setStatus("DELETED");
+        if (chapter != null && chapter.getStatus() == ChapterLifecycleStatus.PURGING) {
+            chapter.setStatus(ChapterLifecycleStatus.DELETED);
             chapterMapper.updateById(chapter);
             catalogCacheInvalidator.evict(chapter.getComicId());
         }
@@ -621,8 +622,9 @@ public class ManagementCommandResultHandler {
             }
             case "CHAPTER" -> {
                 Chapter chapter = chapterMapper.selectById(targetId);
-                if (chapter != null && ("RESTORING".equals(chapter.getStatus()) || "PURGING".equals(chapter.getStatus()))) {
-                    chapter.setStatus("TRASHED");
+                if (chapter != null && (chapter.getStatus() == ChapterLifecycleStatus.RESTORING
+                        || chapter.getStatus() == ChapterLifecycleStatus.PURGING)) {
+                    chapter.setStatus(ChapterLifecycleStatus.TRASHED);
                     chapterMapper.updateById(chapter);
                 }
             }
@@ -651,8 +653,8 @@ public class ManagementCommandResultHandler {
             }
             case "CHAPTER" -> {
                 Chapter chapter = chapterMapper.selectById(targetId);
-                if (chapter != null && "TRASHING".equals(chapter.getStatus())) {
-                    chapter.setStatus("READY");
+                if (chapter != null && chapter.getStatus() == ChapterLifecycleStatus.TRASHING) {
+                    chapter.setStatus(ChapterLifecycleStatus.READY);
                     chapter.setTrashedAt(null);
                     chapterMapper.updateById(chapter);
                 }

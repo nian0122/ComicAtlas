@@ -27,6 +27,7 @@ import com.comicatlas.api.management.state.ManagementStateMachine;
 import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.common.dto.TrashManifest;
 import com.comicatlas.common.dto.TrashManifestActual;
+import com.comicatlas.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.common.enums.MediaLifecycleStatus;
 import com.comicatlas.common.enums.TaskType;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
@@ -106,16 +107,18 @@ public class TrashLifecycleService {
     @Transactional
     public OperationSubmitResult trashChapter(Long comicId, Long chapterId) {
         Chapter chapter = requireChapterInComic(comicId, chapterId);
-        requireAllowed(policyService.forChapter(chapter.getStatus()), OperationPolicyService.OP_DELETE,
+        requireAllowed(policyService.forChapter(chapter.getStatus() == null ? null : chapter.getStatus().name()),
+                OperationPolicyService.OP_DELETE,
                 "章节状态 " + chapter.getStatus() + " 不可回收");
-        ManagementStateMachine.validateChapterTransition(chapter.getStatus(), "TRASHING");
+        ManagementStateMachine.validateChapterTransition(
+                chapter.getStatus() == null ? null : chapter.getStatus().name(), "TRASHING");
 
         String rel = comicId + "/" + chapter.getGlobalOrder();
         List<TrashManifest.Entry> entries = List.of(
                 entry("HQ", rel, "hq/" + rel),
                 entry("LQ", rel, "lq/" + rel));
 
-        chapter.setStatus("TRASHING");
+        chapter.setStatus(ChapterLifecycleStatus.TRASHING);
         chapterMapper.updateById(chapter);
         return createTrashTask("CHAPTER", chapterId, TaskType.CHAPTER_TRASH, "回收章节", entries,
                 null, null);
@@ -166,12 +169,14 @@ public class TrashLifecycleService {
     @Transactional
     public OperationSubmitResult restoreChapter(Long comicId, Long chapterId) {
         Chapter chapter = requireChapterInComic(comicId, chapterId);
-        requireAllowed(policyService.forChapter(chapter.getStatus()), OperationPolicyService.OP_RECOVER,
+        requireAllowed(policyService.forChapter(chapter.getStatus() == null ? null : chapter.getStatus().name()),
+                OperationPolicyService.OP_RECOVER,
                 "章节状态 " + chapter.getStatus() + " 不可恢复");
-        ManagementStateMachine.validateChapterTransition(chapter.getStatus(), "RESTORING");
+        ManagementStateMachine.validateChapterTransition(
+                chapter.getStatus() == null ? null : chapter.getStatus().name(), "RESTORING");
         Long manifestTaskId = findTrashTaskId("CHAPTER", chapterId);
 
-        chapter.setStatus("RESTORING");
+        chapter.setStatus(ChapterLifecycleStatus.RESTORING);
         chapterMapper.updateById(chapter);
         return createCommandTask("CHAPTER", chapterId, TaskType.CHAPTER_RESTORE, "恢复章节", manifestTaskId);
     }
@@ -217,11 +222,13 @@ public class TrashLifecycleService {
         Chapter chapter = requireChapterInComic(comicId, chapterId);
         return purge("CHAPTER", chapterId, token,
                 () -> {
-                    requireAllowed(policyService.forChapter(chapter.getStatus()), OperationPolicyService.OP_PURGE,
+                    requireAllowed(policyService.forChapter(chapter.getStatus() == null ? null : chapter.getStatus().name()),
+                            OperationPolicyService.OP_PURGE,
                             "章节状态 " + chapter.getStatus() + " 不可永久清理");
-                    ManagementStateMachine.validateChapterTransition(chapter.getStatus(), "PURGING");
+                    ManagementStateMachine.validateChapterTransition(
+                            chapter.getStatus() == null ? null : chapter.getStatus().name(), "PURGING");
                     checkRetention(chapter.getTrashedAt());
-                    chapter.setStatus("PURGING");
+                    chapter.setStatus(ChapterLifecycleStatus.PURGING);
                     chapterMapper.updateById(chapter);
                 },
                 TaskType.CHAPTER_PURGE, "永久清理章节");
@@ -321,8 +328,8 @@ public class TrashLifecycleService {
             }
             case "CHAPTER" -> {
                 Chapter chapter = chapterMapper.selectById(targetId);
-                if (chapter != null && "TRASHING".equals(chapter.getStatus())) {
-                    chapter.setStatus("TRASHED");
+                if (chapter != null && chapter.getStatus() == ChapterLifecycleStatus.TRASHING) {
+                    chapter.setStatus(ChapterLifecycleStatus.TRASHED);
                     chapter.setTrashedAt(LocalDateTime.now());
                     chapterMapper.updateById(chapter);
                     return true;
@@ -355,8 +362,8 @@ public class TrashLifecycleService {
             }
             case "CHAPTER" -> {
                 Chapter chapter = chapterMapper.selectById(targetId);
-                if (chapter != null && "TRASHING".equals(chapter.getStatus())) {
-                    chapter.setStatus("READY");
+                if (chapter != null && chapter.getStatus() == ChapterLifecycleStatus.TRASHING) {
+                    chapter.setStatus(ChapterLifecycleStatus.READY);
                     chapter.setTrashedAt(null);
                     chapterMapper.updateById(chapter);
                     return true;
@@ -404,7 +411,7 @@ public class TrashLifecycleService {
             }
             case "CHAPTER" -> {
                 Chapter chapter = chapterMapper.selectById(targetId);
-                yield chapter == null ? null : chapter.getStatus();
+                yield chapter == null || chapter.getStatus() == null ? null : chapter.getStatus().name();
             }
             case "MEDIA" -> {
                 Media media = mediaMapper.selectById(targetId);

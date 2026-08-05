@@ -15,6 +15,7 @@ import com.comicatlas.api.management.mapper.ManagementTaskItemMapper;
 import com.comicatlas.api.management.mapper.ManagementTaskMapper;
 import com.comicatlas.api.reader.entity.ReadingHistory;
 import com.comicatlas.api.reader.mapper.ReadingHistoryMapper;
+import com.comicatlas.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.common.enums.MediaLifecycleStatus;
 import com.comicatlas.common.enums.TaskType;
 import com.comicatlas.common.enums.TranscodeStatus;
@@ -319,7 +320,7 @@ class TrashLifecycleIT {
         makeComicReady(comicId);
 
         long trashTaskId = trashChapter(comicId, chapterId);
-        assertThat(chapterMapper.selectById(chapterId).getStatus()).isEqualTo("TRASHING");
+        assertThat(chapterMapper.selectById(chapterId).getStatus()).isEqualTo(ChapterLifecycleStatus.TRASHING);
         runTrash(chapterId, TaskType.CHAPTER_TRASH);
         awaitStatus("CHAPTER", chapterId, "TRASHED");
 
@@ -785,7 +786,7 @@ class TrashLifecycleIT {
             }
             case "CHAPTER" -> {
                 Chapter c = chapterMapper.selectById(targetId);
-                yield c == null ? "DELETED" : c.getStatus();
+                yield c == null ? "DELETED" : (c.getStatus() == null ? null : c.getStatus().name());
             }
             case "MEDIA" -> {
                 Media m = mediaMapper.selectById(targetId);

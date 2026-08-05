@@ -23,6 +23,7 @@ import com.comicatlas.api.outbox.entity.OutboxMessage;
 import com.comicatlas.api.outbox.mapper.InboxReceiptMapper;
 import com.comicatlas.api.outbox.mapper.OutboxMessageMapper;
 import com.comicatlas.api.outbox.relay.OutboxRelay;
+import com.comicatlas.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.common.enums.ManagementTaskStatus;
 import com.comicatlas.common.enums.MediaLifecycleStatus;
 import com.comicatlas.common.enums.TranscodeStatus;
@@ -482,7 +483,7 @@ class MediaOperationPipelineIT {
         ch.setChapterNo(String.valueOf(order));
         ch.setGlobalOrder(order);
         ch.setSortOrder(order);
-        ch.setStatus("READY");
+        ch.setStatus(ChapterLifecycleStatus.READY);
         ch.setPageCount(1);
         return ch;
     }

@@ -15,6 +15,7 @@ import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.common.enums.HqStatus;
 import com.comicatlas.api.common.enums.LqStatus;
+import com.comicatlas.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.common.enums.MediaLifecycleStatus;
 import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.api.comic.service.CatalogService;
@@ -223,7 +224,7 @@ class ReadingLifecycleCompatibilityIT {
         return c.getId();
     }
 
-    private Long insertChapter(Long comicId, int globalOrder, String chapterNo, String status) {
+    private Long insertChapter(Long comicId, int globalOrder, String chapterNo, ChapterLifecycleStatus status) {
         Chapter ch = new Chapter();
         ch.setComicId(comicId);
         ch.setTitle("章节-" + chapterNo);
@@ -254,7 +255,7 @@ class ReadingLifecycleCompatibilityIT {
     /** 创建一个 READY 漫画 + 1 个 READY 章节 + 2 张 READY 页 */
     private long[] createReadyComicWithChapterAndMedia() {
         Long comicId = insertComic("可读漫画-" + System.nanoTime(), ComicStatus.READY);
-        Long chapterId = insertChapter(comicId, 1, "1", "READY");
+        Long chapterId = insertChapter(comicId, 1, "1", ChapterLifecycleStatus.READY);
         insertMedia(chapterId, 1, comicId + "/" + chapterId + "/001.jpg", MediaLifecycleStatus.READY);
         insertMedia(chapterId, 2, comicId + "/" + chapterId + "/002.jpg", MediaLifecycleStatus.READY);
         return new long[]{comicId, chapterId};
@@ -292,7 +293,7 @@ class ReadingLifecycleCompatibilityIT {
                 ComicStatus.RESTORING, ComicStatus.PURGING, ComicStatus.DELETED);
             for (ComicStatus status : nonReadable) {
                 Long comicId = insertComic("HIDE-" + status, status);
-                Long chapterId = insertChapter(comicId, 1, "1", "READY");
+                Long chapterId = insertChapter(comicId, 1, "1", ChapterLifecycleStatus.READY);
                 insertMedia(chapterId, 1, comicId + "/1/001.jpg", MediaLifecycleStatus.READY);
 
                 // 删除期 reader / catalog 必须 404
@@ -356,8 +357,8 @@ class ReadingLifecycleCompatibilityIT {
         @DisplayName("TRASHED 章节从 catalog/reader 隐藏；READY 章节不受影响")
         void trashedChapter_hiddenFromCatalogAndReader() throws Exception {
             Long comicId = insertComic("TRASH-CH-COMIC", ComicStatus.READY);
-            Long chReady = insertChapter(comicId, 1, "1", "READY");
-            Long chTrashed = insertChapter(comicId, 2, "2", "TRASHED");
+            Long chReady = insertChapter(comicId, 1, "1", ChapterLifecycleStatus.READY);
+            Long chTrashed = insertChapter(comicId, 2, "2", ChapterLifecycleStatus.TRASHED);
             insertMedia(chReady, 1, comicId + "/1/001.jpg", MediaLifecycleStatus.READY);
             insertMedia(chTrashed, 1, comicId + "/2/001.jpg", MediaLifecycleStatus.READY);
 
@@ -375,7 +376,7 @@ class ReadingLifecycleCompatibilityIT {
             assertThat(refs).extracting(ChapterRef::getId).contains(chReady);
 
             // 重排后 prev/next 跳过 TRASHED 章节
-            Long ch3 = insertChapter(comicId, 3, "3", "READY");
+            Long ch3 = insertChapter(comicId, 3, "3", ChapterLifecycleStatus.READY);
             ReaderDTO dto = readerService.getChapter(ch3);
             assertThat(dto.getPrevChapterId()).isEqualTo(chReady);
         }
@@ -472,9 +473,9 @@ class ReadingLifecycleCompatibilityIT {
         @DisplayName("章节重排后 reader prev/next 跟随新 global_order，catalog 缓存失效")
         void chapterReorder_fixesPrevNext_evictsCatalogCache() throws Exception {
             Long comicId = insertComic("REORDER-COMIC", ComicStatus.READY);
-            Long ch1 = insertChapter(comicId, 1, "1", "READY");
-            Long ch2 = insertChapter(comicId, 2, "2", "READY");
-            Long ch3 = insertChapter(comicId, 3, "3", "READY");
+            Long ch1 = insertChapter(comicId, 1, "1", ChapterLifecycleStatus.READY);
+            Long ch2 = insertChapter(comicId, 2, "2", ChapterLifecycleStatus.READY);
+            Long ch3 = insertChapter(comicId, 3, "3", ChapterLifecycleStatus.READY);
             insertMedia(ch1, 1, comicId + "/1/001.jpg", MediaLifecycleStatus.READY);
             insertMedia(ch2, 1, comicId + "/2/001.jpg", MediaLifecycleStatus.READY);
             insertMedia(ch3, 1, comicId + "/3/001.jpg", MediaLifecycleStatus.READY);
@@ -504,7 +505,7 @@ class ReadingLifecycleCompatibilityIT {
         @DisplayName("媒体回收完成：页码边界修正（chapter.page_count/comic.total_pages 只计 READY），reader 隐藏 TRASHED，缓存失效")
         void mediaTrash_fixesPageBoundary_evictsCatalogCache() throws Exception {
             Long comicId = insertComic("MEDIA-TRASH-COMIC", ComicStatus.READY);
-            Long chapterId = insertChapter(comicId, 1, "1", "READY");
+            Long chapterId = insertChapter(comicId, 1, "1", ChapterLifecycleStatus.READY);
             Long m1 = insertMedia(chapterId, 1, comicId + "/1/001.jpg", MediaLifecycleStatus.READY);
             Long m2 = insertMedia(chapterId, 2, comicId + "/1/002.jpg", MediaLifecycleStatus.READY);
             Long m3 = insertMedia(chapterId, 3, comicId + "/1/003.jpg", MediaLifecycleStatus.READY);
@@ -546,7 +547,7 @@ class ReadingLifecycleCompatibilityIT {
         @DisplayName("章节内媒体重排：页码连续 1..N，reader 顺序一致")
         void mediaReorder_renumbersPages() {
             Long comicId = insertComic("MEDIA-REORDER-COMIC", ComicStatus.READY);
-            Long chapterId = insertChapter(comicId, 1, "1", "READY");
+            Long chapterId = insertChapter(comicId, 1, "1", ChapterLifecycleStatus.READY);
             Long m1 = insertMedia(chapterId, 1, comicId + "/1/001.jpg", MediaLifecycleStatus.READY);
             Long m2 = insertMedia(chapterId, 2, comicId + "/1/002.jpg", MediaLifecycleStatus.READY);
             Long m3 = insertMedia(chapterId, 3, comicId + "/1/003.jpg", MediaLifecycleStatus.READY);
@@ -663,7 +664,7 @@ class ReadingLifecycleCompatibilityIT {
             Long comicId = insertComic("LEGACY-COMIC", ComicStatus.READY);
             // 旧布局：目录按 globalOrder 而非 chapterId
             int globalOrder = 7;
-            Long chapterId = insertChapter(comicId, globalOrder, "1", "READY");
+            Long chapterId = insertChapter(comicId, globalOrder, "1", ChapterLifecycleStatus.READY);
             String legacyPath = comicId + "/" + globalOrder + "/001.jpg";
             Long mediaId = insertMedia(chapterId, 1, legacyPath, MediaLifecycleStatus.READY);
             Path file = MANGA_ROOT.resolve("hq").resolve(legacyPath);
