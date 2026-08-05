@@ -14,6 +14,7 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 import com.zaxxer.hikari.HikariConfig;
@@ -95,10 +96,36 @@ class DatabaseMigrationTest {
         }
     }
 
+    /**
+     * 从 classpath:db/flyway 解析全部迁移版本号，按数值排序。
+     * 断言据此动态对比，避免迁移文件新增后测试硬编码版本列表过期。
+     */
+    static List<String> expectedMigrationVersions() {
+        try {
+            var resource = DatabaseMigrationTest.class.getClassLoader()
+                    .getResource("db/flyway");
+            if (resource == null) {
+                throw new IllegalStateException("db/flyway 目录不存在");
+            }
+            java.net.URI uri = resource.toURI();
+            java.nio.file.Path dir = java.nio.file.Paths.get(uri);
+            try (var stream = java.nio.file.Files.list(dir)) {
+                return stream
+                        .map(p -> p.getFileName().toString())
+                        .filter(name -> name.matches("V\\d+__.*\\.sql"))
+                        .map(name -> name.replaceFirst("V(\\d+)__.*\\.sql", "$1"))
+                        .sorted(Comparator.comparingLong(Long::parseLong))
+                        .toList();
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("解析 Flyway 迁移目录失败", e);
+        }
+    }
+
     // ==================== 测试用例 ====================
 
     @Test
-    @DisplayName("空库迁移达到 V2")
+    @DisplayName("空库迁移达到最新版本")
     void freshDatabase_ShouldReachV2() {
         DataSource ds = createDataSource();
 
@@ -113,7 +140,7 @@ class DatabaseMigrationTest {
 
         // 验证 flyway_schema_history
         List<String> versions = appliedMigrations(ds);
-        assertThat(versions).containsExactly("1", "2");
+        assertThat(versions).containsExactlyElementsOf(expectedMigrationVersions());
 
         // 验证核心表存在
         String[] tables = {"comic", "catalog", "chapter", "page", "tag", "comic_tag",
@@ -234,7 +261,7 @@ class DatabaseMigrationTest {
 
         // 验证 no-op
         assertThat(secondResult.migrationsExecuted).as("Repeat migration should be no-op").isEqualTo(0);
-        assertThat(appliedMigrations(ds)).containsExactly("1", "2");
+        assertThat(appliedMigrations(ds)).containsExactlyElementsOf(expectedMigrationVersions());
     }
 
     @Test
