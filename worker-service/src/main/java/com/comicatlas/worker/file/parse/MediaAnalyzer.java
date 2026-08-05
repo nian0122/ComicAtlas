@@ -21,7 +21,9 @@ import java.nio.file.Path;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * 媒体文件分析器：
@@ -130,7 +132,11 @@ public class MediaAnalyzer {
             boolean finished = process.waitFor(FFPROBE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
             try {
                 readFuture.get(1, TimeUnit.SECONDS);
-            } catch (Exception e) {
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                process.destroyForcibly();
+                return videoFallback(name, ext, size, "interrupted");
+            } catch (ExecutionException | TimeoutException e) {
                 log.warn("等待 ffprobe 输出读取超时: {}", e.getMessage());
             }
             if (!finished) {

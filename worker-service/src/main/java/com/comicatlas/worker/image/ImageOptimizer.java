@@ -18,7 +18,9 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * 图片优化器：调用外部 Go 工具 image-optimizer.exe 进行并发 WebP 压缩。
@@ -133,7 +135,11 @@ public class ImageOptimizer {
 
         try {
             readFuture.get(5, TimeUnit.SECONDS);
-        } catch (Exception e) {
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            process.destroyForcibly();
+            throw new RuntimeException("等待图片优化输出被中断: comicId=" + comicId + ", chapterId=" + chapterId, e);
+        } catch (ExecutionException | TimeoutException e) {
             log.warn("等待图片优化输出读取超时: {}", e.getMessage());
         }
 
