@@ -8,6 +8,7 @@ import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
 import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.common.enums.HqStatus;
+import com.comicatlas.api.common.enums.ImportTaskStatus;
 import com.comicatlas.api.common.enums.LqStatus;
 import com.comicatlas.api.common.storage.ApiStorageProperties;
 import com.comicatlas.api.management.entity.ManagementTaskItem;
@@ -59,7 +60,8 @@ public class ImportEventHandler {
     private final ApiStorageProperties storageProperties;
 
     /** 终态集合：到达这些状态后不可回退到非终态（含 CANCELLED 真正终态） */
-    private static final Set<String> TERMINAL_STATUSES = Set.of("SUCCESS", "FAILED", "CANCELLED");
+    private static final Set<ImportTaskStatus> TERMINAL_STATUSES =
+            Set.of(ImportTaskStatus.SUCCESS, ImportTaskStatus.FAILED, ImportTaskStatus.CANCELLED);
 
     @RabbitListener(queues = "import.result.queue")
     @SuppressWarnings("unchecked")
@@ -165,7 +167,7 @@ public class ImportEventHandler {
         comicMapper.updateById(comic);
 
         // 4. UPDATE import_task
-        task.setStatus("SUCCESS");
+        task.setStatus(ImportTaskStatus.SUCCESS);
         task.setEndTime(LocalDateTime.now());
         if (task.getStartTime() != null) {
             task.setDurationMs(Duration.between(task.getStartTime(), task.getEndTime()).toMillis());
@@ -351,13 +353,17 @@ public class ImportEventHandler {
         ImportTask task = taskMapper.selectById(taskId);
         if (task == null) return;
 
-        String currentStatus = task.getStatus();
-        if (TERMINAL_STATUSES.contains(currentStatus) && !TERMINAL_STATUSES.contains(newStatus)) {
+        ImportTaskStatus currentStatus = task.getStatus();
+        ImportTaskStatus mappedStatus = parseStatus(newStatus);
+        if (TERMINAL_STATUSES.contains(currentStatus)
+                && (mappedStatus == null || !mappedStatus.isTerminal())) {
             log.warn("状态机拒绝非终态写入: taskId={}, current={}, attempted={}", taskId, currentStatus, newStatus);
             return;
         }
 
-        task.setStatus(newStatus);
+        if (mappedStatus != null) {
+            task.setStatus(mappedStatus);
+        }
         if ("DOWNLOADING".equals(newStatus) && task.getStartTime() == null) {
             task.setStartTime(LocalDateTime.now());
         }
@@ -407,7 +413,7 @@ public class ImportEventHandler {
                 if (task == null || TERMINAL_STATUSES.contains(task.getStatus())) {
                     return;
                 }
-                task.setStatus("FAILED");
+                task.setStatus(ImportTaskStatus.FAILED);
                 task.setEndTime(LocalDateTime.now());
                 if (event.errorCode() != null) {
                     task.setErrorMessage(event.errorCode() + ": " + event.errorMessage());
@@ -458,6 +464,16 @@ public class ImportEventHandler {
     private boolean isImportTaskTerminal(Long taskId) {
         ImportTask task = taskMapper.selectById(taskId);
         return task != null && TERMINAL_STATUSES.contains(task.getStatus());
+    }
+
+    /** 将事件状态字符串映射为 ImportTaskStatus；阶段值（DOWNLOADING/EXTRACTING）返回 null。 */
+    private static ImportTaskStatus parseStatus(String status) {
+        if (status == null) return null;
+        try {
+            return ImportTaskStatus.valueOf(status);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     /**

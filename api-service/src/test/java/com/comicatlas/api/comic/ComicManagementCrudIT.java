@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.common.enums.ComicStatus;
+import com.comicatlas.api.common.enums.ImportTaskStatus;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.event.ImportEventHandler;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
@@ -510,7 +511,7 @@ class ComicManagementCrudIT {
             assertThat(comic.getTitle()).isEqualTo("导入成功漫画");
 
             ImportTask importTask = importTaskMapper.selectById(taskId);
-            assertThat(importTask.getStatus()).isEqualTo("SUCCESS");
+            assertThat(importTask.getStatus()).isEqualTo(ImportTaskStatus.SUCCESS);
 
             // management task item 终态 SUCCEEDED
             ManagementTaskItem item = managementTaskItemMapper.selectOne(new LambdaQueryWrapper<ManagementTaskItem>()
@@ -541,7 +542,7 @@ class ComicManagementCrudIT {
             assertThat(comic.getStatus()).isEqualTo(ComicStatus.IMPORT_FAILED);
 
             ImportTask importTask = importTaskMapper.selectById(taskId);
-            assertThat(importTask.getStatus()).isEqualTo("FAILED");
+            assertThat(importTask.getStatus()).isEqualTo(ImportTaskStatus.FAILED);
 
             ManagementTaskItem item = managementTaskItemMapper.selectOne(new LambdaQueryWrapper<ManagementTaskItem>()
                     .eq(ManagementTaskItem::getTargetType, "COMIC")
@@ -573,7 +574,7 @@ class ComicManagementCrudIT {
                     .andExpect(jsonPath("$.code").value(200));
 
             assertThat(comicMapper.selectById(comicId).getStatus()).isEqualTo(ComicStatus.IMPORTING);
-            assertThat(importTaskMapper.selectById(taskId).getStatus()).isEqualTo("PENDING");
+            assertThat(importTaskMapper.selectById(taskId).getStatus()).isEqualTo(ImportTaskStatus.PENDING);
         }
 
         @Test

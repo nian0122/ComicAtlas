@@ -8,6 +8,7 @@ import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
+import com.comicatlas.api.common.enums.ImportTaskStatus;
 import com.comicatlas.api.common.storage.ApiStorageProperties;
 import com.comicatlas.api.common.storage.ApiStorageRoot;
 import com.comicatlas.api.management.service.ManagementTaskService;
@@ -59,7 +60,7 @@ class ImportEventHandlerCacheTest {
     void handleComicImported_shouldEvictCatalogCache_whenImportCompletes() throws Exception {
         ImportTask task = new ImportTask();
         task.setId(10L);
-        task.setStatus("PROCESSING");
+        task.setStatus(ImportTaskStatus.PARSING);
         Comic comic = new Comic();
         comic.setId(20L);
         Map<String, Object> metadata = Map.of(

@@ -1,6 +1,8 @@
 package com.comicatlas.api.importer.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
+import com.comicatlas.api.common.enums.ImportTaskStatus;
+import com.comicatlas.api.common.enums.SourceType;
 import lombok.Data;
 import java.time.LocalDateTime;
 
@@ -13,10 +15,10 @@ public class ImportTask {
     private Long managementTaskId;
     private Long comicId;
     private String sourceRef;
-    private String sourceType;
+    private SourceType sourceType;
     private String sourcePath;
     private String batchId;
-    private String status;
+    private ImportTaskStatus status;
     private Integer progress;
     private Integer totalPages;
     private Integer downloadedPages;

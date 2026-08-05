@@ -62,10 +62,11 @@ public class LegacyTaskBackfillService {
                 new LambdaQueryWrapper<ImportTask>().isNull(ImportTask::getManagementTaskId));
         int count = 0;
         for (ImportTask t : rows) {
+            String legacyStatus = t.getStatus() == null ? null : t.getStatus().name();
             ManagementTask managementTask = baseTask(TaskType.IMPORT, "导入漫画", "COMIC",
-                    t.getBatchId(), t.getStatus(), t.getProgress(),
+                    t.getBatchId(), legacyStatus, t.getProgress(),
                     t.getStartTime(), t.getEndTime());
-            ManagementTaskItem item = baseItem(managementTask, "COMIC", t.getComicId(), TaskType.IMPORT, t.getStatus());
+            ManagementTaskItem item = baseItem(managementTask, "COMIC", t.getComicId(), TaskType.IMPORT, legacyStatus);
             insertPair(managementTask, item);
             t.setManagementTaskId(managementTask.getId());
             importTaskMapper.updateById(t);
