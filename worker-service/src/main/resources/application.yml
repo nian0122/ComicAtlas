@@ -32,11 +32,13 @@ spring:
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASS:}
   datasource:
+    # Worker 只读：默认使用独立只读账号（仅 GRANT SELECT），应用层强制 HikariCP read-only
     url: jdbc:mysql://${MYSQL_HOST:localhost}:3306/comic_atlas?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
-    username: ${MYSQL_USER:root}
-    password: ${MYSQL_PASS:root}
+    username: ${MYSQL_USER:comicatlas_ro}
+    password: ${MYSQL_PASS:comicatlas_ro_pass}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
+      read-only: true
       maximum-pool-size: 2
 
 mybatis-plus:
