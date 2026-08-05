@@ -13,16 +13,20 @@ import com.comicatlas.api.common.storage.ApiStorageProperties;
 import com.comicatlas.api.common.storage.ApiStorageRoot;
 import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.common.event.ImportTaskCompletedEvent;
+import com.comicatlas.common.event.ImportTaskFailedEvent;
+import com.comicatlas.common.event.TaskStatusChangedEvent;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.Channel;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -32,8 +36,12 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Consumer;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -87,6 +95,80 @@ class ImportEventHandlerCacheTest {
         handler.handleComicImported(event, channel, 1L);
 
         verify(catalogCacheInvalidator).evict(20L);
+        verify(channel).basicAck(1L, false);
+    }
+
+    /** 遗留 "DOWNLOADING" 行经 safeValueOf 读回 status=null：失败事件必须正常标记 FAILED，不得 NPE。 */
+    @Test
+    void handleImportTaskFailed_withLegacyNullStatusTask_marksFailedWithoutNpe() throws Exception {
+        ImportTask task = new ImportTask();
+        task.setId(30L);
+        task.setStatus(null);
+
+        when(taskMapper.selectById(30L)).thenReturn(task);
+        doAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            Consumer<TransactionStatus> action = invocation.getArgument(0);
+            action.accept(null);
+            return null;
+        }).when(transactionTemplate).executeWithoutResult(any());
+
+        ImportTaskFailedEvent event = new ImportTaskFailedEvent(
+                UUID.randomUUID(), Instant.now(), 30L, 300L, "DOWNLOAD_FAILED", "下载失败");
+
+        assertDoesNotThrow(() -> handler.handleImportTaskFailed(event, channel, 1L));
+        verify(channel).basicAck(1L, false);
+
+        ArgumentCaptor<ImportTask> captor = ArgumentCaptor.forClass(ImportTask.class);
+        verify(taskMapper).updateById(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo(ImportTaskStatus.FAILED);
+    }
+
+    /** 遗留 status=null 行收到终态事件：正常写入终态，不得 NPE。 */
+    @Test
+    void handleTaskStatusChanged_withLegacyNullStatusTask_terminalEventWritesWithoutNpe() throws Exception {
+        ImportTask task = new ImportTask();
+        task.setId(31L);
+        task.setStatus(null);
+
+        when(taskMapper.selectById(31L)).thenReturn(task);
+        doAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            Consumer<TransactionStatus> action = invocation.getArgument(0);
+            action.accept(null);
+            return null;
+        }).when(transactionTemplate).executeWithoutResult(any());
+
+        TaskStatusChangedEvent event = new TaskStatusChangedEvent(
+                UUID.randomUUID(), Instant.now(), 31L, "FAILED", 0, null, 0, 0);
+
+        assertDoesNotThrow(() -> handler.handleTaskStatusChanged(event, channel, 1L));
+        verify(channel).basicAck(1L, false);
+
+        ArgumentCaptor<ImportTask> captor = ArgumentCaptor.forClass(ImportTask.class);
+        verify(taskMapper).updateById(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo(ImportTaskStatus.FAILED);
+    }
+
+    /** 遗留 status=null 行收到阶段事件：不抛异常，status 保持 null（阶段仅写 management_task.stage）。 */
+    @Test
+    void handleTaskStatusChanged_withLegacyNullStatusTask_stageEventDoesNotThrow() throws Exception {
+        ImportTask task = new ImportTask();
+        task.setId(32L);
+        task.setStatus(null);
+
+        when(taskMapper.selectById(32L)).thenReturn(task);
+        doAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            Consumer<TransactionStatus> action = invocation.getArgument(0);
+            action.accept(null);
+            return null;
+        }).when(transactionTemplate).executeWithoutResult(any());
+
+        TaskStatusChangedEvent event = new TaskStatusChangedEvent(
+                UUID.randomUUID(), Instant.now(), 32L, "DOWNLOADING", 42, "HTTP", 1024, 7);
+
+        assertDoesNotThrow(() -> handler.handleTaskStatusChanged(event, channel, 1L));
         verify(channel).basicAck(1L, false);
     }
 }
