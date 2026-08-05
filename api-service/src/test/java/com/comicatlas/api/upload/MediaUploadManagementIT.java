@@ -13,6 +13,7 @@ import com.comicatlas.api.outbox.mapper.OutboxMessageMapper;
 import com.comicatlas.api.outbox.mapper.InboxReceiptMapper;
 import com.comicatlas.api.upload.entity.UploadFile;
 import com.comicatlas.api.upload.entity.UploadSession;
+import com.comicatlas.api.upload.UploadSessionStatus;
 import com.comicatlas.api.upload.mapper.UploadSessionMapper;
 import com.comicatlas.api.upload.mapper.UploadFileMapper;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -567,7 +568,7 @@ class MediaUploadManagementIT {
         assertThat(Files.exists(stagingDir)).isFalse();
 
         UploadSession after = uploadSessionMapper.selectById(session.getId());
-        assertThat(after.getStatus()).isEqualTo("EXPIRED");
+        assertThat(after.getStatus()).isEqualTo(UploadSessionStatus.EXPIRED);
     }
 
     // ======================== reorder ========================
@@ -860,7 +861,7 @@ class MediaUploadManagementIT {
         awaitTrue(() -> {
             UploadSession s = uploadSessionMapper.selectOne(
                     new LambdaQueryWrapper<UploadSession>().eq(UploadSession::getSessionId, sessionId));
-            return s != null && status.equals(s.getStatus());
+            return s != null && status.equals(s.getStatus() == null ? null : s.getStatus().name());
         }, timeoutMs);
     }
 

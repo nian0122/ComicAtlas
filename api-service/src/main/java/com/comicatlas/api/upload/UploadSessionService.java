@@ -115,7 +115,7 @@ public class UploadSessionService {
         session.setComicId(comicId);
         session.setChapterId(chapterId);
         session.setReplaceMediaId(request.getReplaceMediaId());
-        session.setStatus(UploadSessionStatus.ACTIVE.name());
+        session.setStatus(UploadSessionStatus.ACTIVE);
         session.setTotalBytes(totalBytes);
         session.setTotalFiles(manifest.size());
         session.setExpiresAt(LocalDateTime.now().plus(uploadProperties.getSessionTtl()));
@@ -204,7 +204,7 @@ public class UploadSessionService {
         UploadSession session = getBySessionId(sessionId);
         UploadSessionStatusResponse resp = new UploadSessionStatusResponse();
         resp.setSessionId(session.getSessionId());
-        resp.setStatus(session.getStatus());
+        resp.setStatus(session.getStatus() == null ? null : session.getStatus().name());
         resp.setTotalBytes(session.getTotalBytes());
         resp.setTotalFiles(session.getTotalFiles());
         resp.setExpiresAt(session.getExpiresAt());
@@ -279,7 +279,7 @@ public class UploadSessionService {
     @Transactional
     public UploadCompleteResponse complete(String sessionId) {
         UploadSession session = getBySessionId(sessionId);
-        if (!UploadSessionStatus.ACTIVE.name().equals(session.getStatus())) {
+        if (session.getStatus() != UploadSessionStatus.ACTIVE) {
             throw new BusinessException(HttpStatusCodes.CONFLICT, "会话状态 " + session.getStatus() + " 不允许 complete");
         }
         List<UploadFile> files = filesOf(session);
@@ -353,7 +353,7 @@ public class UploadSessionService {
                     item.getTaskId(), item.getId(), item.getAttempt());
         }
 
-        session.setStatus(UploadSessionStatus.COMPLETED.name());
+        session.setStatus(UploadSessionStatus.COMPLETED);
         session.setCompletedAt(LocalDateTime.now());
         sessionMapper.updateById(session);
 
@@ -412,16 +412,16 @@ public class UploadSessionService {
     @Transactional
     public void cancel(String sessionId) {
         UploadSession session = getBySessionId(sessionId);
-        if (UploadSessionStatus.CANCELLED.name().equals(session.getStatus())) {
+        if (session.getStatus() == UploadSessionStatus.CANCELLED) {
             return;
         }
-        if (UploadSessionStatus.COMPLETED.name().equals(session.getStatus())) {
+        if (session.getStatus() == UploadSessionStatus.COMPLETED) {
             throw new BusinessException(HttpStatusCodes.CONFLICT, "会话已 complete，无法取消");
         }
         storageService.deleteStagingDir(session);
         fileMapper.delete(new LambdaQueryWrapper<UploadFile>()
                 .eq(UploadFile::getSessionId, session.getId()));
-        session.setStatus(UploadSessionStatus.CANCELLED.name());
+        session.setStatus(UploadSessionStatus.CANCELLED);
         sessionMapper.updateById(session);
         log.info("取消上传会话: sessionId={}", sessionId);
     }
@@ -433,13 +433,13 @@ public class UploadSessionService {
     public int expireExpiredSessions() {
         List<UploadSession> expired = sessionMapper.selectList(
                 new LambdaQueryWrapper<UploadSession>()
-                        .eq(UploadSession::getStatus, UploadSessionStatus.ACTIVE.name())
+                        .eq(UploadSession::getStatus, UploadSessionStatus.ACTIVE)
                         .lt(UploadSession::getExpiresAt, LocalDateTime.now()));
         for (UploadSession session : expired) {
             storageService.deleteStagingDir(session);
             fileMapper.delete(new LambdaQueryWrapper<UploadFile>()
                     .eq(UploadFile::getSessionId, session.getId()));
-            session.setStatus(UploadSessionStatus.EXPIRED.name());
+            session.setStatus(UploadSessionStatus.EXPIRED);
             sessionMapper.updateById(session);
         }
         if (!expired.isEmpty()) {

@@ -110,7 +110,7 @@ public class UploadStorageService {
     public String writeChunk(UploadSession session, UploadFile file,
                              long start, long end, long total,
                              String chunkSha256, InputStream in) {
-        if (!UploadSessionStatus.ACTIVE.name().equals(session.getStatus())) {
+        if (session.getStatus() != UploadSessionStatus.ACTIVE) {
             throw new BusinessException(HttpStatusCodes.CONFLICT, "会话状态 " + session.getStatus() + " 不允许上传分片");
         }
         if (start < 0 || end < start || end >= total) {

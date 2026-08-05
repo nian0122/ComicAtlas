@@ -13,6 +13,7 @@ import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.common.enums.HqStatus;
 import com.comicatlas.api.common.enums.ImportTaskStatus;
 import com.comicatlas.api.common.enums.LqStatus;
+import com.comicatlas.api.upload.UploadSessionStatus;
 import com.comicatlas.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.common.enums.ComicLifecycleStatus;
 import com.comicatlas.common.enums.ManagementTaskStatus;
@@ -66,6 +67,14 @@ public class EnumTypeHandlers {
         @Override public LqStatus getNullableResult(ResultSet rs, String c) throws SQLException { return safeValueOf(LqStatus.class, rs.getString(c)); }
         @Override public LqStatus getNullableResult(ResultSet rs, int c) throws SQLException { return safeValueOf(LqStatus.class, rs.getString(c)); }
         @Override public LqStatus getNullableResult(CallableStatement cs, int c) throws SQLException { return safeValueOf(LqStatus.class, cs.getString(c)); }
+    }
+
+    @MappedTypes(UploadSessionStatus.class)
+    public static class UploadSessionStatusHandler extends BaseTypeHandler<UploadSessionStatus> {
+        @Override public void setNonNullParameter(PreparedStatement ps, int i, UploadSessionStatus p, JdbcType t) throws SQLException { ps.setString(i, p.name()); }
+        @Override public UploadSessionStatus getNullableResult(ResultSet rs, String c) throws SQLException { return safeValueOf(UploadSessionStatus.class, rs.getString(c)); }
+        @Override public UploadSessionStatus getNullableResult(ResultSet rs, int c) throws SQLException { return safeValueOf(UploadSessionStatus.class, rs.getString(c)); }
+        @Override public UploadSessionStatus getNullableResult(CallableStatement cs, int c) throws SQLException { return safeValueOf(UploadSessionStatus.class, cs.getString(c)); }
     }
 
     // ======================== comic-common 共享枚举 ========================

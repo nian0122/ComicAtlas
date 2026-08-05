@@ -3,6 +3,7 @@ package com.comicatlas.api.upload.entity;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.comicatlas.api.upload.UploadSessionStatus;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -21,7 +22,7 @@ public class UploadSession {
     private Long comicId;
     private Long chapterId;
     private Long replaceMediaId;
-    private String status;
+    private UploadSessionStatus status;
     private Long totalBytes;
     private Integer totalFiles;
     private LocalDateTime expiresAt;
