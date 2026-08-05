@@ -2,6 +2,8 @@ package com.comicatlas.worker.file.transcode;
 
 import com.comicatlas.worker.config.WorkerConfig;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 
 import java.io.BufferedReader;
@@ -15,11 +17,11 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
@@ -34,7 +36,7 @@ import java.util.stream.Stream;
 public class VideoNormalizer {
 
     private final WorkerConfig config;
-    private final int parallelism;
+    private final ThreadPoolTaskExecutor executor;
     private final int ffmpegThreads;
 
     private static final Set<String> NON_STANDARD_EXT = Set.of(
@@ -42,19 +44,11 @@ public class VideoNormalizer {
             ".mts", ".m2ts", ".vob", ".3gp", ".m4v"
     );
 
-    public VideoNormalizer(WorkerConfig config) {
+    public VideoNormalizer(WorkerConfig config,
+                           @Qualifier("videoNormalizeExecutor") ThreadPoolTaskExecutor executor) {
         this.config = config;
-        int cores = Runtime.getRuntime().availableProcessors();
-        if (cores <= 2) {
-            this.parallelism = 1;
-            this.ffmpegThreads = 1;
-        } else if (cores <= 4) {
-            this.parallelism = 2;
-            this.ffmpegThreads = 2;
-        } else {
-            this.parallelism = cores / 2;
-            this.ffmpegThreads = 2;
-        }
+        this.executor = executor;
+        this.ffmpegThreads = 2; // ffmpeg 转码线程固定 2，并行度由托管线程池控制
     }
 
     /**
@@ -83,29 +77,31 @@ public class VideoNormalizer {
         }
 
         log.info("发现 {} 个非标准视频，转码到临时目录 (并行度={}, ffmpeg线程={})",
-                files.size(), parallelism, ffmpegThreads);
+                files.size(), executor.getCorePoolSize(), ffmpegThreads);
 
         ConcurrentHashMap<Path, Path> transcoded = new ConcurrentHashMap<>(); // source → temp-mp4
-        ExecutorService executor = Executors.newFixedThreadPool(parallelism);
         AtomicInteger failed = new AtomicInteger(0);
 
-        try {
-            List<Future<?>> futures = new ArrayList<>();
-            for (Path file : files) {
-                futures.add(executor.submit(() ->
-                        transcodeToTemp(file, sourceDir, tempDir, transcoded, failed)));
-            }
+        List<Future<?>> futures = new ArrayList<>();
+        for (Path file : files) {
+            futures.add(executor.submit(() ->
+                    transcodeToTemp(file, sourceDir, tempDir, transcoded, failed)));
+        }
 
-            for (Future<?> f : futures) {
-                try {
-                    f.get();
-                } catch (ExecutionException | InterruptedException e) {
-                    log.error("转码任务异常: {}", e.getMessage());
-                    failed.incrementAndGet();
+        for (Future<?> f : futures) {
+            try {
+                f.get();
+            } catch (ExecutionException e) {
+                log.error("转码任务异常: {}", e.getCause() != null ? e.getCause().getMessage() : e.getMessage());
+                failed.incrementAndGet();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.warn("转码被中断，取消剩余任务");
+                for (Future<?> remaining : futures) {
+                    remaining.cancel(true);
                 }
+                return 0;
             }
-        } finally {
-            executor.shutdown();
         }
 
         // 全部成功后，搬入源目录
@@ -216,7 +212,7 @@ public class VideoNormalizer {
     private void transcode(Path input, Path output) throws Exception {
         String ffmpeg = config.resolveToolPath(config.getFfmpegPath()).toString();
         log.info("转码: {} → {} (并行度={}, 线程={})",
-                input.getFileName(), output.getFileName(), parallelism, ffmpegThreads);
+                input.getFileName(), output.getFileName(), executor.getCorePoolSize(), ffmpegThreads);
 
         List<String> cmd = List.of(
                 ffmpeg,
@@ -237,21 +233,25 @@ public class VideoNormalizer {
         Process process = processBuilder.start();
 
         StringBuilder processOutput = new StringBuilder();
-        Thread reader = new Thread(() -> {
+        CompletableFuture<Void> readFuture = CompletableFuture.runAsync(() -> {
             try (var br = new BufferedReader(
                     new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
                 String line;
                 while ((line = br.readLine()) != null) {
                     processOutput.append(line).append('\n');
                 }
-            } catch (IOException ignored) {
+            } catch (IOException e) {
+                log.warn("读取 ffmpeg 输出失败: {}", e.getMessage());
             }
-        }, "ffmpeg-" + input.getFileName());
-        reader.setDaemon(true);
-        reader.start();
+        }, executor);
 
         int exitCode = process.waitFor();
-        reader.join(5000);
+
+        try {
+            readFuture.get(5, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            log.warn("等待 ffmpeg 输出读取超时: {}", e.getMessage());
+        }
 
         if (exitCode != 0) {
             String tail = processOutput.length() > 500
