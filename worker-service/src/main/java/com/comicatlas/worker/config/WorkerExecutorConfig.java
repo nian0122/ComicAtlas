@@ -27,4 +27,19 @@ public class WorkerExecutorConfig {
         executor.initialize();
         return executor;
     }
+
+    @Bean(name = "processIoExecutor", destroyMethod = "shutdown")
+    public ThreadPoolTaskExecutor processIoExecutor(
+            @Value("${worker.executor.process-io-threads:4}") int threads) {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(threads);
+        executor.setMaxPoolSize(threads);
+        executor.setQueueCapacity(64);
+        executor.setThreadNamePrefix("process-io-");
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(30);
+        executor.initialize();
+        return executor;
+    }
 }
