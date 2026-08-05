@@ -107,7 +107,7 @@ class RecoveryEventHandlerTest {
 
         RecoveryTask task = new RecoveryTask();
         task.setId(taskId);
-        task.setStatus("SUCCESS");
+        task.setStatus("SUCCEEDED");
         when(recoveryTaskMapper.selectById(taskId)).thenReturn(task);
 
         doNothing().when(channel).basicAck(anyLong(), eq(false));
@@ -221,7 +221,7 @@ class RecoveryEventHandlerTest {
 
         RecoveryTask task = new RecoveryTask();
         task.setId(taskId);
-        task.setStatus("SUCCESS");
+        task.setStatus("SUCCEEDED");
         when(recoveryTaskMapper.selectById(taskId)).thenReturn(task);
 
         doNothing().when(channel).basicAck(anyLong(), eq(false));
