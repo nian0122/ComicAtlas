@@ -520,7 +520,7 @@ class ReadingLifecycleCompatibilityIT {
 
             // 媒体进入 TRASHED，HQ 引用指向 TRASH（不再暴露）
             Media trashed = mediaMapper.selectById(m2);
-            assertThat(trashed.getStatus()).isEqualTo(ComicStatus.TRASHED);
+            assertThat(trashed.getStatus()).isEqualTo("TRASHED");
             assertThat(trashed.getHqStatus()).isEqualTo("DELETED");
             // 页码边界修正：只计 READY 页
             assertThat(chapterMapper.selectById(chapterId).getPageCount()).isEqualTo(2);
