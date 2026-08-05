@@ -91,9 +91,9 @@ public class VideoNormalizer {
                     transcodeToTemp(file, sourceDir, tempDir, transcoded, failed)));
         }
 
-        for (Future<?> f : futures) {
+        for (Future<?> future : futures) {
             try {
-                f.get();
+                future.get();
             } catch (ExecutionException e) {
                 log.error("转码任务异常: {}", e.getCause() != null ? e.getCause().getMessage() : e.getMessage());
                 failed.incrementAndGet();

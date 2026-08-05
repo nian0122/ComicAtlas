@@ -48,8 +48,8 @@ public class PurgeCommandHandler {
         }
         try (Stream<Path> walk = Files.walk(dir)) {
             List<Path> paths = walk.sorted(Comparator.reverseOrder()).toList();
-            for (Path p : paths) {
-                Files.deleteIfExists(p);
+            for (Path path : paths) {
+                Files.deleteIfExists(path);
             }
         }
     }

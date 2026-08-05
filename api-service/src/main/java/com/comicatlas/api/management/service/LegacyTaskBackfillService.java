@@ -61,15 +61,15 @@ public class LegacyTaskBackfillService {
         List<ImportTask> rows = importTaskMapper.selectList(
                 new LambdaQueryWrapper<ImportTask>().isNull(ImportTask::getManagementTaskId));
         int count = 0;
-        for (ImportTask t : rows) {
-            String legacyStatus = t.getStatus() == null ? null : t.getStatus().name();
+        for (ImportTask task : rows) {
+            String legacyStatus = task.getStatus() == null ? null : task.getStatus().name();
             ManagementTask managementTask = baseTask(TaskType.IMPORT, "导入漫画", "COMIC",
-                    t.getBatchId(), legacyStatus, t.getProgress(),
-                    t.getStartTime(), t.getEndTime());
-            ManagementTaskItem item = baseItem(managementTask, "COMIC", t.getComicId(), TaskType.IMPORT, legacyStatus);
+                    task.getBatchId(), legacyStatus, task.getProgress(),
+                    task.getStartTime(), task.getEndTime());
+            ManagementTaskItem item = baseItem(managementTask, "COMIC", task.getComicId(), TaskType.IMPORT, legacyStatus);
             insertPair(managementTask, item);
-            t.setManagementTaskId(managementTask.getId());
-            importTaskMapper.updateById(t);
+            task.setManagementTaskId(managementTask.getId());
+            importTaskMapper.updateById(task);
             count++;
         }
         if (count > 0) {
@@ -101,13 +101,13 @@ public class LegacyTaskBackfillService {
         List<ExportTask> rows = exportTaskMapper.selectList(
                 new LambdaQueryWrapper<ExportTask>().isNull(ExportTask::getManagementTaskId));
         int count = 0;
-        for (ExportTask t : rows) {
+        for (ExportTask task : rows) {
             ManagementTask managementTask = baseTask(TaskType.EXPORT, "导出漫画", "COMIC",
-                    null, t.getStatus(), t.getProgress(), null, t.getCompletedAt());
-            ManagementTaskItem item = baseItem(managementTask, "COMIC", t.getComicId(), TaskType.EXPORT, t.getStatus());
+                    null, task.getStatus(), task.getProgress(), null, task.getCompletedAt());
+            ManagementTaskItem item = baseItem(managementTask, "COMIC", task.getComicId(), TaskType.EXPORT, task.getStatus());
             insertPair(managementTask, item);
-            t.setManagementTaskId(managementTask.getId());
-            exportTaskMapper.updateById(t);
+            task.setManagementTaskId(managementTask.getId());
+            exportTaskMapper.updateById(task);
             count++;
         }
         if (count > 0) {
@@ -120,13 +120,13 @@ public class LegacyTaskBackfillService {
         List<DirectoryScanTask> rows = directoryScanTaskMapper.selectList(
                 new LambdaQueryWrapper<DirectoryScanTask>().isNull(DirectoryScanTask::getManagementTaskId));
         int count = 0;
-        for (DirectoryScanTask t : rows) {
+        for (DirectoryScanTask task : rows) {
             ManagementTask managementTask = baseTask(TaskType.DIRECTORY_SCAN, "目录扫描", "SYSTEM",
-                    null, t.getStatus(), null, t.getStartedAt(), t.getEndedAt());
-            ManagementTaskItem item = baseItem(managementTask, "SYSTEM", t.getId(), TaskType.DIRECTORY_SCAN, t.getStatus());
+                    null, task.getStatus(), null, task.getStartedAt(), task.getEndedAt());
+            ManagementTaskItem item = baseItem(managementTask, "SYSTEM", task.getId(), TaskType.DIRECTORY_SCAN, task.getStatus());
             insertPair(managementTask, item);
-            t.setManagementTaskId(managementTask.getId());
-            directoryScanTaskMapper.updateById(t);
+            task.setManagementTaskId(managementTask.getId());
+            directoryScanTaskMapper.updateById(task);
             count++;
         }
         if (count > 0) {

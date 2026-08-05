@@ -40,13 +40,13 @@ public class WorkerConfig {
      * 解析外部工具路径：相对路径基于 {@code toolsBaseDir}（未配置则取 JVM 工作目录）解析为绝对路径。
      */
     public Path resolveToolPath(String toolPath) {
-        Path p = Path.of(toolPath);
-        if (p.isAbsolute()) {
-            return p;
+        Path path = Path.of(toolPath);
+        if (path.isAbsolute()) {
+            return path;
         }
         String base = toolsBaseDir != null && !toolsBaseDir.isBlank()
                 ? toolsBaseDir : System.getProperty("user.dir");
-        return Path.of(base).resolve(p).normalize();
+        return Path.of(base).resolve(path).normalize();
     }
 
     @Bean

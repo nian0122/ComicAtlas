@@ -235,22 +235,22 @@ public class CatalogManagementServiceImpl implements CatalogManagementService {
             if (!seen.add(cur)) {
                 return false; // 数据本身已有环，停止兜底
             }
-            Catalog c = catalogMapper.selectById(cur);
-            cur = c != null ? c.getParentId() : null;
+            Catalog catalog = catalogMapper.selectById(cur);
+            cur = catalog != null ? catalog.getParentId() : null;
         }
         return false;
     }
 
     private List<Catalog> selectSiblings(Long comicId, Long parentId) {
-        LambdaQueryWrapper<Catalog> w = new LambdaQueryWrapper<Catalog>()
+        LambdaQueryWrapper<Catalog> wrapper = new LambdaQueryWrapper<Catalog>()
                 .eq(Catalog::getComicId, comicId)
                 .orderByAsc(Catalog::getSortOrder, Catalog::getId);
         if (parentId == null) {
-            w.isNull(Catalog::getParentId);
+            wrapper.isNull(Catalog::getParentId);
         } else {
-            w.eq(Catalog::getParentId, parentId);
+            wrapper.eq(Catalog::getParentId, parentId);
         }
-        return catalogMapper.selectList(w);
+        return catalogMapper.selectList(wrapper);
     }
 
     private int nextSiblingSortOrder(Long comicId, Long parentId) {
@@ -273,16 +273,16 @@ public class CatalogManagementServiceImpl implements CatalogManagementService {
     }
 
     private int nextChapterSortOrder(Long comicId, Long catalogId) {
-        LambdaQueryWrapper<Chapter> w = new LambdaQueryWrapper<Chapter>()
+        LambdaQueryWrapper<Chapter> wrapper = new LambdaQueryWrapper<Chapter>()
                 .eq(Chapter::getComicId, comicId)
                 .orderByDesc(Chapter::getSortOrder)
                 .last("LIMIT 1");
         if (catalogId == null) {
-            w.isNull(Chapter::getCatalogId);
+            wrapper.isNull(Chapter::getCatalogId);
         } else {
-            w.eq(Chapter::getCatalogId, catalogId);
+            wrapper.eq(Chapter::getCatalogId, catalogId);
         }
-        List<Chapter> list = chapterMapper.selectList(w);
+        List<Chapter> list = chapterMapper.selectList(wrapper);
         return list.isEmpty() ? 1 : list.get(0).getSortOrder() + 1;
     }
 }

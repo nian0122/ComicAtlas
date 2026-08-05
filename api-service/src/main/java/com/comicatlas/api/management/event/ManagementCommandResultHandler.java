@@ -440,27 +440,27 @@ public class ManagementCommandResultHandler {
 
     private void applyUploadCompletedBusiness(MediaUploadCompletedEvent ev) {
         boolean replace = "MEDIA_REPLACE".equals(ev.operationType());
-        for (MediaAnalysisResult r : ev.results()) {
-            if (r.mediaId() == null) {
+        for (MediaAnalysisResult result : ev.results()) {
+            if (result.mediaId() == null) {
                 continue;
             }
             LambdaUpdateWrapper<Media> mediaUpdate = new LambdaUpdateWrapper<Media>()
-                    .eq(Media::getId, r.mediaId())
+                    .eq(Media::getId, result.mediaId())
                     .set(Media::getStatus, MediaLifecycleStatus.READY)
                     .set(Media::getHqStatus, HqStatus.READY)
-                    .set(Media::getWidth, r.width())
-                    .set(Media::getHeight, r.height())
-                    .set(Media::getFileSize, r.fileSize())
-                    .set(Media::getMediaType, r.mediaType())
-                    .set(Media::getDuration, r.duration())
-                    .set(Media::getContainer, r.container())
-                    .set(Media::getVideoCodec, r.videoCodec())
-                    .set(Media::getAudioCodec, r.audioCodec());
-            if (r.hqRoot() != null && !r.hqRoot().isBlank()) {
-                mediaUpdate.set(Media::getHqRoot, r.hqRoot());
+                    .set(Media::getWidth, result.width())
+                    .set(Media::getHeight, result.height())
+                    .set(Media::getFileSize, result.fileSize())
+                    .set(Media::getMediaType, result.mediaType())
+                    .set(Media::getDuration, result.duration())
+                    .set(Media::getContainer, result.container())
+                    .set(Media::getVideoCodec, result.videoCodec())
+                    .set(Media::getAudioCodec, result.audioCodec());
+            if (result.hqRoot() != null && !result.hqRoot().isBlank()) {
+                mediaUpdate.set(Media::getHqRoot, result.hqRoot());
             }
-            if (r.hqPath() != null && !r.hqPath().isBlank()) {
-                mediaUpdate.set(Media::getHqPath, r.hqPath());
+            if (result.hqPath() != null && !result.hqPath().isBlank()) {
+                mediaUpdate.set(Media::getHqPath, result.hqPath());
             }
             if (replace) {
                 // 原子替换：保留 mediaId/pageNumber，重置 LQ/transcode

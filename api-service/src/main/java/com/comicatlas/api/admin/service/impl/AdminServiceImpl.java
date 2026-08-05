@@ -160,7 +160,7 @@ public class AdminServiceImpl implements AdminService {
         if (!Files.exists(dir)) { return 0; }
         try (var stream = Files.walk(dir)) {
             return stream.filter(Files::isRegularFile)
-                         .mapToLong(p -> { try { return Files.size(p); } catch (Exception e) { return 0; } })
+                         .mapToLong(path -> { try { return Files.size(path); } catch (Exception e) { return 0; } })
                          .sum();
         } catch (Exception e) {
             log.warn("计算目录大小失败: {}", dir, e);
@@ -286,12 +286,12 @@ public class AdminServiceImpl implements AdminService {
                     List<Media> dbPagesList = mediaMapper.selectList(
                             new LambdaQueryWrapper<Media>().eq(Media::getChapterId, chapter.getId()));
                     Map<String, Media> dbPageMap = new LinkedHashMap<>();
-                    for (Media p : dbPagesList) {
-                        String hqPath = p.getHqPath();
+                    for (Media media : dbPagesList) {
+                        String hqPath = media.getHqPath();
                         if (hqPath != null && hqPath.contains("/")) {
                             String fileName = hqPath.substring(hqPath.lastIndexOf('/') + 1);
                             if (!fileName.isEmpty() && !"null".equals(fileName)) {
-                                dbPageMap.put(fileName, p);
+                                dbPageMap.put(fileName, media);
                             }
                         }
                     }

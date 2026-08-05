@@ -78,21 +78,21 @@ public class DirectoryParser {
 
     // ---- helpers ----
     public List<Path> listMediaFiles(Path dir) {
-        List<Path> r = new ArrayList<>();
-        try (DirectoryStream<Path> s = Files.newDirectoryStream(dir)) {
-            for (Path f : s) {
-                if (MEDIA_EXT.stream().anyMatch(e -> f.getFileName().toString().toLowerCase().endsWith(e))) { r.add(f); }
+        List<Path> paths = new ArrayList<>();
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir)) {
+            for (Path file : stream) {
+                if (MEDIA_EXT.stream().anyMatch(ext -> file.getFileName().toString().toLowerCase().endsWith(ext))) { paths.add(file); }
             }
         } catch (Exception e) { log.warn("read: {}", dir, e); }
-        r.sort(Comparator.comparing(p -> p.getFileName().toString(), String.CASE_INSENSITIVE_ORDER));
-        return r;
+        paths.sort(Comparator.comparing(path -> path.getFileName().toString(), String.CASE_INSENSITIVE_ORDER));
+        return paths;
     }
 
     public List<Path> listSubDirs(Path dir) {
-        List<Path> r = new ArrayList<>();
-        try (DirectoryStream<Path> s = Files.newDirectoryStream(dir, Files::isDirectory)) { s.forEach(r::add); } catch (Exception e) { log.warn("listSubDirs: {}", dir, e); }
-        r.sort(Comparator.comparing(p -> p.getFileName().toString(), String.CASE_INSENSITIVE_ORDER));
-        return r;
+        List<Path> paths = new ArrayList<>();
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir, Files::isDirectory)) { stream.forEach(paths::add); } catch (Exception e) { log.warn("listSubDirs: {}", dir, e); }
+        paths.sort(Comparator.comparing(path -> path.getFileName().toString(), String.CASE_INSENSITIVE_ORDER));
+        return paths;
     }
 
     public boolean hasMedia(Path dir) { return !listMediaFiles(dir).isEmpty(); }

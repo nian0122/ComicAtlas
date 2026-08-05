@@ -112,13 +112,13 @@ public class HttpDownloader implements DownloadStrategy {
         comic.put("sourceGalleryToken", md.token());
         comic.put("tags", md.tags().stream().map(tag -> {
             String[] parts = tag.split(":", 2);
-            Map<String, String> m = new LinkedHashMap<>();
-            m.put("name", parts.length > 1 ? parts[1] : parts[0]);
-            m.put("type", parts.length > 1 ? parts[0] : "misc");
-            return m;
+            Map<String, String> tagMap = new LinkedHashMap<>();
+            tagMap.put("name", parts.length > 1 ? parts[1] : parts[0]);
+            tagMap.put("type", parts.length > 1 ? parts[0] : "misc");
+            return tagMap;
         }).toList());
-        comic.put("torrents", md.torrents().stream().map(t -> Map.of(
-            "hash", t.hash(), "name", t.name(), "fsize", t.fsize()
+        comic.put("torrents", md.torrents().stream().map(torrent -> Map.of(
+            "hash", torrent.hash(), "name", torrent.name(), "fsize", torrent.fsize()
         )).toList());
         if (md.archiverKey() != null) {
             comic.put("archiverKey", md.archiverKey());

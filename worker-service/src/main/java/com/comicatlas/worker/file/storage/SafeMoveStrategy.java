@@ -63,11 +63,11 @@ public class SafeMoveStrategy {
         }
     }
 
-    private boolean sameFileStore(Path a, Path b) {
+    private boolean sameFileStore(Path first, Path second) {
         try {
-            return Files.getFileStore(a).equals(Files.getFileStore(b));
+            return Files.getFileStore(first).equals(Files.getFileStore(second));
         } catch (IOException e) {
-            log.warn("无法判断文件存储是否同卷，将使用跨卷移动: {} / {}", a, b, e);
+            log.warn("无法判断文件存储是否同卷，将使用跨卷移动: {} / {}", first, second, e);
             return false;
         }
     }

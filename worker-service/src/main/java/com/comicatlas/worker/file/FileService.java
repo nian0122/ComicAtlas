@@ -115,12 +115,12 @@ public class FileService {
     private List<Path> listImages(Path dir) throws Exception {
         List<Path> images = new ArrayList<>();
         try (var stream = Files.newDirectoryStream(dir)) {
-            for (Path f : stream) {
-                String name = f.getFileName().toString().toLowerCase();
-                if (IMAGE_EXT.stream().anyMatch(name::endsWith)) { images.add(f); }
+            for (Path file : stream) {
+                String name = file.getFileName().toString().toLowerCase();
+                if (IMAGE_EXT.stream().anyMatch(name::endsWith)) { images.add(file); }
             }
         }
-        images.sort(Comparator.comparing(p -> p.getFileName().toString(), String.CASE_INSENSITIVE_ORDER));
+        images.sort(Comparator.comparing(path -> path.getFileName().toString(), String.CASE_INSENSITIVE_ORDER));
         return images;
     }
 }

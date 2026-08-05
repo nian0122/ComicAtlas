@@ -161,9 +161,9 @@ public class MediaAnalyzer {
         try {
             JsonNode root = objectMapper.readTree(json);
             JsonNode fmt = root.path("format");
-            String d = fmt.path("duration").asText(null);
-            if (d != null && !d.isEmpty() && !"N/A".equals(d)) {
-                try { duration = new BigDecimal(d); } catch (Exception e) { log.warn("解析视频时长失败: {}", d, e); }
+            String durationText = fmt.path("duration").asText(null);
+            if (durationText != null && !durationText.isEmpty() && !"N/A".equals(durationText)) {
+                try { duration = new BigDecimal(durationText); } catch (Exception e) { log.warn("解析视频时长失败: {}", durationText, e); }
             }
             for (JsonNode stream : root.path("streams")) {
                 String type = stream.path("codec_type").asText("");
@@ -214,9 +214,9 @@ public class MediaAnalyzer {
 
     private record ImageDimensions(Integer width, Integer height) {}
 
-    private ImageDimensions readImageDims(Path p) {
+    private ImageDimensions readImageDims(Path path) {
         // 1. 优先尝试 ImageIO
-        try (ImageInputStream in = ImageIO.createImageInputStream(p.toFile())) {
+        try (ImageInputStream in = ImageIO.createImageInputStream(path.toFile())) {
             if (in != null) {
                 var readers = ImageIO.getImageReaders(in);
                 if (readers.hasNext()) {
@@ -230,10 +230,10 @@ public class MediaAnalyzer {
                 }
             }
         } catch (Exception e) {
-            log.debug("ImageIO 读取尺寸失败: {}", p, e);
+            log.debug("ImageIO 读取尺寸失败: {}", path, e);
         }
         // 2. 回退：直接解析文件头
-        int[] dims = com.comicatlas.common.util.ImageDimensionsReader.read(p);
+        int[] dims = com.comicatlas.common.util.ImageDimensionsReader.read(path);
         if (dims[0] > 0 && dims[1] > 0) {
             return new ImageDimensions(dims[0], dims[1]);
         }
