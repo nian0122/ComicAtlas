@@ -446,6 +446,7 @@ public class ImportServiceImpl implements ImportService {
         try {
             return SourceType.valueOf(sourceType);
         } catch (IllegalArgumentException e) {
+            log.warn("未知 sourceType={}，映射为 null（调用方将按 REGISTER 兜底）", sourceType);
             return null;
         }
     }
