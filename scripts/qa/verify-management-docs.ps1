@@ -136,7 +136,7 @@ if ($SkipCodeCrossCheck) {
         "comic-common/src/main/java/com/comicatlas/common/enums"
     )
     $enumMap = @{
-        'ComicLifecycleStatus' = @('DRAFT','IMPORTING','IMPORT_FAILED','READY','RECOVERY_REQUIRED','DELETING','TRASHING','TRASHED','RESTORING','PURGING','DELETED')
+        'ComicStatus' = @('DRAFT','IMPORTING','IMPORT_FAILED','READY','RECOVERY_REQUIRED','DELETING','TRASHING','TRASHED','RESTORING','PURGING','DELETED')
         'ManagementTaskStatus' = @('QUEUED','RUNNING','CANCELLING','CANCELLED','SUCCEEDED','PARTIALLY_SUCCEEDED','FAILED')
         'TaskStage'            = @('DOWNLOADING','EXTRACTING','PARSING')
         'HqStatus'             = @('PENDING','READY','MISSING','DELETE_QUEUED','DELETING','DELETED','FAILED')
