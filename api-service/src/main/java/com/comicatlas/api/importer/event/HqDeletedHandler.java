@@ -15,7 +15,6 @@ import org.springframework.amqp.support.AmqpHeaders;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
 
 /**
  * HQ 删除完成事件处理器。

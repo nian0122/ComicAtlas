@@ -1,6 +1,5 @@
 package com.comicatlas.api.admin.controller;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.admin.dto.ChapterStorageDTO;
 import com.comicatlas.api.admin.dto.ComicStorageDTO;
 import com.comicatlas.api.admin.dto.ComicStorageQuery;

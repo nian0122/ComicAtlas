@@ -3,10 +3,8 @@ package com.comicatlas.api.export.controller;
 import com.comicatlas.api.common.Result;
 import com.comicatlas.api.export.dto.ExportTaskVO;
 import com.comicatlas.api.export.service.ExportService;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -14,7 +12,6 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 
 import java.awt.Desktop;
 import java.io.IOException;
-import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;

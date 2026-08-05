@@ -5,8 +5,6 @@ import com.comicatlas.api.admin.dto.RefreshMetadataResult;
 import com.comicatlas.api.admin.dto.ScanRecoverResultDTO;
 import com.comicatlas.api.admin.dto.StorageStatsDTO;
 
-import java.util.Map;
-
 public interface AdminService {
     ScanRecoverResultDTO scanRecover();
     ComicDeleteStats deleteComic(Long comicId, String mode);

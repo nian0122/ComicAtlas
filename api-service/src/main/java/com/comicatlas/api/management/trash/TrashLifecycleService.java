@@ -27,7 +27,6 @@ import com.comicatlas.api.management.state.ManagementStateMachine;
 import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.common.dto.TrashManifest;
 import com.comicatlas.common.dto.TrashManifestActual;
-import com.comicatlas.common.enums.ManagementTaskStatus;
 import com.comicatlas.common.enums.MediaLifecycleStatus;
 import com.comicatlas.common.enums.TaskType;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
@@ -38,7 +37,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.time.Instant;
 import java.time.LocalDateTime;

@@ -2,7 +2,6 @@ package com.comicatlas.api.management.event;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.comic.entity.Chapter;
 import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.entity.Media;
