@@ -12,6 +12,7 @@ import com.comicatlas.common.enums.MediaLifecycleStatus;
 import com.comicatlas.api.common.storage.FileUrlResolver;
 import com.comicatlas.api.reader.dto.ReaderDTO;
 import com.comicatlas.api.common.constant.HttpStatusCodes;
+import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.reader.service.ReaderService;
 import lombok.RequiredArgsConstructor;
@@ -34,7 +35,7 @@ public class ReaderServiceImpl implements ReaderService {
         if (chapter == null) throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在");
 
         Comic comic = comicMapper.selectById(chapter.getComicId());
-        if (comic == null || !"READY".equals(comic.getStatus())) {
+        if (comic == null || comic.getStatus() != ComicStatus.READY) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在或不可阅读");
         }
         if (!ChapterLifecycleStatus.READY.name().equals(chapter.getStatus())) {

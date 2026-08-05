@@ -12,6 +12,8 @@ import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.api.common.constant.HttpStatusCodes;
+import com.comicatlas.api.common.enums.ComicStatus;
+import com.comicatlas.api.common.enums.SourceType;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.common.exception.ConflictException;
 import com.comicatlas.api.common.storage.ApiStorageProperties;
@@ -110,8 +112,8 @@ public class ImportServiceImpl implements ImportService {
 
         // 1. 预创建 comic 行
         Comic comic = new Comic();
-        comic.setSourceType(sourceType);
-        comic.setStatus("IMPORTING");
+        comic.setSourceType(toSourceType(sourceType));
+        comic.setStatus(ComicStatus.IMPORTING);
         comic.setTitle("导入中...");
 
         switch (sourceType) {
@@ -133,7 +135,7 @@ public class ImportServiceImpl implements ImportService {
                 }
                 // DB 去重
                 var existing = comicMapper.selectOne(new LambdaQueryWrapper<Comic>()
-                    .eq(Comic::getSourceType, "EHENTAI")
+                    .eq(Comic::getSourceType, SourceType.EHENTAI)
                     .eq(Comic::getSourceGalleryId, gid));
                 if (existing != null) {
                     throw new BusinessException(HttpStatusCodes.CONFLICT, "该漫画已导入 - 漫画ID: " + existing.getId());
@@ -214,8 +216,8 @@ public class ImportServiceImpl implements ImportService {
                     name = name.contains(".") ? name.substring(0, name.lastIndexOf('.')) : name;
 
                     Comic comic = new Comic();
-                    comic.setSourceType(sourceType);
-                    comic.setStatus("IMPORTING");
+                    comic.setSourceType(toSourceType(sourceType));
+                    comic.setStatus(ComicStatus.IMPORTING);
                     comic.setTitle(name);
                     comic.setSourceRef(path);
                     comicMapper.insert(comic);
@@ -356,9 +358,9 @@ public class ImportServiceImpl implements ImportService {
 
         // IMPORT_FAILED → IMPORTING，允许重新导入
         Comic comic = comicMapper.selectById(comicId);
-        if (comic != null && "IMPORT_FAILED".equals(comic.getStatus())) {
-            ManagementStateMachine.validateComicTransition(comic.getStatus(), "IMPORTING");
-            comic.setStatus("IMPORTING");
+        if (comic != null && comic.getStatus() == ComicStatus.IMPORT_FAILED) {
+            ManagementStateMachine.validateComicTransition(comicStatusName(comic), "IMPORTING");
+            comic.setStatus(ComicStatus.IMPORTING);
             comicMapper.updateById(comic);
         }
 
@@ -429,6 +431,21 @@ public class ImportServiceImpl implements ImportService {
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 不可用", e);
         }
+    }
+
+    /** 兼容历史 "DIRECTORY" 值：语义等同 REGISTER（本地目录导入）。 */
+    private static SourceType toSourceType(String sourceType) {
+        if (sourceType == null) return null;
+        if ("DIRECTORY".equals(sourceType)) return SourceType.REGISTER;
+        try {
+            return SourceType.valueOf(sourceType);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    private static String comicStatusName(Comic comic) {
+        return comic.getStatus() == null ? null : comic.getStatus().name();
     }
 
     private ImportTaskVO toVO(ImportTask t) {

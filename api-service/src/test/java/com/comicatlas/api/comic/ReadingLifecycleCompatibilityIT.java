@@ -12,6 +12,7 @@ import com.comicatlas.api.comic.entity.Media;
 import com.comicatlas.api.comic.mapper.CatalogMapper;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.comic.mapper.ComicMapper;
+import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.api.comic.service.CatalogService;
 import com.comicatlas.api.comic.service.ChapterManagementService;
@@ -209,7 +210,7 @@ class ReadingLifecycleCompatibilityIT {
 
     // ======================== 辅助方法 ========================
 
-    private Long insertComic(String title, String status) {
+    private Long insertComic(String title, ComicStatus status) {
         Comic c = new Comic();
         c.setTitle(title);
         c.setStatus(status);
@@ -249,7 +250,7 @@ class ReadingLifecycleCompatibilityIT {
 
     /** 创建一个 READY 漫画 + 1 个 READY 章节 + 2 张 READY 页 */
     private long[] createReadyComicWithChapterAndMedia() {
-        Long comicId = insertComic("可读漫画-" + System.nanoTime(), "READY");
+        Long comicId = insertComic("可读漫画-" + System.nanoTime(), ComicStatus.READY);
         Long chapterId = insertChapter(comicId, 1, "1", "READY");
         insertMedia(chapterId, 1, comicId + "/" + chapterId + "/001.jpg", "READY");
         insertMedia(chapterId, 2, comicId + "/" + chapterId + "/002.jpg", "READY");
@@ -282,10 +283,8 @@ class ReadingLifecycleCompatibilityIT {
         @Test
         @DisplayName("DRAFT/IMPORTING/IMPORT_FAILED/RECOVERY_REQUIRED/DELETING/TRASHED/RESTORING/PURGING/DELETED 不可读；READY 可读")
         void nonReadyLifecycles_hiddenFromCatalogAndReader() throws Exception {
-            List<String> nonReadable = List.of(
-                "DRAFT", "IMPORTING", "IMPORT_FAILED", "RECOVERY_REQUIRED",
-                "DELETING", "TRASHED", "RESTORING", "PURGING", "DELETED");
-            for (String status : nonReadable) {
+            List<ComicStatus> nonReadable = List.of(ComicStatus.DRAFT, ComicStatus.IMPORTING, ComicStatus.IMPORT_FAILED, ComicStatus.RECOVERY_REQUIRED, ComicStatus.DELETING, ComicStatus.TRASHED, ComicStatus.RESTORING, ComicStatus.PURGING, ComicStatus.DELETED);
+            for (ComicStatus status : nonReadable) {
                 Long comicId = insertComic("HIDE-" + status, status);
                 Long chapterId = insertChapter(comicId, 1, "1", "READY");
                 insertMedia(chapterId, 1, comicId + "/1/001.jpg", "READY");
@@ -306,10 +305,10 @@ class ReadingLifecycleCompatibilityIT {
         @Test
         @DisplayName("阅读列表仅返回 READY；TRASHED/DELETED 等不泄漏")
         void readingList_onlyReady() throws Exception {
-            for (String status : List.of("DRAFT", "IMPORT_FAILED", "TRASHED", "DELETED", "RECOVERY_REQUIRED")) {
+            for (ComicStatus status : List.of(ComicStatus.DRAFT, ComicStatus.IMPORT_FAILED, ComicStatus.TRASHED, ComicStatus.DELETED, ComicStatus.RECOVERY_REQUIRED)) {
                 insertComic("LIST-LC-" + status, status);
             }
-            insertComic("LIST-LC-READY", "READY");
+            insertComic("LIST-LC-READY", ComicStatus.READY);
 
             mockMvc.perform(get("/api/comics")
                             .param("keyword", "LIST-LC")
@@ -324,9 +323,9 @@ class ReadingLifecycleCompatibilityIT {
         @Test
         @DisplayName("管理端 status 过滤可看到 DRAFT/IMPORT_FAILED/RECOVERY_REQUIRED（可管理不可阅读）")
         void managementStatusFilter_exposesNonReady() throws Exception {
-            insertComic("MGMT-DRAFT", "DRAFT");
-            insertComic("MGMT-IMPORT_FAILED", "IMPORT_FAILED");
-            insertComic("MGMT-RECOVERY_REQUIRED", "RECOVERY_REQUIRED");
+            insertComic("MGMT-DRAFT", ComicStatus.DRAFT);
+            insertComic("MGMT-IMPORT_FAILED", ComicStatus.IMPORT_FAILED);
+            insertComic("MGMT-RECOVERY_REQUIRED", ComicStatus.RECOVERY_REQUIRED);
 
             for (String status : List.of("DRAFT", "IMPORT_FAILED", "RECOVERY_REQUIRED")) {
                 mockMvc.perform(get("/api/comics")
@@ -350,7 +349,7 @@ class ReadingLifecycleCompatibilityIT {
         @Test
         @DisplayName("TRASHED 章节从 catalog/reader 隐藏；READY 章节不受影响")
         void trashedChapter_hiddenFromCatalogAndReader() throws Exception {
-            Long comicId = insertComic("TRASH-CH-COMIC", "READY");
+            Long comicId = insertComic("TRASH-CH-COMIC", ComicStatus.READY);
             Long chReady = insertChapter(comicId, 1, "1", "READY");
             Long chTrashed = insertChapter(comicId, 2, "2", "TRASHED");
             insertMedia(chReady, 1, comicId + "/1/001.jpg", "READY");
@@ -406,7 +405,7 @@ class ReadingLifecycleCompatibilityIT {
                             task.getId(), item.getId(), 1, "COMIC_DELETE", "COMIC", comicId),
                     null, 0L);
 
-            assertThat(comicMapper.selectById(comicId).getStatus()).isEqualTo("TRASHED");
+            assertThat(comicMapper.selectById(comicId).getStatus()).isEqualTo(ComicStatus.TRASHED);
             // 阅读入口 404
             assertThat(apiCode("/api/comics/" + comicId + "/catalog")).isEqualTo(404);
             assertThat(apiCode("/api/chapters/" + chapterId)).isEqualTo(404);
@@ -418,7 +417,7 @@ class ReadingLifecycleCompatibilityIT {
 
             // —— 恢复：原 ID 回到 READY，续读原历史
             Comic restored = comicMapper.selectById(comicId);
-            restored.setStatus("READY");
+            restored.setStatus(ComicStatus.READY);
             restored.setDeletedAt(null);
             comicMapper.updateById(restored);
             catalogCacheInvalidator.evict(comicId);
@@ -466,7 +465,7 @@ class ReadingLifecycleCompatibilityIT {
         @Test
         @DisplayName("章节重排后 reader prev/next 跟随新 global_order，catalog 缓存失效")
         void chapterReorder_fixesPrevNext_evictsCatalogCache() throws Exception {
-            Long comicId = insertComic("REORDER-COMIC", "READY");
+            Long comicId = insertComic("REORDER-COMIC", ComicStatus.READY);
             Long ch1 = insertChapter(comicId, 1, "1", "READY");
             Long ch2 = insertChapter(comicId, 2, "2", "READY");
             Long ch3 = insertChapter(comicId, 3, "3", "READY");
@@ -498,7 +497,7 @@ class ReadingLifecycleCompatibilityIT {
         @Test
         @DisplayName("媒体回收完成：页码边界修正（chapter.page_count/comic.total_pages 只计 READY），reader 隐藏 TRASHED，缓存失效")
         void mediaTrash_fixesPageBoundary_evictsCatalogCache() throws Exception {
-            Long comicId = insertComic("MEDIA-TRASH-COMIC", "READY");
+            Long comicId = insertComic("MEDIA-TRASH-COMIC", ComicStatus.READY);
             Long chapterId = insertChapter(comicId, 1, "1", "READY");
             Long m1 = insertMedia(chapterId, 1, comicId + "/1/001.jpg", "READY");
             Long m2 = insertMedia(chapterId, 2, comicId + "/1/002.jpg", "READY");
@@ -521,7 +520,7 @@ class ReadingLifecycleCompatibilityIT {
 
             // 媒体进入 TRASHED，HQ 引用指向 TRASH（不再暴露）
             Media trashed = mediaMapper.selectById(m2);
-            assertThat(trashed.getStatus()).isEqualTo("TRASHED");
+            assertThat(trashed.getStatus()).isEqualTo(ComicStatus.TRASHED);
             assertThat(trashed.getHqStatus()).isEqualTo("DELETED");
             // 页码边界修正：只计 READY 页
             assertThat(chapterMapper.selectById(chapterId).getPageCount()).isEqualTo(2);
@@ -540,7 +539,7 @@ class ReadingLifecycleCompatibilityIT {
         @Test
         @DisplayName("章节内媒体重排：页码连续 1..N，reader 顺序一致")
         void mediaReorder_renumbersPages() {
-            Long comicId = insertComic("MEDIA-REORDER-COMIC", "READY");
+            Long comicId = insertComic("MEDIA-REORDER-COMIC", ComicStatus.READY);
             Long chapterId = insertChapter(comicId, 1, "1", "READY");
             Long m1 = insertMedia(chapterId, 1, comicId + "/1/001.jpg", "READY");
             Long m2 = insertMedia(chapterId, 2, comicId + "/1/002.jpg", "READY");
@@ -585,7 +584,7 @@ class ReadingLifecycleCompatibilityIT {
                     null, 0L);
 
             Comic comic = comicMapper.selectById(comicId);
-            assertThat(comic.getStatus()).isEqualTo("READY");
+            assertThat(comic.getStatus()).isEqualTo(ComicStatus.READY);
             assertThat(comic.getTitle()).isEqualTo("导入兼容漫画");
 
             List<Chapter> chapters = chapterMapper.selectList(
@@ -623,7 +622,7 @@ class ReadingLifecycleCompatibilityIT {
             assertThat(progress.recoveredComics()).isEqualTo(1);
 
             Comic comic = comicMapper.selectById(comicId);
-            assertThat(comic.getStatus()).isEqualTo("READY");
+            assertThat(comic.getStatus()).isEqualTo(ComicStatus.READY);
             assertThat(comic.getTitle()).isEqualTo("恢复兼容漫画");
 
             List<Chapter> chapters = chapterMapper.selectList(
@@ -655,7 +654,7 @@ class ReadingLifecycleCompatibilityIT {
         @Test
         @DisplayName("DB 中旧布局 hq_path 原样解析，不重写为推测值")
         void legacyGlobalOrderPath_readsWithoutRewrite() throws Exception {
-            Long comicId = insertComic("LEGACY-COMIC", "READY");
+            Long comicId = insertComic("LEGACY-COMIC", ComicStatus.READY);
             // 旧布局：目录按 globalOrder 而非 chapterId
             int globalOrder = 7;
             Long chapterId = insertChapter(comicId, globalOrder, "1", "READY");

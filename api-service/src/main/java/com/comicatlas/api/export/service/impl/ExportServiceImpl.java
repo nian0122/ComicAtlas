@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.common.constant.HttpStatusCodes;
+import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.export.dto.ExportTaskVO;
 import com.comicatlas.api.export.entity.ExportTask;
@@ -44,7 +45,7 @@ public class ExportServiceImpl implements ExportService {
         if (comic == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在");
         }
-        if (!"READY".equals(comic.getStatus())) {
+        if (comic.getStatus() != ComicStatus.READY) {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "漫画状态不允许导出，当前状态: " + comic.getStatus());
         }
 

@@ -3,6 +3,7 @@ package com.comicatlas.api.comic;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.mapper.ComicMapper;
+import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.event.ImportEventHandler;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
@@ -367,7 +368,7 @@ class ComicManagementCrudIT {
             // 行保留（软删除），状态迁移为 TRASHING（等待 Worker 回收完成）
             Comic comic = comicMapper.selectById(id);
             assertThat(comic).isNotNull();
-            assertThat(comic.getStatus()).isEqualTo("TRASHING");
+            assertThat(comic.getStatus()).isEqualTo(ComicStatus.TRASHING);
 
             // 回收任务存在且关联 comic
             ManagementTask task = managementTaskMapper.selectById(taskId);
@@ -431,11 +432,11 @@ class ComicManagementCrudIT {
         @Test
         @DisplayName("DRAFT/IMPORT_FAILED/TRASHED/DELETED 不出现，READY 出现")
         void readingList_excludesNonReadableStatuses() throws Exception {
-            insertComic("LIST-EXCL-DRAFT", "DRAFT");
-            insertComic("LIST-EXCL-FAILED", "IMPORT_FAILED");
-            insertComic("LIST-EXCL-TRASHED", "TRASHED");
-            insertComic("LIST-EXCL-DELETED", "DELETED");
-            insertComic("LIST-EXCL-READY", "READY");
+            insertComic("LIST-EXCL-DRAFT", ComicStatus.DRAFT);
+            insertComic("LIST-EXCL-FAILED", ComicStatus.IMPORT_FAILED);
+            insertComic("LIST-EXCL-TRASHED", ComicStatus.TRASHED);
+            insertComic("LIST-EXCL-DELETED", ComicStatus.DELETED);
+            insertComic("LIST-EXCL-READY", ComicStatus.READY);
 
             mockMvc.perform(get("/api/comics")
                             .param("keyword", "LIST-EXCL")
@@ -474,7 +475,7 @@ class ComicManagementCrudIT {
             // comic 处于 IMPORTING
             Comic comic = comicMapper.selectById(comicId);
             assertThat(comic).isNotNull();
-            assertThat(comic.getStatus()).isEqualTo("IMPORTING");
+            assertThat(comic.getStatus()).isEqualTo(ComicStatus.IMPORTING);
 
             // import_task 关联 management task
             ImportTask importTask = importTaskMapper.selectById(taskId);
@@ -505,7 +506,7 @@ class ComicManagementCrudIT {
                     null, 0L);
 
             Comic comic = comicMapper.selectById(comicId);
-            assertThat(comic.getStatus()).isEqualTo("READY");
+            assertThat(comic.getStatus()).isEqualTo(ComicStatus.READY);
             assertThat(comic.getTitle()).isEqualTo("导入成功漫画");
 
             ImportTask importTask = importTaskMapper.selectById(taskId);
@@ -537,7 +538,7 @@ class ComicManagementCrudIT {
                     null, 0L);
 
             Comic comic = comicMapper.selectById(comicId);
-            assertThat(comic.getStatus()).isEqualTo("IMPORT_FAILED");
+            assertThat(comic.getStatus()).isEqualTo(ComicStatus.IMPORT_FAILED);
 
             ImportTask importTask = importTaskMapper.selectById(taskId);
             assertThat(importTask.getStatus()).isEqualTo("FAILED");
@@ -565,13 +566,13 @@ class ComicManagementCrudIT {
             importEventHandler.handleImportTaskFailed(
                     new ImportTaskFailedEvent(UUID.randomUUID(), Instant.now(), taskId, comicId, "DOWNLOAD_FAILED", "下载失败"),
                     null, 0L);
-            assertThat(comicMapper.selectById(comicId).getStatus()).isEqualTo("IMPORT_FAILED");
+            assertThat(comicMapper.selectById(comicId).getStatus()).isEqualTo(ComicStatus.IMPORT_FAILED);
 
             mockMvc.perform(post("/api/tasks/import/{id}/retry", taskId))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200));
 
-            assertThat(comicMapper.selectById(comicId).getStatus()).isEqualTo("IMPORTING");
+            assertThat(comicMapper.selectById(comicId).getStatus()).isEqualTo(ComicStatus.IMPORTING);
             assertThat(importTaskMapper.selectById(taskId).getStatus()).isEqualTo("PENDING");
         }
 
@@ -640,7 +641,7 @@ class ComicManagementCrudIT {
                 .path("data").path("id").asLong();
     }
 
-    private void insertComic(String title, String status) {
+    private void insertComic(String title, ComicStatus status) {
         Comic comic = new Comic();
         comic.setTitle(title);
         comic.setStatus(status);

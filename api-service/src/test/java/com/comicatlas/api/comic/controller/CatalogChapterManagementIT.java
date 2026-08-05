@@ -13,6 +13,7 @@ import com.comicatlas.api.comic.entity.Catalog;
 import com.comicatlas.api.comic.entity.Chapter;
 import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.mapper.CatalogMapper;
+import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.service.CatalogManagementService;
@@ -152,7 +153,7 @@ class CatalogChapterManagementIT {
     private Long createComic(String title) {
         Comic c = new Comic();
         c.setTitle(title);
-        c.setStatus("READY");
+        c.setStatus(ComicStatus.READY);
         c.setStoragePolicy("MANAGED");
         comicMapper.insert(c);
         return c.getId();

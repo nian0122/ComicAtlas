@@ -5,6 +5,7 @@ import com.comicatlas.api.comic.entity.Chapter;
 import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.entity.Media;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
+import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.mapper.MediaMapper;
 import org.junit.jupiter.api.*;
@@ -139,7 +140,7 @@ class StorageLayoutContractIT {
         comic.setTitle("契约测试漫画");
         comic.setAuthor("测试作者");
         comic.setStoragePolicy("MANAGED");
-        comic.setStatus("READY");
+        comic.setStatus(ComicStatus.READY);
         comicMapper.insert(comic);
 
         // 旧布局章节（使用 globalOrder 作为目录名）

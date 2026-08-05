@@ -6,6 +6,7 @@ import com.comicatlas.api.comic.entity.*;
 import com.comicatlas.api.comic.mapper.*;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
+import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.common.storage.ApiStorageProperties;
 import com.comicatlas.api.management.entity.ManagementTaskItem;
 import com.comicatlas.api.management.service.ManagementTaskService;
@@ -138,7 +139,7 @@ public class ImportEventHandler {
             comic.setSourceGalleryId(comicData.get("sourceGalleryId").toString());
         }
         comic.setStoragePolicy("MANAGED");
-        comic.setStatus("READY");
+        comic.setStatus(ComicStatus.READY);
 
         // 2. INSERT catalog（有则写入，无则跳过）
         Map<Integer, Long> catalogIdMap = insertCatalogs(catalogsData, comicId);
@@ -420,9 +421,9 @@ public class ImportEventHandler {
         if (comic == null) {
             return;
         }
-        if ("IMPORTING".equals(comic.getStatus())) {
-            ManagementStateMachine.validateComicTransition(comic.getStatus(), "IMPORT_FAILED");
-            comic.setStatus("IMPORT_FAILED");
+        if (comic.getStatus() == ComicStatus.IMPORTING) {
+            ManagementStateMachine.validateComicTransition(comic.getStatus().name(), "IMPORT_FAILED");
+            comic.setStatus(ComicStatus.IMPORT_FAILED);
             comicMapper.updateById(comic);
         }
         ManagementTaskItem mgmtItem = managementTaskService.findActiveItem(

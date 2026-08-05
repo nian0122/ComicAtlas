@@ -56,7 +56,7 @@ public class BatchEligibilityChecker {
                     blocked.add(new BlockedBatchItem(comicId, BatchReasonCode.OP_NOT_ALLOWED, reason));
                 }
             } else {
-                AllowedOperations ops = policyService.forComic(comic.getStatus());
+                AllowedOperations ops = policyService.forComic(comic.getStatus() != null ? comic.getStatus().name() : null);
                 String opName = policyOpName(operation);
                 if (opName != null && ops.isAllowed(opName)) {
                     eligible.add(comicId);

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.comic.entity.*;
 import com.comicatlas.api.comic.mapper.*;
+import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.common.event.DeleteCompletedEvent;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
@@ -52,7 +53,7 @@ public class DeleteEventHandler {
 
                 Comic comic = comicMapper.selectById(comicId);
                 if (comic != null) {
-                    comic.setStatus("DELETED");
+                    comic.setStatus(ComicStatus.DELETED);
                     comicMapper.updateById(comic);
                 }
             });

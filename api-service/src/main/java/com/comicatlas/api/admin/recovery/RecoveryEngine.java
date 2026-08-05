@@ -8,6 +8,7 @@ import com.comicatlas.api.comic.mapper.*;
 import com.comicatlas.api.common.RestoreContext;
 import com.comicatlas.api.common.RestorePolicy;
 import com.comicatlas.api.common.RestoreSource;
+import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.common.storage.ApiStorageProperties;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -150,7 +151,7 @@ public class RecoveryEngine {
             Comic placeholder = new Comic();
             placeholder.setId(comicId);
             placeholder.setTitle("待恢复漫画 " + comicId);
-            placeholder.setStatus("RECOVERY_REQUIRED");
+            placeholder.setStatus(ComicStatus.RECOVERY_REQUIRED);
             placeholder.setStoragePolicy("MANAGED");
             comicMapper.insert(placeholder);
         });
@@ -195,7 +196,7 @@ public class RecoveryEngine {
             chapterMapper.delete(new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
             catalogMapper.delete(new LambdaQueryWrapper<Catalog>().eq(Catalog::getComicId, comicId));
 
-            comic.setStatus("READY");
+            comic.setStatus(ComicStatus.READY);
             comic.setStoragePolicy("MANAGED");
             if (ctx.policy() == RestorePolicy.IMPORT) {
                 comic.setTitle((String) comicData.get("title"));
@@ -207,7 +208,7 @@ public class RecoveryEngine {
             comic.setId(comicId);
             comic.setTitle((String) comicData.get("title"));
             comic.setAuthor((String) comicData.get("author"));
-            comic.setStatus("READY");
+            comic.setStatus(ComicStatus.READY);
             comic.setStoragePolicy("MANAGED");
             if (comicData.get("category") != null) comic.setCategory((String) comicData.get("category"));
             comicMapper.insert(comic);

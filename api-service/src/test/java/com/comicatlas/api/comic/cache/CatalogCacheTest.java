@@ -5,6 +5,7 @@ import com.comicatlas.api.comic.controller.CatalogController;
 import com.comicatlas.api.comic.entity.Chapter;
 import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.mapper.CatalogMapper;
+import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.service.CatalogService;
@@ -66,7 +67,7 @@ class CatalogCacheTest {
         reset(catalogMapper, chapterMapper, comicMapper);
         Comic comic = new Comic();
         comic.setId(1L);
-        comic.setStatus("READY");
+        comic.setStatus(ComicStatus.READY);
         when(comicMapper.selectById(any())).thenReturn(comic);
         var cache = cacheManager.getCache(CatalogCacheInvalidator.CACHE_NAME);
         if (cache != null) {

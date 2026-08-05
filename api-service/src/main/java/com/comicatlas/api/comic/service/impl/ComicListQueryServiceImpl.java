@@ -12,6 +12,7 @@ import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.mapper.CategoryMapper;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.service.ComicListQueryService;
+import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.common.storage.FileUrlResolver;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
 import com.comicatlas.api.management.policy.OperationPolicyService;
@@ -144,9 +145,9 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
         vo.setPageCount(comic.getTotalPages());
         vo.setCategoryId(comic.getCategoryId());
         vo.setCategoryName(categoryNames.get(comic.getCategoryId()));
-        vo.setLifecycle(toLifecycle(comic.getStatus()));
+        vo.setLifecycle(toLifecycle(comic.getStatus() == null ? null : comic.getStatus().name()));
         vo.setActiveTask(activeTasks.get(comic.getId()));
-        vo.setAllowedOperations(operationPolicyService.forComic(comic.getStatus()));
+        vo.setAllowedOperations(operationPolicyService.forComic(comic.getStatus() == null ? null : comic.getStatus().name()));
         vo.setCreatedAt(comic.getCreatedAt());
 
         ReadingHistory history = histories.get(comic.getId());

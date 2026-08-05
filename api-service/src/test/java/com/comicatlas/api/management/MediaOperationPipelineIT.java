@@ -5,6 +5,7 @@ import com.comicatlas.api.comic.entity.Chapter;
 import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.entity.Media;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
+import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.api.common.exception.ConflictException;
@@ -124,7 +125,7 @@ class MediaOperationPipelineIT {
         cleanup();
         comic = new Comic();
         comic.setTitle("测试漫画");
-        comic.setStatus("READY");
+        comic.setStatus(ComicStatus.READY);
         comic.setStoragePolicy("MANAGED");
         comic.setHqSize(7000L);
         comic.setFileSize(7000L);

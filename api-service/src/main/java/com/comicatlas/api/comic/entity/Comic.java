@@ -1,12 +1,15 @@
 package com.comicatlas.api.comic.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
+import com.comicatlas.api.common.enums.ComicStatus;
+import com.comicatlas.api.common.enums.SourceType;
 import lombok.Data;
 import java.time.LocalDateTime;
 
 /**
  * 漫画实体。
- * status 列存储 {@link com.comicatlas.api.common.enums.ComicStatus} 枚举值。
+ * status 列存储 {@link ComicStatus} 枚举值（DB VARCHAR，存枚举 name()）。
+ * sourceType 列存储 {@link SourceType} 枚举值（DB VARCHAR，存枚举 name()）。
  * version 列用于乐观锁（MyBatis Plus @Version 自动管理）。
  */
 @Data
@@ -22,12 +25,12 @@ public class Comic {
     private Long fileSize;
     private Long hqSize;
     private Long lqSize;
-    private String sourceType;
+    private SourceType sourceType;
     private String sourceGalleryId;
     private String sourceGalleryToken;
     private String sourceRef;
     private String storagePolicy;
-    private String status;
+    private ComicStatus status;
     private Long categoryId;
     private String category;
     private LocalDateTime deletedAt;
