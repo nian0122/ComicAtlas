@@ -20,6 +20,7 @@ import com.comicatlas.common.event.VideoMetadataFixRequestedEvent;
 import com.comicatlas.api.comic.mapper.*;
 import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.common.exception.BusinessException;
+import com.comicatlas.api.common.storage.ApiStorageProperties;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
 import com.comicatlas.api.reader.entity.ReadingHistory;
@@ -27,13 +28,11 @@ import com.comicatlas.api.reader.mapper.ReadingHistoryMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.io.File;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -63,15 +62,10 @@ public class AdminServiceImpl implements AdminService {
     private final RecoveryEngine recoveryEngine;
     private final CatalogCacheInvalidator catalogCacheInvalidator;
     private final com.comicatlas.api.management.operation.MediaOperationCommandService mediaOperationCommandService;
+    private final ApiStorageProperties storageProperties;
 
     /** 未结束（活跃）的导入任务状态 */
     private static final Set<String> ACTIVE_STATUSES = Set.of("PENDING", "PARSING", "IMPORTING");
-
-    @Value("${MANGA_ROOT:D:/manga}")
-    private String mangaRoot;
-
-    @Value("${FFPROBE_PATH:tools/ffmpeg/ffprobe.exe}")
-    private String ffprobePath;
 
     @Override
     @Transactional
@@ -142,7 +136,7 @@ public class AdminServiceImpl implements AdminService {
         if (stats == null) {
             stats = new StorageStatsDTO();
         }
-        Path thumbRoot = Path.of(mangaRoot, "thumbs");
+        Path thumbRoot = storageProperties.root("THUMBS").getPath();
         stats.setThumbBytes(dirSize(thumbRoot));
         stats.setComicCount((int) storageMapper.countActiveComics());
         return stats;
@@ -162,7 +156,7 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     public ScanRecoverResultDTO scanRecover() {
-        Path hqRoot = Path.of(mangaRoot, "hq");
+        Path hqRoot = storageProperties.root("HQ").getPath();
         if (!Files.exists(hqRoot)) {
             throw new RuntimeException("HQ 目录不存在: " + hqRoot);
         }

@@ -5,10 +5,10 @@ import com.comicatlas.api.comic.entity.*;
 import com.comicatlas.api.comic.mapper.*;
 import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.common.exception.BusinessException;
+import com.comicatlas.api.common.storage.ApiStorageProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -31,9 +31,7 @@ public class MetadataExporter {
     private final ComicTagMapper comicTagMapper;
     private final TagMapper tagMapper;
     private final ObjectMapper objectMapper;
-
-    @Value("${MANGA_ROOT:F:/manga}")
-    private String mangaRoot;
+    private final ApiStorageProperties storageProperties;
 
     /**
      * 将漫画的全量元数据（catalog、chapter、page）导出为 metadata JSON 文件，
@@ -148,8 +146,8 @@ public class MetadataExporter {
         root.put("catalogs", catalogList);
         root.put("chapters", chapterList);
 
-        // 7. Write to Path.of(mangaRoot, "metadata", comicId + ".json")
-        Path metaPath = Path.of(mangaRoot, "metadata", comicId + ".json");
+        // 7. 写入 METADATA 存储根下的 metadata JSON
+        Path metaPath = storageProperties.root("METADATA").resolve(comicId + ".json");
         Files.createDirectories(metaPath.getParent());
         objectMapper.writerWithDefaultPrettyPrinter().writeValue(metaPath.toFile(), root);
         log.info("Metadata exported: comicId={}, path={}", comicId, metaPath);

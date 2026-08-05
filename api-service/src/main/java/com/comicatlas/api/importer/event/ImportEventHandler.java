@@ -6,6 +6,7 @@ import com.comicatlas.api.comic.entity.*;
 import com.comicatlas.api.comic.mapper.*;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
+import com.comicatlas.api.common.storage.ApiStorageProperties;
 import com.comicatlas.api.management.entity.ManagementTaskItem;
 import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.management.state.ManagementStateMachine;
@@ -21,13 +22,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.support.AmqpHeaders;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.file.Files;
@@ -54,12 +53,10 @@ public class ImportEventHandler {
     private final TransactionTemplate transactionTemplate;
     private final CatalogCacheInvalidator catalogCacheInvalidator;
     private final ManagementTaskService managementTaskService;
+    private final ApiStorageProperties storageProperties;
 
     /** 终态集合：到达这些状态后不可回退到非终态（含 CANCELLED 真正终态） */
     private static final Set<String> TERMINAL_STATUSES = Set.of("SUCCESS", "FAILED", "CANCELLED");
-
-    @Value("${MANGA_ROOT:F:/manga}")
-    private String mangaRoot;
 
     @RabbitListener(queues = "import.result.queue")
     @SuppressWarnings("unchecked")
@@ -79,7 +76,7 @@ public class ImportEventHandler {
             }
 
             Map<String, Object> metadata = objectMapper.readValue(
-                new File(mangaRoot + "/metadata/" + taskId + ".json"),
+                storageProperties.root("METADATA").resolve(taskId + ".json").toFile(),
                 new TypeReference<Map<String, Object>>() {});
 
             ImportResult result = transactionTemplate.execute(status ->
@@ -465,7 +462,7 @@ public class ImportEventHandler {
         String oldDirPattern = comicId + "/" + globalOrder + "/";
         if (!firstHqPath.contains(oldDirPattern)) return;
 
-        Path hqRoot = Path.of(mangaRoot, "hq");
+        Path hqRoot = storageProperties.root("HQ").getPath();
         Path oldDir = hqRoot.resolve(comicId.toString()).resolve(String.valueOf(globalOrder));
         Path newDir = hqRoot.resolve(comicId.toString()).resolve(String.valueOf(chapterId));
 

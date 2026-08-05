@@ -3,6 +3,8 @@ package com.comicatlas.api.admin.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.comic.entity.*;
 import com.comicatlas.api.comic.mapper.*;
+import com.comicatlas.api.common.storage.ApiStorageProperties;
+import com.comicatlas.api.common.storage.ApiStorageRoot;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -39,6 +41,8 @@ class MetadataExporterTest {
     private TagMapper tagMapper;
     @Mock
     private ObjectMapper objectMapper;
+    @Mock
+    private ApiStorageProperties storageProperties;
 
     @InjectMocks
     private MetadataExporter exporter;
@@ -46,6 +50,9 @@ class MetadataExporterTest {
     @Test
     void export_shouldOutputV3WithMediaItems(@TempDir Path tempDir) throws Exception {
         ObjectMapper realMapper = new ObjectMapper();
+        ApiStorageRoot metadataRoot = new ApiStorageRoot();
+        metadataRoot.setPath(tempDir.resolve("metadata"));
+        when(storageProperties.root("METADATA")).thenReturn(metadataRoot);
 
         Comic comic = new Comic();
         comic.setId(1L);
@@ -97,7 +104,6 @@ class MetadataExporterTest {
                 .thenReturn(List.of(imageItem, videoItem));
 
         ReflectionTestUtils.setField(exporter, "objectMapper", realMapper);
-        ReflectionTestUtils.setField(exporter, "mangaRoot", tempDir.toString());
 
         Path out = exporter.export(1L);
 

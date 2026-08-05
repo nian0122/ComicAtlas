@@ -108,6 +108,8 @@ export:
 comic:
   cache:
     catalog-ttl: ${CATALOG_CACHE_TTL:30m}
+  import:
+    ehentai-url-pattern: ${EHENTAI_GALLERY_URL_PATTERN:e-hentai\.org/g/(\d+)/([a-f0-9]+)}
   batch:
     max-items: ${BATCH_MAX_ITEMS:10000}
     preview-ttl-seconds: ${BATCH_PREVIEW_TTL_SECONDS:300}

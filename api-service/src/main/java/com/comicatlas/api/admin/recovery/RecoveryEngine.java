@@ -8,11 +8,11 @@ import com.comicatlas.api.comic.mapper.*;
 import com.comicatlas.api.common.RestoreContext;
 import com.comicatlas.api.common.RestorePolicy;
 import com.comicatlas.api.common.RestoreSource;
+import com.comicatlas.api.common.storage.ApiStorageProperties;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -48,12 +48,10 @@ public class RecoveryEngine {
     private final MediaMapper mediaMapper;
     private final TransactionTemplate transactionTemplate;
     private final CatalogCacheInvalidator catalogCacheInvalidator;
+    private final ApiStorageProperties storageProperties;
 
     /** 视频文件扩展名 */
     private static final Set<String> VIDEO_EXTENSIONS = Set.of(".mp4", ".webm", ".mkv", ".mov", ".avi");
-
-    @Value("${MANGA_ROOT:D:/manga}")
-    private String mangaRoot;
 
     // ======================== 公共 API ========================
 
@@ -72,7 +70,7 @@ public class RecoveryEngine {
         }
 
         // 2. 检查 metadata JSON
-        Path metaFile = Path.of(mangaRoot, "metadata", comicId + ".json");
+        Path metaFile = storageProperties.root("METADATA").resolve(comicId + ".json");
         if (Files.exists(metaFile)) {
             try {
                 Map<String, Object> metadata = objectMapper.readValue(
@@ -102,7 +100,8 @@ public class RecoveryEngine {
      * 供 {@code AdminServiceImpl.refreshMetadata()} 等场景复用。
      */
     public List<ScannedMediaInfo> scanChapterPages(Long comicId, int globalOrder) {
-        Path dir = Path.of(mangaRoot, "hq", String.valueOf(comicId), String.valueOf(globalOrder));
+        Path dir = storageProperties.root("HQ")
+                .resolve(String.valueOf(comicId)).resolve(String.valueOf(globalOrder));
         if (!Files.exists(dir)) return Collections.emptyList();
 
         List<ScannedMediaInfo> pages = new ArrayList<>();
