@@ -117,7 +117,7 @@ public class FileService {
         try (var stream = Files.newDirectoryStream(dir)) {
             for (Path f : stream) {
                 String name = f.getFileName().toString().toLowerCase();
-                if (IMAGE_EXT.stream().anyMatch(name::endsWith)) images.add(f);
+                if (IMAGE_EXT.stream().anyMatch(name::endsWith)) { images.add(f); }
             }
         }
         images.sort(Comparator.comparing(p -> p.getFileName().toString(), String.CASE_INSENSITIVE_ORDER));

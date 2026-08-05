@@ -319,8 +319,8 @@ class RabbitTopologyIT {
      * RabbitMQ queue arguments 中 DLX/DLQ 值可能为 String 或 List<String>。
      */
     private static String dlxArgToString(Object arg) {
-        if (arg instanceof String s) return s;
-        if (arg instanceof List<?> list && !list.isEmpty()) return list.get(0).toString();
+        if (arg instanceof String s) { return s; }
+        if (arg instanceof List<?> list && !list.isEmpty()) { return list.get(0).toString(); }
         return arg != null ? arg.toString() : null;
     }
 

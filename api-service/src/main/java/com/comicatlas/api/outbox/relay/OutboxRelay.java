@@ -68,7 +68,7 @@ public class OutboxRelay {
      */
     @Scheduled(fixedDelayString = "${outbox.relay.poll-interval-ms:5000}")
     public void relayScheduled() {
-        if (!scheduledEnabled) return;
+        if (!scheduledEnabled) { return; }
         relay();
     }
 
@@ -76,7 +76,7 @@ public class OutboxRelay {
      * 手动触发轮询（供测试和管理 API 调用）。
      */
     public void relay() {
-        if (batchSize <= 0) return;
+        if (batchSize <= 0) { return; }
 
         log.info("OutboxRelay 开始轮询...");
         List<OutboxMessage> messages;

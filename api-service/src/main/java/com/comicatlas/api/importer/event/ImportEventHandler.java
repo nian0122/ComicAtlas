@@ -195,7 +195,7 @@ public class ImportEventHandler {
 
     private Map<Integer, Long> insertCatalogs(List<Map<String, Object>> catalogsData, Long comicId) {
         Map<Integer, Long> idMap = new LinkedHashMap<>();
-        if (catalogsData == null || catalogsData.isEmpty()) return idMap;
+        if (catalogsData == null || catalogsData.isEmpty()) { return idMap; }
 
         int size = catalogsData.size();
 
@@ -214,13 +214,13 @@ public class ImportEventHandler {
         Map<Long, Catalog> inserted = new LinkedHashMap<>();
         for (int i = 0; i < size; i++) {
             Catalog cat = catalogMapper.selectById(idMap.get(i));
-            if (cat == null) continue;
+            if (cat == null) { continue; }
             inserted.put(idMap.get(i), cat);
         }
 
         for (int i = 0; i < size; i++) {
             Catalog cat = inserted.get(idMap.get(i));
-            if (cat == null) continue;
+            if (cat == null) { continue; }
             Map<String, Object> cd = catalogsData.get(i);
             Object pi = cd.get("parentIndex");
             if (pi != null) {
@@ -256,7 +256,7 @@ public class ImportEventHandler {
         chapter.setSortOrder((Integer) chData.getOrDefault("sortOrder", 0));
         chapter.setGlobalOrder((Integer) chData.getOrDefault("globalOrder", 0));
         Object cid = chData.get("catalogIndex");
-        if (cid != null) chapter.setCatalogId(catalogIdMap.get(((Number) cid).intValue()));
+        if (cid != null) { chapter.setCatalogId(catalogIdMap.get(((Number) cid).intValue())); }
 
         // v2: pages + imageName; v3: mediaItems + fileName
         boolean isV3 = version >= 3;
@@ -296,9 +296,9 @@ public class ImportEventHandler {
                 }
                 media.setHqStatus(hqStatus);
                 media.setLqStatus(LqStatus.NOT_GENERATED);
-                if (md.get("fileSize") != null) media.setFileSize(((Number) md.get("fileSize")).longValue());
-                if (md.get("width") != null) media.setWidth(((Number) md.get("width")).intValue());
-                if (md.get("height") != null) media.setHeight(((Number) md.get("height")).intValue());
+                if (md.get("fileSize") != null) { media.setFileSize(((Number) md.get("fileSize")).longValue()); }
+                if (md.get("width") != null) { media.setWidth(((Number) md.get("width")).intValue()); }
+                if (md.get("height") != null) { media.setHeight(((Number) md.get("height")).intValue()); }
 
                 // mediaType: v2 强制 IMAGE；v3 读取 metadata 中的 mediaType
                 String mediaType = isV3 ? (String) md.get("mediaType") : "IMAGE";
@@ -332,9 +332,9 @@ public class ImportEventHandler {
     }
 
     private static BigDecimal toBigDecimal(Object value) {
-        if (value == null) return null;
-        if (value instanceof BigDecimal bd) return bd;
-        if (value instanceof Number n) return BigDecimal.valueOf(n.doubleValue());
+        if (value == null) { return null; }
+        if (value instanceof BigDecimal bd) { return bd; }
+        if (value instanceof Number n) { return BigDecimal.valueOf(n.doubleValue()); }
         try {
             return new BigDecimal(value.toString());
         } catch (NumberFormatException e) {
@@ -358,7 +358,7 @@ public class ImportEventHandler {
         Long taskId = event.taskId();
         String newStatus = event.status();
         ImportTask task = taskMapper.selectById(taskId);
-        if (task == null) return;
+        if (task == null) { return; }
 
         ImportTaskStatus currentStatus = task.getStatus();
         ImportTaskStatus mappedStatus = parseStatus(newStatus);
@@ -375,9 +375,9 @@ public class ImportEventHandler {
             task.setStartTime(LocalDateTime.now());
         }
         task.setProgress(event.progress());
-        if (event.speedBytesPerSec() > 0) task.setDownloadSpeed(event.speedBytesPerSec());
-        if (event.etaSeconds() > 0) task.setEtaSeconds(event.etaSeconds());
-        if (event.downloadMethod() != null) task.setDownloadMethod(event.downloadMethod());
+        if (event.speedBytesPerSec() > 0) { task.setDownloadSpeed(event.speedBytesPerSec()); }
+        if (event.etaSeconds() > 0) { task.setEtaSeconds(event.etaSeconds()); }
+        if (event.downloadMethod() != null) { task.setDownloadMethod(event.downloadMethod()); }
         taskMapper.updateById(task);
 
         // 阶段状态（DOWNLOADING/EXTRACTING/PARSING）同步到统一任务 stage 列（TaskStage 枚举）
@@ -475,7 +475,7 @@ public class ImportEventHandler {
 
     /** 将事件状态字符串映射为 ImportTaskStatus；阶段值（DOWNLOADING/EXTRACTING）返回 null。 */
     private static ImportTaskStatus parseStatus(String status) {
-        if (status == null) return null;
+        if (status == null) { return null; }
         try {
             return ImportTaskStatus.valueOf(status);
         } catch (IllegalArgumentException e) {
@@ -489,13 +489,13 @@ public class ImportEventHandler {
      */
     private void renameChapterDirIfNeeded(Long comicId, Long chapterId, int globalOrder,
                                           List<Map<String, Object>> itemList) {
-        if (itemList == null || itemList.isEmpty()) return;
+        if (itemList == null || itemList.isEmpty()) { return; }
         String firstHqPath = (String) itemList.get(0).get("hqPath");
-        if (firstHqPath == null || firstHqPath.isBlank()) return;
+        if (firstHqPath == null || firstHqPath.isBlank()) { return; }
 
         // 仅当 hqPath 包含 "/globalOrder/" 模式时执行迁移
         String oldDirPattern = comicId + "/" + globalOrder + "/";
-        if (!firstHqPath.contains(oldDirPattern)) return;
+        if (!firstHqPath.contains(oldDirPattern)) { return; }
 
         Path hqRoot = storageProperties.root("HQ").getPath();
         Path oldDir = hqRoot.resolve(comicId.toString()).resolve(String.valueOf(globalOrder));

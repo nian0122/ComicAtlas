@@ -90,7 +90,7 @@ public class LqGenerateHandler {
     }
 
     private static String extractDirectory(String hqPath) {
-        if (hqPath == null) return "";
+        if (hqPath == null) { return ""; }
         int lastSlash = hqPath.lastIndexOf('/');
         return lastSlash > 0 ? hqPath.substring(0, lastSlash) : hqPath;
     }

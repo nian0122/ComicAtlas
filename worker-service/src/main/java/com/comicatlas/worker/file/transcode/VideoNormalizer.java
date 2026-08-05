@@ -61,10 +61,10 @@ public class VideoNormalizer {
      * @return 成功处理的文件数
      */
     public int normalize(Path sourceDir) {
-        if (!Files.exists(sourceDir)) return 0;
+        if (!Files.exists(sourceDir)) { return 0; }
 
         List<Path> files = collectFiles(sourceDir);
-        if (files.isEmpty()) return 0;
+        if (files.isEmpty()) { return 0; }
 
         String cfgTemp = config.getTempDir();
         Path tempRoot = (cfgTemp != null && !cfgTemp.isBlank())

@@ -160,11 +160,11 @@ public class MediaAnalyzer {
                     }
                     if (width == null) {
                         int w = stream.path("width").asInt(0);
-                        if (w > 0) width = w;
+                        if (w > 0) { width = w; }
                     }
                     if (height == null) {
                         int h = stream.path("height").asInt(0);
-                        if (h > 0) height = h;
+                        if (h > 0) { height = h; }
                     }
                 } else if ("audio".equals(type)) {
                     if (audioCodec == null && codec != null && !"N/A".equals(codec)) {
@@ -186,7 +186,7 @@ public class MediaAnalyzer {
      * - 包含路径分隔符 → 检查文件是否存在
      */
     private boolean isFfprobeAvailable(String ffprobe) {
-        if (ffprobe == null || ffprobe.isBlank()) return false;
+        if (ffprobe == null || ffprobe.isBlank()) { return false; }
         if (ffprobe.contains("/") || ffprobe.contains("\\")) {
             return Files.exists(Path.of(ffprobe));
         }

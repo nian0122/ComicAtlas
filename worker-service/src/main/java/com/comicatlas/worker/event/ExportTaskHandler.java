@@ -170,10 +170,10 @@ public class ExportTaskHandler {
 
     private String classifyExportError(Exception e) {
         String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
-        if (msg.contains("ZIP") || msg.contains("zip")) return "ZIP_ERROR";
-        if (msg.contains("collect") || msg.contains("Collect")) return "COLLECT_ERROR";
-        if (msg.contains("manifest") || msg.contains("Manifest")) return "MANIFEST_ERROR";
-        if (msg.contains("STORAGE") || msg.contains("storage") || msg.contains("EXPORT")) return "STORAGE_ERROR";
+        if (msg.contains("ZIP") || msg.contains("zip")) { return "ZIP_ERROR"; }
+        if (msg.contains("collect") || msg.contains("Collect")) { return "COLLECT_ERROR"; }
+        if (msg.contains("manifest") || msg.contains("Manifest")) { return "MANIFEST_ERROR"; }
+        if (msg.contains("STORAGE") || msg.contains("storage") || msg.contains("EXPORT")) { return "STORAGE_ERROR"; }
         return "EXPORT_ERROR";
     }
 }

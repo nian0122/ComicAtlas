@@ -194,9 +194,9 @@ class StorageLayoutContractIT {
 
     @AfterEach
     void tearDown() {
-        if (mediaMapper != null) mediaMapper.delete(new LambdaQueryWrapper<>());
-        if (chapterMapper != null) chapterMapper.delete(new LambdaQueryWrapper<>());
-        if (comicMapper != null) comicMapper.delete(new LambdaQueryWrapper<>());
+        if (mediaMapper != null) { mediaMapper.delete(new LambdaQueryWrapper<>()); }
+        if (chapterMapper != null) { chapterMapper.delete(new LambdaQueryWrapper<>()); }
+        if (comicMapper != null) { comicMapper.delete(new LambdaQueryWrapper<>()); }
     }
 
     // ==================== 布局解析测试 ====================

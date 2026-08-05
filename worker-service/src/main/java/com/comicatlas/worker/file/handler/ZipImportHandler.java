@@ -20,7 +20,7 @@ public class ZipImportHandler {
 
     public Path importZip(ImportContext ctx, Long taskId, Long comicId, Path mangaRoot) throws Exception {
         Path zipFile = ctx.sourcePath();
-        if (!Files.exists(zipFile)) throw new RuntimeException("ZIP 文件不存在: " + zipFile);
+        if (!Files.exists(zipFile)) { throw new RuntimeException("ZIP 文件不存在: " + zipFile); }
 
         Path extractDir = mangaRoot.resolve("temp").resolve(taskId.toString()).resolve("extracted");
         Files.createDirectories(extractDir);
@@ -41,7 +41,7 @@ public class ZipImportHandler {
     }
 
     private void cleanupTemp(Path tempDir) {
-        if (!Files.exists(tempDir)) return;
+        if (!Files.exists(tempDir)) { return; }
         try (var stream = Files.walk(tempDir)) {
             stream.sorted(Comparator.reverseOrder())
                 .map(Path::toFile)

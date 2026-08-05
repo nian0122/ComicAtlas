@@ -48,7 +48,7 @@ public class LqCompletedHandler {
 
             for (Media media : mediaItems) {
                 Integer pageNum = media.getPageNumber();
-                if (pageNum == null) pageNum = -1;
+                if (pageNum == null) { pageNum = -1; }
 
                 if (failedPages != null && failedPages.contains(pageNum)) {
                     media.setLqStatus(LqStatus.FAILED);

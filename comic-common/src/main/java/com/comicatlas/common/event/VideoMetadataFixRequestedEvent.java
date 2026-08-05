@@ -9,7 +9,7 @@ public record VideoMetadataFixRequestedEvent(
     Long comicId
 ) implements ComicEvent {
     public VideoMetadataFixRequestedEvent {
-        if (eventId == null) eventId = UUID.randomUUID();
-        if (occurredAt == null) occurredAt = Instant.now();
+        if (eventId == null) { eventId = UUID.randomUUID(); }
+        if (occurredAt == null) { occurredAt = Instant.now(); }
     }
 }

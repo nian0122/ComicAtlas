@@ -135,18 +135,18 @@ public class RecoveryTaskServiceImpl implements RecoveryTaskService {
     @Transactional
     public void updateTask(RecoveryTaskVO vo) {
         RecoveryTask recoveryTask = recoveryTaskMapper.selectById(vo.getId());
-        if (recoveryTask == null) return;
+        if (recoveryTask == null) { return; }
 
-        if (vo.getStatus() != null) recoveryTask.setStatus(vo.getStatus());
-        if (vo.getTotalComics() != null) recoveryTask.setTotalComics(vo.getTotalComics());
-        if (vo.getRecoveredComics() != null) recoveryTask.setRecoveredComics(vo.getRecoveredComics());
-        if (vo.getSkippedComics() != null) recoveryTask.setSkippedComics(vo.getSkippedComics());
-        if (vo.getPlaceholderComics() != null) recoveryTask.setPlaceholderComics(vo.getPlaceholderComics());
-        if (vo.getErrorComics() != null) recoveryTask.setErrorComics(vo.getErrorComics());
-        if (vo.getErrorMessage() != null) recoveryTask.setErrorMessage(vo.getErrorMessage());
-        if (vo.getErrorDetails() != null) recoveryTask.setErrorDetails(vo.getErrorDetails());
-        if (vo.getStartedAt() != null) recoveryTask.setStartedAt(vo.getStartedAt());
-        if (vo.getEndedAt() != null) recoveryTask.setEndedAt(vo.getEndedAt());
+        if (vo.getStatus() != null) { recoveryTask.setStatus(vo.getStatus()); }
+        if (vo.getTotalComics() != null) { recoveryTask.setTotalComics(vo.getTotalComics()); }
+        if (vo.getRecoveredComics() != null) { recoveryTask.setRecoveredComics(vo.getRecoveredComics()); }
+        if (vo.getSkippedComics() != null) { recoveryTask.setSkippedComics(vo.getSkippedComics()); }
+        if (vo.getPlaceholderComics() != null) { recoveryTask.setPlaceholderComics(vo.getPlaceholderComics()); }
+        if (vo.getErrorComics() != null) { recoveryTask.setErrorComics(vo.getErrorComics()); }
+        if (vo.getErrorMessage() != null) { recoveryTask.setErrorMessage(vo.getErrorMessage()); }
+        if (vo.getErrorDetails() != null) { recoveryTask.setErrorDetails(vo.getErrorDetails()); }
+        if (vo.getStartedAt() != null) { recoveryTask.setStartedAt(vo.getStartedAt()); }
+        if (vo.getEndedAt() != null) { recoveryTask.setEndedAt(vo.getEndedAt()); }
 
         recoveryTaskMapper.updateById(recoveryTask);
     }

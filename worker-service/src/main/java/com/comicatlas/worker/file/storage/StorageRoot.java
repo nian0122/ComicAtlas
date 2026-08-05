@@ -44,7 +44,7 @@ public class StorageRoot {
      * 同卷可用原子 rename；跨卷需 copy+delete，且需显式确认允许跨卷操作。
      */
     public boolean sameFileStore(Path other) {
-        if (path == null || other == null) return false;
+        if (path == null || other == null) { return false; }
         try {
             return Files.getFileStore(path).equals(Files.getFileStore(other));
         } catch (Exception e) {

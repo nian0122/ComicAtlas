@@ -635,7 +635,7 @@ public class ManagementTaskService {
                         .eq(ManagementTaskItem::getTaskId, taskId));
 
         ManagementTask task = taskMapper.selectById(taskId);
-        if (task == null) return;
+        if (task == null) { return; }
 
         long successCount = items.stream()
                 .filter(i -> i.getStatus() == ManagementTaskStatus.SUCCEEDED).count();

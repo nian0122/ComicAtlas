@@ -125,7 +125,7 @@ public class DirectoryImportHandler {
         for (var ch : metadata.chapters()) {
             for (var page : ch.pages()) {
                 Path src = importRoot.resolve(ch.sourceDir()).resolve(page.fileName());
-                if (!Files.exists(src)) src = importRoot.resolve(page.fileName());
+                if (!Files.exists(src)) { src = importRoot.resolve(page.fileName()); }
                 if (Files.exists(src) && page.fileSize() > 0) {
                     String relative = importRoot.relativize(src).toString().replace('\\', '/');
                     // 新布局：serverGeneratedName（UUID + 扩展名），目录暂用 globalOrder
@@ -195,13 +195,13 @@ public class DirectoryImportHandler {
                 if (generatedPath != null) {
                     mediaMap.put("hqPath", generatedPath);
                 }
-                if (p.width() != null) mediaMap.put("width", p.width());
-                if (p.height() != null) mediaMap.put("height", p.height());
+                if (p.width() != null) { mediaMap.put("width", p.width()); }
+                if (p.height() != null) { mediaMap.put("height", p.height()); }
                 mediaMap.put("mediaType", p.mediaType());
-                if (p.duration() != null) mediaMap.put("duration", p.duration());
-                if (p.container() != null) mediaMap.put("container", p.container());
-                if (p.videoCodec() != null) mediaMap.put("videoCodec", p.videoCodec());
-                if (p.audioCodec() != null) mediaMap.put("audioCodec", p.audioCodec());
+                if (p.duration() != null) { mediaMap.put("duration", p.duration()); }
+                if (p.container() != null) { mediaMap.put("container", p.container()); }
+                if (p.videoCodec() != null) { mediaMap.put("videoCodec", p.videoCodec()); }
+                if (p.audioCodec() != null) { mediaMap.put("audioCodec", p.audioCodec()); }
                 return mediaMap;
             }).toList());
             return chapterMap;
@@ -235,10 +235,10 @@ public class DirectoryImportHandler {
 
     private void generateCoverFromNode(JsonNode metadata, Long comicId) {
         JsonNode chapters = metadata.path("chapters");
-        if (chapters.isEmpty()) return;
+        if (chapters.isEmpty()) { return; }
         JsonNode firstCh = chapters.get(0);
         JsonNode mediaItems = firstCh.path("mediaItems");
-        if (mediaItems.isEmpty()) return;
+        if (mediaItems.isEmpty()) { return; }
 
         // 跳过 VIDEO 首项，找第一张图片 — 优先使用 hqPath
         JsonNode firstImage = null;

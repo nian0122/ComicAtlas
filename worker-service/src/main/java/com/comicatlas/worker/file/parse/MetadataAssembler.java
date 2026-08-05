@@ -41,7 +41,7 @@ public class MetadataAssembler {
 
         processNode(tree, root, null, catalogs, chapters, globalOrder, catalogCounter);
 
-        if (chapters.isEmpty()) throw new RuntimeException("无可用章节: " + tree.path());
+        if (chapters.isEmpty()) { throw new RuntimeException("无可用章节: " + tree.path()); }
         return new ComicMetadata(title, null, null, List.of(), catalogs, chapters);
     }
 

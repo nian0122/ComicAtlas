@@ -36,7 +36,7 @@ public class HistoryServiceImpl implements HistoryService {
         var histories = historyMapper.selectList(
             new LambdaQueryWrapper<ReadingHistory>()
                 .orderByDesc(ReadingHistory::getUpdatedAt));
-        if (histories.isEmpty()) return List.of();
+        if (histories.isEmpty()) { return List.of(); }
 
         List<Long> comicIds = histories.stream()
                 .map(ReadingHistory::getComicId).distinct().toList();
@@ -60,7 +60,7 @@ public class HistoryServiceImpl implements HistoryService {
         var history = historyMapper.selectOne(
             new LambdaQueryWrapper<ReadingHistory>()
                 .eq(ReadingHistory::getComicId, comicId));
-        if (history == null) return null;
+        if (history == null) { return null; }
         Comic comic = comicMapper.selectById(history.getComicId());
         Chapter chapter = history.getChapterId() != null
                 ? chapterMapper.selectById(history.getChapterId())

@@ -111,17 +111,17 @@ public class RecoveryEngine {
     public List<ScannedMediaInfo> scanChapterPages(Long comicId, int globalOrder) {
         Path dir = storageProperties.root("HQ")
                 .resolve(String.valueOf(comicId)).resolve(String.valueOf(globalOrder));
-        if (!Files.exists(dir)) return Collections.emptyList();
+        if (!Files.exists(dir)) { return Collections.emptyList(); }
 
         List<ScannedMediaInfo> pages = new ArrayList<>();
         try (var stream = Files.newDirectoryStream(dir)) {
             for (Path file : stream) {
                 String name = file.getFileName().toString();
-                if (name.startsWith(".")) continue;
+                if (name.startsWith(".")) { continue; }
 
                 String lower = name.toLowerCase();
                 int dotIdx = lower.lastIndexOf('.');
-                if (dotIdx < 0) continue;
+                if (dotIdx < 0) { continue; }
                 String ext = lower.substring(dotIdx);
                 String mediaType;
                 if (VIDEO_EXTENSIONS.contains(ext)) {
@@ -209,7 +209,7 @@ public class RecoveryEngine {
             if (ctx.policy() == RestorePolicy.IMPORT) {
                 comic.setTitle((String) comicData.get("title"));
                 comic.setAuthor((String) comicData.get("author"));
-                if (comicData.get("category") != null) comic.setCategory((String) comicData.get("category"));
+                if (comicData.get("category") != null) { comic.setCategory((String) comicData.get("category")); }
             }
         } else {
             comic = new Comic();
@@ -218,7 +218,7 @@ public class RecoveryEngine {
             comic.setAuthor((String) comicData.get("author"));
             comic.setStatus(ComicStatus.READY);
             comic.setStoragePolicy("MANAGED");
-            if (comicData.get("category") != null) comic.setCategory((String) comicData.get("category"));
+            if (comicData.get("category") != null) { comic.setCategory((String) comicData.get("category")); }
             comicMapper.insert(comic);
         }
 
@@ -236,7 +236,7 @@ public class RecoveryEngine {
                 chapter.setSortOrder((Integer) chData.getOrDefault("sortOrder", chCount));
                 chapter.setGlobalOrder((Integer) chData.getOrDefault("globalOrder", chCount));
                 Object cid = chData.get("catalogIndex");
-                if (cid != null) chapter.setCatalogId(catalogIdMap.get(((Number) cid).intValue()));
+                if (cid != null) { chapter.setCatalogId(catalogIdMap.get(((Number) cid).intValue())); }
                 chapterMapper.insert(chapter);
                 chCount++;
 
@@ -283,7 +283,7 @@ public class RecoveryEngine {
     @SuppressWarnings("unchecked")
     private Map<Integer, Long> insertCatalogsWithHierarchy(List<Map<String, Object>> catalogsData, Long comicId) {
         Map<Integer, Long> idMap = new LinkedHashMap<>();
-        if (catalogsData == null || catalogsData.isEmpty()) return idMap;
+        if (catalogsData == null || catalogsData.isEmpty()) { return idMap; }
 
         int size = catalogsData.size();
 
@@ -300,21 +300,21 @@ public class RecoveryEngine {
         Map<Long, Catalog> inserted = new LinkedHashMap<>();
         for (int i = 0; i < size; i++) {
             Catalog cat = catalogMapper.selectById(idMap.get(i));
-            if (cat == null) continue;
+            if (cat == null) { continue; }
             inserted.put(idMap.get(i), cat);
         }
 
         for (int i = 0; i < size; i++) {
             Catalog cat = inserted.get(idMap.get(i));
-            if (cat == null) continue;
+            if (cat == null) { continue; }
             Map<String, Object> cd = catalogsData.get(i);
             Object pi = cd.get("parentIndex");
             if (pi != null) {
                 int parentIdx = ((Number) pi).intValue();
-                if (parentIdx < 0 || parentIdx >= size || !idMap.containsKey(parentIdx)) continue;
+                if (parentIdx < 0 || parentIdx >= size || !idMap.containsKey(parentIdx)) { continue; }
                 Long parentId = idMap.get(parentIdx);
                 Catalog parent = inserted.get(parentId);
-                if (parent == null) continue;
+                if (parent == null) { continue; }
                 cat.setParentId(parentId);
                 catalogMapper.updateById(cat);
             }

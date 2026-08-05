@@ -63,7 +63,7 @@ public class RecoveryTaskHandler {
         List<Long> comicIds = new ArrayList<>();
         try (var stream = Files.newDirectoryStream(hqRoot)) {
             for (Path dir : stream) {
-                if (!Files.isDirectory(dir)) continue;
+                if (!Files.isDirectory(dir)) { continue; }
                 String dirName = dir.getFileName().toString();
 
                 // 只收集纯数字目录名（数字目录名 = comicId）

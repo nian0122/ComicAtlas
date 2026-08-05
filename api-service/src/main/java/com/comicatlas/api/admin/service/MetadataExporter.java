@@ -129,12 +129,12 @@ public class MetadataExporter {
                 mediaMap.put("hqStatus", p.getHqStatus() != null ? p.getHqStatus().name() : "READY");
                 mediaMap.put("lqStatus", p.getLqStatus() != null ? p.getLqStatus().name() : "NOT_GENERATED");
                 mediaMap.put("fileSize", p.getFileSize() != null ? p.getFileSize() : 0);
-                if (p.getWidth() != null) mediaMap.put("width", p.getWidth());
-                if (p.getHeight() != null) mediaMap.put("height", p.getHeight());
-                if (p.getDuration() != null) mediaMap.put("duration", p.getDuration());
-                if (p.getContainer() != null) mediaMap.put("container", p.getContainer());
-                if (p.getVideoCodec() != null) mediaMap.put("videoCodec", p.getVideoCodec());
-                if (p.getAudioCodec() != null) mediaMap.put("audioCodec", p.getAudioCodec());
+                if (p.getWidth() != null) { mediaMap.put("width", p.getWidth()); }
+                if (p.getHeight() != null) { mediaMap.put("height", p.getHeight()); }
+                if (p.getDuration() != null) { mediaMap.put("duration", p.getDuration()); }
+                if (p.getContainer() != null) { mediaMap.put("container", p.getContainer()); }
+                if (p.getVideoCodec() != null) { mediaMap.put("videoCodec", p.getVideoCodec()); }
+                if (p.getAudioCodec() != null) { mediaMap.put("audioCodec", p.getAudioCodec()); }
                 mediaItemList.add(mediaMap);
             }
 

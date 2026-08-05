@@ -130,11 +130,11 @@ public class AdminServiceImpl implements AdminService {
     }
 
     private void deleteRecursively(Path dir) {
-        if (!Files.exists(dir)) return;
+        if (!Files.exists(dir)) { return; }
         try (var stream = Files.walk(dir)) {
             stream.sorted(java.util.Comparator.reverseOrder())
                   .map(Path::toFile)
-                  .forEach(f -> { if (!f.delete()) f.deleteOnExit(); });
+                  .forEach(f -> { if (!f.delete()) { f.deleteOnExit(); } });
         } catch (Exception e) {
             log.warn("删除目录失败: {}", dir, e);
         }
@@ -157,7 +157,7 @@ public class AdminServiceImpl implements AdminService {
     }
 
     private long dirSize(Path dir) {
-        if (!Files.exists(dir)) return 0;
+        if (!Files.exists(dir)) { return 0; }
         try (var stream = Files.walk(dir)) {
             return stream.filter(Files::isRegularFile)
                          .mapToLong(p -> { try { return Files.size(p); } catch (Exception e) { return 0; } })
@@ -241,9 +241,9 @@ public class AdminServiceImpl implements AdminService {
     }
 
     private BigDecimal toBigDecimal(Object o) {
-        if (o == null) return null;
-        if (o instanceof BigDecimal bd) return bd;
-        if (o instanceof Number n) return BigDecimal.valueOf(n.doubleValue());
+        if (o == null) { return null; }
+        if (o instanceof BigDecimal bd) { return bd; }
+        if (o instanceof Number n) { return BigDecimal.valueOf(n.doubleValue()); }
         if (o instanceof String s) {
             try { return new BigDecimal(s); } catch (Exception e) { return null; }
         }

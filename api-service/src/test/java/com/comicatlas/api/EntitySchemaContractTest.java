@@ -97,8 +97,8 @@ class EntitySchemaContractTest {
         boolean hasCategory = false;
         boolean hasCategoryId = false;
         for (var f : fields) {
-            if (f.getName().equals("category")) hasCategory = true;
-            if (f.getName().equals("categoryId")) hasCategoryId = true;
+            if (f.getName().equals("category")) { hasCategory = true; }
+            if (f.getName().equals("categoryId")) { hasCategoryId = true; }
         }
         assertThat(hasCategory).as("Comic should have category field").isTrue();
         assertThat(hasCategoryId).as("Comic should have categoryId field").isTrue();
@@ -111,7 +111,7 @@ class EntitySchemaContractTest {
         var fields = ImportTask.class.getDeclaredFields();
         boolean hasBatchId = false;
         for (var f : fields) {
-            if (f.getName().equals("batchId")) hasBatchId = true;
+            if (f.getName().equals("batchId")) { hasBatchId = true; }
         }
         assertThat(hasBatchId).as("ImportTask should have batchId field").isTrue();
         log.info("ImportTask entity has batchId={}", hasBatchId);

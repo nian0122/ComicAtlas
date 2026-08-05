@@ -24,7 +24,7 @@ public class TransferService implements StorageService {
     @Override
     public StorageRef transfer(Path source, StorageRef target, TransferMode mode) {
         StorageRoot root = properties.getRoots().get(target.rootKey());
-        if (root == null) throw new IllegalArgumentException("未知存储根: " + target.rootKey());
+        if (root == null) { throw new IllegalArgumentException("未知存储根: " + target.rootKey()); }
         Path targetPath = root.resolve(target.relativePath());
         try {
             Files.createDirectories(targetPath.getParent());
@@ -43,7 +43,7 @@ public class TransferService implements StorageService {
     @Override
     public Path resolve(StorageRef ref) {
         StorageRoot root = properties.getRoots().get(ref.rootKey());
-        if (root == null) throw new IllegalArgumentException("未知存储根: " + ref.rootKey());
+        if (root == null) { throw new IllegalArgumentException("未知存储根: " + ref.rootKey()); }
         return root.resolve(ref.relativePath());
     }
 

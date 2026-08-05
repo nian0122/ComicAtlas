@@ -90,16 +90,16 @@ public class MediaTypeDetector {
         if (b == null) {
             return null;
         }
-        if (matches(b, new int[]{0xFF, 0xD8, 0xFF})) return "IMAGE";                       // JPEG
-        if (matches(b, new int[]{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A})) return "IMAGE"; // PNG
-        if (startsWithAscii(b, 0, "GIF8")) return "IMAGE";                                   // GIF
-        if (startsWithAscii(b, 0, "RIFF") && startsWithAscii(b, 8, "WEBP")) return "IMAGE";  // WebP
-        if (b[0] == 0x42 && b[1] == 0x4D) return "IMAGE";                                    // BMP
+        if (matches(b, new int[]{0xFF, 0xD8, 0xFF})) { return "IMAGE"; }                       // JPEG
+        if (matches(b, new int[]{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A})) { return "IMAGE"; } // PNG
+        if (startsWithAscii(b, 0, "GIF8")) { return "IMAGE"; }                                   // GIF
+        if (startsWithAscii(b, 0, "RIFF") && startsWithAscii(b, 8, "WEBP")) { return "IMAGE"; }  // WebP
+        if (b[0] == 0x42 && b[1] == 0x4D) { return "IMAGE"; }                                    // BMP
         if (startsWithAscii(b, 4, "ftyp")
-                && (startsWithAscii(b, 8, "avif") || startsWithAscii(b, 8, "avis"))) return "IMAGE"; // AVIF
-        if (startsWithAscii(b, 4, "ftyp")) return "VIDEO";                                   // MP4/MOV
-        if (startsWithAscii(b, 0, "RIFF") && startsWithAscii(b, 8, "AVI ")) return "VIDEO";  // AVI
-        if (matches(b, new int[]{0x1A, 0x45, 0xDF, 0xA3})) return "VIDEO";                   // WebM/MKV (EBML)
+                && (startsWithAscii(b, 8, "avif") || startsWithAscii(b, 8, "avis"))) { return "IMAGE"; } // AVIF
+        if (startsWithAscii(b, 4, "ftyp")) { return "VIDEO"; }                                   // MP4/MOV
+        if (startsWithAscii(b, 0, "RIFF") && startsWithAscii(b, 8, "AVI ")) { return "VIDEO"; }  // AVI
+        if (matches(b, new int[]{0x1A, 0x45, 0xDF, 0xA3})) { return "VIDEO"; }                   // WebM/MKV (EBML)
         return null;
     }
 
@@ -122,17 +122,17 @@ public class MediaTypeDetector {
     }
 
     private static boolean matches(byte[] b, int[] magic) {
-        if (b.length < magic.length) return false;
+        if (b.length < magic.length) { return false; }
         for (int i = 0; i < magic.length; i++) {
-            if ((b[i] & 0xFF) != magic[i]) return false;
+            if ((b[i] & 0xFF) != magic[i]) { return false; }
         }
         return true;
     }
 
     private static boolean startsWithAscii(byte[] b, int offset, String s) {
-        if (b.length < offset + s.length()) return false;
+        if (b.length < offset + s.length()) { return false; }
         for (int i = 0; i < s.length(); i++) {
-            if ((char) b[offset + i] != s.charAt(i)) return false;
+            if ((char) b[offset + i] != s.charAt(i)) { return false; }
         }
         return true;
     }

@@ -84,7 +84,7 @@ public class ComicServiceImpl implements ComicService {
     @Override
     public ComicDetailVO getComicDetail(Long id) {
         Comic comic = comicMapper.selectById(id);
-        if (comic == null) throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在");
+        if (comic == null) { throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在"); }
         return toDetailVO(comic);
     }
 
@@ -135,7 +135,7 @@ public class ComicServiceImpl implements ComicService {
     @Transactional
     public ComicDetailVO updateComic(Long id, UpdateComicRequest request) {
         Comic comic = comicMapper.selectById(id);
-        if (comic == null) throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在");
+        if (comic == null) { throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在"); }
 
         if (request.getVersion() == null) {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "缺少 version");
@@ -151,9 +151,9 @@ public class ComicServiceImpl implements ComicService {
             }
             comic.setTitle(request.getTitle().trim());
         }
-        if (request.getTitleJpn() != null) comic.setTitleJpn(request.getTitleJpn());
-        if (request.getAuthor() != null) comic.setAuthor(request.getAuthor());
-        if (request.getDescription() != null) comic.setDescription(request.getDescription());
+        if (request.getTitleJpn() != null) { comic.setTitleJpn(request.getTitleJpn()); }
+        if (request.getAuthor() != null) { comic.setAuthor(request.getAuthor()); }
+        if (request.getDescription() != null) { comic.setDescription(request.getDescription()); }
         if (request.getCategoryId() != null) {
             Category category = categoryMapper.selectById(request.getCategoryId());
             if (category == null) {
@@ -223,8 +223,8 @@ public class ComicServiceImpl implements ComicService {
                 .orderByAsc(Chapter::getGlobalOrder));
         for (int i = 0; i < allChapters.size(); i++) {
             if (allChapters.get(i).getId().equals(chapterId)) {
-                if (i > 0) prevId = allChapters.get(i - 1).getId();
-                if (i < allChapters.size() - 1) nextId = allChapters.get(i + 1).getId();
+                if (i > 0) { prevId = allChapters.get(i - 1).getId(); }
+                if (i < allChapters.size() - 1) { nextId = allChapters.get(i + 1).getId(); }
                 break;
             }
         }
@@ -242,7 +242,7 @@ public class ComicServiceImpl implements ComicService {
     }
 
     private String resolveCategoryName(Long categoryId) {
-        if (categoryId == null) return null;
+        if (categoryId == null) { return null; }
         Category category = categoryMapper.selectById(categoryId);
         return category != null ? category.getName() : null;
     }
@@ -254,7 +254,7 @@ public class ComicServiceImpl implements ComicService {
     @Override
     public ComicMetadataDTO getMetadata(Long id) {
         Comic comic = comicMapper.selectById(id);
-        if (comic == null) throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在");
+        if (comic == null) { throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在"); }
 
         ComicMetadataDTO dto = new ComicMetadataDTO();
         dto.setTitle(comic.getTitle());
@@ -267,7 +267,7 @@ public class ComicServiceImpl implements ComicService {
     @Override
     public ComicMetadataDTO updateMetadata(Long id, ComicMetadataUpdateDTO dto) {
         Comic comic = comicMapper.selectById(id);
-        if (comic == null) throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在");
+        if (comic == null) { throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在"); }
 
         comic.setTitle(dto.getTitle());
         comic.setAuthor(dto.getAuthor());
@@ -293,7 +293,7 @@ public class ComicServiceImpl implements ComicService {
     @Override
     public List<Long> getComicTags(Long comicId) {
         Comic comic = comicMapper.selectById(comicId);
-        if (comic == null) throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在");
+        if (comic == null) { throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在"); }
 
         return comicTagMapper.selectList(
                         new LambdaQueryWrapper<ComicTag>().eq(ComicTag::getComicId, comicId))
@@ -315,7 +315,7 @@ public class ComicServiceImpl implements ComicService {
     @Transactional
     public void updateComicTags(Long comicId, ComicTagUpdateDTO dto) {
         Comic comic = comicMapper.selectById(comicId);
-        if (comic == null) throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在");
+        if (comic == null) { throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在"); }
 
         List<Long> tagIds = dto.getTagIds();
         if (tagIds != null && !tagIds.isEmpty()) {
@@ -407,7 +407,7 @@ public class ComicServiceImpl implements ComicService {
                 String title = null;
                 try {
                     Comic comic = comicMapper.selectById(comicId);
-                    if (comic != null) title = comic.getTitle();
+                    if (comic != null) { title = comic.getTitle(); }
                 } catch (Exception ex) { log.warn("批量更新时查询漫画标题失败: comicId={}", comicId, ex); }
                 failed.add(new BatchUpdateResultVO.FailedItem(comicId, title, "系统错误"));
             }
@@ -491,7 +491,7 @@ public class ComicServiceImpl implements ComicService {
     }
 
     private static ComicLifecycleStatus toLifecycle(String status) {
-        if (status == null) return null;
+        if (status == null) { return null; }
         try {
             return ComicLifecycleStatus.valueOf(status);
         } catch (IllegalArgumentException e) {

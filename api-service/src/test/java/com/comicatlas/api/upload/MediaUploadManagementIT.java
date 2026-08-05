@@ -257,7 +257,7 @@ class MediaUploadManagementIT {
         sb.append("{\"comicId\":").append(comicId).append(",\"chapterId\":").append(chapterId)
                 .append(",\"files\":[");
         for (int i = 0; i < 101; i++) {
-            if (i > 0) sb.append(',');
+            if (i > 0) { sb.append(','); }
             sb.append("{\"fileId\":\"f").append(i).append("\",\"name\":\"p").append(i)
                     .append(".jpg\",\"contentType\":\"image/jpeg\",\"size\":").append(jpg.length)
                     .append(",\"sha256\":\"").append(sha256Hex(jpg)).append("\"}");

@@ -60,7 +60,7 @@ public class HqDeleteHandler {
             }
 
             for (ExportMedia page : pages) {
-                if (page.getHqPath() == null || page.getHqPath().isBlank()) continue;
+                if (page.getHqPath() == null || page.getHqPath().isBlank()) { continue; }
                 Path filePath = hqRoot.resolve(page.getHqPath());
                 try {
                     if (Files.exists(filePath)) {
@@ -77,10 +77,10 @@ public class HqDeleteHandler {
 
             try {
                 Path chapterDir = hqRoot.resolve(comicId + "/" + chapterId);
-                if (Files.exists(chapterDir)) Files.deleteIfExists(chapterDir);
+                if (Files.exists(chapterDir)) { Files.deleteIfExists(chapterDir); }
                 if (event.chapterNo() != null && !event.chapterNo().isBlank()) {
                     Path oldDir = hqRoot.resolve(comicId + "/" + event.chapterNo());
-                    if (Files.exists(oldDir)) Files.deleteIfExists(oldDir);
+                    if (Files.exists(oldDir)) { Files.deleteIfExists(oldDir); }
                 }
             } catch (IOException e) {
                 log.warn("删除空目录失败: chapterId={}", chapterId);

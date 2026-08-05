@@ -118,7 +118,7 @@ class ImportManifestManagerTest {
     }
 
     private static void deleteRecursively(Path dir) throws Exception {
-        if (!Files.exists(dir)) return;
+        if (!Files.exists(dir)) { return; }
         try (var stream = Files.walk(dir)) {
             stream.sorted((a, b) -> b.toString().length() - a.toString().length())
                     .forEach(p -> { try { Files.deleteIfExists(p); } catch (IOException ignored) {} });

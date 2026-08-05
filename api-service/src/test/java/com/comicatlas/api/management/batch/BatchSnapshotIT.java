@@ -118,9 +118,9 @@ class BatchSnapshotIT {
 
     @AfterEach
     void tearDown() {
-        if (itemMapper != null) itemMapper.delete(new LambdaQueryWrapper<>());
-        if (taskMapper != null) taskMapper.delete(new LambdaQueryWrapper<>());
-        if (comicMapper != null) comicMapper.delete(new LambdaQueryWrapper<>());
+        if (itemMapper != null) { itemMapper.delete(new LambdaQueryWrapper<>()); }
+        if (taskMapper != null) { taskMapper.delete(new LambdaQueryWrapper<>()); }
+        if (comicMapper != null) { comicMapper.delete(new LambdaQueryWrapper<>()); }
     }
 
     private static boolean checkDockerAvailable() {
