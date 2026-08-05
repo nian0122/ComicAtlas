@@ -325,9 +325,9 @@ public class RecoveryEngine {
 
     // ======================== 图片尺寸 ========================
 
-    private ImageDimensions getImageDimensions(Path p) {
+    private ImageDimensions getImageDimensions(Path path) {
         // 1. ImageIO（支持 JVM 原生 + webp-imageio 插件）
-        try (ImageInputStream in = ImageIO.createImageInputStream(p.toFile())) {
+        try (ImageInputStream in = ImageIO.createImageInputStream(path.toFile())) {
             if (in != null) {
                 var readers = ImageIO.getImageReaders(in);
                 if (readers.hasNext()) {
@@ -341,10 +341,10 @@ public class RecoveryEngine {
                 }
             }
         } catch (Exception e) {
-            log.debug("ImageIO 读取尺寸失败: {}", p, e);
+            log.debug("ImageIO 读取尺寸失败: {}", path, e);
         }
         // 2. 回退：直接解析文件头（JPEG/PNG/GIF/WebP/BMP）
-        int[] dims = com.comicatlas.common.util.ImageDimensionsReader.read(p);
+        int[] dims = com.comicatlas.common.util.ImageDimensionsReader.read(path);
         if (dims[0] > 0 && dims[1] > 0) {
             return new ImageDimensions(dims[0], dims[1]);
         }

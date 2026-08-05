@@ -1015,7 +1015,10 @@ class MediaUploadManagementIT {
 
         @Bean
         MediaAnalyzer mediaAnalyzer(com.comicatlas.worker.config.WorkerConfig wc, ObjectMapper om) {
-            return new MediaAnalyzer(wc, om);
+            org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor processIoExecutor =
+                    new org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor();
+            processIoExecutor.initialize();
+            return new MediaAnalyzer(wc, om, processIoExecutor);
         }
 
         @Bean

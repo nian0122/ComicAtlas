@@ -198,8 +198,8 @@ public class ImportServiceImpl implements ImportService {
             .eq(statusEnum != null, ImportTask::getStatus, statusEnum)
             .eq(batchId != null, ImportTask::getBatchId, batchId)
             .orderByDesc(ImportTask::getCreatedAt);
-        var p = new com.baomidou.mybatisplus.extension.plugins.pagination.Page<ImportTask>(page != null ? page : 1, size != null ? size : 20);
-        return taskMapper.selectPage(p, wrapper).convert(this::toVO);
+        var pageRequest = new com.baomidou.mybatisplus.extension.plugins.pagination.Page<ImportTask>(page != null ? page : 1, size != null ? size : 20);
+        return taskMapper.selectPage(pageRequest, wrapper).convert(this::toVO);
     }
 
     @Override
@@ -277,38 +277,38 @@ public class ImportServiceImpl implements ImportService {
 
     @Override
     public ImportTaskVO getTaskDetail(Long id) {
-        ImportTask t = taskMapper.selectById(id);
-        if (t == null) { throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在"); }
-        return toVO(t);
+        ImportTask task = taskMapper.selectById(id);
+        if (task == null) { throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在"); }
+        return toVO(task);
     }
 
     @Override
     public ImportStatusVO getTaskStatus(Long id) {
-        ImportTask t = taskMapper.selectById(id);
-        if (t == null) { throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在"); }
+        ImportTask task = taskMapper.selectById(id);
+        if (task == null) { throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在"); }
         ImportStatusVO vo = new ImportStatusVO();
-        vo.setTaskId(t.getId());
-        vo.setStatus(statusName(t.getStatus()));
-        vo.setProgress(t.getProgress());
+        vo.setTaskId(task.getId());
+        vo.setStatus(statusName(task.getStatus()));
+        vo.setProgress(task.getProgress());
         return vo;
     }
 
     @Override
     @Transactional
     public void cancelTask(Long id) {
-        ImportTask t = taskMapper.selectById(id);
-        if (t == null) { throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在"); }
-        if (t.getStatus() != null && t.getStatus().isTerminal()) {
+        ImportTask task = taskMapper.selectById(id);
+        if (task == null) { throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在"); }
+        if (task.getStatus() != null && task.getStatus().isTerminal()) {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "终态任务不可取消");
         }
-        t.setStatus(ImportTaskStatus.CANCELLED);
-        taskMapper.updateById(t);
+        task.setStatus(ImportTaskStatus.CANCELLED);
+        taskMapper.updateById(task);
 
-        Long taskId = t.getId();
-        Long comicId = t.getComicId();
+        Long taskId = task.getId();
+        Long comicId = task.getComicId();
 
         // 同步统一任务为 CANCELLED 真正终态（即使 item 已 RUNNING）
-        if (t.getManagementTaskId() != null) {
+        if (task.getManagementTaskId() != null) {
             ManagementTaskItem mgmtItem = managementTaskService.findActiveItem("COMIC", comicId, TaskType.IMPORT);
             if (mgmtItem != null) {
                 managementTaskService.updateItemStatus(mgmtItem.getId(), ManagementTaskStatus.CANCELLED,
@@ -338,14 +338,14 @@ public class ImportServiceImpl implements ImportService {
     @Override
     @Transactional
     public void retryTask(Long id) {
-        ImportTask t = taskMapper.selectById(id);
-        if (t == null) { throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在"); }
-        ImportTaskStatus taskStatus = t.getStatus();
+        ImportTask task = taskMapper.selectById(id);
+        if (task == null) { throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在"); }
+        ImportTaskStatus taskStatus = task.getStatus();
         if (taskStatus != ImportTaskStatus.FAILED && taskStatus != ImportTaskStatus.CANCELLED) {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "仅 FAILED/CANCELLED 状态可重试");
         }
 
-        Long comicId = t.getComicId();
+        Long comicId = task.getComicId();
 
         List<Long> chapterIds = chapterMapper.selectList(
                 new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId))
@@ -357,10 +357,10 @@ public class ImportServiceImpl implements ImportService {
         catalogMapper.delete(new LambdaQueryWrapper<Catalog>().eq(Catalog::getComicId, comicId));
         catalogCacheInvalidator.evict(comicId);
 
-        t.setStatus(ImportTaskStatus.PENDING);
-        t.setRetryCount(t.getRetryCount() + 1);
-        t.setErrorMessage(null);
-        taskMapper.updateById(t);
+        task.setStatus(ImportTaskStatus.PENDING);
+        task.setRetryCount(task.getRetryCount() + 1);
+        task.setErrorMessage(null);
+        taskMapper.updateById(task);
 
         // IMPORT_FAILED → IMPORTING，允许重新导入
         Comic comic = comicMapper.selectById(comicId);
@@ -370,17 +370,17 @@ public class ImportServiceImpl implements ImportService {
             comicMapper.updateById(comic);
         }
 
-        Long taskId = t.getId();
-        String sourceType = resolveSourceType(t);
-        String sourcePath = t.getSourcePath();
+        Long taskId = task.getId();
+        String sourceType = resolveSourceType(task);
+        String sourcePath = task.getSourcePath();
 
         // 同步统一任务：终态统一任务重置回 QUEUED（attempt 递增，失败/取消 item 重新入队）
-        if (t.getManagementTaskId() != null) {
+        if (task.getManagementTaskId() != null) {
             try {
-                managementTaskService.retryTask(t.getManagementTaskId());
+                managementTaskService.retryTask(task.getManagementTaskId());
             } catch (BusinessException e) {
                 log.warn("统一任务重试跳过（非终态）: managementTaskId={}, error={}",
-                        t.getManagementTaskId(), e.getMessage());
+                        task.getManagementTaskId(), e.getMessage());
             }
         }
 
@@ -451,8 +451,8 @@ public class ImportServiceImpl implements ImportService {
     }
 
     /** 兼容遗留 DIRECTORY 值（枚举化后读回 null，语义等价 REGISTER） */
-    private static String resolveSourceType(ImportTask t) {
-        return t.getSourceType() != null ? t.getSourceType().name() : "REGISTER";
+    private static String resolveSourceType(ImportTask task) {
+        return task.getSourceType() != null ? task.getSourceType().name() : "REGISTER";
     }
 
     private static String comicStatusName(Comic comic) {
@@ -472,27 +472,27 @@ public class ImportServiceImpl implements ImportService {
         }
     }
 
-    private ImportTaskVO toVO(ImportTask t) {
+    private ImportTaskVO toVO(ImportTask task) {
         ImportTaskVO vo = new ImportTaskVO();
-        vo.setId(t.getId());
-        vo.setComicId(t.getComicId());
-        vo.setSourceRef(t.getSourceRef());
-        vo.setSourceType(resolveSourceType(t));
-        vo.setSourcePath(t.getSourcePath());
-        vo.setBatchId(t.getBatchId());
-        vo.setStatus(statusName(t.getStatus()));
-        vo.setProgress(t.getProgress());
-        vo.setTotalPages(t.getTotalPages());
-        vo.setDownloadedPages(t.getDownloadedPages());
-        vo.setDownloadMethod(t.getDownloadMethod());
-        vo.setDownloadSpeed(t.getDownloadSpeed());
-        vo.setEtaSeconds(t.getEtaSeconds());
-        vo.setErrorMessage(t.getErrorMessage());
-        vo.setRetryCount(t.getRetryCount());
-        vo.setDurationMs(t.getDurationMs());
-        vo.setStartTime(t.getStartTime());
-        vo.setEndTime(t.getEndTime());
-        vo.setCreatedAt(t.getCreatedAt());
+        vo.setId(task.getId());
+        vo.setComicId(task.getComicId());
+        vo.setSourceRef(task.getSourceRef());
+        vo.setSourceType(resolveSourceType(task));
+        vo.setSourcePath(task.getSourcePath());
+        vo.setBatchId(task.getBatchId());
+        vo.setStatus(statusName(task.getStatus()));
+        vo.setProgress(task.getProgress());
+        vo.setTotalPages(task.getTotalPages());
+        vo.setDownloadedPages(task.getDownloadedPages());
+        vo.setDownloadMethod(task.getDownloadMethod());
+        vo.setDownloadSpeed(task.getDownloadSpeed());
+        vo.setEtaSeconds(task.getEtaSeconds());
+        vo.setErrorMessage(task.getErrorMessage());
+        vo.setRetryCount(task.getRetryCount());
+        vo.setDurationMs(task.getDurationMs());
+        vo.setStartTime(task.getStartTime());
+        vo.setEndTime(task.getEndTime());
+        vo.setCreatedAt(task.getCreatedAt());
         return vo;
     }
 }

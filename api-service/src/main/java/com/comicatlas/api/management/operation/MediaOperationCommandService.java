@@ -117,8 +117,8 @@ public class MediaOperationCommandService {
                         .eq(Media::getChapterId, chapterId)
                         .eq(Media::getMediaType, "IMAGE"));
         return mediaItems.stream()
-                .filter(p -> p.getHqStatus() != HqStatus.DELETED)
-                .filter(p -> regenerate || p.getLqStatus() != LqStatus.READY)
+                .filter(media -> media.getHqStatus() != HqStatus.DELETED)
+                .filter(media -> regenerate || media.getLqStatus() != LqStatus.READY)
                 .toList();
     }
 
@@ -199,12 +199,12 @@ public class MediaOperationCommandService {
                         .eq(Media::getMediaType, "IMAGE")
                         .in(Media::getHqStatus, HqStatus.READY, HqStatus.MISSING));
         List<Media> notReady = mediaItems.stream()
-                .filter(p -> p.getLqStatus() != LqStatus.READY)
+                .filter(media -> media.getLqStatus() != LqStatus.READY)
                 .toList();
         if (!notReady.isEmpty()) {
             List<String> details = notReady.stream()
-                    .map(p -> String.format("第 %d 页 (pageId=%d, lqStatus=%s)",
-                            p.getPageNumber(), p.getId(), p.getLqStatus()))
+                    .map(media -> String.format("第 %d 页 (pageId=%d, lqStatus=%s)",
+                            media.getPageNumber(), media.getId(), media.getLqStatus()))
                     .toList();
             throw new ConflictException("HQ 删除前置条件不满足：以下页面 LQ 未就绪 -> " + details);
         }
@@ -245,7 +245,7 @@ public class MediaOperationCommandService {
         }
 
         List<CreateManagementTaskRequest.TaskTarget> targets = eligible.stream()
-                .map(p -> target("MEDIA", p.getId(), TaskType.TRANSCODE))
+                .map(media -> target("MEDIA", media.getId(), TaskType.TRANSCODE))
                 .toList();
         ManagementTaskResponse task = createTask(TaskType.TRANSCODE, "视频转码", "COMIC", targets);
         List<ManagementTaskItemResponse> items = managementTaskService.getTaskItems(task.getId());
@@ -279,18 +279,18 @@ public class MediaOperationCommandService {
         return OperationSubmitResult.of(task.getId(), TaskType.TRANSCODE.name(), task.getStatus().name(), 1);
     }
 
-    private boolean isTranscodeEligible(Media p) {
-        if (!"VIDEO".equals(p.getMediaType())) {
+    private boolean isTranscodeEligible(Media media) {
+        if (!"VIDEO".equals(media.getMediaType())) {
             return false;
         }
-        if (p.getHqStatus() == HqStatus.DELETED) {
+        if (media.getHqStatus() == HqStatus.DELETED) {
             return false;
         }
-        TranscodeStatus status = p.getTranscodeStatus();
+        TranscodeStatus status = media.getTranscodeStatus();
         if (ACTIVE_TRANSCODE.contains(status) || status == TranscodeStatus.READY) {
             return false;
         }
-        String container = p.getContainer();
+        String container = media.getContainer();
         return container == null || !COMPAT_CONTAINERS.contains(container.toLowerCase());
     }
 

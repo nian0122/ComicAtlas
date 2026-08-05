@@ -63,10 +63,10 @@ public record GalleryMetadata(
 
     @SuppressWarnings("unchecked")
     public static GalleryMetadata fromApiResponse(Object gmetadata) {
-        Map<String, Object> m = (Map<String, Object>) gmetadata;
-        if (m.containsKey("error")) { return null; }
+        Map<String, Object> rawMap = (Map<String, Object>) gmetadata;
+        if (rawMap.containsKey("error")) { return null; }
 
-        List<Map<String, Object>> torrentsRaw = (List<Map<String, Object>>) m.getOrDefault("torrents", List.of());
+        List<Map<String, Object>> torrentsRaw = (List<Map<String, Object>>) rawMap.getOrDefault("torrents", List.of());
         List<TorrentInfo> torrents = torrentsRaw.stream().map(t -> new TorrentInfo(
             (String) t.get("hash"), (String) t.get("added"),
             (String) t.get("name"), (String) t.get("tsize"),
@@ -74,19 +74,19 @@ public record GalleryMetadata(
         )).toList();
 
         return new GalleryMetadata(
-            toLong(m.get("gid")),
-            (String) m.get("token"),
-            (String) m.get("title"),
-            (String) m.get("title_jpn"),
-            (String) m.get("category"),
-            (String) m.get("thumb"),
-            (String) m.get("uploader"),
-            toInt(m.get("filecount")),
-            toLong(m.get("filesize")),
-            toDouble(m.get("rating")),
-            (List<String>) m.getOrDefault("tags", List.of()),
+            toLong(rawMap.get("gid")),
+            (String) rawMap.get("token"),
+            (String) rawMap.get("title"),
+            (String) rawMap.get("title_jpn"),
+            (String) rawMap.get("category"),
+            (String) rawMap.get("thumb"),
+            (String) rawMap.get("uploader"),
+            toInt(rawMap.get("filecount")),
+            toLong(rawMap.get("filesize")),
+            toDouble(rawMap.get("rating")),
+            (List<String>) rawMap.getOrDefault("tags", List.of()),
             torrents,
-            (String) m.get("archiver_key")
+            (String) rawMap.get("archiver_key")
         );
     }
 }

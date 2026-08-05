@@ -107,13 +107,13 @@ public class DeleteHandler {
         try (var stream = Files.walk(dir)) {
             List<Path> paths = stream.sorted(Comparator.reverseOrder()).toList();
             List<String> failed = new ArrayList<>();
-            for (Path p : paths) {
+            for (Path path : paths) {
                 try {
-                    Files.delete(p);
-                    if (Files.isDirectory(p)) { dirs.incrementAndGet(); }
+                    Files.delete(path);
+                    if (Files.isDirectory(path)) { dirs.incrementAndGet(); }
                     else { files.incrementAndGet(); }
                 } catch (Exception e) {
-                    failed.add(p.toString());
+                    failed.add(path.toString());
                 }
             }
             if (!failed.isEmpty()) {

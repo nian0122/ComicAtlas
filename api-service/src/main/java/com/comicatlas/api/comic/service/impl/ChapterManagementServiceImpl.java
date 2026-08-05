@@ -238,30 +238,30 @@ public class ChapterManagementServiceImpl implements ChapterManagementService {
     }
 
     private int nextChapterSortOrder(Long comicId, Long catalogId) {
-        LambdaQueryWrapper<Chapter> w = new LambdaQueryWrapper<Chapter>()
+        LambdaQueryWrapper<Chapter> wrapper = new LambdaQueryWrapper<Chapter>()
                 .eq(Chapter::getComicId, comicId)
                 .orderByDesc(Chapter::getSortOrder)
                 .last("LIMIT 1");
         if (catalogId == null) {
-            w.isNull(Chapter::getCatalogId);
+            wrapper.isNull(Chapter::getCatalogId);
         } else {
-            w.eq(Chapter::getCatalogId, catalogId);
+            wrapper.eq(Chapter::getCatalogId, catalogId);
         }
-        List<Chapter> list = chapterMapper.selectList(w);
+        List<Chapter> list = chapterMapper.selectList(wrapper);
         return list.isEmpty() ? 1 : list.get(0).getSortOrder() + 1;
     }
 
     private void recompactChapterSortOrder(Long comicId, Long catalogId, Long excludedId) {
-        LambdaQueryWrapper<Chapter> w = new LambdaQueryWrapper<Chapter>()
+        LambdaQueryWrapper<Chapter> wrapper = new LambdaQueryWrapper<Chapter>()
                 .eq(Chapter::getComicId, comicId)
                 .orderByAsc(Chapter::getSortOrder, Chapter::getId);
         if (catalogId == null) {
-            w.isNull(Chapter::getCatalogId);
+            wrapper.isNull(Chapter::getCatalogId);
         } else {
-            w.eq(Chapter::getCatalogId, catalogId);
+            wrapper.eq(Chapter::getCatalogId, catalogId);
         }
         int order = 1;
-        for (Chapter chapter : chapterMapper.selectList(w)) {
+        for (Chapter chapter : chapterMapper.selectList(wrapper)) {
             if (chapter.getId().equals(excludedId)) {
                 continue;
             }

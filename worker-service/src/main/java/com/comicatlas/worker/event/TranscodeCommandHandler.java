@@ -160,8 +160,8 @@ public class TranscodeCommandHandler {
     }
 
     private static boolean isAlreadyMp4(String container) {
-        String c = container.toLowerCase();
-        return "mp4".equals(c) || "mov".equals(c) || "m4v".equals(c);
+        String containerLower = container.toLowerCase();
+        return "mp4".equals(containerLower) || "mov".equals(containerLower) || "m4v".equals(containerLower);
     }
 
     private List<String> buildFfmpegCommand(String ffmpegPath, String input, String output) {

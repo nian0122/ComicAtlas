@@ -77,8 +77,8 @@ public class RecoveryTaskServiceImpl implements RecoveryTaskService {
     public IPage<RecoveryTaskVO> listTasks(Integer page, Integer size) {
         var wrapper = new LambdaQueryWrapper<RecoveryTask>()
             .orderByDesc(RecoveryTask::getCreatedAt);
-        var p = new Page<RecoveryTask>(page != null ? page : 1, size != null ? size : 20);
-        return recoveryTaskMapper.selectPage(p, wrapper).convert(this::toVO);
+        var pageRequest = new Page<RecoveryTask>(page != null ? page : 1, size != null ? size : 20);
+        return recoveryTaskMapper.selectPage(pageRequest, wrapper).convert(this::toVO);
     }
 
     @Override
