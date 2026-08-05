@@ -4,8 +4,9 @@ import com.comicatlas.worker.common.FilePathBuilder;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Data;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 
 import java.io.BufferedReader;
@@ -16,6 +17,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -24,11 +26,22 @@ import java.util.concurrent.TimeUnit;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class ImageOptimizer {
     private final WorkerConfig config;
     private final FilePathBuilder pathBuilder;
     private final ObjectMapper objectMapper;
+    /** 托管的外部进程 stdout 读取线程池（线程名统一为 process-io- 前缀，替代裸线程） */
+    private final ThreadPoolTaskExecutor processIoExecutor;
+
+    public ImageOptimizer(WorkerConfig config,
+                          FilePathBuilder pathBuilder,
+                          ObjectMapper objectMapper,
+                          @Qualifier("processIoExecutor") ThreadPoolTaskExecutor processIoExecutor) {
+        this.config = config;
+        this.pathBuilder = pathBuilder;
+        this.objectMapper = objectMapper;
+        this.processIoExecutor = processIoExecutor;
+    }
 
     private static final long LQ_TIMEOUT_SECONDS = 600;
 
@@ -88,8 +101,9 @@ public class ImageOptimizer {
         }
 
         // 必须在 waitFor() 之前消费 stdout，否则管道满后 Go 进程阻塞写 → 死锁
+        // 读取任务提交到托管线程池 processIoExecutor（线程名前缀 process-io-），替代裸线程
         StringBuilder processOutput = new StringBuilder();
-        Thread reader = new Thread(() -> {
+        CompletableFuture<Void> readFuture = CompletableFuture.runAsync(() -> {
             try (BufferedReader r = new BufferedReader(
                     new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
                 String line;
@@ -97,32 +111,30 @@ public class ImageOptimizer {
                     processOutput.append(line).append('\n');
                 }
             } catch (Exception e) {
+                log.warn("读取图片优化工具输出失败: {}", e.getMessage());
                 processOutput.append("__READ_ERROR__:").append(e.getMessage());
             }
-        }, "lq-stdout-reader");
-        reader.start();
+        }, processIoExecutor);
 
         boolean finished;
         try {
             finished = process.waitFor(LQ_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            reader.interrupt();
             process.destroyForcibly();
             throw new RuntimeException("等待图片优化被中断: comicId=" + comicId + ", chapterId=" + chapterId);
         }
 
         if (!finished) {
-            reader.interrupt();
             process.destroyForcibly();
             throw new RuntimeException(
                     "图片优化超时 (" + LQ_TIMEOUT_SECONDS + "s): comicId=" + comicId + ", chapterId=" + chapterId);
         }
 
         try {
-            reader.join(5000);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+            readFuture.get(5, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            log.warn("等待图片优化输出读取超时: {}", e.getMessage());
         }
 
         int exitCode = process.exitValue();
@@ -191,7 +203,7 @@ public class ImageOptimizer {
 
             // 必须在 waitFor() 之前消费 stdout，否则管道满后 Go 进程阻塞写 → 死锁
             StringBuilder processOutput = new StringBuilder();
-            Thread reader = new Thread(() -> {
+            CompletableFuture<Void> readFuture = CompletableFuture.runAsync(() -> {
                 try (BufferedReader r = new BufferedReader(
                         new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
                     String line;
@@ -199,31 +211,29 @@ public class ImageOptimizer {
                         processOutput.append(line).append('\n');
                     }
                 } catch (Exception e) {
+                    log.warn("读取封面优化工具输出失败: {}", e.getMessage());
                     processOutput.append("__READ_ERROR__:").append(e.getMessage());
                 }
-            }, "cover-stdout-reader");
-            reader.start();
+            }, processIoExecutor);
 
             boolean finished;
             try {
                 finished = process.waitFor(LQ_TIMEOUT_SECONDS, TimeUnit.SECONDS);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                reader.interrupt();
                 process.destroyForcibly();
                 throw new RuntimeException("等待封面优化被中断: comicId=" + comicId);
             }
 
             if (!finished) {
-                reader.interrupt();
                 process.destroyForcibly();
                 throw new RuntimeException("封面优化超时 (" + LQ_TIMEOUT_SECONDS + "s): comicId=" + comicId);
             }
 
             try {
-                reader.join(5000);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
+                readFuture.get(5, TimeUnit.SECONDS);
+            } catch (Exception e) {
+                log.warn("等待封面优化输出读取超时: {}", e.getMessage());
             }
 
             int exitCode = process.exitValue();
@@ -296,9 +306,9 @@ public class ImageOptimizer {
             processBuilder.redirectErrorStream(true);
             Process process = processBuilder.start();
 
-            // 消费 stdout 防止管道死锁
+            // 消费 stdout 防止管道死锁（读取任务提交到托管线程池 processIoExecutor）
             StringBuilder processOutput = new StringBuilder();
-            Thread reader = new Thread(() -> {
+            CompletableFuture<Void> readFuture = CompletableFuture.runAsync(() -> {
                 try (BufferedReader r = new BufferedReader(
                         new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
                     String line;
@@ -306,16 +316,18 @@ public class ImageOptimizer {
                         processOutput.append(line).append('\n');
                     }
                 } catch (Exception e) { log.warn("ffmpeg stdout 读取异常", e); }
-            }, "ffmpeg-stdout-reader");
-            reader.start();
+            }, processIoExecutor);
 
             boolean finished = process.waitFor(120, TimeUnit.SECONDS);
             if (!finished) {
-                reader.interrupt();
                 process.destroyForcibly();
                 throw new RuntimeException("ffmpeg 抽帧超时: comicId=" + comicId);
             }
-            reader.join(5000);
+            try {
+                readFuture.get(5, TimeUnit.SECONDS);
+            } catch (Exception e) {
+                log.warn("等待 ffmpeg 输出读取超时: {}", e.getMessage());
+            }
 
             int exitCode = process.exitValue();
             if (exitCode != 0 || !Files.exists(frameFile) || Files.size(frameFile) == 0) {

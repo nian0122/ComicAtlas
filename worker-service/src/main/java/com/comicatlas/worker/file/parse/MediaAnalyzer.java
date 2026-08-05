@@ -3,8 +3,9 @@ package com.comicatlas.worker.file.parse;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 
 import javax.imageio.ImageIO;
@@ -19,6 +20,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -31,7 +33,6 @@ import java.util.concurrent.TimeUnit;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class MediaAnalyzer {
 
     private static final Set<String> VIDEO_EXT = Set.of(".mp4", ".mkv", ".webm", ".mov", ".avi");
@@ -40,6 +41,16 @@ public class MediaAnalyzer {
 
     private final WorkerConfig workerConfig;
     private final ObjectMapper objectMapper;
+    /** 托管的外部进程 stdout 读取线程池（线程名统一为 process-io- 前缀，替代裸线程） */
+    private final ThreadPoolTaskExecutor processIoExecutor;
+
+    public MediaAnalyzer(WorkerConfig workerConfig,
+                         ObjectMapper objectMapper,
+                         @Qualifier("processIoExecutor") ThreadPoolTaskExecutor processIoExecutor) {
+        this.workerConfig = workerConfig;
+        this.objectMapper = objectMapper;
+        this.processIoExecutor = processIoExecutor;
+    }
 
     /**
      * 分析媒体文件。返回 MediaInfo（pageNumber 默认为 0，由调用方按章节顺序填充）。
@@ -106,7 +117,7 @@ public class MediaAnalyzer {
 
             // 必须在 waitFor() 之前消费 stdout，否则管道满后 ffprobe 阻塞写 → 死锁
             StringBuilder sb = new StringBuilder();
-            Thread outputReader = new Thread(() -> {
+            CompletableFuture<Void> readFuture = CompletableFuture.runAsync(() -> {
                 try (BufferedReader r = new BufferedReader(
                         new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
                     String line;
@@ -114,11 +125,14 @@ public class MediaAnalyzer {
                         sb.append(line).append('\n');
                     }
                 } catch (IOException e) { log.warn("ffprobe 读取器异常", e); }
-            }, "ffprobe-reader");
-            outputReader.start();
+            }, processIoExecutor);
 
             boolean finished = process.waitFor(FFPROBE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-            outputReader.join(1000);
+            try {
+                readFuture.get(1, TimeUnit.SECONDS);
+            } catch (Exception e) {
+                log.warn("等待 ffprobe 输出读取超时: {}", e.getMessage());
+            }
             if (!finished) {
                 process.destroyForcibly();
                 log.warn("ffprobe 读取 {} 超时 ({}s)", file, FFPROBE_TIMEOUT_SECONDS);
