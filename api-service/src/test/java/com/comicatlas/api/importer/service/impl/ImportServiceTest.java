@@ -7,6 +7,8 @@ import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.api.common.exception.BusinessException;
+import com.comicatlas.api.common.storage.ApiStorageProperties;
+import com.comicatlas.api.common.storage.ApiStorageRoot;
 import com.comicatlas.api.importer.dto.BatchImportRequest;
 import com.comicatlas.api.importer.dto.BatchImportResultVO;
 import com.comicatlas.api.importer.entity.ImportTask;
@@ -14,6 +16,7 @@ import com.comicatlas.api.importer.event.ImportEventPublisher;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
 import com.comicatlas.api.management.service.ManagementTaskService;
+import com.comicatlas.api.outbox.service.OutboxService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,6 +32,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
@@ -51,6 +55,8 @@ class ImportServiceTest {
     @Mock private TransactionTemplate transactionTemplate;
     @Mock private CatalogCacheInvalidator catalogCacheInvalidator;
     @Mock private ManagementTaskService managementTaskService;
+    @Mock private OutboxService outboxService;
+    @Mock private ApiStorageProperties storageProperties;
     @InjectMocks private ImportServiceImpl service;
 
     @BeforeEach
@@ -65,6 +71,9 @@ class ImportServiceTest {
             resp.setId(mgmtIdGen.getAndIncrement());
             return resp;
         });
+        ApiStorageRoot metadataRoot = new ApiStorageRoot();
+        metadataRoot.setPath(Path.of("target/test-tmp/metadata"));
+        lenient().when(storageProperties.root("METADATA")).thenReturn(metadataRoot);
     }
 
     @AfterEach
@@ -121,7 +130,7 @@ class ImportServiceTest {
         assertEquals(2, result.getSucceeded().size());
         assertEquals(0, result.getFailed().size());
 
-        verify(eventPublisher, times(2)).publishImportTaskCreated(anyLong(), anyLong(), anyString(), anyString());
+        verify(outboxService, times(2)).enqueue(any(), eq("comic.import"), eq("task.created"));
     }
 
     // Test 2: partial failure
@@ -159,7 +168,7 @@ class ImportServiceTest {
         assertEquals("D:/manga/test/invalid", result.getFailed().get(0).getSourcePath());
         assertTrue(result.getFailed().get(0).getErrorMessage().contains("Path not found"));
 
-        verify(eventPublisher, times(1)).publishImportTaskCreated(anyLong(), anyLong(), anyString(), anyString());
+        verify(outboxService, times(1)).enqueue(any(), eq("comic.import"), eq("task.created"));
     }
 
     // Test 3: empty sourcePaths
@@ -283,7 +292,7 @@ class ImportServiceTest {
                 .forEach(sync -> sync.afterCommit());
 
         verify(ops).set(eq("import:cancel:300"), eq("1"), any(Duration.class));
-        verify(eventPublisher).publishCancelTask(300L, 100L);
+        verify(outboxService).enqueue(any(), eq("comic.task"), eq("cancel.requested"));
     }
 
     // Test: retryTask 删除 Redis 取消标记
