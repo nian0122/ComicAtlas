@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.api.common.constant.HttpStatusCodes;
+import com.comicatlas.api.common.enums.RecoveryTaskStatus;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.importer.dto.RecoveryTaskVO;
 import com.comicatlas.api.importer.entity.RecoveryTask;
@@ -38,14 +39,14 @@ public class RecoveryTaskServiceImpl implements RecoveryTaskService {
         // 检查是否有正在执行或等待中的任务
         long runningCount = recoveryTaskMapper.selectCount(
             new LambdaQueryWrapper<RecoveryTask>()
-                .in(RecoveryTask::getStatus, "RUNNING", "QUEUED")
+                .in(RecoveryTask::getStatus, RecoveryTaskStatus.RUNNING, RecoveryTaskStatus.QUEUED)
         );
         if (runningCount > 0) {
             throw new BusinessException(HttpStatusCodes.CONFLICT, "已有恢复任务正在执行");
         }
 
         RecoveryTask task = new RecoveryTask();
-        task.setStatus("QUEUED");
+        task.setStatus(RecoveryTaskStatus.QUEUED);
         task.setTotalComics(0);
         task.setRecoveredComics(0);
         task.setSkippedComics(0);
@@ -96,11 +97,11 @@ public class RecoveryTaskServiceImpl implements RecoveryTaskService {
         if (recoveryTask == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在");
         }
-        if (!"FAILED".equals(recoveryTask.getStatus())) {
+        if (recoveryTask.getStatus() != RecoveryTaskStatus.FAILED) {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "仅 FAILED 状态可重试");
         }
 
-        recoveryTask.setStatus("QUEUED");
+        recoveryTask.setStatus(RecoveryTaskStatus.QUEUED);
         recoveryTask.setRetryCount(recoveryTask.getRetryCount() + 1);
         recoveryTask.setErrorMessage(null);
         recoveryTask.setStartedAt(null);
@@ -136,7 +137,7 @@ public class RecoveryTaskServiceImpl implements RecoveryTaskService {
         RecoveryTask recoveryTask = recoveryTaskMapper.selectById(vo.getId());
         if (recoveryTask == null) { return; }
 
-        if (vo.getStatus() != null) { recoveryTask.setStatus(vo.getStatus()); }
+        if (vo.getStatus() != null) { recoveryTask.setStatus(RecoveryTaskStatus.valueOf(vo.getStatus())); }
         if (vo.getTotalComics() != null) { recoveryTask.setTotalComics(vo.getTotalComics()); }
         if (vo.getRecoveredComics() != null) { recoveryTask.setRecoveredComics(vo.getRecoveredComics()); }
         if (vo.getSkippedComics() != null) { recoveryTask.setSkippedComics(vo.getSkippedComics()); }
@@ -169,7 +170,7 @@ public class RecoveryTaskServiceImpl implements RecoveryTaskService {
     private RecoveryTaskVO toVO(RecoveryTask recoveryTask) {
         RecoveryTaskVO vo = new RecoveryTaskVO();
         vo.setId(recoveryTask.getId());
-        vo.setStatus(recoveryTask.getStatus());
+        vo.setStatus(recoveryTask.getStatus() == null ? null : recoveryTask.getStatus().name());
         vo.setTotalComics(recoveryTask.getTotalComics());
         vo.setRecoveredComics(recoveryTask.getRecoveredComics());
         vo.setSkippedComics(recoveryTask.getSkippedComics());

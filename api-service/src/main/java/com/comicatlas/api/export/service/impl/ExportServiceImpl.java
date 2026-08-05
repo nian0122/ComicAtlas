@@ -5,6 +5,7 @@ import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.common.enums.ComicStatus;
+import com.comicatlas.api.common.enums.ExportTaskStatus;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.export.dto.ExportTaskVO;
 import com.comicatlas.api.export.entity.ExportTask;
@@ -52,7 +53,7 @@ public class ExportServiceImpl implements ExportService {
         // 2. 幂等检查：已存在 PENDING/RUNNING 的导出任务则拒绝
         var existing = exportTaskMapper.selectOne(new LambdaQueryWrapper<ExportTask>()
             .eq(ExportTask::getComicId, comicId)
-            .and(w -> w.eq(ExportTask::getStatus, "PENDING").or().eq(ExportTask::getStatus, "RUNNING")));
+            .and(w -> w.eq(ExportTask::getStatus, ExportTaskStatus.PENDING).or().eq(ExportTask::getStatus, ExportTaskStatus.RUNNING)));
         if (existing != null) {
             throw new BusinessException(HttpStatusCodes.CONFLICT, "该漫画已有进行中的导出任务，任务ID: " + existing.getId());
         }
@@ -60,7 +61,7 @@ public class ExportServiceImpl implements ExportService {
         // 3. 创建 export_task
         ExportTask task = new ExportTask();
         task.setComicId(comicId);
-        task.setStatus("PENDING");
+        task.setStatus(ExportTaskStatus.PENDING);
         task.setProgress(0);
         exportTaskMapper.insert(task);
 
@@ -120,7 +121,7 @@ public class ExportServiceImpl implements ExportService {
         ExportTaskVO vo = new ExportTaskVO();
         vo.setId(task.getId());
         vo.setComicId(task.getComicId());
-        vo.setStatus(task.getStatus());
+        vo.setStatus(task.getStatus() == null ? null : task.getStatus().name());
         vo.setProgress(task.getProgress());
         vo.setOutputRoot(task.getOutputRoot());
         vo.setOutputPath(task.getOutputPath());

@@ -2,6 +2,7 @@ package com.comicatlas.api.importer.event;
 
 import com.comicatlas.api.admin.dto.RecoveryProgress;
 import com.comicatlas.api.admin.recovery.RecoveryEngine;
+import com.comicatlas.api.common.enums.RecoveryTaskStatus;
 import com.comicatlas.api.importer.entity.RecoveryTask;
 import com.comicatlas.api.importer.mapper.RecoveryTaskMapper;
 import com.comicatlas.api.management.service.ManagementTaskService;
@@ -80,7 +81,7 @@ class RecoveryEventHandlerTest {
 
         RecoveryTask task = new RecoveryTask();
         task.setId(taskId);
-        task.setStatus("PENDING");
+        task.setStatus(RecoveryTaskStatus.QUEUED);
         when(recoveryTaskMapper.selectById(taskId)).thenReturn(task);
 
         RecoveryProgress progress = new RecoveryProgress(1, 1, 0, 0, 0, null, 3, 30);
@@ -104,7 +105,7 @@ class RecoveryEventHandlerTest {
         ArgumentCaptor<RecoveryTask> taskCaptor = ArgumentCaptor.forClass(RecoveryTask.class);
         verify(recoveryTaskMapper, atLeastOnce()).updateById(taskCaptor.capture());
         RecoveryTask lastUpdate = taskCaptor.getAllValues().get(taskCaptor.getAllValues().size() - 1);
-        assertEquals("SUCCEEDED", lastUpdate.getStatus());
+        assertEquals(RecoveryTaskStatus.SUCCEEDED, lastUpdate.getStatus());
         assertNotNull(lastUpdate.getEndedAt());
 
         // 验证 ack
@@ -118,7 +119,7 @@ class RecoveryEventHandlerTest {
 
         RecoveryTask task = new RecoveryTask();
         task.setId(taskId);
-        task.setStatus("SUCCEEDED");
+        task.setStatus(RecoveryTaskStatus.SUCCEEDED);
         when(recoveryTaskMapper.selectById(taskId)).thenReturn(task);
 
         doNothing().when(channel).basicAck(anyLong(), eq(false));
@@ -141,7 +142,7 @@ class RecoveryEventHandlerTest {
 
         RecoveryTask task = new RecoveryTask();
         task.setId(taskId);
-        task.setStatus("FAILED");
+        task.setStatus(RecoveryTaskStatus.FAILED);
         when(recoveryTaskMapper.selectById(taskId)).thenReturn(task);
 
         doNothing().when(channel).basicAck(anyLong(), eq(false));
@@ -163,7 +164,7 @@ class RecoveryEventHandlerTest {
 
         RecoveryTask task = new RecoveryTask();
         task.setId(taskId);
-        task.setStatus("PENDING");
+        task.setStatus(RecoveryTaskStatus.QUEUED);
         when(recoveryTaskMapper.selectById(taskId)).thenReturn(task);
 
         // 第1个漫画成功
@@ -189,7 +190,7 @@ class RecoveryEventHandlerTest {
         ArgumentCaptor<RecoveryTask> taskCaptor = ArgumentCaptor.forClass(RecoveryTask.class);
         verify(recoveryTaskMapper, atLeastOnce()).updateById(taskCaptor.capture());
         RecoveryTask lastUpdate = taskCaptor.getAllValues().get(taskCaptor.getAllValues().size() - 1);
-        assertEquals("SUCCEEDED", lastUpdate.getStatus());
+        assertEquals(RecoveryTaskStatus.SUCCEEDED, lastUpdate.getStatus());
         assertEquals(1, lastUpdate.getErrorComics()); // 1 个 comic 出错
 
         verify(channel).basicAck(1L, false);
@@ -204,7 +205,7 @@ class RecoveryEventHandlerTest {
 
         RecoveryTask task = new RecoveryTask();
         task.setId(taskId);
-        task.setStatus("RUNNING");
+        task.setStatus(RecoveryTaskStatus.RUNNING);
         when(recoveryTaskMapper.selectById(taskId)).thenReturn(task);
 
         when(recoveryTaskMapper.updateById(any(RecoveryTask.class))).thenReturn(1);
@@ -218,7 +219,7 @@ class RecoveryEventHandlerTest {
         ArgumentCaptor<RecoveryTask> taskCaptor = ArgumentCaptor.forClass(RecoveryTask.class);
         verify(recoveryTaskMapper).updateById(taskCaptor.capture());
         RecoveryTask updated = taskCaptor.getValue();
-        assertEquals("FAILED", updated.getStatus());
+        assertEquals(RecoveryTaskStatus.FAILED, updated.getStatus());
         assertEquals("Worker 磁盘空间不足", updated.getErrorMessage());
         assertNotNull(updated.getEndedAt());
 
@@ -232,7 +233,7 @@ class RecoveryEventHandlerTest {
 
         RecoveryTask task = new RecoveryTask();
         task.setId(taskId);
-        task.setStatus("SUCCEEDED");
+        task.setStatus(RecoveryTaskStatus.SUCCEEDED);
         when(recoveryTaskMapper.selectById(taskId)).thenReturn(task);
 
         doNothing().when(channel).basicAck(anyLong(), eq(false));

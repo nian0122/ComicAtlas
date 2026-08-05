@@ -2,6 +2,7 @@ package com.comicatlas.api.importer.event;
 
 import com.comicatlas.api.admin.dto.RecoveryProgress;
 import com.comicatlas.api.admin.recovery.RecoveryEngine;
+import com.comicatlas.api.common.enums.RecoveryTaskStatus;
 import com.comicatlas.api.importer.entity.RecoveryTask;
 import com.comicatlas.api.importer.mapper.RecoveryTaskMapper;
 import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
@@ -22,7 +23,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.Set;
+import java.util.EnumSet;
 
 /**
  * 恢复事件处理器 — API 侧消费恢复结果事件，调度 {@link RecoveryEngine} 完成 DB 恢复。
@@ -46,7 +47,8 @@ public class RecoveryEventHandler {
     private final RedisTemplate<String, Object> redisTemplate;
     private final ManagementTaskService managementTaskService;
 
-    private static final Set<String> TERMINAL_STATUSES = Set.of("SUCCEEDED", "FAILED", "CANCELLED");
+    private static final EnumSet<RecoveryTaskStatus> TERMINAL_STATUSES = EnumSet.of(
+            RecoveryTaskStatus.SUCCEEDED, RecoveryTaskStatus.FAILED, RecoveryTaskStatus.CANCELLED);
 
     @RabbitListener(queues = "recovery.result.queue")
     public void handle(ComicEvent event,
@@ -97,7 +99,7 @@ public class RecoveryEventHandler {
             }
 
             // 标记 RUNNING
-            task.setStatus("RUNNING");
+            task.setStatus(RecoveryTaskStatus.RUNNING);
             task.setStartedAt(LocalDateTime.now());
             task.setTotalComics(event.comicIds().size());
             task.setRecoveredComics(0);
@@ -156,7 +158,7 @@ public class RecoveryEventHandler {
             }
 
             // 全部处理完成
-            task.setStatus("SUCCEEDED");
+            task.setStatus(RecoveryTaskStatus.SUCCEEDED);
             task.setEndedAt(LocalDateTime.now());
             recoveryTaskMapper.updateById(task);
 
@@ -175,7 +177,7 @@ public class RecoveryEventHandler {
             try {
                 RecoveryTask task = recoveryTaskMapper.selectById(taskId);
                 if (task != null && !TERMINAL_STATUSES.contains(task.getStatus())) {
-                    task.setStatus("FAILED");
+                    task.setStatus(RecoveryTaskStatus.FAILED);
                     task.setEndedAt(LocalDateTime.now());
                     task.setErrorMessage("事件处理异常: " + e.getMessage());
                     recoveryTaskMapper.updateById(task);
@@ -218,7 +220,7 @@ public class RecoveryEventHandler {
                 return;
             }
 
-            task.setStatus("FAILED");
+            task.setStatus(RecoveryTaskStatus.FAILED);
             task.setEndedAt(LocalDateTime.now());
             task.setErrorMessage(event.errorMessage());
             recoveryTaskMapper.updateById(task);
