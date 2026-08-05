@@ -47,7 +47,7 @@ ComicAtlas 是一个面向个人收藏的本地漫画仓库平台。它把 ZIP�
 1. 创建 `.env`，至少设置漫画存储目录及外部基础设施凭据：
 
    ```dotenv
-   MANGA_ROOT=D:/manga
+   MANGA_ROOT=F:/manga
    MYSQL_ROOT_PASSWORD=请设置强密码
    REMOTE_MYSQL_USER=comicatlas
    REMOTE_MYSQL_PASSWORD=请设置强密码

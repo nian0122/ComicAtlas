@@ -17,10 +17,10 @@
 
 ## 2. MANAGED 文件布局
 
-所有导入的漫画文件统一搬入 `D:/manga/` 下的托管目录。物理路径以 `{chapterId}` 作为章节级分段（不是 `globalOrder`）。
+所有导入的漫画文件统一搬入 `F:/manga/` 下的托管目录。物理路径以 `{chapterId}` 作为章节级分段（不是 `globalOrder`）。
 
 ```text
-D:/manga/                          # MANGA_ROOT
+F:/manga/                          # MANGA_ROOT
 ├── hq/                            # HQ 原图存储根
 │   └── {comicId}/
 │       └── {chapterId}/
@@ -119,10 +119,10 @@ storage:
   roots:
     HQ:
       type: FILESYSTEM
-      path: ${MANGA_ROOT:D:/manga}/hq
+      path: ${MANGA_ROOT:F:/manga}/hq
     LQ:
       type: FILESYSTEM
-      path: ${MANGA_ROOT:D:/manga}/lq
+      path: ${MANGA_ROOT:F:/manga}/lq
 ```
 
 `StorageProperties` 通过 `@ConfigurationProperties(prefix = "storage")` 绑定配置，暴露 `Map<String, StorageRoot> roots`。
