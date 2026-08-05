@@ -32,12 +32,55 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <p>测试运行时工作目录可能是各模块目录或项目根，因此通过 {@code user.dir}
  * 向上定位项目根目录；某个模块目录不存在时容忍跳过。不依赖绝对工作区路径。
+ *
+ * <p><b>守卫不变式：</b>{@link #BANNED}（实际扫描使用的禁用表）与
+ * {@link #DETECTION_FIXTURES}（检测有效性夹具）必须逐项一致（含顺序）。新增或
+ * 删除禁用规则时两处必须同步修改；检测有效性测试会先用
+ * {@code containsExactlyElementsOf} 断言两者完全相同，防止禁用表被静默删减而
+ * 导致守卫被削弱。
  */
 @DisplayName("SemanticNamingContractTest — 固定语义短名守卫（阿里编码规范）")
 class SemanticNamingContractTest {
 
-    /** 固定禁用声明表：类型 + 变量名 → 推荐命名。覆盖命名标准化 Todo 2-6 的全部固定映射。 */
+    /**
+     * 固定禁用声明表：类型 + 变量名 → 推荐命名。覆盖命名标准化 Todo 2-6 的全部固定映射。
+     *
+     * <p><b>不变式：</b>必须与 {@link #DETECTION_FIXTURES} 逐项一致（含顺序）。
+     * 新增或删除规则时两处必须同步修改，否则检测有效性测试会失败。
+     */
     private static final List<BannedPattern> BANNED = List.of(
+            new BannedPattern("Comic", "c", "comic"),
+            new BannedPattern("Chapter", "ch", "chapter"),
+            new BannedPattern("Media", "m", "media"),
+            new BannedPattern("Media", "page", "media"),
+            new BannedPattern("List<Media>", "pages", "mediaItems"),
+            new BannedPattern("RecoveryTask", "t", "recoveryTask"),
+            new BannedPattern("ManagementTask", "mt", "managementTask"),
+            new BannedPattern("ComicTag", "ct", "comicTag"),
+            new BannedPattern("ProcessBuilder", "pb", "processBuilder"),
+            new BannedPattern("Process", "proc", "process"),
+            new BannedPattern("LambdaUpdateWrapper", "uw", "<领域>Update"),
+            new BannedPattern("Page", "p", "pageRequest/pageResult"),
+            new BannedPattern("UploadFile", "uf", "uploadFile"),
+            new BannedPattern("Matcher", "m", "matcher"),
+            new BannedPattern("Map<String, Object>", "cm", "catalogMap"),
+            new BannedPattern("Map<String, Object>", "pm", "mediaMap"),
+            new BannedPattern("Map<String, Object>", "chm", "chapterMap"),
+            new BannedPattern("Result", "r", "result"),
+            new BannedPattern("ZipEntry", "ze", "zipEntry"),
+            new BannedPattern("BufferedImage", "bi", "image"),
+            new BannedPattern("ExportCatalog", "c", "catalog"),
+            new BannedPattern("ExportChapter", "ch", "chapter")
+    );
+
+    /**
+     * 检测有效性夹具：与 {@link #BANNED} 逐项相同（含顺序）的独立硬编码副本。
+     *
+     * <p>重复不是冗余，而是让「削弱守卫」这一行为在测试中响亮地失败：若
+     * {@link #BANNED} 被删减或增改，{@code eachBannedDeclaration_isDetected} 的
+     * {@code containsExactlyElementsOf} 断言会立即失败。两处必须保持同步。
+     */
+    private static final List<BannedPattern> DETECTION_FIXTURES = List.of(
             new BannedPattern("Comic", "c", "comic"),
             new BannedPattern("Chapter", "ch", "chapter"),
             new BannedPattern("Media", "m", "media"),
@@ -70,18 +113,38 @@ class SemanticNamingContractTest {
     private record BannedPattern(String type, String variable, String expected) {
 
         /**
-         * 生成声明匹配正则：类型基名 + 可选泛型实参 + 空白 + 短名。
+         * 生成声明匹配正则：类型基名（单词边界）+ 可选泛型实参 + 空白 + 短名。
          *
-         * <p>泛型实参以最外层 {@code >} 结束（允许实参间空白），因此
-         * 裸声明（{@code LambdaUpdateWrapper uw}）与泛型实例化
-         * （{@code LambdaUpdateWrapper<ManagementTask> uw}）都会被识别；
-         * {@code List<Media>}、{@code Map<String, Object>} 等泛型类型本身
-         * 作为字面类型参与匹配。
+         * <p>匹配策略：以「类型基名」（第一个 {@code <} 之前的部分）为锚并要求
+         * 单词边界，因此 {@code ComicService}、{@code MediaManager} 等复合类型名
+         * 的前缀不会被误认为禁用类型。类型字面量含泛型实参时（如
+         * {@code Map<String, Object>}）以<b>首个实参</b>为锚（同样要求单词边界，
+         * {@code List<MediaItemInfo> pages} 不会命中 {@code List<Media> pages}），
+         * 容忍嵌套 {@code <...>}、空白与其余实参变化：{@code Map<String, List<Path>> cm}、
+         * {@code Map < String , Object > cm} 均被识别，而
+         * {@code List<PageResult> pages} 不命中；无泛型的类型
+         * （{@code Comic c}、{@code Page<Comic> p}）则实参任意。
          */
         Pattern regex() {
-            // 结尾用可选 \b?：含泛型实参的类型（List<Media>、Map<String, Object>）在
-            // ">" 与空白之间无单词边界，\b 断言会失败；\b? 零宽、失败即跳过。
-            return Pattern.compile("\\b" + type + "\\b?(?:<[^>]+>)?\\s+\\b" + variable + "\\b");
+            String base = type;
+            String firstArg = null;
+            int lt = type.indexOf('<');
+            if (lt >= 0) {
+                base = type.substring(0, lt);
+                int gt = type.indexOf('>', lt);
+                firstArg = type.substring(lt + 1, gt).trim();
+                int comma = firstArg.indexOf(',');
+                if (comma >= 0) {
+                    firstArg = firstArg.substring(0, comma).trim();
+                }
+            }
+            // 泛型实参：首实参锚定（后接 \b 防止 MediaItemInfo 等前缀误配）+ 非贪婪
+            // 容错（嵌套 >、空白、其余实参），到 '>' 为止；无泛型的类型整组可选。
+            String genericPart = (firstArg == null)
+                    ? "(?:\\s*<[^;{}()]*?>)?"
+                    : "(?:\\s*<\\s*" + Pattern.quote(firstArg) + "\\b[^;{}()]*?>)?";
+            return Pattern.compile("\\b" + Pattern.quote(base) + "\\b" + genericPart
+                    + "\\s+\\b" + variable + "\\b");
         }
     }
 
@@ -128,6 +191,9 @@ class SemanticNamingContractTest {
     @Test
     @DisplayName("每个固定禁用声明均被识别（检测有效性）")
     void eachBannedDeclaration_isDetected() {
+        // 守卫不变式：禁用表与检测夹具必须逐项一致（含顺序）。先断言再逐个校验，
+        // 防止 BANNED 被删减导致守卫被静默削弱。
+        assertThat(BANNED).containsExactlyElementsOf(DETECTION_FIXTURES);
         for (BannedPattern bp : BANNED) {
             String sample = sampleFor(bp);
             List<Violation> found = findViolations(sample);
@@ -138,6 +204,23 @@ class SemanticNamingContractTest {
                         assertThat(v.variable()).isEqualTo(bp.variable());
                     });
         }
+    }
+
+    @Test
+    @DisplayName("Map 规则的嵌套泛型与空白变体声明均被识别")
+    void nestedGenericAndWhitespaceVariants_areDetected() {
+        String fixture = """
+                Map<String, List<Path>> cm = new HashMap<>();
+                Map < String , Object > cm = new LinkedHashMap<>();
+                """;
+        List<Violation> found = findViolations(fixture);
+        assertThat(found)
+                .as("嵌套泛型与空白变体应触发检测: %s", fixture)
+                .hasSize(2)
+                .allSatisfy(v -> {
+                    assertThat(v.type()).isEqualTo("Map<String, Object>");
+                    assertThat(v.variable()).isEqualTo("cm");
+                });
     }
 
     // ======================== 正向：合法命名不误报 ========================
