@@ -85,11 +85,11 @@ public class MetadataExporter {
         // 组装 catalogs 列表
         List<Map<String, Object>> catalogList = new ArrayList<>();
         for (Catalog cat : catalogs) {
-            Map<String, Object> cm = new LinkedHashMap<>();
-            cm.put("title", cat.getTitle());
-            cm.put("sortOrder", cat.getSortOrder() != null ? cat.getSortOrder() : 0);
-            cm.put("parentIndex", cat.getParentId() != null ? catalogIdToIndex.get(cat.getParentId()) : null);
-            catalogList.add(cm);
+            Map<String, Object> catalogMap = new LinkedHashMap<>();
+            catalogMap.put("title", cat.getTitle());
+            catalogMap.put("sortOrder", cat.getSortOrder() != null ? cat.getSortOrder() : 0);
+            catalogMap.put("parentIndex", cat.getParentId() != null ? catalogIdToIndex.get(cat.getParentId()) : null);
+            catalogList.add(catalogMap);
         }
 
         // 组装 chapters 列表
@@ -103,7 +103,7 @@ public class MetadataExporter {
 
             List<Map<String, Object>> mediaItemList = new ArrayList<>();
             for (Media p : mediaItems) {
-                Map<String, Object> pm = new LinkedHashMap<>();
+                Map<String, Object> mediaMap = new LinkedHashMap<>();
                 String hqPath = p.getHqPath();
                 String fileName = "";
                 if (hqPath != null && hqPath.contains("/")) {
@@ -113,30 +113,30 @@ public class MetadataExporter {
                 if (fileName.isEmpty() || "null".equals(fileName)) {
                     continue;
                 }
-                pm.put("fileName", fileName);
-                pm.put("mediaType", p.getMediaType() != null ? p.getMediaType() : "IMAGE");
-                pm.put("pageNumber", p.getPageNumber());
-                pm.put("hqStatus", p.getHqStatus() != null ? p.getHqStatus() : "READY");
-                pm.put("lqStatus", p.getLqStatus() != null ? p.getLqStatus() : "NOT_GENERATED");
-                pm.put("fileSize", p.getFileSize() != null ? p.getFileSize() : 0);
-                if (p.getWidth() != null) pm.put("width", p.getWidth());
-                if (p.getHeight() != null) pm.put("height", p.getHeight());
-                if (p.getDuration() != null) pm.put("duration", p.getDuration());
-                if (p.getContainer() != null) pm.put("container", p.getContainer());
-                if (p.getVideoCodec() != null) pm.put("videoCodec", p.getVideoCodec());
-                if (p.getAudioCodec() != null) pm.put("audioCodec", p.getAudioCodec());
-                mediaItemList.add(pm);
+                mediaMap.put("fileName", fileName);
+                mediaMap.put("mediaType", p.getMediaType() != null ? p.getMediaType() : "IMAGE");
+                mediaMap.put("pageNumber", p.getPageNumber());
+                mediaMap.put("hqStatus", p.getHqStatus() != null ? p.getHqStatus() : "READY");
+                mediaMap.put("lqStatus", p.getLqStatus() != null ? p.getLqStatus() : "NOT_GENERATED");
+                mediaMap.put("fileSize", p.getFileSize() != null ? p.getFileSize() : 0);
+                if (p.getWidth() != null) mediaMap.put("width", p.getWidth());
+                if (p.getHeight() != null) mediaMap.put("height", p.getHeight());
+                if (p.getDuration() != null) mediaMap.put("duration", p.getDuration());
+                if (p.getContainer() != null) mediaMap.put("container", p.getContainer());
+                if (p.getVideoCodec() != null) mediaMap.put("videoCodec", p.getVideoCodec());
+                if (p.getAudioCodec() != null) mediaMap.put("audioCodec", p.getAudioCodec());
+                mediaItemList.add(mediaMap);
             }
 
-            Map<String, Object> chm = new LinkedHashMap<>();
-            chm.put("title", chapter.getTitle());
-            chm.put("chapterNo", chapter.getChapterNo() != null ? chapter.getChapterNo() : "");
-            chm.put("sortOrder", chapter.getSortOrder() != null ? chapter.getSortOrder() : 0);
-            chm.put("globalOrder", chapter.getGlobalOrder() != null ? chapter.getGlobalOrder() : 0);
-            chm.put("catalogIndex", chapter.getCatalogId() != null ? catalogIdToIndex.get(chapter.getCatalogId()) : null);
-            chm.put("sourceDir", "");
-            chm.put("mediaItems", mediaItemList);
-            chapterList.add(chm);
+            Map<String, Object> chapterMap = new LinkedHashMap<>();
+            chapterMap.put("title", chapter.getTitle());
+            chapterMap.put("chapterNo", chapter.getChapterNo() != null ? chapter.getChapterNo() : "");
+            chapterMap.put("sortOrder", chapter.getSortOrder() != null ? chapter.getSortOrder() : 0);
+            chapterMap.put("globalOrder", chapter.getGlobalOrder() != null ? chapter.getGlobalOrder() : 0);
+            chapterMap.put("catalogIndex", chapter.getCatalogId() != null ? catalogIdToIndex.get(chapter.getCatalogId()) : null);
+            chapterMap.put("sourceDir", "");
+            chapterMap.put("mediaItems", mediaItemList);
+            chapterList.add(chapterMap);
         }
 
         // 6. 组装根结构，匹配 DirectoryImportHandler.writeMetadata() 格式
