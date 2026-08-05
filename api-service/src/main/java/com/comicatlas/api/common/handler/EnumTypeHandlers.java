@@ -1,7 +1,5 @@
 package com.comicatlas.api.common.handler;
 
-import com.comicatlas.api.common.enums.*;
-import com.comicatlas.common.enums.*;
 import org.apache.ibatis.type.BaseTypeHandler;
 import org.apache.ibatis.type.JdbcType;
 import org.apache.ibatis.type.MappedTypes;
@@ -10,6 +8,16 @@ import java.sql.CallableStatement;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import com.comicatlas.api.common.enums.SourceType;
+import com.comicatlas.api.common.enums.ComicStatus;
+import com.comicatlas.api.common.enums.HqStatus;
+import com.comicatlas.api.common.enums.ImportTaskStatus;
+import com.comicatlas.api.common.enums.LqStatus;
+import com.comicatlas.common.enums.ChapterLifecycleStatus;
+import com.comicatlas.common.enums.ComicLifecycleStatus;
+import com.comicatlas.common.enums.ManagementTaskStatus;
+import com.comicatlas.common.enums.MediaLifecycleStatus;
+import com.comicatlas.common.enums.TaskType;
 
 /**
  * 通用枚举 TypeHandler。

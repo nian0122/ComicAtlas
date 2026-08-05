@@ -34,7 +34,6 @@ import com.comicatlas.worker.file.trash.TrashManifestStore;
 import com.comicatlas.worker.mapper.ExportMediaMapper;
 import com.comicatlas.worker.mapper.ExportUploadFileMapper;
 import com.comicatlas.worker.mapper.ExportUploadSessionMapper;
-import org.junit.jupiter.api.*;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -78,6 +77,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 /**
  * 媒体分片上传管理集成测试（Testcontainers MySQL + RabbitMQ）。

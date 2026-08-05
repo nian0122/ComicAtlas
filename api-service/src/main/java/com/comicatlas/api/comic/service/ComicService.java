@@ -1,10 +1,20 @@
 package com.comicatlas.api.comic.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.comicatlas.api.comic.dto.*;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
 
 import java.util.List;
+import com.comicatlas.api.comic.dto.BatchComicUpdateDTO;
+import com.comicatlas.api.comic.dto.BatchUpdateResultVO;
+import com.comicatlas.api.comic.dto.ChapterPageVO;
+import com.comicatlas.api.comic.dto.ComicDetailVO;
+import com.comicatlas.api.comic.dto.ComicListQuery;
+import com.comicatlas.api.comic.dto.ComicListVO;
+import com.comicatlas.api.comic.dto.ComicMetadataDTO;
+import com.comicatlas.api.comic.dto.ComicMetadataUpdateDTO;
+import com.comicatlas.api.comic.dto.ComicTagUpdateDTO;
+import com.comicatlas.api.comic.dto.CreateComicRequest;
+import com.comicatlas.api.comic.dto.UpdateComicRequest;
 
 public interface ComicService {
     IPage<ComicListVO> listComics(ComicListQuery query);

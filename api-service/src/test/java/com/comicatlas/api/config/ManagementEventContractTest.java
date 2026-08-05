@@ -1,6 +1,5 @@
 package com.comicatlas.api.config;
 
-import com.comicatlas.common.event.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.DisplayName;
@@ -9,8 +8,20 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.UUID;
+import com.comicatlas.common.event.ComicEvent;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import com.comicatlas.common.event.DeleteRequestedEvent;
+import com.comicatlas.common.event.HqDeletedEvent;
+import com.comicatlas.common.event.ImportTaskCreatedEvent;
+import com.comicatlas.common.event.LqGenerateEvent;
+import com.comicatlas.common.event.ManagementCommandCancelRequestedEvent;
+import com.comicatlas.common.event.ManagementCommandCompletedEvent;
+import com.comicatlas.common.event.ManagementCommandFailedEvent;
+import com.comicatlas.common.event.ManagementCommandProgressEvent;
+import com.comicatlas.common.event.ManagementCommandRequestedEvent;
+import com.comicatlas.common.event.RecoveryRequestedEvent;
 
-import static org.assertj.core.api.Assertions.*;
 
 /**
  * 管理事件契约测试 — 验证新管理事件的 JSON round-trip 类型保持和旧事件兼容。

@@ -1,10 +1,7 @@
 package com.comicatlas.api.reader.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.comicatlas.api.comic.entity.*;
-import com.comicatlas.api.comic.mapper.*;
 import com.comicatlas.api.common.storage.FileUrlResolver;
-import com.comicatlas.api.reader.dto.*;
 import com.comicatlas.api.reader.entity.ReadingHistory;
 import com.comicatlas.api.reader.mapper.ReadingHistoryMapper;
 import com.comicatlas.api.reader.service.HistoryService;
@@ -17,6 +14,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import com.comicatlas.api.comic.entity.Chapter;
+import com.comicatlas.api.comic.entity.Comic;
+import com.comicatlas.api.comic.mapper.ChapterMapper;
+import com.comicatlas.api.comic.mapper.ComicMapper;
+import com.comicatlas.api.reader.dto.HistoryUpdateRequest;
+import com.comicatlas.api.reader.dto.HistoryVO;
 
 @Slf4j
 @Service

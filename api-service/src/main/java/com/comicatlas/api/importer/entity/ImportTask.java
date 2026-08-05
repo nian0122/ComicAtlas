@@ -1,10 +1,12 @@
 package com.comicatlas.api.importer.entity;
 
-import com.baomidou.mybatisplus.annotation.*;
 import com.comicatlas.api.common.enums.ImportTaskStatus;
 import com.comicatlas.api.common.enums.SourceType;
 import lombok.Data;
 import java.time.LocalDateTime;
+import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
 
 @Data
 @TableName("import_task")

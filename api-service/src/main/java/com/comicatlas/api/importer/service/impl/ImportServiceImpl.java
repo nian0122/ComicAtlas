@@ -18,7 +18,6 @@ import com.comicatlas.api.common.enums.SourceType;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.common.exception.ConflictException;
 import com.comicatlas.api.common.storage.ApiStorageProperties;
-import com.comicatlas.api.importer.dto.*;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
@@ -58,6 +57,12 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import com.comicatlas.api.importer.dto.BatchImportRequest;
+import com.comicatlas.api.importer.dto.BatchImportResultVO;
+import com.comicatlas.api.importer.dto.ImportRequest;
+import com.comicatlas.api.importer.dto.ImportStatusVO;
+import com.comicatlas.api.importer.dto.ImportTaskVO;
+import com.comicatlas.api.importer.dto.FailedItem;
 
 @Slf4j
 @Service

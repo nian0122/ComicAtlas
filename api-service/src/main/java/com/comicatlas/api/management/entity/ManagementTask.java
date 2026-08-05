@@ -1,11 +1,15 @@
 package com.comicatlas.api.management.entity;
 
-import com.baomidou.mybatisplus.annotation.*;
 import com.comicatlas.common.enums.ManagementTaskStatus;
 import com.comicatlas.common.enums.TaskType;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.Version;
 
 /**
  * 统一管理任务主表实体。

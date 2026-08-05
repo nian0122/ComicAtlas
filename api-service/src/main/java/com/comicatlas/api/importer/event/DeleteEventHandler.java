@@ -2,8 +2,6 @@ package com.comicatlas.api.importer.event;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
-import com.comicatlas.api.comic.entity.*;
-import com.comicatlas.api.comic.mapper.*;
 import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.common.event.DeleteCompletedEvent;
 import com.rabbitmq.client.Channel;
@@ -16,6 +14,14 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.List;
+import com.comicatlas.api.comic.mapper.CatalogMapper;
+import com.comicatlas.api.comic.mapper.ChapterMapper;
+import com.comicatlas.api.comic.mapper.ComicMapper;
+import com.comicatlas.api.comic.mapper.MediaMapper;
+import com.comicatlas.api.comic.entity.Catalog;
+import com.comicatlas.api.comic.entity.Chapter;
+import com.comicatlas.api.comic.entity.Comic;
+import com.comicatlas.api.comic.entity.Media;
 
 @Slf4j
 @Component

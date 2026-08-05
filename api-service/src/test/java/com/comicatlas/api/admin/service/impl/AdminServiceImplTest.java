@@ -4,8 +4,6 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.admin.dto.ComicDeleteStats;
 import com.comicatlas.api.admin.recovery.RecoveryEngine;
 import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
-import com.comicatlas.api.comic.entity.*;
-import com.comicatlas.api.comic.mapper.*;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
@@ -21,9 +19,22 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 import java.io.Serializable;
 
-import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import com.comicatlas.api.comic.mapper.CatalogMapper;
+import com.comicatlas.api.comic.mapper.ChapterMapper;
+import com.comicatlas.api.comic.mapper.ComicMapper;
+import com.comicatlas.api.comic.mapper.ComicTagMapper;
+import com.comicatlas.api.comic.mapper.MediaMapper;
+import com.comicatlas.api.comic.mapper.TagMapper;
+import com.comicatlas.api.comic.entity.Chapter;
+import com.comicatlas.api.comic.entity.Comic;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.anyLong;
 
 @ExtendWith(MockitoExtension.class)
 class AdminServiceImplTest {
