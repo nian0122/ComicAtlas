@@ -4,17 +4,28 @@
         "https://checkstyle.org/dtds/configuration_1_3.dtd">
 
 <!--
-  ComicAtlas 命名门禁配置（Checkstyle 13.9.0）
-  仅启用 6 个命名规则：
+  ComicAtlas Checkstyle 门禁配置（Checkstyle 13.9.0，对齐阿里 Java 编码规范 P2 项）
+  一、命名规则（原有，保持不弱化）：
     - TypeName        类型名 UpperCamelCase
     - MethodName      方法名 lowerCamelCase
     - MemberName      成员字段 lowerCamelCase，且禁止 is[A-Z] 开头的字段
     - ParameterName   参数名 lowerCamelCase
     - LocalVariableName 局部变量名 lowerCamelCase
     - ConstantName    常量 UPPER_CASE
+  二、阿里规范 P2 补充规则：
+    - AvoidStarImport    禁止通配符导入（阿里规范【强制】禁止 import *）
+    - NeedBraces         控制语句必须使用花括号，单行语句也强制加花括号
+                          （阿里规范【强制】if/else/for/while/do 必须加大括号）
+    - UnusedImports      禁止未使用的 import（阿里规范【强制】不允许 unused import）
+    - WhitespaceAfter    逗号/分号后必须有空白（阿里规范【强制】）
+    - NoWhitespaceBefore 逗号/分号前禁止空白（阿里规范【强制】）
+  说明：空白规则采用聚焦集合（COMMA/SEMI），未启用全量空白检查，
+        避免对既有代码做大规模无关格式化；EmptyLineSeparator 亦未启用。
 -->
 <module name="Checker">
     <module name="TreeWalker">
+        <!-- ========== 一、命名规则 ========== -->
+
         <!-- 类型名 UpperCamelCase，如 ComicController -->
         <module name="TypeName"/>
 
@@ -34,5 +45,30 @@
 
         <!-- 常量 UPPER_CASE，如 DEFAULT_LIMIT -->
         <module name="ConstantName"/>
+
+        <!-- ========== 二、阿里规范 P2 补充规则 ========== -->
+
+        <!-- 禁止通配符导入：import java.util.* / import static xxx.* 均不允许 -->
+        <module name="AvoidStarImport"/>
+
+        <!-- 控制语句必须使用花括号；单行语句（如 if (x) a();）同样强制花括号 -->
+        <module name="NeedBraces">
+            <property name="tokens"
+                      value="LITERAL_IF, LITERAL_ELSE, LITERAL_FOR, LITERAL_WHILE, LITERAL_DO"/>
+            <property name="allowSingleLineStatement" value="false"/>
+        </module>
+
+        <!-- 禁止未使用的 import -->
+        <module name="UnusedImports"/>
+
+        <!-- 逗号、分号后必须有空白（如 a, b 而不是 a,b） -->
+        <module name="WhitespaceAfter">
+            <property name="tokens" value="COMMA, SEMI"/>
+        </module>
+
+        <!-- 逗号、分号前禁止空白（如 a,b 而不是 a , b） -->
+        <module name="NoWhitespaceBefore">
+            <property name="tokens" value="COMMA, SEMI"/>
+        </module>
     </module>
 </module>

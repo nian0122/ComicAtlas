@@ -50,7 +50,7 @@ public final class ManagementStateMachine {
         Map.entry("DELETING", Set.of("TRASHED", "RESTORING")),
         Map.entry("TRASHING", Set.of("TRASHED", "READY")),
         Map.entry("TRASHED",  Set.of("RESTORING", "PURGING")),
-        Map.entry("RESTORING",Set.of("READY")),
+        Map.entry("RESTORING", Set.of("READY")),
         Map.entry("PURGING",  Set.of("DELETED")),
         Map.entry("DELETED",  Set.of())  // 终态
     );

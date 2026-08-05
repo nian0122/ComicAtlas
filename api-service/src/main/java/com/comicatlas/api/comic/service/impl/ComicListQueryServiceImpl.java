@@ -12,7 +12,6 @@ import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.mapper.CategoryMapper;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.service.ComicListQueryService;
-import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.common.storage.FileUrlResolver;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
 import com.comicatlas.api.management.policy.OperationPolicyService;
