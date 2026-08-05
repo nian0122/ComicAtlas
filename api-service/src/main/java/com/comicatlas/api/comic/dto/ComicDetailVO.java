@@ -1,8 +1,8 @@
 package com.comicatlas.api.comic.dto;
 
+import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
 import com.comicatlas.api.management.policy.AllowedOperations;
-import com.comicatlas.common.enums.ComicLifecycleStatus;
 import lombok.Data;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -28,7 +28,7 @@ public class ComicDetailVO {
     private Long categoryId;
     private String categoryName;
     /** 生命周期状态（强类型，替代旧 status:string） */
-    private ComicLifecycleStatus lifecycle;
+    private ComicStatus lifecycle;
     /** 乐观锁版本号 */
     private Integer version;
     /** 当前活跃的管理任务（无则 null） */

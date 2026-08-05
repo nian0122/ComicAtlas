@@ -18,7 +18,6 @@ import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.management.trash.TrashLifecycleService;
 import com.comicatlas.api.reader.entity.ReadingHistory;
 import com.comicatlas.api.reader.mapper.ReadingHistoryMapper;
-import com.comicatlas.common.enums.ComicLifecycleStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -487,10 +486,10 @@ public class ComicServiceImpl implements ComicService {
         return comic.getStatus() == null ? null : comic.getStatus().name();
     }
 
-    private static ComicLifecycleStatus toLifecycle(String status) {
+    private static ComicStatus toLifecycle(String status) {
         if (status == null) { return null; }
         try {
-            return ComicLifecycleStatus.valueOf(status);
+            return ComicStatus.valueOf(status);
         } catch (IllegalArgumentException e) {
             return null;
         }

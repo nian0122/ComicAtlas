@@ -656,7 +656,7 @@ GET /api/management/outbox/stats
 
 ### 14.1 生命周期状态
 
-**Comic**（`ComicLifecycleStatus`，`GET /api/comics` 的 `lifecycle` 字段）：
+**Comic**（`ComicStatus`，`GET /api/comics` 的 `lifecycle` 字段）：
 
 | 状态 | 含义 | 阅读列表可见 |
 |------|------|-------------|

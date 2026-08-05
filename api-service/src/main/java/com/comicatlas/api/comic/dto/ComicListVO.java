@@ -1,8 +1,8 @@
 package com.comicatlas.api.comic.dto;
 
+import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
 import com.comicatlas.api.management.policy.AllowedOperations;
-import com.comicatlas.common.enums.ComicLifecycleStatus;
 import lombok.Data;
 import java.time.LocalDateTime;
 
@@ -21,7 +21,7 @@ public class ComicListVO {
     private Long categoryId;
     private String categoryName;
     /** 生命周期状态（强类型，替代旧 status:string） */
-    private ComicLifecycleStatus lifecycle;
+    private ComicStatus lifecycle;
     /** 当前活跃的管理任务（无则 null） */
     private ManagementTaskResponse activeTask;
     /** 当前状态下允许的操作与阻塞原因 */
