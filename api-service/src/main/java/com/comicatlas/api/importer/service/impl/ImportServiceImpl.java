@@ -119,10 +119,10 @@ public class ImportServiceImpl implements ImportService {
                 if (sourceRef == null || !ehentaiPattern.matcher(sourceRef).find()) {
                     throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "不支持的 URL 格式");
                 }
-                Matcher m = ehentaiPattern.matcher(sourceRef);
-                m.find();
-                String gid = m.group(1);
-                String token = m.group(2);
+                Matcher matcher = ehentaiPattern.matcher(sourceRef);
+                matcher.find();
+                String gid = matcher.group(1);
+                String token = matcher.group(2);
                 comic.setSourceGalleryId(gid);
                 comic.setSourceGalleryToken(token);
                 comic.setSourceRef(sourceRef);

@@ -116,23 +116,23 @@ public class UploadSessionService {
         List<UploadFileResponse> fileResponses = new ArrayList<>();
         for (var fm : manifest) {
             String ext = mediaTypeDetector.validateAndExtractExtension(fm.getName());
-            UploadFile uf = new UploadFile();
-            uf.setSessionId(session.getId());
-            uf.setFileId(fm.getFileId());
-            uf.setOriginalName(fm.getName());
-            uf.setContentType(fm.getContentType());
-            uf.setSizeBytes(fm.getSize());
-            uf.setSha256(fm.getSha256().toLowerCase(Locale.ROOT));
-            uf.setStorageName(UUID.randomUUID().toString() + "." + ext);
-            uf.setReceivedBytes(0L);
-            uf.setReceivedRanges(null);
-            fileMapper.insert(uf);
+            UploadFile uploadFile = new UploadFile();
+            uploadFile.setSessionId(session.getId());
+            uploadFile.setFileId(fm.getFileId());
+            uploadFile.setOriginalName(fm.getName());
+            uploadFile.setContentType(fm.getContentType());
+            uploadFile.setSizeBytes(fm.getSize());
+            uploadFile.setSha256(fm.getSha256().toLowerCase(Locale.ROOT));
+            uploadFile.setStorageName(UUID.randomUUID().toString() + "." + ext);
+            uploadFile.setReceivedBytes(0L);
+            uploadFile.setReceivedRanges(null);
+            fileMapper.insert(uploadFile);
 
             UploadFileResponse fr = new UploadFileResponse();
-            fr.setFileId(uf.getFileId());
-            fr.setStorageName(uf.getStorageName());
+            fr.setFileId(uploadFile.getFileId());
+            fr.setStorageName(uploadFile.getStorageName());
             fr.setReceivedBytes(0);
-            fr.setSizeBytes(uf.getSizeBytes());
+            fr.setSizeBytes(uploadFile.getSizeBytes());
             fr.setComplete(false);
             fileResponses.add(fr);
         }
@@ -203,14 +203,14 @@ public class UploadSessionService {
         return resp;
     }
 
-    private UploadFileResponse toFileResponse(UploadFile uf) {
+    private UploadFileResponse toFileResponse(UploadFile uploadFile) {
         UploadFileResponse fr = new UploadFileResponse();
-        fr.setFileId(uf.getFileId());
-        fr.setStorageName(uf.getStorageName());
-        fr.setReceivedBytes(uf.getReceivedBytes() != null ? uf.getReceivedBytes() : 0);
-        fr.setSizeBytes(uf.getSizeBytes());
-        fr.setComplete(RangeTracker.isFullyReceived(uf.getReceivedRanges(), uf.getSizeBytes()));
-        fr.setReceivedRanges(uf.getReceivedRanges() != null ? uf.getReceivedRanges() : "");
+        fr.setFileId(uploadFile.getFileId());
+        fr.setStorageName(uploadFile.getStorageName());
+        fr.setReceivedBytes(uploadFile.getReceivedBytes() != null ? uploadFile.getReceivedBytes() : 0);
+        fr.setSizeBytes(uploadFile.getSizeBytes());
+        fr.setComplete(RangeTracker.isFullyReceived(uploadFile.getReceivedRanges(), uploadFile.getSizeBytes()));
+        fr.setReceivedRanges(uploadFile.getReceivedRanges() != null ? uploadFile.getReceivedRanges() : "");
         return fr;
     }
 
@@ -279,19 +279,19 @@ public class UploadSessionService {
 
         List<MediaTypeDetector.Detection> detections = new ArrayList<>();
         List<Long> mediaIds = new ArrayList<>();
-        for (UploadFile uf : files) {
-            if (!RangeTracker.isFullyReceived(uf.getReceivedRanges(), uf.getSizeBytes())) {
-                List<long[]> missing = RangeTracker.missingRanges(uf.getReceivedRanges(), uf.getSizeBytes());
+        for (UploadFile uploadFile : files) {
+            if (!RangeTracker.isFullyReceived(uploadFile.getReceivedRanges(), uploadFile.getSizeBytes())) {
+                List<long[]> missing = RangeTracker.missingRanges(uploadFile.getReceivedRanges(), uploadFile.getSizeBytes());
                 String miss = missing.stream().map(r -> r[0] + "-" + r[1]).collect(Collectors.joining(";"));
-                throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "文件 " + uf.getFileId() + " 未完整接收，缺失区间: " + miss);
+                throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "文件 " + uploadFile.getFileId() + " 未完整接收，缺失区间: " + miss);
             }
-            Path staging = storageService.stagingPath(session, uf);
+            Path staging = storageService.stagingPath(session, uploadFile);
             String actualSha = computeSha256(staging);
-            if (!uf.getSha256().equalsIgnoreCase(actualSha)) {
+            if (!uploadFile.getSha256().equalsIgnoreCase(actualSha)) {
                 throw new BusinessException(HttpStatusCodes.BAD_REQUEST,
-                        "文件 " + uf.getFileId() + " 总校验失败: 声明=" + uf.getSha256() + " 实际=" + actualSha);
+                        "文件 " + uploadFile.getFileId() + " 总校验失败: 声明=" + uploadFile.getSha256() + " 实际=" + actualSha);
             }
-            String ext = mediaTypeDetector.validateAndExtractExtension(uf.getStorageName());
+            String ext = mediaTypeDetector.validateAndExtractExtension(uploadFile.getStorageName());
             detections.add(mediaTypeDetector.detect(staging, ext));
         }
 
@@ -305,24 +305,24 @@ public class UploadSessionService {
             // 预建 STAGING media rows（追加到章节末尾 pageNumber）
             int nextPage = nextPageNumber(session.getChapterId());
             for (int i = 0; i < files.size(); i++) {
-                UploadFile uf = files.get(i);
+                UploadFile uploadFile = files.get(i);
                 MediaTypeDetector.Detection det = detections.get(i);
                 Media media = new Media();
                 media.setChapterId(session.getChapterId());
                 media.setPageNumber(nextPage + i);
                 media.setHqRoot("HQ");
-                media.setHqPath(session.getComicId() + "/" + session.getChapterId() + "/" + uf.getStorageName());
+                media.setHqPath(session.getComicId() + "/" + session.getChapterId() + "/" + uploadFile.getStorageName());
                 media.setHqStatus("PENDING");
                 media.setLqStatus("NOT_GENERATED");
                 media.setTranscodeStatus("NOT_NEEDED");
                 media.setStatus("STAGING");
                 media.setMediaType(det.mediaType());
-                media.setFileSize(uf.getSizeBytes());
+                media.setFileSize(uploadFile.getSizeBytes());
                 media.setVersion(1);
                 mediaMapper.insert(media);
 
                 fileMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<UploadFile>()
-                        .eq(UploadFile::getId, uf.getId())
+                        .eq(UploadFile::getId, uploadFile.getId())
                         .set(UploadFile::getMediaId, media.getId()));
                 mediaIds.add(media.getId());
             }

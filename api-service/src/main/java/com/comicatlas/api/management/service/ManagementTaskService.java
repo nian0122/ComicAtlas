@@ -412,20 +412,20 @@ public class ManagementTaskService {
             return false;
         }
 
-        LambdaUpdateWrapper<ManagementTask> uw = new LambdaUpdateWrapper<ManagementTask>()
+        LambdaUpdateWrapper<ManagementTask> taskUpdate = new LambdaUpdateWrapper<ManagementTask>()
                 .eq(ManagementTask::getId, managementTaskId)
                 .set(ManagementTask::getStage, stage != null ? stage.name() : null)
                 .set(ManagementTask::getUpdatedAt, LocalDateTime.now());
         if (progress != null && progress >= 0) {
-            uw.set(ManagementTask::getProgress, progress);
+            taskUpdate.set(ManagementTask::getProgress, progress);
         }
         if (task.getStatus() == ManagementTaskStatus.QUEUED) {
-            uw.set(ManagementTask::getStatus, ManagementTaskStatus.RUNNING);
+            taskUpdate.set(ManagementTask::getStatus, ManagementTaskStatus.RUNNING);
             if (task.getStartedAt() == null) {
-                uw.set(ManagementTask::getStartedAt, LocalDateTime.now());
+                taskUpdate.set(ManagementTask::getStartedAt, LocalDateTime.now());
             }
         }
-        taskMapper.update(null, uw);
+        taskMapper.update(null, taskUpdate);
         return true;
     }
 
