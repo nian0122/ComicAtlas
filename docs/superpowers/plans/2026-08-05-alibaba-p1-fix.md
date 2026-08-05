@@ -466,7 +466,11 @@ Expected: 编译错误列出所有字符串↔枚举不兼容点。逐个修复�
 | `query.getStatus()`（查询入参 String → 枚举比较） | `ComicStatus.valueOf(query.getStatus())` 包 try/catch 或空值判空 |
 | `status.startsWith("DELETE")` 之类字符串运算 | 改为枚举常量集合判断（如 `Set.of(ComicStatus.DELETING, ...)`） |
 
-- [ ] **Step 3: 运行相关测试**
+- [ ] **Step 3: 同步受影响的测试类**
+
+实体字段枚举化后，引用 `Comic.status/sourceType` 的测试编译失败。运行 `.\mvnw -pl api-service -am test-compile -q` 定位，按 Task 10 Step 2 的修复模式同步（如 `comic.setStatus("READY")` → `comic.setStatus(ComicStatus.READY)`）。仅修与本任务实体（Comic）相关的测试，其余实体相关测试留给对应任务。
+
+- [ ] **Step 4: 运行相关测试**
 
 ```bash
 .\mvnw -pl api-service -Dtest='ComicManagementCrudIT,TrashLifecycleIT,ImportServiceTest' test -q 2>&1 | Select-String "Tests run"
@@ -517,7 +521,11 @@ private MediaLifecycleStatus status;
 - 聚合 DTO（`ChapterStorageDTO`/`ComicStorageDTO` 的 `hqStatus/lqStatus`）保持 String，从枚举 `.name()` 转换。
 - `ReaderDTO.lqStatus`、`MediaItemInfo.lqStatus` 保持 String 契约，转换点加 `.name()`。
 
-- [ ] **Step 3: 运行相关测试**
+- [ ] **Step 3: 同步受影响的测试类**
+
+运行 `.\mvnw -pl api-service -am test-compile -q` 定位引用 `Media` 四状态字段的测试，按 Task 10 Step 2 的修复模式同步（如 `media.setLqStatus("READY")` → `media.setLqStatus(LqStatus.READY)`）。仅修与本任务实体（Media）相关的测试。
+
+- [ ] **Step 4: 运行相关测试**
 
 ```bash
 .\mvnw -pl api-service -Dtest='MediaUploadManagementIT,TrashLifecycleIT,ReadingLifecycleCompatibilityIT' test -q 2>&1 | Select-String "Tests run"
@@ -544,7 +552,24 @@ git commit -m "媒体状态枚举化：Media 四状态字段迁移到 HqStatus/L
 **Interfaces:**
 - Produces: `ImportTask.getStatus() → ImportTaskStatus`、`getSourceType() → SourceType`
 
-- [ ] **Step 1: 修改实体字段类型**
+- [ ] **Step 1: 修改实体字段类型并补 CANCELLED 枚举**
+
+`ImportTaskStatus` 当前缺 `CANCELLED`，但生产代码实际写 `t.setStatus("CANCELLED")`（`ImportServiceImpl:296`）。先为枚举补充常量：
+
+```java
+public enum ImportTaskStatus {
+    PENDING,
+    PARSING,
+    IMPORTING,
+    SUCCESS,
+    FAILED,
+    CANCELLED;
+
+    public boolean isTerminal() { return this == SUCCESS || this == FAILED || this == CANCELLED; }
+}
+```
+
+再修改实体字段类型：
 
 ```java
 private SourceType sourceType;
@@ -560,12 +585,16 @@ private ImportTaskStatus status;
 ```
 
 修复模式同 Task 7 Step 2。特别注意：
-- `ImportServiceImpl` 的 `TERMINAL_STATUSES`（第 293 行 `"SUCCESS"/"FAILED"/"CANCELLED"`）→ 枚举 Set：`Set.of(ImportTaskStatus.SUCCESS, ImportTaskStatus.FAILED)` + CANCELLED 若存在（`ImportTaskStatus` 当前无 CANCELLED 值，保持字符串集合或改为 `status.isTerminal()` 判断，实现时按语义选择）。
+- `ImportServiceImpl` 的 `TERMINAL_STATUSES`（第 293 行 `"SUCCESS"/"FAILED"/"CANCELLED"`）→ `t.getStatus().isTerminal()` 或枚举 Set：`Set.of(ImportTaskStatus.SUCCESS, ImportTaskStatus.FAILED, ImportTaskStatus.CANCELLED)`。
 - `ImportEventHandler.TERMINAL_STATUSES`（第 59 行）同理。
 - `ImportTaskVO.status/sourceType` 保持 String，转换点加 `.name()`。
 - `DirectoryScanTaskServiceImpl` 第 114 行 `"SUCCESS".equals(task.getStatus())` → `task.getStatus() == ImportTaskStatus.SUCCESS`。
 
-- [ ] **Step 3: 运行相关测试**
+- [ ] **Step 3: 同步受影响的测试类**
+
+运行 `.\mvnw -pl api-service -am test-compile -q` 定位引用 `ImportTask.status/sourceType` 的测试，按 Task 10 Step 2 的修复模式同步（如 `task.setStatus("PENDING")` → `task.setStatus(ImportTaskStatus.PENDING)`）。仅修与本任务实体（ImportTask）相关的测试。
+
+- [ ] **Step 4: 运行相关测试**
 
 ```bash
 .\mvnw -pl api-service -Dtest='ImportServiceTest,UnifiedTaskCompatibilityIT,ImportEventHandlerCacheTest' test -q 2>&1 | Select-String "Tests run"
@@ -583,27 +612,26 @@ git commit -m "导入任务状态枚举化：ImportTask.status/sourceType 迁移
 
 ---
 
-### Task 10: 测试代码枚举同步 + 完整验证
+### Task 10: 全量验证与测试兜底清理
 
 **Files:**
-- Modify: 16 个测试文件（79 处 `setStatus("...")`/`setSourceType("...")`/`setHqStatus("...")`/`setLqStatus("...")`/`setTranscodeStatus("...")`），清单见 Task 1 探索结果（`ImportServiceTest`、`RecoveryEventHandlerTest`、`MediaOperationPipelineIT`、`UnifiedTaskCompatibilityIT`、`StorageLayoutContractIT`、`TrashLifecycleIT`、`RecoveryTaskServiceTest`、`TranscodeCompletedHandlerTest`、`MetadataExporterTest`、`TranscodeFailedHandlerTest`、`ReadingLifecycleCompatibilityIT`、`OutboxInboxRelayIT`、`CatalogChapterManagementIT`、`ComicReferenceCacheTest`、`ImportEventHandlerCacheTest`、`CatalogCacheTest`）
+- Modify（兜底）: 16 个测试文件（79 处 `setStatus("...")`/`setSourceType("...")`/`setHqStatus("...")`/`setLqStatus("...")`/`setTranscodeStatus("...")` 中 Task 7-9 遗漏的），清单见 Task 1 探索结果（`ImportServiceTest`、`RecoveryEventHandlerTest`、`MediaOperationPipelineIT`、`UnifiedTaskCompatibilityIT`、`StorageLayoutContractIT`、`TrashLifecycleIT`、`RecoveryTaskServiceTest`、`TranscodeCompletedHandlerTest`、`MetadataExporterTest`、`TranscodeFailedHandlerTest`、`ReadingLifecycleCompatibilityIT`、`OutboxInboxRelayIT`、`CatalogChapterManagementIT`、`ComicReferenceCacheTest`、`ImportEventHandlerCacheTest`、`CatalogCacheTest`）
 
-- [ ] **Step 1: 编译定位全部测试不兼容点**
+- [ ] **Step 1: 兜底编译扫描**
 
 ```bash
 .\mvnw -pl api-service -am test-compile -q
 ```
 
-Expected: 编译错误列出所有测试中 String→枚举不兼容点。
+Expected: 编译通过。若仍有 String→枚举不兼容点（Task 7-9 遗漏），按模式修复：
 
-- [ ] **Step 2: 逐个修复测试断言**
-
-模式：
-- `task.setStatus("PENDING")` → `task.setStatus(ImportTaskStatus.PENDING)`
-- `comic.setStatus("READY")` → `comic.setStatus(ComicStatus.READY)`
-- `media.setLqStatus("READY")` → `media.setLqStatus(LqStatus.READY)`
-- `assertEquals("READY", vo.getStatus())`（VO 仍 String）→ 不变
-- `assertEquals("READY", entity.getStatus())`（实体已枚举）→ `assertEquals(ComicStatus.READY, entity.getStatus())`
+```text
+task.setStatus("PENDING") → task.setStatus(ImportTaskStatus.PENDING)
+comic.setStatus("READY") → comic.setStatus(ComicStatus.READY)
+media.setLqStatus("READY") → media.setLqStatus(LqStatus.READY)
+assertEquals("READY", vo.getStatus())（VO 仍 String）→ 不变
+assertEquals("READY", entity.getStatus())（实体已枚举）→ assertEquals(ComicStatus.READY, entity.getStatus())
+```
 
 - [ ] **Step 3: 运行完整 API 模块测试**
 
