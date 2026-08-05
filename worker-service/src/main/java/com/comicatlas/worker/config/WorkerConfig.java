@@ -6,6 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -24,6 +25,8 @@ public class WorkerConfig {
     private String ffprobePath = "worker-service/ffmpeg/ffprobe.exe";
     private String ffmpegPath = "ffmpeg";
     private String imageOptimizerPath = "tools/image-optimizer/image-optimizer.exe";
+    /** 工具相对路径的解析基准目录；未配置时回退到 JVM 工作目录 */
+    private String toolsBaseDir;
     private int lqQuality = 15;
     private int lqWorkers = 0;
     private int hqDeleteTimeoutSeconds = 60;
@@ -31,6 +34,20 @@ public class WorkerConfig {
     private Map<String, String> storageRoots = new LinkedHashMap<>();
     private String hostMangaRoot;
     private String containerMangaRoot = "/storage";
+    private Ehentai ehentai = new Ehentai();
+
+    /**
+     * 解析外部工具路径：相对路径基于 {@code toolsBaseDir}（未配置则取 JVM 工作目录）解析为绝对路径。
+     */
+    public Path resolveToolPath(String toolPath) {
+        Path p = Path.of(toolPath);
+        if (p.isAbsolute()) {
+            return p;
+        }
+        String base = toolsBaseDir != null && !toolsBaseDir.isBlank()
+                ? toolsBaseDir : System.getProperty("user.dir");
+        return Path.of(base).resolve(p).normalize();
+    }
 
     @Bean
     public ObjectMapper objectMapper() {
@@ -67,5 +84,13 @@ public class WorkerConfig {
         private int maxDepth = 200;
         private long maxEntrySize = 2L * 1024 * 1024 * 1024;
         private long maxTotalSize = 30L * 1024 * 1024 * 1024;
+    }
+
+    @Data
+    public static class Ehentai {
+        private String apiUrl = "https://api.e-hentai.org/api.php";
+        private String siteUrl = "https://e-hentai.org";
+        private String galleryUrlPattern = "e-hentai\\.org/g/(\\d+)/([a-f0-9]+)";
+        private String userAgent = "Mozilla/5.0";
     }
 }

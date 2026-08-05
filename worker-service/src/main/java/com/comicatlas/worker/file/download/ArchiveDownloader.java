@@ -1,5 +1,6 @@
 package com.comicatlas.worker.file.download;
 
+import com.comicatlas.worker.config.WorkerConfig;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -17,8 +18,12 @@ import java.nio.file.StandardCopyOption;
 public class ArchiveDownloader {
 
     private final HttpClient http;
+    private final String siteUrl;
+    private final String userAgent;
 
-    public ArchiveDownloader() {
+    public ArchiveDownloader(WorkerConfig config) {
+        this.siteUrl = config.getEhentai().getSiteUrl();
+        this.userAgent = config.getEhentai().getUserAgent();
         this.http = HttpClient.newBuilder()
             .followRedirects(HttpClient.Redirect.ALWAYS)
             .connectTimeout(java.time.Duration.ofSeconds(60))
@@ -27,19 +32,19 @@ public class ArchiveDownloader {
 
     /**
      * 通过 e-hentai Archiver 下载画廊 zip
-     * URL: https://e-hentai.org/archiver.php?gid={gid}&token={token}&or={archiver_key}
+     * URL: {siteUrl}/archiver.php?gid={gid}&token={token}&or={archiver_key}
      * 该链接会重定向到实际的 zip 下载地址，通过 HTTP 代理下载
      */
     public long download(long gid, String token, String archiverKey, Path destFile) throws Exception {
-        String url = String.format("https://e-hentai.org/archiver.php?gid=%d&token=%s&or=%s",
-            gid, token, archiverKey);
+        String url = String.format("%s/archiver.php?gid=%d&token=%s&or=%s",
+            siteUrl, gid, token, archiverKey);
         log.info("Archive download: {}", url);
 
         Files.createDirectories(destFile.getParent());
 
         HttpRequest req = HttpRequest.newBuilder()
             .uri(URI.create(url))
-            .header("User-Agent", "Mozilla/5.0")
+            .header("User-Agent", userAgent)
             .timeout(java.time.Duration.ofMinutes(30))
             .GET()
             .build();

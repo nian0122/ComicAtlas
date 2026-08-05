@@ -58,10 +58,7 @@ public class ImageOptimizer {
                 ? config.getLqWorkers()
                 : Runtime.getRuntime().availableProcessors();
 
-        Path optimizerPath = Path.of(config.getImageOptimizerPath());
-        if (!optimizerPath.isAbsolute()) {
-            optimizerPath = Path.of(System.getProperty("user.dir")).resolve(optimizerPath);
-        }
+        Path optimizerPath = config.resolveToolPath(config.getImageOptimizerPath());
         String chapterNo = hqDir.getFileName().toString();
         List<String> cmd = new ArrayList<>(List.of(
                 optimizerPath.toString(),
@@ -167,10 +164,7 @@ public class ImageOptimizer {
 
             Files.createDirectories(thumbsDir);
 
-            Path optimizerPath = Path.of(config.getImageOptimizerPath());
-            if (!optimizerPath.isAbsolute()) {
-                optimizerPath = Path.of(System.getProperty("user.dir")).resolve(optimizerPath);
-            }
+            Path optimizerPath = config.resolveToolPath(config.getImageOptimizerPath());
 
             List<String> cmd = new ArrayList<>(List.of(
                     optimizerPath.toString(),
@@ -281,10 +275,7 @@ public class ImageOptimizer {
             Files.createDirectories(tempDir);
             Path frameFile = tempDir.resolve("frame.jpg");
 
-            Path ffmpegPath = Path.of(config.getFfmpegPath());
-            if (!ffmpegPath.isAbsolute()) {
-                ffmpegPath = Path.of(System.getProperty("user.dir")).resolve(ffmpegPath);
-            }
+            Path ffmpegPath = config.resolveToolPath(config.getFfmpegPath());
             if (!Files.exists(ffmpegPath)) {
                 throw new RuntimeException("ffmpeg 不可用: " + ffmpegPath);
             }
