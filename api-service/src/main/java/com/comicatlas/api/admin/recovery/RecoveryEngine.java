@@ -3,8 +3,6 @@ package com.comicatlas.api.admin.recovery;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.admin.dto.RecoveryProgress;
 import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
-import com.comicatlas.api.comic.entity.*;
-import com.comicatlas.api.comic.mapper.*;
 import com.comicatlas.api.common.RestoreContext;
 import com.comicatlas.api.common.RestorePolicy;
 import com.comicatlas.api.common.RestoreSource;
@@ -31,6 +29,14 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import com.comicatlas.api.comic.mapper.CatalogMapper;
+import com.comicatlas.api.comic.mapper.ChapterMapper;
+import com.comicatlas.api.comic.mapper.ComicMapper;
+import com.comicatlas.api.comic.mapper.MediaMapper;
+import com.comicatlas.api.comic.entity.Catalog;
+import com.comicatlas.api.comic.entity.Chapter;
+import com.comicatlas.api.comic.entity.Comic;
+import com.comicatlas.api.comic.entity.Media;
 
 /**
  * 漫画恢复引擎 — 封装每漫画目录的扫描与恢复逻辑。

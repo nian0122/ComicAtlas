@@ -1,6 +1,5 @@
 package com.comicatlas.api.comic.entity;
 
-import com.baomidou.mybatisplus.annotation.*;
 import com.comicatlas.api.common.enums.HqStatus;
 import com.comicatlas.api.common.enums.LqStatus;
 import com.comicatlas.common.enums.MediaLifecycleStatus;
@@ -8,6 +7,10 @@ import com.comicatlas.common.enums.TranscodeStatus;
 import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.Version;
 
 /**
  * 媒体页实体（映射 page 表）。

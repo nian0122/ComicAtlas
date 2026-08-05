@@ -3,7 +3,6 @@ package com.comicatlas.api.management.batch.service;
 import com.comicatlas.api.management.batch.BatchConflictException;
 import com.comicatlas.api.management.batch.BatchReasonCode;
 import com.comicatlas.api.management.batch.config.BatchProperties;
-import com.comicatlas.api.management.batch.dto.*;
 import com.comicatlas.api.management.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
@@ -28,6 +27,10 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import com.comicatlas.api.management.batch.dto.BatchCreateResponse;
+import com.comicatlas.api.management.batch.dto.BatchOperationRequest;
+import com.comicatlas.api.management.batch.dto.BatchPreviewResponse;
+import com.comicatlas.api.management.batch.dto.BlockedBatchItem;
 
 /**
  * 批量操作服务 — 跨页选择快照 + 逐项物化。

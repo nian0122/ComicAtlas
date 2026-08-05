@@ -3,9 +3,21 @@ package com.comicatlas.api.management.policy;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import static com.comicatlas.api.management.policy.OperationPolicyService.OP_DELETE;
+import static com.comicatlas.api.management.policy.OperationPolicyService.OP_EDIT;
+import static com.comicatlas.api.management.policy.OperationPolicyService.OP_HQ_DELETE;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static com.comicatlas.api.management.policy.OperationPolicyService.OP_IMPORT;
+import static com.comicatlas.api.management.policy.OperationPolicyService.OP_LQ_GENERATE;
+import static com.comicatlas.api.management.policy.OperationPolicyService.OP_METADATA_REFRESH;
+import static com.comicatlas.api.management.policy.OperationPolicyService.OP_PURGE;
+import static com.comicatlas.api.management.policy.OperationPolicyService.OP_READ;
+import static com.comicatlas.api.management.policy.OperationPolicyService.OP_RECONCILE;
+import static com.comicatlas.api.management.policy.OperationPolicyService.OP_RECOVER;
+import static com.comicatlas.api.management.policy.OperationPolicyService.OP_RETRY_IMPORT;
+import static com.comicatlas.api.management.policy.OperationPolicyService.OP_TRANSCODE;
 
-import static com.comicatlas.api.management.policy.OperationPolicyService.*;
-import static org.assertj.core.api.Assertions.*;
 
 /**
  * 操作策略服务测试 — 验证每个实体状态返回正确的允许/阻止操作。

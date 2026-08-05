@@ -17,7 +17,6 @@ import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
 import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.outbox.service.OutboxService;
-import com.comicatlas.api.upload.dto.*;
 import com.comicatlas.api.upload.entity.UploadFile;
 import com.comicatlas.common.enums.MediaLifecycleStatus;
 import com.comicatlas.common.enums.TranscodeStatus;
@@ -45,6 +44,12 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import com.comicatlas.api.upload.dto.CreateUploadSessionRequest;
+import com.comicatlas.api.upload.dto.CreateUploadSessionResponse;
+import com.comicatlas.api.upload.dto.UploadChunkResponse;
+import com.comicatlas.api.upload.dto.UploadCompleteResponse;
+import com.comicatlas.api.upload.dto.UploadFileResponse;
+import com.comicatlas.api.upload.dto.UploadSessionStatusResponse;
 
 /**
  * 上传会话编排服务。

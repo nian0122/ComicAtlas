@@ -1,10 +1,15 @@
 package com.comicatlas.api.comic.entity;
 
-import com.baomidou.mybatisplus.annotation.*;
 import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.common.enums.SourceType;
 import lombok.Data;
 import java.time.LocalDateTime;
+import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.Version;
 
 /**
  * 漫画实体。
