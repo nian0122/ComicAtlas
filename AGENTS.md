@@ -7,7 +7,7 @@
 ## OVERVIEW
 AI 驱动个人漫画仓库平台。统一接收 ZIP/目录/EHENTAI 来源的漫画，支持图片+视频混排，完成导入、管理和阅读。
 Spring Boot 3 + Vue3 + RabbitMQ + MySQL + Redis。
-**所有导入统一 MANAGED 存储**——文件搬入 `D:/manga/hq/{comicId}/{chapterId}/`。
+**所有导入统一 MANAGED 存储**——文件搬入 `F:/manga/hq/{comicId}/{chapterId}/`。
 
 ## STRUCTURE
 ```
@@ -93,7 +93,7 @@ API ImportEventHandler: 读 metadata.json → INSERT catalog+chapter+media(IMAGE
 ```
 
 ## STORAGE
-所有漫画统一 MANAGED，文件搬入 `D:/manga/hq/{comicId}/{chapterId}/`。
+所有漫画统一 MANAGED，文件搬入 `F:/manga/hq/{comicId}/{chapterId}/`。
 
 **DB 存储**：
 - `comic.storage_policy` = `MANAGED`
@@ -105,9 +105,9 @@ API ImportEventHandler: 读 metadata.json → INSERT catalog+chapter+media(IMAGE
 ```
 /files/{rootKey_lc}/{relativePath}
 ```
-- `/files/hq/` → alias `D:/manga/hq/` (60d cache)
-- `/files/lq/` → alias `D:/manga/lq/` (30d cache)
-- `/files/thumbs/` → alias `D:/manga/thumbs/` (7d cache)
+- `/files/hq/` → alias `F:/manga/hq/` (60d cache)
+- `/files/lq/` → alias `F:/manga/lq/` (30d cache)
+- `/files/thumbs/` → alias `F:/manga/thumbs/` (7d cache)
 
 URL 统一由 `FileUrlResolver.resolve(page)` 生成，不手拼。
 
@@ -156,7 +156,7 @@ URL 统一由 `FileUrlResolver.resolve(page)` 生成，不手拼。
 ## CONFIG / ENV
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `MANGA_ROOT` | `D:/manga` | 存储根目录，Worker 写 / Nginx 读 |
+| `MANGA_ROOT` | `F:/manga` | 存储根目录，Worker 写 / Nginx 读 |
 | `PROXY_HOST` | `127.0.0.1` | HTTP 代理 |
 | `PROXY_PORT` | `7897` | HTTP 代理端口 |
 | `ARIA2C_PATH` | `tools/aria2c/aria2c.exe` | aria2c 路径 |

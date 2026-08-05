@@ -15,16 +15,16 @@ ComicAtlas 由前端、Gateway、API、Worker、MySQL、Redis、RabbitMQ、Nacos
 - Redis
 - RabbitMQ
 - Nacos 2.x
-- 可写的漫画存储目录，例如 `D:/manga`
+- 可写的漫画存储目录，例如 `F:/manga`
 
-Windows 用户建议使用正斜杠书写路径，例如 `D:/manga`，并确认 Docker Desktop 已共享该磁盘。
+Windows 用户建议使用正斜杠书写路径，例如 `F:/manga`，并确认 Docker Desktop 已共享该磁盘。
 
 ## 二、配置存储和基础设施
 
 在项目根目录创建 `.env`：
 
 ```dotenv
-MANGA_ROOT=D:/manga
+MANGA_ROOT=F:/manga
 MYSQL_ROOT_PASSWORD=请设置强密码
 REMOTE_MYSQL_USER=comicatlas
 REMOTE_MYSQL_PASSWORD=请设置强密码
@@ -39,14 +39,14 @@ REMOTE_RABBITMQ_PASSWORD=guest
 创建目录：
 
 ```text
-D:/manga/hq
-D:/manga/lq
-D:/manga/thumbs
-D:/manga/metadata
-D:/manga/temp
-D:/manga/staging
-D:/manga/trash
-D:/manga/export
+F:/manga/hq
+F:/manga/lq
+F:/manga/thumbs
+F:/manga/metadata
+F:/manga/temp
+F:/manga/staging
+F:/manga/trash
+F:/manga/export
 ```
 
 > v1.0 新增 `staging`（上传临时目录）与 `trash`（回收站文件卷）。`staging` 由 API 写入、不经 Nginx 暴露；`trash` 存放软删除后移入的文件，默认保留 7 天。
