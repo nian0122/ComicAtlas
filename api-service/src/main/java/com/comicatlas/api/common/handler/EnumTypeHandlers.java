@@ -13,6 +13,9 @@ import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.common.enums.HqStatus;
 import com.comicatlas.api.common.enums.ImportTaskStatus;
 import com.comicatlas.api.common.enums.LqStatus;
+import com.comicatlas.api.common.enums.ExportTaskStatus;
+import com.comicatlas.api.common.enums.RecoveryTaskStatus;
+import com.comicatlas.api.common.enums.DirectoryScanTaskStatus;
 import com.comicatlas.api.upload.UploadSessionStatus;
 import com.comicatlas.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.common.enums.ComicLifecycleStatus;
@@ -75,6 +78,30 @@ public class EnumTypeHandlers {
         @Override public UploadSessionStatus getNullableResult(ResultSet rs, String c) throws SQLException { return safeValueOf(UploadSessionStatus.class, rs.getString(c)); }
         @Override public UploadSessionStatus getNullableResult(ResultSet rs, int c) throws SQLException { return safeValueOf(UploadSessionStatus.class, rs.getString(c)); }
         @Override public UploadSessionStatus getNullableResult(CallableStatement cs, int c) throws SQLException { return safeValueOf(UploadSessionStatus.class, cs.getString(c)); }
+    }
+
+    @MappedTypes(ExportTaskStatus.class)
+    public static class ExportTaskStatusHandler extends BaseTypeHandler<ExportTaskStatus> {
+        @Override public void setNonNullParameter(PreparedStatement ps, int i, ExportTaskStatus p, JdbcType t) throws SQLException { ps.setString(i, p.name()); }
+        @Override public ExportTaskStatus getNullableResult(ResultSet rs, String c) throws SQLException { return safeValueOf(ExportTaskStatus.class, rs.getString(c)); }
+        @Override public ExportTaskStatus getNullableResult(ResultSet rs, int c) throws SQLException { return safeValueOf(ExportTaskStatus.class, rs.getString(c)); }
+        @Override public ExportTaskStatus getNullableResult(CallableStatement cs, int c) throws SQLException { return safeValueOf(ExportTaskStatus.class, cs.getString(c)); }
+    }
+
+    @MappedTypes(RecoveryTaskStatus.class)
+    public static class RecoveryTaskStatusHandler extends BaseTypeHandler<RecoveryTaskStatus> {
+        @Override public void setNonNullParameter(PreparedStatement ps, int i, RecoveryTaskStatus p, JdbcType t) throws SQLException { ps.setString(i, p.name()); }
+        @Override public RecoveryTaskStatus getNullableResult(ResultSet rs, String c) throws SQLException { return safeValueOf(RecoveryTaskStatus.class, rs.getString(c)); }
+        @Override public RecoveryTaskStatus getNullableResult(ResultSet rs, int c) throws SQLException { return safeValueOf(RecoveryTaskStatus.class, rs.getString(c)); }
+        @Override public RecoveryTaskStatus getNullableResult(CallableStatement cs, int c) throws SQLException { return safeValueOf(RecoveryTaskStatus.class, cs.getString(c)); }
+    }
+
+    @MappedTypes(DirectoryScanTaskStatus.class)
+    public static class DirectoryScanTaskStatusHandler extends BaseTypeHandler<DirectoryScanTaskStatus> {
+        @Override public void setNonNullParameter(PreparedStatement ps, int i, DirectoryScanTaskStatus p, JdbcType t) throws SQLException { ps.setString(i, p.name()); }
+        @Override public DirectoryScanTaskStatus getNullableResult(ResultSet rs, String c) throws SQLException { return safeValueOf(DirectoryScanTaskStatus.class, rs.getString(c)); }
+        @Override public DirectoryScanTaskStatus getNullableResult(ResultSet rs, int c) throws SQLException { return safeValueOf(DirectoryScanTaskStatus.class, rs.getString(c)); }
+        @Override public DirectoryScanTaskStatus getNullableResult(CallableStatement cs, int c) throws SQLException { return safeValueOf(DirectoryScanTaskStatus.class, cs.getString(c)); }
     }
 
     // ======================== comic-common 共享枚举 ========================

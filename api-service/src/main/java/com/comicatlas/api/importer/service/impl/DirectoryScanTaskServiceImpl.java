@@ -1,6 +1,7 @@
 package com.comicatlas.api.importer.service.impl;
 
 import com.comicatlas.api.common.constant.HttpStatusCodes;
+import com.comicatlas.api.common.enums.DirectoryScanTaskStatus;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.importer.dto.DirectoryScanTaskVO;
 import com.comicatlas.api.importer.entity.DirectoryScanTask;
@@ -43,7 +44,7 @@ public class DirectoryScanTaskServiceImpl implements DirectoryScanTaskService {
         }
 
         DirectoryScanTask task = new DirectoryScanTask();
-        task.setStatus("PENDING");
+        task.setStatus(DirectoryScanTaskStatus.PENDING);
         task.setDirectoryPath(directoryPath);
         task.setTotalItems(0);
         scanTaskMapper.insert(task);
@@ -78,7 +79,7 @@ public class DirectoryScanTaskServiceImpl implements DirectoryScanTaskService {
     private DirectoryScanTaskVO toVO(DirectoryScanTask task) {
         DirectoryScanTaskVO vo = new DirectoryScanTaskVO();
         vo.setId(task.getId());
-        vo.setStatus(task.getStatus());
+        vo.setStatus(task.getStatus() == null ? null : task.getStatus().name());
         vo.setDirectoryPath(task.getDirectoryPath());
         vo.setTotalItems(task.getTotalItems());
         vo.setErrorMessage(task.getErrorMessage());
@@ -98,20 +99,20 @@ public class DirectoryScanTaskServiceImpl implements DirectoryScanTaskService {
     public void applyResult(Long taskId, ScanResultVO result) {
         DirectoryScanTask task = scanTaskMapper.selectById(taskId);
         if (task == null) { return; }
-        task.setStatus("SUCCESS");
+        task.setStatus(DirectoryScanTaskStatus.SUCCESS);
         task.setTotalItems(result.total());
         try {
             task.setResultJson(objectMapper.writeValueAsString(result));
         } catch (Exception e) {
             log.error("扫描结果 JSON 序列化失败: taskId={}", taskId, e);
-            task.setStatus("FAILED");
+            task.setStatus(DirectoryScanTaskStatus.FAILED);
             task.setErrorMessage("扫描结果序列化失败: " + e.getMessage());
         }
         task.setEndedAt(LocalDateTime.now());
         scanTaskMapper.updateById(task);
 
         // 同步统一任务项状态
-        ManagementTaskStatus status = "SUCCESS".equals(task.getStatus())
+        ManagementTaskStatus status = task.getStatus() == DirectoryScanTaskStatus.SUCCESS
                 ? ManagementTaskStatus.SUCCEEDED : ManagementTaskStatus.FAILED;
         syncScanItem(taskId, status, task.getErrorMessage());
     }
@@ -119,7 +120,7 @@ public class DirectoryScanTaskServiceImpl implements DirectoryScanTaskService {
     public void applyFailure(Long taskId, String errorMessage) {
         DirectoryScanTask task = scanTaskMapper.selectById(taskId);
         if (task == null) { return; }
-        task.setStatus("FAILED");
+        task.setStatus(DirectoryScanTaskStatus.FAILED);
         task.setErrorMessage(errorMessage);
         task.setEndedAt(LocalDateTime.now());
         scanTaskMapper.updateById(task);

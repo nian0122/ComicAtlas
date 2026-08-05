@@ -1,5 +1,6 @@
 package com.comicatlas.api.export.event;
 
+import com.comicatlas.api.common.enums.ExportTaskStatus;
 import com.comicatlas.api.export.entity.ExportTask;
 import com.comicatlas.api.export.mapper.ExportTaskMapper;
 import com.comicatlas.api.management.entity.ManagementTaskItem;
@@ -37,7 +38,7 @@ public class ExportStartedHandler {
         try {
             ExportTask task = exportTaskMapper.selectById(taskId);
             if (task != null) {
-                task.setStatus("RUNNING");
+                task.setStatus(ExportTaskStatus.RUNNING);
                 exportTaskMapper.updateById(task);
             }
 

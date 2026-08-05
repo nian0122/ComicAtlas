@@ -5,7 +5,10 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.common.enums.ComicStatus;
+import com.comicatlas.api.common.enums.DirectoryScanTaskStatus;
+import com.comicatlas.api.common.enums.ExportTaskStatus;
 import com.comicatlas.api.common.enums.ImportTaskStatus;
+import com.comicatlas.api.common.enums.RecoveryTaskStatus;
 import com.comicatlas.api.common.enums.SourceType;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.export.entity.ExportTask;
@@ -348,16 +351,16 @@ class UnifiedTaskCompatibilityIT {
         importTaskMapper.insert(it);
 
         RecoveryTask rt = new RecoveryTask();
-        rt.setStatus("SUCCEEDED");
+        rt.setStatus(RecoveryTaskStatus.SUCCEEDED);
         recoveryTaskMapper.insert(rt);
 
         ExportTask et = new ExportTask();
         et.setComicId(comic.getId());
-        et.setStatus("FAILED");
+        et.setStatus(ExportTaskStatus.FAILED);
         exportTaskMapper.insert(et);
 
         DirectoryScanTask st = new DirectoryScanTask();
-        st.setStatus("SUCCESS");
+        st.setStatus(DirectoryScanTaskStatus.SUCCESS);
         st.setDirectoryPath("/mnt/staging/legacy");
         directoryScanTaskMapper.insert(st);
 

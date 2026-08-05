@@ -1,6 +1,7 @@
 package com.comicatlas.api.importer.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.comicatlas.api.common.enums.RecoveryTaskStatus;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.importer.entity.RecoveryTask;
 import com.comicatlas.api.importer.event.RecoveryEventPublisher;
@@ -69,7 +70,7 @@ class RecoveryTaskServiceTest {
 
         verify(recoveryTaskMapper).insert(taskCaptor.capture());
         RecoveryTask captured = taskCaptor.getValue();
-        assertEquals("QUEUED", captured.getStatus());
+        assertEquals(RecoveryTaskStatus.QUEUED, captured.getStatus());
         assertEquals(0, captured.getTotalComics());
         assertEquals(0, captured.getRecoveredComics());
         assertEquals(0, captured.getSkippedComics());
@@ -107,7 +108,7 @@ class RecoveryTaskServiceTest {
     void retryTask_shouldUpdateToPending_whenStatusFailed() {
         RecoveryTask failed = new RecoveryTask();
         failed.setId(2L);
-        failed.setStatus("FAILED");
+        failed.setStatus(RecoveryTaskStatus.FAILED);
         failed.setRetryCount(1);
         failed.setErrorMessage("磁盘空间不足");
 
@@ -121,7 +122,7 @@ class RecoveryTaskServiceTest {
         ArgumentCaptor<RecoveryTask> taskCaptor = ArgumentCaptor.forClass(RecoveryTask.class);
         verify(recoveryTaskMapper).updateById(taskCaptor.capture());
         RecoveryTask updated = taskCaptor.getValue();
-        assertEquals("QUEUED", updated.getStatus());
+        assertEquals(RecoveryTaskStatus.QUEUED, updated.getStatus());
         assertEquals(2, updated.getRetryCount());
         assertNull(updated.getErrorMessage());
         assertNull(updated.getStartedAt());
@@ -142,7 +143,7 @@ class RecoveryTaskServiceTest {
     void retryTask_shouldThrow_whenStatusSuccess() {
         RecoveryTask success = new RecoveryTask();
         success.setId(3L);
-        success.setStatus("SUCCESS");
+        success.setStatus(RecoveryTaskStatus.SUCCEEDED);
         success.setRetryCount(0);
 
         when(recoveryTaskMapper.selectById(3L)).thenReturn(success);
@@ -157,7 +158,7 @@ class RecoveryTaskServiceTest {
     void retryTask_shouldThrow_whenStatusRunning() {
         RecoveryTask running = new RecoveryTask();
         running.setId(4L);
-        running.setStatus("RUNNING");
+        running.setStatus(RecoveryTaskStatus.RUNNING);
         running.setRetryCount(0);
 
         when(recoveryTaskMapper.selectById(4L)).thenReturn(running);
@@ -172,7 +173,7 @@ class RecoveryTaskServiceTest {
     void retryTask_shouldThrow_whenStatusPending() {
         RecoveryTask pending = new RecoveryTask();
         pending.setId(5L);
-        pending.setStatus("PENDING");
+        pending.setStatus(RecoveryTaskStatus.QUEUED);
         pending.setRetryCount(0);
 
         when(recoveryTaskMapper.selectById(5L)).thenReturn(pending);

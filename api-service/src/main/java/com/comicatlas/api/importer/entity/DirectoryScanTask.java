@@ -1,5 +1,6 @@
 package com.comicatlas.api.importer.entity;
 
+import com.comicatlas.api.common.enums.DirectoryScanTaskStatus;
 import lombok.Data;
 import java.time.LocalDateTime;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -13,7 +14,7 @@ public class DirectoryScanTask {
     private Long id;
     /** 关联 management_task.id 一对一扩展（V12 列） */
     private Long managementTaskId;
-    private String status;
+    private DirectoryScanTaskStatus status;
     private String directoryPath;
     private Integer totalItems;
     private String resultJson;

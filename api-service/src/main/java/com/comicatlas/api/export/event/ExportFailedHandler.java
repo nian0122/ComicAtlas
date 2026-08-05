@@ -1,5 +1,6 @@
 package com.comicatlas.api.export.event;
 
+import com.comicatlas.api.common.enums.ExportTaskStatus;
 import com.comicatlas.api.export.entity.ExportTask;
 import com.comicatlas.api.export.mapper.ExportTaskMapper;
 import com.comicatlas.api.management.entity.ManagementTaskItem;
@@ -38,7 +39,7 @@ public class ExportFailedHandler {
         try {
             ExportTask task = exportTaskMapper.selectById(taskId);
             if (task != null) {
-                task.setStatus("FAILED");
+                task.setStatus(ExportTaskStatus.FAILED);
                 task.setErrorMsg(event.errorMessage());
                 task.setProgress(-1);
                 exportTaskMapper.updateById(task);
