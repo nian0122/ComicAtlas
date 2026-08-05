@@ -12,13 +12,13 @@ import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.mapper.CategoryMapper;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.service.ComicListQueryService;
+import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.common.storage.FileUrlResolver;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
 import com.comicatlas.api.management.policy.OperationPolicyService;
 import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.reader.entity.ReadingHistory;
 import com.comicatlas.api.reader.mapper.ReadingHistoryMapper;
-import com.comicatlas.common.enums.ComicLifecycleStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -158,10 +158,10 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
         return vo;
     }
 
-    private static ComicLifecycleStatus toLifecycle(String status) {
+    private static ComicStatus toLifecycle(String status) {
         if (status == null) { return null; }
         try {
-            return ComicLifecycleStatus.valueOf(status);
+            return ComicStatus.valueOf(status);
         } catch (IllegalArgumentException e) {
             return null;
         }

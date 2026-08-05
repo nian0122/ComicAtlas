@@ -18,7 +18,6 @@ import com.comicatlas.api.common.enums.RecoveryTaskStatus;
 import com.comicatlas.api.common.enums.DirectoryScanTaskStatus;
 import com.comicatlas.api.upload.UploadSessionStatus;
 import com.comicatlas.common.enums.ChapterLifecycleStatus;
-import com.comicatlas.common.enums.ComicLifecycleStatus;
 import com.comicatlas.common.enums.ManagementTaskStatus;
 import com.comicatlas.common.enums.MediaLifecycleStatus;
 import com.comicatlas.common.enums.TaskType;
@@ -105,14 +104,6 @@ public class EnumTypeHandlers {
     }
 
     // ======================== comic-common 共享枚举 ========================
-
-    @MappedTypes(ComicLifecycleStatus.class)
-    public static class ComicLifecycleStatusHandler extends BaseTypeHandler<ComicLifecycleStatus> {
-        @Override public void setNonNullParameter(PreparedStatement ps, int i, ComicLifecycleStatus p, JdbcType t) throws SQLException { ps.setString(i, p.name()); }
-        @Override public ComicLifecycleStatus getNullableResult(ResultSet rs, String c) throws SQLException { return safeValueOf(ComicLifecycleStatus.class, rs.getString(c)); }
-        @Override public ComicLifecycleStatus getNullableResult(ResultSet rs, int c) throws SQLException { return safeValueOf(ComicLifecycleStatus.class, rs.getString(c)); }
-        @Override public ComicLifecycleStatus getNullableResult(CallableStatement cs, int c) throws SQLException { return safeValueOf(ComicLifecycleStatus.class, cs.getString(c)); }
-    }
 
     @MappedTypes(ChapterLifecycleStatus.class)
     public static class ChapterLifecycleStatusHandler extends BaseTypeHandler<ChapterLifecycleStatus> {
