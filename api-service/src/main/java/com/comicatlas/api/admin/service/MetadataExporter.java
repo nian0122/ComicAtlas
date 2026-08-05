@@ -116,8 +116,8 @@ public class MetadataExporter {
                 mediaMap.put("fileName", fileName);
                 mediaMap.put("mediaType", p.getMediaType() != null ? p.getMediaType() : "IMAGE");
                 mediaMap.put("pageNumber", p.getPageNumber());
-                mediaMap.put("hqStatus", p.getHqStatus() != null ? p.getHqStatus() : "READY");
-                mediaMap.put("lqStatus", p.getLqStatus() != null ? p.getLqStatus() : "NOT_GENERATED");
+                mediaMap.put("hqStatus", p.getHqStatus() != null ? p.getHqStatus().name() : "READY");
+                mediaMap.put("lqStatus", p.getLqStatus() != null ? p.getLqStatus().name() : "NOT_GENERATED");
                 mediaMap.put("fileSize", p.getFileSize() != null ? p.getFileSize() : 0);
                 if (p.getWidth() != null) mediaMap.put("width", p.getWidth());
                 if (p.getHeight() != null) mediaMap.put("height", p.getHeight());

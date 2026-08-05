@@ -28,6 +28,7 @@ import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.common.dto.TrashManifest;
 import com.comicatlas.common.dto.TrashManifestActual;
 import com.comicatlas.common.enums.ManagementTaskStatus;
+import com.comicatlas.common.enums.MediaLifecycleStatus;
 import com.comicatlas.common.enums.TaskType;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import lombok.RequiredArgsConstructor;
@@ -128,9 +129,9 @@ public class TrashLifecycleService {
         if (media == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "媒体不存在: " + mediaId);
         }
-        requireAllowed(policyService.forMedia(media.getStatus()), OperationPolicyService.OP_DELETE,
+        requireAllowed(policyService.forMedia(mediaStatusName(media)), OperationPolicyService.OP_DELETE,
                 "媒体状态 " + media.getStatus() + " 不可回收");
-        ManagementStateMachine.validateMediaTransition(media.getStatus(), "TRASHING");
+        ManagementStateMachine.validateMediaTransition(mediaStatusName(media), "TRASHING");
 
         List<TrashManifest.Entry> entries = new ArrayList<>();
         if (media.getHqPath() != null && !media.getHqPath().isBlank()) {
@@ -138,7 +139,7 @@ public class TrashLifecycleService {
         }
 
         // 释放页码槽位：回收期间 pageNumber = -id（唯一负值），原页码存入 original_page_number
-        media.setStatus("TRASHING");
+        media.setStatus(MediaLifecycleStatus.TRASHING);
         media.setOriginalPageNumber(media.getPageNumber());
         media.setPageNumber(-media.getId().intValue());
         mediaMapper.updateById(media);
@@ -183,12 +184,12 @@ public class TrashLifecycleService {
         if (media == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "媒体不存在: " + mediaId);
         }
-        requireAllowed(policyService.forMedia(media.getStatus()), OperationPolicyService.OP_RECOVER,
+        requireAllowed(policyService.forMedia(mediaStatusName(media)), OperationPolicyService.OP_RECOVER,
                 "媒体状态 " + media.getStatus() + " 不可恢复");
-        ManagementStateMachine.validateMediaTransition(media.getStatus(), "RESTORING");
+        ManagementStateMachine.validateMediaTransition(mediaStatusName(media), "RESTORING");
         Long manifestTaskId = findTrashTaskId("MEDIA", mediaId);
 
-        media.setStatus("RESTORING");
+        media.setStatus(MediaLifecycleStatus.RESTORING);
         mediaMapper.updateById(media);
         return createCommandTask("MEDIA", mediaId, TaskType.MEDIA_RESTORE, "恢复媒体", manifestTaskId);
     }
@@ -236,11 +237,11 @@ public class TrashLifecycleService {
         }
         return purge("MEDIA", mediaId, token,
                 () -> {
-                    requireAllowed(policyService.forMedia(media.getStatus()), OperationPolicyService.OP_PURGE,
+                    requireAllowed(policyService.forMedia(mediaStatusName(media)), OperationPolicyService.OP_PURGE,
                             "媒体状态 " + media.getStatus() + " 不可永久清理");
-                    ManagementStateMachine.validateMediaTransition(media.getStatus(), "PURGING");
+                    ManagementStateMachine.validateMediaTransition(mediaStatusName(media), "PURGING");
                     checkRetention(media.getTrashedAt());
-                    media.setStatus("PURGING");
+                    media.setStatus(MediaLifecycleStatus.PURGING);
                     mediaMapper.updateById(media);
                 },
                 TaskType.MEDIA_PURGE, "永久清理媒体");
@@ -331,8 +332,8 @@ public class TrashLifecycleService {
             }
             case "MEDIA" -> {
                 Media media = mediaMapper.selectById(targetId);
-                if (media != null && "TRASHING".equals(media.getStatus())) {
-                    media.setStatus("TRASHED");
+                if (media != null && media.getStatus() == MediaLifecycleStatus.TRASHING) {
+                    media.setStatus(MediaLifecycleStatus.TRASHED);
                     media.setTrashedAt(LocalDateTime.now());
                     mediaMapper.updateById(media);
                     return true;
@@ -365,8 +366,8 @@ public class TrashLifecycleService {
             }
             case "MEDIA" -> {
                 Media media = mediaMapper.selectById(targetId);
-                if (media != null && "TRASHING".equals(media.getStatus())) {
-                    media.setStatus("READY");
+                if (media != null && media.getStatus() == MediaLifecycleStatus.TRASHING) {
+                    media.setStatus(MediaLifecycleStatus.READY);
                     media.setTrashedAt(null);
                     media.setPageNumber(media.getOriginalPageNumber());
                     mediaMapper.updateById(media);
@@ -409,7 +410,7 @@ public class TrashLifecycleService {
             }
             case "MEDIA" -> {
                 Media media = mediaMapper.selectById(targetId);
-                yield media == null ? null : media.getStatus();
+                yield media == null ? null : mediaStatusName(media);
             }
             default -> null;
         };
@@ -538,6 +539,10 @@ public class TrashLifecycleService {
 
     private static String comicStatusName(Comic comic) {
         return comic.getStatus() == null ? null : comic.getStatus().name();
+    }
+
+    private static String mediaStatusName(Media media) {
+        return media.getStatus() == null ? null : media.getStatus().name();
     }
 
     private void requireAllowed(AllowedOperations ops, String op, String message) {        if (!ops.isAllowed(op)) {

@@ -1,6 +1,10 @@
 package com.comicatlas.api.comic.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
+import com.comicatlas.api.common.enums.HqStatus;
+import com.comicatlas.api.common.enums.LqStatus;
+import com.comicatlas.common.enums.MediaLifecycleStatus;
+import com.comicatlas.common.enums.TranscodeStatus;
 import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -27,12 +31,12 @@ public class Media {
     private String hqPath;
     private String lqRoot;
     private String lqPath;
-    private String hqStatus;
-    private String lqStatus;
-    private String transcodeStatus;
+    private HqStatus hqStatus;
+    private LqStatus lqStatus;
+    private TranscodeStatus transcodeStatus;
 
     /** 媒体页生命周期状态，默认 READY */
-    private String status;
+    private MediaLifecycleStatus status;
 
     /** 进入 TRASHED 的时间（7 天保留期起点） */
     private LocalDateTime trashedAt;

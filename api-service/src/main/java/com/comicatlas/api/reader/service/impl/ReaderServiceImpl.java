@@ -45,7 +45,7 @@ public class ReaderServiceImpl implements ReaderService {
         var mediaItems = mediaMapper.selectList(
             new LambdaQueryWrapper<Media>()
                 .eq(Media::getChapterId, chapterId)
-                .eq(Media::getStatus, MediaLifecycleStatus.READY.name())
+                .eq(Media::getStatus, MediaLifecycleStatus.READY)
                 .orderByAsc(Media::getPageNumber));
 
         var dto = new ReaderDTO();
@@ -67,7 +67,7 @@ public class ReaderServiceImpl implements ReaderService {
                 pd.setLqStatus("NOT_APPLICABLE");
             } else {
                 pd.setLqUrl(fileUrlResolver.resolveLq(media));
-                pd.setLqStatus(media.getLqStatus());
+                pd.setLqStatus(media.getLqStatus() == null ? null : media.getLqStatus().name());
             }
             pd.setWidth(media.getWidth());
             pd.setHeight(media.getHeight());

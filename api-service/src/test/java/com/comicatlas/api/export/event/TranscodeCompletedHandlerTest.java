@@ -2,6 +2,7 @@ package com.comicatlas.api.export.event;
 
 import com.comicatlas.api.comic.entity.Media;
 import com.comicatlas.api.comic.mapper.MediaMapper;
+import com.comicatlas.common.enums.TranscodeStatus;
 import com.comicatlas.common.event.VideoTranscodeCompletedEvent;
 import com.rabbitmq.client.Channel;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,7 +47,7 @@ class TranscodeCompletedHandlerTest {
 
         Media media = new Media();
         media.setId(pageId);
-        media.setTranscodeStatus("PENDING");
+        media.setTranscodeStatus(TranscodeStatus.QUEUED);
         when(mediaMapper.selectById(pageId)).thenReturn(media);
         when(mediaMapper.updateById(any(Media.class))).thenReturn(1);
 
@@ -58,7 +59,7 @@ class TranscodeCompletedHandlerTest {
         handler.handleCompleted(event, channel, 1L);
 
         // Then: 页面变为 DONE，字段全部更新
-        assertEquals("DONE", media.getTranscodeStatus());
+        assertEquals(TranscodeStatus.READY, media.getTranscodeStatus());
         assertEquals("100/1/transcoded.mp4", media.getHqPath());
         assertEquals("mp4", media.getContainer());
         assertEquals("h264", media.getVideoCodec());
@@ -78,7 +79,7 @@ class TranscodeCompletedHandlerTest {
 
         Media media = new Media();
         media.setId(pageId);
-        media.setTranscodeStatus("DONE");
+        media.setTranscodeStatus(TranscodeStatus.READY);
         media.setHqPath("100/2/original.mp4");
         when(mediaMapper.selectById(pageId)).thenReturn(media);
 
@@ -94,7 +95,7 @@ class TranscodeCompletedHandlerTest {
         verify(channel).basicAck(1L, false);
 
         // 原字段不被覆盖
-        assertEquals("DONE", media.getTranscodeStatus());
+        assertEquals(TranscodeStatus.READY, media.getTranscodeStatus());
         assertEquals("100/2/original.mp4", media.getHqPath());
     }
 
@@ -107,7 +108,7 @@ class TranscodeCompletedHandlerTest {
 
         Media media = new Media();
         media.setId(pageId);
-        media.setTranscodeStatus("FAILED");
+        media.setTranscodeStatus(TranscodeStatus.FAILED);
         when(mediaMapper.selectById(pageId)).thenReturn(media);
 
         VideoTranscodeCompletedEvent event = new VideoTranscodeCompletedEvent(
@@ -120,7 +121,7 @@ class TranscodeCompletedHandlerTest {
         // Then: 不更新，直接 ACK
         verify(mediaMapper, never()).updateById(any(Media.class));
         verify(channel).basicAck(1L, false);
-        assertEquals("FAILED", media.getTranscodeStatus());
+        assertEquals(TranscodeStatus.FAILED, media.getTranscodeStatus());
     }
 
     // ======================== 不存在的 pageId ========================
@@ -152,7 +153,7 @@ class TranscodeCompletedHandlerTest {
 
         Media media = new Media();
         media.setId(pageId);
-        media.setTranscodeStatus("NOT_NEEDED");
+        media.setTranscodeStatus(TranscodeStatus.NOT_NEEDED);
         when(mediaMapper.selectById(pageId)).thenReturn(media);
 
         VideoTranscodeCompletedEvent event = new VideoTranscodeCompletedEvent(

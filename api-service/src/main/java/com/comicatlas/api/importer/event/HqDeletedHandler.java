@@ -5,6 +5,7 @@ import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.entity.Media;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.mapper.MediaMapper;
+import com.comicatlas.api.common.enums.HqStatus;
 import com.comicatlas.common.event.HqDeletedEvent;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
@@ -44,7 +45,7 @@ public class HqDeletedHandler {
                             .eq(Media::getMediaType, "IMAGE"));
 
             for (Media media : mediaItems) {
-                media.setHqStatus("DELETED");
+                media.setHqStatus(HqStatus.DELETED);
                 media.setHqRoot(null);
                 media.setHqPath(null);
                 mediaMapper.updateById(media);
