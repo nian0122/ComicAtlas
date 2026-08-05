@@ -31,6 +31,7 @@ import com.comicatlas.common.event.ManagementCommandProgressEvent;
 import com.comicatlas.common.event.MediaUploadCompletedEvent;
 import com.comicatlas.common.event.MediaUploadCompletedEvent.MediaAnalysisResult;
 import com.comicatlas.api.upload.UploadSessionService;
+import com.comicatlas.api.upload.UploadSessionStatus;
 import com.comicatlas.api.upload.entity.UploadSession;
 import com.comicatlas.api.upload.mapper.UploadSessionMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -579,7 +580,7 @@ public class ManagementCommandResultHandler {
             case "MEDIA_UPLOAD", "MEDIA_REPLACE" -> {
                 uploadSessionMapper.update(null, new LambdaUpdateWrapper<UploadSession>()
                         .eq(UploadSession::getId, ev.targetId())
-                        .set(UploadSession::getStatus, "FAILED"));
+                        .set(UploadSession::getStatus, UploadSessionStatus.FAILED));
             }
             case "COMIC_DELETE", "CHAPTER_TRASH", "MEDIA_TRASH" ->
                     applyTrashFailed(ev.targetType(), ev.targetId(), ev.taskId());
