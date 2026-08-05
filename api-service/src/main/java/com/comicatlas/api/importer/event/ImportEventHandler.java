@@ -200,11 +200,11 @@ public class ImportEventHandler {
 
         // 第一遍：INSERT 全部 catalog，建立 index → DB id 映射
         for (int i = 0; i < size; i++) {
-            Map<String, Object> cd = catalogsData.get(i);
+            Map<String, Object> catalogData = catalogsData.get(i);
             Catalog cat = new Catalog();
             cat.setComicId(comicId);
-            cat.setTitle((String) cd.get("title"));
-            cat.setSortOrder((Integer) cd.getOrDefault("sortOrder", i));
+            cat.setTitle((String) catalogData.get("title"));
+            cat.setSortOrder((Integer) catalogData.getOrDefault("sortOrder", i));
             catalogMapper.insert(cat);
             idMap.put(i, cat.getId());
         }
@@ -220,8 +220,8 @@ public class ImportEventHandler {
         for (int i = 0; i < size; i++) {
             Catalog cat = inserted.get(idMap.get(i));
             if (cat == null) { continue; }
-            Map<String, Object> cd = catalogsData.get(i);
-            Object pi = cd.get("parentIndex");
+            Map<String, Object> catalogData = catalogsData.get(i);
+            Object pi = catalogData.get("parentIndex");
             if (pi != null) {
                 int parentIdx = ((Number) pi).intValue();
                 if (parentIdx < 0 || parentIdx >= size) {
@@ -271,20 +271,20 @@ public class ImportEventHandler {
         int pgCount = 0;
         long totalSize = 0;
         if (itemList != null) {
-            for (Map<String, Object> md : itemList) {
+            for (Map<String, Object> mediaData : itemList) {
                 Media media = new Media();
                 media.setChapterId(chapter.getId());
-                media.setPageNumber(((Number) md.get("pageNumber")).intValue());
+                media.setPageNumber(((Number) mediaData.get("pageNumber")).intValue());
                 media.setHqRoot("HQ");
                 // hqPath: 优先使用 metadata 中的值，fallback 构造旧格式路径
-                String hqPath = (String) md.get("hqPath");
+                String hqPath = (String) mediaData.get("hqPath");
                 if (hqPath == null || hqPath.isBlank()) {
-                    hqPath = comicId + "/" + chapter.getGlobalOrder() + "/" + md.get(nameKey);
+                    hqPath = comicId + "/" + chapter.getGlobalOrder() + "/" + mediaData.get(nameKey);
                 }
                 // 新布局：将 globalOrder 目录替换为 chapterId
                 hqPath = normalizeToChapterIdLayout(hqPath, comicId, chapter.getId(), chapter.getGlobalOrder());
                 media.setHqPath(hqPath);
-                Object hqRaw = md.get("hqStatus");
+                Object hqRaw = mediaData.get("hqStatus");
                 HqStatus hqStatus = HqStatus.READY;
                 if (hqRaw != null) {
                     try {
@@ -295,12 +295,12 @@ public class ImportEventHandler {
                 }
                 media.setHqStatus(hqStatus);
                 media.setLqStatus(LqStatus.NOT_GENERATED);
-                if (md.get("fileSize") != null) { media.setFileSize(((Number) md.get("fileSize")).longValue()); }
-                if (md.get("width") != null) { media.setWidth(((Number) md.get("width")).intValue()); }
-                if (md.get("height") != null) { media.setHeight(((Number) md.get("height")).intValue()); }
+                if (mediaData.get("fileSize") != null) { media.setFileSize(((Number) mediaData.get("fileSize")).longValue()); }
+                if (mediaData.get("width") != null) { media.setWidth(((Number) mediaData.get("width")).intValue()); }
+                if (mediaData.get("height") != null) { media.setHeight(((Number) mediaData.get("height")).intValue()); }
 
                 // mediaType: v2 强制 IMAGE；v3 读取 metadata 中的 mediaType
-                String mediaType = isV3 ? (String) md.get("mediaType") : "IMAGE";
+                String mediaType = isV3 ? (String) mediaData.get("mediaType") : "IMAGE";
                 if (mediaType == null || mediaType.isBlank()) {
                     mediaType = "IMAGE";
                 }
@@ -308,17 +308,17 @@ public class ImportEventHandler {
 
                 // VIDEO 专属字段
                 if ("VIDEO".equalsIgnoreCase(mediaType)) {
-                    if (md.get("duration") != null) {
-                        media.setDuration(toBigDecimal(md.get("duration")));
+                    if (mediaData.get("duration") != null) {
+                        media.setDuration(toBigDecimal(mediaData.get("duration")));
                     }
-                    if (md.get("container") != null) {
-                        media.setContainer((String) md.get("container"));
+                    if (mediaData.get("container") != null) {
+                        media.setContainer((String) mediaData.get("container"));
                     }
-                    if (md.get("videoCodec") != null) {
-                        media.setVideoCodec((String) md.get("videoCodec"));
+                    if (mediaData.get("videoCodec") != null) {
+                        media.setVideoCodec((String) mediaData.get("videoCodec"));
                     }
-                    if (md.get("audioCodec") != null) {
-                        media.setAudioCodec((String) md.get("audioCodec"));
+                    if (mediaData.get("audioCodec") != null) {
+                        media.setAudioCodec((String) mediaData.get("audioCodec"));
                     }
                 }
 

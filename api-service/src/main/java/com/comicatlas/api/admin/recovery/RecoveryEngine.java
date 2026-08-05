@@ -288,11 +288,11 @@ public class RecoveryEngine {
         int size = catalogsData.size();
 
         for (int i = 0; i < size; i++) {
-            Map<String, Object> cd = catalogsData.get(i);
+            Map<String, Object> catalogData = catalogsData.get(i);
             Catalog cat = new Catalog();
             cat.setComicId(comicId);
-            cat.setTitle((String) cd.get("title"));
-            cat.setSortOrder((Integer) cd.getOrDefault("sortOrder", i));
+            cat.setTitle((String) catalogData.get("title"));
+            cat.setSortOrder((Integer) catalogData.getOrDefault("sortOrder", i));
             catalogMapper.insert(cat);
             idMap.put(i, cat.getId());
         }
@@ -307,8 +307,8 @@ public class RecoveryEngine {
         for (int i = 0; i < size; i++) {
             Catalog cat = inserted.get(idMap.get(i));
             if (cat == null) { continue; }
-            Map<String, Object> cd = catalogsData.get(i);
-            Object pi = cd.get("parentIndex");
+            Map<String, Object> catalogData = catalogsData.get(i);
+            Object pi = catalogData.get("parentIndex");
             if (pi != null) {
                 int parentIdx = ((Number) pi).intValue();
                 if (parentIdx < 0 || parentIdx >= size || !idMap.containsKey(parentIdx)) { continue; }
