@@ -22,6 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
@@ -147,6 +148,11 @@ public class VideoNormalizer {
 
             transcode(file, tempMp4);
             transcoded.put(file, tempMp4);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            // 等价传播：本方法经 Runnable lambda 提交（无法声明受检异常），
+            // 包装为 RuntimeException 后由 normalize() 的 future.get() 的 ExecutionException 分支处理
+            throw new RuntimeException("转码被中断: " + file.getFileName(), e);
         } catch (Exception e) {
             log.error("视频标准化失败: {} — {}", file.getFileName(), e.getMessage());
             failed.incrementAndGet();
@@ -252,7 +258,11 @@ public class VideoNormalizer {
 
         try {
             readFuture.get(5, TimeUnit.SECONDS);
-        } catch (Exception e) {
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            process.destroyForcibly();
+            throw e;
+        } catch (ExecutionException | TimeoutException e) {
             log.warn("等待 ffmpeg 输出读取超时: {}", e.getMessage());
         }
 
