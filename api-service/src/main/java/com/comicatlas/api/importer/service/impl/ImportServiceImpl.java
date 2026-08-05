@@ -366,7 +366,7 @@ public class ImportServiceImpl implements ImportService {
         }
 
         Long taskId = t.getId();
-        String sourceType = t.getSourceType() == null ? null : t.getSourceType().name();
+        String sourceType = resolveSourceType(t);
         String sourcePath = t.getSourcePath();
 
         // 同步统一任务：终态统一任务重置回 QUEUED（attempt 递增，失败/取消 item 重新入队）
@@ -445,6 +445,11 @@ public class ImportServiceImpl implements ImportService {
         }
     }
 
+    /** 兼容遗留 DIRECTORY 值（枚举化后读回 null，语义等价 REGISTER） */
+    private static String resolveSourceType(ImportTask t) {
+        return t.getSourceType() != null ? t.getSourceType().name() : "REGISTER";
+    }
+
     private static String comicStatusName(Comic comic) {
         return comic.getStatus() == null ? null : comic.getStatus().name();
     }
@@ -458,7 +463,7 @@ public class ImportServiceImpl implements ImportService {
         try {
             return ImportTaskStatus.valueOf(status);
         } catch (IllegalArgumentException e) {
-            return null;
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "不支持的任务状态: " + status);
         }
     }
 
@@ -467,7 +472,7 @@ public class ImportServiceImpl implements ImportService {
         vo.setId(t.getId());
         vo.setComicId(t.getComicId());
         vo.setSourceRef(t.getSourceRef());
-        vo.setSourceType(t.getSourceType() == null ? null : t.getSourceType().name());
+        vo.setSourceType(resolveSourceType(t));
         vo.setSourcePath(t.getSourcePath());
         vo.setBatchId(t.getBatchId());
         vo.setStatus(statusName(t.getStatus()));
