@@ -50,8 +50,9 @@ public class VideoMetadataFixHandler {
                     new LambdaQueryWrapper<ExportMedia>()
                             .eq(ExportMedia::getMediaType, "VIDEO")
                             .isNull(ExportMedia::getWidth)
-                            .inSql(ExportMedia::getChapterId,
-                                    "SELECT id FROM chapter WHERE comic_id = " + comicId));
+                            // 参数化 apply：避免字符串拼接 SQL，{0} 占位符注入参数
+                            .apply("chapter_id IN (SELECT id FROM chapter WHERE comic_id = {0})",
+                                    comicId));
 
             if (videos.isEmpty()) {
                 log.info("无需修复的视频元数据: comicId={}", comicId);
