@@ -37,6 +37,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -61,7 +62,7 @@ public class ImportEventHandler {
 
     /** 终态集合：到达这些状态后不可回退到非终态（含 CANCELLED 真正终态） */
     private static final Set<ImportTaskStatus> TERMINAL_STATUSES =
-            Set.of(ImportTaskStatus.SUCCESS, ImportTaskStatus.FAILED, ImportTaskStatus.CANCELLED);
+            EnumSet.of(ImportTaskStatus.SUCCESS, ImportTaskStatus.FAILED, ImportTaskStatus.CANCELLED);
 
     @RabbitListener(queues = "import.result.queue")
     @SuppressWarnings("unchecked")
