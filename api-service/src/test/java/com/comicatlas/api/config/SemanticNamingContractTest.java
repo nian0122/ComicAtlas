@@ -36,7 +36,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DisplayName("SemanticNamingContractTest — 固定语义短名守卫（阿里编码规范）")
 class SemanticNamingContractTest {
 
-    /** 固定禁用声明表：类型 + 变量名 → 推荐命名。 */
+    /** 固定禁用声明表：类型 + 变量名 → 推荐命名。覆盖命名标准化 Todo 2-6 的全部固定映射。 */
     private static final List<BannedPattern> BANNED = List.of(
             new BannedPattern("Comic", "c", "comic"),
             new BannedPattern("Chapter", "ch", "chapter"),
@@ -48,7 +48,18 @@ class SemanticNamingContractTest {
             new BannedPattern("ComicTag", "ct", "comicTag"),
             new BannedPattern("ProcessBuilder", "pb", "processBuilder"),
             new BannedPattern("Process", "proc", "process"),
-            new BannedPattern("LambdaUpdateWrapper", "uw", "<领域>Update")
+            new BannedPattern("LambdaUpdateWrapper", "uw", "<领域>Update"),
+            new BannedPattern("Page", "p", "pageRequest/pageResult"),
+            new BannedPattern("UploadFile", "uf", "uploadFile"),
+            new BannedPattern("Matcher", "m", "matcher"),
+            new BannedPattern("Map<String, Object>", "cm", "catalogMap"),
+            new BannedPattern("Map<String, Object>", "pm", "mediaMap"),
+            new BannedPattern("Map<String, Object>", "chm", "chapterMap"),
+            new BannedPattern("Result", "r", "result"),
+            new BannedPattern("ZipEntry", "ze", "zipEntry"),
+            new BannedPattern("BufferedImage", "bi", "image"),
+            new BannedPattern("ExportCatalog", "c", "catalog"),
+            new BannedPattern("ExportChapter", "ch", "chapter")
     );
 
     /** 待扫描的模块名。 */
@@ -59,18 +70,18 @@ class SemanticNamingContractTest {
     private record BannedPattern(String type, String variable, String expected) {
 
         /**
-         * 生成声明匹配正则：类型与短名之间以空白分隔。
+         * 生成声明匹配正则：类型基名 + 可选泛型实参 + 空白 + 短名。
          *
-         * <p>遵循任务给出的字面量声明模式（如 {@code \bComic\s+c\b}），
-         * 因此泛型实例化的写法（如 {@code LambdaUpdateWrapper<ManagementTask> uw}）
-         * 不在本规则匹配范围内 —— 它们之间隔着泛型实参而非空白。
+         * <p>泛型实参以最外层 {@code >} 结束（允许实参间空白），因此
+         * 裸声明（{@code LambdaUpdateWrapper uw}）与泛型实例化
+         * （{@code LambdaUpdateWrapper<ManagementTask> uw}）都会被识别；
+         * {@code List<Media>}、{@code Map<String, Object>} 等泛型类型本身
+         * 作为字面类型参与匹配。
          */
         Pattern regex() {
-            if (type.equals("List<Media>")) {
-                // List<Media> 自身就是泛型，直接匹配整体类型（允许括号间空白）
-                return Pattern.compile("\\bList\\s*<\\s*Media\\s*>\\s+\\b" + variable + "\\b");
-            }
-            return Pattern.compile("\\b" + type + "\\b\\s+\\b" + variable + "\\b");
+            // 结尾用可选 \b?：含泛型实参的类型（List<Media>、Map<String, Object>）在
+            // ">" 与空白之间无单词边界，\b 断言会失败；\b? 零宽、失败即跳过。
+            return Pattern.compile("\\b" + type + "\\b?(?:<[^>]+>)?\\s+\\b" + variable + "\\b");
         }
     }
 
@@ -363,11 +374,19 @@ class SemanticNamingContractTest {
         return sb.toString();
     }
 
-    /** 为禁用声明构造一段必然命中的示例代码。 */
+    /** 为禁用声明构造一段必然命中的示例代码（覆盖裸声明与泛型实例化两种真实形态）。 */
     private static String sampleFor(BannedPattern bp) {
         return switch (bp.type()) {
             case "List<Media>" -> "List<Media> " + bp.variable() + " = new ArrayList<>();";
-            case "LambdaUpdateWrapper" -> "LambdaUpdateWrapper " + bp.variable() + " = new LambdaUpdateWrapper();";
+            case "LambdaUpdateWrapper" ->
+                    "LambdaUpdateWrapper<ManagementTask> " + bp.variable() + " = new LambdaUpdateWrapper<>();";
+            case "Page" -> "Page<Comic> " + bp.variable() + " = new Page<>();";
+            case "Result" -> "Result<Comic> " + bp.variable() + " = new Result<>();";
+            case "Map<String, Object>" ->
+                    "Map<String, Object> " + bp.variable() + " = new LinkedHashMap<>();";
+            case "ZipEntry" -> "ZipEntry " + bp.variable() + " = new ZipEntry(\"x\");";
+            case "BufferedImage" -> "BufferedImage " + bp.variable() + " = null;";
+            case "Matcher" -> "Matcher " + bp.variable() + " = Pattern.compile(\"x\").matcher(\"x\");";
             default -> bp.type() + " " + bp.variable() + " = new " + bp.type() + "();";
         };
     }
