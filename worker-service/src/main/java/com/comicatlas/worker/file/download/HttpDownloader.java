@@ -21,11 +21,10 @@ import java.util.regex.Pattern;
 @Component
 public class HttpDownloader implements DownloadStrategy {
 
-    private static final String API_URL = "https://api.e-hentai.org/api.php";
-    private static final Pattern EH_PATTERN = Pattern.compile("e-hentai\\.org/g/(\\d+)/([a-f0-9]+)");
-
     private final HttpClient http;
     private final ObjectMapper objectMapper;
+    private final String apiUrl;
+    private final Pattern galleryPattern;
 
     public HttpDownloader(ObjectMapper objectMapper, WorkerConfig config) {
         // 配置代理（全局属性方式，最可靠）
@@ -42,11 +41,13 @@ public class HttpDownloader implements DownloadStrategy {
             .proxy(ProxySelector.getDefault())
             .build();
         this.objectMapper = objectMapper;
+        this.apiUrl = config.getEhentai().getApiUrl();
+        this.galleryPattern = Pattern.compile(config.getEhentai().getGalleryUrlPattern());
     }
 
     @Override
     public DownloadContext.DownloadResult download(String sourceRef, Path destDir) throws Exception {
-        Matcher matcher = EH_PATTERN.matcher(sourceRef);
+        Matcher matcher = galleryPattern.matcher(sourceRef);
         if (!matcher.find()) throw new IllegalArgumentException("Invalid e-hentai URL");
         long gid = Long.parseLong(matcher.group(1));
         String token = matcher.group(2);
@@ -66,7 +67,7 @@ public class HttpDownloader implements DownloadStrategy {
      * 获取 gallery 元数据（含 magnet 链接，如果有 torrent）
      */
     public String getMagnetUri(String sourceRef) throws Exception {
-        Matcher matcher = EH_PATTERN.matcher(sourceRef);
+        Matcher matcher = galleryPattern.matcher(sourceRef);
         if (!matcher.find()) return null;
         long gid = Long.parseLong(matcher.group(1));
         String token = matcher.group(2);
@@ -86,7 +87,7 @@ public class HttpDownloader implements DownloadStrategy {
             "namespace", 1
         );
         HttpRequest req = HttpRequest.newBuilder()
-            .uri(URI.create(API_URL))
+            .uri(URI.create(apiUrl))
             .header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
             .build();
@@ -127,7 +128,7 @@ public class HttpDownloader implements DownloadStrategy {
 
     @Override
     public boolean supports(String sourceRef) {
-        return sourceRef.contains("e-hentai.org/g/");
+        return galleryPattern.matcher(sourceRef).find();
     }
 
     @Override

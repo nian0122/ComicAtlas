@@ -22,7 +22,7 @@ public class TorrentDownloader implements DownloadStrategy {
         log.info("Torrent: magnet={}, dest={}", magnetUrl, destDir);
 
         var cmd = new java.util.ArrayList<>(List.of(
-            config.getAria2cPath(), magnetUrl,
+            config.resolveToolPath(config.getAria2cPath()).toString(), magnetUrl,
             "--bt-stop-timeout=60", "--seed-time=0",
             "--max-connection-per-server=16", "--split=8",
             "--bt-enable-lpd=false",

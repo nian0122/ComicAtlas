@@ -22,7 +22,7 @@ import java.nio.file.Path;
 public class MetadataRefreshHandler {
 
     private final ExportCollector exportCollector;
-    @Value("${manga.root}")
+    @Value("${worker.manga-root}")
     private String mangaRoot;
 
     @RabbitListener(queues = "metadata.refresh.queue")

@@ -54,6 +54,7 @@ worker:
   ffprobe-path: ${FFPROBE_PATH:tools/ffmpeg/ffprobe.exe}
   ffmpeg-path: ${FFMPEG_PATH:tools/ffmpeg/ffmpeg.exe}
   image-optimizer-path: ${IMAGE_OPTIMIZER_PATH:tools/image-optimizer/image-optimizer.exe}
+  tools-base-dir: ${TOOLS_BASE_DIR:}
   lq-quality: ${LQ_QUALITY:15}
   lq-workers: ${LQ_WORKERS:4}
   hq-delete-timeout-seconds: ${HQ_DELETE_TIMEOUT_SECONDS:60}
@@ -73,6 +74,11 @@ worker:
     max-depth: 200
     max-entry-size: 2147483648
     max-total-size: 32212254720
+  ehentai:
+    api-url: ${EHENTAI_API_URL:https://api.e-hentai.org/api.php}
+    site-url: ${EHENTAI_SITE_URL:https://e-hentai.org}
+    gallery-url-pattern: ${EHENTAI_GALLERY_URL_PATTERN:e-hentai\.org/g/(\d+)/([a-f0-9]+)}
+    user-agent: ${EHENTAI_USER_AGENT:Mozilla/5.0}
 
 storage:
   roots:

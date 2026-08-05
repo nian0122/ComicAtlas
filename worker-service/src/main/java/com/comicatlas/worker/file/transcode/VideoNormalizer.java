@@ -214,7 +214,7 @@ public class VideoNormalizer {
     }
 
     private void transcode(Path input, Path output) throws Exception {
-        String ffmpeg = config.getFfmpegPath();
+        String ffmpeg = config.resolveToolPath(config.getFfmpegPath()).toString();
         log.info("转码: {} → {} (并行度={}, 线程={})",
                 input.getFileName(), output.getFileName(), parallelism, ffmpegThreads);
 

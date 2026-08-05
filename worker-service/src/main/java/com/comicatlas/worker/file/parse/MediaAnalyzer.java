@@ -89,7 +89,7 @@ public class MediaAnalyzer {
         if (!workerConfig.isFfprobeEnabled()) {
             return videoFallback(name, ext, size, "disabled");
         }
-        String ffprobe = workerConfig.getFfprobePath();
+        String ffprobe = workerConfig.resolveToolPath(workerConfig.getFfprobePath()).toString();
         if (!isFfprobeAvailable(ffprobe)) {
             log.debug("ffprobe 不可用 (path='{}'), 视频 {} 标记为 VIDEO 元数据为 null", ffprobe, name);
             return videoFallback(name, ext, size, "ffprobe-unavailable");

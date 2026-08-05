@@ -110,7 +110,9 @@ public class TranscodeCommandHandler {
 
             publisher.progress(cmd, 10, "开始转码");
             ProcessBuilder processBuilder = new ProcessBuilder();
-            processBuilder.command(buildFfmpegCommand(config.getFfmpegPath(), hqFile.toString(), tempFile.toString()));
+            processBuilder.command(buildFfmpegCommand(
+                config.resolveToolPath(config.getFfmpegPath()).toString(),
+                hqFile.toString(), tempFile.toString()));
             processBuilder.redirectErrorStream(true);
             processBuilder.redirectOutput(ProcessBuilder.Redirect.DISCARD);
             Process process = processBuilder.start();
