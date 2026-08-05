@@ -13,7 +13,7 @@ ComicAtlas 分为 API 与 Worker 两个进程，二者对 MySQL 的权限不同�
 | 账号 | 权限 | 用途 | 强制措施 |
 |------|------|------|---------|
 | API 写账号 | 全部 DDL/DML（库级） | API 服务读写业务表、outbox/inbox、管理任务 | 由 Flyway 执行迁移，`GRANT ALL` |
-| Worker 只读账号 | 仅 `SELECT` | Worker 文件处理侧只读查询（导出、扫描、转码状态读取） | HikariCP `read-only=true` + `GRANT SELECT` 双层兜底 |
+| Worker 只读账号（`comicatlas_ro`，生产默认） | 仅 `SELECT` | Worker 文件处理侧只读查询（导出、扫描、转码状态读取） | HikariCP `read-only=true` + `GRANT SELECT` 双层兜底 |
 
 ### 最小授权示例（MySQL 8）
 
@@ -22,13 +22,13 @@ ComicAtlas 分为 API 与 Worker 两个进程，二者对 MySQL 的权限不同�
 CREATE USER IF NOT EXISTS 'comicatlas_api'@'%' IDENTIFIED BY '请设置强密码';
 GRANT ALL PRIVILEGES ON comic_atlas.* TO 'comicatlas_api'@'%';
 
--- Worker 只读账号（用于 worker-service 的 MYSQL_USER / MYSQL_PASS）
-CREATE USER IF NOT EXISTS 'comicatlas_worker'@'%' IDENTIFIED BY '请设置强密码';
-GRANT SELECT ON comic_atlas.* TO 'comicatlas_worker'@'%';
+-- Worker 只读账号（worker-service 生产默认值 comicatlas_ro，用于其 MYSQL_USER / MYSQL_PASS）
+CREATE USER IF NOT EXISTS 'comicatlas_ro'@'%' IDENTIFIED BY '请设置强密码';
+GRANT SELECT ON comic_atlas.* TO 'comicatlas_ro'@'%';
 FLUSH PRIVILEGES;
 ```
 
-Worker 侧同时把 `spring.datasource.hikari.read-only` 设为 `true`（默认未开启，建议在生产显式配置）。Worker 写数据库被拒绝属于预期行为：所有状态回写通过 MQ 事件由 API 完成。
+Worker 侧生产默认配置已把 `spring.datasource.hikari.read-only` 设为 `true`（`worker-service/src/main/resources/application.yml`），并有配置契约测试防止回退。Worker 写数据库被拒绝属于预期行为：所有状态回写通过 MQ 事件由 API 完成。
 
 > 本手册不包含任何真实凭据，仅示范账号结构与授权方式。
 
