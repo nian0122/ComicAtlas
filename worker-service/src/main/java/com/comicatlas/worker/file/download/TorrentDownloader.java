@@ -18,7 +18,7 @@ public class TorrentDownloader implements DownloadStrategy {
     @Override
     public DownloadContext.DownloadResult download(String magnetUrl, Path destDir) throws Exception {
         Files.createDirectories(destDir);
-        log.info("Torrent: magnet={}, dest={}", magnetUrl, destDir);
+        log.info("Torrent: btih={}..., dest={}", summarizeMagnet(magnetUrl), destDir);
 
         var cmd = new java.util.ArrayList<>(List.of(
             config.resolveToolPath(config.getAria2cPath()).toString(), magnetUrl,
@@ -50,6 +50,19 @@ public class TorrentDownloader implements DownloadStrategy {
             .filter(p -> !p.getFileName().toString().endsWith(".aria2"))
             .mapToLong(p -> { try { return Files.size(p); } catch (Exception e) { return 0; } }).sum();
         return new DownloadContext.DownloadResult(total, "TORRENT", null);
+    }
+
+    /** 提取 magnet URI 的 btih 哈希摘要（前 32 位）；缺失时降级为长度描述，不打印完整 URI。 */
+    private String summarizeMagnet(String magnetUrl) {
+        int idx = magnetUrl.indexOf("btih:");
+        if (idx >= 0) {
+            String hash = magnetUrl.substring(idx + 5);
+            int end = hash.indexOf('&');
+            if (end >= 0) { hash = hash.substring(0, end); }
+            if (hash.length() > 32) { return hash.substring(0, 32); }
+            return hash;
+        }
+        return "magnet?" + magnetUrl.length() + "chars";
     }
 
     @Override

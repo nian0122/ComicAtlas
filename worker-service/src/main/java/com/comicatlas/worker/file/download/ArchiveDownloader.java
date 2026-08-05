@@ -38,7 +38,7 @@ public class ArchiveDownloader {
     public long download(long gid, String token, String archiverKey, Path destFile) throws Exception {
         String url = String.format("%s/archiver.php?gid=%d&token=%s&or=%s",
             siteUrl, gid, token, archiverKey);
-        log.info("Archive download: {}", url);
+        log.info("Archive download: gid={}, dest={}", gid, destFile);
 
         Files.createDirectories(destFile.getParent());
 
