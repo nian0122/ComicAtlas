@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.comic.entity.Media;
 import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.api.common.storage.ApiStorageProperties;
+import com.comicatlas.api.common.enums.LqStatus;
 import com.comicatlas.common.event.LqCompletedEvent;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
@@ -50,9 +51,9 @@ public class LqCompletedHandler {
                 if (pageNum == null) pageNum = -1;
 
                 if (failedPages != null && failedPages.contains(pageNum)) {
-                    media.setLqStatus("FAILED");
+                    media.setLqStatus(LqStatus.FAILED);
                 } else {
-                    media.setLqStatus("READY");
+                    media.setLqStatus(LqStatus.READY);
                     media.setLqRoot("LQ");
                     // 从 hqPath 推断 lqPath：替换扩展名为 .webp
                     String hqPath = media.getHqPath();

@@ -2,6 +2,7 @@ package com.comicatlas.api.export.event;
 
 import com.comicatlas.api.comic.entity.Media;
 import com.comicatlas.api.comic.mapper.MediaMapper;
+import com.comicatlas.common.enums.TranscodeStatus;
 import com.comicatlas.common.event.VideoTranscodeFailedEvent;
 import com.rabbitmq.client.Channel;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,7 +44,7 @@ class TranscodeFailedHandlerTest {
 
         Media media = new Media();
         media.setId(pageId);
-        media.setTranscodeStatus("PENDING");
+        media.setTranscodeStatus(TranscodeStatus.QUEUED);
         when(mediaMapper.selectById(pageId)).thenReturn(media);
         when(mediaMapper.updateById(any(Media.class))).thenReturn(1);
 
@@ -55,7 +56,7 @@ class TranscodeFailedHandlerTest {
         handler.handleFailed(event, channel, 1L);
 
         // Then: 变为 FAILED
-        assertEquals("FAILED", media.getTranscodeStatus());
+        assertEquals(TranscodeStatus.FAILED, media.getTranscodeStatus());
         verify(mediaMapper).updateById(media);
         verify(channel).basicAck(1L, false);
     }
@@ -69,7 +70,7 @@ class TranscodeFailedHandlerTest {
 
         Media media = new Media();
         media.setId(pageId);
-        media.setTranscodeStatus("DONE");
+        media.setTranscodeStatus(TranscodeStatus.READY);
         when(mediaMapper.selectById(pageId)).thenReturn(media);
 
         VideoTranscodeFailedEvent event = new VideoTranscodeFailedEvent(
@@ -82,7 +83,7 @@ class TranscodeFailedHandlerTest {
         // Then: 不更新，直接 ACK
         verify(mediaMapper, never()).updateById(any(Media.class));
         verify(channel).basicAck(1L, false);
-        assertEquals("DONE", media.getTranscodeStatus());
+        assertEquals(TranscodeStatus.READY, media.getTranscodeStatus());
     }
 
     // ======================== 幂等性 — FAILED ========================
@@ -94,7 +95,7 @@ class TranscodeFailedHandlerTest {
 
         Media media = new Media();
         media.setId(pageId);
-        media.setTranscodeStatus("FAILED");
+        media.setTranscodeStatus(TranscodeStatus.FAILED);
         when(mediaMapper.selectById(pageId)).thenReturn(media);
 
         VideoTranscodeFailedEvent event = new VideoTranscodeFailedEvent(

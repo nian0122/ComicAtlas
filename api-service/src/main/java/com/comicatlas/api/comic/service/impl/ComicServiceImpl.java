@@ -179,7 +179,7 @@ public class ComicServiceImpl implements ComicService {
         var mediaItems = mediaMapper.selectList(
             new LambdaQueryWrapper<com.comicatlas.api.comic.entity.Media>()
                 .eq(com.comicatlas.api.comic.entity.Media::getChapterId, chapterId)
-                .eq(com.comicatlas.api.comic.entity.Media::getStatus, MediaLifecycleStatus.READY.name())
+                .eq(com.comicatlas.api.comic.entity.Media::getStatus, MediaLifecycleStatus.READY)
                 .orderByAsc(com.comicatlas.api.comic.entity.Media::getPageNumber));
 
         String chNo = chapter.getChapterNo();
@@ -189,7 +189,7 @@ public class ComicServiceImpl implements ComicService {
             pi.setPageNumber(media.getPageNumber());
             pi.setHqUrl(fileUrlResolver.resolve(media));
             pi.setLqUrl(fileUrlResolver.resolveLq(media));
-            pi.setLqStatus(media.getLqStatus());
+            pi.setLqStatus(media.getLqStatus() == null ? null : media.getLqStatus().name());
             pi.setWidth(media.getWidth());
             pi.setHeight(media.getHeight());
             return pi;

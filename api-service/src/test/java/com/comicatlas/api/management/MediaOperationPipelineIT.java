@@ -6,6 +6,8 @@ import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.entity.Media;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.common.enums.ComicStatus;
+import com.comicatlas.api.common.enums.HqStatus;
+import com.comicatlas.api.common.enums.LqStatus;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.api.common.exception.ConflictException;
@@ -22,6 +24,8 @@ import com.comicatlas.api.outbox.mapper.InboxReceiptMapper;
 import com.comicatlas.api.outbox.mapper.OutboxMessageMapper;
 import com.comicatlas.api.outbox.relay.OutboxRelay;
 import com.comicatlas.common.enums.ManagementTaskStatus;
+import com.comicatlas.common.enums.MediaLifecycleStatus;
+import com.comicatlas.common.enums.TranscodeStatus;
 import com.comicatlas.common.event.ComicEvent;
 import com.comicatlas.common.event.ManagementCommandCompletedEvent;
 import com.comicatlas.common.event.ManagementCommandFailedEvent;
@@ -345,16 +349,16 @@ class MediaOperationPipelineIT {
         assertThat(cmd.targetType()).isEqualTo("MEDIA");
         assertThat(cmd.targetId()).isEqualTo(video.getId());
 
-        assertThat(mediaMapper.selectById(video.getId()).getTranscodeStatus()).isEqualTo("QUEUED");
+        assertThat(mediaMapper.selectById(video.getId()).getTranscodeStatus()).isEqualTo(TranscodeStatus.QUEUED);
 
         publishProgress(cmd.taskId(), cmd.itemId(), cmd.attempt(), "TRANSCODE", "MEDIA", video.getId(), 40, "转码中");
-        await(() -> "TRANSCODING".equals(mediaMapper.selectById(video.getId()).getTranscodeStatus()), "视频 TRANSCODING");
+        await(() -> mediaMapper.selectById(video.getId()).getTranscodeStatus() == TranscodeStatus.TRANSCODING, "视频 TRANSCODING");
 
         rabbitTemplate.convertAndSend("comic.management", "command.completed",
                 new ManagementCommandCompletedEvent(UUID.randomUUID(), Instant.now(), 1,
                         cmd.taskId(), cmd.itemId(), 1, "TRANSCODE", "MEDIA", video.getId()));
         await(() -> managementTaskService.getTask(cmd.taskId()).getStatus() == ManagementTaskStatus.SUCCEEDED, "任务 SUCCEEDED");
-        await(() -> "READY".equals(mediaMapper.selectById(video.getId()).getTranscodeStatus()), "视频 READY");
+        await(() -> mediaMapper.selectById(video.getId()).getTranscodeStatus() == TranscodeStatus.READY, "视频 READY");
 
         Media reloaded = mediaMapper.selectById(video.getId());
         assertThat(reloaded.getContainer()).isEqualTo("mp4");
@@ -422,14 +426,14 @@ class MediaOperationPipelineIT {
         return mediaMapper.selectList(new LambdaQueryWrapper<Media>()
                         .eq(Media::getChapterId, chapterId)
                         .eq(Media::getMediaType, "IMAGE"))
-                .stream().map(Media::getLqStatus).toList();
+                .stream().map(m -> m.getLqStatus() == null ? null : m.getLqStatus().name()).toList();
     }
 
     private List<String> hqStatuses(Long chapterId) {
         return mediaMapper.selectList(new LambdaQueryWrapper<Media>()
                         .eq(Media::getChapterId, chapterId)
                         .eq(Media::getMediaType, "IMAGE"))
-                .stream().map(Media::getHqStatus).toList();
+                .stream().map(m -> m.getHqStatus() == null ? null : m.getHqStatus().name()).toList();
     }
 
     private void setLqReady(Long chapterId) {
@@ -437,7 +441,7 @@ class MediaOperationPipelineIT {
                 .eq(Media::getChapterId, chapterId)
                 .eq(Media::getMediaType, "IMAGE"));
         for (Media p : pages) {
-            p.setLqStatus("READY");
+            p.setLqStatus(LqStatus.READY);
             mediaMapper.updateById(p);
         }
     }
@@ -480,11 +484,11 @@ class MediaOperationPipelineIT {
         m.setMediaType("IMAGE");
         m.setHqRoot("HQ");
         m.setHqPath(hqPath);
-        m.setHqStatus("READY");
-        m.setLqStatus("NOT_GENERATED");
-        m.setTranscodeStatus("NOT_NEEDED");
+        m.setHqStatus(HqStatus.READY);
+        m.setLqStatus(LqStatus.NOT_GENERATED);
+        m.setTranscodeStatus(TranscodeStatus.NOT_NEEDED);
         m.setFileSize(fileSize);
-        m.setStatus("READY");
+        m.setStatus(MediaLifecycleStatus.READY);
         return m;
     }
 
@@ -495,12 +499,12 @@ class MediaOperationPipelineIT {
         m.setMediaType("VIDEO");
         m.setHqRoot("HQ");
         m.setHqPath(hqPath);
-        m.setHqStatus("READY");
-        m.setLqStatus("NOT_GENERATED");
-        m.setTranscodeStatus("NOT_NEEDED");
+        m.setHqStatus(HqStatus.READY);
+        m.setLqStatus(LqStatus.NOT_GENERATED);
+        m.setTranscodeStatus(TranscodeStatus.NOT_NEEDED);
         m.setContainer("avi");
         m.setFileSize(5000L);
-        m.setStatus("READY");
+        m.setStatus(MediaLifecycleStatus.READY);
         return m;
     }
 

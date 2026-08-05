@@ -8,12 +8,16 @@ import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.api.common.enums.ComicStatus;
+import com.comicatlas.api.common.enums.HqStatus;
+import com.comicatlas.api.common.enums.LqStatus;
 import com.comicatlas.api.management.entity.ManagementTaskItem;
 import com.comicatlas.api.management.mapper.ManagementTaskItemMapper;
 import com.comicatlas.api.management.mapper.ManagementTaskMapper;
 import com.comicatlas.api.reader.entity.ReadingHistory;
 import com.comicatlas.api.reader.mapper.ReadingHistoryMapper;
+import com.comicatlas.common.enums.MediaLifecycleStatus;
 import com.comicatlas.common.enums.TaskType;
+import com.comicatlas.common.enums.TranscodeStatus;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.worker.event.ManagementCommandPublisher;
 import com.comicatlas.worker.event.PurgeCommandHandler;
@@ -199,7 +203,7 @@ class TrashLifecycleIT {
 
         // 回收
         long trashTaskId = trashMedia(mediaId);
-        assertThat(mediaMapper.selectById(mediaId).getStatus()).isEqualTo("TRASHING");
+        assertThat(mediaMapper.selectById(mediaId).getStatus()).isEqualTo(MediaLifecycleStatus.TRASHING);
         runTrash(mediaId, TaskType.MEDIA_TRASH);
         awaitStatus("MEDIA", mediaId, "TRASHED");
 
@@ -217,7 +221,7 @@ class TrashLifecycleIT {
 
         // 恢复
         long restoreTaskId = restore("MEDIA", mediaId, TaskType.MEDIA_RESTORE);
-        assertThat(mediaMapper.selectById(mediaId).getStatus()).isEqualTo("RESTORING");
+        assertThat(mediaMapper.selectById(mediaId).getStatus()).isEqualTo(MediaLifecycleStatus.RESTORING);
         runRestore(mediaId, trashTaskId, TaskType.MEDIA_RESTORE);
         awaitStatus("MEDIA", mediaId, "READY");
 
@@ -235,7 +239,7 @@ class TrashLifecycleIT {
         expire(mediaId);
 
         long purgeTaskId = purge("MEDIA", mediaId);
-        assertThat(mediaMapper.selectById(mediaId).getStatus()).isEqualTo("PURGING");
+        assertThat(mediaMapper.selectById(mediaId).getStatus()).isEqualTo(MediaLifecycleStatus.PURGING);
         runPurge(mediaId, secondTrash, TaskType.MEDIA_PURGE);
         awaitRowDeleted(mediaId);
 
@@ -668,10 +672,10 @@ class TrashLifecycleIT {
         m.setPageNumber(pageNumber);
         m.setHqRoot("HQ");
         m.setHqPath(hqPath);
-        m.setHqStatus("READY");
-        m.setLqStatus("NOT_GENERATED");
-        m.setTranscodeStatus("NOT_NEEDED");
-        m.setStatus("READY");
+        m.setHqStatus(HqStatus.READY);
+        m.setLqStatus(LqStatus.NOT_GENERATED);
+        m.setTranscodeStatus(TranscodeStatus.NOT_NEEDED);
+        m.setStatus(MediaLifecycleStatus.READY);
         m.setMediaType("IMAGE");
         m.setFileSize(1024L);
         m.setVersion(1);
@@ -785,7 +789,7 @@ class TrashLifecycleIT {
             }
             case "MEDIA" -> {
                 Media m = mediaMapper.selectById(targetId);
-                yield m == null ? "DELETED" : m.getStatus();
+                yield m == null ? "DELETED" : (m.getStatus() == null ? null : m.getStatus().name());
             }
             default -> null;
         };

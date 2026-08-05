@@ -2,6 +2,7 @@ package com.comicatlas.api.export.event;
 
 import com.comicatlas.api.comic.entity.Media;
 import com.comicatlas.api.comic.mapper.MediaMapper;
+import com.comicatlas.common.enums.TranscodeStatus;
 import com.comicatlas.common.event.VideoTranscodeFailedEvent;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
@@ -23,12 +24,13 @@ public class TranscodeFailedHandler {
             Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         try {
             Media media = mediaMapper.selectById(event.pageId());
-            if (media == null || !"PENDING".equals(media.getTranscodeStatus())) {
-                log.warn("TranscodeFailed: page not in PENDING, skip. pageId={}", event.pageId());
+            if (media == null || media.getTranscodeStatus() == null
+                    || !media.getTranscodeStatus().isProcessing()) {
+                log.warn("TranscodeFailed: page not in processing, skip. pageId={}", event.pageId());
                 channel.basicAck(tag, false);
                 return;
             }
-            media.setTranscodeStatus("FAILED");
+            media.setTranscodeStatus(TranscodeStatus.FAILED);
             mediaMapper.updateById(media);
             channel.basicAck(tag, false);
             log.warn("TranscodeFailed: pageId={}, error={}", event.pageId(), event.errorMessage());

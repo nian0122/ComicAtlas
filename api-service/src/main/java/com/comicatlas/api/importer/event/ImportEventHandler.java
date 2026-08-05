@@ -7,6 +7,8 @@ import com.comicatlas.api.comic.mapper.*;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
 import com.comicatlas.api.common.enums.ComicStatus;
+import com.comicatlas.api.common.enums.HqStatus;
+import com.comicatlas.api.common.enums.LqStatus;
 import com.comicatlas.api.common.storage.ApiStorageProperties;
 import com.comicatlas.api.management.entity.ManagementTaskItem;
 import com.comicatlas.api.management.service.ManagementTaskService;
@@ -274,8 +276,17 @@ public class ImportEventHandler {
                 // 新布局：将 globalOrder 目录替换为 chapterId
                 hqPath = normalizeToChapterIdLayout(hqPath, comicId, chapter.getId(), chapter.getGlobalOrder());
                 media.setHqPath(hqPath);
-                media.setHqStatus(md.get("hqStatus") != null ? (String) md.get("hqStatus") : "READY");
-                media.setLqStatus("NOT_GENERATED");
+                Object hqRaw = md.get("hqStatus");
+                HqStatus hqStatus = HqStatus.READY;
+                if (hqRaw != null) {
+                    try {
+                        hqStatus = HqStatus.valueOf((String) hqRaw);
+                    } catch (IllegalArgumentException e) {
+                        log.warn("metadata 中未知 hqStatus: {}，回退 READY", hqRaw);
+                    }
+                }
+                media.setHqStatus(hqStatus);
+                media.setLqStatus(LqStatus.NOT_GENERATED);
                 if (md.get("fileSize") != null) media.setFileSize(((Number) md.get("fileSize")).longValue());
                 if (md.get("width") != null) media.setWidth(((Number) md.get("width")).intValue());
                 if (md.get("height") != null) media.setHeight(((Number) md.get("height")).intValue());

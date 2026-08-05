@@ -20,6 +20,8 @@ import com.comicatlas.common.event.VideoMetadataFixRequestedEvent;
 import com.comicatlas.api.comic.mapper.*;
 import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.common.enums.ComicStatus;
+import com.comicatlas.api.common.enums.HqStatus;
+import com.comicatlas.api.common.enums.LqStatus;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.common.storage.ApiStorageProperties;
 import com.comicatlas.api.importer.entity.ImportTask;
@@ -294,7 +296,7 @@ public class AdminServiceImpl implements AdminService {
                                 existing.setWidth(pi.width());
                                 existing.setHeight(pi.height());
                             }
-                            existing.setHqStatus("READY");
+                            existing.setHqStatus(HqStatus.READY);
                             mediaMapper.updateById(existing);
                             dbPageMap.remove(pi.imageName());
                         } else {
@@ -303,8 +305,8 @@ public class AdminServiceImpl implements AdminService {
                             newPage.setPageNumber(nextPageNumber++);
                             newPage.setHqRoot("HQ");
                             newPage.setHqPath(comicId + "/" + chapter.getGlobalOrder() + "/" + pi.imageName());
-                            newPage.setHqStatus(pi.fileSize() > 0 ? "READY" : "MISSING");
-                            newPage.setLqStatus("NOT_GENERATED");
+                            newPage.setHqStatus(pi.fileSize() > 0 ? HqStatus.READY : HqStatus.MISSING);
+                            newPage.setLqStatus(LqStatus.NOT_GENERATED);
                             newPage.setFileSize(pi.fileSize());
                             newPage.setWidth(pi.width());
                             newPage.setHeight(pi.height());

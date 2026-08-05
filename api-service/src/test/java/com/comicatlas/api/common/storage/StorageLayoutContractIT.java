@@ -6,6 +6,8 @@ import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.entity.Media;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.common.enums.ComicStatus;
+import com.comicatlas.api.common.enums.HqStatus;
+import com.comicatlas.api.common.enums.LqStatus;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.mapper.MediaMapper;
 import org.junit.jupiter.api.*;
@@ -167,8 +169,8 @@ class StorageLayoutContractIT {
         oldPage.setPageNumber(1);
         oldPage.setHqRoot("HQ");
         oldPage.setHqPath(comic.getId() + "/" + oldChapter.getGlobalOrder() + "/page001.jpg");
-        oldPage.setHqStatus("READY");
-        oldPage.setLqStatus("NOT_GENERATED");
+        oldPage.setHqStatus(HqStatus.READY);
+        oldPage.setLqStatus(LqStatus.NOT_GENERATED);
         oldPage.setMediaType("IMAGE");
         mediaMapper.insert(oldPage);
 
@@ -178,8 +180,8 @@ class StorageLayoutContractIT {
         newPage.setPageNumber(1);
         newPage.setHqRoot("HQ");
         newPage.setHqPath(comic.getId() + "/" + newChapter.getId() + "/a1b2c3d4-e5f6-7890-abcd-ef1234567890.jpg");
-        newPage.setHqStatus("READY");
-        newPage.setLqStatus("NOT_GENERATED");
+        newPage.setHqStatus(HqStatus.READY);
+        newPage.setLqStatus(LqStatus.NOT_GENERATED);
         newPage.setMediaType("IMAGE");
         mediaMapper.insert(newPage);
     }
@@ -403,8 +405,8 @@ class StorageLayoutContractIT {
         lqPage.setHqPath(comic.getId() + "/" + newChapter.getId() + "/page002.jpg");
         lqPage.setLqRoot("LQ");
         lqPage.setLqPath(comic.getId() + "/" + newChapter.getId() + "/page002.webp");
-        lqPage.setHqStatus("READY");
-        lqPage.setLqStatus("READY");
+        lqPage.setHqStatus(HqStatus.READY);
+        lqPage.setLqStatus(LqStatus.READY);
         lqPage.setMediaType("IMAGE");
         mediaMapper.insert(lqPage);
 

@@ -2,6 +2,7 @@ package com.comicatlas.api.export.event;
 
 import com.comicatlas.api.comic.entity.Media;
 import com.comicatlas.api.comic.mapper.MediaMapper;
+import com.comicatlas.common.enums.TranscodeStatus;
 import com.comicatlas.common.event.VideoTranscodeCompletedEvent;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
@@ -23,8 +24,9 @@ public class TranscodeCompletedHandler {
             Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         try {
             Media media = mediaMapper.selectById(event.pageId());
-            if (media == null || !"PENDING".equals(media.getTranscodeStatus())) {
-                log.warn("TranscodeCompleted: page not in PENDING, skip. pageId={}", event.pageId());
+            if (media == null || media.getTranscodeStatus() == null
+                    || !media.getTranscodeStatus().isProcessing()) {
+                log.warn("TranscodeCompleted: page not in processing, skip. pageId={}", event.pageId());
                 channel.basicAck(tag, false);
                 return;
             }
@@ -33,7 +35,7 @@ public class TranscodeCompletedHandler {
             media.setVideoCodec(event.videoCodec());
             media.setAudioCodec(event.audioCodec());
             media.setFileSize(event.fileSize());
-            media.setTranscodeStatus("DONE");
+            media.setTranscodeStatus(TranscodeStatus.READY);
             mediaMapper.updateById(media);
             channel.basicAck(tag, false);
             log.info("TranscodeCompleted: pageId={}, newPath={}", event.pageId(), event.newHqPath());

@@ -3,6 +3,8 @@ package com.comicatlas.api.management.operation;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.api.common.constant.HttpStatusCodes;
+import com.comicatlas.api.common.enums.HqStatus;
+import com.comicatlas.api.common.enums.LqStatus;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.common.exception.ConflictException;
 import com.comicatlas.api.comic.entity.Chapter;
@@ -19,6 +21,7 @@ import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.management.trash.TrashLifecycleService;
 import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.common.enums.TaskType;
+import com.comicatlas.common.enums.TranscodeStatus;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -114,8 +117,8 @@ public class MediaOperationCommandService {
                         .eq(Media::getChapterId, chapterId)
                         .eq(Media::getMediaType, "IMAGE"));
         return mediaItems.stream()
-                .filter(p -> !"DELETED".equals(p.getHqStatus()))
-                .filter(p -> regenerate || !"READY".equals(p.getLqStatus()))
+                .filter(p -> p.getHqStatus() != HqStatus.DELETED)
+                .filter(p -> regenerate || p.getLqStatus() != LqStatus.READY)
                 .toList();
     }
 
@@ -123,8 +126,8 @@ public class MediaOperationCommandService {
         mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
                 .eq(Media::getChapterId, chapterId)
                 .eq(Media::getMediaType, "IMAGE")
-                .ne(Media::getHqStatus, "DELETED")
-                .set(Media::getLqStatus, "QUEUED"));
+                .ne(Media::getHqStatus, HqStatus.DELETED)
+                .set(Media::getLqStatus, LqStatus.QUEUED));
     }
 
     // ======================== HQ 删除 ========================
@@ -183,7 +186,7 @@ public class MediaOperationCommandService {
         return mediaMapper.selectCount(new LambdaQueryWrapper<Media>()
                 .eq(Media::getChapterId, chapterId)
                 .eq(Media::getMediaType, "IMAGE")
-                .in(Media::getHqStatus, "READY", "MISSING")) > 0;
+                .in(Media::getHqStatus, HqStatus.READY, HqStatus.MISSING)) > 0;
     }
 
     /**
@@ -194,9 +197,9 @@ public class MediaOperationCommandService {
                 new LambdaQueryWrapper<Media>()
                         .eq(Media::getChapterId, chapterId)
                         .eq(Media::getMediaType, "IMAGE")
-                        .in(Media::getHqStatus, "READY", "MISSING"));
+                        .in(Media::getHqStatus, HqStatus.READY, HqStatus.MISSING));
         List<Media> notReady = mediaItems.stream()
-                .filter(p -> !"READY".equals(p.getLqStatus()))
+                .filter(p -> p.getLqStatus() != LqStatus.READY)
                 .toList();
         if (!notReady.isEmpty()) {
             List<String> details = notReady.stream()
@@ -211,14 +214,15 @@ public class MediaOperationCommandService {
         mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
                 .eq(Media::getChapterId, chapterId)
                 .eq(Media::getMediaType, "IMAGE")
-                .in(Media::getHqStatus, "READY", "MISSING")
-                .set(Media::getHqStatus, "DELETE_QUEUED"));
+                .in(Media::getHqStatus, HqStatus.READY, HqStatus.MISSING)
+                .set(Media::getHqStatus, HqStatus.DELETE_QUEUED));
     }
 
     // ======================== 视频转码 ========================
 
     private static final Set<String> COMPAT_CONTAINERS = Set.of("mp4", "webm");
-    private static final Set<String> ACTIVE_TRANSCODE = Set.of("QUEUED", "TRANSCODING");
+    private static final Set<TranscodeStatus> ACTIVE_TRANSCODE =
+            Set.of(TranscodeStatus.QUEUED, TranscodeStatus.TRANSCODING);
 
     public OperationSubmitResult requestTranscodeForComic(Long comicId) {
         List<Chapter> chapters = chapterMapper.selectList(
@@ -279,11 +283,11 @@ public class MediaOperationCommandService {
         if (!"VIDEO".equals(p.getMediaType())) {
             return false;
         }
-        if ("DELETED".equals(p.getHqStatus())) {
+        if (p.getHqStatus() == HqStatus.DELETED) {
             return false;
         }
-        String status = p.getTranscodeStatus();
-        if (ACTIVE_TRANSCODE.contains(status) || "READY".equals(status)) {
+        TranscodeStatus status = p.getTranscodeStatus();
+        if (ACTIVE_TRANSCODE.contains(status) || status == TranscodeStatus.READY) {
             return false;
         }
         String container = p.getContainer();
@@ -293,7 +297,7 @@ public class MediaOperationCommandService {
     private void markTranscodeQueued(Long mediaId) {
         mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
                 .eq(Media::getId, mediaId)
-                .set(Media::getTranscodeStatus, "QUEUED"));
+                .set(Media::getTranscodeStatus, TranscodeStatus.QUEUED));
     }
 
     // ======================== 元数据刷新 ========================

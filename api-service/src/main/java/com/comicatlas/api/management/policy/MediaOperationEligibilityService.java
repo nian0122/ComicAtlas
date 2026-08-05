@@ -1,10 +1,13 @@
 package com.comicatlas.api.management.policy;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.comicatlas.api.common.enums.HqStatus;
+import com.comicatlas.api.common.enums.LqStatus;
 import com.comicatlas.api.comic.entity.Chapter;
 import com.comicatlas.api.comic.entity.Media;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.comic.mapper.MediaMapper;
+import com.comicatlas.common.enums.TranscodeStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -116,10 +119,10 @@ public class MediaOperationEligibilityService {
         Map<String, String> blocked = new LinkedHashMap<>();
 
         if ("VIDEO".equals(media.getMediaType())
-                && !"DELETED".equals(media.getHqStatus())
-                && !"READY".equals(media.getTranscodeStatus())
-                && !"QUEUED".equals(media.getTranscodeStatus())
-                && !"TRANSCODING".equals(media.getTranscodeStatus())
+                && media.getHqStatus() != HqStatus.DELETED
+                && media.getTranscodeStatus() != TranscodeStatus.READY
+                && media.getTranscodeStatus() != TranscodeStatus.QUEUED
+                && media.getTranscodeStatus() != TranscodeStatus.TRANSCODING
                 && (media.getContainer() == null
                     || !COMPAT_CONTAINERS.contains(media.getContainer().toLowerCase()))) {
             allowed.add(OperationPolicyService.OP_TRANSCODE);
@@ -136,22 +139,22 @@ public class MediaOperationEligibilityService {
                 .filter(p -> "IMAGE".equals(p.getMediaType()))
                 .toList();
         List<Media> deletableHq = imagePages.stream()
-                .filter(p -> "READY".equals(p.getHqStatus()) || "MISSING".equals(p.getHqStatus()))
+                .filter(p -> p.getHqStatus() == HqStatus.READY || p.getHqStatus() == HqStatus.MISSING)
                 .toList();
 
         ChapterOps ops = new ChapterOps();
         ops.lqGenerateAllowed = imagePages.stream()
-                .anyMatch(p -> !"DELETED".equals(p.getHqStatus()) && !"READY".equals(p.getLqStatus()));
+                .anyMatch(p -> p.getHqStatus() != HqStatus.DELETED && p.getLqStatus() != LqStatus.READY);
         ops.lqRegenerateAllowed = imagePages.stream()
-                .anyMatch(p -> !"DELETED".equals(p.getHqStatus()));
-        ops.hqDeleteBlocked = deletableHq.stream().anyMatch(p -> !"READY".equals(p.getLqStatus()));
+                .anyMatch(p -> p.getHqStatus() != HqStatus.DELETED);
+        ops.hqDeleteBlocked = deletableHq.stream().anyMatch(p -> p.getLqStatus() != LqStatus.READY);
         ops.hqDeleteAllowed = !deletableHq.isEmpty() && !ops.hqDeleteBlocked;
         ops.transcodeAllowed = mediaItems.stream().anyMatch(p ->
                 "VIDEO".equals(p.getMediaType())
-                        && !"DELETED".equals(p.getHqStatus())
-                        && !"READY".equals(p.getTranscodeStatus())
-                        && !"QUEUED".equals(p.getTranscodeStatus())
-                        && !"TRANSCODING".equals(p.getTranscodeStatus())
+                        && p.getHqStatus() != HqStatus.DELETED
+                        && p.getTranscodeStatus() != TranscodeStatus.READY
+                        && p.getTranscodeStatus() != TranscodeStatus.QUEUED
+                        && p.getTranscodeStatus() != TranscodeStatus.TRANSCODING
                         && (p.getContainer() == null
                             || !COMPAT_CONTAINERS.contains(p.getContainer().toLowerCase())));
         return ops;

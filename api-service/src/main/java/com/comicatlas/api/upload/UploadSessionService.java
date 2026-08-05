@@ -2,6 +2,9 @@ package com.comicatlas.api.upload;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.common.constant.HttpStatusCodes;
+import com.comicatlas.api.common.enums.ComicStatus;
+import com.comicatlas.api.common.enums.HqStatus;
+import com.comicatlas.api.common.enums.LqStatus;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.comic.entity.Chapter;
 import com.comicatlas.api.comic.entity.Comic;
@@ -16,6 +19,8 @@ import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.api.upload.dto.*;
 import com.comicatlas.api.upload.entity.UploadFile;
+import com.comicatlas.common.enums.MediaLifecycleStatus;
+import com.comicatlas.common.enums.TranscodeStatus;
 import com.comicatlas.api.upload.entity.UploadSession;
 import com.comicatlas.api.upload.mapper.UploadFileMapper;
 import com.comicatlas.api.upload.mapper.UploadSessionMapper;
@@ -153,7 +158,8 @@ public class UploadSessionService {
         if (comic == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在: " + comicId);
         }
-        if (Set.of("DELETED", "DELETING", "TRASHED", "PURGING", "RESTORING").contains(comic.getStatus())) {
+        if (Set.of(ComicStatus.DELETED, ComicStatus.DELETING, ComicStatus.TRASHED,
+                ComicStatus.PURGING, ComicStatus.RESTORING).contains(comic.getStatus())) {
             throw new BusinessException(HttpStatusCodes.CONFLICT, "漫画状态 " + comic.getStatus() + " 不允许上传媒体");
         }
         Chapter chapter = chapterMapper.selectById(chapterId);
@@ -165,7 +171,7 @@ public class UploadSessionService {
             if (media == null || !media.getChapterId().equals(chapterId)) {
                 throw new BusinessException(HttpStatusCodes.NOT_FOUND, "替换目标媒体不存在或不属于该章节: " + replaceMediaId);
             }
-            if (!"READY".equals(media.getStatus())) {
+            if (media.getStatus() != MediaLifecycleStatus.READY) {
                 throw new BusinessException(HttpStatusCodes.CONFLICT, "替换目标媒体状态 " + media.getStatus() + " 不允许替换");
             }
         }
@@ -312,10 +318,10 @@ public class UploadSessionService {
                 media.setPageNumber(nextPage + i);
                 media.setHqRoot("HQ");
                 media.setHqPath(session.getComicId() + "/" + session.getChapterId() + "/" + uploadFile.getStorageName());
-                media.setHqStatus("PENDING");
-                media.setLqStatus("NOT_GENERATED");
-                media.setTranscodeStatus("NOT_NEEDED");
-                media.setStatus("STAGING");
+                media.setHqStatus(HqStatus.PENDING);
+                media.setLqStatus(LqStatus.NOT_GENERATED);
+                media.setTranscodeStatus(TranscodeStatus.NOT_NEEDED);
+                media.setStatus(MediaLifecycleStatus.STAGING);
                 media.setMediaType(det.mediaType());
                 media.setFileSize(uploadFile.getSizeBytes());
                 media.setVersion(1);

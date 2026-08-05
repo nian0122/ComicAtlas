@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.comic.entity.Media;
 import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
+import com.comicatlas.api.common.enums.HqStatus;
+import com.comicatlas.api.common.enums.LqStatus;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.management.mapper.ManagementTaskMapper;
 import com.comicatlas.api.management.mapper.ManagementTaskItemMapper;
@@ -16,7 +18,9 @@ import com.comicatlas.api.upload.mapper.UploadFileMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.comicatlas.api.management.entity.ManagementTaskItem;
+import com.comicatlas.common.enums.MediaLifecycleStatus;
 import com.comicatlas.common.enums.TaskType;
+import com.comicatlas.common.enums.TranscodeStatus;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.worker.event.TrashCommandHandler;
 import com.comicatlas.worker.event.MediaUploadCommandHandler;
@@ -499,8 +503,8 @@ class MediaUploadManagementIT {
         assertThat(media).hasSize(2);
 
         Media img = media.get(0);
-        assertThat(img.getStatus()).isEqualTo("READY");
-        assertThat(img.getHqStatus()).isEqualTo("READY");
+        assertThat(img.getStatus()).isEqualTo(MediaLifecycleStatus.READY);
+        assertThat(img.getHqStatus()).isEqualTo(HqStatus.READY);
         assertThat(img.getMediaType()).isEqualTo("IMAGE");
         assertThat(img.getWidth()).isEqualTo(3);
         assertThat(img.getHeight()).isEqualTo(2);
@@ -510,7 +514,7 @@ class MediaUploadManagementIT {
         assertThat(Files.exists(MANGA_ROOT.resolve("hq").resolve(imgPath))).isTrue();
 
         Media vid = media.get(1);
-        assertThat(vid.getStatus()).isEqualTo("READY");
+        assertThat(vid.getStatus()).isEqualTo(MediaLifecycleStatus.READY);
         assertThat(vid.getMediaType()).isEqualTo("VIDEO");
         assertThat(vid.getContainer()).isEqualTo("mp4");
         assertThat(vid.getHqRoot()).isEqualTo("HQ");
@@ -643,10 +647,10 @@ class MediaUploadManagementIT {
         Media replaced = mediaMapper.selectById(mediaId);
         assertThat(replaced.getId()).isEqualTo(mediaId);
         assertThat(replaced.getPageNumber()).isEqualTo(pageNumber);
-        assertThat(replaced.getStatus()).isEqualTo("READY");
-        assertThat(replaced.getHqStatus()).isEqualTo("READY");
-        assertThat(replaced.getLqStatus()).isEqualTo("NOT_GENERATED");
-        assertThat(replaced.getTranscodeStatus()).isEqualTo("NOT_NEEDED");
+        assertThat(replaced.getStatus()).isEqualTo(MediaLifecycleStatus.READY);
+        assertThat(replaced.getHqStatus()).isEqualTo(HqStatus.READY);
+        assertThat(replaced.getLqStatus()).isEqualTo(LqStatus.NOT_GENERATED);
+        assertThat(replaced.getTranscodeStatus()).isEqualTo(TranscodeStatus.NOT_NEEDED);
         assertThat(replaced.getHqPath()).isNotEqualTo(oldPath);
         assertThat(replaced.getHqPath()).endsWith(".png");
         assertThat(Files.exists(MANGA_ROOT.resolve("hq").resolve(replaced.getHqPath()))).isTrue();
@@ -686,8 +690,8 @@ class MediaUploadManagementIT {
         awaitMediaStatus(mediaId, "TRASHED", 30000);
 
         Media trashed = mediaMapper.selectById(mediaId);
-        assertThat(trashed.getStatus()).isEqualTo("TRASHED");
-        assertThat(trashed.getHqStatus()).isEqualTo("DELETED");
+        assertThat(trashed.getStatus()).isEqualTo(MediaLifecycleStatus.TRASHED);
+        assertThat(trashed.getHqStatus()).isEqualTo(HqStatus.DELETED);
 
         Path trash = MANGA_ROOT.resolve("trash");
         long filesInTrash;
@@ -724,7 +728,7 @@ class MediaUploadManagementIT {
                 .eq(Media::getChapterId, chapterId));
         assertThat(media).isNotEmpty();
         for (Media m : media) {
-            assertThat(m.getStatus()).isNotEqualTo("READY");
+            assertThat(m.getStatus()).isNotEqualTo(MediaLifecycleStatus.READY);
         }
     }
 
@@ -838,13 +842,13 @@ class MediaUploadManagementIT {
     private void awaitProcessed(Long chapterId, int expectedReady) {
         awaitTrue(() -> mediaMapper.selectCount(new LambdaQueryWrapper<Media>()
                 .eq(Media::getChapterId, chapterId)
-                .eq(Media::getStatus, "READY")) >= expectedReady, 30000);
+                .eq(Media::getStatus, MediaLifecycleStatus.READY)) >= expectedReady, 30000);
     }
 
     private void awaitMediaStatus(Long mediaId, String status, long timeoutMs) {
         awaitTrue(() -> {
             Media m = mediaMapper.selectById(mediaId);
-            return m != null && status.equals(m.getStatus());
+            return m != null && status.equals(m.getStatus() == null ? null : m.getStatus().name());
         }, timeoutMs);
     }
 

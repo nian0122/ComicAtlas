@@ -12,6 +12,8 @@ import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.mapper.ComicTagMapper;
 import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.api.common.enums.ComicStatus;
+import com.comicatlas.api.common.enums.HqStatus;
+import com.comicatlas.api.common.enums.LqStatus;
 import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.management.trash.TrashManifestService;
@@ -20,6 +22,8 @@ import com.comicatlas.api.reader.entity.ReadingHistory;
 import com.comicatlas.api.reader.mapper.ReadingHistoryMapper;
 import com.comicatlas.common.dto.TrashManifestActual;
 import com.comicatlas.common.enums.ManagementTaskStatus;
+import com.comicatlas.common.enums.MediaLifecycleStatus;
+import com.comicatlas.common.enums.TranscodeStatus;
 import com.comicatlas.common.event.ComicEvent;
 import com.comicatlas.common.event.ManagementCommandCompletedEvent;
 import com.comicatlas.common.event.ManagementCommandFailedEvent;
@@ -207,7 +211,7 @@ public class ManagementCommandResultHandler {
         for (Media media : mediaItems) {
             LambdaUpdateWrapper<Media> mediaUpdate = new LambdaUpdateWrapper<Media>()
                     .eq(Media::getId, media.getId())
-                    .set(Media::getLqStatus, "READY")
+                    .set(Media::getLqStatus, LqStatus.READY)
                     .set(Media::getLqRoot, "LQ");
             String hqPath = media.getHqPath();
             if (hqPath != null && !hqPath.isBlank()) {
@@ -223,11 +227,11 @@ public class ManagementCommandResultHandler {
                 new LambdaQueryWrapper<Media>()
                         .eq(Media::getChapterId, chapterId)
                         .eq(Media::getMediaType, "IMAGE")
-                        .in(Media::getHqStatus, "READY", "DELETE_QUEUED", "DELETING", "MISSING"));
+                        .in(Media::getHqStatus, HqStatus.READY, HqStatus.DELETE_QUEUED, HqStatus.DELETING, HqStatus.MISSING));
         for (Media media : mediaItems) {
             mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
                     .eq(Media::getId, media.getId())
-                    .set(Media::getHqStatus, "DELETED")
+                    .set(Media::getHqStatus, HqStatus.DELETED)
                     .set(Media::getHqRoot, null)
                     .set(Media::getHqPath, null));
         }
@@ -243,7 +247,7 @@ public class ManagementCommandResultHandler {
         String hqPath = media.getHqPath();
         LambdaUpdateWrapper<Media> mediaUpdate = new LambdaUpdateWrapper<Media>()
                 .eq(Media::getId, mediaId)
-                .set(Media::getTranscodeStatus, "READY")
+                .set(Media::getTranscodeStatus, TranscodeStatus.READY)
                 .set(Media::getContainer, "mp4")
                 .set(Media::getVideoCodec, "h264")
                 .set(Media::getAudioCodec, "aac");
@@ -292,9 +296,9 @@ public class ManagementCommandResultHandler {
         String originalHqPath = media.getHqPath();
         LambdaUpdateWrapper<Media> mediaUpdate = new LambdaUpdateWrapper<Media>()
                 .eq(Media::getId, mediaId)
-                .set(Media::getStatus, "TRASHED")
+                .set(Media::getStatus, MediaLifecycleStatus.TRASHED)
                 .set(Media::getTrashedAt, LocalDateTime.now())
-                .set(Media::getHqStatus, "DELETED");
+                .set(Media::getHqStatus, HqStatus.DELETED);
         if (originalHqPath != null && !originalHqPath.isBlank()) {
             String trashRef = "media/" + mediaId + "/" + ev.taskId() + "/hq/" + originalHqPath;
             mediaUpdate.set(Media::getHqRoot, "TRASH").set(Media::getHqPath, trashRef);
@@ -340,7 +344,7 @@ public class ManagementCommandResultHandler {
      */
     private void applyMediaRestoreCompleted(Long mediaId) {
         Media media = mediaMapper.selectById(mediaId);
-        if (media == null || !"RESTORING".equals(media.getStatus())) {
+        if (media == null || media.getStatus() != MediaLifecycleStatus.RESTORING) {
             return;
         }
         Long chapterId = media.getChapterId();
@@ -351,8 +355,8 @@ public class ManagementCommandResultHandler {
 
         mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
                 .eq(Media::getId, mediaId)
-                .set(Media::getStatus, "READY")
-                .set(Media::getHqStatus, "READY")
+                .set(Media::getStatus, MediaLifecycleStatus.READY)
+                .set(Media::getHqStatus, HqStatus.READY)
                 .set(Media::getHqRoot, "HQ")
                 .set(Media::getHqPath, originalPath)
                 .set(Media::getPageNumber, targetPage)
@@ -442,8 +446,8 @@ public class ManagementCommandResultHandler {
             }
             LambdaUpdateWrapper<Media> mediaUpdate = new LambdaUpdateWrapper<Media>()
                     .eq(Media::getId, r.mediaId())
-                    .set(Media::getStatus, "READY")
-                    .set(Media::getHqStatus, "READY")
+                    .set(Media::getStatus, MediaLifecycleStatus.READY)
+                    .set(Media::getHqStatus, HqStatus.READY)
                     .set(Media::getWidth, r.width())
                     .set(Media::getHeight, r.height())
                     .set(Media::getFileSize, r.fileSize())
@@ -460,8 +464,8 @@ public class ManagementCommandResultHandler {
             }
             if (replace) {
                 // 原子替换：保留 mediaId/pageNumber，重置 LQ/transcode
-                mediaUpdate.set(Media::getLqStatus, "NOT_GENERATED")
-                        .set(Media::getTranscodeStatus, "NOT_NEEDED");
+                mediaUpdate.set(Media::getLqStatus, LqStatus.NOT_GENERATED)
+                        .set(Media::getTranscodeStatus, TranscodeStatus.NOT_NEEDED);
             }
             mediaMapper.update(null, mediaUpdate);
         }
@@ -528,7 +532,7 @@ public class ManagementCommandResultHandler {
         List<Media> mediaItems = mediaMapper.selectList(
                 new LambdaQueryWrapper<Media>().in(Media::getChapterId, chapterIds));
         long hqSize = mediaItems.stream()
-                .filter(p -> !"DELETED".equals(p.getHqStatus()))
+                .filter(p -> p.getHqStatus() != HqStatus.DELETED)
                 .mapToLong(p -> p.getFileSize() != null ? p.getFileSize() : 0L)
                 .sum();
         Comic comic = comicMapper.selectById(comicId);
@@ -557,20 +561,20 @@ public class ManagementCommandResultHandler {
                 mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
                         .eq(Media::getChapterId, ev.targetId())
                         .eq(Media::getMediaType, "IMAGE")
-                        .in(Media::getLqStatus, "QUEUED", "GENERATING")
-                        .set(Media::getLqStatus, "FAILED"));
+                        .in(Media::getLqStatus, LqStatus.QUEUED, LqStatus.GENERATING)
+                        .set(Media::getLqStatus, LqStatus.FAILED));
             }
             case "HQ_DELETE" -> {
                 mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
                         .eq(Media::getChapterId, ev.targetId())
-                        .in(Media::getHqStatus, "DELETE_QUEUED", "DELETING")
-                        .set(Media::getHqStatus, "FAILED"));
+                        .in(Media::getHqStatus, HqStatus.DELETE_QUEUED, HqStatus.DELETING)
+                        .set(Media::getHqStatus, HqStatus.FAILED));
             }
             case "TRANSCODE" -> {
                 mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
                         .eq(Media::getId, ev.targetId())
-                        .in(Media::getTranscodeStatus, "QUEUED", "TRANSCODING")
-                        .set(Media::getTranscodeStatus, "FAILED"));
+                        .in(Media::getTranscodeStatus, TranscodeStatus.QUEUED, TranscodeStatus.TRANSCODING)
+                        .set(Media::getTranscodeStatus, TranscodeStatus.FAILED));
             }
             case "MEDIA_UPLOAD", "MEDIA_REPLACE" -> {
                 uploadSessionMapper.update(null, new LambdaUpdateWrapper<UploadSession>()
@@ -625,8 +629,9 @@ public class ManagementCommandResultHandler {
             }
             case "MEDIA" -> {
                 Media media = mediaMapper.selectById(targetId);
-                if (media != null && ("RESTORING".equals(media.getStatus()) || "PURGING".equals(media.getStatus()))) {
-                    media.setStatus("TRASHED");
+                if (media != null && (media.getStatus() == MediaLifecycleStatus.RESTORING
+                        || media.getStatus() == MediaLifecycleStatus.PURGING)) {
+                    media.setStatus(MediaLifecycleStatus.TRASHED);
                     mediaMapper.updateById(media);
                 }
             }
@@ -655,8 +660,8 @@ public class ManagementCommandResultHandler {
             }
             case "MEDIA" -> {
                 Media media = mediaMapper.selectById(targetId);
-                if (media != null && "TRASHING".equals(media.getStatus())) {
-                    media.setStatus("READY");
+                if (media != null && media.getStatus() == MediaLifecycleStatus.TRASHING) {
+                    media.setStatus(MediaLifecycleStatus.READY);
                     media.setTrashedAt(null);
                     if (media.getOriginalPageNumber() != null) {
                         media.setPageNumber(media.getOriginalPageNumber());
@@ -683,18 +688,18 @@ public class ManagementCommandResultHandler {
         if (LQ_OPS.contains(ev.operationType())) {
             mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
                     .eq(Media::getChapterId, ev.targetId())
-                    .eq(Media::getLqStatus, "QUEUED")
-                    .set(Media::getLqStatus, "GENERATING"));
+                    .eq(Media::getLqStatus, LqStatus.QUEUED)
+                    .set(Media::getLqStatus, LqStatus.GENERATING));
         } else if ("HQ_DELETE".equals(ev.operationType())) {
             mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
                     .eq(Media::getChapterId, ev.targetId())
-                    .eq(Media::getHqStatus, "DELETE_QUEUED")
-                    .set(Media::getHqStatus, "DELETING"));
+                    .eq(Media::getHqStatus, HqStatus.DELETE_QUEUED)
+                    .set(Media::getHqStatus, HqStatus.DELETING));
         } else if ("TRANSCODE".equals(ev.operationType())) {
             mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
                     .eq(Media::getId, ev.targetId())
-                    .eq(Media::getTranscodeStatus, "QUEUED")
-                    .set(Media::getTranscodeStatus, "TRANSCODING"));
+                    .eq(Media::getTranscodeStatus, TranscodeStatus.QUEUED)
+                    .set(Media::getTranscodeStatus, TranscodeStatus.TRANSCODING));
         }
     }
 
