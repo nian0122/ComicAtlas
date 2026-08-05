@@ -11,6 +11,7 @@ import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.mapper.ComicTagMapper;
 import com.comicatlas.api.comic.mapper.MediaMapper;
+import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.management.trash.TrashManifestService;
@@ -255,8 +256,8 @@ public class ManagementCommandResultHandler {
 
     private void applyComicTrashCompleted(Long comicId) {
         Comic comic = comicMapper.selectById(comicId);
-        if (comic != null && !"DELETED".equals(comic.getStatus())) {
-            comic.setStatus("TRASHED");
+        if (comic != null && comic.getStatus() != ComicStatus.DELETED) {
+            comic.setStatus(ComicStatus.TRASHED);
             comic.setTrashedAt(LocalDateTime.now());
             comicMapper.updateById(comic);
             catalogCacheInvalidator.evict(comicId);
@@ -313,8 +314,8 @@ public class ManagementCommandResultHandler {
 
     private void applyComicRestoreCompleted(Long comicId) {
         Comic comic = comicMapper.selectById(comicId);
-        if (comic != null && "RESTORING".equals(comic.getStatus())) {
-            comic.setStatus("READY");
+        if (comic != null && comic.getStatus() == ComicStatus.RESTORING) {
+            comic.setStatus(ComicStatus.READY);
             comic.setTrashedAt(null);
             comicMapper.updateById(comic);
             catalogCacheInvalidator.evict(comicId);
@@ -385,8 +386,8 @@ public class ManagementCommandResultHandler {
                 .eq(com.comicatlas.api.comic.entity.ComicTag::getComicId, comicId));
 
         Comic comic = comicMapper.selectById(comicId);
-        if (comic != null && "PURGING".equals(comic.getStatus())) {
-            comic.setStatus("DELETED");
+        if (comic != null && comic.getStatus() == ComicStatus.PURGING) {
+            comic.setStatus(ComicStatus.DELETED);
             comic.setDeletedAt(LocalDateTime.now());
             comicMapper.updateById(comic);
         }
@@ -607,11 +608,11 @@ public class ManagementCommandResultHandler {
         switch (targetType) {
             case "COMIC" -> {
                 Comic comic = comicMapper.selectById(targetId);
-                if (comic != null && "RESTORING".equals(comic.getStatus())) {
-                    comic.setStatus("TRASHED");
+                if (comic != null && comic.getStatus() == ComicStatus.RESTORING) {
+                    comic.setStatus(ComicStatus.TRASHED);
                     comicMapper.updateById(comic);
-                } else if (comic != null && "PURGING".equals(comic.getStatus())) {
-                    comic.setStatus("TRASHED");
+                } else if (comic != null && comic.getStatus() == ComicStatus.PURGING) {
+                    comic.setStatus(ComicStatus.TRASHED);
                     comicMapper.updateById(comic);
                 }
             }
@@ -638,8 +639,8 @@ public class ManagementCommandResultHandler {
         switch (targetType) {
             case "COMIC" -> {
                 Comic comic = comicMapper.selectById(targetId);
-                if (comic != null && "TRASHING".equals(comic.getStatus())) {
-                    comic.setStatus("READY");
+                if (comic != null && comic.getStatus() == ComicStatus.TRASHING) {
+                    comic.setStatus(ComicStatus.READY);
                     comic.setTrashedAt(null);
                     comicMapper.updateById(comic);
                 }

@@ -7,6 +7,7 @@ import com.comicatlas.api.comic.entity.Media;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.mapper.MediaMapper;
+import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.management.entity.ManagementTaskItem;
 import com.comicatlas.api.management.mapper.ManagementTaskItemMapper;
 import com.comicatlas.api.management.mapper.ManagementTaskMapper;
@@ -365,7 +366,7 @@ class TrashLifecycleIT {
 
         // 回收
         long trashTaskId = trashComic(comicId);
-        assertThat(comicMapper.selectById(comicId).getStatus()).isEqualTo("TRASHING");
+        assertThat(comicMapper.selectById(comicId).getStatus()).isEqualTo(ComicStatus.TRASHING);
         runTrash(comicId, TaskType.COMIC_DELETE);
         awaitStatus("COMIC", comicId, "TRASHED");
 
@@ -446,7 +447,7 @@ class TrashLifecycleIT {
         insertMedia(chapterId, 1, comicId + "/" + chapter.getGlobalOrder() + "/001.jpg");
 
         long trashTaskId = trashComic(comicId);
-        assertThat(comicMapper.selectById(comicId).getStatus()).isEqualTo("TRASHING");
+        assertThat(comicMapper.selectById(comicId).getStatus()).isEqualTo(ComicStatus.TRASHING);
 
         // 模拟 Worker 补偿不完整：写入 actual.json=PARTIAL 并回传 failed
         ManagementTaskItem item = latestItem(comicId, TaskType.COMIC_DELETE);
@@ -459,7 +460,7 @@ class TrashLifecycleIT {
         awaitTrue(() -> itemMapper.selectById(item.getId()).getStatus().name().equals("FAILED"), 30000);
 
         Comic comic = comicMapper.selectById(comicId);
-        assertThat(comic.getStatus()).isEqualTo("TRASHING");
+        assertThat(comic.getStatus()).isEqualTo(ComicStatus.TRASHING);
         assertThat(actualStatus(comicId, trashTaskId)).isEqualTo("PARTIAL");
 
         // 仅允许 RECONCILE
@@ -498,7 +499,7 @@ class TrashLifecycleIT {
                         .content("{\"token\":\"PURGE\"}"))
                 .andExpect(jsonPath("$.code").value(409));
 
-        assertThat(comicMapper.selectById(comicId).getStatus()).isEqualTo("TRASHED");
+        assertThat(comicMapper.selectById(comicId).getStatus()).isEqualTo(ComicStatus.TRASHED);
         // 清理该次回收（供 tearDown 幂等）不必要，trashTaskId 仅用于可读性
     }
 
@@ -688,7 +689,7 @@ class TrashLifecycleIT {
 
     private void makeComicReady(Long comicId) {
         Comic comic = comicMapper.selectById(comicId);
-        comic.setStatus("READY");
+        comic.setStatus(ComicStatus.READY);
         comicMapper.updateById(comic);
     }
 
@@ -776,7 +777,7 @@ class TrashLifecycleIT {
         return switch (targetType) {
             case "COMIC" -> {
                 Comic c = comicMapper.selectById(targetId);
-                yield c == null ? "DELETED" : c.getStatus();
+                yield c == null ? "DELETED" : (c.getStatus() == null ? null : c.getStatus().name());
             }
             case "CHAPTER" -> {
                 Chapter c = chapterMapper.selectById(targetId);

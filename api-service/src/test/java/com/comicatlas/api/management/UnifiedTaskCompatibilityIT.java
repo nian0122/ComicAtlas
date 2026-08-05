@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.mapper.ComicMapper;
+import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.export.entity.ExportTask;
 import com.comicatlas.api.export.mapper.ExportTaskMapper;
@@ -377,7 +378,7 @@ class UnifiedTaskCompatibilityIT {
     void recoveryRequiredComic_cannotBeExported() {
         Comic comic = new Comic();
         comic.setTitle("待恢复漫画H");
-        comic.setStatus("RECOVERY_REQUIRED");
+        comic.setStatus(ComicStatus.RECOVERY_REQUIRED);
         comic.setStoragePolicy("MANAGED");
         comicMapper.insert(comic);
 
@@ -391,7 +392,7 @@ class UnifiedTaskCompatibilityIT {
     private Comic insertReadyComic(String title) {
         Comic comic = new Comic();
         comic.setTitle(title);
-        comic.setStatus("READY");
+        comic.setStatus(ComicStatus.READY);
         comic.setStoragePolicy("MANAGED");
         comicMapper.insert(comic);
         return comic;

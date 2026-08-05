@@ -11,6 +11,7 @@ import com.comicatlas.api.comic.service.ComicService;
 import com.comicatlas.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.common.enums.MediaLifecycleStatus;
 import com.comicatlas.api.common.constant.HttpStatusCodes;
+import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.common.exception.ConflictException;
 import com.comicatlas.api.common.storage.FileUrlResolver;
@@ -79,7 +80,7 @@ public class ComicServiceImpl implements ComicService {
         comic.setTitleJpn(request.getTitleJpn());
         comic.setAuthor(request.getAuthor());
         comic.setDescription(request.getDescription());
-        comic.setStatus("DRAFT");
+        comic.setStatus(ComicStatus.DRAFT);
         comic.setStoragePolicy("MANAGED");
         comic.setVersion(1);
 
@@ -168,7 +169,7 @@ public class ComicServiceImpl implements ComicService {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在");
         }
         Comic comic = comicMapper.selectById(comicId);
-        if (comic == null || !"READY".equals(comic.getStatus())) {
+        if (comic == null || comic.getStatus() != ComicStatus.READY) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在或不可阅读");
         }
         if (!ChapterLifecycleStatus.READY.name().equals(chapter.getStatus())) {
@@ -333,7 +334,7 @@ public class ComicServiceImpl implements ComicService {
                     failed.add(new BatchUpdateResultVO.FailedItem(comicId, null, "漫画不存在"));
                     continue;
                 }
-                if (!"READY".equals(comic.getStatus())) {
+                if (comic.getStatus() != ComicStatus.READY) {
                     failed.add(new BatchUpdateResultVO.FailedItem(comicId, comic.getTitle(),
                             "漫画状态为 " + comic.getStatus() + "，无法编辑"));
                     continue;
@@ -409,14 +410,14 @@ public class ComicServiceImpl implements ComicService {
         vo.setCoverUrl(resolveCoverUrl(comic.getId()));
         vo.setPageCount(comic.getTotalPages());
         vo.setFileSize(comic.getFileSize());
-        vo.setSourceType(comic.getSourceType());
+        vo.setSourceType(comic.getSourceType() != null ? comic.getSourceType().name() : null);
         vo.setSourceRef(comic.getSourceRef());
         vo.setCategoryId(comic.getCategoryId());
         vo.setCategoryName(resolveCategoryName(comic.getCategoryId()));
-        vo.setLifecycle(toLifecycle(comic.getStatus()));
+        vo.setLifecycle(toLifecycle(comicStatusName(comic)));
         vo.setVersion(comic.getVersion());
         vo.setActiveTask(activeTaskFor(comic.getId()));
-        vo.setAllowedOperations(operationPolicyService.forComic(comic.getStatus()));
+        vo.setAllowedOperations(operationPolicyService.forComic(comicStatusName(comic)));
         vo.setCreatedAt(comic.getCreatedAt());
         vo.setUpdatedAt(comic.getUpdatedAt());
 
@@ -463,6 +464,10 @@ public class ComicServiceImpl implements ComicService {
 
     private ManagementTaskResponse activeTaskFor(Long comicId) {
         return managementTaskService.findActiveTasksForComics(List.of(comicId)).get(comicId);
+    }
+
+    private static String comicStatusName(Comic comic) {
+        return comic.getStatus() == null ? null : comic.getStatus().name();
     }
 
     private static ComicLifecycleStatus toLifecycle(String status) {

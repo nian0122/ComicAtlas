@@ -9,6 +9,7 @@ import com.comicatlas.api.comic.entity.Category;
 import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.entity.Tag;
 import com.comicatlas.api.comic.mapper.CategoryMapper;
+import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.mapper.ComicTagMapper;
 import com.comicatlas.api.comic.mapper.TagMapper;
@@ -296,7 +297,7 @@ class ComicReferenceCacheTest {
         Comic c = new Comic();
         c.setId(id);
         c.setTitle("漫画" + id);
-        c.setStatus("READY");
+        c.setStatus(ComicStatus.READY);
         return c;
     }
 

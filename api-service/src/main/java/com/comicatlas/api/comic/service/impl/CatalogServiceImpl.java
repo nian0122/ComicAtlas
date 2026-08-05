@@ -12,6 +12,7 @@ import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.service.CatalogService;
 import com.comicatlas.api.common.constant.HttpStatusCodes;
+import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.common.enums.ChapterLifecycleStatus;
 import lombok.RequiredArgsConstructor;
@@ -39,7 +40,7 @@ public class CatalogServiceImpl implements CatalogService {
         unless = "#result == null || #result.isEmpty()")
     public List<CatalogNode> buildTree(Long comicId) {
         Comic comic = comicMapper.selectById(comicId);
-        if (comic == null || !"READY".equals(comic.getStatus())) {
+        if (comic == null || comic.getStatus() != ComicStatus.READY) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在或不可阅读");
         }
         var catalogs = catalogMapper.selectList(

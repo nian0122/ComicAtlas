@@ -3,6 +3,7 @@ package com.comicatlas.api.management.batch;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.mapper.ComicMapper;
+import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
 import com.comicatlas.api.management.entity.ManagementTask;
@@ -364,7 +365,7 @@ class BatchSnapshotIT {
         @DisplayName("COMIC_PURGE 需 preview token；过期/条件变化返回 409")
         void purge_previewTokenRequired_expiryAndConditionChange() throws Exception {
             // 插入 TRASHED 漫画（PURGE 前置状态）
-            insertComicsWithStatus("TRASHED", 5);
+            insertComicsWithStatus(ComicStatus.TRASHED, 5);
             String body = """
                 {"operation":"COMIC_PURGE",
                  "selection":{"type":"FILTER","query":{"keyword":"%s"}}}
@@ -397,7 +398,7 @@ class BatchSnapshotIT {
                  "selection":{"type":"FILTER","query":{"keyword":"%s"}},
                  "previewToken":"%s"}
                 """.formatted(filterPrefix, token);
-            insertComicsWithStatus("TRASHED", 1);
+            insertComicsWithStatus(ComicStatus.TRASHED, 1);
             mockMvc.perform(post("/api/management/batch")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(changedBody))
@@ -456,7 +457,7 @@ class BatchSnapshotIT {
         void blockedAggregation_and_retryOnlyFailed() throws Exception {
             // 5 本 READY + 1 本 TRASHED（TRASHED 不允许 METADATA_UPDATE 的 EDIT）
             insertComics(5);
-            insertComicsWithStatus("TRASHED", 1);
+            insertComicsWithStatus(ComicStatus.TRASHED, 1);
 
             String body = """
                 {"operation":"METADATA_UPDATE",
@@ -511,23 +512,23 @@ class BatchSnapshotIT {
 
     private void insertComics(int count) {
         for (int i = 0; i < count; i++) {
-            insertComic(filterPrefix + i, "READY");
+            insertComic(filterPrefix + i, ComicStatus.READY);
         }
     }
 
     private void insertComics(int start, int endExclusive) {
         for (int i = start; i < endExclusive; i++) {
-            insertComic(filterPrefix + i, "READY");
+            insertComic(filterPrefix + i, ComicStatus.READY);
         }
     }
 
-    private void insertComicsWithStatus(String status, int count) {
+    private void insertComicsWithStatus(ComicStatus status, int count) {
         for (int i = 0; i < count; i++) {
             insertComic(filterPrefix + status + "-" + i, status);
         }
     }
 
-    private void insertComic(String title, String status) {
+    private void insertComic(String title, ComicStatus status) {
         Comic c = new Comic();
         c.setTitle(title);
         c.setStatus(status);

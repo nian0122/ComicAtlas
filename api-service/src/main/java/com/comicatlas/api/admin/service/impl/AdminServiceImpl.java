@@ -19,6 +19,7 @@ import com.comicatlas.common.event.MetadataRefreshEvent;
 import com.comicatlas.common.event.VideoMetadataFixRequestedEvent;
 import com.comicatlas.api.comic.mapper.*;
 import com.comicatlas.api.common.constant.HttpStatusCodes;
+import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.common.storage.ApiStorageProperties;
 import com.comicatlas.api.importer.entity.ImportTask;
@@ -242,16 +243,15 @@ public class AdminServiceImpl implements AdminService {
         if (comic == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在");
         }
-        if (!"READY".equals(comic.getStatus())) {
+        if (comic.getStatus() != ComicStatus.READY) {
             throw new BusinessException(HttpStatusCodes.CONFLICT, "漫画状态异常，当前状态: " + comic.getStatus());
         }
 
         // CAS 锁：READY → REFRESHING
         int updated = comicMapper.update(null,
                 new LambdaUpdateWrapper<Comic>()
-                        .eq(Comic::getId, comicId)
-                        .eq(Comic::getStatus, "READY")
-                        .set(Comic::getStatus, "REFRESHING"));
+                        .eq(Comic::getStatus, ComicStatus.READY)
+                        .set(Comic::getStatus, ComicStatus.REFRESHING));
         if (updated == 0) {
             throw new BusinessException(HttpStatusCodes.CONFLICT, "该漫画正在刷新中");
         }
@@ -349,7 +349,7 @@ public class AdminServiceImpl implements AdminService {
             comicMapper.update(null,
                     new LambdaUpdateWrapper<Comic>()
                             .eq(Comic::getId, comicId)
-                            .set(Comic::getStatus, "READY"));
+                            .set(Comic::getStatus, ComicStatus.READY));
         }
     }
 

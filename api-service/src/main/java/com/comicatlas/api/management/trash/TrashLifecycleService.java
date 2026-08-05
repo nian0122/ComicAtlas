@@ -10,6 +10,7 @@ import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.common.exception.ConflictException;
+import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.common.storage.ApiStorageProperties;
 import com.comicatlas.api.common.storage.ApiStorageRoot;
 import com.comicatlas.api.management.dto.CreateManagementTaskRequest;
@@ -87,9 +88,9 @@ public class TrashLifecycleService {
                 return existing;
             }
         }
-        requireAllowed(policyService.forComic(comic.getStatus()), OperationPolicyService.OP_DELETE,
+        requireAllowed(policyService.forComic(comicStatusName(comic)), OperationPolicyService.OP_DELETE,
                 "漫画状态 " + comic.getStatus() + " 不可回收");
-        ManagementStateMachine.validateComicTransition(comic.getStatus(), "TRASHING");
+        ManagementStateMachine.validateComicTransition(comicStatusName(comic), "TRASHING");
 
         List<TrashManifest.Entry> entries = List.of(
                 entry("HQ", comicId.toString(), "hq/" + comicId),
@@ -97,7 +98,7 @@ public class TrashLifecycleService {
                 entry("THUMBS", comicId.toString(), "thumbs/" + comicId),
                 entry("METADATA", comicId + ".json", "metadata/" + comicId + ".json"));
 
-        comic.setStatus("TRASHING");
+        comic.setStatus(ComicStatus.TRASHING);
         comicMapper.updateById(comic);
         return createTrashTask("COMIC", comicId, TaskType.COMIC_DELETE, "回收漫画", entries,
                 idempotencyKey, "comic-delete:" + comicId);
@@ -153,12 +154,12 @@ public class TrashLifecycleService {
         if (comic == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在: " + comicId);
         }
-        requireAllowed(policyService.forComic(comic.getStatus()), OperationPolicyService.OP_RECOVER,
+        requireAllowed(policyService.forComic(comicStatusName(comic)), OperationPolicyService.OP_RECOVER,
                 "漫画状态 " + comic.getStatus() + " 不可恢复");
-        ManagementStateMachine.validateComicTransition(comic.getStatus(), "RESTORING");
+        ManagementStateMachine.validateComicTransition(comicStatusName(comic), "RESTORING");
         Long manifestTaskId = findTrashTaskId("COMIC", comicId);
 
-        comic.setStatus("RESTORING");
+        comic.setStatus(ComicStatus.RESTORING);
         comicMapper.updateById(comic);
         return createCommandTask("COMIC", comicId, TaskType.COMIC_RESTORE, "恢复漫画", manifestTaskId);
     }
@@ -202,11 +203,11 @@ public class TrashLifecycleService {
         }
         return purge("COMIC", comicId, token,
                 () -> {
-                    requireAllowed(policyService.forComic(comic.getStatus()), OperationPolicyService.OP_PURGE,
+                    requireAllowed(policyService.forComic(comicStatusName(comic)), OperationPolicyService.OP_PURGE,
                             "漫画状态 " + comic.getStatus() + " 不可永久清理");
-                    ManagementStateMachine.validateComicTransition(comic.getStatus(), "PURGING");
+                    ManagementStateMachine.validateComicTransition(comicStatusName(comic), "PURGING");
                     checkRetention(comic.getTrashedAt());
-                    comic.setStatus("PURGING");
+                    comic.setStatus(ComicStatus.PURGING);
                     comicMapper.updateById(comic);
                 },
                 TaskType.COMIC_PURGE, "永久清理漫画");
@@ -312,8 +313,8 @@ public class TrashLifecycleService {
         switch (targetType) {
             case "COMIC" -> {
                 Comic comic = comicMapper.selectById(targetId);
-                if (comic != null && "TRASHING".equals(comic.getStatus())) {
-                    comic.setStatus("TRASHED");
+                if (comic != null && comic.getStatus() == ComicStatus.TRASHING) {
+                    comic.setStatus(ComicStatus.TRASHED);
                     comic.setTrashedAt(LocalDateTime.now());
                     comicMapper.updateById(comic);
                     return true;
@@ -346,8 +347,8 @@ public class TrashLifecycleService {
         switch (targetType) {
             case "COMIC" -> {
                 Comic comic = comicMapper.selectById(targetId);
-                if (comic != null && "TRASHING".equals(comic.getStatus())) {
-                    comic.setStatus("READY");
+                if (comic != null && comic.getStatus() == ComicStatus.TRASHING) {
+                    comic.setStatus(ComicStatus.READY);
                     comic.setTrashedAt(null);
                     comicMapper.updateById(comic);
                     return true;
@@ -398,8 +399,10 @@ public class TrashLifecycleService {
 
     private String resolveDbStatus(String targetType, Long targetId) {
         return switch (targetType) {
-            case "COMIC" -> comicMapper.selectById(targetId) == null ? null
-                    : comicMapper.selectById(targetId).getStatus();
+            case "COMIC" -> {
+                Comic comic = comicMapper.selectById(targetId);
+                yield comic == null || comic.getStatus() == null ? null : comic.getStatus().name();
+            }
             case "CHAPTER" -> {
                 Chapter chapter = chapterMapper.selectById(targetId);
                 yield chapter == null ? null : chapter.getStatus();
@@ -533,8 +536,11 @@ public class TrashLifecycleService {
         return chapter;
     }
 
-    private void requireAllowed(AllowedOperations ops, String op, String message) {
-        if (!ops.isAllowed(op)) {
+    private static String comicStatusName(Comic comic) {
+        return comic.getStatus() == null ? null : comic.getStatus().name();
+    }
+
+    private void requireAllowed(AllowedOperations ops, String op, String message) {        if (!ops.isAllowed(op)) {
             String reason = ops.blockedReasons().getOrDefault(op, ops.blockedReasons().getOrDefault("*", message));
             throw new ConflictException(message + "：" + reason);
         }
