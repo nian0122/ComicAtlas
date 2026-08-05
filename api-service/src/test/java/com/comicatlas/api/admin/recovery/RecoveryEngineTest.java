@@ -7,6 +7,8 @@ import com.comicatlas.api.comic.mapper.CatalogMapper;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.mapper.MediaMapper;
+import com.comicatlas.api.common.storage.ApiStorageProperties;
+import com.comicatlas.api.common.storage.ApiStorageRoot;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,7 +18,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.file.Files;
@@ -44,13 +45,20 @@ class RecoveryEngineTest {
     private TransactionTemplate transactionTemplate;
     @Mock
     private CatalogCacheInvalidator catalogCacheInvalidator;
+    @Mock
+    private ApiStorageProperties storageProperties;
 
     @InjectMocks
     private RecoveryEngine recoveryEngine;
 
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(recoveryEngine, "mangaRoot", "D:/manga");
+        ApiStorageRoot metadataRoot = new ApiStorageRoot();
+        metadataRoot.setPath(Path.of("D:/manga/metadata"));
+        ApiStorageRoot hqRoot = new ApiStorageRoot();
+        hqRoot.setPath(Path.of("D:/manga/hq"));
+        lenient().when(storageProperties.root("METADATA")).thenReturn(metadataRoot);
+        lenient().when(storageProperties.root("HQ")).thenReturn(hqRoot);
     }
 
     // ======================== Comic 已存在 ========================

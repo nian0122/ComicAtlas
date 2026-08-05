@@ -3,13 +3,13 @@ package com.comicatlas.api.importer.event;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.comic.entity.Media;
 import com.comicatlas.api.comic.mapper.MediaMapper;
+import com.comicatlas.api.common.storage.ApiStorageProperties;
 import com.comicatlas.common.event.LqCompletedEvent;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.support.AmqpHeaders;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
@@ -27,9 +27,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class LqCompletedHandler {
     private final MediaMapper mediaMapper;
-
-    @Value("${MANGA_ROOT:F:/manga}")
-    private String mangaRoot;
+    private final ApiStorageProperties storageProperties;
 
     @RabbitListener(queues = "lq.result.queue")
     public void handle(LqCompletedEvent event,
@@ -45,7 +43,7 @@ public class LqCompletedHandler {
                             .eq(Media::getChapterId, chapterId)
                             .eq(Media::getMediaType, "IMAGE"));
 
-            Path lqRoot = Path.of(mangaRoot, "lq");
+            Path lqRoot = storageProperties.root("LQ").getPath();
 
             for (Media media : mediaItems) {
                 Integer pageNum = media.getPageNumber();

@@ -8,6 +8,8 @@ import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
+import com.comicatlas.api.common.storage.ApiStorageProperties;
+import com.comicatlas.api.common.storage.ApiStorageRoot;
 import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.common.event.ImportTaskCompletedEvent;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -24,6 +26,7 @@ import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.File;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -48,6 +51,7 @@ class ImportEventHandlerCacheTest {
     @Mock private TransactionTemplate transactionTemplate;
     @Mock private CatalogCacheInvalidator catalogCacheInvalidator;
     @Mock private ManagementTaskService managementTaskService;
+    @Mock private ApiStorageProperties storageProperties;
     @Mock private Channel channel;
     @InjectMocks private ImportEventHandler handler;
 
@@ -75,6 +79,9 @@ class ImportEventHandlerCacheTest {
             return callback.doInTransaction(null);
         });
         when(managementTaskService.findActiveItem(any(), any(), any())).thenReturn(null);
+        ApiStorageRoot metadataRoot = new ApiStorageRoot();
+        metadataRoot.setPath(Path.of("D:/manga/metadata"));
+        when(storageProperties.root("METADATA")).thenReturn(metadataRoot);
 
         handler.handleComicImported(event, channel, 1L);
 

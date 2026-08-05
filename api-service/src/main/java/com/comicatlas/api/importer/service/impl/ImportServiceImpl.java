@@ -14,6 +14,7 @@ import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.common.exception.ConflictException;
+import com.comicatlas.api.common.storage.ApiStorageProperties;
 import com.comicatlas.api.importer.dto.*;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.outbox.service.OutboxService;
@@ -31,10 +32,11 @@ import com.comicatlas.common.event.CancelTaskEvent;
 import com.comicatlas.common.event.ImportTaskCreatedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import jakarta.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -59,7 +61,16 @@ import java.util.HexFormat;
 @RequiredArgsConstructor
 public class ImportServiceImpl implements ImportService {
 
-    private static final Pattern EH_PATTERN = Pattern.compile("e-hentai\\.org/g/(\\d+)/([a-f0-9]+)");
+    /** EHENTAI 画廊 URL 校验正则，与 Worker 的 worker.ehentai.gallery-url-pattern 同源可配 */
+    @Value("${comic.import.ehentai-url-pattern:e-hentai\\.org/g/(\\d+)/([a-f0-9]+)}")
+    private String ehentaiUrlPattern;
+
+    private Pattern ehentaiPattern;
+
+    @PostConstruct
+    void initEhentaiPattern() {
+        ehentaiPattern = Pattern.compile(ehentaiUrlPattern);
+    }
 
     private final ImportTaskMapper taskMapper;
     private final ComicMapper comicMapper;
@@ -71,9 +82,7 @@ public class ImportServiceImpl implements ImportService {
     private final TransactionTemplate transactionTemplate;
     private final CatalogCacheInvalidator catalogCacheInvalidator;
     private final ManagementTaskService managementTaskService;
-
-    @Value("${MANGA_ROOT:F:/manga}")
-    private String mangaRoot;
+    private final ApiStorageProperties storageProperties;
 
     @Override
     @Transactional
@@ -107,10 +116,10 @@ public class ImportServiceImpl implements ImportService {
 
         switch (sourceType) {
             case "EHENTAI" -> {
-                if (sourceRef == null || !EH_PATTERN.matcher(sourceRef).find()) {
+                if (sourceRef == null || !ehentaiPattern.matcher(sourceRef).find()) {
                     throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "不支持的 URL 格式");
                 }
-                Matcher m = EH_PATTERN.matcher(sourceRef);
+                Matcher m = ehentaiPattern.matcher(sourceRef);
                 m.find();
                 String gid = m.group(1);
                 String token = m.group(2);
@@ -378,7 +387,7 @@ public class ImportServiceImpl implements ImportService {
                     @Override
                     public void afterCommit() {
                         try {
-                            Files.deleteIfExists(Path.of(mangaRoot, "metadata", taskId + ".json"));
+                            Files.deleteIfExists(storageProperties.root("METADATA").resolve(taskId + ".json"));
                         } catch (Exception e) {
                             log.warn("Metadata cleanup failed for retry: taskId={}", taskId, e);
                         }
