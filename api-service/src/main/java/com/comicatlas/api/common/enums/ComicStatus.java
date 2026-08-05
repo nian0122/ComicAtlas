@@ -3,6 +3,8 @@ package com.comicatlas.api.common.enums;
 /**
  * 漫画状态（兼容旧枚举名，值对齐 {@link com.comicatlas.common.enums.ComicLifecycleStatus}）。
  * <p>
+ * 例外：REFRESHING 为管理后台内部瞬时状态（CAS 锁中间态），不在 ComicLifecycleStatus 中。
+ * <p>
  * 终态：DELETED。DRAFT/TRASHED/DELETED 不出现在阅读列表。
  */
 public enum ComicStatus {
@@ -11,7 +13,7 @@ public enum ComicStatus {
     IMPORT_FAILED,
     READY,
     RECOVERY_REQUIRED,
-    /** 元数据刷新中（AdminServiceImpl CAS 锁中间态） */
+    /** 元数据刷新中（AdminServiceImpl CAS 锁中间态；仅管理后台内部使用，不属于 ComicLifecycleStatus） */
     REFRESHING,
     /** 删除排队中（Worker 尚未开始删文件） */
     DELETING,

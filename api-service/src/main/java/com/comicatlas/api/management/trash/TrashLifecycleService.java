@@ -543,7 +543,8 @@ public class TrashLifecycleService {
         return media.getStatus() == null ? null : media.getStatus().name();
     }
 
-    private void requireAllowed(AllowedOperations ops, String op, String message) {        if (!ops.isAllowed(op)) {
+    private void requireAllowed(AllowedOperations ops, String op, String message) {
+        if (!ops.isAllowed(op)) {
             String reason = ops.blockedReasons().getOrDefault(op, ops.blockedReasons().getOrDefault("*", message));
             throw new ConflictException(message + "：" + reason);
         }

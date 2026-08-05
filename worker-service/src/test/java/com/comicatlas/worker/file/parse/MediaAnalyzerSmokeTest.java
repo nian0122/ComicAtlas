@@ -57,7 +57,7 @@ public class MediaAnalyzerSmokeTest {
         executor.setThreadNamePrefix("smoke-test-process-io-");
         executor.initialize();
 
-        // 用反射调用构造（因为 @Component 类没有公开构造）
+        // 反射调用构造（MediaAnalyzer 现已有公开构造，反射虽非必需但无害，保留以最小改动）
         MediaAnalyzer analyzer = (MediaAnalyzer) Class.forName("com.comicatlas.worker.file.parse.MediaAnalyzer")
                 .getDeclaredConstructors()[0]
                 .newInstance(cfg, om, executor);

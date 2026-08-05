@@ -286,7 +286,10 @@ class ReadingLifecycleCompatibilityIT {
         @Test
         @DisplayName("DRAFT/IMPORTING/IMPORT_FAILED/RECOVERY_REQUIRED/DELETING/TRASHED/RESTORING/PURGING/DELETED 不可读；READY 可读")
         void nonReadyLifecycles_hiddenFromCatalogAndReader() throws Exception {
-            List<ComicStatus> nonReadable = List.of(ComicStatus.DRAFT, ComicStatus.IMPORTING, ComicStatus.IMPORT_FAILED, ComicStatus.RECOVERY_REQUIRED, ComicStatus.DELETING, ComicStatus.TRASHED, ComicStatus.RESTORING, ComicStatus.PURGING, ComicStatus.DELETED);
+            List<ComicStatus> nonReadable = List.of(
+                ComicStatus.DRAFT, ComicStatus.IMPORTING, ComicStatus.IMPORT_FAILED,
+                ComicStatus.RECOVERY_REQUIRED, ComicStatus.DELETING, ComicStatus.TRASHED,
+                ComicStatus.RESTORING, ComicStatus.PURGING, ComicStatus.DELETED);
             for (ComicStatus status : nonReadable) {
                 Long comicId = insertComic("HIDE-" + status, status);
                 Long chapterId = insertChapter(comicId, 1, "1", "READY");

@@ -14,7 +14,6 @@ import com.comicatlas.api.common.storage.ApiStorageRoot;
 import com.comicatlas.api.importer.dto.BatchImportRequest;
 import com.comicatlas.api.importer.dto.BatchImportResultVO;
 import com.comicatlas.api.importer.entity.ImportTask;
-import com.comicatlas.api.importer.event.ImportEventPublisher;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
 import com.comicatlas.api.management.service.ManagementTaskService;
@@ -61,7 +60,6 @@ class ImportServiceTest {
     @Mock private CatalogMapper catalogMapper;
     @Mock private ChapterMapper chapterMapper;
     @Mock private MediaMapper mediaMapper;
-    @Mock private ImportEventPublisher eventPublisher;
     @Mock private RedisTemplate<String, Object> redisTemplate;
     @Mock private TransactionTemplate transactionTemplate;
     @Mock private CatalogCacheInvalidator catalogCacheInvalidator;

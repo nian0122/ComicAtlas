@@ -98,6 +98,17 @@ class ImportEventHandlerCacheTest {
         verify(channel).basicAck(1L, false);
     }
 
+    /** 让 transactionTemplate.executeWithoutResult 内联执行 Consumer，并在此"事务"中运行 action。 */
+    private void runInTransaction(Runnable action) {
+        doAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            Consumer<TransactionStatus> consumer = invocation.getArgument(0);
+            consumer.accept(null);
+            return null;
+        }).when(transactionTemplate).executeWithoutResult(any());
+        action.run();
+    }
+
     /** 遗留 "DOWNLOADING" 行经 safeValueOf 读回 status=null：失败事件必须正常标记 FAILED，不得 NPE。 */
     @Test
     void handleImportTaskFailed_withLegacyNullStatusTask_marksFailedWithoutNpe() throws Exception {
@@ -106,17 +117,11 @@ class ImportEventHandlerCacheTest {
         task.setStatus(null);
 
         when(taskMapper.selectById(30L)).thenReturn(task);
-        doAnswer(invocation -> {
-            @SuppressWarnings("unchecked")
-            Consumer<TransactionStatus> action = invocation.getArgument(0);
-            action.accept(null);
-            return null;
-        }).when(transactionTemplate).executeWithoutResult(any());
 
         ImportTaskFailedEvent event = new ImportTaskFailedEvent(
                 UUID.randomUUID(), Instant.now(), 30L, 300L, "DOWNLOAD_FAILED", "下载失败");
 
-        assertDoesNotThrow(() -> handler.handleImportTaskFailed(event, channel, 1L));
+        runInTransaction(() -> assertDoesNotThrow(() -> handler.handleImportTaskFailed(event, channel, 1L)));
         verify(channel).basicAck(1L, false);
 
         ArgumentCaptor<ImportTask> captor = ArgumentCaptor.forClass(ImportTask.class);
@@ -132,17 +137,11 @@ class ImportEventHandlerCacheTest {
         task.setStatus(null);
 
         when(taskMapper.selectById(31L)).thenReturn(task);
-        doAnswer(invocation -> {
-            @SuppressWarnings("unchecked")
-            Consumer<TransactionStatus> action = invocation.getArgument(0);
-            action.accept(null);
-            return null;
-        }).when(transactionTemplate).executeWithoutResult(any());
 
         TaskStatusChangedEvent event = new TaskStatusChangedEvent(
                 UUID.randomUUID(), Instant.now(), 31L, "FAILED", 0, null, 0, 0);
 
-        assertDoesNotThrow(() -> handler.handleTaskStatusChanged(event, channel, 1L));
+        runInTransaction(() -> assertDoesNotThrow(() -> handler.handleTaskStatusChanged(event, channel, 1L)));
         verify(channel).basicAck(1L, false);
 
         ArgumentCaptor<ImportTask> captor = ArgumentCaptor.forClass(ImportTask.class);
@@ -158,17 +157,15 @@ class ImportEventHandlerCacheTest {
         task.setStatus(null);
 
         when(taskMapper.selectById(32L)).thenReturn(task);
-        doAnswer(invocation -> {
-            @SuppressWarnings("unchecked")
-            Consumer<TransactionStatus> action = invocation.getArgument(0);
-            action.accept(null);
-            return null;
-        }).when(transactionTemplate).executeWithoutResult(any());
 
         TaskStatusChangedEvent event = new TaskStatusChangedEvent(
                 UUID.randomUUID(), Instant.now(), 32L, "DOWNLOADING", 42, "HTTP", 1024, 7);
 
-        assertDoesNotThrow(() -> handler.handleTaskStatusChanged(event, channel, 1L));
+        runInTransaction(() -> assertDoesNotThrow(() -> handler.handleTaskStatusChanged(event, channel, 1L)));
         verify(channel).basicAck(1L, false);
+
+        ArgumentCaptor<ImportTask> captor = ArgumentCaptor.forClass(ImportTask.class);
+        verify(taskMapper).updateById(captor.capture());
+        assertThat(captor.getValue().getStatus()).isNull();
     }
 }
