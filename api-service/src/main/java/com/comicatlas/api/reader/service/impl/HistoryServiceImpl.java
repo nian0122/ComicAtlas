@@ -81,11 +81,11 @@ public class HistoryServiceImpl implements HistoryService {
             existing.setUpdatedAt(LocalDateTime.now());
             historyMapper.updateById(existing);
         } else {
-            ReadingHistory rh = new ReadingHistory();
-            rh.setComicId(comicId);
-            rh.setChapterId(request.getChapterId());
-            rh.setPageNumber(request.getPageNumber());
-            historyMapper.insert(rh);
+            ReadingHistory history = new ReadingHistory();
+            history.setComicId(comicId);
+            history.setChapterId(request.getChapterId());
+            history.setPageNumber(request.getPageNumber());
+            historyMapper.insert(history);
         }
     }
 

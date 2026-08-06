@@ -154,21 +154,21 @@ public class UploadStorageService {
 
     private String writePositional(Path path, long start, InputStream in) throws IOException {
         try {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            MessageDigest messageDigest = MessageDigest.getInstance("SHA-256");
             try (FileChannel channel = FileChannel.open(path,
                     StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
                 byte[] buf = new byte[64 * 1024];
                 int n;
                 long offset = start;
                 while ((n = in.read(buf)) > 0) {
-                    md.update(buf, 0, n);
+                    messageDigest.update(buf, 0, n);
                     ByteBuffer wb = ByteBuffer.wrap(buf, 0, n);
                     while (wb.hasRemaining()) {
                         offset += channel.write(wb, offset);
                     }
                 }
             }
-            return HexFormat.of().formatHex(md.digest());
+            return HexFormat.of().formatHex(messageDigest.digest());
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 不可用", e);
         }

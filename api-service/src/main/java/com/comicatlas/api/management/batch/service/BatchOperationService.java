@@ -200,29 +200,29 @@ public class BatchOperationService {
         req.setBatchId(UUID.randomUUID().toString());
         List<CreateManagementTaskRequest.TaskTarget> targets = new ArrayList<>();
         for (Long comicId : eligible) {
-            CreateManagementTaskRequest.TaskTarget t = new CreateManagementTaskRequest.TaskTarget();
-            t.setTargetType("COMIC");
-            t.setTargetId(comicId);
-            t.setOperationType(request.getOperation());
-            targets.add(t);
+            CreateManagementTaskRequest.TaskTarget target = new CreateManagementTaskRequest.TaskTarget();
+            target.setTargetType("COMIC");
+            target.setTargetId(comicId);
+            target.setOperationType(request.getOperation());
+            targets.add(target);
         }
         req.setTargets(targets);
         return managementTaskService.createTask(req, idempotencyKey, payload);
     }
 
-    private void enqueueCommand(TaskType op, ManagementTaskItemResponse item) {
+    private void enqueueCommand(TaskType operation, ManagementTaskItemResponse item) {
         ManagementCommandRequestedEvent event = new ManagementCommandRequestedEvent(
                 UUID.randomUUID(), Instant.now(), 1,
                 item.getTaskId(), item.getId(), item.getAttempt(),
-                op.name(), "COMIC", item.getTargetId());
+                operation.name(), "COMIC", item.getTargetId());
         outboxService.enqueue(event, EXCHANGE, ROUTING_REQUEST,
                 item.getTaskId(), item.getId(), item.getAttempt());
         log.info("批量命令已入 Outbox: op={}, taskId={}, itemId={}, targetId={}",
-                op.name(), item.getTaskId(), item.getId(), item.getTargetId());
+                operation.name(), item.getTaskId(), item.getId(), item.getTargetId());
     }
 
-    private static String operationLabel(TaskType op) {
-        return switch (op) {
+    private static String operationLabel(TaskType operation) {
+        return switch (operation) {
             case METADATA_UPDATE -> "批量更新元数据";
             case LQ_GENERATE -> "批量生成低清图";
             case LQ_REGENERATE -> "批量重生成低清图";

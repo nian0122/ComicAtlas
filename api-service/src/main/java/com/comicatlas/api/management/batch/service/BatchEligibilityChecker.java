@@ -71,8 +71,8 @@ public class BatchEligibilityChecker {
     }
 
     /** 资产类操作所需操作名（对应 AllowedOperations 中的 OP_* 常量）。 */
-    private static String assetOpName(TaskType op) {
-        return switch (op) {
+    private static String assetOpName(TaskType operation) {
+        return switch (operation) {
             case LQ_GENERATE -> OperationPolicyService.OP_LQ_GENERATE;
             case LQ_REGENERATE -> OperationPolicyService.OP_LQ_REGENERATE;
             case HQ_DELETE -> OperationPolicyService.OP_HQ_DELETE;
@@ -82,8 +82,8 @@ public class BatchEligibilityChecker {
     }
 
     /** 生命周期类操作所需操作名。 */
-    private static String policyOpName(TaskType op) {
-        return switch (op) {
+    private static String policyOpName(TaskType operation) {
+        return switch (operation) {
             case METADATA_UPDATE, METADATA_REFRESH -> OperationPolicyService.OP_EDIT;
             case COMIC_DELETE -> OperationPolicyService.OP_DELETE;
             case COMIC_RESTORE -> OperationPolicyService.OP_RECOVER;

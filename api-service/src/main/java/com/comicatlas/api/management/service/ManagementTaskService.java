@@ -362,8 +362,8 @@ public class ManagementTaskService {
      * RESTORE/PURGE 类操作通过 result_ref（TRASH_MANIFEST → 回收任务 taskId）定位清单目录。
      */
     private void republishCommand(Long taskId, ManagementTaskItem item, int newAttempt) {
-        TaskType op = item.getOperationType();
-        if (op == null || !COMMAND_OPS.contains(op)) {
+        TaskType operation = item.getOperationType();
+        if (operation == null || !COMMAND_OPS.contains(operation)) {
             return;
         }
         Long manifestTaskId = "TRASH_MANIFEST".equals(item.getResultRefType())
@@ -371,11 +371,11 @@ public class ManagementTaskService {
         var event = new com.comicatlas.common.event.ManagementCommandRequestedEvent(
                 java.util.UUID.randomUUID(), java.time.Instant.now(), 1,
                 taskId, item.getId(), newAttempt,
-                op.name(), item.getTargetType(), item.getTargetId(), manifestTaskId);
+                operation.name(), item.getTargetType(), item.getTargetId(), manifestTaskId);
         outboxService.enqueue(event, "comic.management", "command.requested",
                 taskId, item.getId(), newAttempt);
         log.info("重试已重新发布命令: taskId={}, itemId={}, attempt={}, op={}, target={}:{}, manifestTaskId={}",
-                taskId, item.getId(), newAttempt, op.name(), item.getTargetType(), item.getTargetId(), manifestTaskId);
+                taskId, item.getId(), newAttempt, operation.name(), item.getTargetType(), item.getTargetId(), manifestTaskId);
     }
 
     /** 统一命令管线操作类型集合。 */
@@ -743,8 +743,8 @@ public class ManagementTaskService {
 
     private static String sha256(String input) {
         try {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            byte[] hash = md.digest(input.getBytes(StandardCharsets.UTF_8));
+            MessageDigest messageDigest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = messageDigest.digest(input.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(hash);
         } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException("SHA-256 不可用", e);
