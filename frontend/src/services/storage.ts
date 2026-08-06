@@ -1,5 +1,5 @@
 import { adminApi, exportApi, hqApi, lqApi } from '@/services/api'
-import type { ComicStorageQuery, StorageOperation } from '@/types'
+import type { ComicStorageQuery, OperationSubmitResult, StorageOperation } from '@/types'
 import { StorageOperationType } from '@/types'
 
 function extractMessage(err: unknown): string {
@@ -55,7 +55,7 @@ export const storageService = {
     }
   },
 
-  async transcodeVideos(comicId: number) {
+  async transcodeVideos(comicId: number): Promise<OperationSubmitResult> {
     const res = await adminApi.transcodeVideos(comicId)
     return res.data
   },
