@@ -4,6 +4,7 @@ import com.comicatlas.api.common.Result;
 import com.comicatlas.api.management.dto.OperationSubmitResult;
 import com.comicatlas.api.storage.service.HqDeleteOperationService;
 import com.comicatlas.api.storage.service.LqOperationService;
+import com.comicatlas.api.storage.service.TranscodeOperationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,6 +25,7 @@ public class StorageOperationController {
 
     private final LqOperationService lqOperationService;
     private final HqDeleteOperationService hqDeleteOperationService;
+    private final TranscodeOperationService transcodeOperationService;
 
     // ======================== LQ 生成 ========================
 
@@ -51,5 +53,17 @@ public class StorageOperationController {
     @PostMapping("/delete-hq/chapters/{chapterId}")
     public Result<OperationSubmitResult> deleteChapterHq(@PathVariable Long chapterId) {
         return Result.ok(hqDeleteOperationService.deleteForChapter(chapterId));
+    }
+
+    // ======================== 视频转码 ========================
+
+    @PostMapping("/transcode/comics/{comicId}")
+    public Result<OperationSubmitResult> transcodeComic(@PathVariable Long comicId) {
+        return Result.ok(transcodeOperationService.transcodeForComic(comicId));
+    }
+
+    @PostMapping("/transcode/chapters/{chapterId}")
+    public Result<OperationSubmitResult> transcodeChapter(@PathVariable Long chapterId) {
+        return Result.ok(transcodeOperationService.transcodeForChapter(chapterId));
     }
 }

@@ -7,7 +7,7 @@ import com.comicatlas.api.admin.service.StorageQueryService;
 import com.comicatlas.api.common.Result;
 import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.management.dto.OperationSubmitResult;
-import com.comicatlas.api.management.operation.MediaOperationCommandService;
+import com.comicatlas.api.storage.service.TranscodeOperationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -28,7 +28,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 public class AdminStorageController {
 
     private final StorageQueryService storageQueryService;
-    private final MediaOperationCommandService mediaOperationCommandService;
+    private final TranscodeOperationService transcodeOperationService;
 
     @GetMapping("/comics")
     public Result<Map<String, Object>> listComics(
@@ -63,10 +63,13 @@ public class AdminStorageController {
     /**
      * 视频转码 — 统一任务管线入口。
      * 创建 ManagementTask（逐视频页 item）并返回 taskId，不再逐页发旧事件。
+     *
+     * @deprecated 请改用 {@code POST /api/storage/transcode/comics/{comicId}}
      */
+    @Deprecated
     @PostMapping("/comics/{comicId}/transcode-videos")
     public Result<OperationSubmitResult> transcodeVideos(@PathVariable Long comicId) {
         log.info("请求漫画视频转码: comicId={}", comicId);
-        return Result.ok(mediaOperationCommandService.requestTranscodeForComic(comicId));
+        return Result.ok(transcodeOperationService.transcodeForComic(comicId));
     }
 }

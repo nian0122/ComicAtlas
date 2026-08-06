@@ -258,6 +258,38 @@ public class MediaOperationCommandService {
         return OperationSubmitResult.of(task.getId(), TaskType.TRANSCODE.name(), task.getStatus().name(), items.size());
     }
 
+    public OperationSubmitResult requestTranscodeForChapter(Long chapterId) {
+        Chapter chapter = chapterMapper.selectById(chapterId);
+        if (chapter == null) {
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在: " + chapterId);
+        }
+        List<Media> toTranscode = mediaMapper.selectList(
+                new LambdaQueryWrapper<Media>()
+                        .eq(Media::getChapterId, chapterId)
+                        .eq(Media::getMediaType, "VIDEO"));
+        List<Media> eligible = toTranscode.stream()
+                .filter(this::isTranscodeEligible)
+                .toList();
+        if (eligible.isEmpty()) {
+            log.info("章节 {} 无待转码视频，跳过", chapterId);
+            return OperationSubmitResult.of(null, TaskType.TRANSCODE.name(), null, 0);
+        }
+
+        List<CreateManagementTaskRequest.TaskTarget> targets = eligible.stream()
+                .map(media -> target("MEDIA", media.getId(), TaskType.TRANSCODE))
+                .toList();
+        ManagementTaskResponse task = createTask(TaskType.TRANSCODE, "视频转码", "CHAPTER", targets);
+        List<ManagementTaskItemResponse> items = managementTaskService.getTaskItems(task.getId());
+
+        for (ManagementTaskItemResponse item : items) {
+            markTranscodeQueued(item.getTargetId());
+            enqueue(TaskType.TRANSCODE, item, "MEDIA", item.getTargetId());
+        }
+        log.info("转码命令已提交: chapterId={}, taskId={}, items={}",
+                chapterId, task.getId(), items.size());
+        return OperationSubmitResult.of(task.getId(), TaskType.TRANSCODE.name(), task.getStatus().name(), items.size());
+    }
+
     public OperationSubmitResult requestTranscodeForMedia(Long mediaId) {
         Media media = mediaMapper.selectById(mediaId);
         if (media == null) {
