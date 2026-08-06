@@ -122,10 +122,10 @@ public class OutboxRelay {
             return;
         }
 
-        CorrelationData cd = new CorrelationData(msg.getEventId());
+        CorrelationData correlationData = new CorrelationData(msg.getEventId());
 
         // 异步 confirm：检测 nack，触发重试
-        cd.getFuture().whenComplete((confirm, throwable) -> {
+        correlationData.getFuture().whenComplete((confirm, throwable) -> {
             if (throwable != null) {
                 log.warn("Outbox confirm 异常: eventId={}, error={}", msg.getEventId(), throwable.getMessage());
                 resetForRetry(msg, throwable.getMessage());
@@ -137,7 +137,7 @@ public class OutboxRelay {
         });
 
         try {
-            rabbitTemplate.convertAndSend(msg.getExchange(), msg.getRoutingKey(), event, cd);
+            rabbitTemplate.convertAndSend(msg.getExchange(), msg.getRoutingKey(), event, correlationData);
             // 同步发送成功 → 标记 PUBLISHED
             log.info("OutboxRelay 发布成功: eventId={}", msg.getEventId());
             handlePublishSuccess(msg);
