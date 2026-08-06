@@ -150,24 +150,35 @@ public class ExternalProcessRunner {
     }
 
     /**
-     * 销毁子进程并等待其终止与输出读取任务收尾（有界）。
-     * 中断/超时路径统一调用，确保不悬挂且不泄漏子进程。
+     * 销毁进程树并等待其终止与输出读取任务收尾（有界、不中断）。
+     * <p>
+     * 必须先取出并清除中断标志，使清理期的 waitFor/get 真正生效（若带中断标志调用，
+     * 等待会立即再次收到中断而失效）；清理完成后恢复原中断标志，由调用方决定传播。
      */
     private void destroyAndReap(Process process, CompletableFuture<Void> readFuture) {
-        process.destroyForcibly();
+        boolean interrupted = Thread.interrupted();
         try {
-            if (!process.waitFor(5, TimeUnit.SECONDS)) {
-                log.warn("外部进程强制终止后 5s 仍未退出，可能残留");
+            // 终止进程树：先杀后代再杀直接进程
+            process.descendants().forEach(ProcessHandle::destroyForcibly);
+            process.destroyForcibly();
+            try {
+                if (!process.waitFor(5, TimeUnit.SECONDS)) {
+                    log.warn("外部进程强制终止后 5s 仍未退出，可能残留");
+                }
+            } catch (InterruptedException e) {
+                log.warn("清理阶段等待进程终止被中断（已忽略，进程已终止）");
             }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
-        try {
-            readFuture.get(5, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        } catch (ExecutionException | TimeoutException e) {
-            log.warn("等待外部进程输出读取任务收尾超时: {}", e.getMessage());
+            try {
+                readFuture.get(5, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                log.warn("清理阶段读取任务等待被中断（已忽略，进程已终止）");
+            } catch (ExecutionException | TimeoutException e) {
+                log.warn("等待外部进程输出读取任务收尾超时: {}", e.getMessage());
+            }
+        } finally {
+            if (interrupted) {
+                Thread.currentThread().interrupt();
+            }
         }
     }
 }
