@@ -865,3 +865,20 @@ OP_NOT_ALLOWED, COMIC_NOT_FOUND
 | `GET /api/comics/{id}/catalog` | 目录树（只读，兼容） | 目录管理用 `/api/comics/{comicId}/catalogs` |
 | `POST /api/comics/batch/update` | 保留（分类/标签批量） | 批量操作建议迁移到 `/api/management/batch` |
 | 阅读端接口（`/api/comics`、`/api/chapters/{id}`、`/api/history`） | 兼容，只返回阅读所需字段 | 长期保留 |
+| `POST /api/comics/{id}/lq` 等存储操作旧端点 | 保留 deprecated，转发到 `/api/storage/*` | 前端迁移后移除 |
+
+## 20. 存储操作域（v1.1）
+
+统一形态：`POST /api/storage/{operation}/{targetType}/{targetId}`，`targetType = comics | chapters`。
+
+| 操作 | 端点 |
+|------|------|
+| 生成 LQ | `POST /api/storage/lq/comics/{id}`、`/lq/chapters/{id}` |
+| 视频转码 | `POST /api/storage/transcode/comics/{id}`、`/transcode/chapters/{id}` |
+| 删除 HQ 保留 LQ | `POST /api/storage/delete-hq/comics/{id}`、`/delete-hq/chapters/{id}` |
+| 导出漫画 | `POST /api/storage/export/comics/{id}` |
+| 导出任务查询 | `GET /api/storage/export/comics/{id}/tasks`、`GET /api/storage/export/tasks/{taskId}` |
+| 刷新 Metadata | `POST /api/storage/refresh-metadata/comics/{id}` |
+| 存储统计 | `GET /api/storage/stats` |
+
+> 旧端点（`/comics/{id}/lq`、`/admin/storage/comics/{id}/transcode-videos` 等）保留为 deprecated 兼容入口，等待前端迁移后移除（见 §19.2）。
