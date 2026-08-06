@@ -47,7 +47,7 @@ public class ExternalProcessRunner {
     static final int MAX_OUTPUT_CHARS = 64 * 1024;
 
     /**
-     * 容量受限的 stdout 尾部缓冲：追加内容，超限时丢弃旧内容只保留尾部。
+     * 容量受限的 stdout 缓冲：追加内容，达到上限后继续排空（防管道死锁）但不再保留。
      * 由读取线程单线程调用，无需同步。
      */
     private static final class TailBuffer {
@@ -64,7 +64,7 @@ public class ExternalProcessRunner {
 
         String snapshot() {
             if (!truncated) { return buf.toString(); }
-            return "[输出已截断，仅保留尾部 " + buf.length() + " 字符]\n" + buf;
+            return "[输出已截断，仅保留开头 " + buf.length() + " 字符]\n" + buf;
         }
     }
 
