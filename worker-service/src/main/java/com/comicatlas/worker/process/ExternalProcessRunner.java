@@ -45,7 +45,7 @@ public class ExternalProcessRunner {
     /**
      * 执行外部进程并等待完成。
      *
-     * @param command        完整命令行（含可执行文件路径）
+     * @param processBuilder 待执行的外部进程配置（含可执行文件路径与参数）
      * @param timeoutSeconds 超时秒数；<=0 表示不超时（不推荐，调用方应尽量给超时）
      * @return 进程退出码与 stdout 内容
      * @throws InterruptedException    执行被中断（中断标志已恢复，子进程已销毁）
