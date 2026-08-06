@@ -6,8 +6,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -121,10 +119,8 @@ class ExternalProcessRunnerTest {
     @Test
     @DisplayName("超时后直接进程与全部后代进程均被终止")
     void run_timeout_killsDescendants() throws Exception {
-        Path pidFile = Files.createTempFile("runner-tree-pid", ".txt");
         // cmd 派生子进程（ping），主进程等待；超时后应终止整棵进程树
-        ProcessBuilder pb = new ProcessBuilder("cmd", "/c",
-                "echo " + ProcessHandle.current().pid() + " > \"" + pidFile + "\" & ping -n 10 127.0.0.1");
+        ProcessBuilder pb = new ProcessBuilder("cmd", "/c", "ping -n 10 127.0.0.1");
         long start = System.currentTimeMillis();
         assertThatThrownBy(() -> runner.run(pb, 1))
                 .isInstanceOf(ExternalProcessRunner.ProcessTimeoutException.class);

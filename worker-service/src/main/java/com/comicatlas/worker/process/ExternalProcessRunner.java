@@ -11,6 +11,7 @@ import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -101,17 +102,24 @@ public class ExternalProcessRunner {
         }
 
         TailBuffer processOutput = new TailBuffer();
-        CompletableFuture<Void> readFuture = CompletableFuture.runAsync(() -> {
-            try (Reader r = new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8)) {
-                char[] chunk = new char[CHUNK_SIZE];
-                int n;
-                while ((n = r.read(chunk, 0, CHUNK_SIZE)) != -1) {
-                    processOutput.append(chunk, n);
+        CompletableFuture<Void> readFuture;
+        try {
+            readFuture = CompletableFuture.runAsync(() -> {
+                try (Reader r = new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8)) {
+                    char[] chunk = new char[CHUNK_SIZE];
+                    int n;
+                    while ((n = r.read(chunk, 0, CHUNK_SIZE)) != -1) {
+                        processOutput.append(chunk, n);
+                    }
+                } catch (IOException e) {
+                    log.warn("读取外部进程输出失败: {}", e.getMessage());
                 }
-            } catch (IOException e) {
-                log.warn("读取外部进程输出失败: {}", e.getMessage());
-            }
-        }, processIoExecutor);
+            }, processIoExecutor);
+        } catch (RejectedExecutionException e) {
+            // 输出读取任务被拒绝（池饱和）：销毁已启动的进程，避免孤儿进程残留
+            process.destroyForcibly();
+            throw e;
+        }
 
         boolean finished;
         if (timeoutSeconds <= 0) {

@@ -63,10 +63,23 @@ public class TranscodeCommandHandler {
             return;
         }
         List<Long> failedPages = new ArrayList<>();
+        boolean interrupted = false;
         for (Long pageId : videoPages) {
-            if (processPage(cmd, pageId) != null) {
-                failedPages.add(pageId);
+            String error = processPage(cmd, pageId);
+            if (error == null) {
+                continue;
             }
+            if ("TRANSCODE_INTERRUPTED".equals(error)) {
+                // 中断已置位：终止循环，避免后续页重复启动并立即销毁 ffmpeg 的噪音
+                interrupted = true;
+                break;
+            }
+            failedPages.add(pageId);
+        }
+        if (interrupted) {
+            publisher.failed(cmd, "转码被中断");
+            log.warn("转码命令被中断: comicId={}", comicId);
+            return;
         }
         if (failedPages.isEmpty()) {
             publisher.progress(cmd, 100, "转码完成");
@@ -83,6 +96,8 @@ public class TranscodeCommandHandler {
         if (error == null) {
             publisher.progress(cmd, 100, "转码完成");
             publisher.completed(cmd);
+        } else if ("TRANSCODE_INTERRUPTED".equals(error)) {
+            publisher.failed(cmd, "转码被中断");
         } else {
             publisher.failed(cmd, error);
         }
