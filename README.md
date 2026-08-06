@@ -149,7 +149,7 @@ ComicAtlas 面向单机个人仓库，管理端接口（回收站、永久清理
 - [部署运维](docs/operations/management.md)：数据库账号、存储卷、备份、升级与回滚
 - [开发流程](docs/development-guide.md)：分支、提交、合并、推送与发布
 - [API 文档](docs/api.md)：HTTP 接口与事件状态
-- [发布说明](docs/release/v1.0.0.md)：1.0 功能范围与已知限制
+- [发布说明](docs/releases/v1.0.0.md)：1.0 功能范围与已知限制
 - [架构索引](docs/architecture/00-index.md)：系统设计与模块说明
 
 ## 分支约定
