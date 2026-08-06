@@ -42,8 +42,9 @@ public class ExternalProcessRunner {
         }
     }
 
-    /** 外部进程 stdout 保留上限（字符）。超限后继续排空但不保留旧内容，防 Worker 堆耗尽。 */
-    private static final int MAX_OUTPUT_CHARS = 64 * 1024;
+    /** 外部进程 stdout 保留上限（字符）。超限后继续排空但不保留旧内容，防 Worker 堆耗尽。
+     *  包可见：同包单元测试（ExternalProcessRunnerTest）直接引用该上限做断言。 */
+    static final int MAX_OUTPUT_CHARS = 64 * 1024;
 
     /**
      * 容量受限的 stdout 尾部缓冲：追加内容，超限时丢弃旧内容只保留尾部。
