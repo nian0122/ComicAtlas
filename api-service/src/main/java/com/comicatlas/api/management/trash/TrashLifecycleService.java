@@ -253,13 +253,13 @@ public class TrashLifecycleService {
     }
 
     private OperationSubmitResult purge(String targetType, Long targetId, String token,
-                                        Runnable precondition, TaskType op, String operation) {
+                                        Runnable precondition, TaskType operation, String operationLabel) {
         if (token == null || !PURGE_CONFIRM_TOKEN.equals(token)) {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "二次确认 token 不匹配，必须为 " + PURGE_CONFIRM_TOKEN);
         }
         precondition.run();
         Long manifestTaskId = findTrashTaskId(targetType, targetId);
-        return createCommandTask(targetType, targetId, op, operation, manifestTaskId);
+        return createCommandTask(targetType, targetId, operation, operationLabel, manifestTaskId);
     }
 
     // ======================== 对账 ========================
@@ -444,59 +444,59 @@ public class TrashLifecycleService {
 
     // ======================== 内部辅助 ========================
 
-    private OperationSubmitResult createTrashTask(String targetType, Long targetId, TaskType op,
-                                                   String operation, List<TrashManifest.Entry> entries,
+    private OperationSubmitResult createTrashTask(String targetType, Long targetId, TaskType operation,
+                                                   String operationLabel, List<TrashManifest.Entry> entries,
                                                    String idempotencyKey, String payload) {
-        ManagementTaskResponse task = createTask(op, operation, targetType, targetId, idempotencyKey, payload);
+        ManagementTaskResponse task = createTask(operation, operationLabel, targetType, targetId, idempotencyKey, payload);
         Long taskId = task.getId();
         trashManifestService.writeManifest(new TrashManifest(
                 TrashManifest.CURRENT_VERSION, targetType, targetId, taskId, Instant.now(), entries));
         List<ManagementTaskItemResponse> items = managementTaskService.getTaskItems(taskId);
         for (ManagementTaskItemResponse item : items) {
-            enqueueCommand(op, item, targetType, targetId, null);
+            enqueueCommand(operation, item, targetType, targetId, null);
         }
         log.info("回收命令已提交: {}/{} taskId={}, entries={}", targetType, targetId, taskId, entries.size());
-        return OperationSubmitResult.of(taskId, op.name(), task.getStatus().name(), items.size());
+        return OperationSubmitResult.of(taskId, operation.name(), task.getStatus().name(), items.size());
     }
 
-    private OperationSubmitResult createCommandTask(String targetType, Long targetId, TaskType op,
-                                                    String operation, Long manifestTaskId) {
+    private OperationSubmitResult createCommandTask(String targetType, Long targetId, TaskType operation,
+                                                    String operationLabel, Long manifestTaskId) {
         if (manifestTaskId == null) {
-            throw new ConflictException("未找到 " + targetType + ":" + targetId + " 的回收清单，无法执行 " + op);
+            throw new ConflictException("未找到 " + targetType + ":" + targetId + " 的回收清单，无法执行 " + operation);
         }
-        ManagementTaskResponse task = createTask(op, operation, targetType, targetId, null, null);
+        ManagementTaskResponse task = createTask(operation, operationLabel, targetType, targetId, null, null);
         List<ManagementTaskItemResponse> items = managementTaskService.getTaskItems(task.getId());
         for (ManagementTaskItemResponse item : items) {
             itemMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ManagementTaskItem>()
                     .eq(ManagementTaskItem::getId, item.getId())
                     .set(ManagementTaskItem::getResultRefType, "TRASH_MANIFEST")
                     .set(ManagementTaskItem::getResultRefId, manifestTaskId));
-            enqueueCommand(op, item, targetType, targetId, manifestTaskId);
+            enqueueCommand(operation, item, targetType, targetId, manifestTaskId);
         }
         log.info("命令已提交: {}/{} taskId={}, manifestTaskId={}", targetType, targetId, task.getId(), manifestTaskId);
-        return OperationSubmitResult.of(task.getId(), op.name(), task.getStatus().name(), items.size());
+        return OperationSubmitResult.of(task.getId(), operation.name(), task.getStatus().name(), items.size());
     }
 
-    private ManagementTaskResponse createTask(TaskType op, String operation, String targetType,
+    private ManagementTaskResponse createTask(TaskType operation, String operationLabel, String targetType,
                                               Long targetId, String idempotencyKey, String payload) {
         CreateManagementTaskRequest req = new CreateManagementTaskRequest();
-        req.setTaskType(op);
-        req.setOperation(operation);
+        req.setTaskType(operation);
+        req.setOperation(operationLabel);
         req.setTargetType(targetType);
-        CreateManagementTaskRequest.TaskTarget t = new CreateManagementTaskRequest.TaskTarget();
-        t.setTargetType(targetType);
-        t.setTargetId(targetId);
-        t.setOperationType(op);
-        req.setTargets(List.of(t));
+        CreateManagementTaskRequest.TaskTarget target = new CreateManagementTaskRequest.TaskTarget();
+        target.setTargetType(targetType);
+        target.setTargetId(targetId);
+        target.setOperationType(operation);
+        req.setTargets(List.of(target));
         return managementTaskService.createTask(req, idempotencyKey, payload);
     }
 
-    private void enqueueCommand(TaskType op, ManagementTaskItemResponse item,
+    private void enqueueCommand(TaskType operation, ManagementTaskItemResponse item,
                                 String targetType, Long targetId, Long manifestTaskId) {
         outboxService.enqueue(new ManagementCommandRequestedEvent(
                 UUID.randomUUID(), Instant.now(), 1,
                 item.getTaskId(), item.getId(), item.getAttempt(),
-                op.name(), targetType, targetId, manifestTaskId),
+                operation.name(), targetType, targetId, manifestTaskId),
                 EXCHANGE, ROUTING_REQUEST,
                 item.getTaskId(), item.getId(), item.getAttempt());
     }

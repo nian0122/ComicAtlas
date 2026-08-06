@@ -306,7 +306,7 @@ public class UploadSessionService {
         }
 
         boolean replace = session.getReplaceMediaId() != null;
-        TaskType op = replace ? TaskType.MEDIA_REPLACE : TaskType.MEDIA_UPLOAD;
+        TaskType operation = replace ? TaskType.MEDIA_REPLACE : TaskType.MEDIA_UPLOAD;
 
         if (replace) {
             // 替换：不预建新 media，直接创建管理任务指向会话
@@ -340,7 +340,7 @@ public class UploadSessionService {
 
         String idempotencyKey = "upload:" + session.getSessionId();
         ManagementTaskResponse task = managementTaskService.createTask(
-                buildTaskRequest(op, session), idempotencyKey,
+                buildTaskRequest(operation, session), idempotencyKey,
                 "{\"session\":\"" + session.getSessionId() + "\"}");
 
         List<ManagementTaskItemResponse> items = managementTaskService.getTaskItems(task.getId());
@@ -348,7 +348,7 @@ public class UploadSessionService {
             outboxService.enqueue(new ManagementCommandRequestedEvent(
                     UUID.randomUUID(), Instant.now(), 1,
                     item.getTaskId(), item.getId(), item.getAttempt(),
-                    op.name(), "UPLOAD_SESSION", session.getId()),
+                    operation.name(), "UPLOAD_SESSION", session.getId()),
                     EXCHANGE, ROUTING_REQUEST,
                     item.getTaskId(), item.getId(), item.getAttempt());
         }
@@ -359,24 +359,24 @@ public class UploadSessionService {
 
         UploadCompleteResponse resp = new UploadCompleteResponse();
         resp.setTaskId(task.getId());
-        resp.setTaskType(op.name());
+        resp.setTaskType(operation.name());
         resp.setStatus(task.getStatus().name());
         resp.setItemCount(items.size());
         resp.setMediaIds(mediaIds);
         log.info("上传会话 complete: sessionId={}, op={}, taskId={}, mediaIds={}",
-                sessionId, op, task.getId(), mediaIds);
+                sessionId, operation, task.getId(), mediaIds);
         return resp;
     }
 
-    private CreateManagementTaskRequest buildTaskRequest(TaskType op, UploadSession session) {
+    private CreateManagementTaskRequest buildTaskRequest(TaskType operation, UploadSession session) {
         CreateManagementTaskRequest req = new CreateManagementTaskRequest();
-        req.setTaskType(op);
-        req.setOperation("媒体上传" + (op == TaskType.MEDIA_REPLACE ? "替换" : ""));
+        req.setTaskType(operation);
+        req.setOperation("媒体上传" + (operation == TaskType.MEDIA_REPLACE ? "替换" : ""));
         req.setTargetType("UPLOAD_SESSION");
         CreateManagementTaskRequest.TaskTarget target = new CreateManagementTaskRequest.TaskTarget();
         target.setTargetType("UPLOAD_SESSION");
         target.setTargetId(session.getId());
-        target.setOperationType(op);
+        target.setOperationType(operation);
         req.setTargets(List.of(target));
         return req;
     }

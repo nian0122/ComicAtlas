@@ -60,30 +60,30 @@ public class MediaOperationCommandService {
     public OperationSubmitResult requestLqForComic(Long comicId, boolean regenerate) {
         List<Chapter> chapters = chapterMapper.selectList(
                 new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
-        TaskType op = regenerate ? TaskType.LQ_REGENERATE : TaskType.LQ_GENERATE;
+        TaskType operation = regenerate ? TaskType.LQ_REGENERATE : TaskType.LQ_GENERATE;
 
         List<CreateManagementTaskRequest.TaskTarget> targets = new ArrayList<>();
         for (Chapter chapter : chapters) {
             List<Media> eligible = eligibleLqPages(chapter.getId(), regenerate);
             if (!eligible.isEmpty()) {
-                targets.add(target("CHAPTER", chapter.getId(), op));
+                targets.add(target("CHAPTER", chapter.getId(), operation));
             }
         }
         if (targets.isEmpty()) {
             log.info("漫画 {} 无待生成 LQ 的章节，跳过", comicId);
-            return OperationSubmitResult.of(null, op.name(), null, 0);
+            return OperationSubmitResult.of(null, operation.name(), null, 0);
         }
 
-        ManagementTaskResponse task = createTask(op, "生成低质量图片", "COMIC", targets);
+        ManagementTaskResponse task = createTask(operation, "生成低质量图片", "COMIC", targets);
         List<ManagementTaskItemResponse> items = managementTaskService.getTaskItems(task.getId());
 
         for (ManagementTaskItemResponse item : items) {
             markLqQueued(item.getTargetId());
-            enqueue(op, item, "CHAPTER", item.getTargetId());
+            enqueue(operation, item, "CHAPTER", item.getTargetId());
         }
         log.info("LQ 命令已提交: comicId={}, regenerate={}, taskId={}, items={}",
                 comicId, regenerate, task.getId(), items.size());
-        return OperationSubmitResult.of(task.getId(), op.name(), task.getStatus().name(), items.size());
+        return OperationSubmitResult.of(task.getId(), operation.name(), task.getStatus().name(), items.size());
     }
 
     public OperationSubmitResult requestLqForChapter(Long chapterId, boolean regenerate) {
@@ -91,23 +91,23 @@ public class MediaOperationCommandService {
         if (chapter == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在: " + chapterId);
         }
-        TaskType op = regenerate ? TaskType.LQ_REGENERATE : TaskType.LQ_GENERATE;
+        TaskType operation = regenerate ? TaskType.LQ_REGENERATE : TaskType.LQ_GENERATE;
 
         List<Media> eligible = eligibleLqPages(chapterId, regenerate);
         if (eligible.isEmpty()) {
             log.info("章节 {} 无待生成 LQ 的页面，跳过", chapterId);
-            return OperationSubmitResult.of(null, op.name(), null, 0);
+            return OperationSubmitResult.of(null, operation.name(), null, 0);
         }
 
-        ManagementTaskResponse task = createTask(op, "生成低质量图片", "CHAPTER",
-                List.of(target("CHAPTER", chapterId, op)));
+        ManagementTaskResponse task = createTask(operation, "生成低质量图片", "CHAPTER",
+                List.of(target("CHAPTER", chapterId, operation)));
         ManagementTaskItemResponse item = managementTaskService.getTaskItems(task.getId()).get(0);
 
         markLqQueued(chapterId);
-        enqueue(op, item, "CHAPTER", chapterId);
+        enqueue(operation, item, "CHAPTER", chapterId);
         log.info("LQ 命令已提交: chapterId={}, regenerate={}, taskId={}",
                 chapterId, regenerate, task.getId());
-        return OperationSubmitResult.of(task.getId(), op.name(), task.getStatus().name(), 1);
+        return OperationSubmitResult.of(task.getId(), operation.name(), task.getStatus().name(), 1);
     }
 
     private List<Media> eligibleLqPages(Long chapterId, boolean regenerate) {
@@ -323,32 +323,32 @@ public class MediaOperationCommandService {
 
     // ======================== 通用 ========================
 
-    private ManagementTaskResponse createTask(TaskType op, String operation,
+    private ManagementTaskResponse createTask(TaskType operation, String operationLabel,
                                               String targetType,
                                               List<CreateManagementTaskRequest.TaskTarget> targets) {
         CreateManagementTaskRequest req = new CreateManagementTaskRequest();
-        req.setTaskType(op);
-        req.setOperation(operation);
+        req.setTaskType(operation);
+        req.setOperation(operationLabel);
         req.setTargetType(targetType);
         req.setTargets(targets);
         return managementTaskService.createTask(req, null, null);
     }
 
-    private void enqueue(TaskType op, ManagementTaskItemResponse item,
+    private void enqueue(TaskType operation, ManagementTaskItemResponse item,
                          String targetType, Long targetId) {
         ManagementCommandRequestedEvent event = new ManagementCommandRequestedEvent(
                 UUID.randomUUID(), Instant.now(), 1,
                 item.getTaskId(), item.getId(), item.getAttempt(),
-                op.name(), targetType, targetId);
+                operation.name(), targetType, targetId);
         outboxService.enqueue(event, EXCHANGE, ROUTING_REQUEST,
                 item.getTaskId(), item.getId(), item.getAttempt());
     }
 
-    private static CreateManagementTaskRequest.TaskTarget target(String targetType, Long targetId, TaskType op) {
-        CreateManagementTaskRequest.TaskTarget t = new CreateManagementTaskRequest.TaskTarget();
-        t.setTargetType(targetType);
-        t.setTargetId(targetId);
-        t.setOperationType(op);
-        return t;
+    private static CreateManagementTaskRequest.TaskTarget target(String targetType, Long targetId, TaskType operation) {
+        CreateManagementTaskRequest.TaskTarget target = new CreateManagementTaskRequest.TaskTarget();
+        target.setTargetType(targetType);
+        target.setTargetId(targetId);
+        target.setOperationType(operation);
+        return target;
     }
 }

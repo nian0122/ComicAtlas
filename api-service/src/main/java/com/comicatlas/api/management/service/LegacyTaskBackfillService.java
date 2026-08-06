@@ -161,18 +161,18 @@ public class LegacyTaskBackfillService {
     }
 
     private ManagementTaskItem baseItem(ManagementTask managementTask, String targetType, Long targetId,
-                                        TaskType op, String legacyStatus) {
+                                        TaskType operation, String legacyStatus) {
         ManagementTaskItem item = new ManagementTaskItem();
         item.setTaskId(managementTask.getId());
         item.setTargetType(targetType);
         item.setTargetId(targetId);
-        item.setOperationType(op);
+        item.setOperationType(operation);
         ManagementTaskStatus st = managementTask.getStatus();
         item.setStatus(st);
         item.setAttempt(1);
         item.setProgress(managementTask.getProgress());
         if (st.isProcessing()) {
-            item.setLockKey(ManagementTaskItem.buildLockKey(targetType, targetId, op));
+            item.setLockKey(ManagementTaskItem.buildLockKey(targetType, targetId, operation));
         }
         item.setStartedAt(managementTask.getStartedAt());
         item.setCompletedAt(managementTask.getCompletedAt());

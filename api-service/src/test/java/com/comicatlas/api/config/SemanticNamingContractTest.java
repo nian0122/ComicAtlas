@@ -72,7 +72,11 @@ class SemanticNamingContractTest {
             new BannedPattern("ZipEntry", "ze", "zipEntry"),
             new BannedPattern("BufferedImage", "bi", "image"),
             new BannedPattern("ExportCatalog", "c", "catalog"),
-            new BannedPattern("ExportChapter", "ch", "chapter")
+            new BannedPattern("ExportChapter", "ch", "chapter"),
+            new BannedPattern("MessageDigest", "md", "messageDigest"),
+            new BannedPattern("TaskType", "op", "operation"),
+            new BannedPattern("TaskTarget", "t", "target"),
+            new BannedPattern("ReadingHistory", "rh", "history")
     );
 
     /**
@@ -106,7 +110,11 @@ class SemanticNamingContractTest {
             new BannedPattern("ZipEntry", "ze", "zipEntry"),
             new BannedPattern("BufferedImage", "bi", "image"),
             new BannedPattern("ExportCatalog", "c", "catalog"),
-            new BannedPattern("ExportChapter", "ch", "chapter")
+            new BannedPattern("ExportChapter", "ch", "chapter"),
+            new BannedPattern("MessageDigest", "md", "messageDigest"),
+            new BannedPattern("TaskType", "op", "operation"),
+            new BannedPattern("TaskTarget", "t", "target"),
+            new BannedPattern("ReadingHistory", "rh", "history")
     );
 
     /** 待扫描的模块名。 */
