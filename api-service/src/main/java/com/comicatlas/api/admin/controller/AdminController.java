@@ -1,9 +1,7 @@
 package com.comicatlas.api.admin.controller;
 
 import com.comicatlas.api.admin.dto.ComicDeleteStats;
-import com.comicatlas.api.admin.dto.RefreshMetadataResult;
 import com.comicatlas.api.admin.dto.ScanRecoverResultDTO;
-import com.comicatlas.api.admin.dto.StorageStatsDTO;
 import com.comicatlas.api.common.Result;
 import com.comicatlas.api.admin.service.AdminService;
 import lombok.RequiredArgsConstructor;
@@ -11,7 +9,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -22,17 +19,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 public class AdminController {
 
     private final AdminService adminService;
-
-    /**
-     * 存储统计（HQ/LQ/缩略图占用与漫画数）。
-     *
-     * @deprecated 请改用 GET /api/storage/stats
-     */
-    @Deprecated
-    @GetMapping("/storage/stats")
-    public Result<StorageStatsDTO> storageStats() {
-        return Result.ok(adminService.getStorageStats());
-    }
 
     /**
      * 恢复被删除的漫画：扫描 HQ 目录，用 metadata.json 重建 DB 记录。
@@ -50,17 +36,5 @@ public class AdminController {
     @DeleteMapping("/comics/{id}")
     public Result<ComicDeleteStats> deleteComic(@PathVariable Long id, @RequestParam String mode) {
         return Result.ok(adminService.deleteComic(id, mode));
-    }
-
-    /**
-     * 刷新单漫画元数据：重新扫描 HQ 目录，更新 page 的宽高/文件大小，
-     * 完成后发 MQ 委托 Worker 重新导出 metadata.json。
-     *
-     * @deprecated 请改用 POST /api/storage/refresh-metadata/comics/{id}
-     */
-    @Deprecated
-    @PostMapping("/comics/{comicId}/refresh-metadata")
-    public Result<RefreshMetadataResult> refreshMetadata(@PathVariable Long comicId) {
-        return Result.ok(adminService.refreshMetadata(comicId));
     }
 }
