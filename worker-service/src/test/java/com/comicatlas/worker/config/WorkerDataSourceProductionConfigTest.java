@@ -37,8 +37,8 @@ class WorkerDataSourceProductionConfigTest {
     @DisplayName("生产默认密码不应为固定默认值")
     void productionDefaultPasswordHasNoFixedDefault() throws IOException {
         String password = resolve("spring.datasource.password");
-        assertThat(password).as("Worker 密码必须由环境变量提供，禁止固定默认密码").isNotNull();
-        assertThat(password.toLowerCase()).doesNotContain("comicatlas_ro_pass");
+        assertThat(password).as("Worker 密码必须由环境变量提供，禁止固定默认密码")
+                .isEqualTo("${MYSQL_PASS}");
     }
 
     private String resolve(String key) throws IOException {
