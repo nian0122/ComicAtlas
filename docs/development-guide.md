@@ -117,7 +117,7 @@ git push origin main --follow-tags
 git push origin develop
 ```
 
-发布说明写入 `docs/release/vX.Y.Z.md`，用户操作变更同步更新 `README.md` 和 `docs/user-guide.md`。
+发布说明写入 `docs/releases/vX.Y.Z.md`，用户操作变更同步更新 `README.md` 和 `docs/user-guide.md`。
 
 ## 常见情况
 

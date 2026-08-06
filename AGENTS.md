@@ -277,7 +277,7 @@ git merge --no-ff feature/<功能名称> -m "合入 <功能名称>"
 2. 将 `develop` 合并到 `main`，提交信息使用 `发布 X.Y.Z`。
 3. 在 `main` 创建带注释标签：`git tag -a vX.Y.Z -m "ComicAtlas X.Y.Z 稳定版本"`。
 4. 发布后推送分支和标签：`git push origin main --follow-tags`、`git push origin develop`。
-5. 发布说明放在 `docs/release/vX.Y.Z.md`，用户操作说明维护在 `README.md` 和 `docs/user-guide.md`。
+5. 发布说明放在 `docs/releases/vX.Y.Z.md`，用户操作说明维护在 `README.md` 和 `docs/user-guide.md`。
 
 ### 安全和回滚
 
