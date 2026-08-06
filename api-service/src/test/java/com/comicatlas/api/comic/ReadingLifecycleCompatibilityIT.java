@@ -409,7 +409,7 @@ class ReadingLifecycleCompatibilityIT {
 
             managementCommandResultHandler.handleResult(
                     new ManagementCommandCompletedEvent(UUID.randomUUID(), Instant.now(), 1,
-                            task.getId(), item.getId(), 1, "COMIC_DELETE", "COMIC", comicId),
+                            task.getId(), item.getId(), 1, "COMIC_DELETE", "COMIC", comicId, null),
                     null, 0L);
 
             assertThat(comicMapper.selectById(comicId).getStatus()).isEqualTo(ComicStatus.TRASHED);
@@ -522,7 +522,7 @@ class ReadingLifecycleCompatibilityIT {
                             .eq(ManagementTaskItem::getTaskId, result.taskId()));
             managementCommandResultHandler.handleResult(
                     new ManagementCommandCompletedEvent(UUID.randomUUID(), Instant.now(), 1,
-                            result.taskId(), item.getId(), 1, "MEDIA_TRASH", "MEDIA", m2),
+                            result.taskId(), item.getId(), 1, "MEDIA_TRASH", "MEDIA", m2, null),
                     null, 0L);
 
             // 媒体进入 TRASHED，HQ 引用指向 TRASH（不再暴露）

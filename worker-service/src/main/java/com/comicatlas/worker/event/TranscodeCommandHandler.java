@@ -1,8 +1,11 @@
 package com.comicatlas.worker.event;
 
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
+import com.comicatlas.common.event.TranscodeMediaInfo;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.entity.ExportMedia;
+import com.comicatlas.worker.file.parse.ComicMetadata;
+import com.comicatlas.worker.file.parse.MediaAnalyzer;
 import com.comicatlas.worker.mapper.ExportMediaMapper;
 import com.comicatlas.worker.process.ExternalProcessRunner;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +37,10 @@ public class TranscodeCommandHandler {
     private final WorkerConfig config;
     private final ManagementCommandPublisher publisher;
     private final ExternalProcessRunner processRunner;
+    private final MediaAnalyzer mediaAnalyzer;
+
+    /** 单页转码结果：error 为 null 表示成功；transcode 为成功时的实测元数据（可能为 null）。 */
+    private record TranscodeResult(String error, TranscodeMediaInfo transcode) {}
 
     private static final List<String> FFMPEG_ARGS = List.of(
         "-c:v", "libx264", "-crf", "23", "-preset", "medium",
@@ -65,11 +72,11 @@ public class TranscodeCommandHandler {
         List<Long> failedPages = new ArrayList<>();
         boolean interrupted = false;
         for (Long pageId : videoPages) {
-            String error = processPage(cmd, pageId);
-            if (error == null) {
+            TranscodeResult r = processPage(cmd, pageId);
+            if (r.error() == null) {
                 continue;
             }
-            if ("TRANSCODE_INTERRUPTED".equals(error)) {
+            if ("TRANSCODE_INTERRUPTED".equals(r.error())) {
                 // 中断已置位：终止循环，避免后续页重复启动并立即销毁 ffmpeg 的噪音
                 interrupted = true;
                 break;
@@ -90,24 +97,24 @@ public class TranscodeCommandHandler {
         }
     }
 
-    /** 单页转码，返回是否成功；失败原因由 processPage 记录日志并在此统一发布。 */
+    /** 单页转码，按结果发布完成（携带实测元数据）或失败事件。 */
     private void transcodePage(ManagementCommandRequestedEvent cmd, Long pageId) {
-        String error = processPage(cmd, pageId);
-        if (error == null) {
+        TranscodeResult r = processPage(cmd, pageId);
+        if (r.error() == null) {
             publisher.progress(cmd, 100, "转码完成");
-            publisher.completed(cmd);
-        } else if ("TRANSCODE_INTERRUPTED".equals(error)) {
+            publisher.completed(cmd, r.transcode());
+        } else if ("TRANSCODE_INTERRUPTED".equals(r.error())) {
             publisher.failed(cmd, "转码被中断");
         } else {
-            publisher.failed(cmd, error);
+            publisher.failed(cmd, r.error());
         }
     }
 
-    /** 转码单个视频页。成功返回 null，失败返回错误消息（不在此发布事件）。 */
-    private String processPage(ManagementCommandRequestedEvent cmd, Long pageId) {
+    /** 转码单个视频页。成功返回 TranscodeResult(null, 实测元数据)，失败返回 TranscodeResult(错误消息, null)（不在此发布事件）。 */
+    private TranscodeResult processPage(ManagementCommandRequestedEvent cmd, Long pageId) {
         ExportMedia media = mediaMapper.selectById(pageId);
         if (media == null || !"VIDEO".equals(media.getMediaType())) {
-            return "媒体不存在或非视频: pageId=" + pageId;
+            return new TranscodeResult("媒体不存在或非视频: pageId=" + pageId, null);
         }
         Path hqFile = null;
         Path tempFile = null;
@@ -155,14 +162,15 @@ public class TranscodeCommandHandler {
             }
 
             log.info("转码完成: pageId={}, newPath={}", pageId, newHqFile);
-            return null;
+            TranscodeMediaInfo info = probe(newHqFile);
+            return new TranscodeResult(null, info);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.warn("转码命令被中断: pageId={}", pageId);
-            return "TRANSCODE_INTERRUPTED";
+            return new TranscodeResult("TRANSCODE_INTERRUPTED", null);
         } catch (Exception e) {
             log.error("转码失败: pageId={}", pageId, e);
-            return e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+            return new TranscodeResult(e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName(), null);
         } finally {
             if (tempFile != null) {
                 try {
@@ -171,6 +179,23 @@ public class TranscodeCommandHandler {
                     log.warn("转码临时文件清理失败: pageId={}, tempFile={}", pageId, tempFile, e);
                 }
             }
+        }
+    }
+
+    /** 用 ffprobe 实测转码后文件元数据；失败降级为 null。 */
+    private TranscodeMediaInfo probe(Path file) {
+        try {
+            var opt = mediaAnalyzer.analyzeVideo(file);
+            if (opt.isEmpty()) {
+                return null;
+            }
+            ComicMetadata.MediaInfo info = opt.get();
+            return new TranscodeMediaInfo(
+                    info.duration(), info.container(), info.videoCodec(), info.audioCodec(),
+                    info.fileSize());
+        } catch (Exception e) {
+            log.warn("转码后元数据探测失败，降级为 null: file={}, error={}", file, e.getMessage());
+            return null;
         }
     }
 

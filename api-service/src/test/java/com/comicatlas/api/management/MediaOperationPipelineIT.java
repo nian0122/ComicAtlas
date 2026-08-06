@@ -210,7 +210,7 @@ class MediaOperationPipelineIT {
         ManagementCommandCompletedEvent completed = new ManagementCommandCompletedEvent(
                 UUID.randomUUID(), Instant.now(), 1,
                 cmd.taskId(), cmd.itemId(), cmd.attempt(),
-                "LQ_GENERATE", "CHAPTER", chapter1.getId());
+                "LQ_GENERATE", "CHAPTER", chapter1.getId(), null);
         rabbitTemplate.convertAndSend("comic.management", "command.completed", completed);
         await(() -> managementTaskService.getTask(cmd.taskId()).getStatus() == ManagementTaskStatus.SUCCEEDED, "任务 SUCCEEDED");
         await(() -> lqStatuses(chapter1.getId()).stream().allMatch("READY"::equals), "页面 READY");
@@ -250,7 +250,7 @@ class MediaOperationPipelineIT {
         // 旧 attempt=1 的完成结果 → 忽略，业务不生效
         rabbitTemplate.convertAndSend("comic.management", "command.completed",
                 new ManagementCommandCompletedEvent(UUID.randomUUID(), Instant.now(), 1,
-                        cmd.taskId(), cmd.itemId(), 1, "LQ_GENERATE", "CHAPTER", chapter2.getId()));
+                        cmd.taskId(), cmd.itemId(), 1, "LQ_GENERATE", "CHAPTER", chapter2.getId(), null));
         Thread.sleep(800);
         ManagementTaskItemResponse itemAfterStale = managementTaskService.getTaskItems(cmd.taskId()).get(0);
         assertThat(itemAfterStale.getAttempt()).isEqualTo(2);
@@ -260,7 +260,7 @@ class MediaOperationPipelineIT {
         // 新 attempt=2 完成 → SUCCEEDED + READY
         rabbitTemplate.convertAndSend("comic.management", "command.completed",
                 new ManagementCommandCompletedEvent(UUID.randomUUID(), Instant.now(), 1,
-                        cmd.taskId(), cmd.itemId(), 2, "LQ_GENERATE", "CHAPTER", chapter2.getId()));
+                        cmd.taskId(), cmd.itemId(), 2, "LQ_GENERATE", "CHAPTER", chapter2.getId(), null));
         await(() -> managementTaskService.getTask(cmd.taskId()).getStatus() == ManagementTaskStatus.SUCCEEDED, "任务 SUCCEEDED");
         await(() -> lqStatuses(chapter2.getId()).contains("READY"), "页面 READY");
         assertThat(managementTaskService.getTask(cmd.taskId()).getAttempt()).isEqualTo(2);
@@ -295,7 +295,7 @@ class MediaOperationPipelineIT {
 
         rabbitTemplate.convertAndSend("comic.management", "command.completed",
                 new ManagementCommandCompletedEvent(UUID.randomUUID(), Instant.now(), 1,
-                        cmd.taskId(), cmd.itemId(), 1, "HQ_DELETE", "CHAPTER", chapter1.getId()));
+                        cmd.taskId(), cmd.itemId(), 1, "HQ_DELETE", "CHAPTER", chapter1.getId(), null));
         await(() -> managementTaskService.getTask(cmd.taskId()).getStatus() == ManagementTaskStatus.SUCCEEDED, "任务 SUCCEEDED");
         await(() -> hqStatuses(chapter1.getId()).stream().allMatch("DELETED"::equals), "页面 DELETED");
 
@@ -367,7 +367,7 @@ class MediaOperationPipelineIT {
 
         rabbitTemplate.convertAndSend("comic.management", "command.completed",
                 new ManagementCommandCompletedEvent(UUID.randomUUID(), Instant.now(), 1,
-                        cmd.taskId(), cmd.itemId(), 1, "TRANSCODE", "MEDIA", video.getId()));
+                        cmd.taskId(), cmd.itemId(), 1, "TRANSCODE", "MEDIA", video.getId(), null));
         await(() -> managementTaskService.getTask(cmd.taskId()).getStatus() == ManagementTaskStatus.SUCCEEDED, "任务 SUCCEEDED");
         await(() -> mediaMapper.selectById(video.getId()).getTranscodeStatus() == TranscodeStatus.READY, "视频 READY");
 
@@ -387,7 +387,7 @@ class MediaOperationPipelineIT {
         ManagementCommandRequestedEvent cmd = readSingleCommand(result.getTaskId());
         rabbitTemplate.convertAndSend("comic.management", "command.completed",
                 new ManagementCommandCompletedEvent(UUID.randomUUID(), Instant.now(), 1,
-                        cmd.taskId(), cmd.itemId(), 1, "METADATA_REFRESH", "COMIC", comic.getId()));
+                        cmd.taskId(), cmd.itemId(), 1, "METADATA_REFRESH", "COMIC", comic.getId(), null));
         await(() -> managementTaskService.getTask(cmd.taskId()).getStatus() == ManagementTaskStatus.SUCCEEDED, "任务 SUCCEEDED");
     }
 

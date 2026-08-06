@@ -1,0 +1,123 @@
+package com.comicatlas.api.storage.service;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.comicatlas.api.common.enums.HqStatus;
+import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
+import com.comicatlas.api.comic.entity.Chapter;
+import com.comicatlas.api.comic.entity.Comic;
+import com.comicatlas.api.comic.entity.Media;
+import com.comicatlas.api.comic.mapper.ChapterMapper;
+import com.comicatlas.api.comic.mapper.ComicMapper;
+import com.comicatlas.api.comic.mapper.MediaMapper;
+import com.comicatlas.common.event.MetadataRefreshEvent;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+/**
+ * Media 元信息同步服务（存储操作域）。
+ * <p>
+ * 转码等操作导致 media 元信息变更后，负责：刷新章节/漫画统计、失效目录缓存、
+ * 触发 metadata.json 重导出（发 metadata.refresh.requested MQ）。
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class MediaMetadataSyncService {
+
+    private final MediaMapper mediaMapper;
+    private final ChapterMapper chapterMapper;
+    private final ComicMapper comicMapper;
+    private final CatalogCacheInvalidator catalogCacheInvalidator;
+    private final RabbitTemplate rabbitTemplate;
+
+    /**
+     * 转码完成后同步：更新漫画/章节统计并触发 metadata.json 重导出。
+     */
+    public void notifyTranscoded(Long mediaId, Long taskId) {
+        Media media = mediaMapper.selectById(mediaId);
+        if (media == null || media.getChapterId() == null) {
+            return;
+        }
+        Chapter chapter = chapterMapper.selectById(media.getChapterId());
+        if (chapter == null) {
+            return;
+        }
+        Long comicId = chapter.getComicId();
+        refreshChapterAndComicStats(chapter.getId());
+        catalogCacheInvalidator.evict(comicId);
+        try {
+            rabbitTemplate.convertAndSend("comic.export", "metadata.refresh.requested",
+                    new MetadataRefreshEvent(null, null, comicId));
+            log.info("转码后元数据同步已触发: mediaId={}, comicId={}, taskId={}", mediaId, comicId, taskId);
+        } catch (Exception e) {
+            log.warn("发送 metadata 刷新 MQ 消息失败: comicId={}", comicId, e);
+        }
+    }
+
+    /** 与 ManagementCommandResultHandler.refreshChapterAndComicStats 同款聚合：章节页数 + 漫画总页数 + 整本 HQ 大小。 */
+    private void refreshChapterAndComicStats(Long chapterId) {
+        if (chapterId == null) {
+            return;
+        }
+        Chapter chapter = chapterMapper.selectById(chapterId);
+        if (chapter == null) {
+            return;
+        }
+        long pageCount = mediaMapper.selectCount(new LambdaQueryWrapper<Media>()
+                .eq(Media::getChapterId, chapterId)
+                .notIn(Media::getStatus, "DELETED", "TRASHED"));
+        chapterMapper.update(null, new LambdaUpdateWrapper<Chapter>()
+                .eq(Chapter::getId, chapterId)
+                .set(Chapter::getPageCount, (int) pageCount));
+        recomputeComicHqSize(chapterId);
+        Comic comic = comicMapper.selectById(chapter.getComicId());
+        if (comic != null) {
+            List<Chapter> chapters = chapterMapper.selectList(
+                    new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comic.getId()));
+            List<Long> chapterIds = chapters.stream().map(Chapter::getId).toList();
+            if (!chapterIds.isEmpty()) {
+                long totalPages = mediaMapper.selectCount(new LambdaQueryWrapper<Media>()
+                        .in(Media::getChapterId, chapterIds)
+                        .notIn(Media::getStatus, "DELETED", "TRASHED"));
+                comicMapper.update(null, new LambdaUpdateWrapper<Comic>()
+                        .eq(Comic::getId, comic.getId())
+                        .set(Comic::getTotalPages, (int) totalPages));
+            }
+        }
+    }
+
+    /**
+     * 统计量从实际 media 行重算整本 comic.hqSize（HQ 状态非 DELETED 的文件大小求和），
+     * 与 ManagementCommandResultHandler.recomputeComicHqSize 保持一致。
+     */
+    private void recomputeComicHqSize(Long chapterId) {
+        Chapter chapter = chapterMapper.selectById(chapterId);
+        if (chapter == null) {
+            return;
+        }
+        Long comicId = chapter.getComicId();
+        List<Chapter> chapters = chapterMapper.selectList(
+                new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
+        if (chapters.isEmpty()) {
+            return;
+        }
+        List<Long> chapterIds = chapters.stream().map(Chapter::getId).toList();
+        List<Media> mediaItems = mediaMapper.selectList(
+                new LambdaQueryWrapper<Media>().in(Media::getChapterId, chapterIds));
+        long hqSize = mediaItems.stream()
+                .filter(p -> p.getHqStatus() != HqStatus.DELETED)
+                .mapToLong(p -> p.getFileSize() != null ? p.getFileSize() : 0L)
+                .sum();
+        Comic comic = comicMapper.selectById(comicId);
+        if (comic != null) {
+            comic.setHqSize(hqSize);
+            comicMapper.updateById(comic);
+        }
+        log.debug("重算 comic.hqSize: comicId={}, hqSize={}", comicId, hqSize);
+    }
+}

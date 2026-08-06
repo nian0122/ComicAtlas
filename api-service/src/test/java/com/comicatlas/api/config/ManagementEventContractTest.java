@@ -89,12 +89,13 @@ class ManagementEventContractTest {
         }
 
         @Test
-        @DisplayName("ManagementCommandCompletedEvent 序列化/反序列化保持全部字段")
+        @DisplayName("ManagementCommandCompletedEvent 序列化/反序列化保持全部字段（transcode 为 null）")
         void completedRoundTrip() throws Exception {
             var event = new ManagementCommandCompletedEvent(
                     UUID.randomUUID(), Instant.now(), 1,
                     100L, 200L, 2,
-                    "HQ_DELETE", "COMIC", 400L);
+                    "HQ_DELETE", "COMIC", 400L,
+                    null);
 
             String json = mapper.writeValueAsString(event);
             ManagementCommandCompletedEvent restored = mapper.readValue(json, ManagementCommandCompletedEvent.class);
@@ -106,6 +107,52 @@ class ManagementEventContractTest {
             assertThat(restored.attempt()).isEqualTo(2);
             assertThat(restored.operationType()).isEqualTo("HQ_DELETE");
             assertThat(restored.targetType()).isEqualTo("COMIC");
+            assertThat(restored.targetId()).isEqualTo(400L);
+            assertThat(restored.transcode()).isNull();
+        }
+
+        @Test
+        @DisplayName("ManagementCommandCompletedEvent 携带实测 transcode 元数据时序列化/反序列化保持全部字段")
+        void completedWithTranscodeRoundTrip() throws Exception {
+            var transcode = new com.comicatlas.common.event.TranscodeMediaInfo(
+                    new java.math.BigDecimal("12.34"), "mp4", "h264", "aac", 2048000L);
+            var event = new ManagementCommandCompletedEvent(
+                    UUID.randomUUID(), Instant.now(), 1,
+                    100L, 200L, 2,
+                    "TRANSCODE", "MEDIA", 400L,
+                    transcode);
+
+            String json = mapper.writeValueAsString(event);
+            ManagementCommandCompletedEvent restored = mapper.readValue(json, ManagementCommandCompletedEvent.class);
+
+            assertThat(restored.transcode()).isNotNull();
+            assertThat(restored.transcode().duration()).isEqualByComparingTo("12.34");
+            assertThat(restored.transcode().container()).isEqualTo("mp4");
+            assertThat(restored.transcode().videoCodec()).isEqualTo("h264");
+            assertThat(restored.transcode().audioCodec()).isEqualTo("aac");
+            assertThat(restored.transcode().fileSize()).isEqualTo(2048000L);
+        }
+
+        @Test
+        @DisplayName("旧消息缺少 transcode 字段时反序列化为 null（契约向后兼容）")
+        void completedWithoutTranscodeField_deserializesAsNull() throws Exception {
+            // 手工构造不含 transcode 字段的旧版 completed JSON
+            String json = """
+                    {
+                      "eventType":"ManagementCommandCompletedEvent",
+                      "eventId":"%s",
+                      "occurredAt":"2025-01-01T00:00:00Z",
+                      "version":1,
+                      "taskId":100,
+                      "itemId":200,
+                      "attempt":1,
+                      "operationType":"TRANSCODE",
+                      "targetType":"MEDIA",
+                      "targetId":400
+                    }""".formatted(UUID.randomUUID());
+
+            ManagementCommandCompletedEvent restored = mapper.readValue(json, ManagementCommandCompletedEvent.class);
+            assertThat(restored.transcode()).isNull();
             assertThat(restored.targetId()).isEqualTo(400L);
         }
 
@@ -180,7 +227,7 @@ class ManagementEventContractTest {
 
             testRoundTrip(new ManagementCommandRequestedEvent(eid, now, 1, 1L, 1L, 1, "LQ_GENERATE", "COMIC", 1L, null));
             testRoundTrip(new ManagementCommandProgressEvent(eid, now, 1, 1L, 1L, 1, "LQ_GENERATE", "COMIC", 1L, 50, "stage"));
-            testRoundTrip(new ManagementCommandCompletedEvent(eid, now, 1, 1L, 1L, 1, "HQ_DELETE", "COMIC", 1L));
+            testRoundTrip(new ManagementCommandCompletedEvent(eid, now, 1, 1L, 1L, 1, "HQ_DELETE", "COMIC", 1L, null));
             testRoundTrip(new ManagementCommandFailedEvent(eid, now, 1, 1L, 1L, 1, "IMPORT", "COMIC", 1L, "error"));
             testRoundTrip(new ManagementCommandCancelRequestedEvent(eid, now, 1, 1L, 1L, 1, "EXPORT", "COMIC", 1L));
         }
