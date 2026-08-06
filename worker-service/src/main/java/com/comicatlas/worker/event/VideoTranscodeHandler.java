@@ -4,6 +4,7 @@ import com.comicatlas.common.event.VideoTranscodeCompletedEvent;
 import com.comicatlas.common.event.VideoTranscodeFailedEvent;
 import com.comicatlas.common.event.VideoTranscodeRequestedEvent;
 import com.comicatlas.worker.config.WorkerConfig;
+import com.comicatlas.worker.process.ExternalProcessRunner;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,7 +20,6 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
 /**
  * 视频转码处理器。
@@ -33,6 +33,7 @@ public class VideoTranscodeHandler {
 
     private final RabbitTemplate rabbitTemplate;
     private final WorkerConfig config;
+    private final ExternalProcessRunner processRunner;
 
     private static final List<String> FFMPEG_ARGS = List.of(
         "-c:v", "libx264", "-crf", "23", "-preset", "medium",
@@ -66,17 +67,11 @@ public class VideoTranscodeHandler {
             processBuilder.command(buildFfmpegCommand(
                     config.resolveToolPath(config.getFfmpegPath()).toString(),
                     hqFile.toString(), tempFile.toString()));
-            processBuilder.redirectErrorStream(true);
-            processBuilder.redirectOutput(ProcessBuilder.Redirect.DISCARD);
-            Process process = processBuilder.start();
-
-            // 超时 10 分钟（Metis G9）
-            if (!process.waitFor(10, TimeUnit.MINUTES)) {
-                process.destroyForcibly();
-                throw new IOException("ffmpeg 超时(10min): pageId=" + pageId);
-            }
-            if (process.exitValue() != 0) {
-                throw new IOException("ffmpeg exit code " + process.exitValue() + ": pageId=" + pageId);
+            // 统一外部进程执行：超时 10 分钟，中断由 Runner 恢复标志并销毁 ffmpeg 后向上传播
+            ExternalProcessRunner.ExternalProcessResult result =
+                    processRunner.run(processBuilder, 600);
+            if (result.exitCode() != 0) {
+                throw new IOException("ffmpeg exit code " + result.exitCode() + ": pageId=" + pageId);
             }
 
             // 3. 验证临时文件

@@ -4,6 +4,7 @@ import com.comicatlas.common.event.VideoTranscodeCompletedEvent;
 import com.comicatlas.common.event.VideoTranscodeFailedEvent;
 import com.comicatlas.common.event.VideoTranscodeRequestedEvent;
 import com.comicatlas.worker.config.WorkerConfig;
+import com.comicatlas.worker.process.ExternalProcessRunner;
 import com.rabbitmq.client.Channel;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,6 +14,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -41,6 +43,8 @@ class VideoTranscodeHandlerTest {
 
     private WorkerConfig config;
     private VideoTranscodeHandler handler;
+    private ThreadPoolTaskExecutor ioExecutor;
+    private ExternalProcessRunner processRunner;
 
     private Path tempRoot;   // 模拟 mangaRoot + tempDir 根目录
     private Path hqRoot;     // mangaRoot 下的 HQ 目录
@@ -57,11 +61,18 @@ class VideoTranscodeHandlerTest {
         config.setTempDir(tempRoot.resolve("temp").toString());
         Files.createDirectories(Path.of(config.getTempDir()));
 
-        handler = new VideoTranscodeHandler(rabbitTemplate, config);
+        ioExecutor = new ThreadPoolTaskExecutor();
+        ioExecutor.initialize();
+        processRunner = new ExternalProcessRunner(ioExecutor);
+
+        handler = new VideoTranscodeHandler(rabbitTemplate, config, processRunner);
     }
 
     @AfterEach
     void tearDown() throws Exception {
+        if (ioExecutor != null) {
+            ioExecutor.shutdown();
+        }
         deleteRecursively(tempRoot);
     }
 
@@ -259,8 +270,8 @@ class VideoTranscodeHandlerTest {
         assertTrue(source.contains("RabbitTemplate"), "must use RabbitTemplate for event publishing");
         assertTrue(source.contains("WorkerConfig"), "must use WorkerConfig");
         assertTrue(
-                source.contains("redirectOutput(ProcessBuilder.Redirect.DISCARD)"),
-                "ffmpeg output must be consumed or discarded to prevent pipe deadlock");
+                source.contains("processRunner.run("),
+                "ffmpeg must run via ExternalProcessRunner, which consumes stdout to prevent pipe deadlock");
     }
 
     // ==================== helpers ====================
