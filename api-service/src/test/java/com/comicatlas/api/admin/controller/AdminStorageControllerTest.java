@@ -1,17 +1,21 @@
 package com.comicatlas.api.admin.controller;
 
+import com.comicatlas.api.admin.dto.ChapterStorageDTO;
+import com.comicatlas.api.admin.dto.ComicStorageDTO;
+import com.comicatlas.api.admin.dto.ComicStorageQuery;
 import com.comicatlas.api.admin.service.StorageQueryService;
 import com.comicatlas.api.common.Result;
-import com.comicatlas.api.management.dto.OperationSubmitResult;
-import com.comicatlas.api.storage.service.TranscodeOperationService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
+import java.util.Map;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -19,35 +23,65 @@ class AdminStorageControllerTest {
 
     @Mock
     private StorageQueryService storageQueryService;
-    @Mock
-    private TranscodeOperationService transcodeOperationService;
 
     private AdminStorageController controller() {
-        return new AdminStorageController(storageQueryService, transcodeOperationService);
+        return new AdminStorageController(storageQueryService);
     }
 
     @Test
-    void 转码请求委托统一任务管线并返回taskId() {
-        OperationSubmitResult expected = OperationSubmitResult.of(42L, "TRANSCODE", "QUEUED", 3);
-        when(transcodeOperationService.transcodeForComic(188L)).thenReturn(expected);
+    void listComics_返回分页结果() {
+        ComicStorageDTO dto = new ComicStorageDTO();
+        dto.setComicId(1L);
+        dto.setTitle("测试漫画");
+        when(storageQueryService.listComics(comicQuery(), 1, 20)).thenReturn(List.of(dto));
+        when(storageQueryService.countComics(comicQuery())).thenReturn(1L);
 
-        Result<OperationSubmitResult> result = controller().transcodeVideos(188L);
+        Result<Map<String, Object>> result = controller().listComics(1, 20, comicQuery());
 
         assertEquals(200, result.getCode());
-        assertEquals(42L, result.getData().getTaskId());
-        assertEquals("TRANSCODE", result.getData().getTaskType());
-        assertEquals(3, result.getData().getItemCount());
-        verify(transcodeOperationService).transcodeForComic(188L);
+        Map<String, Object> data = result.getData();
+        assertEquals(1, ((List<?>) data.get("records")).size());
+        assertEquals(1L, data.get("total"));
+        assertEquals(1, data.get("pages"));
+        assertEquals(1, data.get("current"));
     }
 
     @Test
-    void 无可转码视频时返回空taskId() {
-        when(transcodeOperationService.transcodeForComic(99L))
-                .thenReturn(OperationSubmitResult.of(null, "TRANSCODE", null, 0));
+    void listChapters_返回章节存储列表() {
+        ChapterStorageDTO chapter = new ChapterStorageDTO();
+        chapter.setChapterId(10L);
+        when(storageQueryService.listChapters(1L)).thenReturn(List.of(chapter));
 
-        Result<OperationSubmitResult> result = controller().transcodeVideos(99L);
+        Result<List<ChapterStorageDTO>> result = controller().listChapters(1L);
 
-        assertNull(result.getData().getTaskId());
-        assertEquals(0, result.getData().getItemCount());
+        assertEquals(200, result.getCode());
+        assertEquals(1, result.getData().size());
+        assertEquals(10L, result.getData().get(0).getChapterId());
+    }
+
+    @Test
+    void getComic_存在时返回漫画存储信息() {
+        ComicStorageDTO dto = new ComicStorageDTO();
+        dto.setComicId(1L);
+        when(storageQueryService.getComic(1L)).thenReturn(dto);
+
+        Result<ComicStorageDTO> result = controller().getComic(1L);
+
+        assertEquals(200, result.getCode());
+        assertNotNull(result.getData());
+    }
+
+    @Test
+    void getComic_不存在时返回404() {
+        when(storageQueryService.getComic(99L)).thenReturn(null);
+
+        Result<ComicStorageDTO> result = controller().getComic(99L);
+
+        assertEquals(404, result.getCode());
+        assertNull(result.getData());
+    }
+
+    private ComicStorageQuery comicQuery() {
+        return new ComicStorageQuery();
     }
 }

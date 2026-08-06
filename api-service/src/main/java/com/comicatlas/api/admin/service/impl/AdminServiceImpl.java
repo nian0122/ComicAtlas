@@ -2,7 +2,6 @@ package com.comicatlas.api.admin.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.admin.dto.ComicDeleteStats;
-import com.comicatlas.api.admin.dto.RefreshMetadataResult;
 import com.comicatlas.api.admin.dto.RecoveryProgress;
 import com.comicatlas.api.admin.dto.ScanRecoverResultDTO;
 import com.comicatlas.api.admin.dto.StorageStatsDTO;
@@ -20,7 +19,6 @@ import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
 import com.comicatlas.api.reader.entity.ReadingHistory;
 import com.comicatlas.api.reader.mapper.ReadingHistoryMapper;
-import com.comicatlas.api.storage.service.MetadataRefreshService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
@@ -63,7 +61,6 @@ public class AdminServiceImpl implements AdminService {
     private final CatalogCacheInvalidator catalogCacheInvalidator;
     private final com.comicatlas.api.management.operation.MediaOperationCommandService mediaOperationCommandService;
     private final ApiStorageProperties storageProperties;
-    private final MetadataRefreshService metadataRefreshService;
 
     /** 未结束（活跃）的导入任务状态 */
     private static final Set<ImportTaskStatus> ACTIVE_STATUSES =
@@ -222,17 +219,6 @@ public class AdminServiceImpl implements AdminService {
             try { return new BigDecimal(s); } catch (Exception e) { return null; }
         }
         return null;
-    }
-
-    /**
-     * 刷新单漫画元数据（旧入口，已收敛到存储操作域）。
-     *
-     * @deprecated 请改用 POST /api/storage/refresh-metadata/comics/{id}
-     */
-    @Override
-    @Deprecated
-    public RefreshMetadataResult refreshMetadata(Long comicId) {
-        return metadataRefreshService.refresh(comicId);
     }
 
 }
