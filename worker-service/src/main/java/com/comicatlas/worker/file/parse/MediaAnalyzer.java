@@ -1,29 +1,20 @@
 package com.comicatlas.worker.file.parse;
 
 import com.comicatlas.worker.config.WorkerConfig;
+import com.comicatlas.worker.process.ExternalProcessRunner;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 /**
  * 媒体文件分析器：
@@ -43,15 +34,14 @@ public class MediaAnalyzer {
 
     private final WorkerConfig workerConfig;
     private final ObjectMapper objectMapper;
-    /** 托管的外部进程 stdout 读取线程池（线程名统一为 process-io- 前缀，替代裸线程） */
-    private final ThreadPoolTaskExecutor processIoExecutor;
+    private final ExternalProcessRunner processRunner;
 
     public MediaAnalyzer(WorkerConfig workerConfig,
                          ObjectMapper objectMapper,
-                         @Qualifier("processIoExecutor") ThreadPoolTaskExecutor processIoExecutor) {
+                         ExternalProcessRunner processRunner) {
         this.workerConfig = workerConfig;
         this.objectMapper = objectMapper;
-        this.processIoExecutor = processIoExecutor;
+        this.processRunner = processRunner;
     }
 
     /**
@@ -114,41 +104,19 @@ public class MediaAnalyzer {
                     "-show_format", "-show_streams",
                     "-of", "json",
                     file.toAbsolutePath().toString());
-            processBuilder.redirectErrorStream(true);
-            Process process = processBuilder.start();
-
-            // 必须在 waitFor() 之前消费 stdout，否则管道满后 ffprobe 阻塞写 → 死锁
-            StringBuilder sb = new StringBuilder();
-            CompletableFuture<Void> readFuture = CompletableFuture.runAsync(() -> {
-                try (BufferedReader r = new BufferedReader(
-                        new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
-                    String line;
-                    while ((line = r.readLine()) != null) {
-                        sb.append(line).append('\n');
-                    }
-                } catch (IOException e) { log.warn("ffprobe 读取器异常", e); }
-            }, processIoExecutor);
-
-            boolean finished = process.waitFor(FFPROBE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-            try {
-                readFuture.get(1, TimeUnit.SECONDS);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                process.destroyForcibly();
-                return videoFallback(name, ext, size, "interrupted");
-            } catch (ExecutionException | TimeoutException e) {
-                log.warn("等待 ffprobe 输出读取超时: {}", e.getMessage());
+            ExternalProcessRunner.ExternalProcessResult result =
+                    processRunner.run(processBuilder, FFPROBE_TIMEOUT_SECONDS);
+            if (result.exitCode() != 0) {
+                log.warn("ffprobe exit={} for {}", result.exitCode(), file);
+                return videoFallback(name, ext, size, "exit-" + result.exitCode());
             }
-            if (!finished) {
-                process.destroyForcibly();
-                log.warn("ffprobe 读取 {} 超时 ({}s)", file, FFPROBE_TIMEOUT_SECONDS);
-                return videoFallback(name, ext, size, "timeout");
-            }
-            if (process.exitValue() != 0) {
-                log.warn("ffprobe exit={} for {}", process.exitValue(), file);
-                return videoFallback(name, ext, size, "exit-" + process.exitValue());
-            }
-            return parseFfprobeJson(name, ext, size, sb.toString());
+            return parseFfprobeJson(name, ext, size, result.stdout());
+        } catch (InterruptedException e) {
+            // 中断已恢复标志，进程已销毁
+            return videoFallback(name, ext, size, "interrupted");
+        } catch (ExternalProcessRunner.ProcessTimeoutException e) {
+            log.warn("ffprobe 读取 {} 超时 ({}s)", file, FFPROBE_TIMEOUT_SECONDS);
+            return videoFallback(name, ext, size, "timeout");
         } catch (Exception e) {
             log.warn("ffprobe 读取 {} 失败", file, e);
             return videoFallback(name, ext, size, "exception");

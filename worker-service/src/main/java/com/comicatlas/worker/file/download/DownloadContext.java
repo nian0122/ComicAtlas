@@ -35,6 +35,9 @@ public class DownloadContext {
                 long bytes = archiveDownloader.download(gid, token, archiverKey, zipFile);
                 log.info("Archive downloaded: {} bytes", bytes);
                 return new DownloadResult(bytes, "ARCHIVER", metadata);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw e;   // 中断不静默回退，向上传播
             } catch (Exception e) {
                 log.warn("Archiver failed, fallback to torrent: {}", e.getMessage());
             }
