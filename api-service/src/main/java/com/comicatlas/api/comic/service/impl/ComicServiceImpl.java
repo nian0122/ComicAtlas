@@ -30,7 +30,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import com.comicatlas.api.comic.dto.BatchComicUpdateDTO;
 import com.comicatlas.api.comic.dto.BatchUpdateResultVO;
-import com.comicatlas.api.comic.dto.ChapterPageVO;
 import com.comicatlas.api.comic.dto.ComicDetailVO;
 import com.comicatlas.api.comic.dto.ComicListQuery;
 import com.comicatlas.api.comic.dto.ComicListVO;
@@ -176,65 +175,6 @@ public class ComicServiceImpl implements ComicService {
         }
         catalogCacheInvalidator.evict(id);
         return managementTaskService.getTask(result.getTaskId());
-    }
-
-    @Override
-    public ChapterPageVO getChapterPages(Long comicId, Long chapterId) {
-        Chapter chapter = chapterMapper.selectById(chapterId);
-        if (chapter == null || !chapter.getComicId().equals(comicId)) {
-            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在");
-        }
-        Comic comic = comicMapper.selectById(comicId);
-        if (comic == null || comic.getStatus() != ComicStatus.READY) {
-            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在或不可阅读");
-        }
-        if (chapter.getStatus() != ChapterLifecycleStatus.READY) {
-            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在或不可阅读");
-        }
-
-        var mediaItems = mediaMapper.selectList(
-            new LambdaQueryWrapper<com.comicatlas.api.comic.entity.Media>()
-                .eq(com.comicatlas.api.comic.entity.Media::getChapterId, chapterId)
-                .eq(com.comicatlas.api.comic.entity.Media::getStatus, MediaLifecycleStatus.READY)
-                .orderByAsc(com.comicatlas.api.comic.entity.Media::getPageNumber));
-
-        String chNo = chapter.getChapterNo();
-        List<MediaItemInfo> pageInfos = mediaItems.stream().map(media -> {
-            MediaItemInfo pi = new MediaItemInfo();
-            pi.setId(media.getId());
-            pi.setPageNumber(media.getPageNumber());
-            pi.setHqUrl(fileUrlResolver.resolve(media));
-            pi.setLqUrl(fileUrlResolver.resolveLq(media));
-            pi.setLqStatus(media.getLqStatus() == null ? null : media.getLqStatus().name());
-            pi.setWidth(media.getWidth());
-            pi.setHeight(media.getHeight());
-            return pi;
-        }).collect(Collectors.toList());
-
-        Long prevId = null, nextId = null;
-        var allChapters = chapterMapper.selectList(
-            new LambdaQueryWrapper<Chapter>()
-                .eq(Chapter::getComicId, comicId)
-                .eq(Chapter::getStatus, ChapterLifecycleStatus.READY.name())
-                .orderByAsc(Chapter::getGlobalOrder));
-        for (int i = 0; i < allChapters.size(); i++) {
-            if (allChapters.get(i).getId().equals(chapterId)) {
-                if (i > 0) { prevId = allChapters.get(i - 1).getId(); }
-                if (i < allChapters.size() - 1) { nextId = allChapters.get(i + 1).getId(); }
-                break;
-            }
-        }
-
-        ChapterPageVO vo = new ChapterPageVO();
-        vo.setComicId(comicId);
-        vo.setChapterId(chapterId);
-        vo.setChapterNo(chNo);
-        vo.setChapterTitle(chapter.getTitle());
-        vo.setPages(pageInfos);
-        vo.setTotal(pageInfos.size());
-        vo.setPrevChapterId(prevId);
-        vo.setNextChapterId(nextId);
-        return vo;
     }
 
     private String resolveCategoryName(Long categoryId) {

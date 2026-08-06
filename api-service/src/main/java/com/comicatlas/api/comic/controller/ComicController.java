@@ -11,7 +11,6 @@ import lombok.RequiredArgsConstructor;
 import java.util.List;
 import com.comicatlas.api.comic.dto.BatchComicUpdateDTO;
 import com.comicatlas.api.comic.dto.BatchUpdateResultVO;
-import com.comicatlas.api.comic.dto.ChapterPageVO;
 import com.comicatlas.api.comic.dto.ComicDetailVO;
 import com.comicatlas.api.comic.dto.ComicListQuery;
 import com.comicatlas.api.comic.dto.ComicListVO;
@@ -68,13 +67,6 @@ public class ComicController {
             @PathVariable Long id,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
         return Result.ok(comicService.deleteComic(id, idempotencyKey));
-    }
-
-    @GetMapping("/comics/{id}/chapters/{chapterId}/pages")
-    public Result<ChapterPageVO> getChapterPages(
-            @PathVariable Long id,
-            @PathVariable Long chapterId) {
-        return Result.ok(comicService.getChapterPages(id, chapterId));
     }
 
     @GetMapping("/comics/{id}/metadata")

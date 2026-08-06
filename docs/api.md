@@ -60,9 +60,7 @@ GET /api/comics/{id}/catalog
 ```
 
 ### 章节页面
-```
-GET /api/comics/{comicId}/chapters/{chapterId}/pages
-```
+阅读页面统一走 `GET /api/chapters/{id}`（见第 2 节），旧 `GET /api/comics/{comicId}/chapters/{chapterId}/pages` 已移除。
 
 ### 删除（进入回收站）
 ```

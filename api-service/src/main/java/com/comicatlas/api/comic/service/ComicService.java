@@ -6,7 +6,6 @@ import com.comicatlas.api.management.dto.ManagementTaskResponse;
 import java.util.List;
 import com.comicatlas.api.comic.dto.BatchComicUpdateDTO;
 import com.comicatlas.api.comic.dto.BatchUpdateResultVO;
-import com.comicatlas.api.comic.dto.ChapterPageVO;
 import com.comicatlas.api.comic.dto.ComicDetailVO;
 import com.comicatlas.api.comic.dto.ComicListQuery;
 import com.comicatlas.api.comic.dto.ComicListVO;
@@ -25,7 +24,6 @@ public interface ComicService {
     ComicDetailVO updateComic(Long id, UpdateComicRequest request);
     /** 删除漫画：创建回收任务而非硬删，返回管理任务 */
     ManagementTaskResponse deleteComic(Long id, String idempotencyKey);
-    ChapterPageVO getChapterPages(Long comicId, Long chapterId);
     ComicMetadataDTO getMetadata(Long id);
     ComicMetadataDTO updateMetadata(Long id, ComicMetadataUpdateDTO dto);
     List<Long> getComicTags(Long comicId);
