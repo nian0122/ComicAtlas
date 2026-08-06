@@ -23,6 +23,12 @@ public class AdminController {
 
     private final AdminService adminService;
 
+    /**
+     * 存储统计（HQ/LQ/缩略图占用与漫画数）。
+     *
+     * @deprecated 请改用 GET /api/storage/stats
+     */
+    @Deprecated
     @GetMapping("/storage/stats")
     public Result<StorageStatsDTO> storageStats() {
         return Result.ok(adminService.getStorageStats());

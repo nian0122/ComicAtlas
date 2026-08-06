@@ -31,7 +31,10 @@ public class ExportController {
 
     /**
      * POST /api/comics/{comicId}/export — 创建导出任务
+     *
+     * @deprecated 请改用 POST /api/storage/export/comics/{comicId}
      */
+    @Deprecated
     @PostMapping("/comics/{comicId}/export")
     public ResponseEntity<ExportTaskVO> createExport(@PathVariable Long comicId) {
         ExportTaskVO task = exportService.createExportTask(comicId);
@@ -40,7 +43,10 @@ public class ExportController {
 
     /**
      * GET /api/comics/{comicId}/exports — 列出漫画的导出任务
+     *
+     * @deprecated 请改用 GET /api/storage/export/comics/{comicId}/tasks
      */
+    @Deprecated
     @GetMapping("/comics/{comicId}/exports")
     public Result<List<ExportTaskVO>> listExports(@PathVariable Long comicId) {
         return Result.ok(exportService.listExports(comicId));
@@ -48,7 +54,10 @@ public class ExportController {
 
     /**
      * GET /api/export/{taskId} — 获取导出任务详情（含 physicalPath）
+     *
+     * @deprecated 请改用 GET /api/storage/export/tasks/{taskId}
      */
+    @Deprecated
     @GetMapping("/export/{taskId}")
     public Result<ExportTaskVO> getTask(@PathVariable Long taskId) {
         return Result.ok(exportService.getTask(taskId));

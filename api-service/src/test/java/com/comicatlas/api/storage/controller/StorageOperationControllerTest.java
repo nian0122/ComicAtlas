@@ -1,8 +1,10 @@
 package com.comicatlas.api.storage.controller;
 
 import com.comicatlas.api.admin.dto.RefreshMetadataResult;
+import com.comicatlas.api.export.dto.ExportTaskVO;
 import com.comicatlas.api.management.dto.OperationSubmitResult;
 import com.comicatlas.api.management.operation.MediaOperationCommandService;
+import com.comicatlas.api.storage.service.ExportOperationService;
 import com.comicatlas.api.storage.service.HqDeleteOperationService;
 import com.comicatlas.api.storage.service.LqOperationService;
 import com.comicatlas.api.storage.service.MetadataRefreshService;
@@ -12,10 +14,12 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -27,8 +31,9 @@ class StorageOperationControllerTest {
     private final HqDeleteOperationService hqService = new HqDeleteOperationService(commandService);
     private final TranscodeOperationService transcodeService = new TranscodeOperationService(commandService);
     private final MetadataRefreshService metadataRefreshService = mock(MetadataRefreshService.class);
+    private final ExportOperationService exportOperationService = mock(ExportOperationService.class);
     private final StorageOperationController controller =
-            new StorageOperationController(lqService, hqService, transcodeService, metadataRefreshService);
+            new StorageOperationController(lqService, hqService, transcodeService, metadataRefreshService, exportOperationService);
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
 
     @Test
@@ -114,5 +119,54 @@ class StorageOperationControllerTest {
                 .andExpect(jsonPath("$.data.pages").value(20));
 
         verify(metadataRefreshService).refresh(42L);
+    }
+
+    @Test
+    void createExport_返回202与导出任务() throws Exception {
+        when(exportOperationService.createExportTask(42L))
+                .thenReturn(exportTask(7L, 42L));
+
+        mvc.perform(post("/api/storage/export/comics/42"))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.id").value(7))
+                .andExpect(jsonPath("$.comicId").value(42));
+
+        verify(exportOperationService).createExportTask(42L);
+    }
+
+    @Test
+    void listExports_返回漫画导出任务列表() throws Exception {
+        when(exportOperationService.listExports(42L))
+                .thenReturn(List.of(exportTask(7L, 42L), exportTask(8L, 42L)));
+
+        mvc.perform(get("/api/storage/export/comics/42/tasks"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[0].id").value(7));
+
+        verify(exportOperationService).listExports(42L);
+    }
+
+    @Test
+    void getExportTask_返回指定任务详情() throws Exception {
+        when(exportOperationService.getTask(7L))
+                .thenReturn(exportTask(7L, 42L));
+
+        mvc.perform(get("/api/storage/export/tasks/7"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(7))
+                .andExpect(jsonPath("$.data.comicId").value(42));
+
+        verify(exportOperationService).getTask(7L);
+    }
+
+    private ExportTaskVO exportTask(Long id, Long comicId) {
+        ExportTaskVO vo = new ExportTaskVO();
+        vo.setId(id);
+        vo.setComicId(comicId);
+        vo.setStatus("PROCESSING");
+        vo.setProgress(50);
+        vo.setOutputPath("comics/" + comicId + "/" + id + ".zip");
+        return vo;
     }
 }

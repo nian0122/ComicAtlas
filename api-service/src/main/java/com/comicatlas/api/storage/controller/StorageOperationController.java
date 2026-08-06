@@ -2,17 +2,24 @@ package com.comicatlas.api.storage.controller;
 
 import com.comicatlas.api.admin.dto.RefreshMetadataResult;
 import com.comicatlas.api.common.Result;
+import com.comicatlas.api.export.dto.ExportTaskVO;
 import com.comicatlas.api.management.dto.OperationSubmitResult;
+import com.comicatlas.api.storage.service.ExportOperationService;
 import com.comicatlas.api.storage.service.HqDeleteOperationService;
 import com.comicatlas.api.storage.service.LqOperationService;
 import com.comicatlas.api.storage.service.MetadataRefreshService;
 import com.comicatlas.api.storage.service.TranscodeOperationService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 /**
  * 存储操作统一入口（存储操作域）。
@@ -29,6 +36,7 @@ public class StorageOperationController {
     private final HqDeleteOperationService hqDeleteOperationService;
     private final TranscodeOperationService transcodeOperationService;
     private final MetadataRefreshService metadataRefreshService;
+    private final ExportOperationService exportOperationService;
 
     // ======================== LQ 生成 ========================
 
@@ -75,5 +83,23 @@ public class StorageOperationController {
     @PostMapping("/refresh-metadata/comics/{comicId}")
     public Result<RefreshMetadataResult> refreshMetadata(@PathVariable Long comicId) {
         return Result.ok(metadataRefreshService.refresh(comicId));
+    }
+
+    // ======================== 导出 ========================
+
+    @PostMapping("/export/comics/{comicId}")
+    public ResponseEntity<ExportTaskVO> createExport(@PathVariable Long comicId) {
+        ExportTaskVO task = exportOperationService.createExportTask(comicId);
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(task);
+    }
+
+    @GetMapping("/export/comics/{comicId}/tasks")
+    public Result<List<ExportTaskVO>> listExports(@PathVariable Long comicId) {
+        return Result.ok(exportOperationService.listExports(comicId));
+    }
+
+    @GetMapping("/export/tasks/{taskId}")
+    public Result<ExportTaskVO> getExportTask(@PathVariable Long taskId) {
+        return Result.ok(exportOperationService.getTask(taskId));
     }
 }
