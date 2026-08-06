@@ -6,8 +6,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -99,5 +103,98 @@ class ExternalProcessRunnerTest {
         try { t.join(5000); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
         assertThat(interruptRestored).as("中断标志应恢复").isTrue();
         assertThat(elapsed[0]).as("中断后回收应迅速完成（不悬挂）").isLessThan(5000);
+    }
+
+    @Test
+    @DisplayName("单条超长无换行输出被截断（长度受限 + 截断标记）")
+    void run_singleHugeLine_isTruncated() throws Exception {
+        // 输出约 200KB 无换行文本：cmd 用 for 拼接会带空格，改用 PowerShell 生成
+        ProcessBuilder pb = new ProcessBuilder("powershell", "-NoProfile", "-Command",
+                "$s='x' * 200000; Write-Output $s");
+        ExternalProcessRunner.ExternalProcessResult result = runner.run(pb, 30);
+        assertThat(result.exitCode()).isZero();
+        assertThat(result.stdout().length()).as("单条超长输出应被截断")
+                .isLessThanOrEqualTo(ExternalProcessRunner.MAX_OUTPUT_CHARS + 512);
+        assertThat(result.stdout()).contains("[输出已截断");
+    }
+
+    @Test
+    @DisplayName("超时后直接进程与全部后代进程均被终止")
+    void run_timeout_killsDescendants() throws Exception {
+        Path pidFile = Files.createTempFile("runner-tree-pid", ".txt");
+        // cmd 派生子进程（ping），主进程等待；超时后应终止整棵进程树
+        ProcessBuilder pb = new ProcessBuilder("cmd", "/c",
+                "echo " + ProcessHandle.current().pid() + " > \"" + pidFile + "\" & ping -n 10 127.0.0.1");
+        long start = System.currentTimeMillis();
+        assertThatThrownBy(() -> runner.run(pb, 1))
+                .isInstanceOf(ExternalProcessRunner.ProcessTimeoutException.class);
+        // 超时后短时间内返回（有界回收）
+        assertThat(System.currentTimeMillis() - start).isLessThan(10000);
+        // 用 ProcessHandle.allProcesses 查找残留的 ping 进程（命令行含 127.0.0.1）
+        boolean pingAlive = ProcessHandle.allProcesses()
+                .filter(p -> p.info().commandLine().orElse("").contains("ping -n 10 127.0.0.1"))
+                .anyMatch(ProcessHandle::isAlive);
+        assertThat(pingAlive).as("超时后后代 ping 进程应已被终止").isFalse();
+    }
+
+    @Test
+    @DisplayName("进程输出线程池饱和时拒绝（AbortPolicy），不阻塞业务线程")
+    void run_poolSaturation_abortsInsteadOfBlocking() throws Exception {
+        // 小池（core=1, queue=0）：并发 5 个进程，前 1 个占用读取线程，其余被拒绝
+        ThreadPoolTaskExecutor tiny = new ThreadPoolTaskExecutor();
+        tiny.setCorePoolSize(1);
+        tiny.setMaxPoolSize(1);
+        tiny.setQueueCapacity(0);
+        tiny.setThreadNamePrefix("tiny-io-");
+        tiny.initialize();
+        ExternalProcessRunner tinyRunner = new ExternalProcessRunner(tiny);
+        try {
+            List<ProcessBuilder> builders = new ArrayList<>();
+            for (int i = 0; i < 5; i++) {
+                builders.add(new ProcessBuilder("cmd", "/c", "echo task-" + i + " & ping -n 3 127.0.0.1"));
+            }
+            AtomicInteger success = new AtomicInteger();
+            AtomicInteger rejected = new AtomicInteger();
+            List<Thread> threads = new ArrayList<>();
+            for (ProcessBuilder pb : builders) {
+                Thread t = new Thread(() -> {
+                    try {
+                        tinyRunner.run(pb, 5);
+                        success.incrementAndGet();
+                    } catch (Exception e) {
+                        rejected.incrementAndGet();
+                    }
+                });
+                t.start();
+                threads.add(t);
+            }
+            for (Thread t : threads) { t.join(15000); }
+            assertThat(success.get() + rejected.get()).as("全部任务应结束（成功或拒绝）").isEqualTo(5);
+            // 关键：没有任何调用线程被同步阻塞超过声明的超时（有界返回）
+            assertThat(rejected.get()).as("部分任务因池饱和被拒绝而非阻塞").isGreaterThan(0);
+        } finally {
+            tiny.shutdown();
+        }
+    }
+
+    @Test
+    @DisplayName("读取阶段中断向上传播（run 抛 InterruptedException）")
+    void run_readPhaseInterrupt_propagates() throws Exception {
+        // 长时间运行进程使读取任务阻塞；中断主线程应传播
+        AtomicBoolean[] interruptPropagated = {new AtomicBoolean(false)};
+        ProcessBuilder pb = new ProcessBuilder("cmd", "/c", "ping -n 10 127.0.0.1");
+        Thread t = new Thread(() -> {
+            try {
+                runner.run(pb, 10);
+            } catch (InterruptedException e) {
+                interruptPropagated[0].set(true);
+            } catch (Exception ignored) {
+            }
+        });
+        t.start();
+        try { Thread.sleep(300); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        t.interrupt();
+        try { t.join(5000); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        assertThat(interruptPropagated[0].get()).as("读取阶段中断应向上传播").isTrue();
     }
 }
