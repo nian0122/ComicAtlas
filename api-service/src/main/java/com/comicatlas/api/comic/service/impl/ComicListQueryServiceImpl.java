@@ -14,9 +14,6 @@ import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.service.ComicListQueryService;
 import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.common.storage.FileUrlResolver;
-import com.comicatlas.api.management.dto.ManagementTaskResponse;
-import com.comicatlas.api.management.policy.OperationPolicyService;
-import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.reader.entity.ReadingHistory;
 import com.comicatlas.api.reader.mapper.ReadingHistoryMapper;
 import lombok.RequiredArgsConstructor;
@@ -40,8 +37,6 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
     private final CategoryMapper categoryMapper;
     private final ReadingHistoryMapper historyMapper;
     private final FileUrlResolver fileUrlResolver;
-    private final OperationPolicyService operationPolicyService;
-    private final ManagementTaskService managementTaskService;
 
     @Override
     public IPage<ComicListVO> listComics(ComicListQuery query) {
@@ -65,7 +60,7 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
         List<Comic> comics = result.getRecords();
         if (comics.isEmpty()) {
             IPage<ComicListVO> emptyPage = result.convert(comic ->
-                    toListVO(comic, new HashMap<>(), new HashMap<>(), new HashMap<>()));
+                    toListVO(comic, new HashMap<>(), new HashMap<>()));
             return ComicListPage.from(emptyPage);
         }
 
@@ -85,11 +80,8 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
                 .stream()
                 .collect(Collectors.toMap(ReadingHistory::getComicId, history -> history));
 
-        Map<Long, ManagementTaskResponse> activeTasks =
-                managementTaskService.findActiveTasksForComics(comicIds);
-
         IPage<ComicListVO> voPage = result.convert(
-                comic -> toListVO(comic, categoryNames, histories, activeTasks));
+                comic -> toListVO(comic, categoryNames, histories));
         return ComicListPage.from(voPage);
     }
 
@@ -98,7 +90,7 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
      * 同条件同键、不同条件不同键；listComics 的 @Cacheable 引用此方法。
      */
     public String cacheKey(ComicListQuery query) {
-        String raw = String.join("|",
+        String raw = "v2|" + String.join("|",
                 nz(query.getKeyword()),
                 nz(query.getTag()),
                 query.getTags() == null ? "" : String.join(",", query.getTags()),
@@ -134,8 +126,7 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
     private ComicListVO toListVO(
             Comic comic,
             Map<Long, String> categoryNames,
-            Map<Long, ReadingHistory> histories,
-            Map<Long, ManagementTaskResponse> activeTasks) {
+            Map<Long, ReadingHistory> histories) {
         ComicListVO vo = new ComicListVO();
         vo.setId(comic.getId());
         vo.setTitle(comic.getTitle());
@@ -144,9 +135,7 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
         vo.setPageCount(comic.getTotalPages());
         vo.setCategoryId(comic.getCategoryId());
         vo.setCategoryName(categoryNames.get(comic.getCategoryId()));
-        vo.setLifecycle(toLifecycle(comic.getStatus() == null ? null : comic.getStatus().name()));
-        vo.setActiveTask(activeTasks.get(comic.getId()));
-        vo.setAllowedOperations(operationPolicyService.forComic(comic.getStatus() == null ? null : comic.getStatus().name()));
+        vo.setStatus(toStatus(comic.getStatus() == null ? null : comic.getStatus().name()));
         vo.setCreatedAt(comic.getCreatedAt());
 
         ReadingHistory history = histories.get(comic.getId());
@@ -158,7 +147,7 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
         return vo;
     }
 
-    private static ComicStatus toLifecycle(String status) {
+    private static ComicStatus toStatus(String status) {
         if (status == null) { return null; }
         try {
             return ComicStatus.valueOf(status);

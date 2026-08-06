@@ -586,44 +586,6 @@ public class ManagementTaskService {
                         .last("LIMIT 1"));
     }
 
-    /**
-     * 批量查找多个漫画当前的活跃任务（targetId → 最新任务响应）。
-     * <p>
-     * 通过 management_task_item 活跃状态过滤，取每个 target 最新的一条。
-     */
-    public Map<Long, ManagementTaskResponse> findActiveTasksForComics(List<Long> comicIds) {
-        if (comicIds == null || comicIds.isEmpty()) {
-            return Map.of();
-        }
-        List<ManagementTaskItem> items = itemMapper.selectList(
-                new LambdaQueryWrapper<ManagementTaskItem>()
-                        .eq(ManagementTaskItem::getTargetType, "COMIC")
-                        .in(ManagementTaskItem::getTargetId, comicIds)
-                        .in(ManagementTaskItem::getStatus,
-                                ManagementTaskStatus.QUEUED,
-                                ManagementTaskStatus.RUNNING,
-                                ManagementTaskStatus.CANCELLING)
-                        .orderByDesc(ManagementTaskItem::getId));
-        if (items.isEmpty()) {
-            return Map.of();
-        }
-        List<Long> taskIds = items.stream()
-                .map(ManagementTaskItem::getTaskId)
-                .distinct()
-                .collect(Collectors.toList());
-        Map<Long, ManagementTask> tasksById = taskMapper.selectBatchIds(taskIds).stream()
-                .collect(Collectors.toMap(ManagementTask::getId, t -> t));
-
-        Map<Long, ManagementTaskResponse> result = new java.util.LinkedHashMap<>();
-        for (ManagementTaskItem item : items) {
-            ManagementTask task = tasksById.get(item.getTaskId());
-            if (task != null) {
-                result.putIfAbsent(item.getTargetId(), toResponse(task));
-            }
-        }
-        return result;
-    }
-
     // ======================== 聚合 ========================
 
     /**
