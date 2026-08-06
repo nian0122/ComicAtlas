@@ -13,6 +13,7 @@ import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.common.enums.HqStatus;
 import com.comicatlas.api.common.enums.LqStatus;
+import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.management.trash.TrashManifestService;
@@ -172,6 +173,7 @@ public class ManagementCommandResultHandler {
                 } else {
                     applyTranscodeCompleted(ev, ev.targetId());
                 }
+                maybeNotifyTranscodeTaskCompleted(ev);
             }
             case "COMIC_DELETE" -> applyComicTrashCompleted(ev.targetId());
             case "CHAPTER_TRASH" -> applyChapterTrashCompleted(ev.targetId());
@@ -184,7 +186,14 @@ public class ManagementCommandResultHandler {
             case "MEDIA_PURGE" -> applyMediaPurgeCompleted(ev.targetId());
             case "METADATA_REFRESH" -> {
                 if (comicScope) {
-                    metadataRefreshService.refresh(ev.targetId());
+                    try {
+                        metadataRefreshService.refresh(ev.targetId());
+                    } catch (BusinessException e) {
+                        // 漫画非 READY / 并发刷新冲突属于业务态问题：任务项已 SUCCEEDED，
+                        // 不应把消息送 DLQ，DB 刷新可由用户稍后通过接口手动重新触发
+                        log.warn("METADATA_REFRESH 业务刷新跳过: comicId={}, reason={}",
+                                ev.targetId(), e.getMessage());
+                    }
                 }
             }
             default -> log.warn("未知 completed 操作类型: {}", ev.operationType());
@@ -251,7 +260,9 @@ public class ManagementCommandResultHandler {
 
     /**
      * 转码完成业务更新：实测元数据（duration/fileSize/真实 codec）优先，
-     * 事件未携带时回退旧的硬编码 mp4/h264/aac；完成后同步章节/漫画统计并触发 metadata.json 重导出。
+     * 事件未携带时回退旧的硬编码 mp4/h264/aac。
+     * 每个完成事件都更新对应 media 行；整本统计聚合与 metadata.json 重导出
+     * 由 {@link #maybeNotifyTranscodeTaskCompleted} 在任务全部完成时触发一次。
      */
     private void applyTranscodeCompleted(ManagementCommandCompletedEvent ev, Long mediaId) {
         Media media = mediaMapper.selectById(mediaId);
@@ -281,8 +292,23 @@ public class ManagementCommandResultHandler {
             mediaUpdate.set(Media::getHqPath, deriveTranscodedPath(hqPath));
         }
         mediaMapper.update(null, mediaUpdate);
-        mediaMetadataSyncService.notifyTranscoded(mediaId, ev.taskId());
         log.info("转码完成业务更新: mediaId={}", mediaId);
+    }
+
+    /**
+     * 转码任务全部完成（无剩余未完成项）时，触发一次整本元数据同步
+     * （聚合统计 + 重导出 metadata.json），避免每个视频各自聚合与重导出。
+     */
+    private void maybeNotifyTranscodeTaskCompleted(ManagementCommandCompletedEvent ev) {
+        if (managementTaskService.countActiveItems(ev.taskId()) > 0) {
+            log.debug("转码任务仍有未完成项，跳过元数据同步: taskId={}", ev.taskId());
+            return;
+        }
+        if ("COMIC".equals(ev.targetType())) {
+            mediaMetadataSyncService.notifyTaskTranscoded(ev.targetId(), ev.taskId());
+        } else {
+            mediaMetadataSyncService.notifyTranscoded(ev.targetId(), ev.taskId());
+        }
     }
 
     private void applyComicTrashCompleted(Long comicId) {
