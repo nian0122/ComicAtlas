@@ -155,8 +155,13 @@ class SemanticNamingContractTest {
             String genericPart = (firstArg == null)
                     ? "(?:\\s*<[^;{}()]*?>)?"
                     : "(?:\\s*<\\s*" + Pattern.quote(firstArg) + "\\b[^;{}()]*?>)?";
-            return Pattern.compile("\\b" + Pattern.quote(base) + "\\b" + genericPart
-                    + "\\s+\\b" + variable + "\\b");
+            String declared = "\\b" + Pattern.quote(base) + "\\b" + genericPart
+                    + "\\s+\\b" + variable + "\\b";
+            // var 声明：var <短名> = <类型基名>.xxx(...) —— 从初始化式推断真实类型，
+            // 防止 var md = MessageDigest.getInstance(...) 绕过显式类型规则
+            String varDecl = "\\bvar\\s+\\b" + variable + "\\b\\s*=\\s*"
+                    + Pattern.quote(base) + "\\b\\s*\\.";
+            return Pattern.compile(declared + "|" + varDecl);
         }
     }
 
@@ -216,6 +221,26 @@ class SemanticNamingContractTest {
                         assertThat(v.variable()).isEqualTo(bp.variable());
                     });
         }
+    }
+
+    @Test
+    @DisplayName("var 声明按初始化式类型识别（防绕过）")
+    void varDeclarations_areDetectedByInitializerType() {
+        String fixture = """
+                var md = MessageDigest.getInstance("SHA-256");
+                var correlationData = new CorrelationData("id");
+                var op = buildTaskType();
+                """;
+        List<Violation> found = findViolations(fixture);
+        assertThat(found)
+                .as("var md 应命中 MessageDigest 规则: %s", fixture)
+                .anySatisfy(v -> {
+                    assertThat(v.type()).isEqualTo("MessageDigest");
+                    assertThat(v.variable()).isEqualTo("md");
+                });
+        assertThat(found.stream().map(Violation::variable))
+                .as("var correlationData / var op 不应命中")
+                .doesNotContain("correlationData", "op");
     }
 
     @Test

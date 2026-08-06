@@ -33,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -393,15 +394,15 @@ public class UploadSessionService {
 
     private String computeSha256(Path file) {
         try {
-            var md = java.security.MessageDigest.getInstance("SHA-256");
+            MessageDigest messageDigest = MessageDigest.getInstance("SHA-256");
             try (InputStream in = Files.newInputStream(file)) {
                 byte[] buf = new byte[64 * 1024];
                 int n;
                 while ((n = in.read(buf)) > 0) {
-                    md.update(buf, 0, n);
+                    messageDigest.update(buf, 0, n);
                 }
             }
-            return HexFormat.of().formatHex(md.digest());
+            return HexFormat.of().formatHex(messageDigest.digest());
         } catch (Exception e) {
             throw new BusinessException(HttpStatusCodes.INTERNAL_ERROR, "计算文件 SHA-256 失败: " + e.getMessage());
         }
