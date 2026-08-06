@@ -69,9 +69,10 @@ public class MetadataRefreshService {
             throw new BusinessException(HttpStatusCodes.CONFLICT, "漫画状态异常，当前状态: " + comic.getStatus());
         }
 
-        // CAS 锁：READY → REFRESHING
+        // CAS 锁：READY → REFRESHING（必须限定漫画 ID，避免整库状态被置为 REFRESHING）
         int updated = comicMapper.update(null,
                 new LambdaUpdateWrapper<Comic>()
+                        .eq(Comic::getId, comicId)
                         .eq(Comic::getStatus, ComicStatus.READY)
                         .set(Comic::getStatus, ComicStatus.REFRESHING));
         if (updated == 0) {
