@@ -12,14 +12,17 @@ Spring Boot 3 + Vue3 + RabbitMQ + MySQL + Redis。
 ## STRUCTURE
 ```
 comic-atlas/
-├── api-service/             # 漫画CRUD + 导入 + Catalog + Reader + LQ/HQ删除 + MQ消费
+├── api-service/             # 漫画CRUD + 导入 + Catalog + Reader + LQ/HQ删除 + MQ消费（Flyway 迁移在 src/main/resources/db/）
 ├── worker-service/          # 文件处理 + MQ消费 + 下载 + 解压 + 解析 + LQ/HQ删除 + ffprobe
 ├── comic-common/            # 共享事件 DTO（16 个 record + ComicEvent sealed interface，Jackson 多态序列化）
 ├── gateway/                 # Spring Cloud Gateway: 路由 + Nacos发现
 ├── frontend/                # Vue3/Vite: 列表 + 详情 + 阅读器 + 管理后台 + 存储管理
-├── docs/                    # api.md + superpowers/specs|plans
+├── scripts/                 # dev/qa/db/release 开发与运维脚本（入口 scripts/dev/start-dev.ps1）
+├── tools/                   # migration/maintenance/vendor 迁移、维护与第三方二进制
+├── docs/                    # 文档中心（入口 docs/README.md：api/user-guide/development-guide + architecture/operations/releases 等专题）
 ├── nginx.conf               # /files/{root}/{path} → alias /storage/{root}/
-└── docker-compose.yml       # MySQL + Redis + RabbitMQ + Nacos + Nginx
+├── docker-compose.yml       # 项目服务：Gateway + API + Nginx
+└── docker-compose.infra.yml # 基础设施：MySQL + Redis + RabbitMQ + Nacos
 ```
 
 ## WHERE TO LOOK
