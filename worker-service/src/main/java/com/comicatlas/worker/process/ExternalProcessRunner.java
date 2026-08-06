@@ -42,6 +42,31 @@ public class ExternalProcessRunner {
         }
     }
 
+    /** 外部进程 stdout 保留上限（字符）。超限后继续排空但不保留旧内容，防 Worker 堆耗尽。 */
+    private static final int MAX_OUTPUT_CHARS = 64 * 1024;
+
+    /**
+     * 容量受限的 stdout 尾部缓冲：追加内容，超限时丢弃旧内容只保留尾部。
+     * 由读取线程单线程调用，无需同步。
+     */
+    private static final class TailBuffer {
+        private final StringBuilder buf = new StringBuilder(MAX_OUTPUT_CHARS / 2);
+        private boolean truncated = false;
+
+        void append(String line) {
+            if (buf.length() >= MAX_OUTPUT_CHARS) {
+                truncated = true;
+                return;   // 继续排空（读取循环仍在跑，防管道死锁），但不保留
+            }
+            buf.append(line).append('\n');
+        }
+
+        String snapshot() {
+            if (!truncated) { return buf.toString(); }
+            return "[输出已截断，仅保留尾部 " + buf.length() + " 字符]\n" + buf;
+        }
+    }
+
     /**
      * 执行外部进程并等待完成。
      *
@@ -62,13 +87,13 @@ public class ExternalProcessRunner {
             throw new RuntimeException("启动外部进程失败: " + e.getMessage(), e);
         }
 
-        StringBuilder processOutput = new StringBuilder();
+        TailBuffer processOutput = new TailBuffer();
         CompletableFuture<Void> readFuture = CompletableFuture.runAsync(() -> {
             try (BufferedReader r = new BufferedReader(
                     new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
                 String line;
                 while ((line = r.readLine()) != null) {
-                    processOutput.append(line).append('\n');
+                    processOutput.append(line);
                 }
             } catch (IOException e) {
                 log.warn("读取外部进程输出失败: {}", e.getMessage());
@@ -82,7 +107,7 @@ public class ExternalProcessRunner {
                 finished = true;
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                process.destroyForcibly();
+                destroyAndReap(process, readFuture);
                 throw e;
             }
         } else {
@@ -90,11 +115,11 @@ public class ExternalProcessRunner {
                 finished = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                process.destroyForcibly();
+                destroyAndReap(process, readFuture);
                 throw e;
             }
             if (!finished) {
-                process.destroyForcibly();
+                destroyAndReap(process, readFuture);
                 throw new ProcessTimeoutException("外部进程执行超时 (" + timeoutSeconds + "s)");
             }
         }
@@ -108,6 +133,28 @@ public class ExternalProcessRunner {
             log.warn("等待外部进程输出读取超时: {}", e.getMessage());
         }
 
-        return new ExternalProcessResult(process.exitValue(), processOutput.toString());
+        return new ExternalProcessResult(process.exitValue(), processOutput.snapshot());
+    }
+
+    /**
+     * 销毁子进程并等待其终止与输出读取任务收尾（有界）。
+     * 中断/超时路径统一调用，确保不悬挂且不泄漏子进程。
+     */
+    private void destroyAndReap(Process process, CompletableFuture<Void> readFuture) {
+        process.destroyForcibly();
+        try {
+            if (!process.waitFor(5, TimeUnit.SECONDS)) {
+                log.warn("外部进程强制终止后 5s 仍未退出，可能残留");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        try {
+            readFuture.get(5, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (ExecutionException | TimeoutException e) {
+            log.warn("等待外部进程输出读取任务收尾超时: {}", e.getMessage());
+        }
     }
 }

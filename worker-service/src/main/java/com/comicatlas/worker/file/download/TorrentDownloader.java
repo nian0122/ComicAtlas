@@ -31,7 +31,8 @@ public class TorrentDownloader implements DownloadStrategy {
             "--stop-with-process=" + ProcessHandle.current().pid()
         ));
         ProcessBuilder processBuilder = new ProcessBuilder(cmd);
-        ExternalProcessRunner.ExternalProcessResult result = processRunner.run(processBuilder, 0);
+        long timeoutSeconds = (long) config.getTorrent().getTimeoutMinutes() * 60;
+        ExternalProcessRunner.ExternalProcessResult result = processRunner.run(processBuilder, timeoutSeconds);
         int exitCode = result.exitCode();
         if (exitCode != 0 && exitCode != 143) { // 143 = SIGTERM
             throw new RuntimeException("aria2c exit: " + exitCode);
