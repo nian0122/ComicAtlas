@@ -12,7 +12,7 @@
 
 .EXAMPLE
     powershell -NoProfile -ExecutionPolicy Bypass `
-      -File .\tools\backfill-legacy-lq.ps1 `
+      -File .\tools\migration\backfill-legacy-lq.ps1 `
       -LegacyRoot "F:\games\comics" `
       -MangaRoot "F:\manga" `
       -DryRun

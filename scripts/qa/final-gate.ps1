@@ -90,8 +90,7 @@ $deliverables = @(
     @{ p = Join-Path $RepoRoot "scripts\qa\final-gate.ps1"; d = "gate 脚本" },
     @{ p = Join-Path $RepoRoot "scripts\qa\docker-compose.qa.yml"; d = "QA compose" },
     @{ p = Join-Path $RepoRoot "scripts\qa\nginx-e2e.conf"; d = "QA nginx 配置" },
-    @{ p = Join-Path $RepoRoot "scripts\qa\init-qa.sql"; d = "QA 初始化 SQL" },
-    @{ p = Join-Path $RepoRoot "tools\verify-management.ps1"; d = "单命令入口" }
+    @{ p = Join-Path $RepoRoot "scripts\qa\init-qa.sql"; d = "QA 初始化 SQL" }
 )
 foreach ($d in $deliverables) { Test-File $d.p $d.d }
 

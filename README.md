@@ -77,7 +77,7 @@ ComicAtlas 是一个面向个人收藏的本地漫画仓库平台。它把 ZIP�
 
 5. 浏览器打开 [http://localhost](http://localhost)。管理后台位于 `/manage`。
 
-> `docker-compose.infra.yml` 只管理基础服务，`docker-compose.yml` 只管理项目服务。使用远端基础设施时，不要在本地启动基础服务文件，先运行 `tools/start-remote-infra-tunnel.ps1` 建立 SSH 隧道即可。首次部署前请阅读 [用户指南](docs/user-guide.md) 的基础设施章节。
+> `docker-compose.infra.yml` 只管理基础服务，`docker-compose.yml` 只管理项目服务。使用远端基础设施时，不要在本地启动基础服务文件，先运行 `tools/maintenance/start-remote-infra-tunnel.ps1` 建立 SSH 隧道即可。首次部署前请阅读 [用户指南](docs/user-guide.md) 的基础设施章节。
 
 ### 源码开发
 

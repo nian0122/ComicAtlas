@@ -13,18 +13,18 @@
     若接受把旧 LQ 当作新 HQ 导入（会失真：新系统认为 HQ=旧 LQ），可加 -ImportLqOnlyAsHqFallback。
 
 .EXAMPLE
-    .\tools\import-legacy-comics.ps1 `
+    .\tools\migration\import-legacy-comics.ps1 `
       -LegacyRoot "F:\games\comics" `
       -DryRun
 
 .EXAMPLE
-    .\tools\import-legacy-comics.ps1 `
+    .\tools\migration\import-legacy-comics.ps1 `
       -HqRoot "F:\games\comics\h_photograph\写真\梨霜儿" `
       -LqRoot "F:\games\comics\l_photograph\写真\梨霜儿" `
       -DryRun
 
 .EXAMPLE
-    .\tools\import-legacy-comics.ps1 `
+    .\tools\migration\import-legacy-comics.ps1 `
       -HqRoot "F:\games\comics\h_photograph\写真\梨霜儿" `
       -LqRoot "F:\games\comics\l_photograph\写真\梨霜儿" `
       -ApiBaseUrl "http://localhost:8000"

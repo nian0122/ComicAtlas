@@ -2,7 +2,7 @@
 Write-Host "=== ComicAtlas 开发环境 ===" -ForegroundColor Cyan
 
 # 1. 启动 SSH 隧道（连接远端中间件）
-$tunnelScript = Join-Path $PSScriptRoot "tools\start-remote-infra-tunnel.ps1"
+$tunnelScript = Join-Path $PSScriptRoot "tools\maintenance\start-remote-infra-tunnel.ps1"
 if (Test-Path $tunnelScript) {
     Write-Host "正在建立远端中间件 SSH 隧道..." -ForegroundColor DarkGray
     & $tunnelScript
@@ -10,7 +10,7 @@ if (Test-Path $tunnelScript) {
         Write-Host "WARN: SSH 隧道启动失败，Worker 可能无法连接 RabbitMQ/Nacos" -ForegroundColor Yellow
     }
 } else {
-    Write-Host "WARN: 未找到隧道脚本 tools\start-remote-infra-tunnel.ps1" -ForegroundColor Yellow
+    Write-Host "WARN: 未找到隧道脚本 tools\maintenance\start-remote-infra-tunnel.ps1" -ForegroundColor Yellow
 }
 
 # 2. 从 .env 加载远端中间件凭证
