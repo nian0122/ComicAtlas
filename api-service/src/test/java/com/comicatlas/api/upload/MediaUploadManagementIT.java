@@ -1015,6 +1015,23 @@ class MediaUploadManagementIT {
         }
 
         @Bean
+        org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor processIoExecutor() {
+            org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor executor =
+                    new org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor();
+            executor.setCorePoolSize(1);
+            executor.setMaxPoolSize(1);
+            executor.setThreadNamePrefix("test-process-io-");
+            executor.initialize();
+            return executor;
+        }
+
+        @Bean
+        com.comicatlas.worker.process.ExternalProcessRunner externalProcessRunner(
+                org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor processIoExecutor) {
+            return new com.comicatlas.worker.process.ExternalProcessRunner(processIoExecutor);
+        }
+
+        @Bean
         MediaAnalyzer mediaAnalyzer(com.comicatlas.worker.config.WorkerConfig wc, ObjectMapper om,
                 com.comicatlas.worker.process.ExternalProcessRunner processRunner) {
             return new MediaAnalyzer(wc, om, processRunner);
