@@ -64,3 +64,15 @@ frontend/test-results/
 worker-service/tools/aria2c/
 worker-service/tools/ffmpeg/
 worker-service/tools/image-optimizer/image-optimizer.exe
+
+# tools 迁移输出（dry-run / 编译产物）
+tools/*.class
+tools/*dryrun*.csv
+tools/*dryrun*.sql
+
+# scripts QA 证据
+scripts/.omo/
+
+# Playwright 前端报告与截图（根 e2e 已忽略，此处覆盖 frontend/ 下）
+frontend/playwright-report/
+frontend/screenshots/
