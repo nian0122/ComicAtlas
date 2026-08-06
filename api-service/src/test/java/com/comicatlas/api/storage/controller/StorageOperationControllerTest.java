@@ -4,6 +4,7 @@ import com.comicatlas.api.management.dto.OperationSubmitResult;
 import com.comicatlas.api.management.operation.MediaOperationCommandService;
 import com.comicatlas.api.storage.service.HqDeleteOperationService;
 import com.comicatlas.api.storage.service.LqOperationService;
+import com.comicatlas.api.storage.service.TranscodeOperationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -20,7 +21,9 @@ class StorageOperationControllerTest {
     private final MediaOperationCommandService commandService = mock(MediaOperationCommandService.class);
     private final LqOperationService lqService = new LqOperationService(commandService);
     private final HqDeleteOperationService hqService = new HqDeleteOperationService(commandService);
-    private final StorageOperationController controller = new StorageOperationController(lqService, hqService);
+    private final TranscodeOperationService transcodeService = new TranscodeOperationService(commandService);
+    private final StorageOperationController controller =
+            new StorageOperationController(lqService, hqService, transcodeService);
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
 
     @Test
@@ -69,5 +72,29 @@ class StorageOperationControllerTest {
                 .andExpect(status().isOk());
 
         verify(commandService).requestHqDeleteForChapter(9L);
+    }
+
+    @Test
+    void transcodeComic_委托转码命令() throws Exception {
+        when(commandService.requestTranscodeForComic(42L))
+                .thenReturn(OperationSubmitResult.of(11L, "TRANSCODE", "QUEUED", 2));
+
+        mvc.perform(post("/api/storage/transcode/comics/42"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.taskId").value(11));
+
+        verify(commandService).requestTranscodeForComic(42L);
+    }
+
+    @Test
+    void transcodeChapter_委托章节级转码命令() throws Exception {
+        when(commandService.requestTranscodeForChapter(9L))
+                .thenReturn(OperationSubmitResult.of(12L, "TRANSCODE", "QUEUED", 1));
+
+        mvc.perform(post("/api/storage/transcode/chapters/9"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.taskId").value(12));
+
+        verify(commandService).requestTranscodeForChapter(9L);
     }
 }

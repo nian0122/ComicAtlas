@@ -3,7 +3,7 @@ package com.comicatlas.api.admin.controller;
 import com.comicatlas.api.admin.service.StorageQueryService;
 import com.comicatlas.api.common.Result;
 import com.comicatlas.api.management.dto.OperationSubmitResult;
-import com.comicatlas.api.management.operation.MediaOperationCommandService;
+import com.comicatlas.api.storage.service.TranscodeOperationService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -20,16 +20,16 @@ class AdminStorageControllerTest {
     @Mock
     private StorageQueryService storageQueryService;
     @Mock
-    private MediaOperationCommandService mediaOperationCommandService;
+    private TranscodeOperationService transcodeOperationService;
 
     private AdminStorageController controller() {
-        return new AdminStorageController(storageQueryService, mediaOperationCommandService);
+        return new AdminStorageController(storageQueryService, transcodeOperationService);
     }
 
     @Test
     void 转码请求委托统一任务管线并返回taskId() {
         OperationSubmitResult expected = OperationSubmitResult.of(42L, "TRANSCODE", "QUEUED", 3);
-        when(mediaOperationCommandService.requestTranscodeForComic(188L)).thenReturn(expected);
+        when(transcodeOperationService.transcodeForComic(188L)).thenReturn(expected);
 
         Result<OperationSubmitResult> result = controller().transcodeVideos(188L);
 
@@ -37,12 +37,12 @@ class AdminStorageControllerTest {
         assertEquals(42L, result.getData().getTaskId());
         assertEquals("TRANSCODE", result.getData().getTaskType());
         assertEquals(3, result.getData().getItemCount());
-        verify(mediaOperationCommandService).requestTranscodeForComic(188L);
+        verify(transcodeOperationService).transcodeForComic(188L);
     }
 
     @Test
     void 无可转码视频时返回空taskId() {
-        when(mediaOperationCommandService.requestTranscodeForComic(99L))
+        when(transcodeOperationService.transcodeForComic(99L))
                 .thenReturn(OperationSubmitResult.of(null, "TRANSCODE", null, 0));
 
         Result<OperationSubmitResult> result = controller().transcodeVideos(99L);
