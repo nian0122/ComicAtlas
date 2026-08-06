@@ -4,6 +4,7 @@ import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.entity.ExportMedia;
 import com.comicatlas.worker.mapper.ExportMediaMapper;
+import com.comicatlas.worker.process.ExternalProcessRunner;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -13,7 +14,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 /**
  * 视频转码命令处理器（新 envelope 路由）。
@@ -33,6 +33,7 @@ public class TranscodeCommandHandler {
     private final ExportMediaMapper mediaMapper;
     private final WorkerConfig config;
     private final ManagementCommandPublisher publisher;
+    private final ExternalProcessRunner processRunner;
 
     private static final List<String> FFMPEG_ARGS = List.of(
         "-c:v", "libx264", "-crf", "23", "-preset", "medium",
@@ -113,16 +114,11 @@ public class TranscodeCommandHandler {
             processBuilder.command(buildFfmpegCommand(
                 config.resolveToolPath(config.getFfmpegPath()).toString(),
                 hqFile.toString(), tempFile.toString()));
-            processBuilder.redirectErrorStream(true);
-            processBuilder.redirectOutput(ProcessBuilder.Redirect.DISCARD);
-            Process process = processBuilder.start();
-
-            if (!process.waitFor(10, TimeUnit.MINUTES)) {
-                process.destroyForcibly();
-                throw new IOException("ffmpeg 超时(10min): pageId=" + pageId);
-            }
-            if (process.exitValue() != 0) {
-                throw new IOException("ffmpeg exit code " + process.exitValue() + ": pageId=" + pageId);
+            // 统一外部进程执行：超时 10 分钟，中断由 Runner 恢复标志并销毁 ffmpeg 后向上传播
+            ExternalProcessRunner.ExternalProcessResult result =
+                    processRunner.run(processBuilder, 600);
+            if (result.exitCode() != 0) {
+                throw new IOException("ffmpeg exit code " + result.exitCode() + ": pageId=" + pageId);
             }
             if (!Files.exists(tempFile) || Files.size(tempFile) == 0) {
                 throw new IOException("转码输出文件为空: " + tempFile);
