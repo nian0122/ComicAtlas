@@ -64,6 +64,8 @@ public class WorkerConfig {
         private int peerDetectTimeout = 30;
         private long minSpeedThreshold = 10240;
         private int speedCheckDuration = 300;
+        /** 下载总超时（分钟），超过则销毁 aria2c。默认 120 分钟。 */
+        private int timeoutMinutes = 120;
     }
 
     @Data

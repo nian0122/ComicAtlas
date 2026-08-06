@@ -66,6 +66,7 @@ worker:
     peer-detect-timeout: 30
     min-speed-threshold: 10240
     speed-check-duration: 300
+    timeout-minutes: ${TORRENT_TIMEOUT_MINUTES:120}
   proxy:
     host: ${PROXY_HOST:127.0.0.1}
     port: ${PROXY_PORT:7897}
