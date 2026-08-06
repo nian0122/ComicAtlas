@@ -36,7 +36,9 @@ public class WorkerExecutorConfig {
         executor.setMaxPoolSize(threads);
         executor.setQueueCapacity(64);
         executor.setThreadNamePrefix("process-io-");
-        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        // 进程输出读取任务必须异步执行：池饱和时拒绝即抛（AbortPolicy），
+        // 避免 CallerRunsPolicy 让读取循环在业务线程同步阻塞，导致 waitFor 超时失效。
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
         executor.setWaitForTasksToCompleteOnShutdown(true);
         executor.setAwaitTerminationSeconds(30);
         executor.initialize();
