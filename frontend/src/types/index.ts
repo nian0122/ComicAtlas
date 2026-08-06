@@ -344,6 +344,14 @@ export interface ExportTaskVO {
   completedAt?: string
 }
 
+/** 存储操作统一提交结果（/api/storage/* 返回） */
+export interface OperationSubmitResult {
+  readonly taskId: number | null
+  readonly operationType: string
+  readonly status: string | null
+  readonly itemCount: number
+}
+
 // ========== Recovery Domain ==========
 
 /** 存储恢复任务 */
