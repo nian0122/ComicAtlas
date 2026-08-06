@@ -49,7 +49,10 @@ public class AdminController {
     /**
      * 刷新单漫画元数据：重新扫描 HQ 目录，更新 page 的宽高/文件大小，
      * 完成后发 MQ 委托 Worker 重新导出 metadata.json。
+     *
+     * @deprecated 请改用 POST /api/storage/refresh-metadata/comics/{id}
      */
+    @Deprecated
     @PostMapping("/comics/{comicId}/refresh-metadata")
     public Result<RefreshMetadataResult> refreshMetadata(@PathVariable Long comicId) {
         return Result.ok(adminService.refreshMetadata(comicId));

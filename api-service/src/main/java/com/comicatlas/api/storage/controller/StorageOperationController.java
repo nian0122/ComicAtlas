@@ -1,9 +1,11 @@
 package com.comicatlas.api.storage.controller;
 
+import com.comicatlas.api.admin.dto.RefreshMetadataResult;
 import com.comicatlas.api.common.Result;
 import com.comicatlas.api.management.dto.OperationSubmitResult;
 import com.comicatlas.api.storage.service.HqDeleteOperationService;
 import com.comicatlas.api.storage.service.LqOperationService;
+import com.comicatlas.api.storage.service.MetadataRefreshService;
 import com.comicatlas.api.storage.service.TranscodeOperationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -16,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 存储操作统一入口（存储操作域）。
  * <p>
  * URL 形态：POST /api/storage/{operation}/{targetType}/{targetId}，targetType = comics | chapters。
- * 后续转码 / 导出 / 刷新元数据 / 统计端点追加到本类。
+ * 后续转码 / 导出 / 统计端点追加到本类。
  */
 @RestController
 @RequestMapping("/api/storage")
@@ -26,6 +28,7 @@ public class StorageOperationController {
     private final LqOperationService lqOperationService;
     private final HqDeleteOperationService hqDeleteOperationService;
     private final TranscodeOperationService transcodeOperationService;
+    private final MetadataRefreshService metadataRefreshService;
 
     // ======================== LQ 生成 ========================
 
@@ -65,5 +68,12 @@ public class StorageOperationController {
     @PostMapping("/transcode/chapters/{chapterId}")
     public Result<OperationSubmitResult> transcodeChapter(@PathVariable Long chapterId) {
         return Result.ok(transcodeOperationService.transcodeForChapter(chapterId));
+    }
+
+    // ======================== 刷新元数据 ========================
+
+    @PostMapping("/refresh-metadata/comics/{comicId}")
+    public Result<RefreshMetadataResult> refreshMetadata(@PathVariable Long comicId) {
+        return Result.ok(metadataRefreshService.refresh(comicId));
     }
 }
