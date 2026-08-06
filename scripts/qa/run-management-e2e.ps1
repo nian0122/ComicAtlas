@@ -58,7 +58,7 @@ function Write-ProgressFile {
     Write-Host "  [progress#$($script:ProgressCounter)] $Stage = $Status $Detail" -ForegroundColor Magenta
 }
 
-# 关键：Windows PowerShell 5.1 下原生命令（ffmpeg/docker/mvnw/npm）写 stderr 时，
+# 关键：Windows PowerShell 5.1 下原生命令（ffmpeg/docker/mvnw/pnpm）写 stderr 时，
 # 即使 2>$null 重定向，配合 EAP=Stop 仍会抛 NativeCommandError（vite/ffmpeg 的
 # ANSI banner 尤甚）。因此全局用 Continue，成败一律通过 $LASTEXITCODE / 断言 /
 # 显式 throw 判定，绝不让 stderr 噪音误报失败。
@@ -130,7 +130,7 @@ function Assert-True { param([bool]$cond, [string]$msg) if ($cond) { Write-Ok $m
 function Assert-Equal { param($actual, $expected, [string]$msg) if ($actual -eq $expected) { Write-Ok "$msg (=$actual)" } else { Add-Failure "$msg — 期望 $expected 实际 $actual" } }
 
 # 运行原生命令并合并输出到日志：native stderr 在 2>&1 下会被提升为
-# ErrorRecord，配合 EAP=Stop 会误抛为终止错误（vite/npm 的 ANSI 输出尤甚）。
+# ErrorRecord，配合 EAP=Stop 会误抛为终止错误（vite/pnpm 的 ANSI 输出尤甚）。
 # 这里把 EAP 临时降为 Continue，仅依赖 $LASTEXITCODE 判定成败。
 function Run-Native {
     param([scriptblock]$Cmd, [string]$Log)
@@ -1115,7 +1115,7 @@ function Invoke-FrontendUiTests {
     try {
         # CI=1 → Playwright retries=2，吸收偶发 flake；仍失败的为确定性既有用例
         $env:CI = "1"
-        $exit = Run-Native { & npm exec playwright test } -Log (Join-Path $LogsDir "frontend-ui.log")
+        $exit = Run-Native { & pnpm exec playwright test } -Log (Join-Path $LogsDir "frontend-ui.log")
         Remove-Item Env:CI -ErrorAction SilentlyContinue
         if ($exit -eq 0) {
             Write-Ok "前端 UI tests 通过"
@@ -1176,7 +1176,7 @@ function Invoke-RootPlaywright {
         #     （isMobileReadingDevice = coarse pointer + 窄宽，产品设计如此），manage 路由断言在移动端不成立；
         #  2) import.spec 的目标是旧版顶层 /import 路由（现 UI 已迁移到 /manage/import），属既有过时用例。
         # 二者均如实记录，不纳入本任务交付物的 pass/fail。
-        $exit = Run-Native { & npm exec playwright test -- --project=chromium } -Log (Join-Path $LogsDir "root-playwright.log")
+        $exit = Run-Native { & pnpm exec playwright test -- --project=chromium } -Log (Join-Path $LogsDir "root-playwright.log")
         if ($exit -eq 0) {
             Write-Ok "根级 Playwright（chromium）全部通过"
             $script:Evidence.rootPlaywright = @{ status = "pass" }
@@ -1419,11 +1419,11 @@ try {
     Assert-True (Test-Path $ComposeFile) "QA compose 存在"
     if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { throw "docker 不可用" }
     if (-not (Test-Path (Join-Path $RepoRoot "mvnw.cmd"))) { throw "mvnw.cmd 缺失" }
-    if (-not (Get-Command npm -ErrorAction SilentlyContinue)) { throw "npm 不可用" }
+    if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) { throw "pnpm 不可用（可用 corepack enable 启用，packageManager 声明 pnpm@9.15.0）" }
     Assert-True (Test-Path $Ffmpeg) "ffmpeg 工具存在"
     Assert-True (Test-Path $Ffprobe) "ffprobe 工具存在"
     Assert-True (Test-Path $ImgOpt) "image-optimizer 存在"
-    Write-ProgressFile -Stage "precheck" -Status "ok" -Detail "docker/mvnw/npm/ffmpeg/image-optimizer 全部就绪"
+    Write-ProgressFile -Stage "precheck" -Status "ok" -Detail "docker/mvnw/pnpm/ffmpeg/image-optimizer 全部就绪"
 
     # 端口占用检查
     foreach ($p in @($GatewayHostPort, $NginxHostPort, $ApiPort, $WorkerPort)) {
@@ -1494,7 +1494,7 @@ try {
         Write-Step "前端构建"
         Push-Location (Join-Path $RepoRoot "frontend")
         try {
-            $code = Run-Native { & npm run build } -Log (Join-Path $LogsDir "frontend-build.log")
+            $code = Run-Native { & pnpm run build } -Log (Join-Path $LogsDir "frontend-build.log")
             if ($code -ne 0) { throw "frontend build 失败 (exit=$code)" }
             Write-Ok "前端构建完成"
             Write-ProgressFile -Stage "frontend-build" -Status "ok" -Detail "frontend/dist 构建成功"
