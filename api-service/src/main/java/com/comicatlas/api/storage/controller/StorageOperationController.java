@@ -10,7 +10,9 @@ import com.comicatlas.api.storage.service.LqOperationService;
 import com.comicatlas.api.storage.service.MetadataRefreshService;
 import com.comicatlas.api.storage.service.TranscodeOperationService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -18,7 +20,12 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
+import java.awt.Desktop;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 /**
@@ -27,6 +34,7 @@ import java.util.List;
  * URL 形态：POST /api/storage/{operation}/{targetType}/{targetId}，targetType = comics | chapters。
  * 后续转码 / 导出 / 统计端点追加到本类。
  */
+@Slf4j
 @RestController
 @RequestMapping("/api/storage")
 @RequiredArgsConstructor
@@ -101,5 +109,61 @@ public class StorageOperationController {
     @GetMapping("/export/tasks/{taskId}")
     public Result<ExportTaskVO> getExportTask(@PathVariable Long taskId) {
         return Result.ok(exportOperationService.getTask(taskId));
+    }
+
+    /**
+     * 下载导出文件（流式）。
+     */
+    @GetMapping("/export/tasks/{taskId}/download")
+    public ResponseEntity<StreamingResponseBody> downloadExport(@PathVariable Long taskId) {
+        ExportTaskVO task = exportOperationService.getTask(taskId);
+        String physicalPath = task.getPhysicalPath();
+        if (physicalPath == null) {
+            return ResponseEntity.notFound().build();
+        }
+        Path filePath = Path.of(physicalPath.replace("/", java.io.File.separator));
+        if (!Files.exists(filePath)) {
+            return ResponseEntity.notFound().build();
+        }
+        String filename = filePath.getFileName().toString();
+        StreamingResponseBody stream = outputStream -> {
+            try {
+                Files.copy(filePath, outputStream);
+                outputStream.flush();
+            } catch (IOException e) {
+                log.error("下载导出文件失败: taskId={}, path={}", taskId, physicalPath, e);
+                throw new RuntimeException("下载失败: " + e.getMessage(), e);
+            }
+        };
+        return ResponseEntity.ok()
+            .contentType(MediaType.APPLICATION_OCTET_STREAM)
+            .header("Content-Disposition", "attachment; filename=\"" + filename + "\"")
+            .body(stream);
+    }
+
+    /**
+     * 打开导出文件所在目录（Windows/Linux/macOS 通用，Desktop API；失败回退 501）。
+     */
+    @PostMapping("/export/tasks/{taskId}/open")
+    public ResponseEntity<?> openExportDir(@PathVariable Long taskId) {
+        ExportTaskVO task = exportOperationService.getTask(taskId);
+        String physicalPath = task.getPhysicalPath();
+        if (physicalPath == null) {
+            return ResponseEntity.notFound().build();
+        }
+        Path dirPath = Path.of(physicalPath.replace("/", java.io.File.separator)).getParent();
+        if (dirPath == null || !Files.exists(dirPath)) {
+            return ResponseEntity.notFound().build();
+        }
+        if (Desktop.isDesktopSupported()) {
+            try {
+                Desktop.getDesktop().open(dirPath.toFile());
+                return ResponseEntity.ok().build();
+            } catch (IOException e) {
+                log.warn("Desktop.open 失败: dir={}, error={}", dirPath, e.getMessage());
+            }
+        }
+        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED)
+            .body("无法打开文件资源管理器，目录: " + dirPath);
     }
 }

@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -21,6 +22,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -158,6 +160,33 @@ class StorageOperationControllerTest {
                 .andExpect(jsonPath("$.data.comicId").value(42));
 
         verify(exportOperationService).getTask(7L);
+    }
+
+    @Test
+    void downloadExport_返回文件流() throws Exception {
+        ExportTaskVO vo = new ExportTaskVO();
+        vo.setId(1L);
+        Path tempFile = java.nio.file.Files.createTempFile("export-test", ".zip");
+        try {
+            vo.setPhysicalPath(tempFile.toString().replace("\\", "/"));
+            java.nio.file.Files.writeString(tempFile, "hello");
+            when(exportOperationService.getTask(1L)).thenReturn(vo);
+            mvc.perform(get("/api/storage/export/tasks/1/download"))
+                    .andExpect(status().isOk())
+                    .andExpect(header().string("Content-Disposition", org.hamcrest.Matchers.containsString("attachment")));
+        } finally {
+            java.nio.file.Files.deleteIfExists(tempFile);
+        }
+    }
+
+    @Test
+    void openDirExport_文件不存在返回404() throws Exception {
+        ExportTaskVO vo = new ExportTaskVO();
+        vo.setId(1L);
+        vo.setPhysicalPath("/nonexistent/dir");
+        when(exportOperationService.getTask(1L)).thenReturn(vo);
+        mvc.perform(post("/api/storage/export/tasks/1/open"))
+                .andExpect(status().isNotFound());
     }
 
     private ExportTaskVO exportTask(Long id, Long comicId) {
