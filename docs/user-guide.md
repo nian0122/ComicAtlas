@@ -71,7 +71,7 @@ docker compose -f docker-compose.yml ps
 - 管理后台：`http://localhost/manage`
 - Gateway/API：`http://localhost:8000`
 
-`docker-compose.infra.yml` 包含 MySQL、Redis、RabbitMQ 和 Nacos，端口号保持为 3306、6379、5672、15672、8848、9848，并只绑定主机回环地址。如果基础设施运行在远程主机，本地不启动该文件；使用仓库中的 `tools/start-remote-infra-tunnel.ps1` 建立 SSH 隧道，让项目容器通过 `host.docker.internal` 访问宿主机映射端口。
+`docker-compose.infra.yml` 包含 MySQL、Redis、RabbitMQ 和 Nacos，端口号保持为 3306、6379、5672、15672、8848、9848，并只绑定主机回环地址。如果基础设施运行在远程主机，本地不启动该文件；使用仓库中的 `tools/maintenance/start-remote-infra-tunnel.ps1` 建立 SSH 隧道，让项目容器通过 `host.docker.internal` 访问宿主机映射端口。
 
 ### 可信本机部署
 
