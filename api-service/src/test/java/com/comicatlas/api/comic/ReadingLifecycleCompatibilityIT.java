@@ -1,7 +1,7 @@
 package com.comicatlas.api.comic;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.comicatlas.api.admin.recovery.RecoveryEngine;
+import com.comicatlas.api.common.scan.RecoveryEngine;
 import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.comic.dto.CatalogNode;
 import com.comicatlas.api.comic.dto.ChapterRef;
