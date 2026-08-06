@@ -137,11 +137,12 @@ public class ExternalProcessRunner {
             }
         }
 
-        // 等待 stdout 消费完成；中断时恢复标志（子进程已退出，无需再销毁）
+        // 等待 stdout 消费完成；中断向上传播（子进程已退出，无需再销毁）
         try {
             readFuture.get(5, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            throw e;
         } catch (ExecutionException | TimeoutException e) {
             log.warn("等待外部进程输出读取超时: {}", e.getMessage());
         }
