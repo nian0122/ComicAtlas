@@ -347,7 +347,7 @@ export interface ExportTaskVO {
 /** 存储操作统一提交结果（/api/storage/* 返回） */
 export interface OperationSubmitResult {
   readonly taskId: number | null
-  readonly operationType: string
+  readonly taskType: string
   readonly status: string | null
   readonly itemCount: number
 }
