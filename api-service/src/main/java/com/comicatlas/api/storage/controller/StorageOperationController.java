@@ -32,7 +32,8 @@ import java.util.List;
  * 存储操作统一入口（存储操作域）。
  * <p>
  * URL 形态：POST /api/storage/{operation}/{targetType}/{targetId}，targetType = comics | chapters。
- * 后续转码 / 导出 / 统计端点追加到本类。
+ * 包含全部存储操作端点：LQ 生成、HQ 删除（保留 LQ）、视频转码、刷新元数据、导出及导出文件的下载/打开。
+ * 存储统计端点见 {@link StorageStatsController}。
  */
 @Slf4j
 @RestController
