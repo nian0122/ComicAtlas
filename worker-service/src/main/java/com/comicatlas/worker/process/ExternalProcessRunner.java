@@ -5,9 +5,9 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -46,6 +46,9 @@ public class ExternalProcessRunner {
      *  包可见：同包单元测试（ExternalProcessRunnerTest）直接引用该上限做断言。 */
     static final int MAX_OUTPUT_CHARS = 64 * 1024;
 
+    /** 输出读取块大小（字符）。定长块读取，避免 readLine 构造完整无换行长字符串。 */
+    private static final int CHUNK_SIZE = 8192;
+
     /**
      * 容量受限的 stdout 缓冲：追加内容，达到上限后继续排空（防管道死锁）但不再保留。
      * 由读取线程单线程调用，无需同步。
@@ -54,12 +57,21 @@ public class ExternalProcessRunner {
         private final StringBuilder buf = new StringBuilder(MAX_OUTPUT_CHARS / 2);
         private boolean truncated = false;
 
-        void append(String line) {
-            if (buf.length() >= MAX_OUTPUT_CHARS) {
+        /**
+         * 按剩余容量截断写入：最多写入 (MAX - 当前长度) 字符，超限部分丢弃但继续排空
+         * （读取循环仍在跑，防管道死锁）。任何单行/块长均不可能突破上限。
+         */
+        void append(char[] chunk, int len) {
+            int remaining = MAX_OUTPUT_CHARS - buf.length();
+            if (remaining <= 0) {
                 truncated = true;
-                return;   // 继续排空（读取循环仍在跑，防管道死锁），但不保留
+                return;
             }
-            buf.append(line).append('\n');
+            int toWrite = Math.min(len, remaining);
+            buf.append(chunk, 0, toWrite);
+            if (len > toWrite) {
+                truncated = true;
+            }
         }
 
         String snapshot() {
@@ -90,11 +102,11 @@ public class ExternalProcessRunner {
 
         TailBuffer processOutput = new TailBuffer();
         CompletableFuture<Void> readFuture = CompletableFuture.runAsync(() -> {
-            try (BufferedReader r = new BufferedReader(
-                    new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
-                String line;
-                while ((line = r.readLine()) != null) {
-                    processOutput.append(line);
+            try (Reader r = new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8)) {
+                char[] chunk = new char[CHUNK_SIZE];
+                int n;
+                while ((n = r.read(chunk, 0, CHUNK_SIZE)) != -1) {
+                    processOutput.append(chunk, n);
                 }
             } catch (IOException e) {
                 log.warn("读取外部进程输出失败: {}", e.getMessage());
