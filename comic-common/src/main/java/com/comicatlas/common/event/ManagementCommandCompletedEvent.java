@@ -8,6 +8,7 @@ import java.util.UUID;
  * <p>
  * Worker 完成管理命令后发送此事件。API 端依据 taskId/itemId/attempt
  * 更新 management_task_item 为 SUCCEEDED 并聚合 management_task 状态。
+ * transcode 组件仅在 TRANSCODE 操作时携带转码后实测元数据，其余为 null。
  */
 public record ManagementCommandCompletedEvent(
     UUID eventId,
@@ -18,7 +19,8 @@ public record ManagementCommandCompletedEvent(
     int attempt,
     String operationType,
     String targetType,
-    Long targetId
+    Long targetId,
+    TranscodeMediaInfo transcode
 ) implements ComicEvent {
 
     @Override

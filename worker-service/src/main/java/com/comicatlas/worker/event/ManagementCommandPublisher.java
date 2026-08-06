@@ -6,6 +6,7 @@ import com.comicatlas.common.event.ManagementCommandProgressEvent;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.common.event.MediaUploadCompletedEvent;
 import com.comicatlas.common.event.MediaUploadCompletedEvent.MediaAnalysisResult;
+import com.comicatlas.common.event.TranscodeMediaInfo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -39,10 +40,15 @@ public class ManagementCommandPublisher {
     }
 
     public void completed(ManagementCommandRequestedEvent cmd) {
+        completed(cmd, null);
+    }
+
+    public void completed(ManagementCommandRequestedEvent cmd, TranscodeMediaInfo transcode) {
         rabbitTemplate.convertAndSend(EXCHANGE, "command.completed",
                 new ManagementCommandCompletedEvent(UUID.randomUUID(), Instant.now(), 1,
                         cmd.taskId(), cmd.itemId(), cmd.attempt(),
-                        cmd.operationType(), cmd.targetType(), cmd.targetId()));
+                        cmd.operationType(), cmd.targetType(), cmd.targetId(),
+                        transcode));
     }
 
     public void failed(ManagementCommandRequestedEvent cmd, String errorMessage) {

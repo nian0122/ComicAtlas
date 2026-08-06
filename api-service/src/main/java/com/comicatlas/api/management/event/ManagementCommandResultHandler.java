@@ -20,6 +20,7 @@ import com.comicatlas.api.outbox.service.InboxService;
 import com.comicatlas.api.reader.entity.ReadingHistory;
 import com.comicatlas.api.reader.mapper.ReadingHistoryMapper;
 import com.comicatlas.api.storage.service.MetadataRefreshService;
+import com.comicatlas.api.storage.service.MediaMetadataSyncService;
 import com.comicatlas.common.dto.TrashManifestActual;
 import com.comicatlas.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.common.enums.ManagementTaskStatus;
@@ -31,6 +32,7 @@ import com.comicatlas.common.event.ManagementCommandFailedEvent;
 import com.comicatlas.common.event.ManagementCommandProgressEvent;
 import com.comicatlas.common.event.MediaUploadCompletedEvent;
 import com.comicatlas.common.event.MediaUploadCompletedEvent.MediaAnalysisResult;
+import com.comicatlas.common.event.TranscodeMediaInfo;
 import com.comicatlas.api.upload.UploadSessionService;
 import com.comicatlas.api.upload.UploadSessionStatus;
 import com.comicatlas.api.upload.entity.UploadSession;
@@ -84,6 +86,7 @@ public class ManagementCommandResultHandler {
     private final UploadSessionMapper uploadSessionMapper;
     private final UploadSessionService uploadSessionService;
     private final MetadataRefreshService metadataRefreshService;
+    private final MediaMetadataSyncService mediaMetadataSyncService;
 
     @RabbitListener(queues = "management.result.queue")
     public void handleResult(ComicEvent raw,
@@ -164,10 +167,10 @@ public class ManagementCommandResultHandler {
             case "TRANSCODE" -> {
                 if (comicScope) {
                     for (Long mediaId : mediaIdsOf(ev.targetId())) {
-                        applyTranscodeCompleted(mediaId);
+                        applyTranscodeCompleted(ev, mediaId);
                     }
                 } else {
-                    applyTranscodeCompleted(ev.targetId());
+                    applyTranscodeCompleted(ev, ev.targetId());
                 }
             }
             case "COMIC_DELETE" -> applyComicTrashCompleted(ev.targetId());
@@ -246,22 +249,39 @@ public class ManagementCommandResultHandler {
         log.info("HQ 删除完成业务更新: chapterId={}, pages={}", chapterId, mediaItems.size());
     }
 
-    private void applyTranscodeCompleted(Long mediaId) {
+    /**
+     * 转码完成业务更新：实测元数据（duration/fileSize/真实 codec）优先，
+     * 事件未携带时回退旧的硬编码 mp4/h264/aac；完成后同步章节/漫画统计并触发 metadata.json 重导出。
+     */
+    private void applyTranscodeCompleted(ManagementCommandCompletedEvent ev, Long mediaId) {
         Media media = mediaMapper.selectById(mediaId);
         if (media == null) {
             return;
         }
+        TranscodeMediaInfo transcode = ev.transcode();
         String hqPath = media.getHqPath();
         LambdaUpdateWrapper<Media> mediaUpdate = new LambdaUpdateWrapper<Media>()
                 .eq(Media::getId, mediaId)
                 .set(Media::getTranscodeStatus, TranscodeStatus.READY)
-                .set(Media::getContainer, "mp4")
-                .set(Media::getVideoCodec, "h264")
-                .set(Media::getAudioCodec, "aac");
+                .set(Media::getContainer, transcode != null && transcode.container() != null
+                        ? transcode.container() : "mp4")
+                .set(Media::getVideoCodec, transcode != null && transcode.videoCodec() != null
+                        ? transcode.videoCodec() : "h264")
+                .set(Media::getAudioCodec, transcode != null && transcode.audioCodec() != null
+                        ? transcode.audioCodec() : "aac");
+        if (transcode != null) {
+            if (transcode.duration() != null) {
+                mediaUpdate.set(Media::getDuration, transcode.duration());
+            }
+            if (transcode.fileSize() != null) {
+                mediaUpdate.set(Media::getFileSize, transcode.fileSize());
+            }
+        }
         if (hqPath != null && !hqPath.isBlank()) {
             mediaUpdate.set(Media::getHqPath, deriveTranscodedPath(hqPath));
         }
         mediaMapper.update(null, mediaUpdate);
+        mediaMetadataSyncService.notifyTranscoded(mediaId, ev.taskId());
         log.info("转码完成业务更新: mediaId={}", mediaId);
     }
 
