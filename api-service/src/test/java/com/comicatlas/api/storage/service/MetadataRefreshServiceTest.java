@@ -1,5 +1,6 @@
 package com.comicatlas.api.storage.service;
 
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.comicatlas.api.admin.dto.RefreshMetadataResult;
@@ -31,6 +32,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+
+import org.mockito.ArgumentCaptor;
 
 /**
  * MetadataRefreshService 单元测试：
@@ -84,9 +87,17 @@ class MetadataRefreshServiceTest {
 
         assertThrows(BusinessException.class, () -> newService().refresh(1L));
 
-        // 不应发送任何 MQ，也不应恢复状态
+        // 不应发送任何 MQ，也不应恢复状态；唯一一次 update 为 CAS 锁
         verify(rabbitTemplate, never()).convertAndSend(any(String.class), any(String.class), (Object) any());
-        verify(comicMapper, times(1)).update(isNull(), any());
+        ArgumentCaptor<LambdaUpdateWrapper<Comic>> casCaptor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
+        verify(comicMapper, times(1)).update(isNull(), casCaptor.capture());
+        // CAS 锁必须限定目标漫画 ID + READY 状态（防整库被置为 REFRESHING）；
+        // id 参数值类型随 MyBatis-Plus 版本在 Integer/Long 间波动，用数值比较
+        assertThat(casCaptor.getValue().getSqlSegment()).contains("id");
+        assertThat(casCaptor.getValue().getParamNameValuePairs().values())
+                .anyMatch(v -> v instanceof Number n && n.intValue() == 1)
+                .anyMatch(ComicStatus.READY::equals)
+                .anyMatch(ComicStatus.REFRESHING::equals);
     }
 
     @Test
@@ -111,7 +122,15 @@ class MetadataRefreshServiceTest {
                 (Object) any());
         // 目录缓存失效
         verify(invalidator).evict(1L);
-        // CAS 锁 + finally 恢复 READY 各一次
-        verify(comicMapper, times(2)).update(isNull(), any());
+        // CAS 锁 + finally 恢复 READY 各一次；
+        // REFRESHING 仅出现在 CAS 锁的 set 目标中，可据此区分 finally 恢复
+        ArgumentCaptor<LambdaUpdateWrapper<Comic>> updateCaptor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
+        verify(comicMapper, times(2)).update(isNull(), updateCaptor.capture());
+        assertThat(updateCaptor.getAllValues()).anyMatch(w ->
+                w.getSqlSegment().contains("id")
+                        && w.getParamNameValuePairs().values().stream()
+                                .anyMatch(v -> v instanceof Number n && n.intValue() == 1)
+                        && w.getParamNameValuePairs().containsValue(ComicStatus.READY)
+                        && w.getParamNameValuePairs().containsValue(ComicStatus.REFRESHING));
     }
 }
