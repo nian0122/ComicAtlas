@@ -33,6 +33,14 @@ class WorkerDataSourceProductionConfigTest {
         assertThat(username.toLowerCase()).doesNotContain("root");
     }
 
+    @Test
+    @DisplayName("生产默认密码不应为固定默认值")
+    void productionDefaultPasswordHasNoFixedDefault() throws IOException {
+        String password = resolve("spring.datasource.password");
+        assertThat(password).as("Worker 密码必须由环境变量提供，禁止固定默认密码").isNotNull();
+        assertThat(password.toLowerCase()).doesNotContain("comicatlas_ro_pass");
+    }
+
     private String resolve(String key) throws IOException {
         YamlPropertySourceLoader loader = new YamlPropertySourceLoader();
         List<PropertySource<?>> sources = loader.load("application", new ClassPathResource("application.yml"));

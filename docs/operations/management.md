@@ -30,6 +30,8 @@ FLUSH PRIVILEGES;
 
 Worker 侧生产默认配置已把 `spring.datasource.hikari.read-only` 设为 `true`（`worker-service/src/main/resources/application.yml`），并有配置契约测试防止回退。Worker 写数据库被拒绝属于预期行为：所有状态回写通过 MQ 事件由 API 完成。
 
+Worker 只读账号的密码没有固定默认值，必须由 `MYSQL_PASS` 环境变量提供；未设置时 Worker 启动即失败，避免误用默认凭据连接数据库。创建只读账号时请为 `MYSQL_PASS` 设置与示例不同的强密码。
+
 > 本手册不包含任何真实凭据，仅示范账号结构与授权方式。
 
 ---

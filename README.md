@@ -59,7 +59,7 @@ ComicAtlas 是一个面向个人收藏的本地漫画仓库平台。它把 ZIP�
    REMOTE_RABBITMQ_PASSWORD=guest
    ```
 
-   > `REMOTE_MYSQL_USER` 为 API 写账号；Worker 进程需独立的只读账号（仅 `GRANT SELECT`），详见[部署运维](docs/operations/management.md)的"数据库账号"小节。
+   > `REMOTE_MYSQL_USER` 为 API 写账号；Worker 进程需独立的只读账号（仅 `GRANT SELECT`），其密码必须通过 `MYSQL_PASS` 环境变量显式设置（无默认值，未设置时 Worker 无法启动），详见[部署运维](docs/operations/management.md)的"数据库账号"小节。
 
 2. 确认 `MANGA_ROOT` 下存在 `hq`、`lq`、`thumbs`、`metadata`、`temp` 目录。
 
