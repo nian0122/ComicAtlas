@@ -700,7 +700,7 @@ public enum DirectoryScanTaskStatus {
 
 - [ ] **Step 8: 更新受影响测试**
 
-- `RecoveryTaskServiceTest.java` L110/145/160/175：`failed.setStatus("FAILED")` → `RecoveryTaskStatus.FAILED`；`"SUCCESS"`→`SUCCESS`；`"RUNNING"`→`RUNNING`；`"PENDING"`→`PENDING`（注意 L110 的 `failed` 是变量名保留；L145 `success`、L160 `running`、L175 `pending`）
+- `RecoveryTaskServiceTest.java` L110/145/160/175：`failed.setStatus("FAILED")` → `RecoveryTaskStatus.FAILED`；`success.setStatus("SUCCESS")` → `RecoveryTaskStatus.SUCCEEDED`（枚举名为 SUCCEEDED）；`running.setStatus("RUNNING")` → `RecoveryTaskStatus.RUNNING`；`pending.setStatus("PENDING")` → `RecoveryTaskStatus.PENDING`
 - `RecoveryEventHandlerTest.java` L83/121/144/166/207/235：`setStatus("...")` → `RecoveryTaskStatus.X`
 - `UnifiedTaskCompatibilityIT.java` L351/356/360：`rt.setStatus("SUCCEEDED")` → `RecoveryTaskStatus.SUCCEEDED`；`et.setStatus("FAILED")` → `ExportTaskStatus.FAILED`；`st.setStatus("SUCCESS")` → `DirectoryScanTaskStatus.SUCCESS`
 
@@ -708,7 +708,7 @@ public enum DirectoryScanTaskStatus {
 
 ```bash
 ".\mvnw -pl api-service -am test-compile" ; if ($LASTEXITCODE -eq 0) { "COMPILE_OK" }
-".\mvnw -pl api-service -am test \"-Dtest=RecoveryTaskServiceTest,RecoveryEventHandlerTest,UnifiedTaskCompatibilityIT,ExportTaskStatusTest\" \"-Dsurefire.failIfNoSpecifiedTests=false\""
+".\mvnw -pl api-service -am test \"-Dtest=RecoveryTaskServiceTest,RecoveryEventHandlerTest,UnifiedTaskCompatibilityIT\" \"-Dsurefire.failIfNoSpecifiedTests=false\""
 ```
 Expected: BUILD SUCCESS。
 
@@ -718,7 +718,6 @@ Expected: BUILD SUCCESS。
 git add api-service/src/main/java/com/comicatlas/api/common/enums api-service/src/main/java/com/comicatlas/api/export api-service/src/main/java/com/comicatlas/api/importer api-service/src/main/java/com/comicatlas/api/management/service/LegacyTaskBackfillService.java api-service/src/main/java/com/comicatlas/api/common/handler/EnumTypeHandlers.java api-service/src/test/java/com/comicatlas/api/importer api-service/src/test/java/com/comicatlas/api/management/UnifiedTaskCompatibilityIT.java
 git commit -m "Export/Recovery/DirectoryScan 任务状态迁移为枚举并注册 TypeHandler"
 ```
-若 `ExportTaskStatusTest` 不存在，从测试命令与 git add 中移除。
 
 ---
 
