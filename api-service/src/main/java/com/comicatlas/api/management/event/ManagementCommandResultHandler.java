@@ -19,6 +19,7 @@ import com.comicatlas.api.management.trash.TrashManifestService;
 import com.comicatlas.api.outbox.service.InboxService;
 import com.comicatlas.api.reader.entity.ReadingHistory;
 import com.comicatlas.api.reader.mapper.ReadingHistoryMapper;
+import com.comicatlas.api.storage.service.MetadataRefreshService;
 import com.comicatlas.common.dto.TrashManifestActual;
 import com.comicatlas.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.common.enums.ManagementTaskStatus;
@@ -82,6 +83,7 @@ public class ManagementCommandResultHandler {
     private final ObjectMapper objectMapper;
     private final UploadSessionMapper uploadSessionMapper;
     private final UploadSessionService uploadSessionService;
+    private final MetadataRefreshService metadataRefreshService;
 
     @RabbitListener(queues = "management.result.queue")
     public void handleResult(ComicEvent raw,
@@ -177,7 +179,11 @@ public class ManagementCommandResultHandler {
             case "COMIC_PURGE" -> applyComicPurgeCompleted(ev.targetId());
             case "CHAPTER_PURGE" -> applyChapterPurgeCompleted(ev.targetId());
             case "MEDIA_PURGE" -> applyMediaPurgeCompleted(ev.targetId());
-            case "METADATA_REFRESH" -> { }
+            case "METADATA_REFRESH" -> {
+                if (comicScope) {
+                    metadataRefreshService.refresh(ev.targetId());
+                }
+            }
             default -> log.warn("未知 completed 操作类型: {}", ev.operationType());
         }
     }

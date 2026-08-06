@@ -1,7 +1,6 @@
 package com.comicatlas.api.admin.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.api.admin.dto.ComicDeleteStats;
 import com.comicatlas.api.admin.dto.RefreshMetadataResult;
 import com.comicatlas.api.admin.dto.RecoveryProgress;
@@ -9,39 +8,29 @@ import com.comicatlas.api.admin.dto.ScanRecoverResultDTO;
 import com.comicatlas.api.admin.dto.StorageStatsDTO;
 import com.comicatlas.api.admin.mapper.StorageMapper;
 import com.comicatlas.api.admin.recovery.RecoveryEngine;
-import com.comicatlas.api.admin.recovery.ScannedMediaInfo;
 import com.comicatlas.api.admin.service.AdminService;
 import com.comicatlas.api.admin.service.MetadataExporter;
 import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.comic.cache.ComicReferenceCache;
-import com.comicatlas.common.event.MetadataRefreshEvent;
-import com.comicatlas.common.event.VideoMetadataFixRequestedEvent;
 import com.comicatlas.api.common.constant.HttpStatusCodes;
-import com.comicatlas.api.common.enums.ComicStatus;
-import com.comicatlas.api.common.enums.HqStatus;
 import com.comicatlas.api.common.enums.ImportTaskStatus;
-import com.comicatlas.api.common.enums.LqStatus;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.common.storage.ApiStorageProperties;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
 import com.comicatlas.api.reader.entity.ReadingHistory;
 import com.comicatlas.api.reader.mapper.ReadingHistoryMapper;
+import com.comicatlas.api.storage.service.MetadataRefreshService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.LocalDateTime;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import com.comicatlas.api.comic.mapper.CatalogMapper;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
@@ -69,13 +58,12 @@ public class AdminServiceImpl implements AdminService {
     private final ReadingHistoryMapper historyMapper;
     private final ImportTaskMapper taskMapper;
     private final StorageMapper storageMapper;
-    private final TransactionTemplate transactionTemplate;
     private final MetadataExporter metadataExporter;
-    private final RabbitTemplate rabbitTemplate;
     private final RecoveryEngine recoveryEngine;
     private final CatalogCacheInvalidator catalogCacheInvalidator;
     private final com.comicatlas.api.management.operation.MediaOperationCommandService mediaOperationCommandService;
     private final ApiStorageProperties storageProperties;
+    private final MetadataRefreshService metadataRefreshService;
 
     /** 未结束（活跃）的导入任务状态 */
     private static final Set<ImportTaskStatus> ACTIVE_STATUSES =
@@ -226,20 +214,6 @@ public class AdminServiceImpl implements AdminService {
         catalogMapper.delete(new LambdaQueryWrapper<Catalog>().eq(Catalog::getComicId, comicId));
     }
 
-    /**
-     * 根据统计数据构造刷新结果。
-     */
-    private RefreshMetadataResult buildResult(Long comicId, Map<String, Object> stats, long durationMs) {
-        return new RefreshMetadataResult(
-                comicId,
-                "READY",
-                (int) stats.get("catalogs"),
-                (int) stats.get("chapters"),
-                (int) stats.get("pages"),
-                durationMs,
-                LocalDateTime.now());
-    }
-
     private BigDecimal toBigDecimal(Object o) {
         if (o == null) { return null; }
         if (o instanceof BigDecimal bd) { return bd; }
@@ -250,126 +224,15 @@ public class AdminServiceImpl implements AdminService {
         return null;
     }
 
+    /**
+     * 刷新单漫画元数据（旧入口，已收敛到存储操作域）。
+     *
+     * @deprecated 请改用 POST /api/storage/refresh-metadata/comics/{id}
+     */
     @Override
+    @Deprecated
     public RefreshMetadataResult refreshMetadata(Long comicId) {
-        Comic comic = comicMapper.selectById(comicId);
-        if (comic == null) {
-            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在");
-        }
-        if (comic.getStatus() != ComicStatus.READY) {
-            throw new BusinessException(HttpStatusCodes.CONFLICT, "漫画状态异常，当前状态: " + comic.getStatus());
-        }
-
-        // CAS 锁：READY → REFRESHING
-        int updated = comicMapper.update(null,
-                new LambdaUpdateWrapper<Comic>()
-                        .eq(Comic::getStatus, ComicStatus.READY)
-                        .set(Comic::getStatus, ComicStatus.REFRESHING));
-        if (updated == 0) {
-            throw new BusinessException(HttpStatusCodes.CONFLICT, "该漫画正在刷新中");
-        }
-
-        long start = System.currentTimeMillis();
-        try {
-            Map<String, Object> stats = transactionTemplate.execute(status -> {
-                List<Chapter> chapters = chapterMapper.selectList(
-                        new LambdaQueryWrapper<Chapter>()
-                                .eq(Chapter::getComicId, comicId)
-                                .orderByAsc(Chapter::getGlobalOrder));
-
-                int totalPages = 0;
-                long totalSize = 0;
-
-                for (Chapter chapter : chapters) {
-                    List<ScannedMediaInfo> hqImages = recoveryEngine.scanChapterPages(comicId, chapter.getGlobalOrder());
-
-                    List<Media> dbPagesList = mediaMapper.selectList(
-                            new LambdaQueryWrapper<Media>().eq(Media::getChapterId, chapter.getId()));
-                    Map<String, Media> dbPageMap = new LinkedHashMap<>();
-                    for (Media media : dbPagesList) {
-                        String hqPath = media.getHqPath();
-                        if (hqPath != null && hqPath.contains("/")) {
-                            String fileName = hqPath.substring(hqPath.lastIndexOf('/') + 1);
-                            if (!fileName.isEmpty() && !"null".equals(fileName)) {
-                                dbPageMap.put(fileName, media);
-                            }
-                        }
-                    }
-
-                    int nextPageNumber = dbPagesList.isEmpty() ? 1 :
-                            dbPagesList.stream().mapToInt(Media::getPageNumber).max().orElse(0) + 1;
-
-                    for (ScannedMediaInfo pi : hqImages) {
-                        if (dbPageMap.containsKey(pi.imageName())) {
-                            Media existing = dbPageMap.get(pi.imageName());
-                            existing.setFileSize(pi.fileSize());
-                            if (!"VIDEO".equals(existing.getMediaType())) {
-                                existing.setWidth(pi.width());
-                                existing.setHeight(pi.height());
-                            }
-                            existing.setHqStatus(HqStatus.READY);
-                            mediaMapper.updateById(existing);
-                            dbPageMap.remove(pi.imageName());
-                        } else {
-                            Media newPage = new Media();
-                            newPage.setChapterId(chapter.getId());
-                            newPage.setPageNumber(nextPageNumber++);
-                            newPage.setHqRoot("HQ");
-                            newPage.setHqPath(comicId + "/" + chapter.getGlobalOrder() + "/" + pi.imageName());
-                            newPage.setHqStatus(pi.fileSize() > 0 ? HqStatus.READY : HqStatus.MISSING);
-                            newPage.setLqStatus(LqStatus.NOT_GENERATED);
-                            newPage.setFileSize(pi.fileSize());
-                            newPage.setWidth(pi.width());
-                            newPage.setHeight(pi.height());
-                            newPage.setMediaType(pi.mediaType());
-                            mediaMapper.insert(newPage);
-                        }
-                        totalSize += pi.fileSize();
-                    }
-
-                    for (Media leftover : dbPageMap.values()) {
-                        mediaMapper.deleteById(leftover.getId());
-                    }
-
-                    int actualPageCount = hqImages.size();
-                    chapter.setPageCount(actualPageCount);
-                    chapterMapper.updateById(chapter);
-                    totalPages += actualPageCount;
-                }
-
-                comic.setTotalPages(totalPages);
-                comic.setFileSize(totalSize);
-                comic.setHqSize(totalSize);
-                comicMapper.updateById(comic);
-
-                return Map.of("catalogs", 0, "chapters", chapters.size(), "pages", totalPages);
-            });
-
-            long durationMs = System.currentTimeMillis() - start;
-
-            int videoFixed = fixVideoMetadata(comicId);
-            catalogCacheInvalidator.evict(comicId);
-
-            try {
-                rabbitTemplate.convertAndSend("comic.export", "metadata.refresh.requested",
-                        new MetadataRefreshEvent(null, null, comicId));
-            } catch (Exception e) {
-                log.error("发送 metadata 刷新 MQ 消息失败: comicId={}", comicId, e);
-            }
-
-            return buildResult(comicId, stats, durationMs);
-        } finally {
-            comicMapper.update(null,
-                    new LambdaUpdateWrapper<Comic>()
-                            .eq(Comic::getId, comicId)
-                            .set(Comic::getStatus, ComicStatus.READY));
-        }
-    }
-
-    private int fixVideoMetadata(Long comicId) {
-        rabbitTemplate.convertAndSend("comic.image", "video.metadata.fix.requested",
-                new VideoMetadataFixRequestedEvent(null, null, comicId));
-        return 0;
+        return metadataRefreshService.refresh(comicId);
     }
 
 }
