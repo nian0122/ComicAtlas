@@ -157,23 +157,27 @@ SUCCESS
 ## 5. LQ 生成（手动触发）
 
 ```
-POST /api/comics/{comicId}/lq       # 整本
-POST /api/chapters/{chapterId}/lq   # 单章
+POST /api/storage/lq/comics/{comicId}       # 整本
+POST /api/storage/lq/chapters/{chapterId}   # 单章
 ```
 
 状态：NOT_GENERATED → QUEUED → GENERATING → READY / FAILED
+
+> 存储操作统一收敛到 `/api/storage` 形态（见第 20 节）。旧端点 `/api/comics/{comicId}/lq`、`/api/chapters/{chapterId}/lq` 已移除。
 
 ---
 
 ## 6. HQ 删除
 
 ```
-POST /api/comics/{comicId}/delete-hq       # 整本删除 HQ
-POST /api/chapters/{chapterId}/delete-hq   # 单章删除 HQ
+POST /api/storage/delete-hq/comics/{comicId}       # 整本删除 HQ
+POST /api/storage/delete-hq/chapters/{chapterId}   # 单章删除 HQ
 ```
 
 删除漫画/章节的 HQ 高清图片以释放磁盘空间。LQ 缩略图不受影响。
 状态：READY → DELETED（通过 MQ 异步完成）
+
+> 存储操作统一收敛到 `/api/storage` 形态（见第 20 节）。旧端点 `/api/comics/{comicId}/delete-hq` 等已移除。
 
 ---
 
@@ -201,7 +205,7 @@ GET  /api/tasks/directory-scan/{id}
 
 ## 8. 统计
 
-> **已移除（v1.0）**：`GET /api/dashboard/statistics` 不存在于当前代码。存储统计请使用 `GET /api/admin/storage/stats`（见第 11 节）。
+> **已移除（v1.0）**：`GET /api/dashboard/statistics` 不存在于当前代码。存储统计请使用 `GET /api/storage/stats`（见第 20 节）。
 
 ---
 
@@ -224,52 +228,31 @@ DELETE /api/tags/{id}
 ## 11. 管理
 
 ```
-POST /api/admin/comics/{id}/refresh-metadata  # 刷新漫画元数据（重新解析目录）
 POST /api/admin/storage/scan-recover          # 扫描 HQ 目录并恢复/创建占位漫画（已废弃，见第 12 节）
 DELETE /api/admin/comics/{id}?mode=DATABASE_ONLY  # 兼容入口，v1.0 起重定向到回收站
 ```
 
 > `POST /api/admin/rebuild` 不存在于当前代码，勿调用。存储恢复请使用异步恢复任务（第 12 节）。
+> 刷新元数据已迁至 `POST /api/storage/refresh-metadata/comics/{id}`（见第 20 节），不再提供 `/api/admin/comics/{id}/refresh-metadata`。
 
 ### 存储查询
 
 ```
-GET /api/admin/storage/stats                   # 存储统计摘要（total/hq/lq/thumb/comicCount）
+GET /api/storage/stats                       # 存储统计摘要（total/hq/lq/thumb/comicCount，见第 20 节）
 GET /api/admin/storage/comics?hqStatus=&lqStatus=&sort=&keyword=  # 漫画级存储列表
 GET /api/admin/storage/comics/{id}/chapters    # 章节级存储详情
 ```
 
 返回每个漫画/章节的 HQ/LQ 大小和状态，支持按 HQ/LQ 状态筛选和排序。
 
-### 视频转码补偿
+### 视频转码
 
 ```
-POST /api/admin/storage/comics/{comicId}/transcode-videos
+POST /api/storage/transcode/comics/{comicId}       # 整本
+POST /api/storage/transcode/chapters/{chapterId}   # 单章
 ```
 
-触发漫画的视频转码补偿任务。扫描漫画下所有非标准格式视频（非 mp4/webm），标记为 PENDING 并发送 MQ。
-
-**响应**：
-```json
-{
-  "comicId": 92,
-  "totalVideoPages": 15,
-  "notNeededCount": 5,
-  "submittedCount": 3,
-  "pendingCount": 3,
-  "doneCount": 7,
-  "failedCount": 0
-}
-```
-
-| 字段 | 说明 |
-|------|------|
-| `totalVideoPages` | 漫画下所有 VIDEO 类型页面总数 |
-| `notNeededCount` | 无需转码的页面数（transcode_status = NOT_NEEDED） |
-| `submittedCount` | 本次从 NOT_NEEDED/FAILED 标记为 PENDING 并提交的数量 |
-| `pendingCount` | 当前待处理的页面总数，包含本次提交数量 |
-| `doneCount` | 已完成的页面数（transcode_status = DONE） |
-| `failedCount` | 当前转码失败的页面数 |
+触发漫画的视频转码补偿任务。扫描漫画下所有非标准格式视频（非 mp4/webm），标记为 PENDING 并发送 MQ。返回 `OperationSubmitResult`（`taskId`/`taskType`/`status`/`itemCount`，`taskId` 为空表示无可转码目标）。
 
 **transcode_status 状态机**：
 ```
@@ -865,7 +848,6 @@ OP_NOT_ALLOWED, COMIC_NOT_FOUND
 | `GET /api/comics/{id}/catalog` | 目录树（只读，兼容） | 目录管理用 `/api/comics/{comicId}/catalogs` |
 | `POST /api/comics/batch/update` | 保留（分类/标签批量） | 批量操作建议迁移到 `/api/management/batch` |
 | 阅读端接口（`/api/comics`、`/api/chapters/{id}`、`/api/history`） | 兼容，只返回阅读所需字段 | 长期保留 |
-| `POST /api/comics/{id}/lq` 等存储操作旧端点 | 保留 deprecated，转发到 `/api/storage/*` | 前端迁移后移除 |
 
 ## 20. 存储操作域（v1.1）
 
@@ -878,7 +860,9 @@ OP_NOT_ALLOWED, COMIC_NOT_FOUND
 | 删除 HQ 保留 LQ | `POST /api/storage/delete-hq/comics/{id}`、`/delete-hq/chapters/{id}` |
 | 导出漫画 | `POST /api/storage/export/comics/{id}` |
 | 导出任务查询 | `GET /api/storage/export/comics/{id}/tasks`、`GET /api/storage/export/tasks/{taskId}` |
+| 导出下载 | `GET /api/storage/export/tasks/{taskId}/download` |
+| 导出打开目录 | `POST /api/storage/export/tasks/{taskId}/open` |
 | 刷新 Metadata | `POST /api/storage/refresh-metadata/comics/{id}` |
 | 存储统计 | `GET /api/storage/stats` |
 
-> 旧端点（`/comics/{id}/lq`、`/admin/storage/comics/{id}/transcode-videos` 等）保留为 deprecated 兼容入口，等待前端迁移后移除（见 §19.2）。
+> 旧端点（`/comics/{id}/lq`、`/admin/storage/comics/{id}/transcode-videos` 等）已随接口收敛全部移除，存储操作统一使用上表 `/api/storage/*` 形态。
