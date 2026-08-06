@@ -170,6 +170,9 @@ public class ImageOptimizer {
             }
 
             log.info("封面优化完成: comicId={}, output={}", comicId, coverFile);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("封面优化被中断: comicId=" + comicId, e);
         } catch (Exception e) {
             throw new RuntimeException("封面优化失败: comicId=" + comicId + ", " + e.getMessage(), e);
         } finally {
@@ -226,6 +229,9 @@ public class ImageOptimizer {
 
             // 用 generateCover 优化抽出的帧
             generateCover(comicId, frameFile);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("视频封面生成被中断: comicId=" + comicId, e);
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {

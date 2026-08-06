@@ -141,6 +141,10 @@ public class TranscodeCommandHandler {
 
             log.info("转码完成: pageId={}, newPath={}", pageId, newHqFile);
             return null;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("转码命令被中断: pageId={}", pageId);
+            return "TRANSCODE_INTERRUPTED";
         } catch (Exception e) {
             log.error("转码失败: pageId={}", pageId, e);
             return e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();

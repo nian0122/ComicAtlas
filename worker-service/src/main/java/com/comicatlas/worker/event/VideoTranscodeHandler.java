@@ -114,6 +114,10 @@ public class VideoTranscodeHandler {
 
             channel.basicAck(tag, false);
 
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("视频转码被中断: pageId={}", pageId);
+            // 非业务失败：不发送 failed 事件，由监听器容器感知中断状态
         } catch (Exception e) {
             log.error("视频转码失败: pageId={}", pageId, e);
             rabbitTemplate.convertAndSend("comic.video", "video.transcode.failed",
