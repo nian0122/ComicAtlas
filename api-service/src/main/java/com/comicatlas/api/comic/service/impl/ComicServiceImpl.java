@@ -41,7 +41,6 @@ import com.comicatlas.api.comic.mapper.CategoryMapper;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.mapper.ComicTagMapper;
-import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.api.comic.mapper.TagMapper;
 import com.comicatlas.api.comic.entity.Category;
 import com.comicatlas.api.comic.entity.Chapter;
@@ -56,7 +55,6 @@ public class ComicServiceImpl implements ComicService {
     private final ComicMapper comicMapper;
     private final ComicListQueryService comicListQueryService;
     private final ChapterMapper chapterMapper;
-    private final MediaMapper mediaMapper;
     private final TagMapper tagMapper;
     private final ComicTagMapper comicTagMapper;
     private final CategoryMapper categoryMapper;
