@@ -585,6 +585,20 @@ public class ManagementTaskService {
                         .last("LIMIT 1"));
     }
 
+    /**
+     * 统计任务下尚未结束（QUEUED/RUNNING/CANCELLING）的目标项数量。
+     * 供结果事件处理器判断任务是否已全部完成（最后一项完成时触发整本聚合）。
+     */
+    public long countActiveItems(Long taskId) {
+        return itemMapper.selectCount(
+                new LambdaQueryWrapper<ManagementTaskItem>()
+                        .eq(ManagementTaskItem::getTaskId, taskId)
+                        .in(ManagementTaskItem::getStatus,
+                                ManagementTaskStatus.QUEUED,
+                                ManagementTaskStatus.RUNNING,
+                                ManagementTaskStatus.CANCELLING));
+    }
+
     // ======================== 聚合 ========================
 
     /**

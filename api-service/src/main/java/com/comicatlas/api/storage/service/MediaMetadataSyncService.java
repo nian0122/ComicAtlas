@@ -47,16 +47,61 @@ public class MediaMetadataSyncService {
         if (chapter == null) {
             return;
         }
-        Long comicId = chapter.getComicId();
         refreshChapterAndComicStats(chapter.getId());
+        publishMetadataRefresh(chapter.getComicId(), taskId, "mediaId=" + mediaId);
+    }
+
+    /**
+     * 整本转码任务全部完成后同步：一次性聚合整本统计并触发 metadata.json 重导出。
+     * 由结果事件处理器在任务无剩余未完成项时调用，避免每个视频各自重导出一次。
+     */
+    public void notifyTaskTranscoded(Long comicId, Long taskId) {
+        if (comicId == null) {
+            return;
+        }
+        refreshComicStats(comicId);
+        publishMetadataRefresh(comicId, taskId, "taskId=" + taskId);
+    }
+
+    /** 失效目录缓存并发送 metadata.refresh.requested，委托 Worker 重导出 metadata.json。 */
+    private void publishMetadataRefresh(Long comicId, Long taskId, String source) {
         catalogCacheInvalidator.evict(comicId);
         try {
             rabbitTemplate.convertAndSend("comic.export", "metadata.refresh.requested",
                     new MetadataRefreshEvent(null, null, comicId));
-            log.info("转码后元数据同步已触发: mediaId={}, comicId={}, taskId={}", mediaId, comicId, taskId);
+            log.info("转码后元数据同步已触发: comicId={}, taskId={}, source={}", comicId, taskId, source);
         } catch (Exception e) {
             log.warn("发送 metadata 刷新 MQ 消息失败: comicId={}", comicId, e);
         }
+    }
+
+    /** 整本统计聚合（一次性）：各章节页数、漫画总页数与整本 HQ 大小。 */
+    private void refreshComicStats(Long comicId) {
+        List<Chapter> chapters = chapterMapper.selectList(
+                new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
+        if (chapters.isEmpty()) {
+            return;
+        }
+        List<Long> chapterIds = chapters.stream().map(Chapter::getId).toList();
+        long totalPages = 0;
+        for (Chapter chapter : chapters) {
+            long pageCount = mediaMapper.selectCount(new LambdaQueryWrapper<Media>()
+                    .eq(Media::getChapterId, chapter.getId())
+                    .notIn(Media::getStatus, "DELETED", "TRASHED"));
+            totalPages += pageCount;
+            chapterMapper.update(null, new LambdaUpdateWrapper<Chapter>()
+                    .eq(Chapter::getId, chapter.getId())
+                    .set(Chapter::getPageCount, (int) pageCount));
+        }
+        long hqSize = mediaMapper.selectList(
+                        new LambdaQueryWrapper<Media>().in(Media::getChapterId, chapterIds)).stream()
+                .filter(p -> p.getHqStatus() != HqStatus.DELETED)
+                .mapToLong(p -> p.getFileSize() != null ? p.getFileSize() : 0L)
+                .sum();
+        comicMapper.update(null, new LambdaUpdateWrapper<Comic>()
+                .eq(Comic::getId, comicId)
+                .set(Comic::getTotalPages, (int) totalPages)
+                .set(Comic::getHqSize, hqSize));
     }
 
     /** 与 ManagementCommandResultHandler.refreshChapterAndComicStats 同款聚合：章节页数 + 漫画总页数 + 整本 HQ 大小。 */
