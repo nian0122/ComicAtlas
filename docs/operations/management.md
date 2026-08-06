@@ -123,7 +123,7 @@ rsync -a --delete /data/manga/metadata /data/backup/metadata
 
 ### 升级前
 
-1. 阅读 [发布说明](../release/v1.0.0.md) 与版本迁移文档。
+1. 阅读 [发布说明](../releases/v1.0.0.md) 与版本迁移文档。
 2. 备份数据库与存储卷（见上文）。
 3. 确认 Worker、API 无进行中的任务，或接受任务中断由 DLQ/Outbox 补偿。
 

@@ -47,6 +47,7 @@ mysql-data/
 .omo/run-continuation/
 .omo/evidence/
 .omo/drafts/
+.omo/plans/
 frontend/.omo/
 
 # Logs
