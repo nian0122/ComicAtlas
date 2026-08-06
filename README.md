@@ -84,7 +84,7 @@ ComicAtlas 是一个面向个人收藏的本地漫画仓库平台。它把 ZIP�
 开发分支为 `develop`。在 Windows PowerShell 中可使用：
 
 ```powershell
-.\start-dev.ps1
+.\scripts\dev\start-dev.ps1
 ```
 
 前端单独启动：
