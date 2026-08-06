@@ -1,6 +1,7 @@
 package com.comicatlas.worker.file.download;
 
 import com.comicatlas.worker.config.WorkerConfig;
+import com.comicatlas.worker.process.ExternalProcessRunner;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -14,6 +15,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TorrentDownloader implements DownloadStrategy {
     private final WorkerConfig config;
+    private final ExternalProcessRunner processRunner;
 
     @Override
     public DownloadContext.DownloadResult download(String magnetUrl, Path destDir) throws Exception {
@@ -29,9 +31,8 @@ public class TorrentDownloader implements DownloadStrategy {
             "--stop-with-process=" + ProcessHandle.current().pid()
         ));
         ProcessBuilder processBuilder = new ProcessBuilder(cmd);
-        processBuilder.inheritIO();
-        Process process = processBuilder.start();
-        int exitCode = process.waitFor();
+        ExternalProcessRunner.ExternalProcessResult result = processRunner.run(processBuilder, 0);
+        int exitCode = result.exitCode();
         if (exitCode != 0 && exitCode != 143) { // 143 = SIGTERM
             throw new RuntimeException("aria2c exit: " + exitCode);
         }
@@ -40,9 +41,8 @@ public class TorrentDownloader implements DownloadStrategy {
         boolean hasFiles = Files.list(destDir).anyMatch(f ->
             !f.getFileName().toString().endsWith(".aria2"));
 
-        // 延时结束（守护进程），直接 kill
+        // 延时结束（守护进程）或下载为空：进程已被 runner waitFor 回收，直接报错
         if (exitCode == 143 || !hasFiles) {
-            process.destroyForcibly();
             throw new RuntimeException("Torrent 无做种者或下载失败");
         }
 

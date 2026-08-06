@@ -1,15 +1,13 @@
 package com.comicatlas.worker.file.transcode;
 
 import com.comicatlas.worker.config.WorkerConfig;
+import com.comicatlas.worker.process.ExternalProcessRunner;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -17,12 +15,9 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
@@ -38,7 +33,7 @@ public class VideoNormalizer {
 
     private final WorkerConfig config;
     private final ThreadPoolTaskExecutor transcodeExecutor;
-    private final ThreadPoolTaskExecutor processIoExecutor;
+    private final ExternalProcessRunner processRunner;
     private final int ffmpegThreads;
 
     private static final Set<String> NON_STANDARD_EXT = Set.of(
@@ -48,10 +43,10 @@ public class VideoNormalizer {
 
     public VideoNormalizer(WorkerConfig config,
                            @Qualifier("videoNormalizeExecutor") ThreadPoolTaskExecutor transcodeExecutor,
-                           @Qualifier("processIoExecutor") ThreadPoolTaskExecutor processIoExecutor) {
+                           ExternalProcessRunner processRunner) {
         this.config = config;
         this.transcodeExecutor = transcodeExecutor;
-        this.processIoExecutor = processIoExecutor;
+        this.processRunner = processRunner;
         this.ffmpegThreads = 2; // ffmpeg 转码线程固定 2，并行度由托管线程池控制
     }
 
@@ -238,41 +233,14 @@ public class VideoNormalizer {
         );
 
         ProcessBuilder processBuilder = new ProcessBuilder(cmd);
-        processBuilder.redirectErrorStream(true);
-        Process process = processBuilder.start();
-
-        StringBuilder processOutput = new StringBuilder();
-        CompletableFuture<Void> readFuture = CompletableFuture.runAsync(() -> {
-            try (var br = new BufferedReader(
-                    new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
-                String line;
-                while ((line = br.readLine()) != null) {
-                    processOutput.append(line).append('\n');
-                }
-            } catch (IOException e) {
-                log.warn("读取 ffmpeg 输出失败: {}", e.getMessage());
-            }
-        }, processIoExecutor);
-
-        int exitCode = process.waitFor();
-
-        try {
-            readFuture.get(5, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            process.destroyForcibly();
-            throw e;
-        } catch (ExecutionException | TimeoutException e) {
-            log.warn("等待 ffmpeg 输出读取超时: {}", e.getMessage());
+        ExternalProcessRunner.ExternalProcessResult result =
+                processRunner.run(processBuilder, 0);  // 转码无固定超时，中断由调用方取消管理
+        if (result.exitCode() != 0) {
+            String tail = result.stdout().length() > 500
+                    ? result.stdout().substring(result.stdout().length() - 500)
+                    : result.stdout();
+            throw new RuntimeException("ffmpeg exit " + result.exitCode() + ": " + tail.trim());
         }
-
-        if (exitCode != 0) {
-            String tail = processOutput.length() > 500
-                    ? processOutput.substring(processOutput.length() - 500)
-                    : processOutput.toString();
-            throw new RuntimeException("ffmpeg exit " + exitCode + ": " + tail.trim());
-        }
-
         if (!isNonEmpty(output)) {
             throw new RuntimeException("转码输出文件为空: " + output.getFileName());
         }
