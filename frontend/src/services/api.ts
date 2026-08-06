@@ -2,20 +2,11 @@ import axios from 'axios'
 import type {
   ComicMetadataUpdateDTO,
   ExportTaskVO,
+  OperationSubmitResult,
   TagCreateDTO,
   ComicTagUpdateDTO,
   BatchComicUpdateDTO,
 } from '@/types'
-
-export type VideoTranscodeResult = {
-  readonly comicId: number
-  readonly totalVideoPages: number
-  readonly notNeededCount: number
-  readonly submittedCount: number
-  readonly pendingCount: number
-  readonly doneCount: number
-  readonly failedCount: number
-}
 
 const api = axios.create({ baseURL: '/api' })
 
@@ -93,29 +84,29 @@ export const categoryApi = {
 }
 
 export const lqApi = {
-  generateComic: (comicId: number) => api.post(`/comics/${comicId}/lq`),
-  generateChapter: (chapterId: number) => api.post(`/chapters/${chapterId}/lq`),
+  generateComic: (comicId: number) => api.post(`/storage/lq/comics/${comicId}`),
+  generateChapter: (chapterId: number) => api.post(`/storage/lq/chapters/${chapterId}`),
 }
 
 export const hqApi = {
-  deleteComic: (comicId: number) => api.post(`/comics/${comicId}/delete-hq`),
-  deleteChapter: (chapterId: number) => api.post(`/chapters/${chapterId}/delete-hq`),
+  deleteComic: (comicId: number) => api.post(`/storage/delete-hq/comics/${comicId}`),
+  deleteChapter: (chapterId: number) => api.post(`/storage/delete-hq/chapters/${chapterId}`),
 }
 
 export const exportApi = {
-  createExport: (comicId: number) => api.post(`/comics/${comicId}/export`),
-  listExports: (comicId: number) => api.get<ExportTaskVO[]>(`/comics/${comicId}/exports`),
-  getTask: (taskId: number) => api.get<ExportTaskVO>(`/export/${taskId}`),
-  download: (taskId: number) => api.get(`/export/${taskId}/download`, { responseType: 'blob' }),
-  openDir: (taskId: number) => api.post(`/export/${taskId}/open`),
+  createExport: (comicId: number) => api.post(`/storage/export/comics/${comicId}`),
+  listExports: (comicId: number) => api.get<ExportTaskVO[]>(`/storage/export/comics/${comicId}/tasks`),
+  getTask: (taskId: number) => api.get<ExportTaskVO>(`/storage/export/tasks/${taskId}`),
+  download: (taskId: number) => api.get(`/storage/export/tasks/${taskId}/download`, { responseType: 'blob' }),
+  openDir: (taskId: number) => api.post(`/storage/export/tasks/${taskId}/open`),
 }
 
 export const adminApi = {
   deleteComic: (id: number, mode: string) => api.delete(`/admin/comics/${id}`, { params: { mode } }),
-  refreshMetadata: (id: number) => api.post(`/admin/comics/${id}/refresh-metadata`),
+  refreshMetadata: (id: number) => api.post(`/storage/refresh-metadata/comics/${id}`),
   // scanRecover 已迁移至异步恢复任务中心 POST /api/tasks/recovery
   // 旧同步接口 POST /admin/storage/scan-recover 后端保留供兼容
-  stats: () => api.get('/admin/storage/stats'),
+  stats: () => api.get('/storage/stats'),
   storageComics: (params: {
     page?: number
     size?: number
@@ -128,7 +119,7 @@ export const adminApi = {
   storageComic: (comicId: number) => api.get(`/admin/storage/comics/${comicId}`),
   storageChapters: (comicId: number) => api.get(`/admin/storage/comics/${comicId}/chapters`),
   transcodeVideos: (comicId: number) =>
-    api.post<VideoTranscodeResult>(`/admin/storage/comics/${comicId}/transcode-videos`),
+    api.post<OperationSubmitResult>(`/storage/transcode/comics/${comicId}`),
   dlqQueues: () =>
     api.get<readonly DlqQueueVO[]>('/admin/dlq/queues'),
   dlqMessages: (queueName: string, count = 20) =>
