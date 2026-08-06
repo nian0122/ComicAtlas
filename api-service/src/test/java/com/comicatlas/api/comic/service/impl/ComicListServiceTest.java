@@ -7,10 +7,8 @@ import com.comicatlas.api.comic.entity.Category;
 import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.mapper.CategoryMapper;
 import com.comicatlas.api.comic.mapper.ComicMapper;
+import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.common.storage.FileUrlResolver;
-import com.comicatlas.api.management.policy.AllowedOperations;
-import com.comicatlas.api.management.policy.OperationPolicyService;
-import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.reader.entity.ReadingHistory;
 import com.comicatlas.api.reader.mapper.ReadingHistoryMapper;
 import org.junit.jupiter.api.Test;
@@ -20,15 +18,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.same;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -44,10 +39,6 @@ class ComicListServiceTest {
     private ReadingHistoryMapper historyMapper;
     @Mock
     private FileUrlResolver fileUrlResolver;
-    @Mock
-    private OperationPolicyService operationPolicyService;
-    @Mock
-    private ManagementTaskService managementTaskService;
 
     @InjectMocks
     private ComicListQueryServiceImpl service;
@@ -72,8 +63,6 @@ class ComicListServiceTest {
         when(comicMapper.selectPage(any(Page.class), same(query))).thenReturn(comicPage);
         when(categoryMapper.selectBatchIds(List.of(10L))).thenReturn(List.of(category));
         when(historyMapper.selectList(any())).thenReturn(List.of(history));
-        when(operationPolicyService.forComic(any())).thenReturn(AllowedOperations.of(Set.of(), Map.of()));
-        when(managementTaskService.findActiveTasksForComics(List.of(1L, 2L))).thenReturn(Map.of());
 
         var result = service.listComics(query);
 
@@ -84,6 +73,7 @@ class ComicListServiceTest {
         assertEquals(2, result.getTotal());
         assertEquals("冒险", records.get(0).getCategoryName());
         assertEquals("冒险", records.get(1).getCategoryName());
+        assertEquals(ComicStatus.READY, records.get(0).getStatus());
         assertEquals(101L, records.get(0).getLastReadChapterId());
         assertEquals(25, records.get(0).getProgressPercent());
         assertNull(records.get(1).getLastReadChapterId());
@@ -91,8 +81,6 @@ class ComicListServiceTest {
         verify(historyMapper).selectList(any());
         verify(categoryMapper, never()).selectById(any());
         verify(historyMapper, never()).selectOne(any());
-        verify(operationPolicyService, times(2)).forComic(any());
-        verify(managementTaskService).findActiveTasksForComics(List.of(1L, 2L));
     }
 
     @Test
@@ -112,6 +100,7 @@ class ComicListServiceTest {
         comic.setId(id);
         comic.setCategoryId(categoryId);
         comic.setTotalPages(totalPages);
+        comic.setStatus(ComicStatus.READY);
         return comic;
     }
 }

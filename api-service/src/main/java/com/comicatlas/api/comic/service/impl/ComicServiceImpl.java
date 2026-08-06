@@ -13,7 +13,6 @@ import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.common.exception.ConflictException;
 import com.comicatlas.api.common.storage.FileUrlResolver;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
-import com.comicatlas.api.management.policy.OperationPolicyService;
 import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.management.trash.TrashLifecycleService;
 import com.comicatlas.api.reader.entity.ReadingHistory;
@@ -65,7 +64,6 @@ public class ComicServiceImpl implements ComicService {
     private final CategoryMapper categoryMapper;
     private final ReadingHistoryMapper historyMapper;
     private final FileUrlResolver fileUrlResolver;
-    private final OperationPolicyService operationPolicyService;
     private final ManagementTaskService managementTaskService;
     private final TrashLifecycleService trashLifecycleService;
     private final CatalogCacheInvalidator catalogCacheInvalidator;
@@ -370,10 +368,8 @@ public class ComicServiceImpl implements ComicService {
         vo.setSourceRef(comic.getSourceRef());
         vo.setCategoryId(comic.getCategoryId());
         vo.setCategoryName(resolveCategoryName(comic.getCategoryId()));
-        vo.setLifecycle(toLifecycle(comicStatusName(comic)));
+        vo.setStatus(toLifecycle(comicStatusName(comic)));
         vo.setVersion(comic.getVersion());
-        vo.setActiveTask(activeTaskFor(comic.getId()));
-        vo.setAllowedOperations(operationPolicyService.forComic(comicStatusName(comic)));
         vo.setCreatedAt(comic.getCreatedAt());
         vo.setUpdatedAt(comic.getUpdatedAt());
 
@@ -416,10 +412,6 @@ public class ComicServiceImpl implements ComicService {
             vo.setProgressPercent(history.getPageNumber() * 100 / comic.getTotalPages());
         }
         return vo;
-    }
-
-    private ManagementTaskResponse activeTaskFor(Long comicId) {
-        return managementTaskService.findActiveTasksForComics(List.of(comicId)).get(comicId);
     }
 
     private static String comicStatusName(Comic comic) {

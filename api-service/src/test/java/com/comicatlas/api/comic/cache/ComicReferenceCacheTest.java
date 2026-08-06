@@ -20,8 +20,6 @@ import com.comicatlas.api.comic.service.impl.CategoryServiceImpl;
 import com.comicatlas.api.comic.service.impl.ComicListQueryServiceImpl;
 import com.comicatlas.api.comic.service.impl.TagServiceImpl;
 import com.comicatlas.api.common.storage.FileUrlResolver;
-import com.comicatlas.api.management.policy.OperationPolicyService;
-import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.reader.mapper.ReadingHistoryMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -75,15 +73,10 @@ class ComicReferenceCacheTest {
     private CacheEvictor cacheEvictor;
     @Autowired
     private FileUrlResolver fileUrlResolver;
-    @Autowired
-    private OperationPolicyService operationPolicyService;
-    @Autowired
-    private ManagementTaskService managementTaskService;
 
     @BeforeEach
     void setUp() {
         reset(categoryMapper, tagMapper, comicMapper, historyMapper);
-        when(managementTaskService.findActiveTasksForComics(any())).thenReturn(java.util.Map.of());
         for (String name : List.of(
                 ComicReferenceCache.CATEGORIES,
                 ComicReferenceCache.TAGS,
@@ -184,8 +177,7 @@ class ComicReferenceCacheTest {
         q2.setPage(2);
 
         ComicListQueryServiceImpl service = new ComicListQueryServiceImpl(
-                comicMapper, categoryMapper, historyMapper, fileUrlResolver,
-                operationPolicyService, managementTaskService);
+                comicMapper, categoryMapper, historyMapper, fileUrlResolver);
         assertEquals(32, service.cacheKey(q1).length(), "MD5 key 应为 32 字符");
         // 同条件同 key
         ComicListQuery q1b = new ComicListQuery();
@@ -331,16 +323,6 @@ class ComicReferenceCacheTest {
         }
 
         @Bean
-        OperationPolicyService operationPolicyService() {
-            return mock(OperationPolicyService.class);
-        }
-
-        @Bean
-        ManagementTaskService managementTaskService() {
-            return mock(ManagementTaskService.class);
-        }
-
-        @Bean
         CacheManager cacheManager() {
             return new ConcurrentMapCacheManager(
                     ComicReferenceCache.CATEGORIES,
@@ -373,12 +355,9 @@ class ComicReferenceCacheTest {
                 ComicMapper comicMapper,
                 CategoryMapper categoryMapper,
                 ReadingHistoryMapper historyMapper,
-                FileUrlResolver fileUrlResolver,
-                OperationPolicyService operationPolicyService,
-                ManagementTaskService managementTaskService) {
+                FileUrlResolver fileUrlResolver) {
             return new ComicListQueryServiceImpl(
-                    comicMapper, categoryMapper, historyMapper, fileUrlResolver,
-                    operationPolicyService, managementTaskService);
+                    comicMapper, categoryMapper, historyMapper, fileUrlResolver);
         }
     }
 }

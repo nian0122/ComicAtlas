@@ -1,8 +1,6 @@
 package com.comicatlas.api.comic.dto;
 
 import com.comicatlas.api.common.enums.ComicStatus;
-import com.comicatlas.api.management.dto.ManagementTaskResponse;
-import com.comicatlas.api.management.policy.AllowedOperations;
 import lombok.Data;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -10,8 +8,8 @@ import java.util.List;
 /**
  * 漫画详情视图。
  * <p>
- * 生命周期、活跃管理任务、允许操作均由服务端强类型返回，
- * 前端不得自算操作权限。
+ * status 为生命周期状态（强类型，序列化为枚举名，对齐前端 comic.status 契约）。
+ * 活跃管理任务与允许操作已由管理端独立查询，不再冗余返回。
  */
 @Data
 public class ComicDetailVO {
@@ -27,14 +25,10 @@ public class ComicDetailVO {
     private String sourceRef;
     private Long categoryId;
     private String categoryName;
-    /** 生命周期状态（强类型，替代旧 status:string） */
-    private ComicStatus lifecycle;
+    /** 生命周期状态（强类型，对齐前端 comic.status 契约） */
+    private ComicStatus status;
     /** 乐观锁版本号 */
     private Integer version;
-    /** 当前活跃的管理任务（无则 null） */
-    private ManagementTaskResponse activeTask;
-    /** 当前状态下允许的操作与阻塞原因 */
-    private AllowedOperations allowedOperations;
     private Integer progressPercent;
     private Long lastReadChapterId;
     private Integer lastReadPage;
