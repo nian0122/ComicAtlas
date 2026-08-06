@@ -1,5 +1,6 @@
 package com.comicatlas.api.common.handler;
 
+import lombok.extern.slf4j.Slf4j;
 import org.apache.ibatis.type.BaseTypeHandler;
 import org.apache.ibatis.type.JdbcType;
 import org.apache.ibatis.type.MappedTypes;
@@ -27,6 +28,7 @@ import com.comicatlas.common.enums.TaskType;
  * VARCHAR 数据库字段 ↔ Java Enum 自动映射。
  * 覆盖 api-service 自身枚举 + comic-common 共享枚举。
  */
+@Slf4j
 public class EnumTypeHandlers {
 
     // ======================== api-service 枚举 ========================
@@ -149,6 +151,12 @@ public class EnumTypeHandlers {
 
     private static <T extends Enum<T>> T safeValueOf(Class<T> clazz, String value) {
         if (value == null) { return null; }
-        try { return Enum.valueOf(clazz, value); } catch (IllegalArgumentException e) { return null; }
+        try {
+            return Enum.valueOf(clazz, value);
+        } catch (IllegalArgumentException e) {
+            log.warn("数据库存在未知枚举值: type={}, value={}（已按 null 处理，建议核查脏数据）",
+                    clazz.getSimpleName(), value);
+            return null;
+        }
     }
 }
