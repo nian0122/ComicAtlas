@@ -1,4 +1,4 @@
-package com.comicatlas.worker.file.parse;
+package com.comicatlas.worker.importer;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

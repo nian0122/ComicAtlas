@@ -13,7 +13,7 @@ import java.util.List;
 
 /**
  * EHENTAI Gallery 下载服务：下载（Archiver 直链优先 → Torrent 兜底）并解压，
- * 返回可直接交给 {@link com.comicatlas.worker.file.handler.DirectoryImportHandler} 的源目录。
+ * 返回可直接交给 {@link com.comicatlas.worker.importer.DirectoryImportHandler} 的源目录。
  * <p>
  * 文件搬运与 metadata 写入由统一导入链路（DirectoryImportHandler）负责，本服务不落库不搬文件。
  */

@@ -1,13 +1,7 @@
-package com.comicatlas.worker.file.handler;
+package com.comicatlas.worker.importer;
 
 import com.comicatlas.worker.event.CancelHandler;
-import com.comicatlas.worker.file.manifest.ImportManifest;
-import com.comicatlas.worker.file.manifest.ImportManifestManager;
 import com.comicatlas.worker.file.parse.ComicMetadata;
-import com.comicatlas.worker.file.parse.DirectoryParser;
-import com.comicatlas.worker.file.parse.DirectoryTree;
-import com.comicatlas.worker.file.parse.ImportContext;
-import com.comicatlas.worker.file.parse.MetadataAssembler;
 import com.comicatlas.worker.storage.StorageRef;
 import com.comicatlas.worker.storage.StorageService;
 import com.comicatlas.worker.storage.TransferMode;

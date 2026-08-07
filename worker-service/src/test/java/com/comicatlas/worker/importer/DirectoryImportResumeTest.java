@@ -1,11 +1,7 @@
-package com.comicatlas.worker.file.handler;
+package com.comicatlas.worker.importer;
 
 import com.comicatlas.worker.event.CancelHandler;
-import com.comicatlas.worker.file.manifest.ImportManifest;
-import com.comicatlas.worker.file.manifest.ImportManifestManager;
 import com.comicatlas.worker.file.parse.ComicMetadata;
-import com.comicatlas.worker.file.parse.DirectoryTree;
-import com.comicatlas.worker.file.parse.ImportContext;
 import com.comicatlas.worker.storage.SafeMoveStrategy;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageRoot;
@@ -63,8 +59,8 @@ class DirectoryImportResumeTest {
         when(cancelHandler.isCancelled(anyLong())).thenReturn(false);
 
         handler = new DirectoryImportHandler(
-                mock(com.comicatlas.worker.file.parse.DirectoryParser.class),
-                mock(com.comicatlas.worker.file.parse.MetadataAssembler.class),
+                mock(DirectoryParser.class),
+                mock(MetadataAssembler.class),
                 transferService,
                 objectMapper,
                 mock(com.comicatlas.worker.image.ImageOptimizer.class),
@@ -239,10 +235,8 @@ class DirectoryImportResumeTest {
     // ---- helpers ----
 
     private void stubParseAndAssemble() throws Exception {
-        com.comicatlas.worker.file.parse.DirectoryParser parser =
-                mock(com.comicatlas.worker.file.parse.DirectoryParser.class);
-        com.comicatlas.worker.file.parse.MetadataAssembler assembler =
-                mock(com.comicatlas.worker.file.parse.MetadataAssembler.class);
+        DirectoryParser parser = mock(DirectoryParser.class);
+        MetadataAssembler assembler = mock(MetadataAssembler.class);
         when(parser.parse(any(Path.class))).thenReturn(
                 new DirectoryTree(sourceRoot, "src", List.of(), List.of()));
         when(assembler.assemble(any(DirectoryTree.class), any(ImportContext.class)))
