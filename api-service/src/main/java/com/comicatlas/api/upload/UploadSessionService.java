@@ -18,6 +18,8 @@ import com.comicatlas.api.management.dto.ManagementTaskResponse;
 import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.api.upload.entity.UploadFile;
+import com.comicatlas.common.constant.MqExchanges;
+import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.enums.MediaLifecycleStatus;
 import com.comicatlas.common.enums.TranscodeStatus;
 import com.comicatlas.api.upload.entity.UploadSession;
@@ -64,8 +66,8 @@ import com.comicatlas.api.upload.dto.UploadSessionStatusResponse;
 @RequiredArgsConstructor
 public class UploadSessionService {
 
-    private static final String EXCHANGE = "comic.management";
-    private static final String ROUTING_REQUEST = "command.requested";
+    private static final String EXCHANGE = MqExchanges.MANAGEMENT;
+    private static final String ROUTING_REQUEST = MqRoutingKeys.COMMAND_REQUESTED;
 
     private final UploadSessionMapper sessionMapper;
     private final UploadFileMapper fileMapper;

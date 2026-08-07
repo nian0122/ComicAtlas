@@ -1,5 +1,8 @@
 package com.comicatlas.worker.event;
 
+import com.comicatlas.common.constant.MqExchanges;
+import com.comicatlas.common.constant.MqQueues;
+import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.event.RecoveryFailedEvent;
 import com.comicatlas.common.event.RecoveryRequestedEvent;
 import com.comicatlas.common.event.RecoveryScanCompletedEvent;
@@ -24,9 +27,9 @@ import java.util.UUID;
 /**
  * 恢复任务处理器 — Worker 侧入口。
  * <p>
- * 监听 {@code recovery.task.queue}，收到 {@link RecoveryRequestedEvent} 后扫描 HQ 目录，
+ * 监听 {@link MqQueues#RECOVERY_TASK}，收到 {@link RecoveryRequestedEvent} 后扫描 HQ 目录，
  * 收集所有数字命名的漫画目录 ID，发布 {@link RecoveryScanCompletedEvent} 到
- * {@code comic.recovery} 交换器（路由键 {@code recovery.progress}），由 API 侧的
+ * {@link MqExchanges#RECOVERY} 交换器（路由键 {@link MqRoutingKeys#RECOVERY_PROGRESS}），由 API 侧的
  * {@code RecoveryEventHandler} 消费后逐本调用 {@code RecoveryEngine} 完成 DB 恢复。
  * <p>
  * <strong>Worker 绝不直接读写 MySQL</strong> — 所有 DB 操作由 API 侧事件处理器完成。
@@ -43,7 +46,7 @@ public class RecoveryTaskHandler {
     private final WorkerConfig config;
     private final RabbitTemplate rabbitTemplate;
 
-    @RabbitListener(queues = "recovery.task.queue")
+    @RabbitListener(queues = MqQueues.RECOVERY_TASK)
     public void handle(RecoveryRequestedEvent event,
                        Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         Long taskId = event.taskId();
@@ -90,7 +93,7 @@ public class RecoveryTaskHandler {
         // 发布扫描结果事件（路由键 recovery.progress → API recovery.result.queue）
         var scanEvent = new RecoveryScanCompletedEvent(
                 UUID.randomUUID(), Instant.now(), taskId, comicIds);
-        rabbitTemplate.convertAndSend("comic.recovery", "recovery.progress", scanEvent);
+        rabbitTemplate.convertAndSend(MqExchanges.RECOVERY, MqRoutingKeys.RECOVERY_PROGRESS, scanEvent);
         log.info("RecoveryTaskHandler: 已发布 RecoveryScanCompletedEvent, taskId={}", taskId);
 
         ack(channel, tag);
@@ -99,7 +102,7 @@ public class RecoveryTaskHandler {
     private void publishFailed(Long taskId, String errorMessage) {
         var failEvent = new RecoveryFailedEvent(
                 UUID.randomUUID(), Instant.now(), taskId, errorMessage);
-        rabbitTemplate.convertAndSend("comic.recovery", "recovery.failed", failEvent);
+        rabbitTemplate.convertAndSend(MqExchanges.RECOVERY, MqRoutingKeys.RECOVERY_FAILED, failEvent);
         log.info("RecoveryTaskHandler: 已发布 RecoveryFailedEvent, taskId={}, error={}", taskId, errorMessage);
     }
 

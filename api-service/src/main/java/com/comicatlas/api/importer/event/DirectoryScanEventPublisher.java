@@ -1,5 +1,7 @@
 package com.comicatlas.api.importer.event;
 
+import com.comicatlas.common.constant.MqExchanges;
+import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.event.DirectoryScanRequestedEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -17,6 +19,6 @@ public class DirectoryScanEventPublisher {
     public void publishScanRequested(Long taskId, String directoryPath) {
         var event = new DirectoryScanRequestedEvent(
             UUID.randomUUID(), Instant.now(), taskId, directoryPath);
-        rabbitTemplate.convertAndSend("comic.scan", "scan.requested", event);
+        rabbitTemplate.convertAndSend(MqExchanges.SCAN, MqRoutingKeys.SCAN_REQUESTED, event);
     }
 }

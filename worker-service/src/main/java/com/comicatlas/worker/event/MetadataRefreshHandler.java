@@ -1,5 +1,6 @@
 package com.comicatlas.worker.event;
 
+import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.event.MetadataRefreshEvent;
 import com.comicatlas.worker.export.ExportCollectResult;
 import com.comicatlas.worker.export.ExportCollector;
@@ -25,7 +26,7 @@ public class MetadataRefreshHandler {
     @Value("${worker.manga-root}")
     private String mangaRoot;
 
-    @RabbitListener(queues = "metadata.refresh.queue")
+    @RabbitListener(queues = MqQueues.METADATA_REFRESH)
     public void handle(MetadataRefreshEvent event,
             Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         log.info("收到 metadata 刷新请求: comicId={}", event.comicId());

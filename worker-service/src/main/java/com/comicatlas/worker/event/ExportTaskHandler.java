@@ -1,5 +1,8 @@
 package com.comicatlas.worker.event;
 
+import com.comicatlas.common.constant.MqExchanges;
+import com.comicatlas.common.constant.MqQueues;
+import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.event.ExportTaskCompletedEvent;
 import com.comicatlas.common.event.ExportTaskCreatedEvent;
 import com.comicatlas.common.event.ExportTaskFailedEvent;
@@ -55,7 +58,7 @@ public class ExportTaskHandler {
 
     private static final DateTimeFormatter TIMESTAMP_FMT = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
 
-    @RabbitListener(queues = "export.task.queue")
+    @RabbitListener(queues = MqQueues.EXPORT_TASK)
     public void handle(ExportTaskCreatedEvent event,
             Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         Long taskId = event.taskId();
@@ -65,7 +68,7 @@ public class ExportTaskHandler {
 
         try {
             // 1. 发布任务开始事件
-            rabbitTemplate.convertAndSend("comic.export", "task.started",
+            rabbitTemplate.convertAndSend(MqExchanges.EXPORT, MqRoutingKeys.TASK_STARTED,
                     new ExportTaskStartedEvent(UUID.randomUUID(), Instant.now(),
                             taskId, comicId));
             log.info("已发布 ExportTaskStartedEvent: taskId={}", taskId);
@@ -84,7 +87,7 @@ public class ExportTaskHandler {
             long outputSize = zipBuilder.build(manifest, outputPath);
 
             // 3. 发布任务完成事件
-            rabbitTemplate.convertAndSend("comic.export", "task.completed",
+            rabbitTemplate.convertAndSend(MqExchanges.EXPORT, MqRoutingKeys.TASK_COMPLETED,
                     new ExportTaskCompletedEvent(UUID.randomUUID(), Instant.now(),
                             taskId, comicId, "EXPORT",
                             outputPath.getFileName().toString(), outputSize));
@@ -95,7 +98,7 @@ public class ExportTaskHandler {
         } catch (Exception e) {
             log.error("导出任务失败: taskId={}, comicId={}", taskId, comicId, e);
             String errorCode = classifyExportError(e);
-            rabbitTemplate.convertAndSend("comic.export", "task.failed",
+            rabbitTemplate.convertAndSend(MqExchanges.EXPORT, MqRoutingKeys.TASK_FAILED,
                     new ExportTaskFailedEvent(UUID.randomUUID(), Instant.now(),
                             taskId, comicId, errorCode, e.getMessage()));
             try {

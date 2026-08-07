@@ -1,5 +1,6 @@
 package com.comicatlas.worker.event;
 
+import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.event.CancelTaskEvent;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
@@ -34,7 +35,7 @@ public class CancelHandler {
 
     private final StringRedisTemplate redisTemplate;
 
-    @RabbitListener(queues = "cancel.task.queue")
+    @RabbitListener(queues = MqQueues.CANCEL_TASK)
     public void handle(CancelTaskEvent event,
             Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         redisTemplate.opsForValue().set(KEY_PREFIX + event.taskId(), "1", TTL);

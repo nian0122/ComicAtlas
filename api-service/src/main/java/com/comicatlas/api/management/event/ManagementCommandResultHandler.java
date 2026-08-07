@@ -22,6 +22,8 @@ import com.comicatlas.api.reader.entity.ReadingHistory;
 import com.comicatlas.api.reader.mapper.ReadingHistoryMapper;
 import com.comicatlas.api.storage.service.MetadataRefreshService;
 import com.comicatlas.api.storage.service.MediaMetadataSyncService;
+import com.comicatlas.common.constant.MqExchanges;
+import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.dto.TrashManifestActual;
 import com.comicatlas.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.common.enums.ManagementTaskStatus;
@@ -60,7 +62,7 @@ import java.util.Set;
 /**
  * 管理命令结果事件处理器（Worker → API）。
  * <p>
- * 消费 {@code comic.management} 的 completed/failed/progress 事件，
+ * 消费 {@link MqExchanges#MANAGEMENT} 的 completed/failed/progress 事件，
  * 通过 Inbox（eventId + payloadHash）保证恰好一次，attempt 条件更新保证
  * 重复/乱序/旧 attempt 结果对业务只生效一次。Worker 不写 DB，业务状态由
  * API 依据结果事件更新。
@@ -89,7 +91,7 @@ public class ManagementCommandResultHandler {
     private final MetadataRefreshService metadataRefreshService;
     private final MediaMetadataSyncService mediaMetadataSyncService;
 
-    @RabbitListener(queues = "management.result.queue")
+    @RabbitListener(queues = MqQueues.MANAGEMENT_RESULT)
     public void handleResult(ComicEvent raw,
             Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         if (raw instanceof ManagementCommandCompletedEvent ev) {

@@ -1,5 +1,6 @@
 package com.comicatlas.worker.event;
 
+import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
@@ -12,7 +13,7 @@ import org.springframework.stereotype.Component;
 /**
  * 管理命令分发器（API → Worker）。
  * <p>
- * 消费 {@code management.command.queue}，按 operationType 路由到具体命令处理器。
+ * 消费 {@link MqQueues#MANAGEMENT_COMMAND}，按 operationType 路由到具体命令处理器。
  * 处理器负责文件重活并通过 {@link ManagementCommandPublisher} 回传 progress/completed/failed，
  * Worker 不直接决定数据库新状态。
  */
@@ -31,7 +32,7 @@ public class ManagementCommandDispatcher {
     private final MediaUploadCommandHandler mediaUploadCommandHandler;
     private final ManagementCommandPublisher publisher;
 
-    @RabbitListener(queues = "management.command.queue")
+    @RabbitListener(queues = MqQueues.MANAGEMENT_COMMAND)
     public void handle(ManagementCommandRequestedEvent cmd,
             Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         log.info("收到管理命令: op={}, target={}:{}, taskId={}, itemId={}, attempt={}",

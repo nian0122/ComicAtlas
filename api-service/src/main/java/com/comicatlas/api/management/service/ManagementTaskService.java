@@ -14,6 +14,8 @@ import com.comicatlas.api.management.entity.ManagementTask;
 import com.comicatlas.api.management.entity.ManagementTaskItem;
 import com.comicatlas.api.management.mapper.ManagementTaskItemMapper;
 import com.comicatlas.api.management.mapper.ManagementTaskMapper;
+import com.comicatlas.common.constant.MqExchanges;
+import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.enums.ManagementTaskStatus;
 import com.comicatlas.common.enums.TaskStage;
 import com.comicatlas.common.enums.TaskType;
@@ -371,7 +373,7 @@ public class ManagementTaskService {
                 java.util.UUID.randomUUID(), java.time.Instant.now(), 1,
                 taskId, item.getId(), newAttempt,
                 operation.name(), item.getTargetType(), item.getTargetId(), manifestTaskId);
-        outboxService.enqueue(event, "comic.management", "command.requested",
+        outboxService.enqueue(event, MqExchanges.MANAGEMENT, MqRoutingKeys.COMMAND_REQUESTED,
                 taskId, item.getId(), newAttempt);
         log.info("重试已重新发布命令: taskId={}, itemId={}, attempt={}, op={}, target={}:{}, manifestTaskId={}",
                 taskId, item.getId(), newAttempt, operation.name(), item.getTargetType(), item.getTargetId(), manifestTaskId);

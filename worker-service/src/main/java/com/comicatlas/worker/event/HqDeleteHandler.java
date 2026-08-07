@@ -1,5 +1,8 @@
 package com.comicatlas.worker.event;
 
+import com.comicatlas.common.constant.MqExchanges;
+import com.comicatlas.common.constant.MqQueues;
+import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.event.DeleteHqRequestedEvent;
 import com.comicatlas.common.event.HqDeletedEvent;
 import com.comicatlas.worker.entity.ExportMedia;
@@ -33,7 +36,7 @@ public class HqDeleteHandler {
     private final ExportMediaMapper mediaMapper;
     private final RabbitTemplate rabbitTemplate;
 
-    @RabbitListener(queues = "hq.delete.queue")
+    @RabbitListener(queues = MqQueues.HQ_DELETE)
     public void handle(DeleteHqRequestedEvent event,
             Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         Long comicId = event.comicId();
@@ -89,7 +92,7 @@ public class HqDeleteHandler {
             HqDeletedEvent completedEvent = new HqDeletedEvent(
                     UUID.randomUUID(), Instant.now(),
                     comicId, chapterId, freedBytes.get(), deletedCount.get());
-            rabbitTemplate.convertAndSend("comic.image", "hq.delete.completed", completedEvent);
+            rabbitTemplate.convertAndSend(MqExchanges.IMAGE, MqRoutingKeys.HQ_DELETE_COMPLETED, completedEvent);
             channel.basicAck(tag, false);
             log.info("HQ 删除完成: comicId={}, chapterId={}, freedBytes={}, deletedCount={}",
                     comicId, chapterId, freedBytes.get(), deletedCount.get());

@@ -28,6 +28,8 @@ import com.comicatlas.api.management.entity.ManagementTask;
 import com.comicatlas.api.management.entity.ManagementTaskItem;
 import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.management.state.ManagementStateMachine;
+import com.comicatlas.common.constant.MqExchanges;
+import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.enums.ManagementTaskStatus;
 import com.comicatlas.common.enums.TaskType;
 import com.comicatlas.common.event.CancelTaskEvent;
@@ -184,7 +186,7 @@ public class ImportServiceImpl implements ImportService {
         // 5. 将事件写入 Outbox（与 DB 同事务），由 relay 异步发布到 MQ
         var event = new ImportTaskCreatedEvent(
                 UUID.randomUUID(), Instant.now(), task.getId(), comic.getId(), sourceType, sourcePath);
-        outboxService.enqueue(event, "comic.import", "task.created");
+        outboxService.enqueue(event, MqExchanges.IMPORT, MqRoutingKeys.TASK_CREATED);
 
         log.info("导入任务创建: taskId={}, comicId={}, managementTaskId={}, sourceType={}",
                 task.getId(), comic.getId(), task.getManagementTaskId(), sourceType);
@@ -245,7 +247,7 @@ public class ImportServiceImpl implements ImportService {
                     // 写入 Outbox（同事务）
                     var evt = new ImportTaskCreatedEvent(
                             UUID.randomUUID(), Instant.now(), task.getId(), comic.getId(), sourceType, path);
-                    outboxService.enqueue(evt, "comic.import", "task.created");
+                    outboxService.enqueue(evt, MqExchanges.IMPORT, MqRoutingKeys.TASK_CREATED);
 
                     return new long[]{task.getId(), comic.getId()};
                 });
@@ -318,7 +320,7 @@ public class ImportServiceImpl implements ImportService {
 
         // 写入 Outbox（同事务），由 relay 发布到 MQ
         var cancelEvent = new CancelTaskEvent(UUID.randomUUID(), Instant.now(), taskId, comicId);
-        outboxService.enqueue(cancelEvent, "comic.task", "cancel.requested");
+        outboxService.enqueue(cancelEvent, MqExchanges.TASK, MqRoutingKeys.CANCEL_REQUESTED);
 
         // Redis 取消标记（非关键，无需事务保障）
         TransactionSynchronizationManager.registerSynchronization(
@@ -387,7 +389,7 @@ public class ImportServiceImpl implements ImportService {
         // 写入 Outbox（同事务），由 relay 发布到 MQ
         var retryEvent = new ImportTaskCreatedEvent(
                 UUID.randomUUID(), Instant.now(), taskId, comicId, sourceType, sourcePath);
-        outboxService.enqueue(retryEvent, "comic.import", "task.created");
+        outboxService.enqueue(retryEvent, MqExchanges.IMPORT, MqRoutingKeys.TASK_CREATED);
 
         // 非关键清理操作（不参与事务）
         TransactionSynchronizationManager.registerSynchronization(

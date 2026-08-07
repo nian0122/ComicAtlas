@@ -1,5 +1,8 @@
 package com.comicatlas.worker.event;
 
+import com.comicatlas.common.constant.MqExchanges;
+import com.comicatlas.common.constant.MqQueues;
+import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.event.VideoMetadataFixCompletedEvent;
 import com.comicatlas.common.event.VideoMetadataFixRequestedEvent;
 import com.comicatlas.common.event.VideoMetadataFixResult;
@@ -37,7 +40,7 @@ public class VideoMetadataFixHandler {
     @Value("${worker.manga-root}")
     private String mangaRoot;
 
-    @RabbitListener(queues = "video.metadata.fix.queue")
+    @RabbitListener(queues = MqQueues.VIDEO_METADATA_FIX)
     public void handle(VideoMetadataFixRequestedEvent event,
             Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         Long comicId = event.comicId();
@@ -121,7 +124,7 @@ public class VideoMetadataFixHandler {
     private void publishCompleted(Long comicId, List<VideoMetadataFixResult> results) {
         VideoMetadataFixCompletedEvent completedEvent = new VideoMetadataFixCompletedEvent(
                 UUID.randomUUID(), Instant.now(), comicId, results);
-        rabbitTemplate.convertAndSend("comic.image", "video.metadata.fix.completed",
+        rabbitTemplate.convertAndSend(MqExchanges.IMAGE, MqRoutingKeys.VIDEO_METADATA_FIX_COMPLETED,
                 completedEvent);
     }
 }

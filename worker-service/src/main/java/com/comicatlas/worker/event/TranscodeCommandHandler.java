@@ -126,8 +126,7 @@ public class TranscodeCommandHandler {
                 throw new IOException("HQ 文件不存在: " + hqFile);
             }
 
-            Path tempRoot = config.getTempDir() != null ? Path.of(config.getTempDir())
-                    : Path.of(System.getProperty("java.io.tmpdir"));
+            Path tempRoot = config.resolveTempDir();
             Files.createDirectories(tempRoot);
             tempFile = tempRoot.resolve(pageId + ".mp4");
 

@@ -2,6 +2,7 @@ package com.comicatlas.api.admin.event;
 
 import com.comicatlas.api.comic.entity.Media;
 import com.comicatlas.api.comic.mapper.MediaMapper;
+import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.event.VideoMetadataFixCompletedEvent;
 import com.comicatlas.common.event.VideoMetadataFixResult;
 import com.rabbitmq.client.Channel;
@@ -23,7 +24,7 @@ public class VideoMetadataFixCompletedHandler {
 
     private final MediaMapper mediaMapper;
 
-    @RabbitListener(queues = "video.metadata.fix.result.queue")
+    @RabbitListener(queues = MqQueues.VIDEO_METADATA_FIX_RESULT)
     public void handle(VideoMetadataFixCompletedEvent event,
             Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         Long comicId = event.comicId();

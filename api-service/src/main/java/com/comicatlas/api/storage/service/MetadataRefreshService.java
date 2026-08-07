@@ -17,6 +17,8 @@ import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.common.enums.HqStatus;
 import com.comicatlas.api.common.enums.LqStatus;
 import com.comicatlas.api.common.exception.BusinessException;
+import com.comicatlas.common.constant.MqExchanges;
+import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.event.MetadataRefreshEvent;
 import com.comicatlas.common.event.VideoMetadataFixRequestedEvent;
 import lombok.RequiredArgsConstructor;
@@ -161,7 +163,7 @@ public class MetadataRefreshService {
             catalogCacheInvalidator.evict(comicId);
 
             try {
-                rabbitTemplate.convertAndSend("comic.export", "metadata.refresh.requested",
+                rabbitTemplate.convertAndSend(MqExchanges.EXPORT, MqRoutingKeys.METADATA_REFRESH_REQUESTED,
                         new MetadataRefreshEvent(null, null, comicId));
             } catch (Exception e) {
                 log.error("发送 metadata 刷新 MQ 消息失败: comicId={}", comicId, e);
@@ -180,7 +182,7 @@ public class MetadataRefreshService {
      * 委托 Worker 修复视频元数据（ffprobe 补全时长/编码信息）。
      */
     private void fixVideoMetadata(Long comicId) {
-        rabbitTemplate.convertAndSend("comic.image", "video.metadata.fix.requested",
+        rabbitTemplate.convertAndSend(MqExchanges.IMAGE, MqRoutingKeys.VIDEO_METADATA_FIX_REQUESTED,
                 new VideoMetadataFixRequestedEvent(null, null, comicId));
     }
 

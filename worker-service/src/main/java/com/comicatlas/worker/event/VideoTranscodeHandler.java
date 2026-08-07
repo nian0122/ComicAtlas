@@ -1,5 +1,8 @@
 package com.comicatlas.worker.event;
 
+import com.comicatlas.common.constant.MqExchanges;
+import com.comicatlas.common.constant.MqQueues;
+import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.event.VideoTranscodeCompletedEvent;
 import com.comicatlas.common.event.VideoTranscodeFailedEvent;
 import com.comicatlas.common.event.VideoTranscodeRequestedEvent;
@@ -40,7 +43,7 @@ public class VideoTranscodeHandler {
         "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", "-y"
     );
 
-    @RabbitListener(queues = "video.transcode.queue")
+    @RabbitListener(queues = MqQueues.VIDEO_TRANSCODE)
     public void handle(VideoTranscodeRequestedEvent event,
             Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         Long pageId = event.pageId();
@@ -58,8 +61,7 @@ public class VideoTranscodeHandler {
             }
 
             // 2. 转码到临时目录
-            Path tempRoot = config.getTempDir() != null ? Path.of(config.getTempDir())
-                    : Path.of(System.getProperty("java.io.tmpdir"));
+            Path tempRoot = config.resolveTempDir();
             Files.createDirectories(tempRoot);
             tempFile = tempRoot.resolve(pageId + ".mp4");
 
@@ -108,7 +110,7 @@ public class VideoTranscodeHandler {
             log.info("视频转码完成: pageId={}, newPath={}, size={}", pageId, newHqPath, fileSize);
 
             // 6. 发送完成事件
-            rabbitTemplate.convertAndSend("comic.video", "video.transcode.completed",
+            rabbitTemplate.convertAndSend(MqExchanges.VIDEO, MqRoutingKeys.VIDEO_TRANSCODE_COMPLETED,
                 new VideoTranscodeCompletedEvent(UUID.randomUUID(), Instant.now(),
                     pageId, comicId, newHqPath, "mp4", "h264", "aac", fileSize));
 
@@ -120,7 +122,7 @@ public class VideoTranscodeHandler {
             // 非业务失败：不发送 failed 事件，由监听器容器感知中断状态
         } catch (Exception e) {
             log.error("视频转码失败: pageId={}", pageId, e);
-            rabbitTemplate.convertAndSend("comic.video", "video.transcode.failed",
+            rabbitTemplate.convertAndSend(MqExchanges.VIDEO, MqRoutingKeys.VIDEO_TRANSCODE_FAILED,
                 new VideoTranscodeFailedEvent(UUID.randomUUID(), Instant.now(),
                     pageId, comicId, e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName()));
             try {

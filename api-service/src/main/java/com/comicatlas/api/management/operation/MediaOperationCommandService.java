@@ -20,6 +20,8 @@ import com.comicatlas.api.management.dto.OperationSubmitResult;
 import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.management.trash.TrashLifecycleService;
 import com.comicatlas.api.outbox.service.OutboxService;
+import com.comicatlas.common.constant.MqExchanges;
+import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.enums.TaskType;
 import com.comicatlas.common.enums.TranscodeStatus;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
@@ -52,8 +54,8 @@ public class MediaOperationCommandService {
     private final OutboxService outboxService;
     private final TrashLifecycleService trashLifecycleService;
 
-    private static final String EXCHANGE = "comic.management";
-    private static final String ROUTING_REQUEST = "command.requested";
+    private static final String EXCHANGE = MqExchanges.MANAGEMENT;
+    private static final String ROUTING_REQUEST = MqRoutingKeys.COMMAND_REQUESTED;
 
     // ======================== LQ 生成 ========================
 
