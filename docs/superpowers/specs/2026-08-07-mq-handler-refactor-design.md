@@ -182,7 +182,11 @@ private void routeToHandler(String sourceType, String sourcePath, Long taskId, L
 | DirectoryScanHandler | publishFailed(taskId, msg) | **ACK_AFTER_CALLBACK** | 现状 catch → publishFailed + ack：失败事件即结果 |
 | ManagementCommandDispatcher | publisher.failed(cmd, msg) | REJECT_TO_DLQ | 现状 catch → publisher.failed + nack(requeue=false)：失败事件保留 |
 
-**api 侧（13 类 / 15 消费者）**: `ImportEventHandler`（3 个消费者）、`LqCompletedHandler`、`HqDeletedHandler`、`DeleteEventHandler`、`RecoveryEventHandler`、`DirectoryScanEventHandler`、`ManagementCommandResultHandler`、`ExportStartedHandler`、`ExportCompletedHandler`、`ExportFailedHandler`、`TranscodeCompletedHandler`、`TranscodeFailedHandler` — 全部为标准模式（无 onFailure，REJECT_TO_DLQ）。
+**api 侧（13 类 / 15 消费者）**: `ImportEventHandler`（3 个消费者）、`LqCompletedHandler`、`HqDeletedHandler`、`DeleteEventHandler`、`DirectoryScanEventHandler`、`ManagementCommandResultHandler`、`ExportStartedHandler`、`ExportCompletedHandler`、`ExportFailedHandler`、`TranscodeCompletedHandler`、`TranscodeFailedHandler` — 全部为标准模式（无 onFailure，REJECT_TO_DLQ）。
+
+例外（catch 含业务副作用，需 onFailure 变体）：
+- `RecoveryEventHandler`：`handleScanCompleted` 原 catch 会标记恢复任务 FAILED 并同步管理项 → **onFailure = markRecoveryTaskFailed(taskId, e)，REJECT_TO_DLQ**；`handleFailed` 原 catch 仅 log+reject → 标准模式。
+- `ManagementCommandResultHandler` 的 `DuplicateKeyException` 分支是**提前 ack**（并发幂等），迁移为 lambda 内捕获后不重抛（保持 ack 语义）。
 
 特殊：`VideoMetadataFixCompletedHandler` 现状 catch 用 `basicNack(tag, false, false)`（等价 requeue=false 的 reject），映射为 **REJECT_TO_DLQ**（无 onFailure）。
 
