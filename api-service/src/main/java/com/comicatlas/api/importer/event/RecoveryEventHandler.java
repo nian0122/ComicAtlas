@@ -13,6 +13,7 @@ import com.comicatlas.common.enums.TaskType;
 import com.comicatlas.common.event.ComicEvent;
 import com.comicatlas.common.event.RecoveryFailedEvent;
 import com.comicatlas.common.event.RecoveryScanCompletedEvent;
+import com.comicatlas.common.mq.MqConsumerSupport;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,6 +48,7 @@ public class RecoveryEventHandler {
     private final RecoveryTaskMapper recoveryTaskMapper;
     private final RedisTemplate<String, Object> redisTemplate;
     private final ManagementTaskService managementTaskService;
+    private final MqConsumerSupport mqConsumerSupport;
 
     private static final EnumSet<RecoveryTaskStatus> TERMINAL_STATUSES = EnumSet.of(
             RecoveryTaskStatus.SUCCEEDED, RecoveryTaskStatus.FAILED, RecoveryTaskStatus.CANCELLED);
@@ -62,7 +64,7 @@ public class RecoveryEventHandler {
         } else {
             log.warn("recovery.result.queue 收到未知事件类型: {}, ack 跳过",
                     event.getClass().getSimpleName());
-            ack(channel, tag);
+            mqConsumerSupport.consume(channel, tag, "未知恢复事件", () -> { });
         }
     }
 
@@ -75,121 +77,121 @@ public class RecoveryEventHandler {
         log.info("RecoveryEventHandler: 收到扫描完成事件, taskId={}, comicCount={}",
                 taskId, event.comicIds().size());
 
-        try {
-            // 幂等检查
-            if (isEventProcessed(idempKey)) {
-                log.info("事件已处理，ack: eventId={}", event.eventId());
-                ack(channel, tag);
-                return;
-            }
+        mqConsumerSupport.consume(channel, tag, "恢复扫描完成: taskId=" + taskId,
+                () -> processScanCompleted(event, idempKey, taskId),
+                e -> markRecoveryTaskFailed(taskId, e),
+                MqConsumerSupport.FailurePolicy.REJECT_TO_DLQ);
+    }
 
-            RecoveryTask task = recoveryTaskMapper.selectById(taskId);
-            if (task == null) {
-                log.warn("恢复任务不存在: taskId={}", taskId);
-                markEventProcessed(idempKey);
-                ack(channel, tag);
-                return;
-            }
+    private void processScanCompleted(RecoveryScanCompletedEvent event, String idempKey, Long taskId) throws Exception {
+        // 幂等检查
+        if (isEventProcessed(idempKey)) {
+            log.info("事件已处理，ack: eventId={}", event.eventId());
+            return;
+        }
 
-            // 终态检查：已 SUCCESS/FAILED 的任务不再处理（应对重试产生的新 PENDING 任务会走新事件）
-            if (TERMINAL_STATUSES.contains(task.getStatus())) {
-                log.info("任务已处终态，跳过: taskId={}, status={}", taskId, task.getStatus());
-                markEventProcessed(idempKey);
-                ack(channel, tag);
-                return;
-            }
-
-            // 标记 RUNNING
-            task.setStatus(RecoveryTaskStatus.RUNNING);
-            task.setStartedAt(LocalDateTime.now());
-            task.setTotalComics(event.comicIds().size());
-            task.setRecoveredComics(0);
-            task.setSkippedComics(0);
-            task.setPlaceholderComics(0);
-            task.setErrorComics(0);
-            task.setErrorMessage(null);
-            task.setErrorDetails(null);
-            recoveryTaskMapper.updateById(task);
-
-            // 同步统一任务项为 RUNNING
-            ManagementTaskItemResponse mgmtItem = syncRecoveryItem(taskId, ManagementTaskStatus.RUNNING,
-                    null, null, 0L);
-
-            // 逐本恢复
-            int totalSoFar = 0;
-            int recovered = 0, skipped = 0, placeholder = 0, errors = 0;
-
-            for (Long comicId : event.comicIds()) {
-                try {
-                    RecoveryProgress progress = recoveryEngine.processComicDir(comicId, totalSoFar);
-                    totalSoFar = progress.totalComics();
-                    recovered += progress.recoveredComics();
-                    skipped += progress.skippedComics();
-                    placeholder += progress.placeholderComics();
-                    errors += progress.errorComics();
-
-                    // 每个漫画完成后更新计数器（前端轮询可见进度）
-                    task.setRecoveredComics(recovered);
-                    task.setSkippedComics(skipped);
-                    task.setPlaceholderComics(placeholder);
-                    task.setErrorComics(errors);
-                    if (progress.lastError() != null) {
-                        task.setErrorMessage(progress.lastError());
-                    }
-                    recoveryTaskMapper.updateById(task);
-
-                    // 同步统一任务项进度（0-100）
-                    if (mgmtItem != null && totalSoFar > 0) {
-                        int pct = Math.min(100,
-                                (recovered + skipped + placeholder + errors) * 100 / totalSoFar);
-                        managementTaskService.updateItemProgress(mgmtItem.getId(), 0, pct, "RECOVERY");
-                    }
-
-                    log.debug("恢复进度: taskId={}, comicId={}, total={}, recovered={}, skipped={}, placeholder={}, error={}",
-                            taskId, comicId, totalSoFar, recovered, skipped, placeholder, errors);
-                } catch (Exception e) {
-                    // 单个 comic 处理异常不中断整个任务，记录并继续
-                    log.error("恢复漫画失败: taskId={}, comicId={}", taskId, comicId, e);
-                    errors++;
-                    totalSoFar++;
-                    task.setErrorComics(errors);
-                    task.setErrorMessage(e.getMessage());
-                    recoveryTaskMapper.updateById(task);
-                }
-            }
-
-            // 全部处理完成
-            task.setStatus(RecoveryTaskStatus.SUCCEEDED);
-            task.setEndedAt(LocalDateTime.now());
-            recoveryTaskMapper.updateById(task);
-
-            // 同步统一任务项为 SUCCEEDED
-            syncRecoveryItem(taskId, ManagementTaskStatus.SUCCEEDED, null, "RECOVERY_TASK", taskId);
-
+        RecoveryTask task = recoveryTaskMapper.selectById(taskId);
+        if (task == null) {
+            log.warn("恢复任务不存在: taskId={}", taskId);
             markEventProcessed(idempKey);
-            ack(channel, tag);
+            return;
+        }
 
-            log.info("RecoveryEventHandler: 恢复完成, taskId={}, total={}, recovered={}, skipped={}, placeholder={}, error={}",
-                    taskId, totalSoFar, recovered, skipped, placeholder, errors);
+        // 终态检查：已 SUCCESS/FAILED 的任务不再处理（应对重试产生的新 PENDING 任务会走新事件）
+        if (TERMINAL_STATUSES.contains(task.getStatus())) {
+            log.info("任务已处终态，跳过: taskId={}, status={}", taskId, task.getStatus());
+            markEventProcessed(idempKey);
+            return;
+        }
 
-        } catch (Exception e) {
-            log.error("RecoveryEventHandler: 扫描完成处理失败, taskId={}", taskId, e);
-            // 尝试将任务标记为 FAILED
+        // 标记 RUNNING
+        task.setStatus(RecoveryTaskStatus.RUNNING);
+        task.setStartedAt(LocalDateTime.now());
+        task.setTotalComics(event.comicIds().size());
+        task.setRecoveredComics(0);
+        task.setSkippedComics(0);
+        task.setPlaceholderComics(0);
+        task.setErrorComics(0);
+        task.setErrorMessage(null);
+        task.setErrorDetails(null);
+        recoveryTaskMapper.updateById(task);
+
+        // 同步统一任务项为 RUNNING
+        ManagementTaskItemResponse mgmtItem = syncRecoveryItem(taskId, ManagementTaskStatus.RUNNING,
+                null, null, 0L);
+
+        // 逐本恢复
+        int totalSoFar = 0;
+        int recovered = 0, skipped = 0, placeholder = 0, errors = 0;
+
+        for (Long comicId : event.comicIds()) {
             try {
-                RecoveryTask task = recoveryTaskMapper.selectById(taskId);
-                if (task != null && !TERMINAL_STATUSES.contains(task.getStatus())) {
-                    task.setStatus(RecoveryTaskStatus.FAILED);
-                    task.setEndedAt(LocalDateTime.now());
-                    task.setErrorMessage("事件处理异常: " + e.getMessage());
-                    recoveryTaskMapper.updateById(task);
-                    // 同步统一任务项为 FAILED
-                    syncRecoveryItem(taskId, ManagementTaskStatus.FAILED,
-                            task.getErrorMessage(), "RECOVERY_TASK", taskId);
+                RecoveryProgress progress = recoveryEngine.processComicDir(comicId, totalSoFar);
+                totalSoFar = progress.totalComics();
+                recovered += progress.recoveredComics();
+                skipped += progress.skippedComics();
+                placeholder += progress.placeholderComics();
+                errors += progress.errorComics();
+
+                // 每个漫画完成后更新计数器（前端轮询可见进度）
+                task.setRecoveredComics(recovered);
+                task.setSkippedComics(skipped);
+                task.setPlaceholderComics(placeholder);
+                task.setErrorComics(errors);
+                if (progress.lastError() != null) {
+                    task.setErrorMessage(progress.lastError());
                 }
-            } catch (Exception updateEx) {
-                log.error("RecoveryEventHandler: 标记任务失败时出错, taskId={}", taskId, updateEx);
+                recoveryTaskMapper.updateById(task);
+
+                // 同步统一任务项进度（0-100）
+                if (mgmtItem != null && totalSoFar > 0) {
+                    int pct = Math.min(100,
+                            (recovered + skipped + placeholder + errors) * 100 / totalSoFar);
+                    managementTaskService.updateItemProgress(mgmtItem.getId(), 0, pct, "RECOVERY");
+                }
+
+                log.debug("恢复进度: taskId={}, comicId={}, total={}, recovered={}, skipped={}, placeholder={}, error={}",
+                        taskId, comicId, totalSoFar, recovered, skipped, placeholder, errors);
+            } catch (Exception e) {
+                // 单个 comic 处理异常不中断整个任务，记录并继续
+                log.error("恢复漫画失败: taskId={}, comicId={}", taskId, comicId, e);
+                errors++;
+                totalSoFar++;
+                task.setErrorComics(errors);
+                task.setErrorMessage(e.getMessage());
+                recoveryTaskMapper.updateById(task);
             }
-            reject(channel, tag);
+        }
+
+        // 全部处理完成
+        task.setStatus(RecoveryTaskStatus.SUCCEEDED);
+        task.setEndedAt(LocalDateTime.now());
+        recoveryTaskMapper.updateById(task);
+
+        // 同步统一任务项为 SUCCEEDED
+        syncRecoveryItem(taskId, ManagementTaskStatus.SUCCEEDED, null, "RECOVERY_TASK", taskId);
+
+        markEventProcessed(idempKey);
+
+        log.info("RecoveryEventHandler: 恢复完成, taskId={}, total={}, recovered={}, skipped={}, placeholder={}, error={}",
+                taskId, totalSoFar, recovered, skipped, placeholder, errors);
+    }
+
+    /** 处理失败时标记恢复任务为 FAILED 并同步管理项（原 catch 副作用，作为 onFailure 回调）。 */
+    private void markRecoveryTaskFailed(Long taskId, Exception failure) {
+        try {
+            RecoveryTask task = recoveryTaskMapper.selectById(taskId);
+            if (task != null && !TERMINAL_STATUSES.contains(task.getStatus())) {
+                task.setStatus(RecoveryTaskStatus.FAILED);
+                task.setEndedAt(LocalDateTime.now());
+                task.setErrorMessage("事件处理异常: " + failure.getMessage());
+                recoveryTaskMapper.updateById(task);
+                // 同步统一任务项为 FAILED
+                syncRecoveryItem(taskId, ManagementTaskStatus.FAILED,
+                        task.getErrorMessage(), "RECOVERY_TASK", taskId);
+            }
+        } catch (Exception updateEx) {
+            log.error("RecoveryEventHandler: 标记任务失败时出错, taskId={}", taskId, updateEx);
         }
     }
 
@@ -201,41 +203,37 @@ public class RecoveryEventHandler {
         log.warn("RecoveryEventHandler: 收到失败事件, taskId={}, error={}",
                 taskId, event.errorMessage());
 
-        try {
-            if (isEventProcessed(idempKey)) {
-                ack(channel, tag);
-                return;
-            }
+        mqConsumerSupport.consume(channel, tag, "恢复失败事件: taskId=" + taskId,
+                () -> processFailed(event, idempKey, taskId));
+    }
 
-            RecoveryTask task = recoveryTaskMapper.selectById(taskId);
-            if (task == null) {
-                markEventProcessed(idempKey);
-                ack(channel, tag);
-                return;
-            }
-
-            if (TERMINAL_STATUSES.contains(task.getStatus())) {
-                log.info("任务已处终态，跳过失败事件: taskId={}, status={}", taskId, task.getStatus());
-                markEventProcessed(idempKey);
-                ack(channel, tag);
-                return;
-            }
-
-            task.setStatus(RecoveryTaskStatus.FAILED);
-            task.setEndedAt(LocalDateTime.now());
-            task.setErrorMessage(event.errorMessage());
-            recoveryTaskMapper.updateById(task);
-
-            // 同步统一任务项为 FAILED
-            syncRecoveryItem(taskId, ManagementTaskStatus.FAILED,
-                    event.errorMessage(), "RECOVERY_TASK", taskId);
-
-            markEventProcessed(idempKey);
-            ack(channel, tag);
-        } catch (Exception e) {
-            log.error("RecoveryEventHandler: 失败事件处理异常, taskId={}", taskId, e);
-            reject(channel, tag);
+    private void processFailed(RecoveryFailedEvent event, String idempKey, Long taskId) throws Exception {
+        if (isEventProcessed(idempKey)) {
+            return;
         }
+
+        RecoveryTask task = recoveryTaskMapper.selectById(taskId);
+        if (task == null) {
+            markEventProcessed(idempKey);
+            return;
+        }
+
+        if (TERMINAL_STATUSES.contains(task.getStatus())) {
+            log.info("任务已处终态，跳过失败事件: taskId={}, status={}", taskId, task.getStatus());
+            markEventProcessed(idempKey);
+            return;
+        }
+
+        task.setStatus(RecoveryTaskStatus.FAILED);
+        task.setEndedAt(LocalDateTime.now());
+        task.setErrorMessage(event.errorMessage());
+        recoveryTaskMapper.updateById(task);
+
+        // 同步统一任务项为 FAILED
+        syncRecoveryItem(taskId, ManagementTaskStatus.FAILED,
+                event.errorMessage(), "RECOVERY_TASK", taskId);
+
+        markEventProcessed(idempKey);
     }
 
     // ======================== 工具方法 ========================
@@ -254,22 +252,6 @@ public class RecoveryEventHandler {
             redisTemplate.opsForValue().set(idempKey, "1", Duration.ofDays(1));
         } catch (Exception e) {
             log.warn("幂等标记写入失败: key={}", idempKey, e);
-        }
-    }
-
-    private void ack(Channel channel, long tag) {
-        try {
-            channel.basicAck(tag, false);
-        } catch (Exception e) {
-            log.error("消息 ack 失败: tag={}", tag, e);
-        }
-    }
-
-    private void reject(Channel channel, long tag) {
-        try {
-            channel.basicReject(tag, false);
-        } catch (Exception e) {
-            log.error("消息 reject 失败: tag={}", tag, e);
         }
     }
 

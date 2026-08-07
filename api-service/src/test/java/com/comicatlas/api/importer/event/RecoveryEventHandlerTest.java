@@ -8,6 +8,7 @@ import com.comicatlas.api.importer.mapper.RecoveryTaskMapper;
 import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.common.event.RecoveryFailedEvent;
 import com.comicatlas.common.event.RecoveryScanCompletedEvent;
+import com.comicatlas.common.mq.MqConsumerSupport;
 import com.rabbitmq.client.Channel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -64,7 +65,7 @@ class RecoveryEventHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new RecoveryEventHandler(recoveryEngine, recoveryTaskMapper, redisTemplate, managementTaskService);
+        handler = new RecoveryEventHandler(recoveryEngine, recoveryTaskMapper, redisTemplate, managementTaskService, new MqConsumerSupport());
         lenient().when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         lenient().when(redisTemplate.hasKey(anyString())).thenReturn(false);
         lenient().doNothing().when(valueOperations).set(anyString(), any(), any(Duration.class));
