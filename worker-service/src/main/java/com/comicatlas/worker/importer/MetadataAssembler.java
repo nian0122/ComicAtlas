@@ -1,7 +1,7 @@
 package com.comicatlas.worker.importer;
 
-import com.comicatlas.worker.file.parse.ComicMetadata;
-import com.comicatlas.worker.file.parse.MediaAnalyzer;
+import com.comicatlas.worker.media.ComicMetadata;
+import com.comicatlas.worker.media.MediaAnalyzer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

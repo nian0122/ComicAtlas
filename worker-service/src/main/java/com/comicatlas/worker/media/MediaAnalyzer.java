@@ -1,4 +1,4 @@
-package com.comicatlas.worker.file.parse;
+package com.comicatlas.worker.media;
 
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.process.ExternalProcessRunner;

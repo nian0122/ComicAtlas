@@ -1,7 +1,7 @@
 package com.comicatlas.worker.importer;
 
 import com.comicatlas.worker.event.CancelHandler;
-import com.comicatlas.worker.file.parse.ComicMetadata;
+import com.comicatlas.worker.media.ComicMetadata;
 import com.comicatlas.worker.storage.SafeMoveStrategy;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageRoot;
