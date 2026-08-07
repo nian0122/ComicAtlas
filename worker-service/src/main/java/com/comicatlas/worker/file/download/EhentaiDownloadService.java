@@ -1,4 +1,4 @@
-package com.comicatlas.worker.file;
+package com.comicatlas.worker.file.download;
 
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.file.download.DownloadContext;
