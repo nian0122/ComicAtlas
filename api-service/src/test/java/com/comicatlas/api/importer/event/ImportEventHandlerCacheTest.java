@@ -15,6 +15,7 @@ import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.common.event.ImportTaskCompletedEvent;
 import com.comicatlas.common.event.ImportTaskFailedEvent;
 import com.comicatlas.common.event.TaskStatusChangedEvent;
+import com.comicatlas.common.mq.MqConsumerSupport;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.Channel;
@@ -23,6 +24,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
@@ -62,6 +64,7 @@ class ImportEventHandlerCacheTest {
     @Mock private ManagementTaskService managementTaskService;
     @Mock private ApiStorageProperties storageProperties;
     @Mock private Channel channel;
+    @Spy private MqConsumerSupport mqConsumerSupport = new MqConsumerSupport();
     @InjectMocks private ImportEventHandler handler;
 
     @Test

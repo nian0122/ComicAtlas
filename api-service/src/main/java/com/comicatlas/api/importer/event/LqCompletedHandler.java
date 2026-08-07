@@ -7,6 +7,7 @@ import com.comicatlas.api.common.storage.ApiStorageProperties;
 import com.comicatlas.api.common.enums.LqStatus;
 import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.event.LqCompletedEvent;
+import com.comicatlas.common.mq.MqConsumerSupport;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +31,7 @@ import java.util.List;
 public class LqCompletedHandler {
     private final MediaMapper mediaMapper;
     private final ApiStorageProperties storageProperties;
+    private final MqConsumerSupport mqConsumerSupport;
 
     @RabbitListener(queues = MqQueues.LQ_RESULT)
     public void handle(LqCompletedEvent event,
@@ -39,7 +41,7 @@ public class LqCompletedHandler {
         List<Integer> failedPages = event.failedPages();
         log.info("LQ 完成事件: comicId={}, chapterId={}, failedPages={}", comicId, chapterId, failedPages);
 
-        try {
+        mqConsumerSupport.consume(channel, tag, "LQ完成: comicId=" + comicId, () -> {
             var mediaItems = mediaMapper.selectList(
                     new LambdaQueryWrapper<Media>()
                             .eq(Media::getChapterId, chapterId)
@@ -75,16 +77,8 @@ public class LqCompletedHandler {
                 mediaMapper.updateById(media);
             }
 
-            channel.basicAck(tag, false);
             log.info("LQ 状态更新完成: comicId={}, chapterId={}, pages={}", comicId, chapterId, mediaItems.size());
-        } catch (Exception e) {
-            log.error("LQ 状态更新失败: comicId={}, chapterId={}", comicId, chapterId, e);
-            try {
-                channel.basicReject(tag, false);
-            } catch (Exception ex) {
-                log.warn("消息 reject 失败: tag={}", tag, ex);
-            }
-        }
+        });
     }
 }
 

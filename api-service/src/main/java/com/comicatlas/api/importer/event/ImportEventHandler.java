@@ -17,6 +17,7 @@ import com.comicatlas.common.enums.TaskType;
 import com.comicatlas.common.event.ImportTaskCompletedEvent;
 import com.comicatlas.common.event.ImportTaskFailedEvent;
 import com.comicatlas.common.event.TaskStatusChangedEvent;
+import com.comicatlas.common.mq.MqConsumerSupport;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.Channel;
@@ -65,6 +66,7 @@ public class ImportEventHandler {
     private final CatalogCacheInvalidator catalogCacheInvalidator;
     private final ManagementTaskService managementTaskService;
     private final ApiStorageProperties storageProperties;
+    private final MqConsumerSupport mqConsumerSupport;
 
     /** 终态集合：到达这些状态后不可回退到非终态（含 CANCELLED 真正终态） */
     private static final Set<ImportTaskStatus> TERMINAL_STATUSES =
@@ -79,11 +81,10 @@ public class ImportEventHandler {
         Long comicId = event.comicId();
         log.info("ComicImported: taskId={}, comicId={}", taskId, comicId);
 
-        try {
+        mqConsumerSupport.consume(channel, tag, "导入完成: taskId=" + taskId, () -> {
             if (isEventProcessed(idempKey) || isImportTaskTerminal(taskId)) {
                 log.info("事件已处理或任务已处终态，确认消息: eventId={}", event.eventId());
                 markEventProcessed(idempKey);
-                ack(channel, tag);
                 return;
             }
 
@@ -94,17 +95,12 @@ public class ImportEventHandler {
             ImportResult result = transactionTemplate.execute(status ->
                 persistComicImported(event, metadata));
             markEventProcessed(idempKey);
-            ack(channel, tag);
 
             log.info("ComicImported 完成: comicId={}, chapters={}, pages={}, skipped={}",
                 comicId, result != null ? result.chapters() : 0,
                 result != null ? result.pages() : 0,
                 result != null && result.skipped());
-
-        } catch (Exception e) {
-            log.error("ComicImported 失败: taskId={}", taskId, e);
-            reject(channel, tag);
-        }
+        });
     }
 
     @SuppressWarnings("unchecked")
@@ -345,13 +341,9 @@ public class ImportEventHandler {
     @RabbitListener(queues = MqQueues.TASK_STATUS)
     public void handleTaskStatusChanged(TaskStatusChangedEvent event,
             Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
-        try {
+        mqConsumerSupport.consume(channel, tag, "任务状态变更: taskId=" + event.taskId(), () -> {
             transactionTemplate.executeWithoutResult(status -> persistTaskStatusChanged(event));
-            ack(channel, tag);
-        } catch (Exception e) {
-            log.error("TaskStatusChanged 失败", e);
-            reject(channel, tag);
-        }
+        });
     }
 
     private void persistTaskStatusChanged(TaskStatusChangedEvent event) {
@@ -414,7 +406,7 @@ public class ImportEventHandler {
         log.warn("ImportTaskFailed: taskId={}, errorCode={}, message={}",
                 taskId, event.errorCode(), event.errorMessage());
 
-        try {
+        mqConsumerSupport.consume(channel, tag, "导入失败: taskId=" + taskId, () -> {
             transactionTemplate.executeWithoutResult(status -> {
                 ImportTask task = taskMapper.selectById(taskId);
                 if (task == null || TERMINAL_STATUSES.contains(task.getStatus())) {
@@ -430,11 +422,7 @@ public class ImportEventHandler {
                 taskMapper.updateById(task);
                 markImportFailed(task);
             });
-            ack(channel, tag);
-        } catch (Exception e) {
-            log.error("ImportTaskFailed 处理失败: taskId={}", taskId, e);
-            reject(channel, tag);
-        }
+        });
     }
 
     /**
@@ -530,22 +518,6 @@ public class ImportEventHandler {
             redisTemplate.opsForValue().set(idempKey, "1", Duration.ofDays(1));
         } catch (Exception e) {
             log.warn("幂等标记写入失败: key={}", idempKey, e);
-        }
-    }
-
-    private void ack(Channel channel, long tag) {
-        try {
-            channel.basicAck(tag, false);
-        } catch (Exception e) {
-            log.error("消息 ack 失败: tag={}", tag, e);
-        }
-    }
-
-    private void reject(Channel channel, long tag) {
-        try {
-            channel.basicReject(tag, false);
-        } catch (Exception e) {
-            log.error("消息 reject 失败: tag={}", tag, e);
         }
     }
 

@@ -8,6 +8,7 @@ import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.api.common.enums.HqStatus;
 import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.event.HqDeletedEvent;
+import com.comicatlas.common.mq.MqConsumerSupport;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +29,7 @@ public class HqDeletedHandler {
 
     private final MediaMapper mediaMapper;
     private final ComicMapper comicMapper;
+    private final MqConsumerSupport mqConsumerSupport;
 
     @RabbitListener(queues = MqQueues.HQ_DELETE_RESULT)
     public void handle(HqDeletedEvent event,
@@ -37,7 +39,7 @@ public class HqDeletedHandler {
         log.info("HQ 删除完成事件: comicId={}, chapterId={}, freedBytes={}, deletedCount={}",
                 comicId, chapterId, event.freedBytes(), event.deletedCount());
 
-        try {
+        mqConsumerSupport.consume(channel, tag, "HQ删除完成: comicId=" + comicId, () -> {
             // 1. 更新 IMAGE 页
             var mediaItems = mediaMapper.selectList(
                     new LambdaQueryWrapper<Media>()
@@ -59,16 +61,8 @@ public class HqDeletedHandler {
                 comicMapper.updateById(comic);
             }
 
-            channel.basicAck(tag, false);
             log.info("HQ 状态更新完成: comicId={}, chapterId={}, pages={}, freedBytes={}",
                     comicId, chapterId, mediaItems.size(), event.freedBytes());
-        } catch (Exception e) {
-            log.error("HQ 状态更新失败: comicId={}, chapterId={}", comicId, chapterId, e);
-            try {
-                channel.basicReject(tag, false);
-            } catch (Exception ex) {
-                log.warn("消息 reject 失败: tag={}", tag, ex);
-            }
-        }
+        });
     }
 }
