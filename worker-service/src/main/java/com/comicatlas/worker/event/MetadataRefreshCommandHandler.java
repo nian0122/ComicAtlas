@@ -2,8 +2,7 @@ package com.comicatlas.worker.event;
 
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.worker.config.WorkerConfig;
-import com.comicatlas.worker.export.ExportCollectResult;
-import com.comicatlas.worker.export.ExportCollector;
+import com.comicatlas.worker.export.MetadataJsonExporter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -23,7 +22,7 @@ import java.nio.file.Path;
 @RequiredArgsConstructor
 public class MetadataRefreshCommandHandler {
 
-    private final ExportCollector exportCollector;
+    private final MetadataJsonExporter metadataJsonExporter;
     private final WorkerConfig config;
     private final ManagementCommandPublisher publisher;
 
@@ -31,8 +30,7 @@ public class MetadataRefreshCommandHandler {
         Long comicId = cmd.targetId();
         try {
             publisher.progress(cmd, 10, "开始刷新元数据");
-            ExportCollectResult result = exportCollector.collect(comicId);
-            String metadataJson = result.metadataJson();
+            String metadataJson = metadataJsonExporter.exportJson(comicId);
 
             Path metadataDir = config.getMetadataDir() != null
                     ? Path.of(config.getMetadataDir())
