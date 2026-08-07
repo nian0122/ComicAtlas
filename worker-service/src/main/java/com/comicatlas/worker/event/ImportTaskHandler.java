@@ -2,6 +2,7 @@ package com.comicatlas.worker.event;
 
 import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.event.ImportTaskCreatedEvent;
+import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.file.EhentaiDownloadService;
 import com.comicatlas.worker.file.handler.DirectoryImportHandler;
@@ -27,69 +28,53 @@ public class ImportTaskHandler {
     private final WorkerConfig config;
     private final TaskStatusPublisher publisher;
     private final CancelHandler cancelHandler;
+    private final MqConsumerSupport mqConsumerSupport;
 
     @RabbitListener(queues = MqQueues.IMPORT_TASK)
     public void handle(ImportTaskCreatedEvent event,
             Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         Long taskId = event.taskId();
-        Long comicId = event.comicId();
-        String sourceType = event.sourceType() != null ? event.sourceType() : "ZIP";
-        String sourcePath = event.sourcePath();
-        long start = System.currentTimeMillis();
-        log.info("ImportTaskHandler: taskId={}, comicId={}, sourceType={}", taskId, comicId, sourceType);
-
         if (cancelHandler.isCancelled(taskId)) {
             log.info("Task cancelled, skipping: taskId={}", taskId);
             try { channel.basicAck(tag, false); } catch (Exception ex) { log.warn("消息 ack 失败: tag={}", tag, ex); }
             return;
         }
-
-        Path mangaRoot = Path.of(config.getMangaRoot());
-
-        try {
-            publisher.publishStatus(taskId, "PARSING", 0, null, 0, 0);
-            String normalizedPath = mapHostPathToContainer(sourcePath);
-            if (!normalizedPath.equals(sourcePath)) {
-                log.info("Source path normalized: {} -> {}", sourcePath, normalizedPath);
-            }
-
-            switch (sourceType) {
-                case "ZIP" -> {
-                    ImportContext ctx = new ImportContext("ZIP", Path.of(normalizedPath), false, false);
-                    zipHandler.importZip(ctx, taskId, comicId, mangaRoot);
-                }
-                case "REGISTER", "DIRECTORY" -> {
-                    if (normalizedPath == null) { throw new IllegalArgumentException("DIRECTORY 需要 sourcePath"); }
-                    ImportContext ctx = new ImportContext("DIRECTORY", Path.of(normalizedPath), false, false);
-                    directoryHandler.handle(ctx, taskId, comicId, mangaRoot);
-                }
-                case "EHENTAI" -> {
-                    // 统一导入：下载 + 解压到临时目录后委托 DirectoryImportHandler
-                    Path sourceDir = ehentaiDownloadService.downloadToSourceDir(taskId, sourcePath);
-                    ImportContext ctx = new ImportContext("DIRECTORY", sourceDir, false, false);
-                    directoryHandler.handle(ctx, taskId, comicId, mangaRoot);
-                }
-                default -> throw new IllegalArgumentException("Unknown sourceType: " + sourceType);
-            }
-
-            publisher.publishImported(taskId, comicId);
-            channel.basicAck(tag, false);
-            log.info("ImportTaskHandler 完成: taskId={}, elapsed={}ms", taskId, System.currentTimeMillis() - start);
-        } catch (Exception e) {
-            String failureType = classifyFailure(e);
-            log.error("Import failed: taskId={}, type={}, elapsed={}ms",
-                taskId, failureType, System.currentTimeMillis() - start, e);
-            publisher.publishStatus(taskId, "FAILED", 0, null, 0, 0);
-            try { channel.basicReject(tag, false); } catch (Exception ex) { log.warn("消息 reject 失败: tag={}", tag, ex); }
-        }
+        mqConsumerSupport.consume(channel, tag, "导入任务: taskId=" + taskId,
+                () -> runImport(event, taskId),
+                e -> publisher.publishStatus(taskId, "FAILED", 0, null, 0, 0));
     }
 
-    private String classifyFailure(Exception e) {
-        String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
-        if (msg.contains("ZIP") || msg.contains("zip") || msg.contains("ZipEntry")) { return "ZIP_ERROR"; }
-        if (msg.contains("parse") || msg.contains("Parse") || msg.contains("Directory")) { return "PARSE_ERROR"; }
-        if (msg.contains("copy") || msg.contains("Copy") || msg.contains("store") || msg.contains("IO")) { return "COPY_ERROR"; }
-        return "UNKNOWN_ERROR";
+    private void runImport(ImportTaskCreatedEvent event, Long taskId) throws Exception {
+        Long comicId = event.comicId();
+        String sourceType = event.sourceType() != null ? event.sourceType() : "ZIP";
+        String sourcePath = event.sourcePath();
+        Path mangaRoot = Path.of(config.getMangaRoot());
+
+        publisher.publishStatus(taskId, "PARSING", 0, null, 0, 0);
+        String normalizedPath = mapHostPathToContainer(sourcePath);
+        if (!normalizedPath.equals(sourcePath)) {
+            log.info("Source path normalized: {} -> {}", sourcePath, normalizedPath);
+        }
+        routeToHandler(sourceType, normalizedPath, taskId, comicId, mangaRoot);
+        publisher.publishImported(taskId, comicId);
+    }
+
+    private void routeToHandler(String sourceType, String sourcePath, Long taskId, Long comicId, Path mangaRoot) throws Exception {
+        switch (sourceType) {
+            case "ZIP" -> zipHandler.importZip(
+                    new ImportContext("ZIP", Path.of(sourcePath), false, false), taskId, comicId, mangaRoot);
+            case "REGISTER", "DIRECTORY" -> {
+                if (sourcePath == null) { throw new IllegalArgumentException("DIRECTORY 需要 sourcePath"); }
+                directoryHandler.handle(
+                        new ImportContext("DIRECTORY", Path.of(sourcePath), false, false), taskId, comicId, mangaRoot);
+            }
+            case "EHENTAI" -> {
+                Path sourceDir = ehentaiDownloadService.downloadToSourceDir(taskId, sourcePath);
+                directoryHandler.handle(
+                        new ImportContext("DIRECTORY", sourceDir, false, false), taskId, comicId, mangaRoot);
+            }
+            default -> throw new IllegalArgumentException("Unknown sourceType: " + sourceType);
+        }
     }
 
     private String mapHostPathToContainer(String sourcePath) {
