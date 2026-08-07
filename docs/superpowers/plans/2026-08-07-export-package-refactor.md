@@ -773,6 +773,7 @@ git commit -m "重构 worker export 包：新增 ExportService/MetadataJsonExpor
 - Move: `worker-service/src/main/java/com/comicatlas/worker/export/ComicTitleSanitizer.java` → `.../worker/common/ComicTitleSanitizer.java`（package 改 `com.comicatlas.worker.common`，类名不变）
 - Modify: `worker-service/src/main/java/com/comicatlas/worker/event/ExportTaskHandler.java`（瘦身：删 buildManifest/buildOutputFileName/classifyExportError，改调 ExportService）
 - Modify: `worker-service/src/main/java/com/comicatlas/worker/event/MetadataRefreshHandler.java`（改调 MetadataJsonExporter）
+- Modify: `worker-service/src/main/java/com/comicatlas/worker/event/MetadataRefreshCommandHandler.java`（改调 MetadataJsonExporter——review 发现其同样依赖 collect().metadataJson() 会 NPE）
 
 **Interfaces:**
 - Consumes: `ExportService`（Task 2）、`MetadataJsonExporter`（Task 2）
@@ -910,16 +911,46 @@ public class MetadataRefreshHandler {
 }
 ```
 
-- [ ] **Step 4: 编译 + 全量 worker 测试**
+- [ ] **Step 4: `MetadataRefreshCommandHandler` 改调 `MetadataJsonExporter`**
+
+替换 `MetadataRefreshCommandHandler.refresh()` 方法为（依赖从 `ExportCollector` 改为 `MetadataJsonExporter`，消除 `collect().metadataJson()` 恒 null 的 NPE）：
+
+```java
+public void refresh(ManagementCommandRequestedEvent cmd) {
+    Long comicId = cmd.targetId();
+    try {
+        publisher.progress(cmd, 10, "开始刷新元数据");
+        String metadataJson = metadataJsonExporter.exportJson(comicId);
+
+        Path metadataDir = config.getMetadataDir() != null
+                ? Path.of(config.getMetadataDir())
+                : Path.of(config.getMangaRoot(), "metadata");
+        Files.createDirectories(metadataDir);
+        Path metadataFile = metadataDir.resolve(comicId + ".json");
+        Files.writeString(metadataFile, metadataJson, StandardCharsets.UTF_8);
+
+        publisher.progress(cmd, 100, "元数据刷新完成");
+        publisher.completed(cmd);
+        log.info("元数据刷新命令完成: comicId={}, size={} bytes", comicId, Files.size(metadataFile));
+    } catch (Exception e) {
+        log.error("元数据刷新命令失败: comicId={}", comicId, e);
+        publisher.failed(cmd, e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
+    }
+}
+```
+
+字段改为 `private final MetadataJsonExporter metadataJsonExporter;`（删除 `ExportCollector` 字段与 import），import 更新。
+
+- [ ] **Step 5: 编译 + 全量 worker 测试**
 
 Run: `.\mvnw -pl worker-service -am test -DfailIfNoTests=false`
 Expected: BUILD SUCCESS，全部通过（基线 48）
 
-- [ ] **Step 5: 提交**
+- [ ] **Step 6: 提交**
 
 ```bash
 git add -A worker-service/src/main/java/com/comicatlas/worker/
-git commit -m "导出组件归位与 handler 瘦身：ExportFileResolver 移 storage 域、ComicTitleSanitizer 移 common，ExportTaskHandler/MetadataRefreshHandler 委托 ExportService/MetadataJsonExporter"
+git commit -m "导出组件归位与 handler 瘦身：ExportFileResolver 移 storage 域、ComicTitleSanitizer 移 common，ExportTaskHandler/MetadataRefreshHandler/MetadataRefreshCommandHandler 委托 ExportService/MetadataJsonExporter"
 ```
 
 ---
