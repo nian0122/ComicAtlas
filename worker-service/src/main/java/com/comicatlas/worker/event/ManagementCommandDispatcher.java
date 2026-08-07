@@ -2,6 +2,7 @@ package com.comicatlas.worker.event;
 
 import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
+import com.comicatlas.common.mq.MqConsumerSupport;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,27 +31,17 @@ public class ManagementCommandDispatcher {
     private final RestoreCommandHandler restoreCommandHandler;
     private final PurgeCommandHandler purgeCommandHandler;
     private final MediaUploadCommandHandler mediaUploadCommandHandler;
-    private final ManagementCommandPublisher publisher;
+    private final MqConsumerSupport mqConsumerSupport;
 
     @RabbitListener(queues = MqQueues.MANAGEMENT_COMMAND)
     public void handle(ManagementCommandRequestedEvent cmd,
             Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
-        log.info("收到管理命令: op={}, target={}:{}, taskId={}, itemId={}, attempt={}",
-                cmd.operationType(), cmd.targetType(), cmd.targetId(),
-                cmd.taskId(), cmd.itemId(), cmd.attempt());
-        try {
+        mqConsumerSupport.consume(channel, tag, "管理命令: taskId=" + cmd.taskId(), () -> {
+            log.info("收到管理命令: op={}, target={}:{}, taskId={}, itemId={}, attempt={}",
+                    cmd.operationType(), cmd.targetType(), cmd.targetId(),
+                    cmd.taskId(), cmd.itemId(), cmd.attempt());
             route(cmd);
-            channel.basicAck(tag, false);
-        } catch (Exception e) {
-            log.error("管理命令执行失败: op={}, target={}:{}, taskId={}",
-                    cmd.operationType(), cmd.targetType(), cmd.targetId(), cmd.taskId(), e);
-            publisher.failed(cmd, e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
-            try {
-                channel.basicNack(tag, false, false);
-            } catch (Exception ex) {
-                log.warn("消息 nack 失败: tag={}", tag, ex);
-            }
-        }
+        });
     }
 
     private void route(ManagementCommandRequestedEvent cmd) {

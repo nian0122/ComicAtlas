@@ -5,6 +5,7 @@ import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.event.LqCompletedEvent;
 import com.comicatlas.common.event.LqGenerateEvent;
+import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.worker.entity.ExportMedia;
 import com.comicatlas.worker.file.storage.StorageProperties;
 import com.comicatlas.worker.file.storage.StorageRoot;
@@ -36,6 +37,7 @@ public class LqGenerateHandler {
     private final RabbitTemplate rabbitTemplate;
     private final ExportMediaMapper mediaMapper;
     private final StorageProperties storageProperties;
+    private final MqConsumerSupport mqConsumerSupport;
 
     @RabbitListener(queues = MqQueues.LQ_GENERATE)
     public void handle(LqGenerateEvent event,
@@ -43,15 +45,14 @@ public class LqGenerateHandler {
         Long comicId = event.comicId();
         Long chapterId = event.chapterId();
 
-        long start = System.currentTimeMillis();
-        log.info("LQ 生成开始: comicId={}, chapterId={}", comicId, chapterId);
+        mqConsumerSupport.consume(channel, tag, "LQ生成: comicId=" + comicId, () -> {
+            long start = System.currentTimeMillis();
+            log.info("LQ 生成开始: comicId={}, chapterId={}", comicId, chapterId);
 
-        try {
             // 从 DB 读取章节页面，获取真实 hqPath
             List<ExportMedia> pages = mediaMapper.selectByChapterId(chapterId);
             if (pages.isEmpty()) {
                 log.info("章节无页面，跳过 LQ: chapterId={}", chapterId);
-                channel.basicAck(tag, false);
                 return;
             }
 
@@ -59,9 +60,7 @@ public class LqGenerateHandler {
             StorageRoot hqRoot = storageProperties.getRoots().get("HQ");
             StorageRoot lqRoot = storageProperties.getRoots().get("LQ");
             if (hqRoot == null || lqRoot == null) {
-                log.error("HQ/LQ 存储根未配置");
-                channel.basicReject(tag, false);
-                return;
+                throw new IllegalStateException("HQ/LQ 存储根未配置");
             }
 
             String firstHqPath = pages.get(0).getHqPath();
@@ -82,14 +81,9 @@ public class LqGenerateHandler {
                     comicId, chapterId, failedPages,
                     result.getProcessed(), result.getSkipped(), result.getElapsedMs());
             rabbitTemplate.convertAndSend(MqExchanges.IMAGE, MqRoutingKeys.LQ_COMPLETED, completedEvent);
-            channel.basicAck(tag, false);
             log.info("LQ 生成完成: comicId={}, chapterId={}, failed={}, elapsed={}ms",
                     comicId, chapterId, failedPages.size(), System.currentTimeMillis() - start);
-        } catch (Exception e) {
-            log.error("LQ 生成失败: comicId={}, chapterId={}, elapsed={}ms",
-                    comicId, chapterId, System.currentTimeMillis() - start, e);
-            try { channel.basicReject(tag, false); } catch (Exception ex) { log.warn("消息 reject 失败: tag={}", tag, ex); }
-        }
+        });
     }
 
     private static String extractDirectory(String hqPath) {

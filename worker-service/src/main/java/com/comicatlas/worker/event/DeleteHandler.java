@@ -5,6 +5,7 @@ import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.event.DeleteCompletedEvent;
 import com.comicatlas.common.event.DeleteRequestedEvent;
+import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.worker.file.storage.StorageProperties;
 import com.comicatlas.worker.file.storage.StorageRoot;
 import com.rabbitmq.client.Channel;
@@ -33,15 +34,17 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class DeleteHandler {
     private final StorageProperties storageProperties;
     private final RabbitTemplate rabbitTemplate;
+    private final MqConsumerSupport mqConsumerSupport;
 
     @RabbitListener(queues = MqQueues.DELETE_TASK)
     public void handle(DeleteRequestedEvent event,
             Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         Long comicId = event.comicId();
-        long start = System.currentTimeMillis();
-        log.info("Delete: comicId={}", comicId);
 
-        try {
+        mqConsumerSupport.consume(channel, tag, "完整删除: comicId=" + comicId, () -> {
+            long start = System.currentTimeMillis();
+            log.info("Delete: comicId={}", comicId);
+
             StorageRoot hqRoot = storageProperties.getRoots().get("HQ");
             StorageRoot lqRoot = storageProperties.getRoots().get("LQ");
             StorageRoot thumbsRoot = storageProperties.getRoots().get("THUMBS");
@@ -49,9 +52,7 @@ public class DeleteHandler {
             StorageRoot metadataRoot = storageProperties.getRoots().get("METADATA");
 
             if (hqRoot == null || lqRoot == null) {
-                log.error("HQ/LQ 存储根未配置");
-                channel.basicReject(tag, false);
-                return;
+                throw new IllegalStateException("HQ/LQ 存储根未配置");
             }
 
             Path comicHqDir = hqRoot.resolve(comicId.toString());
@@ -79,14 +80,9 @@ public class DeleteHandler {
                 UUID.randomUUID(), Instant.now(), comicId,
                 deletedDirs.get(), deletedFiles.get());
             rabbitTemplate.convertAndSend(MqExchanges.DELETE, MqRoutingKeys.DELETE_COMPLETED, completed);
-            channel.basicAck(tag, false);
             log.info("Delete completed: comicId={}, dirs={}, files={}, elapsed={}ms",
                 comicId, deletedDirs.get(), deletedFiles.get(), System.currentTimeMillis() - start);
-        } catch (Exception e) {
-            log.error("Delete failed: comicId={}, elapsed={}ms",
-                comicId, System.currentTimeMillis() - start, e);
-            try { channel.basicReject(tag, false); } catch (Exception ex) { log.warn("消息 reject 失败: tag={}", tag, ex); }
-        }
+        });
     }
 
     private void moveToTrash(Path sourceDir, Path trashDir, StorageRoot sourceRoot, StorageRoot trashRoot)

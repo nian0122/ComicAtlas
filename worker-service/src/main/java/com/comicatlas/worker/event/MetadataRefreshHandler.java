@@ -2,6 +2,7 @@ package com.comicatlas.worker.event;
 
 import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.event.MetadataRefreshEvent;
+import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.worker.export.ExportCollectResult;
 import com.comicatlas.worker.export.ExportCollector;
 import com.rabbitmq.client.Channel;
@@ -25,33 +26,26 @@ public class MetadataRefreshHandler {
     private final ExportCollector exportCollector;
     @Value("${worker.manga-root}")
     private String mangaRoot;
+    private final MqConsumerSupport mqConsumerSupport;
 
     @RabbitListener(queues = MqQueues.METADATA_REFRESH)
     public void handle(MetadataRefreshEvent event,
             Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
-        log.info("收到 metadata 刷新请求: comicId={}", event.comicId());
+        Long comicId = event.comicId();
+        mqConsumerSupport.consume(channel, tag, "元数据刷新: comicId=" + comicId, () -> {
+            log.info("收到 metadata 刷新请求: comicId={}", comicId);
 
-        try {
-            ExportCollectResult result = exportCollector.collect(event.comicId());
+            ExportCollectResult result = exportCollector.collect(comicId);
             String metadataJson = result.metadataJson();
 
             Path metadataDir = Path.of(mangaRoot, "metadata");
             Files.createDirectories(metadataDir);
-            Path metadataFile = metadataDir.resolve(event.comicId() + ".json");
+            Path metadataFile = metadataDir.resolve(comicId + ".json");
             Files.writeString(metadataFile, metadataJson, StandardCharsets.UTF_8);
 
             long fileSize = Files.size(metadataFile);
             log.info("metadata.json 写入完成: comicId={}, path={}, size={} bytes",
-                    event.comicId(), metadataFile, fileSize);
-
-            channel.basicAck(tag, false);
-        } catch (Exception e) {
-            log.error("metadata 刷新失败: comicId={}", event.comicId(), e);
-            try {
-                channel.basicNack(tag, false, false);
-            } catch (Exception ex) {
-                log.warn("消息 nack 失败: tag={}, comicId={}", tag, event.comicId(), ex);
-            }
-        }
+                    comicId, metadataFile, fileSize);
+        });
     }
 }
