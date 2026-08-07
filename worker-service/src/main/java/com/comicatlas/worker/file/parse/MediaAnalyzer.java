@@ -4,6 +4,7 @@ import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.process.ExternalProcessRunner;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -26,6 +27,7 @@ import java.util.Set;
  */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class MediaAnalyzer {
 
     private static final Set<String> VIDEO_EXT = Set.of(".mp4", ".mkv", ".webm", ".mov", ".avi");
@@ -35,14 +37,6 @@ public class MediaAnalyzer {
     private final WorkerConfig workerConfig;
     private final ObjectMapper objectMapper;
     private final ExternalProcessRunner processRunner;
-
-    public MediaAnalyzer(WorkerConfig workerConfig,
-                         ObjectMapper objectMapper,
-                         ExternalProcessRunner processRunner) {
-        this.workerConfig = workerConfig;
-        this.objectMapper = objectMapper;
-        this.processRunner = processRunner;
-    }
 
     /**
      * 分析媒体文件。返回 MediaInfo（pageNumber 默认为 0，由调用方按章节顺序填充）。
