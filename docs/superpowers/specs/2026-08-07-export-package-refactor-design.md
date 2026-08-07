@@ -20,7 +20,7 @@
 - **消除重复**（强制）：metadata v3 构建唯一化，跨模块共享放二方库（comic-common）。
 - **职责单一**：导出编排进 `ExportService`；handler 只做 MQ 协议。
 - **边界清晰**：刷新解耦导出；存储解析归 storage 域；通用工具归 common。
-- 不改任何导出/刷新的**行为与产物格式**（v3 JSON、ZIP 布局不变）。
+- 不改任何导出/刷新的**业务行为**；metadata v3 输出按共享 builder 的字段集合为准（null 可选字段省略、hqStatus/lqStatus 默认 READY/NOT_GENERATED 为 spec 定义行为——worker 侧相对旧输出有收敛性变化：旧输出显式 null/空串，新输出省略/默认值；无系统内消费者依赖 null 键，导入链路用 `DirectoryImportHandler` 自有 builder，不受影响）。
 
 ## 3. 目标架构
 
