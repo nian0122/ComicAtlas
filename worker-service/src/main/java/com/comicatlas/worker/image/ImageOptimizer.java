@@ -1,10 +1,10 @@
 package com.comicatlas.worker.image;
 
-import com.comicatlas.worker.common.FilePathBuilder;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.process.ExternalProcessRunner;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Data;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -20,21 +20,11 @@ import java.util.List;
  */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class ImageOptimizer {
     private final WorkerConfig config;
-    private final FilePathBuilder pathBuilder;
     private final ObjectMapper objectMapper;
     private final ExternalProcessRunner processRunner;
-
-    public ImageOptimizer(WorkerConfig config,
-                          FilePathBuilder pathBuilder,
-                          ObjectMapper objectMapper,
-                          ExternalProcessRunner processRunner) {
-        this.config = config;
-        this.pathBuilder = pathBuilder;
-        this.objectMapper = objectMapper;
-        this.processRunner = processRunner;
-    }
 
     private static final long LQ_TIMEOUT_SECONDS = 600;
 

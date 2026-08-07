@@ -63,12 +63,12 @@ public class MetadataAssembler {
                 ));
             }
         } else if (node.hasChildren()) {
-            int myIndex = catalogCounter.getAndIncrement();
-            int mySort = catalogs.size();
-            catalogs.add(new ComicMetadata.CatalogInfo(node.name(), mySort, parentCatalogIndex));
+            int catalogIndex = catalogCounter.getAndIncrement();
+            int sortOrder = catalogs.size();
+            catalogs.add(new ComicMetadata.CatalogInfo(node.name(), sortOrder, parentCatalogIndex));
 
             for (DirectoryTree child : node.children()) {
-                processNode(child, root, myIndex, catalogs, chapters, globalOrder, catalogCounter);
+                processNode(child, root, catalogIndex, catalogs, chapters, globalOrder, catalogCounter);
             }
         }
     }

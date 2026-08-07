@@ -5,6 +5,7 @@ import com.comicatlas.api.outbox.mapper.OutboxMessageMapper;
 import com.comicatlas.common.event.ComicEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -26,12 +27,15 @@ import java.util.List;
  */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class OutboxRelay {
 
     private final OutboxMessageMapper outboxMapper;
     private final RabbitTemplate rabbitTemplate;
     private final TransactionTemplate transactionTemplate;
-    private final ObjectMapper objectMapper;
+
+    /** 独立配置的 ObjectMapper：outbox payload 反序列化需 JavaTimeModule，不注入 Spring 默认实例 */
+    private final ObjectMapper objectMapper = createOutboxObjectMapper();
 
     /** 每次轮询抢注的最大消息数 */
     @Value("${outbox.relay.batch-size:50}")
@@ -53,13 +57,10 @@ public class OutboxRelay {
     @Value("${outbox.relay.scheduled:true}")
     private boolean scheduledEnabled;
 
-    public OutboxRelay(OutboxMessageMapper outboxMapper, RabbitTemplate rabbitTemplate,
-                       TransactionTemplate transactionTemplate) {
-        this.outboxMapper = outboxMapper;
-        this.rabbitTemplate = rabbitTemplate;
-        this.transactionTemplate = transactionTemplate;
-        this.objectMapper = new ObjectMapper();
-        this.objectMapper.registerModule(new JavaTimeModule());
+    private static ObjectMapper createOutboxObjectMapper() {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.registerModule(new JavaTimeModule());
+        return mapper;
     }
 
     /**

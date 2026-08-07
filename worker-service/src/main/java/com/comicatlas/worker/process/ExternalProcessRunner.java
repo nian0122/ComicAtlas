@@ -1,5 +1,6 @@
 package com.comicatlas.worker.process;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
@@ -25,13 +26,11 @@ import java.util.concurrent.TimeoutException;
  */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class ExternalProcessRunner {
 
+    @Qualifier("processIoExecutor")
     private final ThreadPoolTaskExecutor processIoExecutor;
-
-    public ExternalProcessRunner(@Qualifier("processIoExecutor") ThreadPoolTaskExecutor processIoExecutor) {
-        this.processIoExecutor = processIoExecutor;
-    }
 
     /** 外部进程执行结果：退出码 + 已消费的 stdout 内容。 */
     public record ExternalProcessResult(int exitCode, String stdout) {}
@@ -55,29 +54,29 @@ public class ExternalProcessRunner {
      * 由读取线程单线程调用，无需同步。
      */
     private static final class TailBuffer {
-        private final StringBuilder buf = new StringBuilder(MAX_OUTPUT_CHARS / 2);
+        private final StringBuilder buffer = new StringBuilder(MAX_OUTPUT_CHARS / 2);
         private boolean truncated = false;
 
         /**
          * 按剩余容量截断写入：最多写入 (MAX - 当前长度) 字符，超限部分丢弃但继续排空
          * （读取循环仍在跑，防管道死锁）。任何单行/块长均不可能突破上限。
          */
-        void append(char[] chunk, int len) {
-            int remaining = MAX_OUTPUT_CHARS - buf.length();
+        void append(char[] chunk, int length) {
+            int remaining = MAX_OUTPUT_CHARS - buffer.length();
             if (remaining <= 0) {
                 truncated = true;
                 return;
             }
-            int toWrite = Math.min(len, remaining);
-            buf.append(chunk, 0, toWrite);
-            if (len > toWrite) {
+            int toWrite = Math.min(length, remaining);
+            buffer.append(chunk, 0, toWrite);
+            if (length > toWrite) {
                 truncated = true;
             }
         }
 
         String snapshot() {
-            if (!truncated) { return buf.toString(); }
-            return "[输出已截断，仅保留开头 " + buf.length() + " 字符]\n" + buf;
+            if (!truncated) { return buffer.toString(); }
+            return "[输出已截断，仅保留开头 " + buffer.length() + " 字符]\n" + buffer;
         }
     }
 
@@ -105,11 +104,11 @@ public class ExternalProcessRunner {
         CompletableFuture<Void> readFuture;
         try {
             readFuture = CompletableFuture.runAsync(() -> {
-                try (Reader r = new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8)) {
+                try (Reader reader = new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8)) {
                     char[] chunk = new char[CHUNK_SIZE];
-                    int n;
-                    while ((n = r.read(chunk, 0, CHUNK_SIZE)) != -1) {
-                        processOutput.append(chunk, n);
+                    int charsRead;
+                    while ((charsRead = reader.read(chunk, 0, CHUNK_SIZE)) != -1) {
+                        processOutput.append(chunk, charsRead);
                     }
                 } catch (IOException e) {
                     log.warn("读取外部进程输出失败: {}", e.getMessage());

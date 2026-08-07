@@ -2,6 +2,7 @@ package com.comicatlas.worker.file.transcode;
 
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.process.ExternalProcessRunner;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
@@ -29,26 +30,21 @@ import java.util.stream.Stream;
  */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class VideoNormalizer {
 
     private final WorkerConfig config;
+    @Qualifier("videoNormalizeExecutor")
     private final ThreadPoolTaskExecutor transcodeExecutor;
     private final ExternalProcessRunner processRunner;
-    private final int ffmpegThreads;
 
-    private static final Set<String> NON_STANDARD_EXT = Set.of(
+    /** ffmpeg 转码线程固定 2，并行度由托管线程池控制 */
+    private static final int FFMPEG_THREADS = 2;
+
+    private static final Set<String> NON_STANDARD_EXTENSIONS = Set.of(
             ".wmv", ".flv", ".ts", ".avi", ".mov", ".mkv",
             ".mts", ".m2ts", ".vob", ".3gp", ".m4v"
     );
-
-    public VideoNormalizer(WorkerConfig config,
-                           @Qualifier("videoNormalizeExecutor") ThreadPoolTaskExecutor transcodeExecutor,
-                           ExternalProcessRunner processRunner) {
-        this.config = config;
-        this.transcodeExecutor = transcodeExecutor;
-        this.processRunner = processRunner;
-        this.ffmpegThreads = 2; // ffmpeg 转码线程固定 2，并行度由托管线程池控制
-    }
 
     /**
      * 扫描源目录，将非标准视频并行转码到临时目录，全部成功后搬入源目录。
@@ -62,10 +58,7 @@ public class VideoNormalizer {
         List<Path> files = collectFiles(sourceDir);
         if (files.isEmpty()) { return 0; }
 
-        String cfgTemp = config.getTempDir();
-        Path tempRoot = (cfgTemp != null && !cfgTemp.isBlank())
-                ? Path.of(cfgTemp)
-                : Path.of(System.getProperty("java.io.tmpdir"));
+        Path tempRoot = config.resolveTempDir();
         Path tempDir;
         try {
             Files.createDirectories(tempRoot);
@@ -76,7 +69,7 @@ public class VideoNormalizer {
         }
 
         log.info("发现 {} 个非标准视频，转码到临时目录 (并行度={}, ffmpeg线程={})",
-                files.size(), transcodeExecutor.getCorePoolSize(), ffmpegThreads);
+                files.size(), transcodeExecutor.getCorePoolSize(), FFMPEG_THREADS);
 
         ConcurrentHashMap<Path, Path> transcoded = new ConcurrentHashMap<>(); // source → temp-mp4
         AtomicInteger failed = new AtomicInteger(0);
@@ -120,7 +113,7 @@ public class VideoNormalizer {
         List<Path> files = new ArrayList<>();
         try (var stream = Files.walk(sourceDir)) {
             stream.filter(Files::isRegularFile)
-                    .filter(this::needsTranscode)
+                    .filter(this::hasNonStandardExtension)
                     .forEach(files::add);
         } catch (IOException e) {
             log.error("扫描目录失败: {}", sourceDir, e);
@@ -132,7 +125,7 @@ public class VideoNormalizer {
                                   ConcurrentHashMap<Path, Path> transcoded, AtomicInteger failed) {
         try {
             Path relative = sourceDir.relativize(file);
-            Path tempMp4 = tempDir.resolve(toMp4Name(relative));
+            Path tempMp4 = tempDir.resolve(toMp4(relative));
             Files.createDirectories(tempMp4.getParent());
 
             if (Files.exists(tempMp4) && isNonEmpty(tempMp4)) {
@@ -183,26 +176,17 @@ public class VideoNormalizer {
         }
     }
 
-    private boolean needsTranscode(Path file) {
+    private boolean hasNonStandardExtension(Path file) {
         String name = file.getFileName().toString().toLowerCase();
-        return NON_STANDARD_EXT.stream().anyMatch(name::endsWith);
+        return NON_STANDARD_EXTENSIONS.stream().anyMatch(name::endsWith);
     }
 
-    /** file.wmv → file.mp4（同目录） */
+    /** file.wmv → file.mp4（同目录；无父目录时返回纯文件名） */
     private Path toMp4(Path original) {
         String name = original.getFileName().toString();
         int dot = name.lastIndexOf('.');
         String base = dot > 0 ? name.substring(0, dot) : name;
         return original.resolveSibling(base + ".mp4");
-    }
-
-    /** Chapter/file.wmv → Chapter/file.mp4（用于 temp 路径） */
-    private Path toMp4Name(Path relative) {
-        String name = relative.getFileName().toString();
-        int dot = name.lastIndexOf('.');
-        String base = dot > 0 ? name.substring(0, dot) : name;
-        Path parent = relative.getParent();
-        return parent != null ? parent.resolve(base + ".mp4") : Path.of(base + ".mp4");
     }
 
     private boolean isNonEmpty(Path path) {
@@ -216,7 +200,7 @@ public class VideoNormalizer {
     private void transcode(Path input, Path output) throws Exception {
         String ffmpeg = config.resolveToolPath(config.getFfmpegPath()).toString();
         log.info("转码: {} → {} (并行度={}, 线程={})",
-                input.getFileName(), output.getFileName(), transcodeExecutor.getCorePoolSize(), ffmpegThreads);
+                input.getFileName(), output.getFileName(), transcodeExecutor.getCorePoolSize(), FFMPEG_THREADS);
 
         List<String> cmd = List.of(
                 ffmpeg,
@@ -224,7 +208,7 @@ public class VideoNormalizer {
                 "-c:v", "libx264",
                 "-crf", "23",
                 "-preset", "medium",
-                "-threads", String.valueOf(ffmpegThreads),
+                "-threads", String.valueOf(FFMPEG_THREADS),
                 "-c:a", "aac",
                 "-b:a", "128k",
                 "-movflags", "+faststart",

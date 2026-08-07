@@ -66,11 +66,11 @@ public class DirectoryImportHandler {
                 throw new RuntimeException("Task cancelled: " + taskId);
             }
 
-// 构建清单（相对路径），原子写入后再动文件
+            // 构建清单（相对路径），原子写入后再动文件
             Path importRoot = tree.path();
-            ManifestBuildResult mbr = buildManifestFiles(metadata, comicId, importRoot);
-            List<ImportManifest.ImportFile> files = mbr.files();
-            Map<String, String> generatedNames = mbr.nameMap();
+            ManifestBuildResult manifestBuildResult = buildManifestFiles(metadata, comicId, importRoot);
+            List<ImportManifest.ImportFile> files = manifestBuildResult.files();
+            Map<String, String> generatedNames = manifestBuildResult.nameMap();
             JsonNode metadataNode = objectMapper.valueToTree(buildMetadataMap(metadata, comicId, generatedNames));
             manifest = new ImportManifest(1, taskId, ctx.sourceType(), importRoot.toString(),
                     metadataNode, files);
@@ -85,22 +85,22 @@ public class DirectoryImportHandler {
                 log.info("Task cancelled during file move: taskId={}", taskId);
                 throw new RuntimeException("Task cancelled: " + taskId);
             }
-            Path src = sourceRoot.resolve(file.source());
-            StorageRef ref = new StorageRef("HQ", file.target());
-            Path dst = storageService.resolve(ref);
-            if (Files.exists(dst)) {
-                long dstSize = Files.size(dst);
-                if (dstSize == file.size()) {
-                    log.debug("跳过已搬文件: {}", dst);
+            Path source = sourceRoot.resolve(file.source());
+            StorageRef storageRef = new StorageRef("HQ", file.target());
+            Path destination = storageService.resolve(storageRef);
+            if (Files.exists(destination)) {
+                long destinationSize = Files.size(destination);
+                if (destinationSize == file.size()) {
+                    log.debug("跳过已搬文件: {}", destination);
                     continue;
                 }
-                throw new IOException("目标已存在但大小不匹配: " + dst
-                        + " expected=" + file.size() + " actual=" + dstSize);
+                throw new IOException("目标已存在但大小不匹配: " + destination
+                        + " expected=" + file.size() + " actual=" + destinationSize);
             }
-            if (!Files.exists(src)) {
-                throw new IOException("源文件缺失且目标不存在: " + src);
+            if (!Files.exists(source)) {
+                throw new IOException("源文件缺失且目标不存在: " + source);
             }
-            storageService.transfer(src, ref, TransferMode.MOVE);
+            storageService.transfer(source, storageRef, TransferMode.MOVE);
         }
 
         // 封面：从 metadata 读取首张图片（跳过 VIDEO），从 HQ 生成，不依赖源目录
@@ -122,15 +122,15 @@ public class DirectoryImportHandler {
     private ManifestBuildResult buildManifestFiles(ComicMetadata metadata, Long comicId, Path importRoot) {
         List<ImportManifest.ImportFile> files = new ArrayList<>();
         Map<String, String> nameMap = new LinkedHashMap<>();
-        for (var ch : metadata.chapters()) {
-            for (var page : ch.pages()) {
-                Path src = importRoot.resolve(ch.sourceDir()).resolve(page.fileName());
-                if (!Files.exists(src)) { src = importRoot.resolve(page.fileName()); }
-                if (Files.exists(src) && page.fileSize() > 0) {
-                    String relative = importRoot.relativize(src).toString().replace('\\', '/');
+        for (var chapter : metadata.chapters()) {
+            for (var page : chapter.pages()) {
+                Path source = importRoot.resolve(chapter.sourceDir()).resolve(page.fileName());
+                if (!Files.exists(source)) { source = importRoot.resolve(page.fileName()); }
+                if (Files.exists(source) && page.fileSize() > 0) {
+                    String relative = importRoot.relativize(source).toString().replace('\\', '/');
                     // 新布局：serverGeneratedName（UUID + 扩展名），目录暂用 globalOrder
                     String generatedName = generateServerName(page.fileName());
-                    String target = comicId + "/" + ch.globalOrder() + "/" + generatedName;
+                    String target = comicId + "/" + chapter.globalOrder() + "/" + generatedName;
                     files.add(new ImportManifest.ImportFile(relative, target, page.fileSize()));
                     // QA 修复注记（task-21）：nameMap 键必须用相对路径而非裸 fileName，
                     // 否则多章节含同名文件（001.jpg）时后处理章节覆盖前者，
@@ -148,14 +148,14 @@ public class DirectoryImportHandler {
      * 避免文件名冲突和路径猜解。
      */
     private static String generateServerName(String originalName) {
-        String ext = "";
+        String extension = "";
         if (originalName != null) {
             int dot = originalName.lastIndexOf('.');
             if (dot >= 0 && dot < originalName.length() - 1) {
-                ext = originalName.substring(dot).toLowerCase();
+                extension = originalName.substring(dot).toLowerCase();
             }
         }
-        return UUID.randomUUID().toString() + ext;
+        return UUID.randomUUID().toString() + extension;
     }
 
     private Map<String, Object> buildMetadataMap(ComicMetadata metadata, Long comicId, Map<String, String> generatedNames) {
@@ -164,44 +164,44 @@ public class DirectoryImportHandler {
         comic.put("author", metadata.author() != null ? metadata.author() : "");
         comic.put("tags", metadata.tags());
 
-        List<Map<String, Object>> catalogList = metadata.catalogs().stream().map(cat -> {
+        List<Map<String, Object>> catalogList = metadata.catalogs().stream().map(catalog -> {
             Map<String, Object> catalogMap = new LinkedHashMap<>();
-            catalogMap.put("title", cat.title());
-            catalogMap.put("sortOrder", cat.sortOrder());
-            catalogMap.put("parentIndex", cat.parentIndex());
+            catalogMap.put("title", catalog.title());
+            catalogMap.put("sortOrder", catalog.sortOrder());
+            catalogMap.put("parentIndex", catalog.parentIndex());
             return catalogMap;
         }).toList();
 
-        List<Map<String, Object>> chapterList = metadata.chapters().stream().map(ch -> {
+        List<Map<String, Object>> chapterList = metadata.chapters().stream().map(chapter -> {
             Map<String, Object> chapterMap = new LinkedHashMap<>();
-            chapterMap.put("title", ch.title());
-            chapterMap.put("chapterNo", ch.chapterNo());
-            chapterMap.put("sortOrder", ch.sortOrder());
-            chapterMap.put("globalOrder", ch.globalOrder());
-            chapterMap.put("catalogIndex", ch.catalogIndex());
-            chapterMap.put("sourceDir", ch.sourceDir());
-            chapterMap.put("mediaItems", ch.pages().stream().map(p -> {
+            chapterMap.put("title", chapter.title());
+            chapterMap.put("chapterNo", chapter.chapterNo());
+            chapterMap.put("sortOrder", chapter.sortOrder());
+            chapterMap.put("globalOrder", chapter.globalOrder());
+            chapterMap.put("catalogIndex", chapter.catalogIndex());
+            chapterMap.put("sourceDir", chapter.sourceDir());
+            chapterMap.put("mediaItems", chapter.pages().stream().map(page -> {
                 Map<String, Object> mediaMap = new LinkedHashMap<>();
-                mediaMap.put("fileName", p.fileName());
-                mediaMap.put("pageNumber", p.pageNumber());
-                mediaMap.put("hqStatus", p.hqStatus());
-                mediaMap.put("lqStatus", p.lqStatus());
-                mediaMap.put("fileSize", p.fileSize());
+                mediaMap.put("fileName", page.fileName());
+                mediaMap.put("pageNumber", page.pageNumber());
+                mediaMap.put("hqStatus", page.hqStatus());
+                mediaMap.put("lqStatus", page.lqStatus());
+                mediaMap.put("fileSize", page.fileSize());
                 // 新布局：写入 hqPath = {comicId}/{globalOrder}/{generatedName}
-                String relKey = (ch.sourceDir() != null && !ch.sourceDir().isBlank())
-                        ? ch.sourceDir() + "/" + p.fileName()
-                        : p.fileName();
+                String relKey = (chapter.sourceDir() != null && !chapter.sourceDir().isBlank())
+                        ? chapter.sourceDir() + "/" + page.fileName()
+                        : page.fileName();
                 String generatedPath = generatedNames.get(relKey);
                 if (generatedPath != null) {
                     mediaMap.put("hqPath", generatedPath);
                 }
-                if (p.width() != null) { mediaMap.put("width", p.width()); }
-                if (p.height() != null) { mediaMap.put("height", p.height()); }
-                mediaMap.put("mediaType", p.mediaType());
-                if (p.duration() != null) { mediaMap.put("duration", p.duration()); }
-                if (p.container() != null) { mediaMap.put("container", p.container()); }
-                if (p.videoCodec() != null) { mediaMap.put("videoCodec", p.videoCodec()); }
-                if (p.audioCodec() != null) { mediaMap.put("audioCodec", p.audioCodec()); }
+                if (page.width() != null) { mediaMap.put("width", page.width()); }
+                if (page.height() != null) { mediaMap.put("height", page.height()); }
+                mediaMap.put("mediaType", page.mediaType());
+                if (page.duration() != null) { mediaMap.put("duration", page.duration()); }
+                if (page.container() != null) { mediaMap.put("container", page.container()); }
+                if (page.videoCodec() != null) { mediaMap.put("videoCodec", page.videoCodec()); }
+                if (page.audioCodec() != null) { mediaMap.put("audioCodec", page.audioCodec()); }
                 return mediaMap;
             }).toList());
             return chapterMap;
@@ -236,8 +236,8 @@ public class DirectoryImportHandler {
     private void generateCoverFromNode(JsonNode metadata, Long comicId) {
         JsonNode chapters = metadata.path("chapters");
         if (chapters.isEmpty()) { return; }
-        JsonNode firstCh = chapters.get(0);
-        JsonNode mediaItems = firstCh.path("mediaItems");
+        JsonNode firstChapter = chapters.get(0);
+        JsonNode mediaItems = firstChapter.path("mediaItems");
         if (mediaItems.isEmpty()) { return; }
 
         // 跳过 VIDEO 首项，找第一张图片 — 优先使用 hqPath
@@ -251,13 +251,13 @@ public class DirectoryImportHandler {
         if (firstImage != null) {
             String hqPath = firstImage.has("hqPath") ? firstImage.path("hqPath").asText() : null;
             if (hqPath == null || hqPath.isBlank()) {
-                int globalOrder = firstCh.path("globalOrder").asInt();
+                int globalOrder = firstChapter.path("globalOrder").asInt();
                 hqPath = comicId + "/" + globalOrder + "/" + firstImage.path("fileName").asText();
             }
-            Path firstImg = storageService.resolve(new StorageRef("HQ", hqPath));
-            if (Files.exists(firstImg)) {
+            Path firstImagePath = storageService.resolve(new StorageRef("HQ", hqPath));
+            if (Files.exists(firstImagePath)) {
                 try {
-                    imageOptimizer.generateCover(comicId, firstImg);
+                    imageOptimizer.generateCover(comicId, firstImagePath);
                 } catch (Exception e) {
                     log.error("封面生成失败: comicId={}, {}", comicId, e.getMessage());
                 }
@@ -266,7 +266,7 @@ public class DirectoryImportHandler {
             JsonNode firstVideo = mediaItems.get(0);
             String hqPath = firstVideo.has("hqPath") ? firstVideo.path("hqPath").asText() : null;
             if (hqPath == null || hqPath.isBlank()) {
-                int globalOrder = firstCh.path("globalOrder").asInt();
+                int globalOrder = firstChapter.path("globalOrder").asInt();
                 hqPath = comicId + "/" + globalOrder + "/" + firstVideo.path("fileName").asText();
             }
             Path firstVideoFile = storageService.resolve(new StorageRef("HQ", hqPath));
