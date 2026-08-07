@@ -5,6 +5,7 @@ import com.comicatlas.api.common.enums.HqStatus;
 import com.comicatlas.api.common.enums.LqStatus;
 import com.comicatlas.api.common.storage.ApiStorageProperties;
 import com.comicatlas.api.common.storage.ApiStorageRoot;
+import com.comicatlas.common.metadata.MetadataJsonBuilder;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -12,8 +13,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.nio.file.Files;
@@ -50,8 +51,8 @@ class MetadataExporterTest {
     private ComicTagMapper comicTagMapper;
     @Mock
     private TagMapper tagMapper;
-    @Mock
-    private ObjectMapper objectMapper;
+    @Spy
+    private MetadataJsonBuilder metadataJsonBuilder = new MetadataJsonBuilder(new ObjectMapper());
     @Mock
     private ApiStorageProperties storageProperties;
 
@@ -113,8 +114,6 @@ class MetadataExporterTest {
 
         when(mediaMapper.selectList(any(LambdaQueryWrapper.class)))
                 .thenReturn(List.of(imageItem, videoItem));
-
-        ReflectionTestUtils.setField(exporter, "objectMapper", realMapper);
 
         Path out = exporter.export(1L);
 
