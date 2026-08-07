@@ -62,16 +62,22 @@ public class MqConsumerSupport {
     /** 标准消费：成功 ack；业务异常 reject 进 DLQ；中断恢复标志且不 reject。 */
     public void consume(Channel channel, long tag, String label, ConsumeAction action);
 
-    /** 带失败回调：失败先执行 onFailure（发失败事件/更新状态），再按默认策略 reject 进 DLQ。 */
-    public void consume(Channel channel, long tag, String label, ConsumeAction action, ConsumeAction onFailure);
+    /** 带失败回调：失败先执行 onFailure（携带异常，发失败事件/更新状态），再按默认策略 reject 进 DLQ。 */
+    public void consume(Channel channel, long tag, String label, ConsumeAction action, ExceptionHandler onFailure);
 
     /** 完整变体：显式指定失败策略。 */
     public void consume(Channel channel, long tag, String label, ConsumeAction action,
-                        ConsumeAction onFailure, FailurePolicy failurePolicy);
+                        ExceptionHandler onFailure, FailurePolicy failurePolicy);
 
     @FunctionalInterface
     public interface ConsumeAction {
         void run() throws Exception;
+    }
+
+    /** 失败回调：接收业务异常，用于发失败事件/更新状态（异常消息即失败事件内容）。 */
+    @FunctionalInterface
+    public interface ExceptionHandler {
+        void accept(Exception e) throws Exception;
     }
 
     /** 消费失败策略（业务异常时）。 */
@@ -91,9 +97,9 @@ public class MqConsumerSupport {
 | 场景 | 行为 |
 |------|------|
 | 业务成功 | `basicAck(tag, false)` + 完成日志（label） |
-| 业务异常 + REJECT_TO_DLQ | 失败日志（保留 cause）→ `onFailure` 回调（异常单独捕获记录，不掩盖原始异常）→ `basicReject(tag, false)` |
+| 业务异常 + REJECT_TO_DLQ | 失败日志（保留 cause）→ `onFailure.accept(e)` 回调（异常单独捕获记录，不掩盖原始异常）→ `basicReject(tag, false)` |
 | 业务异常 + REQUEUE | 同上，`basicReject(tag, true)`（原队列重试） |
-| 业务异常 + ACK_AFTER_CALLBACK | `onFailure` 回调（发失败事件）→ `basicAck(tag, false)`（失败事件即结果） |
+| 业务异常 + ACK_AFTER_CALLBACK | `onFailure.accept(e)` 回调（发失败事件）→ `basicAck(tag, false)`（失败事件即结果） |
 | 中断 | `Thread.currentThread().interrupt()` + 结束任务，**不 reject、不执行 onFailure、不 ack** |
 | ack/reject 本身失败 | 单独捕获，warn 日志（同现状） |
 
@@ -110,7 +116,7 @@ public void handle(ImportTaskCreatedEvent event, Channel channel, @Header(AmqpHe
     }
     mqConsumerSupport.consume(channel, tag, "导入任务: taskId=" + taskId,
             () -> runImport(event, taskId),
-            () -> publisher.publishStatus(taskId, "FAILED", 0, null, 0, 0));
+            e -> publisher.publishStatus(taskId, "FAILED", 0, null, 0, 0));
 }
 
 /** 业务编排：状态发布 → 路径映射 → 路由 → 完成发布。 */
