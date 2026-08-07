@@ -13,7 +13,7 @@ Spring Boot 3 + Vue3 + RabbitMQ + MySQL + Redis。
 ```
 comic-atlas/
 ├── api-service/             # 漫画CRUD + 导入 + Catalog + Reader + LQ/HQ删除 + MQ消费（Flyway 迁移在 src/main/resources/db/）
-├── worker-service/          # 文件处理 + MQ消费 + 下载 + 解压 + 解析 + LQ/HQ删除 + ffprobe
+├── worker-service/          # 文件处理 + MQ消费 + 下载 + 解压 + 导入 + LQ/HQ删除 + ffprobe（模块化：config/event/command/importer/media/storage/export/file/process/image）
 ├── comic-common/            # 共享事件 DTO（16 个 record + ComicEvent sealed interface，Jackson 多态序列化）
 ├── gateway/                 # Spring Cloud Gateway: 路由 + Nacos发现
 ├── frontend/                # Vue3/Vite: 列表 + 详情 + 阅读器 + 管理后台 + 存储管理
@@ -53,20 +53,21 @@ comic-atlas/
 | LQ 生成 | `worker-service/.../event/LqGenerateHandler.java` | 调用 ImageOptimizer 外部工具 |
 | HQ 删除 | `worker-service/.../event/HqDeleteHandler.java` | 按章节删除 HQ 图片 |
 | 完整删除 | `worker-service/.../event/DeleteHandler.java` | 删除 hq/lq/thumbs 全部文件 |
-| 目录解析 | `worker-service/.../parse/DirectoryParser.java` | 输出 DirectoryTree（纯树，无业务语义） |
-| 元数据组装 | `worker-service/.../parse/MetadataAssembler.java` | DirectoryTree → ComicMetadata（注入 Catalog/Chapter） |
-| 媒体分析 | `worker-service/.../parse/MediaAnalyzer.java` | 图片尺寸 + ffprobe 视频元数据 |
-| 统一导入 | `worker-service/.../handler/DirectoryImportHandler.java` | handle() 解析→搬文件→写metadata |
-| ZIP 导入 | `worker-service/.../handler/ZipImportHandler.java` | 解压→委托 DirectoryImportHandler |
-| EHENTAI 导入 | `worker-service/.../file/EhentaiDownloadService.java` | 下载(Archiver优先→Torrent兜底)→解压→返回源目录，委托 DirectoryImportHandler |
-| 存储服务 | `worker-service/.../storage/LocalStorageService.java` | store/resolve/exists/delete |
+| 目录解析 | `worker-service/.../importer/DirectoryParser.java` | 输出 DirectoryTree（纯树，无业务语义） |
+| 元数据组装 | `worker-service/.../importer/MetadataAssembler.java` | DirectoryTree → ComicMetadata（注入 Catalog/Chapter） |
+| 媒体分析 | `worker-service/.../media/MediaAnalyzer.java` | 图片尺寸 + ffprobe 视频元数据 |
+| 统一导入 | `worker-service/.../importer/DirectoryImportHandler.java` | handle() 解析→搬文件→写metadata |
+| ZIP 导入 | `worker-service/.../importer/ZipImportHandler.java` | 解压→委托 DirectoryImportHandler |
+| EHENTAI 导入 | `worker-service/.../file/download/EhentaiDownloadService.java` | 下载(Archiver优先→Torrent兜底)→解压→返回源目录，委托 DirectoryImportHandler |
+| 存储服务 | `worker-service/.../storage/StorageService.java` | store/resolve/exists/delete |
 | 存储根 | `worker-service/.../storage/StorageRoot.java` | path + resolve() + exists() |
 | 文件引用 | `worker-service/.../storage/StorageRef.java` | rootKey + relativePath |
 | 图片优化 | `worker-service/.../image/ImageOptimizer.java` | 外部 Go 工具生成 WebP LQ |
 | URL 解析 | `api-service/.../storage/FileUrlResolver.java` | Page → /files/{root}/{path} |
 | 路径布局 | `api-service/.../storage/StorageLayout.java` | forPage(comicId, chapterId, imageName) |
-| 元数据模型 | `worker-service/.../parse/ComicMetadata.java` | catalogs + chapters + mediaItems(IMAGE/VIDEO) |
-| 导入上下文 | `worker-service/.../parse/ImportContext.java` | sourceType + sourcePath |
+| 元数据模型 | `worker-service/.../media/ComicMetadata.java` | catalogs + chapters + mediaItems(IMAGE/VIDEO) |
+| 导入上下文 | `worker-service/.../importer/ImportContext.java` | sourceType + sourcePath |
+| 命令执行器 | `worker-service/.../command/` | TranscodeCommandHandler/TrashCommandHandler 等 8 个（ManagementCommandDispatcher 路由） |
 | 存储管理 API | `api-service/.../controller/AdminStorageController.java` | stats/comics/chapters |
 | 存储查询 | `api-service/.../service/StorageQueryService.java` | 聚合 HQ/LQ 大小+状态 |
 | 前端路由 | `frontend/src/router/index.ts` | 14 routes（reading 6 + management 8） |
