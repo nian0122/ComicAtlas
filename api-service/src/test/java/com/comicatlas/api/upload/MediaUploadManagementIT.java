@@ -26,7 +26,7 @@ import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.worker.command.TrashCommandHandler;
 import com.comicatlas.worker.command.MediaUploadCommandHandler;
 import com.comicatlas.worker.event.ManagementCommandPublisher;
-import com.comicatlas.worker.file.parse.MediaAnalyzer;
+import com.comicatlas.worker.media.MediaAnalyzer;
 import com.comicatlas.worker.storage.SafeMoveStrategy;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageService;

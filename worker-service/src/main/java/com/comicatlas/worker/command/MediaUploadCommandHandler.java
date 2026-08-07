@@ -5,8 +5,8 @@ import com.comicatlas.common.event.MediaUploadCompletedEvent.MediaAnalysisResult
 import com.comicatlas.worker.entity.ExportMedia;
 import com.comicatlas.worker.entity.ExportUploadFile;
 import com.comicatlas.worker.entity.ExportUploadSession;
-import com.comicatlas.worker.file.parse.ComicMetadata;
-import com.comicatlas.worker.file.parse.MediaAnalyzer;
+import com.comicatlas.worker.media.ComicMetadata;
+import com.comicatlas.worker.media.MediaAnalyzer;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageRef;
 import com.comicatlas.worker.storage.StorageRoot;

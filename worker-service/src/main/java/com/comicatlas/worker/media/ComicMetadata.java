@@ -1,4 +1,4 @@
-package com.comicatlas.worker.file.parse;
+package com.comicatlas.worker.media;
 
 import java.math.BigDecimal;
 import java.util.List;
