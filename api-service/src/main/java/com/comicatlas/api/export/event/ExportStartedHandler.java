@@ -9,6 +9,7 @@ import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.enums.ManagementTaskStatus;
 import com.comicatlas.common.enums.TaskType;
 import com.comicatlas.common.event.ExportTaskStartedEvent;
+import com.comicatlas.common.mq.MqConsumerSupport;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +29,7 @@ public class ExportStartedHandler {
 
     private final ExportTaskMapper exportTaskMapper;
     private final ManagementTaskService managementTaskService;
+    private final MqConsumerSupport mqConsumerSupport;
 
     @RabbitListener(queues = MqQueues.EXPORT_STARTED_RESULT)
     public void handle(ExportTaskStartedEvent event,
@@ -36,7 +38,7 @@ public class ExportStartedHandler {
         Long comicId = event.comicId();
         log.info("导出启动事件: taskId={}, comicId={}", taskId, comicId);
 
-        try {
+        mqConsumerSupport.consume(channel, tag, "导出启动: taskId=" + taskId, () -> {
             ExportTask task = exportTaskMapper.selectById(taskId);
             if (task != null) {
                 task.setStatus(ExportTaskStatus.RUNNING);
@@ -50,15 +52,7 @@ public class ExportStartedHandler {
                         null, "EXPORT_TASK", taskId);
             }
 
-            channel.basicAck(tag, false);
             log.info("导出状态更新为 RUNNING: taskId={}", taskId);
-        } catch (Exception e) {
-            log.error("导出启动状态更新失败: taskId={}, comicId={}", taskId, comicId, e);
-            try {
-                channel.basicReject(tag, false);
-} catch (Exception ex) {
-                log.warn("消息 reject 失败: tag={}", tag, e);
-            }
-        }
+        });
     }
 }

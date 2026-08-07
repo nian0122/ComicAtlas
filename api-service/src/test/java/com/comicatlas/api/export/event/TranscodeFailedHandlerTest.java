@@ -4,6 +4,7 @@ import com.comicatlas.api.comic.entity.Media;
 import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.common.enums.TranscodeStatus;
 import com.comicatlas.common.event.VideoTranscodeFailedEvent;
+import com.comicatlas.common.mq.MqConsumerSupport;
 import com.rabbitmq.client.Channel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,7 +36,7 @@ class TranscodeFailedHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new TranscodeFailedHandler(mediaMapper);
+        handler = new TranscodeFailedHandler(mediaMapper, new MqConsumerSupport());
     }
 
     // ======================== 正向流程 ========================

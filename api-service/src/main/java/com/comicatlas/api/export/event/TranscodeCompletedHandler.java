@@ -5,6 +5,7 @@ import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.enums.TranscodeStatus;
 import com.comicatlas.common.event.VideoTranscodeCompletedEvent;
+import com.comicatlas.common.mq.MqConsumerSupport;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,16 +20,16 @@ import org.springframework.stereotype.Component;
 public class TranscodeCompletedHandler {
 
     private final MediaMapper mediaMapper;
+    private final MqConsumerSupport mqConsumerSupport;
 
     @RabbitListener(queues = MqQueues.VIDEO_TRANSCODE_COMPLETED)
     public void handleCompleted(VideoTranscodeCompletedEvent event,
             Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
-        try {
+        mqConsumerSupport.consume(channel, tag, "转码完成: pageId=" + event.pageId(), () -> {
             Media media = mediaMapper.selectById(event.pageId());
             if (media == null || media.getTranscodeStatus() == null
                     || !media.getTranscodeStatus().isProcessing()) {
                 log.warn("TranscodeCompleted: page not in processing, skip. pageId={}", event.pageId());
-                channel.basicAck(tag, false);
                 return;
             }
             media.setHqPath(event.newHqPath());
@@ -38,11 +39,7 @@ public class TranscodeCompletedHandler {
             media.setFileSize(event.fileSize());
             media.setTranscodeStatus(TranscodeStatus.READY);
             mediaMapper.updateById(media);
-            channel.basicAck(tag, false);
             log.info("TranscodeCompleted: pageId={}, newPath={}", event.pageId(), event.newHqPath());
-        } catch (Exception e) {
-            log.error("TranscodeCompleted failed: pageId={}", event.pageId(), e);
-            try { channel.basicReject(tag, false); } catch (Exception ex) { log.warn("消息 reject 失败: tag={}", tag, ex); }
-        }
+        });
     }
 }

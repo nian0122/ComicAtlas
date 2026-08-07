@@ -4,6 +4,7 @@ import com.comicatlas.api.comic.entity.Media;
 import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.common.enums.TranscodeStatus;
 import com.comicatlas.common.event.VideoTranscodeCompletedEvent;
+import com.comicatlas.common.mq.MqConsumerSupport;
 import com.rabbitmq.client.Channel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,7 +38,7 @@ class TranscodeCompletedHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new TranscodeCompletedHandler(mediaMapper);
+        handler = new TranscodeCompletedHandler(mediaMapper, new MqConsumerSupport());
     }
 
     // ======================== 正向流程 ========================

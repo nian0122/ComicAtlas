@@ -5,6 +5,7 @@ import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.event.VideoMetadataFixCompletedEvent;
 import com.comicatlas.common.event.VideoMetadataFixResult;
+import com.comicatlas.common.mq.MqConsumerSupport;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,16 +24,17 @@ import org.springframework.stereotype.Component;
 public class VideoMetadataFixCompletedHandler {
 
     private final MediaMapper mediaMapper;
+    private final MqConsumerSupport mqConsumerSupport;
 
     @RabbitListener(queues = MqQueues.VIDEO_METADATA_FIX_RESULT)
     public void handle(VideoMetadataFixCompletedEvent event,
             Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         Long comicId = event.comicId();
         int total = event.results().size();
-        int fixed = 0;
         log.info("视频元数据修复完成事件: comicId={}, total={}", comicId, total);
 
-        try {
+        mqConsumerSupport.consume(channel, tag, "视频元数据修复完成: comicId=" + comicId, () -> {
+            int fixed = 0;
             for (VideoMetadataFixResult result : event.results()) {
                 Media media = mediaMapper.selectById(result.pageId());
                 if (media == null) {
@@ -49,15 +51,7 @@ public class VideoMetadataFixCompletedHandler {
                 fixed++;
             }
 
-            channel.basicAck(tag, false);
             log.info("视频元数据修复完成: comicId={}, total={}, fixed={}", comicId, total, fixed);
-        } catch (Exception e) {
-            log.error("视频元数据修复失败: comicId={}", comicId, e);
-            try {
-                channel.basicNack(tag, false, false);
-} catch (Exception ex) {
-                log.warn("消息 nack 失败: tag={}", tag, e);
-            }
-        }
+        });
     }
 }

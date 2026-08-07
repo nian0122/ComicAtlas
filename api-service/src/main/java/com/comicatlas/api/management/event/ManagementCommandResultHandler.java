@@ -36,6 +36,7 @@ import com.comicatlas.common.event.ManagementCommandProgressEvent;
 import com.comicatlas.common.event.MediaUploadCompletedEvent;
 import com.comicatlas.common.event.MediaUploadCompletedEvent.MediaAnalysisResult;
 import com.comicatlas.common.event.TranscodeMediaInfo;
+import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.api.upload.UploadSessionService;
 import com.comicatlas.api.upload.UploadSessionStatus;
 import com.comicatlas.api.upload.entity.UploadSession;
@@ -90,6 +91,7 @@ public class ManagementCommandResultHandler {
     private final UploadSessionService uploadSessionService;
     private final MetadataRefreshService metadataRefreshService;
     private final MediaMetadataSyncService mediaMetadataSyncService;
+    private final MqConsumerSupport mqConsumerSupport;
 
     @RabbitListener(queues = MqQueues.MANAGEMENT_RESULT)
     public void handleResult(ComicEvent raw,
@@ -103,35 +105,33 @@ public class ManagementCommandResultHandler {
         } else if (raw instanceof MediaUploadCompletedEvent ev) {
             process(ev, ev.taskId(), ev.itemId(), ev.attempt(), channel, tag, () -> handleUploadCompleted(ev));
         } else {
-            ack(channel, tag);
+            mqConsumerSupport.consume(channel, tag, "管理命令未知事件: " + raw.eventId(), () -> { });
         }
     }
 
     private void process(ComicEvent event, Long taskId, Long itemId, int attempt,
                          Channel channel, long tag, Runnable business) {
         String eventId = event.eventId().toString();
-        String payloadHash = sha256(toJson(event));
-        try {
-            transactionTemplate.executeWithoutResult(tx -> {
-                if (inboxService.isProcessed(eventId, payloadHash)) {
-                    log.debug("Inbox 幂等跳过结果事件: eventId={}", eventId);
-                    return;
-                }
-                business.run();
-                try {
-                    inboxService.markProcessed(eventId, payloadHash, taskId, itemId, attempt);
-                } catch (DuplicateKeyException e) {
-                    throw e;
-                }
-            });
-            ack(channel, tag);
-        } catch (DuplicateKeyException e) {
-            log.warn("Inbox 并发重复结果事件，已由其他投递处理: eventId={}", eventId);
-            ack(channel, tag);
-        } catch (Exception e) {
-            log.error("管理命令结果处理失败: eventId={}, itemId={}", eventId, itemId, e);
-            reject(channel, tag);
-        }
+        mqConsumerSupport.consume(channel, tag, "管理命令结果: itemId=" + itemId, () -> {
+            String payloadHash = sha256(toJson(event));
+            try {
+                transactionTemplate.executeWithoutResult(tx -> {
+                    if (inboxService.isProcessed(eventId, payloadHash)) {
+                        log.debug("Inbox 幂等跳过结果事件: eventId={}", eventId);
+                        return;
+                    }
+                    business.run();
+                    try {
+                        inboxService.markProcessed(eventId, payloadHash, taskId, itemId, attempt);
+                    } catch (DuplicateKeyException e) {
+                        throw e;
+                    }
+                });
+            } catch (DuplicateKeyException e) {
+                // Inbox 并发重复结果事件：已由其他投递处理，视为成功 ack（保留原 catch 语义）
+                log.warn("Inbox 并发重复结果事件，已由其他投递处理: eventId={}", eventId);
+            }
+        });
     }
 
     // ======================== Completed ========================
@@ -822,22 +822,6 @@ public class ManagementCommandResultHandler {
                     MessageDigest.getInstance("SHA-256").digest(input.getBytes(StandardCharsets.UTF_8)));
         } catch (Exception e) {
             throw new RuntimeException(e);
-        }
-    }
-
-    private void ack(Channel channel, long tag) {
-        try {
-            channel.basicAck(tag, false);
-        } catch (Exception e) {
-            log.error("结果事件 ack 失败: tag={}", tag, e);
-        }
-    }
-
-    private void reject(Channel channel, long tag) {
-        try {
-            channel.basicReject(tag, false);
-        } catch (Exception e) {
-            log.error("结果事件 reject 失败: tag={}", tag, e);
         }
     }
 }

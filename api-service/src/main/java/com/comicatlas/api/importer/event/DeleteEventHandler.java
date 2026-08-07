@@ -5,6 +5,7 @@ import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.event.DeleteCompletedEvent;
+import com.comicatlas.common.mq.MqConsumerSupport;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,6 +36,7 @@ public class DeleteEventHandler {
     private final MediaMapper mediaMapper;
     private final TransactionTemplate transactionTemplate;
     private final CatalogCacheInvalidator catalogCacheInvalidator;
+    private final MqConsumerSupport mqConsumerSupport;
 
     @RabbitListener(queues = MqQueues.DELETE_RESULT)
     public void handleDeleteCompleted(DeleteCompletedEvent event,
@@ -43,7 +45,7 @@ public class DeleteEventHandler {
         log.info("DeleteCompleted: comicId={}, dirs={}, files={}",
             comicId, event.deletedDirs(), event.deletedFiles());
 
-        try {
+        mqConsumerSupport.consume(channel, tag, "删除完成: comicId=" + comicId, () -> {
             transactionTemplate.executeWithoutResult(status -> {
                 List<Chapter> chapters = chapterMapper.selectList(
                     new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
@@ -66,11 +68,7 @@ public class DeleteEventHandler {
             });
             catalogCacheInvalidator.evict(comicId);
 
-            channel.basicAck(tag, false);
             log.info("DeleteCompleted DB cleaned: comicId={}", comicId);
-        } catch (Exception e) {
-            log.error("DeleteCompleted DB cleanup failed: comicId={}", comicId, e);
-            try { channel.basicReject(tag, false); } catch (Exception ex) { log.warn("消息 reject 失败: tag={}", tag, ex); }
-        }
+        });
     }
 }

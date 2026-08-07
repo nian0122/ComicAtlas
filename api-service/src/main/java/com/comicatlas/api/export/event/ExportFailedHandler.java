@@ -9,6 +9,7 @@ import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.enums.ManagementTaskStatus;
 import com.comicatlas.common.enums.TaskType;
 import com.comicatlas.common.event.ExportTaskFailedEvent;
+import com.comicatlas.common.mq.MqConsumerSupport;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +29,7 @@ public class ExportFailedHandler {
 
     private final ExportTaskMapper exportTaskMapper;
     private final ManagementTaskService managementTaskService;
+    private final MqConsumerSupport mqConsumerSupport;
 
     @RabbitListener(queues = MqQueues.EXPORT_FAILED_RESULT)
     public void handle(ExportTaskFailedEvent event,
@@ -37,7 +39,7 @@ public class ExportFailedHandler {
         log.info("导出失败事件: taskId={}, comicId={}, errorCode={}, errorMessage={}",
                 taskId, comicId, event.errorCode(), event.errorMessage());
 
-        try {
+        mqConsumerSupport.consume(channel, tag, "导出失败: taskId=" + taskId, () -> {
             ExportTask task = exportTaskMapper.selectById(taskId);
             if (task != null) {
                 task.setStatus(ExportTaskStatus.FAILED);
@@ -53,15 +55,7 @@ public class ExportFailedHandler {
                         event.errorMessage(), "EXPORT_TASK", taskId);
             }
 
-            channel.basicAck(tag, false);
             log.info("导出状态更新为 FAILED: taskId={}", taskId);
-        } catch (Exception e) {
-            log.error("导出失败状态更新失败: taskId={}, comicId={}", taskId, comicId, e);
-            try {
-                channel.basicReject(tag, false);
-} catch (Exception ex) {
-                log.warn("消息 reject 失败: tag={}", tag, e);
-            }
-        }
+        });
     }
 }
