@@ -2,6 +2,7 @@ package com.comicatlas.worker.event;
 
 import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.event.CancelTaskEvent;
+import com.comicatlas.common.mq.MqConsumerSupport;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,17 +35,13 @@ public class CancelHandler {
     private static final Duration TTL = Duration.ofDays(7);
 
     private final StringRedisTemplate redisTemplate;
+    private final MqConsumerSupport mqConsumerSupport;
 
     @RabbitListener(queues = MqQueues.CANCEL_TASK)
-    public void handle(CancelTaskEvent event,
-            Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
-        redisTemplate.opsForValue().set(KEY_PREFIX + event.taskId(), "1", TTL);
-        log.info("Cancel registered: taskId={}", event.taskId());
-        try {
-            channel.basicAck(tag, false);
-        } catch (Exception e) {
-            log.error("Cancel ack failed: taskId={}", event.taskId(), e);
-        }
+    public void handle(CancelTaskEvent event, Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
+        mqConsumerSupport.consume(channel, tag, "取消标记: taskId=" + event.taskId(),
+                () -> redisTemplate.opsForValue().set(KEY_PREFIX + event.taskId(), "1", TTL),
+                null, MqConsumerSupport.FailurePolicy.REQUEUE);
     }
 
     public boolean isCancelled(Long taskId) {

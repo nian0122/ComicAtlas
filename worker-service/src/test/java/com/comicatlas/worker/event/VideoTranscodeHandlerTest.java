@@ -3,6 +3,7 @@ package com.comicatlas.worker.event;
 import com.comicatlas.common.event.VideoTranscodeCompletedEvent;
 import com.comicatlas.common.event.VideoTranscodeFailedEvent;
 import com.comicatlas.common.event.VideoTranscodeRequestedEvent;
+import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.process.ExternalProcessRunner;
 import com.rabbitmq.client.Channel;
@@ -65,7 +66,7 @@ class VideoTranscodeHandlerTest {
         ioExecutor.initialize();
         processRunner = new ExternalProcessRunner(ioExecutor);
 
-        handler = new VideoTranscodeHandler(rabbitTemplate, config, processRunner);
+        handler = new VideoTranscodeHandler(rabbitTemplate, config, processRunner, new MqConsumerSupport());
     }
 
     @AfterEach

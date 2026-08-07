@@ -6,6 +6,7 @@ import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.event.RecoveryFailedEvent;
 import com.comicatlas.common.event.RecoveryRequestedEvent;
 import com.comicatlas.common.event.RecoveryScanCompletedEvent;
+import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
@@ -45,58 +46,40 @@ public class RecoveryTaskHandler {
 
     private final WorkerConfig config;
     private final RabbitTemplate rabbitTemplate;
+    private final MqConsumerSupport mqConsumerSupport;
 
     @RabbitListener(queues = MqQueues.RECOVERY_TASK)
-    public void handle(RecoveryRequestedEvent event,
-                       Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
+    public void handle(RecoveryRequestedEvent event, Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         Long taskId = event.taskId();
         log.info("RecoveryTaskHandler: 接收恢复请求, taskId={}", taskId);
+        mqConsumerSupport.consume(channel, tag, "存储恢复: taskId=" + taskId,
+                () -> scanAndPublish(taskId),
+                e -> publishFailed(taskId, e.getMessage()),
+                MqConsumerSupport.FailurePolicy.ACK_AFTER_CALLBACK);
+    }
 
+    private void scanAndPublish(Long taskId) throws Exception {
         Path hqRoot = Path.of(config.getMangaRoot(), "hq");
-
-        // 基础设施检查：HQ 根目录必须可读
         if (!Files.isDirectory(hqRoot) || !Files.isReadable(hqRoot)) {
-            String errorMsg = "HQ 根目录不可读: " + hqRoot.toAbsolutePath();
-            log.error("RecoveryTaskHandler: {}", errorMsg);
-            publishFailed(taskId, errorMsg);
-            ack(channel, tag);
-            return;
+            throw new IllegalStateException("HQ 根目录不可读: " + hqRoot.toAbsolutePath());
         }
-
         List<Long> comicIds = new ArrayList<>();
         try (var stream = Files.newDirectoryStream(hqRoot)) {
             for (Path dir : stream) {
                 if (!Files.isDirectory(dir)) { continue; }
                 String dirName = dir.getFileName().toString();
-
-                // 只收集纯数字目录名（数字目录名 = comicId）
                 try {
                     long comicId = Long.parseLong(dirName);
-                    if (comicId > 0) {
-                        comicIds.add(comicId);
-                    }
+                    if (comicId > 0) { comicIds.add(comicId); }
                 } catch (NumberFormatException ignored) {
                     log.debug("RecoveryTaskHandler: 跳过非数字目录: {}", dirName);
                 }
             }
-        } catch (Exception e) {
-            log.error("RecoveryTaskHandler: 扫描 HQ 目录失败, taskId={}", taskId, e);
-            publishFailed(taskId, "扫描 HQ 目录失败: " + e.getMessage());
-            ack(channel, tag);
-            return;
         }
-
-        // 自然排序（按 ID 从小到大）
         comicIds.sort(Comparator.naturalOrder());
         log.info("RecoveryTaskHandler: 扫描完成, taskId={}, 发现 {} 个漫画目录", taskId, comicIds.size());
-
-        // 发布扫描结果事件（路由键 recovery.progress → API recovery.result.queue）
-        var scanEvent = new RecoveryScanCompletedEvent(
-                UUID.randomUUID(), Instant.now(), taskId, comicIds);
-        rabbitTemplate.convertAndSend(MqExchanges.RECOVERY, MqRoutingKeys.RECOVERY_PROGRESS, scanEvent);
-        log.info("RecoveryTaskHandler: 已发布 RecoveryScanCompletedEvent, taskId={}", taskId);
-
-        ack(channel, tag);
+        rabbitTemplate.convertAndSend(MqExchanges.RECOVERY, MqRoutingKeys.RECOVERY_PROGRESS,
+                new RecoveryScanCompletedEvent(UUID.randomUUID(), Instant.now(), taskId, comicIds));
     }
 
     private void publishFailed(Long taskId, String errorMessage) {
@@ -104,13 +87,5 @@ public class RecoveryTaskHandler {
                 UUID.randomUUID(), Instant.now(), taskId, errorMessage);
         rabbitTemplate.convertAndSend(MqExchanges.RECOVERY, MqRoutingKeys.RECOVERY_FAILED, failEvent);
         log.info("RecoveryTaskHandler: 已发布 RecoveryFailedEvent, taskId={}, error={}", taskId, errorMessage);
-    }
-
-    private void ack(Channel channel, long tag) {
-        try {
-            channel.basicAck(tag, false);
-        } catch (Exception e) {
-            log.error("RecoveryTaskHandler: ack 失败, tag={}", tag, e);
-        }
     }
 }

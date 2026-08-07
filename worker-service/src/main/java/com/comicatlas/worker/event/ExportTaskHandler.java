@@ -7,6 +7,7 @@ import com.comicatlas.common.event.ExportTaskCompletedEvent;
 import com.comicatlas.common.event.ExportTaskCreatedEvent;
 import com.comicatlas.common.event.ExportTaskFailedEvent;
 import com.comicatlas.common.event.ExportTaskStartedEvent;
+import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.worker.entity.ExportChapter;
 import com.comicatlas.worker.entity.ExportMedia;
 import com.comicatlas.worker.export.ComicTitleSanitizer;
@@ -55,58 +56,59 @@ public class ExportTaskHandler {
     private final ExportFileResolver exportFileResolver;
     private final ZipBuilder zipBuilder;
     private final StorageProperties storageProperties;
+    private final MqConsumerSupport mqConsumerSupport;
 
     private static final DateTimeFormatter TIMESTAMP_FMT = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
 
     @RabbitListener(queues = MqQueues.EXPORT_TASK)
-    public void handle(ExportTaskCreatedEvent event,
-            Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
+    public void handle(ExportTaskCreatedEvent event, Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
+        Long taskId = event.taskId();
+        Long comicId = event.comicId();
+        log.info("导出任务开始: taskId={}, comicId={}", taskId, comicId);
+        mqConsumerSupport.consume(channel, tag, "导出任务: taskId=" + taskId,
+                () -> exportAndPublish(event),
+                e -> publishExportFailed(event, e),
+                MqConsumerSupport.FailurePolicy.REJECT_TO_DLQ);
+    }
+
+    private void exportAndPublish(ExportTaskCreatedEvent event) throws Exception {
         Long taskId = event.taskId();
         Long comicId = event.comicId();
         long start = System.currentTimeMillis();
-        log.info("导出任务开始: taskId={}, comicId={}", taskId, comicId);
 
-        try {
-            // 1. 发布任务开始事件
-            rabbitTemplate.convertAndSend(MqExchanges.EXPORT, MqRoutingKeys.TASK_STARTED,
-                    new ExportTaskStartedEvent(UUID.randomUUID(), Instant.now(),
-                            taskId, comicId));
-            log.info("已发布 ExportTaskStartedEvent: taskId={}", taskId);
+        // 1. 发布任务开始事件
+        rabbitTemplate.convertAndSend(MqExchanges.EXPORT, MqRoutingKeys.TASK_STARTED,
+                new ExportTaskStartedEvent(UUID.randomUUID(), Instant.now(),
+                        taskId, comicId));
+        log.info("已发布 ExportTaskStartedEvent: taskId={}", taskId);
 
-            // 2. 收集数据 + 构建清单 + 打包 ZIP
-            ExportCollectResult result = exportCollector.collect(comicId);
-            ExportManifest manifest = buildManifest(result);
+        // 2. 收集数据 + 构建清单 + 打包 ZIP
+        ExportCollectResult result = exportCollector.collect(comicId);
+        ExportManifest manifest = buildManifest(result);
 
-            StorageRoot exportRoot = storageProperties.getRoots().get("EXPORT");
-            if (exportRoot == null || !exportRoot.exists()) {
-                throw new IllegalStateException("EXPORT 存储根未配置或路径不存在");
-            }
-
-            String outputFileName = buildOutputFileName(comicId, result.comic().getTitle());
-            Path outputPath = exportRoot.resolve(outputFileName);
-            long outputSize = zipBuilder.build(manifest, outputPath);
-
-            // 3. 发布任务完成事件
-            rabbitTemplate.convertAndSend(MqExchanges.EXPORT, MqRoutingKeys.TASK_COMPLETED,
-                    new ExportTaskCompletedEvent(UUID.randomUUID(), Instant.now(),
-                            taskId, comicId, "EXPORT",
-                            outputPath.getFileName().toString(), outputSize));
-            log.info("已发布 ExportTaskCompletedEvent: taskId={}, size={}", taskId, outputSize);
-
-            channel.basicAck(tag, false);
-            log.info("导出任务完成: taskId={}, elapsed={}ms", taskId, System.currentTimeMillis() - start);
-        } catch (Exception e) {
-            log.error("导出任务失败: taskId={}, comicId={}", taskId, comicId, e);
-            String errorCode = classifyExportError(e);
-            rabbitTemplate.convertAndSend(MqExchanges.EXPORT, MqRoutingKeys.TASK_FAILED,
-                    new ExportTaskFailedEvent(UUID.randomUUID(), Instant.now(),
-                            taskId, comicId, errorCode, e.getMessage()));
-            try {
-                channel.basicReject(tag, false);
-            } catch (Exception ex) {
-                log.warn("消息 reject 失败: tag={}, taskId={}", tag, taskId, ex);
-            }
+        StorageRoot exportRoot = storageProperties.getRoots().get("EXPORT");
+        if (exportRoot == null || !exportRoot.exists()) {
+            throw new IllegalStateException("EXPORT 存储根未配置或路径不存在");
         }
+
+        String outputFileName = buildOutputFileName(comicId, result.comic().getTitle());
+        Path outputPath = exportRoot.resolve(outputFileName);
+        long outputSize = zipBuilder.build(manifest, outputPath);
+
+        // 3. 发布任务完成事件
+        rabbitTemplate.convertAndSend(MqExchanges.EXPORT, MqRoutingKeys.TASK_COMPLETED,
+                new ExportTaskCompletedEvent(UUID.randomUUID(), Instant.now(),
+                        taskId, comicId, "EXPORT",
+                        outputPath.getFileName().toString(), outputSize));
+        log.info("已发布 ExportTaskCompletedEvent: taskId={}, size={}", taskId, outputSize);
+        log.info("导出任务完成: taskId={}, elapsed={}ms", taskId, System.currentTimeMillis() - start);
+    }
+
+    private void publishExportFailed(ExportTaskCreatedEvent event, Exception failure) {
+        String errorCode = classifyExportError(failure);
+        rabbitTemplate.convertAndSend(MqExchanges.EXPORT, MqRoutingKeys.TASK_FAILED,
+                new ExportTaskFailedEvent(UUID.randomUUID(), Instant.now(),
+                        event.taskId(), event.comicId(), errorCode, failure.getMessage()));
     }
 
     /**
