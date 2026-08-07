@@ -58,12 +58,11 @@ comic-atlas/
 | 媒体分析 | `worker-service/.../parse/MediaAnalyzer.java` | 图片尺寸 + ffprobe 视频元数据 |
 | 统一导入 | `worker-service/.../handler/DirectoryImportHandler.java` | handle() 解析→搬文件→写metadata |
 | ZIP 导入 | `worker-service/.../handler/ZipImportHandler.java` | 解压→委托 DirectoryImportHandler |
-| EHENTAI 导入 | `worker-service/.../file/FileService.java` | 下载→解压→搬文件→metadata |
+| EHENTAI 导入 | `worker-service/.../file/EhentaiDownloadService.java` | 下载(Archiver优先→Torrent兜底)→解压→返回源目录，委托 DirectoryImportHandler |
 | 存储服务 | `worker-service/.../storage/LocalStorageService.java` | store/resolve/exists/delete |
 | 存储根 | `worker-service/.../storage/StorageRoot.java` | path + resolve() + exists() |
 | 文件引用 | `worker-service/.../storage/StorageRef.java` | rootKey + relativePath |
 | 图片优化 | `worker-service/.../image/ImageOptimizer.java` | 外部 Go 工具生成 WebP LQ |
-| 路径构建 | `worker-service/.../common/FilePathBuilder.java` | hqDir/lqDir/thumbPath 等 |
 | URL 解析 | `api-service/.../storage/FileUrlResolver.java` | Page → /files/{root}/{path} |
 | 路径布局 | `api-service/.../storage/StorageLayout.java` | forPage(comicId, chapterId, imageName) |
 | 元数据模型 | `worker-service/.../parse/ComicMetadata.java` | catalogs + chapters + mediaItems(IMAGE/VIDEO) |
@@ -86,7 +85,7 @@ ImportServiceImpl: INSERT comic(IMPORTING) + import_task(PENDING) → MQ
 Worker ImportTaskHandler: sourceType 路由
   ├─ ZIP → ZipImportHandler → extract → DirectoryImportHandler.handle()
   ├─ REGISTER → DirectoryImportHandler.handle()
-  └─ EHENTAI → FileService → 下载(Archiver优先→Torrent兜底) → 解压 → DirectoryImportHandler.handle()
+  └─ EHENTAI → EhentaiDownloadService → 下载(Archiver优先→Torrent兜底) → 解压 → DirectoryImportHandler.handle()
   ↓
 DirectoryImportHandler: DirectoryParser → MetadataAssembler → MediaAnalyzer(图片尺寸+ffprobe视频) → 搬文件到 HQ → metadata.json
   ↓
