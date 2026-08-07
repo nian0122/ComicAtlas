@@ -5,6 +5,7 @@ import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.event.DeleteHqRequestedEvent;
 import com.comicatlas.common.event.HqDeletedEvent;
+import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.worker.entity.ExportMedia;
 import com.comicatlas.worker.file.storage.StorageProperties;
 import com.comicatlas.worker.file.storage.StorageRoot;
@@ -35,6 +36,7 @@ public class HqDeleteHandler {
     private final StorageProperties storageProperties;
     private final ExportMediaMapper mediaMapper;
     private final RabbitTemplate rabbitTemplate;
+    private final MqConsumerSupport mqConsumerSupport;
 
     @RabbitListener(queues = MqQueues.HQ_DELETE)
     public void handle(DeleteHqRequestedEvent event,
@@ -42,24 +44,21 @@ public class HqDeleteHandler {
         Long comicId = event.comicId();
         Long chapterId = event.chapterId();
 
-        log.info("HQ 删除开始: comicId={}, chapterId={}", comicId, chapterId);
+        mqConsumerSupport.consume(channel, tag, "HQ删除: chapterId=" + chapterId, () -> {
+            log.info("HQ 删除开始: comicId={}, chapterId={}", comicId, chapterId);
 
-        AtomicLong freedBytes = new AtomicLong(0);
-        AtomicInteger deletedCount = new AtomicInteger(0);
+            AtomicLong freedBytes = new AtomicLong(0);
+            AtomicInteger deletedCount = new AtomicInteger(0);
 
-        try {
             List<ExportMedia> pages = mediaMapper.selectByChapterId(chapterId);
             if (pages.isEmpty()) {
                 log.warn("章节无页面数据: chapterId={}", chapterId);
-                channel.basicAck(tag, false);
                 return;
             }
 
             StorageRoot hqRoot = storageProperties.getRoots().get("HQ");
             if (hqRoot == null) {
-                log.error("HQ 存储根未配置");
-                channel.basicReject(tag, false);
-                return;
+                throw new IllegalStateException("HQ 存储根未配置");
             }
 
             for (ExportMedia page : pages) {
@@ -93,12 +92,8 @@ public class HqDeleteHandler {
                     UUID.randomUUID(), Instant.now(),
                     comicId, chapterId, freedBytes.get(), deletedCount.get());
             rabbitTemplate.convertAndSend(MqExchanges.IMAGE, MqRoutingKeys.HQ_DELETE_COMPLETED, completedEvent);
-            channel.basicAck(tag, false);
             log.info("HQ 删除完成: comicId={}, chapterId={}, freedBytes={}, deletedCount={}",
                     comicId, chapterId, freedBytes.get(), deletedCount.get());
-        } catch (Exception e) {
-            log.error("HQ 删除失败: comicId={}, chapterId={}", comicId, chapterId, e);
-            try { channel.basicReject(tag, false); } catch (Exception ex) { log.warn("消息 reject 失败: tag={}", tag, ex); }
-        }
+        });
     }
 }

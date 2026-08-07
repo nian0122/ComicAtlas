@@ -6,6 +6,7 @@ import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.event.VideoMetadataFixCompletedEvent;
 import com.comicatlas.common.event.VideoMetadataFixRequestedEvent;
 import com.comicatlas.common.event.VideoMetadataFixResult;
+import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.worker.entity.ExportMedia;
 import com.comicatlas.worker.file.parse.ComicMetadata;
 import com.comicatlas.worker.file.parse.MediaAnalyzer;
@@ -36,6 +37,7 @@ public class VideoMetadataFixHandler {
     private final ExportMediaMapper exportMediaMapper;
     private final MediaAnalyzer mediaAnalyzer;
     private final RabbitTemplate rabbitTemplate;
+    private final MqConsumerSupport mqConsumerSupport;
 
     @Value("${worker.manga-root}")
     private String mangaRoot;
@@ -44,16 +46,16 @@ public class VideoMetadataFixHandler {
     public void handle(VideoMetadataFixRequestedEvent event,
             Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         Long comicId = event.comicId();
-        long start = System.currentTimeMillis();
-        log.info("视频元数据修复开始: comicId={}", comicId);
 
-        try {
+        mqConsumerSupport.consume(channel, tag, "视频元数据修复: comicId=" + comicId, () -> {
+            long start = System.currentTimeMillis();
+            log.info("视频元数据修复开始: comicId={}", comicId);
+
             List<ExportMedia> videos = exportMediaMapper.selectVideosMissingMetadataByComicId(comicId);
 
             if (videos.isEmpty()) {
                 log.info("无需修复的视频元数据: comicId={}", comicId);
                 publishCompleted(comicId, List.of());
-                channel.basicAck(tag, false);
                 return;
             }
 
@@ -106,19 +108,10 @@ public class VideoMetadataFixHandler {
             }
 
             publishCompleted(comicId, results);
-            channel.basicAck(tag, false);
             log.info("视频元数据修复完成: comicId={}, 成功={}/{}, elapsed={}ms",
                     comicId, results.size(), videos.size(),
                     System.currentTimeMillis() - start);
-        } catch (Exception e) {
-            log.error("视频元数据修复失败: comicId={}, elapsed={}ms",
-                    comicId, System.currentTimeMillis() - start, e);
-            try {
-                channel.basicReject(tag, false);
-            } catch (Exception ex) {
-                log.warn("消息 reject 失败: tag={}", tag, ex);
-            }
-        }
+        });
     }
 
     private void publishCompleted(Long comicId, List<VideoMetadataFixResult> results) {
