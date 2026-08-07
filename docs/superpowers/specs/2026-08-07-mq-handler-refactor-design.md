@@ -180,7 +180,7 @@ private void routeToHandler(String sourceType, String sourcePath, Long taskId, L
 | MetadataRefreshHandler | 无 | REJECT_TO_DLQ | 标准 |
 | ExportTaskHandler | 发 TASK_FAILED（classifyExportError） | REJECT_TO_DLQ | 失败事件后 reject |
 | DirectoryScanHandler | publishFailed(taskId, msg) | **ACK_AFTER_CALLBACK** | 现状 catch → publishFailed + ack：失败事件即结果 |
-| ManagementCommandDispatcher | 无 | REJECT_TO_DLQ | 标准 |
+| ManagementCommandDispatcher | publisher.failed(cmd, msg) | REJECT_TO_DLQ | 现状 catch → publisher.failed + nack(requeue=false)：失败事件保留 |
 
 **api 侧（13 类 / 15 消费者）**: `ImportEventHandler`（3 个消费者）、`LqCompletedHandler`、`HqDeletedHandler`、`DeleteEventHandler`、`RecoveryEventHandler`、`DirectoryScanEventHandler`、`ManagementCommandResultHandler`、`ExportStartedHandler`、`ExportCompletedHandler`、`ExportFailedHandler`、`TranscodeCompletedHandler`、`TranscodeFailedHandler` — 全部为标准模式（无 onFailure，REJECT_TO_DLQ）。
 

@@ -31,17 +31,21 @@ public class ManagementCommandDispatcher {
     private final RestoreCommandHandler restoreCommandHandler;
     private final PurgeCommandHandler purgeCommandHandler;
     private final MediaUploadCommandHandler mediaUploadCommandHandler;
+    private final ManagementCommandPublisher publisher;
     private final MqConsumerSupport mqConsumerSupport;
 
     @RabbitListener(queues = MqQueues.MANAGEMENT_COMMAND)
     public void handle(ManagementCommandRequestedEvent cmd,
             Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
-        mqConsumerSupport.consume(channel, tag, "管理命令: taskId=" + cmd.taskId(), () -> {
-            log.info("收到管理命令: op={}, target={}:{}, taskId={}, itemId={}, attempt={}",
-                    cmd.operationType(), cmd.targetType(), cmd.targetId(),
-                    cmd.taskId(), cmd.itemId(), cmd.attempt());
-            route(cmd);
-        });
+        mqConsumerSupport.consume(channel, tag, "管理命令: taskId=" + cmd.taskId(),
+                () -> {
+                    log.info("收到管理命令: op={}, target={}:{}, taskId={}, itemId={}, attempt={}",
+                            cmd.operationType(), cmd.targetType(), cmd.targetId(),
+                            cmd.taskId(), cmd.itemId(), cmd.attempt());
+                    route(cmd);
+                },
+                e -> publisher.failed(cmd,
+                        e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName()));
     }
 
     private void route(ManagementCommandRequestedEvent cmd) {
