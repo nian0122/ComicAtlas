@@ -1,8 +1,9 @@
-package com.comicatlas.worker.event;
+package com.comicatlas.worker.command;
 
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.export.MetadataJsonExporter;
+import com.comicatlas.worker.event.ManagementCommandPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

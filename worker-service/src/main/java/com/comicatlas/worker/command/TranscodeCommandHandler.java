@@ -1,4 +1,4 @@
-package com.comicatlas.worker.event;
+package com.comicatlas.worker.command;
 
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.common.event.TranscodeMediaInfo;
@@ -8,6 +8,7 @@ import com.comicatlas.worker.file.parse.ComicMetadata;
 import com.comicatlas.worker.file.parse.MediaAnalyzer;
 import com.comicatlas.worker.mapper.ExportMediaMapper;
 import com.comicatlas.worker.process.ExternalProcessRunner;
+import com.comicatlas.worker.event.ManagementCommandPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
