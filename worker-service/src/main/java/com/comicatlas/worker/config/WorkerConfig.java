@@ -21,14 +21,14 @@ public class WorkerConfig {
     private Proxy proxy = new Proxy();
     private Zip zip = new Zip();
     private Cover cover = new Cover();
-    private String aria2cPath = "aria2c";
-    private String ffprobePath = "worker-service/ffmpeg/ffprobe.exe";
-    private String ffmpegPath = "ffmpeg";
+    private String aria2cPath = "tools/aria2c/aria2c.exe";
+    private String ffprobePath = "tools/ffmpeg/ffprobe.exe";
+    private String ffmpegPath = "tools/ffmpeg/ffmpeg.exe";
     private String imageOptimizerPath = "tools/image-optimizer/image-optimizer.exe";
     /** 工具相对路径的解析基准目录；未配置时回退到 JVM 工作目录 */
     private String toolsBaseDir;
     private int lqQuality = 15;
-    private int lqWorkers = 0;
+    private int lqWorkers = 4;
     private int hqDeleteTimeoutSeconds = 60;
     private boolean ffprobeEnabled = true;
     private Map<String, String> storageRoots = new LinkedHashMap<>();
@@ -47,6 +47,19 @@ public class WorkerConfig {
         String base = toolsBaseDir != null && !toolsBaseDir.isBlank()
                 ? toolsBaseDir : System.getProperty("user.dir");
         return Path.of(base).resolve(path).normalize();
+    }
+
+    /**
+     * 解析临时目录：优先 {@code worker.temp-dir}；未配置时回退到 {@code {mangaRoot}/temp}。
+     * 禁止回退到系统临时目录——转码产物体积大，需与 MANGA_ROOT 同卷且统一清理。
+     */
+    public Path resolveTempDir() {
+        if (tempDir != null && !tempDir.isBlank()) {
+            return Path.of(tempDir);
+        }
+        String root = mangaRoot != null && !mangaRoot.isBlank()
+                ? mangaRoot : System.getProperty("user.dir");
+        return Path.of(root, "temp");
     }
 
     @Bean
@@ -71,7 +84,7 @@ public class WorkerConfig {
     @Data
     public static class Proxy {
         private String host;
-        private int port = 7890;
+        private int port = 7897;
         private int socksPort = 7897;
     }
 

@@ -1,8 +1,9 @@
 package com.comicatlas.worker.event;
 
+import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.event.ImportTaskCreatedEvent;
 import com.comicatlas.worker.config.WorkerConfig;
-import com.comicatlas.worker.file.FileService;
+import com.comicatlas.worker.file.EhentaiDownloadService;
 import com.comicatlas.worker.file.handler.DirectoryImportHandler;
 import com.comicatlas.worker.file.handler.ZipImportHandler;
 import com.comicatlas.worker.file.parse.ImportContext;
@@ -20,14 +21,14 @@ import java.nio.file.Path;
 @Component
 @RequiredArgsConstructor
 public class ImportTaskHandler {
-    private final FileService fileService;
+    private final EhentaiDownloadService ehentaiDownloadService;
     private final DirectoryImportHandler directoryHandler;
     private final ZipImportHandler zipHandler;
     private final WorkerConfig config;
     private final TaskStatusPublisher publisher;
     private final CancelHandler cancelHandler;
 
-    @RabbitListener(queues = "import.task.queue")
+    @RabbitListener(queues = MqQueues.IMPORT_TASK)
     public void handle(ImportTaskCreatedEvent event,
             Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         Long taskId = event.taskId();
@@ -62,7 +63,12 @@ public class ImportTaskHandler {
                     ImportContext ctx = new ImportContext("DIRECTORY", Path.of(normalizedPath), false, false);
                     directoryHandler.handle(ctx, taskId, comicId, mangaRoot);
                 }
-                case "EHENTAI" -> fileService.processImport(taskId, comicId, sourcePath, sourceType);
+                case "EHENTAI" -> {
+                    // 统一导入：下载 + 解压到临时目录后委托 DirectoryImportHandler
+                    Path sourceDir = ehentaiDownloadService.downloadToSourceDir(taskId, sourcePath);
+                    ImportContext ctx = new ImportContext("DIRECTORY", sourceDir, false, false);
+                    directoryHandler.handle(ctx, taskId, comicId, mangaRoot);
+                }
                 default -> throw new IllegalArgumentException("Unknown sourceType: " + sourceType);
             }
 
