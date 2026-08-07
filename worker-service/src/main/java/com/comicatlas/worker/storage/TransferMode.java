@@ -1,4 +1,4 @@
-package com.comicatlas.worker.file.storage;
+package com.comicatlas.worker.storage;
 
 /** 文件搬运模式。 */
 public enum TransferMode {

@@ -1,4 +1,4 @@
-package com.comicatlas.worker.file.storage;
+package com.comicatlas.worker.storage;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;

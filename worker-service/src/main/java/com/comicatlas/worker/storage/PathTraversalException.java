@@ -1,4 +1,4 @@
-package com.comicatlas.worker.file.storage;
+package com.comicatlas.worker.storage;
 
 /**
  * 路径穿越异常 — 当相对路径包含 {@code ../} 穿越存储根边界时抛出。
