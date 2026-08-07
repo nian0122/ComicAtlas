@@ -4,7 +4,7 @@ import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.event.ImportTaskCreatedEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.worker.config.WorkerConfig;
-import com.comicatlas.worker.file.EhentaiDownloadService;
+import com.comicatlas.worker.file.download.EhentaiDownloadService;
 import com.comicatlas.worker.file.handler.DirectoryImportHandler;
 import com.comicatlas.worker.file.handler.ZipImportHandler;
 import com.comicatlas.worker.file.parse.ImportContext;
