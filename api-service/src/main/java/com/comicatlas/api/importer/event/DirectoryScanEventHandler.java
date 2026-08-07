@@ -1,6 +1,7 @@
 package com.comicatlas.api.importer.event;
 
 import com.comicatlas.api.importer.service.DirectoryScanTaskService;
+import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.event.ComicEvent;
 import com.comicatlas.common.event.DirectoryScanCompletedEvent;
 import com.comicatlas.common.event.DirectoryScanFailedEvent;
@@ -19,7 +20,7 @@ public class DirectoryScanEventHandler {
 
     private final DirectoryScanTaskService scanTaskService;
 
-    @RabbitListener(queues = "scan.result.queue")
+    @RabbitListener(queues = MqQueues.SCAN_RESULT)
     public void handle(ComicEvent event,
                        Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
 

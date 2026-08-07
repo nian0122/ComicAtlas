@@ -5,6 +5,7 @@ import com.comicatlas.api.export.entity.ExportTask;
 import com.comicatlas.api.export.mapper.ExportTaskMapper;
 import com.comicatlas.api.management.entity.ManagementTaskItem;
 import com.comicatlas.api.management.service.ManagementTaskService;
+import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.enums.ManagementTaskStatus;
 import com.comicatlas.common.enums.TaskType;
 import com.comicatlas.common.event.ExportTaskFailedEvent;
@@ -28,7 +29,7 @@ public class ExportFailedHandler {
     private final ExportTaskMapper exportTaskMapper;
     private final ManagementTaskService managementTaskService;
 
-    @RabbitListener(queues = "export.failed.result.queue")
+    @RabbitListener(queues = MqQueues.EXPORT_FAILED_RESULT)
     public void handle(ExportTaskFailedEvent event,
             Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         Long taskId = event.taskId();

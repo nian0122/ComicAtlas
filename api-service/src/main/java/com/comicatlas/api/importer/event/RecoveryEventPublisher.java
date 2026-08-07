@@ -1,5 +1,7 @@
 package com.comicatlas.api.importer.event;
 
+import com.comicatlas.common.constant.MqExchanges;
+import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.event.RecoveryCompletedEvent;
 import com.comicatlas.common.event.RecoveryFailedEvent;
 import com.comicatlas.common.event.RecoveryProgressEvent;
@@ -20,7 +22,7 @@ public class RecoveryEventPublisher {
     public void publishRecoveryRequested(Long taskId) {
         var event = new RecoveryRequestedEvent(
             UUID.randomUUID(), Instant.now(), taskId);
-        rabbitTemplate.convertAndSend("comic.recovery", "recovery.requested", event);
+        rabbitTemplate.convertAndSend(MqExchanges.RECOVERY, MqRoutingKeys.RECOVERY_REQUESTED, event);
     }
 
     public void publishRecoveryProgress(Long taskId, int totalComics, int recoveredComics,
@@ -28,7 +30,7 @@ public class RecoveryEventPublisher {
         var event = new RecoveryProgressEvent(
             UUID.randomUUID(), Instant.now(), taskId,
             totalComics, recoveredComics, skippedComics, placeholderComics, errorComics);
-        rabbitTemplate.convertAndSend("comic.recovery", "recovery.progress", event);
+        rabbitTemplate.convertAndSend(MqExchanges.RECOVERY, MqRoutingKeys.RECOVERY_PROGRESS, event);
     }
 
     public void publishRecoveryCompleted(Long taskId, int totalComics, int recoveredComics,
@@ -36,12 +38,12 @@ public class RecoveryEventPublisher {
         var event = new RecoveryCompletedEvent(
             UUID.randomUUID(), Instant.now(), taskId,
             totalComics, recoveredComics, skippedComics, placeholderComics, errorComics);
-        rabbitTemplate.convertAndSend("comic.recovery", "recovery.completed", event);
+        rabbitTemplate.convertAndSend(MqExchanges.RECOVERY, MqRoutingKeys.RECOVERY_COMPLETED, event);
     }
 
     public void publishRecoveryFailed(Long taskId, String errorMessage) {
         var event = new RecoveryFailedEvent(
             UUID.randomUUID(), Instant.now(), taskId, errorMessage);
-        rabbitTemplate.convertAndSend("comic.recovery", "recovery.failed", event);
+        rabbitTemplate.convertAndSend(MqExchanges.RECOVERY, MqRoutingKeys.RECOVERY_FAILED, event);
     }
 }

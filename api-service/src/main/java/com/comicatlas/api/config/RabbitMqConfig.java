@@ -1,5 +1,8 @@
 package com.comicatlas.api.config;
 
+import com.comicatlas.common.constant.MqExchanges;
+import com.comicatlas.common.constant.MqQueues;
+import com.comicatlas.common.constant.MqRoutingKeys;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
@@ -24,537 +27,537 @@ public class RabbitMqConfig {
 
     @Bean
     public DirectExchange importExchange() {
-        return new DirectExchange("comic.import");
+        return new DirectExchange(MqExchanges.IMPORT);
     }
 
     @Bean
     public Queue importResultQueue() {
-        return QueueBuilder.durable("import.result.queue")
-                .deadLetterExchange("comic.import.dlx")
-                .deadLetterRoutingKey("import.result.dlq")
+        return QueueBuilder.durable(MqQueues.IMPORT_RESULT)
+                .deadLetterExchange(MqExchanges.IMPORT_DLX)
+                .deadLetterRoutingKey(MqQueues.IMPORT_RESULT_DLQ)
                 .build();
     }
 
     @Bean
     public Queue importResultDlq() {
-        return QueueBuilder.durable("import.result.dlq").build();
+        return QueueBuilder.durable(MqQueues.IMPORT_RESULT_DLQ).build();
     }
 
     @Bean
     public Binding importResultBinding() {
         return BindingBuilder.bind(importResultQueue())
-                .to(importExchange()).with("task.completed");
+                .to(importExchange()).with(MqRoutingKeys.TASK_COMPLETED);
     }
 
     @Bean
     public Queue importFailedQueue() {
-        return QueueBuilder.durable("import.failed.queue")
-                .deadLetterExchange("comic.import.dlx")
-                .deadLetterRoutingKey("import.failed.dlq")
+        return QueueBuilder.durable(MqQueues.IMPORT_FAILED)
+                .deadLetterExchange(MqExchanges.IMPORT_DLX)
+                .deadLetterRoutingKey(MqQueues.IMPORT_FAILED_DLQ)
                 .build();
     }
 
     @Bean
     public Queue importFailedDlq() {
-        return QueueBuilder.durable("import.failed.dlq").build();
+        return QueueBuilder.durable(MqQueues.IMPORT_FAILED_DLQ).build();
     }
 
     @Bean
     public Binding importFailedBinding() {
         return BindingBuilder.bind(importFailedQueue())
-                .to(importExchange()).with("task.failed");
+                .to(importExchange()).with(MqRoutingKeys.TASK_FAILED);
     }
 
     @Bean
     public Binding importFailedDlqBinding() {
         return BindingBuilder.bind(importFailedDlq())
-                .to(importDlxExchange()).with("import.failed.dlq");
+                .to(importDlxExchange()).with(MqQueues.IMPORT_FAILED_DLQ);
     }
 
     @Bean
     public Binding importResultDlqBinding() {
         return BindingBuilder.bind(importResultDlq())
-                .to(importDlxExchange()).with("import.result.dlq");
+                .to(importDlxExchange()).with(MqQueues.IMPORT_RESULT_DLQ);
     }
 
     @Bean
     public DirectExchange importDlxExchange() {
-        return new DirectExchange("comic.import.dlx");
+        return new DirectExchange(MqExchanges.IMPORT_DLX);
     }
 
     @Bean
     public DirectExchange taskExchange() {
-        return new DirectExchange("comic.task");
+        return new DirectExchange(MqExchanges.TASK);
     }
 
     @Bean
     public Queue taskStatusQueue() {
-        return QueueBuilder.durable("task.status.queue").build();
+        return QueueBuilder.durable(MqQueues.TASK_STATUS).build();
     }
 
     @Bean
     public Binding taskStatusBinding() {
         return BindingBuilder.bind(taskStatusQueue())
-                .to(taskExchange()).with("status.changed");
+                .to(taskExchange()).with(MqRoutingKeys.STATUS_CHANGED);
     }
 
     @Bean
     public DirectExchange deleteExchange() {
-        return new DirectExchange("comic.delete");
+        return new DirectExchange(MqExchanges.DELETE);
     }
 
     @Bean
     public Queue deleteResultQueue() {
-        return QueueBuilder.durable("delete.result.queue")
-                .deadLetterExchange("comic.delete.dlx")
-                .deadLetterRoutingKey("delete.result.dlq")
+        return QueueBuilder.durable(MqQueues.DELETE_RESULT)
+                .deadLetterExchange(MqExchanges.DELETE_DLX)
+                .deadLetterRoutingKey(MqQueues.DELETE_RESULT_DLQ)
                 .build();
     }
 
     @Bean
     public Queue deleteResultDlq() {
-        return QueueBuilder.durable("delete.result.dlq").build();
+        return QueueBuilder.durable(MqQueues.DELETE_RESULT_DLQ).build();
     }
 
     @Bean
     public Binding deleteResultBinding() {
         return BindingBuilder.bind(deleteResultQueue())
-                .to(deleteExchange()).with("delete.completed");
+                .to(deleteExchange()).with(MqRoutingKeys.DELETE_COMPLETED);
     }
 
     @Bean
     public Binding deleteResultDlqBinding() {
         return BindingBuilder.bind(deleteResultDlq())
-                .to(deleteDlxExchange()).with("delete.result.dlq");
+                .to(deleteDlxExchange()).with(MqQueues.DELETE_RESULT_DLQ);
     }
 
     @Bean
     public DirectExchange deleteDlxExchange() {
-        return new DirectExchange("comic.delete.dlx");
+        return new DirectExchange(MqExchanges.DELETE_DLX);
     }
 
     @Bean
     public DirectExchange imageExchange() {
-        return new DirectExchange("comic.image");
+        return new DirectExchange(MqExchanges.IMAGE);
     }
 
     @Bean
     public Queue lqResultQueue() {
-        return QueueBuilder.durable("lq.result.queue")
-                .deadLetterExchange("comic.image.dlx")
-                .deadLetterRoutingKey("lq.result.dlq")
+        return QueueBuilder.durable(MqQueues.LQ_RESULT)
+                .deadLetterExchange(MqExchanges.IMAGE_DLX)
+                .deadLetterRoutingKey(MqQueues.LQ_RESULT_DLQ)
                 .build();
     }
 
     @Bean
     public Queue lqResultDlq() {
-        return QueueBuilder.durable("lq.result.dlq").build();
+        return QueueBuilder.durable(MqQueues.LQ_RESULT_DLQ).build();
     }
 
     @Bean
     public Binding lqResultBinding() {
         return BindingBuilder.bind(lqResultQueue())
-                .to(imageExchange()).with("lq.completed");
+                .to(imageExchange()).with(MqRoutingKeys.LQ_COMPLETED);
     }
 
     @Bean
     public Binding lqResultDlqBinding() {
         return BindingBuilder.bind(lqResultDlq())
-                .to(imageDlxExchange()).with("lq.result.dlq");
+                .to(imageDlxExchange()).with(MqQueues.LQ_RESULT_DLQ);
     }
 
     @Bean
     public Queue hqDeleteQueue() {
-        return QueueBuilder.durable("hq.delete.queue")
-                .deadLetterExchange("comic.image.dlx")
-                .deadLetterRoutingKey("hq.delete.dlq")
+        return QueueBuilder.durable(MqQueues.HQ_DELETE)
+                .deadLetterExchange(MqExchanges.IMAGE_DLX)
+                .deadLetterRoutingKey(MqQueues.HQ_DELETE_DLQ)
                 .build();
     }
 
     @Bean
     public Queue hqDeleteDlq() {
-        return QueueBuilder.durable("hq.delete.dlq").build();
+        return QueueBuilder.durable(MqQueues.HQ_DELETE_DLQ).build();
     }
 
     @Bean
     public Binding hqDeleteBinding() {
         return BindingBuilder.bind(hqDeleteQueue())
-                .to(imageExchange()).with("hq.delete.requested");
+                .to(imageExchange()).with(MqRoutingKeys.HQ_DELETE_REQUESTED);
     }
 
     @Bean
     public Binding hqDeleteDlqBinding() {
         return BindingBuilder.bind(hqDeleteDlq())
-                .to(imageDlxExchange()).with("hq.delete.dlq");
+                .to(imageDlxExchange()).with(MqQueues.HQ_DELETE_DLQ);
     }
 
     @Bean
     public Queue hqDeleteResultQueue() {
-        return QueueBuilder.durable("hq.delete.result.queue")
-                .deadLetterExchange("comic.image.dlx")
-                .deadLetterRoutingKey("hq.delete.result.dlq")
+        return QueueBuilder.durable(MqQueues.HQ_DELETE_RESULT)
+                .deadLetterExchange(MqExchanges.IMAGE_DLX)
+                .deadLetterRoutingKey(MqQueues.HQ_DELETE_RESULT_DLQ)
                 .build();
     }
 
     @Bean
     public Queue hqDeleteResultDlq() {
-        return QueueBuilder.durable("hq.delete.result.dlq").build();
+        return QueueBuilder.durable(MqQueues.HQ_DELETE_RESULT_DLQ).build();
     }
 
     @Bean
     public Binding hqDeleteResultBinding() {
         return BindingBuilder.bind(hqDeleteResultQueue())
-                .to(imageExchange()).with("hq.delete.completed");
+                .to(imageExchange()).with(MqRoutingKeys.HQ_DELETE_COMPLETED);
     }
 
     @Bean
     public Binding hqDeleteResultDlqBinding() {
         return BindingBuilder.bind(hqDeleteResultDlq())
-                .to(imageDlxExchange()).with("hq.delete.result.dlq");
+                .to(imageDlxExchange()).with(MqQueues.HQ_DELETE_RESULT_DLQ);
     }
 
     @Bean
     public Queue videoMetadataFixResultQueue() {
-        return QueueBuilder.durable("video.metadata.fix.result.queue")
-                .deadLetterExchange("comic.image.dlx")
-                .deadLetterRoutingKey("video.metadata.fix.result.dlq")
+        return QueueBuilder.durable(MqQueues.VIDEO_METADATA_FIX_RESULT)
+                .deadLetterExchange(MqExchanges.IMAGE_DLX)
+                .deadLetterRoutingKey(MqQueues.VIDEO_METADATA_FIX_RESULT_DLQ)
                 .build();
     }
 
     @Bean
     public Queue videoMetadataFixResultDlq() {
-        return QueueBuilder.durable("video.metadata.fix.result.dlq").build();
+        return QueueBuilder.durable(MqQueues.VIDEO_METADATA_FIX_RESULT_DLQ).build();
     }
 
     @Bean
     public Binding videoMetadataFixCompletedBinding() {
         return BindingBuilder.bind(videoMetadataFixResultQueue())
-                .to(imageExchange()).with("video.metadata.fix.completed");
+                .to(imageExchange()).with(MqRoutingKeys.VIDEO_METADATA_FIX_COMPLETED);
     }
 
     @Bean
     public Binding videoMetadataFixResultDlqBinding() {
         return BindingBuilder.bind(videoMetadataFixResultDlq())
-                .to(imageDlxExchange()).with("video.metadata.fix.result.dlq");
+                .to(imageDlxExchange()).with(MqQueues.VIDEO_METADATA_FIX_RESULT_DLQ);
     }
 
     @Bean
     public DirectExchange imageDlxExchange() {
-        return new DirectExchange("comic.image.dlx");
+        return new DirectExchange(MqExchanges.IMAGE_DLX);
     }
 
-    // ==================== comic.export ====================
+    // ==================== MqExchanges.EXPORT ====================
 
     @Bean
     public DirectExchange exportExchange() {
-        return new DirectExchange("comic.export");
+        return new DirectExchange(MqExchanges.EXPORT);
     }
 
     @Bean
     public DirectExchange exportDlxExchange() {
-        return new DirectExchange("comic.export.dlx");
+        return new DirectExchange(MqExchanges.EXPORT_DLX);
     }
 
     @Bean
     public DirectExchange videoExchange() {
-        return new DirectExchange("comic.video");
+        return new DirectExchange(MqExchanges.VIDEO);
     }
 
     @Bean
     public DirectExchange videoDlxExchange() {
-        return new DirectExchange("comic.video.dlx");
+        return new DirectExchange(MqExchanges.VIDEO_DLX);
     }
 
     @Bean
     public Queue exportStartedResultQueue() {
-        return QueueBuilder.durable("export.started.result.queue")
-                .deadLetterExchange("comic.export.dlx")
-                .deadLetterRoutingKey("export.started.result.dlq")
+        return QueueBuilder.durable(MqQueues.EXPORT_STARTED_RESULT)
+                .deadLetterExchange(MqExchanges.EXPORT_DLX)
+                .deadLetterRoutingKey(MqQueues.EXPORT_STARTED_RESULT_DLQ)
                 .build();
     }
 
     @Bean
     public Queue exportCompletedResultQueue() {
-        return QueueBuilder.durable("export.completed.result.queue")
-                .deadLetterExchange("comic.export.dlx")
-                .deadLetterRoutingKey("export.completed.result.dlq")
+        return QueueBuilder.durable(MqQueues.EXPORT_COMPLETED_RESULT)
+                .deadLetterExchange(MqExchanges.EXPORT_DLX)
+                .deadLetterRoutingKey(MqQueues.EXPORT_COMPLETED_RESULT_DLQ)
                 .build();
     }
 
     @Bean
     public Queue exportFailedResultQueue() {
-        return QueueBuilder.durable("export.failed.result.queue")
-                .deadLetterExchange("comic.export.dlx")
-                .deadLetterRoutingKey("export.failed.result.dlq")
+        return QueueBuilder.durable(MqQueues.EXPORT_FAILED_RESULT)
+                .deadLetterExchange(MqExchanges.EXPORT_DLX)
+                .deadLetterRoutingKey(MqQueues.EXPORT_FAILED_RESULT_DLQ)
                 .build();
     }
 
     @Bean
     public Queue exportStartedResultDlq() {
-        return QueueBuilder.durable("export.started.result.dlq").build();
+        return QueueBuilder.durable(MqQueues.EXPORT_STARTED_RESULT_DLQ).build();
     }
 
     @Bean
     public Queue exportCompletedResultDlq() {
-        return QueueBuilder.durable("export.completed.result.dlq").build();
+        return QueueBuilder.durable(MqQueues.EXPORT_COMPLETED_RESULT_DLQ).build();
     }
 
     @Bean
     public Queue exportFailedResultDlq() {
-        return QueueBuilder.durable("export.failed.result.dlq").build();
+        return QueueBuilder.durable(MqQueues.EXPORT_FAILED_RESULT_DLQ).build();
     }
 
     @Bean
     public Binding exportStartedResultBinding() {
         return BindingBuilder.bind(exportStartedResultQueue())
-                .to(exportExchange()).with("task.started");
+                .to(exportExchange()).with(MqRoutingKeys.TASK_STARTED);
     }
 
     @Bean
     public Binding exportCompletedResultBinding() {
         return BindingBuilder.bind(exportCompletedResultQueue())
-                .to(exportExchange()).with("task.completed");
+                .to(exportExchange()).with(MqRoutingKeys.TASK_COMPLETED);
     }
 
     @Bean
     public Binding exportFailedResultBinding() {
         return BindingBuilder.bind(exportFailedResultQueue())
-                .to(exportExchange()).with("task.failed");
+                .to(exportExchange()).with(MqRoutingKeys.TASK_FAILED);
     }
 
     @Bean
     public Binding exportStartedResultDlqBinding() {
         return BindingBuilder.bind(exportStartedResultDlq())
-                .to(exportDlxExchange()).with("export.started.result.dlq");
+                .to(exportDlxExchange()).with(MqQueues.EXPORT_STARTED_RESULT_DLQ);
     }
 
     @Bean
     public Binding exportCompletedResultDlqBinding() {
         return BindingBuilder.bind(exportCompletedResultDlq())
-                .to(exportDlxExchange()).with("export.completed.result.dlq");
+                .to(exportDlxExchange()).with(MqQueues.EXPORT_COMPLETED_RESULT_DLQ);
     }
 
     @Bean
     public Binding exportFailedResultDlqBinding() {
         return BindingBuilder.bind(exportFailedResultDlq())
-                .to(exportDlxExchange()).with("export.failed.result.dlq");
+                .to(exportDlxExchange()).with(MqQueues.EXPORT_FAILED_RESULT_DLQ);
     }
 
     @Bean
     public Queue metadataRefreshQueue() {
-        return QueueBuilder.durable("metadata.refresh.queue")
-                .deadLetterExchange("comic.export.dlx")
-                .deadLetterRoutingKey("metadata.refresh.dlq")
+        return QueueBuilder.durable(MqQueues.METADATA_REFRESH)
+                .deadLetterExchange(MqExchanges.EXPORT_DLX)
+                .deadLetterRoutingKey(MqQueues.METADATA_REFRESH_DLQ)
                 .build();
     }
 
     @Bean
     public Queue metadataRefreshDlq() {
-        return QueueBuilder.durable("metadata.refresh.dlq").build();
+        return QueueBuilder.durable(MqQueues.METADATA_REFRESH_DLQ).build();
     }
 
     @Bean
     public Binding metadataRefreshBinding() {
         return BindingBuilder.bind(metadataRefreshQueue())
-                .to(exportExchange()).with("metadata.refresh.requested");
+                .to(exportExchange()).with(MqRoutingKeys.METADATA_REFRESH_REQUESTED);
     }
 
     @Bean
     public Binding metadataRefreshDlqBinding() {
         return BindingBuilder.bind(metadataRefreshDlq())
-                .to(exportDlxExchange()).with("metadata.refresh.dlq");
+                .to(exportDlxExchange()).with(MqQueues.METADATA_REFRESH_DLQ);
     }
 
-    // ==================== comic.video 视频转码结果 ====================
+    // ==================== MqExchanges.VIDEO 视频转码结果 ====================
 
     @Bean
     public Queue videoTranscodeCompletedQueue() {
-        return QueueBuilder.durable("video.transcode.completed.queue")
-                .deadLetterExchange("comic.video.dlx")
-                .deadLetterRoutingKey("video.transcode.completed.dlq")
+        return QueueBuilder.durable(MqQueues.VIDEO_TRANSCODE_COMPLETED)
+                .deadLetterExchange(MqExchanges.VIDEO_DLX)
+                .deadLetterRoutingKey(MqQueues.VIDEO_TRANSCODE_COMPLETED_DLQ)
                 .build();
     }
 
     @Bean
     public Queue videoTranscodeCompletedDlq() {
-        return QueueBuilder.durable("video.transcode.completed.dlq").build();
+        return QueueBuilder.durable(MqQueues.VIDEO_TRANSCODE_COMPLETED_DLQ).build();
     }
 
     @Bean
     public Queue videoTranscodeFailedQueue() {
-        return QueueBuilder.durable("video.transcode.failed.queue")
-                .deadLetterExchange("comic.video.dlx")
-                .deadLetterRoutingKey("video.transcode.failed.dlq")
+        return QueueBuilder.durable(MqQueues.VIDEO_TRANSCODE_FAILED)
+                .deadLetterExchange(MqExchanges.VIDEO_DLX)
+                .deadLetterRoutingKey(MqQueues.VIDEO_TRANSCODE_FAILED_DLQ)
                 .build();
     }
 
     @Bean
     public Queue videoTranscodeFailedDlq() {
-        return QueueBuilder.durable("video.transcode.failed.dlq").build();
+        return QueueBuilder.durable(MqQueues.VIDEO_TRANSCODE_FAILED_DLQ).build();
     }
 
     @Bean
     public Binding videoTranscodeCompletedBinding() {
         return BindingBuilder.bind(videoTranscodeCompletedQueue())
-                .to(videoExchange()).with("video.transcode.completed");
+                .to(videoExchange()).with(MqRoutingKeys.VIDEO_TRANSCODE_COMPLETED);
     }
 
     @Bean
     public Binding videoTranscodeFailedBinding() {
         return BindingBuilder.bind(videoTranscodeFailedQueue())
-                .to(videoExchange()).with("video.transcode.failed");
+                .to(videoExchange()).with(MqRoutingKeys.VIDEO_TRANSCODE_FAILED);
     }
 
     @Bean
     public Binding videoTranscodeCompletedDlqBinding() {
         return BindingBuilder.bind(videoTranscodeCompletedDlq())
-                .to(videoDlxExchange()).with("video.transcode.completed.dlq");
+                .to(videoDlxExchange()).with(MqQueues.VIDEO_TRANSCODE_COMPLETED_DLQ);
     }
 
     @Bean
     public Binding videoTranscodeFailedDlqBinding() {
         return BindingBuilder.bind(videoTranscodeFailedDlq())
-                .to(videoDlxExchange()).with("video.transcode.failed.dlq");
+                .to(videoDlxExchange()).with(MqQueues.VIDEO_TRANSCODE_FAILED_DLQ);
     }
 
-    // ==================== comic.recovery ====================
+    // ==================== MqExchanges.RECOVERY ====================
 
     @Bean
     public DirectExchange recoveryExchange() {
-        return new DirectExchange("comic.recovery");
+        return new DirectExchange(MqExchanges.RECOVERY);
     }
 
     @Bean
     public DirectExchange recoveryDlxExchange() {
-        return new DirectExchange("comic.recovery.dlx");
+        return new DirectExchange(MqExchanges.RECOVERY_DLX);
     }
 
     @Bean
     public Queue recoveryResultQueue() {
-        return QueueBuilder.durable("recovery.result.queue")
-                .deadLetterExchange("comic.recovery.dlx")
-                .deadLetterRoutingKey("recovery.result.dlq")
+        return QueueBuilder.durable(MqQueues.RECOVERY_RESULT)
+                .deadLetterExchange(MqExchanges.RECOVERY_DLX)
+                .deadLetterRoutingKey(MqQueues.RECOVERY_RESULT_DLQ)
                 .build();
     }
 
     @Bean
     public Queue recoveryResultDlq() {
-        return QueueBuilder.durable("recovery.result.dlq").build();
+        return QueueBuilder.durable(MqQueues.RECOVERY_RESULT_DLQ).build();
     }
 
     @Bean
     public Binding recoveryProgressBinding() {
         return BindingBuilder.bind(recoveryResultQueue())
-                .to(recoveryExchange()).with("recovery.progress");
+                .to(recoveryExchange()).with(MqRoutingKeys.RECOVERY_PROGRESS);
     }
 
     @Bean
     public Binding recoveryCompletedBinding() {
         return BindingBuilder.bind(recoveryResultQueue())
-                .to(recoveryExchange()).with("recovery.completed");
+                .to(recoveryExchange()).with(MqRoutingKeys.RECOVERY_COMPLETED);
     }
 
     @Bean
     public Binding recoveryFailedBinding() {
         return BindingBuilder.bind(recoveryResultQueue())
-                .to(recoveryExchange()).with("recovery.failed");
+                .to(recoveryExchange()).with(MqRoutingKeys.RECOVERY_FAILED);
     }
 
     @Bean
     public Binding recoveryResultDlqBinding() {
         return BindingBuilder.bind(recoveryResultDlq())
-                .to(recoveryDlxExchange()).with("recovery.result.dlq");
+                .to(recoveryDlxExchange()).with(MqQueues.RECOVERY_RESULT_DLQ);
     }
 
-    // ==================== comic.scan 目录扫描 ====================
+    // ==================== MqExchanges.SCAN 目录扫描 ====================
 
     @Bean
     public DirectExchange scanExchange() {
-        return new DirectExchange("comic.scan");
+        return new DirectExchange(MqExchanges.SCAN);
     }
 
     @Bean
     public DirectExchange scanDlxExchange() {
-        return new DirectExchange("comic.scan.dlx");
+        return new DirectExchange(MqExchanges.SCAN_DLX);
     }
 
     @Bean
     public Queue scanResultQueue() {
-        return QueueBuilder.durable("scan.result.queue")
-                .deadLetterExchange("comic.scan.dlx")
-                .deadLetterRoutingKey("scan.result.dlq")
+        return QueueBuilder.durable(MqQueues.SCAN_RESULT)
+                .deadLetterExchange(MqExchanges.SCAN_DLX)
+                .deadLetterRoutingKey(MqQueues.SCAN_RESULT_DLQ)
                 .build();
     }
 
     @Bean
     public Queue scanResultDlq() {
-        return QueueBuilder.durable("scan.result.dlq").build();
+        return QueueBuilder.durable(MqQueues.SCAN_RESULT_DLQ).build();
     }
 
     @Bean
     public Binding scanCompletedBinding() {
         return BindingBuilder.bind(scanResultQueue())
-                .to(scanExchange()).with("scan.completed");
+                .to(scanExchange()).with(MqRoutingKeys.SCAN_COMPLETED);
     }
 
     @Bean
     public Binding scanFailedBinding() {
         return BindingBuilder.bind(scanResultQueue())
-                .to(scanExchange()).with("scan.failed");
+                .to(scanExchange()).with(MqRoutingKeys.SCAN_FAILED);
     }
 
     @Bean
     public Binding scanResultDlqBinding() {
         return BindingBuilder.bind(scanResultDlq())
-                .to(scanDlxExchange()).with("scan.result.dlq");
+                .to(scanDlxExchange()).with(MqQueues.SCAN_RESULT_DLQ);
     }
 
-    // ==================== comic.management 管理命令结果 ====================
+    // ==================== MqExchanges.MANAGEMENT 管理命令结果 ====================
 
     @Bean
     public DirectExchange managementExchange() {
-        return new DirectExchange("comic.management");
+        return new DirectExchange(MqExchanges.MANAGEMENT);
     }
 
     @Bean
     public DirectExchange managementDlxExchange() {
-        return new DirectExchange("comic.management.dlx");
+        return new DirectExchange(MqExchanges.MANAGEMENT_DLX);
     }
 
     @Bean
     public Queue managementResultQueue() {
-        return QueueBuilder.durable("management.result.queue")
-                .deadLetterExchange("comic.management.dlx")
-                .deadLetterRoutingKey("management.result.dlq")
+        return QueueBuilder.durable(MqQueues.MANAGEMENT_RESULT)
+                .deadLetterExchange(MqExchanges.MANAGEMENT_DLX)
+                .deadLetterRoutingKey(MqQueues.MANAGEMENT_RESULT_DLQ)
                 .build();
     }
 
     @Bean
     public Queue managementResultDlq() {
-        return QueueBuilder.durable("management.result.dlq").build();
+        return QueueBuilder.durable(MqQueues.MANAGEMENT_RESULT_DLQ).build();
     }
 
     @Bean
     public Binding managementCompletedBinding() {
         return BindingBuilder.bind(managementResultQueue())
-                .to(managementExchange()).with("command.completed");
+                .to(managementExchange()).with(MqRoutingKeys.COMMAND_COMPLETED);
     }
 
     @Bean
     public Binding managementFailedBinding() {
         return BindingBuilder.bind(managementResultQueue())
-                .to(managementExchange()).with("command.failed");
+                .to(managementExchange()).with(MqRoutingKeys.COMMAND_FAILED);
     }
 
     @Bean
     public Binding managementProgressBinding() {
         return BindingBuilder.bind(managementResultQueue())
-                .to(managementExchange()).with("command.progress");
+                .to(managementExchange()).with(MqRoutingKeys.COMMAND_PROGRESS);
     }
 
     @Bean
     public Binding managementResultDlqBinding() {
         return BindingBuilder.bind(managementResultDlq())
-                .to(managementDlxExchange()).with("management.result.dlq");
+                .to(managementDlxExchange()).with(MqQueues.MANAGEMENT_RESULT_DLQ);
     }
 }

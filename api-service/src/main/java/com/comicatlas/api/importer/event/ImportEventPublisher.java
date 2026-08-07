@@ -1,5 +1,7 @@
 package com.comicatlas.api.importer.event;
 
+import com.comicatlas.common.constant.MqExchanges;
+import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.event.CancelTaskEvent;
 import com.comicatlas.common.event.DeleteRequestedEvent;
 import com.comicatlas.common.event.ImportTaskCreatedEvent;
@@ -19,16 +21,16 @@ public class ImportEventPublisher {
     public void publishImportTaskCreated(Long taskId, Long comicId, String sourceType, String sourcePath) {
         var event = new ImportTaskCreatedEvent(
             UUID.randomUUID(), Instant.now(), taskId, comicId, sourceType, sourcePath);
-        rabbitTemplate.convertAndSend("comic.import", "task.created", event);
+        rabbitTemplate.convertAndSend(MqExchanges.IMPORT, MqRoutingKeys.TASK_CREATED, event);
     }
 
     public void publishDeleteRequested(Long comicId) {
         var event = new DeleteRequestedEvent(UUID.randomUUID(), Instant.now(), comicId);
-        rabbitTemplate.convertAndSend("comic.delete", "delete.requested", event);
+        rabbitTemplate.convertAndSend(MqExchanges.DELETE, MqRoutingKeys.DELETE_REQUESTED, event);
     }
 
     public void publishCancelTask(Long taskId, Long comicId) {
         var event = new CancelTaskEvent(UUID.randomUUID(), Instant.now(), taskId, comicId);
-        rabbitTemplate.convertAndSend("comic.task", "cancel.requested", event);
+        rabbitTemplate.convertAndSend(MqExchanges.TASK, MqRoutingKeys.CANCEL_REQUESTED, event);
     }
 }

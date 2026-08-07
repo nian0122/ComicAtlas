@@ -1,5 +1,8 @@
 package com.comicatlas.worker.event;
 
+import com.comicatlas.common.constant.MqExchanges;
+import com.comicatlas.common.constant.MqQueues;
+import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.event.LqCompletedEvent;
 import com.comicatlas.common.event.LqGenerateEvent;
 import com.comicatlas.worker.entity.ExportMedia;
@@ -34,7 +37,7 @@ public class LqGenerateHandler {
     private final ExportMediaMapper mediaMapper;
     private final StorageProperties storageProperties;
 
-    @RabbitListener(queues = "lq.generate.queue")
+    @RabbitListener(queues = MqQueues.LQ_GENERATE)
     public void handle(LqGenerateEvent event,
             Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         Long comicId = event.comicId();
@@ -78,7 +81,7 @@ public class LqGenerateHandler {
                     UUID.randomUUID(), Instant.now(),
                     comicId, chapterId, failedPages,
                     result.getProcessed(), result.getSkipped(), result.getElapsedMs());
-            rabbitTemplate.convertAndSend("comic.image", "lq.completed", completedEvent);
+            rabbitTemplate.convertAndSend(MqExchanges.IMAGE, MqRoutingKeys.LQ_COMPLETED, completedEvent);
             channel.basicAck(tag, false);
             log.info("LQ 生成完成: comicId={}, chapterId={}, failed={}, elapsed={}ms",
                     comicId, chapterId, failedPages.size(), System.currentTimeMillis() - start);

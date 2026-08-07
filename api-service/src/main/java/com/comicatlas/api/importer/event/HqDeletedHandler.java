@@ -6,6 +6,7 @@ import com.comicatlas.api.comic.entity.Media;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.api.common.enums.HqStatus;
+import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.event.HqDeletedEvent;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
@@ -28,7 +29,7 @@ public class HqDeletedHandler {
     private final MediaMapper mediaMapper;
     private final ComicMapper comicMapper;
 
-    @RabbitListener(queues = "hq.delete.result.queue")
+    @RabbitListener(queues = MqQueues.HQ_DELETE_RESULT)
     public void handle(HqDeletedEvent event,
             Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         Long comicId = event.comicId();

@@ -10,6 +10,8 @@ import com.comicatlas.api.comic.entity.Media;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.mapper.MediaMapper;
+import com.comicatlas.common.constant.MqExchanges;
+import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.event.MetadataRefreshEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -67,7 +69,7 @@ public class MediaMetadataSyncService {
     private void publishMetadataRefresh(Long comicId, Long taskId, String source) {
         catalogCacheInvalidator.evict(comicId);
         try {
-            rabbitTemplate.convertAndSend("comic.export", "metadata.refresh.requested",
+            rabbitTemplate.convertAndSend(MqExchanges.EXPORT, MqRoutingKeys.METADATA_REFRESH_REQUESTED,
                     new MetadataRefreshEvent(null, null, comicId));
             log.info("转码后元数据同步已触发: comicId={}, taskId={}, source={}", comicId, taskId, source);
         } catch (Exception e) {

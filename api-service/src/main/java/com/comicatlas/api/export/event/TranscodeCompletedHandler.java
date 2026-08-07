@@ -2,6 +2,7 @@ package com.comicatlas.api.export.event;
 
 import com.comicatlas.api.comic.entity.Media;
 import com.comicatlas.api.comic.mapper.MediaMapper;
+import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.enums.TranscodeStatus;
 import com.comicatlas.common.event.VideoTranscodeCompletedEvent;
 import com.rabbitmq.client.Channel;
@@ -19,7 +20,7 @@ public class TranscodeCompletedHandler {
 
     private final MediaMapper mediaMapper;
 
-    @RabbitListener(queues = "video.transcode.completed.queue")
+    @RabbitListener(queues = MqQueues.VIDEO_TRANSCODE_COMPLETED)
     public void handleCompleted(VideoTranscodeCompletedEvent event,
             Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         try {

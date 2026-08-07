@@ -1,5 +1,8 @@
 package com.comicatlas.worker.event;
 
+import com.comicatlas.common.constant.MqExchanges;
+import com.comicatlas.common.constant.MqQueues;
+import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.dto.ScanItemVO;
 import com.comicatlas.common.dto.ScanResultVO;
 import com.comicatlas.common.event.DirectoryScanCompletedEvent;
@@ -26,9 +29,9 @@ import java.util.UUID;
 /**
  * 目录扫描任务处理器 — Worker 侧入口。
  * <p>
- * 监听 {@code scan.task.queue}，收到 {@link DirectoryScanRequestedEvent} 后在本机文件系统上
+ * 监听 {@link MqQueues#SCAN_TASK}，收到 {@link DirectoryScanRequestedEvent} 后在本机文件系统上
  * 校验路径存在性并遍历子目录（统计各子目录图片数），发布 {@link DirectoryScanCompletedEvent}
- * 到 {@code comic.scan} 交换器（路由键 {@code scan.completed}），由 API 侧
+ * 到 {@link MqExchanges#SCAN} 交换器（路由键 {@link MqRoutingKeys#SCAN_COMPLETED}），由 API 侧
  * {@code DirectoryScanEventHandler} 消费后保存结果。
  * <p>
  * 路径不存在/不可读等业务失败通过 {@link DirectoryScanFailedEvent} 回传，不入死信队列。
@@ -44,7 +47,7 @@ public class DirectoryScanHandler {
 
     private final RabbitTemplate rabbitTemplate;
 
-    @RabbitListener(queues = "scan.task.queue")
+    @RabbitListener(queues = MqQueues.SCAN_TASK)
     public void handle(DirectoryScanRequestedEvent event,
                        Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         Long taskId = event.taskId();
@@ -55,7 +58,7 @@ public class DirectoryScanHandler {
             ScanResultVO result = scanDirectory(dirPath);
             var completed = new DirectoryScanCompletedEvent(
                     UUID.randomUUID(), Instant.now(), taskId, result);
-            rabbitTemplate.convertAndSend("comic.scan", "scan.completed", completed);
+            rabbitTemplate.convertAndSend(MqExchanges.SCAN, MqRoutingKeys.SCAN_COMPLETED, completed);
             log.info("DirectoryScanHandler: 扫描完成, taskId={}, total={}", taskId, result.total());
         } catch (Exception e) {
             String errorMsg = e.getMessage() != null ? e.getMessage() : "扫描目录失败";
@@ -109,7 +112,7 @@ public class DirectoryScanHandler {
     private void publishFailed(Long taskId, String errorMessage) {
         var failEvent = new DirectoryScanFailedEvent(
                 UUID.randomUUID(), Instant.now(), taskId, errorMessage);
-        rabbitTemplate.convertAndSend("comic.scan", "scan.failed", failEvent);
+        rabbitTemplate.convertAndSend(MqExchanges.SCAN, MqRoutingKeys.SCAN_FAILED, failEvent);
         log.info("DirectoryScanHandler: 已发布 DirectoryScanFailedEvent, taskId={}", taskId);
     }
 

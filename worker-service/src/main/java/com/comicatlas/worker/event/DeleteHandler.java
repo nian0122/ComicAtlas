@@ -1,5 +1,8 @@
 package com.comicatlas.worker.event;
 
+import com.comicatlas.common.constant.MqExchanges;
+import com.comicatlas.common.constant.MqQueues;
+import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.event.DeleteCompletedEvent;
 import com.comicatlas.common.event.DeleteRequestedEvent;
 import com.comicatlas.worker.file.storage.StorageProperties;
@@ -31,7 +34,7 @@ public class DeleteHandler {
     private final StorageProperties storageProperties;
     private final RabbitTemplate rabbitTemplate;
 
-    @RabbitListener(queues = "delete.task.queue")
+    @RabbitListener(queues = MqQueues.DELETE_TASK)
     public void handle(DeleteRequestedEvent event,
             Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         Long comicId = event.comicId();
@@ -75,7 +78,7 @@ public class DeleteHandler {
             var completed = new DeleteCompletedEvent(
                 UUID.randomUUID(), Instant.now(), comicId,
                 deletedDirs.get(), deletedFiles.get());
-            rabbitTemplate.convertAndSend("comic.delete", "delete.completed", completed);
+            rabbitTemplate.convertAndSend(MqExchanges.DELETE, MqRoutingKeys.DELETE_COMPLETED, completed);
             channel.basicAck(tag, false);
             log.info("Delete completed: comicId={}, dirs={}, files={}, elapsed={}ms",
                 comicId, deletedDirs.get(), deletedFiles.get(), System.currentTimeMillis() - start);

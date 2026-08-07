@@ -9,6 +9,8 @@ import com.comicatlas.api.management.dto.ManagementTaskResponse;
 import com.comicatlas.api.management.entity.ManagementTask;
 import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.outbox.service.OutboxService;
+import com.comicatlas.common.constant.MqExchanges;
+import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.enums.TaskType;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -44,8 +46,8 @@ import com.comicatlas.api.management.batch.dto.BlockedBatchItem;
 @RequiredArgsConstructor
 public class BatchOperationService {
 
-    private static final String EXCHANGE = "comic.management";
-    private static final String ROUTING_REQUEST = "command.requested";
+    private static final String EXCHANGE = MqExchanges.MANAGEMENT;
+    private static final String ROUTING_REQUEST = MqRoutingKeys.COMMAND_REQUESTED;
 
     private static final Set<TaskType> DANGEROUS_OPS = Set.of(TaskType.COMIC_PURGE);
     private static final Set<TaskType> SYNC_OPS = Set.of(TaskType.METADATA_UPDATE);

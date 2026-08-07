@@ -7,6 +7,7 @@ import com.comicatlas.api.importer.entity.RecoveryTask;
 import com.comicatlas.api.importer.mapper.RecoveryTaskMapper;
 import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.management.service.ManagementTaskService;
+import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.enums.ManagementTaskStatus;
 import com.comicatlas.common.enums.TaskType;
 import com.comicatlas.common.event.ComicEvent;
@@ -50,7 +51,7 @@ public class RecoveryEventHandler {
     private static final EnumSet<RecoveryTaskStatus> TERMINAL_STATUSES = EnumSet.of(
             RecoveryTaskStatus.SUCCEEDED, RecoveryTaskStatus.FAILED, RecoveryTaskStatus.CANCELLED);
 
-    @RabbitListener(queues = "recovery.result.queue")
+    @RabbitListener(queues = MqQueues.RECOVERY_RESULT)
     public void handle(ComicEvent event,
                        Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
 

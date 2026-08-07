@@ -1,5 +1,7 @@
 package com.comicatlas.worker.event;
 
+import com.comicatlas.common.constant.MqExchanges;
+import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.event.ManagementCommandCompletedEvent;
 import com.comicatlas.common.event.ManagementCommandFailedEvent;
 import com.comicatlas.common.event.ManagementCommandProgressEvent;
@@ -29,10 +31,10 @@ public class ManagementCommandPublisher {
 
     private final RabbitTemplate rabbitTemplate;
 
-    private static final String EXCHANGE = "comic.management";
+    private static final String EXCHANGE = MqExchanges.MANAGEMENT;
 
     public void progress(ManagementCommandRequestedEvent cmd, int progress, String stage) {
-        rabbitTemplate.convertAndSend(EXCHANGE, "command.progress",
+        rabbitTemplate.convertAndSend(EXCHANGE, MqRoutingKeys.COMMAND_PROGRESS,
                 new ManagementCommandProgressEvent(UUID.randomUUID(), Instant.now(), 1,
                         cmd.taskId(), cmd.itemId(), cmd.attempt(),
                         cmd.operationType(), cmd.targetType(), cmd.targetId(),
@@ -44,7 +46,7 @@ public class ManagementCommandPublisher {
     }
 
     public void completed(ManagementCommandRequestedEvent cmd, TranscodeMediaInfo transcode) {
-        rabbitTemplate.convertAndSend(EXCHANGE, "command.completed",
+        rabbitTemplate.convertAndSend(EXCHANGE, MqRoutingKeys.COMMAND_COMPLETED,
                 new ManagementCommandCompletedEvent(UUID.randomUUID(), Instant.now(), 1,
                         cmd.taskId(), cmd.itemId(), cmd.attempt(),
                         cmd.operationType(), cmd.targetType(), cmd.targetId(),
@@ -52,7 +54,7 @@ public class ManagementCommandPublisher {
     }
 
     public void failed(ManagementCommandRequestedEvent cmd, String errorMessage) {
-        rabbitTemplate.convertAndSend(EXCHANGE, "command.failed",
+        rabbitTemplate.convertAndSend(EXCHANGE, MqRoutingKeys.COMMAND_FAILED,
                 new ManagementCommandFailedEvent(UUID.randomUUID(), Instant.now(), 1,
                         cmd.taskId(), cmd.itemId(), cmd.attempt(),
                         cmd.operationType(), cmd.targetType(), cmd.targetId(),
@@ -61,7 +63,7 @@ public class ManagementCommandPublisher {
 
     public void uploadCompleted(ManagementCommandRequestedEvent cmd,
                                 List<MediaAnalysisResult> results) {
-        rabbitTemplate.convertAndSend(EXCHANGE, "command.completed",
+        rabbitTemplate.convertAndSend(EXCHANGE, MqRoutingKeys.COMMAND_COMPLETED,
                 new MediaUploadCompletedEvent(UUID.randomUUID(), Instant.now(), 1,
                         cmd.taskId(), cmd.itemId(), cmd.attempt(),
                         cmd.operationType(), cmd.targetType(), cmd.targetId(),

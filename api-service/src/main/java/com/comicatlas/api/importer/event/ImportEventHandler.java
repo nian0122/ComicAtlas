@@ -11,6 +11,7 @@ import com.comicatlas.api.common.storage.ApiStorageProperties;
 import com.comicatlas.api.management.entity.ManagementTaskItem;
 import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.management.state.ManagementStateMachine;
+import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.enums.ManagementTaskStatus;
 import com.comicatlas.common.enums.TaskType;
 import com.comicatlas.common.event.ImportTaskCompletedEvent;
@@ -69,7 +70,7 @@ public class ImportEventHandler {
     private static final Set<ImportTaskStatus> TERMINAL_STATUSES =
             EnumSet.of(ImportTaskStatus.SUCCESS, ImportTaskStatus.FAILED, ImportTaskStatus.CANCELLED);
 
-    @RabbitListener(queues = "import.result.queue")
+    @RabbitListener(queues = MqQueues.IMPORT_RESULT)
     @SuppressWarnings("unchecked")
     public void handleComicImported(ImportTaskCompletedEvent event,
             Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
@@ -341,7 +342,7 @@ public class ImportEventHandler {
         }
     }
 
-    @RabbitListener(queues = "task.status.queue")
+    @RabbitListener(queues = MqQueues.TASK_STATUS)
     public void handleTaskStatusChanged(TaskStatusChangedEvent event,
             Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         try {
@@ -406,7 +407,7 @@ public class ImportEventHandler {
         }
     }
 
-    @RabbitListener(queues = "import.failed.queue")
+    @RabbitListener(queues = MqQueues.IMPORT_FAILED)
     public void handleImportTaskFailed(ImportTaskFailedEvent event,
             Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         Long taskId = event.taskId();

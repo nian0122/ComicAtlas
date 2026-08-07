@@ -3,6 +3,7 @@ package com.comicatlas.api.importer.event;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.common.enums.ComicStatus;
+import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.event.DeleteCompletedEvent;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
@@ -35,7 +36,7 @@ public class DeleteEventHandler {
     private final TransactionTemplate transactionTemplate;
     private final CatalogCacheInvalidator catalogCacheInvalidator;
 
-    @RabbitListener(queues = "delete.result.queue")
+    @RabbitListener(queues = MqQueues.DELETE_RESULT)
     public void handleDeleteCompleted(DeleteCompletedEvent event,
             Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         Long comicId = event.comicId();

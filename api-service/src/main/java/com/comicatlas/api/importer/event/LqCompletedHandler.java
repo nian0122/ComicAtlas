@@ -5,6 +5,7 @@ import com.comicatlas.api.comic.entity.Media;
 import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.api.common.storage.ApiStorageProperties;
 import com.comicatlas.api.common.enums.LqStatus;
+import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.event.LqCompletedEvent;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
@@ -30,7 +31,7 @@ public class LqCompletedHandler {
     private final MediaMapper mediaMapper;
     private final ApiStorageProperties storageProperties;
 
-    @RabbitListener(queues = "lq.result.queue")
+    @RabbitListener(queues = MqQueues.LQ_RESULT)
     public void handle(LqCompletedEvent event,
             Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         Long comicId = event.comicId();

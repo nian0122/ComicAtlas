@@ -1,5 +1,7 @@
 package com.comicatlas.worker.event;
 
+import com.comicatlas.common.constant.MqExchanges;
+import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.event.ImportTaskCompletedEvent;
 import com.comicatlas.common.event.TaskStatusChangedEvent;
 import lombok.RequiredArgsConstructor;
@@ -17,11 +19,11 @@ public class TaskStatusPublisher {
     public void publishStatus(Long taskId, String newStatus, int progress, String downloadMethod, long speedBytesPerSec, int etaSeconds) {
         var event = new TaskStatusChangedEvent(
             UUID.randomUUID(), Instant.now(), taskId, newStatus, progress, downloadMethod, speedBytesPerSec, etaSeconds);
-        rabbitTemplate.convertAndSend("comic.task", "status.changed", event);
+        rabbitTemplate.convertAndSend(MqExchanges.TASK, MqRoutingKeys.STATUS_CHANGED, event);
     }
 
     public void publishImported(Long taskId, Long comicId) {
         var event = new ImportTaskCompletedEvent(UUID.randomUUID(), Instant.now(), taskId, comicId, null);
-        rabbitTemplate.convertAndSend("comic.import", "task.completed", event);
+        rabbitTemplate.convertAndSend(MqExchanges.IMPORT, MqRoutingKeys.TASK_COMPLETED, event);
     }
 }
