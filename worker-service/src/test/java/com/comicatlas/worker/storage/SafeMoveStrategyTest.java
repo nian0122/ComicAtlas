@@ -1,4 +1,4 @@
-package com.comicatlas.worker.file.storage;
+package com.comicatlas.worker.storage;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

@@ -2,8 +2,8 @@ package com.comicatlas.worker.file.trash;
 
 import com.comicatlas.common.dto.TrashManifest;
 import com.comicatlas.common.dto.TrashManifestActual;
-import com.comicatlas.worker.file.storage.StorageProperties;
-import com.comicatlas.worker.file.storage.StorageRoot;
+import com.comicatlas.worker.storage.StorageProperties;
+import com.comicatlas.worker.storage.StorageRoot;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

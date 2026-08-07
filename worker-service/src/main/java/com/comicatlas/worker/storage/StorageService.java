@@ -1,4 +1,4 @@
-package com.comicatlas.worker.file.storage;
+package com.comicatlas.worker.storage;
 
 import java.nio.file.Path;
 

@@ -2,8 +2,8 @@ package com.comicatlas.worker.command;
 
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.worker.entity.ExportMedia;
-import com.comicatlas.worker.file.storage.StorageProperties;
-import com.comicatlas.worker.file.storage.StorageRoot;
+import com.comicatlas.worker.storage.StorageProperties;
+import com.comicatlas.worker.storage.StorageRoot;
 import com.comicatlas.worker.image.ImageOptimizer;
 import com.comicatlas.worker.mapper.ExportMediaMapper;
 import com.comicatlas.worker.event.ManagementCommandPublisher;

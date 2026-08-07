@@ -1,4 +1,4 @@
-package com.comicatlas.worker.file.storage;
+package com.comicatlas.worker.storage;
 
 import lombok.Data;
 import java.nio.file.Files;

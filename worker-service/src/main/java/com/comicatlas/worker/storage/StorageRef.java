@@ -1,4 +1,4 @@
-package com.comicatlas.worker.file.storage;
+package com.comicatlas.worker.storage;
 
 public record StorageRef(String rootKey, String relativePath) {
 

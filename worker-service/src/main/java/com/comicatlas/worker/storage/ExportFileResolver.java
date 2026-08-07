@@ -1,4 +1,4 @@
-package com.comicatlas.worker.file.storage;
+package com.comicatlas.worker.storage;
 
 import com.comicatlas.worker.entity.ExportMedia;
 import com.comicatlas.worker.export.ExportFileNotFoundException;
