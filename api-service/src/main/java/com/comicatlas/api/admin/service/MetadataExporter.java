@@ -4,30 +4,32 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.common.storage.ApiStorageProperties;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
-
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import com.comicatlas.api.comic.mapper.CatalogMapper;
-import com.comicatlas.api.comic.mapper.ChapterMapper;
-import com.comicatlas.api.comic.mapper.ComicMapper;
-import com.comicatlas.api.comic.mapper.ComicTagMapper;
-import com.comicatlas.api.comic.mapper.MediaMapper;
-import com.comicatlas.api.comic.mapper.TagMapper;
 import com.comicatlas.api.comic.entity.Catalog;
 import com.comicatlas.api.comic.entity.Chapter;
 import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.entity.ComicTag;
 import com.comicatlas.api.comic.entity.Media;
 import com.comicatlas.api.comic.entity.Tag;
+import com.comicatlas.api.comic.mapper.CatalogMapper;
+import com.comicatlas.api.comic.mapper.ChapterMapper;
+import com.comicatlas.api.comic.mapper.ComicMapper;
+import com.comicatlas.api.comic.mapper.ComicTagMapper;
+import com.comicatlas.api.comic.mapper.MediaMapper;
+import com.comicatlas.api.comic.mapper.TagMapper;
+import com.comicatlas.common.metadata.MetadataJsonBuilder;
+import com.comicatlas.common.metadata.MetadataV3;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Component
@@ -40,12 +42,12 @@ public class MetadataExporter {
     private final MediaMapper mediaMapper;
     private final ComicTagMapper comicTagMapper;
     private final TagMapper tagMapper;
-    private final ObjectMapper objectMapper;
+    private final MetadataJsonBuilder metadataJsonBuilder;
     private final ApiStorageProperties storageProperties;
 
     /**
      * 将漫画的全量元数据（catalog、chapter、page）导出为 metadata JSON 文件，
-     * 格式与 DirectoryImportHandler.writeMetadata() 一致。
+     * v3 格式由共享 MetadataJsonBuilder 构建（与 worker 侧一致）。
      *
      * @param comicId 漫画 ID
      * @return 写入的 metadata JSON 文件路径
@@ -85,25 +87,22 @@ public class MetadataExporter {
                         .eq(Chapter::getComicId, comicId)
                         .orderByAsc(Chapter::getGlobalOrder));
 
-        // 4-5. 组装 comic 元数据
-        Map<String, Object> comicMap = new LinkedHashMap<>();
-        comicMap.put("title", comic.getTitle() != null ? comic.getTitle() : "");
-        comicMap.put("author", comic.getAuthor() != null ? comic.getAuthor() : "");
-        comicMap.put("category", comic.getCategory() != null ? comic.getCategory() : "");
-        comicMap.put("tags", tagNames);
+        // 4-5. 组装 MetadataV3（api 特有：comic 带 category/tags，media 过滤无效文件名）
+        MetadataV3.Comic comicInfo = new MetadataV3.Comic(
+                comic.getTitle() != null ? comic.getTitle() : "",
+                comic.getAuthor() != null ? comic.getAuthor() : "",
+                comic.getCategory() != null ? comic.getCategory() : "",
+                tagNames);
 
-        // 组装 catalogs 列表
-        List<Map<String, Object>> catalogList = new ArrayList<>();
+        List<MetadataV3.Catalog> catalogList = new ArrayList<>();
         for (Catalog cat : catalogs) {
-            Map<String, Object> catalogMap = new LinkedHashMap<>();
-            catalogMap.put("title", cat.getTitle());
-            catalogMap.put("sortOrder", cat.getSortOrder() != null ? cat.getSortOrder() : 0);
-            catalogMap.put("parentIndex", cat.getParentId() != null ? catalogIdToIndex.get(cat.getParentId()) : null);
-            catalogList.add(catalogMap);
+            catalogList.add(new MetadataV3.Catalog(
+                    cat.getTitle(),
+                    cat.getSortOrder() != null ? cat.getSortOrder() : 0,
+                    cat.getParentId() != null ? catalogIdToIndex.get(cat.getParentId()) : null));
         }
 
-        // 组装 chapters 列表
-        List<Map<String, Object>> chapterList = new ArrayList<>();
+        List<MetadataV3.Chapter> chapterList = new ArrayList<>();
         for (Chapter chapter : chapters) {
             // 4. For each chapter: SELECT pages ordered by pageNumber
             List<Media> mediaItems = mediaMapper.selectList(
@@ -111,9 +110,8 @@ public class MetadataExporter {
                             .eq(Media::getChapterId, chapter.getId())
                             .orderByAsc(Media::getPageNumber));
 
-            List<Map<String, Object>> mediaItemList = new ArrayList<>();
+            List<MetadataV3.MediaItem> mediaItemList = new ArrayList<>();
             for (Media media : mediaItems) {
-                Map<String, Object> mediaMap = new LinkedHashMap<>();
                 String hqPath = media.getHqPath();
                 String fileName = "";
                 if (hqPath != null && hqPath.contains("/")) {
@@ -123,43 +121,32 @@ public class MetadataExporter {
                 if (fileName.isEmpty() || "null".equals(fileName)) {
                     continue;
                 }
-                mediaMap.put("fileName", fileName);
-                mediaMap.put("mediaType", media.getMediaType() != null ? media.getMediaType() : "IMAGE");
-                mediaMap.put("pageNumber", media.getPageNumber());
-                mediaMap.put("hqStatus", media.getHqStatus() != null ? media.getHqStatus().name() : "READY");
-                mediaMap.put("lqStatus", media.getLqStatus() != null ? media.getLqStatus().name() : "NOT_GENERATED");
-                mediaMap.put("fileSize", media.getFileSize() != null ? media.getFileSize() : 0);
-                if (media.getWidth() != null) { mediaMap.put("width", media.getWidth()); }
-                if (media.getHeight() != null) { mediaMap.put("height", media.getHeight()); }
-                if (media.getDuration() != null) { mediaMap.put("duration", media.getDuration()); }
-                if (media.getContainer() != null) { mediaMap.put("container", media.getContainer()); }
-                if (media.getVideoCodec() != null) { mediaMap.put("videoCodec", media.getVideoCodec()); }
-                if (media.getAudioCodec() != null) { mediaMap.put("audioCodec", media.getAudioCodec()); }
-                mediaItemList.add(mediaMap);
+                mediaItemList.add(new MetadataV3.MediaItem(
+                        fileName,
+                        media.getPageNumber() != null ? media.getPageNumber() : 0,
+                        media.getHqStatus() != null ? media.getHqStatus().name() : "READY",
+                        media.getLqStatus() != null ? media.getLqStatus().name() : "NOT_GENERATED",
+                        media.getFileSize() != null ? media.getFileSize() : 0,
+                        media.getMediaType() != null ? media.getMediaType() : "IMAGE",
+                        media.getWidth(), media.getHeight(), media.getDuration(),
+                        media.getContainer(), media.getVideoCodec(), media.getAudioCodec()));
             }
-
-            Map<String, Object> chapterMap = new LinkedHashMap<>();
-            chapterMap.put("title", chapter.getTitle());
-            chapterMap.put("chapterNo", chapter.getChapterNo() != null ? chapter.getChapterNo() : "");
-            chapterMap.put("sortOrder", chapter.getSortOrder() != null ? chapter.getSortOrder() : 0);
-            chapterMap.put("globalOrder", chapter.getGlobalOrder() != null ? chapter.getGlobalOrder() : 0);
-            chapterMap.put("catalogIndex", chapter.getCatalogId() != null ? catalogIdToIndex.get(chapter.getCatalogId()) : null);
-            chapterMap.put("sourceDir", "");
-            chapterMap.put("mediaItems", mediaItemList);
-            chapterList.add(chapterMap);
+            chapterList.add(new MetadataV3.Chapter(
+                    chapter.getTitle(),
+                    chapter.getChapterNo() != null ? chapter.getChapterNo() : "",
+                    chapter.getSortOrder() != null ? chapter.getSortOrder() : 0,
+                    chapter.getGlobalOrder() != null ? chapter.getGlobalOrder() : 0,
+                    chapter.getCatalogId() != null ? catalogIdToIndex.get(chapter.getCatalogId()) : null,
+                    mediaItemList));
         }
 
-        // 6. 组装根结构，匹配 DirectoryImportHandler.writeMetadata() 格式
-        Map<String, Object> root = new LinkedHashMap<>();
-        root.put("version", 3);
-        root.put("comic", comicMap);
-        root.put("catalogs", catalogList);
-        root.put("chapters", chapterList);
+        MetadataV3 v3 = new MetadataV3(comicInfo, catalogList, chapterList);
+        String json = metadataJsonBuilder.build(v3);
 
-        // 7. 写入 METADATA 存储根下的 metadata JSON
+        // 6. 写入 METADATA 存储根下的 metadata JSON
         Path metaPath = storageProperties.root("METADATA").resolve(comicId + ".json");
         Files.createDirectories(metaPath.getParent());
-        objectMapper.writerWithDefaultPrettyPrinter().writeValue(metaPath.toFile(), root);
+        Files.writeString(metaPath, json, StandardCharsets.UTF_8);
         log.info("Metadata exported: comicId={}, path={}", comicId, metaPath);
         return metaPath;
     }
