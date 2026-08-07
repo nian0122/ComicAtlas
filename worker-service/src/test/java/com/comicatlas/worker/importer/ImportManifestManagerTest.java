@@ -1,4 +1,4 @@
-package com.comicatlas.worker.file.manifest;
+package com.comicatlas.worker.importer;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;

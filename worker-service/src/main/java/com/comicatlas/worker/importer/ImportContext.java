@@ -1,4 +1,4 @@
-package com.comicatlas.worker.file.parse;
+package com.comicatlas.worker.importer;
 
 import java.nio.file.Path;
 

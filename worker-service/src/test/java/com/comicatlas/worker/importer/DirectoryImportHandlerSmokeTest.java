@@ -1,4 +1,4 @@
-package com.comicatlas.worker.file.handler;
+package com.comicatlas.worker.importer;
 
 /**
  * Smoke test for DirectoryImportHandler — 已由 DirectoryImportResumeTest 替代。
