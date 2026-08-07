@@ -1,4 +1,4 @@
-package com.comicatlas.worker.export;
+package com.comicatlas.worker.common;
 
 import java.util.regex.Pattern;
 

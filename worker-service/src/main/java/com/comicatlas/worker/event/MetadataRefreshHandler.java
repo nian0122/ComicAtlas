@@ -3,8 +3,7 @@ package com.comicatlas.worker.event;
 import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.event.MetadataRefreshEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
-import com.comicatlas.worker.export.ExportCollectResult;
-import com.comicatlas.worker.export.ExportCollector;
+import com.comicatlas.worker.export.MetadataJsonExporter;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,7 +22,7 @@ import java.nio.file.Path;
 @RequiredArgsConstructor
 public class MetadataRefreshHandler {
 
-    private final ExportCollector exportCollector;
+    private final MetadataJsonExporter metadataJsonExporter;
     @Value("${worker.manga-root}")
     private String mangaRoot;
     private final MqConsumerSupport mqConsumerSupport;
@@ -34,15 +33,11 @@ public class MetadataRefreshHandler {
         Long comicId = event.comicId();
         mqConsumerSupport.consume(channel, tag, "元数据刷新: comicId=" + comicId, () -> {
             log.info("收到 metadata 刷新请求: comicId={}", comicId);
-
-            ExportCollectResult result = exportCollector.collect(comicId);
-            String metadataJson = result.metadataJson();
-
+            String metadataJson = metadataJsonExporter.exportJson(comicId);
             Path metadataDir = Path.of(mangaRoot, "metadata");
             Files.createDirectories(metadataDir);
             Path metadataFile = metadataDir.resolve(comicId + ".json");
             Files.writeString(metadataFile, metadataJson, StandardCharsets.UTF_8);
-
             long fileSize = Files.size(metadataFile);
             log.info("metadata.json 写入完成: comicId={}, path={}, size={} bytes",
                     comicId, metadataFile, fileSize);

@@ -3,6 +3,7 @@ package com.comicatlas.worker.export;
 import com.comicatlas.worker.entity.ExportChapter;
 import com.comicatlas.worker.entity.ExportComic;
 import com.comicatlas.worker.entity.ExportMedia;
+import com.comicatlas.worker.file.storage.ExportFileResolver;
 import com.comicatlas.worker.file.storage.StorageProperties;
 import com.comicatlas.worker.file.storage.StorageRef;
 import com.comicatlas.worker.file.storage.StorageRoot;
