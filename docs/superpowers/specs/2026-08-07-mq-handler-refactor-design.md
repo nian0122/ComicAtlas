@@ -62,16 +62,26 @@ public class MqConsumerSupport {
     /** 标准消费：成功 ack；业务异常 reject 进 DLQ；中断恢复标志且不 reject。 */
     public void consume(Channel channel, long tag, String label, ConsumeAction action);
 
-    /** 带失败回调：失败先执行 onFailure（发失败事件/更新状态），再 reject。 */
+    /** 带失败回调：失败先执行 onFailure（发失败事件/更新状态），再按默认策略 reject 进 DLQ。 */
     public void consume(Channel channel, long tag, String label, ConsumeAction action, ConsumeAction onFailure);
 
-    /** 完整变体：requeueOnFailure=true 时失败 requeue 而非进 DLQ（取消类消息用）。 */
+    /** 完整变体：显式指定失败策略。 */
     public void consume(Channel channel, long tag, String label, ConsumeAction action,
-                        ConsumeAction onFailure, boolean requeueOnFailure);
+                        ConsumeAction onFailure, FailurePolicy failurePolicy);
 
     @FunctionalInterface
     public interface ConsumeAction {
         void run() throws Exception;
+    }
+
+    /** 消费失败策略（业务异常时）。 */
+    public enum FailurePolicy {
+        /** 默认：reject(requeue=false) → 进 DLQ，任务类消费失败 */
+        REJECT_TO_DLQ,
+        /** reject(requeue=true) → 原队列重试，取消类消息不能丢 */
+        REQUEUE,
+        /** 失败回调后 ack：失败事件即业务结果，不重试不进 DLQ */
+        ACK_AFTER_CALLBACK
     }
 }
 ```
@@ -81,9 +91,11 @@ public class MqConsumerSupport {
 | 场景 | 行为 |
 |------|------|
 | 业务成功 | `basicAck(tag, false)` + 完成日志（label） |
-| 业务异常 | 失败日志（保留 cause 占位符，不拼接）→ `onFailure` 回调（异常单独捕获记录，不掩盖原始异常）→ `basicReject(tag, requeueOnFailure)` |
-| 中断 | `Thread.currentThread().interrupt()` + 结束任务，**不 reject、不执行 onFailure** |
-| reject 本身失败 | 单独捕获，warn 日志（同现状） |
+| 业务异常 + REJECT_TO_DLQ | 失败日志（保留 cause）→ `onFailure` 回调（异常单独捕获记录，不掩盖原始异常）→ `basicReject(tag, false)` |
+| 业务异常 + REQUEUE | 同上，`basicReject(tag, true)`（原队列重试） |
+| 业务异常 + ACK_AFTER_CALLBACK | `onFailure` 回调（发失败事件）→ `basicAck(tag, false)`（失败事件即结果） |
+| 中断 | `Thread.currentThread().interrupt()` + 结束任务，**不 reject、不执行 onFailure、不 ack** |
+| ack/reject 本身失败 | 单独捕获，warn 日志（同现状） |
 
 ### 4.2 `ImportTaskHandler.handle` 重构（switch 收敛 + 方法拆分）
 
@@ -149,24 +161,26 @@ private void routeToHandler(String sourceType, String sourcePath, Long taskId, L
 
 **worker 侧（12 类）**:
 
-| Handler | onFailure | requeue | 备注 |
-|---------|-----------|---------|------|
-| ImportTaskHandler | publishStatus(FAILED) | false | 前置取消检查保留在 handle |
-| CancelHandler | 无 | **true** | 取消意图不能丢：Redis 故障应 requeue 重试而非进 DLQ |
-| LqGenerateHandler | 无 | false | 标准 |
-| HqDeleteHandler | 无 | false | 标准 |
-| DeleteHandler | 无 | false | 标准 |
-| RecoveryTaskHandler | 发 recovery.failed | false | 按现状 catch 逻辑映射 |
-| VideoTranscodeHandler | 发 VIDEO_TRANSCODE_FAILED | false | 临时文件清理留在 action 内 try-finally |
-| VideoMetadataFixHandler | 发 fix.completed(带错误) | false | 实施时按现状 catch 确认 |
-| MetadataRefreshHandler | 无 | false | 标准 |
-| ExportTaskHandler | 发 task.failed | false | 按现状 catch 确认 |
-| DirectoryScanHandler | 发 scan.failed | false | 按现状 catch 确认 |
-| ManagementCommandDispatcher | 无 | false | 标准 |
+| Handler | onFailure | FailurePolicy | 备注 |
+|---------|-----------|---------------|------|
+| ImportTaskHandler | publishStatus(FAILED) | REJECT_TO_DLQ | 前置取消检查保留在 handle |
+| CancelHandler | 无 | **REQUEUE** | 取消意图不能丢：Redis 故障应 requeue 重试而非进 DLQ |
+| LqGenerateHandler | 无 | REJECT_TO_DLQ | 标准 |
+| HqDeleteHandler | 无 | REJECT_TO_DLQ | 标准 |
+| DeleteHandler | 无 | REJECT_TO_DLQ | 标准 |
+| RecoveryTaskHandler | publishFailed(taskId, msg) | **ACK_AFTER_CALLBACK** | 现状 catch → publishFailed + ack：失败事件即结果 |
+| VideoTranscodeHandler | 发 VIDEO_TRANSCODE_FAILED | REJECT_TO_DLQ | 临时文件清理留在 action 内 try-finally |
+| VideoMetadataFixHandler | 无 | REJECT_TO_DLQ | 现状 catch 仅 log + reject，无失败事件 |
+| MetadataRefreshHandler | 无 | REJECT_TO_DLQ | 标准 |
+| ExportTaskHandler | 发 TASK_FAILED（classifyExportError） | REJECT_TO_DLQ | 失败事件后 reject |
+| DirectoryScanHandler | publishFailed(taskId, msg) | **ACK_AFTER_CALLBACK** | 现状 catch → publishFailed + ack：失败事件即结果 |
+| ManagementCommandDispatcher | 无 | REJECT_TO_DLQ | 标准 |
 
-**api 侧（13 类 / 15 消费者）**: `ImportEventHandler`（3 个消费者）、`LqCompletedHandler`、`HqDeletedHandler`、`DeleteEventHandler`、`RecoveryEventHandler`、`DirectoryScanEventHandler`、`ManagementCommandResultHandler`、`VideoMetadataFixCompletedHandler`、`ExportStartedHandler`、`ExportCompletedHandler`、`ExportFailedHandler`、`TranscodeCompletedHandler`、`TranscodeFailedHandler` — 全部为标准模式（无 onFailure，requeue=false）。
+**api 侧（13 类 / 15 消费者）**: `ImportEventHandler`（3 个消费者）、`LqCompletedHandler`、`HqDeletedHandler`、`DeleteEventHandler`、`RecoveryEventHandler`、`DirectoryScanEventHandler`、`ManagementCommandResultHandler`、`ExportStartedHandler`、`ExportCompletedHandler`、`ExportFailedHandler`、`TranscodeCompletedHandler`、`TranscodeFailedHandler` — 全部为标准模式（无 onFailure，REJECT_TO_DLQ）。
 
-> 实施说明：每个 handler 的 onFailure/requeue 参数**以现有 catch 块行为为准**逐一手工映射，禁止臆造新行为；`VideoTranscodeHandler` 的 finally 清理移入 action 内部 try-finally。
+特殊：`VideoMetadataFixCompletedHandler` 现状 catch 用 `basicNack(tag, false, false)`（等价 requeue=false 的 reject），映射为 **REJECT_TO_DLQ**（无 onFailure）。
+
+> 实施说明：每个 handler 的 onFailure/FailurePolicy 参数**以现有 catch 块行为为准**逐一手工映射（上表已确认），禁止臆造新行为；`VideoTranscodeHandler` 的 finally 清理移入 action 内部 try-finally；`RecoveryTaskHandler`/`DirectoryScanHandler` 迁移后删除各自的私有 `ack()`/`publishFailed()` 辅助方法（逻辑由模板承载）。
 
 ### 4.4 依赖变更
 
@@ -183,12 +197,14 @@ private void routeToHandler(String sourceType, String sourcePath, Long taskId, L
 
 ## 5. 测试策略
 
-1. **新增 `MqConsumerSupportTest`**（comic-common 或 worker-service 单测）：
-   - 业务成功 → ack 调用，无 reject
-   - 业务异常 → onFailure 执行 + reject
-   - 中断 → 恢复标志、不 reject、不执行 onFailure
-   - `requeueOnFailure=true` → reject 带 requeue=true
-   - onFailure 自身抛异常 → 不影响原始异常与 reject
+1. **新增 `MqConsumerSupportTest`**（comic-common 单测，mock Channel）：
+   - 业务成功 → `basicAck` 调用，无 reject
+   - 业务异常 + REJECT_TO_DLQ → onFailure 执行 + `basicReject(tag, false)`
+   - 业务异常 + REQUEUE → onFailure 执行 + `basicReject(tag, true)`
+   - 业务异常 + ACK_AFTER_CALLBACK → onFailure 执行 + `basicAck(tag, false)`，无 reject
+   - 中断 → 恢复中断标志、不 ack、不 reject、不执行 onFailure
+   - onFailure 自身抛异常 → 不影响原始异常处理（reject 仍执行）
+   - ack/reject 抛异常 → warn 日志，不向上传播
 2. **回归**：`VideoTranscodeHandlerTest`、`TranscodeCommandHandlerTest`、`ImportServiceTest` 等现有测试全部通过。
 3. **全链路**：`api-service` + `worker-service` 编译 + worker 全量测试（48）+ api 契约测试（RabbitTopologyIT 等）。
 
@@ -196,9 +212,11 @@ private void routeToHandler(String sourceType, String sourcePath, Long taskId, L
 
 | 风险 | 缓解 |
 |------|------|
-| 迁移遗漏 handler 的特定 catch 行为 | 每个 handler 迁移时对照原 catch 块，onFailure/requeue 手工映射 |
+| 迁移遗漏 handler 的特定 catch 行为 | 上表已按现有 catch 块逐一确认 onFailure/FailurePolicy，禁止臆造 |
 | 中断语义变化（原来 reject 的现在不 reject） | 这是**修复**而非回归：符合阿里规范；受影响 handler（LqCompletedHandler 等）测试覆盖 |
-| CancelHandler requeue 行为与现状差异 | 现状 set 失败即抛异常由容器 requeue，模板 requeue=true 语义等价 |
+| CancelHandler 行为与现状差异 | 现状 set 失败即抛异常由容器 requeue，模板 REQUEUE 策略语义等价 |
+| RecoveryTaskHandler/DirectoryScanHandler 从"失败 ack"迁到 ACK_AFTER_CALLBACK | 语义完全保留（onFailure 发失败事件 + ack），仅消除手写样板 |
+| VideoMetadataFixCompletedHandler 的 basicNack 语义 | basicNack(tag,false,false) ≡ basicReject(tag,false)，REJECT_TO_DLQ 等价 |
 | comic-common 新增依赖 | 仅 amqp-client（轻量，BOM 管理版本），不引入 spring-amqp |
 
 ## 7. 排除项（YAGNI）
