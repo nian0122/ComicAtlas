@@ -8,6 +8,7 @@ import com.comicatlas.common.dto.ScanResultVO;
 import com.comicatlas.common.event.DirectoryScanCompletedEvent;
 import com.comicatlas.common.event.DirectoryScanFailedEvent;
 import com.comicatlas.common.event.DirectoryScanRequestedEvent;
+import com.comicatlas.common.mq.MqConsumerSupport;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -46,26 +47,24 @@ public class DirectoryScanHandler {
     private static final Set<String> IMAGE_EXT = Set.of(".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp");
 
     private final RabbitTemplate rabbitTemplate;
+    private final MqConsumerSupport mqConsumerSupport;
 
     @RabbitListener(queues = MqQueues.SCAN_TASK)
-    public void handle(DirectoryScanRequestedEvent event,
-                       Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
+    public void handle(DirectoryScanRequestedEvent event, Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         Long taskId = event.taskId();
         String dirPath = event.directoryPath();
         log.info("DirectoryScanHandler: 接收扫描请求, taskId={}, directoryPath={}", taskId, dirPath);
+        mqConsumerSupport.consume(channel, tag, "目录扫描: taskId=" + taskId,
+                () -> scanAndPublish(taskId, dirPath),
+                e -> publishFailed(taskId, e.getMessage()),
+                MqConsumerSupport.FailurePolicy.ACK_AFTER_CALLBACK);
+    }
 
-        try {
-            ScanResultVO result = scanDirectory(dirPath);
-            var completed = new DirectoryScanCompletedEvent(
-                    UUID.randomUUID(), Instant.now(), taskId, result);
-            rabbitTemplate.convertAndSend(MqExchanges.SCAN, MqRoutingKeys.SCAN_COMPLETED, completed);
-            log.info("DirectoryScanHandler: 扫描完成, taskId={}, total={}", taskId, result.total());
-        } catch (Exception e) {
-            String errorMsg = e.getMessage() != null ? e.getMessage() : "扫描目录失败";
-            log.error("DirectoryScanHandler: 扫描失败, taskId={}, error={}", taskId, errorMsg, e);
-            publishFailed(taskId, errorMsg);
-        }
-        ack(channel, tag);
+    private void scanAndPublish(Long taskId, String dirPath) throws Exception {
+        ScanResultVO result = scanDirectory(dirPath);
+        rabbitTemplate.convertAndSend(MqExchanges.SCAN, MqRoutingKeys.SCAN_COMPLETED,
+                new DirectoryScanCompletedEvent(UUID.randomUUID(), Instant.now(), taskId, result));
+        log.info("DirectoryScanHandler: 扫描完成, taskId={}, total={}", taskId, result.total());
     }
 
     private ScanResultVO scanDirectory(String dirPath) {
@@ -114,13 +113,5 @@ public class DirectoryScanHandler {
                 UUID.randomUUID(), Instant.now(), taskId, errorMessage);
         rabbitTemplate.convertAndSend(MqExchanges.SCAN, MqRoutingKeys.SCAN_FAILED, failEvent);
         log.info("DirectoryScanHandler: 已发布 DirectoryScanFailedEvent, taskId={}", taskId);
-    }
-
-    private void ack(Channel channel, long tag) {
-        try {
-            channel.basicAck(tag, false);
-        } catch (Exception e) {
-            log.error("DirectoryScanHandler: ack 失败, tag={}", tag, e);
-        }
     }
 }

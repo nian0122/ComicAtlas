@@ -1,6 +1,7 @@
 package com.comicatlas.worker.event;
 
 import com.comicatlas.common.event.CancelTaskEvent;
+import com.comicatlas.common.mq.MqConsumerSupport;
 import com.rabbitmq.client.Channel;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,7 +40,7 @@ class CancelHandlerTest {
         @SuppressWarnings("unchecked")
         ValueOperations<String, String> ops = mock(ValueOperations.class);
         when(redisTemplate.opsForValue()).thenReturn(ops);
-        CancelHandler handler = new CancelHandler(redisTemplate);
+        CancelHandler handler = new CancelHandler(redisTemplate, new MqConsumerSupport());
 
         CancelTaskEvent event = new CancelTaskEvent(UUID.randomUUID(), Instant.now(), 123L, 1L);
         handler.handle(event, channel, 7L);
@@ -53,7 +54,7 @@ class CancelHandlerTest {
     @Test
     void isCancelled_readsRedis() {
         when(redisTemplate.hasKey("import:cancel:456")).thenReturn(true, false);
-        CancelHandler handler = new CancelHandler(redisTemplate);
+        CancelHandler handler = new CancelHandler(redisTemplate, new MqConsumerSupport());
 
         assertTrue(handler.isCancelled(456L));
         assertFalse(handler.isCancelled(456L));

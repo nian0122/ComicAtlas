@@ -6,6 +6,7 @@ import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.event.VideoTranscodeCompletedEvent;
 import com.comicatlas.common.event.VideoTranscodeFailedEvent;
 import com.comicatlas.common.event.VideoTranscodeRequestedEvent;
+import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.process.ExternalProcessRunner;
 import com.rabbitmq.client.Channel;
@@ -37,6 +38,7 @@ public class VideoTranscodeHandler {
     private final RabbitTemplate rabbitTemplate;
     private final WorkerConfig config;
     private final ExternalProcessRunner processRunner;
+    private final MqConsumerSupport mqConsumerSupport;
 
     private static final List<String> FFMPEG_ARGS = List.of(
         "-c:v", "libx264", "-crf", "23", "-preset", "medium",
@@ -44,12 +46,19 @@ public class VideoTranscodeHandler {
     );
 
     @RabbitListener(queues = MqQueues.VIDEO_TRANSCODE)
-    public void handle(VideoTranscodeRequestedEvent event,
-            Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
+    public void handle(VideoTranscodeRequestedEvent event, Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         Long pageId = event.pageId();
         Long comicId = event.comicId();
         log.info("视频转码开始: pageId={}, comicId={}, container={}", pageId, comicId, event.container());
+        mqConsumerSupport.consume(channel, tag, "视频转码: pageId=" + pageId,
+                () -> transcodeAndPublish(event),
+                e -> publishFailed(event, e),
+                MqConsumerSupport.FailurePolicy.REJECT_TO_DLQ);
+    }
 
+    private void transcodeAndPublish(VideoTranscodeRequestedEvent event) throws Exception {
+        Long pageId = event.pageId();
+        Long comicId = event.comicId();
         Path hqFile = null;
         Path tempFile = null;
         try {
@@ -113,21 +122,6 @@ public class VideoTranscodeHandler {
             rabbitTemplate.convertAndSend(MqExchanges.VIDEO, MqRoutingKeys.VIDEO_TRANSCODE_COMPLETED,
                 new VideoTranscodeCompletedEvent(UUID.randomUUID(), Instant.now(),
                     pageId, comicId, newHqPath, "mp4", "h264", "aac", fileSize));
-
-            channel.basicAck(tag, false);
-
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            log.warn("视频转码被中断: pageId={}", pageId);
-            // 非业务失败：不发送 failed 事件，由监听器容器感知中断状态
-        } catch (Exception e) {
-            log.error("视频转码失败: pageId={}", pageId, e);
-            rabbitTemplate.convertAndSend(MqExchanges.VIDEO, MqRoutingKeys.VIDEO_TRANSCODE_FAILED,
-                new VideoTranscodeFailedEvent(UUID.randomUUID(), Instant.now(),
-                    pageId, comicId, e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName()));
-            try {
-                channel.basicReject(tag, false);
-            } catch (Exception ex) { log.warn("消息 reject 失败: tag={}", tag, ex); }
         } finally {
             // 清理临时文件
             if (tempFile != null) {
@@ -136,6 +130,13 @@ public class VideoTranscodeHandler {
                 } catch (Exception ex) { log.warn("清理转码临时文件失败: {}", tempFile, ex); }
             }
         }
+    }
+
+    private void publishFailed(VideoTranscodeRequestedEvent event, Exception failure) {
+        rabbitTemplate.convertAndSend(MqExchanges.VIDEO, MqRoutingKeys.VIDEO_TRANSCODE_FAILED,
+                new VideoTranscodeFailedEvent(UUID.randomUUID(), Instant.now(),
+                        event.pageId(), event.comicId(),
+                        failure.getMessage() != null ? failure.getMessage() : failure.getClass().getSimpleName()));
     }
 
     private List<String> buildFfmpegCommand(String ffmpegPath, String input, String output) {
