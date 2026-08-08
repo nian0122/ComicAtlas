@@ -645,7 +645,7 @@ DELETE /api/media/{mediaId}                       # 媒体回收（MEDIA_TRASH�
 GET /api/management/outbox/stats
 ```
 
-响应 `OutboxStats`：`{ "pending": 0, "failed": 0, "total": 120 }`，用于监控消息积压。
+响应 `OutboxStatsDTO`：`{ "pending": 0, "failed": 0, "total": 120 }`，用于监控消息积压。
 
 ---
 

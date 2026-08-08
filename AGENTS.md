@@ -14,7 +14,7 @@ Spring Boot 3 + Vue3 + RabbitMQ + MySQL + Redis。
 comic-atlas/
 ├── api-service/             # 漫画CRUD + 导入 + Catalog + Reader + LQ/HQ删除 + MQ消费（Flyway 迁移在 src/main/resources/db/）
 ├── worker-service/          # 文件处理 + MQ消费 + 下载 + 解压 + 导入 + LQ/HQ删除 + ffprobe（模块化：config/event/command/importer/media/storage/export/file/process/image）
-├── comic-common/            # 共享事件 DTO（37 个 record + ComicEvent sealed interface，Jackson 多态序列化）+ 常量/枚举/MQ 模板/metadata 构建/工具（constant/dto/enums/event/metadata/mq/util）
+├── comic-common/            # 共享事件 DTO（35 个事件 record + ComicEvent sealed interface + payload 数据载体，Jackson 多态序列化）+ MQ 契约/元数据/工具（constant/dto/event/metadata/mq/util）
 ├── gateway/                 # Spring Cloud Gateway: 路由 + Nacos发现
 ├── frontend/                # Vue3/Vite: 列表 + 详情 + 阅读器 + 管理后台 + 存储管理
 ├── scripts/                 # dev/qa/db/release 开发与运维脚本（入口 scripts/dev/start-dev.ps1）
@@ -47,13 +47,13 @@ comic-atlas/
 | 恢复事件处理 | `api-service/.../event/RecoveryEventHandler.java` | 消费 MQ 事件，逐本调用 RecoveryEngine |
 | 恢复引擎 | `api-service/.../recovery/RecoveryEngine.java` | 单本漫画的 DB 恢复逻辑 |
 | Worker 恢复入口 | `worker-service/.../event/RecoveryTaskHandler.java` | 扫描 HQ 目录，发布 comicId 列表 |
-| 事件 DTO | `comic-common/.../event/` | 37 个 record + ComicEvent sealed interface（含各域事件） |
+| 事件 DTO | `comic-common/.../event/` | 35 个事件 record + ComicEvent sealed interface + payload/（数据载体） |
 | MQ 常量 | `comic-common/.../constant/` | MqExchanges/MqQueues/MqRoutingKeys（exchange/queue/routingKey 契约） |
 | 元数据构建 | `comic-common/.../metadata/` | MetadataV3/MetadataJsonBuilder（V3 元数据模型） |
 | MQ 消费支持 | `comic-common/.../mq/` | MqConsumerSupport（统一 ACK/Reject/DLQ 策略） |
 | 工具类 | `comic-common/.../util/` | ImageDimensionsReader（图片尺寸读取） |
-| 枚举 | `comic-common/.../enums/` | TaskType/TaskStage/ManagementTaskStatus/TranscodeStatus 等 |
-| DTO | `comic-common/.../dto/` | ScanItemVO/ScanResultVO/TrashManifest/OutboxStats 等 |
+| DTO | `comic-common/.../dto/` | ScanItemDTO/ScanResultDTO/TrashManifestDTO/TrashManifestItemDTO/OutboxStatsDTO 等 |
+| 枚举 | `api-service/.../common/enums/` | TaskType/TaskStage/ManagementTaskStatus/TranscodeStatus 等（仅 api 消费） |
 | Worker 入口 | `worker-service/.../event/ImportTaskHandler.java` | sourceType 路由到统一 handler |
 | 取消任务 | `worker-service/.../event/CancelHandler.java` | ConcurrentHashMap 标记 |
 | LQ 生成 | `worker-service/.../event/LqGenerateHandler.java` | 调用 ImageOptimizer 外部工具 |
