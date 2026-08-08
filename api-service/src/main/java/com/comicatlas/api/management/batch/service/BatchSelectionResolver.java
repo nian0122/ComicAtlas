@@ -31,7 +31,7 @@ public class BatchSelectionResolver {
             return dedupSorted(ids.getIds());
         }
         if (selection instanceof BatchSelectionVO.Filter filter) {
-            List<Long> matched = comicMapper.selectBatchIds(filter.getQuery(), limit);
+            List<Long> matched = comicMapper.selectIdsByQuery(filter.getQuery(), limit);
             Set<Long> excluded = new LinkedHashSet<>(
                     filter.getExcludedIds() == null ? List.of() : filter.getExcludedIds());
             return matched.stream()

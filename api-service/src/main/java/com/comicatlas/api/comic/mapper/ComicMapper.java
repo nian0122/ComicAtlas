@@ -156,6 +156,6 @@ public interface ComicMapper extends BaseMapper<Comic> {
         LIMIT #{limit}
         </script>
     """)
-    List<Long> selectBatchIds(@Param("query") com.comicatlas.api.comic.dto.ComicListQuery query,
-                              @Param("limit") int limit);
+    List<Long> selectIdsByQuery(@Param("query") com.comicatlas.api.comic.dto.ComicListQuery query,
+                                @Param("limit") int limit);
 }
