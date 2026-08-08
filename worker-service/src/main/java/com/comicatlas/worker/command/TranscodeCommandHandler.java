@@ -1,7 +1,7 @@
 package com.comicatlas.worker.command;
 
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
-import com.comicatlas.common.event.TranscodeMediaInfo;
+import com.comicatlas.common.event.payload.TranscodeMediaInfo;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.entity.ExportMedia;
 import com.comicatlas.worker.media.ComicMetadata;

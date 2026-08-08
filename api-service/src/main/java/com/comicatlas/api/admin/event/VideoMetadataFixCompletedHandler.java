@@ -4,7 +4,7 @@ import com.comicatlas.api.comic.entity.Media;
 import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.event.VideoMetadataFixCompletedEvent;
-import com.comicatlas.common.event.VideoMetadataFixResult;
+import com.comicatlas.common.event.payload.VideoMetadataFixResult;
 import com.comicatlas.common.mq.MqConsumerSupport;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;

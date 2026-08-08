@@ -35,7 +35,7 @@ import com.comicatlas.common.event.ManagementCommandFailedEvent;
 import com.comicatlas.common.event.ManagementCommandProgressEvent;
 import com.comicatlas.common.event.MediaUploadCompletedEvent;
 import com.comicatlas.common.event.MediaUploadCompletedEvent.MediaAnalysisResult;
-import com.comicatlas.common.event.TranscodeMediaInfo;
+import com.comicatlas.common.event.payload.TranscodeMediaInfo;
 import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.api.upload.UploadSessionService;
 import com.comicatlas.api.upload.UploadSessionStatus;
