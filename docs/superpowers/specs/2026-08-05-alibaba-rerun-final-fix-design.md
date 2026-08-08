@@ -1,5 +1,6 @@
 # 阿里 Java 规范复审（rerun-final）整改设计
 
+**状态**: 历史归档
 - 日期：2026-08-05
 - 依据：`.omo/evidence/alibaba-java-backend-rerun-final-2026-08-05.md`（综合结论 FAIL / REQUEST_CHANGES）
 - 审查提交：`f6ab39095ada9a4bfd3ce94c3054eb398269c383`

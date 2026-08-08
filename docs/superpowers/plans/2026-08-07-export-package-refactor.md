@@ -1,5 +1,7 @@
 # export 包重构与 metadata v3 统一实施计划
 
+**状态**: 历史归档
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 重构 `worker/export` 包（核心编排进 `ExportService`、刷新解耦、包内归位），并将三处 metadata v3 JSON 构建统一到 comic-common 的 `MetadataJsonBuilder`。

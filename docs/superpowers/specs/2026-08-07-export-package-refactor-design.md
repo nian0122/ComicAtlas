@@ -1,5 +1,7 @@
 # export 包重构与 metadata v3 三处重复统一设计
 
+**状态**: 历史归档
+
 **日期**: 2026-08-07
 **状态**: 设计待审阅
 **范围**: comic-common + worker-service（export 包 + 相关 handler）+ api-service（MetadataExporter）

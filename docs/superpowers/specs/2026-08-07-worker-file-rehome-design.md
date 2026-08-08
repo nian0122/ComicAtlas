@@ -1,5 +1,7 @@
 # worker/file 模块归位审视与 EhentaiDownloadService 归位设计
 
+**状态**: 历史归档
+
 **日期**: 2026-08-07
 **状态**: 已批准（最小归位方案）
 **范围**: worker-service（`EhentaiDownloadService` 移包 + 同步 import）

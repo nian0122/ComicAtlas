@@ -1,5 +1,6 @@
 # 阿里 Java 规范第四次复审（fourth-review）整改设计
 
+**状态**: 历史归档
 - 日期：2026-08-06
 - 依据：`.omo/evidence/alibaba-java-backend-fourth-review-2026-08-06.md`（综合结论 FAIL / REQUEST_CHANGES）
 - 审查提交：`3fdabd771e66c29b1bc35fadef4c4f7b27cd658c`；对比基线 `a73f34b`

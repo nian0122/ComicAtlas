@@ -1,5 +1,7 @@
 # MQ 消费编排统一与 ImportTaskHandler 重构设计
 
+**状态**: 历史归档
+
 **日期**: 2026-08-07
 **状态**: 设计待审阅
 **范围**: worker-service + api-service 全部 RabbitMQ 消费者

@@ -1,5 +1,7 @@
 # 阿里 Java 规范第五次复审（fifth-review）整改实施计划
 
+**状态**: 历史归档
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 修复第五次复审 5 项阻断项（输出上限可突破、中断回收顺序失效+进程树未回收、CallerRunsPolicy 超时失效、中断分支缺失、测试未观测进程存活），保持全绿。

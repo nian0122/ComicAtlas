@@ -1,5 +1,7 @@
 # 阿里 P1 阻断项整改实现计划
 
+**状态**: 历史归档
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 修复阿里 Java 规范复审的三个 P1 阻断项——完整测试门禁、线程池与中断处理、状态枚举落地，使 `mvnw verify -DskipTests=false` 全绿。

@@ -1,5 +1,7 @@
 # 接口固定与前端对接实施计划
 
+**状态**: 历史归档
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 前端全部存储操作迁移到 `/api/storage/*` 统一端点，后端删除全部旧端点，接口最终固定为存储域统一形态（含导出 download/open 新端点）。

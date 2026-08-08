@@ -1,5 +1,7 @@
 # 接口收敛与存储域模块化实施计划
 
+**状态**: 历史归档
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 后端 API 按功能域模块化解耦，存储操作收敛到 `storage` 域统一 URL（`/api/storage/{operation}/{targetType}/{targetId}`），转码完成后自动同步 media 元信息与 metadata.json。

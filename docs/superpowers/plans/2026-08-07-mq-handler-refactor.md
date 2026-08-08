@@ -1,5 +1,7 @@
 # MQ 消费编排统一与 ImportTaskHandler 重构实施计划
 
+**状态**: 历史归档
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 用统一的 `MqConsumerSupport` 消费模板替换全部 25 个 MQ handler 的手写 ack/reject 样板，并重构 `ImportTaskHandler.handle` 为纯编排。
