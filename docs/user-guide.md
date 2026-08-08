@@ -71,14 +71,14 @@ docker compose -f docker-compose.yml ps
 - 管理后台：`http://localhost/manage`
 - Gateway/API：`http://localhost:8000`
 
-`docker-compose.infra.yml` 包含 MySQL、Redis、RabbitMQ 和 Nacos，端口号保持为 3306、6379、5672、15672、8848、9848，并只绑定主机回环地址。如果基础设施运行在远程主机，本地不启动该文件；使用仓库中的 `tools/maintenance/start-remote-infra-tunnel.ps1` 建立 SSH 隧道，让项目容器通过 `host.docker.internal` 访问宿主机映射端口。
+`docker-compose.infra.yml` 包含 MySQL、Redis、RabbitMQ 和 Nacos，端口号保持为 3306、6379、5672、15672、8848、9848，并只绑定主机回环地址。如果基础设施运行在远程主机，本地不启动该文件；使用 `tools/maintenance/manage-remote-infra-frp.ps1` 建立 FRP STCP 连接，让项目容器通过 `host.docker.internal` 访问宿主机映射端口。完整配置见 [FRP 基础设施连接](operations/frp-infrastructure.md)。
 
 ### 可信本机部署
 
 管理端接口（回收站、永久清理、批量操作、DLQ）默认不开启业务鉴权，因此 ComicAtlas 只适合部署在**可信本机**：
 
 - 只在本机或受控内网使用，不要直接暴露 `8000`（Gateway）、`15672`（RabbitMQ 管理台）、`8848`（Nacos）、`3306`（MySQL）等端口到公网。
-- 基础设施容器只绑定回环地址（见 `docker-compose.infra.yml`），远程访问通过 SSH 隧道。
+- 基础设施容器只绑定回环地址（见 `docker-compose.infra.yml`），远程访问通过带 token、STCP secret 和 TLS 的 FRP visitor。
 - 管理后台 `/manage` 建议配合宿主机防火墙或反向代理做访问限制。
 - 生产使用前先阅读[部署运维](operations/management.md)中的账号、备份与升级说明。
 
