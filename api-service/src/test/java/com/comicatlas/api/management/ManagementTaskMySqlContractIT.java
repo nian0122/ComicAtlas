@@ -2,8 +2,8 @@ package com.comicatlas.api.management;
 
 import com.comicatlas.api.management.entity.ManagementTask;
 import com.comicatlas.api.management.mapper.ManagementTaskMapper;
-import com.comicatlas.common.enums.ManagementTaskStatus;
-import com.comicatlas.common.enums.TaskType;
+import com.comicatlas.api.common.enums.ManagementTaskStatus;
+import com.comicatlas.api.common.enums.TaskType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

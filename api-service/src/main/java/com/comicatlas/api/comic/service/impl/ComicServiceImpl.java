@@ -5,7 +5,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.comic.service.ComicListQueryService;
 import com.comicatlas.api.comic.service.ComicService;
-import com.comicatlas.common.enums.ChapterLifecycleStatus;
+import com.comicatlas.api.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.common.exception.BusinessException;

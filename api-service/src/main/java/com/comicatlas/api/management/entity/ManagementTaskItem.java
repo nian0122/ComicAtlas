@@ -1,7 +1,7 @@
 package com.comicatlas.api.management.entity;
 
-import com.comicatlas.common.enums.ManagementTaskStatus;
-import com.comicatlas.common.enums.TaskType;
+import com.comicatlas.api.common.enums.ManagementTaskStatus;
+import com.comicatlas.api.common.enums.TaskType;
 import lombok.Data;
 
 import java.time.LocalDateTime;

@@ -6,11 +6,11 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.Version;
-import com.comicatlas.common.enums.ChapterLifecycleStatus;
+import com.comicatlas.api.common.enums.ChapterLifecycleStatus;
 
 /**
  * 章节实体。
- * status 列存储 {@link com.comicatlas.common.enums.ChapterLifecycleStatus} 枚举值。
+ * status 列存储 {@link com.comicatlas.api.common.enums.ChapterLifecycleStatus} 枚举值。
  */
 @Data
 @TableName("chapter")

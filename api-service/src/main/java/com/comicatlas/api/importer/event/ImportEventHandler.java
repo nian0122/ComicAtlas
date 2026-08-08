@@ -12,8 +12,8 @@ import com.comicatlas.api.management.entity.ManagementTaskItem;
 import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.management.state.ManagementStateMachine;
 import com.comicatlas.common.constant.MqQueues;
-import com.comicatlas.common.enums.ManagementTaskStatus;
-import com.comicatlas.common.enums.TaskType;
+import com.comicatlas.api.common.enums.ManagementTaskStatus;
+import com.comicatlas.api.common.enums.TaskType;
 import com.comicatlas.common.event.ImportTaskCompletedEvent;
 import com.comicatlas.common.event.ImportTaskFailedEvent;
 import com.comicatlas.common.event.TaskStatusChangedEvent;
@@ -374,8 +374,8 @@ public class ImportEventHandler {
 
         // 阶段状态（DOWNLOADING/EXTRACTING/PARSING）同步到统一任务 stage 列（TaskStage 枚举）
         if (task.getManagementTaskId() != null) {
-            com.comicatlas.common.enums.TaskStage stage =
-                    com.comicatlas.common.enums.TaskStage.fromStatus(newStatus);
+            com.comicatlas.api.common.enums.TaskStage stage =
+                    com.comicatlas.api.common.enums.TaskStage.fromStatus(newStatus);
             if (stage != null) {
                 managementTaskService.updateStage(task.getManagementTaskId(), stage, event.progress());
             }

@@ -15,7 +15,7 @@ import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.service.ChapterManagementService;
 import com.comicatlas.api.management.state.ManagementStateMachine;
 import com.comicatlas.api.management.trash.TrashLifecycleService;
-import com.comicatlas.common.enums.ChapterLifecycleStatus;
+import com.comicatlas.api.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.common.exception.ConflictException;

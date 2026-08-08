@@ -1,6 +1,6 @@
 package com.comicatlas.api.management.dto;
 
-import com.comicatlas.common.enums.TaskType;
+import com.comicatlas.api.common.enums.TaskType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;

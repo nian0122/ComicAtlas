@@ -16,7 +16,7 @@ import com.comicatlas.api.comic.mapper.CatalogMapper;
 import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.comic.mapper.ComicMapper;
-import com.comicatlas.common.enums.ChapterLifecycleStatus;
+import com.comicatlas.api.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.api.comic.service.CatalogManagementService;
 import com.comicatlas.api.comic.service.ChapterManagementService;
 import com.comicatlas.api.common.exception.ConflictException;

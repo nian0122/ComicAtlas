@@ -18,10 +18,10 @@ import com.comicatlas.api.common.enums.ExportTaskStatus;
 import com.comicatlas.api.common.enums.RecoveryTaskStatus;
 import com.comicatlas.api.common.enums.DirectoryScanTaskStatus;
 import com.comicatlas.api.upload.UploadSessionStatus;
-import com.comicatlas.common.enums.ChapterLifecycleStatus;
-import com.comicatlas.common.enums.ManagementTaskStatus;
-import com.comicatlas.common.enums.MediaLifecycleStatus;
-import com.comicatlas.common.enums.TaskType;
+import com.comicatlas.api.common.enums.ChapterLifecycleStatus;
+import com.comicatlas.api.common.enums.ManagementTaskStatus;
+import com.comicatlas.api.common.enums.MediaLifecycleStatus;
+import com.comicatlas.api.common.enums.TaskType;
 
 /**
  * 通用枚举 TypeHandler。
@@ -123,12 +123,12 @@ public class EnumTypeHandlers {
         @Override public MediaLifecycleStatus getNullableResult(CallableStatement cs, int c) throws SQLException { return safeValueOf(MediaLifecycleStatus.class, cs.getString(c)); }
     }
 
-    @MappedTypes(com.comicatlas.common.enums.TranscodeStatus.class)
-    public static class TranscodeStatusHandler extends BaseTypeHandler<com.comicatlas.common.enums.TranscodeStatus> {
-        @Override public void setNonNullParameter(PreparedStatement ps, int i, com.comicatlas.common.enums.TranscodeStatus p, JdbcType t) throws SQLException { ps.setString(i, p.name()); }
-        @Override public com.comicatlas.common.enums.TranscodeStatus getNullableResult(ResultSet rs, String c) throws SQLException { return safeValueOf(com.comicatlas.common.enums.TranscodeStatus.class, rs.getString(c)); }
-        @Override public com.comicatlas.common.enums.TranscodeStatus getNullableResult(ResultSet rs, int c) throws SQLException { return safeValueOf(com.comicatlas.common.enums.TranscodeStatus.class, rs.getString(c)); }
-        @Override public com.comicatlas.common.enums.TranscodeStatus getNullableResult(CallableStatement cs, int c) throws SQLException { return safeValueOf(com.comicatlas.common.enums.TranscodeStatus.class, cs.getString(c)); }
+    @MappedTypes(com.comicatlas.api.common.enums.TranscodeStatus.class)
+    public static class TranscodeStatusHandler extends BaseTypeHandler<com.comicatlas.api.common.enums.TranscodeStatus> {
+        @Override public void setNonNullParameter(PreparedStatement ps, int i, com.comicatlas.api.common.enums.TranscodeStatus p, JdbcType t) throws SQLException { ps.setString(i, p.name()); }
+        @Override public com.comicatlas.api.common.enums.TranscodeStatus getNullableResult(ResultSet rs, String c) throws SQLException { return safeValueOf(com.comicatlas.api.common.enums.TranscodeStatus.class, rs.getString(c)); }
+        @Override public com.comicatlas.api.common.enums.TranscodeStatus getNullableResult(ResultSet rs, int c) throws SQLException { return safeValueOf(com.comicatlas.api.common.enums.TranscodeStatus.class, rs.getString(c)); }
+        @Override public com.comicatlas.api.common.enums.TranscodeStatus getNullableResult(CallableStatement cs, int c) throws SQLException { return safeValueOf(com.comicatlas.api.common.enums.TranscodeStatus.class, cs.getString(c)); }
     }
 
     @MappedTypes(ManagementTaskStatus.class)

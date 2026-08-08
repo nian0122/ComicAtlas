@@ -1,4 +1,4 @@
-package com.comicatlas.common.enums;
+package com.comicatlas.api.common.enums;
 
 /**
  * 管理任务类型 — 区分不同业务领域的异步任务。

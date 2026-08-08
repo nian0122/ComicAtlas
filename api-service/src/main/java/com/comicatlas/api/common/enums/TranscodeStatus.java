@@ -1,4 +1,4 @@
-package com.comicatlas.common.enums;
+package com.comicatlas.api.common.enums;
 
 /**
  * 视频转码状态 — 跟踪视频页面的浏览器兼容格式转换。

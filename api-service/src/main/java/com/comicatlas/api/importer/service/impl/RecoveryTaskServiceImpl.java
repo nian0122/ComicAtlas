@@ -14,7 +14,7 @@ import com.comicatlas.api.importer.service.RecoveryTaskService;
 import com.comicatlas.api.management.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
 import com.comicatlas.api.management.service.ManagementTaskService;
-import com.comicatlas.common.enums.TaskType;
+import com.comicatlas.api.common.enums.TaskType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

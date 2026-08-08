@@ -30,8 +30,8 @@ import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.management.state.ManagementStateMachine;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
-import com.comicatlas.common.enums.ManagementTaskStatus;
-import com.comicatlas.common.enums.TaskType;
+import com.comicatlas.api.common.enums.ManagementTaskStatus;
+import com.comicatlas.api.common.enums.TaskType;
 import com.comicatlas.common.event.CancelTaskEvent;
 import com.comicatlas.common.event.ImportTaskCreatedEvent;
 import lombok.RequiredArgsConstructor;
@@ -420,13 +420,13 @@ public class ImportServiceImpl implements ImportService {
      */
     private ManagementTaskResponse createManagementTaskForImport(Long comicId, String idempotencyKey, String payload) {
         CreateManagementTaskRequest mgmtReq = new CreateManagementTaskRequest();
-        mgmtReq.setTaskType(com.comicatlas.common.enums.TaskType.IMPORT);
+        mgmtReq.setTaskType(com.comicatlas.api.common.enums.TaskType.IMPORT);
         mgmtReq.setOperation("导入漫画");
         mgmtReq.setTargetType("COMIC");
         CreateManagementTaskRequest.TaskTarget target = new CreateManagementTaskRequest.TaskTarget();
         target.setTargetType("COMIC");
         target.setTargetId(comicId);
-        target.setOperationType(com.comicatlas.common.enums.TaskType.IMPORT);
+        target.setOperationType(com.comicatlas.api.common.enums.TaskType.IMPORT);
         mgmtReq.setTargets(List.of(target));
         return managementTaskService.createTask(mgmtReq, idempotencyKey, payload);
     }
