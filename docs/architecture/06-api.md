@@ -25,7 +25,9 @@
 | `ImportController` | ImportTask | 导入任务 |
 | `TagController` | Tag | 标签管理 |
 | `CategoryController` | Category | 分类管理（新增） |
-| `StorageController` | Storage | 存储统计、扫描、恢复、清理 |
+| `StorageStatsController` | Storage | 存储统计（`/api/storage/stats`） |
+| `StorageOperationController` | Storage | LQ 生成、HQ 删除（`/api/storage/*`） |
+| `DirectoryScanTaskController` / `RecoveryTaskController` | 扫描 / 恢复 | 目录扫描与存储恢复任务 |
 | `SettingsController` | Settings | 系统设置 |
 
 ---

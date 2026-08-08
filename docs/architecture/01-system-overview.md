@@ -61,13 +61,13 @@ ComicAtlas 由四个运行时模块和一组基础设施组成。
 | `DirectoryImportHandler` | Worker | 调用 `DirectoryParser` 解析目录，调用 `MetadataAssembler` 组装元数据，调用 `StorageService` 搬运文件，写 metadata.json | 不写数据库业务表 |
 | `DirectoryParser` | Worker | 扫描文件系统，输出纯目录树 `DirectoryTree`（无业务语义） | 不了解 Catalog / Chapter 语义 |
 | `MetadataAssembler` | Worker | 将 `DirectoryTree` 转换为 `ComicMetadata`（注入 Catalog / Chapter / Page 结构） | 不碰文件系统 |
-| `StorageService` (接口) | Worker | 定义文件存储抽象：`store` / `resolve` / `exists` / `delete` | 不决定业务语义 |
-| `LocalStorageService` (实现) | Worker | `StorageService` 的本地文件系统实现。基于 `StorageRoot` 配置完成文件复制、路径解析、存在性检查、删除 | 不写数据库 |
+| `StorageService` (接口) | Worker | 定义文件存储抽象：`transfer` / `resolve` / `exists` / `delete` | 不决定业务语义 |
+| `TransferService` (实现) | Worker | `StorageService` 的本地文件系统实现，按 `TransferMode`（COPY/MOVE）完成文件复制/移动、路径解析、存在性检查、删除 | 不写数据库 |
 | `ImportEventHandler` | API | 消费 `import.result.queue`，读取 metadata.json，INSERT catalog / chapter / page 到数据库，更新 comic 状态为 READY | 不碰文件系统 |
 | `ReaderService` | API | 按 `global_order` 取 prev / next 章节，组装阅读器 DTO | 不生成图片，不管理物理文件 |
 | `FileUrlResolver` | API | 将 `Page` 实体转换为 HTTP URL（`/files/{root}/{path}`） | 不管理物理文件 |
 
-> **关于设计概念的说明**：设计文档中提到的"按来源路由"概念在当前实现中由 `ImportTaskHandler` 内部的 `switch (sourceType)` 直接承担，没有独立的路由类。"文件生命周期管理"概念对应 `StorageService` 接口及其实现 `LocalStorageService`，加上 `DirectoryImportHandler` 中协调文件搬运和 metadata.json 写入的逻辑。
+> **关于设计概念的说明**：设计文档中提到的"按来源路由"概念在当前实现中由 `ImportTaskHandler` 内部的 `switch (sourceType)` 直接承担，没有独立的路由类。"文件生命周期管理"概念对应 `StorageService` 接口及其实现 `TransferService`，加上 `DirectoryImportHandler` 中协调文件搬运和 metadata.json 写入的逻辑。
 
 ---
 
@@ -94,7 +94,7 @@ ImportTaskHandler (Worker)  <-- 消费 import.task.queue
 DirectoryImportHandler (Worker)
   - DirectoryParser      --> DirectoryTree (纯目录树)
   - MetadataAssembler    --> ComicMetadata (业务结构)
-  - StorageService.store --> 文件搬入 HQ 存储根
+  - StorageService.transfer --> 文件搬入 HQ 存储根
   - 写 metadata.json
   - 发送 MQ: comic.import.task.completed
         |
@@ -119,7 +119,7 @@ flowchart TD
     F --> G
     G --> H[DirectoryParser<br/>输出 DirectoryTree]
     H --> I[MetadataAssembler<br/>输出 ComicMetadata]
-    I --> J["StorageService.store<br/>文件搬入 HQ"]
+    I --> J["StorageService.transfer<br/>文件搬入 HQ"]
     J --> K["写 metadata.json<br/>发送 task.completed"]
     K --> L[ImportEventHandler<br/>API Service]
     L --> M["INSERT catalog/chapter/page<br/>UPDATE comic → READY"]
@@ -157,11 +157,11 @@ flowchart TD
 
 ### 3. 存储抽象
 
-文件存储通过 `StorageService` 接口抽象。当前实现 `LocalStorageService` 使用本地文件系统，但接口允许未来扩展到对象存储（S3/MinIO）等后端，而不影响上层调用方。
+文件存储通过 `StorageService` 接口抽象。当前实现 `TransferService` 使用本地文件系统，但接口允许未来扩展到对象存储（S3/MinIO）等后端，而不影响上层调用方。
 
 `StorageService` 的四个方法：
 
-- `store(source, rootKey, relativePath)` — 将源文件复制到指定存储根
+- `transfer(source, target, mode)` — 按 `TransferMode`（COPY/MOVE）将源文件复制/移动到目标 `StorageRef`
 - `resolve(ref)` — 将 `StorageRef` 解析为物理路径
 - `exists(ref)` — 检查文件是否存在
 - `delete(ref)` — 删除文件
