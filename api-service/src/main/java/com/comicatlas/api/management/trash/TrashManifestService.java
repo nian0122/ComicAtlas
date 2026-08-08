@@ -4,8 +4,8 @@ import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.common.storage.ApiStorageProperties;
 import com.comicatlas.api.common.storage.ApiStorageRoot;
-import com.comicatlas.common.dto.TrashManifest;
-import com.comicatlas.common.dto.TrashManifestActual;
+import com.comicatlas.common.dto.TrashManifestDTO;
+import com.comicatlas.common.dto.TrashManifestItemDTO;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -46,7 +46,7 @@ public class TrashManifestService {
     }
 
     /** 写入不可变 manifest.json（幂等：已存在则覆盖为同一内容由调用方保证） */
-    public TrashManifest writeManifest(TrashManifest manifest) {
+    public TrashManifestDTO writeManifest(TrashManifestDTO manifest) {
         Path dir = manifestDir(manifest.targetType(), manifest.targetId(), manifest.taskId());
         try {
             Files.createDirectories(dir);
@@ -60,13 +60,13 @@ public class TrashManifestService {
     }
 
     /** 读取 manifest.json（不存在返回 null） */
-    public TrashManifest readManifest(String targetType, Long targetId, Long taskId) {
+    public TrashManifestDTO readManifest(String targetType, Long targetId, Long taskId) {
         Path file = manifestDir(targetType, targetId, taskId).resolve(MANIFEST_FILE);
         if (!Files.exists(file)) {
             return null;
         }
         try {
-            return objectMapper.readValue(Files.readString(file, StandardCharsets.UTF_8), TrashManifest.class);
+            return objectMapper.readValue(Files.readString(file, StandardCharsets.UTF_8), TrashManifestDTO.class);
         } catch (Exception e) {
             log.warn("读取 TRASH 清单失败: {}", file, e);
             return null;
@@ -74,13 +74,13 @@ public class TrashManifestService {
     }
 
     /** 读取 actual.json（不存在返回 null） */
-    public TrashManifestActual readActual(String targetType, Long targetId, Long taskId) {
+    public TrashManifestItemDTO readActual(String targetType, Long targetId, Long taskId) {
         Path file = manifestDir(targetType, targetId, taskId).resolve(ACTUAL_FILE);
         if (!Files.exists(file)) {
             return null;
         }
         try {
-            return objectMapper.readValue(Files.readString(file, StandardCharsets.UTF_8), TrashManifestActual.class);
+            return objectMapper.readValue(Files.readString(file, StandardCharsets.UTF_8), TrashManifestItemDTO.class);
         } catch (Exception e) {
             log.warn("读取 TRASH 实际结果失败: {}", file, e);
             return null;
@@ -88,7 +88,7 @@ public class TrashManifestService {
     }
 
     /** 写入 actual.json（Worker 之外仅对账修复时使用） */
-    public void writeActual(TrashManifestActual actual) {
+    public void writeActual(TrashManifestItemDTO actual) {
         Path dir = manifestDir(actual.targetType(), actual.targetId(), actual.taskId());
         try {
             Files.createDirectories(dir);

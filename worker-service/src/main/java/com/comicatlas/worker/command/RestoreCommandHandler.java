@@ -1,7 +1,7 @@
 package com.comicatlas.worker.command;
 
-import com.comicatlas.common.dto.TrashManifest;
-import com.comicatlas.common.dto.TrashManifestActual;
+import com.comicatlas.common.dto.TrashManifestDTO;
+import com.comicatlas.common.dto.TrashManifestItemDTO;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageRoot;
@@ -40,17 +40,17 @@ public class RestoreCommandHandler {
             return;
         }
         try {
-            TrashManifest manifest = manifestStore.readManifest(targetType, targetId, manifestTaskId);
+            TrashManifestDTO manifest = manifestStore.readManifest(targetType, targetId, manifestTaskId);
             if (manifest == null) {
                 publisher.failed(cmd, "TRASH 清单缺失: " + manifestStore.manifestDir(targetType, targetId, manifestTaskId));
                 return;
             }
             Path manifestDir = manifestStore.manifestDir(targetType, targetId, manifestTaskId);
-            for (TrashManifest.Entry e : manifest.entries()) {
+            for (TrashManifestDTO.Entry e : manifest.entries()) {
                 restoreEntry(e, manifestDir);
             }
-            manifestStore.writeActual(new TrashManifestActual(TrashManifestActual.CURRENT_VERSION,
-                    targetType, targetId, manifestTaskId, TrashManifestActual.STATUS_RESTORED,
+            manifestStore.writeActual(new TrashManifestItemDTO(TrashManifestItemDTO.CURRENT_VERSION,
+                    targetType, targetId, manifestTaskId, TrashManifestItemDTO.STATUS_RESTORED,
                     null, Instant.now(), null));
             publisher.completed(cmd);
             log.info("恢复命令完成: {}/{} entries={}", targetType, targetId, manifest.entries().size());
@@ -63,7 +63,7 @@ public class RestoreCommandHandler {
         }
     }
 
-    private void restoreEntry(TrashManifest.Entry e, Path manifestDir) throws Exception {
+    private void restoreEntry(TrashManifestDTO.Entry e, Path manifestDir) throws Exception {
         StorageRoot sourceRoot = storageProperties.getRoots().get(e.rootKey());
         if (sourceRoot == null || !sourceRoot.isEnabled()) {
             throw new RestoreConflictException("源存储根未配置: " + e.rootKey());

@@ -1,6 +1,6 @@
 package com.comicatlas.api.importer.dto;
 
-import com.comicatlas.common.dto.ScanResultVO;
+import com.comicatlas.common.dto.ScanResultDTO;
 import lombok.Data;
 import java.time.LocalDateTime;
 
@@ -10,7 +10,7 @@ public class DirectoryScanTaskVO {
     private String status;
     private String directoryPath;
     private Integer totalItems;
-    private ScanResultVO result;
+    private ScanResultDTO result;
     private String errorMessage;
     private LocalDateTime createdAt;
     private LocalDateTime startedAt;

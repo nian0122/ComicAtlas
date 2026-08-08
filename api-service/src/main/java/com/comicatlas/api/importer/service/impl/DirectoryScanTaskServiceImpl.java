@@ -15,7 +15,7 @@ import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.common.enums.ManagementTaskStatus;
 import com.comicatlas.api.common.enums.TaskType;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.comicatlas.common.dto.ScanResultVO;
+import com.comicatlas.common.dto.ScanResultDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -88,7 +88,7 @@ public class DirectoryScanTaskServiceImpl implements DirectoryScanTaskService {
         vo.setEndedAt(task.getEndedAt());
         if (task.getResultJson() != null && !task.getResultJson().isBlank()) {
             try {
-                vo.setResult(objectMapper.readValue(task.getResultJson(), ScanResultVO.class));
+                vo.setResult(objectMapper.readValue(task.getResultJson(), ScanResultDTO.class));
             } catch (Exception e) {
                 log.warn("扫描结果 JSON 解析失败: taskId={}", task.getId(), e);
             }
@@ -96,7 +96,7 @@ public class DirectoryScanTaskServiceImpl implements DirectoryScanTaskService {
         return vo;
     }
 
-    public void applyResult(Long taskId, ScanResultVO result) {
+    public void applyResult(Long taskId, ScanResultDTO result) {
         DirectoryScanTask task = scanTaskMapper.selectById(taskId);
         if (task == null) { return; }
         task.setStatus(DirectoryScanTaskStatus.SUCCESS);

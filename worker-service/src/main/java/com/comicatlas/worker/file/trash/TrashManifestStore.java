@@ -1,7 +1,7 @@
 package com.comicatlas.worker.file.trash;
 
-import com.comicatlas.common.dto.TrashManifest;
-import com.comicatlas.common.dto.TrashManifestActual;
+import com.comicatlas.common.dto.TrashManifestDTO;
+import com.comicatlas.common.dto.TrashManifestItemDTO;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageRoot;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -40,20 +40,20 @@ public class TrashManifestStore {
         return trashRoot().resolve(targetType + "/" + targetId + "/" + taskId);
     }
 
-    public TrashManifest readManifest(String targetType, Long targetId, Long taskId) {
+    public TrashManifestDTO readManifest(String targetType, Long targetId, Long taskId) {
         Path file = manifestDir(targetType, targetId, taskId).resolve(MANIFEST_FILE);
         if (!Files.exists(file)) {
             return null;
         }
         try {
-            return objectMapper.readValue(Files.readString(file, StandardCharsets.UTF_8), TrashManifest.class);
+            return objectMapper.readValue(Files.readString(file, StandardCharsets.UTF_8), TrashManifestDTO.class);
         } catch (Exception e) {
             log.warn("读取 TRASH 清单失败: {}", file, e);
             return null;
         }
     }
 
-    public void writeActual(TrashManifestActual actual) {
+    public void writeActual(TrashManifestItemDTO actual) {
         Path dir = manifestDir(actual.targetType(), actual.targetId(), actual.taskId());
         try {
             Files.createDirectories(dir);

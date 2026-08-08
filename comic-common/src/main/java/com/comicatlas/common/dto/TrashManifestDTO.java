@@ -10,10 +10,10 @@ import java.util.List;
  * <p>
  * 存放于 {@code TRASH/{targetType}/{targetId}/{taskId}/manifest.json}。
  * Worker 严格按 entries 移动，绝不覆盖已存在目标；实际结果写入同目录
- * {@code actual.json}（{@link TrashManifestActual}）用于对账与补偿判断。
+ * {@code actual.json}（{@link TrashManifestItemDTO}）用于对账与补偿判断。
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public record TrashManifest(
+public record TrashManifestDTO(
     int version,
     String targetType,
     Long targetId,
