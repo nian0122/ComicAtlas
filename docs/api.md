@@ -60,7 +60,7 @@ GET /api/comics/{id}/catalog
 ```
 
 ### 章节页面
-阅读页面统一走 `GET /api/chapters/{id}`（见第 2 节），旧 `GET /api/comics/{comicId}/chapters/{chapterId}/pages` 已移除。
+> 阅读页面统一走 `GET /api/chapters/{id}`（见第 2 节），旧 `GET /api/comics/{comicId}/chapters/{chapterId}/pages` 已移除。
 
 ### 删除（进入回收站）
 ```
@@ -275,6 +275,22 @@ FAILED ──────┘       │
 - 已是 mp4/webm 的视频不会被标记为 PENDING。
 - 历史 PENDING 记录可通过 DLQ 重放已完成事件收敛为 DONE（handler 接受 PENDING 状态）。
 
+### DLQ 死信管理
+
+主队列均配置 DLX + DLQ，消费失败进入死信队列后可通过以下端点查看、重放或清理：
+
+```
+GET    /api/admin/dlq/queues                                  # 列出所有 DLQ 队列及积压数
+GET    /api/admin/dlq/queues/{queueName}/messages?count=20    # 查看队列内消息（默认 20，上限 50）
+POST   /api/admin/dlq/queues/{queueName}/replay?maxMessages=100  # 重放消息到原主队列（默认 100，上限 500）
+DELETE /api/admin/dlq/queues/{queueName}/messages             # 清空该 DLQ 队列消息
+```
+
+- `DlqQueueVO`：`name`（DLQ 名）、`exchange`、`routingKey`、`originalQueue`（原主队列）、`messages`（积压数）、`consumers`。
+- `ReplayResult`：`queue`、`attempted`、`replayed`、`remaining`、`completed`、`error`。
+- `PurgeResult`：`queue`、`purged`。
+- `{queueName}` 需 URL 编码。消息支持 payload 字符串 / base64 两种编码查看。
+
 ### 存储扫描恢复（已废弃）
 
 > **废弃**：`POST /api/admin/storage/scan-recover` 已废弃，请使用异步恢复任务接口（参见下方 [12. 恢复任务](#12-恢复任务)）。
@@ -421,9 +437,9 @@ PENDING ──► RUNNING ──► SUCCESS
 
 | URL | 物理路径 | 缓存 |
 |-----|---------|------|
-| `/files/hq/*` | `D:/manga/hq/` | 60d |
-| `/files/lq/*` | `D:/manga/lq/` | 30d |
-| `/files/thumbs/*` | `D:/manga/thumbs/` | 7d |
+| `/files/hq/*` | `F:/manga/hq/` | 60d |
+| `/files/lq/*` | `F:/manga/lq/` | 30d |
+| `/files/thumbs/*` | `F:/manga/thumbs/` | 7d |
 
 ---
 
@@ -817,15 +833,45 @@ OP_NOT_ALLOWED, COMIC_NOT_FOUND
 
 ### 18.4 MQ 路由表
 
+共享事件 DTO 共 **37 个 record**（`ComicEvent` sealed 接口 + 各域事件）。队列契约与 AGENTS.md 一致：
+
 | Exchange | RoutingKey | Queue | Consumer |
 |----------|-----------|-------|----------|
+| comic.import | task.created | import.task.queue | Worker ImportTaskHandler |
+| comic.import | task.completed | import.result.queue | API ImportEventHandler |
+| comic.import | task.failed | import.failed.queue | API ImportEventHandler |
+| comic.task | status.changed | task.status.queue | API ImportEventHandler |
+| comic.task | cancel.requested | cancel.task.queue | Worker CancelHandler |
+| comic.image | lq.generate | lq.generate.queue | Worker LqGenerateHandler |
+| comic.image | lq.completed | lq.result.queue | API LqCompletedHandler |
+| comic.image | hq.delete.requested | hq.delete.queue | Worker HqDeleteHandler |
+| comic.image | hq.delete.completed | hq.delete.result.queue | API HqDeletedHandler |
+| comic.image | video.metadata.fix.requested | video.metadata.fix.queue | Worker VideoMetadataFixHandler |
+| comic.image | video.metadata.fix.completed | video.metadata.fix.result.queue | API VideoMetadataFixCompletedHandler |
+| comic.delete | delete.requested | delete.task.queue | Worker DeleteHandler |
+| comic.delete | delete.completed | delete.result.queue | API DeleteEventHandler |
+| comic.export | task.created | export.task.queue | Worker ExportTaskHandler |
+| comic.export | task.started | export.started.result.queue | API ExportStartedHandler |
+| comic.export | task.completed | export.completed.result.queue | API ExportCompletedHandler |
+| comic.export | task.failed | export.failed.result.queue | API ExportFailedHandler |
+| comic.export | metadata.refresh.requested | metadata.refresh.queue | Worker MetadataRefreshHandler |
+| comic.video | video.transcode.requested | video.transcode.queue | Worker VideoTranscodeHandler |
+| comic.video | video.transcode.completed | video.transcode.completed.queue | API TranscodeCompletedHandler |
+| comic.video | video.transcode.failed | video.transcode.failed.queue | API TranscodeFailedHandler |
+| comic.recovery | recovery.requested | recovery.task.queue | Worker RecoveryTaskHandler |
+| comic.recovery | recovery.progress | recovery.result.queue | API RecoveryEventHandler |
+| comic.recovery | recovery.completed | recovery.result.queue | API RecoveryEventHandler |
+| comic.recovery | recovery.failed | recovery.result.queue | API RecoveryEventHandler |
+| comic.scan | scan.requested | scan.task.queue | Worker DirectoryScanHandler |
+| comic.scan | scan.completed | scan.result.queue | API DirectoryScanEventHandler |
+| comic.scan | scan.failed | scan.result.queue | API DirectoryScanEventHandler |
 | comic.management | command.requested | management.command.queue | Worker ManagementCommandDispatcher |
 | comic.management | command.completed | management.result.queue | API ManagementCommandResultHandler |
 | comic.management | command.failed | management.result.queue | API ManagementCommandResultHandler |
 | comic.management | command.progress | management.result.queue | API ManagementCommandResultHandler |
-| comic.management | command.cancel | management.cancel.queue | （已声明，待消费方） |
+| comic.management | command.cancel | management.cancel.queue | （未注册消费者） |
 
-其余队列（导入/删除/LQ/HQ/恢复/扫描/导出/转码）见 AGENTS.md 的 RABBITMQ 表。所有主队列配置 DLX + DLQ。
+**死信**：主队列除 comic.task（task.status.queue / cancel.task.queue 无 DLX）外均配置 DLX + DLQ（comic.import.dlx / comic.image.dlx / comic.delete.dlx / comic.export.dlx / comic.video.dlx / comic.recovery.dlx / comic.scan.dlx / comic.management.dlx）。DLQ 消息可通过 `/api/admin/dlq/*` 查看、重放或清理（见第 11 节）。
 
 ---
 
@@ -851,7 +897,7 @@ OP_NOT_ALLOWED, COMIC_NOT_FOUND
 
 ## 20. 存储操作域（v1.1）
 
-统一形态：`POST /api/storage/{operation}/{targetType}/{targetId}`，`targetType = comics | chapters`。
+> 统一形态：`POST /api/storage/{operation}/{targetType}/{targetId}`，`targetType = comics | chapters`。
 
 | 操作 | 端点 |
 |------|------|
