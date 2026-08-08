@@ -1,8 +1,8 @@
 package com.comicatlas.api.storage.controller;
 
-import com.comicatlas.api.admin.dto.RefreshMetadataResult;
+import com.comicatlas.api.admin.dto.RefreshMetadataResultDTO;
 import com.comicatlas.api.export.dto.ExportTaskVO;
-import com.comicatlas.api.management.dto.OperationSubmitResult;
+import com.comicatlas.api.management.dto.OperationSubmitResultDTO;
 import com.comicatlas.api.management.operation.MediaOperationCommandService;
 import com.comicatlas.api.storage.service.ExportOperationService;
 import com.comicatlas.api.storage.service.HqDeleteOperationService;
@@ -41,7 +41,7 @@ class StorageOperationControllerTest {
     @Test
     void generateComicLq_委托命令服务并返回提交结果() throws Exception {
         when(commandService.requestLqForComic(42L, false))
-                .thenReturn(OperationSubmitResult.of(7L, "LQ_GENERATE", "QUEUED", 3));
+                .thenReturn(OperationSubmitResultDTO.of(7L, "LQ_GENERATE", "QUEUED", 3));
 
         mvc.perform(post("/api/storage/lq/comics/42"))
                 .andExpect(status().isOk())
@@ -54,7 +54,7 @@ class StorageOperationControllerTest {
     @Test
     void generateChapterLq_传递regenerate参数() throws Exception {
         when(commandService.requestLqForChapter(9L, true))
-                .thenReturn(OperationSubmitResult.of(8L, "LQ_REGENERATE", "QUEUED", 1));
+                .thenReturn(OperationSubmitResultDTO.of(8L, "LQ_REGENERATE", "QUEUED", 1));
 
         mvc.perform(post("/api/storage/lq/chapters/9").param("regenerate", "true"))
                 .andExpect(status().isOk())
@@ -66,7 +66,7 @@ class StorageOperationControllerTest {
     @Test
     void deleteComicHq_委托删除命令() throws Exception {
         when(commandService.requestHqDeleteForComic(42L))
-                .thenReturn(OperationSubmitResult.of(9L, "HQ_DELETE", "QUEUED", 2));
+                .thenReturn(OperationSubmitResultDTO.of(9L, "HQ_DELETE", "QUEUED", 2));
 
         mvc.perform(post("/api/storage/delete-hq/comics/42"))
                 .andExpect(status().isOk())
@@ -78,7 +78,7 @@ class StorageOperationControllerTest {
     @Test
     void deleteChapterHq_委托删除命令() throws Exception {
         when(commandService.requestHqDeleteForChapter(9L))
-                .thenReturn(OperationSubmitResult.of(10L, "HQ_DELETE", "QUEUED", 1));
+                .thenReturn(OperationSubmitResultDTO.of(10L, "HQ_DELETE", "QUEUED", 1));
 
         mvc.perform(post("/api/storage/delete-hq/chapters/9"))
                 .andExpect(status().isOk());
@@ -89,7 +89,7 @@ class StorageOperationControllerTest {
     @Test
     void transcodeComic_委托转码命令() throws Exception {
         when(commandService.requestTranscodeForComic(42L))
-                .thenReturn(OperationSubmitResult.of(11L, "TRANSCODE", "QUEUED", 2));
+                .thenReturn(OperationSubmitResultDTO.of(11L, "TRANSCODE", "QUEUED", 2));
 
         mvc.perform(post("/api/storage/transcode/comics/42"))
                 .andExpect(status().isOk())
@@ -101,7 +101,7 @@ class StorageOperationControllerTest {
     @Test
     void transcodeChapter_委托章节级转码命令() throws Exception {
         when(commandService.requestTranscodeForChapter(9L))
-                .thenReturn(OperationSubmitResult.of(12L, "TRANSCODE", "QUEUED", 1));
+                .thenReturn(OperationSubmitResultDTO.of(12L, "TRANSCODE", "QUEUED", 1));
 
         mvc.perform(post("/api/storage/transcode/chapters/9"))
                 .andExpect(status().isOk());
@@ -112,7 +112,7 @@ class StorageOperationControllerTest {
     @Test
     void refreshMetadata_委托刷新服务并返回结果() throws Exception {
         when(metadataRefreshService.refresh(42L))
-                .thenReturn(new RefreshMetadataResult(42L, "READY", 0, 3, 20, 15L, LocalDateTime.now()));
+                .thenReturn(new RefreshMetadataResultDTO(42L, "READY", 0, 3, 20, 15L, LocalDateTime.now()));
 
         mvc.perform(post("/api/storage/refresh-metadata/comics/42"))
                 .andExpect(status().isOk())

@@ -2,7 +2,7 @@ package com.comicatlas.api.management.batch.service;
 
 import com.comicatlas.api.management.batch.BatchReasonCode;
 import com.comicatlas.api.management.batch.dto.BatchOperationRequest;
-import com.comicatlas.api.management.batch.dto.BatchOperationPayload;
+import com.comicatlas.api.management.batch.dto.BatchOperationPayloadDTO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -84,7 +84,7 @@ public class BatchPreviewTokenStore {
         return sha256(sb.toString());
     }
 
-    private static String canonicalPayload(BatchOperationPayload payload) {
+    private static String canonicalPayload(BatchOperationPayloadDTO payload) {
         if (payload == null) {
             return "";
         }

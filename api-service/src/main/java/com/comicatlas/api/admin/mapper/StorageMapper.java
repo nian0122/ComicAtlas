@@ -3,7 +3,7 @@ package com.comicatlas.api.admin.mapper;
 import com.comicatlas.api.admin.dto.ChapterStorageDTO;
 import com.comicatlas.api.admin.dto.ComicStorageDTO;
 import com.comicatlas.api.admin.dto.ComicStorageQuery;
-import com.comicatlas.api.admin.dto.ComicTranscodeStatus;
+import com.comicatlas.api.admin.dto.ComicTranscodeStatusVO;
 import com.comicatlas.api.admin.dto.StorageStatsDTO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -27,7 +27,7 @@ public interface StorageMapper {
     String selectTranscodeStatus(@Param("comicId") Long comicId);
 
     /** 批量查询多个漫画的转码状态聚合（comicId → 逗号分隔的 transcode_status 集合）。 */
-    List<ComicTranscodeStatus> selectTranscodeStatusList(@Param("comicIds") List<Long> comicIds);
+    List<ComicTranscodeStatusVO> selectTranscodeStatusList(@Param("comicIds") List<Long> comicIds);
 
     /** 全局存储统计：HQ/LQ 已就绪文件的总字节数（DB 聚合，避免全量遍历文件系统）。 */
     StorageStatsDTO selectStorageStats();

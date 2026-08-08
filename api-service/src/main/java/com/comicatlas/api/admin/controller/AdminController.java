@@ -1,6 +1,6 @@
 package com.comicatlas.api.admin.controller;
 
-import com.comicatlas.api.admin.dto.ComicDeleteStats;
+import com.comicatlas.api.admin.dto.ComicDeleteStatsDTO;
 import com.comicatlas.api.admin.dto.ScanRecoverResultDTO;
 import com.comicatlas.api.common.Result;
 import com.comicatlas.api.admin.service.AdminService;
@@ -47,7 +47,7 @@ public class AdminController {
      * @return 删除统计
      */
     @DeleteMapping("/comics/{id}")
-    public Result<ComicDeleteStats> deleteComic(@PathVariable Long id, @RequestParam String mode) {
+    public Result<ComicDeleteStatsDTO> deleteComic(@PathVariable Long id, @RequestParam String mode) {
         return Result.ok(adminService.deleteComic(id, mode));
     }
 }

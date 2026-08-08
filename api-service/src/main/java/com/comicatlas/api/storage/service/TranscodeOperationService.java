@@ -1,6 +1,6 @@
 package com.comicatlas.api.storage.service;
 
-import com.comicatlas.api.management.dto.OperationSubmitResult;
+import com.comicatlas.api.management.dto.OperationSubmitResultDTO;
 import com.comicatlas.api.management.operation.MediaOperationCommandService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -14,11 +14,11 @@ public class TranscodeOperationService {
 
     private final MediaOperationCommandService commandService;
 
-    public OperationSubmitResult transcodeForComic(Long comicId) {
+    public OperationSubmitResultDTO transcodeForComic(Long comicId) {
         return commandService.requestTranscodeForComic(comicId);
     }
 
-    public OperationSubmitResult transcodeForChapter(Long chapterId) {
+    public OperationSubmitResultDTO transcodeForChapter(Long chapterId) {
         return commandService.requestTranscodeForChapter(chapterId);
     }
 }

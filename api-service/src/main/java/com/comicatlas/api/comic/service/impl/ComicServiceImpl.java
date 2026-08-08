@@ -162,7 +162,7 @@ public class ComicServiceImpl implements ComicService {
     @Override
     @Transactional
     public ManagementTaskResponse deleteComic(Long id, String idempotencyKey) {
-        com.comicatlas.api.management.dto.OperationSubmitResult result =
+        com.comicatlas.api.management.dto.OperationSubmitResultDTO result =
                 trashLifecycleService.trashComic(id, idempotencyKey);
         if (result.getTaskId() == null) {
             throw new BusinessException(HttpStatusCodes.INTERNAL_ERROR, "回收任务创建失败");

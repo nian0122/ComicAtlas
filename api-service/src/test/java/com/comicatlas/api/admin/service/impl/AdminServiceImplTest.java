@@ -1,13 +1,13 @@
 package com.comicatlas.api.admin.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.comicatlas.api.admin.dto.ComicDeleteStats;
+import com.comicatlas.api.admin.dto.ComicDeleteStatsDTO;
 import com.comicatlas.api.common.scan.RecoveryEngine;
 import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
-import com.comicatlas.api.management.dto.OperationSubmitResult;
+import com.comicatlas.api.management.dto.OperationSubmitResultDTO;
 import com.comicatlas.api.management.operation.MediaOperationCommandService;
 import com.comicatlas.api.reader.mapper.ReadingHistoryMapper;
 import org.junit.jupiter.api.Test;
@@ -121,9 +121,9 @@ class AdminServiceImplTest {
         when(comicTagMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(5L);
         when(historyMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(10L);
         when(mediaOperationCommandService.requestComicDelete(1L))
-                .thenReturn(OperationSubmitResult.of(9L, "COMIC_DELETE", "QUEUED", 1));
+                .thenReturn(OperationSubmitResultDTO.of(9L, "COMIC_DELETE", "QUEUED", 1));
 
-        ComicDeleteStats stats = service.deleteComic(1L, "DELETE_FILES");
+        ComicDeleteStatsDTO stats = service.deleteComic(1L, "DELETE_FILES");
 
         assertEquals(50, stats.getPage());
         assertEquals(2, stats.getChapter());
@@ -151,9 +151,9 @@ class AdminServiceImplTest {
         when(comicTagMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(3L);
         when(historyMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(1L);
         when(mediaOperationCommandService.requestComicDelete(1L))
-                .thenReturn(OperationSubmitResult.of(10L, "COMIC_DELETE", "QUEUED", 1));
+                .thenReturn(OperationSubmitResultDTO.of(10L, "COMIC_DELETE", "QUEUED", 1));
 
-        ComicDeleteStats stats = service.deleteComic(1L, "DATABASE_ONLY");
+        ComicDeleteStatsDTO stats = service.deleteComic(1L, "DATABASE_ONLY");
 
         assertEquals(0, stats.getPage());
         assertEquals(0, stats.getChapter());

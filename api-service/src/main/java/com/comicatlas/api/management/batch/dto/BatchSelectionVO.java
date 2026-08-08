@@ -13,21 +13,21 @@ import lombok.EqualsAndHashCode;
  */
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "type")
 @JsonSubTypes({
-    @JsonSubTypes.Type(value = BatchSelection.Ids.class, name = "IDS"),
-    @JsonSubTypes.Type(value = BatchSelection.Filter.class, name = "FILTER")
+    @JsonSubTypes.Type(value = BatchSelectionVO.Ids.class, name = "IDS"),
+    @JsonSubTypes.Type(value = BatchSelectionVO.Filter.class, name = "FILTER")
 })
-public abstract class BatchSelection {
+public abstract class BatchSelectionVO {
 
     @Data
     @EqualsAndHashCode(callSuper = false)
-    public static class Ids extends BatchSelection {
+    public static class Ids extends BatchSelectionVO {
         @NotEmpty(message = "ids 不能为空")
         private java.util.List<Long> ids;
     }
 
     @Data
     @EqualsAndHashCode(callSuper = false)
-    public static class Filter extends BatchSelection {
+    public static class Filter extends BatchSelectionVO {
         private com.comicatlas.api.comic.dto.ComicListQuery query;
         private java.util.List<Long> excludedIds;
     }

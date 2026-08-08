@@ -2,7 +2,7 @@ package com.comicatlas.api.storage.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.comicatlas.api.admin.dto.RefreshMetadataResult;
+import com.comicatlas.api.admin.dto.RefreshMetadataResultDTO;
 import com.comicatlas.api.common.scan.RecoveryEngine;
 import com.comicatlas.api.common.scan.ScannedMediaInfo;
 import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
@@ -60,9 +60,9 @@ public class MetadataRefreshService {
      * 完成后发 MQ 委托 Worker 重新导出 metadata.json。
      *
      * @param comicId 漫画 ID
-     * @return 刷新结果（沿用 {@code admin.dto.RefreshMetadataResult}）
+     * @return 刷新结果（沿用 {@code admin.dto.RefreshMetadataResultDTO}）
      */
-    public RefreshMetadataResult refresh(Long comicId) {
+    public RefreshMetadataResultDTO refresh(Long comicId) {
         Comic comic = comicMapper.selectById(comicId);
         if (comic == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在");
@@ -189,8 +189,8 @@ public class MetadataRefreshService {
     /**
      * 根据统计数据构造刷新结果。
      */
-    private RefreshMetadataResult buildResult(Long comicId, Map<String, Object> stats, long durationMs) {
-        return new RefreshMetadataResult(
+    private RefreshMetadataResultDTO buildResult(Long comicId, Map<String, Object> stats, long durationMs) {
+        return new RefreshMetadataResultDTO(
                 comicId,
                 "READY",
                 (int) stats.get("catalogs"),

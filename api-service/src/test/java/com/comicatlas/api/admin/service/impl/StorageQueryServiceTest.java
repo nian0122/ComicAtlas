@@ -2,7 +2,7 @@ package com.comicatlas.api.admin.service.impl;
 
 import com.comicatlas.api.admin.dto.ComicStorageDTO;
 import com.comicatlas.api.admin.dto.ComicStorageQuery;
-import com.comicatlas.api.admin.dto.ComicTranscodeStatus;
+import com.comicatlas.api.admin.dto.ComicTranscodeStatusVO;
 import com.comicatlas.api.admin.mapper.StorageMapper;
 import com.comicatlas.api.common.storage.FileUrlResolver;
 import org.junit.jupiter.api.Test;
@@ -40,8 +40,8 @@ class StorageQueryServiceTest {
                 .thenReturn(List.of(dto1, dto2));
         when(storageMapper.selectTranscodeStatusList(List.of(1L, 2L)))
                 .thenReturn(List.of(
-                        new ComicTranscodeStatus(1L, "PENDING"),
-                        new ComicTranscodeStatus(2L, "DONE")));
+                        new ComicTranscodeStatusVO(1L, "PENDING"),
+                        new ComicTranscodeStatusVO(2L, "DONE")));
 
         List<ComicStorageDTO> result = service.listComics(new ComicStorageQuery(), 1, 20);
 

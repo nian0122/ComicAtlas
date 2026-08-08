@@ -1,6 +1,6 @@
 package com.comicatlas.api.common.scan;
 
-import com.comicatlas.api.admin.dto.RecoveryProgress;
+import com.comicatlas.api.admin.dto.RecoveryProgressVO;
 import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.mapper.CatalogMapper;
@@ -77,7 +77,7 @@ class RecoveryEngineTest {
         existing.setTitle("Test");
         when(comicMapper.selectById(1L)).thenReturn(existing);
 
-        RecoveryProgress result = recoveryEngine.processComicDir(1L, 5);
+        RecoveryProgressVO result = recoveryEngine.processComicDir(1L, 5);
 
         assertEquals(6, result.totalComics());
         assertEquals(0, result.recoveredComics());
@@ -109,7 +109,7 @@ class RecoveryEngineTest {
             when(transactionTemplate.execute(any()))
                 .thenReturn(Map.of("catalogs", 2, "chapters", 3, "pages", 30));
 
-            RecoveryProgress result = recoveryEngine.processComicDir(2L, 0);
+            RecoveryProgressVO result = recoveryEngine.processComicDir(2L, 0);
 
             assertEquals(1, result.totalComics());
             assertEquals(1, result.recoveredComics());
@@ -133,7 +133,7 @@ class RecoveryEngineTest {
 
             doNothing().when(transactionTemplate).executeWithoutResult(any());
 
-            RecoveryProgress result = recoveryEngine.processComicDir(3L, 10);
+            RecoveryProgressVO result = recoveryEngine.processComicDir(3L, 10);
 
             assertEquals(11, result.totalComics());
             assertEquals(0, result.recoveredComics());
@@ -158,7 +158,7 @@ class RecoveryEngineTest {
             when(objectMapper.readValue(any(java.io.File.class), any(TypeReference.class)))
                 .thenThrow(new RuntimeException("JSON 解析失败"));
 
-            RecoveryProgress result = recoveryEngine.processComicDir(4L, 0);
+            RecoveryProgressVO result = recoveryEngine.processComicDir(4L, 0);
 
             assertEquals(1, result.totalComics());
             assertEquals(0, result.recoveredComics());
@@ -184,7 +184,7 @@ class RecoveryEngineTest {
             doThrow(new RuntimeException("DB 写入失败"))
                 .when(transactionTemplate).executeWithoutResult(any());
 
-            RecoveryProgress result = recoveryEngine.processComicDir(5L, 3);
+            RecoveryProgressVO result = recoveryEngine.processComicDir(5L, 3);
 
             assertEquals(4, result.totalComics());
             assertEquals(0, result.recoveredComics());
@@ -204,8 +204,8 @@ class RecoveryEngineTest {
         existing.setId(6L);
         when(comicMapper.selectById(6L)).thenReturn(existing);
 
-        RecoveryProgress first = recoveryEngine.processComicDir(6L, 0);
-        RecoveryProgress second = recoveryEngine.processComicDir(6L, 0);
+        RecoveryProgressVO first = recoveryEngine.processComicDir(6L, 0);
+        RecoveryProgressVO second = recoveryEngine.processComicDir(6L, 0);
 
         assertEquals(1, first.skippedComics());
         assertEquals(1, second.skippedComics());

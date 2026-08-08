@@ -9,7 +9,7 @@ import com.comicatlas.api.comic.mapper.CategoryMapper;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.mapper.ComicTagMapper;
 import com.comicatlas.api.comic.mapper.TagMapper;
-import com.comicatlas.api.management.batch.dto.BatchOperationPayload;
+import com.comicatlas.api.management.batch.dto.BatchOperationPayloadDTO;
 import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.common.enums.ManagementTaskStatus;
 import lombok.RequiredArgsConstructor;
@@ -39,7 +39,7 @@ public class BatchMetadataExecutor {
      * 执行单个 item 的元数据更新（独立事务）。
      */
     @Transactional
-    public void execute(Long itemId, BatchOperationPayload payload, Long comicId) {
+    public void execute(Long itemId, BatchOperationPayloadDTO payload, Long comicId) {
         try {
             apply(comicId, payload);
             managementTaskService.updateItemStatus(itemId, ManagementTaskStatus.SUCCEEDED,
@@ -52,7 +52,7 @@ public class BatchMetadataExecutor {
         }
     }
 
-    private void apply(Long comicId, BatchOperationPayload payload) {
+    private void apply(Long comicId, BatchOperationPayloadDTO payload) {
         Comic comic = comicMapper.selectById(comicId);
         if (comic == null) {
             throw new IllegalArgumentException("漫画不存在: " + comicId);

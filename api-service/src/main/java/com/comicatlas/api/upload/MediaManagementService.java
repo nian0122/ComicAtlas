@@ -9,7 +9,7 @@ import com.comicatlas.api.comic.entity.Chapter;
 import com.comicatlas.api.comic.entity.Media;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.comic.mapper.MediaMapper;
-import com.comicatlas.api.management.dto.OperationSubmitResult;
+import com.comicatlas.api.management.dto.OperationSubmitResultDTO;
 import com.comicatlas.api.management.trash.TrashLifecycleService;
 import com.comicatlas.api.upload.dto.MediaReorderItem;
 import com.comicatlas.api.upload.dto.MediaReorderRequest;
@@ -100,7 +100,7 @@ public class MediaManagementService {
      * READY → TRASHING（写入清单）→ Worker 移入 TRASH → 结果回 TRASHED。
      */
     @Transactional
-    public OperationSubmitResult trash(Long mediaId) {
+    public OperationSubmitResultDTO trash(Long mediaId) {
         return trashLifecycleService.trashMedia(mediaId);
     }
 }

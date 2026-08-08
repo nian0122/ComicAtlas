@@ -131,7 +131,7 @@ class SemanticNamingContractTest {
          * 单词边界，因此 {@code ComicService}、{@code MediaManager} 等复合类型名
          * 的前缀不会被误认为禁用类型。类型字面量含泛型实参时（如
          * {@code Map<String, Object>}）以<b>首个实参</b>为锚（同样要求单词边界，
-         * {@code List<MediaItemInfo> pages} 不会命中 {@code List<Media> pages}），
+         * {@code List<MediaItemInfoDTO> pages} 不会命中 {@code List<Media> pages}），
          * 容忍嵌套 {@code <...>}、空白与其余实参变化：{@code Map<String, List<Path>> cm}、
          * {@code Map < String , Object > cm} 均被识别，而
          * {@code List<PageResult> pages} 不命中；无泛型的类型
@@ -150,7 +150,7 @@ class SemanticNamingContractTest {
                     firstArg = firstArg.substring(0, comma).trim();
                 }
             }
-            // 泛型实参：首实参锚定（后接 \b 防止 MediaItemInfo 等前缀误配）+ 非贪婪
+            // 泛型实参：首实参锚定（后接 \b 防止 MediaItemInfoDTO 等前缀误配）+ 非贪婪
             // 容错（嵌套 >、空白、其余实参），到 '>' 为止；无泛型的类型整组可选。
             String genericPart = (firstArg == null)
                     ? "(?:\\s*<[^;{}()]*?>)?"

@@ -1,7 +1,7 @@
 package com.comicatlas.api.management.trash;
 
 import com.comicatlas.api.common.Result;
-import com.comicatlas.api.management.dto.OperationSubmitResult;
+import com.comicatlas.api.management.dto.OperationSubmitResultDTO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -34,7 +34,7 @@ public class TrashLifecycleController {
      * @return 操作提交结果
      */
     @PostMapping("/comics/{comicId}/restore")
-    public Result<OperationSubmitResult> restoreComic(@PathVariable Long comicId) {
+    public Result<OperationSubmitResultDTO> restoreComic(@PathVariable Long comicId) {
         return Result.ok(trashLifecycleService.restoreComic(comicId));
     }
 
@@ -46,7 +46,7 @@ public class TrashLifecycleController {
      * @return 操作提交结果
      */
     @PostMapping("/comics/{comicId}/chapters/{chapterId}/restore")
-    public Result<OperationSubmitResult> restoreChapter(@PathVariable Long comicId,
+    public Result<OperationSubmitResultDTO> restoreChapter(@PathVariable Long comicId,
                                                         @PathVariable Long chapterId) {
         return Result.ok(trashLifecycleService.restoreChapter(comicId, chapterId));
     }
@@ -58,7 +58,7 @@ public class TrashLifecycleController {
      * @return 操作提交结果
      */
     @PostMapping("/media/{mediaId}/restore")
-    public Result<OperationSubmitResult> restoreMedia(@PathVariable Long mediaId) {
+    public Result<OperationSubmitResultDTO> restoreMedia(@PathVariable Long mediaId) {
         return Result.ok(trashLifecycleService.restoreMedia(mediaId));
     }
 
@@ -73,7 +73,7 @@ public class TrashLifecycleController {
      * @return 操作提交结果
      */
     @PostMapping("/comics/{comicId}/purge")
-    public Result<OperationSubmitResult> purgeComic(@PathVariable Long comicId,
+    public Result<OperationSubmitResultDTO> purgeComic(@PathVariable Long comicId,
                                                     @Valid @RequestBody PurgeRequest request) {
         return Result.ok(trashLifecycleService.purgeComic(comicId, request.getToken()));
     }
@@ -88,7 +88,7 @@ public class TrashLifecycleController {
      * @return 操作提交结果
      */
     @PostMapping("/comics/{comicId}/chapters/{chapterId}/purge")
-    public Result<OperationSubmitResult> purgeChapter(@PathVariable Long comicId,
+    public Result<OperationSubmitResultDTO> purgeChapter(@PathVariable Long comicId,
                                                       @PathVariable Long chapterId,
                                                       @Valid @RequestBody PurgeRequest request) {
         return Result.ok(trashLifecycleService.purgeChapter(comicId, chapterId, request.getToken()));
@@ -103,7 +103,7 @@ public class TrashLifecycleController {
      * @return 操作提交结果
      */
     @PostMapping("/media/{mediaId}/purge")
-    public Result<OperationSubmitResult> purgeMedia(@PathVariable Long mediaId,
+    public Result<OperationSubmitResultDTO> purgeMedia(@PathVariable Long mediaId,
                                                     @Valid @RequestBody PurgeRequest request) {
         return Result.ok(trashLifecycleService.purgeMedia(mediaId, request.getToken()));
     }

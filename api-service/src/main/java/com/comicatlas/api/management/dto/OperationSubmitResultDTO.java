@@ -9,14 +9,14 @@ import lombok.Data;
  * taskId 为 null 表示无待处理目标（幂等跳过）。
  */
 @Data
-public class OperationSubmitResult {
+public class OperationSubmitResultDTO {
     private Long taskId;
     private String taskType;
     private String status;
     private Integer itemCount;
 
-    public static OperationSubmitResult of(Long taskId, String taskType, String status, Integer itemCount) {
-        OperationSubmitResult r = new OperationSubmitResult();
+    public static OperationSubmitResultDTO of(Long taskId, String taskType, String status, Integer itemCount) {
+        OperationSubmitResultDTO r = new OperationSubmitResultDTO();
         r.setTaskId(taskId);
         r.setTaskType(taskType);
         r.setStatus(status);
