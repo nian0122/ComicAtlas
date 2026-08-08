@@ -40,7 +40,7 @@ public class Comic {
     private Long hqSize;
     /** LQ 图片占用大小（字节） */
     private Long lqSize;
-    /** 来源类型（ZIP/REGISTER/EHENTAI），存枚举 name() */
+    /** 来源类型（ZIP/DIRECTORY/EHENTAI），存枚举 name() */
     private SourceType sourceType;
     /** EHENTAI gallery id（与 sourceType 组成唯一索引） */
     private String sourceGalleryId;

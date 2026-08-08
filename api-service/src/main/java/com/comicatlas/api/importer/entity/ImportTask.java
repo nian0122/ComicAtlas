@@ -25,7 +25,7 @@ public class ImportTask {
     private Long comicId;
     /** 来源引用：EHENTAI 为画廊 URL，目录/ZIP 为源路径 */
     private String sourceRef;
-    /** 来源类型：ZIP/REGISTER/EHENTAI/DIRECTORY */
+    /** 来源类型：ZIP/DIRECTORY/EHENTAI/DIRECTORY */
     private SourceType sourceType;
     /** 源文件或源目录路径 */
     private String sourcePath;

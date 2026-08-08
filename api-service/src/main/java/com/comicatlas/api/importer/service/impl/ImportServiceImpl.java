@@ -155,7 +155,7 @@ public class ImportServiceImpl implements ImportService {
                 }
                 redisTemplate.opsForValue().set(dedupKey, "1", Duration.ofDays(7));
             }
-            case "ZIP", "REGISTER", "DIRECTORY" -> {
+            case "ZIP", "DIRECTORY" -> {
                 String path = sourcePath != null ? sourcePath : sourceRef;
                 if (path == null || path.isBlank()) { throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "请提供 sourcePath"); }
                 String name = Path.of(path).getFileName().toString();
@@ -441,21 +441,18 @@ public class ImportServiceImpl implements ImportService {
         }
     }
 
-    /** 兼容历史 "DIRECTORY" 值：语义等同 REGISTER（本地目录导入）。 */
     private static SourceType toSourceType(String sourceType) {
         if (sourceType == null) { return null; }
-        if ("DIRECTORY".equals(sourceType)) { return SourceType.REGISTER; }
         try {
             return SourceType.valueOf(sourceType);
         } catch (IllegalArgumentException e) {
-            log.warn("未知 sourceType={}，映射为 null（调用方将按 REGISTER 兜底）", sourceType);
+            log.warn("未知 sourceType={}，映射为 null（调用方将按 DIRECTORY 兜底）", sourceType);
             return null;
         }
     }
 
-    /** 兼容遗留 DIRECTORY 值（枚举化后读回 null，语义等价 REGISTER） */
     private static String resolveSourceType(ImportTask task) {
-        return task.getSourceType() != null ? task.getSourceType().name() : "REGISTER";
+        return task.getSourceType() != null ? task.getSourceType().name() : "DIRECTORY";
     }
 
     private static String comicStatusName(Comic comic) {

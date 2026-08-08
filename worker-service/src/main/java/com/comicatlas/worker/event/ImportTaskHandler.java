@@ -63,7 +63,7 @@ public class ImportTaskHandler {
         switch (sourceType) {
             case "ZIP" -> zipHandler.importZip(
                     new ImportContext("ZIP", Path.of(sourcePath), false, false), taskId, comicId, mangaRoot);
-            case "REGISTER", "DIRECTORY" -> {
+            case "DIRECTORY" -> {
                 if (sourcePath == null) { throw new IllegalArgumentException("DIRECTORY 需要 sourcePath"); }
                 directoryHandler.handle(
                         new ImportContext("DIRECTORY", Path.of(sourcePath), false, false), taskId, comicId, mangaRoot);
