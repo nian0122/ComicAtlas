@@ -26,17 +26,37 @@ public class TrashLifecycleController {
 
     // ======================== 恢复 ========================
 
+    /**
+     * 从回收站恢复整本漫画（异步命令）。
+     * 恢复依赖已存在的回收清单，仅 TRASHED 状态可恢复。
+     *
+     * @param comicId 漫画 ID
+     * @return 操作提交结果
+     */
     @PostMapping("/comics/{comicId}/restore")
     public Result<OperationSubmitResult> restoreComic(@PathVariable Long comicId) {
         return Result.ok(trashLifecycleService.restoreComic(comicId));
     }
 
+    /**
+     * 从回收站恢复指定漫画下的单个章节（异步命令）。
+     *
+     * @param comicId 漫画 ID
+     * @param chapterId 章节 ID
+     * @return 操作提交结果
+     */
     @PostMapping("/comics/{comicId}/chapters/{chapterId}/restore")
     public Result<OperationSubmitResult> restoreChapter(@PathVariable Long comicId,
                                                         @PathVariable Long chapterId) {
         return Result.ok(trashLifecycleService.restoreChapter(comicId, chapterId));
     }
 
+    /**
+     * 从回收站恢复单个媒体（异步命令）。
+     *
+     * @param mediaId 媒体 ID
+     * @return 操作提交结果
+     */
     @PostMapping("/media/{mediaId}/restore")
     public Result<OperationSubmitResult> restoreMedia(@PathVariable Long mediaId) {
         return Result.ok(trashLifecycleService.restoreMedia(mediaId));
@@ -44,12 +64,29 @@ public class TrashLifecycleController {
 
     // ======================== 永久清理 ========================
 
+    /**
+     * 永久清理整本漫画（不可恢复）。
+     * 仅接受 TRASHED 状态 + 二次确认 token + 7 天保留期已过。
+     *
+     * @param comicId 漫画 ID
+     * @param request 二次确认 token
+     * @return 操作提交结果
+     */
     @PostMapping("/comics/{comicId}/purge")
     public Result<OperationSubmitResult> purgeComic(@PathVariable Long comicId,
                                                     @Valid @RequestBody PurgeRequest request) {
         return Result.ok(trashLifecycleService.purgeComic(comicId, request.getToken()));
     }
 
+    /**
+     * 永久清理指定漫画下的单个章节（不可恢复）。
+     * 仅接受 TRASHED 状态 + 二次确认 token + 7 天保留期已过。
+     *
+     * @param comicId 漫画 ID
+     * @param chapterId 章节 ID
+     * @param request 二次确认 token
+     * @return 操作提交结果
+     */
     @PostMapping("/comics/{comicId}/chapters/{chapterId}/purge")
     public Result<OperationSubmitResult> purgeChapter(@PathVariable Long comicId,
                                                       @PathVariable Long chapterId,
@@ -57,6 +94,14 @@ public class TrashLifecycleController {
         return Result.ok(trashLifecycleService.purgeChapter(comicId, chapterId, request.getToken()));
     }
 
+    /**
+     * 永久清理单个媒体（不可恢复）。
+     * 仅接受 TRASHED 状态 + 二次确认 token + 7 天保留期已过。
+     *
+     * @param mediaId 媒体 ID
+     * @param request 二次确认 token
+     * @return 操作提交结果
+     */
     @PostMapping("/media/{mediaId}/purge")
     public Result<OperationSubmitResult> purgeMedia(@PathVariable Long mediaId,
                                                     @Valid @RequestBody PurgeRequest request) {
@@ -65,6 +110,13 @@ public class TrashLifecycleController {
 
     // ======================== 对账 ========================
 
+    /**
+     * 对账指定目标的回收状态（只读）：对比 DB 状态、回收清单与实际文件，输出差异报告。
+     *
+     * @param targetType 目标类型（COMIC/CHAPTER/MEDIA）
+     * @param targetId 目标 ID
+     * @return 对账报告
+     */
     @GetMapping("/{targetType}/{targetId}/reconcile")
     public Result<TrashReconcileReport> reconcile(@PathVariable String targetType,
                                                   @PathVariable Long targetId) {
