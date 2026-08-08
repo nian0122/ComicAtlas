@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
  * 结果 Inbox 收据实体。
  * <p>
  * eventId 为 PK，payload_hash 校验，保证处理恰好一次。
+ * <p>数据库实体（DO），禁止直接暴露给接口；对外使用 {@code dto/} 包对应 DTO/VO。
  */
 @Data
 @Accessors(chain = true)
@@ -37,5 +38,6 @@ public class InboxReceipt {
     /** 处理时间 */
     private LocalDateTime processedAt;
 
+    /** 创建时间 */
     private LocalDateTime createdAt;
 }

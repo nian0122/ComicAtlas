@@ -16,6 +16,7 @@ import com.baomidou.mybatisplus.annotation.Version;
  * <p>
  * 保存通用身份/operation/target/aggregate/status/stage/progress/counts/
  * idempotency fingerprint/error/timestamps/version，不塞具体业务 payload。
+ * <p>数据库实体（DO），禁止直接暴露给接口；对外使用 {@code dto/} 包对应 DTO/VO。
  */
 @Data
 @TableName("management_task")
@@ -80,9 +81,13 @@ public class ManagementTask {
     @Version
     private Integer version;
 
+    /** 创建时间 */
     private LocalDateTime createdAt;
+    /** 更新时间 */
     private LocalDateTime updatedAt;
+    /** 开始时间 */
     private LocalDateTime startedAt;
+    /** 完成时间 */
     private LocalDateTime completedAt;
 
     // ======================== 便捷方法 ========================
