@@ -49,9 +49,10 @@ Reader（阅读器 /reader/:chapterId）
     │
     ▼
 管理端 Import（/manage/import）
-    │ 选择来源 ZIP / REGISTER / EHENTAI
-    │ 输入文件路径（EHENTAI 输入作品链接；REGISTER 输入本地目录）
-    │ 点击"开始导入"（支持批量）
+    │ 选择来源 ZIP 文件 / DIRECTORY 本地目录
+    │ 输入文件路径（ZIP 文件路径 或 本地目录路径）
+    │ （EHENTAI 由 API 提交，前端暂未开放入口）
+    │ 点击"开始导入"（批量仅支持本地目录）
     ▼
 任务中心（/manage/import/tasks）
     │ 看到进度条变化

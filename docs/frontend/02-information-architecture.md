@@ -153,11 +153,11 @@ Comic Workspace
 
 **路由**：`/manage/import`（导入）、`/manage/import/tasks`（任务中心）
 
-**职责**：创建 ZIP / REGISTER / EHENTAI 导入任务（支持批量），监控导入任务进度。
+**职责**：创建导入任务（前端 UI 提供 ZIP / DIRECTORY 来源；EHENTAI 为后端/API 能力），监控导入任务进度。
 
 ```
 Import / Task Center
-├── 导入页       来源类型（ZIP / REGISTER / EHENTAI）+ 路径输入 + 批量导入
+├── 导入页       来源类型（ZIP / DIRECTORY）+ 路径输入 + 批量导入（批量仅 DIRECTORY）
 ├── 任务列表     进行中 / 失败 / 已完成，进度条 + 状态标签
 └── 操作         取消 / 重试 / 立即阅读
 ```

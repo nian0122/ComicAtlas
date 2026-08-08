@@ -6,15 +6,15 @@
 
 > 目标：验证 MVP 全链路（Import → Task → Library → Comic Detail → Reader → History）是否可用。
 > 执行方式：按模块逐项手动验证，发现问题记录在 `docs/issues/`。
-> 本清单为 v0.1 历史验收记录。v1.0 中导入任务中心位于 `/manage/import/tasks`、导入来源为 ZIP / REGISTER / EHENTAI、删除进入回收站，执行新版清单时以用户指南与当前路由为准。
+> 本清单为 v0.1 历史验收记录。v1.0 中导入任务中心位于 `/manage/import/tasks`、导入来源（API）为 ZIP / REGISTER / EHENTAI（前端导入页仅提供 ZIP / DIRECTORY）、删除进入回收站，执行新版清单时以用户指南与当前路由为准。
 
 ---
 
 ## ① 导入（Import）
 
 - [ ] ZIP 正常导入：选择 ZIP 类型，输入合法路径，点击"开始导入"后跳转到任务中心（`/manage/import/tasks`）
-- [ ] REGISTER 正常导入：选择本地目录类型，输入合法目录路径，任务创建成功
-- [ ] EHENTAI 正常导入：输入作品链接，任务创建成功（下载 → 解压 → 入库）
+- [ ] DIRECTORY（本地目录）正常导入：选择目录类型，输入合法目录路径，任务创建成功
+- [ ] EHENTAI 导入（API 级）：通过 `POST /api/tasks/import` 提交 `sourceType: "EHENTAI"` 与作品链接，任务创建成功（下载 → 解压 → 入库）。前端导入页未提供 EHENTAI 选项，需用 curl/脚本调用 API 验证
 - [ ] 路径不存在：任务创建或 Worker 处理阶段报错，前端显示清晰错误信息
 - [ ] 重复导入：同一 ZIP/目录再次导入时后端去重逻辑生效，前端收到明确提示
 - [ ] 非法路径：空路径或异常字符路径被拒绝，前端显示校验提示
@@ -112,7 +112,7 @@
 按顺序执行以下完整流程，全部通过才算 Beta v0.1 可用：
 
 ```text
-导入一本新漫画（ZIP / REGISTER / EHENTAI）
+导入一本新漫画（ZIP / 本地目录；EHENTAI 走 API）
     ↓
 任务中心看到任务 → 状态变为 SUCCESS
     ↓

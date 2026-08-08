@@ -27,7 +27,7 @@
 |------|------|------|
 | `/manage/comics` | ComicListPage（漫画工作区） | 管理端列表、筛选、批量选择 |
 | `/manage/comics/:id/edit` | ComicEditPage（漫画编辑） | 元数据 / 标签 / 分类 / 封面（乐观锁） |
-| `/manage/import` | ImportPage（导入） | ZIP / REGISTER / EHENTAI 导入（含批量） |
+| `/manage/import` | ImportPage（导入） | ZIP / DIRECTORY 导入（批量仅 DIRECTORY；EHENTAI 由 API 支持） |
 | `/manage/import/tasks` | TaskPage（任务中心） | 导入任务进度、取消、重试 |
 | `/manage/storage` | StoragePage（存储管理） | 存储统计、HQ/LQ 状态、批量操作 |
 | `/manage/storage/:id` | StorageDetailPage（章节明细） | 单本漫画的章节级 HQ/LQ 状态与操作 |
@@ -116,9 +116,9 @@
 **路由**：`/manage/import`
 
 **职责**：
-- 选择来源类型（ZIP / REGISTER / EHENTAI）
-- 输入文件路径（EHENTAI 作品链接）
-- 批量导入（多条路径）
+- 选择来源类型（ZIP 文件 / DIRECTORY 本地目录；EHENTAI 由 API 支持，前端暂未提供选项）
+- 输入文件路径（ZIP 文件路径或本地目录路径）
+- 批量导入（多条本地目录路径）
 - 提交后跳转任务中心
 
 ---
