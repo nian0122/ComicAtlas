@@ -559,7 +559,9 @@ public class ManagementTaskService {
     // ======================== 查询辅助 ========================
 
     /**
-     * 按幂等键查找任务（无则返回 null）。
+     * 根据幂等键查询任务，未命中返回 null。
+     * <p>
+     * 内部方法，返回数据库实体 {@link ManagementTask}，禁止用于接口响应；对外使用 {@code dto/} 包对应 DTO/VO。
      */
     public ManagementTask findByIdempotencyKey(String idempotencyKey) {
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
@@ -571,7 +573,9 @@ public class ManagementTaskService {
     }
 
     /**
-     * 查找目标当前活跃（QUEUED/RUNNING/CANCELLING）的项。
+     * 查询目标当前活跃（QUEUED/RUNNING/CANCELLING）的任务项。
+     * <p>
+     * 内部方法，返回数据库实体 {@link ManagementTaskItem}，禁止用于接口响应；对外使用 {@code dto/} 包对应 DTO/VO。
      */
     public ManagementTaskItem findActiveItem(String targetType, Long targetId, TaskType operationType) {
         return itemMapper.selectOne(

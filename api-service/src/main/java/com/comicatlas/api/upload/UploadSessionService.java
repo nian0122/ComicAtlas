@@ -187,6 +187,14 @@ public class UploadSessionService {
 
     // ======================== 查询 ========================
 
+    /**
+     * 按对外会话 ID 查询上传会话，不存在抛出 404。
+     * <p>
+     * 内部方法，返回数据库实体 {@link UploadSession}，禁止用于接口响应；对外使用 {@code dto/} 包对应 DTO/VO。
+     *
+     * @param sessionId 对外 opaque 会话 ID
+     * @return 上传会话实体
+     */
     public UploadSession getBySessionId(String sessionId) {
         UploadSession session = sessionMapper.selectOne(
                 new LambdaQueryWrapper<UploadSession>().eq(UploadSession::getSessionId, sessionId));
