@@ -169,8 +169,8 @@ func run(cfg *CLIConfig) *RunResult {
 		}
 		if info.Size() == 0 {
 			atomic.AddInt32(&result.Skipped, 1)
-			if !cfg.Quiet && !cfg.JSON {
-				fmt.Printf("跳过: %s | 空文件\n", path)
+			if !cfg.Quiet {
+				fmt.Fprintf(os.Stderr, "跳过: %s | 空文件\n", path)
 			}
 			return nil
 		}
@@ -190,8 +190,8 @@ func run(cfg *CLIConfig) *RunResult {
 			if lqInfo, err := os.Stat(lqPath); err == nil {
 				if lqInfo.ModTime().Unix() >= info.ModTime().Unix() {
 					atomic.AddInt32(&result.Skipped, 1)
-					if !cfg.Quiet && !cfg.JSON {
-						fmt.Printf("跳过: %s | 已存在最新版本 (%s)\n", relPath, formatSize(lqInfo.Size()))
+					if !cfg.Quiet {
+						fmt.Fprintf(os.Stderr, "跳过: %s | 已存在最新版本 (%s)\n", relPath, formatSize(lqInfo.Size()))
 					}
 					result.mu.Lock()
 					result.Pages = append(result.Pages, PageResult{
@@ -235,8 +235,8 @@ func worker(id int, tasks <-chan imageTask, wg *sync.WaitGroup, cfg *CLIConfig, 
 			atomic.AddInt32(&result.Failed, 1)
 			page.Status = "failed"
 			page.Reason = err.Error()
-			if !cfg.Quiet && !cfg.JSON {
-				fmt.Printf("[Worker %d] 失败: %s → %v\n", id, task.RelativePath, err)
+			if !cfg.Quiet {
+				fmt.Fprintf(os.Stderr, "[Worker %d] 失败: %s → %v\n", id, task.RelativePath, err)
 			}
 		} else {
 			atomic.AddInt32(&result.Processed, 1)
@@ -246,8 +246,8 @@ func worker(id int, tasks <-chan imageTask, wg *sync.WaitGroup, cfg *CLIConfig, 
 			if optResult.InputSize > 0 {
 				page.Ratio = float64(optResult.OutputSize) / float64(optResult.InputSize) * 100
 			}
-			if !cfg.Quiet && !cfg.JSON {
-				fmt.Printf("[Worker %d] 完成: %s | %s → %s (%.1f%%)\n",
+			if !cfg.Quiet {
+				fmt.Fprintf(os.Stderr, "[Worker %d] 完成: %s | %s → %s (%.1f%%)\n",
 					id, task.RelativePath,
 					formatSize(optResult.InputSize),
 					formatSize(optResult.OutputSize),
