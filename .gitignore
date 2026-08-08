@@ -65,6 +65,8 @@ frontend/test-results/
 worker-service/tools/aria2c/
 worker-service/tools/ffmpeg/
 worker-service/tools/image-optimizer/image-optimizer.exe
+/tools/vendor/frp/
+/.runtime/
 
 # tools 迁移输出（dry-run / 编译产物）
 tools/*.class

@@ -1,19 +1,19 @@
 # ComicAtlas - 开发环境启动
 Write-Host "=== ComicAtlas 开发环境 ===" -ForegroundColor Cyan
 
-# 仓库根目录 = 本脚本（scripts/dev/）的上一级
-$repoRoot = Split-Path $PSScriptRoot -Parent
+# 仓库根目录 = 本脚本（scripts/dev/）的两级上级
+$repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 
-# 1. 启动 SSH 隧道（连接远端中间件）
-$tunnelScript = Join-Path $repoRoot "tools\maintenance\start-remote-infra-tunnel.ps1"
-if (Test-Path $tunnelScript) {
-    Write-Host "正在建立远端中间件 SSH 隧道..." -ForegroundColor DarkGray
-    & $tunnelScript
+# 1. 启动 FRP visitor（连接远端中间件）
+$frpScript = Join-Path $repoRoot "tools\maintenance\manage-remote-infra-frp.ps1"
+if (Test-Path $frpScript) {
+    Write-Host "正在建立远端中间件 FRP 连接..." -ForegroundColor DarkGray
+    & $frpScript -Action Start
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "WARN: SSH 隧道启动失败，Worker 可能无法连接 RabbitMQ/Nacos" -ForegroundColor Yellow
+        Write-Host "WARN: FRP 启动失败，Worker 可能无法连接 RabbitMQ/Nacos" -ForegroundColor Yellow
     }
 } else {
-    Write-Host "WARN: 未找到隧道脚本 tools\maintenance\start-remote-infra-tunnel.ps1" -ForegroundColor Yellow
+    Write-Host "WARN: 未找到 FRP 脚本 tools\maintenance\manage-remote-infra-frp.ps1" -ForegroundColor Yellow
 }
 
 # 2. 从 .env 加载远端中间件凭证
@@ -46,7 +46,7 @@ $env:MANGA_ROOT    = if ($env:MANGA_ROOT) { $env:MANGA_ROOT } else { "F:/manga" 
 # 5. 检查 RabbitMQ AMQP 端口是否可达
 $mqTest = Test-NetConnection -ComputerName 127.0.0.1 -Port 5672 -WarningAction SilentlyContinue -InformationLevel Quiet
 if (-not $mqTest) {
-    Write-Host "WARN: RabbitMQ 127.0.0.1:5672 不可达 — SSH 隧道可能未建立" -ForegroundColor Yellow
+    Write-Host "WARN: RabbitMQ 127.0.0.1:5672 不可达 — FRP 连接可能尚未建立" -ForegroundColor Yellow
 }
 
 # 5. 启动 Worker
