@@ -1,5 +1,9 @@
 # ComicAtlas 部署运维手册
 
+**更新日期：** 2026-08-08
+**状态：** 生效
+**维护者：** ComicAtlas 运维组
+
 > 适用版本：v1.0。配套文档：[用户指南](../user-guide.md)、[API 文档](../api.md)。所有命令示例均可在 `scripts/qa/verify-management-docs.ps1` 中校验。
 
 本手册覆盖管理控制台（回收站、批量操作、媒体上传、任务中心）上线后所需的运维知识：数据库账号、存储卷、保留期、磁盘阈值、备份、升级与回滚。
@@ -141,7 +145,7 @@ docker compose -f docker-compose.yml ps
 docker compose logs -f api-service
 ```
 
-Flyway 会按版本号顺序执行 `db/flyway/V*.sql`（v1.0 含 V10 生命周期/乐观锁、V11 管理任务、V12 任务外键、V13 outbox/inbox）。迁移失败时 Flyway 会停在失败版本，需要修复后重试。
+Flyway 会按版本号顺序执行 `api-service/src/main/resources/db/flyway/V*.sql`（生效迁移目录，见 `db/README.md`）。当前生效迁移：V1 初始化、V2 修正 schema 漂移、V10 生命周期/乐观锁、V11 管理任务、V12 管理任务外键、V13 outbox/inbox、V14 章节全局顺序唯一、V15 上传会话、V16 回收站生命周期；V3–V9 等历史迁移已归档到 `db/migration-archive/`，不参与执行。迁移失败时 Flyway 会停在失败版本，需要修复后重试。
 
 ### 升级后的检查清单
 

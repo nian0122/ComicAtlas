@@ -1,6 +1,11 @@
 # 09 — 开发计划
 
+**更新日期：** 2026-08-08
+**状态：** 历史计划（早期开发路线）
+**维护者：** ComicAtlas 前端组
+
 > 按依赖顺序排列开发任务。每步完成可独立验证。
+> 本计划记录前端早期（v0.x）的开发路线。其中引用的 `components/` 旧路径与「阶段」清单仅为当时计划，当前实现已演化为 `views/reading` + `views/management` + `components/reading|management|layout` 的实际结构（见 `08-frontend-architecture.md`），本文件仅作历史参考。
 
 ---
 

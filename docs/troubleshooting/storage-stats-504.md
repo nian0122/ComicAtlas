@@ -1,7 +1,12 @@
 # 存储统计 504 修复与踩坑记录
 
+**更新日期：** 2026-08-08
+**状态：** 历史记录（2026-08-02 修复）
+**维护者：** ComicAtlas 开发组
+
 > 记录时间：2026-08-02
 > 关联改动：`storage/stats` 接口改为 DB 聚合 + Redis 缓存；Redis 缓存序列化修复
+> 说明：修复当时统计端点为 `/api/admin/storage/stats`；接口统一后当前端点为 `GET /api/storage/stats`（见 `StorageStatsController`，`/api/storage` 前缀）。
 
 ## 背景
 
