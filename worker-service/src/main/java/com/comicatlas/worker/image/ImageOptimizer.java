@@ -10,13 +10,14 @@ import org.springframework.stereotype.Component;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 图片优化器：调用外部 Go 工具 image-optimizer.exe 进行并发 WebP 压缩。
+ * 图片优化器：调用外部 Go 工具 image-optimizer.exe 进行章节 LQ WebP 并发压缩。
  * 零 JVM 内图片处理，全部通过 ProcessBuilder 委托给 Go 子进程。
+ * <p>
+ * 职责边界：仅负责章节 LQ 生成；封面生成见 {@link CoverGenerator}（图片/视频封面）。
  */
 @Slf4j
 @Component
@@ -77,7 +78,7 @@ public class ImageOptimizer {
         ProcessBuilder processBuilder = new ProcessBuilder(cmd);
         ExternalProcessRunner.ExternalProcessResult result;
         try {
-            result = processRunner.run(processBuilder, LQ_TIMEOUT_SECONDS);
+            result = processRunner.run(processBuilder, LQ_TIMEOUT_SECONDS, "LQ优化");
         } catch (InterruptedException e) {
             // runner 已恢复中断标志并销毁子进程
             throw new RuntimeException("等待图片优化被中断: comicId=" + comicId + ", chapterId=" + chapterId, e);
@@ -102,141 +103,6 @@ public class ImageOptimizer {
                 comicId, chapterId, parsed.getTotal(), parsed.getProcessed(),
                 parsed.getSkipped(), parsed.getFailed(), parsed.getElapsedMs());
         return parsed;
-    }
-
-    /**
-     * 为漫画生成优化封面 WebP，调用 Go 工具处理单张源图片，
-     * 输出到 thumbs/{comicId}/cover.webp。
-     *
-     * @param comicId     漫画 ID
-     * @param sourceImage 源封面图片路径（HQ 中已存在的文件）
-     * @throws RuntimeException Go 工具超时、异常退出或 IO 错误
-     */
-    public void generateCover(Long comicId, Path sourceImage) {
-        Path tempDir = Path.of(config.getMangaRoot(), "temp", "cover-" + comicId);
-        Path thumbsDir = Path.of(config.getMangaRoot(), "thumbs", String.valueOf(comicId));
-
-        try {
-            Files.createDirectories(tempDir);
-            Files.copy(sourceImage, tempDir.resolve(sourceImage.getFileName()), StandardCopyOption.REPLACE_EXISTING);
-
-            Files.createDirectories(thumbsDir);
-
-            Path optimizerPath = config.resolveToolPath(config.getImageOptimizerPath());
-
-            List<String> cmd = new ArrayList<>(List.of(
-                    optimizerPath.toString(),
-                    "-scan-dir", tempDir.toString(),
-                    "-output-dir", thumbsDir.toString(),
-                    "-comic-id", comicId.toString(),
-                    "-chapter-id", "0",
-                    "-chapter-no", "cover",
-                    "-quality", String.valueOf(config.getCover().getQuality()),
-                    "-workers", "1",
-                    "-json"
-            ));
-
-            log.info("生成封面: comicId={}, quality={}", comicId, config.getCover().getQuality());
-
-            ProcessBuilder processBuilder = new ProcessBuilder(cmd);
-            ExternalProcessRunner.ExternalProcessResult result =
-                    processRunner.run(processBuilder, LQ_TIMEOUT_SECONDS);
-            int exitCode = result.exitCode();
-            if (exitCode != 0) {
-                throw new RuntimeException(
-                        "封面优化工具异常退出 exitCode=" + exitCode + ", comicId=" + comicId + ", stdout=" + result.stdout());
-            }
-
-            Path coverFile = thumbsDir.resolve("cover.webp");
-            try (var stream = Files.list(thumbsDir)) {
-                Path webpFile = stream
-                        .filter(f -> f.getFileName().toString().endsWith(".webp")
-                                && !f.getFileName().toString().equals("cover.webp"))
-                        .findFirst()
-                        .orElse(null);
-                if (webpFile != null) {
-                    Files.move(webpFile, coverFile, StandardCopyOption.REPLACE_EXISTING);
-                }
-            }
-
-            log.info("封面优化完成: comicId={}, output={}", comicId, coverFile);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("封面优化被中断: comicId=" + comicId, e);
-        } catch (Exception e) {
-            throw new RuntimeException("封面优化失败: comicId=" + comicId + ", " + e.getMessage(), e);
-        } finally {
-            try {
-                if (Files.exists(tempDir)) {
-                    try (var stream = Files.walk(tempDir)) {
-                        stream.sorted(java.util.Comparator.reverseOrder())
-                                .map(Path::toFile)
-                                .forEach(java.io.File::delete);
-                    }
-                }
-            } catch (Exception e) {
-                log.warn("清理封面临时目录失败: {}", tempDir, e);
-            }
-        }
-    }
-
-    /**
-     * 从视频文件提取首帧作为封面（全视频漫画回退方案）。
-     *
-     * @param comicId   漫画 ID
-     * @param videoPath 视频文件路径（HQ 中已存在的文件）
-     * @throws RuntimeException ffmpeg 不可用、超时或异常退出
-     */
-    public void generateCoverFromVideo(Long comicId, Path videoPath) {
-        Path tempDir = Path.of(config.getMangaRoot(), "temp", "cover-video-" + comicId);
-        try {
-            Files.createDirectories(tempDir);
-            Path frameFile = tempDir.resolve("frame.jpg");
-
-            Path ffmpegPath = config.resolveToolPath(config.getFfmpegPath());
-            if (!Files.exists(ffmpegPath)) {
-                throw new RuntimeException("ffmpeg 不可用: " + ffmpegPath);
-            }
-
-            List<String> cmd = List.of(
-                    ffmpegPath.toString(),
-                    "-ss", "2",
-                    "-i", videoPath.toString(),
-                    "-vframes", "1",
-                    "-q:v", "2",
-                    frameFile.toString(),
-                    "-y"
-            );
-
-            log.info("抽取视频封面帧: comicId={}, video={}", comicId, videoPath.getFileName());
-
-            ProcessBuilder processBuilder = new ProcessBuilder(cmd);
-            ExternalProcessRunner.ExternalProcessResult result = processRunner.run(processBuilder, 120);
-            int exitCode = result.exitCode();
-            if (exitCode != 0 || !Files.exists(frameFile) || Files.size(frameFile) == 0) {
-                throw new RuntimeException("ffmpeg 抽帧失败 exitCode=" + exitCode + ", comicId=" + comicId);
-            }
-
-            // 用 generateCover 优化抽出的帧
-            generateCover(comicId, frameFile);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("视频封面生成被中断: comicId=" + comicId, e);
-        } catch (RuntimeException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new RuntimeException("视频封面生成失败: comicId=" + comicId, e);
-        } finally {
-            try {
-                if (Files.exists(tempDir)) {
-                    try (var stream = Files.walk(tempDir)) {
-                        stream.sorted(java.util.Comparator.reverseOrder())
-                                .map(Path::toFile)
-                                .forEach(java.io.File::delete);
-                    }
-                }
-            } catch (Exception e) { log.warn("清理临时目录失败: comicId={}", comicId, e); }
-        }
     }
 
     @Data
