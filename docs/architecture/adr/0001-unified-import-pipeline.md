@@ -167,7 +167,7 @@ Handler (来源特定) → DirectoryParser → MetadataAssembler → StorageServ
 - 设计文档：`docs/superpowers/specs/2026-07-16-project-docs-update-phase1-design.md` §3.4
 - 实现代码：
   - `worker-service/.../event/ImportTaskHandler.java`：MQ 消费，路由到具体 Handler
-  - `worker-service/.../file/handler/DirectoryImportHandler.java`：统一导入逻辑
-  - `worker-service/.../file/handler/ZipImportHandler.java`：解压后委托 DirectoryImportHandler
-  - `worker-service/.../file/parse/DirectoryParser.java`：输出 DirectoryTree
-  - `worker-service/.../file/parse/MetadataAssembler.java`：DirectoryTree → ComicMetadata
+  - `worker-service/.../importer/DirectoryImportHandler.java`：统一导入逻辑
+  - `worker-service/.../importer/ZipImportHandler.java`：解压后委托 DirectoryImportHandler
+  - `worker-service/.../importer/DirectoryParser.java`：输出 DirectoryTree
+  - `worker-service/.../importer/MetadataAssembler.java`：DirectoryTree → ComicMetadata

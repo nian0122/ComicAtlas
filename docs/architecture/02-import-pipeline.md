@@ -73,7 +73,7 @@ Worker ImportTaskHandler (消费 MQ)
          │  (或 "DIRECTORY" 别名)           │
          │                                  ▼ DirectoryParser
          │
-          └─ sourceType="EHENTAI" ─────► FileService (下载→解压→委托 DirectoryImportHandler)
+          └─ sourceType="EHENTAI" ─────► EhentaiDownloadService (下载→解压→委托 DirectoryImportHandler)
          
 所有路径最终汇聚到 DirectoryImportHandler:
          │
@@ -93,7 +93,7 @@ ComicMetadata (包含 catalogs + chapters + mediaItems)
 MediaAnalyzer.analyze(): 图片尺寸 + ffprobe 视频元数据
           │
           ▼
-StorageService.store(): 搬文件到 HQ/{comicId}/{chapterId}/
+StorageService.transfer(): 搬文件到 HQ/{comicId}/{chapterId}/
          │
          ▼
 writeMetadata(): 写 metadata.json 到 MANGA_ROOT/metadata/{taskId}.json
@@ -162,7 +162,7 @@ SUCCESS
 
 ### 5.1 DirectoryTree
 
-**位置**: `worker-service/.../file/parse/DirectoryTree.java`
+**位置**: `worker-service/.../importer/DirectoryTree.java`
 
 **职责**: 纯文件系统结构，无业务语义。
 
@@ -170,23 +170,23 @@ SUCCESS
 public record DirectoryTree(
     Path path,           // 目录绝对路径
     String name,         // 目录名
-    List<Path> imageFiles,  // 图片文件列表
+    List<Path> mediaFiles,   // 当前目录下的媒体文件（图片 + 视频）
     List<DirectoryTree> children  // 子目录
 ) {
-    public boolean isLeaf() { return children.isEmpty(); }
-    public boolean hasChildren() { return !children.isEmpty(); }
+    public boolean isLeaf() { return mediaFiles != null && !mediaFiles.isEmpty(); }
+    public boolean hasChildren() { return children != null && !children.isEmpty(); }
 }
 ```
 
 **特点**：
 
 - 不包含 Catalog/Chapter 概念
-- 只记录目录结构和图片列表
+- 只记录目录结构和媒体文件列表（图片 + 视频）
 - 由 `DirectoryParser` 生成
 
 ### 5.2 ComicMetadata
 
-**位置**: `worker-service/.../file/parse/ComicMetadata.java`
+**位置**: `worker-service/.../media/ComicMetadata.java`
 
 **职责**: 包含业务语义的漫画元数据。
 
@@ -194,6 +194,7 @@ public record DirectoryTree(
 public record ComicMetadata(
     String title,
     String author,
+    String category,     // 分类（可选）
     List<String> tags,
     List<CatalogInfo> catalogs,  // 目录树
     List<ChapterInfo> chapters   // 章节列表
@@ -211,17 +212,22 @@ public record ComicMetadata(
         int globalOrder,     // 全书阅读顺序
         Integer catalogIndex,  // 所属 catalog 索引
         String sourceDir,    // 源目录相对路径
-        List<PageInfo> pages
+        List<MediaInfo> pages
     ) {}
     
-    public record PageInfo(
-        String imageName,
+    public record MediaInfo(
+        String fileName,     // 媒体文件名（图片 + 视频）
         int pageNumber,
         String hqStatus,
         String lqStatus,
         long fileSize,
         Integer width,
-        Integer height
+        Integer height,
+        String mediaType,    // IMAGE / VIDEO
+        BigDecimal duration,  // 视频时长（秒），仅 VIDEO
+        String container,     // 视频容器，仅 VIDEO
+        String videoCodec,    // 视频编码，仅 VIDEO
+        String audioCodec     // 音频编码，仅 VIDEO
     ) {}
 }
 ```
@@ -231,10 +237,11 @@ public record ComicMetadata(
 - 包含 Catalog/Chapter 层级关系
 - `globalOrder` 决定全书阅读顺序
 - `parentIndex` / `catalogIndex` 是列表索引，落库时转换为 DB 主键
+- 媒体字段 `mediaType` 区分图片（IMAGE）与视频（VIDEO），视频条目额外带 `duration` / `container` / `videoCodec` / `audioCodec`
 
 ### 5.3 ImportContext
 
-**位置**: `worker-service/.../file/parse/ImportContext.java`
+**位置**: `worker-service/.../importer/ImportContext.java`
 
 **职责**: 导入上下文，记录来源信息。
 
@@ -303,7 +310,7 @@ public record ImportContext(
        │                │                 │<───────────────│                 │
        │                │                 │  ComicMetadata  │                 │
        │                │                 │                │                 │
-       │                │                 │ 8. StorageService.store()        │
+       │                │                 │ 8. StorageService.transfer()        │
        │                │                 │───────────────>│                 │
        │                │                 │                │ 搬文件到 HQ     │
        │                │                 │<───────────────│                 │
@@ -350,7 +357,11 @@ switch (sourceType) {
         ImportContext ctx = new ImportContext("DIRECTORY", Path.of(normalizedPath), false, false);
         directoryHandler.handle(ctx, taskId, comicId, mangaRoot);
     }
-    case "EHENTAI" -> fileService.processImport(taskId, comicId, sourcePath, sourceType);
+    case "EHENTAI" -> {
+        Path sourceDir = ehentaiDownloadService.downloadToSourceDir(taskId, sourcePath);
+        directoryHandler.handle(new ImportContext("DIRECTORY", sourceDir, false, false),
+                taskId, comicId, mangaRoot);
+    }
     default -> throw new IllegalArgumentException("Unknown sourceType: " + sourceType);
 }
 ```
@@ -369,14 +380,15 @@ public enum SourceType { ZIP, REGISTER, EHENTAI }
 
 Worker 写入 `MANGA_ROOT/metadata/{taskId}.json`，API 读取后落库。
 
-**结构示例**：
+**结构示例**（metadata v3）：
 
 ```json
 {
-  "version": 2,
+  "version": 3,
   "comic": {
     "title": "漫画标题",
     "author": "作者",
+    "category": "漫画",
     "tags": ["tag1", "tag2"]
   },
   "catalogs": [
@@ -399,13 +411,14 @@ Worker 写入 `MANGA_ROOT/metadata/{taskId}.json`，API 读取后落库。
       "globalOrder": 0,
       "catalogIndex": 1,
       "sourceDir": "vol1/ch1",
-      "pages": [
+      "mediaItems": [
         {
-          "imageName": "001.jpg",
+          "fileName": "001.jpg",
           "pageNumber": 1,
           "hqStatus": "READY",
-          "lqStatus": "PENDING",
+          "lqStatus": "NOT_GENERATED",
           "fileSize": 123456,
+          "mediaType": "IMAGE",
           "width": 800,
           "height": 1200
         }
@@ -417,12 +430,15 @@ Worker 写入 `MANGA_ROOT/metadata/{taskId}.json`，API 读取后落库。
 
 **字段说明**：
 
-- `version`: 元数据版本号，当前为 2
+- `version`: 元数据版本号，当前为 3
 - `catalogs[].parentIndex`: catalogs 列表索引，落库时转换为 `parent_id`
 - `chapters[].catalogIndex`: 所属 catalog 索引，落库时转换为 `catalog_id`
 - `chapters[].globalOrder`: 全书阅读顺序，决定 prev/next 章节
-- `pages[].hqStatus`: HQ 文件状态（READY/MISSING/PENDING）
-- `pages[].lqStatus`: LQ 文件状态（NOT_GENERATED/PENDING/READY/FAILED）
+- `mediaItems[].fileName`: 媒体文件名（图片或视频）
+- `mediaItems[].mediaType`: 媒体类型（`IMAGE` / `VIDEO`）
+- `mediaItems[].hqStatus`: HQ 文件状态（READY/MISSING/PENDING）
+- `mediaItems[].lqStatus`: LQ 文件状态（NOT_GENERATED/PENDING/READY/FAILED）
+- `mediaItems[].width` / `height`: 图片尺寸；视频条目额外带 `duration` / `container` / `videoCodec` / `audioCodec`
 
 ---
 

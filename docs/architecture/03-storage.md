@@ -58,13 +58,13 @@ F:/manga/                          # MANGA_ROOT
 
 ## 3. 存储服务 (Worker)
 
-Worker 侧的存储抽象由 `StorageService` 接口和 `LocalStorageService` 实现组成。
+Worker 侧的存储抽象由 `StorageService` 接口和 `TransferService` 实现组成。
 
 ### 3.1 StorageService 接口
 
 ```java
 public interface StorageService {
-    StorageRef store(Path source, String rootKey, String relativePath);
+    StorageRef transfer(Path source, StorageRef target, TransferMode mode);
     Path resolve(StorageRef ref);
     boolean exists(StorageRef ref);
     void delete(StorageRef ref);
@@ -73,18 +73,18 @@ public interface StorageService {
 
 | 方法 | 职责 |
 |------|------|
-| `store` | 将源文件复制到指定 root 下的相对路径，返回 `StorageRef` |
+| `transfer` | 按 `TransferMode`（COPY/MOVE）将源文件复制/移动到目标 `StorageRef`，返回目标引用 |
 | `resolve` | 将 `StorageRef` 解析为物理 `Path` |
 | `exists` | 检查 `StorageRef` 对应的文件是否存在 |
 | `delete` | 删除 `StorageRef` 对应的文件 |
 
-### 3.2 LocalStorageService
+### 3.2 TransferService
 
-`LocalStorageService` 是 `StorageService` 的本地文件系统实现。它通过 `StorageProperties` 获取已注册的 `StorageRoot` 映射。
+`TransferService` 是 `StorageService` 的本地文件系统实现。它通过 `StorageProperties` 获取已注册的 `StorageRoot` 映射，并按 `TransferMode` 决定复制或移动。
 
 核心行为：
 
-- `store`: 创建父目录，使用 `Files.copy` + `REPLACE_EXISTING` 复制文件
+- `transfer`: 创建父目录，COPY 模式使用 `Files.copy` + `REPLACE_EXISTING`，MOVE 模式通过 `SafeMoveStrategy` 安全移动
 - `resolve`: 通过 `rootKey` 查找 `StorageRoot`，调用 `root.resolve(relativePath)` 得到绝对路径
 - `delete`: 调用 `Files.deleteIfExists`，失败时仅 warn 不抛异常
 
@@ -193,7 +193,7 @@ URL 前缀通过 `storage.url-prefix` 配置，默认 `/files`。Nginx 将 `/fil
 
 | 组件 | 负责 | 不负责 |
 |------|------|--------|
-| `StorageService` (Worker) | 文件复制、解析、存在检查、删除 | 数据库写入、URL 生成 |
+| `StorageService` (Worker) | 文件复制/移动、解析、存在检查、删除 | 数据库写入、URL 生成 |
 | `StorageLayout` (API) | 计算页面相对路径 | 文件操作、URL 拼接 |
 | `FileUrlResolver` (API) | 将 Page 存储字段转为 HTTP URL | 物理文件管理 |
 | `ImportEventHandler` (API) | 读 metadata.json 写数据库 | 文件搬移 |
