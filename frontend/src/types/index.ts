@@ -392,3 +392,321 @@ export const EXPORT_STATUS_COLOR_MAP: Record<string, string> = {
   SUCCESS: 'success',
   FAILED: 'danger',
 }
+
+// ========== Management Domain ==========
+
+/** 管理任务类型（后端 TaskType 枚举） */
+export type ManagementTaskType =
+  | 'IMPORT'
+  | 'RECOVERY'
+  | 'EXPORT'
+  | 'DIRECTORY_SCAN'
+  | 'LQ_GENERATE'
+  | 'LQ_REGENERATE'
+  | 'HQ_DELETE'
+  | 'TRANSCODE'
+  | 'METADATA_REFRESH'
+  | 'METADATA_UPDATE'
+  | 'COMIC_DELETE'
+  | 'MEDIA_UPLOAD'
+  | 'MEDIA_REPLACE'
+  | 'MEDIA_TRASH'
+  | 'CHAPTER_TRASH'
+  | 'COMIC_RESTORE'
+  | 'CHAPTER_RESTORE'
+  | 'MEDIA_RESTORE'
+  | 'COMIC_PURGE'
+  | 'CHAPTER_PURGE'
+  | 'MEDIA_PURGE'
+
+/** 管理任务状态（后端 ManagementTaskStatus 枚举） */
+export type ManagementTaskStatus =
+  | 'QUEUED'
+  | 'RUNNING'
+  | 'CANCELLING'
+  | 'CANCELLED'
+  | 'SUCCEEDED'
+  | 'PARTIALLY_SUCCEEDED'
+  | 'FAILED'
+
+/** 统一管理任务（后端 ManagementTaskResponse，JSON 字段 isBatch） */
+export interface ManagementTaskVO {
+  readonly id: number
+  readonly taskType: ManagementTaskType
+  readonly operation: string
+  readonly targetType: string
+  readonly batchId: string | null
+  readonly isBatch: boolean
+  readonly status: ManagementTaskStatus
+  readonly stage: string | null
+  readonly progress: number | null
+  readonly totalCount: number | null
+  readonly successCount: number | null
+  readonly failureCount: number | null
+  readonly cancelledCount: number | null
+  readonly errorMessage: string | null
+  readonly attempt: number | null
+  readonly version: number | null
+  readonly createdAt: string
+  readonly updatedAt: string
+  readonly startedAt: string | null
+  readonly completedAt: string | null
+}
+
+/** 管理任务目标项（后端 ManagementTaskItemResponse） */
+export interface ManagementTaskItemVO {
+  readonly id: number
+  readonly taskId: number
+  readonly targetType: string
+  readonly targetId: number
+  readonly operationType: ManagementTaskType
+  readonly status: ManagementTaskStatus
+  readonly attempt: number | null
+  readonly progress: number | null
+  readonly resultRefType: string | null
+  readonly resultRefId: number | null
+  readonly errorMessage: string | null
+  readonly version: number | null
+  readonly createdAt: string
+  readonly updatedAt: string
+  readonly startedAt: string | null
+  readonly completedAt: string | null
+}
+
+/** 创建管理任务的目标项（后端 CreateManagementTaskRequest.TaskTarget） */
+export interface ManagementTaskTarget {
+  readonly targetType: string
+  readonly targetId: number
+  readonly operationType?: ManagementTaskType
+}
+
+/** 创建管理任务请求（后端 CreateManagementTaskRequest） */
+export interface CreateManagementTaskRequest {
+  readonly taskType: ManagementTaskType
+  readonly operation: string
+  readonly targetType?: string
+  readonly batchId?: string
+  readonly targets?: readonly ManagementTaskTarget[]
+}
+
+/** 上传会话状态（后端 UploadSessionStatus 枚举） */
+export type UploadSessionState =
+  | 'ACTIVE'
+  | 'COMPLETED'
+  | 'CANCELLED'
+  | 'EXPIRED'
+  | 'FAILED'
+
+/** 会话内单个文件状态（后端 UploadFileResponse） */
+export interface UploadFileStatus {
+  readonly fileId: string
+  readonly storageName: string
+  readonly receivedBytes: number
+  readonly sizeBytes: number
+  readonly complete: boolean
+  readonly receivedRanges: string
+}
+
+/** 上传会话状态响应（后端 UploadSessionStatusResponse） */
+export interface UploadSessionStatus {
+  readonly sessionId: string
+  readonly status: UploadSessionState
+  readonly totalBytes: number
+  readonly totalFiles: number
+  readonly expiresAt: string
+  readonly completedAt: string | null
+  readonly files: readonly UploadFileStatus[]
+}
+
+/** 上传文件清单项（后端 CreateUploadSessionRequest.FileManifest） */
+export interface UploadFileManifest {
+  readonly fileId: string
+  readonly name: string
+  readonly contentType: string
+  readonly size: number
+  readonly sha256: string
+}
+
+/** 创建上传会话请求（后端 CreateUploadSessionRequest） */
+export interface CreateUploadSessionRequest {
+  readonly comicId: number
+  readonly chapterId: number
+  readonly replaceMediaId?: number | null
+  readonly files: readonly UploadFileManifest[]
+}
+
+/** 创建上传会话响应（后端 CreateUploadSessionResponse） */
+export interface CreateUploadSessionResult {
+  readonly sessionId: string
+  readonly chunkSize: number
+  readonly expiresAt: string
+  readonly totalBytes: number
+  readonly files: readonly UploadFileStatus[]
+}
+
+/** 分片上传响应（后端 UploadChunkResponse） */
+export interface UploadChunkResult {
+  readonly fileId: string
+  readonly receivedBytes: number
+  readonly complete: boolean
+  readonly receivedRanges: string
+}
+
+/** 上传会话完成响应（后端 UploadCompleteResponse） */
+export interface UploadCompleteResult {
+  readonly taskId: number | null
+  readonly taskType: string
+  readonly status: string | null
+  readonly itemCount: number | null
+  readonly mediaIds: readonly number[]
+}
+
+/** 永久清理二次确认请求（后端 PurgeRequest） */
+export interface TrashPurgeRequest {
+  readonly token: string
+}
+
+/** 回收对账报告条目（后端 TrashReconcileReport.EntryReport） */
+export interface ReconcileEntry {
+  readonly rootKey: string
+  readonly sourceRelativePath: string
+  readonly sourceExists: boolean
+  readonly trashExists: boolean
+  readonly state: string
+}
+
+/** 回收对账报告（后端 TrashReconcileReport） */
+export interface ReconcileResult {
+  readonly targetType: string
+  readonly targetId: number
+  readonly dbStatus: string | null
+  readonly manifestTaskId: number | null
+  readonly manifestStatus: string | null
+  readonly consistent: boolean
+  readonly entries: readonly ReconcileEntry[]
+}
+
+/** 批量选择：显式 ID 列表 */
+export interface BatchSelectionIds {
+  readonly type: 'IDS'
+  readonly ids: readonly number[]
+}
+
+/** 批量选择：筛选条件 + 排除项 */
+export interface BatchSelectionFilter {
+  readonly type: 'FILTER'
+  readonly query?: ComicListQuery
+  readonly excludedIds?: readonly number[]
+}
+
+/** 批量目标选择（后端 BatchSelectionVO 判别联合） */
+export type BatchSelection = BatchSelectionIds | BatchSelectionFilter
+
+/** 批量操作负载（后端 BatchOperationPayloadDTO） */
+export interface BatchOperationPayload {
+  readonly categoryId?: number | null
+  readonly addTagIds?: readonly number[]
+  readonly title?: string
+  readonly author?: string
+  readonly description?: string
+}
+
+/** 被阻止的批量目标（后端 BlockedBatchItem） */
+export interface BlockedBatchItem {
+  readonly comicId: number
+  readonly reasonCode: string
+  readonly reason: string
+}
+
+/** 批量选择预览结果（后端 BatchPreviewResponse） */
+export interface BatchPreviewResult {
+  readonly operation: ManagementTaskType
+  readonly selectedCount: number
+  readonly eligibleCount: number
+  readonly blocked: readonly BlockedBatchItem[]
+  readonly dangerous: boolean
+  readonly previewToken: string | null
+  readonly expiresAt: string | null
+}
+
+/** 批量操作提交请求（后端 BatchOperationRequest） */
+export interface BatchSubmitRequest {
+  readonly operation: ManagementTaskType
+  readonly selection: BatchSelection
+  readonly payload?: BatchOperationPayload | null
+  readonly previewToken?: string | null
+}
+
+/** 批量任务创建结果（后端 BatchCreateResponse） */
+export interface BatchCreateResult {
+  readonly task: ManagementTaskVO
+  readonly selectedCount: number
+  readonly eligibleCount: number
+  readonly blocked: readonly BlockedBatchItem[]
+}
+
+/** 允许操作查询结果（后端 AllowedOperations） */
+export interface MediaOperationResult {
+  readonly allowed: readonly string[]
+  readonly blockedReasons: Readonly<Record<string, string>>
+}
+
+/** Outbox 积压统计（后端 OutboxStatsDTO） */
+export interface OutboxStats {
+  readonly pending: number
+  readonly failed: number
+  readonly total: number
+}
+
+/** 目录管理请求（创建/重命名/移动/重排，字段按操作取用） */
+export interface CatalogManagementRequest {
+  readonly title?: string
+  readonly parentId?: number | null
+  readonly sortOrder?: number
+}
+
+/** 章节管理请求（创建/重命名/移动/重排，字段按操作取用） */
+export interface ChapterManagementRequest {
+  readonly title?: string
+  readonly chapterNo?: string
+  readonly catalogId?: number | null
+  readonly targetGlobalOrder?: number
+}
+
+/** 目录视图（后端 CatalogVO） */
+export interface CatalogVO {
+  readonly id: number
+  readonly comicId: number
+  readonly parentId: number | null
+  readonly title: string
+  readonly sortOrder: number | null
+}
+
+/** 章节管理视图（后端 ChapterVO，区别于阅读域的 ChapterVO） */
+export interface ChapterManagementVO {
+  readonly id: number
+  readonly comicId: number
+  readonly catalogId: number | null
+  readonly title: string
+  readonly chapterNo: string | null
+  readonly pageCount: number | null
+  readonly sortOrder: number | null
+  readonly globalOrder: number | null
+  readonly status: string | null
+}
+
+/** 媒体重排请求（后端 MediaReorderRequest） */
+export interface MediaReorderRequest {
+  readonly mediaIds: readonly number[]
+}
+
+/** 媒体重排结果项（后端 MediaReorderItem） */
+export interface MediaReorderItem {
+  readonly mediaId: number
+  readonly pageNumber: number | null
+}
+
+/** 媒体重排结果（后端 MediaReorderResponse） */
+export interface MediaReorderResult {
+  readonly items: readonly MediaReorderItem[]
+}
