@@ -1,6 +1,11 @@
 # ComicAtlas v0.1.0 Release Checklist
 
+**更新日期：** 2026-08-08
+**状态：** 历史记录（v0.1.0 发布验收）
+**维护者：** ComicAtlas 发布组
+
 > 本清单在 `v0.1.0-beta` 冻结后执行，全部通过方可发布 `v0.1.0` 稳定版。
+> 本文为 v0.1.0 历史发布清单。v1.0 的发布流程与验收见 `docs/operations/management.md` 与 `docs/releases/v1.0.0.md`。
 
 ---
 
@@ -52,7 +57,7 @@
 
 ## 五、Happy Path 全链路
 
-使用真实漫画数据（至少 1 本 ZIP 或 DIRECTORY）完整走通：
+使用真实漫画数据（至少 1 本 ZIP / 本地目录 / EHENTAI）完整走通：
 
 - [ ] 创建导入任务
 - [ ] Task Center 状态变为 SUCCESS
@@ -72,7 +77,7 @@
 - [ ] 重复导入：行为符合设计
 - [ ] 导入中刷新页面：Task Center 能恢复轮询
 - [ ] Reader 中刷新页面：恢复章节和页码
-- [ ] 删除漫画后返回 Library
+- [ ] 删除漫画后返回 Library（v1.0 中删除进入回收站，7 天保留期）
 - [ ] 封面不存在：显示占位图
 
 ---

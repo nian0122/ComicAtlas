@@ -101,8 +101,8 @@ private Boolean batch;
 | 文件 | 修改前 | 修改后 | 语义 |
 |------|--------|--------|------|
 | `api-service/.../common/Result.java` | `Result<T> r`（3 个静态工厂方法内） | `result` | 返回容器对象，全名可读 |
-| `worker-service/.../file/storage/SafeMoveStrategy.java` | `tmp`（`moveCrossVolume` 局部 + `verifyCopySize` 参数） | `tempPath` | 跨卷复制的临时路径 |
-| `worker-service/.../file/manifest/ImportManifestManager.java` | `tmp`（`write` 方法局部） | `tempPath` | 清单原子写入的临时文件路径 |
+| `worker-service/.../storage/SafeMoveStrategy.java` | `tmp`（`moveCrossVolume` 局部 + `verifyCopySize` 参数） | `tempPath` | 跨卷复制的临时路径 |
+| `worker-service/.../importer/ImportManifestManager.java` | `tmp`（`write` 方法局部） | `tempPath` | 清单原子写入的临时文件路径 |
 
 ### 4.2 修复边界（明确不动）
 

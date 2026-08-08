@@ -1,164 +1,191 @@
 # 08 — 前端技术架构
 
-> Vue3 项目的技术层设计。确定 Router、Pinia、API、Types、组件层级、目录结构。
+**更新日期：** 2026-08-08
+**状态：** 与 v1.0 源码结构同步
+**维护者：** ComicAtlas 前端组
+
+> Vue3 项目的技术层设计：Router、Pinia、API、Types、组件层级、目录结构。
 
 ---
 
-## 目录结构（目标）
+## 目录结构（当前）
 
 ```
 frontend/src/
-├── App.vue                  # 根组件：全局 Layout
+├── App.vue                  # 根组件
 ├── main.ts                  # 入口
-├── style.css                # CSS 变量
+├── style.css                # CSS 变量 / 设计 Token
 ├── router/
-│   └── index.ts             # 路由定义
+│   └── index.ts             # 路由定义（阅读端 6 + 管理端 8 主路由）
+├── layouts/                 # 布局
+│   ├── ReadingLayout.vue    # 阅读端（Home/Library/Detail/History）
+│   ├── ReaderLayout.vue     # 阅读器（全屏）
+│   └── ManagementLayout.vue # 管理端（TopNav + <router-view>）
 ├── stores/                  # Pinia
-│   ├── comic-store.ts       # 漫画列表
+│   ├── comic-store.ts       # 漫画列表 / 搜索 / 分页
 │   ├── reader-store.ts      # 阅读器状态
-│   ├── import-store.ts      # 导入任务
 │   ├── history-store.ts     # 阅读记录
-│   ├── dashboard-store.ts   # 仪表盘
 │   ├── tag-store.ts         # 标签
-│   └── app-store.ts         # 全局状态
-├── services/
-│   └── api.ts               # Axios + 所有 API
+│   ├── app-store.ts         # 全局状态
+│   ├── reader-settings-store.ts  # 阅读偏好（localStorage 持久化）
+│   ├── reading.ts           # 阅读端 store barrel
+│   └── management/          # 管理端 store
+│       ├── comic.ts         # management-comic（漫画工作区）
+│       ├── import.ts        # 导入任务
+│       ├── storage.ts       # 存储管理
+│       ├── category.ts      # 分类
+│       └── recovery.ts      # 恢复任务
+├── services/                # API 服务层
+│   ├── api.ts               # axios 实例 + 全部领域 API + DLQ 类型
+│   ├── storage.ts           # storageService / exportService（存储域封装）
+│   ├── recovery.ts          # recoveryApi（恢复任务）
+│   ├── reading.ts           # 阅读端 API barrel
+│   ├── management.ts        # 管理端 API barrel
+│   └── media-url.ts         # 媒体 URL 解析
 ├── types/
-│   └── index.ts             # 接口定义
+│   └── index.ts             # 接口定义（阅读 + 管理 + 存储类型）
 ├── components/              # 可复用组件
-│   ├── layout/
-│   │   └── TopNav.vue       # 全局导航栏
-│   ├── comic/
-│   │   ├── ComicCard.vue
-│   │   ├── CatalogTree.vue
-│   │   └── SearchBar.vue
-│   ├── reader/
-│   │   ├── ReaderToolbar.vue
-│   │   └── ImageViewer.vue
-│   ├── task/
-│   │   └── TaskCard.vue
-│   └── common/
-│       ├── PageHeader.vue
-│       └── EmptyState.vue
-└── pages/                   # 页面（路由级组件）
-    ├── ComicListPage.vue
-    ├── ComicDetailPage.vue
-    ├── ReaderPage.vue
-    ├── ImportPage.vue
-    ├── TaskCenterPage.vue
-    ├── HistoryPage.vue
-    ├── DashboardPage.vue
-    └── OperationLogPage.vue
+│   ├── layout/TopNav.vue    # 全局导航
+│   ├── reading/             # 阅读端组件（home / comic / HeroBanner）
+│   ├── management/task/     # TaskCard / ExportTaskCard / RecoveryTaskCard
+│   ├── history/             # 阅读记录组件
+│   └── icons/               # MaterialSymbolIcon
+├── views/                   # 页面（路由级组件）
+│   ├── reading/             # HomePage / LibraryPage / DetailPage / HistoryPage / ReaderPage / PosterTestPage
+│   │   └── reader/components/  # ReaderViewport / ProgressiveImage / VideoPlayer 等
+│   └── management/          # ComicListPage / ComicEditPage / ImportPage / TaskPage /
+│                            # storage/ / dlq/ / MetadataPage / SettingsPage / InterceptPage
+└── utils/
+    ├── device.ts            # 移动阅读设备判定（isMobileReadingDevice）
+    └── preload-engine.ts    # 阅读器预加载引擎
 ```
 
 ---
 
 ## Router
 
-当前 8 条路由。需新增 AppLayout 包裹：
+路由定义在 `frontend/src/router/index.ts`，共 14 条主页面路由（阅读端 6 + 管理端 8），另含管理端移动拦截页 `/manage/intercept` 与存储详情子页 `/manage/storage/:id`：
 
 ```typescript
-const routes = [
-  {
-    path: '/',
-    component: AppLayout,       // TopNav + <router-view>
-    children: [
-      { path: '/', redirect: '/comics' },
-      { path: '/comics', ... },
-      { path: '/comics/:id', ... },
-      { path: '/comics/:id/read', ... },
-      { path: '/tasks', ... },
-      { path: '/history', ... },
-      { path: '/dashboard', ... },
-      { path: '/import', ... },     // 不需要在 TopNav 中显示
-      { path: '/operations', ... },  // 不需要在 TopNav 中显示
-    ]
-  }
-]
+// 阅读端
+{ path: '/',              name: 'home',            ReadingLayout  }
+{ path: '/library',       name: 'library',         ReadingLayout  }
+{ path: '/history',       name: 'history',         ReadingLayout  }
+{ path: '/comic/:id',     name: 'comic-detail',    ReadingLayout  }
+{ path: '/reader/:chapterId', name: 'reader',      ReaderLayout   }
+{ path: '/poster-test',   name: 'poster-test' }        // 测试页
+// 管理端
+{ path: '/manage/intercept', name: 'manage-intercept' }  // 移动端拦截
+{ path: '/manage',        ManagementLayout
+  ├── /manage/comics           manage-comics
+  ├── /manage/comics/:id/edit  manage-comic-edit
+  ├── /manage/import           manage-import
+  ├── /manage/import/tasks     manage-import-tasks
+  ├── /manage/storage          manage-storage
+  ├── /manage/storage/:id      manage-storage-detail
+  ├── /manage/metadata         manage-metadata
+  ├── /manage/dlq              manage-dlq
+  └── /manage/settings         manage-settings }
 ```
+
+移动端守卫：`router.beforeEach` 对 `/manage/*` 前缀做移动阅读设备判定（`isMobileReadingDevice`），命中则重定向到 `/manage/intercept`；DEV 下可带 `?force-desktop=1` 旁路。
 
 ---
 
 ## Pinia Stores
 
-| Store | 职责 | 状态 |
+| Store | 文件 | 职责 |
 |-------|------|------|
-| `comic-store` | 漫画列表、搜索、分页 | ✅ 已有 |
-| `reader-store` | 当前章节、页码、prev/next、HQ 模式 | ✅ 已有 |
-| `import-store` | 导入任务列表、创建、取消、重试 | ✅ 已有 |
-| `history-store` | 阅读记录列表 | ✅ 已有 |
-| `dashboard-store` | 统计数据 | ✅ 已有 |
-| `tag-store` | 标签列表 | ✅ 已有 |
-| `app-store` | 全局状态（侧边栏等） | ✅ 已有 |
+| `comic` | `stores/comic-store.ts` | 漫画列表、搜索、筛选、分页 |
+| `reader` | `stores/reader-store.ts` | 当前章节、页码、prev/next |
+| `reader-settings` | `stores/reader-settings-store.ts` | 阅读偏好（画质/适配/缩放/方向/预加载） |
+| `history` | `stores/history-store.ts` | 阅读记录 |
+| `tag` | `stores/tag-store.ts` | 标签 |
+| `app` | `stores/app-store.ts` | 全局状态 |
+| `management-comic` | `stores/management/comic.ts` | 漫画工作区（列表/编辑/批量） |
+| `import` | `stores/management/import.ts` | 导入任务 |
+| `storage` | `stores/management/storage.ts` | 存储管理 |
+| `category` | `stores/management/category.ts` | 分类 |
+| `recovery` | `stores/management/recovery.ts` | 恢复任务 |
 
-**无需新增 Store**。只新增 Layout 组件和可复用组件。
+`stores/reading.ts` 为阅读端 store barrel（统一导出阅读端 stores）。
 
 ---
 
 ## API 服务层
 
-当前 `api.ts` 结构：
+`services/api.ts` 创建 axios 实例（`baseURL: '/api'`，响应拦截器统一解包 `{ code, data }`），按域导出：
 
-```typescript
-export const comicApi   = { list, detail, delete }
-export const catalogApi = { tree }
-export const readerApi  = { chapter }
-export const importApi  = { create, list, detail, status, cancel, retry }
-export const historyApi = { list, get, update }
-export const lqApi      = { generateComic, generateChapter }
-export const dashboardApi = { statistics }
-export const operationApi = { list }
-export const tagApi     = { list }
-```
+| API 对象 | 接口域 |
+|----------|--------|
+| `comicApi` | `/comics`（list/detail/delete/metadata/tags/batch） |
+| `catalogApi` | `/comics/{id}/catalog` |
+| `readerApi` | `/chapters/{id}` |
+| `importApi` | `/tasks/import`（create/list/detail/status/cancel/retry/batch） |
+| `directoryScanApi` | `/tasks/directory-scan` |
+| `historyApi` | `/history` |
+| `tagApi` | `/tags` |
+| `categoryApi` | `/categories` |
+| `lqApi` | `/storage/lq/*`（generateComic / generateChapter） |
+| `hqApi` | `/storage/delete-hq/*`（deleteComic / deleteChapter） |
+| `exportApi` | `/storage/export/*`（create/list/get/download/open） |
+| `adminApi` | `/storage/stats`、`/admin/storage/*`、`/storage/transcode/*`、`/admin/dlq/*` |
+| `settingsApi` | `/settings` |
 
-**无需新增**。完整覆盖当前所有后端接口。
+存储域封装在 `services/storage.ts`：`storageService`（fetchComics / fetchSummary / fetchComic / fetchChapters / executeOperation / transcodeVideos）+ `exportService`。恢复任务在 `services/recovery.ts`（`recoveryApi`）。`services/reading.ts` 与 `services/management.ts` 分别为阅读端、管理端 API barrel。
 
 ---
 
 ## Types
 
-当前 `index.ts` 类型定义：
+`types/index.ts` 覆盖阅读与管理全部 DTO：
 
 ```typescript
-ComicListVO, ComicDetailVO, ChapterVO
-CatalogNode, ChapterRef
-PageInfo, ChapterPageVO, ReaderDTO
-ImportTaskVO, ImportStatusVO
-HistoryVO, TagRef
-StatisticsVO, OperationLogVO
-STATUS_COLOR_MAP
+// 阅读端
+ComicListQuery, ComicListVO, ComicDetailVO, ChapterVO, TagRef
+CatalogNode, ChapterRef, MediaType('IMAGE'|'VIDEO'), MediaItemInfo
+ReaderDTO, ChapterPageVO
+HistoryVO
+// 导入/任务
+ImportTaskVO, ImportStatusVO, ScanItemVO, ScanResultVO, BatchImportRequest, BatchImportResultVO
+// 管理端
+ComicMetadataDTO, ComicMetadataUpdateDTO, TagDTO, TagCreateDTO, ComicTagUpdateDTO
+BatchComicUpdateDTO, BatchUpdateResultVO, FailedItem
+// 存储域
+HqStatus, LqStatus, ComicStorageItem, ChapterStorageItem, StorageStats, ComicStorageQuery
+StorageOperationType, StorageOperation, ExportTaskVO, OperationSubmitResult
+RecoveryTaskVO, DirectoryScanTaskVO
+// 展示辅助
+STATUS_COLOR_MAP, EXPORT_STATUS_COLOR_MAP, DEFAULT_ASPECT_RATIO
 ```
-
-**需新增**：
-- 无需新增。当前类型完整覆盖。
 
 ---
 
 ## 组件层级
 
 ```
-AppLayout
-├── TopNav（全局导航）
-│   ├── Logo + 标题
-│   ├── NavLink: 漫画库
-│   ├── NavLink: 任务
-│   ├── NavLink: 历史
-│   └── NavLink: 仪表盘
-└── <router-view>
-    ├── ComicListPage
-    │   ├── SearchBar
-    │   └── ComicCard[]
-    ├── ComicDetailPage
-    │   └── CatalogTree（递归）
-    ├── ReaderPage
-    │   ├── ReaderToolbar
-    │   └── ImageViewer
-    ├── ImportPage
-    ├── TaskCenterPage
-    │   └── TaskCard[]
-    ├── HistoryPage
-    │   └── ComicCard[]
-    └── DashboardPage
+ReadingLayout
+├── HomePage（HomeHero / HomeRow / HomeActionGrid）
+├── LibraryPage（ComicCard[] / ComicPoster）
+├── HistoryPage
+└── DetailPage（CatalogTree → CatalogTreeNode[]，ChapterRow，MobileComicDetail）
+
+ReaderLayout
+└── ReaderPage
+    ├── ReaderViewport / ReaderPagedViewport
+    │   ├── ReaderImageItem → ProgressiveImage
+    │   └── VideoPlayer（VIDEO 类型）
+    ├── ReaderToolbar（Desktop/Mobile 变体）
+    └── ReaderSettingsDrawer / ReaderBottomNav
+
+ManagementLayout
+├── ComicListPage（BatchEditDialog）
+├── ComicEditPage
+├── ImportPage → TaskPage（TaskCard[] / ExportTaskCard / RecoveryTaskCard）
+├── StoragePage / StorageDetailPage（storage/ 子组件）
+├── MetadataPage
+├── DeadLetterPage（dlq/ 子组件）
+└── SettingsPage
 ```
 
 ---
@@ -167,21 +194,10 @@ AppLayout
 
 | 层 | 技术 |
 |----|------|
-| 框架 | Vue 3 + Composition API |
+| 框架 | Vue 3 + Composition API（`<script setup lang="ts">`） |
 | 构建 | Vite |
 | 路由 | Vue Router 4 |
 | 状态 | Pinia |
 | UI 库 | Element Plus |
 | HTTP | Axios |
 | 语言 | TypeScript strict |
-
----
-
-## 当前状态 vs 目标
-
-| 项 | 当前 | 目标 |
-|----|------|------|
-| Layout | 无全局布局，页面独立渲染 | AppLayout + TopNav |
-| 组件 | 页面内联，无独立组件文件 | 提取 8 个可复用组件 |
-| 导航 | 无顶部导航 | TopNav 4 个主要入口 |
-| 响应式 | 部分支持 | 移动端友好（TopNav 折叠 + 卡片网格） |

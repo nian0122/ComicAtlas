@@ -1,6 +1,10 @@
 # 开发流程
 
-本文面向 ComicAtlas 的开发者，说明如何使用 Git 管理一次功能开发、修复和发布。
+**更新日期：** 2026-08-08
+**状态：** 生效
+**维护者：** ComicAtlas 开发组
+
+本文面向 ComicAtlas 的开发者，说明如何使用 Git 管理一次功能开发、修复和发布。流程约定与仓库根目录 `AGENTS.md` 的「GIT 工作流」一致，二者冲突时以 `AGENTS.md` 为准。
 
 ## 分支职责
 
@@ -82,6 +86,8 @@ npm --prefix frontend run build
 # 后端
 mvn -pl api-service test
 ```
+
+合并到 `develop` 前按 `AGENTS.md` 门禁执行：修改后端代码至少运行对应模块测试；合并前运行 `./mvnw verify`、Checkstyle 与 `git diff --check`。
 
 不要提交 `.env`、密码、远程服务凭据、日志、构建产物、个人漫画文件或宿主机绝对路径。
 
