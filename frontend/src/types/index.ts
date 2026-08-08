@@ -429,6 +429,17 @@ export type ManagementTaskStatus =
   | 'PARTIALLY_SUCCEEDED'
   | 'FAILED'
 
+/** 管理任务列表查询参数（后端 ManagementTaskController.listTasks） */
+export interface ManagementTaskQuery {
+  readonly page?: number
+  readonly size?: number
+  readonly type?: ManagementTaskType
+  readonly status?: ManagementTaskStatus
+  readonly batchId?: string
+  readonly targetType?: string
+  readonly targetId?: number
+}
+
 /** 统一管理任务（后端 ManagementTaskResponse，JSON 字段 isBatch） */
 export interface ManagementTaskVO {
   readonly id: number

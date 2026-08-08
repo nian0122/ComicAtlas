@@ -1,11 +1,25 @@
 import axios from 'axios'
 import type {
+  BatchCreateResult,
+  BatchPreviewResult,
+  BatchSubmitRequest,
   ComicMetadataUpdateDTO,
+  CreateManagementTaskRequest,
+  CreateUploadSessionRequest,
+  CreateUploadSessionResult,
   ExportTaskVO,
+  ManagementTaskItemVO,
+  ManagementTaskQuery,
+  ManagementTaskVO,
   OperationSubmitResult,
+  ReconcileResult,
   TagCreateDTO,
   ComicTagUpdateDTO,
   BatchComicUpdateDTO,
+  TrashPurgeRequest,
+  UploadChunkResult,
+  UploadCompleteResult,
+  UploadSessionStatus,
 } from '@/types'
 
 const api = axios.create({ baseURL: '/api' })
@@ -99,6 +113,73 @@ export const exportApi = {
   getTask: (taskId: number) => api.get<ExportTaskVO>(`/storage/export/tasks/${taskId}`),
   download: (taskId: number) => api.get(`/storage/export/tasks/${taskId}/download`, { responseType: 'blob' }),
   openDir: (taskId: number) => api.post(`/storage/export/tasks/${taskId}/open`),
+}
+
+// ========== Management Domain ==========
+
+/** 统一管理任务中心 */
+export const managementTaskApi = {
+  list: (params: ManagementTaskQuery) => api.get('/management/tasks', { params }),
+  get: (id: number) => api.get<ManagementTaskVO>(`/management/tasks/${id}`),
+  getItems: (id: number) => api.get<ManagementTaskItemVO[]>(`/management/tasks/${id}/items`),
+  create: (data: CreateManagementTaskRequest) => api.post<ManagementTaskVO>('/management/tasks', data),
+  cancel: (id: number) => api.post<ManagementTaskVO>(`/management/tasks/${id}/cancel`),
+  retry: (id: number) => api.post<ManagementTaskVO>(`/management/tasks/${id}/retry`),
+}
+
+/** 回收站生命周期（恢复 / 永久清理 / 对账） */
+export const trashApi = {
+  restoreComic: (comicId: number) =>
+    api.post<OperationSubmitResult>(`/trash/comics/${comicId}/restore`),
+  restoreChapter: (comicId: number, chapterId: number) =>
+    api.post<OperationSubmitResult>(`/trash/comics/${comicId}/chapters/${chapterId}/restore`),
+  restoreMedia: (mediaId: number) =>
+    api.post<OperationSubmitResult>(`/trash/media/${mediaId}/restore`),
+  purgeComic: (comicId: number, token: string) =>
+    api.post<OperationSubmitResult>(`/trash/comics/${comicId}/purge`, { token } satisfies TrashPurgeRequest),
+  purgeChapter: (comicId: number, chapterId: number, token: string) =>
+    api.post<OperationSubmitResult>(
+      `/trash/comics/${comicId}/chapters/${chapterId}/purge`,
+      { token } satisfies TrashPurgeRequest,
+    ),
+  purgeMedia: (mediaId: number, token: string) =>
+    api.post<OperationSubmitResult>(`/trash/media/${mediaId}/purge`, { token } satisfies TrashPurgeRequest),
+  reconcile: (targetType: string, targetId: number) =>
+    api.get<ReconcileResult>(`/trash/${targetType}/${targetId}/reconcile`),
+  reconcileAndRepair: (targetType: string, targetId: number) =>
+    api.post<ReconcileResult>(`/trash/${targetType}/${targetId}/reconcile`),
+}
+
+/** 分块上传会话（原始字节流 + Content-Range 头） */
+export const uploadApi = {
+  createSession: (data: CreateUploadSessionRequest) =>
+    api.post<CreateUploadSessionResult>('/uploads/sessions', data),
+  getSession: (sessionId: string) =>
+    api.get<UploadSessionStatus>(`/uploads/sessions/${sessionId}`),
+  uploadChunk: (
+    sessionId: string,
+    fileId: string,
+    chunk: Blob,
+    contentRange: string,
+    chunkSha256?: string,
+  ) =>
+    api.put<UploadChunkResult>(`/uploads/sessions/${sessionId}/files/${fileId}`, chunk, {
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        'Content-Range': contentRange,
+        ...(chunkSha256 ? { 'X-Sha256': chunkSha256 } : {}),
+      },
+    }),
+  completeSession: (sessionId: string) =>
+    api.post<UploadCompleteResult>(`/uploads/sessions/${sessionId}/complete`),
+  cancelSession: (sessionId: string) =>
+    api.delete(`/uploads/sessions/${sessionId}`),
+}
+
+/** 跨页批量操作 */
+export const batchApi = {
+  preview: (data: BatchSubmitRequest) => api.post<BatchPreviewResult>('/management/batch/preview', data),
+  submit: (data: BatchSubmitRequest) => api.post<BatchCreateResult>('/management/batch', data),
 }
 
 export const adminApi = {
