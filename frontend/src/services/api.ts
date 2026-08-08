@@ -3,6 +3,10 @@ import type {
   BatchCreateResult,
   BatchPreviewResult,
   BatchSubmitRequest,
+  CatalogManagementRequest,
+  CatalogVO,
+  ChapterManagementRequest,
+  ChapterManagementVO,
   ComicMetadataUpdateDTO,
   CreateManagementTaskRequest,
   CreateUploadSessionRequest,
@@ -11,7 +15,11 @@ import type {
   ManagementTaskItemVO,
   ManagementTaskQuery,
   ManagementTaskVO,
+  MediaOperationResult,
+  MediaReorderRequest,
+  MediaReorderResult,
   OperationSubmitResult,
+  OutboxStats,
   ReconcileResult,
   TagCreateDTO,
   ComicTagUpdateDTO,
@@ -182,9 +190,58 @@ export const batchApi = {
   submit: (data: BatchSubmitRequest) => api.post<BatchCreateResult>('/management/batch', data),
 }
 
+/** 目录管理（create / rename / move / reorder / delete） */
+export const catalogManagementApi = {
+  create: (comicId: number, data: CatalogManagementRequest) =>
+    api.post<CatalogVO>(`/comics/${comicId}/catalogs`, data),
+  rename: (comicId: number, catalogId: number, data: CatalogManagementRequest) =>
+    api.patch<CatalogVO>(`/comics/${comicId}/catalogs/${catalogId}`, data),
+  move: (comicId: number, catalogId: number, data: CatalogManagementRequest) =>
+    api.put<CatalogVO>(`/comics/${comicId}/catalogs/${catalogId}/move`, data),
+  reorder: (comicId: number, catalogId: number, data: CatalogManagementRequest) =>
+    api.put(`/comics/${comicId}/catalogs/${catalogId}/reorder`, data),
+  delete: (comicId: number, catalogId: number, reparentTo?: number) =>
+    api.delete(`/comics/${comicId}/catalogs/${catalogId}`, { params: { reparentTo } }),
+}
+
+/** 章节管理（create / rename / move / reorder / trash） */
+export const chapterManagementApi = {
+  create: (comicId: number, data: ChapterManagementRequest) =>
+    api.post<ChapterManagementVO>(`/comics/${comicId}/chapters`, data),
+  rename: (comicId: number, chapterId: number, data: ChapterManagementRequest) =>
+    api.patch<ChapterManagementVO>(`/comics/${comicId}/chapters/${chapterId}`, data),
+  move: (comicId: number, chapterId: number, data: ChapterManagementRequest) =>
+    api.put<ChapterManagementVO>(`/comics/${comicId}/chapters/${chapterId}/move`, data),
+  reorder: (comicId: number, chapterId: number, data: ChapterManagementRequest) =>
+    api.put<ChapterManagementVO>(`/comics/${comicId}/chapters/${chapterId}/reorder`, data),
+  trash: (comicId: number, chapterId: number) =>
+    api.delete(`/comics/${comicId}/chapters/${chapterId}`),
+}
+
+/** 媒体管理（章节内重排 / 回收） */
+export const mediaManagementApi = {
+  reorder: (chapterId: number, data: MediaReorderRequest) =>
+    api.post<MediaReorderResult>(`/chapters/${chapterId}/media/reorder`, data),
+  trash: (mediaId: number) =>
+    api.delete<OperationSubmitResult>(`/media/${mediaId}`),
+}
+
+/** 允许操作查询（按钮权限以后端判定为准） */
+export const mediaOperationApi = {
+  forComic: (comicId: number) => api.get<MediaOperationResult>(`/management/operations/comics/${comicId}`),
+  forChapter: (chapterId: number) => api.get<MediaOperationResult>(`/management/operations/chapters/${chapterId}`),
+  forMedia: (mediaId: number) => api.get<MediaOperationResult>(`/management/operations/media/${mediaId}`),
+}
+
+/** Outbox 积压统计 */
+export const outboxApi = {
+  stats: () => api.get<OutboxStats>('/management/outbox/stats'),
+}
+
 export const adminApi = {
   deleteComic: (id: number, mode: string) => api.delete(`/admin/comics/${id}`, { params: { mode } }),
   refreshMetadata: (id: number) => api.post(`/storage/refresh-metadata/comics/${id}`),
+  scanRecover: () => api.post('/admin/storage/scan-recover'),
   // scanRecover 已迁移至异步恢复任务中心 POST /api/tasks/recovery
   // 旧同步接口 POST /admin/storage/scan-recover 后端保留供兼容
   stats: () => api.get('/storage/stats'),
