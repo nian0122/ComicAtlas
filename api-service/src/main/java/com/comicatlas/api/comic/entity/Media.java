@@ -20,6 +20,7 @@ import com.baomidou.mybatisplus.annotation.Version;
  *   <li>lqStatus 列: {@link com.comicatlas.api.common.enums.LqStatus}</li>
  *   <li>transcodeStatus 列: {@link com.comicatlas.api.common.enums.TranscodeStatus}</li>
  * </ul>
+ * <p>数据库实体（DO），禁止直接暴露给接口；对外使用 {@code dto/} 包对应 DTO/VO。
  */
 @Data
 @TableName("page")
@@ -48,8 +49,11 @@ public class Media {
     private Integer width;
     private Integer height;
     private Long fileSize;
+    /** 媒体类型：IMAGE 或 VIDEO（默认 IMAGE，支持图片+视频混排） */
     private String mediaType;
+    /** 视频时长（秒），仅 VIDEO 有意义 */
     private BigDecimal duration;
+    /** 视频容器格式（如 mp4/webm/mkv） */
     private String container;
     private String videoCodec;
     private String audioCodec;

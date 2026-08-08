@@ -11,6 +11,7 @@ import com.comicatlas.api.common.enums.ChapterLifecycleStatus;
 /**
  * 章节实体。
  * status 列存储 {@link com.comicatlas.api.common.enums.ChapterLifecycleStatus} 枚举值。
+ * <p>数据库实体（DO），禁止直接暴露给接口；对外使用 {@code dto/} 包对应 DTO/VO。
  */
 @Data
 @TableName("chapter")
@@ -20,9 +21,11 @@ public class Chapter {
     private Long comicId;
     private Long catalogId;
     private String title;
+    /** 原始章节编号（仅展示，不参与排序） */
     private String chapterNo;
     private Integer pageCount;
     private Integer sortOrder;
+    /** 全书阅读顺序（重排依据，comicId 内唯一） */
     private Integer globalOrder;
 
     /** 章节生命周期状态 */
