@@ -14,7 +14,7 @@ import com.comicatlas.api.comic.service.CatalogService;
 import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.common.exception.BusinessException;
-import com.comicatlas.common.enums.ChapterLifecycleStatus;
+import com.comicatlas.api.common.enums.ChapterLifecycleStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;

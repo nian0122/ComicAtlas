@@ -1,4 +1,4 @@
-package com.comicatlas.common.enums;
+package com.comicatlas.api.common.enums;
 
 /**
  * 管理任务状态 — 用于导入/恢复/导出/扫描等异步管理任务。

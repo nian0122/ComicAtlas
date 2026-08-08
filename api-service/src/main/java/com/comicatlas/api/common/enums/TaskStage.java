@@ -1,4 +1,4 @@
-package com.comicatlas.common.enums;
+package com.comicatlas.api.common.enums;
 
 /**
  * 导入任务阶段 — 细分导入过程中的子阶段（区别于任务终态）。

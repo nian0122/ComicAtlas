@@ -1,4 +1,4 @@
-package com.comicatlas.common.enums;
+package com.comicatlas.api.common.enums;
 
 /**
  * 媒体页（IMAGE/VIDEO）生命周期状态。

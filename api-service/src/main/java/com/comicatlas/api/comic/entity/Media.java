@@ -2,8 +2,8 @@ package com.comicatlas.api.comic.entity;
 
 import com.comicatlas.api.common.enums.HqStatus;
 import com.comicatlas.api.common.enums.LqStatus;
-import com.comicatlas.common.enums.MediaLifecycleStatus;
-import com.comicatlas.common.enums.TranscodeStatus;
+import com.comicatlas.api.common.enums.MediaLifecycleStatus;
+import com.comicatlas.api.common.enums.TranscodeStatus;
 import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -15,10 +15,10 @@ import com.baomidou.mybatisplus.annotation.Version;
 /**
  * 媒体页实体（映射 page 表）。
  * <ul>
- *   <li>status 列: {@link com.comicatlas.common.enums.MediaLifecycleStatus}</li>
+ *   <li>status 列: {@link com.comicatlas.api.common.enums.MediaLifecycleStatus}</li>
  *   <li>hqStatus 列: {@link com.comicatlas.api.common.enums.HqStatus}</li>
  *   <li>lqStatus 列: {@link com.comicatlas.api.common.enums.LqStatus}</li>
- *   <li>transcodeStatus 列: {@link com.comicatlas.common.enums.TranscodeStatus}</li>
+ *   <li>transcodeStatus 列: {@link com.comicatlas.api.common.enums.TranscodeStatus}</li>
  * </ul>
  */
 @Data

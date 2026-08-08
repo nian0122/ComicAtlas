@@ -3,7 +3,7 @@ package com.comicatlas.api.export.event;
 import com.comicatlas.api.comic.entity.Media;
 import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.common.constant.MqQueues;
-import com.comicatlas.common.enums.TranscodeStatus;
+import com.comicatlas.api.common.enums.TranscodeStatus;
 import com.comicatlas.common.event.VideoTranscodeCompletedEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
 import com.rabbitmq.client.Channel;

@@ -11,7 +11,7 @@ import com.comicatlas.api.comic.mapper.ComicTagMapper;
 import com.comicatlas.api.comic.mapper.TagMapper;
 import com.comicatlas.api.management.batch.dto.BatchOperationPayload;
 import com.comicatlas.api.management.service.ManagementTaskService;
-import com.comicatlas.common.enums.ManagementTaskStatus;
+import com.comicatlas.api.common.enums.ManagementTaskStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

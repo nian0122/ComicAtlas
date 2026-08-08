@@ -7,7 +7,7 @@ import com.comicatlas.api.comic.entity.Chapter;
 import com.comicatlas.api.comic.entity.Media;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.comic.mapper.MediaMapper;
-import com.comicatlas.common.enums.TranscodeStatus;
+import com.comicatlas.api.common.enums.TranscodeStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

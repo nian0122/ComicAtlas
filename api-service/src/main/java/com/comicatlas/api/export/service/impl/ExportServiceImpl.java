@@ -106,13 +106,13 @@ public class ExportServiceImpl implements ExportService {
      */
     private ManagementTaskResponse createManagementTaskForExport(Long comicId) {
         CreateManagementTaskRequest mgmtReq = new CreateManagementTaskRequest();
-        mgmtReq.setTaskType(com.comicatlas.common.enums.TaskType.EXPORT);
+        mgmtReq.setTaskType(com.comicatlas.api.common.enums.TaskType.EXPORT);
         mgmtReq.setOperation("导出漫画");
         mgmtReq.setTargetType("COMIC");
         CreateManagementTaskRequest.TaskTarget target = new CreateManagementTaskRequest.TaskTarget();
         target.setTargetType("COMIC");
         target.setTargetId(comicId);
-        target.setOperationType(com.comicatlas.common.enums.TaskType.EXPORT);
+        target.setOperationType(com.comicatlas.api.common.enums.TaskType.EXPORT);
         mgmtReq.setTargets(List.of(target));
         return managementTaskService.createTask(mgmtReq, null, null);
     }

@@ -11,7 +11,7 @@ import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
-import com.comicatlas.common.enums.TaskType;
+import com.comicatlas.api.common.enums.TaskType;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
