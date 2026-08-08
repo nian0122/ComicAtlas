@@ -30,6 +30,12 @@ public class ChapterManagementController {
 
     private final ChapterManagementService chapterManagementService;
 
+    /**
+     * 在指定漫画下创建章节，自动分配 globalOrder（全书顺序）与目录内 sortOrder。
+     *
+     * @param request 章节信息（标题/编号/所属目录）
+     * @return 创建的章节
+     */
     @PostMapping
     public Result<ChapterVO> create(
             @PathVariable Long comicId,
@@ -37,6 +43,12 @@ public class ChapterManagementController {
         return Result.ok(chapterManagementService.createChapter(comicId, request));
     }
 
+    /**
+     * 重命名章节（标题或编号，至少提供一项）。
+     *
+     * @param request 标题/编号
+     * @return 重命名后的章节
+     */
     @PatchMapping("/{chapterId}")
     public Result<ChapterVO> rename(
             @PathVariable Long comicId,
@@ -45,6 +57,12 @@ public class ChapterManagementController {
         return Result.ok(chapterManagementService.renameChapter(comicId, chapterId, request));
     }
 
+    /**
+     * 移动章节到目标目录（跨目录重排 sortOrder）。
+     *
+     * @param request 目标目录 ID；请求体缺省或 catalogId 为 null 表示移到根级
+     * @return 移动后的章节
+     */
     @PutMapping("/{chapterId}/move")
     public Result<ChapterVO> move(
             @PathVariable Long comicId,
@@ -54,6 +72,12 @@ public class ChapterManagementController {
         return Result.ok(chapterManagementService.moveChapter(comicId, chapterId, catalogId));
     }
 
+    /**
+     * 全书章节重排（globalOrder 两阶段写库，避免唯一键瞬时冲突）。
+     *
+     * @param request 目标 globalOrder（1 基）
+     * @return 重排后的章节
+     */
     @PutMapping("/{chapterId}/reorder")
     public Result<ChapterVO> reorder(
             @PathVariable Long comicId,
@@ -62,6 +86,11 @@ public class ChapterManagementController {
         return Result.ok(chapterManagementService.reorderChapter(comicId, chapterId, request.getTargetGlobalOrder()));
     }
 
+    /**
+     * 回收章节（软删除，状态 → TRASHING，Worker 异步移入回收站）。
+     *
+     * @return 空结果
+     */
     @DeleteMapping("/{chapterId}")
     public Result<Void> trash(@PathVariable Long comicId, @PathVariable Long chapterId) {
         chapterManagementService.trashChapter(comicId, chapterId);

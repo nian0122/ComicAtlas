@@ -31,6 +31,12 @@ public class CatalogManagementController {
 
     private final CatalogManagementService catalogManagementService;
 
+    /**
+     * 在指定漫画下创建目录。
+     *
+     * @param request 目录信息（标题/父目录/排序）
+     * @return 创建的目录
+     */
     @PostMapping
     public Result<CatalogVO> create(
             @PathVariable Long comicId,
@@ -38,6 +44,12 @@ public class CatalogManagementController {
         return Result.ok(catalogManagementService.createCatalog(comicId, request));
     }
 
+    /**
+     * 重命名目录，同级重名时返回 409。
+     *
+     * @param request 新标题
+     * @return 重命名后的目录
+     */
     @PatchMapping("/{catalogId}")
     public Result<CatalogVO> rename(
             @PathVariable Long comicId,
@@ -46,6 +58,12 @@ public class CatalogManagementController {
         return Result.ok(catalogManagementService.renameCatalog(comicId, catalogId, request));
     }
 
+    /**
+     * 移动目录到目标父目录下（祖先检查防环）。
+     *
+     * @param request 目标父目录 ID；请求体缺省或 parentId 为 null 表示移到根级
+     * @return 移动后的目录
+     */
     @PutMapping("/{catalogId}/move")
     public Result<CatalogVO> move(
             @PathVariable Long comicId,
@@ -55,6 +73,12 @@ public class CatalogManagementController {
         return Result.ok(catalogManagementService.moveCatalog(comicId, catalogId, parentId));
     }
 
+    /**
+     * 同级目录重排（结果保持连续 1..N）。
+     *
+     * @param request 目标 sortOrder（1 基）
+     * @return 空结果
+     */
     @PutMapping("/{catalogId}/reorder")
     public Result<Void> reorder(
             @PathVariable Long comicId,
@@ -64,6 +88,12 @@ public class CatalogManagementController {
         return Result.ok();
     }
 
+    /**
+     * 删除目录；非空目录必须显式指定 reparentTo 重挂子目录/章节，否则 409。
+     *
+     * @param reparentTo 子目录与章节重挂的目标目录 ID；空目录可省略
+     * @return 空结果
+     */
     @DeleteMapping("/{catalogId}")
     public Result<Void> delete(
             @PathVariable Long comicId,
