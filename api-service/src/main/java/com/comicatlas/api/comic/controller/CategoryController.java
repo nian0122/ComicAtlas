@@ -15,6 +15,12 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
+/**
+ * 漫画分类管理接口。
+ * <p>
+ * 基路径 {@code /api/categories}，提供分类列表、创建、重命名与删除。
+ * 分类名称唯一（重名返回 400），列表按 sortOrder 排序。
+ */
 @RestController
 @RequestMapping("/api/categories")
 @RequiredArgsConstructor
@@ -22,21 +28,43 @@ public class CategoryController {
 
     private final CategoryService categoryService;
 
+    /**
+     * 查询全部分类（按 sortOrder 排序）。
+     *
+     * @return 分类列表
+     */
     @GetMapping
     public Result<List<CategoryDTO>> list() {
         return Result.ok(categoryService.listCategories());
     }
 
+    /**
+     * 创建分类，名称重复时返回 400。
+     *
+     * @param name 分类名称
+     * @return 创建的分类
+     */
     @PostMapping
     public Result<CategoryDTO> create(@RequestParam String name) {
         return Result.ok(categoryService.createCategory(name));
     }
 
+    /**
+     * 重命名分类，与其他分类重名时返回 400。
+     *
+     * @param name 新分类名称
+     * @return 更新后的分类
+     */
     @PutMapping("/{id}")
     public Result<CategoryDTO> update(@PathVariable Long id, @RequestParam String name) {
         return Result.ok(categoryService.updateCategory(id, name));
     }
 
+    /**
+     * 删除分类。
+     *
+     * @return 空结果
+     */
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {
         categoryService.deleteCategory(id);
