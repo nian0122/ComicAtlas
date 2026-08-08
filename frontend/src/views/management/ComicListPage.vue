@@ -11,6 +11,24 @@
       </div>
     </header>
 
+    <section class="repository-stats" aria-label="仓库统计">
+      <article class="repository-stat repository-stat--wide">
+        <span>已索引漫画</span>
+        <strong>{{ store.total.toLocaleString() }}</strong>
+        <small>来自当前漫画目录</small>
+      </article>
+      <article class="repository-stat">
+        <span>存储池</span>
+        <strong>{{ formatBytes(storageTotalBytes) }}</strong>
+        <small>HQ {{ formatBytes(storageStats?.hqBytes) }}</small>
+      </article>
+      <article class="repository-stat">
+        <span>低画质缓存</span>
+        <strong>{{ formatBytes(storageStats?.lqBytes) }}</strong>
+        <small>缩略图 {{ formatBytes(storageStats?.thumbBytes) }}</small>
+      </article>
+    </section>
+
     <div class="filter-toolbar">
       <el-input
         v-model="filters.keyword"
@@ -155,12 +173,18 @@ import { useManagementComicStore } from '@/stores/management/comic'
 import { useCategoryStore } from '@/stores/management/category'
 import { useTagStore } from '@/stores/tag-store'
 import BatchEditDialog from './BatchEditDialog.vue'
-import type { ComicListQuery } from '@/types'
+import type { ComicListQuery, StorageStats } from '@/types'
+import { storageService } from '@/services/storage'
 
 const router = useRouter()
 const store = useManagementComicStore()
 const categoryStore = useCategoryStore()
 const tagStore = useTagStore()
+const storageStats = ref<StorageStats | null>(null)
+const storageTotalBytes = computed(() => {
+  if (!storageStats.value) return undefined
+  return storageStats.value.hqBytes + storageStats.value.lqBytes + storageStats.value.thumbBytes
+})
 
 function hideBrokenImage(event: Event) {
   const image = event.currentTarget as HTMLImageElement
@@ -282,13 +306,21 @@ onMounted(() => {
   categoryStore.fetchList()
   tagStore.fetchList()
   store.fetchList()
+  storageService.fetchSummary().then((stats) => { storageStats.value = stats }).catch(() => { storageStats.value = null })
 })
+
+function formatBytes(bytes: number | undefined): string {
+  if (!bytes) return '0 B'
+  if (bytes >= 1024 ** 4) return `${(bytes / 1024 ** 4).toFixed(1)} TB`
+  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`
+  return `${(bytes / 1024 ** 2).toFixed(1)} MB`
+}
 </script>
 
 <style scoped>
 .manage-comic-list-page {
-  max-width: 1120px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: none;
 }
 
 .page-header {
@@ -392,27 +424,55 @@ onMounted(() => {
 .comic-grid {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   margin-bottom: var(--space-xl);
 }
+
+.repository-stats {
+  display: grid;
+  grid-template-columns: 1.5fr repeat(2, minmax(180px, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-8);
+}
+
+.repository-stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 128px;
+  padding: var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+}
+
+.repository-stat span,
+.repository-stat small { color: var(--text-muted); font-size: var(--text-sm); }
+.repository-stat strong { color: var(--text-primary); font-size: clamp(1.75rem, 3vw, 2.5rem); font-variant-numeric: tabular-nums; }
 
 .comic-row {
   position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-base);
-  min-height: 76px;
-  padding: var(--space-3) var(--space-4);
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  min-height: 82px;
+  padding: var(--space-3) var(--space-5);
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border);
   cursor: pointer;
   transition: background-color var(--transition-fast);
 }
 
 .comic-row:hover {
   background: var(--bg-surface);
-  box-shadow: inset 2px 0 var(--accent);
+  box-shadow: inset 2px 0 var(--color-brand-pale);
+}
+
+.comic-row:last-child {
+  border-bottom: 0;
 }
 
 .comic-cover {

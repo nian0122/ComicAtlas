@@ -335,9 +335,10 @@ async function doBatchImport() {
 
 <style scoped>
 .import-page {
-  max-width: 720px;
+  width: 100%;
+  max-width: 1120px;
   margin: 0 auto;
-  padding: var(--space-xl) var(--space-lg) var(--space-3xl);
+  padding: 0 0 var(--space-3xl);
   background: var(--bg-primary);
   min-height: 100%;
 }

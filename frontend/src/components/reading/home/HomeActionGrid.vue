@@ -2,7 +2,6 @@
   <section class="home-actions">
     <div class="actions-inner">
       <router-link to="/library" class="action-card hover-lift">
-        <span class="action-index" aria-hidden="true">01</span>
         <div class="action-icon action-icon--library">
           <el-icon :size="28"><Collection /></el-icon>
         </div>
@@ -14,7 +13,6 @@
       </router-link>
 
       <router-link to="/manage/import" class="action-card action-card--desktop-only hover-lift">
-        <span class="action-index" aria-hidden="true">02</span>
         <div class="action-icon action-icon--import">
           <el-icon :size="28"><Download /></el-icon>
         </div>
@@ -26,7 +24,6 @@
       </router-link>
 
       <router-link to="/history" class="action-card hover-lift">
-        <span class="action-index" aria-hidden="true">03</span>
         <div class="action-icon action-icon--history">
           <el-icon :size="28"><Clock /></el-icon>
         </div>
@@ -46,14 +43,14 @@ import { Collection, Download, Clock, ArrowRight } from '@element-plus/icons-vue
 
 <style scoped>
 .home-actions {
-  margin-top: var(--space-12);
+  margin-top: var(--space-10);
 }
 
 .actions-inner {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   width: min(100%, var(--content-max));
-  border-block: 1px solid var(--border);
+  gap: var(--space-3);
   margin: 0 auto;
 }
 
@@ -65,8 +62,8 @@ import { Collection, Download, Clock, ArrowRight } from '@element-plus/icons-vue
   min-width: 0;
   min-height: 112px;
   padding: var(--space-5);
-  border-right: 1px solid var(--border);
-  background: transparent;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
   color: var(--text-primary);
   text-decoration: none;
   transition:
@@ -75,17 +72,17 @@ import { Collection, Download, Clock, ArrowRight } from '@element-plus/icons-vue
 }
 
 .action-card:last-child {
-  border-right: 0;
+  border-right: 1px solid var(--border);
 }
 
 .action-card:hover {
-  background: var(--bg-surface);
+  background: var(--surface-highlight);
   color: var(--text-primary);
   transform: translateY(-1px);
 }
 
 .action-index {
-  position: absolute;
+  display: none;
   top: var(--space-2);
   left: var(--space-3);
   color: var(--text-muted);
@@ -102,7 +99,7 @@ import { Collection, Download, Clock, ArrowRight } from '@element-plus/icons-vue
   align-items: center;
   justify-content: center;
   border: 1px solid var(--accent-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-xs);
   background: var(--accent-bg);
   color: var(--accent);
 }

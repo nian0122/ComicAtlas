@@ -102,7 +102,8 @@ onMounted(loadSettings)
 
 <style scoped>
 .settings-page {
-  max-width: 640px;
+  width: 100%;
+  max-width: 1120px;
 }
 
 .page-title {
@@ -117,6 +118,10 @@ onMounted(loadSettings)
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: var(--space-xl);
+}
+
+.settings-card:first-of-type {
+  max-width: 100%;
 }
 
 .settings-card + .settings-card {

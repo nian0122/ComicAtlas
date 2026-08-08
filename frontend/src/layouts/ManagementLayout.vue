@@ -2,28 +2,33 @@
   <div class="management-layout">
     <header class="management-header">
       <router-link to="/" class="header-logo" aria-label="返回 ComicAtlas 阅读端">
-        <span class="logo-mark" aria-hidden="true">CA</span>
-        <span>COMICATLAS</span>
-        <span class="console-label">仓库控制台</span>
+        <span>ComicAtlas</span>
       </router-link>
+      <nav class="management-topnav" aria-label="主导航">
+        <router-link to="/">首页</router-link>
+        <router-link to="/library">漫画库</router-link>
+        <router-link to="/history">阅读历史</router-link>
+        <router-link to="/manage" class="active">管理</router-link>
+      </nav>
       <div class="header-context">
-        <router-link to="/" class="back-link">
-          <el-icon :size="16"><Back /></el-icon>
-          切换到阅读端
-        </router-link>
+        <router-link to="/manage/import" class="header-import"><el-icon :size="16"><UploadFilled /></el-icon>导入</router-link>
+        <router-link to="/" class="profile-button" aria-label="返回阅读端"><el-icon :size="18"><User /></el-icon></router-link>
       </div>
     </header>
 
     <div class="management-body">
       <aside class="management-sidenav">
+        <div class="sidenav-brand">
+          <strong>Management</strong>
+          <span>Private Console</span>
+        </div>
+        <router-link to="/manage/import" class="new-import-link"><el-icon :size="18"><Plus /></el-icon>新建导入</router-link>
         <nav class="sidenav-menu" aria-label="管理导航">
-          <p class="sidenav-label">内容</p>
           <router-link to="/manage/comics" class="sidenav-link" active-class="active">
             <el-icon :size="18"><Collection /></el-icon>
             <span>漫画</span>
           </router-link>
 
-          <p class="sidenav-label">导入</p>
           <router-link to="/manage/import" class="sidenav-link" active-class="active">
             <el-icon :size="18"><UploadFilled /></el-icon>
             <span>新建导入</span>
@@ -37,7 +42,6 @@
             <span>任务中心</span>
           </router-link>
 
-          <p class="sidenav-label">维护</p>
           <router-link to="/manage/storage" class="sidenav-link" active-class="active">
             <el-icon :size="18"><Coin /></el-icon>
             <span>存储</span>
@@ -51,7 +55,6 @@
             <span>死信队列</span>
           </router-link>
 
-          <p class="sidenav-label">偏好</p>
           <router-link to="/manage/settings" class="sidenav-link" active-class="active">
             <el-icon :size="18"><Setting /></el-icon>
             <span>设置</span>
@@ -59,9 +62,8 @@
         </nav>
 
         <div class="sidenav-footer">
-          <span class="archive-line" aria-hidden="true" />
-          <p>PRIVATE LIBRARY</p>
-          <span>仓库服务运行中</span>
+          <span><el-icon :size="18"><QuestionFilled /></el-icon>支持</span>
+          <span><el-icon :size="18"><InfoFilled /></el-icon>系统</span>
         </div>
       </aside>
 
@@ -75,7 +77,6 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import {
-  Back,
   Coin,
   Collection,
   List,
@@ -83,6 +84,10 @@ import {
   Tickets,
   UploadFilled,
   WarningFilled,
+  Plus,
+  User,
+  QuestionFilled,
+  InfoFilled,
 } from '@element-plus/icons-vue'
 import { useImportStore } from '@/stores/management/import'
 
@@ -270,5 +275,228 @@ onMounted(() => {
   background:
     radial-gradient(circle at 100% 0, var(--accent-bg), transparent 26rem),
     var(--bg-primary);
+}
+
+/* Stitch 管理端：编辑台式布局，沿用阅读端同一组影院色阶。 */
+.management-layout {
+  grid-template-rows: var(--management-header-height) minmax(0, 1fr);
+}
+
+.management-header {
+  padding-inline: var(--space-8);
+  border-bottom-color: var(--border);
+  background: var(--bg-primary);
+}
+
+.header-logo {
+  font-size: 28px;
+  letter-spacing: -0.04em;
+}
+
+.management-topnav {
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+  gap: var(--space-10);
+}
+
+.management-topnav a {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 100%;
+  color: var(--text-secondary);
+  font-size: var(--text-md);
+}
+
+.management-topnav a:hover,
+.management-topnav a.active {
+  color: var(--color-brand-pale);
+}
+
+.management-topnav a.active::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: var(--color-brand-pale);
+  content: "";
+}
+
+.header-context {
+  gap: var(--space-4);
+}
+
+.header-import {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding-inline: var(--space-5);
+  border-radius: var(--radius-xs);
+  background: var(--color-brand-pale);
+  color: var(--color-canvas);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.profile-button {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  color: var(--text-secondary);
+}
+
+.management-body {
+  grid-template-columns: var(--management-sidebar-width) minmax(0, 1fr);
+}
+
+.management-sidenav {
+  padding: var(--space-6) var(--space-5);
+  border-right-color: var(--border);
+  background: var(--bg-secondary);
+}
+
+.sidenav-brand {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-2) var(--space-6);
+}
+
+.sidenav-brand strong {
+  color: var(--text-primary);
+  font-size: var(--text-lg);
+}
+
+.sidenav-brand span {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.new-import-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 48px;
+  margin-bottom: var(--space-6);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xs);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.new-import-link:hover {
+  border-color: var(--color-brand-pale);
+  color: var(--color-brand-pale);
+}
+
+.sidenav-menu {
+  gap: var(--space-2);
+}
+
+.sidenav-label {
+  display: none;
+}
+
+.sidenav-link {
+  min-height: 48px;
+  padding-inline: var(--space-3);
+  border-radius: var(--radius-xs);
+  font-size: var(--text-md);
+}
+
+.sidenav-link::before {
+  top: 0;
+  bottom: 0;
+  left: calc(-1 * var(--space-5));
+  width: 2px;
+}
+
+.sidenav-link.active {
+  background: var(--surface-highlight);
+  color: var(--color-brand-pale);
+}
+
+.sidenav-footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.sidenav-footer span {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--text-muted);
+}
+
+.archive-line {
+  display: none;
+}
+
+.management-content {
+  padding: var(--space-10) clamp(32px, 4vw, 64px);
+  background: var(--bg-primary);
+}
+
+.management-content :deep(.page-header) {
+  padding-bottom: var(--space-8);
+  margin-bottom: var(--space-8);
+  border-bottom: 1px solid var(--border);
+}
+
+.management-content :deep(.page-title) {
+  color: var(--text-primary);
+  font-size: clamp(2rem, 3.3vw, 3rem);
+  letter-spacing: -0.04em;
+}
+
+.management-content :deep(.page-subtitle),
+.management-content :deep(.section-desc) {
+  color: var(--text-muted);
+  font-size: var(--text-lg);
+}
+
+.management-content :deep(.settings-card),
+.management-content :deep(.import-form-card),
+.management-content :deep(.batch-panel),
+.management-content :deep(.recent-section),
+.management-content :deep(.comic-table-section),
+.management-content :deep(.task-card),
+.management-content :deep(.settings-card),
+.management-content :deep(.storage-summary),
+.management-content :deep(.metadata-card) {
+  border-color: var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+}
+
+.management-content :deep(.primary-btn),
+.management-content :deep(.el-button--primary) {
+  border-radius: var(--radius-xs);
+  background: var(--color-brand-pale);
+  color: var(--color-canvas);
+  font-weight: 700;
+}
+
+@media (max-width: 900px) {
+  .management-topnav {
+    display: none;
+  }
+
+  .management-body {
+    grid-template-columns: 1fr;
+  }
+
+  .management-sidenav {
+    display: none;
+  }
 }
 </style>

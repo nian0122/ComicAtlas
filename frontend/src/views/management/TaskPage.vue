@@ -15,6 +15,13 @@
       </div>
     </header>
 
+    <section class="task-summary" aria-label="任务统计">
+      <article><span>进行中任务</span><strong>{{ activeCount }}</strong><small>实时队列</small></article>
+      <article><span>等待处理</span><strong>{{ store.activeTasks.filter((task) => task.status === 'PENDING').length }}</strong><small>等待 Worker</small></article>
+      <article class="task-summary--danger"><span>失败任务</span><strong>{{ failedCount }}</strong><small>需要关注</small></article>
+      <article class="task-summary--success"><span>已完成</span><strong>{{ completedCount.toLocaleString() }}</strong><small>历史导入任务</small></article>
+    </section>
+
     <div v-if="batchId" class="batch-filter-banner">
       <span class="batch-label">批次导入 {{ batchId.slice(0, 8) }}{{ batchId.length > 8 ? '...' : '' }}</span>
       <router-link to="/manage/import/tasks" class="batch-clear-link">返回全部任务</router-link>
@@ -224,6 +231,9 @@ const store = useImportStore()
 const recoveryStore = useRecoveryStore()
 
 const batchId = computed(() => (route.query.batchId as string) || '')
+const activeCount = computed(() => store.activeTasks.length)
+const failedCount = computed(() => store.failedTasks.length)
+const completedCount = computed(() => store.completedTotal)
 
 function formatRelative(ts: number): string {
   const diff = Date.now() - ts
@@ -400,9 +410,10 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .task-center-page {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: var(--space-xl) var(--space-lg) var(--space-3xl);
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0 0 var(--space-3xl);
   background: var(--bg-primary);
   min-height: 100%;
 }
@@ -518,10 +529,34 @@ onBeforeUnmount(() => {
 }
 
 .task-cards {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-base);
 }
+
+.task-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-8);
+}
+
+.task-summary article {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 128px;
+  padding: var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+}
+
+.task-summary span,
+.task-summary small { color: var(--text-muted); font-size: var(--text-sm); }
+.task-summary strong { color: var(--text-primary); font-size: 2.5rem; font-variant-numeric: tabular-nums; }
+.task-summary--danger strong { color: var(--danger); }
+.task-summary--success strong { color: var(--success); }
 
 /* States */
 .state {

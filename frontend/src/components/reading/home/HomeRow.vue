@@ -147,7 +147,7 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .home-row {
-  margin-top: var(--space-12);
+  margin-top: var(--space-10);
   color: var(--text-primary);
 }
 
@@ -158,7 +158,7 @@ onBeforeUnmount(() => {
   gap: var(--space-base);
   width: min(100%, var(--content-max));
   padding: 0;
-  margin: 0 auto var(--space-3);
+  margin: 0 auto var(--space-4);
 }
 
 .row-title {
@@ -214,8 +214,12 @@ onBeforeUnmount(() => {
 .row-items {
   display: flex;
   flex-shrink: 0;
-  gap: var(--poster-gap);
+  gap: var(--home-row-gap);
   padding: var(--space-3) var(--space-1) var(--space-5);
+}
+
+.row-items :deep(.size--md) {
+  width: var(--home-row-card-width);
 }
 
 .row-arrow {

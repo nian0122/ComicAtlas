@@ -198,7 +198,8 @@ onMounted(loadQueues)
 .dlq-page {
   display: grid;
   gap: var(--space-6);
-  width: min(100%, var(--content-max));
+  width: 100%;
+  max-width: none;
 }
 
 .page-header {

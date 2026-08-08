@@ -110,6 +110,8 @@
   --status-dot-size: 8px;
   --disabled-opacity: 0.55;
   --sidebar-width: 232px;
+  --management-header-height: 84px;
+  --management-sidebar-width: 240px;
   --nav-height: 68px;
   --mobile-nav-height: 64px;
   --mobile-tabbar-height: 64px;
@@ -159,6 +161,12 @@
   --poster-width-md: 176px;
   --poster-width-lg: 188px;
   --poster-gap: var(--space-5);
+  --home-hero-height: clamp(520px, 58vw, 620px);
+  --home-hero-title-size: clamp(2.5rem, 4vw, 4rem);
+  --home-hero-content-gap: clamp(32px, 4vw, 56px);
+  --home-poster-width: clamp(208px, 15vw, 236px);
+  --home-row-card-width: clamp(176px, 14.4vw, 208px);
+  --home-row-gap: clamp(16px, 1.7vw, 24px);
 
   /* 深度 */
   --shadow-sm: 0 1px 2px rgb(0 0 0 / 28%);

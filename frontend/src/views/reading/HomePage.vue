@@ -11,12 +11,17 @@
 
     <HomeRow
       v-if="recentlyAddedItems.length"
-      title="最近加入"
+      title="最近更新"
       :items="recentlyAddedItems"
       more-link="/library"
     />
 
     <HomeActionGrid />
+
+    <footer class="home-footer">
+      <span>© 2024 ComicAtlas Archive. 私人高保真控制台。</span>
+      <span class="home-footer-meta">本地部署 · 内容由你的仓库提供</span>
+    </footer>
   </div>
 </template>
 
@@ -86,6 +91,22 @@ onMounted(() => {
   color: var(--text-primary);
 }
 
+.home-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-6);
+  width: min(100%, var(--content-max));
+  padding: var(--space-8) var(--content-gutter) 0;
+  margin: var(--space-16) auto 0;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.home-footer-meta {
+  text-align: right;
+}
+
 /* ==========================================================================
    移动端布局（由 useInteractionMode 驱动；桌面端无 is-mobile 类，完全不受影响）
    遵循设计规范 §5：Layout 负责响应式，业务组件保持设备无关，故统一从父级 :deep() 覆盖
@@ -122,5 +143,19 @@ onMounted(() => {
 /* 移动端阅读入口保持内容优先，不展示仓库操作捷径。 */
 .home-page.is-mobile :deep(.home-actions) {
   display: none;
+}
+
+.home-page.is-mobile .home-footer {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+  .home-page {
+    padding-bottom: calc(var(--mobile-tabbar-height) + var(--space-10) + env(safe-area-inset-bottom));
+  }
+
+  .home-footer {
+    display: none;
+  }
 }
 </style>

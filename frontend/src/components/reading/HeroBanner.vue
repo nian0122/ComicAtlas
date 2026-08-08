@@ -100,7 +100,7 @@ const hasActions = computed(
   display: flex;
   align-items: center;
   width: 100%;
-  min-height: clamp(560px, 72dvh, 760px);
+  min-height: var(--home-hero-height);
   overflow: hidden;
   color: var(--text-primary);
 }
@@ -111,9 +111,9 @@ const hasActions = computed(
   left: 50%;
   width: 100vw;
   background-repeat: no-repeat;
-  background-position: 72% 24%;
+  background-position: 70% 20%;
   background-size: cover;
-  filter: saturate(0.92) brightness(0.7);
+  filter: saturate(0.78) brightness(0.38);
   transform: translateX(-50%) scale(1.02);
   z-index: 0;
 }
@@ -129,22 +129,22 @@ const hasActions = computed(
   position: relative;
   z-index: 2;
   display: grid;
-  grid-template-columns: minmax(180px, 260px) minmax(0, 1fr);
-  align-items: end;
-  gap: var(--space-12);
+  grid-template-columns: var(--home-poster-width) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--home-hero-content-gap);
   width: 100%;
   max-width: var(--page-width);
   margin: 0 auto;
-  padding: calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-16);
+  padding: calc(var(--nav-height) + var(--space-8)) var(--page-padding) var(--space-8);
 }
 
 .hero-poster {
   width: 100%;
   aspect-ratio: 2 / 3;
   overflow: hidden;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-xs);
   background: var(--bg-surface);
-  box-shadow: var(--card-shadow-hover);
+  box-shadow: var(--shadow-mount);
 }
 
 .hero-poster-bg {
@@ -169,7 +169,7 @@ const hasActions = computed(
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: var(--space-4);
+  gap: var(--space-3);
   max-width: 720px;
   padding-bottom: var(--space-2);
 }
@@ -178,7 +178,7 @@ const hasActions = computed(
   margin: 0;
   font-family: var(--heading);
   color: var(--text-primary);
-  font-size: var(--text-hero);
+  font-size: var(--home-hero-title-size);
   font-weight: 800;
   letter-spacing: -0.045em;
   line-height: 1.02;
@@ -187,7 +187,10 @@ const hasActions = computed(
 
 .hero-subtitle {
   margin: 0;
-  font-size: var(--text-lg);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  font-size: var(--text-sm);
   font-weight: 500;
   color: var(--text-secondary);
   text-wrap: pretty;
@@ -219,7 +222,7 @@ const hasActions = computed(
   min-height: var(--control-min-size);
   padding: 0 var(--space-5);
   border: none;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-xs);
   font-family: inherit;
   font-size: var(--text-sm);
   font-weight: 700;
@@ -230,18 +233,18 @@ const hasActions = computed(
 }
 
 .hero-btn--primary {
-  background: var(--text-primary);
-  color: var(--bg-primary);
+  background: var(--accent);
+  color: var(--color-on-brand);
 }
 
 .hero-btn--primary:hover {
-  background: var(--accent);
-  color: var(--color-on-brand);
+  background: var(--accent-hover);
   transform: translateY(-2px);
 }
 
 .hero-btn--secondary {
-  background: var(--color-overlay-soft);
+  border: 1px solid var(--accent-border);
+  background: var(--accent-bg);
   color: var(--text-primary);
 }
 
