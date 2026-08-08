@@ -1,6 +1,6 @@
 package com.comicatlas.api.storage.service;
 
-import com.comicatlas.api.management.dto.OperationSubmitResult;
+import com.comicatlas.api.management.dto.OperationSubmitResultDTO;
 import com.comicatlas.api.management.operation.MediaOperationCommandService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -17,11 +17,11 @@ public class LqOperationService {
 
     private final MediaOperationCommandService commandService;
 
-    public OperationSubmitResult generateForComic(Long comicId, boolean regenerate) {
+    public OperationSubmitResultDTO generateForComic(Long comicId, boolean regenerate) {
         return commandService.requestLqForComic(comicId, regenerate);
     }
 
-    public OperationSubmitResult generateForChapter(Long chapterId, boolean regenerate) {
+    public OperationSubmitResultDTO generateForChapter(Long chapterId, boolean regenerate) {
         return commandService.requestLqForChapter(chapterId, regenerate);
     }
 }

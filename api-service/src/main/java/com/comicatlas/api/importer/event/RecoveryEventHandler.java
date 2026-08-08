@@ -1,6 +1,6 @@
 package com.comicatlas.api.importer.event;
 
-import com.comicatlas.api.admin.dto.RecoveryProgress;
+import com.comicatlas.api.admin.dto.RecoveryProgressVO;
 import com.comicatlas.api.common.scan.RecoveryEngine;
 import com.comicatlas.api.common.enums.RecoveryTaskStatus;
 import com.comicatlas.api.importer.entity.RecoveryTask;
@@ -126,7 +126,7 @@ public class RecoveryEventHandler {
 
         for (Long comicId : event.comicIds()) {
             try {
-                RecoveryProgress progress = recoveryEngine.processComicDir(comicId, totalSoFar);
+                RecoveryProgressVO progress = recoveryEngine.processComicDir(comicId, totalSoFar);
                 totalSoFar = progress.totalComics();
                 recovered += progress.recoveredComics();
                 skipped += progress.skippedComics();

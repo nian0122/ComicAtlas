@@ -11,7 +11,7 @@ import java.util.List;
  * 其他操作（LQ/HQ/TRANSCODE/回收/恢复/清理）负载为空。
  */
 @Data
-public class BatchOperationPayload {
+public class BatchOperationPayloadDTO {
 
     private Long categoryId;
 

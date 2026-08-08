@@ -1,7 +1,7 @@
 package com.comicatlas.api.upload.controller;
 
 import com.comicatlas.api.common.Result;
-import com.comicatlas.api.management.dto.OperationSubmitResult;
+import com.comicatlas.api.management.dto.OperationSubmitResultDTO;
 import com.comicatlas.api.upload.MediaManagementService;
 import com.comicatlas.api.upload.dto.MediaReorderRequest;
 import com.comicatlas.api.upload.dto.MediaReorderResponse;
@@ -49,7 +49,7 @@ public class MediaManagementController {
      * @return 管理任务提交结果（任务 ID）
      */
     @DeleteMapping("/api/media/{mediaId}")
-    public Result<OperationSubmitResult> trash(@PathVariable Long mediaId) {
+    public Result<OperationSubmitResultDTO> trash(@PathVariable Long mediaId) {
         return Result.ok(mediaManagementService.trash(mediaId));
     }
 }

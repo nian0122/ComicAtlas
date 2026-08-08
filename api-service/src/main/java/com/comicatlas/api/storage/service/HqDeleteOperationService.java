@@ -1,6 +1,6 @@
 package com.comicatlas.api.storage.service;
 
-import com.comicatlas.api.management.dto.OperationSubmitResult;
+import com.comicatlas.api.management.dto.OperationSubmitResultDTO;
 import com.comicatlas.api.management.operation.MediaOperationCommandService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -15,11 +15,11 @@ public class HqDeleteOperationService {
 
     private final MediaOperationCommandService commandService;
 
-    public OperationSubmitResult deleteForComic(Long comicId) {
+    public OperationSubmitResultDTO deleteForComic(Long comicId) {
         return commandService.requestHqDeleteForComic(comicId);
     }
 
-    public OperationSubmitResult deleteForChapter(Long chapterId) {
+    public OperationSubmitResultDTO deleteForChapter(Long chapterId) {
         return commandService.requestHqDeleteForChapter(chapterId);
     }
 }

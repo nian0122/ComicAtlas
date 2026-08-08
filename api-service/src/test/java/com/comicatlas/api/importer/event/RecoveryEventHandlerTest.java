@@ -1,6 +1,6 @@
 package com.comicatlas.api.importer.event;
 
-import com.comicatlas.api.admin.dto.RecoveryProgress;
+import com.comicatlas.api.admin.dto.RecoveryProgressVO;
 import com.comicatlas.api.common.scan.RecoveryEngine;
 import com.comicatlas.api.common.enums.RecoveryTaskStatus;
 import com.comicatlas.api.importer.entity.RecoveryTask;
@@ -85,7 +85,7 @@ class RecoveryEventHandlerTest {
         task.setStatus(RecoveryTaskStatus.QUEUED);
         when(recoveryTaskMapper.selectById(taskId)).thenReturn(task);
 
-        RecoveryProgress progress = new RecoveryProgress(1, 1, 0, 0, 0, null, 3, 30);
+        RecoveryProgressVO progress = new RecoveryProgressVO(1, 1, 0, 0, 0, null, 3, 30);
         when(recoveryEngine.processComicDir(anyLong(), anyInt())).thenReturn(progress);
 
         when(recoveryTaskMapper.updateById(any(RecoveryTask.class))).thenReturn(1);
@@ -169,7 +169,7 @@ class RecoveryEventHandlerTest {
         when(recoveryTaskMapper.selectById(taskId)).thenReturn(task);
 
         // 第1个漫画成功
-        RecoveryProgress success = new RecoveryProgress(1, 1, 0, 0, 0, null, 1, 10);
+        RecoveryProgressVO success = new RecoveryProgressVO(1, 1, 0, 0, 0, null, 1, 10);
         when(recoveryEngine.processComicDir(eq(10L), anyInt())).thenReturn(success);
 
         // 第2个漫画失败（抛出异常）

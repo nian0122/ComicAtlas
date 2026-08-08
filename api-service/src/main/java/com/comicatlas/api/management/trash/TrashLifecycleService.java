@@ -16,7 +16,7 @@ import com.comicatlas.api.common.storage.ApiStorageRoot;
 import com.comicatlas.api.management.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
-import com.comicatlas.api.management.dto.OperationSubmitResult;
+import com.comicatlas.api.management.dto.OperationSubmitResultDTO;
 import com.comicatlas.api.management.entity.ManagementTask;
 import com.comicatlas.api.management.entity.ManagementTaskItem;
 import com.comicatlas.api.management.mapper.ManagementTaskItemMapper;
@@ -79,13 +79,13 @@ public class TrashLifecycleService {
     // ======================== 回收 ========================
 
     @Transactional
-    public OperationSubmitResult trashComic(Long comicId, String idempotencyKey) {
+    public OperationSubmitResultDTO trashComic(Long comicId, String idempotencyKey) {
         Comic comic = comicMapper.selectById(comicId);
         if (comic == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在: " + comicId);
         }
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {
-            OperationSubmitResult existing = idempotencyHit(idempotencyKey, "comic-delete:" + comicId);
+            OperationSubmitResultDTO existing = idempotencyHit(idempotencyKey, "comic-delete:" + comicId);
             if (existing != null) {
                 return existing;
             }
@@ -107,7 +107,7 @@ public class TrashLifecycleService {
     }
 
     @Transactional
-    public OperationSubmitResult trashChapter(Long comicId, Long chapterId) {
+    public OperationSubmitResultDTO trashChapter(Long comicId, Long chapterId) {
         Chapter chapter = requireChapterInComic(comicId, chapterId);
         requireAllowed(policyService.forChapter(chapter.getStatus() == null ? null : chapter.getStatus().name()),
                 OperationPolicyService.OP_DELETE,
@@ -127,7 +127,7 @@ public class TrashLifecycleService {
     }
 
     @Transactional
-    public OperationSubmitResult trashMedia(Long mediaId) {
+    public OperationSubmitResultDTO trashMedia(Long mediaId) {
         Media media = mediaMapper.selectById(mediaId);
         if (media == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "媒体不存在: " + mediaId);
@@ -153,7 +153,7 @@ public class TrashLifecycleService {
     // ======================== 恢复 ========================
 
     @Transactional
-    public OperationSubmitResult restoreComic(Long comicId) {
+    public OperationSubmitResultDTO restoreComic(Long comicId) {
         Comic comic = comicMapper.selectById(comicId);
         if (comic == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在: " + comicId);
@@ -169,7 +169,7 @@ public class TrashLifecycleService {
     }
 
     @Transactional
-    public OperationSubmitResult restoreChapter(Long comicId, Long chapterId) {
+    public OperationSubmitResultDTO restoreChapter(Long comicId, Long chapterId) {
         Chapter chapter = requireChapterInComic(comicId, chapterId);
         requireAllowed(policyService.forChapter(chapter.getStatus() == null ? null : chapter.getStatus().name()),
                 OperationPolicyService.OP_RECOVER,
@@ -184,7 +184,7 @@ public class TrashLifecycleService {
     }
 
     @Transactional
-    public OperationSubmitResult restoreMedia(Long mediaId) {
+    public OperationSubmitResultDTO restoreMedia(Long mediaId) {
         Media media = mediaMapper.selectById(mediaId);
         if (media == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "媒体不存在: " + mediaId);
@@ -202,7 +202,7 @@ public class TrashLifecycleService {
     // ======================== 永久清理 ========================
 
     @Transactional
-    public OperationSubmitResult purgeComic(Long comicId, String token) {
+    public OperationSubmitResultDTO purgeComic(Long comicId, String token) {
         Comic comic = comicMapper.selectById(comicId);
         if (comic == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在: " + comicId);
@@ -220,7 +220,7 @@ public class TrashLifecycleService {
     }
 
     @Transactional
-    public OperationSubmitResult purgeChapter(Long comicId, Long chapterId, String token) {
+    public OperationSubmitResultDTO purgeChapter(Long comicId, Long chapterId, String token) {
         Chapter chapter = requireChapterInComic(comicId, chapterId);
         return purge("CHAPTER", chapterId, token,
                 () -> {
@@ -237,7 +237,7 @@ public class TrashLifecycleService {
     }
 
     @Transactional
-    public OperationSubmitResult purgeMedia(Long mediaId, String token) {
+    public OperationSubmitResultDTO purgeMedia(Long mediaId, String token) {
         Media media = mediaMapper.selectById(mediaId);
         if (media == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "媒体不存在: " + mediaId);
@@ -254,7 +254,7 @@ public class TrashLifecycleService {
                 TaskType.MEDIA_PURGE, "永久清理媒体");
     }
 
-    private OperationSubmitResult purge(String targetType, Long targetId, String token,
+    private OperationSubmitResultDTO purge(String targetType, Long targetId, String token,
                                         Runnable precondition, TaskType operation, String operationLabel) {
         if (token == null || !PURGE_CONFIRM_TOKEN.equals(token)) {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "二次确认 token 不匹配，必须为 " + PURGE_CONFIRM_TOKEN);
@@ -446,7 +446,7 @@ public class TrashLifecycleService {
 
     // ======================== 内部辅助 ========================
 
-    private OperationSubmitResult createTrashTask(String targetType, Long targetId, TaskType operation,
+    private OperationSubmitResultDTO createTrashTask(String targetType, Long targetId, TaskType operation,
                                                    String operationLabel, List<TrashManifestDTO.Entry> entries,
                                                    String idempotencyKey, String payload) {
         ManagementTaskResponse task = createTask(operation, operationLabel, targetType, targetId, idempotencyKey, payload);
@@ -458,10 +458,10 @@ public class TrashLifecycleService {
             enqueueCommand(operation, item, targetType, targetId, null);
         }
         log.info("回收命令已提交: {}/{} taskId={}, entries={}", targetType, targetId, taskId, entries.size());
-        return OperationSubmitResult.of(taskId, operation.name(), task.getStatus().name(), items.size());
+        return OperationSubmitResultDTO.of(taskId, operation.name(), task.getStatus().name(), items.size());
     }
 
-    private OperationSubmitResult createCommandTask(String targetType, Long targetId, TaskType operation,
+    private OperationSubmitResultDTO createCommandTask(String targetType, Long targetId, TaskType operation,
                                                     String operationLabel, Long manifestTaskId) {
         if (manifestTaskId == null) {
             throw new ConflictException("未找到 " + targetType + ":" + targetId + " 的回收清单，无法执行 " + operation);
@@ -476,7 +476,7 @@ public class TrashLifecycleService {
             enqueueCommand(operation, item, targetType, targetId, manifestTaskId);
         }
         log.info("命令已提交: {}/{} taskId={}, manifestTaskId={}", targetType, targetId, task.getId(), manifestTaskId);
-        return OperationSubmitResult.of(task.getId(), operation.name(), task.getStatus().name(), items.size());
+        return OperationSubmitResultDTO.of(task.getId(), operation.name(), task.getStatus().name(), items.size());
     }
 
     private ManagementTaskResponse createTask(TaskType operation, String operationLabel, String targetType,
@@ -504,7 +504,7 @@ public class TrashLifecycleService {
     }
 
     /** 幂等命中检查：同键同 payload 返回已有任务结果。 */
-    private OperationSubmitResult idempotencyHit(String idempotencyKey, String payload) {
+    private OperationSubmitResultDTO idempotencyHit(String idempotencyKey, String payload) {
         ManagementTask existing = managementTaskService.findByIdempotencyKey(idempotencyKey);
         if (existing == null) {
             return null;
@@ -512,7 +512,7 @@ public class TrashLifecycleService {
         if (!sha256(payload).equals(existing.getIdempotencyPayloadHash())) {
             throw new ConflictException("幂等键 " + idempotencyKey + " 已存在但 payload 不匹配");
         }
-        return OperationSubmitResult.of(existing.getId(), existing.getTaskType().name(),
+        return OperationSubmitResultDTO.of(existing.getId(), existing.getTaskType().name(),
                 existing.getStatus().name(), existing.getTotalCount());
     }
 

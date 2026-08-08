@@ -4,7 +4,7 @@ import lombok.Data;
 import java.math.BigDecimal;
 
 @Data
-public class MediaItemInfo {
+public class MediaItemInfoDTO {
     private Long id;
     private Integer pageNumber;
     private String hqUrl;

@@ -1,9 +1,9 @@
 package com.comicatlas.api.storage.controller;
 
-import com.comicatlas.api.admin.dto.RefreshMetadataResult;
+import com.comicatlas.api.admin.dto.RefreshMetadataResultDTO;
 import com.comicatlas.api.common.Result;
 import com.comicatlas.api.export.dto.ExportTaskVO;
-import com.comicatlas.api.management.dto.OperationSubmitResult;
+import com.comicatlas.api.management.dto.OperationSubmitResultDTO;
 import com.comicatlas.api.storage.service.ExportOperationService;
 import com.comicatlas.api.storage.service.HqDeleteOperationService;
 import com.comicatlas.api.storage.service.LqOperationService;
@@ -57,7 +57,7 @@ public class StorageOperationController {
      * @return 操作提交结果
      */
     @PostMapping("/lq/comics/{comicId}")
-    public Result<OperationSubmitResult> generateComicLq(
+    public Result<OperationSubmitResultDTO> generateComicLq(
             @PathVariable Long comicId,
             @RequestParam(defaultValue = "false") boolean regenerate) {
         return Result.ok(lqOperationService.generateForComic(comicId, regenerate));
@@ -71,7 +71,7 @@ public class StorageOperationController {
      * @return 操作提交结果
      */
     @PostMapping("/lq/chapters/{chapterId}")
-    public Result<OperationSubmitResult> generateChapterLq(
+    public Result<OperationSubmitResultDTO> generateChapterLq(
             @PathVariable Long chapterId,
             @RequestParam(defaultValue = "false") boolean regenerate) {
         return Result.ok(lqOperationService.generateForChapter(chapterId, regenerate));
@@ -86,7 +86,7 @@ public class StorageOperationController {
      * @return 操作提交结果
      */
     @PostMapping("/delete-hq/comics/{comicId}")
-    public Result<OperationSubmitResult> deleteComicHq(@PathVariable Long comicId) {
+    public Result<OperationSubmitResultDTO> deleteComicHq(@PathVariable Long comicId) {
         return Result.ok(hqDeleteOperationService.deleteForComic(comicId));
     }
 
@@ -97,7 +97,7 @@ public class StorageOperationController {
      * @return 操作提交结果
      */
     @PostMapping("/delete-hq/chapters/{chapterId}")
-    public Result<OperationSubmitResult> deleteChapterHq(@PathVariable Long chapterId) {
+    public Result<OperationSubmitResultDTO> deleteChapterHq(@PathVariable Long chapterId) {
         return Result.ok(hqDeleteOperationService.deleteForChapter(chapterId));
     }
 
@@ -110,7 +110,7 @@ public class StorageOperationController {
      * @return 操作提交结果
      */
     @PostMapping("/transcode/comics/{comicId}")
-    public Result<OperationSubmitResult> transcodeComic(@PathVariable Long comicId) {
+    public Result<OperationSubmitResultDTO> transcodeComic(@PathVariable Long comicId) {
         return Result.ok(transcodeOperationService.transcodeForComic(comicId));
     }
 
@@ -121,7 +121,7 @@ public class StorageOperationController {
      * @return 操作提交结果
      */
     @PostMapping("/transcode/chapters/{chapterId}")
-    public Result<OperationSubmitResult> transcodeChapter(@PathVariable Long chapterId) {
+    public Result<OperationSubmitResultDTO> transcodeChapter(@PathVariable Long chapterId) {
         return Result.ok(transcodeOperationService.transcodeForChapter(chapterId));
     }
 
@@ -134,7 +134,7 @@ public class StorageOperationController {
      * @return 刷新结果（章节/页面统计）
      */
     @PostMapping("/refresh-metadata/comics/{comicId}")
-    public Result<RefreshMetadataResult> refreshMetadata(@PathVariable Long comicId) {
+    public Result<RefreshMetadataResultDTO> refreshMetadata(@PathVariable Long comicId) {
         return Result.ok(metadataRefreshService.refresh(comicId));
     }
 

@@ -1,6 +1,6 @@
 package com.comicatlas.api.admin.controller;
 
-import com.comicatlas.api.admin.dto.ComicDeleteStats;
+import com.comicatlas.api.admin.dto.ComicDeleteStatsDTO;
 import com.comicatlas.api.admin.dto.ScanRecoverResultDTO;
 import com.comicatlas.api.admin.service.AdminService;
 import com.comicatlas.api.common.exception.BusinessException;
@@ -32,7 +32,7 @@ class AdminControllerTest {
 
     @Test
     void deleteComic_shouldReturn200AndStats_whenSuccessful() throws Exception {
-        ComicDeleteStats stats = new ComicDeleteStats();
+        ComicDeleteStatsDTO stats = new ComicDeleteStatsDTO();
         stats.setComic(1);
         stats.setPage(50);
         stats.setChapter(2);

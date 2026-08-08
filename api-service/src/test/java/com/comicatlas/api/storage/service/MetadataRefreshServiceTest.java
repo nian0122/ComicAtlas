@@ -3,7 +3,7 @@ package com.comicatlas.api.storage.service;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
-import com.comicatlas.api.admin.dto.RefreshMetadataResult;
+import com.comicatlas.api.admin.dto.RefreshMetadataResultDTO;
 import com.comicatlas.api.common.scan.RecoveryEngine;
 import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.comic.entity.Chapter;
@@ -106,7 +106,7 @@ class MetadataRefreshServiceTest {
         when(comicMapper.update(any(), any())).thenReturn(1);
         when(transactionTemplate.execute(any())).thenReturn(Map.of("catalogs", 0, "chapters", 0, "pages", 0));
 
-        RefreshMetadataResult result = newService().refresh(1L);
+        RefreshMetadataResultDTO result = newService().refresh(1L);
 
         // 结果组装正确
         assertThat(result.comicId()).isEqualTo(1L);

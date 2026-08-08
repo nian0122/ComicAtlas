@@ -1,7 +1,7 @@
 package com.comicatlas.api.management.batch.service;
 
 import com.comicatlas.api.comic.mapper.ComicMapper;
-import com.comicatlas.api.management.batch.dto.BatchSelection;
+import com.comicatlas.api.management.batch.dto.BatchSelectionVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -26,11 +26,11 @@ public class BatchSelectionResolver {
      * @param limit     最多解析数量（超限探测：maxItems + 1）
      * @return 去重、稳定排序（id ASC）的漫画 id 列表
      */
-    public List<Long> resolve(BatchSelection selection, int limit) {
-        if (selection instanceof BatchSelection.Ids ids) {
+    public List<Long> resolve(BatchSelectionVO selection, int limit) {
+        if (selection instanceof BatchSelectionVO.Ids ids) {
             return dedupSorted(ids.getIds());
         }
-        if (selection instanceof BatchSelection.Filter filter) {
+        if (selection instanceof BatchSelectionVO.Filter filter) {
             List<Long> matched = comicMapper.selectBatchIds(filter.getQuery(), limit);
             Set<Long> excluded = new LinkedHashSet<>(
                     filter.getExcludedIds() == null ? List.of() : filter.getExcludedIds());

@@ -1,8 +1,8 @@
 package com.comicatlas.api.admin.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.comicatlas.api.admin.dto.ComicDeleteStats;
-import com.comicatlas.api.admin.dto.RecoveryProgress;
+import com.comicatlas.api.admin.dto.ComicDeleteStatsDTO;
+import com.comicatlas.api.admin.dto.RecoveryProgressVO;
 import com.comicatlas.api.admin.dto.ScanRecoverResultDTO;
 import com.comicatlas.api.admin.dto.StorageStatsDTO;
 import com.comicatlas.api.admin.mapper.StorageMapper;
@@ -68,7 +68,7 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     @Transactional
-    public ComicDeleteStats deleteComic(Long comicId, String mode) {
+    public ComicDeleteStatsDTO deleteComic(Long comicId, String mode) {
         if (!"DATABASE_ONLY".equals(mode) && !"DELETE_FILES".equals(mode)) {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "不支持的模式: " + mode + "，当前支持 DATABASE_ONLY 和 DELETE_FILES");
         }
@@ -101,7 +101,7 @@ public class AdminServiceImpl implements AdminService {
         mediaOperationCommandService.requestComicDelete(comicId);
         catalogCacheInvalidator.evict(comicId);
 
-        ComicDeleteStats stats = new ComicDeleteStats();
+        ComicDeleteStatsDTO stats = new ComicDeleteStatsDTO();
         stats.setComic(1);
         stats.setCatalog(catalogCount);
         stats.setChapter(chapters.size());
@@ -173,7 +173,7 @@ public class AdminServiceImpl implements AdminService {
                 }
 
                 totalSoFar++;
-                RecoveryProgress progress = recoveryEngine.processComicDir(comicId, totalSoFar);
+                RecoveryProgressVO progress = recoveryEngine.processComicDir(comicId, totalSoFar);
 
                 result.setScannedComics(totalSoFar);
                 result.setExistingComics(result.getExistingComics() + progress.skippedComics());

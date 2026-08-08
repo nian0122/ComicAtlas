@@ -1,7 +1,7 @@
 package com.comicatlas.api.common.scan;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.comicatlas.api.admin.dto.RecoveryProgress;
+import com.comicatlas.api.admin.dto.RecoveryProgressVO;
 import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.common.RestoreContext;
 import com.comicatlas.api.common.RestorePolicy;
@@ -42,7 +42,7 @@ import com.comicatlas.api.comic.entity.Media;
  * 漫画恢复引擎 — 封装每漫画目录的扫描与恢复逻辑。
  * <p>
  * 无状态 Singleton，可被同步 scanRecover() 和异步 MQ 事件处理器复用。
- * {@link #processComicDir(Long, int)} 是主要入口，每次处理一个漫画目录并返回 {@link RecoveryProgress}。
+ * {@link #processComicDir(Long, int)} 是主要入口，每次处理一个漫画目录并返回 {@link RecoveryProgressVO}。
  * {@link #scanChapterPages(Long, int)} 是公共工具方法，供 {@code refreshMetadata()} 等场景复用。
  */
 @Slf4j
@@ -71,11 +71,11 @@ public class RecoveryEngine {
      * @param totalSoFar 本次调用前已处理的总数（含非数字目录跳过的）
      * @return 本次处理结果，各计数器为 0 或 1
      */
-    public RecoveryProgress processComicDir(Long comicId, int totalSoFar) {
+    public RecoveryProgressVO processComicDir(Long comicId, int totalSoFar) {
         // 1. 已存在 → 跳过
         if (comicMapper.selectById(comicId) != null) {
             log.debug("漫画已存在，跳过: comicId={}", comicId);
-            return new RecoveryProgress(totalSoFar + 1, 0, 1, 0, 0, null, 0, 0);
+            return new RecoveryProgressVO(totalSoFar + 1, 0, 1, 0, 0, null, 0, 0);
         }
 
         // 2. 检查 metadata JSON
@@ -87,20 +87,20 @@ public class RecoveryEngine {
                 Map<String, Object> restored = restoreComic(metadata, comicId);
                 int chapters = (int) restored.getOrDefault("chapters", 0);
                 int pages = (int) restored.getOrDefault("pages", 0);
-                return new RecoveryProgress(totalSoFar + 1, 1, 0, 0, 0, null, chapters, pages);
+                return new RecoveryProgressVO(totalSoFar + 1, 1, 0, 0, 0, null, chapters, pages);
             } catch (Exception e) {
                 log.error("恢复漫画失败: comicId={}", comicId, e);
-                return new RecoveryProgress(totalSoFar + 1, 0, 0, 0, 1, e.getMessage(), 0, 0);
+                return new RecoveryProgressVO(totalSoFar + 1, 0, 0, 0, 1, e.getMessage(), 0, 0);
             }
         }
 
         // 3. 无 metadata → 占位
         try {
             createPlaceholder(comicId);
-            return new RecoveryProgress(totalSoFar + 1, 0, 0, 1, 0, null, 0, 0);
+            return new RecoveryProgressVO(totalSoFar + 1, 0, 0, 1, 0, null, 0, 0);
         } catch (Exception e) {
             log.error("创建占位漫画失败: comicId={}", comicId, e);
-            return new RecoveryProgress(totalSoFar + 1, 0, 0, 0, 1, "创建占位失败 - " + e.getMessage(), 0, 0);
+            return new RecoveryProgressVO(totalSoFar + 1, 0, 0, 0, 1, "创建占位失败 - " + e.getMessage(), 0, 0);
         }
     }
 

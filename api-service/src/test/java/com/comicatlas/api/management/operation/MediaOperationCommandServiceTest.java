@@ -12,7 +12,7 @@ import com.comicatlas.api.common.enums.HqStatus;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
-import com.comicatlas.api.management.dto.OperationSubmitResult;
+import com.comicatlas.api.management.dto.OperationSubmitResultDTO;
 import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.management.trash.TrashLifecycleService;
 import com.comicatlas.api.outbox.service.OutboxService;
@@ -82,7 +82,7 @@ class MediaOperationCommandServiceTest {
         item.setAttempt(1);
         when(managementTaskService.getTaskItems(100L)).thenReturn(List.of(item));
 
-        OperationSubmitResult result = service.requestTranscodeForChapter(9L);
+        OperationSubmitResultDTO result = service.requestTranscodeForChapter(9L);
 
         assertEquals(100L, result.getTaskId());
         assertEquals("TRANSCODE", result.getTaskType());
@@ -106,7 +106,7 @@ class MediaOperationCommandServiceTest {
         Media alreadyReady = video(12L, 9L, "mp4", TranscodeStatus.READY);
         when(mediaMapper.selectList(any())).thenReturn(List.of(alreadyReady));
 
-        OperationSubmitResult result = service.requestTranscodeForChapter(9L);
+        OperationSubmitResultDTO result = service.requestTranscodeForChapter(9L);
 
         assertNull(result.getTaskId());
         assertEquals(0, result.getItemCount());

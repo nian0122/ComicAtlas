@@ -743,7 +743,7 @@ class ReadingLifecycleCompatibilityIT {
 
     /** 通过真实媒体回收管线提交 MEDIA_TRASH，返回任务信息 */
     private OperationSubmitResultSafe trashMediaViaPipeline(Long mediaId) {
-        com.comicatlas.api.management.dto.OperationSubmitResult result = mediaManagementService.trash(mediaId);
+        com.comicatlas.api.management.dto.OperationSubmitResultDTO result = mediaManagementService.trash(mediaId);
         assertThat(result.isNoOp()).isFalse();
         return new OperationSubmitResultSafe(result.getTaskId(), result.getItemCount());
     }

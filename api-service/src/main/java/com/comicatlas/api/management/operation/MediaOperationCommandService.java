@@ -16,7 +16,7 @@ import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.api.management.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
-import com.comicatlas.api.management.dto.OperationSubmitResult;
+import com.comicatlas.api.management.dto.OperationSubmitResultDTO;
 import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.management.trash.TrashLifecycleService;
 import com.comicatlas.api.outbox.service.OutboxService;
@@ -59,7 +59,7 @@ public class MediaOperationCommandService {
 
     // ======================== LQ 生成 ========================
 
-    public OperationSubmitResult requestLqForComic(Long comicId, boolean regenerate) {
+    public OperationSubmitResultDTO requestLqForComic(Long comicId, boolean regenerate) {
         List<Chapter> chapters = chapterMapper.selectList(
                 new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
         TaskType operation = regenerate ? TaskType.LQ_REGENERATE : TaskType.LQ_GENERATE;
@@ -73,7 +73,7 @@ public class MediaOperationCommandService {
         }
         if (targets.isEmpty()) {
             log.info("漫画 {} 无待生成 LQ 的章节，跳过", comicId);
-            return OperationSubmitResult.of(null, operation.name(), null, 0);
+            return OperationSubmitResultDTO.of(null, operation.name(), null, 0);
         }
 
         ManagementTaskResponse task = createTask(operation, "生成低质量图片", "COMIC", targets);
@@ -85,10 +85,10 @@ public class MediaOperationCommandService {
         }
         log.info("LQ 命令已提交: comicId={}, regenerate={}, taskId={}, items={}",
                 comicId, regenerate, task.getId(), items.size());
-        return OperationSubmitResult.of(task.getId(), operation.name(), task.getStatus().name(), items.size());
+        return OperationSubmitResultDTO.of(task.getId(), operation.name(), task.getStatus().name(), items.size());
     }
 
-    public OperationSubmitResult requestLqForChapter(Long chapterId, boolean regenerate) {
+    public OperationSubmitResultDTO requestLqForChapter(Long chapterId, boolean regenerate) {
         Chapter chapter = chapterMapper.selectById(chapterId);
         if (chapter == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在: " + chapterId);
@@ -98,7 +98,7 @@ public class MediaOperationCommandService {
         List<Media> eligible = eligibleLqPages(chapterId, regenerate);
         if (eligible.isEmpty()) {
             log.info("章节 {} 无待生成 LQ 的页面，跳过", chapterId);
-            return OperationSubmitResult.of(null, operation.name(), null, 0);
+            return OperationSubmitResultDTO.of(null, operation.name(), null, 0);
         }
 
         ManagementTaskResponse task = createTask(operation, "生成低质量图片", "CHAPTER",
@@ -109,7 +109,7 @@ public class MediaOperationCommandService {
         enqueue(operation, item, "CHAPTER", chapterId);
         log.info("LQ 命令已提交: chapterId={}, regenerate={}, taskId={}",
                 chapterId, regenerate, task.getId());
-        return OperationSubmitResult.of(task.getId(), operation.name(), task.getStatus().name(), 1);
+        return OperationSubmitResultDTO.of(task.getId(), operation.name(), task.getStatus().name(), 1);
     }
 
     private List<Media> eligibleLqPages(Long chapterId, boolean regenerate) {
@@ -133,7 +133,7 @@ public class MediaOperationCommandService {
 
     // ======================== HQ 删除 ========================
 
-    public OperationSubmitResult requestHqDeleteForComic(Long comicId) {
+    public OperationSubmitResultDTO requestHqDeleteForComic(Long comicId) {
         List<Chapter> chapters = chapterMapper.selectList(
                 new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
 
@@ -147,7 +147,7 @@ public class MediaOperationCommandService {
         }
         if (targets.isEmpty()) {
             log.info("漫画 {} 无可删除 HQ 的章节，跳过", comicId);
-            return OperationSubmitResult.of(null, TaskType.HQ_DELETE.name(), null, 0);
+            return OperationSubmitResultDTO.of(null, TaskType.HQ_DELETE.name(), null, 0);
         }
 
         ManagementTaskResponse task = createTask(TaskType.HQ_DELETE, "删除高清图片", "COMIC", targets);
@@ -159,17 +159,17 @@ public class MediaOperationCommandService {
         }
         log.info("HQ 删除命令已提交: comicId={}, taskId={}, items={}",
                 comicId, task.getId(), items.size());
-        return OperationSubmitResult.of(task.getId(), TaskType.HQ_DELETE.name(), task.getStatus().name(), items.size());
+        return OperationSubmitResultDTO.of(task.getId(), TaskType.HQ_DELETE.name(), task.getStatus().name(), items.size());
     }
 
-    public OperationSubmitResult requestHqDeleteForChapter(Long chapterId) {
+    public OperationSubmitResultDTO requestHqDeleteForChapter(Long chapterId) {
         Chapter chapter = chapterMapper.selectById(chapterId);
         if (chapter == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在: " + chapterId);
         }
         if (!hasDeletableHq(chapterId)) {
             log.info("章节 {} 无可删除 HQ，跳过", chapterId);
-            return OperationSubmitResult.of(null, TaskType.HQ_DELETE.name(), null, 0);
+            return OperationSubmitResultDTO.of(null, TaskType.HQ_DELETE.name(), null, 0);
         }
         validateHqDeletePrecondition(chapterId);
 
@@ -180,7 +180,7 @@ public class MediaOperationCommandService {
         markHqDeleteQueued(chapterId);
         enqueue(TaskType.HQ_DELETE, item, "CHAPTER", chapterId);
         log.info("HQ 删除命令已提交: chapterId={}, taskId={}", chapterId, task.getId());
-        return OperationSubmitResult.of(task.getId(), TaskType.HQ_DELETE.name(), task.getStatus().name(), 1);
+        return OperationSubmitResultDTO.of(task.getId(), TaskType.HQ_DELETE.name(), task.getStatus().name(), 1);
     }
 
     private boolean hasDeletableHq(Long chapterId) {
@@ -225,11 +225,11 @@ public class MediaOperationCommandService {
     private static final Set<TranscodeStatus> ACTIVE_TRANSCODE =
             Set.of(TranscodeStatus.QUEUED, TranscodeStatus.TRANSCODING);
 
-    public OperationSubmitResult requestTranscodeForComic(Long comicId) {
+    public OperationSubmitResultDTO requestTranscodeForComic(Long comicId) {
         List<Chapter> chapters = chapterMapper.selectList(
                 new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
         if (chapters.isEmpty()) {
-            return OperationSubmitResult.of(null, TaskType.TRANSCODE.name(), null, 0);
+            return OperationSubmitResultDTO.of(null, TaskType.TRANSCODE.name(), null, 0);
         }
         List<Long> chapterIds = chapters.stream().map(Chapter::getId).toList();
 
@@ -242,7 +242,7 @@ public class MediaOperationCommandService {
                 .toList();
         if (eligible.isEmpty()) {
             log.info("漫画 {} 无待转码视频，跳过", comicId);
-            return OperationSubmitResult.of(null, TaskType.TRANSCODE.name(), null, 0);
+            return OperationSubmitResultDTO.of(null, TaskType.TRANSCODE.name(), null, 0);
         }
 
         List<CreateManagementTaskRequest.TaskTarget> targets = eligible.stream()
@@ -257,10 +257,10 @@ public class MediaOperationCommandService {
         }
         log.info("转码命令已提交: comicId={}, taskId={}, items={}",
                 comicId, task.getId(), items.size());
-        return OperationSubmitResult.of(task.getId(), TaskType.TRANSCODE.name(), task.getStatus().name(), items.size());
+        return OperationSubmitResultDTO.of(task.getId(), TaskType.TRANSCODE.name(), task.getStatus().name(), items.size());
     }
 
-    public OperationSubmitResult requestTranscodeForChapter(Long chapterId) {
+    public OperationSubmitResultDTO requestTranscodeForChapter(Long chapterId) {
         Chapter chapter = chapterMapper.selectById(chapterId);
         if (chapter == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在: " + chapterId);
@@ -274,7 +274,7 @@ public class MediaOperationCommandService {
                 .toList();
         if (eligible.isEmpty()) {
             log.info("章节 {} 无待转码视频，跳过", chapterId);
-            return OperationSubmitResult.of(null, TaskType.TRANSCODE.name(), null, 0);
+            return OperationSubmitResultDTO.of(null, TaskType.TRANSCODE.name(), null, 0);
         }
 
         List<CreateManagementTaskRequest.TaskTarget> targets = eligible.stream()
@@ -289,17 +289,17 @@ public class MediaOperationCommandService {
         }
         log.info("转码命令已提交: chapterId={}, taskId={}, items={}",
                 chapterId, task.getId(), items.size());
-        return OperationSubmitResult.of(task.getId(), TaskType.TRANSCODE.name(), task.getStatus().name(), items.size());
+        return OperationSubmitResultDTO.of(task.getId(), TaskType.TRANSCODE.name(), task.getStatus().name(), items.size());
     }
 
-    public OperationSubmitResult requestTranscodeForMedia(Long mediaId) {
+    public OperationSubmitResultDTO requestTranscodeForMedia(Long mediaId) {
         Media media = mediaMapper.selectById(mediaId);
         if (media == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "媒体页不存在: " + mediaId);
         }
         if (!isTranscodeEligible(media)) {
             log.info("媒体页 {} 无需转码，跳过", mediaId);
-            return OperationSubmitResult.of(null, TaskType.TRANSCODE.name(), null, 0);
+            return OperationSubmitResultDTO.of(null, TaskType.TRANSCODE.name(), null, 0);
         }
 
         ManagementTaskResponse task = createTask(TaskType.TRANSCODE, "视频转码", "MEDIA",
@@ -309,7 +309,7 @@ public class MediaOperationCommandService {
         markTranscodeQueued(mediaId);
         enqueue(TaskType.TRANSCODE, item, "MEDIA", mediaId);
         log.info("转码命令已提交: mediaId={}, taskId={}", mediaId, task.getId());
-        return OperationSubmitResult.of(task.getId(), TaskType.TRANSCODE.name(), task.getStatus().name(), 1);
+        return OperationSubmitResultDTO.of(task.getId(), TaskType.TRANSCODE.name(), task.getStatus().name(), 1);
     }
 
     private boolean isTranscodeEligible(Media media) {
@@ -335,7 +335,7 @@ public class MediaOperationCommandService {
 
     // ======================== 元数据刷新 ========================
 
-    public OperationSubmitResult requestMetadataRefresh(Long comicId) {
+    public OperationSubmitResultDTO requestMetadataRefresh(Long comicId) {
         Comic comic = comicMapper.selectById(comicId);
         if (comic == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在: " + comicId);
@@ -346,12 +346,12 @@ public class MediaOperationCommandService {
 
         enqueue(TaskType.METADATA_REFRESH, item, "COMIC", comicId);
         log.info("元数据刷新命令已提交: comicId={}, taskId={}", comicId, task.getId());
-        return OperationSubmitResult.of(task.getId(), TaskType.METADATA_REFRESH.name(), task.getStatus().name(), 1);
+        return OperationSubmitResultDTO.of(task.getId(), TaskType.METADATA_REFRESH.name(), task.getStatus().name(), 1);
     }
 
     // ======================== 整本删除（回收/永久清理重定向） ========================
 
-    public OperationSubmitResult requestComicDelete(Long comicId) {
+    public OperationSubmitResultDTO requestComicDelete(Long comicId) {
         return trashLifecycleService.trashComic(comicId, null);
     }
 

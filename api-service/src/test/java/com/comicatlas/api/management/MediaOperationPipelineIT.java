@@ -13,7 +13,7 @@ import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.api.common.exception.ConflictException;
 import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
-import com.comicatlas.api.management.dto.OperationSubmitResult;
+import com.comicatlas.api.management.dto.OperationSubmitResultDTO;
 import com.comicatlas.api.management.operation.MediaOperationCommandService;
 import com.comicatlas.api.management.policy.AllowedOperations;
 import com.comicatlas.api.management.policy.MediaOperationEligibilityService;
@@ -184,7 +184,7 @@ class MediaOperationPipelineIT {
     @Test
     @DisplayName("LQ 命令：创建任务、命令入 outbox、完成恰好一次生效")
     void lqCommand_appliesExactlyOnce() throws Exception {
-        OperationSubmitResult result = commandService.requestLqForChapter(chapter1.getId(), false);
+        OperationSubmitResultDTO result = commandService.requestLqForChapter(chapter1.getId(), false);
         assertThat(result.getTaskId()).isNotNull();
         assertThat(result.getItemCount()).isEqualTo(1);
 
@@ -231,7 +231,7 @@ class MediaOperationPipelineIT {
     @Test
     @DisplayName("旧 attempt 结果不生效；retry 后新 attempt 生效且任务终态可查")
     void staleAttemptResultIgnored_andRetryWorks() throws Exception {
-        OperationSubmitResult result = commandService.requestLqForChapter(chapter2.getId(), false);
+        OperationSubmitResultDTO result = commandService.requestLqForChapter(chapter2.getId(), false);
         ManagementCommandRequestedEvent cmd = readSingleCommand(result.getTaskId());
 
         // 第一次失败
@@ -284,7 +284,7 @@ class MediaOperationPipelineIT {
         // 让 chapter1 的 LQ 全部 READY（满足前置条件）
         setLqReady(chapter1.getId());
 
-        OperationSubmitResult result = commandService.requestHqDeleteForChapter(chapter1.getId());
+        OperationSubmitResultDTO result = commandService.requestHqDeleteForChapter(chapter1.getId());
         assertThat(result.getTaskId()).isNotNull();
         assertThat(hqStatuses(chapter1.getId())).containsExactly("DELETE_QUEUED", "DELETE_QUEUED");
 
@@ -320,7 +320,7 @@ class MediaOperationPipelineIT {
         int threadCount = 2;
         ExecutorService executor = Executors.newFixedThreadPool(threadCount);
         CyclicBarrier barrier = new CyclicBarrier(threadCount);
-        ConcurrentLinkedQueue<OperationSubmitResult> ok = new ConcurrentLinkedQueue<>();
+        ConcurrentLinkedQueue<OperationSubmitResultDTO> ok = new ConcurrentLinkedQueue<>();
         ConcurrentLinkedQueue<Throwable> errors = new ConcurrentLinkedQueue<>();
 
         for (int i = 0; i < threadCount; i++) {
@@ -352,7 +352,7 @@ class MediaOperationPipelineIT {
         Media video = mediaMapper.selectList(new LambdaQueryWrapper<Media>()
                 .eq(Media::getMediaType, "VIDEO")).get(0);
 
-        OperationSubmitResult result = commandService.requestTranscodeForComic(comic.getId());
+        OperationSubmitResultDTO result = commandService.requestTranscodeForComic(comic.getId());
         assertThat(result.getTaskId()).isNotNull();
         assertThat(result.getItemCount()).isEqualTo(1);
 
@@ -381,7 +381,7 @@ class MediaOperationPipelineIT {
     @Test
     @DisplayName("元数据刷新命令：完成即任务 SUCCEEDED")
     void metadataRefreshCommand_succeeds() throws Exception {
-        OperationSubmitResult result = commandService.requestMetadataRefresh(comic.getId());
+        OperationSubmitResultDTO result = commandService.requestMetadataRefresh(comic.getId());
         assertThat(result.getTaskId()).isNotNull();
 
         ManagementCommandRequestedEvent cmd = readSingleCommand(result.getTaskId());

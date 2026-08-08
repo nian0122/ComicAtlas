@@ -16,10 +16,10 @@ public class BatchOperationRequest {
 
     /** 目标选择（IDS 或 FILTER 判别联合） */
     @NotNull(message = "selection 不能为空")
-    private BatchSelection selection;
+    private BatchSelectionVO selection;
 
     /** 批量操作负载（METADATA_UPDATE 的分类/标签；其他操作为空） */
-    private BatchOperationPayload payload;
+    private BatchOperationPayloadDTO payload;
 
     /** 危险操作二次确认 token（由 preview 接口签发） */
     private String previewToken;

@@ -3,7 +3,7 @@ package com.comicatlas.api.admin.service.impl;
 import com.comicatlas.api.admin.dto.ChapterStorageDTO;
 import com.comicatlas.api.admin.dto.ComicStorageDTO;
 import com.comicatlas.api.admin.dto.ComicStorageQuery;
-import com.comicatlas.api.admin.dto.ComicTranscodeStatus;
+import com.comicatlas.api.admin.dto.ComicTranscodeStatusVO;
 import com.comicatlas.api.admin.mapper.StorageMapper;
 import com.comicatlas.api.admin.service.StorageQueryService;
 import com.comicatlas.api.common.storage.FileUrlResolver;
@@ -29,7 +29,7 @@ public class StorageQueryServiceImpl implements StorageQueryService {
 
         List<Long> comicIds = list.stream().map(ComicStorageDTO::getComicId).toList();
         Map<Long, String> transcodeStatusMap = storageMapper.selectTranscodeStatusList(comicIds).stream()
-                .collect(Collectors.toMap(ComicTranscodeStatus::comicId, ComicTranscodeStatus::transcodeStatus));
+                .collect(Collectors.toMap(ComicTranscodeStatusVO::comicId, ComicTranscodeStatusVO::transcodeStatus));
 
         for (ComicStorageDTO dto : list) {
             dto.setCoverUrl(fileUrlResolver.resolveCover(dto.getComicId()));
