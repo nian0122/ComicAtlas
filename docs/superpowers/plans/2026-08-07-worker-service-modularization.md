@@ -1,5 +1,7 @@
 # worker-service 模块化重构实施计划
 
+**状态**: 历史归档
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 将 worker-service 拆分为 `command`/`importer`/`media`/`storage` 顶层业务包，解决 `event` 包职责混杂与 `file` 包过大问题。

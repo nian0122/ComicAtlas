@@ -1,5 +1,7 @@
 # ComicAtlas Design System
 
+**状态**: 现行
+
 > 受 Netflix 视觉语言启发的个人漫画仓库设计系统。
 
 ---

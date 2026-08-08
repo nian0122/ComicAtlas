@@ -1,5 +1,7 @@
 # 阿里 Java 规范复审（rerun-final）整改实施计划
 
+**状态**: 历史归档
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 修复 rerun-final 复审全部 5 项阻断项（2×P1 中断语义 + Worker 只读、3×P2 命名/枚举/日志），保持全绿。

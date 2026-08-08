@@ -1,5 +1,7 @@
 # 阿里 Java 规范第四次复审（fourth-review）整改实施计划
 
+**状态**: 历史归档
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 修复第四次复审 5 项阻断项（两处转码吞中断、Runner 输出无上限+回收无界、`var md` 守卫假绿、RunnerTest 断言不足、SmokeTest 未入 JUnit 门禁），保持全绿。

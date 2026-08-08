@@ -1,5 +1,6 @@
 # 阿里 Java 规范复审 P1 阻断项整改设计
 
+**状态**: 历史归档
 - 日期：2026-08-05
 - 分支：`develop`
 - 依据：`.omo/evidence/alibaba-java-backend-review-2026-08-05.md`（结论 FAIL / REQUEST_CHANGES）

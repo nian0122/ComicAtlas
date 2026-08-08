@@ -1,5 +1,6 @@
 # 阿里 Java 规范第五次复审（fifth-review）整改设计
 
+**状态**: 历史归档
 - 日期：2026-08-06
 - 依据：`.omo/evidence/alibaba-java-backend-fifth-review-2026-08-06.md`（综合结论 FAIL / REQUEST_CHANGES）
 - 审查提交：`9d9296db4cff60ebd967571ed5c0d802a22372ef`；对比基线 `3fdabd7`

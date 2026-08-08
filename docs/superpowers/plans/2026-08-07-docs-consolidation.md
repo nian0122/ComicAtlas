@@ -1,5 +1,7 @@
 # 项目核心文档全面整理实施计划
 
+**状态**: 历史归档
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 整理 66 篇核心文档（根 3 + docs/ 63）——更新过时内容、统一格式、归档冗余，按阿里规范。

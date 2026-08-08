@@ -1,5 +1,7 @@
 # 阿里 Java 规范第三次复审（third-review）整改实施计划
 
+**状态**: 历史归档
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 修复第三次复审 1 项 P1（外部进程中断清理未覆盖）与 3 条非阻断建议（命名清理、枚举可观察化、密码去默认值），保持全绿。

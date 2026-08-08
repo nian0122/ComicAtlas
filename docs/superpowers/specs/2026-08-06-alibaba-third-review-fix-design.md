@@ -1,5 +1,6 @@
 # 阿里 Java 规范第三次复审（third-review）整改设计
 
+**状态**: 历史归档
 - 日期：2026-08-06
 - 依据：`.omo/evidence/alibaba-java-backend-third-review-2026-08-06.md`（综合结论 FAIL / REQUEST_CHANGES）
 - 审查提交：`a73f34baff1938ace6881e33bdcf88a27f9285ce`
