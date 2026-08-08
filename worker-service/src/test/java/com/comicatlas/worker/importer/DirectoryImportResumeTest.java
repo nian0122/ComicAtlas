@@ -85,7 +85,7 @@ class DirectoryImportResumeTest {
         // 源被搬空
         assertFalse(Files.exists(sourceRoot.resolve("vol1/ch1/001.jpg")), "源 001 应被搬走");
         assertFalse(Files.exists(sourceRoot.resolve("vol1/ch1/002.jpg")), "源 002 应被搬走");
-        // HQ 落位 — 新布局使用 UUID 文件名
+        // HQ 落位 — 新布局保留原始文件名
         Path hqChapterDir = mangaRoot.resolve("hq/10/1");
         assertTrue(Files.exists(hqChapterDir), "HQ 章节目录应存在");
         List<Path> hqFiles;
@@ -93,11 +93,9 @@ class DirectoryImportResumeTest {
             hqFiles = stream.filter(Files::isRegularFile).toList();
         }
         assertEquals(2, hqFiles.size(), "HQ 应有 2 个文件");
-        // 文件名应为 serverGeneratedName（UUID + 扩展名）
-        for (Path f : hqFiles) {
-            assertTrue(f.getFileName().toString().matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.jpg"),
-                "文件名应为 UUID.jpg 格式: " + f.getFileName());
-        }
+        // 文件名应保留原始文件名（禁止 UUID 化）
+        var hqNames = hqFiles.stream().map(f -> f.getFileName().toString()).sorted().toList();
+        assertEquals(List.of("001.jpg", "002.jpg"), hqNames, "HQ 文件名应保留原始文件名");
         // metadata 完整 — 包含 hqPath
         JsonNode meta = objectMapper.readTree(mangaRoot.resolve("metadata/100.json").toFile());
         assertEquals(3, meta.path("version").asInt());

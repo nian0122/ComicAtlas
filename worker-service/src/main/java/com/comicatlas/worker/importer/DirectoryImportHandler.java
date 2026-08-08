@@ -20,7 +20,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 @Slf4j
 @Component
@@ -122,9 +121,8 @@ public class DirectoryImportHandler {
                 if (!Files.exists(source)) { source = importRoot.resolve(page.fileName()); }
                 if (Files.exists(source) && page.fileSize() > 0) {
                     String relative = importRoot.relativize(source).toString().replace('\\', '/');
-                    // 新布局：serverGeneratedName（UUID + 扩展名），目录暂用 globalOrder
-                    String generatedName = generateServerName(page.fileName());
-                    String target = comicId + "/" + chapter.globalOrder() + "/" + generatedName;
+                    // 目标文件名保留原始文件名（禁止 UUID 化），目录用 globalOrder
+                    String target = comicId + "/" + chapter.globalOrder() + "/" + page.fileName();
                     files.add(new ImportManifest.ImportFile(relative, target, page.fileSize()));
                     // QA 修复注记（task-21）：nameMap 键必须用相对路径而非裸 fileName，
                     // 否则多章节含同名文件（001.jpg）时后处理章节覆盖前者，
@@ -135,21 +133,6 @@ public class DirectoryImportHandler {
             }
         }
         return new ManifestBuildResult(files, nameMap);
-    }
-
-    /**
-     * 生成服务端文件名：{@code UUID + 原扩展名}。
-     * 避免文件名冲突和路径猜解。
-     */
-    private static String generateServerName(String originalName) {
-        String extension = "";
-        if (originalName != null) {
-            int dot = originalName.lastIndexOf('.');
-            if (dot >= 0 && dot < originalName.length() - 1) {
-                extension = originalName.substring(dot).toLowerCase();
-            }
-        }
-        return UUID.randomUUID().toString() + extension;
     }
 
     private Map<String, Object> buildMetadataMap(ComicMetadata metadata, Long comicId, Map<String, String> generatedNames) {
