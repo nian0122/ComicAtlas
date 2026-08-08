@@ -1,6 +1,7 @@
 package com.comicatlas.worker.file.download;
 
 import com.comicatlas.worker.config.WorkerConfig;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -15,20 +16,14 @@ import java.nio.file.StandardCopyOption;
 
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class ArchiveDownloader {
 
-    private final HttpClient http;
-    private final String siteUrl;
-    private final String userAgent;
-
-    public ArchiveDownloader(WorkerConfig config) {
-        this.siteUrl = config.getEhentai().getSiteUrl();
-        this.userAgent = config.getEhentai().getUserAgent();
-        this.http = HttpClient.newBuilder()
-            .followRedirects(HttpClient.Redirect.ALWAYS)
-            .connectTimeout(java.time.Duration.ofSeconds(60))
-            .build();
-    }
+    private final HttpClient http = HttpClient.newBuilder()
+        .followRedirects(HttpClient.Redirect.ALWAYS)
+        .connectTimeout(java.time.Duration.ofSeconds(60))
+        .build();
+    private final WorkerConfig config;
 
     /**
      * 通过 e-hentai Archiver 下载画廊 zip
@@ -37,14 +32,14 @@ public class ArchiveDownloader {
      */
     public long download(long gid, String token, String archiverKey, Path destFile) throws Exception {
         String url = String.format("%s/archiver.php?gid=%d&token=%s&or=%s",
-            siteUrl, gid, token, archiverKey);
+            config.getEhentai().getSiteUrl(), gid, token, archiverKey);
         log.info("Archive download: gid={}, dest={}", gid, destFile);
 
         Files.createDirectories(destFile.getParent());
 
         HttpRequest req = HttpRequest.newBuilder()
             .uri(URI.create(url))
-            .header("User-Agent", userAgent)
+            .header("User-Agent", config.getEhentai().getUserAgent())
             .timeout(java.time.Duration.ofMinutes(30))
             .GET()
             .build();
