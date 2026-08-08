@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
  * 事务 Outbox 消息实体。
  * <p>
  * 业务写入 + outbox 记录同事务，relay 异步轮询发布到 MQ。
+ * <p>数据库实体（DO），禁止直接暴露给接口；对外使用 {@code dto/} 包对应 DTO/VO。
  */
 @Data
 @Accessors(chain = true)
@@ -61,5 +62,6 @@ public class OutboxMessage {
     /** 最后一次发布错误 */
     private String lastError;
 
+    /** 创建时间 */
     private LocalDateTime createdAt;
 }

@@ -15,6 +15,7 @@ import com.baomidou.mybatisplus.annotation.Version;
  * <p>
  * 逐 comic/directory 追踪，支持目标冲突锁（lock_key 唯一）和 retry attempt 递增。
  * 活跃时 lock_key 非空占用唯一约束，终态时设 NULL 释放。
+ * <p>数据库实体（DO），禁止直接暴露给接口；对外使用 {@code dto/} 包对应 DTO/VO。
  */
 @Data
 @TableName("management_task_item")
@@ -60,9 +61,13 @@ public class ManagementTaskItem {
     @Version
     private Integer version;
 
+    /** 创建时间 */
     private LocalDateTime createdAt;
+    /** 更新时间 */
     private LocalDateTime updatedAt;
+    /** 开始时间 */
     private LocalDateTime startedAt;
+    /** 完成时间 */
     private LocalDateTime completedAt;
 
     // ======================== 便捷方法 ========================
