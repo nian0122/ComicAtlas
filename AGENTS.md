@@ -14,7 +14,7 @@ Spring Boot 3 + Vue3 + RabbitMQ + MySQL + Redis。
 comic-atlas/
 ├── api-service/             # 漫画CRUD + 导入 + Catalog + Reader + LQ/HQ删除 + MQ消费（Flyway 迁移在 src/main/resources/db/）
 ├── worker-service/          # 文件处理 + MQ消费 + 下载 + 解压 + 导入 + LQ/HQ删除 + ffprobe（模块化：config/event/command/importer/media/storage/export/file/process/image）
-├── comic-common/            # 共享事件 DTO（16 个 record + ComicEvent sealed interface，Jackson 多态序列化）
+├── comic-common/            # 共享事件 DTO（37 个 record + ComicEvent sealed interface，Jackson 多态序列化）+ 常量/枚举/MQ 模板/metadata 构建/工具（constant/dto/enums/event/metadata/mq/util）
 ├── gateway/                 # Spring Cloud Gateway: 路由 + Nacos发现
 ├── frontend/                # Vue3/Vite: 列表 + 详情 + 阅读器 + 管理后台 + 存储管理
 ├── scripts/                 # dev/qa/db/release 开发与运维脚本（入口 scripts/dev/start-dev.ps1）
@@ -47,7 +47,13 @@ comic-atlas/
 | 恢复事件处理 | `api-service/.../event/RecoveryEventHandler.java` | 消费 MQ 事件，逐本调用 RecoveryEngine |
 | 恢复引擎 | `api-service/.../recovery/RecoveryEngine.java` | 单本漫画的 DB 恢复逻辑 |
 | Worker 恢复入口 | `worker-service/.../event/RecoveryTaskHandler.java` | 扫描 HQ 目录，发布 comicId 列表 |
-| 事件 DTO | `comic-common/.../event/` | 16 个 record + ComicEvent sealed interface |
+| 事件 DTO | `comic-common/.../event/` | 37 个 record + ComicEvent sealed interface（含各域事件） |
+| MQ 常量 | `comic-common/.../constant/` | MqExchanges/MqQueues/MqRoutingKeys（exchange/queue/routingKey 契约） |
+| 元数据构建 | `comic-common/.../metadata/` | MetadataV3/MetadataJsonBuilder（V3 元数据模型） |
+| MQ 消费支持 | `comic-common/.../mq/` | MqConsumerSupport（统一 ACK/Reject/DLQ 策略） |
+| 工具类 | `comic-common/.../util/` | ImageDimensionsReader（图片尺寸读取） |
+| 枚举 | `comic-common/.../enums/` | TaskType/TaskStage/ManagementTaskStatus/TranscodeStatus 等 |
+| DTO | `comic-common/.../dto/` | ScanItemVO/ScanResultVO/TrashManifest/OutboxStats 等 |
 | Worker 入口 | `worker-service/.../event/ImportTaskHandler.java` | sourceType 路由到统一 handler |
 | 取消任务 | `worker-service/.../event/CancelHandler.java` | ConcurrentHashMap 标记 |
 | LQ 生成 | `worker-service/.../event/LqGenerateHandler.java` | 调用 ImageOptimizer 外部工具 |
@@ -119,42 +125,78 @@ URL 统一由 `FileUrlResolver.resolve(page)` 生成，不手拼。
 |----------|-----------|-------|----------|
 | comic.import | task.created | import.task.queue | Worker ImportTaskHandler |
 | comic.import | task.completed | import.result.queue | API ImportEventHandler |
-| comic.import | task.failed | import.result.queue | API ImportEventHandler |
+| comic.import | task.failed | import.failed.queue | API ImportEventHandler |
 | comic.task | status.changed | task.status.queue | API ImportEventHandler |
 | comic.task | cancel.requested | cancel.task.queue | Worker CancelHandler |
 | comic.image | lq.generate | lq.generate.queue | Worker LqGenerateHandler |
 | comic.image | lq.completed | lq.result.queue | API LqCompletedHandler |
 | comic.image | hq.delete.requested | hq.delete.queue | Worker HqDeleteHandler |
 | comic.image | hq.delete.completed | hq.delete.result.queue | API HqDeletedHandler |
+| comic.image | video.metadata.fix.requested | video.metadata.fix.queue | Worker VideoMetadataFixHandler |
+| comic.image | video.metadata.fix.completed | video.metadata.fix.result.queue | API VideoMetadataFixCompletedHandler |
 | comic.delete | delete.requested | delete.task.queue | Worker DeleteHandler |
 | comic.delete | delete.completed | delete.result.queue | API DeleteEventHandler |
+| comic.export | task.created | export.task.queue | Worker ExportTaskHandler |
+| comic.export | task.started | export.started.result.queue | API ExportStartedHandler |
+| comic.export | task.completed | export.completed.result.queue | API ExportCompletedHandler |
+| comic.export | task.failed | export.failed.result.queue | API ExportFailedHandler |
+| comic.export | metadata.refresh.requested | metadata.refresh.queue | Worker MetadataRefreshHandler |
+| comic.video | video.transcode.requested | video.transcode.queue | Worker VideoTranscodeHandler |
+| comic.video | video.transcode.completed | video.transcode.completed.queue | API TranscodeCompletedHandler |
+| comic.video | video.transcode.failed | video.transcode.failed.queue | API TranscodeFailedHandler |
 | comic.recovery | recovery.requested | recovery.task.queue | Worker RecoveryTaskHandler |
 | comic.recovery | recovery.progress | recovery.result.queue | API RecoveryEventHandler |
 | comic.recovery | recovery.completed | recovery.result.queue | API RecoveryEventHandler |
 | comic.recovery | recovery.failed | recovery.result.queue | API RecoveryEventHandler |
+| comic.scan | scan.requested | scan.task.queue | Worker DirectoryScanHandler |
+| comic.scan | scan.completed | scan.result.queue | API DirectoryScanEventHandler |
+| comic.scan | scan.failed | scan.result.queue | API DirectoryScanEventHandler |
+| comic.management | command.requested | management.command.queue | Worker ManagementCommandDispatcher |
+| comic.management | command.cancel | management.cancel.queue | （未注册消费者） |
+| comic.management | command.completed / failed / progress | management.result.queue | API ManagementCommandResultHandler |
 
-**死信**: 所有主队列配置 DLX + DLQ（comic.import.dlx / comic.image.dlx / comic.delete.dlx / comic.recovery.dlx）
+**死信**: 主队列除 comic.task（task.status.queue / cancel.task.queue 无 DLX）外均配置 DLX + DLQ（comic.import.dlx / comic.image.dlx / comic.delete.dlx / comic.export.dlx / comic.video.dlx / comic.recovery.dlx / comic.scan.dlx / comic.management.dlx）
 
 **序列化**: Jackson2JsonMessageConverter
 
 **事件命名规范（冻结）**:
-| Event | RoutingKey | DTO（Phase B） |
+| Event | RoutingKey | DTO |
 |-------|-----------|----------------|
 | ImportTaskCreated | comic.import.task.created | ImportTaskCreatedEvent |
 | ImportTaskCompleted | comic.import.task.completed | ImportTaskCompletedEvent |
 | ImportTaskFailed | comic.import.task.failed | ImportTaskFailedEvent |
+| TaskStatusChanged | comic.task.status.changed | TaskStatusChangedEvent |
+| CancelTask | comic.task.cancel.requested | CancelTaskEvent |
 | LqGenerate | comic.image.lq.generate | LqGenerateEvent |
 | LqCompleted | comic.image.lq.completed | LqCompletedEvent |
-| DeleteRequested | comic.delete.requested | DeleteRequestedEvent |
-| DeleteCompleted | comic.delete.completed | DeleteCompletedEvent |
 | DeleteHqRequested | comic.image.hq.delete.requested | DeleteHqRequestedEvent |
 | HqDeleted | comic.image.hq.delete.completed | HqDeletedEvent |
-| CancelTask | comic.task.cancel.requested | CancelTaskEvent |
-| TaskStatusChanged | comic.task.status.changed | TaskStatusChangedEvent |
+| VideoMetadataFixRequested | comic.image.video.metadata.fix.requested | VideoMetadataFixRequestedEvent |
+| VideoMetadataFixCompleted | comic.image.video.metadata.fix.completed | VideoMetadataFixCompletedEvent |
+| DeleteRequested | comic.delete.requested | DeleteRequestedEvent |
+| DeleteCompleted | comic.delete.completed | DeleteCompletedEvent |
+| ExportTaskCreated | comic.export.task.created | ExportTaskCreatedEvent |
+| ExportTaskStarted | comic.export.task.started | ExportTaskStartedEvent |
+| ExportTaskCompleted | comic.export.task.completed | ExportTaskCompletedEvent |
+| ExportTaskFailed | comic.export.task.failed | ExportTaskFailedEvent |
+| MetadataRefresh | comic.export.metadata.refresh.requested | MetadataRefreshEvent |
+| VideoTranscodeRequested | comic.video.video.transcode.requested | VideoTranscodeRequestedEvent |
+| VideoTranscodeCompleted | comic.video.video.transcode.completed | VideoTranscodeCompletedEvent |
+| VideoTranscodeFailed | comic.video.video.transcode.failed | VideoTranscodeFailedEvent |
 | RecoveryRequested | comic.recovery.requested | RecoveryRequestedEvent |
 | RecoveryScanCompleted | comic.recovery.progress | RecoveryScanCompletedEvent |
+| RecoveryProgress | comic.recovery.progress | RecoveryProgressEvent |
 | RecoveryCompleted | comic.recovery.completed | RecoveryCompletedEvent |
 | RecoveryFailed | comic.recovery.failed | RecoveryFailedEvent |
+| DirectoryScanRequested | comic.scan.requested | DirectoryScanRequestedEvent |
+| DirectoryScanCompleted | comic.scan.completed | DirectoryScanCompletedEvent |
+| DirectoryScanFailed | comic.scan.failed | DirectoryScanFailedEvent |
+| ManagementCommandRequested | comic.management.command.requested | ManagementCommandRequestedEvent |
+| ManagementCommandProgress | comic.management.command.progress | ManagementCommandProgressEvent |
+| ManagementCommandCompleted | comic.management.command.completed | ManagementCommandCompletedEvent |
+| ManagementCommandFailed | comic.management.command.failed | ManagementCommandFailedEvent |
+| ManagementCommandCancelRequested | comic.management.command.cancel | ManagementCommandCancelRequestedEvent |
+| MediaUploadCompleted | comic.management.command.completed | MediaUploadCompletedEvent |
 
 ## CONFIG / ENV
 | 变量 | 默认值 | 说明 |
@@ -166,17 +208,21 @@ URL 统一由 `FileUrlResolver.resolve(page)` 生成，不手拼。
 | `FFMPEG_PATH` | `tools/ffmpeg/ffmpeg.exe` | ffmpeg 路径（视频封面抽取） |
 | `FFPROBE_PATH` | `tools/ffmpeg/ffprobe.exe` | ffprobe 路径（视频元数据提取） |
 | `IMAGE_OPTIMIZER_PATH` | `tools/image-optimizer/image-optimizer.exe` | LQ 图片优化工具路径 |
+| `MYSQL_PASS` | 无默认值（必填） | Worker 只读 MySQL 密码（仅 GRANT SELECT） |
 
 ## DB SCHEMA 要点
 - `catalog` 表：comic_id, parent_id, title, sort_order（可选目录树）
 - `chapter` 表：catalog_id(nullable), sort_order, global_order（全书阅读顺序）
 - `chapter.chapter_no` = 原始编号，不参与排序。排序只用 `global_order`
 - `page` 表：hq_root, hq_path（替代旧 image_name）
-- `page.hq_status` = PENDING（文件复制前），→ READY（复制成功），→ DELETED（HQ 删除后），MISSING（文件丢失）
-- `page.lq_status` = NOT_GENERATED（不自动生成 LQ）
+- `page.hq_status` = PENDING（文件复制前），→ READY（复制成功），→ DELETED（HQ 删除后），MISSING（文件丢失），另有 DELETE_QUEUED/DELETING/FAILED（HqStatus 枚举）
+- `page.lq_status` = NOT_GENERATED（不自动生成 LQ），另有 QUEUED/GENERATING/READY/MISSING/FAILED（LqStatus 枚举）
+- `page.status` / `chapter.status` = MediaLifecycleStatus 生命周期（STAGING→READY→TRASHED→DELETED，含 DELETING/TRASHING/RESTORING/PURGING）
 - `page` 视频字段：media_type, duration, container, video_codec, audio_codec（ffprobe 提取）
 - `import_task` 表：source_type, source_path（修复 retry 硬编码问题）
 - `comic.category_id` 替代旧 `category` VARCHAR 列
+- 新增表：`management_task`/`management_task_item`（管理任务）、`outbox_message`/`inbox_receipt`（Outbox 发件箱）、`upload_session`/`upload_file`（分块上传）、`recovery_task`、`directory_scan_task`、`export_task`（回收清单以 TrashManifest DTO + resultRef 存储，非表）
+- comic/chapter/page 均含 `version` 乐观锁列（管理端编辑）
 - **已清理死字段**：comic(root_key, relative_path, lq_status)、catalog(path, level)、import_task(current_page, downloaded_bytes)
 
 ## CONVENTIONS
