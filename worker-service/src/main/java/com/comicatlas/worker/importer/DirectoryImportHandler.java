@@ -6,7 +6,7 @@ import com.comicatlas.worker.storage.StorageRef;
 import com.comicatlas.worker.storage.StorageService;
 import com.comicatlas.worker.storage.TransferMode;
 import com.comicatlas.worker.file.transcode.VideoNormalizer;
-import com.comicatlas.worker.image.ImageOptimizer;
+import com.comicatlas.worker.image.CoverGenerator;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -31,7 +31,7 @@ public class DirectoryImportHandler {
     private final MetadataAssembler assembler;
     private final StorageService storageService;
     private final ObjectMapper objectMapper;
-    private final ImageOptimizer imageOptimizer;
+    private final CoverGenerator coverGenerator;
     private final CancelHandler cancelHandler;
     private final VideoNormalizer videoNormalizer;
     private final ImportManifestManager manifestManager;
@@ -251,7 +251,7 @@ public class DirectoryImportHandler {
             Path firstImagePath = storageService.resolve(new StorageRef("HQ", hqPath));
             if (Files.exists(firstImagePath)) {
                 try {
-                    imageOptimizer.generateCover(comicId, firstImagePath);
+                    coverGenerator.generateCover(comicId, firstImagePath);
                 } catch (Exception e) {
                     log.error("封面生成失败: comicId={}, {}", comicId, e.getMessage());
                 }
@@ -266,7 +266,7 @@ public class DirectoryImportHandler {
             Path firstVideoFile = storageService.resolve(new StorageRef("HQ", hqPath));
             if (Files.exists(firstVideoFile)) {
                 try {
-                    imageOptimizer.generateCoverFromVideo(comicId, firstVideoFile);
+                    coverGenerator.generateCoverFromVideo(comicId, firstVideoFile);
                 } catch (Exception e) {
                     log.error("视频封面生成失败: comicId={}, {}", comicId, e.getMessage());
                 }
