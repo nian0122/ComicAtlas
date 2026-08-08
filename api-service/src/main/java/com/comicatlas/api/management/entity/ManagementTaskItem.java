@@ -22,6 +22,7 @@ import com.baomidou.mybatisplus.annotation.Version;
 public class ManagementTaskItem {
 
     @TableId(type = IdType.AUTO)
+    /** 主键（自增） */
     private Long id;
 
     /** 关联 management_task.id */
@@ -57,10 +58,9 @@ public class ManagementTaskItem {
     /** 活跃锁键，完成时设 NULL 以释放唯一约束 */
     private String lockKey;
 
-    /** @Version 乐观锁 */
+    /** 乐观锁版本号（@Version 手动管理） */
     @Version
     private Integer version;
-
     /** 创建时间 */
     private LocalDateTime createdAt;
     /** 更新时间 */
