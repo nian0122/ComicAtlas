@@ -1,5 +1,7 @@
 package com.comicatlas.common.event;
 
+import com.comicatlas.common.event.payload.TranscodeMediaInfo;
+
 import java.time.Instant;
 import java.util.UUID;
 

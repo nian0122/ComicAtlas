@@ -1,4 +1,4 @@
-package com.comicatlas.common.event;
+package com.comicatlas.common.event.payload;
 
 import java.math.BigDecimal;
 

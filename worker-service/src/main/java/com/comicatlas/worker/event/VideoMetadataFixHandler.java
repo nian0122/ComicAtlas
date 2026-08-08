@@ -5,7 +5,7 @@ import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.event.VideoMetadataFixCompletedEvent;
 import com.comicatlas.common.event.VideoMetadataFixRequestedEvent;
-import com.comicatlas.common.event.VideoMetadataFixResult;
+import com.comicatlas.common.event.payload.VideoMetadataFixResult;
 import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.worker.entity.ExportMedia;
 import com.comicatlas.worker.media.ComicMetadata;

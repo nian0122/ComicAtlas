@@ -8,7 +8,7 @@ import com.comicatlas.common.event.ManagementCommandProgressEvent;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.common.event.MediaUploadCompletedEvent;
 import com.comicatlas.common.event.MediaUploadCompletedEvent.MediaAnalysisResult;
-import com.comicatlas.common.event.TranscodeMediaInfo;
+import com.comicatlas.common.event.payload.TranscodeMediaInfo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;

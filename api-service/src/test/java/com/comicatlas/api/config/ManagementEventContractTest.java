@@ -114,7 +114,7 @@ class ManagementEventContractTest {
         @Test
         @DisplayName("ManagementCommandCompletedEvent 携带实测 transcode 元数据时序列化/反序列化保持全部字段")
         void completedWithTranscodeRoundTrip() throws Exception {
-            var transcode = new com.comicatlas.common.event.TranscodeMediaInfo(
+            var transcode = new com.comicatlas.common.event.payload.TranscodeMediaInfo(
                     new java.math.BigDecimal("12.34"), "mp4", "h264", "aac", 2048000L);
             var event = new ManagementCommandCompletedEvent(
                     UUID.randomUUID(), Instant.now(), 1,

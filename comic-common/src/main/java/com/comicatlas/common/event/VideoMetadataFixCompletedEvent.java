@@ -1,5 +1,7 @@
 package com.comicatlas.common.event;
 
+import com.comicatlas.common.event.payload.VideoMetadataFixResult;
+
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
