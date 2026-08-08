@@ -49,6 +49,13 @@ public class StorageOperationController {
 
     // ======================== LQ 生成 ========================
 
+    /**
+     * 为整本漫画生成 LQ 版本（异步执行，生成结果经 MQ 回写）。
+     *
+     * @param comicId 漫画 ID
+     * @param regenerate 是否强制重新生成（忽略已存在的 LQ 结果）
+     * @return 操作提交结果
+     */
     @PostMapping("/lq/comics/{comicId}")
     public Result<OperationSubmitResult> generateComicLq(
             @PathVariable Long comicId,
@@ -56,6 +63,13 @@ public class StorageOperationController {
         return Result.ok(lqOperationService.generateForComic(comicId, regenerate));
     }
 
+    /**
+     * 为单个章节生成 LQ 版本（异步执行，生成结果经 MQ 回写）。
+     *
+     * @param chapterId 章节 ID
+     * @param regenerate 是否强制重新生成（忽略已存在的 LQ 结果）
+     * @return 操作提交结果
+     */
     @PostMapping("/lq/chapters/{chapterId}")
     public Result<OperationSubmitResult> generateChapterLq(
             @PathVariable Long chapterId,
@@ -65,11 +79,23 @@ public class StorageOperationController {
 
     // ======================== HQ 删除（保留 LQ） ========================
 
+    /**
+     * 删除整本漫画的 HQ 原图（保留 LQ 版本，异步执行）。
+     *
+     * @param comicId 漫画 ID
+     * @return 操作提交结果
+     */
     @PostMapping("/delete-hq/comics/{comicId}")
     public Result<OperationSubmitResult> deleteComicHq(@PathVariable Long comicId) {
         return Result.ok(hqDeleteOperationService.deleteForComic(comicId));
     }
 
+    /**
+     * 删除单个章节的 HQ 原图（保留 LQ 版本，异步执行）。
+     *
+     * @param chapterId 章节 ID
+     * @return 操作提交结果
+     */
     @PostMapping("/delete-hq/chapters/{chapterId}")
     public Result<OperationSubmitResult> deleteChapterHq(@PathVariable Long chapterId) {
         return Result.ok(hqDeleteOperationService.deleteForChapter(chapterId));
@@ -77,11 +103,23 @@ public class StorageOperationController {
 
     // ======================== 视频转码 ========================
 
+    /**
+     * 对整本漫画的章节视频发起转码（异步执行）。
+     *
+     * @param comicId 漫画 ID
+     * @return 操作提交结果
+     */
     @PostMapping("/transcode/comics/{comicId}")
     public Result<OperationSubmitResult> transcodeComic(@PathVariable Long comicId) {
         return Result.ok(transcodeOperationService.transcodeForComic(comicId));
     }
 
+    /**
+     * 对单个章节的视频发起转码（异步执行）。
+     *
+     * @param chapterId 章节 ID
+     * @return 操作提交结果
+     */
     @PostMapping("/transcode/chapters/{chapterId}")
     public Result<OperationSubmitResult> transcodeChapter(@PathVariable Long chapterId) {
         return Result.ok(transcodeOperationService.transcodeForChapter(chapterId));
@@ -89,6 +127,12 @@ public class StorageOperationController {
 
     // ======================== 刷新元数据 ========================
 
+    /**
+     * 刷新漫画元数据：重读 HQ 目录重建 metadata.json 及目录/章节信息。
+     *
+     * @param comicId 漫画 ID
+     * @return 刷新结果（章节/页面统计）
+     */
     @PostMapping("/refresh-metadata/comics/{comicId}")
     public Result<RefreshMetadataResult> refreshMetadata(@PathVariable Long comicId) {
         return Result.ok(metadataRefreshService.refresh(comicId));
@@ -96,17 +140,35 @@ public class StorageOperationController {
 
     // ======================== 导出 ========================
 
+    /**
+     * 为漫画创建导出任务（异步打包，任务就绪后经 MQ 通知）。
+     *
+     * @param comicId 漫画 ID
+     * @return 202 Accepted + 导出任务信息
+     */
     @PostMapping("/export/comics/{comicId}")
     public ResponseEntity<ExportTaskVO> createExport(@PathVariable Long comicId) {
         ExportTaskVO task = exportOperationService.createExportTask(comicId);
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(task);
     }
 
+    /**
+     * 查询漫画的导出任务列表。
+     *
+     * @param comicId 漫画 ID
+     * @return 导出任务列表
+     */
     @GetMapping("/export/comics/{comicId}/tasks")
     public Result<List<ExportTaskVO>> listExports(@PathVariable Long comicId) {
         return Result.ok(exportOperationService.listExports(comicId));
     }
 
+    /**
+     * 查询导出任务详情（含导出产物物理路径）。
+     *
+     * @param taskId 导出任务 ID
+     * @return 导出任务详情
+     */
     @GetMapping("/export/tasks/{taskId}")
     public Result<ExportTaskVO> getExportTask(@PathVariable Long taskId) {
         return Result.ok(exportOperationService.getTask(taskId));
