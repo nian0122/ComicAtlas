@@ -26,8 +26,7 @@ public class MyBatisPlusConfig {
     /**
      * 注册自定义枚举 TypeHandler：数据库 VARCHAR 与 Java 枚举双向映射。
      * <p>
-     * 默认 {@code EnumTypeHandler} 按 name() 严格匹配，历史脏数据（如
-     * {@code SourceType.DIRECTORY}，已由导入层映射为 REGISTER）会导致读取抛异常；
+     * 默认 {@code EnumTypeHandler} 按 name() 严格匹配，历史脏数据会导致读取抛异常；
      * 自定义 handler 经 {@code safeValueOf} 兜底为 null 并告警，避免运行时崩溃。
      */
     @Bean

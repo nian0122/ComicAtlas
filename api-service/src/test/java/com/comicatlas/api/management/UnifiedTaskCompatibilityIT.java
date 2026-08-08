@@ -345,7 +345,7 @@ class UnifiedTaskCompatibilityIT {
 
         ImportTask it = new ImportTask();
         it.setComicId(comic.getId());
-        it.setSourceType(SourceType.REGISTER);
+        it.setSourceType(SourceType.DIRECTORY);
         it.setStatus(ImportTaskStatus.SUCCESS);
         it.setProgress(100);
         importTaskMapper.insert(it);
@@ -408,7 +408,7 @@ class UnifiedTaskCompatibilityIT {
 
     private ImportRequest buildRequest(String path) {
         ImportRequest request = new ImportRequest();
-        request.setSourceType("REGISTER");
+        request.setSourceType("DIRECTORY");
         request.setSourcePath(path);
         return request;
     }
