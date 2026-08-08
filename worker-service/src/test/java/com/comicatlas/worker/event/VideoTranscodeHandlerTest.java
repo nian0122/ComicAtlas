@@ -5,7 +5,7 @@ import com.comicatlas.common.event.VideoTranscodeFailedEvent;
 import com.comicatlas.common.event.VideoTranscodeRequestedEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.worker.config.WorkerConfig;
-import com.comicatlas.worker.process.ExternalProcessRunner;
+import com.comicatlas.worker.file.transcode.FfmpegTranscoder;
 import com.rabbitmq.client.Channel;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,7 +15,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -26,8 +25,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
  * VideoTranscodeHandler 单元测试。
@@ -44,8 +46,7 @@ class VideoTranscodeHandlerTest {
 
     private WorkerConfig config;
     private VideoTranscodeHandler handler;
-    private ThreadPoolTaskExecutor ioExecutor;
-    private ExternalProcessRunner processRunner;
+    private FfmpegTranscoder ffmpegTranscoder;
 
     private Path tempRoot;   // 模拟 mangaRoot + tempDir 根目录
     private Path hqRoot;     // mangaRoot 下的 HQ 目录
@@ -62,19 +63,23 @@ class VideoTranscodeHandlerTest {
         config.setTempDir(tempRoot.resolve("temp").toString());
         Files.createDirectories(Path.of(config.getTempDir()));
 
-        ioExecutor = new ThreadPoolTaskExecutor();
-        ioExecutor.initialize();
-        processRunner = new ExternalProcessRunner(ioExecutor);
+        ffmpegTranscoder = mock(FfmpegTranscoder.class);
 
-        handler = new VideoTranscodeHandler(rabbitTemplate, config, processRunner, new MqConsumerSupport());
+        handler = new VideoTranscodeHandler(rabbitTemplate, config, ffmpegTranscoder, new MqConsumerSupport());
     }
 
     @AfterEach
     void tearDown() throws Exception {
-        if (ioExecutor != null) {
-            ioExecutor.shutdown();
-        }
         deleteRecursively(tempRoot);
+    }
+
+    /** 模拟转码：创建输出文件并返回指定退出码。 */
+    private void stubTranscode(int exitCode) throws Exception {
+        when(ffmpegTranscoder.transcode(any(Path.class), any(Path.class))).thenAnswer(inv -> {
+            Path output = inv.getArgument(1);
+            Files.writeString(output, "transcoded mp4");
+            return exitCode;
+        });
     }
 
     // ==================== Test 1: 转码成功 → 发送完成事件 ====================
@@ -91,7 +96,7 @@ class VideoTranscodeHandlerTest {
         Path sourceFile = chapterDir.resolve("test.webm");
         Files.writeString(sourceFile, "fake video data");
 
-        config.setFfmpegPath(createFakeFfmpeg(0).toString());
+        stubTranscode(0);
 
         VideoTranscodeRequestedEvent event = new VideoTranscodeRequestedEvent(
                 UUID.randomUUID(), Instant.now(), comicId, pageId,
@@ -143,7 +148,7 @@ class VideoTranscodeHandlerTest {
         Path chapterDir = Files.createDirectories(hqRoot.resolve("2/ch02"));
         Files.writeString(chapterDir.resolve("bad.avi"), "untranscodable data");
 
-        config.setFfmpegPath(createFakeFfmpeg(1).toString());
+        stubTranscode(1);
 
         VideoTranscodeRequestedEvent event = new VideoTranscodeRequestedEvent(
                 UUID.randomUUID(), Instant.now(), comicId, pageId,
@@ -224,7 +229,7 @@ class VideoTranscodeHandlerTest {
         Path existingMp4 = chapterDir.resolve("same.mp4");
         Files.writeString(sourceFile, "avi video");
         Files.writeString(existingMp4, "existing mp4");
-        config.setFfmpegPath(createFakeFfmpeg(0).toString());
+        stubTranscode(0);
         VideoTranscodeRequestedEvent event = new VideoTranscodeRequestedEvent(
                 UUID.randomUUID(), Instant.now(), comicId, pageId,
                 "HQ", "4/ch04/same.avi", "avi");
@@ -271,36 +276,11 @@ class VideoTranscodeHandlerTest {
         assertTrue(source.contains("RabbitTemplate"), "must use RabbitTemplate for event publishing");
         assertTrue(source.contains("WorkerConfig"), "must use WorkerConfig");
         assertTrue(
-                source.contains("processRunner.run("),
-                "ffmpeg must run via ExternalProcessRunner, which consumes stdout to prevent pipe deadlock");
+                source.contains("ffmpegTranscoder.transcode("),
+                "ffmpeg must run via FfmpegTranscoder (unified transcoding core)");
     }
 
     // ==================== helpers ====================
-
-    /**
-     * 创建假 ffmpeg 批处理，接受 ffmpeg 参数并将最后参数视为输出文件。
-     * exitCode=0 → 正常写入输出文件；exitCode≠0 → 不写文件，直接退出。
-     */
-    private Path createFakeFfmpeg(int exitCode) throws Exception {
-        Path bat = tempRoot.resolve("fake-ffmpeg.bat");
-        String script = """
-            @echo off
-            setlocal enabledelayedexpansion
-            set "output="
-            :loop
-            if "%~1"=="" goto done
-            set "output=%~1"
-            shift
-            goto loop
-            :done
-            if EXIT_CODE==0 (
-                if defined output echo fake-transcode-data > "!output!"
-            )
-            exit /b EXIT_CODE
-            """.replace("EXIT_CODE", String.valueOf(exitCode));
-        Files.writeString(bat, script);
-        return bat;
-    }
 
     private static void deleteRecursively(Path dir) throws Exception {
         if (Files.exists(dir)) {
