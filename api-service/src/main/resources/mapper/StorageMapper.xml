@@ -90,7 +90,7 @@
         WHERE c.id = #{comicId}
     </select>
 
-    <select id="selectTranscodeStatusList" resultType="com.comicatlas.api.admin.dto.ComicTranscodeStatus">
+    <select id="selectTranscodeStatusList" resultType="com.comicatlas.api.admin.dto.ComicTranscodeStatusVO">
         SELECT
             c.id as comic_id,
             GROUP_CONCAT(DISTINCT m.transcode_status) as transcode_status
