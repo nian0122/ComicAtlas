@@ -17,13 +17,19 @@ import com.comicatlas.api.common.enums.ChapterLifecycleStatus;
 @TableName("chapter")
 public class Chapter {
     @TableId(type = IdType.AUTO)
+    /** 主键（自增） */
     private Long id;
+    /** 所属漫画 ID */
     private Long comicId;
+    /** 所属目录节点 ID（可空，表示章节直接挂在漫画根下） */
     private Long catalogId;
+    /** 章节标题 */
     private String title;
     /** 原始章节编号（仅展示，不参与排序） */
     private String chapterNo;
+    /** 章节页数 */
     private Integer pageCount;
+    /** 同目录下排序序号 */
     private Integer sortOrder;
     /** 全书阅读顺序（重排依据，comicId 内唯一） */
     private Integer globalOrder;
@@ -38,5 +44,6 @@ public class Chapter {
     @Version
     private Integer version;
 
+    /** 创建时间 */
     private LocalDateTime createdAt;
 }

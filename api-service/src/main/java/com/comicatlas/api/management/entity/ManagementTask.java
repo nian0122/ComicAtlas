@@ -23,6 +23,7 @@ import com.baomidou.mybatisplus.annotation.Version;
 public class ManagementTask {
 
     @TableId(type = IdType.AUTO)
+    /** 主键（自增） */
     private Long id;
 
     /** 任务类型 */
