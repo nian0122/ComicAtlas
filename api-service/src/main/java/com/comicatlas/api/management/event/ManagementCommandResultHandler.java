@@ -24,7 +24,7 @@ import com.comicatlas.api.storage.service.MetadataRefreshService;
 import com.comicatlas.api.storage.service.MediaMetadataSyncService;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqQueues;
-import com.comicatlas.common.dto.TrashManifestActual;
+import com.comicatlas.common.dto.TrashManifestItemDTO;
 import com.comicatlas.api.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.api.common.enums.ManagementTaskStatus;
 import com.comicatlas.api.common.enums.MediaLifecycleStatus;
@@ -652,8 +652,8 @@ public class ManagementCommandResultHandler {
      * COMPENSATED → 文件已全部回滚，实体回 READY；否则保持 TRASHING（可 RECONCILE/RETRY）。
      */
     private void applyTrashFailed(String targetType, Long targetId, Long taskId) {
-        TrashManifestActual actual = trashManifestService.readActual(targetType, targetId, taskId);
-        if (actual != null && TrashManifestActual.STATUS_COMPENSATED.equals(actual.status())) {
+        TrashManifestItemDTO actual = trashManifestService.readActual(targetType, targetId, taskId);
+        if (actual != null && TrashManifestItemDTO.STATUS_COMPENSATED.equals(actual.status())) {
             revertToReady(targetType, targetId);
             log.info("回收补偿完成，回退 READY: {}/{}", targetType, targetId);
         } else {

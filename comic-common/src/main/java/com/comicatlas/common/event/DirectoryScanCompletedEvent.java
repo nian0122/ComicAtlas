@@ -1,6 +1,6 @@
 package com.comicatlas.common.event;
 
-import com.comicatlas.common.dto.ScanResultVO;
+import com.comicatlas.common.dto.ScanResultDTO;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -13,5 +13,5 @@ public record DirectoryScanCompletedEvent(
     UUID eventId,
     Instant occurredAt,
     Long taskId,
-    ScanResultVO result
+    ScanResultDTO result
 ) implements ComicEvent {}

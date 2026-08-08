@@ -7,7 +7,7 @@ import com.comicatlas.api.outbox.mapper.InboxReceiptMapper;
 import com.comicatlas.api.outbox.mapper.OutboxMessageMapper;
 import com.comicatlas.api.outbox.service.InboxService;
 import com.comicatlas.api.outbox.service.OutboxService;
-import com.comicatlas.common.dto.OutboxStats;
+import com.comicatlas.common.dto.OutboxStatsDTO;
 import com.comicatlas.common.event.ImportTaskCreatedEvent;
 import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -153,7 +153,7 @@ class OutboxInboxRelayIT {
             assertThat(outboxMapper.countPending()).isEqualTo(3);
             assertThat(outboxMapper.countFailed()).isEqualTo(2);
             assertThat(outboxMapper.selectCount(null)).isEqualTo(5);
-            var s = OutboxStats.of(outboxMapper.countPending(), outboxMapper.countFailed(), outboxMapper.selectCount(null));
+            var s = OutboxStatsDTO.of(outboxMapper.countPending(), outboxMapper.countFailed(), outboxMapper.selectCount(null));
             assertThat(s.pending()).isEqualTo(3); assertThat(s.failed()).isEqualTo(2); assertThat(s.total()).isEqualTo(5);
         }
     }

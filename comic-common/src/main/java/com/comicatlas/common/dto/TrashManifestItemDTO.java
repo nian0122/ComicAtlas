@@ -19,7 +19,7 @@ import java.util.List;
  * </ul>
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public record TrashManifestActual(
+public record TrashManifestItemDTO(
     int version,
     String targetType,
     Long targetId,

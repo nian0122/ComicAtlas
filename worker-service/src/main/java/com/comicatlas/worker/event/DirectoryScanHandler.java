@@ -3,8 +3,8 @@ package com.comicatlas.worker.event;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.constant.MqRoutingKeys;
-import com.comicatlas.common.dto.ScanItemVO;
-import com.comicatlas.common.dto.ScanResultVO;
+import com.comicatlas.common.dto.ScanItemDTO;
+import com.comicatlas.common.dto.ScanResultDTO;
 import com.comicatlas.common.event.DirectoryScanCompletedEvent;
 import com.comicatlas.common.event.DirectoryScanFailedEvent;
 import com.comicatlas.common.event.DirectoryScanRequestedEvent;
@@ -61,13 +61,13 @@ public class DirectoryScanHandler {
     }
 
     private void scanAndPublish(Long taskId, String dirPath) throws Exception {
-        ScanResultVO result = scanDirectory(dirPath);
+        ScanResultDTO result = scanDirectory(dirPath);
         rabbitTemplate.convertAndSend(MqExchanges.SCAN, MqRoutingKeys.SCAN_COMPLETED,
                 new DirectoryScanCompletedEvent(UUID.randomUUID(), Instant.now(), taskId, result));
         log.info("DirectoryScanHandler: 扫描完成, taskId={}, total={}", taskId, result.total());
     }
 
-    private ScanResultVO scanDirectory(String dirPath) {
+    private ScanResultDTO scanDirectory(String dirPath) {
         Path parent = Path.of(dirPath);
 
         if (!Files.exists(parent)) {
@@ -80,18 +80,18 @@ public class DirectoryScanHandler {
             throw new IllegalArgumentException("目录无读取权限: " + dirPath);
         }
 
-        List<ScanItemVO> items = new ArrayList<>();
+        List<ScanItemDTO> items = new ArrayList<>();
         try (var subdirs = Files.list(parent)) {
             subdirs.filter(Files::isDirectory).forEach(subdir -> {
                 long count = countImages(subdir);
-                items.add(new ScanItemVO(subdir.getFileName().toString(), subdir.toString(), (int) count));
+                items.add(new ScanItemDTO(subdir.getFileName().toString(), subdir.toString(), (int) count));
             });
         } catch (Exception e) {
             throw new IllegalArgumentException("扫描目录失败: " + e.getMessage());
         }
 
-        items.sort(Comparator.comparing(ScanItemVO::name));
-        return new ScanResultVO(dirPath, items.size(), items);
+        items.sort(Comparator.comparing(ScanItemDTO::name));
+        return new ScanResultDTO(dirPath, items.size(), items);
     }
 
     private long countImages(Path dir) {

@@ -27,8 +27,8 @@ import com.comicatlas.api.management.state.ManagementStateMachine;
 import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
-import com.comicatlas.common.dto.TrashManifest;
-import com.comicatlas.common.dto.TrashManifestActual;
+import com.comicatlas.common.dto.TrashManifestDTO;
+import com.comicatlas.common.dto.TrashManifestItemDTO;
 import com.comicatlas.api.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.api.common.enums.MediaLifecycleStatus;
 import com.comicatlas.api.common.enums.TaskType;
@@ -94,7 +94,7 @@ public class TrashLifecycleService {
                 "漫画状态 " + comic.getStatus() + " 不可回收");
         ManagementStateMachine.validateComicTransition(comicStatusName(comic), "TRASHING");
 
-        List<TrashManifest.Entry> entries = List.of(
+        List<TrashManifestDTO.Entry> entries = List.of(
                 entry("HQ", comicId.toString(), "hq/" + comicId),
                 entry("LQ", comicId.toString(), "lq/" + comicId),
                 entry("THUMBS", comicId.toString(), "thumbs/" + comicId),
@@ -116,7 +116,7 @@ public class TrashLifecycleService {
                 chapter.getStatus() == null ? null : chapter.getStatus().name(), "TRASHING");
 
         String rel = comicId + "/" + chapter.getGlobalOrder();
-        List<TrashManifest.Entry> entries = List.of(
+        List<TrashManifestDTO.Entry> entries = List.of(
                 entry("HQ", rel, "hq/" + rel),
                 entry("LQ", rel, "lq/" + rel));
 
@@ -136,7 +136,7 @@ public class TrashLifecycleService {
                 "媒体状态 " + media.getStatus() + " 不可回收");
         ManagementStateMachine.validateMediaTransition(mediaStatusName(media), "TRASHING");
 
-        List<TrashManifest.Entry> entries = new ArrayList<>();
+        List<TrashManifestDTO.Entry> entries = new ArrayList<>();
         if (media.getHqPath() != null && !media.getHqPath().isBlank()) {
             entries.add(entry("HQ", media.getHqPath(), "hq/" + media.getHqPath()));
         }
@@ -270,14 +270,14 @@ public class TrashLifecycleService {
     public TrashReconcileReport reconcile(String targetType, Long targetId) {
         Long taskId = findTrashTaskId(targetType, targetId);
         String dbStatus = resolveDbStatus(targetType, targetId);
-        TrashManifest manifest = taskId != null
+        TrashManifestDTO manifest = taskId != null
                 ? trashManifestService.readManifest(targetType, targetId, taskId) : null;
-        TrashManifestActual actual = taskId != null
+        TrashManifestItemDTO actual = taskId != null
                 ? trashManifestService.readActual(targetType, targetId, taskId) : null;
 
         List<TrashReconcileReport.EntryReport> entries = new ArrayList<>();
         if (manifest != null) {
-            for (TrashManifest.Entry e : manifest.entries()) {
+            for (TrashManifestDTO.Entry e : manifest.entries()) {
                 boolean sourceExists = existsInRoot(e.rootKey(), e.sourceRelativePath());
                 boolean trashExists = existsInTrash(targetType, targetId, taskId, e.trashRelativePath());
                 String state = trashExists ? (sourceExists ? "BOTH" : "IN_TRASH")
@@ -295,18 +295,18 @@ public class TrashLifecycleService {
     @Transactional
     public TrashReconcileReport reconcileAndRepair(String targetType, Long targetId) {
         Long taskId = findTrashTaskId(targetType, targetId);
-        TrashManifestActual actual = taskId != null
+        TrashManifestItemDTO actual = taskId != null
                 ? trashManifestService.readActual(targetType, targetId, taskId) : null;
         if (actual == null) {
             return reconcile(targetType, targetId);
         }
         String dbStatus = resolveDbStatus(targetType, targetId);
         String repaired = null;
-        if (TrashManifestActual.STATUS_TRASHED.equals(actual.status()) && "TRASHING".equals(dbStatus)) {
+        if (TrashManifestItemDTO.STATUS_TRASHED.equals(actual.status()) && "TRASHING".equals(dbStatus)) {
             if (markTrashed(targetType, targetId)) {
                 repaired = "TRASHED";
             }
-        } else if (TrashManifestActual.STATUS_COMPENSATED.equals(actual.status()) && "TRASHING".equals(dbStatus)) {
+        } else if (TrashManifestItemDTO.STATUS_COMPENSATED.equals(actual.status()) && "TRASHING".equals(dbStatus)) {
             if (markReady(targetType, targetId)) {
                 repaired = "READY";
             }
@@ -386,7 +386,7 @@ public class TrashLifecycleService {
         return false;
     }
 
-    private boolean computeConsistency(String dbStatus, TrashManifestActual actual,
+    private boolean computeConsistency(String dbStatus, TrashManifestItemDTO actual,
                                        List<TrashReconcileReport.EntryReport> entries) {
         boolean conflict = entries.stream().anyMatch(e -> "BOTH".equals(e.state()));
         if (conflict) {
@@ -397,11 +397,11 @@ public class TrashLifecycleService {
             return "TRASHING".equals(dbStatus);
         }
         return switch (actual.status()) {
-            case TrashManifestActual.STATUS_TRASHED, TrashManifestActual.STATUS_PURGED
+            case TrashManifestItemDTO.STATUS_TRASHED, TrashManifestItemDTO.STATUS_PURGED
                     -> "TRASHED".equals(dbStatus) || "PURGING".equals(dbStatus);
-            case TrashManifestActual.STATUS_COMPENSATED, TrashManifestActual.STATUS_RESTORED
+            case TrashManifestItemDTO.STATUS_COMPENSATED, TrashManifestItemDTO.STATUS_RESTORED
                     -> "READY".equals(dbStatus);
-            case TrashManifestActual.STATUS_PARTIAL -> "TRASHING".equals(dbStatus);
+            case TrashManifestItemDTO.STATUS_PARTIAL -> "TRASHING".equals(dbStatus);
             default -> false;
         };    }
 
@@ -447,12 +447,12 @@ public class TrashLifecycleService {
     // ======================== 内部辅助 ========================
 
     private OperationSubmitResult createTrashTask(String targetType, Long targetId, TaskType operation,
-                                                   String operationLabel, List<TrashManifest.Entry> entries,
+                                                   String operationLabel, List<TrashManifestDTO.Entry> entries,
                                                    String idempotencyKey, String payload) {
         ManagementTaskResponse task = createTask(operation, operationLabel, targetType, targetId, idempotencyKey, payload);
         Long taskId = task.getId();
-        trashManifestService.writeManifest(new TrashManifest(
-                TrashManifest.CURRENT_VERSION, targetType, targetId, taskId, Instant.now(), entries));
+        trashManifestService.writeManifest(new TrashManifestDTO(
+                TrashManifestDTO.CURRENT_VERSION, targetType, targetId, taskId, Instant.now(), entries));
         List<ManagementTaskItemResponse> items = managementTaskService.getTaskItems(taskId);
         for (ManagementTaskItemResponse item : items) {
             enqueueCommand(operation, item, targetType, targetId, null);
@@ -569,8 +569,8 @@ public class TrashLifecycleService {
         }
     }
 
-    private static TrashManifest.Entry entry(String rootKey, String source, String trash) {
-        return new TrashManifest.Entry(rootKey, source, trash);
+    private static TrashManifestDTO.Entry entry(String rootKey, String source, String trash) {
+        return new TrashManifestDTO.Entry(rootKey, source, trash);
     }
 
     private static String sha256(String input) {

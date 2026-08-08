@@ -760,8 +760,8 @@ class TrashLifecycleIT {
         Path dir = MANGA_ROOT.resolve("trash").resolve(targetType + "/" + targetId + "/" + taskId);
         Files.createDirectories(dir);
         Files.writeString(dir.resolve("actual.json"),
-                objectMapper.writeValueAsString(new com.comicatlas.common.dto.TrashManifestActual(
-                        com.comicatlas.common.dto.TrashManifestActual.CURRENT_VERSION,
+                objectMapper.writeValueAsString(new com.comicatlas.common.dto.TrashManifestItemDTO(
+                        com.comicatlas.common.dto.TrashManifestItemDTO.CURRENT_VERSION,
                         targetType.toUpperCase(), targetId, taskId, status,
                         "模拟补偿不完整", java.time.Instant.now(), null)),
                 StandardCharsets.UTF_8);

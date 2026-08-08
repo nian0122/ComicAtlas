@@ -1,7 +1,7 @@
 package com.comicatlas.worker.command;
 
-import com.comicatlas.common.dto.TrashManifest;
-import com.comicatlas.common.dto.TrashManifestActual;
+import com.comicatlas.common.dto.TrashManifestDTO;
+import com.comicatlas.common.dto.TrashManifestItemDTO;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageRoot;
@@ -39,16 +39,16 @@ public class TrashCommandHandler {
         Long targetId = cmd.targetId();
         Long manifestTaskId = cmd.manifestTaskId() != null ? cmd.manifestTaskId() : cmd.taskId();
         try {
-            TrashManifest manifest = manifestStore.readManifest(targetType, targetId, manifestTaskId);
+            TrashManifestDTO manifest = manifestStore.readManifest(targetType, targetId, manifestTaskId);
             if (manifest == null) {
                 publisher.failed(cmd, "TRASH 清单缺失: " + manifestStore.manifestDir(targetType, targetId, manifestTaskId));
                 return;
             }
             Path manifestDir = manifestStore.manifestDir(targetType, targetId, manifestTaskId);
-            List<TrashManifestActual.Entry> results = new ArrayList<>();
+            List<TrashManifestItemDTO.Entry> results = new ArrayList<>();
             TrashMoveException failure = null;
 
-            for (TrashManifest.Entry e : manifest.entries()) {
+            for (TrashManifestDTO.Entry e : manifest.entries()) {
                 try {
                     results.add(moveToTrash(e, manifestDir));
                 } catch (TrashMoveException ex) {
@@ -58,14 +58,14 @@ public class TrashCommandHandler {
             }
 
             if (failure == null) {
-                manifestStore.writeActual(actual(manifest, TrashManifestActual.STATUS_TRASHED, null, results));
+                manifestStore.writeActual(actual(manifest, TrashManifestItemDTO.STATUS_TRASHED, null, results));
                 publisher.completed(cmd);
                 log.info("回收命令完成: {}/{} entries={}", targetType, targetId, results.size());
                 return;
             }
 
             boolean compensated = compensateBack(results, manifestDir);
-            String status = compensated ? TrashManifestActual.STATUS_COMPENSATED : TrashManifestActual.STATUS_PARTIAL;
+            String status = compensated ? TrashManifestItemDTO.STATUS_COMPENSATED : TrashManifestItemDTO.STATUS_PARTIAL;
             String message = compensated
                     ? "回收失败，已全部回滚: " + failure.getMessage()
                     : "回收失败且补偿不完整（文件部分在 TRASH，仅可对账/重试）: " + failure.getMessage();
@@ -79,7 +79,7 @@ public class TrashCommandHandler {
     }
 
     /** 单条目移入 TRASH（同卷 + 绝不覆盖）。 */
-    private TrashManifestActual.Entry moveToTrash(TrashManifest.Entry e, Path manifestDir)
+    private TrashManifestItemDTO.Entry moveToTrash(TrashManifestDTO.Entry e, Path manifestDir)
             throws TrashMoveException {
         StorageRoot sourceRoot = storageProperties.getRoots().get(e.rootKey());
         if (sourceRoot == null || !sourceRoot.isEnabled()) {
@@ -88,8 +88,8 @@ public class TrashCommandHandler {
         Path source = sourceRoot.resolve(e.sourceRelativePath());
         Path target = manifestDir.resolve(e.trashRelativePath());
         if (!Files.exists(source)) {
-            return new TrashManifestActual.Entry(e.rootKey(), e.sourceRelativePath(),
-                    e.trashRelativePath(), TrashManifestActual.Entry.STATE_MISSING, "源文件缺失");
+            return new TrashManifestItemDTO.Entry(e.rootKey(), e.sourceRelativePath(),
+                    e.trashRelativePath(), TrashManifestItemDTO.Entry.STATE_MISSING, "源文件缺失");
         }
         if (Files.exists(target)) {
             throw new TrashMoveException("目标已存在，绝不覆盖: " + target);
@@ -100,19 +100,19 @@ public class TrashCommandHandler {
         try {
             Files.createDirectories(target.getParent());
             Files.move(source, target);
-            return new TrashManifestActual.Entry(e.rootKey(), e.sourceRelativePath(),
-                    e.trashRelativePath(), TrashManifestActual.Entry.STATE_TRASHED, null);
+            return new TrashManifestItemDTO.Entry(e.rootKey(), e.sourceRelativePath(),
+                    e.trashRelativePath(), TrashManifestItemDTO.Entry.STATE_TRASHED, null);
         } catch (IOException ex) {
             throw new TrashMoveException("移动失败: " + source + " -> " + target + ": " + ex.getMessage());
         }
     }
 
     /** 反向补偿：把已移入 TRASH 的条目移回源位置，成功则把状态改为 SOURCE。 */
-    private boolean compensateBack(List<TrashManifestActual.Entry> results, Path manifestDir) {
+    private boolean compensateBack(List<TrashManifestItemDTO.Entry> results, Path manifestDir) {
         boolean allOk = true;
         for (int i = 0; i < results.size(); i++) {
-            TrashManifestActual.Entry resultEntry = results.get(i);
-            if (!TrashManifestActual.Entry.STATE_TRASHED.equals(resultEntry.state())) {
+            TrashManifestItemDTO.Entry resultEntry = results.get(i);
+            if (!TrashManifestItemDTO.Entry.STATE_TRASHED.equals(resultEntry.state())) {
                 continue;
             }
             StorageRoot sourceRoot = storageProperties.getRoots().get(resultEntry.rootKey());
@@ -129,8 +129,8 @@ public class TrashCommandHandler {
                 }
                 Files.createDirectories(dst.getParent());
                 Files.move(src, dst);
-                results.set(i, new TrashManifestActual.Entry(resultEntry.rootKey(), resultEntry.sourceRelativePath(),
-                        resultEntry.trashRelativePath(), TrashManifestActual.Entry.STATE_SOURCE, "已回滚"));
+                results.set(i, new TrashManifestItemDTO.Entry(resultEntry.rootKey(), resultEntry.sourceRelativePath(),
+                        resultEntry.trashRelativePath(), TrashManifestItemDTO.Entry.STATE_SOURCE, "已回滚"));
             } catch (Exception e) {
                 log.warn("补偿失败: {} -> {}", src, dst, e);
                 allOk = false;
@@ -139,9 +139,9 @@ public class TrashCommandHandler {
         return allOk;
     }
 
-    private static TrashManifestActual actual(TrashManifest manifest, String status, String message,
-                                              List<TrashManifestActual.Entry> entries) {
-        return new TrashManifestActual(TrashManifestActual.CURRENT_VERSION,
+    private static TrashManifestItemDTO actual(TrashManifestDTO manifest, String status, String message,
+                                              List<TrashManifestItemDTO.Entry> entries) {
+        return new TrashManifestItemDTO(TrashManifestItemDTO.CURRENT_VERSION,
                 manifest.targetType(), manifest.targetId(), manifest.taskId(),
                 status, message, Instant.now(), entries);
     }
