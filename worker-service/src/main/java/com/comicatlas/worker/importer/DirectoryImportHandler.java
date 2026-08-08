@@ -5,7 +5,6 @@ import com.comicatlas.worker.media.ComicMetadata;
 import com.comicatlas.worker.storage.StorageRef;
 import com.comicatlas.worker.storage.StorageService;
 import com.comicatlas.worker.storage.TransferMode;
-import com.comicatlas.worker.file.transcode.VideoNormalizer;
 import com.comicatlas.worker.image.CoverGenerator;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -32,7 +31,6 @@ public class DirectoryImportHandler {
     private final ObjectMapper objectMapper;
     private final CoverGenerator coverGenerator;
     private final CancelHandler cancelHandler;
-    private final VideoNormalizer videoNormalizer;
     private final ImportManifestManager manifestManager;
 
     /**
@@ -46,11 +44,8 @@ public class DirectoryImportHandler {
             manifest = manifestManager.read(mangaRoot, taskId);
             log.info("恢复中断导入: taskId={}, files={}", taskId, manifest.files().size());
         } else {
-            int normalized = videoNormalizer.normalize(ctx.sourcePath());
-            if (normalized > 0) {
-                log.info("视频标准化: {} 个文件已转码为 .mp4", normalized);
-            }
-
+            // 导入只录入文件信息 + 生成封面，不做视频转码/图片优化；
+            // 转码与 LQ 优化由导入后在管理面板手动调用接口执行，加快导入时间。
             DirectoryTree tree = parser.parse(ctx.sourcePath());
             ComicMetadata metadata = assembler.assemble(tree, ctx);
 

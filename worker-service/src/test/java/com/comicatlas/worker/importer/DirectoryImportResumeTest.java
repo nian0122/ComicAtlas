@@ -65,7 +65,6 @@ class DirectoryImportResumeTest {
                 objectMapper,
                 mock(com.comicatlas.worker.image.CoverGenerator.class),
                 cancelHandler,
-                mock(com.comicatlas.worker.file.transcode.VideoNormalizer.class),
                 manifestManager);
     }
 
@@ -241,10 +240,8 @@ class DirectoryImportResumeTest {
                 .thenReturn(sampleMetadata());
         // 重新装配 handler（@RequiredArgsConstructor 无 setter，用新实例）
         com.comicatlas.worker.image.CoverGenerator coverGen = mock(com.comicatlas.worker.image.CoverGenerator.class);
-        com.comicatlas.worker.file.transcode.VideoNormalizer vn = mock(com.comicatlas.worker.file.transcode.VideoNormalizer.class);
-        when(vn.normalize(any(Path.class))).thenReturn(0);
         handler = new DirectoryImportHandler(parser, assembler, transferService, objectMapper,
-                coverGen, cancelHandler, vn, manifestManager);
+                coverGen, cancelHandler, manifestManager);
     }
 
     private ComicMetadata sampleMetadata() throws IOException {

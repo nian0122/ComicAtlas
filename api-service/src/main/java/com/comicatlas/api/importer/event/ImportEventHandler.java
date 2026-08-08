@@ -7,6 +7,7 @@ import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.common.enums.HqStatus;
 import com.comicatlas.api.common.enums.ImportTaskStatus;
 import com.comicatlas.api.common.enums.LqStatus;
+import com.comicatlas.api.common.enums.TranscodeStatus;
 import com.comicatlas.api.common.storage.ApiStorageProperties;
 import com.comicatlas.api.management.entity.ManagementTaskItem;
 import com.comicatlas.api.management.service.ManagementTaskService;
@@ -317,6 +318,11 @@ public class ImportEventHandler {
                     if (mediaData.get("audioCodec") != null) {
                         media.setAudioCodec((String) mediaData.get("audioCodec"));
                     }
+                    // 非标准视频（非 mp4/m4v）标记为待转码，供导入后手动触发转码
+                    String container = (String) mediaData.get("container");
+                    if (container == null || !isStandardVideoContainer(container)) {
+                        media.setTranscodeStatus(TranscodeStatus.QUEUED);
+                    }
                 }
 
                 mediaMapper.insert(media);
@@ -519,6 +525,12 @@ public class ImportEventHandler {
         } catch (Exception e) {
             log.warn("幂等标记写入失败: key={}", idempKey, e);
         }
+    }
+
+    /** 标准视频容器（无需转码）：mp4 / m4v，其余（avi/mkv/webm/mov 等）标记为待转码。 */
+    private static boolean isStandardVideoContainer(String container) {
+        String c = container.toLowerCase();
+        return "mp4".equals(c) || "m4v".equals(c);
     }
 
     private record ImportResult(int chapters, int pages, boolean skipped) {}
