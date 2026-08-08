@@ -54,6 +54,7 @@ public class Comic {
     private ComicStatus status;
     /** 分类 ID（关联 category 表，可空） */
     private Long categoryId;
+    /** 分类名（V3 迁移前的过渡遗留列，已由 {@link #categoryId} 取代；保留供 MetadataExporter 导出历史数据） */
     private String category;
     /** 软删除时间（null 表示未删除） */
     private LocalDateTime deletedAt;
