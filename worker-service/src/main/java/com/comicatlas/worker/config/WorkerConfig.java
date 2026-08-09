@@ -1,6 +1,7 @@
 package com.comicatlas.worker.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -14,6 +15,11 @@ import java.util.Map;
 @Configuration
 @ConfigurationProperties(prefix = "worker")
 public class WorkerConfig {
+    /** Commons Compress 分卷大小下限：64 KiB（ZIP 规范要求 split segment 不小于 64 KB）。 */
+    private static final long ZIP_SPLIT_SIZE_MIN_BYTES = 64L * 1024;
+    /** Commons Compress 分卷大小上限：2^32 - 1（无 Zip64 分卷的最大段大小）。 */
+    private static final long ZIP_SPLIT_SIZE_MAX_BYTES = 4_294_967_295L;
+
     private String mangaRoot;
     private String tempDir;
     private String metadataDir;
@@ -97,8 +103,33 @@ public class WorkerConfig {
     public static class Zip {
         private int maxEntries = 100_000;
         private int maxDepth = 200;
-        private long maxEntrySize = 2L * 1024 * 1024 * 1024;
+        /** 分卷导出单卷最大大小（字节），默认 2 GiB，须落在 Commons Compress 分卷支持范围（64 KiB..4 GiB）。 */
+        private long splitSize = 2L * 1024 * 1024 * 1024;
+        /** 单条目最大大小（字节），默认与 maxTotalSize 一致（30 GiB）。 */
+        private long maxEntrySize = 30L * 1024 * 1024 * 1024;
+        /** ZIP 解压内容总大小上限（字节），默认 30 GiB。 */
         private long maxTotalSize = 30L * 1024 * 1024 * 1024;
+    }
+
+    /**
+     * 启动校验分卷（split ZIP）容量配置边界：splitSize 必须落在 Commons Compress
+     * 分卷支持范围（64 KiB..4 GiB）；maxEntrySize 必须满足 0 &lt; maxEntrySize &lt;= maxTotalSize。
+     * 非法配置抛 {@link IllegalArgumentException}，异常消息携带字段名以便定位。
+     */
+    @PostConstruct
+    void validateZipConfig() {
+        Zip zipConfig = zip;
+        if (zipConfig.getSplitSize() < ZIP_SPLIT_SIZE_MIN_BYTES || zipConfig.getSplitSize() > ZIP_SPLIT_SIZE_MAX_BYTES) {
+            throw new IllegalArgumentException(
+                    "worker.zip.splitSize 必须位于 [" + ZIP_SPLIT_SIZE_MIN_BYTES + ", " + ZIP_SPLIT_SIZE_MAX_BYTES
+                            + "] 字节范围内（Commons Compress 分卷限制 64 KiB..4 GiB），当前值：" + zipConfig.getSplitSize());
+        }
+        if (zipConfig.getMaxEntrySize() <= 0 || zipConfig.getMaxEntrySize() > zipConfig.getMaxTotalSize()) {
+            throw new IllegalArgumentException(
+                    "worker.zip.maxEntrySize 必须满足 0 < maxEntrySize <= maxTotalSize，"
+                            + "当前 maxEntrySize=" + zipConfig.getMaxEntrySize()
+                            + ", maxTotalSize=" + zipConfig.getMaxTotalSize());
+        }
     }
 
     @Data

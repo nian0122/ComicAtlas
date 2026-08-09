@@ -95,6 +95,12 @@
             <version>0.1.6</version>
         </dependency>
 
+        <!-- ZIP 分卷构建（版本由根 pom dependencyManagement 统一管理） -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-compress</artifactId>
+        </dependency>
+
         <!-- 测试 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
