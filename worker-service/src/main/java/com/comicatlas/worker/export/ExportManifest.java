@@ -8,6 +8,10 @@ import java.util.List;
  */
 public record ExportManifest(String rootDirName, String metadataJson, List<Entry> entries) {
 
-    public record Entry(String targetPath, Path sourceFile) {
+    /**
+     * 待打包文件条目 — 规范化 targetPath（ZIP 内相对路径，仅正斜杠）、
+     * 源文件绝对路径、预检时已知的源文件大小（字节）。
+     */
+    public record Entry(String targetPath, Path sourceFile, long sourceSize) {
     }
 }
