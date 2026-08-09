@@ -20,6 +20,18 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 统一导入：清单驱动的安全搬运（导入两阶段最终化的<b>第一阶段（staging）</b>）。
+ * <p>
+ * <b>暂存语义</b>：Worker 在 DB 尚未生成章节 ID 时，以漫画内暂存键 {@code globalOrder} 把文件
+ * 落到 {@code hq/{comicId}/{globalOrder}}（见 {@link #buildManifestFiles}）；最终目录
+ * {@code hq/{comicId}/{chapterId}} 由 API 插入章节取得不可变 {@code chapterId} 后，经
+ * {@code ImportStorageFinalizeRequestedEvent} 逐章请求 Worker 搬运（见
+ * com.comicatlas.worker.event.ImportStorageFinalizeHandler）。
+ * <p>
+ * 清单存在 → 中断恢复（跳过已搬文件，metadata 从清单出，绝不重新解析源目录）；
+ * 清单不存在 → 全新导入（标准化 → 解析 → 组装 → 写清单 → 搬文件）。
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -121,7 +133,8 @@ public class DirectoryImportHandler {
                 if (!Files.exists(source)) { source = importRoot.resolve(page.fileName()); }
                 if (Files.exists(source) && page.fileSize() > 0) {
                     String relative = importRoot.relativize(source).toString().replace('\\', '/');
-                    // 目标文件名保留原始文件名（禁止 UUID 化），目录用 globalOrder
+                    // 目标文件名保留原始文件名（禁止 UUID 化），目录用 globalOrder——
+                    // DB chapterId 未生成前的漫画内暂存键，最终化时由 Worker 搬到 {comicId}/{chapterId}
                     String target = comicId + "/" + chapter.globalOrder() + "/" + page.fileName();
                     files.add(new ImportManifest.ImportFile(relative, target, page.fileSize()));
                     // QA 修复注记（task-21）：nameMap 键必须用相对路径而非裸 fileName，
@@ -164,7 +177,8 @@ public class DirectoryImportHandler {
                 mediaMap.put("hqStatus", page.hqStatus());
                 mediaMap.put("lqStatus", page.lqStatus());
                 mediaMap.put("fileSize", page.fileSize());
-                // 新布局：写入 hqPath = {comicId}/{globalOrder}/{generatedName}
+                // 新布局：写入 hqPath = {comicId}/{globalOrder}/{generatedName}（staging 暂存布局，
+                // 最终化阶段由 Worker 按 {comicId}/{chapterId} 移动后以事件真实 targetDir 修正）
                 String relKey = (chapter.sourceDir() != null && !chapter.sourceDir().isBlank())
                         ? chapter.sourceDir() + "/" + page.fileName()
                         : page.fileName();

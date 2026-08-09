@@ -97,7 +97,7 @@ class ImportStorageFinalizeHandlerTest {
     // ======================== happy path ========================
 
     @Test
-    @DisplayName("单章最终化：源搬空、目标就位、Completed 发布一次、manifest 删除")
+    @DisplayName("单章最终化（globalOrder→chapterId 两阶段）：staging 源搬空、chapterId 目标就位、Completed 发布一次、manifest 删除")
     void finalize_singleChapter_movesAllFilesPublishesCompletedOnceAndDeletesManifest() throws Exception {
         writeStaging(1, "001.jpg", "aaa");
         writeStaging(1, "002.jpg", "bbb");
@@ -126,7 +126,7 @@ class ImportStorageFinalizeHandlerTest {
     }
 
     @Test
-    @DisplayName("多章最终化：每章立即发布 Completed、清单逐章移除、最后一章后清单删除")
+    @DisplayName("多章最终化（逐章 globalOrder→chapterId）：每章立即发布 Completed、清单逐章移除、最后一章后清单删除")
     void finalize_threeChapters_publishesCompletedPerChapter_andRemovesManifestEntries() throws Exception {
         writeStaging(1, "001.jpg", "aaa");
         writeStaging(1, "002.jpg", "bbb");
