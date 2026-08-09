@@ -811,13 +811,14 @@ function Invoke-ScenarioA {
     $newOrder = @($catalog1.chapters | ForEach-Object { [long]$_.id })
     Assert-Equal $newOrder[0] $chIds[2] "重排后第 1 章为原第 3 章"
 
-    # 媒体重排：ch1 倒序
-    $ch1Pages = Invoke-Api -Path "/api/comics/$storyComicId/chapters/$($chIds[0])/pages"
+    # 媒体重排：ch1 倒序（章节页面列表统一走阅读详情 /api/chapters/{id}，
+    # 旧的 /api/comics/{id}/chapters/{cid}/pages 端点已于 1cfc9ea 删除）
+    $ch1Pages = Invoke-Api -Path "/api/chapters/$($chIds[0])"
     $pageIds = @($ch1Pages.pages | ForEach-Object { [long]$_.id })
     $revIds = @($pageIds | Select-Object -Last 1; $pageIds | Select-Object -First ([Math]::Max(0, $pageIds.Count - 1)))
     $rev = Invoke-Api -Method Post -Path "/api/chapters/$($chIds[0])/media/reorder" -Body @{ mediaIds = $revIds }
     Assert-Equal $rev.items.Count $pageIds.Count "媒体重排返回全部页"
-    $ch1Pages2 = Invoke-Api -Path "/api/comics/$storyComicId/chapters/$($chIds[0])/pages"
+    $ch1Pages2 = Invoke-Api -Path "/api/chapters/$($chIds[0])"
     Assert-Equal $ch1Pages2.pages[0].id $pageIds[-1] "重排后第 1 页为原末页"
 
     # 阅读器 prev/next
@@ -860,7 +861,7 @@ function Invoke-ScenarioA {
 
     # 单项 LQ（story-comic 视频章也有 IMAGE 页？story 只有 ch1/ch2 是图，ch3 视频）
     $dbg = Invoke-Sql -Db $Db -Sql "SELECT CONCAT(p.id,':',p.chapter_id,':',p.hq_path) FROM page p JOIN chapter c ON p.chapter_id=c.id WHERE c.comic_id=$storyComicId ORDER BY p.chapter_id, p.page_number"
-    $lq = Invoke-Api -Method Post -Path "/api/comics/$storyComicId/lq" -Body @{}
+    $lq = Invoke-Api -Method Post -Path "/api/storage/lq/comics/$storyComicId" -Body @{}
     Assert-True ($null -ne $lq.taskId) "单项 LQ 创建管理任务"
     $lt = Wait-ManagementTaskRobust -TaskId $lq.taskId -TimeoutSec 600 -Label "单项 LQ"
     Assert-Equal $lt.status "SUCCEEDED" "单项 LQ 任务成功"
@@ -871,7 +872,7 @@ function Invoke-ScenarioA {
     # 单项 HQ 删除（batch-comic 第 1 章，需 LQ 全 READY）
     $bch = Invoke-Api -Path "/api/comics/$batchComicId/catalog"
     $bchId = [long]$bch.chapters[0].id
-    $hd = Invoke-Api -Method Post -Path "/api/chapters/$bchId/delete-hq" -Body @{}
+    $hd = Invoke-Api -Method Post -Path "/api/storage/delete-hq/chapters/$bchId" -Body @{}
     Assert-True ($null -ne $hd.taskId) "单项 HQ 删除创建任务"
     $ht = Wait-ManagementTask -TaskId $hd.taskId -TimeoutSec 600
     Assert-Equal $ht.status "SUCCEEDED" "单项 HQ 删除成功"
@@ -930,7 +931,7 @@ function Invoke-ScenarioA {
     $ut2 = Wait-ManagementTask -TaskId $c2.taskId -TimeoutSec 300
     Assert-Equal $ut2.status "SUCCEEDED" "第 2 个视频上传成功"
 
-    $tr = Invoke-Api -Method Post -Path "/api/admin/storage/comics/$draftId/transcode-videos" -Body @{}
+    $tr = Invoke-Api -Method Post -Path "/api/storage/transcode/comics/$draftId" -Body @{}
     Assert-True ($null -ne $tr.taskId) "单项转码创建任务"
     $trt = Wait-ManagementTaskRobust -TaskId $tr.taskId -TimeoutSec 600 -Label "单项转码"
     Assert-Equal $trt.status "SUCCEEDED" "单项转码成功"
@@ -1051,7 +1052,7 @@ SET FOREIGN_KEY_CHECKS=1"
     Assert-Equal $orders[0] "1" "首章 globalOrder = 1"
     Assert-Equal $orders[5] "6" "末章 globalOrder = 6"
     $rootScatter = [int](Invoke-Sql -Db $Db -Sql "SELECT COUNT(*) FROM chapter WHERE comic_id=$mixedComicId AND catalog_id IS NULL")
-    Assert-Equal $rootScatter 1 "根散页 = 1（catalog_id NULL 的本书散页章）"
+    Assert-Equal $rootScatter 4 "顶层平铺章 = 4（ch1/ch2/ch10 目录话数 + 根散页章，均 catalog_id NULL）"
     $vol1Chapters = [int](Invoke-Sql -Db $Db -Sql "SELECT COUNT(*) FROM chapter WHERE comic_id=$mixedComicId AND catalog_id=$vol1Cat")
     Assert-Equal $vol1Chapters 2 "vol1 下章节 = 2（本目录散页 + vol1-1）"
 
@@ -1200,9 +1201,9 @@ INSERT INTO reading_history (comic_id, chapter_id, page_number) VALUES (1001, 20
     # 启动服务：Flyway baseline=2 → 应用 V10..V16
     Start-QaServices -Db $Db -FlywayBaseline "2"
 
-    # 升级断言（version 是 VARCHAR，MAX 需转数值比较，字典序 "2" > "16"）
+    # 升级断言（version 是 VARCHAR，MAX 需转数值比较，字典序 "2" > "17"）
     $v = Invoke-Sql -Db $Db -Sql "SELECT MAX(CAST(version AS UNSIGNED)) FROM flyway_schema_history"
-    Assert-Equal $v "16" "Flyway 升级到版本 16"
+    Assert-Equal $v "17" "Flyway 升级到版本 17（V1..V17 全量）"
     $newTables = Invoke-Sql -Db $Db -Sql "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$Db' AND table_name IN ('management_task','management_task_item','outbox_message','inbox_receipt','upload_session')"
     Assert-Equal ([int]$newTables) 5 "管理任务/outbox/upload 新表存在"
     Assert-Equal ([int](Invoke-Sql -Db $Db -Sql "SELECT COUNT(*) FROM comic WHERE id=1001 AND title='legacy-comic'")) 1 "legacy 漫画保留"
@@ -1217,7 +1218,7 @@ INSERT INTO reading_history (comic_id, chapter_id, page_number) VALUES (1001, 20
     Assert-Equal $legacyDetail.chapters.Count 2 "升级库章节可读"
 
     # 单项 LQ（升级库上的管理任务链路）
-    $lq = Invoke-Api -Method Post -Path "/api/comics/1001/lq" -Body @{}
+    $lq = Invoke-Api -Method Post -Path "/api/storage/lq/comics/1001" -Body @{}
     Assert-True ($null -ne $lq.taskId) "升级库 LQ 创建管理任务"
     $lt = Wait-ManagementTaskRobust -TaskId $lq.taskId -TimeoutSec 600 -Label "升级库 LQ"
     Assert-Equal $lt.status "SUCCEEDED" "升级库 LQ 成功"
