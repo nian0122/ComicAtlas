@@ -70,8 +70,9 @@ public class ImportTaskHandler {
             }
             case "EHENTAI" -> {
                 Path sourceDir = ehentaiDownloadService.downloadToSourceDir(taskId, sourcePath);
+                // 保留 EHENTAI 来源类型，使 parser 能剥离下载产物中的单层传输包装目录
                 directoryHandler.handle(
-                        new ImportContext("DIRECTORY", sourceDir, false, false), taskId, comicId, mangaRoot);
+                        new ImportContext("EHENTAI", sourceDir, false, false), taskId, comicId, mangaRoot);
             }
             default -> throw new IllegalArgumentException("Unknown sourceType: " + sourceType);
         }

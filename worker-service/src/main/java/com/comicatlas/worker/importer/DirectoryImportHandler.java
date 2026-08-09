@@ -46,7 +46,7 @@ public class DirectoryImportHandler {
         } else {
             // 导入只录入文件信息 + 生成封面，不做视频转码/图片优化；
             // 转码与 LQ 优化由导入后在管理面板手动调用接口执行，加快导入时间。
-            DirectoryTree tree = parser.parse(ctx.sourcePath());
+            DirectoryTree tree = parser.parse(ctx.sourcePath(), ctx.sourceType());
             ComicMetadata metadata = assembler.assemble(tree, ctx);
 
             if (cancelHandler.isCancelled(taskId)) {
