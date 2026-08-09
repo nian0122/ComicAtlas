@@ -4,6 +4,7 @@ import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.worker.command.HqDeleteCommandHandler;
 import com.comicatlas.worker.command.LqCommandHandler;
 import com.comicatlas.worker.command.MediaUploadCommandHandler;
+import com.comicatlas.worker.command.MetadataRefreshCommandHandler;
 import com.comicatlas.worker.command.PurgeCommandHandler;
 import com.comicatlas.worker.command.RestoreCommandHandler;
 import com.comicatlas.worker.command.TranscodeCommandHandler;
@@ -127,7 +128,8 @@ class RabbitMqConfigTopologyTest {
                     mock(LqCommandHandler.class), mock(HqDeleteCommandHandler.class),
                     mock(TranscodeCommandHandler.class), mock(TrashCommandHandler.class),
                     mock(RestoreCommandHandler.class), mock(PurgeCommandHandler.class),
-                    mock(MediaUploadCommandHandler.class), mock(ManagementCommandPublisher.class),
+                    mock(MediaUploadCommandHandler.class), mock(MetadataRefreshCommandHandler.class),
+                    mock(ManagementCommandPublisher.class),
                     new MqConsumerSupport());
         }
     }

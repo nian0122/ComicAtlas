@@ -23,4 +23,7 @@ public class ExportChapter {
     private Integer sortOrder;
 
     private Integer globalOrder;
+
+    /** 乐观锁版本号（元数据扫盘快照基线用） */
+    private Integer version;
 }

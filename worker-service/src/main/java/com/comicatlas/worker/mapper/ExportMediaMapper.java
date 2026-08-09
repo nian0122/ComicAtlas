@@ -22,6 +22,24 @@ public interface ExportMediaMapper {
     """)
     List<ExportMedia> selectByComicId(Long comicId);
 
+    /**
+     * 元数据扫盘刷新专用只读查询：额外取媒体生命周期 status 与乐观锁 version 作为快照基线。
+     * 不修改既有查询，避免影响导出/删除等共享消费方。
+     */
+    @Select("""
+        SELECT p.id, p.chapter_id, p.page_number, p.media_type,
+               p.hq_root, p.hq_path, p.hq_status,
+               p.lq_root, p.lq_path, p.lq_status,
+               p.file_size, p.width, p.height,
+               p.duration, p.container, p.video_codec, p.audio_codec,
+               p.status, p.version
+        FROM page p
+        JOIN chapter ch ON p.chapter_id = ch.id
+        WHERE ch.comic_id = #{comicId}
+        ORDER BY ch.global_order ASC, p.page_number ASC
+    """)
+    List<ExportMedia> selectByComicIdWithVersionAndStatus(Long comicId);
+
     @Select("""
         SELECT p.id, p.chapter_id, p.page_number, p.media_type,
                p.hq_root, p.hq_path, p.hq_status,

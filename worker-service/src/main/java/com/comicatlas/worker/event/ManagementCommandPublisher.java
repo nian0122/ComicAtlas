@@ -8,6 +8,7 @@ import com.comicatlas.common.event.ManagementCommandProgressEvent;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.common.event.MediaUploadCompletedEvent;
 import com.comicatlas.common.event.MediaUploadCompletedEvent.MediaAnalysisResult;
+import com.comicatlas.common.event.MetadataRefreshScanCompletedEvent;
 import com.comicatlas.common.event.payload.TranscodeMediaInfo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -59,6 +60,23 @@ public class ManagementCommandPublisher {
                         cmd.taskId(), cmd.itemId(), cmd.attempt(),
                         cmd.operationType(), cmd.targetType(), cmd.targetId(),
                         errorMessage));
+    }
+
+    /**
+     * 元数据扫盘刷新完成事件（Worker → API）。
+     * <p>
+     * 复用 MANAGEMENT exchange + COMMAND_COMPLETED routing（不新增队列）：
+     * 快照产物已落盘，事件只携带引用路径 + SHA-256 校验 + 字节数 + schema 版本，
+     * 供 API 端按引用读取并校验完整性后与数据库比对刷新元数据。
+     */
+    public void metadataRefreshScanCompleted(ManagementCommandRequestedEvent cmd,
+                                             String snapshotRef, String snapshotSha256,
+                                             long snapshotBytes, int schemaVersion) {
+        rabbitTemplate.convertAndSend(EXCHANGE, MqRoutingKeys.COMMAND_COMPLETED,
+                new MetadataRefreshScanCompletedEvent(UUID.randomUUID(), Instant.now(), 1,
+                        cmd.taskId(), cmd.itemId(), cmd.attempt(),
+                        cmd.operationType(), cmd.targetType(), cmd.targetId(),
+                        snapshotRef, snapshotSha256, snapshotBytes, schemaVersion));
     }
 
     public void uploadCompleted(ManagementCommandRequestedEvent cmd,
