@@ -12,6 +12,8 @@ import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.api.common.enums.TaskType;
+import com.comicatlas.api.common.exception.ConflictException;
+import com.comicatlas.common.constant.MetadataRefreshConstants;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -118,6 +120,9 @@ public class BatchOperationService {
      */
     @Transactional
     public BatchCreateResponse createBatch(BatchOperationRequest request, String idempotencyKey) {
+        if (request.getOperation() == TaskType.METADATA_REFRESH) {
+            throw new ConflictException(MetadataRefreshConstants.METADATA_REFRESH_DISABLED_REASON);
+        }
         String payload = toJson(request);
 
         // 幂等重放：同键同 payload 直接返回既有任务，不重复物化

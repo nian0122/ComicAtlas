@@ -225,10 +225,10 @@ class ImportPersistenceServiceTest {
                 UUID.randomUUID(), Instant.now(), 10L, 100L, 0, chapterId, "hq/100/" + chapterId, 1);
     }
 
-    // ======================== 1. completed：PENDING 结构 + 逐章请求 ========================
+    // ======================== 1. completed（两阶段之 staging）：PENDING 结构 + 逐章请求 ========================
 
     @Test
-    @DisplayName("completed 阶段：comic 保持 IMPORTING、media PENDING、逐章产出最终化请求并写入 Outbox")
+    @DisplayName("completed 阶段（staging）：sourceDir 用 globalOrder、targetDir 用 chapterId，comic 保持 IMPORTING、media PENDING，逐章产出最终化请求并写入 Outbox")
     void persistCompleted_insertsPendingStructure_andReturnsFinalizeRequests() {
         runInTransaction();
         when(taskMapper.selectById(10L)).thenReturn(task(ImportTaskStatus.PARSING));
@@ -370,10 +370,10 @@ class ImportPersistenceServiceTest {
                 .hasMessageContaining("catalogIndex");
     }
 
-    // ======================== 2. finalize completed：READY / SUCCESS ========================
+    // ======================== 2. finalize completed（两阶段之最终化）：READY / SUCCESS ========================
 
     @Test
-    @DisplayName("finalize completed：media 用事件真实 hqPath 转 READY，chapter/comic READY，task SUCCESS，缓存失效")
+    @DisplayName("finalize completed（两阶段之最终化）：media 用事件真实 targetDir 修正 hqPath 转 READY，最后章完成才 chapter/comic READY、task SUCCESS，缓存失效")
     void applyFinalizeCompleted_marksAllReady_taskSuccess_evictsCache() {
         runInTransactionWithoutResult();
         when(taskMapper.selectById(10L)).thenReturn(task(ImportTaskStatus.IMPORTING));
@@ -463,7 +463,7 @@ class ImportPersistenceServiceTest {
     }
 
     @Test
-    @DisplayName("两章两次 completed：第一次不 finalize comic（仍有 PENDING），第二次全部 READY 才 finalize")
+    @DisplayName("两章两次 completed：第一章完成前 comic 不 READY（仍有 PENDING），全部章节完成才 READY/SUCCESS")
     void applyFinalizeCompleted_twoChapters_finalizesOnlyOnLastCompleted() {
         runInTransactionWithoutResult();
         when(taskMapper.selectById(10L)).thenReturn(task(ImportTaskStatus.IMPORTING));

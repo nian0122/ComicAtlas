@@ -57,16 +57,28 @@ ImportTaskHandler (按 sourceType 路由)
                                     StorageService + DirectoryImportHandler
                                               │
                                               ▼
-                                    HQ / LQ / Thumbs + metadata.json
+                staging: HQ hq/{comicId}/{globalOrder} + metadata.json + 恢复清单
                                               │
                                               ▼
-                                    MQ: task.completed
+                                    MQ: task.completed（两阶段之 staging）
                                               │
                                               ▼
                                     API ImportEventHandler
                                               │
                                               ▼
-                                    Database (comic/catalog/chapter/page)
+            Database（插入章节取得不可变 chapterId，comic 保持 IMPORTING / media PENDING）
+                                              │
+                                              ▼
+              MQ: import.storage.finalize.requested（逐章，sourceDir=globalOrder → targetDir=chapterId）
+                                              │
+                                              ▼
+                                    Worker ImportStorageFinalizeHandler
+                                              │
+                                              ▼
+                移动文件到 hq/{comicId}/{chapterId} + MQ: finalize.completed（逐章）
+                                              │
+                                              ▼
+            API：全部章节完成后 comic → READY / import_task → SUCCESS
 ```
 
 **关键设计点**：
@@ -75,16 +87,16 @@ ImportTaskHandler (按 sourceType 路由)
 
 2. **DirectoryParser 输出纯目录结构**：`DirectoryTree` 只包含文件系统信息（目录名、文件列表、层级），不包含任何业务语义（不知道什么是 Catalog、Chapter）。
 
-3. **MetadataAssembler 注入业务语义**：将 `DirectoryTree` 转换为 `ComicMetadata`，决定哪些目录是 Catalog、哪些是 Chapter，生成 `global_order` 等。
+3. **MetadataAssembler 注入业务语义**：将 `DirectoryTree` 转换为 `ComicMetadata`，决定哪些目录是 Catalog、哪些是 Chapter，生成 `global_order` 等。`global_order` 同时充当导入**两阶段最终化**的第一阶段暂存键：Worker 在 DB 尚未生成章节 ID 时，把文件落到 `hq/{comicId}/{globalOrder}`。
 
-4. **ComicMetadata 是不可变记录**：一旦生成，后续流程只读不改。StorageService + DirectoryImportHandler 负责文件搬迁，API 侧的 `ImportEventHandler` 负责数据库写入。
+4. **ComicMetadata 是不可变记录**：一旦生成，后续流程只读不改。导入采用两阶段最终化——StorageService + DirectoryImportHandler 负责把文件暂存到 `hq/{comicId}/{globalOrder}` 并写 metadata.json；API 侧的落库逻辑（`ImportPersistenceService`）插入章节取得不可变 `chapterId` 后，逐章发送最终化请求；Worker 的 `ImportStorageFinalizeHandler` 再把文件移动到正式 `hq/{comicId}/{chapterId}`，全部章节完成后 API 才将 comic 置为 READY。
 
-5. **API Service 是数据库的唯一写入方**：Worker 不直接写 MySQL，全部通过 MQ 事件（`task.completed`）回传元数据，由 API 侧消费并写入数据库。
+5. **API Service 是数据库的唯一写入方**：Worker 不直接写 MySQL，全部通过 MQ 事件（`task.completed`）回传元数据，由 API 侧消费并写入数据库；最终化的文件搬运结果同样经 MQ 事件（`finalize.completed` / `finalize.failed`）回传，失败保持可重试。
 
 **实现示例**：
 
 - `ZipImportHandler`：解压 ZIP 到临时目录，然后委托 `DirectoryImportHandler` 处理解压后的目录。
-- `DirectoryImportHandler`：调用 `DirectoryParser.parse()` 得到 `DirectoryTree`，调用 `MetadataAssembler.assemble()` 得到 `ComicMetadata`，搬文件到 HQ，写 `metadata.json`。
+- `DirectoryImportHandler`：调用 `DirectoryParser.parse()` 得到 `DirectoryTree`，调用 `MetadataAssembler.assemble()` 得到 `ComicMetadata`，把文件暂存到 `hq/{comicId}/{globalOrder}`，写 `metadata.json`。
 - 未来 `EHentaiImportHandler`：抓取远程图片到本地目录，然后同样委托 `DirectoryImportHandler`。
 
 ---

@@ -58,12 +58,14 @@ ComicAtlas 由四个运行时模块和一组基础设施组成。
 | `ImportService` | API | 任务持久化、状态推进、MQ 消息发送 | 不解析文件，不搬运图片 |
 | `ImportTaskHandler` | Worker | 消费 `import.task.queue`，按 `sourceType` 路由到具体 Handler（`ZipImportHandler` / `DirectoryImportHandler`） | 不写数据库，不解析漫画语义 |
 | `ZipImportHandler` | Worker | 解压 ZIP 到临时目录，委托 `DirectoryImportHandler` 处理 | 不解析漫画语义 |
-| `DirectoryImportHandler` | Worker | 调用 `DirectoryParser` 解析目录，调用 `MetadataAssembler` 组装元数据，调用 `StorageService` 搬运文件，写 metadata.json | 不写数据库业务表 |
+| `DirectoryImportHandler` | Worker | 调用 `DirectoryParser` 解析目录，调用 `MetadataAssembler` 组装元数据，调用 `StorageService` 把文件暂存到 `hq/{comicId}/{globalOrder}`（两阶段之第一阶段 staging），写 metadata.json | 不写数据库业务表，不生成 chapterId |
 | `DirectoryParser` | Worker | 扫描文件系统，输出纯目录树 `DirectoryTree`（无业务语义） | 不了解 Catalog / Chapter 语义 |
 | `MetadataAssembler` | Worker | 将 `DirectoryTree` 转换为 `ComicMetadata`（注入 Catalog / Chapter / Page 结构） | 不碰文件系统 |
 | `StorageService` (接口) | Worker | 定义文件存储抽象：`transfer` / `resolve` / `exists` / `delete` | 不决定业务语义 |
 | `TransferService` (实现) | Worker | `StorageService` 的本地文件系统实现，按 `TransferMode`（COPY/MOVE）完成文件复制/移动、路径解析、存在性检查、删除 | 不写数据库 |
-| `ImportEventHandler` | API | 消费 `import.result.queue`，读取 metadata.json，INSERT catalog / chapter / page 到数据库，更新 comic 状态为 READY | 不碰文件系统 |
+| `ImportEventHandler` | API | 消费 `import.result.queue`，读取 metadata.json，INSERT catalog / chapter / page 到数据库；插入章节取得不可变 `chapterId`，逐章发送最终化请求；全部章节最终化完成才更新 comic 为 READY | 不碰文件系统 |
+| `ImportPersistenceService` | API | 两阶段落库编排：completed 插入结构并保持 IMPORTING/PENDING，finalize completed/failed 按章节累加收尾（全 READY → comic READY / task SUCCESS），失败可重试 | 不搬文件，不在事务内做 IO |
+| `ImportStorageFinalizeHandler` | Worker | 消费最终化请求，逐章把 `hq/{comicId}/{globalOrder}` 暂存目录移动到 `hq/{comicId}/{chapterId}`，每章发布 Completed | 不写数据库业务表 |
 | `ReaderService` | API | 按 `global_order` 取 prev / next 章节，组装阅读器 DTO | 不生成图片，不管理物理文件 |
 | `FileUrlResolver` | API | 将 `Page` 实体转换为 HTTP URL（`/files/{root}/{path}`） | 不管理物理文件 |
 
@@ -91,19 +93,28 @@ ImportTaskHandler (Worker)  <-- 消费 import.task.queue
     +-- DIRECTORY  --> DirectoryImportHandler
         |
         v
-DirectoryImportHandler (Worker)
+DirectoryImportHandler (Worker)   <-- 两阶段之第一阶段：staging
   - DirectoryParser      --> DirectoryTree (纯目录树)
   - MetadataAssembler    --> ComicMetadata (业务结构)
-  - StorageService.transfer --> 文件搬入 HQ 存储根
-  - 写 metadata.json
+  - StorageService.transfer --> 文件暂存 HQ: hq/{comicId}/{globalOrder}（DB ID 生成前的漫画内暂存键）
+  - 写 metadata.json + 恢复清单
   - 发送 MQ: comic.import.task.completed
         |
         v
 ImportEventHandler (API)  <-- 消费 import.result.queue
   - 读取 metadata.json
-  - INSERT catalog / chapter / page
-  - UPDATE comic (status=READY)
-  - UPDATE import_task (status=SUCCESS)
+  - INSERT catalog / chapter / page（插入章节取得不可变 chapterId，comic 保持 IMPORTING、media PENDING）
+  - 逐章发送 MQ: comic.import.import.storage.finalize.requested（sourceDir=globalOrder → targetDir=chapterId）
+        |
+        v
+ImportStorageFinalizeHandler (Worker)  <-- 消费 finalize.requested（两阶段之第二阶段：最终化）
+  - 逐章把 hq/{comicId}/{globalOrder} 移动到 hq/{comicId}/{chapterId}
+  - 每章发送 MQ: comic.import.import.storage.finalize.completed
+        |
+        v
+ImportPersistenceService (API)  <-- 消费 finalize.completed
+  - 逐章 media/chapter → READY；全部章节完成（无 PENDING）才 UPDATE comic (status=READY)
+  - UPDATE import_task (status=SUCCESS)；任一章节失败则 FAILED/IMPORT_FAILED 可重试
 ```
 
 ### Mermaid 流程图
@@ -119,10 +130,14 @@ flowchart TD
     F --> G
     G --> H[DirectoryParser<br/>输出 DirectoryTree]
     H --> I[MetadataAssembler<br/>输出 ComicMetadata]
-    I --> J["StorageService.transfer<br/>文件搬入 HQ"]
-    J --> K["写 metadata.json<br/>发送 task.completed"]
+    I --> J["StorageService.transfer<br/>暂存到 hq/{comicId}/{globalOrder}"]
+    J --> K["写 metadata.json + 恢复清单<br/>发送 task.completed"]
     K --> L[ImportEventHandler<br/>API Service]
-    L --> M["INSERT catalog/chapter/page<br/>UPDATE comic → READY"]
+    L --> M["INSERT catalog/chapter/page<br/>插入章节取得不可变 chapterId"]
+    M --> N["逐章发送 finalize.requested<br/>sourceDir=globalOrder → targetDir=chapterId"]
+    N --> O[ImportStorageFinalizeHandler<br/>Worker Service]
+    O --> P["逐章移动文件到 hq/{comicId}/{chapterId}<br/>发送 finalize.completed"]
+    P --> Q["全部章节完成后<br/>UPDATE comic → READY / task → SUCCESS"]
 ```
 
 ### 其他数据流
@@ -131,7 +146,7 @@ flowchart TD
 |------|------|------|
 | 阅读 | 用户打开章节 | Frontend → API `ReaderService` → `FileUrlResolver` → Nginx 静态文件 |
 | LQ 生成 | 用户手动触发 | API `LqController` → MQ `comic.image.lq.generate` → Worker → 生成 LQ 图片 |
-| 漫画删除 | 用户删除漫画 | API → MQ `comic.delete.requested` → Worker 删除物理文件 → API 逻辑删除 DB 记录 |
+| 漫画删除（回收） | 用户删除漫画 | API 创建管理任务（`COMIC_DELETE`）→ MQ `comic.management.command.requested` → Worker 移入 trash 卷 → API 更新生命周期为 `TRASHED`；永久删除走 `purge`（`TRASHED` + 7 天保留期 + 二次确认） |
 | 任务状态同步 | Worker 进度变化 | Worker `TaskStatusPublisher` → MQ `comic.task.status.changed` → API `ImportEventHandler` 更新 import_task |
 
 ---
@@ -140,10 +155,11 @@ flowchart TD
 
 ### 1. Worker 不写数据库，API 不碰文件系统
 
-这是系统最重要的边界。Worker 完成文件处理后，通过 MQ 事件通知 API，由 API 写入数据库。两者通过 `metadata.json` 文件传递结构化数据。
+这是系统最重要的边界。Worker 完成文件处理后，通过 MQ 事件通知 API，由 API 写入数据库。两者通过 `metadata.json` 文件传递结构化数据。导入采用**两阶段最终化**：Worker 先以 `globalOrder` 作为 DB ID 未生成前的漫画内暂存键把文件落到 `hq/{comicId}/{globalOrder}`（staging），API 读取 `metadata.json` 写入结构并生成不可变 `chapterId`，再逐章请求 Worker 把文件移动到正式 `hq/{comicId}/{chapterId}`；全部章节完成后 API 才将 comic 置为 READY、task 置为 SUCCESS。
 
-- Worker 产出：物理文件（HQ/LQ/Thumbs）+ `metadata.json`
-- API 消费：读取 `metadata.json`，写入 catalog / chapter / page 表
+- Worker 产出：物理文件（暂存于 `hq/{comicId}/{globalOrder}`）+ `metadata.json` + 恢复清单
+- API 消费：读取 `metadata.json`，写入 catalog / chapter / page 表，生成 `chapterId` 并驱动最终化
+- Worker 再搬运：按 `chapterId` 把文件移动到 `hq/{comicId}/{chapterId}`（两阶段之第二阶段）
 
 这条边界保证了 Worker 可以独立部署、独立扩缩，不会与 API 争抢数据库连接。
 

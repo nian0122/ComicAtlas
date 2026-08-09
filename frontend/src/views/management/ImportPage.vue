@@ -78,9 +78,9 @@
 
     <!-- 批量导入 -->
     <section v-if="activeTab === 'batch'" class="batch-panel">
-      <!-- 父目录输入 -->
+      <!-- 漫画集根目录输入 -->
       <div class="form-group">
-        <label class="form-label">父目录</label>
+        <label class="form-label">漫画集根目录</label>
         <div class="scan-input-row">
           <input
             v-model="batchParentPath"
@@ -98,7 +98,7 @@
             <span>{{ scanning ? '扫描中...' : '扫描' }}</span>
           </button>
         </div>
-        <p class="form-hint">输入包含多个漫画目录的父文件夹路径，自动发现子目录</p>
+        <p class="form-hint">输入漫画集根目录路径，其直接子目录各是一本候选漫画，自动批量发现并递归预览媒体与警告</p>
       </div>
 
       <!-- 扫描结果 -->
@@ -113,7 +113,7 @@
         <el-alert v-else-if="scanError" type="error" :title="scanError" show-icon />
 
         <!-- 空结果 -->
-        <el-empty v-else-if="!scanResult || scanResult.items.length === 0" description="此目录下未发现漫画子目录" />
+        <el-empty v-else-if="!scanResult || scanResult.items.length === 0" description="此漫画集根目录下未发现候选漫画（直接子目录）" />
 
         <!-- 成功 -->
         <div v-else class="scan-results">

@@ -13,9 +13,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
 /**
- * 目录扫描任务接口（导入域）。
+ * 目录扫描任务接口（导入域）：漫画集根目录批量发现。
  * <p>
- * 基路径 {@code /api/tasks/directory-scan}。扫描指定父目录下的漫画候选目录，
+ * 基路径 {@code /api/tasks/directory-scan}。用户选择的父目录作为「漫画集根目录」，
+ * 其直接子目录各是一本候选漫画，每个候选内部递归预览所有层级的媒体与警告；
  * 生成可导入来源清单供用户确认后发起导入，扫描过程异步执行。
  */
 @RestController
@@ -28,9 +29,10 @@ public class DirectoryScanTaskController {
     /**
      * 创建目录扫描任务（异步执行）。
      * <p>
-     * 仅传入 parentPath，由 Worker 递归扫描其下的候选漫画目录并汇总结果。
+     * 仅传入 parentPath（漫画集根目录），由 Worker 批量发现其直接子目录作为候选漫画，
+     * 每个候选内部递归预览媒体与警告并汇总结果。
      *
-     * @param request 扫描请求（parentPath 待扫描的父目录路径）
+     * @param request 扫描请求（parentPath 待扫描的漫画集根目录路径）
      * @return 已创建的扫描任务信息
      */
     @PostMapping

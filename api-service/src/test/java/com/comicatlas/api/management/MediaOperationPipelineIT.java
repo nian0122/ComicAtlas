@@ -376,19 +376,16 @@ class MediaOperationPipelineIT {
         assertThat(reloaded.getHqPath()).endsWith(".mp4");
     }
 
-    // ======================== 元数据刷新命令 ========================
+    // ======================== 元数据刷新命令（fail-closed 停用） ========================
 
     @Test
-    @DisplayName("元数据刷新命令：完成即任务 SUCCEEDED")
-    void metadataRefreshCommand_succeeds() throws Exception {
-        OperationSubmitResultDTO result = commandService.requestMetadataRefresh(comic.getId());
-        assertThat(result.getTaskId()).isNotNull();
+    @DisplayName("元数据刷新命令：fail-closed 拒绝且无 task/outbox 副作用")
+    void metadataRefreshCommand_rejectedWithoutSideEffects() {
+        assertThatThrownBy(() -> commandService.requestMetadataRefresh(comic.getId()))
+                .isInstanceOf(ConflictException.class);
 
-        ManagementCommandRequestedEvent cmd = readSingleCommand(result.getTaskId());
-        rabbitTemplate.convertAndSend("comic.management", "command.completed",
-                new ManagementCommandCompletedEvent(UUID.randomUUID(), Instant.now(), 1,
-                        cmd.taskId(), cmd.itemId(), 1, "METADATA_REFRESH", "COMIC", comic.getId(), null));
-        await(() -> managementTaskService.getTask(cmd.taskId()).getStatus() == ManagementTaskStatus.SUCCEEDED, "任务 SUCCEEDED");
+        assertThat(taskMapper.selectCount(new LambdaQueryWrapper<>())).isZero();
+        assertThat(outboxMapper.selectCount(new LambdaQueryWrapper<>())).isZero();
     }
 
     // ======================== allowedOperations 可查询 ========================
@@ -414,7 +411,8 @@ class MediaOperationPipelineIT {
         assertThat(eligibilityService.forMedia(video.getId()).isAllowed(OperationPolicyService.OP_TRANSCODE)).isTrue();
 
         AllowedOperations comicOps = eligibilityService.forComic(comic.getId());
-        assertThat(comicOps.isAllowed(OperationPolicyService.OP_METADATA_REFRESH)).isTrue();
+        assertThat(comicOps.isAllowed(OperationPolicyService.OP_METADATA_REFRESH)).isFalse();
+        assertThat(comicOps.blockedReasons()).containsKey(OperationPolicyService.OP_METADATA_REFRESH);
     }
 
     // ======================== 辅助 ========================

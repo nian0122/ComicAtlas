@@ -19,6 +19,8 @@ import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.api.common.enums.ManagementTaskStatus;
 import com.comicatlas.api.common.enums.TaskStage;
 import com.comicatlas.api.common.enums.TaskType;
+import com.comicatlas.api.common.exception.ConflictException;
+import com.comicatlas.common.constant.MetadataRefreshConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -63,6 +65,9 @@ public class ManagementTaskService {
     public ManagementTaskResponse createTask(CreateManagementTaskRequest request,
                                               String idempotencyKey,
                                               String payload) {
+        if (isMetadataRefreshRequest(request)) {
+            throw new ConflictException(MetadataRefreshConstants.METADATA_REFRESH_DISABLED_REASON);
+        }
         // 幂等检查
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {
             ManagementTask existing = taskMapper.selectOne(
@@ -303,6 +308,11 @@ public class ManagementTaskService {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在: " + taskId);
         }
 
+        if (task.getTaskType() == TaskType.METADATA_REFRESH
+                || hasMetadataRefreshItem(taskId)) {
+            throw new ConflictException(MetadataRefreshConstants.METADATA_REFRESH_DISABLED_REASON);
+        }
+
         if (!task.getStatus().isTerminal()) {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST,
                     "任务 " + taskId + " 处于 " + task.getStatus() + "，仅终态可重试");
@@ -387,6 +397,28 @@ public class ManagementTaskService {
             TaskType.CHAPTER_TRASH, TaskType.COMIC_RESTORE, TaskType.CHAPTER_RESTORE,
             TaskType.MEDIA_RESTORE, TaskType.COMIC_PURGE, TaskType.CHAPTER_PURGE,
             TaskType.MEDIA_PURGE);
+
+    /** 创建请求是否包含已停用的元数据扫盘刷新（主任务类型或任一 target）。 */
+    private static boolean isMetadataRefreshRequest(CreateManagementTaskRequest request) {
+        if (request.getTaskType() == TaskType.METADATA_REFRESH) {
+            return true;
+        }
+        if (request.getTargets() != null) {
+            for (CreateManagementTaskRequest.TaskTarget target : request.getTargets()) {
+                if (target.getOperationType() == TaskType.METADATA_REFRESH) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** 任务下是否存在已停用的元数据扫盘刷新 item。 */
+    private boolean hasMetadataRefreshItem(Long taskId) {
+        return itemMapper.selectCount(new LambdaQueryWrapper<ManagementTaskItem>()
+                .eq(ManagementTaskItem::getTaskId, taskId)
+                .eq(ManagementTaskItem::getOperationType, TaskType.METADATA_REFRESH)) > 0;
+    }
 
     // ======================== Item 状态更新 ========================
 

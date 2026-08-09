@@ -37,10 +37,12 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 导入存储最终化处理器（Worker 侧）。
+ * 导入存储最终化处理器（Worker 侧）——导入两阶段最终化的<b>第二阶段</b>。
  * <p>
  * 监听 {@link MqQueues#IMPORT_STORAGE_FINALIZE_REQUESTED}，消费 {@link ImportStorageFinalizeRequestedEvent}：
- * 逐章把 {@code hq/{comicId}/{globalOrder}} 暂存目录移动到 {@code hq/{comicId}/{chapterId}}。
+ * 把 API 在落库阶段生成的不可变 chapterId 作为最终目录键，逐章把
+ * {@code hq/{comicId}/{globalOrder}} 暂存目录（globalOrder 是 DB ID 生成前 Worker 使用的
+ * 漫画内暂存键）移动到 {@code hq/{comicId}/{chapterId}}。
  * 移动前对事件中的全部相对路径做规范化并校验均位于 HQ 根内（防御路径穿越），校验全部通过后才执行搬运。
  * <p>
  * 幂等规则（尺寸以 {@code imports/{taskId}/manifest.json} 清单为基准）：

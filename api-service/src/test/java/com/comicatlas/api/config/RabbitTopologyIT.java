@@ -234,13 +234,6 @@ class RabbitTopologyIT {
         }
 
         @Test
-        @DisplayName("comic.delete exchange + DLX 仍存在")
-        void deleteExchange_stillExists() {
-            assertThat(apiConfig.deleteExchange().getName()).isEqualTo("comic.delete");
-            assertThat(apiConfig.deleteDlxExchange().getName()).isEqualTo("comic.delete.dlx");
-        }
-
-        @Test
         @DisplayName("comic.recovery exchange + DLX 仍存在")
         void recoveryExchange_stillExists() {
             assertThat(apiConfig.recoveryExchange().getName()).isEqualTo("comic.recovery");

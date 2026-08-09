@@ -57,6 +57,19 @@ import java.util.UUID;
 /**
  * 导入两阶段落库服务实现。
  * <p>
+ * <b>两阶段语义</b>：
+ * <ul>
+ *   <li>第一阶段（completed → {@code persistCompleted}）：Worker 已把文件按漫画内暂存键
+ *       {@code hq/{comicId}/{globalOrder}} 暂存（DB ID 未生成）。本阶段只插入 catalog/chapter/media
+ *       结构并保持 comic=IMPORTING、media=PENDING/STAGING；插入章节取得不可变 {@code chapterId}，
+ *       逐章构造 sourceDir={comicId}/{globalOrder} → targetDir={comicId}/{chapterId} 的最终化请求
+ *       （见 {@link #buildFinalizeRequest}）经 Outbox 发往 Worker。</li>
+ *   <li>第二阶段（finalize completed/failed → {@code applyFinalizeCompleted}/
+ *       {@code applyFinalizeFailed}）：Worker 逐章把文件移动到正式 {@code hq/{comicId}/{chapterId}}
+ *       并逐章确认；API 按章节累加，全部章节 READY 后才 comic → READY、task → SUCCESS，任一章节
+ *       失败则明确 FAILED/IMPORT_FAILED 且可重试。</li>
+ * </ul>
+ * <p>
  * <b>事务边界</b>：所有事务方法内只做 DB 读写与字符串路径运算，<b>禁止</b>文件移动/
  * 下载/解压/外部进程调用（阿里规范：事务内不得长 IO）。metadata.json 由 Handler 在事务外读取，
  * 最终化的文件搬运由 Worker 负责（ImportStorageFinalizeRequestedEvent → 逐章）。
@@ -85,6 +98,10 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
     private String mangaRoot;
 
     // ======================== Phase 1: completed → 插入结构 + 逐章请求 ========================
+    // Worker 已把文件按漫画内暂存键 {comicId}/{globalOrder} 落到 HQ（DB chapterId 尚未生成）。
+    // 本阶段插入章节取得不可变 chapterId，并为每章构造
+    // sourceDir={comicId}/{globalOrder} → targetDir={comicId}/{chapterId} 的最终化请求
+    // （见 buildFinalizeRequest），经 Outbox 逐章发给 Worker 搬运（两阶段之第一阶段）。
 
     @Override
     public List<FinalizeRequest> persistCompleted(ImportTaskCompletedEvent event, Map<String, Object> metadata) {
@@ -135,7 +152,7 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
         }
         int metadataVersion = resolveMetadataVersion(metadata);
 
-        // 1. comic 元数据：仅补全信息，保持 IMPORTING（READY 必须等 finalize completed）
+        // 1. comic 元数据：仅补全信息，保持 IMPORTING（READY 必须等全部章节 finalize completed）
         comic.setTitle((String) comicData.get("title"));
         comic.setTitleJpn((String) comicData.get("titleJpn"));
         comic.setAuthor((String) comicData.get("author"));
@@ -148,7 +165,8 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
         // 2. catalog（无则跳过）
         Map<Integer, Long> catalogIdMap = insertCatalogs(catalogsData, comicId);
 
-        // 3. chapter + media（一律 PENDING/STAGING，不触碰文件系统）
+        // 3. chapter + media（一律 PENDING/STAGING，不触碰文件系统）。
+        //    chapterId 由 API 在此生成，作为最终存储目录 {comicId}/{chapterId} 的不可变键。
         List<FinalizeRequest> requests = new ArrayList<>(chaptersData.size());
         int totalPages = 0;
         long totalSize = 0;
@@ -166,7 +184,7 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
         }
         comicMapper.updateById(comic);
 
-        // 4. task：completed 仅表示 staging/metadata 就绪，推进到非终态 IMPORTING
+        // 4. task：completed 仅表示 staging/metadata 就绪（两阶段之第一阶段），推进到非终态 IMPORTING
         task.setStatus(ImportTaskStatus.IMPORTING);
         task.setProgress(100);
         task.setErrorMessage(null);
@@ -326,6 +344,12 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
         return new ChapterInsertResult(chapter, pgCount, totalSize, mappings);
     }
 
+    /**
+     * 构造单章最终化请求（两阶段目录映射）。
+     * sourceDir 使用 {@code globalOrder}——Worker 在 DB ID 生成前把文件暂存到
+     * {@code hq/{comicId}/{globalOrder}} 的漫画内暂存键；targetDir 使用本章刚生成的
+     * 不可变 {@code chapterId}——最终位置 {@code hq/{comicId}/{chapterId}}。
+     */
     private FinalizeRequest buildFinalizeRequest(Long taskId, Long comicId, String hqPrefix,
                                                  Chapter chapter, List<FinalizeMediaMapping> mappings) {
         String sourceDir = hqPrefix + "/" + comicId + "/" + chapter.getGlobalOrder();
@@ -335,6 +359,8 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
     }
 
     // ======================== Phase 2a: finalize completed → READY / SUCCESS ========================
+    // 两阶段之第二阶段：Worker 逐章把 {comicId}/{globalOrder} 暂存移动到 {comicId}/{chapterId} 后
+    // 逐章确认。本章 media/chapter 转 READY，全部章节 READY（无 PENDING media）才收尾 comic/task。
 
     @Override
     public void applyFinalizeCompleted(ImportStorageFinalizeCompletedEvent event) {
@@ -410,7 +436,8 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
             }
         }
 
-        // 3) 检查该 comic 下是否还有 PENDING media：全 READY 才收尾 comic/task，否则仅提交本章 READY
+        // 3) 检查该 comic 下是否还有 PENDING media：全部章节最终化完成（全 READY）才收尾
+        //    comic/task，否则仅提交本章 READY
         List<Long> chapterIds = chapters.stream().map(Chapter::getId).toList();
         long pendingCount = mediaMapper.selectCount(new LambdaQueryWrapper<Media>()
                 .in(Media::getChapterId, chapterIds)

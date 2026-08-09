@@ -3,7 +3,6 @@ package com.comicatlas.api.importer.event;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.event.CancelTaskEvent;
-import com.comicatlas.common.event.DeleteRequestedEvent;
 import com.comicatlas.common.event.ImportTaskCreatedEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -22,11 +21,6 @@ public class ImportEventPublisher {
         var event = new ImportTaskCreatedEvent(
             UUID.randomUUID(), Instant.now(), taskId, comicId, sourceType, sourcePath);
         rabbitTemplate.convertAndSend(MqExchanges.IMPORT, MqRoutingKeys.TASK_CREATED, event);
-    }
-
-    public void publishDeleteRequested(Long comicId) {
-        var event = new DeleteRequestedEvent(UUID.randomUUID(), Instant.now(), comicId);
-        rabbitTemplate.convertAndSend(MqExchanges.DELETE, MqRoutingKeys.DELETE_REQUESTED, event);
     }
 
     public void publishCancelTask(Long taskId, Long comicId) {
