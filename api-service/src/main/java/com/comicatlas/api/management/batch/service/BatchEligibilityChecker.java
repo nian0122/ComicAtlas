@@ -8,6 +8,7 @@ import com.comicatlas.api.management.policy.AllowedOperations;
 import com.comicatlas.api.management.policy.MediaOperationEligibilityService;
 import com.comicatlas.api.management.policy.OperationPolicyService;
 import com.comicatlas.api.common.enums.TaskType;
+import com.comicatlas.common.constant.MetadataRefreshConstants;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -33,10 +34,20 @@ public class BatchEligibilityChecker {
             TaskType.LQ_GENERATE, TaskType.LQ_REGENERATE,
             TaskType.HQ_DELETE, TaskType.TRANSCODE);
 
+    /** 已临时停用的批量操作：一律标为不可执行（fail-closed）。 */
+    private static final Set<TaskType> DISABLED_OPS = Set.of(TaskType.METADATA_REFRESH);
+
     /**
      * 按操作所需权限逐漫画校验，返回 [eligibleIds, blocked]。
      */
     public Result evaluate(List<Long> comicIds, TaskType operation) {
+        if (DISABLED_OPS.contains(operation)) {
+            List<BlockedBatchItem> blocked = comicIds.stream()
+                    .map(comicId -> new BlockedBatchItem(comicId, BatchReasonCode.OP_NOT_ALLOWED,
+                            MetadataRefreshConstants.METADATA_REFRESH_DISABLED_MESSAGE))
+                    .toList();
+            return new Result(List.of(), blocked);
+        }
         List<Long> eligible = new ArrayList<>();
         List<BlockedBatchItem> blocked = new ArrayList<>();
         for (Long comicId : comicIds) {
@@ -84,7 +95,7 @@ public class BatchEligibilityChecker {
     /** 生命周期类操作所需操作名。 */
     private static String policyOpName(TaskType operation) {
         return switch (operation) {
-            case METADATA_UPDATE, METADATA_REFRESH -> OperationPolicyService.OP_EDIT;
+            case METADATA_UPDATE -> OperationPolicyService.OP_EDIT;
             case COMIC_DELETE -> OperationPolicyService.OP_DELETE;
             case COMIC_RESTORE -> OperationPolicyService.OP_RECOVER;
             case COMIC_PURGE -> OperationPolicyService.OP_PURGE;
