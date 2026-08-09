@@ -154,41 +154,6 @@ public class RabbitMqConfig {
     }
 
     @Bean
-    public DirectExchange deleteExchange() {
-        return new DirectExchange(MqExchanges.DELETE);
-    }
-
-    @Bean
-    public Queue deleteResultQueue() {
-        return QueueBuilder.durable(MqQueues.DELETE_RESULT)
-                .deadLetterExchange(MqExchanges.DELETE_DLX)
-                .deadLetterRoutingKey(MqQueues.DELETE_RESULT_DLQ)
-                .build();
-    }
-
-    @Bean
-    public Queue deleteResultDlq() {
-        return QueueBuilder.durable(MqQueues.DELETE_RESULT_DLQ).build();
-    }
-
-    @Bean
-    public Binding deleteResultBinding() {
-        return BindingBuilder.bind(deleteResultQueue())
-                .to(deleteExchange()).with(MqRoutingKeys.DELETE_COMPLETED);
-    }
-
-    @Bean
-    public Binding deleteResultDlqBinding() {
-        return BindingBuilder.bind(deleteResultDlq())
-                .to(deleteDlxExchange()).with(MqQueues.DELETE_RESULT_DLQ);
-    }
-
-    @Bean
-    public DirectExchange deleteDlxExchange() {
-        return new DirectExchange(MqExchanges.DELETE_DLX);
-    }
-
-    @Bean
     public DirectExchange imageExchange() {
         return new DirectExchange(MqExchanges.IMAGE);
     }
