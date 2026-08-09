@@ -76,7 +76,8 @@ worker:
   zip:
     max-entries: 100000
     max-depth: 200
-    max-entry-size: 2147483648
+    split-size: 2147483648
+    max-entry-size: 32212254720
     max-total-size: 32212254720
   ehentai:
     api-url: ${EHENTAI_API_URL:https://api.e-hentai.org/api.php}

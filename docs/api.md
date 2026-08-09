@@ -108,6 +108,8 @@ POST /api/tasks/import
 { "sourceType": "EHENTAI", "sourcePath": "https://e-hentai.org/g/123456/abc123" }
 ```
 
+> **标准分卷 ZIP 导入**：分卷文件的 `sourcePath` 必须是同 basename 分卷组中**最后一个 `.zip`**（主文件），`.z01..zNN` 与主文件须同目录同 basename。缺任一卷（如存在 `.z01/.z03` 缺 `.z02`）导入直接失败；`.z01` 永不作为入口。HTTP 只传输任务/本地路径/状态等元数据，文件字节全部走宿主机本地路径，不经 HTTP。
+
 ### 任务列表（Dashboard）
 ```
 GET /api/tasks/import?page=1&size=50&status=
@@ -911,11 +913,13 @@ OP_NOT_ALLOWED, COMIC_NOT_FOUND
 | 删除 HQ 保留 LQ | `POST /api/storage/delete-hq/comics/{id}`、`/delete-hq/chapters/{id}` |
 | 导出漫画 | `POST /api/storage/export/comics/{id}` |
 | 导出任务查询 | `GET /api/storage/export/comics/{id}/tasks`、`GET /api/storage/export/tasks/{taskId}` |
-| 导出下载 | `GET /api/storage/export/tasks/{taskId}/download` |
+| 导出分卷清单 | `GET /api/storage/export/tasks/{taskId}/artifacts` |
 | 导出打开目录 | `POST /api/storage/export/tasks/{taskId}/open` |
 | 刷新 Metadata | `POST /api/storage/refresh-metadata/comics/{id}` |
 | 存储统计 | `GET /api/storage/stats` |
 
 > 旧端点（`/comics/{id}/lq`、`/admin/storage/comics/{id}/transcode-videos` 等）已随接口收敛全部移除，存储操作统一使用上表 `/api/storage/*` 形态。
+>
+> **导出为本地路径交互（v1.1）**：导出产物落在宿主机 `EXPORT/{taskId}/{base}.z01..zNN + {base}.zip`（标准分卷，主 `.zip` 为最后卷）。`GET /api/storage/export/tasks/{taskId}/artifacts` 返回有序分卷**元数据**（1-based index、文件名、字节大小、是否最后 `.zip`、本地物理路径），**不提供任何文件字节下载**；`POST /api/storage/export/tasks/{taskId}/open` 仅在宿主机打开文件管理器。HTTP 全程只传输任务/路径/状态/卷元数据，文件字节不经过 HTTP——把最后 `.zip` 的本地路径作为 `sourcePath` 即可重新导入该分卷（缺任一卷会失败，`.z01` 不可作为入口）。
 >
 > **METADATA_REFRESH 临时停用**：`METADATA_REFRESH`（扫盘刷新元数据）当前被全局临时阻断，提交后返回 `409`（`reasonCode = METADATA_REFRESH_DISABLED`，消息"元数据扫盘刷新已临时停用"），以隔离危险扫盘入口；`OperationPolicyService` / `BatchEligibilityChecker` / `ManagementTaskService` 统一引用 `MetadataRefreshConstants.METADATA_REFRESH_DISABLED_*`。恢复时需移除该阻断并放开 `METADATA_REFRESH` 权限位。

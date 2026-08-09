@@ -70,6 +70,7 @@ worker:
   zip:
     max-entries: 1000
     max-depth: 10
+    split-size: 2147483648
     max-entry-size: 10485760
     max-total-size: 52428800
 

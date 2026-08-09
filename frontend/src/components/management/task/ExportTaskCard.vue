@@ -7,7 +7,7 @@
       <!-- 头部 -->
       <div class="card-header">
         <div class="header-info">
-          <h3 class="task-name">导出任务 #{{ task.taskId }}</h3>
+          <h3 class="task-name">导出任务 #{{ task.id }}</h3>
           <div class="task-meta-row">
             <span class="meta-chip">漫画 #{{ task.comicId }}</span>
             <span class="meta-time">{{ formatTime(task.createdAt) }}</span>
@@ -20,18 +20,31 @@
 
       <!-- 主体内容 - 根据状态切换 -->
       <div class="card-content">
-        <!-- SUCCESS: 输出信息 -->
+        <!-- SUCCESS: 分卷产物列表 -->
         <template v-if="task.status === 'SUCCESS'">
-          <div class="output-block">
-            <div class="output-row">
+          <div v-if="artifactsLoading" class="status-block running">
+            <el-icon class="is-loading" :size="16"><Loading /></el-icon>
+            <span>加载卷列表...</span>
+          </div>
+          <template v-else>
+            <div v-if="artifacts.length > 1" class="artifact-summary">
+              <span class="artifact-summary-label">共 {{ artifacts.length }} 卷</span>
+              <span class="artifact-summary-size">总大小 {{ formatSize(totalSize) }}</span>
+            </div>
+            <div v-if="artifacts.length > 0" class="artifact-list">
+              <div v-for="a in artifacts" :key="a.index" class="artifact-row">
+                <span class="artifact-index">#{{ a.index + 1 }}</span>
+                <span class="artifact-name" :title="a.fileName">{{ a.fileName }}</span>
+                <span class="artifact-size">{{ formatSize(a.size) }}</span>
+                <span class="artifact-path" :title="a.physicalPath">{{ a.physicalPath }}</span>
+                <button class="artifact-copy-btn" @click="onCopyVolumePath(a)">复制卷路径</button>
+              </div>
+            </div>
+            <div v-else class="output-row">
               <span class="output-label">输出路径</span>
               <span class="output-value" :title="task.outputPath">{{ task.outputPath || '-' }}</span>
             </div>
-            <div class="output-row">
-              <span class="output-label">文件大小</span>
-              <span class="output-value">{{ formatSize(task.outputSize) }}</span>
-            </div>
-          </div>
+          </template>
         </template>
 
         <!-- RUNNING: spinning -->
@@ -53,7 +66,7 @@
         <!-- FAILED: 错误信息 -->
         <template v-else-if="task.status === 'FAILED'">
           <div class="error-block">
-            <p class="error-message">{{ task.errorMessage || '未知错误' }}</p>
+            <p class="error-message">{{ task.errorMsg || '未知错误' }}</p>
           </div>
         </template>
       </div>
@@ -61,8 +74,7 @@
       <!-- 操作区 -->
       <div class="card-actions">
         <template v-if="task.status === 'SUCCESS'">
-          <button class="action-btn primary" @click="onDownload">下载</button>
-          <button class="action-btn ghost" @click="onCopyPath">复制路径</button>
+          <button class="action-btn primary" @click="onCopyMainZip">复制主 ZIP 路径</button>
           <button class="action-btn ghost" @click="onOpenDir">打开目录</button>
         </template>
       </div>
@@ -71,16 +83,19 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Loading, Clock } from '@element-plus/icons-vue'
-import type { ExportTaskVO } from '@/types'
+import type { ExportArtifactVO, ExportTaskVO } from '@/types'
 import { exportApi } from '@/services/api'
 
 const props = defineProps<{
   task: ExportTaskVO
   variant: 'active' | 'failed' | 'done'
 }>()
+
+const artifacts = ref<ExportArtifactVO[]>([])
+const artifactsLoading = ref(false)
 
 const STATUS_LABELS: Record<string, string> = {
   PENDING: '等待中',
@@ -90,6 +105,13 @@ const STATUS_LABELS: Record<string, string> = {
 }
 
 const statusLabel = computed(() => STATUS_LABELS[props.task.status] || props.task.status)
+
+const totalSize = computed(() => artifacts.value.reduce((sum, a) => sum + a.size, 0))
+
+const mainZipPath = computed(() => {
+  const main = artifacts.value.find(a => a.lastSegment) ?? artifacts.value[0]
+  return main?.physicalPath ?? props.task.outputPath ?? ''
+})
 
 function formatTime(ts: string): string {
   if (!ts) return ''
@@ -109,42 +131,52 @@ function formatSize(bytes: number): string {
   return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB'
 }
 
-async function onDownload() {
+async function loadArtifacts() {
+  artifactsLoading.value = true
   try {
-    const res = await exportApi.download(props.task.taskId)
-    const blob = res.data as Blob
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    // 从 outputPath 提取文件名
-    const filename = props.task.outputPath
-      ? props.task.outputPath.replace(/\\/g, '/').split('/').pop() || 'export.zip'
-      : `export-${props.task.taskId}.zip`
-    a.download = filename
-    a.click()
-    URL.revokeObjectURL(url)
+    const res = await exportApi.getArtifacts(props.task.id)
+    artifacts.value = Array.isArray(res.data) ? res.data : []
   } catch {
-    ElMessage.error('下载失败')
+    artifacts.value = []
+  } finally {
+    artifactsLoading.value = false
   }
 }
 
-async function onCopyPath() {
-  const path = props.task.physicalPath || ''
-  if (!path) {
+watch(
+  () => props.task.status,
+  (status) => {
+    if (status === 'SUCCESS') {
+      loadArtifacts()
+    }
+  },
+  { immediate: true }
+)
+
+async function copyText(text: string, successMsg: string) {
+  if (!text) {
     ElMessage.warning('无可用路径')
     return
   }
   try {
-    await navigator.clipboard.writeText(path)
-    ElMessage.success('路径已复制')
+    await navigator.clipboard.writeText(text)
+    ElMessage.success(successMsg)
   } catch {
     ElMessage.error('复制失败')
   }
 }
 
+function onCopyMainZip() {
+  copyText(mainZipPath.value, '主 ZIP 路径已复制')
+}
+
+function onCopyVolumePath(artifact: ExportArtifactVO) {
+  copyText(artifact.physicalPath, '卷路径已复制')
+}
+
 async function onOpenDir() {
   try {
-    await exportApi.openDir(props.task.taskId)
+    await exportApi.openDir(props.task.id)
   } catch {
     ElMessage.error('打开目录失败')
   }
@@ -285,6 +317,92 @@ async function onOpenDir() {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Artifact list */
+.artifact-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-base);
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: var(--space-sm);
+  padding: 6px 10px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.artifact-summary-label {
+  color: var(--text-primary);
+}
+
+.artifact-summary-size {
+  color: var(--accent);
+}
+
+.artifact-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.artifact-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+}
+
+.artifact-row:hover {
+  background: var(--bg-primary);
+}
+
+.artifact-index {
+  color: var(--text-muted);
+  flex-shrink: 0;
+  width: 24px;
+}
+
+.artifact-name {
+  color: var(--text-primary);
+  font-weight: 500;
+  flex-shrink: 0;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.artifact-size {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.artifact-path {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.artifact-copy-btn {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.artifact-copy-btn:hover {
+  background: var(--bg-primary);
 }
 
 .status-block {

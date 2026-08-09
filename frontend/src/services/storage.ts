@@ -1,5 +1,11 @@
 import { adminApi, exportApi, hqApi, lqApi } from '@/services/api'
-import type { ComicStorageQuery, OperationSubmitResult, StorageOperation } from '@/types'
+import type {
+  ComicStorageQuery,
+  ExportArtifactVO,
+  ExportTaskVO,
+  OperationSubmitResult,
+  StorageOperation,
+} from '@/types'
 import { StorageOperationType } from '@/types'
 
 function extractMessage(err: unknown): string {
@@ -62,7 +68,13 @@ export const storageService = {
 }
 
 export const exportService = {
-  async createExport(comicId: number) {
-    await exportApi.createExport(comicId)
+  async createExport(comicId: number): Promise<ExportTaskVO> {
+    const res = await exportApi.createExport(comicId)
+    return res.data
+  },
+
+  async fetchArtifacts(taskId: number): Promise<ExportArtifactVO[]> {
+    const res = await exportApi.getArtifacts(taskId)
+    return res.data
   },
 }

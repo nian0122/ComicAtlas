@@ -4,6 +4,7 @@ import com.comicatlas.api.common.Result;
 import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.export.dto.ExportTaskVO;
 import com.comicatlas.api.management.dto.OperationSubmitResultDTO;
+import com.comicatlas.api.storage.dto.ExportArtifactVO;
 import com.comicatlas.api.storage.service.ExportOperationService;
 import com.comicatlas.api.storage.service.HqDeleteOperationService;
 import com.comicatlas.api.storage.service.LqOperationService;
@@ -12,7 +13,6 @@ import com.comicatlas.common.constant.MetadataRefreshConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -20,7 +20,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 import java.awt.Desktop;
 import java.io.IOException;
@@ -32,7 +31,7 @@ import java.util.List;
  * 存储操作统一入口（存储操作域）。
  * <p>
  * URL 形态：POST /api/storage/{operation}/{targetType}/{targetId}，targetType = comics | chapters。
- * 包含全部存储操作端点：LQ 生成、HQ 删除（保留 LQ）、视频转码、刷新元数据、导出及导出文件的下载/打开。
+ * 包含全部存储操作端点：LQ 生成、HQ 删除（保留 LQ）、视频转码、刷新元数据、导出及导出分卷清单/打开目录。
  * 存储统计端点见 {@link StorageStatsController}。
  */
 @Slf4j
@@ -180,33 +179,14 @@ public class StorageOperationController {
     }
 
     /**
-     * 下载导出文件（流式）。
+     * 查询导出任务的分卷清单（仅元数据：卷名/大小/本地物理路径，不提供文件字节）。
+     *
+     * @param taskId 导出任务 ID
+     * @return 有序分卷清单，最后一个为 .zip 主卷
      */
-    @GetMapping("/export/tasks/{taskId}/download")
-    public ResponseEntity<StreamingResponseBody> downloadExport(@PathVariable Long taskId) {
-        ExportTaskVO task = exportOperationService.getTask(taskId);
-        String physicalPath = task.getPhysicalPath();
-        if (physicalPath == null) {
-            return ResponseEntity.notFound().build();
-        }
-        Path filePath = Path.of(physicalPath.replace("/", java.io.File.separator));
-        if (!Files.exists(filePath)) {
-            return ResponseEntity.notFound().build();
-        }
-        String filename = filePath.getFileName().toString();
-        StreamingResponseBody stream = outputStream -> {
-            try {
-                Files.copy(filePath, outputStream);
-                outputStream.flush();
-            } catch (IOException e) {
-                log.error("下载导出文件失败: taskId={}, path={}", taskId, physicalPath, e);
-                throw new RuntimeException("下载失败: " + e.getMessage(), e);
-            }
-        };
-        return ResponseEntity.ok()
-            .contentType(MediaType.APPLICATION_OCTET_STREAM)
-            .header("Content-Disposition", "attachment; filename=\"" + filename + "\"")
-            .body(stream);
+    @GetMapping("/export/tasks/{taskId}/artifacts")
+    public Result<List<ExportArtifactVO>> getExportArtifacts(@PathVariable Long taskId) {
+        return Result.ok(exportOperationService.listArtifacts(taskId));
     }
 
     /**

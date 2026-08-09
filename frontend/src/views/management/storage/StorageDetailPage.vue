@@ -243,8 +243,9 @@ async function onTranscode() {
 
 async function onExportZip() {
   try {
-    await exportService.createExport(comicId)
-    ElMessage.success('导出任务已提交')
+    const task = await exportService.createExport(comicId)
+    ElMessage.success('导出任务已提交，正在跳转任务中心')
+    router.push({ path: '/manage/import/tasks', query: { comicId: String(task.comicId) } })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : '导出失败'
     ElMessage.error(message)

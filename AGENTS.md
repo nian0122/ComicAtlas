@@ -66,7 +66,11 @@ comic-atlas/
 | 统一导入 | `worker-service/.../importer/DirectoryImportHandler.java` | handle() 解析→暂存文件到 HQ→写metadata |
 | 导入最终化 | `worker-service/.../event/ImportStorageFinalizeHandler.java` | 两阶段最终化：hq/{comicId}/{globalOrder} → hq/{comicId}/{chapterId} |
 | 最终化落库 | `api-service/.../importer/service/impl/ImportPersistenceServiceImpl.java` | 逐章收尾，全 READY → comic READY / task SUCCESS |
-| ZIP 导入 | `worker-service/.../importer/ZipImportHandler.java` | 解压→委托 DirectoryImportHandler |
+| ZIP 导入 | `worker-service/.../importer/ZipImportHandler.java` | 解压→委托 DirectoryImportHandler；入口必须是最后 `.zip`，缺任一卷失败，`.z01` 不可作为入口 |
+| 分卷解析 | `worker-service/.../file/archive/ZipVolumeResolver.java` | 最后 `.zip` 为唯一入口 → 有序 `.z01..zNN`+主文件（缺号/重复/非法命名/非普通文件拒绝） |
+| ZIP 解压 | `worker-service/.../file/extract/ZipExtractor.java` | Commons ZipFile 随机访问 + 标准分卷 + 安全校验；`.z01` 永不作为入口 |
+| 导出编排 | `worker-service/.../export/ExportService.java` | collect → manifest → ZipBuilder → 原子发布 `EXPORT/{taskId}`（本地路径产物，无下载端点） |
+| 分卷 ZIP 构建 | `worker-service/.../export/ZipBuilder.java` | `ZipBuildResult(主 .zip, 有序分卷, 总大小)`；manifest 总未压缩 > `zip.splitSize` 才分卷 |
 | EHENTAI 导入 | `worker-service/.../file/download/EhentaiDownloadService.java` | 下载(Archiver优先→Torrent兜底)→解压→返回源目录，委托 DirectoryImportHandler |
 | 存储服务 | `worker-service/.../storage/StorageService.java` | store/resolve/exists/delete |
 | 存储根 | `worker-service/.../storage/StorageRoot.java` | path + resolve() + exists() |
@@ -93,7 +97,7 @@ POST /api/tasks/import { sourceType:"ZIP"|"REGISTER"|"EHENTAI", sourcePath:"D:/.
 ImportServiceImpl: INSERT comic(IMPORTING) + import_task(PENDING) → MQ
   ↓
 Worker ImportTaskHandler: sourceType 路由
-  ├─ ZIP → ZipImportHandler → extract → DirectoryImportHandler.handle()
+  ├─ ZIP → ZipImportHandler → ZipExtractor(标准分卷) → DirectoryImportHandler.handle()
   ├─ REGISTER → DirectoryImportHandler.handle()
   └─ EHENTAI → EhentaiDownloadService → 下载(Archiver优先→Torrent兜底) → 解压 → DirectoryImportHandler.handle()
   ↓
@@ -111,6 +115,11 @@ Worker ImportStorageFinalizeHandler（两阶段之第二阶段 最终化）:
   ↓
 API ImportPersistenceService: 逐章 media/chapter → READY，全部章节完成才 UPDATE comic→READY / task→SUCCESS
 ```
+
+**分卷 ZIP 导入规则**：
+- 导入入口必须是同 basename 分卷组中**最后一个 `.zip`**（`sourcePath` 指向主文件），`.z01..zNN` 与主文件须同目录同 basename。
+- 缺任一卷（如存在 `.z01/.z03` 缺 `.z02`）导入直接失败；`.z01` 永不作为入口。
+- 导出产物布局：`EXPORT/{taskId}/{base}.z01..zNN + {base}.zip`（总未压缩 > `worker.zip.splitSize` 默认 **2 GiB** 才分卷；单条目与总量上限 `maxEntrySize/maxTotalSize` 默认 **30 GiB**）。
 
 ## STORAGE
 所有漫画统一 MANAGED，文件搬入 `F:/manga/hq/{comicId}/{chapterId}/`。

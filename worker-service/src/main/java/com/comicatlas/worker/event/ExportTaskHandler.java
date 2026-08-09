@@ -21,7 +21,13 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 import java.util.UUID;
 
-/** 导出任务 MQ 消费者 — 只负责协议与事件发布，业务编排委托 ExportService。 */
+/**
+ * 导出任务 MQ 消费者 — 只负责协议与事件发布，业务编排委托 ExportService。
+ *
+ * <p>ACK/REQUEUE 语义：构建/校验失败时发布 failed 事件后正常 ACK（失败事件即业务结果）；
+ * completed 事件发布失败时不发布 failed，抛出使消息 requeue 重投；重投经发布器幂等复用
+ * 既有任务目录后重新发布 completed。
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -38,8 +44,8 @@ public class ExportTaskHandler {
         log.info("导出任务开始: taskId={}, comicId={}", taskId, comicId);
         mqConsumerSupport.consume(channel, tag, "导出任务: taskId=" + taskId,
                 () -> exportAndPublish(event),
-                e -> publishExportFailed(event, e),
-                MqConsumerSupport.FailurePolicy.REJECT_TO_DLQ);
+                null,
+                MqConsumerSupport.FailurePolicy.REQUEUE);
     }
 
     private void exportAndPublish(ExportTaskCreatedEvent event) throws Exception {
@@ -48,13 +54,23 @@ public class ExportTaskHandler {
                         event.taskId(), event.comicId()));
         log.info("已发布 ExportTaskStartedEvent: taskId={}", event.taskId());
 
-        ExportService.ExportOutput output = exportService.export(event.comicId(), event.taskId());
-
-        rabbitTemplate.convertAndSend(MqExchanges.EXPORT, MqRoutingKeys.TASK_COMPLETED,
-                new ExportTaskCompletedEvent(UUID.randomUUID(), Instant.now(),
-                        event.taskId(), event.comicId(), "EXPORT",
-                        output.fileName(), output.size()));
-        log.info("已发布 ExportTaskCompletedEvent: taskId={}, size={}", event.taskId(), output.size());
+        ExportService.ExportOutput output;
+        try {
+            output = exportService.export(event.comicId(), event.taskId());
+        } catch (Exception e) {
+            publishExportFailed(event, e);
+            return;
+        }
+        try {
+            rabbitTemplate.convertAndSend(MqExchanges.EXPORT, MqRoutingKeys.TASK_COMPLETED,
+                    new ExportTaskCompletedEvent(UUID.randomUUID(), Instant.now(),
+                            event.taskId(), event.comicId(), "EXPORT",
+                            output.fileName(), output.size()));
+            log.info("已发布 ExportTaskCompletedEvent: taskId={}, size={}", event.taskId(), output.size());
+        } catch (Exception e) {
+            throw new ExportCompletedPublishException(
+                    "导出完成事件发布失败：taskId=" + event.taskId() + ", comicId=" + event.comicId(), e);
+        }
     }
 
     private void publishExportFailed(ExportTaskCreatedEvent event, Exception failure) {
@@ -62,5 +78,12 @@ public class ExportTaskHandler {
         rabbitTemplate.convertAndSend(MqExchanges.EXPORT, MqRoutingKeys.TASK_FAILED,
                 new ExportTaskFailedEvent(UUID.randomUUID(), Instant.now(),
                         event.taskId(), event.comicId(), errorCode, failure.getMessage()));
+    }
+
+    /** completed 事件发布失败标记：不发布 failed，抛出使消息 requeue 重投。 */
+    private static class ExportCompletedPublishException extends Exception {
+        ExportCompletedPublishException(String message, Throwable cause) {
+            super(message, cause);
+        }
     }
 }
