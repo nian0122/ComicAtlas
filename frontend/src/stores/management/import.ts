@@ -1,7 +1,13 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { importApi, directoryScanApi } from '@/services/management'
-import type { ImportTaskVO, ImportStatusVO, DirectoryScanTaskVO, ScanResultVO } from '@/types'
+import type {
+  BatchImportResultVO,
+  ImportTaskVO,
+  ImportStatusVO,
+  DirectoryScanTaskVO,
+  ScanResultVO,
+} from '@/types'
 
 /**
  * 导入工作流统一 Store
@@ -71,8 +77,8 @@ export const useImportStore = defineStore('import', () => {
   async function fetchList(params?: { batchId?: string }) {
     error.value = null
     try {
-      const res: any = await importApi.list({ page: 1, size: 50, ...params })
-      tasks.value = (res.data?.records || []) as ImportTaskVO[]
+      const res = await importApi.list({ page: 1, size: 50, ...params })
+      tasks.value = res.data?.records ?? []
       lastUpdated.value = Date.now()
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
@@ -83,13 +89,13 @@ export const useImportStore = defineStore('import', () => {
   async function fetchCompletedTasks(page?: number) {
     if (page !== undefined) completedPage.value = page
     try {
-      const res: any = await importApi.list({
+      const res = await importApi.list({
         page: completedPage.value,
         size: completedPageSize.value,
         status: 'SUCCESS',
       })
-      completedTasks.value = (res.data?.records || []) as ImportTaskVO[]
-      completedTotal.value = res.data?.total || 0
+      completedTasks.value = res.data?.records ?? []
+      completedTotal.value = res.data?.total ?? 0
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
       error.value = msg || '加载已完成任务失败'
@@ -99,11 +105,12 @@ export const useImportStore = defineStore('import', () => {
   async function create(sourceType: string, sourcePath: string): Promise<ImportTaskVO> {
     loading.value = true
     try {
-      const res: any = await importApi.create(sourceType, sourcePath)
+      const res = await importApi.create(sourceType, sourcePath)
+      const task = res.data
       await fetchList()
       // 创建后立刻启动轮询（如果还没启动）
       if (!polling.value) startPolling()
-      return res.data as ImportTaskVO
+      return task
     } finally {
       loading.value = false
     }
@@ -115,46 +122,45 @@ export const useImportStore = defineStore('import', () => {
    * 返回最终 ScanResultVO，失败时抛错。
    */
   async function scan(parentPath: string): Promise<ScanResultVO> {
-    const created: any = await directoryScanApi.create(parentPath)
-    const taskId = (created.data as DirectoryScanTaskVO).id
+    const created = await directoryScanApi.create(parentPath)
+    const taskId = created.data.id
 
     for (let attempt = 0; attempt < 60; attempt++) {
       await new Promise(resolve => setTimeout(resolve, 1000))
-      const res: any = await directoryScanApi.get(taskId)
-      const task = res.data as DirectoryScanTaskVO
+      const res = await directoryScanApi.get(taskId)
+      const task: DirectoryScanTaskVO = res.data
       if (task.status === 'SUCCESS') {
-        return task.result as ScanResultVO
+        if (!task.result) {
+          throw new Error('扫描完成但结果为空')
+        }
+        return task.result
       }
       if (task.status === 'FAILED') {
-        const err = new Error(task.errorMessage || '扫描目录失败') as Error & {
-          response?: { data?: { message?: string } }
-        }
-        err.response = { data: { message: task.errorMessage || '扫描目录失败' } }
-        throw err
+        throw new Error(task.errorMessage || '扫描目录失败')
       }
     }
-    const timeout = new Error('扫描超时') as Error & {
-      response?: { data?: { message?: string } }
-    }
-    timeout.response = { data: { message: '扫描超时，请稍后重试' } }
-    throw timeout
+    throw new Error('扫描超时，请稍后重试')
   }
 
-  async function createBatch(sourceType: string, sourcePaths: string[]): Promise<ImportTaskVO[]> {
+  async function createBatch(
+    sourceType: string,
+    sourcePaths: string[]
+  ): Promise<BatchImportResultVO> {
     loading.value = true
     try {
-      const res: any = await importApi.createBatch({ sourceType, sourcePaths })
+      const res = await importApi.createBatch({ sourceType, sourcePaths })
+      const result = res.data
       await fetchList()
       if (!polling.value) startPolling()
-      return res.data as ImportTaskVO[]
+      return result
     } finally {
       loading.value = false
     }
   }
 
   async function pollStatus(taskId: number): Promise<ImportStatusVO> {
-    const res: any = await importApi.status(taskId)
-    return res.data as ImportStatusVO
+    const res = await importApi.status(taskId)
+    return res.data
   }
 
   async function cancel(taskId: number) {

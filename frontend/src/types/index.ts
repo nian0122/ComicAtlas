@@ -160,21 +160,80 @@ export interface ImportStatusVO {
   progress: number
 }
 
+/** 目录预览节点类型（对齐后端 ScanNodeKind） */
+export type ScanNodeKind = 'DIRECTORY' | 'ARCHIVE' | 'COMIC'
+
+/** 目录扫描警告级别（对齐后端 ScanWarningSeverity） */
+export type ScanWarningSeverity = 'INFO' | 'WARNING' | 'ERROR'
+
+/** 目录扫描警告码（对齐后端 ScanWarningCode，枚举名必须保持一致） */
+export type ScanWarningCode =
+  | 'UNREADABLE_DIRECTORY'
+  | 'PATH_TOO_LONG'
+  | 'UNSAFE_PATH'
+  | 'INVALID_NAME'
+  | 'MIXED_DIRECTORY'
+  | 'EMPTY_DIRECTORY'
+  | 'UNSUPPORTED_FILE'
+  | 'SYMLINK_SKIPPED'
+  | 'LIMIT_EXCEEDED'
+
+/** 阻断码：命中则对应漫画候选不可导入（importable=false） */
+export const BLOCKING_SCAN_WARNING_CODES: readonly ScanWarningCode[] = [
+  'UNREADABLE_DIRECTORY',
+  'LIMIT_EXCEEDED',
+]
+
+export function isBlockingScanWarning(code: ScanWarningCode): boolean {
+  return BLOCKING_SCAN_WARNING_CODES.includes(code)
+}
+
+/** 目录扫描警告（对齐后端 ScanWarningDTO） */
+export interface ScanWarningVO {
+  code: ScanWarningCode
+  severity: ScanWarningSeverity
+  message: string
+  relativePath: string
+}
+
+/** 目录预览节点（对齐后端 ScanPreviewNodeDTO） */
+export interface ScanPreviewNodeVO {
+  name: string
+  kind: ScanNodeKind
+  relativePath: string
+  fileCount: number
+  children?: ScanPreviewNodeVO[]
+  warnings?: ScanWarningVO[]
+}
+
 export interface ScanItemVO {
   name: string
   path: string
   imageCount: number
+  kind?: ScanNodeKind | null
+  relativePath?: string | null
+  warnings?: ScanWarningVO[]
 }
 
 export interface ScanResultVO {
   parentPath: string
   total: number
   items: ScanItemVO[]
+  preview?: ScanPreviewNodeVO[]
+  warnings?: ScanWarningVO[]
 }
 
 export interface BatchImportRequest {
   sourceType: string
   sourcePaths: string[]
+}
+
+/** 导入任务列表查询参数 */
+export interface ImportTaskQuery {
+  page?: number
+  size?: number
+  status?: string
+  batchId?: string
 }
 
 export interface FailedItem {

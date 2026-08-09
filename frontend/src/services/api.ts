@@ -1,6 +1,8 @@
 import axios from 'axios'
 import type {
   BatchCreateResult,
+  BatchImportRequest,
+  BatchImportResultVO,
   BatchPreviewResult,
   BatchSubmitRequest,
   CatalogManagementRequest,
@@ -11,7 +13,11 @@ import type {
   CreateManagementTaskRequest,
   CreateUploadSessionRequest,
   CreateUploadSessionResult,
+  DirectoryScanTaskVO,
   ExportTaskVO,
+  ImportStatusVO,
+  ImportTaskQuery,
+  ImportTaskVO,
   ManagementTaskItemVO,
   ManagementTaskQuery,
   ManagementTaskVO,
@@ -68,21 +74,22 @@ export const readerApi = {
 
 export const importApi = {
   create: (sourceType: string, sourcePath: string) =>
-    api.post('/tasks/import', { sourceType, sourcePath }),
-  list: (params: any) => api.get('/tasks/import', { params }),
-  detail: (id: number) => api.get(`/tasks/import/${id}`),
-  status: (id: number) => api.get(`/tasks/import/${id}/status`),
-  cancel: (id: number) => api.post(`/tasks/import/${id}/cancel`),
-  retry: (id: number) => api.post(`/tasks/import/${id}/retry`),
-  createBatch: (data: { sourceType: string; sourcePaths: string[] }) =>
-    api.post('/tasks/import/batch', data),
+    api.post<ImportTaskVO>('/tasks/import', { sourceType, sourcePath }),
+  list: (params?: ImportTaskQuery) =>
+    api.get<{ records: ImportTaskVO[]; total: number }>('/tasks/import', { params }),
+  detail: (id: number) => api.get<ImportTaskVO>(`/tasks/import/${id}`),
+  status: (id: number) => api.get<ImportStatusVO>(`/tasks/import/${id}/status`),
+  cancel: (id: number) => api.post<void>(`/tasks/import/${id}/cancel`),
+  retry: (id: number) => api.post<void>(`/tasks/import/${id}/retry`),
+  createBatch: (data: BatchImportRequest) =>
+    api.post<BatchImportResultVO>('/tasks/import/batch', data),
 }
 
 /** 目录扫描异步任务（API 创建 → MQ → Worker 扫描 → 结果回写 → 前端轮询） */
 export const directoryScanApi = {
   create: (parentPath: string) =>
-    api.post('/tasks/directory-scan', { parentPath }),
-  get: (id: number) => api.get(`/tasks/directory-scan/${id}`),
+    api.post<DirectoryScanTaskVO>('/tasks/directory-scan', { parentPath }),
+  get: (id: number) => api.get<DirectoryScanTaskVO>(`/tasks/directory-scan/${id}`),
 }
 
 export const historyApi = {

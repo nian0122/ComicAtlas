@@ -123,26 +123,80 @@
               <span class="link-sep">/</span>
               <a class="link" @click="deselectAll">取消全选</a>
             </span>
-            <span class="scan-count">已选 {{ selectedPaths.length }} / {{ scanResult.total }}</span>
+            <span class="scan-count">已选 {{ selectedPaths.length }} / {{ importableCount }} 个可导入</span>
+          </div>
+
+          <!-- 规范化统计与扫描级警告 -->
+          <div class="scan-summary">
+            <div v-if="hasPreview" class="scan-stats" aria-label="扫描统计">
+              <span class="stat-item">候选 <strong>{{ scanResult.total }}</strong></span>
+              <span class="stat-item">图片 <strong>{{ totalImageCount }}</strong></span>
+              <span class="stat-item">视频 <strong>{{ totalVideoCount }}</strong></span>
+              <span class="stat-item">媒体 <strong>{{ totalMediaCount }}</strong></span>
+            </div>
+            <div v-if="(scanResult.warnings ?? []).length > 0" class="scan-warnings" aria-label="扫描警告">
+              <span
+                v-for="w in scanResult.warnings"
+                :key="`${w.code}-${w.relativePath}`"
+                class="warn-chip severity-warning"
+              >
+                {{ w.message }}
+              </span>
+            </div>
           </div>
 
           <div class="scan-items-list">
             <div
-              v-for="item in scanResult.items"
-              :key="item.path"
+              v-for="row in scanItemRows"
+              :key="row.item.path"
               class="scan-item"
-              :class="{ selected: selectedPaths.includes(item.path) }"
-              @click="togglePath(item.path)"
+              :class="{
+                selected: selectedPaths.includes(row.item.path),
+                blocked: !isImportable(row.item),
+              }"
+              @click="togglePath(row.item.path)"
             >
               <el-checkbox
                 v-model="selectedPaths"
-                :value="item.path"
+                :value="row.item.path"
+                :disabled="!isImportable(row.item)"
                 class="scan-checkbox"
                 @click.stop
               />
               <div class="scan-item-info">
-                <span class="scan-item-name">{{ item.name }}</span>
-                <span class="scan-item-count">{{ item.imageCount }} 张</span>
+                <div class="scan-item-header">
+                  <span class="scan-item-name">{{ row.item.name }}</span>
+                  <span class="scan-item-count">{{ itemStats(row.item, row.preview) }}</span>
+                </div>
+                <div v-if="nonBlockingWarnings(row.item).length > 0" class="scan-item-warnings">
+                  <span
+                    v-for="w in nonBlockingWarnings(row.item)"
+                    :key="`${w.code}-${w.relativePath}`"
+                    class="warn-chip"
+                    :class="`severity-${w.severity.toLowerCase()}`"
+                  >
+                    {{ w.message }}
+                  </span>
+                </div>
+                <div v-if="blockingReason(row.item)" class="blocked-reason">
+                  不可导入：{{ blockingReason(row.item) }}
+                </div>
+                <div v-if="row.preview" class="scan-item-preview">
+                  <button
+                    class="preview-toggle"
+                    :aria-expanded="previewExpanded.has(row.item.path)"
+                    @click.stop="togglePreview(row.item.path)"
+                  >
+                    {{ previewExpanded.has(row.item.path) ? '收起' : '展开' }}规范化预览
+                  </button>
+                  <div
+                    v-if="previewExpanded.has(row.item.path)"
+                    class="preview-tree"
+                    :aria-label="`${row.item.name} 目录预览`"
+                  >
+                    <PreviewNode :node="row.preview" />
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -155,7 +209,7 @@
               @click="doBatchImport"
             >
               <span v-if="batchCreating" class="spinner-sm" />
-              <span>{{ batchCreating ? '导入中...' : '确认导入' }}</span>
+              <span>{{ batchCreating ? '导入中...' : `确认导入 ${selectedPaths.length} 项` }}</span>
             </button>
           </div>
         </div>
@@ -188,7 +242,15 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useImportStore } from '@/stores/management/import'
-import type { ImportTaskVO, ScanResultVO } from '@/types'
+import PreviewNode from '@/components/management/import/PreviewNode.vue'
+import { isBlockingScanWarning } from '@/types'
+import type {
+  ImportTaskVO,
+  ScanItemVO,
+  ScanPreviewNodeVO,
+  ScanResultVO,
+  ScanWarningVO,
+} from '@/types'
 
 const router = useRouter()
 const store = useImportStore()
@@ -208,6 +270,37 @@ const scanResult = ref<ScanResultVO | null>(null)
 const scanError = ref('')
 const selectedPaths = ref<string[]>([])
 const batchCreating = ref(false)
+const previewExpanded = ref<Set<string>>(new Set())
+
+interface ScanItemRow {
+  item: ScanItemVO
+  preview?: ScanPreviewNodeVO
+}
+
+const hasPreview = computed(() => (scanResult.value?.preview?.length ?? 0) > 0)
+
+const importableCount = computed(
+  () => (scanResult.value?.items ?? []).filter(isImportable).length
+)
+
+const totalImageCount = computed(() =>
+  (scanResult.value?.items ?? []).reduce((sum, item) => sum + item.imageCount, 0)
+)
+
+const totalMediaCount = computed(() =>
+  (scanResult.value?.preview ?? []).reduce((sum, node) => sum + node.fileCount, 0)
+)
+
+const totalVideoCount = computed(() =>
+  Math.max(totalMediaCount.value - totalImageCount.value, 0)
+)
+
+const scanItemRows = computed<ScanItemRow[]>(() =>
+  (scanResult.value?.items ?? []).map(item => ({
+    item,
+    preview: scanResult.value?.preview?.find(p => p.name === item.name),
+  }))
+)
 
 const sourceTypeOptions = [
   { value: 'ZIP' as const, label: 'ZIP 文件', desc: '压缩包，自动解压并解析目录结构' },
@@ -265,8 +358,7 @@ async function doImport() {
     // 工作流闭环：创建后直接跳到任务中心观察进度
     router.push('/manage/import/tasks')
   } catch (err: unknown) {
-    const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-    ElMessage.error(msg || '创建导入任务失败')
+    ElMessage.error(errorMessage(err) || '创建导入任务失败')
   } finally {
     creating.value = false
   }
@@ -274,9 +366,42 @@ async function doImport() {
 
 // ——— 批量导入 ———
 
+function isImportable(item: ScanItemVO): boolean {
+  return !(item.warnings ?? []).some(w => isBlockingScanWarning(w.code))
+}
+
+function nonBlockingWarnings(item: ScanItemVO): ScanWarningVO[] {
+  return (item.warnings ?? []).filter(w => !isBlockingScanWarning(w.code))
+}
+
+function blockingReason(item: ScanItemVO): string {
+  const block = (item.warnings ?? []).find(w => isBlockingScanWarning(w.code))
+  return block?.message ?? ''
+}
+
+function itemStats(item: ScanItemVO, preview?: ScanPreviewNodeVO): string {
+  if (!preview) {
+    return `${item.imageCount} 张图片`
+  }
+  const video = Math.max(preview.fileCount - item.imageCount, 0)
+  return video > 0
+    ? `图片 ${item.imageCount} · 视频 ${video} · 媒体 ${preview.fileCount}`
+    : `图片 ${item.imageCount} · 媒体 ${preview.fileCount}`
+}
+
+function togglePreview(path: string) {
+  const next = new Set(previewExpanded.value)
+  if (next.has(path)) {
+    next.delete(path)
+  } else {
+    next.add(path)
+  }
+  previewExpanded.value = next
+}
+
 function selectAll() {
   if (!scanResult.value) return
-  selectedPaths.value = scanResult.value.items.map(i => i.path)
+  selectedPaths.value = scanResult.value.items.filter(isImportable).map(i => i.path)
 }
 
 function deselectAll() {
@@ -284,6 +409,8 @@ function deselectAll() {
 }
 
 function togglePath(path: string) {
+  const item = scanResult.value?.items.find(i => i.path === path)
+  if (item && !isImportable(item)) return
   const idx = selectedPaths.value.indexOf(path)
   if (idx >= 0) {
     selectedPaths.value.splice(idx, 1)
@@ -299,15 +426,11 @@ async function doScan() {
   scanResult.value = null
   scanError.value = ''
   selectedPaths.value = []
+  previewExpanded.value = new Set()
   try {
-    const result = await store.scan(path)
-    scanResult.value = result as ScanResultVO
-    if (!result || result.total === 0) {
-      scanError.value = ''
-    }
+    scanResult.value = await store.scan(path)
   } catch (err: unknown) {
-    const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-    scanError.value = msg || '扫描目录失败'
+    scanError.value = errorMessage(err) || '扫描目录失败'
   } finally {
     scanning.value = false
   }
@@ -318,18 +441,23 @@ async function doBatchImport() {
   if (paths.length === 0) return
   batchCreating.value = true
   try {
-    const result: any = await store.createBatch('DIRECTORY', paths)
+    const result = await store.createBatch('DIRECTORY', paths)
     ElMessage.success(`批量导入已创建，共 ${paths.length} 个任务`)
     batchParentPath.value = ''
     scanResult.value = null
     selectedPaths.value = []
+    previewExpanded.value = new Set()
     router.push(`/manage/import/tasks?batchId=${result.batchId}`)
   } catch (err: unknown) {
-    const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-    ElMessage.error(msg || '批量导入失败')
+    ElMessage.error(errorMessage(err) || '批量导入失败')
   } finally {
     batchCreating.value = false
   }
+}
+
+function errorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message
+  return (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? ''
 }
 </script>
 
@@ -722,7 +850,7 @@ async function doBatchImport() {
 
 .scan-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-sm);
   padding: var(--space-sm) var(--space-base);
   border: 1px solid var(--border);
@@ -741,6 +869,16 @@ async function doBatchImport() {
   background: var(--accent-bg);
 }
 
+.scan-item.blocked {
+  opacity: var(--disabled-opacity);
+  cursor: not-allowed;
+}
+
+.scan-item.blocked:hover {
+  border-color: var(--border);
+  background: transparent;
+}
+
 .scan-checkbox {
   flex-shrink: 0;
   pointer-events: auto;
@@ -749,8 +887,16 @@ async function doBatchImport() {
 .scan-item-info {
   flex: 1;
   display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.scan-item-header {
+  display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: var(--space-base);
   min-width: 0;
 }
 
@@ -767,7 +913,106 @@ async function doBatchImport() {
   font-size: 12px;
   color: var(--text-muted);
   flex-shrink: 0;
-  margin-left: var(--space-base);
+}
+
+.scan-item-warnings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.warn-chip {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.warn-chip.severity-error {
+  color: var(--danger);
+  background: rgb(240 107 112 / 12%);
+}
+
+.warn-chip.severity-warning {
+  color: var(--warning);
+  background: rgb(216 165 79 / 12%);
+}
+
+.warn-chip.severity-info {
+  color: var(--info);
+  background: rgb(112 166 216 / 12%);
+}
+
+.blocked-reason {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--danger);
+}
+
+.scan-item-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.preview-toggle {
+  align-self: flex-start;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 150ms ease;
+}
+
+.preview-toggle:hover {
+  color: var(--accent-hover);
+}
+
+.preview-toggle:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+
+.preview-tree {
+  margin-top: var(--space-sm);
+  padding: var(--space-sm);
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+/* 扫描统计与警告摘要 */
+.scan-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-base);
+}
+
+.scan-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-base);
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.stat-item strong {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.scan-warnings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
 /* Scan actions */
@@ -793,6 +1038,18 @@ async function doBatchImport() {
   }
   .ghost-link {
     text-align: center;
+  }
+  .scan-stats {
+    gap: var(--space-sm);
+  }
+  .scan-item-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+  .scan-item-count {
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 }
 </style>
