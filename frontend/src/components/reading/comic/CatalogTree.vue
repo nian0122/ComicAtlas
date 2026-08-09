@@ -12,12 +12,12 @@
           v-if="item.type === 'header'"
           class="node-header"
           :style="{ paddingLeft: item.depth * 16 + 12 + 'px' }"
-          @click="toggleExpanded(item.nodeId)"
+          @click="toggleExpanded(item.nodePath)"
         >
           <button
             type="button"
             class="expand-btn"
-            :class="{ expanded: isExpanded(item.nodeId) }"
+            :class="{ expanded: isExpanded(item.nodePath) }"
           >
             <el-icon :size="12"><ArrowRight /></el-icon>
           </button>
@@ -47,7 +47,8 @@ import ChapterRow from './ChapterRow.vue'
 interface HeaderFlatItem {
   type: 'header'
   flatKey: string
-  nodeId: string
+  /** 完整 nodePath（如 `/1/3/5`），作为折叠状态唯一键，同名/无 id 目录互不干扰 */
+  nodePath: string
   title: string
   count: number
   depth: number
@@ -92,17 +93,28 @@ provide('expandedIds', expandedIds)
 provide('toggleExpanded', toggleExpanded)
 provide('isExpanded', isExpanded)
 
-function nodeKeyOf(node: CatalogNode): string {
-  return String(node.id ?? node.title ?? 'root')
+/**
+ * 节点路径段：优先用稳定 id；无 id 时用「下标:标题」保证同级唯一，
+ * 避免共用 title/root 键导致同名目录折叠状态互相干扰。
+ */
+function keySegmentOf(node: CatalogNode, index: number): string {
+  return node.id != null ? String(node.id) : `${index}:${node.title ?? ''}`
+}
+
+/** 递归统计节点全部后代章节数（不把子目录当"话"） */
+function countChapters(node: CatalogNode): number {
+  let count = node.chapters?.length ?? 0
+  for (const child of node.children ?? []) count += countChapters(child)
+  return count
 }
 
 // 默认展开顶层分组（与原 CatalogTreeNode depth=0 onMounted 自动展开行为一致）
 watch(
   () => props.tree,
   (tree) => {
-    for (const node of tree) {
-      if (node.title) expandedIds.value.add(nodeKeyOf(node))
-    }
+    tree.forEach((node, index) => {
+      if (node.title) expandedIds.value.add(`/${keySegmentOf(node, index)}`)
+    })
   },
   { immediate: true }
 )
@@ -110,55 +122,62 @@ watch(
 /**
  * 递归扁平化目录树：
  * - 有标题的节点输出 header 行，仅在展开时输出其章节与子节点
- * - 无标题的节点不输出 header，章节与子节点始终可见
- * 同级章节与子目录按 globalOrder 混合排布（目录锚点 = 其下最小子项 globalOrder），
- * 保持与源目录文件名顺序一致。
+ * - 无标题的节点（匿名根）不输出 header，章节与子节点始终可见
+ * 同级章节与子目录按 globalOrder 混合排布（目录锚点 = 其下最小子项 globalOrder，
+ * null 锚点排最后），保持与源目录文件名顺序一致。
  */
-function walkNodes(nodes: CatalogNode[], depth: number, path: string, out: FlatItem[]) {
-  nodes.forEach((node, index) => {
-    const nodeKey = nodeKeyOf(node)
-    const nodePath = `${path}/${node.id ?? node.title ?? index}`
+function walkNode(node: CatalogNode, depth: number, path: string, out: FlatItem[], index: number) {
+  const nodePath = `${path}/${keySegmentOf(node, index)}`
 
-    if (node.title) {
-      out.push({
-        type: 'header',
-        flatKey: `h:${nodePath}`,
-        nodeId: nodeKey,
-        title: node.title,
-        count: (node.chapters?.length ?? 0) + (node.children?.length ?? 0),
-        depth,
-      })
-    }
+  if (node.title) {
+    out.push({
+      type: 'header',
+      flatKey: `h:${nodePath}`,
+      nodePath,
+      title: node.title,
+      count: countChapters(node),
+      depth,
+    })
+  }
 
-    if (!node.title || isExpanded(nodeKey)) {
-      const indent = (node.title ? depth + 1 : depth) * 16
-      const chapters = node.chapters ?? []
-      const children = node.children ?? []
-      const items = [
-        ...chapters.map((ch) => ({ kind: 'chapter' as const, order: ch.globalOrder, chapter: ch })),
-        ...children.map((child) => ({ kind: 'catalog' as const, order: child.globalOrder ?? Number.MAX_SAFE_INTEGER, node: child })),
-      ].sort((a, b) => a.order - b.order || a.kind.localeCompare(b.kind))
+  if (!node.title || isExpanded(nodePath)) {
+    const indent = (node.title ? depth + 1 : depth) * 16
+    const chapters = node.chapters ?? []
+    const children = node.children ?? []
+    const items = [
+      ...chapters.map((ch) => ({ kind: 'chapter' as const, order: ch.globalOrder, chapter: ch })),
+      ...children.map((child, childIndex) => ({
+        kind: 'catalog' as const,
+        order: child.globalOrder ?? Number.MAX_SAFE_INTEGER,
+        node: child,
+        childIndex,
+      })),
+    ].sort((a, b) => a.order - b.order || a.kind.localeCompare(b.kind))
 
-      for (const item of items) {
-        if (item.kind === 'chapter') {
-          const ch = item.chapter
-          out.push({
-            type: 'chapter',
-            flatKey: `c:${ch.id}`,
-            chapterId: ch.id,
-            chapterNo: ch.chapterNo,
-            title: ch.title,
-            pageCount: ch.pageCount,
-            status: ch.status,
-            chapter: ch,
-            indent,
-          })
-        } else {
-          walkNodes([item.node], depth + 1, nodePath, out)
-        }
+    for (const item of items) {
+      if (item.kind === 'chapter') {
+        const ch = item.chapter
+        out.push({
+          type: 'chapter',
+          flatKey: `c:${ch.id}`,
+          chapterId: ch.id,
+          chapterNo: ch.chapterNo,
+          title: ch.title,
+          pageCount: ch.pageCount,
+          status: ch.status,
+          chapter: ch,
+          indent,
+        })
+      } else {
+        // 携带原始兄弟下标，保证同名/无 id 子目录路径段唯一
+        walkNode(item.node, depth + 1, nodePath, out, item.childIndex)
       }
     }
-  })
+  }
+}
+
+function walkNodes(nodes: CatalogNode[], depth: number, path: string, out: FlatItem[]) {
+  nodes.forEach((node, index) => walkNode(node, depth, path, out, index))
 }
 
 const flatItems = computed<FlatItem[]>(() => {
