@@ -59,10 +59,6 @@ export const storageService = {
     const res = await adminApi.transcodeVideos(comicId)
     return res.data
   },
-
-  async refreshMetadata(comicId: number) {
-    await adminApi.refreshMetadata(comicId)
-  },
 }
 
 export const exportService = {

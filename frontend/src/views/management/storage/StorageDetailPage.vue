@@ -11,8 +11,8 @@
           <span class="meta-item">章节数: {{ chapters.length }}</span>
         </div>
       </div>
-      <button class="refresh-btn" :disabled="refreshing" @click="onRefreshMetadata">
-        {{ refreshing ? '刷新中...' : '刷新状态' }}
+      <button class="refresh-btn" disabled title="危险扫盘刷新已停用，暂不可用">
+        刷新状态（暂不可用）
       </button>
     </header>
 
@@ -45,8 +45,7 @@
         <el-button type="primary" plain @click="onGenerateLQ">生成 LQ</el-button>
         <el-button type="warning" plain @click="onTranscode">视频转码</el-button>
         <el-button type="success" plain @click="onExportZip">导出 ZIP</el-button>
-        <el-button type="danger" @click="onDeleteComic">删除漫画（含本地文件）</el-button>
-        <el-button type="danger" plain @click="onDeleteDatabase">仅删除数据库</el-button>
+        <el-button type="danger" @click="onTrashComic">移入回收站</el-button>
       </div>
     </section>
 
@@ -95,7 +94,7 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { storageService, exportService } from '@/services/storage'
-import { adminApi } from '@/services/api'
+import { comicApi } from '@/services/api'
 import type { ComicStorageItem, ChapterStorageItem } from '@/types'
 import StorageStatusTag from './StorageStatusTag.vue'
 
@@ -104,7 +103,6 @@ const router = useRouter()
 const comicId = Number(route.params.id)
 
 const loading = ref(false)
-const refreshing = ref(false)
 const comic = ref<ComicStorageItem | null>(null)
 const chapters = ref<ChapterStorageItem[]>([])
 const chapterKeyword = ref('')
@@ -171,20 +169,6 @@ async function loadData() {
     ElMessage.error('加载失败')
   } finally {
     loading.value = false
-  }
-}
-
-async function onRefreshMetadata() {
-  refreshing.value = true
-  try {
-    await storageService.refreshMetadata(comicId)
-    ElMessage.success('刷新完成')
-    await loadData()
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : '刷新失败'
-    ElMessage.error(message)
-  } finally {
-    refreshing.value = false
   }
 }
 
@@ -267,48 +251,22 @@ async function onExportZip() {
   }
 }
 
-async function onDeleteDatabase() {
+async function onTrashComic() {
   const title = comic.value?.title ?? ''
   try {
     await ElMessageBox.confirm(
-      `确定仅删除「${title}」的数据库记录？所有章节、页面、标签关联将被移除，本地文件保留。`,
-      '仅删除数据库',
-      { type: 'warning', confirmButtonText: '确定删除' }
+      `确定将「${title}」移入回收站？数据库记录与本地文件将进入 7 天保留期，期间可恢复或永久清理。`,
+      '移入回收站',
+      { type: 'warning', confirmButtonText: '移入回收站' }
     )
   } catch { return }
   try {
-    await adminApi.deleteComic(comicId, 'DATABASE_ONLY')
-    ElMessage.success('数据库记录已删除，本地文件保留')
+    await comicApi.delete(comicId)
+    ElMessage.success('已移入回收站，回收任务已提交')
     router.push('/manage/storage')
   } catch (err: unknown) {
     const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-    ElMessage.error(msg || '删除失败')
-  }
-}
-
-async function onDeleteComic() {
-  const title = comic.value?.title ?? ''
-  try {
-    await ElMessageBox.confirm(
-      `确定删除「${title}」的数据库记录和所有本地文件？包括 HQ / LQ / 缩略图。此操作不可恢复！`,
-      '删除漫画',
-      { type: 'warning', confirmButtonText: '确定删除' }
-    )
-  } catch { return }
-  try {
-    await ElMessageBox.prompt(
-      `请输入漫画标题「${title}」以确认删除：`,
-      '二次确认',
-      { type: 'warning', confirmButtonText: '确认删除', inputValidator: (val) => val === title || '标题不匹配' }
-    )
-  } catch { return }
-  try {
-    await adminApi.deleteComic(comicId, 'DELETE_FILES')
-    ElMessage.success('已删除，文件删除任务已提交')
-    router.push('/manage/storage')
-  } catch (err: unknown) {
-    const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-    ElMessage.error(msg || '删除失败')
+    ElMessage.error(msg || '操作失败')
   }
 }
 
@@ -358,11 +316,11 @@ onBeforeUnmount(stopTranscodePolling)
 .refresh-btn {
   padding: 8px 16px;
   background: var(--bg-surface);
-  color: var(--text-primary);
-  border: 1px solid var(--border-strong);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   font-size: 13px;
-  cursor: pointer;
+  cursor: not-allowed;
   white-space: nowrap;
 }
 
