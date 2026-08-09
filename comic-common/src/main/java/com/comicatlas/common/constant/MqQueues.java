@@ -22,8 +22,6 @@ public final class MqQueues {
     public static final String LQ_RESULT = "lq.result.queue";
     public static final String HQ_DELETE = "hq.delete.queue";
     public static final String HQ_DELETE_RESULT = "hq.delete.result.queue";
-    public static final String DELETE_TASK = "delete.task.queue";
-    public static final String DELETE_RESULT = "delete.result.queue";
     public static final String VIDEO_METADATA_FIX = "video.metadata.fix.queue";
     public static final String VIDEO_METADATA_FIX_RESULT = "video.metadata.fix.result.queue";
     public static final String EXPORT_TASK = "export.task.queue";
@@ -53,8 +51,6 @@ public final class MqQueues {
     public static final String LQ_RESULT_DLQ = "lq.result.dlq";
     public static final String HQ_DELETE_DLQ = "hq.delete.dlq";
     public static final String HQ_DELETE_RESULT_DLQ = "hq.delete.result.dlq";
-    public static final String DELETE_TASK_DLQ = "delete.task.dlq";
-    public static final String DELETE_RESULT_DLQ = "delete.result.dlq";
     public static final String VIDEO_METADATA_FIX_DLQ = "video.metadata.fix.dlq";
     public static final String VIDEO_METADATA_FIX_RESULT_DLQ = "video.metadata.fix.result.dlq";
     public static final String EXPORT_TASK_DLQ = "export.task.dlq";
