@@ -397,6 +397,37 @@ function New-Fixtures {
     Compress-Archive -Path (Join-Path $rc "*") -DestinationPath $recoverZip -CompressionLevel Optimal
     Assert-True (Test-Path $recoverZip) "recover-comic.zip 生成"
 
+    # mixed-comic（Wave 5 目录规范化 fixture）：
+    #   根散页（cover.jpg/001.jpg/002.mp4，cover 为封面命名候选）、
+    #   嵌套散页（vol1 自身媒体 + vol1/vol1-1 子目录）、
+    #   空目录（empty，应触发 EMPTY_DIRECTORY 警告且不建 catalog/chapter）、
+    #   unsupported 文件（notes.txt 非媒体，应被忽略）、
+    #   ch1/ch2/ch10（自然排序 1<2<10，同名页 001.jpg 跨章）、
+    #   图文混排（ch1 含 003.mp4）、多个封面候选（cover.jpg/front.png）
+    $mc = Join-Path $FixturesRoot "mixed-comic"
+    if (Test-Path $mc) { Remove-Item $mc -Recurse -Force }
+    foreach ($sub in @("ch1", "ch2", "ch10", "vol1\vol1-1", "empty")) {
+        New-Item -ItemType Directory -Path (Join-Path $mc $sub) -Force | Out-Null
+    }
+    New-FixtureJpg $mc "cover" "orange"                       # 封面命名候选 priority 0
+    New-FixtureJpg $mc "001" "red"                            # 根散页（同名页 001.jpg）
+    New-FixtureMp4 $mc "002"                                  # 根散页视频
+    New-FixtureJpg (Join-Path $mc "ch1") "001" "green"
+    New-FixtureJpg (Join-Path $mc "ch1") "002" "blue"
+    New-FixtureMp4 (Join-Path $mc "ch1") "003"                # ch1 图文混排
+    New-FixtureJpg (Join-Path $mc "ch2") "001" "yellow"       # 同名页
+    New-FixtureJpg (Join-Path $mc "ch10") "001" "magenta"     # 同名页
+    New-FixtureJpg (Join-Path $mc "ch10") "002" "cyan"
+    New-FixtureJpg (Join-Path $mc "vol1") "001" "purple"      # vol1 本目录散页
+    New-FixtureJpg (Join-Path $mc "vol1") "front" "white"     # 封面候选 priority 3（被 cover 覆盖）
+    New-FixtureJpg (Join-Path $mc "vol1\vol1-1") "001" "black"
+    Set-Content -Path (Join-Path $mc "notes.txt") -Value "not a comic" -Encoding UTF8   # unsupported 非媒体
+    Assert-True ((Get-ChildItem $mc -Recurse -File).Count -eq 13) "mixed-comic 共 13 个文件（12 媒体 + notes.txt）"
+    $mixedZip = Join-Path $FixturesRoot "mixed-comic.zip"
+    if (Test-Path $mixedZip) { Remove-Item $mixedZip -Force }
+    Compress-Archive -Path (Join-Path $mc "*") -DestinationPath $mixedZip -CompressionLevel Optimal
+    Assert-True (Test-Path $mixedZip) "mixed-comic.zip 生成（ZIP 通道委托 DirectoryImportHandler）"
+
     # 上传媒体 fixtures
     New-FixtureJpg $FixturesRoot "upload-image" "gold"
     New-FixtureAvi $FixturesRoot "upload-video"
@@ -484,8 +515,8 @@ function Start-QaServices {
     if (-not (Test-Path (Join-Path $RepoRoot "api-service\target\api-service-0.0.1-SNAPSHOT.jar"))) {
         throw "缺少 api-service jar，请先执行 Maven package"
     }
-    if (-not (Test-Path (Join-Path $RepoRoot "worker-service\target\worker-service-0.0.1-SNAPSHOT.jar"))) {
-        throw "缺少 worker-service jar，请先执行 Maven package"
+    if (-not (Test-Path (Join-Path $RepoRoot "worker-service\target\worker-service-0.0.1-SNAPSHOT-exec.jar"))) {
+        throw "缺少 worker-service fat jar（*-exec.jar），请先执行 Maven package"
     }
     if (-not (Test-Path (Join-Path $RepoRoot "gateway\target\gateway-0.0.1-SNAPSHOT.jar"))) {
         throw "缺少 gateway jar，请先执行 Maven package"
@@ -515,7 +546,7 @@ function Start-QaServices {
     $workerEnv["FFMPEG_PATH"] = $Ffmpeg
     $workerEnv["FFPROBE_PATH"] = $Ffprobe
     $workerEnv["IMAGE_OPTIMIZER_PATH"] = $ImgOpt
-    Start-JavaProcess -Jar (Join-Path $RepoRoot "worker-service\target\worker-service-0.0.1-SNAPSHOT.jar") -Name "Worker" -EnvMap $workerEnv -LogFile (Join-Path $LogsDir "worker.log")
+    Start-JavaProcess -Jar (Join-Path $RepoRoot "worker-service\target\worker-service-0.0.1-SNAPSHOT-exec.jar") -Name "Worker" -EnvMap $workerEnv -LogFile (Join-Path $LogsDir "worker.log")
 
     # Gateway
     $gwEnv = @{
@@ -657,7 +688,7 @@ function Invoke-ScenarioA {
     Assert-True ($storyComicId -gt 0) "导入得到 comicId"
 
     $detail = Invoke-Api -Path "/api/comics/$storyComicId"
-    Assert-Equal $detail.lifecycle "READY" "漫画生命周期 READY"
+    Assert-Equal $detail.status "READY" "漫画生命周期 READY"
     Assert-Equal $detail.chapters.Count 3 "chapter 数 = 3"
     $hqRoot = Join-Path $MangaRoot "hq"
     $metaPath = Join-Path $MangaRoot "metadata\metadata.json"
@@ -694,7 +725,7 @@ function Invoke-ScenarioA {
     }
     $draftId = [long]$draft.id
     Assert-True ($draftId -gt 0) "创建 DRAFT 漫画"
-    Assert-Equal $draft.lifecycle "DRAFT" "DRAFT 生命周期"
+    Assert-Equal $draft.status "DRAFT" "DRAFT 生命周期"
 
     $upd = Invoke-Api -Method Put -Path "/api/comics/$draftId" -Body @{
         version = $draft.version
@@ -929,7 +960,7 @@ function Invoke-ScenarioA {
     $dt = Wait-ManagementTask -TaskId $del.id -TimeoutSec 300
     Assert-Equal $dt.status "SUCCEEDED" "COMIC_DELETE 任务成功"
     $trashed = Invoke-Api -Path "/api/comics/$batchComicId"
-    Assert-Equal $trashed.lifecycle "TRASHED" "漫画进入 TRASHED"
+    Assert-Equal $trashed.status "TRASHED" "漫画进入 TRASHED"
     $trashManifest = Get-ChildItem (Join-Path $MangaRoot "trash") -Recurse -Filter "manifest.json" -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match "comic" } | Select-Object -First 1
     Assert-True ($null -ne $trashManifest) "trash manifest.json 已生成"
 
@@ -938,7 +969,7 @@ function Invoke-ScenarioA {
     $rt = Wait-ManagementTask -TaskId $rest.taskId -TimeoutSec 300
     Assert-Equal $rt.status "SUCCEEDED" "COMIC_RESTORE 任务成功"
     $restored = Invoke-Api -Path "/api/comics/$batchComicId"
-    Assert-Equal $restored.lifecycle "READY" "漫画恢复为 READY"
+    Assert-Equal $restored.status "READY" "漫画恢复为 READY"
 
     # 再次回收并模拟过期（保留期 7 天）后永久清理
     $del2 = Invoke-Api -Method Delete -Path "/api/comics/$batchComicId"
@@ -993,6 +1024,110 @@ SET FOREIGN_KEY_CHECKS=1"
     Assert-Equal $recoveredComic "READY" "漫画行已从 HQ/metadata 重建为 READY"
     $recoveredChapters = Invoke-Sql -Db $Db -Sql "SELECT COUNT(*) FROM chapter WHERE comic_id=$recoverComicId"
     Assert-True ([int]$recoveredChapters -ge 2) "章节已从 HQ/metadata 重建"
+
+    # ---------- 7.5 混合目录规范化（Wave 5：根散页/嵌套散页/空目录/1-2-10话/同名页/图文混排/封面候选） ----------
+    Write-Step "A7.5: 混合目录规范化（DIRECTORY + ZIP 双通道 + DB 删除恢复）"
+    $impM = Invoke-Api -Method Post -Path "/api/tasks/import" -Body @{ sourceType = "DIRECTORY"; sourcePath = (Join-Path $FixturesRoot "mixed-comic") }
+    $tM = Wait-ImportTask -TaskId $impM.id -TimeoutSec 300
+    Assert-Equal $tM.status "SUCCESS" "mixed-comic DIRECTORY 导入成功（staging→finalize 两阶段落库）"
+    $mixedComicId = [long]$tM.comicId
+    Assert-True ($mixedComicId -gt 0) "mixed-comic 得到 comicId"
+
+    $md = Invoke-Api -Path "/api/comics/$mixedComicId"
+    Assert-Equal $md.status "READY" "mixed-comic 生命周期 READY（completed 时 IMPORTING → finalize completed 后 READY）"
+    Assert-Equal $md.chapters.Count 6 "章节数 = 6（根散页+ch1+ch10+ch2+vol1散页+vol1-1）"
+
+    # catalog：仅 vol1（单层），空目录不建 catalog
+    $catCount = [int](Invoke-Sql -Db $Db -Sql "SELECT COUNT(*) FROM catalog WHERE comic_id=$mixedComicId")
+    Assert-Equal $catCount 1 "catalog 数 = 1（仅 vol1，空目录/根散页不建）"
+    $vol1Cat = (Invoke-Sql -Db $Db -Sql "SELECT id FROM catalog WHERE comic_id=$mixedComicId AND title='vol1'").Trim()
+    Assert-True ([long]$vol1Cat -gt 0) "vol1 catalog 存在"
+    $badParent = [int](Invoke-Sql -Db $Db -Sql "SELECT COUNT(*) FROM catalog WHERE comic_id=$mixedComicId AND parent_id IS NOT NULL")
+    Assert-Equal $badParent 0 "catalog 无嵌套（vol1 为单层目录，parent_id 全 NULL）"
+
+    # globalOrder 按规范化 DFS 连续 1..6；根散页 catalog_id NULL；vol1 下 2 章（本目录散页 + vol1-1）
+    $orders = @((Invoke-Sql -Db $Db -Sql "SELECT global_order FROM chapter WHERE comic_id=$mixedComicId ORDER BY global_order") -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" })
+    Assert-Equal $orders.Count 6 "globalOrder 连续 1..6"
+    Assert-Equal $orders[0] "1" "首章 globalOrder = 1"
+    Assert-Equal $orders[5] "6" "末章 globalOrder = 6"
+    $rootScatter = [int](Invoke-Sql -Db $Db -Sql "SELECT COUNT(*) FROM chapter WHERE comic_id=$mixedComicId AND catalog_id IS NULL")
+    Assert-Equal $rootScatter 1 "根散页 = 1（catalog_id NULL 的本书散页章）"
+    $vol1Chapters = [int](Invoke-Sql -Db $Db -Sql "SELECT COUNT(*) FROM chapter WHERE comic_id=$mixedComicId AND catalog_id=$vol1Cat")
+    Assert-Equal $vol1Chapters 2 "vol1 下章节 = 2（本目录散页 + vol1-1）"
+
+    # 媒体：总数 12（图片 10 + 视频 2），混排正确落库
+    $mediaCount = [int](Invoke-Sql -Db $Db -Sql "SELECT COUNT(*) FROM page p JOIN chapter c ON p.chapter_id=c.id WHERE c.comic_id=$mixedComicId")
+    Assert-Equal $mediaCount 12 "媒体总数 = 12（图片 10 + 视频 2）"
+    $videoCount = [int](Invoke-Sql -Db $Db -Sql "SELECT COUNT(*) FROM page p JOIN chapter c ON p.chapter_id=c.id WHERE c.comic_id=$mixedComicId AND p.media_type='VIDEO'")
+    Assert-Equal $videoCount 2 "视频数 = 2（根散页 002.mp4 + ch1 003.mp4）"
+    $pendingMedia = [int](Invoke-Sql -Db $Db -Sql "SELECT COUNT(*) FROM page p JOIN chapter c ON p.chapter_id=c.id WHERE c.comic_id=$mixedComicId AND (p.hq_status <> 'READY' OR p.status <> 'READY')")
+    Assert-Equal $pendingMedia 0 "全部媒体 finalize 后 hq_status/status = READY"
+
+    # 最终 chapterId 目录 + 每个 hqPath 文件存在；HQ 下无 globalOrder 目录残留
+    $hqPaths = Invoke-Sql -Db $Db -Sql "SELECT hq_path FROM page p JOIN chapter c ON p.chapter_id=c.id WHERE c.comic_id=$mixedComicId ORDER BY p.chapter_id, p.page_number"
+    $missing = @()
+    foreach ($line in ($hqPaths -split "`n")) {
+        $hp = $line.Trim()
+        if ($hp -eq "") { continue }
+        $f = Join-Path $MangaRoot "hq" ($hp -replace "/", "\")
+        if (-not (Test-Path -LiteralPath $f)) { $missing += $hp }
+    }
+    Assert-True ($missing.Count -eq 0) "全部 hqPath 文件存在（缺失: $($missing -join ', ')）"
+    $chapterDirCount = (Get-ChildItem (Join-Path $MangaRoot "hq\$mixedComicId") -Directory -ErrorAction SilentlyContinue).Count
+    Assert-Equal $chapterDirCount 6 "HQ 下 6 个 chapterId 目录（目录用 chapterId 而非 globalOrder）"
+
+    # 封面：cover.jpg（命名候选 priority 0）胜出 → thumbs/{comicId}/cover.webp
+    $coverFile = Join-Path $MangaRoot "thumbs\$mixedComicId\cover.webp"
+    Assert-True (Test-Path $coverFile) "cover.webp 已生成（cover.jpg 命名候选胜出）"
+    $md2 = Invoke-Api -Path "/api/comics/$mixedComicId"
+    Assert-True ($md2.coverUrl -match "/files/thumbs/$mixedComicId/cover.webp") "Reader 封面 URL 指向 cover.webp"
+
+    # Reader URL + metadata hqPath（chapterId 布局）
+    $firstCh = (Invoke-Sql -Db $Db -Sql "SELECT id FROM chapter WHERE comic_id=$mixedComicId ORDER BY global_order LIMIT 1").Trim()
+    $reader = Invoke-Api -Path "/api/chapters/$firstCh"
+    Assert-Equal $reader.total 3 "根散页章 3 页（cover+001.jpg+002.mp4）"
+    Assert-True ($reader.pages[0].hqUrl -match "^/files/hq/$mixedComicId/") "Reader 页 URL 前缀 /files/hq/{comicId}/（FileUrlResolver 统一生成）"
+    $metaFile = Join-Path $MangaRoot "metadata\$mixedComicId.json"
+    Assert-True (Test-Path $metaFile) "metadata/{comicId}.json 已写出（DB 删除后恢复依据）"
+    $metaJson = Get-Content $metaFile -Raw | ConvertFrom-Json
+    $metaChapters = @($metaJson.chapters)
+    Assert-Equal $metaChapters.Count 6 "metadata chapters = 6"
+    Assert-Equal (@($metaJson.chapters | Where-Object { $_.globalOrder -eq 1 }).mediaItems.Count) 3 "metadata 根散页章 mediaItems = 3"
+    $anyHqPath = [string]$metaJson.chapters[0].mediaItems[0].hqPath
+    Assert-True ($anyHqPath -match "^$mixedComicId/\d+/") "metadata hqPath 布局 {comicId}/{chapterId}/{fileName}"
+
+    # ZIP 通道委托同一 DirectoryImportHandler：mixed-comic.zip 同构导入
+    $impMz = Invoke-Api -Method Post -Path "/api/tasks/import" -Body @{ sourceType = "ZIP"; sourcePath = (Join-Path $FixturesRoot "mixed-comic.zip") }
+    $tMz = Wait-ImportTask -TaskId $impMz.id -TimeoutSec 300
+    Assert-Equal $tMz.status "SUCCESS" "mixed-comic ZIP 导入成功（解压→DirectoryImportHandler）"
+    $mixedZipId = [long]$tMz.comicId
+    $mz = Invoke-Api -Path "/api/comics/$mixedZipId"
+    Assert-Equal $mz.chapters.Count 6 "ZIP 通道章节数同样 = 6（同构规范化）"
+
+    # 删除 mixed-comic DIRECTORY 版本 DB 行后，用 HQ + metadata/{comicId}.json 恢复一致
+    $delSqlM = "SET FOREIGN_KEY_CHECKS=0;
+DELETE FROM reading_history WHERE comic_id=$mixedComicId;
+DELETE FROM comic_tag WHERE comic_id=$mixedComicId;
+DELETE FROM page WHERE chapter_id IN (SELECT id FROM chapter WHERE comic_id=$mixedComicId);
+DELETE FROM chapter WHERE comic_id=$mixedComicId;
+DELETE FROM catalog WHERE comic_id=$mixedComicId;
+DELETE FROM comic WHERE id=$mixedComicId;
+SET FOREIGN_KEY_CHECKS=1"
+    Invoke-Sql -Db $Db -Sql $delSqlM | Out-Null
+    Assert-Equal ([int](Invoke-Sql -Db $Db -Sql "SELECT COUNT(*) FROM comic WHERE id=$mixedComicId")) 0 "mixed-comic DB 行已删除（模拟数据丢失）"
+    $rec2 = Invoke-Api -Method Post -Path "/api/tasks/recovery" -Body @{}
+    $rec2Done = Wait-Until -TimeoutSec 300 -IntervalSec 5 -Description "mixed-comic 恢复任务终态" {
+        try {
+            $r2 = Invoke-Api -Path "/api/tasks/recovery/$($rec2.id)"
+            return ($r2.status -in @("SUCCEEDED", "FAILED"))
+        } catch { return $false }
+    }
+    Assert-True $rec2Done "mixed-comic 恢复任务到达终态"
+    $rec2Final = Invoke-Api -Path "/api/tasks/recovery/$($rec2.id)"
+    Assert-Equal $rec2Final.status "SUCCEEDED" "mixed-comic 恢复任务成功"
+    Assert-Equal (Invoke-Sql -Db $Db -Sql "SELECT status FROM comic WHERE id=$mixedComicId") "READY" "mixed-comic 从 HQ/metadata 恢复为 READY"
+    $recMCh = [int](Invoke-Sql -Db $Db -Sql "SELECT COUNT(*) FROM chapter WHERE comic_id=$mixedComicId")
+    Assert-Equal $recMCh 6 "mixed-comic 恢复章节数 = 6（结构一致）"
 
     # ---------- 8. 任务中心 / Outbox / 无孤儿 ----------
     Write-Step "A8: 任务中心 / Outbox / 无孤儿对账"
@@ -1078,7 +1213,7 @@ INSERT INTO reading_history (comic_id, chapter_id, page_number) VALUES (1001, 20
 
     # 升级库上的真实故事（LQ + 重排 + 任务中心 + 回收/恢复）
     $legacyDetail = Invoke-Api -Path "/api/comics/1001"
-    Assert-Equal $legacyDetail.lifecycle "READY" "升级库漫画可读"
+    Assert-Equal $legacyDetail.status "READY" "升级库漫画可读"
     Assert-Equal $legacyDetail.chapters.Count 2 "升级库章节可读"
 
     # 单项 LQ（升级库上的管理任务链路）
