@@ -94,6 +94,11 @@ pwsh -File tools/maintenance/manage-remote-infra-frp.ps1 -Action RemoveTask
 
 ## 五、部署日志
 
+### 2026-08-09
+
+- 修复 FRP 客户端心跳配置不匹配：本地 visitor 和远端 provider 恢复每 30 秒发送心跳，服务端继续使用 90 秒心跳超时。
+- 修复前两个客户端会被 `frps` 每约 90 秒以 `heartbeat timeout` 主动断开并自动重连；修复后持续观察超过两个旧超时周期，未再新增超时或重连。
+
 ### 2026-08-08
 
 - 将远端旧版 FRP 替换为 `v0.70.1`，统一安装到 `/usr/local/bin/`，配置集中到 `/opt/comicatlas-frp/`。

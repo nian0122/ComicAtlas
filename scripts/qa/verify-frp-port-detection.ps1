@@ -6,6 +6,14 @@ $scriptPath = Join-Path $repositoryRoot "tools\maintenance\manage-remote-infra-f
 . $scriptPath
 $null = Get-ClientProcess
 
+$configuredHeartbeatInterval = Get-Variable `
+    -Name heartbeatIntervalSeconds `
+    -ValueOnly `
+    -ErrorAction SilentlyContinue
+if ($configuredHeartbeatInterval -ne 30) {
+    throw "FRP client 心跳必须为 30 秒，不能禁用后继续保留服务端 90 秒超时"
+}
+
 function Get-ClientProcess {
     return [System.Diagnostics.Process]::GetCurrentProcess()
 }

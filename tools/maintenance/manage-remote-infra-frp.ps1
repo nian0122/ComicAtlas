@@ -20,6 +20,7 @@ $frpcPath = Join-Path $vendorDirectory "frpc.exe"
 $taskName = "ComicAtlas Remote Infra FRP"
 $legacyTaskName = "ComicAtlas Remote Infra Tunnel"
 $visitorUser = "comicatlas-local"
+$heartbeatIntervalSeconds = 30
 $serviceMappings = @(
     [ordered]@{ Name = "mysql"; Port = 3306 },
     [ordered]@{ Name = "redis"; Port = 6379 },
@@ -177,7 +178,7 @@ function Write-VisitorConfig {
     $lines.Add('transport.tls.enable = true')
     $lines.Add('transport.wireProtocol = "v2"')
     $lines.Add('transport.tcpMuxKeepaliveInterval = 30')
-    $lines.Add('transport.heartbeatInterval = -1')
+    $lines.Add("transport.heartbeatInterval = $heartbeatIntervalSeconds")
     $lines.Add("log.to = `"$logPath`"")
     $lines.Add('log.level = "info"')
     $lines.Add('log.maxDays = 7')
@@ -255,7 +256,7 @@ log.maxDays = 7
     $providerLines.Add('transport.tls.enable = true')
     $providerLines.Add('transport.wireProtocol = "v2"')
     $providerLines.Add('transport.tcpMuxKeepaliveInterval = 30')
-    $providerLines.Add('transport.heartbeatInterval = -1')
+    $providerLines.Add("transport.heartbeatInterval = $heartbeatIntervalSeconds")
     $providerLines.Add('log.to = "/var/log/frp/frpc-provider.log"')
     $providerLines.Add('log.level = "info"')
     $providerLines.Add('log.maxDays = 7')
