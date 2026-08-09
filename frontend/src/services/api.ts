@@ -165,7 +165,10 @@ export const trashApi = {
     api.post<ReconcileResult>(`/trash/${targetType}/${targetId}/reconcile`),
 }
 
-/** 分块上传会话（原始字节流 + Content-Range 头） */
+/**
+ * 分块上传会话（原始字节流 + Content-Range 头）。
+ * 预留接口能力：后端接口已实现且测试可用，但当前无前端页面入口，不属于漫画导入主流程。
+ */
 export const uploadApi = {
   createSession: (data: CreateUploadSessionRequest) =>
     api.post<CreateUploadSessionResult>('/uploads/sessions', data),

@@ -590,6 +590,8 @@ POST  /api/trash/{targetType}/{targetId}/reconcile          # 对账并修复可
 
 原始字节流上传（**非 multipart**），无 `spring.servlet.multipart` 配置。限制见 `storage.upload.*`。
 
+> **预留接口能力**：媒体上传/替换（`MEDIA_UPLOAD` / `MEDIA_REPLACE`）后端接口已实现且测试可用，但当前无前端页面入口，不属于漫画导入主流程。接入需自行实现前端上传页面。
+
 ```
 POST   /api/uploads/sessions                     # 创建会话
 GET    /api/uploads/sessions/{sessionId}         # 查询状态
