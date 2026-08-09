@@ -1,5 +1,7 @@
 package com.comicatlas.worker.importer;
 
+import org.springframework.stereotype.Component;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -8,7 +10,10 @@ import java.util.Locale;
 import java.util.Set;
 
 /**
- * 封面候选选择器：纯内存排序逻辑，不依赖 Spring / 无 IO 副作用，可直接单测。
+ * 封面候选选择器：纯内存排序逻辑，无 IO 副作用，可直接单测。
+ * <p>
+ * 注册为 Spring bean 供 {@link DirectoryImportHandler} 构造注入；无任何状态，
+ * 单测仍可直接 {@code new CoverCandidateSelector()} 使用。
  * <p>
  * 候选排序（全局固定优先级）：
  * <ol>
@@ -19,6 +24,7 @@ import java.util.Set;
  * </ol>
  * 只负责"选哪个文件"，封面生成仍由 {@link com.comicatlas.worker.image.CoverGenerator} 完成。
  */
+@Component
 public final class CoverCandidateSelector {
 
     /** 命名候选固定优先级表：索引即优先级。 */
