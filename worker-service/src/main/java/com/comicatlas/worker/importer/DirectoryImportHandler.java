@@ -30,6 +30,7 @@ public class DirectoryImportHandler {
     private final StorageService storageService;
     private final ObjectMapper objectMapper;
     private final CoverGenerator coverGenerator;
+    private final CoverCandidateSelector coverCandidateSelector;
     private final CancelHandler cancelHandler;
     private final ImportManifestManager manifestManager;
 
@@ -46,7 +47,7 @@ public class DirectoryImportHandler {
         } else {
             // 导入只录入文件信息 + 生成封面，不做视频转码/图片优化；
             // 转码与 LQ 优化由导入后在管理面板手动调用接口执行，加快导入时间。
-            DirectoryTree tree = parser.parse(ctx.sourcePath());
+            DirectoryTree tree = parser.parse(ctx.sourcePath(), ctx.sourceType());
             ComicMetadata metadata = assembler.assemble(tree, ctx);
 
             if (cancelHandler.isCancelled(taskId)) {
@@ -97,8 +98,12 @@ public class DirectoryImportHandler {
         // metadata.json 从清单 metadata 写出
         Path metaPath = writeMetadataNode(manifest.metadata(), taskId, comicId, mangaRoot);
 
-        // 成功后清理恢复点
-        manifestManager.delete(mangaRoot, taskId);
+        // 注意：此处不再删除清单（恢复点）。两阶段最终化协议中，文件先按
+        // {comicId}/{globalOrder} 暂存，Worker 逐章搬运到 {comicId}/{chapterId} 时
+        // 仍需清单中的预期尺寸做幂等校验，并由 ImportStorageFinalizeHandler 在全部章节
+        // 最终化完成后经 rewriteWithoutChapter 清空清单目录。若在此提前删除，
+        // 最终化阶段将无法核对尺寸（sourceDir==targetDir 时还会静默跳过导致不发布
+        // Completed，漫画卡在 IMPORTING）。
         return metaPath;
     }
 
@@ -205,50 +210,68 @@ public class DirectoryImportHandler {
         return metaPath;
     }
 
+    /**
+     * 封面生成：从清单 metadata 提取全部媒体项，交由 CoverCandidateSelector 按固定优先级排序，
+     * 逐个候选尝试生成；单候选失败保留 cause 并继续下一候选，全部失败仅告警不阻断导入。
+     */
     private void generateCoverFromNode(JsonNode metadata, Long comicId) {
-        JsonNode chapters = metadata.path("chapters");
-        if (chapters.isEmpty()) { return; }
-        JsonNode firstChapter = chapters.get(0);
-        JsonNode mediaItems = firstChapter.path("mediaItems");
-        if (mediaItems.isEmpty()) { return; }
+        List<CoverCandidateSelector.MediaCandidate> media = flattenMedia(metadata, comicId);
+        if (media.isEmpty()) { return; }
+        List<CoverCandidateSelector.CoverCandidate> candidates = coverCandidateSelector.select(media);
+        if (candidates.isEmpty()) {
+            log.warn("无可用的封面候选，本漫画无封面: comicId={}", comicId);
+            return;
+        }
+        for (int i = 0; i < candidates.size(); i++) {
+            CoverCandidateSelector.CoverCandidate candidate = candidates.get(i);
+            Path sourcePath = storageService.resolve(new StorageRef("HQ", candidate.hqPath()));
+            if (!Files.exists(sourcePath)) {
+                log.warn("封面候选文件缺失，跳过: comicId={}, candidateIndex={}, fileName={}",
+                        comicId, i, candidate.fileName());
+                continue;
+            }
+            try {
+                if ("VIDEO".equalsIgnoreCase(candidate.mediaType())) {
+                    coverGenerator.generateCoverFromVideo(comicId, sourcePath);
+                } else {
+                    coverGenerator.generateCover(comicId, sourcePath);
+                }
+                log.info("封面候选生成成功: comicId={}, candidateIndex={}, fileName={}",
+                        comicId, i, candidate.fileName());
+                return;
+            } catch (Exception e) {
+                log.warn("封面候选生成失败，继续下一候选: comicId={}, candidateIndex={}, fileName={}",
+                        comicId, i, candidate.fileName(), e);
+            }
+        }
+        log.warn("全部封面候选生成失败，本漫画无封面: comicId={}, candidateCount={}",
+                comicId, candidates.size());
+    }
 
-        // 跳过 VIDEO 首项，找第一张图片 — 优先使用 hqPath
-        JsonNode firstImage = null;
-        for (JsonNode item : mediaItems) {
-            if (!"VIDEO".equals(item.path("mediaType").asText())) {
-                firstImage = item;
-                break;
+    /**
+     * 把清单 metadata 展开为选择器输入；hqPath 缺失时按
+     * {comicId}/{globalOrder}/{fileName} 兜底（与清单目标命名一致）。
+     */
+    private List<CoverCandidateSelector.MediaCandidate> flattenMedia(JsonNode metadata, Long comicId) {
+        List<CoverCandidateSelector.MediaCandidate> media = new ArrayList<>();
+        JsonNode chapters = metadata.path("chapters");
+        for (JsonNode chapter : chapters) {
+            int globalOrder = chapter.path("globalOrder").asInt();
+            String sourceDir = chapter.hasNonNull("sourceDir") ? chapter.path("sourceDir").asText() : null;
+            JsonNode mediaItems = chapter.path("mediaItems");
+            for (JsonNode item : mediaItems) {
+                String fileName = item.path("fileName").asText(null);
+                if (fileName == null || fileName.isBlank()) { continue; }
+                String mediaType = item.path("mediaType").asText("IMAGE");
+                int pageNumber = item.path("pageNumber").asInt();
+                String hqPath = item.path("hqPath").asText(null);
+                if (hqPath == null || hqPath.isBlank()) {
+                    hqPath = comicId + "/" + globalOrder + "/" + fileName;
+                }
+                media.add(new CoverCandidateSelector.MediaCandidate(
+                        mediaType, globalOrder, pageNumber, sourceDir, fileName, hqPath));
             }
         }
-        if (firstImage != null) {
-            String hqPath = firstImage.has("hqPath") ? firstImage.path("hqPath").asText() : null;
-            if (hqPath == null || hqPath.isBlank()) {
-                int globalOrder = firstChapter.path("globalOrder").asInt();
-                hqPath = comicId + "/" + globalOrder + "/" + firstImage.path("fileName").asText();
-            }
-            Path firstImagePath = storageService.resolve(new StorageRef("HQ", hqPath));
-            if (Files.exists(firstImagePath)) {
-                try {
-                    coverGenerator.generateCover(comicId, firstImagePath);
-                } catch (Exception e) {
-                    log.error("封面生成失败: comicId={}, {}", comicId, e.getMessage());
-                }
-            }
-        } else {
-            JsonNode firstVideo = mediaItems.get(0);
-            String hqPath = firstVideo.has("hqPath") ? firstVideo.path("hqPath").asText() : null;
-            if (hqPath == null || hqPath.isBlank()) {
-                int globalOrder = firstChapter.path("globalOrder").asInt();
-                hqPath = comicId + "/" + globalOrder + "/" + firstVideo.path("fileName").asText();
-            }
-            Path firstVideoFile = storageService.resolve(new StorageRef("HQ", hqPath));
-            if (Files.exists(firstVideoFile)) {
-                try {
-                    coverGenerator.generateCoverFromVideo(comicId, firstVideoFile);
-                } catch (Exception e) {
-                    log.error("视频封面生成失败: comicId={}, {}", comicId, e.getMessage());
-                }
-            }
-        }
+        return media;
     }
 }

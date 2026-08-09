@@ -1,6 +1,9 @@
 package com.comicatlas.common.metadata;
 
 import com.comicatlas.common.metadata.MetadataV3.*;
+import com.comicatlas.common.storage.InvalidRelativePathException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -72,5 +75,103 @@ class MetadataJsonBuilderTest {
         assertTrue(media.has("audioCodec"), "audioCodec 非 null 时应输出");
         assertTrue(media.has("width"), "width 非 null 时应输出");
         assertTrue(media.has("height"), "height 非 null 时应输出");
+    }
+
+    @Test
+    void build_outputsHqPathWhenPresent() throws Exception {
+        MetadataV3 v3 = new MetadataV3(
+                new Comic("标题", "作者", null, null),
+                List.of(),
+                List.of(new Chapter("章节1", "1", 0, 1, null,
+                        List.of(new MediaItem("001.jpg", 1, "READY", "NOT_GENERATED",
+                                1000L, "IMAGE", 800, 600, null, null, null, null, "12/001.jpg")))));
+        JsonNode root = objectMapper.readTree(builder.build(v3));
+        JsonNode media = root.path("chapters").get(0).path("mediaItems").get(0);
+        assertTrue(media.has("hqPath"), "hqPath 非 null 时应输出");
+        assertEquals("12/001.jpg", media.path("hqPath").asText());
+    }
+
+    @Test
+    void build_omitsHqPathWhenNull() throws Exception {
+        MetadataV3 v3 = new MetadataV3(
+                new Comic("标题", "作者", null, null),
+                List.of(),
+                List.of(new Chapter("章节1", "1", 0, 1, null,
+                        List.of(new MediaItem("001.jpg", 1, "READY", "NOT_GENERATED",
+                                1000L, "IMAGE", 800, 600, null, null, null, null)))));
+        JsonNode root = objectMapper.readTree(builder.build(v3));
+        JsonNode media = root.path("chapters").get(0).path("mediaItems").get(0);
+        assertFalse(media.has("hqPath"), "hqPath 为 null 时不应输出");
+    }
+
+    @Test
+    void build_rejectsParentTraversalHqPath() {
+        assertThrows(InvalidRelativePathException.class, () -> new MediaItem(
+                "001.jpg", 1, "READY", "NOT_GENERATED", 1L, "IMAGE",
+                null, null, null, null, null, null, "../001.jpg"));
+    }
+
+    @Test
+    void build_rejectsAbsoluteHqPath() {
+        assertThrows(InvalidRelativePathException.class, () -> new MediaItem(
+                "001.jpg", 1, "READY", "NOT_GENERATED", 1L, "IMAGE",
+                null, null, null, null, null, null, "F:/manga/hq/12/001.jpg"));
+    }
+
+    @Test
+    void build_rejectsBackslashHqPath() {
+        assertThrows(InvalidRelativePathException.class, () -> new MediaItem(
+                "001.jpg", 1, "READY", "NOT_GENERATED", 1L, "IMAGE",
+                null, null, null, null, null, null, "12\\001.jpg"));
+    }
+
+    @Test
+    void oldMetadataJson_withoutHqPath_roundTrips() throws Exception {
+        ObjectMapper lenient = new ObjectMapper();
+        lenient.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        String oldJson = "{"
+                + "\"version\":3,"
+                + "\"comic\":{\"title\":\"标题\",\"author\":\"作者\"},"
+                + "\"catalogs\":[],"
+                + "\"chapters\":[{\"title\":\"章节1\",\"chapterNo\":\"1\",\"sortOrder\":0,\"globalOrder\":1,"
+                + "\"sourceDir\":\"\","
+                + "\"mediaItems\":[{\"fileName\":\"001.jpg\",\"pageNumber\":1,\"hqStatus\":\"READY\","
+                + "\"lqStatus\":\"NOT_GENERATED\",\"fileSize\":1000,\"mediaType\":\"IMAGE\","
+                + "\"width\":800,\"height\":600}]}]"
+                + "}";
+        MetadataV3 v3 = lenient.readValue(oldJson, MetadataV3.class);
+        assertEquals("001.jpg", v3.chapters().get(0).mediaItems().get(0).fileName());
+        assertNull(v3.chapters().get(0).mediaItems().get(0).hqPath(), "旧 metadata 无 hqPath 时应为 null");
+    }
+
+    @Test
+    void metadataJson_withParentTraversalHqPath_rejectedAtParseBoundary() {
+        ObjectMapper lenient = new ObjectMapper();
+        lenient.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        String json = "{"
+                + "\"comic\":{\"title\":\"t\"},\"catalogs\":[],"
+                + "\"chapters\":[{\"title\":\"c\",\"chapterNo\":\"1\",\"sortOrder\":0,\"globalOrder\":1,"
+                + "\"mediaItems\":[{\"fileName\":\"001.jpg\",\"pageNumber\":1,\"hqStatus\":\"READY\","
+                + "\"lqStatus\":\"NOT_GENERATED\",\"fileSize\":1,\"mediaType\":\"IMAGE\","
+                + "\"hqPath\":\"../001.jpg\"}]}]"
+                + "}";
+        assertThrows(JsonMappingException.class, () -> lenient.readValue(json, MetadataV3.class));
+    }
+
+    @Test
+    void directSerialization_includesHqPathOnlyWhenNonNull() throws Exception {
+        MetadataV3 withPath = new MetadataV3(new Comic("t", null, null, null), List.of(),
+                List.of(new Chapter("c", "1", 0, 1, null,
+                        List.of(new MediaItem("001.jpg", 1, "READY", "NOT_GENERATED",
+                                1L, "IMAGE", null, null, null, null, null, null, "12/001.jpg")))));
+        assertTrue(objectMapper.writeValueAsString(withPath).contains("\"hqPath\":\"12/001.jpg\""),
+                "hqPath 非 null 时直接序列化应输出");
+
+        MetadataV3 withoutPath = new MetadataV3(new Comic("t", null, null, null), List.of(),
+                List.of(new Chapter("c", "1", 0, 1, null,
+                        List.of(new MediaItem("001.jpg", 1, "READY", "NOT_GENERATED",
+                                1L, "IMAGE", null, null, null, null, null, null)))));
+        assertFalse(objectMapper.writeValueAsString(withoutPath).contains("hqPath"),
+                "hqPath 为 null 时直接序列化不应输出");
     }
 }

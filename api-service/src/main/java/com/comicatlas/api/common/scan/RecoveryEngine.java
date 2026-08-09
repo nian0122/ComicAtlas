@@ -17,18 +17,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import javax.imageio.ImageIO;
-import javax.imageio.ImageReader;
-import javax.imageio.stream.ImageInputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import com.comicatlas.api.comic.mapper.CatalogMapper;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.comic.mapper.ComicMapper;
@@ -39,11 +33,14 @@ import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.entity.Media;
 
 /**
- * 漫画恢复引擎 — 封装每漫画目录的扫描与恢复逻辑。
+ * 漫画恢复引擎 — 封装每漫画目录的恢复逻辑。
  * <p>
  * 无状态 Singleton，可被同步 scanRecover() 和异步 MQ 事件处理器复用。
  * {@link #processComicDir(Long, int)} 是主要入口，每次处理一个漫画目录并返回 {@link RecoveryProgressVO}。
  * {@link #scanChapterPages(Long, int)} 是公共工具方法，供 {@code refreshMetadata()} 等场景复用。
+ * <p>
+ * <b>事务边界</b>：metadata 结构校验与文件扫描/存在性读取全部由 {@link RecoveryMediaResolver}
+ * 在 DB 写事务之前完成；事务内只做 DB 读写与字符串路径运算（阿里规范：事务内不得长 IO）。
  */
 @Slf4j
 @Component
@@ -58,9 +55,7 @@ public class RecoveryEngine {
     private final TransactionTemplate transactionTemplate;
     private final CatalogCacheInvalidator catalogCacheInvalidator;
     private final ApiStorageProperties storageProperties;
-
-    /** 视频文件扩展名 */
-    private static final Set<String> VIDEO_EXTENSIONS = Set.of(".mp4", ".webm", ".mkv", ".mov", ".avi");
+    private final RecoveryMediaResolver recoveryMediaResolver;
 
     // ======================== 公共 API ========================
 
@@ -109,47 +104,7 @@ public class RecoveryEngine {
      * 供 {@code AdminServiceImpl.refreshMetadata()} 等场景复用。
      */
     public List<ScannedMediaInfo> scanChapterPages(Long comicId, int globalOrder) {
-        Path dir = storageProperties.root("HQ")
-                .resolve(String.valueOf(comicId)).resolve(String.valueOf(globalOrder));
-        if (!Files.exists(dir)) { return Collections.emptyList(); }
-
-        List<ScannedMediaInfo> pages = new ArrayList<>();
-        try (var stream = Files.newDirectoryStream(dir)) {
-            for (Path file : stream) {
-                String name = file.getFileName().toString();
-                if (name.startsWith(".")) { continue; }
-
-                String lower = name.toLowerCase();
-                int dotIdx = lower.lastIndexOf('.');
-                if (dotIdx < 0) { continue; }
-                String ext = lower.substring(dotIdx);
-                String mediaType;
-                if (VIDEO_EXTENSIONS.contains(ext)) {
-                    mediaType = "VIDEO";
-                } else if (ext.equals(".jpg") || ext.equals(".jpeg") || ext.equals(".png")
-                    || ext.equals(".webp") || ext.equals(".gif") || ext.equals(".bmp")) {
-                    mediaType = "IMAGE";
-                } else {
-                    continue;
-                }
-
-                long fileSize;
-                try {
-                    fileSize = Files.size(file);
-                } catch (Exception e) {
-                    fileSize = 0;
-                }
-
-                ImageDimensions dims = "IMAGE".equals(mediaType) ? getImageDimensions(file) : new ImageDimensions(null, null);
-                pages.add(new ScannedMediaInfo(name, fileSize, dims.width(), dims.height(), mediaType));
-            }
-        } catch (Exception e) {
-            log.warn("扫描章节页面失败: comicId={}, globalOrder={}", comicId, globalOrder, e);
-            return Collections.emptyList();
-        }
-
-        pages.sort(Comparator.comparing(ScannedMediaInfo::imageName));
-        return pages;
+        return recoveryMediaResolver.scanChapterDir(comicId, globalOrder);
     }
 
     // ======================== 恢复逻辑 ========================
@@ -170,9 +125,17 @@ public class RecoveryEngine {
     }
 
     private Map<String, Object> restoreComic(Map<String, Object> metadata, RestoreContext ctx) {
+        // 事务外：结构校验（typed-fail）与文件扫描/存在性读取，事务内不得做任何文件 IO
+        Map<String, Object> comicData = asMap(metadata.get("comic"), "comic");
+        List<Map<String, Object>> catalogsData = asMapList(metadata.get("catalogs"), "catalogs");
+        List<Map<String, Object>> chaptersData = asMapList(metadata.get("chapters"), "chapters");
+        validateIndexes(catalogsData, chaptersData);
+        List<List<ResolvedMediaItem>> resolvedMedia =
+                recoveryMediaResolver.resolveMedia(ctx.comicId(), chaptersData);
+
         Map<String, Object> result = transactionTemplate.execute(status -> {
             try {
-                return restoreComicInternal(metadata, ctx);
+                return restoreComicInternal(comicData, catalogsData, chaptersData, resolvedMedia, ctx);
             } catch (Exception e) {
                 throw new RuntimeException("恢复漫画失败: comicId=" + ctx.comicId(), e);
             }
@@ -181,12 +144,39 @@ public class RecoveryEngine {
         return result;
     }
 
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> restoreComicInternal(Map<String, Object> metadata, RestoreContext ctx) throws Exception {
-        Map<String, Object> comicData = (Map<String, Object>) metadata.get("comic");
-        List<Map<String, Object>> catalogsData = (List<Map<String, Object>>) metadata.get("catalogs");
-        List<Map<String, Object>> chaptersData = (List<Map<String, Object>>) metadata.get("chapters");
+    /**
+     * 事务前校验 parentIndex/catalogIndex 边界，越界必须 typed-fail，不得静默挂根。
+     */
+    private static void validateIndexes(List<Map<String, Object>> catalogsData,
+                                        List<Map<String, Object>> chaptersData) {
+        int catalogCount = catalogsData.size();
+        for (Map<String, Object> catalogData : catalogsData) {
+            Object pi = catalogData.get("parentIndex");
+            if (pi != null) {
+                int parentIdx = ((Number) pi).intValue();
+                if (parentIdx < 0 || parentIdx >= catalogCount) {
+                    throw new IllegalArgumentException("catalog parentIndex 越界: index="
+                            + parentIdx + ", catalogCount=" + catalogCount);
+                }
+            }
+        }
+        for (Map<String, Object> chData : chaptersData) {
+            Object cid = chData.get("catalogIndex");
+            if (cid != null) {
+                int catalogIdx = ((Number) cid).intValue();
+                if (catalogIdx < 0 || catalogIdx >= catalogCount) {
+                    throw new IllegalArgumentException("chapter catalogIndex 越界: index="
+                            + catalogIdx + ", catalogCount=" + catalogCount);
+                }
+            }
+        }
+    }
 
+    private Map<String, Object> restoreComicInternal(Map<String, Object> comicData,
+                                                     List<Map<String, Object>> catalogsData,
+                                                     List<Map<String, Object>> chaptersData,
+                                                     List<List<ResolvedMediaItem>> resolvedMedia,
+                                                     RestoreContext ctx) {
         Long comicId = ctx.comicId();
         Comic comic;
 
@@ -222,45 +212,51 @@ public class RecoveryEngine {
             comicMapper.insert(comic);
         }
 
-        int catalogCount = catalogsData != null ? catalogsData.size() : 0;
+        int catalogCount = catalogsData.size();
         Map<Integer, Long> catalogIdMap = insertCatalogsWithHierarchy(catalogsData, comicId);
 
         int chCount = 0, pgCount = 0;
         long totalSize = 0;
-        if (chaptersData != null) {
-            for (Map<String, Object> chData : chaptersData) {
-                Chapter chapter = new Chapter();
-                chapter.setComicId(comicId);
-                chapter.setTitle((String) chData.get("title"));
-                chapter.setChapterNo((String) chData.get("chapterNo"));
-                chapter.setSortOrder((Integer) chData.getOrDefault("sortOrder", chCount));
-                chapter.setGlobalOrder((Integer) chData.getOrDefault("globalOrder", chCount));
-                Object cid = chData.get("catalogIndex");
-                if (cid != null) { chapter.setCatalogId(catalogIdMap.get(((Number) cid).intValue())); }
-                chapterMapper.insert(chapter);
-                chCount++;
+        for (int i = 0; i < chaptersData.size(); i++) {
+            Map<String, Object> chData = chaptersData.get(i);
+            List<ResolvedMediaItem> chapterItems = resolvedMedia != null && i < resolvedMedia.size()
+                    ? resolvedMedia.get(i) : List.of();
 
-                List<ScannedMediaInfo> scannedPages = scanChapterPages(comicId, chapter.getGlobalOrder());
-                chapter.setPageCount(scannedPages.size());
-                chapterMapper.updateById(chapter);
+            Chapter chapter = new Chapter();
+            chapter.setComicId(comicId);
+            chapter.setTitle((String) chData.get("title"));
+            chapter.setChapterNo((String) chData.get("chapterNo"));
+            chapter.setSortOrder(chData.get("sortOrder") != null
+                    ? ((Number) chData.get("sortOrder")).intValue() : chCount);
+            chapter.setGlobalOrder(chData.get("globalOrder") != null
+                    ? ((Number) chData.get("globalOrder")).intValue() : chCount);
+            Object cid = chData.get("catalogIndex");
+            if (cid != null) {
+                // 事务前已校验边界，此处必然命中
+                chapter.setCatalogId(catalogIdMap.get(((Number) cid).intValue()));
+            }
+            chapterMapper.insert(chapter);
+            chCount++;
 
-                int pageNum = 1;
-                for (ScannedMediaInfo pi : scannedPages) {
-                    Media media = new Media();
-                    media.setChapterId(chapter.getId());
-                    media.setPageNumber(pageNum++);
-                    media.setHqRoot("HQ");
-                    media.setHqPath(comicId + "/" + chapter.getGlobalOrder() + "/" + pi.imageName());
-                    media.setHqStatus(pi.fileSize() > 0 ? HqStatus.READY : HqStatus.MISSING);
-                    media.setLqStatus(LqStatus.NOT_GENERATED);
-                    media.setFileSize(pi.fileSize());
-                    media.setWidth(pi.width());
-                    media.setHeight(pi.height());
-                    media.setMediaType(pi.mediaType());
-                    mediaMapper.insert(media);
-                    totalSize += pi.fileSize();
-                    pgCount++;
-                }
+            chapter.setPageCount(chapterItems.size());
+            chapterMapper.updateById(chapter);
+
+            for (ResolvedMediaItem item : chapterItems) {
+                Media media = new Media();
+                media.setChapterId(chapter.getId());
+                media.setPageNumber(item.pageNumber());
+                media.setHqRoot("HQ");
+                media.setHqPath(item.hqPath());
+                // 缺文件必须 MISSING，不得标 READY
+                media.setHqStatus(item.exists() ? HqStatus.READY : HqStatus.MISSING);
+                media.setLqStatus(LqStatus.NOT_GENERATED);
+                media.setFileSize(item.fileSize());
+                media.setWidth(item.width());
+                media.setHeight(item.height());
+                media.setMediaType(item.mediaType());
+                mediaMapper.insert(media);
+                totalSize += item.fileSize();
+                pgCount++;
             }
         }
 
@@ -280,10 +276,9 @@ public class RecoveryEngine {
         return Map.of("catalogs", catalogCount, "chapters", chCount, "pages", pgCount);
     }
 
-    @SuppressWarnings("unchecked")
     private Map<Integer, Long> insertCatalogsWithHierarchy(List<Map<String, Object>> catalogsData, Long comicId) {
         Map<Integer, Long> idMap = new LinkedHashMap<>();
-        if (catalogsData == null || catalogsData.isEmpty()) { return idMap; }
+        if (catalogsData.isEmpty()) { return idMap; }
 
         int size = catalogsData.size();
 
@@ -292,30 +287,21 @@ public class RecoveryEngine {
             Catalog cat = new Catalog();
             cat.setComicId(comicId);
             cat.setTitle((String) catalogData.get("title"));
-            cat.setSortOrder((Integer) catalogData.getOrDefault("sortOrder", i));
+            cat.setSortOrder(catalogData.get("sortOrder") != null
+                    ? ((Number) catalogData.get("sortOrder")).intValue() : i);
             catalogMapper.insert(cat);
             idMap.put(i, cat.getId());
         }
 
-        Map<Long, Catalog> inserted = new LinkedHashMap<>();
+        // 第二遍恢复 parent_id：越界已由事务前校验拦截，此处直接命中
         for (int i = 0; i < size; i++) {
-            Catalog cat = catalogMapper.selectById(idMap.get(i));
-            if (cat == null) { continue; }
-            inserted.put(idMap.get(i), cat);
-        }
-
-        for (int i = 0; i < size; i++) {
-            Catalog cat = inserted.get(idMap.get(i));
-            if (cat == null) { continue; }
             Map<String, Object> catalogData = catalogsData.get(i);
             Object pi = catalogData.get("parentIndex");
-            if (pi != null) {
-                int parentIdx = ((Number) pi).intValue();
-                if (parentIdx < 0 || parentIdx >= size || !idMap.containsKey(parentIdx)) { continue; }
-                Long parentId = idMap.get(parentIdx);
-                Catalog parent = inserted.get(parentId);
-                if (parent == null) { continue; }
-                cat.setParentId(parentId);
+            if (pi == null) { continue; }
+            int parentIdx = ((Number) pi).intValue();
+            Catalog cat = catalogMapper.selectById(idMap.get(i));
+            if (cat != null) {
+                cat.setParentId(idMap.get(parentIdx));
                 catalogMapper.updateById(cat);
             }
         }
@@ -323,31 +309,31 @@ public class RecoveryEngine {
         return idMap;
     }
 
-    // ======================== 图片尺寸 ========================
+    // ======================== metadata 结构解析 ========================
 
-    private ImageDimensions getImageDimensions(Path path) {
-        // 1. ImageIO（支持 JVM 原生 + webp-imageio 插件）
-        try (ImageInputStream in = ImageIO.createImageInputStream(path.toFile())) {
-            if (in != null) {
-                var readers = ImageIO.getImageReaders(in);
-                if (readers.hasNext()) {
-                    ImageReader reader = readers.next();
-                    try {
-                        reader.setInput(in);
-                        return new ImageDimensions(reader.getWidth(0), reader.getHeight(0));
-                    } finally {
-                        reader.dispose();
-                    }
-                }
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> asMap(Object value, String field) {
+        if (!(value instanceof Map<?, ?> map)) {
+            throw new IllegalArgumentException("metadata 字段类型非法: " + field);
+        }
+        return (Map<String, Object>) map;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> asMapList(Object value, String field) {
+        if (value == null) {
+            return List.of();
+        }
+        if (!(value instanceof List<?> list)) {
+            throw new IllegalArgumentException("metadata 字段类型非法: " + field);
+        }
+        List<Map<String, Object>> result = new ArrayList<>(list.size());
+        for (Object item : list) {
+            if (!(item instanceof Map<?, ?> map)) {
+                throw new IllegalArgumentException("metadata 字段元素类型非法: " + field);
             }
-        } catch (Exception e) {
-            log.debug("ImageIO 读取尺寸失败: {}", path, e);
+            result.add((Map<String, Object>) map);
         }
-        // 2. 回退：直接解析文件头（JPEG/PNG/GIF/WebP/BMP）
-        int[] dims = com.comicatlas.common.util.ImageDimensionsReader.read(path);
-        if (dims[0] > 0 && dims[1] > 0) {
-            return new ImageDimensions(dims[0], dims[1]);
-        }
-        return new ImageDimensions(null, null);
+        return result;
     }
 }

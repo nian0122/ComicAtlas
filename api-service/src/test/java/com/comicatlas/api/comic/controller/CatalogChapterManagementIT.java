@@ -3,10 +3,12 @@ package com.comicatlas.api.comic.controller;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.comic.dto.CatalogCreateRequest;
 import com.comicatlas.api.comic.dto.CatalogMoveRequest;
+import com.comicatlas.api.comic.dto.CatalogNode;
 import com.comicatlas.api.comic.dto.CatalogRenameRequest;
 import com.comicatlas.api.comic.dto.CatalogReorderRequest;
 import com.comicatlas.api.comic.dto.ChapterCreateRequest;
 import com.comicatlas.api.comic.dto.ChapterMoveRequest;
+import com.comicatlas.api.comic.dto.ChapterRef;
 import com.comicatlas.api.comic.dto.ChapterRenameRequest;
 import com.comicatlas.api.comic.dto.ChapterReorderRequest;
 import com.comicatlas.api.comic.entity.Catalog;
@@ -18,6 +20,7 @@ import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.api.comic.service.CatalogManagementService;
+import com.comicatlas.api.comic.service.CatalogService;
 import com.comicatlas.api.comic.service.ChapterManagementService;
 import com.comicatlas.api.common.exception.ConflictException;
 import com.comicatlas.api.reader.dto.ReaderDTO;
@@ -133,6 +136,9 @@ class CatalogChapterManagementIT {
 
     @Autowired
     private CatalogManagementService catalogManagementService;
+
+    @Autowired
+    private CatalogService catalogService;
 
     @Autowired
     private ChapterManagementService chapterManagementService;
@@ -812,6 +818,109 @@ class CatalogChapterManagementIT {
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
+        }
+    }
+
+    // ======================== 目录树形态与锚点 ========================
+
+    @Nested
+    @DisplayName("目录树形态与锚点")
+    class CatalogTreeShapeTests {
+
+        private CatalogNode findNode(List<CatalogNode> nodes, Long id) {
+            for (CatalogNode node : nodes) {
+                if (id.equals(node.getId())) {
+                    return node;
+                }
+                CatalogNode found = findNode(node.getChildren(), id);
+                if (found != null) {
+                    return found;
+                }
+            }
+            return null;
+        }
+
+        @Test
+        @DisplayName("根混合 + 三层嵌套：匿名根包裹根级章节与顶层目录，锚点为后代最小 globalOrder")
+        void mixedTree_anonymousRootAndRecursiveAnchors() throws Exception {
+            Long comicId = createComic("树形漫画");
+            Long volA = createCatalogViaHttp(comicId, "卷A", null);
+            Long volB = createCatalogViaHttp(comicId, "卷B", null);
+            Long child = createCatalogViaHttp(comicId, "卷A-子", volA);
+            Long grandchild = createCatalogViaHttp(comicId, "卷A-孙", child);
+            // 创建顺序即 globalOrder：根散页(1)、卷A章(2)、孙章(3)、卷B章(4)
+            Long rootCh = createChapterViaHttp(comicId, "ROOT", null);
+            Long volACh = createChapterViaHttp(comicId, "A1", volA);
+            Long grandCh = createChapterViaHttp(comicId, "A2", grandchild);
+            Long volBCh = createChapterViaHttp(comicId, "B1", volB);
+
+            List<CatalogNode> tree = catalogService.buildTree(comicId);
+
+            assertThat(tree).hasSize(1);
+            CatalogNode root = tree.get(0);
+            assertThat(root.getId()).isNull();
+            assertThat(root.getTitle()).isNull();
+            // 根散页章节不丢失，且按 globalOrder 排序
+            assertThat(root.getChapters()).extracting(ChapterRef::getId).containsExactly(rootCh);
+            assertThat(root.getChildren()).extracting(CatalogNode::getId).containsExactly(volA, volB);
+            // 递归后序锚点：卷A 直接章(2) + 孙章(3) → 2；孙目录 → 3；卷B → 4
+            CatalogNode nodeA = findNode(root.getChildren(), volA);
+            CatalogNode nodeB = findNode(root.getChildren(), volB);
+            CatalogNode nodeChild = findNode(nodeA.getChildren(), child);
+            CatalogNode nodeGrand = findNode(nodeChild.getChildren(), grandchild);
+            assertThat(nodeA.getGlobalOrder()).isEqualTo(2);
+            assertThat(nodeChild.getGlobalOrder()).isEqualTo(3);
+            assertThat(nodeGrand.getGlobalOrder()).isEqualTo(3);
+            assertThat(nodeB.getGlobalOrder()).isEqualTo(4);
+        }
+
+        @Test
+        @DisplayName("TRASHED 章节不参与锚点，空目录锚点 null 排在有内容节点后")
+        void trashedChapter_excludedFromAnchor_emptyCatalogLast() throws Exception {
+            Long comicId = createComic("TRASHED 漫画");
+            Long volA = createCatalogViaHttp(comicId, "卷A", null);
+            Long volB = createCatalogViaHttp(comicId, "卷B", null);
+            createChapterViaHttp(comicId, "1", volB); // globalOrder 1
+            // 直接插入 TRASHED 章节（globalOrder 2），查询按 READY 过滤后不应参与树与锚点
+            Chapter trashed = new Chapter();
+            trashed.setComicId(comicId);
+            trashed.setCatalogId(volA);
+            trashed.setTitle("已回收章节");
+            trashed.setChapterNo("2");
+            trashed.setSortOrder(1);
+            trashed.setGlobalOrder(2);
+            trashed.setPageCount(1);
+            trashed.setStatus(ChapterLifecycleStatus.TRASHED);
+            chapterMapper.insert(trashed);
+
+            List<CatalogNode> tree = catalogService.buildTree(comicId);
+
+            // 纯目录形态：直接返回顶层节点；卷A 无 READY 后代 → 锚点 null 排最后
+            assertThat(tree).extracting(CatalogNode::getId).containsExactly(volB, volA);
+            assertThat(tree.get(0).getGlobalOrder()).isEqualTo(1);
+            assertThat(tree.get(1).getGlobalOrder()).isNull();
+            assertThat(tree.get(1).getChapters()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("目录删除后其章节退化为根级章节（ON DELETE SET NULL），放入匿名根不丢失")
+        void chapterBecomesRootLevel_whenCatalogDeleted() throws Exception {
+            Long comicId = createComic("孤儿漫画");
+            Long volA = createCatalogViaHttp(comicId, "卷A", null);
+            Long volB = createCatalogViaHttp(comicId, "卷B", null);
+            Long orphan = createChapterViaHttp(comicId, "1", volA); // globalOrder 1
+            createChapterViaHttp(comicId, "2", volB); // globalOrder 2
+            // 直接删除目录行：数据库外键 ON DELETE SET NULL 把章节 catalog_id 置空 → 章节退化根级
+            catalogMapper.deleteById(volA);
+
+            List<CatalogNode> tree = catalogService.buildTree(comicId);
+
+            // 退化章节 = 根级章节 → 混合形态，返回匿名根，章节不丢失
+            assertThat(tree).hasSize(1);
+            CatalogNode root = tree.get(0);
+            assertThat(root.getId()).isNull();
+            assertThat(root.getChapters()).extracting(ChapterRef::getId).containsExactly(orphan);
+            assertThat(root.getChildren()).extracting(CatalogNode::getId).containsExactly(volB);
         }
     }
 }

@@ -29,11 +29,16 @@ F:/manga/                          # MANGA_ROOT
 │   └── {comicId}/
 │       └── {chapterId}/
 │           └── {imageName}
+├── imports/                       # 导入清单（恢复点，最终化后删除）
+│   └── {taskId}/
+│       └── manifest.json
 ├── thumbs/                        # 封面缩略图（Worker 配置目录，非 StorageRoot）
 │   └── {comicId}/
 │       └── cover.webp
-└── metadata/                      # 导入元数据 JSON（Worker 配置目录，非 StorageRoot）
-    └── {comicId}.json
+├── metadata/                      # 导入元数据 JSON（Worker 配置目录，非 StorageRoot）
+│   ├── {taskId}.json
+│   └── {comicId}.json
+└── staging/ trash/ export/        # 上传临时 / 回收站文件卷 / 导出产物
 ```
 
 ### 布局规则
@@ -42,6 +47,19 @@ F:/manga/                          # MANGA_ROOT
 - **LQ 页面路径**: 与 HQ 同构，仅根目录不同
 - **路径分隔符**: 统一使用 `/`，代码中通过 `replace('\\', '/')` 规范化
 - **布局接口**: `StorageLayout.forPage(comicId, chapterId, imageName)` 返回相对路径字符串
+
+### 两阶段落位（staging → finalize）
+
+导入文件不直接落到最终位置，而是先暂存、最终化后再就位：
+
+| 阶段 | HQ 路径 | 说明 |
+|------|---------|------|
+| 暂存（DirectoryImportHandler） | `{comicId}/{globalOrder}/{fileName}` | Worker 按规范化 globalOrder 暂存 |
+| 最终化（ImportStorageFinalizeHandler） | `{comicId}/{chapterId}/{fileName}` | Worker 按章节移动到最终位置 |
+
+- 最终化前 DB 中 `page.hq_path` 为 PENDING；最终化完成后由 API 按 finalize completed 事件的 `targetDir` 修正为 `{comicId}/{chapterId}/{fileName}` 并置 READY。
+- **`chapterId == globalOrder` 时**（DB 自增恰好等于全书顺序）：暂存即最终位置，无需移动文件，仅校验尺寸并照常确认。
+- 迁移存储时只改 `storage.roots.HQ.path` 配置与 `MANGA_ROOT`，不改 DB 页面路径。
 
 ### 重要区分
 
@@ -149,9 +167,26 @@ storage:
 ### 字段说明
 
 - `hqRoot` + `hqPath` 组合定位 HQ 文件。`hqRoot` 对应 `StorageRoot` 的 map key，`hqPath` 是该根下的相对路径。
+- `hqPath` 最终形态为 `{comicId}/{chapterId}/{fileName}`；最终化前为 `{comicId}/{globalOrder}/{fileName}`（PENDING），由 API 在 finalize completed 时按事件 `targetDir` 修正。
 - `fileSize` 记录 HQ 原始文件大小，`lqSize` 记录 LQ 文件大小。注意 HQ 文件大小字段名为 `fileSize`。
 - `lqStatus` 初始值为 `NOT_GENERATED`，LQ 不自动生成，需手动触发。
+- `hq_status` 生命周期：`PENDING`（staging 落库）→ `READY`（最终化完成）→ `DELETED`（HQ 删除后），另有 `MISSING`（文件丢失）、`DELETE_QUEUED`/`DELETING`/`FAILED`。
 - `width` / `height` 为图片尺寸元数据，在导入时提取。
+
+### metadata 中的 hqPath（真实 StorageRef）
+
+`metadata/{comicId}.json` 的 `mediaItems[].hqPath` 是**真实 StorageRef**（`{comicId}/{globalOrder}/{fileName}`，暂存布局），不是 DB 中的最终路径：
+
+- 导入时由 `DirectoryImportHandler` 按清单目标写入；DB 落库后 API 统一用 finalize 事件的 `targetDir` 修正为 `{comicId}/{chapterId}/` 布局。
+- 封面候选选择器、恢复引擎均按该字段定位 HQ 文件，不手拼路径。
+
+### legacy globalOrder 兼容恢复
+
+升级库（Flyway baseline=2）中的旧数据页面 `hq_path` 可能为 `{comicId}/{chapterId}/{fileName}`（旧布局）或历史 globalOrder 布局。恢复与读取按以下规则兼容：
+
+- 最终化完成的页面一律以 DB `page.hq_path` 为准（`{comicId}/{chapterId}/`），阅读/删除/LQ 均通过 `FileUrlResolver` 统一解析，不做路径猜测。
+- RecoveryEngine 从 `metadata/{comicId}.json` 重建时，若 metadata 缺失则以 HQ 磁盘目录结构为准（`{comicId}/{chapterId}/`），旧 globalOrder 目录不再作为新布局来源。
+- 迁移存储只改根配置，禁止改写 DB 路径列。
 
 ---
 
@@ -194,7 +229,8 @@ URL 前缀通过 `storage.url-prefix` 配置，默认 `/files`。Nginx 将 `/fil
 | 组件 | 负责 | 不负责 |
 |------|------|--------|
 | `StorageService` (Worker) | 文件复制/移动、解析、存在检查、删除 | 数据库写入、URL 生成 |
+| `ImportManifestManager` (Worker) | 导入清单（`imports/{taskId}/manifest.json`）的原子读写与逐章移除 | 落库 |
 | `StorageLayout` (API) | 计算页面相对路径 | 文件操作、URL 拼接 |
 | `FileUrlResolver` (API) | 将 Page 存储字段转为 HTTP URL | 物理文件管理 |
-| `ImportEventHandler` (API) | 读 metadata.json 写数据库 | 文件搬移 |
-| Worker Handlers | 解析、搬文件、写 metadata.json | 数据库业务表写入 |
+| `ImportPersistenceService` (API) | completed/finalize completed 事件驱动 DB 状态推进 | 文件搬移 |
+| `ImportStorageFinalizeHandler` (Worker) | 按清单校验尺寸并把 `{globalOrder}` 移动到 `{chapterId}` | DB 业务表写入 |

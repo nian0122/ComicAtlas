@@ -9,7 +9,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.List;
 
 /**
  * 导入清单管理器：位于 mangaRoot/imports/{taskId}/manifest.json。
@@ -65,5 +67,35 @@ public class ImportManifestManager {
                     });
         }
         log.info("恢复点已清理: {}", dir);
+    }
+
+    /**
+     * 从清单移除指定章节（comicId/globalOrder 前缀）的所有文件条目并重写。
+     * 移除后无剩余文件则删除清单目录；删除失败抛 IOException 由调用方延后清理。
+     * 该章无条目时幂等返回（不重写）。
+     */
+    public void rewriteWithoutChapter(Path mangaRoot, Long taskId, Long comicId, Integer globalOrder)
+            throws IOException {
+        ImportManifest manifest = read(mangaRoot, taskId);
+        String prefix = comicId + "/" + globalOrder + "/";
+        List<ImportManifest.ImportFile> remaining = new ArrayList<>(manifest.files().size());
+        for (ImportManifest.ImportFile file : manifest.files()) {
+            if (file.target() == null || !file.target().startsWith(prefix)) {
+                remaining.add(file);
+            }
+        }
+        if (remaining.size() == manifest.files().size()) {
+            log.info("清单中无该章条目，跳过重写: taskId={}, comicId={}, globalOrder={}",
+                    taskId, comicId, globalOrder);
+            return;
+        }
+        if (remaining.isEmpty()) {
+            delete(mangaRoot, taskId);
+            return;
+        }
+        ImportManifest filtered = new ImportManifest(
+                manifest.version(), manifest.taskId(), manifest.sourceType(),
+                manifest.sourceRoot(), manifest.metadata(), remaining);
+        write(mangaRoot, taskId, filtered);
     }
 }

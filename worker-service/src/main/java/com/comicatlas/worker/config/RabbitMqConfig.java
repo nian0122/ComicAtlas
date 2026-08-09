@@ -185,6 +185,33 @@ public class RabbitMqConfig {
                 .to(importDlxExchange()).with(MqQueues.IMPORT_TASK_DLQ);
     }
 
+    // ==================== MqExchanges.IMPORT 导入存储最终化请求 ====================
+
+    @Bean
+    public Queue importStorageFinalizeRequestedQueue() {
+        return QueueBuilder.durable(MqQueues.IMPORT_STORAGE_FINALIZE_REQUESTED)
+                .deadLetterExchange(MqExchanges.IMPORT_DLX)
+                .deadLetterRoutingKey(MqQueues.IMPORT_STORAGE_FINALIZE_REQUESTED_DLQ)
+                .build();
+    }
+
+    @Bean
+    public Queue importStorageFinalizeRequestedDlq() {
+        return QueueBuilder.durable(MqQueues.IMPORT_STORAGE_FINALIZE_REQUESTED_DLQ).build();
+    }
+
+    @Bean
+    public Binding importStorageFinalizeRequestedBinding() {
+        return BindingBuilder.bind(importStorageFinalizeRequestedQueue())
+                .to(importExchange()).with(MqRoutingKeys.IMPORT_STORAGE_FINALIZE_REQUESTED);
+    }
+
+    @Bean
+    public Binding importStorageFinalizeRequestedDlqBinding() {
+        return BindingBuilder.bind(importStorageFinalizeRequestedDlq())
+                .to(importDlxExchange()).with(MqQueues.IMPORT_STORAGE_FINALIZE_REQUESTED_DLQ);
+    }
+
     @Bean
     public Binding cancelTaskBinding() {
         return BindingBuilder.bind(cancelTaskQueue())

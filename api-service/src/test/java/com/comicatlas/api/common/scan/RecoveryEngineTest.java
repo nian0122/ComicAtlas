@@ -14,7 +14,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -22,17 +22,21 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.doThrow;
 
 
 @ExtendWith(MockitoExtension.class)
@@ -55,17 +59,26 @@ class RecoveryEngineTest {
     @Mock
     private ApiStorageProperties storageProperties;
 
-    @InjectMocks
+    @TempDir
+    Path tempDir;
+
     private RecoveryEngine recoveryEngine;
+    /** 真实 resolver，仅依赖被 mock 的 storageProperties（HQ 根指向临时目录）。 */
+    private RecoveryMediaResolver realResolver;
 
     @BeforeEach
     void setUp() {
         ApiStorageRoot metadataRoot = new ApiStorageRoot();
         metadataRoot.setPath(Path.of("D:/manga/metadata"));
         ApiStorageRoot hqRoot = new ApiStorageRoot();
-        hqRoot.setPath(Path.of("D:/manga/hq"));
+        hqRoot.setPath(tempDir.resolve("hq"));
         lenient().when(storageProperties.root("METADATA")).thenReturn(metadataRoot);
         lenient().when(storageProperties.root("HQ")).thenReturn(hqRoot);
+
+        realResolver = new RecoveryMediaResolver(storageProperties);
+        recoveryEngine = new RecoveryEngine(
+                objectMapper, comicMapper, catalogMapper, chapterMapper, mediaMapper,
+                transactionTemplate, catalogCacheInvalidator, storageProperties, realResolver);
     }
 
     // ======================== Comic 已存在 ========================
@@ -165,7 +178,6 @@ class RecoveryEngineTest {
             assertEquals(0, result.skippedComics());
             assertEquals(0, result.placeholderComics());
             assertEquals(1, result.errorComics());
-            assertNotNull(result.lastError());
             assertTrue(result.lastError().contains("JSON 解析失败"));
             assertEquals(0, result.restoredChapters());
             assertEquals(0, result.restoredPages());
@@ -191,7 +203,6 @@ class RecoveryEngineTest {
             assertEquals(0, result.skippedComics());
             assertEquals(0, result.placeholderComics());
             assertEquals(1, result.errorComics());
-            assertNotNull(result.lastError());
             assertTrue(result.lastError().contains("DB 写入失败"));
         }
     }
@@ -210,5 +221,156 @@ class RecoveryEngineTest {
         assertEquals(1, first.skippedComics());
         assertEquals(1, second.skippedComics());
         assertEquals(first.totalComics(), second.totalComics());
+    }
+
+    // ======================== 现代 hqPath 解析（resolver） ========================
+
+    @Test
+    void resolveMedia_shouldUseMetadataHqPath_withoutRewritingToNewChapterId() throws Exception {
+        // 现代 metadata：hqPath 指向旧 chapterId 目录（99），恢复后 DB 新 chapterId 不必相同
+        Long comicId = 7700001L;
+        Path hqDir = tempDir.resolve("hq").resolve(String.valueOf(comicId)).resolve("99");
+        Files.createDirectories(hqDir);
+        Files.writeString(hqDir.resolve("001.jpg"), "fake-jpeg");
+
+        Map<String, Object> chapter = mapOf(
+            "title", "第1话", "chapterNo", "1", "sortOrder", 0, "globalOrder", 3, "catalogIndex", null,
+            "mediaItems", List.of(mapOf(
+                "fileName", "001.jpg", "pageNumber", 1, "mediaType", "IMAGE",
+                "hqPath", comicId + "/99/001.jpg", "fileSize", 2048, "hqStatus", "READY"))
+        );
+
+        List<List<ResolvedMediaItem>> resolved = realResolver.resolveMedia(comicId, List.of(chapter));
+
+        assertEquals(1, resolved.size());
+        List<ResolvedMediaItem> items = resolved.get(0);
+        assertEquals(1, items.size());
+        ResolvedMediaItem item = items.get(0);
+        assertEquals(comicId + "/99/001.jpg", item.hqPath(),
+                "modern 恢复必须保留 metadata 的真实 hqPath，不得改写为新的 chapterId 目录");
+        assertTrue(item.exists(), "hqPath 指向真实存在的文件");
+        assertEquals("001.jpg", item.fileName());
+        assertEquals(1, item.pageNumber());
+    }
+
+    @Test
+    void resolveMedia_shouldFallBackToGlobalOrderDirScan_whenNoHqPath() throws Exception {
+        // legacy metadata：无 mediaItems/hqPath → 按 globalOrder 目录扫描
+        Long comicId = 7700002L;
+        Path hqDir = tempDir.resolve("hq").resolve(String.valueOf(comicId)).resolve("7");
+        Files.createDirectories(hqDir);
+        Files.writeString(hqDir.resolve("002.jpg"), "fake-jpeg-2");
+        Files.writeString(hqDir.resolve("001.jpg"), "fake-jpeg-1");
+
+        Map<String, Object> chapter = mapOf(
+            "title", "第1话", "chapterNo", "1", "sortOrder", 0, "globalOrder", 7, "catalogIndex", null);
+
+        List<List<ResolvedMediaItem>> resolved = realResolver.resolveMedia(comicId, List.of(chapter));
+
+        List<ResolvedMediaItem> items = resolved.get(0);
+        assertEquals(2, items.size(), "legacy 按目录扫描出全部媒体");
+        // 文件名排序（001 先于 002）
+        assertEquals("001.jpg", items.get(0).fileName());
+        assertEquals(comicId + "/7/001.jpg", items.get(0).hqPath());
+        assertEquals("002.jpg", items.get(1).fileName());
+        assertTrue(items.get(0).exists());
+    }
+
+    @Test
+    void resolveMedia_shouldReturnMissing_whenHqPathFileAbsent() throws Exception {
+        // hqPath 指向不存在的文件 → exists=false（恢复时标 MISSING，不得 READY）
+        Long comicId = 7700003L;
+        Map<String, Object> chapter = mapOf(
+            "title", "第1话", "chapterNo", "1", "sortOrder", 0, "globalOrder", 0, "catalogIndex", null,
+            "mediaItems", List.of(mapOf(
+                "fileName", "001.jpg", "pageNumber", 1, "mediaType", "IMAGE",
+                "hqPath", comicId + "/99/001.jpg", "fileSize", 1024, "hqStatus", "READY"))
+        );
+
+        List<List<ResolvedMediaItem>> resolved = realResolver.resolveMedia(comicId, List.of(chapter));
+
+        List<ResolvedMediaItem> items = resolved.get(0);
+        assertEquals(1, items.size());
+        assertFalse(items.get(0).exists(), "缺文件必须识别为缺失，不得标 READY");
+    }
+
+    @Test
+    void resolveMedia_shouldTypedFail_whenHqPathIsAbsolute() {
+        Long comicId = 7700004L;
+        Map<String, Object> chapter = mapOf(
+            "title", "第1话", "chapterNo", "1", "sortOrder", 0, "globalOrder", 0, "catalogIndex", null,
+            "mediaItems", List.of(mapOf(
+                "fileName", "001.jpg", "pageNumber", 1, "mediaType", "IMAGE",
+                "hqPath", "D:/manga/hq/" + comicId + "/99/001.jpg", "fileSize", 1024, "hqStatus", "READY"))
+        );
+
+        try {
+            realResolver.resolveMedia(comicId, List.of(chapter));
+            org.junit.jupiter.api.Assertions.fail("绝对路径 hqPath 必须 typed-fail");
+        } catch (RuntimeException e) {
+            assertTrue(e.getMessage().contains("绝对路径"),
+                    "错误信息应说明绝对路径被拒绝，实际: " + e.getMessage());
+        }
+    }
+
+    /** 允许 null 值的 Map 构造（Map.of 禁止 null，metadata 字段常含 null）。 */
+    private static Map<String, Object> mapOf(Object... kv) {
+        Map<String, Object> map = new java.util.HashMap<>();
+        for (int i = 0; i < kv.length; i += 2) {
+            map.put((String) kv[i], kv[i + 1]);
+        }
+        return map;
+    }
+
+    // ======================== 坏索引 typed-fail（事务前校验，不写 DB） ========================
+
+    @Test
+    void processComicDir_shouldTypedFail_whenCatalogParentIndexOutOfRange() throws Exception {
+        when(comicMapper.selectById(8L)).thenReturn(null);
+
+        Map<String, Object> metadata = Map.of(
+            "comic", Map.of("title", "坏索引漫画", "author", "A"),
+            "catalogs", List.of(Map.of("title", "目录1", "sortOrder", 0, "parentIndex", 5)),
+            "chapters", java.util.Collections.emptyList()
+        );
+
+        try (MockedStatic<Files> filesMock = mockStatic(Files.class)) {
+            filesMock.when(() -> Files.exists(any(Path.class))).thenReturn(true);
+            when(objectMapper.readValue(any(java.io.File.class), any(TypeReference.class)))
+                .thenReturn(metadata);
+
+            RecoveryProgressVO result = recoveryEngine.processComicDir(8L, 0);
+
+            assertEquals(1, result.errorComics());
+            assertTrue(result.lastError().contains("parentIndex"),
+                    "错误信息应包含 parentIndex，实际: " + result.lastError());
+            // typed-fail 发生在 DB 写事务之前：事务从未执行
+            verify(transactionTemplate, never()).execute(any());
+        }
+    }
+
+    @Test
+    void processComicDir_shouldTypedFail_whenChapterCatalogIndexOutOfRange() throws Exception {
+        when(comicMapper.selectById(9L)).thenReturn(null);
+
+        Map<String, Object> metadata = Map.of(
+            "comic", Map.of("title", "坏索引漫画", "author", "A"),
+            "catalogs", List.of(Map.of("title", "目录1", "sortOrder", 0)),
+            "chapters", List.of(Map.of(
+                "title", "第1话", "chapterNo", "1", "sortOrder", 0, "globalOrder", 0, "catalogIndex", 3))
+        );
+
+        try (MockedStatic<Files> filesMock = mockStatic(Files.class)) {
+            filesMock.when(() -> Files.exists(any(Path.class))).thenReturn(true);
+            when(objectMapper.readValue(any(java.io.File.class), any(TypeReference.class)))
+                .thenReturn(metadata);
+
+            RecoveryProgressVO result = recoveryEngine.processComicDir(9L, 0);
+
+            assertEquals(1, result.errorComics());
+            assertTrue(result.lastError().contains("catalogIndex"),
+                    "错误信息应包含 catalogIndex，实际: " + result.lastError());
+            verify(transactionTemplate, never()).execute(any());
+        }
     }
 }

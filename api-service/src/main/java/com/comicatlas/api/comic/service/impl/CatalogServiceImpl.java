@@ -20,6 +20,7 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +34,10 @@ public class CatalogServiceImpl implements CatalogService {
     private final ChapterMapper chapterMapper;
     private final ComicMapper comicMapper;
 
+    /** 节点锚点排序：null（无内容）排在最后，非空按锚点升序；稳定排序保留同级 sortOrder 顺序。 */
+    private static final Comparator<CatalogNode> BY_ANCHOR = Comparator
+            .comparing(CatalogNode::getGlobalOrder, Comparator.nullsLast(Comparator.naturalOrder()));
+
     @Override
     @Cacheable(
         cacheNames = CatalogCacheInvalidator.CACHE_NAME,
@@ -43,38 +48,43 @@ public class CatalogServiceImpl implements CatalogService {
         if (comic == null || comic.getStatus() != ComicStatus.READY) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在或不可阅读");
         }
-        var catalogs = catalogMapper.selectList(
-            new LambdaQueryWrapper<Catalog>().eq(Catalog::getComicId, comicId).orderByAsc(Catalog::getSortOrder));
-        var chapters = chapterMapper.selectList(
+        List<Catalog> catalogs = new ArrayList<>(catalogMapper.selectList(
+            new LambdaQueryWrapper<Catalog>().eq(Catalog::getComicId, comicId).orderByAsc(Catalog::getSortOrder)));
+        List<Chapter> chapters = chapterMapper.selectList(
             new LambdaQueryWrapper<Chapter>()
                 .eq(Chapter::getComicId, comicId)
                 .eq(Chapter::getStatus, ChapterLifecycleStatus.READY.name())
                 .orderByAsc(Chapter::getGlobalOrder));
 
+        // 纯平铺：无目录行时返回单个匿名根，chapters 为全部章节。
         if (catalogs.isEmpty()) {
-            var refs = chapters.stream().map(ch -> new ChapterRef(
-                ch.getId(), ch.getChapterNo(), ch.getTitle(),
-                ch.getGlobalOrder(), ch.getPageCount(), null
-            )).collect(Collectors.toList());
+            List<ChapterRef> refs = toRefs(chapters);
+            refs.sort(Comparator.comparingInt(ChapterRef::getGlobalOrder));
             if (refs.isEmpty()) {
                 return List.of();
             }
-            List<CatalogNode> roots = new ArrayList<>();
-            roots.add(new CatalogNode(null, null, new ArrayList<>(), refs));
-            return roots;
+            return List.of(new CatalogNode(null, null, new ArrayList<>(), refs));
         }
+
+        // 同级目录先按 sortOrder、再按稳定 ID 排序，保证结果确定，不依赖 DB 返回顺序。
+        catalogs.sort(Comparator
+                .comparing(Catalog::getSortOrder, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(Catalog::getId));
 
         Map<Long, CatalogNode> nodeMap = new HashMap<>();
         for (Catalog cat : catalogs) {
             nodeMap.put(cat.getId(), new CatalogNode(cat.getId(), cat.getTitle(), new ArrayList<>(), new ArrayList<>()));
         }
 
+        // 章节归属目录；孤儿章节（catalogId 为 null 或指向不存在的目录）归入根级，绝不静默丢弃。
+        List<ChapterRef> rootRefs = new ArrayList<>();
         for (Chapter chapter : chapters) {
-            if (chapter.getCatalogId() != null && nodeMap.containsKey(chapter.getCatalogId())) {
-                nodeMap.get(chapter.getCatalogId()).getChapters().add(new ChapterRef(
-                    chapter.getId(), chapter.getChapterNo(), chapter.getTitle(),
-                    chapter.getGlobalOrder(), chapter.getPageCount(), null
-                ));
+            ChapterRef ref = toRef(chapter);
+            Long catalogId = chapter.getCatalogId();
+            if (catalogId != null && nodeMap.containsKey(catalogId)) {
+                nodeMap.get(catalogId).getChapters().add(ref);
+            } else {
+                rootRefs.add(ref);
             }
         }
 
@@ -88,24 +98,50 @@ public class CatalogServiceImpl implements CatalogService {
             }
         }
 
-        // 目录 globalOrder 锚点 = 其下最小子项 globalOrder，供前端与章节按阅读顺序混合排布。
-        for (CatalogNode node : nodeMap.values()) {
-            node.setGlobalOrder(minGlobalOrder(node));
+        // 递归后序：先算子节点锚点，父节点锚点 = 所有后代 READY 章节的最小 globalOrder，再按锚点稳定排序子节点。
+        for (CatalogNode root : roots) {
+            computeAnchorAndSort(root);
+        }
+        roots.sort(BY_ANCHOR);
+
+        // 混合形态：根级章节与顶层目录并存时包一层匿名根，保证根级章节不丢失。
+        if (!rootRefs.isEmpty()) {
+            rootRefs.sort(Comparator.comparingInt(ChapterRef::getGlobalOrder));
+            return List.of(new CatalogNode(null, null, roots, rootRefs));
         }
         return roots;
     }
 
-    /** 目录排序锚点 = 其下最小 globalOrder（章节或嵌套目录）。 */
-    private static Integer minGlobalOrder(CatalogNode node) {
+    private static ChapterRef toRef(Chapter chapter) {
+        return new ChapterRef(
+            chapter.getId(), chapter.getChapterNo(), chapter.getTitle(),
+            chapter.getGlobalOrder(), chapter.getPageCount(), null
+        );
+    }
+
+    private static List<ChapterRef> toRefs(List<Chapter> chapters) {
+        return chapters.stream().map(CatalogServiceImpl::toRef).collect(Collectors.toList());
+    }
+
+    /**
+     * 递归后序计算节点锚点并稳定排序子节点。
+     *
+     * @return 本子树锚点（无任何 READY 后代时返回 null）
+     */
+    private static Integer computeAnchorAndSort(CatalogNode node) {
         Integer min = null;
-        for (ChapterRef ch : node.getChapters()) {
-            min = min == null ? ch.getGlobalOrder() : Math.min(min, ch.getGlobalOrder());
+        node.getChapters().sort(Comparator.comparingInt(ChapterRef::getGlobalOrder));
+        for (ChapterRef ref : node.getChapters()) {
+            min = min == null ? ref.getGlobalOrder() : Math.min(min, ref.getGlobalOrder());
         }
         for (CatalogNode child : node.getChildren()) {
-            if (child.getGlobalOrder() != null) {
-                min = min == null ? child.getGlobalOrder() : Math.min(min, child.getGlobalOrder());
+            Integer childAnchor = computeAnchorAndSort(child);
+            if (childAnchor != null) {
+                min = min == null ? childAnchor : Math.min(min, childAnchor);
             }
         }
+        node.setGlobalOrder(min);
+        node.getChildren().sort(BY_ANCHOR);
         return min;
     }
 }

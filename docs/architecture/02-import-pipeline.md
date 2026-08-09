@@ -1,6 +1,6 @@
 # 导入流水线 (Import Pipeline)
 
-**最后更新**: 2026-07-16  
+**最后更新**: 2026-08-09
 **状态**: 生产环境使用  
 **维护者**: ComicAtlas 团队
 
@@ -8,7 +8,7 @@
 
 ## 1. 概述
 
-ComicAtlas 采用统一导入流水线处理所有漫画来源（ZIP、目录、EHentai 等）。不同来源最终都走同一条路径：解析来源 → 生成结构化元数据 → 搬文件 → 落库。
+ComicAtlas 采用统一导入流水线处理所有漫画来源（ZIP、目录、EHentai 等）。不同来源最终都走同一条路径：解析来源 → 目录规范化 → 生成结构化元数据 → 暂存搬文件 → 两阶段落库 → 逐章最终化确认。
 
 统一模型的好处：新增来源只需实现一个 Handler 和可选 Parser，无需改动 API 侧落库逻辑。
 
@@ -16,8 +16,9 @@ ComicAtlas 采用统一导入流水线处理所有漫画来源（ZIP、目录、
 
 ```
 Acquire → ImportTask → Handler routing → DirectoryParser → DirectoryTree 
-       → MetadataAssembler → ComicMetadata → StorageService → metadata.json 
-       → API Consumer → Database
+       → MetadataAssembler（目录规范化）→ ComicMetadata → 写清单+暂存文件 → metadata.json
+       → task.completed → API staging 落库 → 逐章 finalize 请求 → Worker 最终化搬运
+       → 逐章 finalize completed → API 全部 media READY → comic READY + task SUCCESS
 ```
 
 ---
@@ -69,8 +70,8 @@ Worker ImportTaskHandler (消费 MQ)
          │                                    │
          │                                    ▼ 委托 DirectoryImportHandler
          │
-         ├─ sourceType="REGISTER" ─────► DirectoryImportHandler
-         │  (或 "DIRECTORY" 别名)           │
+         ├─ sourceType="DIRECTORY" ────► DirectoryImportHandler
+         │  (REGISTER 的别名)               │
          │                                  ▼ DirectoryParser
          │
           └─ sourceType="EHENTAI" ─────► EhentaiDownloadService (下载→解压→委托 DirectoryImportHandler)
@@ -84,29 +85,49 @@ DirectoryParser.parse(sourcePath)
 DirectoryTree (纯目录结构，无业务语义)
          │
          ▼
-MetadataAssembler.assemble(tree, ctx)
-          │
-          ▼
+MetadataAssembler.assembleWithWarnings(tree, ctx)  ← 目录规范化
+         │         （根混合→本书散页、嵌套混合→本目录散页、
+         │          globalOrder DFS 1..N、sortOrder 每父作用域连续、
+         │          空目录 EMPTY_DIRECTORY 警告）
+         ▼
 ComicMetadata (包含 catalogs + chapters + mediaItems)
-          │
-          ▼
+         │
+         ▼
 MediaAnalyzer.analyze(): 图片尺寸 + ffprobe 视频元数据
-          │
-          ▼
-StorageService.transfer(): 搬文件到 HQ/{comicId}/{chapterId}/
          │
          ▼
-writeMetadata(): 写 metadata.json 到 MANGA_ROOT/metadata/{taskId}.json
+写导入清单 manifest.json（imports/{taskId}/）+ 按 {comicId}/{globalOrder} 暂存搬文件
          │
          ▼
-MQ: task.success → import.result.queue
+生成封面（CoverCandidateSelector 命名候选 → 图片 → 视频抽帧降级）
          │
          ▼
-API ImportEventHandler (消费 MQ)
+写 metadata.json（metadata/{taskId}.json 与 metadata/{comicId}.json）
          │
          ▼
-读取 metadata.json → INSERT catalog/chapter/media(IMAGE/VIDEO) → UPDATE comic(READY)
+MQ: task.completed → import.result.queue  （清单保留给最终化阶段）
+         │
+         ▼
+API ImportEventHandler → ImportPersistenceService.persistCompleted
+         │     INSERT catalog + chapter(DRAFT) + media(STAGING/PENDING)
+         │     task → IMPORTING，逐章写入 Outbox finalize 请求
+         ▼
+MQ: import.storage.finalize.requested（逐章）
+         │
+         ▼
+Worker ImportStorageFinalizeHandler：按清单校验尺寸 →
+         │     把 hq/{comicId}/{globalOrder} 移动到 hq/{comicId}/{chapterId}
+         │     发布逐章 finalize.completed，并从清单移除本章条目（清空才删清单）
+         ▼
+MQ: import.storage.finalize.completed（逐章）
+         │
+         ▼
+API applyFinalizeCompleted：本章 media/chapter → READY；
+         │     全部 media READY 才 → comic READY + task SUCCESS
 ```
+
+> **关键点**：`task.completed` 只代表 staging/元数据就绪，**不等于漫画可阅读**；
+> 漫画进入 READY 必须等全部章节的 finalize.completed（逐章确认协议，见第 7 节）。
 
 ---
 
@@ -151,10 +172,87 @@ SUCCESS
 |------|--------|------|
 | `PENDING` | API ImportService | 创建任务时 |
 | `PARSING` | Worker ImportTaskHandler | 开始解析前 |
-| `IMPORTING` | Worker DirectoryImportHandler | 解析完成，开始搬文件（可选，当前代码未显式设置） |
-| `SUCCESS` | API ImportEventHandler | 读取 metadata.json 并落库成功后 |
-| `FAILED` | Worker ImportTaskHandler | 捕获异常时 |
+| `IMPORTING` | API ImportPersistenceService.persistCompleted | Worker 发布 task.completed 后 staging 落库完成（staging 就绪，等待最终化） |
+| `SUCCESS` | API applyFinalizeCompleted | 全部章节 media 最终化 READY 后收尾 |
+| `FAILED` | Worker ImportTaskHandler（解析/搬运失败）或 API applyFinalizeFailed（存储最终化失败） | 捕获异常 / 收到 finalize.failed 时 |
 | `CANCELLED` | API ImportService | 用户主动取消时 |
+
+> `IMPORTING` 状态横跨 staging 落库与最终化两个阶段：task.completed 后任务仍处于 IMPORTING（staging 就绪但文件未就位），直到全部 media READY 才置 SUCCESS。最终化失败走 `STORAGE_FINALIZE_*` 错误码并置 FAILED（可重试）。
+
+---
+
+## 4.1 目录规范化规则（无损递归）
+
+`MetadataAssembler.assembleWithWarnings` 是目录规范化的唯一入口，按结构（而非标题）递归判定节点类型：
+
+| 节点形态 | 处理 |
+|----------|------|
+| 纯媒体根（根只有媒体无子目录） | 生成单个 Chapter（无 Catalog） |
+| 混合根（根有媒体 + 子目录） | 生成 `catalogIndex=null` 的**本书散页** Chapter（先于所有子目录），再递归顶层子目录 |
+| 嵌套混合（目录自身有媒体 + 子目录） | 生成 Catalog，先生成挂在该 Catalog 下的**本目录散页** Chapter，再递归 children |
+| 纯媒体目录 | 直接生成 Chapter（目录话数，挂在父 Catalog 下，无父则 catalog_id 为 NULL） |
+| 纯子目录（只有子目录无媒体） | 生成 Catalog 后递归 children |
+| 空子树（无媒体且无子目录） | 不建 Catalog/Chapter，返回 `EMPTY_DIRECTORY` 警告（不中断导入） |
+
+**排序规则**：
+
+- `globalOrder`：按规范化 DFS 从 **1** 连续分配 1..N（全书唯一，阅读器 prev/next 依据）。
+- `sortOrder`：每个父作用域独立计数器从 **0** 连续分配（作用域键 = catalogIndex，`null` 表示漫画根）。Catalog 与 Chapter 共用同一作用域计数器，保证同级内目录与章节互不重叠。
+- 同名页（跨章 001.jpg）、自然排序（1 < 2 < 10）由 `DirectoryParser` 的自然路径排序保证，规范化层不重排媒体。
+
+> 漫画根**不创建**具名 Catalog：匿名根只存在于输出模型中（`CatalogNode` 的 `id/title` 为 null），用于承载本书散页。
+
+---
+
+## 4.2 两阶段最终化协议（逐章确认）
+
+导入文件不是一次到位，而是分两阶段落库，最终化按**章节独立确认**：
+
+**Phase 1 — staging 落库（API `ImportPersistenceService.persistCompleted`）**：
+
+1. Worker 完成解析、暂存搬运与 metadata 写出后发布 `task.completed`。
+2. API 读取 metadata.json：INSERT `catalog` / `chapter(DRAFT)` / `media(STAGING, hq_status=PENDING)`，comic 保持 IMPORTING，task → IMPORTING。
+3. API 在**同一事务**内为每个章节写入 Outbox 一条 `ImportStorageFinalizeRequestedEvent`（`sourceDir=hq/{comicId}/{globalOrder}`，`targetDir=hq/{comicId}/{chapterId}`，媒体映射 fileName→fileName）。
+
+**Phase 2 — 逐章最终化（Worker `ImportStorageFinalizeHandler` + API `applyFinalizeCompleted`）**：
+
+1. Worker 按章节消费 finalize 请求：以 `imports/{taskId}/manifest.json` 清单为尺寸基准做幂等校验（目标存在且尺寸匹配视为已完成；冲突/缺失发布失败事件），把 `hq/{comicId}/{globalOrder}` 逐文件移动到 `hq/{comicId}/{chapterId}`。
+2. 每章移动/校验成功**立即**发布一次 `ImportStorageFinalizeCompletedEvent`（不等待全部章），随后 `rewriteWithoutChapter` 从清单移除本章条目；清单清空才删除（延后清理不阻断）。
+3. API `applyFinalizeCompleted` 按事件 `chapterId` 将本章 media/chapter → READY，并用事件返回的 `targetDir` 修正 media.hqPath（幂等，行锁串行化防丢失更新）。
+4. 仅当该 comic 下**全部 media** 都 hq_status=READY 时，才收尾：comic → READY、task → SUCCESS、管理任务项 SUCCEEDED、缓存失效。
+5. 任一章节最终化失败（`STORAGE_FINALIZE_MANIFEST_MISSING` / `SIZE_CONFLICT` / `CONFLICT` / `SOURCE_MISSING` 等）→ API `applyFinalizeFailed` 置 task FAILED、comic IMPORT_FAILED（可重试；重试会清空章节/媒体结构并重置状态）。
+
+**关键约束**：
+
+- **清单生命周期**：`DirectoryImportHandler` 不删除清单（恢复点）。清单在最终化阶段供尺寸校验，由最终化 handler 逐章移除、清空后删除。提前删除会导致 sourceDir≠targetDir 时 `MANIFEST_MISSING`，或 sourceDir==targetDir（chapterId==globalOrder）时静默跳过而不发布 Completed（漫画卡 IMPORTING）。
+- `chapterId == globalOrder` 时（暂存即最终位置）无需移动文件，仅校验存在与尺寸并照常发布 Completed。
+- Worker 最终化 handler 不访问 MySQL；结果一律经 MQ 事件回传 API。
+
+---
+
+## 4.3 封面候选降级
+
+封面由 `CoverCandidateSelector` 在 Worker 端从全部媒体中按固定优先级排序，`CoverGenerator` 逐个候选尝试生成：
+
+| 优先级 | 候选 |
+|--------|------|
+| 0..4 | 命名表精确匹配：`cover(0)`、`封面(1)`、`表紙(2)`、`front(3)`、`folder(4)` |
+| 5 | 全书图片兜底（自然顺序） |
+| 6 | 视频兜底（按 globalOrder → pageNumber 顺序抽帧） |
+
+同一优先级内按：目录深度升序 → 自然相对路径 → globalOrder → pageNumber 排序。**降级**：单个候选生成失败（文件缺失/转换异常）保留 cause 继续下一候选；全部候选失败仅告警，不阻断导入（漫画无封面，读者端显示占位）。产物写入 `thumbs/{comicId}/cover.webp`。
+
+---
+
+## 4.4 DIRECTORY 扫描预览（批量导入）
+
+导入前可对父目录做一次**扫描预览**（`POST /api/tasks/directory-scan`，异步）：
+
+- 输出规范化候选列表：每个子目录的名称、相对路径、图片/视频/总媒体统计、`kind`（COMIC/DIRECTORY）。
+- 输出可展开的**规范化预览树**（根混合/嵌套混合按第 4.1 节规则推演后的目录形态）。
+- 结构化警告（`preview.warnings`）：`UNREADABLE_DIRECTORY`（目录不可读，阻断该项）、`LIMIT_EXCEEDED`、`EMPTY_DIRECTORY`、`MIXED_DIRECTORY`（图文混排提示）、`SYMLINK_SKIPPED`（符号链接跳过）等。
+- 阻断项（ERROR 级警告）不可勾选；可导入项可勾选后批量提交（`POST /api/tasks/import/batch`，返回真实 batchId）。
+- 旧契约扫描结果（缺少 `preview`/`warnings` 字段）前端仍渲染简版，不报错。
 
 ---
 
@@ -262,11 +360,13 @@ public record ImportContext(
 | 模块 | 输入 | 输出 | 关键约束 |
 |------|------|------|----------|
 | `DirectoryParser` | 文件系统目录路径 | `DirectoryTree` | 不识别 ZIP/EHentai 等特殊语义 |
-| `MetadataAssembler` | `DirectoryTree` + `ImportContext` | `ComicMetadata` | 决定 catalog/chapter/page 组织 |
-| `DirectoryImportHandler` | `ImportContext` + taskId + comicId | `metadata.json` 路径 | 委托 Parser/Assembler，搬文件 |
+| `MetadataAssembler` | `DirectoryTree` + `ImportContext` | `ComicMetadata` + 结构化警告 | 决定 catalog/chapter/page 组织（规范化规则见 4.1） |
+| `DirectoryImportHandler` | `ImportContext` + taskId + comicId | `metadata.json` 路径 | 委托 Parser/Assembler，写清单、暂存搬文件、生成封面；**不删除清单** |
+| `ImportStorageFinalizeHandler` | `ImportStorageFinalizeRequestedEvent`（逐章） | 逐章 `ImportStorageFinalizeCompletedEvent` | 按清单校验尺寸，移动 `{globalOrder}`→`{chapterId}`，逐章移除清单条目；不访问 MySQL |
 | `ZipImportHandler` | ZIP 文件路径 | 委托 `DirectoryImportHandler` | 解压到 temp，清理临时文件 |
 | `StorageService` | 源文件 + 目标路径 | 文件存储到 HQ/LQ/Thumbs | 不写 DB 业务表 |
-| `ImportEventHandler` | `task.success` 事件 + `metadata.json` | DB 记录 | 不碰文件系统 |
+| `ImportEventHandler` | `task.completed` 事件 + `metadata.json` | DB 记录（staging） | 不碰文件系统 |
+| `ImportPersistenceService` | completed / finalize.completed / finalize.failed 事件 | DB 状态推进 | 事务内只做 DB 与路径运算，不做文件 IO；全部 media READY 才收尾 |
 
 **禁止**：
 
@@ -293,49 +393,41 @@ public record ImportContext(
        │                │                 │                │                 │
        │ 3. Publish task.created          │                │                 │
        │───────────────>│                 │                │                 │
-       │                │                 │                │                 │
        │                │ 4. Consume task.created          │                 │
        │                │────────────────>│                │                 │
+       │                │                 │ 5. 规范化+暂存：写清单、搬文件到    │
+       │                │                 │    hq/{comicId}/{globalOrder}、    │
+       │                │                 │    生成封面、写 metadata            │
+       │                │                 │───────────────>│                 │
        │                │                 │                │                 │
-       │                │                 │ 5. Update status: PARSING        │
+       │                │ 6. Publish task.completed（清单保留）│                │
        │                │<────────────────│                │                 │
        │                │                 │                │                 │
-       │                │                 │ 6. DirectoryParser.parse()       │
-       │                │                 │───────────────>│                 │
-       │                │                 │<───────────────│                 │
-       │                │                 │  DirectoryTree  │                 │
-       │                │                 │                │                 │
-       │                │                 │ 7. MetadataAssembler.assemble()  │
-       │                │                 │───────────────>│                 │
-       │                │                 │<───────────────│                 │
-       │                │                 │  ComicMetadata  │                 │
-       │                │                 │                │                 │
-       │                │                 │ 8. StorageService.transfer()        │
-       │                │                 │───────────────>│                 │
-       │                │                 │                │ 搬文件到 HQ     │
-       │                │                 │<───────────────│                 │
-       │                │                 │                │                 │
-       │                │                 │ 9. writeMetadata()               │
-       │                │                 │───────────────>│                 │
-       │                │                 │                │ 写 metadata.json│
-       │                │                 │<───────────────│                 │
-       │                │                 │                │                 │
-       │                │ 10. Publish task.success         │                │
-       │                │<────────────────│                │                 │
-       │                │                 │                │                 │
-       │                │ 11. Consume task.success         │                │
+       │                │ 7. Consume task.completed          │                │
        │                │─────────────────────────────────────────────────>│
-       │                │                 │                │                 │
-       │                │                 │                │ 12. 读取 metadata.json
-       │                │                 │                │<────────────────│
-       │                │                 │                │                 │
-       │                │                 │                │ 13. INSERT catalog/chapter/page
+       │                │                 │                │ 8. staging 落库：│
+       │                │                 │                │    catalog+chapter(DRAFT)+│
+       │                │                 │                │    media(STAGING/PENDING)，│
+       │                │                 │                │    task→IMPORTING         │
        │                │                 │                │────────────────>│
        │                │                 │                │                 │
-       │                │                 │                │ 14. UPDATE comic(READY)
-       │                │                 │                │────────────────>│
+       │                │ 9. Publish finalize.requested（逐章，Outbox）│        │
+       │                │<────────────────│                │                 │
        │                │                 │                │                 │
-       │                │                 │                │ 15. UPDATE import_task(SUCCESS)
+       │                │ 10. Consume finalize.requested    │                │
+       │                │────────────────>│                │                 │
+       │                │                 │ 11. 按清单校验尺寸，移动             │
+       │                │                 │     hq/{globalOrder}→hq/{chapterId} │
+       │                │                 │───────────────>│                 │
+       │                │                 │                │                 │
+       │                │ 12. Publish finalize.completed（逐章）│             │
+       │                │<────────────────│                │                 │
+       │                │                 │                │                 │
+       │                │ 13. Consume finalize.completed     │                │
+       │                │─────────────────────────────────────────────────>│
+       │                │                 │                │ 14. 本章 media/chapter→READY│
+       │                │                 │                │     全部 media READY 时     │
+       │                │                 │                │     comic→READY+task→SUCCESS│
        │                │                 │                │────────────────>│
        │                │                 │                │                 │
 ```
@@ -352,33 +444,33 @@ switch (sourceType) {
         ImportContext ctx = new ImportContext("ZIP", Path.of(normalizedPath), false, false);
         zipHandler.importZip(ctx, taskId, comicId, mangaRoot);
     }
-    case "REGISTER", "DIRECTORY" -> {  // DIRECTORY 是 REGISTER 的别名
+    case "DIRECTORY" -> {  // 旧 REGISTER 已由 V17 迁移为 DIRECTORY
         if (normalizedPath == null) throw new IllegalArgumentException("DIRECTORY 需要 sourcePath");
         ImportContext ctx = new ImportContext("DIRECTORY", Path.of(normalizedPath), false, false);
         directoryHandler.handle(ctx, taskId, comicId, mangaRoot);
     }
     case "EHENTAI" -> {
         Path sourceDir = ehentaiDownloadService.downloadToSourceDir(taskId, sourcePath);
-        directoryHandler.handle(new ImportContext("DIRECTORY", sourceDir, false, false),
+        directoryHandler.handle(new ImportContext("EHENTAI", sourceDir, false, false),
                 taskId, comicId, mangaRoot);
     }
     default -> throw new IllegalArgumentException("Unknown sourceType: " + sourceType);
 }
 ```
 
-**注意**：`"DIRECTORY"` 在 Worker 侧作为 `"REGISTER"` 的别名处理，两者走同一逻辑。
+**注意**：`"REGISTER"` 来源类型已由迁移脚本 `V17__source_type_register_to_directory.sql` 统一迁移为 `"DIRECTORY"`（同一目录导入逻辑）。
 
 **SourceType 枚举**（`api-service/.../common/enums/SourceType.java`）：
 
 ```java
-public enum SourceType { ZIP, REGISTER, EHENTAI }
+public enum SourceType { ZIP, DIRECTORY, EHENTAI }
 ```
 
 ---
 
 ## 9. metadata.json 结构
 
-Worker 写入 `MANGA_ROOT/metadata/{taskId}.json`，API 读取后落库。
+Worker 写入 `MANGA_ROOT/metadata/{taskId}.json` 与 `MANGA_ROOT/metadata/{comicId}.json`（同一内容），API 读取后 staging 落库；`{comicId}.json` 同时是 DB 记录丢失后 RecoveryEngine 的恢复依据。
 
 **结构示例**（metadata v3）：
 
@@ -408,19 +500,20 @@ Worker 写入 `MANGA_ROOT/metadata/{taskId}.json`，API 读取后落库。
       "title": "章节1",
       "chapterNo": "1",
       "sortOrder": 0,
-      "globalOrder": 0,
+      "globalOrder": 1,
       "catalogIndex": 1,
       "sourceDir": "vol1/ch1",
       "mediaItems": [
         {
           "fileName": "001.jpg",
           "pageNumber": 1,
-          "hqStatus": "READY",
+          "hqStatus": "PENDING",
           "lqStatus": "NOT_GENERATED",
           "fileSize": 123456,
           "mediaType": "IMAGE",
           "width": 800,
-          "height": 1200
+          "height": 1200,
+          "hqPath": "1/5/001.jpg"
         }
       ]
     }
@@ -430,14 +523,14 @@ Worker 写入 `MANGA_ROOT/metadata/{taskId}.json`，API 读取后落库。
 
 **字段说明**：
 
-- `version`: 元数据版本号，当前为 3
+- `version`: 元数据版本号，当前为 3（v3 用 `mediaItems[].fileName`，v2 用 `pages[].imageName`）
 - `catalogs[].parentIndex`: catalogs 列表索引，落库时转换为 `parent_id`
-- `chapters[].catalogIndex`: 所属 catalog 索引，落库时转换为 `catalog_id`
-- `chapters[].globalOrder`: 全书阅读顺序，决定 prev/next 章节
-- `mediaItems[].fileName`: 媒体文件名（图片或视频）
+- `chapters[].catalogIndex`: 所属 catalog 索引，落库时转换为 `catalog_id`；`null` 表示本书散页（漫画根层）
+- `chapters[].globalOrder`: 全书阅读顺序（DFS 1..N），决定 prev/next 章节
+- `mediaItems[].fileName`: 媒体文件名（图片或视频，保留原始文件名）
 - `mediaItems[].mediaType`: 媒体类型（`IMAGE` / `VIDEO`）
-- `mediaItems[].hqStatus`: HQ 文件状态（READY/MISSING/PENDING）
-- `mediaItems[].lqStatus`: LQ 文件状态（NOT_GENERATED/PENDING/READY/FAILED）
+- `mediaItems[].hqPath`: **暂存期**目标路径 `{comicId}/{globalOrder}/{fileName}`；最终化后 DB 中的 `page.hq_path` 由 API 按事件 `targetDir` 修正为 `{comicId}/{chapterId}/{fileName}`（metadata 文件保持暂存布局，供恢复引擎映射）
+- `mediaItems[].hqStatus` / `lqStatus`: 文件状态（staging 期 PENDING / NOT_GENERATED）
 - `mediaItems[].width` / `height`: 图片尺寸；视频条目额外带 `duration` / `container` / `videoCodec` / `audioCodec`
 
 ---

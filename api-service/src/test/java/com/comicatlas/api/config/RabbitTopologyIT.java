@@ -313,6 +313,113 @@ class RabbitTopologyIT {
         }
     }
 
+    // ======================== 导入存储最终化拓扑（comic.import） ========================
+
+    @Nested
+    @DisplayName("导入存储最终化 comic.import 拓扑")
+    class ImportStorageFinalizeTopology {
+
+        private static final String QUEUE_FINALIZE_REQUESTED = "import.storage.finalize.requested.queue";
+        private static final String QUEUE_FINALIZE_COMPLETED = "import.storage.finalize.completed.queue";
+        private static final String QUEUE_FINALIZE_FAILED = "import.storage.finalize.failed.queue";
+        private static final String DLQ_FINALIZE_REQUESTED = "import.storage.finalize.requested.dlq";
+        private static final String DLQ_FINALIZE_COMPLETED = "import.storage.finalize.completed.dlq";
+        private static final String DLQ_FINALIZE_FAILED = "import.storage.finalize.failed.dlq";
+        private static final String KEY_FINALIZE_REQUESTED = "import.storage.finalize.requested";
+        private static final String KEY_FINALIZE_COMPLETED = "import.storage.finalize.completed";
+        private static final String KEY_FINALIZE_FAILED = "import.storage.finalize.failed";
+
+        @Test
+        @DisplayName("API completed/failed 队列持久化并绑定 comic.import DLX/DLQ")
+        void apiResultQueues_dlxConfig() {
+            var completed = apiConfig.importStorageFinalizeCompletedQueue();
+            assertThat(completed.getName()).isEqualTo(QUEUE_FINALIZE_COMPLETED);
+            assertThat(completed.isDurable()).isTrue();
+            assertThat(dlxArgToString(completed.getArguments().get("x-dead-letter-exchange")))
+                    .isEqualTo("comic.import.dlx");
+            assertThat(dlxArgToString(completed.getArguments().get("x-dead-letter-routing-key")))
+                    .isEqualTo(DLQ_FINALIZE_COMPLETED);
+
+            var failed = apiConfig.importStorageFinalizeFailedQueue();
+            assertThat(failed.getName()).isEqualTo(QUEUE_FINALIZE_FAILED);
+            assertThat(failed.isDurable()).isTrue();
+            assertThat(dlxArgToString(failed.getArguments().get("x-dead-letter-exchange")))
+                    .isEqualTo("comic.import.dlx");
+            assertThat(dlxArgToString(failed.getArguments().get("x-dead-letter-routing-key")))
+                    .isEqualTo(DLQ_FINALIZE_FAILED);
+        }
+
+        @Test
+        @DisplayName("API completed/failed 绑定到 comic.import exchange 且 routing key 正确")
+        void apiBindings_routingKeys() {
+            var completed = apiConfig.importStorageFinalizeCompletedBinding();
+            assertThat(completed.getDestination()).isEqualTo(QUEUE_FINALIZE_COMPLETED);
+            assertThat(completed.getExchange()).isEqualTo("comic.import");
+            assertThat(completed.getRoutingKey()).isEqualTo(KEY_FINALIZE_COMPLETED);
+
+            var failed = apiConfig.importStorageFinalizeFailedBinding();
+            assertThat(failed.getDestination()).isEqualTo(QUEUE_FINALIZE_FAILED);
+            assertThat(failed.getExchange()).isEqualTo("comic.import");
+            assertThat(failed.getRoutingKey()).isEqualTo(KEY_FINALIZE_FAILED);
+        }
+
+        @Test
+        @DisplayName("API DLQ 绑定 DLX comic.import.dlx → 各 DLQ")
+        void apiDlqBindings() {
+            var completedDlq = apiConfig.importStorageFinalizeCompletedDlqBinding();
+            assertThat(completedDlq.getDestination()).isEqualTo(DLQ_FINALIZE_COMPLETED);
+            assertThat(completedDlq.getExchange()).isEqualTo("comic.import.dlx");
+            assertThat(completedDlq.getRoutingKey()).isEqualTo(DLQ_FINALIZE_COMPLETED);
+
+            var failedDlq = apiConfig.importStorageFinalizeFailedDlqBinding();
+            assertThat(failedDlq.getDestination()).isEqualTo(DLQ_FINALIZE_FAILED);
+            assertThat(failedDlq.getExchange()).isEqualTo("comic.import.dlx");
+            assertThat(failedDlq.getRoutingKey()).isEqualTo(DLQ_FINALIZE_FAILED);
+        }
+
+        @Test
+        @DisplayName("requested 仅 Worker 消费，completed/failed 仅 API 消费（互补）")
+        void consumption_complementary() {
+            // API 侧不得注册 requested 队列/绑定
+            assertThat(hasDeclaredMethod(apiConfig.getClass(), "importStorageFinalizeRequestedQueue")).isFalse();
+            assertThat(hasDeclaredMethod(apiConfig.getClass(), "importStorageFinalizeRequestedBinding")).isFalse();
+
+            // Worker 侧注册 requested 队列/绑定，且不得注册 completed/failed
+            var workerConfig = new com.comicatlas.worker.config.RabbitMqConfig();
+            var requestedQueue = workerConfig.importStorageFinalizeRequestedQueue();
+            assertThat(requestedQueue.getName()).isEqualTo(QUEUE_FINALIZE_REQUESTED);
+            assertThat(requestedQueue.isDurable()).isTrue();
+
+            var requestedBinding = workerConfig.importStorageFinalizeRequestedBinding();
+            assertThat(requestedBinding.getDestination()).isEqualTo(QUEUE_FINALIZE_REQUESTED);
+            assertThat(requestedBinding.getExchange()).isEqualTo("comic.import");
+            assertThat(requestedBinding.getRoutingKey()).isEqualTo(KEY_FINALIZE_REQUESTED);
+
+            assertThat(hasDeclaredMethod(workerConfig.getClass(), "importStorageFinalizeCompletedQueue")).isFalse();
+            assertThat(hasDeclaredMethod(workerConfig.getClass(), "importStorageFinalizeFailedQueue")).isFalse();
+        }
+
+        @Test
+        @DisplayName("Worker requested 队列持久化并绑定 comic.import DLX/DLQ")
+        void workerRequestedQueue_dlxConfig() {
+            var workerConfig = new com.comicatlas.worker.config.RabbitMqConfig();
+            var requested = workerConfig.importStorageFinalizeRequestedQueue();
+            assertThat(dlxArgToString(requested.getArguments().get("x-dead-letter-exchange")))
+                    .isEqualTo("comic.import.dlx");
+            assertThat(dlxArgToString(requested.getArguments().get("x-dead-letter-routing-key")))
+                    .isEqualTo(DLQ_FINALIZE_REQUESTED);
+        }
+
+        private static boolean hasDeclaredMethod(Class<?> type, String methodName) {
+            for (java.lang.reflect.Method method : type.getDeclaredMethods()) {
+                if (method.getName().equals(methodName)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
     // ======================== 辅助 ========================
 
     /**

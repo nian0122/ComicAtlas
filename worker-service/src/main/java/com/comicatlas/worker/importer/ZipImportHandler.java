@@ -30,8 +30,10 @@ public class ZipImportHandler {
 
             String fileName = zipFile.getFileName().toString();
             String titleHint = fileName.contains(".") ? fileName.substring(0, fileName.lastIndexOf('.')) : fileName;
+            // 保留原始来源类型（ZIP），使 parser 对解压根执行"恰有一个有效子目录时剥离一层
+            // 传输包装"的语义；不得改写成 DIRECTORY，否则单层包装目录无法被剥离。
             ImportContext extractCtx = new ImportContext(
-                "DIRECTORY", extractDir, ctx.generateLq(), ctx.overwrite(), titleHint
+                ctx.sourceType(), extractDir, ctx.generateLq(), ctx.overwrite(), titleHint
             );
             return directoryHandler.handle(extractCtx, taskId, comicId, mangaRoot);
         } finally {

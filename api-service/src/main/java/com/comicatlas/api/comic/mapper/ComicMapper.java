@@ -92,6 +92,13 @@ public interface ComicMapper extends BaseMapper<Comic> {
     List<String> selectTitlesLike(@Param("pattern") String pattern, @Param("limit") int limit);
 
     /**
+     * 行锁读取：串行化同一漫画的并发最终化（completed/failed）处理，防止 lost update。
+     * 必须在事务内调用，事务提交/回滚后释放锁。
+     */
+    @Select("SELECT * FROM comic WHERE id = #{id} FOR UPDATE")
+    Comic selectByIdForUpdate(@Param("id") Long id);
+
+    /**
      * 批量操作 FILTER 解析：返回匹配筛选条件的全部漫画 id。
      * <p>
      * 与列表查询不同：不强制 READY（批量可作用于 TRASHED/DRAFT 等），

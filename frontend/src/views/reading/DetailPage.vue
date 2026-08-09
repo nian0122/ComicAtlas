@@ -158,11 +158,9 @@ const lastReadChapter = computed<ChapterRef | null>(() => {
 })
 
 const firstChapter = computed<ChapterRef | null>(() => {
-  for (const node of catalogTree.value) {
-    const ch = findFirstChapter(node)
-    if (ch) return ch
-  }
-  return null
+  const all = collectChapters(catalogTree.value)
+  if (all.length === 0) return null
+  return all.reduce((min, ch) => (orderOf(ch) < orderOf(min) ? ch : min))
 })
 
 const totalChapters = computed(() => {
@@ -237,13 +235,19 @@ function findChapterById(nodes: CatalogNode[], id: number): ChapterRef | null {
   return null
 }
 
-function findFirstChapter(node: CatalogNode): ChapterRef | null {
-  if (node.chapters && node.chapters.length > 0) return node.chapters[0]
-  for (const child of node.children || []) {
-    const found = findFirstChapter(child)
-    if (found) return found
+/** 递归收集全部章节（含子目录），用于按全局锚点取首章 */
+function collectChapters(nodes: CatalogNode[]): ChapterRef[] {
+  const out: ChapterRef[] = []
+  for (const node of nodes) {
+    out.push(...(node.chapters ?? []))
+    out.push(...collectChapters(node.children ?? []))
   }
-  return null
+  return out
+}
+
+/** 阅读顺序锚点；null 锚点视为最大（排最后） */
+function orderOf(ch: ChapterRef): number {
+  return ch.globalOrder ?? Number.MAX_SAFE_INTEGER
 }
 
 function countChapters(node: CatalogNode): number {

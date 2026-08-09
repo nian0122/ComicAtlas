@@ -14,6 +14,7 @@ import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.common.enums.HqStatus;
+import com.comicatlas.api.common.enums.ImportTaskStatus;
 import com.comicatlas.api.common.enums.LqStatus;
 import com.comicatlas.api.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.api.common.enums.MediaLifecycleStatus;
@@ -24,6 +25,7 @@ import com.comicatlas.api.comic.service.ComicService;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.event.ImportEventHandler;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
+import com.comicatlas.api.importer.service.ImportPersistenceService;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
 import com.comicatlas.api.management.entity.ManagementTaskItem;
 import com.comicatlas.api.management.event.ManagementCommandResultHandler;
@@ -37,6 +39,8 @@ import com.comicatlas.api.reader.service.ReaderService;
 import com.comicatlas.api.upload.MediaManagementService;
 import com.comicatlas.api.common.enums.TaskType;
 import com.comicatlas.common.event.ImportTaskCompletedEvent;
+import com.comicatlas.common.event.ImportStorageFinalizeCompletedEvent;
+import com.comicatlas.common.event.ImportStorageFinalizeFailedEvent;
 import com.comicatlas.common.event.ManagementCommandCompletedEvent;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -151,6 +155,7 @@ class ReadingLifecycleCompatibilityIT {
     @Autowired private MediaManagementService mediaManagementService;
 
     @Autowired private ImportEventHandler importEventHandler;
+    @Autowired private ImportPersistenceService importPersistenceService;
     @Autowired private ManagementCommandResultHandler managementCommandResultHandler;
     @Autowired private RecoveryEngine recoveryEngine;
     @Autowired private CatalogCacheInvalidator catalogCacheInvalidator;
@@ -324,7 +329,7 @@ class ReadingLifecycleCompatibilityIT {
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data.records.length()").value(1))
                     .andExpect(jsonPath("$.data.records[0].title").value("LIST-LC-READY"))
-                    .andExpect(jsonPath("$.data.records[0].lifecycle").value("READY"));
+                    .andExpect(jsonPath("$.data.records[0].status").value("READY"));
         }
 
         @Test
@@ -342,15 +347,15 @@ class ReadingLifecycleCompatibilityIT {
                         .andExpect(status().isOk())
                         .andExpect(jsonPath("$.code").value(200))
                         .andExpect(jsonPath("$.data.records.length()").value(1))
-                        .andExpect(jsonPath("$.data.records[0].lifecycle").value(status));
+                        .andExpect(jsonPath("$.data.records[0].status").value(status));
             }
 
-            // 管理态漫画详情仍可返回（lifecycle 等管理元数据），仅阅读入口被拦
+            // 管理态漫画详情仍可返回（status 等管理元数据），仅阅读入口被拦
             Comic draft = comicMapper.selectOne(new LambdaQueryWrapper<Comic>().eq(Comic::getTitle, "MGMT-DRAFT"));
             mockMvc.perform(get("/api/comics/{id}", draft.getId()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
-                    .andExpect(jsonPath("$.data.lifecycle").value("DRAFT"));
+                    .andExpect(jsonPath("$.data.status").value("DRAFT"));
         }
 
         @Test
@@ -573,25 +578,26 @@ class ReadingLifecycleCompatibilityIT {
     class ImportRecoveryLifecycleTests {
 
         @Test
-        @DisplayName("导入完成：comic → READY，页面落真实 StorageRef（旧目录迁移到 chapterId），reader URL 命中真实文件")
+        @DisplayName("两阶段导入：completed 后仍不可读（comic IMPORTING/media PENDING），finalized 后可读")
         void importCompleted_writesReady_withRealStorageRef() throws Exception {
             long[] ids = createImportTask("import-lc");
             long taskId = ids[0];
             long comicId = ids[1];
 
-            // 旧布局文件：hq/{comicId}/0/001.jpg，metadata 带 hqPath 触发目录迁移
-            Path legacyDir = MANGA_ROOT.resolve("hq").resolve(String.valueOf(comicId)).resolve("0");
-            Files.createDirectories(legacyDir);
-            Files.writeString(legacyDir.resolve("001.jpg"), "fake-jpeg");
+            // staging 布局文件：hq/{comicId}/0/001.jpg（globalOrder=0），metadata 带 hqPath
+            Path stagingDir = MANGA_ROOT.resolve("hq").resolve(String.valueOf(comicId)).resolve("0");
+            Files.createDirectories(stagingDir);
+            Files.writeString(stagingDir.resolve("001.jpg"), "fake-jpeg");
 
             writeMetadataV3(taskId, comicId, "导入兼容漫画", "导入作者");
 
+            // Phase 1：completed → 结构插入，comic 保持 IMPORTING、media PENDING（不得 READY）
             importEventHandler.handleComicImported(
                     new ImportTaskCompletedEvent(UUID.randomUUID(), Instant.now(), taskId, comicId, null),
                     null, 0L);
 
             Comic comic = comicMapper.selectById(comicId);
-            assertThat(comic.getStatus()).isEqualTo(ComicStatus.READY);
+            assertThat(comic.getStatus()).isEqualTo(ComicStatus.IMPORTING);
             assertThat(comic.getTitle()).isEqualTo("导入兼容漫画");
 
             List<Chapter> chapters = chapterMapper.selectList(
@@ -603,13 +609,147 @@ class ReadingLifecycleCompatibilityIT {
                     new LambdaQueryWrapper<Media>().eq(Media::getChapterId, chapterId));
             assertThat(pages).hasSize(1);
             Media page = pages.get(0);
-            // 旧 globalOrder 目录已迁移为 chapterId 目录（真实 StorageRef）
+            // 目标布局路径（chapterId 目录）但状态 PENDING —— 文件尚未最终化
             assertThat(page.getHqPath()).isEqualTo(comicId + "/" + chapterId + "/001.jpg");
-            assertThat(Files.exists(MANGA_ROOT.resolve("hq").resolve(page.getHqPath()))).isTrue();
+            assertThat(page.getHqStatus()).isEqualTo(HqStatus.PENDING);
+            // completed 后仍不可读
+            assertThat(apiCode("/api/comics/" + comicId + "/catalog")).isEqualTo(404);
+            assertThat(apiCode("/api/chapters/" + chapterId)).isEqualTo(404);
+
+            // 模拟 Worker 最终化：把 staging 文件搬到目标目录
+            Path targetDir = MANGA_ROOT.resolve("hq").resolve(String.valueOf(comicId)).resolve(String.valueOf(chapterId));
+            Files.createDirectories(targetDir);
+            Files.move(stagingDir.resolve("001.jpg"), targetDir.resolve("001.jpg"));
+
+            // Phase 2：finalize completed → media/chapter/comic READY、task SUCCESS
+            importPersistenceService.applyFinalizeCompleted(new ImportStorageFinalizeCompletedEvent(
+                    UUID.randomUUID(), Instant.now(), taskId, comicId, 0, chapterId,
+                    "hq/" + comicId + "/" + chapterId, 1));
+
+            assertThat(comicMapper.selectById(comicId).getStatus()).isEqualTo(ComicStatus.READY);
+            assertThat(mediaMapper.selectById(page.getId()).getHqStatus()).isEqualTo(HqStatus.READY);
+            assertThat(importTaskMapper.selectById(taskId).getStatus()).isEqualTo(ImportTaskStatus.SUCCESS);
 
             // reader URL 命中真实文件
             ReaderDTO dto = readChapter(chapterId);
             assertThat(dto.getComicId()).isEqualTo(comicId);
+            assertThat(dto.getPages()).hasSize(1);
+            assertThat(dto.getPages().get(0).getHqUrl())
+                    .isEqualTo("/files/hq/" + comicId + "/" + chapterId + "/001.jpg");
+        }
+
+        @Test
+        @DisplayName("finalize failed：comic/task 明确失败可重试、reader 404、DB 无 READY 推测 hqPath")
+        void importFinalizeFailed_comicNotReady_reader404_retryable() throws Exception {
+            long[] ids = createImportTask("import-fail");
+            long taskId = ids[0];
+            long comicId = ids[1];
+
+            Path stagingDir = MANGA_ROOT.resolve("hq").resolve(String.valueOf(comicId)).resolve("0");
+            Files.createDirectories(stagingDir);
+            Files.writeString(stagingDir.resolve("001.jpg"), "fake-jpeg");
+            writeMetadataV3(taskId, comicId, "失败漫画", "失败作者");
+
+            importEventHandler.handleComicImported(
+                    new ImportTaskCompletedEvent(UUID.randomUUID(), Instant.now(), taskId, comicId, null),
+                    null, 0L);
+
+            Long chapterId = chapterMapper.selectList(
+                    new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId)).get(0).getId();
+
+            // Worker 最终化失败
+            importPersistenceService.applyFinalizeFailed(new ImportStorageFinalizeFailedEvent(
+                    UUID.randomUUID(), Instant.now(), taskId, comicId, 0, chapterId,
+                    "STORAGE_FINALIZE_SOURCE_MISSING", "源目录不存在"));
+
+            // 明确失败且可重试：comic → IMPORT_FAILED、task → FAILED（均非 READY/SUCCESS）
+            assertThat(comicMapper.selectById(comicId).getStatus()).isEqualTo(ComicStatus.IMPORT_FAILED);
+            assertThat(importTaskMapper.selectById(taskId).getStatus()).isEqualTo(ImportTaskStatus.FAILED);
+            assertThat(importTaskMapper.selectById(taskId).getErrorMessage()).contains("STORAGE_FINALIZE_SOURCE_MISSING");
+            // reader 404（不得置 READY 可读）
+            assertThat(apiCode("/api/chapters/" + chapterId)).isEqualTo(404);
+            // DB 不含 READY 状态的推测 hqPath（media 保持 PENDING，未确认文件存在）
+            List<Media> pages = mediaMapper.selectList(
+                    new LambdaQueryWrapper<Media>().eq(Media::getChapterId, chapterId));
+            assertThat(pages).isNotEmpty();
+            assertThat(pages).allMatch(m -> m.getHqStatus() != HqStatus.READY);
+        }
+
+        @Test
+        @DisplayName("finalize completed 重复事件：幂等，不重复计数、不重复置 SUCCESS")
+        void importFinalizeCompleted_duplicate_isIdempotent() throws Exception {
+            long[] ids = createImportTask("import-dup");
+            long taskId = ids[0];
+            long comicId = ids[1];
+
+            Path stagingDir = MANGA_ROOT.resolve("hq").resolve(String.valueOf(comicId)).resolve("0");
+            Files.createDirectories(stagingDir);
+            Files.writeString(stagingDir.resolve("001.jpg"), "fake-jpeg");
+            writeMetadataV3(taskId, comicId, "重复漫画", "重复作者");
+
+            importEventHandler.handleComicImported(
+                    new ImportTaskCompletedEvent(UUID.randomUUID(), Instant.now(), taskId, comicId, null),
+                    null, 0L);
+            Long chapterId = chapterMapper.selectList(
+                    new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId)).get(0).getId();
+
+            Path targetDir = MANGA_ROOT.resolve("hq").resolve(String.valueOf(comicId)).resolve(String.valueOf(chapterId));
+            Files.createDirectories(targetDir);
+            Files.move(stagingDir.resolve("001.jpg"), targetDir.resolve("001.jpg"));
+
+            var completed = new ImportStorageFinalizeCompletedEvent(
+                    UUID.randomUUID(), Instant.now(), taskId, comicId, 0, chapterId,
+                    "hq/" + comicId + "/" + chapterId, 1);
+
+            importPersistenceService.applyFinalizeCompleted(completed);
+            importPersistenceService.applyFinalizeCompleted(completed);
+
+            // 幂等：media 仍只有 1 张且 READY，task 仍 SUCCESS，无重复计数
+            assertThat(mediaMapper.selectCount(new LambdaQueryWrapper<Media>()
+                    .eq(Media::getChapterId, chapterId))).isEqualTo(1);
+            assertThat(mediaMapper.selectList(new LambdaQueryWrapper<Media>()
+                    .eq(Media::getChapterId, chapterId)))
+                    .allMatch(m -> m.getHqStatus() == HqStatus.READY);
+            assertThat(importTaskMapper.selectById(taskId).getStatus()).isEqualTo(ImportTaskStatus.SUCCESS);
+            assertThat(comicMapper.selectById(comicId).getTotalPages()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("chapterId==globalOrder（staging 即最终位置）：completed + finalize 全链可读")
+        void importFinalizeSameDir_chapterIdEqualsGlobalOrder_fullChain() throws Exception {
+            long[] ids = createImportTask("import-samedir");
+            long taskId = ids[0];
+            long comicId = ids[1];
+
+            writeMetadataV3(taskId, comicId, "同目录漫画", "同目录作者");
+
+            importEventHandler.handleComicImported(
+                    new ImportTaskCompletedEvent(UUID.randomUUID(), Instant.now(), taskId, comicId, null),
+                    null, 0L);
+
+            assertThat(comicMapper.selectById(comicId).getStatus()).isEqualTo(ComicStatus.IMPORTING);
+            Long chapterId = chapterMapper.selectList(
+                    new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId)).get(0).getId();
+            Media page = mediaMapper.selectList(
+                    new LambdaQueryWrapper<Media>().eq(Media::getChapterId, chapterId)).get(0);
+            assertThat(page.getHqStatus()).isEqualTo(HqStatus.PENDING);
+            assertThat(page.getHqPath()).isEqualTo(comicId + "/" + chapterId + "/001.jpg");
+
+            // chapterId==globalOrder：文件从导入阶段就位于最终位置（staging 即最终，无需移动）
+            Path finalDir = MANGA_ROOT.resolve("hq").resolve(String.valueOf(comicId))
+                    .resolve(String.valueOf(chapterId));
+            Files.createDirectories(finalDir);
+            Files.writeString(finalDir.resolve("001.jpg"), "fake-jpeg");
+
+            importPersistenceService.applyFinalizeCompleted(new ImportStorageFinalizeCompletedEvent(
+                    UUID.randomUUID(), Instant.now(), taskId, comicId, chapterId.intValue(), chapterId,
+                    "hq/" + comicId + "/" + chapterId, 1));
+
+            assertThat(comicMapper.selectById(comicId).getStatus()).isEqualTo(ComicStatus.READY);
+            assertThat(mediaMapper.selectById(page.getId()).getHqStatus()).isEqualTo(HqStatus.READY);
+            assertThat(importTaskMapper.selectById(taskId).getStatus()).isEqualTo(ImportTaskStatus.SUCCESS);
+
+            ReaderDTO dto = readChapter(chapterId);
             assertThat(dto.getPages()).hasSize(1);
             assertThat(dto.getPages().get(0).getHqUrl())
                     .isEqualTo("/files/hq/" + comicId + "/" + chapterId + "/001.jpg");
@@ -649,6 +789,91 @@ class ReadingLifecycleCompatibilityIT {
             assertThat(dto.getPages()).hasSize(2);
             assertThat(dto.getPages()).extracting(com.comicatlas.api.reader.dto.ReaderDTO.MediaItemDTO::getHqUrl)
                     .contains("/files/hq/" + comicId + "/3/001.jpg", "/files/hq/" + comicId + "/3/002.jpg");
+        }
+
+        @Test
+        @DisplayName("现代恢复：metadata hqPath 优先重建 page，新 DB chapterId 可不同，hqPath 保留真实磁盘引用")
+        void recovery_rebuildsModern_withRealHqPathStorageRef() throws Exception {
+            long comicId = 8800002L;
+            long legacyChapterId = 99L;
+            Path hqDir = MANGA_ROOT.resolve("hq").resolve(String.valueOf(comicId)).resolve(String.valueOf(legacyChapterId));
+            Files.createDirectories(hqDir);
+            Files.writeString(hqDir.resolve("001.jpg"), "fake-jpeg-modern");
+            writeModernRecoveryMetadata(comicId, legacyChapterId);
+
+            var progress = recoveryEngine.processComicDir(comicId, 0);
+            assertThat(progress.recoveredComics()).isEqualTo(1);
+
+            Comic comic = comicMapper.selectById(comicId);
+            assertThat(comic.getStatus()).isEqualTo(ComicStatus.READY);
+            assertThat(comic.getTitle()).isEqualTo("现代恢复漫画");
+
+            List<Catalog> catalogs = catalogMapper.selectList(
+                    new LambdaQueryWrapper<Catalog>().eq(Catalog::getComicId, comicId)
+                            .orderByAsc(Catalog::getSortOrder));
+            assertThat(catalogs).hasSize(2);
+            assertThat(catalogs.get(1).getParentId()).isEqualTo(catalogs.get(0).getId());
+
+            List<Chapter> chapters = chapterMapper.selectList(
+                    new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
+            assertThat(chapters).hasSize(1);
+            Chapter chapter = chapters.get(0);
+            assertThat(chapter.getPageCount()).isEqualTo(1);
+            assertThat(chapter.getCatalogId()).isEqualTo(catalogs.get(1).getId());
+            assertThat(chapter.getGlobalOrder()).isEqualTo(3);
+
+            List<Media> pages = mediaMapper.selectList(
+                    new LambdaQueryWrapper<Media>().eq(Media::getChapterId, chapter.getId()));
+            assertThat(pages).hasSize(1);
+            Media page = pages.get(0);
+            assertThat(page.getHqPath()).isEqualTo(comicId + "/" + legacyChapterId + "/001.jpg");
+            assertThat(page.getHqStatus()).isEqualTo(HqStatus.READY);
+            assertThat(Files.exists(MANGA_ROOT.resolve("hq").resolve(comicId + "/" + legacyChapterId + "/001.jpg")))
+                    .isTrue();
+
+            ReaderDTO dto = readChapter(chapter.getId());
+            assertThat(dto.getPages()).hasSize(1);
+            assertThat(dto.getPages().get(0).getHqUrl())
+                    .isEqualTo("/files/hq/" + comicId + "/" + legacyChapterId + "/001.jpg");
+        }
+
+        @Test
+        @DisplayName("恢复缺文件：hqPath 指向不存在文件 → media MISSING，不得标 READY")
+        void recovery_rebuildsMissingFile_asMissingNotReady() throws Exception {
+            long comicId = 8800003L;
+            writeMissingFileRecoveryMetadata(comicId);
+
+            var progress = recoveryEngine.processComicDir(comicId, 0);
+            assertThat(progress.recoveredComics()).isEqualTo(1);
+
+            Comic comic = comicMapper.selectById(comicId);
+            assertThat(comic.getStatus()).isEqualTo(ComicStatus.READY);
+
+            List<Chapter> chapters = chapterMapper.selectList(
+                    new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
+            assertThat(chapters).hasSize(1);
+            List<Media> pages = mediaMapper.selectList(
+                    new LambdaQueryWrapper<Media>().eq(Media::getChapterId, chapters.get(0).getId()));
+            assertThat(pages).hasSize(1);
+            assertThat(pages.get(0).getHqStatus()).isEqualTo(HqStatus.MISSING);
+            assertThat(pages.get(0).getHqPath()).isEqualTo(comicId + "/77/001.jpg");
+        }
+
+        @Test
+        @DisplayName("恢复坏索引：catalog parentIndex 越界 → typed-fail，不写任何 DB 行、不静默挂根")
+        void recovery_rejectsBadParentIndex_typedFail_noDbRows() throws Exception {
+            long comicId = 8800004L;
+            writeBadIndexRecoveryMetadata(comicId);
+
+            var progress = recoveryEngine.processComicDir(comicId, 0);
+            assertThat(progress.errorComics()).isEqualTo(1);
+            assertThat(progress.lastError()).contains("parentIndex");
+
+            assertThat(comicMapper.selectById(comicId)).isNull();
+            assertThat(catalogMapper.selectCount(
+                    new LambdaQueryWrapper<Catalog>().eq(Catalog::getComicId, comicId))).isZero();
+            assertThat(chapterMapper.selectCount(
+                    new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId))).isZero();
         }
     }
 
@@ -735,6 +960,65 @@ class ReadingLifecycleCompatibilityIT {
               "catalogs": [],
               "chapters": [
                 {"title": "第1话", "chapterNo": "1", "sortOrder": 0, "globalOrder": 3, "catalogIndex": null}
+              ]
+            }
+            """;
+        Files.writeString(MANGA_ROOT.resolve("metadata").resolve(comicId + ".json"), metadata);
+    }
+
+    private void writeModernRecoveryMetadata(long comicId, long legacyChapterId) throws IOException {
+        String metadata = """
+            {
+              "version": 3,
+              "comic": {"title": "现代恢复漫画", "author": "现代作者", "category": "Action"},
+              "catalogs": [
+                {"title": "卷1", "sortOrder": 0},
+                {"title": "卷1·话", "sortOrder": 1, "parentIndex": 0}
+              ],
+              "chapters": [
+                {
+                  "title": "第1话", "chapterNo": "1", "sortOrder": 0, "globalOrder": 3, "catalogIndex": 1,
+                  "mediaItems": [
+                    {"pageNumber": 1, "fileName": "001.jpg", "hqPath": "%d/%d/001.jpg",
+                     "fileSize": 2048, "width": 100, "height": 150, "mediaType": "IMAGE", "hqStatus": "READY"}
+                  ]
+                }
+              ]
+            }
+            """.formatted(comicId, legacyChapterId);
+        Files.writeString(MANGA_ROOT.resolve("metadata").resolve(comicId + ".json"), metadata);
+    }
+
+    private void writeMissingFileRecoveryMetadata(long comicId) throws IOException {
+        String metadata = """
+            {
+              "version": 3,
+              "comic": {"title": "缺文件漫画", "author": "作者", "category": null},
+              "catalogs": [],
+              "chapters": [
+                {
+                  "title": "第1话", "chapterNo": "1", "sortOrder": 0, "globalOrder": 0, "catalogIndex": null,
+                  "mediaItems": [
+                    {"pageNumber": 1, "fileName": "001.jpg", "hqPath": "%d/77/001.jpg",
+                     "fileSize": 1024, "width": 100, "height": 150, "mediaType": "IMAGE", "hqStatus": "READY"}
+                  ]
+                }
+              ]
+            }
+            """.formatted(comicId);
+        Files.writeString(MANGA_ROOT.resolve("metadata").resolve(comicId + ".json"), metadata);
+    }
+
+    private void writeBadIndexRecoveryMetadata(long comicId) throws IOException {
+        String metadata = """
+            {
+              "version": 3,
+              "comic": {"title": "坏索引漫画", "author": "作者", "category": null},
+              "catalogs": [
+                {"title": "目录1", "sortOrder": 0, "parentIndex": 5}
+              ],
+              "chapters": [
+                {"title": "第1话", "chapterNo": "1", "sortOrder": 0, "globalOrder": 0, "catalogIndex": null}
               ]
             }
             """;
