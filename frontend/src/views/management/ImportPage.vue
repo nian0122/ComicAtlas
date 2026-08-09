@@ -315,7 +315,7 @@ const pathPlaceholder = computed(() =>
 
 const pathHint = computed(() =>
   sourceType.value === 'ZIP'
-    ? '完整 ZIP 文件路径，包含 .zip 扩展名'
+    ? '完整 ZIP 文件路径，包含 .zip 扩展名；大导出分卷时 sourcePath 填最后一个 .zip（主文件），分卷须同目录同 basename，缺卷会失败，.z01 不可作为入口'
     : '漫画根目录绝对路径，包含章节子目录'
 )
 

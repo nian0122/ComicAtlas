@@ -94,6 +94,17 @@ D:/downloads/comic.zip
 
 提交后，任务会进入任务中心。Worker 会解压、解析目录、分析媒体并把文件搬入 MANAGED 存储。
 
+**标准分卷 ZIP（`.z01`/`.z02`/… + `.zip`）**：分卷文件必须**同目录、同 basename**，`sourcePath` 一律填**最后一个 `.zip`（主文件）**，例如：
+
+```text
+D:/downloads/comic.z01
+D:/downloads/comic.z02
+D:/downloads/comic.zip   ← sourcePath 填这个
+```
+
+- 缺任一卷（如存在 `.z01`/`.z03` 但缺 `.z02`）导入会直接失败；把卷补回同目录同 basename 后重试即可。
+- `.z01` 等分卷**永不**作为导入入口。
+
 ### 2. 本地目录导入
 
 选择本地目录来源，填写漫画目录，例如：
@@ -210,6 +221,21 @@ MANGA_ROOT/lq/{comicId}/{chapterId}/文件名
 - 单文件上限 20 GiB，单次会话上限 100 GiB，会话 24 小时未完成自动过期。
 - 上传先进入 `staging`，完成后由后台分析并搬入 HQ；视频会保留元数据用于阅读器混排。
 - 上传完成后可通过 `POST /chapters/{id}/media/reorder` 重排、通过媒体回收接口管理。
+
+### 导出漫画（分卷 ZIP）
+
+管理后台的存储管理可对漫画发起导出（`POST /api/storage/export/comics/{id}`）。导出是**异步打包**：任务完成后，产物以**标准分卷 ZIP** 落在宿主机本地目录：
+
+```text
+MANGA_ROOT/export/{taskId}/{书名}_{id}_{时间戳}.z01
+MANGA_ROOT/export/{taskId}/{书名}_{id}_{时间戳}.z02
+...
+MANGA_ROOT/export/{taskId}/{书名}_{id}_{时间戳}.zip   ← 主文件（最后卷）
+```
+
+- 单卷默认上限 **2 GiB**，内容超过即自动分卷（`.z01..zNN` + 主 `.zip`）；总量与单条目默认上限 **30 GiB**。
+- 导出**不提供 HTTP 下载**：任务接口只返回任务状态与各卷的本地物理路径（元数据），文件字节全部在宿主机本地，不经过网络传输。任务中心/导出卡片可查看每卷路径，也可在宿主机直接打开导出目录。
+- 分卷文件需**同目录、同 basename**。若需把这批分卷重新导入，把主 `.zip` 的本地路径填到"导入 → ZIP"的 `sourcePath` 即可（缺任一卷会失败，补回后重试；`.z01` 不可作为入口）。
 
 ### 从存储恢复数据库记录
 
