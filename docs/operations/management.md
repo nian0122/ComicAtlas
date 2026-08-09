@@ -154,6 +154,14 @@ Flyway 会按版本号顺序执行 `api-service/src/main/resources/db/flyway/V*.
 - [ ] 回收站页面能列出 `TRASHED` 对象。
 - [ ] 旧客户端仍可调用兼容端点（见 API 文档第 19 章兼容窗口）。
 
+### Broker 遗留 MQ 实体清理（可选）
+
+代码已不再声明旧完整删除（`comic.delete`）的 exchange/queue/DLQ（`delete.task.queue` / `delete.result.queue` / `comic.delete.dlx` 等），升级部署后这些 durable 实体仍会残留在已运行的 RabbitMQ Broker 中，且不会被 Spring 自动删除。如需清理：
+
+1. 在停服窗口确认对应队列无积压消息（RabbitMQ 管理台或 `rabbitmqctl list_queues`）。
+2. 手动删除残留 exchange/queue（`rabbitmqctl delete_queue delete.task.queue` 等）。
+3. 残留实体不影响新拓扑运行，本计划不执行 Broker 删除；不清理也不影响功能。
+
 ---
 
 ## 六、回滚

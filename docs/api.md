@@ -835,13 +835,16 @@ OP_NOT_ALLOWED, COMIC_NOT_FOUND
 
 ### 18.4 MQ 路由表
 
-共享事件 DTO 共 **37 个 record**（`ComicEvent` sealed 接口 + 各域事件）。队列契约与 AGENTS.md 一致：
+共享事件 DTO 共 **36 个事件 record**（`ComicEvent` sealed 接口 + 各域事件）。队列契约与 AGENTS.md 一致：
 
 | Exchange | RoutingKey | Queue | Consumer |
 |----------|-----------|-------|----------|
 | comic.import | task.created | import.task.queue | Worker ImportTaskHandler |
 | comic.import | task.completed | import.result.queue | API ImportEventHandler |
 | comic.import | task.failed | import.failed.queue | API ImportEventHandler |
+| comic.import | import.storage.finalize.requested | import.storage.finalize.requested.queue | Worker ImportStorageFinalizeHandler |
+| comic.import | import.storage.finalize.completed | import.storage.finalize.completed.queue | API ImportStorageFinalizeEventHandler |
+| comic.import | import.storage.finalize.failed | import.storage.finalize.failed.queue | API ImportStorageFinalizeEventHandler |
 | comic.task | status.changed | task.status.queue | API ImportEventHandler |
 | comic.task | cancel.requested | cancel.task.queue | Worker CancelHandler |
 | comic.image | lq.generate | lq.generate.queue | Worker LqGenerateHandler |
@@ -850,8 +853,6 @@ OP_NOT_ALLOWED, COMIC_NOT_FOUND
 | comic.image | hq.delete.completed | hq.delete.result.queue | API HqDeletedHandler |
 | comic.image | video.metadata.fix.requested | video.metadata.fix.queue | Worker VideoMetadataFixHandler |
 | comic.image | video.metadata.fix.completed | video.metadata.fix.result.queue | API VideoMetadataFixCompletedHandler |
-| comic.delete | delete.requested | delete.task.queue | Worker DeleteHandler |
-| comic.delete | delete.completed | delete.result.queue | API DeleteEventHandler |
 | comic.export | task.created | export.task.queue | Worker ExportTaskHandler |
 | comic.export | task.started | export.started.result.queue | API ExportStartedHandler |
 | comic.export | task.completed | export.completed.result.queue | API ExportCompletedHandler |
@@ -873,7 +874,9 @@ OP_NOT_ALLOWED, COMIC_NOT_FOUND
 | comic.management | command.progress | management.result.queue | API ManagementCommandResultHandler |
 | comic.management | command.cancel | management.cancel.queue | （未注册消费者） |
 
-**死信**：主队列除 comic.task（task.status.queue / cancel.task.queue 无 DLX）外均配置 DLX + DLQ（comic.import.dlx / comic.image.dlx / comic.delete.dlx / comic.export.dlx / comic.video.dlx / comic.recovery.dlx / comic.scan.dlx / comic.management.dlx）。DLQ 消息可通过 `/api/admin/dlq/*` 查看、重放或清理（见第 11 节）。
+**死信**：主队列除 comic.task（task.status.queue / cancel.task.queue 无 DLX）外均配置 DLX + DLQ（comic.import.dlx / comic.image.dlx / comic.export.dlx / comic.video.dlx / comic.recovery.dlx / comic.scan.dlx / comic.management.dlx）。DLQ 消息可通过 `/api/admin/dlq/*` 查看、重放或清理（见第 11 节）。
+
+> **Broker 遗留实体清理**：代码已不再声明旧完整删除（comic.delete）的 exchange/queue/DLQ（`delete.task.queue` / `delete.result.queue` / `comic.delete.dlx` 等）。但已运行 Broker 中残留的 durable 实体不会被 Spring 自动删除，需用户在停服且确认无消息后单独人工清理（RabbitMQ 管理台或 `rabbitmqctl`）；本计划不执行 Broker 删除。
 
 ---
 
@@ -914,3 +917,5 @@ OP_NOT_ALLOWED, COMIC_NOT_FOUND
 | 存储统计 | `GET /api/storage/stats` |
 
 > 旧端点（`/comics/{id}/lq`、`/admin/storage/comics/{id}/transcode-videos` 等）已随接口收敛全部移除，存储操作统一使用上表 `/api/storage/*` 形态。
+>
+> **METADATA_REFRESH 临时停用**：`METADATA_REFRESH`（扫盘刷新元数据）当前被全局临时阻断，提交后返回 `409`（`reasonCode = METADATA_REFRESH_DISABLED`，消息"元数据扫盘刷新已临时停用"），以隔离危险扫盘入口；`OperationPolicyService` / `BatchEligibilityChecker` / `ManagementTaskService` 统一引用 `MetadataRefreshConstants.METADATA_REFRESH_DISABLED_*`。恢复时需移除该阻断并放开 `METADATA_REFRESH` 权限位。
