@@ -22,7 +22,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 
 /**
  * 管理命令分发器单元测试：已停用的 METADATA_REFRESH 命令直接回 FAILED，
- * 禁止调用 MetadataRefreshCommandHandler/任何命令处理器，且正常 ack 不进 DLQ。
+ * 不调用任何命令处理器，且正常 ack 不进 DLQ。
  */
 class ManagementCommandDispatcherTest {
 
