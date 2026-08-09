@@ -9,6 +9,7 @@ import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageRef;
 import com.comicatlas.worker.storage.StorageRoot;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -26,7 +27,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/** 导出编排：收集 → 构建清单 → 打包 ZIP。 */
+/** 导出编排：收集 → 构建清单 → 打包 ZIP → 原子发布任务目录。 */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ExportService {
@@ -37,6 +39,7 @@ public class ExportService {
     private final MetadataJsonExporter metadataJsonExporter;
     private final StorageProperties storageProperties;
     private final WorkerConfig workerConfig;
+    private final ExportArchivePublisher archivePublisher;
 
     private static final DateTimeFormatter TIMESTAMP_FMT = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
 
@@ -51,10 +54,14 @@ public class ExportService {
             throw new IllegalStateException("EXPORT 存储根未配置或路径不存在");
         }
 
-        String outputFileName = buildOutputFileName(comicId, result.comic().getTitle());
-        Path outputPath = exportRoot.resolve(outputFileName);
-        ZipBuilder.ZipBuildResult zipResult = zipBuilder.build(manifest, outputPath);
-        return new ExportOutput(taskId, comicId, outputPath.getFileName().toString(), zipResult.totalSize());
+        String baseFileName = buildOutputFileName(comicId, result.comic().getTitle());
+        Path stagingDir = exportRoot.resolve(".staging-" + taskId);
+        Path finalDir = exportRoot.resolve(String.valueOf(taskId));
+        deleteRecursively(stagingDir);
+        ZipBuilder.ZipBuildResult zipResult = zipBuilder.build(manifest, stagingDir.resolve(baseFileName));
+        ExportArchivePublisher.PublishResult publishResult = archivePublisher.publish(
+                taskId, stagingDir, finalDir, manifest);
+        return new ExportOutput(taskId, comicId, publishResult.fileName(), publishResult.size());
     }
 
     /** 供 handler 发失败事件使用。 */
@@ -212,6 +219,23 @@ public class ExportService {
 
     private long maxTotalSize() {
         return workerConfig.getZip().getMaxTotalSize();
+    }
+
+    private void deleteRecursively(Path dir) {
+        if (dir == null || !Files.exists(dir)) {
+            return;
+        }
+        try (var walk = Files.walk(dir)) {
+            walk.sorted(Comparator.reverseOrder()).forEach(path -> {
+                try {
+                    Files.deleteIfExists(path);
+                } catch (IOException e) {
+                    log.warn("清理 staging 目录失败: {}", path, e);
+                }
+            });
+        } catch (IOException e) {
+            log.warn("清理 staging 目录失败: {}", dir, e);
+        }
     }
 
     private String buildOutputFileName(Long comicId, String title) {

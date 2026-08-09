@@ -132,6 +132,20 @@ public class ZipBuilder {
     }
 
     /**
+     * 对既有 ZIP 产物执行与构建一致的读回校验（条目集合、长度与 CRC）。
+     *
+     * <p>供发布器在最终任务目录已存在时判断是否与本次 manifest 完全一致（幂等复用）。
+     *
+     * @param mainZip  最终 .zip 文件路径（其父目录内同 basename 的 .zNN 视为分卷）
+     * @param manifest 当前导出清单
+     * @return 主 .zip、有序分卷与全部卷总大小
+     * @throws IOException 回读校验失败或分卷解析失败
+     */
+    public ZipBuildResult verify(Path mainZip, ExportManifest manifest) throws IOException {
+        return verifyAndReturn(mainZip, manifest);
+    }
+
+    /**
      * 回读校验：用 {@link ZipVolumeResolver} 解析有序分卷，{@link ZipSplitReadOnlySeekableByteChannel}/
      * {@link ZipFile} 读回每个条目，逐一校验条目集合、长度与 CRC。
      */

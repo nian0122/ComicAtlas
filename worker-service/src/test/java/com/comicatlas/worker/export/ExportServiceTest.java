@@ -34,6 +34,7 @@ class ExportServiceTest {
     private MetadataJsonExporter metadataJsonExporter;
     private StorageProperties storageProperties;
     private WorkerConfig workerConfig;
+    private ExportArchivePublisher archivePublisher;
     private ExportService service;
 
     @BeforeEach
@@ -42,6 +43,7 @@ class ExportServiceTest {
         exportFileResolver = mock(ExportFileResolver.class);
         zipBuilder = mock(ZipBuilder.class);
         metadataJsonExporter = mock(MetadataJsonExporter.class);
+        archivePublisher = mock(ExportArchivePublisher.class);
 
         storageProperties = new StorageProperties();
         StorageRoot exportRoot = new StorageRoot();
@@ -50,9 +52,11 @@ class ExportServiceTest {
         storageProperties.setRoots(Map.of("EXPORT", exportRoot));
 
         workerConfig = new WorkerConfig();
+        when(archivePublisher.publish(anyLong(), any(), any(), any()))
+                .thenReturn(new ExportArchivePublisher.PublishResult("99/out.zip", 1234L));
 
         service = new ExportService(exportCollector, exportFileResolver, zipBuilder,
-                metadataJsonExporter, storageProperties, workerConfig);
+                metadataJsonExporter, storageProperties, workerConfig, archivePublisher);
     }
 
     private ExportComic comic(Long id, String title) {
@@ -123,16 +127,30 @@ class ExportServiceTest {
         stubResolverToRoot();
         when(zipBuilder.build(any(), any())).thenReturn(
                 new ZipBuilder.ZipBuildResult(tempDir.resolve("out.zip"), List.of(tempDir.resolve("out.zip")), 1234L));
+        when(archivePublisher.publish(anyLong(), any(), any(), any()))
+                .thenReturn(new ExportArchivePublisher.PublishResult("99/测试标题_1_20260809_120000.zip", 1234L));
 
         ExportService.ExportOutput output = service.export(1L, 99L);
 
         assertEquals(99L, output.taskId());
         assertEquals(1234L, output.size());
-        assertTrue(output.fileName().startsWith("测试标题_1_"), "输出文件名应含清理后标题+comicId");
-        assertTrue(output.fileName().endsWith(".zip"));
+        assertEquals("99/测试标题_1_20260809_120000.zip", output.fileName(),
+                "fileName 必须为 EXPORT 根相对路径 {taskId}/{base}.zip");
 
         ArgumentCaptor<ExportManifest> manifestCaptor = ArgumentCaptor.forClass(ExportManifest.class);
-        verify(zipBuilder).build(manifestCaptor.capture(), any());
+        ArgumentCaptor<Path> outputPathCaptor = ArgumentCaptor.forClass(Path.class);
+        verify(zipBuilder).build(manifestCaptor.capture(), outputPathCaptor.capture());
+        Path stagedOutput = outputPathCaptor.getValue();
+        assertEquals(".staging-99", stagedOutput.getParent().getFileName().toString(),
+                "构建必须写入 EXPORT/.staging-{taskId} 隐藏任务目录（同文件系统保证 ATOMIC_MOVE 有效）");
+        assertTrue(stagedOutput.getFileName().toString().startsWith("测试标题_1_"));
+        assertTrue(stagedOutput.getFileName().toString().endsWith(".zip"));
+
+        ArgumentCaptor<Path> finalDirCaptor = ArgumentCaptor.forClass(Path.class);
+        verify(archivePublisher).publish(eq(99L), eq(stagedOutput.getParent()), finalDirCaptor.capture(), any());
+        assertEquals(storageProperties.getRoots().get("EXPORT").getPath().resolve("99"), finalDirCaptor.getValue(),
+                "最终目录必须为 EXPORT/{taskId}");
+
         ExportManifest manifest = manifestCaptor.getValue();
         assertEquals(result.allMedia().size(), manifest.entries().size(),
                 "媒体条目数必须与采集媒体数严格相等，metadata 另计一条");
@@ -272,6 +290,65 @@ class ExportServiceTest {
         assertEquals("同名章/001.jpg", manifestCaptor.getValue().entries().get(0).targetPath());
         assertEquals("同名章(1)/001.jpg", manifestCaptor.getValue().entries().get(1).targetPath(),
                 "同名章节目录应去重为 同名章(1)");
+    }
+
+    @Test
+    void export_publishesTaskDirectoryAtomically_noStagingLeak() throws Exception {
+        WorkerConfig realConfig = new WorkerConfig();
+        ZipBuilder realBuilder = new ZipBuilder(realConfig);
+        ExportArchivePublisher realPublisher = new ExportArchivePublisher(realBuilder);
+        ExportService realService = new ExportService(exportCollector, exportFileResolver, realBuilder,
+                metadataJsonExporter, storageProperties, realConfig, realPublisher);
+
+        ExportMedia m1 = media(1L, 10L, "1/10/001.jpg", 1);
+        when(exportCollector.collect(1L)).thenReturn(result(comic(1L, "测试标题"),
+                List.of(chapter(10L, "第一章", 1)), List.of(m1)));
+        when(metadataJsonExporter.exportJson(1L)).thenReturn("{}");
+        when(exportFileResolver.resolve(m1)).thenReturn(new StorageRef("HQ", "1/10/001.jpg"));
+        writeFile("hq/1/10/001.jpg", "a");
+        stubResolverToRoot();
+
+        ExportService.ExportOutput output = realService.export(1L, 99L);
+
+        Path exportRoot = storageProperties.getRoots().get("EXPORT").getPath();
+        assertTrue(Files.isDirectory(exportRoot.resolve("99")), "最终任务目录必须一次性出现");
+        assertFalse(Files.exists(exportRoot.resolve(".staging-99")), "发布后 staging 不得残留");
+        assertTrue(output.fileName().startsWith("99/测试标题_1_"), "fileName 必须为 {taskId}/{base}.zip");
+        assertTrue(output.fileName().endsWith(".zip"));
+        assertTrue(Files.exists(exportRoot.resolve(output.fileName())),
+                "fileName 必须能解析到最终目录内的主 .zip");
+        long expectedSize;
+        try (var stream = Files.list(exportRoot.resolve("99"))) {
+            expectedSize = stream.mapToLong(p -> {
+                try {
+                    return Files.size(p);
+                } catch (IOException e) {
+                    throw new java.io.UncheckedIOException(e);
+                }
+            }).sum();
+        }
+        assertEquals(expectedSize, output.size(), "size 必须等于最终目录全部卷总和");
+    }
+
+    @Test
+    void export_cleansStaleStagingBeforeRebuild() throws Exception {
+        ExportMedia m1 = media(1L, 10L, "1/10/001.jpg", 1);
+        when(exportCollector.collect(1L)).thenReturn(result(comic(1L, "标题"), List.of(chapter(10L, "第一章", 1)), List.of(m1)));
+        when(metadataJsonExporter.exportJson(1L)).thenReturn("{}");
+        when(exportFileResolver.resolve(m1)).thenReturn(new StorageRef("HQ", "1/10/001.jpg"));
+        writeFile("hq/1/10/001.jpg", "a");
+        stubResolverToRoot();
+        when(zipBuilder.build(any(), any())).thenReturn(
+                new ZipBuilder.ZipBuildResult(tempDir.resolve("out.zip"), List.of(tempDir.resolve("out.zip")), 10L));
+
+        Path staleStaging = storageProperties.getRoots().get("EXPORT").getPath().resolve(".staging-99");
+        Files.createDirectories(staleStaging);
+        Path staleFile = staleStaging.resolve("stale.bin");
+        Files.writeString(staleFile, "遗留");
+
+        service.export(1L, 99L);
+
+        assertFalse(Files.exists(staleFile), "每次导出必须从干净 staging 开始，不得复用遗留文件");
     }
 
     @Test
