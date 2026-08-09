@@ -43,12 +43,6 @@ public class RabbitMqConfig {
     public DirectExchange taskExchange() { return new DirectExchange(MqExchanges.TASK); }
 
     @Bean
-    public DirectExchange deleteExchange() { return new DirectExchange(MqExchanges.DELETE); }
-
-    @Bean
-    public DirectExchange deleteDlxExchange() { return new DirectExchange(MqExchanges.DELETE_DLX); }
-
-    @Bean
     public DirectExchange exportExchange() { return new DirectExchange(MqExchanges.EXPORT); }
 
     @Bean
@@ -91,19 +85,6 @@ public class RabbitMqConfig {
     @Bean
     public Queue lqGenerateDlq() {
         return QueueBuilder.durable(MqQueues.LQ_GENERATE_DLQ).build();
-    }
-
-    @Bean
-    public Queue deleteTaskQueue() {
-        return QueueBuilder.durable(MqQueues.DELETE_TASK)
-                .deadLetterExchange(MqExchanges.DELETE_DLX)
-                .deadLetterRoutingKey(MqQueues.DELETE_TASK_DLQ)
-                .build();
-    }
-
-    @Bean
-    public Queue deleteTaskDlq() {
-        return QueueBuilder.durable(MqQueues.DELETE_TASK_DLQ).build();
     }
 
     @Bean
@@ -228,18 +209,6 @@ public class RabbitMqConfig {
     public Binding lqGenerateDlqBinding() {
         return BindingBuilder.bind(lqGenerateDlq())
                 .to(imageDlxExchange()).with(MqQueues.LQ_GENERATE_DLQ);
-    }
-
-    @Bean
-    public Binding deleteTaskBinding() {
-        return BindingBuilder.bind(deleteTaskQueue())
-                .to(deleteExchange()).with(MqRoutingKeys.DELETE_REQUESTED);
-    }
-
-    @Bean
-    public Binding deleteTaskDlqBinding() {
-        return BindingBuilder.bind(deleteTaskDlq())
-                .to(deleteDlxExchange()).with(MqQueues.DELETE_TASK_DLQ);
     }
 
     @Bean
