@@ -1,5 +1,8 @@
 package com.comicatlas.common.metadata;
 
+import com.comicatlas.common.storage.RelativePathValidator;
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -20,5 +23,35 @@ public record MetadataV3(
     /** width/height/duration/container/videoCodec/audioCodec 可选（null 时不输出）。 */
     public record MediaItem(String fileName, int pageNumber, String hqStatus, String lqStatus,
                             long fileSize, String mediaType, Integer width, Integer height,
-                            BigDecimal duration, String container, String videoCodec, String audioCodec) {}
+                            BigDecimal duration, String container, String videoCodec, String audioCodec,
+                            @JsonInclude(JsonInclude.Include.NON_NULL) String hqPath) {
+
+        public MediaItem(String fileName, int pageNumber, String hqStatus, String lqStatus,
+                         long fileSize, String mediaType, Integer width, Integer height,
+                         BigDecimal duration, String container, String videoCodec, String audioCodec,
+                         String hqPath) {
+            RelativePathValidator.requireRelativeForwardSlash(hqPath);
+            this.fileName = fileName;
+            this.pageNumber = pageNumber;
+            this.hqStatus = hqStatus;
+            this.lqStatus = lqStatus;
+            this.fileSize = fileSize;
+            this.mediaType = mediaType;
+            this.width = width;
+            this.height = height;
+            this.duration = duration;
+            this.container = container;
+            this.videoCodec = videoCodec;
+            this.audioCodec = audioCodec;
+            this.hqPath = hqPath;
+        }
+
+        /** 旧构造入口（无 hqPath），保持向后兼容。 */
+        public MediaItem(String fileName, int pageNumber, String hqStatus, String lqStatus,
+                         long fileSize, String mediaType, Integer width, Integer height,
+                         BigDecimal duration, String container, String videoCodec, String audioCodec) {
+            this(fileName, pageNumber, hqStatus, lqStatus, fileSize, mediaType, width, height,
+                    duration, container, videoCodec, audioCodec, null);
+        }
+    }
 }

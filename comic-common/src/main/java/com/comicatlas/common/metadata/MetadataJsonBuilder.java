@@ -65,6 +65,7 @@ public class MetadataJsonBuilder {
                 if (media.container() != null) { mNode.put("container", media.container()); }
                 if (media.videoCodec() != null) { mNode.put("videoCodec", media.videoCodec()); }
                 if (media.audioCodec() != null) { mNode.put("audioCodec", media.audioCodec()); }
+                if (media.hqPath() != null) { mNode.put("hqPath", media.hqPath()); }
             }
         }
 
