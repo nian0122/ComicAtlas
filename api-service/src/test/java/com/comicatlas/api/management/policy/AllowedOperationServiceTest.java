@@ -64,13 +64,21 @@ class AllowedOperationServiceTest {
         }
 
         @Test
-        void readyShouldAllowOperationsButBlockMetadataRefresh() {
+        void readyShouldAllowOperationsIncludingMetadataRefresh() {
             AllowedOperations ops = service.forComic("READY");
             assertThat(ops.allowed()).contains(
-                OP_READ, OP_EDIT, OP_DELETE, OP_LQ_GENERATE, OP_HQ_DELETE);
-            assertThat(ops.allowed()).doesNotContain(OP_METADATA_REFRESH);
-            assertThat(ops.blockedReasons()).containsKey(OP_METADATA_REFRESH);
-            assertThat(ops.blockedReasons().get(OP_METADATA_REFRESH)).contains("临时停用");
+                OP_READ, OP_EDIT, OP_DELETE, OP_LQ_GENERATE, OP_HQ_DELETE, OP_METADATA_REFRESH);
+            assertThat(ops.isAllowed(OP_METADATA_REFRESH)).isTrue();
+            assertThat(ops.blockedReasons()).doesNotContainKey(OP_METADATA_REFRESH);
+        }
+
+        @Test
+        void nonReadyShouldBlockMetadataRefresh() {
+            assertThat(service.forComic("IMPORTING").isAllowed(OP_METADATA_REFRESH)).isFalse();
+            assertThat(service.forComic("IMPORT_FAILED").isAllowed(OP_METADATA_REFRESH)).isFalse();
+            assertThat(service.forComic("TRASHED").isAllowed(OP_METADATA_REFRESH)).isFalse();
+            assertThat(service.forComic("DELETING").isAllowed(OP_METADATA_REFRESH)).isFalse();
+            assertThat(service.forComic("RECOVERY_REQUIRED").isAllowed(OP_METADATA_REFRESH)).isFalse();
         }
 
         @Test

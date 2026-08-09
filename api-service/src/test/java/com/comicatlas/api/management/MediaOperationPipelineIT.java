@@ -11,6 +11,7 @@ import com.comicatlas.api.common.enums.HqStatus;
 import com.comicatlas.api.common.enums.LqStatus;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.mapper.MediaMapper;
+import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.common.exception.ConflictException;
 import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
@@ -405,16 +406,72 @@ class MediaOperationPipelineIT {
         assertThat(reloaded.getHqPath()).endsWith(".mp4");
     }
 
-    // ======================== 元数据刷新命令（fail-closed 停用） ========================
+    // ======================== 元数据刷新命令 ========================
 
     @Test
-    @DisplayName("元数据刷新命令：fail-closed 拒绝且无 task/outbox 副作用")
-    void metadataRefreshCommand_rejectedWithoutSideEffects() {
+    @DisplayName("元数据刷新命令：创建 COMIC item + comic READY→REFRESHING + 命令入 outbox")
+    void metadataRefreshCommand_createsTaskAndLocksComic() throws Exception {
+        OperationSubmitResultDTO result = commandService.requestMetadataRefresh(comic.getId());
+        assertThat(result.getTaskId()).isNotNull();
+        assertThat(result.getItemCount()).isEqualTo(1);
+        assertThat(comicMapper.selectById(comic.getId()).getStatus()).isEqualTo(ComicStatus.REFRESHING);
+
+        ManagementCommandRequestedEvent cmd = readSingleCommand(result.getTaskId());
+        assertThat(cmd.operationType()).isEqualTo("METADATA_REFRESH");
+        assertThat(cmd.targetType()).isEqualTo("COMIC");
+        assertThat(cmd.targetId()).isEqualTo(comic.getId());
+        assertThat(cmd.attempt()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("元数据刷新命令：漫画不存在 → 404")
+    void metadataRefresh_comicNotFound_throws404() {
+        assertThatThrownBy(() -> commandService.requestMetadataRefresh(99999L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getCode())
+                .isEqualTo(404);
+    }
+
+    @Test
+    @DisplayName("元数据刷新命令：非 READY 漫画 → 409")
+    void metadataRefresh_nonReadyComic_throws409() {
+        comic.setStatus(ComicStatus.IMPORTING);
+        comicMapper.updateById(comic);
+
         assertThatThrownBy(() -> commandService.requestMetadataRefresh(comic.getId()))
                 .isInstanceOf(ConflictException.class);
-
         assertThat(taskMapper.selectCount(new LambdaQueryWrapper<>())).isZero();
         assertThat(outboxMapper.selectCount(new LambdaQueryWrapper<>())).isZero();
+    }
+
+    @Test
+    @DisplayName("元数据刷新命令：并发双提交只有一个成功另一个 409")
+    void metadataRefresh_concurrentPosts_onlyOneActiveCommand() throws Exception {
+        int threadCount = 2;
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        CyclicBarrier barrier = new CyclicBarrier(threadCount);
+        ConcurrentLinkedQueue<OperationSubmitResultDTO> ok = new ConcurrentLinkedQueue<>();
+        ConcurrentLinkedQueue<Throwable> errors = new ConcurrentLinkedQueue<>();
+
+        for (int i = 0; i < threadCount; i++) {
+            executor.submit(() -> {
+                try {
+                    barrier.await();
+                    ok.add(commandService.requestMetadataRefresh(comic.getId()));
+                } catch (Throwable e) {
+                    errors.add(e);
+                }
+            });
+        }
+        executor.shutdown();
+        assertThat(executor.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+
+        assertThat(ok).hasSize(1);
+        assertThat(errors).hasSize(1);
+        assertThat(errors.peek()).isInstanceOf(ConflictException.class);
+
+        // 只产生一条命令
+        assertThat(outboxMapper.selectCount(new LambdaQueryWrapper<>())).isEqualTo(1);
     }
 
     // ======================== 元数据刷新完成事件（Todo 5 专用流程） ========================
@@ -598,8 +655,7 @@ class MediaOperationPipelineIT {
         assertThat(eligibilityService.forMedia(video.getId()).isAllowed(OperationPolicyService.OP_TRANSCODE)).isTrue();
 
         AllowedOperations comicOps = eligibilityService.forComic(comic.getId());
-        assertThat(comicOps.isAllowed(OperationPolicyService.OP_METADATA_REFRESH)).isFalse();
-        assertThat(comicOps.blockedReasons()).containsKey(OperationPolicyService.OP_METADATA_REFRESH);
+        assertThat(comicOps.isAllowed(OperationPolicyService.OP_METADATA_REFRESH)).isTrue();
     }
 
     // ======================== 辅助 ========================

@@ -13,7 +13,6 @@ import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.api.common.enums.TaskType;
 import com.comicatlas.api.common.exception.ConflictException;
-import com.comicatlas.common.constant.MetadataRefreshConstants;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -120,9 +119,6 @@ public class BatchOperationService {
      */
     @Transactional
     public BatchCreateResponse createBatch(BatchOperationRequest request, String idempotencyKey) {
-        if (request.getOperation() == TaskType.METADATA_REFRESH) {
-            throw new ConflictException(MetadataRefreshConstants.METADATA_REFRESH_DISABLED_REASON);
-        }
         String payload = toJson(request);
 
         // 幂等重放：同键同 payload 直接返回既有任务，不重复物化
@@ -235,6 +231,7 @@ public class BatchOperationService {
             case LQ_REGENERATE -> "批量重生成低清图";
             case HQ_DELETE -> "批量删除高清图";
             case TRANSCODE -> "批量视频转码";
+            case METADATA_REFRESH -> "批量刷新元数据";
             case COMIC_DELETE -> "批量回收漫画";
             case COMIC_RESTORE -> "批量恢复漫画";
             case COMIC_PURGE -> "批量永久清理";

@@ -922,4 +922,4 @@ OP_NOT_ALLOWED, COMIC_NOT_FOUND
 >
 > **导出为本地路径交互（v1.1）**：导出产物落在宿主机 `EXPORT/{taskId}/{base}.z01..zNN + {base}.zip`（标准分卷，主 `.zip` 为最后卷）。`GET /api/storage/export/tasks/{taskId}/artifacts` 返回有序分卷**元数据**（1-based index、文件名、字节大小、是否最后 `.zip`、本地物理路径），**不提供任何文件字节下载**；`POST /api/storage/export/tasks/{taskId}/open` 仅在宿主机打开文件管理器。HTTP 全程只传输任务/路径/状态/卷元数据，文件字节不经过 HTTP——把最后 `.zip` 的本地路径作为 `sourcePath` 即可重新导入该分卷（缺任一卷会失败，`.z01` 不可作为入口）。
 >
-> **METADATA_REFRESH 临时停用**：`METADATA_REFRESH`（扫盘刷新元数据）当前被全局临时阻断，提交后返回 `409`（`reasonCode = METADATA_REFRESH_DISABLED`，消息"元数据扫盘刷新已临时停用"），以隔离危险扫盘入口；`OperationPolicyService` / `BatchEligibilityChecker` / `ManagementTaskService` 统一引用 `MetadataRefreshConstants.METADATA_REFRESH_DISABLED_*`。恢复时需移除该阻断并放开 `METADATA_REFRESH` 权限位。
+> **METADATA_REFRESH（扫盘刷新元数据）**：`POST /api/storage/refresh-metadata/comics/{id}` 走统一命令管线（创建管理任务 + Outbox 发布，Worker 扫盘后回传快照结果），漫画不存在返回 404、非 READY 或并发被占用返回 409，成功返回 `202` 与 `OperationSubmitResultDTO`。批量 `METADATA_REFRESH` 资格与单项一致（仅 READY 漫画可执行）。

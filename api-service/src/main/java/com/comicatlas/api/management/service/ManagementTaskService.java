@@ -5,8 +5,11 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.api.common.constant.HttpStatusCodes;
+import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.common.exception.ConflictException;
+import com.comicatlas.api.comic.entity.Comic;
+import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.management.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
@@ -19,8 +22,6 @@ import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.api.common.enums.ManagementTaskStatus;
 import com.comicatlas.api.common.enums.TaskStage;
 import com.comicatlas.api.common.enums.TaskType;
-import com.comicatlas.api.common.exception.ConflictException;
-import com.comicatlas.common.constant.MetadataRefreshConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -49,6 +50,7 @@ public class ManagementTaskService {
 
     private final ManagementTaskMapper taskMapper;
     private final ManagementTaskItemMapper itemMapper;
+    private final ComicMapper comicMapper;
     private final com.comicatlas.api.outbox.service.OutboxService outboxService;
 
     // ======================== 创建任务 ========================
@@ -65,9 +67,6 @@ public class ManagementTaskService {
     public ManagementTaskResponse createTask(CreateManagementTaskRequest request,
                                               String idempotencyKey,
                                               String payload) {
-        if (isMetadataRefreshRequest(request)) {
-            throw new ConflictException(MetadataRefreshConstants.METADATA_REFRESH_DISABLED_REASON);
-        }
         // 幂等检查
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {
             ManagementTask existing = taskMapper.selectOne(
@@ -110,13 +109,27 @@ public class ManagementTaskService {
 
         taskMapper.insert(task);
 
-        // 创建目标项（带目标冲突锁检查）
+        // 创建目标项（带目标冲突锁检查 + 元数据刷新漫画 CAS）
         List<ManagementTaskItem> items = new ArrayList<>();
         if (request.getTargets() != null) {
             for (CreateManagementTaskRequest.TaskTarget target : request.getTargets()) {
                 TaskType opType = target.getOperationType() != null
                         ? target.getOperationType()
                         : request.getTaskType();
+
+                // 元数据刷新：同一事务 CAS 漫画 READY→REFRESHING（0 行 = 非 READY 或并发被占用 → 409）
+                if (opType == TaskType.METADATA_REFRESH) {
+                    int casRows = comicMapper.update(null, new LambdaUpdateWrapper<Comic>()
+                            .eq(Comic::getId, target.getTargetId())
+                            .eq(Comic::getStatus, ComicStatus.READY)
+                            .set(Comic::getStatus, ComicStatus.REFRESHING));
+                    if (casRows == 0) {
+                        throw new ConflictException(
+                                String.format("漫画 %d 不是 READY 或已被其他任务占用，无法创建元数据刷新任务",
+                                        target.getTargetId()));
+                    }
+                }
+
                 String lockKey = ManagementTaskItem.buildLockKey(
                         target.getTargetType(), target.getTargetId(), opType);
 
@@ -308,14 +321,31 @@ public class ManagementTaskService {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在: " + taskId);
         }
 
-        if (task.getTaskType() == TaskType.METADATA_REFRESH
-                || hasMetadataRefreshItem(taskId)) {
-            throw new ConflictException(MetadataRefreshConstants.METADATA_REFRESH_DISABLED_REASON);
-        }
-
         if (!task.getStatus().isTerminal()) {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST,
                     "任务 " + taskId + " 处于 " + task.getStatus() + "，仅终态可重试");
+        }
+
+        // 元数据刷新重试：先在同一事务 CAS 漫画 READY→REFRESHING（comic 非 READY → 冲突 409）
+        List<ManagementTaskItem> items = itemMapper.selectList(
+                new LambdaQueryWrapper<ManagementTaskItem>()
+                        .eq(ManagementTaskItem::getTaskId, taskId));
+        if (task.getTaskType() == TaskType.METADATA_REFRESH) {
+            for (ManagementTaskItem item : items) {
+                if (item.getOperationType() != TaskType.METADATA_REFRESH
+                        || !"COMIC".equals(item.getTargetType())) {
+                    continue;
+                }
+                int casRows = comicMapper.update(null, new LambdaUpdateWrapper<Comic>()
+                        .eq(Comic::getId, item.getTargetId())
+                        .eq(Comic::getStatus, ComicStatus.READY)
+                        .set(Comic::getStatus, ComicStatus.REFRESHING));
+                if (casRows == 0) {
+                    throw new ConflictException(
+                            String.format("漫画 %d 不是 READY 或已被其他任务占用，无法重试元数据刷新",
+                                    item.getTargetId()));
+                }
+            }
         }
 
         // 重置主任务（使用 LambdaUpdateWrapper 确保 null 字段写入）
@@ -336,9 +366,6 @@ public class ManagementTaskService {
                 .set(ManagementTask::getUpdatedAt, LocalDateTime.now()));
 
         // 重置失败/取消的 item（使用 LambdaUpdateWrapper 确保 nullable 字段写入）
-        List<ManagementTaskItem> items = itemMapper.selectList(
-                new LambdaQueryWrapper<ManagementTaskItem>()
-                        .eq(ManagementTaskItem::getTaskId, taskId));
         for (ManagementTaskItem item : items) {
             if (item.getStatus() == ManagementTaskStatus.FAILED
                     || item.getStatus() == ManagementTaskStatus.CANCELLED) {
@@ -397,28 +424,6 @@ public class ManagementTaskService {
             TaskType.CHAPTER_TRASH, TaskType.COMIC_RESTORE, TaskType.CHAPTER_RESTORE,
             TaskType.MEDIA_RESTORE, TaskType.COMIC_PURGE, TaskType.CHAPTER_PURGE,
             TaskType.MEDIA_PURGE);
-
-    /** 创建请求是否包含已停用的元数据扫盘刷新（主任务类型或任一 target）。 */
-    private static boolean isMetadataRefreshRequest(CreateManagementTaskRequest request) {
-        if (request.getTaskType() == TaskType.METADATA_REFRESH) {
-            return true;
-        }
-        if (request.getTargets() != null) {
-            for (CreateManagementTaskRequest.TaskTarget target : request.getTargets()) {
-                if (target.getOperationType() == TaskType.METADATA_REFRESH) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    /** 任务下是否存在已停用的元数据扫盘刷新 item。 */
-    private boolean hasMetadataRefreshItem(Long taskId) {
-        return itemMapper.selectCount(new LambdaQueryWrapper<ManagementTaskItem>()
-                .eq(ManagementTaskItem::getTaskId, taskId)
-                .eq(ManagementTaskItem::getOperationType, TaskType.METADATA_REFRESH)) > 0;
-    }
 
     // ======================== Item 状态更新 ========================
 

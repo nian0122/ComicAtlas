@@ -1,14 +1,16 @@
 package com.comicatlas.api.management.policy;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.common.enums.HqStatus;
 import com.comicatlas.api.common.enums.LqStatus;
 import com.comicatlas.api.comic.entity.Chapter;
+import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.entity.Media;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
+import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.api.common.enums.TranscodeStatus;
-import com.comicatlas.common.constant.MetadataRefreshConstants;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -29,6 +31,7 @@ public class MediaOperationEligibilityService {
 
     private final ChapterMapper chapterMapper;
     private final MediaMapper mediaMapper;
+    private final ComicMapper comicMapper;
     private final OperationPolicyService policyService;
 
     private static final Set<String> COMPAT_CONTAINERS = Set.of("mp4", "webm");
@@ -76,8 +79,13 @@ public class MediaOperationEligibilityService {
         } else {
             blocked.put(OperationPolicyService.OP_TRANSCODE, "没有需要转码的视频页");
         }
-        blocked.put(OperationPolicyService.OP_METADATA_REFRESH,
-                MetadataRefreshConstants.METADATA_REFRESH_DISABLED_MESSAGE);
+        Comic comic = comicMapper.selectById(comicId);
+        if (comic != null && comic.getStatus() == ComicStatus.READY) {
+            allowed.add(OperationPolicyService.OP_METADATA_REFRESH);
+        } else {
+            blocked.put(OperationPolicyService.OP_METADATA_REFRESH,
+                    "漫画状态不是 READY，无法刷新元数据");
+        }
 
         return AllowedOperations.of(allowed, blocked);
     }

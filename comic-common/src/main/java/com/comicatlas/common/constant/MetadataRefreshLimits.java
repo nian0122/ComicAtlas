@@ -3,8 +3,7 @@ package com.comicatlas.common.constant;
 /**
  * 元数据扫盘刷新统一限制常量 — 冻结的容量与路径契约。
  * <p>
- * 与 {@link MetadataRefreshConstants}（fail-closed 临时停用常量，待移除）职责不同：
- * 本类描述「功能启用后」的快照产物上限与落盘路径布局，供 API/Worker 两侧共用，
+ * 描述「功能启用后」的快照产物上限与落盘路径布局，供 API/Worker 两侧共用，
  * 保证上限判定与路径模板在两端一致。
  */
 public final class MetadataRefreshLimits {

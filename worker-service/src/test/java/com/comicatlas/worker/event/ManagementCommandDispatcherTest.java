@@ -16,6 +16,8 @@ import org.junit.jupiter.api.Test;
 import java.time.Instant;
 import java.util.UUID;
 
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -51,7 +53,7 @@ class ManagementCommandDispatcherTest {
         dispatcher.handle(cmd, channel, 1L);
 
         verify(metadataRefreshCommandHandler).refresh(cmd);
-        verify(publisher, never()).failed(cmd, com.comicatlas.common.constant.MetadataRefreshConstants.METADATA_REFRESH_DISABLED_REASON);
+        verify(publisher, never()).failed(eq(cmd), anyString());
         verifyNoInteractions(lqCommandHandler, hqDeleteCommandHandler, transcodeCommandHandler,
                 trashCommandHandler, restoreCommandHandler, purgeCommandHandler,
                 mediaUploadCommandHandler);

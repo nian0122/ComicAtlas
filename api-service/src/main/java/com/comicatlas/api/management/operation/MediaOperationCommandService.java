@@ -3,13 +3,16 @@ package com.comicatlas.api.management.operation;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.api.common.constant.HttpStatusCodes;
+import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.common.enums.HqStatus;
 import com.comicatlas.api.common.enums.LqStatus;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.common.exception.ConflictException;
 import com.comicatlas.api.comic.entity.Chapter;
+import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.entity.Media;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
+import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.api.management.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
@@ -18,7 +21,6 @@ import com.comicatlas.api.management.dto.OperationSubmitResultDTO;
 import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.management.trash.TrashLifecycleService;
 import com.comicatlas.api.outbox.service.OutboxService;
-import com.comicatlas.common.constant.MetadataRefreshConstants;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.api.common.enums.TaskType;
@@ -27,6 +29,7 @@ import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -48,6 +51,7 @@ public class MediaOperationCommandService {
 
     private final ChapterMapper chapterMapper;
     private final MediaMapper mediaMapper;
+    private final ComicMapper comicMapper;
     private final ManagementTaskService managementTaskService;
     private final OutboxService outboxService;
     private final TrashLifecycleService trashLifecycleService;
@@ -331,15 +335,33 @@ public class MediaOperationCommandService {
                 .set(Media::getTranscodeStatus, TranscodeStatus.QUEUED));
     }
 
-    // ======================== 元数据刷新（fail-closed 停用） ========================
+    // ======================== 元数据刷新 ========================
 
     /**
-     * 请求元数据扫盘刷新：已临时停用，创建 task/outbox 前直接拒绝。
+     * 请求元数据扫盘刷新：重读 HQ 目录生成快照 → Worker 合并 DB（异步执行）。
      * <p>
-     * 安全重导出（DB→JSON）由转码完成等场景经 MediaMetadataSyncService 触发，不走本命令管线。
+     * 与 LQ/HQ/转码同一命令管线：同事务 CAS 漫画 READY→REFRESHING（0 行 = 并发被占用 409）、
+     * 创建单个 COMIC/METADATA_REFRESH item（零章节也创建），并发布命令到 Outbox。
+     * 漫画不存在 404；非 READY 状态 409。
      */
+    @Transactional
     public OperationSubmitResultDTO requestMetadataRefresh(Long comicId) {
-        throw new ConflictException(MetadataRefreshConstants.METADATA_REFRESH_DISABLED_REASON);
+        Comic comic = comicMapper.selectById(comicId);
+        if (comic == null) {
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在: " + comicId);
+        }
+        if (comic.getStatus() != ComicStatus.READY) {
+            throw new ConflictException("漫画状态 " + comic.getStatus() + " 不支持元数据刷新，仅 READY 可刷新");
+        }
+
+        ManagementTaskResponse task = createTask(TaskType.METADATA_REFRESH, "刷新元数据", "COMIC",
+                List.of(target("COMIC", comicId, TaskType.METADATA_REFRESH)));
+        ManagementTaskItemResponse item = managementTaskService.getTaskItems(task.getId()).get(0);
+
+        enqueue(TaskType.METADATA_REFRESH, item, "COMIC", comicId);
+        log.info("元数据刷新命令已提交: comicId={}, taskId={}", comicId, task.getId());
+        return OperationSubmitResultDTO.of(task.getId(), TaskType.METADATA_REFRESH.name(),
+                task.getStatus().name(), 1);
     }
 
     // ======================== 整本删除（回收/永久清理重定向） ========================

@@ -1,6 +1,5 @@
 package com.comicatlas.api.management.policy;
 
-import com.comicatlas.common.constant.MetadataRefreshConstants;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
@@ -57,8 +56,7 @@ public class OperationPolicyService {
                 break;
             case "READY":
                 allowed.addAll(Set.of(OP_READ, OP_EDIT, OP_DELETE,
-                    OP_LQ_GENERATE, OP_HQ_DELETE));
-                blocked.put(OP_METADATA_REFRESH, MetadataRefreshConstants.METADATA_REFRESH_DISABLED_MESSAGE);
+                    OP_LQ_GENERATE, OP_HQ_DELETE, OP_METADATA_REFRESH));
                 break;
             case "RECOVERY_REQUIRED":
                 allowed.addAll(Set.of(OP_RECOVER, OP_DELETE));
