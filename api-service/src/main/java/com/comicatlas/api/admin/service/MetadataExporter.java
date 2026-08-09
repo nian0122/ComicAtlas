@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Component
@@ -48,6 +49,7 @@ public class MetadataExporter {
     /**
      * 将漫画的全量元数据（catalog、chapter、page）导出为 metadata JSON 文件，
      * v3 格式由共享 MetadataJsonBuilder 构建（与 worker 侧一致）。
+     * 页面数据按该漫画全部 chapterIds 一次 IN 查询批量加载后在内存分组，避免逐章节 N+1。
      *
      * @param comicId 漫画 ID
      * @return 写入的 metadata JSON 文件路径
@@ -87,6 +89,16 @@ public class MetadataExporter {
                         .eq(Chapter::getComicId, comicId)
                         .orderByAsc(Chapter::getGlobalOrder));
 
+        // 3b. 一次 IN 查询批量加载全部 media（避免逐章节 N+1），按 chapterId 分组；
+        // 查询按 pageNumber 排序，分组后各章节内保持页码顺序，与改动前输出语义一致
+        List<Long> chapterIds = chapters.stream().map(Chapter::getId).toList();
+        List<Media> allMedia = chapterIds.isEmpty() ? List.of() : mediaMapper.selectList(
+                new LambdaQueryWrapper<Media>()
+                        .in(Media::getChapterId, chapterIds)
+                        .orderByAsc(Media::getPageNumber));
+        Map<Long, List<Media>> mediaByChapter = allMedia.stream()
+                .collect(Collectors.groupingBy(Media::getChapterId));
+
         // 4-5. 组装 MetadataV3（api 特有：comic 带 category/tags，media 过滤无效文件名）
         MetadataV3.Comic comicInfo = new MetadataV3.Comic(
                 comic.getTitle() != null ? comic.getTitle() : "",
@@ -104,11 +116,7 @@ public class MetadataExporter {
 
         List<MetadataV3.Chapter> chapterList = new ArrayList<>();
         for (Chapter chapter : chapters) {
-            // 4. For each chapter: SELECT pages ordered by pageNumber
-            List<Media> mediaItems = mediaMapper.selectList(
-                    new LambdaQueryWrapper<Media>()
-                            .eq(Media::getChapterId, chapter.getId())
-                            .orderByAsc(Media::getPageNumber));
+            List<Media> mediaItems = mediaByChapter.getOrDefault(chapter.getId(), List.of());
 
             List<MetadataV3.MediaItem> mediaItemList = new ArrayList<>();
             for (Media media : mediaItems) {

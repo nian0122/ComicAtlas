@@ -1,6 +1,7 @@
 package com.comicatlas.worker.export;
 
 import com.comicatlas.common.metadata.MetadataV3;
+import com.comicatlas.common.storage.InvalidRelativePathException;
 import com.comicatlas.worker.entity.ExportCatalog;
 import com.comicatlas.worker.entity.ExportChapter;
 import com.comicatlas.worker.entity.ExportComic;
@@ -63,7 +64,46 @@ class MetadataModelMapperTest {
         assertEquals(0, v3.chapters().get(0).catalogIndex().intValue(), "catalogIndex 应映射为 catalogs 列表索引");
         assertEquals(1, v3.chapters().get(0).mediaItems().size());
         assertEquals("001.jpg", v3.chapters().get(0).mediaItems().get(0).fileName());
+        assertEquals("1/20/001.jpg", v3.chapters().get(0).mediaItems().get(0).hqPath(),
+                "hqPath 必须原样输出 DB 中的真实相对路径，不得用 globalOrder/chapterNo/fileName 重建");
         assertEquals("IMAGE", v3.chapters().get(0).mediaItems().get(0).mediaType());
+    }
+
+    @Test
+    void toV3_missingHqPath_throwsIllegalArgumentException() {
+        ExportComic comic = new ExportComic();
+        comic.setId(1L);
+        comic.setTitle("标题");
+        ExportChapter ch = new ExportChapter();
+        ch.setId(20L);
+        ch.setComicId(1L);
+        ch.setTitle("章节1");
+        ch.setGlobalOrder(1);
+        ExportMedia m = media(100L, 20L, null, "IMAGE", 1);
+
+        ExportCollectResult result = new ExportCollectResult(comic, List.of(ch), List.of(), List.of(m), null);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> mapper.toV3(result));
+        assertTrue(ex.getMessage().contains("hqPath"),
+                "缺失 hqPath 的异常信息应包含 hqPath 上下文: " + ex.getMessage());
+    }
+
+    @Test
+    void toV3_invalidHqPath_throwsInvalidRelativePathException() {
+        ExportComic comic = new ExportComic();
+        comic.setId(1L);
+        comic.setTitle("标题");
+        ExportChapter ch = new ExportChapter();
+        ch.setId(20L);
+        ch.setComicId(1L);
+        ch.setTitle("章节1");
+        ch.setGlobalOrder(1);
+        // 反斜杠路径违反相对路径契约，MetadataV3 构造器应自然抛 InvalidRelativePathException
+        ExportMedia m = media(100L, 20L, "1\\20\\001.jpg", "IMAGE", 1);
+
+        ExportCollectResult result = new ExportCollectResult(comic, List.of(ch), List.of(), List.of(m), null);
+
+        assertThrows(InvalidRelativePathException.class, () -> mapper.toV3(result));
     }
 
     @Test
