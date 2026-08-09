@@ -28,9 +28,11 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * 目录扫描预览（只读）组件 — Worker 侧。
+ * 目录扫描预览（只读）组件 — Worker 侧，语义为「漫画集根目录批量发现」。
  * <p>
- * 复用 {@link DirectoryParser} 的只读解析能力：每个候选子目录先经
+ * 用户选择的父目录作为「漫画集根目录」，其直接子目录各是一本候选漫画；
+ * 每个候选内部递归预览所有层级的媒体与警告。
+ * 复用 {@link DirectoryParser} 的只读解析能力：每个候选漫画先经
  * {@link DirectoryParser#parse(Path, String)} 得到规范化目录树，再轻量归一化为
  * {@link ScanPreviewNodeDTO} 预览树，保证与真实导入使用的 metadata 树结构/计数一致。
  * 解析期确定错误转换为结构化 {@link ScanWarningDTO}：UNREADABLE_DIRECTORY /
@@ -52,11 +54,12 @@ public class DirectoryScanPreviews {
     private final DirectoryParser directoryParser;
 
     /**
-     * 扫描父目录下的漫画候选子目录，返回可导入来源清单与规范化预览树。
+     * 批量发现漫画集根目录的直接子目录作为候选漫画，每个候选内部递归预览媒体与警告，
+     * 返回可导入来源清单与规范化预览树。
      *
-     * @param parentDir 待扫描的父目录
+     * @param parentDir 待扫描的漫画集根目录
      * @return 扫描结果（含 items/preview/warnings）
-     * @throws IllegalArgumentException 父目录不存在、不是目录或不可读（消息脱敏，不含完整路径）
+     * @throws IllegalArgumentException 漫画集根目录不存在、不是目录或不可读（消息脱敏，不含完整路径）
      */
     public ScanResultDTO scan(Path parentDir) {
         if (parentDir == null || !Files.exists(parentDir)) {
