@@ -3,6 +3,7 @@ package com.comicatlas.api.storage.controller;
 import com.comicatlas.api.export.dto.ExportTaskVO;
 import com.comicatlas.api.management.dto.OperationSubmitResultDTO;
 import com.comicatlas.api.management.operation.MediaOperationCommandService;
+import com.comicatlas.api.storage.dto.ExportArtifactVO;
 import com.comicatlas.api.storage.service.ExportOperationService;
 import com.comicatlas.api.storage.service.HqDeleteOperationService;
 import com.comicatlas.api.storage.service.LqOperationService;
@@ -12,7 +13,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-import java.nio.file.Path;
 import java.util.List;
 
 import static org.mockito.Mockito.mock;
@@ -20,7 +20,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -154,20 +153,42 @@ class StorageOperationControllerTest {
     }
 
     @Test
-    void downloadExport_返回文件流() throws Exception {
-        ExportTaskVO vo = new ExportTaskVO();
-        vo.setId(1L);
-        Path tempFile = java.nio.file.Files.createTempFile("export-test", ".zip");
-        try {
-            vo.setPhysicalPath(tempFile.toString().replace("\\", "/"));
-            java.nio.file.Files.writeString(tempFile, "hello");
-            when(exportOperationService.getTask(1L)).thenReturn(vo);
-            mvc.perform(get("/api/storage/export/tasks/1/download"))
-                    .andExpect(status().isOk())
-                    .andExpect(header().string("Content-Disposition", org.hamcrest.Matchers.containsString("attachment")));
-        } finally {
-            java.nio.file.Files.deleteIfExists(tempFile);
-        }
+    void getExportArtifacts_按顺序返回分卷元数据清单() throws Exception {
+        when(exportOperationService.listArtifacts(7L))
+                .thenReturn(List.of(
+                        artifact(1, "base.z01", 3L, false),
+                        artifact(2, "base.z02", 5L, false),
+                        artifact(3, "base.zip", 2L, true)));
+
+        mvc.perform(get("/api/storage/export/tasks/7/artifacts"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(3))
+                .andExpect(jsonPath("$.data[0].index").value(1))
+                .andExpect(jsonPath("$.data[0].fileName").value("base.z01"))
+                .andExpect(jsonPath("$.data[0].lastSegment").value(false))
+                .andExpect(jsonPath("$.data[2].index").value(3))
+                .andExpect(jsonPath("$.data[2].fileName").value("base.zip"))
+                .andExpect(jsonPath("$.data[2].lastSegment").value(true));
+
+        verify(exportOperationService).listArtifacts(7L);
+    }
+
+    @Test
+    void downloadExport_旧下载端点已移除返回404() throws Exception {
+        mvc.perform(get("/api/storage/export/tasks/1/download"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void downloadArtifact_逐卷下载端点不存在返回404() throws Exception {
+        mvc.perform(get("/api/storage/export/tasks/1/artifacts/1/download"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void downloadArtifact_分卷无独立元数据端点返回404() throws Exception {
+        mvc.perform(get("/api/storage/export/tasks/1/artifacts/1"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
@@ -187,6 +208,16 @@ class StorageOperationControllerTest {
         vo.setStatus("PROCESSING");
         vo.setProgress(50);
         vo.setOutputPath("comics/" + comicId + "/" + id + ".zip");
+        return vo;
+    }
+
+    private ExportArtifactVO artifact(int index, String fileName, long size, boolean lastSegment) {
+        ExportArtifactVO vo = new ExportArtifactVO();
+        vo.setIndex(index);
+        vo.setFileName(fileName);
+        vo.setSize(size);
+        vo.setLastSegment(lastSegment);
+        vo.setPhysicalPath("/export/" + index + "/" + fileName);
         return vo;
     }
 }

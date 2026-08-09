@@ -7,6 +7,8 @@ import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.common.enums.ExportTaskStatus;
 import com.comicatlas.api.common.exception.BusinessException;
+import com.comicatlas.api.common.storage.ApiStorageProperties;
+import com.comicatlas.api.common.storage.PathTraversalException;
 import com.comicatlas.api.export.dto.ExportTaskVO;
 import com.comicatlas.api.export.entity.ExportTask;
 import com.comicatlas.api.export.event.ExportEventPublisher;
@@ -17,7 +19,6 @@ import com.comicatlas.api.management.dto.ManagementTaskResponse;
 import com.comicatlas.api.management.service.ManagementTaskService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -30,13 +31,13 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ExportServiceImpl implements ExportService {
 
+    private static final String DEFAULT_OUTPUT_ROOT = "EXPORT";
+
     private final ComicMapper comicMapper;
     private final ExportTaskMapper exportTaskMapper;
     private final ExportEventPublisher eventPublisher;
     private final ManagementTaskService managementTaskService;
-
-    @Value("${export.output-dir}")
-    private String exportDir;
+    private final ApiStorageProperties storageProperties;
 
     @Override
     @Transactional
@@ -130,11 +131,16 @@ public class ExportServiceImpl implements ExportService {
         vo.setCreatedAt(task.getCreatedAt());
         vo.setCompletedAt(task.getCompletedAt());
 
-        // 计算物理路径: exportDir + "/" + outputPath
+        // 计算物理路径：经逻辑存储根（默认 EXPORT）安全解析 outputPath，而非字符串拼接
         if (task.getOutputPath() != null && !task.getOutputPath().isBlank()) {
-            String root = task.getOutputRoot() != null && !task.getOutputRoot().isBlank()
-                ? task.getOutputRoot() : exportDir;
-            vo.setPhysicalPath(root.replace("\\", "/") + "/" + task.getOutputPath());
+            String rootKey = task.getOutputRoot() != null && !task.getOutputRoot().isBlank()
+                    ? task.getOutputRoot() : DEFAULT_OUTPUT_ROOT;
+            try {
+                vo.setPhysicalPath(storageProperties.root(rootKey).resolve(task.getOutputPath()).toString());
+            } catch (PathTraversalException e) {
+                log.warn("导出任务物理路径穿越被拒绝: taskId={}", task.getId());
+                vo.setPhysicalPath(null);
+            }
         }
         return vo;
     }
