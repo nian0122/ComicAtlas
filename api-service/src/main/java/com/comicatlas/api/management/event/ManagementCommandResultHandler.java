@@ -13,14 +13,12 @@ import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.common.enums.HqStatus;
 import com.comicatlas.api.common.enums.LqStatus;
-import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.management.trash.TrashManifestService;
 import com.comicatlas.api.outbox.service.InboxService;
 import com.comicatlas.api.reader.entity.ReadingHistory;
 import com.comicatlas.api.reader.mapper.ReadingHistoryMapper;
-import com.comicatlas.api.storage.service.MetadataRefreshService;
 import com.comicatlas.api.storage.service.MediaMetadataSyncService;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqQueues;
@@ -89,7 +87,6 @@ public class ManagementCommandResultHandler {
     private final ObjectMapper objectMapper;
     private final UploadSessionMapper uploadSessionMapper;
     private final UploadSessionService uploadSessionService;
-    private final MetadataRefreshService metadataRefreshService;
     private final MediaMetadataSyncService mediaMetadataSyncService;
     private final MqConsumerSupport mqConsumerSupport;
 
@@ -187,16 +184,10 @@ public class ManagementCommandResultHandler {
             case "CHAPTER_PURGE" -> applyChapterPurgeCompleted(ev.targetId());
             case "MEDIA_PURGE" -> applyMediaPurgeCompleted(ev.targetId());
             case "METADATA_REFRESH" -> {
-                if (comicScope) {
-                    try {
-                        metadataRefreshService.refresh(ev.targetId());
-                    } catch (BusinessException e) {
-                        // 漫画非 READY / 并发刷新冲突属于业务态问题：任务项已 SUCCEEDED，
-                        // 不应把消息送 DLQ，DB 刷新可由用户稍后通过接口手动重新触发
-                        log.warn("METADATA_REFRESH 业务刷新跳过: comicId={}, reason={}",
-                                ev.targetId(), e.getMessage());
-                    }
-                }
+                // 危险扫盘刷新已停用：completed 回调不再调用 MetadataRefreshService。
+                // Worker dispatcher 已对该命令直接回 FAILED，此分支仅防御性兜底。
+                log.warn("METADATA_REFRESH completed 事件被忽略（元数据扫盘刷新已临时停用）: comicId={}",
+                        ev.targetId());
             }
             default -> log.warn("未知 completed 操作类型: {}", ev.operationType());
         }

@@ -1,20 +1,18 @@
 package com.comicatlas.api.storage.controller;
 
-import com.comicatlas.api.admin.dto.RefreshMetadataResultDTO;
 import com.comicatlas.api.export.dto.ExportTaskVO;
 import com.comicatlas.api.management.dto.OperationSubmitResultDTO;
 import com.comicatlas.api.management.operation.MediaOperationCommandService;
 import com.comicatlas.api.storage.service.ExportOperationService;
 import com.comicatlas.api.storage.service.HqDeleteOperationService;
 import com.comicatlas.api.storage.service.LqOperationService;
-import com.comicatlas.api.storage.service.MetadataRefreshService;
 import com.comicatlas.api.storage.service.TranscodeOperationService;
+import com.comicatlas.common.constant.MetadataRefreshConstants;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.nio.file.Path;
-import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.mockito.Mockito.mock;
@@ -32,10 +30,9 @@ class StorageOperationControllerTest {
     private final LqOperationService lqService = new LqOperationService(commandService);
     private final HqDeleteOperationService hqService = new HqDeleteOperationService(commandService);
     private final TranscodeOperationService transcodeService = new TranscodeOperationService(commandService);
-    private final MetadataRefreshService metadataRefreshService = mock(MetadataRefreshService.class);
     private final ExportOperationService exportOperationService = mock(ExportOperationService.class);
     private final StorageOperationController controller =
-            new StorageOperationController(lqService, hqService, transcodeService, metadataRefreshService, exportOperationService);
+            new StorageOperationController(lqService, hqService, transcodeService, exportOperationService);
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
 
     @Test
@@ -110,17 +107,11 @@ class StorageOperationControllerTest {
     }
 
     @Test
-    void refreshMetadata_委托刷新服务并返回结果() throws Exception {
-        when(metadataRefreshService.refresh(42L))
-                .thenReturn(new RefreshMetadataResultDTO(42L, "READY", 0, 3, 20, 15L, LocalDateTime.now()));
-
+    void refreshMetadata_固定返回409并携带统一停用码() throws Exception {
         mvc.perform(post("/api/storage/refresh-metadata/comics/42"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.comicId").value(42))
-                .andExpect(jsonPath("$.data.status").value("READY"))
-                .andExpect(jsonPath("$.data.pages").value(20));
-
-        verify(metadataRefreshService).refresh(42L);
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value(409))
+                .andExpect(jsonPath("$.message").value(MetadataRefreshConstants.METADATA_REFRESH_DISABLED_REASON));
     }
 
     @Test

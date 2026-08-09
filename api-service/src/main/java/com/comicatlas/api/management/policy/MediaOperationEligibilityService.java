@@ -8,6 +8,7 @@ import com.comicatlas.api.comic.entity.Media;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.api.common.enums.TranscodeStatus;
+import com.comicatlas.common.constant.MetadataRefreshConstants;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -75,7 +76,8 @@ public class MediaOperationEligibilityService {
         } else {
             blocked.put(OperationPolicyService.OP_TRANSCODE, "没有需要转码的视频页");
         }
-        allowed.add(OperationPolicyService.OP_METADATA_REFRESH);
+        blocked.put(OperationPolicyService.OP_METADATA_REFRESH,
+                MetadataRefreshConstants.METADATA_REFRESH_DISABLED_MESSAGE);
 
         return AllowedOperations.of(allowed, blocked);
     }

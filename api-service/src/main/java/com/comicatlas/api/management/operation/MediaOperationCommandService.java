@@ -8,10 +8,8 @@ import com.comicatlas.api.common.enums.LqStatus;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.common.exception.ConflictException;
 import com.comicatlas.api.comic.entity.Chapter;
-import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.entity.Media;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
-import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.api.management.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
@@ -20,6 +18,7 @@ import com.comicatlas.api.management.dto.OperationSubmitResultDTO;
 import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.management.trash.TrashLifecycleService;
 import com.comicatlas.api.outbox.service.OutboxService;
+import com.comicatlas.common.constant.MetadataRefreshConstants;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.api.common.enums.TaskType;
@@ -49,7 +48,6 @@ public class MediaOperationCommandService {
 
     private final ChapterMapper chapterMapper;
     private final MediaMapper mediaMapper;
-    private final ComicMapper comicMapper;
     private final ManagementTaskService managementTaskService;
     private final OutboxService outboxService;
     private final TrashLifecycleService trashLifecycleService;
@@ -333,20 +331,15 @@ public class MediaOperationCommandService {
                 .set(Media::getTranscodeStatus, TranscodeStatus.QUEUED));
     }
 
-    // ======================== 元数据刷新 ========================
+    // ======================== 元数据刷新（fail-closed 停用） ========================
 
+    /**
+     * 请求元数据扫盘刷新：已临时停用，创建 task/outbox 前直接拒绝。
+     * <p>
+     * 安全重导出（DB→JSON）由转码完成等场景经 MediaMetadataSyncService 触发，不走本命令管线。
+     */
     public OperationSubmitResultDTO requestMetadataRefresh(Long comicId) {
-        Comic comic = comicMapper.selectById(comicId);
-        if (comic == null) {
-            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在: " + comicId);
-        }
-        ManagementTaskResponse task = createTask(TaskType.METADATA_REFRESH, "刷新元数据", "COMIC",
-                List.of(target("COMIC", comicId, TaskType.METADATA_REFRESH)));
-        ManagementTaskItemResponse item = managementTaskService.getTaskItems(task.getId()).get(0);
-
-        enqueue(TaskType.METADATA_REFRESH, item, "COMIC", comicId);
-        log.info("元数据刷新命令已提交: comicId={}, taskId={}", comicId, task.getId());
-        return OperationSubmitResultDTO.of(task.getId(), TaskType.METADATA_REFRESH.name(), task.getStatus().name(), 1);
+        throw new ConflictException(MetadataRefreshConstants.METADATA_REFRESH_DISABLED_REASON);
     }
 
     // ======================== 整本删除（回收/永久清理重定向） ========================

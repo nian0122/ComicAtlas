@@ -1,12 +1,12 @@
 package com.comicatlas.worker.event;
 
+import com.comicatlas.common.constant.MetadataRefreshConstants;
 import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.worker.command.HqDeleteCommandHandler;
 import com.comicatlas.worker.command.LqCommandHandler;
 import com.comicatlas.worker.command.MediaUploadCommandHandler;
-import com.comicatlas.worker.command.MetadataRefreshCommandHandler;
 import com.comicatlas.worker.command.PurgeCommandHandler;
 import com.comicatlas.worker.command.RestoreCommandHandler;
 import com.comicatlas.worker.command.TranscodeCommandHandler;
@@ -34,7 +34,6 @@ public class ManagementCommandDispatcher {
     private final LqCommandHandler lqCommandHandler;
     private final HqDeleteCommandHandler hqDeleteCommandHandler;
     private final TranscodeCommandHandler transcodeCommandHandler;
-    private final MetadataRefreshCommandHandler metadataRefreshCommandHandler;
     private final TrashCommandHandler trashCommandHandler;
     private final RestoreCommandHandler restoreCommandHandler;
     private final PurgeCommandHandler purgeCommandHandler;
@@ -74,7 +73,8 @@ public class ManagementCommandDispatcher {
                 }
             }
             case "TRANSCODE" -> transcodeCommandHandler.transcode(cmd);
-            case "METADATA_REFRESH" -> metadataRefreshCommandHandler.refresh(cmd);
+            case "METADATA_REFRESH" -> publisher.failed(cmd,
+                    MetadataRefreshConstants.METADATA_REFRESH_DISABLED_REASON);
             case "COMIC_DELETE", "CHAPTER_TRASH", "MEDIA_TRASH" -> trashCommandHandler.trash(cmd);
             case "COMIC_RESTORE", "CHAPTER_RESTORE", "MEDIA_RESTORE" -> restoreCommandHandler.restore(cmd);
             case "COMIC_PURGE", "CHAPTER_PURGE", "MEDIA_PURGE" -> purgeCommandHandler.purge(cmd);
