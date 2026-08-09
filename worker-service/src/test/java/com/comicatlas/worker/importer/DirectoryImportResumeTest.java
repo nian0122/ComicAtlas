@@ -64,6 +64,7 @@ class DirectoryImportResumeTest {
                 transferService,
                 objectMapper,
                 mock(com.comicatlas.worker.image.CoverGenerator.class),
+                new CoverCandidateSelector(),
                 cancelHandler,
                 manifestManager);
     }
@@ -241,7 +242,7 @@ class DirectoryImportResumeTest {
         // 重新装配 handler（@RequiredArgsConstructor 无 setter，用新实例）
         com.comicatlas.worker.image.CoverGenerator coverGen = mock(com.comicatlas.worker.image.CoverGenerator.class);
         handler = new DirectoryImportHandler(parser, assembler, transferService, objectMapper,
-                coverGen, cancelHandler, manifestManager);
+                coverGen, new CoverCandidateSelector(), cancelHandler, manifestManager);
     }
 
     private ComicMetadata sampleMetadata() throws IOException {
