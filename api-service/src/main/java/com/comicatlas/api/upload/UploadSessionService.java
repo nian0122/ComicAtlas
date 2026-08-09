@@ -60,6 +60,9 @@ import com.comicatlas.api.upload.dto.UploadSessionStatusResponse;
  * uploadChunk → 委托存储层流式写分片；complete → 校验完整性与魔数后
  * 预建 STAGING media rows + 创建管理任务 + 同事务 Outbox 发布命令；
  * cancel/expire → 清理 STAGING 文件与会话。
+ * <p>
+ * 预留接口能力：媒体上传/替换功能契约已实现且测试可用（见 MediaUploadManagementIT），
+ * 但当前无前端页面入口，不属于漫画导入主流程。
  */
 @Slf4j
 @Service

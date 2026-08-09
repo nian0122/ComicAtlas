@@ -78,6 +78,8 @@ public class ManagementCommandDispatcher {
             case "COMIC_DELETE", "CHAPTER_TRASH", "MEDIA_TRASH" -> trashCommandHandler.trash(cmd);
             case "COMIC_RESTORE", "CHAPTER_RESTORE", "MEDIA_RESTORE" -> restoreCommandHandler.restore(cmd);
             case "COMIC_PURGE", "CHAPTER_PURGE", "MEDIA_PURGE" -> purgeCommandHandler.purge(cmd);
+            // MEDIA_UPLOAD / MEDIA_REPLACE：预留接口能力（后端已实现且测试可用，
+            // 当前无前端页面入口，不属于漫画导入主流程）
             case "MEDIA_UPLOAD", "MEDIA_REPLACE" -> mediaUploadCommandHandler.handle(cmd);
             default -> throw new IllegalStateException("未知管理命令操作类型: " + cmd.operationType());
         }

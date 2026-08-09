@@ -27,6 +27,9 @@ import java.io.IOException;
  * <p>
  * 分片以原始字节流接收（Content-Range + X-Sha256 头），服务端流式写入 STAGING，
  * 不缓冲到内存。STAGING 不经 Nginx 暴露，不可下载。
+ * <p>
+ * 预留接口能力：媒体上传/替换功能契约已实现且测试可用（见 MediaUploadManagementIT），
+ * 但当前无前端页面入口，不属于漫画导入主流程。
  */
 @RestController
 @RequestMapping("/api/uploads")
