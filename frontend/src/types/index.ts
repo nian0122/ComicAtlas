@@ -75,6 +75,8 @@ export interface CatalogNode {
   title: string | null
   children: CatalogNode[]
   chapters: ChapterRef[]
+  /** 目录在阅读顺序中的锚点（= 其下最小子项 globalOrder），用于与章节混合排布 */
+  globalOrder?: number | null
 }
 
 export interface ChapterRef {

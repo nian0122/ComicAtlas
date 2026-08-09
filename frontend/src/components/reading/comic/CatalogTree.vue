@@ -111,7 +111,8 @@ watch(
  * 递归扁平化目录树：
  * - 有标题的节点输出 header 行，仅在展开时输出其章节与子节点
  * - 无标题的节点不输出 header，章节与子节点始终可见
- * 缩进规则与原 CatalogTreeNode 保持一致。
+ * 同级章节与子目录按 globalOrder 混合排布（目录锚点 = 其下最小子项 globalOrder），
+ * 保持与源目录文件名顺序一致。
  */
 function walkNodes(nodes: CatalogNode[], depth: number, path: string, out: FlatItem[]) {
   nodes.forEach((node, index) => {
@@ -124,27 +125,38 @@ function walkNodes(nodes: CatalogNode[], depth: number, path: string, out: FlatI
         flatKey: `h:${nodePath}`,
         nodeId: nodeKey,
         title: node.title,
-        count: node.chapters?.length ?? 0,
+        count: (node.chapters?.length ?? 0) + (node.children?.length ?? 0),
         depth,
       })
     }
 
     if (!node.title || isExpanded(nodeKey)) {
       const indent = (node.title ? depth + 1 : depth) * 16
-      for (const ch of node.chapters ?? []) {
-        out.push({
-          type: 'chapter',
-          flatKey: `c:${ch.id}`,
-          chapterId: ch.id,
-          chapterNo: ch.chapterNo,
-          title: ch.title,
-          pageCount: ch.pageCount,
-          status: ch.status,
-          chapter: ch,
-          indent,
-        })
+      const chapters = node.chapters ?? []
+      const children = node.children ?? []
+      const items = [
+        ...chapters.map((ch) => ({ kind: 'chapter' as const, order: ch.globalOrder, chapter: ch })),
+        ...children.map((child) => ({ kind: 'catalog' as const, order: child.globalOrder ?? Number.MAX_SAFE_INTEGER, node: child })),
+      ].sort((a, b) => a.order - b.order || a.kind.localeCompare(b.kind))
+
+      for (const item of items) {
+        if (item.kind === 'chapter') {
+          const ch = item.chapter
+          out.push({
+            type: 'chapter',
+            flatKey: `c:${ch.id}`,
+            chapterId: ch.id,
+            chapterNo: ch.chapterNo,
+            title: ch.title,
+            pageCount: ch.pageCount,
+            status: ch.status,
+            chapter: ch,
+            indent,
+          })
+        } else {
+          walkNodes([item.node], depth + 1, nodePath, out)
+        }
       }
-      walkNodes(node.children ?? [], depth + 1, nodePath, out)
     }
   })
 }

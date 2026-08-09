@@ -88,6 +88,24 @@ public class CatalogServiceImpl implements CatalogService {
             }
         }
 
+        // 目录 globalOrder 锚点 = 其下最小子项 globalOrder，供前端与章节按阅读顺序混合排布。
+        for (CatalogNode node : nodeMap.values()) {
+            node.setGlobalOrder(minGlobalOrder(node));
+        }
         return roots;
+    }
+
+    /** 目录排序锚点 = 其下最小 globalOrder（章节或嵌套目录）。 */
+    private static Integer minGlobalOrder(CatalogNode node) {
+        Integer min = null;
+        for (ChapterRef ch : node.getChapters()) {
+            min = min == null ? ch.getGlobalOrder() : Math.min(min, ch.getGlobalOrder());
+        }
+        for (CatalogNode child : node.getChildren()) {
+            if (child.getGlobalOrder() != null) {
+                min = min == null ? child.getGlobalOrder() : Math.min(min, child.getGlobalOrder());
+            }
+        }
+        return min;
     }
 }
