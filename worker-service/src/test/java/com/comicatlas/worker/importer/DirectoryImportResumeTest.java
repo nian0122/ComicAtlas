@@ -102,8 +102,10 @@ class DirectoryImportResumeTest {
         JsonNode items = meta.path("chapters").get(0).path("mediaItems");
         assertEquals(2, items.size());
         assertTrue(items.get(0).has("hqPath"), "mediaItems 应包含 hqPath");
-        // 恢复点清理
-        assertFalse(manifestManager.exists(mangaRoot, 100L), "成功后恢复点应删除");
+        // 恢复点（清单）须保留到最终化阶段：文件已按 {comicId}/{globalOrder} 暂存，
+        // Worker 逐章搬运到 {comicId}/{chapterId} 时仍需清单做尺寸校验，
+        // 清单由 ImportStorageFinalizeHandler 全部章节完成后清空删除。
+        assertTrue(manifestManager.exists(mangaRoot, 100L), "handle 成功后恢复点应保留（供最终化阶段使用）");
     }
 
     @Test
@@ -164,7 +166,7 @@ class DirectoryImportResumeTest {
         assertFalse(Files.exists(sourceRoot.resolve("vol1/ch1/002.jpg")), "源 002 应被搬走");
         JsonNode meta = objectMapper.readTree(mangaRoot.resolve("metadata/100.json").toFile());
         assertEquals(2, meta.path("chapters").get(0).path("mediaItems").size());
-        assertFalse(manifestManager.exists(mangaRoot, 100L), "续搬完成后恢复点应清理");
+        assertTrue(manifestManager.exists(mangaRoot, 100L), "续搬完成后恢复点应保留（最终化阶段仍需清单）");
     }
 
     @Test
@@ -227,7 +229,7 @@ class DirectoryImportResumeTest {
         assertEquals(2, hqFiles.size(), "续搬后应有 2 个文件");
         JsonNode meta = objectMapper.readTree(mangaRoot.resolve("metadata/100.json").toFile());
         assertEquals(2, meta.path("chapters").get(0).path("mediaItems").size());
-        assertFalse(manifestManager.exists(mangaRoot, 100L));
+        assertTrue(manifestManager.exists(mangaRoot, 100L), "中断重试续搬完成后恢复点应保留（最终化阶段仍需清单）");
     }
 
     // ---- helpers ----

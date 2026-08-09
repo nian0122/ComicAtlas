@@ -98,8 +98,12 @@ public class DirectoryImportHandler {
         // metadata.json 从清单 metadata 写出
         Path metaPath = writeMetadataNode(manifest.metadata(), taskId, comicId, mangaRoot);
 
-        // 成功后清理恢复点
-        manifestManager.delete(mangaRoot, taskId);
+        // 注意：此处不再删除清单（恢复点）。两阶段最终化协议中，文件先按
+        // {comicId}/{globalOrder} 暂存，Worker 逐章搬运到 {comicId}/{chapterId} 时
+        // 仍需清单中的预期尺寸做幂等校验，并由 ImportStorageFinalizeHandler 在全部章节
+        // 最终化完成后经 rewriteWithoutChapter 清空清单目录。若在此提前删除，
+        // 最终化阶段将无法核对尺寸（sourceDir==targetDir 时还会静默跳过导致不发布
+        // Completed，漫画卡在 IMPORTING）。
         return metaPath;
     }
 
