@@ -24,10 +24,10 @@ import com.comicatlas.common.util.MetadataSnapshotRevision;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
@@ -57,6 +57,7 @@ import java.util.stream.Collectors;
  * 不在本服务职责范围（本服务只做 DB 合并）。
  */
 @Slf4j
+@Service
 @RequiredArgsConstructor
 public class MetadataRefreshService {
 

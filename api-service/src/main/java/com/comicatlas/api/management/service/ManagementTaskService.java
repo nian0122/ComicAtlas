@@ -640,6 +640,16 @@ public class ManagementTaskService {
     // ======================== 聚合 ========================
 
     /**
+     * 重新聚合主任务状态（供元数据刷新完成/失败流程在自定义短事务内复用现有聚合逻辑）。
+     * <p>
+     * 内部调用 {@link #aggregateTaskStatus}；必须在事务内调用（自身无事务边界，
+     * 由调用方的事务承载），全部 item 到终态时任务随之流转到 SUCCEEDED/FAILED 等。
+     */
+    public void reaggregateTask(Long taskId) {
+        aggregateTaskStatus(taskId);
+    }
+
+    /**
      * 根据所有 item 状态聚合主任务状态和计数。
      */
     private void aggregateTaskStatus(Long taskId) {

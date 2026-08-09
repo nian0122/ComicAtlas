@@ -1,6 +1,7 @@
 package com.comicatlas.api.management;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.api.comic.entity.Chapter;
 import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.entity.Media;
@@ -14,6 +15,8 @@ import com.comicatlas.api.common.exception.ConflictException;
 import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
 import com.comicatlas.api.management.dto.OperationSubmitResultDTO;
+import com.comicatlas.api.management.entity.ManagementTask;
+import com.comicatlas.api.management.entity.ManagementTaskItem;
 import com.comicatlas.api.management.operation.MediaOperationCommandService;
 import com.comicatlas.api.management.policy.AllowedOperations;
 import com.comicatlas.api.management.policy.MediaOperationEligibilityService;
@@ -26,12 +29,19 @@ import com.comicatlas.api.outbox.relay.OutboxRelay;
 import com.comicatlas.api.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.api.common.enums.ManagementTaskStatus;
 import com.comicatlas.api.common.enums.MediaLifecycleStatus;
+import com.comicatlas.api.common.enums.TaskType;
 import com.comicatlas.api.common.enums.TranscodeStatus;
+import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO;
+import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO.ChapterSnapshot;
+import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO.MediaSnapshot;
 import com.comicatlas.common.event.ComicEvent;
 import com.comicatlas.common.event.ManagementCommandCompletedEvent;
 import com.comicatlas.common.event.ManagementCommandFailedEvent;
 import com.comicatlas.common.event.ManagementCommandProgressEvent;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
+import com.comicatlas.common.event.MetadataRefreshEvent;
+import com.comicatlas.common.event.MetadataRefreshScanCompletedEvent;
+import com.comicatlas.common.util.MetadataSnapshotRevision;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,7 +54,13 @@ import org.testcontainers.containers.RabbitMQContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Supplier;
@@ -85,6 +101,17 @@ class MediaOperationPipelineIT {
     private static boolean dockerAvailable;
     static { dockerAvailable = checkDockerAvailable(); }
 
+    /** 集成测试专用 STAGING 根（快照产物落盘/清理校验）。 */
+    private static final Path STAGING_TMP = createStagingTempDir();
+
+    private static Path createStagingTempDir() {
+        try {
+            return Files.createTempDirectory("comic-atlas-staging-it");
+        } catch (IOException e) {
+            throw new ExceptionInInitializerError(e);
+        }
+    }
+
     @Container static MySQLContainer<?> mysql = dockerAvailable
         ? new MySQLContainer<>("mysql:8.0.33").withDatabaseName("comic_atlas_test").withUsername("test").withPassword("test") : null;
     @Container static RabbitMQContainer rabbitmq = dockerAvailable
@@ -114,6 +141,7 @@ class MediaOperationPipelineIT {
         registry.add("outbox.relay.scheduled", () -> "false");
         registry.add("outbox.relay.poll-interval-ms", () -> "600000");
         registry.add("outbox.relay.batch-size", () -> "50");
+        registry.add("storage.roots.STAGING.path", () -> STAGING_TMP.toString());
     }
 
     @Autowired private MediaOperationCommandService commandService;
@@ -138,6 +166,7 @@ class MediaOperationPipelineIT {
     void setUp() {
         Assumptions.assumeTrue(dockerAvailable, "Docker 不可用，跳过容器化集成测试");
         cleanup();
+        cleanupStaging();
         comic = new Comic();
         comic.setTitle("测试漫画");
         comic.setStatus(ComicStatus.READY);
@@ -386,6 +415,164 @@ class MediaOperationPipelineIT {
 
         assertThat(taskMapper.selectCount(new LambdaQueryWrapper<>())).isZero();
         assertThat(outboxMapper.selectCount(new LambdaQueryWrapper<>())).isZero();
+    }
+
+    // ======================== 元数据刷新完成事件（Todo 5 专用流程） ========================
+
+    @Test
+    @DisplayName("元数据刷新完成：completed → item SUCCEEDED、comic READY、Outbox 入箱并 relay 发布、快照清理")
+    void metadataRefreshCompleted_appliesAndPublishes() throws Exception {
+        comic.setStatus(ComicStatus.REFRESHING);
+        comicMapper.update(null, new LambdaUpdateWrapper<Comic>()
+                .eq(Comic::getId, comic.getId()).set(Comic::getStatus, ComicStatus.REFRESHING));
+        // 使媒体 hqPath 匹配真实 comicId/chapterId（快照结构校验要求 {comicId}/{chapterId}/{fileName}）
+        for (Media m : mediaMapper.selectList(new LambdaQueryWrapper<>())) {
+            String fileName = m.getHqPath().substring(m.getHqPath().lastIndexOf('/') + 1);
+            m.setHqPath(comic.getId() + "/" + m.getChapterId() + "/" + fileName);
+            mediaMapper.updateById(m);
+        }
+
+        ManagementTask task = metadataRefreshTask();
+        taskMapper.insert(task);
+        ManagementTaskItem item = metadataRefreshItem(task.getId());
+        taskItemMapper.insert(item);
+
+        MetadataRefreshSnapshotDTO snapshot = buildSnapshot(comic.getId());
+        String revision = MetadataSnapshotRevision.compute(snapshot);
+        MetadataRefreshSnapshotDTO withRevision = new MetadataRefreshSnapshotDTO(
+                snapshot.schemaVersion(), snapshot.comicId(), snapshot.generatedAt(), revision, snapshot.chapters());
+        byte[] bytes = objectMapper.writeValueAsBytes(withRevision);
+        String ref = "metadata-refresh/" + task.getId() + "/" + item.getId() + "/1/snapshot.json";
+        Path snapshotFile = STAGING_TMP.resolve(ref);
+        Files.createDirectories(snapshotFile.getParent());
+        Files.write(snapshotFile, bytes);
+
+        var completed = new MetadataRefreshScanCompletedEvent(
+                UUID.randomUUID(), Instant.now(), 1,
+                task.getId(), item.getId(), 1, "METADATA_REFRESH", "COMIC", comic.getId(),
+                ref, sha256(bytes), bytes.length, 1);
+        rabbitTemplate.convertAndSend("comic.management", "command.completed", completed);
+
+        await(() -> taskItemMapper.selectById(item.getId()).getStatus() == ManagementTaskStatus.SUCCEEDED,
+                "item SUCCEEDED");
+        await(() -> taskMapper.selectById(task.getId()).getStatus() == ManagementTaskStatus.SUCCEEDED,
+                "task SUCCEEDED");
+        assertThat(comicMapper.selectById(comic.getId()).getStatus()).isEqualTo(ComicStatus.READY);
+
+        // metadata 重导出走 Outbox（MetadataRefreshEvent 入箱，relay 后发 MQ）
+        OutboxMessage msg = outboxMapper.selectOne(new LambdaQueryWrapper<OutboxMessage>()
+                .eq(OutboxMessage::getEventType, "MetadataRefreshEvent"));
+        assertThat(msg).isNotNull();
+        assertThat(msg.getExchange()).isEqualTo("comic.export");
+        assertThat(msg.getRoutingKey()).isEqualTo("metadata.refresh.requested");
+
+        // 提交后快照目录已清理
+        assertThat(Files.exists(snapshotFile.getParent())).isFalse();
+
+        // relay 发布成功
+        outboxRelay.relay();
+        await(() -> outboxMapper.selectById(msg.getEventId()).getStatus().equals("PUBLISHED"), "relay 发布");
+    }
+
+    @Test
+    @DisplayName("元数据刷新完成：快照文件不可用 → 基础设施故障 reject/DLQ，不伪造成功")
+    void metadataRefreshCompleted_snapshotMissing_goesToDlq() throws Exception {
+        comic.setStatus(ComicStatus.REFRESHING);
+        comicMapper.update(null, new LambdaUpdateWrapper<Comic>()
+                .eq(Comic::getId, comic.getId()).set(Comic::getStatus, ComicStatus.REFRESHING));
+
+        ManagementTask task = metadataRefreshTask();
+        taskMapper.insert(task);
+        ManagementTaskItem item = metadataRefreshItem(task.getId());
+        taskItemMapper.insert(item);
+
+        // 快照产物缺失（Worker 未落盘或已被清理）→ loadAndValidate 文件 IO 异常 → DLQ
+        String ref = "metadata-refresh/" + task.getId() + "/" + item.getId() + "/1/snapshot.json";
+        var completed = new MetadataRefreshScanCompletedEvent(
+                UUID.randomUUID(), Instant.now(), 1,
+                task.getId(), item.getId(), 1, "METADATA_REFRESH", "COMIC", comic.getId(),
+                ref, "deadbeef", 0L, 1);
+        rabbitTemplate.convertAndSend("comic.management", "command.completed", completed);
+
+        // 事件进入 management.result.dlq；item/comic 保持原状态（不伪造成功）
+        await(() -> rabbitTemplate.receive("management.result.dlq", 500) != null, "事件进入 DLQ");
+        assertThat(taskItemMapper.selectById(item.getId()).getStatus()).isEqualTo(ManagementTaskStatus.RUNNING);
+        assertThat(comicMapper.selectById(comic.getId()).getStatus()).isEqualTo(ComicStatus.REFRESHING);
+        assertThat(outboxMapper.selectCount(new LambdaQueryWrapper<OutboxMessage>()
+                .eq(OutboxMessage::getEventType, "MetadataRefreshEvent"))).isZero();
+    }
+
+    private ManagementTask metadataRefreshTask() {
+        ManagementTask task = new ManagementTask();
+        task.setTaskType(TaskType.METADATA_REFRESH);
+        task.setOperation("元数据刷新");
+        task.setTargetType("COMIC");
+        task.setStatus(ManagementTaskStatus.RUNNING);
+        task.setTotalCount(1);
+        task.setAttempt(1);
+        return task;
+    }
+
+    private ManagementTaskItem metadataRefreshItem(Long taskId) {
+        ManagementTaskItem item = new ManagementTaskItem();
+        item.setTaskId(taskId);
+        item.setTargetType("COMIC");
+        item.setTargetId(comic.getId());
+        item.setOperationType(TaskType.METADATA_REFRESH);
+        item.setStatus(ManagementTaskStatus.RUNNING);
+        item.setAttempt(1);
+        item.setLockKey(ManagementTaskItem.buildLockKey("COMIC", comic.getId(), TaskType.METADATA_REFRESH));
+        return item;
+    }
+
+    /** 从 DB 真实章节/媒体行构建快照（版本与 hqPath 取自 DB，保证 revision 一致）。 */
+    private MetadataRefreshSnapshotDTO buildSnapshot(Long comicId) {
+        List<Chapter> chapters = chapterMapper.selectList(
+                new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
+        List<ChapterSnapshot> chapterSnapshots = new ArrayList<>();
+        for (Chapter ch : chapters) {
+            List<Media> mediaItems = mediaMapper.selectList(
+                    new LambdaQueryWrapper<Media>().eq(Media::getChapterId, ch.getId()));
+            List<MediaSnapshot> mediaSnapshots = mediaItems.stream().map(m -> new MediaSnapshot(
+                    m.getId(),
+                    m.getVersion() == null ? 0 : m.getVersion(),
+                    m.getHqPath(),
+                    m.getHqStatus() == null ? "READY" : m.getHqStatus().name(),
+                    m.getStatus() == null ? "READY" : m.getStatus().name(),
+                    m.getPageNumber() == null ? 0 : m.getPageNumber(),
+                    m.getFileSize() == null ? 0L : m.getFileSize(),
+                    m.getMediaType(),
+                    m.getWidth(), m.getHeight(),
+                    m.getDuration(), m.getContainer(), m.getVideoCodec(), m.getAudioCodec()
+            )).toList();
+            chapterSnapshots.add(new ChapterSnapshot(
+                    ch.getId(), ch.getVersion() == null ? 0 : ch.getVersion(), mediaSnapshots, List.of()));
+        }
+        return new MetadataRefreshSnapshotDTO(1, comicId, Instant.now(), null, chapterSnapshots);
+    }
+
+    private void cleanupStaging() {
+        if (STAGING_TMP == null || !Files.exists(STAGING_TMP)) {
+            return;
+        }
+        try (var entries = Files.list(STAGING_TMP)) {
+            for (Path p : entries.toList()) {
+                try (var walk = Files.walk(p)) {
+                    walk.sorted(Comparator.reverseOrder()).forEach(f -> {
+                        try {
+                            Files.deleteIfExists(f);
+                        } catch (IOException ignored) {
+                        }
+                    });
+                }
+            }
+        } catch (IOException ignored) {
+        }
+    }
+
+    private static String sha256(byte[] bytes) throws Exception {
+        return java.util.HexFormat.of().formatHex(
+                java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
     }
 
     // ======================== allowedOperations 可查询 ========================
