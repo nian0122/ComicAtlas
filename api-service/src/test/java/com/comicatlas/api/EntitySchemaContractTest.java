@@ -56,6 +56,9 @@ class EntitySchemaContractTest {
         registry.add("spring.datasource.username", mysql::getUsername);
         registry.add("spring.datasource.password", mysql::getPassword);
         registry.add("spring.datasource.driver-class-name", mysql::getDriverClassName);
+        // 本测试只验证实体/Schema 契约，不涉及 MQ；禁用 Rabbit 监听自动启动，
+        // 避免宿主机 5672 端口被 FRP 隧道占用（认证拒绝=致命监听启动失败）导致上下文加载失败。
+        registry.add("spring.rabbitmq.listener.simple.auto-startup", () -> "false");
     }
 
     @Autowired

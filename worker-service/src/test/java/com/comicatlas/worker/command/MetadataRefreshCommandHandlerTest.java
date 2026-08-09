@@ -207,7 +207,7 @@ class MetadataRefreshCommandHandlerTest {
                 any(ManagementCommandRequestedEvent.class),
                 refCaptor.capture(), shaCaptor.capture(), bytesCaptor.capture(), schemaCaptor.capture());
 
-        assertEquals("STAGING/metadata-refresh/100/200/3/snapshot.json", refCaptor.getValue());
+        assertEquals("metadata-refresh/100/200/3/snapshot.json", refCaptor.getValue());
         assertEquals(1, schemaCaptor.getValue());
         Path snapshot = snapshotPath();
         assertTrue(Files.exists(snapshot), "快照文件应已落盘");

@@ -42,7 +42,7 @@ class MetadataRefreshContractTest {
 
     private static final UUID EVENT_ID = UUID.fromString("33333333-3333-3333-3333-333333333333");
     private static final Instant OCCURRED_AT = Instant.parse("2026-08-09T00:00:00Z");
-    private static final String SNAPSHOT_REF = "STAGING/metadata-refresh/1001/7/3/snapshot.json";
+    private static final String SNAPSHOT_REF = "metadata-refresh/1001/7/3/snapshot.json";
     private static final String SNAPSHOT_SHA256 =
             "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
     private static final long SNAPSHOT_BYTES = 1_048_576L;

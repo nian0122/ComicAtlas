@@ -290,15 +290,15 @@ public class MetadataRefreshService {
         Map<String, Media> index = new HashMap<>();
         Set<Long> matchedIds = new HashSet<>();
         Map<Long, Integer> nextPageByChapter = new HashMap<>();
-        for (Media m : activeMedia) {
-            if (m.getStatus() != MediaLifecycleStatus.READY
-                    || (m.getHqStatus() != HqStatus.READY && m.getHqStatus() != HqStatus.MISSING)
-                    || m.getHqPath() == null) {
+        for (Media media : activeMedia) {
+            if (media.getStatus() != MediaLifecycleStatus.READY
+                    || (media.getHqStatus() != HqStatus.READY && media.getHqStatus() != HqStatus.MISSING)
+                    || media.getHqPath() == null) {
                 continue;
             }
-            index.put(m.getChapterId() + "/" + basename(m.getHqPath()), m);
-            if (m.getPageNumber() != null && m.getPageNumber() >= 0) {
-                nextPageByChapter.merge(m.getChapterId(), m.getPageNumber(), Math::max);
+            index.put(media.getChapterId() + "/" + basename(media.getHqPath()), media);
+            if (media.getPageNumber() != null && media.getPageNumber() >= 0) {
+                nextPageByChapter.merge(media.getChapterId(), media.getPageNumber(), Math::max);
             }
         }
 
@@ -325,22 +325,22 @@ public class MetadataRefreshService {
                     matchedIds.add(dbRow.getId());
                     applyMatchedUpdate(dbRow, item);
                     toUpdate.add(dbRow);
-                } else if (item.fileSize() > 0) {
+                } else if (item.fileSize() > 0 && !INACTIVE_STATUSES.contains(item.lifecycleStatus())) {
                     Media created = buildNewMedia(cs.chapterId(), item, nextPageByChapter);
                     toInsert.add(created);
                 }
-                // fileSize==0 且无匹配行：磁盘无文件、DB 无行 → 跳过
+                // fileSize==0 且无匹配行：跳过；TRASHED/DELETED 同名行（Worker 基线含回收/删除行）不复活
             }
         }
         // 未匹配活动行：标 HQ MISSING、fileSize=0，保留尺寸/视频/LQ
-        for (Media m : activeMedia) {
-            if (m.getStatus() == MediaLifecycleStatus.READY
-                    && (m.getHqStatus() == HqStatus.READY || m.getHqStatus() == HqStatus.MISSING)
-                    && !matchedIds.contains(m.getId())) {
-                m.setHqStatus(HqStatus.MISSING);
-                m.setFileSize(0L);
-                toMarkMissing.add(m);
-                toUpdate.add(m);
+        for (Media media : activeMedia) {
+            if (media.getStatus() == MediaLifecycleStatus.READY
+                    && (media.getHqStatus() == HqStatus.READY || media.getHqStatus() == HqStatus.MISSING)
+                    && !matchedIds.contains(media.getId())) {
+                media.setHqStatus(HqStatus.MISSING);
+                media.setFileSize(0L);
+                toMarkMissing.add(media);
+                toUpdate.add(media);
             }
         }
         return new MergePlan(toUpdate, toInsert, toMarkMissing);
@@ -370,33 +370,33 @@ public class MetadataRefreshService {
 
     /** 磁盘新增文件：插入 READY，pageNumber 从本章最大非负页码 +1 追加。 */
     private Media buildNewMedia(Long chapterId, MediaSnapshot item, Map<Long, Integer> nextPageByChapter) {
-        Media m = new Media();
-        m.setChapterId(chapterId);
-        m.setPageNumber(nextPageNumber(chapterId, nextPageByChapter));
-        m.setHqRoot("HQ");
-        m.setHqPath(item.hqPath());
-        m.setHqStatus(HqStatus.READY);
-        m.setLqStatus(LqStatus.NOT_GENERATED);
-        m.setLqRoot(null);
-        m.setLqPath(null);
-        m.setTranscodeStatus(TranscodeStatus.NOT_NEEDED);
-        m.setStatus(MediaLifecycleStatus.READY);
-        m.setFileSize(item.fileSize());
-        m.setMediaType(item.mediaType());
-        m.setWidth(item.width());
-        m.setHeight(item.height());
+        Media media = new Media();
+        media.setChapterId(chapterId);
+        media.setPageNumber(nextPageNumber(chapterId, nextPageByChapter));
+        media.setHqRoot("HQ");
+        media.setHqPath(item.hqPath());
+        media.setHqStatus(HqStatus.READY);
+        media.setLqStatus(LqStatus.NOT_GENERATED);
+        media.setLqRoot(null);
+        media.setLqPath(null);
+        media.setTranscodeStatus(TranscodeStatus.NOT_NEEDED);
+        media.setStatus(MediaLifecycleStatus.READY);
+        media.setFileSize(item.fileSize());
+        media.setMediaType(item.mediaType());
+        media.setWidth(item.width());
+        media.setHeight(item.height());
         if ("IMAGE".equals(item.mediaType())) {
-            m.setDuration(null);
-            m.setContainer(null);
-            m.setVideoCodec(null);
-            m.setAudioCodec(null);
+            media.setDuration(null);
+            media.setContainer(null);
+            media.setVideoCodec(null);
+            media.setAudioCodec(null);
         } else {
-            m.setDuration(item.duration());
-            m.setContainer(item.container());
-            m.setVideoCodec(item.videoCodec());
-            m.setAudioCodec(item.audioCodec());
+            media.setDuration(item.duration());
+            media.setContainer(item.container());
+            media.setVideoCodec(item.videoCodec());
+            media.setAudioCodec(item.audioCodec());
         }
-        return m;
+        return media;
     }
 
     /** 追加页码：初始为本章现存最大非负页码 +1，逐条递增。 */

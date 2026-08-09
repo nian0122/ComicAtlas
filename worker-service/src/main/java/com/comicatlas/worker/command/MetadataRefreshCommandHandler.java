@@ -19,6 +19,7 @@ import com.comicatlas.worker.storage.StorageRoot;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -46,7 +47,7 @@ import java.util.stream.Stream;
  * 元数据扫盘刷新命令处理器（API → Worker，METADATA_REFRESH/COMIC）。
  * <p>
  * 职责：重读 {@code HQ/{comicId}/{chapterId}} 直接子级的媒体文件，生成原子落盘的结构快照
- * {@code STAGING/metadata-refresh/{taskId}/{itemId}/{attempt}/snapshot.json}，
+ * {@code metadata-refresh/{taskId}/{itemId}/{attempt}/snapshot.json}（相对 STAGING 根），
  * 完成后经 MANAGEMENT exchange 发布 {@code MetadataRefreshScanCompletedEvent}（只传引用 + SHA-256 + 字节数），
  * 由 API 端与数据库比对刷新元数据。Worker 全程只读 MySQL，不直接改库。
  * <p>
@@ -97,6 +98,10 @@ public class MetadataRefreshCommandHandler {
     private final int maxMedia;
     private final long maxSnapshotBytes;
 
+    /**
+     * 生产装配构造器：@Autowired 显式声明——类含包级测试构造器，不标注时 Spring 无法决定用哪个。
+     */
+    @Autowired
     public MetadataRefreshCommandHandler(ExportChapterMapper chapterMapper, ExportMediaMapper mediaMapper,
                                          MediaAnalyzer mediaAnalyzer, ManagementCommandPublisher publisher,
                                          StorageProperties storageProperties, ObjectMapper objectMapper) {
@@ -361,7 +366,7 @@ public class MetadataRefreshCommandHandler {
      * 原子写入快照：同目录写 {@code .tmp} → flush/close → ATOMIC_MOVE 到目标。
      * 原子移动不受支持即失败并清理临时文件（拒绝非原子覆盖写入）。
      *
-     * @return 快照引用路径（相对 MANGA_ROOT，如 {@code STAGING/metadata-refresh/1/2/3/snapshot.json}）
+     * @return 快照引用路径（相对 STAGING 根，如 {@code metadata-refresh/1/2/3/snapshot.json}）
      */
     private String writeSnapshotAtomically(ManagementCommandRequestedEvent cmd, byte[] jsonBytes)
             throws IOException {
@@ -383,7 +388,7 @@ public class MetadataRefreshCommandHandler {
         } finally {
             Files.deleteIfExists(temp);
         }
-        return STAGING_ROOT_KEY + "/" + relative + "/snapshot.json";
+        return relative + "/snapshot.json";
     }
 
     private StorageRoot requireRoot(String key) {
