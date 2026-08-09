@@ -11,7 +11,6 @@ import java.util.UUID;
 import com.comicatlas.common.event.ComicEvent;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import com.comicatlas.common.event.DeleteRequestedEvent;
 import com.comicatlas.common.event.HqDeletedEvent;
 import com.comicatlas.common.event.ImportTaskCreatedEvent;
 import com.comicatlas.common.event.LqGenerateEvent;
@@ -276,19 +275,6 @@ class ManagementEventContractTest {
             assertThat(typed.sourceType()).isEqualTo("ZIP");
             // 旧事件 version() 返回默认值 1
             assertThat(typed.version()).isEqualTo(1);
-        }
-
-        @Test
-        @DisplayName("DeleteRequestedEvent 可序列化并保持字段")
-        void deleteRequestedEvent_stillWorks() throws Exception {
-            var event = new DeleteRequestedEvent(
-                    UUID.randomUUID(), Instant.now(), 100L);
-
-            String json = mapper.writeValueAsString(event);
-            DeleteRequestedEvent restored = mapper.readValue(json, DeleteRequestedEvent.class);
-
-            assertThat(restored.comicId()).isEqualTo(100L);
-            assertThat(restored.version()).isEqualTo(1);
         }
 
         @Test

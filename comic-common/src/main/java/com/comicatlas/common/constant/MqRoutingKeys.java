@@ -32,10 +32,6 @@ public final class MqRoutingKeys {
     public static final String VIDEO_METADATA_FIX_REQUESTED = "video.metadata.fix.requested";
     public static final String VIDEO_METADATA_FIX_COMPLETED = "video.metadata.fix.completed";
 
-    // comic.delete
-    public static final String DELETE_REQUESTED = "delete.requested";
-    public static final String DELETE_COMPLETED = "delete.completed";
-
     // comic.export
     public static final String TASK_STARTED = "task.started";
     public static final String METADATA_REFRESH_REQUESTED = "metadata.refresh.requested";
