@@ -58,7 +58,6 @@ comic-atlas/
 | 取消任务 | `worker-service/.../event/CancelHandler.java` | ConcurrentHashMap 标记 |
 | LQ 生成 | `worker-service/.../event/LqGenerateHandler.java` | 调用 ImageOptimizer 外部工具 |
 | HQ 删除 | `worker-service/.../event/HqDeleteHandler.java` | 按章节删除 HQ 图片 |
-| 完整删除 | `worker-service/.../event/DeleteHandler.java` | 删除 hq/lq/thumbs 全部文件 |
 | 目录解析 | `worker-service/.../importer/DirectoryParser.java` | 输出 DirectoryTree（纯树，无业务语义） |
 | 元数据组装 | `worker-service/.../importer/MetadataAssembler.java` | DirectoryTree → ComicMetadata（注入 Catalog/Chapter） |
 | 媒体分析 | `worker-service/.../media/MediaAnalyzer.java` | 图片尺寸 + ffprobe 视频元数据 |
@@ -134,8 +133,6 @@ URL 统一由 `FileUrlResolver.resolve(page)` 生成，不手拼。
 | comic.image | hq.delete.completed | hq.delete.result.queue | API HqDeletedHandler |
 | comic.image | video.metadata.fix.requested | video.metadata.fix.queue | Worker VideoMetadataFixHandler |
 | comic.image | video.metadata.fix.completed | video.metadata.fix.result.queue | API VideoMetadataFixCompletedHandler |
-| comic.delete | delete.requested | delete.task.queue | Worker DeleteHandler |
-| comic.delete | delete.completed | delete.result.queue | API DeleteEventHandler |
 | comic.export | task.created | export.task.queue | Worker ExportTaskHandler |
 | comic.export | task.started | export.started.result.queue | API ExportStartedHandler |
 | comic.export | task.completed | export.completed.result.queue | API ExportCompletedHandler |
@@ -155,7 +152,7 @@ URL 统一由 `FileUrlResolver.resolve(page)` 生成，不手拼。
 | comic.management | command.cancel | management.cancel.queue | （未注册消费者） |
 | comic.management | command.completed / failed / progress | management.result.queue | API ManagementCommandResultHandler |
 
-**死信**: 主队列除 comic.task（task.status.queue / cancel.task.queue 无 DLX）外均配置 DLX + DLQ（comic.import.dlx / comic.image.dlx / comic.delete.dlx / comic.export.dlx / comic.video.dlx / comic.recovery.dlx / comic.scan.dlx / comic.management.dlx）
+**死信**: 主队列除 comic.task（task.status.queue / cancel.task.queue 无 DLX）外均配置 DLX + DLQ（comic.import.dlx / comic.image.dlx / comic.export.dlx / comic.video.dlx / comic.recovery.dlx / comic.scan.dlx / comic.management.dlx）
 
 **序列化**: Jackson2JsonMessageConverter
 
@@ -173,8 +170,6 @@ URL 统一由 `FileUrlResolver.resolve(page)` 生成，不手拼。
 | HqDeleted | comic.image.hq.delete.completed | HqDeletedEvent |
 | VideoMetadataFixRequested | comic.image.video.metadata.fix.requested | VideoMetadataFixRequestedEvent |
 | VideoMetadataFixCompleted | comic.image.video.metadata.fix.completed | VideoMetadataFixCompletedEvent |
-| DeleteRequested | comic.delete.requested | DeleteRequestedEvent |
-| DeleteCompleted | comic.delete.completed | DeleteCompletedEvent |
 | ExportTaskCreated | comic.export.task.created | ExportTaskCreatedEvent |
 | ExportTaskStarted | comic.export.task.started | ExportTaskStartedEvent |
 | ExportTaskCompleted | comic.export.task.completed | ExportTaskCompletedEvent |
