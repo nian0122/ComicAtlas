@@ -188,7 +188,7 @@ POST /api/tasks/import/batch
 { "sourceType": "DIRECTORY", "sourcePaths": ["D:/downloads/A", "D:/downloads/B"] }
 # → { "batchId": "...", "total": 2, "succeeded": [...], "failed": [] }
 
-# 目录扫描（异步任务：API 创建 → MQ → Worker 扫描 → 结果回写）
+# 目录扫描（异步任务：API 创建 → MQ → Worker 批量发现 → 结果回写）
 POST /api/tasks/directory-scan
 { "parentPath": "D:/downloads" }
 # → { "id": 1, "status": "PENDING", ... }
@@ -197,7 +197,7 @@ GET  /api/tasks/directory-scan/{id}
 # → { "id": 1, "status": "SUCCESS", "result": { "parentPath": "...", "total": 5, "items": [...] } }
 ```
 
-批量导入支持一次提交多个来源。目录扫描为异步任务：Worker 在本机文件系统上校验路径并遍历子目录，前端轮询 `GET /api/tasks/directory-scan/{id}` 直到 `status` 为 `SUCCESS`/`FAILED` 后读取 `result`。
+批量导入支持一次提交多个来源。目录扫描为「漫画集根目录批量发现」异步任务：`parentPath` 作为漫画集根目录，其直接子目录各是一本候选漫画，Worker 对每个候选内部递归预览所有层级的媒体与警告；前端轮询 `GET /api/tasks/directory-scan/{id}` 直到 `status` 为 `SUCCESS`/`FAILED` 后读取 `result`。
 
 > v1.0 新增 `POST /api/tasks/import` 支持可选 `Idempotency-Key` 头，同键同 payload 重放不重复建任务；`POST /api/tasks/import` 请求体字段为 `sourceType`（EHENTAI/ZIP/DIRECTORY）、`sourcePath`（ZIP 文件或目录路径）、`sourceRef`（EHENTAI 画廊 URL）。跨页批量元数据操作请使用新领域接口 `POST /api/management/batch`（见 13.6）。
 

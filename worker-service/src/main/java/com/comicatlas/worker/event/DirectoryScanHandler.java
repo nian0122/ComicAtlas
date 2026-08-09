@@ -28,10 +28,12 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * 目录扫描任务处理器 — Worker 侧入口。
+ * 目录扫描任务处理器 — Worker 侧入口（漫画集根目录批量发现）。
  * <p>
  * 监听 {@link MqQueues#SCAN_TASK}，收到 {@link DirectoryScanRequestedEvent} 后委托
- * {@link DirectoryScanPreviews} 复用 {@code DirectoryParser} 的只读解析能力扫描父目录
+ * {@link DirectoryScanPreviews} 复用 {@code DirectoryParser} 的只读解析能力：
+ * 用户选择的父目录作为「漫画集根目录」，其直接子目录各是一本候选漫画，
+ * 每个候选内部递归预览所有层级的媒体与警告
  * （规范化预览树 + 图片/视频/unsupported/总媒体计数 + 结构化 warnings），发布
  * {@link DirectoryScanCompletedEvent} 到 {@link MqExchanges#SCAN} 交换器
  * （路由键 {@link MqRoutingKeys#SCAN_COMPLETED}），由 API 侧
