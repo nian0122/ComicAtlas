@@ -68,15 +68,17 @@ public final class MetadataSnapshotRevision {
     private static List<ChapterSnapshot> sortedChapters(MetadataRefreshSnapshotDTO snapshot) {
         List<ChapterSnapshot> chapters = new ArrayList<>(
                 snapshot.chapters() == null ? List.of() : snapshot.chapters());
-        chapters.sort(Comparator.comparingLong(ChapterSnapshot::chapterId));
+        chapters.sort(Comparator.comparing(ChapterSnapshot::chapterId,
+                Comparator.nullsFirst(Comparator.naturalOrder())));
         return chapters;
     }
 
-    /** 章节内媒体按 mediaId 升序排序；null 列表按空处理。 */
+    /** 章节内媒体按 mediaId 升序排序；null 列表按空处理，mediaId 为 null（新增文件）排最前。 */
     private static List<MediaSnapshot> sortedMedia(ChapterSnapshot chapter) {
         List<MediaSnapshot> mediaItems = new ArrayList<>(
                 chapter.mediaItems() == null ? List.of() : chapter.mediaItems());
-        mediaItems.sort(Comparator.comparingLong(MediaSnapshot::mediaId));
+        mediaItems.sort(Comparator.comparing(MediaSnapshot::mediaId,
+                Comparator.nullsFirst(Comparator.naturalOrder())));
         return mediaItems;
     }
 

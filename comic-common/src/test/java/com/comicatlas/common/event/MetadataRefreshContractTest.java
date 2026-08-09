@@ -126,6 +126,29 @@ class MetadataRefreshContractTest {
                 "输入顺序不同必须产生相同摘要（仅按 chapterId/mediaId 排序，不含 generatedAt 等易变信息）");
     }
 
+    @Test
+    @DisplayName("mediaId 为 null（磁盘新增文件）时摘要仍确定且不抛异常")
+    void revision_isDeterministic_withNullMediaId() {
+        MetadataRefreshSnapshotDTO withNull = new MetadataRefreshSnapshotDTO(
+                1, 7L, OCCURRED_AT, "cafebabe",
+                List.of(chapter(42L, 3, List.of(
+                        imageMedia(101L, 1, "1/42/001.jpg", "READY", "READY", 1),
+                        new MetadataRefreshSnapshotDTO.MediaSnapshot(null, 0,
+                                "1/42/004.jpg", "READY", "READY", 4,
+                                9999L, "IMAGE", 400, 600, null, null, null, null)))));
+        MetadataRefreshSnapshotDTO shuffled = new MetadataRefreshSnapshotDTO(
+                1, 7L, OCCURRED_AT, "cafebabe",
+                List.of(chapter(42L, 3, List.of(
+                        new MetadataRefreshSnapshotDTO.MediaSnapshot(null, 0,
+                                "1/42/004.jpg", "READY", "READY", 4,
+                                9999L, "IMAGE", 400, 600, null, null, null, null),
+                        imageMedia(101L, 1, "1/42/001.jpg", "READY", "READY", 1)))));
+
+        assertEquals(MetadataSnapshotRevision.compute(withNull),
+                MetadataSnapshotRevision.compute(shuffled),
+                "null mediaId 项与有序项混排时摘要必须一致（null 排最前）");
+    }
+
     // ======================== failure 1：摘要对 covered 字段敏感 ========================
 
     @Test
