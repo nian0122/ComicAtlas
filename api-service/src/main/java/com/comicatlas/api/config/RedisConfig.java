@@ -37,6 +37,15 @@ public class RedisConfig implements CachingConfigurer {
     private static final GenericJackson2JsonRedisSerializer VALUE_SERIALIZER =
             new GenericJackson2JsonRedisSerializer(cacheObjectMapper());
 
+    /**
+     * 目录缓存专用序列化器：NON_FINAL 类型信息无法 round-trip {@code List.of(...)} 返回的
+     * 不可变最终集合（如 ImmutableCollections$List12）——写入时最终类型不带类型包装，读取时
+     * 以 Object 期望数组类型包装而失败。改用 EVERYTHING（全部类型携带类型信息）+ PTV（放行
+     * java.lang/java.util/com.comicatlas），保证目录树缓存可读写。
+     */
+    private static final GenericJackson2JsonRedisSerializer CATALOG_VALUE_SERIALIZER =
+            new GenericJackson2JsonRedisSerializer(catalogObjectMapper());
+
     private static ObjectMapper cacheObjectMapper() {
         PolymorphicTypeValidator ptv = BasicPolymorphicTypeValidator.builder()
                 .allowIfSubType("com.comicatlas.")
@@ -45,6 +54,18 @@ public class RedisConfig implements CachingConfigurer {
         return JsonMapper.builder()
                 .addModule(new JavaTimeModule())
                 .activateDefaultTyping(ptv, ObjectMapper.DefaultTyping.NON_FINAL)
+                .build();
+    }
+
+    private static ObjectMapper catalogObjectMapper() {
+        PolymorphicTypeValidator ptv = BasicPolymorphicTypeValidator.builder()
+                .allowIfSubType("com.comicatlas.")
+                .allowIfSubType("java.util.")
+                .allowIfSubType("java.lang.")
+                .build();
+        return JsonMapper.builder()
+                .addModule(new JavaTimeModule())
+                .activateDefaultTyping(ptv, ObjectMapper.DefaultTyping.EVERYTHING)
                 .build();
     }
 
@@ -72,7 +93,15 @@ public class RedisConfig implements CachingConfigurer {
                         .fromSerializer(VALUE_SERIALIZER));
 
         Map<String, RedisCacheConfiguration> cacheConfigs = new HashMap<>();
-        cacheConfigs.put(CatalogCacheInvalidator.CACHE_NAME, baseConfig.entryTtl(catalogTtl));
+        // 目录缓存使用 EVERYTHING 专用序列化器，避免最终集合（List.of）无法 round-trip
+        cacheConfigs.put(CatalogCacheInvalidator.CACHE_NAME,
+                RedisCacheConfiguration.defaultCacheConfig()
+                        .disableCachingNullValues()
+                        .entryTtl(catalogTtl)
+                        .serializeKeysWith(RedisSerializationContext.SerializationPair
+                                .fromSerializer(new StringRedisSerializer()))
+                        .serializeValuesWith(RedisSerializationContext.SerializationPair
+                                .fromSerializer(CATALOG_VALUE_SERIALIZER)));
         cacheConfigs.put(ComicReferenceCache.CATEGORIES, baseConfig.entryTtl(referenceTtl));
         cacheConfigs.put(ComicReferenceCache.TAGS, baseConfig.entryTtl(referenceTtl));
         cacheConfigs.put(ComicReferenceCache.COMIC_LIST, baseConfig.entryTtl(listTtl));
