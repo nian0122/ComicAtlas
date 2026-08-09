@@ -9,6 +9,7 @@ import type {
   CatalogVO,
   ChapterManagementRequest,
   ChapterManagementVO,
+  ComicDetailVO,
   ComicMetadataUpdateDTO,
   CreateManagementTaskRequest,
   CreateUploadSessionRequest,
@@ -52,7 +53,7 @@ api.interceptors.response.use(
 
 export const comicApi = {
   list: (params: any) => api.get('/comics', { params }),
-  detail: (id: number) => api.get(`/comics/${id}`),
+  detail: (id: number) => api.get<ComicDetailVO>(`/comics/${id}`),
   delete: (id: number) => api.delete(`/comics/${id}`),
   getMetadata: (id: number) => api.get(`/comics/${id}/metadata`),
   updateMetadata: (id: number, data: ComicMetadataUpdateDTO) =>
@@ -114,13 +115,13 @@ export const categoryApi = {
 }
 
 export const lqApi = {
-  generateComic: (comicId: number) => api.post(`/storage/lq/comics/${comicId}`),
-  generateChapter: (chapterId: number) => api.post(`/storage/lq/chapters/${chapterId}`),
+  generateComic: (comicId: number) => api.post<OperationSubmitResult>(`/storage/lq/comics/${comicId}`),
+  generateChapter: (chapterId: number) => api.post<OperationSubmitResult>(`/storage/lq/chapters/${chapterId}`),
 }
 
 export const hqApi = {
-  deleteComic: (comicId: number) => api.post(`/storage/delete-hq/comics/${comicId}`),
-  deleteChapter: (chapterId: number) => api.post(`/storage/delete-hq/chapters/${chapterId}`),
+  deleteComic: (comicId: number) => api.post<OperationSubmitResult>(`/storage/delete-hq/comics/${comicId}`),
+  deleteChapter: (chapterId: number) => api.post<OperationSubmitResult>(`/storage/delete-hq/chapters/${chapterId}`),
 }
 
 export const exportApi = {
@@ -252,7 +253,7 @@ export const outboxApi = {
 
 export const adminApi = {
   deleteComic: (id: number, mode: string) => api.delete(`/admin/comics/${id}`, { params: { mode } }),
-  refreshMetadata: (id: number) => api.post(`/storage/refresh-metadata/comics/${id}`),
+  refreshMetadata: (id: number) => api.post<OperationSubmitResult>(`/storage/refresh-metadata/comics/${id}`),
   scanRecover: () => api.post('/admin/storage/scan-recover'),
   // scanRecover 已迁移至异步恢复任务中心 POST /api/tasks/recovery
   // 旧同步接口 POST /admin/storage/scan-recover 后端保留供兼容

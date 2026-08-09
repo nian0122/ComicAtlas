@@ -42,8 +42,8 @@ ComicAtlas 由四个运行时模块和一组基础设施组成。
 
 - **Frontend**: Vue3 + Vite 单页应用。提供漫画列表、详情页（CatalogTree）、阅读器、导入管理、管理后台等界面。通过 Gateway 访问后端 API。
 - **Gateway**: Spring Cloud Gateway。负责路由转发和 Nacos 服务发现。前端所有请求经 Gateway 分发到 API Service。
-- **API Service**: 核心业务服务。提供 HTTP API、消费 Worker 发回的 MQ 结果事件、写入 MySQL 数据库。不碰文件系统。
-- **Worker Service**: 文件处理服务。消费 MQ 任务消息、解析来源文件、搬运图片到存储根目录、写 metadata.json。不写数据库业务表。
+- **API Service**: 核心业务服务。提供 HTTP API、消费 Worker 发回的 MQ 结果事件、写入 MySQL 数据库。合并元数据刷新快照并驱动 DB 差异落库。不碰文件系统。
+- **Worker Service**: 文件处理服务。消费 MQ 任务消息、解析来源文件、搬运图片到存储根目录、写 metadata.json；元数据刷新时扫描 HQ 目录生成 STAGING 快照。不写数据库业务表。
 - **Infrastructure**: MySQL 持久化、Redis 缓存与幂等标记、RabbitMQ 异步消息、Nginx 静态文件代理（`/files/{root}/{path}` 映射到存储目录）。
 
 ---
@@ -160,6 +160,8 @@ flowchart TD
 - Worker 产出：物理文件（暂存于 `hq/{comicId}/{globalOrder}`）+ `metadata.json` + 恢复清单
 - API 消费：读取 `metadata.json`，写入 catalog / chapter / page 表，生成 `chapterId` 并驱动最终化
 - Worker 再搬运：按 `chapterId` 把文件移动到 `hq/{comicId}/{chapterId}`（两阶段之第二阶段）
+
+元数据刷新遵循同一边界：Worker 只读 DB 基线后按 `HQ/{comicId}/{chapterId}` 逐章扫描，写 STAGING 快照（SHA-256 + `databaseRevision`），API 校验后事务合并 DB（磁盘缺失行标记 `HQ MISSING`），CAS 释放 `REFRESHING → READY`，再经 Outbox 重导出 `metadata.json`（安全 DB→JSON 链）。
 
 这条边界保证了 Worker 可以独立部署、独立扩缩，不会与 API 争抢数据库连接。
 

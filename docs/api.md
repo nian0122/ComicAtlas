@@ -922,4 +922,12 @@ OP_NOT_ALLOWED, COMIC_NOT_FOUND
 >
 > **导出为本地路径交互（v1.1）**：导出产物落在宿主机 `EXPORT/{taskId}/{base}.z01..zNN + {base}.zip`（标准分卷，主 `.zip` 为最后卷）。`GET /api/storage/export/tasks/{taskId}/artifacts` 返回有序分卷**元数据**（1-based index、文件名、字节大小、是否最后 `.zip`、本地物理路径），**不提供任何文件字节下载**；`POST /api/storage/export/tasks/{taskId}/open` 仅在宿主机打开文件管理器。HTTP 全程只传输任务/路径/状态/卷元数据，文件字节不经过 HTTP——把最后 `.zip` 的本地路径作为 `sourcePath` 即可重新导入该分卷（缺任一卷会失败，`.z01` 不可作为入口）。
 >
-> **METADATA_REFRESH（扫盘刷新元数据）**：`POST /api/storage/refresh-metadata/comics/{id}` 走统一命令管线（创建管理任务 + Outbox 发布，Worker 扫盘后回传快照结果），漫画不存在返回 404、非 READY 或并发被占用返回 409，成功返回 `202` 与 `OperationSubmitResultDTO`。批量 `METADATA_REFRESH` 资格与单项一致（仅 READY 漫画可执行）。
+> **METADATA_REFRESH（刷新元数据，异步任务）**：`POST /api/storage/refresh-metadata/comics/{id}` 走统一命令管线，同一事务 CAS 漫画 `READY → REFRESHING`、创建 COMIC 级管理任务并发布命令到 Outbox。漫画不存在返回 `404`；非 `READY` 或并发被占用返回 `409`；成功返回 `202 Accepted` 与 `OperationSubmitResultDTO`（含 `taskId`）。
+>
+> 执行链路（全程无 HTTP 文件传输，HTTP 只传任务信息、快照引用与 SHA-256 校验值）：
+> 1. Worker 只读 DB 基线（章节/媒体 + 版本），按 `HQ/{comicId}/{chapterId}` **逐章扫描**目录，识别图片/视频媒体，记录缺失文件；
+> 2. 组装 **STAGING 快照**（schemaVersion=1，含确定性 SHA-256 结构摘要 `databaseRevision`），原子落盘后回传 `snapshotRef` + `snapshotSha256` + 字节数；
+> 3. API 校验快照（SHA/schema/comicId/章节版本漂移）后在同一事务内执行**差异合并**：匹配行刷新 HQ 尺寸/媒体类型与视频字段；磁盘新增文件插入 READY 媒体；DB 有记录但磁盘缺失的行标记 `HQ MISSING` 且 `fileSize=0`（保留 LQ/视频/转码状态）；
+> 4. **成功点** = 合并提交 + CAS 释放 `REFRESHING → READY` + Outbox 重导出 `metadata.json`（`MetadataRefreshEvent`，安全 DB→JSON 链）；业务失败则任务 FAILED、释放锁并保留快照供排查。
+>
+> 批量 `METADATA_REFRESH` 资格与单项一致（仅 READY 漫画可执行）。
