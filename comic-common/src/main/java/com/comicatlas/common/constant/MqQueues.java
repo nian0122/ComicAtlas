@@ -13,6 +13,9 @@ public final class MqQueues {
     public static final String IMPORT_TASK = "import.task.queue";
     public static final String IMPORT_RESULT = "import.result.queue";
     public static final String IMPORT_FAILED = "import.failed.queue";
+    public static final String IMPORT_STORAGE_FINALIZE_REQUESTED = "import.storage.finalize.requested.queue";
+    public static final String IMPORT_STORAGE_FINALIZE_COMPLETED = "import.storage.finalize.completed.queue";
+    public static final String IMPORT_STORAGE_FINALIZE_FAILED = "import.storage.finalize.failed.queue";
     public static final String TASK_STATUS = "task.status.queue";
     public static final String CANCEL_TASK = "cancel.task.queue";
     public static final String LQ_GENERATE = "lq.generate.queue";
@@ -43,6 +46,9 @@ public final class MqQueues {
     public static final String IMPORT_TASK_DLQ = "import.task.dlq";
     public static final String IMPORT_RESULT_DLQ = "import.result.dlq";
     public static final String IMPORT_FAILED_DLQ = "import.failed.dlq";
+    public static final String IMPORT_STORAGE_FINALIZE_REQUESTED_DLQ = "import.storage.finalize.requested.dlq";
+    public static final String IMPORT_STORAGE_FINALIZE_COMPLETED_DLQ = "import.storage.finalize.completed.dlq";
+    public static final String IMPORT_STORAGE_FINALIZE_FAILED_DLQ = "import.storage.finalize.failed.dlq";
     public static final String LQ_GENERATE_DLQ = "lq.generate.dlq";
     public static final String LQ_RESULT_DLQ = "lq.result.dlq";
     public static final String HQ_DELETE_DLQ = "hq.delete.dlq";

@@ -85,6 +85,58 @@ public class RabbitMqConfig {
         return new DirectExchange(MqExchanges.IMPORT_DLX);
     }
 
+    // ==================== MqExchanges.IMPORT 导入存储最终化结果 ====================
+
+    @Bean
+    public Queue importStorageFinalizeCompletedQueue() {
+        return QueueBuilder.durable(MqQueues.IMPORT_STORAGE_FINALIZE_COMPLETED)
+                .deadLetterExchange(MqExchanges.IMPORT_DLX)
+                .deadLetterRoutingKey(MqQueues.IMPORT_STORAGE_FINALIZE_COMPLETED_DLQ)
+                .build();
+    }
+
+    @Bean
+    public Queue importStorageFinalizeCompletedDlq() {
+        return QueueBuilder.durable(MqQueues.IMPORT_STORAGE_FINALIZE_COMPLETED_DLQ).build();
+    }
+
+    @Bean
+    public Binding importStorageFinalizeCompletedBinding() {
+        return BindingBuilder.bind(importStorageFinalizeCompletedQueue())
+                .to(importExchange()).with(MqRoutingKeys.IMPORT_STORAGE_FINALIZE_COMPLETED);
+    }
+
+    @Bean
+    public Binding importStorageFinalizeCompletedDlqBinding() {
+        return BindingBuilder.bind(importStorageFinalizeCompletedDlq())
+                .to(importDlxExchange()).with(MqQueues.IMPORT_STORAGE_FINALIZE_COMPLETED_DLQ);
+    }
+
+    @Bean
+    public Queue importStorageFinalizeFailedQueue() {
+        return QueueBuilder.durable(MqQueues.IMPORT_STORAGE_FINALIZE_FAILED)
+                .deadLetterExchange(MqExchanges.IMPORT_DLX)
+                .deadLetterRoutingKey(MqQueues.IMPORT_STORAGE_FINALIZE_FAILED_DLQ)
+                .build();
+    }
+
+    @Bean
+    public Queue importStorageFinalizeFailedDlq() {
+        return QueueBuilder.durable(MqQueues.IMPORT_STORAGE_FINALIZE_FAILED_DLQ).build();
+    }
+
+    @Bean
+    public Binding importStorageFinalizeFailedBinding() {
+        return BindingBuilder.bind(importStorageFinalizeFailedQueue())
+                .to(importExchange()).with(MqRoutingKeys.IMPORT_STORAGE_FINALIZE_FAILED);
+    }
+
+    @Bean
+    public Binding importStorageFinalizeFailedDlqBinding() {
+        return BindingBuilder.bind(importStorageFinalizeFailedDlq())
+                .to(importDlxExchange()).with(MqQueues.IMPORT_STORAGE_FINALIZE_FAILED_DLQ);
+    }
+
     @Bean
     public DirectExchange taskExchange() {
         return new DirectExchange(MqExchanges.TASK);

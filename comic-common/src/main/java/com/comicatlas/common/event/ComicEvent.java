@@ -11,6 +11,9 @@ import java.util.UUID;
     @JsonSubTypes.Type(value = ImportTaskCreatedEvent.class, name = "ImportTaskCreatedEvent"),
     @JsonSubTypes.Type(value = ImportTaskCompletedEvent.class, name = "ImportTaskCompletedEvent"),
     @JsonSubTypes.Type(value = ImportTaskFailedEvent.class, name = "ImportTaskFailedEvent"),
+    @JsonSubTypes.Type(value = ImportStorageFinalizeRequestedEvent.class, name = "ImportStorageFinalizeRequestedEvent"),
+    @JsonSubTypes.Type(value = ImportStorageFinalizeCompletedEvent.class, name = "ImportStorageFinalizeCompletedEvent"),
+    @JsonSubTypes.Type(value = ImportStorageFinalizeFailedEvent.class, name = "ImportStorageFinalizeFailedEvent"),
     @JsonSubTypes.Type(value = TaskStatusChangedEvent.class, name = "TaskStatusChangedEvent"),
     @JsonSubTypes.Type(value = LqGenerateEvent.class, name = "LqGenerateEvent"),
     @JsonSubTypes.Type(value = DeleteRequestedEvent.class, name = "DeleteRequestedEvent"),
@@ -46,6 +49,8 @@ import java.util.UUID;
 })
 public sealed interface ComicEvent
     permits ImportTaskCreatedEvent, ImportTaskCompletedEvent, ImportTaskFailedEvent,
+            ImportStorageFinalizeRequestedEvent, ImportStorageFinalizeCompletedEvent,
+            ImportStorageFinalizeFailedEvent,
             TaskStatusChangedEvent, LqGenerateEvent, DeleteRequestedEvent,
             CancelTaskEvent, DeleteCompletedEvent, LqCompletedEvent,
             DeleteHqRequestedEvent, HqDeletedEvent,

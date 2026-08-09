@@ -15,6 +15,11 @@ public final class MqRoutingKeys {
     public static final String TASK_COMPLETED = "task.completed";
     public static final String TASK_FAILED = "task.failed";
 
+    // comic.import 导入存储最终化（routing key 以 comic.import. 前缀复用 comic.import exchange）
+    public static final String IMPORT_STORAGE_FINALIZE_REQUESTED = "import.storage.finalize.requested";
+    public static final String IMPORT_STORAGE_FINALIZE_COMPLETED = "import.storage.finalize.completed";
+    public static final String IMPORT_STORAGE_FINALIZE_FAILED = "import.storage.finalize.failed";
+
     // comic.task
     public static final String STATUS_CHANGED = "status.changed";
     public static final String CANCEL_REQUESTED = "cancel.requested";
