@@ -18,6 +18,7 @@ import com.comicatlas.api.common.enums.MediaLifecycleStatus;
 import com.comicatlas.api.common.enums.TaskType;
 import com.comicatlas.api.common.enums.TranscodeStatus;
 import com.comicatlas.api.common.exception.BusinessException;
+import com.comicatlas.api.common.exception.SnapshotUnavailableException;
 import com.comicatlas.api.common.storage.ApiStorageProperties;
 import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.management.entity.ManagementTaskItem;
@@ -740,18 +741,19 @@ public class ManagementCommandResultHandler {
      * 快照产物不可用（文件缺失/非常规文件/读取 IO 异常）视为基础设施故障 → DLQ；
      * 纯业务校验异常（SHA/schema/comicId/数量/结构漂移）走失败短事务。
      * <p>
-     * 缺失文件时 {@code Files.isRegularFile} 返回 false 而非抛异常，因此除 IOException
-     * cause 外还需按「产物不可用」的稳定错误文案识别。
+     * 产物级故障由 {@link SnapshotUnavailableException} 类型直接标识，
+     * IOException cause 兜底兼容旧链路，避免依赖错误消息文案匹配。
      */
     private boolean isSnapshotIoFailure(BusinessException e) {
+        if (e instanceof SnapshotUnavailableException) {
+            return true;
+        }
         for (Throwable cause = e.getCause(); cause != null; cause = cause.getCause()) {
             if (cause instanceof IOException) {
                 return true;
             }
         }
-        String message = e.getMessage();
-        return message != null && (message.contains("读取失败")
-                || message.contains("常规文件") || message.contains("符号链接"));
+        return false;
     }
 
     /** 释放漫画元数据刷新锁（REFRESHING → READY），仅仍为 REFRESHING 时生效（CAS）。 */

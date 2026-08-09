@@ -383,7 +383,7 @@ public class MetadataRefreshCommandHandler {
             try {
                 Files.move(temp, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
             } catch (AtomicMoveNotSupportedException e) {
-                throw new IOException("原子移动不受支持，拒绝非原子覆盖写入: " + target, e);
+                throw new IOException("原子移动不受支持，拒绝非原子覆盖写入: " + relative, e);
             }
         } finally {
             Files.deleteIfExists(temp);

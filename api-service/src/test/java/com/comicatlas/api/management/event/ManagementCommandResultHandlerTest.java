@@ -14,6 +14,7 @@ import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.common.enums.ManagementTaskStatus;
 import com.comicatlas.api.common.enums.TaskType;
 import com.comicatlas.api.common.exception.BusinessException;
+import com.comicatlas.api.common.exception.SnapshotUnavailableException;
 import com.comicatlas.api.common.storage.ApiStorageProperties;
 import com.comicatlas.api.common.storage.ApiStorageRoot;
 import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
@@ -374,7 +375,7 @@ class ManagementCommandResultHandlerTest {
     void infraFailure_snapshotIo_fallsToDlq() throws Exception {
         when(managementTaskItemMapper.selectById(100L)).thenReturn(runningItem());
         when(metadataRefreshService.loadAndValidate(any()))
-                .thenThrow(new BusinessException("快照读取失败", new IOException("文件不存在")));
+                .thenThrow(new SnapshotUnavailableException("快照读取失败", new IOException("文件不存在")));
 
         handler.handleResult(completedEvent(), channel, 1L);
 
@@ -389,7 +390,7 @@ class ManagementCommandResultHandlerTest {
     void infraFailure_snapshotNotRegularFile_fallsToDlq() throws Exception {
         when(managementTaskItemMapper.selectById(100L)).thenReturn(runningItem());
         when(metadataRefreshService.loadAndValidate(any()))
-                .thenThrow(new BusinessException("快照必须是常规文件且禁止符号链接: snapshot.json"));
+                .thenThrow(new SnapshotUnavailableException("快照产物不可用（非常规文件或符号链接）: snapshot.json"));
 
         handler.handleResult(completedEvent(), channel, 1L);
 

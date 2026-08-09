@@ -5,6 +5,7 @@ import com.comicatlas.api.common.enums.LqStatus;
 import com.comicatlas.api.common.enums.MediaLifecycleStatus;
 import com.comicatlas.api.common.enums.TranscodeStatus;
 import com.comicatlas.api.common.exception.BusinessException;
+import com.comicatlas.api.common.exception.SnapshotUnavailableException;
 import com.comicatlas.api.common.storage.ApiStorageProperties;
 import com.comicatlas.api.common.storage.ApiStorageRoot;
 import com.comicatlas.api.common.storage.PathTraversalException;
@@ -114,7 +115,7 @@ public class MetadataRefreshService {
         if (!snapshotPath.startsWith(stagingRoot.getPath().normalize())) {
             throw new PathTraversalException("快照路径越界 STAGING: " + request.snapshotRef());
         }
-        byte[] bytes = readBounded(snapshotPath);
+        byte[] bytes = readBounded(snapshotPath, request.snapshotRef());
         String actualSha = sha256Hex(bytes);
         if (!actualSha.equalsIgnoreCase(request.snapshotSha256())) {
             throw new BusinessException("快照 SHA-256 与事件声明不一致");
@@ -168,11 +169,12 @@ public class MetadataRefreshService {
 
     // ======================== 阶段一内部 ========================
 
-    /** NOFOLLOW_LINKS 有界读取：拒绝符号链接与非常规文件。 */
-    private byte[] readBounded(Path snapshotPath) {
+    /** NOFOLLOW_LINKS 有界读取：拒绝符号链接与非常规文件。产物不可用抛 {@link SnapshotUnavailableException}（DLQ）。 */
+    private byte[] readBounded(Path snapshotPath, String snapshotRef) {
         try {
             if (!Files.isRegularFile(snapshotPath, LinkOption.NOFOLLOW_LINKS)) {
-                throw new BusinessException("快照必须是常规文件且禁止符号链接: " + snapshotPath);
+                throw new SnapshotUnavailableException(
+                        "快照产物不可用（非常规文件或符号链接）: " + snapshotRef);
             }
             long size = Files.size(snapshotPath);
             if (size > MetadataRefreshLimits.MAX_SNAPSHOT_BYTES) {
@@ -180,7 +182,7 @@ public class MetadataRefreshService {
             }
             return Files.readAllBytes(snapshotPath);
         } catch (IOException e) {
-            throw new BusinessException("快照读取失败: " + snapshotPath, e);
+            throw new SnapshotUnavailableException("快照读取失败: " + snapshotRef, e);
         }
     }
 
@@ -255,10 +257,11 @@ public class MetadataRefreshService {
     /** 校验快照章节在 DB 中存在、版本无漂移且无重复匹配键（重复键整任务失败）。 */
     private void validateChapters(MetadataRefreshSnapshotDTO snapshot,
                                   Map<Long, Chapter> chapterById) {
+        List<ChapterSnapshot> chapters = snapshot.chapters() == null ? List.of() : snapshot.chapters();
         Set<Long> seenChapterIds = new HashSet<>();
         Set<Long> seenMediaIds = new HashSet<>();
         Set<String> seenKeys = new HashSet<>();
-        for (ChapterSnapshot cs : snapshot.chapters()) {
+        for (ChapterSnapshot cs : chapters) {
             if (!seenChapterIds.add(cs.chapterId())) {
                 throw new BusinessException("快照重复章节: " + cs.chapterId());
             }
@@ -306,7 +309,8 @@ public class MetadataRefreshService {
         List<Media> toInsert = new ArrayList<>();
         List<Media> toMarkMissing = new ArrayList<>();
 
-        for (ChapterSnapshot cs : snapshot.chapters()) {
+        List<ChapterSnapshot> chapters = snapshot.chapters() == null ? List.of() : snapshot.chapters();
+        for (ChapterSnapshot cs : chapters) {
             List<MediaSnapshot> mediaItems = cs.mediaItems() == null ? List.of() : cs.mediaItems();
             for (MediaSnapshot item : mediaItems) {
                 String key = cs.chapterId() + "/" + basename(item.hqPath());
