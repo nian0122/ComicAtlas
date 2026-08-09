@@ -169,6 +169,28 @@ class CatalogCacheTest {
     }
 
     @Test
+    void evict_shouldNotInvalidateOnRollback() {
+        var cache = cacheManager.getCache(CatalogCacheInvalidator.CACHE_NAME);
+        if (cache == null) {
+            throw new AssertionError("目录缓存未创建");
+        }
+        cache.put(1L, List.of(new CatalogNode(1L, "目录")));
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            cacheInvalidator.evict(1L);
+            assertNotNull(cache.get(1L));
+
+            // 事务回滚：afterCompletion(STATUS_ROLLED_BACK) 不应触发缓存失效，旧缓存仍有效
+            TransactionSynchronizationManager.getSynchronizations()
+                    .forEach(s -> s.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK));
+            assertNotNull(cache.get(1L));
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    @Test
     void catalogDto_shouldSupportRedisJsonRoundTrip() {
         var serializer = new GenericJackson2JsonRedisSerializer();
         List<CatalogNode> original = new ArrayList<>();
