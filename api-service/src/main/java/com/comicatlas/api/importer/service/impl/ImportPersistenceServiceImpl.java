@@ -359,7 +359,8 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
             return;
         }
 
-        Comic comic = comicMapper.selectById(comicId);
+        // 行锁串行化：同一 comic 的并发 completed/failed 串行处理，防止 lost update（锁在事务提交/回滚后释放）
+        Comic comic = comicMapper.selectByIdForUpdate(comicId);
         if (comic == null) {
             return;
         }
@@ -375,42 +376,62 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
             log.warn("finalize completed 时无章节结构，跳过: comicId={}", comicId);
             return;
         }
-        List<Long> chapterIds = chapters.stream().map(Chapter::getId).toList();
-        List<Media> mediaList = mediaMapper.selectList(
-                new LambdaQueryWrapper<Media>().in(Media::getChapterId, chapterIds));
 
-        // 使用事件返回的真实 targetDir 修正本章 hqPath（其余章节保持插入时的 chapterId 布局），全部置 READY
-        long totalSize = 0;
-        for (Media media : mediaList) {
+        // 1) 本章 media → READY（幂等：alreadyReady 检查保留），其余章节保持 PENDING
+        if (chapterId == null) {
+            log.warn("finalize completed 缺少 chapterId，跳过媒体确认: comicId={}", comicId);
+            return;
+        }
+        List<Media> chapterMedia = mediaMapper.selectList(
+                new LambdaQueryWrapper<Media>().eq(Media::getChapterId, chapterId));
+        for (Media media : chapterMedia) {
             boolean alreadyReady = media.getHqStatus() == HqStatus.READY
                     && media.getStatus() == MediaLifecycleStatus.READY;
-            if (!alreadyReady) {
-                if (chapterId != null && chapterId.equals(media.getChapterId())) {
-                    String fileName = fileNameOf(media.getHqPath());
-                    String hqRelative = stripHqPrefix(targetDir, hqPrefix);
-                    media.setHqPath(hqRelative + "/" + fileName);
-                }
-                media.setHqStatus(HqStatus.READY);
-                media.setStatus(MediaLifecycleStatus.READY);
-                mediaMapper.updateById(media);
+            if (alreadyReady) {
+                continue;
             }
+            // 使用事件返回的真实 targetDir 修正本章 hqPath
+            String fileName = fileNameOf(media.getHqPath());
+            String hqRelative = stripHqPrefix(targetDir, hqPrefix);
+            media.setHqPath(hqRelative + "/" + fileName);
+            media.setHqStatus(HqStatus.READY);
+            media.setStatus(MediaLifecycleStatus.READY);
+            mediaMapper.updateById(media);
+        }
+
+        // 2) 本章 chapter → READY（幂等）
+        for (Chapter chapter : chapters) {
+            if (chapter.getId().equals(chapterId) && chapter.getStatus() != ChapterLifecycleStatus.READY) {
+                ManagementStateMachine.validateChapterTransition(
+                        chapter.getStatus() == null ? "DRAFT" : chapter.getStatus().name(), "READY");
+                chapter.setStatus(ChapterLifecycleStatus.READY);
+                chapterMapper.updateById(chapter);
+                break;
+            }
+        }
+
+        // 3) 检查该 comic 下是否还有 PENDING media：全 READY 才收尾 comic/task，否则仅提交本章 READY
+        List<Long> chapterIds = chapters.stream().map(Chapter::getId).toList();
+        long pendingCount = mediaMapper.selectCount(new LambdaQueryWrapper<Media>()
+                .in(Media::getChapterId, chapterIds)
+                .ne(Media::getHqStatus, HqStatus.READY));
+        if (pendingCount > 0) {
+            log.info("仍有章节未最终化，仅提交本章 READY: comicId={}, taskId={}, chapterId={}, pending={}",
+                    comicId, taskId, chapterId, pendingCount);
+            return;
+        }
+
+        // 4) 全部 READY → 收尾：comic READY（重算统计）、task SUCCESS、管理任务 SUCCEEDED、缓存失效
+        List<Media> allMedia = mediaMapper.selectList(
+                new LambdaQueryWrapper<Media>().in(Media::getChapterId, chapterIds));
+        long totalSize = 0;
+        for (Media media : allMedia) {
             if (media.getFileSize() != null) {
                 totalSize += media.getFileSize();
             }
         }
-
-        for (Chapter chapter : chapters) {
-            if (chapter.getStatus() == ChapterLifecycleStatus.READY) {
-                continue;
-            }
-            ManagementStateMachine.validateChapterTransition(
-                    chapter.getStatus() == null ? "DRAFT" : chapter.getStatus().name(), "READY");
-            chapter.setStatus(ChapterLifecycleStatus.READY);
-            chapterMapper.updateById(chapter);
-        }
-
         ManagementStateMachine.validateComicTransition(comic.getStatus().name(), "READY");
-        comic.setTotalPages(mediaList.size());
+        comic.setTotalPages(allMedia.size());
         if (totalSize > 0) {
             comic.setFileSize(totalSize);
             comic.setHqSize(totalSize);
@@ -434,7 +455,7 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
                     mgmtItem.getId(), ManagementTaskStatus.SUCCEEDED, null, "IMPORT_TASK", taskId);
         }
         catalogCacheInvalidator.evict(comicId);
-        log.info("导入最终化完成: comicId={}, taskId={}, mediaCount={}", comicId, taskId, mediaList.size());
+        log.info("导入最终化完成: comicId={}, taskId={}, mediaCount={}", comicId, taskId, allMedia.size());
     }
 
     // ======================== Phase 2b: finalize failed → 明确失败且可重试 ========================
@@ -465,7 +486,8 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
         task.setErrorMessage(error);
         taskMapper.updateById(task);
 
-        Comic comic = comicMapper.selectById(comicId);
+        // 行锁串行化：与 completed 相同的保护，防止并发 completed/failed 对同一 comic 的 lost update
+        Comic comic = comicMapper.selectByIdForUpdate(comicId);
         if (comic != null && comic.getStatus() == ComicStatus.IMPORTING) {
             ManagementStateMachine.validateComicTransition("IMPORTING", "IMPORT_FAILED");
             comic.setStatus(ComicStatus.IMPORT_FAILED);

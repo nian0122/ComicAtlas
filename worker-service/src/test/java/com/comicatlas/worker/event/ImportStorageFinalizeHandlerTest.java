@@ -40,6 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -125,8 +126,8 @@ class ImportStorageFinalizeHandlerTest {
     }
 
     @Test
-    @DisplayName("三章最终化：前两章不发布 Completed，最后一章才发布一次并删除 manifest")
-    void finalize_threeChapters_publishesCompletedOnlyAfterLastChapter() throws Exception {
+    @DisplayName("多章最终化：每章立即发布 Completed、清单逐章移除、最后一章后清单删除")
+    void finalize_threeChapters_publishesCompletedPerChapter_andRemovesManifestEntries() throws Exception {
         writeStaging(1, "001.jpg", "aaa");
         writeStaging(1, "002.jpg", "bbb");
         writeStaging(2, "003.jpg", "ccc");
@@ -136,24 +137,29 @@ class ImportStorageFinalizeHandlerTest {
                 2, List.of("003.jpg"),
                 3, List.of("004.jpg")), 3);
 
-        // 第一章：移动成功，但不得发布 Completed、清单保留
         handler.handle(event(1, 100L, "001.jpg", "002.jpg"), channel, 1L);
+        ImportStorageFinalizeCompletedEvent c1 = captureCompleted();
+        assertEquals(1, c1.globalOrder());
+        assertEquals(2, c1.mediaCount());
         assertTrue(Files.exists(chapterFile(100L, "001.jpg")), "第一章应已移动到 chapterId=100");
-        verify(rabbitTemplate, never()).convertAndSend(
-                eq(MqExchanges.IMPORT), eq(MqRoutingKeys.IMPORT_STORAGE_FINALIZE_COMPLETED), any(Object.class));
         assertTrue(manifestManager.exists(mangaRoot, TASK_ID), "还有章节未完成时清单应保留");
+        assertEquals(List.of("10/2/003.jpg", "10/3/004.jpg"), manifestTargets(),
+                "清单应只移除第一章条目");
 
-        // 第二章：移动成功，仍不发布 Completed
+        clearInvocations(rabbitTemplate);
         handler.handle(event(2, 200L, "003.jpg"), channel, 2L);
+        ImportStorageFinalizeCompletedEvent c2 = captureCompleted();
+        assertEquals(2, c2.globalOrder());
+        assertEquals(1, c2.mediaCount());
         assertTrue(Files.exists(chapterFile(200L, "003.jpg")), "第二章应已移动到 chapterId=200");
-        verify(rabbitTemplate, never()).convertAndSend(
-                eq(MqExchanges.IMPORT), eq(MqRoutingKeys.IMPORT_STORAGE_FINALIZE_COMPLETED), any(Object.class));
-        assertTrue(manifestManager.exists(mangaRoot, TASK_ID), "还有章节未完成时清单应保留");
+        assertTrue(manifestManager.exists(mangaRoot, TASK_ID));
+        assertEquals(List.of("10/3/004.jpg"), manifestTargets(), "清单应只移除第二章条目");
 
-        // 第三章（最后一章）：发布 Completed 一次 + 删除 manifest
+        clearInvocations(rabbitTemplate);
         handler.handle(event(3, 300L, "004.jpg"), channel, 3L);
+        ImportStorageFinalizeCompletedEvent c3 = captureCompleted();
+        assertEquals(3, c3.globalOrder());
         assertTrue(Files.exists(chapterFile(300L, "004.jpg")), "第三章应已移动到 chapterId=300");
-        assertNotNull(captureCompleted(), "最后一章完成后应发布 Completed");
         assertFalse(manifestManager.exists(mangaRoot, TASK_ID), "全部章完成后清单应删除");
     }
 
@@ -196,8 +202,8 @@ class ImportStorageFinalizeHandlerTest {
     }
 
     @Test
-    @DisplayName("重复事件（目标齐全、清单仍在）：幂等跳过，Completed 不重复发布")
-    void finalize_duplicateEventWhileManifestPresent_isIdempotent() throws Exception {
+    @DisplayName("重复事件（目标齐全、清单仍在）：幂等跳过，每章每次投递仍发布 Completed")
+    void finalize_duplicateEventWhileManifestPresent_publishesCompletedPerChapter() throws Exception {
         writeStaging(1, "001.jpg", "aaa");
         writeStaging(1, "002.jpg", "bbb");
         writeStaging(2, "003.jpg", "ccc");
@@ -205,23 +211,23 @@ class ImportStorageFinalizeHandlerTest {
                 1, List.of("001.jpg", "002.jpg"),
                 2, List.of("003.jpg")), 3);
 
-        // 第一次投递：第一章移动完成，但第二章未完成 → 不发布 Completed
         handler.handle(event(1, 100L, "001.jpg", "002.jpg"), channel, 1L);
-        verify(rabbitTemplate, never()).convertAndSend(
-                eq(MqExchanges.IMPORT), eq(MqRoutingKeys.IMPORT_STORAGE_FINALIZE_COMPLETED), any(Object.class));
+        ImportStorageFinalizeCompletedEvent c1 = captureCompleted();
+        assertEquals(1, c1.globalOrder());
+        assertEquals(2, c1.mediaCount());
+        assertTrue(manifestManager.exists(mangaRoot, TASK_ID), "还有章节未完成时清单应保留");
 
-        // 第二次投递（同一事件重投）：第一章目标齐全、源缺失 → 幂等跳过，仍不发布 Completed
+        clearInvocations(rabbitTemplate);
         handler.handle(event(1, 100L, "001.jpg", "002.jpg"), channel, 2L);
-        verify(rabbitTemplate, never()).convertAndSend(
-                eq(MqExchanges.IMPORT), eq(MqRoutingKeys.IMPORT_STORAGE_FINALIZE_COMPLETED), any(Object.class));
-        assertTrue(manifestManager.exists(mangaRoot, TASK_ID), "重复事件不得删除清单");
-        // 目标只有一个副本
+        ImportStorageFinalizeCompletedEvent c1Again = captureCompleted();
+        assertEquals(1, c1Again.globalOrder());
         assertEquals("aaa", Files.readString(chapterFile(100L, "001.jpg")));
         assertFalse(existsStaging(1, "001.jpg"), "重复事件不得重新移动");
 
-        // 第二章完成 → 全部章完成 → Completed 发布一次
+        clearInvocations(rabbitTemplate);
         handler.handle(event(2, 200L, "003.jpg"), channel, 3L);
-        assertNotNull(captureCompleted());
+        ImportStorageFinalizeCompletedEvent c2 = captureCompleted();
+        assertEquals(2, c2.globalOrder());
         assertFalse(manifestManager.exists(mangaRoot, TASK_ID));
     }
 
@@ -244,6 +250,90 @@ class ImportStorageFinalizeHandlerTest {
         verify(rabbitTemplate, never()).convertAndSend(
                 eq(MqExchanges.IMPORT), eq(MqRoutingKeys.IMPORT_STORAGE_FINALIZE_FAILED), any(Object.class));
         verify(channel).basicAck(2L, false);
+    }
+
+    // ======================== 回归：sameDir / expected==null 重投 / 清理失败 ========================
+
+    @Test
+    @DisplayName("sameDir 章（chapterId==globalOrder，sourceDir==targetDir）：文件已在最终位置，必须发布 Completed")
+    void finalize_sameDirChapter_publishesCompleted() throws Exception {
+        writeStaging(1, "001.jpg", "aaa");
+        writeStaging(1, "002.jpg", "bbb");
+        writeManifest(Map.of(1, List.of("001.jpg", "002.jpg")), 3);
+
+        handler.handle(event(1, 1L, "001.jpg", "002.jpg"), channel, 1L);
+
+        ImportStorageFinalizeCompletedEvent completed = captureCompleted();
+        assertEquals(TASK_ID, completed.taskId());
+        assertEquals(COMIC_ID, completed.comicId());
+        assertEquals(1, completed.globalOrder());
+        assertEquals(1L, completed.chapterId());
+        assertEquals("hq/10/1", completed.targetDir());
+        assertEquals(2, completed.mediaCount());
+        assertTrue(Files.exists(chapterFile(1L, "001.jpg")));
+        assertTrue(Files.exists(chapterFile(1L, "002.jpg")));
+        assertFalse(manifestManager.exists(mangaRoot, TASK_ID), "单章完成后清单应删除");
+    }
+
+    @Test
+    @DisplayName("重投（本章清单条目已清理，expected==null）：目标存在即视为完成，不抛 SIZE_CONFLICT")
+    void finalize_redeliveryAfterChapterEntriesCleaned_noSizeConflict() throws Exception {
+        writeStaging(1, "001.jpg", "aaa");
+        writeStaging(2, "002.jpg", "bbb");
+        writeStaging(2, "003.jpg", "ccc");
+        writeManifest(Map.of(
+                1, List.of("001.jpg"),
+                2, List.of("002.jpg", "003.jpg")), 3);
+
+        handler.handle(event(1, 100L, "001.jpg"), channel, 1L);
+        ImportStorageFinalizeCompletedEvent c1 = captureCompleted();
+        assertEquals(1, c1.globalOrder());
+        assertTrue(manifestManager.exists(mangaRoot, TASK_ID));
+        assertEquals(List.of("10/2/002.jpg", "10/2/003.jpg"), manifestTargets());
+
+        clearInvocations(rabbitTemplate);
+        handler.handle(event(1, 100L, "001.jpg"), channel, 2L);
+        ImportStorageFinalizeCompletedEvent c1Again = captureCompleted();
+        assertEquals(1, c1Again.globalOrder());
+        verify(rabbitTemplate, never()).convertAndSend(
+                eq(MqExchanges.IMPORT), eq(MqRoutingKeys.IMPORT_STORAGE_FINALIZE_FAILED), any(Object.class));
+
+        clearInvocations(rabbitTemplate);
+        handler.handle(event(2, 200L, "002.jpg", "003.jpg"), channel, 3L);
+        ImportStorageFinalizeCompletedEvent c2 = captureCompleted();
+        assertEquals(2, c2.globalOrder());
+        assertFalse(manifestManager.exists(mangaRoot, TASK_ID));
+    }
+
+    @Test
+    @DisplayName("清单清理失败（删除异常）：不误报失败，Completed 照常发布，下次事件可再清理")
+    void finalize_manifestCleanupFailure_publishesCompletedWithoutFailed() throws Exception {
+        writeStaging(1, "001.jpg", "aaa");
+        writeManifest(Map.of(1, List.of("001.jpg")), 3);
+
+        ImportManifestManager failingDelete = new ImportManifestManager(objectMapper) {
+            @Override
+            public void delete(Path mangaRoot, Long taskId) throws IOException {
+                throw new IOException("模拟删除失败");
+            }
+        };
+        WorkerConfig config = new WorkerConfig();
+        config.setMangaRoot(mangaRoot.toString());
+        ImportStorageFinalizeHandler cleanupHandler = new ImportStorageFinalizeHandler(
+                config, storageService, storageProperties, failingDelete, rabbitTemplate, new MqConsumerSupport());
+
+        cleanupHandler.handle(event(1, 100L, "001.jpg"), channel, 1L);
+        ImportStorageFinalizeCompletedEvent completed = captureCompleted();
+        assertEquals(1, completed.mediaCount());
+        verify(rabbitTemplate, never()).convertAndSend(
+                eq(MqExchanges.IMPORT), eq(MqRoutingKeys.IMPORT_STORAGE_FINALIZE_FAILED), any(Object.class));
+        assertTrue(manifestManager.exists(mangaRoot, TASK_ID), "删除失败时清单应保留供下次清理");
+
+        clearInvocations(rabbitTemplate);
+        cleanupHandler.handle(event(1, 100L, "001.jpg"), channel, 2L);
+        captureCompleted();
+        verify(rabbitTemplate, never()).convertAndSend(
+                eq(MqExchanges.IMPORT), eq(MqRoutingKeys.IMPORT_STORAGE_FINALIZE_FAILED), any(Object.class));
     }
 
     // ======================== 失败路径 ========================
@@ -453,6 +543,13 @@ class ImportStorageFinalizeHandlerTest {
         verify(rabbitTemplate).convertAndSend(
                 eq(MqExchanges.IMPORT), eq(MqRoutingKeys.IMPORT_STORAGE_FINALIZE_FAILED), captor.capture());
         return (ImportStorageFinalizeFailedEvent) captor.getValue();
+    }
+
+    private List<String> manifestTargets() throws IOException {
+        return manifestManager.read(mangaRoot, TASK_ID).files().stream()
+                .map(ImportManifest.ImportFile::target)
+                .sorted()
+                .toList();
     }
 
     private static void deleteRecursively(Path dir) throws Exception {

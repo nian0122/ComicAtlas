@@ -34,6 +34,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 导入存储最终化处理器（Worker 侧）。
@@ -50,8 +51,9 @@ import java.util.UUID;
  *       保留 manifest 与 staging 供重试。</li>
  * </ul>
  * <p>
- * 只有按清单判定全部章的暂存文件都搬离后，才发布一次 {@link ImportStorageFinalizeCompletedEvent}
- * 并删除 manifest（延后清单清理）。重复投递（清单已删、目标齐全）静默 ACK，不重复发布 Completed。
+ * 每章移动/校验成功后即发布一次 {@link ImportStorageFinalizeCompletedEvent}（API 按章节累加确认，
+ * 不再依赖"全部章完成后一次性确认"），随后从清单移除本章条目，清单清空才删除（延后清单清理）。
+ * 重复投递（清单已删、目标齐全）静默 ACK，不重复发布 Completed。
  * <p>
  * 中断（{@link InterruptedException}）由 {@link MqConsumerSupport} 恢复中断标志并终止流程，
  * 不发布失败事件，不得误报普通业务失败。Worker 只读 MySQL 边界：本处理器不访问 Mapper/MySQL，
@@ -78,6 +80,9 @@ public class ImportStorageFinalizeHandler {
     /** 未归类异常错误码。 */
     private static final String ERROR_UNEXPECTED = "STORAGE_FINALIZE_UNEXPECTED";
 
+    /** 按 taskId 的 JVM 锁：串行化同一导入任务的清单读改写与移动循环（单实例 Worker）。 */
+    private static final ConcurrentHashMap<Long, Object> TASK_LOCKS = new ConcurrentHashMap<>();
+
     private final WorkerConfig config;
     private final StorageService storageService;
     private final StorageProperties storageProperties;
@@ -101,7 +106,8 @@ public class ImportStorageFinalizeHandler {
 
     /**
      * 幂等最终化：先校验全部相对路径位于 HQ 根内，再逐文件按清单尺寸执行移动。
-     * 全部章完成后发布一次 Completed 并删除清单；失败抛异常由调用方发布 Failed。
+     * 每章移动/校验成功后立即发布 Completed（不再等待全部章完成）；随后从清单移除本章条目，
+     * 清单清空才删除，否则重写（失败延后清理，不阻断结果）。
      */
     private void finalizeStorage(ImportStorageFinalizeRequestedEvent event) throws Exception {
         Path mangaRoot = Path.of(config.getMangaRoot()).toAbsolutePath().normalize();
@@ -112,7 +118,20 @@ public class ImportStorageFinalizeHandler {
         Path targetDir = resolveWithinHq(mangaRoot, hqRoot, event.targetDir(), "targetDir");
         List<MediaMove> moves = validateMappings(event, sourceDir, targetDir, hqRoot);
 
-        // 2) 读取清单获取预期尺寸；清单缺失说明全部章此前已最终化（延后清理已完成）
+        // 并发串行化：同一 taskId 的事件串行处理（单实例 Worker），保证清单读改写与移动循环原子性
+        Object lock = TASK_LOCKS.computeIfAbsent(event.taskId(), k -> new Object());
+        synchronized (lock) {
+            try {
+                finalizeStorageLocked(event, mangaRoot, hqRoot, sourceDir, targetDir, moves);
+            } finally {
+                TASK_LOCKS.remove(event.taskId(), lock);
+            }
+        }
+    }
+
+    private void finalizeStorageLocked(ImportStorageFinalizeRequestedEvent event, Path mangaRoot, Path hqRoot,
+                                       Path sourceDir, Path targetDir, List<MediaMove> moves) throws Exception {
+        // 2) 读取清单获取预期尺寸；清单缺失说明该任务清单已清理（全部章此前已最终化）
         ImportManifest manifest = manifestManager.exists(mangaRoot, event.taskId())
                 ? manifestManager.read(mangaRoot, event.taskId())
                 : null;
@@ -131,7 +150,10 @@ public class ImportStorageFinalizeHandler {
             return;
         }
 
-        // 3) 幂等移动：目标存在且尺寸匹配视为已完成，冲突/不完整则失败保留现场
+        // 3) 幂等移动：目标存在且尺寸匹配视为已完成，冲突/不完整则失败保留现场。
+        //    源目录与目标目录相同（chapterId == globalOrder 时暂存即最终位置）时无需移动，
+        //    文件已在最终位置，仅校验存在与尺寸匹配。
+        boolean sameDir = sourceDir.equals(targetDir);
         Map<String, Long> expectedSizes = expectedSizesForChapter(manifest, event.comicId(), event.globalOrder());
         for (MediaMove move : moves) {
             boolean sourceExists = Files.exists(move.source());
@@ -139,12 +161,13 @@ public class ImportStorageFinalizeHandler {
             if (targetExists) {
                 Long expected = expectedSizes.get(move.fileName());
                 long actual = Files.size(move.target());
-                if (expected == null || actual != expected) {
+                // 清单中无该文件尺寸预期（本章条目已被清理后的重投）→ 目标存在即视为已完成
+                if (expected != null && actual != expected) {
                     throw new ImportStorageFinalizeException(ERROR_SIZE_CONFLICT,
                             "目标存在但尺寸不匹配: " + relativeRef(event, move)
                                     + ", expected=" + expected + ", actual=" + actual);
                 }
-                if (sourceExists) {
+                if (sourceExists && !sameDir) {
                     throw new ImportStorageFinalizeException(ERROR_CONFLICT,
                             "源与目标同时存在: " + relativeRef(event, move));
                 }
@@ -161,17 +184,15 @@ public class ImportStorageFinalizeHandler {
         // 4) 清理空暂存目录
         deleteIfEmpty(sourceDir);
 
-        // 5) 只有全部章完成后才发布 Completed 并删除清单
-        if (allStagingGone(manifest, mangaRoot)) {
-            publishCompleted(event, moves.size());
-            try {
-                manifestManager.delete(mangaRoot, event.taskId());
-            } catch (IOException e) {
-                // 延后清单清理：删除失败不阻断最终化，保留 cause 供排查，稍后事件可再次清理
-                log.warn("清单清理失败（延后处理）: taskId={}", event.taskId(), e);
-            }
-        } else {
-            log.info("仍有章节未最终化，不发布 Completed: taskId={}", event.taskId());
+        // 5) 每章独立确认：本章移动/校验成功即发布 Completed（API 按章节累加确认）
+        publishCompleted(event, moves.size());
+
+        // 6) 逐章移除清单条目：清空才删除，否则重写；清理失败延后处理（下次事件可再清理）
+        try {
+            manifestManager.rewriteWithoutChapter(mangaRoot, event.taskId(), event.comicId(), event.globalOrder());
+        } catch (IOException e) {
+            // 延后清单清理：失败不阻断最终化，保留 cause 供排查，稍后事件可再次清理
+            log.warn("清单清理失败（延后处理）: taskId={}, chapterId={}", event.taskId(), event.chapterId(), e);
         }
     }
 
@@ -237,16 +258,6 @@ public class ImportStorageFinalizeHandler {
     private void moveFile(MediaMove move, Path hqRoot) throws Exception {
         String targetRelative = hqRoot.relativize(move.target()).toString().replace('\\', '/');
         storageService.transfer(move.source(), new StorageRef(HQ_ROOT_KEY, targetRelative), TransferMode.MOVE);
-    }
-
-    /** 全部清单文件的暂存位置都不存在 → 全部章已最终化。 */
-    private boolean allStagingGone(ImportManifest manifest, Path mangaRoot) {
-        for (ImportManifest.ImportFile file : manifest.files()) {
-            if (Files.exists(mangaRoot.resolve("hq").resolve(file.target()).normalize())) {
-                return false;
-            }
-        }
-        return true;
     }
 
     private void deleteIfEmpty(Path dir) {

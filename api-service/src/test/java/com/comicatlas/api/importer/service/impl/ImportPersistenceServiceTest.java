@@ -198,6 +198,33 @@ class ImportPersistenceServiceTest {
         }).when(chapterMapper).insert(any(Chapter.class));
     }
 
+    private Chapter chapter(Long id, int globalOrder) {
+        Chapter chapter = new Chapter();
+        chapter.setId(id);
+        chapter.setComicId(100L);
+        chapter.setGlobalOrder(globalOrder);
+        chapter.setStatus(ChapterLifecycleStatus.DRAFT);
+        return chapter;
+    }
+
+    private Media pendingMedia(Long id, Long chapterId) {
+        Media media = new Media();
+        media.setId(id);
+        media.setChapterId(chapterId);
+        media.setPageNumber(1);
+        media.setHqRoot("HQ");
+        media.setHqPath(chapterId + "/001.jpg");
+        media.setHqStatus(HqStatus.PENDING);
+        media.setStatus(MediaLifecycleStatus.STAGING);
+        media.setFileSize(1024L);
+        return media;
+    }
+
+    private ImportStorageFinalizeCompletedEvent completedEventFor(Long chapterId) {
+        return new ImportStorageFinalizeCompletedEvent(
+                UUID.randomUUID(), Instant.now(), 10L, 100L, 0, chapterId, "hq/100/" + chapterId, 1);
+    }
+
     // ======================== 1. completed：PENDING 结构 + 逐章请求 ========================
 
     @Test
@@ -352,7 +379,7 @@ class ImportPersistenceServiceTest {
         when(taskMapper.selectById(10L)).thenReturn(task(ImportTaskStatus.IMPORTING));
 
         Comic comic = comic(ComicStatus.IMPORTING);
-        when(comicMapper.selectById(100L)).thenReturn(comic);
+        when(comicMapper.selectByIdForUpdate(100L)).thenReturn(comic);
 
         Chapter chapter = new Chapter();
         chapter.setId(1001L);
@@ -372,6 +399,7 @@ class ImportPersistenceServiceTest {
         media.setStatus(MediaLifecycleStatus.STAGING);
         media.setFileSize(1024L);
         when(mediaMapper.selectList(any(Wrapper.class))).thenReturn(List.of(media));
+        when(mediaMapper.selectCount(any(Wrapper.class))).thenReturn(0L);
 
         when(managementTaskService.findActiveItem("COMIC", 100L, TaskType.IMPORT)).thenReturn(null);
 
@@ -425,13 +453,76 @@ class ImportPersistenceServiceTest {
     void applyFinalizeCompleted_comicNotImporting_isIdempotent() {
         runInTransactionWithoutResult();
         when(taskMapper.selectById(10L)).thenReturn(task(ImportTaskStatus.IMPORTING));
-        when(comicMapper.selectById(100L)).thenReturn(comic(ComicStatus.READY));
+        when(comicMapper.selectByIdForUpdate(100L)).thenReturn(comic(ComicStatus.READY));
 
         ImportStorageFinalizeCompletedEvent event = new ImportStorageFinalizeCompletedEvent(
                 UUID.randomUUID(), Instant.now(), 10L, 100L, 0, 1001L, "hq/100/1001", 1);
         service.applyFinalizeCompleted(event);
 
         verifyNoInteractions(chapterMapper, mediaMapper, catalogCacheInvalidator);
+    }
+
+    @Test
+    @DisplayName("两章两次 completed：第一次不 finalize comic（仍有 PENDING），第二次全部 READY 才 finalize")
+    void applyFinalizeCompleted_twoChapters_finalizesOnlyOnLastCompleted() {
+        runInTransactionWithoutResult();
+        when(taskMapper.selectById(10L)).thenReturn(task(ImportTaskStatus.IMPORTING));
+        Comic comic = comic(ComicStatus.IMPORTING);
+        when(comicMapper.selectByIdForUpdate(100L)).thenReturn(comic);
+
+        Chapter ch1 = chapter(1001L, 0);
+        Chapter ch2 = chapter(1002L, 1);
+        when(chapterMapper.selectList(any(Wrapper.class))).thenReturn(List.of(ch1, ch2));
+
+        Media m1 = pendingMedia(2001L, 1001L);
+        Media m2 = pendingMedia(2002L, 1002L);
+        when(mediaMapper.selectList(any(Wrapper.class)))
+                .thenReturn(List.of(m1))
+                .thenReturn(List.of(m2))
+                .thenReturn(List.of(m1, m2));
+        when(mediaMapper.selectCount(any(Wrapper.class)))
+                .thenReturn(1L)
+                .thenReturn(0L);
+        when(managementTaskService.findActiveItem("COMIC", 100L, TaskType.IMPORT)).thenReturn(null);
+
+        service.applyFinalizeCompleted(completedEventFor(1001L));
+        verify(comicMapper, never()).updateById(any(Comic.class));
+        verify(taskMapper, never()).updateById(any(ImportTask.class));
+        verify(catalogCacheInvalidator, never()).evict(100L);
+
+        service.applyFinalizeCompleted(completedEventFor(1002L));
+        ArgumentCaptor<Comic> comicCaptor = ArgumentCaptor.forClass(Comic.class);
+        verify(comicMapper).updateById(comicCaptor.capture());
+        assertThat(comicCaptor.getValue().getStatus()).isEqualTo(ComicStatus.READY);
+        assertThat(comicCaptor.getValue().getTotalPages()).isEqualTo(2);
+        ArgumentCaptor<ImportTask> taskCaptor = ArgumentCaptor.forClass(ImportTask.class);
+        verify(taskMapper).updateById(taskCaptor.capture());
+        assertThat(taskCaptor.getValue().getStatus()).isEqualTo(ImportTaskStatus.SUCCESS);
+        verify(catalogCacheInvalidator).evict(100L);
+    }
+
+    @Test
+    @DisplayName("并发重投同一 completed：行锁后第二次重读 comic 已 READY → 跳过，comic 只 finalize 一次")
+    void applyFinalizeCompleted_concurrentRedelivery_comicFinalizedOnce() {
+        runInTransactionWithoutResult();
+        when(taskMapper.selectById(10L)).thenReturn(task(ImportTaskStatus.IMPORTING));
+        when(comicMapper.selectByIdForUpdate(100L))
+                .thenReturn(comic(ComicStatus.IMPORTING))
+                .thenReturn(comic(ComicStatus.READY));
+
+        when(chapterMapper.selectList(any(Wrapper.class))).thenReturn(List.of(chapter(1001L, 0)));
+
+        when(mediaMapper.selectList(any(Wrapper.class))).thenReturn(List.of(pendingMedia(2001L, 1001L)));
+        when(mediaMapper.selectCount(any(Wrapper.class))).thenReturn(0L);
+        when(managementTaskService.findActiveItem("COMIC", 100L, TaskType.IMPORT)).thenReturn(null);
+
+        service.applyFinalizeCompleted(completedEventFor(1001L));
+        service.applyFinalizeCompleted(completedEventFor(1001L));
+
+        ArgumentCaptor<Comic> comicCaptor = ArgumentCaptor.forClass(Comic.class);
+        verify(comicMapper, times(1)).updateById(comicCaptor.capture());
+        assertThat(comicCaptor.getValue().getStatus()).isEqualTo(ComicStatus.READY);
+        assertThat(comicCaptor.getValue().getTotalPages()).isEqualTo(1);
     }
 
     // ======================== 3. finalize failed：明确失败且可重试 ========================
@@ -441,7 +532,7 @@ class ImportPersistenceServiceTest {
     void applyFinalizeFailed_marksRetryableFailure_mediaStaysPending() {
         runInTransactionWithoutResult();
         when(taskMapper.selectById(10L)).thenReturn(task(ImportTaskStatus.IMPORTING));
-        when(comicMapper.selectById(100L)).thenReturn(comic(ComicStatus.IMPORTING));
+        when(comicMapper.selectByIdForUpdate(100L)).thenReturn(comic(ComicStatus.IMPORTING));
         when(managementTaskService.findActiveItem("COMIC", 100L, TaskType.IMPORT)).thenReturn(null);
 
         ImportStorageFinalizeFailedEvent event = new ImportStorageFinalizeFailedEvent(

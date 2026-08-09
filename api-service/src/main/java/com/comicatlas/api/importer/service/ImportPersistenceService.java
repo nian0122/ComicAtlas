@@ -15,8 +15,8 @@ import java.util.Map;
  * <ul>
  *   <li>{@link #persistCompleted}：completed 事件短事务内校验 metadata、插入 catalog/chapter/media
  *       （media 一律 PENDING、comic/task 保持非终态），逐章产出最终化请求（经 Outbox 提交后发布）；</li>
- *   <li>{@link #applyFinalizeCompleted}：使用事件真实 targetDir 更新 media hqPath → READY，
- *       chapter/comic → READY、task → SUCCESS，维护统计与缓存失效；</li>
+ *   <li>{@link #applyFinalizeCompleted}：按事件 chapterId 将本章 media/chapter 置 READY（逐章确认，幂等）；
+ *       全部章节 media 均 READY 后才把 comic → READY、task → SUCCESS，维护统计与缓存失效；</li>
  *   <li>{@link #applyFinalizeFailed}：明确标记失败且保持可重试，不得置 READY。</li>
  * </ul>
  * <p>

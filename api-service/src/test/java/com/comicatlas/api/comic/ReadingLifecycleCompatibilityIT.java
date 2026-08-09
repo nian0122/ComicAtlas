@@ -715,6 +715,47 @@ class ReadingLifecycleCompatibilityIT {
         }
 
         @Test
+        @DisplayName("chapterId==globalOrder（staging 即最终位置）：completed + finalize 全链可读")
+        void importFinalizeSameDir_chapterIdEqualsGlobalOrder_fullChain() throws Exception {
+            long[] ids = createImportTask("import-samedir");
+            long taskId = ids[0];
+            long comicId = ids[1];
+
+            writeMetadataV3(taskId, comicId, "同目录漫画", "同目录作者");
+
+            importEventHandler.handleComicImported(
+                    new ImportTaskCompletedEvent(UUID.randomUUID(), Instant.now(), taskId, comicId, null),
+                    null, 0L);
+
+            assertThat(comicMapper.selectById(comicId).getStatus()).isEqualTo(ComicStatus.IMPORTING);
+            Long chapterId = chapterMapper.selectList(
+                    new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId)).get(0).getId();
+            Media page = mediaMapper.selectList(
+                    new LambdaQueryWrapper<Media>().eq(Media::getChapterId, chapterId)).get(0);
+            assertThat(page.getHqStatus()).isEqualTo(HqStatus.PENDING);
+            assertThat(page.getHqPath()).isEqualTo(comicId + "/" + chapterId + "/001.jpg");
+
+            // chapterId==globalOrder：文件从导入阶段就位于最终位置（staging 即最终，无需移动）
+            Path finalDir = MANGA_ROOT.resolve("hq").resolve(String.valueOf(comicId))
+                    .resolve(String.valueOf(chapterId));
+            Files.createDirectories(finalDir);
+            Files.writeString(finalDir.resolve("001.jpg"), "fake-jpeg");
+
+            importPersistenceService.applyFinalizeCompleted(new ImportStorageFinalizeCompletedEvent(
+                    UUID.randomUUID(), Instant.now(), taskId, comicId, chapterId.intValue(), chapterId,
+                    "hq/" + comicId + "/" + chapterId, 1));
+
+            assertThat(comicMapper.selectById(comicId).getStatus()).isEqualTo(ComicStatus.READY);
+            assertThat(mediaMapper.selectById(page.getId()).getHqStatus()).isEqualTo(HqStatus.READY);
+            assertThat(importTaskMapper.selectById(taskId).getStatus()).isEqualTo(ImportTaskStatus.SUCCESS);
+
+            ReaderDTO dto = readChapter(chapterId);
+            assertThat(dto.getPages()).hasSize(1);
+            assertThat(dto.getPages().get(0).getHqUrl())
+                    .isEqualTo("/files/hq/" + comicId + "/" + chapterId + "/001.jpg");
+        }
+
+        @Test
         @DisplayName("恢复（RecoveryEngine）：placeholder/缺失 → READY，页面用旧 globalOrder StorageRef 重建")
         void recovery_rebuildsReady_withRealStorageRef() throws Exception {
             long comicId = 8800001L;
