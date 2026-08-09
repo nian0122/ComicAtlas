@@ -53,8 +53,8 @@ public class ExportService {
 
         String outputFileName = buildOutputFileName(comicId, result.comic().getTitle());
         Path outputPath = exportRoot.resolve(outputFileName);
-        long outputSize = zipBuilder.build(manifest, outputPath);
-        return new ExportOutput(taskId, comicId, outputPath.getFileName().toString(), outputSize);
+        ZipBuilder.ZipBuildResult zipResult = zipBuilder.build(manifest, outputPath);
+        return new ExportOutput(taskId, comicId, outputPath.getFileName().toString(), zipResult.totalSize());
     }
 
     /** 供 handler 发失败事件使用。 */

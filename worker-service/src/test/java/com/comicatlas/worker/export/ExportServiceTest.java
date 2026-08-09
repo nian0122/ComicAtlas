@@ -121,7 +121,8 @@ class ExportServiceTest {
         writeFile("hq/1/10/003.mp4", "v");
         writeFile("lq/1/10/002.jpg", "b");
         stubResolverToRoot();
-        when(zipBuilder.build(any(), any())).thenReturn(1234L);
+        when(zipBuilder.build(any(), any())).thenReturn(
+                new ZipBuilder.ZipBuildResult(tempDir.resolve("out.zip"), List.of(tempDir.resolve("out.zip")), 1234L));
 
         ExportService.ExportOutput output = service.export(1L, 99L);
 
@@ -260,7 +261,8 @@ class ExportServiceTest {
         writeFile("hq/1/10/001.jpg", "a");
         writeFile("hq/1/11/001.jpg", "b");
         stubResolverToRoot();
-        when(zipBuilder.build(any(), any())).thenReturn(10L);
+        when(zipBuilder.build(any(), any())).thenReturn(
+                new ZipBuilder.ZipBuildResult(tempDir.resolve("out.zip"), List.of(tempDir.resolve("out.zip")), 10L));
 
         service.export(1L, 99L);
 
