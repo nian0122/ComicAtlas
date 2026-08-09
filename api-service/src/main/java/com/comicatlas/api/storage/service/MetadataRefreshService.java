@@ -1,32 +1,472 @@
 package com.comicatlas.api.storage.service;
 
-import com.comicatlas.api.admin.dto.RefreshMetadataResultDTO;
-import com.comicatlas.api.common.exception.ConflictException;
-import com.comicatlas.common.constant.MetadataRefreshConstants;
+import com.comicatlas.api.common.enums.HqStatus;
+import com.comicatlas.api.common.enums.LqStatus;
+import com.comicatlas.api.common.enums.MediaLifecycleStatus;
+import com.comicatlas.api.common.enums.TranscodeStatus;
+import com.comicatlas.api.common.exception.BusinessException;
+import com.comicatlas.api.common.storage.ApiStorageProperties;
+import com.comicatlas.api.common.storage.ApiStorageRoot;
+import com.comicatlas.api.common.storage.PathTraversalException;
+import com.comicatlas.api.comic.entity.Chapter;
+import com.comicatlas.api.comic.entity.Comic;
+import com.comicatlas.api.comic.entity.Media;
+import com.comicatlas.api.comic.mapper.ChapterMapper;
+import com.comicatlas.api.comic.mapper.ComicMapper;
+import com.comicatlas.api.comic.mapper.MediaMapper;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.comicatlas.common.constant.MetadataRefreshLimits;
+import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO;
+import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO.ChapterSnapshot;
+import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO.MediaSnapshot;
+import com.comicatlas.common.util.MetadataSnapshotRevision;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
- * 刷新单漫画元数据（存储操作域，fail-closed 临时停用）。
+ * 元数据扫盘刷新服务（API 侧，两阶段）。
  * <p>
- * 原危险扫盘逻辑（CAS 锁 READY→REFRESHING、重读 HQ 目录比对 DB、
- * 增删媒体、发 MQ）已在 worker-capability-cleanup Wave 1 临时停用。
- * 本类已无任何依赖，{@link #refresh} 固定抛业务异常作为最后防线：
- * 任何遗漏入口调用它都不会产生 mapper、文件、事务或 MQ 副作用。
- * 安全重导出（DB→JSON，{@code MetadataRefreshEvent} + {@code metadata.refresh.queue}）
- * 由 {@link MediaMetadataSyncService} 在转码完成等场景触发，不经过本类。
+ * <b>阶段一 {@link #loadAndValidate}（事务外）</b>：单次有界读取 STAGING 快照文件，
+ * 同时计算 SHA-256 与事件携带值比对、解析 JSON、校验 schema/comicId/大小/数量/重复键/路径结构；
+ * 本阶段不做任何数据库写入，事务内禁止文件 IO 的约束天然满足。
+ * <p>
+ * <b>阶段二 {@link #applyValidatedSnapshot}（事务内）</b>：批量预取章节与活动媒体，
+ * 重算 {@code databaseRevision} 比对后执行差异合并（更新/新增/标记 MISSING），
+ * 并刷新章节页数与漫画统计。任何失败路径零提交（整体事务回滚）。
+ * <p>
+ * 安全重导出（DB→JSON）由 {@link MediaMetadataSyncService} 在转码完成等场景触发，
+ * 不在本服务职责范围（本服务只做 DB 合并）。
  */
-@Service
+@Slf4j
 @RequiredArgsConstructor
 public class MetadataRefreshService {
 
+    private final MediaMapper mediaMapper;
+    private final ChapterMapper chapterMapper;
+    private final ComicMapper comicMapper;
+    private final ApiStorageProperties storageProperties;
+    private final ObjectMapper objectMapper;
+
+    /** 已删除/回收中媒体不参与活动匹配。 */
+    private static final List<String> INACTIVE_STATUSES = List.of("TRASHED", "DELETED");
+
     /**
-     * 刷新单漫画元数据（已停用）：统一抛 409 业务异常，无任何副作用。
+     * 阶段一请求：事件携带的快照引用信息。
      *
-     * @param comicId 漫画 ID
-     * @return 永不返回；统一抛 {@link ConflictException}
+     * @param comicId        目标漫画 ID（须与快照内 comicId 一致）
+     * @param snapshotRef    快照相对 STAGING 根的路径（正斜杠相对路径）
+     * @param snapshotSha256 快照文件最终字节的 SHA-256（十六进制）
+     * @param snapshotBytes  快照文件字节数（须 ≤ {@link MetadataRefreshLimits#MAX_SNAPSHOT_BYTES}）
+     * @param schemaVersion  快照 schema 版本（须与快照内一致）
      */
-    public RefreshMetadataResultDTO refresh(Long comicId) {
-        throw new ConflictException(MetadataRefreshConstants.METADATA_REFRESH_DISABLED_REASON);
+    public record MetadataRefreshLoadRequest(
+            Long comicId,
+            String snapshotRef,
+            String snapshotSha256,
+            long snapshotBytes,
+            int schemaVersion) {
+    }
+
+    /**
+     * 阶段二结果：合并统计摘要。
+     */
+    public record MetadataRefreshApplyResult(
+            Long comicId,
+            int updated,
+            int inserted,
+            int missing) {
+    }
+
+    /**
+     * 阶段一：事务外受限读取并校验快照。
+     *
+     * @param request 事件携带的快照引用信息
+     * @return 解析并校验通过的快照 DTO
+     * @throws PathTraversalException 快照路径逃逸 STAGING 根
+     * @throws BusinessException      SHA-256/schema/comicId/大小/结构/重复校验失败
+     */
+    public MetadataRefreshSnapshotDTO loadAndValidate(MetadataRefreshLoadRequest request) {
+        if (request.snapshotBytes() > MetadataRefreshLimits.MAX_SNAPSHOT_BYTES) {
+            throw new BusinessException("快照声明大小超限: " + request.snapshotBytes());
+        }
+        ApiStorageRoot stagingRoot = storageProperties.root("STAGING");
+        Path snapshotPath = stagingRoot.resolve(request.snapshotRef());
+        if (!snapshotPath.startsWith(stagingRoot.getPath().normalize())) {
+            throw new PathTraversalException("快照路径越界 STAGING: " + request.snapshotRef());
+        }
+        byte[] bytes = readBounded(snapshotPath);
+        String actualSha = sha256Hex(bytes);
+        if (!actualSha.equalsIgnoreCase(request.snapshotSha256())) {
+            throw new BusinessException("快照 SHA-256 与事件声明不一致");
+        }
+        if (bytes.length > MetadataRefreshLimits.MAX_SNAPSHOT_BYTES) {
+            throw new BusinessException("快照实际大小超限: " + bytes.length);
+        }
+        MetadataRefreshSnapshotDTO snapshot = parse(bytes);
+        validateStructure(snapshot, request);
+        return snapshot;
+    }
+
+    /**
+     * 阶段二：事务内应用已校验快照，执行媒体差异合并并刷新统计。
+     *
+     * @param snapshot 阶段一已校验通过的快照
+     * @return 合并统计摘要
+     * @throws BusinessException 摘要漂移/未知章节/版本漂移/重复键等业务失败（零提交）
+     */
+    @Transactional
+    public MetadataRefreshApplyResult applyValidatedSnapshot(MetadataRefreshSnapshotDTO snapshot) {
+        Long comicId = snapshot.comicId();
+        String recomputed = MetadataSnapshotRevision.compute(snapshot);
+        if (!recomputed.equals(snapshot.databaseRevision())) {
+            throw new BusinessException("快照结构摘要与自带 databaseRevision 不一致");
+        }
+
+        // 批量预取章节（一次查询）
+        List<Chapter> chapters = chapterMapper.selectList(
+                new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
+        Map<Long, Chapter> chapterById = chapters.stream()
+                .collect(Collectors.toMap(Chapter::getId, c -> c));
+        validateChapters(snapshot, chapterById);
+
+        // 批量预取活动媒体（一次查询：全部章节 + 非回收/删除）
+        List<Long> chapterIds = chapters.stream().map(Chapter::getId).toList();
+        List<Media> activeMedia = chapterIds.isEmpty() ? List.of() : mediaMapper.selectList(
+                new LambdaQueryWrapper<Media>()
+                        .in(Media::getChapterId, chapterIds)
+                        .notIn(Media::getStatus, INACTIVE_STATUSES));
+
+        MergePlan plan = buildMergePlan(snapshot, activeMedia);
+        executeMerge(plan);
+        refreshStats(comicId, chapterById, activeMedia, plan);
+
+        log.info("元数据刷新合并完成: comicId={}, updated={}, inserted={}, missing={}",
+                comicId, plan.updatedCount(), plan.inserted().size(), plan.missing().size());
+        return new MetadataRefreshApplyResult(comicId, plan.updatedCount(),
+                plan.inserted().size(), plan.missing().size());
+    }
+
+    // ======================== 阶段一内部 ========================
+
+    /** NOFOLLOW_LINKS 有界读取：拒绝符号链接与非常规文件。 */
+    private byte[] readBounded(Path snapshotPath) {
+        try {
+            if (!Files.isRegularFile(snapshotPath, LinkOption.NOFOLLOW_LINKS)) {
+                throw new BusinessException("快照必须是常规文件且禁止符号链接: " + snapshotPath);
+            }
+            long size = Files.size(snapshotPath);
+            if (size > MetadataRefreshLimits.MAX_SNAPSHOT_BYTES) {
+                throw new BusinessException("快照实际大小超限: " + size);
+            }
+            return Files.readAllBytes(snapshotPath);
+        } catch (IOException e) {
+            throw new BusinessException("快照读取失败: " + snapshotPath, e);
+        }
+    }
+
+    private MetadataRefreshSnapshotDTO parse(byte[] bytes) {
+        try {
+            return objectMapper.readValue(bytes, MetadataRefreshSnapshotDTO.class);
+        } catch (Exception e) {
+            throw new BusinessException("快照 JSON 解析失败", e);
+        }
+    }
+
+    /** schema/comicId/数量/重复 ID/重复键/hqPath 结构校验。 */
+    private void validateStructure(MetadataRefreshSnapshotDTO snapshot,
+                                   MetadataRefreshLoadRequest request) {
+        if (snapshot.schemaVersion() != request.schemaVersion()) {
+            throw new BusinessException("快照 schemaVersion 与事件不一致: "
+                    + snapshot.schemaVersion() + " != " + request.schemaVersion());
+        }
+        if (snapshot.comicId() == null || !snapshot.comicId().equals(request.comicId())) {
+            throw new BusinessException("快照 comicId 与事件不一致: "
+                    + snapshot.comicId() + " != " + request.comicId());
+        }
+        List<ChapterSnapshot> chapters = snapshot.chapters();
+        if (chapters != null && chapters.size() > MetadataRefreshLimits.MAX_CHAPTERS) {
+            throw new BusinessException("快照章节数超限: " + chapters.size());
+        }
+        long mediaCount = chapters == null ? 0 : chapters.stream()
+                .mapToLong(c -> c.mediaItems() == null ? 0 : c.mediaItems().size())
+                .sum();
+        if (mediaCount > MetadataRefreshLimits.MAX_MEDIA) {
+            throw new BusinessException("快照媒体数超限: " + mediaCount);
+        }
+        Set<Long> seenChapterIds = new HashSet<>();
+        Set<Long> seenMediaIds = new HashSet<>();
+        Set<String> seenKeys = new HashSet<>();
+        for (ChapterSnapshot chapter : chapters) {
+            if (!seenChapterIds.add(chapter.chapterId())) {
+                throw new BusinessException("快照重复章节: " + chapter.chapterId());
+            }
+            List<MediaSnapshot> mediaItems = chapter.mediaItems() == null ? List.of() : chapter.mediaItems();
+            for (MediaSnapshot media : mediaItems) {
+                if (media.mediaId() != null && !seenMediaIds.add(media.mediaId())) {
+                    throw new BusinessException("快照重复媒体 ID: " + media.mediaId());
+                }
+                validateHqPathStructure(media, request.comicId(), chapter.chapterId());
+                String key = chapter.chapterId() + "/" + basename(media.hqPath());
+                if (!seenKeys.add(key)) {
+                    throw new BusinessException("快照重复匹配键 (chapterId+basename): " + key);
+                }
+            }
+        }
+    }
+
+    /** hqPath 必须是 {comicId}/{chapterId}/{fileName} 三段正斜杠相对路径。 */
+    private void validateHqPathStructure(MediaSnapshot media, Long comicId, Long chapterId) {
+        String hqPath = media.hqPath();
+        String[] segments = hqPath == null ? new String[0] : hqPath.split("/");
+        if (segments.length != 3) {
+            throw new BusinessException("快照 hqPath 结构非法（需 comicId/chapterId/fileName）: " + hqPath);
+        }
+        if (!segments[0].equals(String.valueOf(comicId))
+                || !segments[1].equals(String.valueOf(chapterId))) {
+            throw new BusinessException("快照 hqPath 与 comicId/chapterId 不符: " + hqPath);
+        }
+        if (segments[2].isBlank()) {
+            throw new BusinessException("快照 hqPath 缺少文件名: " + hqPath);
+        }
+    }
+
+    // ======================== 阶段二内部 ========================
+
+    /** 校验快照章节在 DB 中存在、版本无漂移且无重复匹配键（重复键整任务失败）。 */
+    private void validateChapters(MetadataRefreshSnapshotDTO snapshot,
+                                  Map<Long, Chapter> chapterById) {
+        Set<Long> seenChapterIds = new HashSet<>();
+        Set<Long> seenMediaIds = new HashSet<>();
+        Set<String> seenKeys = new HashSet<>();
+        for (ChapterSnapshot cs : snapshot.chapters()) {
+            if (!seenChapterIds.add(cs.chapterId())) {
+                throw new BusinessException("快照重复章节: " + cs.chapterId());
+            }
+            Chapter db = chapterById.get(cs.chapterId());
+            if (db == null) {
+                throw new BusinessException("快照包含未知章节: " + cs.chapterId());
+            }
+            int dbVersion = db.getVersion() == null ? 0 : db.getVersion();
+            if (dbVersion != cs.chapterVersion()) {
+                throw new BusinessException("章节版本漂移: chapterId=" + cs.chapterId()
+                        + ", snapshot=" + cs.chapterVersion() + ", db=" + dbVersion);
+            }
+            List<MediaSnapshot> mediaItems = cs.mediaItems() == null ? List.of() : cs.mediaItems();
+            for (MediaSnapshot media : mediaItems) {
+                if (media.mediaId() != null && !seenMediaIds.add(media.mediaId())) {
+                    throw new BusinessException("快照重复媒体 ID: " + media.mediaId());
+                }
+                String key = cs.chapterId() + "/" + basename(media.hqPath());
+                if (!seenKeys.add(key)) {
+                    throw new BusinessException("快照重复匹配键 (chapterId+basename): " + key);
+                }
+            }
+        }
+    }
+
+    /** 合并计划：内存中构造待更新/待插入/待标记缺失的集合，之后一次性执行。 */
+    private MergePlan buildMergePlan(MetadataRefreshSnapshotDTO snapshot, List<Media> activeMedia) {
+        // 匹配索引：chapterId + basename → 活动行（仅 READY 生命周期且 HQ READY/MISSING 行参与匹配）
+        Map<String, Media> index = new HashMap<>();
+        Set<Long> matchedIds = new HashSet<>();
+        Map<Long, Integer> nextPageByChapter = new HashMap<>();
+        for (Media m : activeMedia) {
+            if (m.getStatus() != MediaLifecycleStatus.READY
+                    || (m.getHqStatus() != HqStatus.READY && m.getHqStatus() != HqStatus.MISSING)
+                    || m.getHqPath() == null) {
+                continue;
+            }
+            index.put(m.getChapterId() + "/" + basename(m.getHqPath()), m);
+            if (m.getPageNumber() != null && m.getPageNumber() >= 0) {
+                nextPageByChapter.merge(m.getChapterId(), m.getPageNumber(), Math::max);
+            }
+        }
+
+        List<Media> toUpdate = new ArrayList<>();
+        List<Media> toInsert = new ArrayList<>();
+        List<Media> toMarkMissing = new ArrayList<>();
+
+        for (ChapterSnapshot cs : snapshot.chapters()) {
+            List<MediaSnapshot> mediaItems = cs.mediaItems() == null ? List.of() : cs.mediaItems();
+            for (MediaSnapshot item : mediaItems) {
+                String key = cs.chapterId() + "/" + basename(item.hqPath());
+                Media dbRow = index.get(key);
+                if (dbRow != null) {
+                    // 媒体版本漂移校验：快照记录的 mediaVersion 须与 DB 一致
+                    int dbVersion = dbRow.getVersion() == null ? 0 : dbRow.getVersion();
+                    if (item.mediaId() != null && !item.mediaId().equals(dbRow.getId())) {
+                        throw new BusinessException("媒体 ID 漂移: key=" + key
+                                + ", snapshot=" + item.mediaId() + ", db=" + dbRow.getId());
+                    }
+                    if (item.mediaVersion() != dbVersion) {
+                        throw new BusinessException("媒体版本漂移: key=" + key
+                                + ", snapshot=" + item.mediaVersion() + ", db=" + dbVersion);
+                    }
+                    matchedIds.add(dbRow.getId());
+                    applyMatchedUpdate(dbRow, item);
+                    toUpdate.add(dbRow);
+                } else if (item.fileSize() > 0) {
+                    Media created = buildNewMedia(cs.chapterId(), item, nextPageByChapter);
+                    toInsert.add(created);
+                }
+                // fileSize==0 且无匹配行：磁盘无文件、DB 无行 → 跳过
+            }
+        }
+        // 未匹配活动行：标 HQ MISSING、fileSize=0，保留尺寸/视频/LQ
+        for (Media m : activeMedia) {
+            if (m.getStatus() == MediaLifecycleStatus.READY
+                    && (m.getHqStatus() == HqStatus.READY || m.getHqStatus() == HqStatus.MISSING)
+                    && !matchedIds.contains(m.getId())) {
+                m.setHqStatus(HqStatus.MISSING);
+                m.setFileSize(0L);
+                toMarkMissing.add(m);
+                toUpdate.add(m);
+            }
+        }
+        return new MergePlan(toUpdate, toInsert, toMarkMissing);
+    }
+
+    /** 匹配成功：更新 HQ READY、fileSize、宽高、mediaType 与视频字段（IMAGE 清空视频字段）。 */
+    private void applyMatchedUpdate(Media dbRow, MediaSnapshot item) {
+        boolean image = "IMAGE".equals(item.mediaType());
+        dbRow.setHqStatus(HqStatus.READY);
+        dbRow.setFileSize(item.fileSize());
+        dbRow.setWidth(item.width());
+        dbRow.setHeight(item.height());
+        dbRow.setMediaType(item.mediaType());
+        if (image) {
+            dbRow.setDuration(null);
+            dbRow.setContainer(null);
+            dbRow.setVideoCodec(null);
+            dbRow.setAudioCodec(null);
+        } else {
+            dbRow.setDuration(item.duration());
+            dbRow.setContainer(item.container());
+            dbRow.setVideoCodec(item.videoCodec());
+            dbRow.setAudioCodec(item.audioCodec());
+        }
+        // 保留 mediaId/pageNumber/LQ root/path/status 与 transcodeStatus 不变
+    }
+
+    /** 磁盘新增文件：插入 READY，pageNumber 从本章最大非负页码 +1 追加。 */
+    private Media buildNewMedia(Long chapterId, MediaSnapshot item, Map<Long, Integer> nextPageByChapter) {
+        Media m = new Media();
+        m.setChapterId(chapterId);
+        m.setPageNumber(nextPageNumber(chapterId, nextPageByChapter));
+        m.setHqRoot("HQ");
+        m.setHqPath(item.hqPath());
+        m.setHqStatus(HqStatus.READY);
+        m.setLqStatus(LqStatus.NOT_GENERATED);
+        m.setLqRoot(null);
+        m.setLqPath(null);
+        m.setTranscodeStatus(TranscodeStatus.NOT_NEEDED);
+        m.setStatus(MediaLifecycleStatus.READY);
+        m.setFileSize(item.fileSize());
+        m.setMediaType(item.mediaType());
+        m.setWidth(item.width());
+        m.setHeight(item.height());
+        if ("IMAGE".equals(item.mediaType())) {
+            m.setDuration(null);
+            m.setContainer(null);
+            m.setVideoCodec(null);
+            m.setAudioCodec(null);
+        } else {
+            m.setDuration(item.duration());
+            m.setContainer(item.container());
+            m.setVideoCodec(item.videoCodec());
+            m.setAudioCodec(item.audioCodec());
+        }
+        return m;
+    }
+
+    /** 追加页码：初始为本章现存最大非负页码 +1，逐条递增。 */
+    private int nextPageNumber(Long chapterId, Map<Long, Integer> nextPageByChapter) {
+        int next = nextPageByChapter.getOrDefault(chapterId, 0) + 1;
+        nextPageByChapter.put(chapterId, next);
+        return next;
+    }
+
+    private void executeMerge(MergePlan plan) {
+        for (Media media : plan.updated()) {
+            mediaMapper.updateById(media);
+        }
+        for (Media media : plan.inserted()) {
+            mediaMapper.insert(media);
+        }
+    }
+
+    /** 刷新章节 pageCount 与漫画 totalPages/hqSize（pageCount 统计 READY 生命周期行，含 HQ MISSING）。 */
+    private void refreshStats(Long comicId, Map<Long, Chapter> chapterById,
+                              List<Media> activeMedia, MergePlan plan) {
+        // 合并后媒体集合 = 活动行（已就地更新）+ 新增行
+        List<Media> merged = new ArrayList<>(activeMedia);
+        merged.addAll(plan.inserted());
+        Map<Long, List<Media>> byChapter = merged.stream()
+                .collect(Collectors.groupingBy(Media::getChapterId));
+
+        long totalPages = 0;
+        for (Map.Entry<Long, Chapter> entry : chapterById.entrySet()) {
+            Long chapterId = entry.getKey();
+            long pageCount = byChapter.getOrDefault(chapterId, List.of()).stream()
+                    .filter(m -> m.getStatus() == MediaLifecycleStatus.READY)
+                    .count();
+            totalPages += pageCount;
+            chapterMapper.update(null, new LambdaUpdateWrapper<Chapter>()
+                    .eq(Chapter::getId, chapterId)
+                    .set(Chapter::getPageCount, (int) pageCount));
+        }
+        // hqSize/fileSize 只统计实际扫描 READY 字节（MISSING 已置 0，自然排除）
+        long hqSize = merged.stream()
+                .filter(m -> m.getHqStatus() == HqStatus.READY)
+                .mapToLong(m -> m.getFileSize() == null ? 0L : m.getFileSize())
+                .sum();
+        comicMapper.update(null, new LambdaUpdateWrapper<Comic>()
+                .eq(Comic::getId, comicId)
+                .set(Comic::getTotalPages, (int) totalPages)
+                .set(Comic::getHqSize, hqSize)
+                .set(Comic::getFileSize, hqSize));
+    }
+
+    private String basename(String hqPath) {
+        if (hqPath == null) {
+            return "";
+        }
+        int idx = hqPath.lastIndexOf('/');
+        return idx >= 0 ? hqPath.substring(idx + 1) : hqPath;
+    }
+
+    private String sha256Hex(byte[] bytes) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(digest.digest(bytes));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("JVM 不支持 SHA-256", e);
+        }
+    }
+
+    /** 合并计划载体。 */
+    private record MergePlan(List<Media> updated, List<Media> inserted, List<Media> missing) {
+        private int updatedCount() {
+            return updated.size() - missing.size();
+        }
     }
 }
