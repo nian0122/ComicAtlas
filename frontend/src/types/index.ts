@@ -392,15 +392,30 @@ export interface StorageOperation {
 
 // ========== Export Domain ==========
 
+/** 导出产物分卷（GET /api/storage/export/tasks/{taskId}/artifacts 返回） */
+export interface ExportArtifactVO {
+  /** 卷序号（0 起） */
+  index: number
+  /** 本地 ZIP 文件名 */
+  fileName: string
+  /** 文件字节数 */
+  size: number
+  /** 是否为最后一卷 */
+  lastSegment: boolean
+  /** 宿主机物理路径 */
+  physicalPath: string
+}
+
+/** 导出任务（后端 ExportTaskVO，主键字段为 id、错误字段为 errorMsg） */
 export interface ExportTaskVO {
-  taskId: number
+  id: number
   comicId: number
   status: string // PENDING | RUNNING | SUCCESS | FAILED
+  progress: number // 0-100
   outputRoot?: string
   outputPath?: string
   outputSize: number
-  physicalPath?: string
-  errorMessage?: string
+  errorMsg?: string
   createdAt: string
   completedAt?: string
 }

@@ -168,7 +168,7 @@
       <div class="task-cards">
         <ExportTaskCard
           v-for="task in activeExportTasks"
-          :key="task.taskId"
+          :key="task.id"
           :task="task"
           variant="active"
         />
@@ -184,7 +184,7 @@
       <div class="task-cards">
         <ExportTaskCard
           v-for="task in failedExportTasks"
-          :key="task.taskId"
+          :key="task.id"
           :task="task"
           variant="failed"
         />
@@ -200,7 +200,7 @@
       <div v-if="completedExportTasks.length > 0" class="task-cards">
         <ExportTaskCard
           v-for="task in completedExportTasks.slice(0, 10)"
-          :key="task.taskId"
+          :key="task.id"
           :task="task"
           variant="done"
         />
@@ -277,6 +277,12 @@ onMounted(async () => {
 
   await recoveryStore.fetchTasks()
   if (recoveryStore.hasActive) recoveryStore.startPolling()
+
+  // 首次从 query.comicId 加载该漫画导出任务，有进行中任务则启动轮询
+  await fetchExportTasks()
+  if (hasActiveExports()) {
+    startExportPolling()
+  }
 })
 
 watch(batchId, async () => {
@@ -332,6 +338,14 @@ const exportPollTimer = ref<ReturnType<typeof setInterval> | null>(null)
 
 const TERMINAL_EXPORT_STATUSES = new Set(['SUCCESS', 'FAILED'])
 
+/** 关注的漫画 ID 集合：由 query.comicId 首次进入 + 已加载任务的漫画构成 */
+const exportComicIds = ref<Set<number>>(new Set())
+
+const queryComicId = computed(() => {
+  const n = Number(route.query.comicId)
+  return Number.isFinite(n) && n > 0 ? n : null
+})
+
 const activeExportTasks = computed(() =>
   exportTasks.value.filter(t => !TERMINAL_EXPORT_STATUSES.has(t.status))
 )
@@ -347,13 +361,14 @@ function hasActiveExports(): boolean {
 }
 
 async function fetchExportTasks() {
-  // 收集已知的 comicId
-  const comicIds = [...new Set(exportTasks.value.map(t => t.comicId))]
-  if (comicIds.length === 0) return
+  if (queryComicId.value != null) {
+    exportComicIds.value.add(queryComicId.value)
+  }
+  if (exportComicIds.value.size === 0) return
 
   try {
     const results = await Promise.allSettled(
-      comicIds.map(id => exportApi.listExports(id))
+      [...exportComicIds.value].map(id => exportApi.listExports(id))
     )
     const allTasks: ExportTaskVO[] = []
     for (const r of results) {
@@ -364,10 +379,10 @@ async function fetchExportTasks() {
         }
       }
     }
-    // 去重：同一 taskId 取最新
+    // 去重：同一任务 id 取最新
     const map = new Map<number, ExportTaskVO>()
     for (const t of allTasks) {
-      map.set(t.taskId, t)
+      map.set(t.id, t)
     }
     exportTasks.value = [...map.values()]
   } catch {
@@ -392,13 +407,6 @@ function stopExportPolling() {
     exportPollTimer.value = null
   }
 }
-
-// 初始拉取一次，有进行中任务则启动轮询
-fetchExportTasks().then(() => {
-  if (hasActiveExports()) {
-    startExportPolling()
-  }
-})
 
 onBeforeUnmount(() => {
   // 离开页面不停止轮询：TopNav 全局依赖此 store 维持红点徽章

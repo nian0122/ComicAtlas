@@ -14,6 +14,7 @@ import type {
   CreateUploadSessionRequest,
   CreateUploadSessionResult,
   DirectoryScanTaskVO,
+  ExportArtifactVO,
   ExportTaskVO,
   ImportStatusVO,
   ImportTaskQuery,
@@ -123,10 +124,11 @@ export const hqApi = {
 }
 
 export const exportApi = {
-  createExport: (comicId: number) => api.post(`/storage/export/comics/${comicId}`),
+  createExport: (comicId: number) => api.post<ExportTaskVO>(`/storage/export/comics/${comicId}`),
   listExports: (comicId: number) => api.get<ExportTaskVO[]>(`/storage/export/comics/${comicId}/tasks`),
   getTask: (taskId: number) => api.get<ExportTaskVO>(`/storage/export/tasks/${taskId}`),
-  download: (taskId: number) => api.get(`/storage/export/tasks/${taskId}/download`, { responseType: 'blob' }),
+  getArtifacts: (taskId: number) =>
+    api.get<ExportArtifactVO[]>(`/storage/export/tasks/${taskId}/artifacts`),
   openDir: (taskId: number) => api.post(`/storage/export/tasks/${taskId}/open`),
 }
 
