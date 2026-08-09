@@ -142,6 +142,8 @@ class MetadataExporterTest {
         assertEquals(1200, firstItem.get("height").asInt());
         assertFalse(firstItem.has("duration"), "IMAGE item should not have duration field");
         assertFalse(firstItem.has("container"), "IMAGE item should not have container field");
+        assertEquals("1/10/001.jpg", firstItem.get("hqPath").asText(),
+                "IMAGE item should carry the real relative hqPath StorageRef");
 
         JsonNode secondItem = mediaItems.get(1);
         assertEquals("002.mp4", secondItem.get("fileName").asText());
@@ -156,5 +158,7 @@ class MetadataExporterTest {
         assertEquals("mp4", secondItem.get("container").asText());
         assertEquals("h264", secondItem.get("videoCodec").asText());
         assertEquals("aac", secondItem.get("audioCodec").asText());
+        assertEquals("1/10/002.mp4", secondItem.get("hqPath").asText(),
+                "VIDEO item should carry the real relative hqPath StorageRef");
     }
 }

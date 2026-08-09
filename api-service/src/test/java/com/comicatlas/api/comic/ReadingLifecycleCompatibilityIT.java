@@ -749,6 +749,91 @@ class ReadingLifecycleCompatibilityIT {
             assertThat(dto.getPages()).extracting(com.comicatlas.api.reader.dto.ReaderDTO.MediaItemDTO::getHqUrl)
                     .contains("/files/hq/" + comicId + "/3/001.jpg", "/files/hq/" + comicId + "/3/002.jpg");
         }
+
+        @Test
+        @DisplayName("现代恢复：metadata hqPath 优先重建 page，新 DB chapterId 可不同，hqPath 保留真实磁盘引用")
+        void recovery_rebuildsModern_withRealHqPathStorageRef() throws Exception {
+            long comicId = 8800002L;
+            long legacyChapterId = 99L;
+            Path hqDir = MANGA_ROOT.resolve("hq").resolve(String.valueOf(comicId)).resolve(String.valueOf(legacyChapterId));
+            Files.createDirectories(hqDir);
+            Files.writeString(hqDir.resolve("001.jpg"), "fake-jpeg-modern");
+            writeModernRecoveryMetadata(comicId, legacyChapterId);
+
+            var progress = recoveryEngine.processComicDir(comicId, 0);
+            assertThat(progress.recoveredComics()).isEqualTo(1);
+
+            Comic comic = comicMapper.selectById(comicId);
+            assertThat(comic.getStatus()).isEqualTo(ComicStatus.READY);
+            assertThat(comic.getTitle()).isEqualTo("现代恢复漫画");
+
+            List<Catalog> catalogs = catalogMapper.selectList(
+                    new LambdaQueryWrapper<Catalog>().eq(Catalog::getComicId, comicId)
+                            .orderByAsc(Catalog::getSortOrder));
+            assertThat(catalogs).hasSize(2);
+            assertThat(catalogs.get(1).getParentId()).isEqualTo(catalogs.get(0).getId());
+
+            List<Chapter> chapters = chapterMapper.selectList(
+                    new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
+            assertThat(chapters).hasSize(1);
+            Chapter chapter = chapters.get(0);
+            assertThat(chapter.getPageCount()).isEqualTo(1);
+            assertThat(chapter.getCatalogId()).isEqualTo(catalogs.get(1).getId());
+            assertThat(chapter.getGlobalOrder()).isEqualTo(3);
+
+            List<Media> pages = mediaMapper.selectList(
+                    new LambdaQueryWrapper<Media>().eq(Media::getChapterId, chapter.getId()));
+            assertThat(pages).hasSize(1);
+            Media page = pages.get(0);
+            assertThat(page.getHqPath()).isEqualTo(comicId + "/" + legacyChapterId + "/001.jpg");
+            assertThat(page.getHqStatus()).isEqualTo(HqStatus.READY);
+            assertThat(Files.exists(MANGA_ROOT.resolve("hq").resolve(comicId + "/" + legacyChapterId + "/001.jpg")))
+                    .isTrue();
+
+            ReaderDTO dto = readChapter(chapter.getId());
+            assertThat(dto.getPages()).hasSize(1);
+            assertThat(dto.getPages().get(0).getHqUrl())
+                    .isEqualTo("/files/hq/" + comicId + "/" + legacyChapterId + "/001.jpg");
+        }
+
+        @Test
+        @DisplayName("恢复缺文件：hqPath 指向不存在文件 → media MISSING，不得标 READY")
+        void recovery_rebuildsMissingFile_asMissingNotReady() throws Exception {
+            long comicId = 8800003L;
+            writeMissingFileRecoveryMetadata(comicId);
+
+            var progress = recoveryEngine.processComicDir(comicId, 0);
+            assertThat(progress.recoveredComics()).isEqualTo(1);
+
+            Comic comic = comicMapper.selectById(comicId);
+            assertThat(comic.getStatus()).isEqualTo(ComicStatus.READY);
+
+            List<Chapter> chapters = chapterMapper.selectList(
+                    new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
+            assertThat(chapters).hasSize(1);
+            List<Media> pages = mediaMapper.selectList(
+                    new LambdaQueryWrapper<Media>().eq(Media::getChapterId, chapters.get(0).getId()));
+            assertThat(pages).hasSize(1);
+            assertThat(pages.get(0).getHqStatus()).isEqualTo(HqStatus.MISSING);
+            assertThat(pages.get(0).getHqPath()).isEqualTo(comicId + "/77/001.jpg");
+        }
+
+        @Test
+        @DisplayName("恢复坏索引：catalog parentIndex 越界 → typed-fail，不写任何 DB 行、不静默挂根")
+        void recovery_rejectsBadParentIndex_typedFail_noDbRows() throws Exception {
+            long comicId = 8800004L;
+            writeBadIndexRecoveryMetadata(comicId);
+
+            var progress = recoveryEngine.processComicDir(comicId, 0);
+            assertThat(progress.errorComics()).isEqualTo(1);
+            assertThat(progress.lastError()).contains("parentIndex");
+
+            assertThat(comicMapper.selectById(comicId)).isNull();
+            assertThat(catalogMapper.selectCount(
+                    new LambdaQueryWrapper<Catalog>().eq(Catalog::getComicId, comicId))).isZero();
+            assertThat(chapterMapper.selectCount(
+                    new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId))).isZero();
+        }
     }
 
     // ======================== 5. 旧 globalOrder 路径 ========================
@@ -834,6 +919,65 @@ class ReadingLifecycleCompatibilityIT {
               "catalogs": [],
               "chapters": [
                 {"title": "第1话", "chapterNo": "1", "sortOrder": 0, "globalOrder": 3, "catalogIndex": null}
+              ]
+            }
+            """;
+        Files.writeString(MANGA_ROOT.resolve("metadata").resolve(comicId + ".json"), metadata);
+    }
+
+    private void writeModernRecoveryMetadata(long comicId, long legacyChapterId) throws IOException {
+        String metadata = """
+            {
+              "version": 3,
+              "comic": {"title": "现代恢复漫画", "author": "现代作者", "category": "Action"},
+              "catalogs": [
+                {"title": "卷1", "sortOrder": 0},
+                {"title": "卷1·话", "sortOrder": 1, "parentIndex": 0}
+              ],
+              "chapters": [
+                {
+                  "title": "第1话", "chapterNo": "1", "sortOrder": 0, "globalOrder": 3, "catalogIndex": 1,
+                  "mediaItems": [
+                    {"pageNumber": 1, "fileName": "001.jpg", "hqPath": "%d/%d/001.jpg",
+                     "fileSize": 2048, "width": 100, "height": 150, "mediaType": "IMAGE", "hqStatus": "READY"}
+                  ]
+                }
+              ]
+            }
+            """.formatted(comicId, legacyChapterId);
+        Files.writeString(MANGA_ROOT.resolve("metadata").resolve(comicId + ".json"), metadata);
+    }
+
+    private void writeMissingFileRecoveryMetadata(long comicId) throws IOException {
+        String metadata = """
+            {
+              "version": 3,
+              "comic": {"title": "缺文件漫画", "author": "作者", "category": null},
+              "catalogs": [],
+              "chapters": [
+                {
+                  "title": "第1话", "chapterNo": "1", "sortOrder": 0, "globalOrder": 0, "catalogIndex": null,
+                  "mediaItems": [
+                    {"pageNumber": 1, "fileName": "001.jpg", "hqPath": "%d/77/001.jpg",
+                     "fileSize": 1024, "width": 100, "height": 150, "mediaType": "IMAGE", "hqStatus": "READY"}
+                  ]
+                }
+              ]
+            }
+            """.formatted(comicId);
+        Files.writeString(MANGA_ROOT.resolve("metadata").resolve(comicId + ".json"), metadata);
+    }
+
+    private void writeBadIndexRecoveryMetadata(long comicId) throws IOException {
+        String metadata = """
+            {
+              "version": 3,
+              "comic": {"title": "坏索引漫画", "author": "作者", "category": null},
+              "catalogs": [
+                {"title": "目录1", "sortOrder": 0, "parentIndex": 5}
+              ],
+              "chapters": [
+                {"title": "第1话", "chapterNo": "1", "sortOrder": 0, "globalOrder": 0, "catalogIndex": null}
               ]
             }
             """;

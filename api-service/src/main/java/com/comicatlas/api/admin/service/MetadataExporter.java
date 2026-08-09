@@ -129,7 +129,8 @@ public class MetadataExporter {
                         media.getFileSize() != null ? media.getFileSize() : 0,
                         media.getMediaType() != null ? media.getMediaType() : "IMAGE",
                         media.getWidth(), media.getHeight(), media.getDuration(),
-                        media.getContainer(), media.getVideoCodec(), media.getAudioCodec()));
+                        media.getContainer(), media.getVideoCodec(), media.getAudioCodec(),
+                        media.getHqPath()));
             }
             chapterList.add(new MetadataV3.Chapter(
                     chapter.getTitle(),
