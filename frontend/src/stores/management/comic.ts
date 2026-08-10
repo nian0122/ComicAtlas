@@ -34,18 +34,19 @@ export const useManagementComicStore = defineStore('management-comic', () => {
     state.query = { page: 1, size: 24, sort: 'createdAt' }
   }
 
-  async function fetchList() {
+  async function fetchList(append = false) {
     state.loading = true
     state.error = null
 
     try {
       const res = await comicApi.list(state.query)
-      state.list = res.data.records || []
+      const records = res.data.records || []
+      state.list = append ? [...state.list, ...records] : records
       state.total = res.data.total || 0
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
       state.error = msg || '加载漫画列表失败'
-      state.list = []
+      if (!append) state.list = []
       state.total = 0
     } finally {
       state.loading = false
@@ -54,13 +55,13 @@ export const useManagementComicStore = defineStore('management-comic', () => {
 
   async function search(patch: Partial<ComicListQuery>) {
     updateQuery({ ...patch, page: 1 })
-    await fetchList()
+    await fetchList(false)
   }
 
   async function nextPage() {
     if (state.list.length >= state.total) return
     state.query.page = (state.query.page || 1) + 1
-    await fetchList()
+    await fetchList(true)
   }
 
   return {

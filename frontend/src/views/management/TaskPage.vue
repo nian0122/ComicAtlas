@@ -87,14 +87,10 @@
           @retry="onRetry"
           @read="onRead"
         />
-        <el-pagination
-          class="pagination-bar"
-          layout="prev, pager, next"
-          :total="store.completedTotal"
-          :page-size="store.completedPageSize"
-          :current-page="store.completedPage"
-          @current-change="onCompletedPageChange"
-        />
+        <div ref="completedSentinel" class="infinite-sentinel" aria-live="polite">
+          <span v-if="completedLoading">正在加载更多...</span>
+          <span v-else-if="!completedHasMore">已加载全部任务</span>
+        </div>
       </div>
       <div v-else class="state empty">
         <el-icon :size="48"><CircleCheckFilled /></el-icon>
@@ -224,6 +220,7 @@ import { exportApi } from '@/services/api'
 import TaskCard from '@/components/management/task/TaskCard.vue'
 import ExportTaskCard from '@/components/management/task/ExportTaskCard.vue'
 import RecoveryTaskCard from '@/components/management/task/RecoveryTaskCard.vue'
+import { useInfiniteScroll } from '@/composables/useInfiniteScroll'
 
 const router = useRouter()
 const route = useRoute()
@@ -234,6 +231,14 @@ const batchId = computed(() => (route.query.batchId as string) || '')
 const activeCount = computed(() => store.activeTasks.length)
 const failedCount = computed(() => store.failedTasks.length)
 const completedCount = computed(() => store.completedTotal)
+const { sentinel: completedSentinel, loading: completedLoading, hasMore: completedHasMore, reset: resetCompletedScroll } = useInfiniteScroll({
+  loadMore: async () => {
+    if (store.loading || !store.completedHasMore) return false
+    await store.fetchCompletedTasks(store.completedPage + 1)
+    return store.completedHasMore
+  },
+})
+void completedSentinel
 
 function formatRelative(ts: number): string {
   const diff = Date.now() - ts
@@ -286,14 +291,11 @@ onMounted(async () => {
 })
 
 watch(batchId, async () => {
+  resetCompletedScroll()
   await store.fetchList(batchId.value ? { batchId: batchId.value } : undefined)
   await store.fetchCompletedTasks(1)
   if (store.hasActive) store.startPolling()
 })
-
-function onCompletedPageChange(page: number) {
-  store.fetchCompletedTasks(page)
-}
 
 // ========== Recovery tasks ==========
 

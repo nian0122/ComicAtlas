@@ -41,7 +41,7 @@ export function useStorageFilter(
   const pageSize = ref(20)
 
   watch(
-    [() => filter.value.hqStatus, () => filter.value.lqStatus, () => filter.value.keyword],
+    [() => filter.value.hqStatus, () => filter.value.lqStatus, () => filter.value.keyword, sort],
     () => {
       page.value = 1
     },

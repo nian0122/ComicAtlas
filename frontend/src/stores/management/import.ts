@@ -53,6 +53,7 @@ export const useImportStore = defineStore('import', () => {
   const completedTotal = ref(0)
   const completedPage = ref(1)
   const completedPageSize = ref(20)
+  const completedHasMore = ref(false)
 
   let pollTimer: ReturnType<typeof setInterval> | null = null
 
@@ -94,8 +95,12 @@ export const useImportStore = defineStore('import', () => {
         size: completedPageSize.value,
         status: 'SUCCESS',
       })
-      completedTasks.value = res.data?.records ?? []
+      const records = res.data?.records ?? []
+      completedTasks.value = completedPage.value === 1
+        ? records
+        : [...completedTasks.value, ...records]
       completedTotal.value = res.data?.total ?? 0
+      completedHasMore.value = completedTasks.value.length < completedTotal.value
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
       error.value = msg || '加载已完成任务失败'
@@ -223,6 +228,7 @@ export const useImportStore = defineStore('import', () => {
     completedTotal,
     completedPage,
     completedPageSize,
+    completedHasMore,
     // getters
     activeCount,
     hasActive,

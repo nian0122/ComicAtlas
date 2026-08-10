@@ -21,6 +21,10 @@
       @update:page-size="pageSize = $event"
       @row-click="handleShowDetail"
     />
+    <div ref="storageSentinel" class="infinite-sentinel" aria-live="polite">
+      <span v-if="infiniteLoading">正在加载更多...</span>
+      <span v-else-if="!infiniteHasMore">已加载全部漫画</span>
+    </div>
   </div>
 </template>
 
@@ -29,6 +33,7 @@ import { watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useStorageStore } from '@/stores/management/storage'
 import { useStorageFilter } from '@/composables/storage/useStorageFilter'
+import { useInfiniteScroll } from '@/composables/useInfiniteScroll'
 import StorageSummary from './StorageSummary.vue'
 import StorageToolbar from './StorageToolbar.vue'
 import StorageTable from './StorageTable.vue'
@@ -50,8 +55,18 @@ function reload() {
   store.loadComics(buildQuery())
 }
 
+const { sentinel: storageSentinel, loading: infiniteLoading, hasMore: infiniteHasMore } = useInfiniteScroll({
+  loadMore: async () => {
+    if (store.loading || !store.hasMore) return false
+    page.value += 1
+    await store.loadComics(buildQuery(), true)
+    return store.hasMore
+  },
+})
+void storageSentinel
+
 watch(
-  [() => filterState.value.hqStatus, () => filterState.value.lqStatus, () => filterState.value.keyword, sortState, page, pageSize],
+  [() => filterState.value.hqStatus, () => filterState.value.lqStatus, () => filterState.value.keyword, sortState, pageSize],
   reload,
 )
 

@@ -84,16 +84,6 @@ function formatSize(bytes: number): string {
       <template #default="{ row }">{{ formatSize(row.lqSize) }}</template>
     </el-table-column>
   </el-table>
-  <el-pagination
-    class="pagination-bar"
-    layout="total, sizes, prev, pager, next, jumper"
-    :page-sizes="[10, 20, 50, 100]"
-    :total="total"
-    :current-page="currentPage"
-    :page-size="pageSize"
-    @update:current-page="emit('update:currentPage', $event)"
-    @update:page-size="emit('update:pageSize', $event)"
-  />
 </template>
 
 <style scoped>

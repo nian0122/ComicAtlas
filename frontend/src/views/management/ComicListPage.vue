@@ -145,15 +145,9 @@
         </div>
       </div>
 
-      <div class="pagination-wrapper">
-        <el-pagination
-          v-model:current-page="store.query.page"
-          :page-size="store.query.size"
-          :total="store.total"
-          layout="prev, pager, next"
-          background
-          @current-change="onPageChange"
-        />
+      <div ref="comicSentinel" class="infinite-sentinel" aria-live="polite">
+        <span v-if="infiniteLoading">正在加载更多...</span>
+        <span v-else-if="!infiniteHasMore">已加载全部漫画</span>
       </div>
     </section>
 
@@ -175,9 +169,18 @@ import { useTagStore } from '@/stores/tag-store'
 import BatchEditDialog from './BatchEditDialog.vue'
 import type { ComicListQuery, StorageStats } from '@/types'
 import { storageService } from '@/services/storage'
+import { useInfiniteScroll } from '@/composables/useInfiniteScroll'
 
 const router = useRouter()
 const store = useManagementComicStore()
+const { sentinel: comicSentinel, loading: infiniteLoading, hasMore: infiniteHasMore, reset: resetInfinite } = useInfiniteScroll({
+  loadMore: async () => {
+    if (store.loading || !store.hasMore) return false
+    await store.nextPage()
+    return store.hasMore
+  },
+})
+void comicSentinel
 const categoryStore = useCategoryStore()
 const tagStore = useTagStore()
 const storageStats = ref<StorageStats | null>(null)
@@ -276,6 +279,7 @@ watch(() => filters.tags, (val) => {
 }, { deep: true })
 
 function applyFilters() {
+  resetInfinite()
   store.search({
     keyword: filters.keyword || undefined,
     category: filters.category || undefined,
@@ -294,11 +298,7 @@ function resetFilters() {
   filters.tagMode = 'OR'
   filters.sort = 'createdAt'
   store.resetQuery()
-  store.fetchList()
-}
-
-function onPageChange(page: number) {
-  store.updateQuery({ page })
+  resetInfinite()
   store.fetchList()
 }
 

@@ -163,15 +163,9 @@
         />
       </div>
 
-      <div class="pagination-wrapper">
-        <el-pagination
-          v-model:current-page="store.query.page"
-          :page-size="store.query.size"
-          :total="store.total"
-          layout="prev, pager, next"
-          background
-          @current-change="onPageChange"
-        />
+      <div ref="comicSentinel" class="infinite-sentinel" aria-live="polite">
+        <span v-if="infiniteLoading">正在加载更多...</span>
+        <span v-else-if="!infiniteHasMore">已加载全部漫画</span>
       </div>
     </section>
   </div>
@@ -187,9 +181,18 @@ import { useBreakpoint, BREAKPOINTS } from '@/composables/useBreakpoint'
 import ComicPoster from '@/components/reading/comic/ComicPoster.vue'
 import { toPosterStatus } from '@/components/reading/comic/poster-status'
 import type { CategoryDTO, ComicListQuery, ComicListVO, TagDTO } from '@/types'
+import { useInfiniteScroll } from '@/composables/useInfiniteScroll'
 
 const router = useRouter()
 const store = useComicStore()
+const { sentinel: comicSentinel, loading: infiniteLoading, hasMore: infiniteHasMore, reset: resetInfinite } = useInfiniteScroll({
+  loadMore: async () => {
+    if (store.loading || !store.hasMore) return false
+    await store.nextPage()
+    return store.hasMore
+  },
+})
+void comicSentinel
 
 const keyword = ref('')
 const sort = ref<NonNullable<ComicListQuery['sort']>>('createdAt')
@@ -267,6 +270,7 @@ watch(selectedTags, (val) => {
 }, { deep: true })
 
 function onSearch() {
+  resetInfinite()
   store.search({
     keyword: keyword.value || undefined,
     category: categoryFilter.value || undefined,
@@ -274,11 +278,6 @@ function onSearch() {
     tags: selectedTags.value.length > 0 ? selectedTags.value : undefined,
     tagMode: selectedTags.value.length > 1 ? tagMode.value : undefined,
   })
-}
-
-function onPageChange(page: number) {
-  store.updateQuery({ page })
-  store.fetchList()
 }
 
 function goDetail(id: string | number) {

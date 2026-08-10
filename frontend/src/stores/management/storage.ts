@@ -10,16 +10,22 @@ export const useStorageStore = defineStore('storage', () => {
   const busyState = ref<Record<number, boolean>>({})
   const loading = ref(false)
   const serverTotal = ref(0)
+  const hasMore = ref(false)
 
-  async function loadComics(params?: ComicStorageQuery) {
+  async function loadComics(params?: ComicStorageQuery, append = false) {
     loading.value = true
     try {
       const data = await storageService.fetchComics(params ?? {})
-      comicList.value = Array.isArray(data?.records) ? data.records : []
+      const records = Array.isArray(data?.records) ? data.records : []
+      comicList.value = append ? [...comicList.value, ...records] : records
       serverTotal.value = data?.total ?? 0
+      hasMore.value = comicList.value.length < serverTotal.value
     } catch {
-      comicList.value = []
-      serverTotal.value = 0
+      if (!append) {
+        comicList.value = []
+        serverTotal.value = 0
+      }
+      hasMore.value = false
     } finally {
       loading.value = false
     }
@@ -80,6 +86,7 @@ export const useStorageStore = defineStore('storage', () => {
     busyState,
     loading,
     serverTotal,
+    hasMore,
     loadComics,
     loadSummary,
     loadChapters,
