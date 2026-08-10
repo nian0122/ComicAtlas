@@ -115,10 +115,19 @@ public class TrashLifecycleService {
         ManagementStateMachine.validateChapterTransition(
                 chapter.getStatus() == null ? null : chapter.getStatus().name(), "TRASHING");
 
-        String rel = comicId + "/" + chapter.getGlobalOrder();
-        List<TrashManifestDTO.Entry> entries = List.of(
-                entry("HQ", rel, "hq/" + rel),
-                entry("LQ", rel, "lq/" + rel));
+        // 逐媒体使用 DB 真实 hqRoot/hqPath 与 lqRoot/lqPath 生成不可变清单，
+        // 不按 globalOrder 猜目录、不做目录聚合（最终布局为 {comicId}/{chapterId}）
+        List<TrashManifestDTO.Entry> entries = new ArrayList<>();
+        List<Media> mediaList = mediaMapper.selectList(new LambdaQueryWrapper<Media>()
+                .eq(Media::getChapterId, chapterId));
+        for (Media media : mediaList) {
+            if (media.getHqPath() != null && !media.getHqPath().isBlank()) {
+                entries.add(entry(hqRootKey(media), media.getHqPath(), "hq/" + media.getHqPath()));
+            }
+            if (media.getLqPath() != null && !media.getLqPath().isBlank()) {
+                entries.add(entry(lqRootKey(media), media.getLqPath(), "lq/" + media.getLqPath()));
+            }
+        }
 
         chapter.setStatus(ChapterLifecycleStatus.TRASHING);
         chapterMapper.updateById(chapter);
@@ -571,6 +580,14 @@ public class TrashLifecycleService {
 
     private static TrashManifestDTO.Entry entry(String rootKey, String source, String trash) {
         return new TrashManifestDTO.Entry(rootKey, source, trash);
+    }
+
+    private static String hqRootKey(Media media) {
+        return media.getHqRoot() != null && !media.getHqRoot().isBlank() ? media.getHqRoot() : "HQ";
+    }
+
+    private static String lqRootKey(Media media) {
+        return media.getLqRoot() != null && !media.getLqRoot().isBlank() ? media.getLqRoot() : "LQ";
     }
 
     private static String sha256(String input) {

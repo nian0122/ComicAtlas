@@ -19,6 +19,8 @@ import com.comicatlas.api.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.api.common.enums.MediaLifecycleStatus;
 import com.comicatlas.api.common.enums.TaskType;
 import com.comicatlas.api.common.enums.TranscodeStatus;
+import com.comicatlas.common.dto.TrashManifestDTO;
+import com.comicatlas.common.dto.TrashManifestItemDTO;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.worker.event.ManagementCommandPublisher;
 import com.comicatlas.worker.command.PurgeCommandHandler;
@@ -315,7 +317,7 @@ class TrashLifecycleIT {
         writeFile("hq", rel + "/001.jpg", "ch-hq-1");
         writeFile("hq", rel + "/002.jpg", "ch-hq-2");
         writeFile("lq", rel + "/001.webp", "ch-lq-1");
-        Long m1 = insertMedia(chapterId, 1, rel + "/001.jpg");
+        Long m1 = insertMedia(chapterId, 1, rel + "/001.jpg", rel + "/001.webp");
         Long m2 = insertMedia(chapterId, 2, rel + "/002.jpg");
         makeComicReady(comicId);
 
@@ -324,8 +326,8 @@ class TrashLifecycleIT {
         runTrash(chapterId, TaskType.CHAPTER_TRASH);
         awaitStatus("CHAPTER", chapterId, "TRASHED");
 
-        assertThat(Files.exists(MANGA_ROOT.resolve("hq").resolve(rel))).isFalse();
-        assertThat(Files.exists(MANGA_ROOT.resolve("lq").resolve(rel))).isFalse();
+        assertThat(Files.exists(MANGA_ROOT.resolve("hq").resolve(rel + "/001.jpg"))).isFalse();
+        assertThat(Files.exists(MANGA_ROOT.resolve("lq").resolve(rel + "/001.webp"))).isFalse();
         assertThat(Files.exists(MANGA_ROOT.resolve("trash").resolve("chapter/" + chapterId + "/" + trashTaskId + "/hq/" + rel + "/001.jpg"))).isTrue();
         assertThat(Files.exists(MANGA_ROOT.resolve("trash").resolve("chapter/" + chapterId + "/" + trashTaskId + "/lq/" + rel + "/001.webp"))).isTrue();
         // 阅读面隐藏
@@ -351,6 +353,135 @@ class TrashLifecycleIT {
         awaitStatus("CHAPTER", chapterId, "DELETED");
         assertThat(mediaMapper.selectById(m1)).isNull();
         assertThat(mediaMapper.selectById(m2)).isNull();
+    }
+
+    @Test
+    @DisplayName("章节：globalOrder != chapterId 时按媒体真实 hqPath/lqPath 回收（缺陷修复 F3-01/F7-01）")
+    void chapterTrash_globalOrderDiffersFromChapterId_usesRealMediaPaths() throws Exception {
+        Long comicId = createComic("全局序号≠章节ID");
+        Long chapterId = createChapter(comicId, "第 1 话");
+        // 制造 globalOrder != chapterId：真实最终布局按 chapterId 存文件，全局序号只用于排序
+        Chapter chapter = chapterMapper.selectById(chapterId);
+        chapter.setGlobalOrder(chapterId.intValue() + 100);
+        chapterMapper.updateById(chapter);
+
+        String realRel = comicId + "/" + chapterId; // 真实最终布局 {comicId}/{chapterId}
+        writeFile("hq", realRel + "/001.jpg", "ch-real-hq");
+        writeFile("lq", realRel + "/001.webp", "ch-real-lq");
+        Long m1 = insertMedia(chapterId, 1, realRel + "/001.jpg", realRel + "/001.webp");
+        makeComicReady(comicId);
+
+        long trashTaskId = trashChapter(comicId, chapterId);
+        runTrash(chapterId, TaskType.CHAPTER_TRASH);
+        awaitStatus("CHAPTER", chapterId, "TRASHED");
+
+        // 清单必须逐媒体指向真实 hqPath/lqPath（chapterId 布局），不得按 globalOrder 猜目录
+        TrashManifestDTO manifest = readManifest("CHAPTER", chapterId, trashTaskId);
+        assertThat(manifest.entries())
+                .extracting(TrashManifestDTO.Entry::sourceRelativePath)
+                .containsExactly(realRel + "/001.jpg", realRel + "/001.webp");
+        assertThat(manifest.entries())
+                .extracting(TrashManifestDTO.Entry::sourceRelativePath)
+                .noneMatch(p -> p.contains(String.valueOf(chapter.getGlobalOrder())));
+
+        // 物理文件已移入 TRASH（旧实现按 globalOrder 猜目录 → 源缺失静默 TRASHED → 本断言失败 = RED）
+        assertThat(Files.exists(MANGA_ROOT.resolve("hq").resolve(realRel + "/001.jpg"))).isFalse();
+        assertThat(Files.exists(MANGA_ROOT.resolve("lq").resolve(realRel + "/001.webp"))).isFalse();
+        assertThat(Files.exists(MANGA_ROOT.resolve("trash").resolve(
+                "chapter/" + chapterId + "/" + trashTaskId + "/hq/" + realRel + "/001.jpg"))).isTrue();
+        assertThat(Files.exists(MANGA_ROOT.resolve("trash").resolve(
+                "chapter/" + chapterId + "/" + trashTaskId + "/lq/" + realRel + "/001.webp"))).isTrue();
+
+        // 恢复：按清单移回真实路径，DB 媒体引用与物理文件一致
+        long restoreTaskId = restoreChapter(comicId, chapterId);
+        runRestore(chapterId, trashTaskId, TaskType.CHAPTER_RESTORE);
+        awaitStatus("CHAPTER", chapterId, "READY");
+        assertThat(Files.exists(MANGA_ROOT.resolve("hq").resolve(realRel + "/001.jpg"))).isTrue();
+        assertThat(Files.exists(MANGA_ROOT.resolve("lq").resolve(realRel + "/001.webp"))).isTrue();
+        assertThat(mediaMapper.selectById(m1).getHqPath()).isEqualTo(realRel + "/001.jpg");
+        assertThat(mediaMapper.selectById(m1).getLqPath()).isEqualTo(realRel + "/001.webp");
+    }
+
+    @Test
+    @DisplayName("章节：源文件缺失 → actual.json 逐条明确 MISSING，不伪装为完全可恢复")
+    void chapterTrash_missingSource_recordsMISSING() throws Exception {
+        Long comicId = createComic("缺失源");
+        Long chapterId = createChapter(comicId, "第 1 话");
+        String realRel = comicId + "/" + chapterId;
+        // 媒体引用真实路径但文件不存在（真实缺失，不是猜错目录）
+        insertMedia(chapterId, 1, realRel + "/001.jpg");
+        makeComicReady(comicId);
+
+        long trashTaskId = trashChapter(comicId, chapterId);
+        runTrash(chapterId, TaskType.CHAPTER_TRASH);
+        awaitStatus("CHAPTER", chapterId, "TRASHED");
+
+        TrashManifestItemDTO actual = readActual("CHAPTER", chapterId, trashTaskId);
+        assertThat(actual.entries())
+                .anySatisfy(e -> {
+                    assertThat(e.rootKey()).isEqualTo("HQ");
+                    assertThat(e.sourceRelativePath()).isEqualTo(realRel + "/001.jpg");
+                    assertThat(e.state()).isEqualTo(TrashManifestItemDTO.Entry.STATE_MISSING);
+                });
+    }
+
+    @Test
+    @DisplayName("章节：重复执行回收命令幂等，不重复移动不报错")
+    void chapterTrash_duplicateCommand_idempotent() throws Exception {
+        Long comicId = createComic("幂等回收");
+        Long chapterId = createChapter(comicId, "第 1 话");
+        String realRel = comicId + "/" + chapterId;
+        writeFile("hq", realRel + "/001.jpg", "data");
+        insertMedia(chapterId, 1, realRel + "/001.jpg");
+        makeComicReady(comicId);
+
+        long trashTaskId = trashChapter(comicId, chapterId);
+        runTrash(chapterId, TaskType.CHAPTER_TRASH);
+        awaitStatus("CHAPTER", chapterId, "TRASHED");
+        assertThat(Files.exists(MANGA_ROOT.resolve("hq").resolve(realRel + "/001.jpg"))).isFalse();
+
+        // 再次执行同一回收命令：源已移走 → 全部 MISSING → 不报错、不重复移动
+        runTrash(chapterId, TaskType.CHAPTER_TRASH);
+        assertThat(chapterMapper.selectById(chapterId).getStatus()).isEqualTo(ChapterLifecycleStatus.TRASHED);
+        assertThat(Files.exists(MANGA_ROOT.resolve("trash").resolve(
+                "chapter/" + chapterId + "/" + trashTaskId + "/hq/" + realRel + "/001.jpg"))).isTrue();
+    }
+
+    @Test
+    @DisplayName("章节 purge：只删除本清单目录，不误删其他章节 TRASH 文件与 DB")
+    void chapterPurge_deletesOnlyOwnManifestDir() throws Exception {
+        Long comicId = createComic("双章节清理");
+        Long chA = createChapter(comicId, "A");
+        Long chB = createChapter(comicId, "B");
+        String relA = comicId + "/" + chA;
+        String relB = comicId + "/" + chB;
+        writeFile("hq", relA + "/001.jpg", "a");
+        writeFile("hq", relB + "/001.jpg", "b");
+        insertMedia(chA, 1, relA + "/001.jpg");
+        insertMedia(chB, 1, relB + "/001.jpg");
+        makeComicReady(comicId);
+
+        long trashTaskA = trashChapter(comicId, chA);
+        runTrash(chA, TaskType.CHAPTER_TRASH);
+        awaitStatus("CHAPTER", chA, "TRASHED");
+        long trashTaskB = trashChapter(comicId, chB);
+        runTrash(chB, TaskType.CHAPTER_TRASH);
+        awaitStatus("CHAPTER", chB, "TRASHED");
+        assertThat(Files.exists(MANGA_ROOT.resolve("hq").resolve(relB + "/001.jpg"))).isFalse();
+
+        expireChapter(chA);
+        long purgeTaskA = purgeChapter(comicId, chA);
+        runPurge(chA, trashTaskA, TaskType.CHAPTER_PURGE);
+        awaitStatus("CHAPTER", chA, "DELETED");
+
+        // A 的清单目录已删；B 的 TRASH 文件与 DB 保留，未被 A 的 purge 误删
+        assertThat(Files.exists(MANGA_ROOT.resolve("trash").resolve("chapter/" + chA))).isFalse();
+        assertThat(Files.exists(MANGA_ROOT.resolve("trash").resolve("chapter/" + chB))).isTrue();
+        assertThat(chapterMapper.selectById(chB).getStatus()).isEqualTo(ChapterLifecycleStatus.TRASHED);
+        assertThat(Files.exists(MANGA_ROOT.resolve("trash").resolve(
+                "chapter/" + chB + "/" + trashTaskB + "/hq/" + relB + "/001.jpg"))).isTrue();
+        assertThat(mediaMapper.selectCount(new LambdaQueryWrapper<Media>()
+                .eq(Media::getChapterId, chB))).isEqualTo(1);
     }
 
     // ======================== 漫画全流程 ========================
@@ -468,10 +599,10 @@ class TrashLifecycleIT {
         assertThat(comic.getStatus()).isEqualTo(ComicStatus.TRASHING);
         assertThat(actualStatus(comicId, trashTaskId)).isEqualTo("PARTIAL");
 
-        // 仅允许 RECONCILE
+        // 生命周期保持 TRASHING（阅读面可见），仅可对账推进
         mockMvc.perform(get("/api/comics/{id}", comicId))
-                .andExpect(jsonPath("$.data.allowedOperations.allowed.length()").value(1))
-                .andExpect(jsonPath("$.data.allowedOperations.allowed[0]").value("RECONCILE"));
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.status").value("TRASHING"));
 
         // 对账报告一致且可修复
         MvcResult rep = mockMvc.perform(get("/api/trash/COMIC/{id}/reconcile", comicId))
@@ -668,13 +799,21 @@ class TrashLifecycleIT {
     }
 
     private Long insertMedia(Long chapterId, int pageNumber, String hqPath) {
+        return insertMedia(chapterId, pageNumber, hqPath, null);
+    }
+
+    private Long insertMedia(Long chapterId, int pageNumber, String hqPath, String lqPath) {
         Media m = new Media();
         m.setChapterId(chapterId);
         m.setPageNumber(pageNumber);
         m.setHqRoot("HQ");
         m.setHqPath(hqPath);
         m.setHqStatus(HqStatus.READY);
-        m.setLqStatus(LqStatus.NOT_GENERATED);
+        m.setLqStatus(lqPath == null ? LqStatus.NOT_GENERATED : LqStatus.READY);
+        if (lqPath != null) {
+            m.setLqRoot("LQ");
+            m.setLqPath(lqPath);
+        }
         m.setTranscodeStatus(TranscodeStatus.NOT_NEEDED);
         m.setStatus(MediaLifecycleStatus.READY);
         m.setMediaType("IMAGE");
@@ -754,6 +893,18 @@ class TrashLifecycleIT {
             return null;
         }
         return objectMapper.readTree(Files.readString(actual)).path("status").asText();
+    }
+
+    private TrashManifestDTO readManifest(String targetType, Long targetId, Long taskId) throws Exception {
+        Path manifest = MANGA_ROOT.resolve("trash")
+                .resolve(targetType.toLowerCase() + "/" + targetId + "/" + taskId + "/manifest.json");
+        return objectMapper.readValue(Files.readString(manifest), TrashManifestDTO.class);
+    }
+
+    private TrashManifestItemDTO readActual(String targetType, Long targetId, Long taskId) throws Exception {
+        Path actual = MANGA_ROOT.resolve("trash")
+                .resolve(targetType.toLowerCase() + "/" + targetId + "/" + taskId + "/actual.json");
+        return objectMapper.readValue(Files.readString(actual), TrashManifestItemDTO.class);
     }
 
     private void writeActualJson(String targetType, Long targetId, Long taskId, String status) throws Exception {
