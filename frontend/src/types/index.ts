@@ -347,6 +347,7 @@ export interface ComicStorageItem {
   totalSize: number
   hqSize: number
   lqSize: number
+  videoSize: number
   hqStatus: HqStatus
   lqStatus: LqStatus
   transcodeStatus: TranscodeStatus
@@ -362,6 +363,8 @@ export interface ChapterStorageItem {
   pageCount: number
   hqSize: number
   lqSize: number
+  videoSize: number
+  transcodeStatus: TranscodeStatus
   hqStatus: HqStatus
   lqStatus: LqStatus
 }

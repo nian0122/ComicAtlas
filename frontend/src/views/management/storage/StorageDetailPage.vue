@@ -41,7 +41,8 @@
           <span class="ov-value">{{ comic?.pageCount ?? 0 }}</span>
         </div>
         <div class="overview-item">
-          <span class="ov-label">视频转码</span>
+          <span class="ov-label">video</span>
+          <span class="ov-value">{{ formatSize(comic?.videoSize ?? 0) }}</span>
           <StorageStatusTag :status="comic?.transcodeStatus ?? 'NOT_NEEDED'" type="transcode" />
         </div>
       </div>
@@ -90,11 +91,17 @@
         <el-table-column label="LQ 大小" width="100" align="right">
           <template #default="{ row }">{{ formatSize(row.lqSize) }}</template>
         </el-table-column>
+        <el-table-column label="video 大小" width="100" align="right">
+          <template #default="{ row }">{{ formatSize(row.videoSize) }}</template>
+        </el-table-column>
         <el-table-column label="HQ 状态" width="90">
           <template #default="{ row }"><StorageStatusTag :status="row.hqStatus" type="hq" /></template>
         </el-table-column>
         <el-table-column label="LQ 状态" width="90">
           <template #default="{ row }"><StorageStatusTag :status="row.lqStatus" type="lq" /></template>
+        </el-table-column>
+        <el-table-column label="video 状态" width="90">
+          <template #default="{ row }"><StorageStatusTag :status="row.transcodeStatus ?? 'NOT_NEEDED'" type="transcode" /></template>
         </el-table-column>
         <el-table-column label="操作" width="160">
           <template #default="{ row }">

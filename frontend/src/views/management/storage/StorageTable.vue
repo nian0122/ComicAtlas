@@ -74,6 +74,12 @@ function formatSize(bytes: number): string {
     <el-table-column label="HQ 状态" width="90">
       <template #default="{ row }"><StorageStatusTag :status="row.hqStatus" type="hq" /></template>
     </el-table-column>
+    <el-table-column label="LQ 状态" width="90">
+      <template #default="{ row }"><StorageStatusTag :status="row.lqStatus" type="lq" /></template>
+    </el-table-column>
+    <el-table-column label="video 状态" width="90">
+      <template #default="{ row }"><StorageStatusTag :status="row.transcodeStatus" type="transcode" /></template>
+    </el-table-column>
     <el-table-column label="章节数" width="70" align="center">
       <template #default="{ row }">{{ row.chapterCount ?? '-' }}</template>
     </el-table-column>
@@ -82,6 +88,9 @@ function formatSize(bytes: number): string {
     </el-table-column>
     <el-table-column label="LQ 大小" width="100" align="right">
       <template #default="{ row }">{{ formatSize(row.lqSize) }}</template>
+    </el-table-column>
+    <el-table-column label="video 大小" width="100" align="right">
+      <template #default="{ row }">{{ formatSize(row.videoSize) }}</template>
     </el-table-column>
   </el-table>
 </template>
