@@ -58,9 +58,10 @@ class AllowedOperationServiceTest {
         }
 
         @Test
-        void importFailedShouldAllowRetryEditDelete() {
+        void importFailedShouldAllowRetryDeleteOnly() {
             AllowedOperations ops = service.forComic("IMPORT_FAILED");
-            assertThat(ops.allowed()).contains(OP_RETRY_IMPORT, OP_EDIT, OP_DELETE);
+            assertThat(ops.allowed()).contains(OP_RETRY_IMPORT, OP_DELETE);
+            assertThat(ops.isAllowed(OP_EDIT)).isFalse();
         }
 
         @Test

@@ -52,7 +52,7 @@ public class OperationPolicyService {
                 blocked.put(OP_DELETE, "漫画正在导入中");
                 break;
             case "IMPORT_FAILED":
-                allowed.addAll(Set.of(OP_RETRY_IMPORT, OP_EDIT, OP_DELETE));
+                allowed.addAll(Set.of(OP_RETRY_IMPORT, OP_DELETE));
                 break;
             case "READY":
                 allowed.addAll(Set.of(OP_READ, OP_EDIT, OP_DELETE,
