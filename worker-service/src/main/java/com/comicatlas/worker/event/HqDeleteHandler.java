@@ -50,9 +50,16 @@ public class HqDeleteHandler {
             AtomicLong freedBytes = new AtomicLong(0);
             AtomicInteger deletedCount = new AtomicInteger(0);
 
-            List<ExportMedia> pages = mediaMapper.selectByChapterId(chapterId);
+            // 仅删除 IMAGE：VIDEO 不参与 HQ 删除（F6-26 修复前遍历全部媒体导致视频文件被删而 DB 仍 READY）
+            List<ExportMedia> pages = mediaMapper.selectByChapterId(chapterId).stream()
+                    .filter(m -> "IMAGE".equals(m.getMediaType()))
+                    .toList();
             if (pages.isEmpty()) {
-                log.warn("章节无页面数据: chapterId={}", chapterId);
+                // 无 IMAGE 可删（纯视频章节/无页面）：VIDEO 保留，回传空完成事件保持 API 一致性
+                log.info("HQ 删除：章节无 IMAGE 页面（VIDEO 保留），回传空完成: chapterId={}", chapterId);
+                HqDeletedEvent noop = new HqDeletedEvent(
+                        UUID.randomUUID(), Instant.now(), comicId, chapterId, 0L, 0);
+                rabbitTemplate.convertAndSend(MqExchanges.IMAGE, MqRoutingKeys.HQ_DELETE_COMPLETED, noop);
                 return;
             }
 
@@ -85,7 +92,8 @@ public class HqDeleteHandler {
                     if (Files.exists(oldDir)) { Files.deleteIfExists(oldDir); }
                 }
             } catch (IOException e) {
-                log.warn("删除空目录失败: chapterId={}", chapterId);
+                // 目录非空（VIDEO 仍存在）或删除失败：不递归删除、不视为任务失败
+                log.warn("HQ 删除章节目录失败（非致命，VIDEO 保留时目录非空属正常）: chapterId={}", chapterId, e);
             }
 
             HqDeletedEvent completedEvent = new HqDeletedEvent(

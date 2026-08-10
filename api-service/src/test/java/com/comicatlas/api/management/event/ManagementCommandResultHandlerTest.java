@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
+import com.comicatlas.api.comic.entity.Chapter;
 import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.entity.Media;
 import com.comicatlas.api.comic.mapper.CatalogMapper;
@@ -39,6 +40,7 @@ import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO;
 import com.comicatlas.common.event.ManagementCommandCompletedEvent;
 import com.comicatlas.common.event.ManagementCommandFailedEvent;
+import com.comicatlas.common.event.ManagementCommandProgressEvent;
 import com.comicatlas.common.event.MetadataRefreshEvent;
 import com.comicatlas.common.event.MetadataRefreshScanCompletedEvent;
 import com.comicatlas.common.event.payload.LqGenerationResult;
@@ -140,6 +142,7 @@ class ManagementCommandResultHandlerTest {
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), Comic.class);
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), ManagementTaskItem.class);
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), Media.class);
+        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), Chapter.class);
 
         staging = tempDir.resolve("staging");
         Files.createDirectories(staging);
@@ -690,6 +693,159 @@ class ManagementCommandResultHandlerTest {
 
         verify(channel).basicReject(1L, false);
         verify(channel, never()).basicAck(anyLong(), anyBoolean());
+    }
+
+    // ======================== COMIC 目标 LQ（批量 LQ 分流，Todo P1） ========================
+
+    private ManagementTaskItem lqComicItem() {
+        ManagementTaskItem item = new ManagementTaskItem();
+        item.setId(300L);
+        item.setTaskId(30L);
+        item.setTargetType("COMIC");
+        item.setTargetId(1L);
+        item.setOperationType(TaskType.LQ_GENERATE);
+        item.setStatus(ManagementTaskStatus.RUNNING);
+        item.setAttempt(1);
+        return item;
+    }
+
+    private ManagementCommandCompletedEvent lqComicCompletedEvent(LqGenerationResult result) {
+        return new ManagementCommandCompletedEvent(UUID.randomUUID(), Instant.now(), 1,
+                30L, 300L, 1, "LQ_GENERATE", "COMIC", 1L, null, result);
+    }
+
+    private Chapter chapter(Long id, Long comicId) {
+        Chapter chapter = new Chapter();
+        chapter.setId(id);
+        chapter.setComicId(comicId);
+        return chapter;
+    }
+
+    @Test
+    @DisplayName("COMIC LQ：跨两章 2 READY + 1 FAILED 混合结果逐媒体落库、item=PARTIALLY_SUCCEEDED、任务聚合、ACK")
+    void lqComic_crossChapter_mixedResult_appliesPerMedia() throws Exception {
+        when(managementTaskItemMapper.selectById(300L)).thenReturn(lqComicItem());
+        when(mediaMapper.selectById(1L)).thenReturn(lqMedia(1L, 5L, 1, "5/001.jpg", LqStatus.QUEUED));
+        when(mediaMapper.selectById(2L)).thenReturn(lqMedia(2L, 6L, 1, "6/001.jpg", LqStatus.GENERATING));
+        when(mediaMapper.selectById(3L)).thenReturn(lqMedia(3L, 6L, 2, "6/002.jpg", LqStatus.QUEUED));
+        when(chapterMapper.selectById(5L)).thenReturn(chapter(5L, 1L));
+        when(chapterMapper.selectById(6L)).thenReturn(chapter(6L, 1L));
+        when(managementTaskItemMapper.update(isNull(), any())).thenReturn(1);
+
+        LqGenerationResult result = new LqGenerationResult(List.of(
+                lqReady(1L, 1, "5/001.jpg", "5/001.webp", 512L),
+                lqReady(2L, 1, "6/001.jpg", "6/001.webp", 256L),
+                lqFailed(3L, 2, "6/002.jpg")), 2, 1, 3);
+        handler.handleResult(lqComicCompletedEvent(result), channel, 1L);
+
+        // item CAS → PARTIALLY_SUCCEEDED + progress=100
+        ArgumentCaptor<LambdaUpdateWrapper> itemCaptor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
+        verify(managementTaskItemMapper).update(isNull(), itemCaptor.capture());
+        assertThat(setValues(itemCaptor.getValue())).contains(
+                ManagementTaskStatus.PARTIALLY_SUCCEEDED, 100);
+
+        // 跨章节媒体逐条落库（3 条），不因 targetId=comicId 误拒
+        verify(mediaMapper, times(3)).update(isNull(), any(LambdaUpdateWrapper.class));
+        verify(managementTaskService).reaggregateTask(30L);
+        verify(channel).basicAck(1L, false);
+    }
+
+    @Test
+    @DisplayName("COMIC LQ 越权：media 经 chapter 归属非目标漫画 → item FAILED、媒体零更新、ACK")
+    void lqComicEscalation_mediaNotInTargetComic() throws Exception {
+        when(managementTaskItemMapper.selectById(300L)).thenReturn(lqComicItem());
+        when(mediaMapper.selectById(1L)).thenReturn(lqMedia(1L, 999L, 1, "999/001.jpg", LqStatus.QUEUED));
+        when(chapterMapper.selectById(999L)).thenReturn(chapter(999L, 999L));
+        when(managementTaskItemMapper.update(isNull(), any())).thenReturn(1);
+
+        LqGenerationResult result = new LqGenerationResult(List.of(
+                lqReady(1L, 1, "999/001.jpg", "999/001.webp", 512L)), 1, 0, 1);
+        handler.handleResult(lqComicCompletedEvent(result), channel, 1L);
+
+        verify(mediaMapper, never()).update(any(), any());
+        ArgumentCaptor<LambdaUpdateWrapper> itemCaptor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
+        verify(managementTaskItemMapper).update(isNull(), itemCaptor.capture());
+        assertThat(setValues(itemCaptor.getValue())).contains(ManagementTaskStatus.FAILED);
+        verify(managementTaskService).reaggregateTask(30L);
+        verify(channel).basicAck(1L, false);
+    }
+
+    @Test
+    @DisplayName("COMIC LQ 旧 attempt：零更新 ACK")
+    void lqComic_staleAttempt_acked() throws Exception {
+        ManagementTaskItem item = lqComicItem();
+        item.setAttempt(2);
+        when(managementTaskItemMapper.selectById(300L)).thenReturn(item);
+
+        LqGenerationResult result = new LqGenerationResult(List.of(
+                lqReady(1L, 1, "5/001.jpg", "5/001.webp", 512L)), 1, 0, 1);
+        handler.handleResult(lqComicCompletedEvent(result), channel, 1L);
+
+        verify(mediaMapper, never()).update(any(), any());
+        verify(managementTaskItemMapper, never()).update(any(), any());
+        verify(channel).basicAck(1L, false);
+    }
+
+    @Test
+    @DisplayName("COMIC LQ 重复事件·item 已终态：幂等零更新 ACK")
+    void lqComicReplay_terminalItem_acked() throws Exception {
+        ManagementTaskItem item = lqComicItem();
+        item.setStatus(ManagementTaskStatus.SUCCEEDED);
+        when(managementTaskItemMapper.selectById(300L)).thenReturn(item);
+
+        LqGenerationResult result = new LqGenerationResult(List.of(
+                lqReady(1L, 1, "5/001.jpg", "5/001.webp", 512L)), 1, 0, 1);
+        handler.handleResult(lqComicCompletedEvent(result), channel, 1L);
+
+        verify(mediaMapper, never()).update(any(), any());
+        verify(managementTaskItemMapper, never()).update(any(), any());
+        verify(channel).basicAck(1L, false);
+    }
+
+    @Test
+    @DisplayName("COMIC LQ 进度：漫画下全部章节 QUEUED 图片 → GENERATING")
+    void lqComicProgress_routesAllComicChapters() throws Exception {
+        when(inboxService.isProcessed(anyString(), anyString())).thenReturn(false);
+        when(managementTaskService.updateItemProgress(anyLong(), anyInt(), anyInt(), anyString()))
+                .thenReturn(true);
+        when(chapterMapper.selectList(any())).thenReturn(List.of(chapter(5L, 1L), chapter(6L, 1L)));
+
+        ManagementCommandProgressEvent ev = new ManagementCommandProgressEvent(
+                UUID.randomUUID(), Instant.now(), 1, 30L, 300L, 1,
+                "LQ_GENERATE", "COMIC", 1L, 50, "生成中");
+        handler.handleResult(ev, channel, 1L);
+
+        ArgumentCaptor<LambdaUpdateWrapper> mediaCaptor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
+        verify(mediaMapper).update(isNull(), mediaCaptor.capture());
+        assertThat(setValues(mediaCaptor.getValue())).contains(LqStatus.GENERATING);
+        // COMIC 作用域：WHERE 必须为 chapter_id IN (章节集合)，而非旧的 chapter_id = comicId
+        assertThat(mediaCaptor.getValue().getSqlSegment())
+                .contains("chapter_id").contains("IN");
+        verify(channel).basicAck(1L, false);
+    }
+
+    @Test
+    @DisplayName("COMIC LQ 失败：漫画下全部章节 QUEUED/GENERATING 图片 → FAILED")
+    void lqComicFailed_marksComicMediaFailed() throws Exception {
+        when(inboxService.isProcessed(anyString(), anyString())).thenReturn(false);
+        ManagementTaskItemResponse resp = new ManagementTaskItemResponse();
+        resp.setStatus(ManagementTaskStatus.FAILED);
+        when(managementTaskService.updateItemStatus(eq(300L), eq(ManagementTaskStatus.FAILED),
+                anyString(), isNull(), isNull(), eq(1))).thenReturn(resp);
+        when(chapterMapper.selectList(any())).thenReturn(List.of(chapter(5L, 1L), chapter(6L, 1L)));
+
+        ManagementCommandFailedEvent ev = new ManagementCommandFailedEvent(
+                UUID.randomUUID(), Instant.now(), 1, 30L, 300L, 1,
+                "LQ_GENERATE", "COMIC", 1L, "Worker 失败");
+        handler.handleResult(ev, channel, 1L);
+
+        ArgumentCaptor<LambdaUpdateWrapper> mediaCaptor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
+        verify(mediaMapper).update(isNull(), mediaCaptor.capture());
+        assertThat(setValues(mediaCaptor.getValue())).contains(LqStatus.FAILED);
+        // COMIC 作用域：WHERE 必须为 chapter_id IN (章节集合)，而非旧的 chapter_id = comicId
+        assertThat(mediaCaptor.getValue().getSqlSegment())
+                .contains("chapter_id").contains("IN");
+        verify(channel).basicAck(1L, false);
     }
 
     // ======================== 转码完成专用流程（Todo 7） ========================

@@ -1,7 +1,9 @@
 package com.comicatlas.api.management.batch.service;
 
 import com.comicatlas.api.comic.entity.Comic;
+import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.comic.mapper.ComicMapper;
+import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.api.common.enums.ManagementTaskStatus;
 import com.comicatlas.api.common.enums.TaskType;
 import com.comicatlas.api.management.batch.BatchReasonCode;
@@ -51,11 +53,13 @@ class BatchOperationServiceTest {
     @Mock private OutboxService outboxService;
     @Mock private ObjectMapper objectMapper;
     @Mock private TranscodeMediaSelector transcodeMediaSelector;
+    @Mock private MediaMapper mediaMapper;
+    @Mock private ChapterMapper chapterMapper;
 
     private BatchOperationService newService(BatchEligibilityChecker checker) {
         return new BatchOperationService(selectionResolver, checker, previewTokenStore,
                 metadataExecutor, batchProperties, managementTaskService, outboxService, objectMapper,
-                transcodeMediaSelector);
+                transcodeMediaSelector, mediaMapper, chapterMapper);
     }
 
     /** 真实资格校验器：METADATA_REFRESH 走资产资格（comic READY），ComicMapper 返回存在的漫画。 */

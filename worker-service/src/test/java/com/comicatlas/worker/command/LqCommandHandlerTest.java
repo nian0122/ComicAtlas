@@ -313,4 +313,37 @@ class LqCommandHandlerTest {
         verify(publisher).completedLq(eq(cmd), captor.capture());
         assertEquals(0, captor.getValue().totalCount());
     }
+
+    // ==================== 场景 9：COMIC 目标跨章节聚合（批量 LQ Worker 路径） ====================
+
+    @Test
+    void generateComic_aggregatesAllChaptersIntoOneResult() throws Exception {
+        ManagementCommandRequestedEvent cmd = new ManagementCommandRequestedEvent(
+                UUID.randomUUID(), Instant.now(), 1, 1L, 1L, 1,
+                "LQ_GENERATE", "COMIC", 1L);
+        ExportMedia ch1 = imageMedia(901L, "1/100/001.jpg");
+        ExportMedia ch2 = new ExportMedia();
+        ch2.setId(902L);
+        ch2.setChapterId(200L);
+        ch2.setMediaType("IMAGE");
+        ch2.setHqRoot("HQ");
+        ch2.setHqPath("1/200/001.jpg");
+        when(mediaMapper.selectByComicId(1L)).thenReturn(List.of(ch1, ch2));
+        when(mediaMapper.selectByChapterId(100L)).thenReturn(List.of(ch1));
+        when(mediaMapper.selectByChapterId(200L)).thenReturn(List.of(ch2));
+        when(optimizer.generateLq(anyLong(), anyLong(), any(Path.class), any(Path.class), anyBoolean()))
+                .thenReturn(runResult(page("processed", "001.jpg", "001.webp", 10L)));
+
+        handler.generateComic(cmd);
+
+        ArgumentCaptor<LqGenerationResult> captor = ArgumentCaptor.forClass(LqGenerationResult.class);
+        verify(publisher).completedLq(eq(cmd), captor.capture());
+        verify(publisher, never()).failed(any(), anyString());
+
+        LqGenerationResult result = captor.getValue();
+        assertEquals(2, result.totalCount());
+        assertEquals(2, result.successCount());
+        assertEquals(Long.valueOf(901L), result.results().get(0).mediaId());
+        assertEquals(Long.valueOf(902L), result.results().get(1).mediaId());
+    }
 }

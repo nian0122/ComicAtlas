@@ -1,5 +1,13 @@
 package com.comicatlas.api.management.batch.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.comicatlas.api.comic.entity.Chapter;
+import com.comicatlas.api.comic.entity.Media;
+import com.comicatlas.api.comic.mapper.ChapterMapper;
+import com.comicatlas.api.comic.mapper.MediaMapper;
+import com.comicatlas.api.common.enums.HqStatus;
+import com.comicatlas.api.common.enums.LqStatus;
 import com.comicatlas.api.management.batch.BatchConflictException;
 import com.comicatlas.api.management.batch.BatchReasonCode;
 import com.comicatlas.api.management.batch.config.BatchProperties;
@@ -66,6 +74,8 @@ public class BatchOperationService {
     private final OutboxService outboxService;
     private final ObjectMapper objectMapper;
     private final TranscodeMediaSelector transcodeMediaSelector;
+    private final MediaMapper mediaMapper;
+    private final ChapterMapper chapterMapper;
 
     // ======================== 预览 ========================
 
@@ -186,6 +196,11 @@ public class BatchOperationService {
                 metadataExecutor.execute(item.getId(), request.getPayload(), item.getTargetId());
             }
         } else if (COMMAND_OPS.contains(request.getOperation())) {
+            // 批量 LQ（COMIC 目标）：先标记目标漫画 IMAGE 媒体为 QUEUED，保证 Worker
+            // 逐媒体结果可应用（API 端 lqStatus 仅接受 QUEUED/GENERATING/FAILED）
+            if (isLqOperation(request.getOperation())) {
+                markLqQueuedForComics(eligible);
+            }
             for (ManagementTaskItemResponse item : items) {
                 enqueueCommand(request.getOperation(), item);
             }
@@ -277,6 +292,32 @@ public class BatchOperationService {
         log.info("批量命令已入 Outbox: op={}, taskId={}, itemId={}, target={}:{}",
                 operation.name(), item.getTaskId(), item.getId(),
                 item.getTargetType(), item.getTargetId());
+    }
+
+    private static boolean isLqOperation(TaskType operation) {
+        return operation == TaskType.LQ_GENERATE || operation == TaskType.LQ_REGENERATE;
+    }
+
+    /**
+     * 批量 LQ 提交前把目标漫画全部 IMAGE 媒体（HQ 未删）置 QUEUED，与单项 LQ 的
+     * {@code MediaOperationCommandService.markLqQueued} 口径一致；COMIC 目标跨章节结果由
+     * API 按 mediaId 逐条落库，因此必须让全部将生成的媒体进入可应用状态。
+     */
+    private void markLqQueuedForComics(List<Long> comicIds) {
+        if (comicIds.isEmpty()) {
+            return;
+        }
+        List<Chapter> chapters = chapterMapper.selectList(
+                new LambdaQueryWrapper<Chapter>().in(Chapter::getComicId, comicIds));
+        List<Long> chapterIds = chapters.stream().map(Chapter::getId).toList();
+        if (chapterIds.isEmpty()) {
+            return;
+        }
+        mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
+                .in(Media::getChapterId, chapterIds)
+                .eq(Media::getMediaType, "IMAGE")
+                .ne(Media::getHqStatus, HqStatus.DELETED)
+                .set(Media::getLqStatus, LqStatus.QUEUED));
     }
 
     private static String operationLabel(TaskType operation) {

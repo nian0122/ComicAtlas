@@ -237,6 +237,46 @@ public class ManagementCommandResultHandler {
     }
 
     /**
+     * LQ 结果媒体归属校验：CHAPTER 目标 → media.chapterId == targetId；
+     * COMIC 目标 → media 经 chapter.comicId 归属目标漫画（批量 LQ 跨章节结果，修复 P1 审核缺陷
+     * 前 validate 把 targetId 当 chapterId 导致跨章节结果全被拒）。
+     */
+    private void validateLqTargetMembership(boolean comicScope, Long targetId,
+                                            LqMediaResult result, Media media) {
+        if (comicScope) {
+            Long mediaChapterId = media.getChapterId();
+            Chapter chapter = mediaChapterId == null ? null : chapterMapper.selectById(mediaChapterId);
+            if (chapter == null || !targetId.equals(chapter.getComicId())) {
+                throw new BusinessException("LQ 结果 mediaId=" + result.mediaId()
+                        + " 不属于目标漫画 " + targetId);
+            }
+        } else if (!targetId.equals(media.getChapterId())) {
+            throw new BusinessException("LQ 结果 mediaId=" + result.mediaId()
+                    + " 不属于目标章节 " + targetId);
+        }
+    }
+
+    /**
+     * LQ 业务更新作用域：按 targetType 解析媒体范围，进度/失败/完成逐媒体更新共用。
+     * CHAPTER 目标 → chapter_id = targetId；COMIC 目标 → 目标漫画下全部章节（经 chapter.comic_id 归属）。
+     * COMIC 无任何章节时附加必然不命中的 id=-1 约束，避免全表更新。
+     */
+    private LambdaUpdateWrapper<Media> lqMediaScope(String targetType, Long targetId) {
+        LambdaUpdateWrapper<Media> wrapper = new LambdaUpdateWrapper<>();
+        if ("COMIC".equals(targetType)) {
+            List<Long> chapterIds = chapterIdsOf(targetId);
+            if (chapterIds.isEmpty()) {
+                wrapper.eq(Media::getId, -1L);
+            } else {
+                wrapper.in(Media::getChapterId, chapterIds);
+            }
+        } else {
+            wrapper.eq(Media::getChapterId, targetId);
+        }
+        return wrapper;
+    }
+
+    /**
      * LQ 完成事件逐媒体落库（Todo 6，取代旧的整章统一改状态）。
      * <p>
      * 顺序：幂等前置检查（幽灵 item / 旧 attempt / 已终态直接 ACK）→ 校验 LQ payload
@@ -286,18 +326,20 @@ public class ManagementCommandResultHandler {
      * 校验 LQ 逐媒体结果与事件/DB 的一致性。任一校验失败抛 {@link BusinessException}
      * （业务 payload 错误，由调用方置 item FAILED 并 ACK）：
      * <ul>
-     *   <li>目标章节非空、逐媒体结果非空；</li>
-     *   <li>mediaId 非 null 且属于目标章节、mediaType == IMAGE、pageNumber 与 DB 一致；</li>
+     *   <li>目标非空、逐媒体结果非空；</li>
+     *   <li>mediaId 非 null 且归属目标（CHAPTER → 目标章节；COMIC → 经 chapter 归属目标漫画）、
+     *       mediaType == IMAGE、pageNumber 与 DB 一致；</li>
      *   <li>sourceHqPath 与 DB hqPath 归一化后一致（不一致视为越权/漂移）；</li>
      *   <li>READY 结果的 lqRoot/lqPath 相对且 resolve 后位于对应存储根内（containment）；</li>
      *   <li>当前媒体 lqStatus 可应用（QUEUED/GENERATING/FAILED，幂等保护）。</li>
      * </ul>
      */
     private void validateLqResult(ManagementCommandCompletedEvent ev, LqGenerationResult lqResult) {
-        Long targetChapterId = ev.targetId();
-        if (targetChapterId == null) {
-            throw new BusinessException("LQ 完成事件缺少目标章节");
+        Long targetId = ev.targetId();
+        if (targetId == null) {
+            throw new BusinessException("LQ 完成事件缺少目标");
         }
+        boolean comicScope = "COMIC".equals(ev.targetType());
         List<LqMediaResult> results = lqResult.results();
         if (results == null || results.isEmpty()) {
             throw new BusinessException("LQ 完成事件逐媒体结果为空");
@@ -310,10 +352,7 @@ public class ManagementCommandResultHandler {
             if (media == null) {
                 throw new BusinessException("LQ 结果引用不存在的媒体: mediaId=" + result.mediaId());
             }
-            if (!targetChapterId.equals(media.getChapterId())) {
-                throw new BusinessException("LQ 结果 mediaId=" + result.mediaId()
-                        + " 不属于目标章节 " + targetChapterId);
-            }
+            validateLqTargetMembership(comicScope, targetId, result, media);
             if (!"IMAGE".equals(media.getMediaType())) {
                 throw new BusinessException("LQ 结果 mediaId=" + result.mediaId() + " 非 IMAGE 类型");
             }
@@ -1141,8 +1180,7 @@ public class ManagementCommandResultHandler {
     private void applyFailedBusiness(ManagementCommandFailedEvent ev) {
         switch (ev.operationType()) {
             case "LQ_GENERATE", "LQ_REGENERATE" -> {
-                mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
-                        .eq(Media::getChapterId, ev.targetId())
+                mediaMapper.update(null, lqMediaScope(ev.targetType(), ev.targetId())
                         .eq(Media::getMediaType, "IMAGE")
                         .in(Media::getLqStatus, LqStatus.QUEUED, LqStatus.GENERATING)
                         .set(Media::getLqStatus, LqStatus.FAILED));
@@ -1271,8 +1309,7 @@ public class ManagementCommandResultHandler {
 
     private void applyProgressTransition(ManagementCommandProgressEvent ev) {
         if (LQ_OPS.contains(ev.operationType())) {
-            mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
-                    .eq(Media::getChapterId, ev.targetId())
+            mediaMapper.update(null, lqMediaScope(ev.targetType(), ev.targetId())
                     .eq(Media::getLqStatus, LqStatus.QUEUED)
                     .set(Media::getLqStatus, LqStatus.GENERATING));
         } else if ("HQ_DELETE".equals(ev.operationType())) {

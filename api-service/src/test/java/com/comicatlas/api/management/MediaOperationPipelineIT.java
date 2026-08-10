@@ -322,6 +322,80 @@ class MediaOperationPipelineIT {
         assertThat(task.getErrorMessage()).contains("部分成功");
     }
 
+    // ======================== COMIC 目标批量 LQ（批量操作主入口，修复 P1） ========================
+
+    @Test
+    @DisplayName("COMIC 目标批量 LQ：跨两章混合结果逐媒体落库、item/task 终态正确、重复事件幂等")
+    void lqComicTarget_crossChapterMixedResult_appliesPerMedia() throws Exception {
+        // 直接构造 COMIC 目标任务/条目（模拟批量操作 API 创建的 COMIC item）
+        ManagementTask task = new ManagementTask();
+        task.setTaskType(TaskType.LQ_GENERATE);
+        task.setOperation("批量生成低清图");
+        task.setTargetType("COMIC");
+        task.setStatus(ManagementTaskStatus.RUNNING);
+        task.setTotalCount(2);
+        task.setAttempt(1);
+        taskMapper.insert(task);
+        ManagementTaskItem item = new ManagementTaskItem();
+        item.setTaskId(task.getId());
+        item.setTargetType("COMIC");
+        item.setTargetId(comic.getId());
+        item.setOperationType(TaskType.LQ_GENERATE);
+        item.setStatus(ManagementTaskStatus.RUNNING);
+        item.setAttempt(1);
+        item.setLockKey(ManagementTaskItem.buildLockKey("COMIC", comic.getId(), TaskType.LQ_GENERATE));
+        taskItemMapper.insert(item);
+
+        List<Media> images = mediaMapper.selectList(new LambdaQueryWrapper<Media>()
+                .eq(Media::getMediaType, "IMAGE"));
+        for (Media m : images) {
+            m.setLqStatus(LqStatus.QUEUED);
+            mediaMapper.updateById(m);
+        }
+
+        // 进度：COMIC 目标 → 漫画下全部章节 QUEUED → GENERATING
+        publishProgress(task.getId(), item.getId(), 1, "LQ_GENERATE", "COMIC", comic.getId(), 50, "生成中");
+        await(() -> mediaMapper.selectList(new LambdaQueryWrapper<Media>()
+                .eq(Media::getMediaType, "IMAGE")).stream()
+                .allMatch(m -> m.getLqStatus() == LqStatus.GENERATING), "页面 GENERATING");
+
+        // 完成：跨两章混合结果（chapter1 2 READY + chapter2 1 FAILED）
+        List<Media> ch1Images = mediaMapper.selectList(new LambdaQueryWrapper<Media>()
+                .eq(Media::getChapterId, chapter1.getId())
+                .eq(Media::getMediaType, "IMAGE"));
+        List<Media> ch2Images = mediaMapper.selectList(new LambdaQueryWrapper<Media>()
+                .eq(Media::getChapterId, chapter2.getId())
+                .eq(Media::getMediaType, "IMAGE"));
+        LqGenerationResult lqResult = new LqGenerationResult(List.of(
+                readyResult(ch1Images.get(0), 512L),
+                readyResult(ch1Images.get(1), 1024L),
+                failedResult(ch2Images.get(0))), 2, 1, 3);
+        ManagementCommandCompletedEvent completed = new ManagementCommandCompletedEvent(
+                UUID.randomUUID(), Instant.now(), 1,
+                task.getId(), item.getId(), 1,
+                "LQ_GENERATE", "COMIC", comic.getId(), null, lqResult);
+        rabbitTemplate.convertAndSend("comic.management", "command.completed", completed);
+
+        await(() -> taskItemMapper.selectById(item.getId()).getStatus() == ManagementTaskStatus.PARTIALLY_SUCCEEDED,
+                "item PARTIALLY_SUCCEEDED");
+        await(() -> taskMapper.selectById(task.getId()).getStatus() == ManagementTaskStatus.PARTIALLY_SUCCEEDED,
+                "task PARTIALLY_SUCCEEDED");
+
+        List<Media> after = mediaMapper.selectList(new LambdaQueryWrapper<Media>()
+                .eq(Media::getMediaType, "IMAGE").orderByAsc(Media::getId));
+        assertThat(after).extracting(Media::getLqStatus)
+                .containsExactly(LqStatus.READY, LqStatus.READY, LqStatus.FAILED);
+
+        // 重复投递同一事件 → Inbox 幂等，业务不二次生效
+        rabbitTemplate.convertAndSend("comic.management", "command.completed", completed);
+        await(() -> inboxMapper.selectById(completed.eventId().toString()) != null, "Inbox 记录");
+        Thread.sleep(800);
+        List<Media> again = mediaMapper.selectList(new LambdaQueryWrapper<Media>()
+                .eq(Media::getMediaType, "IMAGE").orderByAsc(Media::getId));
+        assertThat(again).extracting(Media::getLqStatus)
+                .containsExactly(LqStatus.READY, LqStatus.READY, LqStatus.FAILED);
+    }
+
     // ======================== 旧 attempt 结果不生效 + retry ========================
 
     @Test

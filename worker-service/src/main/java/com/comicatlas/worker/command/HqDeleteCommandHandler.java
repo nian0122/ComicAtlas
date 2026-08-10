@@ -20,7 +20,8 @@ import java.util.Objects;
 /**
  * HQ 删除命令处理器（新 envelope 路由）。
  * <p>
- * CHAPTER 级删除单个章节全部 HQ 文件；COMIC 级（批量操作 API 创建的
+ * 仅作用于 IMAGE 媒体（VIDEO 不参与 HQ 删除，F6-26 修复前会误删视频文件而 DB 仍 READY）：
+ * CHAPTER 级删除单个章节全部 IMAGE 的 HQ 文件；COMIC 级（批量操作 API 创建的
  * COMIC 目标 item）展开为漫画下所有章节逐章删除，最终按 item 聚合回传一次。
  * <p>
  * QA 修复注记（task-21）：原实现只有 deleteChapter，批量操作创建 COMIC
@@ -73,9 +74,11 @@ public class HqDeleteCommandHandler {
         }
     }
 
-    /** 删除单章全部 HQ 文件，返回是否成功。空章节视为成功（无内容可删）。 */
+    /** 删除单章 IMAGE 的 HQ 文件，返回是否成功。空/纯视频章节视为成功（无 IMAGE 可删，VIDEO 不参与 HQ 删除）。 */
     private boolean processChapter(Long chapterId) {
-        List<ExportMedia> pages = mediaMapper.selectByChapterId(chapterId);
+        List<ExportMedia> pages = mediaMapper.selectByChapterId(chapterId).stream()
+                .filter(m -> "IMAGE".equals(m.getMediaType()))
+                .toList();
         if (pages.isEmpty()) {
             return true;
         }
@@ -100,7 +103,8 @@ public class HqDeleteCommandHandler {
             Path chapterDir = hqRoot.resolve(comicId + "/" + chapterId);
             Files.deleteIfExists(chapterDir);
         } catch (IOException e) {
-            log.warn("HQ 删除空目录失败（非致命）: chapterId={}", chapterId, e);
+            // 目录非空（VIDEO 仍存在）或删除失败：不递归删除、不视为任务失败
+            log.warn("HQ 删除章节目录失败（非致命，VIDEO 保留时目录非空属正常）: chapterId={}", chapterId, e);
         }
         return true;
     }
