@@ -14,7 +14,7 @@ Spring Boot 3 + Vue3 + RabbitMQ + MySQL + Redis。
 comic-atlas/
 ├── api-service/             # 漫画CRUD + 导入 + Catalog + Reader + LQ/HQ删除 + 回收站 + MQ消费（Flyway 迁移在 src/main/resources/db/）
 ├── worker-service/          # 文件处理 + MQ消费 + 下载 + 解压 + 导入 + LQ/HQ删除 + 回收/恢复/永久清理 + ffprobe（模块化：config/event/command/importer/media/storage/export/file/process/image）
-├── comic-common/            # 共享事件 DTO（36 个事件 record + ComicEvent sealed interface + payload 数据载体，Jackson 多态序列化）+ MQ 契约/元数据/工具（constant/dto/event/metadata/mq/util）
+├── comic-common/            # 共享事件 DTO（31 个事件 record + ComicEvent sealed interface + payload 数据载体，Jackson 多态序列化）+ MQ 契约/元数据/工具（constant/dto/event/metadata/mq/util）
 ├── gateway/                 # Spring Cloud Gateway: 路由 + Nacos发现
 ├── frontend/                # Vue3/Vite: 列表 + 详情 + 阅读器 + 管理后台 + 存储管理
 ├── scripts/                 # dev/qa/db/release 开发与运维脚本（入口 scripts/dev/start-dev.ps1）
@@ -38,7 +38,7 @@ comic-atlas/
 | LQ 手动触发 | `api-service/.../controller/LqController.java` | POST /comics/{id}/lq |
 | HQ 删除 API | `api-service/.../controller/HqDeleteController.java` | POST /comics/{id}/delete-hq |
 | MQ 消费 | `api-service/.../event/ImportEventHandler.java` | 读 metadata.json → INSERT |
-| LQ 完成处理 | `api-service/.../event/LqCompletedHandler.java` | 更新 media.lq_status + lq_path |
+| LQ 完成处理 | `api-service/.../management/event/ManagementCommandResultHandler.java` | 处理 LQ 命令结果，更新 media.lq_status + lq_path |
 | HQ 删除完成 | `api-service/.../event/HqDeletedHandler.java` | 更新 media.hq_status=DELETED |
 | 回收站/永久清理 | `api-service/.../management/trash/TrashLifecycleController.java` | POST /api/trash/... restore/purge/reconcile（删除=回收，永久删除=purge） |
 | 目录扫描 | `api-service/.../importer/controller/DirectoryScanTaskController.java` | POST /api/tasks/directory-scan，漫画集根目录批量发现（直接子目录=候选漫画） |
@@ -49,7 +49,7 @@ comic-atlas/
 | 恢复事件处理 | `api-service/.../event/RecoveryEventHandler.java` | 消费 MQ 事件，逐本调用 RecoveryEngine |
 | 恢复引擎 | `api-service/.../recovery/RecoveryEngine.java` | 单本漫画的 DB 恢复逻辑 |
 | Worker 恢复入口 | `worker-service/.../event/RecoveryTaskHandler.java` | 扫描 HQ 目录，发布 comicId 列表 |
-| 事件 DTO | `comic-common/.../event/` | 36 个事件 record + ComicEvent sealed interface + payload/（数据载体） |
+| 事件 DTO | `comic-common/.../event/` | 31 个事件 record + ComicEvent sealed interface + payload/（数据载体） |
 | MQ 常量 | `comic-common/.../constant/` | MqExchanges/MqQueues/MqRoutingKeys（exchange/queue/routingKey 契约） |
 | 元数据构建 | `comic-common/.../metadata/` | MetadataV3/MetadataJsonBuilder（V3 元数据模型） |
 | MQ 消费支持 | `comic-common/.../mq/` | MqConsumerSupport（统一 ACK/Reject/DLQ 策略） |
@@ -58,7 +58,7 @@ comic-atlas/
 | 枚举 | `api-service/.../common/enums/` | TaskType/TaskStage/ManagementTaskStatus/TranscodeStatus 等（仅 api 消费） |
 | Worker 入口 | `worker-service/.../event/ImportTaskHandler.java` | sourceType 路由到统一 handler |
 | 取消任务 | `worker-service/.../event/CancelHandler.java` | ConcurrentHashMap 标记 |
-| LQ 生成 | `worker-service/.../event/LqGenerateHandler.java` | 调用 ImageOptimizer 外部工具 |
+| LQ 生成 | `worker-service/.../command/LqCommandHandler.java` | 消费 management 命令，调用 ImageOptimizer 外部工具 |
 | HQ 删除 | `worker-service/.../event/HqDeleteHandler.java` | 按章节删除 HQ 图片 |
 | 目录解析 | `worker-service/.../importer/DirectoryParser.java` | 输出 DirectoryTree（纯树，无业务语义） |
 | 元数据组装 | `worker-service/.../importer/MetadataAssembler.java` | DirectoryTree → ComicMetadata（注入 Catalog/Chapter） |
@@ -153,8 +153,6 @@ URL 统一由 `FileUrlResolver.resolve(page)` 生成，不手拼。
 | comic.import | import.storage.finalize.failed | import.storage.finalize.failed.queue | API ImportStorageFinalizeEventHandler |
 | comic.task | status.changed | task.status.queue | API ImportEventHandler |
 | comic.task | cancel.requested | cancel.task.queue | Worker CancelHandler |
-| comic.image | lq.generate | lq.generate.queue | Worker LqGenerateHandler |
-| comic.image | lq.completed | lq.result.queue | API LqCompletedHandler |
 | comic.image | hq.delete.requested | hq.delete.queue | Worker HqDeleteHandler |
 | comic.image | hq.delete.completed | hq.delete.result.queue | API HqDeletedHandler |
 | comic.image | video.metadata.fix.requested | video.metadata.fix.queue | Worker VideoMetadataFixHandler |
@@ -164,9 +162,6 @@ URL 统一由 `FileUrlResolver.resolve(page)` 生成，不手拼。
 | comic.export | task.completed | export.completed.result.queue | API ExportCompletedHandler |
 | comic.export | task.failed | export.failed.result.queue | API ExportFailedHandler |
 | comic.export | metadata.refresh.requested | metadata.refresh.queue | Worker MetadataRefreshHandler |
-| comic.video | video.transcode.requested | video.transcode.queue | Worker VideoTranscodeHandler |
-| comic.video | video.transcode.completed | video.transcode.completed.queue | API TranscodeCompletedHandler |
-| comic.video | video.transcode.failed | video.transcode.failed.queue | API TranscodeFailedHandler |
 | comic.recovery | recovery.requested | recovery.task.queue | Worker RecoveryTaskHandler |
 | comic.recovery | recovery.progress | recovery.result.queue | API RecoveryEventHandler |
 | comic.recovery | recovery.completed | recovery.result.queue | API RecoveryEventHandler |
@@ -178,7 +173,7 @@ URL 统一由 `FileUrlResolver.resolve(page)` 生成，不手拼。
 | comic.management | command.cancel | management.cancel.queue | （未注册消费者） |
 | comic.management | command.completed / failed / progress | management.result.queue | API ManagementCommandResultHandler |
 
-**死信**: 主队列除 comic.task（task.status.queue / cancel.task.queue 无 DLX）外均配置 DLX + DLQ（comic.import.dlx / comic.image.dlx / comic.export.dlx / comic.video.dlx / comic.recovery.dlx / comic.scan.dlx / comic.management.dlx）
+**死信**: 主队列除 comic.task（task.status.queue / cancel.task.queue 无 DLX）外均配置 DLX + DLQ（comic.import.dlx / comic.image.dlx / comic.export.dlx / comic.recovery.dlx / comic.scan.dlx / comic.management.dlx）
 
 **Broker 遗留实体清理**: 代码已不再声明旧完整删除（comic.delete）的 exchange/queue/DLQ（`delete.task.queue` / `delete.result.queue` / `comic.delete.dlx` 等）。但已运行 Broker 中残留的 durable 实体不会被 Spring 自动删除，需用户在停服且确认无消息后单独人工清理（RabbitMQ 管理台或 `rabbitmqctl`）；本计划不执行 Broker 删除。
 
@@ -195,8 +190,6 @@ URL 统一由 `FileUrlResolver.resolve(page)` 生成，不手拼。
 | ImportStorageFinalizeFailed | comic.import.import.storage.finalize.failed | ImportStorageFinalizeFailedEvent |
 | TaskStatusChanged | comic.task.status.changed | TaskStatusChangedEvent |
 | CancelTask | comic.task.cancel.requested | CancelTaskEvent |
-| LqGenerate | comic.image.lq.generate | LqGenerateEvent |
-| LqCompleted | comic.image.lq.completed | LqCompletedEvent |
 | DeleteHqRequested | comic.image.hq.delete.requested | DeleteHqRequestedEvent |
 | HqDeleted | comic.image.hq.delete.completed | HqDeletedEvent |
 | VideoMetadataFixRequested | comic.image.video.metadata.fix.requested | VideoMetadataFixRequestedEvent |
@@ -206,9 +199,6 @@ URL 统一由 `FileUrlResolver.resolve(page)` 生成，不手拼。
 | ExportTaskCompleted | comic.export.task.completed | ExportTaskCompletedEvent |
 | ExportTaskFailed | comic.export.task.failed | ExportTaskFailedEvent |
 | MetadataRefresh | comic.export.metadata.refresh.requested | MetadataRefreshEvent |
-| VideoTranscodeRequested | comic.video.video.transcode.requested | VideoTranscodeRequestedEvent |
-| VideoTranscodeCompleted | comic.video.video.transcode.completed | VideoTranscodeCompletedEvent |
-| VideoTranscodeFailed | comic.video.video.transcode.failed | VideoTranscodeFailedEvent |
 | RecoveryRequested | comic.recovery.requested | RecoveryRequestedEvent |
 | RecoveryScanCompleted | comic.recovery.progress | RecoveryScanCompletedEvent |
 | RecoveryProgress | comic.recovery.progress | RecoveryProgressEvent |

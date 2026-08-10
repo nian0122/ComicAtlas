@@ -19,12 +19,10 @@ public class DlqService {
 
     private static final Map<String, DlqRoute> DLQ_ROUTES = Map.ofEntries(
         entry(MqQueues.IMPORT_TASK_DLQ, new DlqRoute(MqExchanges.IMPORT, MqRoutingKeys.TASK_CREATED)),
-        entry(MqQueues.LQ_GENERATE_DLQ, new DlqRoute(MqExchanges.IMAGE, MqRoutingKeys.LQ_GENERATE)),
         entry(MqQueues.HQ_DELETE_DLQ, new DlqRoute(MqExchanges.IMAGE, MqRoutingKeys.HQ_DELETE_REQUESTED)),
         entry(MqQueues.EXPORT_TASK_DLQ, new DlqRoute(MqExchanges.EXPORT, MqRoutingKeys.TASK_CREATED)),
         entry(MqQueues.IMPORT_RESULT_DLQ, new DlqRoute(MqExchanges.IMPORT, MqRoutingKeys.TASK_COMPLETED)),
         entry(MqQueues.IMPORT_FAILED_DLQ, new DlqRoute(MqExchanges.IMPORT, MqRoutingKeys.TASK_FAILED)),
-        entry(MqQueues.LQ_RESULT_DLQ, new DlqRoute(MqExchanges.IMAGE, MqRoutingKeys.LQ_COMPLETED)),
         entry(MqQueues.HQ_DELETE_RESULT_DLQ, new DlqRoute(MqExchanges.IMAGE, MqRoutingKeys.HQ_DELETE_COMPLETED)),
         entry(MqQueues.EXPORT_STARTED_RESULT_DLQ, new DlqRoute(MqExchanges.EXPORT, MqRoutingKeys.TASK_STARTED)),
         entry(MqQueues.EXPORT_COMPLETED_RESULT_DLQ, new DlqRoute(MqExchanges.EXPORT, MqRoutingKeys.TASK_COMPLETED)),

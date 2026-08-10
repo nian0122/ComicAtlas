@@ -18,8 +18,6 @@ public final class MqQueues {
     public static final String IMPORT_STORAGE_FINALIZE_FAILED = "import.storage.finalize.failed.queue";
     public static final String TASK_STATUS = "task.status.queue";
     public static final String CANCEL_TASK = "cancel.task.queue";
-    public static final String LQ_GENERATE = "lq.generate.queue";
-    public static final String LQ_RESULT = "lq.result.queue";
     public static final String HQ_DELETE = "hq.delete.queue";
     public static final String HQ_DELETE_RESULT = "hq.delete.result.queue";
     public static final String VIDEO_METADATA_FIX = "video.metadata.fix.queue";
@@ -29,9 +27,6 @@ public final class MqQueues {
     public static final String EXPORT_COMPLETED_RESULT = "export.completed.result.queue";
     public static final String EXPORT_FAILED_RESULT = "export.failed.result.queue";
     public static final String METADATA_REFRESH = "metadata.refresh.queue";
-    public static final String VIDEO_TRANSCODE = "video.transcode.queue";
-    public static final String VIDEO_TRANSCODE_COMPLETED = "video.transcode.completed.queue";
-    public static final String VIDEO_TRANSCODE_FAILED = "video.transcode.failed.queue";
     public static final String RECOVERY_TASK = "recovery.task.queue";
     public static final String RECOVERY_RESULT = "recovery.result.queue";
     public static final String SCAN_TASK = "scan.task.queue";
@@ -47,8 +42,6 @@ public final class MqQueues {
     public static final String IMPORT_STORAGE_FINALIZE_REQUESTED_DLQ = "import.storage.finalize.requested.dlq";
     public static final String IMPORT_STORAGE_FINALIZE_COMPLETED_DLQ = "import.storage.finalize.completed.dlq";
     public static final String IMPORT_STORAGE_FINALIZE_FAILED_DLQ = "import.storage.finalize.failed.dlq";
-    public static final String LQ_GENERATE_DLQ = "lq.generate.dlq";
-    public static final String LQ_RESULT_DLQ = "lq.result.dlq";
     public static final String HQ_DELETE_DLQ = "hq.delete.dlq";
     public static final String HQ_DELETE_RESULT_DLQ = "hq.delete.result.dlq";
     public static final String VIDEO_METADATA_FIX_DLQ = "video.metadata.fix.dlq";
@@ -58,9 +51,6 @@ public final class MqQueues {
     public static final String EXPORT_COMPLETED_RESULT_DLQ = "export.completed.result.dlq";
     public static final String EXPORT_FAILED_RESULT_DLQ = "export.failed.result.dlq";
     public static final String METADATA_REFRESH_DLQ = "metadata.refresh.dlq";
-    public static final String VIDEO_TRANSCODE_DLQ = "video.transcode.dlq";
-    public static final String VIDEO_TRANSCODE_COMPLETED_DLQ = "video.transcode.completed.dlq";
-    public static final String VIDEO_TRANSCODE_FAILED_DLQ = "video.transcode.failed.dlq";
     public static final String RECOVERY_TASK_DLQ = "recovery.task.dlq";
     public static final String RECOVERY_RESULT_DLQ = "recovery.result.dlq";
     public static final String SCAN_TASK_DLQ = "scan.task.dlq";

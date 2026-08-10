@@ -25,8 +25,6 @@ public final class MqRoutingKeys {
     public static final String CANCEL_REQUESTED = "cancel.requested";
 
     // comic.image
-    public static final String LQ_GENERATE = "lq.generate";
-    public static final String LQ_COMPLETED = "lq.completed";
     public static final String HQ_DELETE_REQUESTED = "hq.delete.requested";
     public static final String HQ_DELETE_COMPLETED = "hq.delete.completed";
     public static final String VIDEO_METADATA_FIX_REQUESTED = "video.metadata.fix.requested";
@@ -35,11 +33,6 @@ public final class MqRoutingKeys {
     // comic.export
     public static final String TASK_STARTED = "task.started";
     public static final String METADATA_REFRESH_REQUESTED = "metadata.refresh.requested";
-
-    // comic.video
-    public static final String VIDEO_TRANSCODE_REQUESTED = "video.transcode.requested";
-    public static final String VIDEO_TRANSCODE_COMPLETED = "video.transcode.completed";
-    public static final String VIDEO_TRANSCODE_FAILED = "video.transcode.failed";
 
     // comic.recovery
     public static final String RECOVERY_REQUESTED = "recovery.requested";

@@ -14,7 +14,7 @@ import java.util.List;
  * 视频转码纯技术能力：调用 ffmpeg 将视频转为 H.264 + AAC MP4。
  * <p>
  * 职责单一——只负责 ffmpeg 命令构造、非标准格式判定与进程执行；
- * 业务编排（MQ 消费、临时文件替换、DB 更新）由调用方 {@code VideoTranscodeHandler} 负责。
+ * 业务编排（MQ 消费、临时文件替换、DB 更新）由调用方 {@code TranscodeCommandHandler} 负责。
  * ffmpeg 参数与标准容器判定在此收敛单处，避免多处重复实现。
  */
 @Slf4j

@@ -259,14 +259,76 @@ class RabbitTopologyIT {
         }
 
         @Test
-        @DisplayName("lq.result.queue DLX 配置不变")
-        void lqResultQueue_unchanged() {
-            var queue = apiConfig.lqResultQueue();
-            assertThat(queue.getName()).isEqualTo("lq.result.queue");
+        @DisplayName("旧 LQ/转码专用 bean 已从 API 配置移除")
+        void legacyLqTranscodeBeans_removed() {
+            assertThat(hasDeclaredMethod(apiConfig.getClass(), "lqResultQueue")).isFalse();
+            assertThat(hasDeclaredMethod(apiConfig.getClass(), "lqResultDlq")).isFalse();
+            assertThat(hasDeclaredMethod(apiConfig.getClass(), "lqResultBinding")).isFalse();
+            assertThat(hasDeclaredMethod(apiConfig.getClass(), "lqResultDlqBinding")).isFalse();
+            assertThat(hasDeclaredMethod(apiConfig.getClass(), "videoExchange")).isFalse();
+            assertThat(hasDeclaredMethod(apiConfig.getClass(), "videoTranscodeCompletedQueue")).isFalse();
+            assertThat(hasDeclaredMethod(apiConfig.getClass(), "videoTranscodeFailedQueue")).isFalse();
+        }
+    }
 
-            Object dlx = queue.getArguments().get("x-dead-letter-exchange");
-            assertThat(dlx).isNotNull();
-            assertThat(dlxArgToString(dlx)).isEqualTo("comic.image.dlx");
+    // ======================== 正向保留：HQ_DELETE / VIDEO_METADATA_FIX / METADATA_REFRESH ========================
+
+    @Nested
+    @DisplayName("保留管线拓扑：HQ_DELETE / VIDEO_METADATA_FIX / METADATA_REFRESH")
+    class RetainedPipelinesTopology {
+
+        @Test
+        @DisplayName("HQ delete 请求/结果队列绑定 comic.image 且 DLX 为 comic.image.dlx")
+        void hqDeleteTopology_present() {
+            var workerConfig = new com.comicatlas.worker.config.RabbitMqConfig();
+            assertThat(workerConfig.hqDeleteQueue().getName()).isEqualTo("hq.delete.queue");
+            assertThat(apiConfig.hqDeleteResultQueue().getName()).isEqualTo("hq.delete.result.queue");
+            assertThat(dlxArgToString(apiConfig.hqDeleteResultQueue().getArguments().get("x-dead-letter-exchange")))
+                    .isEqualTo("comic.image.dlx");
+            assertThat(apiConfig.hqDeleteResultBinding().getRoutingKey()).isEqualTo("hq.delete.completed");
+        }
+
+        @Test
+        @DisplayName("video metadata fix 请求/结果队列绑定 comic.image 且 DLX 为 comic.image.dlx")
+        void videoMetadataFixTopology_present() {
+            var workerConfig = new com.comicatlas.worker.config.RabbitMqConfig();
+            assertThat(workerConfig.videoMetadataFixQueue().getName()).isEqualTo("video.metadata.fix.queue");
+            assertThat(apiConfig.videoMetadataFixResultQueue().getName()).isEqualTo("video.metadata.fix.result.queue");
+            assertThat(dlxArgToString(apiConfig.videoMetadataFixResultQueue().getArguments().get("x-dead-letter-exchange")))
+                    .isEqualTo("comic.image.dlx");
+            assertThat(apiConfig.videoMetadataFixCompletedBinding().getRoutingKey())
+                    .isEqualTo("video.metadata.fix.completed");
+        }
+
+        @Test
+        @DisplayName("metadata refresh 队列绑定 comic.export 且 DLX 为 comic.export.dlx")
+        void metadataRefreshTopology_present() {
+            var workerConfig = new com.comicatlas.worker.config.RabbitMqConfig();
+            assertThat(workerConfig.metadataRefreshQueue().getName()).isEqualTo("metadata.refresh.queue");
+            assertThat(apiConfig.metadataRefreshQueue().getName()).isEqualTo("metadata.refresh.queue");
+            assertThat(dlxArgToString(apiConfig.metadataRefreshQueue().getArguments().get("x-dead-letter-exchange")))
+                    .isEqualTo("comic.export.dlx");
+            assertThat(apiConfig.metadataRefreshBinding().getRoutingKey()).isEqualTo("metadata.refresh.requested");
+        }
+
+        @Test
+        @DisplayName("comic.image 与 IMAGE_DLX 仍存在（HQ delete / video metadata fix 共享）")
+        void imageExchange_stillShared() {
+            assertThat(apiConfig.imageExchange().getName()).isEqualTo("comic.image");
+            assertThat(apiConfig.imageDlxExchange().getName()).isEqualTo("comic.image.dlx");
+            var workerConfig = new com.comicatlas.worker.config.RabbitMqConfig();
+            assertThat(workerConfig.imageExchange().getName()).isEqualTo("comic.image");
+            assertThat(workerConfig.imageDlxExchange().getName()).isEqualTo("comic.image.dlx");
+        }
+
+        @Test
+        @DisplayName("comic.video 与 VIDEO_DLX 已整体移除（引用归零）")
+        void videoExchange_removed() {
+            assertThat(hasDeclaredMethod(apiConfig.getClass(), "videoExchange")).isFalse();
+            assertThat(hasDeclaredMethod(apiConfig.getClass(), "videoDlxExchange")).isFalse();
+            var workerConfig = new com.comicatlas.worker.config.RabbitMqConfig();
+            assertThat(hasDeclaredMethod(workerConfig.getClass(), "videoExchange")).isFalse();
+            assertThat(hasDeclaredMethod(workerConfig.getClass(), "videoDlxExchange")).isFalse();
         }
     }
 
@@ -402,18 +464,18 @@ class RabbitTopologyIT {
             assertThat(dlxArgToString(requested.getArguments().get("x-dead-letter-routing-key")))
                     .isEqualTo(DLQ_FINALIZE_REQUESTED);
         }
-
-        private static boolean hasDeclaredMethod(Class<?> type, String methodName) {
-            for (java.lang.reflect.Method method : type.getDeclaredMethods()) {
-                if (method.getName().equals(methodName)) {
-                    return true;
-                }
-            }
-            return false;
-        }
     }
 
     // ======================== 辅助 ========================
+
+    private static boolean hasDeclaredMethod(Class<?> type, String methodName) {
+        for (java.lang.reflect.Method method : type.getDeclaredMethods()) {
+            if (method.getName().equals(methodName)) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     /**
      * RabbitMQ queue arguments 中 DLX/DLQ 值可能为 String 或 List<String>。

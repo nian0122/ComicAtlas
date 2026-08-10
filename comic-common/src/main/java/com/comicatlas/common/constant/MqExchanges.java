@@ -16,8 +16,6 @@ public final class MqExchanges {
     public static final String TASK = "comic.task";
     public static final String EXPORT = "comic.export";
     public static final String EXPORT_DLX = "comic.export.dlx";
-    public static final String VIDEO = "comic.video";
-    public static final String VIDEO_DLX = "comic.video.dlx";
     public static final String RECOVERY = "comic.recovery";
     public static final String RECOVERY_DLX = "comic.recovery.dlx";
     public static final String SCAN = "comic.scan";

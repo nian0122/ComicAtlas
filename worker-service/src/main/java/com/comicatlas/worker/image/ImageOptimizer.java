@@ -43,7 +43,7 @@ public class ImageOptimizer {
         try {
             return generateLq(comicId, chapterId, hqDir, lqDir, false);
         } catch (InterruptedException e) {
-            // 兼容既有调用方（LqGenerateHandler）：包装为 RuntimeException 并保留原始 cause；
+            // 兼容既有调用方：包装为 RuntimeException 并保留原始 cause；
             // LqCommandHandler 走 5 参变体以精确区分中断。
             Thread.currentThread().interrupt();
             throw new RuntimeException(

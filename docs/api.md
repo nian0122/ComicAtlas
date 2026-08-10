@@ -849,8 +849,6 @@ OP_NOT_ALLOWED, COMIC_NOT_FOUND
 | comic.import | import.storage.finalize.failed | import.storage.finalize.failed.queue | API ImportStorageFinalizeEventHandler |
 | comic.task | status.changed | task.status.queue | API ImportEventHandler |
 | comic.task | cancel.requested | cancel.task.queue | Worker CancelHandler |
-| comic.image | lq.generate | lq.generate.queue | Worker LqGenerateHandler |
-| comic.image | lq.completed | lq.result.queue | API LqCompletedHandler |
 | comic.image | hq.delete.requested | hq.delete.queue | Worker HqDeleteHandler |
 | comic.image | hq.delete.completed | hq.delete.result.queue | API HqDeletedHandler |
 | comic.image | video.metadata.fix.requested | video.metadata.fix.queue | Worker VideoMetadataFixHandler |
@@ -860,9 +858,6 @@ OP_NOT_ALLOWED, COMIC_NOT_FOUND
 | comic.export | task.completed | export.completed.result.queue | API ExportCompletedHandler |
 | comic.export | task.failed | export.failed.result.queue | API ExportFailedHandler |
 | comic.export | metadata.refresh.requested | metadata.refresh.queue | Worker MetadataRefreshHandler |
-| comic.video | video.transcode.requested | video.transcode.queue | Worker VideoTranscodeHandler |
-| comic.video | video.transcode.completed | video.transcode.completed.queue | API TranscodeCompletedHandler |
-| comic.video | video.transcode.failed | video.transcode.failed.queue | API TranscodeFailedHandler |
 | comic.recovery | recovery.requested | recovery.task.queue | Worker RecoveryTaskHandler |
 | comic.recovery | recovery.progress | recovery.result.queue | API RecoveryEventHandler |
 | comic.recovery | recovery.completed | recovery.result.queue | API RecoveryEventHandler |
@@ -876,9 +871,9 @@ OP_NOT_ALLOWED, COMIC_NOT_FOUND
 | comic.management | command.progress | management.result.queue | API ManagementCommandResultHandler |
 | comic.management | command.cancel | management.cancel.queue | （未注册消费者） |
 
-**死信**：主队列除 comic.task（task.status.queue / cancel.task.queue 无 DLX）外均配置 DLX + DLQ（comic.import.dlx / comic.image.dlx / comic.export.dlx / comic.video.dlx / comic.recovery.dlx / comic.scan.dlx / comic.management.dlx）。DLQ 消息可通过 `/api/admin/dlq/*` 查看、重放或清理（见第 11 节）。
+**死信**：主队列除 comic.task（task.status.queue / cancel.task.queue 无 DLX）外均配置 DLX + DLQ（comic.import.dlx / comic.image.dlx / comic.export.dlx / comic.recovery.dlx / comic.scan.dlx / comic.management.dlx）。DLQ 消息可通过 `/api/admin/dlq/*` 查看、重放或清理（见第 11 节）。
 
-> **Broker 遗留实体清理**：代码已不再声明旧完整删除（comic.delete）的 exchange/queue/DLQ（`delete.task.queue` / `delete.result.queue` / `comic.delete.dlx` 等）。但已运行 Broker 中残留的 durable 实体不会被 Spring 自动删除，需用户在停服且确认无消息后单独人工清理（RabbitMQ 管理台或 `rabbitmqctl`）；本计划不执行 Broker 删除。
+> **Broker 遗留实体清理**：代码已不再声明旧完整删除（comic.delete）的 exchange/queue/DLQ（`delete.task.queue` / `delete.result.queue` / `comic.delete.dlx` 等），也不再声明旧 LQ/视频转码专用 MQ 管线（`lq.generate.queue` / `lq.result.queue` / `video.transcode*` / `comic.video` / `comic.video.dlx`）。但已运行 Broker 中残留的 durable 实体不会被 Spring 自动删除，需用户在停服且确认无消息后单独人工清理（RabbitMQ 管理台或 `rabbitmqctl`）；本计划不执行 Broker 删除。
 
 ---
 

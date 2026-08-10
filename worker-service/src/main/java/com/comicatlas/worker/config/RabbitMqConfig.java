@@ -48,12 +48,6 @@ public class RabbitMqConfig {
     @Bean
     public DirectExchange exportDlxExchange() { return new DirectExchange(MqExchanges.EXPORT_DLX); }
 
-    @Bean
-    public DirectExchange videoExchange() { return new DirectExchange(MqExchanges.VIDEO); }
-
-    @Bean
-    public DirectExchange videoDlxExchange() { return new DirectExchange(MqExchanges.VIDEO_DLX); }
-
     // ===== Queues =====
 
     @Bean
@@ -72,19 +66,6 @@ public class RabbitMqConfig {
     @Bean
     public Queue cancelTaskQueue() {
         return QueueBuilder.durable(MqQueues.CANCEL_TASK).build();
-    }
-
-    @Bean
-    public Queue lqGenerateQueue() {
-        return QueueBuilder.durable(MqQueues.LQ_GENERATE)
-                .deadLetterExchange(MqExchanges.IMAGE_DLX)
-                .deadLetterRoutingKey(MqQueues.LQ_GENERATE_DLQ)
-                .build();
-    }
-
-    @Bean
-    public Queue lqGenerateDlq() {
-        return QueueBuilder.durable(MqQueues.LQ_GENERATE_DLQ).build();
     }
 
     @Bean
@@ -139,19 +120,6 @@ public class RabbitMqConfig {
         return QueueBuilder.durable(MqQueues.VIDEO_METADATA_FIX_DLQ).build();
     }
 
-    @Bean
-    public Queue videoTranscodeQueue() {
-        return QueueBuilder.durable(MqQueues.VIDEO_TRANSCODE)
-                .deadLetterExchange(MqExchanges.VIDEO_DLX)
-                .deadLetterRoutingKey(MqQueues.VIDEO_TRANSCODE_DLQ)
-                .build();
-    }
-
-    @Bean
-    public Queue videoTranscodeDlq() {
-        return QueueBuilder.durable(MqQueues.VIDEO_TRANSCODE_DLQ).build();
-    }
-
     // ===== Bindings =====
 
     @Bean
@@ -200,18 +168,6 @@ public class RabbitMqConfig {
     }
 
     @Bean
-    public Binding lqGenerateBinding() {
-        return BindingBuilder.bind(lqGenerateQueue())
-                .to(imageExchange()).with(MqRoutingKeys.LQ_GENERATE);
-    }
-
-    @Bean
-    public Binding lqGenerateDlqBinding() {
-        return BindingBuilder.bind(lqGenerateDlq())
-                .to(imageDlxExchange()).with(MqQueues.LQ_GENERATE_DLQ);
-    }
-
-    @Bean
     public Binding hqDeleteBinding() {
         return BindingBuilder.bind(hqDeleteQueue())
                 .to(imageExchange()).with(MqRoutingKeys.HQ_DELETE_REQUESTED);
@@ -257,18 +213,6 @@ public class RabbitMqConfig {
     public Binding videoMetadataFixDlqBinding() {
         return BindingBuilder.bind(videoMetadataFixDlq())
                 .to(imageDlxExchange()).with(MqQueues.VIDEO_METADATA_FIX_DLQ);
-    }
-
-    @Bean
-    public Binding videoTranscodeBinding() {
-        return BindingBuilder.bind(videoTranscodeQueue())
-                .to(videoExchange()).with(MqRoutingKeys.VIDEO_TRANSCODE_REQUESTED);
-    }
-
-    @Bean
-    public Binding videoTranscodeDlqBinding() {
-        return BindingBuilder.bind(videoTranscodeDlq())
-                .to(videoDlxExchange()).with(MqQueues.VIDEO_TRANSCODE_DLQ);
     }
 
     // ==================== recovery 恢复任务 ====================

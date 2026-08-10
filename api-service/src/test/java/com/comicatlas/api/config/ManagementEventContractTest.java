@@ -13,7 +13,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.comicatlas.common.event.HqDeletedEvent;
 import com.comicatlas.common.event.ImportTaskCreatedEvent;
-import com.comicatlas.common.event.LqGenerateEvent;
 import com.comicatlas.common.event.ManagementCommandCancelRequestedEvent;
 import com.comicatlas.common.event.ManagementCommandCompletedEvent;
 import com.comicatlas.common.event.ManagementCommandFailedEvent;
@@ -290,18 +289,14 @@ class ManagementEventContractTest {
         }
 
         @Test
-        @DisplayName("LqGenerateEvent 可序列化并保持字段")
-        void lqGenerateEvent_stillWorks() throws Exception {
-            var event = new LqGenerateEvent(
-                    UUID.randomUUID(), Instant.now(), 10L, 5L, "01");
+        @DisplayName("旧 LqGenerateEvent 类型不再被 ComicEvent 识别（旧 LQ 管线已移除）")
+        void legacyLqGenerateEvent_notRecognized() throws Exception {
+            String json = """
+                    {"eventType":"LqGenerateEvent","eventId":"%s","occurredAt":"2025-01-01T00:00:00Z"}
+                    """.formatted(UUID.randomUUID());
 
-            String json = mapper.writeValueAsString(event);
-            LqGenerateEvent restored = mapper.readValue(json, LqGenerateEvent.class);
-
-            assertThat(restored.comicId()).isEqualTo(10L);
-            assertThat(restored.chapterId()).isEqualTo(5L);
-            assertThat(restored.chapterNo()).isEqualTo("01");
-            assertThat(restored.version()).isEqualTo(1);
+            assertThatThrownBy(() -> mapper.readValue(json, ComicEvent.class))
+                    .hasMessageContaining("LqGenerateEvent");
         }
 
         @Test

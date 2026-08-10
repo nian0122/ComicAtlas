@@ -159,31 +159,6 @@ public class RabbitMqConfig {
     }
 
     @Bean
-    public Queue lqResultQueue() {
-        return QueueBuilder.durable(MqQueues.LQ_RESULT)
-                .deadLetterExchange(MqExchanges.IMAGE_DLX)
-                .deadLetterRoutingKey(MqQueues.LQ_RESULT_DLQ)
-                .build();
-    }
-
-    @Bean
-    public Queue lqResultDlq() {
-        return QueueBuilder.durable(MqQueues.LQ_RESULT_DLQ).build();
-    }
-
-    @Bean
-    public Binding lqResultBinding() {
-        return BindingBuilder.bind(lqResultQueue())
-                .to(imageExchange()).with(MqRoutingKeys.LQ_COMPLETED);
-    }
-
-    @Bean
-    public Binding lqResultDlqBinding() {
-        return BindingBuilder.bind(lqResultDlq())
-                .to(imageDlxExchange()).with(MqQueues.LQ_RESULT_DLQ);
-    }
-
-    @Bean
     public Queue hqDeleteQueue() {
         return QueueBuilder.durable(MqQueues.HQ_DELETE)
                 .deadLetterExchange(MqExchanges.IMAGE_DLX)
@@ -273,16 +248,6 @@ public class RabbitMqConfig {
     @Bean
     public DirectExchange exportDlxExchange() {
         return new DirectExchange(MqExchanges.EXPORT_DLX);
-    }
-
-    @Bean
-    public DirectExchange videoExchange() {
-        return new DirectExchange(MqExchanges.VIDEO);
-    }
-
-    @Bean
-    public DirectExchange videoDlxExchange() {
-        return new DirectExchange(MqExchanges.VIDEO_DLX);
     }
 
     @Bean
@@ -383,58 +348,6 @@ public class RabbitMqConfig {
     public Binding metadataRefreshDlqBinding() {
         return BindingBuilder.bind(metadataRefreshDlq())
                 .to(exportDlxExchange()).with(MqQueues.METADATA_REFRESH_DLQ);
-    }
-
-    // ==================== MqExchanges.VIDEO 视频转码结果 ====================
-
-    @Bean
-    public Queue videoTranscodeCompletedQueue() {
-        return QueueBuilder.durable(MqQueues.VIDEO_TRANSCODE_COMPLETED)
-                .deadLetterExchange(MqExchanges.VIDEO_DLX)
-                .deadLetterRoutingKey(MqQueues.VIDEO_TRANSCODE_COMPLETED_DLQ)
-                .build();
-    }
-
-    @Bean
-    public Queue videoTranscodeCompletedDlq() {
-        return QueueBuilder.durable(MqQueues.VIDEO_TRANSCODE_COMPLETED_DLQ).build();
-    }
-
-    @Bean
-    public Queue videoTranscodeFailedQueue() {
-        return QueueBuilder.durable(MqQueues.VIDEO_TRANSCODE_FAILED)
-                .deadLetterExchange(MqExchanges.VIDEO_DLX)
-                .deadLetterRoutingKey(MqQueues.VIDEO_TRANSCODE_FAILED_DLQ)
-                .build();
-    }
-
-    @Bean
-    public Queue videoTranscodeFailedDlq() {
-        return QueueBuilder.durable(MqQueues.VIDEO_TRANSCODE_FAILED_DLQ).build();
-    }
-
-    @Bean
-    public Binding videoTranscodeCompletedBinding() {
-        return BindingBuilder.bind(videoTranscodeCompletedQueue())
-                .to(videoExchange()).with(MqRoutingKeys.VIDEO_TRANSCODE_COMPLETED);
-    }
-
-    @Bean
-    public Binding videoTranscodeFailedBinding() {
-        return BindingBuilder.bind(videoTranscodeFailedQueue())
-                .to(videoExchange()).with(MqRoutingKeys.VIDEO_TRANSCODE_FAILED);
-    }
-
-    @Bean
-    public Binding videoTranscodeCompletedDlqBinding() {
-        return BindingBuilder.bind(videoTranscodeCompletedDlq())
-                .to(videoDlxExchange()).with(MqQueues.VIDEO_TRANSCODE_COMPLETED_DLQ);
-    }
-
-    @Bean
-    public Binding videoTranscodeFailedDlqBinding() {
-        return BindingBuilder.bind(videoTranscodeFailedDlq())
-                .to(videoDlxExchange()).with(MqQueues.VIDEO_TRANSCODE_FAILED_DLQ);
     }
 
     // ==================== MqExchanges.RECOVERY ====================
