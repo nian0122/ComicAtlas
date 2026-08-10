@@ -87,7 +87,7 @@ class ExportServiceTest {
     }
 
     private ExportCollectResult result(ExportComic comic, List<ExportChapter> chapters, List<ExportMedia> media) {
-        return new ExportCollectResult(comic, chapters, List.of(), media, null);
+        return new ExportCollectResult(comic, chapters, List.of(), media, null, List.of());
     }
 
     private void writeFile(String relative, String content) throws IOException {

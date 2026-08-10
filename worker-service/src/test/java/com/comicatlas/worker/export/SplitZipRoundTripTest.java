@@ -277,7 +277,7 @@ class SplitZipRoundTripTest {
     private ExportCollector exportCollectorMock(ExportFixture fixture) {
         ExportCollector collector = mock(ExportCollector.class);
         when(collector.collect(COMIC_ID)).thenReturn(new ExportCollectResult(
-                comic(COMIC_ID, ROOT_DIR), fixture.chapters(), List.of(), fixture.media(), null));
+                comic(COMIC_ID, ROOT_DIR), fixture.chapters(), List.of(), fixture.media(), null, List.of()));
         return collector;
     }
 

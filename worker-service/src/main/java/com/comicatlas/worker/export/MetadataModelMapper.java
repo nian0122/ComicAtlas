@@ -26,7 +26,8 @@ public class MetadataModelMapper {
         MetadataV3.Comic comicInfo = new MetadataV3.Comic(
                 comic.getTitle() != null ? comic.getTitle() : "",
                 comic.getAuthor() != null ? comic.getAuthor() : "",
-                null, null);
+                comic.getCategory() != null ? comic.getCategory() : "",
+                result.tags() != null ? result.tags() : List.of());
 
         List<MetadataV3.Catalog> catalogs = new ArrayList<>();
         for (int i = 0; i < result.catalogs().size(); i++) {

@@ -41,7 +41,8 @@ public class ExportCollector {
 
         List<Long> chapterIds = chapters.stream().map(ExportChapter::getId).toList();
         List<ExportMedia> allMedia = chapterIds.isEmpty() ? List.of() : mediaMapper.selectByComicId(comicId);
+        List<String> tags = comicMapper.selectTagNamesByComicId(comicId);
 
-        return new ExportCollectResult(comic, chapters, catalogs, allMedia, null);
+        return new ExportCollectResult(comic, chapters, catalogs, allMedia, null, tags);
     }
 }

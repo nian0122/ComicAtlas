@@ -35,6 +35,7 @@ class MetadataModelMapperTest {
         comic.setId(1L);
         comic.setTitle("标题");
         comic.setAuthor("作者");
+        comic.setCategory("冒险");
 
         ExportCatalog cat1 = new ExportCatalog();
         cat1.setId(10L);
@@ -54,11 +55,13 @@ class MetadataModelMapperTest {
 
         ExportMedia m = media(100L, 20L, "1/20/001.jpg", "IMAGE", 1);
 
-        ExportCollectResult result = new ExportCollectResult(comic, List.of(ch), List.of(cat1), List.of(m), null);
+        ExportCollectResult result = new ExportCollectResult(comic, List.of(ch), List.of(cat1), List.of(m), null,
+                List.of("action", "comedy"));
         MetadataV3 v3 = mapper.toV3(result);
 
         assertEquals("标题", v3.comic().title());
-        assertNull(v3.comic().category());
+        assertEquals("冒险", v3.comic().category());
+        assertEquals(List.of("action", "comedy"), v3.comic().tags());
         assertEquals(1, v3.catalogs().size());
         assertEquals("目录1", v3.catalogs().get(0).title());
         assertEquals(0, v3.chapters().get(0).catalogIndex().intValue(), "catalogIndex 应映射为 catalogs 列表索引");
@@ -67,6 +70,20 @@ class MetadataModelMapperTest {
         assertEquals("1/20/001.jpg", v3.chapters().get(0).mediaItems().get(0).hqPath(),
                 "hqPath 必须原样输出 DB 中的真实相对路径，不得用 globalOrder/chapterNo/fileName 重建");
         assertEquals("IMAGE", v3.chapters().get(0).mediaItems().get(0).mediaType());
+    }
+
+    @Test
+    void toV3_clearedCategoryAndTags_produceEmptyValues() {
+        ExportComic comic = new ExportComic();
+        comic.setId(1L);
+        comic.setTitle("清空后");
+        comic.setCategory(null);
+
+        ExportCollectResult result = new ExportCollectResult(comic, List.of(), List.of(), List.of(), null, List.of());
+        MetadataV3 v3 = mapper.toV3(result);
+
+        assertEquals("", v3.comic().category(), "清分类后应输出空串而非 null");
+        assertEquals(List.of(), v3.comic().tags(), "清标签后应输出空列表");
     }
 
     @Test
@@ -81,7 +98,7 @@ class MetadataModelMapperTest {
         ch.setGlobalOrder(1);
         ExportMedia m = media(100L, 20L, null, "IMAGE", 1);
 
-        ExportCollectResult result = new ExportCollectResult(comic, List.of(ch), List.of(), List.of(m), null);
+        ExportCollectResult result = new ExportCollectResult(comic, List.of(ch), List.of(), List.of(m), null, List.of());
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> mapper.toV3(result));
         assertTrue(ex.getMessage().contains("hqPath"),
@@ -101,7 +118,7 @@ class MetadataModelMapperTest {
         // 反斜杠路径违反相对路径契约，MetadataV3 构造器应自然抛 InvalidRelativePathException
         ExportMedia m = media(100L, 20L, "1\\20\\001.jpg", "IMAGE", 1);
 
-        ExportCollectResult result = new ExportCollectResult(comic, List.of(ch), List.of(), List.of(m), null);
+        ExportCollectResult result = new ExportCollectResult(comic, List.of(ch), List.of(), List.of(m), null, List.of());
 
         assertThrows(InvalidRelativePathException.class, () -> mapper.toV3(result));
     }
@@ -112,9 +129,11 @@ class MetadataModelMapperTest {
         comic.setId(1L);
         comic.setTitle(null);
         comic.setAuthor(null);
-        ExportCollectResult result = new ExportCollectResult(comic, List.of(), List.of(), List.of(), null);
+        ExportCollectResult result = new ExportCollectResult(comic, List.of(), List.of(), List.of(), null, null);
         MetadataV3 v3 = mapper.toV3(result);
         assertEquals("", v3.comic().title());
+        assertEquals("", v3.comic().category());
+        assertEquals(List.of(), v3.comic().tags(), "tags 为 null 时应回退为空列表");
         assertTrue(v3.chapters().isEmpty());
         assertTrue(v3.catalogs().isEmpty());
     }
