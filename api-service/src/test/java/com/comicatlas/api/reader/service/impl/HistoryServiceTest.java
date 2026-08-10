@@ -4,7 +4,10 @@ import com.comicatlas.api.comic.entity.Chapter;
 import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.comic.mapper.ComicMapper;
+import com.comicatlas.api.common.constant.HttpStatusCodes;
+import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.common.storage.FileUrlResolver;
+import com.comicatlas.api.reader.dto.HistoryUpdateRequest;
 import com.comicatlas.api.reader.dto.HistoryVO;
 import com.comicatlas.api.reader.entity.ReadingHistory;
 import com.comicatlas.api.reader.mapper.ReadingHistoryMapper;
@@ -20,6 +23,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -96,6 +100,39 @@ class HistoryServiceTest {
         verify(chapterMapper, never()).selectBatchIds(any());
     }
 
+    @Test
+    void upsertHistory_shouldRejectChapterFromAnotherComic() {
+        Comic comic = comic(10L, "火影");
+        Chapter chapter = chapter(200L, "1");
+        chapter.setComicId(20L);
+        HistoryUpdateRequest request = historyRequest(200L, 1);
+        when(comicMapper.selectById(10L)).thenReturn(comic);
+        when(chapterMapper.selectById(200L)).thenReturn(chapter);
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> service.upsertHistory(10L, request));
+
+        assertEquals(HttpStatusCodes.CONFLICT, exception.getCode());
+        verify(historyMapper, never()).selectOne(any());
+        verify(historyMapper, never()).insert(any(ReadingHistory.class));
+        verify(historyMapper, never()).updateById(any(ReadingHistory.class));
+    }
+
+    @Test
+    void upsertHistory_shouldInsertWhenChapterBelongsToComic() {
+        Comic comic = comic(10L, "火影");
+        Chapter chapter = chapter(100L, "1");
+        chapter.setComicId(10L);
+        HistoryUpdateRequest request = historyRequest(100L, 2);
+        when(comicMapper.selectById(10L)).thenReturn(comic);
+        when(chapterMapper.selectById(100L)).thenReturn(chapter);
+        when(historyMapper.selectOne(any())).thenReturn(null);
+
+        service.upsertHistory(10L, request);
+
+        verify(historyMapper).insert(any(ReadingHistory.class));
+    }
+
     private static ReadingHistory history(Long id, Long comicId, Long chapterId) {
         ReadingHistory h = new ReadingHistory();
         h.setId(id);
@@ -119,5 +156,12 @@ class HistoryServiceTest {
         ch.setId(id);
         ch.setChapterNo(chapterNo);
         return ch;
+    }
+
+    private static HistoryUpdateRequest historyRequest(Long chapterId, Integer pageNumber) {
+        HistoryUpdateRequest request = new HistoryUpdateRequest();
+        request.setChapterId(chapterId);
+        request.setPageNumber(pageNumber);
+        return request;
     }
 }

@@ -2,6 +2,8 @@ package com.comicatlas.api.reader.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.common.storage.FileUrlResolver;
+import com.comicatlas.api.common.constant.HttpStatusCodes;
+import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.reader.entity.ReadingHistory;
 import com.comicatlas.api.reader.mapper.ReadingHistoryMapper;
 import com.comicatlas.api.reader.service.HistoryService;
@@ -72,6 +74,7 @@ public class HistoryServiceImpl implements HistoryService {
 
     @Override
     public void upsertHistory(Long comicId, HistoryUpdateRequest request) {
+        validateHistoryTarget(comicId, request);
         var existing = historyMapper.selectOne(
             new LambdaQueryWrapper<ReadingHistory>()
                 .eq(ReadingHistory::getComicId, comicId));
@@ -86,6 +89,26 @@ public class HistoryServiceImpl implements HistoryService {
             history.setChapterId(request.getChapterId());
             history.setPageNumber(request.getPageNumber());
             historyMapper.insert(history);
+        }
+    }
+
+    private void validateHistoryTarget(Long comicId, HistoryUpdateRequest request) {
+        if (comicId == null || request == null || request.getChapterId() == null
+                || request.getPageNumber() == null || request.getPageNumber() < 1) {
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "漫画、章节和页码必须有效");
+        }
+
+        Comic comic = comicMapper.selectById(comicId);
+        if (comic == null) {
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在");
+        }
+
+        Chapter chapter = chapterMapper.selectById(request.getChapterId());
+        if (chapter == null) {
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在");
+        }
+        if (!comicId.equals(chapter.getComicId())) {
+            throw new BusinessException(HttpStatusCodes.CONFLICT, "章节不属于该漫画");
         }
     }
 

@@ -23,6 +23,7 @@ import com.zaxxer.hikari.HikariDataSource;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.fail;
 
 
@@ -323,9 +324,12 @@ class DatabaseMigrationTest {
 
         log.info("Inserted V17-end fixture data for V18 upgrade");
 
-        // 第二步：迁移到最新（应用 V18）
-        Flyway flywayLatest = createFlyway(ds, false);
-        MigrateResult migrateResult = flywayLatest.migrate();
+        Flyway flywayV18 = Flyway.configure()
+                .dataSource(ds)
+                .locations("classpath:db/flyway")
+                .target("18")
+                .load();
+        MigrateResult migrateResult = flywayV18.migrate();
         log.info("Applied {} migrations on V17 upgrade (expect V18)", migrateResult.migrationsExecuted);
         assertThat(migrateResult.migrationsExecuted).isEqualTo(1);
         assertThat(appliedMigrations(ds)).contains("18");
@@ -362,9 +366,55 @@ class DatabaseMigrationTest {
         assertThat(checksumsAfterV18).containsAllEntriesOf(checksumsBeforeV18);
 
         // 再执行一次应为 no-op（Flyway 已 applied，checksum 一致）
-        Flyway flywayNoop = createFlyway(ds, false);
+        Flyway flywayNoop = Flyway.configure()
+                .dataSource(ds)
+                .locations("classpath:db/flyway")
+                .target("18")
+                .load();
         MigrateResult noopResult = flywayNoop.migrate();
         assertThat(noopResult.migrationsExecuted).as("Repeat V18 migration should be no-op").isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("升级：V19 补齐 Outbox 主键、恢复任务默认值和阅读历史归属")
+    void upgrade_ApplyV19_EnforcesOutboxAndHistoryIntegrity() {
+        DataSource ds = createDataSource();
+
+        Flyway cleanFlyway = createFlyway(ds, false);
+        cleanFlyway.clean();
+
+        Flyway flywayV18 = Flyway.configure()
+                .dataSource(ds)
+                .locations("classpath:db/flyway")
+                .target("18")
+                .load();
+        flywayV18.migrate();
+
+        runSql(ds, "INSERT INTO comic (id, title, status) VALUES (1, 'Comic A', 'READY'), (2, 'Comic B', 'READY')");
+        runSql(ds, "INSERT INTO chapter (id, comic_id, chapter_no, global_order) VALUES (1, 1, '1', 1), (2, 2, '1', 1)");
+        runSql(ds, "INSERT INTO reading_history (id, comic_id, chapter_id, page_number) VALUES (1, 1, 2, 1)");
+        runSql(ds, "INSERT INTO outbox_message (event_id, exchange, routing_key, event_type, payload) VALUES ('event-1', 'x', 'k', 'type', '{}')");
+
+        Flyway flywayLatest = createFlyway(ds, false);
+        MigrateResult migrateResult = flywayLatest.migrate();
+
+        assertThat(migrateResult.migrationsExecuted).isEqualTo(1);
+        assertThat(appliedMigrations(ds)).contains("19");
+        assertThat(countRows(ds, "reading_history")).isZero();
+        assertThatThrownBy(() -> runSql(ds,
+                "INSERT INTO reading_history (id, comic_id, chapter_id, page_number) VALUES (2, 1, 2, 1)"))
+                .isInstanceOf(RuntimeException.class);
+        assertThatThrownBy(() -> runSql(ds,
+                "INSERT INTO outbox_message (event_id, exchange, routing_key, event_type, payload) VALUES ('event-1', 'x', 'k', 'type', '{}')"))
+                .isInstanceOf(RuntimeException.class);
+
+        try (Connection connection = ds.getConnection(); Statement statement = connection.createStatement()) {
+            ResultSet resultSet = statement.executeQuery("SHOW COLUMNS FROM recovery_task LIKE 'status'");
+            assertThat(resultSet.next()).isTrue();
+            assertThat(resultSet.getString("Default")).isEqualTo("QUEUED");
+        } catch (Exception exception) {
+            fail("V19 structure verification failed: " + exception.getMessage());
+        }
     }
 
     @Test
