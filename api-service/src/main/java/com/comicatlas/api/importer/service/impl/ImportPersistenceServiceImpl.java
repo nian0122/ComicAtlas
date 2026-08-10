@@ -19,6 +19,7 @@ import com.comicatlas.api.common.enums.ManagementTaskStatus;
 import com.comicatlas.api.common.enums.MediaLifecycleStatus;
 import com.comicatlas.api.common.enums.TaskType;
 import com.comicatlas.api.common.enums.TranscodeStatus;
+import com.comicatlas.api.common.media.VideoCompatibilityPolicy;
 import com.comicatlas.api.common.storage.ApiStorageProperties;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.exception.ImportMetadataException;
@@ -311,7 +312,8 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
             // 存储最终化前一律 PENDING，文件就位后才可 READY
             media.setHqStatus(HqStatus.PENDING);
             media.setLqStatus(LqStatus.NOT_GENERATED);
-            // 批量 INSERT 使用数据库默认值，故须显式设置全部状态列
+            // 批量 INSERT 使用数据库默认值，故须显式设置全部状态列。
+            // IMAGE 无需转码 → NOT_NEEDED；VIDEO 由唯一兼容策略判定，覆盖为 NOT_NEEDED/REQUIRED。
             media.setTranscodeStatus(TranscodeStatus.NOT_NEEDED);
             media.setStatus(MediaLifecycleStatus.STAGING);
             if (mediaData.get("fileSize") != null) {
@@ -345,11 +347,10 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
                 if (mediaData.get("audioCodec") != null) {
                     media.setAudioCodec((String) mediaData.get("audioCodec"));
                 }
-                // 非标准视频（非 mp4/m4v）标记为待转码，供导入后手动触发转码
-                String container = (String) mediaData.get("container");
-                if (container == null || !isStandardVideoContainer(container)) {
-                    media.setTranscodeStatus(TranscodeStatus.QUEUED);
-                }
+                // 转码状态由唯一兼容策略判定：兼容 → NOT_NEEDED，不兼容/未知 → REQUIRED。
+                // 导入只标记状态，不创建管理任务/Outbox，不写 QUEUED（手动转码由用户触发）。
+                media.setTranscodeStatus(VideoCompatibilityPolicy.classify(
+                        media.getContainer(), media.getVideoCodec(), media.getAudioCodec()));
             }
 
             mediaList.add(media);
@@ -612,12 +613,6 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
             }
         }
         return 2;
-    }
-
-    /** 标准视频容器（无需转码）：mp4 / m4v，其余标记为待转码。 */
-    private static boolean isStandardVideoContainer(String container) {
-        String c = container.toLowerCase();
-        return "mp4".equals(c) || "m4v".equals(c);
     }
 
     private static BigDecimal toBigDecimal(Object value) {

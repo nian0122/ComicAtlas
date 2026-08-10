@@ -7,6 +7,7 @@ import com.comicatlas.api.management.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
 import com.comicatlas.api.management.entity.ManagementTask;
+import com.comicatlas.api.management.operation.TranscodeMediaSelector;
 import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.common.constant.MqExchanges;
@@ -64,6 +65,7 @@ public class BatchOperationService {
     private final ManagementTaskService managementTaskService;
     private final OutboxService outboxService;
     private final ObjectMapper objectMapper;
+    private final TranscodeMediaSelector transcodeMediaSelector;
 
     // ======================== 预览 ========================
 
@@ -169,6 +171,11 @@ public class BatchOperationService {
             throw new BatchConflictException(BatchReasonCode.EMPTY_SELECTION, "无可执行的目标");
         }
 
+        // 批量转码：COMIC 目标在 API 侧展开为逐视频 MEDIA item（Worker 不接受聚合 COMIC 转码 item）
+        if (request.getOperation() == TaskType.TRANSCODE) {
+            return createTranscodeBatch(request, eligible, payload, idempotencyKey, eligibility.blocked());
+        }
+
         // 物化 items 快照：稳定排序（eligible 已按 id ASC）
         ManagementTaskResponse task = materializeTask(request, eligible, payload, idempotencyKey);
 
@@ -212,15 +219,64 @@ public class BatchOperationService {
         return managementTaskService.createTask(req, idempotencyKey, payload);
     }
 
+    /**
+     * 批量转码任务创建：eligible 为漫画 ID（资格已在漫画级判定），此处预取并展开为
+     * 每个视频一个 MEDIA item，逐视频 CAS 置 QUEUED 后逐条入 Outbox（同一事务）。
+     * <p>
+     * 为什么展开为 MEDIA：Worker 转码按单个媒体页执行并逐页回传结果，不接受聚合
+     * COMIC 目标；CAS 影响 0 行视为并发冲突抛 {@link com.comicatlas.api.common.exception.ConflictException}，
+     * 与 createTask 同事务整体回滚，不产生孤儿任务。
+     */
+    private BatchCreateResponse createTranscodeBatch(BatchOperationRequest request,
+                                                     List<Long> eligibleComics, String payload,
+                                                     String idempotencyKey,
+                                                     List<BlockedBatchItem> blocked) {
+        List<com.comicatlas.api.comic.entity.Media> mediaItems =
+                transcodeMediaSelector.eligibleVideosOfComics(eligibleComics);
+        if (mediaItems.isEmpty()) {
+            throw new BatchConflictException(BatchReasonCode.EMPTY_SELECTION, "无可转码的视频页");
+        }
+
+        CreateManagementTaskRequest req = new CreateManagementTaskRequest();
+        req.setTaskType(TaskType.TRANSCODE);
+        req.setOperation(operationLabel(TaskType.TRANSCODE));
+        req.setTargetType("MEDIA");
+        req.setBatchId(UUID.randomUUID().toString());
+        List<CreateManagementTaskRequest.TaskTarget> targets = new ArrayList<>();
+        for (com.comicatlas.api.comic.entity.Media media : mediaItems) {
+            CreateManagementTaskRequest.TaskTarget target = new CreateManagementTaskRequest.TaskTarget();
+            target.setTargetType("MEDIA");
+            target.setTargetId(media.getId());
+            target.setOperationType(TaskType.TRANSCODE);
+            targets.add(target);
+        }
+        req.setTargets(targets);
+        ManagementTaskResponse task = managementTaskService.createTask(req, idempotencyKey, payload);
+
+        List<ManagementTaskItemResponse> items = managementTaskService.getTaskItems(task.getId());
+        for (ManagementTaskItemResponse item : items) {
+            transcodeMediaSelector.markTranscodeQueued(item.getTargetId());
+            enqueueCommand(TaskType.TRANSCODE, item);
+        }
+
+        BatchCreateResponse resp = new BatchCreateResponse();
+        resp.setTask(managementTaskService.getTask(task.getId()));
+        resp.setSelectedCount(eligibleComics.size());
+        resp.setEligibleCount(mediaItems.size());
+        resp.setBlocked(blocked);
+        return resp;
+    }
+
     private void enqueueCommand(TaskType operation, ManagementTaskItemResponse item) {
         ManagementCommandRequestedEvent event = new ManagementCommandRequestedEvent(
                 UUID.randomUUID(), Instant.now(), 1,
                 item.getTaskId(), item.getId(), item.getAttempt(),
-                operation.name(), "COMIC", item.getTargetId());
+                operation.name(), item.getTargetType(), item.getTargetId());
         outboxService.enqueue(event, EXCHANGE, ROUTING_REQUEST,
                 item.getTaskId(), item.getId(), item.getAttempt());
-        log.info("批量命令已入 Outbox: op={}, taskId={}, itemId={}, targetId={}",
-                operation.name(), item.getTaskId(), item.getId(), item.getTargetId());
+        log.info("批量命令已入 Outbox: op={}, taskId={}, itemId={}, target={}:{}",
+                operation.name(), item.getTaskId(), item.getId(),
+                item.getTargetType(), item.getTargetId());
     }
 
     private static String operationLabel(TaskType operation) {

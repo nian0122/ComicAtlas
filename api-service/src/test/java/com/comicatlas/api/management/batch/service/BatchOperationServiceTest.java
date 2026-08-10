@@ -13,6 +13,7 @@ import com.comicatlas.api.management.batch.dto.BatchSelectionVO;
 import com.comicatlas.api.management.batch.dto.BlockedBatchItem;
 import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
+import com.comicatlas.api.management.operation.TranscodeMediaSelector;
 import com.comicatlas.api.management.policy.AllowedOperations;
 import com.comicatlas.api.management.policy.MediaOperationEligibilityService;
 import com.comicatlas.api.management.policy.OperationPolicyService;
@@ -49,10 +50,12 @@ class BatchOperationServiceTest {
     @Mock private ManagementTaskService managementTaskService;
     @Mock private OutboxService outboxService;
     @Mock private ObjectMapper objectMapper;
+    @Mock private TranscodeMediaSelector transcodeMediaSelector;
 
     private BatchOperationService newService(BatchEligibilityChecker checker) {
         return new BatchOperationService(selectionResolver, checker, previewTokenStore,
-                metadataExecutor, batchProperties, managementTaskService, outboxService, objectMapper);
+                metadataExecutor, batchProperties, managementTaskService, outboxService, objectMapper,
+                transcodeMediaSelector);
     }
 
     /** 真实资格校验器：METADATA_REFRESH 走资产资格（comic READY），ComicMapper 返回存在的漫画。 */

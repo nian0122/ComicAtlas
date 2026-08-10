@@ -17,6 +17,7 @@ import com.comicatlas.api.common.enums.ImportTaskStatus;
 import com.comicatlas.api.common.enums.LqStatus;
 import com.comicatlas.api.common.enums.MediaLifecycleStatus;
 import com.comicatlas.api.common.enums.TaskType;
+import com.comicatlas.api.common.enums.TranscodeStatus;
 import com.comicatlas.api.common.storage.ApiStorageProperties;
 import com.comicatlas.api.common.storage.ApiStorageRoot;
 import com.comicatlas.api.importer.entity.ImportTask;
@@ -424,6 +425,86 @@ class ImportPersistenceServiceTest {
         assertThatThrownBy(() -> service.persistCompleted(completedEvent(), metadata))
                 .isInstanceOf(ImportMetadataException.class)
                 .hasMessageContaining("catalogIndex");
+    }
+
+    @Test
+    @DisplayName("completed 导入视频：兼容 mp4/h264/aac → NOT_NEEDED，不兼容 avi → REQUIRED，不创建管理任务/Outbox 转码命令")
+    void persistCompleted_videoTranscodeStatus_classifiedByPolicy_noTranscodeTask() {
+        runInTransaction();
+        when(taskMapper.selectById(10L)).thenReturn(task(ImportTaskStatus.PARSING));
+        when(comicMapper.selectById(100L)).thenReturn(comic(ComicStatus.IMPORTING));
+        when(chapterMapper.selectCount(any(Wrapper.class))).thenReturn(0L);
+        stubCatalogInsert();
+        stubChapterInsert();
+        stubMediaBatchInsert();
+
+        Map<String, Object> root = metadataV3();
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> chapters = (List<Map<String, Object>>) root.get("chapters");
+        Map<String, Object> compatVideo = videoItem(1, "001.mp4", "mp4", "h264", "aac");
+        Map<String, Object> incompatVideo = videoItem(2, "002.avi", "avi", "mpeg4", "mp3");
+        chapters.get(0).put("mediaItems", List.of(compatVideo, incompatVideo));
+
+        mediaBatchSnapshots.clear();
+        service.persistCompleted(completedEvent(), root);
+
+        // 兼容视频 NOT_NEEDED，不兼容视频 REQUIRED（不再写 QUEUED）
+        List<Media> inserted = mediaBatchSnapshots.get(0);
+        assertThat(inserted).hasSize(2);
+        assertThat(inserted.get(0).getMediaType()).isEqualTo("VIDEO");
+        assertThat(inserted.get(0).getTranscodeStatus()).isEqualTo(TranscodeStatus.NOT_NEEDED);
+        assertThat(inserted.get(1).getMediaType()).isEqualTo("VIDEO");
+        assertThat(inserted.get(1).getTranscodeStatus()).isEqualTo(TranscodeStatus.REQUIRED);
+
+        // 导入只标记状态：不得创建任何管理任务 / Outbox 转码命令
+        verifyNoInteractions(managementTaskService);
+        verify(outboxService, never()).enqueue(any(), eq(MqExchanges.MANAGEMENT), anyString());
+    }
+
+    @Test
+    @DisplayName("completed 导入视频：container/codec 未知（null）→ REQUIRED（正确默认）")
+    void persistCompleted_videoUnknownFields_classifiedAsRequired() {
+        runInTransaction();
+        when(taskMapper.selectById(10L)).thenReturn(task(ImportTaskStatus.PARSING));
+        when(comicMapper.selectById(100L)).thenReturn(comic(ComicStatus.IMPORTING));
+        when(chapterMapper.selectCount(any(Wrapper.class))).thenReturn(0L);
+        stubCatalogInsert();
+        stubChapterInsert();
+        stubMediaBatchInsert();
+
+        Map<String, Object> root = metadataV3();
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> chapters = (List<Map<String, Object>>) root.get("chapters");
+        // container/videoCodec/audioCodec 全为 null（未知）→ classify 返回 REQUIRED
+        Map<String, Object> unknownVideo = videoItem(1, "001.bin", null, null, null);
+        chapters.get(0).put("mediaItems", List.of(unknownVideo));
+
+        mediaBatchSnapshots.clear();
+        service.persistCompleted(completedEvent(), root);
+
+        List<Media> inserted = mediaBatchSnapshots.get(0);
+        assertThat(inserted).hasSize(1);
+        assertThat(inserted.get(0).getMediaType()).isEqualTo("VIDEO");
+        assertThat(inserted.get(0).getTranscodeStatus()).isEqualTo(TranscodeStatus.REQUIRED);
+
+        verifyNoInteractions(managementTaskService);
+        verify(outboxService, never()).enqueue(any(), eq(MqExchanges.MANAGEMENT), anyString());
+    }
+
+    private static Map<String, Object> videoItem(int pageNumber, String fileName,
+                                                 String container, String videoCodec, String audioCodec) {
+        Map<String, Object> item = new HashMap<>();
+        item.put("pageNumber", pageNumber);
+        item.put("fileName", fileName);
+        item.put("hqPath", "100/0/" + fileName);
+        item.put("fileSize", 2048L);
+        item.put("width", 1920);
+        item.put("height", 1080);
+        item.put("mediaType", "VIDEO");
+        item.put("container", container);
+        item.put("videoCodec", videoCodec);
+        item.put("audioCodec", audioCodec);
+        return item;
     }
 
     // ======================== 2. finalize completed（两阶段之最终化）：READY / SUCCESS ========================

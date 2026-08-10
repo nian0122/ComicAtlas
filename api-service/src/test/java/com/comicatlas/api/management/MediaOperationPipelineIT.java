@@ -406,6 +406,36 @@ class MediaOperationPipelineIT {
         assertThat(reloaded.getHqPath()).endsWith(".mp4");
     }
 
+    @Test
+    @DisplayName("转码并发双提交：CAS 只允许一个成功，另一个 409，只产生一条命令")
+    void transcodeConcurrentPosts_onlyOneSucceeds() throws Exception {
+        int threadCount = 2;
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        CyclicBarrier barrier = new CyclicBarrier(threadCount);
+        ConcurrentLinkedQueue<OperationSubmitResultDTO> ok = new ConcurrentLinkedQueue<>();
+        ConcurrentLinkedQueue<Throwable> errors = new ConcurrentLinkedQueue<>();
+
+        for (int i = 0; i < threadCount; i++) {
+            executor.submit(() -> {
+                try {
+                    barrier.await();
+                    ok.add(commandService.requestTranscodeForComic(comic.getId()));
+                } catch (Throwable e) {
+                    errors.add(e);
+                }
+            });
+        }
+        executor.shutdown();
+        assertThat(executor.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+
+        assertThat(ok).hasSize(1);
+        assertThat(errors).hasSize(1);
+        assertThat(errors.peek()).isInstanceOf(ConflictException.class);
+
+        // 只产生一条命令
+        assertThat(outboxMapper.selectCount(new LambdaQueryWrapper<>())).isEqualTo(1);
+    }
+
     // ======================== 元数据刷新命令 ========================
 
     @Test
@@ -753,7 +783,8 @@ class MediaOperationPipelineIT {
         m.setHqPath(hqPath);
         m.setHqStatus(HqStatus.READY);
         m.setLqStatus(LqStatus.NOT_GENERATED);
-        m.setTranscodeStatus(TranscodeStatus.NOT_NEEDED);
+        // avi 不兼容 → REQUIRED（与导入 VideoCompatibilityPolicy 判定一致，手动转码可选中）
+        m.setTranscodeStatus(TranscodeStatus.REQUIRED);
         m.setContainer("avi");
         m.setFileSize(5000L);
         m.setStatus(MediaLifecycleStatus.READY);

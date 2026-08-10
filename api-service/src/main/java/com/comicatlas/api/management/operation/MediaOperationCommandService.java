@@ -18,13 +18,13 @@ import com.comicatlas.api.management.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
 import com.comicatlas.api.management.dto.OperationSubmitResultDTO;
+import com.comicatlas.api.management.policy.TranscodeEligibility;
 import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.management.trash.TrashLifecycleService;
 import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.api.common.enums.TaskType;
-import com.comicatlas.api.common.enums.TranscodeStatus;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,7 +34,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -55,6 +54,7 @@ public class MediaOperationCommandService {
     private final ManagementTaskService managementTaskService;
     private final OutboxService outboxService;
     private final TrashLifecycleService trashLifecycleService;
+    private final TranscodeMediaSelector transcodeMediaSelector;
 
     private static final String EXCHANGE = MqExchanges.MANAGEMENT;
     private static final String ROUTING_REQUEST = MqRoutingKeys.COMMAND_REQUESTED;
@@ -223,25 +223,17 @@ public class MediaOperationCommandService {
 
     // ======================== 视频转码 ========================
 
-    private static final Set<String> COMPAT_CONTAINERS = Set.of("mp4", "webm");
-    private static final Set<TranscodeStatus> ACTIVE_TRANSCODE =
-            Set.of(TranscodeStatus.QUEUED, TranscodeStatus.TRANSCODING);
-
+    /**
+     * 请求整本视频转码：漫画入口必须预取并展开为每个视频一个 MEDIA item，
+     * Worker 只接收 MEDIA 目标（不接收聚合 COMIC 转码 item）。
+     * <p>
+     * 资格：{@link TranscodeEligibility#isEligible}（VIDEO + HQ 可用 + 生命周期可操作
+     * + transcodeStatus ∈ {REQUIRED, FAILED}）。并发冲突由 {@code markTranscodeQueued}
+     * 的 CAS 语义保证：影响 0 行 → 409，与 createTask 同事务整体回滚，不产生孤儿任务。
+     */
+    @Transactional
     public OperationSubmitResultDTO requestTranscodeForComic(Long comicId) {
-        List<Chapter> chapters = chapterMapper.selectList(
-                new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
-        if (chapters.isEmpty()) {
-            return OperationSubmitResultDTO.of(null, TaskType.TRANSCODE.name(), null, 0);
-        }
-        List<Long> chapterIds = chapters.stream().map(Chapter::getId).toList();
-
-        List<Media> toTranscode = mediaMapper.selectList(
-                new LambdaQueryWrapper<Media>()
-                        .in(Media::getChapterId, chapterIds)
-                        .eq(Media::getMediaType, "VIDEO"));
-        List<Media> eligible = toTranscode.stream()
-                .filter(this::isTranscodeEligible)
-                .toList();
+        List<Media> eligible = transcodeMediaSelector.eligibleVideosOfComics(List.of(comicId));
         if (eligible.isEmpty()) {
             log.info("漫画 {} 无待转码视频，跳过", comicId);
             return OperationSubmitResultDTO.of(null, TaskType.TRANSCODE.name(), null, 0);
@@ -254,7 +246,7 @@ public class MediaOperationCommandService {
         List<ManagementTaskItemResponse> items = managementTaskService.getTaskItems(task.getId());
 
         for (ManagementTaskItemResponse item : items) {
-            markTranscodeQueued(item.getTargetId());
+            transcodeMediaSelector.markTranscodeQueued(item.getTargetId());
             enqueue(TaskType.TRANSCODE, item, "MEDIA", item.getTargetId());
         }
         log.info("转码命令已提交: comicId={}, taskId={}, items={}",
@@ -262,18 +254,13 @@ public class MediaOperationCommandService {
         return OperationSubmitResultDTO.of(task.getId(), TaskType.TRANSCODE.name(), task.getStatus().name(), items.size());
     }
 
+    @Transactional
     public OperationSubmitResultDTO requestTranscodeForChapter(Long chapterId) {
         Chapter chapter = chapterMapper.selectById(chapterId);
         if (chapter == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在: " + chapterId);
         }
-        List<Media> toTranscode = mediaMapper.selectList(
-                new LambdaQueryWrapper<Media>()
-                        .eq(Media::getChapterId, chapterId)
-                        .eq(Media::getMediaType, "VIDEO"));
-        List<Media> eligible = toTranscode.stream()
-                .filter(this::isTranscodeEligible)
-                .toList();
+        List<Media> eligible = transcodeMediaSelector.eligibleVideosOfChapter(chapterId);
         if (eligible.isEmpty()) {
             log.info("章节 {} 无待转码视频，跳过", chapterId);
             return OperationSubmitResultDTO.of(null, TaskType.TRANSCODE.name(), null, 0);
@@ -286,7 +273,7 @@ public class MediaOperationCommandService {
         List<ManagementTaskItemResponse> items = managementTaskService.getTaskItems(task.getId());
 
         for (ManagementTaskItemResponse item : items) {
-            markTranscodeQueued(item.getTargetId());
+            transcodeMediaSelector.markTranscodeQueued(item.getTargetId());
             enqueue(TaskType.TRANSCODE, item, "MEDIA", item.getTargetId());
         }
         log.info("转码命令已提交: chapterId={}, taskId={}, items={}",
@@ -294,12 +281,13 @@ public class MediaOperationCommandService {
         return OperationSubmitResultDTO.of(task.getId(), TaskType.TRANSCODE.name(), task.getStatus().name(), items.size());
     }
 
+    @Transactional
     public OperationSubmitResultDTO requestTranscodeForMedia(Long mediaId) {
         Media media = mediaMapper.selectById(mediaId);
         if (media == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "媒体页不存在: " + mediaId);
         }
-        if (!isTranscodeEligible(media)) {
+        if (!TranscodeEligibility.isEligible(media)) {
             log.info("媒体页 {} 无需转码，跳过", mediaId);
             return OperationSubmitResultDTO.of(null, TaskType.TRANSCODE.name(), null, 0);
         }
@@ -308,31 +296,10 @@ public class MediaOperationCommandService {
                 List.of(target("MEDIA", mediaId, TaskType.TRANSCODE)));
         ManagementTaskItemResponse item = managementTaskService.getTaskItems(task.getId()).get(0);
 
-        markTranscodeQueued(mediaId);
+        transcodeMediaSelector.markTranscodeQueued(mediaId);
         enqueue(TaskType.TRANSCODE, item, "MEDIA", mediaId);
         log.info("转码命令已提交: mediaId={}, taskId={}", mediaId, task.getId());
         return OperationSubmitResultDTO.of(task.getId(), TaskType.TRANSCODE.name(), task.getStatus().name(), 1);
-    }
-
-    private boolean isTranscodeEligible(Media media) {
-        if (!"VIDEO".equals(media.getMediaType())) {
-            return false;
-        }
-        if (media.getHqStatus() == HqStatus.DELETED) {
-            return false;
-        }
-        TranscodeStatus status = media.getTranscodeStatus();
-        if (ACTIVE_TRANSCODE.contains(status) || status == TranscodeStatus.READY) {
-            return false;
-        }
-        String container = media.getContainer();
-        return container == null || !COMPAT_CONTAINERS.contains(container.toLowerCase());
-    }
-
-    private void markTranscodeQueued(Long mediaId) {
-        mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
-                .eq(Media::getId, mediaId)
-                .set(Media::getTranscodeStatus, TranscodeStatus.QUEUED));
     }
 
     // ======================== 元数据刷新 ========================
