@@ -148,6 +148,58 @@ public class RabbitMqConfig {
                 .to(importDlxExchange()).with(MqQueues.IMPORT_STORAGE_FINALIZE_REQUESTED_DLQ);
     }
 
+    // ==================== MqExchanges.IMPORT 导入元数据重建结果 ====================
+
+    @Bean
+    public Queue importMetadataRefreshCompletedQueue() {
+        return QueueBuilder.durable(MqQueues.IMPORT_METADATA_REFRESH_COMPLETED)
+                .deadLetterExchange(MqExchanges.IMPORT_DLX)
+                .deadLetterRoutingKey(MqQueues.IMPORT_METADATA_REFRESH_COMPLETED_DLQ)
+                .build();
+    }
+
+    @Bean
+    public Queue importMetadataRefreshCompletedDlq() {
+        return QueueBuilder.durable(MqQueues.IMPORT_METADATA_REFRESH_COMPLETED_DLQ).build();
+    }
+
+    @Bean
+    public Binding importMetadataRefreshCompletedBinding() {
+        return BindingBuilder.bind(importMetadataRefreshCompletedQueue())
+                .to(importExchange()).with(MqRoutingKeys.IMPORT_METADATA_REFRESH_COMPLETED);
+    }
+
+    @Bean
+    public Binding importMetadataRefreshCompletedDlqBinding() {
+        return BindingBuilder.bind(importMetadataRefreshCompletedDlq())
+                .to(importDlxExchange()).with(MqQueues.IMPORT_METADATA_REFRESH_COMPLETED_DLQ);
+    }
+
+    @Bean
+    public Queue importMetadataRefreshFailedQueue() {
+        return QueueBuilder.durable(MqQueues.IMPORT_METADATA_REFRESH_FAILED)
+                .deadLetterExchange(MqExchanges.IMPORT_DLX)
+                .deadLetterRoutingKey(MqQueues.IMPORT_METADATA_REFRESH_FAILED_DLQ)
+                .build();
+    }
+
+    @Bean
+    public Queue importMetadataRefreshFailedDlq() {
+        return QueueBuilder.durable(MqQueues.IMPORT_METADATA_REFRESH_FAILED_DLQ).build();
+    }
+
+    @Bean
+    public Binding importMetadataRefreshFailedBinding() {
+        return BindingBuilder.bind(importMetadataRefreshFailedQueue())
+                .to(importExchange()).with(MqRoutingKeys.IMPORT_METADATA_REFRESH_FAILED);
+    }
+
+    @Bean
+    public Binding importMetadataRefreshFailedDlqBinding() {
+        return BindingBuilder.bind(importMetadataRefreshFailedDlq())
+                .to(importDlxExchange()).with(MqQueues.IMPORT_METADATA_REFRESH_FAILED_DLQ);
+    }
+
     @Bean
     public Binding cancelTaskBinding() {
         return BindingBuilder.bind(cancelTaskQueue())

@@ -29,10 +29,13 @@ import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.event.ComicEvent;
+import com.comicatlas.common.event.ImportMetadataRefreshCompletedEvent;
+import com.comicatlas.common.event.ImportMetadataRefreshFailedEvent;
 import com.comicatlas.common.event.ImportStorageFinalizeCompletedEvent;
 import com.comicatlas.common.event.ImportStorageFinalizeFailedEvent;
 import com.comicatlas.common.event.ImportStorageFinalizeRequestedEvent;
 import com.comicatlas.common.event.ImportTaskCompletedEvent;
+import com.comicatlas.common.event.MetadataRefreshEvent;
 import com.comicatlas.common.event.payload.FinalizeMediaMapping;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -507,11 +510,11 @@ class ImportPersistenceServiceTest {
         return item;
     }
 
-    // ======================== 2. finalize completed（两阶段之最终化）：READY / SUCCESS ========================
+    // ======================== 2. finalize completed（两阶段之最终化）：READY / 元数据重建请求 ========================
 
     @Test
-    @DisplayName("finalize completed（两阶段之最终化）：media 用事件真实 targetDir 修正 hqPath 转 READY，最后章完成才 chapter/comic READY、task SUCCESS，缓存失效")
-    void applyFinalizeCompleted_marksAllReady_taskSuccess_evictsCache() {
+    @DisplayName("finalize completed（两阶段之最终化）：media 用事件真实 targetDir 修正 hqPath 转 READY，全部 READY 后 task→FINALIZING、发元数据重建请求、comic 保持 IMPORTING（不直接 SUCCESS）")
+    void applyFinalizeCompleted_marksAllReady_sendsMetadataRefresh_taskFinalizing_comicStaysImporting() {
         runInTransactionWithoutResult();
         when(taskMapper.selectById(10L)).thenReturn(task(ImportTaskStatus.IMPORTING));
 
@@ -525,21 +528,8 @@ class ImportPersistenceServiceTest {
         chapter.setStatus(ChapterLifecycleStatus.DRAFT);
         when(chapterMapper.selectList(any(Wrapper.class))).thenReturn(List.of(chapter));
 
-        Media media = new Media();
-        media.setId(2001L);
-        media.setChapterId(1001L);
-        media.setPageNumber(1);
-        media.setHqRoot("HQ");
-        // 旧 staging 布局路径，最终化后由批量 UPDATE 用事件真实 targetDir 修正为 chapterId 布局
-        media.setHqPath("100/0/001.jpg");
-        media.setHqStatus(HqStatus.PENDING);
-        media.setStatus(MediaLifecycleStatus.STAGING);
-        media.setFileSize(1024L);
-        when(mediaMapper.selectList(any(Wrapper.class))).thenReturn(List.of(media));
         when(mediaMapper.selectCount(any(Wrapper.class))).thenReturn(0L);
         when(mediaMapper.markImportFinalizedByChapter(1001L, "100/1001")).thenReturn(1);
-
-        when(managementTaskService.findActiveItem("COMIC", 100L, TaskType.IMPORT)).thenReturn(null);
 
         ImportStorageFinalizeCompletedEvent event = new ImportStorageFinalizeCompletedEvent(
                 UUID.randomUUID(), Instant.now(), 10L, 100L, 0, 1001L, "hq/100/1001", 1);
@@ -553,19 +543,20 @@ class ImportPersistenceServiceTest {
         verify(chapterMapper).updateById(chapterCaptor.capture());
         assertThat(chapterCaptor.getValue().getStatus()).isEqualTo(ChapterLifecycleStatus.READY);
 
-        // comic → READY + 统计
-        ArgumentCaptor<Comic> comicCaptor = ArgumentCaptor.forClass(Comic.class);
-        verify(comicMapper).updateById(comicCaptor.capture());
-        assertThat(comicCaptor.getValue().getStatus()).isEqualTo(ComicStatus.READY);
-        assertThat(comicCaptor.getValue().getTotalPages()).isEqualTo(1);
-        assertThat(comicCaptor.getValue().getHqSize()).isEqualTo(1024L);
-
-        // task → SUCCESS
+        // task → FINALIZING（不直接 SUCCESS），并发出元数据重建请求（comic.export / metadata.refresh.requested）
         ArgumentCaptor<ImportTask> taskCaptor = ArgumentCaptor.forClass(ImportTask.class);
         verify(taskMapper).updateById(taskCaptor.capture());
-        assertThat(taskCaptor.getValue().getStatus()).isEqualTo(ImportTaskStatus.SUCCESS);
+        assertThat(taskCaptor.getValue().getStatus()).isEqualTo(ImportTaskStatus.FINALIZING);
+        ArgumentCaptor<ComicEvent> refreshCaptor = ArgumentCaptor.forClass(ComicEvent.class);
+        verify(outboxService).enqueue(refreshCaptor.capture(),
+                eq(MqExchanges.EXPORT), eq(MqRoutingKeys.METADATA_REFRESH_REQUESTED));
+        MetadataRefreshEvent refreshEvent = (MetadataRefreshEvent) refreshCaptor.getValue();
+        assertThat(refreshEvent.taskId()).isEqualTo(10L);
+        assertThat(refreshEvent.comicId()).isEqualTo(100L);
 
-        verify(catalogCacheInvalidator).evict(100L);
+        // comic 保持 IMPORTING，不得直接 READY；缓存失效必须等元数据重建成功后
+        verify(comicMapper, never()).updateById(any(Comic.class));
+        verify(catalogCacheInvalidator, never()).evict(100L);
     }
 
     @Test
@@ -596,8 +587,8 @@ class ImportPersistenceServiceTest {
     }
 
     @Test
-    @DisplayName("两章两次 completed：第一章完成前 comic 不 READY（仍有 PENDING），全部章节完成才 READY/SUCCESS")
-    void applyFinalizeCompleted_twoChapters_finalizesOnlyOnLastCompleted() {
+    @DisplayName("两章两次 completed：第一章完成前 comic 不 READY（仍有 PENDING），全部章节完成才发元数据重建请求并置 task FINALIZING")
+    void applyFinalizeCompleted_twoChapters_sendsMetadataRefreshOnlyOnLastCompleted() {
         runInTransactionWithoutResult();
         when(taskMapper.selectById(10L)).thenReturn(task(ImportTaskStatus.IMPORTING));
         Comic comic = comic(ComicStatus.IMPORTING);
@@ -607,60 +598,60 @@ class ImportPersistenceServiceTest {
         Chapter ch2 = chapter(1002L, 1);
         when(chapterMapper.selectList(any(Wrapper.class))).thenReturn(List.of(ch1, ch2));
 
-        Media m1 = pendingMedia(2001L, 1001L);
-        Media m2 = pendingMedia(2002L, 1002L);
-
         // 批量确认：每章一次 UPDATE；第一章后仍有 PENDING（selectCount=1），第二章后全部完成（=0）
         when(mediaMapper.markImportFinalizedByChapter(1001L, "100/1001")).thenReturn(1);
         when(mediaMapper.markImportFinalizedByChapter(1002L, "100/1002")).thenReturn(1);
-        when(mediaMapper.selectList(any(Wrapper.class))).thenReturn(List.of(m1, m2));
         when(mediaMapper.selectCount(any(Wrapper.class)))
                 .thenReturn(1L)
                 .thenReturn(0L);
-        when(managementTaskService.findActiveItem("COMIC", 100L, TaskType.IMPORT)).thenReturn(null);
 
         service.applyFinalizeCompleted(completedEventFor(1001L));
         verify(mediaMapper).markImportFinalizedByChapter(1001L, "100/1001");
         verify(comicMapper, never()).updateById(any(Comic.class));
         verify(taskMapper, never()).updateById(any(ImportTask.class));
         verify(catalogCacheInvalidator, never()).evict(100L);
+        verify(outboxService, never()).enqueue(any(), eq(MqExchanges.EXPORT), eq(MqRoutingKeys.METADATA_REFRESH_REQUESTED));
 
         service.applyFinalizeCompleted(completedEventFor(1002L));
         verify(mediaMapper).markImportFinalizedByChapter(1002L, "100/1002");
-        ArgumentCaptor<Comic> comicCaptor = ArgumentCaptor.forClass(Comic.class);
-        verify(comicMapper).updateById(comicCaptor.capture());
-        assertThat(comicCaptor.getValue().getStatus()).isEqualTo(ComicStatus.READY);
-        assertThat(comicCaptor.getValue().getTotalPages()).isEqualTo(2);
+        // 只有最后一次 completed 发元数据重建请求，task → FINALIZING，comic 仍 IMPORTING
         ArgumentCaptor<ImportTask> taskCaptor = ArgumentCaptor.forClass(ImportTask.class);
         verify(taskMapper).updateById(taskCaptor.capture());
-        assertThat(taskCaptor.getValue().getStatus()).isEqualTo(ImportTaskStatus.SUCCESS);
-        verify(catalogCacheInvalidator).evict(100L);
+        assertThat(taskCaptor.getValue().getStatus()).isEqualTo(ImportTaskStatus.FINALIZING);
+        ArgumentCaptor<ComicEvent> refreshCaptor = ArgumentCaptor.forClass(ComicEvent.class);
+        verify(outboxService).enqueue(refreshCaptor.capture(),
+                eq(MqExchanges.EXPORT), eq(MqRoutingKeys.METADATA_REFRESH_REQUESTED));
+        MetadataRefreshEvent refreshEvent = (MetadataRefreshEvent) refreshCaptor.getValue();
+        assertThat(refreshEvent.taskId()).isEqualTo(10L);
+        assertThat(refreshEvent.comicId()).isEqualTo(100L);
+        verify(comicMapper, never()).updateById(any(Comic.class));
+        verify(catalogCacheInvalidator, never()).evict(100L);
     }
 
     @Test
-    @DisplayName("并发重投同一 completed：行锁后第二次重读 comic 已 READY → 跳过，comic 只 finalize 一次")
-    void applyFinalizeCompleted_concurrentRedelivery_comicFinalizedOnce() {
+    @DisplayName("并发重投同一 completed：行锁后任务已 FINALIZING → 跳过，元数据重建请求只发一次，comic 不 READY")
+    void applyFinalizeCompleted_concurrentRedelivery_metadataRefreshSentOnce() {
         runInTransactionWithoutResult();
-        when(taskMapper.selectById(10L)).thenReturn(task(ImportTaskStatus.IMPORTING));
-        when(comicMapper.selectByIdForUpdate(100L))
-                .thenReturn(comic(ComicStatus.IMPORTING))
-                .thenReturn(comic(ComicStatus.READY));
+        // 同一 task 实例在首次调用被置 FINALIZING；重投时复用该实例
+        ImportTask sharedTask = task(ImportTaskStatus.IMPORTING);
+        when(taskMapper.selectById(10L)).thenReturn(sharedTask);
+        when(comicMapper.selectByIdForUpdate(100L)).thenReturn(comic(ComicStatus.IMPORTING));
 
         when(chapterMapper.selectList(any(Wrapper.class))).thenReturn(List.of(chapter(1001L, 0)));
 
         when(mediaMapper.markImportFinalizedByChapter(1001L, "100/1001")).thenReturn(1);
-        when(mediaMapper.selectList(any(Wrapper.class))).thenReturn(List.of(pendingMedia(2001L, 1001L)));
         when(mediaMapper.selectCount(any(Wrapper.class))).thenReturn(0L);
-        when(managementTaskService.findActiveItem("COMIC", 100L, TaskType.IMPORT)).thenReturn(null);
 
         service.applyFinalizeCompleted(completedEventFor(1001L));
         service.applyFinalizeCompleted(completedEventFor(1001L));
 
         verify(mediaMapper, times(1)).markImportFinalizedByChapter(1001L, "100/1001");
-        ArgumentCaptor<Comic> comicCaptor = ArgumentCaptor.forClass(Comic.class);
-        verify(comicMapper, times(1)).updateById(comicCaptor.capture());
-        assertThat(comicCaptor.getValue().getStatus()).isEqualTo(ComicStatus.READY);
-        assertThat(comicCaptor.getValue().getTotalPages()).isEqualTo(1);
+        verify(outboxService, times(1)).enqueue(any(), eq(MqExchanges.EXPORT), eq(MqRoutingKeys.METADATA_REFRESH_REQUESTED));
+        ArgumentCaptor<ImportTask> taskCaptor = ArgumentCaptor.forClass(ImportTask.class);
+        verify(taskMapper, times(1)).updateById(taskCaptor.capture());
+        assertThat(taskCaptor.getValue().getStatus()).isEqualTo(ImportTaskStatus.FINALIZING);
+        verify(comicMapper, never()).updateById(any(Comic.class));
+        verify(catalogCacheInvalidator, never()).evict(100L);
     }
 
     // ======================== 3. finalize failed：明确失败且可重试 ========================
@@ -701,6 +692,105 @@ class ImportPersistenceServiceTest {
         ImportStorageFinalizeFailedEvent event = new ImportStorageFinalizeFailedEvent(
                 UUID.randomUUID(), Instant.now(), 10L, 100L, 0, 1001L, "X", "y");
         service.applyFinalizeFailed(event);
+
+        verifyNoInteractions(comicMapper, mediaMapper, catalogCacheInvalidator);
+    }
+
+    // ======================== 5. 元数据重建结果：completed → 收尾 SUCCESS / failed → 明确失败 ========================
+
+    @Test
+    @DisplayName("元数据重建完成（task FINALIZING + comic IMPORTING）：收尾 comic READY + 统计、task SUCCESS、管理任务项 SUCCEEDED、缓存失效")
+    void applyMetadataRefreshCompleted_finalizesImport_taskSuccess() {
+        runInTransactionWithoutResult();
+        when(taskMapper.selectById(10L)).thenReturn(task(ImportTaskStatus.FINALIZING));
+        when(comicMapper.selectByIdForUpdate(100L)).thenReturn(comic(ComicStatus.IMPORTING));
+
+        Chapter ch1 = chapter(1001L, 0);
+        Chapter ch2 = chapter(1002L, 1);
+        when(chapterMapper.selectList(any(Wrapper.class))).thenReturn(List.of(ch1, ch2));
+
+        Media m1 = pendingMedia(2001L, 1001L);
+        Media m2 = pendingMedia(2002L, 1002L);
+        when(mediaMapper.selectList(any(Wrapper.class))).thenReturn(List.of(m1, m2));
+        when(managementTaskService.findActiveItem("COMIC", 100L, TaskType.IMPORT)).thenReturn(null);
+
+        ImportMetadataRefreshCompletedEvent event = new ImportMetadataRefreshCompletedEvent(
+                UUID.randomUUID(), Instant.now(), 10L, 100L);
+        service.applyMetadataRefreshCompleted(event);
+
+        ArgumentCaptor<Comic> comicCaptor = ArgumentCaptor.forClass(Comic.class);
+        verify(comicMapper).updateById(comicCaptor.capture());
+        assertThat(comicCaptor.getValue().getStatus()).isEqualTo(ComicStatus.READY);
+        assertThat(comicCaptor.getValue().getTotalPages()).isEqualTo(2);
+
+        ArgumentCaptor<ImportTask> taskCaptor = ArgumentCaptor.forClass(ImportTask.class);
+        verify(taskMapper).updateById(taskCaptor.capture());
+        assertThat(taskCaptor.getValue().getStatus()).isEqualTo(ImportTaskStatus.SUCCESS);
+        assertThat(taskCaptor.getValue().getProgress()).isEqualTo(100);
+
+        verify(catalogCacheInvalidator).evict(100L);
+    }
+
+    @Test
+    @DisplayName("元数据重建完成 重复/乱序（task 非 FINALIZING）：幂等跳过，不收尾")
+    void applyMetadataRefreshCompleted_taskNotFinalizing_isIdempotent() {
+        runInTransactionWithoutResult();
+        when(taskMapper.selectById(10L)).thenReturn(task(ImportTaskStatus.SUCCESS));
+
+        ImportMetadataRefreshCompletedEvent event = new ImportMetadataRefreshCompletedEvent(
+                UUID.randomUUID(), Instant.now(), 10L, 100L);
+        service.applyMetadataRefreshCompleted(event);
+
+        verifyNoInteractions(comicMapper, chapterMapper, mediaMapper, catalogCacheInvalidator);
+    }
+
+    @Test
+    @DisplayName("元数据重建完成 乱序（comic 非 IMPORTING）：幂等跳过，不收尾")
+    void applyMetadataRefreshCompleted_comicNotImporting_isIdempotent() {
+        runInTransactionWithoutResult();
+        when(taskMapper.selectById(10L)).thenReturn(task(ImportTaskStatus.FINALIZING));
+        when(comicMapper.selectByIdForUpdate(100L)).thenReturn(comic(ComicStatus.READY));
+
+        ImportMetadataRefreshCompletedEvent event = new ImportMetadataRefreshCompletedEvent(
+                UUID.randomUUID(), Instant.now(), 10L, 100L);
+        service.applyMetadataRefreshCompleted(event);
+
+        verifyNoInteractions(chapterMapper, mediaMapper, catalogCacheInvalidator);
+    }
+
+    @Test
+    @DisplayName("元数据重建失败（task FINALIZING）：task FAILED、comic IMPORT_FAILED（可重试），管理任务项 FAILED")
+    void applyMetadataRefreshFailed_marksRetryableFailure() {
+        runInTransactionWithoutResult();
+        when(taskMapper.selectById(10L)).thenReturn(task(ImportTaskStatus.FINALIZING));
+        when(comicMapper.selectByIdForUpdate(100L)).thenReturn(comic(ComicStatus.IMPORTING));
+        when(managementTaskService.findActiveItem("COMIC", 100L, TaskType.IMPORT)).thenReturn(null);
+
+        ImportMetadataRefreshFailedEvent event = new ImportMetadataRefreshFailedEvent(
+                UUID.randomUUID(), Instant.now(), 10L, 100L, "METADATA_REFRESH_FAILED", "重建失败");
+        service.applyMetadataRefreshFailed(event);
+
+        ArgumentCaptor<ImportTask> taskCaptor = ArgumentCaptor.forClass(ImportTask.class);
+        verify(taskMapper).updateById(taskCaptor.capture());
+        assertThat(taskCaptor.getValue().getStatus()).isEqualTo(ImportTaskStatus.FAILED);
+        assertThat(taskCaptor.getValue().getErrorMessage()).contains("METADATA_REFRESH_FAILED");
+
+        ArgumentCaptor<Comic> comicCaptor = ArgumentCaptor.forClass(Comic.class);
+        verify(comicMapper).updateById(comicCaptor.capture());
+        assertThat(comicCaptor.getValue().getStatus()).isEqualTo(ComicStatus.IMPORT_FAILED);
+
+        verify(catalogCacheInvalidator).evict(100L);
+    }
+
+    @Test
+    @DisplayName("元数据重建失败 重复/乱序（task 非 FINALIZING）：幂等跳过")
+    void applyMetadataRefreshFailed_taskNotFinalizing_isIdempotent() {
+        runInTransactionWithoutResult();
+        when(taskMapper.selectById(10L)).thenReturn(task(ImportTaskStatus.FAILED));
+
+        ImportMetadataRefreshFailedEvent event = new ImportMetadataRefreshFailedEvent(
+                UUID.randomUUID(), Instant.now(), 10L, 100L, "X", "y");
+        service.applyMetadataRefreshFailed(event);
 
         verifyNoInteractions(comicMapper, mediaMapper, catalogCacheInvalidator);
     }

@@ -1,5 +1,9 @@
 package com.comicatlas.worker.event;
 
+import com.comicatlas.common.constant.MqExchanges;
+import com.comicatlas.common.constant.MqRoutingKeys;
+import com.comicatlas.common.event.ImportMetadataRefreshCompletedEvent;
+import com.comicatlas.common.event.ImportMetadataRefreshFailedEvent;
 import com.comicatlas.common.event.MetadataRefreshEvent;
 import com.comicatlas.common.metadata.MetadataJsonBuilder;
 import com.comicatlas.common.metadata.MetadataV3;
@@ -14,6 +18,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.nio.charset.StandardCharsets;
@@ -25,6 +30,8 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -32,6 +39,7 @@ import static org.mockito.Mockito.when;
  * MetadataRefreshHandler 单元测试。
  * 验证 metadata.json 采用"同目录临时文件 + 原子替换"写入：
  * 成功时目标文件完整可解析且无 .tmp 残留；写入失败时清理临时文件、保留旧文件并 reject/DLQ。
+ * 携带 taskId（导入收尾触发）时：成功后发布 completed 结果事件、失败发布 failed 结果事件并 ack。
  */
 @ExtendWith(MockitoExtension.class)
 class MetadataRefreshHandlerTest {
@@ -43,6 +51,8 @@ class MetadataRefreshHandlerTest {
     private MetadataJsonExporter metadataJsonExporter;
     @Mock
     private Channel channel;
+    @Mock
+    private RabbitTemplate rabbitTemplate;
 
     private MetadataRefreshHandler handler;
 
@@ -54,7 +64,7 @@ class MetadataRefreshHandlerTest {
     }
 
     private void newHandler() {
-        handler = new MetadataRefreshHandler(metadataJsonExporter, new MqConsumerSupport());
+        handler = new MetadataRefreshHandler(metadataJsonExporter, new MqConsumerSupport(), rabbitTemplate);
         ReflectionTestUtils.setField(handler, "mangaRoot", tempRoot.toString());
     }
 
@@ -117,6 +127,39 @@ class MetadataRefreshHandlerTest {
         assertEquals("OLD", Files.readString(target, StandardCharsets.UTF_8),
                 "写入失败时旧版目标文件必须保留");
         assertFalse(Files.exists(tempDir), "写入失败后临时文件必须被清理");
+    }
+
+    @Test
+    void importFinalize_taskIdNotNull_success_publishesCompletedAndAcks() throws Exception {
+        newHandler();
+        String metadataJson = metadataJsonWithHqPath("1/42/001.jpg");
+        when(metadataJsonExporter.exportJson(1L)).thenReturn(metadataJson);
+
+        handler.handle(new MetadataRefreshEvent(null, null, 7L, 1L), channel, 1L);
+
+        verify(channel).basicAck(1L, false);
+        verify(rabbitTemplate).convertAndSend(eq(MqExchanges.IMPORT),
+                eq(MqRoutingKeys.IMPORT_METADATA_REFRESH_COMPLETED), any(ImportMetadataRefreshCompletedEvent.class));
+        Path target = metadataFile();
+        assertTrue(Files.exists(target), "metadata.json 应写入成功");
+        assertEquals(metadataJson, Files.readString(target, StandardCharsets.UTF_8),
+                "目标文件内容应与导出 JSON 完全一致");
+        assertFalse(Files.exists(tempRoot.resolve("metadata").resolve("1.json.tmp")),
+                "成功写入后不得残留 .tmp 临时文件");
+    }
+
+    @Test
+    void importFinalize_taskIdNotNull_failure_publishesFailedAndAcks() throws Exception {
+        newHandler();
+        when(metadataJsonExporter.exportJson(1L)).thenThrow(new IllegalStateException("导出失败"));
+
+        handler.handle(new MetadataRefreshEvent(null, null, 7L, 1L), channel, 1L);
+
+        // 失败事件即业务结果：发布 failed 后正常 ack（不进 DLQ 不重试），旧 JSON 不被破坏
+        verify(channel).basicAck(1L, false);
+        verify(rabbitTemplate).convertAndSend(eq(MqExchanges.IMPORT),
+                eq(MqRoutingKeys.IMPORT_METADATA_REFRESH_FAILED), any(ImportMetadataRefreshFailedEvent.class));
+        assertFalse(Files.exists(metadataFile()), "重建失败不得产生新的 metadata.json");
     }
 
     private static void deleteRecursively(Path dir) throws Exception {

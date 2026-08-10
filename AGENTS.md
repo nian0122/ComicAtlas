@@ -65,7 +65,8 @@ comic-atlas/
 | 媒体分析 | `worker-service/.../media/MediaAnalyzer.java` | 图片尺寸 + ffprobe 视频元数据 |
 | 统一导入 | `worker-service/.../importer/DirectoryImportHandler.java` | handle() 解析→暂存文件到 HQ→写metadata |
 | 导入最终化 | `worker-service/.../event/ImportStorageFinalizeHandler.java` | 两阶段最终化：hq/{comicId}/{globalOrder} → hq/{comicId}/{chapterId} |
-| 最终化落库 | `api-service/.../importer/service/impl/ImportPersistenceServiceImpl.java` | 逐章收尾，全 READY → comic READY / task SUCCESS |
+| 最终化落库 | `api-service/.../importer/service/impl/ImportPersistenceServiceImpl.java` | 逐章收尾，全 READY → 发 metadata 重建请求（task FINALIZING）→ 重建成功结果事件后才 comic READY / task SUCCESS |
+| 元数据重建结果 | `api-service/.../importer/event/ImportMetadataRefreshResultHandler.java` | 消费 completed/failed 结果事件，inbox 幂等后委托 Service 收尾/失败 |
 | ZIP 导入 | `worker-service/.../importer/ZipImportHandler.java` | 解压→委托 DirectoryImportHandler；入口必须是最后 `.zip`，缺任一卷失败，`.z01` 不可作为入口 |
 | 分卷解析 | `worker-service/.../file/archive/ZipVolumeResolver.java` | 最后 `.zip` 为唯一入口 → 有序 `.z01..zNN`+主文件（缺号/重复/非法命名/非普通文件拒绝） |
 | ZIP 解压 | `worker-service/.../file/extract/ZipExtractor.java` | Commons ZipFile 随机访问 + 标准分卷 + 安全校验；`.z01` 永不作为入口 |
@@ -113,7 +114,14 @@ API ImportEventHandler: 读 metadata.json → INSERT catalog+chapter+media(IMAGE
 Worker ImportStorageFinalizeHandler（两阶段之第二阶段 最终化）:
   逐章把 hq/{comicId}/{globalOrder} 移动到 hq/{comicId}/{chapterId} → 逐章发送 finalize.completed
   ↓
-API ImportPersistenceService: 逐章 media/chapter → READY，全部章节完成才 UPDATE comic→READY / task→SUCCESS
+API ImportPersistenceService: 逐章 media/chapter → READY，全部章节完成（pendingCount==0）
+  → 发 MetadataRefreshEvent(taskId, comicId) → task → FINALIZING（comic 仍 IMPORTING）
+  ↓
+Worker MetadataRefreshHandler（taskId 非空分支）: 从 DB 重建 metadata/{comicId}.json
+  （hqPath 天然为 {comicId}/{chapterId} 最终布局，原子写入）→ 发 import.metadata.refresh.completed / failed
+  ↓
+API ImportMetadataRefreshResultHandler: inbox 幂等 → completed → comic READY / task SUCCESS；
+  failed → task FAILED / comic IMPORT_FAILED（可重试，旧 JSON 完整）
 ```
 
 **分卷 ZIP 导入规则**：
@@ -151,6 +159,8 @@ URL 统一由 `FileUrlResolver.resolve(page)` 生成，不手拼。
 | comic.import | import.storage.finalize.requested | import.storage.finalize.requested.queue | Worker ImportStorageFinalizeHandler |
 | comic.import | import.storage.finalize.completed | import.storage.finalize.completed.queue | API ImportStorageFinalizeEventHandler |
 | comic.import | import.storage.finalize.failed | import.storage.finalize.failed.queue | API ImportStorageFinalizeEventHandler |
+| comic.import | import.metadata.refresh.completed | import.metadata.refresh.completed.queue | API ImportMetadataRefreshResultHandler |
+| comic.import | import.metadata.refresh.failed | import.metadata.refresh.failed.queue | API ImportMetadataRefreshResultHandler |
 | comic.task | status.changed | task.status.queue | API ImportEventHandler |
 | comic.task | cancel.requested | cancel.task.queue | Worker CancelHandler |
 | comic.image | hq.delete.requested | hq.delete.queue | Worker HqDeleteHandler |
@@ -194,7 +204,9 @@ URL 统一由 `FileUrlResolver.resolve(page)` 生成，不手拼。
 | ExportTaskStarted | comic.export.task.started | ExportTaskStartedEvent |
 | ExportTaskCompleted | comic.export.task.completed | ExportTaskCompletedEvent |
 | ExportTaskFailed | comic.export.task.failed | ExportTaskFailedEvent |
-| MetadataRefresh | comic.export.metadata.refresh.requested | MetadataRefreshEvent |
+| MetadataRefresh | comic.export.metadata.refresh.requested | MetadataRefreshEvent（新增可选 taskId：导入最终化收尾触发时携带） |
+| ImportMetadataRefreshCompleted | comic.import.import.metadata.refresh.completed | ImportMetadataRefreshCompletedEvent |
+| ImportMetadataRefreshFailed | comic.import.import.metadata.refresh.failed | ImportMetadataRefreshFailedEvent |
 | RecoveryRequested | comic.recovery.requested | RecoveryRequestedEvent |
 | RecoveryScanCompleted | comic.recovery.progress | RecoveryScanCompletedEvent |
 | RecoveryProgress | comic.recovery.progress | RecoveryProgressEvent |

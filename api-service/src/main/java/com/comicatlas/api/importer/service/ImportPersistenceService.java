@@ -1,5 +1,7 @@
 package com.comicatlas.api.importer.service;
 
+import com.comicatlas.common.event.ImportMetadataRefreshCompletedEvent;
+import com.comicatlas.common.event.ImportMetadataRefreshFailedEvent;
 import com.comicatlas.common.event.ImportStorageFinalizeCompletedEvent;
 import com.comicatlas.common.event.ImportStorageFinalizeFailedEvent;
 import com.comicatlas.common.event.ImportTaskCompletedEvent;
@@ -58,4 +60,18 @@ public interface ImportPersistenceService {
      * media 保持 PENDING 不置 READY。幂等：重复/乱序事件安全跳过。
      */
     void applyFinalizeFailed(ImportStorageFinalizeFailedEvent event);
+
+    /**
+     * 导入元数据重建完成：磁盘 metadata.json 已重建为最终 chapterId 布局后调用。
+     * 校验 task==FINALIZING 且 comic==IMPORTING 才收尾（comic → READY、task → SUCCESS、
+     * 统计重算、管理任务项 SUCCEEDED、缓存失效）；状态不符按幂等跳过。
+     */
+    void applyMetadataRefreshCompleted(ImportMetadataRefreshCompletedEvent event);
+
+    /**
+     * 导入元数据重建失败：磁盘 metadata.json 重建失败后调用。
+     * 校验 task==FINALIZING 才置 task → FAILED、comic IMPORTING → IMPORT_FAILED，
+     * 保留重试条件；非成功终态可直接重试。
+     */
+    void applyMetadataRefreshFailed(ImportMetadataRefreshFailedEvent event);
 }

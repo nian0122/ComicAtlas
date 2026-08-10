@@ -31,10 +31,13 @@ import com.comicatlas.api.management.state.ManagementStateMachine;
 import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
+import com.comicatlas.common.event.ImportMetadataRefreshCompletedEvent;
+import com.comicatlas.common.event.ImportMetadataRefreshFailedEvent;
 import com.comicatlas.common.event.ImportStorageFinalizeCompletedEvent;
 import com.comicatlas.common.event.ImportStorageFinalizeFailedEvent;
 import com.comicatlas.common.event.ImportStorageFinalizeRequestedEvent;
 import com.comicatlas.common.event.ImportTaskCompletedEvent;
+import com.comicatlas.common.event.MetadataRefreshEvent;
 import com.comicatlas.common.event.payload.FinalizeMediaMapping;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -426,6 +429,12 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
                     comicId, comic.getStatus());
             return;
         }
+        // 防重：已发过元数据重建请求（任务 FINALIZING）后，任何乱序/重投的 finalize.completed 直接跳过，
+        // 不再重复确认媒体或重复发请求（行锁保证与本事务并发处理串行化）
+        if (task.getStatus() == ImportTaskStatus.FINALIZING) {
+            log.info("finalize completed 幂等跳过（任务已 FINALIZING，等待元数据重建）: taskId={}", taskId);
+            return;
+        }
 
         List<Chapter> chapters = chapterMapper.selectList(
                 new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
@@ -467,7 +476,57 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
             return;
         }
 
-        // 4) 全部 READY → 收尾：comic READY（重算统计）、task SUCCESS、管理任务 SUCCEEDED、缓存失效
+        // 4) 全部 READY → 不直接 SUCCESS：发 metadata 重建请求（任务进入 FINALIZING 防重），
+        //    磁盘 metadata.json 以最终 chapterId 布局重建成功后（结果事件）才收尾 comic/task。
+        outboxService.enqueue(new MetadataRefreshEvent(UUID.randomUUID(), Instant.now(), taskId, comicId),
+                MqExchanges.EXPORT, MqRoutingKeys.METADATA_REFRESH_REQUESTED);
+        task.setStatus(ImportTaskStatus.FINALIZING);
+        taskMapper.updateById(task);
+        log.info("全部章节最终化完成，等待元数据重建: comicId={}, taskId={}", comicId, taskId);
+    }
+
+    // ======================== Phase 2c: metadata refresh completed → READY / SUCCESS ========================
+    // 磁盘 metadata/{comicId}.json 已按最终 chapterId 布局重建成功（Worker 结果事件）。
+    // 校验 task==FINALIZING 且 comic==IMPORTING 才收尾 comic/task 终态；重复/乱序结果事件幂等跳过。
+
+    @Override
+    public void applyMetadataRefreshCompleted(ImportMetadataRefreshCompletedEvent event) {
+        transactionTemplate.executeWithoutResult(status -> applyMetadataRefreshCompletedInTxn(event));
+    }
+
+    private void applyMetadataRefreshCompletedInTxn(ImportMetadataRefreshCompletedEvent event) {
+        Long taskId = event.taskId();
+        Long comicId = event.comicId();
+
+        ImportTask task = taskMapper.selectById(taskId);
+        if (task == null) {
+            return;
+        }
+        if (task.getStatus() != ImportTaskStatus.FINALIZING) {
+            log.info("metadata refresh completed 幂等跳过（任务非 FINALIZING）: taskId={}, status={}",
+                    taskId, task.getStatus());
+            return;
+        }
+
+        // 行锁串行化：与 finalize completed 相同的保护
+        Comic comic = comicMapper.selectByIdForUpdate(comicId);
+        if (comic == null) {
+            return;
+        }
+        if (comic.getStatus() != ComicStatus.IMPORTING) {
+            log.warn("metadata refresh completed 乱序/重复（comic 状态非 IMPORTING）: comicId={}, status={}",
+                    comicId, comic.getStatus());
+            return;
+        }
+
+        completeImport(comic, task, comicId, taskId);
+    }
+
+    /** 收尾：统计重算 + comic READY + task SUCCESS + 管理任务项 SUCCEEDED + 缓存失效。 */
+    private void completeImport(Comic comic, ImportTask task, Long comicId, Long taskId) {
+        List<Long> chapterIds = chapterMapper.selectList(
+                new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId))
+                .stream().map(Chapter::getId).toList();
         List<Media> allMedia = mediaMapper.selectList(
                 new LambdaQueryWrapper<Media>().in(Media::getChapterId, chapterIds));
         long totalSize = 0;
@@ -502,6 +561,58 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
         }
         catalogCacheInvalidator.evict(comicId);
         log.info("导入最终化完成: comicId={}, taskId={}, mediaCount={}", comicId, taskId, allMedia.size());
+    }
+
+    // ======================== Phase 2d: metadata refresh failed → FAILED / IMPORT_FAILED ========================
+    // 磁盘 metadata.json 重建失败（原子写入保证旧 JSON 完整，不误报 SUCCESS）。
+    // 任务保持可重试：task → FAILED、comic IMPORTING → IMPORT_FAILED，经 retryTask 重新导入。
+
+    @Override
+    public void applyMetadataRefreshFailed(ImportMetadataRefreshFailedEvent event) {
+        transactionTemplate.executeWithoutResult(status -> applyMetadataRefreshFailedInTxn(event));
+    }
+
+    private void applyMetadataRefreshFailedInTxn(ImportMetadataRefreshFailedEvent event) {
+        Long taskId = event.taskId();
+        Long comicId = event.comicId();
+
+        ImportTask task = taskMapper.selectById(taskId);
+        if (task == null) {
+            return;
+        }
+        if (task.getStatus() != ImportTaskStatus.FINALIZING) {
+            log.info("metadata refresh failed 幂等跳过（任务非 FINALIZING）: taskId={}, status={}",
+                    taskId, task.getStatus());
+            return;
+        }
+
+        // 明确标记失败（可重试），不得置 READY
+        String error = event.errorCode() + ": " + (event.errorMessage() == null || event.errorMessage().isBlank()
+                ? "导入元数据重建失败" : sanitizePath(event.errorMessage()));
+        task.setStatus(ImportTaskStatus.FAILED);
+        task.setEndTime(LocalDateTime.now());
+        task.setErrorMessage(error);
+        taskMapper.updateById(task);
+
+        // 行锁串行化：与 completed 相同的保护
+        Comic comic = comicMapper.selectByIdForUpdate(comicId);
+        if (comic != null && comic.getStatus() == ComicStatus.IMPORTING) {
+            ManagementStateMachine.validateComicTransition("IMPORTING", "IMPORT_FAILED");
+            comic.setStatus(ComicStatus.IMPORT_FAILED);
+            comicMapper.updateById(comic);
+        }
+
+        // 统一管理任务项：导入失败（可经 retry 重新导入）
+        ManagementTaskItem mgmtItem = managementTaskService.findActiveItem(
+                "COMIC", comicId, TaskType.IMPORT);
+        if (mgmtItem != null) {
+            managementTaskService.updateItemStatus(
+                    mgmtItem.getId(), ManagementTaskStatus.FAILED,
+                    task.getErrorMessage(), "IMPORT_TASK", taskId);
+        }
+        catalogCacheInvalidator.evict(comicId);
+        log.warn("导入元数据重建失败（可重试）: comicId={}, taskId={}, errorCode={}",
+                comicId, taskId, event.errorCode());
     }
 
     // ======================== Phase 2b: finalize failed → 明确失败且可重试 ========================

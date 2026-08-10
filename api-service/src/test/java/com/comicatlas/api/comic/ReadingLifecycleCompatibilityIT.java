@@ -41,6 +41,7 @@ import com.comicatlas.api.common.enums.TaskType;
 import com.comicatlas.common.event.ImportTaskCompletedEvent;
 import com.comicatlas.common.event.ImportStorageFinalizeCompletedEvent;
 import com.comicatlas.common.event.ImportStorageFinalizeFailedEvent;
+import com.comicatlas.common.event.ImportMetadataRefreshCompletedEvent;
 import com.comicatlas.common.event.ManagementCommandCompletedEvent;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -621,13 +622,20 @@ class ReadingLifecycleCompatibilityIT {
             Files.createDirectories(targetDir);
             Files.move(stagingDir.resolve("001.jpg"), targetDir.resolve("001.jpg"));
 
-            // Phase 2：finalize completed → media/chapter/comic READY、task SUCCESS
+            // Phase 2：finalize completed → media/chapter READY、task FINALIZING、comic 仍 IMPORTING
             importPersistenceService.applyFinalizeCompleted(new ImportStorageFinalizeCompletedEvent(
                     UUID.randomUUID(), Instant.now(), taskId, comicId, 0, chapterId,
                     "hq/" + comicId + "/" + chapterId, 1));
 
-            assertThat(comicMapper.selectById(comicId).getStatus()).isEqualTo(ComicStatus.READY);
+            assertThat(comicMapper.selectById(comicId).getStatus()).isEqualTo(ComicStatus.IMPORTING);
             assertThat(mediaMapper.selectById(page.getId()).getHqStatus()).isEqualTo(HqStatus.READY);
+            assertThat(importTaskMapper.selectById(taskId).getStatus()).isEqualTo(ImportTaskStatus.FINALIZING);
+
+            // Phase 3：磁盘 metadata.json 重建成功（结果事件）→ comic READY、task SUCCESS
+            importPersistenceService.applyMetadataRefreshCompleted(new ImportMetadataRefreshCompletedEvent(
+                    UUID.randomUUID(), Instant.now(), taskId, comicId));
+
+            assertThat(comicMapper.selectById(comicId).getStatus()).isEqualTo(ComicStatus.READY);
             assertThat(importTaskMapper.selectById(taskId).getStatus()).isEqualTo(ImportTaskStatus.SUCCESS);
 
             // reader URL 命中真实文件
@@ -704,13 +712,20 @@ class ReadingLifecycleCompatibilityIT {
             importPersistenceService.applyFinalizeCompleted(completed);
             importPersistenceService.applyFinalizeCompleted(completed);
 
-            // 幂等：media 仍只有 1 张且 READY，task 仍 SUCCESS，无重复计数
+            // 幂等：media 仍只有 1 张且 READY，task 仍 FINALIZING（重复 completed 不重复触发），
+            // 元数据重建结果事件后才是 SUCCESS，无重复计数
             assertThat(mediaMapper.selectCount(new LambdaQueryWrapper<Media>()
                     .eq(Media::getChapterId, chapterId))).isEqualTo(1);
             assertThat(mediaMapper.selectList(new LambdaQueryWrapper<Media>()
                     .eq(Media::getChapterId, chapterId)))
                     .allMatch(m -> m.getHqStatus() == HqStatus.READY);
+            assertThat(importTaskMapper.selectById(taskId).getStatus()).isEqualTo(ImportTaskStatus.FINALIZING);
+            assertThat(comicMapper.selectById(comicId).getStatus()).isEqualTo(ComicStatus.IMPORTING);
+
+            importPersistenceService.applyMetadataRefreshCompleted(new ImportMetadataRefreshCompletedEvent(
+                    UUID.randomUUID(), Instant.now(), taskId, comicId));
             assertThat(importTaskMapper.selectById(taskId).getStatus()).isEqualTo(ImportTaskStatus.SUCCESS);
+            assertThat(comicMapper.selectById(comicId).getStatus()).isEqualTo(ComicStatus.READY);
             assertThat(comicMapper.selectById(comicId).getTotalPages()).isEqualTo(1);
         }
 
@@ -745,8 +760,13 @@ class ReadingLifecycleCompatibilityIT {
                     UUID.randomUUID(), Instant.now(), taskId, comicId, chapterId.intValue(), chapterId,
                     "hq/" + comicId + "/" + chapterId, 1));
 
-            assertThat(comicMapper.selectById(comicId).getStatus()).isEqualTo(ComicStatus.READY);
+            assertThat(comicMapper.selectById(comicId).getStatus()).isEqualTo(ComicStatus.IMPORTING);
             assertThat(mediaMapper.selectById(page.getId()).getHqStatus()).isEqualTo(HqStatus.READY);
+            assertThat(importTaskMapper.selectById(taskId).getStatus()).isEqualTo(ImportTaskStatus.FINALIZING);
+
+            importPersistenceService.applyMetadataRefreshCompleted(new ImportMetadataRefreshCompletedEvent(
+                    UUID.randomUUID(), Instant.now(), taskId, comicId));
+            assertThat(comicMapper.selectById(comicId).getStatus()).isEqualTo(ComicStatus.READY);
             assertThat(importTaskMapper.selectById(taskId).getStatus()).isEqualTo(ImportTaskStatus.SUCCESS);
 
             ReaderDTO dto = readChapter(chapterId);

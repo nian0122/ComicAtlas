@@ -16,6 +16,8 @@ public final class MqQueues {
     public static final String IMPORT_STORAGE_FINALIZE_REQUESTED = "import.storage.finalize.requested.queue";
     public static final String IMPORT_STORAGE_FINALIZE_COMPLETED = "import.storage.finalize.completed.queue";
     public static final String IMPORT_STORAGE_FINALIZE_FAILED = "import.storage.finalize.failed.queue";
+    public static final String IMPORT_METADATA_REFRESH_COMPLETED = "import.metadata.refresh.completed.queue";
+    public static final String IMPORT_METADATA_REFRESH_FAILED = "import.metadata.refresh.failed.queue";
     public static final String TASK_STATUS = "task.status.queue";
     public static final String CANCEL_TASK = "cancel.task.queue";
     public static final String HQ_DELETE = "hq.delete.queue";
@@ -40,6 +42,8 @@ public final class MqQueues {
     public static final String IMPORT_STORAGE_FINALIZE_REQUESTED_DLQ = "import.storage.finalize.requested.dlq";
     public static final String IMPORT_STORAGE_FINALIZE_COMPLETED_DLQ = "import.storage.finalize.completed.dlq";
     public static final String IMPORT_STORAGE_FINALIZE_FAILED_DLQ = "import.storage.finalize.failed.dlq";
+    public static final String IMPORT_METADATA_REFRESH_COMPLETED_DLQ = "import.metadata.refresh.completed.dlq";
+    public static final String IMPORT_METADATA_REFRESH_FAILED_DLQ = "import.metadata.refresh.failed.dlq";
     public static final String HQ_DELETE_DLQ = "hq.delete.dlq";
     public static final String HQ_DELETE_RESULT_DLQ = "hq.delete.result.dlq";
     public static final String EXPORT_TASK_DLQ = "export.task.dlq";

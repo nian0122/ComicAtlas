@@ -20,6 +20,10 @@ public final class MqRoutingKeys {
     public static final String IMPORT_STORAGE_FINALIZE_COMPLETED = "import.storage.finalize.completed";
     public static final String IMPORT_STORAGE_FINALIZE_FAILED = "import.storage.finalize.failed";
 
+    // comic.import 导入最终化元数据重建结果（Worker → API，复用 comic.import exchange）
+    public static final String IMPORT_METADATA_REFRESH_COMPLETED = "import.metadata.refresh.completed";
+    public static final String IMPORT_METADATA_REFRESH_FAILED = "import.metadata.refresh.failed";
+
     // comic.task
     public static final String STATUS_CHANGED = "status.changed";
     public static final String CANCEL_REQUESTED = "cancel.requested";
