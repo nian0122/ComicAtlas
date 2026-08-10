@@ -13,3 +13,4 @@
 | `issues/` | BUG 记录（BUG-xxx + TODO） |
 | `database/` `frontend/` `troubleshooting/` | 专项说明 |
 | `superpowers/` | specs/plans 历史归档（specs + plans） |
+| `audits/` | 项目能力架构审核报告（2026-08-10 全项目审核见 `audits/2026-08-10-project-capability-architecture-audit.md`） |
