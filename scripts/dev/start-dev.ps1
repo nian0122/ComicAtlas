@@ -37,6 +37,12 @@ $env:REDIS_HOST    = "localhost"
 $env:REDIS_PORT    = "6379"
 $env:REDIS_PASS    = $env:REMOTE_REDIS_PASSWORD
 $env:MANGA_ROOT    = if ($env:MANGA_ROOT) { $env:MANGA_ROOT } else { "F:/manga" }
+# Worker 只读 MySQL：映射 .env 远端账号到 Worker 期望的变量名
+# （Todo2 后 metadata 重建是导入成功必经步骤，Worker 必须能连接 DB 读取元数据）
+$env:MYSQL_HOST    = "localhost"
+$env:MYSQL_PORT    = "3306"
+$env:MYSQL_USER    = if ($env:MYSQL_USER) { $env:MYSQL_USER } else { $env:REMOTE_MYSQL_USER }
+$env:MYSQL_PASS    = if ($env:MYSQL_PASS) { $env:MYSQL_PASS } else { $env:REMOTE_MYSQL_PASSWORD }
 
 # 4. 确保存储目录存在（HQ/LQ/EXPORT/thumb）
 @("$env:MANGA_ROOT/hq", "$env:MANGA_ROOT/lq", "$env:MANGA_ROOT/export", "$env:MANGA_ROOT/thumbs") | ForEach-Object {
@@ -50,7 +56,7 @@ if (-not $mqTest) {
 }
 
 # 5. 启动 Worker
-Start-Process pwsh -WorkingDirectory "$repoRoot\worker-service" -ArgumentList "-NoExit", "-Command", "`$env:MANGA_ROOT='$env:MANGA_ROOT'; `$env:RABBITMQ_HOST='$env:RABBITMQ_HOST'; `$env:RABBITMQ_PORT='$env:RABBITMQ_PORT'; `$env:RABBITMQ_USER='$env:RABBITMQ_USER'; `$env:RABBITMQ_PASS='$env:RABBITMQ_PASS'; `$env:REDIS_HOST='$env:REDIS_HOST'; `$env:REDIS_PORT='$env:REDIS_PORT'; `$env:REDIS_PASS='$env:REDIS_PASS'; `$env:NACOS_ADDR='$env:NACOS_ADDR'; `$env:NACOS_USER='$env:NACOS_USER'; `$env:NACOS_PASS='$env:NACOS_PASS'; mvn clean spring-boot:run"
+Start-Process pwsh -WorkingDirectory "$repoRoot\worker-service" -ArgumentList "-NoExit", "-Command", "`$env:MANGA_ROOT='$env:MANGA_ROOT'; `$env:RABBITMQ_HOST='$env:RABBITMQ_HOST'; `$env:RABBITMQ_PORT='$env:RABBITMQ_PORT'; `$env:RABBITMQ_USER='$env:RABBITMQ_USER'; `$env:RABBITMQ_PASS='$env:RABBITMQ_PASS'; `$env:REDIS_HOST='$env:REDIS_HOST'; `$env:REDIS_PORT='$env:REDIS_PORT'; `$env:REDIS_PASS='$env:REDIS_PASS'; `$env:NACOS_ADDR='$env:NACOS_ADDR'; `$env:NACOS_USER='$env:NACOS_USER'; `$env:NACOS_PASS='$env:NACOS_PASS'; `$env:MYSQL_HOST='$env:MYSQL_HOST'; `$env:MYSQL_PORT='$env:MYSQL_PORT'; `$env:MYSQL_USER='$env:MYSQL_USER'; `$env:MYSQL_PASS='$env:MYSQL_PASS'; mvn clean spring-boot:run"
 # Start-Process pwsh -WorkingDirectory "$repoRoot\api-service" -ArgumentList "-NoExit", "-Command", "`$env:RABBITMQ_HOST='$env:RABBITMQ_HOST'; `$env:RABBITMQ_PORT='$env:RABBITMQ_PORT'; `$env:RABBITMQ_USER='$env:RABBITMQ_USER'; `$env:RABBITMQ_PASS='$env:RABBITMQ_PASS'; `$env:NACOS_ADDR='$env:NACOS_ADDR'; `$env:NACOS_USER='$env:NACOS_USER'; `$env:NACOS_PASS='$env:NACOS_PASS'; `$env:REDIS_PASS='$env:REDIS_PASS'; mvn clean spring-boot:run"
 
 Write-Host "Worker 已在独立窗口启动" -ForegroundColor Green
