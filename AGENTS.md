@@ -14,7 +14,7 @@ Spring Boot 3 + Vue3 + RabbitMQ + MySQL + Redis。
 comic-atlas/
 ├── api-service/             # 漫画CRUD + 导入 + Catalog + Reader + LQ/HQ删除 + 回收站 + MQ消费（Flyway 迁移在 src/main/resources/db/）
 ├── worker-service/          # 文件处理 + MQ消费 + 下载 + 解压 + 导入 + LQ/HQ删除 + 回收/恢复/永久清理 + ffprobe（模块化：config/event/command/importer/media/storage/export/file/process/image）
-├── comic-common/            # 共享事件 DTO（31 个事件 record + ComicEvent sealed interface + payload 数据载体，Jackson 多态序列化）+ MQ 契约/元数据/工具（constant/dto/event/metadata/mq/util）
+├── comic-common/            # 共享事件 DTO（32 个事件 record + ComicEvent sealed interface + payload 数据载体，Jackson 多态序列化）+ MQ 契约/元数据/工具（constant/dto/event/metadata/mq/util）
 ├── gateway/                 # Spring Cloud Gateway: 路由 + Nacos发现
 ├── frontend/                # Vue3/Vite: 列表 + 详情 + 阅读器 + 管理后台 + 存储管理
 ├── scripts/                 # dev/qa/db/release 开发与运维脚本（入口 scripts/dev/start-dev.ps1）
@@ -38,9 +38,9 @@ comic-atlas/
 | LQ 手动触发 | `api-service/.../controller/LqController.java` | POST /comics/{id}/lq |
 | HQ 删除 API | `api-service/.../controller/HqDeleteController.java` | POST /comics/{id}/delete-hq |
 | MQ 消费 | `api-service/.../event/ImportEventHandler.java` | 读 metadata.json → INSERT |
-| LQ 完成处理 | `api-service/.../management/event/ManagementCommandResultHandler.java` | 处理 LQ 命令结果，更新 media.lq_status + lq_path |
+| LQ 完成处理 | `api-service/.../management/event/ManagementCommandResultHandler.java` | 处理 LQ 命令结果；按 targetType 分流校验归属（COMIC 经章节归属校验、CHAPTER 按章节校验），通过后更新 media.lq_status + lq_path |
 | HQ 删除完成 | `api-service/.../event/HqDeletedHandler.java` | 更新 media.hq_status=DELETED |
-| 回收站/永久清理 | `api-service/.../management/trash/TrashLifecycleController.java` | POST /api/trash/... restore/purge/reconcile（删除=回收，永久删除=purge） |
+| 回收站/永久清理 | `api-service/.../management/trash/TrashLifecycleController.java` | POST /api/trash/... restore/purge/reconcile（删除=回收，永久删除=purge）；章节回收 manifest 逐媒体用 DB 真实 hqRoot/hqPath、lqRoot/lqPath 生成（`TrashLifecycleService.trashChapter`），不按 globalOrder 猜路径 |
 | 目录扫描 | `api-service/.../importer/controller/DirectoryScanTaskController.java` | POST /api/tasks/directory-scan，漫画集根目录批量发现（直接子目录=候选漫画） |
 | 媒体上传（预留能力） | `api-service/.../upload/` | 分块上传后端可用、无前端入口，接口能力预留 |
 | 恢复任务 API | `api-service/.../controller/RecoveryTaskController.java` | POST /api/tasks/recovery |
@@ -49,7 +49,7 @@ comic-atlas/
 | 恢复事件处理 | `api-service/.../event/RecoveryEventHandler.java` | 消费 MQ 事件，逐本调用 RecoveryEngine |
 | 恢复引擎 | `api-service/.../recovery/RecoveryEngine.java` | 单本漫画的 DB 恢复逻辑 |
 | Worker 恢复入口 | `worker-service/.../event/RecoveryTaskHandler.java` | 扫描 HQ 目录，发布 comicId 列表 |
-| 事件 DTO | `comic-common/.../event/` | 31 个事件 record + ComicEvent sealed interface + payload/（数据载体） |
+| 事件 DTO | `comic-common/.../event/` | 32 个事件 record + ComicEvent sealed interface + payload/（数据载体） |
 | MQ 常量 | `comic-common/.../constant/` | MqExchanges/MqQueues/MqRoutingKeys（exchange/queue/routingKey 契约） |
 | 元数据构建 | `comic-common/.../metadata/` | MetadataV3/MetadataJsonBuilder（V3 元数据模型） |
 | MQ 消费支持 | `comic-common/.../mq/` | MqConsumerSupport（统一 ACK/Reject/DLQ 策略） |
@@ -58,11 +58,11 @@ comic-atlas/
 | 枚举 | `api-service/.../common/enums/` | TaskType/TaskStage/ManagementTaskStatus/TranscodeStatus 等（仅 api 消费） |
 | Worker 入口 | `worker-service/.../event/ImportTaskHandler.java` | sourceType 路由到统一 handler |
 | 取消任务 | `worker-service/.../event/CancelHandler.java` | ConcurrentHashMap 标记 |
-| LQ 生成 | `worker-service/.../command/LqCommandHandler.java` | 消费 management 命令，调用 ImageOptimizer 外部工具 |
-| HQ 删除 | `worker-service/.../event/HqDeleteHandler.java` | 按章节删除 HQ 图片 |
+| LQ 生成 | `worker-service/.../command/LqCommandHandler.java` | 消费 management 命令，调用 ImageOptimizer 外部工具；仅处理 IMAGE |
+| HQ 删除 | `worker-service/.../event/HqDeleteHandler.java` | 按章节删除 HQ 图片；仅 IMAGE（VIDEO 文件/状态/统计不触碰） |
 | 目录解析 | `worker-service/.../importer/DirectoryParser.java` | 输出 DirectoryTree（纯树，无业务语义） |
 | 元数据组装 | `worker-service/.../importer/MetadataAssembler.java` | DirectoryTree → ComicMetadata（注入 Catalog/Chapter） |
-| 媒体分析 | `worker-service/.../media/MediaAnalyzer.java` | 图片尺寸 + ffprobe 视频元数据 |
+| 媒体分析 | `worker-service/.../media/MediaAnalyzer.java` | 图片尺寸 + ffprobe 视频元数据；容器字段去前导点（`.mp4`→`mp4`） |
 | 统一导入 | `worker-service/.../importer/DirectoryImportHandler.java` | handle() 解析→暂存文件到 HQ→写metadata |
 | 导入最终化 | `worker-service/.../event/ImportStorageFinalizeHandler.java` | 两阶段最终化：hq/{comicId}/{globalOrder} → hq/{comicId}/{chapterId} |
 | 最终化落库 | `api-service/.../importer/service/impl/ImportPersistenceServiceImpl.java` | 逐章收尾，全 READY → 发 metadata 重建请求（task FINALIZING）→ 重建成功结果事件后才 comic READY / task SUCCESS |
@@ -74,19 +74,20 @@ comic-atlas/
 | 分卷 ZIP 构建 | `worker-service/.../export/ZipBuilder.java` | `ZipBuildResult(主 .zip, 有序分卷, 总大小)`；manifest 总未压缩 > `zip.splitSize` 才分卷 |
 | EHENTAI 导入 | `worker-service/.../file/download/EhentaiDownloadService.java` | 下载(Archiver优先→Torrent兜底)→解压→返回源目录，委托 DirectoryImportHandler |
 | 存储服务 | `worker-service/.../storage/StorageService.java` | store/resolve/exists/delete |
-| 存储根 | `worker-service/.../storage/StorageRoot.java` | path + resolve() + exists() |
+| 存储根 | `worker-service/.../storage/StorageRoot.java` | path + resolve() + exists()；resolve() 词法（normalize+startsWith）+ 真实路径（toRealPath）双重 containment，拒绝 symlink/junction 逃出根 |
+| API 存储根 | `api-service/.../common/storage/ApiStorageRoot.java` | 与 StorageRoot 同款双重防线校验（API 侧，STAGING 可写其余只读） |
 | 文件引用 | `worker-service/.../storage/StorageRef.java` | rootKey + relativePath |
 | 图片优化 | `worker-service/.../image/ImageOptimizer.java` | 外部 Go 工具生成 WebP LQ |
 | URL 解析 | `api-service/.../storage/FileUrlResolver.java` | Page → /files/{root}/{path} |
 | 路径布局 | `api-service/.../storage/StorageLayout.java` | forPage(comicId, chapterId, imageName) |
 | 元数据模型 | `worker-service/.../media/ComicMetadata.java` | catalogs + chapters + mediaItems(IMAGE/VIDEO) |
 | 导入上下文 | `worker-service/.../importer/ImportContext.java` | sourceType + sourcePath |
-| 命令执行器 | `worker-service/.../command/` | TranscodeCommandHandler/TrashCommandHandler 等 8 个（ManagementCommandDispatcher 路由） |
-| 存储管理 API | `api-service/.../controller/AdminStorageController.java` | stats/comics/chapters |
+| 命令执行器 | `worker-service/.../command/` | TranscodeCommandHandler/TrashCommandHandler 等 8 个（ManagementCommandDispatcher 路由）；转码临时产物 `.probe.mp4`（MediaAnalyzer 门禁可识别），ffmpeg 后 ffprobe 验证容器/codec 才原子发布 |
+| 存储管理 API | `api-service/.../controller/AdminStorageController.java` | stats/comics/chapters；`StorageStatsDTO.totalBytes` 随 JSON 序列化（曾 @JsonIgnore 致前端恒 0 B） |
 | 存储查询 | `api-service/.../service/StorageQueryService.java` | 聚合 HQ/LQ 大小+状态 |
 | 前端路由 | `frontend/src/router/index.ts` | 14 routes（reading 6 + management 8） |
 | Pinia Store | `frontend/src/stores/` | comic/reader/import/history/tag/app/management-comic/storage/category/reader-settings + reading.ts barrel |
-| API 服务 | `frontend/src/services/api.ts` | comic/catalog/reader/import/lq/hq/admin |
+| API 服务 | `frontend/src/services/api.ts` | comic/catalog/reader/import/lq/hq/admin；拦截器 code==200 才解包，业务 code 非 200 reject 且保留 error.response.data |
 | 存储服务 | `frontend/src/services/storage.ts` | fetchComics/fetchSummary/fetchChapters/executeOperation |
 | 类型定义 | `frontend/src/types/index.ts` | CatalogNode/ChapterRef/ReaderDTO 等 + 存储类型 |
 | 视频播放器 | `frontend/src/views/reading/reader/components/VideoPlayer.vue` | VIDEO 类型播放 |
@@ -131,6 +132,12 @@ API ImportMetadataRefreshResultHandler: inbox 幂等 → completed → comic REA
 
 ## STORAGE
 所有漫画统一 MANAGED，文件搬入 `F:/manga/hq/{comicId}/{chapterId}/`。
+
+**路径契约**：
+- 正式文件路径统一 `{comicId}/{chapterId}/{fileName}`；`globalOrder` 只承担两个职责：阅读顺序（prev/next）与导入暂存键（`hq/{comicId}/{globalOrder}`，DB ID 生成前使用）。
+- 任何按 DB 路径操作（回收 manifest、转码、LQ、HQ 删除、恢复）必须读取 `page.hq_path`/`lq_path` 真实值，禁止用 `globalOrder` 猜测目录。
+- canonical metadata：导入最终化完成后 `metadata/{comicId}.json` 由 DB 重建（chapterId 布局），是灾难恢复与转码/刷新重建的统一产物。
+- 存储根解析经 `StorageRoot`/`ApiStorageRoot.resolve()` 双重防线：词法（normalize + startsWith）+ 真实路径 containment（toRealPath），拒绝 `../` 穿越与经 symlink/junction/reparse point 逃出根。
 
 **DB 存储**：
 - `comic.storage_policy` = `MANAGED`
@@ -205,6 +212,7 @@ URL 统一由 `FileUrlResolver.resolve(page)` 生成，不手拼。
 | ExportTaskCompleted | comic.export.task.completed | ExportTaskCompletedEvent |
 | ExportTaskFailed | comic.export.task.failed | ExportTaskFailedEvent |
 | MetadataRefresh | comic.export.metadata.refresh.requested | MetadataRefreshEvent（新增可选 taskId：导入最终化收尾触发时携带） |
+| MetadataRefreshScanCompleted | comic.management.command.completed | MetadataRefreshScanCompletedEvent（METADATA_REFRESH 快照回传载荷） |
 | ImportMetadataRefreshCompleted | comic.import.import.metadata.refresh.completed | ImportMetadataRefreshCompletedEvent |
 | ImportMetadataRefreshFailed | comic.import.import.metadata.refresh.failed | ImportMetadataRefreshFailedEvent |
 | RecoveryRequested | comic.recovery.requested | RecoveryRequestedEvent |
@@ -243,7 +251,7 @@ URL 统一由 `FileUrlResolver.resolve(page)` 生成，不手拼。
 - `page.lq_status` = NOT_GENERATED（不自动生成 LQ），另有 QUEUED/GENERATING/READY/MISSING/FAILED（LqStatus 枚举）
 - `page.status` / `chapter.status` = MediaLifecycleStatus 生命周期（STAGING→READY→TRASHED→DELETED，含 DELETING/TRASHING/RESTORING/PURGING）
 - `page` 视频字段：media_type, duration, container, video_codec, audio_codec（ffprobe 提取）
-- `import_task` 表：source_type, source_path（修复 retry 硬编码问题）
+- `import_task` 表：source_type, source_path（修复 retry 硬编码问题）；`ImportTaskStatus` 含 `FINALIZING` 中间态（全部章节最终化 READY 后、等待 DB→JSON 元数据重建成功结果），防重标记防止乱序/重投的 finalize.completed 重复触发收尾
 - `comic.category_id` 替代旧 `category` VARCHAR 列
 - 新增表：`management_task`/`management_task_item`（管理任务）、`outbox_message`/`inbox_receipt`（Outbox 发件箱）、`upload_session`/`upload_file`（分块上传）、`recovery_task`、`directory_scan_task`、`export_task`（回收清单以 TrashManifest DTO + resultRef 存储，非表）
 - comic/chapter/page 均含 `version` 乐观锁列（管理端编辑）

@@ -1,6 +1,6 @@
 # 导入流水线 (Import Pipeline)
 
-**最后更新**: 2026-08-09
+**最后更新**: 2026-08-10
 **状态**: 生产环境使用  
 **维护者**: ComicAtlas 团队
 
@@ -18,7 +18,9 @@ ComicAtlas 采用统一导入流水线处理所有漫画来源（ZIP、目录、
 Acquire → ImportTask → Handler routing → DirectoryParser → DirectoryTree 
        → MetadataAssembler（目录规范化）→ ComicMetadata → 写清单+暂存文件 → metadata.json
        → task.completed → API staging 落库 → 逐章 finalize 请求 → Worker 最终化搬运
-       → 逐章 finalize completed → API 全部 media READY → comic READY + task SUCCESS
+       → 逐章 finalize completed → API 全部 media READY → task FINALIZING → MetadataRefreshEvent
+       → Worker 从 DB 重建 canonical metadata.json（chapterId 布局）
+       → ImportMetadataRefreshCompleted → comic READY + task SUCCESS
 ```
 
 ---
@@ -123,7 +125,18 @@ MQ: import.storage.finalize.completed（逐章）
          │
          ▼
 API applyFinalizeCompleted：本章 media/chapter → READY；
-         │     全部 media READY 才 → comic READY + task SUCCESS
+         │     全部 media READY → task → FINALIZING（comic 仍 IMPORTING）
+         │     发 MetadataRefreshEvent(taskId, comicId)（comic.export.metadata.refresh.requested）
+         ▼
+Worker MetadataRefreshHandler（taskId 非空分支）：从 DB 重建 metadata/{comicId}.json
+         │     （hqPath 天然为 {comicId}/{chapterId} 最终布局，原子写入）
+         ▼
+MQ: import.metadata.refresh.completed / failed
+         │
+         ▼
+API ImportMetadataRefreshResultHandler：inbox 幂等 →
+              completed → comic READY + task SUCCESS
+              failed → task FAILED + comic IMPORT_FAILED（可重试，旧 JSON 完整）
 ```
 
 > **关键点**：`task.completed` 只代表 staging/元数据就绪，**不等于漫画可阅读**；
@@ -137,11 +150,13 @@ API applyFinalizeCompleted：本章 media/chapter → READY；
 
 ```java
 public enum ImportTaskStatus { 
-    PENDING,    // 等待处理
-    PARSING,    // 解析中（DirectoryParser 阶段）
-    IMPORTING,  // 导入中（搬文件、写 metadata）
-    SUCCESS,    // 成功（终态）
-    FAILED      // 失败（终态）
+    PENDING,     // 等待处理
+    PARSING,     // 解析中（DirectoryParser 阶段）
+    IMPORTING,   // 导入中（搬文件、写 metadata、staging 落库）
+    FINALIZING,  // 全部章节存储最终化完成，等待 DB→JSON 元数据重建成功结果
+    SUCCESS,     // 成功（终态）
+    FAILED,      // 失败（终态）
+    CANCELLED    // 取消（终态）
 }
 ```
 
@@ -157,14 +172,18 @@ PARSING ──────────► FAILED
 IMPORTING ────────────┘
    │
    ▼
-SUCCESS
+FINALIZING ──────────► FAILED
+   │                      ▲
+   │                      │
+   ▼                      │
+SUCCESS ──────────────────┘
 
 任意非终态 ──► CANCELLED (用户取消)
 ```
 
 **终态**：`SUCCESS`、`FAILED`、`CANCELLED`
 
-到达终态后不可回退到非终态。`ImportEventHandler` 中通过 `TERMINAL_STATUSES = Set.of("SUCCESS", "FAILED")` 强制约束。
+到达终态后不可回退到非终态。`ImportEventHandler` 中通过 `TERMINAL_STATUSES = Set.of("SUCCESS", "FAILED")` 强制约束；`FINALIZING` 作为防重标记，防止乱序/重投的 finalize.completed 重复触发收尾。
 
 **状态推进时机**：
 
@@ -173,11 +192,12 @@ SUCCESS
 | `PENDING` | API ImportService | 创建任务时 |
 | `PARSING` | Worker ImportTaskHandler | 开始解析前 |
 | `IMPORTING` | API ImportPersistenceService.persistCompleted | Worker 发布 task.completed 后 staging 落库完成（staging 就绪，等待最终化） |
-| `SUCCESS` | API applyFinalizeCompleted | 全部章节 media 最终化 READY 后收尾 |
-| `FAILED` | Worker ImportTaskHandler（解析/搬运失败）或 API applyFinalizeFailed（存储最终化失败） | 捕获异常 / 收到 finalize.failed 时 |
+| `FINALIZING` | API ImportPersistenceService | 全部章节 media 最终化 READY 后（pendingCount==0），发出 MetadataRefreshEvent 请求 DB→JSON 重建（comic 仍 IMPORTING） |
+| `SUCCESS` | API ImportMetadataRefreshResultHandler | 收到 ImportMetadataRefreshCompleted 且 task==FINALIZING、comic==IMPORTING 才收尾（否则幂等跳过） |
+| `FAILED` | Worker ImportTaskHandler（解析/搬运失败）、API applyFinalizeFailed（存储最终化失败）或 API ImportMetadataRefreshResultHandler（元数据重建失败） | 捕获异常 / 收到 finalize.failed / 收到 ImportMetadataRefreshFailed |
 | `CANCELLED` | API ImportService | 用户主动取消时 |
 
-> `IMPORTING` 状态横跨 staging 落库与最终化两个阶段：task.completed 后任务仍处于 IMPORTING（staging 就绪但文件未就位），直到全部 media READY 才置 SUCCESS。最终化失败走 `STORAGE_FINALIZE_*` 错误码并置 FAILED（可重试）。
+> `IMPORTING` 状态横跨 staging 落库与最终化两个阶段：task.completed 后任务仍处于 IMPORTING（staging 就绪但文件未就位），直到全部 media READY 才进入 `FINALIZING` 等待元数据重建结果，重建成功才置 SUCCESS。最终化失败走 `STORAGE_FINALIZE_*` 错误码并置 FAILED（可重试）；元数据重建失败（`ImportMetadataRefreshFailed`）置 FAILED 且 comic IMPORT_FAILED，旧 JSON 完整可重试。
 
 ---
 
@@ -219,8 +239,16 @@ SUCCESS
 1. Worker 按章节消费 finalize 请求：以 `imports/{taskId}/manifest.json` 清单为尺寸基准做幂等校验（目标存在且尺寸匹配视为已完成；冲突/缺失发布失败事件），把 `hq/{comicId}/{globalOrder}` 逐文件移动到 `hq/{comicId}/{chapterId}`。
 2. 每章移动/校验成功**立即**发布一次 `ImportStorageFinalizeCompletedEvent`（不等待全部章），随后 `rewriteWithoutChapter` 从清单移除本章条目；清单清空才删除（延后清理不阻断）。
 3. API `applyFinalizeCompleted` 按事件 `chapterId` 将本章 media/chapter → READY，并用事件返回的 `targetDir` 修正 media.hqPath（幂等，行锁串行化防丢失更新）。
-4. 仅当该 comic 下**全部 media** 都 hq_status=READY 时，才收尾：comic → READY、task → SUCCESS、管理任务项 SUCCEEDED、缓存失效。
+4. 仅当该 comic 下**全部 media** 都 hq_status=READY 时，进入收尾前置态：task → **FINALIZING**（comic 仍 IMPORTING），并发出 `MetadataRefreshEvent(taskId, comicId)` 请求 Worker 从 DB 重建 canonical metadata.json。
 5. 任一章节最终化失败（`STORAGE_FINALIZE_MANIFEST_MISSING` / `SIZE_CONFLICT` / `CONFLICT` / `SOURCE_MISSING` 等）→ API `applyFinalizeFailed` 置 task FAILED、comic IMPORT_FAILED（可重试；重试会清空章节/媒体结构并重置状态）。
+
+**Phase 3 — canonical metadata 重建（Worker `MetadataRefreshHandler` + API `ImportMetadataRefreshResultHandler`）**：
+
+1. Worker 消费 `MetadataRefreshEvent`（taskId 非空分支）：从 DB 重建 `metadata/{comicId}.json`，hqPath 天然为 `{comicId}/{chapterId}` 最终布局，原子写入后发布 `ImportMetadataRefreshCompletedEvent` / `ImportMetadataRefreshFailedEvent`（comic.import exchange）。
+2. API `ImportMetadataRefreshResultHandler` inbox 幂等消费：completed → 校验 task==FINALIZING 且 comic==IMPORTING 后收尾（comic → READY、task → SUCCESS、统计重算、管理任务项 SUCCEEDED、缓存失效）；failed → task FAILED、comic IMPORT_FAILED（旧 JSON 完整，可重试）。
+3. 状态不符（乱序/重投）按幂等跳过，不重复收尾。
+
+> 导入期 Worker 写出的 `metadata.json`（globalOrder 暂存布局）只是 staging 落库的中间载体；**canonical metadata 永远是最终化后由 DB 重建的 chapterId 布局**，供灾难恢复与转码/刷新重建复用。
 
 **关键约束**：
 
@@ -364,9 +392,11 @@ public record ImportContext(
 | `DirectoryImportHandler` | `ImportContext` + taskId + comicId | `metadata.json` 路径 | 委托 Parser/Assembler，写清单、暂存搬文件、生成封面；**不删除清单** |
 | `ImportStorageFinalizeHandler` | `ImportStorageFinalizeRequestedEvent`（逐章） | 逐章 `ImportStorageFinalizeCompletedEvent` | 按清单校验尺寸，移动 `{globalOrder}`→`{chapterId}`，逐章移除清单条目；不访问 MySQL |
 | `ZipImportHandler` | ZIP 文件路径 | 委托 `DirectoryImportHandler` | 解压到 temp，清理临时文件 |
-| `StorageService` | 源文件 + 目标路径 | 文件存储到 HQ/LQ/Thumbs | 不写 DB 业务表 |
+| `StorageService` | 源文件 + 目标路径 | 文件存储到 HQ/LQ/Thumbs | 不写 DB 业务表；路径经 `StorageRoot.resolve()` 双重防线校验 |
 | `ImportEventHandler` | `task.completed` 事件 + `metadata.json` | DB 记录（staging） | 不碰文件系统 |
-| `ImportPersistenceService` | completed / finalize.completed / finalize.failed 事件 | DB 状态推进 | 事务内只做 DB 与路径运算，不做文件 IO；全部 media READY 才收尾 |
+| `ImportPersistenceService` | completed / finalize.completed / finalize.failed / metadata 重建结果事件 | DB 状态推进 | 事务内只做 DB 与路径运算，不做文件 IO；全部 media READY → task FINALIZING + MetadataRefreshEvent，重建成功结果后才 comic READY / task SUCCESS |
+| `MetadataRefreshHandler` | `MetadataRefreshEvent`（taskId 非空分支） | `ImportMetadataRefreshCompletedEvent` / `ImportMetadataRefreshFailedEvent` | 从 DB 重建 `metadata/{comicId}.json`（chapterId 最终布局，原子写入）；不访问 MySQL 写 |
+| `ImportMetadataRefreshResultHandler` | metadata 重建 completed / failed 事件 | comic/task 收尾或失败 | inbox 幂等；completed → 校验 task==FINALIZING + comic==IMPORTING 才收尾 |
 
 **禁止**：
 
@@ -423,13 +453,29 @@ public record ImportContext(
        │                │ 12. Publish finalize.completed（逐章）│             │
        │                │<────────────────│                │                 │
        │                │                 │                │                 │
-       │                │ 13. Consume finalize.completed     │                │
-       │                │─────────────────────────────────────────────────>│
-       │                │                 │                │ 14. 本章 media/chapter→READY│
-       │                │                 │                │     全部 media READY 时     │
-       │                │                 │                │     comic→READY+task→SUCCESS│
-       │                │                 │                │────────────────>│
-       │                │                 │                │                 │
+        │                │ 13. Consume finalize.completed     │                │
+        │                │─────────────────────────────────────────────────>│
+        │                │                 │                │ 14. 本章 media/chapter→READY│
+        │                │                 │                │     全部 media READY 时     │
+        │                │                 │                │     task→FINALIZING，发    │
+        │                │                 │                │     MetadataRefreshEvent   │
+        │                │                 │                │────────────────>│
+        │                │                 │                │                 │
+        │                │ 15. Consume metadata.refresh.requested（taskId 非空）│
+        │                │────────────────>│                │                 │
+        │                │                 │ 16. 从 DB 重建 metadata/{comicId}.json│
+        │                │                 │     （chapterId 最终布局，原子写入）    │
+        │                │                 │───────────────>│                 │
+        │                │                 │                │                 │
+        │                │ 17. Publish import.metadata.refresh.completed│       │
+        │                │<────────────────│                │                 │
+        │                │                 │                │                 │
+        │                │ 18. Consume completed → inbox 幂等  │               │
+        │                │─────────────────────────────────────────────────>│
+        │                │                 │                │ 19. comic→READY，│
+        │                │                 │                │     task→SUCCESS │
+        │                │                 │                │────────────────>│
+        │                │                 │                │                 │
 ```
 
 ---
@@ -471,6 +517,8 @@ public enum SourceType { ZIP, DIRECTORY, EHENTAI }
 ## 9. metadata.json 结构
 
 Worker 写入 `MANGA_ROOT/metadata/{taskId}.json` 与 `MANGA_ROOT/metadata/{comicId}.json`（同一内容），API 读取后 staging 落库；`{comicId}.json` 同时是 DB 记录丢失后 RecoveryEngine 的恢复依据。
+
+> **canonical metadata**：导入期 Worker 写出的 `{comicId}.json` 为 globalOrder 暂存布局，仅服务 staging 落库；全部章节最终化 READY 后，API 经 `MetadataRefreshEvent(taskId, comicId)` 请求 Worker 从 DB 重建 `{comicId}.json`（hqPath 天然为 `{comicId}/{chapterId}` 最终布局，原子写入）。此后 `{comicId}.json` 才是灾难恢复与转码/刷新重建共用的 canonical 副本。
 
 **结构示例**（metadata v3）：
 
@@ -529,7 +577,7 @@ Worker 写入 `MANGA_ROOT/metadata/{taskId}.json` 与 `MANGA_ROOT/metadata/{comi
 - `chapters[].globalOrder`: 全书阅读顺序（DFS 1..N），决定 prev/next 章节
 - `mediaItems[].fileName`: 媒体文件名（图片或视频，保留原始文件名）
 - `mediaItems[].mediaType`: 媒体类型（`IMAGE` / `VIDEO`）
-- `mediaItems[].hqPath`: **暂存期**目标路径 `{comicId}/{globalOrder}/{fileName}`；最终化后 DB 中的 `page.hq_path` 由 API 按事件 `targetDir` 修正为 `{comicId}/{chapterId}/{fileName}`（metadata 文件保持暂存布局，供恢复引擎映射）
+- `mediaItems[].hqPath`: **导入期暂存布局** `{comicId}/{globalOrder}/{fileName}`；最终化后 DB 中的 `page.hq_path` 由 API 按事件 `targetDir` 修正为 `{comicId}/{chapterId}/{fileName}`。canonical metadata 由 DB 重建，重建后的 `metadata/{comicId}.json` 中 hqPath 即最终布局 `{comicId}/{chapterId}/{fileName}`（导入期暂存布局只在重建前短暂存在）
 - `mediaItems[].hqStatus` / `lqStatus`: 文件状态（staging 期 PENDING / NOT_GENERATED）
 - `mediaItems[].width` / `height`: 图片尺寸；视频条目额外带 `duration` / `container` / `videoCodec` / `audioCodec`
 

@@ -93,14 +93,15 @@ API 提交漫画集根路径
 → 分析图片尺寸和视频 ffprobe 元数据
 → 按统一兼容策略标记视频
 → 生成封面
-→ 媒体进入 MANAGED 暂存位置
-→ 生成导入 metadata 快照
+→ 媒体进入 MANAGED 暂存位置（hq/{comicId}/{globalOrder}，DB ID 生成前暂存键）
+→ 生成导入 metadata 快照（globalOrder 暂存布局）
 → Worker 发布导入完成事件
 → API 批量写入 catalog/chapter/page
 → API 逐章提交存储最终化命令
-→ Worker 将暂存目录最终化为 chapterId 布局
+→ Worker 将暂存目录最终化为 chapterId 布局（hq/{comicId}/{chapterId}）
 → API 确认全部章节 READY
-→ 重建规范化 metadata.json
+→ task → FINALIZING，发出 MetadataRefreshEvent 请求 DB→JSON 重建
+→ Worker 从 DB 重建 canonical metadata.json（chapterId 布局）
 → comic READY、import_task SUCCESS
 ```
 
@@ -123,7 +124,9 @@ HQ/{comicId}/{globalOrder}
 → HQ/{comicId}/{chapterId}
 ```
 
-最终数据库中的 `hqPath` 必须指向 `{comicId}/{chapterId}/{fileName}`。导入完成事件只表示解析和暂存完成；只有全部章节最终化成功后，漫画才能进入 READY。
+最终数据库中的 `hqPath` 必须指向 `{comicId}/{chapterId}/{fileName}`。导入完成事件只表示解析和暂存完成；只有全部章节最终化成功且 canonical metadata 重建成功后，漫画才能进入 READY。
+
+**路径规范**：正式文件路径统一为 `{comicId}/{chapterId}`；`globalOrder` 只承担两个职责——阅读顺序（prev/next）与导入暂存键（DB ID 生成前使用）。任何按 DB 路径操作（回收 manifest、转码、LQ、HQ 删除、恢复）都必须读取 `page.hq_path`/`lq_path` 真实值，禁止用 `globalOrder` 猜测目录。
 
 ### 4.4 封面规则
 
@@ -164,12 +167,14 @@ API 根据 comicId 创建导出任务
 ## 6. LQ 生成
 
 ```text
-API 根据 comicId 查询 HQ READY 的图片
-→ 创建漫画任务及逐媒体任务项
+API 根据目标类型查询 HQ READY 的图片
+→ 创建漫画任务及逐媒体任务项（targetType = COMIC / CHAPTER）
 → Worker 调用 image-optimizer
 → 生成 LQ/{comicId}/{chapterId}/{fileName}.webp
 → Worker 发布逐项结果
-→ API 更新 lqRoot、lqPath 和 lqStatus
+→ API 按 targetType 分流校验归属：COMIC 目标校验 media 属于该漫画任一章，
+  CHAPTER 目标校验 media 属于该章节（不得跨章节/跨漫画误判）
+→ 校验通过后更新 lqRoot、lqPath 和 lqStatus
 ```
 
 约束：
@@ -186,9 +191,9 @@ API 根据 comicId 查询 HQ READY 的图片
 ```text
 API 根据 comicId 查询 transcodeStatus=REQUIRED 的视频
 → 创建逐视频任务项
-→ Worker 调用 ffmpeg 输出临时文件
-→ ffprobe 验证容器、视频编码、音频编码和时长
-→ 原子替换或发布标准视频
+→ Worker 调用 ffmpeg 输出 .probe.mp4 临时文件（MediaAnalyzer 扩展名门禁可识别）
+→ ffprobe 验证容器、视频编码、音频编码和时长（输出不兼容不发布成功）
+→ 验证通过后才原子发布为标准视频
 → Worker 发布逐项结果
 → API 更新媒体字段和转码状态
 → Outbox 触发 metadata.json 重建
@@ -197,6 +202,8 @@ API 根据 comicId 查询 transcodeStatus=REQUIRED 的视频
 兼容性不能只根据扩展名判断，必须统一检查容器、视频编码、音频编码、像素格式和浏览器播放能力。
 
 只处理 `REQUIRED`；不得重复处理 `QUEUED`、`TRANSCODING` 或 `READY`。转码成功且验证通过前不得删除或覆盖原文件。取消、超时和线程中断时必须终止完整 ffmpeg 进程树并清理临时文件。
+
+**临时文件扩展名约定**：临时产物必须以 `.probe.mp4` 结尾（而非 `.mp4.tmp`），保证 `MediaAnalyzer` 扩展名门禁可识别为视频并完成 ffprobe 验证；`MediaAnalyzer` 的容器字段统一去掉扩展名前导点（`.mp4` → `mp4`），与兼容判定矩阵保持一致。
 
 ## 8. 媒体元数据刷新
 
@@ -236,13 +243,15 @@ MySQL → 规范化快照 → 原子覆盖 METADATA/{comicId}.json
 
 自动触发：
 
-- 导入最终化完成。
+- 导入最终化完成：全部章节 READY 后 task 进入 FINALIZING，API 发出 `MetadataRefreshEvent(taskId, comicId)`（comic.export.metadata.refresh.requested），Worker `MetadataRefreshHandler` 从 DB 重建（hqPath 天然为 `{comicId}/{chapterId}` 最终布局），发布 `ImportMetadataRefreshCompletedEvent` / `ImportMetadataRefreshFailedEvent`（comic.import exchange），API `ImportMetadataRefreshResultHandler` inbox 幂等消费后才置 comic READY / task SUCCESS。
 - 视频转码成功。
 - 媒体元数据刷新成功。
 - HQ 状态或媒体路径发生变化。
 - 回收站恢复完成。
 
 同时保留按 comicId 的手动维护入口，用于修复 JSON 缺失、损坏或与数据库不一致。该操作不扫描媒体文件、不改变数据库、不生成 LQ、不转码，也不通过 HTTP 传输 JSON 文件内容。
+
+**单一元数据刷新拓扑**：孤儿视频元数据修复管线（F6-10）已下线，其事件/handler/MQ 常量/Rabbit bean 全部移除。当前 DB→JSON 维护链只有两条：`COMIC/METADATA_REFRESH` 管理命令（用户手动维护）与导入收尾的 metadata 重建（`MetadataRefreshEvent` taskId 非空分支）。新能力不得另建第三套元数据重建管线。
 
 规范化 metadata 至少保存：
 
@@ -266,9 +275,9 @@ HQ 删除是质量层级优化，不是漫画删除：
 ```text
 API 校验图片已有可用 LQ
 → 创建逐媒体 HQ 删除任务
-→ Worker 删除对应 HQ 文件
+→ Worker 仅删除 media_type='IMAGE' 的 HQ 文件（VIDEO 文件/状态/统计不触碰）
 → Worker 发布结果
-→ API 设置 hqStatus=DELETED，保留 lqRoot/lqPath
+→ API 仅对 IMAGE 设置 hqStatus=DELETED，保留 lqRoot/lqPath；VIDEO 保持 READY 不变
 → metadata.json 重建
 ```
 
@@ -280,7 +289,7 @@ HQ READY → 使用 HQ
 否则 → 媒体不可用
 ```
 
-删除前必须确认媒体是图片、LQ 状态 READY、LQ 文件真实可读，并且媒体不在生成、回收、恢复或删除中。视频默认不参与 HQ 删除。
+删除前必须确认媒体是图片（`media_type='IMAGE'`）、LQ 状态 READY、LQ 文件真实可读，并且媒体不在生成、回收、恢复或删除中。**视频（VIDEO）默认不参与 HQ 删除**——Worker 与 API 双侧都只处理 IMAGE，杜绝"视频文件被删而 DB 仍 READY"的数据丢失。
 
 ## 12. 回收站
 
@@ -289,7 +298,8 @@ HQ READY → 使用 HQ
 ```text
 READY
 → TRASHING
-→ API 生成不可变 Trash Manifest
+→ API 生成不可变 Trash Manifest（逐媒体使用 DB 真实 hqRoot/hqPath 与 lqRoot/lqPath，
+  不按 globalOrder 猜目录、不做目录聚合）
 → Worker 按清单移动 HQ/LQ/封面/metadata 到 TRASH
 → API 将 comic/chapter/page 更新为 TRASHED
 ```
@@ -396,7 +406,7 @@ READY → TRASHING → TRASHED → RESTORING → READY
 - 所有数据库结构变更使用新的 Flyway 迁移，不修改已应用脚本。
 - Controller 只做协议适配；Service 编排事务；Mapper 使用参数绑定、明确列名和受控批量。
 - 文件扫描、压缩、图片优化和 ffmpeg 不得位于数据库事务内。
-- 路径必须 normalize 并限制在配置根目录，拒绝绝对注入、`..`、符号链接逃逸和非普通文件。
+- 路径必须经 `StorageRoot`/`ApiStorageRoot.resolve()` 双重防线校验：词法（normalize + startsWith）拦截 `../` 穿越与绝对路径注入；真实路径 containment（toRealPath）拒绝 symlink/junction/reparse point 逃出根；每次解析重新校验避免 TOCTOU 窗口。
 - 大文件流式处理，临时文件有清理策略，外部进程有超时、取消和完整进程树回收。
 - 状态、事件、数据库、API DTO、前端类型和文档必须同步更新。
 - 真实验收必须覆盖 MySQL、RabbitMQ 和共享文件根；Docker/Testcontainers 跳过不视为通过。

@@ -146,18 +146,22 @@ PARSING        ──► FAILED
 IMPORTING      ─────┘
    │
    ▼
-SUCCESS
+FINALIZING     ──► FAILED
+   │                ▲
+   ▼                │
+SUCCESS        ─────┘
 ```
 
 | 状态 | 含义 |
 |------|------|
 | `PENDING` | 任务已创建，等待 Worker 消费 |
 | `PARSING` | Worker 正在解析来源（DirectoryParser / MetadataAssembler） |
-| `IMPORTING` | 文件搬运到 HQ 存储中 |
-| `SUCCESS` | 导入完成，metadata.json 已写入，API 侧已落库 |
+| `IMPORTING` | 文件搬运到 HQ 存储中（staging 落库 + 逐章最终化） |
+| `FINALIZING` | 全部章节存储最终化完成，等待 DB→JSON 元数据重建成功结果（防重标记，防止乱序/重投的 finalize.completed 重复触发收尾） |
+| `SUCCESS` | 导入完成：canonical metadata.json 重建成功，API 已收尾 |
 | `FAILED` | 导入失败，可通过 retry 重置回 PENDING |
 
-> v1.0 起任务状态统一收敛到 `ManagementTaskStatus`（QUEUED/RUNNING/.../SUCCEEDED/FAILED）与 `TaskStage`（DOWNLOADING/EXTRACTING/PARSING 子阶段）。`ImportTaskStatus` 枚举保留为导入进度状态（`PENDING/PARSING/IMPORTING/SUCCESS/FAILED`），终态为 SUCCESS/FAILED。
+> v1.0 起任务状态统一收敛到 `ManagementTaskStatus`（QUEUED/RUNNING/.../SUCCEEDED/FAILED）与 `TaskStage`（DOWNLOADING/EXTRACTING/PARSING 子阶段）。`ImportTaskStatus` 枚举保留为导入进度状态（`PENDING/PARSING/IMPORTING/FINALIZING/SUCCESS/FAILED/CANCELLED`），终态为 SUCCESS/FAILED/CANCELLED；`FINALIZING` 为全部章节最终化完成、等待元数据重建成功结果的中间态。
 
 > 完整导入流水线设计见 [`docs/architecture/02-import-pipeline.md`](architecture/02-import-pipeline.md)。
 
@@ -185,6 +189,8 @@ POST /api/storage/delete-hq/chapters/{chapterId}   # 单章删除 HQ
 
 删除漫画/章节的 HQ 高清图片以释放磁盘空间。LQ 缩略图不受影响。
 状态：READY → DELETED（通过 MQ 异步完成）
+
+> **仅 IMAGE**：HQ 删除只处理 `media_type='IMAGE'` 的媒体。视频（VIDEO）的 HQ 文件、状态与存储统计不触碰，Worker 与 API 双侧均过滤 IMAGE，避免"视频文件被删而 DB 仍 READY"的数据丢失。
 
 > 存储操作统一收敛到 `/api/storage` 形态（见第 20 节）。旧端点 `/api/comics/{comicId}/delete-hq` 等已移除。
 
@@ -247,12 +253,12 @@ DELETE /api/admin/comics/{id}?mode=DATABASE_ONLY  # 兼容入口，v1.0 起重�
 ### 存储查询
 
 ```
-GET /api/storage/stats                       # 存储统计摘要（total/hq/lq/thumb/comicCount，见第 20 节）
+GET /api/storage/stats                       # 存储统计摘要（totalBytes/hqBytes/lqBytes/thumbBytes/comicCount，见第 20 节）
 GET /api/admin/storage/comics?hqStatus=&lqStatus=&sort=&keyword=  # 漫画级存储列表
 GET /api/admin/storage/comics/{id}/chapters    # 章节级存储详情
 ```
 
-返回每个漫画/章节的 HQ/LQ 大小和状态，支持按 HQ/LQ 状态筛选和排序。
+返回每个漫画/章节的 HQ/LQ 大小和状态，支持按 HQ/LQ 状态筛选和排序。`StorageStatsDTO`：`hqBytes` / `lqBytes` / `thumbBytes` / `comicCount` / `totalBytes`（`totalBytes = hqBytes + lqBytes + thumbBytes`，随 JSON 序列化，供前端"总大小"展示）。
 
 ### 视频转码
 
@@ -262,6 +268,8 @@ POST /api/storage/transcode/chapters/{chapterId}   # 单章
 ```
 
 触发漫画的视频转码补偿任务。扫描漫画下所有非标准格式视频（非 mp4/webm），标记为 PENDING 并发送 MQ。返回 `OperationSubmitResult`（`taskId`/`taskType`/`status`/`itemCount`，`taskId` 为空表示无可转码目标）。
+
+> **转码产物验证**：Worker 输出 `.probe.mp4` 临时文件（扩展名可被 `MediaAnalyzer` 门禁识别），ffmpeg 后经 ffprobe 验证容器/编码/时长，**验证通过才原子发布**为正式视频；不兼容的输出不发布成功。临时文件随任务清理。
 
 **transcode_status 状态机**：
 ```
@@ -802,6 +810,8 @@ Transcode: NOT_NEEDED → QUEUED           QUEUED → TRANSCODING, FAILED
 | 409 | 状态冲突 / 数据重复 / 幂等冲突 / 批量阻塞 | `IllegalStateTransitionException`、`DuplicateKeyException`、`ConflictException`、`BatchConflictException` |
 | 500 | 服务器内部错误 | `BusinessException`（默认）/ 未捕获异常 |
 
+> **前端业务错误处理（v1.1）**：`frontend/src/services/api.ts` 拦截器只在 `code == 200` 时解包 `data`；业务 `code` 非 200 时以 `Promise.reject` 抛出并保留 `error.code` / `error.message` / `error.response` 结构（含 `response.data`），调用方 `catch` 分支可读到原始业务错误与原因码，不再出现"HTTP 200 + 业务失败被静默吞掉"的误导性成功提示。
+
 批量操作原因码（`data.reasonCode`，来自 `BatchReasonCode`）：
 
 ```
@@ -842,7 +852,7 @@ OP_NOT_ALLOWED, COMIC_NOT_FOUND
 
 ### 18.4 MQ 路由表
 
-共享事件 DTO 共 **36 个事件 record**（`ComicEvent` sealed 接口 + 各域事件）。队列契约与 AGENTS.md 一致：
+共享事件 DTO 共 **32 个事件 record**（`ComicEvent` sealed 接口 + 各域事件）。队列契约与 AGENTS.md 一致：
 
 | Exchange | RoutingKey | Queue | Consumer |
 |----------|-----------|-------|----------|
@@ -852,6 +862,8 @@ OP_NOT_ALLOWED, COMIC_NOT_FOUND
 | comic.import | import.storage.finalize.requested | import.storage.finalize.requested.queue | Worker ImportStorageFinalizeHandler |
 | comic.import | import.storage.finalize.completed | import.storage.finalize.completed.queue | API ImportStorageFinalizeEventHandler |
 | comic.import | import.storage.finalize.failed | import.storage.finalize.failed.queue | API ImportStorageFinalizeEventHandler |
+| comic.import | import.metadata.refresh.completed | import.metadata.refresh.completed.queue | API ImportMetadataRefreshResultHandler |
+| comic.import | import.metadata.refresh.failed | import.metadata.refresh.failed.queue | API ImportMetadataRefreshResultHandler |
 | comic.task | status.changed | task.status.queue | API ImportEventHandler |
 | comic.task | cancel.requested | cancel.task.queue | Worker CancelHandler |
 | comic.image | hq.delete.requested | hq.delete.queue | Worker HqDeleteHandler |
@@ -876,7 +888,7 @@ OP_NOT_ALLOWED, COMIC_NOT_FOUND
 
 **死信**：主队列除 comic.task（task.status.queue / cancel.task.queue 无 DLX）外均配置 DLX + DLQ（comic.import.dlx / comic.image.dlx / comic.export.dlx / comic.recovery.dlx / comic.scan.dlx / comic.management.dlx）。DLQ 消息可通过 `/api/admin/dlq/*` 查看、重放或清理（见第 11 节）。
 
-> **Broker 遗留实体清理**：代码已不再声明旧完整删除（comic.delete）的 exchange/queue/DLQ（`delete.task.queue` / `delete.result.queue` / `comic.delete.dlx` 等），也不再声明旧 LQ/视频转码专用 MQ 管线（`lq.generate.queue` / `lq.result.queue` / `video.transcode*` / `comic.video` / `comic.video.dlx`）。但已运行 Broker 中残留的 durable 实体不会被 Spring 自动删除，需用户在停服且确认无消息后单独人工清理（RabbitMQ 管理台或 `rabbitmqctl`）；本计划不执行 Broker 删除。
+> **Broker 遗留实体清理**：代码已不再声明旧完整删除（comic.delete）的 exchange/queue/DLQ（`delete.task.queue` / `delete.result.queue` / `comic.delete.dlx` 等），也已下线孤儿视频元数据修复拓扑及其队列常量与 Rabbit bean（元数据维护链仅保留 `COMIC/METADATA_REFRESH` 与导入收尾重建）。但已运行 Broker 中残留的 durable 实体不会被 Spring 自动删除，需用户在停服且确认无消息后单独人工清理（RabbitMQ 管理台或 `rabbitmqctl`）；本计划不执行 Broker 删除。
 
 ---
 
@@ -929,3 +941,13 @@ OP_NOT_ALLOWED, COMIC_NOT_FOUND
 > 4. **成功点** = 合并提交 + CAS 释放 `REFRESHING → READY` + Outbox 重导出 `metadata.json`（`MetadataRefreshEvent`，安全 DB→JSON 链）；业务失败则任务 FAILED、释放锁并保留快照供排查。
 >
 > 批量 `METADATA_REFRESH` 资格与单项一致（仅 READY 漫画可执行）。
+
+### 20.1 路径契约（正式文件路径）
+
+所有按 DB 路径操作（回收 manifest、转码、LQ、HQ 删除、恢复）必须读取 `page.hq_path` / `page.lq_path` 真实值：
+
+- 正式文件路径统一为 `{comicId}/{chapterId}/{fileName}`（`hq_path` 最终布局）。
+- `globalOrder` 只承担两个职责：阅读顺序（prev/next）与导入暂存键（`hq/{comicId}/{globalOrder}`，DB ID 生成前使用），**禁止用 globalOrder 猜测目录**。
+- canonical metadata：导入最终化完成后 `metadata/{comicId}.json` 由 DB 重建（chapterId 布局，见导入流水线文档）；该文件是灾难恢复与转码/刷新重建的统一产物。
+- 存储根解析统一经 `StorageRoot`/`ApiStorageRoot.resolve()` 双重防线：词法校验（normalize + startsWith）+ 真实路径 containment（toRealPath），拒绝 `../` 穿越与经 symlink/junction/reparse point 逃出根。
+- HQ 删除只处理 IMAGE；LQ 只对 IMAGE 生成；转码只对 VIDEO。

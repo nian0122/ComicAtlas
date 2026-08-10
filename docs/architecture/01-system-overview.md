@@ -63,9 +63,12 @@ ComicAtlas 由四个运行时模块和一组基础设施组成。
 | `MetadataAssembler` | Worker | 将 `DirectoryTree` 转换为 `ComicMetadata`（注入 Catalog / Chapter / Page 结构） | 不碰文件系统 |
 | `StorageService` (接口) | Worker | 定义文件存储抽象：`transfer` / `resolve` / `exists` / `delete` | 不决定业务语义 |
 | `TransferService` (实现) | Worker | `StorageService` 的本地文件系统实现，按 `TransferMode`（COPY/MOVE）完成文件复制/移动、路径解析、存在性检查、删除 | 不写数据库 |
-| `ImportEventHandler` | API | 消费 `import.result.queue`，读取 metadata.json，INSERT catalog / chapter / page 到数据库；插入章节取得不可变 `chapterId`，逐章发送最终化请求；全部章节最终化完成才更新 comic 为 READY | 不碰文件系统 |
-| `ImportPersistenceService` | API | 两阶段落库编排：completed 插入结构并保持 IMPORTING/PENDING，finalize completed/failed 按章节累加收尾（全 READY → comic READY / task SUCCESS），失败可重试 | 不搬文件，不在事务内做 IO |
+| `StorageRoot` / `ApiStorageRoot` | Worker/API | 存储根解析：词法校验（normalize + startsWith）+ 真实路径 containment（toRealPath）双重防线，拒绝 `../` 穿越与经 symlink/junction/reparse point 逃出根 | 不决定业务语义 |
+| `ImportEventHandler` | API | 消费 `import.result.queue`，读取 metadata.json，INSERT catalog / chapter / page 到数据库；插入章节取得不可变 `chapterId`，逐章发送最终化请求；全部章节最终化完成才进入 metadata 重建收尾 | 不碰文件系统 |
+| `ImportPersistenceService` | API | 两阶段落库编排：completed 插入结构并保持 IMPORTING/PENDING，finalize completed/failed 按章节累加收尾；全部章节 READY 后 task → FINALIZING 并发 MetadataRefreshEvent 请求 DB→JSON 重建，重建成功结果事件后才 comic READY / task SUCCESS，失败可重试 | 不搬文件，不在事务内做 IO |
 | `ImportStorageFinalizeHandler` | Worker | 消费最终化请求，逐章把 `hq/{comicId}/{globalOrder}` 暂存目录移动到 `hq/{comicId}/{chapterId}`，每章发布 Completed | 不写数据库业务表 |
+| `MetadataRefreshHandler` | Worker | 消费 `MetadataRefreshEvent`（taskId 非空=导入收尾触发），从 DB 重建 `metadata/{comicId}.json`（hqPath 天然为 `{comicId}/{chapterId}` 最终布局），发布 ImportMetadataRefreshCompleted/Failed | 不写数据库业务表 |
+| `ImportMetadataRefreshResultHandler` | API | 消费 `import.metadata.refresh.completed/failed`，inbox 幂等后委托 Service 收尾：completed → comic READY / task SUCCESS；failed → task FAILED / comic IMPORT_FAILED | 不碰文件系统 |
 | `ReaderService` | API | 按 `global_order` 取 prev / next 章节，组装阅读器 DTO | 不生成图片，不管理物理文件 |
 | `FileUrlResolver` | API | 将 `Page` 实体转换为 HTTP URL（`/files/{root}/{path}`） | 不管理物理文件 |
 
@@ -113,8 +116,18 @@ ImportStorageFinalizeHandler (Worker)  <-- 消费 finalize.requested（两阶段
         |
         v
 ImportPersistenceService (API)  <-- 消费 finalize.completed
-  - 逐章 media/chapter → READY；全部章节完成（无 PENDING）才 UPDATE comic (status=READY)
-  - UPDATE import_task (status=SUCCESS)；任一章节失败则 FAILED/IMPORT_FAILED 可重试
+  - 逐章 media/chapter → READY；全部章节完成（pendingCount==0）
+  - 发 MetadataRefreshEvent(taskId, comicId) → task → FINALIZING（comic 仍 IMPORTING）
+        |
+        v
+MetadataRefreshHandler (Worker)  <-- 消费 comic.export.metadata.refresh.requested（taskId 非空分支）
+  - 从 DB 重建 metadata/{comicId}.json（hqPath 天然为 {comicId}/{chapterId} 最终布局，原子写入）
+  - 发送 MQ: comic.import.import.metadata.refresh.completed / failed
+        |
+        v
+ImportMetadataRefreshResultHandler (API)  <-- 消费 metadata 重建结果
+  - inbox 幂等：completed → comic READY / task SUCCESS
+  - failed → task FAILED / comic IMPORT_FAILED（可重试，旧 JSON 完整）
 ```
 
 ### Mermaid 流程图
@@ -137,7 +150,11 @@ flowchart TD
     M --> N["逐章发送 finalize.requested<br/>sourceDir=globalOrder → targetDir=chapterId"]
     N --> O[ImportStorageFinalizeHandler<br/>Worker Service]
     O --> P["逐章移动文件到 hq/{comicId}/{chapterId}<br/>发送 finalize.completed"]
-    P --> Q["全部章节完成后<br/>UPDATE comic → READY / task → SUCCESS"]
+    P --> Q["ImportPersistenceService<br/>全部章节 READY → task FINALIZING<br/>发 MetadataRefreshEvent"]
+    Q --> R[MetadataRefreshHandler<br/>Worker Service]
+    R --> S["从 DB 重建 metadata/{comicId}.json<br/>chapterId 最终布局，原子写入"]
+    S --> T[ImportMetadataRefreshResultHandler<br/>API Service]
+    T --> U["completed → comic READY / task SUCCESS<br/>failed → task FAILED / comic IMPORT_FAILED"]
 ```
 
 ### 其他数据流
@@ -145,8 +162,9 @@ flowchart TD
 | 流程 | 触发 | 路径 |
 |------|------|------|
 | 阅读 | 用户打开章节 | Frontend → API `ReaderService` → `FileUrlResolver` → Nginx 静态文件 |
-| LQ 生成 | 用户手动触发 | API 创建管理命令（`LQ_GENERATE`）→ MQ `comic.management.command.requested` → Worker `LqCommandHandler` 生成 LQ 图片 → 回传 `command.completed` → API 更新 media |
-| 视频转码 | 用户手动触发 | API 创建管理命令（`TRANSCODE`）→ MQ `comic.management.command.requested` → Worker `TranscodeCommandHandler` 转码 → 回传 `command.completed` → API 更新 media |
+| LQ 生成 | 用户手动触发 | API 创建管理命令（`LQ_GENERATE`，COMIC/CHAPTER 目标）→ MQ `comic.management.command.requested` → Worker `LqCommandHandler` 生成 LQ 图片（仅 IMAGE）→ 回传 `command.completed` → API 按 targetType 校验归属（COMIC 经章节归属校验、CHAPTER 按章节校验）后更新 media |
+| 视频转码 | 用户手动触发 | API 创建管理命令（`TRANSCODE`，MEDIA 目标）→ MQ `comic.management.command.requested` → Worker `TranscodeCommandHandler` 输出 `.probe.mp4` 临时文件，ffmpeg 转码 + ffprobe 验证容器/codec 后才原子发布 → 回传 `command.completed` → API 更新 media |
+| HQ 删除 | 用户手动触发 | API 创建管理命令（`HQ_DELETE`）→ MQ `comic.management.command.requested` → Worker 仅删除 `media_type='IMAGE'` 的 HQ 文件（VIDEO 文件/状态/统计不触碰）→ 回传 `command.completed` → API 仅对 IMAGE 置 hq_status=DELETED |
 | 漫画删除（回收） | 用户删除漫画 | API 创建管理任务（`COMIC_DELETE`）→ MQ `comic.management.command.requested` → Worker 移入 trash 卷 → API 更新生命周期为 `TRASHED`；永久删除走 `purge`（`TRASHED` + 7 天保留期 + 二次确认） |
 | 任务状态同步 | Worker 进度变化 | Worker `TaskStatusPublisher` → MQ `comic.task.status.changed` → API `ImportEventHandler` 更新 import_task |
 
@@ -156,13 +174,14 @@ flowchart TD
 
 ### 1. Worker 不写数据库，API 不碰文件系统
 
-这是系统最重要的边界。Worker 完成文件处理后，通过 MQ 事件通知 API，由 API 写入数据库。两者通过 `metadata.json` 文件传递结构化数据。导入采用**两阶段最终化**：Worker 先以 `globalOrder` 作为 DB ID 未生成前的漫画内暂存键把文件落到 `hq/{comicId}/{globalOrder}`（staging），API 读取 `metadata.json` 写入结构并生成不可变 `chapterId`，再逐章请求 Worker 把文件移动到正式 `hq/{comicId}/{chapterId}`；全部章节完成后 API 才将 comic 置为 READY、task 置为 SUCCESS。
+这是系统最重要的边界。Worker 完成文件处理后，通过 MQ 事件通知 API，由 API 写入数据库。两者通过 `metadata.json` 文件传递结构化数据。导入采用**两阶段最终化 + 元数据重建收尾**：Worker 先以 `globalOrder` 作为 DB ID 未生成前的漫画内暂存键把文件落到 `hq/{comicId}/{globalOrder}`（staging），API 读取 `metadata.json` 写入结构并生成不可变 `chapterId`，再逐章请求 Worker 把文件移动到正式 `hq/{comicId}/{chapterId}`；全部章节 READY 后 task 进入 **FINALIZING** 中间态，API 经 `MetadataRefreshEvent(taskId, comicId)` 请求 Worker 从 DB 重建 `metadata/{comicId}.json`（chapterId 最终布局），只有重建成功结果事件返回后 API 才将 comic 置为 READY、task 置为 SUCCESS。
 
 - Worker 产出：物理文件（暂存于 `hq/{comicId}/{globalOrder}`）+ `metadata.json` + 恢复清单
 - API 消费：读取 `metadata.json`，写入 catalog / chapter / page 表，生成 `chapterId` 并驱动最终化
 - Worker 再搬运：按 `chapterId` 把文件移动到 `hq/{comicId}/{chapterId}`（两阶段之第二阶段）
+- canonical metadata：最终化完成后 `metadata/{comicId}.json` 由 DB 重建（不再保留 globalOrder 暂存布局），是灾难恢复与转码/刷新重建的统一产物
 
-元数据刷新遵循同一边界：Worker 只读 DB 基线后按 `HQ/{comicId}/{chapterId}` 逐章扫描，写 STAGING 快照（SHA-256 + `databaseRevision`），API 校验后事务合并 DB（磁盘缺失行标记 `HQ MISSING`），CAS 释放 `REFRESHING → READY`，再经 Outbox 重导出 `metadata.json`（安全 DB→JSON 链）。
+元数据刷新遵循同一边界：Worker 只读 DB 基线后按 `HQ/{comicId}/{chapterId}` 逐章扫描，写 STAGING 快照（SHA-256 + `databaseRevision`），API 校验后事务合并 DB（磁盘缺失行标记 `HQ MISSING`），CAS 释放 `REFRESHING → READY`，再经 Outbox 重导出 `metadata.json`（安全 DB→JSON 链）。**单一元数据刷新拓扑**：孤儿视频元数据修复管线已下线（F6-10），`COMIC/METADATA_REFRESH` 管理命令与导入收尾的 metadata 重建是仅有的两条 DB→JSON 维护链。
 
 这条边界保证了 Worker 可以独立部署、独立扩缩，不会与 API 争抢数据库连接。
 
@@ -185,9 +204,18 @@ flowchart TD
 - `exists(ref)` — 检查文件是否存在
 - `delete(ref)` — 删除文件
 
+所有路径解析统一经 `StorageRoot`/`ApiStorageRoot.resolve()` 完成**双重防线校验**：
+
+1. **词法校验**：`normalize()` + `startsWith` 拦截 `../` 穿越与绝对路径注入；
+2. **真实路径 containment**：`toRealPath()` 比较根与目标的真实路径，拒绝经 symlink/junction/reparse point 逃出根（目标尚不存在时按最近已存在父目录校验，允许根内安全创建）。
+
+任一防线被击穿即抛 `PathTraversalException`，且每次解析都重新执行真实路径校验，避免"校验与 IO 之间链接被替换"的 TOCTOU 窗口。
+
 ### 4. 所有导入统一 MANAGED 存储
 
-当前阶段所有漫画统一使用 MANAGED 存储策略：文件搬入 `D:/manga/hq/{comicId}/{chapterId}/`，由 ComicAtlas 统一管理生命周期。DB 中 `page.hq_root` 存存储根 key（如 `HQ`），`page.hq_path` 存相对路径。
+当前阶段所有漫画统一使用 MANAGED 存储策略：文件搬入 `F:/manga/hq/{comicId}/{chapterId}/`，由 ComicAtlas 统一管理生命周期。DB 中 `page.hq_root` 存存储根 key（如 `HQ`），`page.hq_path` 存相对路径。
+
+**路径规范**：正式文件路径统一为 `{comicId}/{chapterId}` 布局；`globalOrder` 只承担两个职责——阅读顺序（prev/next）与导入暂存键（`hq/{comicId}/{globalOrder}`，DB ID 生成前使用）。任何按 DB 路径操作（回收 manifest、转码、LQ、HQ 删除、恢复）都必须读取 `page.hq_path`/`lq_path` 真实值，禁止用 `globalOrder` 猜测目录。
 
 ### 5. URL 统一由 FileUrlResolver 生成
 
