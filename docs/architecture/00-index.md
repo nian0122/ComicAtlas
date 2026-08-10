@@ -21,6 +21,7 @@
 | [06-api.md](./06-api.md) | API 组织原则、Controller/DTO 策略 | 后端、前端 |
 | [07-frontend.md](./07-frontend.md) | 前端目录结构、Layout、Router | 前端 |
 | [08-migration.md](./08-migration.md) | 0.2 迁移阶段计划 | 所有开发者 |
+| [09-media-lifecycle-capabilities.md](./09-media-lifecycle-capabilities.md) | 媒体处理与生命周期能力（导入、导出、LQ、转码、回收站、灾难恢复） | 所有开发者 |
 
 > 01-product / 02-navigation / 03-reading 为 0.2 时代历史设计文档，保留作归档参考；当前实现以 01-system-overview / 02-import-pipeline / 03-storage 为准。
 
@@ -40,3 +41,4 @@
 |------|------|------|
 | 2026-07-16 | 0.2 | 确立 Reading / Management 双域架构，冻结为开发基线 |
 | 2026-08-08 | 0.2 | 索引补充现行系统文档（01-system-overview / 02-import-pipeline / 03-storage），0.2 设计文档标注历史归档 |
+| 2026-08-10 | 0.2 | 新增媒体处理与生命周期能力目标设计 |

@@ -5,7 +5,7 @@
 | `api.md` | HTTP 接口与事件状态 |
 | `user-guide.md` | 用户指南 |
 | `development-guide.md` | 开发流程 |
-| `architecture/` | 系统设计与模块说明（ADR 决策记录位于 `architecture/adr/`） |
+| `architecture/` | 系统设计与模块说明（媒体处理与生命周期总览见 `architecture/09-media-lifecycle-capabilities.md`，ADR 位于 `architecture/adr/`） |
 | `operations/` | 部署运维 |
 | `testing/` | 测试与验收清单 |
 | `releases/` | 发布说明 |
