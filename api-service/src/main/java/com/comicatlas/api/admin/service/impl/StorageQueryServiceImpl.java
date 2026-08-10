@@ -52,6 +52,7 @@ public class StorageQueryServiceImpl implements StorageQueryService {
         dto.setCoverUrl(fileUrlResolver.resolveCover(comicId));
         dto.setHqStatus(aggregateHqStatus(dto.getHqStatus(), isEmpty));
         dto.setLqStatus(aggregateLqStatus(dto.getLqStatus(), isEmpty));
+        dto.setTranscodeStatus(aggregateTranscodeStatus(storageMapper.selectTranscodeStatus(comicId)));
         long hqSize = dto.getHqSize() != null ? dto.getHqSize() : 0;
         long lqSize = dto.getLqSize() != null ? dto.getLqSize() : 0;
         dto.setTotalSize(hqSize + lqSize);
@@ -107,17 +108,29 @@ public class StorageQueryServiceImpl implements StorageQueryService {
         if (isEmpty) { return "EMPTY"; }
         if (statuses == null || statuses.isEmpty()) { return "NOT_GENERATED"; }
         Set<String> set = Set.of(statuses.split(","));
+        // 活跃状态（生成中/排队中）优先于失败与静止状态，保证列表/详情轮询期间状态可见
+        if (set.contains("GENERATING")) { return "GENERATING"; }
+        if (set.contains("QUEUED")) { return "QUEUED"; }
         if (set.size() == 1) { return set.iterator().next(); }
         return "MIXED";
     }
 
+    /** 转码状态聚合优先级（从高到低取第一个命中）：TRANSCODING > QUEUED > FAILED > REQUIRED > READY > NOT_NEEDED。 */
+    private static final List<String> TRANSCODE_STATUS_PRIORITY = List.of(
+            "TRANSCODING", "QUEUED", "FAILED", "REQUIRED", "READY", "NOT_NEEDED");
+
+    /**
+     * 把对象（漫画/章节）下全部视频媒体的转码状态聚合成单一状态。
+     * <p>
+     * 输入为逗号分隔的去重集合；按 {@link #TRANSCODE_STATUS_PRIORITY} 从高到低取第一个命中。
+     * 无视频或状态集合为空时返回 NOT_NEEDED；数据库迁移前的历史遗留词汇统一回退为 NOT_NEEDED，不再透出。
+     */
     private String aggregateTranscodeStatus(String statuses) {
         if (statuses == null || statuses.isBlank()) { return "NOT_NEEDED"; }
         Set<String> set = Set.of(statuses.split(","));
-        if (set.contains("PROCESSING")) { return "PROCESSING"; }
-        if (set.contains("PENDING")) { return "PENDING"; }
-        if (set.contains("FAILED")) { return "FAILED"; }
-        if (set.size() == 1) { return set.iterator().next(); }
-        return "MIXED";
+        for (String priority : TRANSCODE_STATUS_PRIORITY) {
+            if (set.contains(priority)) { return priority; }
+        }
+        return "NOT_NEEDED";
     }
 }

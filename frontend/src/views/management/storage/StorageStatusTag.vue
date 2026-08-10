@@ -1,10 +1,21 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import type { TranscodeStatus } from '@/types'
 
 const props = defineProps<{
   status: string
   type: 'hq' | 'lq' | 'transcode'
 }>()
+
+/** 转码状态标签映射：六状态逐一穷举，随后端 TranscodeStatus 枚举同步维护。 */
+const TRANSCODE_STATUS_MAP: Record<TranscodeStatus, { type: string; text: string }> = {
+  NOT_NEEDED: { type: 'info', text: '无需转码' },
+  REQUIRED: { type: 'warning', text: '需要转码' },
+  QUEUED: { type: 'info', text: '排队中' },
+  TRANSCODING: { type: 'warning', text: '转码中' },
+  READY: { type: 'success', text: '已转码' },
+  FAILED: { type: 'danger', text: '转码失败' },
+}
 
 const STATUS_MAP: Record<string, Record<string, { type: string; text: string }>> = {
   hq: {
@@ -24,13 +35,7 @@ const STATUS_MAP: Record<string, Record<string, { type: string; text: string }>>
     QUEUED: { type: 'warning', text: '排队中' },
     GENERATING: { type: 'warning', text: '生成中' },
   },
-  transcode: {
-    NOT_NEEDED: { type: '', text: '' },
-    PENDING: { type: 'warning', text: '转码中' },
-    PROCESSING: { type: 'warning', text: '转码中' },
-    DONE: { type: 'success', text: '已转码' },
-    FAILED: { type: 'danger', text: '失败' },
-  },
+  transcode: TRANSCODE_STATUS_MAP,
 }
 
 const tagType = computed(() => STATUS_MAP[props.type]?.[props.status]?.type ?? '')

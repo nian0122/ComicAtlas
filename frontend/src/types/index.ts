@@ -326,6 +326,9 @@ export type HqStatus = 'READY' | 'DELETED' | 'MIXED' | 'EMPTY' | 'PENDING' | 'MI
 /** LQ 状态 */
 export type LqStatus = 'READY' | 'NOT_GENERATED' | 'MIXED' | 'EMPTY' | 'FAILED' | 'QUEUED' | 'GENERATING'
 
+/** 视频转码状态（与后端 TranscodeStatus 枚举一致；仅含六状态，不含数据库迁移前的旧词汇） */
+export type TranscodeStatus = 'NOT_NEEDED' | 'REQUIRED' | 'QUEUED' | 'TRANSCODING' | 'READY' | 'FAILED'
+
 /** 存储漫画列表项 */
 export interface ComicStorageItem {
   comicId: number
@@ -336,7 +339,7 @@ export interface ComicStorageItem {
   lqSize: number
   hqStatus: HqStatus
   lqStatus: LqStatus
-  transcodeStatus: 'NOT_NEEDED' | 'PENDING' | 'PROCESSING' | 'DONE' | 'FAILED'
+  transcodeStatus: TranscodeStatus
   chapterCount: number
   pageCount: number
 }

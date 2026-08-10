@@ -83,8 +83,13 @@ export const storageService = {
   },
 
   async transcodeVideos(comicId: number): Promise<OperationSubmitResult> {
-    const res = await adminApi.transcodeVideos(comicId)
-    return res.data
+    try {
+      const res = await adminApi.transcodeVideos(comicId)
+      return res.data
+    } catch (err) {
+      // 透出后端 message（409/500 场景由页面展示），与其他存储操作错误处理保持一致
+      throw new Error(extractMessage(err))
+    }
   },
 }
 

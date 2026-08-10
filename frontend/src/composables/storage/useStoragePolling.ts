@@ -42,11 +42,13 @@ export function useStoragePolling(store: ReturnType<typeof useStorageStore>) {
           shouldStop = true
         }
       } else if (type === StorageOperationType.GenerateLQ) {
-        if (comic && comic.lqStatus === 'READY') {
+        // LQ 仅 QUEUED/GENERATING 持续轮询，其余（READY/FAILED/NOT_GENERATED 等）停止
+        if (comic && comic.lqStatus !== 'QUEUED' && comic.lqStatus !== 'GENERATING') {
           shouldStop = true
         }
       } else if (type === StorageOperationType.TranscodeVideos) {
-        if (comic && (comic.transcodeStatus === 'DONE' || comic.transcodeStatus === 'NOT_NEEDED' || comic.transcodeStatus === 'FAILED')) {
+        // 转码仅 QUEUED/TRANSCODING 持续轮询，其余（REQUIRED/FAILED/READY/NOT_NEEDED）停止
+        if (comic && comic.transcodeStatus !== 'QUEUED' && comic.transcodeStatus !== 'TRANSCODING') {
           shouldStop = true
         }
       }

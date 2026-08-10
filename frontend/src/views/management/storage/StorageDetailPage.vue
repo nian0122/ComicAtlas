@@ -40,6 +40,10 @@
           <span class="ov-label">总文件数</span>
           <span class="ov-value">{{ comic?.pageCount ?? 0 }}</span>
         </div>
+        <div class="overview-item">
+          <span class="ov-label">视频转码</span>
+          <StorageStatusTag :status="comic?.transcodeStatus ?? 'NOT_NEEDED'" type="transcode" />
+        </div>
       </div>
     </section>
 
@@ -49,7 +53,15 @@
       <div class="ops-bar">
         <el-button type="danger" plain @click="onDeleteHQ">删除 HQ（保留 LQ）</el-button>
         <el-button type="primary" plain @click="onGenerateLQ">生成 LQ</el-button>
-        <el-button type="warning" plain @click="onTranscode">视频转码</el-button>
+        <el-button
+          type="warning"
+          plain
+          :disabled="transcodeControl.disabled"
+          :title="transcodeControl.title"
+          @click="onTranscode"
+        >
+          {{ transcodeControl.label }}
+        </el-button>
         <el-button type="success" plain @click="onExportZip">导出 ZIP</el-button>
         <el-button type="danger" @click="onTrashComic">移入回收站</el-button>
       </div>
@@ -125,6 +137,29 @@ const TRANSCODE_MAX_RETRIES = 12 // 60 秒
 const transcodePollTimer = ref<ReturnType<typeof setInterval> | null>(null)
 const transcodePollRetries = ref(0)
 
+/**
+ * 转码按钮资格：仅 REQUIRED/FAILED 可点击，QUEUED/TRANSCODING 禁用（进行中），
+ * READY/NOT_NEEDED 禁用（无需转码）；未知状态走安全禁用兜底，不崩溃。
+ */
+const transcodeControl = computed(() => {
+  switch (comic.value?.transcodeStatus) {
+    case 'REQUIRED':
+      return { label: '视频转码', disabled: false, title: '为所有视频发起转码' }
+    case 'FAILED':
+      return { label: '重试转码', disabled: false, title: '部分视频转码失败，可重新发起' }
+    case 'QUEUED':
+    case 'TRANSCODING':
+      return { label: '转码中', disabled: true, title: '转码任务进行中，请稍候' }
+    case 'READY':
+      return { label: '已转码', disabled: true, title: '视频均已转码' }
+    case 'NOT_NEEDED':
+      return { label: '无需转码', disabled: true, title: '该漫画无待转码视频' }
+    default:
+      return { label: '视频转码', disabled: true, title: '转码状态未知，暂时不可操作' }
+  }
+})
+
+/** 转码轮询：仅 QUEUED/TRANSCODING 持续轮询，其余终态（含 REQUIRED/FAILED/READY/NOT_NEEDED）停止。 */
 function startTranscodePolling() {
   stopTranscodePolling()
   transcodePollRetries.value = 0
@@ -132,14 +167,14 @@ function startTranscodePolling() {
     transcodePollRetries.value++
     await loadData()
     const status = comic.value?.transcodeStatus
-    if (status === 'DONE' || status === 'FAILED' || status === 'NOT_NEEDED') {
-      stopTranscodePolling()
+    if (status === 'QUEUED' || status === 'TRANSCODING') {
+      if (transcodePollRetries.value >= TRANSCODE_MAX_RETRIES) {
+        stopTranscodePolling()
+        ElMessage.warning('部分视频仍在后台处理，可稍后刷新页面查看结果')
+      }
       return
     }
-    if (transcodePollRetries.value >= TRANSCODE_MAX_RETRIES) {
-      stopTranscodePolling()
-      ElMessage.warning('部分视频仍在后台处理，可稍后刷新页面查看结果')
-    }
+    stopTranscodePolling()
   }, TRANSCODE_POLL_INTERVAL)
 }
 
@@ -303,7 +338,11 @@ async function onGenerateChapterLQ(chapterId: number) {
 
 async function onTranscode() {
   try {
-    await ElMessageBox.confirm('确认为该漫画的所有视频进行转码？', '视频转码', { type: 'info' })
+    await ElMessageBox.confirm('确认为该漫画的所有视频进行转码？', '视频转码', {
+      type: 'info',
+      confirmButtonText: '开始转码',
+      cancelButtonText: '取消',
+    })
   } catch { return }
   try {
     const result = await storageService.transcodeVideos(comicId)
