@@ -263,8 +263,14 @@ class ManagementStateMachineTest {
     class TranscodeTransitions {
 
         @Test
-        void notNeededToQueued() {
-            assertThatCode(() -> ManagementStateMachine.validateTranscodeTransition("NOT_NEEDED", "QUEUED"))
+        void requiredToQueued() {
+            assertThatCode(() -> ManagementStateMachine.validateTranscodeTransition("REQUIRED", "QUEUED"))
+                .doesNotThrowAnyException();
+        }
+
+        @Test
+        void failedToQueued() {
+            assertThatCode(() -> ManagementStateMachine.validateTranscodeTransition("FAILED", "QUEUED"))
                 .doesNotThrowAnyException();
         }
 
@@ -272,6 +278,41 @@ class ManagementStateMachineTest {
         void queuedToTranscoding() {
             assertThatCode(() -> ManagementStateMachine.validateTranscodeTransition("QUEUED", "TRANSCODING"))
                 .doesNotThrowAnyException();
+        }
+
+        @Test
+        void transcodingToReady() {
+            assertThatCode(() -> ManagementStateMachine.validateTranscodeTransition("TRANSCODING", "READY"))
+                .doesNotThrowAnyException();
+        }
+
+        @Test
+        void transcodingToFailed() {
+            assertThatCode(() -> ManagementStateMachine.validateTranscodeTransition("TRANSCODING", "FAILED"))
+                .doesNotThrowAnyException();
+        }
+
+        @Test
+        void requiredToReadyShouldThrow() {
+            assertThatThrownBy(() -> ManagementStateMachine.validateTranscodeTransition("REQUIRED", "READY"))
+                .isInstanceOf(IllegalStateTransitionException.class)
+                .hasFieldOrPropertyWithValue("reasonCode", "REQUIRED_TO_READY_FORBIDDEN");
+        }
+
+        @Test
+        void notNeededToQueuedShouldThrow() {
+            // 旧迁移表允许 NOT_NEEDED→QUEUED；新策略下未标记 REQUIRED 不得入队
+            assertThatThrownBy(() -> ManagementStateMachine.validateTranscodeTransition("NOT_NEEDED", "QUEUED"))
+                .isInstanceOf(IllegalStateTransitionException.class)
+                .hasFieldOrPropertyWithValue("reasonCode", "NOT_NEEDED_TO_QUEUED_FORBIDDEN");
+        }
+
+        @Test
+        void queuedToReadyShouldThrow() {
+            // 未排队直接转码非法：入队后必须先 TRANSCODING 才能 READY
+            assertThatThrownBy(() -> ManagementStateMachine.validateTranscodeTransition("QUEUED", "READY"))
+                .isInstanceOf(IllegalStateTransitionException.class)
+                .hasFieldOrPropertyWithValue("reasonCode", "QUEUED_TO_READY_FORBIDDEN");
         }
     }
 

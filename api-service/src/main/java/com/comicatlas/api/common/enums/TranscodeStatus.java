@@ -8,6 +8,8 @@ package com.comicatlas.api.common.enums;
 public enum TranscodeStatus {
     /** 无需转码（图片页或兼容格式视频） */
     NOT_NEEDED,
+    /** 需要转码但未进队列（等待用户手动触发） */
+    REQUIRED,
     /** 排队等待 Worker 转码 */
     QUEUED,
     /** Worker 正在转码 */

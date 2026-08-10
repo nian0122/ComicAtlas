@@ -79,9 +79,13 @@ public final class ManagementStateMachine {
     );
 
     // ======================== Transcode 状态 ========================
+    // 转码入口为 REQUIRED（VideoCompatibilityPolicy 判定需转码）或 FAILED（重试）：
+    // REQUIRED|FAILED -> QUEUED -> TRANSCODING -> READY|FAILED。
+    // 禁止未排队直接 READY（如 REQUIRED->READY、QUEUED->READY、NOT_NEEDED->QUEUED）。
 
     private static final Map<String, Set<String>> TRANSCODE_TRANSITIONS = Map.ofEntries(
-        Map.entry("NOT_NEEDED",   Set.of("QUEUED")),
+        Map.entry("NOT_NEEDED",   Set.of()),               // 终态：兼容无需转码
+        Map.entry("REQUIRED",     Set.of("QUEUED")),       // 需转码：仅可入队
         Map.entry("QUEUED",       Set.of("TRANSCODING", "FAILED")),
         Map.entry("TRANSCODING",  Set.of("READY", "FAILED")),
         Map.entry("READY",        Set.of()),
