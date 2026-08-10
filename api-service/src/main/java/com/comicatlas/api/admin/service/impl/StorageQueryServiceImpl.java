@@ -39,6 +39,7 @@ public class StorageQueryServiceImpl implements StorageQueryService {
             dto.setTranscodeStatus(aggregateTranscodeStatus(transcodeStatusMap.get(dto.getComicId())));
             long hqSize = dto.getHqSize() != null ? dto.getHqSize() : 0;
             long lqSize = dto.getLqSize() != null ? dto.getLqSize() : 0;
+            dto.setVideoSize(dto.getVideoSize() != null ? dto.getVideoSize() : 0);
             dto.setTotalSize(hqSize + lqSize);
         }
         return applyStatusFilter(list, query);
@@ -55,6 +56,7 @@ public class StorageQueryServiceImpl implements StorageQueryService {
         dto.setTranscodeStatus(aggregateTranscodeStatus(storageMapper.selectTranscodeStatus(comicId)));
         long hqSize = dto.getHqSize() != null ? dto.getHqSize() : 0;
         long lqSize = dto.getLqSize() != null ? dto.getLqSize() : 0;
+        dto.setVideoSize(dto.getVideoSize() != null ? dto.getVideoSize() : 0);
         dto.setTotalSize(hqSize + lqSize);
         return dto;
     }
@@ -71,6 +73,8 @@ public class StorageQueryServiceImpl implements StorageQueryService {
             boolean isEmpty = dto.getPageCount() == null || dto.getPageCount() == 0;
             dto.setHqStatus(aggregateHqStatus(dto.getHqStatus(), isEmpty));
             dto.setLqStatus(aggregateLqStatus(dto.getLqStatus(), isEmpty));
+            dto.setVideoSize(dto.getVideoSize() != null ? dto.getVideoSize() : 0);
+            dto.setTranscodeStatus(aggregateTranscodeStatus(dto.getTranscodeStatus()));
         }
         return list;
     }

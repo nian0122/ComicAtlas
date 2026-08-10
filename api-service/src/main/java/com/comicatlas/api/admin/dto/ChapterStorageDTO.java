@@ -10,6 +10,8 @@ public class ChapterStorageDTO {
     private Integer pageCount;
     private Long hqSize;
     private Long lqSize;
+    private Long videoSize;
     private String hqStatus;
     private String lqStatus;
+    private String transcodeStatus;
 }

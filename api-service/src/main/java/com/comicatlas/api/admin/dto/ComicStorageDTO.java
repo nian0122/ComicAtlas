@@ -10,6 +10,7 @@ public class ComicStorageDTO {
     private Long totalSize;
     private Long hqSize;
     private Long lqSize;
+    private Long videoSize;
     private String hqStatus;
     private String lqStatus;
     private String transcodeStatus;
