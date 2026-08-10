@@ -83,6 +83,11 @@ const router = createRouter({
           component: () => import('@/views/management/TaskPage.vue'),
         },
         {
+          path: 'tasks',
+          name: 'manage-tasks',
+          component: () => import('@/views/management/ManagementTaskPage.vue'),
+        },
+        {
           path: 'storage',
           name: 'manage-storage',
           component: () => import('@/views/management/storage/StoragePage.vue'),
@@ -97,6 +102,16 @@ const router = createRouter({
           path: 'metadata',
           name: 'manage-metadata',
           component: () => import('@/views/management/MetadataPage.vue'),
+        },
+        {
+          path: 'trash',
+          name: 'manage-trash',
+          component: () => import('@/views/management/TrashPage.vue'),
+        },
+        {
+          path: 'outbox',
+          name: 'manage-outbox',
+          component: () => import('@/views/management/OutboxPage.vue'),
         },
         {
           path: 'dlq',

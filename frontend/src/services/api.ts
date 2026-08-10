@@ -160,7 +160,7 @@ export const exportApi = {
 
 /** 统一管理任务中心 */
 export const managementTaskApi = {
-  list: (params: ManagementTaskQuery) => api.get('/management/tasks', { params }),
+  list: (params: ManagementTaskQuery) => api.get<PageResult<ManagementTaskVO>>('/management/tasks', { params }),
   get: (id: number) => api.get<ManagementTaskVO>(`/management/tasks/${id}`),
   getItems: (id: number) => api.get<ManagementTaskItemVO[]>(`/management/tasks/${id}/items`),
   create: (data: CreateManagementTaskRequest) => api.post<ManagementTaskVO>('/management/tasks', data),

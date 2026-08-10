@@ -41,6 +41,10 @@
             <el-icon :size="18"><List /></el-icon>
             <span>任务中心</span>
           </router-link>
+          <router-link to="/manage/tasks" class="sidenav-link" active-class="active">
+            <el-icon :size="18"><Operation /></el-icon>
+            <span>管理任务</span>
+          </router-link>
 
           <router-link to="/manage/storage" class="sidenav-link" active-class="active">
             <el-icon :size="18"><Coin /></el-icon>
@@ -49,6 +53,14 @@
           <router-link to="/manage/metadata" class="sidenav-link" active-class="active">
             <el-icon :size="18"><Tickets /></el-icon>
             <span>元数据</span>
+          </router-link>
+          <router-link to="/manage/trash" class="sidenav-link" active-class="active">
+            <el-icon :size="18"><Delete /></el-icon>
+            <span>回收站</span>
+          </router-link>
+          <router-link to="/manage/outbox" class="sidenav-link" active-class="active">
+            <el-icon :size="18"><DataAnalysis /></el-icon>
+            <span>Outbox</span>
           </router-link>
           <router-link to="/manage/dlq" class="sidenav-link" active-class="active">
             <el-icon :size="18"><WarningFilled /></el-icon>
@@ -88,6 +100,9 @@ import {
   User,
   QuestionFilled,
   InfoFilled,
+  DataAnalysis,
+  Delete,
+  Operation,
 } from '@element-plus/icons-vue'
 import { useImportStore } from '@/stores/management/import'
 
