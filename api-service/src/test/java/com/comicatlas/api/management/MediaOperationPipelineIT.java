@@ -42,6 +42,9 @@ import com.comicatlas.common.event.ManagementCommandProgressEvent;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.common.event.MetadataRefreshEvent;
 import com.comicatlas.common.event.MetadataRefreshScanCompletedEvent;
+import com.comicatlas.common.event.payload.LqGenerationResult;
+import com.comicatlas.common.event.payload.LqMediaResult;
+import com.comicatlas.common.event.payload.TranscodeMediaInfo;
 import com.comicatlas.common.util.MetadataSnapshotRevision;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -143,6 +146,8 @@ class MediaOperationPipelineIT {
         registry.add("outbox.relay.poll-interval-ms", () -> "600000");
         registry.add("outbox.relay.batch-size", () -> "50");
         registry.add("storage.roots.STAGING.path", () -> STAGING_TMP.toString());
+        // HQ 根：转码完成产物 containment 校验（事件 hqPath 必须位于 HQ 根内）
+        registry.add("storage.roots.HQ.path", () -> STAGING_TMP.resolve("hq").toString());
     }
 
     @Autowired private MediaOperationCommandService commandService;
@@ -236,11 +241,14 @@ class MediaOperationPipelineIT {
         await(() -> managementTaskService.getTask(cmd.taskId()).getStatus() == ManagementTaskStatus.RUNNING, "任务 RUNNING");
         await(() -> lqStatuses(chapter1.getId()).stream().allMatch("GENERATING"::equals), "页面 GENERATING");
 
-        // Worker 完成 → SUCCEEDED + READY
+        // Worker 完成 → SUCCEEDED + READY（携带逐媒体结果）
+        List<Media> ch1Pages = mediaMapper.selectList(new LambdaQueryWrapper<Media>()
+                .eq(Media::getChapterId, chapter1.getId())
+                .eq(Media::getMediaType, "IMAGE"));
         ManagementCommandCompletedEvent completed = new ManagementCommandCompletedEvent(
                 UUID.randomUUID(), Instant.now(), 1,
                 cmd.taskId(), cmd.itemId(), cmd.attempt(),
-                "LQ_GENERATE", "CHAPTER", chapter1.getId(), null);
+                "LQ_GENERATE", "CHAPTER", chapter1.getId(), null, lqResultAllReady(ch1Pages));
         rabbitTemplate.convertAndSend("comic.management", "command.completed", completed);
         await(() -> managementTaskService.getTask(cmd.taskId()).getStatus() == ManagementTaskStatus.SUCCEEDED, "任务 SUCCEEDED");
         await(() -> lqStatuses(chapter1.getId()).stream().allMatch("READY"::equals), "页面 READY");
@@ -254,6 +262,64 @@ class MediaOperationPipelineIT {
         assertThat(inboxMapper.selectCount(new LambdaQueryWrapper<com.comicatlas.api.outbox.entity.InboxReceipt>()
                 .eq(com.comicatlas.api.outbox.entity.InboxReceipt::getEventId, completed.eventId().toString())))
                 .isEqualTo(1);
+    }
+
+    // ======================== LQ 部分成功（Todo 6：逐媒体落库） ========================
+
+    @Test
+    @DisplayName("LQ 部分成功：2 READY + 1 FAILED → 媒体逐条落库、item/task PARTIALLY_SUCCEEDED、progress 与失败摘要正确")
+    void lqCommand_partialSuccess_appliesPerMedia() throws Exception {
+        // 额外插入第 3 页，构造 2 READY + 1 FAILED 场景
+        mediaMapper.insert(image(chapter1.getId(), 3, "1/1/003.jpg", 3000L));
+
+        OperationSubmitResultDTO result = commandService.requestLqForChapter(chapter1.getId(), false);
+        ManagementCommandRequestedEvent cmd = readSingleCommand(result.getTaskId());
+        assertThat(lqStatuses(chapter1.getId())).containsExactly("QUEUED", "QUEUED", "QUEUED");
+
+        publishProgress(cmd.taskId(), cmd.itemId(), cmd.attempt(), "LQ_GENERATE", "CHAPTER",
+                chapter1.getId(), 50, "生成中");
+        await(() -> lqStatuses(chapter1.getId()).stream().allMatch("GENERATING"::equals), "页面 GENERATING");
+
+        List<Media> pages = mediaMapper.selectList(new LambdaQueryWrapper<Media>()
+                .eq(Media::getChapterId, chapter1.getId())
+                .eq(Media::getMediaType, "IMAGE")
+                .orderByAsc(Media::getPageNumber));
+        assertThat(pages).hasSize(3);
+
+        LqGenerationResult lqResult = new LqGenerationResult(List.of(
+                readyResult(pages.get(0), 2048L),
+                readyResult(pages.get(1), 1024L),
+                failedResult(pages.get(2))), 2, 1, 3);
+        rabbitTemplate.convertAndSend("comic.management", "command.completed",
+                new ManagementCommandCompletedEvent(UUID.randomUUID(), Instant.now(), 1,
+                        cmd.taskId(), cmd.itemId(), cmd.attempt(),
+                        "LQ_GENERATE", "CHAPTER", chapter1.getId(), null, lqResult));
+
+        // item → PARTIALLY_SUCCEEDED + progress 100 + 失败摘要
+        await(() -> taskItemMapper.selectById(cmd.itemId()).getStatus() == ManagementTaskStatus.PARTIALLY_SUCCEEDED,
+                "item PARTIALLY_SUCCEEDED");
+        ManagementTaskItem item = taskItemMapper.selectById(cmd.itemId());
+        assertThat(item.getProgress()).isEqualTo(100);
+        assertThat(item.getErrorMessage()).contains("mediaId=" + pages.get(2).getId());
+
+        // 媒体逐条：2 READY（真实 lqPath/lqSize）+ 1 FAILED
+        List<Media> after = mediaMapper.selectList(new LambdaQueryWrapper<Media>()
+                .eq(Media::getChapterId, chapter1.getId())
+                .eq(Media::getMediaType, "IMAGE")
+                .orderByAsc(Media::getPageNumber));
+        assertThat(after).extracting(Media::getLqStatus)
+                .containsExactly(LqStatus.READY, LqStatus.READY, LqStatus.FAILED);
+        assertThat(after.get(0).getLqPath()).endsWith(".webp");
+        assertThat(after.get(0).getLqSize()).isEqualTo(2048L);
+        assertThat(after.get(1).getLqPath()).endsWith(".webp");
+        assertThat(after.get(1).getLqSize()).isEqualTo(1024L);
+
+        // 任务聚合：PARTIALLY_SUCCEEDED + progress 100 + 失败摘要
+        await(() -> taskMapper.selectById(cmd.taskId()).getStatus() == ManagementTaskStatus.PARTIALLY_SUCCEEDED,
+                "task PARTIALLY_SUCCEEDED");
+        ManagementTask task = taskMapper.selectById(cmd.taskId());
+        assertThat(task.getProgress()).isEqualTo(100);
+        assertThat(task.getErrorMessage()).contains("部分成功");
     }
 
     // ======================== 旧 attempt 结果不生效 + retry ========================
@@ -287,10 +353,14 @@ class MediaOperationPipelineIT {
         assertThat(itemAfterStale.getStatus()).isEqualTo(ManagementTaskStatus.QUEUED);
         assertThat(lqStatuses(chapter2.getId())).containsExactly("FAILED");
 
-        // 新 attempt=2 完成 → SUCCEEDED + READY
+        // 新 attempt=2 完成（携带逐媒体结果）→ SUCCEEDED + READY
+        List<Media> ch2Pages = mediaMapper.selectList(new LambdaQueryWrapper<Media>()
+                .eq(Media::getChapterId, chapter2.getId())
+                .eq(Media::getMediaType, "IMAGE"));
         rabbitTemplate.convertAndSend("comic.management", "command.completed",
                 new ManagementCommandCompletedEvent(UUID.randomUUID(), Instant.now(), 1,
-                        cmd.taskId(), cmd.itemId(), 2, "LQ_GENERATE", "CHAPTER", chapter2.getId(), null));
+                        cmd.taskId(), cmd.itemId(), 2, "LQ_GENERATE", "CHAPTER", chapter2.getId(),
+                        null, lqResultAllReady(ch2Pages)));
         await(() -> managementTaskService.getTask(cmd.taskId()).getStatus() == ManagementTaskStatus.SUCCEEDED, "任务 SUCCEEDED");
         await(() -> lqStatuses(chapter2.getId()).contains("READY"), "页面 READY");
         assertThat(managementTaskService.getTask(cmd.taskId()).getAttempt()).isEqualTo(2);
@@ -395,15 +465,26 @@ class MediaOperationPipelineIT {
         publishProgress(cmd.taskId(), cmd.itemId(), cmd.attempt(), "TRANSCODE", "MEDIA", video.getId(), 40, "转码中");
         await(() -> mediaMapper.selectById(video.getId()).getTranscodeStatus() == TranscodeStatus.TRANSCODING, "视频 TRANSCODING");
 
+        // 完成事件携带真实产物（确定性命名 + ffprobe 实测元数据）；API 按事件一次落库
+        String deterministicPath = "1/2/" + cmd.taskId() + "-" + cmd.itemId() + "-" + cmd.attempt()
+                + "-" + video.getId() + ".mp4";
+        TranscodeMediaInfo transcode = new TranscodeMediaInfo(new BigDecimal("12.34"), "mp4", "h264", "aac",
+                2048000L, "HQ", deterministicPath, 1280, 720);
         rabbitTemplate.convertAndSend("comic.management", "command.completed",
                 new ManagementCommandCompletedEvent(UUID.randomUUID(), Instant.now(), 1,
-                        cmd.taskId(), cmd.itemId(), 1, "TRANSCODE", "MEDIA", video.getId(), null));
+                        cmd.taskId(), cmd.itemId(), cmd.attempt(), "TRANSCODE", "MEDIA", video.getId(), transcode));
         await(() -> managementTaskService.getTask(cmd.taskId()).getStatus() == ManagementTaskStatus.SUCCEEDED, "任务 SUCCEEDED");
         await(() -> mediaMapper.selectById(video.getId()).getTranscodeStatus() == TranscodeStatus.READY, "视频 READY");
 
         Media reloaded = mediaMapper.selectById(video.getId());
         assertThat(reloaded.getContainer()).isEqualTo("mp4");
-        assertThat(reloaded.getHqPath()).endsWith(".mp4");
+        assertThat(reloaded.getHqRoot()).isEqualTo("HQ");
+        assertThat(reloaded.getHqPath()).isEqualTo(deterministicPath);
+        assertThat(reloaded.getHqStatus()).isEqualTo(HqStatus.READY);
+        assertThat(reloaded.getWidth()).isEqualTo(1280);
+        assertThat(reloaded.getHeight()).isEqualTo(720);
+        assertThat(reloaded.getDuration()).isEqualByComparingTo(new BigDecimal("12.34"));
+        assertThat(reloaded.getFileSize()).isEqualTo(2048000L);
     }
 
     @Test
@@ -726,6 +807,24 @@ class MediaOperationPipelineIT {
             p.setLqStatus(LqStatus.READY);
             mediaMapper.updateById(p);
         }
+    }
+
+    /** 构造全部 READY 的 LQ 结果（sourceHqPath 取自 DB，保证与校验一致）。 */
+    private LqGenerationResult lqResultAllReady(List<Media> pages) {
+        return new LqGenerationResult(pages.stream()
+                .map(p -> readyResult(p, 1024L))
+                .toList(), pages.size(), 0, pages.size());
+    }
+
+    private LqMediaResult readyResult(Media p, long size) {
+        return new LqMediaResult(p.getId(), p.getPageNumber(), p.getHqPath(),
+                LqMediaResult.STATUS_READY, "LQ",
+                p.getHqPath().replaceAll("\\.[^.]+$", ".webp"), size, null, null);
+    }
+
+    private LqMediaResult failedResult(Media p) {
+        return new LqMediaResult(p.getId(), p.getPageNumber(), p.getHqPath(),
+                LqMediaResult.STATUS_FAILED, null, null, 0L, "LQ_OPTIMIZE_FAILED", "优化失败");
     }
 
     private void await(Supplier<Boolean> cond, String desc) {

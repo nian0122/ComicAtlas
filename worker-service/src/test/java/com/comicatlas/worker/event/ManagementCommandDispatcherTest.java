@@ -17,8 +17,11 @@ import java.time.Instant;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -73,6 +76,25 @@ class ManagementCommandDispatcherTest {
         verify(lqCommandHandler).generateChapter(cmd);
         verify(lqCommandHandler, never()).generateComic(any());
         verify(publisher, never()).failed(eq(cmd), anyString());
+    }
+
+    @Test
+    void transcodeResultPublishFailure_requeuesWithoutFailed() throws Exception {
+        ManagementCommandRequestedEvent cmd = new ManagementCommandRequestedEvent(
+                UUID.randomUUID(), Instant.now(), 1, 1L, 1L, 1,
+                "TRANSCODE", "MEDIA", 42L);
+        doThrow(new TranscodeCommandHandler.TranscodeResultPublishException(
+                "转码结果发布失败", new RuntimeException("broker down")))
+                .when(transcodeCommandHandler).transcode(cmd);
+
+        dispatcher.handle(cmd, channel, 1L);
+
+        verify(transcodeCommandHandler).transcode(cmd);
+        // 产物已成功但结果未发出：不发布 failed（避免 API 误置 FAILED）
+        verify(publisher, never()).failed(eq(cmd), anyString());
+        // REQUEUE 策略：消息回到原队列重试，而非 ack/DLQ
+        verify(channel).basicReject(1L, true);
+        verify(channel, never()).basicAck(anyLong(), anyBoolean());
     }
 
     @Test

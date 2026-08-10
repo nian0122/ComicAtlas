@@ -5,14 +5,19 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.comic.entity.Comic;
+import com.comicatlas.api.comic.entity.Media;
 import com.comicatlas.api.comic.mapper.CatalogMapper;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.mapper.ComicTagMapper;
 import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.api.common.enums.ComicStatus;
+import com.comicatlas.api.common.enums.HqStatus;
+import com.comicatlas.api.common.enums.LqStatus;
 import com.comicatlas.api.common.enums.ManagementTaskStatus;
+import com.comicatlas.api.common.enums.MediaLifecycleStatus;
 import com.comicatlas.api.common.enums.TaskType;
+import com.comicatlas.api.common.enums.TranscodeStatus;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.common.exception.SnapshotUnavailableException;
 import com.comicatlas.api.common.storage.ApiStorageProperties;
@@ -32,9 +37,13 @@ import com.comicatlas.api.upload.mapper.UploadSessionMapper;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO;
+import com.comicatlas.common.event.ManagementCommandCompletedEvent;
 import com.comicatlas.common.event.ManagementCommandFailedEvent;
 import com.comicatlas.common.event.MetadataRefreshEvent;
 import com.comicatlas.common.event.MetadataRefreshScanCompletedEvent;
+import com.comicatlas.common.event.payload.LqGenerationResult;
+import com.comicatlas.common.event.payload.LqMediaResult;
+import com.comicatlas.common.event.payload.TranscodeMediaInfo;
 import com.comicatlas.common.mq.MqConsumerSupport;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -45,6 +54,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
@@ -54,9 +64,11 @@ import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -127,12 +139,23 @@ class ManagementCommandResultHandlerTest {
         // 单元测试无 Spring 上下文：注册实体 TableInfo 以支持 LambdaUpdateWrapper 解析
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), Comic.class);
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), ManagementTaskItem.class);
+        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), Media.class);
 
         staging = tempDir.resolve("staging");
         Files.createDirectories(staging);
         ApiStorageRoot stagingRoot = new ApiStorageRoot();
         stagingRoot.setPath(staging);
         lenient().when(apiStorageProperties.root("STAGING")).thenReturn(stagingRoot);
+
+        // LQ 根：供 LQ 完成结果路径 containment 校验（resolve 后必须位于 LQ 根内）
+        ApiStorageRoot lqStorageRoot = new ApiStorageRoot();
+        lqStorageRoot.setPath(tempDir.resolve("lq"));
+        lenient().when(apiStorageProperties.root("LQ")).thenReturn(lqStorageRoot);
+
+        // HQ 根：供转码完成产物路径 containment 校验（resolve 后必须位于 HQ 根内）
+        ApiStorageRoot hqStorageRoot = new ApiStorageRoot();
+        hqStorageRoot.setPath(tempDir.resolve("hq"));
+        lenient().when(apiStorageProperties.root("HQ")).thenReturn(hqStorageRoot);
 
         // 让 TransactionTemplate 直接执行回调（等价于短事务提交）
         lenient().doAnswer(invocation -> {
@@ -415,6 +438,452 @@ class ManagementCommandResultHandlerTest {
         handler.handleResult(ev, channel, 1L);
 
         verify(comicMapper).update(isNull(), any(LambdaUpdateWrapper.class));
+        verify(channel).basicAck(1L, false);
+    }
+
+    // ======================== LQ 完成逐媒体落库（Todo 6） ========================
+
+    private ManagementTaskItem lqItem() {
+        ManagementTaskItem item = new ManagementTaskItem();
+        item.setId(200L);
+        item.setTaskId(20L);
+        item.setTargetType("CHAPTER");
+        item.setTargetId(5L);
+        item.setOperationType(TaskType.LQ_GENERATE);
+        item.setStatus(ManagementTaskStatus.RUNNING);
+        item.setAttempt(1);
+        return item;
+    }
+
+    private Media lqMedia(Long id, Long chapterId, int page, String hqPath, LqStatus lqStatus) {
+        Media media = new Media();
+        media.setId(id);
+        media.setChapterId(chapterId);
+        media.setPageNumber(page);
+        media.setMediaType("IMAGE");
+        media.setHqRoot("HQ");
+        media.setHqPath(hqPath);
+        media.setHqStatus(HqStatus.READY);
+        media.setLqStatus(lqStatus);
+        media.setStatus(MediaLifecycleStatus.READY);
+        media.setVersion(1);
+        return media;
+    }
+
+    private ManagementCommandCompletedEvent lqCompletedEvent(LqGenerationResult result) {
+        return new ManagementCommandCompletedEvent(UUID.randomUUID(), Instant.now(), 1,
+                20L, 200L, 1, "LQ_GENERATE", "CHAPTER", 5L, null, result);
+    }
+
+    private LqMediaResult lqReady(Long mediaId, int page, String hqPath, String lqPath, long size) {
+        return new LqMediaResult(mediaId, page, hqPath, LqMediaResult.STATUS_READY,
+                "LQ", lqPath, size, null, null);
+    }
+
+    private LqMediaResult lqFailed(Long mediaId, int page, String hqPath) {
+        return new LqMediaResult(mediaId, page, hqPath, LqMediaResult.STATUS_FAILED,
+                null, null, 0L, "LQ_OPTIMIZE_FAILED", "优化失败");
+    }
+
+    /** 提取 LambdaUpdateWrapper 中 set 的字段值集合（用于断言落库内容）。 */
+    private static Collection<Object> setValues(LambdaUpdateWrapper<?> wrapper) {
+        return wrapper.getParamNameValuePairs().values();
+    }
+
+    @Test
+    @DisplayName("LQ happy：2 READY + 1 FAILED → 媒体逐条落库（lqSize 正确）、item=PARTIALLY_SUCCEEDED、progress=100、任务聚合")
+    void lqHappy_mixed_partialSucceeded() throws Exception {
+        when(managementTaskItemMapper.selectById(200L)).thenReturn(lqItem());
+        when(mediaMapper.selectById(1L)).thenReturn(lqMedia(1L, 5L, 1, "5/001.jpg", LqStatus.QUEUED));
+        when(mediaMapper.selectById(2L)).thenReturn(lqMedia(2L, 5L, 2, "5/002.jpg", LqStatus.GENERATING));
+        when(mediaMapper.selectById(3L)).thenReturn(lqMedia(3L, 5L, 3, "5/003.jpg", LqStatus.QUEUED));
+        when(managementTaskItemMapper.update(isNull(), any())).thenReturn(1);
+
+        LqGenerationResult result = new LqGenerationResult(List.of(
+                lqReady(1L, 1, "5/001.jpg", "5/001.webp", 512L),
+                lqReady(2L, 2, "5/002.jpg", "5/002.webp", 256L),
+                lqFailed(3L, 3, "5/003.jpg")), 2, 1, 3);
+        handler.handleResult(lqCompletedEvent(result), channel, 1L);
+
+        // item CAS → PARTIALLY_SUCCEEDED + progress=100
+        ArgumentCaptor<LambdaUpdateWrapper> itemCaptor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
+        verify(managementTaskItemMapper).update(isNull(), itemCaptor.capture());
+        assertThat(setValues(itemCaptor.getValue())).contains(
+                ManagementTaskStatus.PARTIALLY_SUCCEEDED, 100);
+
+        // 媒体逐条落库（3 条）：READY 页带 lqRoot/lqPath/lqSize，FAILED 页只置 FAILED
+        ArgumentCaptor<LambdaUpdateWrapper> mediaCaptor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
+        verify(mediaMapper, times(3)).update(isNull(), mediaCaptor.capture());
+        LambdaUpdateWrapper<?> ready1 = mediaCaptor.getAllValues().stream()
+                .filter(w -> setValues(w).contains("5/001.webp")).findFirst().orElseThrow();
+        assertThat(setValues(ready1)).contains(LqStatus.READY, "LQ", "5/001.webp", 512L);
+        LambdaUpdateWrapper<?> ready2 = mediaCaptor.getAllValues().stream()
+                .filter(w -> setValues(w).contains("5/002.webp")).findFirst().orElseThrow();
+        assertThat(setValues(ready2)).contains(256L);
+        LambdaUpdateWrapper<?> failed = mediaCaptor.getAllValues().stream()
+                .filter(w -> setValues(w).contains(LqStatus.FAILED))
+                .findFirst().orElseThrow();
+        assertThat(setValues(failed)).contains(LqStatus.FAILED);
+
+        verify(managementTaskService).reaggregateTask(20L);
+        verify(inboxService).markProcessed(anyString(), anyString(), eq(20L), eq(200L), eq(1));
+        verify(channel).basicAck(1L, false);
+    }
+
+    @Test
+    @DisplayName("LQ 全成功 → item=SUCCEEDED；全失败 → item=FAILED")
+    void lqAllSuccess_orAllFailed() throws Exception {
+        when(managementTaskItemMapper.selectById(200L)).thenReturn(lqItem());
+        when(mediaMapper.selectById(1L)).thenReturn(lqMedia(1L, 5L, 1, "5/001.jpg", LqStatus.QUEUED));
+        when(mediaMapper.selectById(2L)).thenReturn(lqMedia(2L, 5L, 2, "5/002.jpg", LqStatus.GENERATING));
+        when(managementTaskItemMapper.update(isNull(), any())).thenReturn(1);
+
+        LqGenerationResult allSuccess = new LqGenerationResult(List.of(
+                lqReady(1L, 1, "5/001.jpg", "5/001.webp", 512L),
+                lqReady(2L, 2, "5/002.jpg", "5/002.webp", 256L)), 2, 0, 2);
+        handler.handleResult(lqCompletedEvent(allSuccess), channel, 1L);
+        ArgumentCaptor<LambdaUpdateWrapper> successCaptor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
+        verify(managementTaskItemMapper).update(isNull(), successCaptor.capture());
+        assertThat(setValues(successCaptor.getValue())).contains(ManagementTaskStatus.SUCCEEDED);
+        verify(mediaMapper, times(2)).update(isNull(), any(LambdaUpdateWrapper.class));
+        verify(managementTaskService).reaggregateTask(20L);
+
+        // 全失败 → item=FAILED，媒体只置 FAILED
+        when(managementTaskItemMapper.selectById(200L)).thenReturn(lqItem());
+        when(mediaMapper.selectById(1L)).thenReturn(lqMedia(1L, 5L, 1, "5/001.jpg", LqStatus.QUEUED));
+        when(managementTaskItemMapper.update(isNull(), any())).thenReturn(1);
+        LqGenerationResult allFailed = new LqGenerationResult(List.of(lqFailed(1L, 1, "5/001.jpg")), 0, 1, 1);
+        handler.handleResult(lqCompletedEvent(allFailed), channel, 1L);
+        ArgumentCaptor<LambdaUpdateWrapper> failedCaptor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
+        verify(managementTaskItemMapper, times(2)).update(isNull(), failedCaptor.capture());
+        assertThat(setValues(failedCaptor.getAllValues().get(1))).contains(ManagementTaskStatus.FAILED);
+    }
+
+    @Test
+    @DisplayName("LQ 幂等·同 eventId（Inbox 已处理）：零更新，ACK")
+    void lqReplay_sameEventId_acked() throws Exception {
+        when(inboxService.isProcessed(anyString(), anyString())).thenReturn(true);
+
+        LqGenerationResult result = new LqGenerationResult(List.of(
+                lqReady(1L, 1, "5/001.jpg", "5/001.webp", 512L)), 1, 0, 1);
+        handler.handleResult(lqCompletedEvent(result), channel, 1L);
+
+        verifyNoInteractions(mediaMapper);
+        verify(managementTaskItemMapper, never()).update(any(), any());
+        verify(channel).basicAck(1L, false);
+    }
+
+    @Test
+    @DisplayName("LQ 幂等·不同 eventId 同 payload：item CAS 0 行 → 媒体零更新、不聚合，ACK")
+    void lqReplay_differentEventId_casLoser() throws Exception {
+        when(managementTaskItemMapper.selectById(200L)).thenReturn(lqItem());
+        when(mediaMapper.selectById(1L)).thenReturn(lqMedia(1L, 5L, 1, "5/001.jpg", LqStatus.QUEUED));
+        when(managementTaskItemMapper.update(isNull(), any())).thenReturn(0);
+
+        LqGenerationResult result = new LqGenerationResult(List.of(
+                lqReady(1L, 1, "5/001.jpg", "5/001.webp", 512L)), 1, 0, 1);
+        handler.handleResult(lqCompletedEvent(result), channel, 1L);
+
+        verify(mediaMapper, never()).update(any(), any());
+        verify(managementTaskItemMapper).update(isNull(), any(LambdaUpdateWrapper.class));
+        verify(managementTaskService, never()).reaggregateTask(any());
+        verify(channel).basicAck(1L, false);
+    }
+
+    @Test
+    @DisplayName("LQ 幂等·旧 attempt：item attempt 不匹配 → 零更新，ACK")
+    void lqReplay_staleAttempt_acked() throws Exception {
+        ManagementTaskItem item = lqItem();
+        item.setAttempt(2);
+        when(managementTaskItemMapper.selectById(200L)).thenReturn(item);
+
+        LqGenerationResult result = new LqGenerationResult(List.of(
+                lqReady(1L, 1, "5/001.jpg", "5/001.webp", 512L)), 1, 0, 1);
+        handler.handleResult(lqCompletedEvent(result), channel, 1L);
+
+        verify(mediaMapper, never()).update(any(), any());
+        verify(managementTaskItemMapper, never()).update(any(), any());
+        verify(channel).basicAck(1L, false);
+    }
+
+    @Test
+    @DisplayName("LQ 幂等·已终态 item：零更新，ACK")
+    void lqReplay_terminalItem_acked() throws Exception {
+        ManagementTaskItem item = lqItem();
+        item.setStatus(ManagementTaskStatus.SUCCEEDED);
+        when(managementTaskItemMapper.selectById(200L)).thenReturn(item);
+
+        LqGenerationResult result = new LqGenerationResult(List.of(
+                lqReady(1L, 1, "5/001.jpg", "5/001.webp", 512L)), 1, 0, 1);
+        handler.handleResult(lqCompletedEvent(result), channel, 1L);
+
+        verify(mediaMapper, never()).update(any(), any());
+        verify(managementTaskItemMapper, never()).update(any(), any());
+        verify(channel).basicAck(1L, false);
+    }
+
+    @Test
+    @DisplayName("LQ 越权·mediaId 不属于目标章节：媒体零更新、item FAILED、ACK")
+    void lqEscalation_mediaNotInTargetChapter() throws Exception {
+        when(managementTaskItemMapper.selectById(200L)).thenReturn(lqItem());
+        when(mediaMapper.selectById(1L)).thenReturn(lqMedia(1L, 999L, 1, "999/001.jpg", LqStatus.QUEUED));
+        when(managementTaskItemMapper.update(isNull(), any())).thenReturn(1);
+
+        LqGenerationResult result = new LqGenerationResult(List.of(
+                lqReady(1L, 1, "999/001.jpg", "5/001.webp", 512L)), 1, 0, 1);
+        handler.handleResult(lqCompletedEvent(result), channel, 1L);
+
+        verify(mediaMapper, never()).update(any(), any());
+        ArgumentCaptor<LambdaUpdateWrapper> itemCaptor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
+        verify(managementTaskItemMapper).update(isNull(), itemCaptor.capture());
+        assertThat(setValues(itemCaptor.getValue())).contains(ManagementTaskStatus.FAILED);
+        verify(managementTaskService).reaggregateTask(20L);
+        verify(channel).basicAck(1L, false);
+    }
+
+    @Test
+    @DisplayName("LQ 越权·sourceHqPath 与 DB 不一致：媒体零更新、item FAILED、ACK")
+    void lqEscalation_sourceHqPathMismatch() throws Exception {
+        when(managementTaskItemMapper.selectById(200L)).thenReturn(lqItem());
+        when(mediaMapper.selectById(1L)).thenReturn(lqMedia(1L, 5L, 1, "5/001.jpg", LqStatus.QUEUED));
+        when(managementTaskItemMapper.update(isNull(), any())).thenReturn(1);
+
+        LqGenerationResult result = new LqGenerationResult(List.of(
+                lqReady(1L, 1, "5/OTHER.jpg", "5/001.webp", 512L)), 1, 0, 1);
+        handler.handleResult(lqCompletedEvent(result), channel, 1L);
+
+        verify(mediaMapper, never()).update(any(), any());
+        ArgumentCaptor<LambdaUpdateWrapper> itemCaptor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
+        verify(managementTaskItemMapper).update(isNull(), itemCaptor.capture());
+        assertThat(setValues(itemCaptor.getValue())).contains(ManagementTaskStatus.FAILED);
+        verify(channel).basicAck(1L, false);
+    }
+
+    @Test
+    @DisplayName("LQ 旧协议·lqResult 为 null：item FAILED 并 ACK，不猜整章结果")
+    void lqPayloadNull_oldProtocol_failsItem() throws Exception {
+        when(managementTaskItemMapper.selectById(200L)).thenReturn(lqItem());
+        when(managementTaskItemMapper.update(isNull(), any())).thenReturn(1);
+
+        ManagementCommandCompletedEvent ev = new ManagementCommandCompletedEvent(
+                UUID.randomUUID(), Instant.now(), 1,
+                20L, 200L, 1, "LQ_GENERATE", "CHAPTER", 5L, null);
+        handler.handleResult(ev, channel, 1L);
+
+        verify(mediaMapper, never()).update(any(), any());
+        ArgumentCaptor<LambdaUpdateWrapper> itemCaptor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
+        verify(managementTaskItemMapper).update(isNull(), itemCaptor.capture());
+        assertThat(setValues(itemCaptor.getValue())).contains(ManagementTaskStatus.FAILED);
+        verify(managementTaskService).reaggregateTask(20L);
+        verify(channel).basicAck(1L, false);
+    }
+
+    @Test
+    @DisplayName("LQ 基础设施异常·mapper 抛出：异常传播 → reject/DLQ，不 ACK")
+    void lqInfraFailure_mapperThrows_rejectsToDlq() throws Exception {
+        when(managementTaskItemMapper.selectById(200L)).thenReturn(lqItem());
+        when(mediaMapper.selectById(1L)).thenThrow(new RuntimeException("数据库不可用"));
+
+        LqGenerationResult result = new LqGenerationResult(List.of(
+                lqReady(1L, 1, "5/001.jpg", "5/001.webp", 512L)), 1, 0, 1);
+        handler.handleResult(lqCompletedEvent(result), channel, 1L);
+
+        verify(channel).basicReject(1L, false);
+        verify(channel, never()).basicAck(anyLong(), anyBoolean());
+    }
+
+    // ======================== 转码完成专用流程（Todo 7） ========================
+
+    private ManagementTaskItem transcodeItem(Long itemId, Long taskId, Long mediaId,
+                                             ManagementTaskStatus status, int attempt) {
+        ManagementTaskItem item = new ManagementTaskItem();
+        item.setId(itemId);
+        item.setTaskId(taskId);
+        item.setTargetType("MEDIA");
+        item.setTargetId(mediaId);
+        item.setOperationType(TaskType.TRANSCODE);
+        item.setStatus(status);
+        item.setAttempt(attempt);
+        return item;
+    }
+
+    private Media transcodeMedia(Long mediaId, TranscodeStatus status) {
+        Media m = new Media();
+        m.setId(mediaId);
+        m.setChapterId(5L);
+        m.setMediaType("VIDEO");
+        m.setHqRoot("HQ");
+        m.setHqPath("5/001.avi");
+        m.setHqStatus(HqStatus.READY);
+        m.setTranscodeStatus(status);
+        m.setStatus(MediaLifecycleStatus.READY);
+        return m;
+    }
+
+    private TranscodeMediaInfo transcodeInfo() {
+        return new TranscodeMediaInfo(new BigDecimal("12.34"), "mp4", "h264", "aac", 2048000L,
+                "HQ", "5/001/1-2-3-100.mp4", 1280, 720);
+    }
+
+    private ManagementCommandCompletedEvent transcodeCompletedEvent(Long taskId, Long itemId,
+                                                                    int attempt, Long mediaId,
+                                                                    TranscodeMediaInfo info) {
+        return new ManagementCommandCompletedEvent(UUID.randomUUID(), Instant.now(), 1,
+                taskId, itemId, attempt, "TRANSCODE", "MEDIA", mediaId, info);
+    }
+
+    private ManagementTaskItemResponse failedResp() {
+        ManagementTaskItemResponse resp = new ManagementTaskItemResponse();
+        resp.setStatus(ManagementTaskStatus.FAILED);
+        return resp;
+    }
+
+    @Test
+    @DisplayName("转码完成：校验通过 → item SUCCEEDED、media 一次更新真实产物与全部元数据、聚合、ACK")
+    void transcodeCompleted_happy_appliesRealArtifact() throws Exception {
+        when(managementTaskItemMapper.selectById(100L))
+                .thenReturn(transcodeItem(100L, 10L, 1L, ManagementTaskStatus.RUNNING, 1));
+        when(mediaMapper.selectById(1L)).thenReturn(transcodeMedia(1L, TranscodeStatus.QUEUED));
+        when(managementTaskItemMapper.update(isNull(), any())).thenReturn(1);
+        when(managementTaskService.countActiveItems(10L)).thenReturn(1L);
+
+        handler.handleResult(transcodeCompletedEvent(10L, 100L, 1, 1L, transcodeInfo()), channel, 1L);
+
+        // item CAS → SUCCEEDED
+        ArgumentCaptor<LambdaUpdateWrapper> itemCaptor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
+        verify(managementTaskItemMapper).update(isNull(), itemCaptor.capture());
+        assertThat(itemCaptor.getValue().getParamNameValuePairs().values()).contains(ManagementTaskStatus.SUCCEEDED);
+        // media 一次更新：hqRoot/hqPath + width/height/duration/container/codecs/fileSize + hqStatus READY + transcodeStatus READY
+        ArgumentCaptor<LambdaUpdateWrapper> mediaCaptor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
+        verify(mediaMapper).update(isNull(), mediaCaptor.capture());
+        assertThat(mediaCaptor.getValue().getSqlSet()).contains("hq_root").contains("hq_path")
+                .contains("width").contains("height").contains("duration")
+                .contains("container").contains("video_codec").contains("audio_codec")
+                .contains("file_size").contains("hq_status").contains("transcode_status");
+        assertThat(mediaCaptor.getValue().getParamNameValuePairs().values())
+                .contains("HQ", "5/001/1-2-3-100.mp4", 1280, 720, "mp4", "h264", "aac",
+                        new BigDecimal("12.34"), 2048000L, TranscodeStatus.READY, HqStatus.READY);
+        verify(managementTaskService).reaggregateTask(10L);
+        verify(channel).basicAck(1L, false);
+    }
+
+    @Test
+    @DisplayName("转码完成：事件缺真实产物路径 → item FAILED、media FAILED（保留原 HQ 引用）、ACK")
+    void transcodeCompleted_missingTranscode_failsItem() throws Exception {
+        when(managementTaskItemMapper.selectById(100L))
+                .thenReturn(transcodeItem(100L, 10L, 1L, ManagementTaskStatus.RUNNING, 1));
+        when(mediaMapper.selectById(1L)).thenReturn(transcodeMedia(1L, TranscodeStatus.QUEUED));
+        when(managementTaskItemMapper.update(isNull(), any())).thenReturn(1);
+
+        ManagementCommandCompletedEvent ev = new ManagementCommandCompletedEvent(
+                UUID.randomUUID(), Instant.now(), 1,
+                10L, 100L, 1, "TRANSCODE", "MEDIA", 1L, null);
+        handler.handleResult(ev, channel, 1L);
+
+        ArgumentCaptor<LambdaUpdateWrapper> itemCaptor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
+        verify(managementTaskItemMapper).update(isNull(), itemCaptor.capture());
+        assertThat(itemCaptor.getValue().getParamNameValuePairs().values()).contains(ManagementTaskStatus.FAILED);
+        ArgumentCaptor<LambdaUpdateWrapper> mediaCaptor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
+        verify(mediaMapper).update(isNull(), mediaCaptor.capture());
+        assertThat(mediaCaptor.getValue().getParamNameValuePairs().values()).contains(TranscodeStatus.FAILED);
+        verify(managementTaskService).reaggregateTask(10L);
+        verify(channel).basicAck(1L, false);
+    }
+
+    @Test
+    @DisplayName("转码完成：产物存储根未配置（containment 无法通过）→ 业务失败，item FAILED、media FAILED、ACK")
+    void transcodeCompleted_pathTraversal_failsItem() throws Exception {
+        when(managementTaskItemMapper.selectById(100L))
+                .thenReturn(transcodeItem(100L, 10L, 1L, ManagementTaskStatus.RUNNING, 1));
+        when(mediaMapper.selectById(1L)).thenReturn(transcodeMedia(1L, TranscodeStatus.TRANSCODING));
+        when(managementTaskItemMapper.update(isNull(), any())).thenReturn(1);
+
+        // 事件 DTO 已内建相对路径校验（拒绝 ../ 穿越），containment 防御的失败分支是存储根缺失/越界
+        TranscodeMediaInfo unknownRoot = new TranscodeMediaInfo(new BigDecimal("1"), "mp4", "h264", "aac", 10L,
+                "UNKNOWN", "5/001.mp4", 10, 10);
+        handler.handleResult(transcodeCompletedEvent(10L, 100L, 1, 1L, unknownRoot), channel, 1L);
+
+        ArgumentCaptor<LambdaUpdateWrapper> itemCaptor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
+        verify(managementTaskItemMapper).update(isNull(), itemCaptor.capture());
+        assertThat(itemCaptor.getValue().getParamNameValuePairs().values()).contains(ManagementTaskStatus.FAILED);
+        verify(mediaMapper).update(isNull(), any(LambdaUpdateWrapper.class));
+        verify(managementTaskService).reaggregateTask(10L);
+        verify(channel).basicAck(1L, false);
+    }
+
+    @Test
+    @DisplayName("转码完成：旧 attempt → 零更新 ACK")
+    void transcodeCompleted_staleAttempt_acked() throws Exception {
+        when(managementTaskItemMapper.selectById(100L))
+                .thenReturn(transcodeItem(100L, 10L, 1L, ManagementTaskStatus.RUNNING, 2));
+
+        handler.handleResult(transcodeCompletedEvent(10L, 100L, 1, 1L, transcodeInfo()), channel, 1L);
+
+        verify(mediaMapper, never()).update(any(), any());
+        verify(managementTaskItemMapper, never()).update(any(), any());
+        verify(channel).basicAck(1L, false);
+    }
+
+    @Test
+    @DisplayName("转码完成：item 已终态 → 幂等零更新 ACK")
+    void transcodeCompleted_terminalItem_acked() throws Exception {
+        when(managementTaskItemMapper.selectById(100L))
+                .thenReturn(transcodeItem(100L, 10L, 1L, ManagementTaskStatus.SUCCEEDED, 1));
+
+        handler.handleResult(transcodeCompletedEvent(10L, 100L, 1, 1L, transcodeInfo()), channel, 1L);
+
+        verify(mediaMapper, never()).update(any(), any());
+        verify(managementTaskItemMapper, never()).update(any(), any());
+        verify(channel).basicAck(1L, false);
+    }
+
+    @Test
+    @DisplayName("转码完成：事件 targetId 与 item 不一致 → item FAILED、ACK")
+    void transcodeCompleted_targetMismatch_failsItem() throws Exception {
+        when(managementTaskItemMapper.selectById(100L))
+                .thenReturn(transcodeItem(100L, 10L, 99L, ManagementTaskStatus.RUNNING, 1));
+        when(managementTaskItemMapper.update(isNull(), any())).thenReturn(1);
+
+        handler.handleResult(transcodeCompletedEvent(10L, 100L, 1, 1L, transcodeInfo()), channel, 1L);
+
+        ArgumentCaptor<LambdaUpdateWrapper> itemCaptor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
+        verify(managementTaskItemMapper).update(isNull(), itemCaptor.capture());
+        assertThat(itemCaptor.getValue().getParamNameValuePairs().values()).contains(ManagementTaskStatus.FAILED);
+        verify(mediaMapper).update(isNull(), any(LambdaUpdateWrapper.class));
+        verify(channel).basicAck(1L, false);
+    }
+
+    @Test
+    @DisplayName("转码完成：目标类型非 MEDIA → item FAILED、ACK")
+    void transcodeCompleted_nonMediaTarget_failsItem() throws Exception {
+        when(managementTaskItemMapper.update(isNull(), any())).thenReturn(1);
+
+        ManagementCommandCompletedEvent ev = new ManagementCommandCompletedEvent(
+                UUID.randomUUID(), Instant.now(), 1,
+                10L, 100L, 1, "TRANSCODE", "COMIC", 42L, transcodeInfo());
+        handler.handleResult(ev, channel, 1L);
+
+        ArgumentCaptor<LambdaUpdateWrapper> itemCaptor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
+        verify(managementTaskItemMapper).update(isNull(), itemCaptor.capture());
+        assertThat(itemCaptor.getValue().getParamNameValuePairs().values()).contains(ManagementTaskStatus.FAILED);
+        verify(mediaMapper, never()).update(any(), any());
+        verify(channel).basicAck(1L, false);
+    }
+
+    @Test
+    @DisplayName("转码失败事件：仅当前 QUEUED/TRANSCODING 媒体置 FAILED，保留原 HQ 引用，item FAILED")
+    void transcodeFailedEvent_marksMediaFailed_keepingHqRef() throws Exception {
+        when(managementTaskService.updateItemStatus(eq(100L), eq(ManagementTaskStatus.FAILED),
+                anyString(), isNull(), isNull(), eq(1))).thenReturn(failedResp());
+
+        ManagementCommandFailedEvent ev = new ManagementCommandFailedEvent(
+                UUID.randomUUID(), Instant.now(), 1,
+                10L, 100L, 1, "TRANSCODE", "MEDIA", 1L, "ffmpeg exit 1");
+        handler.handleResult(ev, channel, 1L);
+
+        ArgumentCaptor<LambdaUpdateWrapper> mediaCaptor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
+        verify(mediaMapper).update(isNull(), mediaCaptor.capture());
+        assertThat(mediaCaptor.getValue().getParamNameValuePairs().values()).contains(TranscodeStatus.FAILED);
         verify(channel).basicAck(1L, false);
     }
 }

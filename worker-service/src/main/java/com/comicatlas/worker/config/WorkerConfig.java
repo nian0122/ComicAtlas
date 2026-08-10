@@ -36,6 +36,8 @@ public class WorkerConfig {
     private int lqQuality = 15;
     private int lqWorkers = 4;
     private int hqDeleteTimeoutSeconds = 60;
+    /** 视频转码 ffmpeg 进程超时（秒）；必须有限超时，禁止无界执行外部进程。 */
+    private int transcodeTimeoutSeconds = 600;
     private boolean ffprobeEnabled = true;
     private Map<String, String> storageRoots = new LinkedHashMap<>();
     private String hostMangaRoot;

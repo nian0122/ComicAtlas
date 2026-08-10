@@ -20,6 +20,7 @@ import com.comicatlas.api.common.enums.TranscodeStatus;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.common.exception.SnapshotUnavailableException;
 import com.comicatlas.api.common.storage.ApiStorageProperties;
+import com.comicatlas.api.common.storage.PathTraversalException;
 import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.management.entity.ManagementTaskItem;
 import com.comicatlas.api.management.mapper.ManagementTaskItemMapper;
@@ -46,6 +47,8 @@ import com.comicatlas.common.event.MediaUploadCompletedEvent;
 import com.comicatlas.common.event.MediaUploadCompletedEvent.MediaAnalysisResult;
 import com.comicatlas.common.event.MetadataRefreshEvent;
 import com.comicatlas.common.event.MetadataRefreshScanCompletedEvent;
+import com.comicatlas.common.event.payload.LqGenerationResult;
+import com.comicatlas.common.event.payload.LqMediaResult;
 import com.comicatlas.common.event.payload.TranscodeMediaInfo;
 import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.api.upload.UploadSessionService;
@@ -71,9 +74,11 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 管理命令结果事件处理器（Worker → API）。
@@ -89,6 +94,20 @@ import java.util.Set;
 public class ManagementCommandResultHandler {
 
     private static final Set<String> LQ_OPS = Set.of("LQ_GENERATE", "LQ_REGENERATE");
+
+    /** item 终态集合（CAS notIn 使用）。 */
+    private static final List<ManagementTaskStatus> TERMINAL_ITEM_STATUSES = List.of(
+            ManagementTaskStatus.CANCELLED, ManagementTaskStatus.SUCCEEDED,
+            ManagementTaskStatus.PARTIALLY_SUCCEEDED, ManagementTaskStatus.FAILED);
+
+    /**
+     * LQ 结果可应用的媒体状态。
+     * QUEUED/GENERATING 为本次 attempt 处理中；FAILED 为上一次 attempt 失败后重试再生成，
+     * 重试完成事件必须能应用到 FAILED 页面，否则重试链路永远失败。READY/NOT_GENERATED/MISSING
+     * 拒绝——READY 即重复结果（幂等保护），NOT_GENERATED/MISSING 不属于本次任务范围。
+     */
+    private static final Set<LqStatus> LQ_APPLYABLE_MEDIA_STATES =
+            EnumSet.of(LqStatus.QUEUED, LqStatus.GENERATING, LqStatus.FAILED);
 
     private final ManagementTaskService managementTaskService;
     private final InboxService inboxService;
@@ -158,6 +177,16 @@ public class ManagementCommandResultHandler {
     // ======================== Completed ========================
 
     private void handleCompleted(ManagementCommandCompletedEvent ev) {
+        if ("TRANSCODE".equals(ev.operationType())) {
+            // 转码完成走专用流程：校验目标/归属/attempt/containment 通过后才 CAS 并一次落库真实产物
+            handleTranscodeCompleted(ev);
+            return;
+        }
+        if (LQ_OPS.contains(ev.operationType())) {
+            // LQ 完成走专用流程：先校验逐媒体 payload，再 item CAS 抢占并逐媒体落库（见 handleLqCompleted）
+            handleLqCompleted(ev);
+            return;
+        }
         ManagementTaskItemResponse item = managementTaskService.updateItemStatus(
                 ev.itemId(), ManagementTaskStatus.SUCCEEDED, null, null, null, ev.attempt());
         if (item.getStatus() != ManagementTaskStatus.SUCCEEDED) {
@@ -170,15 +199,6 @@ public class ManagementCommandResultHandler {
     private void applyCompletedBusiness(ManagementCommandCompletedEvent ev) {
         boolean comicScope = "COMIC".equals(ev.targetType());
         switch (ev.operationType()) {
-            case "LQ_GENERATE", "LQ_REGENERATE" -> {
-                if (comicScope) {
-                    for (Long chId : chapterIdsOf(ev.targetId())) {
-                        applyLqCompleted(chId);
-                    }
-                } else {
-                    applyLqCompleted(ev.targetId());
-                }
-            }
             case "HQ_DELETE" -> {
                 if (comicScope) {
                     for (Long chId : chapterIdsOf(ev.targetId())) {
@@ -187,16 +207,6 @@ public class ManagementCommandResultHandler {
                 } else {
                     applyHqDeleteCompleted(ev.targetId());
                 }
-            }
-            case "TRANSCODE" -> {
-                if (comicScope) {
-                    for (Long mediaId : mediaIdsOf(ev.targetId())) {
-                        applyTranscodeCompleted(ev, mediaId);
-                    }
-                } else {
-                    applyTranscodeCompleted(ev, ev.targetId());
-                }
-                maybeNotifyTranscodeTaskCompleted(ev);
             }
             case "COMIC_DELETE" -> applyComicTrashCompleted(ev.targetId());
             case "CHAPTER_TRASH" -> applyChapterTrashCompleted(ev.targetId());
@@ -226,37 +236,234 @@ public class ManagementCommandResultHandler {
                 .toList();
     }
 
-    /** 漫画 ID → 视频媒体 ID 列表（COMIC 目标转码 item 展开到视频页处理业务状态）。 */
-    private List<Long> mediaIdsOf(Long comicId) {
-        List<Long> chapterIds = chapterIdsOf(comicId);
-        if (chapterIds.isEmpty()) {
-            return List.of();
+    /**
+     * LQ 完成事件逐媒体落库（Todo 6，取代旧的整章统一改状态）。
+     * <p>
+     * 顺序：幂等前置检查（幽灵 item / 旧 attempt / 已终态直接 ACK）→ 校验 LQ payload
+     * （operation/目标章节、mediaId 归属、mediaType、pageNumber、sourceHqPath、相对结果路径、
+     * 当前 LQ 状态）→ item CAS 抢占结果应用权 → 逐媒体批量落库 → 任务聚合。
+     * <p>
+     * 失败分类：payload 业务错误（lqResult 缺失/校验失败）→ 当前 item FAILED 并 ACK；
+     * 数据库/基础设施异常 → 异常传播给 {@link MqConsumerSupport} 走重试/DLQ。
+     */
+    private void handleLqCompleted(ManagementCommandCompletedEvent ev) {
+        ManagementTaskItem item = managementTaskItemMapper.selectById(ev.itemId());
+        if (item == null) {
+            log.info("LQ 完成事件引用不存在的 item，忽略: itemId={}", ev.itemId());
+            return;
         }
-        return mediaMapper.selectList(new LambdaQueryWrapper<Media>()
-                        .in(Media::getChapterId, chapterIds)
-                        .eq(Media::getMediaType, "VIDEO"))
-                .stream()
-                .map(Media::getId)
-                .toList();
+        if (item.getAttempt() != null && !item.getAttempt().equals(ev.attempt())) {
+            log.info("LQ 完成事件旧 attempt，忽略: itemId={}, event={}, item={}",
+                    ev.itemId(), ev.attempt(), item.getAttempt());
+            return;
+        }
+        if (item.getStatus() != null && item.getStatus().isTerminal()) {
+            log.info("LQ 完成事件 item 已终态 {}，幂等跳过: itemId={}", item.getStatus(), ev.itemId());
+            return;
+        }
+        if (item.getOperationType() == null || !LQ_OPS.contains(item.getOperationType().name())) {
+            failLqItem(ev, "LQ 完成事件 operation 与 item 不匹配: itemId=" + ev.itemId()
+                    + ", op=" + item.getOperationType());
+            return;
+        }
+        LqGenerationResult lqResult = ev.lqResult();
+        if (lqResult == null) {
+            // 旧协议/无效 payload：明确失败，不猜整章结果
+            failLqItem(ev, "LQ 完成事件缺少逐媒体结果（旧协议），明确失败");
+            return;
+        }
+        try {
+            validateLqResult(ev, lqResult);
+        } catch (BusinessException e) {
+            // payload 业务错误 → item FAILED + ACK，不重试不进 DLQ
+            failLqItem(ev, e.getMessage());
+            return;
+        }
+        applyLqResult(ev, lqResult);
     }
 
-    private void applyLqCompleted(Long chapterId) {
-        List<Media> mediaItems = mediaMapper.selectList(
-                new LambdaQueryWrapper<Media>()
-                        .eq(Media::getChapterId, chapterId)
-                        .eq(Media::getMediaType, "IMAGE"));
-        for (Media media : mediaItems) {
-            LambdaUpdateWrapper<Media> mediaUpdate = new LambdaUpdateWrapper<Media>()
-                    .eq(Media::getId, media.getId())
-                    .set(Media::getLqStatus, LqStatus.READY)
-                    .set(Media::getLqRoot, "LQ");
-            String hqPath = media.getHqPath();
-            if (hqPath != null && !hqPath.isBlank()) {
-                mediaUpdate.set(Media::getLqPath, deriveLqPath(hqPath));
-            }
-            mediaMapper.update(null, mediaUpdate);
+    /**
+     * 校验 LQ 逐媒体结果与事件/DB 的一致性。任一校验失败抛 {@link BusinessException}
+     * （业务 payload 错误，由调用方置 item FAILED 并 ACK）：
+     * <ul>
+     *   <li>目标章节非空、逐媒体结果非空；</li>
+     *   <li>mediaId 非 null 且属于目标章节、mediaType == IMAGE、pageNumber 与 DB 一致；</li>
+     *   <li>sourceHqPath 与 DB hqPath 归一化后一致（不一致视为越权/漂移）；</li>
+     *   <li>READY 结果的 lqRoot/lqPath 相对且 resolve 后位于对应存储根内（containment）；</li>
+     *   <li>当前媒体 lqStatus 可应用（QUEUED/GENERATING/FAILED，幂等保护）。</li>
+     * </ul>
+     */
+    private void validateLqResult(ManagementCommandCompletedEvent ev, LqGenerationResult lqResult) {
+        Long targetChapterId = ev.targetId();
+        if (targetChapterId == null) {
+            throw new BusinessException("LQ 完成事件缺少目标章节");
         }
-        log.info("LQ 完成业务更新: chapterId={}, pages={}", chapterId, mediaItems.size());
+        List<LqMediaResult> results = lqResult.results();
+        if (results == null || results.isEmpty()) {
+            throw new BusinessException("LQ 完成事件逐媒体结果为空");
+        }
+        for (LqMediaResult result : results) {
+            if (result.mediaId() == null) {
+                throw new BusinessException("LQ 结果缺少 mediaId");
+            }
+            Media media = mediaMapper.selectById(result.mediaId());
+            if (media == null) {
+                throw new BusinessException("LQ 结果引用不存在的媒体: mediaId=" + result.mediaId());
+            }
+            if (!targetChapterId.equals(media.getChapterId())) {
+                throw new BusinessException("LQ 结果 mediaId=" + result.mediaId()
+                        + " 不属于目标章节 " + targetChapterId);
+            }
+            if (!"IMAGE".equals(media.getMediaType())) {
+                throw new BusinessException("LQ 结果 mediaId=" + result.mediaId() + " 非 IMAGE 类型");
+            }
+            if (media.getPageNumber() == null || media.getPageNumber() != result.pageNumber()) {
+                throw new BusinessException("LQ 结果 mediaId=" + result.mediaId() + " pageNumber 与 DB 不一致");
+            }
+            if (result.sourceHqPath() == null
+                    || !normalizeHqPath(result.sourceHqPath()).equals(normalizeHqPath(media.getHqPath()))) {
+                throw new BusinessException("LQ 结果 mediaId=" + result.mediaId()
+                        + " sourceHqPath 与 DB hqPath 不一致");
+            }
+            if (LqMediaResult.STATUS_READY.equals(result.status())) {
+                validateLqResultPath(result);
+            }
+            if (media.getLqStatus() == null || !LQ_APPLYABLE_MEDIA_STATES.contains(media.getLqStatus())) {
+                throw new BusinessException("LQ 结果 mediaId=" + result.mediaId()
+                        + " 当前 lqStatus=" + media.getLqStatus() + " 不可应用（幂等保护）");
+            }
+        }
+    }
+
+    /** READY 结果的 lqRoot/lqPath containment 校验：resolve 后必须位于对应存储根内（内建 ../ 穿越防御）。 */
+    private void validateLqResultPath(LqMediaResult result) {
+        String lqRoot = result.lqRoot();
+        String lqPath = result.lqPath();
+        if (lqRoot == null || lqPath == null) {
+            throw new BusinessException("LQ READY 结果缺少 lqRoot/lqPath: mediaId=" + result.mediaId());
+        }
+        try {
+            apiStorageProperties.root(lqRoot).resolve(lqPath);
+        } catch (PathTraversalException e) {
+            throw new BusinessException("LQ 结果路径越界: mediaId=" + result.mediaId()
+                    + ", lqPath=" + lqPath, e);
+        }
+    }
+
+    /**
+     * 以 itemId + attempt + 非终态 CAS 抢占结果应用权，仅 1 行者进入同一短事务批量更新。
+     * <p>
+     * 抢占成功后逐媒体落库并聚合任务；0 行 = 已被其他 eventId 处理 → 幂等跳过（ACK）。
+     * item 终态按媒体结果派生：全 READY → SUCCEEDED；混合 → PARTIALLY_SUCCEEDED；全 FAILED → FAILED；
+     * progress=(READY+FAILED)/total。
+     */
+    private void applyLqResult(ManagementCommandCompletedEvent ev, LqGenerationResult lqResult) {
+        int successCount = lqResult.successCount();
+        int failureCount = lqResult.failureCount();
+        int totalCount = lqResult.totalCount();
+        ManagementTaskStatus itemStatus;
+        if (failureCount == 0) {
+            itemStatus = ManagementTaskStatus.SUCCEEDED;
+        } else if (successCount == 0) {
+            itemStatus = ManagementTaskStatus.FAILED;
+        } else {
+            itemStatus = ManagementTaskStatus.PARTIALLY_SUCCEEDED;
+        }
+        int itemProgress = totalCount > 0 ? (successCount + failureCount) * 100 / totalCount : 100;
+
+        LambdaUpdateWrapper<ManagementTaskItem> cas = new LambdaUpdateWrapper<ManagementTaskItem>()
+                .eq(ManagementTaskItem::getId, ev.itemId())
+                .eq(ManagementTaskItem::getAttempt, ev.attempt())
+                .notIn(ManagementTaskItem::getStatus, TERMINAL_ITEM_STATUSES)
+                .set(ManagementTaskItem::getStatus, itemStatus)
+                .set(ManagementTaskItem::getProgress, itemProgress)
+                .set(ManagementTaskItem::getCompletedAt, LocalDateTime.now())
+                .set(ManagementTaskItem::getLockKey, null)
+                .set(ManagementTaskItem::getUpdatedAt, LocalDateTime.now());
+        if (itemStatus != ManagementTaskStatus.SUCCEEDED) {
+            cas.set(ManagementTaskItem::getErrorMessage, buildLqFailureSummary(lqResult));
+        }
+        int rows = managementTaskItemMapper.update(null, cas);
+        if (rows == 0) {
+            log.info("LQ item 已被其他事件置终态，幂等跳过 apply: itemId={}", ev.itemId());
+            return;
+        }
+
+        // 逐媒体落库（事务内禁止文件 IO，lqSize 直接用 payload 值）
+        for (LqMediaResult result : lqResult.results()) {
+            applyLqMediaResult(result);
+        }
+        managementTaskService.reaggregateTask(ev.taskId());
+    }
+
+    /** 单媒体落库：READY 页写 lq_status/root/path/size；FAILED 页只置 lq_status。 */
+    private void applyLqMediaResult(LqMediaResult result) {
+        LambdaUpdateWrapper<Media> update = new LambdaUpdateWrapper<Media>()
+                .eq(Media::getId, result.mediaId())
+                .in(Media::getLqStatus, LQ_APPLYABLE_MEDIA_STATES);
+        if (LqMediaResult.STATUS_READY.equals(result.status())) {
+            update.set(Media::getLqStatus, LqStatus.READY)
+                    .set(Media::getLqRoot, result.lqRoot())
+                    .set(Media::getLqPath, result.lqPath())
+                    .set(Media::getLqSize, result.lqSize());
+        } else {
+            update.set(Media::getLqStatus, LqStatus.FAILED);
+        }
+        int rows = mediaMapper.update(null, update);
+        if (rows == 0) {
+            log.warn("LQ 媒体更新未命中（状态漂移，幂等跳过）: mediaId={}", result.mediaId());
+        }
+    }
+
+    /**
+     * LQ 完成事件业务失败（payload 校验错误/旧协议）：item（attempt + 非终态 CAS）置 FAILED
+     * 并聚合任务，不抛异常 → ACK。0 行 = 旧 attempt/已终态 → 幂等跳过。
+     */
+    private void failLqItem(ManagementCommandCompletedEvent ev, String errorMessage) {
+        log.warn("LQ 完成事件业务失败，item FAILED 并 ACK: itemId={}, error={}", ev.itemId(), errorMessage);
+        int rows = managementTaskItemMapper.update(null, new LambdaUpdateWrapper<ManagementTaskItem>()
+                .eq(ManagementTaskItem::getId, ev.itemId())
+                .eq(ManagementTaskItem::getAttempt, ev.attempt())
+                .notIn(ManagementTaskItem::getStatus, TERMINAL_ITEM_STATUSES)
+                .set(ManagementTaskItem::getStatus, ManagementTaskStatus.FAILED)
+                .set(ManagementTaskItem::getErrorMessage, errorMessage)
+                .set(ManagementTaskItem::getCompletedAt, LocalDateTime.now())
+                .set(ManagementTaskItem::getLockKey, null)
+                .set(ManagementTaskItem::getUpdatedAt, LocalDateTime.now()));
+        if (rows == 0) {
+            log.info("LQ 失败结果未生效（旧 attempt/已终态）: itemId={}", ev.itemId());
+            return;
+        }
+        managementTaskService.reaggregateTask(ev.taskId());
+    }
+
+    /** 失败媒体摘要：mediaId + errorCode + errorMessage，供 item/task 记录与展示。 */
+    private static String buildLqFailureSummary(LqGenerationResult lqResult) {
+        List<LqMediaResult> failures = lqResult.results().stream()
+                .filter(result -> LqMediaResult.STATUS_FAILED.equals(result.status()))
+                .toList();
+        if (failures.isEmpty()) {
+            return null;
+        }
+        String detail = failures.stream()
+                .map(f -> "mediaId=" + f.mediaId()
+                        + (f.errorCode() != null ? "[" + f.errorCode() + "]" : "")
+                        + (f.errorMessage() != null ? " " + f.errorMessage() : ""))
+                .collect(Collectors.joining("; "));
+        String summary = "LQ 失败 " + failures.size() + "/" + lqResult.totalCount() + ": " + detail;
+        return summary.length() > 4000 ? summary.substring(0, 4000) : summary;
+    }
+
+    /** HQ 相对路径归一化（统一正斜杠、去首部斜杠），供 sourceHqPath 与 DB hqPath 比对。 */
+    private static String normalizeHqPath(String path) {
+        if (path == null) {
+            return null;
+        }
+        String normalized = path.replace('\\', '/');
+        while (normalized.startsWith("/")) {
+            normalized = normalized.substring(1);
+        }
+        return normalized;
     }
 
     private void applyHqDeleteCompleted(Long chapterId) {
@@ -277,40 +484,135 @@ public class ManagementCommandResultHandler {
     }
 
     /**
-     * 转码完成业务更新：实测元数据（duration/fileSize/真实 codec）优先，
-     * 事件未携带时回退旧的硬编码 mp4/h264/aac。
-     * 每个完成事件都更新对应 media 行；整本统计聚合与 metadata.json 重导出
-     * 由 {@link #maybeNotifyTranscodeTaskCompleted} 在任务全部完成时触发一次。
+     * 转码完成专用流程（Todo 7 新契约）。
+     * <p>
+     * 校验顺序（全部通过才 CAS 落库）：目标必须为 MEDIA → item 归属/attempt/非终态 →
+     * targetId 与 media 一致且媒体为 VIDEO → 事件携带真实产物路径 → hqPath containment
+     * （必须位于对应存储根内，越界视为业务错误 → item FAILED + ACK）。
+     * <p>
+     * 通过后：item CAS（attempt + 非终态）置 SUCCEEDED → 一次更新 media 的 hqRoot/hqPath、
+     * width/height/duration/container/codecs/fileSize、hqStatus READY、transcodeStatus READY
+     * → 任务聚合 → 全部完成时触发一次整本统计。
+     * <p>
+     * 幂等：Inbox 复用 + item CAS 0 行（旧 attempt/已终态/并发胜者已处理）→ 零更新 ACK。
+     * 业务失败（目标不匹配/路径越界/缺产物）→ item FAILED，保留可诊断摘要与媒体原 HQ 引用。
+     * 基础设施异常（DB 等）向上传播 → reject/DLQ，不伪造成功。
      */
-    private void applyTranscodeCompleted(ManagementCommandCompletedEvent ev, Long mediaId) {
-        Media media = mediaMapper.selectById(mediaId);
-        if (media == null) {
+    private void handleTranscodeCompleted(ManagementCommandCompletedEvent ev) {
+        if (!"MEDIA".equals(ev.targetType())) {
+            failTranscodeItem(ev, null, "转码完成事件目标类型必须为 MEDIA: " + ev.targetType());
             return;
         }
+        Long mediaId = ev.targetId();
+
+        ManagementTaskItem item = managementTaskItemMapper.selectById(ev.itemId());
+        if (item == null) {
+            log.info("转码完成事件引用不存在的 item，忽略: itemId={}", ev.itemId());
+            return;
+        }
+        if (item.getAttempt() != null && !item.getAttempt().equals(ev.attempt())) {
+            log.info("转码完成事件 attempt 不匹配，忽略旧 attempt 结果: itemId={}, event={}, item={}",
+                    ev.itemId(), ev.attempt(), item.getAttempt());
+            return;
+        }
+        if (item.getStatus() != null && item.getStatus().isTerminal()) {
+            log.info("转码完成事件 item 已终态 {}，幂等跳过: itemId={}", item.getStatus(), ev.itemId());
+            return;
+        }
+        if (item.getTargetId() == null || !item.getTargetId().equals(mediaId)) {
+            failTranscodeItem(ev, mediaId, "转码完成事件 targetId 与 item 不一致: itemTarget="
+                    + item.getTargetId() + ", event=" + mediaId);
+            return;
+        }
+
+        Media media = mediaMapper.selectById(mediaId);
+        if (media == null || !"VIDEO".equals(media.getMediaType())) {
+            failTranscodeItem(ev, mediaId, "转码完成事件媒体不存在或非视频: mediaId=" + mediaId);
+            return;
+        }
+
         TranscodeMediaInfo transcode = ev.transcode();
-        String hqPath = media.getHqPath();
-        LambdaUpdateWrapper<Media> mediaUpdate = new LambdaUpdateWrapper<Media>()
+        if (transcode == null || transcode.hqRoot() == null
+                || transcode.hqPath() == null || transcode.hqPath().isBlank()) {
+            failTranscodeItem(ev, mediaId, "转码完成事件缺少真实产物路径（hqRoot/hqPath）: mediaId=" + mediaId);
+            return;
+        }
+
+        // 路径 containment：hqPath 必须位于对应存储根内（resolve 内建 ../ 穿越防御）
+        String rootKey = transcode.hqRoot();
+        try {
+            apiStorageProperties.root(rootKey).resolve(transcode.hqPath());
+        } catch (Exception e) {
+            failTranscodeItem(ev, mediaId, "转码产物路径越界或存储根未配置: root=" + rootKey
+                    + ", hqPath=" + transcode.hqPath() + ", " + e.getMessage());
+            return;
+        }
+
+        // item CAS：当前 attempt 非终态 → SUCCEEDED；0 行 = 已被其他 eventId 处理 → 幂等跳过
+        int rows = managementTaskItemMapper.update(null, new LambdaUpdateWrapper<ManagementTaskItem>()
+                .eq(ManagementTaskItem::getId, ev.itemId())
+                .eq(ManagementTaskItem::getAttempt, ev.attempt())
+                .notIn(ManagementTaskItem::getStatus, ManagementTaskStatus.CANCELLED,
+                        ManagementTaskStatus.SUCCEEDED, ManagementTaskStatus.PARTIALLY_SUCCEEDED,
+                        ManagementTaskStatus.FAILED)
+                .set(ManagementTaskItem::getStatus, ManagementTaskStatus.SUCCEEDED)
+                .set(ManagementTaskItem::getCompletedAt, LocalDateTime.now())
+                .set(ManagementTaskItem::getLockKey, null)
+                .set(ManagementTaskItem::getUpdatedAt, LocalDateTime.now()));
+        if (rows == 0) {
+            log.info("转码完成 item 已被其他 eventId 置为终态，幂等跳过 apply: itemId={}", ev.itemId());
+            return;
+        }
+
+        // 一次更新 media：真实产物引用（hqRoot/hqPath）+ 全部视频元数据 + hqStatus READY + transcodeStatus READY
+        mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
                 .eq(Media::getId, mediaId)
-                .set(Media::getTranscodeStatus, TranscodeStatus.READY)
-                .set(Media::getContainer, transcode != null && transcode.container() != null
-                        ? transcode.container() : "mp4")
-                .set(Media::getVideoCodec, transcode != null && transcode.videoCodec() != null
-                        ? transcode.videoCodec() : "h264")
-                .set(Media::getAudioCodec, transcode != null && transcode.audioCodec() != null
-                        ? transcode.audioCodec() : "aac");
-        if (transcode != null) {
-            if (transcode.duration() != null) {
-                mediaUpdate.set(Media::getDuration, transcode.duration());
-            }
-            if (transcode.fileSize() != null) {
-                mediaUpdate.set(Media::getFileSize, transcode.fileSize());
-            }
+                .set(Media::getHqRoot, rootKey)
+                .set(Media::getHqPath, transcode.hqPath())
+                .set(Media::getWidth, transcode.width())
+                .set(Media::getHeight, transcode.height())
+                .set(Media::getDuration, transcode.duration())
+                .set(Media::getContainer, transcode.container())
+                .set(Media::getVideoCodec, transcode.videoCodec())
+                .set(Media::getAudioCodec, transcode.audioCodec())
+                .set(Media::getFileSize, transcode.fileSize())
+                .set(Media::getHqStatus, HqStatus.READY)
+                .set(Media::getTranscodeStatus, TranscodeStatus.READY));
+        log.info("转码完成业务更新: mediaId={}, hqPath={}", mediaId, transcode.hqPath());
+
+        managementTaskService.reaggregateTask(ev.taskId());
+        maybeNotifyTranscodeTaskCompleted(ev);
+    }
+
+    /**
+     * 转码完成事件业务失败：item（attempt + 非终态 CAS）置 FAILED 并聚合任务；
+     * 媒体仍在 QUEUED/TRANSCODING 时置 FAILED（保留原 HQ 引用与可诊断摘要），避免卡死状态。
+     * 不抛异常 → ACK（业务失败即结果，不重试不进 DLQ）。
+     */
+    private void failTranscodeItem(ManagementCommandCompletedEvent ev, Long mediaId, String errorMessage) {
+        log.warn("转码完成事件业务失败，置 item FAILED: itemId={}, error={}", ev.itemId(), errorMessage);
+        int rows = managementTaskItemMapper.update(null, new LambdaUpdateWrapper<ManagementTaskItem>()
+                .eq(ManagementTaskItem::getId, ev.itemId())
+                .eq(ManagementTaskItem::getAttempt, ev.attempt())
+                .notIn(ManagementTaskItem::getStatus, ManagementTaskStatus.CANCELLED,
+                        ManagementTaskStatus.SUCCEEDED, ManagementTaskStatus.PARTIALLY_SUCCEEDED,
+                        ManagementTaskStatus.FAILED)
+                .set(ManagementTaskItem::getStatus, ManagementTaskStatus.FAILED)
+                .set(ManagementTaskItem::getErrorMessage, errorMessage)
+                .set(ManagementTaskItem::getCompletedAt, LocalDateTime.now())
+                .set(ManagementTaskItem::getLockKey, null)
+                .set(ManagementTaskItem::getUpdatedAt, LocalDateTime.now()));
+        if (rows == 0) {
+            log.info("转码完成失败项 CAS 0 行（已终态/旧 attempt），幂等跳过: itemId={}", ev.itemId());
+            return;
         }
-        if (hqPath != null && !hqPath.isBlank()) {
-            mediaUpdate.set(Media::getHqPath, deriveTranscodedPath(hqPath));
+        if (mediaId != null) {
+            mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
+                    .eq(Media::getId, mediaId)
+                    .in(Media::getTranscodeStatus, TranscodeStatus.QUEUED, TranscodeStatus.TRANSCODING)
+                    .set(Media::getTranscodeStatus, TranscodeStatus.FAILED));
         }
-        mediaMapper.update(null, mediaUpdate);
-        log.info("转码完成业务更新: mediaId={}", mediaId);
+        managementTaskService.reaggregateTask(ev.taskId());
     }
 
     /**
@@ -1020,19 +1322,6 @@ public class ManagementCommandResultHandler {
             slot++;
         }
         return slot;
-    }
-
-    private static String deriveLqPath(String hqPath) {
-        return hqPath.replaceAll("\\.[^.]+$", ".webp");
-    }
-
-    private static String deriveTranscodedPath(String hqPath) {
-        int lastSlash = hqPath.lastIndexOf('/');
-        String dir = lastSlash > 0 ? hqPath.substring(0, lastSlash + 1) : "";
-        String name = hqPath.substring(lastSlash + 1);
-        int dot = name.lastIndexOf('.');
-        String base = dot > 0 ? name.substring(0, dot) : name;
-        return dir + base + ".mp4";
     }
 
     private String toJson(ComicEvent event) {

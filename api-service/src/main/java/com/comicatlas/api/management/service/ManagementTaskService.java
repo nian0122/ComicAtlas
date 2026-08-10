@@ -671,15 +671,17 @@ public class ManagementTaskService {
                 .filter(i -> i.getStatus() == ManagementTaskStatus.FAILED).count();
         long cancelledCount = items.stream()
                 .filter(i -> i.getStatus() == ManagementTaskStatus.CANCELLED).count();
+        long partialCount = items.stream()
+                .filter(i -> i.getStatus() == ManagementTaskStatus.PARTIALLY_SUCCEEDED).count();
 
         task.setSuccessCount((int) successCount);
         task.setFailureCount((int) failureCount);
         task.setCancelledCount((int) cancelledCount);
 
-        // 聚合进度
+        // 聚合进度：部分成功项同时计入已完成数
         long total = items.size();
         if (total > 0) {
-            long completed = successCount + failureCount + cancelledCount;
+            long completed = successCount + failureCount + cancelledCount + partialCount;
             task.setProgress((int) (completed * 100 / total));
         }
 
@@ -708,6 +710,9 @@ public class ManagementTaskService {
             } else {
                 task.setStatus(ManagementTaskStatus.PARTIALLY_SUCCEEDED);
                 task.setCompletedAt(LocalDateTime.now());
+                // 失败摘要：部分成功/混合结果时记录主任务摘要，供任务中心展示失败原因
+                task.setErrorMessage(String.format("成功 %d、失败 %d、部分成功 %d、取消 %d",
+                        successCount, failureCount, partialCount, cancelledCount));
             }
         } else if (hasRunning || task.getStatus() == ManagementTaskStatus.RUNNING) {
             // 确保是 RUNNING 状态

@@ -45,6 +45,9 @@ public class ManagementCommandDispatcher {
     @RabbitListener(queues = MqQueues.MANAGEMENT_COMMAND)
     public void handle(ManagementCommandRequestedEvent cmd,
             Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
+        // TRANSCODE 命令使用 REQUEUE 策略：转码产物已成功但结果事件发布失败时，
+        // 命令 requeue 重投并复用既有确定性产物（不误报业务失败）；其他命令维持 DLQ 语义。
+        boolean transcodeCommand = "TRANSCODE".equals(cmd.operationType());
         mqConsumerSupport.consume(channel, tag, "管理命令: taskId=" + cmd.taskId(),
                 () -> {
                     log.info("收到管理命令: op={}, target={}:{}, taskId={}, itemId={}, attempt={}",
@@ -52,8 +55,19 @@ public class ManagementCommandDispatcher {
                             cmd.taskId(), cmd.itemId(), cmd.attempt());
                     route(cmd);
                 },
-                e -> publisher.failed(cmd,
-                        e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName()));
+                e -> {
+                    if (e instanceof TranscodeCommandHandler.TranscodeResultPublishException t) {
+                        // 转码产物已成功但结果事件未发出：requeue 由 REQUEUE 策略处理，不发布 failed
+                        log.warn("转码结果发布失败，命令 requeue 重试: taskId={}, itemId={}, mediaId={}",
+                                cmd.taskId(), cmd.itemId(), cmd.targetId(), t);
+                        return;
+                    }
+                    publisher.failed(cmd,
+                            e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
+                },
+                transcodeCommand
+                        ? MqConsumerSupport.FailurePolicy.REQUEUE
+                        : MqConsumerSupport.FailurePolicy.REJECT_TO_DLQ);
     }
 
     private void route(ManagementCommandRequestedEvent cmd) {
