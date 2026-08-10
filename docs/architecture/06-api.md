@@ -97,6 +97,8 @@ POST   /api/trash/comics/{comicId}/restore      # 回收站（恢复/永久清�
 POST   /api/uploads/sessions                    # 分块上传会话
 ```
 
+> **刷新元数据（异步任务）**：`POST /api/storage/refresh-metadata/comics/{id}` 仅接受 `READY` 漫画（不存在 404、非 READY/并发 409），成功返回 `202` + `OperationSubmitResultDTO`（taskId）。Worker 按 `HQ/{comicId}/{chapterId}` 逐章扫描生成 STAGING 快照（SHA-256 + `databaseRevision`），API 校验后事务合并 DB（缺失文件置 `HQ MISSING`），成功后 CAS 释放 `REFRESHING → READY` 并经 Outbox 重导出 `metadata.json`。HTTP 全程不传输文件字节。
+
 > v1.0 起封面候选/设置接口已移除（封面 URL 由 `FileUrlResolver.resolveCover(comicId)` 生成），`DELETE /api/comics/{id}` 语义由硬删改为进入回收站。完整端点见 [`docs/api.md`](../api.md)。
 
 **决策**：0.2 优先保留现有 URL，通过 DTO 解耦；管理领域按资源拆出 `/api/management`、`/api/storage`、`/api/trash`、`/api/uploads` 前缀，未使用 `/api/manage/*`。

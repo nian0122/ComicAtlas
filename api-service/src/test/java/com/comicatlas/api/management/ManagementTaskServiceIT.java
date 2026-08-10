@@ -1,8 +1,12 @@
 package com.comicatlas.api.management;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.comicatlas.api.common.exception.ConflictException;
+import com.comicatlas.api.common.enums.ComicStatus;
+import com.comicatlas.api.comic.entity.Comic;
+import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.management.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
@@ -101,10 +105,14 @@ class ManagementTaskServiceIT {
     @Autowired
     private ManagementTaskItemMapper itemMapper;
 
+    @Autowired
+    private ComicMapper comicMapper;
+
     @AfterEach
     void tearDown() {
         if (itemMapper != null) { itemMapper.delete(new LambdaQueryWrapper<>()); }
         if (taskMapper != null) { taskMapper.delete(new LambdaQueryWrapper<>()); }
+        if (comicMapper != null) { comicMapper.delete(new LambdaQueryWrapper<>()); }
     }
 
     private static boolean checkDockerAvailable() {
@@ -571,6 +579,90 @@ class ManagementTaskServiceIT {
 
             ManagementTaskResponse updated = service.getTask(task.getId());
             assertThat(updated.getStatus()).isEqualTo(ManagementTaskStatus.RUNNING);
+        }
+    }
+
+    // ======================== 元数据刷新任务 CAS ========================
+
+    @Nested
+    @DisplayName("元数据刷新任务 CAS")
+    class MetadataRefreshCasTests {
+
+        private Comic comic;
+
+        @BeforeEach
+        void setUpComic() {
+            comic = new Comic();
+            comic.setTitle("CAS 测试漫画");
+            comic.setStatus(ComicStatus.READY);
+            comicMapper.insert(comic);
+        }
+
+        @Test
+        @DisplayName("创建 METADATA_REFRESH 任务：comic READY→REFRESHING")
+        void createMetadataRefreshTask_casComicToRefreshing() {
+            ManagementTaskResponse task = service.createTask(metadataRefreshRequest(comic.getId()), null, null);
+
+            assertThat(task.getTaskType()).isEqualTo(TaskType.METADATA_REFRESH);
+            assertThat(comicMapper.selectById(comic.getId()).getStatus()).isEqualTo(ComicStatus.REFRESHING);
+        }
+
+        @Test
+        @DisplayName("创建 METADATA_REFRESH 任务：comic 非 READY → 409 且无 task 副作用")
+        void createMetadataRefreshTask_nonReadyComic_conflict() {
+            comic.setStatus(ComicStatus.IMPORTING);
+            comicMapper.updateById(comic);
+
+            assertThatThrownBy(() -> service.createTask(metadataRefreshRequest(comic.getId()), null, null))
+                    .isInstanceOf(ConflictException.class);
+            assertThat(taskMapper.selectCount(new LambdaQueryWrapper<>())).isZero();
+            assertThat(itemMapper.selectCount(new LambdaQueryWrapper<>())).isZero();
+        }
+
+        @Test
+        @DisplayName("重试 METADATA_REFRESH 任务：comic 先 CAS READY→REFRESHING 再重置")
+        void retryMetadataRefreshTask_casComicToRefreshing() {
+            ManagementTaskResponse task = service.createTask(metadataRefreshRequest(comic.getId()), null, null);
+            List<ManagementTaskItemResponse> items = service.getTaskItems(task.getId());
+            service.updateItemStatus(items.get(0).getId(), ManagementTaskStatus.FAILED,
+                    "失败", null, null);
+            // 生产由 ManagementCommandResultHandler 失败分支释放 REFRESHING→READY，这里模拟
+            comicMapper.update(null, new LambdaUpdateWrapper<Comic>()
+                    .eq(Comic::getId, comic.getId()).set(Comic::getStatus, ComicStatus.READY));
+
+            ManagementTaskResponse retried = service.retryTask(task.getId());
+
+            assertThat(retried.getAttempt()).isEqualTo(2);
+            assertThat(comicMapper.selectById(comic.getId()).getStatus()).isEqualTo(ComicStatus.REFRESHING);
+        }
+
+        @Test
+        @DisplayName("重试 METADATA_REFRESH 任务：comic 非 READY → 409")
+        void retryMetadataRefreshTask_comicNotReady_conflict() {
+            ManagementTaskResponse task = service.createTask(metadataRefreshRequest(comic.getId()), null, null);
+            List<ManagementTaskItemResponse> items = service.getTaskItems(task.getId());
+            service.updateItemStatus(items.get(0).getId(), ManagementTaskStatus.FAILED,
+                    "失败", null, null);
+            comicMapper.update(null, new LambdaUpdateWrapper<Comic>()
+                    .eq(Comic::getId, comic.getId()).set(Comic::getStatus, ComicStatus.REFRESHING));
+
+            assertThatThrownBy(() -> service.retryTask(task.getId()))
+                    .isInstanceOf(ConflictException.class);
+        }
+
+        private CreateManagementTaskRequest metadataRefreshRequest(Long comicId) {
+            CreateManagementTaskRequest req = new CreateManagementTaskRequest();
+            req.setTaskType(TaskType.METADATA_REFRESH);
+            req.setOperation("刷新元数据");
+            req.setTargetType("COMIC");
+
+            CreateManagementTaskRequest.TaskTarget target = new CreateManagementTaskRequest.TaskTarget();
+            target.setTargetType("COMIC");
+            target.setTargetId(comicId);
+            target.setOperationType(TaskType.METADATA_REFRESH);
+
+            req.setTargets(List.of(target));
+            return req;
         }
     }
 

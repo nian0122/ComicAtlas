@@ -1,15 +1,14 @@
 package com.comicatlas.api.storage.controller;
 
 import com.comicatlas.api.common.Result;
-import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.export.dto.ExportTaskVO;
 import com.comicatlas.api.management.dto.OperationSubmitResultDTO;
+import com.comicatlas.api.management.operation.MediaOperationCommandService;
 import com.comicatlas.api.storage.dto.ExportArtifactVO;
 import com.comicatlas.api.storage.service.ExportOperationService;
 import com.comicatlas.api.storage.service.HqDeleteOperationService;
 import com.comicatlas.api.storage.service.LqOperationService;
 import com.comicatlas.api.storage.service.TranscodeOperationService;
-import com.comicatlas.common.constant.MetadataRefreshConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -44,6 +43,7 @@ public class StorageOperationController {
     private final HqDeleteOperationService hqDeleteOperationService;
     private final TranscodeOperationService transcodeOperationService;
     private final ExportOperationService exportOperationService;
+    private final MediaOperationCommandService commandService;
 
     // ======================== LQ 生成 ========================
 
@@ -123,23 +123,22 @@ public class StorageOperationController {
         return Result.ok(transcodeOperationService.transcodeForChapter(chapterId));
     }
 
-    // ======================== 刷新元数据（fail-closed 停用） ========================
+    // ======================== 刷新元数据 ========================
 
     /**
-     * 刷新漫画元数据：危险扫盘路径已临时停用，固定返回 HTTP 409。
+     * 刷新漫画元数据：重读 HQ 目录 → 快照合并 DB（异步执行，经 MQ 回写）。
      * <p>
-     * 扫盘刷新（重读 HQ 目录修改 DB）fail-closed 停用，不再委托
-     * {@code MetadataRefreshService}；安全重导出（DB→JSON）仍由
-     * {@code MediaMetadataSyncService} 在转码完成等场景经 MQ 触发，不受影响。
+     * 委托 {@link MediaOperationCommandService#requestMetadataRefresh} 走统一命令管线：
+     * 同事务 CAS 漫画 READY→REFRESHING、创建 COMIC 级任务并发布命令到 Outbox；
+     * 漫画不存在 404、非 READY 或并发被占用 409。
      *
      * @param comicId 漫画 ID
-     * @return HTTP 409 + 统一停用 code/message
+     * @return 202 Accepted + 操作提交结果
      */
     @PostMapping("/refresh-metadata/comics/{comicId}")
-    public ResponseEntity<Result<?>> refreshMetadata(@PathVariable Long comicId) {
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(Result.fail(HttpStatusCodes.CONFLICT,
-                        MetadataRefreshConstants.METADATA_REFRESH_DISABLED_REASON));
+    public ResponseEntity<Result<OperationSubmitResultDTO>> refreshMetadata(@PathVariable Long comicId) {
+        OperationSubmitResultDTO dto = commandService.requestMetadataRefresh(comicId);
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(Result.ok(dto));
     }
 
     // ======================== 导出 ========================

@@ -22,6 +22,8 @@ import java.nio.file.Path;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import com.comicatlas.api.comic.mapper.CatalogMapper;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
@@ -121,6 +123,7 @@ class MetadataExporterTest {
         JsonNode root = realMapper.readTree(out.toFile());
 
         assertEquals(3, root.get("version").asInt(), "version should be 3");
+        verify(mediaMapper, times(1)).selectList(any(LambdaQueryWrapper.class));
         JsonNode chapters = root.get("chapters");
         assertEquals(1, chapters.size());
         JsonNode chapterNode = chapters.get(0);
@@ -160,5 +163,69 @@ class MetadataExporterTest {
         assertEquals("aac", secondItem.get("audioCodec").asText());
         assertEquals("1/10/002.mp4", secondItem.get("hqPath").asText(),
                 "VIDEO item should carry the real relative hqPath StorageRef");
+    }
+
+    @Test
+    void export_loadsAllMediaInSingleBatchQuery_groupedByChapter(@TempDir Path tempDir) throws Exception {
+        ObjectMapper realMapper = new ObjectMapper();
+        ApiStorageRoot metadataRoot = new ApiStorageRoot();
+        metadataRoot.setPath(tempDir.resolve("metadata"));
+        when(storageProperties.root("METADATA")).thenReturn(metadataRoot);
+
+        Comic comic = new Comic();
+        comic.setId(1L);
+        comic.setTitle("Test Comic");
+        comic.setAuthor("Author A");
+        comic.setCategory("Action");
+        when(comicMapper.selectById(1L)).thenReturn(comic);
+
+        when(catalogMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
+        when(comicTagMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
+
+        Chapter chapter1 = new Chapter();
+        chapter1.setId(10L);
+        chapter1.setTitle("第1话");
+        chapter1.setGlobalOrder(0);
+        Chapter chapter2 = new Chapter();
+        chapter2.setId(20L);
+        chapter2.setTitle("第2话");
+        chapter2.setGlobalOrder(1);
+        when(chapterMapper.selectList(any(LambdaQueryWrapper.class)))
+                .thenReturn(List.of(chapter1, chapter2));
+
+        Media item1 = new Media();
+        item1.setId(100L);
+        item1.setChapterId(10L);
+        item1.setPageNumber(1);
+        item1.setHqPath("1/10/001.jpg");
+        item1.setHqStatus(HqStatus.READY);
+        item1.setLqStatus(LqStatus.NOT_GENERATED);
+        item1.setFileSize(100L);
+        item1.setMediaType("IMAGE");
+        Media item2 = new Media();
+        item2.setId(101L);
+        item2.setChapterId(20L);
+        item2.setPageNumber(1);
+        item2.setHqPath("1/20/001.jpg");
+        item2.setHqStatus(HqStatus.READY);
+        item2.setLqStatus(LqStatus.NOT_GENERATED);
+        item2.setFileSize(100L);
+        item2.setMediaType("IMAGE");
+
+        when(mediaMapper.selectList(any(LambdaQueryWrapper.class)))
+                .thenReturn(List.of(item1, item2));
+
+        Path out = exporter.export(1L);
+
+        verify(mediaMapper, times(1)).selectList(any(LambdaQueryWrapper.class));
+
+        JsonNode chapters = realMapper.readTree(out.toFile()).get("chapters");
+        assertEquals(2, chapters.size());
+        assertEquals(1, chapters.get(0).get("mediaItems").size(),
+                "第1话只应包含其自身章节的 media");
+        assertEquals("1/10/001.jpg", chapters.get(0).get("mediaItems").get(0).get("hqPath").asText());
+        assertEquals(1, chapters.get(1).get("mediaItems").size(),
+                "第2话只应包含其自身章节的 media");
+        assertEquals("1/20/001.jpg", chapters.get(1).get("mediaItems").get(0).get("hqPath").asText());
     }
 }

@@ -43,4 +43,10 @@ public class ExportMedia {
     private String videoCodec;
 
     private String audioCodec;
+
+    /** 媒体页生命周期状态（READY/TRASHED/DELETED 等，元数据扫盘快照基线用） */
+    private String status;
+
+    /** 乐观锁版本号（元数据扫盘快照基线用） */
+    private Integer version;
 }

@@ -44,6 +44,7 @@ import java.util.UUID;
     @JsonSubTypes.Type(value = ManagementCommandFailedEvent.class, name = "ManagementCommandFailedEvent"),
     @JsonSubTypes.Type(value = ManagementCommandCancelRequestedEvent.class, name = "ManagementCommandCancelRequestedEvent"),
     @JsonSubTypes.Type(value = MediaUploadCompletedEvent.class, name = "MediaUploadCompletedEvent"),
+    @JsonSubTypes.Type(value = MetadataRefreshScanCompletedEvent.class, name = "MetadataRefreshScanCompletedEvent"),
 })
 public sealed interface ComicEvent
     permits ImportTaskCreatedEvent, ImportTaskCompletedEvent, ImportTaskFailedEvent,
@@ -63,7 +64,8 @@ public sealed interface ComicEvent
             ManagementCommandRequestedEvent, ManagementCommandProgressEvent,
             ManagementCommandCompletedEvent, ManagementCommandFailedEvent,
             ManagementCommandCancelRequestedEvent,
-            MediaUploadCompletedEvent {
+            MediaUploadCompletedEvent,
+            MetadataRefreshScanCompletedEvent {
 
     UUID eventId();
     Instant occurredAt();

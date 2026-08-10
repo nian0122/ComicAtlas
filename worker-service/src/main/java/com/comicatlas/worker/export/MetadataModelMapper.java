@@ -13,7 +13,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-/** worker entity(Export*) → MetadataV3 通用模型映射。 */
+/**
+ * worker entity(Export*) → MetadataV3 通用模型映射。
+ * media 的 hqPath 原样传递 DB 中的真实相对路径（{comicId}/{chapterId}/{fileName}），
+ * 不依赖 globalOrder/chapterNo/fileName 重建；缺失时抛业务异常，非法路径由 MetadataV3 校验。
+ */
 @Component
 public class MetadataModelMapper {
 
@@ -41,8 +45,9 @@ public class MetadataModelMapper {
             ExportChapter chapter = result.chapters().get(i);
             List<MetadataV3.MediaItem> mediaItems = new ArrayList<>();
             for (ExportMedia media : mediaByChapter.getOrDefault(chapter.getId(), List.of())) {
+                String hqPath = requireHqPath(media);
                 mediaItems.add(new MetadataV3.MediaItem(
-                        extractFileName(media.getHqPath()),
+                        extractFileName(hqPath),
                         media.getPageNumber() != null ? media.getPageNumber() : 0,
                         media.getHqStatus() != null ? media.getHqStatus() : "READY",
                         media.getLqStatus() != null ? media.getLqStatus() : "NOT_GENERATED",
@@ -51,7 +56,8 @@ public class MetadataModelMapper {
                         media.getWidth(), media.getHeight(),
                         media.getDuration() != null ? BigDecimal.valueOf(media.getDuration()) : null,
                         media.getContainer(),
-                        media.getVideoCodec(), media.getAudioCodec()));
+                        media.getVideoCodec(), media.getAudioCodec(),
+                        hqPath));
             }
             chapters.add(new MetadataV3.Chapter(
                     chapter.getTitle() != null ? chapter.getTitle() : "",
@@ -62,6 +68,22 @@ public class MetadataModelMapper {
                     mediaItems));
         }
         return new MetadataV3(comicInfo, catalogs, chapters);
+    }
+
+    /**
+     * 读取媒体记录的 hqPath 相对路径；缺失或为空时抛业务异常，避免输出非法路径。
+     *
+     * @param media 媒体记录
+     * @return 原样 DB hqPath（相对正斜杠，{comicId}/{chapterId}/{fileName}）
+     * @throws IllegalArgumentException hqPath 缺失或为空时抛出
+     */
+    private static String requireHqPath(ExportMedia media) {
+        String hqPath = media.getHqPath();
+        if (hqPath == null || hqPath.isBlank()) {
+            throw new IllegalArgumentException(
+                    "媒体缺少 hqPath 相对路径，无法生成 metadata: mediaId=" + media.getId());
+        }
+        return hqPath;
     }
 
     private static String extractFileName(String hqPath) {

@@ -1,0 +1,460 @@
+package com.comicatlas.worker.command;
+
+import com.comicatlas.common.constant.MetadataRefreshLimits;
+import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO;
+import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO.ChapterSnapshot;
+import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO.MediaSnapshot;
+import com.comicatlas.common.event.ManagementCommandRequestedEvent;
+import com.comicatlas.common.util.MetadataSnapshotRevision;
+import com.comicatlas.worker.entity.ExportChapter;
+import com.comicatlas.worker.entity.ExportMedia;
+import com.comicatlas.worker.event.ManagementCommandPublisher;
+import com.comicatlas.worker.importer.NaturalPathComparator;
+import com.comicatlas.worker.mapper.ExportChapterMapper;
+import com.comicatlas.worker.mapper.ExportMediaMapper;
+import com.comicatlas.worker.media.ComicMetadata;
+import com.comicatlas.worker.media.MediaAnalyzer;
+import com.comicatlas.worker.storage.StorageProperties;
+import com.comicatlas.worker.storage.StorageRoot;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import java.io.IOException;
+import java.io.OutputStream;
+import java.math.BigDecimal;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+/**
+ * 元数据扫盘刷新命令处理器（API → Worker，METADATA_REFRESH/COMIC）。
+ * <p>
+ * 职责：重读 {@code HQ/{comicId}/{chapterId}} 直接子级的媒体文件，生成原子落盘的结构快照
+ * {@code metadata-refresh/{taskId}/{itemId}/{attempt}/snapshot.json}（相对 STAGING 根），
+ * 完成后经 MANAGEMENT exchange 发布 {@code MetadataRefreshScanCompletedEvent}（只传引用 + SHA-256 + 字节数），
+ * 由 API 端与数据库比对刷新元数据。Worker 全程只读 MySQL，不直接改库。
+ * <p>
+ * 过滤规则（NOFOLLOW_LINKS 语义）：忽略符号链接、隐藏项（点前缀或系统隐藏位）、子目录与
+ * 未知扩展名（记结构化 warning）；仅允许 jpg/jpeg/png/webp/gif/bmp/mp4/mkv/webm/mov/avi
+ * 进入 MediaAnalyzer 提取尺寸/视频字段，文件名自然排序。
+ * <p>
+ * 路径安全：章节目录仅由 {@link StorageRoot#resolve}（防御 {@code ../} 穿越）构建，
+ * 快照 hqPath 为 DB 真实相对路径格式并经受 {@code RelativePathValidator} 校验；
+ * 目录遍历只产出 {@code {comicId}/{chapterId}/{fileName}}，绝不访问 globalOrder 目录。
+ * <p>
+ * 原子写：同目录写 {@code .tmp} → flush/close → 计算最终字节 SHA-256 → ATOMIC_MOVE；
+ * 原子移动不受支持即失败并清理临时文件（拒绝非原子覆盖）。
+ * <p>
+ * TTL：命令开始时清理超过 7 天的旧 attempt 目录；每次 attempt 使用新路径重新扫描，不读旧快照。
+ */
+@Slf4j
+@Component
+public class MetadataRefreshCommandHandler {
+
+    /** 快照 schema 版本（与 MetadataRefreshSnapshotDTO 契约一致）。 */
+    private static final int SNAPSHOT_SCHEMA_VERSION = 1;
+
+    /** 过期 attempt 目录保留时长：7 天。 */
+    private static final Duration ATTEMPT_TTL = Duration.ofDays(7);
+
+    /** HQ 存储根 key。 */
+    private static final String HQ_ROOT_KEY = "HQ";
+
+    /** STAGING 存储根 key（快照产物落盘根）。 */
+    private static final String STAGING_ROOT_KEY = "STAGING";
+
+    /** 图片扩展名白名单。 */
+    private static final Set<String> IMAGE_EXTENSIONS =
+            Set.of(".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp");
+
+    /** 视频扩展名白名单。 */
+    private static final Set<String> VIDEO_EXTENSIONS =
+            Set.of(".mp4", ".mkv", ".webm", ".mov", ".avi");
+
+    private final ExportChapterMapper chapterMapper;
+    private final ExportMediaMapper mediaMapper;
+    private final MediaAnalyzer mediaAnalyzer;
+    private final ManagementCommandPublisher publisher;
+    private final StorageProperties storageProperties;
+    private final ObjectMapper objectMapper;
+    private final int maxChapters;
+    private final int maxMedia;
+    private final long maxSnapshotBytes;
+
+    /**
+     * 生产装配构造器：@Autowired 显式声明——类含包级测试构造器，不标注时 Spring 无法决定用哪个。
+     */
+    @Autowired
+    public MetadataRefreshCommandHandler(ExportChapterMapper chapterMapper, ExportMediaMapper mediaMapper,
+                                         MediaAnalyzer mediaAnalyzer, ManagementCommandPublisher publisher,
+                                         StorageProperties storageProperties, ObjectMapper objectMapper) {
+        this(chapterMapper, mediaMapper, mediaAnalyzer, publisher, storageProperties, objectMapper,
+                MetadataRefreshLimits.MAX_CHAPTERS, MetadataRefreshLimits.MAX_MEDIA,
+                MetadataRefreshLimits.MAX_SNAPSHOT_BYTES);
+    }
+
+    /**
+     * 包级构造器：允许测试覆盖上限常量以快速验证超限失败路径。
+     * 生产装配一律走公开构造器（上限取冻结常量）。
+     */
+    MetadataRefreshCommandHandler(ExportChapterMapper chapterMapper, ExportMediaMapper mediaMapper,
+                                  MediaAnalyzer mediaAnalyzer, ManagementCommandPublisher publisher,
+                                  StorageProperties storageProperties, ObjectMapper objectMapper,
+                                  int maxChapters, int maxMedia, long maxSnapshotBytes) {
+        this.chapterMapper = chapterMapper;
+        this.mediaMapper = mediaMapper;
+        this.mediaAnalyzer = mediaAnalyzer;
+        this.publisher = publisher;
+        this.storageProperties = storageProperties;
+        this.objectMapper = objectMapper;
+        this.maxChapters = maxChapters;
+        this.maxMedia = maxMedia;
+        this.maxSnapshotBytes = maxSnapshotBytes;
+    }
+
+    /**
+     * 执行元数据扫盘刷新：清理过期 attempt → 只读查询基线 → 逐章扫描 HQ 目录 →
+     * 组装快照 → 原子落盘 → 发布完成事件。任何异常统一转 FAILED 事件（业务结果，正常 ack）。
+     *
+     * @param cmd 管理命令请求（operationType=METADATA_REFRESH, targetType=COMIC, targetId=comicId）
+     */
+    public void refresh(ManagementCommandRequestedEvent cmd) {
+        publisher.progress(cmd, 10, "开始元数据扫盘");
+        try {
+            if (!"COMIC".equals(cmd.targetType()) || cmd.targetId() == null) {
+                publisher.failed(cmd, "元数据扫盘刷新仅支持漫画级（COMIC 且 targetId 非空），当前 targetType="
+                        + cmd.targetType());
+                return;
+            }
+            Long comicId = cmd.targetId();
+
+            cleanupExpiredAttempts();
+
+            List<ExportChapter> chapters = new ArrayList<>(
+                    chapterMapper.selectByComicIdWithVersion(comicId));
+            if (chapters.size() > maxChapters) {
+                publisher.failed(cmd, "章节数量超过上限: " + chapters.size() + " > " + maxChapters);
+                return;
+            }
+            // 仅按 globalOrder 排序章节，扫描路径一律使用 chapterId
+            chapters.sort(Comparator.comparingInt(ch -> ch.getGlobalOrder() != null ? ch.getGlobalOrder() : 0));
+
+            Map<Long, List<ExportMedia>> mediaByChapter = mediaMapper.selectByComicIdWithVersionAndStatus(comicId).stream()
+                    .filter(m -> m.getChapterId() != null)
+                    .collect(Collectors.groupingBy(ExportMedia::getChapterId));
+
+            List<ChapterSnapshot> chapterSnapshots = new ArrayList<>(chapters.size());
+            int totalMedia = 0;
+            for (ExportChapter chapter : chapters) {
+                ChapterScanResult scan = scanChapter(comicId, chapter,
+                        mediaByChapter.getOrDefault(chapter.getId(), List.of()));
+                totalMedia += scan.mediaItems().size();
+                if (totalMedia > maxMedia) {
+                    publisher.failed(cmd, "媒体条目超过上限: " + totalMedia + " > " + maxMedia);
+                    return;
+                }
+                chapterSnapshots.add(new ChapterSnapshot(
+                        chapter.getId(), versionOrZero(chapter.getVersion()),
+                        scan.mediaItems(), scan.warnings()));
+            }
+
+            publisher.progress(cmd, 60, "扫描完成，写入快照");
+
+            Instant generatedAt = Instant.now();
+            MetadataRefreshSnapshotDTO draft = new MetadataRefreshSnapshotDTO(
+                    SNAPSHOT_SCHEMA_VERSION, comicId, generatedAt, "", chapterSnapshots);
+            String databaseRevision = MetadataSnapshotRevision.compute(draft);
+            MetadataRefreshSnapshotDTO snapshot = new MetadataRefreshSnapshotDTO(
+                    SNAPSHOT_SCHEMA_VERSION, comicId, generatedAt, databaseRevision, chapterSnapshots);
+
+            byte[] jsonBytes;
+            try {
+                jsonBytes = objectMapper.writeValueAsBytes(snapshot);
+            } catch (JsonProcessingException e) {
+                publisher.failed(cmd, "快照序列化失败: " + e.getMessage());
+                return;
+            }
+            if (jsonBytes.length > maxSnapshotBytes) {
+                publisher.failed(cmd, "快照超过大小上限: " + jsonBytes.length + " > " + maxSnapshotBytes);
+                return;
+            }
+
+            String snapshotRef = writeSnapshotAtomically(cmd, jsonBytes);
+            String snapshotSha256 = sha256Hex(jsonBytes);
+
+            publisher.metadataRefreshScanCompleted(cmd, snapshotRef, snapshotSha256,
+                    jsonBytes.length, SNAPSHOT_SCHEMA_VERSION);
+            publisher.progress(cmd, 100, "元数据扫盘完成");
+            log.info("元数据扫盘完成: comicId={}, taskId={}, itemId={}, attempt={}, chapters={}, media={}, bytes={}",
+                    comicId, cmd.taskId(), cmd.itemId(), cmd.attempt(),
+                    chapterSnapshots.size(), totalMedia, jsonBytes.length);
+        } catch (Exception e) {
+            log.warn("元数据扫盘失败: taskId={}, itemId={}, attempt={}",
+                    cmd.taskId(), cmd.itemId(), cmd.attempt(), e);
+            publisher.failed(cmd, e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
+        }
+    }
+
+    /** 单章扫描结果：媒体快照列表 + 结构化 warning 列表。 */
+    private record ChapterScanResult(List<MediaSnapshot> mediaItems, List<String> warnings) {
+    }
+
+    /**
+     * 扫描单个章节的 HQ 直接子级 regular file（NOFOLLOW_LINKS），按自然排序组装媒体快照。
+     * 章节目录缺失时返回空扫描 + warning（API 侧据此标记 MISSING）。
+     * <p>
+     * 快照只包含「磁盘文件 ∩ DB 媒体行」：匹配行的媒体身份（mediaId/mediaVersion/pageNumber/状态）
+     * 取自 DB，尺寸/视频字段取自 MediaAnalyzer 实测；磁盘存在但 DB 无记录的孤儿文件不导入
+     * （快照 mediaId 契约非空），仅记 warning；DB 存在但磁盘缺失的媒体行不在快照中，
+     * 由 API 侧比对后标记 MISSING。
+     *
+     * @param comicId   漫画 ID（用于构建相对路径，不参与目录定位）
+     * @param chapter   章节（chapterId 决定扫描目录，globalOrder 仅排序不用于路径）
+     * @param dbMedia   该章节的 DB 媒体行基线（用于匹配 mediaId/mediaVersion/pageNumber/状态）
+     */
+    private ChapterScanResult scanChapter(Long comicId, ExportChapter chapter,
+                                          List<ExportMedia> dbMedia) {
+        List<String> warnings = new ArrayList<>();
+        StorageRoot hqRoot = requireRoot(HQ_ROOT_KEY);
+        Long chapterId = chapter.getId();
+        Path chapterDir = hqRoot.resolve(comicId + "/" + chapterId);
+
+        if (!Files.isDirectory(chapterDir, LinkOption.NOFOLLOW_LINKS)) {
+            warnings.add("章节目录不存在: " + comicId + "/" + chapterId);
+            return new ChapterScanResult(List.of(), warnings);
+        }
+
+        List<Path> files;
+        try (Stream<Path> stream = Files.list(chapterDir)) {
+            files = stream.collect(Collectors.toList());
+        } catch (IOException e) {
+            warnings.add("读取章节目录失败: " + comicId + "/" + chapterId);
+            return new ChapterScanResult(List.of(), warnings);
+        }
+        files.sort(NaturalPathComparator.INSTANCE);
+
+        Map<String, ExportMedia> mediaByHqPath = dbMedia.stream()
+                .filter(m -> m.getHqPath() != null)
+                .collect(Collectors.toMap(ExportMedia::getHqPath, m -> m, (a, b) -> a));
+
+        List<MediaSnapshot> mediaItems = new ArrayList<>(files.size());
+        int sequence = 0;
+        for (Path file : files) {
+            String fileName = file.getFileName().toString();
+            if (fileName.startsWith(".") || isHidden(file)) {
+                warnings.add("忽略隐藏文件: " + fileName);
+                continue;
+            }
+            if (Files.isSymbolicLink(file)) {
+                warnings.add("忽略符号链接: " + fileName);
+                continue;
+            }
+            if (!Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) {
+                if (Files.isDirectory(file, LinkOption.NOFOLLOW_LINKS)) {
+                    warnings.add("忽略子目录: " + fileName);
+                } else {
+                    warnings.add("忽略非普通文件: " + fileName);
+                }
+                continue;
+            }
+            String mediaType = mediaTypeOf(extensionOf(fileName));
+            if (mediaType == null) {
+                warnings.add("忽略未知扩展名: " + fileName);
+                continue;
+            }
+
+            sequence++;
+            String relativePath = comicId + "/" + chapterId + "/" + fileName;
+            ExportMedia row = mediaByHqPath.get(relativePath);
+            if (row == null) {
+                warnings.add("物理文件无对应DB记录: " + fileName);
+                continue;
+            }
+
+            long fileSize = safeSize(file);
+            Integer width = null;
+            Integer height = null;
+            BigDecimal duration = null;
+            String container = null;
+            String videoCodec = null;
+            String audioCodec = null;
+            try {
+                ComicMetadata.MediaInfo info = mediaAnalyzer.analyze(file);
+                if (info != null) {
+                    width = info.width();
+                    height = info.height();
+                    duration = info.duration();
+                    container = info.container();
+                    videoCodec = info.videoCodec();
+                    audioCodec = info.audioCodec();
+                    if (info.fileSize() > 0) {
+                        fileSize = info.fileSize();
+                    }
+                }
+            } catch (Exception e) {
+                warnings.add("媒体分析失败: " + fileName);
+                log.debug("媒体分析失败: comicId={}, chapterId={}, file={}", comicId, chapterId, fileName, e);
+            }
+
+            mediaItems.add(new MediaSnapshot(
+                    row.getId(), versionOrZero(row.getVersion()), relativePath,
+                    row.getHqStatus() != null ? row.getHqStatus() : "READY",
+                    row.getStatus() != null ? row.getStatus() : "READY",
+                    row.getPageNumber() != null ? row.getPageNumber() : sequence,
+                    fileSize, mediaType, width, height, duration, container, videoCodec, audioCodec));
+        }
+        return new ChapterScanResult(mediaItems, warnings);
+    }
+
+    /**
+     * 清理超过 7 天的 {@code STAGING/metadata-refresh/} 下 attempt 目录。
+     * 判断依据为 attempt 目录自身 mtime（最后一次写快照的时间）。
+     */
+    private void cleanupExpiredAttempts() {
+        StorageRoot stagingRoot = roots().get(STAGING_ROOT_KEY);
+        if (stagingRoot == null) {
+            log.debug("STAGING 存储根未配置，跳过元数据快照 TTL 清理");
+            return;
+        }
+        Path root = stagingRoot.resolve("metadata-refresh");
+        if (!Files.isDirectory(root, LinkOption.NOFOLLOW_LINKS)) {
+            return;
+        }
+        Instant cutoff = Instant.now().minus(ATTEMPT_TTL);
+        try (Stream<Path> taskDirs = Files.list(root)) {
+            for (Path taskDir : taskDirs.filter(Files::isDirectory).toList()) {
+                try (Stream<Path> itemDirs = Files.list(taskDir)) {
+                    for (Path itemDir : itemDirs.filter(Files::isDirectory).toList()) {
+                        try (Stream<Path> attemptDirs = Files.list(itemDir)) {
+                            for (Path attemptDir : attemptDirs.filter(Files::isDirectory).toList()) {
+                                try {
+                                    if (Files.getLastModifiedTime(attemptDir).toInstant().isBefore(cutoff)) {
+                                        deleteRecursively(attemptDir);
+                                        log.info("清理过期元数据快照 attempt 目录: {}", attemptDir);
+                                    }
+                                } catch (IOException e) {
+                                    log.warn("清理元数据快照 attempt 目录失败: {}", attemptDir, e);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (IOException e) {
+            log.warn("扫描 metadata-refresh 目录失败，跳过 TTL 清理", e);
+        }
+    }
+
+    /**
+     * 原子写入快照：同目录写 {@code .tmp} → flush/close → ATOMIC_MOVE 到目标。
+     * 原子移动不受支持即失败并清理临时文件（拒绝非原子覆盖写入）。
+     *
+     * @return 快照引用路径（相对 STAGING 根，如 {@code metadata-refresh/1/2/3/snapshot.json}）
+     */
+    private String writeSnapshotAtomically(ManagementCommandRequestedEvent cmd, byte[] jsonBytes)
+            throws IOException {
+        StorageRoot stagingRoot = requireRoot(STAGING_ROOT_KEY);
+        String relative = "metadata-refresh/" + cmd.taskId() + "/" + cmd.itemId() + "/" + cmd.attempt();
+        Path target = stagingRoot.resolve(relative + "/snapshot.json");
+        Path temp = target.resolveSibling("snapshot.json.tmp");
+        Files.createDirectories(target.getParent());
+        try {
+            try (OutputStream out = Files.newOutputStream(temp)) {
+                out.write(jsonBytes);
+                out.flush();
+            }
+            try {
+                Files.move(temp, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } catch (AtomicMoveNotSupportedException e) {
+                throw new IOException("原子移动不受支持，拒绝非原子覆盖写入: " + relative, e);
+            }
+        } finally {
+            Files.deleteIfExists(temp);
+        }
+        return relative + "/snapshot.json";
+    }
+
+    private StorageRoot requireRoot(String key) {
+        StorageRoot root = roots().get(key);
+        if (root == null) {
+            throw new IllegalStateException("存储根未配置: " + key);
+        }
+        return root;
+    }
+
+    private Map<String, StorageRoot> roots() {
+        return storageProperties.getRoots();
+    }
+
+    private static boolean isHidden(Path file) {
+        try {
+            return Files.isHidden(file);
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    private static long safeSize(Path file) {
+        try {
+            return Files.size(file);
+        } catch (IOException e) {
+            return 0L;
+        }
+    }
+
+    private static String extensionOf(String fileName) {
+        int dot = fileName.lastIndexOf('.');
+        return dot >= 0 ? fileName.substring(dot).toLowerCase() : "";
+    }
+
+    private static String mediaTypeOf(String ext) {
+        if (IMAGE_EXTENSIONS.contains(ext)) {
+            return "IMAGE";
+        }
+        if (VIDEO_EXTENSIONS.contains(ext)) {
+            return "VIDEO";
+        }
+        return null;
+    }
+
+    private static int versionOrZero(Integer version) {
+        return version != null ? version : 0;
+    }
+
+    private static String sha256Hex(byte[] bytes) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(digest.digest(bytes));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("JVM 不支持 SHA-256", e);
+        }
+    }
+
+    private static void deleteRecursively(Path dir) throws IOException {
+        if (!Files.exists(dir)) {
+            return;
+        }
+        try (Stream<Path> walk = Files.walk(dir)) {
+            for (Path p : walk.sorted(Comparator.comparingInt(Path::getNameCount).reversed()).toList()) {
+                Files.deleteIfExists(p);
+            }
+        }
+    }
+}

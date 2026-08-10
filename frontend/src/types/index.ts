@@ -378,6 +378,7 @@ export const StorageOperationType = {
   DeleteHQ: 'DELETE_HQ',
   GenerateLQ: 'GENERATE_LQ',
   TranscodeVideos: 'TRANSCODE_VIDEOS',
+  RefreshMetadata: 'REFRESH_METADATA',
 } as const
 
 export type StorageOperationType =

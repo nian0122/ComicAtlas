@@ -11,8 +11,14 @@
           <span class="meta-item">章节数: {{ chapters.length }}</span>
         </div>
       </div>
-      <button class="refresh-btn" disabled title="危险扫盘刷新已停用，暂不可用">
-        刷新状态（暂不可用）
+      <button
+        class="refresh-btn"
+        :class="{ 'refresh-btn--ready': !refreshDisabled }"
+        :disabled="refreshDisabled"
+        :title="refreshButtonTitle"
+        @click="onRefreshMetadata"
+      >
+        {{ refreshButtonLabel }}
       </button>
     </header>
 
@@ -96,6 +102,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { storageService, exportService } from '@/services/storage'
 import { comicApi } from '@/services/api'
 import type { ComicStorageItem, ChapterStorageItem } from '@/types'
+import { StorageOperationType } from '@/types'
 import StorageStatusTag from './StorageStatusTag.vue'
 
 const route = useRoute()
@@ -106,6 +113,11 @@ const loading = ref(false)
 const comic = ref<ComicStorageItem | null>(null)
 const chapters = ref<ChapterStorageItem[]>([])
 const chapterKeyword = ref('')
+
+// --- 元数据刷新（异步任务，202 + taskId） ---
+const comicStatus = ref('')
+const refreshSubmitted = ref(false)
+const refreshInFlight = ref(false)
 
 // --- 转码轮询 ---
 const TRANSCODE_POLL_INTERVAL = 5000
@@ -170,6 +182,69 @@ async function loadData() {
   } finally {
     loading.value = false
   }
+  void loadComicStatus()
+}
+
+/** 读取漫画生命周期状态（READY/REFRESHING 等），决定刷新按钮可用性；失败时保持禁用不阻断主体。 */
+async function loadComicStatus() {
+  try {
+    const res = await comicApi.detail(comicId)
+    comicStatus.value = res.data.status ?? ''
+  } catch {
+    comicStatus.value = ''
+  }
+}
+
+const refreshDisabled = computed(() =>
+  refreshInFlight.value || refreshSubmitted.value || comicStatus.value !== 'READY'
+)
+
+const refreshButtonLabel = computed(() => {
+  if (refreshInFlight.value) return '提交中...'
+  if (refreshSubmitted.value) return '已提交'
+  if (comicStatus.value === 'REFRESHING') return '刷新中...'
+  if (comicStatus.value && comicStatus.value !== 'READY') return '仅 READY 可刷新'
+  return '刷新元数据'
+})
+
+const refreshButtonTitle = computed(() => {
+  if (refreshInFlight.value) return '正在提交刷新请求，请稍候'
+  if (refreshSubmitted.value) return '本次刷新已提交，等待后台扫描与合并完成'
+  if (comicStatus.value === 'REFRESHING') return '元数据刷新任务正在后台执行'
+  if (comicStatus.value && comicStatus.value !== 'READY') return `漫画状态 ${comicStatus.value}，仅 READY 可刷新`
+  return '重读 HQ 目录生成快照并与数据库合并（异步任务）'
+})
+
+async function onRefreshMetadata() {
+  if (refreshDisabled.value) return
+  try {
+    await ElMessageBox.confirm(
+      '将重读该漫画的 HQ 目录并按章节生成快照，与数据库安全合并。提交后进入后台异步执行，期间不可重复刷新。是否继续？',
+      '刷新元数据',
+      { type: 'warning', confirmButtonText: '刷新', cancelButtonText: '取消' }
+    )
+  } catch { return }
+  refreshInFlight.value = true
+  try {
+    const result = await storageService.requestMetadataRefresh(comicId)
+    refreshSubmitted.value = true
+    const taskIdText = result.taskId != null ? `，任务 #${result.taskId}` : ''
+    try {
+      await ElMessageBox.alert(
+        `元数据刷新任务已提交${taskIdText}，正在后台扫描并合并。可在任务中心查看进度。`,
+        '刷新已提交',
+        { confirmButtonText: '前往任务中心', type: 'success' }
+      )
+      router.push('/manage/import/tasks')
+    } catch {
+      // 用户选择留在本页
+    }
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : '刷新失败'
+    ElMessage.error(message)
+  } finally {
+    refreshInFlight.value = false
+  }
 }
 
 async function onDeleteHQ() {
@@ -177,7 +252,7 @@ async function onDeleteHQ() {
     await ElMessageBox.confirm('确定删除该漫画的所有 HQ 原图？LQ 文件保留。', '删除 HQ', { type: 'warning' })
   } catch { return }
   try {
-    await storageService.executeOperation({ type: 'DeleteHQ' as any, comicId })
+    await storageService.executeOperation({ type: StorageOperationType.DeleteHQ, comicId })
     ElMessage.success('HQ 删除任务已提交')
     await loadData()
   } catch (err: unknown) {
@@ -191,7 +266,7 @@ async function onDeleteChapterHQ(chapterId: number) {
     await ElMessageBox.confirm('确定删除该章节的 HQ？', '删除 HQ', { type: 'warning' })
   } catch { return }
   try {
-    await storageService.executeOperation({ type: 'DeleteHQ' as any, comicId, chapterId })
+    await storageService.executeOperation({ type: StorageOperationType.DeleteHQ, comicId, chapterId })
     ElMessage.success('已提交')
     await loadData()
   } catch (err: unknown) {
@@ -205,7 +280,7 @@ async function onGenerateLQ() {
     await ElMessageBox.confirm('确认为该漫画所有章节生成 LQ？', '生成 LQ', { type: 'info' })
   } catch { return }
   try {
-    await storageService.executeOperation({ type: 'GenerateLQ' as any, comicId })
+    await storageService.executeOperation({ type: StorageOperationType.GenerateLQ, comicId })
     ElMessage.success('LQ 生成任务已提交')
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : '操作失败'
@@ -218,7 +293,7 @@ async function onGenerateChapterLQ(chapterId: number) {
     await ElMessageBox.confirm('确认为该章节生成 LQ？', '生成 LQ', { type: 'info' })
   } catch { return }
   try {
-    await storageService.executeOperation({ type: 'GenerateLQ' as any, comicId, chapterId })
+    await storageService.executeOperation({ type: StorageOperationType.GenerateLQ, comicId, chapterId })
     ElMessage.success('已提交')
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : '操作失败'
@@ -323,6 +398,16 @@ onBeforeUnmount(stopTranscodePolling)
   font-size: 13px;
   cursor: not-allowed;
   white-space: nowrap;
+}
+
+.refresh-btn--ready {
+  color: var(--accent);
+  border-color: var(--accent);
+  cursor: pointer;
+}
+
+.refresh-btn--ready:hover {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
 .card {

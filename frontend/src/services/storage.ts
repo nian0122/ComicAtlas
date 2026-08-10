@@ -37,25 +37,46 @@ export const storageService = {
     return res.data as import('@/types').ChapterStorageItem[]
   },
 
-  async executeOperation(op: StorageOperation): Promise<void> {
+  /**
+   * 统一存储操作：按类型分发到对应 API 并透传操作提交结果（taskId 等）。
+   * 失败时抛出携带后端 message 的错误（409/404 场景由页面展示）。
+   */
+  async executeOperation(op: StorageOperation): Promise<OperationSubmitResult> {
     const { type, comicId, chapterId } = op
     try {
       switch (type) {
         case StorageOperationType.DeleteHQ:
           if (chapterId != null) {
-            await hqApi.deleteChapter(chapterId)
-          } else {
-            await hqApi.deleteComic(comicId)
+            const res = await hqApi.deleteChapter(chapterId)
+            return res.data
           }
-          break
+          const deleteComicRes = await hqApi.deleteComic(comicId)
+          return deleteComicRes.data
         case StorageOperationType.GenerateLQ:
           if (chapterId != null) {
-            await lqApi.generateChapter(chapterId)
-          } else {
-            await lqApi.generateComic(comicId)
+            const res = await lqApi.generateChapter(chapterId)
+            return res.data
           }
-          break
+          const generateComicRes = await lqApi.generateComic(comicId)
+          return generateComicRes.data
+        case StorageOperationType.RefreshMetadata:
+          return this.requestMetadataRefresh(comicId)
       }
+    } catch (err) {
+      throw new Error(extractMessage(err))
+    }
+    // StorageOperationType 已穷举，此分支不可达；保留兜底以满足全路径返回
+    throw new Error('未知存储操作类型')
+  },
+
+  /**
+   * 刷新漫画元数据（异步任务）：重读 HQ 目录生成快照并与数据库合并。
+   * 成功返回 202 + OperationSubmitResult（taskId）；409/404 抛出带 message 的错误。
+   */
+  async requestMetadataRefresh(comicId: number): Promise<OperationSubmitResult> {
+    try {
+      const res = await adminApi.refreshMetadata(comicId)
+      return res.data
     } catch (err) {
       throw new Error(extractMessage(err))
     }

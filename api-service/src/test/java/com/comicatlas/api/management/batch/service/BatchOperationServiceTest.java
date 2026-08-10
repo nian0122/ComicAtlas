@@ -1,19 +1,23 @@
 package com.comicatlas.api.management.batch.service;
 
+import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.mapper.ComicMapper;
+import com.comicatlas.api.common.enums.ManagementTaskStatus;
 import com.comicatlas.api.common.enums.TaskType;
-import com.comicatlas.api.common.exception.ConflictException;
 import com.comicatlas.api.management.batch.BatchReasonCode;
 import com.comicatlas.api.management.batch.config.BatchProperties;
+import com.comicatlas.api.management.batch.dto.BatchCreateResponse;
 import com.comicatlas.api.management.batch.dto.BatchOperationRequest;
 import com.comicatlas.api.management.batch.dto.BatchPreviewResponse;
 import com.comicatlas.api.management.batch.dto.BatchSelectionVO;
 import com.comicatlas.api.management.batch.dto.BlockedBatchItem;
+import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
+import com.comicatlas.api.management.dto.ManagementTaskResponse;
+import com.comicatlas.api.management.policy.AllowedOperations;
 import com.comicatlas.api.management.policy.MediaOperationEligibilityService;
 import com.comicatlas.api.management.policy.OperationPolicyService;
 import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.outbox.service.OutboxService;
-import com.comicatlas.common.constant.MetadataRefreshConstants;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,19 +25,19 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * 批量操作服务单元测试：验证 METADATA_REFRESH 在预览中标记不可执行、
- * 提交时统一拒绝且无 task/outbox 副作用（fail-closed）。
+ * 批量操作服务单元测试：验证 METADATA_REFRESH 走与单项一致的资格（comic READY）、
+ * 预览/提交正常产生任务并入 Outbox。
  */
 @ExtendWith(MockitoExtension.class)
 class BatchOperationServiceTest {
@@ -51,10 +55,17 @@ class BatchOperationServiceTest {
                 metadataExecutor, batchProperties, managementTaskService, outboxService, objectMapper);
     }
 
-    /** 真实资格校验器：METADATA_REFRESH 走停用分支，不触碰 ComicMapper/策略服务。 */
+    /** 真实资格校验器：METADATA_REFRESH 走资产资格（comic READY），ComicMapper 返回存在的漫画。 */
     private BatchEligibilityChecker realChecker() {
-        return new BatchEligibilityChecker(mock(ComicMapper.class),
-                mock(OperationPolicyService.class), mock(MediaOperationEligibilityService.class));
+        ComicMapper comicMapper = mock(ComicMapper.class);
+        Comic comic = new Comic();
+        comic.setId(1L);
+        when(comicMapper.selectById(anyLong())).thenReturn(comic);
+        MediaOperationEligibilityService assetEligibility = mock(MediaOperationEligibilityService.class);
+        when(assetEligibility.forComic(anyLong()))
+                .thenReturn(AllowedOperations.only(Set.of(OperationPolicyService.OP_METADATA_REFRESH)));
+        return new BatchEligibilityChecker(comicMapper,
+                mock(OperationPolicyService.class), assetEligibility);
     }
 
     private static BatchOperationRequest metadataRefreshRequest() {
@@ -67,7 +78,7 @@ class BatchOperationServiceTest {
     }
 
     @Test
-    void preview_metadataRefresh标记为不可执行() {
+    void preview_metadataRefresh正常计算资格() {
         when(batchProperties.getMaxItems()).thenReturn(100);
         when(selectionResolver.resolve(any(), anyInt())).thenReturn(List.of(1L, 2L));
 
@@ -75,36 +86,59 @@ class BatchOperationServiceTest {
 
         assertThat(resp.getOperation()).isEqualTo(TaskType.METADATA_REFRESH);
         assertThat(resp.getSelectedCount()).isEqualTo(2);
-        assertThat(resp.getEligibleCount()).isZero();
+        assertThat(resp.getEligibleCount()).isEqualTo(2);
+        assertThat(resp.getBlocked()).isEmpty();
         assertThat(resp.getPreviewToken()).isNull();
-        assertThat(resp.getBlocked()).hasSize(2);
-        assertThat(resp.getBlocked()).allSatisfy(item -> {
-            assertThat(item.getReasonCode()).isEqualTo(BatchReasonCode.OP_NOT_ALLOWED);
-            assertThat(item.getReason()).isEqualTo(MetadataRefreshConstants.METADATA_REFRESH_DISABLED_MESSAGE);
-        });
     }
 
     @Test
-    void createBatch_metadataRefresh统一拒绝且无副作用() {
-        BatchOperationService service = newService(mock(BatchEligibilityChecker.class));
+    void createBatch_metadataRefresh正常创建任务并入Outbox() throws Exception {
+        when(batchProperties.getMaxItems()).thenReturn(100);
+        when(selectionResolver.resolve(any(), anyInt())).thenReturn(List.of(1L, 2L));
+        when(objectMapper.writeValueAsString(any())).thenReturn("{}");
 
-        assertThatThrownBy(() -> service.createBatch(metadataRefreshRequest(), null))
-                .isInstanceOf(ConflictException.class)
-                .hasMessage(MetadataRefreshConstants.METADATA_REFRESH_DISABLED_REASON);
+        BatchEligibilityChecker checker = mock(BatchEligibilityChecker.class);
+        when(checker.evaluate(any(), any()))
+                .thenReturn(new BatchEligibilityChecker.Result(List.of(1L, 2L), List.of()));
 
-        verify(selectionResolver, never()).resolve(any(), anyInt());
-        verify(managementTaskService, never()).createTask(any(), any(), any());
-        verify(outboxService, never()).enqueue(any(), any(), any(), any(), any(), anyInt());
+        ManagementTaskResponse taskResp = new ManagementTaskResponse();
+        taskResp.setId(77L);
+        taskResp.setTaskType(TaskType.METADATA_REFRESH);
+        taskResp.setStatus(ManagementTaskStatus.QUEUED);
+        when(managementTaskService.createTask(any(), any(), any())).thenReturn(taskResp);
+        when(managementTaskService.getTask(77L)).thenReturn(taskResp);
+
+        ManagementTaskItemResponse item = new ManagementTaskItemResponse();
+        item.setId(1L);
+        item.setTaskId(77L);
+        item.setAttempt(1);
+        item.setTargetId(1L);
+        when(managementTaskService.getTaskItems(77L)).thenReturn(List.of(item));
+
+        BatchCreateResponse resp = newService(checker).createBatch(metadataRefreshRequest(), null);
+
+        assertThat(resp.getTask().getId()).isEqualTo(77L);
+        assertThat(resp.getEligibleCount()).isEqualTo(2);
+        verify(managementTaskService).createTask(any(), any(), any());
+        verify(outboxService).enqueue(any(), any(), any(), any(), any(), anyInt());
     }
 
     @Test
-    void eligibilityChecker_metadataRefresh全部标为阻止() {
-        BatchEligibilityChecker.Result result = realChecker()
-                .evaluate(List.of(1L, 2L, 3L), TaskType.METADATA_REFRESH);
+    void eligibilityChecker_metadataRefresh走资产资格_部分不可用() {
+        ComicMapper comicMapper = mock(ComicMapper.class);
+        when(comicMapper.selectById(anyLong())).thenReturn(new Comic());
+        MediaOperationEligibilityService assetEligibility = mock(MediaOperationEligibilityService.class);
+        when(assetEligibility.forComic(1L))
+                .thenReturn(AllowedOperations.only(Set.of(OperationPolicyService.OP_METADATA_REFRESH)));
+        when(assetEligibility.forComic(2L))
+                .thenReturn(AllowedOperations.none("漫画状态不是 READY，无法刷新元数据"));
+        BatchEligibilityChecker checker = new BatchEligibilityChecker(comicMapper,
+                mock(OperationPolicyService.class), assetEligibility);
 
-        assertThat(result.eligible()).isEmpty();
-        assertThat(result.blocked()).hasSize(3);
-        assertThat(result.blocked()).extracting(BlockedBatchItem::getReasonCode)
-                .containsOnly(BatchReasonCode.OP_NOT_ALLOWED);
+        BatchEligibilityChecker.Result result = checker.evaluate(List.of(1L, 2L), TaskType.METADATA_REFRESH);
+
+        assertThat(result.eligible()).containsExactly(1L);
+        assertThat(result.blocked()).hasSize(1);
+        assertThat(result.blocked().get(0).getReasonCode()).isEqualTo(BatchReasonCode.OP_NOT_ALLOWED);
     }
 }

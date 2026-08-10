@@ -8,7 +8,6 @@ import com.comicatlas.api.storage.service.ExportOperationService;
 import com.comicatlas.api.storage.service.HqDeleteOperationService;
 import com.comicatlas.api.storage.service.LqOperationService;
 import com.comicatlas.api.storage.service.TranscodeOperationService;
-import com.comicatlas.common.constant.MetadataRefreshConstants;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -31,7 +30,7 @@ class StorageOperationControllerTest {
     private final TranscodeOperationService transcodeService = new TranscodeOperationService(commandService);
     private final ExportOperationService exportOperationService = mock(ExportOperationService.class);
     private final StorageOperationController controller =
-            new StorageOperationController(lqService, hqService, transcodeService, exportOperationService);
+            new StorageOperationController(lqService, hqService, transcodeService, exportOperationService, commandService);
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
 
     @Test
@@ -106,11 +105,16 @@ class StorageOperationControllerTest {
     }
 
     @Test
-    void refreshMetadata_固定返回409并携带统一停用码() throws Exception {
+    void refreshMetadata_委托命令服务并返回202() throws Exception {
+        when(commandService.requestMetadataRefresh(42L))
+                .thenReturn(OperationSubmitResultDTO.of(13L, "METADATA_REFRESH", "QUEUED", 1));
+
         mvc.perform(post("/api/storage/refresh-metadata/comics/42"))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value(409))
-                .andExpect(jsonPath("$.message").value(MetadataRefreshConstants.METADATA_REFRESH_DISABLED_REASON));
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.data.taskId").value(13))
+                .andExpect(jsonPath("$.data.taskType").value("METADATA_REFRESH"));
+
+        verify(commandService).requestMetadataRefresh(42L);
     }
 
     @Test
