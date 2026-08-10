@@ -72,7 +72,7 @@ public class DirectoryImportHandler {
             ManifestBuildResult manifestBuildResult = buildManifestFiles(metadata, comicId, importRoot);
             List<ImportManifest.ImportFile> files = manifestBuildResult.files();
             Map<String, String> generatedNames = manifestBuildResult.nameMap();
-            JsonNode metadataNode = objectMapper.valueToTree(buildMetadataMap(metadata, comicId, generatedNames));
+            JsonNode metadataNode = objectMapper.valueToTree(buildMetadataMap(metadata, comicId, importRoot, generatedNames));
             manifest = new ImportManifest(1, taskId, ctx.sourceType(), importRoot.toString(),
                     metadataNode, files);
             manifestManager.write(mangaRoot, taskId, manifest);
@@ -129,26 +129,49 @@ public class DirectoryImportHandler {
         Map<String, String> nameMap = new LinkedHashMap<>();
         for (var chapter : metadata.chapters()) {
             for (var page : chapter.pages()) {
-                Path source = importRoot.resolve(chapter.sourceDir()).resolve(page.fileName());
-                if (!Files.exists(source)) { source = importRoot.resolve(page.fileName()); }
-                if (Files.exists(source) && page.fileSize() > 0) {
-                    String relative = importRoot.relativize(source).toString().replace('\\', '/');
-                    // 目标文件名保留原始文件名（禁止 UUID 化），目录用 globalOrder——
-                    // DB chapterId 未生成前的漫画内暂存键，最终化时由 Worker 搬到 {comicId}/{chapterId}
-                    String target = comicId + "/" + chapter.globalOrder() + "/" + page.fileName();
-                    files.add(new ImportManifest.ImportFile(relative, target, page.fileSize()));
-                    // QA 修复注记（task-21）：nameMap 键必须用相对路径而非裸 fileName，
-                    // 否则多章节含同名文件（001.jpg）时后处理章节覆盖前者，
-                    // 导致 metadata.hq_path 与清单存储路径不一致（文件搬进 hq/{globalOrder}/，
-                    // 但 DB 页面路径指向另一章节的目录，LQ/HQ 删除按 hq_path 定位文件全部失败）。
-                    nameMap.put(relative, target);
-                }
+                Path source = resolveSourceOrNull(importRoot, chapter, page);
+                if (source == null) { continue; }
+                String relative = importRoot.relativize(source).toString().replace('\\', '/');
+                // 目标文件名保留原始文件名（禁止 UUID 化），目录用 globalOrder——
+                // DB chapterId 未生成前的漫画内暂存键，最终化时由 Worker 搬到 {comicId}/{chapterId}
+                String target = comicId + "/" + chapter.globalOrder() + "/" + page.fileName();
+                files.add(new ImportManifest.ImportFile(relative, target, page.fileSize()));
+                // QA 修复注记（task-21）：nameMap 键必须用相对路径而非裸 fileName，
+                // 否则多章节含同名文件（001.jpg）时后处理章节覆盖前者，
+                // 导致 metadata.hq_path 与清单存储路径不一致（文件搬进 hq/{globalOrder}/，
+                // 但 DB 页面路径指向另一章节的目录，LQ/HQ 删除按 hq_path 定位文件全部失败）。
+                nameMap.put(relative, target);
             }
         }
         return new ManifestBuildResult(files, nameMap);
     }
 
-    private Map<String, Object> buildMetadataMap(ComicMetadata metadata, Long comicId, Map<String, String> generatedNames) {
+    /**
+     * 解析页面源文件的真实路径；源文件不存在或文件大小为 0（空文件）时返回 {@code null}。
+     * <p>
+     * 该收录判定同时被 {@link #buildManifestFiles} 与 {@link #buildMetadataMap} 使用，保证
+     * manifest.files 与 metadata.mediaItems 文件集逐一对齐：同一文件要么同时出现在两处，
+     * 要么都不出现。修复前 metadata 无条件收录全部页面，0 字节空文件/源缺失文件成为幽灵媒体，
+     * API 据此插入不存在的 DB 记录，最终化阶段 STORAGE_FINALIZE_SOURCE_MISSING 整章失败。
+     * <p>
+     * 路径解析与清单构建保持完全一致：优先 {@code sourceDir/fileName}，失败兜底裸
+     * {@code fileName}（兼容 sourceDir 与文件实际位置不一致的源目录）。
+     *
+     * @param importRoot 漫画源目录根
+     * @param chapter    章节（提供 sourceDir/globalOrder）
+     * @param page       页面（提供 fileName/fileSize）
+     * @return 收录文件的源路径；不满足收录条件时返回 {@code null}
+     */
+    private Path resolveSourceOrNull(Path importRoot, ComicMetadata.ChapterInfo chapter,
+                                     ComicMetadata.MediaInfo page) {
+        Path source = importRoot.resolve(chapter.sourceDir()).resolve(page.fileName());
+        if (!Files.exists(source)) { source = importRoot.resolve(page.fileName()); }
+        if (!Files.exists(source) || page.fileSize() <= 0) { return null; }
+        return source;
+    }
+
+    private Map<String, Object> buildMetadataMap(ComicMetadata metadata, Long comicId, Path importRoot,
+                                                 Map<String, String> generatedNames) {
         Map<String, Object> comic = new LinkedHashMap<>();
         comic.put("title", metadata.title());
         comic.put("author", metadata.author() != null ? metadata.author() : "");
@@ -170,7 +193,11 @@ public class DirectoryImportHandler {
             chapterMap.put("globalOrder", chapter.globalOrder());
             chapterMap.put("catalogIndex", chapter.catalogIndex());
             chapterMap.put("sourceDir", chapter.sourceDir());
-            chapterMap.put("mediaItems", chapter.pages().stream().map(page -> {
+            // 媒体项收录条件与清单逐一对齐：源文件存在且 fileSize > 0 才写入 mediaItems，
+            // 0 字节空文件/源缺失文件两处都不出现，防止 API 插入幽灵 DB 记录导致最终化失败
+            chapterMap.put("mediaItems", chapter.pages().stream()
+                    .filter(page -> resolveSourceOrNull(importRoot, chapter, page) != null)
+                    .map(page -> {
                 Map<String, Object> mediaMap = new LinkedHashMap<>();
                 mediaMap.put("fileName", page.fileName());
                 mediaMap.put("pageNumber", page.pageNumber());
