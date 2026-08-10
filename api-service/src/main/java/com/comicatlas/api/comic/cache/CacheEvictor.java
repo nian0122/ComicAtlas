@@ -51,4 +51,36 @@ public class CacheEvictor {
 
         eviction.run();
     }
+
+    /**
+     * 事务提交后清空指定缓存的全部键（组合键缓存无法逐 key 枚举时使用）。
+     *
+     * @param cacheName 缓存名（如 ComicReferenceCache.COMIC_LIST）
+     */
+    public void clear(String cacheName) {
+        Runnable clearing = () -> {
+            Cache cache = cacheManager.getCache(cacheName);
+            if (cache != null) {
+                try {
+                    cache.clear();
+                    log.debug("缓存清空: cache={}", cacheName);
+                } catch (RuntimeException e) {
+                    log.warn("缓存清空失败，继续使用数据库结果: cache={}", cacheName, e);
+                }
+            }
+        };
+
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(
+                    new TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            clearing.run();
+                        }
+                    });
+            return;
+        }
+
+        clearing.run();
+    }
 }

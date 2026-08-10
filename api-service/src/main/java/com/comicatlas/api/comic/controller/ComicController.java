@@ -15,8 +15,6 @@ import com.comicatlas.api.comic.dto.ComicDetailVO;
 import com.comicatlas.api.comic.dto.ComicListQuery;
 import com.comicatlas.api.comic.dto.ComicListVO;
 import com.comicatlas.api.comic.dto.ComicMetadataDTO;
-import com.comicatlas.api.comic.dto.ComicMetadataUpdateDTO;
-import com.comicatlas.api.comic.dto.ComicTagUpdateDTO;
 import com.comicatlas.api.comic.dto.CreateComicRequest;
 import com.comicatlas.api.comic.dto.UpdateComicRequest;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -113,19 +111,6 @@ public class ComicController {
     }
 
     /**
-     * 更新漫画元数据。
-     *
-     * @param dto 元数据待更新字段
-     * @return 更新后的元数据
-     */
-    @PutMapping("/comics/{id}/metadata")
-    public Result<ComicMetadataDTO> updateMetadata(
-            @PathVariable Long id,
-            @Valid @RequestBody ComicMetadataUpdateDTO dto) {
-        return Result.ok(comicService.updateMetadata(id, dto));
-    }
-
-    /**
      * 查询漫画绑定的标签 ID 列表。
      *
      * @return 标签 ID 列表
@@ -133,20 +118,6 @@ public class ComicController {
     @GetMapping("/comics/{id}/tags")
     public Result<List<Long>> getComicTags(@PathVariable Long id) {
         return Result.ok(comicService.getComicTags(id));
-    }
-
-    /**
-     * 全量覆盖漫画标签绑定关系。
-     *
-     * @param dto 新的标签 ID 集合
-     * @return 空结果
-     */
-    @PutMapping("/comics/{id}/tags")
-    public Result<?> updateComicTags(
-            @PathVariable Long id,
-            @Valid @RequestBody ComicTagUpdateDTO dto) {
-        comicService.updateComicTags(id, dto);
-        return Result.ok();
     }
 
     /**

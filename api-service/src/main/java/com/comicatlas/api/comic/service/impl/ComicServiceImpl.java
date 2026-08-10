@@ -1,8 +1,11 @@
 package com.comicatlas.api.comic.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.comicatlas.api.comic.cache.CacheEvictor;
 import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
+import com.comicatlas.api.comic.cache.ComicReferenceCache;
 import com.comicatlas.api.comic.service.ComicListQueryService;
 import com.comicatlas.api.comic.service.ComicService;
 import com.comicatlas.api.common.enums.ChapterLifecycleStatus;
@@ -14,8 +17,12 @@ import com.comicatlas.api.common.storage.FileUrlResolver;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
 import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.management.trash.TrashLifecycleService;
+import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.api.reader.entity.ReadingHistory;
 import com.comicatlas.api.reader.mapper.ReadingHistoryMapper;
+import com.comicatlas.common.constant.MqExchanges;
+import com.comicatlas.common.constant.MqRoutingKeys;
+import com.comicatlas.common.event.MetadataRefreshEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -32,8 +39,6 @@ import com.comicatlas.api.comic.dto.ComicDetailVO;
 import com.comicatlas.api.comic.dto.ComicListQuery;
 import com.comicatlas.api.comic.dto.ComicListVO;
 import com.comicatlas.api.comic.dto.ComicMetadataDTO;
-import com.comicatlas.api.comic.dto.ComicMetadataUpdateDTO;
-import com.comicatlas.api.comic.dto.ComicTagUpdateDTO;
 import com.comicatlas.api.comic.dto.CreateComicRequest;
 import com.comicatlas.api.comic.dto.UpdateComicRequest;
 import com.comicatlas.api.comic.entity.Comic;
@@ -63,6 +68,8 @@ public class ComicServiceImpl implements ComicService {
     private final ManagementTaskService managementTaskService;
     private final TrashLifecycleService trashLifecycleService;
     private final CatalogCacheInvalidator catalogCacheInvalidator;
+    private final CacheEvictor cacheEvictor;
+    private final OutboxService outboxService;
 
     @Override
     public IPage<ComicListVO> listComics(ComicListQuery query) {
@@ -133,30 +140,94 @@ public class ComicServiceImpl implements ComicService {
             throw new ConflictException(
                     "版本冲突：当前版本 " + comic.getVersion() + "，请求版本 " + request.getVersion());
         }
-
-        if (request.getTitle() != null) {
-            if (request.getTitle().isBlank()) {
-                throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "标题不能为空");
-            }
-            comic.setTitle(request.getTitle().trim());
-        }
-        if (request.getTitleJpn() != null) { comic.setTitleJpn(request.getTitleJpn()); }
-        if (request.getAuthor() != null) { comic.setAuthor(request.getAuthor()); }
-        if (request.getDescription() != null) { comic.setDescription(request.getDescription()); }
-        if (request.getCategoryId() != null) {
-            Category category = categoryMapper.selectById(request.getCategoryId());
-            if (category == null) {
-                throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "分类不存在");
-            }
-            comic.setCategoryId(category.getId());
-            comic.setCategory(category.getName());
+        if (!isEditable(comic.getStatus())) {
+            throw new BusinessException(HttpStatusCodes.CONFLICT,
+                    "当前状态 " + comic.getStatus() + " 不可编辑（仅 DRAFT/READY 可编辑）");
         }
 
-        int rows = comicMapper.updateById(comic);
+        applyEditableFields(comic, request);
+        applyCategory(comic, request.getCategoryId());
+        List<Long> dedupedTagIds = resolveTagIds(request.getTagIds());
+
+        // updateById 默认忽略 null 字段（NOT_NULL 策略），无法清空分类/文本；
+        // 改用显式 UpdateWrapper 逐列 set；version 用乐观锁条件 +1 保证并发正确（@Version 不作用于 UpdateWrapper）
+        int rows = comicMapper.update(null, new LambdaUpdateWrapper<Comic>()
+                .eq(Comic::getId, id)
+                .eq(Comic::getVersion, comic.getVersion())
+                .set(Comic::getTitle, comic.getTitle())
+                .set(Comic::getTitleJpn, comic.getTitleJpn())
+                .set(Comic::getAuthor, comic.getAuthor())
+                .set(Comic::getDescription, comic.getDescription())
+                .set(Comic::getCategoryId, comic.getCategoryId())
+                .set(Comic::getCategory, comic.getCategory())
+                .set(Comic::getVersion, comic.getVersion() + 1));
         if (rows == 0) {
             throw new ConflictException("漫画已被其他操作修改，请刷新后重试");
         }
+        replaceComicTags(id, dedupedTagIds);
+
+        // metadata 重建走 Outbox（同事务，relay 异步发 MQ）；成功后清空漫画列表组合缓存
+        outboxService.enqueue(new MetadataRefreshEvent(null, null, id),
+                MqExchanges.EXPORT, MqRoutingKeys.METADATA_REFRESH_REQUESTED);
+        cacheEvictor.clear(ComicReferenceCache.COMIC_LIST);
         return toDetailVO(comicMapper.selectById(id));
+    }
+
+    /** 仅 DRAFT/READY 可编辑（与 OperationPolicyService 一致）。 */
+    private static boolean isEditable(ComicStatus status) {
+        return status == ComicStatus.DRAFT || status == ComicStatus.READY;
+    }
+
+    /** 全量替换语义：title 必填非空，可选文本空白归一化为 null。 */
+    private static void applyEditableFields(Comic comic, UpdateComicRequest request) {
+        comic.setTitle(request.getTitle().trim());
+        comic.setTitleJpn(normalizeBlank(request.getTitleJpn()));
+        comic.setAuthor(normalizeBlank(request.getAuthor()));
+        comic.setDescription(normalizeBlank(request.getDescription()));
+    }
+
+    /** categoryId 非空时验证并同步兼容列 category；null 时清空两列。 */
+    private void applyCategory(Comic comic, Long categoryId) {
+        if (categoryId == null) {
+            comic.setCategoryId(null);
+            comic.setCategory(null);
+            return;
+        }
+        Category category = categoryMapper.selectById(categoryId);
+        if (category == null) {
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "分类不存在");
+        }
+        comic.setCategoryId(category.getId());
+        comic.setCategory(category.getName());
+    }
+
+    /** 去重并验证标签全部存在，返回有序去重后的 tagIds（空列表表示清空标签）。 */
+    private List<Long> resolveTagIds(List<Long> tagIds) {
+        List<Long> deduped = new ArrayList<>(new LinkedHashSet<>(tagIds));
+        if (deduped.isEmpty()) {
+            return deduped;
+        }
+        List<Tag> existingTags = tagMapper.selectBatchIds(deduped);
+        if (existingTags.size() != deduped.size()) {
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "部分标签不存在");
+        }
+        return deduped;
+    }
+
+    /** 全量替换 comic_tag：先删后插，全部在当前事务内。 */
+    private void replaceComicTags(Long comicId, List<Long> tagIds) {
+        comicTagMapper.delete(
+                new LambdaQueryWrapper<ComicTag>().eq(ComicTag::getComicId, comicId));
+        for (Long tagId : tagIds) {
+            ComicTag comicTag = new ComicTag();
+            comicTag.setComicId(comicId);
+            comicTag.setTagId(tagId);
+            comicTagMapper.insert(comicTag);
+        }
+    }
+
+    private static String normalizeBlank(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     @Override
@@ -195,32 +266,6 @@ public class ComicServiceImpl implements ComicService {
     }
 
     @Override
-    public ComicMetadataDTO updateMetadata(Long id, ComicMetadataUpdateDTO dto) {
-        Comic comic = comicMapper.selectById(id);
-        if (comic == null) { throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在"); }
-
-        comic.setTitle(dto.getTitle());
-        comic.setAuthor(dto.getAuthor());
-        comic.setDescription(dto.getDescription());
-        if (dto.getCategoryId() != null) {
-            Category category = categoryMapper.selectById(dto.getCategoryId());
-            if (category == null) {
-                throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "分类不存在");
-            }
-            comic.setCategoryId(dto.getCategoryId());
-            comic.setCategory(category.getName());
-        }
-        comicMapper.updateById(comic);
-
-        ComicMetadataDTO result = new ComicMetadataDTO();
-        result.setTitle(comic.getTitle());
-        result.setAuthor(comic.getAuthor());
-        result.setDescription(comic.getDescription());
-        result.setCategoryId(comic.getCategoryId());
-        return result;
-    }
-
-    @Override
     public List<Long> getComicTags(Long comicId) {
         Comic comic = comicMapper.selectById(comicId);
         if (comic == null) { throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在"); }
@@ -239,33 +284,6 @@ public class ComicServiceImpl implements ComicService {
         }
         String pattern = "%" + keyword.trim() + "%";
         return comicMapper.selectTitlesLike(pattern, 10);
-    }
-
-    @Override
-    @Transactional
-    public void updateComicTags(Long comicId, ComicTagUpdateDTO dto) {
-        Comic comic = comicMapper.selectById(comicId);
-        if (comic == null) { throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在"); }
-
-        List<Long> tagIds = dto.getTagIds();
-        if (tagIds != null && !tagIds.isEmpty()) {
-            List<Tag> existingTags = tagMapper.selectBatchIds(tagIds);
-            if (existingTags.size() != tagIds.size()) {
-                throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "部分标签不存在");
-            }
-        }
-
-        comicTagMapper.delete(
-                new LambdaQueryWrapper<ComicTag>().eq(ComicTag::getComicId, comicId));
-
-        if (tagIds != null) {
-            for (Long tagId : tagIds) {
-                ComicTag comicTag = new ComicTag();
-                comicTag.setComicId(comicId);
-                comicTag.setTagId(tagId);
-                comicTagMapper.insert(comicTag);
-            }
-        }
     }
 
     @Override
@@ -394,10 +412,13 @@ public class ComicServiceImpl implements ComicService {
             var tags = tagMapper.selectBatchIds(tagIds);
             vo.setTags(tags.stream().map(t -> {
                 ComicDetailVO.TagRef tr = new ComicDetailVO.TagRef();
+                tr.setId(t.getId());
                 tr.setName(t.getName());
                 tr.setType(t.getType());
                 return tr;
             }).collect(Collectors.toList()));
+        } else {
+            vo.setTags(List.of());
         }
 
         var history = historyMapper.selectOne(

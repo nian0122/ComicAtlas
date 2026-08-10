@@ -1,11 +1,9 @@
 package com.comicatlas.api.comic.controller;
 
-import com.comicatlas.api.comic.dto.ComicTagUpdateDTO;
 import com.comicatlas.api.comic.service.ComicService;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.common.exception.GlobalExceptionHandler;
 import com.comicatlas.api.config.DlqSecurityConfig;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -15,10 +13,6 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -32,9 +26,6 @@ class ComicTagControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
-
-    @Autowired
-    private ObjectMapper objectMapper;
 
     @MockBean
     private ComicService comicService;
@@ -65,48 +56,11 @@ class ComicTagControllerTest {
     }
 
     @Test
-    void updateComicTags_shouldReturn200_whenSuccessful() throws Exception {
-        ComicTagUpdateDTO dto = new ComicTagUpdateDTO();
-        dto.setTagIds(List.of(1L, 2L));
-        doNothing().when(comicService).updateComicTags(eq(1L), any(ComicTagUpdateDTO.class));
-
+    void updateComicTags_shouldReturn405_whenOldWriteEndpointRemoved() throws Exception {
         mockMvc.perform(put("/api/comics/{id}/tags", 1L)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(dto))
+                        .content("{\"tagIds\": [1, 2]}")
                         .accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(200));
-    }
-
-    @Test
-    void updateComicTags_shouldReturn404_whenComicNotFound() throws Exception {
-        ComicTagUpdateDTO dto = new ComicTagUpdateDTO();
-        dto.setTagIds(List.of(1L));
-        doThrow(new BusinessException(404, "漫画不存在"))
-                .when(comicService).updateComicTags(eq(99L), any(ComicTagUpdateDTO.class));
-
-        mockMvc.perform(put("/api/comics/{id}/tags", 99L)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(dto))
-                        .accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(404))
-                .andExpect(jsonPath("$.message").value("漫画不存在"));
-    }
-
-    @Test
-    void updateComicTags_shouldReturn400_whenTagsNotExist() throws Exception {
-        ComicTagUpdateDTO dto = new ComicTagUpdateDTO();
-        dto.setTagIds(List.of(999L));
-        doThrow(new BusinessException(400, "部分标签不存在"))
-                .when(comicService).updateComicTags(eq(1L), any(ComicTagUpdateDTO.class));
-
-        mockMvc.perform(put("/api/comics/{id}/tags", 1L)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(dto))
-                        .accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(400))
-                .andExpect(jsonPath("$.message").value("部分标签不存在"));
+                .andExpect(status().isMethodNotAllowed());
     }
 }

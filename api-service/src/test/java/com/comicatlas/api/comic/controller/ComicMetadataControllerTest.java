@@ -1,12 +1,10 @@
 package com.comicatlas.api.comic.controller;
 
 import com.comicatlas.api.comic.dto.ComicMetadataDTO;
-import com.comicatlas.api.comic.dto.ComicMetadataUpdateDTO;
 import com.comicatlas.api.comic.service.ComicService;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.common.exception.GlobalExceptionHandler;
 import com.comicatlas.api.config.DlqSecurityConfig;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -15,11 +13,8 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -29,9 +24,6 @@ class ComicMetadataControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
-
-    @Autowired
-    private ObjectMapper objectMapper;
 
     @MockBean
     private ComicService comicService;
@@ -65,69 +57,12 @@ class ComicMetadataControllerTest {
     }
 
     @Test
-    void updateMetadata_shouldReturn200_whenSuccessful() throws Exception {
-        ComicMetadataUpdateDTO updateDto = new ComicMetadataUpdateDTO();
-        updateDto.setTitle("Updated Title");
-        updateDto.setAuthor("Updated Author");
-
-        ComicMetadataDTO resultDto = new ComicMetadataDTO();
-        resultDto.setTitle("Updated Title");
-        resultDto.setAuthor("Updated Author");
-        when(comicService.updateMetadata(eq(1L), any(ComicMetadataUpdateDTO.class))).thenReturn(resultDto);
-
-        mockMvc.perform(put("/api/comics/{id}/metadata", 1L)
+    void updateMetadata_shouldReturn405_whenOldWriteEndpointRemoved() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .put("/api/comics/{id}/metadata", 1L)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(updateDto))
+                        .content("{\"title\": \"Updated Title\"}")
                         .accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.data.title").value("Updated Title"))
-                .andExpect(jsonPath("$.data.author").value("Updated Author"));
-    }
-
-    @Test
-    void updateMetadata_shouldReturn404_whenComicNotFound() throws Exception {
-        ComicMetadataUpdateDTO updateDto = new ComicMetadataUpdateDTO();
-        updateDto.setTitle("Updated Title");
-        updateDto.setAuthor("Updated Author");
-        when(comicService.updateMetadata(eq(99L), any(ComicMetadataUpdateDTO.class)))
-                .thenThrow(new BusinessException(404, "漫画不存在"));
-
-        mockMvc.perform(put("/api/comics/{id}/metadata", 99L)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(updateDto))
-                        .accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(404))
-                .andExpect(jsonPath("$.message").value("漫画不存在"));
-    }
-
-    @Test
-    void updateMetadata_shouldReturn400_whenTitleIsEmpty() throws Exception {
-        ComicMetadataUpdateDTO updateDto = new ComicMetadataUpdateDTO();
-        updateDto.setTitle("");
-        updateDto.setAuthor("Test Author");
-
-        mockMvc.perform(put("/api/comics/{id}/metadata", 1L)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(updateDto))
-                        .accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(400));
-    }
-
-    @Test
-    void updateMetadata_shouldReturn400_whenTitleIsTooLong() throws Exception {
-        String longTitle = "a".repeat(256);
-        ComicMetadataUpdateDTO updateDto = new ComicMetadataUpdateDTO();
-        updateDto.setTitle(longTitle);
-        updateDto.setAuthor("Test Author");
-
-        mockMvc.perform(put("/api/comics/{id}/metadata", 1L)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(updateDto))
-                        .accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(400));
+                .andExpect(status().isMethodNotAllowed());
     }
 }

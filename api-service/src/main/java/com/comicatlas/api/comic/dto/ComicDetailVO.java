@@ -47,6 +47,7 @@ public class ComicDetailVO {
 
     @Data
     public static class TagRef {
+        private Long id;
         private String name;
         private String type;
     }

@@ -1,7 +1,6 @@
 package com.comicatlas.api.comic.service.impl;
 
 import com.comicatlas.api.comic.dto.ComicMetadataDTO;
-import com.comicatlas.api.comic.dto.ComicMetadataUpdateDTO;
 import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.common.exception.BusinessException;
@@ -48,40 +47,6 @@ class ComicMetadataServiceTest {
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> service.getMetadata(99L));
-        assertEquals(404, ex.getCode());
-        assertEquals("漫画不存在", ex.getMessage());
-    }
-
-    @Test
-    void updateMetadata_shouldReturnUpdatedDto_whenSuccessful() {
-        Comic comic = new Comic();
-        comic.setId(1L);
-        comic.setTitle("Old Title");
-        comic.setAuthor("Old Author");
-        when(comicMapper.selectById(1L)).thenReturn(comic);
-        when(comicMapper.updateById(comic)).thenReturn(1);
-
-        ComicMetadataUpdateDTO updateDto = new ComicMetadataUpdateDTO();
-        updateDto.setTitle("New Title");
-        updateDto.setAuthor("New Author");
-
-        ComicMetadataDTO result = service.updateMetadata(1L, updateDto);
-
-        assertEquals("New Title", result.getTitle());
-        assertEquals("New Author", result.getAuthor());
-        verify(comicMapper).updateById(comic);
-    }
-
-    @Test
-    void updateMetadata_shouldThrow404_whenComicNotFound() {
-        when(comicMapper.selectById(99L)).thenReturn(null);
-
-        ComicMetadataUpdateDTO updateDto = new ComicMetadataUpdateDTO();
-        updateDto.setTitle("New Title");
-        updateDto.setAuthor("New Author");
-
-        BusinessException ex = assertThrows(BusinessException.class,
-                () -> service.updateMetadata(99L, updateDto));
         assertEquals(404, ex.getCode());
         assertEquals("漫画不存在", ex.getMessage());
     }

@@ -10,8 +10,6 @@ import com.comicatlas.api.comic.dto.ComicDetailVO;
 import com.comicatlas.api.comic.dto.ComicListQuery;
 import com.comicatlas.api.comic.dto.ComicListVO;
 import com.comicatlas.api.comic.dto.ComicMetadataDTO;
-import com.comicatlas.api.comic.dto.ComicMetadataUpdateDTO;
-import com.comicatlas.api.comic.dto.ComicTagUpdateDTO;
 import com.comicatlas.api.comic.dto.CreateComicRequest;
 import com.comicatlas.api.comic.dto.UpdateComicRequest;
 
@@ -25,9 +23,7 @@ public interface ComicService {
     /** 删除漫画：创建回收任务而非硬删，返回管理任务 */
     ManagementTaskResponse deleteComic(Long id, String idempotencyKey);
     ComicMetadataDTO getMetadata(Long id);
-    ComicMetadataDTO updateMetadata(Long id, ComicMetadataUpdateDTO dto);
     List<Long> getComicTags(Long comicId);
-    void updateComicTags(Long comicId, ComicTagUpdateDTO dto);
     BatchUpdateResultVO batchUpdate(BatchComicUpdateDTO dto);
     List<String> autocompleteTitles(String keyword);
 }

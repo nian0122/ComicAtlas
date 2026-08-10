@@ -37,6 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.mock;
@@ -165,6 +166,43 @@ class ComicReferenceCacheTest {
         comicListService.loadPage(query);
 
         verify(comicMapper).selectPage(any(Page.class), same(query));
+    }
+
+    @Test
+    void clearComicList_shouldEvictAllCombinationKeys() {
+        // 用两个不同查询条件（不同缓存 key）预热漫画列表缓存
+        ComicListQuery q1 = new ComicListQuery();
+        q1.setPage(1);
+        q1.setSize(20);
+        ComicListQuery q2 = new ComicListQuery();
+        q2.setPage(2);
+        q2.setSize(20);
+        // 每次调用返回新建 Page：MyBatis-Plus convert 会原地改写 records，复用同一对象会导致类型漂移
+        when(comicMapper.selectPage(any(Page.class), same(q1))).thenAnswer(invocation -> {
+            Page<Comic> p = new Page<>(1, 20, 1);
+            p.setRecords(List.of(comic(1L)));
+            return p;
+        });
+        when(comicMapper.selectPage(any(Page.class), same(q2))).thenAnswer(invocation -> {
+            Page<Comic> p = new Page<>(2, 20, 1);
+            p.setRecords(List.of(comic(2L)));
+            return p;
+        });
+
+        comicListService.loadPage(q1);
+        comicListService.loadPage(q2);
+        var cache = cacheManager.getCache(ComicReferenceCache.COMIC_LIST);
+        java.util.Map<Object, Object> nativeCache = (java.util.Map<Object, Object>) cache.getNativeCache();
+        assertTrue(nativeCache.size() >= 2,
+                "两个不同查询 key 都应进入缓存");
+
+        // 事务外直接调用 clear：同步清空（无事务时不走 afterCommit）
+        cacheEvictor.clear(ComicReferenceCache.COMIC_LIST);
+
+        assertEquals(0, nativeCache.size(), "clear 应清空全部组合键");
+        // 清空后再次查询应重新走 DB（不命中缓存）
+        comicListService.loadPage(q1);
+        verify(comicMapper, times(2)).selectPage(any(Page.class), same(q1));
     }
 
     @Test
