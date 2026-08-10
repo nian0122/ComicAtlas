@@ -30,19 +30,26 @@ GET /api/comics/{id}
 ```
 返回：title, author, coverUrl, pageCount, sourceType, tags, description
 
-### 元数据编辑
+### 信息编辑（一次全量保存）
 ```
-GET  /api/comics/{id}/metadata
-PUT  /api/comics/{id}/metadata
-{ "title": "Title", "author": "Author", "description": "Description" }
+GET /api/comics/{id}/metadata          # 读取元数据（标题/作者/描述/分类）
+GET /api/comics/{id}/tags              # 读取标签 ID 列表
+PUT /api/comics/{id}                   # 一次保存基本信息 + 分类 + 标签（version 乐观锁）
+{
+  "version": 3,
+  "title": "Title",
+  "titleJpn": "タイトル",
+  "author": "Author",
+  "description": "Description",
+  "categoryId": 1,
+  "tagIds": [1, 2, 3]
+}
 ```
-
-### 标签绑定
-```
-GET /api/comics/{id}/tags
-PUT /api/comics/{id}/tags
-{ "tagIds": [1, 2, 3] }
-```
+- `version`/`title`/`tagIds` 必填；`tagIds` 为全量替换语义（空数组清空标签，最多 100 个）。
+- `categoryId` 为 `null` 时清除分类；`titleJpn`/`author`/`description` 空白归一化为 `null`。
+- 仅 `DRAFT`/`READY` 状态可编辑；版本冲突或状态不可编辑时返回业务体 `code=409`。
+- 保存为同步 API 短事务：comic、comic_tag、Outbox 全部成功或全部回滚；metadata.json 由现有 Outbox/MQ 链异步重建。
+- 旧 `PUT /api/comics/{id}/metadata` 与 `PUT /api/comics/{id}/tags` 已移除（仍保留两个 GET 读取端点）。
 
 ### 封面
 
@@ -456,13 +463,11 @@ PENDING ──► RUNNING ──► SUCCESS
 ```
 GET    /api/comics                                # 列表（含 lifecycle/activeTask/allowedOperations）
 POST   /api/comics                                # 创建空漫画（DRAFT）
-GET    /api/comics/{id}                           # 详情（含 version 乐观锁）
-PUT    /api/comics/{id}                           # 更新（version 必填，冲突 → 409）
+GET    /api/comics/{id}                           # 详情（含 version 乐观锁、tags[].id）
+PUT    /api/comics/{id}                           # 一次全量保存基本信息+分类+标签（version/title/tagIds 必填，冲突 → 409）
 DELETE /api/comics/{id}                           # 回收（创建管理任务，可选 Idempotency-Key）
-GET    /api/comics/{id}/metadata                  # 元数据
-PUT    /api/comics/{id}/metadata                  # 更新元数据
-GET    /api/comics/{id}/tags                      # 标签 ID 列表
-PUT    /api/comics/{id}/tags                      # 绑定标签 { "tagIds": [1,2] }
+GET    /api/comics/{id}/metadata                  # 元数据（只读）
+GET    /api/comics/{id}/tags                      # 标签 ID 列表（只读）
 GET    /api/comics/{id}/catalog                   # 目录树（只读）
 ```
 

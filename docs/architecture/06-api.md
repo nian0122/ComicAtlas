@@ -82,10 +82,10 @@ PUT /api/history/{comicId}
 ```http
 GET    /api/comics                              # 列表（含 lifecycle / allowedOperations）
 POST   /api/comics                              # 创建空漫画（DRAFT）
-PUT    /api/comics/{id}                         # 更新（version 乐观锁，冲突 → 409）
+PUT    /api/comics/{id}                         # 一次全量保存基本信息+分类+标签（version 乐观锁，冲突 → 409）
 DELETE /api/comics/{id}                         # 回收（创建管理任务，进入回收站）
-PUT    /api/comics/{id}/metadata                # 更新元数据
-PUT    /api/comics/{id}/tags                    # 绑定标签
+GET    /api/comics/{id}/metadata                # 元数据（只读）
+GET    /api/comics/{id}/tags                    # 标签 ID 列表（只读）
 GET    /api/comics/{comicId}/catalog            # 目录树（只读）
 POST   /api/comics/{comicId}/catalogs           # 目录 CRUD（创建/重命名/移动/排序/删除）
 POST   /api/comics/{comicId}/chapters           # 章节 CRUD（创建/重命名/移动/排序/回收）
