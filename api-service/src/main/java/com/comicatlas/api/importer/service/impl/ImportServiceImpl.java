@@ -13,6 +13,7 @@ import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.common.enums.ComicStatus;
+import com.comicatlas.api.common.enums.HqStatus;
 import com.comicatlas.api.common.enums.ImportTaskStatus;
 import com.comicatlas.api.common.enums.SourceType;
 import com.comicatlas.api.common.exception.BusinessException;
@@ -34,6 +35,7 @@ import com.comicatlas.api.common.enums.ManagementTaskStatus;
 import com.comicatlas.api.common.enums.TaskType;
 import com.comicatlas.common.event.CancelTaskEvent;
 import com.comicatlas.common.event.ImportTaskCreatedEvent;
+import com.comicatlas.common.event.MetadataRefreshEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import jakarta.annotation.PostConstruct;
@@ -352,6 +354,15 @@ public class ImportServiceImpl implements ImportService {
         List<Long> chapterIds = chapterMapper.selectList(
                 new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId))
                 .stream().map(Chapter::getId).toList();
+
+        // 轻量重建分支：MANAGED 导入的源文件已在 staging 阶段被搬入 hq/{comicId}/{globalOrder}
+        // （随后最终化到 hq/{comicId}/{chapterId}），源目录已空。当任务 FAILED 且全部 media 已 READY
+        // （文件全部就位、仅 metadata 重建失败），重试无需重新解析源目录——直接再发 metadata 重建请求即可收尾。
+        if (taskStatus == ImportTaskStatus.FAILED && isAllMediaReady(chapterIds)) {
+            retryMetadataRebuild(task, comicId);
+            return;
+        }
+
         if (!chapterIds.isEmpty()) {
             mediaMapper.delete(new LambdaQueryWrapper<Media>().in(Media::getChapterId, chapterIds));
         }
@@ -391,7 +402,57 @@ public class ImportServiceImpl implements ImportService {
                 UUID.randomUUID(), Instant.now(), taskId, comicId, sourceType, sourcePath);
         outboxService.enqueue(retryEvent, MqExchanges.IMPORT, MqRoutingKeys.TASK_CREATED);
 
-        // 非关键清理操作（不参与事务）
+        registerRetryCleanup(taskId);
+    }
+
+    /** 章节结构非空且 media 全部 HQ READY 时，判定为"文件最终化已完成、仅 metadata 重建失败"特征。 */
+    private boolean isAllMediaReady(List<Long> chapterIds) {
+        if (chapterIds.isEmpty()) {
+            return false;
+        }
+        long notReadyCount = mediaMapper.selectCount(new LambdaQueryWrapper<Media>()
+                .in(Media::getChapterId, chapterIds)
+                .ne(Media::getHqStatus, HqStatus.READY));
+        return notReadyCount == 0;
+    }
+
+    /**
+     * 轻量重试：仅重发 metadata 重建请求（task FINALIZING）。
+     * 不删除 media/chapter/catalog 结构、不重导、不重置管理任务，与业务同事务写 Outbox。
+     */
+    private void retryMetadataRebuild(ImportTask task, Long comicId) {
+        Long taskId = task.getId();
+
+        // comic IMPORT_FAILED → IMPORTING（复用全量重导同款状态机校验）
+        Comic comic = comicMapper.selectById(comicId);
+        if (comic != null && comic.getStatus() == ComicStatus.IMPORT_FAILED) {
+            ManagementStateMachine.validateComicTransition(comicStatusName(comic), "IMPORTING");
+            comic.setStatus(ComicStatus.IMPORTING);
+            comicMapper.updateById(comic);
+        }
+
+        // task FAILED → FINALIZING（等待 metadata 重建结果事件收尾），清空错误、attempt+1
+        task.setStatus(ImportTaskStatus.FINALIZING);
+        task.setErrorMessage(null);
+        task.setRetryCount(task.getRetryCount() + 1);
+        taskMapper.updateById(task);
+
+        // 与业务同事务写 Outbox：Worker 从 DB 重建 metadata/{comicId}.json（chapterId 最终布局）后回传结果事件
+        outboxService.enqueue(new MetadataRefreshEvent(UUID.randomUUID(), Instant.now(), taskId, comicId),
+                MqExchanges.EXPORT, MqRoutingKeys.METADATA_REFRESH_REQUESTED);
+
+        // 轻量重建不动管理任务：metadata 重建失败时管理任务项已置 FAILED 终态，findActiveItem 只匹配
+        // QUEUED/RUNNING/CANCELLING、updateItemStatus 忽略终态项，无法直接复位；轻量重建也不构成新的
+        // 导入尝试（不调用 managementTaskService.retryTask），故保持其终态，权威状态以 import_task/comic 为准。
+
+        registerRetryCleanup(taskId);
+
+        log.info("轻量重试：metadata 重建（文件已全部就位，仅重建 DB→JSON 元数据）: taskId={}, comicId={}",
+                taskId, comicId);
+    }
+
+    /** 非关键清理操作（不参与事务）：删暂存 metadata.json、清 Redis 取消标记。 */
+    private void registerRetryCleanup(Long taskId) {
         TransactionSynchronizationManager.registerSynchronization(
                 new TransactionSynchronization() {
                     @Override
