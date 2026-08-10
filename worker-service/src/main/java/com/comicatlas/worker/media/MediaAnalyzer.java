@@ -77,9 +77,11 @@ public class MediaAnalyzer {
         if (!VIDEO_EXT.contains(ext)) {
             return Optional.empty();
         }
+        // 容器与 analyze() 保持一致：去掉扩展名前导点（".mp4" → "mp4"），供兼容判定与落库使用
+        String container = ext.startsWith(".") ? ext.substring(1) : ext;
         long size = 0L;
         try { size = Files.size(videoFile); } catch (Exception e) { log.warn("读取视频文件大小失败: {}", videoFile, e); }
-        return Optional.of(analyzeVideo(videoFile, name, ext, size));
+        return Optional.of(analyzeVideo(videoFile, name, container, size));
     }
 
     private ComicMetadata.MediaInfo analyzeVideo(Path file, String name, String ext, long size) {

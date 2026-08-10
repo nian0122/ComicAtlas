@@ -491,8 +491,10 @@ class TranscodeCommandHandlerTest {
             return;
         }
         try (var stream = Files.list(temp)) {
-            assertTrue(stream.noneMatch(p -> p.getFileName().toString().endsWith(".tmp")),
-                    "临时 .tmp 文件应已清理");
+            assertTrue(stream.noneMatch(p -> {
+                String name = p.getFileName().toString();
+                return name.endsWith(".tmp") || name.endsWith(".probe.mp4");
+            }), "临时转码文件（.tmp/.probe.mp4）应已清理");
         }
     }
 

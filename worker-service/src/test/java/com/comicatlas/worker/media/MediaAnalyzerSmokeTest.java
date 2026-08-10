@@ -117,6 +117,24 @@ class MediaAnalyzerSmokeTest {
     }
 
     @Test
+    @DisplayName(".mp4.tmp 扩展名门禁拒绝 → 不被视为视频（安全边界，F6-09 根因）")
+    void dotTmpExtension_isRejectedByVideoGate() throws Exception {
+        Path tmpFile = tmp.resolve("out.mp4.tmp");
+        Files.write(tmpFile, new byte[]{0, 0, 0, 0});
+
+        assertThat(analyzer.analyzeVideo(tmpFile)).isEmpty();
+    }
+
+    @Test
+    @DisplayName(".probe.mp4 扩展名被门禁识别为视频")
+    void probeMp4Extension_isAcceptedByVideoGate() throws Exception {
+        Path probeFile = tmp.resolve("out.probe.mp4");
+        Files.write(probeFile, new byte[]{0, 0, 0, 0});
+
+        assertThat(analyzer.analyzeVideo(probeFile)).isPresent();
+    }
+
+    @Test
     @DisplayName("不存在的文件 → MISSING")
     void missingFile_isMissing() {
         ComicMetadata.MediaInfo info = analyzer.analyze(tmp.resolve("nope.jpg"));

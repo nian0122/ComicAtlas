@@ -30,9 +30,15 @@ import java.util.Set;
  * <b>入口语义：</b>只处理 {@code MEDIA} 目标（API 已按媒体逐条展开为 MEDIA item，
  * Todo 4 保证 Worker 不再收到聚合 COMIC 转码 item）；非 MEDIA 目标防御性 failed。
  * <p>
- * <b>确定性命名：</b>临时文件 {@code {temp}/{taskId}-{itemId}-{attempt}-{mediaId}.mp4.tmp}，
+ * <b>确定性命名：</b>临时文件 {@code {temp}/{taskId}-{itemId}-{attempt}-{mediaId}.probe.mp4}，
  * 最终文件 {@code {hqDir}/{taskId}-{itemId}-{attempt}-{mediaId}.mp4}——不使用字符串替换推导
  * {@code .mp4}，文件名对 task/item/attempt/media 完全确定，天然避免与源文件及并发重试冲突。
+ * <p>
+ * <b>F6-09 修复：临时产物必须保留可识别的末尾 {@code .mp4} 扩展名（如 {@code .probe.mp4}），
+ * 禁止使用裸 {@code .tmp}：ffmpeg 依赖扩展名推断输出容器（{@code .tmp} 无法推断 → EINVAL 退出），
+ * 且 {@link MediaAnalyzer#analyzeVideo} 的扩展名门禁仅接受视频扩展名（{@code .tmp} 被拒 →
+ * probe 恒返回空 → 转码每次全新执行必然失败）。{@code .probe} 中间缀标记"待验证产物"，
+ * 与最终文件区分，验证通过后原子发布并清理。
  * <p>
  * <b>路径 containment：</b>源（HQ 根内）、TEMP（temp 根内）、目标（HQ 根内）分别
  * normalize 后必须位于对应存储根内，越界拒绝并发布失败事件。
@@ -132,6 +138,12 @@ public class TranscodeCommandHandler {
 
             TranscodeMediaInfo info = buildInfo(finalFile);
             if (info == null) {
+                // 最终产物 probe 失败：尽力删除已发布文件，避免遗留 DB 未记录的孤儿（幂等重试会重新转码）
+                try {
+                    Files.deleteIfExists(finalFile);
+                } catch (Exception cleanupError) {
+                    log.warn("清理 probe 失败的最终产物失败: finalFile={}", finalFile, cleanupError);
+                }
                 throw new IOException("最终产物 ffprobe 探测失败: " + finalFile);
             }
             publisher.progress(cmd, 100, "转码完成");
@@ -175,11 +187,15 @@ public class TranscodeCommandHandler {
         return source.toAbsolutePath().normalize();
     }
 
-    /** 解析临时文件：{temp}/{taskId}-{itemId}-{attempt}-{mediaId}.mp4.tmp，必须位于 temp 根内。 */
+    /**
+     * 解析临时文件：{temp}/{taskId}-{itemId}-{attempt}-{mediaId}.probe.mp4。
+     * 末尾保留 {@code .mp4}（F6-09）：ffmpeg 据此推断 mp4 容器，MediaAnalyzer 扩展名门禁也可识别；
+     * 必须位于 temp 根内。
+     */
     private Path resolveTempFile(ManagementCommandRequestedEvent cmd, Long mediaId) throws Exception {
         Path tempRoot = config.resolveTempDir().toAbsolutePath().normalize();
         Files.createDirectories(tempRoot);
-        Path temp = tempRoot.resolve(deterministicBaseName(cmd, mediaId) + ".tmp").toAbsolutePath().normalize();
+        Path temp = tempRoot.resolve(deterministicStem(cmd, mediaId) + ".probe.mp4").toAbsolutePath().normalize();
         requireInside(tempRoot, temp, "临时文件");
         return temp;
     }
@@ -191,14 +207,14 @@ public class TranscodeCommandHandler {
         if (hqDir == null) {
             throw new IllegalStateException("源路径无父目录: " + source);
         }
-        Path finalFile = hqDir.resolve(deterministicBaseName(cmd, mediaId)).toAbsolutePath().normalize();
+        Path finalFile = hqDir.resolve(deterministicStem(cmd, mediaId) + ".mp4").toAbsolutePath().normalize();
         requireInside(hqRootPath, finalFile, "目标文件");
         return finalFile;
     }
 
-    /** 确定性最终文件名（不含 .tmp 后缀）：taskId-itemId-attempt-mediaId.mp4。 */
-    private static String deterministicBaseName(ManagementCommandRequestedEvent cmd, Long mediaId) {
-        return cmd.taskId() + "-" + cmd.itemId() + "-" + cmd.attempt() + "-" + mediaId + ".mp4";
+    /** 确定性文件名主干（不含扩展名）：taskId-itemId-attempt-mediaId；临时/最终文件在此主干上追加后缀。 */
+    private static String deterministicStem(ManagementCommandRequestedEvent cmd, Long mediaId) {
+        return cmd.taskId() + "-" + cmd.itemId() + "-" + cmd.attempt() + "-" + mediaId;
     }
 
     /** 路径 containment 校验：candidate normalize 后必须位于 root 内，越界抛非法状态异常。 */
