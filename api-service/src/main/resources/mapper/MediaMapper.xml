@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.comicatlas.api.comic.mapper.MediaMapper">
+
+    <!--
+      导入落库专用批量 INSERT：全书聚合、固定批次上限（MEDIA_INSERT_BATCH_SIZE）、MySQL 多值 INSERT。
+      仅覆盖导入时显式写入的列；id/version/created_at/lq_size 等使用数据库默认值。
+      每个 Media 的状态字段必须在 Java 侧显式设置，不得依赖不同批次的动态列。
+    -->
+    <insert id="insertImportBatch">
+        INSERT INTO page (
+            chapter_id,
+            page_number,
+            hq_root,
+            hq_path,
+            hq_status,
+            lq_status,
+            transcode_status,
+            status,
+            width,
+            height,
+            file_size,
+            media_type,
+            duration,
+            container,
+            video_codec,
+            audio_codec
+        )
+        VALUES
+        <foreach collection="mediaList" item="media" separator=",">
+            (
+                #{media.chapterId},
+                #{media.pageNumber},
+                #{media.hqRoot},
+                #{media.hqPath},
+                #{media.hqStatus},
+                #{media.lqStatus},
+                #{media.transcodeStatus},
+                #{media.status},
+                #{media.width},
+                #{media.height},
+                #{media.fileSize},
+                #{media.mediaType},
+                #{media.duration},
+                #{media.container},
+                #{media.videoCodec},
+                #{media.audioCodec}
+            )
+        </foreach>
+    </insert>
+
+    <!--
+      最终化确认批量 UPDATE：按章节把 PENDING/STAGING 媒体一次性置为 READY（含 version 乐观锁自增）。
+      幂等由 WHERE 条件保证：已 READY 的行不命中，不重复自增版本。
+      hq_path 使用事件返回的 targetDir 重写（防御目标目录与插入时 chapterId 不一致的边界）。
+    -->
+    <update id="markImportFinalizedByChapter">
+        UPDATE page
+        SET hq_status = 'READY',
+            status = 'READY',
+            hq_path = CONCAT(#{targetDirHqRelative}, '/', SUBSTRING_INDEX(hq_path, '/', -1)),
+            version = version + 1
+        WHERE chapter_id = #{chapterId}
+          AND (hq_status &lt;&gt; 'READY' OR status &lt;&gt; 'READY')
+    </update>
+
+</mapper>

@@ -83,6 +83,9 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
     private static final Set<ImportTaskStatus> TERMINAL_STATUSES =
             EnumSet.of(ImportTaskStatus.SUCCESS, ImportTaskStatus.FAILED, ImportTaskStatus.CANCELLED);
 
+    /** 导入落库媒体批量插入批次上限：每批一次 MySQL 多值 INSERT，控制单条 SQL 长度与事务内往返。 */
+    private static final int MEDIA_INSERT_BATCH_SIZE = 500;
+
     private final TransactionTemplate transactionTemplate;
     private final ComicMapper comicMapper;
     private final CatalogMapper catalogMapper;
@@ -167,15 +170,25 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
 
         // 3. chapter + media（一律 PENDING/STAGING，不触碰文件系统）。
         //    chapterId 由 API 在此生成，作为最终存储目录 {comicId}/{chapterId} 的不可变键。
+        //    media 聚合到全书缓冲区，满 MEDIA_INSERT_BATCH_SIZE 即一次多值 INSERT（消除逐页往返）。
         List<FinalizeRequest> requests = new ArrayList<>(chaptersData.size());
+        List<Media> mediaBatch = new ArrayList<>(MEDIA_INSERT_BATCH_SIZE);
         int totalPages = 0;
         long totalSize = 0;
         for (Map<String, Object> chData : chaptersData) {
-            ChapterInsertResult inserted = insertChapter(chData, comicId, catalogIdMap, metadataVersion);
+            ChapterInsertResult inserted = prepareChapter(chData, comicId, catalogIdMap, metadataVersion);
             totalPages += inserted.pages();
             totalSize += inserted.size();
             requests.add(buildFinalizeRequest(taskId, comicId, hqPrefix, inserted.chapter(), inserted.mappings()));
+            for (Media media : inserted.mediaList()) {
+                mediaBatch.add(media);
+                if (mediaBatch.size() >= MEDIA_INSERT_BATCH_SIZE) {
+                    insertMediaBatch(mediaBatch);
+                    mediaBatch.clear();
+                }
+            }
         }
+        insertMediaBatch(mediaBatch);
 
         comic.setTotalPages(totalPages);
         if (totalSize > 0) {
@@ -245,11 +258,13 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
     }
 
     private record ChapterInsertResult(Chapter chapter, int pages, long size,
-                                       List<FinalizeMediaMapping> mappings) {
+                                       List<FinalizeMediaMapping> mappings,
+                                       List<Media> mediaList) {
     }
 
-    private ChapterInsertResult insertChapter(Map<String, Object> chData, Long comicId,
-                                              Map<Integer, Long> catalogIdMap, int version) {
+    /** 构造单章结构并插入 Chapter（须立即取得 chapterId）；media 只构造不落库，由调用方聚合批量插入。 */
+    private ChapterInsertResult prepareChapter(Map<String, Object> chData, Long comicId,
+                                               Map<Integer, Long> catalogIdMap, int version) {
         Chapter chapter = new Chapter();
         chapter.setComicId(comicId);
         chapter.setTitle((String) chData.get("title"));
@@ -277,6 +292,7 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
 
         int pgCount = 0;
         long totalSize = 0;
+        List<Media> mediaList = new ArrayList<>(itemList.size());
         List<FinalizeMediaMapping> mappings = new ArrayList<>(itemList.size());
         for (Map<String, Object> mediaData : itemList) {
             Media media = new Media();
@@ -295,6 +311,9 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
             // 存储最终化前一律 PENDING，文件就位后才可 READY
             media.setHqStatus(HqStatus.PENDING);
             media.setLqStatus(LqStatus.NOT_GENERATED);
+            // 批量 INSERT 使用数据库默认值，故须显式设置全部状态列
+            media.setTranscodeStatus(TranscodeStatus.NOT_NEEDED);
+            media.setStatus(MediaLifecycleStatus.STAGING);
             if (mediaData.get("fileSize") != null) {
                 media.setFileSize(((Number) mediaData.get("fileSize")).longValue());
             }
@@ -333,15 +352,26 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
                 }
             }
 
-            media.setStatus(MediaLifecycleStatus.STAGING);
-            mediaMapper.insert(media);
+            mediaList.add(media);
             totalSize += media.getFileSize() != null ? media.getFileSize() : 0;
             pgCount++;
             if (fileName != null && !fileName.isBlank()) {
                 mappings.add(new FinalizeMediaMapping(fileName, fileName));
             }
         }
-        return new ChapterInsertResult(chapter, pgCount, totalSize, mappings);
+        return new ChapterInsertResult(chapter, pgCount, totalSize, mappings, mediaList);
+    }
+
+    /** 批量插入媒体：空批次跳过；实际插入行数与入参不符视为数据不一致，抛异常回滚整个导入事务。 */
+    private void insertMediaBatch(List<Media> mediaList) {
+        if (mediaList.isEmpty()) {
+            return;
+        }
+        int inserted = mediaMapper.insertImportBatch(mediaList);
+        if (inserted != mediaList.size()) {
+            throw new IllegalStateException("媒体批量落库数量不一致: expected="
+                    + mediaList.size() + ", actual=" + inserted);
+        }
     }
 
     /**
@@ -403,27 +433,15 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
             return;
         }
 
-        // 1) 本章 media → READY（幂等：alreadyReady 检查保留），其余章节保持 PENDING
+        // 1) 本章 media → READY（幂等：WHERE 条件保证已 READY 行不命中），其余章节保持 PENDING
         if (chapterId == null) {
             log.warn("finalize completed 缺少 chapterId，跳过媒体确认: comicId={}", comicId);
             return;
         }
-        List<Media> chapterMedia = mediaMapper.selectList(
-                new LambdaQueryWrapper<Media>().eq(Media::getChapterId, chapterId));
-        for (Media media : chapterMedia) {
-            boolean alreadyReady = media.getHqStatus() == HqStatus.READY
-                    && media.getStatus() == MediaLifecycleStatus.READY;
-            if (alreadyReady) {
-                continue;
-            }
-            // 使用事件返回的真实 targetDir 修正本章 hqPath
-            String fileName = fileNameOf(media.getHqPath());
-            String hqRelative = stripHqPrefix(targetDir, hqPrefix);
-            media.setHqPath(hqRelative + "/" + fileName);
-            media.setHqStatus(HqStatus.READY);
-            media.setStatus(MediaLifecycleStatus.READY);
-            mediaMapper.updateById(media);
-        }
+        String hqRelative = stripHqPrefix(targetDir, hqPrefix);
+        int finalized = mediaMapper.markImportFinalizedByChapter(chapterId, hqRelative);
+        log.debug("最终化确认媒体批量置 READY: comicId={}, chapterId={}, updated={}",
+                comicId, chapterId, finalized);
 
         // 2) 本章 chapter → READY（幂等）
         for (Chapter chapter : chapters) {
@@ -567,16 +585,6 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
             return targetDir.substring(prefix.length() + 1);
         }
         return targetDir;
-    }
-
-    private static String fileNameOf(String hqPath) {
-        if (hqPath == null || hqPath.isBlank()) {
-            return "unknown";
-        }
-        int slash = hqPath.lastIndexOf('/');
-        int backslash = hqPath.lastIndexOf('\\');
-        int cut = Math.max(slash, backslash);
-        return cut >= 0 ? hqPath.substring(cut + 1) : hqPath;
     }
 
     /**

@@ -59,6 +59,7 @@ import java.util.function.Consumer;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
@@ -97,6 +98,7 @@ class ImportPersistenceServiceTest {
 
     @BeforeEach
     void setUp() {
+        mediaBatchSnapshots.clear();
         ReflectionTestUtils.setField(service, "mangaRoot", "F:/manga");
         ApiStorageRoot hqRoot = new ApiStorageRoot();
         hqRoot.setPath(Path.of("F:/manga/hq"));
@@ -198,6 +200,22 @@ class ImportPersistenceServiceTest {
         }).when(chapterMapper).insert(any(Chapter.class));
     }
 
+    /**
+     * 批量插入 stub：返回入参条数（与生产校验语义一致），并把批次快照存入
+     * {@link #mediaBatchSnapshots}（生产 flush 后 clear 原列表，快照不受影响）。
+     */
+    private void stubMediaBatchInsert() {
+        doAnswer(inv -> {
+            @SuppressWarnings("unchecked")
+            List<Media> snapshot = new ArrayList<>((List<Media>) inv.getArgument(0));
+            mediaBatchSnapshots.add(snapshot);
+            return snapshot.size();
+        }).when(mediaMapper).insertImportBatch(anyList());
+    }
+
+    /** 各次 insertImportBatch 入参的不可变快照（生产 clear 后仍可断言）。 */
+    private final List<List<Media>> mediaBatchSnapshots = new ArrayList<>();
+
     private Chapter chapter(Long id, int globalOrder) {
         Chapter chapter = new Chapter();
         chapter.setId(id);
@@ -228,6 +246,43 @@ class ImportPersistenceServiceTest {
     // ======================== 1. completed（两阶段之 staging）：PENDING 结构 + 逐章请求 ========================
 
     @Test
+    @DisplayName("媒体批量插入按固定批次拆分：1001 页严格产生 500 + 500 + 1 三次 insertImportBatch")
+    void persistCompleted_batchesMediaInsert_500PerBatch() {
+        runInTransaction();
+        when(taskMapper.selectById(10L)).thenReturn(task(ImportTaskStatus.PARSING));
+        when(comicMapper.selectById(100L)).thenReturn(comic(ComicStatus.IMPORTING));
+        when(chapterMapper.selectCount(any(Wrapper.class))).thenReturn(0L);
+        stubCatalogInsert();
+        stubChapterInsert();
+        stubMediaBatchInsert();
+
+        // 单章 1001 页
+        Map<String, Object> root = metadataV3();
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> chapters = (List<Map<String, Object>>) root.get("chapters");
+        List<Map<String, Object>> items = new ArrayList<>(1001);
+        for (int i = 1; i <= 1001; i++) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("pageNumber", i);
+            item.put("fileName", String.format("%03d.jpg", i));
+            item.put("hqPath", "100/0/" + String.format("%03d.jpg", i));
+            item.put("fileSize", 1024L);
+            item.put("mediaType", "IMAGE");
+            items.add(item);
+        }
+        chapters.get(0).put("mediaItems", items);
+
+        mediaBatchSnapshots.clear();
+        service.persistCompleted(completedEvent(), root);
+
+        verify(mediaMapper, times(3)).insertImportBatch(anyList());
+        assertThat(mediaBatchSnapshots).hasSize(3);
+        assertThat(mediaBatchSnapshots.get(0)).hasSize(500);
+        assertThat(mediaBatchSnapshots.get(1)).hasSize(500);
+        assertThat(mediaBatchSnapshots.get(2)).hasSize(1);
+    }
+
+    @Test
     @DisplayName("completed 阶段（staging）：sourceDir 用 globalOrder、targetDir 用 chapterId，comic 保持 IMPORTING、media PENDING，逐章产出最终化请求并写入 Outbox")
     void persistCompleted_insertsPendingStructure_andReturnsFinalizeRequests() {
         runInTransaction();
@@ -236,6 +291,7 @@ class ImportPersistenceServiceTest {
         when(chapterMapper.selectCount(any(Wrapper.class))).thenReturn(0L);
         stubCatalogInsert();
         stubChapterInsert();
+        stubMediaBatchInsert();
 
         List<ImportPersistenceService.FinalizeRequest> requests =
                 service.persistCompleted(completedEvent(), metadataV3());
@@ -268,9 +324,9 @@ class ImportPersistenceServiceTest {
 
         // 章节 DRAFT，media PENDING/STAGING，hqPath 为 chapterId 目标布局（无文件 IO）
         assertThat(chapterCaptor.getValue().getStatus()).isEqualTo(ChapterLifecycleStatus.DRAFT);
-        ArgumentCaptor<Media> mediaCaptor = ArgumentCaptor.forClass(Media.class);
-        verify(mediaMapper).insert(mediaCaptor.capture());
-        Media media = mediaCaptor.getValue();
+        ArgumentCaptor<List<Media>> mediaListCaptor = ArgumentCaptor.forClass(List.class);
+        verify(mediaMapper).insertImportBatch(mediaListCaptor.capture());
+        Media media = mediaListCaptor.getValue().get(0);
         assertThat(media.getHqStatus()).isEqualTo(HqStatus.PENDING);
         assertThat(media.getStatus()).isEqualTo(MediaLifecycleStatus.STAGING);
         assertThat(media.getHqPath()).isEqualTo("100/" + chapterId + "/001.jpg");
@@ -393,13 +449,14 @@ class ImportPersistenceServiceTest {
         media.setChapterId(1001L);
         media.setPageNumber(1);
         media.setHqRoot("HQ");
-        // 旧 staging 布局路径，最终化后用事件真实 targetDir 修正为 chapterId 布局
+        // 旧 staging 布局路径，最终化后由批量 UPDATE 用事件真实 targetDir 修正为 chapterId 布局
         media.setHqPath("100/0/001.jpg");
         media.setHqStatus(HqStatus.PENDING);
         media.setStatus(MediaLifecycleStatus.STAGING);
         media.setFileSize(1024L);
         when(mediaMapper.selectList(any(Wrapper.class))).thenReturn(List.of(media));
         when(mediaMapper.selectCount(any(Wrapper.class))).thenReturn(0L);
+        when(mediaMapper.markImportFinalizedByChapter(1001L, "100/1001")).thenReturn(1);
 
         when(managementTaskService.findActiveItem("COMIC", 100L, TaskType.IMPORT)).thenReturn(null);
 
@@ -407,13 +464,8 @@ class ImportPersistenceServiceTest {
                 UUID.randomUUID(), Instant.now(), 10L, 100L, 0, 1001L, "hq/100/1001", 1);
         service.applyFinalizeCompleted(event);
 
-        // media：真实 hqPath（剥掉 hq/ 前缀）+ READY
-        ArgumentCaptor<Media> mediaCaptor = ArgumentCaptor.forClass(Media.class);
-        verify(mediaMapper).updateById(mediaCaptor.capture());
-        Media updated = mediaCaptor.getValue();
-        assertThat(updated.getHqPath()).isEqualTo("100/1001/001.jpg");
-        assertThat(updated.getHqStatus()).isEqualTo(HqStatus.READY);
-        assertThat(updated.getStatus()).isEqualTo(MediaLifecycleStatus.READY);
+        // media：批量 UPDATE 一次性置 READY，hqPath 由 SQL 用 targetDir 相对路径重写
+        verify(mediaMapper).markImportFinalizedByChapter(1001L, "100/1001");
 
         // chapter → READY
         ArgumentCaptor<Chapter> chapterCaptor = ArgumentCaptor.forClass(Chapter.class);
@@ -476,21 +528,24 @@ class ImportPersistenceServiceTest {
 
         Media m1 = pendingMedia(2001L, 1001L);
         Media m2 = pendingMedia(2002L, 1002L);
-        when(mediaMapper.selectList(any(Wrapper.class)))
-                .thenReturn(List.of(m1))
-                .thenReturn(List.of(m2))
-                .thenReturn(List.of(m1, m2));
+
+        // 批量确认：每章一次 UPDATE；第一章后仍有 PENDING（selectCount=1），第二章后全部完成（=0）
+        when(mediaMapper.markImportFinalizedByChapter(1001L, "100/1001")).thenReturn(1);
+        when(mediaMapper.markImportFinalizedByChapter(1002L, "100/1002")).thenReturn(1);
+        when(mediaMapper.selectList(any(Wrapper.class))).thenReturn(List.of(m1, m2));
         when(mediaMapper.selectCount(any(Wrapper.class)))
                 .thenReturn(1L)
                 .thenReturn(0L);
         when(managementTaskService.findActiveItem("COMIC", 100L, TaskType.IMPORT)).thenReturn(null);
 
         service.applyFinalizeCompleted(completedEventFor(1001L));
+        verify(mediaMapper).markImportFinalizedByChapter(1001L, "100/1001");
         verify(comicMapper, never()).updateById(any(Comic.class));
         verify(taskMapper, never()).updateById(any(ImportTask.class));
         verify(catalogCacheInvalidator, never()).evict(100L);
 
         service.applyFinalizeCompleted(completedEventFor(1002L));
+        verify(mediaMapper).markImportFinalizedByChapter(1002L, "100/1002");
         ArgumentCaptor<Comic> comicCaptor = ArgumentCaptor.forClass(Comic.class);
         verify(comicMapper).updateById(comicCaptor.capture());
         assertThat(comicCaptor.getValue().getStatus()).isEqualTo(ComicStatus.READY);
@@ -512,6 +567,7 @@ class ImportPersistenceServiceTest {
 
         when(chapterMapper.selectList(any(Wrapper.class))).thenReturn(List.of(chapter(1001L, 0)));
 
+        when(mediaMapper.markImportFinalizedByChapter(1001L, "100/1001")).thenReturn(1);
         when(mediaMapper.selectList(any(Wrapper.class))).thenReturn(List.of(pendingMedia(2001L, 1001L)));
         when(mediaMapper.selectCount(any(Wrapper.class))).thenReturn(0L);
         when(managementTaskService.findActiveItem("COMIC", 100L, TaskType.IMPORT)).thenReturn(null);
@@ -519,6 +575,7 @@ class ImportPersistenceServiceTest {
         service.applyFinalizeCompleted(completedEventFor(1001L));
         service.applyFinalizeCompleted(completedEventFor(1001L));
 
+        verify(mediaMapper, times(1)).markImportFinalizedByChapter(1001L, "100/1001");
         ArgumentCaptor<Comic> comicCaptor = ArgumentCaptor.forClass(Comic.class);
         verify(comicMapper, times(1)).updateById(comicCaptor.capture());
         assertThat(comicCaptor.getValue().getStatus()).isEqualTo(ComicStatus.READY);
@@ -578,6 +635,7 @@ class ImportPersistenceServiceTest {
         when(chapterMapper.selectCount(any(Wrapper.class))).thenReturn(0L);
         stubCatalogInsert();
         stubChapterInsert();
+        stubMediaBatchInsert();
 
         List<ImportPersistenceService.FinalizeRequest> requests =
                 service.persistCompleted(completedEvent(), metadataV3());
