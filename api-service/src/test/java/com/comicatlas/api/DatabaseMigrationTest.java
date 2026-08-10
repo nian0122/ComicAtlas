@@ -14,7 +14,9 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
@@ -121,6 +123,39 @@ class DatabaseMigrationTest {
             }
         } catch (Exception e) {
             throw new RuntimeException("解析 Flyway 迁移目录失败", e);
+        }
+    }
+
+    /**
+     * 查询指定 page 的 transcode_status 值。
+     */
+    static String queryTranscodeStatus(DataSource ds, long pageId) {
+        try (Connection c = ds.getConnection();
+             Statement s = c.createStatement();
+             ResultSet rs = s.executeQuery("SELECT transcode_status FROM page WHERE id = " + pageId)) {
+            rs.next();
+            return rs.getString(1);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * 读取 flyway_schema_history 中已应用迁移的 version → checksum 快照。
+     * 用于断言 V1-V17 checksum 在 V18 升级前后无漂移。
+     */
+    static Map<String, String> migrationChecksums(DataSource ds) {
+        try (Connection c = ds.getConnection();
+             Statement s = c.createStatement();
+             ResultSet rs = s.executeQuery(
+                     "SELECT version, checksum FROM flyway_schema_history ORDER BY installed_rank")) {
+            Map<String, String> map = new LinkedHashMap<>();
+            while (rs.next()) {
+                map.put(rs.getString("version"), String.valueOf(rs.getLong("checksum")));
+            }
+            return map;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -238,6 +273,98 @@ class DatabaseMigrationTest {
         // 验证 flyway_schema_history
         List<String> versions = appliedMigrations(ds);
         assertThat(versions).contains("1", "2");
+    }
+
+    @Test
+    @DisplayName("升级：V18 重分类历史视频转码状态（图片归一 + 视频兼容矩阵）")
+    void upgrade_ApplyV18_ReclassifiesVideoTranscodeStatus() {
+        DataSource ds = createDataSource();
+
+        Flyway cleanFlyway = createFlyway(ds, false);
+        cleanFlyway.clean();
+
+        // 第一步：只应用 V1-V17（模拟现存 V17 数据库）
+        Flyway flywayV17 = Flyway.configure()
+                .dataSource(ds)
+                .locations("classpath:db/flyway")
+                .target("17")
+                .load();
+        flywayV17.migrate();
+
+        // 记录 V1-V17 checksum 快照，V18 应用后断言无漂移
+        Map<String, String> checksumsBeforeV18 = migrationChecksums(ds);
+
+        // 构造 V17 结束态的旧数据：IMAGE 异常/NULL 状态 + VIDEO 各兼容/不兼容/未知 + 进行中/终态视频
+        runSql(ds, "INSERT INTO comic (id, title, status) VALUES (1, 'V18 Test', 'READY')");
+        runSql(ds, "INSERT INTO chapter (id, comic_id, chapter_no, global_order) VALUES (1, 1, '1', 1)");
+        // transcode_status 现行 schema 为 NOT NULL DEFAULT 'NOT_NEEDED'；为模拟 V18 前曾允许 NULL 的历史库，
+        // 临时放宽该列约束后再插入 NULL 行（V18 迁移本身不依赖约束，放宽仅用于构造历史数据）。
+        runSql(ds, "ALTER TABLE page MODIFY COLUMN transcode_status VARCHAR(32) NULL DEFAULT 'NOT_NEEDED'");
+        runSql(ds, "INSERT INTO page (id, chapter_id, page_number, transcode_status, media_type, container, video_codec, audio_codec) VALUES "
+                + "(1, 1, 1, NULL, 'IMAGE', NULL, NULL, NULL),"
+                + "(2, 1, 2, 'REQUIRED', 'IMAGE', NULL, NULL, NULL),"
+                + "(3, 1, 3, 'QUEUED', 'IMAGE', NULL, NULL, NULL),"
+                + "(4, 1, 4, 'NOT_NEEDED', 'VIDEO', 'mp4', 'h264', 'aac'),"
+                + "(5, 1, 5, 'NOT_NEEDED', 'VIDEO', 'M4V', 'AVC1', NULL),"
+                + "(6, 1, 6, 'NOT_NEEDED', 'VIDEO', 'WebM', 'VP9', 'opus'),"
+                + "(7, 1, 7, 'NOT_NEEDED', 'VIDEO', 'webm', 'vp8', 'vorbis'),"
+                + "(8, 1, 8, 'NOT_NEEDED', 'VIDEO', 'mp4', 'h264', 'opus'),"
+                + "(9, 1, 9, 'NOT_NEEDED', 'VIDEO', 'webm', 'vp9', 'aac'),"
+                + "(10, 1, 10, 'NOT_NEEDED', 'VIDEO', 'webm', 'h264', NULL),"
+                + "(11, 1, 11, 'NOT_NEEDED', 'VIDEO', NULL, NULL, NULL),"
+                + "(12, 1, 12, 'NOT_NEEDED', 'VIDEO', 'mp4', NULL, 'aac'),"
+                + "(13, 1, 13, 'NOT_NEEDED', 'VIDEO', 'MOV', 'h264', 'aac'),"
+                + "(14, 1, 14, 'QUEUED', 'VIDEO', 'mp4', 'h264', 'aac'),"
+                + "(15, 1, 15, 'TRANSCODING', 'VIDEO', 'mp4', 'h264', 'aac'),"
+                + "(16, 1, 16, 'READY', 'VIDEO', 'webm', 'vp9', 'opus'),"
+                + "(17, 1, 17, 'FAILED', 'VIDEO', 'mp4', 'h264', 'opus'),"
+                + "(18, 1, 18, 'NOT_NEEDED', 'VIDEO', 'mp4', 'h264', ' aac '),"
+                + "(19, 1, 19, 'NOT_NEEDED', 'VIDEO', 'mp4', 'avc', '')");
+
+        log.info("Inserted V17-end fixture data for V18 upgrade");
+
+        // 第二步：迁移到最新（应用 V18）
+        Flyway flywayLatest = createFlyway(ds, false);
+        MigrateResult migrateResult = flywayLatest.migrate();
+        log.info("Applied {} migrations on V17 upgrade (expect V18)", migrateResult.migrationsExecuted);
+        assertThat(migrateResult.migrationsExecuted).isEqualTo(1);
+        assertThat(appliedMigrations(ds)).contains("18");
+
+        // IMAGE：异常/null 状态归一为 NOT_NEEDED
+        assertThat(queryTranscodeStatus(ds, 1)).isEqualTo("NOT_NEEDED");
+        assertThat(queryTranscodeStatus(ds, 2)).isEqualTo("NOT_NEEDED");
+        assertThat(queryTranscodeStatus(ds, 3)).isEqualTo("NOT_NEEDED");
+
+        // VIDEO 兼容组合（大小写不敏感、空音频/空白音频）→ 保持 NOT_NEEDED
+        assertThat(queryTranscodeStatus(ds, 4)).isEqualTo("NOT_NEEDED");
+        assertThat(queryTranscodeStatus(ds, 5)).isEqualTo("NOT_NEEDED");
+        assertThat(queryTranscodeStatus(ds, 6)).isEqualTo("NOT_NEEDED");
+        assertThat(queryTranscodeStatus(ds, 7)).isEqualTo("NOT_NEEDED");
+        assertThat(queryTranscodeStatus(ds, 18)).isEqualTo("NOT_NEEDED");
+        assertThat(queryTranscodeStatus(ds, 19)).isEqualTo("NOT_NEEDED");
+
+        // VIDEO 不兼容/未知（含缺失 container/codec）→ REQUIRED
+        assertThat(queryTranscodeStatus(ds, 8)).isEqualTo("REQUIRED");
+        assertThat(queryTranscodeStatus(ds, 9)).isEqualTo("REQUIRED");
+        assertThat(queryTranscodeStatus(ds, 10)).isEqualTo("REQUIRED");
+        assertThat(queryTranscodeStatus(ds, 11)).isEqualTo("REQUIRED");
+        assertThat(queryTranscodeStatus(ds, 12)).isEqualTo("REQUIRED");
+        assertThat(queryTranscodeStatus(ds, 13)).isEqualTo("REQUIRED");
+
+        // 已有 QUEUED/TRANSCODING/READY/FAILED 的视频 → 原样保留
+        assertThat(queryTranscodeStatus(ds, 14)).isEqualTo("QUEUED");
+        assertThat(queryTranscodeStatus(ds, 15)).isEqualTo("TRANSCODING");
+        assertThat(queryTranscodeStatus(ds, 16)).isEqualTo("READY");
+        assertThat(queryTranscodeStatus(ds, 17)).isEqualTo("FAILED");
+
+        // V1-V17 checksum 无漂移（V18 不修改既有迁移）
+        Map<String, String> checksumsAfterV18 = migrationChecksums(ds);
+        assertThat(checksumsAfterV18).containsAllEntriesOf(checksumsBeforeV18);
+
+        // 再执行一次应为 no-op（Flyway 已 applied，checksum 一致）
+        Flyway flywayNoop = createFlyway(ds, false);
+        MigrateResult noopResult = flywayNoop.migrate();
+        assertThat(noopResult.migrationsExecuted).as("Repeat V18 migration should be no-op").isEqualTo(0);
     }
 
     @Test
