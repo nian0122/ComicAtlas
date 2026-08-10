@@ -1,10 +1,15 @@
 package com.comicatlas.api.common.storage;
 
 /**
- * 路径穿越异常 — 当相对路径包含 {@code ../} 穿越存储根边界时抛出。
+ * 路径穿越异常 — 当相对路径包含 {@code ../} 穿越存储根边界，或经 symlink/junction
+ * 逃出根的真实边界时抛出。
  */
 public class PathTraversalException extends RuntimeException {
     public PathTraversalException(String message) {
         super(message);
+    }
+
+    public PathTraversalException(String message, Throwable cause) {
+        super(message, cause);
     }
 }
