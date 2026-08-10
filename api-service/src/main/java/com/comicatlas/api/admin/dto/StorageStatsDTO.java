@@ -1,5 +1,6 @@
 package com.comicatlas.api.admin.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 /**
@@ -16,6 +17,7 @@ public class StorageStatsDTO {
     private int comicCount;
 
     /** 总占用字节数 = HQ + LQ + 缩略图。 */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     public long getTotalBytes() {
         return hqBytes + lqBytes + thumbBytes;
     }

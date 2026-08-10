@@ -3,11 +3,14 @@ package com.comicatlas.api.storage.controller;
 import com.comicatlas.api.admin.dto.StorageStatsDTO;
 import com.comicatlas.api.admin.service.AdminService;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -54,5 +57,19 @@ class StorageStatsControllerTest {
                 .andExpect(jsonPath("$.data.thumbBytes").value(0))
                 .andExpect(jsonPath("$.data.comicCount").value(0))
                 .andExpect(jsonPath("$.data.totalBytes").value(0));
+    }
+
+    @Test
+    void statsDto_应支持Redis缓存往返并重新计算totalBytes() {
+        StorageStatsDTO stats = new StorageStatsDTO();
+        stats.setHqBytes(100);
+        stats.setLqBytes(30);
+        stats.setThumbBytes(20);
+
+        GenericJackson2JsonRedisSerializer serializer = new GenericJackson2JsonRedisSerializer();
+        Object restored = serializer.deserialize(serializer.serialize(stats));
+
+        StorageStatsDTO restoredStats = assertInstanceOf(StorageStatsDTO.class, restored);
+        assertEquals(150L, restoredStats.getTotalBytes());
     }
 }
