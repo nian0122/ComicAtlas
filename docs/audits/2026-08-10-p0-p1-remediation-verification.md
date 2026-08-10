@@ -1,7 +1,7 @@
 # P0/P1 审计整改验证报告（2026-08-10）
 
 - **审计报告**: `docs/audits/2026-08-10-project-capability-architecture-audit.md`（原文未改动）
-- **整改 HEAD**: `de37f7e`（`feature/lq-transcode-import-video-status`）
+- **整改 HEAD（最后整改提交）**: `de37f7e`；**当前 HEAD（含本验证报告）**: `42d2a42`（`feature/lq-transcode-import-video-status`）
 - **snapshotId**: `remediation-20260810-1`
 - **证据目录**: `.omo/evidence/audit-p0-p1-remediation/20260810-192036/`
 
@@ -21,15 +21,15 @@
 
 ## 门禁验证摘要
 
-- 九项整改相关显式 IT（5 组，共 148 用例）全部通过（0 失败、0 skipped），见 `task-9-final-verification/gates.log`：
+- 九项整改相关显式 IT（5 组，共 195 用例）全部通过（0 失败、0 skipped），见 `task-9-final-verification/gates.log`：
   - StorageRoot/ApiStorageRoot 12 用例
   - 存储管理 API 27 用例
   - 转码/媒体分析 24 用例
   - 管理命令管线（LQ/HQ）61 用例
   - MQ 拓扑/契约/元数据刷新 71 用例（Testcontainers 真实执行）
 - `git diff --check` 通过；前端 `pnpm build` 通过。
-- **BLOCKED（非本计划引入）**: `ImportPersistenceServiceTest`/`ImportMetadataRefreshResultHandlerTest`/`ReadingLifecycleCompatibilityIT`/`TrashLifecycleIT` 的 api 侧复核被工作区未提交的用户改动 `HistoryServiceTest.java` 编译错误（MyBatisPlus 双重载歧义）阻断；该文件非本计划提交内容，需用户处理后再复核。
-- 全量 `mvnw clean verify` 因同一用户改动编译失败未完成（用户确认精简门禁）。
+- **最终复核（干净 worktree）**: 上述 4 个 api 侧 IT（`ImportPersistenceServiceTest` 22 + `ImportMetadataRefreshResultHandlerTest` 5 + `ReadingLifecycleCompatibilityIT` 18 + `TrashLifecycleIT` 14 = 59 用例）在干净 HEAD `42d2a42` 上全部通过（0 失败、0 skipped，含 2 个 Testcontainers IT 真实执行），见 `task-9-final-verification/f1-clean-worktree-it.log`。主工作区未提交的用户改动 `HistoryServiceTest.java`（MyBatisPlus 双重载歧义编译错误）仅影响主工作区 testCompile，不影响本计划代码。
+- 全量 `mvnw clean verify` 与真实 QA runner/final-gate 未执行（用户确认精简门禁，环境/时间受限）。
 
 ## 边界说明
 
