@@ -209,31 +209,6 @@ public class RabbitMqConfig {
     }
 
     @Bean
-    public Queue videoMetadataFixResultQueue() {
-        return QueueBuilder.durable(MqQueues.VIDEO_METADATA_FIX_RESULT)
-                .deadLetterExchange(MqExchanges.IMAGE_DLX)
-                .deadLetterRoutingKey(MqQueues.VIDEO_METADATA_FIX_RESULT_DLQ)
-                .build();
-    }
-
-    @Bean
-    public Queue videoMetadataFixResultDlq() {
-        return QueueBuilder.durable(MqQueues.VIDEO_METADATA_FIX_RESULT_DLQ).build();
-    }
-
-    @Bean
-    public Binding videoMetadataFixCompletedBinding() {
-        return BindingBuilder.bind(videoMetadataFixResultQueue())
-                .to(imageExchange()).with(MqRoutingKeys.VIDEO_METADATA_FIX_COMPLETED);
-    }
-
-    @Bean
-    public Binding videoMetadataFixResultDlqBinding() {
-        return BindingBuilder.bind(videoMetadataFixResultDlq())
-                .to(imageDlxExchange()).with(MqQueues.VIDEO_METADATA_FIX_RESULT_DLQ);
-    }
-
-    @Bean
     public DirectExchange imageDlxExchange() {
         return new DirectExchange(MqExchanges.IMAGE_DLX);
     }

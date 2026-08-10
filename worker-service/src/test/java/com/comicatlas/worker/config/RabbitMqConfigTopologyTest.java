@@ -55,6 +55,28 @@ class RabbitMqConfigTopologyTest {
     }
 
     @Test
+    @DisplayName("配置不再声明旧 video.metadata.fix queue/DLQ/binding bean（F6-10 下线）")
+    void legacyVideoMetadataFixBeansShouldBeAbsent() {
+        try (AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext(RabbitMqConfig.class)) {
+            assertThat(ctx.containsBean("videoMetadataFixQueue")).as("旧 video metadata fix queue").isFalse();
+            assertThat(ctx.containsBean("videoMetadataFixDlq")).as("旧 video metadata fix DLQ").isFalse();
+            assertThat(ctx.containsBean("videoMetadataFixBinding")).as("旧 video metadata fix binding").isFalse();
+            assertThat(ctx.containsBean("videoMetadataFixDlqBinding")).as("旧 video metadata fix DLQ binding").isFalse();
+        }
+    }
+
+    @Test
+    @DisplayName("metadata refresh 拓扑 bean 仍存在（唯一用户维护链）")
+    void metadataRefreshTopologyBeansShouldRemain() {
+        try (AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext(RabbitMqConfig.class)) {
+            assertThat(ctx.containsBean("metadataRefreshQueue")).as("METADATA_REFRESH queue").isTrue();
+            assertThat(ctx.containsBean("metadataRefreshDlq")).as("METADATA_REFRESH DLQ").isTrue();
+            assertThat(ctx.containsBean("metadataRefreshBinding")).as("METADATA_REFRESH binding").isTrue();
+            assertThat(ctx.containsBean("metadataRefreshDlqBinding")).as("METADATA_REFRESH DLQ binding").isTrue();
+        }
+    }
+
+    @Test
     @DisplayName("不存在绑定到 delete.task.queue / delete.task.dlq 的 Binding")
     void noBindingShouldReferenceLegacyDeleteQueues() {
         try (AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext(RabbitMqConfig.class)) {

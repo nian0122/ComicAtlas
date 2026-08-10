@@ -856,8 +856,6 @@ OP_NOT_ALLOWED, COMIC_NOT_FOUND
 | comic.task | cancel.requested | cancel.task.queue | Worker CancelHandler |
 | comic.image | hq.delete.requested | hq.delete.queue | Worker HqDeleteHandler |
 | comic.image | hq.delete.completed | hq.delete.result.queue | API HqDeletedHandler |
-| comic.image | video.metadata.fix.requested | video.metadata.fix.queue | Worker VideoMetadataFixHandler |
-| comic.image | video.metadata.fix.completed | video.metadata.fix.result.queue | API VideoMetadataFixCompletedHandler |
 | comic.export | task.created | export.task.queue | Worker ExportTaskHandler |
 | comic.export | task.started | export.started.result.queue | API ExportStartedHandler |
 | comic.export | task.completed | export.completed.result.queue | API ExportCompletedHandler |

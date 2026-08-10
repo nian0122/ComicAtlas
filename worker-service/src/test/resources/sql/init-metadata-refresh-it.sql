@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS comic (
     title VARCHAR(255) NOT NULL,
     author VARCHAR(255),
     category VARCHAR(64),
+    category_id BIGINT,
     cover_path VARCHAR(512),
     status VARCHAR(16) DEFAULT 'READY',
     storage_policy VARCHAR(16) DEFAULT 'MANAGED',
@@ -77,6 +78,29 @@ CREATE TABLE IF NOT EXISTS page (
     UNIQUE INDEX uk_chapter_page (chapter_id, page_number),
     FOREIGN KEY (chapter_id) REFERENCES chapter(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS tag (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(255) NOT NULL,
+    type VARCHAR(32),
+    UNIQUE INDEX idx_name_type (name, type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS comic_tag (
+    comic_id BIGINT NOT NULL,
+    tag_id BIGINT NOT NULL,
+    PRIMARY KEY (comic_id, tag_id),
+    FOREIGN KEY (comic_id) REFERENCES comic(id) ON DELETE CASCADE,
+    FOREIGN KEY (tag_id) REFERENCES tag(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS category (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(64) NOT NULL UNIQUE,
+    sort_order INT DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ======== 用户权限 ========
 

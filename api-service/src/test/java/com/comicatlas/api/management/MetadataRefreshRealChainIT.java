@@ -208,8 +208,10 @@ class MetadataRefreshRealChainIT {
         mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
                 .eq(Media::getId, 101L)
                 .set(Media::getLqRoot, "LQ").set(Media::getLqPath, "1/42/001.webp"));
-        // m102 已有视频，尺寸/大小变化 + 视频字段
+        // m102 已有视频，尺寸/大小变化 + 视频字段（动态转码状态 TRANSCODING 须保留）
         mediaMapper.insert(video(102L, 42L, 2, "1/42/002.mp4", 5000L));
+        mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
+                .eq(Media::getId, 102L).set(Media::getTranscodeStatus, TranscodeStatus.TRANSCODING));
         writeFile(hq("1/42/002.mp4"), 6000);
         // m103 缺失 HQ（DB 有行，磁盘无文件）
         mediaMapper.insert(image(103L, 42L, 3, "1/42/003.jpg", 3000L, LqStatus.NOT_GENERATED, "READY"));
@@ -347,6 +349,7 @@ class MetadataRefreshRealChainIT {
         assertThat(m102.getContainer()).isEqualTo("mp4");
         assertThat(m102.getVideoCodec()).isEqualTo("h264");
         assertThat(m102.getAudioCodec()).isEqualTo("aac");
+        assertThat(m102.getTranscodeStatus()).as("刷新不得覆盖动态转码状态").isEqualTo(TranscodeStatus.TRANSCODING);
 
         Media m103 = mediaMapper.selectById(103L);
         assertThat(m103.getHqStatus()).isEqualTo(HqStatus.MISSING); // 缺失 HQ → MISSING

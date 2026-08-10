@@ -375,6 +375,39 @@ class MetadataRefreshServiceTest {
         }
 
         @Test
+        @DisplayName("匹配更新与缺失标记均保留动态转码状态（QUEUED/TRANSCODING/READY）")
+        void transcodeStatus_preservedOnMatchedAndMissing() {
+            Chapter c42 = chapter(42L, 1);
+            Chapter c43 = chapter(43L, 1);
+            when(chapterMapper.selectList(any())).thenReturn(List.of(c42, c43));
+            Media m101 = media(101L, 42L, "1/42/001.jpg", 1, "READY", 100L, "IMAGE", 1);
+            m101.setTranscodeStatus(TranscodeStatus.QUEUED);
+            Media m102 = media(102L, 42L, "1/42/002.mp4", 2, "READY", 500L, "VIDEO", 1);
+            m102.setTranscodeStatus(TranscodeStatus.TRANSCODING);
+            Media m103 = media(103L, 42L, "1/42/003.jpg", 3, "READY", 200L, "IMAGE", 1);
+            m103.setTranscodeStatus(TranscodeStatus.READY);
+            Media m201 = media(201L, 43L, "1/43/001.jpg", 1, "READY", 30L, "IMAGE", 1);
+            when(mediaMapper.selectList(any())).thenReturn(List.of(m101, m102, m103, m201));
+            when(mediaMapper.insert(any(Media.class))).thenReturn(1);
+            when(mediaMapper.updateById(any(Media.class))).thenReturn(1);
+
+            MetadataRefreshSnapshotDTO snapshot = snapshotForApply();
+            String revision = MetadataSnapshotRevision.compute(snapshot);
+            MetadataRefreshSnapshotDTO applied =
+                    new MetadataRefreshSnapshotDTO(snapshot.schemaVersion(), snapshot.comicId(),
+                            snapshot.generatedAt(), revision, snapshot.chapters());
+
+            service.applyValidatedSnapshot(applied);
+
+            assertThat(m101.getTranscodeStatus()).as("匹配 IMAGE 保留转码状态").isEqualTo(TranscodeStatus.QUEUED);
+            assertThat(m102.getTranscodeStatus()).as("匹配 VIDEO 保留转码状态").isEqualTo(TranscodeStatus.TRANSCODING);
+            assertThat(m102.getDuration()).isEqualByComparingTo("12.500");
+            assertThat(m102.getContainer()).isEqualTo("mp4");
+            assertThat(m103.getHqStatus()).as("未匹配标记 MISSING").isEqualTo(HqStatus.MISSING);
+            assertThat(m103.getTranscodeStatus()).as("缺失标记保留转码状态").isEqualTo(TranscodeStatus.READY);
+        }
+
+        @Test
         @DisplayName("applyValidatedSnapshot 标注 @Transactional")
         void apply_hasTransactionalAnnotation() throws Exception {
             assertThat(MetadataRefreshService.class

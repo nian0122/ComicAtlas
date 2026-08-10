@@ -271,10 +271,10 @@ class RabbitTopologyIT {
         }
     }
 
-    // ======================== 正向保留：HQ_DELETE / VIDEO_METADATA_FIX / METADATA_REFRESH ========================
+    // ======================== 正向保留：HQ_DELETE / METADATA_REFRESH ========================
 
     @Nested
-    @DisplayName("保留管线拓扑：HQ_DELETE / VIDEO_METADATA_FIX / METADATA_REFRESH")
+    @DisplayName("保留管线拓扑：HQ_DELETE / METADATA_REFRESH（video.metadata.fix 已下线）")
     class RetainedPipelinesTopology {
 
         @Test
@@ -289,15 +289,17 @@ class RabbitTopologyIT {
         }
 
         @Test
-        @DisplayName("video metadata fix 请求/结果队列绑定 comic.image 且 DLX 为 comic.image.dlx")
-        void videoMetadataFixTopology_present() {
+        @DisplayName("video metadata fix 旧拓扑 bean 已从 API/Worker 配置移除（F6-10 下线）")
+        void videoMetadataFixTopology_removed() {
             var workerConfig = new com.comicatlas.worker.config.RabbitMqConfig();
-            assertThat(workerConfig.videoMetadataFixQueue().getName()).isEqualTo("video.metadata.fix.queue");
-            assertThat(apiConfig.videoMetadataFixResultQueue().getName()).isEqualTo("video.metadata.fix.result.queue");
-            assertThat(dlxArgToString(apiConfig.videoMetadataFixResultQueue().getArguments().get("x-dead-letter-exchange")))
-                    .isEqualTo("comic.image.dlx");
-            assertThat(apiConfig.videoMetadataFixCompletedBinding().getRoutingKey())
-                    .isEqualTo("video.metadata.fix.completed");
+            assertThat(hasDeclaredMethod(workerConfig.getClass(), "videoMetadataFixQueue")).isFalse();
+            assertThat(hasDeclaredMethod(workerConfig.getClass(), "videoMetadataFixDlq")).isFalse();
+            assertThat(hasDeclaredMethod(workerConfig.getClass(), "videoMetadataFixBinding")).isFalse();
+            assertThat(hasDeclaredMethod(workerConfig.getClass(), "videoMetadataFixDlqBinding")).isFalse();
+            assertThat(hasDeclaredMethod(apiConfig.getClass(), "videoMetadataFixResultQueue")).isFalse();
+            assertThat(hasDeclaredMethod(apiConfig.getClass(), "videoMetadataFixResultDlq")).isFalse();
+            assertThat(hasDeclaredMethod(apiConfig.getClass(), "videoMetadataFixCompletedBinding")).isFalse();
+            assertThat(hasDeclaredMethod(apiConfig.getClass(), "videoMetadataFixResultDlqBinding")).isFalse();
         }
 
         @Test
@@ -312,7 +314,7 @@ class RabbitTopologyIT {
         }
 
         @Test
-        @DisplayName("comic.image 与 IMAGE_DLX 仍存在（HQ delete / video metadata fix 共享）")
+        @DisplayName("comic.image 与 IMAGE_DLX 仍存在（HQ delete 消费）")
         void imageExchange_stillShared() {
             assertThat(apiConfig.imageExchange().getName()).isEqualTo("comic.image");
             assertThat(apiConfig.imageDlxExchange().getName()).isEqualTo("comic.image.dlx");

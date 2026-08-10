@@ -155,8 +155,6 @@ URL 统一由 `FileUrlResolver.resolve(page)` 生成，不手拼。
 | comic.task | cancel.requested | cancel.task.queue | Worker CancelHandler |
 | comic.image | hq.delete.requested | hq.delete.queue | Worker HqDeleteHandler |
 | comic.image | hq.delete.completed | hq.delete.result.queue | API HqDeletedHandler |
-| comic.image | video.metadata.fix.requested | video.metadata.fix.queue | Worker VideoMetadataFixHandler |
-| comic.image | video.metadata.fix.completed | video.metadata.fix.result.queue | API VideoMetadataFixCompletedHandler |
 | comic.export | task.created | export.task.queue | Worker ExportTaskHandler |
 | comic.export | task.started | export.started.result.queue | API ExportStartedHandler |
 | comic.export | task.completed | export.completed.result.queue | API ExportCompletedHandler |
@@ -192,8 +190,6 @@ URL 统一由 `FileUrlResolver.resolve(page)` 生成，不手拼。
 | CancelTask | comic.task.cancel.requested | CancelTaskEvent |
 | DeleteHqRequested | comic.image.hq.delete.requested | DeleteHqRequestedEvent |
 | HqDeleted | comic.image.hq.delete.completed | HqDeletedEvent |
-| VideoMetadataFixRequested | comic.image.video.metadata.fix.requested | VideoMetadataFixRequestedEvent |
-| VideoMetadataFixCompleted | comic.image.video.metadata.fix.completed | VideoMetadataFixCompletedEvent |
 | ExportTaskCreated | comic.export.task.created | ExportTaskCreatedEvent |
 | ExportTaskStarted | comic.export.task.started | ExportTaskStartedEvent |
 | ExportTaskCompleted | comic.export.task.completed | ExportTaskCompletedEvent |
