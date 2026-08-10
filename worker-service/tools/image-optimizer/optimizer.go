@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/chai2010/webp"
+	"golang.org/x/image/bmp"
 )
 
 // OptimizeResult 包含单文件的优化结果
@@ -49,6 +50,8 @@ func optimizeImageToWebP(filePath string, outputPath string, quality int) (Optim
 		img, err = webp.Decode(file)
 	case ".gif":
 		img, err = gif.Decode(file)
+	case ".bmp":
+		img, err = bmp.Decode(file)
 	default:
 		return result, fmt.Errorf("不支持的格式: %s", ext)
 	}

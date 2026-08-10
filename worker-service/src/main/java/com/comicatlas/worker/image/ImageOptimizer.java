@@ -31,6 +31,7 @@ public class ImageOptimizer {
 
     /**
      * 对指定章节的 HQ 图片生成 LQ WebP（使用显式路径，禁止 globalOrder 拼目录）。
+     * 不强制覆盖：已存在且不旧于源文件的产物由 Go 工具置 skipped。
      *
      * @param comicId   漫画 ID
      * @param chapterId 章节 ID（仅用于日志和 JSON 回传）
@@ -39,6 +40,33 @@ public class ImageOptimizer {
      * @return Go 工具返回的详细结果
      */
     public RunResult generateLq(Long comicId, Long chapterId, Path hqDir, Path lqDir) {
+        try {
+            return generateLq(comicId, chapterId, hqDir, lqDir, false);
+        } catch (InterruptedException e) {
+            // 兼容既有调用方（LqGenerateHandler）：包装为 RuntimeException 并保留原始 cause；
+            // LqCommandHandler 走 5 参变体以精确区分中断。
+            Thread.currentThread().interrupt();
+            throw new RuntimeException(
+                    "等待图片优化被中断: comicId=" + comicId + ", chapterId=" + chapterId, e);
+        }
+    }
+
+    /**
+     * 对指定章节的 HQ 图片生成 LQ WebP，显式指定是否强制覆盖（{@code force} 映射 Go 的 {@code -force}）。
+     * <p>
+     * 中断语义：被中断时抛出 {@link InterruptedException} 且线程中断标志已恢复（由
+     * {@link ExternalProcessRunner} 保证），调用方负责处理中断并清理。
+     *
+     * @param comicId   漫画 ID
+     * @param chapterId 章节 ID（仅用于日志和 JSON 回传）
+     * @param hqDir     HQ 源目录绝对路径
+     * @param lqDir     LQ 目标目录绝对路径
+     * @param force     true 时传 {@code -force} 强制重新处理（LQ_REGENERATE），普通 LQ 不覆盖已有有效输出
+     * @return Go 工具返回的详细结果
+     * @throws InterruptedException 执行被中断（中断标志已恢复）
+     */
+    public RunResult generateLq(Long comicId, Long chapterId, Path hqDir, Path lqDir, boolean force)
+            throws InterruptedException {
         String hqDirStr = hqDir.toString();
         String lqDirStr = lqDir.toString();
 
@@ -68,21 +96,21 @@ public class ImageOptimizer {
                 "-workers", String.valueOf(workers),
                 "-json"
         ));
+        if (force) {
+            cmd.add("-force");
+        }
 
-        log.info("启动图片优化: comicId={}, chapterId={}, hqDir={}, lqDir={}, workers={}, quality={}",
-                comicId, chapterId, hqDirStr, lqDirStr, workers, config.getLqQuality());
+        log.info("启动图片优化: comicId={}, chapterId={}, hqDir={}, lqDir={}, workers={}, quality={}, force={}",
+                comicId, chapterId, hqDirStr, lqDirStr, workers, config.getLqQuality(), force);
         return runOptimizer(cmd, comicId, chapterId);
     }
 
-    private RunResult runOptimizer(List<String> cmd, Long comicId, Long chapterId) {
+    private RunResult runOptimizer(List<String> cmd, Long comicId, Long chapterId) throws InterruptedException {
         ProcessBuilder processBuilder = new ProcessBuilder(cmd);
         ExternalProcessRunner.ExternalProcessResult result;
-        try {
-            result = processRunner.run(processBuilder, LQ_TIMEOUT_SECONDS, "LQ优化");
-        } catch (InterruptedException e) {
-            // runner 已恢复中断标志并销毁子进程
-            throw new RuntimeException("等待图片优化被中断: comicId=" + comicId + ", chapterId=" + chapterId, e);
-        }
+        result = processRunner.run(processBuilder, LQ_TIMEOUT_SECONDS, "LQ优化");
+        // InterruptedException 由 ExternalProcessRunner 恢复中断标志并销毁子进程后向上传播，
+        // 这里不再吞掉，交由调用方（LqCommandHandler）恢复标志并发布失败。
 
         int exitCode = result.exitCode();
         if (exitCode == 2) {
@@ -125,6 +153,8 @@ public class ImageOptimizer {
     public static class PageResult {
         private Long pageNumber;
         private String status;
+        private String sourceRelPath;
+        private String targetRelPath;
         private Long inputSize;
         private Long outputSize;
         private Double ratio;

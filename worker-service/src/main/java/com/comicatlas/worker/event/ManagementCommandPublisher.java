@@ -9,6 +9,7 @@ import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.common.event.MediaUploadCompletedEvent;
 import com.comicatlas.common.event.MediaUploadCompletedEvent.MediaAnalysisResult;
 import com.comicatlas.common.event.MetadataRefreshScanCompletedEvent;
+import com.comicatlas.common.event.payload.LqGenerationResult;
 import com.comicatlas.common.event.payload.TranscodeMediaInfo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -52,6 +53,19 @@ public class ManagementCommandPublisher {
                         cmd.taskId(), cmd.itemId(), cmd.attempt(),
                         cmd.operationType(), cmd.targetType(), cmd.targetId(),
                         transcode));
+    }
+
+    /**
+     * 发布 LQ 命令完成事件，携带逐媒体 {@link LqGenerationResult}。
+     * 混合结果（部分 READY 部分 FAILED）也必须走 completed，禁止把逐媒体业务失败
+     * 当作基础设施异常发布 failed；transcode 组件固定为 null。
+     */
+    public void completedLq(ManagementCommandRequestedEvent cmd, LqGenerationResult lqResult) {
+        rabbitTemplate.convertAndSend(EXCHANGE, MqRoutingKeys.COMMAND_COMPLETED,
+                new ManagementCommandCompletedEvent(UUID.randomUUID(), Instant.now(), 1,
+                        cmd.taskId(), cmd.itemId(), cmd.attempt(),
+                        cmd.operationType(), cmd.targetType(), cmd.targetId(),
+                        null, lqResult));
     }
 
     public void failed(ManagementCommandRequestedEvent cmd, String errorMessage) {

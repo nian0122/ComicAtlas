@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import java.time.Instant;
 import java.util.UUID;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -59,5 +60,31 @@ class ManagementCommandDispatcherTest {
                 mediaUploadCommandHandler);
         // 扫盘由 handler 内部发布 completed/failed：命令正常 ack，不进入 DLQ
         verify(channel).basicAck(1L, false);
+    }
+
+    @Test
+    void lqGenerate章节目标路由到章节处理器() throws Exception {
+        ManagementCommandRequestedEvent cmd = new ManagementCommandRequestedEvent(
+                UUID.randomUUID(), Instant.now(), 1, 1L, 1L, 1,
+                "LQ_GENERATE", "CHAPTER", 100L);
+
+        dispatcher.handle(cmd, channel, 1L);
+
+        verify(lqCommandHandler).generateChapter(cmd);
+        verify(lqCommandHandler, never()).generateComic(any());
+        verify(publisher, never()).failed(eq(cmd), anyString());
+    }
+
+    @Test
+    void lqRegenerate漫画目标路由到漫画处理器() throws Exception {
+        ManagementCommandRequestedEvent cmd = new ManagementCommandRequestedEvent(
+                UUID.randomUUID(), Instant.now(), 1, 1L, 1L, 1,
+                "LQ_REGENERATE", "COMIC", 42L);
+
+        dispatcher.handle(cmd, channel, 1L);
+
+        verify(lqCommandHandler).generateComic(cmd);
+        verify(lqCommandHandler, never()).generateChapter(any());
+        verify(publisher, never()).failed(eq(cmd), anyString());
     }
 }

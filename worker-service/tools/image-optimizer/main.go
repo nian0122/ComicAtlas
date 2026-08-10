@@ -16,7 +16,7 @@ import (
 
 const (
 	defaultQuality    = 15
-	defaultExtensions = ".jpg,.jpeg,.png,.webp,.gif"
+	defaultExtensions = ".jpg,.jpeg,.png,.webp,.gif,.bmp"
 )
 
 // CLIConfig 命令行配置
@@ -35,13 +35,17 @@ type CLIConfig struct {
 }
 
 // PageResult 单页处理结果
+// SourceRelPath/TargetRelPath 为规范化（正斜杠）相对路径，供 Java Worker 精确映射 mediaId，
+// Java 侧不使用 PageNumber 推断媒体身份。
 type PageResult struct {
-	PageNumber int64   `json:"pageNumber"`
-	Status     string  `json:"status"`                // processed, skipped, failed
-	InputSize  int64   `json:"inputSize,omitempty"`   // bytes
-	OutputSize int64   `json:"outputSize,omitempty"`  // bytes
-	Ratio      float64 `json:"ratio,omitempty"`       // output/input * 100
-	Reason     string  `json:"reason,omitempty"`      // 失败/跳过原因
+	PageNumber   int64   `json:"pageNumber"`
+	Status       string  `json:"status"`                              // processed, skipped, failed
+	SourceRelPath string `json:"sourceRelPath,omitempty"`             // 源文件相对扫描根（正斜杠）
+	TargetRelPath string `json:"targetRelPath,omitempty"`             // 产物相对输出根（正斜杠）
+	InputSize    int64   `json:"inputSize,omitempty"`                 // bytes
+	OutputSize   int64   `json:"outputSize,omitempty"`                // 产物真实字节数
+	Ratio        float64 `json:"ratio,omitempty"`                     // output/input * 100
+	Reason       string  `json:"reason,omitempty"`                    // 失败/跳过原因
 }
 
 // RunResult 整章运行结果
@@ -183,6 +187,8 @@ func run(cfg *CLIConfig) *RunResult {
 		baseName := strings.TrimSuffix(filepath.Base(relPath), filepath.Ext(relPath))
 		pageNum := inferPageNumber(baseName)
 		lqPath := filepath.Join(cfg.OutputDir, filepath.Dir(relPath), baseName+".webp")
+		sourceRel := filepath.ToSlash(relPath)
+		targetRel := filepath.ToSlash(filepath.Join(filepath.Dir(relPath), baseName+".webp"))
 
 		atomic.AddInt32(&result.Total, 1)
 
@@ -195,9 +201,11 @@ func run(cfg *CLIConfig) *RunResult {
 					}
 					result.mu.Lock()
 					result.Pages = append(result.Pages, PageResult{
-						PageNumber: pageNum,
-						Status:     "skipped",
-						Reason:     "exists",
+						PageNumber:   pageNum,
+						Status:       "skipped",
+						SourceRelPath: sourceRel,
+						TargetRelPath: targetRel,
+						Reason:       "exists",
 					})
 					result.mu.Unlock()
 					return nil
@@ -206,10 +214,12 @@ func run(cfg *CLIConfig) *RunResult {
 		}
 
 		tasks <- imageTask{
-			HQPath:       path,
-			LQPath:       lqPath,
-			RelativePath: relPath,
-			PageNumber:   pageNum,
+			HQPath:        path,
+			LQPath:        lqPath,
+			RelativePath:  relPath,
+			SourceRelPath: sourceRel,
+			TargetRelPath: targetRel,
+			PageNumber:    pageNum,
 		}
 		return nil
 	})
@@ -220,17 +230,23 @@ func run(cfg *CLIConfig) *RunResult {
 }
 
 type imageTask struct {
-	HQPath       string
-	LQPath       string
-	RelativePath string
-	PageNumber   int64
+	HQPath        string
+	LQPath        string
+	RelativePath  string
+	SourceRelPath string
+	TargetRelPath string
+	PageNumber    int64
 }
 
 func worker(id int, tasks <-chan imageTask, wg *sync.WaitGroup, cfg *CLIConfig, result *RunResult) {
 	defer wg.Done()
 	for task := range tasks {
 		optResult, err := optimizeImageToWebP(task.HQPath, task.LQPath, cfg.Quality)
-		page := PageResult{PageNumber: task.PageNumber}
+		page := PageResult{
+			PageNumber:    task.PageNumber,
+			SourceRelPath: task.SourceRelPath,
+			TargetRelPath: task.TargetRelPath,
+		}
 		if err != nil {
 			atomic.AddInt32(&result.Failed, 1)
 			page.Status = "failed"
