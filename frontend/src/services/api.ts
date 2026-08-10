@@ -10,7 +10,8 @@ import type {
   ChapterManagementRequest,
   ChapterManagementVO,
   ComicDetailVO,
-  ComicMetadataUpdateDTO,
+  ComicListQuery,
+  ComicListVO,
   CreateManagementTaskRequest,
   CreateUploadSessionRequest,
   CreateUploadSessionResult,
@@ -28,11 +29,12 @@ import type {
   MediaReorderResult,
   OperationSubmitResult,
   OutboxStats,
+  PageResult,
   ReconcileResult,
   TagCreateDTO,
-  ComicTagUpdateDTO,
   BatchComicUpdateDTO,
   TrashPurgeRequest,
+  UpdateComicRequest,
   UploadChunkResult,
   UploadCompleteResult,
   UploadSessionStatus,
@@ -40,27 +42,48 @@ import type {
 
 const api = axios.create({ baseURL: '/api' })
 
+/** 业务包装响应（HTTP 200 + code/message/data） */
+interface WrappedResponse<T> {
+  code: number
+  message: string
+  data: T
+}
+
 api.interceptors.response.use(
   (response) => {
     const data = response.data
     if (data && typeof data === 'object' && 'code' in data && 'data' in data) {
-      response.data = data.data
+      const wrapped = data as WrappedResponse<unknown>
+      if (wrapped.code !== 200) {
+        // 业务非 200：在解包前 reject，保留 code/message/response 供调用方区分（如 409 冲突）
+        return Promise.reject(buildBusinessError(wrapped, response))
+      }
+      response.data = wrapped.data
     }
     return response
   },
   (error) => Promise.reject(error)
 )
 
+/** 构造保留 code/message/response 的业务错误，供调用方按业务码分支处理。 */
+function buildBusinessError(wrapped: WrappedResponse<unknown>, response: unknown): Error & {
+  code?: number
+  response?: unknown
+} {
+  const err = new Error(wrapped.message || `业务错误 ${wrapped.code}`) as Error & {
+    code?: number
+    response?: unknown
+  }
+  err.code = wrapped.code
+  err.response = response
+  return err
+}
+
 export const comicApi = {
-  list: (params: any) => api.get('/comics', { params }),
+  list: (params: ComicListQuery) => api.get<PageResult<ComicListVO>>('/comics', { params }),
   detail: (id: number) => api.get<ComicDetailVO>(`/comics/${id}`),
+  update: (id: number, data: UpdateComicRequest) => api.put<ComicDetailVO>(`/comics/${id}`, data),
   delete: (id: number) => api.delete(`/comics/${id}`),
-  getMetadata: (id: number) => api.get(`/comics/${id}/metadata`),
-  updateMetadata: (id: number, data: ComicMetadataUpdateDTO) =>
-    api.put(`/comics/${id}/metadata`, data),
-  getTags: (id: number) => api.get(`/comics/${id}/tags`),
-  updateTags: (id: number, data: ComicTagUpdateDTO) =>
-    api.put(`/comics/${id}/tags`, data),
   /** 批量更新漫画分类和标签 */
   batchUpdate: (data: BatchComicUpdateDTO) =>
     api.post('/comics/batch/update', data),

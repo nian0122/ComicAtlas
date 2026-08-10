@@ -18,6 +18,7 @@
           ref="formRef"
           :model="form"
           :rules="rules"
+          :disabled="!editable"
           label-position="top"
           class="edit-form"
         >
@@ -25,6 +26,15 @@
             <el-input
               v-model="form.title"
               placeholder="输入漫画标题"
+              maxlength="255"
+              show-word-limit
+            />
+          </el-form-item>
+
+          <el-form-item label="日文标题" prop="titleJpn">
+            <el-input
+              v-model="form.titleJpn"
+              placeholder="输入日文原标题（可选）"
               maxlength="255"
               show-word-limit
             />
@@ -55,6 +65,12 @@
               <span v-if="sourceType" class="source-tag">{{ sourceType }}</span>
               <span v-if="sourceRef" class="source-ref">{{ sourceRef }}</span>
               <span v-if="!sourceType && !sourceRef" class="source-empty">—</span>
+            </div>
+          </el-form-item>
+
+          <el-form-item label="状态" prop="status">
+            <div class="source-display">
+              <span v-if="statusLabel" class="source-tag">{{ statusLabel }}</span>
             </div>
           </el-form-item>
 
@@ -109,7 +125,7 @@
 
           <div class="form-actions">
             <el-button @click="goBack">取消</el-button>
-            <el-button type="primary" :loading="saving" @click="handleSave">
+            <el-button type="primary" :loading="saving" :disabled="!editable" @click="handleSave">
               保存
             </el-button>
           </div>
@@ -128,12 +144,10 @@ import { ArrowLeft } from '@element-plus/icons-vue'
 import { comicApi, tagApi } from '@/services/management'
 import { useCategoryStore } from '@/stores/management/category'
 import type {
-  ComicMetadataDTO,
-  ComicMetadataUpdateDTO,
   ComicDetailVO,
   TagDTO,
   TagCreateDTO,
-  ComicTagUpdateDTO,
+  UpdateComicRequest,
 } from '@/types'
 
 const route = useRoute()
@@ -144,12 +158,16 @@ const comicId = Number(route.params.id)
 const formRef = ref()
 const loading = ref(false)
 const saving = ref(false)
+const editable = ref(true)
 
-const form = ref<ComicMetadataUpdateDTO>({
+const form = ref<UpdateComicRequest>({
+  version: 0,
   title: '',
+  titleJpn: '',
   author: '',
   description: '',
   categoryId: null,
+  tagIds: [],
 })
 
 const selectedTagIds = ref<number[]>([])
@@ -159,6 +177,7 @@ const newTagName = ref('')
 
 const sourceType = ref('')
 const sourceRef = ref('')
+const statusLabel = ref('')
 
 const selectedTags = computed<TagDTO[]>(() => {
   return selectedTagIds.value
@@ -188,34 +207,39 @@ async function loadData() {
   }
   loading.value = true
   try {
-    const [metadataRes, tagsRes, allTagsRes] = await Promise.all([
-      comicApi.getMetadata(comicId),
-      comicApi.getTags(comicId),
+    const [detailRes, allTagsRes] = await Promise.all([
+      comicApi.detail(comicId),
       tagApi.list(),
       categoryStore.fetchList(),
     ])
-    const metadata = metadataRes.data as ComicMetadataDTO
+    const detail = detailRes.data as ComicDetailVO
     form.value = {
-      title: metadata.title || '',
-      author: metadata.author || '',
-      description: metadata.description || '',
-      categoryId: metadata.categoryId ?? null,
+      version: detail.version ?? 0,
+      title: detail.title || '',
+      titleJpn: detail.titleJpn || '',
+      author: detail.author || '',
+      description: detail.description || '',
+      categoryId: detail.categoryId ?? null,
+      tagIds: (detail.tags || []).map((t) => t.id),
     }
-    selectedTagIds.value = (tagsRes.data as number[]) || []
+    selectedTagIds.value = (detail.tags || []).map((t) => t.id)
     allTags.value = (allTagsRes.data as TagDTO[]) || []
-    try {
-      const detailRes = await comicApi.detail(comicId)
-      const detail = detailRes.data as ComicDetailVO
-      sourceType.value = detail.sourceType || ''
-      sourceRef.value = detail.sourceRef || ''
-    } catch { /* non-critical */ }
+    sourceType.value = detail.sourceType || ''
+    sourceRef.value = detail.sourceRef || ''
+    statusLabel.value = detail.status || ''
+    editable.value = detail.status === 'DRAFT' || detail.status === 'READY'
   } catch (err: unknown) {
-    const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+    const msg = extractErrorMessage(err)
     ElMessage.error(msg || '加载漫画信息失败')
     router.push('/manage/comics')
   } finally {
     loading.value = false
   }
+}
+
+function extractErrorMessage(err: unknown): string | undefined {
+  const e = err as { message?: string; response?: { data?: { message?: string } } }
+  return e?.response?.data?.message || e?.message
 }
 
 function removeTag(id: number) {
@@ -246,7 +270,7 @@ async function onCreateTag() {
       allTags.value.push(newTag)
       selectedTagIds.value.push(newTag.id)
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      const msg = extractErrorMessage(err)
       ElMessage.error(msg || '创建标签失败')
       return
     }
@@ -262,20 +286,27 @@ async function handleSave() {
 
   saving.value = true
   try {
-    await Promise.all([
-      comicApi.updateMetadata(comicId, {
-        title: form.value.title.trim(),
-        author: form.value.author?.trim() || '',
-        description: form.value.description?.trim() || '',
-        categoryId: form.value.categoryId,
-      }),
-      comicApi.updateTags(comicId, { tagIds: selectedTagIds.value } as ComicTagUpdateDTO),
-    ])
+    const res = await comicApi.update(comicId, {
+      version: form.value.version,
+      title: form.value.title.trim(),
+      titleJpn: form.value.titleJpn?.trim() || null,
+      author: form.value.author?.trim() || null,
+      description: form.value.description?.trim() || null,
+      categoryId: form.value.categoryId,
+      tagIds: selectedTagIds.value,
+    })
+    const updated = res.data as ComicDetailVO
+    form.value.version = updated.version ?? form.value.version
     ElMessage.success('保存成功')
     router.push('/manage/comics')
   } catch (err: unknown) {
-    const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-    ElMessage.error(msg || '保存失败')
+    const e = err as { code?: number; message?: string }
+    if (e.code === 409) {
+      ElMessage.warning('数据已被修改，已重新加载最新内容')
+      await loadData()
+    } else {
+      ElMessage.error(e.message || extractErrorMessage(err) || '保存失败')
+    }
   } finally {
     saving.value = false
   }

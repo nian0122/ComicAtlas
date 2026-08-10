@@ -49,6 +49,7 @@ export interface ComicDetailVO {
   categoryId: number | null
   categoryName: string | null
   status: string
+  version: number
   progressPercent: number
   lastReadChapterId: number
   lastReadPage: number
@@ -66,6 +67,7 @@ export interface ChapterVO {
 }
 
 export interface TagRef {
+  id: number
   name: string
   type: string
 }
@@ -130,6 +132,14 @@ export interface ChapterPageVO {
   total: number
   prevChapterId: number | null
   nextChapterId: number | null
+}
+
+/** 后端 IPage 分页响应结构 */
+export interface PageResult<T> {
+  records: T[]
+  total: number
+  current: number
+  size: number
 }
 
 export interface ImportTaskVO {
@@ -267,11 +277,15 @@ export interface ComicMetadataDTO {
   categoryId?: number | null
 }
 
-export interface ComicMetadataUpdateDTO {
+/** 漫画信息一次全量保存请求（version/title/tagIds 必填，与后端 UpdateComicRequest 对齐） */
+export interface UpdateComicRequest {
+  version: number
   title: string
-  author?: string
-  description?: string
+  titleJpn?: string | null
+  author?: string | null
+  description?: string | null
   categoryId?: number | null
+  tagIds: number[]
 }
 
 export interface TagDTO {
@@ -281,10 +295,6 @@ export interface TagDTO {
 
 export interface TagCreateDTO {
   name: string
-}
-
-export interface ComicTagUpdateDTO {
-  tagIds: number[]
 }
 
 /** 批量更新漫画分类和标签 */
