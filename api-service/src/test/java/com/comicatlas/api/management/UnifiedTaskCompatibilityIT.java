@@ -30,6 +30,7 @@ import com.comicatlas.api.importer.service.RecoveryTaskService;
 import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
 import com.comicatlas.api.management.entity.ManagementTask;
+import com.comicatlas.api.management.entity.ManagementTaskItem;
 import com.comicatlas.api.management.mapper.ManagementTaskItemMapper;
 import com.comicatlas.api.management.mapper.ManagementTaskMapper;
 import com.comicatlas.api.management.service.LegacyTaskBackfillService;
@@ -285,6 +286,39 @@ class UnifiedTaskCompatibilityIT {
                 .andExpect(jsonPath("$.data.total").value(org.hamcrest.Matchers.greaterThanOrEqualTo(1)))
                 .andExpect(jsonPath("$.data.records[*].taskType").value(org.hamcrest.Matchers.everyItem(
                         org.hamcrest.Matchers.is("EXPORT"))));
+    }
+
+    @Test
+    @DisplayName("EXPORT 失败任务重试：专表回到 PENDING 并重新发布导出命令到 Outbox")
+    void exportTask_retry_republishesExportCommand() {
+        Comic comic = insertReadyComic("导出漫画重试I");
+        var export = exportService.createExportTask(comic.getId());
+        ExportTask et = exportTaskMapper.selectById(export.getId());
+        Long mgmtTaskId = et.getManagementTaskId();
+        assertThat(mgmtTaskId).isNotNull();
+
+        // 模拟导出失败：item 标记 FAILED（与 ExportFailedHandler 行为一致）
+        ManagementTaskItem activeItem = managementTaskService.findActiveItem(
+                "COMIC", comic.getId(), TaskType.EXPORT);
+        assertThat(activeItem).isNotNull();
+        managementTaskService.updateItemStatus(activeItem.getId(), ManagementTaskStatus.FAILED,
+                "模拟导出失败", "EXPORT_TASK", et.getId());
+
+        ManagementTaskResponse failed = managementTaskService.getTask(mgmtTaskId);
+        assertThat(failed.getStatus()).isEqualTo(ManagementTaskStatus.FAILED);
+
+        ManagementTaskResponse retried = managementTaskService.retryTask(mgmtTaskId);
+        assertThat(retried.getAttempt()).isEqualTo(2);
+        assertThat(retried.getStatus()).isEqualTo(ManagementTaskStatus.QUEUED);
+
+        ExportTask after = exportTaskMapper.selectById(et.getId());
+        assertThat(after.getStatus()).isEqualTo(ExportTaskStatus.PENDING);
+
+        Long commandCount = outboxMessageMapper.selectCount(
+                new LambdaQueryWrapper<OutboxMessage>()
+                        .eq(OutboxMessage::getEventType, "ExportTaskCreatedEvent")
+                        .eq(OutboxMessage::getRoutingKey, "task.created"));
+        assertThat(commandCount).isGreaterThanOrEqualTo(1);
     }
 
     @Test

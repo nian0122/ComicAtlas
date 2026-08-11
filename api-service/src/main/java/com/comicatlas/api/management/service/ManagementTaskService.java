@@ -6,10 +6,13 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.common.enums.ComicStatus;
+import com.comicatlas.api.common.enums.ExportTaskStatus;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.common.exception.ConflictException;
 import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.mapper.ComicMapper;
+import com.comicatlas.api.export.entity.ExportTask;
+import com.comicatlas.api.export.mapper.ExportTaskMapper;
 import com.comicatlas.api.management.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
@@ -22,6 +25,7 @@ import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.api.common.enums.ManagementTaskStatus;
 import com.comicatlas.api.common.enums.TaskStage;
 import com.comicatlas.api.common.enums.TaskType;
+import com.comicatlas.common.event.ExportTaskCreatedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -51,6 +55,7 @@ public class ManagementTaskService {
     private final ManagementTaskMapper taskMapper;
     private final ManagementTaskItemMapper itemMapper;
     private final ComicMapper comicMapper;
+    private final ExportTaskMapper exportTaskMapper;
     private final com.comicatlas.api.outbox.service.OutboxService outboxService;
 
     // ======================== 创建任务 ========================
@@ -384,6 +389,8 @@ public class ManagementTaskService {
 
                 // 重新发布管理命令到 Outbox，Worker 按新 attempt 重新执行
                 republishCommand(taskId, item, newAttempt);
+                // EXPORT 走独立导出链路（export.task.queue），单独重新入队
+                republishExportCommand(taskId, item, newAttempt);
             }
         }
 
@@ -414,6 +421,38 @@ public class ManagementTaskService {
                 taskId, item.getId(), newAttempt);
         log.info("重试已重新发布命令: taskId={}, itemId={}, attempt={}, op={}, target={}:{}, manifestTaskId={}",
                 taskId, item.getId(), newAttempt, operation.name(), item.getTargetType(), item.getTargetId(), manifestTaskId);
+    }
+
+    /**
+     * EXPORT 任务重试：重置导出专表为 PENDING 并重新发布 ExportTaskCreatedEvent。
+     * <p>
+     * 导出走独立链路（export.task.queue），不经 ManagementCommandDispatcher，
+     * 重试时必须主动重新入队，否则 item 重置为 QUEUED 后 Worker 永远不会收到命令而卡死。
+     */
+    private void republishExportCommand(Long taskId, ManagementTaskItem item, int newAttempt) {
+        if (item.getOperationType() != TaskType.EXPORT) {
+            return;
+        }
+        ExportTask exportTask = exportTaskMapper.selectOne(new LambdaQueryWrapper<ExportTask>()
+                .eq(ExportTask::getManagementTaskId, taskId));
+        if (exportTask == null) {
+            log.warn("导出专表不存在，跳过导出重试入队: taskId={}, itemId={}", taskId, item.getId());
+            return;
+        }
+        exportTaskMapper.update(null, new LambdaUpdateWrapper<ExportTask>()
+                .eq(ExportTask::getId, exportTask.getId())
+                .set(ExportTask::getStatus, ExportTaskStatus.PENDING)
+                .set(ExportTask::getProgress, 0)
+                .set(ExportTask::getErrorMsg, null)
+                .set(ExportTask::getCompletedAt, null));
+
+        var event = new ExportTaskCreatedEvent(
+                java.util.UUID.randomUUID(), java.time.Instant.now(),
+                exportTask.getId(), exportTask.getComicId());
+        outboxService.enqueue(event, MqExchanges.EXPORT, MqRoutingKeys.TASK_CREATED,
+                taskId, item.getId(), newAttempt);
+        log.info("导出任务重试已重新入队: taskId={}, itemId={}, attempt={}, exportTaskId={}, comicId={}",
+                taskId, item.getId(), newAttempt, exportTask.getId(), exportTask.getComicId());
     }
 
     /** 统一命令管线操作类型集合。 */
