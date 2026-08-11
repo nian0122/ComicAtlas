@@ -9,6 +9,8 @@ export interface FilterState {
   hqStatus: HqStatusFilter
   lqStatus: LqStatusFilter
   keyword: string
+  category: string
+  tag: string
 }
 
 export interface SortState {
@@ -30,6 +32,8 @@ export function useStorageFilter(
     hqStatus: 'ALL',
     lqStatus: 'ALL',
     keyword: '',
+    category: '',
+    tag: '',
   })
 
   const sort = ref<SortState>({
@@ -41,7 +45,7 @@ export function useStorageFilter(
   const pageSize = ref(20)
 
   watch(
-    [() => filter.value.hqStatus, () => filter.value.lqStatus, () => filter.value.keyword],
+    [() => filter.value.hqStatus, () => filter.value.lqStatus, () => filter.value.keyword, () => filter.value.category, () => filter.value.tag],
     () => {
       page.value = 1
     },
@@ -73,6 +77,8 @@ export function useStorageFilter(
       sort: sort.value.field,
       order: sort.value.order,
       keyword: filter.value.keyword || undefined,
+      category: filter.value.category || undefined,
+      tag: filter.value.tag || undefined,
     }
   }
 

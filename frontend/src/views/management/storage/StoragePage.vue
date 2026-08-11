@@ -51,7 +51,7 @@ function reload() {
 }
 
 watch(
-  [() => filterState.value.hqStatus, () => filterState.value.lqStatus, () => filterState.value.keyword, sortState, page, pageSize],
+  [() => filterState.value.hqStatus, () => filterState.value.lqStatus, () => filterState.value.keyword, () => filterState.value.category, () => filterState.value.tag, sortState, page, pageSize],
   reload,
 )
 

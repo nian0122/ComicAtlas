@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElSelect, ElOption, ElInput, ElButton } from 'element-plus'
 import type { FilterState, SortState } from '@/composables/storage/useStorageFilter'
+import { useCategoryStore } from '@/stores/management/category'
+import { useTagStore } from '@/stores/tag-store'
 
 const props = defineProps<{
   filter: FilterState
@@ -19,7 +21,9 @@ const emit = defineEmits<{
 const hasActiveFilters = computed(() =>
   props.filter.hqStatus !== 'ALL' ||
   props.filter.lqStatus !== 'ALL' ||
-  props.filter.keyword.trim().length > 0,
+  props.filter.keyword.trim().length > 0 ||
+  props.filter.category.length > 0 ||
+  props.filter.tag.length > 0,
 )
 
 function goToTaskCenter() {
@@ -31,13 +35,17 @@ function setFilter(patch: Partial<FilterState>) {
 }
 
 function clearFilters() {
-  emit('update:filter', { hqStatus: 'ALL', lqStatus: 'ALL', keyword: '' })
+  emit('update:filter', { hqStatus: 'ALL', lqStatus: 'ALL', keyword: '', category: '', tag: '' })
 }
 
 const sortModel = computed({
   get: () => props.sort,
   set: (val) => emit('update:sort', val)
 })
+
+const categoryStore = useCategoryStore()
+const tagStore = useTagStore()
+onMounted(() => { void categoryStore.fetchList(); void tagStore.fetchList() })
 </script>
 
 <template>
@@ -62,6 +70,14 @@ const sortModel = computed({
           <el-option label="全部" value="ALL" />
           <el-option label="需要生成" value="NEEDS_LQ" />
           <el-option label="LQ 就绪" value="READY" />
+        </el-select>
+        <el-select :model-value="props.filter.category" @update:model-value="setFilter({ category: $event })" placeholder="分类" class="filter-select" clearable>
+          <el-option label="未分类" value="_NONE" />
+          <el-option v-for="category in categoryStore.list" :key="category.id" :label="category.name" :value="category.name" />
+        </el-select>
+        <el-select :model-value="props.filter.tag" @update:model-value="setFilter({ tag: $event })" placeholder="标签" class="filter-select" clearable>
+          <el-option label="无标签" value="_NONE" />
+          <el-option v-for="tag in tagStore.list" :key="tag.id" :label="tag.name" :value="tag.name" />
         </el-select>
         <el-select v-model="sortModel.field" placeholder="排序" class="filter-select">
           <el-option label="HQ 大小" value="hqSize" />
@@ -89,11 +105,10 @@ const sortModel = computed({
 .action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .action-btn.danger { color: var(--danger); border-color: var(--danger); }
 .action-btn.primary { color: var(--accent); border-color: var(--accent); }
-.filter-bar { display: flex; gap: var(--space-sm); margin-bottom: var(--space-base); flex-wrap: wrap; align-items: center; }
-.filter-select { width: 120px; }
-.filter-select--mini { width: 100px; }
-.filter-input { width: 180px; }
+.filter-bar { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-sm); margin-bottom: var(--space-base); align-items: center; }
+.filter-select, .filter-select--mini, .filter-input { width: 100%; min-width: 0; }
+.filter-input { grid-column: auto; }
 .filter-reset { padding-inline: 8px; color: var(--text-secondary); }
 .filter-reset:hover { color: var(--accent); background: var(--accent-bg); }
-@media (max-width: 768px) { .filter-bar { flex-direction: column; align-items: stretch; } .filter-select, .filter-select--mini, .filter-input { width: 100% !important; } }
+@media (max-width: 768px) { .filter-bar { display: flex; flex-direction: column; align-items: stretch; } .filter-select, .filter-select--mini, .filter-input { width: 100% !important; } }
 </style>

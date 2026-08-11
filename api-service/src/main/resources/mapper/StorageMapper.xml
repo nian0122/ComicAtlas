@@ -50,6 +50,18 @@
             <if test="query.keyword != null and query.keyword != ''">
                 AND c.title LIKE CONCAT('%', #{query.keyword}, '%')
             </if>
+            <if test="query.category != null and query.category != ''">
+                <choose>
+                    <when test="query.category == '_NONE'">AND c.category_id IS NULL</when>
+                    <otherwise>AND EXISTS (SELECT 1 FROM category cat WHERE cat.id = c.category_id AND cat.name = #{query.category})</otherwise>
+                </choose>
+            </if>
+            <if test="query.tag != null and query.tag != ''">
+                <choose>
+                    <when test="query.tag == '_NONE'">AND NOT EXISTS (SELECT 1 FROM comic_tag ct WHERE ct.comic_id = c.id)</when>
+                    <otherwise>AND EXISTS (SELECT 1 FROM comic_tag ct JOIN tag tg ON tg.id = ct.tag_id WHERE ct.comic_id = c.id AND tg.name = #{query.tag})</otherwise>
+                </choose>
+            </if>
             GROUP BY c.id
             <include refid="storageStatusHaving" />
         ) t
@@ -93,6 +105,18 @@
             WHERE c.deleted_at IS NULL
             <if test="query.keyword != null and query.keyword != ''">
                 AND c.title LIKE CONCAT('%', #{query.keyword}, '%')
+            </if>
+            <if test="query.category != null and query.category != ''">
+                <choose>
+                    <when test="query.category == '_NONE'">AND c.category_id IS NULL</when>
+                    <otherwise>AND EXISTS (SELECT 1 FROM category cat WHERE cat.id = c.category_id AND cat.name = #{query.category})</otherwise>
+                </choose>
+            </if>
+            <if test="query.tag != null and query.tag != ''">
+                <choose>
+                    <when test="query.tag == '_NONE'">AND NOT EXISTS (SELECT 1 FROM comic_tag ct WHERE ct.comic_id = c.id)</when>
+                    <otherwise>AND EXISTS (SELECT 1 FROM comic_tag ct JOIN tag tg ON tg.id = ct.tag_id WHERE ct.comic_id = c.id AND tg.name = #{query.tag})</otherwise>
+                </choose>
             </if>
             GROUP BY c.id
             <include refid="storageStatusHaving" />

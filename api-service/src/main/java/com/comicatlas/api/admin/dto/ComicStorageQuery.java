@@ -9,4 +9,6 @@ public class ComicStorageQuery {
     private String sort;
     private String order;
     private String keyword;
+    private String category;
+    private String tag;
 }

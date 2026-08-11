@@ -385,6 +385,8 @@ export interface ComicStorageQuery {
   sort?: 'totalSize' | 'hqSize' | 'lqSize' | 'title'
   order?: 'asc' | 'desc'
   keyword?: string
+  category?: string
+  tag?: string
 }
 
 /** 存储操作类型 */
