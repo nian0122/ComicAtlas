@@ -35,6 +35,7 @@ import com.comicatlas.worker.file.trash.TrashManifestStore;
 import com.comicatlas.worker.mapper.ExportMediaMapper;
 import com.comicatlas.worker.mapper.ExportUploadFileMapper;
 import com.comicatlas.worker.mapper.ExportUploadSessionMapper;
+import com.comicatlas.worker.mapper.TrashManifestReadMapper;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -1050,8 +1051,9 @@ class MediaUploadManagementIT {
         }
 
         @Bean
-        TrashManifestStore trashManifestStore(StorageProperties p, ObjectMapper om) {
-            return new TrashManifestStore(p, om);
+        TrashManifestStore trashManifestStore(StorageProperties p, ObjectMapper om,
+                                               TrashManifestReadMapper readMapper) {
+            return new TrashManifestStore(p, readMapper, om);
         }
 
         @Bean

@@ -13,6 +13,7 @@ import com.comicatlas.api.common.enums.LqStatus;
 import com.comicatlas.api.management.entity.ManagementTaskItem;
 import com.comicatlas.api.management.mapper.ManagementTaskItemMapper;
 import com.comicatlas.api.management.mapper.ManagementTaskMapper;
+import com.comicatlas.api.management.mapper.TrashManifestMapper;
 import com.comicatlas.api.reader.entity.ReadingHistory;
 import com.comicatlas.api.reader.mapper.ReadingHistoryMapper;
 import com.comicatlas.api.common.enums.ChapterLifecycleStatus;
@@ -26,6 +27,7 @@ import com.comicatlas.worker.command.RestoreCommandHandler;
 import com.comicatlas.worker.command.TrashCommandHandler;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.file.trash.TrashManifestStore;
+import com.comicatlas.worker.mapper.TrashManifestReadMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
@@ -77,6 +79,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("test")
 @Testcontainers(disabledWithoutDocker = true)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
+@org.mybatis.spring.annotation.MapperScan("com.comicatlas.worker.mapper")
 @DisplayName("回收站生命周期集成测试")
 class TrashLifecycleIT {
 
@@ -129,6 +132,8 @@ class TrashLifecycleIT {
     @Autowired
     ManagementTaskItemMapper itemMapper;
     @Autowired
+    TrashManifestMapper trashManifestMapper;
+    @Autowired
     ReadingHistoryMapper historyMapper;
     @Autowired
     TrashCommandHandler trashCommandHandler;
@@ -148,8 +153,9 @@ class TrashLifecycleIT {
         }
 
         @Bean
-        TrashManifestStore trashManifestStore(StorageProperties p, ObjectMapper om) {
-            return new TrashManifestStore(p, om);
+        TrashManifestStore trashManifestStore(StorageProperties p, ObjectMapper om,
+                                               TrashManifestReadMapper readMapper) {
+            return new TrashManifestStore(p, readMapper, om);
         }
 
         @Bean
@@ -183,6 +189,7 @@ class TrashLifecycleIT {
         if (mediaMapper != null) { mediaMapper.delete(new LambdaQueryWrapper<>()); }
         if (chapterMapper != null) { chapterMapper.delete(new LambdaQueryWrapper<>()); }
         if (comicMapper != null) { comicMapper.delete(new LambdaQueryWrapper<>()); }
+        if (trashManifestMapper != null) { trashManifestMapper.delete(new LambdaQueryWrapper<>()); }
         cleanDir(MANGA_ROOT.resolve("hq"));
         cleanDir(MANGA_ROOT.resolve("lq"));
         cleanDir(MANGA_ROOT.resolve("thumbs"));
@@ -215,8 +222,11 @@ class TrashLifecycleIT {
         assertThat(trashed.getPageNumber()).isEqualTo(-mediaId.intValue());
         assertThat(Files.exists(MANGA_ROOT.resolve("hq").resolve(hqPath))).isFalse();
         assertThat(Files.exists(MANGA_ROOT.resolve("trash").resolve("media/" + mediaId + "/" + trashTaskId + "/hq/" + hqPath))).isTrue();
-        // 清单与磁盘一致
-        assertThat(Files.exists(MANGA_ROOT.resolve("trash").resolve("media/" + mediaId + "/" + trashTaskId + "/manifest.json"))).isTrue();
+        // 清单与磁盘一致（manifest 存 DB）
+        TrashManifestRecord manifestRecord = trashManifestMapper.selectById(trashTaskId);
+        assertThat(manifestRecord).isNotNull();
+        assertThat(objectMapper.readTree(manifestRecord.getManifestJson()).path("targetType").asText()).isEqualTo("MEDIA");
+        assertThat(objectMapper.readTree(manifestRecord.getManifestJson()).path("targetId").asLong()).isEqualTo(mediaId);
         // 阅读面隐藏：READY 过滤器排除 TRASHED
         assertThat(listMediaPages(chapterId).stream().anyMatch(m -> m.getId().equals(mediaId))).isFalse();
 
@@ -329,7 +339,11 @@ class TrashLifecycleIT {
         assertThat(Files.exists(MANGA_ROOT.resolve("trash").resolve("chapter/" + chapterId + "/" + trashTaskId + "/hq/" + rel + "/001.jpg"))).isTrue();
         assertThat(Files.exists(MANGA_ROOT.resolve("trash").resolve("chapter/" + chapterId + "/" + trashTaskId + "/lq/" + rel + "/001.webp"))).isTrue();
         // 阅读面隐藏
-        assertThat(Files.exists(MANGA_ROOT.resolve("trash").resolve("chapter/" + chapterId + "/" + trashTaskId + "/manifest.json"))).isTrue();
+        // 清单与磁盘一致（manifest 存 DB）
+        TrashManifestRecord chapterManifest = trashManifestMapper.selectById(trashTaskId);
+        assertThat(chapterManifest).isNotNull();
+        assertThat(objectMapper.readTree(chapterManifest.getManifestJson()).path("targetType").asText()).isEqualTo("CHAPTER");
+        assertThat(objectMapper.readTree(chapterManifest.getManifestJson()).path("targetId").asLong()).isEqualTo(chapterId);
         assertThat(catalogChapterIds(comicId)).doesNotContain(chapterId);
 
         // 恢复
