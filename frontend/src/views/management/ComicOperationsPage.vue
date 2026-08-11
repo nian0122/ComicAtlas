@@ -84,6 +84,7 @@ import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { adminApi, comicApi, exportApi, hqApi, mediaOperationApi, outboxApi, trashApi } from '@/services/api'
+import { storageService } from '@/services/storage'
 import { lqOperationApi, trackedTaskApi } from '@/services/management-capabilities'
 import ComicStatusTag from '@/components/management/ComicStatusTag.vue'
 import { comicStatusMeta } from '@/utils/comic-status'
@@ -122,7 +123,7 @@ async function runAction(label: string, action: () => Promise<unknown>): Promise
 function generateLq(regenerate: boolean): void { void runAction(regenerate ? '重新生成 LQ' : '生成 LQ', () => lqOperationApi.generateComic(comicId.value, regenerate)) }
 function deleteHq(): void { void runAction('删除 HQ', () => hqApi.deleteComic(comicId.value)) }
 function transcode(): void { void runAction('视频转码', () => adminApi.transcodeVideos(comicId.value)) }
-function refreshMetadata(): void { void runAction('刷新元数据', () => adminApi.refreshMetadata(comicId.value)) }
+function refreshMetadata(): void { void runAction('刷新元数据', () => storageService.requestMetadataRefresh(comicId.value)) }
 function createExport(): void { void runAction('导出', () => exportApi.createExport(comicId.value)) }
 async function trashComic(): Promise<void> { await ElMessageBox.confirm('漫画将移入回收站，可在保留期内恢复。', '确认回收', { type: 'warning' }); await runAction('回收漫画', () => comicApi.delete(comicId.value)) }
 function restoreComic(): void { void runAction('恢复漫画', () => trashApi.restoreComic(comicId.value)) }
