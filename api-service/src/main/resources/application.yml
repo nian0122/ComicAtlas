@@ -1,6 +1,12 @@
 server:
   port: 8010
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
 spring:
   application:
     name: comic-api-service
