@@ -43,6 +43,7 @@ import ProgressiveImage from './ProgressiveImage.vue'
 import VideoPlayer from './VideoPlayer.vue'
 import type { MediaItemInfo } from '@/types'
 import { DEFAULT_ASPECT_RATIO } from '@/types'
+import { isVideoMedia } from '@/utils/media-type'
 
 interface Props {
   item: MediaItemInfo
@@ -64,7 +65,7 @@ const aspectRatio = computed(() => {
   }
   return DEFAULT_ASPECT_RATIO
 })
-const isVideo = computed(() => page.value.mediaType === 'VIDEO')
+const isVideo = computed(() => isVideoMedia(page.value))
 
 /*
  * 用明确的像素高度（= scroller 的 size 字段）替代 CSS aspect-ratio 控制

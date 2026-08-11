@@ -39,7 +39,6 @@ async function openPagedReader(page: Page): Promise<void> {
               lqStatus: 'NOT_GENERATED',
               width: 640,
               height: 360,
-              mediaType: 'VIDEO',
             },
             {
               id: 102,

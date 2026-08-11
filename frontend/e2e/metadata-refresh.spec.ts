@@ -64,10 +64,31 @@ test('章节存储按目录树展示并支持逐级展开', async ({ page }) => 
   expect(visibleRows.findIndex((row) => row.includes('第一部'))).toBeLessThan(visibleRows.findIndex((row) => row.includes('全局顺序章节')))
   await page.locator('.el-table__expand-icon').nth(1).click()
   await expect(page.getByRole('cell', { name: '启程' })).toBeVisible()
+  await page.screenshot({ path: 'test-results/storage-directory-summary.png', fullPage: false })
   await page.getByPlaceholder('搜索章节').fill('全局顺序章节')
   await expect(page.getByRole('cell', { name: '第一卷' })).toBeVisible()
   await expect(page.getByRole('cell', { name: '全局顺序章节' })).toBeVisible()
   await expect(page.getByRole('cell', { name: '第一部' })).toBeHidden()
+})
+
+test('纯视频章节显示真实 HQ 大小且 LQ 标记为不适用', async ({ page }) => {
+  await page.unroute(`**/api/admin/storage/comics/${COMIC_ID}`)
+  await page.route(`**/api/admin/storage/comics/${COMIC_ID}`, (route) =>
+    json(route, comicStorageItem({ mediaType: 'VIDEO', hqSize: 1024 * 1024 * 3, lqSize: 0, pageCount: 100 }))
+  )
+  await page.unroute(`**/api/admin/storage/comics/${COMIC_ID}/chapters`)
+  await page.route(`**/api/admin/storage/comics/${COMIC_ID}/chapters`, (route) =>
+    json(route, [chapterStorageItem({ title: '视频', mediaType: 'VIDEO', hqSize: 1024 * 1024 * 3, lqSize: 0, pageCount: 100 })])
+  )
+
+  await page.goto(`/manage/storage/${COMIC_ID}?force-desktop=1`)
+  const videoRow = page.locator('.el-table__body-wrapper tbody tr').filter({ hasText: '视频' })
+  await expect(videoRow).toContainText('3.0 MB')
+  await expect(videoRow).toContainText('不适用')
+  await expect(videoRow.getByRole('button', { name: '生LQ' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '生成 LQ' })).toHaveCount(0)
+  await videoRow.scrollIntoViewIfNeeded()
+  await page.screenshot({ path: 'test-results/pure-video-storage.png', fullPage: false })
 })
 
 test('READY 状态下提交元数据刷新：单次 POST 并展示任务编号', async ({ page }) => {
@@ -86,8 +107,8 @@ test('READY 状态下提交元数据刷新：单次 POST 并展示任务编号',
   await expect(page.getByRole('button', { name: '前往任务中心' })).toBeVisible()
   expect(refreshPostCount).toBe(1)
 
-  await page.getByRole('dialog', { name: '刷新已提交' }).getByLabel('Close this dialog').click()
-  await expect(page.getByRole('button', { name: '已提交' })).toBeDisabled()
+  await page.getByRole('dialog', { name: '刷新已提交' }).getByRole('button', { name: '前往任务中心' }).click()
+  await expect(page).toHaveURL(/\/manage\/tasks$/)
 })
 
 test('服务端拒绝（409）时展示后端 message 且页面数据不变', async ({ page }) => {
@@ -135,7 +156,7 @@ async function handleRefresh(route: Route) {
   })
 }
 
-function comicStorageItem() {
+function comicStorageItem(overrides: Record<string, unknown> = {}) {
   return {
     comicId: COMIC_ID,
     title: '测试漫画',
@@ -148,10 +169,12 @@ function comicStorageItem() {
     transcodeStatus: 'NOT_NEEDED',
     chapterCount: 0,
     pageCount: 0,
+    mediaType: 'IMAGE',
+    ...overrides,
   }
 }
 
-function chapterStorageItem(overrides: Partial<{ chapterId: number; chapterNo: string; title: string; pageCount: number }> = {}) {
+function chapterStorageItem(overrides: Partial<{ chapterId: number; chapterNo: string; title: string; pageCount: number; mediaType: string; hqSize: number; lqSize: number }> = {}) {
   return {
     chapterId: 11,
     chapterNo: '1',
@@ -161,6 +184,7 @@ function chapterStorageItem(overrides: Partial<{ chapterId: number; chapterNo: s
     lqSize: 0,
     hqStatus: 'READY',
     lqStatus: 'NOT_GENERATED',
+    mediaType: 'IMAGE',
     ...overrides,
   }
 }

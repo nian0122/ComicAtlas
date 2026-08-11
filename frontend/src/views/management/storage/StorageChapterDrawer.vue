@@ -85,12 +85,13 @@ function onDrawerSelectionChange(rows: ChapterStorageItem[]) {
         <template #default="{ row }">{{ formatSize(row.hqSize) }}</template>
       </el-table-column>
       <el-table-column label="LQ" width="80" align="right">
-        <template #default="{ row }">{{ formatSize(row.lqSize) }}</template>
+        <template #default="{ row }">{{ row.mediaType === 'VIDEO' ? '不适用' : formatSize(row.lqSize) }}</template>
       </el-table-column>
       <el-table-column label="状态" width="160">
         <template #default="{ row }">
           <StorageStatusTag :status="row.hqStatus" type="hq" />
-          <StorageStatusTag :status="row.lqStatus" type="lq" />
+          <StorageStatusTag v-if="row.mediaType !== 'VIDEO'" :status="row.lqStatus" type="lq" />
+          <span v-else class="not-applicable">不适用</span>
         </template>
       </el-table-column>
       <el-table-column label="操作" width="140">
@@ -105,7 +106,7 @@ function onDrawerSelectionChange(rows: ChapterStorageItem[]) {
             删HQ
           </el-button>
           <el-button
-            v-if="row.lqStatus === 'NOT_GENERATED' || row.lqStatus === 'MIXED'"
+            v-if="row.mediaType !== 'VIDEO' && (row.lqStatus === 'NOT_GENERATED' || row.lqStatus === 'MIXED')"
             type="primary"
             size="small"
             :disabled="busyState[comicId!]"
@@ -162,5 +163,10 @@ function onDrawerSelectionChange(rows: ChapterStorageItem[]) {
   padding: var(--space-base) 0;
   border-top: 1px solid var(--border);
   margin-top: var(--space-base);
+}
+
+.not-applicable {
+  color: var(--text-muted);
+  font-size: 12px;
 }
 </style>

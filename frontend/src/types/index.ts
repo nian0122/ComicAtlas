@@ -350,6 +350,7 @@ export interface ComicStorageItem {
   lqSize: number
   hqStatus: HqStatus
   lqStatus: LqStatus
+  mediaType: 'IMAGE' | 'VIDEO' | 'MIXED'
   transcodeStatus: 'NOT_NEEDED' | 'PENDING' | 'PROCESSING' | 'DONE' | 'FAILED'
   chapterCount: number
   pageCount: number
@@ -365,6 +366,7 @@ export interface ChapterStorageItem {
   lqSize: number
   hqStatus: HqStatus
   lqStatus: LqStatus
+  mediaType: 'IMAGE' | 'VIDEO' | 'MIXED'
 }
 
 /** 存储统计摘要 */
@@ -539,6 +541,8 @@ export interface ManagementTaskVO {
   readonly taskType: ManagementTaskType
   readonly operation: string
   readonly targetType: string
+  readonly targetId: number | null
+  readonly targetName: string | null
   readonly batchId: string | null
   readonly isBatch: boolean
   readonly status: ManagementTaskStatus

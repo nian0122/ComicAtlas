@@ -22,10 +22,8 @@
                     AND SUM(CASE WHEN m.media_type = 'IMAGE' AND (m.lq_status IS NULL OR m.lq_status != 'READY') THEN 1 ELSE 0 END) = 0
                 </when>
                 <when test="query.lqStatus == 'NEEDS_LQ'">
-                    AND (
-                        SUM(CASE WHEN m.media_type = 'IMAGE' THEN 1 ELSE 0 END) = 0
-                        OR SUM(CASE WHEN m.media_type = 'IMAGE' AND (m.lq_status IS NULL OR m.lq_status != 'READY') THEN 1 ELSE 0 END) &gt; 0
-                    )
+                    AND SUM(CASE WHEN m.media_type = 'IMAGE' THEN 1 ELSE 0 END) &gt; 0
+                    AND SUM(CASE WHEN m.media_type = 'IMAGE' AND (m.lq_status IS NULL OR m.lq_status != 'READY') THEN 1 ELSE 0 END) &gt; 0
                 </when>
             </choose>
         </if>
@@ -39,10 +37,15 @@
                 NULL as cover_url,
                 COUNT(DISTINCT ch.id) as chapter_count,
                 COUNT(m.id) as page_count,
-                SUM(CASE WHEN m.media_type = 'IMAGE' AND m.hq_status = 'READY' THEN COALESCE(m.file_size, 0) ELSE 0 END) as hq_size,
+                SUM(CASE WHEN m.hq_status = 'READY' THEN COALESCE(m.file_size, 0) ELSE 0 END) as hq_size,
                 SUM(CASE WHEN m.media_type = 'IMAGE' AND m.lq_status = 'READY' THEN COALESCE(m.lq_size, 0) ELSE 0 END) as lq_size,
                 GROUP_CONCAT(DISTINCT m.hq_status) as hq_status,
-                GROUP_CONCAT(DISTINCT CASE WHEN m.media_type = 'IMAGE' THEN m.lq_status END) as lq_status
+                GROUP_CONCAT(DISTINCT CASE WHEN m.media_type = 'IMAGE' THEN m.lq_status END) as lq_status,
+                CASE WHEN SUM(CASE WHEN m.media_type = 'VIDEO' THEN 1 ELSE 0 END) > 0
+                     AND SUM(CASE WHEN m.media_type = 'IMAGE' THEN 1 ELSE 0 END) = 0 THEN 'VIDEO'
+                     WHEN SUM(CASE WHEN m.media_type = 'IMAGE' THEN 1 ELSE 0 END) > 0
+                     AND SUM(CASE WHEN m.media_type = 'VIDEO' THEN 1 ELSE 0 END) = 0 THEN 'IMAGE'
+                     ELSE 'MIXED' END as media_type
             FROM comic c
             LEFT JOIN chapter ch ON ch.comic_id = c.id
             LEFT JOIN page m ON m.chapter_id = ch.id AND m.media_type IN ('IMAGE', 'VIDEO')
@@ -85,10 +88,15 @@
             NULL as cover_url,
             COUNT(DISTINCT ch.id) as chapter_count,
             COUNT(m.id) as page_count,
-            SUM(CASE WHEN m.media_type = 'IMAGE' AND m.hq_status = 'READY' THEN COALESCE(m.file_size, 0) ELSE 0 END) as hq_size,
+            SUM(CASE WHEN m.hq_status = 'READY' THEN COALESCE(m.file_size, 0) ELSE 0 END) as hq_size,
             SUM(CASE WHEN m.media_type = 'IMAGE' AND m.lq_status = 'READY' THEN COALESCE(m.lq_size, 0) ELSE 0 END) as lq_size,
             GROUP_CONCAT(DISTINCT m.hq_status) as hq_status,
-            GROUP_CONCAT(DISTINCT CASE WHEN m.media_type = 'IMAGE' THEN m.lq_status END) as lq_status
+            GROUP_CONCAT(DISTINCT CASE WHEN m.media_type = 'IMAGE' THEN m.lq_status END) as lq_status,
+            CASE WHEN SUM(CASE WHEN m.media_type = 'VIDEO' THEN 1 ELSE 0 END) > 0
+                 AND SUM(CASE WHEN m.media_type = 'IMAGE' THEN 1 ELSE 0 END) = 0 THEN 'VIDEO'
+                 WHEN SUM(CASE WHEN m.media_type = 'IMAGE' THEN 1 ELSE 0 END) > 0
+                 AND SUM(CASE WHEN m.media_type = 'VIDEO' THEN 1 ELSE 0 END) = 0 THEN 'IMAGE'
+                 ELSE 'MIXED' END as media_type
         FROM comic c
         LEFT JOIN chapter ch ON ch.comic_id = c.id
         LEFT JOIN page m ON m.chapter_id = ch.id
@@ -129,10 +137,15 @@
             ch.chapter_no,
             ch.title,
             COUNT(m.id) as page_count,
-            SUM(CASE WHEN m.media_type = 'IMAGE' AND m.hq_status = 'READY' THEN COALESCE(m.file_size, 0) ELSE 0 END) as hq_size,
+            SUM(CASE WHEN m.hq_status = 'READY' THEN COALESCE(m.file_size, 0) ELSE 0 END) as hq_size,
             SUM(CASE WHEN m.media_type = 'IMAGE' AND m.lq_status = 'READY' THEN COALESCE(m.lq_size, 0) ELSE 0 END) as lq_size,
             GROUP_CONCAT(DISTINCT m.hq_status) as hq_status,
-            GROUP_CONCAT(DISTINCT CASE WHEN m.media_type = 'IMAGE' THEN m.lq_status END) as lq_status
+            GROUP_CONCAT(DISTINCT CASE WHEN m.media_type = 'IMAGE' THEN m.lq_status END) as lq_status,
+            CASE WHEN SUM(CASE WHEN m.media_type = 'VIDEO' THEN 1 ELSE 0 END) > 0
+                 AND SUM(CASE WHEN m.media_type = 'IMAGE' THEN 1 ELSE 0 END) = 0 THEN 'VIDEO'
+                 WHEN SUM(CASE WHEN m.media_type = 'IMAGE' THEN 1 ELSE 0 END) > 0
+                 AND SUM(CASE WHEN m.media_type = 'VIDEO' THEN 1 ELSE 0 END) = 0 THEN 'IMAGE'
+                 ELSE 'MIXED' END as media_type
         FROM chapter ch
         LEFT JOIN page m ON m.chapter_id = ch.id AND m.media_type IN ('IMAGE', 'VIDEO')
         WHERE ch.comic_id = #{comicId}

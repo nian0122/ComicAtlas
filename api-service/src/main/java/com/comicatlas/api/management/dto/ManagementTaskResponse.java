@@ -17,6 +17,8 @@ public class ManagementTaskResponse {
     private TaskType taskType;
     private String operation;
     private String targetType;
+    private Long targetId;
+    private String targetName;
     private String batchId;
     /** 是否批量任务（REST 键 isBatch，内部名 batch） */
     @JsonProperty("isBatch")

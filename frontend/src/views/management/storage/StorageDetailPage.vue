@@ -7,7 +7,7 @@
         <h1 class="comic-title">{{ comic?.title ?? '加载中...' }}</h1>
         <div class="header-meta">
           <span class="meta-item">HQ 总大小: {{ formatSize(comic?.hqSize ?? 0) }}</span>
-          <span class="meta-item">LQ 总大小: {{ formatSize(comic?.lqSize ?? 0) }}</span>
+          <span class="meta-item">LQ 总大小: {{ comic?.mediaType === 'VIDEO' ? '不适用' : formatSize(comic?.lqSize ?? 0) }}</span>
           <span class="meta-item">章节数: {{ chapters.length }}</span>
         </div>
       </div>
@@ -33,8 +33,9 @@
         </div>
         <div class="overview-item">
           <span class="ov-label">LQ</span>
-          <span class="ov-value">{{ formatSize(comic?.lqSize ?? 0) }}</span>
-          <StorageStatusTag :status="comic?.lqStatus ?? 'EMPTY'" type="lq" />
+          <span class="ov-value">{{ comic?.mediaType === 'VIDEO' ? '不适用' : formatSize(comic?.lqSize ?? 0) }}</span>
+          <StorageStatusTag v-if="comic?.mediaType !== 'VIDEO'" :status="comic?.lqStatus ?? 'EMPTY'" type="lq" />
+          <span v-else class="not-applicable">视频无需 LQ</span>
         </div>
         <div class="overview-item">
           <span class="ov-label">总文件数</span>
@@ -48,7 +49,7 @@
       <h2 class="section-title">存储操作</h2>
       <div class="ops-bar">
         <el-button type="danger" plain @click="onDeleteHQ">删除 HQ（保留 LQ）</el-button>
-        <el-button type="primary" plain @click="onGenerateLQ">生成 LQ</el-button>
+        <el-button v-if="comic?.mediaType !== 'VIDEO'" type="primary" plain @click="onGenerateLQ">生成 LQ</el-button>
         <el-button type="warning" plain @click="onTranscode">视频转码</el-button>
         <el-button type="success" plain @click="onExportZip">导出 ZIP</el-button>
         <el-button type="danger" @click="onTrashComic">移入回收站</el-button>
@@ -67,7 +68,9 @@
         />
       </div>
       <el-table :data="filteredStructureRows" row-key="key" :tree-props="{ children: 'children' }" size="small">
-        <el-table-column prop="title" label="章节名" min-width="160" show-overflow-tooltip />
+        <el-table-column prop="title" label="章节名" min-width="160" show-overflow-tooltip>
+          <template #default="{ row }"><span class="row-kind" :class="`row-kind--${row.kind.toLowerCase()}`">{{ row.kind === 'CATALOG' ? '目录' : '章节' }}</span><span>{{ row.title }}</span></template>
+        </el-table-column>
         <el-table-column prop="chapterNo" label="编号" width="70" />
         <el-table-column label="媒体数" width="80" align="center">
           <template #default="{ row }">{{ row.pageCount ?? '-' }}</template>
@@ -76,20 +79,24 @@
           <template #default="{ row }">{{ formatSize(row.hqSize) }}</template>
         </el-table-column>
         <el-table-column label="LQ 大小" width="100" align="right">
-          <template #default="{ row }">{{ formatSize(row.lqSize) }}</template>
+          <template #default="{ row }">{{ row.mediaType === 'VIDEO' ? '不适用' : formatSize(row.lqSize) }}</template>
         </el-table-column>
         <el-table-column label="HQ 状态" width="90">
-          <template #default="{ row }"><StorageStatusTag v-if="row.kind === 'CHAPTER'" :status="row.hqStatus" type="hq" /></template>
+          <template #default="{ row }"><StorageStatusTag v-if="row.hqStatus" :status="row.hqStatus" type="hq" /></template>
         </el-table-column>
         <el-table-column label="LQ 状态" width="90">
-          <template #default="{ row }"><StorageStatusTag v-if="row.kind === 'CHAPTER'" :status="row.lqStatus" type="lq" /></template>
+          <template #default="{ row }">
+            <StorageStatusTag v-if="row.mediaType !== 'VIDEO' && row.lqStatus" :status="row.lqStatus" type="lq" />
+            <span v-else class="not-applicable">{{ row.mediaType === 'VIDEO' ? '不适用' : '暂无数据' }}</span>
+          </template>
         </el-table-column>
         <el-table-column label="操作" width="160">
           <template #default="{ row }">
             <template v-if="row.kind === 'CHAPTER'">
               <el-button size="small" type="danger" plain @click="onDeleteChapterHQ(row.chapterId)">删HQ</el-button>
-              <el-button size="small" type="primary" plain @click="onGenerateChapterLQ(row.chapterId)">生LQ</el-button>
+              <el-button v-if="row.mediaType !== 'VIDEO'" size="small" type="primary" plain @click="onGenerateChapterLQ(row.chapterId)">生LQ</el-button>
             </template>
+            <span v-else class="not-applicable">目录汇总</span>
           </template>
         </el-table-column>
       </el-table>
@@ -128,6 +135,7 @@ interface StorageStructureRow {
   readonly lqSize: number
   readonly hqStatus: ChapterStorageItem['hqStatus'] | null
   readonly lqStatus: ChapterStorageItem['lqStatus'] | null
+  readonly mediaType: ChapterStorageItem['mediaType']
   readonly order: number | null
   readonly children?: readonly StorageStructureRow[]
 }
@@ -198,6 +206,7 @@ function chapterRow(chapter: ChapterStorageItem, globalOrder: number | null = nu
     lqSize: chapter.lqSize,
     hqStatus: chapter.hqStatus,
     lqStatus: chapter.lqStatus,
+    mediaType: chapter.mediaType,
     order: globalOrder,
   }
 }
@@ -213,20 +222,53 @@ function toStorageRows(node: CatalogNode): readonly StorageStructureRow[] {
     ...node.children.flatMap(toStorageRows),
   ].sort((left, right) => (left.order ?? Number.MAX_SAFE_INTEGER) - (right.order ?? Number.MAX_SAFE_INTEGER))
   if (node.id === null) return children
+  const childRows = children.filter((row) => row.kind === 'CHAPTER' || row.children)
   return [{
     key: `catalog-${node.id}`,
     kind: 'CATALOG',
     title: node.title ?? '未命名目录',
     chapterId: null,
     chapterNo: null,
-    pageCount: null,
+    pageCount: children.reduce((sum, row) => sum + (row.pageCount ?? 0), 0),
     hqSize: children.reduce((sum, row) => sum + row.hqSize, 0),
     lqSize: children.reduce((sum, row) => sum + row.lqSize, 0),
-    hqStatus: null,
-    lqStatus: null,
+    hqStatus: aggregateHqStatus(childRows),
+    lqStatus: aggregateLqStatus(childRows),
+    mediaType: aggregateMediaType(childRows),
     order: node.globalOrder ?? null,
     children,
   }]
+}
+
+function aggregateHqStatus(rows: readonly StorageStructureRow[]): StorageStructureRow['hqStatus'] {
+  const statuses = collectHqStatuses(rows)
+  if (statuses.length === 0) return null
+  return statuses.every((status) => status === statuses[0]) ? statuses[0] : 'MIXED'
+}
+
+function aggregateLqStatus(rows: readonly StorageStructureRow[]): StorageStructureRow['lqStatus'] {
+  const statuses = collectLqStatuses(rows)
+  if (statuses.length === 0) return null
+  return statuses.every((status) => status === statuses[0]) ? statuses[0] : 'MIXED'
+}
+
+function collectHqStatuses(rows: readonly StorageStructureRow[]): Array<NonNullable<StorageStructureRow['hqStatus']>> {
+  return rows.flatMap((row) => [row.hqStatus, ...(row.children ? collectHqStatuses(row.children) : [])]).filter((status): status is NonNullable<StorageStructureRow['hqStatus']> => status != null)
+}
+
+function collectLqStatuses(rows: readonly StorageStructureRow[]): Array<NonNullable<StorageStructureRow['lqStatus']>> {
+  return rows.flatMap((row) => [row.lqStatus, ...(row.children ? collectLqStatuses(row.children) : [])]).filter((status): status is NonNullable<StorageStructureRow['lqStatus']> => status != null)
+}
+
+function aggregateMediaType(rows: readonly StorageStructureRow[]): StorageStructureRow['mediaType'] {
+  const types = rows.flatMap((row) => [row.mediaType, ...(row.children ? collectMediaTypes(row.children) : [])])
+  const meaningful = types.filter((type) => type !== 'MIXED')
+  if (meaningful.length === 0) return 'MIXED'
+  return meaningful.every((type) => type === meaningful[0]) ? meaningful[0] : 'MIXED'
+}
+
+function collectMediaTypes(rows: readonly StorageStructureRow[]): Array<StorageStructureRow['mediaType']> {
+  return rows.flatMap((row) => [row.mediaType, ...(row.children ? collectMediaTypes(row.children) : [])])
 }
 
 function collectChapterIds(rows: readonly StorageStructureRow[], output: Set<number>): void {
@@ -323,7 +365,7 @@ async function onRefreshMetadata() {
         '刷新已提交',
         { confirmButtonText: '前往任务中心', type: 'success' }
       )
-      router.push('/manage/import/tasks')
+      router.push('/manage/tasks')
     } catch {
       // 用户选择留在本页
     }
@@ -536,6 +578,7 @@ onBeforeUnmount(stopTranscodePolling)
 
 .ov-label { font-size: 12px; color: var(--text-muted); }
 .ov-value { font-size: 20px; font-weight: 700; color: var(--text-primary); }
+.not-applicable { color: var(--text-muted); font-size: 12px; }
 
 .ops-bar {
   display: flex;

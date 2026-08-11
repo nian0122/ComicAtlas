@@ -36,6 +36,17 @@ test('加载不存在/非 READY 的漫画时页面不崩溃，目录表格显示
   expect(pageErrors, `页面渲染抛出了未捕获异常: ${pageErrors.join(' | ')}`).toEqual([])
 })
 
+test('成功加载空目录时清晰提示暂无结构', async ({ page }) => {
+  await page.route(CATALOG_API, (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ code: 200, message: 'success', data: [] }) })
+  )
+  await page.goto('/manage/structure')
+  await page.locator('input[role="spinbutton"]').first().fill('8')
+  await page.getByRole('button', { name: '加载' }).click()
+  await expect(page.locator('.summary-hint')).toContainText('已加载，暂无结构')
+  await expect(page.locator('.structure-table .el-table__empty-text')).toHaveText('该漫画暂无目录或章节')
+})
+
 test('正常漫画加载目录树并渲染目录与章节行', async ({ page }) => {
   const pageErrors: string[] = []
   page.on('pageerror', (err) => pageErrors.push(err.message))
@@ -69,6 +80,7 @@ test('正常漫画加载目录树并渲染目录与章节行', async ({ page }) 
   await expect(page.getByRole('cell', { name: 'Vol 1' })).toBeVisible()
   await page.locator('.el-table__expand-icon').first().click()
   await expect(page.getByRole('cell', { name: '第一话' })).toBeVisible()
+  await page.screenshot({ path: 'test-results/comic-structure-optimized.png', fullPage: true })
   expect(pageErrors, `页面渲染抛出了未捕获异常: ${pageErrors.join(' | ')}`).toEqual([])
 })
 
@@ -116,4 +128,5 @@ test('嵌套目录保持父子关系并可展开查看章节', async ({ page }) 
   await expect(page.getByRole('cell', { name: '启程' })).toBeHidden()
   await page.locator('.el-table__expand-icon').nth(1).click()
   await expect(page.getByRole('cell', { name: '启程' })).toBeVisible()
+  await expect(page.locator('.structure-summary').getByText('目录').locator('..').getByText('2')).toBeVisible()
 })

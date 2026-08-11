@@ -11,6 +11,7 @@ import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.api.common.enums.TranscodeStatus;
+import com.comicatlas.common.util.VideoPlayability;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -33,8 +34,6 @@ public class MediaOperationEligibilityService {
     private final MediaMapper mediaMapper;
     private final ComicMapper comicMapper;
     private final OperationPolicyService policyService;
-
-    private static final Set<String> COMPAT_CONTAINERS = Set.of("mp4", "webm");
 
     public AllowedOperations forComic(Long comicId) {
         Set<String> allowed = new LinkedHashSet<>();
@@ -133,8 +132,7 @@ public class MediaOperationEligibilityService {
                 && media.getTranscodeStatus() != TranscodeStatus.READY
                 && media.getTranscodeStatus() != TranscodeStatus.QUEUED
                 && media.getTranscodeStatus() != TranscodeStatus.TRANSCODING
-                && (media.getContainer() == null
-                    || !COMPAT_CONTAINERS.contains(media.getContainer().toLowerCase()))) {
+                && !VideoPlayability.isBrowserPlayable(media.getVideoCodec(), media.getContainer())) {
             allowed.add(OperationPolicyService.OP_TRANSCODE);
         } else {
             blocked.put(OperationPolicyService.OP_TRANSCODE, "该媒体无需转码或处于转码中");
@@ -165,8 +163,7 @@ public class MediaOperationEligibilityService {
                         && p.getTranscodeStatus() != TranscodeStatus.READY
                         && p.getTranscodeStatus() != TranscodeStatus.QUEUED
                         && p.getTranscodeStatus() != TranscodeStatus.TRANSCODING
-                        && (p.getContainer() == null
-                            || !COMPAT_CONTAINERS.contains(p.getContainer().toLowerCase())));
+                        && !VideoPlayability.isBrowserPlayable(p.getVideoCodec(), p.getContainer()));
         return ops;
     }
 

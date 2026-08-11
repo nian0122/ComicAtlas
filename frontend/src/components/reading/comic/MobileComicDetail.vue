@@ -2,7 +2,10 @@
   <div class="mobile-detail">
     <section class="cover-stage" aria-label="漫画封面">
       <div class="cover-backdrop" :style="{ backgroundImage: `url(${comic.coverUrl})` }" />
-      <img class="cover-poster" :src="comic.coverUrl" :alt="comic.title">
+      <img v-if="comic.coverUrl" class="cover-poster" :src="comic.coverUrl" :alt="comic.title">
+      <div v-else class="cover-placeholder" aria-label="暂无封面">
+        <el-icon :size="64"><VideoPlay /></el-icon>
+      </div>
     </section>
 
     <div class="detail-body">
@@ -160,6 +163,19 @@ const fileSize = computed(() => {
   aspect-ratio: 2 / 3;
   border-radius: var(--radius-md);
   object-fit: cover;
+  box-shadow: var(--shadow-lg);
+}
+
+.cover-placeholder {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: var(--mobile-detail-poster-width);
+  aspect-ratio: 2 / 3;
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  color: var(--accent);
   box-shadow: var(--shadow-lg);
 }
 

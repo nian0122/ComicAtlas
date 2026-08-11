@@ -12,6 +12,7 @@ public class ComicStorageDTO {
     private Long lqSize;
     private String hqStatus;
     private String lqStatus;
+    private String mediaType;
     private String transcodeStatus;
     private Integer chapterCount;
     private Integer pageCount;

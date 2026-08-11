@@ -37,8 +37,10 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -232,9 +234,11 @@ public class ManagementTaskService {
 
         IPage<ManagementTaskResponse> responsePage = new Page<>(page, size);
         responsePage.setTotal(taskPage.getTotal());
-        responsePage.setRecords(taskPage.getRecords().stream()
+        List<ManagementTaskResponse> responses = taskPage.getRecords().stream()
                 .map(this::toResponse)
-                .collect(Collectors.toList()));
+                .collect(Collectors.toList());
+        enrichTargetSummaries(taskPage.getRecords(), responses);
+        responsePage.setRecords(responses);
         return responsePage;
     }
 
@@ -246,7 +250,9 @@ public class ManagementTaskService {
         if (task == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在: " + taskId);
         }
-        return toResponse(task);
+        ManagementTaskResponse response = toResponse(task);
+        enrichTargetSummaries(List.of(task), List.of(response));
+        return response;
     }
 
     /**
@@ -813,6 +819,46 @@ public class ManagementTaskService {
         resp.setStartedAt(task.getStartedAt());
         resp.setCompletedAt(task.getCompletedAt());
         return resp;
+    }
+
+    private void enrichTargetSummaries(List<ManagementTask> tasks,
+                                       List<ManagementTaskResponse> responses) {
+        if (tasks.isEmpty()) {
+            return;
+        }
+        Map<Long, ManagementTaskResponse> responseByTaskId = new HashMap<>();
+        for (ManagementTaskResponse response : responses) {
+            responseByTaskId.put(response.getId(), response);
+        }
+        List<ManagementTaskItem> items = itemMapper.selectList(
+                new LambdaQueryWrapper<ManagementTaskItem>()
+                        .in(ManagementTaskItem::getTaskId,
+                                tasks.stream().map(ManagementTask::getId).toList())
+                        .orderByAsc(ManagementTaskItem::getId));
+        Map<Long, ManagementTaskItem> firstItemByTaskId = new HashMap<>();
+        for (ManagementTaskItem item : items) {
+            firstItemByTaskId.putIfAbsent(item.getTaskId(), item);
+        }
+        Map<Long, Comic> comics = new HashMap<>();
+        List<Long> comicIds = firstItemByTaskId.values().stream()
+                .filter(item -> "COMIC".equals(item.getTargetType()))
+                .map(ManagementTaskItem::getTargetId)
+                .distinct()
+                .toList();
+        if (!comicIds.isEmpty()) {
+            for (Comic comic : comicMapper.selectBatchIds(comicIds)) {
+                comics.put(comic.getId(), comic);
+            }
+        }
+        for (ManagementTaskItem item : firstItemByTaskId.values()) {
+            ManagementTaskResponse response = responseByTaskId.get(item.getTaskId());
+            if (response == null) {
+                continue;
+            }
+            response.setTargetId(item.getTargetId());
+            Comic comic = comics.get(item.getTargetId());
+            response.setTargetName(comic != null ? comic.getTitle() : null);
+        }
     }
 
     private ManagementTaskItemResponse toItemResponse(ManagementTaskItem item) {

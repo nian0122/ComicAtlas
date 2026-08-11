@@ -2,6 +2,7 @@ package com.comicatlas.worker.command;
 
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.common.event.payload.TranscodeMediaInfo;
+import com.comicatlas.common.util.VideoPlayability;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.entity.ExportMedia;
 import com.comicatlas.worker.media.ComicMetadata;
@@ -62,7 +63,7 @@ public class TranscodeCommandHandler {
         List<ExportMedia> pages = mediaMapper.selectByComicId(comicId);
         List<Long> videoPages = pages.stream()
                 .filter(p -> "VIDEO".equals(p.getMediaType()))
-                .filter(p -> p.getContainer() == null || !isAlreadyMp4(p.getContainer()))
+                .filter(p -> !VideoPlayability.isBrowserPlayable(p.getVideoCodec(), p.getContainer()))
                 .map(ExportMedia::getId)
                 .toList();
         if (videoPages.isEmpty()) {
@@ -197,11 +198,6 @@ public class TranscodeCommandHandler {
             log.warn("转码后元数据探测失败，降级为 null: file={}, error={}", file, e.getMessage());
             return null;
         }
-    }
-
-    private static boolean isAlreadyMp4(String container) {
-        String containerLower = container.toLowerCase();
-        return "mp4".equals(containerLower) || "mov".equals(containerLower) || "m4v".equals(containerLower);
     }
 
     private List<String> buildFfmpegCommand(String ffmpegPath, String input, String output) {

@@ -37,6 +37,7 @@ import { isReaderInteractiveTarget } from '@/views/reading/reader/composables/us
 import ProgressiveImage from './ProgressiveImage.vue'
 import VideoPlayer from './VideoPlayer.vue'
 import type { MediaItemInfo } from '@/types'
+import { isVideoMedia } from '@/utils/media-type'
 
 interface Props {
   pages: MediaItemInfo[]
@@ -74,7 +75,7 @@ const page = computed<MediaItemInfo | null>(() => {
 
 const forceHq = computed(() => props.forceHqPages.has(props.currentPage - 1))
 
-const isVideo = computed(() => page.value?.mediaType === 'VIDEO')
+const isVideo = computed(() => page.value != null && isVideoMedia(page.value))
 
 const aspectRatio = computed(() => {
   const p = page.value

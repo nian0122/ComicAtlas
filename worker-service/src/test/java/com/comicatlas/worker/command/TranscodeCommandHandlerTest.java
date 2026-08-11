@@ -197,14 +197,14 @@ class TranscodeCommandHandlerTest {
         Long comicId = 1L;
         Long pageId = 400L;
         Path chapterDir = Files.createDirectories(hqRoot.resolve("1/ch04"));
-        Files.writeString(chapterDir.resolve("test.webm"), "fake video data");
+        Files.writeString(chapterDir.resolve("test.mkv"), "fake video data");
 
         ExportMedia media = new ExportMedia();
         media.setId(pageId);
         media.setHqRoot("HQ");
-        media.setHqPath("1/ch04/test.webm");
+        media.setHqPath("1/ch04/test.mkv");
         media.setMediaType("VIDEO");
-        media.setContainer("webm");
+        media.setContainer("mkv");
         when(mediaMapper.selectByComicId(comicId)).thenReturn(List.of(media));
         when(mediaMapper.selectById(pageId)).thenReturn(media);
 
@@ -224,6 +224,43 @@ class TranscodeCommandHandlerTest {
         verify(publisher).completed(cmd);
         verify(publisher, never()).completed(any(ManagementCommandRequestedEvent.class), any());
         verify(publisher).progress(eq(cmd), eq(100), eq("转码完成"));
+    }
+
+    // ==================== Test 5: 漫画级 mpeg4-in-mp4 应被选中转码（回归） ====================
+
+    @Test
+    void comicScope_mp4ContainerMpeg4Codec_isSelectedForTranscode() throws Exception {
+        Long comicId = 1L;
+        Long pageId = 500L;
+        Path chapterDir = Files.createDirectories(hqRoot.resolve("1/ch05"));
+        Files.writeString(chapterDir.resolve("test.mp4"), "fake video data");
+
+        ExportMedia media = new ExportMedia();
+        media.setId(pageId);
+        media.setHqRoot("HQ");
+        media.setHqPath("1/ch05/test.mp4");
+        media.setMediaType("VIDEO");
+        media.setContainer("mp4");
+        media.setVideoCodec("mpeg4");
+        when(mediaMapper.selectByComicId(comicId)).thenReturn(List.of(media));
+        when(mediaMapper.selectById(pageId)).thenReturn(media);
+
+        config.setFfmpegPath(createFakeFfmpeg(0).toString());
+        when(mediaAnalyzer.analyzeVideo(any(Path.class))).thenReturn(Optional.of(
+                new ComicMetadata.MediaInfo("test.mp4", 0, "READY", "NOT_GENERATED",
+                        1024L, 1280, 720, "VIDEO",
+                        new BigDecimal("5.5"), "mp4", "h264", "aac")));
+
+        ManagementCommandRequestedEvent cmd = new ManagementCommandRequestedEvent(
+                UUID.randomUUID(), Instant.now(), 1, 1L, pageId, 1,
+                "TRANSCODE", "COMIC", comicId);
+
+        handler.transcode(cmd);
+
+        // mp4 容器 + mpeg4 编码（MPEG-4 Part 2）浏览器无法解码，必须被选中转码
+        verify(publisher).completed(cmd);
+        verify(publisher).progress(eq(cmd), eq(100), eq("转码完成"));
+        assertTrue(Files.exists(chapterDir.resolve("test.mp4")), "转码产物应存在");
     }
 
     // ==================== helpers ====================

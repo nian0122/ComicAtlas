@@ -26,6 +26,7 @@ import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.api.common.enums.TaskType;
 import com.comicatlas.api.common.enums.TranscodeStatus;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
+import com.comicatlas.common.util.VideoPlayability;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -223,7 +224,6 @@ public class MediaOperationCommandService {
 
     // ======================== 视频转码 ========================
 
-    private static final Set<String> COMPAT_CONTAINERS = Set.of("mp4", "webm");
     private static final Set<TranscodeStatus> ACTIVE_TRANSCODE =
             Set.of(TranscodeStatus.QUEUED, TranscodeStatus.TRANSCODING);
 
@@ -322,11 +322,13 @@ public class MediaOperationCommandService {
             return false;
         }
         TranscodeStatus status = media.getTranscodeStatus();
-        if (ACTIVE_TRANSCODE.contains(status) || status == TranscodeStatus.READY) {
+        // safeValueOf 对未知枚举值返回 null，此处判空避免 Set12.contains(null) 抛 NPE
+        if (status != null && (ACTIVE_TRANSCODE.contains(status) || status == TranscodeStatus.READY)) {
             return false;
         }
-        String container = media.getContainer();
-        return container == null || !COMPAT_CONTAINERS.contains(container.toLowerCase());
+        // 判定基于视频编码 + 容器：mp4 容器 + mpeg4(MPEG-4 Part 2) 等老编码浏览器无法解码
+        // （只出声不出画），必须转码为 H.264。判定收敛到共享模块避免 API/Worker 漂移。
+        return !VideoPlayability.isBrowserPlayable(media.getVideoCodec(), media.getContainer());
     }
 
     private void markTranscodeQueued(Long mediaId) {

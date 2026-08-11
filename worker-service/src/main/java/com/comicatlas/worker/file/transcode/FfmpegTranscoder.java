@@ -13,9 +13,9 @@ import java.util.List;
 /**
  * 视频转码纯技术能力：调用 ffmpeg 将视频转为 H.264 + AAC MP4。
  * <p>
- * 职责单一——只负责 ffmpeg 命令构造、非标准格式判定与进程执行；
+ * 职责单一——只负责 ffmpeg 命令构造与进程执行；
  * 业务编排（MQ 消费、临时文件替换、DB 更新）由调用方 {@code VideoTranscodeHandler} 负责。
- * ffmpeg 参数与标准容器判定在此收敛单处，避免多处重复实现。
+ * 浏览器可播放判定（是否需要转码）收敛在共享模块 {@code VideoPlayability}，本类不重复实现。
  */
 @Slf4j
 @Component
@@ -32,20 +32,6 @@ public class FfmpegTranscoder {
 
     private final WorkerConfig config;
     private final ExternalProcessRunner processRunner;
-
-    /**
-     * 判定视频容器是否为标准格式（无需转码）：mp4 / m4v。
-     *
-     * @param container 容器名（如 mp4/mkv/avi），大小写不敏感；null 视为非标准
-     * @return true 表示标准容器
-     */
-    public boolean isStandardContainer(String container) {
-        if (container == null) {
-            return false;
-        }
-        String c = container.toLowerCase();
-        return "mp4".equals(c) || "m4v".equals(c);
-    }
 
     /**
      * 执行 ffmpeg 转码：{@code input} → {@code output}。

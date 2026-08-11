@@ -12,4 +12,5 @@ public class ChapterStorageDTO {
     private Long lqSize;
     private String hqStatus;
     private String lqStatus;
+    private String mediaType;
 }

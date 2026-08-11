@@ -28,7 +28,7 @@ const entries = [
   { to: '/manage/status', title: '漫画状态', description: '查看完整生命周期与当前页状态统计' },
   { to: '/manage/operations', title: '漫画操作台', description: '触发存储、导出、回收和恢复并观察状态' },
   { to: '/manage/trash', title: '回收站', description: '查看已回收漫画并恢复或永久清理' },
-  { to: '/manage/tasks', title: '统一管理任务', description: '查看所有异步任务、进度、错误与目标项' },
+  { to: '/manage/tasks', title: '任务中心', description: '查看所有异步任务、进度、错误与目标项' },
   { to: '/manage/upload', title: '媒体上传', description: '向章节追加或替换图片和视频' },
   { to: '/manage/structure', title: '目录与媒体结构', description: '维护目录、章节顺序和章节内媒体' },
   { to: '/manage/comics', title: '漫画信息编辑', description: '编辑标题、作者、简介、分类和标签' },

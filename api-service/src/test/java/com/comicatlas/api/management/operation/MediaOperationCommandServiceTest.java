@@ -124,6 +124,117 @@ class MediaOperationCommandServiceTest {
         assertEquals(HttpStatusCodes.NOT_FOUND, ex.getCode());
     }
 
+    @Test
+    void requestTranscodeForChapter_状态REQUIRED的视频可被转码() {
+        Chapter chapter = new Chapter();
+        chapter.setId(9L);
+        when(chapterMapper.selectById(9L)).thenReturn(chapter);
+
+        // 回归：V18 迁移把不兼容视频标记为 REQUIRED，此前枚举缺失导致 NPE
+        Media required = video(11L, 9L, "mkv", TranscodeStatus.REQUIRED);
+        when(mediaMapper.selectList(any())).thenReturn(List.of(required));
+
+        ManagementTaskResponse task = new ManagementTaskResponse();
+        task.setId(100L);
+        task.setStatus(ManagementTaskStatus.QUEUED);
+        when(managementTaskService.createTask(any(), any(), any())).thenReturn(task);
+
+        ManagementTaskItemResponse item = new ManagementTaskItemResponse();
+        item.setId(200L);
+        item.setTaskId(100L);
+        item.setTargetType("MEDIA");
+        item.setTargetId(11L);
+        item.setAttempt(1);
+        when(managementTaskService.getTaskItems(100L)).thenReturn(List.of(item));
+
+        OperationSubmitResultDTO result = service.requestTranscodeForChapter(9L);
+
+        assertEquals(100L, result.getTaskId());
+        assertEquals(1, result.getItemCount());
+        verify(outboxService, times(1)).enqueue(any(), any(), any(), any(), any(), anyInt());
+    }
+
+    @Test
+    void requestTranscodeForChapter_未知状态映射为null时不抛NPE() {
+        Chapter chapter = new Chapter();
+        chapter.setId(9L);
+        when(chapterMapper.selectById(9L)).thenReturn(chapter);
+
+        // 回归：EnumTypeHandlers.safeValueOf 对未知枚举值返回 null，此前 Set.contains(null) 抛 NPE
+        Media unknown = video(11L, 9L, "mkv", null);
+        when(mediaMapper.selectList(any())).thenReturn(List.of(unknown));
+
+        ManagementTaskResponse task = new ManagementTaskResponse();
+        task.setId(100L);
+        task.setStatus(ManagementTaskStatus.QUEUED);
+        when(managementTaskService.createTask(any(), any(), any())).thenReturn(task);
+
+        ManagementTaskItemResponse item = new ManagementTaskItemResponse();
+        item.setId(200L);
+        item.setTaskId(100L);
+        item.setTargetType("MEDIA");
+        item.setTargetId(11L);
+        item.setAttempt(1);
+        when(managementTaskService.getTaskItems(100L)).thenReturn(List.of(item));
+
+        OperationSubmitResultDTO result = service.requestTranscodeForChapter(9L);
+
+        assertEquals(100L, result.getTaskId());
+        assertEquals(1, result.getItemCount());
+        verify(outboxService, times(1)).enqueue(any(), any(), any(), any(), any(), anyInt());
+    }
+
+    @Test
+    void requestTranscodeForChapter_mp4容器mpeg4编码需要转码() {
+        Chapter chapter = new Chapter();
+        chapter.setId(9L);
+        when(chapterMapper.selectById(9L)).thenReturn(chapter);
+
+        // 回归：mp4 容器 + mpeg4(MPEG-4 Part 2) 编码浏览器无法解码（只出声不出画），
+        // 此前 isTranscodeEligible 只看容器名导致 mpeg4-in-mp4 被误判"无需转码"
+        Media mpeg4InMp4 = video(11L, 9L, "mp4", TranscodeStatus.NOT_NEEDED);
+        mpeg4InMp4.setVideoCodec("mpeg4");
+        when(mediaMapper.selectList(any())).thenReturn(List.of(mpeg4InMp4));
+
+        ManagementTaskResponse task = new ManagementTaskResponse();
+        task.setId(100L);
+        task.setStatus(ManagementTaskStatus.QUEUED);
+        when(managementTaskService.createTask(any(), any(), any())).thenReturn(task);
+
+        ManagementTaskItemResponse item = new ManagementTaskItemResponse();
+        item.setId(200L);
+        item.setTaskId(100L);
+        item.setTargetType("MEDIA");
+        item.setTargetId(11L);
+        item.setAttempt(1);
+        when(managementTaskService.getTaskItems(100L)).thenReturn(List.of(item));
+
+        OperationSubmitResultDTO result = service.requestTranscodeForChapter(9L);
+
+        assertEquals(100L, result.getTaskId());
+        assertEquals(1, result.getItemCount());
+        verify(outboxService, times(1)).enqueue(any(), any(), any(), any(), any(), anyInt());
+    }
+
+    @Test
+    void requestTranscodeForChapter_mp4容器h264编码无需转码() {
+        Chapter chapter = new Chapter();
+        chapter.setId(9L);
+        when(chapterMapper.selectById(9L)).thenReturn(chapter);
+
+        // 浏览器可直接播放的 mp4+h264 不应进入转码目标
+        Media h264InMp4 = video(12L, 9L, "mp4", TranscodeStatus.NOT_NEEDED);
+        h264InMp4.setVideoCodec("h264");
+        when(mediaMapper.selectList(any())).thenReturn(List.of(h264InMp4));
+
+        OperationSubmitResultDTO result = service.requestTranscodeForChapter(9L);
+
+        assertNull(result.getTaskId());
+        assertEquals(0, result.getItemCount());
+        verify(managementTaskService, never()).createTask(any(), any(), any());
+        verify(outboxService, never()).enqueue(any(), any(), any(), any(), any(), anyInt());
+    }
+
     private static Media video(Long id, Long chapterId, String container, TranscodeStatus status) {
         Media media = new Media();
         media.setId(id);

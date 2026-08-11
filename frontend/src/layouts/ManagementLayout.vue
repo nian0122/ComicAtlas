@@ -42,7 +42,7 @@
           </router-link>
           <router-link to="/manage/tasks" class="sidenav-link" active-class="active">
             <el-icon :size="18"><List /></el-icon>
-            <span>统一管理任务</span>
+            <span>任务中心</span>
           </router-link>
           <router-link to="/manage/upload" class="sidenav-link" active-class="active">
             <el-icon :size="18"><UploadFilled /></el-icon>
@@ -61,15 +61,6 @@
             <el-icon :size="18"><UploadFilled /></el-icon>
             <span>新建导入</span>
           </router-link>
-          <router-link
-            to="/manage/import/tasks"
-            class="sidenav-link"
-            active-class="active"
-          >
-            <el-icon :size="18"><List /></el-icon>
-            <span>导入任务</span>
-          </router-link>
-
           <router-link to="/manage/storage" class="sidenav-link" active-class="active">
             <el-icon :size="18"><Coin /></el-icon>
             <span>存储</span>
