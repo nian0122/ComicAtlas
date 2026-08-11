@@ -166,7 +166,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { PictureFilled, WarningFilled } from '@element-plus/icons-vue'
 import { useManagementComicStore } from '@/stores/management/comic'
@@ -175,6 +175,7 @@ import { useTagStore } from '@/stores/tag-store'
 import BatchEditDialog from './BatchEditDialog.vue'
 import type { ComicListQuery, StorageStats } from '@/types'
 import { storageService } from '@/services/storage'
+import { COMIC_STATUSES, comicStatusMeta } from '@/utils/comic-status'
 
 const router = useRouter()
 const store = useManagementComicStore()
@@ -191,19 +192,10 @@ function hideBrokenImage(event: Event) {
   image.hidden = true
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  READY: '已就绪',
-  IMPORTING: '导入中',
-  PENDING: '等待中',
-  FAILED: '失败',
-}
-
-const STATUS_OPTIONS = [
-  { label: '已就绪', value: 'READY' },
-  { label: '导入中', value: 'IMPORTING' },
-  { label: '等待中', value: 'PENDING' },
-  { label: '失败', value: 'FAILED' },
-]
+const STATUS_OPTIONS = COMIC_STATUSES.map((value) => ({
+  label: comicStatusMeta(value).label,
+  value,
+}))
 
 const SORT_OPTIONS = [
   { label: '创建时间', value: 'createdAt' },
@@ -256,7 +248,8 @@ function onBatchSaved() {
 }
 
 function statusLabel(s: string) {
-  return STATUS_LABELS[s] || s
+  const knownStatus = COMIC_STATUSES.find((value) => value === s)
+  return knownStatus ? comicStatusMeta(knownStatus).label : s
 }
 
 function goEdit(id: number) {
@@ -269,18 +262,25 @@ function goStorage(id: number) {
 
 watch(() => filters.tags, (val) => {
   if (val.includes('_NONE') && val.length > 1) {
-    nextTick(() => {
-      filters.tags = ['_NONE']
-    })
+    filters.tags = ['_NONE']
+  }
+  if (val.length <= 1 && filters.tagMode !== 'OR') {
+    filters.tagMode = 'OR'
   }
 }, { deep: true })
 
 function applyFilters() {
+  const normalizedTags = filters.tags.includes('_NONE') ? ['_NONE'] : [...filters.tags]
+  filters.tags = normalizedTags
+  if (normalizedTags.length <= 1) {
+    filters.tagMode = 'OR'
+  }
+  selectedIds.value = []
   store.search({
     keyword: filters.keyword || undefined,
     category: filters.category || undefined,
     status: filters.status || undefined,
-    tags: filters.tags.length > 0 ? filters.tags : undefined,
+    tags: normalizedTags.length > 0 ? normalizedTags : undefined,
     tagMode: filters.tagMode,
     sort: filters.sort as ComicListQuery['sort'],
   })
@@ -293,11 +293,13 @@ function resetFilters() {
   filters.tags = []
   filters.tagMode = 'OR'
   filters.sort = 'createdAt'
+  selectedIds.value = []
   store.resetQuery()
   store.fetchList()
 }
 
 function onPageChange(page: number) {
+  selectedIds.value = []
   store.updateQuery({ page })
   store.fetchList()
 }

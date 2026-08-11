@@ -1,37 +1,37 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElSelect, ElOption, ElInput } from 'element-plus'
-
-interface Filter {
-  hqStatus: string
-  lqStatus: string
-  keyword: string
-}
-
-interface Sort {
-  field: string
-  order: string
-}
+import { ElSelect, ElOption, ElInput, ElButton } from 'element-plus'
+import type { FilterState, SortState } from '@/composables/storage/useStorageFilter'
 
 const props = defineProps<{
-  filter: Filter
-  sort: Sort
+  filter: FilterState
+  sort: SortState
 }>()
 
 const router = useRouter()
 
 const emit = defineEmits<{
-  'update:filter': [value: Filter]
-  'update:sort': [value: Sort]
+  'update:filter': [value: FilterState]
+  'update:sort': [value: SortState]
 }>()
+
+const hasActiveFilters = computed(() =>
+  props.filter.hqStatus !== 'ALL' ||
+  props.filter.lqStatus !== 'ALL' ||
+  props.filter.keyword.trim().length > 0,
+)
 
 function goToTaskCenter() {
   router.push('/manage/import/tasks')
 }
 
-function setFilter(patch: Partial<Filter>) {
+function setFilter(patch: Partial<FilterState>) {
   emit('update:filter', { ...props.filter, ...patch })
+}
+
+function clearFilters() {
+  emit('update:filter', { hqStatus: 'ALL', lqStatus: 'ALL', keyword: '' })
 }
 
 const sortModel = computed({
@@ -74,6 +74,7 @@ const sortModel = computed({
           <el-option label="升序" value="asc" />
         </el-select>
         <el-input :model-value="props.filter.keyword" @update:model-value="setFilter({ keyword: $event })" placeholder="搜索标题" clearable class="filter-input" />
+        <el-button v-if="hasActiveFilters" class="filter-reset" text @click="clearFilters">清空筛选</el-button>
       </div>
     </section>
   </div>
@@ -92,5 +93,7 @@ const sortModel = computed({
 .filter-select { width: 120px; }
 .filter-select--mini { width: 100px; }
 .filter-input { width: 180px; }
+.filter-reset { padding-inline: 8px; color: var(--text-secondary); }
+.filter-reset:hover { color: var(--accent); background: var(--accent-bg); }
 @media (max-width: 768px) { .filter-bar { flex-direction: column; align-items: stretch; } .filter-select, .filter-select--mini, .filter-input { width: 100% !important; } }
 </style>

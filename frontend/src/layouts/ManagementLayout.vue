@@ -24,7 +24,7 @@
         </div>
         <router-link to="/manage/import" class="new-import-link"><el-icon :size="18"><Plus /></el-icon>新建导入</router-link>
         <nav class="sidenav-menu" aria-label="管理导航">
-          <router-link to="/manage" class="sidenav-link" active-class="active">
+          <router-link to="/manage" class="sidenav-link" exact-active-class="active">
             <el-icon :size="18"><HomeFilled /></el-icon>
             <span>仓库控制台</span>
           </router-link>
@@ -35,6 +35,10 @@
           <router-link to="/manage/operations" class="sidenav-link" active-class="active">
             <el-icon :size="18"><Operation /></el-icon>
             <span>漫画操作台</span>
+          </router-link>
+          <router-link to="/manage/trash" class="sidenav-link" active-class="active">
+            <el-icon :size="18"><Delete /></el-icon>
+            <span>回收站</span>
           </router-link>
           <router-link to="/manage/tasks" class="sidenav-link" active-class="active">
             <el-icon :size="18"><List /></el-icon>
@@ -104,6 +108,7 @@ import {
   Coin,
   Collection,
   DataAnalysis,
+  Delete,
   HomeFilled,
   List,
   Operation,

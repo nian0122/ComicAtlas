@@ -76,6 +76,11 @@ const router = createRouter({
           component: () => import('@/views/management/ComicOperationsPage.vue'),
         },
         {
+          path: 'trash',
+          name: 'manage-trash',
+          component: () => import('@/views/management/TrashPage.vue'),
+        },
+        {
           path: 'tasks',
           name: 'manage-tasks',
           component: () => import('@/views/management/ManagementTasksPage.vue'),

@@ -2,6 +2,35 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.comicatlas.api.admin.mapper.StorageMapper">
 
+    <sql id="storageStatusHaving">
+        HAVING 1 = 1
+        <if test="query.hqStatus != null and query.hqStatus != '' and query.hqStatus != 'ALL'">
+            <choose>
+                <when test="query.hqStatus == 'HAS_HQ'">
+                    AND SUM(CASE WHEN m.hq_status = 'READY' THEN 1 ELSE 0 END) &gt; 0
+                </when>
+                <when test="query.hqStatus == 'NO_HQ'">
+                    AND COUNT(m.id) &gt; 0
+                    AND SUM(CASE WHEN m.hq_status IS NOT NULL AND m.hq_status != 'DELETED' THEN 1 ELSE 0 END) = 0
+                </when>
+            </choose>
+        </if>
+        <if test="query.lqStatus != null and query.lqStatus != '' and query.lqStatus != 'ALL'">
+            <choose>
+                <when test="query.lqStatus == 'READY'">
+                    AND SUM(CASE WHEN m.media_type = 'IMAGE' THEN 1 ELSE 0 END) &gt; 0
+                    AND SUM(CASE WHEN m.media_type = 'IMAGE' AND (m.lq_status IS NULL OR m.lq_status != 'READY') THEN 1 ELSE 0 END) = 0
+                </when>
+                <when test="query.lqStatus == 'NEEDS_LQ'">
+                    AND (
+                        SUM(CASE WHEN m.media_type = 'IMAGE' THEN 1 ELSE 0 END) = 0
+                        OR SUM(CASE WHEN m.media_type = 'IMAGE' AND (m.lq_status IS NULL OR m.lq_status != 'READY') THEN 1 ELSE 0 END) &gt; 0
+                    )
+                </when>
+            </choose>
+        </if>
+    </sql>
+
     <select id="selectComicStorageList" resultType="com.comicatlas.api.admin.dto.ComicStorageDTO">
         SELECT * FROM (
             SELECT
@@ -22,6 +51,7 @@
                 AND c.title LIKE CONCAT('%', #{query.keyword}, '%')
             </if>
             GROUP BY c.id
+            <include refid="storageStatusHaving" />
         ) t
         <choose>
             <when test="query.sort == 'hqSize'">ORDER BY t.hq_size</when>
@@ -55,14 +85,18 @@
     </select>
 
     <select id="countComicStorageList" resultType="long">
-        SELECT COUNT(DISTINCT c.id)
-        FROM comic c
-        LEFT JOIN chapter ch ON ch.comic_id = c.id
-        LEFT JOIN page m ON m.chapter_id = ch.id AND m.media_type IN ('IMAGE', 'VIDEO')
-        WHERE c.deleted_at IS NULL
-        <if test="query.keyword != null and query.keyword != ''">
-            AND c.title LIKE CONCAT('%', #{query.keyword}, '%')
-        </if>
+        SELECT COUNT(*) FROM (
+            SELECT c.id
+            FROM comic c
+            LEFT JOIN chapter ch ON ch.comic_id = c.id
+            LEFT JOIN page m ON m.chapter_id = ch.id AND m.media_type IN ('IMAGE', 'VIDEO')
+            WHERE c.deleted_at IS NULL
+            <if test="query.keyword != null and query.keyword != ''">
+                AND c.title LIKE CONCAT('%', #{query.keyword}, '%')
+            </if>
+            GROUP BY c.id
+            <include refid="storageStatusHaving" />
+        ) t
     </select>
 
     <select id="selectChapterStorageList" resultType="com.comicatlas.api.admin.dto.ChapterStorageDTO">
