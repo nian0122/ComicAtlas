@@ -119,14 +119,14 @@ async function mockDetailPage(page: Page) {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ code: 0, data: comicFixture }),
+      body: JSON.stringify({ code: 200, data: comicFixture }),
     })
   })
   await page.route('/api/comics/7/catalog', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ code: 0, data: treeFixture }),
+      body: JSON.stringify({ code: 200, data: treeFixture }),
     })
   })
 }
@@ -138,7 +138,7 @@ async function mockReaderApi(page: Page) {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        code: 0,
+        code: 200,
         data: {
           chapterId: 1,
           comicId: 7,
@@ -155,7 +155,7 @@ async function mockReaderApi(page: Page) {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ code: 0, data: { pageNumber: 1 } }),
+      body: JSON.stringify({ code: 200, data: { pageNumber: 1 } }),
     })
   })
 }
@@ -303,7 +303,7 @@ test.describe('desktop', () => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ code: 0, data: [] }),
+        body: JSON.stringify({ code: 200, data: [] }),
       })
     })
     await page.goto('/comic/7')

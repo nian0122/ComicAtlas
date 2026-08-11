@@ -25,7 +25,7 @@ async function openPagedReader(page: Page): Promise<void> {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        code: 0,
+        code: 200,
         data: {
           chapterId: 1,
           comicId: 7,
@@ -63,14 +63,14 @@ async function openPagedReader(page: Page): Promise<void> {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ code: 0, data: { pageNumber: 1 } }),
+      body: JSON.stringify({ code: 200, data: { pageNumber: 1 } }),
     })
   })
   await page.route('/api/comics/7', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ code: 0, data: { id: 7, title: '视频测试漫画' } }),
+      body: JSON.stringify({ code: 200, data: { id: 7, title: '视频测试漫画' } }),
     })
   })
 

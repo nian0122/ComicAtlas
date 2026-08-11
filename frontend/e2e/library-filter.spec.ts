@@ -35,7 +35,7 @@ async function mockRoutes(page: Page, captured: CapturedParams) {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ code: 0, data: { records, total: 24 } }),
+      body: JSON.stringify({ code: 200, data: { records, total: 24 } }),
     })
   })
 
@@ -44,7 +44,7 @@ async function mockRoutes(page: Page, captured: CapturedParams) {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        code: 0,
+        code: 200,
         data: [
           { id: 1, name: '少年', sortOrder: 1 },
           { id: 2, name: '青年', sortOrder: 2 },
@@ -57,7 +57,7 @@ async function mockRoutes(page: Page, captured: CapturedParams) {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ code: 0, data: [] }),
+      body: JSON.stringify({ code: 200, data: [] }),
     })
   })
 }

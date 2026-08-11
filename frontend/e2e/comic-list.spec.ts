@@ -29,7 +29,7 @@ function mockComicsRoute(page: Page) {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ code: 0, data: { records, total } }),
+      body: JSON.stringify({ code: 200, data: { records, total } }),
     })
   })
 }
