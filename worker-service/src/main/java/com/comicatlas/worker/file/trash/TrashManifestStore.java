@@ -2,6 +2,7 @@ package com.comicatlas.worker.file.trash;
 
 import com.comicatlas.common.dto.TrashManifestDTO;
 import com.comicatlas.common.dto.TrashManifestItemDTO;
+import com.comicatlas.worker.mapper.TrashManifestReadMapper;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageRoot;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -15,17 +16,20 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
- * Worker 侧 TRASH 清单存取 — 读取 API 创建的不可变 manifest.json，回写 actual.json。
+ * Worker 侧 TRASH 清单存取 — 从 DB 只读 API 创建的不可变 manifest，回写 actual.json 文件。
+ * <p>
+ * 架构边界：Worker 只读数据库、操作本地文件。manifest 存 DB（只读查询），
+ * actual.json 写文件（操作文件）。
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class TrashManifestStore {
 
-    private static final String MANIFEST_FILE = "manifest.json";
     private static final String ACTUAL_FILE = "actual.json";
 
     private final StorageProperties storageProperties;
+    private final TrashManifestReadMapper trashManifestReadMapper;
     private final ObjectMapper objectMapper;
 
     public StorageRoot trashRoot() {
@@ -40,19 +44,21 @@ public class TrashManifestStore {
         return trashRoot().resolve(targetType + "/" + targetId + "/" + taskId);
     }
 
+    /** 从 DB 只读 manifest（无记录返回 null） */
     public TrashManifestDTO readManifest(String targetType, Long targetId, Long taskId) {
-        Path file = manifestDir(targetType, targetId, taskId).resolve(MANIFEST_FILE);
-        if (!Files.exists(file)) {
+        String json = trashManifestReadMapper.selectManifestJsonByTaskId(taskId);
+        if (json == null || json.isBlank()) {
             return null;
         }
         try {
-            return objectMapper.readValue(Files.readString(file, StandardCharsets.UTF_8), TrashManifestDTO.class);
+            return objectMapper.readValue(json, TrashManifestDTO.class);
         } catch (Exception e) {
-            log.warn("读取 TRASH 清单失败: {}", file, e);
+            log.warn("解析 TRASH 清单(DB)失败: taskId={}", taskId, e);
             return null;
         }
     }
 
+    /** 回写 actual.json（Worker 操作文件；API 以只读挂载访问） */
     public void writeActual(TrashManifestItemDTO actual) {
         Path dir = manifestDir(actual.targetType(), actual.targetId(), actual.taskId());
         try {
