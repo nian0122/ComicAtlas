@@ -104,6 +104,13 @@ ComicAtlas 是一座“私人放映馆”：打开应用先看到作品，而不
 - **States**：default、hover、active、focus-visible、disabled、loading。
 - **Accessibility**：最小触控目标 44px；状态不能只依靠颜色。
 
+### Input / Select / Textarea
+
+- **Structure**：深色渐变表面、内描边、10px 圆角与 42px 基准高度；文本和占位符使用统一的内容层级。
+- **States**：default、hover、focus-visible、disabled、error；焦点同时使用品牌描边与柔和外环，不只依赖颜色变化。
+- **Layout**：表单控件按内容需要伸缩，移动端字号至少 16px；数字、日期与下拉控件沿用同一表面和焦点语言。
+- **Accessibility**：焦点环保持清晰对比，错误状态需配合文字说明，禁用状态降低对比但不隐藏内容。
+
 ### Poster card
 
 - **Structure**：2:3 封面、状态、底部进度、两行标题、元数据；封面本身承担主要色彩。

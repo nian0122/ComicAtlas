@@ -66,9 +66,9 @@
           class="chapter-search"
         />
       </div>
-      <el-table :data="filteredChapters" row-key="chapterId" size="small">
-        <el-table-column prop="chapterNo" label="编号" width="70" />
+      <el-table :data="filteredStructureRows" row-key="key" :tree-props="{ children: 'children' }" size="small">
         <el-table-column prop="title" label="章节名" min-width="160" show-overflow-tooltip />
+        <el-table-column prop="chapterNo" label="编号" width="70" />
         <el-table-column label="媒体数" width="80" align="center">
           <template #default="{ row }">{{ row.pageCount ?? '-' }}</template>
         </el-table-column>
@@ -79,15 +79,17 @@
           <template #default="{ row }">{{ formatSize(row.lqSize) }}</template>
         </el-table-column>
         <el-table-column label="HQ 状态" width="90">
-          <template #default="{ row }"><StorageStatusTag :status="row.hqStatus" type="hq" /></template>
+          <template #default="{ row }"><StorageStatusTag v-if="row.kind === 'CHAPTER'" :status="row.hqStatus" type="hq" /></template>
         </el-table-column>
         <el-table-column label="LQ 状态" width="90">
-          <template #default="{ row }"><StorageStatusTag :status="row.lqStatus" type="lq" /></template>
+          <template #default="{ row }"><StorageStatusTag v-if="row.kind === 'CHAPTER'" :status="row.lqStatus" type="lq" /></template>
         </el-table-column>
         <el-table-column label="操作" width="160">
           <template #default="{ row }">
-            <el-button size="small" type="danger" plain @click="onDeleteChapterHQ(row.chapterId)">删HQ</el-button>
-            <el-button size="small" type="primary" plain @click="onGenerateChapterLQ(row.chapterId)">生LQ</el-button>
+            <template v-if="row.kind === 'CHAPTER'">
+              <el-button size="small" type="danger" plain @click="onDeleteChapterHQ(row.chapterId)">删HQ</el-button>
+              <el-button size="small" type="primary" plain @click="onGenerateChapterLQ(row.chapterId)">生LQ</el-button>
+            </template>
           </template>
         </el-table-column>
       </el-table>
@@ -100,8 +102,8 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { storageService, exportService } from '@/services/storage'
-import { comicApi } from '@/services/api'
-import type { ComicStorageItem, ChapterStorageItem } from '@/types'
+import { catalogApi, comicApi } from '@/services/api'
+import type { CatalogNode, ComicStorageItem, ChapterStorageItem } from '@/types'
 import { StorageOperationType } from '@/types'
 import StorageStatusTag from './StorageStatusTag.vue'
 
@@ -112,7 +114,23 @@ const comicId = Number(route.params.id)
 const loading = ref(false)
 const comic = ref<ComicStorageItem | null>(null)
 const chapters = ref<ChapterStorageItem[]>([])
+const catalogTree = ref<CatalogNode[]>([])
 const chapterKeyword = ref('')
+
+interface StorageStructureRow {
+  readonly key: string
+  readonly kind: 'CATALOG' | 'CHAPTER'
+  readonly title: string
+  readonly chapterId: number | null
+  readonly chapterNo: string | null
+  readonly pageCount: number | null
+  readonly hqSize: number
+  readonly lqSize: number
+  readonly hqStatus: ChapterStorageItem['hqStatus'] | null
+  readonly lqStatus: ChapterStorageItem['lqStatus'] | null
+  readonly order: number | null
+  readonly children?: readonly StorageStructureRow[]
+}
 
 // --- 元数据刷新（异步任务，202 + taskId） ---
 const comicStatus = ref('')
@@ -150,14 +168,82 @@ function stopTranscodePolling() {
   }
 }
 
-const filteredChapters = computed(() => {
-  if (!chapterKeyword.value) return chapters.value
-  const kw = chapterKeyword.value.toLowerCase()
-  return chapters.value.filter(c =>
-    (c.title ?? '').toLowerCase().includes(kw) ||
-    (c.chapterNo ?? '').toLowerCase().includes(kw)
-  )
+const structureRows = computed<readonly StorageStructureRow[]>(() => {
+  const rows = catalogTree.value.flatMap((node) => toStorageRows(node))
+  const includedChapterIds = new Set<number>()
+  collectChapterIds(rows, includedChapterIds)
+  return [
+    ...rows,
+    ...chapters.value
+      .filter((chapter) => !includedChapterIds.has(chapter.chapterId))
+      .map((chapter) => chapterRow(chapter)),
+  ]
 })
+
+const filteredStructureRows = computed(() => {
+  if (!chapterKeyword.value) return structureRows.value
+  const kw = chapterKeyword.value.toLowerCase()
+  return filterStructureRows(structureRows.value, kw)
+})
+
+function chapterRow(chapter: ChapterStorageItem, globalOrder: number | null = null): StorageStructureRow {
+  return {
+    key: `chapter-${chapter.chapterId}`,
+    kind: 'CHAPTER',
+    title: chapter.title,
+    chapterId: chapter.chapterId,
+    chapterNo: chapter.chapterNo,
+    pageCount: chapter.pageCount,
+    hqSize: chapter.hqSize,
+    lqSize: chapter.lqSize,
+    hqStatus: chapter.hqStatus,
+    lqStatus: chapter.lqStatus,
+    order: globalOrder,
+  }
+}
+
+function toStorageRows(node: CatalogNode): readonly StorageStructureRow[] {
+  const children = [
+    ...node.chapters
+      .map((chapter) => {
+        const storageChapter = chapters.value.find((item) => item.chapterId === chapter.id)
+        return storageChapter ? chapterRow(storageChapter, chapter.globalOrder) : null
+      })
+      .filter((chapter): chapter is StorageStructureRow => chapter != null),
+    ...node.children.flatMap(toStorageRows),
+  ].sort((left, right) => (left.order ?? Number.MAX_SAFE_INTEGER) - (right.order ?? Number.MAX_SAFE_INTEGER))
+  if (node.id === null) return children
+  return [{
+    key: `catalog-${node.id}`,
+    kind: 'CATALOG',
+    title: node.title ?? '未命名目录',
+    chapterId: null,
+    chapterNo: null,
+    pageCount: null,
+    hqSize: children.reduce((sum, row) => sum + row.hqSize, 0),
+    lqSize: children.reduce((sum, row) => sum + row.lqSize, 0),
+    hqStatus: null,
+    lqStatus: null,
+    order: node.globalOrder ?? null,
+    children,
+  }]
+}
+
+function collectChapterIds(rows: readonly StorageStructureRow[], output: Set<number>): void {
+  for (const row of rows) {
+    if (row.chapterId !== null) output.add(row.chapterId)
+    if (row.children) collectChapterIds(row.children, output)
+  }
+}
+
+function filterStructureRows(rows: readonly StorageStructureRow[], keyword: string): readonly StorageStructureRow[] {
+  return rows.flatMap((row) => {
+    const children = row.children ? filterStructureRows(row.children, keyword) : []
+    const matches = row.title.toLowerCase().includes(keyword) || (row.chapterNo ?? '').toLowerCase().includes(keyword)
+    if (!matches && children.length === 0) return []
+    return [{ ...row, children: row.children ? children : undefined }]
+  })
+}
 
 function formatSize(bytes: number): string {
   if (!bytes || bytes < 0) return '0 B'
@@ -171,12 +257,14 @@ function formatSize(bytes: number): string {
 async function loadData() {
   loading.value = true
   try {
-    const [comicData, chaptersData] = await Promise.all([
+    const [comicData, chaptersData, catalogData] = await Promise.all([
       storageService.fetchComic(comicId),
       storageService.fetchChapters(comicId),
+      catalogApi.tree(comicId),
     ])
     comic.value = comicData
     chapters.value = chaptersData
+    catalogTree.value = (catalogData.data ?? []) as CatalogNode[]
   } catch {
     ElMessage.error('加载失败')
   } finally {

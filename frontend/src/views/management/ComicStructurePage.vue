@@ -2,10 +2,15 @@
   <div class="structure-page">
     <header class="page-header"><div><h1>目录与媒体结构</h1><p>先输入漫画 ID，加载目录、章节与媒体 ID，再执行维护操作。</p></div><div><el-input-number v-model="comicId" :min="1" :controls="false" /><el-button type="primary" @click="loadTree">加载</el-button></div></header>
     <el-alert v-if="error" :title="error" type="error" show-icon />
-    <el-table v-loading="loading" :data="structureRows" row-key="key">
+    <el-table
+      v-loading="loading"
+      :data="structureRows"
+      row-key="key"
+      :tree-props="{ children: 'children' }"
+    >
+      <el-table-column prop="title" label="标题" min-width="280" />
       <el-table-column label="类型" width="90"><template #default="{ row }">{{ row.kind === 'CATALOG' ? '目录' : '章节' }}</template></el-table-column>
       <el-table-column prop="id" label="ID" width="90" />
-      <el-table-column label="标题" min-width="280"><template #default="{ row }"><span :style="{ paddingLeft: `${row.depth * 20}px` }">{{ row.title }}</span></template></el-table-column>
       <el-table-column prop="order" label="顺序" width="90" />
       <el-table-column label="状态" width="150"><template #default="{ row }">{{ row.status ? `${chapterStatusLabel(row.status)} (${row.status})` : '—' }}</template></el-table-column>
     </el-table>
@@ -50,7 +55,15 @@ import type { CatalogNode, MediaItemInfo } from '@/types'
 
 type CatalogAction = 'create' | 'rename' | 'move' | 'reorder' | 'delete'
 type ChapterAction = 'create' | 'rename' | 'move' | 'reorder' | 'trash'
-type StructureRow = { readonly key: string; readonly kind: 'CATALOG' | 'CHAPTER'; readonly id: number; readonly title: string; readonly order: number | null; readonly status: string | null; readonly depth: number }
+interface StructureRow {
+  readonly key: string
+  readonly kind: 'CATALOG' | 'CHAPTER'
+  readonly id: number
+  readonly title: string
+  readonly order: number | null
+  readonly status: string | null
+  readonly children?: readonly StructureRow[]
+}
 const CATALOG_ACTIONS = [{ value: 'create', label: '新建目录' }, { value: 'rename', label: '重命名目录' }, { value: 'move', label: '移动目录' }, { value: 'reorder', label: '目录重排' }, { value: 'delete', label: '删除目录' }] as const
 const CHAPTER_ACTIONS = [{ value: 'create', label: '新建章节' }, { value: 'rename', label: '重命名章节' }, { value: 'move', label: '移动章节' }, { value: 'reorder', label: '章节重排' }, { value: 'trash', label: '回收章节' }] as const
 const comicId = ref(1)
@@ -63,7 +76,32 @@ const error = ref('')
 const activeTab = ref('catalog')
 const catalogForm = reactive<{ action: CatalogAction; id?: number; title: string; parentId?: number; order?: number; reparentTo?: number }>({ action: 'create', title: '' })
 const chapterForm = reactive<{ action: ChapterAction; id?: number; title: string; chapterNo: string; catalogId?: number; order?: number }>({ action: 'create', title: '', chapterNo: '' })
-const structureRows = computed(() => { const rows: StructureRow[] = []; const visit = (nodes: readonly CatalogNode[], depth: number): void => { for (const node of nodes) { if (node.id !== null) rows.push({ key: `catalog-${node.id}`, kind: 'CATALOG', id: node.id, title: node.title ?? '未命名目录', order: node.globalOrder ?? null, status: null, depth }); for (const chapter of node.chapters) rows.push({ key: `chapter-${chapter.id}`, kind: 'CHAPTER', id: chapter.id, title: chapter.title, order: chapter.globalOrder, status: chapter.status ?? null, depth: depth + 1 }); visit(node.children, depth + 1) } }; visit(tree.value, 0); return rows })
+const structureRows = computed<readonly StructureRow[]>(() => tree.value.flatMap(toStructureRows))
+
+function toStructureRows(node: CatalogNode): readonly StructureRow[] {
+  const children = [
+    ...node.chapters.map((chapter) => ({
+      key: `chapter-${chapter.id}`,
+      kind: 'CHAPTER' as const,
+      id: chapter.id,
+      title: chapter.title,
+      order: chapter.globalOrder,
+      status: chapter.status ?? null,
+    })),
+    ...node.children.flatMap(toStructureRows),
+  ].sort((left, right) => (left.order ?? Number.MAX_SAFE_INTEGER) - (right.order ?? Number.MAX_SAFE_INTEGER))
+
+  if (node.id === null) return children
+  return [{
+    key: `catalog-${node.id}`,
+    kind: 'CATALOG',
+    id: node.id,
+    title: node.title ?? '未命名目录',
+    order: node.globalOrder ?? null,
+    status: null,
+    children,
+  }]
+}
 function errorMessage(reason: unknown): string { if (axios.isAxiosError<{ message?: string }>(reason)) return reason.response?.data?.message ?? reason.message; return reason instanceof Error ? reason.message : '未知错误' }
 function assertNever(value: never): never { throw new TypeError(`未知操作: ${String(value)}`) }
 function chapterStatusLabel(status: string): string { const labels: Readonly<Record<string, string>> = { DRAFT: '草稿', READY: '可阅读', DELETING: '删除排队中', TRASHING: '回收中', TRASHED: '已回收', RESTORING: '恢复中', PURGING: '永久清理中', DELETED: '已永久删除' }; return labels[status] ?? '未知状态' }

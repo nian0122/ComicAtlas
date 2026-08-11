@@ -107,6 +107,11 @@
   --content-narrow: 420px;
   --content-gutter: clamp(16px, 3vw, 40px);
   --control-min-size: 44px;
+  --control-height: 42px;
+  --control-radius: 10px;
+  --control-bg: var(--color-surface-2);
+  --control-bg-hover: var(--color-surface-3);
+  --control-focus-ring: rgb(229 9 20 / 18%);
   --status-dot-size: 8px;
   --disabled-opacity: 0.55;
   --sidebar-width: 232px;

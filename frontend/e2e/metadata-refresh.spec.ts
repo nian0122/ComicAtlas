@@ -18,10 +18,56 @@ test.beforeEach(async ({ page }) => {
   await page.route(`**/api/admin/storage/comics/${COMIC_ID}/chapters`, (route) =>
     json(route, [])
   )
+  await page.route(`**/api/comics/${COMIC_ID}/catalog`, (route) =>
+    json(route, [])
+  )
   await page.route(`**/api/comics/${COMIC_ID}`, (route) =>
     json(route, comicDetail('READY'))
   )
   await page.route(`**/api/storage/refresh-metadata/comics/${COMIC_ID}`, handleRefresh)
+})
+
+test('章节存储按目录树展示并支持逐级展开', async ({ page }) => {
+  await page.unroute(`**/api/comics/${COMIC_ID}/catalog`)
+  await page.route(`**/api/comics/${COMIC_ID}/catalog`, (route) =>
+    json(route, [{
+      id: 1,
+      title: '第一卷',
+      globalOrder: 1,
+      chapters: [{ id: 12, chapterNo: '99', title: '全局顺序章节', globalOrder: 5, pageCount: 20 }],
+      children: [{
+        id: 2,
+        title: '第一部',
+        globalOrder: 2,
+        chapters: [{ id: 11, chapterNo: '1', title: '启程', globalOrder: 1, pageCount: 10 }],
+        children: [],
+      }],
+    }])
+  )
+  await page.unroute(`**/api/admin/storage/comics/${COMIC_ID}/chapters`)
+  await page.route(`**/api/admin/storage/comics/${COMIC_ID}/chapters`, (route) =>
+    json(route, [
+      chapterStorageItem(),
+      chapterStorageItem({ chapterId: 12, chapterNo: '99', title: '全局顺序章节', pageCount: 20 }),
+      chapterStorageItem({ chapterId: 13, chapterNo: '孤儿', title: '无目录章节' }),
+    ])
+  )
+
+  await page.goto(`/manage/storage/${COMIC_ID}?force-desktop=1`)
+  await expect(page.getByRole('cell', { name: '第一卷' })).toBeVisible()
+  await expect(page.getByRole('cell', { name: '无目录章节' })).toBeVisible()
+  await expect(page.getByRole('cell', { name: '第一部' })).toBeHidden()
+  await page.locator('.el-table__expand-icon').first().click()
+  await expect(page.getByRole('cell', { name: '第一部' })).toBeVisible()
+  await expect(page.getByRole('cell', { name: '启程' })).toBeHidden()
+  const visibleRows = await page.locator('.el-table__body-wrapper tbody tr:visible').allTextContents()
+  expect(visibleRows.findIndex((row) => row.includes('第一部'))).toBeLessThan(visibleRows.findIndex((row) => row.includes('全局顺序章节')))
+  await page.locator('.el-table__expand-icon').nth(1).click()
+  await expect(page.getByRole('cell', { name: '启程' })).toBeVisible()
+  await page.getByPlaceholder('搜索章节').fill('全局顺序章节')
+  await expect(page.getByRole('cell', { name: '第一卷' })).toBeVisible()
+  await expect(page.getByRole('cell', { name: '全局顺序章节' })).toBeVisible()
+  await expect(page.getByRole('cell', { name: '第一部' })).toBeHidden()
 })
 
 test('READY 状态下提交元数据刷新：单次 POST 并展示任务编号', async ({ page }) => {
@@ -102,6 +148,20 @@ function comicStorageItem() {
     transcodeStatus: 'NOT_NEEDED',
     chapterCount: 0,
     pageCount: 0,
+  }
+}
+
+function chapterStorageItem(overrides: Partial<{ chapterId: number; chapterNo: string; title: string; pageCount: number }> = {}) {
+  return {
+    chapterId: 11,
+    chapterNo: '1',
+    title: '启程',
+    pageCount: 10,
+    hqSize: 1024,
+    lqSize: 0,
+    hqStatus: 'READY',
+    lqStatus: 'NOT_GENERATED',
+    ...overrides,
   }
 }
 

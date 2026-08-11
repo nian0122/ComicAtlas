@@ -67,6 +67,53 @@ test('正常漫画加载目录树并渲染目录与章节行', async ({ page }) 
   await catalogResp
 
   await expect(page.getByRole('cell', { name: 'Vol 1' })).toBeVisible()
+  await page.locator('.el-table__expand-icon').first().click()
   await expect(page.getByRole('cell', { name: '第一话' })).toBeVisible()
   expect(pageErrors, `页面渲染抛出了未捕获异常: ${pageErrors.join(' | ')}`).toEqual([])
+})
+
+test('嵌套目录保持父子关系并可展开查看章节', async ({ page }) => {
+  await page.route(CATALOG_API, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 200,
+        message: 'success',
+        data: [
+          {
+            id: 1,
+            title: '第一卷',
+            globalOrder: 1,
+            chapters: [],
+            children: [
+              {
+                id: 2,
+                title: '第一部',
+                globalOrder: 1,
+                chapters: [
+                  { id: 11, chapterNo: '1', title: '启程', globalOrder: 1, pageCount: 10, status: 'READY' },
+                ],
+                children: [],
+              },
+            ],
+          },
+        ],
+      }),
+    })
+  )
+  await page.goto('/manage/structure')
+
+  await page.locator('input[role="spinbutton"]').first().fill('7')
+  const catalogResp = page.waitForResponse((resp) => /\/api\/comics\/7\/catalog/.test(resp.url()))
+  await page.getByRole('button', { name: '加载' }).click()
+  await catalogResp
+
+  await expect(page.getByRole('cell', { name: '第一卷' })).toBeVisible()
+  await expect(page.getByRole('cell', { name: '第一部' })).toBeHidden()
+  await page.locator('.el-table__expand-icon').first().click()
+  await expect(page.getByRole('cell', { name: '第一部' })).toBeVisible()
+  await expect(page.getByRole('cell', { name: '启程' })).toBeHidden()
+  await page.locator('.el-table__expand-icon').nth(1).click()
+  await expect(page.getByRole('cell', { name: '启程' })).toBeVisible()
 })
