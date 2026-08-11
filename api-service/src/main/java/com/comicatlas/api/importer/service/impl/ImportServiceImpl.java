@@ -392,6 +392,7 @@ public class ImportServiceImpl implements ImportService {
         outboxService.enqueue(retryEvent, MqExchanges.IMPORT, MqRoutingKeys.TASK_CREATED);
 
         // 非关键清理操作（不参与事务）
+        List<Long> orphanChapterIds = new ArrayList<>(chapterIds);
         TransactionSynchronizationManager.registerSynchronization(
                 new TransactionSynchronization() {
                     @Override
@@ -406,8 +407,47 @@ public class ImportServiceImpl implements ImportService {
                         } catch (Exception e) {
                             log.warn("取消标记清理失败（非关键）: taskId={}, error={}", taskId, e.getMessage());
                         }
+                        // 清理旧章节最终化残留的孤儿 HQ 目录（重试将生成新 chapterId）
+                        cleanupOrphanHqChapterDirs(comicId, orphanChapterIds);
                     }
                 });
+    }
+
+    /**
+     * 清理重试后旧章节的孤儿 HQ 目录 {@code hq/{comicId}/{chapterId}}。
+     * <p>
+     * finalize 阶段失败可能已把部分文件从 {@code {globalOrder}} 暂存搬到 {@code {chapterId}} 目录；
+     * 重试会生成全新的 chapterId，旧 chapterId 目录中的文件在 DB 无引用且永不回收，
+     * 故在重试提交后递归删除。目录不存在或删除失败仅告警（非关键清理）。
+     */
+    private void cleanupOrphanHqChapterDirs(Long comicId, List<Long> orphanChapterIds) {
+        if (comicId == null || orphanChapterIds == null || orphanChapterIds.isEmpty()) {
+            return;
+        }
+        for (Long chapterId : orphanChapterIds) {
+            try {
+                Path dir = storageProperties.root("HQ").resolve(comicId + "/" + chapterId);
+                if (Files.exists(dir)) {
+                    deleteRecursively(dir);
+                    log.info("重试已清理孤儿 HQ 章节目录: {}", dir);
+                }
+            } catch (Exception e) {
+                log.warn("孤儿 HQ 章节目录清理失败（非关键）: comicId={}, chapterId={}, error={}",
+                        comicId, chapterId, e.getMessage());
+            }
+        }
+    }
+
+    private void deleteRecursively(Path dir) throws Exception {
+        try (var stream = Files.walk(dir)) {
+            stream.sorted(java.util.Comparator.reverseOrder()).forEach(p -> {
+                try {
+                    Files.deleteIfExists(p);
+                } catch (Exception e) {
+                    log.warn("递归删除失败: {}", p, e);
+                }
+            });
+        }
     }
 
     /** 幂等 payload：导入请求的确定性表示 */

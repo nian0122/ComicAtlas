@@ -3,6 +3,7 @@ package com.comicatlas.api.importer.service.impl;
 import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.comic.mapper.CatalogMapper;
+import com.comicatlas.api.comic.entity.Chapter;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.mapper.MediaMapper;
@@ -33,12 +34,14 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -83,6 +86,9 @@ class ImportServiceTest {
         ApiStorageRoot metadataRoot = new ApiStorageRoot();
         metadataRoot.setPath(Path.of("target/test-tmp/metadata"));
         lenient().when(storageProperties.root("METADATA")).thenReturn(metadataRoot);
+        ApiStorageRoot hqRoot = new ApiStorageRoot();
+        hqRoot.setPath(Path.of("target/test-tmp/hq"));
+        lenient().when(storageProperties.root("HQ")).thenReturn(hqRoot);
     }
 
     @AfterEach
@@ -345,5 +351,39 @@ class ImportServiceTest {
         }
 
         verify(catalogCacheInvalidator).evict(20L);
+    }
+
+    @Test
+    void retryTask_shouldDeleteOrphanHqChapterDirs_whenFinalizePartiallyMovedFiles() throws Exception {
+        ImportTask task = new ImportTask();
+        task.setId(50L);
+        task.setComicId(60L);
+        task.setStatus(ImportTaskStatus.FAILED);
+        task.setRetryCount(0);
+        task.setSourceType(SourceType.DIRECTORY);
+        task.setSourcePath("D:/manga/test/orphan");
+        when(taskMapper.selectById(50L)).thenReturn(task);
+
+        // 旧章节结构（finalize 部分失败后仍残留）
+        Chapter ch1 = new Chapter();
+        ch1.setId(7001L);
+        ch1.setComicId(60L);
+        when(chapterMapper.selectList(any())).thenReturn(List.of(ch1));
+
+        // 预置孤儿 HQ 目录（重试将生成新 chapterId，旧目录 DB 无引用）
+        Path orphanDir = Path.of("target/test-tmp/hq/60/7001");
+        Files.createDirectories(orphanDir);
+        Files.writeString(orphanDir.resolve("001.jpg"), "orphan");
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            service.retryTask(50L);
+            TransactionSynchronizationManager.getSynchronizations()
+                    .forEach(sync -> sync.afterCommit());
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+
+        assertFalse(Files.exists(orphanDir), "重试提交后旧 chapterId 目录应被清理");
     }
 }
