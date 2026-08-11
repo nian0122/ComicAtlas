@@ -31,12 +31,24 @@ public record MetadataRefreshSnapshotDTO(
     /**
      * 章节快照：chapterId 与 chapterVersion（乐观锁）为结构标识，
      * mediaItems 为该章媒体列表，warnings 为该章扫描告警（可为 null）。
+     * <p>
+     * {@code legacyDirKey} 为旧布局升级信号（可为 null）：Worker 发现该章文件存放于
+     * {@code hq/{comicId}/{legacyDirKey}}（旧暂存键目录）并已成功移动至
+     * {@code hq/{comicId}/{chapterId}} 时填充；API 据此将该章 page 行
+     * {@code hq_path}/{@code lq_path} 前缀重写为新布局。非 null 即表示文件已迁移完成。
      */
     public record ChapterSnapshot(
             Long chapterId,
             int chapterVersion,
             List<MediaSnapshot> mediaItems,
-            List<String> warnings) {
+            List<String> warnings,
+            String legacyDirKey) {
+
+        /** 旧布局升级前的构造器形态：未升级（legacyDirKey=null）。 */
+        public ChapterSnapshot(Long chapterId, int chapterVersion,
+                               List<MediaSnapshot> mediaItems, List<String> warnings) {
+            this(chapterId, chapterVersion, mediaItems, warnings, null);
+        }
     }
 
     /**

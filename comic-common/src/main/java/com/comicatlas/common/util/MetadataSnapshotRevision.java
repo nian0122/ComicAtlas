@@ -50,7 +50,8 @@ public final class MetadataSnapshotRevision {
         for (ChapterSnapshot chapter : sortedChapters(snapshot)) {
             canonical.append('C').append(FIELD_SEPARATOR)
                     .append(chapter.chapterId()).append(FIELD_SEPARATOR)
-                    .append(chapter.chapterVersion()).append(RECORD_SEPARATOR);
+                    .append(chapter.chapterVersion()).append(FIELD_SEPARATOR)
+                    .append(normalize(chapter.legacyDirKey())).append(RECORD_SEPARATOR);
             for (MediaSnapshot media : sortedMedia(chapter)) {
                 canonical.append('M').append(FIELD_SEPARATOR)
                         .append(media.mediaId()).append(FIELD_SEPARATOR)
