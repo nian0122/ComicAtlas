@@ -57,6 +57,8 @@ public class ManagementTaskService {
     private final ComicMapper comicMapper;
     private final ExportTaskMapper exportTaskMapper;
     private final com.comicatlas.api.outbox.service.OutboxService outboxService;
+    private final com.comicatlas.api.importer.mapper.ImportTaskMapper importTaskMapper;
+    private final com.comicatlas.api.importer.service.ImportRetryCoordinator importRetryCoordinator;
 
     // ======================== 创建任务 ========================
 
@@ -391,6 +393,8 @@ public class ManagementTaskService {
                 republishCommand(taskId, item, newAttempt);
                 // EXPORT 走独立导出链路（export.task.queue），单独重新入队
                 republishExportCommand(taskId, item, newAttempt);
+                // IMPORT 走独立导入链路（import.task.queue），重新发布导入事件
+                republishImportCommand(taskId, item, newAttempt);
             }
         }
 
@@ -453,6 +457,30 @@ public class ManagementTaskService {
                 taskId, item.getId(), newAttempt);
         log.info("导出任务重试已重新入队: taskId={}, itemId={}, attempt={}, exportTaskId={}, comicId={}",
                 taskId, item.getId(), newAttempt, exportTask.getId(), exportTask.getComicId());
+    }
+
+    /**
+     * IMPORT 任务重试：委托 ImportRetryCoordinator 重新入队。
+     * <p>
+     * 导入走独立链路（import.task.queue），不经 ManagementCommandDispatcher；
+     * 重试时必须主动重新发布导入事件，否则 item 重置为 QUEUED 后 Worker 永远不会收到命令而卡死。
+     * coordinator 内置终态守卫：仅当 import_task 仍处于终态（FAILED/CANCELLED）才执行重试入队，
+     * 与导入任务页重试（ImportServiceImpl.retryTask 已先重置 import_task）并存时不会重复入队。
+     */
+    private void republishImportCommand(Long taskId, ManagementTaskItem item, int newAttempt) {
+        if (item.getOperationType() != TaskType.IMPORT) {
+            return;
+        }
+        com.comicatlas.api.importer.entity.ImportTask importTask = importTaskMapper.selectOne(
+                new LambdaQueryWrapper<com.comicatlas.api.importer.entity.ImportTask>()
+                        .eq(com.comicatlas.api.importer.entity.ImportTask::getManagementTaskId, taskId));
+        if (importTask == null) {
+            log.warn("导入任务不存在，跳过导入重试入队: taskId={}, itemId={}", taskId, item.getId());
+            return;
+        }
+        boolean retried = importRetryCoordinator.retry(importTask);
+        log.info("导入任务重试已重新入队: taskId={}, itemId={}, attempt={}, importTaskId={}, retried={}",
+                taskId, item.getId(), newAttempt, importTask.getId(), retried);
     }
 
     /** 统一命令管线操作类型集合。 */

@@ -2,15 +2,8 @@ package com.comicatlas.api.importer.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.comicatlas.api.comic.entity.Catalog;
-import com.comicatlas.api.comic.entity.Chapter;
 import com.comicatlas.api.comic.entity.Comic;
-import com.comicatlas.api.comic.entity.Media;
-import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
-import com.comicatlas.api.comic.mapper.CatalogMapper;
-import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.comic.mapper.ComicMapper;
-import com.comicatlas.api.comic.mapper.MediaMapper;
 import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.common.enums.ComicStatus;
 import com.comicatlas.api.common.enums.ImportTaskStatus;
@@ -22,12 +15,12 @@ import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
 import com.comicatlas.api.importer.service.ImportService;
+import com.comicatlas.api.importer.service.ImportRetryCoordinator;
 import com.comicatlas.api.management.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
 import com.comicatlas.api.management.entity.ManagementTask;
 import com.comicatlas.api.management.entity.ManagementTaskItem;
 import com.comicatlas.api.management.service.ManagementTaskService;
-import com.comicatlas.api.management.state.ManagementStateMachine;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.api.common.enums.ManagementTaskStatus;
@@ -53,7 +46,6 @@ import java.util.List;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -84,15 +76,12 @@ public class ImportServiceImpl implements ImportService {
 
     private final ImportTaskMapper taskMapper;
     private final ComicMapper comicMapper;
-    private final CatalogMapper catalogMapper;
-    private final ChapterMapper chapterMapper;
-    private final MediaMapper mediaMapper;
     private final OutboxService outboxService;
     private final RedisTemplate<String, Object> redisTemplate;
     private final TransactionTemplate transactionTemplate;
-    private final CatalogCacheInvalidator catalogCacheInvalidator;
     private final ManagementTaskService managementTaskService;
     private final ApiStorageProperties storageProperties;
+    private final ImportRetryCoordinator importRetryCoordinator;
 
     @Override
     @Transactional
@@ -347,36 +336,11 @@ public class ImportServiceImpl implements ImportService {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "仅 FAILED/CANCELLED 状态可重试");
         }
 
-        Long comicId = task.getComicId();
-
-        List<Long> chapterIds = chapterMapper.selectList(
-                new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId))
-                .stream().map(Chapter::getId).toList();
-        if (!chapterIds.isEmpty()) {
-            mediaMapper.delete(new LambdaQueryWrapper<Media>().in(Media::getChapterId, chapterIds));
-        }
-        chapterMapper.delete(new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
-        catalogMapper.delete(new LambdaQueryWrapper<Catalog>().eq(Catalog::getComicId, comicId));
-        catalogCacheInvalidator.evict(comicId);
-
-        task.setStatus(ImportTaskStatus.PENDING);
-        task.setRetryCount(task.getRetryCount() + 1);
-        task.setErrorMessage(null);
-        taskMapper.updateById(task);
-
-        // IMPORT_FAILED → IMPORTING，允许重新导入
-        Comic comic = comicMapper.selectById(comicId);
-        if (comic != null && comic.getStatus() == ComicStatus.IMPORT_FAILED) {
-            ManagementStateMachine.validateComicTransition(comicStatusName(comic), "IMPORTING");
-            comic.setStatus(ComicStatus.IMPORTING);
-            comicMapper.updateById(comic);
-        }
-
-        Long taskId = task.getId();
-        String sourceType = resolveSourceType(task);
-        String sourcePath = task.getSourcePath();
+        // 统一重试编排：清理旧章节 → import_task 重置 PENDING → comic IMPORTING → 重发 ImportTaskCreatedEvent
+        importRetryCoordinator.retry(task);
 
         // 同步统一任务：终态统一任务重置回 QUEUED（attempt 递增，失败/取消 item 重新入队）
+        // IMPORT 类型 item 由 ImportRetryCoordinator 幂等守卫保证不重复入队（此时 import_task 已非终态）
         if (task.getManagementTaskId() != null) {
             try {
                 managementTaskService.retryTask(task.getManagementTaskId());
@@ -384,69 +348,6 @@ public class ImportServiceImpl implements ImportService {
                 log.warn("统一任务重试跳过（非终态）: managementTaskId={}, error={}",
                         task.getManagementTaskId(), e.getMessage());
             }
-        }
-
-        // 写入 Outbox（同事务），由 relay 发布到 MQ
-        var retryEvent = new ImportTaskCreatedEvent(
-                UUID.randomUUID(), Instant.now(), taskId, comicId, sourceType, sourcePath);
-        outboxService.enqueue(retryEvent, MqExchanges.IMPORT, MqRoutingKeys.TASK_CREATED);
-
-        // 非关键清理操作（不参与事务）
-        List<Long> orphanChapterIds = new ArrayList<>(chapterIds);
-        TransactionSynchronizationManager.registerSynchronization(
-                new TransactionSynchronization() {
-                    @Override
-                    public void afterCommit() {
-                        try {
-                            Files.deleteIfExists(storageProperties.root("METADATA").resolve(taskId + ".json"));
-                        } catch (Exception e) {
-                            log.warn("Metadata cleanup failed for retry: taskId={}", taskId, e);
-                        }
-                        try {
-                            redisTemplate.delete("import:cancel:" + taskId);
-                        } catch (Exception e) {
-                            log.warn("取消标记清理失败（非关键）: taskId={}, error={}", taskId, e.getMessage());
-                        }
-                        // 清理旧章节最终化残留的孤儿 HQ 目录（重试将生成新 chapterId）
-                        cleanupOrphanHqChapterDirs(comicId, orphanChapterIds);
-                    }
-                });
-    }
-
-    /**
-     * 清理重试后旧章节的孤儿 HQ 目录 {@code hq/{comicId}/{chapterId}}。
-     * <p>
-     * finalize 阶段失败可能已把部分文件从 {@code {globalOrder}} 暂存搬到 {@code {chapterId}} 目录；
-     * 重试会生成全新的 chapterId，旧 chapterId 目录中的文件在 DB 无引用且永不回收，
-     * 故在重试提交后递归删除。目录不存在或删除失败仅告警（非关键清理）。
-     */
-    private void cleanupOrphanHqChapterDirs(Long comicId, List<Long> orphanChapterIds) {
-        if (comicId == null || orphanChapterIds == null || orphanChapterIds.isEmpty()) {
-            return;
-        }
-        for (Long chapterId : orphanChapterIds) {
-            try {
-                Path dir = storageProperties.root("HQ").resolve(comicId + "/" + chapterId);
-                if (Files.exists(dir)) {
-                    deleteRecursively(dir);
-                    log.info("重试已清理孤儿 HQ 章节目录: {}", dir);
-                }
-            } catch (Exception e) {
-                log.warn("孤儿 HQ 章节目录清理失败（非关键）: comicId={}, chapterId={}, error={}",
-                        comicId, chapterId, e.getMessage());
-            }
-        }
-    }
-
-    private void deleteRecursively(Path dir) throws Exception {
-        try (var stream = Files.walk(dir)) {
-            stream.sorted(java.util.Comparator.reverseOrder()).forEach(p -> {
-                try {
-                    Files.deleteIfExists(p);
-                } catch (Exception e) {
-                    log.warn("递归删除失败: {}", p, e);
-                }
-            });
         }
     }
 
@@ -493,10 +394,6 @@ public class ImportServiceImpl implements ImportService {
 
     private static String resolveSourceType(ImportTask task) {
         return task.getSourceType() != null ? task.getSourceType().name() : "DIRECTORY";
-    }
-
-    private static String comicStatusName(Comic comic) {
-        return comic.getStatus() == null ? null : comic.getStatus().name();
     }
 
     private static String statusName(ImportTaskStatus status) {

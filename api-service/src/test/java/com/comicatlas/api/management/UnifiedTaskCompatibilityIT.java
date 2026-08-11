@@ -268,6 +268,51 @@ class UnifiedTaskCompatibilityIT {
         assertThat(retried.getFailureCount()).isZero();
     }
 
+    @Test
+    @DisplayName("IMPORT 失败管理任务重试：import_task 回 PENDING、comic 回 IMPORTING 并重新发布导入事件")
+    void importTask_retry_republishesImportEvent() {
+        ImportTaskVO vo = importService.createImportTask(buildRequest("/mnt/import/测试漫画D"), null);
+        ImportTask it = importTaskMapper.selectById(vo.getId());
+        Long mgmtTaskId = it.getManagementTaskId();
+        assertThat(mgmtTaskId).isNotNull();
+
+        // 模拟导入失败：item 标记 FAILED，import_task 同步 FAILED，comic IMPORT_FAILED
+        ManagementTaskItem activeItem = managementTaskService.findActiveItem(
+                "COMIC", it.getComicId(), TaskType.IMPORT);
+        assertThat(activeItem).isNotNull();
+        managementTaskService.updateItemStatus(activeItem.getId(), ManagementTaskStatus.FAILED,
+                "模拟导入失败", "IMPORT_TASK", it.getId());
+
+        Comic comic = comicMapper.selectById(it.getComicId());
+        assertThat(comic.getStatus()).isEqualTo(ComicStatus.IMPORTING);
+        comic.setStatus(ComicStatus.IMPORT_FAILED);
+        comicMapper.updateById(comic);
+        it.setStatus(ImportTaskStatus.FAILED);
+        it.setErrorMessage("模拟导入失败");
+        importTaskMapper.updateById(it);
+
+        ManagementTaskResponse failed = managementTaskService.getTask(mgmtTaskId);
+        assertThat(failed.getStatus()).isEqualTo(ManagementTaskStatus.FAILED);
+
+        ManagementTaskResponse retried = managementTaskService.retryTask(mgmtTaskId);
+        assertThat(retried.getAttempt()).isEqualTo(2);
+        assertThat(retried.getStatus()).isEqualTo(ManagementTaskStatus.QUEUED);
+
+        ImportTask after = importTaskMapper.selectById(it.getId());
+        assertThat(after.getStatus()).isEqualTo(ImportTaskStatus.PENDING);
+        assertThat(after.getErrorMessage()).isNull();
+        assertThat(after.getRetryCount()).isEqualTo(1);
+
+        Comic comicAfter = comicMapper.selectById(it.getComicId());
+        assertThat(comicAfter.getStatus()).isEqualTo(ComicStatus.IMPORTING);
+
+        Long commandCount = outboxMessageMapper.selectCount(
+                new LambdaQueryWrapper<OutboxMessage>()
+                        .eq(OutboxMessage::getEventType, "ImportTaskCreatedEvent")
+                        .eq(OutboxMessage::getRoutingKey, "task.created"));
+        assertThat(commandCount).isGreaterThanOrEqualTo(1);
+    }
+
     // ======================== Export / Scan / Recovery 首屏可见 ========================
 
     @Test
