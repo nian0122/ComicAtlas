@@ -338,53 +338,36 @@ const exportPollTimer = ref<ReturnType<typeof setInterval> | null>(null)
 
 const TERMINAL_EXPORT_STATUSES = new Set(['SUCCESS', 'FAILED'])
 
-/** 关注的漫画 ID 集合：由 query.comicId 首次进入 + 已加载任务的漫画构成 */
-const exportComicIds = ref<Set<number>>(new Set())
-
 const queryComicId = computed(() => {
   const n = Number(route.query.comicId)
   return Number.isFinite(n) && n > 0 ? n : null
 })
 
+/** 按 query.comicId 过滤后的导出任务（未指定时展示全部） */
+const visibleExportTasks = computed(() =>
+  queryComicId.value == null
+    ? exportTasks.value
+    : exportTasks.value.filter(t => t.comicId === queryComicId.value)
+)
+
 const activeExportTasks = computed(() =>
-  exportTasks.value.filter(t => !TERMINAL_EXPORT_STATUSES.has(t.status))
+  visibleExportTasks.value.filter(t => !TERMINAL_EXPORT_STATUSES.has(t.status))
 )
 const failedExportTasks = computed(() =>
-  exportTasks.value.filter(t => t.status === 'FAILED')
+  visibleExportTasks.value.filter(t => t.status === 'FAILED')
 )
 const completedExportTasks = computed(() =>
-  exportTasks.value.filter(t => t.status === 'SUCCESS')
+  visibleExportTasks.value.filter(t => t.status === 'SUCCESS')
 )
 
 function hasActiveExports(): boolean {
-  return exportTasks.value.some(t => !TERMINAL_EXPORT_STATUSES.has(t.status))
+  return visibleExportTasks.value.some(t => !TERMINAL_EXPORT_STATUSES.has(t.status))
 }
 
 async function fetchExportTasks() {
-  if (queryComicId.value != null) {
-    exportComicIds.value.add(queryComicId.value)
-  }
-  if (exportComicIds.value.size === 0) return
-
   try {
-    const results = await Promise.allSettled(
-      [...exportComicIds.value].map(id => exportApi.listExports(id))
-    )
-    const allTasks: ExportTaskVO[] = []
-    for (const r of results) {
-      if (r.status === 'fulfilled') {
-        const data = (r.value as { data?: ExportTaskVO[] })?.data
-        if (Array.isArray(data)) {
-          allTasks.push(...data)
-        }
-      }
-    }
-    // 去重：同一任务 id 取最新
-    const map = new Map<number, ExportTaskVO>()
-    for (const t of allTasks) {
-      map.set(t.id, t)
-    }
-    exportTasks.value = [...map.values()]
+    const res = await exportApi.listAllExports()
+    exportTasks.value = Array.isArray(res.data) ? res.data : []
   } catch {
     // 静默处理轮询错误
   }

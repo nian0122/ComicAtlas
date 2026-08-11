@@ -138,6 +138,7 @@ export const hqApi = {
 export const exportApi = {
   createExport: (comicId: number) => api.post<ExportTaskVO>(`/storage/export/comics/${comicId}`),
   listExports: (comicId: number) => api.get<ExportTaskVO[]>(`/storage/export/comics/${comicId}/tasks`),
+  listAllExports: () => api.get<ExportTaskVO[]>('/storage/export/tasks'),
   getTask: (taskId: number) => api.get<ExportTaskVO>(`/storage/export/tasks/${taskId}`),
   getArtifacts: (taskId: number) =>
     api.get<ExportArtifactVO[]>(`/storage/export/tasks/${taskId}/artifacts`),
