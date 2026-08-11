@@ -94,6 +94,13 @@ public class ExportServiceImpl implements ExportService {
     }
 
     @Override
+    public List<ExportTaskVO> listAllExports() {
+        var list = exportTaskMapper.selectList(new LambdaQueryWrapper<ExportTask>()
+            .orderByDesc(ExportTask::getCreatedAt));
+        return list.stream().map(this::toVO).toList();
+    }
+
+    @Override
     public ExportTaskVO getTask(Long taskId) {
         ExportTask task = exportTaskMapper.selectById(taskId);
         if (task == null) {

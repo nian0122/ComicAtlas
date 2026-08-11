@@ -13,9 +13,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -83,5 +85,35 @@ class ExportServiceImplTest {
 
         assertThat(vo.getPhysicalPath()).isNull();
         assertThat(vo.getOutputPath()).isNull();
+    }
+
+    @Test
+    void listAllExports_返回全部导出任务并解析物理路径() {
+        ExportTask task = new ExportTask();
+        task.setId(7L);
+        task.setComicId(42L);
+        task.setStatus(ExportTaskStatus.SUCCESS);
+        task.setOutputRoot("EXPORT");
+        task.setOutputPath("7/base.zip");
+        task.setOutputSize(100L);
+
+        ExportTaskMapper taskMapper = mock(ExportTaskMapper.class);
+        when(taskMapper.selectList(any())).thenReturn(List.of(task));
+
+        ApiStorageRoot exportRoot = new ApiStorageRoot();
+        exportRoot.setPath(tempDir);
+        ApiStorageProperties props = new ApiStorageProperties();
+        props.setRoots(Map.of("EXPORT", exportRoot));
+
+        ExportServiceImpl svc = new ExportServiceImpl(mock(ComicMapper.class), taskMapper,
+                mock(ExportEventPublisher.class), mock(ManagementTaskService.class), props);
+
+        List<ExportTaskVO> vos = svc.listAllExports();
+
+        assertThat(vos).hasSize(1);
+        assertThat(vos.get(0).getId()).isEqualTo(7L);
+        assertThat(vos.get(0).getComicId()).isEqualTo(42L);
+        assertThat(vos.get(0).getStatus()).isEqualTo("SUCCESS");
+        assertThat(vos.get(0).getPhysicalPath()).isEqualTo(tempDir.resolve("7/base.zip").toString());
     }
 }
