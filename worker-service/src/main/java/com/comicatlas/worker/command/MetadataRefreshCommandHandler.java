@@ -5,6 +5,8 @@ import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO.ChapterSnapshot;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO.MediaSnapshot;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
+import com.comicatlas.common.storage.InvalidRelativePathException;
+import com.comicatlas.common.storage.RelativePathValidator;
 import com.comicatlas.common.util.MetadataSnapshotRevision;
 import com.comicatlas.worker.entity.ExportChapter;
 import com.comicatlas.worker.entity.ExportMedia;
@@ -36,7 +38,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HexFormat;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -46,7 +50,8 @@ import java.util.stream.Stream;
 /**
  * 元数据扫盘刷新命令处理器（API → Worker，METADATA_REFRESH/COMIC）。
  * <p>
- * 职责：重读 {@code HQ/{comicId}/{chapterId}} 直接子级的媒体文件，生成原子落盘的结构快照
+ * 职责：重读 HQ 中 DB hqPath 指向的真实媒体文件（旧布局 {@code hq/{comicId}/{stagingKey}} 与现布局
+ * {@code hq/{comicId}/{chapterId}} 均可），生成原子落盘的结构快照
  * {@code metadata-refresh/{taskId}/{itemId}/{attempt}/snapshot.json}（相对 STAGING 根），
  * 完成后经 MANAGEMENT exchange 发布 {@code MetadataRefreshScanCompletedEvent}（只传引用 + SHA-256 + 字节数），
  * 由 API 端与数据库比对刷新元数据。Worker 全程只读 MySQL，不直接改库。
@@ -55,9 +60,10 @@ import java.util.stream.Stream;
  * 未知扩展名（记结构化 warning）；仅允许 jpg/jpeg/png/webp/gif/bmp/mp4/mkv/webm/mov/avi
  * 进入 MediaAnalyzer 提取尺寸/视频字段，文件名自然排序。
  * <p>
- * 路径安全：章节目录仅由 {@link StorageRoot#resolve}（防御 {@code ../} 穿越）构建，
- * 快照 hqPath 为 DB 真实相对路径格式并经受 {@code RelativePathValidator} 校验；
- * 目录遍历只产出 {@code {comicId}/{chapterId}/{fileName}}，绝不访问 globalOrder 目录。
+ * 路径安全：扫描目录仅由 {@link StorageRoot#resolve}（防御 {@code ../} 穿越）构建，且只接受
+ * 结构合法（{@code {comicId}/{dirKey}/{fileName}}、无穿越）的 DB hqPath 参与定位；快照 hqPath
+ * 统一规范为 {@code {comicId}/{chapterId}/{fileName}} 并经 {@code RelativePathValidator} 校验，
+ * 与磁盘实际存放目录解耦，API 按 chapterId+basename 匹配。
  * <p>
  * 原子写：同目录写 {@code .tmp} → flush/close → 计算最终字节 SHA-256 → ATOMIC_MOVE；
  * 原子移动不受支持即失败并清理临时文件（拒绝非原子覆盖）。
@@ -79,6 +85,9 @@ public class MetadataRefreshCommandHandler {
 
     /** STAGING 存储根 key（快照产物落盘根）。 */
     private static final String STAGING_ROOT_KEY = "STAGING";
+
+    /** LQ 存储根 key（旧布局升级时同构移动 LQ 目录）。 */
+    private static final String LQ_ROOT_KEY = "LQ";
 
     /** 图片扩展名白名单。 */
     private static final Set<String> IMAGE_EXTENSIONS =
@@ -172,7 +181,7 @@ public class MetadataRefreshCommandHandler {
                 }
                 chapterSnapshots.add(new ChapterSnapshot(
                         chapter.getId(), versionOrZero(chapter.getVersion()),
-                        scan.mediaItems(), scan.warnings()));
+                        scan.mediaItems(), scan.warnings(), scan.legacyDirKey()));
             }
 
             publisher.progress(cmd, 60, "扫描完成，写入快照");
@@ -212,13 +221,23 @@ public class MetadataRefreshCommandHandler {
         }
     }
 
-    /** 单章扫描结果：媒体快照列表 + 结构化 warning 列表。 */
-    private record ChapterScanResult(List<MediaSnapshot> mediaItems, List<String> warnings) {
+    /** 单章扫描结果：媒体快照列表 + 结构化 warning 列表 + 旧布局升级信号（已移动成功时为旧目录键，否则 null）。 */
+    private record ChapterScanResult(List<MediaSnapshot> mediaItems, List<String> warnings, String legacyDirKey) {
+
+        /** 空扫描/失败路径：未涉及布局升级。 */
+        private ChapterScanResult(List<MediaSnapshot> mediaItems, List<String> warnings) {
+            this(mediaItems, warnings, null);
+        }
     }
 
     /**
-     * 扫描单个章节的 HQ 直接子级 regular file（NOFOLLOW_LINKS），按自然排序组装媒体快照。
-     * 章节目录缺失时返回空扫描 + warning（API 侧据此标记 MISSING）。
+     * 扫描单个章节的 HQ 媒体文件（NOFOLLOW_LINKS），按自然排序组装媒体快照。
+     * <p>
+     * 扫描目录从 DB 行的真实 hqPath 推导：合法行（{@code {comicId}/{dirKey}/{fileName}}、无穿越）
+     * 共同父目录存在时扫描该目录（兼容旧布局 {@code hq/{comicId}/{stagingKey}} 与现布局
+     * {@code hq/{comicId}/{chapterId}}），否则回退 chapterId 目录；两者都缺失返回空扫描 + warning
+     * （API 侧据此标记 MISSING）。行按 basename 与磁盘文件匹配，快照 hqPath 统一规范
+     * {@code {comicId}/{chapterId}/{fileName}}（API 按 chapterId+basename 匹配，与磁盘实际存放目录解耦）。
      * <p>
      * 快照只包含「磁盘文件 ∩ DB 媒体行」：匹配行的媒体身份（mediaId/mediaVersion/pageNumber/状态）
      * 取自 DB，尺寸/视频字段取自 MediaAnalyzer 实测；磁盘存在但 DB 无记录的孤儿文件不导入
@@ -226,7 +245,7 @@ public class MetadataRefreshCommandHandler {
      * 由 API 侧比对后标记 MISSING。
      *
      * @param comicId   漫画 ID（用于构建相对路径，不参与目录定位）
-     * @param chapter   章节（chapterId 决定扫描目录，globalOrder 仅排序不用于路径）
+     * @param chapter   章节（chapterId 参与回退目录定位，globalOrder 仅排序不用于路径）
      * @param dbMedia   该章节的 DB 媒体行基线（用于匹配 mediaId/mediaVersion/pageNumber/状态）
      */
     private ChapterScanResult scanChapter(Long comicId, ExportChapter chapter,
@@ -234,25 +253,48 @@ public class MetadataRefreshCommandHandler {
         List<String> warnings = new ArrayList<>();
         StorageRoot hqRoot = requireRoot(HQ_ROOT_KEY);
         Long chapterId = chapter.getId();
-        Path chapterDir = hqRoot.resolve(comicId + "/" + chapterId);
 
-        if (!Files.isDirectory(chapterDir, LinkOption.NOFOLLOW_LINKS)) {
+        // 合法 DB 行按 basename 索引（结构校验通过者），并收集其真实存放目录键
+        Map<String, ExportMedia> mediaByBasename = new HashMap<>();
+        Set<String> parentDirKeys = new LinkedHashSet<>();
+        for (ExportMedia row : dbMedia) {
+            String dirKey = extractDirKey(row.getHqPath(), comicId);
+            if (dirKey == null) {
+                warnings.add("忽略非法 hqPath: " + row.getHqPath());
+                continue;
+            }
+            mediaByBasename.putIfAbsent(basenameOf(row.getHqPath()), row);
+            parentDirKeys.add(dirKey);
+        }
+
+        // 扫描目录选择：合法行共同父目录存在则用之（DB 真值），否则回退 chapterId 目录
+        Path scanDir = null;
+        if (parentDirKeys.size() == 1) {
+            String dirKey = parentDirKeys.iterator().next();
+            Path candidate = hqRoot.resolve(comicId + "/" + dirKey);
+            if (Files.isDirectory(candidate, LinkOption.NOFOLLOW_LINKS)) {
+                scanDir = candidate;
+            }
+        }
+        if (scanDir == null) {
+            Path chapterDir = hqRoot.resolve(comicId + "/" + chapterId);
+            if (Files.isDirectory(chapterDir, LinkOption.NOFOLLOW_LINKS)) {
+                scanDir = chapterDir;
+            }
+        }
+        if (scanDir == null) {
             warnings.add("章节目录不存在: " + comicId + "/" + chapterId);
             return new ChapterScanResult(List.of(), warnings);
         }
 
         List<Path> files;
-        try (Stream<Path> stream = Files.list(chapterDir)) {
+        try (Stream<Path> stream = Files.list(scanDir)) {
             files = stream.collect(Collectors.toList());
         } catch (IOException e) {
             warnings.add("读取章节目录失败: " + comicId + "/" + chapterId);
             return new ChapterScanResult(List.of(), warnings);
         }
         files.sort(NaturalPathComparator.INSTANCE);
-
-        Map<String, ExportMedia> mediaByHqPath = dbMedia.stream()
-                .filter(m -> m.getHqPath() != null)
-                .collect(Collectors.toMap(ExportMedia::getHqPath, m -> m, (a, b) -> a));
 
         List<MediaSnapshot> mediaItems = new ArrayList<>(files.size());
         int sequence = 0;
@@ -281,8 +323,7 @@ public class MetadataRefreshCommandHandler {
             }
 
             sequence++;
-            String relativePath = comicId + "/" + chapterId + "/" + fileName;
-            ExportMedia row = mediaByHqPath.get(relativePath);
+            ExportMedia row = mediaByBasename.get(fileName);
             if (row == null) {
                 warnings.add("物理文件无对应DB记录: " + fileName);
                 continue;
@@ -313,6 +354,7 @@ public class MetadataRefreshCommandHandler {
                 log.debug("媒体分析失败: comicId={}, chapterId={}, file={}", comicId, chapterId, fileName, e);
             }
 
+            String relativePath = comicId + "/" + chapterId + "/" + fileName;
             mediaItems.add(new MediaSnapshot(
                     row.getId(), versionOrZero(row.getVersion()), relativePath,
                     row.getHqStatus() != null ? row.getHqStatus() : "READY",
@@ -320,7 +362,112 @@ public class MetadataRefreshCommandHandler {
                     row.getPageNumber() != null ? row.getPageNumber() : sequence,
                     fileSize, mediaType, width, height, duration, container, videoCodec, audioCodec));
         }
-        return new ChapterScanResult(mediaItems, warnings);
+
+        // 旧布局升级：匹配行携带旧目录键（!= chapterId）即需升级——文件本次从旧目录扫到则移动，
+        // 文件已在 chapterId 目录（上次移动成功但 API 未重写的重试场景）则跳过移动；两种情形都标注
+        // legacyDirKey 供 API 重写 DB 前缀；移动失败保留原目录不标注（可下次重试）
+        String legacyDirKey = null;
+        if (!mediaItems.isEmpty()) {
+            String rowDirKey = legacyDirKeyOf(mediaByBasename, chapterId);
+            if (rowDirKey != null) {
+                try {
+                    if (!rowDirKey.equals(String.valueOf(chapterId))) {
+                        normalizeLayout(comicId, chapterId, scanDir);
+                    }
+                    legacyDirKey = rowDirKey;
+                } catch (Exception e) {
+                    warnings.add("旧布局升级失败（保留原目录）: " + rowDirKey);
+                    log.warn("旧布局升级失败: comicId={}, chapterId={}, dir={}",
+                            comicId, chapterId, rowDirKey, e);
+                }
+            }
+        }
+        return new ChapterScanResult(mediaItems, warnings, legacyDirKey);
+    }
+
+    /** 匹配行中首个目录键 != chapterId 的 hqPath 目录键；全部为新布局返回 null。 */
+    private static String legacyDirKeyOf(Map<String, ExportMedia> mediaByBasename, Long chapterId) {
+        String chapterKey = String.valueOf(chapterId);
+        for (ExportMedia row : mediaByBasename.values()) {
+            String hqPath = row.getHqPath();
+            if (hqPath == null) {
+                continue;
+            }
+            String[] segments = hqPath.split("/");
+            if (segments.length == 3 && !segments[1].equals(chapterKey)) {
+                return segments[1];
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 旧布局目录移动：将 {@code scanDir}（目录键 != chapterId）整体移动为新布局
+     * {@code hq/{comicId}/{chapterId}}，LQ 目录同构移动（存在才移）。
+     * 已是新布局（scanDir 即 chapterId 目录）时为 no-op。
+     *
+     * @throws IOException 目标目录非空或移动失败时抛出（调用方记 warning 保留原目录）
+     */
+    private void normalizeLayout(Long comicId, Long chapterId, Path scanDir) throws IOException {
+        String dirKey = scanDir.getFileName().toString();
+        String chapterKey = String.valueOf(chapterId);
+        if (dirKey.equals(chapterKey)) {
+            return;
+        }
+        StorageRoot hqRoot = requireRoot(HQ_ROOT_KEY);
+        moveDirectorySafely(hqRoot.resolve(comicId + "/" + dirKey),
+                hqRoot.resolve(comicId + "/" + chapterKey), "HQ");
+        StorageRoot lqRoot = roots().get(LQ_ROOT_KEY);
+        if (lqRoot != null) {
+            Path lqSource = lqRoot.resolve(comicId + "/" + dirKey);
+            if (Files.isDirectory(lqSource, LinkOption.NOFOLLOW_LINKS)) {
+                moveDirectorySafely(lqSource, lqRoot.resolve(comicId + "/" + chapterKey), "LQ");
+            }
+        }
+        log.info("旧布局升级为新布局: comicId={}, chapterId={}, dir={} -> {}", comicId, chapterId, dirKey, chapterKey);
+    }
+
+    /** 同卷目录移动：目标已存在且非空拒绝覆盖（抛错）；目标为空目录先删除再移动。 */
+    private static void moveDirectorySafely(Path source, Path target, String rootLabel) throws IOException {
+        if (Files.isDirectory(target, LinkOption.NOFOLLOW_LINKS)) {
+            try (Stream<Path> entries = Files.list(target)) {
+                if (entries.findAny().isPresent()) {
+                    throw new IOException(rootLabel + " 目标目录非空，拒绝覆盖: " + target.getFileName());
+                }
+            }
+            Files.delete(target);
+        }
+        try {
+            Files.move(source, target, StandardCopyOption.ATOMIC_MOVE);
+        } catch (AtomicMoveNotSupportedException e) {
+            Files.move(source, target);
+        }
+    }
+
+    /**
+     * 校验 DB hqPath 结构（{@code {comicId}/{dirKey}/{fileName}}、正斜杠、无穿越）并返回 dirKey；
+     * 结构非法（含 null）返回 null，由调用方记 warning 并跳过该行，绝不被解析。
+     */
+    private String extractDirKey(String hqPath, Long comicId) {
+        if (hqPath == null) {
+            return null;
+        }
+        try {
+            RelativePathValidator.requireRelativeForwardSlash(hqPath);
+        } catch (InvalidRelativePathException e) {
+            return null;
+        }
+        String[] segments = hqPath.split("/");
+        if (segments.length != 3 || !segments[0].equals(String.valueOf(comicId))
+                || segments[1].isBlank() || segments[2].isBlank()) {
+            return null;
+        }
+        return segments[1];
+    }
+
+    private static String basenameOf(String hqPath) {
+        int idx = hqPath.lastIndexOf('/');
+        return idx >= 0 ? hqPath.substring(idx + 1) : hqPath;
     }
 
     /**

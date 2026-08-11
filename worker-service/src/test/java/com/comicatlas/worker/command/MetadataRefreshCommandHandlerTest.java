@@ -419,6 +419,84 @@ class MetadataRefreshCommandHandlerTest {
         assertEquals("secret", Files.readString(secret));
     }
 
+    // ==================== 旧布局：文件存放于 staging 键目录，按 DB hqPath 推导扫描目录 ====================
+
+    @Test
+    void legacyLayout_filesInStagingKeyDir_areResolvedFromDbHqPath_andReanalyzed() throws Exception {
+        // 旧布局：文件物理存放于 hq/1/0（staging 键目录），DB hqPath=1/0/...，chapterId=42 目录不存在
+        Path legacyDir = Files.createDirectories(tempRoot.resolve("hq/1/0"));
+        Files.writeString(legacyDir.resolve("001.jpg"), "img-001");
+        Files.writeString(legacyDir.resolve("002.mp4"), "video-002");
+
+        when(chapterMapper.selectByComicIdWithVersion(COMIC_ID))
+                .thenReturn(List.of(chapter(CHAPTER_ID, 1, 1)));
+        when(mediaMapper.selectByComicIdWithVersionAndStatus(COMIC_ID)).thenReturn(List.of(
+                media(101L, CHAPTER_ID, "1/0/001.jpg", 1, "READY", "READY", 1),
+                media(102L, CHAPTER_ID, "1/0/002.mp4", 2, "READY", "READY", 1)));
+        stubAnalyzerByExtension();
+        newHandler();
+
+        handler.refresh(cmd());
+
+        verify(publisher, never()).failed(any(ManagementCommandRequestedEvent.class), any(String.class));
+        JsonNode root = objectMapper.readTree(snapshotPath().toFile());
+        JsonNode chapter = root.get("chapters").get(0);
+        JsonNode items = chapter.get("mediaItems");
+        assertEquals(2, items.size(), "旧布局媒体应被重新分析并入快照");
+        // 快照 hqPath 保持规范 chapterId 形式（API 按 chapterId+basename 匹配，DB 行真实路径不变）
+        assertEquals("1/42/001.jpg", items.get(0).get("hqPath").asText());
+        assertEquals(800, items.get(0).get("width").asInt());
+        assertEquals(1200, items.get(0).get("height").asInt());
+        assertEquals(101, items.get(0).get("mediaId").asLong());
+        assertEquals("1/42/002.mp4", items.get(1).get("hqPath").asText());
+        assertEquals(1280, items.get(1).get("width").asInt());
+        assertEquals(0, new BigDecimal(items.get(1).get("duration").asText())
+                .compareTo(new BigDecimal("12.34")));
+        assertEquals(102, items.get(1).get("mediaId").asLong());
+        // 旧布局升级信号：Worker 已移动文件并标注 legacyDirKey，API 据此重写 DB 前缀
+        assertEquals("0", chapter.get("legacyDirKey").asText());
+        // 文件已移动：旧目录消失、新布局目录存在
+        assertFalse(Files.exists(tempRoot.resolve("hq/1/0")), "旧布局目录应已被移动");
+        assertTrue(Files.isDirectory(tempRoot.resolve("hq/1/42")), "新布局目录应存在");
+        assertEquals(2, Files.list(tempRoot.resolve("hq/1/42")).count());
+        // 不再报「章节目录不存在」
+        boolean missingDirWarning = false;
+        for (JsonNode w : chapter.get("warnings")) {
+            if (w.asText().contains("章节目录不存在")) {
+                missingDirWarning = true;
+                break;
+            }
+        }
+        assertFalse(missingDirWarning, "旧布局目录存在时不应报章节目录不存在");
+    }
+
+    @Test
+    void legacyLayoutRetry_filesAlreadyAtChapterIdDir_stillMarksLegacyDirKey() throws Exception {
+        // 重试场景：首次移动成功但 API 未重写 → 文件已在 chapterId 目录，DB 行仍是旧前缀
+        Path chapterDir = Files.createDirectories(tempRoot.resolve("hq/1/42"));
+        Files.writeString(chapterDir.resolve("001.jpg"), "img-001");
+
+        when(chapterMapper.selectByComicIdWithVersion(COMIC_ID))
+                .thenReturn(List.of(chapter(CHAPTER_ID, 1, 1)));
+        when(mediaMapper.selectByComicIdWithVersionAndStatus(COMIC_ID))
+                .thenReturn(List.of(media(101L, CHAPTER_ID, "1/0/001.jpg", 1, "READY", "READY", 1)));
+        stubAnalyzerByExtension();
+        newHandler();
+
+        handler.refresh(cmd());
+
+        JsonNode root = objectMapper.readTree(snapshotPath().toFile());
+        JsonNode chapter = root.get("chapters").get(0);
+        JsonNode items = chapter.get("mediaItems");
+        assertEquals(1, items.size(), "文件已在 chapterId 目录应正常扫描分析");
+        assertEquals(800, items.get(0).get("width").asInt());
+        // 行仍是旧前缀 → 仍标注 legacyDirKey，API 据此完成前缀重写（不重复移动文件）
+        assertEquals("0", chapter.get("legacyDirKey").asText());
+        assertTrue(Files.isDirectory(tempRoot.resolve("hq/1/42")), "chapterId 目录保留");
+        assertFalse(Files.exists(tempRoot.resolve("hq/1/0")), "旧目录本就不存在，不得新建");
+        verify(publisher, never()).failed(any(ManagementCommandRequestedEvent.class), any(String.class));
+    }
+
     // ==================== 原子移动失败：FAILED + 无临时残留 ====================
 
     @Test
