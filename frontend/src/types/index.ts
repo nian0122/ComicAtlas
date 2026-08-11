@@ -1,6 +1,20 @@
 /** 默认图片宽高比（3:4），用于宽高未知的页面 */
 export const DEFAULT_ASPECT_RATIO = 3 / 4
 
+export type ComicStatus =
+  | 'DRAFT'
+  | 'IMPORTING'
+  | 'IMPORT_FAILED'
+  | 'READY'
+  | 'RECOVERY_REQUIRED'
+  | 'REFRESHING'
+  | 'DELETING'
+  | 'TRASHING'
+  | 'TRASHED'
+  | 'RESTORING'
+  | 'PURGING'
+  | 'DELETED'
+
 export interface ComicListQuery {
   keyword?: string
   tag?: string
@@ -28,7 +42,7 @@ export interface ComicListVO {
   pageCount: number
   categoryId: number | null
   categoryName: string | null
-  status: string
+  status: ComicStatus
   progressPercent: number
   lastReadChapterId: number
   lastReadPage: number
@@ -48,7 +62,7 @@ export interface ComicDetailVO {
   sourceRef: string
   categoryId: number | null
   categoryName: string | null
-  status: string
+  status: ComicStatus
   progressPercent: number
   lastReadChapterId: number
   lastReadPage: number

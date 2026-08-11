@@ -60,7 +60,36 @@ const router = createRouter({
       path: '/manage',
       component: ManagementLayout,
       children: [
-        { path: '', redirect: '/manage/comics' },
+        {
+          path: '',
+          name: 'manage-home',
+          component: () => import('@/views/management/ManagementHomePage.vue'),
+        },
+        {
+          path: 'status',
+          name: 'manage-status',
+          component: () => import('@/views/management/ComicStatusPage.vue'),
+        },
+        {
+          path: 'operations',
+          name: 'manage-operations',
+          component: () => import('@/views/management/ComicOperationsPage.vue'),
+        },
+        {
+          path: 'tasks',
+          name: 'manage-tasks',
+          component: () => import('@/views/management/ManagementTasksPage.vue'),
+        },
+        {
+          path: 'upload',
+          name: 'manage-upload',
+          component: () => import('@/views/management/MediaUploadPage.vue'),
+        },
+        {
+          path: 'structure',
+          name: 'manage-structure',
+          component: () => import('@/views/management/ComicStructurePage.vue'),
+        },
         {
           path: 'comics',
           name: 'manage-comics',

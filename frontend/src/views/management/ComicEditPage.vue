@@ -354,7 +354,9 @@ onMounted(loadData)
 }
 
 .edit-card {
+  width: 100%;
   max-width: 640px;
+  box-sizing: border-box;
   margin: 0 auto;
   padding: var(--space-xl);
   background: var(--bg-surface);
@@ -374,6 +376,10 @@ onMounted(loadData)
 
 .edit-form :deep(.el-input__inner) {
   color: var(--text-primary);
+}
+
+.edit-form :deep(.el-select) {
+  max-width: 100%;
 }
 
 .tag-block {
@@ -452,7 +458,9 @@ onMounted(loadData)
 }
 
 .danger-zone {
+  width: 100%;
   max-width: 640px;
+  box-sizing: border-box;
   margin: var(--space-2xl) auto 0;
   padding: var(--space-lg);
   border: 1px solid var(--danger);

@@ -24,9 +24,33 @@
         </div>
         <router-link to="/manage/import" class="new-import-link"><el-icon :size="18"><Plus /></el-icon>新建导入</router-link>
         <nav class="sidenav-menu" aria-label="管理导航">
+          <router-link to="/manage" class="sidenav-link" active-class="active">
+            <el-icon :size="18"><HomeFilled /></el-icon>
+            <span>仓库控制台</span>
+          </router-link>
+          <router-link to="/manage/status" class="sidenav-link" active-class="active">
+            <el-icon :size="18"><DataAnalysis /></el-icon>
+            <span>漫画状态</span>
+          </router-link>
+          <router-link to="/manage/operations" class="sidenav-link" active-class="active">
+            <el-icon :size="18"><Operation /></el-icon>
+            <span>漫画操作台</span>
+          </router-link>
+          <router-link to="/manage/tasks" class="sidenav-link" active-class="active">
+            <el-icon :size="18"><List /></el-icon>
+            <span>统一管理任务</span>
+          </router-link>
+          <router-link to="/manage/upload" class="sidenav-link" active-class="active">
+            <el-icon :size="18"><UploadFilled /></el-icon>
+            <span>媒体上传</span>
+          </router-link>
+          <router-link to="/manage/structure" class="sidenav-link" active-class="active">
+            <el-icon :size="18"><Share /></el-icon>
+            <span>目录与媒体结构</span>
+          </router-link>
           <router-link to="/manage/comics" class="sidenav-link" active-class="active">
             <el-icon :size="18"><Collection /></el-icon>
-            <span>漫画</span>
+            <span>漫画信息编辑</span>
           </router-link>
 
           <router-link to="/manage/import" class="sidenav-link" active-class="active">
@@ -39,7 +63,7 @@
             active-class="active"
           >
             <el-icon :size="18"><List /></el-icon>
-            <span>任务中心</span>
+            <span>导入任务</span>
           </router-link>
 
           <router-link to="/manage/storage" class="sidenav-link" active-class="active">
@@ -79,7 +103,11 @@ import { onMounted } from 'vue'
 import {
   Coin,
   Collection,
+  DataAnalysis,
+  HomeFilled,
   List,
+  Operation,
+  Share,
   Setting,
   Tickets,
   UploadFilled,
@@ -187,6 +215,8 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .sidenav-label {
@@ -271,7 +301,8 @@ onMounted(() => {
   min-width: 0;
   min-height: 0;
   padding: var(--space-8) var(--content-gutter);
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
   background:
     radial-gradient(circle at 100% 0, var(--accent-bg), transparent 26rem),
     var(--bg-primary);
@@ -446,6 +477,13 @@ onMounted(() => {
   background: var(--bg-primary);
 }
 
+.management-content > * {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
 .management-content :deep(.page-header) {
   padding-bottom: var(--space-8);
   margin-bottom: var(--space-8);
@@ -496,6 +534,28 @@ onMounted(() => {
   }
 
   .management-sidenav {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .management-header {
+    padding-inline: var(--space-5);
+  }
+
+  .header-logo {
+    font-size: 24px;
+  }
+
+  .header-context {
+    gap: var(--space-2);
+  }
+
+  .header-import {
+    padding-inline: var(--space-4);
+  }
+
+  .profile-button {
     display: none;
   }
 }

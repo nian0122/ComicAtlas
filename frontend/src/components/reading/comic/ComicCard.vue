@@ -50,6 +50,7 @@
 import { computed } from 'vue'
 import { PictureFilled } from '@element-plus/icons-vue'
 import type { ComicListVO } from '@/types'
+import { comicStatusMeta } from '@/utils/comic-status'
 
 const props = defineProps<{
   comic: ComicListVO
@@ -69,17 +70,13 @@ const canContinue = computed(() =>
 )
 
 const statusLabel = computed(() => {
-  if (props.comic.status === 'IMPORTING') return '导入中'
-  if (props.comic.status === 'PENDING') return '等待中'
-  if (props.comic.status === 'FAILED') return '失败'
-  return ''
+  if (props.comic.status === 'READY') return ''
+  return comicStatusMeta(props.comic.status).label
 })
 
 const statusClass = computed(() => {
-  if (props.comic.status === 'IMPORTING') return 'warning'
-  if (props.comic.status === 'PENDING') return 'info'
-  if (props.comic.status === 'FAILED') return 'danger'
-  return ''
+  if (props.comic.status === 'READY') return ''
+  return comicStatusMeta(props.comic.status).tone
 })
 </script>
 
