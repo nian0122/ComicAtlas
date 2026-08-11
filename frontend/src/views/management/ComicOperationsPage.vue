@@ -68,8 +68,8 @@
         </section>
         <el-table :data="relatedTasks" row-key="id">
           <el-table-column prop="id" label="任务 ID" width="90" />
-          <el-table-column prop="taskType" label="类型" />
-          <el-table-column prop="status" label="状态" />
+          <el-table-column label="类型"><template #default="{ row }">{{ managementTaskTypeLabel(row.taskType) }}</template></el-table-column>
+          <el-table-column label="状态"><template #default="{ row }">{{ managementTaskStatusLabel(row.status) }}</template></el-table-column>
           <el-table-column prop="progress" label="进度" />
           <el-table-column prop="updatedAt" label="最后变化" />
         </el-table>
@@ -87,6 +87,7 @@ import { adminApi, comicApi, exportApi, hqApi, mediaOperationApi, outboxApi, tra
 import { lqOperationApi, trackedTaskApi } from '@/services/management-capabilities'
 import ComicStatusTag from '@/components/management/ComicStatusTag.vue'
 import { comicStatusMeta } from '@/utils/comic-status'
+import { managementTaskStatusLabel, managementTaskTypeLabel } from '@/utils/management-task'
 import type { ComicDetailVO, ComicStatus, ManagementTaskVO, MediaOperationResult, OutboxStats, ReconcileResult } from '@/types'
 
 type StatusEvent = { readonly status: ComicStatus; readonly at: string }

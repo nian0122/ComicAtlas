@@ -18,6 +18,7 @@ async function mockOperationsEndpoints(
   page: import('@playwright/test').Page,
   comicId: string,
   detailBody: string,
+  records: readonly Record<string, unknown>[] = [],
 ): Promise<void> {
   await page.route(`/api/comics/${comicId}`, (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: detailBody })
@@ -26,7 +27,7 @@ async function mockOperationsEndpoints(
     route.fulfill({ status: 200, contentType: 'application/json', body: resultBody(200, 'success', { allowed: [], blockedReasons: {} }) })
   )
   await page.route(/\/api\/management\/tasks\?/, (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: resultBody(200, 'success', { records: [], total: 0 }) })
+    route.fulfill({ status: 200, contentType: 'application/json', body: resultBody(200, 'success', { records, total: records.length }) })
   )
   await page.route(/\/api\/management\/outbox\/stats/, (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: resultBody(200, 'success', { pending: 0, failed: 0, total: 0 }) })
@@ -79,4 +80,18 @@ test('加载正常漫画时展示当前状态卡片', async ({ page }) => {
   await expect(page.locator('.current-state')).toContainText('测试漫画')
   await expect(page.locator('.current-state')).toContainText('READY')
   expect(pageErrors).toEqual([])
+})
+
+test('漫画操作台相关任务使用统一中文类型和状态', async ({ page }) => {
+  await mockOperationsEndpoints(page, '7', resultBody(200, 'success', validDetail), [{
+    id: 101,
+    taskType: 'IMPORT',
+    status: 'SUCCEEDED',
+    progress: 100,
+    updatedAt: '2026-08-11T10:01:00Z',
+  }])
+  await page.goto('/manage/operations?comicId=7')
+  await page.getByRole('tab', { name: '相关任务与统计' }).click()
+  await expect(page.locator('.el-table').getByText('导入漫画', { exact: true })).toBeVisible()
+  await expect(page.locator('.el-table').getByText('成功', { exact: true })).toBeVisible()
 })

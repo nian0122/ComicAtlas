@@ -61,9 +61,9 @@ const pageCounts = computed<Partial<Record<ComicStatus, number>>>(() => { const 
 const transientCount = computed(() => comics.value.filter((comic) => comicStatusMeta(comic.status).transient).length)
 const attentionCount = computed(() => comics.value.filter((comic) => ['IMPORT_FAILED', 'RECOVERY_REQUIRED', 'TRASHED', 'DELETED'].includes(comic.status)).length)
 function errorMessage(reason: unknown): string { if (axios.isAxiosError<{ message?: string }>(reason)) return reason.response?.data?.message ?? reason.message; return reason instanceof Error ? reason.message : '未知错误' }
-async function loadComics(): Promise<void> { loading.value = true; error.value = ''; try { const response = await comicStatusApi.list({ page: page.value, size: 20, keyword: keyword.value.trim() || undefined, status: status.value }); comics.value = response.data.records; total.value = response.data.total; updatedAt.value = new Date().toLocaleTimeString() } catch (reason: unknown) { error.value = errorMessage(reason) } finally { loading.value = false } }
+async function loadComics(silent = false): Promise<void> { if (!silent) loading.value = true; error.value = ''; try { const response = await comicStatusApi.list({ page: page.value, size: 20, keyword: keyword.value.trim() || undefined, status: status.value }); comics.value = response.data.records; total.value = response.data.total; updatedAt.value = new Date().toLocaleTimeString() } catch (reason: unknown) { error.value = errorMessage(reason) } finally { if (!silent) loading.value = false } }
 function applyFilters(): void { page.value = 1; void loadComics() }
-onMounted(() => { void loadComics(); timer = setInterval(() => { if (autoRefresh.value && !loading.value) void loadComics() }, 3000) })
+onMounted(() => { void loadComics(); timer = setInterval(() => { if (autoRefresh.value && !loading.value) void loadComics(true) }, 3000) })
 onBeforeUnmount(() => { if (timer !== undefined) clearInterval(timer) })
 </script>
 

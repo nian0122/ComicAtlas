@@ -17,7 +17,7 @@
 
     <div class="filters">
       <el-select v-model="query.type" placeholder="任务类型" clearable @change="resetAndLoad">
-        <el-option v-for="type in TASK_TYPES" :key="type" :label="taskTypeLabel(type)" :value="type" />
+        <el-option v-for="type in MANAGEMENT_TASK_TYPES" :key="type" :label="managementTaskTypeLabel(type)" :value="type" />
       </el-select>
       <el-select v-model="query.status" placeholder="任务状态" clearable @change="resetAndLoad">
         <el-option v-for="status in TASK_STATUSES" :key="status" :label="taskStatusLabel(status)" :value="status" />
@@ -32,7 +32,7 @@
     <div class="table-scroll"><el-table v-loading="loading" :data="tasks" row-key="id" @row-click="openTask">
       <el-table-column prop="id" label="ID" width="80" />
       <el-table-column label="类型" min-width="150">
-        <template #default="{ row }">{{ taskTypeLabel(row.taskType) }}</template>
+        <template #default="{ row }">{{ managementTaskTypeLabel(row.taskType) }}</template>
       </el-table-column>
       <el-table-column prop="operation" label="操作" min-width="150" />
       <el-table-column label="状态" width="140">
@@ -79,12 +79,10 @@ import { useRoute } from 'vue-router'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import { trackedTaskApi } from '@/services/management-capabilities'
+import { MANAGEMENT_TASK_TYPES, managementTaskStatusLabel, managementTaskTypeLabel } from '@/utils/management-task'
 import type { ManagementTaskItemVO, ManagementTaskStatus, ManagementTaskType, ManagementTaskVO } from '@/types'
 
 const TASK_STATUSES = ['QUEUED', 'RUNNING', 'CANCELLING', 'CANCELLED', 'SUCCEEDED', 'PARTIALLY_SUCCEEDED', 'FAILED'] as const
-const TASK_TYPES = ['LQ_GENERATE', 'LQ_REGENERATE', 'HQ_DELETE', 'TRANSCODE', 'METADATA_REFRESH', 'MEDIA_UPLOAD', 'MEDIA_TRASH', 'CHAPTER_TRASH', 'COMIC_RESTORE', 'CHAPTER_RESTORE', 'MEDIA_RESTORE', 'COMIC_PURGE', 'CHAPTER_PURGE', 'MEDIA_PURGE', 'EXPORT'] as const
-const STATUS_LABELS: Readonly<Record<ManagementTaskStatus, string>> = { QUEUED: '排队中', RUNNING: '执行中', CANCELLING: '取消中', CANCELLED: '已取消', SUCCEEDED: '成功', PARTIALLY_SUCCEEDED: '部分成功', FAILED: '失败' }
-const TYPE_LABELS: Readonly<Partial<Record<ManagementTaskType, string>>> = { LQ_GENERATE: '生成 LQ', LQ_REGENERATE: '重新生成 LQ', HQ_DELETE: '删除 HQ', TRANSCODE: '视频转码', METADATA_REFRESH: '刷新元数据', MEDIA_UPLOAD: '媒体上传', MEDIA_TRASH: '回收媒体', CHAPTER_TRASH: '回收章节', COMIC_RESTORE: '恢复漫画', CHAPTER_RESTORE: '恢复章节', MEDIA_RESTORE: '恢复媒体', COMIC_PURGE: '永久清理漫画', CHAPTER_PURGE: '永久清理章节', MEDIA_PURGE: '永久清理媒体', EXPORT: '导出' }
 
 const route = useRoute()
 const routeTargetId = Number(route.query['targetId'])
@@ -109,19 +107,18 @@ function errorMessage(reason: unknown): string {
   if (axios.isAxiosError<{ message?: string }>(reason)) return reason.response?.data?.message ?? reason.message
   return reason instanceof Error ? reason.message : '未知错误'
 }
-function taskStatusLabel(status: ManagementTaskStatus): string { return STATUS_LABELS[status] }
-function taskTypeLabel(type: ManagementTaskType): string { return TYPE_LABELS[type] ?? type }
+function taskStatusLabel(status: ManagementTaskStatus): string { return managementTaskStatusLabel(status) }
 function taskStatusTone(status: ManagementTaskStatus): 'success' | 'warning' | 'danger' | 'info' { if (status === 'SUCCEEDED') return 'success'; if (status === 'FAILED' || status === 'PARTIALLY_SUCCEEDED') return 'danger'; if (status === 'RUNNING' || status === 'CANCELLING') return 'warning'; return 'info' }
 function canCancel(status: ManagementTaskStatus): boolean { return ['QUEUED', 'RUNNING'].includes(status) }
 function canRetry(status: ManagementTaskStatus): boolean { return ['FAILED', 'CANCELLED', 'PARTIALLY_SUCCEEDED'].includes(status) }
-async function loadTasks(): Promise<void> { loading.value = true; error.value = ''; try { const response = await trackedTaskApi.list(query); tasks.value = response.data.records; total.value = response.data.total; updatedAt.value = new Date().toLocaleTimeString() } catch (reason: unknown) { error.value = errorMessage(reason) } finally { loading.value = false } }
+async function loadTasks(silent = false): Promise<void> { if (!silent) loading.value = true; error.value = ''; try { const response = await trackedTaskApi.list(query); tasks.value = response.data.records; total.value = response.data.total; updatedAt.value = new Date().toLocaleTimeString() } catch (reason: unknown) { error.value = errorMessage(reason) } finally { if (!silent) loading.value = false } }
 function resetAndLoad(): void { query.page = 1; void loadTasks() }
 function applyTarget(): void { const parsed = Number(targetIdInput.value); query.targetId = Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined; resetAndLoad() }
 async function openTask(task: ManagementTaskVO): Promise<void> { selectedTask.value = task; drawerVisible.value = true; try { taskItems.value = (await trackedTaskApi.getItems(task.id)).data } catch (reason: unknown) { ElMessage.error(errorMessage(reason)) } }
 async function cancelTask(id: number): Promise<void> { try { await trackedTaskApi.cancel(id); ElMessage.success('已请求取消'); await loadTasks() } catch (reason: unknown) { ElMessage.error(errorMessage(reason)) } }
 async function retryTask(id: number): Promise<void> { try { await trackedTaskApi.retry(id); ElMessage.success('已重新入队'); await loadTasks() } catch (reason: unknown) { ElMessage.error(errorMessage(reason)) } }
 
-onMounted(() => { void loadTasks(); timer = setInterval(() => { if (autoRefresh.value && !loading.value) void loadTasks() }, 2500) })
+onMounted(() => { void loadTasks(); timer = setInterval(() => { if (autoRefresh.value && !loading.value) void loadTasks(true) }, 2500) })
 onBeforeUnmount(() => { if (timer !== undefined) clearInterval(timer) })
 </script>
 
