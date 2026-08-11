@@ -63,10 +63,14 @@ public class LegacyTaskBackfillService {
         int count = 0;
         for (ImportTask task : rows) {
             String legacyStatus = task.getStatus() == null ? null : task.getStatus().name();
-            ManagementTask managementTask = baseTask(TaskType.IMPORT, "导入漫画", "COMIC",
+            boolean hasComicTarget = task.getComicId() != null;
+            String targetType = hasComicTarget ? "COMIC" : "IMPORT_TASK";
+            Long targetId = hasComicTarget ? task.getComicId() : task.getId();
+            ManagementTask managementTask = baseTask(TaskType.IMPORT, "导入漫画", targetType,
                     task.getBatchId(), legacyStatus, task.getProgress(),
                     task.getStartTime(), task.getEndTime());
-            ManagementTaskItem item = baseItem(managementTask, "COMIC", task.getComicId(), TaskType.IMPORT, legacyStatus);
+            ManagementTaskItem item = baseItem(
+                    managementTask, targetType, targetId, TaskType.IMPORT, legacyStatus);
             insertPair(managementTask, item);
             task.setManagementTaskId(managementTask.getId());
             importTaskMapper.updateById(task);

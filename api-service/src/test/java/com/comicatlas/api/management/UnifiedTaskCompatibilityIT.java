@@ -416,6 +416,27 @@ class UnifiedTaskCompatibilityIT {
     }
 
     @Test
+    @DisplayName("历史导入缺少漫画ID时按导入任务目标回填")
+    void backfill_legacyImportWithoutComicId_usesImportTaskTarget() {
+        ImportTask importTask = new ImportTask();
+        importTask.setSourceType(SourceType.DIRECTORY);
+        importTask.setStatus(ImportTaskStatus.FAILED);
+        importTask.setProgress(0);
+        importTaskMapper.insert(importTask);
+
+        assertThat(backfillService.backfillAll()).isEqualTo(1);
+
+        ImportTask updated = importTaskMapper.selectById(importTask.getId());
+        ManagementTask managementTask = managementTaskMapper.selectById(updated.getManagementTaskId());
+        ManagementTaskItem item = managementTaskItemMapper.selectOne(
+                new LambdaQueryWrapper<ManagementTaskItem>()
+                        .eq(ManagementTaskItem::getTaskId, managementTask.getId()));
+        assertThat(managementTask.getTargetType()).isEqualTo("IMPORT_TASK");
+        assertThat(item.getTargetType()).isEqualTo("IMPORT_TASK");
+        assertThat(item.getTargetId()).isEqualTo(importTask.getId());
+    }
+
+    @Test
     @DisplayName("RECOVERY_REQUIRED 漫画不允许导出（导出链路一致）")
     void recoveryRequiredComic_cannotBeExported() {
         Comic comic = new Comic();
