@@ -1,9 +1,11 @@
 package com.comicatlas.api.management.trash;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.common.constant.HttpStatusCodes;
 import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.api.common.storage.ApiStorageProperties;
 import com.comicatlas.api.common.storage.ApiStorageRoot;
+import com.comicatlas.api.management.mapper.TrashManifestMapper;
 import com.comicatlas.common.dto.TrashManifestDTO;
 import com.comicatlas.common.dto.TrashManifestItemDTO;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -19,21 +21,22 @@ import java.nio.file.Path;
 /**
  * TRASH 资产清单服务（API 侧）。
  * <p>
- * API 基于 DB refs 创建不可变 manifest.json，Worker 严格按清单移动文件；
- * actual.json 记录 Worker 实际执行结果，用于补偿判断与对账。
+ * 架构边界：API 只操作数据库，<b>不写</b>本地文件。
+ * manifest 存 {@code trash_manifest} 表（API 写，Worker 只读 DB 后按清单移动文件）；
+ * actual.json 保持文件形式，由 Worker 写（操作文件）、API 以只读挂载访问。
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class TrashManifestService {
 
-    private static final String MANIFEST_FILE = "manifest.json";
     private static final String ACTUAL_FILE = "actual.json";
 
+    private final TrashManifestMapper trashManifestMapper;
     private final ApiStorageProperties storageProperties;
     private final ObjectMapper objectMapper;
 
-    /** 清单目录：TRASH/{targetType}/{targetId}/{taskId} */
+    /** 清单目录：TRASH/{targetType}/{targetId}/{taskId}（actual.json 所在目录，Worker 操作文件） */
     public Path manifestDir(String targetType, Long targetId, Long taskId) {
         if (taskId == null) {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "缺少 TRASH 清单任务 ID");
@@ -45,35 +48,52 @@ public class TrashManifestService {
         return trash.resolve(targetType + "/" + targetId + "/" + taskId);
     }
 
-    /** 写入不可变 manifest.json（幂等：已存在则覆盖为同一内容由调用方保证） */
+    /** 写入不可变 manifest 到 DB（幂等：同 taskId 覆盖为同一内容由调用方保证） */
     public TrashManifestDTO writeManifest(TrashManifestDTO manifest) {
-        Path dir = manifestDir(manifest.targetType(), manifest.targetId(), manifest.taskId());
-        try {
-            Files.createDirectories(dir);
-            Path file = dir.resolve(MANIFEST_FILE);
-            Files.writeString(file, toJson(manifest), StandardCharsets.UTF_8);
-            log.info("写入 TRASH 清单: {}", file);
-            return manifest;
-        } catch (IOException e) {
-            throw new BusinessException(HttpStatusCodes.INTERNAL_ERROR, "写入 TRASH 清单失败: " + e.getMessage());
-        }
+        TrashManifestRecord record = new TrashManifestRecord();
+        record.setTaskId(manifest.taskId());
+        record.setTargetType(manifest.targetType());
+        record.setTargetId(manifest.targetId());
+        record.setManifestJson(toJson(manifest));
+        trashManifestMapper.insert(record);
+        log.info("写入 TRASH 清单(DB): taskId={}", manifest.taskId());
+        return manifest;
     }
 
-    /** 读取 manifest.json（不存在返回 null） */
+    /** 从 DB 读 manifest（不存在返回 null） */
     public TrashManifestDTO readManifest(String targetType, Long targetId, Long taskId) {
-        Path file = manifestDir(targetType, targetId, taskId).resolve(MANIFEST_FILE);
-        if (!Files.exists(file)) {
+        TrashManifestRecord record = trashManifestMapper.selectById(taskId);
+        if (record == null) {
             return null;
         }
         try {
-            return objectMapper.readValue(Files.readString(file, StandardCharsets.UTF_8), TrashManifestDTO.class);
+            return objectMapper.readValue(record.getManifestJson(), TrashManifestDTO.class);
         } catch (Exception e) {
-            log.warn("读取 TRASH 清单失败: {}", file, e);
+            log.warn("读取 TRASH 清单(DB)失败: taskId={}", taskId, e);
             return null;
         }
     }
 
-    /** 读取 actual.json（不存在返回 null） */
+    /** 从 DB 读指定目标最近一次清单（对账/恢复定位用，不存在返回 null） */
+    public TrashManifestDTO readLatestManifest(String targetType, Long targetId) {
+        TrashManifestRecord record = trashManifestMapper.selectOne(
+                new LambdaQueryWrapper<TrashManifestRecord>()
+                        .eq(TrashManifestRecord::getTargetType, targetType)
+                        .eq(TrashManifestRecord::getTargetId, targetId)
+                        .orderByDesc(TrashManifestRecord::getTaskId)
+                        .last("LIMIT 1"));
+        if (record == null) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(record.getManifestJson(), TrashManifestDTO.class);
+        } catch (Exception e) {
+            log.warn("读取 TRASH 清单(DB)失败: targetType={}, targetId={}", targetType, targetId, e);
+            return null;
+        }
+    }
+
+    /** 读 actual.json（Worker 写的文件，API 只读） */
     public TrashManifestItemDTO readActual(String targetType, Long targetId, Long taskId) {
         Path file = manifestDir(targetType, targetId, taskId).resolve(ACTUAL_FILE);
         if (!Files.exists(file)) {
@@ -87,21 +107,10 @@ public class TrashManifestService {
         }
     }
 
-    /** 写入 actual.json（Worker 之外仅对账修复时使用） */
-    public void writeActual(TrashManifestItemDTO actual) {
-        Path dir = manifestDir(actual.targetType(), actual.targetId(), actual.taskId());
-        try {
-            Files.createDirectories(dir);
-            Files.writeString(dir.resolve(ACTUAL_FILE), toJson(actual), StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new BusinessException(HttpStatusCodes.INTERNAL_ERROR, "写入 TRASH 实际结果失败: " + e.getMessage());
-        }
-    }
-
     private String toJson(Object obj) {
         try {
             return objectMapper.writeValueAsString(obj);
-        } catch (Exception e) {
+        } catch (IOException e) {
             throw new BusinessException(HttpStatusCodes.INTERNAL_ERROR, "TRASH 清单序列化失败: " + e.getMessage());
         }
     }

@@ -328,3 +328,17 @@ CREATE TABLE IF NOT EXISTS upload_file (
     CONSTRAINT fk_upload_file_session FOREIGN KEY (session_id) REFERENCES upload_session(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='上传会话内文件';
 
+-- ======================== TRASH 资产清单（API 写 DB，Worker 只读 DB） ========================
+
+CREATE TABLE IF NOT EXISTS trash_manifest (
+    task_id        BIGINT       NOT NULL COMMENT '管理任务 ID（唯一）',
+    target_type    VARCHAR(32)  NOT NULL COMMENT '目标类型：COMIC/CHAPTER/MEDIA',
+    target_id      BIGINT       NOT NULL COMMENT '目标实体 ID',
+    manifest_json  TEXT         NOT NULL COMMENT '不可变 TRASH 清单 JSON（TrashManifestDTO）',
+    created_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (task_id),
+    INDEX idx_target (target_type, target_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='TRASH 资产清单（API 写 DB，Worker 只读 DB + 操作文件）';
+
+
