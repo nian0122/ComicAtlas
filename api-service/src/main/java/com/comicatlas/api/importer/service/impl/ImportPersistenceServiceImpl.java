@@ -523,6 +523,15 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
             return;
         }
 
+        // 陈旧事件保护：重试已删除旧章节结构，旧 attempt 的 finalize failed 事件
+        // 不得误杀新尝试（章节不存在或不属于本 comic → 忽略，仅记录）
+        Long chapterId = event.chapterId();
+        if (chapterId == null || !isChapterOfComic(chapterId, comicId)) {
+            log.info("finalize failed 陈旧事件忽略（章节不存在或不属于本漫画）: taskId={}, chapterId={}",
+                    taskId, chapterId);
+            return;
+        }
+
         // 明确标记失败（可重试），不得置 READY
         String error = event.errorCode() + ": " + (event.errorMessage() == null || event.errorMessage().isBlank()
                 ? "导入存储最终化失败" : sanitizePath(event.errorMessage()));
@@ -550,6 +559,12 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
         catalogCacheInvalidator.evict(comicId);
         log.warn("导入存储最终化失败（可重试）: comicId={}, taskId={}, errorCode={}",
                 comicId, taskId, event.errorCode());
+    }
+
+    /** 章节必须仍存在且属于本漫画，否则视为陈旧 finalize 事件。 */
+    private boolean isChapterOfComic(Long chapterId, Long comicId) {
+        Chapter chapter = chapterMapper.selectById(chapterId);
+        return chapter != null && comicId.equals(chapter.getComicId());
     }
 
     // ======================== 工具方法 ========================

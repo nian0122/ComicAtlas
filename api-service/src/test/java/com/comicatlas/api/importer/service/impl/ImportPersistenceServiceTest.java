@@ -589,6 +589,7 @@ class ImportPersistenceServiceTest {
     void applyFinalizeFailed_marksRetryableFailure_mediaStaysPending() {
         runInTransactionWithoutResult();
         when(taskMapper.selectById(10L)).thenReturn(task(ImportTaskStatus.IMPORTING));
+        when(chapterMapper.selectById(1001L)).thenReturn(chapter(1001L, 0));
         when(comicMapper.selectByIdForUpdate(100L)).thenReturn(comic(ComicStatus.IMPORTING));
         when(managementTaskService.findActiveItem("COMIC", 100L, TaskType.IMPORT)).thenReturn(null);
 
@@ -622,6 +623,41 @@ class ImportPersistenceServiceTest {
         service.applyFinalizeFailed(event);
 
         verifyNoInteractions(comicMapper, mediaMapper, catalogCacheInvalidator);
+    }
+
+    @Test
+    @DisplayName("finalize failed 陈旧事件（章节已被重试删除）：忽略，不得误杀新尝试")
+    void applyFinalizeFailed_staleEvent_chapterDeleted_ignored() {
+        runInTransactionWithoutResult();
+        when(taskMapper.selectById(10L)).thenReturn(task(ImportTaskStatus.IMPORTING));
+        // 重试已删除旧章节结构 → 章节查询返回 null → 视为陈旧事件
+        when(chapterMapper.selectById(1001L)).thenReturn(null);
+
+        ImportStorageFinalizeFailedEvent event = new ImportStorageFinalizeFailedEvent(
+                UUID.randomUUID(), Instant.now(), 10L, 100L, 0, 1001L,
+                "STORAGE_FINALIZE_SOURCE_MISSING", "源目录不存在");
+        service.applyFinalizeFailed(event);
+
+        verify(taskMapper, never()).updateById(any(ImportTask.class));
+        verify(comicMapper, never()).updateById(any(Comic.class));
+        verifyNoInteractions(mediaMapper, catalogCacheInvalidator);
+    }
+
+    @Test
+    @DisplayName("finalize failed 陈旧事件（章节属于其他漫画）：忽略，不得误杀新尝试")
+    void applyFinalizeFailed_staleEvent_chapterOfOtherComic_ignored() {
+        runInTransactionWithoutResult();
+        when(taskMapper.selectById(10L)).thenReturn(task(ImportTaskStatus.IMPORTING));
+        Chapter otherComicChapter = chapter(1001L, 0);
+        otherComicChapter.setComicId(999L);
+        when(chapterMapper.selectById(1001L)).thenReturn(otherComicChapter);
+
+        ImportStorageFinalizeFailedEvent event = new ImportStorageFinalizeFailedEvent(
+                UUID.randomUUID(), Instant.now(), 10L, 100L, 0, 1001L, "X", "y");
+        service.applyFinalizeFailed(event);
+
+        verify(taskMapper, never()).updateById(any(ImportTask.class));
+        verify(comicMapper, never()).updateById(any(Comic.class));
     }
 
     // ======================== 4. completed 阶段无文件 IO ========================
