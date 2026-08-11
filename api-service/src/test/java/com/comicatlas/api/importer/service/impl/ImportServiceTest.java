@@ -3,7 +3,6 @@ package com.comicatlas.api.importer.service.impl;
 import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.comic.mapper.CatalogMapper;
-import com.comicatlas.api.comic.entity.Chapter;
 import com.comicatlas.api.comic.mapper.ChapterMapper;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.mapper.MediaMapper;
@@ -16,6 +15,7 @@ import com.comicatlas.api.importer.dto.BatchImportRequest;
 import com.comicatlas.api.importer.dto.BatchImportResultVO;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
+import com.comicatlas.api.importer.service.ImportRetryCoordinator;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
 import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.outbox.service.OutboxService;
@@ -34,7 +34,6 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Collections;
@@ -69,6 +68,7 @@ class ImportServiceTest {
     @Mock private ManagementTaskService managementTaskService;
     @Mock private OutboxService outboxService;
     @Mock private ApiStorageProperties storageProperties;
+    @Mock private ImportRetryCoordinator importRetryCoordinator;
     @InjectMocks private ImportServiceImpl service;
 
     @BeforeEach
@@ -310,9 +310,9 @@ class ImportServiceTest {
         verify(outboxService).enqueue(any(), eq("comic.task"), eq("cancel.requested"));
     }
 
-    // Test: retryTask 删除 Redis 取消标记
+    // Test: retryTask 委托 ImportRetryCoordinator 完成清理与重新入队，并同步统一任务
     @Test
-    void retryTask_deletesRedisCancelKey() {
+    void retryTask_delegatesToCoordinator_andSyncsManagementTask() {
         ImportTask t = new ImportTask();
         t.setId(301L);
         t.setComicId(100L);
@@ -320,19 +320,17 @@ class ImportServiceTest {
         t.setSourceType(SourceType.DIRECTORY);
         t.setSourcePath("D:/manga/test/comic");
         t.setRetryCount(0);
+        t.setManagementTaskId(207L);
         when(taskMapper.selectById(301L)).thenReturn(t);
-        when(chapterMapper.selectList(any())).thenReturn(List.of());
 
-        TransactionSynchronizationManager.initSynchronization();
         service.retryTask(301L);
-        TransactionSynchronizationManager.getSynchronizations()
-                .forEach(sync -> sync.afterCommit());
 
-        verify(redisTemplate).delete("import:cancel:301");
+        verify(importRetryCoordinator).retry(t);
+        verify(managementTaskService).retryTask(207L);
     }
 
     @Test
-    void retryTask_shouldEvictCatalogCache_whenOldCatalogIsDeleted() {
+    void retryTask_delegatesToCoordinator_whenNoManagementTask() {
         ImportTask task = new ImportTask();
         task.setId(10L);
         task.setComicId(20L);
@@ -341,49 +339,23 @@ class ImportServiceTest {
         task.setSourceType(SourceType.DIRECTORY);
         task.setSourcePath("D:/manga/test/retry");
         when(taskMapper.selectById(10L)).thenReturn(task);
-        when(chapterMapper.selectList(any())).thenReturn(List.of());
 
-        TransactionSynchronizationManager.initSynchronization();
-        try {
-            service.retryTask(10L);
-        } finally {
-            TransactionSynchronizationManager.clearSynchronization();
-        }
+        service.retryTask(10L);
 
-        verify(catalogCacheInvalidator).evict(20L);
+        verify(importRetryCoordinator).retry(task);
+        verify(managementTaskService, org.mockito.Mockito.never())
+                .retryTask(org.mockito.ArgumentMatchers.anyLong());
     }
 
     @Test
-    void retryTask_shouldDeleteOrphanHqChapterDirs_whenFinalizePartiallyMovedFiles() throws Exception {
+    void retryTask_rejectsNonTerminalStatus() {
         ImportTask task = new ImportTask();
         task.setId(50L);
-        task.setComicId(60L);
-        task.setStatus(ImportTaskStatus.FAILED);
-        task.setRetryCount(0);
-        task.setSourceType(SourceType.DIRECTORY);
-        task.setSourcePath("D:/manga/test/orphan");
+        task.setStatus(ImportTaskStatus.PENDING);
         when(taskMapper.selectById(50L)).thenReturn(task);
 
-        // 旧章节结构（finalize 部分失败后仍残留）
-        Chapter ch1 = new Chapter();
-        ch1.setId(7001L);
-        ch1.setComicId(60L);
-        when(chapterMapper.selectList(any())).thenReturn(List.of(ch1));
+        assertThrows(BusinessException.class, () -> service.retryTask(50L));
 
-        // 预置孤儿 HQ 目录（重试将生成新 chapterId，旧目录 DB 无引用）
-        Path orphanDir = Path.of("target/test-tmp/hq/60/7001");
-        Files.createDirectories(orphanDir);
-        Files.writeString(orphanDir.resolve("001.jpg"), "orphan");
-
-        TransactionSynchronizationManager.initSynchronization();
-        try {
-            service.retryTask(50L);
-            TransactionSynchronizationManager.getSynchronizations()
-                    .forEach(sync -> sync.afterCommit());
-        } finally {
-            TransactionSynchronizationManager.clearSynchronization();
-        }
-
-        assertFalse(Files.exists(orphanDir), "重试提交后旧 chapterId 目录应被清理");
+        verify(importRetryCoordinator, org.mockito.Mockito.never()).retry(any());
     }
 }
