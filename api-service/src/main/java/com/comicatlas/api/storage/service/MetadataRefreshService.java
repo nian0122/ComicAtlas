@@ -157,6 +157,9 @@ public class MetadataRefreshService {
                         .in(Media::getChapterId, chapterIds)
                         .notIn(Media::getStatus, INACTIVE_STATUSES));
 
+        // 旧布局升级：快照标注 legacyDirKey 的章节（Worker 已移动文件），重写 page 行路径前缀为新布局
+        normalizeLegacyLayouts(snapshot, comicId);
+
         MergePlan plan = buildMergePlan(snapshot, activeMedia);
         executeMerge(plan);
         refreshStats(comicId, chapterById, activeMedia, plan);
@@ -284,6 +287,33 @@ public class MetadataRefreshService {
                     throw new BusinessException("快照重复匹配键 (chapterId+basename): " + key);
                 }
             }
+        }
+    }
+
+    /**
+     * 旧布局升级：Worker 已将标注 legacyDirKey 章节的文件移动至 {@code hq/{comicId}/{chapterId}}，
+     * 此处将该章 page 行 {@code hq_path}/{@code lq_path} 前缀 {@code {comicId}/{legacyDirKey}/}
+     * 重写为 {@code {comicId}/{chapterId}/}。仅命中旧前缀的行被更新（LIKE 守卫），幂等可重试。
+     */
+    private void normalizeLegacyLayouts(MetadataRefreshSnapshotDTO snapshot, Long comicId) {
+        List<ChapterSnapshot> chapters = snapshot.chapters() == null ? List.of() : snapshot.chapters();
+        for (ChapterSnapshot cs : chapters) {
+            if (cs.legacyDirKey() == null || cs.legacyDirKey().isBlank()) {
+                continue;
+            }
+            String oldPrefix = comicId + "/" + cs.legacyDirKey() + "/";
+            String newPrefix = comicId + "/" + cs.chapterId() + "/";
+            int hqUpdated = mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
+                    .eq(Media::getChapterId, cs.chapterId())
+                    .likeRight(Media::getHqPath, oldPrefix)
+                    .setSql("hq_path = REPLACE(hq_path, {0}, {1})", oldPrefix, newPrefix));
+            int lqUpdated = mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
+                    .eq(Media::getChapterId, cs.chapterId())
+                    .isNotNull(Media::getLqPath)
+                    .likeRight(Media::getLqPath, oldPrefix)
+                    .setSql("lq_path = REPLACE(lq_path, {0}, {1})", oldPrefix, newPrefix));
+            log.info("旧布局前缀重写: comicId={}, chapterId={}, dir={} -> {}, hq={}, lq={}",
+                    comicId, cs.chapterId(), cs.legacyDirKey(), cs.chapterId(), hqUpdated, lqUpdated);
         }
     }
 

@@ -18,6 +18,7 @@ import com.comicatlas.common.constant.MetadataRefreshLimits;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO;
 import com.comicatlas.common.util.MetadataSnapshotRevision;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -39,12 +40,15 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+
+import org.mockito.ArgumentCaptor;
 
 /**
  * MetadataRefreshService 两阶段单元测试 — 阶段一（事务外受限读取/校验）+ 阶段二（事务内差异合并）。
@@ -461,6 +465,42 @@ class MetadataRefreshServiceTest {
             verify(mediaMapper, never()).selectList(any());
             verify(mediaMapper, never()).insert(any(Media.class));
             verify(mediaMapper, never()).updateById(any(Media.class));
+        }
+
+        @Test
+        @DisplayName("旧布局升级：章节携带 legacyDirKey 时重写 hq_path/lq_path 前缀")
+        void legacyLayout_migratesPrefix_whenChapterCarriesLegacyDirKey() {
+            Chapter c42 = chapter(42L, 1);
+            when(chapterMapper.selectList(any())).thenReturn(List.of(c42));
+            Media m101 = media(101L, 42L, "1/0/001.jpg", 1, "READY", 100L, "IMAGE", 1);
+            when(mediaMapper.selectList(any())).thenReturn(List.of(m101));
+            when(mediaMapper.update(any(), any())).thenReturn(1);
+            when(mediaMapper.updateById(any(Media.class))).thenReturn(1);
+
+            MetadataRefreshSnapshotDTO snapshot = new MetadataRefreshSnapshotDTO(1, 1L,
+                    Instant.parse("2026-08-09T00:00:00Z"), null,
+                    List.of(new MetadataRefreshSnapshotDTO.ChapterSnapshot(42L, 1,
+                            List.of(new MetadataRefreshSnapshotDTO.MediaSnapshot(101L, 1,
+                                    "1/42/001.jpg", "READY", "READY", 1,
+                                    100L, "IMAGE", 800, 1200, null, null, null, null)),
+                            List.of(), "0")));
+            String revision = MetadataSnapshotRevision.compute(snapshot);
+            MetadataRefreshSnapshotDTO applied =
+                    new MetadataRefreshSnapshotDTO(snapshot.schemaVersion(), snapshot.comicId(),
+                            snapshot.generatedAt(), revision, snapshot.chapters());
+
+            var result = service.applyValidatedSnapshot(applied);
+
+            // 前缀重写：hq_path 与 lq_path 各一次 UPDATE，均携带旧前缀 1/0/ 与新前缀 1/42/
+            ArgumentCaptor<LambdaUpdateWrapper<Media>> captor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
+            verify(mediaMapper, times(2)).update(isNull(), captor.capture());
+            for (LambdaUpdateWrapper<Media> wrapper : captor.getAllValues()) {
+                assertThat(wrapper.getSqlSet()).contains("REPLACE");
+                assertThat(wrapper.getParamNameValuePairs().values()).contains("1/0/", "1/42/");
+            }
+            // 快照合并照常执行（按 basename 匹配更新该行）
+            assertThat(m101.getHqStatus()).isEqualTo(HqStatus.READY);
+            assertThat(result.updated()).isEqualTo(1);
         }
 
         @Test
