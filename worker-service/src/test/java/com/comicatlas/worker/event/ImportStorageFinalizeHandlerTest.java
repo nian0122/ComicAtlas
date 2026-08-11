@@ -10,6 +10,7 @@ import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.importer.ImportManifest;
 import com.comicatlas.worker.importer.ImportManifestManager;
+import com.comicatlas.worker.mapper.ExportChapterMapper;
 import com.comicatlas.worker.storage.SafeMoveStrategy;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageRoot;
@@ -47,6 +48,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 /**
  * ImportStorageFinalizeHandler 幂等存储最终化集成测试。
@@ -65,6 +67,7 @@ class ImportStorageFinalizeHandlerTest {
     private StorageProperties storageProperties;
     private RabbitTemplate rabbitTemplate;
     private Channel channel;
+    private ExportChapterMapper exportChapterMapper;
     private ImportStorageFinalizeHandler handler;
 
     @BeforeEach
@@ -83,10 +86,15 @@ class ImportStorageFinalizeHandlerTest {
         rabbitTemplate = mock(RabbitTemplate.class);
         channel = mock(Channel.class);
 
+        // 默认章节有效（存在且属于本漫画），陈旧事件测试单独覆盖
+        exportChapterMapper = mock(ExportChapterMapper.class);
+        when(exportChapterMapper.countByIdAndComicId(anyLong(), anyLong())).thenReturn(1);
+
         WorkerConfig config = new WorkerConfig();
         config.setMangaRoot(mangaRoot.toString());
         handler = new ImportStorageFinalizeHandler(
-                config, storageService, storageProperties, manifestManager, rabbitTemplate, new MqConsumerSupport());
+                config, storageService, storageProperties, manifestManager, exportChapterMapper,
+                rabbitTemplate, new MqConsumerSupport());
     }
 
     @AfterEach
@@ -320,7 +328,8 @@ class ImportStorageFinalizeHandlerTest {
         WorkerConfig config = new WorkerConfig();
         config.setMangaRoot(mangaRoot.toString());
         ImportStorageFinalizeHandler cleanupHandler = new ImportStorageFinalizeHandler(
-                config, storageService, storageProperties, failingDelete, rabbitTemplate, new MqConsumerSupport());
+                config, storageService, storageProperties, failingDelete, exportChapterMapper,
+                rabbitTemplate, new MqConsumerSupport());
 
         cleanupHandler.handle(event(1, 100L, "001.jpg"), channel, 1L);
         ImportStorageFinalizeCompletedEvent completed = captureCompleted();
@@ -432,6 +441,41 @@ class ImportStorageFinalizeHandlerTest {
         assertTrue(existsStaging(1, "001.jpg"));
     }
 
+    // ======================== 陈旧事件保护 ========================
+
+    @Test
+    @DisplayName("章节已被重试删除（陈旧 finalize 事件）：不移动文件、不发布任何事件、静默 ACK")
+    void finalize_staleEventAfterRetry_doesNotMoveFilesAndAcksSilently() throws Exception {
+        writeStaging(1, "001.jpg", "aaa");
+        writeManifest(Map.of(1, List.of("001.jpg")), 3);
+
+        // 重试后旧 chapterId 已从 DB 删除 → 章节有效性校验失败
+        when(exportChapterMapper.countByIdAndComicId(100L, COMIC_ID)).thenReturn(0);
+
+        handler.handle(event(1, 100L, "001.jpg"), channel, 1L);
+
+        assertTrue(existsStaging(1, "001.jpg"), "陈旧事件不得搬移 staging 文件");
+        assertFalse(Files.exists(chapterFile(100L, "001.jpg")), "不得创建孤儿 chapterId 目录");
+        verifyNoInteractions(rabbitTemplate);
+        verify(channel).basicAck(1L, false);
+    }
+
+    @Test
+    @DisplayName("章节有效性只读查询异常：保守跳过移动并静默 ACK（陈旧事件不得搬入孤儿目录）")
+    void finalize_chapterValidityQueryFails_skipsMoveSilently() throws Exception {
+        writeStaging(1, "001.jpg", "aaa");
+        writeManifest(Map.of(1, List.of("001.jpg")), 3);
+
+        when(exportChapterMapper.countByIdAndComicId(anyLong(), anyLong()))
+                .thenThrow(new RuntimeException("mock DB down"));
+
+        handler.handle(event(1, 100L, "001.jpg"), channel, 1L);
+
+        assertTrue(existsStaging(1, "001.jpg"), "查询失败时保守跳过，不移动文件");
+        verifyNoInteractions(rabbitTemplate);
+        verify(channel).basicAck(1L, false);
+    }
+
     // ======================== 中断恢复 ========================
 
     @Test
@@ -464,7 +508,8 @@ class ImportStorageFinalizeHandlerTest {
         WorkerConfig config = new WorkerConfig();
         config.setMangaRoot(mangaRoot.toString());
         ImportStorageFinalizeHandler interruptHandler = new ImportStorageFinalizeHandler(
-                config, throwingStorage, storageProperties, manifestManager, rabbitTemplate, new MqConsumerSupport());
+                config, throwingStorage, storageProperties, manifestManager, exportChapterMapper,
+                rabbitTemplate, new MqConsumerSupport());
 
         try {
             interruptHandler.handle(event(1, 100L, "001.jpg"), channel, 1L);

@@ -11,6 +11,7 @@ import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.importer.ImportManifest;
 import com.comicatlas.worker.importer.ImportManifestManager;
+import com.comicatlas.worker.mapper.ExportChapterMapper;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageRef;
 import com.comicatlas.worker.storage.StorageRoot;
@@ -89,6 +90,7 @@ public class ImportStorageFinalizeHandler {
     private final StorageService storageService;
     private final StorageProperties storageProperties;
     private final ImportManifestManager manifestManager;
+    private final ExportChapterMapper exportChapterMapper;
     private final RabbitTemplate rabbitTemplate;
     private final MqConsumerSupport mqConsumerSupport;
 
@@ -133,6 +135,15 @@ public class ImportStorageFinalizeHandler {
 
     private void finalizeStorageLocked(ImportStorageFinalizeRequestedEvent event, Path mangaRoot, Path hqRoot,
                                        Path sourceDir, Path targetDir, List<MediaMove> moves) throws Exception {
+        // 陈旧事件保护：重试已删除旧章节结构，旧 attempt 的最终化事件不得再移动文件
+        //（避免把 staging 文件搬入重试后已不存在的孤儿 chapterId 目录，导致新尝试源缺失）
+        if (!isChapterStillActive(event.chapterId(), event.comicId())) {
+            log.info("最终化陈旧事件跳过（章节已不存在）: taskId={}, comicId={}, chapterId={}",
+                    event.taskId(), event.comicId(), event.chapterId());
+            deleteIfEmpty(sourceDir);
+            return;
+        }
+
         // 2) 读取清单获取预期尺寸；清单缺失说明该任务清单已清理（全部章此前已最终化）
         ImportManifest manifest = manifestManager.exists(mangaRoot, event.taskId())
                 ? manifestManager.read(mangaRoot, event.taskId())
@@ -200,6 +211,20 @@ public class ImportStorageFinalizeHandler {
 
     /** 媒体搬运对：解析并校验后的源/目标绝对路径 + 用于清单尺寸核对的源文件名。 */
     private record MediaMove(Path source, Path target, String fileName) {}
+
+    /** 最终化事件引用章节必须仍存在于 DB 且属于本漫画，否则视为陈旧事件（重试已删除）。 */
+    private boolean isChapterStillActive(Long chapterId, Long comicId) {
+        if (chapterId == null || comicId == null) {
+            return false;
+        }
+        try {
+            return exportChapterMapper.countByIdAndComicId(chapterId, comicId) > 0;
+        } catch (Exception e) {
+            // 只读查询异常：保守跳过移动，避免陈旧事件把文件搬入孤儿目录
+            log.warn("章节有效性校验失败，跳过最终化: chapterId={}, comicId={}", chapterId, comicId, e);
+            return false;
+        }
+    }
 
     /**
      * 逐映射解析并校验：源/目标绝对路径必须仍位于 HQ 根内。
