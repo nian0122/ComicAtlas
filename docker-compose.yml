@@ -29,8 +29,8 @@ services:
       NACOS_USER: ${REMOTE_NACOS_USERNAME}
       NACOS_PASS: ${REMOTE_NACOS_PASSWORD}
       MYSQL_HOST: host.docker.internal
-      MYSQL_USER: ${REMOTE_MYSQL_USER}
-      MYSQL_PASS: ${REMOTE_MYSQL_PASSWORD}
+      MYSQL_USER: ${API_MYSQL_USER:?请在 .env 中设置 API_MYSQL_USER}
+      MYSQL_PASS: ${API_MYSQL_PASSWORD:?请在 .env 中设置 API_MYSQL_PASSWORD}
       REDIS_HOST: host.docker.internal
       REDIS_PORT: ${REMOTE_REDIS_PORT}
       REDIS_PASS: ${REMOTE_REDIS_PASSWORD}
@@ -64,7 +64,9 @@ services:
   #     NACOS_ADDR: nacos:8848
   #     RABBITMQ_HOST: rabbitmq
   #     RABBITMQ_PORT: 5672
-  #     MYSQL_HOST: mysql
+  #     MYSQL_HOST: host.docker.internal
+  #     MYSQL_USER: ${WORKER_MYSQL_USER:?请在 .env 中设置 WORKER_MYSQL_USER}
+  #     MYSQL_PASS: ${WORKER_MYSQL_PASSWORD:?请在 .env 中设置 WORKER_MYSQL_PASSWORD}
   #     MANGA_ROOT: /storage
   #     WORKER_HOST_MANGA_ROOT: ${MANGA_ROOT:-./manga}
   #     WORKER_CONTAINER_MANGA_ROOT: /storage

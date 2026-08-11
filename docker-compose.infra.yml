@@ -6,8 +6,8 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?请在 .env 中设置 MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: comic_atlas
-      MYSQL_USER: ${REMOTE_MYSQL_USER}
-      MYSQL_PASSWORD: ${REMOTE_MYSQL_PASSWORD}
+      MYSQL_USER: ${API_MYSQL_USER:?请在 .env 中设置 API_MYSQL_USER}
+      MYSQL_PASSWORD: ${API_MYSQL_PASSWORD:?请在 .env 中设置 API_MYSQL_PASSWORD}
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci

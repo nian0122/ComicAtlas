@@ -49,8 +49,10 @@ ComicAtlas 是一个面向个人收藏的本地漫画仓库平台。它把 ZIP�
    ```dotenv
    MANGA_ROOT=F:/manga
    MYSQL_ROOT_PASSWORD=请设置强密码
-   REMOTE_MYSQL_USER=comicatlas
-   REMOTE_MYSQL_PASSWORD=请设置强密码
+   API_MYSQL_USER=comicatlas_api
+   API_MYSQL_PASSWORD=请设置强密码
+   WORKER_MYSQL_USER=comicatlas_ro
+   WORKER_MYSQL_PASSWORD=请设置另一组强密码
    REMOTE_NACOS_USERNAME=nacos
    REMOTE_NACOS_PASSWORD=nacos
    REMOTE_REDIS_PORT=6379
@@ -59,7 +61,7 @@ ComicAtlas 是一个面向个人收藏的本地漫画仓库平台。它把 ZIP�
    REMOTE_RABBITMQ_PASSWORD=guest
    ```
 
-   > `REMOTE_MYSQL_USER` 为 API 写账号；Worker 进程需独立的只读账号（仅 `GRANT SELECT`），其密码必须通过 `MYSQL_PASS` 环境变量显式设置（无默认值，未设置时 Worker 无法启动），详见[部署运维](docs/operations/management.md)的"数据库账号"小节。
+   > 仓库级 `.env` 使用 `API_MYSQL_*` 和 `WORKER_MYSQL_*` 区分写账号与只读账号。启动脚本或 Compose 会在进程边界映射为 Spring 使用的 `MYSQL_USER` / `MYSQL_PASS`；Worker 账号仅授予 `SELECT`，详见[部署运维](docs/operations/management.md)的"数据库账号"小节。
 
 2. 确认 `MANGA_ROOT` 下存在 `hq`、`lq`、`thumbs`、`metadata`、`temp` 目录。
 

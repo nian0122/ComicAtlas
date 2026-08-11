@@ -19,6 +19,8 @@ ComicAtlas 分为 API 与 Worker 两个进程，二者对 MySQL 的权限不同�
 | API 写账号 | 全部 DDL/DML（库级） | API 服务读写业务表、outbox/inbox、管理任务 | 由 Flyway 执行迁移，`GRANT ALL` |
 | Worker 只读账号（`comicatlas_ro`，生产默认） | 仅 `SELECT` | Worker 文件处理侧只读查询（导出、扫描、转码状态读取） | HikariCP `read-only=true` + `GRANT SELECT` 双层兜底 |
 
+仓库级 `.env` 按服务角色命名：API 使用 `API_MYSQL_USER` / `API_MYSQL_PASSWORD`，Worker 使用 `WORKER_MYSQL_USER` / `WORKER_MYSQL_PASSWORD`。Docker Compose 和开发启动脚本只在启动具体 JVM 时，将对应账号映射为 Spring 通用变量 `MYSQL_USER` / `MYSQL_PASS`，避免两个进程误用同一账号。
+
 ### 最小授权示例（MySQL 8）
 
 ```sql
@@ -34,7 +36,7 @@ FLUSH PRIVILEGES;
 
 Worker 侧生产默认配置已把 `spring.datasource.hikari.read-only` 设为 `true`（`worker-service/src/main/resources/application.yml`），并有配置契约测试防止回退。Worker 写数据库被拒绝属于预期行为：所有状态回写通过 MQ 事件由 API 完成。
 
-Worker 只读账号的密码没有固定默认值，必须由 `MYSQL_PASS` 环境变量提供；未设置时 Worker 启动即失败，避免误用默认凭据连接数据库。创建只读账号时请为 `MYSQL_PASS` 设置与示例不同的强密码。
+Worker 只读账号的密码没有固定默认值，必须在仓库 `.env` 中通过 `WORKER_MYSQL_PASSWORD` 显式提供；启动 Worker 时再映射为进程级 `MYSQL_PASS`。未设置时 Worker 启动即失败，避免误用默认凭据连接数据库。
 
 > 本手册不包含任何真实凭据，仅示范账号结构与授权方式。
 

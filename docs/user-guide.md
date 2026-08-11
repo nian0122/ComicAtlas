@@ -26,8 +26,10 @@ Windows 用户建议使用正斜杠书写路径，例如 `F:/manga`，并确认 
 ```dotenv
 MANGA_ROOT=F:/manga
 MYSQL_ROOT_PASSWORD=请设置强密码
-REMOTE_MYSQL_USER=comicatlas
-REMOTE_MYSQL_PASSWORD=请设置强密码
+API_MYSQL_USER=comicatlas_api
+API_MYSQL_PASSWORD=请设置强密码
+WORKER_MYSQL_USER=comicatlas_ro
+WORKER_MYSQL_PASSWORD=请设置另一组强密码
 REMOTE_NACOS_USERNAME=nacos
 REMOTE_NACOS_PASSWORD=nacos
 REMOTE_REDIS_PORT=6379

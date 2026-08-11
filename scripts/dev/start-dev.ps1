@@ -36,7 +36,14 @@ $env:NACOS_PASS    = $env:REMOTE_NACOS_PASSWORD
 $env:REDIS_HOST    = "localhost"
 $env:REDIS_PORT    = "6379"
 $env:REDIS_PASS    = $env:REMOTE_REDIS_PASSWORD
+$env:MYSQL_HOST    = "localhost"
+$env:MYSQL_USER    = $env:WORKER_MYSQL_USER
+$env:MYSQL_PASS    = $env:WORKER_MYSQL_PASSWORD
 $env:MANGA_ROOT    = if ($env:MANGA_ROOT) { $env:MANGA_ROOT } else { "F:/manga" }
+
+if ([string]::IsNullOrWhiteSpace($env:MYSQL_USER) -or [string]::IsNullOrWhiteSpace($env:MYSQL_PASS)) {
+    throw "Worker 数据库凭据未配置，请在 .env 中设置 WORKER_MYSQL_USER 和 WORKER_MYSQL_PASSWORD"
+}
 
 # 4. 确保存储目录存在（HQ/LQ/EXPORT/thumb）
 @("$env:MANGA_ROOT/hq", "$env:MANGA_ROOT/lq", "$env:MANGA_ROOT/export", "$env:MANGA_ROOT/thumbs") | ForEach-Object {
