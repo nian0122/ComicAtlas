@@ -167,6 +167,16 @@ public class StorageOperationController {
     }
 
     /**
+     * 查询全局导出任务列表（跨漫画，按创建时间倒序），供任务中心展示全部导出记录。
+     *
+     * @return 导出任务列表
+     */
+    @GetMapping("/export/tasks")
+    public Result<List<ExportTaskVO>> listAllExports() {
+        return Result.ok(exportOperationService.listAllExports());
+    }
+
+    /**
      * 查询导出任务详情（含导出产物物理路径）。
      *
      * @param taskId 导出任务 ID

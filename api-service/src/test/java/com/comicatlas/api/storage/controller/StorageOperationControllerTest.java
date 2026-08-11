@@ -157,6 +157,20 @@ class StorageOperationControllerTest {
     }
 
     @Test
+    void listAllExports_返回全部导出任务列表() throws Exception {
+        when(exportOperationService.listAllExports())
+                .thenReturn(List.of(exportTask(7L, 42L), exportTask(8L, 43L)));
+
+        mvc.perform(get("/api/storage/export/tasks"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[0].id").value(7))
+                .andExpect(jsonPath("$.data[1].id").value(8));
+
+        verify(exportOperationService).listAllExports();
+    }
+
+    @Test
     void getExportArtifacts_按顺序返回分卷元数据清单() throws Exception {
         when(exportOperationService.listArtifacts(7L))
                 .thenReturn(List.of(
