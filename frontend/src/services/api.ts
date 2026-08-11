@@ -40,11 +40,22 @@ import type {
 
 const api = axios.create({ baseURL: '/api' })
 
+/** 后端 Result 业务成功码（Result.ok 恒为 200） */
+const RESULT_OK_CODE = 200
+
 api.interceptors.response.use(
   (response) => {
     const data = response.data
-    if (data && typeof data === 'object' && 'code' in data && 'data' in data) {
-      response.data = data.data
+    if (data && typeof data === 'object' && 'code' in data) {
+      // 后端业务失败以 HTTP 200 + 非 200 code 返回：必须转为 reject，
+      // 让各页面的 catch 统一展示后端 message，避免把 null 当成功数据继续使用（曾引发读 null.status / null.pages 崩溃）。
+      if (data.code !== RESULT_OK_CODE) {
+        const message = typeof data.message === 'string' && data.message ? data.message : '请求失败'
+        return Promise.reject(new Error(message))
+      }
+      if ('data' in data) {
+        response.data = data.data
+      }
     }
     return response
   },
