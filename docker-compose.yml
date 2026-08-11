@@ -11,6 +11,12 @@ services:
       NACOS_ADDR: host.docker.internal:8848
       NACOS_USER: ${REMOTE_NACOS_USERNAME}
       NACOS_PASS: ${REMOTE_NACOS_PASSWORD}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8000/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   api-service:
     build:
@@ -35,6 +41,12 @@ services:
       SPRING_SECURITY_USER_NAME: ${REMOTE_RABBITMQ_USER}
       SPRING_SECURITY_USER_PASSWORD: ${REMOTE_RABBITMQ_PASSWORD}
       MANGA_ROOT: /storage
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8010/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     volumes:
       - ${MANGA_ROOT:-./manga}/metadata:/storage/metadata:ro
       - ${MANGA_ROOT:-./manga}/hq:/storage/hq:ro
@@ -77,5 +89,12 @@ services:
       - ${MANGA_ROOT:-./manga}/hq:/storage/hq:ro
       - ${MANGA_ROOT:-./manga}/lq:/storage/lq:ro
       - ${MANGA_ROOT:-./manga}/thumbs:/storage/thumbs:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
     depends_on:
-      - gateway
+      gateway:
+        condition: service_healthy
