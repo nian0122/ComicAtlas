@@ -150,21 +150,29 @@ const TRANSCODE_POLL_INTERVAL = 5000
 const TRANSCODE_MAX_RETRIES = 12 // 60 秒
 const transcodePollTimer = ref<ReturnType<typeof setInterval> | null>(null)
 const transcodePollRetries = ref(0)
+let transcodePollInFlight = false
 
 function startTranscodePolling() {
   stopTranscodePolling()
   transcodePollRetries.value = 0
   transcodePollTimer.value = setInterval(async () => {
+    if (transcodePollInFlight) return
+    transcodePollInFlight = true
     transcodePollRetries.value++
-    await loadData()
-    const status = comic.value?.transcodeStatus
-    if (status === 'DONE' || status === 'FAILED' || status === 'NOT_NEEDED') {
-      stopTranscodePolling()
-      return
-    }
-    if (transcodePollRetries.value >= TRANSCODE_MAX_RETRIES) {
-      stopTranscodePolling()
-      ElMessage.warning('部分视频仍在后台处理，可稍后刷新页面查看结果')
+    try {
+      // 轮询只更新数据，不遮罩整个详情页；遮罩会让任务触发后的页面产生明显闪烁。
+      await loadData({ silent: true })
+      const status = comic.value?.transcodeStatus
+      if (status === 'DONE' || status === 'FAILED' || status === 'NOT_NEEDED') {
+        stopTranscodePolling()
+        return
+      }
+      if (transcodePollRetries.value >= TRANSCODE_MAX_RETRIES) {
+        stopTranscodePolling()
+        ElMessage.warning('部分视频仍在后台处理，可稍后刷新页面查看结果')
+      }
+    } finally {
+      transcodePollInFlight = false
     }
   }, TRANSCODE_POLL_INTERVAL)
 }
@@ -174,6 +182,7 @@ function stopTranscodePolling() {
     clearInterval(transcodePollTimer.value)
     transcodePollTimer.value = null
   }
+  transcodePollInFlight = false
 }
 
 const structureRows = computed<readonly StorageStructureRow[]>(() => {
@@ -296,8 +305,9 @@ function formatSize(bytes: number): string {
   return `${size.toFixed(i > 0 ? 1 : 0)} ${units[i]}`
 }
 
-async function loadData() {
-  loading.value = true
+async function loadData(options: { silent?: boolean } = {}) {
+  const silent = options.silent ?? false
+  if (!silent) loading.value = true
   try {
     const [comicData, chaptersData, catalogData] = await Promise.all([
       storageService.fetchComic(comicId),
@@ -308,9 +318,9 @@ async function loadData() {
     chapters.value = chaptersData
     catalogTree.value = (catalogData.data ?? []) as CatalogNode[]
   } catch {
-    ElMessage.error('加载失败')
+    if (!silent) ElMessage.error('加载失败')
   } finally {
-    loading.value = false
+    if (!silent) loading.value = false
   }
   void loadComicStatus()
 }
@@ -384,7 +394,7 @@ async function onDeleteHQ() {
   try {
     await storageService.executeOperation({ type: StorageOperationType.DeleteHQ, comicId })
     ElMessage.success('HQ 删除任务已提交')
-    await loadData()
+    await loadData({ silent: true })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : '删除失败'
     ElMessage.error(message)
@@ -398,7 +408,7 @@ async function onDeleteChapterHQ(chapterId: number) {
   try {
     await storageService.executeOperation({ type: StorageOperationType.DeleteHQ, comicId, chapterId })
     ElMessage.success('已提交')
-    await loadData()
+    await loadData({ silent: true })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : '操作失败'
     ElMessage.error(message)
@@ -438,7 +448,7 @@ async function onTranscode() {
   try {
     const result = await storageService.transcodeVideos(comicId)
     ElMessage.success(`已提交 ${result.itemCount} 个视频转码任务`)
-    await loadData()
+    await loadData({ silent: true })
     startTranscodePolling()
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : '转码失败'

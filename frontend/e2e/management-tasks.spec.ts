@@ -9,7 +9,7 @@ function success(route: Route, data: unknown) {
 }
 
 test('统一管理任务页展示完整任务类型并可筛选导入任务', async ({ page }) => {
-  await page.route('/api/management/tasks**', (route) => success(route, {
+  await page.route('/api/manage/tasks**', (route) => success(route, {
     records: [{
       id: 101,
       taskType: 'IMPORT',
@@ -58,7 +58,7 @@ test('统一管理任务页展示完整任务类型并可筛选导入任务', as
     }],
     total: 2,
   }))
-  await page.route('/api/management/tasks/101/items', (route) => success(route, [{
+  await page.route('/api/manage/tasks/101/items', (route) => success(route, [{
     id: 1001,
     taskId: 101,
     targetType: 'COMIC',
@@ -96,7 +96,7 @@ test('统一管理任务页展示完整任务类型并可筛选导入任务', as
 test('统一管理任务自动刷新不覆盖当前列表', async ({ page }) => {
   let requestCount = 0
   let releaseSecondRequest: (() => void) | undefined
-  await page.route('/api/management/tasks**', async (route) => {
+  await page.route('/api/manage/tasks**', async (route) => {
     requestCount += 1
     if (requestCount === 2) await new Promise<void>((resolve) => { releaseSecondRequest = resolve })
     await success(route, { records: [], total: 0 })
