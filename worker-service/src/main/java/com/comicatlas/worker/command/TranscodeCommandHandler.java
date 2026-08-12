@@ -5,10 +5,10 @@ import com.comicatlas.common.event.payload.TranscodeMediaInfo;
 import com.comicatlas.common.util.VideoPlayability;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.entity.ExportMedia;
+import com.comicatlas.worker.file.transcode.FfmpegTranscoder;
 import com.comicatlas.worker.media.ComicMetadata;
 import com.comicatlas.worker.media.MediaAnalyzer;
 import com.comicatlas.worker.mapper.ExportMediaMapper;
-import com.comicatlas.worker.process.ExternalProcessRunner;
 import com.comicatlas.worker.event.ManagementCommandPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,16 +38,11 @@ public class TranscodeCommandHandler {
     private final ExportMediaMapper mediaMapper;
     private final WorkerConfig config;
     private final ManagementCommandPublisher publisher;
-    private final ExternalProcessRunner processRunner;
     private final MediaAnalyzer mediaAnalyzer;
+    private final FfmpegTranscoder ffmpegTranscoder;
 
     /** 单页转码结果：error 为 null 表示成功；transcode 为成功时的实测元数据（可能为 null）。 */
     private record TranscodeResult(String error, TranscodeMediaInfo transcode) {}
-
-    private static final List<String> FFMPEG_ARGS = List.of(
-        "-c:v", "libx264", "-crf", "23", "-preset", "medium",
-        "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", "-y"
-    );
 
     public void transcode(ManagementCommandRequestedEvent cmd) {
         Long targetId = cmd.targetId();
@@ -63,6 +58,7 @@ public class TranscodeCommandHandler {
         List<ExportMedia> pages = mediaMapper.selectByComicId(comicId);
         List<Long> videoPages = pages.stream()
                 .filter(p -> "VIDEO".equals(p.getMediaType()))
+                .filter(p -> VideoPlayability.isTranscodable(p.getWidth(), p.getHeight()))
                 .filter(p -> !VideoPlayability.isBrowserPlayable(p.getVideoCodec(), p.getContainer()))
                 .map(ExportMedia::getId)
                 .toList();
@@ -133,15 +129,11 @@ public class TranscodeCommandHandler {
             tempFile = tempRoot.resolve(pageId + ".mp4");
 
             publisher.progress(cmd, 10, "开始转码");
-            ProcessBuilder processBuilder = new ProcessBuilder();
-            processBuilder.command(buildFfmpegCommand(
-                config.resolveToolPath(config.getFfmpegPath()).toString(),
-                hqFile.toString(), tempFile.toString()));
-            // 统一外部进程执行：超时 10 分钟，中断由 Runner 恢复标志并销毁 ffmpeg 后向上传播
-            ExternalProcessRunner.ExternalProcessResult result =
-                    processRunner.run(processBuilder, 600);
-            if (result.exitCode() != 0) {
-                throw new IOException("ffmpeg exit code " + result.exitCode() + ": pageId=" + pageId);
+            // 统一 ffmpeg 核心（参数/编码器选择/执行）：委托 FfmpegTranscoder，
+            // 硬件加速探测与 CPU 回退收敛单处；超时 10 分钟，中断由 Runner 恢复标志并销毁 ffmpeg 后向上传播
+            int exitCode = ffmpegTranscoder.transcode(hqFile, tempFile);
+            if (exitCode != 0) {
+                throw new IOException("ffmpeg exit code " + exitCode + ": pageId=" + pageId);
             }
             if (!Files.exists(tempFile) || Files.size(tempFile) == 0) {
                 throw new IOException("转码输出文件为空: " + tempFile);
@@ -198,15 +190,5 @@ public class TranscodeCommandHandler {
             log.warn("转码后元数据探测失败，降级为 null: file={}, error={}", file, e.getMessage());
             return null;
         }
-    }
-
-    private List<String> buildFfmpegCommand(String ffmpegPath, String input, String output) {
-        List<String> cmd = new java.util.ArrayList<>();
-        cmd.add(ffmpegPath != null ? ffmpegPath : "ffmpeg");
-        cmd.add("-i");
-        cmd.add(input);
-        cmd.addAll(FFMPEG_ARGS);
-        cmd.add(output);
-        return cmd;
     }
 }

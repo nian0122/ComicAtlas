@@ -6,6 +6,7 @@ import com.comicatlas.common.event.payload.TranscodeMediaInfo;
 import com.comicatlas.worker.command.TranscodeCommandHandler;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.entity.ExportMedia;
+import com.comicatlas.worker.file.transcode.FfmpegTranscoder;
 import com.comicatlas.worker.media.ComicMetadata;
 import com.comicatlas.worker.media.MediaAnalyzer;
 import com.comicatlas.worker.mapper.ExportMediaMapper;
@@ -77,8 +78,9 @@ class TranscodeCommandHandlerTest {
         ioExecutor = new ThreadPoolTaskExecutor();
         ioExecutor.initialize();
         processRunner = new ExternalProcessRunner(ioExecutor);
+        FfmpegTranscoder ffmpegTranscoder = new FfmpegTranscoder(config, processRunner);
 
-        handler = new TranscodeCommandHandler(mediaMapper, config, publisher, processRunner, mediaAnalyzer);
+        handler = new TranscodeCommandHandler(mediaMapper, config, publisher, mediaAnalyzer, ffmpegTranscoder);
     }
 
     @AfterEach
