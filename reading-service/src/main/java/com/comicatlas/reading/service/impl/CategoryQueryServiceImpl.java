@@ -1,10 +1,10 @@
 package com.comicatlas.reading.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.comicatlas.api.comic.cache.ComicReferenceCache;
-import com.comicatlas.api.comic.dto.CategoryDTO;
-import com.comicatlas.api.comic.entity.Category;
-import com.comicatlas.api.comic.mapper.CategoryMapper;
+import com.comicatlas.contract.comic.cache.ComicReferenceCache;
+import com.comicatlas.contract.comic.dto.CategoryDTO;
+import com.comicatlas.persistence.comic.entity.Category;
+import com.comicatlas.persistence.comic.mapper.CategoryMapper;
 import com.comicatlas.reading.service.CategoryQueryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;

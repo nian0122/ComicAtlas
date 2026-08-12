@@ -655,7 +655,7 @@ TRASH 资产清单（API 写 DB，Worker 只读 DB + 操作文件）。V20 新�
 
 ## 状态/值枚举
 
-以下枚举定义来自 `com.comicatlas.api.common.enums` 包。数据库中均以 `VARCHAR` 存储枚举名称字符串。
+以下枚举定义来自 `com.comicatlas.contract.common.enums` 包。数据库中均以 `VARCHAR` 存储枚举名称字符串。
 
 ### ComicStatus
 

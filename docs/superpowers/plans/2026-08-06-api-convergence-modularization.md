@@ -47,7 +47,7 @@
 
 ```java
 // 删除（ComicController.java）：
-// import com.comicatlas.api.comic.dto.ChapterPageVO;  ← 删除
+// import com.comicatlas.contract.comic.dto.ChapterPageVO;  ← 删除
 //
 //    @GetMapping("/comics/{id}/chapters/{chapterId}/pages")
 //    public Result<ChapterPageVO> getChapterPages(
@@ -65,11 +65,11 @@
 // 删除：
 // ChapterPageVO getChapterPages(Long comicId, Long chapterId);
 ```
-同时删除 `import com.comicatlas.api.comic.dto.ChapterPageVO;`（L9）。
+同时删除 `import com.comicatlas.contract.comic.dto.ChapterPageVO;`（L9）。
 
 - [ ] **Step 3: 删除 Service 实现**
 
-`ComicServiceImpl.java` 删除方法 `getChapterPages`（当前 L182-238，整段方法体）与 `import com.comicatlas.api.comic.dto.ChapterPageVO;`（L33）。
+`ComicServiceImpl.java` 删除方法 `getChapterPages`（当前 L182-238，整段方法体）与 `import com.comicatlas.contract.comic.dto.ChapterPageVO;`（L33）。
 
 - [ ] **Step 4: 删除 DTO 并验证无引用**
 
@@ -129,7 +129,7 @@ git commit -m "删除废弃的章节页面端点：pages 死代码无前端调�
 
 `ComicListVO.java` 完整新内容：
 ```java
-package com.comicatlas.api.comic.dto;
+package com.comicatlas.contract.comic.dto;
 
 import com.comicatlas.api.common.enums.ComicStatus;
 import lombok.Data;
@@ -283,7 +283,7 @@ git commit -m "漫画列表与详情 VO 修正：移除无消费者管理字段�
 ```java
 package com.comicatlas.api.storage.controller;
 
-import com.comicatlas.api.common.Result;
+import com.comicatlas.contract.common.Result;
 import com.comicatlas.api.management.dto.OperationSubmitResult;
 import com.comicatlas.api.management.operation.MediaOperationCommandService;
 import com.comicatlas.api.storage.service.HqDeleteOperationService;
@@ -440,7 +440,7 @@ public class HqDeleteOperationService {
 ```java
 package com.comicatlas.api.storage.controller;
 
-import com.comicatlas.api.common.Result;
+import com.comicatlas.contract.common.Result;
 import com.comicatlas.api.management.dto.OperationSubmitResult;
 import com.comicatlas.api.storage.service.HqDeleteOperationService;
 import com.comicatlas.api.storage.service.LqOperationService;
@@ -687,7 +687,7 @@ package com.comicatlas.api.storage.service;
 
 import com.comicatlas.api.admin.dto.RefreshMetadataResult;
 import com.comicatlas.api.admin.recovery.RecoveryEngine;
-import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
+import com.comicatlas.contract.comic.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.mapper.ComicMapper;
 import com.comicatlas.api.common.enums.ComicStatus;
@@ -719,7 +719,7 @@ class MetadataRefreshServiceTest {
     void refresh_漫画不存在时抛出业务异常() {
         when(comicMapper.selectById(1L)).thenReturn(null);
         org.junit.jupiter.api.Assertions.assertThrows(
-                com.comicatlas.api.common.exception.BusinessException.class,
+                com.comicatlas.contract.common.exception.BusinessException.class,
                 () -> newService().refresh(1L));
     }
 
@@ -732,7 +732,7 @@ class MetadataRefreshServiceTest {
         // update 返回 0（CAS 失败）
         when(comicMapper.update(any(), any())).thenReturn(0);
         org.junit.jupiter.api.Assertions.assertThrows(
-                com.comicatlas.api.common.exception.BusinessException.class,
+                com.comicatlas.contract.common.exception.BusinessException.class,
                 () -> newService().refresh(1L));
     }
 
@@ -893,7 +893,7 @@ package com.comicatlas.api.storage.controller;
 
 import com.comicatlas.api.admin.dto.StorageStatsDTO;
 import com.comicatlas.api.admin.service.AdminService;
-import com.comicatlas.api.common.Result;
+import com.comicatlas.contract.common.Result;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -1074,7 +1074,7 @@ public record ManagementCommandCompletedEvent(
 ```java
 package com.comicatlas.api.storage.service;
 
-import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
+import com.comicatlas.contract.comic.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.comic.entity.Chapter;
 import com.comicatlas.api.comic.entity.Comic;
 import com.comicatlas.api.comic.entity.Media;

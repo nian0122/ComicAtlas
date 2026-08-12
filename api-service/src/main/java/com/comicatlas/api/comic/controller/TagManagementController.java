@@ -1,8 +1,8 @@
 package com.comicatlas.api.comic.controller;
 
-import com.comicatlas.api.common.Result;
-import com.comicatlas.api.common.constant.HttpStatusCodes;
-import com.comicatlas.api.comic.dto.TagDTO;
+import com.comicatlas.contract.common.Result;
+import com.comicatlas.contract.common.constant.HttpStatusCodes;
+import com.comicatlas.contract.comic.dto.TagDTO;
 import com.comicatlas.api.comic.service.TagManagementService;
 import lombok.RequiredArgsConstructor;
 

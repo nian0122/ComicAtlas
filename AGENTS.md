@@ -14,7 +14,8 @@ Spring Boot 3 + Vue3 + RabbitMQ + MySQL + Redis。
 comic-atlas/
 ├── api-service/             # 管理服务（comic-api-service，端口 8010）：漫画写操作 + 导入 + LQ/HQ删除 + 回收站 + 管理任务中心 + 批量操作 + 存储管理 + DLQ + 全部 MQ 消费（Flyway 迁移在 src/main/resources/db/），管理端 URL 统一 /api/manage/**
 ├── reading-service/         # 阅读服务（comic-reading-service，端口 8011）：漫画列表/详情 + 目录树 + 章节阅读 + 阅读历史（纯读为主，仅阅读进度保存写 reading_history），URL 保持 /api/**
-├── comic-shared/            # 共享持久化层：entity/mapper/comic-dto/reader-dto/common 基础设施（Result/异常/枚举/storage/缓存常量），包名保持 com.comicatlas.api.* 不变，两个 API 服务共同依赖
+├── comic-contract/          # 跨服务契约：DTO、Result、异常、枚举与缓存名；包名 com.comicatlas.contract.*
+├── comic-persistence/       # 跨服务持久化基础设施：entity/mapper/storage/assembler/type handler；包名 com.comicatlas.persistence.*
 ├── worker-service/          # 文件处理 + MQ消费 + 下载 + 解压 + 导入 + LQ/HQ删除 + 回收/恢复/永久清理 + ffprobe（模块化：config/event/command/importer/media/storage/export/file/process/image）
 ├── comic-common/            # 共享事件 DTO（36 个事件 record + ComicEvent sealed interface + payload 数据载体，Jackson 多态序列化）+ MQ 契约/元数据/工具（constant/dto/event/metadata/mq/util）
 ├── gateway/                 # Spring Cloud Gateway: 路由 + Nacos发现（/api/manage/** → 管理服务，/api/** → 阅读服务）

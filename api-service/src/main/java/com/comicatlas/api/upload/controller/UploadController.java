@@ -1,6 +1,6 @@
 package com.comicatlas.api.upload.controller;
 
-import com.comicatlas.api.common.Result;
+import com.comicatlas.contract.common.Result;
 import com.comicatlas.api.upload.UploadSessionService;
 import com.comicatlas.api.upload.dto.CreateUploadSessionRequest;
 import com.comicatlas.api.upload.dto.CreateUploadSessionResponse;

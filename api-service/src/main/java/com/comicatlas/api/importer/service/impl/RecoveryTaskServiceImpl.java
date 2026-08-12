@@ -3,9 +3,9 @@ package com.comicatlas.api.importer.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.comicatlas.api.common.constant.HttpStatusCodes;
-import com.comicatlas.api.common.enums.RecoveryTaskStatus;
-import com.comicatlas.api.common.exception.BusinessException;
+import com.comicatlas.contract.common.constant.HttpStatusCodes;
+import com.comicatlas.contract.common.enums.RecoveryTaskStatus;
+import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.importer.dto.RecoveryTaskVO;
 import com.comicatlas.api.importer.entity.RecoveryTask;
 import com.comicatlas.api.importer.event.RecoveryEventPublisher;
@@ -14,7 +14,7 @@ import com.comicatlas.api.importer.service.RecoveryTaskService;
 import com.comicatlas.api.management.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
 import com.comicatlas.api.management.service.ManagementTaskService;
-import com.comicatlas.api.common.enums.TaskType;
+import com.comicatlas.contract.common.enums.TaskType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -112,7 +112,7 @@ public class RecoveryTaskServiceImpl implements RecoveryTaskService {
         if (recoveryTask.getManagementTaskId() != null) {
             try {
                 managementTaskService.retryTask(recoveryTask.getManagementTaskId());
-            } catch (com.comicatlas.api.common.exception.BusinessException e) {
+            } catch (com.comicatlas.contract.common.exception.BusinessException e) {
                 log.warn("统一恢复任务重试跳过（非终态）: managementTaskId={}, error={}",
                         recoveryTask.getManagementTaskId(), e.getMessage());
             }

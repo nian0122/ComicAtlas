@@ -1,6 +1,7 @@
 package com.comicatlas.api.comic.cache;
 
-import com.comicatlas.api.comic.dto.CatalogNode;
+import com.comicatlas.contract.comic.cache.ComicReferenceCache;
+import com.comicatlas.contract.comic.dto.CatalogNode;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.CacheManager;

@@ -1,9 +1,9 @@
 package com.comicatlas.reading.service.impl;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.comicatlas.api.comic.dto.ComicListPage;
-import com.comicatlas.api.comic.dto.ComicListQuery;
-import com.comicatlas.api.comic.dto.ComicListVO;
+import com.comicatlas.contract.comic.dto.ComicListPage;
+import com.comicatlas.contract.comic.dto.ComicListQuery;
+import com.comicatlas.contract.comic.dto.ComicListVO;
 import com.comicatlas.reading.service.ComicListQueryService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

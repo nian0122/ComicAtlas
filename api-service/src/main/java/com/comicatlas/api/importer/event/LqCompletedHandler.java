@@ -1,10 +1,10 @@
 package com.comicatlas.api.importer.event;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.comicatlas.api.comic.entity.Media;
-import com.comicatlas.api.comic.mapper.MediaMapper;
-import com.comicatlas.api.common.storage.ApiStorageProperties;
-import com.comicatlas.api.common.enums.LqStatus;
+import com.comicatlas.persistence.comic.entity.Media;
+import com.comicatlas.persistence.comic.mapper.MediaMapper;
+import com.comicatlas.persistence.storage.ApiStorageProperties;
+import com.comicatlas.contract.common.enums.LqStatus;
 import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.event.LqCompletedEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;

@@ -1,4 +1,4 @@
-package com.comicatlas.api.common.scan;
+package com.comicatlas.contract.common.scan;
 
 /**
  * 扫描到的媒体文件信息（图片或视频）。

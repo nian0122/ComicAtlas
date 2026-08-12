@@ -1,20 +1,20 @@
 package com.comicatlas.reading.cache;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.comicatlas.api.comic.cache.ComicReferenceCache;
-import com.comicatlas.api.comic.dto.ComicListPage;
-import com.comicatlas.api.comic.dto.ComicListQuery;
-import com.comicatlas.api.comic.dto.ComicListVO;
-import com.comicatlas.api.comic.entity.Category;
-import com.comicatlas.api.comic.entity.Comic;
-import com.comicatlas.api.comic.entity.Tag;
-import com.comicatlas.api.comic.mapper.CategoryMapper;
-import com.comicatlas.api.comic.mapper.ComicMapper;
-import com.comicatlas.api.comic.mapper.ComicTagMapper;
-import com.comicatlas.api.comic.mapper.TagMapper;
-import com.comicatlas.api.common.enums.ComicStatus;
-import com.comicatlas.api.common.storage.FileUrlResolver;
-import com.comicatlas.api.reader.mapper.ReadingHistoryMapper;
+import com.comicatlas.contract.comic.cache.ComicReferenceCache;
+import com.comicatlas.contract.comic.dto.ComicListPage;
+import com.comicatlas.contract.comic.dto.ComicListQuery;
+import com.comicatlas.contract.comic.dto.ComicListVO;
+import com.comicatlas.persistence.comic.entity.Category;
+import com.comicatlas.persistence.comic.entity.Comic;
+import com.comicatlas.persistence.comic.entity.Tag;
+import com.comicatlas.persistence.comic.mapper.CategoryMapper;
+import com.comicatlas.persistence.comic.mapper.ComicMapper;
+import com.comicatlas.persistence.comic.mapper.ComicTagMapper;
+import com.comicatlas.persistence.comic.mapper.TagMapper;
+import com.comicatlas.contract.common.enums.ComicStatus;
+import com.comicatlas.persistence.storage.FileUrlResolver;
+import com.comicatlas.persistence.reader.mapper.ReadingHistoryMapper;
 import com.comicatlas.reading.service.CategoryQueryService;
 import com.comicatlas.reading.service.ComicListQueryService;
 import com.comicatlas.reading.service.TagQueryService;
@@ -231,7 +231,7 @@ class ComicReferenceCacheTest {
         assertEquals(1, restoredPage.getRecords().size());
         assertEquals("测试", restoredPage.getRecords().get(0).getTitle());
         assertEquals(1, restoredPage.getTotal());
-        assertEquals(1L, restoredPage.toPage().getCurrent());
+        assertEquals(1L, restoredPage.getCurrent());
     }
 
     // ==================== helpers ====================

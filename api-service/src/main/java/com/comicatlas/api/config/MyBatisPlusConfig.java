@@ -5,14 +5,18 @@ import com.baomidou.mybatisplus.autoconfigure.ConfigurationCustomizer;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.OptimisticLockerInnerInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
-import com.comicatlas.api.common.handler.EnumTypeHandlers;
+import com.comicatlas.persistence.handler.EnumTypeHandlers;
 import com.comicatlas.api.upload.UploadSessionStatusTypeHandler;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-@MapperScan("com.comicatlas.api.*.mapper")
+@MapperScan({
+        "com.comicatlas.api.*.mapper",
+        "com.comicatlas.persistence.comic.mapper",
+        "com.comicatlas.persistence.reader.mapper"
+})
 public class MyBatisPlusConfig {
     @Bean
     public MybatisPlusInterceptor mybatisPlusInterceptor() {
@@ -29,7 +33,7 @@ public class MyBatisPlusConfig {
      * <p>
      * 默认 {@code EnumTypeHandler} 按 name() 严格匹配，历史脏数据会导致读取抛异常；
      * 自定义 handler 经 {@code safeValueOf} 兜底为 null 并告警，避免运行时崩溃。
-     * 共享枚举来自 comic-shared 的 {@code EnumTypeHandlers}，上传会话状态为管理端专属。
+     * 共享枚举来自 comic-contract 的 {@code EnumTypeHandlers}，上传会话状态为管理端专属。
      */
     @Bean
     public ConfigurationCustomizer enumTypeHandlerCustomizer() {

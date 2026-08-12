@@ -4,8 +4,8 @@ import com.comicatlas.api.admin.dto.ChapterStorageDTO;
 import com.comicatlas.api.admin.dto.ComicStorageDTO;
 import com.comicatlas.api.admin.dto.ComicStorageQuery;
 import com.comicatlas.api.admin.service.StorageQueryService;
-import com.comicatlas.api.common.Result;
-import com.comicatlas.api.common.constant.HttpStatusCodes;
+import com.comicatlas.contract.common.Result;
+import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import lombok.RequiredArgsConstructor;
 
 import java.util.HashMap;

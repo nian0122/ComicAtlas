@@ -1,5 +1,6 @@
 package com.comicatlas.api.comic.cache;
 
+import com.comicatlas.contract.comic.cache.ComicReferenceCache;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.Cache;
@@ -13,7 +14,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @Slf4j
 public class CatalogCacheInvalidator {
 
-    public static final String CACHE_NAME = "comicCatalog";
+    public static final String CACHE_NAME = ComicReferenceCache.CATALOG;
 
     private final CacheManager cacheManager;
 

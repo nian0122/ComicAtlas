@@ -1,9 +1,9 @@
 package com.comicatlas.reading.service.impl;
 
-import com.comicatlas.api.comic.cache.ComicReferenceCache;
-import com.comicatlas.api.comic.dto.TagDTO;
-import com.comicatlas.api.comic.entity.Tag;
-import com.comicatlas.api.comic.mapper.TagMapper;
+import com.comicatlas.contract.comic.cache.ComicReferenceCache;
+import com.comicatlas.contract.comic.dto.TagDTO;
+import com.comicatlas.persistence.comic.entity.Tag;
+import com.comicatlas.persistence.comic.mapper.TagMapper;
 import com.comicatlas.reading.service.TagQueryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;

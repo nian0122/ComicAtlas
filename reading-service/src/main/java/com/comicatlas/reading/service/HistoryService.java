@@ -1,7 +1,7 @@
 package com.comicatlas.reading.service;
 
-import com.comicatlas.api.reader.dto.HistoryUpdateRequest;
-import com.comicatlas.api.reader.dto.HistoryVO;
+import com.comicatlas.contract.reader.dto.HistoryUpdateRequest;
+import com.comicatlas.contract.reader.dto.HistoryVO;
 
 import java.util.List;
 

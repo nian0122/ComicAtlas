@@ -2,17 +2,18 @@ package com.comicatlas.reading.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.comicatlas.api.comic.assemble.ComicDetailAssembler;
-import com.comicatlas.api.comic.dto.ComicDetailVO;
-import com.comicatlas.api.comic.dto.ComicListQuery;
-import com.comicatlas.api.comic.dto.ComicListVO;
-import com.comicatlas.api.comic.dto.ComicMetadataDTO;
-import com.comicatlas.api.comic.entity.Comic;
-import com.comicatlas.api.comic.entity.ComicTag;
-import com.comicatlas.api.comic.mapper.ComicMapper;
-import com.comicatlas.api.comic.mapper.ComicTagMapper;
-import com.comicatlas.api.common.constant.HttpStatusCodes;
-import com.comicatlas.api.common.exception.BusinessException;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.comicatlas.persistence.comic.assemble.ComicDetailAssembler;
+import com.comicatlas.contract.comic.dto.ComicDetailVO;
+import com.comicatlas.contract.comic.dto.ComicListQuery;
+import com.comicatlas.contract.comic.dto.ComicListVO;
+import com.comicatlas.contract.comic.dto.ComicMetadataDTO;
+import com.comicatlas.persistence.comic.entity.Comic;
+import com.comicatlas.persistence.comic.entity.ComicTag;
+import com.comicatlas.persistence.comic.mapper.ComicMapper;
+import com.comicatlas.persistence.comic.mapper.ComicTagMapper;
+import com.comicatlas.contract.common.constant.HttpStatusCodes;
+import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.reading.service.ComicListQueryService;
 import com.comicatlas.reading.service.ComicQueryService;
 import lombok.RequiredArgsConstructor;
@@ -32,7 +33,11 @@ public class ComicQueryServiceImpl implements ComicQueryService {
     @Override
     public IPage<ComicListVO> listComics(ComicListQuery query) {
         // 直接调用 loadPage（走代理，触发 @Cacheable），再组装为 IPage 返回
-        return comicListQueryService.loadPage(query).toPage();
+        var comicListPage = comicListQueryService.loadPage(query);
+        Page<ComicListVO> page = new Page<>(
+                comicListPage.getCurrent(), comicListPage.getSize(), comicListPage.getTotal());
+        page.setRecords(comicListPage.getRecords());
+        return page;
     }
 
     @Override

@@ -1,9 +1,9 @@
 package com.comicatlas.api.comic.controller;
 
-import com.comicatlas.api.comic.dto.TagDTO;
+import com.comicatlas.contract.comic.dto.TagDTO;
 import com.comicatlas.api.comic.service.TagManagementService;
-import com.comicatlas.api.common.exception.BusinessException;
-import com.comicatlas.api.common.exception.GlobalExceptionHandler;
+import com.comicatlas.contract.common.exception.BusinessException;
+import com.comicatlas.contract.common.exception.GlobalExceptionHandler;
 import com.comicatlas.api.config.DlqSecurityConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;

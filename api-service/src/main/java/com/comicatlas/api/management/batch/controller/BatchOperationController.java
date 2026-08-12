@@ -1,6 +1,6 @@
 package com.comicatlas.api.management.batch.controller;
 
-import com.comicatlas.api.common.Result;
+import com.comicatlas.contract.common.Result;
 import com.comicatlas.api.management.batch.dto.BatchCreateResponse;
 import com.comicatlas.api.management.batch.dto.BatchOperationRequest;
 import com.comicatlas.api.management.batch.dto.BatchPreviewResponse;

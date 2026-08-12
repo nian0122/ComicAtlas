@@ -1,6 +1,6 @@
 package com.comicatlas.reading.service;
 
-import com.comicatlas.api.reader.dto.ReaderDTO;
+import com.comicatlas.contract.reader.dto.ReaderDTO;
 
 /**
  * 章节阅读接口（阅读域）。

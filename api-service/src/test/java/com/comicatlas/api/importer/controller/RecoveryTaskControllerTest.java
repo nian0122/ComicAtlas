@@ -2,8 +2,8 @@ package com.comicatlas.api.importer.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.comicatlas.api.common.exception.BusinessException;
-import com.comicatlas.api.common.exception.GlobalExceptionHandler;
+import com.comicatlas.contract.common.exception.BusinessException;
+import com.comicatlas.contract.common.exception.GlobalExceptionHandler;
 import com.comicatlas.api.config.DlqSecurityConfig;
 import com.comicatlas.api.importer.dto.RecoveryTaskVO;
 import com.comicatlas.api.importer.service.RecoveryTaskService;

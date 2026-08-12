@@ -2,19 +2,19 @@ package com.comicatlas.api.comic.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
-import com.comicatlas.api.comic.dto.CatalogCreateRequest;
-import com.comicatlas.api.comic.dto.CatalogRenameRequest;
-import com.comicatlas.api.comic.dto.CatalogVO;
-import com.comicatlas.api.comic.entity.Catalog;
-import com.comicatlas.api.comic.entity.Chapter;
-import com.comicatlas.api.comic.entity.Comic;
-import com.comicatlas.api.comic.mapper.CatalogMapper;
-import com.comicatlas.api.comic.mapper.ChapterMapper;
-import com.comicatlas.api.comic.mapper.ComicMapper;
+import com.comicatlas.contract.comic.dto.CatalogCreateRequest;
+import com.comicatlas.contract.comic.dto.CatalogRenameRequest;
+import com.comicatlas.contract.comic.dto.CatalogVO;
+import com.comicatlas.persistence.comic.entity.Catalog;
+import com.comicatlas.persistence.comic.entity.Chapter;
+import com.comicatlas.persistence.comic.entity.Comic;
+import com.comicatlas.persistence.comic.mapper.CatalogMapper;
+import com.comicatlas.persistence.comic.mapper.ChapterMapper;
+import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.service.CatalogManagementService;
-import com.comicatlas.api.common.constant.HttpStatusCodes;
-import com.comicatlas.api.common.exception.BusinessException;
-import com.comicatlas.api.common.exception.ConflictException;
+import com.comicatlas.contract.common.constant.HttpStatusCodes;
+import com.comicatlas.contract.common.exception.BusinessException;
+import com.comicatlas.contract.common.exception.ConflictException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -68,7 +68,7 @@ public class CatalogManagementServiceImpl implements CatalogManagementService {
         catalogCacheInvalidator.evict(comicId);
         log.info("创建目录: comicId={}, catalogId={}, parentId={}, sortOrder={}",
                 comicId, cat.getId(), cat.getParentId(), cat.getSortOrder());
-        return CatalogVO.from(cat);
+        return toCatalogVO(cat);
     }
 
     // ======================== 重命名 ========================
@@ -85,7 +85,7 @@ public class CatalogManagementServiceImpl implements CatalogManagementService {
             throw new ConflictException("同级目录已存在同名目录");
         }
         catalogCacheInvalidator.evict(comicId);
-        return CatalogVO.from(cat);
+        return toCatalogVO(cat);
     }
 
     // ======================== 移动（防环） ========================
@@ -112,7 +112,7 @@ public class CatalogManagementServiceImpl implements CatalogManagementService {
         catalogMapper.updateById(cat);
         catalogCacheInvalidator.evict(comicId);
         log.info("移动目录: comicId={}, catalogId={}, newParentId={}", comicId, catalogId, newParentId);
-        return CatalogVO.from(cat);
+        return toCatalogVO(cat);
     }
 
     // ======================== 重排 ========================
@@ -195,6 +195,16 @@ public class CatalogManagementServiceImpl implements CatalogManagementService {
         if (comic == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在");
         }
+    }
+
+    private CatalogVO toCatalogVO(Catalog catalog) {
+        CatalogVO catalogVO = new CatalogVO();
+        catalogVO.setId(catalog.getId());
+        catalogVO.setComicId(catalog.getComicId());
+        catalogVO.setParentId(catalog.getParentId());
+        catalogVO.setTitle(catalog.getTitle());
+        catalogVO.setSortOrder(catalog.getSortOrder());
+        return catalogVO;
     }
 
     private Catalog requireCatalogInComic(Long comicId, Long catalogId) {

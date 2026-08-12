@@ -1,13 +1,13 @@
 package com.comicatlas.reading.cache;
 
-import com.comicatlas.api.comic.cache.ComicReferenceCache;
-import com.comicatlas.api.comic.dto.CatalogNode;
-import com.comicatlas.api.comic.entity.Chapter;
-import com.comicatlas.api.comic.entity.Comic;
-import com.comicatlas.api.comic.mapper.CatalogMapper;
-import com.comicatlas.api.comic.mapper.ChapterMapper;
-import com.comicatlas.api.comic.mapper.ComicMapper;
-import com.comicatlas.api.common.enums.ComicStatus;
+import com.comicatlas.contract.comic.cache.ComicReferenceCache;
+import com.comicatlas.contract.comic.dto.CatalogNode;
+import com.comicatlas.persistence.comic.entity.Chapter;
+import com.comicatlas.persistence.comic.entity.Comic;
+import com.comicatlas.persistence.comic.mapper.CatalogMapper;
+import com.comicatlas.persistence.comic.mapper.ChapterMapper;
+import com.comicatlas.persistence.comic.mapper.ComicMapper;
+import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.reading.config.RedisConfig;
 import com.comicatlas.reading.controller.CatalogController;
 import com.comicatlas.reading.service.CatalogService;

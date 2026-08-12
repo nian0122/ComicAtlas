@@ -1,6 +1,6 @@
 package com.comicatlas.api.management.controller;
 
-import com.comicatlas.api.common.Result;
+import com.comicatlas.contract.common.Result;
 import com.comicatlas.api.outbox.mapper.OutboxMessageMapper;
 import com.comicatlas.common.dto.OutboxStatsDTO;
 import lombok.RequiredArgsConstructor;

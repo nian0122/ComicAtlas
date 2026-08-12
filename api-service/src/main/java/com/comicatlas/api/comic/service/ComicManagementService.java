@@ -1,13 +1,13 @@
 package com.comicatlas.api.comic.service;
 
-import com.comicatlas.api.comic.dto.BatchComicUpdateDTO;
-import com.comicatlas.api.comic.dto.BatchUpdateResultVO;
-import com.comicatlas.api.comic.dto.ComicDetailVO;
-import com.comicatlas.api.comic.dto.ComicMetadataDTO;
-import com.comicatlas.api.comic.dto.ComicMetadataUpdateDTO;
-import com.comicatlas.api.comic.dto.ComicTagUpdateDTO;
-import com.comicatlas.api.comic.dto.CreateComicRequest;
-import com.comicatlas.api.comic.dto.UpdateComicRequest;
+import com.comicatlas.contract.comic.dto.BatchComicUpdateDTO;
+import com.comicatlas.contract.comic.dto.BatchUpdateResultVO;
+import com.comicatlas.contract.comic.dto.ComicDetailVO;
+import com.comicatlas.contract.comic.dto.ComicMetadataDTO;
+import com.comicatlas.contract.comic.dto.ComicMetadataUpdateDTO;
+import com.comicatlas.contract.comic.dto.ComicTagUpdateDTO;
+import com.comicatlas.contract.comic.dto.CreateComicRequest;
+import com.comicatlas.contract.comic.dto.UpdateComicRequest;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
 
 /**

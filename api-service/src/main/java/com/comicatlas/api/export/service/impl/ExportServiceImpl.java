@@ -1,14 +1,14 @@
 package com.comicatlas.api.export.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.comicatlas.api.comic.entity.Comic;
-import com.comicatlas.api.comic.mapper.ComicMapper;
-import com.comicatlas.api.common.constant.HttpStatusCodes;
-import com.comicatlas.api.common.enums.ComicStatus;
-import com.comicatlas.api.common.enums.ExportTaskStatus;
-import com.comicatlas.api.common.exception.BusinessException;
-import com.comicatlas.api.common.storage.ApiStorageProperties;
-import com.comicatlas.api.common.storage.PathTraversalException;
+import com.comicatlas.persistence.comic.entity.Comic;
+import com.comicatlas.persistence.comic.mapper.ComicMapper;
+import com.comicatlas.contract.common.constant.HttpStatusCodes;
+import com.comicatlas.contract.common.enums.ComicStatus;
+import com.comicatlas.contract.common.enums.ExportTaskStatus;
+import com.comicatlas.contract.common.exception.BusinessException;
+import com.comicatlas.persistence.storage.ApiStorageProperties;
+import com.comicatlas.persistence.storage.PathTraversalException;
 import com.comicatlas.api.export.dto.ExportTaskVO;
 import com.comicatlas.api.export.entity.ExportTask;
 import com.comicatlas.api.export.event.ExportEventPublisher;
@@ -114,13 +114,13 @@ public class ExportServiceImpl implements ExportService {
      */
     private ManagementTaskResponse createManagementTaskForExport(Long comicId) {
         CreateManagementTaskRequest mgmtReq = new CreateManagementTaskRequest();
-        mgmtReq.setTaskType(com.comicatlas.api.common.enums.TaskType.EXPORT);
+        mgmtReq.setTaskType(com.comicatlas.contract.common.enums.TaskType.EXPORT);
         mgmtReq.setOperation("导出漫画");
         mgmtReq.setTargetType("COMIC");
         CreateManagementTaskRequest.TaskTarget target = new CreateManagementTaskRequest.TaskTarget();
         target.setTargetType("COMIC");
         target.setTargetId(comicId);
-        target.setOperationType(com.comicatlas.api.common.enums.TaskType.EXPORT);
+        target.setOperationType(com.comicatlas.contract.common.enums.TaskType.EXPORT);
         mgmtReq.setTargets(List.of(target));
         return managementTaskService.createTask(mgmtReq, null, null);
     }

@@ -1,7 +1,7 @@
 package com.comicatlas.api.admin.service;
 
 import com.comicatlas.api.admin.service.DlqBrokerClient.QueueStats;
-import com.comicatlas.api.common.exception.BusinessException;
+import com.comicatlas.contract.common.exception.BusinessException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

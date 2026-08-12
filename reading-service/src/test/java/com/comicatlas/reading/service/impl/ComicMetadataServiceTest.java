@@ -1,9 +1,9 @@
 package com.comicatlas.reading.service.impl;
 
-import com.comicatlas.api.comic.dto.ComicMetadataDTO;
-import com.comicatlas.api.comic.entity.Comic;
-import com.comicatlas.api.comic.mapper.ComicMapper;
-import com.comicatlas.api.common.exception.BusinessException;
+import com.comicatlas.contract.comic.dto.ComicMetadataDTO;
+import com.comicatlas.persistence.comic.entity.Comic;
+import com.comicatlas.persistence.comic.mapper.ComicMapper;
+import com.comicatlas.contract.common.exception.BusinessException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

@@ -1,10 +1,10 @@
 package com.comicatlas.api.upload;
 
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.comicatlas.api.common.constant.HttpStatusCodes;
-import com.comicatlas.api.common.exception.BusinessException;
-import com.comicatlas.api.common.storage.ApiStorageProperties;
-import com.comicatlas.api.common.storage.ApiStorageRoot;
+import com.comicatlas.contract.common.constant.HttpStatusCodes;
+import com.comicatlas.contract.common.exception.BusinessException;
+import com.comicatlas.persistence.storage.ApiStorageProperties;
+import com.comicatlas.persistence.storage.ApiStorageRoot;
 import com.comicatlas.api.upload.entity.UploadFile;
 import com.comicatlas.api.upload.entity.UploadSession;
 import com.comicatlas.api.upload.mapper.UploadFileMapper;

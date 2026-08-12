@@ -1,4 +1,4 @@
-﻿# ============================================================
+# ============================================================
 # ComicAtlas 管理控制台文档校验 Gate
 # ============================================================
 # 用途：校验 docs/api.md / README.md / docs/user-guide.md /
@@ -143,7 +143,7 @@ if ($SkipCodeCrossCheck) {
         "api-service/src/main/java/com/comicatlas/api/common/enums",
         "api-service/src/main/java/com/comicatlas/api/upload",
         "comic-common/src/main/java/com/comicatlas/common/enums",
-        "comic-shared/src/main/java/com/comicatlas/api/common/enums"
+        "comic-contract/src/main/java/com/comicatlas/contract/common/enums"
     )
     $enumMap = @{
         'ComicStatus' = @('DRAFT','IMPORTING','IMPORT_FAILED','READY','RECOVERY_REQUIRED','DELETING','TRASHING','TRASHED','RESTORING','PURGING','DELETED')

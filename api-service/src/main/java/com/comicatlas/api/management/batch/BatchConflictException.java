@@ -1,6 +1,6 @@
 package com.comicatlas.api.management.batch;
 
-import com.comicatlas.api.common.exception.ConflictException;
+import com.comicatlas.contract.common.exception.ConflictException;
 import lombok.Getter;
 
 /**

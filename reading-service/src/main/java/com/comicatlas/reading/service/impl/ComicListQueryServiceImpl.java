@@ -3,18 +3,18 @@ package com.comicatlas.reading.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.comicatlas.api.comic.cache.ComicReferenceCache;
-import com.comicatlas.api.comic.dto.ComicListPage;
-import com.comicatlas.api.comic.dto.ComicListQuery;
-import com.comicatlas.api.comic.dto.ComicListVO;
-import com.comicatlas.api.comic.entity.Category;
-import com.comicatlas.api.comic.entity.Comic;
-import com.comicatlas.api.comic.mapper.CategoryMapper;
-import com.comicatlas.api.comic.mapper.ComicMapper;
-import com.comicatlas.api.common.enums.ComicStatus;
-import com.comicatlas.api.common.storage.FileUrlResolver;
-import com.comicatlas.api.reader.entity.ReadingHistory;
-import com.comicatlas.api.reader.mapper.ReadingHistoryMapper;
+import com.comicatlas.contract.comic.cache.ComicReferenceCache;
+import com.comicatlas.contract.comic.dto.ComicListPage;
+import com.comicatlas.contract.comic.dto.ComicListQuery;
+import com.comicatlas.contract.comic.dto.ComicListVO;
+import com.comicatlas.persistence.comic.entity.Category;
+import com.comicatlas.persistence.comic.entity.Comic;
+import com.comicatlas.persistence.comic.mapper.CategoryMapper;
+import com.comicatlas.persistence.comic.mapper.ComicMapper;
+import com.comicatlas.contract.common.enums.ComicStatus;
+import com.comicatlas.persistence.storage.FileUrlResolver;
+import com.comicatlas.persistence.reader.entity.ReadingHistory;
+import com.comicatlas.persistence.reader.mapper.ReadingHistoryMapper;
 import com.comicatlas.reading.service.ComicListQueryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
@@ -42,7 +42,10 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
     public IPage<ComicListVO> listComics(ComicListQuery query) {
         // 直接委托 loadPage（缓存方法）。注意：本方法内部调用不触发 @Cacheable（自调用绕过代理），
         // 缓存生效路径由 ComicQueryServiceImpl 通过代理调用 loadPage 触发。
-        return loadPage(query).toPage();
+        ComicListPage comicListPage = loadPage(query);
+        Page<ComicListVO> page = new Page<>(comicListPage.getCurrent(), comicListPage.getSize(), comicListPage.getTotal());
+        page.setRecords(comicListPage.getRecords());
+        return page;
     }
 
     /**
@@ -62,7 +65,7 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
         if (comics.isEmpty()) {
             IPage<ComicListVO> emptyPage = result.convert(comic ->
                     toListVO(comic, new HashMap<>(), new HashMap<>()));
-            return ComicListPage.from(emptyPage);
+            return ComicListPage.of(emptyPage.getRecords(), emptyPage.getTotal(), emptyPage.getCurrent(), emptyPage.getSize());
         }
 
         List<Long> categoryIds = comics.stream()
@@ -83,7 +86,7 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
 
         IPage<ComicListVO> voPage = result.convert(
                 comic -> toListVO(comic, categoryNames, histories));
-        return ComicListPage.from(voPage);
+        return ComicListPage.of(voPage.getRecords(), voPage.getTotal(), voPage.getCurrent(), voPage.getSize());
     }
 
     /**

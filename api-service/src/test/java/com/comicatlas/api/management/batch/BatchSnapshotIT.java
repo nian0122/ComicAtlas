@@ -1,16 +1,16 @@
 package com.comicatlas.api.management.batch;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.comicatlas.api.comic.entity.Comic;
-import com.comicatlas.api.comic.mapper.ComicMapper;
-import com.comicatlas.api.common.enums.ComicStatus;
+import com.comicatlas.persistence.comic.entity.Comic;
+import com.comicatlas.persistence.comic.mapper.ComicMapper;
+import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
 import com.comicatlas.api.management.entity.ManagementTask;
 import com.comicatlas.api.management.entity.ManagementTaskItem;
 import com.comicatlas.api.management.mapper.ManagementTaskItemMapper;
 import com.comicatlas.api.management.mapper.ManagementTaskMapper;
-import com.comicatlas.api.common.enums.ManagementTaskStatus;
+import com.comicatlas.contract.common.enums.ManagementTaskStatus;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -553,7 +553,7 @@ class BatchSnapshotIT {
             it.setTaskId(n.path("taskId").asLong());
             it.setTargetId(n.path("targetId").asLong());
             it.setTargetType(n.path("targetType").asText());
-            it.setOperationType(com.comicatlas.api.common.enums.TaskType.valueOf(n.path("operationType").asText()));
+            it.setOperationType(com.comicatlas.contract.common.enums.TaskType.valueOf(n.path("operationType").asText()));
             it.setStatus(ManagementTaskStatus.valueOf(n.path("status").asText()));
             it.setAttempt(n.path("attempt").asInt());
             out.add(it);

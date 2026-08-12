@@ -1,5 +1,6 @@
 package com.comicatlas.api.comic.cache;
 
+import com.comicatlas.contract.comic.cache.ComicReferenceCache;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.Cache;
