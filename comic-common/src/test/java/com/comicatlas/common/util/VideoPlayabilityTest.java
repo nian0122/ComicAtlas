@@ -112,4 +112,29 @@ class VideoPlayabilityTest {
     void movContainer_h264Codec_notPlayable() {
         assertFalse(VideoPlayability.isBrowserPlayable("h264", "mov"));
     }
+
+    // ======================== 转码能力：分辨率上限判定 ========================
+
+    @Test
+    @DisplayName("常规 1080p/4K 分辨率 → 可转码")
+    void normalResolution_transcodable() {
+        assertTrue(VideoPlayability.isTranscodable(1920, 1080));
+        assertTrue(VideoPlayability.isTranscodable(4096, 2160));
+        assertTrue(VideoPlayability.isTranscodable(3840, 2160));
+    }
+
+    @Test
+    @DisplayName("8K 分辨率 → 不可转码（硬件编码器无法处理）")
+    void ultraHdResolution_notTranscodable() {
+        assertFalse(VideoPlayability.isTranscodable(7680, 4320));
+        assertFalse(VideoPlayability.isTranscodable(4320, 7680));
+    }
+
+    @Test
+    @DisplayName("宽或高为 null（尺寸未知）→ 可转码（按常规处理）")
+    void unknownDimension_transcodable() {
+        assertTrue(VideoPlayability.isTranscodable(null, null));
+        assertTrue(VideoPlayability.isTranscodable(1920, null));
+        assertTrue(VideoPlayability.isTranscodable(null, 1080));
+    }
 }
