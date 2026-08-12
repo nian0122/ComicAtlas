@@ -986,8 +986,13 @@ function Invoke-ScenarioA {
     Assert-Equal $dt.status "SUCCEEDED" "COMIC_DELETE 任务成功"
     $trashed = Invoke-Api -Path "/api/comics/$batchComicId"
     Assert-Equal $trashed.status "TRASHED" "漫画进入 TRASHED"
-    $trashManifest = Get-ChildItem (Join-Path $MangaRoot "trash") -Recurse -Filter "manifest.json" -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match "comic" } | Select-Object -First 1
-    Assert-True ($null -ne $trashManifest) "trash manifest.json 已生成"
+    # V20 架构：回收清单 manifest 存 DB trash_manifest 表（API 写、Worker 只读），
+    # Worker 磁盘只写 actual.json（{TRASH_ROOT}/COMIC/{comicId}/{taskId}/actual.json，
+    # taskId = 管理任务 id = $del.id，与 trash_manifest.task_id 一致）。
+    $trashManifestCount = Invoke-Sql -Db $Db -Sql "SELECT COUNT(*) FROM trash_manifest WHERE target_type='COMIC' AND target_id=$batchComicId"
+    Assert-True ([int]$trashManifestCount -ge 1) "回收清单已落库 trash_manifest（COMIC/$batchComicId）"
+    $trashActualFile = Join-Path $MangaRoot "trash\COMIC\$batchComicId\$($del.id)\actual.json"
+    Assert-True (Test-Path $trashActualFile) "trash actual.json 已生成（回收产物）"
 
     # 恢复
     $rest = Invoke-Api -Method Post -Path "/api/trash/comics/$batchComicId/restore" -Body @{}
