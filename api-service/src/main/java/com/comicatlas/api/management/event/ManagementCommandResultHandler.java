@@ -278,7 +278,9 @@ public class ManagementCommandResultHandler {
 
     /**
      * 转码完成业务更新：实测元数据（duration/fileSize/真实 codec）优先，
-     * 事件未携带时回退旧的硬编码 mp4/h264/aac。
+     * 事件未携带时回退旧的硬编码 mp4/h264/aac；hq_path 以事件实测
+     * {@code transcode.newHqPath()} 为准（含防撞名），老消息回退
+     * {@code deriveTranscodedPath}。
      * 每个完成事件都更新对应 media 行；整本统计聚合与 metadata.json 重导出
      * 由 {@link #maybeNotifyTranscodeTaskCompleted} 在任务全部完成时触发一次。
      */
@@ -307,7 +309,13 @@ public class ManagementCommandResultHandler {
             }
         }
         if (hqPath != null && !hqPath.isBlank()) {
-            mediaUpdate.set(Media::getHqPath, deriveTranscodedPath(hqPath));
+            // 优先使用 Worker 实测写入路径（含防撞名 {base}.transcoded-{mediaId}.mp4 场景）；
+            // 老消息无 newHqPath 时回退 deriveTranscodedPath（{base}.mp4）
+            String newHqPath = transcode != null && transcode.newHqPath() != null
+                    && !transcode.newHqPath().isBlank()
+                    ? transcode.newHqPath()
+                    : deriveTranscodedPath(hqPath);
+            mediaUpdate.set(Media::getHqPath, newHqPath);
         }
         mediaMapper.update(null, mediaUpdate);
         log.info("转码完成业务更新: mediaId={}", mediaId);

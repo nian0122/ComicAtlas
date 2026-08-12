@@ -114,7 +114,8 @@ class ManagementEventContractTest {
         @DisplayName("ManagementCommandCompletedEvent 携带实测 transcode 元数据时序列化/反序列化保持全部字段")
         void completedWithTranscodeRoundTrip() throws Exception {
             var transcode = new com.comicatlas.common.event.payload.TranscodeMediaInfo(
-                    new java.math.BigDecimal("12.34"), "mp4", "h264", "aac", 2048000L);
+                    new java.math.BigDecimal("12.34"), "mp4", "h264", "aac", 2048000L,
+                    "100/200/movie.transcoded-400.mp4");
             var event = new ManagementCommandCompletedEvent(
                     UUID.randomUUID(), Instant.now(), 1,
                     100L, 200L, 2,
@@ -130,6 +131,7 @@ class ManagementEventContractTest {
             assertThat(restored.transcode().videoCodec()).isEqualTo("h264");
             assertThat(restored.transcode().audioCodec()).isEqualTo("aac");
             assertThat(restored.transcode().fileSize()).isEqualTo(2048000L);
+            assertThat(restored.transcode().newHqPath()).isEqualTo("100/200/movie.transcoded-400.mp4");
         }
 
         @Test

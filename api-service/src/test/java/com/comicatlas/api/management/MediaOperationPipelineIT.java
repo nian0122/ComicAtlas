@@ -406,6 +406,28 @@ class MediaOperationPipelineIT {
         assertThat(reloaded.getHqPath()).endsWith(".mp4");
     }
 
+    @Test
+    @DisplayName("转码完成事件携带防撞 newHqPath：hq_path 精确落库（回归：API 重算 {base}.mp4 导致 basename 冲突）")
+    void transcodeCompleted_carriedCollisionNewHqPath_winsOverDerive() throws Exception {
+        Media video = mediaMapper.selectList(new LambdaQueryWrapper<Media>()
+                .eq(Media::getMediaType, "VIDEO")).get(0);
+
+        OperationSubmitResultDTO result = commandService.requestTranscodeForComic(comic.getId());
+        assertThat(result.getTaskId()).isNotNull();
+        ManagementCommandRequestedEvent cmd = readSingleCommand(result.getTaskId());
+        assertThat(cmd.targetId()).isEqualTo(video.getId());
+
+        String collisionPath = "1/2/002.transcoded-" + video.getId() + ".mp4";
+        rabbitTemplate.convertAndSend("comic.management", "command.completed",
+                new ManagementCommandCompletedEvent(UUID.randomUUID(), Instant.now(), 1,
+                        cmd.taskId(), cmd.itemId(), cmd.attempt(), "TRANSCODE", "MEDIA", video.getId(),
+                        new com.comicatlas.common.event.payload.TranscodeMediaInfo(
+                                new BigDecimal("12.3"), "mp4", "h264", "aac", 7777L, collisionPath)));
+        await(() -> mediaMapper.selectById(video.getId()).getTranscodeStatus() == TranscodeStatus.READY, "视频 READY");
+        await(() -> collisionPath.equals(mediaMapper.selectById(video.getId()).getHqPath()), "hq_path 使用实测防撞路径");
+        assertThat(mediaMapper.selectById(video.getId()).getHqPath()).isEqualTo(collisionPath);
+    }
+
     // ======================== 元数据刷新命令 ========================
 
     @Test
