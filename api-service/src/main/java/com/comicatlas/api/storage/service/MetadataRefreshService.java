@@ -71,6 +71,9 @@ public class MetadataRefreshService {
     /** 已删除/回收中媒体不参与活动匹配。 */
     private static final List<String> INACTIVE_STATUSES = List.of("TRASHED", "DELETED");
 
+    /** 合并落库分批上限（与导入链路 MEDIA_INSERT_BATCH_SIZE 一致，控制单条 SQL 长度与参数数）。 */
+    private static final int MERGE_BATCH_SIZE = 500;
+
     /**
      * 阶段一请求：事件携带的快照引用信息。
      *
@@ -440,13 +443,23 @@ public class MetadataRefreshService {
         return next;
     }
 
+    /** 合并落库：批量 UPDATE（updateRefreshBatch）+ 批量 INSERT（insertImportBatch），消除逐行往返。 */
     private void executeMerge(MergePlan plan) {
-        for (Media media : plan.updated()) {
-            mediaMapper.updateById(media);
+        for (List<Media> batch : partition(plan.updated(), MERGE_BATCH_SIZE)) {
+            mediaMapper.updateRefreshBatch(batch);
         }
-        for (Media media : plan.inserted()) {
-            mediaMapper.insert(media);
+        for (List<Media> batch : partition(plan.inserted(), MERGE_BATCH_SIZE)) {
+            mediaMapper.insertImportBatch(batch);
         }
+    }
+
+    /** 按固定大小分批（每批 1..size 个，空列表返回空列表）。 */
+    private static <T> List<List<T>> partition(List<T> source, int size) {
+        List<List<T>> batches = new ArrayList<>((source.size() + size - 1) / size);
+        for (int i = 0; i < source.size(); i += size) {
+            batches.add(source.subList(i, Math.min(i + size, source.size())));
+        }
+        return batches;
     }
 
     /** 刷新章节 pageCount 与漫画 totalPages/hqSize（pageCount 统计 READY 生命周期行，含 HQ MISSING）。 */
@@ -459,15 +472,19 @@ public class MetadataRefreshService {
                 .collect(Collectors.groupingBy(Media::getChapterId));
 
         long totalPages = 0;
+        List<Chapter> chaptersToUpdate = new ArrayList<>(chapterById.size());
         for (Map.Entry<Long, Chapter> entry : chapterById.entrySet()) {
             Long chapterId = entry.getKey();
             long pageCount = byChapter.getOrDefault(chapterId, List.of()).stream()
                     .filter(m -> m.getStatus() == MediaLifecycleStatus.READY)
                     .count();
             totalPages += pageCount;
-            chapterMapper.update(null, new LambdaUpdateWrapper<Chapter>()
-                    .eq(Chapter::getId, chapterId)
-                    .set(Chapter::getPageCount, (int) pageCount));
+            Chapter chapter = entry.getValue();
+            chapter.setPageCount((int) pageCount);
+            chaptersToUpdate.add(chapter);
+        }
+        for (List<Chapter> batch : partition(chaptersToUpdate, MERGE_BATCH_SIZE)) {
+            chapterMapper.updatePageCountBatch(batch);
         }
         // hqSize/fileSize 只统计实际扫描 READY 字节（MISSING 已置 0，自然排除）
         long hqSize = merged.stream()

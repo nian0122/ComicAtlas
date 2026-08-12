@@ -64,4 +64,43 @@
           AND (hq_status &lt;&gt; 'READY' OR status &lt;&gt; 'READY')
     </update>
 
+    <!--
+      元数据刷新合并专用批量 UPDATE：CASE id WHEN ... THEN ... 单条 SQL 一次更新整批媒体，
+      消除逐行 updateById 的往返开销。更新列固定为扫描覆盖的字段（含可空视频字段，IMAGE 行显式清空）。
+      version 统一自增保持乐观锁语义（漂移校验在合并计划阶段完成）。
+    -->
+    <update id="updateRefreshBatch">
+        UPDATE page
+        SET hq_status = CASE id
+            <foreach collection="mediaList" item="m"> WHEN #{m.id} THEN #{m.hqStatus}</foreach>
+            END,
+            file_size = CASE id
+            <foreach collection="mediaList" item="m"> WHEN #{m.id} THEN #{m.fileSize}</foreach>
+            END,
+            width = CASE id
+            <foreach collection="mediaList" item="m"> WHEN #{m.id} THEN #{m.width}</foreach>
+            END,
+            height = CASE id
+            <foreach collection="mediaList" item="m"> WHEN #{m.id} THEN #{m.height}</foreach>
+            END,
+            media_type = CASE id
+            <foreach collection="mediaList" item="m"> WHEN #{m.id} THEN #{m.mediaType}</foreach>
+            END,
+            duration = CASE id
+            <foreach collection="mediaList" item="m"> WHEN #{m.id} THEN #{m.duration}</foreach>
+            END,
+            container = CASE id
+            <foreach collection="mediaList" item="m"> WHEN #{m.id} THEN #{m.container}</foreach>
+            END,
+            video_codec = CASE id
+            <foreach collection="mediaList" item="m"> WHEN #{m.id} THEN #{m.videoCodec}</foreach>
+            END,
+            audio_codec = CASE id
+            <foreach collection="mediaList" item="m"> WHEN #{m.id} THEN #{m.audioCodec}</foreach>
+            END,
+            version = version + 1
+        WHERE id IN
+        <foreach collection="mediaList" item="m" open="(" separator="," close=")">#{m.id}</foreach>
+    </update>
+
 </mapper>

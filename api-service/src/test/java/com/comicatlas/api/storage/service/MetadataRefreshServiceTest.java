@@ -40,6 +40,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -340,8 +341,8 @@ class MetadataRefreshServiceTest {
             Media m201 = media(201L, 43L, "1/43/001.jpg", 1, "READY", 30L, "IMAGE", 1);
             Media m202 = media(202L, 43L, "1/43/002.jpg", 2, "READY", 60L, "IMAGE", 1);
             when(mediaMapper.selectList(any())).thenReturn(List.of(m101, m102, m103, m201, m202));
-            when(mediaMapper.insert(any(Media.class))).thenReturn(1);
-            when(mediaMapper.updateById(any(Media.class))).thenReturn(1);
+            when(mediaMapper.insertImportBatch(anyList())).thenReturn(1);
+            when(mediaMapper.updateRefreshBatch(anyList())).thenReturn(1);
 
             MetadataRefreshSnapshotDTO snapshot = snapshotForApply();
             String revision = MetadataSnapshotRevision.compute(snapshot);
@@ -351,10 +352,10 @@ class MetadataRefreshServiceTest {
 
             var result = service.applyValidatedSnapshot(applied);
 
-            // m101/m102/m201 匹配更新；m103/m202 未匹配标 MISSING → 5 次 updateById
-            verify(mediaMapper, times(5)).updateById(any(Media.class));
-            // 004.jpg 新增
-            verify(mediaMapper).insert(any(Media.class));
+            // m101/m102/m201 匹配更新；m103/m202 未匹配标 MISSING → 5 行一次批量 UPDATE
+            verify(mediaMapper, times(1)).updateRefreshBatch(anyList());
+            // 004.jpg 新增 → 1 行一次批量 INSERT
+            verify(mediaMapper, times(1)).insertImportBatch(anyList());
             assertThat(result.inserted()).isEqualTo(1);
 
             // m101 更新为扫描值
@@ -376,6 +377,8 @@ class MetadataRefreshServiceTest {
             // 批量查询次数：章节一次 + 媒体一次
             verify(chapterMapper, times(1)).selectList(any());
             verify(mediaMapper, times(1)).selectList(any());
+            // 章节 pageCount 统计：两章一次批量 UPDATE
+            verify(chapterMapper, times(1)).updatePageCountBatch(anyList());
             // 应用阶段不触碰存储根（无文件 IO）
             verifyNoInteractions(storageProperties);
         }
@@ -415,8 +418,8 @@ class MetadataRefreshServiceTest {
                     .hasMessageContaining("章节");
 
             verify(mediaMapper, never()).selectList(any());
-            verify(mediaMapper, never()).insert(any(Media.class));
-            verify(mediaMapper, never()).updateById(any(Media.class));
+            verify(mediaMapper, never()).insertImportBatch(anyList());
+            verify(mediaMapper, never()).updateRefreshBatch(anyList());
         }
 
         @Test
@@ -436,8 +439,8 @@ class MetadataRefreshServiceTest {
                     .hasMessageContaining("漂移");
 
             verify(mediaMapper, never()).selectList(any());
-            verify(mediaMapper, never()).insert(any(Media.class));
-            verify(mediaMapper, never()).updateById(any(Media.class));
+            verify(mediaMapper, never()).insertImportBatch(anyList());
+            verify(mediaMapper, never()).updateRefreshBatch(anyList());
         }
 
         @Test
@@ -465,8 +468,8 @@ class MetadataRefreshServiceTest {
                     .hasMessageContaining("重复");
 
             verify(mediaMapper, never()).selectList(any());
-            verify(mediaMapper, never()).insert(any(Media.class));
-            verify(mediaMapper, never()).updateById(any(Media.class));
+            verify(mediaMapper, never()).insertImportBatch(anyList());
+            verify(mediaMapper, never()).updateRefreshBatch(anyList());
         }
 
         @Test
@@ -477,7 +480,7 @@ class MetadataRefreshServiceTest {
             Media m101 = media(101L, 42L, "1/0/001.jpg", 1, "READY", 100L, "IMAGE", 1);
             when(mediaMapper.selectList(any())).thenReturn(List.of(m101));
             when(mediaMapper.update(any(), any())).thenReturn(1);
-            when(mediaMapper.updateById(any(Media.class))).thenReturn(1);
+            when(mediaMapper.updateRefreshBatch(anyList())).thenReturn(1);
 
             MetadataRefreshSnapshotDTO snapshot = new MetadataRefreshSnapshotDTO(1, 1L,
                     Instant.parse("2026-08-09T00:00:00Z"), null,
@@ -500,10 +503,10 @@ class MetadataRefreshServiceTest {
                 assertThat(wrapper.getSqlSet()).contains("REPLACE");
                 assertThat(wrapper.getParamNameValuePairs().values()).contains("1/0/", "1/42/");
             }
-            // 顺序契约：合并的 updateById 必须先于前缀重写的 update 执行——否则 updateById 会把
+            // 顺序契约：合并的批量 UPDATE 必须先于前缀重写的 update 执行——否则会把
             // 预取的旧前缀 hq_path 整行写回，覆盖刚完成的重写（真实 DB 中会因此丢失迁移）
             InOrder inOrder = inOrder(mediaMapper);
-            inOrder.verify(mediaMapper).updateById(any(Media.class));
+            inOrder.verify(mediaMapper).updateRefreshBatch(anyList());
             inOrder.verify(mediaMapper, times(2)).update(isNull(), any(LambdaUpdateWrapper.class));
             // 快照合并照常执行（按 basename 匹配更新该行）
             assertThat(m101.getHqStatus()).isEqualTo(HqStatus.READY);
@@ -520,7 +523,7 @@ class MetadataRefreshServiceTest {
                             snapshot.generatedAt(), revision, snapshot.chapters());
             when(chapterMapper.selectList(any())).thenReturn(List.of(chapter(42L, 1), chapter(43L, 1)));
             when(mediaMapper.selectList(any())).thenReturn(List.of());
-            when(mediaMapper.insert(any(Media.class)))
+            when(mediaMapper.insertImportBatch(anyList()))
                     .thenThrow(new DuplicateKeyException("唯一键冲突"));
 
             assertThatThrownBy(() -> service.applyValidatedSnapshot(applied))
