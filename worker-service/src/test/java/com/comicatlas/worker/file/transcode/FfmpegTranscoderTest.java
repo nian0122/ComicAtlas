@@ -60,7 +60,7 @@ class FfmpegTranscoderTest {
 
         // fake ffmpeg -encoders 输出不含硬件编码器 → 回退 CPU
         assertThat(cmd).contains("-c:v", "libx264");
-        assertThat(cmd).contains("-preset", "medium");
+        assertThat(cmd).contains("-preset", "veryfast");
         assertThat(cmd).contains("-c:a", "aac");
         assertThat(cmd).contains("-movflags", "+faststart");
     }
@@ -94,10 +94,46 @@ class FfmpegTranscoderTest {
         assertThat(Files.exists(out)).isTrue();
     }
 
+    @Test
+    @DisplayName("硬件编码器运行时失败 → 自动回退 CPU 重试成功")
+    void hwEncoderFails_fallsBackToCpuRetry() throws Exception {
+        // fake ffmpeg：-encoders 探测报告 h264_nvenc 存在；但用 h264_nvenc 转码失败（exit 1）
+        // 且不产出文件，第二次调用（CPU libx264）成功——模拟驱动 API 版本不兼容的 NVENC
+        Path fakeFfmpeg = createFakeFfmpegWithHwFailure(tempRoot);
+        config.setFfmpegPath(fakeFfmpeg.toString());
+        Path in = tempRoot.resolve("in.mp4");
+        Path out = tempRoot.resolve("out.mp4");
+        Files.writeString(in, "fake");
+
+        int exit = transcoder.transcode(in, out);
+
+        assertThat(exit).isZero();
+        assertThat(Files.exists(out)).isTrue();
+        // 首次硬件失败 + 回退 CPU：执行了两次
+        assertThat(countInvocations(tempRoot, "invocations.log")).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("硬件编码器失败后禁用：后续转码不再尝试硬件")
+    void hwEncoderDisabledAfterFailure_subsequentTranscodeSkipsHw() throws Exception {
+        Path fakeFfmpeg = createFakeFfmpegWithHwFailure(tempRoot);
+        config.setFfmpegPath(fakeFfmpeg.toString());
+        Path in = tempRoot.resolve("in.mp4");
+        Path out = tempRoot.resolve("out.mp4");
+        Files.writeString(in, "fake");
+
+        transcoder.transcode(in, out);   // 第一次：硬件失败 → CPU 成功 → 禁用 NVENC
+        Files.deleteIfExists(out);
+        transcoder.transcode(in, out);   // 第二次：直接 CPU，不再尝试硬件
+
+        // 4 次调用 = 第1次(hw+cpu) + 第2次(cpu only)；无第3次 hw 尝试
+        assertThat(countInvocations(tempRoot, "invocations.log")).isEqualTo(3);
+        // CPU 参数出现在命令里
+        assertThat(countInvocations(tempRoot, "cpu-calls.log")).isEqualTo(2);
+    }
+
     private Path createFakeFfmpeg(Path dir) throws Exception {
         Path bat = dir.resolve("fake-ffmpeg.cmd");
-        // fake ffmpeg：-encoders 探测输出仅 libx264（无硬件编码器）；其他调用把输出写到
-        // 参数中最后一个 ".mp4" 文件（外部进程执行用 stdout 收集，必须保证进程正常退出）
         String script = """
                 @echo off
                 setlocal enabledelayedexpansion
@@ -115,6 +151,53 @@ class FfmpegTranscoderTest {
                 """;
         Files.writeString(bat, script);
         return bat;
+    }
+
+    /**
+     * fake ffmpeg: -encoders probe reports h264_nvenc (probe only checks output,
+     * not driver); using h264_nvenc fails (exit 1, no output file) to simulate
+     * driver API mismatch; CPU libx264 path succeeds. Invocation log written to
+     * {dir}/invocations.log and {dir}/cpu-calls.log.
+     */
+    private Path createFakeFfmpegWithHwFailure(Path dir) throws Exception {
+        Path bat = dir.resolve("fake-ffmpeg-hwfail.cmd");
+        Path log = dir.resolve("invocations.log");
+        Path cpuLog = dir.resolve("cpu-calls.log");
+        String script = """
+                @echo off
+                setlocal enabledelayedexpansion
+                set "args=%*"
+                if not "!args:-encoders=!"=="!args!" (
+                    echo  V....D h264_nvenc  NVIDIA NVENC H.264 encoder
+                    echo  V....D libx264     libx264 H.264
+                    exit /b 0
+                )
+                echo !args!>> "LOG_FILE"
+                if not "!args:h264_nvenc=!"=="!args!" (
+                    rem hardware encoder: driver mismatch -> fail, no output
+                    exit /b 1
+                )
+                set "output="
+                for %%a in (%*) do (
+                    if /i "%%~xa"==".mp4" set "output=%%~a"
+                )
+                if not "!output!"=="" (
+                    echo fake-transcode-data > "!output!"
+                    echo cpu>> "CPU_LOG"
+                )
+                exit /b 0
+                """.replace("LOG_FILE", log.toString())
+                .replace("CPU_LOG", cpuLog.toString());
+        Files.writeString(bat, script);
+        return bat;
+    }
+
+    private static long countInvocations(Path dir, String logName) throws Exception {
+        Path log = dir.resolve(logName);
+        if (!Files.exists(log)) {
+            return 0;
+        }
+        return Files.readAllLines(log).stream().filter(line -> !line.isBlank()).count();
     }
 
     private static void deleteRecursively(Path dir) {

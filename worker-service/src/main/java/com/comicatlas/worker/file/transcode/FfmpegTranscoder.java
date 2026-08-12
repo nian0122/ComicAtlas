@@ -17,9 +17,10 @@ import java.util.List;
  * 业务编排（MQ 消费、临时文件替换、DB 更新）由调用方 {@code VideoTranscodeHandler} 负责。
  * 浏览器可播放判定（是否需要转码）收敛在共享模块 {@code VideoPlayability}，本类不重复实现。
  * <p>
- * 编码器选择：优先硬件加速（NVENC → QSV → AMF，按 {@code ffmpeg -encoders} 探测），
- * 硬件不可用时回退 CPU libx264。硬件路径可显著提速大分辨率视频（4K HEVC 转 H.264
- * 从 ~3x 实时降至 ~1x 实时），避免 600s 超时。
+ * 编码器选择：优先硬件加速（NVENC → QSV → AMF，按 {@code ffmpeg -encoders} 探测）。
+ * {@code -encoders} 只证明编码器存在、不证明驱动兼容（驱动 API 版本过旧时 NVENC 运行时
+ * 报错，如 "Driver does not support the required nvenc API version"），因此硬件转码
+ * 失败后自动回退 CPU libx264 重试一次，并禁用该硬件编码器避免后续重复失败。
  */
 @Slf4j
 @Component
@@ -28,9 +29,16 @@ public class FfmpegTranscoder {
 
     private static final long TRANSCODE_TIMEOUT_SECONDS = 600;
 
-    /** CPU 转码参数：H.264 + AAC，faststart 便于流式播放。 */
+    /** 硬件编码器已探测但运行时失败后的禁用哨兵（进程内缓存值）。 */
+    private static final String HW_DISABLED = "__disabled__";
+
+    /**
+     * CPU 转码参数：H.264 + AAC，faststart 便于流式播放。
+     * preset 用 veryfast 而非 medium——实测 4K 视频 medium 全片约 570s 贴 600s 超时线，
+     * veryfast 约 308s 留足余量；硬件加速不可用（驱动/构建不兼容）时 CPU 回退也能按时完成。
+     */
     private static final List<String> CPU_FFMPEG_ARGS = List.of(
-            "-c:v", "libx264", "-crf", "23", "-preset", "medium",
+            "-c:v", "libx264", "-crf", "23", "-preset", "veryfast",
             "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", "-y"
     );
 
@@ -41,11 +49,12 @@ public class FfmpegTranscoder {
     private final WorkerConfig config;
     private final ExternalProcessRunner processRunner;
 
-    /** 已探测到的硬件编码器名（null = 未探测或不可用）。 */
+    /** 已探测到的硬件编码器名（null = 未探测，HW_DISABLED = 运行时失败已禁用）。 */
     private volatile String hwEncoder;
 
     /**
      * 执行 ffmpeg 转码：{@code input} → {@code output}。
+     * 硬件编码器运行时失败（驱动/构建不兼容）时自动回退 CPU 重试一次。
      *
      * @param input  源视频文件
      * @param output 输出 mp4 文件
@@ -53,12 +62,16 @@ public class FfmpegTranscoder {
      * @throws InterruptedException 执行被中断（中断标志已恢复，子进程已销毁）
      */
     public int transcode(Path input, Path output) throws InterruptedException {
-        ProcessBuilder processBuilder = new ProcessBuilder(buildCommand(
-                config.resolveToolPath(config.getFfmpegPath()).toString(),
-                input.toString(), output.toString()));
-        ExternalProcessRunner.ExternalProcessResult result =
-                processRunner.run(processBuilder, TRANSCODE_TIMEOUT_SECONDS);
-        return result.exitCode();
+        String ffmpeg = config.resolveToolPath(config.getFfmpegPath()).toString();
+        String encoder = resolveHwEncoder(ffmpeg);
+        int exitCode = runTranscode(ffmpeg, input, output, encoder);
+        if (exitCode != 0 && encoder != null) {
+            log.warn("硬件编码器 {} 转码失败（exit={}），回退 CPU libx264 重试: {}",
+                    encoder, exitCode, input.getFileName());
+            disableHwEncoder(encoder);
+            exitCode = runTranscode(ffmpeg, input, output, null);
+        }
+        return exitCode;
     }
 
     /** 构造 ffmpeg 命令（包可见，供单元测试断言参数）。 */
@@ -72,12 +85,30 @@ public class FfmpegTranscoder {
         return cmd;
     }
 
+    /** 按当前选定的编码器（null = CPU）执行一次转码。 */
+    private int runTranscode(String ffmpegPath, Path input, Path output, String encoder)
+            throws InterruptedException {
+        List<String> cmd = new ArrayList<>();
+        cmd.add(ffmpegPath);
+        cmd.add("-i");
+        cmd.add(input.toString());
+        cmd.addAll(encoderArgs(ffmpegPath, encoder));
+        cmd.add(output.toString());
+        ProcessBuilder processBuilder = new ProcessBuilder(cmd);
+        ExternalProcessRunner.ExternalProcessResult result =
+                processRunner.run(processBuilder, TRANSCODE_TIMEOUT_SECONDS);
+        return result.exitCode();
+    }
+
     /**
-     * 视频编码参数：探测到硬件编码器用硬编（cq 23 质量等价 crf 23），否则回退 CPU。
+     * 视频编码参数：编码器非 null 用硬编（cq 23 质量等价 crf 23），否则 CPU。
      * 硬件路径沿用软解（不指定 hwaccel），避免 GPU 解码与容器兼容性问题。
      */
     private List<String> encoderArgs(String ffmpegPath) {
-        String encoder = resolveHwEncoder(ffmpegPath);
+        return encoderArgs(ffmpegPath, resolveHwEncoder(ffmpegPath));
+    }
+
+    private List<String> encoderArgs(String ffmpegPath, String encoder) {
         if (encoder != null) {
             return List.of("-c:v", encoder, "-preset", "p5", "-cq", "23",
                     "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", "-y");
@@ -85,14 +116,22 @@ public class FfmpegTranscoder {
         return CPU_FFMPEG_ARGS;
     }
 
+    /** 硬件编码器运行时失败后禁用（进程内缓存），后续转码直接走 CPU。 */
+    private void disableHwEncoder(String failedEncoder) {
+        if (hwEncoder != null && hwEncoder.equals(failedEncoder)) {
+            hwEncoder = HW_DISABLED;
+            log.info("硬件编码器 {} 已禁用（驱动/构建不兼容），后续转码回退 CPU libx264", failedEncoder);
+        }
+    }
+
     /** 探测可用硬件编码器（进程内缓存一次）：NVENC → QSV → AMF，全部不可用返回 null。 */
     private String resolveHwEncoder(String ffmpegPath) {
         if (hwEncoder != null) {
-            return hwEncoder;
+            return HW_DISABLED.equals(hwEncoder) ? null : hwEncoder;
         }
         synchronized (this) {
             if (hwEncoder != null) {
-                return hwEncoder;
+                return HW_DISABLED.equals(hwEncoder) ? null : hwEncoder;
             }
             String encoder = probeHwEncoder(ffmpegPath);
             hwEncoder = encoder;
