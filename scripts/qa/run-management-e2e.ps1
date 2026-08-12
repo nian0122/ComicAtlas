@@ -11,9 +11,10 @@
 #   - 所有断言走真实 API / MySQL / MQ 管理端 / 文件系统，不使用 route mock 冒充。
 #
 # 场景：
-#   A. 空库（Flyway V1..V16 自建全表）+ 管理控制台完整故事
-#   B. 升级库（手工应用 V1+V2 旧 schema + 旧数据 → Flyway baseline=2 升级到 V16，
-#      验证旧数据保留 + 新功能在升级库可用）
+#   A. 空库（Flyway V1..V20 自建全表）+ 管理控制台完整故事
+#   B. 升级库（git show v1.1.0:.../schema.sql 真实旧 schema + 旧数据
+#      → Flyway baseline=1 升级到 V20，验证旧数据保留 +
+#      V17 REGISTER→DIRECTORY / V18 转码状态分类 / V19 历史清理 / V20 trash_manifest 迁移语义）
 # ============================================================
 
 param(
@@ -27,13 +28,36 @@ param(
     [switch]$SkipUiTests,          # 跳过前端 mocked UI tests
     [switch]$SkipRootPlaywright,   # 跳过根级真实 Playwright
     [switch]$SkipVisual,           # 跳过视觉/Lighthouse
-    [switch]$OnlyScenarioA         # 只跑空库场景
+    [switch]$OnlyScenarioA,        # 只跑空库场景
+    [switch]$ReleaseMode           # 发布模式：禁止 Skip/OnlyScenarioA/已知失败白名单，任一验证失败即抛错阻断
 )
 
 # 统一控制台输出为 UTF-8（Windows PowerShell 5.1 默认按 ANSI 输出中文会乱码）
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
 try { $OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
 $ProgressPreference = "SilentlyContinue"
+
+# ------------------------------------------------------------
+# 发布模式硬门禁：禁止任何 Skip*/OnlyScenarioA 组合，禁止已知失败白名单，
+# 任一验证非零即抛错阻断（ReleaseMode 下 Add-Failure 立即升级为 throw）。
+# ------------------------------------------------------------
+if ($ReleaseMode) {
+    $releaseForbidden = @()
+    if ($SkipMaven) { $releaseForbidden += "-SkipMaven" }
+    if ($SkipUnitTests) { $releaseForbidden += "-SkipUnitTests" }
+    if ($SkipFrontendBuild) { $releaseForbidden += "-SkipFrontendBuild" }
+    if ($SkipUiTests) { $releaseForbidden += "-SkipUiTests" }
+    if ($SkipRootPlaywright) { $releaseForbidden += "-SkipRootPlaywright" }
+    if ($SkipVisual) { $releaseForbidden += "-SkipVisual" }
+    if ($OnlyScenarioA) { $releaseForbidden += "-OnlyScenarioA" }
+    if ($releaseForbidden.Count -gt 0) {
+        throw "发布模式（-ReleaseMode）禁止与跳过参数/单场景开关组合使用：$($releaseForbidden -join ', ')"
+    }
+}
+
+# 发布模式下失败必须立即抛错阻断（而非收集后继续跑），
+# 覆盖 Add-Failure 收集的既有失败与已知失败白名单两类路径。
+$script:ReleaseMode = $ReleaseMode
 
 # 防卡死证据：每个阶段立即写 progress-N.txt（N 为递增序号），供外部监控与最终报告使用。
 $script:ProgressCounter = 0
@@ -125,7 +149,7 @@ function Write-Step { param([string]$msg) Write-Host "`n=== [QA] $msg ===" -Fore
 function Write-Ok   { param([string]$msg) Write-Host "  OK: $msg" -ForegroundColor Green }
 function Write-Warn { param([string]$msg) Write-Host "  WARN: $msg" -ForegroundColor Yellow }
 function Write-Fail { param([string]$msg) Write-Host "  FAIL: $msg" -ForegroundColor Red }
-function Add-Failure { param([string]$msg) $script:Failures += $msg; Write-Fail $msg }
+function Add-Failure { param([string]$msg) $script:Failures += $msg; if ($script:ReleaseMode) { throw "发布模式硬门禁失败：$msg" }; Write-Fail $msg }
 function Assert-True { param([bool]$cond, [string]$msg) if ($cond) { Write-Ok $msg } else { Add-Failure $msg } }
 function Assert-Equal { param($actual, $expected, [string]$msg) if ($actual -eq $expected) { Write-Ok "$msg (=$actual)" } else { Add-Failure "$msg — 期望 $expected 实际 $actual" } }
 
@@ -1150,36 +1174,129 @@ SET FOREIGN_KEY_CHECKS=1"
 }
 
 # ------------------------------------------------------------
-# 场景 B：升级库（旧 schema V1+V2 + 旧数据 → Flyway 升级 V16）
+# Flyway 历史一致性检查（迁移前防御门禁）
+# ------------------------------------------------------------
+# 背景：e6a58f9 曾把 trash_manifest 迁移误标为 V18，后修正为 V20。若历史库的
+# flyway_schema_history 残留「V18 description=trash_manifest」或某版本 description
+# 与当前迁移文件不一致（内容漂移/重编号），说明历史从未走修复迁移，Flyway
+# validate-on-migrate 必然失败。此时任何「自动 repair」都会掩盖真实数据风险，
+# 本检查明确失败并提示禁止 repair（脚本绝不调用 flyway repair）。
+function Assert-FlywayHistoryClean {
+    param([string]$Db, [string]$FlywayDir)
+    $hasHistory = [int](Invoke-Sql -Db $Db -Sql "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$Db' AND table_name='flyway_schema_history'")
+    if ($hasHistory -eq 0) {
+        Write-Ok "flyway_schema_history 不存在（全新/无历史库），跳过历史一致性检查"
+        return $true
+    }
+    # 期望映射：当前迁移文件 version -> description（基于文件命名，权威）
+    $expected = @{}
+    Get-ChildItem $FlywayDir -Filter "V*.sql" | ForEach-Object {
+        if ($_.BaseName -match '^V(\d+)__(.+)$') { $expected[[int]$matches[1]] = $matches[2] }
+    }
+    $dirty = @()
+    # 逐行读取历史：version|description|checksum|success|type（仅校验 SQL 迁移行，
+    # BASELINE/SCHEMA 行是 Flyway 自建元数据，description 无文件对应，跳过）
+    $rows = Invoke-Sql -Db $Db -Sql "SELECT CONCAT(version,'|',description,'|',checksum,'|',success,'|',type) FROM flyway_schema_history ORDER BY installed_rank"
+    foreach ($line in ($rows -split "`n")) {
+        $line = $line.Trim()
+        if ($line -eq "") { continue }
+        $parts = $line -split '\|'
+        if ($parts.Count -lt 5) { continue }
+        $ver = [int]$parts[0]
+        $desc = $parts[1]
+        $success = $parts[3]
+        $type = $parts[4]
+        if ($type -ne "SQL") { continue }
+        if ($success -ne "1") { $dirty += "V$ver 历史上失败（success=0）" ; continue }
+        # 关键脏数据：V18 被 trash_manifest 冒充（e6a58f9 修复前的历史）
+        if ($ver -eq 18 -and $desc -match 'trash|manifest') {
+            $dirty += "V18 description='$desc' 为 trash_manifest 冒充（正确版本应为 V20）"
+            continue
+        }
+        # 版本 description 与当前迁移文件不一致 = 内容漂移/重编号（checksum 必然不匹配）
+        if ($expected.ContainsKey($ver) -and $desc -ne $expected[$ver]) {
+            $dirty += "V$ver description='$desc' 与当前迁移 '$($expected[$ver])' 不一致（checksum 不匹配）"
+        } elseif (-not $expected.ContainsKey($ver)) {
+            $dirty += "V$ver description='$desc' 在历史中存在但当前无此迁移（版本被移除/重编号）"
+        }
+    }
+    if ($dirty.Count -gt 0) {
+        Add-Failure "Flyway 历史一致性检查失败：$($dirty -join '；')。禁止自动 repair——请人工核对迁移历史与数据后处理，脚本不会调用任何 flyway repair。"
+        return $false
+    }
+    Write-Ok "flyway_schema_history 一致性检查通过（版本/description/checksum 与当前迁移匹配）"
+    return $true
+}
+
+# ------------------------------------------------------------
+# 场景 B：升级库（v1.1.0 真实 schema + 旧数据 → Flyway baseline=1 升级到 V20）
 # ------------------------------------------------------------
 function Invoke-ScenarioB {
     Write-Step "场景 B（升级库）开始"
     $Db = $DbB
     $flywayDir = Join-Path $RepoRoot "api-service\src\main\resources\db\flyway"
+    $schemaPathInRepo = "api-service/src/main/resources/db/schema.sql"
 
     # 重建空升级库
     Invoke-Sql -Db "mysql" -Sql "DROP DATABASE IF EXISTS $Db" | Out-Null
     Invoke-Sql -Db "mysql" -Sql "CREATE DATABASE $Db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci" | Out-Null
 
-    # 手工应用旧 schema（V1 + V2），模拟 1.0 时代数据库
-    Invoke-SqlFile -Db $Db -SqlFile (Join-Path $flywayDir "V1__init.sql")
-    Invoke-SqlFile -Db $Db -SqlFile (Join-Path $flywayDir "V2__fix_schema_drift.sql")
+    # 用真实 v1.1.0 schema 构造旧库（不再手工应用当前 V1+V2 冒充）：
+    # git show v1.1.0:.../schema.sql 导出（v1.1.0 为 annotated tag），
+    # 落到临时文件后经 Invoke-SqlFile 喂给 docker exec（见 Invoke-SqlFile 的 UTF-8 读取约定）。
+    $tmpSchema = Join-Path $ArtifactsDir "schema-v110.sql"
+    $gitShow = git show "v1.1.0:$schemaPathInRepo" 2>&1 | Out-String
+    if ($LASTEXITCODE -ne 0) {
+        Add-Failure "git show v1.1.0:$schemaPathInRepo 失败：$gitShow"
+        return
+    }
+    [System.IO.File]::WriteAllText($tmpSchema, $gitShow, [System.Text.UTF8Encoding]::new($false))
+    Assert-True (Test-Path $tmpSchema) "v1.1.0 schema.sql 已导出到临时文件"
+    Invoke-SqlFile -Db $Db -SqlFile $tmpSchema
 
-    # 灌入旧数据
+    # v1.1.0 基线缺 directory_scan_task（该表由当前 V1 完整基线引入，V12 会 ALTER 它），
+    # 升级前必须补建该表，否则 V12 迁移失败（表结构取自当前 V1__init.sql）。
+    $dirScanDdl = @"
+CREATE TABLE directory_scan_task (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    status VARCHAR(32) NOT NULL DEFAULT 'PENDING',
+    directory_path VARCHAR(1024) NOT NULL,
+    total_items INT DEFAULT 0,
+    result_json MEDIUMTEXT,
+    error_message TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    started_at DATETIME,
+    ended_at DATETIME,
+    INDEX idx_status (status),
+    INDEX idx_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+"@
+    Invoke-Sql -Db $Db -Sql $dirScanDdl | Out-Null
+
+    # 灌入代表性旧数据（v1.1.0 时代值）：
+    #  - comic.source_type='REGISTER' / import_task.source_type='REGISTER' → V17 断言 DIRECTORY
+    #  - page.transcode_status：IMAGE 旧值 'DONE'（V10→READY，V18→NOT_NEEDED）、
+    #    VIDEO 'NOT_NEEDED' + avi/mpeg4 不兼容组合（V18 → REQUIRED）
+    #  - reading_history 错配行 (1002, 2001)：comic_id 与 chapter 的 comic 不符 → V19 清理
+    #  - comic 1002 / chapter 2003：仅用于承载错配历史与 V17 断言，不参与后续故事
     $legacy = @"
 INSERT INTO category (id, name, sort_order) VALUES (1, '旧分类', 0);
-INSERT INTO comic (id, title, author, status, category_id, total_pages, storage_policy)
-VALUES (1001, 'legacy-comic', 'old-author', 'READY', 1, 3, 'MANAGED');
+INSERT INTO comic (id, title, author, status, source_type, category_id, total_pages, storage_policy)
+VALUES (1001, 'legacy-comic', 'old-author', 'READY', 'REGISTER', 1, 4, 'MANAGED'),
+       (1002, 'legacy-orphan', 'old-author', 'READY', 'REGISTER', 1, 1, 'MANAGED');
 INSERT INTO chapter (id, comic_id, title, chapter_no, sort_order, global_order, page_count)
-VALUES (2001, 1001, '第1章', '1', 0, 1, 2), (2002, 1001, '第2章', '2', 1, 2, 1);
-INSERT INTO page (id, chapter_id, page_number, hq_root, hq_path, hq_status, lq_status, transcode_status, media_type, width, height, file_size)
+VALUES (2001, 1001, '第1章', '1', 0, 1, 2), (2002, 1001, '第2章', '2', 1, 2, 2),
+       (2003, 1002, '孤儿章', '1', 0, 1, 1);
+INSERT INTO page (id, chapter_id, page_number, hq_root, hq_path, hq_status, lq_status, transcode_status, media_type, width, height, file_size, container, video_codec, audio_codec)
 VALUES
- (3001, 2001, 1, 'HQ', '1001/2001/001.jpg', 'READY', 'NOT_GENERATED', 'NOT_NEEDED', 'IMAGE', 800, 1200, 1000),
- (3002, 2001, 2, 'HQ', '1001/2001/002.jpg', 'READY', 'NOT_GENERATED', 'NOT_NEEDED', 'IMAGE', 800, 1200, 1000),
- (3003, 2002, 1, 'HQ', '1001/2002/001.jpg', 'READY', 'NOT_GENERATED', 'NOT_NEEDED', 'IMAGE', 800, 1200, 1000);
+ (3001, 2001, 1, 'HQ', '1001/2001/001.jpg', 'READY', 'NOT_GENERATED', 'DONE', 'IMAGE', 800, 1200, 1000, NULL, NULL, NULL),
+ (3002, 2001, 2, 'HQ', '1001/2001/002.jpg', 'READY', 'NOT_GENERATED', 'NOT_NEEDED', 'IMAGE', 800, 1200, 1000, NULL, NULL, NULL),
+ (3003, 2002, 1, 'HQ', '1001/2002/001.jpg', 'READY', 'NOT_GENERATED', 'NOT_NEEDED', 'IMAGE', 800, 1200, 1000, NULL, NULL, NULL),
+ (3004, 2002, 2, 'HQ', '1001/2002/002.mp4', 'READY', 'NOT_GENERATED', 'NOT_NEEDED', 'VIDEO', 640, 480, 2000, 'avi', 'mpeg4', NULL),
+ (3005, 2003, 1, 'HQ', '1002/2003/001.jpg', 'READY', 'NOT_GENERATED', 'NOT_NEEDED', 'IMAGE', 800, 1200, 1000, NULL, NULL, NULL);
 INSERT INTO import_task (id, comic_id, source_type, source_path, status, progress)
 VALUES (4001, 1001, 'REGISTER', 'legacy-path', 'SUCCESS', 100);
-INSERT INTO reading_history (comic_id, chapter_id, page_number) VALUES (1001, 2001, 2);
+INSERT INTO reading_history (comic_id, chapter_id, page_number) VALUES (1001, 2001, 2), (1002, 2001, 1);
 "@
     # 通过 stdin 注入 legacy SQL（Get-Content 会剥离 BOM）
     $tmpSql = Join-Path $ArtifactsDir "legacy-data.sql"
@@ -1192,25 +1309,47 @@ INSERT INTO reading_history (comic_id, chapter_id, page_number) VALUES (1001, 20
     Assert-Equal ([int](Invoke-Sql -Db $Db -Sql "SELECT COUNT(*) FROM comic WHERE id=1001")) 1 "legacy comic 已灌入"
 
     # 为 legacy 漫画生成真实 HQ 文件（DB 页面 hq_path 指向 1001/2001、1001/2002）
-    foreach ($p in @("1001\2001\001.jpg", "1001\2001\002.jpg", "1001\2002\001.jpg")) {
+    foreach ($p in @("1001\2001\001.jpg", "1001\2001\002.jpg", "1001\2002\001.jpg", "1001\2002\002.mp4")) {
         $dest = Join-Path $MangaRoot "hq\$p"
         New-Item -ItemType Directory -Path (Split-Path $dest) -Force | Out-Null
-        Copy-Item (Join-Path $FixturesRoot "upload-image.jpg") $dest -Force
+        $src = if ($p -match '\.mp4$') { Join-Path $FixturesRoot "upload-video.avi" } else { Join-Path $FixturesRoot "upload-image.jpg" }
+        Copy-Item $src $dest -Force
     }
 
-    # 启动服务：Flyway baseline=2 → 应用 V10..V16
-    Start-QaServices -Db $Db -FlywayBaseline "2"
+    # 迁移前 Flyway 历史一致性检查（禁止 repair 硬门禁）
+    Assert-FlywayHistoryClean -Db $Db -FlywayDir $flywayDir
 
-    # 升级断言（version 是 VARCHAR，MAX 需转数值比较，字典序 "2" > "17"）
+    # 启动服务：Flyway baseline=1（v1.1.0 库视为旧基线）→ 应用 V2（漂移修复）+ V10..V20
+    Start-QaServices -Db $Db -FlywayBaseline "1"
+
+    # 升级断言（version 是 VARCHAR，MAX 需转数值比较，字典序 "2" > "20"）
     $v = Invoke-Sql -Db $Db -Sql "SELECT MAX(CAST(version AS UNSIGNED)) FROM flyway_schema_history"
-    Assert-Equal $v "17" "Flyway 升级到版本 17（V1..V17 全量）"
-    $newTables = Invoke-Sql -Db $Db -Sql "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$Db' AND table_name IN ('management_task','management_task_item','outbox_message','inbox_receipt','upload_session')"
-    Assert-Equal ([int]$newTables) 5 "管理任务/outbox/upload 新表存在"
+    Assert-Equal $v "20" "Flyway 升级到版本 20（V1..V20 全部应用）"
+    # 基于 flyway_schema_history 表数据的描述校验（而非 V20 文件头注释，该注释残留 "V18: TRASH..." 字样）：
+    # V18 必须是 classify_video_transcode_status、V20 必须是 trash_manifest_db
+    Assert-Equal (Invoke-Sql -Db $Db -Sql "SELECT description FROM flyway_schema_history WHERE version='18' AND type='SQL'") "classify_video_transcode_status" "V18 历史描述为 classify_video_transcode_status（非 trash_manifest 冒充）"
+    Assert-Equal (Invoke-Sql -Db $Db -Sql "SELECT description FROM flyway_schema_history WHERE version='20' AND type='SQL'") "trash_manifest_db" "V20 历史描述为 trash_manifest_db（trash_manifest 迁移正确落在 V20）"
+
+    # 升级后正向 checksum 一致性验证：干净历史应通过 Assert-FlywayHistoryClean（不误报）
+    Assert-FlywayHistoryClean -Db $Db -FlywayDir $flywayDir
+    $newTables = Invoke-Sql -Db $Db -Sql "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$Db' AND table_name IN ('management_task','management_task_item','outbox_message','inbox_receipt','upload_session','upload_file','trash_manifest')"
+    Assert-Equal ([int]$newTables) 7 "管理任务/outbox/upload/trash_manifest 新表存在（V20 trash_manifest 已建）"
     Assert-Equal ([int](Invoke-Sql -Db $Db -Sql "SELECT COUNT(*) FROM comic WHERE id=1001 AND title='legacy-comic'")) 1 "legacy 漫画保留"
     Assert-Equal ([int](Invoke-Sql -Db $Db -Sql "SELECT COUNT(*) FROM chapter WHERE comic_id=1001")) 2 "legacy 章节保留"
-    Assert-Equal ([int](Invoke-Sql -Db $Db -Sql "SELECT COUNT(*) FROM page WHERE chapter_id IN (2001,2002)")) 3 "legacy 页面保留"
+    Assert-Equal ([int](Invoke-Sql -Db $Db -Sql "SELECT COUNT(*) FROM page WHERE chapter_id IN (2001,2002)")) 4 "legacy 页面保留（3 IMAGE + 1 VIDEO）"
     Assert-Equal ([int](Invoke-Sql -Db $Db -Sql "SELECT COUNT(*) FROM reading_history WHERE comic_id=1001")) 1 "legacy 阅读历史保留"
     Assert-Equal ([int](Invoke-Sql -Db $Db -Sql "SELECT COUNT(*) FROM import_task WHERE id=4001 AND status='SUCCESS'")) 1 "legacy import_task 保留"
+
+    # V17 迁移语义：REGISTER → DIRECTORY（comic + import_task 双表）
+    Assert-Equal (Invoke-Sql -Db $Db -Sql "SELECT source_type FROM comic WHERE id=1001") "DIRECTORY" "V17: comic.source_type REGISTER→DIRECTORY"
+    Assert-Equal (Invoke-Sql -Db $Db -Sql "SELECT source_type FROM import_task WHERE id=4001") "DIRECTORY" "V17: import_task.source_type REGISTER→DIRECTORY"
+
+    # V18 迁移语义：VIDEO 不兼容组合 NOT_NEEDED → REQUIRED；IMAGE 旧值 DONE → V10 READY → V18 NOT_NEEDED
+    Assert-Equal (Invoke-Sql -Db $Db -Sql "SELECT transcode_status FROM page WHERE id=3004") "REQUIRED" "V18: VIDEO(avi/mpeg4) NOT_NEEDED → REQUIRED"
+    Assert-Equal (Invoke-Sql -Db $Db -Sql "SELECT transcode_status FROM page WHERE id=3001") "NOT_NEEDED" "V18: IMAGE 旧值 DONE 归一为 NOT_NEEDED"
+
+    # V19 迁移语义：错配阅读历史（comic_id 与 chapter 的 comic 不符）被清理
+    Assert-Equal ([int](Invoke-Sql -Db $Db -Sql "SELECT COUNT(*) FROM reading_history WHERE comic_id=1002")) 0 "V19: 错配 reading_history(1002,2001) 已清理"
 
     # 升级库上的真实故事（LQ + 重排 + 任务中心 + 回收/恢复）
     $legacyDetail = Invoke-Api -Path "/api/comics/1001"
@@ -1222,8 +1361,8 @@ INSERT INTO reading_history (comic_id, chapter_id, page_number) VALUES (1001, 20
     Assert-True ($null -ne $lq.taskId) "升级库 LQ 创建管理任务"
     $lt = Wait-ManagementTaskRobust -TaskId $lq.taskId -TimeoutSec 600 -Label "升级库 LQ"
     Assert-Equal $lt.status "SUCCEEDED" "升级库 LQ 成功"
-    $lqUp = Invoke-Sql -Db $Db -Sql "SELECT COUNT(*) FROM page WHERE chapter_id IN (2001,2002) AND lq_status='READY'"
-    Assert-Equal ([int]$lqUp) 3 "升级库页面 LQ=READY"
+    $lqUp = Invoke-Sql -Db $Db -Sql "SELECT COUNT(*) FROM page WHERE chapter_id IN (2001,2002) AND media_type='IMAGE' AND lq_status='READY'"
+    Assert-Equal ([int]$lqUp) 3 "升级库 IMAGE 页面 LQ=READY（VIDEO 页不生成 LQ）"
 
     # 章节重排
     $mv = Invoke-Api -Method Put -Path "/api/comics/1001/chapters/2002/reorder" -Body @{ targetGlobalOrder = 1 }
@@ -1266,7 +1405,8 @@ function Invoke-FrontendUiTests {
             # 既有确定性失败：comic-list / comic-poster / video-player
             # （前端 redesign 后组件与旧断言漂移：sticky 偏移 56→68、移动端 3 列→2 列、
             #  hover 1.04→1.025、video controls 行为变化）——用户未提交 WIP 中已存在，如实记录不阻断。
-            $knownStale = @("comic-list.spec.ts", "comic-poster.spec.ts", "video-player.spec.ts")
+            # 发布模式（-ReleaseMode）下白名单失效：任何失败都视为硬失败。
+            $knownStale = if ($script:ReleaseMode) { @() } else { @("comic-list.spec.ts", "comic-poster.spec.ts", "video-player.spec.ts") }
             $unexpected = @($failedSpecs | Where-Object { $n = $_; -not ($knownStale | Where-Object { $n -eq $_ }) })
             if ($unexpected.Count -eq 0 -and $failedSpecs.Count -gt 0) {
                 Write-Warn "前端 UI tests 存在既有确定性失败（已如实记录）: $($failedSpecs -join ', ')"
@@ -1317,14 +1457,16 @@ function Invoke-RootPlaywright {
             Write-Ok "根级 Playwright（chromium）全部通过"
             $script:Evidence.rootPlaywright = @{ status = "pass" }
         } else {
-            # 解析失败用例：仅 import.spec（旧版 /import 路由）视为既有过时用例，如实记录不阻断
+            # 解析失败用例：仅 import.spec（旧版 /import 路由）视为既有过时用例，如实记录不阻断。
+            # 发布模式（-ReleaseMode）下白名单失效：任何失败都视为硬失败。
             $logContent = Get-Content (Join-Path $LogsDir "root-playwright.log") -Raw -ErrorAction SilentlyContinue
             $failedSpecs = @()
             if ($logContent) {
                 $failedSpecs = @([regex]::Matches($logContent, "\[chromium\] › tests/([^:]+)") | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique)
             }
-            $unexpected = @($failedSpecs | Where-Object { $_ -ne "import.spec.ts" })
-            if ($unexpected.Count -eq 0) {
+            $unexpected = @($failedSpecs | Where-Object { $_ -ne "import.spec.ts" -or $script:ReleaseMode })
+            # 发布模式下无任何白名单：失败即硬失败（Write-Warn 分支不生效，落入 Add-Failure）
+            if ($unexpected.Count -eq 0 -and -not $script:ReleaseMode) {
                 Write-Warn "根级 Playwright 仅 import.spec.ts 失败（旧版 /import 路由已移除，属既有过时用例）"
                 $script:Evidence.rootPlaywright = @{ status = "pass-with-stale-import-spec"; failedSpecs = $failedSpecs }
             } else {
@@ -1556,10 +1698,11 @@ try {
     if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { throw "docker 不可用" }
     if (-not (Test-Path (Join-Path $RepoRoot "mvnw.cmd"))) { throw "mvnw.cmd 缺失" }
     if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) { throw "pnpm 不可用（可用 corepack enable 启用，packageManager 声明 pnpm@9.15.0）" }
+    if (-not (Get-Command git -ErrorAction SilentlyContinue)) { throw "git 不可用（场景 B 需 git show v1.1.0 导出旧 schema）" }
     Assert-True (Test-Path $Ffmpeg) "ffmpeg 工具存在"
     Assert-True (Test-Path $Ffprobe) "ffprobe 工具存在"
     Assert-True (Test-Path $ImgOpt) "image-optimizer 存在"
-    Write-ProgressFile -Stage "precheck" -Status "ok" -Detail "docker/mvnw/pnpm/ffmpeg/image-optimizer 全部就绪"
+    Write-ProgressFile -Stage "precheck" -Status "ok" -Detail "docker/mvnw/pnpm/git/ffmpeg/image-optimizer 全部就绪"
 
     # 端口占用检查
     foreach ($p in @($GatewayHostPort, $NginxHostPort, $ApiPort, $WorkerPort)) {
@@ -1610,11 +1753,12 @@ try {
                     }
                 }
             }
-            $knownStale = @("DatabaseMigrationTest", "ImportServiceTest", "RecoveryEventHandlerTest")
+            # 发布模式（-ReleaseMode）下白名单失效：DatabaseMigrationTest 等既有失败视为硬失败
+            $knownStale = if ($script:ReleaseMode) { @() } else { @("DatabaseMigrationTest", "ImportServiceTest", "RecoveryEventHandlerTest") }
             $unexpected = @($failedClasses | Where-Object { $n = $_; -not ($knownStale | Where-Object { $n -match $_ }) })
             if ($testExit -eq 0) {
                 Write-Ok "Maven 单元测试通过"
-            } elseif ($unexpected.Count -eq 0) {
+            } elseif ($unexpected.Count -eq 0 -and -not $script:ReleaseMode) {
                 Write-Warn "Maven 单元测试存在既有失败（已如实记录，均为 WIP 过时测试，非本次交付引入）: $($failedClasses -join ', ')"
                 $script:Evidence.mavenTests = @{ status = "pre-existing-stale-failures"; failedClasses = $failedClasses; total = 257 }
             } else {

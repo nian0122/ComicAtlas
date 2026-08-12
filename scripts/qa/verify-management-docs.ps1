@@ -6,7 +6,7 @@
 # 校验项：
 #   D1 端点：api.md 中出现的端点与 api-service controller 实际映射一致
 #   D2 枚举表：api.md 枚举值与 comic-common / api-service 枚举源码一致
-#   D3 MQ 表：api.md 的 MQ 路由表（comic.management 域）与 RabbitMqConfig 一致
+#   D3 MQ 表：api.md 的 MQ 路由表（comic.management 域）与 comic-common MQ 常量类一致
 #   D4 链接有效：目标文档内的相对 Markdown 链接指向存在的文件
 #   D5 示例命令可执行：文档代码块中关键命令语法可解析、宿主命令存在
 #   D6 故障索引完整：user-guide.md / operations/management.md 含故障排查章节与关键症状
@@ -199,24 +199,28 @@ if ($SkipCodeCrossCheck) {
             $mqFails++
         }
     }
-    $apiConfig = Resolve-Abs "api-service/src/main/java/com/comicatlas/api/config/RabbitMqConfig.java"
-    $workerConfig = Resolve-Abs "worker-service/src/main/java/com/comicatlas/worker/config/RabbitMqConfig.java"
-    if ((Test-Path $apiConfig) -and (Test-Path $workerConfig)) {
-        $cfgText = (Get-Content -LiteralPath $apiConfig -Raw -Encoding UTF8) + (Get-Content -LiteralPath $workerConfig -Raw -Encoding UTF8)
+    $mqConstDir = Resolve-Abs "comic-common/src/main/java/com/comicatlas/common/constant"
+    $mqConstFiles = @()
+    foreach ($cn in @('MqExchanges.java', 'MqRoutingKeys.java', 'MqQueues.java')) {
+        $cf = Get-ChildItem -Path $mqConstDir -Filter $cn -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($cf) { $mqConstFiles += $cf.FullName }
+    }
+    if ($mqConstFiles.Count -eq 3) {
+        $cfgText = ($mqConstFiles | ForEach-Object { Get-Content -LiteralPath $_ -Raw -Encoding UTF8 }) -join "`n"
         foreach ($row in $mqExpected) {
             $rk = $row[1]; $q = $row[2]
             if (-not $cfgText.Contains('"' + $rk + '"')) {
-                Gate-Fail "RabbitMqConfig 源码缺 routing key $rk"
+                Gate-Fail "comic-common MQ 常量类缺 routing key $rk"
                 $mqFails++
             }
             if (-not $cfgText.Contains('"' + $q + '"')) {
-                Gate-Fail "RabbitMqConfig 源码缺 queue $q"
+                Gate-Fail "comic-common MQ 常量类缺 queue $q"
                 $mqFails++
             }
         }
-        if ($mqFails -eq 0) { Gate-Ok "MQ 路由表在文档与 RabbitMqConfig 中一致" }
+        if ($mqFails -eq 0) { Gate-Ok "MQ 路由表在文档与 comic-common MQ 常量类中一致" }
     } else {
-        Gate-Warn "未找到 RabbitMqConfig 源码，跳过 MQ 源码对照"
+        Gate-Warn "未找到 comic-common MQ 常量类，跳过 MQ 源码对照"
     }
 }
 
