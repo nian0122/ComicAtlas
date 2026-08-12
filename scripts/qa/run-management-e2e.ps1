@@ -1193,10 +1193,13 @@ function Assert-FlywayHistoryClean {
         Write-Ok "flyway_schema_history 不存在（全新/无历史库），跳过历史一致性检查"
         return $true
     }
-    # 期望映射：当前迁移文件 version -> description（基于文件命名，权威）
+    # 期望映射：当前迁移文件 version -> description（基于文件命名，权威）。
+    # 注意 Flyway 会把文件名中的下划线规范化为空格后写入 flyway_schema_history
+    #（如 V18__classify_video_transcode_status.sql -> "classify video transcode status"），
+    # 因此期望值需同样将下划线替换为空格再比较。
     $expected = @{}
     Get-ChildItem $FlywayDir -Filter "V*.sql" | ForEach-Object {
-        if ($_.BaseName -match '^V(\d+)__(.+)$') { $expected[[int]$matches[1]] = $matches[2] }
+        if ($_.BaseName -match '^V(\d+)__(.+)$') { $expected[[int]$matches[1]] = ($matches[2] -replace '_', ' ') }
     }
     $dirty = @()
     # 逐行读取历史：version|description|checksum|success|type（仅校验 SQL 迁移行，
@@ -1331,9 +1334,10 @@ INSERT INTO reading_history (comic_id, chapter_id, page_number) VALUES (1001, 20
     $v = Invoke-Sql -Db $Db -Sql "SELECT MAX(CAST(version AS UNSIGNED)) FROM flyway_schema_history"
     Assert-Equal $v "20" "Flyway 升级到版本 20（V1..V20 全部应用）"
     # 基于 flyway_schema_history 表数据的描述校验（而非 V20 文件头注释，该注释残留 "V18: TRASH..." 字样）：
-    # V18 必须是 classify_video_transcode_status、V20 必须是 trash_manifest_db
-    Assert-Equal (Invoke-Sql -Db $Db -Sql "SELECT description FROM flyway_schema_history WHERE version='18' AND type='SQL'") "classify_video_transcode_status" "V18 历史描述为 classify_video_transcode_status（非 trash_manifest 冒充）"
-    Assert-Equal (Invoke-Sql -Db $Db -Sql "SELECT description FROM flyway_schema_history WHERE version='20' AND type='SQL'") "trash_manifest_db" "V20 历史描述为 trash_manifest_db（trash_manifest 迁移正确落在 V20）"
+    # Flyway 会把文件名中的下划线规范化为空格写入 history，故 V18 期望为
+    # "classify video transcode status"、V20 期望为 "trash manifest db"。
+    Assert-Equal (Invoke-Sql -Db $Db -Sql "SELECT description FROM flyway_schema_history WHERE version='18' AND type='SQL'") "classify video transcode status" "V18 历史描述为 classify video transcode status（非 trash_manifest 冒充）"
+    Assert-Equal (Invoke-Sql -Db $Db -Sql "SELECT description FROM flyway_schema_history WHERE version='20' AND type='SQL'") "trash manifest db" "V20 历史描述为 trash manifest db（trash_manifest 迁移正确落在 V20）"
 
     # 升级后正向 checksum 一致性验证：干净历史应通过 Assert-FlywayHistoryClean（不误报）
     Assert-FlywayHistoryClean -Db $Db -FlywayDir $flywayDir
