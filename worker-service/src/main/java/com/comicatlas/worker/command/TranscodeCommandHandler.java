@@ -155,7 +155,8 @@ public class TranscodeCommandHandler {
             }
 
             log.info("转码完成: pageId={}, newPath={}", pageId, newHqFile);
-            TranscodeMediaInfo info = probe(newHqFile);
+            String newHqPath = deriveNewHqPath(media.getHqPath(), newHqFile.getFileName().toString());
+            TranscodeMediaInfo info = probe(newHqFile, newHqPath);
             return new TranscodeResult(null, info);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -175,20 +176,29 @@ public class TranscodeCommandHandler {
         }
     }
 
-    /** 用 ffprobe 实测转码后文件元数据；失败降级为 null。 */
-    private TranscodeMediaInfo probe(Path file) {
+    /**
+     * 用 ffprobe 实测转码后文件元数据；失败时元数据字段降级为 null，
+     * 但始终携带 Worker 实际写入的 newHqPath（API 落库依赖它，不能丢失）。
+     */
+    private TranscodeMediaInfo probe(Path file, String newHqPath) {
         try {
             var opt = mediaAnalyzer.analyzeVideo(file);
             if (opt.isEmpty()) {
-                return null;
+                return new TranscodeMediaInfo(null, null, null, null, null, newHqPath);
             }
             ComicMetadata.MediaInfo info = opt.get();
             return new TranscodeMediaInfo(
                     info.duration(), info.container(), info.videoCodec(), info.audioCodec(),
-                    info.fileSize());
+                    info.fileSize(), newHqPath);
         } catch (Exception e) {
-            log.warn("转码后元数据探测失败，降级为 null: file={}, error={}", file, e.getMessage());
-            return null;
+            log.warn("转码后元数据探测失败，元数据字段降级为 null: file={}, error={}", file, e.getMessage());
+            return new TranscodeMediaInfo(null, null, null, null, null, newHqPath);
         }
+    }
+
+    private static String deriveNewHqPath(String hqPath, String newFileName) {
+        int idx = hqPath == null ? -1 : hqPath.lastIndexOf('/');
+        String dir = idx >= 0 ? hqPath.substring(0, idx + 1) : "";
+        return dir + newFileName;
     }
 }

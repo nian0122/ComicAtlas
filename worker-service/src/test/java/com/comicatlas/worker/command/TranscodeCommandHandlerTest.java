@@ -128,16 +128,17 @@ class TranscodeCommandHandlerTest {
         assertEquals("h264", info.videoCodec());
         assertEquals("aac", info.audioCodec());
         assertEquals(Long.valueOf(2048000L), info.fileSize());
+        assertEquals("1/ch01/test.mp4", info.newHqPath());
 
         verify(publisher).progress(eq(cmd), eq(100), eq("转码完成"));
         assertTrue(Files.exists(chapterDir.resolve("test.mp4")), "new .mp4 should exist in HQ");
         assertFalse(Files.exists(sourceFile), "old .webm should be deleted");
     }
 
-    // ==================== Test 2: ffprobe 探测失败 → completed 携带 null（API 侧回退硬编码） ====================
+    // ==================== Test 2: ffprobe 探测失败 → 元数据降级为 null，但 newHqPath 仍随事件回传（API 落库依赖） ====================
 
     @Test
-    void probeEmpty_transcodeDegradesToNull() throws Exception {
+    void probeEmpty_metadataDegradesButCarriesNewHqPath() throws Exception {
         Long pageId = 200L;
         Path chapterDir = Files.createDirectories(hqRoot.resolve("2/ch02"));
         Files.writeString(chapterDir.resolve("bad.mkv"), "fake video data");
@@ -161,7 +162,47 @@ class TranscodeCommandHandlerTest {
 
         ArgumentCaptor<TranscodeMediaInfo> captor = ArgumentCaptor.forClass(TranscodeMediaInfo.class);
         verify(publisher).completed(eq(cmd), captor.capture());
-        assertNull(captor.getValue());
+        TranscodeMediaInfo info = captor.getValue();
+        assertNull(info.duration());
+        assertNull(info.fileSize());
+        assertEquals("2/ch02/bad.mp4", info.newHqPath());
+    }
+
+    // ==================== Test 2.5: 目标 {base}.mp4 已存在 → 防撞名 newHqPath 随事件回传（回归：修复 basename 冲突） ====================
+
+    @Test
+    void targetMp4Exists_usesTranscodedSuffixAndCarriesIt() throws Exception {
+        Long pageId = 600L;
+        Path chapterDir = Files.createDirectories(hqRoot.resolve("6/ch06"));
+        Files.writeString(chapterDir.resolve("movie.mp4"), "existing other media");
+        Files.writeString(chapterDir.resolve("movie.mkv"), "source to transcode");
+
+        ExportMedia media = new ExportMedia();
+        media.setId(pageId);
+        media.setHqRoot("HQ");
+        media.setHqPath("6/ch06/movie.mkv");
+        media.setMediaType("VIDEO");
+        media.setContainer("mkv");
+        when(mediaMapper.selectById(pageId)).thenReturn(media);
+
+        config.setFfmpegPath(createFakeFfmpeg(0).toString());
+        when(mediaAnalyzer.analyzeVideo(any(Path.class))).thenReturn(Optional.of(
+                new ComicMetadata.MediaInfo("movie.transcoded-600.mp4", 0, "READY", "NOT_GENERATED",
+                        2048L, 1280, 720, "VIDEO",
+                        new BigDecimal("9.9"), "mp4", "h264", "aac")));
+
+        ManagementCommandRequestedEvent cmd = new ManagementCommandRequestedEvent(
+                UUID.randomUUID(), Instant.now(), 1, 1L, pageId, 1,
+                "TRANSCODE", "MEDIA", pageId);
+
+        handler.transcode(cmd);
+
+        ArgumentCaptor<TranscodeMediaInfo> captor = ArgumentCaptor.forClass(TranscodeMediaInfo.class);
+        verify(publisher).completed(eq(cmd), captor.capture());
+        assertEquals("6/ch06/movie.transcoded-600.mp4", captor.getValue().newHqPath());
+        assertTrue(Files.exists(chapterDir.resolve("movie.transcoded-600.mp4")), "防撞名产物应存在");
+        assertTrue(Files.exists(chapterDir.resolve("movie.mp4")), "既有 mp4 不得被覆盖");
+        assertFalse(Files.exists(chapterDir.resolve("movie.mkv")), "源文件应删除");
     }
 
     // ==================== Test 3: ffmpeg 非零退出 → failed 事件，不发布 completed ====================
