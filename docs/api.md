@@ -1,10 +1,10 @@
-# ComicAtlas API 文档 v1.0
+# ComicAtlas API 文档 v1.5
 
 **Base URL**: `http://localhost/api`
 
 所有响应格式：`{ "code": 200, "message": "success", "data": ... }`。业务失败时 `code` 为 HTTP 语义错误码（400/409/500 等），`message` 为可读错误，管理领域失败响应还可在 `data.reasonCode`（业务原因码）上补充原因。
 
-> 本文覆盖 v1.0 管理控制台新增端点。管理端新领域（任务中心 / 批量 / 回收站 / 上传 / 允许操作）为 T17-T20 实现，端点对照 `api-service` 源码；所有示例均可被 `scripts/qa/verify-management-docs.ps1` 校验。
+> 本文覆盖 v1.5 管理控制台端点。管理端新领域（任务中心 / 批量 / 回收站 / 上传 / 允许操作）自 v1.0 引入并在 v1.5 持续演进，端点对照 `api-service` 源码；所有示例均可被 `scripts/qa/verify-management-docs.ps1` 校验。
 
 ---
 
@@ -445,7 +445,7 @@ PENDING ──► RUNNING ──► SUCCESS
 
 ---
 
-## 13. 管理控制台（v1.0）
+## 13. 管理控制台
 
 管理端使用独立的显式边界客户端 `frontend/src/services/management/http.ts`，响应解析在 `frontend/src/types/management/`。所有枚举字段在前端经 `parseEnum` 边界解析，未知枚举值降级为“未知状态”而不崩溃。
 
@@ -653,7 +653,7 @@ GET /api/management/outbox/stats
 
 ---
 
-## 14. 枚举域（v1.0）
+## 14. 枚举域
 
 ### 14.1 生命周期状态
 
@@ -893,7 +893,7 @@ OP_NOT_ALLOWED, COMIC_NOT_FOUND
 
 ### 19.2 旧 API 兼容窗口
 
-| 旧调用 | v1.0 行为 | 退役计划 |
+| 旧调用 | 当前行为 | 退役计划 |
 |--------|-----------|---------|
 | `DELETE /api/comics/{id}` | 改为回收（原硬删语义不再提供） | 永久删除走 `/api/trash/.../purge` |
 | `DELETE /api/admin/comics/{id}?mode=DATABASE_ONLY\|DELETE_FILES` | 均重定向到回收站 | 保留兼容，未来移除 `mode` 参数 |
@@ -902,7 +902,7 @@ OP_NOT_ALLOWED, COMIC_NOT_FOUND
 | `POST /api/comics/batch/update` | 保留（分类/标签批量） | 批量操作建议迁移到 `/api/management/batch` |
 | 阅读端接口（`/api/comics`、`/api/chapters/{id}`、`/api/history`） | 兼容，只返回阅读所需字段 | 长期保留 |
 
-## 20. 存储操作域（v1.1）
+## 20. 存储操作域
 
 > 统一形态：`POST /api/storage/{operation}/{targetType}/{targetId}`，`targetType = comics | chapters`。
 
@@ -920,7 +920,7 @@ OP_NOT_ALLOWED, COMIC_NOT_FOUND
 
 > 旧端点（`/comics/{id}/lq`、`/admin/storage/comics/{id}/transcode-videos` 等）已随接口收敛全部移除，存储操作统一使用上表 `/api/storage/*` 形态。
 >
-> **导出为本地路径交互（v1.1）**：导出产物落在宿主机 `EXPORT/{taskId}/{base}.z01..zNN + {base}.zip`（标准分卷，主 `.zip` 为最后卷）。`GET /api/storage/export/tasks/{taskId}/artifacts` 返回有序分卷**元数据**（1-based index、文件名、字节大小、是否最后 `.zip`、本地物理路径），**不提供任何文件字节下载**；`POST /api/storage/export/tasks/{taskId}/open` 仅在宿主机打开文件管理器。HTTP 全程只传输任务/路径/状态/卷元数据，文件字节不经过 HTTP——把最后 `.zip` 的本地路径作为 `sourcePath` 即可重新导入该分卷（缺任一卷会失败，`.z01` 不可作为入口）。
+> **导出为本地路径交互**：导出产物落在宿主机 `EXPORT/{taskId}/{base}.z01..zNN + {base}.zip`（标准分卷，主 `.zip` 为最后卷）。`GET /api/storage/export/tasks/{taskId}/artifacts` 返回有序分卷**元数据**（1-based index、文件名、字节大小、是否最后 `.zip`、本地物理路径），**不提供任何文件字节下载**；`POST /api/storage/export/tasks/{taskId}/open` 仅在宿主机打开文件管理器。HTTP 全程只传输任务/路径/状态/卷元数据，文件字节不经过 HTTP——把最后 `.zip` 的本地路径作为 `sourcePath` 即可重新导入该分卷（缺任一卷会失败，`.z01` 不可作为入口）。
 >
 > **METADATA_REFRESH（刷新元数据，异步任务）**：`POST /api/storage/refresh-metadata/comics/{id}` 走统一命令管线，同一事务 CAS 漫画 `READY → REFRESHING`、创建 COMIC 级管理任务并发布命令到 Outbox。漫画不存在返回 `404`；非 `READY` 或并发被占用返回 `409`；成功返回 `202 Accepted` 与 `OperationSubmitResultDTO`（含 `taskId`）。
 >

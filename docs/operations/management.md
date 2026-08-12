@@ -1,10 +1,10 @@
 # ComicAtlas 部署运维手册
 
-**更新日期：** 2026-08-08
+**更新日期：** 2026-08-12
 **状态：** 生效
 **维护者：** ComicAtlas 运维组
 
-> 适用版本：v1.0。配套文档：[用户指南](../user-guide.md)、[API 文档](../api.md)。所有命令示例均可在 `scripts/qa/verify-management-docs.ps1` 中校验。
+> 适用版本：v1.5。配套文档：[用户指南](../user-guide.md)、[API 文档](../api.md)。所有命令示例均可在 `scripts/qa/verify-management-docs.ps1` 中校验。
 
 本手册覆盖管理控制台（回收站、批量操作、媒体上传、任务中心）上线后所需的运维知识：数据库账号、存储卷、保留期、磁盘阈值、备份、升级与回滚。
 
@@ -56,7 +56,7 @@ Worker 只读账号的密码没有固定默认值，必须在仓库 `.env` 中�
 | `{MANGA_ROOT}/trash/` | API + Worker 写 | **否** | 回收站文件卷（软删除移入） |
 | `{MANGA_ROOT}/export/` | Worker 写 | 否 | 导出产物 |
 
-> v1.0 新增 `staging` 与 `trash`。`staging` 不经 Nginx 暴露，避免未完成上传被公网访问；`trash` 存放软删除文件，配合 7 天保留期。
+> `staging` 为上传临时目录，不经 Nginx 暴露，避免未完成上传被公网访问；`trash` 为回收站文件卷，存放软删除文件，配合 7 天保留期。
 
 ### 磁盘布局建议
 
@@ -129,7 +129,7 @@ rsync -a --delete /data/manga/metadata /data/backup/metadata
 
 ### 升级前
 
-1. 阅读 [发布说明](../releases/v1.0.0.md) 与版本迁移文档。
+1. 阅读 [当前发布说明](../releases/v1.5.0.md) 与历史发布说明中的版本迁移信息。
 2. 备份数据库与存储卷（见上文）。
 3. 确认 Worker、API 无进行中的任务，或接受任务中断由 DLQ/Outbox 补偿。
 
@@ -147,7 +147,7 @@ docker compose -f docker-compose.yml ps
 docker compose logs -f api-service
 ```
 
-Flyway 会按版本号顺序执行 `api-service/src/main/resources/db/flyway/V*.sql`（生效迁移目录，见 `db/README.md`）。当前生效迁移：V1 初始化、V2 修正 schema 漂移、V10 生命周期/乐观锁、V11 管理任务、V12 管理任务外键、V13 outbox/inbox、V14 章节全局顺序唯一、V15 上传会话、V16 回收站生命周期；V3–V9 等历史迁移已归档到 `db/migration-archive/`，不参与执行。迁移失败时 Flyway 会停在失败版本，需要修复后重试。
+Flyway 会按版本号顺序执行 `api-service/src/main/resources/db/flyway/V*.sql`（生效迁移目录，见 `db/README.md`）。当前生效迁移：V1 初始化、V2 修正 schema 漂移、V10 生命周期/乐观锁、V11 管理任务、V12 管理任务外键、V13 outbox/inbox、V14 章节全局顺序唯一、V15 上传会话、V16 回收站生命周期、V17 REGISTER→DIRECTORY、V18 视频转码状态分类、V19 Outbox/阅读历史完整性、V20 TRASH 资产清单落库；V3–V9 等历史迁移已归档到 `db/migration-archive/`，不参与执行。迁移失败时 Flyway 会停在失败版本，需要修复后重试。
 
 ### 升级后的检查清单
 
