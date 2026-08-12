@@ -78,6 +78,7 @@ public class ComicManagementServiceImpl implements ComicManagementService {
         }
 
         comicMapper.insert(comic);
+        catalogCacheInvalidator.evict(comic.getId());
 
         if (request.getTagIds() != null && !request.getTagIds().isEmpty()) {
             List<Tag> tags = tagMapper.selectBatchIds(request.getTagIds());
@@ -131,6 +132,7 @@ public class ComicManagementServiceImpl implements ComicManagementService {
         if (rows == 0) {
             throw new ConflictException("漫画已被其他操作修改，请刷新后重试");
         }
+        catalogCacheInvalidator.evict(id);
         return comicDetailAssembler.assemble(comicMapper.selectById(id));
     }
 
@@ -147,6 +149,7 @@ public class ComicManagementServiceImpl implements ComicManagementService {
     }
 
     @Override
+    @Transactional
     public ComicMetadataDTO updateMetadata(Long id, ComicMetadataUpdateDTO dto) {
         Comic comic = comicMapper.selectById(id);
         if (comic == null) { throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在"); }
@@ -163,6 +166,7 @@ public class ComicManagementServiceImpl implements ComicManagementService {
             comic.setCategory(category.getName());
         }
         comicMapper.updateById(comic);
+        catalogCacheInvalidator.evict(id);
 
         ComicMetadataDTO result = new ComicMetadataDTO();
         result.setTitle(comic.getTitle());
@@ -197,9 +201,11 @@ public class ComicManagementServiceImpl implements ComicManagementService {
                 comicTagMapper.insert(comicTag);
             }
         }
+        catalogCacheInvalidator.evict(comicId);
     }
 
     @Override
+    @Transactional
     public BatchUpdateResultVO batchUpdate(BatchComicUpdateDTO dto) {
         List<BatchUpdateResultVO.FailedItem> failed = new ArrayList<>();
         int succeeded = 0;
@@ -278,6 +284,9 @@ public class ComicManagementServiceImpl implements ComicManagementService {
         result.setTotal(uniqueIds.size());
         result.setSucceeded(succeeded);
         result.setFailed(failed.isEmpty() ? List.of() : failed);
+        if (succeeded > 0) {
+            catalogCacheInvalidator.evictComicList();
+        }
         return result;
     }
 }

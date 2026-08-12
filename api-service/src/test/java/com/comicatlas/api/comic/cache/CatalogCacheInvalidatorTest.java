@@ -49,6 +49,24 @@ class CatalogCacheInvalidatorTest {
     }
 
     @Test
+    void evict_shouldClearComicListCache() {
+        var catalogCache = cacheManager.getCache(CatalogCacheInvalidator.CACHE_NAME);
+        var comicListCache = cacheManager.getCache(ComicReferenceCache.COMIC_LIST);
+        if (catalogCache == null || comicListCache == null) {
+            throw new AssertionError("缓存未创建");
+        }
+        catalogCache.put(1L, List.of(new CatalogNode(1L, "目录")));
+        comicListCache.put("筛选条件一", "页面一");
+        comicListCache.put("筛选条件二", "页面二");
+
+        cacheInvalidator.evict(1L);
+
+        assertNull(catalogCache.get(1L));
+        assertNull(comicListCache.get("筛选条件一"));
+        assertNull(comicListCache.get("筛选条件二"));
+    }
+
+    @Test
     void evict_shouldWaitUntilTransactionCommit() {
         var cache = cacheManager.getCache(CatalogCacheInvalidator.CACHE_NAME);
         if (cache == null) {
@@ -97,7 +115,8 @@ class CatalogCacheInvalidatorTest {
 
         @Bean
         CacheManager cacheManager() {
-            return new ConcurrentMapCacheManager(CatalogCacheInvalidator.CACHE_NAME);
+            return new ConcurrentMapCacheManager(
+                    CatalogCacheInvalidator.CACHE_NAME, ComicReferenceCache.COMIC_LIST);
         }
 
         @Bean
