@@ -27,6 +27,13 @@
             <version>${project.version}</version>
         </dependency>
 
+        <!-- Comic Shared（实体 / Mapper / DTO / common 基础设施，包名 com.comicatlas.api.* 不变） -->
+        <dependency>
+            <groupId>com.comicatlas</groupId>
+            <artifactId>comic-shared</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- Web -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

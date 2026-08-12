@@ -27,7 +27,7 @@ import org.springframework.web.bind.annotation.RequestParam;
  * 用于排查 MQ 消费失败的消息。仅供本机管理端使用。
  */
 @RestController
-@RequestMapping("/api/admin/dlq")
+@RequestMapping("/api/manage/admin/dlq")
 @RequiredArgsConstructor
 @Validated
 public class AdminDlqController {

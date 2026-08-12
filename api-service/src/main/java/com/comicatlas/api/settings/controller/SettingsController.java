@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RequestBody;
  * 未设置时返回默认空配置，支持前端读取与持久化。
  */
 @RestController
-@RequestMapping("/api/settings")
+@RequestMapping("/api/manage/settings")
 @RequiredArgsConstructor
 public class SettingsController {
 

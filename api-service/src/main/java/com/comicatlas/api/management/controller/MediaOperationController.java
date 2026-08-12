@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 前端不得自行复制操作矩阵。
  */
 @RestController
-@RequestMapping("/api/management/operations")
+@RequestMapping("/api/manage/operations")
 @RequiredArgsConstructor
 public class MediaOperationController {
 

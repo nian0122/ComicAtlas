@@ -1,4 +1,4 @@
-﻿# ============================================================
+# ============================================================
 # ComicAtlas 管理控制台真实链路 E2E Runner
 # ============================================================
 # 用途：一条命令跑通「真实导入 → 管理 → 阅读 → 维护 → 回收/恢复 → 清理」全链路，
@@ -264,24 +264,24 @@ function Wait-ImportTask {
     param([long]$TaskId, [int]$TimeoutSec = 240)
     $ok = Wait-Until -TimeoutSec $TimeoutSec -IntervalSec 3 -Description "导入任务 $TaskId 到达终态" {
         try {
-            $t = Invoke-Api -Path "/api/tasks/import/$TaskId"
+            $t = Invoke-Api -Path "/api/manage/tasks/import/$TaskId"
             if ($t.status -in @("SUCCESS", "FAILED", "CANCELLED")) { return $true }
         } catch { }
         return $false
     }
-    return (Invoke-Api -Path "/api/tasks/import/$TaskId")
+    return (Invoke-Api -Path "/api/manage/tasks/import/$TaskId")
 }
 
 function Wait-ManagementTask {
     param([long]$TaskId, [int]$TimeoutSec = 300)
     $ok = Wait-Until -TimeoutSec $TimeoutSec -IntervalSec 3 -Description "管理任务 $TaskId 到达终态" {
         try {
-            $t = Invoke-Api -Path "/api/management/tasks/$TaskId"
+            $t = Invoke-Api -Path "/api/manage/tasks/$TaskId"
             if ($t.status -in @("SUCCEEDED", "FAILED", "PARTIALLY_SUCCEEDED", "CANCELLED")) { return $true }
         } catch { }
         return $false
     }
-    return (Invoke-Api -Path "/api/management/tasks/$TaskId")
+    return (Invoke-Api -Path "/api/manage/tasks/$TaskId")
 }
 
 # 健壮等待：终态 FAILED 时通过管理任务中心 retry 重试一次（吸收 worker/ffmpeg 瞬时故障）
@@ -290,7 +290,7 @@ function Wait-ManagementTaskRobust {
     $t = Wait-ManagementTask -TaskId $TaskId -TimeoutSec $TimeoutSec
     if ($t.status -eq "FAILED") {
         Write-Warn "$Label 首次 FAILED，重试一次 (taskId=$TaskId)"
-        try { Invoke-Api -Method Post -Path "/api/management/tasks/$TaskId/retry" -Body @{} | Out-Null } catch {
+        try { Invoke-Api -Method Post -Path "/api/manage/tasks/$TaskId/retry" -Body @{} | Out-Null } catch {
             Write-Warn "管理任务 retry 调用失败（可能非终态/不可重试）: $($_.Exception.Message)"
             return $t
         }
@@ -701,7 +701,7 @@ function Invoke-ScenarioA {
     # ---------- 1. ZIP 导入（真实链路：MQ -> Worker -> 搬文件 -> metadata -> API 落库） ----------
     Write-Step "A1: ZIP 导入"
     $storyZip = Join-Path $FixturesRoot "story-comic.zip"
-    $imp = Invoke-Api -Method Post -Path "/api/tasks/import" -Body @{
+    $imp = Invoke-Api -Method Post -Path "/api/manage/tasks/import" -Body @{
         sourceType = "ZIP"
         sourcePath = $storyZip
     }
@@ -721,10 +721,10 @@ function Invoke-ScenarioA {
     Assert-True ($null -ne $metaFile -or (Test-Path $metaPath)) "metadata.json 已生成"
 
     # 种子漫画：root Playwright 的 reader/video-reader spec 需要 host-path-test / video-comic
-    $impHp = Invoke-Api -Method Post -Path "/api/tasks/import" -Body @{ sourceType = "DIRECTORY"; sourcePath = (Join-Path $FixturesRoot "host-path-test") }
+    $impHp = Invoke-Api -Method Post -Path "/api/manage/tasks/import" -Body @{ sourceType = "DIRECTORY"; sourcePath = (Join-Path $FixturesRoot "host-path-test") }
     $tHp = Wait-ImportTask -TaskId $impHp.id -TimeoutSec 300
     Assert-Equal $tHp.status "SUCCESS" "host-path-test 导入成功（root reader spec 种子）"
-    $impVc = Invoke-Api -Method Post -Path "/api/tasks/import" -Body @{ sourceType = "DIRECTORY"; sourcePath = (Join-Path $FixturesRoot "video-comic") }
+    $impVc = Invoke-Api -Method Post -Path "/api/manage/tasks/import" -Body @{ sourceType = "DIRECTORY"; sourcePath = (Join-Path $FixturesRoot "video-comic") }
     $tVc = Wait-ImportTask -TaskId $impVc.id -TimeoutSec 300
     Assert-Equal $tVc.status "SUCCESS" "video-comic 导入成功（root video-reader spec 种子）"
 
@@ -733,14 +733,14 @@ function Invoke-ScenarioA {
     # 注意：CategoryController.create 用 @RequestParam name（查询参数），不是 body
     $catName = "测试分类"
     $catEncoded = [uri]::EscapeDataString($catName)
-    $cat = Invoke-Api -Method Post -Path "/api/categories?name=$catEncoded"
+    $cat = Invoke-Api -Method Post -Path "/api/manage/categories?name=$catEncoded"
     $catId = [long]$cat.id
     Assert-True ($catId -gt 0) "创建分类"
 
-    $tag = Invoke-Api -Method Post -Path "/api/tags" -Body @{ name = "QA标签" }
+    $tag = Invoke-Api -Method Post -Path "/api/manage/tags" -Body @{ name = "QA标签" }
     $tagId = [long]$tag.id
 
-    $draft = Invoke-Api -Method Post -Path "/api/comics" -Body @{
+    $draft = Invoke-Api -Method Post -Path "/api/manage/comics" -Body @{
         title = "workspace-draft"
         author = "qa"
         description = "qa draft comic"
@@ -751,7 +751,7 @@ function Invoke-ScenarioA {
     Assert-True ($draftId -gt 0) "创建 DRAFT 漫画"
     Assert-Equal $draft.status "DRAFT" "DRAFT 生命周期"
 
-    $upd = Invoke-Api -Method Put -Path "/api/comics/$draftId" -Body @{
+    $upd = Invoke-Api -Method Put -Path "/api/manage/comics/$draftId" -Body @{
         version = $draft.version
         title = "workspace-draft-v2"
         author = "qa2"
@@ -763,7 +763,7 @@ function Invoke-ScenarioA {
     Assert-Equal $updDetail.categoryName "测试分类" "categoryName 关联生效"
     Assert-True ($updDetail.tags.Count -ge 1) "tag 关联生效"
 
-    $batch = Invoke-Api -Method Post -Path "/api/comics/batch/update" -Body @{
+    $batch = Invoke-Api -Method Post -Path "/api/manage/comics/batch/update" -Body @{
         comicIds = @($draftId)
         categoryId = $catId
     }
@@ -771,7 +771,7 @@ function Invoke-ScenarioA {
 
     # ---------- 3. 上传媒体（分片字节流） ----------
     Write-Step "A3: 上传媒体"
-    $chapter = Invoke-Api -Method Post -Path "/api/comics/$draftId/chapters" -Body @{ title = "upch" }
+    $chapter = Invoke-Api -Method Post -Path "/api/manage/comics/$draftId/chapters" -Body @{ title = "upch" }
     $upChId = [long]$chapter.id
 
     $imgFile = Join-Path $FixturesRoot "upload-image.jpg"
@@ -784,7 +784,7 @@ function Invoke-ScenarioA {
         @{ fileId = "img1"; name = "upload-image.jpg"; contentType = "image/jpeg"; size = $imgBytes.Length; sha256 = (Get-Sha256 $imgBytes) },
         @{ fileId = "avi1"; name = "upload-video.avi"; contentType = "video/x-msvideo"; size = $aviBytes.Length; sha256 = (Get-Sha256 $aviBytes) }
     )
-    $sess = Invoke-Api -Method Post -Path "/api/uploads/sessions" -Body @{
+    $sess = Invoke-Api -Method Post -Path "/api/manage/uploads/sessions" -Body @{
         comicId = $draftId
         chapterId = $upChId
         files = $files
@@ -801,11 +801,11 @@ function Invoke-ScenarioA {
             "Content-Range" = "bytes 0-$($bytes.Length - 1)/$($bytes.Length)"
             "X-Sha256" = $f.sha256
         }
-        $chunk = Invoke-Api -Method Put -Path "/api/uploads/sessions/$sid/files/$($f.fileId)" -Headers $hdr -RawBytesPath $bodyPath
+        $chunk = Invoke-Api -Method Put -Path "/api/manage/uploads/sessions/$sid/files/$($f.fileId)" -Headers $hdr -RawBytesPath $bodyPath
         Assert-True ([bool]$chunk.complete) "分片 $($f.fileId) 上传完成"
     }
 
-    $complete = Invoke-Api -Method Post -Path "/api/uploads/sessions/$sid/complete" -Body @{}
+    $complete = Invoke-Api -Method Post -Path "/api/manage/uploads/sessions/$sid/complete" -Body @{}
     $uploadTaskId = [long]$complete.taskId
     Assert-True ($uploadTaskId -gt 0) "upload complete 生成管理任务"
     $ut = Wait-ManagementTask -TaskId $uploadTaskId -TimeoutSec 300
@@ -828,7 +828,7 @@ function Invoke-ScenarioA {
     Assert-Equal $chIds.Count 3 "catalog 章节 3"
 
     # 章节重排：把第 3 章移到第 1 位
-    $mv = Invoke-Api -Method Put -Path "/api/comics/$storyComicId/chapters/$($chIds[2])/reorder" -Body @{ targetGlobalOrder = 1 }
+    $mv = Invoke-Api -Method Put -Path "/api/manage/comics/$storyComicId/chapters/$($chIds[2])/reorder" -Body @{ targetGlobalOrder = 1 }
     Assert-Equal $mv.globalOrder 1 "章节重排 globalOrder=1"
 
     $catalog1 = Invoke-Api -Path "/api/comics/$storyComicId/catalog"
@@ -840,7 +840,7 @@ function Invoke-ScenarioA {
     $ch1Pages = Invoke-Api -Path "/api/chapters/$($chIds[0])"
     $pageIds = @($ch1Pages.pages | ForEach-Object { [long]$_.id })
     $revIds = @($pageIds | Select-Object -Last 1; $pageIds | Select-Object -First ([Math]::Max(0, $pageIds.Count - 1)))
-    $rev = Invoke-Api -Method Post -Path "/api/chapters/$($chIds[0])/media/reorder" -Body @{ mediaIds = $revIds }
+    $rev = Invoke-Api -Method Post -Path "/api/manage/chapters/$($chIds[0])/media/reorder" -Body @{ mediaIds = $revIds }
     Assert-Equal $rev.items.Count $pageIds.Count "媒体重排返回全部页"
     $ch1Pages2 = Invoke-Api -Path "/api/chapters/$($chIds[0])"
     Assert-Equal $ch1Pages2.pages[0].id $pageIds[-1] "重排后第 1 页为原末页"
@@ -859,19 +859,19 @@ function Invoke-ScenarioA {
     Write-Step "A5: LQ / HQ / 转码"
     # 批量 LQ（batch-comic 先导入）
     $batchZip = Join-Path $FixturesRoot "batch-comic.zip"
-    $impB = Invoke-Api -Method Post -Path "/api/tasks/import" -Body @{ sourceType = "ZIP"; sourcePath = $batchZip }
+    $impB = Invoke-Api -Method Post -Path "/api/manage/tasks/import" -Body @{ sourceType = "ZIP"; sourcePath = $batchZip }
     $tB = Wait-ImportTask -TaskId $impB.id -TimeoutSec 300
     Assert-Equal $tB.status "SUCCESS" "batch-comic 导入成功"
     $batchComicId = [long]$tB.comicId
 
     # 批量 LQ
-    $pv = Invoke-Api -Method Post -Path "/api/management/batch/preview" -Body @{
+    $pv = Invoke-Api -Method Post -Path "/api/manage/batch/preview" -Body @{
         operation = "LQ_GENERATE"
         selection = @{ type = "IDS"; ids = @($batchComicId) }
         payload = @{}
     }
     Assert-True ($pv.eligibleCount -ge 1) "批量 LQ preview 有可执行项"
-    $batchCreate = Invoke-Api -Method Post -Path "/api/management/batch" -Body @{
+    $batchCreate = Invoke-Api -Method Post -Path "/api/manage/batch" -Body @{
         operation = "LQ_GENERATE"
         selection = @{ type = "IDS"; ids = @($batchComicId) }
         payload = @{}
@@ -885,7 +885,7 @@ function Invoke-ScenarioA {
 
     # 单项 LQ（story-comic 视频章也有 IMAGE 页？story 只有 ch1/ch2 是图，ch3 视频）
     $dbg = Invoke-Sql -Db $Db -Sql "SELECT CONCAT(p.id,':',p.chapter_id,':',p.hq_path) FROM page p JOIN chapter c ON p.chapter_id=c.id WHERE c.comic_id=$storyComicId ORDER BY p.chapter_id, p.page_number"
-    $lq = Invoke-Api -Method Post -Path "/api/storage/lq/comics/$storyComicId" -Body @{}
+    $lq = Invoke-Api -Method Post -Path "/api/manage/storage/lq/comics/$storyComicId" -Body @{}
     Assert-True ($null -ne $lq.taskId) "单项 LQ 创建管理任务"
     $lt = Wait-ManagementTaskRobust -TaskId $lq.taskId -TimeoutSec 600 -Label "单项 LQ"
     Assert-Equal $lt.status "SUCCEEDED" "单项 LQ 任务成功"
@@ -896,7 +896,7 @@ function Invoke-ScenarioA {
     # 单项 HQ 删除（batch-comic 第 1 章，需 LQ 全 READY）
     $bch = Invoke-Api -Path "/api/comics/$batchComicId/catalog"
     $bchId = [long]$bch.chapters[0].id
-    $hd = Invoke-Api -Method Post -Path "/api/storage/delete-hq/chapters/$bchId" -Body @{}
+    $hd = Invoke-Api -Method Post -Path "/api/manage/storage/delete-hq/chapters/$bchId" -Body @{}
     Assert-True ($null -ne $hd.taskId) "单项 HQ 删除创建任务"
     $ht = Wait-ManagementTask -TaskId $hd.taskId -TimeoutSec 600
     Assert-Equal $ht.status "SUCCEEDED" "单项 HQ 删除成功"
@@ -904,13 +904,13 @@ function Invoke-ScenarioA {
     Assert-True ([int]$hqDelCount -ge 1) "batch-comic 第 1 章 hq_status=DELETED"
 
     # 批量 HQ 删除（story-comic 整本）
-    $pvH = Invoke-Api -Method Post -Path "/api/management/batch/preview" -Body @{
+    $pvH = Invoke-Api -Method Post -Path "/api/manage/batch/preview" -Body @{
         operation = "HQ_DELETE"
         selection = @{ type = "IDS"; ids = @($storyComicId) }
         payload = @{}
     }
     Assert-True ($pvH.eligibleCount -ge 1) "批量 HQ preview 有可执行项"
-    $batchH = Invoke-Api -Method Post -Path "/api/management/batch" -Body @{
+    $batchH = Invoke-Api -Method Post -Path "/api/manage/batch" -Body @{
         operation = "HQ_DELETE"
         selection = @{ type = "IDS"; ids = @($storyComicId) }
         payload = @{}
@@ -920,13 +920,13 @@ function Invoke-ScenarioA {
     Assert-Equal $bht.status "SUCCEEDED" "批量 HQ 删除成功"
 
     # 批量转码（upload-comic 的第 1 个 avi）
-    $pvT = Invoke-Api -Method Post -Path "/api/management/batch/preview" -Body @{
+    $pvT = Invoke-Api -Method Post -Path "/api/manage/batch/preview" -Body @{
         operation = "TRANSCODE"
         selection = @{ type = "IDS"; ids = @($draftId) }
         payload = @{}
     }
     Assert-True ($pvT.eligibleCount -ge 1) "批量转码 preview 有可执行项"
-    $batchT = Invoke-Api -Method Post -Path "/api/management/batch" -Body @{
+    $batchT = Invoke-Api -Method Post -Path "/api/manage/batch" -Body @{
         operation = "TRANSCODE"
         selection = @{ type = "IDS"; ids = @($draftId) }
         payload = @{}
@@ -939,23 +939,23 @@ function Invoke-ScenarioA {
     Assert-True ([int]$transCount1 -ge 1) "转码后 transcode_status=READY"
 
     # 单项转码（第 2 个 avi，上传到新章节避免与已有媒体 page_number 冲突）
-    $chapter2 = Invoke-Api -Method Post -Path "/api/comics/$draftId/chapters" -Body @{ title = "upch2" }
+    $chapter2 = Invoke-Api -Method Post -Path "/api/manage/comics/$draftId/chapters" -Body @{ title = "upch2" }
     $upCh2Id = [long]$chapter2.id
     $avi2File = Join-Path $FixturesRoot "upload-video2.avi"
     $avi2Bytes = [IO.File]::ReadAllBytes($avi2File)
-    $sess2 = Invoke-Api -Method Post -Path "/api/uploads/sessions" -Body @{
+    $sess2 = Invoke-Api -Method Post -Path "/api/manage/uploads/sessions" -Body @{
         comicId = $draftId
         chapterId = $upCh2Id
         files = @(@{ fileId = "avi2"; name = "upload-video2.avi"; contentType = "video/x-msvideo"; size = $avi2Bytes.Length; sha256 = (Get-Sha256 $avi2Bytes) })
     }
     $body2 = Join-Path $ArtifactsDir "chunk-avi2"
     [IO.File]::WriteAllBytes($body2, $avi2Bytes)
-    Invoke-Api -Method Put -Path "/api/uploads/sessions/$($sess2.sessionId)/files/avi2" -Headers @{ "Content-Range" = "bytes 0-$($avi2Bytes.Length - 1)/$($avi2Bytes.Length)"; "X-Sha256" = (Get-Sha256 $avi2Bytes) } -RawBytesPath $body2 | Out-Null
-    $c2 = Invoke-Api -Method Post -Path "/api/uploads/sessions/$($sess2.sessionId)/complete" -Body @{}
+    Invoke-Api -Method Put -Path "/api/manage/uploads/sessions/$($sess2.sessionId)/files/avi2" -Headers @{ "Content-Range" = "bytes 0-$($avi2Bytes.Length - 1)/$($avi2Bytes.Length)"; "X-Sha256" = (Get-Sha256 $avi2Bytes) } -RawBytesPath $body2 | Out-Null
+    $c2 = Invoke-Api -Method Post -Path "/api/manage/uploads/sessions/$($sess2.sessionId)/complete" -Body @{}
     $ut2 = Wait-ManagementTask -TaskId $c2.taskId -TimeoutSec 300
     Assert-Equal $ut2.status "SUCCEEDED" "第 2 个视频上传成功"
 
-    $tr = Invoke-Api -Method Post -Path "/api/storage/transcode/comics/$draftId" -Body @{}
+    $tr = Invoke-Api -Method Post -Path "/api/manage/storage/transcode/comics/$draftId" -Body @{}
     Assert-True ($null -ne $tr.taskId) "单项转码创建任务"
     $trt = Wait-ManagementTaskRobust -TaskId $tr.taskId -TimeoutSec 600 -Label "单项转码"
     Assert-Equal $trt.status "SUCCEEDED" "单项转码成功"
@@ -966,14 +966,14 @@ function Invoke-ScenarioA {
     Write-Step "A6: 任务失败重试"
     $fixDir = Join-Path $FixturesRoot "retry-comic"
     if (Test-Path $fixDir) { Remove-Item $fixDir -Recurse -Force }
-    $impF = Invoke-Api -Method Post -Path "/api/tasks/import" -Body @{ sourceType = "DIRECTORY"; sourcePath = $fixDir }
+    $impF = Invoke-Api -Method Post -Path "/api/manage/tasks/import" -Body @{ sourceType = "DIRECTORY"; sourcePath = $fixDir }
     $tf = Wait-ImportTask -TaskId $impF.id -TimeoutSec 180
     Assert-Equal $tf.status "FAILED" "不存在的目录导入失败"
 
     # 补上目录内容后重试
     New-Item -ItemType Directory -Path (Join-Path $fixDir "ch1") -Force | Out-Null
     for ($i = 1; $i -le 2; $i++) { New-FixtureJpg (Join-Path $fixDir "ch1") ("{0:D3}" -f $i) "black" }
-    Invoke-Api -Method Post -Path "/api/tasks/import/$($impF.id)/retry" -Body @{} | Out-Null
+    Invoke-Api -Method Post -Path "/api/manage/tasks/import/$($impF.id)/retry" -Body @{} | Out-Null
     $tf2 = Wait-ImportTask -TaskId $impF.id -TimeoutSec 300
     Assert-Equal $tf2.status "SUCCESS" "重试后导入成功"
     Assert-True ([int]$tf2.retryCount -ge 1) "retryCount >= 1"
@@ -981,7 +981,7 @@ function Invoke-ScenarioA {
     # ---------- 7. 回收 / 恢复 / 永久清理 ----------
     Write-Step "A7: 回收 / 恢复 / 永久清理"
     # 回收 batch-comic
-    $del = Invoke-Api -Method Delete -Path "/api/comics/$batchComicId"
+    $del = Invoke-Api -Method Delete -Path "/api/manage/comics/$batchComicId"
     $dt = Wait-ManagementTask -TaskId $del.id -TimeoutSec 300
     Assert-Equal $dt.status "SUCCEEDED" "COMIC_DELETE 任务成功"
     $trashed = Invoke-Api -Path "/api/comics/$batchComicId"
@@ -995,18 +995,18 @@ function Invoke-ScenarioA {
     Assert-True (Test-Path $trashActualFile) "trash actual.json 已生成（回收产物）"
 
     # 恢复
-    $rest = Invoke-Api -Method Post -Path "/api/trash/comics/$batchComicId/restore" -Body @{}
+    $rest = Invoke-Api -Method Post -Path "/api/manage/trash/comics/$batchComicId/restore" -Body @{}
     $rt = Wait-ManagementTask -TaskId $rest.taskId -TimeoutSec 300
     Assert-Equal $rt.status "SUCCEEDED" "COMIC_RESTORE 任务成功"
     $restored = Invoke-Api -Path "/api/comics/$batchComicId"
     Assert-Equal $restored.status "READY" "漫画恢复为 READY"
 
     # 再次回收并模拟过期（保留期 7 天）后永久清理
-    $del2 = Invoke-Api -Method Delete -Path "/api/comics/$batchComicId"
+    $del2 = Invoke-Api -Method Delete -Path "/api/manage/comics/$batchComicId"
     Wait-ManagementTask -TaskId $del2.id -TimeoutSec 300 | Out-Null
     Invoke-Sql -Db $Db -Sql "UPDATE comic SET trashed_at=DATE_SUB(NOW(), INTERVAL 8 DAY) WHERE id=$batchComicId" | Out-Null
     Invoke-Sql -Db $Db -Sql "UPDATE chapter SET trashed_at=DATE_SUB(NOW(), INTERVAL 8 DAY) WHERE comic_id=$batchComicId" | Out-Null
-    $purge = Invoke-Api -Method Post -Path "/api/trash/comics/$batchComicId/purge" -Body @{ token = "PURGE" }
+    $purge = Invoke-Api -Method Post -Path "/api/manage/trash/comics/$batchComicId/purge" -Body @{ token = "PURGE" }
     $pt = Wait-ManagementTask -TaskId $purge.taskId -TimeoutSec 300
     Assert-Equal $pt.status "SUCCEEDED" "COMIC_PURGE 任务成功"
     $gone = Invoke-Api -Path "/api/comics/$batchComicId" -NoThrow
@@ -1020,7 +1020,7 @@ function Invoke-ScenarioA {
     Assert-True ($null -eq $goneHq) "HQ 目录已清理"
 
     # 存储恢复：删除 recover-comic 整行（含章节/媒体），用 HQ + metadata.json 重建
-    $impR = Invoke-Api -Method Post -Path "/api/tasks/import" -Body @{ sourceType = "ZIP"; sourcePath = (Join-Path $FixturesRoot "recover-comic.zip") }
+    $impR = Invoke-Api -Method Post -Path "/api/manage/tasks/import" -Body @{ sourceType = "ZIP"; sourcePath = (Join-Path $FixturesRoot "recover-comic.zip") }
     $tR = Wait-ImportTask -TaskId $impR.id -TimeoutSec 300
     Assert-Equal $tR.status "SUCCESS" "recover-comic 导入成功"
     $recoverComicId = [long]$tR.comicId
@@ -1038,16 +1038,16 @@ SET FOREIGN_KEY_CHECKS=1"
     Assert-Equal ([int](Invoke-Sql -Db $Db -Sql "SELECT COUNT(*) FROM comic WHERE id=$recoverComicId")) 0 "已删除漫画整行（模拟数据丢失）"
     Assert-Equal ([int](Invoke-Sql -Db $Db -Sql "SELECT COUNT(*) FROM chapter WHERE comic_id=$recoverComicId")) 0 "章节记录已同步清除"
 
-    $rec = Invoke-Api -Method Post -Path "/api/tasks/recovery" -Body @{}
+    $rec = Invoke-Api -Method Post -Path "/api/manage/tasks/recovery" -Body @{}
     Assert-True ($null -ne $rec.id) "创建恢复任务"
     $recDone = Wait-Until -TimeoutSec 300 -IntervalSec 5 -Description "恢复任务终态" {
         try {
-            $r = Invoke-Api -Path "/api/tasks/recovery/$($rec.id)"
+            $r = Invoke-Api -Path "/api/manage/tasks/recovery/$($rec.id)"
             return ($r.status -in @("SUCCEEDED", "FAILED"))
         } catch { return $false }
     }
     Assert-True $recDone "恢复任务到达终态"
-    $recFinal = Invoke-Api -Path "/api/tasks/recovery/$($rec.id)"
+    $recFinal = Invoke-Api -Path "/api/manage/tasks/recovery/$($rec.id)"
     Assert-Equal $recFinal.status "SUCCEEDED" "恢复任务成功"
     Assert-True ([int]$recFinal.recoveredComics -ge 1) "recoveredComics >= 1"
     $recoveredComic = Invoke-Sql -Db $Db -Sql "SELECT status FROM comic WHERE id=$recoverComicId"
@@ -1057,7 +1057,7 @@ SET FOREIGN_KEY_CHECKS=1"
 
     # ---------- 7.5 混合目录规范化（Wave 5：根散页/嵌套散页/空目录/1-2-10话/同名页/图文混排/封面候选） ----------
     Write-Step "A7.5: 混合目录规范化（DIRECTORY + ZIP 双通道 + DB 删除恢复）"
-    $impM = Invoke-Api -Method Post -Path "/api/tasks/import" -Body @{ sourceType = "DIRECTORY"; sourcePath = (Join-Path $FixturesRoot "mixed-comic") }
+    $impM = Invoke-Api -Method Post -Path "/api/manage/tasks/import" -Body @{ sourceType = "DIRECTORY"; sourcePath = (Join-Path $FixturesRoot "mixed-comic") }
     $tM = Wait-ImportTask -TaskId $impM.id -TimeoutSec 300
     Assert-Equal $tM.status "SUCCESS" "mixed-comic DIRECTORY 导入成功（staging→finalize 两阶段落库）"
     $mixedComicId = [long]$tM.comicId
@@ -1127,7 +1127,7 @@ SET FOREIGN_KEY_CHECKS=1"
     Assert-True ($anyHqPath -match "^$mixedComicId/\d+/") "metadata hqPath 布局 {comicId}/{chapterId}/{fileName}"
 
     # ZIP 通道委托同一 DirectoryImportHandler：mixed-comic.zip 同构导入
-    $impMz = Invoke-Api -Method Post -Path "/api/tasks/import" -Body @{ sourceType = "ZIP"; sourcePath = (Join-Path $FixturesRoot "mixed-comic.zip") }
+    $impMz = Invoke-Api -Method Post -Path "/api/manage/tasks/import" -Body @{ sourceType = "ZIP"; sourcePath = (Join-Path $FixturesRoot "mixed-comic.zip") }
     $tMz = Wait-ImportTask -TaskId $impMz.id -TimeoutSec 300
     Assert-Equal $tMz.status "SUCCESS" "mixed-comic ZIP 导入成功（解压→DirectoryImportHandler）"
     $mixedZipId = [long]$tMz.comicId
@@ -1145,15 +1145,15 @@ DELETE FROM comic WHERE id=$mixedComicId;
 SET FOREIGN_KEY_CHECKS=1"
     Invoke-Sql -Db $Db -Sql $delSqlM | Out-Null
     Assert-Equal ([int](Invoke-Sql -Db $Db -Sql "SELECT COUNT(*) FROM comic WHERE id=$mixedComicId")) 0 "mixed-comic DB 行已删除（模拟数据丢失）"
-    $rec2 = Invoke-Api -Method Post -Path "/api/tasks/recovery" -Body @{}
+    $rec2 = Invoke-Api -Method Post -Path "/api/manage/tasks/recovery" -Body @{}
     $rec2Done = Wait-Until -TimeoutSec 300 -IntervalSec 5 -Description "mixed-comic 恢复任务终态" {
         try {
-            $r2 = Invoke-Api -Path "/api/tasks/recovery/$($rec2.id)"
+            $r2 = Invoke-Api -Path "/api/manage/tasks/recovery/$($rec2.id)"
             return ($r2.status -in @("SUCCEEDED", "FAILED"))
         } catch { return $false }
     }
     Assert-True $rec2Done "mixed-comic 恢复任务到达终态"
-    $rec2Final = Invoke-Api -Path "/api/tasks/recovery/$($rec2.id)"
+    $rec2Final = Invoke-Api -Path "/api/manage/tasks/recovery/$($rec2.id)"
     Assert-Equal $rec2Final.status "SUCCEEDED" "mixed-comic 恢复任务成功"
     Assert-Equal (Invoke-Sql -Db $Db -Sql "SELECT status FROM comic WHERE id=$mixedComicId") "READY" "mixed-comic 从 HQ/metadata 恢复为 READY"
     $recMCh = [int](Invoke-Sql -Db $Db -Sql "SELECT COUNT(*) FROM chapter WHERE comic_id=$mixedComicId")
@@ -1161,11 +1161,11 @@ SET FOREIGN_KEY_CHECKS=1"
 
     # ---------- 8. 任务中心 / Outbox / 无孤儿 ----------
     Write-Step "A8: 任务中心 / Outbox / 无孤儿对账"
-    $outbox = Invoke-Api -Path "/api/management/outbox/stats"
+    $outbox = Invoke-Api -Path "/api/manage/outbox/stats"
     Assert-Equal ([int]$outbox.pending) 0 "outbox pending = 0"
-    $dlqQueues = Invoke-Api -Path "/api/admin/dlq/queues"
+    $dlqQueues = Invoke-Api -Path "/api/manage/admin/dlq/queues"
     Assert-True ($dlqQueues.Count -ge 1) "DLQ 队列枚举可用"
-    $tasks = Invoke-Api -Path "/api/management/tasks?page=1&size=100"
+    $tasks = Invoke-Api -Path "/api/manage/tasks?page=1&size=100"
     $activeTasks = @($tasks.records | Where-Object { $_.status -in @("QUEUED", "RUNNING", "CANCELLING") })
     Assert-True ($activeTasks.Count -eq 0) "无活跃管理任务"
     $activeItems = [int](Invoke-Sql -Db $Db -Sql "SELECT COUNT(*) FROM management_task_item WHERE status IN ('QUEUED','RUNNING')")
@@ -1366,7 +1366,7 @@ INSERT INTO reading_history (comic_id, chapter_id, page_number) VALUES (1001, 20
     Assert-Equal $legacyDetail.chapters.Count 2 "升级库章节可读"
 
     # 单项 LQ（升级库上的管理任务链路）
-    $lq = Invoke-Api -Method Post -Path "/api/storage/lq/comics/1001" -Body @{}
+    $lq = Invoke-Api -Method Post -Path "/api/manage/storage/lq/comics/1001" -Body @{}
     Assert-True ($null -ne $lq.taskId) "升级库 LQ 创建管理任务"
     $lt = Wait-ManagementTaskRobust -TaskId $lq.taskId -TimeoutSec 600 -Label "升级库 LQ"
     Assert-Equal $lt.status "SUCCEEDED" "升级库 LQ 成功"
@@ -1374,14 +1374,14 @@ INSERT INTO reading_history (comic_id, chapter_id, page_number) VALUES (1001, 20
     Assert-Equal ([int]$lqUp) 3 "升级库 IMAGE 页面 LQ=READY（VIDEO 页不生成 LQ）"
 
     # 章节重排
-    $mv = Invoke-Api -Method Put -Path "/api/comics/1001/chapters/2002/reorder" -Body @{ targetGlobalOrder = 1 }
+    $mv = Invoke-Api -Method Put -Path "/api/manage/comics/1001/chapters/2002/reorder" -Body @{ targetGlobalOrder = 1 }
     Assert-Equal $mv.globalOrder 1 "升级库章节重排成功"
 
     # 回收 + 恢复
-    $del = Invoke-Api -Method Delete -Path "/api/comics/1001"
+    $del = Invoke-Api -Method Delete -Path "/api/manage/comics/1001"
     $dt = Wait-ManagementTask -TaskId $del.id -TimeoutSec 300
     Assert-Equal $dt.status "SUCCEEDED" "升级库 COMIC_DELETE 成功"
-    $rest = Invoke-Api -Method Post -Path "/api/trash/comics/1001/restore" -Body @{}
+    $rest = Invoke-Api -Method Post -Path "/api/manage/trash/comics/1001/restore" -Body @{}
     $rt = Wait-ManagementTask -TaskId $rest.taskId -TimeoutSec 300
     Assert-Equal $rt.status "SUCCEEDED" "升级库 COMIC_RESTORE 成功"
 

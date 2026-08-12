@@ -41,7 +41,7 @@ class AdminControllerTest {
         stats.setHistory(10);
         when(adminService.deleteComic(1L, "DATABASE_ONLY")).thenReturn(stats);
 
-        mockMvc.perform(delete("/api/admin/comics/{id}", 1L)
+        mockMvc.perform(delete("/api/manage/admin/comics/{id}", 1L)
                         .param("mode", "DATABASE_ONLY")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
@@ -60,7 +60,7 @@ class AdminControllerTest {
         when(adminService.deleteComic(1L, "INVALID"))
                 .thenThrow(new BusinessException(400, "不支持的模式: INVALID，当前仅支持 DATABASE_ONLY"));
 
-        mockMvc.perform(delete("/api/admin/comics/{id}", 1L)
+        mockMvc.perform(delete("/api/manage/admin/comics/{id}", 1L)
                         .param("mode", "INVALID")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
@@ -73,7 +73,7 @@ class AdminControllerTest {
         when(adminService.deleteComic(99L, "DATABASE_ONLY"))
                 .thenThrow(new BusinessException(404, "漫画不存在"));
 
-        mockMvc.perform(delete("/api/admin/comics/{id}", 99L)
+        mockMvc.perform(delete("/api/manage/admin/comics/{id}", 99L)
                         .param("mode", "DATABASE_ONLY")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
@@ -86,7 +86,7 @@ class AdminControllerTest {
         when(adminService.deleteComic(1L, "DATABASE_ONLY"))
                 .thenThrow(new BusinessException(409, "该漫画存在运行中的导入任务，请等待任务完成后再删除数据库记录。"));
 
-        mockMvc.perform(delete("/api/admin/comics/{id}", 1L)
+        mockMvc.perform(delete("/api/manage/admin/comics/{id}", 1L)
                         .param("mode", "DATABASE_ONLY")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
@@ -105,7 +105,7 @@ class AdminControllerTest {
         result.setRestoredPages(60);
         when(adminService.scanRecover()).thenReturn(result);
 
-        mockMvc.perform(post("/api/admin/storage/scan-recover")
+        mockMvc.perform(post("/api/manage/admin/storage/scan-recover")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))

@@ -41,7 +41,7 @@ class RecoveryTaskControllerTest {
         RecoveryTaskVO vo = buildVO(1L, "PENDING", 0, 0, 0, 0, 0);
         when(recoveryTaskService.createRecoveryTask()).thenReturn(vo);
 
-        mockMvc.perform(post("/api/tasks/recovery")
+        mockMvc.perform(post("/api/manage/tasks/recovery")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
@@ -55,7 +55,7 @@ class RecoveryTaskControllerTest {
         when(recoveryTaskService.createRecoveryTask())
                 .thenThrow(new BusinessException(409, "已有恢复任务正在执行"));
 
-        mockMvc.perform(post("/api/tasks/recovery")
+        mockMvc.perform(post("/api/manage/tasks/recovery")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(409))
@@ -74,7 +74,7 @@ class RecoveryTaskControllerTest {
 
         when(recoveryTaskService.listTasks(1, 20)).thenReturn(page);
 
-        mockMvc.perform(get("/api/tasks/recovery")
+        mockMvc.perform(get("/api/manage/tasks/recovery")
                         .param("page", "1")
                         .param("size", "20")
                         .accept(MediaType.APPLICATION_JSON))
@@ -95,7 +95,7 @@ class RecoveryTaskControllerTest {
         RecoveryTaskVO vo = buildVO(1L, "RUNNING", 100, 50, 20, 10, 5);
         when(recoveryTaskService.getTaskDetail(1L)).thenReturn(vo);
 
-        mockMvc.perform(get("/api/tasks/recovery/{id}", 1L)
+        mockMvc.perform(get("/api/manage/tasks/recovery/{id}", 1L)
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
@@ -113,7 +113,7 @@ class RecoveryTaskControllerTest {
         when(recoveryTaskService.getTaskDetail(99L))
                 .thenThrow(new BusinessException(404, "任务不存在"));
 
-        mockMvc.perform(get("/api/tasks/recovery/{id}", 99L)
+        mockMvc.perform(get("/api/manage/tasks/recovery/{id}", 99L)
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(404))
@@ -128,7 +128,7 @@ class RecoveryTaskControllerTest {
         vo.setRetryCount(1);
         when(recoveryTaskService.retryTask(1L)).thenReturn(vo);
 
-        mockMvc.perform(post("/api/tasks/recovery/{id}/retry", 1L)
+        mockMvc.perform(post("/api/manage/tasks/recovery/{id}/retry", 1L)
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
@@ -142,7 +142,7 @@ class RecoveryTaskControllerTest {
         when(recoveryTaskService.retryTask(1L))
                 .thenThrow(new BusinessException(400, "仅 FAILED 状态可重试"));
 
-        mockMvc.perform(post("/api/tasks/recovery/{id}/retry", 1L)
+        mockMvc.perform(post("/api/manage/tasks/recovery/{id}/retry", 1L)
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(400))

@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
  * DELETE /api/media/{mediaId}。永久清理只接受 TRASHED + 二次确认 token + 7 天保留期。
  */
 @RestController
-@RequestMapping("/api/trash")
+@RequestMapping("/api/manage/trash")
 @RequiredArgsConstructor
 public class TrashLifecycleController {
 

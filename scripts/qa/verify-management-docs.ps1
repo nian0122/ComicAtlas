@@ -58,16 +58,25 @@ Test-DocFile "scripts/qa/verify-management-docs.ps1" "本校验脚本"
 $targetDocs = @($apiAbs, $ugAbs, $readmeAbs, $opsAbs) | Where-Object { $_ -and (Test-Path -LiteralPath $_) }
 
 # ------------------------------------------------------------
-# D1: 端点对照源码（api-service controller）
+# D1: 端点对照源码（api-service + reading-service controller）
 # ------------------------------------------------------------
 Write-Host "`n--- D1: 端点对照源码 ---" -ForegroundColor Cyan
 if ($SkipCodeCrossCheck) {
     Gate-Warn "跳过源码对照（-SkipCodeCrossCheck）"
 } else {
     $apiContent = Get-Content -LiteralPath $apiAbs -Raw -Encoding UTF8
-    $controllerDir = Resolve-Abs "api-service/src/main/java/com/comicatlas/api"
-    if (Test-Path $controllerDir) {
-        $controllerFiles = Get-ChildItem -Path $controllerDir -Recurse -Filter "*Controller.java" -ErrorAction SilentlyContinue
+    $controllerDirs = @(
+        "api-service/src/main/java/com/comicatlas/api",
+        "reading-service/src/main/java/com/comicatlas/reading"
+    )
+    $controllerFiles = @()
+    foreach ($cd in $controllerDirs) {
+        $cdAbs = Resolve-Abs $cd
+        if (Test-Path $cdAbs) {
+            $controllerFiles += Get-ChildItem -Path $cdAbs -Recurse -Filter "*Controller.java" -ErrorAction SilentlyContinue
+        }
+    }
+    if ($controllerFiles.Count -gt 0) {
         # 收集所有完整端点（base + method）与 base 路径
         $endpoints = [System.Collections.Generic.HashSet[string]]::new()
         $bases = [System.Collections.Generic.HashSet[string]]::new()
@@ -118,7 +127,7 @@ if ($SkipCodeCrossCheck) {
             foreach ($u in $unmatched) { Gate-Fail "api.md 中出现但源码未匹配的路径: $u" }
         }
     } else {
-        Gate-Warn "未找到 api-service 源码目录，跳过端点源码对照"
+        Gate-Warn "未找到 api-service/reading-service 源码目录，跳过端点源码对照"
     }
 }
 
@@ -133,7 +142,8 @@ if ($SkipCodeCrossCheck) {
     $enumDirs = @(
         "api-service/src/main/java/com/comicatlas/api/common/enums",
         "api-service/src/main/java/com/comicatlas/api/upload",
-        "comic-common/src/main/java/com/comicatlas/common/enums"
+        "comic-common/src/main/java/com/comicatlas/common/enums",
+        "comic-shared/src/main/java/com/comicatlas/api/common/enums"
     )
     $enumMap = @{
         'ComicStatus' = @('DRAFT','IMPORTING','IMPORT_FAILED','READY','RECOVERY_REQUIRED','DELETING','TRASHING','TRASHED','RESTORING','PURGING','DELETED')

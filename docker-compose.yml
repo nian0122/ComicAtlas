@@ -54,6 +54,36 @@ services:
       - ${MANGA_ROOT:-./manga}/thumbs:/storage/thumbs:ro
       - ${MANGA_ROOT:-./manga}/staging:/storage/staging
       - ${MANGA_ROOT:-./manga}/trash:/storage/trash:ro
+
+  reading-service:
+    build:
+      context: .
+      dockerfile: reading-service/Dockerfile
+    container_name: comicatlas-reading
+    restart: unless-stopped
+    environment:
+      NACOS_ADDR: host.docker.internal:8848
+      NACOS_USER: ${REMOTE_NACOS_USERNAME}
+      NACOS_PASS: ${REMOTE_NACOS_PASSWORD}
+      MYSQL_HOST: host.docker.internal
+      # 阅读服务写入阅读进度（reading_history），需使用具备读写权限的 API 账号
+      MYSQL_USER: ${API_MYSQL_USER:?请在 .env 中设置 API_MYSQL_USER}
+      MYSQL_PASS: ${API_MYSQL_PASSWORD:?请在 .env 中设置 API_MYSQL_PASSWORD}
+      REDIS_HOST: host.docker.internal
+      REDIS_PORT: ${REMOTE_REDIS_PORT}
+      REDIS_PASS: ${REMOTE_REDIS_PASSWORD}
+      MANGA_ROOT: /storage
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8011/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    volumes:
+      - ${MANGA_ROOT:-./manga}/metadata:/storage/metadata:ro
+      - ${MANGA_ROOT:-./manga}/hq:/storage/hq:ro
+      - ${MANGA_ROOT:-./manga}/lq:/storage/lq:ro
+      - ${MANGA_ROOT:-./manga}/thumbs:/storage/thumbs:ro
   # worker-service:
   #   build:
   #     context: .

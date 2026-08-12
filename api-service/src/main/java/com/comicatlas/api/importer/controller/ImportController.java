@@ -26,7 +26,7 @@ import org.springframework.web.bind.annotation.PathVariable;
  * 并提供批量导入入口。
  */
 @RestController
-@RequestMapping("/api/tasks/import")
+@RequestMapping("/api/manage/tasks/import")
 @RequiredArgsConstructor
 public class ImportController {
 

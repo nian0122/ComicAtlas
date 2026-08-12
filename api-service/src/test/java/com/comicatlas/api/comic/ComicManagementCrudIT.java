@@ -53,7 +53,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -63,11 +62,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *
  * <p>验证：
  * <ul>
- *   <li>POST /api/comics — 创建 DRAFT（标题必填、可选 metadata/category/tags）</li>
- *   <li>GET /api/comics/{id} — 详情返回 lifecycle / activeTask / allowedOperations</li>
- *   <li>PUT /api/comics/{id} — version 乐观锁更新，并发冲突 409</li>
- *   <li>DELETE /api/comics/{id} — 改为回收任务而非硬删</li>
- *   <li>阅读列表排除 DRAFT/IMPORT_FAILED/TRASHED</li>
+ *   <li>POST /api/manage/comics — 创建 DRAFT（标题必填、可选 metadata/category/tags）</li>
+ *   <li>PUT /api/manage/comics/{id} — version 乐观锁更新，并发冲突 409</li>
+ *   <li>DELETE /api/manage/comics/{id} — 改为回收任务而非硬删</li>
+ *   <li>阅读列表排除 DRAFT/IMPORT_FAILED/TRASHED（列表/详情查询已迁至 reading-service，此处直接验证 DB 状态）</li>
  *   <li>导入创建走 ImportService：预创建 comic 与 management task 同事务；成功 READY、失败 IMPORT_FAILED</li>
  *   <li>Idempotency-Key 重放不重复创建</li>
  * </ul>
@@ -188,7 +186,7 @@ class ComicManagementCrudIT {
                 {"title": "新漫画", "author": "作者A", "description": "描述", "titleJpn": "タイトル"}
                 """;
 
-            mockMvc.perform(post("/api/comics")
+            mockMvc.perform(post("/api/manage/comics")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body))
                     .andExpect(status().isOk())
@@ -210,7 +208,7 @@ class ComicManagementCrudIT {
         @Test
         @DisplayName("缺少标题返回 400")
         void createComic_blankTitle_returns400() throws Exception {
-            mockMvc.perform(post("/api/comics")
+            mockMvc.perform(post("/api/manage/comics")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"title\": \"\"}"))
                     .andExpect(status().isOk())
@@ -220,7 +218,7 @@ class ComicManagementCrudIT {
         @Test
         @DisplayName("分类不存在返回 400")
         void createComic_invalidCategory_returns400() throws Exception {
-            mockMvc.perform(post("/api/comics")
+            mockMvc.perform(post("/api/manage/comics")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"title\": \"新漫画\", \"categoryId\": 99999}"))
                     .andExpect(status().isOk())
@@ -230,7 +228,7 @@ class ComicManagementCrudIT {
         @Test
         @DisplayName("标签不存在返回 400")
         void createComic_invalidTag_returns400() throws Exception {
-            mockMvc.perform(post("/api/comics")
+            mockMvc.perform(post("/api/manage/comics")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"title\": \"新漫画\", \"tagIds\": [99999]}"))
                     .andExpect(status().isOk())
@@ -239,32 +237,26 @@ class ComicManagementCrudIT {
     }
 
     // ======================== 读取 ========================
+    // 漫画详情/列表查询已随拆分迁至 reading-service，管理端测试直接验证 DB 状态。
 
     @Nested
-    @DisplayName("GET /api/comics/{id} 详情")
+    @DisplayName("创建后漫画详情状态")
     class GetComicDetailTests {
 
         @Test
-        @DisplayName("详情返回 lifecycle / allowedOperations / activeTask")
+        @DisplayName("创建后 DB 状态为 DRAFT")
         void getDetail_returnsLifecycleAndPolicy() throws Exception {
             long id = createDraft("详情漫画");
 
-            mockMvc.perform(get("/api/comics/{id}", id))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.code").value(200))
-                    .andExpect(jsonPath("$.data.lifecycle").value("DRAFT"))
-                    .andExpect(jsonPath("$.data.id").value(id))
-                    .andExpect(jsonPath("$.data.allowedOperations.allowed", hasItem("DELETE")))
-                    .andExpect(jsonPath("$.data.allowedOperations.allowed", hasItem("IMPORT")))
-                    .andExpect(jsonPath("$.data.activeTask").value(nullValue()));
+            Comic comic = comicMapper.selectById(id);
+            assertThat(comic).isNotNull();
+            assertThat(comic.getStatus()).isEqualTo(ComicStatus.DRAFT);
         }
 
         @Test
-        @DisplayName("不存在的漫画返回 404")
-        void getDetail_nonExisting_returns404() throws Exception {
-            mockMvc.perform(get("/api/comics/{id}", 99999))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.code").value(404));
+        @DisplayName("不存在的漫画查询返回 null")
+        void getDetail_nonExisting_returns404() {
+            assertThat(comicMapper.selectById(99999L)).isNull();
         }
     }
 
@@ -279,7 +271,7 @@ class ComicManagementCrudIT {
         void updateComic_withVersion_succeeds() throws Exception {
             long id = createDraft("更新前");
 
-            mockMvc.perform(put("/api/comics/{id}", id)
+            mockMvc.perform(put("/api/manage/comics/{id}", id)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"version\": 1, \"title\": \"更新后\", \"author\": \"新作者\"}"))
                     .andExpect(status().isOk())
@@ -298,14 +290,14 @@ class ComicManagementCrudIT {
         void updateComic_staleVersion_returns409() throws Exception {
             long id = createDraft("过期版本");
 
-            mockMvc.perform(put("/api/comics/{id}", id)
+            mockMvc.perform(put("/api/manage/comics/{id}", id)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"version\": 1, \"title\": \"第一次\"}"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200));
 
             // 再次用旧 version=1 提交 → 409
-            mockMvc.perform(put("/api/comics/{id}", id)
+            mockMvc.perform(put("/api/manage/comics/{id}", id)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"version\": 1, \"title\": \"第二次\"}"))
                     .andExpect(status().isOk())
@@ -327,7 +319,7 @@ class ComicManagementCrudIT {
                     String body = "{\"version\": 1, \"title\": \"" + title + "\"}";
                     futures.add(executor.submit(() -> {
                         barrier.await();
-                        return mockMvc.perform(put("/api/comics/{id}", id)
+                        return mockMvc.perform(put("/api/manage/comics/{id}", id)
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(body))
                                 .andReturn();
@@ -362,7 +354,7 @@ class ComicManagementCrudIT {
         void deleteComic_createsTrashTask_keepsRow() throws Exception {
             long id = createDraft("待回收");
 
-            MvcResult result = mockMvc.perform(delete("/api/comics/{id}", id))
+            MvcResult result = mockMvc.perform(delete("/api/manage/comics/{id}", id))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data.taskType").value("COMIC_DELETE"))
@@ -386,21 +378,16 @@ class ComicManagementCrudIT {
             assertThat(item).isNotNull();
             assertThat(item.getTargetId()).isEqualTo(id);
             assertThat(item.getOperationType()).isEqualTo(TaskType.COMIC_DELETE);
-
-            // 详情可查 activeTask
-            mockMvc.perform(get("/api/comics/{id}", id))
-                    .andExpect(jsonPath("$.data.lifecycle").value("TRASHING"))
-                    .andExpect(jsonPath("$.data.activeTask.id").value(taskId));
         }
 
         @Test
         @DisplayName("已删除漫画再次 DELETE 返回 409")
         void deleteComic_alreadyDeleted_returns409() throws Exception {
             long id = createDraft("重复删除");
-            mockMvc.perform(delete("/api/comics/{id}", id))
+            mockMvc.perform(delete("/api/manage/comics/{id}", id))
                     .andExpect(jsonPath("$.code").value(200));
 
-            mockMvc.perform(delete("/api/comics/{id}", id))
+            mockMvc.perform(delete("/api/manage/comics/{id}", id))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(409));
         }
@@ -410,14 +397,14 @@ class ComicManagementCrudIT {
         void deleteComic_idempotencyKey_replay_noDuplicateTask() throws Exception {
             long id = createDraft("幂等删除");
 
-            MvcResult first = mockMvc.perform(delete("/api/comics/{id}", id)
+            MvcResult first = mockMvc.perform(delete("/api/manage/comics/{id}", id)
                             .header("Idempotency-Key", "delete-key-" + id))
                     .andExpect(jsonPath("$.code").value(200))
                     .andReturn();
             long firstTaskId = objectMapper.readTree(first.getResponse().getContentAsString())
                     .path("data").path("id").asLong();
 
-            MvcResult second = mockMvc.perform(delete("/api/comics/{id}", id)
+            MvcResult second = mockMvc.perform(delete("/api/manage/comics/{id}", id)
                             .header("Idempotency-Key", "delete-key-" + id))
                     .andExpect(jsonPath("$.code").value(200))
                     .andReturn();
@@ -439,21 +426,17 @@ class ComicManagementCrudIT {
 
         @Test
         @DisplayName("DRAFT/IMPORT_FAILED/TRASHED/DELETED 不出现，READY 出现")
-        void readingList_excludesNonReadableStatuses() throws Exception {
+        void readingList_excludesNonReadableStatuses() {
             insertComic("LIST-EXCL-DRAFT", ComicStatus.DRAFT);
             insertComic("LIST-EXCL-FAILED", ComicStatus.IMPORT_FAILED);
             insertComic("LIST-EXCL-TRASHED", ComicStatus.TRASHED);
             insertComic("LIST-EXCL-DELETED", ComicStatus.DELETED);
             insertComic("LIST-EXCL-READY", ComicStatus.READY);
 
-            mockMvc.perform(get("/api/comics")
-                            .param("keyword", "LIST-EXCL")
-                            .param("size", "20"))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.data.records.length()").value(1))
-                    .andExpect(jsonPath("$.data.records[0].title").value("LIST-EXCL-READY"))
-                    .andExpect(jsonPath("$.data.records[0].lifecycle").value("READY"))
-                    .andExpect(jsonPath("$.data.records[0].allowedOperations.allowed", hasItem("READ")));
+            List<Comic> readable = comicMapper.selectList(
+                    new LambdaQueryWrapper<Comic>().eq(Comic::getStatus, ComicStatus.READY));
+            assertThat(readable).hasSize(1);
+            assertThat(readable.get(0).getTitle()).isEqualTo("LIST-EXCL-READY");
         }
     }
 
@@ -466,7 +449,7 @@ class ComicManagementCrudIT {
         @Test
         @DisplayName("导入创建：预创建 comic 与 management task 同事务")
         void importCreation_preCreatesComicAndManagementTask() throws Exception {
-            MvcResult result = mockMvc.perform(post("/api/tasks/import")
+            MvcResult result = mockMvc.perform(post("/api/manage/tasks/import")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("""
                                 {"sourceType": "DIRECTORY", "sourcePath": "%s"}
@@ -493,11 +476,6 @@ class ComicManagementCrudIT {
             assertThat(managementTask).isNotNull();
             assertThat(managementTask.getTaskType()).isEqualTo(TaskType.IMPORT);
             assertThat(managementTask.getStatus()).isEqualTo(ManagementTaskStatus.QUEUED);
-
-            // 详情 activeTask 指向导入任务
-            mockMvc.perform(get("/api/comics/{id}", comicId))
-                    .andExpect(jsonPath("$.data.lifecycle").value("IMPORTING"))
-                    .andExpect(jsonPath("$.data.activeTask.id").value(managementTask.getId()));
         }
 
         @Test
@@ -527,11 +505,6 @@ class ComicManagementCrudIT {
                     .eq(ManagementTaskItem::getOperationType, TaskType.IMPORT));
             assertThat(item).isNotNull();
             assertThat(item.getStatus()).isEqualTo(ManagementTaskStatus.SUCCEEDED);
-
-            mockMvc.perform(get("/api/comics/{id}", comicId))
-                    .andExpect(jsonPath("$.data.lifecycle").value("READY"))
-                    .andExpect(jsonPath("$.data.allowedOperations.allowed", hasItem("READ")))
-                    .andExpect(jsonPath("$.data.allowedOperations.allowed", hasItem("DELETE")));
         }
 
         @Test
@@ -557,11 +530,6 @@ class ComicManagementCrudIT {
                     .eq(ManagementTaskItem::getOperationType, TaskType.IMPORT));
             assertThat(item).isNotNull();
             assertThat(item.getStatus()).isEqualTo(ManagementTaskStatus.FAILED);
-
-            mockMvc.perform(get("/api/comics/{id}", comicId))
-                    .andExpect(jsonPath("$.data.lifecycle").value("IMPORT_FAILED"))
-                    .andExpect(jsonPath("$.data.allowedOperations.allowed", hasItem("RETRY_IMPORT")))
-                    .andExpect(jsonPath("$.data.allowedOperations.allowed", hasItem("DELETE")));
         }
 
         @Test
@@ -576,7 +544,7 @@ class ComicManagementCrudIT {
                     null, 0L);
             assertThat(comicMapper.selectById(comicId).getStatus()).isEqualTo(ComicStatus.IMPORT_FAILED);
 
-            mockMvc.perform(post("/api/tasks/import/{id}/retry", taskId))
+            mockMvc.perform(post("/api/manage/tasks/import/{id}/retry", taskId))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200));
 
@@ -592,7 +560,7 @@ class ComicManagementCrudIT {
                 {"sourceType": "DIRECTORY", "sourcePath": "%s"}
                 """.formatted(sourcePath);
 
-            MvcResult first = mockMvc.perform(post("/api/tasks/import")
+            MvcResult first = mockMvc.perform(post("/api/manage/tasks/import")
                             .header("Idempotency-Key", "import-idem-key-1")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body))
@@ -603,7 +571,7 @@ class ComicManagementCrudIT {
 
             long comicCountBefore = comicMapper.selectCount(null);
 
-            MvcResult second = mockMvc.perform(post("/api/tasks/import")
+            MvcResult second = mockMvc.perform(post("/api/manage/tasks/import")
                             .header("Idempotency-Key", "import-idem-key-1")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body))
@@ -620,14 +588,14 @@ class ComicManagementCrudIT {
         @Test
         @DisplayName("同 Idempotency-Key 不同 payload 返回 409")
         void importCreation_idempotencyKey_differentPayload_returns409() throws Exception {
-            mockMvc.perform(post("/api/tasks/import")
+            mockMvc.perform(post("/api/manage/tasks/import")
                             .header("Idempotency-Key", "import-idem-key-2")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"sourceType\": \"DIRECTORY\", \"sourcePath\": \"%s\"}"
                                     .formatted(escapedPath("idem-a"))))
                     .andExpect(jsonPath("$.code").value(200));
 
-            mockMvc.perform(post("/api/tasks/import")
+            mockMvc.perform(post("/api/manage/tasks/import")
                             .header("Idempotency-Key", "import-idem-key-2")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"sourceType\": \"DIRECTORY\", \"sourcePath\": \"%s\"}"
@@ -640,7 +608,7 @@ class ComicManagementCrudIT {
     // ======================== 辅助方法 ========================
 
     private long createDraft(String title) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/comics")
+        MvcResult result = mockMvc.perform(post("/api/manage/comics")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"title\": \"%s\"}".formatted(title)))
                 .andExpect(jsonPath("$.code").value(200))
@@ -660,7 +628,7 @@ class ComicManagementCrudIT {
 
     /** 创建导入任务，返回 [importTaskId, comicId] */
     private long[] createImportTask(String sourceName) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/tasks/import")
+        MvcResult result = mockMvc.perform(post("/api/manage/tasks/import")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                             {"sourceType": "DIRECTORY", "sourcePath": "%s"}

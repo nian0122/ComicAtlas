@@ -12,28 +12,32 @@ Spring Boot 3 + Vue3 + RabbitMQ + MySQL + Redis。
 ## STRUCTURE
 ```
 comic-atlas/
-├── api-service/             # 漫画CRUD + 导入 + Catalog + Reader + LQ/HQ删除 + 回收站 + MQ消费（Flyway 迁移在 src/main/resources/db/）
+├── api-service/             # 管理服务（comic-api-service，端口 8010）：漫画写操作 + 导入 + LQ/HQ删除 + 回收站 + 管理任务中心 + 批量操作 + 存储管理 + DLQ + 全部 MQ 消费（Flyway 迁移在 src/main/resources/db/），管理端 URL 统一 /api/manage/**
+├── reading-service/         # 阅读服务（comic-reading-service，端口 8011）：漫画列表/详情 + 目录树 + 章节阅读 + 阅读历史（纯读为主，仅阅读进度保存写 reading_history），URL 保持 /api/**
+├── comic-shared/            # 共享持久化层：entity/mapper/comic-dto/reader-dto/common 基础设施（Result/异常/枚举/storage/缓存常量），包名保持 com.comicatlas.api.* 不变，两个 API 服务共同依赖
 ├── worker-service/          # 文件处理 + MQ消费 + 下载 + 解压 + 导入 + LQ/HQ删除 + 回收/恢复/永久清理 + ffprobe（模块化：config/event/command/importer/media/storage/export/file/process/image）
 ├── comic-common/            # 共享事件 DTO（36 个事件 record + ComicEvent sealed interface + payload 数据载体，Jackson 多态序列化）+ MQ 契约/元数据/工具（constant/dto/event/metadata/mq/util）
-├── gateway/                 # Spring Cloud Gateway: 路由 + Nacos发现
+├── gateway/                 # Spring Cloud Gateway: 路由 + Nacos发现（/api/manage/** → 管理服务，/api/** → 阅读服务）
 ├── frontend/                # Vue3/Vite: 列表 + 详情 + 阅读器 + 管理后台 + 存储管理
 ├── scripts/                 # dev/qa/db/release 开发与运维脚本（入口 scripts/dev/start-dev.ps1）
 ├── tools/                   # migration/maintenance/vendor 迁移、维护与第三方二进制
 ├── docs/                    # 文档中心（入口 docs/README.md：api/user-guide/development-guide + architecture/operations/releases 等专题）
 ├── nginx.conf               # /files/{root}/{path} → alias /storage/{root}/
-├── docker-compose.yml       # 项目服务：Gateway + API + Nginx
+├── docker-compose.yml       # 项目服务：Gateway + API + Reading + Nginx
 └── docker-compose.infra.yml # 基础设施：MySQL + Redis + RabbitMQ + Nacos
 ```
 
 ## WHERE TO LOOK
 | 任务 | 位置 | Notes |
 |------|------|-------|
-| 漫画列表/详情 | `api-service/.../controller/ComicController.java` | list/detail/delete |
-| 目录树 | `api-service/.../controller/CatalogController.java` | GET `/comics/{id}/catalog` |
-| 章节阅读 | `api-service/.../reader/controller/ReaderController.java` | GET `/chapters/{id}` 返回 pages+prev/next |
-| Catalog Service | `api-service/.../service/CatalogService.java` | buildTree 组装 ViewModel |
-| Reader Service | `api-service/.../reader/service/ReaderService.java` | 按 global_order 取 prev/next |
-| 导入 API | `api-service/.../controller/ImportController.java` | POST sourceType+sourcePath + batch/scan |
+| 漫画列表/详情（读） | `reading-service/.../controller/ReadingComicController.java` | GET `/api/comics` + `/api/comics/{id}` + metadata/tags/autocomplete |
+| 漫画管理（写） | `api-service/.../controller/ComicManagementController.java` | POST/PUT/DELETE `/api/manage/comics/**` |
+| 目录树 | `reading-service/.../controller/CatalogController.java` | GET `/api/comics/{id}/catalog` |
+| 章节阅读 | `reading-service/.../controller/ReaderController.java` | GET `/api/chapters/{id}` 返回 pages+prev/next |
+| 阅读历史 | `reading-service/.../controller/HistoryController.java` | GET/PUT `/api/history/**`（进度保存为阅读端唯一写操作） |
+| Catalog Service | `reading-service/.../service/impl/CatalogServiceImpl.java` | buildTree 组装 ViewModel，缓存失效由管理端 CatalogCacheInvalidator 触发 |
+| Reader Service | `reading-service/.../service/impl/ReaderServiceImpl.java` | 按 global_order 取 prev/next |
+| 导入 API | `api-service/.../controller/ImportController.java` | POST `/api/manage/tasks/import` sourceType+sourcePath + batch/scan |
 | 导入 Service | `api-service/.../service/impl/ImportServiceImpl.java` | 预创建 comic+task → MQ |
 | LQ 手动触发 | `api-service/.../controller/LqController.java` | POST /comics/{id}/lq |
 | HQ 删除 API | `api-service/.../controller/HqDeleteController.java` | POST /comics/{id}/delete-hq |
@@ -134,8 +138,12 @@ API ImportPersistenceService: 逐章 media/chapter → READY，全部章节完�
 
 ## URL 规范
 ```
-/files/{rootKey_lc}/{relativePath}
+阅读端（reading-service）：/api/{资源}/{id}/...（纯读为主）
+管理端（api-service）：/api/manage/{资源}/{id}/...（全部写操作 + 管理查询）
+文件访问：/files/{rootKey_lc}/{relativePath}
 ```
+- `/api/**` → 网关路由到 reading-service（comic-reading-service）
+- `/api/manage/**` → 网关路由到 api-service 管理服务（comic-api-service）；路由声明必须先管理后阅读
 - `/files/hq/` → alias `F:/manga/hq/` (60d cache)
 - `/files/lq/` → alias `F:/manga/lq/` (30d cache)
 - `/files/thumbs/` → alias `F:/manga/thumbs/` (7d cache)

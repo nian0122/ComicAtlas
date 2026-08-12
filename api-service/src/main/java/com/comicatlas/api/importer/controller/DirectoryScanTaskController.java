@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RequestBody;
  * 生成可导入来源清单供用户确认后发起导入，扫描过程异步执行。
  */
 @RestController
-@RequestMapping("/api/tasks/directory-scan")
+@RequestMapping("/api/manage/tasks/directory-scan")
 @RequiredArgsConstructor
 public class DirectoryScanTaskController {
 

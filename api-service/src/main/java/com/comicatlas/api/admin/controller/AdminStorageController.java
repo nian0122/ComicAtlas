@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RequestParam;
  * 供管理端存储管理页使用。仅供本机管理端使用。
  */
 @RestController
-@RequestMapping("/api/admin/storage")
+@RequestMapping("/api/manage/admin/storage")
 @RequiredArgsConstructor
 public class AdminStorageController {
 

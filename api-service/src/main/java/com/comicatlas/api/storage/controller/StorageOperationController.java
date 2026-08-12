@@ -35,7 +35,7 @@ import java.util.List;
  */
 @Slf4j
 @RestController
-@RequestMapping("/api/storage")
+@RequestMapping("/api/manage/storage")
 @RequiredArgsConstructor
 public class StorageOperationController {
 
