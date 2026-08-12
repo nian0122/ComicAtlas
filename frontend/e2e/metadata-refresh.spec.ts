@@ -12,10 +12,10 @@ test.beforeEach(async ({ page }) => {
   refreshPostCount = 0
   refreshStatus = 202
   refreshBody = successBody()
-  await page.route(`**/api/admin/storage/comics/${COMIC_ID}`, (route) =>
+  await page.route(`**/api/manage/admin/storage/comics/${COMIC_ID}`, (route) =>
     json(route, comicStorageItem())
   )
-  await page.route(`**/api/admin/storage/comics/${COMIC_ID}/chapters`, (route) =>
+  await page.route(`**/api/manage/admin/storage/comics/${COMIC_ID}/chapters`, (route) =>
     json(route, [])
   )
   await page.route(`**/api/comics/${COMIC_ID}/catalog`, (route) =>
@@ -24,7 +24,7 @@ test.beforeEach(async ({ page }) => {
   await page.route(`**/api/comics/${COMIC_ID}`, (route) =>
     json(route, comicDetail('READY'))
   )
-  await page.route(`**/api/storage/refresh-metadata/comics/${COMIC_ID}`, handleRefresh)
+  await page.route(`**/api/manage/storage/refresh-metadata/comics/${COMIC_ID}`, handleRefresh)
 })
 
 test('章节存储按目录树展示并支持逐级展开', async ({ page }) => {
@@ -44,8 +44,8 @@ test('章节存储按目录树展示并支持逐级展开', async ({ page }) => 
       }],
     }])
   )
-  await page.unroute(`**/api/admin/storage/comics/${COMIC_ID}/chapters`)
-  await page.route(`**/api/admin/storage/comics/${COMIC_ID}/chapters`, (route) =>
+  await page.unroute(`**/api/manage/admin/storage/comics/${COMIC_ID}/chapters`)
+  await page.route(`**/api/manage/admin/storage/comics/${COMIC_ID}/chapters`, (route) =>
     json(route, [
       chapterStorageItem(),
       chapterStorageItem({ chapterId: 12, chapterNo: '99', title: '全局顺序章节', pageCount: 20 }),
@@ -72,12 +72,12 @@ test('章节存储按目录树展示并支持逐级展开', async ({ page }) => 
 })
 
 test('纯视频章节显示真实 HQ 大小且 LQ 标记为不适用', async ({ page }) => {
-  await page.unroute(`**/api/admin/storage/comics/${COMIC_ID}`)
-  await page.route(`**/api/admin/storage/comics/${COMIC_ID}`, (route) =>
+  await page.unroute(`**/api/manage/admin/storage/comics/${COMIC_ID}`)
+  await page.route(`**/api/manage/admin/storage/comics/${COMIC_ID}`, (route) =>
     json(route, comicStorageItem({ mediaType: 'VIDEO', hqSize: 1024 * 1024 * 3, lqSize: 0, pageCount: 100 }))
   )
-  await page.unroute(`**/api/admin/storage/comics/${COMIC_ID}/chapters`)
-  await page.route(`**/api/admin/storage/comics/${COMIC_ID}/chapters`, (route) =>
+  await page.unroute(`**/api/manage/admin/storage/comics/${COMIC_ID}/chapters`)
+  await page.route(`**/api/manage/admin/storage/comics/${COMIC_ID}/chapters`, (route) =>
     json(route, [chapterStorageItem({ title: '视频', mediaType: 'VIDEO', hqSize: 1024 * 1024 * 3, lqSize: 0, pageCount: 100 })])
   )
 
@@ -89,6 +89,25 @@ test('纯视频章节显示真实 HQ 大小且 LQ 标记为不适用', async ({ 
   await expect(page.getByRole('button', { name: '生成 LQ' })).toHaveCount(0)
   await videoRow.scrollIntoViewIfNeeded()
   await page.screenshot({ path: 'test-results/pure-video-storage.png', fullPage: false })
+})
+
+test('触发视频转码后后台轮询不遮罩详情页', async ({ page }) => {
+  await page.route(`**/api/manage/storage/transcode/comics/${COMIC_ID}`, (route) =>
+    json(route, { taskId: 2001, itemCount: 1 })
+  )
+
+  await page.goto(`/manage/storage/${COMIC_ID}?force-desktop=1`)
+  await expect(page.getByText('测试漫画', { exact: true })).toBeVisible()
+
+  await page.getByRole('button', { name: '视频转码' }).click()
+  await page.locator('.el-message-box__btns .el-button--primary').click()
+
+  await expect(page.getByText('已提交 1 个视频转码任务')).toBeVisible()
+  await expect(page.locator('.el-loading-mask')).toHaveCount(0)
+
+  await page.clock.install()
+  await page.clock.fastForward(5000)
+  await expect(page.locator('.el-loading-mask')).toHaveCount(0)
 })
 
 test('READY 状态下提交元数据刷新：单次 POST 并展示任务编号', async ({ page }) => {
