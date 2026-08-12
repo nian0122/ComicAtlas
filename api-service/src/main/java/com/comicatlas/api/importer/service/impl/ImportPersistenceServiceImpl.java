@@ -345,10 +345,11 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
                 if (mediaData.get("audioCodec") != null) {
                     media.setAudioCodec((String) mediaData.get("audioCodec"));
                 }
-                // 非标准视频（非 mp4/m4v）标记为待转码，供导入后手动触发转码
+                // 非标准视频（非 mp4/m4v）标记为待转码（REQUIRED：需转码但未入队，
+                // 等待用户手动触发；不能标 QUEUED——那表示已在转码队列中且必有任务记录）
                 String container = normalizeContainer((String) mediaData.get("container"));
                 if (container == null || !isStandardVideoContainer(container)) {
-                    media.setTranscodeStatus(TranscodeStatus.QUEUED);
+                    media.setTranscodeStatus(TranscodeStatus.REQUIRED);
                 }
             }
 

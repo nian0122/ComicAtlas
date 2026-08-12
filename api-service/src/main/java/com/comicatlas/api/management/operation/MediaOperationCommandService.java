@@ -321,6 +321,17 @@ public class MediaOperationCommandService {
         if (media.getHqStatus() == HqStatus.DELETED) {
             return false;
         }
+        // 超高清视频（任一边 > 4096，如 8K）硬件编码器无法处理，CPU 转码又超时，
+        // 判定为不可转码：保持原样并标记 NOT_NEEDED，避免反复进入转码队列失败
+        if (!VideoPlayability.isTranscodable(media.getWidth(), media.getHeight())) {
+            mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
+                    .eq(Media::getId, media.getId())
+                    .eq(Media::getTranscodeStatus, TranscodeStatus.REQUIRED)
+                    .set(Media::getTranscodeStatus, TranscodeStatus.NOT_NEEDED));
+            log.info("视频分辨率超出硬件转码能力，标记无需转码: mediaId={}, {}x{}",
+                    media.getId(), media.getWidth(), media.getHeight());
+            return false;
+        }
         TranscodeStatus status = media.getTranscodeStatus();
         // safeValueOf 对未知枚举值返回 null，此处判空避免 Set12.contains(null) 抛 NPE
         if (status != null && (ACTIVE_TRANSCODE.contains(status) || status == TranscodeStatus.READY)) {

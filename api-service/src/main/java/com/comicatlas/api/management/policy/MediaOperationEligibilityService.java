@@ -132,6 +132,7 @@ public class MediaOperationEligibilityService {
                 && media.getTranscodeStatus() != TranscodeStatus.READY
                 && media.getTranscodeStatus() != TranscodeStatus.QUEUED
                 && media.getTranscodeStatus() != TranscodeStatus.TRANSCODING
+                && VideoPlayability.isTranscodable(media.getWidth(), media.getHeight())
                 && !VideoPlayability.isBrowserPlayable(media.getVideoCodec(), media.getContainer())) {
             allowed.add(OperationPolicyService.OP_TRANSCODE);
         } else {
@@ -163,6 +164,7 @@ public class MediaOperationEligibilityService {
                         && p.getTranscodeStatus() != TranscodeStatus.READY
                         && p.getTranscodeStatus() != TranscodeStatus.QUEUED
                         && p.getTranscodeStatus() != TranscodeStatus.TRANSCODING
+                        && VideoPlayability.isTranscodable(p.getWidth(), p.getHeight())
                         && !VideoPlayability.isBrowserPlayable(p.getVideoCodec(), p.getContainer()));
         return ops;
     }

@@ -17,6 +17,7 @@ import com.comicatlas.contract.common.enums.ImportTaskStatus;
 import com.comicatlas.contract.common.enums.LqStatus;
 import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
 import com.comicatlas.contract.common.enums.TaskType;
+import com.comicatlas.contract.common.enums.TranscodeStatus;
 import com.comicatlas.persistence.storage.ApiStorageProperties;
 import com.comicatlas.persistence.storage.ApiStorageRoot;
 import com.comicatlas.api.importer.entity.ImportTask;
@@ -342,6 +343,39 @@ class ImportPersistenceServiceTest {
         assertThat(published.chapterId()).isEqualTo(chapterId);
         assertThat(published.sourceDir()).isEqualTo("hq/100/0");
         assertThat(published.targetDir()).isEqualTo("hq/100/" + chapterId);
+    }
+
+    @Test
+    @DisplayName("completed 视频媒体：非标准容器 mov 标记 REQUIRED（需转码未入队），不标 QUEUED")
+    void persistCompleted_videoWithMovContainer_marksRequiredNotQueued() {
+        runInTransaction();
+        when(taskMapper.selectById(10L)).thenReturn(task(ImportTaskStatus.PARSING));
+        when(comicMapper.selectById(100L)).thenReturn(comic(ComicStatus.IMPORTING));
+        when(chapterMapper.selectCount(any(Wrapper.class))).thenReturn(0L);
+        stubCatalogInsert();
+        stubChapterInsert();
+        stubMediaBatchInsert();
+
+        Map<String, Object> root = metadataV3();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> chapter = (Map<String, Object>) ((List<?>) root.get("chapters")).get(0);
+        Map<String, Object> video = new HashMap<>();
+        video.put("pageNumber", 1);
+        video.put("fileName", "video.mov");
+        video.put("hqPath", "100/0/video.mov");
+        video.put("fileSize", 1024L);
+        video.put("mediaType", "VIDEO");
+        video.put("container", "mov");
+        video.put("videoCodec", "h264");
+        video.put("audioCodec", "aac");
+        chapter.put("mediaItems", List.of(video));
+
+        service.persistCompleted(completedEvent(), root);
+
+        ArgumentCaptor<List<Media>> mediaListCaptor = ArgumentCaptor.forClass(List.class);
+        verify(mediaMapper).insertImportBatch(mediaListCaptor.capture());
+        Media media = mediaListCaptor.getValue().get(0);
+        assertThat(media.getTranscodeStatus()).isEqualTo(TranscodeStatus.REQUIRED);
     }
 
     @Test
