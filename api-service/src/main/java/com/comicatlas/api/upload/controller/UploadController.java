@@ -32,7 +32,7 @@ import java.io.IOException;
  * 但当前无前端页面入口，不属于漫画导入主流程。
  */
 @RestController
-@RequestMapping("/api/uploads")
+@RequestMapping("/api/manage/uploads")
 @RequiredArgsConstructor
 public class UploadController {
 

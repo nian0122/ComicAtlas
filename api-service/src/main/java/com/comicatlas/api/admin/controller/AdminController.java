@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RequestParam;
  * 普通删除已统一走回收站，本控制器仅供本机管理端使用。
  */
 @RestController
-@RequestMapping("/api/admin")
+@RequestMapping("/api/manage/admin")
 @RequiredArgsConstructor
 public class AdminController {
 

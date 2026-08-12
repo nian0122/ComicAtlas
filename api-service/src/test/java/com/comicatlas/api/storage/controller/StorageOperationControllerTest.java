@@ -38,7 +38,7 @@ class StorageOperationControllerTest {
         when(commandService.requestLqForComic(42L, false))
                 .thenReturn(OperationSubmitResultDTO.of(7L, "LQ_GENERATE", "QUEUED", 3));
 
-        mvc.perform(post("/api/storage/lq/comics/42"))
+        mvc.perform(post("/api/manage/storage/lq/comics/42"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.taskId").value(7))
                 .andExpect(jsonPath("$.data.taskType").value("LQ_GENERATE"));
@@ -51,7 +51,7 @@ class StorageOperationControllerTest {
         when(commandService.requestLqForChapter(9L, true))
                 .thenReturn(OperationSubmitResultDTO.of(8L, "LQ_REGENERATE", "QUEUED", 1));
 
-        mvc.perform(post("/api/storage/lq/chapters/9").param("regenerate", "true"))
+        mvc.perform(post("/api/manage/storage/lq/chapters/9").param("regenerate", "true"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.taskType").value("LQ_REGENERATE"));
 
@@ -63,7 +63,7 @@ class StorageOperationControllerTest {
         when(commandService.requestHqDeleteForComic(42L))
                 .thenReturn(OperationSubmitResultDTO.of(9L, "HQ_DELETE", "QUEUED", 2));
 
-        mvc.perform(post("/api/storage/delete-hq/comics/42"))
+        mvc.perform(post("/api/manage/storage/delete-hq/comics/42"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.taskId").value(9));
 
@@ -75,7 +75,7 @@ class StorageOperationControllerTest {
         when(commandService.requestHqDeleteForChapter(9L))
                 .thenReturn(OperationSubmitResultDTO.of(10L, "HQ_DELETE", "QUEUED", 1));
 
-        mvc.perform(post("/api/storage/delete-hq/chapters/9"))
+        mvc.perform(post("/api/manage/storage/delete-hq/chapters/9"))
                 .andExpect(status().isOk());
 
         verify(commandService).requestHqDeleteForChapter(9L);
@@ -86,7 +86,7 @@ class StorageOperationControllerTest {
         when(commandService.requestTranscodeForComic(42L))
                 .thenReturn(OperationSubmitResultDTO.of(11L, "TRANSCODE", "QUEUED", 2));
 
-        mvc.perform(post("/api/storage/transcode/comics/42"))
+        mvc.perform(post("/api/manage/storage/transcode/comics/42"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.taskId").value(11));
 
@@ -98,7 +98,7 @@ class StorageOperationControllerTest {
         when(commandService.requestTranscodeForChapter(9L))
                 .thenReturn(OperationSubmitResultDTO.of(12L, "TRANSCODE", "QUEUED", 1));
 
-        mvc.perform(post("/api/storage/transcode/chapters/9"))
+        mvc.perform(post("/api/manage/storage/transcode/chapters/9"))
                 .andExpect(status().isOk());
 
         verify(commandService).requestTranscodeForChapter(9L);
@@ -109,7 +109,7 @@ class StorageOperationControllerTest {
         when(commandService.requestMetadataRefresh(42L))
                 .thenReturn(OperationSubmitResultDTO.of(13L, "METADATA_REFRESH", "QUEUED", 1));
 
-        mvc.perform(post("/api/storage/refresh-metadata/comics/42"))
+        mvc.perform(post("/api/manage/storage/refresh-metadata/comics/42"))
                 .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.data.taskId").value(13))
                 .andExpect(jsonPath("$.data.taskType").value("METADATA_REFRESH"));
@@ -122,7 +122,7 @@ class StorageOperationControllerTest {
         when(exportOperationService.createExportTask(42L))
                 .thenReturn(exportTask(7L, 42L));
 
-        mvc.perform(post("/api/storage/export/comics/42"))
+        mvc.perform(post("/api/manage/storage/export/comics/42"))
                 .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.id").value(7))
                 .andExpect(jsonPath("$.comicId").value(42));
@@ -135,7 +135,7 @@ class StorageOperationControllerTest {
         when(exportOperationService.listExports(42L))
                 .thenReturn(List.of(exportTask(7L, 42L), exportTask(8L, 42L)));
 
-        mvc.perform(get("/api/storage/export/comics/42/tasks"))
+        mvc.perform(get("/api/manage/storage/export/comics/42/tasks"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(2))
                 .andExpect(jsonPath("$.data[0].id").value(7));
@@ -148,7 +148,7 @@ class StorageOperationControllerTest {
         when(exportOperationService.getTask(7L))
                 .thenReturn(exportTask(7L, 42L));
 
-        mvc.perform(get("/api/storage/export/tasks/7"))
+        mvc.perform(get("/api/manage/storage/export/tasks/7"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.id").value(7))
                 .andExpect(jsonPath("$.data.comicId").value(42));
@@ -161,7 +161,7 @@ class StorageOperationControllerTest {
         when(exportOperationService.listAllExports())
                 .thenReturn(List.of(exportTask(7L, 42L), exportTask(8L, 43L)));
 
-        mvc.perform(get("/api/storage/export/tasks"))
+        mvc.perform(get("/api/manage/storage/export/tasks"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(2))
                 .andExpect(jsonPath("$.data[0].id").value(7))
@@ -178,7 +178,7 @@ class StorageOperationControllerTest {
                         artifact(2, "base.z02", 5L, false),
                         artifact(3, "base.zip", 2L, true)));
 
-        mvc.perform(get("/api/storage/export/tasks/7/artifacts"))
+        mvc.perform(get("/api/manage/storage/export/tasks/7/artifacts"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(3))
                 .andExpect(jsonPath("$.data[0].index").value(1))
@@ -193,19 +193,19 @@ class StorageOperationControllerTest {
 
     @Test
     void downloadExport_旧下载端点已移除返回404() throws Exception {
-        mvc.perform(get("/api/storage/export/tasks/1/download"))
+        mvc.perform(get("/api/manage/storage/export/tasks/1/download"))
                 .andExpect(status().isNotFound());
     }
 
     @Test
     void downloadArtifact_逐卷下载端点不存在返回404() throws Exception {
-        mvc.perform(get("/api/storage/export/tasks/1/artifacts/1/download"))
+        mvc.perform(get("/api/manage/storage/export/tasks/1/artifacts/1/download"))
                 .andExpect(status().isNotFound());
     }
 
     @Test
     void downloadArtifact_分卷无独立元数据端点返回404() throws Exception {
-        mvc.perform(get("/api/storage/export/tasks/1/artifacts/1"))
+        mvc.perform(get("/api/manage/storage/export/tasks/1/artifacts/1"))
                 .andExpect(status().isNotFound());
     }
 
@@ -215,7 +215,7 @@ class StorageOperationControllerTest {
         vo.setId(1L);
         vo.setPhysicalPath("/nonexistent/dir");
         when(exportOperationService.getTask(1L)).thenReturn(vo);
-        mvc.perform(post("/api/storage/export/tasks/1/open"))
+        mvc.perform(post("/api/manage/storage/export/tasks/1/open"))
                 .andExpect(status().isNotFound());
     }
 

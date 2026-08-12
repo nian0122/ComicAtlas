@@ -1,0 +1,74 @@
+server:
+  port: 8011
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+spring:
+  application:
+    name: comic-reading-service
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_ADDR:localhost:8848}
+        username: ${NACOS_USER:nacos}
+        password: ${NACOS_PASS:nacos}
+      config:
+        import-check:
+          enabled: false
+  # 阅读服务只读漫画数据 + 写入阅读进度（reading_history），
+  # 需使用具备该库读写权限的账号；不承担 Flyway 迁移（由管理服务统一执行）。
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:3306/comic_atlas?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASS:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASS:}
+  cache:
+    type: redis
+    redis:
+      time-to-live: 30m
+
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: auto
+
+# 阅读服务仅需解析图片 URL 的读卷；无上传/回收/导出写卷。
+storage:
+  url-prefix: /files
+  roots:
+    HQ:
+      type: FILESYSTEM
+      path: ${MANGA_ROOT:F:/manga}/hq
+      enabled: true
+      readOnly: true
+    LQ:
+      type: FILESYSTEM
+      path: ${MANGA_ROOT:F:/manga}/lq
+      enabled: true
+      readOnly: true
+    THUMBS:
+      type: FILESYSTEM
+      path: ${MANGA_ROOT:F:/manga}/thumbs
+      enabled: true
+      readOnly: true
+    METADATA:
+      type: FILESYSTEM
+      path: ${MANGA_ROOT:F:/manga}/metadata
+      enabled: true
+      readOnly: true
+
+comic:
+  cache:
+    catalog-ttl: ${CATALOG_CACHE_TTL:30m}

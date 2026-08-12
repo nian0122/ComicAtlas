@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>所有请求携带 comicId，用于校验 path ID 属于同一漫画。
  */
 @RestController
-@RequestMapping("/api/comics/{comicId}/chapters")
+@RequestMapping("/api/manage/comics/{comicId}/chapters")
 @RequiredArgsConstructor
 public class ChapterManagementController {
 

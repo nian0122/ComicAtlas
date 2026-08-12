@@ -32,19 +32,19 @@ class AdminDlqControllerTest {
     void allowsAnonymousReadAccess() throws Exception {
         when(dlqService.listQueues()).thenReturn(List.of());
 
-        mockMvc.perform(get("/api/admin/dlq/queues"))
+        mockMvc.perform(get("/api/manage/admin/dlq/queues"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(200));
     }
 
     @Test
     void validatesPreviewAndReplayLimits() throws Exception {
-        mockMvc.perform(get("/api/admin/dlq/queues/import.task.dlq/messages")
+        mockMvc.perform(get("/api/manage/admin/dlq/queues/import.task.dlq/messages")
                 .param("count", "0"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(400));
 
-        mockMvc.perform(post("/api/admin/dlq/queues/import.task.dlq/replay")
+        mockMvc.perform(post("/api/manage/admin/dlq/queues/import.task.dlq/replay")
                 .param("maxMessages", "501"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(400));

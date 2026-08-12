@@ -28,7 +28,7 @@ import org.springframework.web.bind.annotation.RequestParam;
  * 异步命令需携带 Idempotency-Key 头。
  */
 @RestController
-@RequestMapping("/api/management/tasks")
+@RequestMapping("/api/manage/tasks")
 @RequiredArgsConstructor
 public class ManagementTaskController {
 

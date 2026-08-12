@@ -16,8 +16,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.List;
-
 import static org.mockito.ArgumentMatchers.any;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.verify;
@@ -25,6 +23,11 @@ import static org.mockito.Mockito.when;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * 标签管理服务测试（管理域写操作）。
+ * <p>
+ * 标签查询（listTags）为阅读端行为，由阅读服务 TagQueryServiceImpl 覆盖。
+ */
 @ExtendWith(MockitoExtension.class)
 class TagServiceTest {
 
@@ -38,28 +41,10 @@ class TagServiceTest {
     private CacheEvictor cacheEvictor;
 
     @InjectMocks
-    private TagServiceImpl service;
+    private TagManagementServiceImpl service;
 
     @Captor
     private ArgumentCaptor<Tag> tagCaptor;
-
-    @Test
-    void listTags_shouldReturnAllTags() {
-        Tag tag1 = new Tag();
-        tag1.setId(1L);
-        tag1.setName("action");
-        Tag tag2 = new Tag();
-        tag2.setId(2L);
-        tag2.setName("comedy");
-        when(tagMapper.selectList(null)).thenReturn(List.of(tag1, tag2));
-
-        List<TagDTO> result = service.listTags();
-
-        assertEquals(2, result.size());
-        assertEquals(1L, result.get(0).getId());
-        assertEquals("action", result.get(0).getName());
-        verify(tagMapper).selectList(null);
-    }
 
     @Test
     void createTag_shouldReturnDto_whenNameIsUnique() {

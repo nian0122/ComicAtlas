@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 供管理端存储管理页展示。仅供本机管理端使用。
  */
 @RestController
-@RequestMapping("/api/storage")
+@RequestMapping("/api/manage/storage")
 @RequiredArgsConstructor
 public class StorageStatsController {
 

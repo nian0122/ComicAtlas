@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 暴露 outbox 消息积压和失败计数，用于监控和告警。
  */
 @RestController
-@RequestMapping("/api/management/outbox")
+@RequestMapping("/api/manage/outbox")
 @RequiredArgsConstructor
 public class OutboxStatsController {
 
