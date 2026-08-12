@@ -3,7 +3,7 @@ WORKDIR /build
 COPY settings.xml /root/.m2/settings.xml
 COPY pom.xml .
 COPY comic-common ./comic-common
-COPY comic-contract ./comic-contract
+COPY comic-shared ./comic-shared
 COPY api-service ./api-service
 COPY reading-service ./reading-service
 COPY worker-service ./worker-service

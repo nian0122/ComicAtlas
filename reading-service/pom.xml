@@ -22,15 +22,10 @@
             <version>${project.version}</version>
         </dependency>
 
-        <!-- 跨服务契约与持久化基础设施 -->
+        <!-- 跨服务共享模型（contract + persistence） -->
         <dependency>
             <groupId>com.comicatlas</groupId>
-            <artifactId>comic-contract</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.comicatlas</groupId>
-            <artifactId>comic-persistence</artifactId>
+            <artifactId>comic-shared</artifactId>
             <version>${project.version}</version>
         </dependency>
 

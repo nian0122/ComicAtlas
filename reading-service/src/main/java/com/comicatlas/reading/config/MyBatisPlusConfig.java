@@ -26,7 +26,7 @@ public class MyBatisPlusConfig {
     }
 
     /**
-     * 注册共享枚举 TypeHandler（comic-contract），数据库 VARCHAR 与 Java 枚举双向映射。
+     * 注册共享枚举 TypeHandler（comic-shared），数据库 VARCHAR 与 Java 枚举双向映射。
      * <p>
      * 与管理服务保持一致的安全解析语义（未知枚举值返回 null 并告警），
      * 保证阅读端读取漫画/章节/媒体等表的历史数据行为一致。

@@ -10,10 +10,10 @@
         <version>0.0.1-SNAPSHOT</version>
     </parent>
 
-    <artifactId>comic-contract</artifactId>
+    <artifactId>comic-shared</artifactId>
     <packaging>jar</packaging>
-    <name>Comic Contract</name>
-    <description>跨服务契约：请求与响应 DTO、公共结果、异常、枚举和缓存契约</description>
+    <name>Comic Shared</name>
+    <description>跨服务共享模型：contract 与 persistence 包边界</description>
 
     <properties>
         <!-- 上游 -Dtest 指定服务测试时，本模块无匹配测试不视为失败 -->
@@ -29,6 +29,14 @@
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-tx</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
         </dependency>
 
         <!-- Validation（DTO 校验注解） -->

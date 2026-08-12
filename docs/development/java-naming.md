@@ -1,7 +1,7 @@
 # Java 命名规范（语义重命名）
 
 **更新日期：** 2026-08-04
-**适用范围：** `comic-atlas` 各 Java 模块（api-service / reading-service / worker-service / comic-common / comic-contract / comic-persistence / gateway）
+**适用范围：** `comic-atlas` 各 Java 模块（api-service / reading-service / worker-service / comic-common / comic-shared / gateway）
 **依据：** 阿里 Java 开发手册《Java 开发手册（黄山版）》（禁止用魔法值、禁止拼音与单字母命名、缩写需为行业通用等约定）
 
 ---

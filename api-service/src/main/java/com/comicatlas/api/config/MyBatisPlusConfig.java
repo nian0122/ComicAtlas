@@ -33,7 +33,7 @@ public class MyBatisPlusConfig {
      * <p>
      * 默认 {@code EnumTypeHandler} 按 name() 严格匹配，历史脏数据会导致读取抛异常；
      * 自定义 handler 经 {@code safeValueOf} 兜底为 null 并告警，避免运行时崩溃。
-     * 共享枚举来自 comic-contract 的 {@code EnumTypeHandlers}，上传会话状态为管理端专属。
+     * 共享枚举来自 comic-shared 的 {@code EnumTypeHandlers}，上传会话状态为管理端专属。
      */
     @Bean
     public ConfigurationCustomizer enumTypeHandlerCustomizer() {
