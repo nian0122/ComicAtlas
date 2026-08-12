@@ -79,3 +79,6 @@ scripts/.omo/
 # Playwright 前端报告与截图（根 e2e 已忽略，此处覆盖 frontend/ 下）
 frontend/playwright-report/
 frontend/screenshots/
+
+# ffmpeg -encoders 探测在测试工作目录的误产物
+worker-service/-encoders

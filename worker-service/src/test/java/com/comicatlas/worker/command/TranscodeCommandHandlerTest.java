@@ -275,7 +275,7 @@ class TranscodeCommandHandlerTest {
             set "output="
             :loop
             if "%~1"=="" goto done
-            set "output=%~1"
+            if /i "%~x1"==".mp4" set "output=%~1"
             shift
             goto loop
             :done
