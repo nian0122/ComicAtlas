@@ -71,7 +71,7 @@ ComicAtlas 是一个面向个人收藏的本地漫画仓库平台。它把 ZIP�
    docker compose -f docker-compose.infra.yml up -d
    ```
 
-4. 启动 Gateway、API 和 Nginx：
+4. 启动 Gateway、阅读服务、管理服务和 Nginx：
 
    ```bash
    docker compose -f docker-compose.yml up -d --build

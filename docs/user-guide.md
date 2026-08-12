@@ -6,7 +6,7 @@
 
 ## 一、部署前准备
 
-ComicAtlas 由前端、Gateway、API、Worker、MySQL、Redis、RabbitMQ、Nacos 和 Nginx 组成。漫画文件由 Worker 写入本地存储，Nginx 以只读方式向浏览器提供文件。
+ComicAtlas 由前端、Gateway、阅读服务、管理服务、Worker、MySQL、Redis、RabbitMQ、Nacos 和 Nginx 组成。漫画文件由 Worker 写入本地存储，Nginx 以只读方式向浏览器提供文件。
 
 准备以下环境：
 
@@ -71,7 +71,9 @@ docker compose -f docker-compose.yml ps
 
 - 用户端：`http://localhost`
 - 管理后台：`http://localhost/manage`
-- Gateway/API：`http://localhost:8000`
+- Gateway（统一 API 入口）：`http://localhost:8000`
+
+Gateway 会把阅读端 `/api/**` 请求转给阅读服务，把管理端 `/api/manage/**` 请求优先转给管理服务；浏览器和前端只需访问 Gateway，不直接访问两个服务端口。
 
 `docker-compose.infra.yml` 包含 MySQL、Redis、RabbitMQ 和 Nacos，端口号保持为 3306、6379、5672、15672、8848、9848，并只绑定主机回环地址。如果基础设施运行在远程主机，本地不启动该文件；使用 `tools/maintenance/manage-remote-infra-frp.ps1` 建立 FRP STCP 连接，让项目容器通过 `host.docker.internal` 访问宿主机映射端口。完整配置见 [FRP 基础设施连接](operations/frp-infrastructure.md)。
 
@@ -226,7 +228,7 @@ MANGA_ROOT/lq/{comicId}/{chapterId}/文件名
 
 ### 导出漫画（分卷 ZIP）
 
-管理后台的存储管理可对漫画发起导出（`POST /api/storage/export/comics/{id}`）。导出是**异步打包**：任务完成后，产物以**标准分卷 ZIP** 落在宿主机本地目录：
+管理后台的存储管理可对漫画发起导出（`POST /api/manage/storage/export/comics/{id}`）。导出是**异步打包**：任务完成后，产物以**标准分卷 ZIP** 落在宿主机本地目录：
 
 ```text
 MANGA_ROOT/export/{taskId}/{书名}_{id}_{时间戳}.z01

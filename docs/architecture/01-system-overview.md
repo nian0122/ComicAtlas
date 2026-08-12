@@ -6,7 +6,7 @@
 
 ## 系统分层
 
-ComicAtlas 由四个运行时模块和一组基础设施组成。
+ComicAtlas 由五个运行时模块和一组基础设施组成。
 
 ```
 +-----------------------------------------------------------+
@@ -19,19 +19,20 @@ ComicAtlas 由四个运行时模块和一组基础设施组成。
 +-----------------------------------------------------------+
 |                   Gateway (Spring Cloud Gateway)           |
 |              路由转发 + Nacos 服务发现                       |
-+--------+----------------------------+---------------------+
-         |                            |
-         v                            v
-+------------------+        +---------------------+
-|   API Service    |  MQ    |   Worker Service    |
-|  (Spring Boot 3) |<------>|  (Spring Boot 3)    |
-|                  |        |                     |
-| - HTTP API       |        | - 文件解析           |
-| - MQ 消费(结果)   |        | - 文件搬运/存储       |
-| - 数据库写入      |        | - MQ 消费(任务)       |
-+--------+---------+        +----------+----------+
-         |                            |
-         v                            v
++--------+----------------------+-------------------+
+         |                      |                   |
+         v                      v                   v
++------------------+  +------------------+  +---------------------+
+| Reading Service  |  | Management API   |  |   Worker Service    |
+| (Spring Boot 3)  |  | (Spring Boot 3)  |  |  (Spring Boot 3)    |
+| - /api/** 查询    |  | - /api/manage/** |  | - 文件解析           |
+| - 阅读历史写入     |  | - MQ 结果消费     |  | - 文件搬运/存储       |
+| - Redis 查询缓存  |  | - 数据库业务写入   |  | - MQ 任务消费         |
++--------+---------+  +--------+---------+  +----------+----------+
+         |                      |                   |
+         +----------------------+-------------------+
+                                |
+                                v
 +-----------------------------------------------------------+
 |                    Infrastructure                          |
 |  MySQL  |  Redis  |  RabbitMQ  |  Nginx (静态文件服务)      |
@@ -41,8 +42,9 @@ ComicAtlas 由四个运行时模块和一组基础设施组成。
 ### 各层说明
 
 - **Frontend**: Vue3 + Vite 单页应用。提供漫画列表、详情页（CatalogTree）、阅读器、导入管理、管理后台等界面。通过 Gateway 访问后端 API。
-- **Gateway**: Spring Cloud Gateway。负责路由转发和 Nacos 服务发现。前端所有请求经 Gateway 分发到 API Service。
-- **API Service**: 核心业务服务。提供 HTTP API、消费 Worker 发回的 MQ 结果事件、写入 MySQL 数据库。合并元数据刷新快照并驱动 DB 差异落库。不碰文件系统。
+- **Gateway**: Spring Cloud Gateway。负责路由转发和 Nacos 服务发现。`/api/manage/**` 优先转发给管理服务，其他 `/api/**` 转发给阅读服务。
+- **Reading Service**: 阅读服务。提供漫画列表、详情、目录、章节阅读、分类与标签查询；写入 `reading_history` 阅读进度。使用 Redis 共享查询缓存，不消费 MQ，不执行 Flyway。
+- **Management API Service**: 管理服务。提供 `/api/manage/**` 写操作与管理查询，消费 Worker 发回的 MQ 结果事件，是除阅读进度外数据库业务写入和 Flyway 迁移的唯一执行方。不碰文件系统。
 - **Worker Service**: 文件处理服务。消费 MQ 任务消息、解析来源文件、搬运图片到存储根目录、写 metadata.json；元数据刷新时扫描 HQ 目录生成 STAGING 快照。不写数据库业务表。
 - **Infrastructure**: MySQL 持久化、Redis 缓存与幂等标记、RabbitMQ 异步消息、Nginx 静态文件代理（`/files/{root}/{path}` 映射到存储目录）。
 
@@ -54,8 +56,8 @@ ComicAtlas 由四个运行时模块和一组基础设施组成。
 
 | 模块 | 所在服务 | 职责 | 不做什么 |
 |------|----------|------|----------|
-| `ImportController` | API | 接收导入 HTTP 请求，创建 `comic` + `import_task` 记录，发送 MQ 任务消息 | 不碰文件系统，不解析来源 |
-| `ImportService` | API | 任务持久化、状态推进、MQ 消息发送 | 不解析文件，不搬运图片 |
+| `ImportController` | 管理服务 | 接收导入 HTTP 请求，创建 `comic` + `import_task` 记录，发送 MQ 任务消息 | 不碰文件系统，不解析来源 |
+| `ImportService` | 管理服务 | 任务持久化、状态推进、MQ 消息发送 | 不解析文件，不搬运图片 |
 | `ImportTaskHandler` | Worker | 消费 `import.task.queue`，按 `sourceType` 路由到具体 Handler（`ZipImportHandler` / `DirectoryImportHandler`） | 不写数据库，不解析漫画语义 |
 | `ZipImportHandler` | Worker | 解压 ZIP 到临时目录，委托 `DirectoryImportHandler` 处理 | 不解析漫画语义 |
 | `DirectoryImportHandler` | Worker | 调用 `DirectoryParser` 解析目录，调用 `MetadataAssembler` 组装元数据，调用 `StorageService` 把文件暂存到 `hq/{comicId}/{globalOrder}`（两阶段之第一阶段 staging），写 metadata.json | 不写数据库业务表，不生成 chapterId |
@@ -63,11 +65,11 @@ ComicAtlas 由四个运行时模块和一组基础设施组成。
 | `MetadataAssembler` | Worker | 将 `DirectoryTree` 转换为 `ComicMetadata`（注入 Catalog / Chapter / Page 结构） | 不碰文件系统 |
 | `StorageService` (接口) | Worker | 定义文件存储抽象：`transfer` / `resolve` / `exists` / `delete` | 不决定业务语义 |
 | `TransferService` (实现) | Worker | `StorageService` 的本地文件系统实现，按 `TransferMode`（COPY/MOVE）完成文件复制/移动、路径解析、存在性检查、删除 | 不写数据库 |
-| `ImportEventHandler` | API | 消费 `import.result.queue`，读取 metadata.json，INSERT catalog / chapter / page 到数据库；插入章节取得不可变 `chapterId`，逐章发送最终化请求；全部章节最终化完成才更新 comic 为 READY | 不碰文件系统 |
-| `ImportPersistenceService` | API | 两阶段落库编排：completed 插入结构并保持 IMPORTING/PENDING，finalize completed/failed 按章节累加收尾（全 READY → comic READY / task SUCCESS），失败可重试 | 不搬文件，不在事务内做 IO |
+| `ImportEventHandler` | 管理服务 | 消费 `import.result.queue`，读取 metadata.json，INSERT catalog / chapter / page 到数据库；插入章节取得不可变 `chapterId`，逐章发送最终化请求；全部章节最终化完成才更新 comic 为 READY | 不碰文件系统 |
+| `ImportPersistenceService` | 管理服务 | 两阶段落库编排：completed 插入结构并保持 IMPORTING/PENDING，finalize completed/failed 按章节累加收尾（全 READY → comic READY / task SUCCESS），失败可重试 | 不搬文件，不在事务内做 IO |
 | `ImportStorageFinalizeHandler` | Worker | 消费最终化请求，逐章把 `hq/{comicId}/{globalOrder}` 暂存目录移动到 `hq/{comicId}/{chapterId}`，每章发布 Completed | 不写数据库业务表 |
-| `ReaderService` | API | 按 `global_order` 取 prev / next 章节，组装阅读器 DTO | 不生成图片，不管理物理文件 |
-| `FileUrlResolver` | API | 将 `Page` 实体转换为 HTTP URL（`/files/{root}/{path}`） | 不管理物理文件 |
+| `ReaderService` | 阅读服务 | 按 `global_order` 取 prev / next 章节，组装阅读器 DTO | 不生成图片，不管理物理文件 |
+| `FileUrlResolver` | 共享模块 | 将 `Page` 实体转换为 HTTP URL（`/files/{root}/{path}`） | 不管理物理文件 |
 
 > **关于设计概念的说明**：设计文档中提到的"按来源路由"概念在当前实现中由 `ImportTaskHandler` 内部的 `switch (sourceType)` 直接承担，没有独立的路由类。"文件生命周期管理"概念对应 `StorageService` 接口及其实现 `TransferService`，加上 `DirectoryImportHandler` 中协调文件搬运和 metadata.json 写入的逻辑。
 
@@ -81,7 +83,7 @@ ComicAtlas 由四个运行时模块和一组基础设施组成。
 Source (ZIP / Directory)
         |
         v
-ImportController (API)
+ImportController (管理服务)
   - INSERT comic (status=IMPORTING)
   - INSERT import_task (status=PENDING)
   - 发送 MQ: comic.import.task.created
@@ -101,7 +103,7 @@ DirectoryImportHandler (Worker)   <-- 两阶段之第一阶段：staging
   - 发送 MQ: comic.import.task.completed
         |
         v
-ImportEventHandler (API)  <-- 消费 import.result.queue
+ImportEventHandler (管理服务)  <-- 消费 import.result.queue
   - 读取 metadata.json
   - INSERT catalog / chapter / page（插入章节取得不可变 chapterId，comic 保持 IMPORTING、media PENDING）
   - 逐章发送 MQ: comic.import.import.storage.finalize.requested（sourceDir=globalOrder → targetDir=chapterId）
@@ -112,7 +114,7 @@ ImportStorageFinalizeHandler (Worker)  <-- 消费 finalize.requested（两阶段
   - 每章发送 MQ: comic.import.import.storage.finalize.completed
         |
         v
-ImportPersistenceService (API)  <-- 消费 finalize.completed
+ImportPersistenceService (管理服务)  <-- 消费 finalize.completed
   - 逐章 media/chapter → READY；全部章节完成（无 PENDING）才 UPDATE comic (status=READY)
   - UPDATE import_task (status=SUCCESS)；任一章节失败则 FAILED/IMPORT_FAILED 可重试
 ```
@@ -144,24 +146,24 @@ flowchart TD
 
 | 流程 | 触发 | 路径 |
 |------|------|------|
-| 阅读 | 用户打开章节 | Frontend → API `ReaderService` → `FileUrlResolver` → Nginx 静态文件 |
-| LQ 生成 | 用户手动触发 | API `LqController` → MQ `comic.image.lq.generate` → Worker → 生成 LQ 图片 |
-| 漫画删除（回收） | 用户删除漫画 | API 创建管理任务（`COMIC_DELETE`）→ MQ `comic.management.command.requested` → Worker 移入 trash 卷 → API 更新生命周期为 `TRASHED`；永久删除走 `purge`（`TRASHED` + 7 天保留期 + 二次确认） |
-| 任务状态同步 | Worker 进度变化 | Worker `TaskStatusPublisher` → MQ `comic.task.status.changed` → API `ImportEventHandler` 更新 import_task |
+| 阅读 | 用户打开章节 | Frontend → Gateway → 阅读服务 `ReaderService` → `FileUrlResolver` → Nginx 静态文件 |
+| LQ 生成 | 用户手动触发 | 管理服务 → MQ `comic.image.lq.generate` → Worker → 生成 LQ 图片 |
+| 漫画删除（回收） | 用户删除漫画 | 管理服务创建管理任务（`COMIC_DELETE`）→ MQ `comic.management.command.requested` → Worker 移入 trash 卷 → 管理服务更新生命周期为 `TRASHED`；永久删除走 `purge`（`TRASHED` + 7 天保留期 + 二次确认） |
+| 任务状态同步 | Worker 进度变化 | Worker `TaskStatusPublisher` → MQ `comic.task.status.changed` → 管理服务 `ImportEventHandler` 更新 import_task |
 
 ---
 
 ## 核心设计原则
 
-### 1. Worker 不写数据库，API 不碰文件系统
+### 1. Worker 不写数据库，管理服务不碰文件系统
 
-这是系统最重要的边界。Worker 完成文件处理后，通过 MQ 事件通知 API，由 API 写入数据库。两者通过 `metadata.json` 文件传递结构化数据。导入采用**两阶段最终化**：Worker 先以 `globalOrder` 作为 DB ID 未生成前的漫画内暂存键把文件落到 `hq/{comicId}/{globalOrder}`（staging），API 读取 `metadata.json` 写入结构并生成不可变 `chapterId`，再逐章请求 Worker 把文件移动到正式 `hq/{comicId}/{chapterId}`；全部章节完成后 API 才将 comic 置为 READY、task 置为 SUCCESS。
+这是系统最重要的边界。Worker 完成文件处理后，通过 MQ 事件通知管理服务，由管理服务写入数据库。两者通过 `metadata.json` 文件传递结构化数据。导入采用**两阶段最终化**：Worker 先以 `globalOrder` 作为 DB ID 未生成前的漫画内暂存键把文件落到 `hq/{comicId}/{globalOrder}`（staging），管理服务读取 `metadata.json` 写入结构并生成不可变 `chapterId`，再逐章请求 Worker 把文件移动到正式 `hq/{comicId}/{chapterId}`；全部章节完成后管理服务才将 comic 置为 READY、task 置为 SUCCESS。
 
 - Worker 产出：物理文件（暂存于 `hq/{comicId}/{globalOrder}`）+ `metadata.json` + 恢复清单
-- API 消费：读取 `metadata.json`，写入 catalog / chapter / page 表，生成 `chapterId` 并驱动最终化
+- 管理服务消费：读取 `metadata.json`，写入 catalog / chapter / page 表，生成 `chapterId` 并驱动最终化
 - Worker 再搬运：按 `chapterId` 把文件移动到 `hq/{comicId}/{chapterId}`（两阶段之第二阶段）
 
-元数据刷新遵循同一边界：Worker 只读 DB 基线后按 `HQ/{comicId}/{chapterId}` 逐章扫描，写 STAGING 快照（SHA-256 + `databaseRevision`），API 校验后事务合并 DB（磁盘缺失行标记 `HQ MISSING`），CAS 释放 `REFRESHING → READY`，再经 Outbox 重导出 `metadata.json`（安全 DB→JSON 链）。
+元数据刷新遵循同一边界：Worker 只读 DB 基线后按 `HQ/{comicId}/{chapterId}` 逐章扫描，写 STAGING 快照（SHA-256 + `databaseRevision`），管理服务校验后事务合并 DB（磁盘缺失行标记 `HQ MISSING`），CAS 释放 `REFRESHING → READY`，再经 Outbox 重导出 `metadata.json`（安全 DB→JSON 链）。
 
 这条边界保证了 Worker 可以独立部署、独立扩缩，不会与 API 争抢数据库连接。
 
@@ -204,7 +206,8 @@ flowchart TD
 |----|------|------|
 | Frontend | Vue3 + Vite + Element Plus + Pinia | Vue 3.x |
 | Gateway | Spring Cloud Gateway | Spring Boot 3.x |
-| API Service | Spring Boot 3 + MyBatis Plus | Spring Boot 3.x |
+| Reading Service | Spring Boot 3 + MyBatis Plus + Redis | Spring Boot 3.x |
+| Management API Service | Spring Boot 3 + MyBatis Plus | Spring Boot 3.x |
 | Worker Service | Spring Boot 3 | Spring Boot 3.x |
 | 数据库 | MySQL | 8.x |
 | 缓存 | Redis | 7.x |

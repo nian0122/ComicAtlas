@@ -4,7 +4,7 @@
 
 所有响应格式：`{ "code": 200, "message": "success", "data": ... }`。业务失败时 `code` 为 HTTP 语义错误码（400/409/500 等），`message` 为可读错误，管理领域失败响应还可在 `data.reasonCode`（业务原因码）上补充原因。
 
-> 本文覆盖 v1.5 管理控制台端点。管理端新领域（任务中心 / 批量 / 回收站 / 上传 / 允许操作）自 v1.0 引入并在 v1.5 持续演进，端点对照 `api-service` 源码；所有示例均可被 `scripts/qa/verify-management-docs.ps1` 校验。
+> 本文覆盖当前读写服务拆分后的公开端点：阅读服务提供 `/api/**` 查询与阅读进度，管理服务提供 `/api/manage/**` 管理操作；Gateway 按管理前缀优先路由。管理端端点对照 `api-service`、阅读端端点对照 `reading-service` 源码；所有示例均可被 `scripts/qa/verify-management-docs.ps1` 校验。
 
 ---
 
