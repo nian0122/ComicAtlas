@@ -11,14 +11,14 @@ public class CorsConfig {
 
     @Bean
     public CorsFilter corsFilter() {
-        CorsConfiguration config = new CorsConfiguration();
-        config.addAllowedOriginPattern("*");
-        config.addAllowedMethod("*");
-        config.addAllowedHeader("*");
-        config.setAllowCredentials(true);
+        CorsConfiguration corsConfiguration = new CorsConfiguration();
+        corsConfiguration.addAllowedOriginPattern("*");
+        corsConfiguration.addAllowedMethod("*");
+        corsConfiguration.addAllowedHeader("*");
+        corsConfiguration.setAllowCredentials(true);
 
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", config);
-        return new CorsFilter(source);
+        UrlBasedCorsConfigurationSource corsConfigurationSource = new UrlBasedCorsConfigurationSource();
+        corsConfigurationSource.registerCorsConfiguration("/**", corsConfiguration);
+        return new CorsFilter(corsConfigurationSource);
     }
 }
