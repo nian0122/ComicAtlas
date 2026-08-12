@@ -99,6 +99,19 @@ class MediaAnalyzerSmokeTest {
     }
 
     @Test
+    @DisplayName("analyzeVideo 入口 container 无点（转码 probe 用，回归 .mp4 脏数据）")
+    void analyzeVideo_entry_containerWithoutDot() throws Exception {
+        Path mp4 = tmp.resolve("test.mp4");
+        Files.write(mp4, new byte[]{0, 0, 0, 0});
+        cfg.setFfprobePath("");  // 走 fallback，container 由扩展名派生
+
+        ComicMetadata.MediaInfo info = analyzer.analyzeVideo(mp4).orElseThrow();
+        assertThat(info.mediaType()).isEqualTo("VIDEO");
+        assertThat(info.container()).isEqualTo("mp4");
+        assertThat(info.container()).doesNotStartWith(".");
+    }
+
+    @Test
     @DisplayName("fake-ffprobe 返回 JSON → 解析视频元数据")
     void mp4_withFakeFfprobe_parsesVideoMetadata() throws Exception {
         Path mp4 = tmp.resolve("test.mp4");

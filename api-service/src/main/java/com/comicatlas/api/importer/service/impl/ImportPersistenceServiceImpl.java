@@ -337,7 +337,7 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
                     media.setDuration(toBigDecimal(mediaData.get("duration")));
                 }
                 if (mediaData.get("container") != null) {
-                    media.setContainer((String) mediaData.get("container"));
+                    media.setContainer(normalizeContainer((String) mediaData.get("container")));
                 }
                 if (mediaData.get("videoCodec") != null) {
                     media.setVideoCodec((String) mediaData.get("videoCodec"));
@@ -346,7 +346,7 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
                     media.setAudioCodec((String) mediaData.get("audioCodec"));
                 }
                 // 非标准视频（非 mp4/m4v）标记为待转码，供导入后手动触发转码
-                String container = (String) mediaData.get("container");
+                String container = normalizeContainer((String) mediaData.get("container"));
                 if (container == null || !isStandardVideoContainer(container)) {
                     media.setTranscodeStatus(TranscodeStatus.QUEUED);
                 }
@@ -629,10 +629,22 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
         return 2;
     }
 
-    /** 标准视频容器（无需转码）：mp4 / m4v，其余标记为待转码。 */
+    /** 标准视频容器（无需转码）：mp4 / m4v（兼容带点写法 .mp4/.m4v），其余标记为待转码。 */
     private static boolean isStandardVideoContainer(String container) {
-        String c = container.toLowerCase();
+        String c = normalizeContainer(container);
+        if (c == null) {
+            return false;
+        }
         return "mp4".equals(c) || "m4v".equals(c);
+    }
+
+    /** 容器名统一为无点形式：{@code .mp4} → {@code mp4}；null/空白返回 null。 */
+    private static String normalizeContainer(String container) {
+        if (container == null) {
+            return null;
+        }
+        String trimmed = container.trim();
+        return trimmed.startsWith(".") ? trimmed.substring(1) : trimmed;
     }
 
     private static BigDecimal toBigDecimal(Object value) {

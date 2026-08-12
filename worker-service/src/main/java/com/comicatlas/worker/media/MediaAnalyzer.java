@@ -67,6 +67,8 @@ public class MediaAnalyzer {
     /**
      * 分析视频文件，返回元数据。
      * 文件不存在或非视频类型时返回 empty。
+     * 容器名统一为无点形式（{@code mp4} 而非 {@code .mp4}），与 {@link #analyze} 一致，
+     * 避免转码后 probe 写入带点容器导致下游精确比对失配。
      */
     public Optional<ComicMetadata.MediaInfo> analyzeVideo(Path videoFile) {
         if (videoFile == null || !Files.exists(videoFile)) {
@@ -79,17 +81,18 @@ public class MediaAnalyzer {
         }
         long size = 0L;
         try { size = Files.size(videoFile); } catch (Exception e) { log.warn("读取视频文件大小失败: {}", videoFile, e); }
-        return Optional.of(analyzeVideo(videoFile, name, ext, size));
+        String container = ext.startsWith(".") ? ext.substring(1) : ext;
+        return Optional.of(analyzeVideo(videoFile, name, container, size));
     }
 
-    private ComicMetadata.MediaInfo analyzeVideo(Path file, String name, String ext, long size) {
+    private ComicMetadata.MediaInfo analyzeVideo(Path file, String name, String container, long size) {
         if (!workerConfig.isFfprobeEnabled()) {
-            return videoFallback(name, ext, size, "disabled");
+            return videoFallback(name, container, size, "disabled");
         }
         String ffprobe = workerConfig.resolveToolPath(workerConfig.getFfprobePath()).toString();
         if (!isFfprobeAvailable(ffprobe)) {
             log.debug("ffprobe 不可用 (path='{}'), 视频 {} 标记为 VIDEO 元数据为 null", ffprobe, name);
-            return videoFallback(name, ext, size, "ffprobe-unavailable");
+            return videoFallback(name, container, size, "ffprobe-unavailable");
         }
         try {
             ProcessBuilder processBuilder = new ProcessBuilder(
@@ -102,27 +105,27 @@ public class MediaAnalyzer {
                     processRunner.run(processBuilder, FFPROBE_TIMEOUT_SECONDS);
             if (result.exitCode() != 0) {
                 log.warn("ffprobe exit={} for {}", result.exitCode(), file);
-                return videoFallback(name, ext, size, "exit-" + result.exitCode());
+                return videoFallback(name, container, size, "exit-" + result.exitCode());
             }
-            return parseFfprobeJson(name, ext, size, result.stdout());
+            return parseFfprobeJson(name, container, size, result.stdout());
         } catch (InterruptedException e) {
             // 中断已恢复标志，进程已销毁
-            return videoFallback(name, ext, size, "interrupted");
+            return videoFallback(name, container, size, "interrupted");
         } catch (ExternalProcessRunner.ProcessTimeoutException e) {
             log.warn("ffprobe 读取 {} 超时 ({}s)", file, FFPROBE_TIMEOUT_SECONDS);
-            return videoFallback(name, ext, size, "timeout");
+            return videoFallback(name, container, size, "timeout");
         } catch (Exception e) {
             log.warn("ffprobe 读取 {} 失败", file, e);
-            return videoFallback(name, ext, size, "exception");
+            return videoFallback(name, container, size, "exception");
         }
     }
 
-    private ComicMetadata.MediaInfo videoFallback(String name, String ext, long size, String reason) {
+    private ComicMetadata.MediaInfo videoFallback(String name, String container, long size, String reason) {
         return new ComicMetadata.MediaInfo(name, 0, "READY", "NOT_GENERATED",
-                size, null, null, "VIDEO", null, ext, null, null);
+                size, null, null, "VIDEO", null, normalizeContainer(container), null, null);
     }
 
-    private ComicMetadata.MediaInfo parseFfprobeJson(String name, String ext, long size, String json) {
+    private ComicMetadata.MediaInfo parseFfprobeJson(String name, String container, long size, String json) {
         BigDecimal duration = null;
         Integer width = null, height = null;
         String videoCodec = null, audioCodec = null;
@@ -158,7 +161,16 @@ public class MediaAnalyzer {
             log.warn("解析 ffprobe JSON 失败: {}", e.toString());
         }
         return new ComicMetadata.MediaInfo(name, 0, "READY", "NOT_GENERATED",
-                size, width, height, "VIDEO", duration, ext, videoCodec, audioCodec);
+                size, width, height, "VIDEO", duration, normalizeContainer(container), videoCodec, audioCodec);
+    }
+
+    /** 容器名统一为无点形式：{@code .mp4} → {@code mp4}；null/空白保持原样。 */
+    private static String normalizeContainer(String container) {
+        if (container == null) {
+            return null;
+        }
+        String trimmed = container.trim();
+        return trimmed.startsWith(".") ? trimmed.substring(1) : trimmed;
     }
 
     /**
