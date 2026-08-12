@@ -41,6 +41,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -49,6 +50,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 
 /**
  * MetadataRefreshService 两阶段单元测试 — 阶段一（事务外受限读取/校验）+ 阶段二（事务内差异合并）。
@@ -498,6 +500,11 @@ class MetadataRefreshServiceTest {
                 assertThat(wrapper.getSqlSet()).contains("REPLACE");
                 assertThat(wrapper.getParamNameValuePairs().values()).contains("1/0/", "1/42/");
             }
+            // 顺序契约：合并的 updateById 必须先于前缀重写的 update 执行——否则 updateById 会把
+            // 预取的旧前缀 hq_path 整行写回，覆盖刚完成的重写（真实 DB 中会因此丢失迁移）
+            InOrder inOrder = inOrder(mediaMapper);
+            inOrder.verify(mediaMapper).updateById(any(Media.class));
+            inOrder.verify(mediaMapper, times(2)).update(isNull(), any(LambdaUpdateWrapper.class));
             // 快照合并照常执行（按 basename 匹配更新该行）
             assertThat(m101.getHqStatus()).isEqualTo(HqStatus.READY);
             assertThat(result.updated()).isEqualTo(1);

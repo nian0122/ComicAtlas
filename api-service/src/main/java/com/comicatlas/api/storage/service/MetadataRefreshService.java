@@ -157,11 +157,11 @@ public class MetadataRefreshService {
                         .in(Media::getChapterId, chapterIds)
                         .notIn(Media::getStatus, INACTIVE_STATUSES));
 
-        // 旧布局升级：快照标注 legacyDirKey 的章节（Worker 已移动文件），重写 page 行路径前缀为新布局
-        normalizeLegacyLayouts(snapshot, comicId);
-
         MergePlan plan = buildMergePlan(snapshot, activeMedia);
         executeMerge(plan);
+        // 旧布局升级：快照标注 legacyDirKey 的章节（Worker 已移动文件），在合并之后重写 page 行
+        // hq_path/lq_path 前缀为新布局——必须先于合并执行，否则 updateById 会把预取的旧前缀整行写回覆盖
+        normalizeLegacyLayouts(snapshot, comicId);
         refreshStats(comicId, chapterById, activeMedia, plan);
 
         log.info("元数据刷新合并完成: comicId={}, updated={}, inserted={}, missing={}",
