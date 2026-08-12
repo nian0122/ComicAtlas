@@ -1,15 +1,15 @@
-package com.comicatlas.api.common.storage;
+package com.comicatlas.persistence.storage;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.comicatlas.api.comic.entity.Chapter;
-import com.comicatlas.api.comic.entity.Comic;
-import com.comicatlas.api.comic.entity.Media;
-import com.comicatlas.api.comic.mapper.ChapterMapper;
-import com.comicatlas.api.common.enums.ComicStatus;
-import com.comicatlas.api.common.enums.HqStatus;
-import com.comicatlas.api.common.enums.LqStatus;
-import com.comicatlas.api.comic.mapper.ComicMapper;
-import com.comicatlas.api.comic.mapper.MediaMapper;
+import com.comicatlas.persistence.comic.entity.Chapter;
+import com.comicatlas.persistence.comic.entity.Comic;
+import com.comicatlas.persistence.comic.entity.Media;
+import com.comicatlas.persistence.comic.mapper.ChapterMapper;
+import com.comicatlas.contract.common.enums.ComicStatus;
+import com.comicatlas.contract.common.enums.HqStatus;
+import com.comicatlas.contract.common.enums.LqStatus;
+import com.comicatlas.persistence.comic.mapper.ComicMapper;
+import com.comicatlas.persistence.comic.mapper.MediaMapper;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;

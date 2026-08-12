@@ -1,8 +1,8 @@
 package com.comicatlas.api.importer.service.impl;
 
-import com.comicatlas.api.common.constant.HttpStatusCodes;
-import com.comicatlas.api.common.enums.DirectoryScanTaskStatus;
-import com.comicatlas.api.common.exception.BusinessException;
+import com.comicatlas.contract.common.constant.HttpStatusCodes;
+import com.comicatlas.contract.common.enums.DirectoryScanTaskStatus;
+import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.importer.dto.DirectoryScanTaskVO;
 import com.comicatlas.api.importer.entity.DirectoryScanTask;
 import com.comicatlas.api.importer.event.DirectoryScanEventPublisher;
@@ -12,8 +12,8 @@ import com.comicatlas.api.management.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
 import com.comicatlas.api.management.service.ManagementTaskService;
-import com.comicatlas.api.common.enums.ManagementTaskStatus;
-import com.comicatlas.api.common.enums.TaskType;
+import com.comicatlas.contract.common.enums.ManagementTaskStatus;
+import com.comicatlas.contract.common.enums.TaskType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.comicatlas.common.dto.ScanResultDTO;
 import lombok.RequiredArgsConstructor;

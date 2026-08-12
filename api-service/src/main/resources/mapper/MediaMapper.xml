@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.comicatlas.api.comic.mapper.MediaMapper">
+<mapper namespace="com.comicatlas.persistence.comic.mapper.MediaMapper">
 
     <!--
       导入落库专用批量 INSERT：全书聚合、固定批次上限（MEDIA_INSERT_BATCH_SIZE）、MySQL 多值 INSERT。

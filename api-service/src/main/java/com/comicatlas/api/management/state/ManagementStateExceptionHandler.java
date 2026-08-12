@@ -1,7 +1,7 @@
 package com.comicatlas.api.management.state;
 
-import com.comicatlas.api.common.Result;
-import com.comicatlas.api.common.constant.HttpStatusCodes;
+import com.comicatlas.contract.common.Result;
+import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;

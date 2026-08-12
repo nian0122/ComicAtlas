@@ -3,10 +3,10 @@ package com.comicatlas.api.management;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.comicatlas.api.common.exception.ConflictException;
-import com.comicatlas.api.common.enums.ComicStatus;
-import com.comicatlas.api.comic.entity.Comic;
-import com.comicatlas.api.comic.mapper.ComicMapper;
+import com.comicatlas.contract.common.exception.ConflictException;
+import com.comicatlas.contract.common.enums.ComicStatus;
+import com.comicatlas.persistence.comic.entity.Comic;
+import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.api.management.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
@@ -15,8 +15,8 @@ import com.comicatlas.api.management.entity.ManagementTaskItem;
 import com.comicatlas.api.management.mapper.ManagementTaskItemMapper;
 import com.comicatlas.api.management.mapper.ManagementTaskMapper;
 import com.comicatlas.api.management.service.ManagementTaskService;
-import com.comicatlas.api.common.enums.ManagementTaskStatus;
-import com.comicatlas.api.common.enums.TaskType;
+import com.comicatlas.contract.common.enums.ManagementTaskStatus;
+import com.comicatlas.contract.common.enums.TaskType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
@@ -379,7 +379,7 @@ class ManagementTaskServiceIT {
         @DisplayName("getTask 不存在时 404")
         void getTask_notFound_throws404() {
             assertThatThrownBy(() -> service.getTask(99999L))
-                .isInstanceOf(com.comicatlas.api.common.exception.BusinessException.class)
+                .isInstanceOf(com.comicatlas.contract.common.exception.BusinessException.class)
                 .hasMessageContaining("任务不存在");
         }
     }
@@ -418,7 +418,7 @@ class ManagementTaskServiceIT {
                     null, null, null);
 
             assertThatThrownBy(() -> service.cancelTask(task.getId()))
-                .isInstanceOf(com.comicatlas.api.common.exception.BusinessException.class)
+                .isInstanceOf(com.comicatlas.contract.common.exception.BusinessException.class)
                 .hasMessageContaining("已处于终态");
         }
     }
@@ -498,7 +498,7 @@ class ManagementTaskServiceIT {
             ManagementTaskResponse task = service.createTask(req, null, null);
 
             assertThatThrownBy(() -> service.retryTask(task.getId()))
-                .isInstanceOf(com.comicatlas.api.common.exception.BusinessException.class)
+                .isInstanceOf(com.comicatlas.contract.common.exception.BusinessException.class)
                 .hasMessageContaining("仅终态可重试");
         }
     }

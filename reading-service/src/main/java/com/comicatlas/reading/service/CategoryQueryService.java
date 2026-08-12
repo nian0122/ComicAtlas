@@ -1,6 +1,6 @@
 package com.comicatlas.reading.service;
 
-import com.comicatlas.api.comic.dto.CategoryDTO;
+import com.comicatlas.contract.comic.dto.CategoryDTO;
 
 import java.util.List;
 

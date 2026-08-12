@@ -6,7 +6,7 @@ import com.comicatlas.api.admin.dto.ComicStorageQuery;
 import com.comicatlas.api.admin.dto.ComicTranscodeStatusVO;
 import com.comicatlas.api.admin.mapper.StorageMapper;
 import com.comicatlas.api.admin.service.StorageQueryService;
-import com.comicatlas.api.common.storage.FileUrlResolver;
+import com.comicatlas.persistence.storage.FileUrlResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

@@ -5,14 +5,18 @@ import com.baomidou.mybatisplus.autoconfigure.ConfigurationCustomizer;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.OptimisticLockerInnerInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
-import com.comicatlas.api.common.handler.EnumTypeHandlers;
+import com.comicatlas.persistence.handler.EnumTypeHandlers;
 import com.comicatlas.api.upload.UploadSessionStatusTypeHandler;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-@MapperScan("com.comicatlas.api.*.mapper")
+@MapperScan({
+        "com.comicatlas.api.*.mapper",
+        "com.comicatlas.persistence.comic.mapper",
+        "com.comicatlas.persistence.reader.mapper"
+})
 public class MyBatisPlusConfig {
     @Bean
     public MybatisPlusInterceptor mybatisPlusInterceptor() {

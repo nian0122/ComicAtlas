@@ -1,16 +1,16 @@
 package com.comicatlas.reading.service.impl;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.comicatlas.api.comic.dto.ComicListQuery;
-import com.comicatlas.api.comic.dto.ComicListVO;
-import com.comicatlas.api.comic.entity.Category;
-import com.comicatlas.api.comic.entity.Comic;
-import com.comicatlas.api.comic.mapper.CategoryMapper;
-import com.comicatlas.api.comic.mapper.ComicMapper;
-import com.comicatlas.api.common.enums.ComicStatus;
-import com.comicatlas.api.common.storage.FileUrlResolver;
-import com.comicatlas.api.reader.entity.ReadingHistory;
-import com.comicatlas.api.reader.mapper.ReadingHistoryMapper;
+import com.comicatlas.contract.comic.dto.ComicListQuery;
+import com.comicatlas.contract.comic.dto.ComicListVO;
+import com.comicatlas.persistence.comic.entity.Category;
+import com.comicatlas.persistence.comic.entity.Comic;
+import com.comicatlas.persistence.comic.mapper.CategoryMapper;
+import com.comicatlas.persistence.comic.mapper.ComicMapper;
+import com.comicatlas.contract.common.enums.ComicStatus;
+import com.comicatlas.persistence.storage.FileUrlResolver;
+import com.comicatlas.persistence.reader.entity.ReadingHistory;
+import com.comicatlas.persistence.reader.mapper.ReadingHistoryMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

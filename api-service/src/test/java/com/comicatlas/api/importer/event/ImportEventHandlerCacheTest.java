@@ -1,13 +1,13 @@
 package com.comicatlas.api.importer.event;
 
-import com.comicatlas.api.comic.entity.Comic;
-import com.comicatlas.api.comic.mapper.ComicMapper;
+import com.comicatlas.persistence.comic.entity.Comic;
+import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
 import com.comicatlas.api.importer.service.ImportPersistenceService;
-import com.comicatlas.api.common.enums.ImportTaskStatus;
-import com.comicatlas.api.common.storage.ApiStorageProperties;
-import com.comicatlas.api.common.storage.ApiStorageRoot;
+import com.comicatlas.contract.common.enums.ImportTaskStatus;
+import com.comicatlas.persistence.storage.ApiStorageProperties;
+import com.comicatlas.persistence.storage.ApiStorageRoot;
 import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.common.event.ImportTaskCompletedEvent;
 import com.comicatlas.common.event.ImportTaskFailedEvent;

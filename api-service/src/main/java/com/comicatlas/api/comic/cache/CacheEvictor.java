@@ -1,5 +1,6 @@
 package com.comicatlas.api.comic.cache;
 
+import com.comicatlas.contract.comic.cache.ComicReferenceCache;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.Cache;
@@ -23,17 +24,17 @@ public class CacheEvictor {
      * 事务提交后失效指定缓存中的单个 key。
      *
      * @param cacheName 缓存名（如 ComicReferenceCache.CATEGORIES）
-     * @param key       缓存的 key（如 "all"）
+     * @param cacheKey  缓存键（如 "all"）
      */
-    public void evict(String cacheName, Object key) {
+    public void evict(String cacheName, Object cacheKey) {
         Runnable eviction = () -> {
             Cache cache = cacheManager.getCache(cacheName);
             if (cache != null) {
                 try {
-                    cache.evict(key);
-                    log.debug("缓存失效: cache={}, key={}", cacheName, key);
+                    cache.evict(cacheKey);
+                    log.debug("缓存失效: cache={}, key={}", cacheName, cacheKey);
                 } catch (RuntimeException e) {
-                    log.warn("缓存失效失败，继续使用数据库结果: cache={}, key={}", cacheName, key, e);
+                    log.warn("缓存失效失败，继续使用数据库结果: cache={}, key={}", cacheName, cacheKey, e);
                 }
             }
         };
@@ -59,10 +60,10 @@ public class CacheEvictor {
      * 因而使用整缓存失效保证跨服务可见的一致性。
      */
     public void evictComicList() {
-        evictAll(ComicReferenceCache.COMIC_LIST);
+        clearCache(ComicReferenceCache.COMIC_LIST);
     }
 
-    private void evictAll(String cacheName) {
+    private void clearCache(String cacheName) {
         Runnable eviction = () -> {
             Cache cache = cacheManager.getCache(cacheName);
             if (cache == null) {

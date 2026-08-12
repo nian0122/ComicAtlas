@@ -1,6 +1,6 @@
-package com.comicatlas.api.common.scan;
+package com.comicatlas.contract.common.scan;
 
-import com.comicatlas.api.common.storage.ApiStorageProperties;
+import com.comicatlas.persistence.storage.ApiStorageProperties;
 import com.comicatlas.common.storage.RelativePathValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

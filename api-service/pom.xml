@@ -27,7 +27,7 @@
             <version>${project.version}</version>
         </dependency>
 
-        <!-- Comic Shared（实体 / Mapper / DTO / common 基础设施，包名 com.comicatlas.api.* 不变） -->
+        <!-- 跨服务共享模型（contract + persistence） -->
         <dependency>
             <groupId>com.comicatlas</groupId>
             <artifactId>comic-shared</artifactId>

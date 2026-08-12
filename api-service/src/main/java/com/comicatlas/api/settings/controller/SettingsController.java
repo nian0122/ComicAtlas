@@ -1,6 +1,6 @@
 package com.comicatlas.api.settings.controller;
 
-import com.comicatlas.api.common.Result;
+import com.comicatlas.contract.common.Result;
 import com.comicatlas.api.settings.dto.SettingsDTO;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;

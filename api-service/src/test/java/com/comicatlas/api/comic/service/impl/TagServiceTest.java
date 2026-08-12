@@ -2,12 +2,12 @@ package com.comicatlas.api.comic.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.comic.cache.CacheEvictor;
-import com.comicatlas.api.comic.dto.TagDTO;
-import com.comicatlas.api.comic.entity.ComicTag;
-import com.comicatlas.api.comic.entity.Tag;
-import com.comicatlas.api.comic.mapper.ComicTagMapper;
-import com.comicatlas.api.comic.mapper.TagMapper;
-import com.comicatlas.api.common.exception.BusinessException;
+import com.comicatlas.contract.comic.dto.TagDTO;
+import com.comicatlas.persistence.comic.entity.ComicTag;
+import com.comicatlas.persistence.comic.entity.Tag;
+import com.comicatlas.persistence.comic.mapper.ComicTagMapper;
+import com.comicatlas.persistence.comic.mapper.TagMapper;
+import com.comicatlas.contract.common.exception.BusinessException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;

@@ -4,7 +4,7 @@ import com.comicatlas.api.admin.dto.ComicStorageDTO;
 import com.comicatlas.api.admin.dto.ComicStorageQuery;
 import com.comicatlas.api.admin.dto.ComicTranscodeStatusVO;
 import com.comicatlas.api.admin.mapper.StorageMapper;
-import com.comicatlas.api.common.storage.FileUrlResolver;
+import com.comicatlas.persistence.storage.FileUrlResolver;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

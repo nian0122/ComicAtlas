@@ -6,6 +6,7 @@
 | `user-guide.md` | 用户指南 |
 | `development-guide.md` | 开发流程 |
 | `architecture/` | 系统设计与模块说明（ADR 决策记录位于 `architecture/adr/`） |
+| `architecture/shared-module-boundaries.md` | 跨服务契约与持久化模块边界 |
 | `operations/` | 部署运维 |
 | `testing/` | 测试与验收清单 |
 | `releases/` | 发布说明（当前稳定版 v1.5.0，历史版本归档） |

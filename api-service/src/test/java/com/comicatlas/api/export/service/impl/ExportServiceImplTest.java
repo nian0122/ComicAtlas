@@ -1,9 +1,9 @@
 package com.comicatlas.api.export.service.impl;
 
-import com.comicatlas.api.comic.mapper.ComicMapper;
-import com.comicatlas.api.common.enums.ExportTaskStatus;
-import com.comicatlas.api.common.storage.ApiStorageProperties;
-import com.comicatlas.api.common.storage.ApiStorageRoot;
+import com.comicatlas.persistence.comic.mapper.ComicMapper;
+import com.comicatlas.contract.common.enums.ExportTaskStatus;
+import com.comicatlas.persistence.storage.ApiStorageProperties;
+import com.comicatlas.persistence.storage.ApiStorageRoot;
 import com.comicatlas.api.export.dto.ExportTaskVO;
 import com.comicatlas.api.export.entity.ExportTask;
 import com.comicatlas.api.export.event.ExportEventPublisher;

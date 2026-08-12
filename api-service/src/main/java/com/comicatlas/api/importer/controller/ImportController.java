@@ -1,7 +1,7 @@
 package com.comicatlas.api.importer.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.comicatlas.api.common.Result;
+import com.comicatlas.contract.common.Result;
 import com.comicatlas.api.importer.service.ImportService;
 import lombok.RequiredArgsConstructor;
 import com.comicatlas.api.importer.dto.BatchImportRequest;

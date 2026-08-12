@@ -1,6 +1,6 @@
 package com.comicatlas.api.comic.service;
 
-import com.comicatlas.api.comic.dto.TagDTO;
+import com.comicatlas.contract.comic.dto.TagDTO;
 
 /**
  * 标签管理接口（管理域写操作）。

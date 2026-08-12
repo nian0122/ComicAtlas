@@ -1,16 +1,16 @@
 package com.comicatlas.api;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.comicatlas.api.comic.entity.Catalog;
-import com.comicatlas.api.comic.entity.Category;
-import com.comicatlas.api.comic.entity.Chapter;
-import com.comicatlas.api.comic.entity.Comic;
-import com.comicatlas.api.comic.entity.ComicTag;
-import com.comicatlas.api.comic.entity.Media;
+import com.comicatlas.persistence.comic.entity.Catalog;
+import com.comicatlas.persistence.comic.entity.Category;
+import com.comicatlas.persistence.comic.entity.Chapter;
+import com.comicatlas.persistence.comic.entity.Comic;
+import com.comicatlas.persistence.comic.entity.ComicTag;
+import com.comicatlas.persistence.comic.entity.Media;
 import com.comicatlas.api.importer.entity.DirectoryScanTask;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.export.entity.ExportTask;
-import com.comicatlas.api.reader.entity.ReadingHistory;
+import com.comicatlas.persistence.reader.entity.ReadingHistory;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -126,7 +126,7 @@ class EntitySchemaContractTest {
         // 验证所有核心实体类可被 ClassLoader 加载
         Class<?>[] entities = {
                 Comic.class, Catalog.class, Chapter.class, Media.class,
-                com.comicatlas.api.comic.entity.Tag.class, ComicTag.class, Category.class,
+                com.comicatlas.persistence.comic.entity.Tag.class, ComicTag.class, Category.class,
                 ImportTask.class, DirectoryScanTask.class,
                 ExportTask.class, ReadingHistory.class
         };

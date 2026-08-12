@@ -1,10 +1,10 @@
 package com.comicatlas.api.comic;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.comicatlas.api.comic.entity.Comic;
-import com.comicatlas.api.comic.mapper.ComicMapper;
-import com.comicatlas.api.common.enums.ComicStatus;
-import com.comicatlas.api.common.enums.ImportTaskStatus;
+import com.comicatlas.persistence.comic.entity.Comic;
+import com.comicatlas.persistence.comic.mapper.ComicMapper;
+import com.comicatlas.contract.common.enums.ComicStatus;
+import com.comicatlas.contract.common.enums.ImportTaskStatus;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.event.ImportEventHandler;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
@@ -12,8 +12,8 @@ import com.comicatlas.api.management.entity.ManagementTask;
 import com.comicatlas.api.management.entity.ManagementTaskItem;
 import com.comicatlas.api.management.mapper.ManagementTaskItemMapper;
 import com.comicatlas.api.management.mapper.ManagementTaskMapper;
-import com.comicatlas.api.common.enums.ManagementTaskStatus;
-import com.comicatlas.api.common.enums.TaskType;
+import com.comicatlas.contract.common.enums.ManagementTaskStatus;
+import com.comicatlas.contract.common.enums.TaskType;
 import com.comicatlas.common.event.ImportTaskCompletedEvent;
 import com.comicatlas.common.event.ImportTaskFailedEvent;
 import com.fasterxml.jackson.databind.JsonNode;

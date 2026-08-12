@@ -1,7 +1,7 @@
 package com.comicatlas.reading.controller;
 
-import com.comicatlas.api.common.Result;
-import com.comicatlas.api.comic.dto.CategoryDTO;
+import com.comicatlas.contract.common.Result;
+import com.comicatlas.contract.comic.dto.CategoryDTO;
 import com.comicatlas.reading.service.CategoryQueryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;

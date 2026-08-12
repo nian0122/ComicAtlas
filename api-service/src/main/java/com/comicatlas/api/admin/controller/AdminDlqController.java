@@ -5,7 +5,7 @@ import com.comicatlas.api.admin.service.DlqBrokerClient.DlqMessage;
 import com.comicatlas.api.admin.service.DlqService.DlqQueueVO;
 import com.comicatlas.api.admin.service.DlqService.PurgeResult;
 import com.comicatlas.api.admin.service.DlqService.ReplayResult;
-import com.comicatlas.api.common.Result;
+import com.comicatlas.contract.common.Result;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;

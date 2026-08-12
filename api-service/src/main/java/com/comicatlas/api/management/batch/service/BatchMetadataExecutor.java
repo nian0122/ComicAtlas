@@ -1,17 +1,17 @@
 package com.comicatlas.api.management.batch.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.comicatlas.api.comic.entity.Category;
-import com.comicatlas.api.comic.entity.Comic;
-import com.comicatlas.api.comic.entity.ComicTag;
-import com.comicatlas.api.comic.entity.Tag;
-import com.comicatlas.api.comic.mapper.CategoryMapper;
-import com.comicatlas.api.comic.mapper.ComicMapper;
-import com.comicatlas.api.comic.mapper.ComicTagMapper;
-import com.comicatlas.api.comic.mapper.TagMapper;
+import com.comicatlas.persistence.comic.entity.Category;
+import com.comicatlas.persistence.comic.entity.Comic;
+import com.comicatlas.persistence.comic.entity.ComicTag;
+import com.comicatlas.persistence.comic.entity.Tag;
+import com.comicatlas.persistence.comic.mapper.CategoryMapper;
+import com.comicatlas.persistence.comic.mapper.ComicMapper;
+import com.comicatlas.persistence.comic.mapper.ComicTagMapper;
+import com.comicatlas.persistence.comic.mapper.TagMapper;
 import com.comicatlas.api.management.batch.dto.BatchOperationPayloadDTO;
 import com.comicatlas.api.management.service.ManagementTaskService;
-import com.comicatlas.api.common.enums.ManagementTaskStatus;
+import com.comicatlas.contract.common.enums.ManagementTaskStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

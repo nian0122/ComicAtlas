@@ -26,9 +26,9 @@
     </appender>
 
     <logger name="com.comicatlas.api" level="DEBUG" />
-    <logger name="com.comicatlas.api.comic.mapper" level="DEBUG" />
+    <logger name="com.comicatlas.persistence.comic.mapper" level="DEBUG" />
     <logger name="com.comicatlas.api.importer.mapper" level="DEBUG" />
-    <logger name="com.comicatlas.api.reader.mapper" level="DEBUG" />
+    <logger name="com.comicatlas.persistence.reader.mapper" level="DEBUG" />
     <logger name="org.springframework.amqp" level="INFO" />
 
     <root level="INFO">

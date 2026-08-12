@@ -1,8 +1,8 @@
 package com.comicatlas.api.comic.controller;
 
-import com.comicatlas.api.comic.dto.CategoryDTO;
+import com.comicatlas.contract.comic.dto.CategoryDTO;
 import com.comicatlas.api.comic.service.CategoryManagementService;
-import com.comicatlas.api.common.Result;
+import com.comicatlas.contract.common.Result;
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.web.bind.annotation.RequestMapping;

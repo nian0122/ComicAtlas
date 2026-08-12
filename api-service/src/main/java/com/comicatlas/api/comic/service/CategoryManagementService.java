@@ -1,6 +1,6 @@
 package com.comicatlas.api.comic.service;
 
-import com.comicatlas.api.comic.dto.CategoryDTO;
+import com.comicatlas.contract.comic.dto.CategoryDTO;
 
 /**
  * 分类管理接口（管理域写操作）。

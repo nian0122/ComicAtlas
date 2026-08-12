@@ -13,37 +13,30 @@
     <artifactId>comic-shared</artifactId>
     <packaging>jar</packaging>
     <name>Comic Shared</name>
-    <description>阅读服务与管理服务共享的持久化层与基础能力（实体/Mapper/DTO/common 基础设施，包名保持 com.comicatlas.api.* 不变）</description>
+    <description>跨服务共享模型：contract 与 persistence 包边界</description>
 
     <properties>
-        <!-- 上游 -Dtest 指定 api-service 测试时，comic-shared 无匹配测试不视为失败 -->
+        <!-- 上游 -Dtest 指定服务测试时，本模块无匹配测试不视为失败 -->
         <surefire.failIfNoSpecifiedTests>false</surefire.failIfNoSpecifiedTests>
     </properties>
 
     <dependencies>
-        <!-- Comic Common（事件 DTO / MQ 契约 / 工具） -->
+        <!-- Spring Web（全局异常处理器与协议适配） -->
         <dependency>
-            <groupId>com.comicatlas</groupId>
-            <artifactId>comic-common</artifactId>
-            <version>${project.version}</version>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-web</artifactId>
         </dependency>
-
-        <!-- MyBatis Plus（Mapper BaseMapper / LambdaQueryWrapper） -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-tx</artifactId>
+        </dependency>
         <dependency>
             <groupId>com.baomidou</groupId>
             <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
         </dependency>
-
-        <!-- Spring 上下文（storage 基础设施 @Component / @ConfigurationProperties） -->
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-context</artifactId>
-        </dependency>
-
-        <!-- Spring Web（全局异常处理器 @RestControllerAdvice，共享层必备） -->
-        <dependency>
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-web</artifactId>
         </dependency>
 
         <!-- Validation（DTO 校验注解） -->

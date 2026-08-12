@@ -1,8 +1,8 @@
 package com.comicatlas.reading.service.impl;
 
-import com.comicatlas.api.comic.dto.TagDTO;
-import com.comicatlas.api.comic.entity.Tag;
-import com.comicatlas.api.comic.mapper.TagMapper;
+import com.comicatlas.contract.comic.dto.TagDTO;
+import com.comicatlas.persistence.comic.entity.Tag;
+import com.comicatlas.persistence.comic.mapper.TagMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

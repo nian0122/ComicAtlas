@@ -1,13 +1,13 @@
 package com.comicatlas.api.management.batch.service;
 
-import com.comicatlas.api.comic.entity.Comic;
-import com.comicatlas.api.comic.mapper.ComicMapper;
+import com.comicatlas.persistence.comic.entity.Comic;
+import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.api.management.batch.BatchReasonCode;
 import com.comicatlas.api.management.batch.dto.BlockedBatchItem;
 import com.comicatlas.api.management.policy.AllowedOperations;
 import com.comicatlas.api.management.policy.MediaOperationEligibilityService;
 import com.comicatlas.api.management.policy.OperationPolicyService;
-import com.comicatlas.api.common.enums.TaskType;
+import com.comicatlas.contract.common.enums.TaskType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

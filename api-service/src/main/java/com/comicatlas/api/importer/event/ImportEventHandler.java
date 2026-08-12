@@ -1,12 +1,12 @@
 package com.comicatlas.api.importer.event;
 
-import com.comicatlas.api.comic.entity.Comic;
-import com.comicatlas.api.comic.mapper.ComicMapper;
-import com.comicatlas.api.common.enums.ComicStatus;
-import com.comicatlas.api.common.enums.ImportTaskStatus;
-import com.comicatlas.api.common.enums.ManagementTaskStatus;
-import com.comicatlas.api.common.enums.TaskType;
-import com.comicatlas.api.common.storage.ApiStorageProperties;
+import com.comicatlas.persistence.comic.entity.Comic;
+import com.comicatlas.persistence.comic.mapper.ComicMapper;
+import com.comicatlas.contract.common.enums.ComicStatus;
+import com.comicatlas.contract.common.enums.ImportTaskStatus;
+import com.comicatlas.contract.common.enums.ManagementTaskStatus;
+import com.comicatlas.contract.common.enums.TaskType;
+import com.comicatlas.persistence.storage.ApiStorageProperties;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
 import com.comicatlas.api.importer.service.ImportPersistenceService;
@@ -127,8 +127,8 @@ public class ImportEventHandler {
 
         // 阶段状态（DOWNLOADING/EXTRACTING/PARSING）同步到统一任务 stage 列（TaskStage 枚举）
         if (task.getManagementTaskId() != null) {
-            com.comicatlas.api.common.enums.TaskStage stage =
-                    com.comicatlas.api.common.enums.TaskStage.fromStatus(newStatus);
+            com.comicatlas.contract.common.enums.TaskStage stage =
+                    com.comicatlas.contract.common.enums.TaskStage.fromStatus(newStatus);
             if (stage != null) {
                 managementTaskService.updateStage(task.getManagementTaskId(), stage, event.progress());
             }

@@ -1,13 +1,13 @@
 package com.comicatlas.reading.service.impl;
 
-import com.comicatlas.api.comic.entity.Chapter;
-import com.comicatlas.api.comic.entity.Comic;
-import com.comicatlas.api.comic.mapper.ChapterMapper;
-import com.comicatlas.api.comic.mapper.ComicMapper;
-import com.comicatlas.api.common.storage.FileUrlResolver;
-import com.comicatlas.api.reader.dto.HistoryVO;
-import com.comicatlas.api.reader.entity.ReadingHistory;
-import com.comicatlas.api.reader.mapper.ReadingHistoryMapper;
+import com.comicatlas.persistence.comic.entity.Chapter;
+import com.comicatlas.persistence.comic.entity.Comic;
+import com.comicatlas.persistence.comic.mapper.ChapterMapper;
+import com.comicatlas.persistence.comic.mapper.ComicMapper;
+import com.comicatlas.persistence.storage.FileUrlResolver;
+import com.comicatlas.contract.reader.dto.HistoryVO;
+import com.comicatlas.persistence.reader.entity.ReadingHistory;
+import com.comicatlas.persistence.reader.mapper.ReadingHistoryMapper;
 import com.comicatlas.reading.service.HistoryService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

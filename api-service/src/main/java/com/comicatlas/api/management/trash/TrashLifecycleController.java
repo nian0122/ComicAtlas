@@ -1,6 +1,6 @@
 package com.comicatlas.api.management.trash;
 
-import com.comicatlas.api.common.Result;
+import com.comicatlas.contract.common.Result;
 import com.comicatlas.api.management.dto.OperationSubmitResultDTO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

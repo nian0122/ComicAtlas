@@ -1,6 +1,6 @@
 package com.comicatlas.reading.service;
 
-import com.comicatlas.api.comic.dto.TagDTO;
+import com.comicatlas.contract.comic.dto.TagDTO;
 
 import java.util.List;
 

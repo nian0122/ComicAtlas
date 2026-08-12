@@ -2,7 +2,7 @@ package com.comicatlas.api.storage.controller;
 
 import com.comicatlas.api.admin.dto.StorageStatsDTO;
 import com.comicatlas.api.admin.service.AdminService;
-import com.comicatlas.api.common.Result;
+import com.comicatlas.contract.common.Result;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;

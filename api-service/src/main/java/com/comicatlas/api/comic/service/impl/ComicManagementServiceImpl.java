@@ -1,13 +1,13 @@
 package com.comicatlas.api.comic.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.comicatlas.api.comic.assemble.ComicDetailAssembler;
+import com.comicatlas.persistence.comic.assemble.ComicDetailAssembler;
 import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.comic.service.ComicManagementService;
-import com.comicatlas.api.common.constant.HttpStatusCodes;
-import com.comicatlas.api.common.enums.ComicStatus;
-import com.comicatlas.api.common.exception.BusinessException;
-import com.comicatlas.api.common.exception.ConflictException;
+import com.comicatlas.contract.common.constant.HttpStatusCodes;
+import com.comicatlas.contract.common.enums.ComicStatus;
+import com.comicatlas.contract.common.exception.BusinessException;
+import com.comicatlas.contract.common.exception.ConflictException;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
 import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.management.trash.TrashLifecycleService;
@@ -21,22 +21,22 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
-import com.comicatlas.api.comic.dto.BatchComicUpdateDTO;
-import com.comicatlas.api.comic.dto.BatchUpdateResultVO;
-import com.comicatlas.api.comic.dto.ComicDetailVO;
-import com.comicatlas.api.comic.dto.ComicMetadataDTO;
-import com.comicatlas.api.comic.dto.ComicMetadataUpdateDTO;
-import com.comicatlas.api.comic.dto.ComicTagUpdateDTO;
-import com.comicatlas.api.comic.dto.CreateComicRequest;
-import com.comicatlas.api.comic.dto.UpdateComicRequest;
-import com.comicatlas.api.comic.entity.Comic;
-import com.comicatlas.api.comic.mapper.CategoryMapper;
-import com.comicatlas.api.comic.mapper.ComicMapper;
-import com.comicatlas.api.comic.mapper.ComicTagMapper;
-import com.comicatlas.api.comic.mapper.TagMapper;
-import com.comicatlas.api.comic.entity.Category;
-import com.comicatlas.api.comic.entity.ComicTag;
-import com.comicatlas.api.comic.entity.Tag;
+import com.comicatlas.contract.comic.dto.BatchComicUpdateDTO;
+import com.comicatlas.contract.comic.dto.BatchUpdateResultVO;
+import com.comicatlas.contract.comic.dto.ComicDetailVO;
+import com.comicatlas.contract.comic.dto.ComicMetadataDTO;
+import com.comicatlas.contract.comic.dto.ComicMetadataUpdateDTO;
+import com.comicatlas.contract.comic.dto.ComicTagUpdateDTO;
+import com.comicatlas.contract.comic.dto.CreateComicRequest;
+import com.comicatlas.contract.comic.dto.UpdateComicRequest;
+import com.comicatlas.persistence.comic.entity.Comic;
+import com.comicatlas.persistence.comic.mapper.CategoryMapper;
+import com.comicatlas.persistence.comic.mapper.ComicMapper;
+import com.comicatlas.persistence.comic.mapper.ComicTagMapper;
+import com.comicatlas.persistence.comic.mapper.TagMapper;
+import com.comicatlas.persistence.comic.entity.Category;
+import com.comicatlas.persistence.comic.entity.ComicTag;
+import com.comicatlas.persistence.comic.entity.Tag;
 
 @Slf4j
 @Service
