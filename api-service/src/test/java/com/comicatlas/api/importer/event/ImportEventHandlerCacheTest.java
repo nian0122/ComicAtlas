@@ -5,6 +5,7 @@ import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
 import com.comicatlas.api.importer.service.ImportPersistenceService;
+import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.enums.ImportTaskStatus;
 import com.comicatlas.persistence.storage.ApiStorageProperties;
 import com.comicatlas.persistence.storage.ApiStorageRoot;
@@ -42,6 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -161,5 +163,52 @@ class ImportEventHandlerCacheTest {
         ArgumentCaptor<ImportTask> captor = ArgumentCaptor.forClass(ImportTask.class);
         verify(taskMapper).updateById(captor.capture());
         assertThat(captor.getValue().getStatus()).isNull();
+    }
+
+    /**
+     * Worker 导入失败只发 TaskStatusChangedEvent(FAILED) 不发 ImportTaskFailedEvent：
+     * comic 必须联动 IMPORT_FAILED，否则漫画永久卡 IMPORTING（taskId=207/comicId=239 复现）。
+     */
+    @Test
+    void handleTaskStatusChanged_withFailedStatus_marksComicImportFailed() throws Exception {
+        ImportTask task = new ImportTask();
+        task.setId(33L);
+        task.setComicId(40L);
+        task.setStatus(ImportTaskStatus.PARSING);
+
+        Comic comic = new Comic();
+        comic.setId(40L);
+        comic.setStatus(ComicStatus.IMPORTING);
+
+        when(taskMapper.selectById(33L)).thenReturn(task);
+        when(comicMapper.selectById(40L)).thenReturn(comic);
+
+        TaskStatusChangedEvent event = new TaskStatusChangedEvent(
+                UUID.randomUUID(), Instant.now(), 33L, "FAILED", 0, null, 0, 0);
+
+        runInTransaction(() -> handler.handleTaskStatusChanged(event, channel, 1L));
+        verify(channel).basicAck(1L, false);
+
+        ArgumentCaptor<Comic> captor = ArgumentCaptor.forClass(Comic.class);
+        verify(comicMapper).updateById(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo(ComicStatus.IMPORT_FAILED);
+    }
+
+    /** 非 FAILED 状态（如 READY/阶段值）不得触发 comic 联动。 */
+    @Test
+    void handleTaskStatusChanged_withNonFailedStatus_doesNotTouchComic() throws Exception {
+        ImportTask task = new ImportTask();
+        task.setId(34L);
+        task.setComicId(41L);
+        task.setStatus(ImportTaskStatus.PARSING);
+
+        when(taskMapper.selectById(34L)).thenReturn(task);
+
+        TaskStatusChangedEvent event = new TaskStatusChangedEvent(
+                UUID.randomUUID(), Instant.now(), 34L, "DOWNLOADING", 10, "HTTP", 0, 0);
+
+        runInTransaction(() -> handler.handleTaskStatusChanged(event, channel, 1L));
+
+        verify(comicMapper, never()).updateById(any(Comic.class));
     }
 }

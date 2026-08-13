@@ -150,6 +150,12 @@ public class ImportEventHandler {
                         mgmtItem.getId(), mgmtStatus, null, "IMPORT_TASK", task.getId());
             }
         }
+
+        // Worker 导入失败只发 TaskStatusChangedEvent(FAILED)（同 task-21 注记），
+        // 若不联动 comic → IMPORT_FAILED，漫画将永久卡 IMPORTING（如 taskId=207/comicId=239）。
+        if ("FAILED".equals(newStatus)) {
+            markComicImportFailed(task);
+        }
     }
 
     @RabbitListener(queues = MqQueues.IMPORT_FAILED)
@@ -182,14 +188,9 @@ public class ImportEventHandler {
      * 导入失败：comic → IMPORT_FAILED（可重试），并标记管理任务项失败。
      */
     private void markImportFailed(ImportTask task) {
-        Comic comic = comicMapper.selectById(task.getComicId());
+        Comic comic = markComicImportFailed(task);
         if (comic == null) {
             return;
-        }
-        if (comic.getStatus() == ComicStatus.IMPORTING) {
-            ManagementStateMachine.validateComicTransition(comic.getStatus().name(), "IMPORT_FAILED");
-            comic.setStatus(ComicStatus.IMPORT_FAILED);
-            comicMapper.updateById(comic);
         }
         ManagementTaskItem mgmtItem = managementTaskService.findActiveItem(
                 "COMIC", comic.getId(), TaskType.IMPORT);
@@ -198,6 +199,23 @@ public class ImportEventHandler {
                     mgmtItem.getId(), ManagementTaskStatus.FAILED,
                     task.getErrorMessage(), "IMPORT_TASK", task.getId());
         }
+    }
+
+    /**
+     * comic → IMPORT_FAILED（仅当处于 IMPORTING）。
+     * 供 ImportTaskFailedEvent 与 TaskStatusChangedEvent(FAILED) 两条失败路径共用。
+     *
+     * @return 加载到的 comic；不存在时返回 null
+     */
+    private Comic markComicImportFailed(ImportTask task) {
+        Comic comic = comicMapper.selectById(task.getComicId());
+        if (comic == null || comic.getStatus() != ComicStatus.IMPORTING) {
+            return comic;
+        }
+        ManagementStateMachine.validateComicTransition(comic.getStatus().name(), "IMPORT_FAILED");
+        comic.setStatus(ComicStatus.IMPORT_FAILED);
+        comicMapper.updateById(comic);
+        return comic;
     }
 
     private boolean isEventProcessed(String idempKey) {
