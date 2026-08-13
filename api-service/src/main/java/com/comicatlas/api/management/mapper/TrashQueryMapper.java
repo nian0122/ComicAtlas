@@ -47,7 +47,9 @@ public interface TrashQueryMapper {
 
     @Select("""
         <script>
-        SELECT * FROM (""" + UNION_SQL + """
+        SELECT target_type, target_id, comic_id, chapter_id, title, subtitle, cover_url,
+               status, media_type, page_number, created_at, trashed_at
+          FROM (""" + UNION_SQL + """
         ) trash
         WHERE trash.status = #{status}
           <if test='keyword != null and keyword != ""'>
