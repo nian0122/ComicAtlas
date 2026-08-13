@@ -3,7 +3,7 @@ package com.comicatlas.reading.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.comicatlas.persistence.comic.assemble.ComicDetailAssembler;
+import com.comicatlas.persistence.comic.assembler.ComicDetailAssembler;
 import com.comicatlas.contract.comic.dto.ComicDetailVO;
 import com.comicatlas.contract.comic.dto.ComicListQuery;
 import com.comicatlas.contract.comic.dto.ComicListVO;
