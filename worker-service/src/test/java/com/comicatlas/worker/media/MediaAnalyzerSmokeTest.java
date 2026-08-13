@@ -15,6 +15,9 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+
+import org.mockito.ArgumentCaptor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -166,6 +169,30 @@ class MediaAnalyzerSmokeTest {
         assertThat(info.width()).isNull();
         assertThat(info.duration()).isNull();
         Mockito.verifyNoInteractions(mockRunner);
+    }
+
+    @Test
+    @DisplayName("ffprobe 命令使用 -loglevel fatal 抑制损坏流错误刷屏")
+    void ffprobeCommand_usesFatalLoglevel() throws Exception {
+        Path mp4 = tmp.resolve("test.mp4");
+        Files.write(mp4, new byte[]{0, 0, 0, 0});
+        Path fakeScript = createFakeFfprobeScript(tmp);
+        cfg.setFfprobePath(fakeScript.toString());
+
+        ExternalProcessRunner mockRunner = Mockito.mock(ExternalProcessRunner.class);
+        String jsonBody = "{\"streams\":[{\"codec_type\":\"video\",\"codec_name\":\"h264\",\"width\":1920,\"height\":1080},{\"codec_type\":\"audio\",\"codec_name\":\"aac\"}],\"format\":{\"duration\":\"125.500000\"}}";
+        Mockito.when(mockRunner.run(Mockito.any(ProcessBuilder.class), Mockito.anyLong(), Mockito.anyString()))
+                .thenReturn(new ExternalProcessRunner.ExternalProcessResult(0, jsonBody));
+        MediaAnalyzer analyzer6 = new MediaAnalyzer(cfg, om, mockRunner);
+
+        ComicMetadata.MediaInfo info = analyzer6.analyze(mp4);
+        assertThat(info.width()).isEqualTo(1920);
+
+        ArgumentCaptor<ProcessBuilder> captor = ArgumentCaptor.forClass(ProcessBuilder.class);
+        Mockito.verify(mockRunner).run(captor.capture(), Mockito.anyLong(), Mockito.anyString());
+        List<String> cmd = captor.getValue().command();
+        assertThat(cmd).contains("-loglevel", "fatal");
+        assertThat(cmd).doesNotContain("error");
     }
 
     @Test

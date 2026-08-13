@@ -102,9 +102,11 @@ public class MediaAnalyzer {
             return videoFallback(name, container, size, "ffprobe-unavailable");
         }
         try {
+            // -loglevel fatal：损坏流的 NAL 解码错误（error 级）不再刷屏日志；
+            // 三参重载分离 stderr：残留的 fatal 级输出经 [ffprobe] tag 打日志，stdout 保持纯 JSON。
             ProcessBuilder processBuilder = new ProcessBuilder(
                     ffprobe,
-                    "-v", "error",
+                    "-loglevel", "fatal",
                     "-show_format", "-show_streams",
                     "-of", "json",
                     file.toAbsolutePath().toString());
