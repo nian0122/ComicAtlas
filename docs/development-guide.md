@@ -10,13 +10,13 @@
 
 | 分支 | 用途 |
 |------|------|
-| `main` | 面向用户的稳定版本；只接收已验证的发布内容。 |
+| `main` | 面向用户的稳定部署树；只接收已验证的发布内容与部署必需文件。 |
 | `develop` | 日常开发集成分支；下一版本的功能和修复先汇总到这里。 |
 | `feature/<名称>` | 从 `develop` 创建的功能分支，例如 `feature/恢复任务中心`。 |
 | `fix/<名称>` | 从 `develop` 创建的普通缺陷修复分支。 |
 | `hotfix/<名称>` | 从 `main` 创建的线上紧急修复分支；完成后必须合并回 `main` 和 `develop`。 |
 
-不要直接在 `main` 上开发，也不要把未验证的功能推送到 `main`。
+不要直接在 `main` 上开发，也不要把未验证的功能推送到 `main`。开发工具和发布内容的文件边界以本文件“发布稳定版本”章节为准。
 
 ## 开始一个功能
 
@@ -112,18 +112,37 @@ git status
 
 ## 发布稳定版本
 
-当 `develop` 已通过前端构建、后端测试和真实导入—阅读链路验证后，才发布到 `main`：
+当 `develop` 已通过前端构建、后端测试和真实导入—阅读链路验证后，才发布到 `main`。不要将 `develop` 直接整体合并进 `main`：`develop` 需要保留开发、QA 和测试文件，而 `main` 只保留部署树。
+
+### 发布树禁入清单
+
+以下路径只能留在 `develop` 或功能分支，任何候选发布分支与 `main` 都不得跟踪：
+
+- `.mvn/`、`mvnw`、`mvnw.cmd`、`docker-compose.test.yml`
+- `e2e/`、`frontend/e2e/`、`frontend/e2e-legacy/`、`frontend/test-fixtures/`
+- `scripts/dev/`、`scripts/qa/`、`tools/migration/`
+
+发布从 `main` 创建候选分支；只拣选经过验证的运行代码、部署配置、用户文档、发布说明和发布门禁。合入前、合入后打标签前分别运行发布树校验，任一失败均不得继续发布：
 
 ```bash
 git switch main
 git pull --rebase origin main
-git merge --no-ff develop -m "发布 X.Y.Z"
+git switch -c release/X.Y.Z
+
+# 拣选已验证的发布提交；不要合并整个 develop
+git cherry-pick <已验证提交>
+
+pwsh -NoProfile -File scripts/release/verify-release-tree.ps1
+git switch main
+git merge --no-ff release/X.Y.Z -m "发布 X.Y.Z"
+pwsh -NoProfile -File scripts/release/verify-release-tree.ps1
+git switch main
 git tag -a vX.Y.Z -m "ComicAtlas X.Y.Z 稳定版本"
 git push origin main --follow-tags
 git push origin develop
 ```
 
-发布说明写入 `docs/releases/vX.Y.Z.md`，用户操作变更同步更新 `README.md` 和 `docs/user-guide.md`。
+发布说明写入 `docs/releases/vX.Y.Z.md`，用户操作变更同步更新 `README.md` 和 `docs/user-guide.md`。热修复合入 `main` 后回流 `develop` 时，只回流运行代码、文档和修复本身；不得删除 `develop` 中的研发工具。
 
 ## 常见情况
 
