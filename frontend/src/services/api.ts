@@ -38,6 +38,21 @@ import type {
   UploadSessionStatus,
 } from '@/types'
 
+export type TrashContentVO = {
+  readonly targetType: 'COMIC' | 'CHAPTER' | 'MEDIA'
+  readonly targetId: number
+  readonly comicId: number | null
+  readonly chapterId: number | null
+  readonly title: string
+  readonly subtitle: string | null
+  readonly coverUrl: string | null
+  readonly status: string
+  readonly mediaType: string | null
+  readonly pageNumber: number | null
+  readonly createdAt: string
+  readonly trashedAt: string | null
+}
+
 const api = axios.create({ baseURL: '/api' })
 
 /** 后端 Result 业务成功码（Result.ok 恒为 200） */
@@ -162,6 +177,8 @@ export const managementTaskApi = {
 
 /** 回收站生命周期（恢复 / 永久清理 / 对账） */
 export const trashApi = {
+  list: (params: { page?: number; size?: number; status?: string; keyword?: string }) =>
+    api.get<{ readonly records: readonly TrashContentVO[]; readonly total: number }>('/manage/trash', { params }),
   restoreComic: (comicId: number) =>
     api.post<OperationSubmitResult>(`/manage/trash/comics/${comicId}/restore`),
   restoreChapter: (comicId: number, chapterId: number) =>

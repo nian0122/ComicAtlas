@@ -10,6 +10,15 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * 回收站生命周期端点 — 恢复 / 永久清理 / 对账。
@@ -23,6 +32,37 @@ import org.springframework.web.bind.annotation.RestController;
 public class TrashLifecycleController {
 
     private final TrashLifecycleService trashLifecycleService;
+    private final TrashQueryService trashQueryService;
+    private final TrashManifestService trashManifestService;
+
+    /** 回收后封面已移入 TRASH，提供受管理端保护的只读封面读取端点。 */
+    @GetMapping(value = "/comics/{comicId}/cover", produces = "image/webp")
+    public ResponseEntity<Resource> cover(@PathVariable Long comicId) {
+        var manifest = trashManifestService.readLatestManifest("COMIC", comicId);
+        if (manifest == null) return ResponseEntity.notFound().build();
+        for (var entry : manifest.entries()) {
+            if (!"THUMBS".equalsIgnoreCase(entry.rootKey())) continue;
+            Path file = trashManifestService.manifestDir("COMIC", comicId, manifest.taskId())
+                    .resolve(entry.trashRelativePath()).resolve("cover.webp").normalize();
+            if (Files.isRegularFile(file)) return ResponseEntity.ok(new FileSystemResource(file));
+        }
+        return ResponseEntity.notFound().build();
+    }
+
+    /** 查询漫画、章节和媒体的统一回收内容。 */
+    @GetMapping
+    public Result<Map<String, Object>> list(@org.springframework.web.bind.annotation.RequestParam(defaultValue = "TRASHED") String status,
+                                            @org.springframework.web.bind.annotation.RequestParam(required = false) String keyword,
+                                            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "1") int page,
+                                            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "20") int size) {
+        long total = trashQueryService.count(status, keyword);
+        Map<String, Object> data = new HashMap<>();
+        data.put("records", trashQueryService.list(status, keyword, page, size));
+        data.put("total", total);
+        data.put("current", page);
+        data.put("size", size);
+        return Result.ok(data);
+    }
 
     // ======================== 恢复 ========================
 
