@@ -6,6 +6,7 @@ import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.enums.ExportTaskStatus;
+import com.comicatlas.contract.common.enums.TaskType;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.persistence.storage.ApiStorageProperties;
 import com.comicatlas.persistence.storage.PathTraversalException;
@@ -32,6 +33,10 @@ import java.util.List;
 public class ExportServiceImpl implements ExportService {
 
     private static final String DEFAULT_OUTPUT_ROOT = "EXPORT";
+    /** 管理任务目标类型：漫画 */
+    private static final String TARGET_TYPE_COMIC = "COMIC";
+    /** 管理任务操作描述 */
+    private static final String EXPORT_OPERATION = "导出漫画";
 
     private final ComicMapper comicMapper;
     private final ExportTaskMapper exportTaskMapper;
@@ -42,44 +47,13 @@ public class ExportServiceImpl implements ExportService {
     @Override
     @Transactional
     public ExportTaskVO createExportTask(Long comicId) {
-        // 1. 校验漫画存在且状态为 READY
-        Comic comic = comicMapper.selectById(comicId);
-        if (comic == null) {
-            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在");
-        }
-        if (comic.getStatus() != ComicStatus.READY) {
-            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "漫画状态不允许导出，当前状态: " + comic.getStatus());
-        }
+        requireExportableComic(comicId);
+        rejectDuplicateActiveTask(comicId);
 
-        // 2. 幂等检查：已存在 PENDING/RUNNING 的导出任务则拒绝
-        var existing = exportTaskMapper.selectOne(new LambdaQueryWrapper<ExportTask>()
-            .eq(ExportTask::getComicId, comicId)
-            .and(w -> w.eq(ExportTask::getStatus, ExportTaskStatus.PENDING).or().eq(ExportTask::getStatus, ExportTaskStatus.RUNNING)));
-        if (existing != null) {
-            throw new BusinessException(HttpStatusCodes.CONFLICT, "该漫画已有进行中的导出任务，任务ID: " + existing.getId());
-        }
+        ExportTask task = createExportTaskRecord(comicId);
 
-        // 3. 创建 export_task
-        ExportTask task = new ExportTask();
-        task.setComicId(comicId);
-        task.setStatus(ExportTaskStatus.PENDING);
-        task.setProgress(0);
-        exportTaskMapper.insert(task);
-
-        // 3.5 同事务创建统一管理任务并回填 management_task_id
-        ManagementTaskResponse mgmtResp = createManagementTaskForExport(comicId);
-        task.setManagementTaskId(mgmtResp.getId());
-        exportTaskMapper.updateById(task);
-
-        // 4. 事务提交后发送 MQ
         Long taskId = task.getId();
-        TransactionSynchronizationManager.registerSynchronization(
-            new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    eventPublisher.publishExportTaskCreated(taskId, comicId);
-                }
-            });
+        registerPublishAfterCommit(taskId, comicId);
 
         log.info("导出任务创建: taskId={}, comicId={}", taskId, comicId);
         return toVO(task);
@@ -87,17 +61,17 @@ public class ExportServiceImpl implements ExportService {
 
     @Override
     public List<ExportTaskVO> listExports(Long comicId) {
-        var list = exportTaskMapper.selectList(new LambdaQueryWrapper<ExportTask>()
+        List<ExportTask> tasks = exportTaskMapper.selectList(new LambdaQueryWrapper<ExportTask>()
             .eq(ExportTask::getComicId, comicId)
             .orderByDesc(ExportTask::getCreatedAt));
-        return list.stream().map(this::toVO).toList();
+        return tasks.stream().map(this::toVO).toList();
     }
 
     @Override
     public List<ExportTaskVO> listAllExports() {
-        var list = exportTaskMapper.selectList(new LambdaQueryWrapper<ExportTask>()
+        List<ExportTask> tasks = exportTaskMapper.selectList(new LambdaQueryWrapper<ExportTask>()
             .orderByDesc(ExportTask::getCreatedAt));
-        return list.stream().map(this::toVO).toList();
+        return tasks.stream().map(this::toVO).toList();
     }
 
     @Override
@@ -109,46 +83,88 @@ public class ExportServiceImpl implements ExportService {
         return toVO(task);
     }
 
+    private void requireExportableComic(Long comicId) {
+        Comic comic = comicMapper.selectById(comicId);
+        if (comic == null) {
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在");
+        }
+        if (comic.getStatus() != ComicStatus.READY) {
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "漫画状态不允许导出，当前状态: " + comic.getStatus());
+        }
+    }
+
+    private void rejectDuplicateActiveTask(Long comicId) {
+        ExportTask existing = exportTaskMapper.selectOne(new LambdaQueryWrapper<ExportTask>()
+            .eq(ExportTask::getComicId, comicId)
+            .and(wrapper -> wrapper.eq(ExportTask::getStatus, ExportTaskStatus.PENDING).or().eq(ExportTask::getStatus, ExportTaskStatus.RUNNING)));
+        if (existing != null) {
+            throw new BusinessException(HttpStatusCodes.CONFLICT, "该漫画已有进行中的导出任务，任务ID: " + existing.getId());
+        }
+    }
+
+    private ExportTask createExportTaskRecord(Long comicId) {
+        ExportTask task = new ExportTask();
+        task.setComicId(comicId);
+        task.setStatus(ExportTaskStatus.PENDING);
+        task.setProgress(0);
+        exportTaskMapper.insert(task);
+
+        ManagementTaskResponse managementTaskResponse = createManagementTaskForExport(comicId);
+        task.setManagementTaskId(managementTaskResponse.getId());
+        exportTaskMapper.updateById(task);
+        return task;
+    }
+
+    private void registerPublishAfterCommit(Long taskId, Long comicId) {
+        TransactionSynchronizationManager.registerSynchronization(
+            new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    eventPublisher.publishExportTaskCreated(taskId, comicId);
+                }
+            });
+    }
+
     /**
      * 同事务创建统一导出任务并返回其响应。
      */
     private ManagementTaskResponse createManagementTaskForExport(Long comicId) {
         CreateManagementTaskRequest mgmtReq = new CreateManagementTaskRequest();
-        mgmtReq.setTaskType(com.comicatlas.contract.common.enums.TaskType.EXPORT);
-        mgmtReq.setOperation("导出漫画");
-        mgmtReq.setTargetType("COMIC");
+        mgmtReq.setTaskType(TaskType.EXPORT);
+        mgmtReq.setOperation(EXPORT_OPERATION);
+        mgmtReq.setTargetType(TARGET_TYPE_COMIC);
         CreateManagementTaskRequest.TaskTarget target = new CreateManagementTaskRequest.TaskTarget();
-        target.setTargetType("COMIC");
+        target.setTargetType(TARGET_TYPE_COMIC);
         target.setTargetId(comicId);
-        target.setOperationType(com.comicatlas.contract.common.enums.TaskType.EXPORT);
+        target.setOperationType(TaskType.EXPORT);
         mgmtReq.setTargets(List.of(target));
         return managementTaskService.createTask(mgmtReq, null, null);
     }
 
     private ExportTaskVO toVO(ExportTask task) {
-        ExportTaskVO vo = new ExportTaskVO();
-        vo.setId(task.getId());
-        vo.setComicId(task.getComicId());
-        vo.setStatus(task.getStatus() == null ? null : task.getStatus().name());
-        vo.setProgress(task.getProgress());
-        vo.setOutputRoot(task.getOutputRoot());
-        vo.setOutputPath(task.getOutputPath());
-        vo.setOutputSize(task.getOutputSize());
-        vo.setErrorMsg(task.getErrorMsg());
-        vo.setCreatedAt(task.getCreatedAt());
-        vo.setCompletedAt(task.getCompletedAt());
+        ExportTaskVO taskVO = new ExportTaskVO();
+        taskVO.setId(task.getId());
+        taskVO.setComicId(task.getComicId());
+        taskVO.setStatus(task.getStatus() == null ? null : task.getStatus().name());
+        taskVO.setProgress(task.getProgress());
+        taskVO.setOutputRoot(task.getOutputRoot());
+        taskVO.setOutputPath(task.getOutputPath());
+        taskVO.setOutputSize(task.getOutputSize());
+        taskVO.setErrorMsg(task.getErrorMsg());
+        taskVO.setCreatedAt(task.getCreatedAt());
+        taskVO.setCompletedAt(task.getCompletedAt());
 
         // 计算物理路径：经逻辑存储根（默认 EXPORT）安全解析 outputPath，而非字符串拼接
         if (task.getOutputPath() != null && !task.getOutputPath().isBlank()) {
             String rootKey = task.getOutputRoot() != null && !task.getOutputRoot().isBlank()
                     ? task.getOutputRoot() : DEFAULT_OUTPUT_ROOT;
             try {
-                vo.setPhysicalPath(storageProperties.root(rootKey).resolve(task.getOutputPath()).toString());
+                taskVO.setPhysicalPath(storageProperties.root(rootKey).resolve(task.getOutputPath()).toString());
             } catch (PathTraversalException e) {
                 log.warn("导出任务物理路径穿越被拒绝: taskId={}", task.getId());
-                vo.setPhysicalPath(null);
+                taskVO.setPhysicalPath(null);
             }
         }
-        return vo;
+        return taskVO;
     }
 }
