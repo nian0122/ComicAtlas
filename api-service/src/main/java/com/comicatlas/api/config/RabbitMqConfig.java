@@ -7,6 +7,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.amqp.core.Binding;
@@ -14,6 +16,9 @@ import org.springframework.amqp.core.DirectExchange;
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.QueueBuilder;
+import org.springframework.web.client.RestTemplate;
+
+import java.time.Duration;
 
 @Configuration
 public class RabbitMqConfig {
@@ -23,6 +28,23 @@ public class RabbitMqConfig {
         ObjectMapper mapper = new ObjectMapper();
         mapper.registerModule(new JavaTimeModule());
         return new Jackson2JsonMessageConverter(mapper);
+    }
+
+    /**
+     * RabbitMQ Management HTTP API 客户端（枚举全部队列用于积压/死信统计）。
+     * <p>
+     * 凭据默认回退 spring.rabbitmq 配置；连接/读取超时避免管理插件不可用时拖垮管理接口。
+     */
+    @Bean
+    public RestTemplate rabbitManagementRestTemplate(
+            RestTemplateBuilder builder,
+            @Value("${mq.management.username:${spring.rabbitmq.username:guest}}") String username,
+            @Value("${mq.management.password:${spring.rabbitmq.password:guest}}") String password) {
+        return builder
+                .basicAuthentication(username, password)
+                .setConnectTimeout(Duration.ofSeconds(3))
+                .setReadTimeout(Duration.ofSeconds(5))
+                .build();
     }
 
     @Bean

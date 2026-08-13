@@ -119,3 +119,9 @@ comic:
   batch:
     max-items: ${BATCH_MAX_ITEMS:10000}
     preview-ttl-seconds: ${BATCH_PREVIEW_TTL_SECONDS:300}
+
+# RabbitMQ Management HTTP API（积压/死信统计）。host/username/password 未配置时回退 spring.rabbitmq 对应值；
+# 如需单独指定可设环境变量 RABBITMQ_MANAGEMENT_HOST / RABBITMQ_MANAGEMENT_USER / RABBITMQ_MANAGEMENT_PASS。
+mq:
+  management:
+    port: ${RABBITMQ_MANAGEMENT_PORT:15672}

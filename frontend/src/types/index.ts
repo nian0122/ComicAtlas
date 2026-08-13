@@ -768,6 +768,23 @@ export interface OutboxStats {
   readonly total: number
 }
 
+/** MQ 积压与死信统计（后端 MqStatsDTO），覆盖消费层失败与堆积 */
+export interface MqStats {
+  readonly available: boolean
+  readonly dlqTotal: number
+  readonly dlqQueues: number
+  readonly queuedTotal: number
+  readonly queues: readonly MqQueueStat[]
+}
+
+/** 单队列积压快照（后端 MqQueueStat） */
+export interface MqQueueStat {
+  readonly name: string
+  readonly messages: number
+  readonly consumers: number
+  readonly dlq: boolean
+}
+
 /** 目录管理请求（创建/重命名/移动/重排，字段按操作取用） */
 export interface CatalogManagementRequest {
   readonly title?: string

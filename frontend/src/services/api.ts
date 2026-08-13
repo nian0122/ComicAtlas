@@ -26,6 +26,7 @@ import type {
   MediaOperationResult,
   MediaReorderRequest,
   MediaReorderResult,
+  MqStats,
   OperationSubmitResult,
   OutboxStats,
   ReconcileResult,
@@ -281,6 +282,11 @@ export const mediaOperationApi = {
 /** Outbox 积压统计 */
 export const outboxApi = {
   stats: () => api.get<OutboxStats>('/manage/outbox/stats'),
+}
+
+/** MQ 积压与死信统计（消费层失败与堆积，覆盖僵尸队列） */
+export const mqApi = {
+  stats: () => api.get<MqStats>('/manage/mq/stats'),
 }
 
 export const adminApi = {
