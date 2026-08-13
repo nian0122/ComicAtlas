@@ -9,6 +9,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.mockito.Mockito;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -130,6 +131,44 @@ class MediaAnalyzerSmokeTest {
     }
 
     @Test
+    @DisplayName("ffprobe stderr 输出解码错误（损坏 h264）时 stdout JSON 仍被正确解析")
+    void corruptVideo_withFfprobeStderrErrors_parsesStdoutJson() throws Exception {
+        Path mp4 = tmp.resolve("test.mp4");
+        Files.write(mp4, new byte[]{0, 0, 0, 0});
+        Path fakeScript = createFakeFfprobeWithStderrErrors(tmp);
+        cfg.setFfprobePath(fakeScript.toString());
+        MediaAnalyzer analyzer4 = new MediaAnalyzer(cfg, om, runner);
+
+        // 回归：ffprobe 对损坏流会向 stderr 打印 NAL 解码错误（exit=0），
+        // stderr 必须与 stdout 分离，否则合并流破坏 JSON 导致视频元数据全部丢失。
+        ComicMetadata.MediaInfo info = analyzer4.analyze(mp4);
+        assertThat(info.mediaType()).isEqualTo("VIDEO");
+        assertThat(info.container()).isEqualTo("mp4");
+        assertThat(info.width()).isEqualTo(1920);
+        assertThat(info.height()).isEqualTo(1080);
+        assertThat(info.videoCodec()).isEqualTo("h264");
+        assertThat(info.audioCodec()).isEqualTo("aac");
+        assertThat(info.duration()).isEqualByComparingTo("125.5");
+    }
+
+    @Test
+    @DisplayName("ffprobe 路径为空时不启动外部进程，直接回退 VIDEO")
+    void blankFfprobePath_skipsProcessAndFallsBack() throws Exception {
+        Path mp4 = tmp.resolve("test.mp4");
+        Files.write(mp4, new byte[]{0, 0, 0, 0});
+        cfg.setFfprobePath("");
+
+        ExternalProcessRunner mockRunner = Mockito.mock(ExternalProcessRunner.class);
+        MediaAnalyzer analyzer5 = new MediaAnalyzer(cfg, om, mockRunner);
+
+        ComicMetadata.MediaInfo info = analyzer5.analyze(mp4);
+        assertThat(info.mediaType()).isEqualTo("VIDEO");
+        assertThat(info.width()).isNull();
+        assertThat(info.duration()).isNull();
+        Mockito.verifyNoInteractions(mockRunner);
+    }
+
+    @Test
     @DisplayName("不存在的文件 → MISSING")
     void missingFile_isMissing() {
         ComicMetadata.MediaInfo info = analyzer.analyze(tmp.resolve("nope.jpg"));
@@ -161,6 +200,29 @@ class MediaAnalyzerSmokeTest {
         }
         Path script = dir.resolve("fake-ffprobe.sh");
         String content = "#!/bin/sh\necho '" + jsonBody + "'\n";
+        Files.writeString(script, content);
+        script.toFile().setExecutable(true);
+        return script;
+    }
+
+    /** fake ffprobe：stdout 输出合法 JSON，stderr 输出真实损坏 h264 的解码错误行（exit=0）。 */
+    private Path createFakeFfprobeWithStderrErrors(Path dir) throws Exception {
+        String jsonBody = "{\"streams\":[{\"codec_type\":\"video\",\"codec_name\":\"h264\",\"width\":1920,\"height\":1080},{\"codec_type\":\"audio\",\"codec_name\":\"aac\"}],\"format\":{\"duration\":\"125.500000\"}}";
+        String os = System.getProperty("os.name").toLowerCase();
+        if (os.contains("win")) {
+            Path script = dir.resolve("fake-ffprobe-err.cmd");
+            String content = "@echo off\r\n"
+                    + "echo [h264 @ 000001eb8d40c240] Error splitting the input into NAL units. 1>&2\r\n"
+                    + "echo [h264 @ 000001eb8d40c240] missing picture in access unit with size 25317 1>&2\r\n"
+                    + "echo " + jsonBody + "\r\n";
+            Files.writeString(script, content);
+            return script;
+        }
+        Path script = dir.resolve("fake-ffprobe-err.sh");
+        String content = "#!/bin/sh\n"
+                + "echo '[h264 @ 000001eb8d40c240] Error splitting the input into NAL units.' >&2\n"
+                + "echo '[h264 @ 000001eb8d40c240] missing picture in access unit with size 25317' >&2\n"
+                + "echo '" + jsonBody + "'\n";
         Files.writeString(script, content);
         script.toFile().setExecutable(true);
         return script;

@@ -89,7 +89,14 @@ public class MediaAnalyzer {
         if (!workerConfig.isFfprobeEnabled()) {
             return videoFallback(name, container, size, "disabled");
         }
-        String ffprobe = workerConfig.resolveToolPath(workerConfig.getFfprobePath()).toString();
+        // 空路径直接回退：resolveToolPath("") 会解析成 JVM 工作目录（存在的目录），
+        // 若继续会误判 ffprobe 可用并尝试把目录当程序执行。
+        String configuredPath = workerConfig.getFfprobePath();
+        if (configuredPath == null || configuredPath.isBlank()) {
+            log.debug("ffprobe 路径未配置，视频 {} 标记为 VIDEO 元数据为 null", name);
+            return videoFallback(name, container, size, "ffprobe-unavailable");
+        }
+        String ffprobe = workerConfig.resolveToolPath(configuredPath).toString();
         if (!isFfprobeAvailable(ffprobe)) {
             log.debug("ffprobe 不可用 (path='{}'), 视频 {} 标记为 VIDEO 元数据为 null", ffprobe, name);
             return videoFallback(name, container, size, "ffprobe-unavailable");
@@ -101,8 +108,10 @@ public class MediaAnalyzer {
                     "-show_format", "-show_streams",
                     "-of", "json",
                     file.toAbsolutePath().toString());
+            // 三参重载分离 stderr：损坏流的 NAL 解码错误经 [ffprobe] tag 打日志，
+            // stdout 保持纯 JSON 供解析（与 ImageOptimizer 一致），避免合并流破坏 JSON。
             ExternalProcessRunner.ExternalProcessResult result =
-                    processRunner.run(processBuilder, FFPROBE_TIMEOUT_SECONDS);
+                    processRunner.run(processBuilder, FFPROBE_TIMEOUT_SECONDS, "ffprobe");
             if (result.exitCode() != 0) {
                 log.warn("ffprobe exit={} for {}", result.exitCode(), file);
                 return videoFallback(name, container, size, "exit-" + result.exitCode());
