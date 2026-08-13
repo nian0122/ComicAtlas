@@ -19,6 +19,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -26,14 +27,17 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class HistoryServiceImpl implements HistoryService {
 
-    private final ReadingHistoryMapper historyMapper;
+    /** 进度百分比换算基数 */
+    private static final int PERCENT_SCALE = 100;
+
+    private final ReadingHistoryMapper readingHistoryMapper;
     private final ComicMapper comicMapper;
     private final ChapterMapper chapterMapper;
     private final FileUrlResolver fileUrlResolver;
 
     @Override
     public List<HistoryVO> listHistory() {
-        var histories = historyMapper.selectList(
+        List<ReadingHistory> histories = readingHistoryMapper.selectList(
             new LambdaQueryWrapper<ReadingHistory>()
                 .orderByDesc(ReadingHistory::getUpdatedAt));
         if (histories.isEmpty()) {
@@ -43,23 +47,23 @@ public class HistoryServiceImpl implements HistoryService {
         List<Long> comicIds = histories.stream()
                 .map(ReadingHistory::getComicId).distinct().toList();
         Map<Long, Comic> comicMap = comicMapper.selectBatchIds(comicIds).stream()
-                .collect(Collectors.toMap(Comic::getId, c -> c));
+                .collect(Collectors.toMap(Comic::getId, Function.identity(), (first, duplicate) -> first));
 
         List<Long> chapterIds = histories.stream()
                 .map(ReadingHistory::getChapterId).filter(Objects::nonNull).distinct().toList();
         Map<Long, Chapter> chapterMap = chapterIds.isEmpty()
                 ? Map.of()
                 : chapterMapper.selectBatchIds(chapterIds).stream()
-                        .collect(Collectors.toMap(Chapter::getId, c -> c));
+                        .collect(Collectors.toMap(Chapter::getId, Function.identity(), (first, duplicate) -> first));
 
         return histories.stream()
-                .map(h -> buildVO(h, comicMap, chapterMap))
+                .map(history -> buildVO(history, comicMap, chapterMap))
                 .toList();
     }
 
     @Override
     public HistoryVO getHistory(Long comicId) {
-        var history = historyMapper.selectOne(
+        ReadingHistory history = readingHistoryMapper.selectOne(
             new LambdaQueryWrapper<ReadingHistory>()
                 .eq(ReadingHistory::getComicId, comicId));
         if (history == null) {
@@ -76,47 +80,47 @@ public class HistoryServiceImpl implements HistoryService {
 
     @Override
     public void upsertHistory(Long comicId, HistoryUpdateRequest request) {
-        var existing = historyMapper.selectOne(
+        ReadingHistory existing = readingHistoryMapper.selectOne(
             new LambdaQueryWrapper<ReadingHistory>()
                 .eq(ReadingHistory::getComicId, comicId));
         if (existing != null) {
             existing.setChapterId(request.getChapterId());
             existing.setPageNumber(request.getPageNumber());
             existing.setUpdatedAt(LocalDateTime.now());
-            historyMapper.updateById(existing);
+            readingHistoryMapper.updateById(existing);
         } else {
             ReadingHistory history = new ReadingHistory();
             history.setComicId(comicId);
             history.setChapterId(request.getChapterId());
             history.setPageNumber(request.getPageNumber());
-            historyMapper.insert(history);
+            readingHistoryMapper.insert(history);
         }
     }
 
-    private HistoryVO buildVO(ReadingHistory h, Map<Long, Comic> comicMap, Map<Long, Chapter> chapterMap) {
-        HistoryVO vo = new HistoryVO();
-        vo.setComicId(h.getComicId());
-        vo.setChapterId(h.getChapterId());
-        vo.setPageNumber(h.getPageNumber());
-        vo.setUpdatedAt(h.getUpdatedAt());
+    private HistoryVO buildVO(ReadingHistory history, Map<Long, Comic> comicMap, Map<Long, Chapter> chapterMap) {
+        HistoryVO historyVO = new HistoryVO();
+        historyVO.setComicId(history.getComicId());
+        historyVO.setChapterId(history.getChapterId());
+        historyVO.setPageNumber(history.getPageNumber());
+        historyVO.setUpdatedAt(history.getUpdatedAt());
 
-        Comic comic = comicMap.get(h.getComicId());
+        Comic comic = comicMap.get(history.getComicId());
         if (comic != null) {
-            vo.setComicTitle(comic.getTitle());
-            vo.setCoverUrl(fileUrlResolver.resolveCover(comic.getId()));
+            historyVO.setComicTitle(comic.getTitle());
+            historyVO.setCoverUrl(fileUrlResolver.resolveCover(comic.getId()));
             if (comic.getTotalPages() != null && comic.getTotalPages() > 0) {
-                vo.setTotalPages(comic.getTotalPages());
-                if (h.getPageNumber() != null) {
-                    vo.setProgressPercent(h.getPageNumber() * 100 / comic.getTotalPages());
+                historyVO.setTotalPages(comic.getTotalPages());
+                if (history.getPageNumber() != null) {
+                    historyVO.setProgressPercent(history.getPageNumber() * PERCENT_SCALE / comic.getTotalPages());
                 }
             }
         }
 
-        Chapter chapter = h.getChapterId() != null ? chapterMap.get(h.getChapterId()) : null;
+        Chapter chapter = history.getChapterId() != null ? chapterMap.get(history.getChapterId()) : null;
         if (chapter != null) {
-            vo.setChapterNo(chapter.getChapterNo());
+            historyVO.setChapterNo(chapter.getChapterNo());
         }
 
-        return vo;
+        return historyVO;
     }
 }

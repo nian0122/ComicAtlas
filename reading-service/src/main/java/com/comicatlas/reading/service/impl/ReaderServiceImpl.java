@@ -18,11 +18,17 @@ import com.comicatlas.reading.service.ReaderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class ReaderServiceImpl implements ReaderService {
+
+    /** 媒体类型：视频 */
+    private static final String MEDIA_TYPE_VIDEO = "VIDEO";
+    /** 视频页无 LQ 产物时的占位状态 */
+    private static final String LQ_STATUS_NOT_APPLICABLE = "NOT_APPLICABLE";
 
     private final ChapterMapper chapterMapper;
     private final MediaMapper mediaMapper;
@@ -44,57 +50,57 @@ public class ReaderServiceImpl implements ReaderService {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在或不可阅读");
         }
 
-        var mediaItems = mediaMapper.selectList(
+        List<Media> mediaItems = mediaMapper.selectList(
             new LambdaQueryWrapper<Media>()
                 .eq(Media::getChapterId, chapterId)
                 .eq(Media::getStatus, MediaLifecycleStatus.READY)
                 .orderByAsc(Media::getPageNumber));
 
-        var dto = new ReaderDTO();
-        dto.setChapterId(chapter.getId());
-        dto.setComicId(chapter.getComicId());
-        dto.setChapterTitle(chapter.getTitle());
-        dto.setPages(mediaItems.stream().map(media -> {
-            var pd = new ReaderDTO.MediaItemDTO();
-            pd.setId(media.getId());
-            pd.setPageNumber(media.getPageNumber());
-            pd.setHqUrl(fileUrlResolver.resolve(media));
-            pd.setMediaType(media.getMediaType());
-            pd.setDuration(media.getDuration());
-            pd.setContainer(media.getContainer());
-            pd.setVideoCodec(media.getVideoCodec());
-            pd.setAudioCodec(media.getAudioCodec());
-            if ("VIDEO".equals(media.getMediaType())) {
-                pd.setLqUrl(null);
-                pd.setLqStatus("NOT_APPLICABLE");
+        ReaderDTO readerDTO = new ReaderDTO();
+        readerDTO.setChapterId(chapter.getId());
+        readerDTO.setComicId(chapter.getComicId());
+        readerDTO.setChapterTitle(chapter.getTitle());
+        readerDTO.setPages(mediaItems.stream().map(media -> {
+            ReaderDTO.MediaItemDTO mediaItem = new ReaderDTO.MediaItemDTO();
+            mediaItem.setId(media.getId());
+            mediaItem.setPageNumber(media.getPageNumber());
+            mediaItem.setHqUrl(fileUrlResolver.resolve(media));
+            mediaItem.setMediaType(media.getMediaType());
+            mediaItem.setDuration(media.getDuration());
+            mediaItem.setContainer(media.getContainer());
+            mediaItem.setVideoCodec(media.getVideoCodec());
+            mediaItem.setAudioCodec(media.getAudioCodec());
+            if (MEDIA_TYPE_VIDEO.equals(media.getMediaType())) {
+                mediaItem.setLqUrl(null);
+                mediaItem.setLqStatus(LQ_STATUS_NOT_APPLICABLE);
             } else {
-                pd.setLqUrl(fileUrlResolver.resolveLq(media));
-                pd.setLqStatus(media.getLqStatus() == null ? null : media.getLqStatus().name());
+                mediaItem.setLqUrl(fileUrlResolver.resolveLq(media));
+                mediaItem.setLqStatus(media.getLqStatus() == null ? null : media.getLqStatus().name());
             }
-            pd.setWidth(media.getWidth());
-            pd.setHeight(media.getHeight());
-            return pd;
+            mediaItem.setWidth(media.getWidth());
+            mediaItem.setHeight(media.getHeight());
+            return mediaItem;
         }).collect(Collectors.toList()));
-        dto.setTotal(dto.getPages().size());
+        readerDTO.setTotal(mediaItems.size());
 
-        var prev = chapterMapper.selectList(
+        List<Chapter> prev = chapterMapper.selectList(
             new LambdaQueryWrapper<Chapter>()
                 .eq(Chapter::getComicId, chapter.getComicId())
                 .eq(Chapter::getStatus, ChapterLifecycleStatus.READY.name())
                 .lt(Chapter::getGlobalOrder, chapter.getGlobalOrder())
                 .orderByDesc(Chapter::getGlobalOrder)
                 .last("LIMIT 1"));
-        dto.setPrevChapterId(prev.isEmpty() ? null : prev.get(0).getId());
+        readerDTO.setPrevChapterId(prev.isEmpty() ? null : prev.get(0).getId());
 
-        var next = chapterMapper.selectList(
+        List<Chapter> next = chapterMapper.selectList(
             new LambdaQueryWrapper<Chapter>()
                 .eq(Chapter::getComicId, chapter.getComicId())
                 .eq(Chapter::getStatus, ChapterLifecycleStatus.READY.name())
                 .gt(Chapter::getGlobalOrder, chapter.getGlobalOrder())
                 .orderByAsc(Chapter::getGlobalOrder)
                 .last("LIMIT 1"));
-        dto.setNextChapterId(next.isEmpty() ? null : next.get(0).getId());
+        readerDTO.setNextChapterId(next.isEmpty() ? null : next.get(0).getId());
 
-        return dto;
+        return readerDTO;
     }
 }
