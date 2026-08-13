@@ -2,8 +2,7 @@
   <header :class="['top-nav', `top-nav--${mobileHeaderKind}`, { scrolled: isScrolled }]">
     <div class="nav-shell">
       <router-link to="/" class="nav-logo desktop-brand" aria-label="ComicAtlas 首页">
-        <span class="logo-mark" aria-hidden="true">CA</span>
-        <span class="logo-wordmark">COMICATLAS</span>
+        <ComicAtlasLogo size="sm" />
       </router-link>
 
       <div class="mobile-header">
@@ -11,7 +10,7 @@
           <button type="button" class="mobile-header-action" aria-label="返回" @click="router.back()">
             <el-icon :size="22"><ArrowLeft /></el-icon>
           </button>
-          <router-link to="/" class="mobile-detail-brand">COMICATLAS</router-link>
+          <router-link to="/" class="mobile-detail-brand"><ComicAtlasLogo size="sm" /></router-link>
           <button type="button" class="mobile-header-action" aria-label="分享当前漫画" @click="onShare">
             <el-icon :size="21"><Share /></el-icon>
           </button>
@@ -21,14 +20,13 @@
           <span class="mobile-header-action" aria-hidden="true">
             <el-icon :size="23"><Menu /></el-icon>
           </span>
-          <router-link to="/" class="mobile-wordmark mobile-wordmark--solo">COMICATLAS</router-link>
+          <router-link to="/" class="mobile-wordmark mobile-wordmark--solo"><ComicAtlasLogo size="sm" /></router-link>
           <span class="mobile-header-spacer" aria-hidden="true" />
         </template>
 
         <template v-else-if="mobileHeaderKind === 'history'">
           <router-link to="/" class="mobile-brand" aria-label="ComicAtlas 首页">
-            <span class="logo-mark" aria-hidden="true">CA</span>
-            <span class="mobile-wordmark">COMICATLAS</span>
+            <ComicAtlasLogo size="sm" />
           </router-link>
           <button
             type="button"
@@ -46,8 +44,7 @@
 
         <template v-else>
           <router-link to="/" class="mobile-brand" aria-label="ComicAtlas 首页">
-            <span class="logo-mark" aria-hidden="true">CA</span>
-            <span class="mobile-wordmark">COMICATLAS</span>
+            <ComicAtlasLogo size="sm" />
           </router-link>
           <span v-if="mobileHeaderKind === 'home'" class="profile-badge" aria-label="当前用户">U</span>
         </template>
@@ -97,6 +94,7 @@ import {
   UploadFilled,
 } from '@element-plus/icons-vue'
 import MaterialSymbolIcon from '@/components/icons/MaterialSymbolIcon.vue'
+import ComicAtlasLogo from '@/components/brand/ComicAtlasLogo.vue'
 import { useHistoryStore } from '@/stores/history-store'
 
 const isScrolled = ref(false)

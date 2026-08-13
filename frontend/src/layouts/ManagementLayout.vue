@@ -2,7 +2,7 @@
   <div class="management-layout">
     <header class="management-header">
       <router-link to="/" class="header-logo" aria-label="返回 ComicAtlas 阅读端">
-        <span>ComicAtlas</span>
+        <ComicAtlasLogo size="sm" />
       </router-link>
       <nav class="management-topnav" aria-label="主导航">
         <router-link to="/">首页</router-link>
@@ -114,6 +114,7 @@ import {
   InfoFilled,
 } from '@element-plus/icons-vue'
 import { useImportStore } from '@/stores/management/import'
+import ComicAtlasLogo from '@/components/brand/ComicAtlasLogo.vue'
 
 const importStore = useImportStore()
 
