@@ -81,34 +81,11 @@ ComicAtlas 是一个面向个人收藏的本地漫画仓库平台。它把 ZIP�
 
 > `docker-compose.infra.yml` 只管理基础服务，`docker-compose.yml` 只管理项目服务。使用远端基础设施时，不要在本地启动基础服务文件；通过 `tools/maintenance/manage-remote-infra-frp.ps1` 建立 FRP STCP 连接。部署步骤见 [FRP 基础设施连接](docs/operations/frp-infrastructure.md)。
 
-### 源码开发
+### 开发与发布边界
 
-开发分支为 `develop`。在 Windows PowerShell 中可使用：
+`main` 只保留可部署的正式版本内容；Maven Wrapper、开发启动脚本、QA 配置、端到端测试和迁移工具均只在 `develop` 及功能分支维护。开发说明见 [开发指南](docs/development-guide.md)。
 
-```powershell
-.\scripts\dev\start-dev.ps1
-```
-
-前端单独启动：
-
-```bash
-cd frontend
-pnpm install
-pnpm dev
-```
-
-构建前端：
-
-```bash
-cd frontend
-pnpm build
-```
-
-构建后端：
-
-```bash
-.\mvnw clean package
-```
+每次将候选版本合入 `main` 前，必须执行 `scripts/release/verify-release-tree.ps1`，确保发布树未重新混入开发文件。
 
 ## 存储约定
 

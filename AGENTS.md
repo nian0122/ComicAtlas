@@ -313,7 +313,7 @@ URL 统一由 `FileUrlResolver.resolve(page)` 生成，不手拼。
 
 ### 分支职责
 
-- `main`：用户稳定版本，只允许合并已验证的发布内容；当前 1.0 版本使用标签 `v1.0.0`。
+- `main`：用户稳定版本，只允许合并已验证的发布内容；只保留部署运行、用户文档和发布脚本，禁止携带研发辅助文件。
 - `develop`：日常开发和下一版本集成，必须保持可构建。
 - `feature/<名称>`：从 `develop` 创建的短期功能分支。
 - `fix/<名称>`：从 `develop` 创建的普通缺陷修复分支。
@@ -346,13 +346,22 @@ git switch develop
 git merge --no-ff feature/<功能名称> -m "合入 <功能名称>"
 ```
 
+#### 正式发布树边界（强制）
+
+- `develop` 是研发完整工作区；允许保留 Maven Wrapper、开发启动脚本、QA 配置、E2E/测试夹具和迁移工具。
+- `main` 是部署树，禁止跟踪以下研发路径：`.mvn/`、`mvnw`、`mvnw.cmd`、`docker-compose.test.yml`、`e2e/`、`frontend/e2e/`、`frontend/e2e-legacy/`、`frontend/test-fixtures/`、`scripts/dev/`、`scripts/qa/`、`tools/migration/`。
+- 禁止直接将 `develop` 整体合并到 `main`。发布负责人必须从 `main` 创建 `release/<版本>` 或 `hotfix/<名称>`，只拣选已验证的运行、部署、文档和发布门禁变更；研发文件继续留在 `develop`。
+- 候选发布分支合入 `main` 前，以及合入 `main` 后、打标签与推送前，均必须执行 `pwsh -NoProfile -File scripts/release/verify-release-tree.ps1`。任何命中均阻断发布，删除或移回 `develop` 后才可继续。
+- 热修复合入 `main` 后，回流 `develop` 时不得以“同步 main”为由删除开发工具；只回流运行代码、文档和对应修复。
+
 发布流程：
 
 1. 在 `develop` 完成前端构建、后端测试和真实导入—阅读链路验证。
-2. 将 `develop` 合并到 `main`，提交信息使用 `发布 X.Y.Z`。
-3. 在 `main` 创建带注释标签：`git tag -a vX.Y.Z -m "ComicAtlas X.Y.Z 稳定版本"`。
-4. 发布后推送分支和标签：`git push origin main --follow-tags`、`git push origin develop`。
-5. 发布说明放在 `docs/releases/vX.Y.Z.md`，用户操作说明维护在 `README.md` 和 `docs/user-guide.md`。
+2. 从 `main` 创建候选发布分支，拣选本次发布所需内容，并执行发布树校验。
+3. 将候选发布分支合并到 `main`，再次执行发布树校验；提交信息使用 `发布 X.Y.Z`。
+4. 在 `main` 创建带注释标签：`git tag -a vX.Y.Z -m "ComicAtlas X.Y.Z 稳定版本"`。
+5. 发布后推送分支和标签：`git push origin main --follow-tags`、`git push origin develop`。
+6. 发布说明放在 `docs/releases/vX.Y.Z.md`，用户操作说明维护在 `README.md` 和 `docs/user-guide.md`。
 
 ### 安全和回滚
 
