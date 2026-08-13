@@ -31,10 +31,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * 回收站跨表 UNION 排序规则契约测试（不可降级）。
  * <p>
- * 生产迁移历史导致 {@code comic} 为 {@code utf8mb4_unicode_ci}、{@code chapter}/{@code page}
+ * 生产迁移历史曾导致 {@code comic} 为 {@code utf8mb4_unicode_ci}、{@code chapter}/{@code page}
  * 为 {@code utf8mb4_0900_ai_ci}，直接 UNION 会抛 {@code Illegal mix of collations}（MySQL 1271）。
- * 本测试在 Testcontainer 中强制复刻该漂移，验证 {@link TrashQueryMapper} 依赖显式
- * {@code COLLATE} 而非表默认排序规则。修复前的旧 SQL 在本环境必然失败。
+ * V21 迁移已治本统一三表排序规则，本测试仍强制复刻该历史漂移，验证 {@link TrashQueryMapper}
+ * 依赖显式 {@code COLLATE} 而非表默认排序规则（防御未来再次漂移）。修复前的旧 SQL 在本环境必然失败。
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 @ActiveProfiles("test")
@@ -68,11 +68,12 @@ class TrashQueryMapperCollationIT {
     private MediaMapper mediaMapper;
 
     /**
-     * 强制复刻生产漂移：comic 归一到 utf8mb4_unicode_ci（迁移显式指定），
-     * chapter/page 保持容器默认 utf8mb4_0900_ai_ci。幂等，防止容器服务器默认变化导致假绿。
+     * 强制复刻 V21 迁移前的生产漂移：chapter/page 转回 MySQL 8 默认 utf8mb4_0900_ai_ci，
+     * comic 保持迁移显式的 utf8mb4_unicode_ci。幂等，防止容器默认变化导致假绿。
      */
     private void pinDriftedCollations() {
-        jdbcTemplate.execute("ALTER TABLE comic CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+        jdbcTemplate.execute("ALTER TABLE chapter CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci");
+        jdbcTemplate.execute("ALTER TABLE page CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci");
     }
 
     /** 用例间清空种子数据（Testcontainers 上下文跨用例复用）。 */
