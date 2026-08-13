@@ -64,6 +64,7 @@ public class ReaderServiceImpl implements ReaderService {
             ReaderDTO.MediaItemDTO mediaItem = new ReaderDTO.MediaItemDTO();
             mediaItem.setId(media.getId());
             mediaItem.setPageNumber(media.getPageNumber());
+            mediaItem.setFileName(extractFileName(media.getHqPath()));
             mediaItem.setHqUrl(fileUrlResolver.resolve(media));
             mediaItem.setMediaType(media.getMediaType());
             mediaItem.setDuration(media.getDuration());
@@ -102,5 +103,13 @@ public class ReaderServiceImpl implements ReaderService {
         readerDTO.setNextChapterId(next.isEmpty() ? null : next.get(0).getId());
 
         return readerDTO;
+    }
+
+    private String extractFileName(String path) {
+        if (path == null || path.isBlank()) {
+            return "";
+        }
+        int separator = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+        return separator >= 0 ? path.substring(separator + 1) : path;
     }
 }

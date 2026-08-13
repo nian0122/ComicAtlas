@@ -18,6 +18,8 @@ public class ReaderDTO {
     public static class MediaItemDTO {
         private Long id;
         private int pageNumber;
+        /** HQ 存储文件名，仅用于管理端媒体维护展示。 */
+        private String fileName;
         private String hqUrl;
         private String lqUrl;
         private String lqStatus;

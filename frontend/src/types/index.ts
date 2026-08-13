@@ -108,6 +108,8 @@ export type MediaType = 'IMAGE' | 'VIDEO'
 export interface MediaItemInfo {
   id: number
   pageNumber: number
+  /** HQ 存储文件名，用于管理端媒体维护展示。 */
+  fileName?: string
   hqUrl: string
   lqUrl: string
   lqStatus: string

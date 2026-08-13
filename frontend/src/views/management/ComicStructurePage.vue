@@ -52,7 +52,7 @@
       </el-tab-pane>
       <el-tab-pane label="媒体维护" name="media">
         <section class="form-panel"><el-input-number v-model="mediaChapterId" :min="1" :controls="false" placeholder="章节 ID" /><el-button @click="loadMedia">加载媒体</el-button><el-input v-model="mediaOrder" placeholder="重排后的完整媒体 ID，逗号分隔" /><el-button type="primary" @click="reorderMedia">提交重排</el-button></section>
-        <el-table :data="mediaItems" row-key="id"><el-table-column prop="id" label="媒体 ID" /><el-table-column prop="pageNumber" label="页码" /><el-table-column prop="mediaType" label="类型" /><el-table-column prop="lqStatus" label="LQ 状态" /><el-table-column label="操作"><template #default="{ row }"><el-button link type="danger" @click="trashMedia(row.id)">回收</el-button></template></el-table-column></el-table>
+        <el-table :data="mediaItems" row-key="id"><el-table-column prop="id" label="媒体 ID" /><el-table-column prop="fileName" label="文件名" min-width="220" show-overflow-tooltip /><el-table-column prop="pageNumber" label="页码" /><el-table-column prop="mediaType" label="类型" /><el-table-column prop="lqStatus" label="LQ 状态" /><el-table-column label="操作"><template #default="{ row }"><el-button link type="danger" @click="trashMedia(row.id)">回收</el-button></template></el-table-column></el-table>
       </el-tab-pane>
     </el-tabs>
   </div>

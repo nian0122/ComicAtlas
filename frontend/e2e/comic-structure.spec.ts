@@ -84,6 +84,32 @@ test('正常漫画加载目录树并渲染目录与章节行', async ({ page }) 
   expect(pageErrors, `页面渲染抛出了未捕获异常: ${pageErrors.join(' | ')}`).toEqual([])
 })
 
+test('媒体维护展示媒体文件名', async ({ page }) => {
+  await page.route('/api/chapters/11', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 200,
+        message: 'success',
+        data: {
+          chapterId: 11,
+          comicId: 7,
+          chapterTitle: '第一话',
+          pages: [{ id: 88725, pageNumber: 1, fileName: '0001.webp', mediaType: 'IMAGE', lqStatus: 'NOT_GENERATED' }],
+          total: 1,
+        },
+      }),
+    })
+  )
+  await page.goto('/manage/structure')
+  await page.getByRole('tab', { name: '媒体维护' }).click()
+  await page.getByPlaceholder('章节 ID').fill('11')
+  await page.getByRole('button', { name: '加载媒体' }).click()
+  await expect(page.getByRole('columnheader', { name: '文件名' })).toBeVisible()
+  await expect(page.getByRole('cell', { name: '0001.webp' })).toBeVisible()
+})
+
 test('嵌套目录保持父子关系并可展开查看章节', async ({ page }) => {
   await page.route(CATALOG_API, (route) =>
     route.fulfill({
