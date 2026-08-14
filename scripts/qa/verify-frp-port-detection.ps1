@@ -23,14 +23,27 @@ if (-not ($statusOutput -match "FRP visitor 进程：运行中，PID=$PID")) {
     throw "FRP 状态输出未使用 System.Diagnostics.Process.Id"
 }
 
-$dashboardMapping = $serviceMappings |
+$portSettings = @{
+    REMOTE_MYSQL_PORT = "13306"
+    REMOTE_REDIS_PORT = "16379"
+    REMOTE_RABBITMQ_PORT = "15672"
+    REMOTE_RABBITMQ_MANAGEMENT_PORT = "25672"
+    REMOTE_NACOS_HTTP_PORT = "18848"
+    REMOTE_NACOS_GRPC_PORT = "19848"
+    FRP_DASHBOARD_PORT = "17500"
+}
+$configuredMappings = @(Get-ServiceMappings $portSettings)
+$dashboardMapping = $configuredMappings |
     Where-Object { $_.Name -eq "frps-dashboard" } |
     Select-Object -First 1
 if (-not $dashboardMapping) {
     throw "FRP Dashboard 映射缺失"
 }
-if ($dashboardMapping.Port -ne 7500 -or $dashboardMapping.BindAddress -ne "127.0.0.1") {
-    throw "FRP Dashboard 必须固定绑定 127.0.0.1:7500"
+if ($dashboardMapping.Port -ne 17500 -or $dashboardMapping.BindAddress -ne "127.0.0.1") {
+    throw "FRP Dashboard 必须使用环境变量端口并固定绑定 127.0.0.1"
+}
+if ($serviceDefinitions | Where-Object { $_.Contains("Port") }) {
+    throw "FRP 服务定义不得写死端口"
 }
 
 $listener = [System.Net.Sockets.TcpListener]::new(

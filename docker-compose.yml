@@ -8,9 +8,9 @@ services:
     ports:
       - "8000:8000"
     environment:
-      NACOS_ADDR: host.docker.internal:8848
-      NACOS_USER: ${REMOTE_NACOS_USERNAME}
-      NACOS_PASS: ${REMOTE_NACOS_PASSWORD}
+      NACOS_ADDR: ${REMOTE_INFRA_HOST:?请设置 REMOTE_INFRA_HOST}:${REMOTE_NACOS_HTTP_PORT:?请设置 REMOTE_NACOS_HTTP_PORT}
+      NACOS_USER: ${REMOTE_NACOS_USER:?请设置 REMOTE_NACOS_USER}
+      NACOS_PASS: ${REMOTE_NACOS_PASSWORD:?请设置 REMOTE_NACOS_PASSWORD}
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8000/actuator/health"]
       interval: 10s
@@ -25,21 +25,23 @@ services:
     container_name: comicatlas-api
     restart: unless-stopped
     environment:
-      NACOS_ADDR: host.docker.internal:8848
-      NACOS_USER: ${REMOTE_NACOS_USERNAME}
-      NACOS_PASS: ${REMOTE_NACOS_PASSWORD}
-      MYSQL_HOST: host.docker.internal
+      NACOS_ADDR: ${REMOTE_INFRA_HOST:?请设置 REMOTE_INFRA_HOST}:${REMOTE_NACOS_HTTP_PORT:?请设置 REMOTE_NACOS_HTTP_PORT}
+      NACOS_USER: ${REMOTE_NACOS_USER:?请设置 REMOTE_NACOS_USER}
+      NACOS_PASS: ${REMOTE_NACOS_PASSWORD:?请设置 REMOTE_NACOS_PASSWORD}
+      MYSQL_HOST: ${REMOTE_INFRA_HOST:?请设置 REMOTE_INFRA_HOST}
+      MYSQL_PORT: ${REMOTE_MYSQL_PORT:?请设置 REMOTE_MYSQL_PORT}
       MYSQL_USER: ${API_MYSQL_USER:?请在 .env 中设置 API_MYSQL_USER}
       MYSQL_PASS: ${API_MYSQL_PASSWORD:?请在 .env 中设置 API_MYSQL_PASSWORD}
-      REDIS_HOST: host.docker.internal
-      REDIS_PORT: ${REMOTE_REDIS_PORT}
-      REDIS_PASS: ${REMOTE_REDIS_PASSWORD}
-      RABBITMQ_HOST: host.docker.internal
-      RABBITMQ_PORT: 5672
-      RABBITMQ_USER: ${REMOTE_RABBITMQ_USER}
-      RABBITMQ_PASS: ${REMOTE_RABBITMQ_PASSWORD}
-      SPRING_SECURITY_USER_NAME: ${REMOTE_RABBITMQ_USER}
-      SPRING_SECURITY_USER_PASSWORD: ${REMOTE_RABBITMQ_PASSWORD}
+      REDIS_HOST: ${REMOTE_INFRA_HOST:?请设置 REMOTE_INFRA_HOST}
+      REDIS_PORT: ${REMOTE_REDIS_PORT:?请设置 REMOTE_REDIS_PORT}
+      REDIS_PASS: ${REMOTE_REDIS_PASSWORD:?请设置 REMOTE_REDIS_PASSWORD}
+      RABBITMQ_HOST: ${REMOTE_INFRA_HOST:?请设置 REMOTE_INFRA_HOST}
+      RABBITMQ_PORT: ${REMOTE_RABBITMQ_PORT:?请设置 REMOTE_RABBITMQ_PORT}
+      RABBITMQ_MANAGEMENT_PORT: ${REMOTE_RABBITMQ_MANAGEMENT_PORT:?请设置 REMOTE_RABBITMQ_MANAGEMENT_PORT}
+      RABBITMQ_USER: ${REMOTE_RABBITMQ_USER:?请设置 REMOTE_RABBITMQ_USER}
+      RABBITMQ_PASS: ${REMOTE_RABBITMQ_PASSWORD:?请设置 REMOTE_RABBITMQ_PASSWORD}
+      SPRING_SECURITY_USER_NAME: ${REMOTE_RABBITMQ_USER:?请设置 REMOTE_RABBITMQ_USER}
+      SPRING_SECURITY_USER_PASSWORD: ${REMOTE_RABBITMQ_PASSWORD:?请设置 REMOTE_RABBITMQ_PASSWORD}
       MANGA_ROOT: /storage
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8010/actuator/health"]
@@ -62,16 +64,17 @@ services:
     container_name: comicatlas-reading
     restart: unless-stopped
     environment:
-      NACOS_ADDR: host.docker.internal:8848
-      NACOS_USER: ${REMOTE_NACOS_USERNAME}
-      NACOS_PASS: ${REMOTE_NACOS_PASSWORD}
-      MYSQL_HOST: host.docker.internal
+      NACOS_ADDR: ${REMOTE_INFRA_HOST:?请设置 REMOTE_INFRA_HOST}:${REMOTE_NACOS_HTTP_PORT:?请设置 REMOTE_NACOS_HTTP_PORT}
+      NACOS_USER: ${REMOTE_NACOS_USER:?请设置 REMOTE_NACOS_USER}
+      NACOS_PASS: ${REMOTE_NACOS_PASSWORD:?请设置 REMOTE_NACOS_PASSWORD}
+      MYSQL_HOST: ${REMOTE_INFRA_HOST:?请设置 REMOTE_INFRA_HOST}
+      MYSQL_PORT: ${REMOTE_MYSQL_PORT:?请设置 REMOTE_MYSQL_PORT}
       # 阅读服务写入阅读进度（reading_history），需使用具备读写权限的 API 账号
       MYSQL_USER: ${API_MYSQL_USER:?请在 .env 中设置 API_MYSQL_USER}
       MYSQL_PASS: ${API_MYSQL_PASSWORD:?请在 .env 中设置 API_MYSQL_PASSWORD}
-      REDIS_HOST: host.docker.internal
-      REDIS_PORT: ${REMOTE_REDIS_PORT}
-      REDIS_PASS: ${REMOTE_REDIS_PASSWORD}
+      REDIS_HOST: ${REMOTE_INFRA_HOST:?请设置 REMOTE_INFRA_HOST}
+      REDIS_PORT: ${REMOTE_REDIS_PORT:?请设置 REMOTE_REDIS_PORT}
+      REDIS_PASS: ${REMOTE_REDIS_PASSWORD:?请设置 REMOTE_REDIS_PASSWORD}
       MANGA_ROOT: /storage
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8011/actuator/health"]
@@ -91,12 +94,15 @@ services:
   #   container_name: comicatlas-worker
   #   restart: unless-stopped
   #   environment:
-  #     NACOS_ADDR: nacos:8848
-  #     RABBITMQ_HOST: rabbitmq
-  #     RABBITMQ_PORT: 5672
-  #     MYSQL_HOST: host.docker.internal
+  #     NACOS_ADDR: ${REMOTE_INFRA_HOST}:${REMOTE_NACOS_HTTP_PORT}
+  #     RABBITMQ_HOST: ${REMOTE_INFRA_HOST}
+  #     RABBITMQ_PORT: ${REMOTE_RABBITMQ_PORT}
+  #     MYSQL_HOST: ${REMOTE_INFRA_HOST}
+  #     MYSQL_PORT: ${REMOTE_MYSQL_PORT}
   #     MYSQL_USER: ${WORKER_MYSQL_USER:?请在 .env 中设置 WORKER_MYSQL_USER}
   #     MYSQL_PASS: ${WORKER_MYSQL_PASSWORD:?请在 .env 中设置 WORKER_MYSQL_PASSWORD}
+  #     REDIS_HOST: ${REMOTE_INFRA_HOST}
+  #     REDIS_PORT: ${REMOTE_REDIS_PORT}
   #     MANGA_ROOT: /storage
   #     WORKER_HOST_MANGA_ROOT: ${MANGA_ROOT:-./manga}
   #     WORKER_CONTAINER_MANGA_ROOT: /storage

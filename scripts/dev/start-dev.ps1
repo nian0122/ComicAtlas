@@ -27,22 +27,39 @@ if (Test-Path $envFile) {
 
 # 3. 映射 .env 变量到 app 期望的变量名
 $env:RABBITMQ_HOST = "localhost"
-$env:RABBITMQ_PORT = "5672"
+$env:RABBITMQ_PORT = $env:REMOTE_RABBITMQ_PORT
 $env:RABBITMQ_USER = $env:REMOTE_RABBITMQ_USER
 $env:RABBITMQ_PASS = $env:REMOTE_RABBITMQ_PASSWORD
-$env:NACOS_ADDR    = "localhost:8848"
-$env:NACOS_USER    = $env:REMOTE_NACOS_USERNAME
+$env:NACOS_ADDR    = "localhost:$env:REMOTE_NACOS_HTTP_PORT"
+$env:NACOS_USER    = $env:REMOTE_NACOS_USER
 $env:NACOS_PASS    = $env:REMOTE_NACOS_PASSWORD
 $env:REDIS_HOST    = "localhost"
-$env:REDIS_PORT    = "6379"
+$env:REDIS_PORT    = $env:REMOTE_REDIS_PORT
 $env:REDIS_PASS    = $env:REMOTE_REDIS_PASSWORD
 $env:MYSQL_HOST    = "localhost"
+$env:MYSQL_PORT    = $env:REMOTE_MYSQL_PORT
 $env:MYSQL_USER    = $env:WORKER_MYSQL_USER
 $env:MYSQL_PASS    = $env:WORKER_MYSQL_PASSWORD
 $env:MANGA_ROOT    = if ($env:MANGA_ROOT) { $env:MANGA_ROOT } else { "F:/manga" }
 
-if ([string]::IsNullOrWhiteSpace($env:MYSQL_USER) -or [string]::IsNullOrWhiteSpace($env:MYSQL_PASS)) {
-    throw "Worker 数据库凭据未配置，请在 .env 中设置 WORKER_MYSQL_USER 和 WORKER_MYSQL_PASSWORD"
+$requiredSettings = @(
+    "WORKER_MYSQL_USER",
+    "WORKER_MYSQL_PASSWORD",
+    "REMOTE_MYSQL_PORT",
+    "REMOTE_REDIS_PORT",
+    "REMOTE_RABBITMQ_PORT",
+    "REMOTE_RABBITMQ_USER",
+    "REMOTE_RABBITMQ_PASSWORD",
+    "REMOTE_NACOS_HTTP_PORT",
+    "REMOTE_NACOS_USER",
+    "REMOTE_NACOS_PASSWORD",
+    "REMOTE_REDIS_PASSWORD"
+)
+$missingSettings = @($requiredSettings | Where-Object {
+    [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($_, "Process"))
+})
+if ($missingSettings) {
+    throw "Worker 环境变量未配置：$($missingSettings -join ', ')"
 }
 
 # 4. 确保存储目录存在（HQ/LQ/EXPORT/thumb）
@@ -51,9 +68,9 @@ if ([string]::IsNullOrWhiteSpace($env:MYSQL_USER) -or [string]::IsNullOrWhiteSpa
 }
 
 # 5. 检查 RabbitMQ AMQP 端口是否可达
-$mqTest = Test-NetConnection -ComputerName 127.0.0.1 -Port 5672 -WarningAction SilentlyContinue -InformationLevel Quiet
+$mqTest = Test-NetConnection -ComputerName 127.0.0.1 -Port $env:RABBITMQ_PORT -WarningAction SilentlyContinue -InformationLevel Quiet
 if (-not $mqTest) {
-    Write-Host "WARN: RabbitMQ 127.0.0.1:5672 不可达 — FRP 连接可能尚未建立" -ForegroundColor Yellow
+    Write-Host "WARN: RabbitMQ 127.0.0.1:$env:RABBITMQ_PORT 不可达 — FRP 连接可能尚未建立" -ForegroundColor Yellow
 }
 
 # 5. 启动 Worker

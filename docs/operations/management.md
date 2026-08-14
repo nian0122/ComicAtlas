@@ -204,6 +204,6 @@ docker compose -f docker-compose.yml up -d --build
 ## 八、安全基线
 
 - 管理端接口默认无鉴权：只部署在可信本机，管理端口不暴露公网。
-- RabbitMQ 管理台（15672）、Nacos（8848）只绑定回环地址。
+- RabbitMQ 管理台与 Nacos 使用 `.env` 中对应的 `REMOTE_*_PORT`，并只绑定回环地址。
 - 不要把 `.env`、数据库密码、远程凭据提交到 Git 或写入文档。
 - 定期轮换 `MYSQL_ROOT_PASSWORD` 等基础设施密码。

@@ -13,29 +13,29 @@ spring:
   cloud:
     nacos:
       discovery:
-        server-addr: ${NACOS_ADDR:localhost:8848}
-        username: ${NACOS_USER:nacos}
-        password: ${NACOS_PASS:nacos}
+        server-addr: ${NACOS_ADDR}
+        username: ${NACOS_USER}
+        password: ${NACOS_PASS}
       config:
         import-check:
           enabled: false
-        server-addr: ${NACOS_ADDR:localhost:8848}
+        server-addr: ${NACOS_ADDR}
         file-extension: yaml
   datasource:
-    url: jdbc:mysql://${MYSQL_HOST:localhost}:3306/comic_atlas?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
-    username: ${MYSQL_USER:root}
-    password: ${MYSQL_PASS:root}
+    url: jdbc:mysql://${MYSQL_HOST}:${MYSQL_PORT}/comic_atlas?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
+    username: ${MYSQL_USER}
+    password: ${MYSQL_PASS}
     driver-class-name: com.mysql.cj.jdbc.Driver
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASS:}
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+      password: ${REDIS_PASS}
   rabbitmq:
-    host: ${RABBITMQ_HOST:localhost}
-    port: ${RABBITMQ_PORT:5672}
-    username: ${RABBITMQ_USER:guest}
-    password: ${RABBITMQ_PASS:guest}
+    host: ${RABBITMQ_HOST}
+    port: ${RABBITMQ_PORT}
+    username: ${RABBITMQ_USER}
+    password: ${RABBITMQ_PASS}
     publisher-confirm-type: correlated
     publisher-returns: true
     template:
@@ -124,4 +124,4 @@ comic:
 # 如需单独指定可设环境变量 RABBITMQ_MANAGEMENT_HOST / RABBITMQ_MANAGEMENT_USER / RABBITMQ_MANAGEMENT_PASS。
 mq:
   management:
-    port: ${RABBITMQ_MANAGEMENT_PORT:15672}
+    port: ${RABBITMQ_MANAGEMENT_PORT}

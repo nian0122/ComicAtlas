@@ -44,21 +44,30 @@ ComicAtlas 是一个面向个人收藏的本地漫画仓库平台。它把 ZIP�
 
 ### 使用 Docker 部署
 
-1. 创建 `.env`，至少设置漫画存储目录及外部基础设施凭据：
+1. 复制 `.env.example` 为不受 Git 跟踪的 `.env`，按分组填写漫画存储、远端基础设施和 FRP 配置：
 
    ```dotenv
    MANGA_ROOT=F:/manga
+   REMOTE_INFRA_HOST=host.docker.internal
    MYSQL_ROOT_PASSWORD=请设置强密码
    API_MYSQL_USER=comicatlas_api
    API_MYSQL_PASSWORD=请设置强密码
    WORKER_MYSQL_USER=comicatlas_ro
    WORKER_MYSQL_PASSWORD=请设置另一组强密码
-   REMOTE_NACOS_USERNAME=nacos
-   REMOTE_NACOS_PASSWORD=nacos
+   REMOTE_MYSQL_PORT=3306
    REMOTE_REDIS_PORT=6379
+   REMOTE_RABBITMQ_PORT=5672
+   REMOTE_RABBITMQ_MANAGEMENT_PORT=15672
+   REMOTE_NACOS_HTTP_PORT=8848
+   REMOTE_NACOS_GRPC_PORT=9848
+   REMOTE_NACOS_USER=nacos
+   REMOTE_NACOS_PASSWORD=nacos
    REMOTE_REDIS_PASSWORD=
    REMOTE_RABBITMQ_USER=guest
    REMOTE_RABBITMQ_PASSWORD=guest
+   FRP_SERVER_ADDR=远端服务器公网地址
+   FRP_SERVER_PORT=7000
+   FRP_DASHBOARD_PORT=7500
    ```
 
    > 仓库级 `.env` 使用 `API_MYSQL_*` 和 `WORKER_MYSQL_*` 区分写账号与只读账号。启动脚本或 Compose 会在进程边界映射为 Spring 使用的 `MYSQL_USER` / `MYSQL_PASS`；Worker 账号仅授予 `SELECT`，详见[部署运维](docs/operations/management.md)的"数据库账号"小节。
@@ -142,7 +151,7 @@ pnpm build
 ComicAtlas 面向单机个人仓库，管理端接口（回收站、永久清理、DLQ 等）默认不开启鉴权。请遵守：
 
 - 仅部署在可信本机环境；基础服务（`docker-compose.infra.yml`）只绑定 `127.0.0.1` 回环地址。
-- 不要把 8000/3306/15672/8848 等管理端口直接暴露到公网。
+- 不要把 Gateway 或 `.env` 中的数据库、管理台、注册中心端口直接暴露到公网；FRP 只开放 `FRP_SERVER_PORT`。
 - 在宿主机或防火墙层限制对管理后台 `/manage` 的访问，需要远程访问时使用 SSH 隧道。
 
 ## 文档

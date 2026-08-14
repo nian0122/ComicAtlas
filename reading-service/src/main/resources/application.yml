@@ -13,24 +13,24 @@ spring:
   cloud:
     nacos:
       discovery:
-        server-addr: ${NACOS_ADDR:localhost:8848}
-        username: ${NACOS_USER:nacos}
-        password: ${NACOS_PASS:nacos}
+        server-addr: ${NACOS_ADDR}
+        username: ${NACOS_USER}
+        password: ${NACOS_PASS}
       config:
         import-check:
           enabled: false
   # 阅读服务只读漫画数据 + 写入阅读进度（reading_history），
   # 需使用具备该库读写权限的账号；不承担 Flyway 迁移（由管理服务统一执行）。
   datasource:
-    url: jdbc:mysql://${MYSQL_HOST:localhost}:3306/comic_atlas?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
-    username: ${MYSQL_USER:root}
-    password: ${MYSQL_PASS:root}
+    url: jdbc:mysql://${MYSQL_HOST}:${MYSQL_PORT}/comic_atlas?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
+    username: ${MYSQL_USER}
+    password: ${MYSQL_PASS}
     driver-class-name: com.mysql.cj.jdbc.Driver
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASS:}
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+      password: ${REDIS_PASS}
   cache:
     type: redis
     redis:
