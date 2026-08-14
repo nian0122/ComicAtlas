@@ -9,7 +9,9 @@ import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.persistence.comic.mapper.MediaMapper;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.enums.HqStatus;
+import com.comicatlas.contract.common.enums.LqStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
+import com.comicatlas.contract.common.exception.ConflictException;
 import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
 import com.comicatlas.api.management.dto.OperationSubmitResultDTO;
@@ -235,6 +237,65 @@ class MediaOperationCommandServiceTest {
         verify(outboxService, never()).enqueue(any(), any(), any(), any(), any(), anyInt());
     }
 
+    @Test
+    void requestHqDeleteForComic_单次IN查询批量校验与置状态() {
+        Chapter chapterA = new Chapter();
+        chapterA.setId(10L);
+        Chapter chapterB = new Chapter();
+        chapterB.setId(20L);
+        when(chapterMapper.selectList(any())).thenReturn(List.of(chapterA, chapterB));
+
+        // 两个章节共 3 个 IMAGE 页，LQ 均 READY
+        when(mediaMapper.selectList(any())).thenReturn(List.of(
+                image(31L, 10L, HqStatus.READY, LqStatus.READY),
+                image(32L, 10L, HqStatus.MISSING, LqStatus.READY),
+                image(33L, 20L, HqStatus.READY, LqStatus.READY)));
+
+        ManagementTaskResponse task = new ManagementTaskResponse();
+        task.setId(300L);
+        task.setStatus(ManagementTaskStatus.QUEUED);
+        when(managementTaskService.createTask(any(), any(), any())).thenReturn(task);
+
+        ManagementTaskItemResponse itemA = new ManagementTaskItemResponse();
+        itemA.setId(400L);
+        itemA.setTaskId(300L);
+        itemA.setTargetType("CHAPTER");
+        itemA.setTargetId(10L);
+        itemA.setAttempt(1);
+        ManagementTaskItemResponse itemB = new ManagementTaskItemResponse();
+        itemB.setId(401L);
+        itemB.setTaskId(300L);
+        itemB.setTargetType("CHAPTER");
+        itemB.setTargetId(20L);
+        itemB.setAttempt(1);
+        when(managementTaskService.getTaskItems(300L)).thenReturn(List.of(itemA, itemB));
+
+        OperationSubmitResultDTO result = service.requestHqDeleteForComic(1L);
+
+        assertEquals(300L, result.getTaskId());
+        assertEquals("HQ_DELETE", result.getTaskType());
+        assertEquals(2, result.getItemCount());
+
+        // N+1 回归：候选页一次 IN 查询取回，置 DELETE_QUEUED 仅一次批量 UPDATE
+        verify(mediaMapper, times(1)).selectList(any());
+        verify(mediaMapper, times(1)).update(any(), any());
+        verify(outboxService, times(2)).enqueue(any(), any(), any(), any(), any(), anyInt());
+    }
+
+    @Test
+    void requestHqDeleteForComic_LQ未就绪章节抛409且不建任务() {
+        Chapter chapter = new Chapter();
+        chapter.setId(10L);
+        when(chapterMapper.selectList(any())).thenReturn(List.of(chapter));
+
+        Media notReady = image(31L, 10L, HqStatus.READY, LqStatus.NOT_GENERATED);
+        when(mediaMapper.selectList(any())).thenReturn(List.of(notReady));
+
+        assertThrows(ConflictException.class, () -> service.requestHqDeleteForComic(1L));
+        verify(managementTaskService, never()).createTask(any(), any(), any());
+        verify(outboxService, never()).enqueue(any(), any(), any(), any(), any(), anyInt());
+    }
+
     private static Media video(Long id, Long chapterId, String container, TranscodeStatus status) {
         Media media = new Media();
         media.setId(id);
@@ -243,6 +304,17 @@ class MediaOperationCommandServiceTest {
         media.setHqStatus(HqStatus.READY);
         media.setContainer(container);
         media.setTranscodeStatus(status);
+        return media;
+    }
+
+    private static Media image(Long id, Long chapterId, HqStatus hqStatus, LqStatus lqStatus) {
+        Media media = new Media();
+        media.setId(id);
+        media.setChapterId(chapterId);
+        media.setMediaType("IMAGE");
+        media.setPageNumber(1);
+        media.setHqStatus(hqStatus);
+        media.setLqStatus(lqStatus);
         return media;
     }
 }

@@ -35,8 +35,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * 媒体操作命令编排服务。
@@ -139,13 +141,28 @@ public class MediaOperationCommandService {
     public OperationSubmitResultDTO requestHqDeleteForComic(Long comicId) {
         List<Chapter> chapters = chapterMapper.selectList(
                 new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
+        if (chapters.isEmpty()) {
+            log.info("漫画 {} 无章节，跳过", comicId);
+            return OperationSubmitResultDTO.of(null, TaskType.HQ_DELETE.name(), null, 0);
+        }
+        List<Long> chapterIds = chapters.stream().map(Chapter::getId).toList();
+
+        // 一次性 IN 查询取回全部候选图片页并按章节分组，避免逐章 selectCount/selectList（N+1）
+        List<Media> deletablePages = mediaMapper.selectList(
+                new LambdaQueryWrapper<Media>()
+                        .in(Media::getChapterId, chapterIds)
+                        .eq(Media::getMediaType, "IMAGE")
+                        .in(Media::getHqStatus, HqStatus.READY, HqStatus.MISSING));
+        Map<Long, List<Media>> pagesByChapter = deletablePages.stream()
+                .collect(Collectors.groupingBy(Media::getChapterId));
 
         List<CreateManagementTaskRequest.TaskTarget> targets = new ArrayList<>();
         for (Chapter chapter : chapters) {
-            if (!hasDeletableHq(chapter.getId())) {
+            List<Media> pages = pagesByChapter.getOrDefault(chapter.getId(), List.of());
+            if (pages.isEmpty()) {
                 continue;
             }
-            validateHqDeletePrecondition(chapter.getId());
+            validateHqDeletePrecondition(pages);
             targets.add(target("CHAPTER", chapter.getId(), TaskType.HQ_DELETE));
         }
         if (targets.isEmpty()) {
@@ -156,8 +173,11 @@ public class MediaOperationCommandService {
         ManagementTaskResponse task = createTask(TaskType.HQ_DELETE, "删除高清图片", "COMIC", targets);
         List<ManagementTaskItemResponse> items = managementTaskService.getTaskItems(task.getId());
 
+        List<Long> targetChapterIds = items.stream()
+                .map(ManagementTaskItemResponse::getTargetId)
+                .toList();
+        markHqDeleteQueued(targetChapterIds);
         for (ManagementTaskItemResponse item : items) {
-            markHqDeleteQueued(item.getTargetId());
             enqueue(TaskType.HQ_DELETE, item, "CHAPTER", item.getTargetId());
         }
         log.info("HQ 删除命令已提交: comicId={}, taskId={}, items={}",
@@ -202,6 +222,13 @@ public class MediaOperationCommandService {
                         .eq(Media::getChapterId, chapterId)
                         .eq(Media::getMediaType, "IMAGE")
                         .in(Media::getHqStatus, HqStatus.READY, HqStatus.MISSING));
+        validateHqDeletePrecondition(mediaItems);
+    }
+
+    /**
+     * HQ 删除前置条件（复用已加载页数据）：全部图片页 LQ 必须 READY。
+     */
+    private void validateHqDeletePrecondition(List<Media> mediaItems) {
         List<Media> notReady = mediaItems.stream()
                 .filter(media -> media.getLqStatus() != LqStatus.READY)
                 .toList();
@@ -217,6 +244,17 @@ public class MediaOperationCommandService {
     private void markHqDeleteQueued(Long chapterId) {
         mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
                 .eq(Media::getChapterId, chapterId)
+                .eq(Media::getMediaType, "IMAGE")
+                .in(Media::getHqStatus, HqStatus.READY, HqStatus.MISSING)
+                .set(Media::getHqStatus, HqStatus.DELETE_QUEUED));
+    }
+
+    private void markHqDeleteQueued(List<Long> chapterIds) {
+        if (chapterIds.isEmpty()) {
+            return;
+        }
+        mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
+                .in(Media::getChapterId, chapterIds)
                 .eq(Media::getMediaType, "IMAGE")
                 .in(Media::getHqStatus, HqStatus.READY, HqStatus.MISSING)
                 .set(Media::getHqStatus, HqStatus.DELETE_QUEUED));
