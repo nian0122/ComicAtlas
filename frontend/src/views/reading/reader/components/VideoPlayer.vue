@@ -17,6 +17,7 @@
         :src="hqUrl"
         muted
         playsinline
+        webkit-playsinline
         preload="metadata"
         @loadedmetadata="onPreviewMetadata"
         @seeked="onPreviewSeeked"
@@ -44,6 +45,7 @@
       :height="height"
       controls
       playsinline
+      webkit-playsinline
       preload="none"
       data-reader-interactive
       @loadedmetadata="onMetadata"

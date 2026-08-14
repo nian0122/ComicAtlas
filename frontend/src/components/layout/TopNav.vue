@@ -11,6 +11,7 @@
             <el-icon :size="22"><ArrowLeft /></el-icon>
           </button>
           <router-link to="/" class="mobile-detail-brand"><ComicAtlasLogo size="sm" /></router-link>
+          <DisplayModeToggle />
           <button type="button" class="mobile-header-action" aria-label="分享当前漫画" @click="onShare">
             <el-icon :size="21"><Share /></el-icon>
           </button>
@@ -21,7 +22,7 @@
             <el-icon :size="23"><Menu /></el-icon>
           </span>
           <router-link to="/" class="mobile-wordmark mobile-wordmark--solo"><ComicAtlasLogo size="sm" /></router-link>
-          <span class="mobile-header-spacer" aria-hidden="true" />
+          <DisplayModeToggle />
         </template>
 
         <template v-else-if="mobileHeaderKind === 'history'">
@@ -40,13 +41,14 @@
               :class="['mobile-history-refresh-icon', { 'refresh-icon--loading': historyStore.loading }]"
             />
           </button>
+          <DisplayModeToggle />
         </template>
 
         <template v-else>
           <router-link to="/" class="mobile-brand" aria-label="ComicAtlas 首页">
             <ComicAtlasLogo size="sm" />
           </router-link>
-          <span v-if="mobileHeaderKind === 'home'" class="profile-badge" aria-label="当前用户">U</span>
+          <DisplayModeToggle v-if="mobileHeaderKind === 'home'" />
         </template>
       </div>
 
@@ -64,6 +66,7 @@
         <el-icon :size="18"><UploadFilled /></el-icon>
         <span>导入漫画</span>
       </router-link>
+      <DisplayModeToggle class="desktop-action" />
     </div>
   </header>
 
@@ -95,6 +98,7 @@ import {
 } from '@element-plus/icons-vue'
 import MaterialSymbolIcon from '@/components/icons/MaterialSymbolIcon.vue'
 import ComicAtlasLogo from '@/components/brand/ComicAtlasLogo.vue'
+import DisplayModeToggle from '@/components/layout/DisplayModeToggle.vue'
 import { useHistoryStore } from '@/stores/history-store'
 
 const isScrolled = ref(false)
@@ -292,6 +296,30 @@ onBeforeUnmount(() => {
   display: none;
 }
 
+/* 用户显式选择桌面版时，覆盖设备断点，便于手机访问管理端。 */
+:global(html[data-display-mode='desktop']) .top-nav {
+  height: var(--nav-height);
+  background: var(--nav-gradient);
+}
+
+:global(html[data-display-mode='desktop']) .desktop-brand,
+:global(html[data-display-mode='desktop']) .desktop-nav,
+:global(html[data-display-mode='desktop']) .desktop-action {
+  display: inline-flex;
+}
+
+:global(html[data-display-mode='desktop']) .mobile-header,
+:global(html[data-display-mode='desktop']) .mobile-tabbar {
+  display: none;
+}
+
+:global(html[data-display-mode='desktop']) .nav-shell {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  width: min(100%, var(--content-max));
+  padding-inline: var(--content-gutter);
+}
+
 @media (max-width: 1024px) {
   .top-nav {
     height: var(--mobile-nav-height);
@@ -329,6 +357,14 @@ onBeforeUnmount(() => {
     align-items: center;
     justify-content: space-between;
     width: 100%;
+  }
+
+  .mobile-header .display-mode-toggle {
+    display: inline-flex;
+    min-height: 40px;
+    padding-inline: var(--space-3);
+    border-color: var(--color-border-faint);
+    font-size: var(--text-xs);
   }
 
   .desktop-action {

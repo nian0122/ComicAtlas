@@ -30,6 +30,15 @@ const routeClass = computed(() => `route-${String(route.name ?? 'unknown')}`)
   padding: var(--nav-height) var(--content-gutter) var(--space-10);
 }
 
+:global(html[data-display-mode='desktop']) .main-content {
+  padding: var(--nav-height) var(--content-gutter) var(--space-10);
+}
+
+:global(html[data-display-mode='desktop']) .main-content.route-home,
+:global(html[data-display-mode='desktop']) .main-content.route-comic-detail {
+  padding: var(--nav-height) var(--content-gutter) var(--space-10);
+}
+
 @media (max-width: 1024px) {
   .reading-layout {
     background: var(--mobile-canvas);

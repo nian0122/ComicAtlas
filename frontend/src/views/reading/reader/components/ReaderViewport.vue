@@ -289,6 +289,8 @@ watch(() => [settings.fitMode, settings.zoom], () => {
   height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
 }
 
 .reader-item-wrapper {

@@ -74,6 +74,7 @@ const emit = defineEmits<{
   padding: env(safe-area-inset-top) var(--space-xs) 0;
   /* 半透明深色背景 + 毛玻璃 */
   background: var(--bg-primary);
+  background: rgb(8 8 8 / 88%);
   background: color-mix(in srgb, var(--bg-primary) 80%, transparent);
   -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);

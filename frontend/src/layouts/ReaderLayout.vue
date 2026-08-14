@@ -7,7 +7,8 @@
 <style scoped>
 .reader-layout {
   width: 100%;
-  min-height: 100dvh;
+  min-height: 100vh;
+  min-height: var(--app-viewport-height, 100dvh);
   background: var(--bg-primary);
 }
 </style>
