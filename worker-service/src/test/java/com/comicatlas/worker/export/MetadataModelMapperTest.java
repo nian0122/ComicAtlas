@@ -70,7 +70,7 @@ class MetadataModelMapperTest {
     }
 
     @Test
-    void toV3_missingHqPath_throwsIllegalArgumentException() {
+    void toV3_hqDeletedNullHqPath_mapsToNullHqPath() {
         ExportComic comic = new ExportComic();
         comic.setId(1L);
         comic.setTitle("标题");
@@ -79,13 +79,21 @@ class MetadataModelMapperTest {
         ch.setComicId(1L);
         ch.setTitle("章节1");
         ch.setGlobalOrder(1);
+        // HQ 已删除：hqPath 清空、hqStatus=DELETED、LQ 就绪（LQ 替代 HQ 的存储优化场景）
         ExportMedia m = media(100L, 20L, null, "IMAGE", 1);
+        m.setHqStatus("DELETED");
+        m.setLqStatus("READY");
 
         ExportCollectResult result = new ExportCollectResult(comic, List.of(ch), List.of(), List.of(m), null);
 
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> mapper.toV3(result));
-        assertTrue(ex.getMessage().contains("hqPath"),
-                "缺失 hqPath 的异常信息应包含 hqPath 上下文: " + ex.getMessage());
+        MetadataV3 v3 = mapper.toV3(result);
+        assertEquals(1, v3.chapters().get(0).mediaItems().size(),
+                "HQ 已删除的页面必须保留在 metadata 中，不得因缺 hqPath 抛异常");
+        MetadataV3.MediaItem item = v3.chapters().get(0).mediaItems().get(0);
+        assertNull(item.hqPath(), "HQ 删除后 hqPath 应为 null（序列化层将省略该字段）");
+        assertEquals("DELETED", item.hqStatus(), "hqStatus 必须原样传递 DELETED，供恢复/审计识别");
+        assertEquals("READY", item.lqStatus(), "lqStatus 必须原样传递 READY");
+        assertEquals("", item.fileName(), "hqPath 缺失时 fileName 为空");
     }
 
     @Test
