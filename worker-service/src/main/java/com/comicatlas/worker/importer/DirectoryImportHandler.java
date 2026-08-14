@@ -1,11 +1,12 @@
 package com.comicatlas.worker.importer;
 
+import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.worker.event.CancelHandler;
+import com.comicatlas.worker.image.CoverGenerator;
 import com.comicatlas.worker.media.ComicMetadata;
 import com.comicatlas.worker.storage.StorageRef;
 import com.comicatlas.worker.storage.StorageService;
 import com.comicatlas.worker.storage.TransferMode;
-import com.comicatlas.worker.image.CoverGenerator;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +38,19 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class DirectoryImportHandler {
 
+    /** metadata V3 版本号（与 MetadataV3 模型一致）。 */
+    private static final int METADATA_VERSION = 3;
+    /** 导入清单版本号（与 ImportManifestManager.VERSION 保持一致）。 */
+    private static final int MANIFEST_VERSION = 1;
+    /** 媒体类型：视频。 */
+    private static final String MEDIA_TYPE_VIDEO = "VIDEO";
+    /** 媒体类型：图片。 */
+    private static final String MEDIA_TYPE_IMAGE = "IMAGE";
+    /** metadata 目录名（MANGA_ROOT 下）。 */
+    private static final String METADATA_DIR_NAME = "metadata";
+    /** metadata JSON 文件名后缀。 */
+    private static final String JSON_FILE_SUFFIX = ".json";
+
     private final DirectoryParser parser;
     private final MetadataAssembler assembler;
     private final StorageService storageService;
@@ -51,7 +65,7 @@ public class DirectoryImportHandler {
      * 清单存在 → 中断恢复（跳过已搬文件，metadata 从清单出，绝不重新解析源目录）；
      * 清单不存在 → 全新导入（标准化 → 解析 → 组装 → 写清单 → 搬文件）。
      */
-    public Path handle(ImportContext ctx, Long taskId, Long comicId, Path mangaRoot) throws Exception {
+    public Path handle(ImportContext ctx, Long taskId, Long comicId, Path mangaRoot) throws IOException {
         ImportManifest manifest;
         if (manifestManager.exists(mangaRoot, taskId)) {
             manifest = manifestManager.read(mangaRoot, taskId);
@@ -73,7 +87,7 @@ public class DirectoryImportHandler {
             List<ImportManifest.ImportFile> files = manifestBuildResult.files();
             Map<String, String> generatedNames = manifestBuildResult.nameMap();
             JsonNode metadataNode = objectMapper.valueToTree(buildMetadataMap(metadata, comicId, generatedNames));
-            manifest = new ImportManifest(1, taskId, ctx.sourceType(), importRoot.toString(),
+            manifest = new ImportManifest(MANIFEST_VERSION, taskId, ctx.sourceType(), importRoot.toString(),
                     metadataNode, files);
             manifestManager.write(mangaRoot, taskId, manifest);
             log.info("清单已写入: taskId={}, files={}", taskId, files.size());
@@ -87,7 +101,7 @@ public class DirectoryImportHandler {
                 throw new RuntimeException("Task cancelled: " + taskId);
             }
             Path source = sourceRoot.resolve(file.source());
-            StorageRef storageRef = new StorageRef("HQ", file.target());
+            StorageRef storageRef = new StorageRef(StorageRootKeys.HQ, file.target());
             Path destination = storageService.resolve(storageRef);
             if (Files.exists(destination)) {
                 long destinationSize = Files.size(destination);
@@ -119,18 +133,15 @@ public class DirectoryImportHandler {
         return metaPath;
     }
 
-    /**
-     * 清单构建结果：文件列表 + 源文件名→生成文件名映射（用于 metadata）。
-     */
-    private record ManifestBuildResult(List<ImportManifest.ImportFile> files, Map<String, String> nameMap) {}
-
     private ManifestBuildResult buildManifestFiles(ComicMetadata metadata, Long comicId, Path importRoot) {
         List<ImportManifest.ImportFile> files = new ArrayList<>();
         Map<String, String> nameMap = new LinkedHashMap<>();
-        for (var chapter : metadata.chapters()) {
-            for (var page : chapter.pages()) {
+        for (ComicMetadata.ChapterInfo chapter : metadata.chapters()) {
+            for (ComicMetadata.MediaInfo page : chapter.pages()) {
                 Path source = importRoot.resolve(chapter.sourceDir()).resolve(page.fileName());
-                if (!Files.exists(source)) { source = importRoot.resolve(page.fileName()); }
+                if (!Files.exists(source)) {
+                    source = importRoot.resolve(page.fileName());
+                }
                 if (Files.exists(source) && page.fileSize() > 0) {
                     String relative = importRoot.relativize(source).toString().replace('\\', '/');
                     // 目标文件名保留原始文件名（禁止 UUID 化），目录用 globalOrder——
@@ -186,38 +197,50 @@ public class DirectoryImportHandler {
                 if (generatedPath != null) {
                     mediaMap.put("hqPath", generatedPath);
                 }
-                if (page.width() != null) { mediaMap.put("width", page.width()); }
-                if (page.height() != null) { mediaMap.put("height", page.height()); }
+                if (page.width() != null) {
+                    mediaMap.put("width", page.width());
+                }
+                if (page.height() != null) {
+                    mediaMap.put("height", page.height());
+                }
                 mediaMap.put("mediaType", page.mediaType());
-                if (page.duration() != null) { mediaMap.put("duration", page.duration()); }
-                if (page.container() != null) { mediaMap.put("container", page.container()); }
-                if (page.videoCodec() != null) { mediaMap.put("videoCodec", page.videoCodec()); }
-                if (page.audioCodec() != null) { mediaMap.put("audioCodec", page.audioCodec()); }
+                if (page.duration() != null) {
+                    mediaMap.put("duration", page.duration());
+                }
+                if (page.container() != null) {
+                    mediaMap.put("container", page.container());
+                }
+                if (page.videoCodec() != null) {
+                    mediaMap.put("videoCodec", page.videoCodec());
+                }
+                if (page.audioCodec() != null) {
+                    mediaMap.put("audioCodec", page.audioCodec());
+                }
                 return mediaMap;
             }).toList());
             return chapterMap;
         }).toList();
 
         Map<String, Object> root = new LinkedHashMap<>();
-        root.put("version", 3);
+        root.put("version", METADATA_VERSION);
         root.put("comic", comic);
         root.put("catalogs", catalogList);
         root.put("chapters", chapterList);
         return root;
     }
 
-    private Path writeMetadataNode(JsonNode metadata, Long taskId, Long comicId, Path mangaRoot) throws Exception {
-        Path metaDir = mangaRoot.resolve("metadata");
+    private Path writeMetadataNode(JsonNode metadata, Long taskId, Long comicId, Path mangaRoot) throws IOException {
+        Path metaDir = mangaRoot.resolve(METADATA_DIR_NAME);
         Files.createDirectories(metaDir);
         // 任务级 metadata（ImportEventHandler 消费）
-        Path metaPath = metaDir.resolve(taskId + ".json");
+        Path metaPath = metaDir.resolve(taskId + JSON_FILE_SUFFIX);
         objectMapper.writerWithDefaultPrettyPrinter().writeValue(metaPath.toFile(), metadata);
         // QA 修复注记（task-21）：同时写出 comicId.json。
         // RecoveryEngine 按 metadata/{comicId}.json 查找元数据重建 DB 记录，而原实现
         // 只写 {taskId}.json，导致正常导入的漫画在 DB 数据丢失后恢复走占位路径
         // （RECOVERY_REQUIRED）而非完整恢复（READY）。
         if (comicId != null) {
-            Path comicMeta = metaDir.resolve(comicId + ".json");
+            Path comicMeta = metaDir.resolve(comicId + JSON_FILE_SUFFIX);
             objectMapper.writerWithDefaultPrettyPrinter().writeValue(comicMeta.toFile(), metadata);
         }
         log.info("Metadata written: {}", metaPath);
@@ -230,7 +253,9 @@ public class DirectoryImportHandler {
      */
     private void generateCoverFromNode(JsonNode metadata, Long comicId) {
         List<CoverCandidateSelector.MediaCandidate> media = flattenMedia(metadata, comicId);
-        if (media.isEmpty()) { return; }
+        if (media.isEmpty()) {
+            return;
+        }
         List<CoverCandidateSelector.CoverCandidate> candidates = coverCandidateSelector.select(media);
         if (candidates.isEmpty()) {
             log.warn("无可用的封面候选，本漫画无封面: comicId={}", comicId);
@@ -238,14 +263,14 @@ public class DirectoryImportHandler {
         }
         for (int i = 0; i < candidates.size(); i++) {
             CoverCandidateSelector.CoverCandidate candidate = candidates.get(i);
-            Path sourcePath = storageService.resolve(new StorageRef("HQ", candidate.hqPath()));
+            Path sourcePath = storageService.resolve(new StorageRef(StorageRootKeys.HQ, candidate.hqPath()));
             if (!Files.exists(sourcePath)) {
                 log.warn("封面候选文件缺失，跳过: comicId={}, candidateIndex={}, fileName={}",
                         comicId, i, candidate.fileName());
                 continue;
             }
             try {
-                if ("VIDEO".equalsIgnoreCase(candidate.mediaType())) {
+                if (MEDIA_TYPE_VIDEO.equalsIgnoreCase(candidate.mediaType())) {
                     coverGenerator.generateCoverFromVideo(comicId, sourcePath);
                 } else {
                     coverGenerator.generateCover(comicId, sourcePath);
@@ -253,9 +278,9 @@ public class DirectoryImportHandler {
                 log.info("封面候选生成成功: comicId={}, candidateIndex={}, fileName={}",
                         comicId, i, candidate.fileName());
                 return;
-            } catch (Exception e) {
+            } catch (RuntimeException ex) {
                 log.warn("封面候选生成失败，继续下一候选: comicId={}, candidateIndex={}, fileName={}",
-                        comicId, i, candidate.fileName(), e);
+                        comicId, i, candidate.fileName(), ex);
             }
         }
         log.warn("全部封面候选生成失败，本漫画无封面: comicId={}, candidateCount={}",
@@ -275,8 +300,10 @@ public class DirectoryImportHandler {
             JsonNode mediaItems = chapter.path("mediaItems");
             for (JsonNode item : mediaItems) {
                 String fileName = item.path("fileName").asText(null);
-                if (fileName == null || fileName.isBlank()) { continue; }
-                String mediaType = item.path("mediaType").asText("IMAGE");
+                if (fileName == null || fileName.isBlank()) {
+                    continue;
+                }
+                String mediaType = item.path("mediaType").asText(MEDIA_TYPE_IMAGE);
                 int pageNumber = item.path("pageNumber").asInt();
                 String hqPath = item.path("hqPath").asText(null);
                 if (hqPath == null || hqPath.isBlank()) {
@@ -287,5 +314,9 @@ public class DirectoryImportHandler {
             }
         }
         return media;
+    }
+
+    /** 清单构建结果：文件列表 + 源文件名→生成文件名映射（用于 metadata）。 */
+    private record ManifestBuildResult(List<ImportManifest.ImportFile> files, Map<String, String> nameMap) {
     }
 }

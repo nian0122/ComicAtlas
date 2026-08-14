@@ -1,14 +1,14 @@
 package com.comicatlas.api.importer.event;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.comicatlas.common.constant.MqQueues;
+import com.comicatlas.common.event.HqDeletedEvent;
+import com.comicatlas.common.mq.MqConsumerSupport;
+import com.comicatlas.contract.common.enums.HqStatus;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.entity.Media;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.persistence.comic.mapper.MediaMapper;
-import com.comicatlas.contract.common.enums.HqStatus;
-import com.comicatlas.common.constant.MqQueues;
-import com.comicatlas.common.event.HqDeletedEvent;
-import com.comicatlas.common.mq.MqConsumerSupport;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,7 +16,6 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.support.AmqpHeaders;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
-
 
 /**
  * HQ 删除完成事件处理器。
@@ -26,6 +25,9 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class HqDeletedHandler {
+
+    /** 媒体类型：图片（HQ 删除仅作用于 IMAGE 页，VIDEO 不受影响）。 */
+    private static final String MEDIA_TYPE_IMAGE = "IMAGE";
 
     private final MediaMapper mediaMapper;
     private final ComicMapper comicMapper;
@@ -40,18 +42,13 @@ public class HqDeletedHandler {
                 comicId, chapterId, event.freedBytes(), event.deletedCount());
 
         mqConsumerSupport.consume(channel, tag, "HQ删除完成: comicId=" + comicId, () -> {
-            // 1. 更新 IMAGE 页
-            var mediaItems = mediaMapper.selectList(
-                    new LambdaQueryWrapper<Media>()
-                            .eq(Media::getChapterId, chapterId)
-                            .eq(Media::getMediaType, "IMAGE"));
-
-            for (Media media : mediaItems) {
-                media.setHqStatus(HqStatus.DELETED);
-                media.setHqRoot(null);
-                media.setHqPath(null);
-                mediaMapper.updateById(media);
-            }
+            // 1. IMAGE 页批量置 DELETED 并清空 HQ 引用（单条 UPDATE，消除逐页往返）
+            int updated = mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
+                    .eq(Media::getChapterId, chapterId)
+                    .eq(Media::getMediaType, MEDIA_TYPE_IMAGE)
+                    .set(Media::getHqStatus, HqStatus.DELETED)
+                    .set(Media::getHqRoot, null)
+                    .set(Media::getHqPath, null));
 
             // 2. 更新 Comic.hqSize
             Comic comic = comicMapper.selectById(comicId);
@@ -62,7 +59,7 @@ public class HqDeletedHandler {
             }
 
             log.info("HQ 状态更新完成: comicId={}, chapterId={}, pages={}, freedBytes={}",
-                    comicId, chapterId, mediaItems.size(), event.freedBytes());
+                    comicId, chapterId, updated, event.freedBytes());
         });
     }
 }

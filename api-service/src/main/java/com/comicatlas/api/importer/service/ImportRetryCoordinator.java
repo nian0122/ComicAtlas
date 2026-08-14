@@ -9,9 +9,11 @@ import com.comicatlas.api.management.state.ManagementStateMachine;
 import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
+import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.common.event.ImportTaskCreatedEvent;
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.enums.ImportTaskStatus;
+import com.comicatlas.contract.common.enums.SourceType;
 import com.comicatlas.persistence.comic.entity.Catalog;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Comic;
@@ -41,7 +43,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * 导入任务重试编排器 — 统一 IMPORT 类型任务的重新入队逻辑。
@@ -78,6 +80,12 @@ public class ImportRetryCoordinator {
     private static final int MANIFEST_VERSION = 1;
     /** 重建清单使用的 JSON 序列化器（线程安全，可作静态常量） */
     private static final ObjectMapper MANIFEST_MAPPER = new ObjectMapper();
+    /** 导入清单目录名（MANGA_ROOT/imports/ 下按 taskId 存放 manifest.json）。 */
+    private static final String IMPORTS_DIR_NAME = "imports";
+    /** 原子写清单临时文件名（与 Worker ImportManifestManager 一致）。 */
+    private static final String MANIFEST_TMP_FILE_NAME = "manifest.json.tmp";
+    /** Redis 导入取消标记 key 前缀（与 Worker CancelHandler.KEY_PREFIX 契约一致）。 */
+    private static final String IMPORT_CANCEL_KEY_PREFIX = "import:cancel:";
 
     private final ImportTaskMapper importTaskMapper;
     private final ComicMapper comicMapper;
@@ -103,6 +111,7 @@ public class ImportRetryCoordinator {
         }
 
         // CAS 并发互斥：仅当仍处于终态时重置为 PENDING；影响 0 行说明并发重试已抢先处理
+        // 列名以字符串形式绑定（UpdateWrapper 标准用法，mock 单元测试无 MyBatis-Plus lambda cache）
         int retryCount = task.getRetryCount() != null ? task.getRetryCount() + 1 : 1;
         int updated = importTaskMapper.update(null, new UpdateWrapper<ImportTask>()
                 .eq("id", task.getId())
@@ -151,9 +160,9 @@ public class ImportRetryCoordinator {
         }
 
         // 重发导入事件到 Outbox（与业务同事务，relay 异步发布到 MQ）
-        String sourceType = task.getSourceType() != null ? task.getSourceType().name() : "DIRECTORY";
+        String sourceType = task.getSourceType() != null ? task.getSourceType().name() : SourceType.DIRECTORY.name();
         String sourcePath = resolveRepublishSourcePath(task);
-        var event = new ImportTaskCreatedEvent(
+        ImportTaskCreatedEvent event = new ImportTaskCreatedEvent(
                 UUID.randomUUID(), Instant.now(), task.getId(), comicId, sourceType, sourcePath);
         outboxService.enqueue(event, MqExchanges.IMPORT, MqRoutingKeys.TASK_CREATED);
 
@@ -188,7 +197,7 @@ public class ImportRetryCoordinator {
      * 明确报错而非静默，用户可再次重试（反最终化幂等）。
      */
     private void reverseFinalizeToStaging(Long comicId, List<Chapter> chapters) {
-        Path hqRoot = storageProperties.root("HQ").getPath();
+        Path hqRoot = storageProperties.root(StorageRootKeys.HQ).getPath();
         int restored = 0;
         for (Chapter chapter : chapters) {
             if (chapter.getGlobalOrder() == null) {
@@ -199,15 +208,15 @@ public class ImportRetryCoordinator {
             if (!Files.isDirectory(chapterDir)) {
                 continue;
             }
-            try (var stream = Files.list(chapterDir)) {
+            try (Stream<Path> stream = Files.list(chapterDir)) {
                 List<Path> files = stream.filter(Files::isRegularFile).toList();
                 for (Path file : files) {
                     if (reverseFinalizeFile(file, stagingDir)) {
                         restored++;
                     }
                 }
-            } catch (Exception e) {
-                log.warn("重试反最终化目录扫描失败（非关键）: dir={}, error={}", chapterDir, e.getMessage());
+            } catch (IOException ex) {
+                log.warn("重试反最终化目录扫描失败（非关键）: dir={}", chapterDir, ex);
             }
         }
         log.info("重试反最终化完成: comicId={}, restoredFiles={}, chapters={}", comicId, restored, chapters.size());
@@ -233,8 +242,8 @@ public class ImportRetryCoordinator {
             Files.createDirectories(stagingDir);
             Files.move(chapterFile, stagingTarget);
             return true;
-        } catch (Exception e) {
-            log.warn("重试反最终化单文件失败（非关键）: file={}, error={}", chapterFile, e.getMessage());
+        } catch (IOException ex) {
+            log.warn("重试反最终化单文件失败（非关键）: file={}", chapterFile, ex);
             return false;
         }
     }
@@ -265,21 +274,21 @@ public class ImportRetryCoordinator {
      * 重建失败仅告警（非关键）：沿用残缺清单最多导致章节缺失，但不会损坏现有数据。
      */
     private void rebuildManifest(ImportTask task, Long comicId) {
-        Path comicMeta = storageProperties.root("METADATA").getPath().resolve(comicId + ".json");
+        Path comicMeta = storageProperties.root(StorageRootKeys.METADATA).getPath().resolve(comicId + ".json");
         if (!Files.exists(comicMeta)) {
             log.debug("重试保留原导入清单（persist 未发生，清单完整）: taskId={}", task.getId());
             return;
         }
         try {
             JsonNode metadata = MANIFEST_MAPPER.readTree(comicMeta.toFile());
-            Path comicHqDir = storageProperties.root("HQ").getPath().resolve(String.valueOf(comicId));
+            Path comicHqDir = storageProperties.root(StorageRootKeys.HQ).getPath().resolve(String.valueOf(comicId));
             List<ManifestFileEntry> files = scanStagingFiles(comicHqDir);
             files.sort(Comparator.comparing(ManifestFileEntry::target));
 
             ObjectNode manifest = MANIFEST_MAPPER.createObjectNode();
             manifest.put("version", MANIFEST_VERSION);
             manifest.put("taskId", task.getId());
-            manifest.put("sourceType", task.getSourceType() != null ? task.getSourceType().name() : "DIRECTORY");
+            manifest.put("sourceType", task.getSourceType() != null ? task.getSourceType().name() : SourceType.DIRECTORY.name());
             manifest.put("sourceRoot", comicHqDir.toString());
             manifest.set("metadata", metadata);
             ArrayNode fileNodes = manifest.putArray("files");
@@ -290,13 +299,13 @@ public class ImportRetryCoordinator {
                 node.put("size", file.size());
             }
 
-            Path target = storageProperties.root("METADATA").getPath().getParent()
-                    .resolve("imports").resolve(String.valueOf(task.getId())).resolve("manifest.json");
+            Path target = storageProperties.root(StorageRootKeys.METADATA).getPath().getParent()
+                    .resolve(IMPORTS_DIR_NAME).resolve(String.valueOf(task.getId())).resolve("manifest.json");
             writeManifestAtomically(manifest, target);
             log.info("重试已重建完整导入清单: taskId={}, comicId={}, files={}", task.getId(), comicId, files.size());
-        } catch (Exception e) {
-            log.warn("重建导入清单失败（非关键，重试可能沿用残缺清单）: taskId={}, comicId={}, error={}",
-                    task.getId(), comicId, e.getMessage());
+        } catch (IOException ex) {
+            log.warn("重建导入清单失败（非关键，重试可能沿用残缺清单）: taskId={}, comicId={}",
+                    task.getId(), comicId, ex);
         }
     }
 
@@ -306,11 +315,11 @@ public class ImportRetryCoordinator {
             return List.of();
         }
         List<ManifestFileEntry> files = new ArrayList<>();
-        try (var globalOrderStream = Files.list(comicHqDir)) {
+        try (Stream<Path> globalOrderStream = Files.list(comicHqDir)) {
             List<Path> globalOrderDirs = globalOrderStream.filter(Files::isDirectory).toList();
             for (Path globalOrderDir : globalOrderDirs) {
                 String globalOrder = globalOrderDir.getFileName().toString();
-                try (var fileStream = Files.list(globalOrderDir)) {
+                try (Stream<Path> fileStream = Files.list(globalOrderDir)) {
                     List<Path> regularFiles = fileStream.filter(Files::isRegularFile).toList();
                     for (Path file : regularFiles) {
                         String fileName = file.getFileName().toString();
@@ -328,21 +337,21 @@ public class ImportRetryCoordinator {
     /** 原子写清单（临时文件 + 原子 move），与 Worker ImportManifestManager 写入方式一致。 */
     private void writeManifestAtomically(ObjectNode manifest, Path target) throws IOException {
         Files.createDirectories(target.getParent());
-        Path temp = target.resolveSibling("manifest.json.tmp");
-        MANIFEST_MAPPER.writerWithDefaultPrettyPrinter().writeValue(temp.toFile(), manifest);
-        Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING);
+        Path tempPath = target.resolveSibling(MANIFEST_TMP_FILE_NAME);
+        MANIFEST_MAPPER.writerWithDefaultPrettyPrinter().writeValue(tempPath.toFile(), manifest);
+        Files.move(tempPath, target, StandardCopyOption.REPLACE_EXISTING);
     }
 
     private void cleanupAfterCommit(Long taskId, Long comicId, List<Long> orphanChapterIds) {
         try {
-            Files.deleteIfExists(storageProperties.root("METADATA").getPath().resolve(taskId + ".json"));
-        } catch (Exception e) {
-            log.warn("Metadata cleanup failed for retry: taskId={}", taskId, e);
+            Files.deleteIfExists(storageProperties.root(StorageRootKeys.METADATA).getPath().resolve(taskId + ".json"));
+        } catch (IOException ex) {
+            log.warn("重试清理 metadata 文件失败: taskId={}", taskId, ex);
         }
         try {
-            redisTemplate.delete("import:cancel:" + taskId);
-        } catch (Exception e) {
-            log.warn("取消标记清理失败（非关键）: taskId={}, error={}", taskId, e.getMessage());
+            redisTemplate.delete(IMPORT_CANCEL_KEY_PREFIX + taskId);
+        } catch (RuntimeException ex) {
+            log.warn("取消标记清理失败（非关键）: taskId={}", taskId, ex);
         }
         cleanupOrphanHqChapterDirs(comicId, orphanChapterIds);
     }
@@ -359,22 +368,22 @@ public class ImportRetryCoordinator {
         }
         for (Long chapterId : orphanChapterIds) {
             try {
-                Path dir = storageProperties.root("HQ").getPath()
+                Path dir = storageProperties.root(StorageRootKeys.HQ).getPath()
                         .resolve(String.valueOf(comicId)).resolve(String.valueOf(chapterId));
                 if (Files.exists(dir)) {
                     deleteRecursively(dir);
                     log.info("重试已清理孤儿 HQ 章节目录: {}", dir);
                 }
-            } catch (Exception e) {
-                log.warn("孤儿 HQ 章节目录清理失败（非关键）: comicId={}, chapterId={}, error={}",
-                        comicId, chapterId, e.getMessage());
+            } catch (IOException ex) {
+                log.warn("孤儿 HQ 章节目录清理失败（非关键）: comicId={}, chapterId={}",
+                        comicId, chapterId, ex);
             }
         }
     }
 
-    private void deleteRecursively(Path dir) throws Exception {
-        try (var paths = Files.walk(dir)) {
-            List<Path> files = paths.sorted(Comparator.reverseOrder()).collect(Collectors.toList());
+    private void deleteRecursively(Path dir) throws IOException {
+        try (Stream<Path> paths = Files.walk(dir)) {
+            List<Path> files = paths.sorted(Comparator.reverseOrder()).toList();
             for (Path path : files) {
                 Files.deleteIfExists(path);
             }
@@ -382,5 +391,6 @@ public class ImportRetryCoordinator {
     }
 
     /** 重建清单条目（与 Worker ImportManifest.ImportFile 的 JSON 结构保持一致：source/target/size）。 */
-    private record ManifestFileEntry(String source, String target, long size) {}
+    private record ManifestFileEntry(String source, String target, long size) {
+    }
 }

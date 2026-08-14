@@ -30,9 +30,8 @@ import java.util.Locale;
 @RequiredArgsConstructor
 public class ExportArchivePublisher {
 
-    /** 发布结果 — fileName 为 EXPORT 根相对路径，size 为全部卷总大小。 */
-    public record PublishResult(String fileName, long size) {
-    }
+    /** ZIP 主文件扩展名（识别任务目录中的主 .zip）。 */
+    private static final String ZIP_EXTENSION = ".zip";
 
     private final ZipBuilder zipBuilder;
 
@@ -54,14 +53,14 @@ public class ExportArchivePublisher {
         }
         try {
             Files.move(stagingDir, finalDir, StandardCopyOption.ATOMIC_MOVE);
-        } catch (AtomicMoveNotSupportedException e) {
+        } catch (AtomicMoveNotSupportedException ex) {
             throw new ExportPublishException(
-                    "EXPORT 发布失败：文件系统不支持原子移动，拒绝非原子降级 taskId=" + taskId, e);
-        } catch (IOException e) {
-            throw new ExportPublishException("EXPORT 发布失败：原子移动任务目录失败 taskId=" + taskId, e);
+                    "EXPORT 发布失败：文件系统不支持原子移动，拒绝非原子降级 taskId=" + taskId, ex);
+        } catch (IOException ex) {
+            throw new ExportPublishException("EXPORT 发布失败：原子移动任务目录失败 taskId=" + taskId, ex);
         }
         log.info("已原子发布导出任务目录: taskId={}", taskId);
-        return resultFor(taskId, finalDir);
+        return buildPublishResult(taskId, finalDir);
     }
 
     private PublishResult reuseExisting(Long taskId, Path finalDir, ExportManifest manifest, Path stagingDir)
@@ -69,18 +68,18 @@ public class ExportArchivePublisher {
         Path mainZip = findMainZip(finalDir);
         try {
             zipBuilder.verify(mainZip, manifest);
-        } catch (Exception e) {
+        } catch (IOException ex) {
             deleteRecursively(stagingDir);
             throw new ExportPublishConflictException(
                     "EXPORT 发布冲突：最终任务目录已存在且与本次 manifest 不一致，拒绝覆盖/删除 taskId="
-                            + taskId, e);
+                            + taskId, ex);
         }
         deleteRecursively(stagingDir);
         log.info("幂等复用既有导出任务目录（与本次 manifest 完全一致，不重写文件）: taskId={}", taskId);
-        return resultFor(taskId, finalDir);
+        return buildPublishResult(taskId, finalDir);
     }
 
-    private PublishResult resultFor(Long taskId, Path finalDir) throws IOException {
+    private PublishResult buildPublishResult(Long taskId, Path finalDir) throws IOException {
         Path mainZip = findMainZip(finalDir);
         String fileName = taskId + "/" + mainZip.getFileName();
         long size = 0L;
@@ -95,7 +94,7 @@ public class ExportArchivePublisher {
             for (Path candidate : stream) {
                 String name = candidate.getFileName().toString();
                 if (Files.isRegularFile(candidate, LinkOption.NOFOLLOW_LINKS)
-                        && name.toLowerCase(Locale.ROOT).endsWith(".zip")) {
+                        && name.toLowerCase(Locale.ROOT).endsWith(ZIP_EXTENSION)) {
                     return candidate;
                 }
             }
@@ -111,12 +110,16 @@ public class ExportArchivePublisher {
             walk.sorted(Comparator.reverseOrder()).forEach(path -> {
                 try {
                     Files.deleteIfExists(path);
-                } catch (IOException e) {
-                    log.warn("清理 staging 目录失败: {}", path, e);
+                } catch (IOException ex) {
+                    log.warn("清理 staging 目录失败: {}", path, ex);
                 }
             });
-        } catch (IOException e) {
-            log.warn("清理 staging 目录失败: {}", dir, e);
+        } catch (IOException ex) {
+            log.warn("清理 staging 目录失败: {}", dir, ex);
         }
+    }
+
+    /** 发布结果 — fileName 为 EXPORT 根相对路径，size 为全部卷总大小。 */
+    public record PublishResult(String fileName, long size) {
     }
 }
