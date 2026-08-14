@@ -132,15 +132,6 @@ onMounted(() => {
   background: var(--bg-primary);
 }
 
-/* 手机选择桌面版后恢复管理台的双栏导航。 */
-:global(html[data-display-mode='desktop']) .management-topnav,
-:global(html[data-display-mode='desktop']) .management-sidenav {
-  display: flex;
-}
-
-:global(html[data-display-mode='desktop']) .management-body {
-  grid-template-columns: var(--management-sidebar-width) minmax(0, 1fr);
-}
 
 .management-header {
   z-index: var(--z-nav);
