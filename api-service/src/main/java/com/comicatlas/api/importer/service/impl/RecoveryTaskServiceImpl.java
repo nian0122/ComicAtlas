@@ -93,7 +93,10 @@ public class RecoveryTaskServiceImpl implements RecoveryTaskService {
         recoveryTask.setEndedAt(null);
         recoveryTaskMapper.updateById(recoveryTask);
 
-        retryManagementTask(recoveryTask.getManagementTaskId());
+        // 同步统一任务重置（仅状态，不在此重新入队——恢复事件由下方 afterCommit 重发）
+        if (recoveryTask.getManagementTaskId() != null) {
+            managementTaskService.resetTaskState(recoveryTask.getManagementTaskId());
+        }
 
         Long taskId = recoveryTask.getId();
         registerPublishAfterCommit(taskId);
@@ -161,18 +164,6 @@ public class RecoveryTaskServiceImpl implements RecoveryTaskService {
                     recoveryEventPublisher.publishRecoveryRequested(taskId);
                 }
             });
-    }
-
-    private void retryManagementTask(Long managementTaskId) {
-        if (managementTaskId == null) {
-            return;
-        }
-        try {
-            managementTaskService.retryTask(managementTaskId);
-        } catch (BusinessException e) {
-            log.warn("统一恢复任务重试跳过（非终态）: managementTaskId={}, error={}",
-                    managementTaskId, e.getMessage());
-        }
     }
 
     /**

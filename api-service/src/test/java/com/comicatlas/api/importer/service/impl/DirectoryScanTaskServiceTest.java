@@ -13,21 +13,26 @@ import com.comicatlas.common.dto.ScanResultDTO;
 import com.comicatlas.common.dto.ScanWarningCode;
 import com.comicatlas.common.dto.ScanWarningDTO;
 import com.comicatlas.common.dto.ScanWarningSeverity;
+import com.comicatlas.contract.common.exception.BusinessException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -61,6 +66,16 @@ class DirectoryScanTaskServiceTest {
         objectMapper = new ObjectMapper();
         service = new DirectoryScanTaskServiceImpl(
                 scanTaskMapper, eventPublisher, objectMapper, managementTaskService);
+        // 重试会注册事务提交后回调，统一初始化同步器（tearDown 负责清理）
+        TransactionSynchronizationManager.initSynchronization();
+    }
+
+    @AfterEach
+    void tearDown() {
+        try {
+            TransactionSynchronizationManager.clearSynchronization();
+        } catch (IllegalStateException ignored) {
+        }
     }
 
     private static DirectoryScanTask taskWithJson(Long id, String resultJson) {
@@ -160,5 +175,43 @@ class DirectoryScanTaskServiceTest {
         assertEquals(1, reloaded.warnings().size());
         assertEquals(ScanWarningCode.EMPTY_DIRECTORY, reloaded.warnings().get(0).code());
         assertEquals(4, reloaded.items().get(0).imageCount());
+    }
+
+    @Test
+    void retryTask_failedTask_resetsAndRepublishesScanRequest() {
+        DirectoryScanTask task = new DirectoryScanTask();
+        task.setId(4L);
+        task.setManagementTaskId(99L);
+        task.setStatus(DirectoryScanTaskStatus.FAILED);
+        task.setDirectoryPath("D:/scans/root");
+        task.setRetryCount(0);
+        task.setErrorMessage("扫描失败");
+        when(scanTaskMapper.selectById(4L)).thenReturn(task);
+        when(scanTaskMapper.updateById(any(DirectoryScanTask.class))).thenReturn(1);
+
+        service.retryTask(4L);
+        TransactionSynchronizationManager.getSynchronizations()
+                .forEach(sync -> sync.afterCommit());
+
+        ArgumentCaptor<DirectoryScanTask> captor = ArgumentCaptor.forClass(DirectoryScanTask.class);
+        verify(scanTaskMapper).updateById(captor.capture());
+        DirectoryScanTask saved = captor.getValue();
+        assertEquals(DirectoryScanTaskStatus.PENDING, saved.getStatus());
+        assertEquals(1, saved.getRetryCount(), "重试应递增 retryCount");
+        assertNull(saved.getErrorMessage(), "重试应清空失败原因");
+        verify(managementTaskService).resetTaskState(99L);
+        verify(eventPublisher).publishScanRequested(4L, "D:/scans/root");
+    }
+
+    @Test
+    void retryTask_nonFailedTask_throws() {
+        DirectoryScanTask task = new DirectoryScanTask();
+        task.setId(5L);
+        task.setStatus(DirectoryScanTaskStatus.SUCCESS);
+        when(scanTaskMapper.selectById(5L)).thenReturn(task);
+
+        assertThrows(BusinessException.class, () -> service.retryTask(5L));
+        verify(scanTaskMapper, never()).updateById(any(DirectoryScanTask.class));
+        verify(eventPublisher, never()).publishScanRequested(any(), any());
     }
 }

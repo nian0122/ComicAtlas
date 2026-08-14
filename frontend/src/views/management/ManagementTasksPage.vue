@@ -59,8 +59,8 @@
                 <span>成功 {{ task.successCount ?? 0 }} · 失败 {{ task.failureCount ?? 0 }} · 取消 {{ task.cancelledCount ?? 0 }}</span>
                 <span class="task-card-actions">
                   <el-button v-if="canCancel(task.status)" link type="warning" @click.stop="cancelTask(task.id)">取消</el-button>
-                  <el-button v-if="canRetry(task.status)" link type="primary" @click.stop="retryTask(task.id)">重试</el-button>
-                  <span v-if="!canCancel(task.status) && !canRetry(task.status)" class="detail-hint">查看明细</span>
+                  <el-button v-if="canRetry(task)" link type="primary" @click.stop="retryTask(task.id)">重试</el-button>
+                  <span v-if="!canCancel(task.status) && !canRetry(task)" class="detail-hint">查看明细</span>
                 </span>
               </div>
             </div>
@@ -191,7 +191,12 @@ function targetSummary(task: ManagementTaskVO): string {
   return task.targetType
 }
 function canCancel(status: ManagementTaskStatus): boolean { return ['QUEUED', 'RUNNING'].includes(status) }
-function canRetry(status: ManagementTaskStatus): boolean { return ['FAILED', 'CANCELLED', 'PARTIALLY_SUCCEEDED'].includes(status) }
+function canRetry(task: ManagementTaskVO): boolean {
+  // RECOVERY/SCAN 走各自专用重试入口（恢复页/扫描页），任务中心不提供，
+  // 避免统一入口重置 QUEUED 后无人重新入队导致任务永久卡死
+  if (task.taskType === 'RECOVERY' || task.taskType === 'DIRECTORY_SCAN') return false
+  return ['FAILED', 'CANCELLED', 'PARTIALLY_SUCCEEDED'].includes(task.status)
+}
 async function loadTasks(silent = false): Promise<void> { if (!silent) loading.value = true; error.value = ''; try { const response = await trackedTaskApi.list(query); tasks.value = response.data.records; total.value = response.data.total; updatedAt.value = new Date().toLocaleTimeString(); void loadImportNames(response.data.records) } catch (reason: unknown) { error.value = errorMessage(reason) } finally { if (!silent) loading.value = false } }
 async function loadImportNames(records: readonly ManagementTaskVO[]): Promise<void> {
   const candidates = records.filter((task) => task.targetType === 'COMIC' && !task.targetName)

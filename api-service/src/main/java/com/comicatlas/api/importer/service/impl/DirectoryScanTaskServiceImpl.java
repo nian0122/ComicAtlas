@@ -47,6 +47,7 @@ public class DirectoryScanTaskServiceImpl implements DirectoryScanTaskService {
         task.setStatus(DirectoryScanTaskStatus.PENDING);
         task.setDirectoryPath(directoryPath);
         task.setTotalItems(0);
+        task.setRetryCount(0);
         scanTaskMapper.insert(task);
 
         // 同事务创建统一扫描任务并回填 management_task_id
@@ -76,6 +77,43 @@ public class DirectoryScanTaskServiceImpl implements DirectoryScanTaskService {
         return toVO(task);
     }
 
+    @Override
+    @Transactional
+    public DirectoryScanTaskVO retryTask(Long id) {
+        DirectoryScanTask task = scanTaskMapper.selectById(id);
+        if (task == null) {
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "扫描任务不存在");
+        }
+        if (task.getStatus() != DirectoryScanTaskStatus.FAILED) {
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "仅 FAILED 状态可重试");
+        }
+
+        task.setStatus(DirectoryScanTaskStatus.PENDING);
+        task.setRetryCount(task.getRetryCount() != null ? task.getRetryCount() + 1 : 1);
+        task.setErrorMessage(null);
+        task.setStartedAt(null);
+        task.setEndedAt(null);
+        scanTaskMapper.updateById(task);
+
+        // 同步统一任务重置（仅状态，不在此重新入队——扫描事件由下方 afterCommit 重发）
+        if (task.getManagementTaskId() != null) {
+            managementTaskService.resetTaskState(task.getManagementTaskId());
+        }
+
+        Long taskId = task.getId();
+        String directoryPath = task.getDirectoryPath();
+        TransactionSynchronizationManager.registerSynchronization(
+            new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    eventPublisher.publishScanRequested(taskId, directoryPath);
+                }
+            });
+
+        log.info("目录扫描任务重试: taskId={}", taskId);
+        return toVO(task);
+    }
+
     private DirectoryScanTaskVO toVO(DirectoryScanTask task) {
         DirectoryScanTaskVO vo = new DirectoryScanTaskVO();
         vo.setId(task.getId());
@@ -83,6 +121,7 @@ public class DirectoryScanTaskServiceImpl implements DirectoryScanTaskService {
         vo.setDirectoryPath(task.getDirectoryPath());
         vo.setTotalItems(task.getTotalItems());
         vo.setErrorMessage(task.getErrorMessage());
+        vo.setRetryCount(task.getRetryCount());
         vo.setCreatedAt(task.getCreatedAt());
         vo.setStartedAt(task.getStartedAt());
         vo.setEndedAt(task.getEndedAt());

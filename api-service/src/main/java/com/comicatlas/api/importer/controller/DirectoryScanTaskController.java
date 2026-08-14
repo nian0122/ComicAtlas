@@ -50,4 +50,17 @@ public class DirectoryScanTaskController {
     public Result<DirectoryScanTaskVO> getScanTask(@PathVariable Long id) {
         return Result.ok(directoryScanTaskService.getTaskDetail(id));
     }
+
+    /**
+     * 重试失败的目录扫描任务。
+     * <p>
+     * 重新触发对同一目录的异步扫描（重置任务为 PENDING 并重发扫描请求）。
+     *
+     * @param id 任务 ID
+     * @return 重试后的任务详情
+     */
+    @PostMapping("/{id}/retry")
+    public Result<DirectoryScanTaskVO> retryScanTask(@PathVariable Long id) {
+        return Result.ok(directoryScanTaskService.retryTask(id));
+    }
 }

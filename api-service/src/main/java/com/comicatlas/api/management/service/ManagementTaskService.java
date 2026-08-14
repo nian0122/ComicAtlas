@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.enums.ExportTaskStatus;
+import com.comicatlas.contract.common.enums.ImportTaskStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.contract.common.exception.ConflictException;
 import com.comicatlas.persistence.comic.entity.Comic;
@@ -339,6 +340,17 @@ public class ManagementTaskService {
                     "任务 " + taskId + " 处于 " + task.getStatus() + "，仅终态可重试");
         }
 
+        // RECOVERY/SCAN 走各自专用重试入口（恢复页/扫描页会自行重置任务并重发执行事件）；
+        // 若在此重置 QUEUED 而不重新入队，Worker 永不执行导致任务永久卡死。
+        if (task.getTaskType() == TaskType.RECOVERY) {
+            throw new BusinessException(HttpStatusCodes.CONFLICT,
+                    "恢复任务请使用专用重试入口: /api/manage/tasks/recovery/{id}/retry");
+        }
+        if (task.getTaskType() == TaskType.DIRECTORY_SCAN) {
+            throw new BusinessException(HttpStatusCodes.CONFLICT,
+                    "目录扫描任务请使用专用重试入口: /api/manage/tasks/directory-scan/{id}/retry");
+        }
+
         // 元数据刷新重试：先在同一事务 CAS 漫画 READY→REFRESHING（comic 非 READY → 冲突 409）
         List<ManagementTaskItem> items = itemMapper.selectList(
                 new LambdaQueryWrapper<ManagementTaskItem>()
@@ -361,8 +373,33 @@ public class ManagementTaskService {
             }
         }
 
-        // 重置主任务（使用 LambdaUpdateWrapper 确保 null 字段写入）
         int newAttempt = task.getAttempt() + 1;
+        resetTaskAndItems(taskId, newAttempt, items);
+
+        // 重新入队：按 item 类型发布对应事件，Worker 按新 attempt 重新执行
+        for (ManagementTaskItem item : items) {
+            if (item.getStatus() == ManagementTaskStatus.FAILED
+                    || item.getStatus() == ManagementTaskStatus.CANCELLED) {
+                republishCommand(taskId, item, newAttempt);
+                // EXPORT 走独立导出链路（export.task.queue），单独重新入队
+                republishExportCommand(taskId, item, newAttempt);
+                // IMPORT 走独立导入链路（import.task.queue），重新发布导入事件
+                republishImportCommand(taskId, item, newAttempt);
+            }
+        }
+
+        log.info("重试任务 id={}, newAttempt={}", taskId, newAttempt);
+        return toResponse(taskMapper.selectById(taskId));
+    }
+
+    /**
+     * 重置管理任务与失败/取消 item 为 QUEUED（attempt 递增、清空进度与错误）。
+     * <p>
+     * 不包含任何重新入队——重新入队由各任务类型流程负责（retryTask 内按类型 republish，
+     * RECOVERY/SCAN 由各自专用重试入口在事务提交后重发执行事件）。
+     */
+    private void resetTaskAndItems(Long taskId, int newAttempt, List<ManagementTaskItem> items) {
+        // 重置主任务（使用 LambdaUpdateWrapper 确保 null 字段写入）
         taskMapper.update(null, new LambdaUpdateWrapper<ManagementTask>()
                 .eq(ManagementTask::getId, taskId)
                 .set(ManagementTask::getStatus, ManagementTaskStatus.QUEUED)
@@ -394,18 +431,28 @@ public class ManagementTaskService {
                         .set(ManagementTaskItem::getCompletedAt, null)
                         .set(ManagementTaskItem::getLockKey, lockKey)
                         .set(ManagementTaskItem::getUpdatedAt, LocalDateTime.now()));
-
-                // 重新发布管理命令到 Outbox，Worker 按新 attempt 重新执行
-                republishCommand(taskId, item, newAttempt);
-                // EXPORT 走独立导出链路（export.task.queue），单独重新入队
-                republishExportCommand(taskId, item, newAttempt);
-                // IMPORT 走独立导入链路（import.task.queue），重新发布导入事件
-                republishImportCommand(taskId, item, newAttempt);
             }
         }
+    }
 
-        log.info("重试任务 id={}, newAttempt={}", taskId, newAttempt);
-        return toResponse(taskMapper.selectById(taskId));
+    /**
+     * 供 RECOVERY/SCAN 独立重试流程同步统一任务状态：仅重置为 QUEUED，不重新入队，
+     * 执行事件由调用方在其事务提交后重发。
+     */
+    @Transactional
+    public void resetTaskState(Long taskId) {
+        ManagementTask task = taskMapper.selectById(taskId);
+        if (task == null) {
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在: " + taskId);
+        }
+        if (!task.getStatus().isTerminal()) {
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST,
+                    "任务 " + taskId + " 处于 " + task.getStatus() + "，仅终态可重置");
+        }
+        List<ManagementTaskItem> items = itemMapper.selectList(
+                new LambdaQueryWrapper<ManagementTaskItem>()
+                        .eq(ManagementTaskItem::getTaskId, taskId));
+        resetTaskAndItems(taskId, task.getAttempt() + 1, items);
     }
 
     /**
@@ -485,6 +532,15 @@ public class ManagementTaskService {
             return;
         }
         boolean retried = importRetryCoordinator.retry(importTask);
+        // 幂等防重：导入页重试已先重置 import_task 为 PENDING（ImportServiceImpl.retryTask 链路），
+        // 此处返回 false 且为 PENDING 属预期，不重复入队；其余非终态说明导入任务状态与管理任务
+        // 不一致，若静默跳过会导致管理任务重置 QUEUED 但导入永不入队，故抛冲突让本事务回滚。
+        if (!retried && importTask.getStatus() != ImportTaskStatus.PENDING) {
+            throw new BusinessException(HttpStatusCodes.CONFLICT,
+                    "导入任务非终态且未被重置，无法重试入队: taskId=" + taskId
+                            + ", importTaskId=" + importTask.getId()
+                            + ", status=" + importTask.getStatus());
+        }
         log.info("导入任务重试已重新入队: taskId={}, itemId={}, attempt={}, importTaskId={}, retried={}",
                 taskId, item.getId(), newAttempt, importTask.getId(), retried);
     }
@@ -792,6 +848,21 @@ public class ManagementTaskService {
 
         task.setUpdatedAt(LocalDateTime.now());
         taskMapper.updateById(task);
+
+        // 聚合失败原因到任务级：终态失败时汇总失败 item 的首条错误，供任务卡片/详情直接展示。
+        // 单独用 UpdateWrapper 显式更新——updateById 忽略 null 字段，其余状态须显式清空避免残留旧错误。
+        String aggregatedError = task.getStatus() == ManagementTaskStatus.FAILED
+                || task.getStatus() == ManagementTaskStatus.PARTIALLY_SUCCEEDED
+                ? items.stream()
+                        .filter(i -> i.getStatus() == ManagementTaskStatus.FAILED)
+                        .map(ManagementTaskItem::getErrorMessage)
+                        .filter(msg -> msg != null && !msg.isBlank())
+                        .findFirst()
+                        .orElse(null)
+                : null;
+        taskMapper.update(null, new LambdaUpdateWrapper<ManagementTask>()
+                .eq(ManagementTask::getId, taskId)
+                .set(ManagementTask::getErrorMessage, aggregatedError));
     }
 
     // ======================== 辅助方法 ========================
