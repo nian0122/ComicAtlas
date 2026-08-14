@@ -11,5 +11,6 @@ public record TaskStatusChangedEvent(
     int progress,
     String downloadMethod,
     long speedBytesPerSec,
-    int etaSeconds
+    int etaSeconds,
+    String errorMessage
 ) implements ComicEvent {}

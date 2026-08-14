@@ -135,7 +135,7 @@ class ImportEventHandlerCacheTest {
         when(taskMapper.selectById(31L)).thenReturn(task);
 
         TaskStatusChangedEvent event = new TaskStatusChangedEvent(
-                UUID.randomUUID(), Instant.now(), 31L, "FAILED", 0, null, 0, 0);
+                UUID.randomUUID(), Instant.now(), 31L, "FAILED", 0, null, 0, 0, null);
 
         runInTransaction(() -> assertDoesNotThrow(() -> handler.handleTaskStatusChanged(event, channel, 1L)));
         verify(channel).basicAck(1L, false);
@@ -155,7 +155,7 @@ class ImportEventHandlerCacheTest {
         when(taskMapper.selectById(32L)).thenReturn(task);
 
         TaskStatusChangedEvent event = new TaskStatusChangedEvent(
-                UUID.randomUUID(), Instant.now(), 32L, "DOWNLOADING", 42, "HTTP", 1024, 7);
+                UUID.randomUUID(), Instant.now(), 32L, "DOWNLOADING", 42, "HTTP", 1024, 7, null);
 
         runInTransaction(() -> assertDoesNotThrow(() -> handler.handleTaskStatusChanged(event, channel, 1L)));
         verify(channel).basicAck(1L, false);
@@ -184,7 +184,7 @@ class ImportEventHandlerCacheTest {
         when(comicMapper.selectById(40L)).thenReturn(comic);
 
         TaskStatusChangedEvent event = new TaskStatusChangedEvent(
-                UUID.randomUUID(), Instant.now(), 33L, "FAILED", 0, null, 0, 0);
+                UUID.randomUUID(), Instant.now(), 33L, "FAILED", 0, null, 0, 0, null);
 
         runInTransaction(() -> handler.handleTaskStatusChanged(event, channel, 1L));
         verify(channel).basicAck(1L, false);
@@ -205,10 +205,31 @@ class ImportEventHandlerCacheTest {
         when(taskMapper.selectById(34L)).thenReturn(task);
 
         TaskStatusChangedEvent event = new TaskStatusChangedEvent(
-                UUID.randomUUID(), Instant.now(), 34L, "DOWNLOADING", 10, "HTTP", 0, 0);
+                UUID.randomUUID(), Instant.now(), 34L, "DOWNLOADING", 10, "HTTP", 0, 0, null);
 
         runInTransaction(() -> handler.handleTaskStatusChanged(event, channel, 1L));
 
         verify(comicMapper, never()).updateById(any(Comic.class));
+    }
+
+    /** Worker 失败事件携带 errorMessage：必须写入任务，供前端展示与重试决策。 */
+    @Test
+    void handleTaskStatusChanged_withFailedStatus_persistsErrorMessage() throws Exception {
+        ImportTask task = new ImportTask();
+        task.setId(35L);
+        task.setStatus(ImportTaskStatus.PARSING);
+
+        when(taskMapper.selectById(35L)).thenReturn(task);
+
+        TaskStatusChangedEvent event = new TaskStatusChangedEvent(
+                UUID.randomUUID(), Instant.now(), 35L, "FAILED", 0, null, 0, 0,
+                "源文件缺失: D:/comics/ComicA/001.jpg");
+
+        runInTransaction(() -> handler.handleTaskStatusChanged(event, channel, 1L));
+        verify(channel).basicAck(1L, false);
+
+        ArgumentCaptor<ImportTask> captor = ArgumentCaptor.forClass(ImportTask.class);
+        verify(taskMapper).updateById(captor.capture());
+        assertThat(captor.getValue().getErrorMessage()).isEqualTo("源文件缺失: D:/comics/ComicA/001.jpg");
     }
 }

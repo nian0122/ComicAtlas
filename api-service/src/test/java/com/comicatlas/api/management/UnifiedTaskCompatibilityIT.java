@@ -200,7 +200,7 @@ class UnifiedTaskCompatibilityIT {
         ImportTask it = importTaskMapper.selectById(vo.getId());
 
         var stageEvent = new TaskStatusChangedEvent(
-                UUID.randomUUID(), Instant.now(), it.getId(), "DOWNLOADING", 42, "HTTP", 1024, 7);
+                UUID.randomUUID(), Instant.now(), it.getId(), "DOWNLOADING", 42, "HTTP", 1024, 7, null);
         importEventHandler.handleTaskStatusChanged(stageEvent, mock(Channel.class), 1L);
 
         ImportTask after = importTaskMapper.selectById(it.getId());
@@ -220,7 +220,7 @@ class UnifiedTaskCompatibilityIT {
 
         // 先进入 RUNNING 阶段（模拟 Worker 已开始）
         var stageEvent = new TaskStatusChangedEvent(
-                UUID.randomUUID(), Instant.now(), it.getId(), "PARSING", 5, null, 0, 0);
+                UUID.randomUUID(), Instant.now(), it.getId(), "PARSING", 5, null, 0, 0, null);
         importEventHandler.handleTaskStatusChanged(stageEvent, mock(Channel.class), 1L);
 
         importService.cancelTask(it.getId());
@@ -233,7 +233,7 @@ class UnifiedTaskCompatibilityIT {
 
         // 迟到阶段事件 → management_task 不回退（CANCELLED 为终态）
         var lateStage = new TaskStatusChangedEvent(
-                UUID.randomUUID(), Instant.now(), cancelled.getId(), "DOWNLOADING", 80, null, 0, 0);
+                UUID.randomUUID(), Instant.now(), cancelled.getId(), "DOWNLOADING", 80, null, 0, 0, null);
         importEventHandler.handleTaskStatusChanged(lateStage, mock(Channel.class), 1L);
         assertThat(importTaskMapper.selectById(cancelled.getId()).getStatus()).isEqualTo(ImportTaskStatus.CANCELLED);
 

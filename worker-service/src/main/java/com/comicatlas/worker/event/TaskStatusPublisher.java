@@ -16,9 +16,11 @@ import java.util.UUID;
 public class TaskStatusPublisher {
     private final RabbitTemplate rabbitTemplate;
 
-    public void publishStatus(Long taskId, String newStatus, int progress, String downloadMethod, long speedBytesPerSec, int etaSeconds) {
+    public void publishStatus(Long taskId, String newStatus, int progress, String downloadMethod,
+                              long speedBytesPerSec, int etaSeconds, String errorMessage) {
         var event = new TaskStatusChangedEvent(
-            UUID.randomUUID(), Instant.now(), taskId, newStatus, progress, downloadMethod, speedBytesPerSec, etaSeconds);
+            UUID.randomUUID(), Instant.now(), taskId, newStatus, progress, downloadMethod,
+            speedBytesPerSec, etaSeconds, errorMessage);
         rabbitTemplate.convertAndSend(MqExchanges.TASK, MqRoutingKeys.STATUS_CHANGED, event);
     }
 

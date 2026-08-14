@@ -6,11 +6,14 @@ import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.file.download.EhentaiDownloadService;
 import com.comicatlas.worker.importer.DirectoryImportHandler;
 import com.comicatlas.worker.importer.ImportContext;
+import com.comicatlas.worker.importer.ImportManifest;
+import com.comicatlas.worker.importer.ImportManifestManager;
 import com.comicatlas.worker.importer.ZipImportHandler;
 import com.rabbitmq.client.Channel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -18,7 +21,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
+import java.io.IOException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
@@ -66,10 +71,16 @@ class ImportTaskHandlerTest {
     private MqConsumerSupport mqConsumerSupport;
 
     @Mock
+    private ImportManifestManager manifestManager;
+
+    @Mock
     private Channel channel;
 
     @InjectMocks
     private ImportTaskHandler handler;
+
+    @TempDir
+    Path tempDir;
 
     @BeforeEach
     void setUp() {
@@ -110,10 +121,50 @@ class ImportTaskHandlerTest {
         verify(directoryHandler).handle(ctx.capture(), eq(7L), eq(11L), eq(Path.of("F:/manga")));
         assertEquals("EHENTAI", ctx.getValue().sourceType(), "EHENTAI 保留来源类型供 parser 剥离包装目录");
         assertEquals(downloaded, ctx.getValue().sourcePath(), "委托的是下载后的本地源目录");
-        verify(publisher).publishStatus(eq(7L), eq("PARSING"), anyInt(), isNull(), anyLong(), anyInt());
+        verify(publisher).publishStatus(eq(7L), eq("PARSING"), anyInt(), isNull(), anyLong(), anyInt(), isNull());
         verify(publisher).publishImported(7L, 11L);
         // EHENTAI 不直接进 ZIP 解压路径
         verify(zipHandler, never()).importZip(any(), anyLong(), anyLong(), any());
+    }
+
+    @Test
+    void ehentai_resumesFromManifestSourceRoot_skipsRedownload() throws Exception {
+        when(manifestManager.exists(any(), eq(7L))).thenReturn(true);
+        when(manifestManager.read(any(), eq(7L))).thenReturn(
+                new ImportManifest(1, 7L, "EHENTAI", tempDir.toString(), null, List.of()));
+        when(directoryHandler.handle(any(), anyLong(), anyLong(), any()))
+                .thenReturn(tempDir.resolve("metadata.json"));
+
+        handler.handle(event(7L, 11L, "EHENTAI", "https://exhentai.org/g/12345"), channel, 1L);
+
+        ArgumentCaptor<ImportContext> ctx = ArgumentCaptor.forClass(ImportContext.class);
+        verify(directoryHandler).handle(ctx.capture(), eq(7L), eq(11L), eq(Path.of("F:/manga")));
+        assertEquals("EHENTAI", ctx.getValue().sourceType());
+        assertEquals(tempDir, ctx.getValue().sourcePath(), "命中恢复点时应直接复用清单源目录");
+        verify(ehentaiDownloadService, never()).downloadToSourceDir(anyLong(), anyString());
+        verify(publisher).publishImported(7L, 11L);
+    }
+
+    @Test
+    void failure_publishesErrorMessageToStatusEvent() throws Exception {
+        when(directoryHandler.handle(any(), anyLong(), anyLong(), any()))
+                .thenThrow(new IOException("源文件缺失: D:/comics/ComicA/001.jpg"));
+
+        handler.handle(event(8L, 12L, "DIRECTORY", "D:/comics/ComicA"), channel, 1L);
+
+        verify(publisher).publishStatus(eq(8L), eq("FAILED"), eq(0), isNull(), eq(0L), eq(0),
+                eq("源文件缺失: D:/comics/ComicA/001.jpg"));
+    }
+
+    @Test
+    void failure_normalizesMultilineErrorMessage() throws Exception {
+        when(directoryHandler.handle(any(), anyLong(), anyLong(), any()))
+                .thenThrow(new IOException("解析失败\r\n压缩包损坏\n第 3 行"));
+
+        handler.handle(event(8L, 12L, "DIRECTORY", "D:/comics/ComicA"), channel, 1L);
+
+        verify(publisher).publishStatus(eq(8L), eq("FAILED"), eq(0), isNull(), eq(0L), eq(0),
+                eq("解析失败  压缩包损坏 第 3 行"));
     }
 
     @Test

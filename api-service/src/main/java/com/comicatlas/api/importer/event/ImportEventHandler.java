@@ -123,6 +123,12 @@ public class ImportEventHandler {
         if (event.speedBytesPerSec() > 0) { task.setDownloadSpeed(event.speedBytesPerSec()); }
         if (event.etaSeconds() > 0) { task.setEtaSeconds(event.etaSeconds()); }
         if (event.downloadMethod() != null) { task.setDownloadMethod(event.downloadMethod()); }
+        // 失败原因透传：Worker 失败事件携带 errorMessage（下载/解压/解析/搬移环节），
+        // 写入任务供前端展示与重试决策（阿里规范：失败信息须包含可定位的业务上下文）
+        if ("FAILED".equals(newStatus) && event.errorMessage() != null && !event.errorMessage().isBlank()) {
+            task.setErrorMessage(event.errorMessage());
+            task.setEndTime(LocalDateTime.now());
+        }
         taskMapper.updateById(task);
 
         // 阶段状态（DOWNLOADING/EXTRACTING/PARSING）同步到统一任务 stage 列（TaskStage 枚举）
@@ -147,7 +153,7 @@ public class ImportEventHandler {
                         ? ManagementTaskStatus.CANCELLED
                         : ManagementTaskStatus.FAILED;
                 managementTaskService.updateItemStatus(
-                        mgmtItem.getId(), mgmtStatus, null, "IMPORT_TASK", task.getId());
+                        mgmtItem.getId(), mgmtStatus, task.getErrorMessage(), "IMPORT_TASK", task.getId());
             }
         }
 
