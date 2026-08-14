@@ -1,4 +1,4 @@
-package com.comicatlas.contract.common.scan;
+package com.comicatlas.api.common.scan;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.admin.dto.RecoveryProgressVO;

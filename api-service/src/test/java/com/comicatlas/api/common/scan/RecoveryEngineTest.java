@@ -1,4 +1,4 @@
-package com.comicatlas.contract.common.scan;
+package com.comicatlas.api.common.scan;
 
 import com.comicatlas.api.admin.dto.RecoveryProgressVO;
 import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
