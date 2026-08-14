@@ -52,8 +52,14 @@ public class ManagementCommandDispatcher {
                             cmd.taskId(), cmd.itemId(), cmd.attempt());
                     route(cmd);
                 },
-                e -> publisher.failed(cmd,
-                        e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName()));
+                e -> {
+                    // 完整异常写入 Worker 日志（errorMessage 事件侧会截断，详见 ManagementCommandPublisher）
+                    log.warn("管理命令执行失败: op={}, target={}:{}, taskId={}, itemId={}",
+                            cmd.operationType(), cmd.targetType(), cmd.targetId(),
+                            cmd.taskId(), cmd.itemId(), e);
+                    publisher.failed(cmd,
+                            e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
+                });
     }
 
     private void route(ManagementCommandRequestedEvent cmd) {

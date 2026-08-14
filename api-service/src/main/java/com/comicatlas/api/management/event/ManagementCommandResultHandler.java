@@ -135,6 +135,10 @@ public class ManagementCommandResultHandler {
     /** 元数据刷新快照目录名（STAGING/metadata-refresh/{taskId}/{itemId}/{attempt}）。 */
     private static final String METADATA_REFRESH_DIR = "metadata-refresh/";
 
+    /** 失败原因写入列上限（字符）：management_task_item.error_message 为 varchar(4096)。
+     *  防御 Worker 或其他来源的超长 errorMessage 导致写库异常、结果事件进 DLQ、item 永久 QUEUED。 */
+    private static final int MAX_ITEM_ERROR_MESSAGE_CHARS = 4000;
+
     private final ManagementTaskService managementTaskService;
     private final InboxService inboxService;
     private final MediaMapper mediaMapper;
@@ -890,12 +894,20 @@ public class ManagementCommandResultHandler {
 
     private void handleFailed(ManagementCommandFailedEvent ev) {
         ManagementTaskItemResponse item = managementTaskService.updateItemStatus(
-                ev.itemId(), ManagementTaskStatus.FAILED, ev.errorMessage(), null, null, ev.attempt());
+                ev.itemId(), ManagementTaskStatus.FAILED,
+                truncateItemErrorMessage(ev.errorMessage()), null, null, ev.attempt());
         if (item.getStatus() != ManagementTaskStatus.FAILED) {
             log.info("failed 结果未生效（旧 attempt/已终态）: itemId={}, attempt={}", ev.itemId(), ev.attempt());
             return;
         }
         applyFailedBusiness(ev);
+    }
+
+    private static String truncateItemErrorMessage(String errorMessage) {
+        if (errorMessage == null || errorMessage.length() <= MAX_ITEM_ERROR_MESSAGE_CHARS) {
+            return errorMessage;
+        }
+        return errorMessage.substring(0, MAX_ITEM_ERROR_MESSAGE_CHARS) + "...（已截断）";
     }
 
     private void applyFailedBusiness(ManagementCommandFailedEvent ev) {

@@ -65,9 +65,11 @@ class ExternalProcessRunnerTest {
     @Test
     @DisplayName("输出容量受限：超限后截断保留头部且进程正常退出")
     void run_outputExceedsLimit_isTruncated() throws Exception {
+        // 每行约 48 字符，行数取上限的 2 倍 → 输出约为 MAX_OUTPUT_CHARS 的两倍，必然触发截断
         // cmd /c 命令行上下文中 for 循环变量用单 %i（批处理文件才需要 %%i）
+        int lines = ExternalProcessRunner.MAX_OUTPUT_CHARS / 48 * 2;
         ProcessBuilder pb = new ProcessBuilder("cmd", "/c",
-                "for /l %i in (1,1,3000) do @echo line-%i-0123456789012345678901234567890123456789");
+                "for /l %i in (1,1," + lines + ") do @echo line-%i-0123456789012345678901234567890123456789");
         ExternalProcessRunner.ExternalProcessResult result = runner.run(pb, 30);
         assertThat(result.exitCode()).isZero();
         assertThat(result.stdout().length()).as("输出应被容量限制截断")
@@ -106,9 +108,9 @@ class ExternalProcessRunnerTest {
     @Test
     @DisplayName("单条超长无换行输出被截断（长度受限 + 截断标记）")
     void run_singleHugeLine_isTruncated() throws Exception {
-        // 输出约 200KB 无换行文本：cmd 用 for 拼接会带空格，改用 PowerShell 生成
+        // 输出约为 MAX_OUTPUT_CHARS 两倍的无换行文本：cmd 用 for 拼接会带空格，改用 PowerShell 生成
         ProcessBuilder pb = new ProcessBuilder("powershell", "-NoProfile", "-Command",
-                "$s='x' * 200000; Write-Output $s");
+                "$s='x' * " + (ExternalProcessRunner.MAX_OUTPUT_CHARS * 2) + "; Write-Output $s");
         ExternalProcessRunner.ExternalProcessResult result = runner.run(pb, 30);
         assertThat(result.exitCode()).isZero();
         assertThat(result.stdout().length()).as("单条超长输出应被截断")

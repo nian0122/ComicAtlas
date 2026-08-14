@@ -34,6 +34,21 @@ public class ManagementCommandPublisher {
 
     private static final String EXCHANGE = MqExchanges.MANAGEMENT;
 
+    /**
+     * FAILED 事件 errorMessage 保留上限（字符）。API 端写入 management_task_item.error_message
+     * （varchar(4096)），超长消息（如内嵌外部进程 stdout 的异常文本可达数十 KB）会导致
+     * API 消费端写库异常、结果事件进 DLQ，item 永远停在 QUEUED。截断后保留头部，
+     * 完整错误由 Worker 日志承载。
+     */
+    private static final int MAX_ERROR_MESSAGE_CHARS = 2000;
+
+    private static String truncateErrorMessage(String errorMessage) {
+        if (errorMessage == null || errorMessage.length() <= MAX_ERROR_MESSAGE_CHARS) {
+            return errorMessage;
+        }
+        return errorMessage.substring(0, MAX_ERROR_MESSAGE_CHARS) + "...（已截断，完整信息见 Worker 日志）";
+    }
+
     public void progress(ManagementCommandRequestedEvent cmd, int progress, String stage) {
         rabbitTemplate.convertAndSend(EXCHANGE, MqRoutingKeys.COMMAND_PROGRESS,
                 new ManagementCommandProgressEvent(UUID.randomUUID(), Instant.now(), 1,
@@ -59,7 +74,7 @@ public class ManagementCommandPublisher {
                 new ManagementCommandFailedEvent(UUID.randomUUID(), Instant.now(), 1,
                         cmd.taskId(), cmd.itemId(), cmd.attempt(),
                         cmd.operationType(), cmd.targetType(), cmd.targetId(),
-                        errorMessage));
+                        truncateErrorMessage(errorMessage)));
     }
 
     /**
