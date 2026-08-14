@@ -1,5 +1,11 @@
 import { BREAKPOINTS } from '@/composables/useBreakpoint'
 
+/** Safari“请求桌面版网站”后会使用桌面 User-Agent，因此不再命中移动端识别。 */
+export function isMobileBrowserUserAgent(): boolean {
+  if (typeof navigator === 'undefined') return false
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+}
+
 /**
  * 判断当前是否为移动阅读设备。
  *
@@ -16,6 +22,7 @@ export function isMobileReadingDevice(): boolean {
     return false
   }
   return (
+    isMobileBrowserUserAgent() &&
     window.matchMedia('(pointer: coarse)').matches &&
     window.innerWidth <= BREAKPOINTS.tablet
   )

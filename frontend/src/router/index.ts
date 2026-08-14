@@ -3,7 +3,6 @@ import ReadingLayout from '@/layouts/ReadingLayout.vue'
 import ReaderLayout from '@/layouts/ReaderLayout.vue'
 import ManagementLayout from '@/layouts/ManagementLayout.vue'
 import { isMobileReadingDevice } from '@/utils/device'
-import { getStoredDisplayMode } from '@/utils/display-mode'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -165,7 +164,7 @@ router.beforeEach((to) => {
     return true
   }
   // 4. 移动阅读设备 → 重定向到拦截页
-  if (getStoredDisplayMode() !== 'desktop' && isMobileReadingDevice()) {
+  if (isMobileReadingDevice()) {
     return { name: 'manage-intercept' }
   }
   // 5. 桌面设备正常放行
