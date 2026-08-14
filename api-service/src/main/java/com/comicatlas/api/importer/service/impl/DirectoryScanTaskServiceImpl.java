@@ -5,13 +5,16 @@ import com.comicatlas.contract.common.enums.DirectoryScanTaskStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.importer.dto.DirectoryScanTaskVO;
 import com.comicatlas.api.importer.entity.DirectoryScanTask;
-import com.comicatlas.api.importer.event.DirectoryScanEventPublisher;
 import com.comicatlas.api.importer.mapper.DirectoryScanTaskMapper;
 import com.comicatlas.api.importer.service.DirectoryScanTaskService;
 import com.comicatlas.api.management.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
 import com.comicatlas.api.management.service.ManagementTaskService;
+import com.comicatlas.api.outbox.service.OutboxService;
+import com.comicatlas.common.constant.MqExchanges;
+import com.comicatlas.common.constant.MqRoutingKeys;
+import com.comicatlas.common.event.DirectoryScanRequestedEvent;
 import com.comicatlas.contract.common.enums.ManagementTaskStatus;
 import com.comicatlas.contract.common.enums.TaskType;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -20,11 +23,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -32,7 +35,7 @@ import java.util.List;
 public class DirectoryScanTaskServiceImpl implements DirectoryScanTaskService {
 
     private final DirectoryScanTaskMapper scanTaskMapper;
-    private final DirectoryScanEventPublisher eventPublisher;
+    private final OutboxService outboxService;
     private final ObjectMapper objectMapper;
     private final ManagementTaskService managementTaskService;
 
@@ -56,13 +59,9 @@ public class DirectoryScanTaskServiceImpl implements DirectoryScanTaskService {
         scanTaskMapper.updateById(task);
 
         Long taskId = task.getId();
-        TransactionSynchronizationManager.registerSynchronization(
-            new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    eventPublisher.publishScanRequested(taskId, directoryPath);
-                }
-            });
+        // 写入 Outbox（同事务），由 relay 异步发布，保证 DB 与消息一致
+        outboxService.enqueue(new DirectoryScanRequestedEvent(UUID.randomUUID(), Instant.now(), taskId, directoryPath),
+                MqExchanges.SCAN, MqRoutingKeys.SCAN_REQUESTED);
 
         log.info("目录扫描任务创建: taskId={}, directoryPath={}", taskId, directoryPath);
         return toVO(task);
@@ -95,20 +94,16 @@ public class DirectoryScanTaskServiceImpl implements DirectoryScanTaskService {
         task.setEndedAt(null);
         scanTaskMapper.updateById(task);
 
-        // 同步统一任务重置（仅状态，不在此重新入队——扫描事件由下方 afterCommit 重发）
+        // 同步统一任务重置（仅状态，不在此重新入队——扫描事件由下方 Outbox 重发）
         if (task.getManagementTaskId() != null) {
             managementTaskService.resetTaskState(task.getManagementTaskId());
         }
 
         Long taskId = task.getId();
         String directoryPath = task.getDirectoryPath();
-        TransactionSynchronizationManager.registerSynchronization(
-            new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    eventPublisher.publishScanRequested(taskId, directoryPath);
-                }
-            });
+        // 写入 Outbox（同事务），由 relay 异步发布
+        outboxService.enqueue(new DirectoryScanRequestedEvent(UUID.randomUUID(), Instant.now(), taskId, directoryPath),
+                MqExchanges.SCAN, MqRoutingKeys.SCAN_REQUESTED);
 
         log.info("目录扫描任务重试: taskId={}", taskId);
         return toVO(task);

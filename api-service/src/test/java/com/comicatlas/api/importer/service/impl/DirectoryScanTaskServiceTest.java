@@ -3,9 +3,11 @@ package com.comicatlas.api.importer.service.impl;
 import com.comicatlas.contract.common.enums.DirectoryScanTaskStatus;
 import com.comicatlas.api.importer.dto.DirectoryScanTaskVO;
 import com.comicatlas.api.importer.entity.DirectoryScanTask;
-import com.comicatlas.api.importer.event.DirectoryScanEventPublisher;
 import com.comicatlas.api.importer.mapper.DirectoryScanTaskMapper;
 import com.comicatlas.api.management.service.ManagementTaskService;
+import com.comicatlas.api.outbox.service.OutboxService;
+import com.comicatlas.common.constant.MqExchanges;
+import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.dto.ScanItemDTO;
 import com.comicatlas.common.dto.ScanNodeKind;
 import com.comicatlas.common.dto.ScanPreviewNodeDTO;
@@ -13,6 +15,7 @@ import com.comicatlas.common.dto.ScanResultDTO;
 import com.comicatlas.common.dto.ScanWarningCode;
 import com.comicatlas.common.dto.ScanWarningDTO;
 import com.comicatlas.common.dto.ScanWarningSeverity;
+import com.comicatlas.common.event.DirectoryScanRequestedEvent;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
@@ -32,6 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -53,7 +57,7 @@ class DirectoryScanTaskServiceTest {
     private DirectoryScanTaskMapper scanTaskMapper;
 
     @Mock
-    private DirectoryScanEventPublisher eventPublisher;
+    private OutboxService outboxService;
 
     @Mock
     private ManagementTaskService managementTaskService;
@@ -65,17 +69,7 @@ class DirectoryScanTaskServiceTest {
     void setUp() {
         objectMapper = new ObjectMapper();
         service = new DirectoryScanTaskServiceImpl(
-                scanTaskMapper, eventPublisher, objectMapper, managementTaskService);
-        // 重试会注册事务提交后回调，统一初始化同步器（tearDown 负责清理）
-        TransactionSynchronizationManager.initSynchronization();
-    }
-
-    @AfterEach
-    void tearDown() {
-        try {
-            TransactionSynchronizationManager.clearSynchronization();
-        } catch (IllegalStateException ignored) {
-        }
+                scanTaskMapper, outboxService, objectMapper, managementTaskService);
     }
 
     private static DirectoryScanTask taskWithJson(Long id, String resultJson) {
@@ -190,8 +184,6 @@ class DirectoryScanTaskServiceTest {
         when(scanTaskMapper.updateById(any(DirectoryScanTask.class))).thenReturn(1);
 
         service.retryTask(4L);
-        TransactionSynchronizationManager.getSynchronizations()
-                .forEach(sync -> sync.afterCommit());
 
         ArgumentCaptor<DirectoryScanTask> captor = ArgumentCaptor.forClass(DirectoryScanTask.class);
         verify(scanTaskMapper).updateById(captor.capture());
@@ -200,7 +192,9 @@ class DirectoryScanTaskServiceTest {
         assertEquals(1, saved.getRetryCount(), "重试应递增 retryCount");
         assertNull(saved.getErrorMessage(), "重试应清空失败原因");
         verify(managementTaskService).resetTaskState(99L);
-        verify(eventPublisher).publishScanRequested(4L, "D:/scans/root");
+        // 重试后同事务向 Outbox 重新写入扫描请求事件
+        verify(outboxService).enqueue(any(DirectoryScanRequestedEvent.class),
+                eq(MqExchanges.SCAN), eq(MqRoutingKeys.SCAN_REQUESTED));
     }
 
     @Test
@@ -212,6 +206,6 @@ class DirectoryScanTaskServiceTest {
 
         assertThrows(BusinessException.class, () -> service.retryTask(5L));
         verify(scanTaskMapper, never()).updateById(any(DirectoryScanTask.class));
-        verify(eventPublisher, never()).publishScanRequested(any(), any());
+        verify(outboxService, never()).enqueue(any(), any(), any());
     }
 }
