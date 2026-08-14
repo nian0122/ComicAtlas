@@ -1,5 +1,6 @@
 package com.comicatlas.worker.importer;
 
+import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.file.extract.ZipExtractor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,6 +14,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * ZIP 导入处理器 — 解压到任务唯一临时目录后委托 {@link DirectoryImportHandler}。
@@ -27,26 +29,31 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ZipImportHandler {
 
+    /** 解压产物子目录名（任务临时目录下）。 */
+    private static final String EXTRACT_DIR_NAME = "extracted";
+
     private final ZipExtractor zipExtractor;
+    private final WorkerConfig config;
     private final DirectoryImportHandler directoryHandler;
 
     public Path importZip(ImportContext ctx, Long taskId, Long comicId, Path mangaRoot) throws Exception {
         Path zipFile = ctx.sourcePath();
         if (!Files.exists(zipFile)) {
-            throw new RuntimeException("ZIP 文件不存在: " + zipFile.getFileName());
+            throw new IllegalArgumentException("ZIP 文件不存在: " + zipFile.getFileName());
         }
 
         // 任务唯一临时目录：temp/{taskId}/extracted，互不干扰
-        Path tempRoot = mangaRoot.resolve("temp").resolve(taskId.toString());
-        Path extractDir = tempRoot.resolve("extracted");
+        Path tempRoot = config.resolveTempDir().resolve(taskId.toString());
+        Path extractDir = tempRoot.resolve(EXTRACT_DIR_NAME);
         Files.createDirectories(extractDir);
 
         try {
             zipExtractor.extract(zipFile, extractDir);
-            log.info("ZIP extracted: archive={}", zipFile.getFileName());
+            log.info("ZIP 解压完成: archive={}", zipFile.getFileName());
 
             String fileName = zipFile.getFileName().toString();
-            String titleHint = fileName.contains(".") ? fileName.substring(0, fileName.lastIndexOf('.')) : fileName;
+            int lastDotIndex = fileName.lastIndexOf('.');
+            String titleHint = lastDotIndex >= 0 ? fileName.substring(0, lastDotIndex) : fileName;
             // 保留原始来源类型（ZIP），使 parser 对解压根执行"恰有一个有效子目录时剥离一层
             // 传输包装"的语义；不得改写成 DIRECTORY，否则单层包装目录无法被剥离。
             ImportContext extractCtx = new ImportContext(
@@ -68,7 +75,7 @@ public class ZipImportHandler {
         }
         List<Path> failed = new ArrayList<>();
         IOException firstFailure = null;
-        try (var walk = Files.walk(tempRoot)) {
+        try (Stream<Path> walk = Files.walk(tempRoot)) {
             List<Path> paths = walk.sorted(Comparator.reverseOrder()).toList();
             for (Path path : paths) {
                 try {

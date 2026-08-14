@@ -14,6 +14,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Comparator;
 import java.util.Locale;
+import java.util.stream.Stream;
 
 /**
  * 导出产物发布器 — 将 staging 任务目录原子发布为最终 {@code EXPORT/{taskId}} 目录。
@@ -106,7 +107,7 @@ public class ExportArchivePublisher {
         if (dir == null || !Files.exists(dir, LinkOption.NOFOLLOW_LINKS)) {
             return;
         }
-        try (var walk = Files.walk(dir)) {
+        try (Stream<Path> walk = Files.walk(dir)) {
             walk.sorted(Comparator.reverseOrder()).forEach(path -> {
                 try {
                     Files.deleteIfExists(path);

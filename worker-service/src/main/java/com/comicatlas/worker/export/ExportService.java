@@ -1,5 +1,6 @@
 package com.comicatlas.worker.export;
 
+import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.worker.common.ComicTitleSanitizer;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.entity.ExportChapter;
@@ -26,12 +27,32 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /** 导出编排：收集 → 构建清单 → 打包 ZIP → 原子发布任务目录。 */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class ExportService {
+
+    /** 导出错误码：ZIP 打包失败（classifyExportError 契约值）。 */
+    private static final String ERROR_CODE_ZIP = "ZIP_ERROR";
+    /** 导出错误码：媒体收集失败。 */
+    private static final String ERROR_CODE_COLLECT = "COLLECT_ERROR";
+    /** 导出错误码：清单构建失败。 */
+    private static final String ERROR_CODE_MANIFEST = "MANIFEST_ERROR";
+    /** 导出错误码：存储访问失败。 */
+    private static final String ERROR_CODE_STORAGE = "STORAGE_ERROR";
+    /** 导出错误码：未归类失败。 */
+    private static final String ERROR_CODE_EXPORT = "EXPORT_ERROR";
+    /** staging 目录名前缀（任务发布前的临时目录）。 */
+    private static final String STAGING_DIR_PREFIX = ".staging-";
+    /** 无标题章节的目录名兜底前缀。 */
+    private static final String CHAPTER_DIR_PREFIX = "chapter_";
+    /** ZIP 产物扩展名。 */
+    private static final String ZIP_EXTENSION = ".zip";
+    /** 导出文件名时间戳格式。 */
+    private static final DateTimeFormatter TIMESTAMP_FMT = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
 
     private final ExportCollector exportCollector;
     private final ExportFileResolver exportFileResolver;
@@ -41,37 +62,45 @@ public class ExportService {
     private final WorkerConfig workerConfig;
     private final ExportArchivePublisher archivePublisher;
 
-    private static final DateTimeFormatter TIMESTAMP_FMT = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
-
-    public record ExportOutput(Long taskId, Long comicId, String fileName, long size) {}
+    public record ExportOutput(Long taskId, Long comicId, String fileName, long size) {
+    }
 
     public ExportOutput export(Long comicId, Long taskId) throws IOException {
         ExportCollectResult result = exportCollector.collect(comicId);
         ExportManifest manifest = buildManifest(result);
 
-        StorageRoot exportRoot = storageProperties.getRoots().get("EXPORT");
+        StorageRoot exportRoot = storageProperties.getRoots().get(StorageRootKeys.EXPORT);
         if (exportRoot == null || !exportRoot.exists()) {
             throw new IllegalStateException("EXPORT 存储根未配置或路径不存在");
         }
 
         String baseFileName = buildOutputFileName(comicId, result.comic().getTitle());
-        Path stagingDir = exportRoot.resolve(".staging-" + taskId);
+        Path stagingDir = exportRoot.resolve(STAGING_DIR_PREFIX + taskId);
         Path finalDir = exportRoot.resolve(String.valueOf(taskId));
         deleteRecursively(stagingDir);
-        ZipBuilder.ZipBuildResult zipResult = zipBuilder.build(manifest, stagingDir.resolve(baseFileName));
+        // 打包到 staging（发布由 archivePublisher 原子执行）
+        zipBuilder.build(manifest, stagingDir.resolve(baseFileName));
         ExportArchivePublisher.PublishResult publishResult = archivePublisher.publish(
                 taskId, stagingDir, finalDir, manifest);
         return new ExportOutput(taskId, comicId, publishResult.fileName(), publishResult.size());
     }
 
     /** 供 handler 发失败事件使用。 */
-    public String classifyExportError(Exception e) {
-        String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
-        if (msg.contains("ZIP") || msg.contains("zip")) { return "ZIP_ERROR"; }
-        if (msg.contains("collect") || msg.contains("Collect")) { return "COLLECT_ERROR"; }
-        if (msg.contains("manifest") || msg.contains("Manifest")) { return "MANIFEST_ERROR"; }
-        if (msg.contains("STORAGE") || msg.contains("storage") || msg.contains("EXPORT")) { return "STORAGE_ERROR"; }
-        return "EXPORT_ERROR";
+    public String classifyExportError(Exception exception) {
+        String message = exception.getMessage() != null ? exception.getMessage() : exception.getClass().getSimpleName();
+        if (message.contains("ZIP") || message.contains("zip")) {
+            return ERROR_CODE_ZIP;
+        }
+        if (message.contains("collect") || message.contains("Collect")) {
+            return ERROR_CODE_COLLECT;
+        }
+        if (message.contains("manifest") || message.contains("Manifest")) {
+            return ERROR_CODE_MANIFEST;
+        }
+        if (message.contains("STORAGE") || message.contains("storage") || message.contains("EXPORT")) {
+            return ERROR_CODE_STORAGE;
+        }
+        return ERROR_CODE_EXPORT;
     }
 
     /**
@@ -99,14 +128,14 @@ public class ExportService {
                 .collect(Collectors.toMap(ExportChapter::getId, chapter ->
                         chapter.getTitle() != null && !chapter.getTitle().isBlank()
                                 ? ComicTitleSanitizer.sanitize(chapter.getTitle())
-                                : "chapter_" + chapter.getId()));
+                                : CHAPTER_DIR_PREFIX + chapter.getId()));
 
         // 构建文件条目：按章节分组，去重目录名，并做目标路径冲突与容量预检
         Set<String> usedChapterDirs = new HashSet<>();
         Set<String> usedTargetPaths = new HashSet<>();
         long mediaTotalSize = 0L;
         for (ExportChapter chapter : result.chapters()) {
-            String chapterDir = chapterTitles.getOrDefault(chapter.getId(), "chapter_" + chapter.getId());
+            String chapterDir = chapterTitles.getOrDefault(chapter.getId(), CHAPTER_DIR_PREFIX + chapter.getId());
             String uniqueDir = chapterDir;
             int counter = 1;
             while (usedChapterDirs.contains(uniqueDir)) {
@@ -152,36 +181,36 @@ public class ExportService {
     private ExportManifest.Entry buildEntry(Long comicId, ExportMedia media, String uniqueDir,
                                             Set<String> usedTargetPaths) {
         Long mediaId = media.getId();
-        StorageRef ref;
+        StorageRef storageRef;
         try {
-            ref = exportFileResolver.resolve(media);
-        } catch (ExportFileNotFoundException e) {
-            throw manifestBuildError(comicId, mediaId, "无可用媒体文件（HQ 缺失且 LQ 未就绪）", e);
+            storageRef = exportFileResolver.resolve(media);
+        } catch (ExportFileNotFoundException ex) {
+            throw manifestBuildError(comicId, mediaId, "无可用媒体文件（HQ 缺失且 LQ 未就绪）", ex);
         }
 
-        Path sourceFile = exportFileResolver.resolveToPath(ref);
+        Path sourceFile = exportFileResolver.resolveToPath(storageRef);
         if (!Files.isRegularFile(sourceFile)) {
-            throw manifestBuildError(comicId, mediaId, "源文件缺失或非普通文件: " + ref.relativePath());
+            throw manifestBuildError(comicId, mediaId, "源文件缺失或非普通文件: " + storageRef.relativePath());
         }
         if (!Files.isReadable(sourceFile)) {
-            throw manifestBuildError(comicId, mediaId, "源文件不可读: " + ref.relativePath());
+            throw manifestBuildError(comicId, mediaId, "源文件不可读: " + storageRef.relativePath());
         }
 
         long sourceSize;
         try {
             sourceSize = Files.size(sourceFile);
-        } catch (IOException e) {
-            throw manifestBuildError(comicId, mediaId, "读取源文件大小失败: " + ref.relativePath(), e);
+        } catch (IOException ex) {
+            throw manifestBuildError(comicId, mediaId, "读取源文件大小失败: " + storageRef.relativePath(), ex);
         }
         if (sourceSize > maxEntrySize()) {
             throw manifestBuildError(comicId, mediaId, "单文件超限: " + sourceSize
                     + " 字节 > maxEntrySize=" + maxEntrySize());
         }
 
-        String fileName = Path.of(ref.relativePath()).getFileName().toString();
+        String fileName = Path.of(storageRef.relativePath()).getFileName().toString();
         String targetPath = normalizeTargetPath(uniqueDir + "/" + fileName);
-        String folded = targetPath.toLowerCase(Locale.ROOT);
-        if (!usedTargetPaths.add(folded)) {
+        String foldedPath = targetPath.toLowerCase(Locale.ROOT);
+        if (!usedTargetPaths.add(foldedPath)) {
             throw manifestBuildError(comicId, mediaId, "ZIP 目标路径冲突（大小写折叠后）: " + targetPath);
         }
         return new ExportManifest.Entry(targetPath, sourceFile, sourceSize);
@@ -198,9 +227,9 @@ public class ExportService {
     private long addSizes(Long comicId, Long mediaId, long left, long right) {
         try {
             return Math.addExact(left, right);
-        } catch (ArithmeticException e) {
+        } catch (ArithmeticException ex) {
             throw new ExportManifestBuildException(
-                    "导出清单构建失败：comicId=" + comicId + ", mediaId=" + mediaId + ", 媒体总量累加溢出", e);
+                    "导出清单构建失败：comicId=" + comicId + ", mediaId=" + mediaId + ", 媒体总量累加溢出", ex);
         }
     }
 
@@ -225,22 +254,22 @@ public class ExportService {
         if (dir == null || !Files.exists(dir)) {
             return;
         }
-        try (var walk = Files.walk(dir)) {
+        try (Stream<Path> walk = Files.walk(dir)) {
             walk.sorted(Comparator.reverseOrder()).forEach(path -> {
                 try {
                     Files.deleteIfExists(path);
-                } catch (IOException e) {
-                    log.warn("清理 staging 目录失败: {}", path, e);
+                } catch (IOException ex) {
+                    log.warn("清理 staging 目录失败: {}", path, ex);
                 }
             });
-        } catch (IOException e) {
-            log.warn("清理 staging 目录失败: {}", dir, e);
+        } catch (IOException ex) {
+            log.warn("清理 staging 目录失败: {}", dir, ex);
         }
     }
 
     private String buildOutputFileName(Long comicId, String title) {
         String timestamp = LocalDateTime.now().format(TIMESTAMP_FMT);
         String safeTitle = ComicTitleSanitizer.sanitize(title);
-        return safeTitle + "_" + comicId + "_" + timestamp + ".zip";
+        return safeTitle + "_" + comicId + "_" + timestamp + ZIP_EXTENSION;
     }
 }

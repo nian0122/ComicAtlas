@@ -27,11 +27,9 @@ import java.io.IOException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -121,7 +119,7 @@ class ImportTaskHandlerTest {
         verify(directoryHandler).handle(ctx.capture(), eq(7L), eq(11L), eq(Path.of("F:/manga")));
         assertEquals("EHENTAI", ctx.getValue().sourceType(), "EHENTAI 保留来源类型供 parser 剥离包装目录");
         assertEquals(downloaded, ctx.getValue().sourcePath(), "委托的是下载后的本地源目录");
-        verify(publisher).publishStatus(eq(7L), eq("PARSING"), anyInt(), isNull(), anyLong(), anyInt(), isNull());
+        verify(publisher).publishStatus(eq(new TaskStatusUpdate(7L, "PARSING", 0, null, 0, 0, null)));
         verify(publisher).publishImported(7L, 11L);
         // EHENTAI 不直接进 ZIP 解压路径
         verify(zipHandler, never()).importZip(any(), anyLong(), anyLong(), any());
@@ -152,8 +150,8 @@ class ImportTaskHandlerTest {
 
         handler.handle(event(8L, 12L, "DIRECTORY", "D:/comics/ComicA"), channel, 1L);
 
-        verify(publisher).publishStatus(eq(8L), eq("FAILED"), eq(0), isNull(), eq(0L), eq(0),
-                eq("源文件缺失: D:/comics/ComicA/001.jpg"));
+        verify(publisher).publishStatus(eq(new TaskStatusUpdate(8L, "FAILED", 0, null, 0, 0,
+                "源文件缺失: D:/comics/ComicA/001.jpg")));
     }
 
     @Test
@@ -163,8 +161,8 @@ class ImportTaskHandlerTest {
 
         handler.handle(event(8L, 12L, "DIRECTORY", "D:/comics/ComicA"), channel, 1L);
 
-        verify(publisher).publishStatus(eq(8L), eq("FAILED"), eq(0), isNull(), eq(0L), eq(0),
-                eq("解析失败  压缩包损坏 第 3 行"));
+        verify(publisher).publishStatus(eq(new TaskStatusUpdate(8L, "FAILED", 0, null, 0, 0,
+                "解析失败  压缩包损坏 第 3 行")));
     }
 
     @Test

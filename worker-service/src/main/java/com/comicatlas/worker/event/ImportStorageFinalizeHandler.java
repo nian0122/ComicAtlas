@@ -38,6 +38,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Stream;
 
 /**
  * 导入存储最终化处理器（Worker 侧）——导入两阶段最终化的<b>第二阶段</b>。
@@ -109,7 +110,7 @@ public class ImportStorageFinalizeHandler {
         List<MediaMove> moves = validateMappings(event, sourceDir, targetDir, hqRoot);
 
         // 并发串行化：同一 taskId 的事件串行处理（单实例 Worker），保证清单读改写与移动循环原子性
-        Object lock = TASK_LOCKS.computeIfAbsent(event.taskId(), key -> new Object());
+        Object lock = TASK_LOCKS.computeIfAbsent(event.taskId(), ignored -> new Object());
         synchronized (lock) {
             try {
                 finalizeStorageLocked(event, new FinalizeContext(mangaRoot, hqRoot, sourceDir, targetDir, moves));
@@ -294,7 +295,7 @@ public class ImportStorageFinalizeHandler {
         if (dir == null || !Files.isDirectory(dir)) {
             return;
         }
-        try (var stream = Files.list(dir)) {
+        try (Stream<Path> stream = Files.list(dir)) {
             if (stream.findAny().isEmpty()) {
                 Files.deleteIfExists(dir);
                 log.info("已清理空暂存目录: {}", dir.getFileName());
@@ -305,7 +306,7 @@ public class ImportStorageFinalizeHandler {
     }
 
     private void publishCompleted(ImportStorageFinalizeRequestedEvent event, int mediaCount) {
-        var completed = new ImportStorageFinalizeCompletedEvent(
+        ImportStorageFinalizeCompletedEvent completed = new ImportStorageFinalizeCompletedEvent(
                 UUID.randomUUID(), Instant.now(),
                 event.taskId(), event.comicId(), event.globalOrder(), event.chapterId(),
                 event.targetDir(), mediaCount);
@@ -317,7 +318,7 @@ public class ImportStorageFinalizeHandler {
     private void publishFailed(ImportStorageFinalizeRequestedEvent event, Exception failure) {
         String errorCode = failure instanceof ImportStorageFinalizeException finalizeException
                 ? finalizeException.getErrorCode() : StorageFinalizeErrorCode.UNEXPECTED;
-        var failed = new ImportStorageFinalizeFailedEvent(
+        ImportStorageFinalizeFailedEvent failed = new ImportStorageFinalizeFailedEvent(
                 UUID.randomUUID(), Instant.now(),
                 event.taskId(), event.comicId(), event.globalOrder(), event.chapterId(),
                 errorCode, sanitize(failure.getMessage()));

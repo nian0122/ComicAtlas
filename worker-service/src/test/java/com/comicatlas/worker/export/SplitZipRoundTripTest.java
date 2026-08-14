@@ -96,8 +96,9 @@ class SplitZipRoundTripTest {
         realConfig = new WorkerConfig();
         realConfig.getZip().setSplitSize(SPLIT_SIZE);
         directoryHandler = mock(DirectoryImportHandler.class);
-        zipImportHandler = new ZipImportHandler(new ZipExtractor(realConfig), directoryHandler);
         mangaRoot = tempDir.resolve("manga");
+        realConfig.setTempDir(mangaRoot.resolve("temp").toString());
+        zipImportHandler = new ZipImportHandler(new ZipExtractor(realConfig), realConfig, directoryHandler);
     }
 
     @Test

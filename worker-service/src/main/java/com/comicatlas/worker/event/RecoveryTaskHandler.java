@@ -3,11 +3,13 @@ package com.comicatlas.worker.event;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.constant.MqRoutingKeys;
+import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.common.event.RecoveryFailedEvent;
 import com.comicatlas.common.event.RecoveryRequestedEvent;
 import com.comicatlas.common.event.RecoveryScanCompletedEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
-import com.comicatlas.worker.config.WorkerConfig;
+import com.comicatlas.worker.storage.StorageProperties;
+import com.comicatlas.worker.storage.StorageRoot;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +19,7 @@ import org.springframework.amqp.support.AmqpHeaders;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
+import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -44,48 +47,55 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class RecoveryTaskHandler {
 
-    private final WorkerConfig config;
+    private final StorageProperties storageProperties;
     private final RabbitTemplate rabbitTemplate;
     private final MqConsumerSupport mqConsumerSupport;
 
     @RabbitListener(queues = MqQueues.RECOVERY_TASK)
     public void handle(RecoveryRequestedEvent event, Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         Long taskId = event.taskId();
-        log.info("RecoveryTaskHandler: 接收恢复请求, taskId={}", taskId);
+        log.info("接收恢复请求: taskId={}", taskId);
         mqConsumerSupport.consume(channel, tag, "存储恢复: taskId=" + taskId,
                 () -> scanAndPublish(taskId),
                 e -> publishFailed(taskId, e.getMessage()),
                 MqConsumerSupport.FailurePolicy.ACK_AFTER_CALLBACK);
     }
 
+    /** 扫描 HQ 根目录收集数字命名的漫画目录 ID，排序后发布扫描完成事件。 */
     private void scanAndPublish(Long taskId) throws Exception {
-        Path hqRoot = Path.of(config.getMangaRoot(), "hq");
-        if (!Files.isDirectory(hqRoot) || !Files.isReadable(hqRoot)) {
-            throw new IllegalStateException("HQ 根目录不可读: " + hqRoot.toAbsolutePath());
+        StorageRoot hqRoot = storageProperties.getRoots().get(StorageRootKeys.HQ);
+        Path hqRootPath = hqRoot == null ? null : hqRoot.getPath();
+        if (hqRootPath == null || !Files.isDirectory(hqRootPath) || !Files.isReadable(hqRootPath)) {
+            throw new IllegalStateException("HQ 根目录不可读: "
+                    + (hqRootPath == null ? "存储根未配置" : hqRootPath.toAbsolutePath()));
         }
         List<Long> comicIds = new ArrayList<>();
-        try (var stream = Files.newDirectoryStream(hqRoot)) {
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(hqRootPath)) {
             for (Path dir : stream) {
-                if (!Files.isDirectory(dir)) { continue; }
+                if (!Files.isDirectory(dir)) {
+                    continue;
+                }
                 String dirName = dir.getFileName().toString();
                 try {
                     long comicId = Long.parseLong(dirName);
-                    if (comicId > 0) { comicIds.add(comicId); }
+                    if (comicId > 0) {
+                        comicIds.add(comicId);
+                    }
                 } catch (NumberFormatException ignored) {
-                    log.debug("RecoveryTaskHandler: 跳过非数字目录: {}", dirName);
+                    log.debug("跳过非数字目录: {}", dirName);
                 }
             }
         }
         comicIds.sort(Comparator.naturalOrder());
-        log.info("RecoveryTaskHandler: 扫描完成, taskId={}, 发现 {} 个漫画目录", taskId, comicIds.size());
+        log.info("扫描完成: taskId={}, 发现 {} 个漫画目录", taskId, comicIds.size());
         rabbitTemplate.convertAndSend(MqExchanges.RECOVERY, MqRoutingKeys.RECOVERY_PROGRESS,
                 new RecoveryScanCompletedEvent(UUID.randomUUID(), Instant.now(), taskId, comicIds));
     }
 
     private void publishFailed(Long taskId, String errorMessage) {
-        var failEvent = new RecoveryFailedEvent(
+        RecoveryFailedEvent failEvent = new RecoveryFailedEvent(
                 UUID.randomUUID(), Instant.now(), taskId, errorMessage);
         rabbitTemplate.convertAndSend(MqExchanges.RECOVERY, MqRoutingKeys.RECOVERY_FAILED, failEvent);
-        log.info("RecoveryTaskHandler: 已发布 RecoveryFailedEvent, taskId={}, error={}", taskId, errorMessage);
+        log.info("已发布恢复失败事件: taskId={}, error={}", taskId, errorMessage);
     }
 }

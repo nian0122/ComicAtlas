@@ -49,7 +49,8 @@ public class ImportTaskHandler {
         }
         mqConsumerSupport.consume(channel, tag, "导入任务: taskId=" + taskId,
                 () -> runImport(event, taskId),
-                e -> publisher.publishStatus(taskId, "FAILED", 0, null, 0, 0, toErrorMessage(e)));
+                e -> publisher.publishStatus(new TaskStatusUpdate(
+                        taskId, "FAILED", 0, null, 0, 0, toErrorMessage(e))));
     }
 
     private void runImport(ImportTaskCreatedEvent event, Long taskId) throws Exception {
@@ -58,7 +59,7 @@ public class ImportTaskHandler {
         String sourcePath = event.sourcePath();
         Path mangaRoot = Path.of(config.getMangaRoot());
 
-        publisher.publishStatus(taskId, "PARSING", 0, null, 0, 0, null);
+        publisher.publishStatus(new TaskStatusUpdate(taskId, "PARSING", 0, null, 0, 0, null));
         String normalizedPath = mapHostPathToContainer(sourcePath);
         if (!normalizedPath.equals(sourcePath)) {
             log.info("Source path normalized: {} -> {}", sourcePath, normalizedPath);

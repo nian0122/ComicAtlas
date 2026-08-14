@@ -4,16 +4,11 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.comicatlas.contract.common.constant.HttpStatusCodes;
-import com.comicatlas.contract.common.enums.ComicStatus;
-import com.comicatlas.contract.common.enums.ExportTaskStatus;
-import com.comicatlas.contract.common.enums.ImportTaskStatus;
-import com.comicatlas.contract.common.exception.BusinessException;
-import com.comicatlas.contract.common.exception.ConflictException;
-import com.comicatlas.persistence.comic.entity.Comic;
-import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.api.export.entity.ExportTask;
 import com.comicatlas.api.export.mapper.ExportTaskMapper;
+import com.comicatlas.api.importer.entity.ImportTask;
+import com.comicatlas.api.importer.mapper.ImportTaskMapper;
+import com.comicatlas.api.importer.service.ImportRetryCoordinator;
 import com.comicatlas.api.management.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
@@ -21,12 +16,22 @@ import com.comicatlas.api.management.entity.ManagementTask;
 import com.comicatlas.api.management.entity.ManagementTaskItem;
 import com.comicatlas.api.management.mapper.ManagementTaskItemMapper;
 import com.comicatlas.api.management.mapper.ManagementTaskMapper;
+import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
+import com.comicatlas.common.event.ExportTaskCreatedEvent;
+import com.comicatlas.common.event.ManagementCommandRequestedEvent;
+import com.comicatlas.contract.common.constant.HttpStatusCodes;
+import com.comicatlas.contract.common.enums.ComicStatus;
+import com.comicatlas.contract.common.enums.ExportTaskStatus;
+import com.comicatlas.contract.common.enums.ImportTaskStatus;
 import com.comicatlas.contract.common.enums.ManagementTaskStatus;
 import com.comicatlas.contract.common.enums.TaskStage;
 import com.comicatlas.contract.common.enums.TaskType;
-import com.comicatlas.common.event.ExportTaskCreatedEvent;
+import com.comicatlas.contract.common.exception.BusinessException;
+import com.comicatlas.contract.common.exception.ConflictException;
+import com.comicatlas.persistence.comic.entity.Comic;
+import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -36,12 +41,15 @@ import org.springframework.transaction.annotation.Transactional;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -55,13 +63,20 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ManagementTaskService {
 
+    /** 目标类型：漫画。 */
+    private static final String TARGET_TYPE_COMIC = "COMIC";
+    /** 结果引用类型：回收清单（RESTORE/PURGE 定位 manifest 目录）。 */
+    private static final String RESULT_REF_TYPE_TRASH_MANIFEST = "TRASH_MANIFEST";
+    /** 初始 attempt 次数。 */
+    private static final int INITIAL_ATTEMPT = 1;
+
     private final ManagementTaskMapper taskMapper;
     private final ManagementTaskItemMapper itemMapper;
     private final ComicMapper comicMapper;
     private final ExportTaskMapper exportTaskMapper;
-    private final com.comicatlas.api.outbox.service.OutboxService outboxService;
-    private final com.comicatlas.api.importer.mapper.ImportTaskMapper importTaskMapper;
-    private final com.comicatlas.api.importer.service.ImportRetryCoordinator importRetryCoordinator;
+    private final OutboxService outboxService;
+    private final ImportTaskMapper importTaskMapper;
+    private final ImportRetryCoordinator importRetryCoordinator;
 
     // ======================== 创建任务 ========================
 
@@ -101,7 +116,7 @@ public class ManagementTaskService {
         task.setBatch(request.getTargets() != null && request.getTargets().size() > 1);
         task.setStatus(ManagementTaskStatus.QUEUED);
         task.setProgress(0);
-        task.setAttempt(1);
+        task.setAttempt(INITIAL_ATTEMPT);
 
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {
             task.setIdempotencyKey(idempotencyKey);
@@ -159,7 +174,7 @@ public class ManagementTaskService {
                 item.setTargetId(target.getTargetId());
                 item.setOperationType(opType);
                 item.setStatus(ManagementTaskStatus.QUEUED);
-                item.setAttempt(1);
+                item.setAttempt(INITIAL_ATTEMPT);
                 item.setProgress(0);
                 item.setLockKey(lockKey);
                 items.add(item);
@@ -170,7 +185,7 @@ public class ManagementTaskService {
             for (ManagementTaskItem item : items) {
                 try {
                     itemMapper.insert(item);
-                } catch (DuplicateKeyException e) {
+                } catch (DuplicateKeyException ex) {
                     throw new ConflictException(
                             String.format("目标 %s:%d 在操作 %s 中已有活跃任务项",
                                     item.getTargetType(), item.getTargetId(), item.getOperationType()));
@@ -358,7 +373,7 @@ public class ManagementTaskService {
         if (task.getTaskType() == TaskType.METADATA_REFRESH) {
             for (ManagementTaskItem item : items) {
                 if (item.getOperationType() != TaskType.METADATA_REFRESH
-                        || !"COMIC".equals(item.getTargetType())) {
+                        || !TARGET_TYPE_COMIC.equals(item.getTargetType())) {
                     continue;
                 }
                 int casRows = comicMapper.update(null, new LambdaUpdateWrapper<Comic>()
@@ -468,10 +483,10 @@ public class ManagementTaskService {
         if (operation == null || !COMMAND_OPS.contains(operation)) {
             return;
         }
-        Long manifestTaskId = "TRASH_MANIFEST".equals(item.getResultRefType())
+        Long manifestTaskId = RESULT_REF_TYPE_TRASH_MANIFEST.equals(item.getResultRefType())
                 ? item.getResultRefId() : null;
-        var event = new com.comicatlas.common.event.ManagementCommandRequestedEvent(
-                java.util.UUID.randomUUID(), java.time.Instant.now(), 1,
+        ManagementCommandRequestedEvent event = new ManagementCommandRequestedEvent(
+                UUID.randomUUID(), Instant.now(), INITIAL_ATTEMPT,
                 taskId, item.getId(), newAttempt,
                 operation.name(), item.getTargetType(), item.getTargetId(), manifestTaskId);
         outboxService.enqueue(event, MqExchanges.MANAGEMENT, MqRoutingKeys.COMMAND_REQUESTED,
@@ -503,8 +518,8 @@ public class ManagementTaskService {
                 .set(ExportTask::getErrorMsg, null)
                 .set(ExportTask::getCompletedAt, null));
 
-        var event = new ExportTaskCreatedEvent(
-                java.util.UUID.randomUUID(), java.time.Instant.now(),
+        ExportTaskCreatedEvent event = new ExportTaskCreatedEvent(
+                UUID.randomUUID(), Instant.now(),
                 exportTask.getId(), exportTask.getComicId());
         outboxService.enqueue(event, MqExchanges.EXPORT, MqRoutingKeys.TASK_CREATED,
                 taskId, item.getId(), newAttempt);
@@ -524,9 +539,9 @@ public class ManagementTaskService {
         if (item.getOperationType() != TaskType.IMPORT) {
             return;
         }
-        com.comicatlas.api.importer.entity.ImportTask importTask = importTaskMapper.selectOne(
-                new LambdaQueryWrapper<com.comicatlas.api.importer.entity.ImportTask>()
-                        .eq(com.comicatlas.api.importer.entity.ImportTask::getManagementTaskId, taskId));
+        ImportTask importTask = importTaskMapper.selectOne(
+                new LambdaQueryWrapper<ImportTask>()
+                        .eq(ImportTask::getManagementTaskId, taskId));
         if (importTask == null) {
             log.warn("导入任务不存在，跳过导入重试入队: taskId={}, itemId={}", taskId, item.getId());
             return;
@@ -546,7 +561,7 @@ public class ManagementTaskService {
     }
 
     /** 统一命令管线操作类型集合。 */
-    private static final java.util.Set<TaskType> COMMAND_OPS = java.util.Set.of(
+    private static final Set<TaskType> COMMAND_OPS = Set.of(
             TaskType.LQ_GENERATE, TaskType.LQ_REGENERATE, TaskType.HQ_DELETE,
             TaskType.TRANSCODE, TaskType.METADATA_REFRESH, TaskType.COMIC_DELETE,
             TaskType.MEDIA_UPLOAD, TaskType.MEDIA_REPLACE, TaskType.MEDIA_TRASH,
@@ -707,8 +722,8 @@ public class ManagementTaskService {
                 .eq(ManagementTaskItem::getId, itemId)
                 .set(ManagementTaskItem::getProgress, progress)
                 .set(ManagementTaskItem::getUpdatedAt, LocalDateTime.now());
-        boolean started = item.getStatus() == ManagementTaskStatus.QUEUED;
-        if (started) {
+        boolean isStarted = item.getStatus() == ManagementTaskStatus.QUEUED;
+        if (isStarted) {
             updateWrapper.set(ManagementTaskItem::getStatus, ManagementTaskStatus.RUNNING);
             if (item.getStartedAt() == null) {
                 updateWrapper.set(ManagementTaskItem::getStartedAt, LocalDateTime.now());
@@ -716,7 +731,7 @@ public class ManagementTaskService {
         }
         itemMapper.update(null, updateWrapper);
 
-        if (started) {
+        if (isStarted) {
             aggregateTaskStatus(item.getTaskId());
         }
         return true;
@@ -792,14 +807,16 @@ public class ManagementTaskService {
                         .eq(ManagementTaskItem::getTaskId, taskId));
 
         ManagementTask task = taskMapper.selectById(taskId);
-        if (task == null) { return; }
+        if (task == null) {
+            return;
+        }
 
         long successCount = items.stream()
-                .filter(i -> i.getStatus() == ManagementTaskStatus.SUCCEEDED).count();
+                .filter(item -> item.getStatus() == ManagementTaskStatus.SUCCEEDED).count();
         long failureCount = items.stream()
-                .filter(i -> i.getStatus() == ManagementTaskStatus.FAILED).count();
+                .filter(item -> item.getStatus() == ManagementTaskStatus.FAILED).count();
         long cancelledCount = items.stream()
-                .filter(i -> i.getStatus() == ManagementTaskStatus.CANCELLED).count();
+                .filter(item -> item.getStatus() == ManagementTaskStatus.CANCELLED).count();
 
         task.setSuccessCount((int) successCount);
         task.setFailureCount((int) failureCount);
@@ -814,10 +831,10 @@ public class ManagementTaskService {
 
         // 聚合状态
         boolean hasRunning = items.stream()
-                .anyMatch(i -> i.getStatus() == ManagementTaskStatus.RUNNING
-                        || i.getStatus() == ManagementTaskStatus.CANCELLING);
+                .anyMatch(item -> item.getStatus() == ManagementTaskStatus.RUNNING
+                        || item.getStatus() == ManagementTaskStatus.CANCELLING);
         boolean hasQueued = items.stream()
-                .anyMatch(i -> i.getStatus() == ManagementTaskStatus.QUEUED);
+                .anyMatch(item -> item.getStatus() == ManagementTaskStatus.QUEUED);
 
         // 如果主任务正在取消中，且没有 running/queued 项了，标记为 CANCELLED
         if (task.getStatus() == ManagementTaskStatus.CANCELLING && !hasRunning && !hasQueued) {
@@ -854,9 +871,9 @@ public class ManagementTaskService {
         String aggregatedError = task.getStatus() == ManagementTaskStatus.FAILED
                 || task.getStatus() == ManagementTaskStatus.PARTIALLY_SUCCEEDED
                 ? items.stream()
-                        .filter(i -> i.getStatus() == ManagementTaskStatus.FAILED)
+                        .filter(item -> item.getStatus() == ManagementTaskStatus.FAILED)
                         .map(ManagementTaskItem::getErrorMessage)
-                        .filter(msg -> msg != null && !msg.isBlank())
+                        .filter(message -> message != null && !message.isBlank())
                         .findFirst()
                         .orElse(null)
                 : null;
@@ -868,28 +885,28 @@ public class ManagementTaskService {
     // ======================== 辅助方法 ========================
 
     private ManagementTaskResponse toResponse(ManagementTask task) {
-        ManagementTaskResponse resp = new ManagementTaskResponse();
-        resp.setId(task.getId());
-        resp.setTaskType(task.getTaskType());
-        resp.setOperation(task.getOperation());
-        resp.setTargetType(task.getTargetType());
-        resp.setBatchId(task.getBatchId());
-        resp.setBatch(task.getBatch());
-        resp.setStatus(task.getStatus());
-        resp.setStage(task.getStage());
-        resp.setProgress(task.getProgress());
-        resp.setTotalCount(task.getTotalCount());
-        resp.setSuccessCount(task.getSuccessCount());
-        resp.setFailureCount(task.getFailureCount());
-        resp.setCancelledCount(task.getCancelledCount());
-        resp.setErrorMessage(task.getErrorMessage());
-        resp.setAttempt(task.getAttempt());
-        resp.setVersion(task.getVersion());
-        resp.setCreatedAt(task.getCreatedAt());
-        resp.setUpdatedAt(task.getUpdatedAt());
-        resp.setStartedAt(task.getStartedAt());
-        resp.setCompletedAt(task.getCompletedAt());
-        return resp;
+        ManagementTaskResponse response = new ManagementTaskResponse();
+        response.setId(task.getId());
+        response.setTaskType(task.getTaskType());
+        response.setOperation(task.getOperation());
+        response.setTargetType(task.getTargetType());
+        response.setBatchId(task.getBatchId());
+        response.setBatch(task.getBatch());
+        response.setStatus(task.getStatus());
+        response.setStage(task.getStage());
+        response.setProgress(task.getProgress());
+        response.setTotalCount(task.getTotalCount());
+        response.setSuccessCount(task.getSuccessCount());
+        response.setFailureCount(task.getFailureCount());
+        response.setCancelledCount(task.getCancelledCount());
+        response.setErrorMessage(task.getErrorMessage());
+        response.setAttempt(task.getAttempt());
+        response.setVersion(task.getVersion());
+        response.setCreatedAt(task.getCreatedAt());
+        response.setUpdatedAt(task.getUpdatedAt());
+        response.setStartedAt(task.getStartedAt());
+        response.setCompletedAt(task.getCompletedAt());
+        return response;
     }
 
     private void enrichTargetSummaries(List<ManagementTask> tasks,
@@ -912,7 +929,7 @@ public class ManagementTaskService {
         }
         Map<Long, Comic> comics = new HashMap<>();
         List<Long> comicIds = firstItemByTaskId.values().stream()
-                .filter(item -> "COMIC".equals(item.getTargetType()))
+                .filter(item -> TARGET_TYPE_COMIC.equals(item.getTargetType()))
                 .map(ManagementTaskItem::getTargetId)
                 .distinct()
                 .toList();
@@ -933,24 +950,24 @@ public class ManagementTaskService {
     }
 
     private ManagementTaskItemResponse toItemResponse(ManagementTaskItem item) {
-        ManagementTaskItemResponse resp = new ManagementTaskItemResponse();
-        resp.setId(item.getId());
-        resp.setTaskId(item.getTaskId());
-        resp.setTargetType(item.getTargetType());
-        resp.setTargetId(item.getTargetId());
-        resp.setOperationType(item.getOperationType());
-        resp.setStatus(item.getStatus());
-        resp.setAttempt(item.getAttempt());
-        resp.setProgress(item.getProgress());
-        resp.setResultRefType(item.getResultRefType());
-        resp.setResultRefId(item.getResultRefId());
-        resp.setErrorMessage(item.getErrorMessage());
-        resp.setVersion(item.getVersion());
-        resp.setCreatedAt(item.getCreatedAt());
-        resp.setUpdatedAt(item.getUpdatedAt());
-        resp.setStartedAt(item.getStartedAt());
-        resp.setCompletedAt(item.getCompletedAt());
-        return resp;
+        ManagementTaskItemResponse response = new ManagementTaskItemResponse();
+        response.setId(item.getId());
+        response.setTaskId(item.getTaskId());
+        response.setTargetType(item.getTargetType());
+        response.setTargetId(item.getTargetId());
+        response.setOperationType(item.getOperationType());
+        response.setStatus(item.getStatus());
+        response.setAttempt(item.getAttempt());
+        response.setProgress(item.getProgress());
+        response.setResultRefType(item.getResultRefType());
+        response.setResultRefId(item.getResultRefId());
+        response.setErrorMessage(item.getErrorMessage());
+        response.setVersion(item.getVersion());
+        response.setCreatedAt(item.getCreatedAt());
+        response.setUpdatedAt(item.getUpdatedAt());
+        response.setStartedAt(item.getStartedAt());
+        response.setCompletedAt(item.getCompletedAt());
+        return response;
     }
 
     private static String sha256(String input) {
@@ -958,8 +975,8 @@ public class ManagementTaskService {
             MessageDigest messageDigest = MessageDigest.getInstance("SHA-256");
             byte[] hash = messageDigest.digest(input.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(hash);
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("SHA-256 不可用", e);
+        } catch (NoSuchAlgorithmException ex) {
+            throw new BusinessException("SHA-256 不可用", ex);
         }
     }
 }

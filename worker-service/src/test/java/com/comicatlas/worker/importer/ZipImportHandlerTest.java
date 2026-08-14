@@ -3,6 +3,7 @@ package com.comicatlas.worker.importer;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.file.extract.ZipExtractor;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,6 +49,7 @@ class ZipImportHandlerTest {
 
     private ZipExtractor zipExtractor;
     private DirectoryImportHandler directoryHandler;
+    private WorkerConfig config;
     private ZipImportHandler handler;
     private ListAppender<ILoggingEvent> logAppender;
 
@@ -55,7 +57,8 @@ class ZipImportHandlerTest {
     void setUp() {
         zipExtractor = mock(ZipExtractor.class);
         directoryHandler = mock(DirectoryImportHandler.class);
-        handler = new ZipImportHandler(zipExtractor, directoryHandler);
+        config = new WorkerConfig();
+        handler = new ZipImportHandler(zipExtractor, config, directoryHandler);
 
         Logger logger = (Logger) LoggerFactory.getLogger(ZipImportHandler.class);
         logAppender = new ListAppender<>();
@@ -76,6 +79,7 @@ class ZipImportHandlerTest {
         Path zip = mangaRoot.resolve("下载/漫画.zip");
         Files.createDirectories(zip.getParent());
         Files.writeString(zip, "zip-bytes");
+        config.setTempDir(mangaRoot.resolve("temp").toString());
         Path extractDir = mangaRoot.resolve("temp").resolve(String.valueOf(TASK_ID)).resolve("extracted");
         Path metadata = extractDir.resolve("metadata.json");
 
@@ -108,6 +112,7 @@ class ZipImportHandlerTest {
         Path zip = mangaRoot.resolve("私人下载/绝密漫画.zip");
         Files.createDirectories(zip.getParent());
         Files.writeString(zip, "zip");
+        config.setTempDir(mangaRoot.resolve("temp").toString());
 
         IOException cause = new IOException("解压失败: 声明 size 与实读字节不一致: page.bin");
         when(zipExtractor.extract(eq(zip), any())).thenThrow(cause);
@@ -135,6 +140,7 @@ class ZipImportHandlerTest {
         Path zip = mangaRoot.resolve("锁.zip");
         Files.createDirectories(zip.getParent());
         Files.writeString(zip, "zip");
+        config.setTempDir(mangaRoot.resolve("temp").toString());
 
         // 预置一个被 Windows 锁定的临时文件（RandomAccessFile 打开时不共享删除）
         Path taskTemp = mangaRoot.resolve("temp").resolve(String.valueOf(TASK_ID));

@@ -18,6 +18,7 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Enumeration;
@@ -47,6 +48,7 @@ public class ZipBuilder {
 
     private static final String METADATA_FILE = "metadata.json";
     private static final int COPY_BUFFER_SIZE = 64 * 1024;
+    private static final int MAX_LOG_PATHS = 10;
 
     private final WorkerConfig workerConfig;
 
@@ -68,7 +70,7 @@ public class ZipBuilder {
                 return buildSplit(manifest, outputPath);
             }
             return buildSingle(manifest, outputPath);
-        } catch (Exception e) {
+        } catch (IOException | RuntimeException e) {
             deleteRecursively(stagingDir);
             throw e;
         }
@@ -157,14 +159,15 @@ public class ZipBuilder {
         }
 
         String prefix = manifest.rootDirName() + "/";
-        Set<String> expectedNames = new HashSet<>();
+        int expectedSize = manifest.entries().size() + 1;
+        Set<String> expectedNames = new HashSet<>(expectedSize);
         expectedNames.add(prefix + METADATA_FILE);
         for (ExportManifest.Entry entry : manifest.entries()) {
             expectedNames.add(prefix + entry.targetPath());
         }
 
         try (ZipFile zipFile = openZipFile(volumes)) {
-            Set<String> actualNames = new HashSet<>();
+            Set<String> actualNames = new HashSet<>(expectedSize);
             Enumeration<ZipArchiveEntry> entries = zipFile.getEntries();
             while (entries.hasMoreElements()) {
                 actualNames.add(entries.nextElement().getName());
@@ -220,17 +223,23 @@ public class ZipBuilder {
             throw new IOException("ZIP 回读校验失败：条目长度不一致 name=" + name
                     + ", stored=" + zipEntry.getSize() + ", expected=" + entry.sourceSize());
         }
-        long sourceCrc = crc32(Files.newInputStream(entry.sourceFile()));
+        long sourceCrc;
+        try (InputStream sourceIn = Files.newInputStream(entry.sourceFile())) {
+            sourceCrc = calculateCrc32(sourceIn);
+        }
         if (zipEntry.getCrc() != sourceCrc) {
             throw new IOException("ZIP 回读校验失败：条目 CRC 与源文件不一致 name=" + name);
         }
-        long readCrc = crc32(zipFile.getInputStream(zipEntry));
+        long readCrc;
+        try (InputStream storedIn = zipFile.getInputStream(zipEntry)) {
+            readCrc = calculateCrc32(storedIn);
+        }
         if (readCrc != zipEntry.getCrc()) {
             throw new IOException("ZIP 回读校验失败：条目读回 CRC 与存储 CRC 不一致 name=" + name);
         }
     }
 
-    private static long crc32(InputStream in) throws IOException {
+    private static long calculateCrc32(InputStream in) throws IOException {
         CRC32 crc = new CRC32();
         byte[] buffer = new byte[COPY_BUFFER_SIZE];
         int read;
@@ -244,16 +253,26 @@ public class ZipBuilder {
         if (dir == null || !Files.exists(dir, LinkOption.NOFOLLOW_LINKS)) {
             return;
         }
+        List<Path> undeleted = new ArrayList<>();
+        IOException[] firstFailure = new IOException[1];
         try (var walk = Files.walk(dir)) {
             walk.sorted(Comparator.reverseOrder()).forEach(path -> {
                 try {
                     Files.deleteIfExists(path);
                 } catch (IOException e) {
-                    log.warn("清理 staging 目录失败: {}", path, e);
+                    if (firstFailure[0] == null) {
+                        firstFailure[0] = e;
+                    }
+                    undeleted.add(path);
                 }
             });
         } catch (IOException e) {
             log.warn("清理 staging 目录失败: {}", dir, e);
+            return;
+        }
+        if (!undeleted.isEmpty()) {
+            log.warn("清理 staging 目录失败，共 {} 个文件未删除，示例: {}，首个失败原因: {}",
+                    undeleted.size(), undeleted.stream().limit(MAX_LOG_PATHS).toList(), firstFailure[0]);
         }
     }
 }
