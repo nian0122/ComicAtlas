@@ -10,12 +10,12 @@ import com.comicatlas.persistence.comic.entity.Media;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.persistence.comic.mapper.MediaMapper;
+import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.event.MetadataRefreshEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -24,7 +24,7 @@ import java.util.List;
  * Media 元信息同步服务（存储操作域）。
  * <p>
  * 转码等操作导致 media 元信息变更后，负责：刷新章节/漫画统计、失效目录缓存、
- * 触发 metadata.json 重导出（发 metadata.refresh.requested MQ）。
+ * 触发 metadata.json 重导出（metadata.refresh.requested 事件走 Outbox，与业务同事务）。
  */
 @Slf4j
 @Service
@@ -35,7 +35,7 @@ public class MediaMetadataSyncService {
     private final ChapterMapper chapterMapper;
     private final ComicMapper comicMapper;
     private final CatalogCacheInvalidator catalogCacheInvalidator;
-    private final RabbitTemplate rabbitTemplate;
+    private final OutboxService outboxService;
 
     /**
      * 转码完成后同步：更新漫画/章节统计并触发 metadata.json 重导出。
@@ -65,16 +65,17 @@ public class MediaMetadataSyncService {
         publishMetadataRefresh(comicId, taskId, "taskId=" + taskId);
     }
 
-    /** 失效目录缓存并发送 metadata.refresh.requested，委托 Worker 重导出 metadata.json。 */
+    /**
+     * 失效目录缓存并发送 metadata.refresh.requested（Outbox 入箱，由 relay 异步发布）。
+     * <p>
+     * 与业务同事务写入 outbox_message，保证 DB 变更与消息发布的最终一致性；
+     * 禁止吞异常——Outbox 写入失败必须向上传播，由调用方决定重试/死信策略。
+     */
     private void publishMetadataRefresh(Long comicId, Long taskId, String source) {
         catalogCacheInvalidator.evict(comicId);
-        try {
-            rabbitTemplate.convertAndSend(MqExchanges.EXPORT, MqRoutingKeys.METADATA_REFRESH_REQUESTED,
-                    new MetadataRefreshEvent(null, null, comicId));
-            log.info("转码后元数据同步已触发: comicId={}, taskId={}, source={}", comicId, taskId, source);
-        } catch (Exception e) {
-            log.warn("发送 metadata 刷新 MQ 消息失败: comicId={}", comicId, e);
-        }
+        outboxService.enqueue(new MetadataRefreshEvent(null, null, comicId),
+                MqExchanges.EXPORT, MqRoutingKeys.METADATA_REFRESH_REQUESTED);
+        log.info("转码后元数据同步已触发（Outbox）: comicId={}, taskId={}, source={}", comicId, taskId, source);
     }
 
     /** 整本统计聚合（一次性）：各章节页数、漫画总页数与整本 HQ 大小。 */
