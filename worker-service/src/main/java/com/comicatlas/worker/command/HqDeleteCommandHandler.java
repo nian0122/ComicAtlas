@@ -15,7 +15,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * HQ 删除命令处理器（新 envelope 路由）。
@@ -48,26 +49,31 @@ public class HqDeleteCommandHandler {
 
     public void deleteComic(ManagementCommandRequestedEvent cmd) {
         Long comicId = cmd.targetId();
+        // selectByComicId 一次性取回全部页数据后按章节分组复用实体，
+        // 避免在循环内对每个章节重复 selectByChapterId（N+1）
         List<ExportMedia> pages = mediaMapper.selectByComicId(comicId);
-        List<Long> chapterIds = pages.stream()
-                .map(ExportMedia::getChapterId)
-                .filter(Objects::nonNull)
-                .distinct()
-                .toList();
-        if (chapterIds.isEmpty()) {
+        Map<Long, List<ExportMedia>> pagesByChapter = pages.stream()
+                .filter(page -> page.getChapterId() != null)
+                .collect(Collectors.groupingBy(ExportMedia::getChapterId));
+        if (pagesByChapter.isEmpty()) {
             publisher.failed(cmd, "漫画无页面: " + comicId);
             return;
         }
+        StorageRoot hqRoot = storageProperties.getRoots().get("HQ");
+        if (hqRoot == null) {
+            publisher.failed(cmd, "HQ 存储根未配置");
+            return;
+        }
         List<Long> failedChapters = new ArrayList<>();
-        for (Long chapterId : chapterIds) {
-            if (!processChapter(chapterId)) {
+        pagesByChapter.forEach((chapterId, chapterPages) -> {
+            if (!deleteChapterFiles(comicId, chapterId, chapterPages, hqRoot)) {
                 failedChapters.add(chapterId);
             }
-        }
+        });
         if (failedChapters.isEmpty()) {
             publisher.progress(cmd, 100, "HQ 删除完成");
             publisher.completed(cmd);
-            log.info("HQ 删除命令完成（漫画）: comicId={}, chapters={}", comicId, chapterIds.size());
+            log.info("HQ 删除命令完成（漫画）: comicId={}, chapters={}", comicId, pagesByChapter.size());
         } else {
             publisher.failed(cmd, "HQ 删除失败章节: " + failedChapters);
         }
@@ -84,6 +90,11 @@ public class HqDeleteCommandHandler {
         if (comicId == null || hqRoot == null) {
             return false;
         }
+        return deleteChapterFiles(comicId, chapterId, pages, hqRoot);
+    }
+
+    /** 删除单个章节的全部 HQ 文件与章节目录，返回是否成功。 */
+    private boolean deleteChapterFiles(Long comicId, Long chapterId, List<ExportMedia> pages, StorageRoot hqRoot) {
         for (ExportMedia page : pages) {
             if (page.getHqPath() == null || page.getHqPath().isBlank()) {
                 continue;
