@@ -1,8 +1,5 @@
 package com.comicatlas.api.importer.service.impl;
 
-import com.comicatlas.contract.common.constant.HttpStatusCodes;
-import com.comicatlas.contract.common.enums.DirectoryScanTaskStatus;
-import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.importer.dto.DirectoryScanTaskVO;
 import com.comicatlas.api.importer.entity.DirectoryScanTask;
 import com.comicatlas.api.importer.mapper.DirectoryScanTaskMapper;
@@ -10,15 +7,20 @@ import com.comicatlas.api.importer.service.DirectoryScanTaskService;
 import com.comicatlas.api.management.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
+import com.comicatlas.api.management.entity.ManagementTaskItem;
 import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
+import com.comicatlas.common.dto.ScanResultDTO;
 import com.comicatlas.common.event.DirectoryScanRequestedEvent;
+import com.comicatlas.contract.common.constant.HttpStatusCodes;
+import com.comicatlas.contract.common.enums.DirectoryScanTaskStatus;
 import com.comicatlas.contract.common.enums.ManagementTaskStatus;
 import com.comicatlas.contract.common.enums.TaskType;
+import com.comicatlas.contract.common.exception.BusinessException;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.comicatlas.common.dto.ScanResultDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -33,6 +35,13 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class DirectoryScanTaskServiceImpl implements DirectoryScanTaskService {
+
+    /** 管理任务目标类型：系统级扫描任务。 */
+    private static final String TARGET_TYPE_SYSTEM = "SYSTEM";
+    /** 管理任务操作描述：目录扫描。 */
+    private static final String SCAN_OPERATION = "目录扫描";
+    /** 结果引用类型：扫描任务自身（统一任务项定位扫描任务）。 */
+    private static final String RESULT_REF_TYPE_SCAN_TASK = "SCAN_TASK";
 
     private final DirectoryScanTaskMapper scanTaskMapper;
     private final OutboxService outboxService;
@@ -54,14 +63,12 @@ public class DirectoryScanTaskServiceImpl implements DirectoryScanTaskService {
         scanTaskMapper.insert(task);
 
         // 同事务创建统一扫描任务并回填 management_task_id
-        ManagementTaskResponse mgmtResp = createManagementTaskForScan(task.getId());
-        task.setManagementTaskId(mgmtResp.getId());
+        ManagementTaskResponse managementResponse = createManagementTaskForScan(task.getId());
+        task.setManagementTaskId(managementResponse.getId());
         scanTaskMapper.updateById(task);
 
         Long taskId = task.getId();
-        // 写入 Outbox（同事务），由 relay 异步发布，保证 DB 与消息一致
-        outboxService.enqueue(new DirectoryScanRequestedEvent(UUID.randomUUID(), Instant.now(), taskId, directoryPath),
-                MqExchanges.SCAN, MqRoutingKeys.SCAN_REQUESTED);
+        enqueueScanRequested(taskId, directoryPath);
 
         log.info("目录扫描任务创建: taskId={}, directoryPath={}", taskId, directoryPath);
         return toVO(task);
@@ -100,44 +107,46 @@ public class DirectoryScanTaskServiceImpl implements DirectoryScanTaskService {
         }
 
         Long taskId = task.getId();
-        String directoryPath = task.getDirectoryPath();
-        // 写入 Outbox（同事务），由 relay 异步发布
-        outboxService.enqueue(new DirectoryScanRequestedEvent(UUID.randomUUID(), Instant.now(), taskId, directoryPath),
-                MqExchanges.SCAN, MqRoutingKeys.SCAN_REQUESTED);
+        enqueueScanRequested(taskId, task.getDirectoryPath());
 
         log.info("目录扫描任务重试: taskId={}", taskId);
         return toVO(task);
     }
 
     private DirectoryScanTaskVO toVO(DirectoryScanTask task) {
-        DirectoryScanTaskVO vo = new DirectoryScanTaskVO();
-        vo.setId(task.getId());
-        vo.setStatus(task.getStatus() == null ? null : task.getStatus().name());
-        vo.setDirectoryPath(task.getDirectoryPath());
-        vo.setTotalItems(task.getTotalItems());
-        vo.setErrorMessage(task.getErrorMessage());
-        vo.setRetryCount(task.getRetryCount());
-        vo.setCreatedAt(task.getCreatedAt());
-        vo.setStartedAt(task.getStartedAt());
-        vo.setEndedAt(task.getEndedAt());
+        DirectoryScanTaskVO viewObject = new DirectoryScanTaskVO();
+        viewObject.setId(task.getId());
+        viewObject.setStatus(task.getStatus() == null ? null : task.getStatus().name());
+        viewObject.setDirectoryPath(task.getDirectoryPath());
+        viewObject.setTotalItems(task.getTotalItems());
+        viewObject.setErrorMessage(task.getErrorMessage());
+        viewObject.setRetryCount(task.getRetryCount());
+        viewObject.setCreatedAt(task.getCreatedAt());
+        viewObject.setStartedAt(task.getStartedAt());
+        viewObject.setEndedAt(task.getEndedAt());
         if (task.getResultJson() != null && !task.getResultJson().isBlank()) {
             try {
-                vo.setResult(objectMapper.readValue(task.getResultJson(), ScanResultDTO.class));
-            } catch (Exception e) {
+                viewObject.setResult(objectMapper.readValue(task.getResultJson(), ScanResultDTO.class));
+            } catch (JsonProcessingException | IllegalArgumentException e) {
                 log.warn("扫描结果 JSON 解析失败: taskId={}", task.getId(), e);
             }
         }
-        return vo;
+        return viewObject;
     }
 
+    @Override
+    @Transactional
     public void applyResult(Long taskId, ScanResultDTO result) {
         DirectoryScanTask task = scanTaskMapper.selectById(taskId);
-        if (task == null) { return; }
+        if (task == null) {
+            log.warn("扫描结果回写跳过：任务不存在 taskId={}", taskId);
+            return;
+        }
         task.setStatus(DirectoryScanTaskStatus.SUCCESS);
         task.setTotalItems(result.total());
         try {
             task.setResultJson(objectMapper.writeValueAsString(result));
-        } catch (Exception e) {
+        } catch (JsonProcessingException e) {
             log.error("扫描结果 JSON 序列化失败: taskId={}", taskId, e);
             task.setStatus(DirectoryScanTaskStatus.FAILED);
             task.setErrorMessage("扫描结果序列化失败: " + e.getMessage());
@@ -151,9 +160,14 @@ public class DirectoryScanTaskServiceImpl implements DirectoryScanTaskService {
         syncScanItem(taskId, status, task.getErrorMessage());
     }
 
+    @Override
+    @Transactional
     public void applyFailure(Long taskId, String errorMessage) {
         DirectoryScanTask task = scanTaskMapper.selectById(taskId);
-        if (task == null) { return; }
+        if (task == null) {
+            log.warn("扫描失败回写跳过：任务不存在 taskId={}", taskId);
+            return;
+        }
         task.setStatus(DirectoryScanTaskStatus.FAILED);
         task.setErrorMessage(errorMessage);
         task.setEndedAt(LocalDateTime.now());
@@ -163,29 +177,38 @@ public class DirectoryScanTaskServiceImpl implements DirectoryScanTaskService {
         syncScanItem(taskId, ManagementTaskStatus.FAILED, errorMessage);
     }
 
+    /** 写入扫描请求到 Outbox（同事务），由 relay 异步发布。 */
+    private void enqueueScanRequested(Long taskId, String directoryPath) {
+        outboxService.enqueue(
+                new DirectoryScanRequestedEvent(UUID.randomUUID(), Instant.now(), taskId, directoryPath),
+                MqExchanges.SCAN, MqRoutingKeys.SCAN_REQUESTED);
+    }
+
     /**
      * 同事务创建统一扫描任务并返回其响应（target = SYSTEM:scanTaskId）。
      */
     private ManagementTaskResponse createManagementTaskForScan(Long scanTaskId) {
-        CreateManagementTaskRequest mgmtReq = new CreateManagementTaskRequest();
-        mgmtReq.setTaskType(TaskType.DIRECTORY_SCAN);
-        mgmtReq.setOperation("目录扫描");
-        mgmtReq.setTargetType("SYSTEM");
+        CreateManagementTaskRequest managementTaskRequest = new CreateManagementTaskRequest();
+        managementTaskRequest.setTaskType(TaskType.DIRECTORY_SCAN);
+        managementTaskRequest.setOperation(SCAN_OPERATION);
+        managementTaskRequest.setTargetType(TARGET_TYPE_SYSTEM);
         CreateManagementTaskRequest.TaskTarget target = new CreateManagementTaskRequest.TaskTarget();
-        target.setTargetType("SYSTEM");
+        target.setTargetType(TARGET_TYPE_SYSTEM);
         target.setTargetId(scanTaskId);
         target.setOperationType(TaskType.DIRECTORY_SCAN);
-        mgmtReq.setTargets(List.of(target));
-        return managementTaskService.createTask(mgmtReq, null, null);
+        managementTaskRequest.setTargets(List.of(target));
+        return managementTaskService.createTask(managementTaskRequest, null, null);
     }
 
     /**
      * 同步统一扫描任务项状态；无活跃项时跳过（终态/旧事件幂等）。
      */
     private ManagementTaskItemResponse syncScanItem(Long scanTaskId, ManagementTaskStatus status, String errorMessage) {
-        var item = managementTaskService.findActiveItem("SYSTEM", scanTaskId, TaskType.DIRECTORY_SCAN);
+        ManagementTaskItem item = managementTaskService.findActiveItem(
+                TARGET_TYPE_SYSTEM, scanTaskId, TaskType.DIRECTORY_SCAN);
         if (item != null) {
-            return managementTaskService.updateItemStatus(item.getId(), status, errorMessage, "SCAN_TASK", scanTaskId);
+            return managementTaskService.updateItemStatus(
+                    item.getId(), status, errorMessage, RESULT_REF_TYPE_SCAN_TASK, scanTaskId);
         }
         return null;
     }

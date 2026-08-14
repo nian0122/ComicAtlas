@@ -2,24 +2,7 @@ package com.comicatlas.api.management.event;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.comicatlas.persistence.comic.entity.Chapter;
-import com.comicatlas.persistence.comic.entity.Comic;
-import com.comicatlas.persistence.comic.entity.Media;
-import com.comicatlas.persistence.comic.mapper.CatalogMapper;
-import com.comicatlas.persistence.comic.mapper.ChapterMapper;
-import com.comicatlas.persistence.comic.mapper.ComicMapper;
-import com.comicatlas.persistence.comic.mapper.ComicTagMapper;
-import com.comicatlas.persistence.comic.mapper.MediaMapper;
-import com.comicatlas.contract.common.enums.ComicStatus;
-import com.comicatlas.contract.common.enums.HqStatus;
-import com.comicatlas.contract.common.enums.LqStatus;
-import com.comicatlas.contract.common.enums.ManagementTaskStatus;
-import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
-import com.comicatlas.contract.common.enums.TaskType;
-import com.comicatlas.contract.common.enums.TranscodeStatus;
-import com.comicatlas.contract.common.exception.BusinessException;
-import com.comicatlas.contract.common.exception.SnapshotUnavailableException;
-import com.comicatlas.persistence.storage.ApiStorageProperties;
+import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.management.entity.ManagementTaskItem;
 import com.comicatlas.api.management.mapper.ManagementTaskItemMapper;
@@ -27,17 +10,19 @@ import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.management.trash.TrashManifestService;
 import com.comicatlas.api.outbox.service.InboxService;
 import com.comicatlas.api.outbox.service.OutboxService;
-import com.comicatlas.persistence.reader.entity.ReadingHistory;
-import com.comicatlas.persistence.reader.mapper.ReadingHistoryMapper;
 import com.comicatlas.api.storage.service.MediaMetadataSyncService;
 import com.comicatlas.api.storage.service.MetadataRefreshService;
 import com.comicatlas.api.storage.service.MetadataRefreshService.MetadataRefreshLoadRequest;
+import com.comicatlas.api.upload.UploadSessionService;
+import com.comicatlas.api.upload.UploadSessionStatus;
+import com.comicatlas.api.upload.entity.UploadSession;
+import com.comicatlas.api.upload.mapper.UploadSessionMapper;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.constant.MqRoutingKeys;
+import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO;
 import com.comicatlas.common.dto.TrashManifestItemDTO;
-import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.common.event.ComicEvent;
 import com.comicatlas.common.event.ManagementCommandCompletedEvent;
 import com.comicatlas.common.event.ManagementCommandFailedEvent;
@@ -48,10 +33,29 @@ import com.comicatlas.common.event.MetadataRefreshEvent;
 import com.comicatlas.common.event.MetadataRefreshScanCompletedEvent;
 import com.comicatlas.common.event.payload.TranscodeMediaInfo;
 import com.comicatlas.common.mq.MqConsumerSupport;
-import com.comicatlas.api.upload.UploadSessionService;
-import com.comicatlas.api.upload.UploadSessionStatus;
-import com.comicatlas.api.upload.entity.UploadSession;
-import com.comicatlas.api.upload.mapper.UploadSessionMapper;
+import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
+import com.comicatlas.contract.common.enums.ComicStatus;
+import com.comicatlas.contract.common.enums.HqStatus;
+import com.comicatlas.contract.common.enums.LqStatus;
+import com.comicatlas.contract.common.enums.ManagementTaskStatus;
+import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
+import com.comicatlas.contract.common.enums.TaskType;
+import com.comicatlas.contract.common.enums.TranscodeStatus;
+import com.comicatlas.contract.common.exception.BusinessException;
+import com.comicatlas.contract.common.exception.SnapshotUnavailableException;
+import com.comicatlas.persistence.comic.entity.Catalog;
+import com.comicatlas.persistence.comic.entity.Chapter;
+import com.comicatlas.persistence.comic.entity.Comic;
+import com.comicatlas.persistence.comic.entity.ComicTag;
+import com.comicatlas.persistence.comic.entity.Media;
+import com.comicatlas.persistence.comic.mapper.CatalogMapper;
+import com.comicatlas.persistence.comic.mapper.ChapterMapper;
+import com.comicatlas.persistence.comic.mapper.ComicMapper;
+import com.comicatlas.persistence.comic.mapper.ComicTagMapper;
+import com.comicatlas.persistence.comic.mapper.MediaMapper;
+import com.comicatlas.persistence.reader.entity.ReadingHistory;
+import com.comicatlas.persistence.reader.mapper.ReadingHistoryMapper;
+import com.comicatlas.persistence.storage.ApiStorageProperties;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.Channel;
@@ -71,9 +75,11 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Stream;
 
 /**
  * 管理命令结果事件处理器（Worker → API）。
@@ -90,6 +96,45 @@ public class ManagementCommandResultHandler {
 
     private static final Set<String> LQ_OPS = Set.of("LQ_GENERATE", "LQ_REGENERATE");
 
+    /** 命令目标类型：漫画级（批量操作展开）。 */
+    private static final String TARGET_TYPE_COMIC = "COMIC";
+
+    /** 媒体类型：图片。 */
+    private static final String MEDIA_TYPE_IMAGE = "IMAGE";
+
+    /** 媒体类型：视频。 */
+    private static final String MEDIA_TYPE_VIDEO = "VIDEO";
+
+    /** 回收卷存储根键。 */
+    private static final String ROOT_KEY_TRASH = "TRASH";
+
+    /** 暂存卷存储根键。 */
+    private static final String ROOT_KEY_STAGING = "STAGING";
+
+    /** 转码产物默认容器（事件未携带实测值时回退）。 */
+    private static final String DEFAULT_CONTAINER = "mp4";
+
+    /** 转码产物默认视频编码（事件未携带实测值时回退）。 */
+    private static final String DEFAULT_VIDEO_CODEC = "h264";
+
+    /** 转码产物默认音频编码（事件未携带实测值时回退）。 */
+    private static final String DEFAULT_AUDIO_CODEC = "aac";
+
+    /** LQ 缩略图扩展名。 */
+    private static final String LQ_EXTENSION = ".webp";
+
+    /** 转码产物扩展名。 */
+    private static final String MP4_EXTENSION = ".mp4";
+
+    /** TRASH 引用前缀（media/{mediaId}/{taskId}/hq/{original}）。 */
+    private static final String TRASH_REF_PREFIX = "media/";
+
+    /** TRASH 引用中原始 HQ 路径的分隔标记。 */
+    private static final String TRASH_HQ_MARKER = "/hq/";
+
+    /** 元数据刷新快照目录名（STAGING/metadata-refresh/{taskId}/{itemId}/{attempt}）。 */
+    private static final String METADATA_REFRESH_DIR = "metadata-refresh/";
+
     private final ManagementTaskService managementTaskService;
     private final InboxService inboxService;
     private final MediaMapper mediaMapper;
@@ -99,7 +144,7 @@ public class ManagementCommandResultHandler {
     private final ComicTagMapper comicTagMapper;
     private final ReadingHistoryMapper readingHistoryMapper;
     private final TrashManifestService trashManifestService;
-    private final com.comicatlas.api.comic.cache.CatalogCacheInvalidator catalogCacheInvalidator;
+    private final CatalogCacheInvalidator catalogCacheInvalidator;
     private final TransactionTemplate transactionTemplate;
     private final ObjectMapper objectMapper;
     private final UploadSessionMapper uploadSessionMapper;
@@ -168,12 +213,12 @@ public class ManagementCommandResultHandler {
     }
 
     private void applyCompletedBusiness(ManagementCommandCompletedEvent ev) {
-        boolean comicScope = "COMIC".equals(ev.targetType());
+        boolean comicScope = TARGET_TYPE_COMIC.equals(ev.targetType());
         switch (ev.operationType()) {
             case "LQ_GENERATE", "LQ_REGENERATE" -> {
                 if (comicScope) {
-                    for (Long chId : chapterIdsOf(ev.targetId())) {
-                        applyLqCompleted(chId);
+                    for (Long chapterId : chapterIdsOf(ev.targetId())) {
+                        applyLqCompleted(chapterId);
                     }
                 } else {
                     applyLqCompleted(ev.targetId());
@@ -181,8 +226,8 @@ public class ManagementCommandResultHandler {
             }
             case "HQ_DELETE" -> {
                 if (comicScope) {
-                    for (Long chId : chapterIdsOf(ev.targetId())) {
-                        applyHqDeleteCompleted(chId);
+                    for (Long chapterId : chapterIdsOf(ev.targetId())) {
+                        applyHqDeleteCompleted(chapterId);
                     }
                 } else {
                     applyHqDeleteCompleted(ev.targetId());
@@ -234,7 +279,7 @@ public class ManagementCommandResultHandler {
         }
         return mediaMapper.selectList(new LambdaQueryWrapper<Media>()
                         .in(Media::getChapterId, chapterIds)
-                        .eq(Media::getMediaType, "VIDEO"))
+                        .eq(Media::getMediaType, MEDIA_TYPE_VIDEO))
                 .stream()
                 .map(Media::getId)
                 .toList();
@@ -244,12 +289,12 @@ public class ManagementCommandResultHandler {
         List<Media> mediaItems = mediaMapper.selectList(
                 new LambdaQueryWrapper<Media>()
                         .eq(Media::getChapterId, chapterId)
-                        .eq(Media::getMediaType, "IMAGE"));
+                        .eq(Media::getMediaType, MEDIA_TYPE_IMAGE));
         for (Media media : mediaItems) {
             LambdaUpdateWrapper<Media> mediaUpdate = new LambdaUpdateWrapper<Media>()
                     .eq(Media::getId, media.getId())
                     .set(Media::getLqStatus, LqStatus.READY)
-                    .set(Media::getLqRoot, "LQ");
+                    .set(Media::getLqRoot, StorageRootKeys.LQ);
             String hqPath = media.getHqPath();
             if (hqPath != null && !hqPath.isBlank()) {
                 mediaUpdate.set(Media::getLqPath, deriveLqPath(hqPath));
@@ -263,7 +308,7 @@ public class ManagementCommandResultHandler {
         List<Media> mediaItems = mediaMapper.selectList(
                 new LambdaQueryWrapper<Media>()
                         .eq(Media::getChapterId, chapterId)
-                        .eq(Media::getMediaType, "IMAGE")
+                        .eq(Media::getMediaType, MEDIA_TYPE_IMAGE)
                         .in(Media::getHqStatus, HqStatus.READY, HqStatus.DELETE_QUEUED, HqStatus.DELETING, HqStatus.MISSING));
         for (Media media : mediaItems) {
             mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
@@ -295,11 +340,11 @@ public class ManagementCommandResultHandler {
                 .eq(Media::getId, mediaId)
                 .set(Media::getTranscodeStatus, TranscodeStatus.READY)
                 .set(Media::getContainer, transcode != null && transcode.container() != null
-                        ? transcode.container() : "mp4")
+                        ? transcode.container() : DEFAULT_CONTAINER)
                 .set(Media::getVideoCodec, transcode != null && transcode.videoCodec() != null
-                        ? transcode.videoCodec() : "h264")
+                        ? transcode.videoCodec() : DEFAULT_VIDEO_CODEC)
                 .set(Media::getAudioCodec, transcode != null && transcode.audioCodec() != null
-                        ? transcode.audioCodec() : "aac");
+                        ? transcode.audioCodec() : DEFAULT_AUDIO_CODEC);
         if (transcode != null) {
             if (transcode.duration() != null) {
                 mediaUpdate.set(Media::getDuration, transcode.duration());
@@ -330,7 +375,7 @@ public class ManagementCommandResultHandler {
             log.debug("转码任务仍有未完成项，跳过元数据同步: taskId={}", ev.taskId());
             return;
         }
-        if ("COMIC".equals(ev.targetType())) {
+        if (TARGET_TYPE_COMIC.equals(ev.targetType())) {
             mediaMetadataSyncService.notifyTaskTranscoded(ev.targetId(), ev.taskId());
         } else {
             mediaMetadataSyncService.notifyTranscoded(ev.targetId(), ev.taskId());
@@ -379,8 +424,8 @@ public class ManagementCommandResultHandler {
                 .set(Media::getTrashedAt, LocalDateTime.now())
                 .set(Media::getHqStatus, HqStatus.DELETED);
         if (originalHqPath != null && !originalHqPath.isBlank()) {
-            String trashRef = "media/" + mediaId + "/" + ev.taskId() + "/hq/" + originalHqPath;
-            mediaUpdate.set(Media::getHqRoot, "TRASH").set(Media::getHqPath, trashRef);
+            String trashRef = TRASH_REF_PREFIX + mediaId + "/" + ev.taskId() + TRASH_HQ_MARKER + originalHqPath;
+            mediaUpdate.set(Media::getHqRoot, ROOT_KEY_TRASH).set(Media::getHqPath, trashRef);
         } else {
             mediaUpdate.set(Media::getHqRoot, null).set(Media::getHqPath, null);
         }
@@ -436,7 +481,7 @@ public class ManagementCommandResultHandler {
                 .eq(Media::getId, mediaId)
                 .set(Media::getStatus, MediaLifecycleStatus.READY)
                 .set(Media::getHqStatus, HqStatus.READY)
-                .set(Media::getHqRoot, "HQ")
+                .set(Media::getHqRoot, StorageRootKeys.HQ)
                 .set(Media::getHqPath, originalPath)
                 .set(Media::getPageNumber, targetPage)
                 .set(Media::getTrashedAt, null));
@@ -463,10 +508,10 @@ public class ManagementCommandResultHandler {
         readingHistoryMapper.delete(new LambdaQueryWrapper<ReadingHistory>()
                 .eq(ReadingHistory::getComicId, comicId));
         chapterMapper.delete(new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
-        catalogMapper.delete(new LambdaQueryWrapper<com.comicatlas.persistence.comic.entity.Catalog>()
-                .eq(com.comicatlas.persistence.comic.entity.Catalog::getComicId, comicId));
-        comicTagMapper.delete(new LambdaQueryWrapper<com.comicatlas.persistence.comic.entity.ComicTag>()
-                .eq(com.comicatlas.persistence.comic.entity.ComicTag::getComicId, comicId));
+        catalogMapper.delete(new LambdaQueryWrapper<Catalog>()
+                .eq(Catalog::getComicId, comicId));
+        comicTagMapper.delete(new LambdaQueryWrapper<ComicTag>()
+                .eq(ComicTag::getComicId, comicId));
 
         Comic comic = comicMapper.selectById(comicId);
         if (comic != null && comic.getStatus() == ComicStatus.PURGING) {
@@ -591,22 +636,7 @@ public class ManagementCommandResultHandler {
 
         // 1. 幂等前置检查（无事务）
         ManagementTaskItem item = managementTaskItemMapper.selectById(ev.itemId());
-        if (item == null) {
-            log.info("元数据刷新完成事件引用不存在的 item，忽略: itemId={}", ev.itemId());
-            return;
-        }
-        if (item.getStatus() != null && item.getStatus().isTerminal()) {
-            log.info("元数据刷新完成事件 item 已终态 {}，幂等跳过: itemId={}", item.getStatus(), ev.itemId());
-            return;
-        }
-        if (item.getAttempt() != null && !item.getAttempt().equals(ev.attempt())) {
-            log.info("元数据刷新完成事件 attempt 不匹配，忽略旧 attempt 结果: itemId={}, event={}, item={}",
-                    ev.itemId(), ev.attempt(), item.getAttempt());
-            return;
-        }
-        if (item.getOperationType() != TaskType.METADATA_REFRESH || !"COMIC".equals(item.getTargetType())) {
-            log.warn("元数据刷新完成事件 target/op 不匹配，防御性忽略: itemId={}, op={}, target={}",
-                    ev.itemId(), item.getOperationType(), item.getTargetType());
+        if (shouldSkipMetadataRefresh(ev, item, eventId)) {
             return;
         }
         Long comicId = item.getTargetId();
@@ -638,6 +668,30 @@ public class ManagementCommandResultHandler {
         if (Boolean.TRUE.equals(applied)) {
             deleteSnapshotDir(ev);
         }
+    }
+
+    /** 元数据刷新完成事件幂等前置检查：命中任一条件直接 ACK（返回 true）。 */
+    private boolean shouldSkipMetadataRefresh(MetadataRefreshScanCompletedEvent ev,
+                                              ManagementTaskItem item, String eventId) {
+        if (item == null) {
+            log.info("元数据刷新完成事件引用不存在的 item，忽略: itemId={}", ev.itemId());
+            return true;
+        }
+        if (item.getStatus() != null && item.getStatus().isTerminal()) {
+            log.info("元数据刷新完成事件 item 已终态 {}，幂等跳过: itemId={}", item.getStatus(), ev.itemId());
+            return true;
+        }
+        if (item.getAttempt() != null && !item.getAttempt().equals(ev.attempt())) {
+            log.info("元数据刷新完成事件 attempt 不匹配，忽略旧 attempt 结果: itemId={}, event={}, item={}",
+                    ev.itemId(), ev.attempt(), item.getAttempt());
+            return true;
+        }
+        if (item.getOperationType() != TaskType.METADATA_REFRESH || !TARGET_TYPE_COMIC.equals(item.getTargetType())) {
+            log.warn("元数据刷新完成事件 target/op 不匹配，防御性忽略: itemId={}, op={}, target={}",
+                    ev.itemId(), item.getOperationType(), item.getTargetType());
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -725,17 +779,17 @@ public class ManagementCommandResultHandler {
 
     /** 提交后删除当前 attempt 快照目录（STAGING/metadata-refresh/{taskId}/{itemId}/{attempt}）。 */
     private void deleteSnapshotDir(MetadataRefreshScanCompletedEvent ev) {
-        Path dir = apiStorageProperties.root("STAGING").resolve(
-                "metadata-refresh/" + ev.taskId() + "/" + ev.itemId() + "/" + ev.attempt());
+        Path dir = apiStorageProperties.root(ROOT_KEY_STAGING).resolve(
+                METADATA_REFRESH_DIR + ev.taskId() + "/" + ev.itemId() + "/" + ev.attempt());
         if (!Files.exists(dir)) {
             return;
         }
-        try (var walk = Files.walk(dir)) {
-            walk.sorted(Comparator.reverseOrder()).forEach(p -> {
+        try (Stream<Path> walk = Files.walk(dir)) {
+            walk.sorted(Comparator.reverseOrder()).forEach(path -> {
                 try {
-                    Files.deleteIfExists(p);
+                    Files.deleteIfExists(path);
                 } catch (IOException e) {
-                    log.warn("删除元数据刷新快照文件失败: {}", p, e);
+                    log.warn("删除元数据刷新快照文件失败: {}", path, e);
                 }
             });
             log.info("元数据刷新快照目录已清理: taskId={}, itemId={}, attempt={}",
@@ -782,7 +836,7 @@ public class ManagementCommandResultHandler {
         }
         long pageCount = mediaMapper.selectCount(new LambdaQueryWrapper<Media>()
                 .eq(Media::getChapterId, chapterId)
-                .notIn(Media::getStatus, "DELETED", "TRASHED"));
+                .notIn(Media::getStatus, MediaLifecycleStatus.DELETED, MediaLifecycleStatus.TRASHED));
         chapterMapper.update(null, new LambdaUpdateWrapper<Chapter>()
                 .eq(Chapter::getId, chapterId)
                 .set(Chapter::getPageCount, (int) pageCount));
@@ -795,7 +849,7 @@ public class ManagementCommandResultHandler {
             if (!chapterIds.isEmpty()) {
                 long totalPages = mediaMapper.selectCount(new LambdaQueryWrapper<Media>()
                         .in(Media::getChapterId, chapterIds)
-                        .notIn(Media::getStatus, "DELETED", "TRASHED"));
+                        .notIn(Media::getStatus, MediaLifecycleStatus.DELETED, MediaLifecycleStatus.TRASHED));
                 comicMapper.update(null, new LambdaUpdateWrapper<Comic>()
                         .eq(Comic::getId, comic.getId())
                         .set(Comic::getTotalPages, (int) totalPages));
@@ -821,8 +875,8 @@ public class ManagementCommandResultHandler {
         List<Media> mediaItems = mediaMapper.selectList(
                 new LambdaQueryWrapper<Media>().in(Media::getChapterId, chapterIds));
         long hqSize = mediaItems.stream()
-                .filter(p -> p.getHqStatus() != HqStatus.DELETED)
-                .mapToLong(p -> p.getFileSize() != null ? p.getFileSize() : 0L)
+                .filter(media -> media.getHqStatus() != HqStatus.DELETED)
+                .mapToLong(media -> media.getFileSize() != null ? media.getFileSize() : 0L)
                 .sum();
         Comic comic = comicMapper.selectById(comicId);
         if (comic != null) {
@@ -849,7 +903,7 @@ public class ManagementCommandResultHandler {
             case "LQ_GENERATE", "LQ_REGENERATE" -> {
                 mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
                         .eq(Media::getChapterId, ev.targetId())
-                        .eq(Media::getMediaType, "IMAGE")
+                        .eq(Media::getMediaType, MEDIA_TYPE_IMAGE)
                         .in(Media::getLqStatus, LqStatus.QUEUED, LqStatus.GENERATING)
                         .set(Media::getLqStatus, LqStatus.FAILED));
             }
@@ -902,10 +956,8 @@ public class ManagementCommandResultHandler {
         switch (targetType) {
             case "COMIC" -> {
                 Comic comic = comicMapper.selectById(targetId);
-                if (comic != null && comic.getStatus() == ComicStatus.RESTORING) {
-                    comic.setStatus(ComicStatus.TRASHED);
-                    comicMapper.updateById(comic);
-                } else if (comic != null && comic.getStatus() == ComicStatus.PURGING) {
+                if (comic != null && (comic.getStatus() == ComicStatus.RESTORING
+                        || comic.getStatus() == ComicStatus.PURGING)) {
                     comic.setStatus(ComicStatus.TRASHED);
                     comicMapper.updateById(comic);
                 }
@@ -1003,8 +1055,8 @@ public class ManagementCommandResultHandler {
         if (trashRef == null) {
             return null;
         }
-        int idx = trashRef.indexOf("/hq/");
-        return idx >= 0 ? trashRef.substring(idx + 4) : null;
+        int hqMarkerIndex = trashRef.indexOf(TRASH_HQ_MARKER);
+        return hqMarkerIndex >= 0 ? trashRef.substring(hqMarkerIndex + TRASH_HQ_MARKER.length()) : null;
     }
 
     /**
@@ -1014,7 +1066,7 @@ public class ManagementCommandResultHandler {
         List<Media> existing = mediaMapper.selectList(new LambdaQueryWrapper<Media>()
                 .eq(Media::getChapterId, chapterId)
                 .select(Media::getId, Media::getPageNumber));
-        java.util.Set<Integer> occupied = new java.util.HashSet<>();
+        Set<Integer> occupied = new HashSet<>();
         for (Media media : existing) {
             if (!media.getId().equals(mediaId) && media.getPageNumber() != null) {
                 occupied.add(media.getPageNumber());
@@ -1031,7 +1083,7 @@ public class ManagementCommandResultHandler {
     }
 
     private static String deriveLqPath(String hqPath) {
-        return hqPath.replaceAll("\\.[^.]+$", ".webp");
+        return hqPath.replaceAll("\\.[^.]+$", LQ_EXTENSION);
     }
 
     private static String deriveTranscodedPath(String hqPath) {
@@ -1040,7 +1092,7 @@ public class ManagementCommandResultHandler {
         String name = hqPath.substring(lastSlash + 1);
         int dot = name.lastIndexOf('.');
         String base = dot > 0 ? name.substring(0, dot) : name;
-        return dir + base + ".mp4";
+        return dir + base + MP4_EXTENSION;
     }
 
     private String toJson(ComicEvent event) {

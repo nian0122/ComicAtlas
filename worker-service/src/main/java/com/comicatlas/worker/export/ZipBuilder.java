@@ -25,6 +25,7 @@ import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Stream;
 import java.util.zip.CRC32;
 import java.util.zip.ZipEntry;
 
@@ -70,59 +71,59 @@ public class ZipBuilder {
                 return buildSplit(manifest, outputPath);
             }
             return buildSingle(manifest, outputPath);
-        } catch (IOException | RuntimeException e) {
+        } catch (IOException | RuntimeException ex) {
             deleteRecursively(stagingDir);
-            throw e;
+            throw ex;
         }
     }
 
     private ZipBuildResult buildSingle(ExportManifest manifest, Path outputPath) throws IOException {
-        try (ZipArchiveOutputStream zipOut = new ZipArchiveOutputStream(outputPath.toFile())) {
-            configure(zipOut);
-            writeEntries(zipOut, manifest);
+        try (ZipArchiveOutputStream zipOutputStream = new ZipArchiveOutputStream(outputPath.toFile())) {
+            configure(zipOutputStream);
+            writeEntries(zipOutputStream, manifest);
         }
         return verifyAndReturn(outputPath, manifest);
     }
 
     private ZipBuildResult buildSplit(ExportManifest manifest, Path outputPath) throws IOException {
         long splitSize = workerConfig.getZip().getSplitSize();
-        try (ZipArchiveOutputStream zipOut = new ZipArchiveOutputStream(outputPath, splitSize)) {
-            configure(zipOut);
-            writeEntries(zipOut, manifest);
+        try (ZipArchiveOutputStream zipOutputStream = new ZipArchiveOutputStream(outputPath, splitSize)) {
+            configure(zipOutputStream);
+            writeEntries(zipOutputStream, manifest);
         }
         return verifyAndReturn(outputPath, manifest);
     }
 
-    private void configure(ZipArchiveOutputStream zipOut) {
-        zipOut.setUseZip64(Zip64Mode.AsNeeded);
-        zipOut.setEncoding(StandardCharsets.UTF_8.name());
-        zipOut.setUseLanguageEncodingFlag(true);
-        zipOut.setCreateUnicodeExtraFields(ZipArchiveOutputStream.UnicodeExtraFieldPolicy.NEVER);
-        zipOut.setFallbackToUTF8(true);
+    private void configure(ZipArchiveOutputStream zipOutputStream) {
+        zipOutputStream.setUseZip64(Zip64Mode.AsNeeded);
+        zipOutputStream.setEncoding(StandardCharsets.UTF_8.name());
+        zipOutputStream.setUseLanguageEncodingFlag(true);
+        zipOutputStream.setCreateUnicodeExtraFields(ZipArchiveOutputStream.UnicodeExtraFieldPolicy.NEVER);
+        zipOutputStream.setFallbackToUTF8(true);
     }
 
-    private void writeEntries(ZipArchiveOutputStream zipOut, ExportManifest manifest) throws IOException {
+    private void writeEntries(ZipArchiveOutputStream zipOutputStream, ExportManifest manifest) throws IOException {
         String prefix = manifest.rootDirName() + "/";
-        writeBytesEntry(zipOut, prefix + METADATA_FILE, manifest.metadataJson().getBytes(StandardCharsets.UTF_8));
+        writeBytesEntry(zipOutputStream, prefix + METADATA_FILE, manifest.metadataJson().getBytes(StandardCharsets.UTF_8));
         for (ExportManifest.Entry entry : manifest.entries()) {
-            ZipArchiveEntry zipEntry = new ZipArchiveEntry(prefix + entry.targetPath());
-            zipEntry.setSize(entry.sourceSize());
-            zipEntry.setMethod(ZipEntry.DEFLATED);
-            zipOut.putArchiveEntry(zipEntry);
+            ZipArchiveEntry zipArchiveEntry = new ZipArchiveEntry(prefix + entry.targetPath());
+            zipArchiveEntry.setSize(entry.sourceSize());
+            zipArchiveEntry.setMethod(ZipEntry.DEFLATED);
+            zipOutputStream.putArchiveEntry(zipArchiveEntry);
             try (InputStream in = Files.newInputStream(entry.sourceFile())) {
-                in.transferTo(zipOut);
+                in.transferTo(zipOutputStream);
             }
-            zipOut.closeArchiveEntry();
+            zipOutputStream.closeArchiveEntry();
         }
     }
 
-    private void writeBytesEntry(ZipArchiveOutputStream zipOut, String name, byte[] content) throws IOException {
-        ZipArchiveEntry zipEntry = new ZipArchiveEntry(name);
-        zipEntry.setSize(content.length);
-        zipEntry.setMethod(ZipEntry.DEFLATED);
-        zipOut.putArchiveEntry(zipEntry);
-        zipOut.write(content);
-        zipOut.closeArchiveEntry();
+    private void writeBytesEntry(ZipArchiveOutputStream zipOutputStream, String name, byte[] content) throws IOException {
+        ZipArchiveEntry zipArchiveEntry = new ZipArchiveEntry(name);
+        zipArchiveEntry.setSize(content.length);
+        zipArchiveEntry.setMethod(ZipEntry.DEFLATED);
+        zipOutputStream.putArchiveEntry(zipArchiveEntry);
+        zipOutputStream.write(content);
+        zipOutputStream.closeArchiveEntry();
     }
 
     private long manifestTotalSize(ExportManifest manifest) {
@@ -197,16 +198,16 @@ public class ZipBuilder {
     }
 
     private void verifyBytesEntry(ZipFile zipFile, String name, byte[] expected) throws IOException {
-        ZipArchiveEntry zipEntry = zipFile.getEntry(name);
-        if (zipEntry == null) {
+        ZipArchiveEntry zipArchiveEntry = zipFile.getEntry(name);
+        if (zipArchiveEntry == null) {
             throw new IOException("ZIP 回读校验失败：缺少条目 " + name);
         }
-        if (zipEntry.getSize() != expected.length) {
+        if (zipArchiveEntry.getSize() != expected.length) {
             throw new IOException("ZIP 回读校验失败：条目长度不一致 name=" + name
-                    + ", stored=" + zipEntry.getSize() + ", expected=" + expected.length);
+                    + ", stored=" + zipArchiveEntry.getSize() + ", expected=" + expected.length);
         }
         byte[] actual;
-        try (InputStream in = zipFile.getInputStream(zipEntry)) {
+        try (InputStream in = zipFile.getInputStream(zipArchiveEntry)) {
             actual = in.readAllBytes();
         }
         if (!Arrays.equals(actual, expected)) {
@@ -215,26 +216,26 @@ public class ZipBuilder {
     }
 
     private void verifyFileEntry(ZipFile zipFile, String name, ExportManifest.Entry entry) throws IOException {
-        ZipArchiveEntry zipEntry = zipFile.getEntry(name);
-        if (zipEntry == null) {
+        ZipArchiveEntry zipArchiveEntry = zipFile.getEntry(name);
+        if (zipArchiveEntry == null) {
             throw new IOException("ZIP 回读校验失败：缺少条目 " + name);
         }
-        if (zipEntry.getSize() != entry.sourceSize()) {
+        if (zipArchiveEntry.getSize() != entry.sourceSize()) {
             throw new IOException("ZIP 回读校验失败：条目长度不一致 name=" + name
-                    + ", stored=" + zipEntry.getSize() + ", expected=" + entry.sourceSize());
+                    + ", stored=" + zipArchiveEntry.getSize() + ", expected=" + entry.sourceSize());
         }
         long sourceCrc;
         try (InputStream sourceIn = Files.newInputStream(entry.sourceFile())) {
             sourceCrc = calculateCrc32(sourceIn);
         }
-        if (zipEntry.getCrc() != sourceCrc) {
+        if (zipArchiveEntry.getCrc() != sourceCrc) {
             throw new IOException("ZIP 回读校验失败：条目 CRC 与源文件不一致 name=" + name);
         }
         long readCrc;
-        try (InputStream storedIn = zipFile.getInputStream(zipEntry)) {
+        try (InputStream storedIn = zipFile.getInputStream(zipArchiveEntry)) {
             readCrc = calculateCrc32(storedIn);
         }
-        if (readCrc != zipEntry.getCrc()) {
+        if (readCrc != zipArchiveEntry.getCrc()) {
             throw new IOException("ZIP 回读校验失败：条目读回 CRC 与存储 CRC 不一致 name=" + name);
         }
     }
@@ -255,19 +256,19 @@ public class ZipBuilder {
         }
         List<Path> undeleted = new ArrayList<>();
         IOException[] firstFailure = new IOException[1];
-        try (var walk = Files.walk(dir)) {
+        try (Stream<Path> walk = Files.walk(dir)) {
             walk.sorted(Comparator.reverseOrder()).forEach(path -> {
                 try {
                     Files.deleteIfExists(path);
-                } catch (IOException e) {
+                } catch (IOException ex) {
                     if (firstFailure[0] == null) {
-                        firstFailure[0] = e;
+                        firstFailure[0] = ex;
                     }
                     undeleted.add(path);
                 }
             });
-        } catch (IOException e) {
-            log.warn("清理 staging 目录失败: {}", dir, e);
+        } catch (IOException ex) {
+            log.warn("清理 staging 目录失败: {}", dir, ex);
             return;
         }
         if (!undeleted.isEmpty()) {

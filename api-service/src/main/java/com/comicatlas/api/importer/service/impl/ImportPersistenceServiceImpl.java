@@ -232,7 +232,7 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
 
         // 5. 逐章最终化请求写入 Outbox（与业务同事务，relay 在提交后发布到 MQ）
         for (FinalizeRequest request : requests) {
-            var finalizeEvent = new ImportStorageFinalizeRequestedEvent(
+            ImportStorageFinalizeRequestedEvent finalizeEvent = new ImportStorageFinalizeRequestedEvent(
                     UUID.randomUUID(), Instant.now(),
                     request.taskId(), request.comicId(), request.globalOrder(), request.chapterId(),
                     request.sourceDir(), request.targetDir(), request.mediaMappings());
@@ -429,6 +429,7 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
 
         ImportTask task = taskMapper.selectById(taskId);
         if (task == null) {
+            log.warn("finalize completed 时任务不存在，跳过: taskId={}", taskId);
             return;
         }
         if (TERMINAL_STATUSES.contains(task.getStatus())) {
@@ -440,6 +441,7 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
         // 行锁串行化：同一 comic 的并发 completed/failed 串行处理，防止 lost update（锁在事务提交/回滚后释放）
         Comic comic = comicMapper.selectByIdForUpdate(comicId);
         if (comic == null) {
+            log.warn("finalize completed 时漫画不存在，跳过: comicId={}", comicId);
             return;
         }
         if (comic.getStatus() != ComicStatus.IMPORTING) {
@@ -550,6 +552,7 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
 
         ImportTask task = taskMapper.selectById(taskId);
         if (task == null) {
+            log.warn("finalize failed 时任务不存在，跳过: taskId={}", taskId);
             return;
         }
         if (TERMINAL_STATUSES.contains(task.getStatus())) {
@@ -696,6 +699,7 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
         try {
             return new BigDecimal(value.toString());
         } catch (NumberFormatException ex) {
+            log.debug("解析媒体数字字段失败，回退 null: value={}", value, ex);
             return null;
         }
     }
