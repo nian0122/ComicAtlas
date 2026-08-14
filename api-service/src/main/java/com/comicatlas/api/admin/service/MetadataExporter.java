@@ -125,8 +125,9 @@ public class MetadataExporter {
                 if (hqPath != null && hqPath.contains("/")) {
                     fileName = hqPath.substring(hqPath.lastIndexOf('/') + 1);
                 }
-                // 跳过无效文件名，防止 "null" 污染 metadata.json
-                if (fileName.isEmpty() || "null".equals(fileName)) {
+                // HQ 已删除（hq_path 清空）：页面保留输出（hqStatus=DELETED），不得跳过；
+                // 仅当 hqPath 存在但文件名为空或 "null"（脏数据）时跳过，防止污染 metadata.json
+                if (hqPath != null && (fileName.isEmpty() || "null".equals(fileName))) {
                     continue;
                 }
                 mediaItemList.add(new MetadataV3.MediaItem(
