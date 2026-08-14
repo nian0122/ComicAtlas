@@ -1,5 +1,6 @@
 package com.comicatlas.common.event;
 
+import com.comicatlas.common.constant.StorageFinalizeErrorCode;
 import com.comicatlas.common.event.payload.FinalizeMediaMapping;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -105,7 +106,7 @@ class ImportStorageFinalizeEventTest {
         var event = new ImportStorageFinalizeFailedEvent(
                 EVENT_ID, OCCURRED_AT,
                 1001L, 7L, 3, 42L,
-                "STORAGE_FINALIZE_SOURCE_MISSING", "源目录不存在");
+                StorageFinalizeErrorCode.SOURCE_MISSING, "源目录不存在");
 
         String json = MAPPER.writeValueAsString(event);
         assertTrue(json.contains("\"eventType\":\"ImportStorageFinalizeFailedEvent\""),
@@ -120,7 +121,7 @@ class ImportStorageFinalizeEventTest {
         assertEquals(7L, typed.comicId());
         assertEquals(3, typed.globalOrder());
         assertEquals(42L, typed.chapterId());
-        assertEquals("STORAGE_FINALIZE_SOURCE_MISSING", typed.errorCode());
+        assertEquals(StorageFinalizeErrorCode.SOURCE_MISSING, typed.errorCode());
         assertEquals("源目录不存在", typed.errorMessage());
     }
 

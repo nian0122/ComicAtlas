@@ -2,6 +2,7 @@ package com.comicatlas.worker.event;
 
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
+import com.comicatlas.common.constant.StorageFinalizeErrorCode;
 import com.comicatlas.common.event.ImportStorageFinalizeCompletedEvent;
 import com.comicatlas.common.event.ImportStorageFinalizeFailedEvent;
 import com.comicatlas.common.event.ImportStorageFinalizeRequestedEvent;
@@ -360,7 +361,7 @@ class ImportStorageFinalizeHandlerTest {
         handler.handle(event(1, 100L, "001.jpg", "002.jpg"), channel, 1L);
 
         ImportStorageFinalizeFailedEvent failed = captureFailed();
-        assertEquals("STORAGE_FINALIZE_SIZE_CONFLICT", failed.errorCode());
+        assertEquals(StorageFinalizeErrorCode.SIZE_CONFLICT, failed.errorCode());
         assertEquals(TASK_ID, failed.taskId());
         assertEquals(COMIC_ID, failed.comicId());
         assertEquals(100L, failed.chapterId());
@@ -382,7 +383,7 @@ class ImportStorageFinalizeHandlerTest {
         handler.handle(event(1, 100L, "001.jpg", "002.jpg"), channel, 1L);
 
         ImportStorageFinalizeFailedEvent failed = captureFailed();
-        assertEquals("STORAGE_FINALIZE_SOURCE_MISSING", failed.errorCode());
+        assertEquals(StorageFinalizeErrorCode.SOURCE_MISSING, failed.errorCode());
         assertTrue(manifestManager.exists(mangaRoot, TASK_ID), "失败后清单应保留");
         verify(rabbitTemplate, never()).convertAndSend(
                 eq(MqExchanges.IMPORT), eq(MqRoutingKeys.IMPORT_STORAGE_FINALIZE_COMPLETED), any(Object.class));
@@ -399,7 +400,7 @@ class ImportStorageFinalizeHandlerTest {
         handler.handle(event(1, 100L, "001.jpg"), channel, 1L);
 
         ImportStorageFinalizeFailedEvent failed = captureFailed();
-        assertEquals("STORAGE_FINALIZE_CONFLICT", failed.errorCode());
+        assertEquals(StorageFinalizeErrorCode.CONFLICT, failed.errorCode());
         assertTrue(manifestManager.exists(mangaRoot, TASK_ID), "冲突后清单应保留");
         assertTrue(existsStaging(1, "001.jpg"), "冲突后 staging 应保留供人工处理");
     }
@@ -418,7 +419,7 @@ class ImportStorageFinalizeHandlerTest {
         handler.handle(evil, channel, 1L);
 
         ImportStorageFinalizeFailedEvent failed = captureFailed();
-        assertEquals("STORAGE_FINALIZE_PATH_OUTSIDE_HQ", failed.errorCode());
+        assertEquals(StorageFinalizeErrorCode.PATH_OUTSIDE_HQ, failed.errorCode());
         assertTrue(existsStaging(1, "001.jpg"), "穿越路径不应触发移动");
         assertTrue(manifestManager.exists(mangaRoot, TASK_ID));
     }
@@ -437,7 +438,7 @@ class ImportStorageFinalizeHandlerTest {
         handler.handle(evil, channel, 1L);
 
         ImportStorageFinalizeFailedEvent failed = captureFailed();
-        assertEquals("STORAGE_FINALIZE_PATH_OUTSIDE_HQ", failed.errorCode());
+        assertEquals(StorageFinalizeErrorCode.PATH_OUTSIDE_HQ, failed.errorCode());
         assertTrue(existsStaging(1, "001.jpg"));
     }
 

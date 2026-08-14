@@ -28,6 +28,7 @@ import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
+import com.comicatlas.common.constant.StorageFinalizeErrorCode;
 import com.comicatlas.common.event.ComicEvent;
 import com.comicatlas.common.event.ImportStorageFinalizeCompletedEvent;
 import com.comicatlas.common.event.ImportStorageFinalizeFailedEvent;
@@ -629,13 +630,13 @@ class ImportPersistenceServiceTest {
 
         ImportStorageFinalizeFailedEvent event = new ImportStorageFinalizeFailedEvent(
                 UUID.randomUUID(), Instant.now(), 10L, 100L, 0, 1001L,
-                "STORAGE_FINALIZE_SOURCE_MISSING", "源目录不存在");
+                StorageFinalizeErrorCode.SOURCE_MISSING, "源目录不存在");
         service.applyFinalizeFailed(event);
 
         ArgumentCaptor<ImportTask> taskCaptor = ArgumentCaptor.forClass(ImportTask.class);
         verify(taskMapper).updateById(taskCaptor.capture());
         assertThat(taskCaptor.getValue().getStatus()).isEqualTo(ImportTaskStatus.FAILED);
-        assertThat(taskCaptor.getValue().getErrorMessage()).contains("STORAGE_FINALIZE_SOURCE_MISSING");
+        assertThat(taskCaptor.getValue().getErrorMessage()).contains(StorageFinalizeErrorCode.SOURCE_MISSING);
 
         ArgumentCaptor<Comic> comicCaptor = ArgumentCaptor.forClass(Comic.class);
         verify(comicMapper).updateById(comicCaptor.capture());
@@ -669,7 +670,7 @@ class ImportPersistenceServiceTest {
 
         ImportStorageFinalizeFailedEvent event = new ImportStorageFinalizeFailedEvent(
                 UUID.randomUUID(), Instant.now(), 10L, 100L, 0, 1001L,
-                "STORAGE_FINALIZE_SOURCE_MISSING", "源目录不存在");
+                StorageFinalizeErrorCode.SOURCE_MISSING, "源目录不存在");
         service.applyFinalizeFailed(event);
 
         verify(taskMapper, never()).updateById(any(ImportTask.class));
