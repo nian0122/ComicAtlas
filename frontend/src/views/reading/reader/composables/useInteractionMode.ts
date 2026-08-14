@@ -2,7 +2,6 @@ import { computed } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
 import { BREAKPOINTS, useBreakpoint } from '@/composables/useBreakpoint'
 import { useMediaQuery } from '@/composables/useMediaQuery'
-import { isMobileBrowserUserAgent } from '@/utils/device'
 
 /** 阅读器交互模式：desktop（鼠标/键盘）或 mobile（触摸） */
 export type InteractionMode = 'desktop' | 'mobile'
@@ -25,8 +24,8 @@ export interface InteractionContext {
 /**
  * 检测阅读器交互模式。
  *
- * 视口宽度 ≤ BREAKPOINTS.tablet、pointer: coarse 且移动端 User-Agent 命中时为 'mobile'。
- * Safari 请求桌面版网站后会发送桌面 User-Agent，因此自动使用 'desktop'。
+ * 视口宽度 ≤ BREAKPOINTS.tablet 且 pointer: coarse 命中时为 'mobile'，
+ * 否则为 'desktop'。resize 与指针类型变化均会触发响应式更新。
  */
 export function useInteractionMode(): InteractionContext {
   const width = useBreakpoint()
@@ -35,10 +34,7 @@ export function useInteractionMode(): InteractionContext {
 
   const mode = computed<InteractionMode>(() =>
     width.value <= BREAKPOINTS.tablet &&
-    coarsePointer.value &&
-    isMobileBrowserUserAgent()
-      ? 'mobile'
-      : 'desktop',
+    coarsePointer.value ? 'mobile' : 'desktop'
   )
 
   return { mode, coarsePointer, supportsHover }
