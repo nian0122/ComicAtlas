@@ -7,14 +7,15 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$projectRoot = Split-Path -Parent $PSScriptRoot
+$projectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $environmentFile = Join-Path $projectRoot ".env"
 $projectEnvironment = @{}
-if (Test-Path -LiteralPath $environmentFile) {
-    Get-Content -LiteralPath $environmentFile | ForEach-Object {
-        if ($_ -match '^\s*([^#][^=]*?)\s*=\s*(.*)\s*$') {
-            $projectEnvironment[$Matches[1].Trim()] = $Matches[2].Trim()
-        }
+if (-not (Test-Path -LiteralPath $environmentFile)) {
+    throw "未找到项目环境文件：$environmentFile"
+}
+Get-Content -LiteralPath $environmentFile | ForEach-Object {
+    if ($_ -match '^\s*([^#][^=]*?)\s*=\s*(.*)\s*$') {
+        $projectEnvironment[$Matches[1].Trim()] = $Matches[2].Trim()
     }
 }
 
