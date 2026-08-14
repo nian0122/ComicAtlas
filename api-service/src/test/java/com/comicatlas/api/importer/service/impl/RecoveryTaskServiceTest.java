@@ -4,10 +4,13 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.contract.common.enums.RecoveryTaskStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.importer.entity.RecoveryTask;
-import com.comicatlas.api.importer.event.RecoveryEventPublisher;
 import com.comicatlas.api.importer.mapper.RecoveryTaskMapper;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
 import com.comicatlas.api.management.service.ManagementTaskService;
+import com.comicatlas.api.outbox.service.OutboxService;
+import com.comicatlas.common.constant.MqExchanges;
+import com.comicatlas.common.constant.MqRoutingKeys;
+import com.comicatlas.common.event.RecoveryRequestedEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,6 +19,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -32,7 +36,7 @@ class RecoveryTaskServiceTest {
     private RecoveryTaskMapper recoveryTaskMapper;
 
     @Mock
-    private RecoveryEventPublisher recoveryEventPublisher;
+    private OutboxService outboxService;
 
     @Mock
     private ManagementTaskService managementTaskService;
@@ -52,8 +56,8 @@ class RecoveryTaskServiceTest {
     // ======================== createRecoveryTask ========================
 
     /**
-     * 验证创建恢复任务的核心业务逻辑：检查无活跃任务时，正确创建 PENDING 状态任务。
-     * 不依赖 Spring Transaction 上下文，仅验证事务边界前的业务状态。
+     * 验证创建恢复任务的核心业务逻辑：检查无活跃任务时，正确创建 QUEUED 状态任务，
+     * 且同事务向 Outbox 写入恢复请求事件（由 relay 异步发布，不直接操作 MQ）。
      */
     @Test
     void createRecoveryTask_shouldCreatePendingTask_whenNoActiveTask() {
@@ -61,12 +65,10 @@ class RecoveryTaskServiceTest {
 
         // 捕获 insert 的参数以验证任务初始状态
         ArgumentCaptor<RecoveryTask> taskCaptor = ArgumentCaptor.forClass(RecoveryTask.class);
-        // MyBatis Plus insert 在无事务时也会执行，只需 verify 不抛异常
         when(recoveryTaskMapper.insert(any(RecoveryTask.class))).thenReturn(1);
+        when(recoveryTaskMapper.updateById(any(RecoveryTask.class))).thenReturn(1);
 
-        // TransactionSynchronizationManager.registerSynchronization() 在无 Spring 事务时抛 IllegalStateException
-        // 这是预期行为，验证抛出前 insert 已正确执行
-        assertThrows(IllegalStateException.class, () -> service.createRecoveryTask());
+        service.createRecoveryTask();
 
         verify(recoveryTaskMapper).insert(taskCaptor.capture());
         RecoveryTask captured = taskCaptor.getValue();
@@ -77,6 +79,10 @@ class RecoveryTaskServiceTest {
         assertEquals(0, captured.getPlaceholderComics());
         assertEquals(0, captured.getErrorComics());
         assertEquals(0, captured.getRetryCount());
+
+        // 恢复请求事件走 Outbox（同事务），而非直接发布 MQ
+        verify(outboxService).enqueue(any(RecoveryRequestedEvent.class),
+                eq(MqExchanges.RECOVERY), eq(MqRoutingKeys.RECOVERY_REQUESTED));
     }
 
     @Test
@@ -115,9 +121,7 @@ class RecoveryTaskServiceTest {
         when(recoveryTaskMapper.selectById(2L)).thenReturn(failed);
         when(recoveryTaskMapper.updateById(any(RecoveryTask.class))).thenReturn(1);
 
-        // TransactionSynchronizationManager.registerSynchronization() 在无 Spring 事务上下文时抛异常
-        // 验证在异常抛出前，updateById 已正确执行重置任务状态
-        assertThrows(IllegalStateException.class, () -> service.retryTask(2L));
+        service.retryTask(2L);
 
         ArgumentCaptor<RecoveryTask> taskCaptor = ArgumentCaptor.forClass(RecoveryTask.class);
         verify(recoveryTaskMapper).updateById(taskCaptor.capture());
@@ -127,6 +131,10 @@ class RecoveryTaskServiceTest {
         assertNull(updated.getErrorMessage());
         assertNull(updated.getStartedAt());
         assertNull(updated.getEndedAt());
+
+        // 重试后同事务向 Outbox 重新写入恢复请求事件
+        verify(outboxService).enqueue(any(RecoveryRequestedEvent.class),
+                eq(MqExchanges.RECOVERY), eq(MqRoutingKeys.RECOVERY_REQUESTED));
     }
 
     @Test

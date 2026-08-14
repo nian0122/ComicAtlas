@@ -8,21 +8,24 @@ import com.comicatlas.contract.common.enums.RecoveryTaskStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.importer.dto.RecoveryTaskVO;
 import com.comicatlas.api.importer.entity.RecoveryTask;
-import com.comicatlas.api.importer.event.RecoveryEventPublisher;
 import com.comicatlas.api.importer.mapper.RecoveryTaskMapper;
 import com.comicatlas.api.importer.service.RecoveryTaskService;
 import com.comicatlas.api.management.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
 import com.comicatlas.api.management.service.ManagementTaskService;
+import com.comicatlas.api.outbox.service.OutboxService;
+import com.comicatlas.common.constant.MqExchanges;
+import com.comicatlas.common.constant.MqRoutingKeys;
+import com.comicatlas.common.event.RecoveryRequestedEvent;
 import com.comicatlas.contract.common.enums.TaskType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -39,7 +42,7 @@ public class RecoveryTaskServiceImpl implements RecoveryTaskService {
     private static final int DEFAULT_PAGE_SIZE = 20;
 
     private final RecoveryTaskMapper recoveryTaskMapper;
-    private final RecoveryEventPublisher recoveryEventPublisher;
+    private final OutboxService outboxService;
     private final ManagementTaskService managementTaskService;
 
     @Override
@@ -50,7 +53,9 @@ public class RecoveryTaskServiceImpl implements RecoveryTaskService {
         RecoveryTask task = createRecoveryTaskRecord();
 
         Long taskId = task.getId();
-        registerPublishAfterCommit(taskId);
+        // 写入 Outbox（同事务），由 relay 异步发布，保证 DB 与消息一致
+        outboxService.enqueue(new RecoveryRequestedEvent(UUID.randomUUID(), Instant.now(), taskId),
+                MqExchanges.RECOVERY, MqRoutingKeys.RECOVERY_REQUESTED);
 
         log.info("恢复任务创建: taskId={}", taskId);
         return toVO(task);
@@ -93,13 +98,15 @@ public class RecoveryTaskServiceImpl implements RecoveryTaskService {
         recoveryTask.setEndedAt(null);
         recoveryTaskMapper.updateById(recoveryTask);
 
-        // 同步统一任务重置（仅状态，不在此重新入队——恢复事件由下方 afterCommit 重发）
+        // 同步统一任务重置（仅状态，不在此重新入队——恢复事件由下方 Outbox 重发）
         if (recoveryTask.getManagementTaskId() != null) {
             managementTaskService.resetTaskState(recoveryTask.getManagementTaskId());
         }
 
         Long taskId = recoveryTask.getId();
-        registerPublishAfterCommit(taskId);
+        // 写入 Outbox（同事务），由 relay 异步发布
+        outboxService.enqueue(new RecoveryRequestedEvent(UUID.randomUUID(), Instant.now(), taskId),
+                MqExchanges.RECOVERY, MqRoutingKeys.RECOVERY_REQUESTED);
 
         log.info("恢复任务重试: taskId={}", taskId);
         return toVO(recoveryTask);
@@ -154,16 +161,6 @@ public class RecoveryTaskServiceImpl implements RecoveryTaskService {
         task.setManagementTaskId(mgmtResp.getId());
         recoveryTaskMapper.updateById(task);
         return task;
-    }
-
-    private void registerPublishAfterCommit(Long taskId) {
-        TransactionSynchronizationManager.registerSynchronization(
-            new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    recoveryEventPublisher.publishRecoveryRequested(taskId);
-                }
-            });
     }
 
     /**
