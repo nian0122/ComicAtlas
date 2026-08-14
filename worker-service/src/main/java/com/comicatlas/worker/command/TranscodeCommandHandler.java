@@ -55,12 +55,12 @@ public class TranscodeCommandHandler {
 
     /** 漫画级：展开为所有待转码视频页逐页转码，聚合失败页列表。 */
     private void transcodeComic(ManagementCommandRequestedEvent cmd, Long comicId) {
+        // selectByComicId 一次性取回全部页数据，循环复用实体，避免对每页重复查询（N+1）
         List<ExportMedia> pages = mediaMapper.selectByComicId(comicId);
-        List<Long> videoPages = pages.stream()
+        List<ExportMedia> videoPages = pages.stream()
                 .filter(p -> "VIDEO".equals(p.getMediaType()))
                 .filter(p -> VideoPlayability.isTranscodable(p.getWidth(), p.getHeight()))
                 .filter(p -> !VideoPlayability.isBrowserPlayable(p.getVideoCodec(), p.getContainer()))
-                .map(ExportMedia::getId)
                 .toList();
         if (videoPages.isEmpty()) {
             publisher.completed(cmd);
@@ -69,8 +69,8 @@ public class TranscodeCommandHandler {
         }
         List<Long> failedPages = new ArrayList<>();
         boolean interrupted = false;
-        for (Long pageId : videoPages) {
-            TranscodeResult r = processPage(cmd, pageId);
+        for (ExportMedia media : videoPages) {
+            TranscodeResult r = processPage(cmd, media);
             if (r.error() == null) {
                 continue;
             }
@@ -79,7 +79,7 @@ public class TranscodeCommandHandler {
                 interrupted = true;
                 break;
             }
-            failedPages.add(pageId);
+            failedPages.add(media.getId());
         }
         if (interrupted) {
             publisher.failed(cmd, "转码被中断");
@@ -108,10 +108,19 @@ public class TranscodeCommandHandler {
         }
     }
 
-    /** 转码单个视频页。成功返回 TranscodeResult(null, 实测元数据)，失败返回 TranscodeResult(错误消息, null)（不在此发布事件）。 */
+    /** 转码单个视频页（MEDIA 级入口，按 pageId 加载实体后委托实体重载）。 */
     private TranscodeResult processPage(ManagementCommandRequestedEvent cmd, Long pageId) {
         ExportMedia media = mediaMapper.selectById(pageId);
-        if (media == null || !"VIDEO".equals(media.getMediaType())) {
+        if (media == null) {
+            return new TranscodeResult("媒体不存在或非视频: pageId=" + pageId, null);
+        }
+        return processPage(cmd, media);
+    }
+
+    /** 转码单个视频页（复用已加载实体，漫画级循环内不重复查询）。成功返回 TranscodeResult(null, 实测元数据)，失败返回 TranscodeResult(错误消息, null)（不在此发布事件）。 */
+    private TranscodeResult processPage(ManagementCommandRequestedEvent cmd, ExportMedia media) {
+        Long pageId = media.getId();
+        if (!"VIDEO".equals(media.getMediaType())) {
             return new TranscodeResult("媒体不存在或非视频: pageId=" + pageId, null);
         }
         Path hqFile = null;

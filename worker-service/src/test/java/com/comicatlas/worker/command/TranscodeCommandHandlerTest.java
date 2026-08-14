@@ -249,7 +249,6 @@ class TranscodeCommandHandlerTest {
         media.setMediaType("VIDEO");
         media.setContainer("mkv");
         when(mediaMapper.selectByComicId(comicId)).thenReturn(List.of(media));
-        when(mediaMapper.selectById(pageId)).thenReturn(media);
 
         config.setFfmpegPath(createFakeFfmpeg(0).toString());
         when(mediaAnalyzer.analyzeVideo(any(Path.class))).thenReturn(Optional.of(
@@ -286,7 +285,6 @@ class TranscodeCommandHandlerTest {
         media.setContainer("mp4");
         media.setVideoCodec("mpeg4");
         when(mediaMapper.selectByComicId(comicId)).thenReturn(List.of(media));
-        when(mediaMapper.selectById(pageId)).thenReturn(media);
 
         config.setFfmpegPath(createFakeFfmpeg(0).toString());
         when(mediaAnalyzer.analyzeVideo(any(Path.class))).thenReturn(Optional.of(
@@ -304,6 +302,55 @@ class TranscodeCommandHandlerTest {
         verify(publisher).completed(cmd);
         verify(publisher).progress(eq(cmd), eq(100), eq("转码完成"));
         assertTrue(Files.exists(chapterDir.resolve("test.mp4")), "转码产物应存在");
+    }
+
+    // ==================== Test 6: 漫画级不得逐页 selectById（N+1 回归） ====================
+
+    @Test
+    void comicScope_doesNotRequeryEachPage() throws Exception {
+        Long comicId = 1L;
+        Path chapterDir = Files.createDirectories(hqRoot.resolve("1/ch06"));
+        Files.writeString(chapterDir.resolve("a.webm"), "fake video data");
+        Files.writeString(chapterDir.resolve("b.webm"), "fake video data");
+
+        ExportMedia mediaA = new ExportMedia();
+        mediaA.setId(601L);
+        mediaA.setHqRoot("HQ");
+        mediaA.setHqPath("1/ch06/a.webm");
+        mediaA.setMediaType("VIDEO");
+        mediaA.setContainer("webm");
+        mediaA.setVideoCodec("mpeg4");
+
+        ExportMedia mediaB = new ExportMedia();
+        mediaB.setId(602L);
+        mediaB.setHqRoot("HQ");
+        mediaB.setHqPath("1/ch06/b.webm");
+        mediaB.setMediaType("VIDEO");
+        mediaB.setContainer("webm");
+        mediaB.setVideoCodec("mpeg4");
+
+        when(mediaMapper.selectByComicId(comicId)).thenReturn(List.of(mediaA, mediaB));
+
+        config.setFfmpegPath(createFakeFfmpeg(0).toString());
+        when(mediaAnalyzer.analyzeVideo(any(Path.class))).thenReturn(Optional.of(
+                new ComicMetadata.MediaInfo("x.mp4", 0, "READY", "NOT_GENERATED",
+                        1024L, 640, 480, "VIDEO",
+                        new BigDecimal("3.3"), "mp4", "h264", "aac")));
+
+        ManagementCommandRequestedEvent cmd = new ManagementCommandRequestedEvent(
+                UUID.randomUUID(), Instant.now(), 1, 1L, 601L, 1,
+                "TRANSCODE", "COMIC", comicId);
+
+        handler.transcode(cmd);
+
+        // N+1 回归：漫画级转码一次 selectByComicId 取回全部页数据后，
+        // 不得在循环内对每个视频页重复 selectById
+        verify(mediaMapper).selectByComicId(comicId);
+        verify(mediaMapper, never()).selectById(any(Long.class));
+        verify(publisher).completed(cmd);
+        verify(publisher).progress(eq(cmd), eq(100), eq("转码完成"));
+        assertTrue(Files.exists(chapterDir.resolve("a.mp4")), "第一个视频转码产物应存在");
+        assertTrue(Files.exists(chapterDir.resolve("b.mp4")), "第二个视频转码产物应存在");
     }
 
     // ==================== helpers ====================
