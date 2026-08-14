@@ -166,6 +166,50 @@ class MetadataExporterTest {
     }
 
     @Test
+    void export_keepsHqDeletedPageWithDeletedStatus(@TempDir Path tempDir) throws Exception {
+        ObjectMapper realMapper = new ObjectMapper();
+        ApiStorageRoot metadataRoot = new ApiStorageRoot();
+        metadataRoot.setPath(tempDir.resolve("metadata"));
+        when(storageProperties.root("METADATA")).thenReturn(metadataRoot);
+
+        Comic comic = new Comic();
+        comic.setId(1L);
+        comic.setTitle("Test Comic");
+        comic.setAuthor("Author A");
+        comic.setCategory("Action");
+        when(comicMapper.selectById(1L)).thenReturn(comic);
+        when(catalogMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
+        when(comicTagMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
+
+        Chapter chapter = new Chapter();
+        chapter.setId(10L);
+        chapter.setTitle("第1话");
+        chapter.setGlobalOrder(0);
+        when(chapterMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(chapter));
+
+        // HQ 已删除：hq_path 清空、hqStatus=DELETED、LQ 就绪（LQ 替代 HQ 的存储优化场景）
+        Media deletedPage = new Media();
+        deletedPage.setId(100L);
+        deletedPage.setChapterId(10L);
+        deletedPage.setPageNumber(1);
+        deletedPage.setHqPath(null);
+        deletedPage.setHqStatus(HqStatus.DELETED);
+        deletedPage.setLqStatus(LqStatus.READY);
+        deletedPage.setFileSize(0L);
+        deletedPage.setMediaType("IMAGE");
+
+        when(mediaMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(deletedPage));
+
+        Path out = exporter.export(1L);
+
+        JsonNode mediaItems = realMapper.readTree(out.toFile()).get("chapters").get(0).get("mediaItems");
+        assertEquals(1, mediaItems.size(), "HQ 已删除的页面必须保留在 metadata 中，不得被静默丢弃");
+        JsonNode item = mediaItems.get(0);
+        assertEquals("DELETED", item.get("hqStatus").asText(), "hqStatus 必须输出 DELETED");
+        assertFalse(item.has("hqPath"), "hq_path 已清空，序列化层应省略 hqPath 字段");
+    }
+
+    @Test
     void export_loadsAllMediaInSingleBatchQuery_groupedByChapter(@TempDir Path tempDir) throws Exception {
         ObjectMapper realMapper = new ObjectMapper();
         ApiStorageRoot metadataRoot = new ApiStorageRoot();
