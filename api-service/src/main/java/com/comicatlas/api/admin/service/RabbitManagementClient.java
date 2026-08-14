@@ -34,7 +34,7 @@ public class RabbitManagementClient {
     @Value("${mq.management.host:${spring.rabbitmq.host:localhost}}")
     private String host;
 
-    @Value("${mq.management.port:15672}")
+    @Value("${mq.management.port}")
     private int port;
 
     /**

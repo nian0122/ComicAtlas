@@ -19,10 +19,7 @@ if (Test-Path -LiteralPath $environmentFile) {
 }
 
 if ([string]::IsNullOrWhiteSpace($RemoteHost)) {
-    $RemoteHost = $projectEnvironment["MYSQL_BACKUP_HOST"]
-}
-if ([string]::IsNullOrWhiteSpace($RemoteHost)) {
-    $RemoteHost = $projectEnvironment["REMOTE_INFRA_HOST"]
+    $RemoteHost = $projectEnvironment["FRP_SERVER_ADDR"]
 }
 if ([string]::IsNullOrWhiteSpace($BackupPath)) {
     $mangaRoot = $projectEnvironment["MANGA_ROOT"]
@@ -31,7 +28,7 @@ if ([string]::IsNullOrWhiteSpace($BackupPath)) {
     }
 }
 if ([string]::IsNullOrWhiteSpace($RemoteHost)) {
-    throw "未设置远端主机，请在 .env 中配置 MYSQL_BACKUP_HOST 或 REMOTE_INFRA_HOST"
+    throw "未设置远端主机，请在 .env 中配置 FRP_SERVER_ADDR"
 }
 if ([string]::IsNullOrWhiteSpace($BackupPath)) {
     throw "未设置备份路径，请在 .env 中配置 MANGA_ROOT 或通过参数传入 BackupPath"

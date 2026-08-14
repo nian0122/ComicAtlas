@@ -21,21 +21,30 @@ Windows 用户建议使用正斜杠书写路径，例如 `F:/manga`，并确认 
 
 ## 二、配置存储和基础设施
 
-在项目根目录创建 `.env`：
+将项目根目录的 `.env.example` 复制为 `.env`，再按分组填写实际值：
 
 ```dotenv
 MANGA_ROOT=F:/manga
+REMOTE_INFRA_HOST=host.docker.internal
 MYSQL_ROOT_PASSWORD=请设置强密码
 API_MYSQL_USER=comicatlas_api
 API_MYSQL_PASSWORD=请设置强密码
 WORKER_MYSQL_USER=comicatlas_ro
 WORKER_MYSQL_PASSWORD=请设置另一组强密码
-REMOTE_NACOS_USERNAME=nacos
-REMOTE_NACOS_PASSWORD=nacos
+REMOTE_MYSQL_PORT=3306
 REMOTE_REDIS_PORT=6379
+REMOTE_RABBITMQ_PORT=5672
+REMOTE_RABBITMQ_MANAGEMENT_PORT=15672
+REMOTE_NACOS_HTTP_PORT=8848
+REMOTE_NACOS_GRPC_PORT=9848
+REMOTE_NACOS_USER=nacos
+REMOTE_NACOS_PASSWORD=nacos
 REMOTE_REDIS_PASSWORD=
 REMOTE_RABBITMQ_USER=guest
 REMOTE_RABBITMQ_PASSWORD=guest
+FRP_SERVER_ADDR=远端服务器公网地址
+FRP_SERVER_PORT=7000
+FRP_DASHBOARD_PORT=7500
 ```
 
 创建目录：
@@ -75,13 +84,13 @@ docker compose -f docker-compose.yml ps
 
 Gateway 会把阅读端 `/api/**` 请求转给阅读服务，把管理端 `/api/manage/**` 请求优先转给管理服务；浏览器和前端只需访问 Gateway，不直接访问两个服务端口。
 
-`docker-compose.infra.yml` 包含 MySQL、Redis、RabbitMQ 和 Nacos，端口号保持为 3306、6379、5672、15672、8848、9848，并只绑定主机回环地址。如果基础设施运行在远程主机，本地不启动该文件；使用 `tools/maintenance/manage-remote-infra-frp.ps1` 建立 FRP STCP 连接，让项目容器通过 `host.docker.internal` 访问宿主机映射端口。完整配置见 [FRP 基础设施连接](operations/frp-infrastructure.md)。
+`docker-compose.infra.yml` 包含 MySQL、Redis、RabbitMQ 和 Nacos。远端宿主映射端口全部来自 `.env` 的 `REMOTE_*_PORT`，并只绑定主机回环地址；项目服务与 FRP 读取同一组端口变量。如果基础设施运行在远程主机，本地不启动该文件；使用 `tools/maintenance/manage-remote-infra-frp.ps1` 建立 FRP STCP 连接，让项目容器通过 `REMOTE_INFRA_HOST` 访问宿主机映射端口。完整配置见 [FRP 基础设施连接](operations/frp-infrastructure.md)。
 
 ### 可信本机部署
 
 管理端接口（回收站、永久清理、批量操作、DLQ）默认不开启业务鉴权，因此 ComicAtlas 只适合部署在**可信本机**：
 
-- 只在本机或受控内网使用，不要直接暴露 `8000`（Gateway）、`15672`（RabbitMQ 管理台）、`8848`（Nacos）、`3306`（MySQL）等端口到公网。
+- 只在本机或受控内网使用，不要把 Gateway 或 `.env` 中的数据库、管理台、注册中心端口直接暴露到公网。
 - 基础设施容器只绑定回环地址（见 `docker-compose.infra.yml`），远程访问通过带 token、STCP secret 和 TLS 的 FRP visitor。
 - 管理后台 `/manage` 建议配合宿主机防火墙或反向代理做访问限制。
 - 生产使用前先阅读[部署运维](operations/management.md)中的账号、备份与升级说明。

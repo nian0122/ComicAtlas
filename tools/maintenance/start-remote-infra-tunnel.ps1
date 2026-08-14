@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$RemoteHost = "101.37.66.217",
+    [string]$RemoteHost,
     [string]$BindAddress = "0.0.0.0"
 )
 
@@ -8,13 +8,44 @@ $ErrorActionPreference = "Stop"
 
 $keyPath = Join-Path $env:USERPROFILE ".ssh\comicatlas_infra_ed25519"
 $sshPath = (Get-Command ssh.exe).Source
+$repositoryRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$environmentFile = Join-Path $repositoryRoot ".env"
+$projectEnvironment = @{}
+Get-Content -LiteralPath $environmentFile | ForEach-Object {
+    if ($_ -match '^\s*([^#][^=]*?)\s*=\s*(.*)\s*$') {
+        $projectEnvironment[$Matches[1].Trim()] = $Matches[2].Trim()
+    }
+}
+
+function Get-RequiredSetting {
+    param([string]$Name)
+    $value = $projectEnvironment[$Name]
+    if ([string]::IsNullOrWhiteSpace($value)) {
+        throw "缺少远端隧道配置：$Name"
+    }
+    return $value
+}
+
+function Get-RequiredPort {
+    param([string]$Name)
+    $rawPort = Get-RequiredSetting $Name
+    $port = 0
+    if (-not [int]::TryParse($rawPort, [ref]$port) -or $port -lt 1 -or $port -gt 65535) {
+        throw "$Name 不是有效端口：$rawPort"
+    }
+    return $port
+}
+
+if ([string]::IsNullOrWhiteSpace($RemoteHost)) {
+    $RemoteHost = Get-RequiredSetting "FRP_SERVER_ADDR"
+}
 $tunnelMappings = @(
-    @{ Local = 3306; Remote = 3306 },
-    @{ Local = 6379; Remote = 6379 },
-    @{ Local = 5672; Remote = 5672 },
-    @{ Local = 15672; Remote = 15672 },
-    @{ Local = 8848; Remote = 8848 },
-    @{ Local = 9848; Remote = 9848 }
+    @{ Local = Get-RequiredPort "REMOTE_MYSQL_PORT"; Remote = Get-RequiredPort "REMOTE_MYSQL_PORT" },
+    @{ Local = Get-RequiredPort "REMOTE_REDIS_PORT"; Remote = Get-RequiredPort "REMOTE_REDIS_PORT" },
+    @{ Local = Get-RequiredPort "REMOTE_RABBITMQ_PORT"; Remote = Get-RequiredPort "REMOTE_RABBITMQ_PORT" },
+    @{ Local = Get-RequiredPort "REMOTE_RABBITMQ_MANAGEMENT_PORT"; Remote = Get-RequiredPort "REMOTE_RABBITMQ_MANAGEMENT_PORT" },
+    @{ Local = Get-RequiredPort "REMOTE_NACOS_HTTP_PORT"; Remote = Get-RequiredPort "REMOTE_NACOS_HTTP_PORT" },
+    @{ Local = Get-RequiredPort "REMOTE_NACOS_GRPC_PORT"; Remote = Get-RequiredPort "REMOTE_NACOS_GRPC_PORT" }
 )
 $tunnelPorts = $tunnelMappings.Local
 

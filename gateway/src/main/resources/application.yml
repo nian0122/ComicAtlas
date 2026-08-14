@@ -15,9 +15,9 @@ spring:
   cloud:
     nacos:
       discovery:
-        server-addr: ${NACOS_ADDR:localhost:8848}
-        username: ${NACOS_USER:}
-        password: ${NACOS_PASS:}
+        server-addr: ${NACOS_ADDR}
+        username: ${NACOS_USER}
+        password: ${NACOS_PASS}
       config:
         import-check:
           enabled: false

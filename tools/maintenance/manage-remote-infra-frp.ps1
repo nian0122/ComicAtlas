@@ -21,14 +21,14 @@ $taskName = "ComicAtlas Remote Infra FRP"
 $legacyTaskName = "ComicAtlas Remote Infra Tunnel"
 $visitorUser = "comicatlas-local"
 $heartbeatIntervalSeconds = 30
-$serviceMappings = @(
-    [ordered]@{ Name = "mysql"; Port = 3306 },
-    [ordered]@{ Name = "redis"; Port = 6379 },
-    [ordered]@{ Name = "rabbitmq"; Port = 5672 },
-    [ordered]@{ Name = "rabbitmq-management"; Port = 15672 },
-    [ordered]@{ Name = "nacos-http"; Port = 8848 },
-    [ordered]@{ Name = "nacos-grpc"; Port = 9848 },
-    [ordered]@{ Name = "frps-dashboard"; Port = 7500; BindAddress = "127.0.0.1" }
+$serviceDefinitions = @(
+    [ordered]@{ Name = "mysql"; PortSetting = "REMOTE_MYSQL_PORT" },
+    [ordered]@{ Name = "redis"; PortSetting = "REMOTE_REDIS_PORT" },
+    [ordered]@{ Name = "rabbitmq"; PortSetting = "REMOTE_RABBITMQ_PORT" },
+    [ordered]@{ Name = "rabbitmq-management"; PortSetting = "REMOTE_RABBITMQ_MANAGEMENT_PORT" },
+    [ordered]@{ Name = "nacos-http"; PortSetting = "REMOTE_NACOS_HTTP_PORT" },
+    [ordered]@{ Name = "nacos-grpc"; PortSetting = "REMOTE_NACOS_GRPC_PORT" },
+    [ordered]@{ Name = "frps-dashboard"; PortSetting = "FRP_DASHBOARD_PORT"; BindAddress = "127.0.0.1" }
 )
 
 function Get-ProjectEnvironment {
@@ -62,13 +62,7 @@ function Initialize-Environment {
     }
     $settings = Get-ProjectEnvironment
     if (-not $settings.ContainsKey("FRP_SERVER_ADDR")) {
-        if (-not $settings.ContainsKey("MYSQL_BACKUP_HOST")) {
-            throw "请先在 .env 中设置 FRP_SERVER_ADDR"
-        }
-        Add-EnvironmentSetting "FRP_SERVER_ADDR" $settings["MYSQL_BACKUP_HOST"]
-    }
-    if (-not $settings.ContainsKey("FRP_SERVER_PORT")) {
-        Add-EnvironmentSetting "FRP_SERVER_PORT" "7000"
+        throw "请先在 .env 中设置 FRP_SERVER_ADDR"
     }
     if (-not $settings.ContainsKey("FRP_AUTH_TOKEN")) {
         Add-EnvironmentSetting "FRP_AUTH_TOKEN" (New-Secret)
@@ -88,6 +82,9 @@ function Initialize-Environment {
     if (-not $settings.ContainsKey("FRP_DASHBOARD_PASSWORD")) {
         Add-EnvironmentSetting "FRP_DASHBOARD_PASSWORD" (New-Secret)
     }
+    $settings = Get-ProjectEnvironment
+    $null = Get-ServerPort $settings
+    $null = @(Get-ServiceMappings $settings)
     Write-Output "FRP 环境变量已在未跟踪的 .env 中就绪"
 }
 
@@ -104,14 +101,34 @@ function ConvertTo-TomlString {
     return $Value.Replace('\', '\\').Replace('"', '\"')
 }
 
-function Get-ServerPort {
-    param([hashtable]$Settings)
-    $rawPort = Get-RequiredSetting $Settings "FRP_SERVER_PORT"
+function Get-RequiredPort {
+    param([hashtable]$Settings, [string]$Name)
+    $rawPort = Get-RequiredSetting $Settings $Name
     $port = 0
     if (-not [int]::TryParse($rawPort, [ref]$port) -or $port -lt 1 -or $port -gt 65535) {
-        throw "FRP_SERVER_PORT 不是有效端口：$rawPort"
+        throw "$Name 不是有效端口：$rawPort"
     }
     return $port
+}
+
+function Get-ServerPort {
+    param([hashtable]$Settings)
+    return Get-RequiredPort $Settings "FRP_SERVER_PORT"
+}
+
+function Get-ServiceMappings {
+    param([hashtable]$Settings)
+    foreach ($definition in $serviceDefinitions) {
+        $mapping = [ordered]@{
+            Name = $definition.Name
+            Port = Get-RequiredPort $Settings $definition.PortSetting
+            PortSetting = $definition.PortSetting
+        }
+        if ($definition.Contains("BindAddress")) {
+            $mapping.BindAddress = $definition.BindAddress
+        }
+        $mapping
+    }
 }
 
 function Get-ReleaseArchive {
@@ -160,6 +177,7 @@ function Install-WindowsClient {
 
 function Write-VisitorConfig {
     $settings = Get-ProjectEnvironment
+    $serviceMappings = @(Get-ServiceMappings $settings)
     $serverAddress = ConvertTo-TomlString (Get-RequiredSetting $settings "FRP_SERVER_ADDR")
     $serverPort = Get-ServerPort $settings
     $authToken = ConvertTo-TomlString (Get-RequiredSetting $settings "FRP_AUTH_TOKEN")
@@ -206,6 +224,8 @@ function Write-VisitorConfig {
 function Write-ServerBundle {
     $settings = Get-ProjectEnvironment
     $serverPort = Get-ServerPort $settings
+    $dashboardPort = Get-RequiredPort $settings "FRP_DASHBOARD_PORT"
+    $serviceMappings = @(Get-ServiceMappings $settings)
     $authToken = Get-RequiredSetting $settings "FRP_AUTH_TOKEN"
     $stcpSecret = Get-RequiredSetting $settings "FRP_STCP_SECRET"
     $providerUser = ConvertTo-TomlString (Get-RequiredSetting $settings "FRP_PROVIDER_USER")
@@ -230,7 +250,7 @@ function Write-ServerBundle {
     Copy-Item -LiteralPath (Join-Path $linuxRoot.FullName "frpc") -Destination $bundleDirectory
     $frpsConfig = @"
 bindAddr = "0.0.0.0"
-bindPort = $serverPort
+bindPort = {{ .Envs.FRP_SERVER_PORT }}
 auth.method = "token"
 auth.token = "{{ .Envs.FRP_AUTH_TOKEN }}"
 auth.additionalScopes = ["HeartBeats", "NewWorkConns"]
@@ -238,7 +258,7 @@ transport.tls.force = true
 transport.tcpMuxKeepaliveInterval = 30
 transport.heartbeatTimeout = 90
 webServer.addr = "127.0.0.1"
-webServer.port = 7500
+webServer.port = {{ .Envs.FRP_DASHBOARD_PORT }}
 webServer.user = "{{ .Envs.FRP_DASHBOARD_USER }}"
 webServer.password = "{{ .Envs.FRP_DASHBOARD_PASSWORD }}"
 log.to = "/var/log/frp/frps.log"
@@ -247,7 +267,7 @@ log.maxDays = 7
 "@
     $providerLines = [System.Collections.Generic.List[string]]::new()
     $providerLines.Add('serverAddr = "127.0.0.1"')
-    $providerLines.Add("serverPort = $serverPort")
+    $providerLines.Add('serverPort = {{ .Envs.FRP_SERVER_PORT }}')
     $providerLines.Add("user = `"$providerUser`"")
     $providerLines.Add('loginFailExit = false')
     $providerLines.Add('auth.method = "token"')
@@ -268,7 +288,7 @@ log.maxDays = 7
         $providerLines.Add('secretKey = "{{ .Envs.FRP_STCP_SECRET }}"')
         $providerLines.Add("allowUsers = [`"$visitorUser`"]")
         $providerLines.Add('localIP = "127.0.0.1"')
-        $providerLines.Add("localPort = $($service.Port)")
+        $providerLines.Add("localPort = {{ .Envs.$($service.PortSetting) }}")
         $providerLines.Add('healthCheck.type = "tcp"')
         $providerLines.Add('healthCheck.timeoutSeconds = 3')
         $providerLines.Add('healthCheck.maxFailed = 3')
@@ -279,6 +299,14 @@ FRP_AUTH_TOKEN=$authToken
 FRP_STCP_SECRET=$stcpSecret
 FRP_DASHBOARD_USER=$dashboardUser
 FRP_DASHBOARD_PASSWORD=$dashboardPassword
+FRP_SERVER_PORT=$serverPort
+FRP_DASHBOARD_PORT=$dashboardPort
+REMOTE_MYSQL_PORT=$($settings["REMOTE_MYSQL_PORT"])
+REMOTE_REDIS_PORT=$($settings["REMOTE_REDIS_PORT"])
+REMOTE_RABBITMQ_PORT=$($settings["REMOTE_RABBITMQ_PORT"])
+REMOTE_RABBITMQ_MANAGEMENT_PORT=$($settings["REMOTE_RABBITMQ_MANAGEMENT_PORT"])
+REMOTE_NACOS_HTTP_PORT=$($settings["REMOTE_NACOS_HTTP_PORT"])
+REMOTE_NACOS_GRPC_PORT=$($settings["REMOTE_NACOS_GRPC_PORT"])
 "@
     $frpsService = @'
 [Unit]
@@ -367,6 +395,7 @@ function Test-LocalTcpPort {
 
 function Start-Client {
     Stop-LegacyTunnel
+    $serviceMappings = @(Get-ServiceMappings (Get-ProjectEnvironment))
     $existingProcess = Get-ClientProcess
     if ($existingProcess) {
         Write-Output "FRP visitor 已运行，PID=$($existingProcess.Id)"
@@ -409,6 +438,7 @@ function Stop-Client {
 }
 
 function Show-Status {
+    $serviceMappings = @(Get-ServiceMappings (Get-ProjectEnvironment))
     $process = Get-ClientProcess
     if ($process) {
         Write-Output "FRP visitor 进程：运行中，PID=$($process.Id)"
