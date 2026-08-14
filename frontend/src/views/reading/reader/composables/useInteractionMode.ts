@@ -2,6 +2,7 @@ import { computed } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
 import { BREAKPOINTS, useBreakpoint } from '@/composables/useBreakpoint'
 import { useMediaQuery } from '@/composables/useMediaQuery'
+import { useDisplayModeStore } from '@/stores/display-mode-store'
 
 /** 阅读器交互模式：desktop（鼠标/键盘）或 mobile（触摸） */
 export type InteractionMode = 'desktop' | 'mobile'
@@ -24,19 +25,21 @@ export interface InteractionContext {
 /**
  * 检测阅读器交互模式。
  *
- * 判定逻辑（双重条件，非简单 Touch 检测）：
- * 视口宽度 ≤ BREAKPOINTS.tablet 且 pointer: coarse 命中时为 'mobile'，
- * 因此手机和平板均使用触控阅读交互，
- * 否则为 'desktop'。resize 与指针类型变化均会触发响应式更新。
+ * 判定优先级：用户显式选择 > 设备能力自动判断。
+ * 自动模式下，视口宽度 ≤ BREAKPOINTS.tablet 且 pointer: coarse 命中时为 'mobile'，
+ * 因此手机和平板均使用触控阅读交互；否则为 'desktop'。
  */
 export function useInteractionMode(): InteractionContext {
+  const displayMode = useDisplayModeStore()
   const width = useBreakpoint()
   const coarsePointer = useMediaQuery('(pointer: coarse)')
   const supportsHover = useMediaQuery('(hover: hover)')
 
-  const mode = computed<InteractionMode>(() =>
-    width.value <= BREAKPOINTS.tablet && coarsePointer.value ? 'mobile' : 'desktop'
-  )
+  const mode = computed<InteractionMode>(() => {
+    if (displayMode.mode === 'mobile') return 'mobile'
+    if (displayMode.mode === 'desktop') return 'desktop'
+    return width.value <= BREAKPOINTS.tablet && coarsePointer.value ? 'mobile' : 'desktop'
+  })
 
   return { mode, coarsePointer, supportsHover }
 }

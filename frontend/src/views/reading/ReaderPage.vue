@@ -383,7 +383,9 @@ onBeforeUnmount(() => {
 <style scoped>
 .reader-page {
   width: 100%;
-  height: 100dvh;
+  height: 100vh;
+  height: var(--app-viewport-height, 100dvh);
+  min-height: 0;
   display: flex;
   flex-direction: column;
   background: var(--bg);

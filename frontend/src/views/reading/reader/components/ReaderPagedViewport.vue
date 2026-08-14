@@ -162,6 +162,8 @@ watch(
   overflow: auto;
   display: flex;
   touch-action: manipulation;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 .paged-page {
