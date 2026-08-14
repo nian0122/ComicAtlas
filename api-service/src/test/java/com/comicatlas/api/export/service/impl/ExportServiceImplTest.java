@@ -6,9 +6,9 @@ import com.comicatlas.persistence.storage.ApiStorageProperties;
 import com.comicatlas.persistence.storage.ApiStorageRoot;
 import com.comicatlas.api.export.dto.ExportTaskVO;
 import com.comicatlas.api.export.entity.ExportTask;
-import com.comicatlas.api.export.event.ExportEventPublisher;
 import com.comicatlas.api.export.mapper.ExportTaskMapper;
 import com.comicatlas.api.management.service.ManagementTaskService;
+import com.comicatlas.api.outbox.service.OutboxService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -40,7 +40,7 @@ class ExportServiceImplTest {
         props.setRoots(Map.of("EXPORT", exportRoot));
 
         return new ExportServiceImpl(mock(ComicMapper.class), taskMapper,
-                mock(ExportEventPublisher.class), mock(ManagementTaskService.class), props);
+                mock(OutboxService.class), mock(ManagementTaskService.class), props);
     }
 
     @Test
@@ -106,7 +106,7 @@ class ExportServiceImplTest {
         props.setRoots(Map.of("EXPORT", exportRoot));
 
         ExportServiceImpl svc = new ExportServiceImpl(mock(ComicMapper.class), taskMapper,
-                mock(ExportEventPublisher.class), mock(ManagementTaskService.class), props);
+                mock(OutboxService.class), mock(ManagementTaskService.class), props);
 
         List<ExportTaskVO> vos = svc.listAllExports();
 

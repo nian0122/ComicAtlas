@@ -12,20 +12,23 @@ import com.comicatlas.persistence.storage.ApiStorageProperties;
 import com.comicatlas.persistence.storage.PathTraversalException;
 import com.comicatlas.api.export.dto.ExportTaskVO;
 import com.comicatlas.api.export.entity.ExportTask;
-import com.comicatlas.api.export.event.ExportEventPublisher;
 import com.comicatlas.api.export.mapper.ExportTaskMapper;
 import com.comicatlas.api.export.service.ExportService;
 import com.comicatlas.api.management.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
 import com.comicatlas.api.management.service.ManagementTaskService;
+import com.comicatlas.api.outbox.service.OutboxService;
+import com.comicatlas.common.constant.MqExchanges;
+import com.comicatlas.common.constant.MqRoutingKeys;
+import com.comicatlas.common.event.ExportTaskCreatedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -40,7 +43,7 @@ public class ExportServiceImpl implements ExportService {
 
     private final ComicMapper comicMapper;
     private final ExportTaskMapper exportTaskMapper;
-    private final ExportEventPublisher eventPublisher;
+    private final OutboxService outboxService;
     private final ManagementTaskService managementTaskService;
     private final ApiStorageProperties storageProperties;
 
@@ -53,7 +56,9 @@ public class ExportServiceImpl implements ExportService {
         ExportTask task = createExportTaskRecord(comicId);
 
         Long taskId = task.getId();
-        registerPublishAfterCommit(taskId, comicId);
+        // 写入 Outbox（同事务），由 relay 异步发布，保证 DB 与消息一致
+        outboxService.enqueue(new ExportTaskCreatedEvent(UUID.randomUUID(), Instant.now(), taskId, comicId),
+                MqExchanges.EXPORT, MqRoutingKeys.TASK_CREATED);
 
         log.info("导出任务创建: taskId={}, comicId={}", taskId, comicId);
         return toVO(task);
@@ -113,16 +118,6 @@ public class ExportServiceImpl implements ExportService {
         task.setManagementTaskId(managementTaskResponse.getId());
         exportTaskMapper.updateById(task);
         return task;
-    }
-
-    private void registerPublishAfterCommit(Long taskId, Long comicId) {
-        TransactionSynchronizationManager.registerSynchronization(
-            new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    eventPublisher.publishExportTaskCreated(taskId, comicId);
-                }
-            });
     }
 
     /**
