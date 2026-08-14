@@ -39,7 +39,7 @@ public class LqCommandHandler {
 
     public void generateChapter(ManagementCommandRequestedEvent cmd) {
         Long chapterId = cmd.targetId();
-        List<Integer> failedPages = processChapter(chapterId);
+        List<Integer> failedPages = processChapter(chapterId, isRegenerate(cmd));
         if (failedPages.isEmpty()) {
             publisher.progress(cmd, 100, "LQ 生成完成");
             publisher.completed(cmd);
@@ -64,7 +64,7 @@ public class LqCommandHandler {
         }
         List<Long> failedChapters = new ArrayList<>();
         for (Long chapterId : chapterIds) {
-            List<Integer> failedPages = processChapter(chapterId);
+            List<Integer> failedPages = processChapter(chapterId, isRegenerate(cmd));
             if (!failedPages.isEmpty()) {
                 failedChapters.add(chapterId);
             }
@@ -79,8 +79,13 @@ public class LqCommandHandler {
         }
     }
 
+    /** LQ_REGENERATE 表示强制重新生成（忽略已存在的 LQ 产物）。 */
+    private static boolean isRegenerate(ManagementCommandRequestedEvent cmd) {
+        return "LQ_REGENERATE".equals(cmd.operationType());
+    }
+
     /** 处理单个章节的 LQ 生成，返回失败页码列表（空 = 全部成功）。空章节视为无需处理。 */
-    private List<Integer> processChapter(Long chapterId) {
+    private List<Integer> processChapter(Long chapterId, boolean force) {
         List<ExportMedia> pages = mediaMapper.selectByChapterId(chapterId);
         if (pages.isEmpty()) {
             return List.of();
@@ -94,7 +99,7 @@ public class LqCommandHandler {
         String relativeDir = extractDirectory(pages.get(0).getHqPath());
         Path hqDir = hqRoot.resolve(relativeDir);
         Path lqDir = lqRoot.resolve(relativeDir);
-        ImageOptimizer.RunResult result = optimizer.generateLq(comicId, chapterId, hqDir, lqDir);
+        ImageOptimizer.RunResult result = optimizer.generateLq(comicId, chapterId, hqDir, lqDir, force);
         if (result.getPages() == null) {
             return List.of();
         }

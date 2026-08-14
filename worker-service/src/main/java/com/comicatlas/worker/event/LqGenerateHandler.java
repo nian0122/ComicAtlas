@@ -69,7 +69,7 @@ public class LqGenerateHandler {
             Path lqDir = lqRoot.resolve(relativeDir);
 
             ImageOptimizer.RunResult result = optimizer.generateLq(
-                    comicId, chapterId, hqDir, lqDir);
+                    comicId, chapterId, hqDir, lqDir, false);
 
             List<Integer> failedPages = result.getPages().stream()
                     .filter(p -> "failed".equals(p.getStatus()))

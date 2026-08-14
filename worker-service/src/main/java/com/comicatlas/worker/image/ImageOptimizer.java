@@ -36,9 +36,10 @@ public class ImageOptimizer {
      * @param chapterId 章节 ID（仅用于日志和 JSON 回传）
      * @param hqDir     HQ 源目录绝对路径
      * @param lqDir     LQ 目标目录绝对路径
+     * @param force     是否强制重新生成（忽略已存在的 LQ 产物，对应 LQ_REGENERATE）
      * @return Go 工具返回的详细结果
      */
-    public RunResult generateLq(Long comicId, Long chapterId, Path hqDir, Path lqDir) {
+    public RunResult generateLq(Long comicId, Long chapterId, Path hqDir, Path lqDir, boolean force) {
         String hqDirStr = hqDir.toString();
         String lqDirStr = lqDir.toString();
 
@@ -68,9 +69,12 @@ public class ImageOptimizer {
                 "-workers", String.valueOf(workers),
                 "-json"
         ));
+        if (force) {
+            cmd.add("-force");
+        }
 
-        log.info("启动图片优化: comicId={}, chapterId={}, hqDir={}, lqDir={}, workers={}, quality={}",
-                comicId, chapterId, hqDirStr, lqDirStr, workers, config.getLqQuality());
+        log.info("启动图片优化: comicId={}, chapterId={}, hqDir={}, lqDir={}, workers={}, quality={}, force={}",
+                comicId, chapterId, hqDirStr, lqDirStr, workers, config.getLqQuality(), force);
         return runOptimizer(cmd, comicId, chapterId);
     }
 
