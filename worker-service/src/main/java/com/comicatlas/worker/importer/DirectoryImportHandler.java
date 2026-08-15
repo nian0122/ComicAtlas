@@ -1,6 +1,7 @@
 package com.comicatlas.worker.importer;
 
 import com.comicatlas.common.constant.StorageRootKeys;
+import com.comicatlas.common.util.MetadataFileWriter;
 import com.comicatlas.worker.event.CancelHandler;
 import com.comicatlas.worker.image.CoverGenerator;
 import com.comicatlas.worker.media.ComicMetadata;
@@ -232,16 +233,18 @@ public class DirectoryImportHandler {
     private Path writeMetadataNode(JsonNode metadata, Long taskId, Long comicId, Path mangaRoot) throws IOException {
         Path metaDir = mangaRoot.resolve(METADATA_DIR_NAME);
         Files.createDirectories(metaDir);
+        // 统一原子写（tmp → flush → ATOMIC_MOVE）：避免崩溃产生半截 metadata 无法用于恢复
+        String metadataJson = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(metadata);
         // 任务级 metadata（ImportEventHandler 消费）
         Path metaPath = metaDir.resolve(taskId + JSON_FILE_SUFFIX);
-        objectMapper.writerWithDefaultPrettyPrinter().writeValue(metaPath.toFile(), metadata);
+        MetadataFileWriter.write(metaPath, metadataJson);
         // QA 修复注记（task-21）：同时写出 comicId.json。
         // RecoveryEngine 按 metadata/{comicId}.json 查找元数据重建 DB 记录，而原实现
         // 只写 {taskId}.json，导致正常导入的漫画在 DB 数据丢失后恢复走占位路径
         // （RECOVERY_REQUIRED）而非完整恢复（READY）。
         if (comicId != null) {
             Path comicMeta = metaDir.resolve(comicId + JSON_FILE_SUFFIX);
-            objectMapper.writerWithDefaultPrettyPrinter().writeValue(comicMeta.toFile(), metadata);
+            MetadataFileWriter.write(comicMeta, metadataJson);
         }
         log.info("Metadata written: {}", metaPath);
         return metaPath;
