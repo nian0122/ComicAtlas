@@ -837,7 +837,7 @@ OP_NOT_ALLOWED, COMIC_NOT_FOUND
 
 ### 18.4 MQ 路由表
 
-共享事件 DTO 共 **36 个事件 record**（`ComicEvent` sealed 接口 + 各域事件）。队列契约与 AGENTS.md 一致：
+共享事件 DTO 共 **33 个事件 record**（`ComicEvent` sealed 接口 + 各域事件）。队列契约与 AGENTS.md 一致：
 
 | Exchange | RoutingKey | Queue | Consumer |
 |----------|-----------|-------|----------|
@@ -849,10 +849,6 @@ OP_NOT_ALLOWED, COMIC_NOT_FOUND
 | comic.import | import.storage.finalize.failed | import.storage.finalize.failed.queue | API ImportStorageFinalizeEventHandler |
 | comic.task | status.changed | task.status.queue | API ImportEventHandler |
 | comic.task | cancel.requested | cancel.task.queue | Worker CancelHandler |
-| comic.image | lq.generate | lq.generate.queue | Worker LqGenerateHandler |
-| comic.image | lq.completed | lq.result.queue | API LqCompletedHandler |
-| comic.image | hq.delete.requested | hq.delete.queue | Worker HqDeleteHandler |
-| comic.image | hq.delete.completed | hq.delete.result.queue | API HqDeletedHandler |
 | comic.image | video.metadata.fix.requested | video.metadata.fix.queue | Worker VideoMetadataFixHandler |
 | comic.image | video.metadata.fix.completed | video.metadata.fix.result.queue | API VideoMetadataFixCompletedHandler |
 | comic.export | task.created | export.task.queue | Worker ExportTaskHandler |

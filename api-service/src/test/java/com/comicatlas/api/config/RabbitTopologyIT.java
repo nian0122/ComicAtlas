@@ -257,17 +257,6 @@ class RabbitTopologyIT {
             assertThat(dlx).isNotNull();
             assertThat(dlxArgToString(dlx)).isEqualTo("comic.import.dlx");
         }
-
-        @Test
-        @DisplayName("lq.result.queue DLX 配置不变")
-        void lqResultQueue_unchanged() {
-            var queue = apiConfig.lqResultQueue();
-            assertThat(queue.getName()).isEqualTo("lq.result.queue");
-
-            Object dlx = queue.getArguments().get("x-dead-letter-exchange");
-            assertThat(dlx).isNotNull();
-            assertThat(dlxArgToString(dlx)).isEqualTo("comic.image.dlx");
-        }
     }
 
     // ======================== 拓扑完整性 ========================

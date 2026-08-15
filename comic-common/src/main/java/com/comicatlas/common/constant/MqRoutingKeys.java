@@ -25,10 +25,6 @@ public final class MqRoutingKeys {
     public static final String CANCEL_REQUESTED = "cancel.requested";
 
     // comic.image
-    public static final String LQ_GENERATE = "lq.generate";
-    public static final String LQ_COMPLETED = "lq.completed";
-    public static final String HQ_DELETE_REQUESTED = "hq.delete.requested";
-    public static final String HQ_DELETE_COMPLETED = "hq.delete.completed";
     public static final String VIDEO_METADATA_FIX_REQUESTED = "video.metadata.fix.requested";
     public static final String VIDEO_METADATA_FIX_COMPLETED = "video.metadata.fix.completed";
 

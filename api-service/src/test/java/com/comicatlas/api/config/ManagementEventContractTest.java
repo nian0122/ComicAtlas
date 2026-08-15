@@ -11,9 +11,7 @@ import java.util.UUID;
 import com.comicatlas.common.event.ComicEvent;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import com.comicatlas.common.event.HqDeletedEvent;
 import com.comicatlas.common.event.ImportTaskCreatedEvent;
-import com.comicatlas.common.event.LqGenerateEvent;
 import com.comicatlas.common.event.ManagementCommandCancelRequestedEvent;
 import com.comicatlas.common.event.ManagementCommandCompletedEvent;
 import com.comicatlas.common.event.ManagementCommandFailedEvent;
@@ -292,33 +290,17 @@ class ManagementEventContractTest {
         }
 
         @Test
-        @DisplayName("LqGenerateEvent 可序列化并保持字段")
-        void lqGenerateEvent_stillWorks() throws Exception {
-            var event = new LqGenerateEvent(
-                    UUID.randomUUID(), Instant.now(), 10L, 5L, "01");
-
-            String json = mapper.writeValueAsString(event);
-            LqGenerateEvent restored = mapper.readValue(json, LqGenerateEvent.class);
-
-            assertThat(restored.comicId()).isEqualTo(10L);
-            assertThat(restored.chapterId()).isEqualTo(5L);
-            assertThat(restored.chapterNo()).isEqualTo("01");
-            assertThat(restored.version()).isEqualTo(1);
+        @DisplayName("LqGenerateEvent 已随旧 LQ 链路移除")
+        void lqGenerateEvent_shouldBeRemoved() {
+            assertThatThrownBy(() -> Class.forName("com.comicatlas.common.event.LqGenerateEvent"))
+                    .isInstanceOf(ClassNotFoundException.class);
         }
 
         @Test
-        @DisplayName("HqDeletedEvent 可序列化并保持字段")
-        void hqDeletedEvent_stillWorks() throws Exception {
-            var event = new HqDeletedEvent(
-                    UUID.randomUUID(), Instant.now(), 10L, 5L, 1024L, 5);
-
-            String json = mapper.writeValueAsString(event);
-            HqDeletedEvent restored = mapper.readValue(json, HqDeletedEvent.class);
-
-            assertThat(restored.comicId()).isEqualTo(10L);
-            assertThat(restored.chapterId()).isEqualTo(5L);
-            assertThat(restored.freedBytes()).isEqualTo(1024L);
-            assertThat(restored.deletedCount()).isEqualTo(5);
+        @DisplayName("HqDeletedEvent 已随旧 HQ 删除链路移除")
+        void hqDeletedEvent_shouldBeRemoved() {
+            assertThatThrownBy(() -> Class.forName("com.comicatlas.common.event.HqDeletedEvent"))
+                    .isInstanceOf(ClassNotFoundException.class);
         }
     }
 

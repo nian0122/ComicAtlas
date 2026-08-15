@@ -147,7 +147,7 @@ flowchart TD
 | 流程 | 触发 | 路径 |
 |------|------|------|
 | 阅读 | 用户打开章节 | Frontend → Gateway → 阅读服务 `ReaderService` → `FileUrlResolver` → Nginx 静态文件 |
-| LQ 生成 | 用户手动触发 | 管理服务 → MQ `comic.image.lq.generate` → Worker → 生成 LQ 图片 |
+| LQ 生成 | 用户手动触发 | 管理服务创建管理任务（`LQ_GENERATE`）→ MQ `comic.management.command.requested` → Worker `LqCommandHandler` → 生成 LQ 图片 |
 | 漫画删除（回收） | 用户删除漫画 | 管理服务创建管理任务（`COMIC_DELETE`）→ MQ `comic.management.command.requested` → Worker 移入 trash 卷 → 管理服务更新生命周期为 `TRASHED`；永久删除走 `purge`（`TRASHED` + 7 天保留期 + 二次确认） |
 | 任务状态同步 | Worker 进度变化 | Worker `TaskStatusPublisher` → MQ `comic.task.status.changed` → 管理服务 `ImportEventHandler` 更新 import_task |
 
