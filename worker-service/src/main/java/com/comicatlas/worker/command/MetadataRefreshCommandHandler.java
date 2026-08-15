@@ -89,6 +89,18 @@ public class MetadataRefreshCommandHandler {
     /** LQ 存储根 key（旧布局升级时同构移动 LQ 目录）。 */
     private static final String LQ_ROOT_KEY = "LQ";
 
+    /** LQ 产物扩展名：image-optimizer.exe 固定输出 WebP。 */
+    private static final String LQ_EXTENSION = ".webp";
+
+    /** LQ 未生成状态名（与 LqStatus 枚举一致）。 */
+    private static final String LQ_STATUS_NOT_GENERATED = "NOT_GENERATED";
+
+    /** LQ 状态：READY（文件存在）。 */
+    private static final String STATUS_READY = "READY";
+
+    /** 媒体类型：图片（仅图片有 LQ 产物）。 */
+    private static final String IMAGE_TYPE = "IMAGE";
+
     /** 图片扩展名白名单。 */
     private static final Set<String> IMAGE_EXTENSIONS =
             Set.of(".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp");
@@ -354,13 +366,25 @@ public class MetadataRefreshCommandHandler {
                 log.debug("媒体分析失败: comicId={}, chapterId={}, file={}", comicId, chapterId, fileName, e);
             }
 
+            // LQ 事实：仅图片媒体扫 LQ 目录（视频无 LQ 产物）；文件名推导为 {basename}.webp，
+            // 与 LQ 生成工具（image-optimizer.exe）输出规则一致。文件存在且为普通文件才计大小，
+            // 符号链接/缺失按未生成处理（NOFOLLOW_LINKS 语义）。
+            String lqStatus = LQ_STATUS_NOT_GENERATED;
+            long lqSize = 0L;
+            if (IMAGE_TYPE.equals(mediaType)) {
+                LqFileFact lqFact = resolveLqFact(comicId, chapterId, fileName);
+                lqStatus = lqFact.status();
+                lqSize = lqFact.size();
+            }
+
             String relativePath = comicId + "/" + chapterId + "/" + fileName;
             mediaItems.add(new MediaSnapshot(
                     row.getId(), versionOrZero(row.getVersion()), relativePath,
                     row.getHqStatus() != null ? row.getHqStatus() : "READY",
                     row.getStatus() != null ? row.getStatus() : "READY",
                     row.getPageNumber() != null ? row.getPageNumber() : sequence,
-                    fileSize, mediaType, width, height, duration, container, videoCodec, audioCodec));
+                    fileSize, mediaType, width, height, duration, container, videoCodec, audioCodec,
+                    lqStatus, lqSize));
         }
 
         // 旧布局升级：匹配行携带旧目录键（!= chapterId）即需升级——文件本次从旧目录扫到则移动，
@@ -564,6 +588,39 @@ public class MetadataRefreshCommandHandler {
         } catch (IOException e) {
             return 0L;
         }
+    }
+
+    /**
+     * 解析 LQ 文件事实：LQ 文件名由 HQ 文件名推导（{basename}.webp，与 image-optimizer.exe
+     * 输出规则一致）。文件存在且为普通文件（NOFOLLOW_LINKS）计大小并标 READY；
+     * 符号链接、非常规文件或缺失一律按未生成处理——以本地文件为准，绝不沿用 DB 旧状态。
+     * LQ 根未配置/目录不存在时按未生成处理（LQ 为可选增强，缺失不得阻断 HQ 扫盘）。
+     *
+     * @param comicId   漫画 ID（LQ 相对路径首段）
+     * @param chapterId 章节 ID（LQ 相对路径次段）
+     * @param hqFileName HQ 文件名（用于推导 {basename}.webp）
+     * @return LQ 状态与字节数
+     */
+    private LqFileFact resolveLqFact(Long comicId, Long chapterId, String hqFileName) {
+        String baseName = hqFileName;
+        int dot = baseName.lastIndexOf('.');
+        if (dot > 0) {
+            baseName = baseName.substring(0, dot);
+        }
+        String lqFileName = baseName + LQ_EXTENSION;
+        StorageRoot lqRoot = roots().get(LQ_ROOT_KEY);
+        if (lqRoot == null) {
+            return new LqFileFact(LQ_STATUS_NOT_GENERATED, 0L);
+        }
+        Path lqFile = lqRoot.resolve(comicId + "/" + chapterId + "/" + lqFileName);
+        if (!Files.isRegularFile(lqFile, LinkOption.NOFOLLOW_LINKS)) {
+            return new LqFileFact(LQ_STATUS_NOT_GENERATED, 0L);
+        }
+        return new LqFileFact(STATUS_READY, safeSize(lqFile));
+    }
+
+    /** LQ 文件事实：状态 + 字节数（未生成时 status=NOT_GENERATED、size=0）。 */
+    private record LqFileFact(String status, long size) {
     }
 
     private static String extensionOf(String fileName) {

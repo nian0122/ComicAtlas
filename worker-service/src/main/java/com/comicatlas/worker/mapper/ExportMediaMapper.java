@@ -12,7 +12,7 @@ public interface ExportMediaMapper {
     @Select("""
         SELECT p.id, p.chapter_id, p.page_number, p.media_type,
                p.hq_root, p.hq_path, p.hq_status,
-               p.lq_root, p.lq_path, p.lq_status,
+               p.lq_root, p.lq_path, p.lq_status, p.lq_size,
                p.hq_size, p.width, p.height,
                p.duration, p.container, p.video_codec, p.audio_codec
         FROM page p
@@ -29,7 +29,7 @@ public interface ExportMediaMapper {
     @Select("""
         SELECT p.id, p.chapter_id, p.page_number, p.media_type,
                p.hq_root, p.hq_path, p.hq_status,
-               p.lq_root, p.lq_path, p.lq_status,
+               p.lq_root, p.lq_path, p.lq_status, p.lq_size,
                p.hq_size, p.width, p.height,
                p.duration, p.container, p.video_codec, p.audio_codec,
                p.status, p.version
@@ -43,7 +43,7 @@ public interface ExportMediaMapper {
     @Select("""
         SELECT p.id, p.chapter_id, p.page_number, p.media_type,
                p.hq_root, p.hq_path, p.hq_status,
-               p.lq_root, p.lq_path, p.lq_status,
+               p.lq_root, p.lq_path, p.lq_status, p.lq_size,
                p.hq_size, p.width, p.height,
                p.duration, p.container, p.video_codec, p.audio_codec
         FROM page p
@@ -55,7 +55,7 @@ public interface ExportMediaMapper {
     @Select("""
         SELECT id, chapter_id, page_number, media_type,
                hq_root, hq_path, hq_status,
-               lq_root, lq_path, lq_status,
+               lq_root, lq_path, lq_status, lq_size,
                hq_size, width, height,
                duration, container, video_codec, audio_codec
         FROM page
@@ -66,7 +66,7 @@ public interface ExportMediaMapper {
     @Select("""
         SELECT p.id, p.chapter_id, p.page_number, p.media_type,
                p.hq_root, p.hq_path, p.hq_status,
-               p.lq_root, p.lq_path, p.lq_status,
+               p.lq_root, p.lq_path, p.lq_status, p.lq_size,
                p.hq_size, p.width, p.height,
                p.duration, p.container, p.video_codec, p.audio_codec
         FROM page p
@@ -78,3 +78,4 @@ public interface ExportMediaMapper {
     """)
     List<ExportMedia> selectVideosMissingMetadataByComicId(Long comicId);
 }
+

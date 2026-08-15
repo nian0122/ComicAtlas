@@ -58,6 +58,7 @@ public class MetadataModelMapper {
                         media.getDuration() != null ? BigDecimal.valueOf(media.getDuration()) : null,
                         media.getContainer(),
                         media.getVideoCodec(), media.getAudioCodec(),
+                        media.getLqSize() != null ? media.getLqSize() : 0L,
                         hqPath));
             }
             chapters.add(new MetadataV3.Chapter(

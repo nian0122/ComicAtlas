@@ -84,10 +84,12 @@ class MetadataRefreshCommandHandlerTest {
                 .build();
         Files.createDirectories(tempRoot.resolve("hq"));
         Files.createDirectories(tempRoot.resolve("staging"));
+        Files.createDirectories(tempRoot.resolve("lq"));
         storageProperties = new StorageProperties();
         storageProperties.setRoots(java.util.Map.of(
                 "HQ", rootOf(tempRoot.resolve("hq")),
-                "STAGING", rootOf(tempRoot.resolve("staging"))));
+                "STAGING", rootOf(tempRoot.resolve("staging")),
+                "LQ", rootOf(tempRoot.resolve("lq"))));
     }
 
     @AfterEach
@@ -615,6 +617,51 @@ class MetadataRefreshCommandHandlerTest {
         assertTrue(Files.exists(freshAttempt), "新鲜 attempt 目录应保留");
         // 本次命令自己的 attempt 快照正常落盘
         assertTrue(Files.exists(snapshotPath()));
+    }
+
+    @Test
+    void lqScan_carriesLqStatusAndSizeInSnapshot() throws Exception {
+        // HQ + LQ 双目录：LQ 目录同构（lq/{comicId}/{chapterId}/{basename}.webp）
+        Path hqDir = Files.createDirectories(tempRoot.resolve("hq/1/42"));
+        Files.writeString(hqDir.resolve("001.jpg"), "img-001");
+        Files.createDirectories(tempRoot.resolve("lq/1/42"));
+        Files.writeString(tempRoot.resolve("lq/1/42/001.webp"), "lq-img-001"); // LQ 存在
+
+        when(chapterMapper.selectByComicIdWithVersion(COMIC_ID))
+                .thenReturn(List.of(chapter(CHAPTER_ID, 1, 1)));
+        when(mediaMapper.selectByComicIdWithVersionAndStatus(COMIC_ID))
+                .thenReturn(List.of(media(101L, CHAPTER_ID, "1/42/001.jpg", 1, "READY", "READY", 1)));
+        stubAnalyzerByExtension();
+        newHandler();
+
+        handler.refresh(cmd());
+
+        JsonNode root = objectMapper.readTree(snapshotPath().toFile());
+        JsonNode item = root.get("chapters").get(0).get("mediaItems").get(0);
+        assertEquals("READY", item.get("lqStatus").asText(), "LQ 文件存在应标 READY");
+        assertTrue(item.get("lqSize").asLong() > 0, "LQ 大小应取实测字节数");
+    }
+
+    @Test
+    void lqScan_lqFileMissing_marksNotGenerated() throws Exception {
+        // LQ 目录存在但无对应 .webp 文件（或 LQ 根未配置）→ 快照 lqStatus=NOT_GENERATED
+        Path hqDir = Files.createDirectories(tempRoot.resolve("hq/1/42"));
+        Files.writeString(hqDir.resolve("001.jpg"), "img-001");
+        Files.createDirectories(tempRoot.resolve("lq/1/42")); // LQ 目录存在但空
+
+        when(chapterMapper.selectByComicIdWithVersion(COMIC_ID))
+                .thenReturn(List.of(chapter(CHAPTER_ID, 1, 1)));
+        when(mediaMapper.selectByComicIdWithVersionAndStatus(COMIC_ID))
+                .thenReturn(List.of(media(101L, CHAPTER_ID, "1/42/001.jpg", 1, "READY", "READY", 1)));
+        stubAnalyzerByExtension();
+        newHandler();
+
+        handler.refresh(cmd());
+
+        JsonNode root = objectMapper.readTree(snapshotPath().toFile());
+        JsonNode item = root.get("chapters").get(0).get("mediaItems").get(0);
+        assertEquals("NOT_GENERATED", item.get("lqStatus").asText(), "LQ 文件缺失应标 NOT_GENERATED");
+        assertEquals(0, item.get("lqSize").asLong());
     }
 
     private static String shaHex(byte[] bytes) throws Exception {
