@@ -58,6 +58,8 @@ class RecoveryEngineTest {
     private CatalogCacheInvalidator catalogCacheInvalidator;
     @Mock
     private ApiStorageProperties storageProperties;
+    @Mock
+    private com.comicatlas.api.storage.service.MetadataUpdateCoordinator metadataUpdateCoordinator;
 
     @TempDir
     Path tempDir;
@@ -72,13 +74,19 @@ class RecoveryEngineTest {
         metadataRoot.setPath(Path.of("D:/manga/metadata"));
         ApiStorageRoot hqRoot = new ApiStorageRoot();
         hqRoot.setPath(tempDir.resolve("hq"));
+        ApiStorageRoot lqRoot = new ApiStorageRoot();
+        lqRoot.setPath(tempDir.resolve("lq"));
         lenient().when(storageProperties.root("METADATA")).thenReturn(metadataRoot);
         lenient().when(storageProperties.root("HQ")).thenReturn(hqRoot);
+        lenient().when(storageProperties.root("LQ")).thenReturn(lqRoot);
+        lenient().when(storageProperties.getRoots()).thenReturn(java.util.Map.of(
+                "METADATA", metadataRoot, "HQ", hqRoot, "LQ", lqRoot));
 
         realResolver = new RecoveryMediaResolver(storageProperties);
         recoveryEngine = new RecoveryEngine(
                 objectMapper, comicMapper, catalogMapper, chapterMapper, mediaMapper,
-                transactionTemplate, catalogCacheInvalidator, storageProperties, realResolver);
+                transactionTemplate, catalogCacheInvalidator, storageProperties, realResolver,
+                metadataUpdateCoordinator);
     }
 
     // ======================== Comic 已存在 ========================
@@ -292,6 +300,58 @@ class RecoveryEngineTest {
         List<ResolvedMediaItem> items = resolved.get(0);
         assertEquals(1, items.size());
         assertFalse(items.get(0).exists(), "缺文件必须识别为缺失，不得标 READY");
+        assertEquals("NOT_GENERATED", items.get(0).lqStatus(), "无 LQ 文件时 lqStatus 应为 NOT_GENERATED");
+    }
+
+    @Test
+    void resolveMedia_shouldCarryLqFact_whenLqFileExists() throws Exception {
+        // HQ 缺失但 LQ 存在：恢复为 MISSING + LQ READY（"hq 删除 lq 存在"仍可读）
+        Long comicId = 7700005L;
+        Path hqDir = tempDir.resolve("hq").resolve(String.valueOf(comicId)).resolve("99");
+        Files.createDirectories(hqDir);
+        // HQ 文件存在 + LQ 文件存在 → 双 READY
+        Files.writeString(hqDir.resolve("001.jpg"), "fake-jpeg");
+        Path lqDir = tempDir.resolve("lq").resolve(String.valueOf(comicId)).resolve("99");
+        Files.createDirectories(lqDir);
+        Files.writeString(lqDir.resolve("001.webp"), "fake-webp");
+
+        Map<String, Object> chapter = mapOf(
+            "title", "第1话", "chapterNo", "1", "sortOrder", 0, "globalOrder", 3, "catalogIndex", null,
+            "mediaItems", List.of(mapOf(
+                "fileName", "001.jpg", "pageNumber", 1, "mediaType", "IMAGE",
+                "hqPath", comicId + "/99/001.jpg", "fileSize", 2048, "hqStatus", "READY"))
+        );
+
+        List<List<ResolvedMediaItem>> resolved = realResolver.resolveMedia(comicId, List.of(chapter));
+
+        ResolvedMediaItem item = resolved.get(0).get(0);
+        assertTrue(item.exists());
+        assertEquals("READY", item.lqStatus(), "LQ 文件存在应恢复为 READY");
+        assertTrue(item.lqSize() > 0, "LQ 大小应取实测字节数");
+    }
+
+    @Test
+    void resolveMedia_shouldKeepLqReady_whenHqMissingButLqExists() throws Exception {
+        // HQ 缺失但 LQ 存在：exists=false + lqStatus=READY（恢复后 MISSING + LQ READY 可读）
+        Long comicId = 7700006L;
+        Path lqDir = tempDir.resolve("lq").resolve(String.valueOf(comicId)).resolve("99");
+        Files.createDirectories(lqDir);
+        Files.writeString(lqDir.resolve("001.webp"), "fake-webp");
+        // HQ 目录故意不建（HQ 文件缺失）
+
+        Map<String, Object> chapter = mapOf(
+            "title", "第1话", "chapterNo", "1", "sortOrder", 0, "globalOrder", 3, "catalogIndex", null,
+            "mediaItems", List.of(mapOf(
+                "fileName", "001.jpg", "pageNumber", 1, "mediaType", "IMAGE",
+                "hqPath", comicId + "/99/001.jpg", "fileSize", 2048, "hqStatus", "READY"))
+        );
+
+        List<List<ResolvedMediaItem>> resolved = realResolver.resolveMedia(comicId, List.of(chapter));
+
+        ResolvedMediaItem item = resolved.get(0).get(0);
+        assertFalse(item.exists(), "HQ 缺失必须识别为缺失");
+        assertEquals("READY", item.lqStatus(), "HQ 缺失但 LQ 存在时 LQ 仍应恢复为 READY（兜底可读）");
+        assertTrue(item.lqSize() > 0);
     }
 
     @Test

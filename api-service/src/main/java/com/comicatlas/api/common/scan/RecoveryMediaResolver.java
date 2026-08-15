@@ -4,6 +4,7 @@ import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.common.storage.RelativePathValidator;
 import com.comicatlas.common.util.ImageDimensionsReader;
 import com.comicatlas.api.storage.ApiStorageProperties;
+import com.comicatlas.api.storage.ApiStorageRoot;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -47,6 +48,13 @@ public class RecoveryMediaResolver {
     private static final String MEDIA_TYPE_IMAGE = "IMAGE";
     /** 媒体类型：视频。 */
     private static final String MEDIA_TYPE_VIDEO = "VIDEO";
+
+    /** LQ 状态：READY（LQ 文件存在）。 */
+    private static final String LQ_STATUS_READY = "READY";
+    /** LQ 状态：NOT_GENERATED（LQ 文件不存在）。 */
+    private static final String LQ_STATUS_NOT_GENERATED = "NOT_GENERATED";
+    /** LQ 产物扩展名：image-optimizer.exe 固定输出 WebP。 */
+    private static final String LQ_EXTENSION = ".webp";
 
     // metadata JSON 字段名（与 MetadataJsonBuilder 写出字段保持一致）
     private static final String FIELD_GLOBAL_ORDER = "globalOrder";
@@ -170,18 +178,21 @@ public class RecoveryMediaResolver {
     /**
      * 现代 metadata 条目：hqPath 存在性校验后原样保留。
      * typed-fail：绝对路径/反斜杠/目录穿越一律拒绝。
+     * LQ 事实按 hqPath 推导（{hqPath 去扩展名}.webp）独立扫描——HQ 缺失时 LQ 可能仍在，
+     * 恢复为 MISSING + LQ READY（"hq 删除 lq 存在"仍可读）。
      */
     private ResolvedMediaItem resolveHqPathItem(Map<String, Object> item, String fileName, int pageNumber,
                                                 String mediaType, String hqPath) {
         RelativePathValidator.requireRelativeForwardSlash(hqPath);
         Path resolved = storageProperties.root(StorageRootKeys.HQ).resolve(hqPath);
         boolean exists = Files.exists(resolved) && Files.isRegularFile(resolved);
+        LqFileFact lqFact = resolveLqFact(hqPath, mediaType);
         if (exists) {
             long fileSize = safeSize(resolved);
             ImageDimensions dims = MEDIA_TYPE_IMAGE.equals(mediaType)
                     ? getImageDimensions(resolved) : new ImageDimensions(null, null);
             return new ResolvedMediaItem(fileName, pageNumber, fileSize, dims.width(), dims.height(),
-                    mediaType, hqPath, true);
+                    mediaType, hqPath, true, lqFact.status(), lqFact.size());
         }
         // 文件缺失：尺寸/大小回退 metadata 值（恢复为 MISSING，不得标 READY）
         long fileSize = item.get(FIELD_FILE_SIZE) != null
@@ -190,7 +201,45 @@ public class RecoveryMediaResolver {
                 ? ((Number) item.get(FIELD_WIDTH)).intValue() : null;
         Integer height = item.get(FIELD_HEIGHT) != null
                 ? ((Number) item.get(FIELD_HEIGHT)).intValue() : null;
-        return new ResolvedMediaItem(fileName, pageNumber, fileSize, width, height, mediaType, hqPath, false);
+        return new ResolvedMediaItem(fileName, pageNumber, fileSize, width, height, mediaType, hqPath, false,
+                lqFact.status(), lqFact.size());
+    }
+
+    /**
+     * 解析 LQ 文件事实：LQ 文件名由 hqPath 推导（{basename}.webp，与 image-optimizer.exe
+     * 输出规则一致），目录与 hqPath 同构（LQ 与 HQ 保持同目录结构）。
+     * 仅图片媒体有 LQ；LQ 文件存在且为普通文件才标 READY，否则 NOT_GENERATED。
+     * LQ 根未配置时按未生成处理（LQ 为可选增强，缺失不得阻断 HQ 恢复）。
+     *
+     * @param hqPath    相对 HQ 根的正斜杠路径
+     * @param mediaType IMAGE / VIDEO（仅 IMAGE 扫描 LQ）
+     * @return LQ 状态与字节数（视频或 LQ 缺失时为 NOT_GENERATED/0）
+     */
+    private LqFileFact resolveLqFact(String hqPath, String mediaType) {
+        if (!MEDIA_TYPE_IMAGE.equals(mediaType) || isBlank(hqPath)) {
+            return new LqFileFact(LQ_STATUS_NOT_GENERATED, 0L);
+        }
+        Map<String, ApiStorageRoot> roots = storageProperties.getRoots();
+        ApiStorageRoot lqRoot = roots == null ? null : roots.get(StorageRootKeys.LQ);
+        if (lqRoot == null) {
+            return new LqFileFact(LQ_STATUS_NOT_GENERATED, 0L);
+        }
+        String lqPath = deriveLqPath(hqPath);
+        Path lqFile = lqRoot.getPath().resolve(lqPath);
+        if (!Files.isRegularFile(lqFile)) {
+            return new LqFileFact(LQ_STATUS_NOT_GENERATED, 0L);
+        }
+        return new LqFileFact(LQ_STATUS_READY, safeSize(lqFile));
+    }
+
+    /** LQ 相对路径推导：{hqPath 去扩展名}.webp（与 LQ 生成工具输出规则一致）。 */
+    private static String deriveLqPath(String hqPath) {
+        int dot = hqPath.lastIndexOf('.');
+        return (dot > 0 ? hqPath.substring(0, dot) : hqPath) + LQ_EXTENSION;
+    }
+
+    /** LQ 文件事实：状态 + 字节数（未生成时 status=NOT_GENERATED、size=0）。 */
+    private record LqFileFact(String status, long size) {
     }
 
     /**
