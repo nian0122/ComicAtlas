@@ -28,14 +28,6 @@
             <el-icon :size="18"><HomeFilled /></el-icon>
             <span>仓库控制台</span>
           </router-link>
-          <router-link to="/manage/status" class="sidenav-link" active-class="active">
-            <el-icon :size="18"><DataAnalysis /></el-icon>
-            <span>漫画状态</span>
-          </router-link>
-          <router-link to="/manage/operations" class="sidenav-link" active-class="active">
-            <el-icon :size="18"><Operation /></el-icon>
-            <span>漫画操作台</span>
-          </router-link>
           <router-link to="/manage/trash" class="sidenav-link" active-class="active">
             <el-icon :size="18"><Delete /></el-icon>
             <span>回收站</span>
@@ -48,22 +40,18 @@
             <el-icon :size="18"><UploadFilled /></el-icon>
             <span>媒体上传</span>
           </router-link>
-          <router-link to="/manage/structure" class="sidenav-link" active-class="active">
-            <el-icon :size="18"><Share /></el-icon>
-            <span>目录与媒体结构</span>
-          </router-link>
           <router-link to="/manage/comics" class="sidenav-link" active-class="active">
             <el-icon :size="18"><Collection /></el-icon>
-            <span>漫画信息编辑</span>
+            <span>漫画管理</span>
+          </router-link>
+          <router-link to="/manage/storage" class="sidenav-link" active-class="active">
+            <el-icon :size="18"><Coin /></el-icon>
+            <span>存储统计</span>
           </router-link>
 
           <router-link to="/manage/import" class="sidenav-link" active-class="active">
             <el-icon :size="18"><UploadFilled /></el-icon>
             <span>新建导入</span>
-          </router-link>
-          <router-link to="/manage/storage" class="sidenav-link" active-class="active">
-            <el-icon :size="18"><Coin /></el-icon>
-            <span>存储</span>
           </router-link>
           <router-link to="/manage/metadata" class="sidenav-link" active-class="active">
             <el-icon :size="18"><Tickets /></el-icon>
@@ -98,12 +86,9 @@ import { onMounted } from 'vue'
 import {
   Coin,
   Collection,
-  DataAnalysis,
   Delete,
   HomeFilled,
   List,
-  Operation,
-  Share,
   Setting,
   Tickets,
   UploadFilled,
@@ -340,7 +325,7 @@ onMounted(() => {
 
 .management-topnav a:hover,
 .management-topnav a.active {
-  color: var(--color-brand-pale);
+  color: var(--color-brand);
 }
 
 .management-topnav a.active::after {
@@ -349,7 +334,7 @@ onMounted(() => {
   bottom: 0;
   left: 0;
   height: 2px;
-  background: var(--color-brand-pale);
+  background: var(--color-brand);
   content: "";
 }
 
@@ -364,8 +349,8 @@ onMounted(() => {
   min-height: 44px;
   padding-inline: var(--space-5);
   border-radius: var(--radius-xs);
-  background: var(--color-brand-pale);
-  color: var(--color-canvas);
+  background: var(--color-brand);
+  color: var(--color-on-brand);
   font-size: var(--text-sm);
   font-weight: 700;
 }
@@ -420,8 +405,8 @@ onMounted(() => {
 }
 
 .new-import-link:hover {
-  border-color: var(--color-brand-pale);
-  color: var(--color-brand-pale);
+  border-color: var(--color-brand);
+  color: var(--color-brand);
 }
 
 .sidenav-menu {
@@ -448,7 +433,7 @@ onMounted(() => {
 
 .sidenav-link.active {
   background: var(--surface-highlight);
-  color: var(--color-brand-pale);
+  color: var(--color-brand);
 }
 
 .sidenav-footer {
@@ -517,8 +502,8 @@ onMounted(() => {
 .management-content :deep(.primary-btn),
 .management-content :deep(.el-button--primary) {
   border-radius: var(--radius-xs);
-  background: var(--color-brand-pale);
-  color: var(--color-canvas);
+  background: var(--color-brand);
+  color: var(--color-on-brand);
   font-weight: 700;
 }
 

@@ -64,8 +64,11 @@ public class ReaderServiceImpl implements ReaderService {
             ReaderDTO.MediaItemDTO mediaItem = new ReaderDTO.MediaItemDTO();
             mediaItem.setId(media.getId());
             mediaItem.setPageNumber(media.getPageNumber());
-            mediaItem.setFileName(extractFileName(media.getHqPath()));
+            // HQ 删除后会清空 hq_path；LQ 与 HQ 保持同名，优先用 LQ 路径保留文件名展示。
+            mediaItem.setFileName(extractFileName(
+                    media.getHqPath() != null ? media.getHqPath() : media.getLqPath()));
             mediaItem.setHqUrl(fileUrlResolver.resolve(media));
+            mediaItem.setHqStatus(media.getHqStatus() == null ? null : media.getHqStatus().name());
             mediaItem.setMediaType(media.getMediaType());
             mediaItem.setDuration(media.getDuration());
             mediaItem.setContainer(media.getContainer());
@@ -80,6 +83,8 @@ public class ReaderServiceImpl implements ReaderService {
             }
             mediaItem.setWidth(media.getWidth());
             mediaItem.setHeight(media.getHeight());
+            mediaItem.setFileSize(media.getFileSize());
+            mediaItem.setTranscodeStatus(media.getTranscodeStatus() == null ? null : media.getTranscodeStatus().name());
             return mediaItem;
         }).collect(Collectors.toList()));
         readerDTO.setTotal(mediaItems.size());

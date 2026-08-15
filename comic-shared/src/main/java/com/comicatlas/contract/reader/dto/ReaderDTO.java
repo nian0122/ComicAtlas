@@ -21,10 +21,13 @@ public class ReaderDTO {
         /** HQ 存储文件名，仅用于管理端媒体维护展示。 */
         private String fileName;
         private String hqUrl;
+        private String hqStatus;
         private String lqUrl;
         private String lqStatus;
         private Integer width;
         private Integer height;
+        private Long fileSize;
+        private String transcodeStatus;
         private String mediaType;
         private BigDecimal duration;
         private String container;

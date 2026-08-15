@@ -56,7 +56,7 @@ watch(
 )
 
 function handleShowDetail(comicId: number) {
-  router.push(`/manage/storage/${comicId}`)
+  router.push(`/manage/comics/${comicId}?tab=storage`)
 }
 
 onMounted(async () => {

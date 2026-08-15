@@ -154,6 +154,7 @@ export const lqApi = {
 export const hqApi = {
   deleteComic: (comicId: number) => api.post<OperationSubmitResult>(`/manage/storage/delete-hq/comics/${comicId}`),
   deleteChapter: (chapterId: number) => api.post<OperationSubmitResult>(`/manage/storage/delete-hq/chapters/${chapterId}`),
+  transcodeMedia: (mediaId: number) => api.post<OperationSubmitResult>(`/manage/storage/transcode/media/${mediaId}`),
 }
 
 export const exportApi = {
@@ -309,6 +310,8 @@ export const adminApi = {
   storageChapters: (comicId: number) => api.get(`/manage/admin/storage/comics/${comicId}/chapters`),
   transcodeVideos: (comicId: number) =>
     api.post<OperationSubmitResult>(`/manage/storage/transcode/comics/${comicId}`),
+  transcodeChapter: (chapterId: number) =>
+    api.post<OperationSubmitResult>(`/manage/storage/transcode/chapters/${chapterId}`),
   dlqQueues: () =>
     api.get<readonly DlqQueueVO[]>('/manage/admin/dlq/queues'),
   dlqMessages: (queueName: string, count = 20) =>

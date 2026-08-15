@@ -112,6 +112,12 @@ public class StorageOperationController {
         return Result.ok(transcodeOperationService.transcodeForComic(comicId));
     }
 
+    /** 对单个视频媒体发起转码。 */
+    @PostMapping("/transcode/media/{mediaId}")
+    public Result<OperationSubmitResultDTO> transcodeMedia(@PathVariable Long mediaId) {
+        return Result.ok(transcodeOperationService.transcodeForMedia(mediaId));
+    }
+
     /**
      * 对单个章节的视频发起转码（异步执行）。
      *

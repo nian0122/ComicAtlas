@@ -111,10 +111,14 @@ export interface MediaItemInfo {
   /** HQ 存储文件名，用于管理端媒体维护展示。 */
   fileName?: string
   hqUrl: string
+  /** HQ 文件状态，不能用 hqUrl 是否存在推断。 */
+  hqStatus?: string
   lqUrl: string
   lqStatus: string
   width: number
   height: number
+  fileSize?: number
+  transcodeStatus?: string
   /** 媒体类型，缺失时默认按 IMAGE 处理 */
   mediaType?: MediaType
   /** 视频时长（秒），仅 VIDEO 有意义 */

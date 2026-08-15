@@ -25,9 +25,9 @@ withDefaults(defineProps<{ size?: 'sm' | 'md' | 'lg'; showWordmark?: boolean }>(
 .comic-atlas-logo--lg svg { width: 3rem; height: 3rem; }
 .logo-shell { fill: var(--bg-surface); stroke: var(--color-brand); stroke-width: 1.7; }
 .logo-page { fill: none; stroke: var(--text-primary); stroke-width: 1.55; stroke-linejoin: round; }
-.logo-tree { fill: none; stroke: var(--color-brand-pale); stroke-width: 1.15; stroke-linecap: round; }
+.logo-tree { fill: none; stroke: var(--color-brand); stroke-width: 1.15; stroke-linecap: round; }
 .logo-node--red { fill: var(--color-brand); }
-.logo-node--teal { fill: #48b9a7; }
+.logo-node--teal { fill: var(--color-brand); }
 .logo-orbit { fill: none; stroke: var(--color-brand); stroke-width: 1.2; stroke-linecap: round; }
 .logo-play { fill: var(--color-brand); }
 .comic-atlas-logo__wordmark { font-size: 1.08rem; font-weight: 800; letter-spacing: -.035em; }

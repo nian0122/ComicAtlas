@@ -1,105 +1,53 @@
 <template>
   <div class="detail-page" v-loading="loading">
-    <!-- 顶部导航 -->
-    <header class="detail-header">
-      <button class="back-btn" @click="$router.back()">← 返回存储列表</button>
-      <div class="header-info">
-        <h1 class="comic-title">{{ comic?.title ?? '加载中...' }}</h1>
-        <div class="header-meta">
-          <span class="meta-item">HQ 总大小: {{ formatSize(comic?.hqSize ?? 0) }}</span>
-          <span class="meta-item">LQ 总大小: {{ comic?.mediaType === 'VIDEO' ? '不适用' : formatSize(comic?.lqSize ?? 0) }}</span>
-          <span class="meta-item">章节数: {{ chapters.length }}</span>
-        </div>
-      </div>
-      <button
-        class="refresh-btn"
-        :class="{ 'refresh-btn--ready': !refreshDisabled }"
-        :disabled="refreshDisabled"
-        :title="refreshButtonTitle"
-        @click="onRefreshMetadata"
-      >
-        {{ refreshButtonLabel }}
-      </button>
+    <header class="storage-header">
+      <div><span class="storage-eyebrow">COMIC / STORAGE</span><h1>{{ comic?.title ?? '存储详情' }}</h1><p>查看这本漫画的存储结构、媒体状态和维护操作。</p></div>
+      <div class="storage-header-tools"><span class="comic-ref">漫画 #{{ comicId }}</span><el-button :disabled="refreshDisabled" :title="refreshButtonTitle" @click="onRefreshMetadata">{{ refreshButtonLabel }}</el-button></div>
     </header>
-
-    <!-- 存储概览 -->
-    <section class="card">
-      <h2 class="section-title">存储概览</h2>
-      <div class="overview-grid">
-        <div class="overview-item">
-          <span class="ov-label">HQ</span>
-          <span class="ov-value">{{ formatSize(comic?.hqSize ?? 0) }}</span>
-          <StorageStatusTag :status="comic?.hqStatus ?? 'EMPTY'" type="hq" />
-        </div>
-        <div class="overview-item">
-          <span class="ov-label">LQ</span>
-          <span class="ov-value">{{ comic?.mediaType === 'VIDEO' ? '不适用' : formatSize(comic?.lqSize ?? 0) }}</span>
-          <StorageStatusTag v-if="comic?.mediaType !== 'VIDEO'" :status="comic?.lqStatus ?? 'EMPTY'" type="lq" />
-          <span v-else class="not-applicable">视频无需 LQ</span>
-        </div>
-        <div class="overview-item">
-          <span class="ov-label">总文件数</span>
-          <span class="ov-value">{{ comic?.pageCount ?? 0 }}</span>
-        </div>
-      </div>
+    <section class="storage-summary" aria-label="存储概览">
+      <div><span>HQ</span><strong>{{ formatSize(comic?.hqSize ?? 0) }}</strong><StorageStatusTag :status="comic?.hqStatus ?? 'EMPTY'" type="hq" /></div>
+      <div><span>LQ</span><strong>{{ comic?.mediaType === 'VIDEO' ? '不适用' : formatSize(comic?.lqSize ?? 0) }}</strong><StorageStatusTag v-if="comic?.mediaType !== 'VIDEO'" :status="comic?.lqStatus ?? 'EMPTY'" type="lq" /><small v-else>视频无需 LQ</small></div>
+      <div><span>媒体总数</span><strong>{{ comic?.pageCount ?? 0 }}</strong><small>{{ chapters.length }} 个章节</small></div>
+      <div><span>转码状态</span><strong class="status-value">{{ comic?.transcodeStatus ?? '—' }}</strong><small>实时同步</small></div>
     </section>
-
-    <!-- 存储操作 -->
-    <section class="card">
-      <h2 class="section-title">存储操作</h2>
-      <div class="ops-bar">
-        <el-button type="danger" plain @click="onDeleteHQ">删除 HQ（保留 LQ）</el-button>
-        <el-button v-if="comic?.mediaType !== 'VIDEO'" type="primary" plain @click="onGenerateLQ">生成 LQ</el-button>
-        <el-button type="warning" plain @click="onTranscode">视频转码</el-button>
-        <el-button type="success" plain @click="onExportZip">导出 ZIP</el-button>
-        <el-button type="danger" @click="onTrashComic">移入回收站</el-button>
-      </div>
-    </section>
-
-    <!-- 章节列表 -->
-    <section class="card">
-      <div class="section-header">
-        <h2 class="section-title">章节存储</h2>
-        <el-input
-          v-model="chapterKeyword"
-          placeholder="搜索章节"
-          clearable
-          class="chapter-search"
-        />
-      </div>
-      <el-table :data="filteredStructureRows" row-key="key" :tree-props="{ children: 'children' }" size="small">
-        <el-table-column prop="title" label="章节名" min-width="160" show-overflow-tooltip>
-          <template #default="{ row }"><span class="row-kind" :class="`row-kind--${row.kind.toLowerCase()}`">{{ row.kind === 'CATALOG' ? '目录' : '章节' }}</span><span>{{ row.title }}</span></template>
-        </el-table-column>
-        <el-table-column prop="chapterNo" label="编号" width="70" />
-        <el-table-column label="媒体数" width="80" align="center">
-          <template #default="{ row }">{{ row.pageCount ?? '-' }}</template>
-        </el-table-column>
-        <el-table-column label="HQ 大小" width="100" align="right">
-          <template #default="{ row }">{{ formatSize(row.hqSize) }}</template>
-        </el-table-column>
-        <el-table-column label="LQ 大小" width="100" align="right">
-          <template #default="{ row }">{{ row.mediaType === 'VIDEO' ? '不适用' : formatSize(row.lqSize) }}</template>
-        </el-table-column>
-        <el-table-column label="HQ 状态" width="90">
-          <template #default="{ row }"><StorageStatusTag v-if="row.hqStatus" :status="row.hqStatus" type="hq" /></template>
-        </el-table-column>
-        <el-table-column label="LQ 状态" width="90">
-          <template #default="{ row }">
-            <StorageStatusTag v-if="row.mediaType !== 'VIDEO' && row.lqStatus" :status="row.lqStatus" type="lq" />
-            <span v-else class="not-applicable">{{ row.mediaType === 'VIDEO' ? '不适用' : '暂无数据' }}</span>
+    <section class="storage-browser">
+      <aside class="storage-tree-panel">
+        <div class="panel-topline"><div><span class="panel-kicker">NAVIGATOR</span><h2>存储结构</h2></div><span class="node-count">{{ structureRows.length }} 个根节点</span></div>
+        <el-input v-model="chapterKeyword" placeholder="搜索章节" clearable class="chapter-search" />
+        <el-table class="storage-tree-table" :data="filteredStructureRows" row-key="key" :tree-props="{ children: 'children' }" highlight-current-row @row-click="selectStorageRow">
+          <el-table-column prop="title" min-width="190"><template #default="{ row }"><div class="tree-title"><span class="tree-icon">{{ row.kind === 'CATALOG' ? '▰' : '▱' }}</span><span>{{ row.title }}</span></div></template></el-table-column>
+          <el-table-column width="78"><template #default="{ row }"><span class="tree-kind">{{ formatSize(row.hqSize) }}</span></template></el-table-column>
+        </el-table>
+      </aside>
+      <main class="storage-detail-panel">
+        <template v-if="selectedStorageRow">
+          <div class="selected-header"><div><span class="panel-kicker">SELECTED NODE</span><h2>{{ selectedStorageRow.title }}</h2><p>{{ selectedStorageRow.kind === 'CATALOG' ? '目录汇总' : `章节 · ID ${selectedStorageRow.chapterId}` }}</p></div><StorageStatusTag v-if="selectedStorageRow.hqStatus" :status="selectedStorageRow.hqStatus" type="hq" /></div>
+          <div class="storage-metrics">
+            <div><span>HQ 占用</span><strong>{{ formatSize(selectedStorageRow.hqSize) }}</strong><StorageStatusTag v-if="selectedStorageRow.hqStatus" :status="selectedStorageRow.hqStatus" type="hq" /></div>
+            <div><span>LQ 占用</span><strong>{{ selectedStorageRow.mediaType === 'VIDEO' ? '不适用' : formatSize(selectedStorageRow.lqSize) }}</strong><StorageStatusTag v-if="selectedStorageRow.mediaType !== 'VIDEO' && selectedStorageRow.lqStatus" :status="selectedStorageRow.lqStatus" type="lq" /></div>
+            <div><span>媒体数量</span><strong>{{ selectedStorageRow.pageCount ?? 0 }}</strong><small>{{ selectedStorageRow.mediaType === 'VIDEO' ? '视频媒体' : '图片媒体' }}</small></div>
+          </div>
+          <div v-if="selectedStorageRow.children?.length" class="storage-children"><h3>下级存储</h3><button v-for="child in selectedStorageRow.children" :key="child.key" type="button" @click="selectStorageRow(child)"><span>{{ child.kind === 'CATALOG' ? '▰' : '▱' }}</span>{{ child.title }}<small>{{ formatSize(child.hqSize) }}</small></button></div>
+          <div v-else class="storage-note">该章节的存储状态已汇总在上方，可在右侧执行章节级操作。</div>
+        </template>
+        <div v-else class="selection-empty"><span class="empty-mark">✦</span><h2>选择一个目录或章节</h2><p>左侧结构树用于定位存储节点。</p></div>
+      </main>
+      <aside class="storage-action-panel">
+        <div class="panel-topline"><div><span class="panel-kicker">OPERATIONS</span><h2>{{ selectedStorageRow?.kind === 'CHAPTER' ? '章节操作' : '漫画操作' }}</h2></div></div>
+        <div class="storage-actions">
+          <template v-if="selectedStorageRow?.kind === 'CHAPTER'">
+            <el-button type="danger" plain @click="onDeleteChapterHQ(selectedChapterId)">删除本章 HQ</el-button>
+            <el-button v-if="selectedStorageRow.mediaType !== 'VIDEO'" type="primary" plain @click="onGenerateChapterLQ(selectedChapterId)">生成本章 LQ</el-button>
           </template>
-        </el-table-column>
-        <el-table-column label="操作" width="160">
-          <template #default="{ row }">
-            <template v-if="row.kind === 'CHAPTER'">
-              <el-button size="small" type="danger" plain @click="onDeleteChapterHQ(row.chapterId)">删HQ</el-button>
-              <el-button v-if="row.mediaType !== 'VIDEO'" size="small" type="primary" plain @click="onGenerateChapterLQ(row.chapterId)">生LQ</el-button>
-            </template>
-            <span v-else class="not-applicable">目录汇总</span>
+          <template v-else>
+            <el-button type="danger" plain @click="onDeleteHQ">删除全部 HQ</el-button>
+            <el-button v-if="comic?.mediaType !== 'VIDEO'" type="primary" plain @click="onGenerateLQ">生成全部 LQ</el-button>
+            <el-button type="warning" plain @click="onTranscode">视频转码</el-button>
+            <el-button type="success" plain @click="onExportZip">导出 ZIP</el-button>
+            <el-button type="danger" @click="onTrashComic">移入回收站</el-button>
           </template>
-        </el-table-column>
-      </el-table>
+        </div>
+      </aside>
     </section>
   </div>
 </template>
@@ -123,6 +71,7 @@ const comic = ref<ComicStorageItem | null>(null)
 const chapters = ref<ChapterStorageItem[]>([])
 const catalogTree = ref<CatalogNode[]>([])
 const chapterKeyword = ref('')
+const selectedStorageRow = ref<StorageStructureRow | null>(null)
 
 interface StorageStructureRow {
   readonly key: string
@@ -202,6 +151,7 @@ const filteredStructureRows = computed(() => {
   const kw = chapterKeyword.value.toLowerCase()
   return filterStructureRows(structureRows.value, kw)
 })
+const selectedChapterId = computed(() => selectedStorageRow.value?.chapterId ?? 0)
 
 function chapterRow(chapter: ChapterStorageItem, globalOrder: number | null = null): StorageStructureRow {
   return {
@@ -295,6 +245,9 @@ function filterStructureRows(rows: readonly StorageStructureRow[], keyword: stri
     return [{ ...row, children: row.children ? children : undefined }]
   })
 }
+function selectStorageRow(row: StorageStructureRow): void {
+  selectedStorageRow.value = row
+}
 
 function formatSize(bytes: number): string {
   if (!bytes || bytes < 0) return '0 B'
@@ -317,6 +270,7 @@ async function loadData(options: { silent?: boolean } = {}) {
     comic.value = comicData
     chapters.value = chaptersData
     catalogTree.value = (catalogData.data ?? []) as CatalogNode[]
+    if (!silent) selectedStorageRow.value = null
   } catch {
     if (!silent) ElMessage.error('加载失败')
   } finally {
@@ -479,7 +433,7 @@ async function onTrashComic() {
   try {
     await comicApi.delete(comicId)
     ElMessage.success('已移入回收站，回收任务已提交')
-    router.push('/manage/storage')
+    router.push(`/manage/comics/${comicId}?tab=storage`)
   } catch (err: unknown) {
     const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
     ElMessage.error(msg || '操作失败')
@@ -593,5 +547,63 @@ onBeforeUnmount(stopTranscodePolling)
 .ops-bar {
   display: flex;
   gap: var(--space-base);
+}
+
+.detail-page { width: 100%; max-width: none; padding: 0; }
+.storage-header { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-5); padding-bottom: var(--space-6); border-bottom: 1px solid var(--border); }
+.storage-eyebrow, .panel-kicker { color: var(--accent); font: 800 10px var(--mono); letter-spacing: .16em; }
+.storage-header h1 { margin: var(--space-2) 0; color: var(--text-primary); font-family: Georgia, 'Times New Roman', serif; font-size: clamp(2rem, 3vw, 2.7rem); letter-spacing: -.04em; }
+.storage-header p { color: var(--text-muted); font-size: var(--text-sm); }
+.storage-header-tools { display: flex; align-items: center; gap: var(--space-3); }
+.comic-ref { color: var(--accent); font: 700 12px var(--mono); }
+.storage-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3); margin: var(--space-5) 0; }
+.storage-summary > div { display: grid; gap: var(--space-2); min-height: 108px; padding: var(--space-4); border: 1px solid var(--border); background: var(--bg-surface); }
+.storage-summary span, .storage-summary small { color: var(--text-muted); font-size: var(--text-xs); }
+.storage-summary strong { color: var(--text-primary); font-size: 1.35rem; }
+.storage-summary .status-value { color: var(--accent); font-size: var(--text-sm); }
+.storage-browser { display: grid; grid-template-columns: minmax(250px, .78fr) minmax(360px, 1.55fr) minmax(240px, .75fr); gap: var(--space-3); min-height: 560px; }
+.storage-tree-panel, .storage-detail-panel, .storage-action-panel { min-width: 0; border: 1px solid var(--border); background: var(--bg-surface); }
+.storage-tree-panel, .storage-action-panel { padding: var(--space-4); }
+.storage-detail-panel { padding: clamp(var(--space-5), 3vw, var(--space-8)); }
+.storage-tree-panel .panel-topline, .storage-action-panel .panel-topline, .selected-header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
+.storage-tree-panel h2, .storage-action-panel h2, .selected-header h2 { margin: var(--space-1) 0 0; color: var(--text-primary); font-size: var(--text-lg); }
+.node-count, .selected-header p { color: var(--text-muted); font-size: var(--text-xs); }
+.chapter-search { width: 100%; margin: var(--space-4) 0; }
+.storage-tree-table { height: 455px; }
+.storage-tree-table :deep(.el-table__header-wrapper) { display: none; }
+.storage-tree-table :deep(.el-table__body-wrapper) { overflow-y: auto; }
+.storage-tree-table :deep(.el-table__row) { cursor: pointer; }
+.storage-tree-table :deep(.el-table__cell) { padding: 11px 6px; }
+.tree-title { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--text-primary); }
+.tree-title > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tree-icon { flex: 0 0 auto; color: var(--accent); }
+.tree-kind { color: var(--text-muted); font-size: 11px; }
+.selected-header { padding-bottom: var(--space-5); border-bottom: 1px solid var(--border); }
+.selected-header p { margin-top: var(--space-2); }
+.storage-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); margin: var(--space-8) 0; }
+.storage-metrics > div { display: grid; gap: var(--space-2); padding: var(--space-4); border: 1px solid var(--border); background: var(--bg-secondary); }
+.storage-metrics span, .storage-metrics small { color: var(--text-muted); font-size: var(--text-xs); }
+.storage-metrics strong { color: var(--text-primary); font-size: 1.25rem; }
+.storage-children { display: grid; gap: var(--space-2); }
+.storage-children h3 { margin: 0 0 var(--space-2); color: var(--text-primary); font-size: var(--text-md); }
+.storage-children button { display: grid; grid-template-columns: 18px 1fr auto; align-items: center; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--border); background: var(--bg-secondary); color: var(--text-primary); text-align: left; cursor: pointer; }
+.storage-children button:hover { border-color: var(--accent); background: var(--accent-bg); }
+.storage-children button span { color: var(--accent); }
+.storage-children small, .storage-note { color: var(--text-muted); font-size: var(--text-xs); }
+.storage-note { padding: var(--space-5); border: 1px dashed var(--border); }
+.storage-actions { display: grid; gap: var(--space-3); margin-top: var(--space-6); }
+.storage-actions .el-button { width: 100%; margin: 0; }
+@media (max-width: 1100px) {
+  .storage-browser { grid-template-columns: minmax(220px, .8fr) minmax(320px, 1.4fr); }
+  .storage-action-panel { grid-column: 1 / -1; }
+  .storage-actions { display: flex; flex-wrap: wrap; }
+  .storage-actions .el-button { width: auto; }
+}
+@media (max-width: 760px) {
+  .storage-header { align-items: flex-start; flex-direction: column; }
+  .storage-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .storage-browser { grid-template-columns: 1fr; }
+  .storage-action-panel { grid-column: auto; }
+  .storage-metrics { grid-template-columns: 1fr; }
 }
 </style>

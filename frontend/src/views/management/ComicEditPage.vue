@@ -1,122 +1,70 @@
 <template>
-  <div class="comic-edit-page fade-in">
-    <div class="edit-header">
-      <div class="header-inner">
-        <button class="back-btn" @click="goBack">
-          <el-icon :size="18"><ArrowLeft /></el-icon>
-          <span>返回</span>
-        </button>
-        <h1 class="page-title">编辑漫画信息</h1>
-        <span class="comic-id-badge">ID: {{ comicId }}</span>
-        <div class="header-spacer" />
+  <div class="comic-edit-page fade-in" v-loading="loading">
+    <div class="edit-intro">
+      <div>
+        <p class="edit-eyebrow">IDENTITY / METADATA</p>
+        <h2>编辑漫画信息</h2>
+        <p>维护阅读端展示的标题、归属和检索标签。</p>
       </div>
+      <div class="edit-ref"><span>RECORD</span><strong>#{{ comicId }}</strong></div>
     </div>
 
-    <div class="edit-body">
-      <div class="edit-card">
-        <el-form
-          ref="formRef"
-          :model="form"
-          :rules="rules"
-          label-position="top"
-          class="edit-form"
-        >
-          <el-form-item label="标题" prop="title">
-            <el-input
-              v-model="form.title"
-              placeholder="输入漫画标题"
-              maxlength="255"
-              show-word-limit
-            />
-          </el-form-item>
-
+    <el-form ref="formRef" :model="form" :rules="rules" label-position="top" class="edit-form">
+      <section class="edit-panel edit-panel--primary">
+        <div class="panel-heading"><span class="panel-number">01</span><div><h3>基本信息</h3><p>这些字段会直接影响漫画在列表和详情页中的呈现。</p></div></div>
+        <el-form-item label="标题" prop="title" class="title-field">
+          <el-input v-model="form.title" placeholder="输入漫画标题" maxlength="255" show-word-limit size="large" />
+        </el-form-item>
+        <div class="field-grid">
           <el-form-item label="作者" prop="author">
-            <el-input
-              v-model="form.author"
-              placeholder="输入作者名（可选）"
-              maxlength="128"
-              show-word-limit
-            />
+            <el-input v-model="form.author" placeholder="输入作者名（可选）" maxlength="128" show-word-limit />
           </el-form-item>
-
-          <el-form-item label="描述" prop="description">
-            <el-input
-              v-model="form.description"
-              type="textarea"
-              :rows="4"
-              placeholder="输入漫画描述（可选）"
-              maxlength="4000"
-              show-word-limit
-            />
-          </el-form-item>
-
-          <el-form-item label="来源" prop="source">
-            <div class="source-display">
-              <span v-if="sourceType" class="source-tag">{{ sourceType }}</span>
-              <span v-if="sourceRef" class="source-ref">{{ sourceRef }}</span>
-              <span v-if="!sourceType && !sourceRef" class="source-empty">—</span>
-            </div>
-          </el-form-item>
-
           <el-form-item label="分类" prop="categoryId">
-            <el-select v-model="form.categoryId" placeholder="选择分类" clearable style="width: 240px">
-              <el-option
-                v-for="cat in categoryStore.list"
-                :key="cat.id"
-                :label="cat.name"
-                :value="cat.id"
-              />
+            <el-select v-model="form.categoryId" placeholder="选择分类" clearable>
+              <el-option v-for="cat in categoryStore.list" :key="cat.id" :label="cat.name" :value="cat.id" />
             </el-select>
           </el-form-item>
+        </div>
+        <el-form-item label="描述" prop="description">
+          <el-input v-model="form.description" type="textarea" :rows="5" placeholder="写下这部漫画的简介、备注或阅读提示（可选）" maxlength="4000" show-word-limit />
+        </el-form-item>
+      </section>
 
-          <el-form-item label="标签" prop="tags">
-            <div class="tag-block">
-              <el-tag
-                v-for="tag in selectedTags"
-                :key="tag.id"
-                closable
-                class="selected-tag"
-                @close="removeTag(tag.id)"
-              >
-                {{ tag.name }}
-              </el-tag>
-              <el-select
-                v-model="tagInput"
-                filterable
-                default-first-option
-                placeholder="选择或输入标签"
-                class="tag-select"
-                @change="onExistingTagSelect"
-              >
-                <el-option
-                  v-for="tag in availableTags"
-                  :key="tag.id"
-                  :label="tag.name"
-                  :value="tag.id"
-                />
-              </el-select>
-              <el-input
-                v-model="newTagName"
-                placeholder="新标签"
-                class="new-tag-input"
-                @keyup.enter="onCreateTag"
-              />
-              <el-button type="primary" text @click="onCreateTag">
-                添加
-              </el-button>
+      <section class="edit-panel archive-panel">
+        <div class="panel-heading"><span class="panel-number">02</span><div><h3>归档与检索</h3><p>用分类和标签建立你的漫画索引。</p></div></div>
+        <el-form-item label="标签" prop="tags">
+          <div class="tag-editor">
+            <div v-if="selectedTags.length" class="selected-tags">
+              <el-tag v-for="tag in selectedTags" :key="tag.id" closable class="selected-tag" @close="removeTag(tag.id)">{{ tag.name }}</el-tag>
             </div>
-          </el-form-item>
-
-          <div class="form-actions">
-            <el-button @click="goBack">取消</el-button>
-            <el-button type="primary" :loading="saving" @click="handleSave">
-              保存
-            </el-button>
+            <div class="tag-add-row">
+              <el-select v-model="tagInput" filterable default-first-option placeholder="搜索或选择标签" class="tag-select" popper-class="comic-tag-popper" @change="onExistingTagSelect">
+                <template #prefix><el-icon><Search /></el-icon></template>
+                <el-option v-for="tag in availableTags" :key="tag.id" :label="tag.name" :value="tag.id" />
+              </el-select>
+              <span class="or-divider">或</span>
+              <el-input v-model="newTagName" placeholder="创建新标签" class="new-tag-input" @keyup.enter="onCreateTag" />
+              <el-button type="primary" plain @click="onCreateTag">添加</el-button>
+            </div>
+            <small class="field-hint"><el-icon><Search /></el-icon>可输入关键词搜索已有标签；标签只用于搜索和筛选，不会改变原始文件。</small>
           </div>
-        </el-form>
-      </div>
-    </div>
+        </el-form-item>
+      </section>
 
+      <section class="edit-panel source-panel">
+        <div class="panel-heading"><span class="panel-number">03</span><div><h3>来源记录</h3><p>来源信息由导入流程生成，仅供追溯。</p></div></div>
+        <div class="source-display">
+          <span v-if="sourceType" class="source-tag">{{ sourceType }}</span>
+          <span v-if="sourceRef" class="source-ref">{{ sourceRef }}</span>
+          <span v-if="!sourceType && !sourceRef" class="source-empty">暂无来源记录</span>
+        </div>
+      </section>
+
+      <div class="form-actions">
+        <el-button text @click="goBack">取消</el-button>
+        <el-button type="primary" size="large" :loading="saving" @click="handleSave">保存修改</el-button>
+      </div>
+    </el-form>
   </div>
 </template>
 
@@ -124,7 +72,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { ArrowLeft } from '@element-plus/icons-vue'
+import { Search } from '@element-plus/icons-vue'
 import { comicApi, tagApi } from '@/services/management'
 import { useCategoryStore } from '@/stores/management/category'
 import type {
@@ -272,7 +220,7 @@ async function handleSave() {
       comicApi.updateTags(comicId, { tagIds: selectedTagIds.value } as ComicTagUpdateDTO),
     ])
     ElMessage.success('保存成功')
-    router.push('/manage/comics')
+    router.push(`/manage/comics/${comicId}?tab=operations`)
   } catch (err: unknown) {
     const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
     ElMessage.error(msg || '保存失败')
@@ -282,7 +230,7 @@ async function handleSave() {
 }
 
 function goBack() {
-  router.push('/manage/comics')
+  router.push(`/manage/comics/${comicId}?tab=operations`)
 }
 
 onMounted(loadData)
@@ -290,216 +238,77 @@ onMounted(loadData)
 
 <style scoped>
 .comic-edit-page {
-  min-height: calc(100vh - var(--nav-height));
-  background: var(--bg-primary);
-  color: var(--text-primary);
-}
-
-.edit-header {
-  padding: var(--space-lg) var(--page-padding);
-  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.6), transparent);
-}
-
-.header-inner {
-  max-width: var(--page-width);
-  margin: 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.back-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-xs);
-  padding: 8px 14px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color var(--transition-fast);
-}
-
-.back-btn:hover {
-  background: rgba(255, 255, 255, 0.18);
-}
-
-.page-title {
-  font-family: var(--heading);
-  font-size: 20px;
-  font-weight: 700;
+  display: grid;
+  gap: var(--space-5);
+  width: 100%;
+  max-width: none;
   margin: 0;
-}
-
-.comic-id-badge {
-  font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-muted);
-  background: var(--bg-surface);
-  padding: 4px 10px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-}
-
-.header-spacer {
-  width: 80px;
-}
-
-.edit-body {
-  padding: var(--space-2xl) var(--page-padding);
-}
-
-.edit-card {
-  width: 100%;
-  max-width: 640px;
-  box-sizing: border-box;
-  margin: 0 auto;
-  padding: var(--space-xl);
-  background: var(--bg-surface);
-  border-radius: var(--card-radius);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.edit-form :deep(.el-form-item__label) {
-  color: var(--text-secondary);
-  font-weight: 600;
-}
-
-.edit-form :deep(.el-input__wrapper) {
-  background: var(--bg-secondary);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1) inset;
-}
-
-.edit-form :deep(.el-input__inner) {
   color: var(--text-primary);
 }
-
-.edit-form :deep(.el-select) {
-  max-width: 100%;
-}
-
-.tag-block {
+.edit-intro {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-sm);
-  padding: var(--space-sm);
-  background: var(--bg-secondary);
-  border-radius: var(--radius-sm);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  min-height: 40px;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-5);
+  padding: 0 0 var(--space-5);
+  border-bottom: 1px solid var(--border);
 }
-
-.selected-tag {
-  background: var(--accent-bg);
-  color: var(--text-primary);
-  border: none;
+.edit-eyebrow, .panel-number { color: var(--accent); font: 800 11px ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .16em;
 }
-
-.tag-select {
-  min-width: 160px;
-  flex: 1;
+.edit-intro h2 { margin: var(--space-2) 0; font-family: Georgia, 'Times New Roman', serif; font-size: clamp(1.7rem, 3vw, 2.35rem); letter-spacing: -.04em;
 }
-
-.tag-select :deep(.el-input__wrapper) {
-  background: transparent;
-  box-shadow: none;
+.edit-intro p:last-child { margin: 0; color: var(--text-muted); font-size: var(--text-sm);
 }
-
-.new-tag-input {
-  width: 140px;
+.edit-ref { display: grid; gap: 4px; min-width: 88px; padding: 9px 12px; border: 1px solid var(--border); text-align: right;
 }
-
-.new-tag-input :deep(.el-input__wrapper) {
-  background: transparent;
-  box-shadow: none;
+.edit-ref span { color: var(--text-muted); font-size: 10px; letter-spacing: .15em;
 }
-
-.form-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-base);
-  margin-top: var(--space-xl);
+.edit-ref strong { color: var(--accent); font: 700 15px ui-monospace, SFMono-Regular, Consolas, monospace;
 }
-
-.source-display {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  padding: var(--space-sm);
-  background: var(--bg-secondary);
-  border-radius: var(--radius-sm);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  min-height: 32px;
+.edit-form { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(280px, .85fr); align-items: start; gap: var(--space-4); width: 100%; max-width: none; margin: 0;
 }
-
-.source-tag {
-  font-size: 12px;
-  font-weight: 600;
-  padding: 2px 8px;
-  background: var(--accent-bg);
-  border-radius: var(--radius-xs);
-  color: var(--text-primary);
+.edit-panel { padding: clamp(var(--space-5), 4vw, var(--space-8)); border: 1px solid var(--border); background: var(--bg-surface); box-shadow: none;
 }
-
-.source-ref {
-  font-size: 12px;
-  color: var(--text-secondary);
-  word-break: break-all;
-}
-
-.source-empty {
-  color: var(--text-muted);
-  font-size: 13px;
-}
-
-.danger-zone {
-  width: 100%;
-  max-width: 640px;
-  box-sizing: border-box;
-  margin: var(--space-2xl) auto 0;
-  padding: var(--space-lg);
-  border: 1px solid var(--danger);
-  border-radius: var(--card-radius);
-  background: rgba(220, 50, 50, 0.06);
-}
-
-.danger-zone-title {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--danger);
-  margin: 0 0 var(--space-base);
-}
-
-.danger-zone-actions {
-  display: flex;
-  gap: var(--space-sm);
-  flex-wrap: wrap;
-}
-
-@media (max-width: 768px) {
-  .header-inner {
-    flex-wrap: wrap;
-    gap: var(--space-base);
-  }
-
-  .header-spacer {
-    display: none;
-  }
-
-  .page-title {
-    order: 3;
-    width: 100%;
-    text-align: center;
-  }
-
-  .comic-id-badge {
-    order: 4;
-    margin: 0 auto;
-  }
+.edit-panel--primary { grid-column: 1; grid-row: 1; }
+.archive-panel { grid-column: 1; grid-row: 2; }
+.panel-heading { display: flex; align-items: flex-start; gap: var(--space-4); margin-bottom: var(--space-6); }
+.panel-heading h3 { margin: 0 0 5px; color: var(--text-primary); font-size: 17px; }
+.panel-heading p { margin: 0; color: var(--text-muted); font-size: var(--text-sm); }
+.panel-number { padding-top: 3px; }
+.field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-5); }
+.edit-form :deep(.el-form-item) { margin-bottom: var(--space-5); }
+.edit-form :deep(.el-form-item__label) { color: var(--text-secondary); font-weight: 700; }
+.edit-form :deep(.el-input__wrapper), .edit-form :deep(.el-textarea__inner) { background: color-mix(in srgb, var(--bg-primary) 72%, transparent); box-shadow: 0 0 0 1px var(--border) inset; }
+.edit-form :deep(.el-textarea__inner:focus) { box-shadow: 0 0 0 1px var(--accent) inset, 0 0 0 3px var(--control-focus-ring); }
+.edit-form :deep(.el-select) { width: 100%; }
+.tag-editor { display: grid; gap: var(--space-3); }
+.selected-tags { display: flex; flex-wrap: wrap; gap: var(--space-2); min-height: 26px; }
+.selected-tag { border-color: var(--accent-border); background: var(--accent-bg); color: var(--text-primary); }
+.tag-add-row { display: flex; align-items: center; gap: var(--space-3); }
+.tag-select { flex: 1; min-width: 190px; }
+.tag-select :deep(.el-select__wrapper) { width: 100%; background: linear-gradient(180deg, var(--control-bg), var(--bg-secondary)); box-shadow: inset 0 0 0 1px var(--border), var(--shadow-sm); }
+.tag-select :deep(.el-select__wrapper.is-focused) { box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 3px var(--control-focus-ring); }
+.new-tag-input { flex: 1; min-width: 150px; }
+.or-divider { color: var(--text-muted); font-size: var(--text-xs); }
+.field-hint { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--text-muted); }
+.field-hint :deep(.el-icon) { color: var(--accent); }
+.source-panel { grid-column: 2; grid-row: 1; background: var(--bg-surface); }
+.source-display { display: flex; align-items: center; gap: var(--space-3); min-height: 46px; padding: 0 var(--space-4); border: 1px dashed var(--border); color: var(--text-muted); }
+.source-tag { padding: 4px 8px; background: var(--accent-bg); color: var(--accent); font-size: 11px; font-weight: 800; letter-spacing: .08em; }
+.source-ref { overflow: hidden; color: var(--text-secondary); font-size: var(--text-sm); text-overflow: ellipsis; white-space: nowrap; }
+.source-empty { font-size: var(--text-sm); }
+:global(.comic-tag-popper) { background: var(--bg-surface); border: 1px solid var(--border); box-shadow: var(--card-shadow-hover); }
+.form-actions { position: sticky; bottom: 0; z-index: 2; grid-column: 2; grid-row: 2; display: flex; justify-content: flex-end; gap: var(--space-3); padding: var(--space-4) 0 var(--space-2); background: linear-gradient(to bottom, transparent, var(--bg-primary) 28%); }
+.form-actions :deep(.el-button--primary) { min-width: 132px; background: var(--accent); border-color: var(--accent); }
+.form-actions :deep(.el-button--primary:hover) { background: var(--accent-hover); border-color: var(--accent-hover); }
+@media (max-width: 820px) {
+  .edit-form { grid-template-columns: 1fr; }
+  .edit-panel--primary, .archive-panel, .source-panel, .form-actions { grid-column: 1; grid-row: auto; }
+  .edit-intro { align-items: flex-start; }
+  .edit-ref { min-width: auto; }
+  .field-grid { grid-template-columns: 1fr; gap: 0; }
+  .tag-add-row { align-items: stretch; flex-wrap: wrap; }
+  .tag-select, .new-tag-input { min-width: calc(100% - 0px); flex-basis: 100%; }
+  .or-divider { display: none; }
 }
 </style>
