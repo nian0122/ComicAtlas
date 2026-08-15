@@ -3,7 +3,7 @@ package com.comicatlas.reading.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.contract.comic.dto.ComicListQuery;
-import com.comicatlas.contract.comic.dto.ComicListVO;
+import com.comicatlas.reading.dto.ComicListVO;
 import com.comicatlas.reading.service.ComicQueryService;
 import com.comicatlas.contract.common.exception.GlobalExceptionHandler;
 import org.junit.jupiter.api.Test;

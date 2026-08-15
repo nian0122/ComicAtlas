@@ -1,6 +1,6 @@
 package com.comicatlas.api.importer.entity;
 
-import com.comicatlas.contract.common.enums.ImportTaskStatus;
+import com.comicatlas.api.common.enums.ImportTaskStatus;
 import com.comicatlas.contract.common.enums.SourceType;
 import lombok.Data;
 import java.time.LocalDateTime;

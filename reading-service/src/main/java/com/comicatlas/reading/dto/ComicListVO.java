@@ -1,11 +1,11 @@
-package com.comicatlas.contract.comic.dto;
+package com.comicatlas.reading.dto;
 
 import com.comicatlas.contract.common.enums.ComicStatus;
 import lombok.Data;
 import java.time.LocalDateTime;
 
 /**
- * 漫画列表项视图。
+ * 漫画列表项视图（阅读端）。
  * <p>
  * 仅含阅读端所需字段；status 为生命周期状态（强类型，序列化为枚举名）。
  * activeTask / allowedOperations 已在管理端独立查询（/api/management/operations），不再冗余返回。

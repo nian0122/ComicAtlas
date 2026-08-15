@@ -2,8 +2,8 @@ package com.comicatlas.reading.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.contract.comic.cache.ComicReferenceCache;
-import com.comicatlas.contract.comic.dto.CatalogNode;
-import com.comicatlas.contract.comic.dto.ChapterRef;
+import com.comicatlas.reading.dto.CatalogNode;
+import com.comicatlas.reading.dto.ChapterRef;
 import com.comicatlas.persistence.comic.entity.Catalog;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Comic;

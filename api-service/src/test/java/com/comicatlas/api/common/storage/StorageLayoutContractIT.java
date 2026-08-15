@@ -1,7 +1,12 @@
-package com.comicatlas.persistence.storage;
+package com.comicatlas.api.common.storage;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.comicatlas.api.storage.ApiStorageProperties;
+import com.comicatlas.api.storage.ApiStorageRoot;
+import com.comicatlas.api.storage.PathTraversalException;
+import com.comicatlas.api.storage.StorageLayout;
 import com.comicatlas.persistence.comic.entity.Chapter;
+import com.comicatlas.persistence.storage.FileUrlResolver;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.entity.Media;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;

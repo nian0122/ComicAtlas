@@ -1,4 +1,4 @@
-package com.comicatlas.contract.common.enums;
+package com.comicatlas.api.common.enums;
 
 /**
  * 导入任务进度状态（Worker 实时推送）。

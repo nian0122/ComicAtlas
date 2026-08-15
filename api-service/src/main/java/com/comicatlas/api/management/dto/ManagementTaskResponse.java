@@ -1,7 +1,7 @@
 package com.comicatlas.api.management.dto;
 
-import com.comicatlas.contract.common.enums.ManagementTaskStatus;
-import com.comicatlas.contract.common.enums.TaskType;
+import com.comicatlas.api.common.enums.ManagementTaskStatus;
+import com.comicatlas.api.common.enums.TaskType;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 

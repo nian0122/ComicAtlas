@@ -1,4 +1,4 @@
-package com.comicatlas.contract.common.enums;
+package com.comicatlas.api.common.enums;
 
 /** 导出任务状态。 */
 public enum ExportTaskStatus {

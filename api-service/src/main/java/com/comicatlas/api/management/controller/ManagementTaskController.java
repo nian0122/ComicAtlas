@@ -6,8 +6,8 @@ import com.comicatlas.api.management.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
 import com.comicatlas.api.management.service.ManagementTaskService;
-import com.comicatlas.contract.common.enums.ManagementTaskStatus;
-import com.comicatlas.contract.common.enums.TaskType;
+import com.comicatlas.api.common.enums.ManagementTaskStatus;
+import com.comicatlas.api.common.enums.TaskType;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 

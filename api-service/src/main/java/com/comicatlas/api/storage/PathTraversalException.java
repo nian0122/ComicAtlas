@@ -1,7 +1,7 @@
-package com.comicatlas.persistence.storage;
+package com.comicatlas.api.storage;
 
 /**
- * 路径穿越异常 — 当相对路径包含 {@code ../} 穿越存储根边界时抛出。
+ * 路径穿越异常 — 存储根边界校验失败时抛出。
  */
 public class PathTraversalException extends RuntimeException {
     public PathTraversalException(String message) {

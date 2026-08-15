@@ -13,7 +13,7 @@ import com.comicatlas.common.event.ManagementCommandFailedEvent;
 import com.comicatlas.common.event.ManagementCommandProgressEvent;
 import com.comicatlas.common.event.MediaUploadCompletedEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
-import com.comicatlas.contract.common.enums.ManagementTaskStatus;
+import com.comicatlas.api.common.enums.ManagementTaskStatus;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.rabbitmq.client.Channel;

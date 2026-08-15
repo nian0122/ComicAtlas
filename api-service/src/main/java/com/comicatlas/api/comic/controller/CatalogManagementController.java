@@ -1,7 +1,7 @@
 package com.comicatlas.api.comic.controller;
 
 import com.comicatlas.contract.common.Result;
-import com.comicatlas.contract.comic.dto.CatalogVO;
+import com.comicatlas.api.comic.dto.CatalogVO;
 import com.comicatlas.api.comic.dto.CatalogCreateRequest;
 import com.comicatlas.api.comic.dto.CatalogMoveRequest;
 import com.comicatlas.api.comic.dto.CatalogRenameRequest;

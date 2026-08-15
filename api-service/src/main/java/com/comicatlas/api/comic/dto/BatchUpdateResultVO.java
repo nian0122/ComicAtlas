@@ -1,9 +1,10 @@
-package com.comicatlas.contract.comic.dto;
+package com.comicatlas.api.comic.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import java.util.List;
 
+/** 批量更新结果视图（管理端） */
 @Data
 public class BatchUpdateResultVO {
     private int total;

@@ -1,7 +1,7 @@
 package com.comicatlas.api.comic.controller;
 
 import com.comicatlas.contract.common.Result;
-import com.comicatlas.contract.comic.dto.ChapterVO;
+import com.comicatlas.api.comic.dto.ChapterVO;
 import com.comicatlas.api.comic.dto.ChapterCreateRequest;
 import com.comicatlas.api.comic.dto.ChapterMoveRequest;
 import com.comicatlas.api.comic.dto.ChapterRenameRequest;

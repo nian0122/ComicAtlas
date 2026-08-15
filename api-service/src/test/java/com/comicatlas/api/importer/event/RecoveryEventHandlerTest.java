@@ -2,7 +2,7 @@ package com.comicatlas.api.importer.event;
 
 import com.comicatlas.api.admin.dto.RecoveryProgressVO;
 import com.comicatlas.api.common.scan.RecoveryEngine;
-import com.comicatlas.contract.common.enums.RecoveryTaskStatus;
+import com.comicatlas.api.common.enums.RecoveryTaskStatus;
 import com.comicatlas.api.importer.entity.RecoveryTask;
 import com.comicatlas.api.importer.mapper.RecoveryTaskMapper;
 import com.comicatlas.api.management.service.ManagementTaskService;

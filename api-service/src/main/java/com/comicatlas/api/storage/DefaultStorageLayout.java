@@ -1,4 +1,4 @@
-package com.comicatlas.persistence.storage;
+package com.comicatlas.api.storage;
 
 import org.springframework.stereotype.Component;
 

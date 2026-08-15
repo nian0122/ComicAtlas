@@ -1,8 +1,8 @@
-package com.comicatlas.contract.comic.dto;
+package com.comicatlas.api.comic.dto;
 
 import lombok.Data;
 
-/** 章节视图对象 */
+/** 章节视图对象（管理端） */
 @Data
 public class ChapterVO {
     private Long id;

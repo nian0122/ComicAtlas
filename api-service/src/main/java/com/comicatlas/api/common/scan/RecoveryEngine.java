@@ -9,7 +9,7 @@ import com.comicatlas.contract.common.RestoreSource;
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.enums.HqStatus;
 import com.comicatlas.contract.common.enums.LqStatus;
-import com.comicatlas.persistence.storage.ApiStorageProperties;
+import com.comicatlas.api.storage.ApiStorageProperties;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;

@@ -2,7 +2,7 @@ package com.comicatlas.api.comic.controller;
 
 import com.comicatlas.contract.common.Result;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
-import com.comicatlas.contract.comic.dto.BatchUpdateResultVO;
+import com.comicatlas.api.comic.dto.BatchUpdateResultVO;
 import com.comicatlas.contract.comic.dto.ComicDetailVO;
 import com.comicatlas.contract.comic.dto.ComicMetadataDTO;
 import com.comicatlas.api.comic.dto.BatchComicUpdateRequest;

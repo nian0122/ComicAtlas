@@ -3,7 +3,7 @@ package com.comicatlas.api.common.scan;
 import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.common.storage.RelativePathValidator;
 import com.comicatlas.common.util.ImageDimensionsReader;
-import com.comicatlas.persistence.storage.ApiStorageProperties;
+import com.comicatlas.api.storage.ApiStorageProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

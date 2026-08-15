@@ -1,11 +1,11 @@
-package com.comicatlas.contract.comic.dto;
+package com.comicatlas.reading.dto;
 
 import lombok.Data;
 
 import java.util.List;
 
 /**
- * 漫画列表分页结果的纯数据载体。
+ * 漫画列表分页结果的纯数据载体（阅读端）。
  * 仅含 records 与分页元数据，不包含持久化框架对象，专用于跨服务缓存序列化。
  */
 @Data

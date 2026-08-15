@@ -1,8 +1,8 @@
 package com.comicatlas.api.storage.service;
 
 import com.comicatlas.contract.common.exception.BusinessException;
-import com.comicatlas.persistence.storage.ApiStorageProperties;
-import com.comicatlas.persistence.storage.ApiStorageRoot;
+import com.comicatlas.api.storage.ApiStorageProperties;
+import com.comicatlas.api.storage.ApiStorageRoot;
 import com.comicatlas.api.export.entity.ExportTask;
 import com.comicatlas.api.export.mapper.ExportTaskMapper;
 import com.comicatlas.api.storage.dto.ExportArtifactVO;
@@ -51,7 +51,7 @@ class ExportArtifactServiceTest {
     private ExportTask task(Long id, String status, String outputPath, Long outputSize) {
         ExportTask task = new ExportTask();
         task.setId(id);
-        task.setStatus(com.comicatlas.contract.common.enums.ExportTaskStatus.valueOf(status));
+        task.setStatus(com.comicatlas.api.common.enums.ExportTaskStatus.valueOf(status));
         task.setOutputRoot("EXPORT");
         task.setOutputPath(outputPath);
         task.setOutputSize(outputSize);

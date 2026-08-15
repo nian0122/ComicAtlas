@@ -3,7 +3,7 @@ package com.comicatlas.reading.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.comicatlas.contract.comic.dto.ComicDetailVO;
 import com.comicatlas.contract.comic.dto.ComicListQuery;
-import com.comicatlas.contract.comic.dto.ComicListVO;
+import com.comicatlas.reading.dto.ComicListVO;
 import com.comicatlas.contract.comic.dto.ComicMetadataDTO;
 
 import java.util.List;

@@ -1,7 +1,6 @@
 package com.comicatlas.api.comic.cache;
 
 import com.comicatlas.contract.comic.cache.ComicReferenceCache;
-import com.comicatlas.contract.comic.dto.CatalogNode;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.CacheManager;
@@ -40,8 +39,8 @@ class CatalogCacheInvalidatorTest {
         if (cache == null) {
             throw new AssertionError("目录缓存未创建");
         }
-        cache.put(1L, List.of(new CatalogNode(1L, "目录")));
-        cache.put(2L, List.of(new CatalogNode(2L, "其他目录")));
+        cache.put(1L, List.of("目录"));
+        cache.put(2L, List.of("其他目录"));
 
         cacheInvalidator.evict(1L);
 
@@ -56,7 +55,7 @@ class CatalogCacheInvalidatorTest {
         if (catalogCache == null || comicListCache == null) {
             throw new AssertionError("缓存未创建");
         }
-        catalogCache.put(1L, List.of(new CatalogNode(1L, "目录")));
+        catalogCache.put(1L, List.of("目录"));
         comicListCache.put("筛选条件一", "页面一");
         comicListCache.put("筛选条件二", "页面二");
 
@@ -73,7 +72,7 @@ class CatalogCacheInvalidatorTest {
         if (cache == null) {
             throw new AssertionError("目录缓存未创建");
         }
-        cache.put(1L, List.of(new CatalogNode(1L, "目录")));
+        cache.put(1L, List.of("目录"));
 
         TransactionSynchronizationManager.initSynchronization();
         try {
@@ -94,7 +93,7 @@ class CatalogCacheInvalidatorTest {
         if (cache == null) {
             throw new AssertionError("目录缓存未创建");
         }
-        cache.put(1L, List.of(new CatalogNode(1L, "目录")));
+        cache.put(1L, List.of("目录"));
 
         TransactionSynchronizationManager.initSynchronization();
         try {
