@@ -37,6 +37,7 @@ import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.persistence.comic.mapper.MediaMapper;
 import com.comicatlas.api.storage.ApiStorageProperties;
+import com.comicatlas.api.storage.service.MetadataUpdateCoordinator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -123,6 +124,7 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
     private final ManagementTaskService managementTaskService;
     private final OutboxService outboxService;
     private final ApiStorageProperties storageProperties;
+    private final MetadataUpdateCoordinator metadataUpdateCoordinator;
 
     @Value("${MANGA_ROOT:}")
     private String mangaRoot;
@@ -534,6 +536,9 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
                     RESULT_REF_TYPE_IMPORT_TASK, taskId);
         }
         catalogCacheInvalidator.evict(comicId);
+        // 导入最终化完成（全 READY）：触发 metadata 同步，让 metadata.json 反映最终
+        // chapterId 布局与 READY 状态（导入写入的是 {taskId}/{comicId}.json 暂存态）
+        metadataUpdateCoordinator.requestSync(comicId, taskId, "导入最终化完成");
         log.info("导入最终化完成: comicId={}, taskId={}, mediaCount={}", comicId, taskId, allMedia.size());
     }
 

@@ -93,6 +93,7 @@ class ImportPersistenceServiceTest {
     @Mock private ManagementTaskService managementTaskService;
     @Mock private OutboxService outboxService;
     @Mock private ApiStorageProperties storageProperties;
+    @Mock private com.comicatlas.api.storage.service.MetadataUpdateCoordinator metadataUpdateCoordinator;
 
     @InjectMocks private ImportPersistenceServiceImpl service;
 
