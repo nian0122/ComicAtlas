@@ -4,9 +4,18 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.comicatlas.contract.common.exception.ConflictException;
+import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.contract.common.enums.ComicStatus;
+import com.comicatlas.contract.common.enums.HqStatus;
+import com.comicatlas.contract.common.enums.LqStatus;
+import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
+import com.comicatlas.contract.common.enums.TranscodeStatus;
+import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Comic;
+import com.comicatlas.persistence.comic.entity.Media;
+import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
+import com.comicatlas.persistence.comic.mapper.MediaMapper;
 import com.comicatlas.api.management.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
@@ -108,10 +117,18 @@ class ManagementTaskServiceIT {
     @Autowired
     private ComicMapper comicMapper;
 
+    @Autowired
+    private ChapterMapper chapterMapper;
+
+    @Autowired
+    private MediaMapper mediaMapper;
+
     @AfterEach
     void tearDown() {
         if (itemMapper != null) { itemMapper.delete(new LambdaQueryWrapper<>()); }
         if (taskMapper != null) { taskMapper.delete(new LambdaQueryWrapper<>()); }
+        if (mediaMapper != null) { mediaMapper.delete(new LambdaQueryWrapper<>()); }
+        if (chapterMapper != null) { chapterMapper.delete(new LambdaQueryWrapper<>()); }
         if (comicMapper != null) { comicMapper.delete(new LambdaQueryWrapper<>()); }
     }
 
@@ -663,6 +680,113 @@ class ManagementTaskServiceIT {
 
             req.setTargets(List.of(target));
             return req;
+        }
+    }
+
+    // ======================== 目标归属解析 ========================
+
+    @Nested
+    @DisplayName("目标归属解析")
+    class TargetAttributionTests {
+
+        @Test
+        @DisplayName("漫画级任务（章节级 item）按漫画 id 过滤应命中并展示父漫画")
+        void comicLevelTaskWithChapterItems_isFoundByComicFilter() {
+            // 显式指定漫画 id，避免与章节自增序列巧合相同——字面 target_id 反查会漏掉此类任务的复现前提
+            Comic comic = new Comic();
+            comic.setId(90_001L);
+            comic.setTitle("归属测试漫画");
+            comic.setStatus(ComicStatus.READY);
+            comicMapper.insert(comic);
+
+            Chapter chapter1 = chapter(comic.getId(), 1);
+            Chapter chapter2 = chapter(comic.getId(), 2);
+            chapterMapper.insert(chapter1);
+            chapterMapper.insert(chapter2);
+
+            // 模拟删除 HQ：任务 targetType=COMIC，目标项为 CHAPTER 级
+            CreateManagementTaskRequest request = new CreateManagementTaskRequest();
+            request.setTaskType(TaskType.HQ_DELETE);
+            request.setOperation("删除高清图片");
+            request.setTargetType("COMIC");
+            List<CreateManagementTaskRequest.TaskTarget> targets = new java.util.ArrayList<>();
+            targets.add(target("CHAPTER", chapter1.getId(), TaskType.HQ_DELETE));
+            targets.add(target("CHAPTER", chapter2.getId(), TaskType.HQ_DELETE));
+            request.setTargets(targets);
+            ManagementTaskResponse task = service.createTask(request, null, null);
+
+            IPage<ManagementTaskResponse> page = service.listTasks(
+                    1, 10, null, null, null, null, comic.getId());
+            assertThat(page.getRecords())
+                    .extracting(ManagementTaskResponse::getId)
+                    .contains(task.getId());
+
+            ManagementTaskResponse detail = service.getTask(task.getId());
+            assertThat(detail.getTargetId()).isEqualTo(comic.getId());
+            assertThat(detail.getTargetName()).isEqualTo("归属测试漫画");
+        }
+
+        @Test
+        @DisplayName("媒体级 item（转码）的任务按漫画 id 过滤应归属到父漫画")
+        void transcodeTaskWithMediaItems_isFoundByComicFilter() {
+            Comic comic = new Comic();
+            comic.setId(90_002L);
+            comic.setTitle("转码归属测试漫画");
+            comic.setStatus(ComicStatus.READY);
+            comicMapper.insert(comic);
+
+            Chapter chapter = chapter(comic.getId(), 1);
+            chapterMapper.insert(chapter);
+
+            Media media = new Media();
+            media.setChapterId(chapter.getId());
+            media.setPageNumber(1);
+            media.setMediaType("VIDEO");
+            media.setHqRoot("HQ");
+            media.setHqPath("902/1/001.avi");
+            media.setHqStatus(HqStatus.READY);
+            media.setLqStatus(LqStatus.NOT_GENERATED);
+            media.setTranscodeStatus(TranscodeStatus.NOT_NEEDED);
+            media.setStatus(MediaLifecycleStatus.READY);
+            mediaMapper.insert(media);
+
+            CreateManagementTaskRequest request = new CreateManagementTaskRequest();
+            request.setTaskType(TaskType.TRANSCODE);
+            request.setOperation("视频转码");
+            request.setTargetType("COMIC");
+            request.setTargets(List.of(target("MEDIA", media.getId(), TaskType.TRANSCODE)));
+            ManagementTaskResponse task = service.createTask(request, null, null);
+
+            IPage<ManagementTaskResponse> page = service.listTasks(
+                    1, 10, null, null, null, null, comic.getId());
+            assertThat(page.getRecords())
+                    .extracting(ManagementTaskResponse::getId)
+                    .contains(task.getId());
+
+            ManagementTaskResponse detail = service.getTask(task.getId());
+            assertThat(detail.getTargetId()).isEqualTo(comic.getId());
+            assertThat(detail.getTargetName()).isEqualTo("转码归属测试漫画");
+        }
+
+        private CreateManagementTaskRequest.TaskTarget target(String targetType, Long targetId,
+                                                              TaskType operationType) {
+            CreateManagementTaskRequest.TaskTarget target = new CreateManagementTaskRequest.TaskTarget();
+            target.setTargetType(targetType);
+            target.setTargetId(targetId);
+            target.setOperationType(operationType);
+            return target;
+        }
+
+        private Chapter chapter(Long comicId, int order) {
+            Chapter chapter = new Chapter();
+            chapter.setComicId(comicId);
+            chapter.setTitle("章节" + order);
+            chapter.setChapterNo(String.valueOf(order));
+            chapter.setGlobalOrder(order);
+            chapter.setSortOrder(order);
+            chapter.setStatus(ChapterLifecycleStatus.READY);
+            chapter.setPageCount(1);
+            return chapter;
         }
     }
 
