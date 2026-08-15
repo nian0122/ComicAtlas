@@ -118,6 +118,7 @@ export interface MediaItemInfo {
   width: number
   height: number
   fileSize?: number
+  lqSize?: number
   transcodeStatus?: string
   /** 媒体类型，缺失时默认按 IMAGE 处理 */
   mediaType?: MediaType
