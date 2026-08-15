@@ -7,6 +7,7 @@ import com.comicatlas.api.outbox.service.InboxService;
 import com.comicatlas.api.storage.service.ComicStatsService;
 import com.comicatlas.api.storage.service.MediaOperationCompletionService;
 import com.comicatlas.api.storage.service.MetadataRefreshCompletionService;
+import com.comicatlas.api.storage.service.MetadataUpdateCoordinator;
 import com.comicatlas.api.upload.UploadCompletionService;
 import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.event.ComicEvent;
@@ -68,6 +69,7 @@ public class ManagementCommandResultHandler {
     private final UploadCompletionService uploadCompletionService;
     private final MetadataRefreshCompletionService metadataRefreshCompletionService;
     private final ComicStatsService comicStatsService;
+    private final MetadataUpdateCoordinator metadataUpdateCoordinator;
 
     @RabbitListener(queues = MqQueues.MANAGEMENT_RESULT)
     public void handleResult(ComicEvent raw,
@@ -175,6 +177,14 @@ public class ManagementCommandResultHandler {
             }
             default -> log.warn("未知 completed 操作类型: {}", ev.operationType());
         }
+        // 统一触发 metadata 同步：全部命令成功完成后按 comicId 合并重导出 metadata.json。
+        // METADATA_REFRESH 已在专用流程触发，此处跳过避免重复；
+        // 其余操作（LQ/HQ/转码/回收/恢复/上传等）完成后由 Coordinator 解析 comicId 并发
+        // MetadataRefreshEvent（Worker 消费后原子写文件，API 不碰文件系统）。
+        if (!"METADATA_REFRESH".equals(ev.operationType())) {
+            metadataUpdateCoordinator.requestSyncForTarget(
+                    ev.targetType(), ev.targetId(), ev.taskId(), "命令完成: " + ev.operationType());
+        }
     }
 
     // ======================== Failed ========================
@@ -239,6 +249,9 @@ public class ManagementCommandResultHandler {
             return;
         }
         uploadCompletionService.applyUploadCompletedBusiness(ev);
+        // 媒体上传/替换同样改变文件与 media 状态，统一触发 metadata 同步
+        metadataUpdateCoordinator.requestSyncForTarget(
+                ev.targetType(), ev.targetId(), ev.taskId(), "上传完成: " + ev.operationType());
     }
 
     // ======================== 辅助 ========================
