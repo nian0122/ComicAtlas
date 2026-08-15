@@ -55,7 +55,7 @@ public class ComicDetailAssembler {
         detailVO.setDescription(comic.getDescription());
         detailVO.setCoverUrl(fileUrlResolver.resolveCover(comic.getId()));
         detailVO.setPageCount(comic.getTotalPages());
-        detailVO.setFileSize(comic.getFileSize());
+        detailVO.setHqSize(comic.getHqSize());
         detailVO.setSourceType(comic.getSourceType() != null ? comic.getSourceType().name() : null);
         detailVO.setSourceRef(comic.getSourceRef());
         detailVO.setCategoryId(comic.getCategoryId());

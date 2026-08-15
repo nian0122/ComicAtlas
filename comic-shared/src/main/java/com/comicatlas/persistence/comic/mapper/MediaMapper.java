@@ -40,7 +40,7 @@ public interface MediaMapper extends BaseMapper<Media> {
 
     /**
      * 元数据刷新合并专用批量 UPDATE：按 id 一次性更新扫描所得的媒体字段
-     * （hq_status/file_size/width/height/media_type/duration/container/video_codec/audio_codec），
+     * （hq_status/hq_size/width/height/media_type/duration/container/video_codec/audio_codec），
      * 消除逐行 {@code updateById} 的往返开销（CASE WHEN 单条 UPDATE）。
      * 乐观锁语义：version 统一自增；版本漂移已在 {@code applyValidatedSnapshot} 合并计划阶段校验。
      *

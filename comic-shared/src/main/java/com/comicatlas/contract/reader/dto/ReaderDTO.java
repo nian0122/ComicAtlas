@@ -26,7 +26,7 @@ public class ReaderDTO {
         private String lqStatus;
         private Integer width;
         private Integer height;
-        private Long fileSize;
+        private Long hqSize;
         private Long lqSize;
         private String transcodeStatus;
         private String mediaType;

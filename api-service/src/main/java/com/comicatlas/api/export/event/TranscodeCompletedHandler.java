@@ -36,7 +36,7 @@ public class TranscodeCompletedHandler {
             media.setContainer(event.container());
             media.setVideoCodec(event.videoCodec());
             media.setAudioCodec(event.audioCodec());
-            media.setFileSize(event.fileSize());
+            media.setHqSize(event.fileSize());
             media.setTranscodeStatus(TranscodeStatus.READY);
             mediaMapper.updateById(media);
             log.info("TranscodeCompleted: pageId={}, newPath={}", event.pageId(), event.newHqPath());

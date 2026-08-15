@@ -296,7 +296,7 @@ class MetadataRefreshServiceTest {
             m.setLqPath(hqPath.replace(".jpg", ".webp").replace(".mp4", ".webp"));
             m.setTranscodeStatus(TranscodeStatus.NOT_NEEDED);
             m.setStatus(MediaLifecycleStatus.READY);
-            m.setFileSize(fileSize);
+            m.setHqSize(fileSize);
             m.setMediaType(mediaType);
             m.setWidth(800);
             m.setHeight(1200);
@@ -359,18 +359,18 @@ class MetadataRefreshServiceTest {
             assertThat(result.inserted()).isEqualTo(1);
 
             // m101 更新为扫描值
-            assertThat(m101.getFileSize()).isEqualTo(123456L);
+            assertThat(m101.getHqSize()).isEqualTo(123456L);
             assertThat(m101.getHqStatus()).isEqualTo(HqStatus.READY);
             assertThat(m101.getMediaType()).isEqualTo("IMAGE");
             assertThat(m101.getDuration()).isNull();
             // m102 视频字段更新
-            assertThat(m102.getFileSize()).isEqualTo(654321L);
+            assertThat(m102.getHqSize()).isEqualTo(654321L);
             assertThat(m102.getMediaType()).isEqualTo("VIDEO");
             assertThat(m102.getDuration()).isEqualByComparingTo("12.500");
             assertThat(m102.getContainer()).isEqualTo("mp4");
             // m103 未匹配 → MISSING + fileSize=0
             assertThat(m103.getHqStatus()).isEqualTo(HqStatus.MISSING);
-            assertThat(m103.getFileSize()).isZero();
+            assertThat(m103.getHqSize()).isZero();
             // m202 未匹配 → MISSING
             assertThat(m202.getHqStatus()).isEqualTo(HqStatus.MISSING);
 

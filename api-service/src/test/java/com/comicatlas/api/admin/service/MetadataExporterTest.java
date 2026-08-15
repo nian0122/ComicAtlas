@@ -93,7 +93,7 @@ class MetadataExporterTest {
         imageItem.setHqPath("1/10/001.jpg");
         imageItem.setHqStatus(HqStatus.READY);
         imageItem.setLqStatus(LqStatus.NOT_GENERATED);
-        imageItem.setFileSize(102400L);
+        imageItem.setHqSize(102400L);
         imageItem.setWidth(800);
         imageItem.setHeight(1200);
         imageItem.setMediaType("IMAGE");
@@ -105,7 +105,7 @@ class MetadataExporterTest {
         videoItem.setHqPath("1/10/002.mp4");
         videoItem.setHqStatus(HqStatus.READY);
         videoItem.setLqStatus(LqStatus.NOT_GENERATED);
-        videoItem.setFileSize(5242880L);
+        videoItem.setHqSize(5242880L);
         videoItem.setWidth(1920);
         videoItem.setHeight(1080);
         videoItem.setMediaType("VIDEO");
@@ -195,7 +195,7 @@ class MetadataExporterTest {
         deletedPage.setHqPath(null);
         deletedPage.setHqStatus(HqStatus.DELETED);
         deletedPage.setLqStatus(LqStatus.READY);
-        deletedPage.setFileSize(0L);
+        deletedPage.setHqSize(0L);
         deletedPage.setMediaType("IMAGE");
 
         when(mediaMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(deletedPage));
@@ -244,7 +244,7 @@ class MetadataExporterTest {
         item1.setHqPath("1/10/001.jpg");
         item1.setHqStatus(HqStatus.READY);
         item1.setLqStatus(LqStatus.NOT_GENERATED);
-        item1.setFileSize(100L);
+        item1.setHqSize(100L);
         item1.setMediaType("IMAGE");
         Media item2 = new Media();
         item2.setId(101L);
@@ -253,7 +253,7 @@ class MetadataExporterTest {
         item2.setHqPath("1/20/001.jpg");
         item2.setHqStatus(HqStatus.READY);
         item2.setLqStatus(LqStatus.NOT_GENERATED);
-        item2.setFileSize(100L);
+        item2.setHqSize(100L);
         item2.setMediaType("IMAGE");
 
         when(mediaMapper.selectList(any(LambdaQueryWrapper.class)))

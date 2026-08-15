@@ -20,7 +20,7 @@ public class ComicDetailVO {
     private String description;
     private String coverUrl;
     private Integer pageCount;
-    private Long fileSize;
+    private Long hqSize;
     private String sourceType;
     private String sourceRef;
     private Long categoryId;

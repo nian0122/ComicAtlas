@@ -354,7 +354,7 @@ public class ManagementCommandResultHandler {
                 mediaUpdate.set(Media::getDuration, transcode.duration());
             }
             if (transcode.fileSize() != null) {
-                mediaUpdate.set(Media::getFileSize, transcode.fileSize());
+                mediaUpdate.set(Media::getHqSize, transcode.fileSize());
             }
         }
         if (hqPath != null && !hqPath.isBlank()) {
@@ -578,7 +578,7 @@ public class ManagementCommandResultHandler {
                     .set(Media::getHqStatus, HqStatus.READY)
                     .set(Media::getWidth, result.width())
                     .set(Media::getHeight, result.height())
-                    .set(Media::getFileSize, result.fileSize())
+                    .set(Media::getHqSize, result.fileSize())
                     .set(Media::getMediaType, result.mediaType())
                     .set(Media::getDuration, result.duration())
                     .set(Media::getContainer, result.container())
@@ -880,7 +880,7 @@ public class ManagementCommandResultHandler {
                 new LambdaQueryWrapper<Media>().in(Media::getChapterId, chapterIds));
         long hqSize = mediaItems.stream()
                 .filter(media -> media.getHqStatus() != HqStatus.DELETED)
-                .mapToLong(media -> media.getFileSize() != null ? media.getFileSize() : 0L)
+                .mapToLong(media -> media.getHqSize() != null ? media.getHqSize() : 0L)
                 .sum();
         Comic comic = comicMapper.selectById(comicId);
         if (comic != null) {

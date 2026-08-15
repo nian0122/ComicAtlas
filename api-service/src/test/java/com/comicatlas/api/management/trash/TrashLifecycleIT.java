@@ -692,7 +692,7 @@ class TrashLifecycleIT {
         m.setTranscodeStatus(TranscodeStatus.NOT_NEEDED);
         m.setStatus(MediaLifecycleStatus.READY);
         m.setMediaType("IMAGE");
-        m.setFileSize(1024L);
+        m.setHqSize(1024L);
         m.setVersion(1);
         mediaMapper.insert(m);
         return m.getId();

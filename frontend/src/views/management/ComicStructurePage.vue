@@ -216,7 +216,7 @@ function transcodeLabel(status?: string): string {
 function mediaResolution(item: MediaItemInfo): string { return item.width && item.height ? `${item.width} × ${item.height}` : '未统计' }
 function mediaSizeLabel(item: MediaItemInfo): string {
   if (normalizedHqStatus(item) === 'DELETED') return '已删除'
-  if (item.fileSize) return formatSize(item.fileSize)
+  if (item.hqSize) return formatSize(item.hqSize)
   return '未统计'
 }
 function mediaLqSizeLabel(item: MediaItemInfo): string {

@@ -135,7 +135,7 @@ public class MetadataExporter {
                         media.getPageNumber() != null ? media.getPageNumber() : 0,
                         media.getHqStatus() != null ? media.getHqStatus().name() : "READY",
                         media.getLqStatus() != null ? media.getLqStatus().name() : "NOT_GENERATED",
-                        media.getFileSize() != null ? media.getFileSize() : 0,
+                        media.getHqSize() != null ? media.getHqSize() : 0,
                         media.getMediaType() != null ? media.getMediaType() : "IMAGE",
                         media.getWidth(), media.getHeight(), media.getDuration(),
                         media.getContainer(), media.getVideoCodec(), media.getAudioCodec(),

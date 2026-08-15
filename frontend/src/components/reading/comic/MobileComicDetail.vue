@@ -60,7 +60,7 @@
         </div>
         <div>
           <span>文件大小</span>
-          <strong>{{ fileSize }}</strong>
+          <strong>{{ hqSize }}</strong>
         </div>
         <div>
           <span>来源</span>
@@ -110,10 +110,10 @@ defineEmits<{
 
 const year = computed(() => props.comic.createdAt?.slice(0, 4) || '未知年份')
 
-const fileSize = computed(() => {
-  if (!props.comic.fileSize) return '-'
+const hqSize = computed(() => {
+  if (!props.comic.hqSize) return '-'
   const units = ['B', 'KB', 'MB', 'GB', 'TB']
-  let value = props.comic.fileSize
+  let value = props.comic.hqSize
   let unitIndex = 0
   while (value >= 1024 && unitIndex < units.length - 1) {
     value /= 1024

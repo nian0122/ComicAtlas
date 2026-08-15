@@ -219,7 +219,6 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
 
         comic.setTotalPages(totalPages);
         if (totalSize > 0) {
-            comic.setFileSize(totalSize);
             comic.setHqSize(totalSize);
         }
         comicMapper.updateById(comic);
@@ -337,7 +336,7 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
             media.setTranscodeStatus(TranscodeStatus.NOT_NEEDED);
             media.setStatus(MediaLifecycleStatus.STAGING);
             if (mediaData.get("fileSize") != null) {
-                media.setFileSize(((Number) mediaData.get("fileSize")).longValue());
+                media.setHqSize(((Number) mediaData.get("fileSize")).longValue());
             }
             if (mediaData.get("width") != null) {
                 media.setWidth(((Number) mediaData.get("width")).intValue());
@@ -376,7 +375,7 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
             }
 
             mediaList.add(media);
-            totalSize += media.getFileSize() != null ? media.getFileSize() : 0;
+            totalSize += media.getHqSize() != null ? media.getHqSize() : 0;
             pageCount++;
             if (fileName != null && !fileName.isBlank()) {
                 mappings.add(new FinalizeMediaMapping(fileName, fileName));
@@ -506,14 +505,13 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
                 new LambdaQueryWrapper<Media>().in(Media::getChapterId, chapterIds));
         long totalSize = 0;
         for (Media media : allMedia) {
-            if (media.getFileSize() != null) {
-                totalSize += media.getFileSize();
+            if (media.getHqSize() != null) {
+                totalSize += media.getHqSize();
             }
         }
         ManagementStateMachine.validateComicTransition(comic.getStatus().name(), ComicStatus.READY.name());
         comic.setTotalPages(allMedia.size());
         if (totalSize > 0) {
-            comic.setFileSize(totalSize);
             comic.setHqSize(totalSize);
         }
         comic.setStatus(ComicStatus.READY);

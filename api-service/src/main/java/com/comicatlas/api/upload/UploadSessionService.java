@@ -406,7 +406,7 @@ public class UploadSessionService {
             media.setTranscodeStatus(TranscodeStatus.NOT_NEEDED);
             media.setStatus(MediaLifecycleStatus.STAGING);
             media.setMediaType(detection.mediaType());
-            media.setFileSize(uploadFile.getSizeBytes());
+            media.setHqSize(uploadFile.getSizeBytes());
             media.setVersion(INITIAL_VERSION);
             mediaMapper.insert(media);
 

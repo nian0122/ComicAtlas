@@ -83,7 +83,7 @@ public class ReaderServiceImpl implements ReaderService {
             }
             mediaItem.setWidth(media.getWidth());
             mediaItem.setHeight(media.getHeight());
-            mediaItem.setFileSize(media.getFileSize());
+            mediaItem.setHqSize(media.getHqSize());
             mediaItem.setLqSize(media.getLqSize());
             mediaItem.setTranscodeStatus(media.getTranscodeStatus() == null ? null : media.getTranscodeStatus().name());
             return mediaItem;

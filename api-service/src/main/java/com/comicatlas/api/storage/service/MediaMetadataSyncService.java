@@ -99,7 +99,7 @@ public class MediaMetadataSyncService {
         long hqSize = mediaMapper.selectList(
                         new LambdaQueryWrapper<Media>().in(Media::getChapterId, chapterIds)).stream()
                 .filter(p -> p.getHqStatus() != HqStatus.DELETED)
-                .mapToLong(p -> p.getFileSize() != null ? p.getFileSize() : 0L)
+                .mapToLong(p -> p.getHqSize() != null ? p.getHqSize() : 0L)
                 .sum();
         comicMapper.update(null, new LambdaUpdateWrapper<Comic>()
                 .eq(Comic::getId, comicId)
@@ -159,7 +159,7 @@ public class MediaMetadataSyncService {
                 new LambdaQueryWrapper<Media>().in(Media::getChapterId, chapterIds));
         long hqSize = mediaItems.stream()
                 .filter(p -> p.getHqStatus() != HqStatus.DELETED)
-                .mapToLong(p -> p.getFileSize() != null ? p.getFileSize() : 0L)
+                .mapToLong(p -> p.getHqSize() != null ? p.getHqSize() : 0L)
                 .sum();
         Comic comic = comicMapper.selectById(comicId);
         if (comic != null) {

@@ -1295,7 +1295,7 @@ VALUES (1001, 'legacy-comic', 'old-author', 'READY', 'REGISTER', 1, 4, 'MANAGED'
 INSERT INTO chapter (id, comic_id, title, chapter_no, sort_order, global_order, page_count)
 VALUES (2001, 1001, '第1章', '1', 0, 1, 2), (2002, 1001, '第2章', '2', 1, 2, 2),
        (2003, 1002, '孤儿章', '1', 0, 1, 1);
-INSERT INTO page (id, chapter_id, page_number, hq_root, hq_path, hq_status, lq_status, transcode_status, media_type, width, height, file_size, container, video_codec, audio_codec)
+INSERT INTO page (id, chapter_id, page_number, hq_root, hq_path, hq_status, lq_status, transcode_status, media_type, width, height, hq_size, container, video_codec, audio_codec)
 VALUES
  (3001, 2001, 1, 'HQ', '1001/2001/001.jpg', 'READY', 'NOT_GENERATED', 'DONE', 'IMAGE', 800, 1200, 1000, NULL, NULL, NULL),
  (3002, 2001, 2, 'HQ', '1001/2001/002.jpg', 'READY', 'NOT_GENERATED', 'NOT_NEEDED', 'IMAGE', 800, 1200, 1000, NULL, NULL, NULL),

@@ -57,7 +57,7 @@ export interface ComicDetailVO {
   description?: string
   coverUrl: string
   pageCount: number
-  fileSize: number
+  hqSize: number
   sourceType: string
   sourceRef: string
   categoryId: number | null
@@ -117,7 +117,7 @@ export interface MediaItemInfo {
   lqStatus: string
   width: number
   height: number
-  fileSize?: number
+  hqSize?: number
   lqSize?: number
   transcodeStatus?: string
   /** 媒体类型，缺失时默认按 IMAGE 处理 */

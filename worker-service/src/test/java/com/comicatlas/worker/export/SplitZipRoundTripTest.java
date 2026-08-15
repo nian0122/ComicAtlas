@@ -267,7 +267,7 @@ class SplitZipRoundTripTest {
             m.setHqRoot("HQ");
             m.setHqPath(COMIC_ID + "/" + chapterId + "/" + sourceFile.fileName());
             m.setHqStatus("READY");
-            m.setFileSize((long) sourceFile.size());
+            m.setHqSize((long) sourceFile.size());
             media.add(m);
 
             expectedByZipRelative.put(sourceFile.chapterDir() + "/" + sourceFile.fileName(), content);

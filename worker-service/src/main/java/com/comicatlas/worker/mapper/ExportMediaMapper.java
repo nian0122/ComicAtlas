@@ -13,7 +13,7 @@ public interface ExportMediaMapper {
         SELECT p.id, p.chapter_id, p.page_number, p.media_type,
                p.hq_root, p.hq_path, p.hq_status,
                p.lq_root, p.lq_path, p.lq_status,
-               p.file_size, p.width, p.height,
+               p.hq_size, p.width, p.height,
                p.duration, p.container, p.video_codec, p.audio_codec
         FROM page p
         JOIN chapter ch ON p.chapter_id = ch.id
@@ -30,7 +30,7 @@ public interface ExportMediaMapper {
         SELECT p.id, p.chapter_id, p.page_number, p.media_type,
                p.hq_root, p.hq_path, p.hq_status,
                p.lq_root, p.lq_path, p.lq_status,
-               p.file_size, p.width, p.height,
+               p.hq_size, p.width, p.height,
                p.duration, p.container, p.video_codec, p.audio_codec,
                p.status, p.version
         FROM page p
@@ -44,7 +44,7 @@ public interface ExportMediaMapper {
         SELECT p.id, p.chapter_id, p.page_number, p.media_type,
                p.hq_root, p.hq_path, p.hq_status,
                p.lq_root, p.lq_path, p.lq_status,
-               p.file_size, p.width, p.height,
+               p.hq_size, p.width, p.height,
                p.duration, p.container, p.video_codec, p.audio_codec
         FROM page p
         WHERE p.chapter_id = #{chapterId}
@@ -56,7 +56,7 @@ public interface ExportMediaMapper {
         SELECT id, chapter_id, page_number, media_type,
                hq_root, hq_path, hq_status,
                lq_root, lq_path, lq_status,
-               file_size, width, height,
+               hq_size, width, height,
                duration, container, video_codec, audio_codec
         FROM page
         WHERE id = #{id}
@@ -67,7 +67,7 @@ public interface ExportMediaMapper {
         SELECT p.id, p.chapter_id, p.page_number, p.media_type,
                p.hq_root, p.hq_path, p.hq_status,
                p.lq_root, p.lq_path, p.lq_status,
-               p.file_size, p.width, p.height,
+               p.hq_size, p.width, p.height,
                p.duration, p.container, p.video_codec, p.audio_codec
         FROM page p
         JOIN chapter ch ON p.chapter_id = ch.id

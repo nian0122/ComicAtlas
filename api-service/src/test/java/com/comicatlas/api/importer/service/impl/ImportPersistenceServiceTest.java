@@ -236,7 +236,7 @@ class ImportPersistenceServiceTest {
         media.setHqPath(chapterId + "/001.jpg");
         media.setHqStatus(HqStatus.PENDING);
         media.setStatus(MediaLifecycleStatus.STAGING);
-        media.setFileSize(1024L);
+        media.setHqSize(1024L);
         return media;
     }
 
@@ -488,7 +488,7 @@ class ImportPersistenceServiceTest {
         media.setHqPath("100/0/001.jpg");
         media.setHqStatus(HqStatus.PENDING);
         media.setStatus(MediaLifecycleStatus.STAGING);
-        media.setFileSize(1024L);
+        media.setHqSize(1024L);
         when(mediaMapper.selectList(any(Wrapper.class))).thenReturn(List.of(media));
         when(mediaMapper.selectCount(any(Wrapper.class))).thenReturn(0L);
         when(mediaMapper.markImportFinalizedByChapter(1001L, "100/1001")).thenReturn(1);

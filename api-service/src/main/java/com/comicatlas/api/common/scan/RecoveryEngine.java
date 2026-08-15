@@ -250,7 +250,7 @@ public class RecoveryEngine {
                 // 缺文件必须 MISSING，不得标 READY
                 media.setHqStatus(item.exists() ? HqStatus.READY : HqStatus.MISSING);
                 media.setLqStatus(LqStatus.NOT_GENERATED);
-                media.setFileSize(item.fileSize());
+                media.setHqSize(item.fileSize());
                 media.setWidth(item.width());
                 media.setHeight(item.height());
                 media.setMediaType(item.mediaType());
@@ -262,11 +262,11 @@ public class RecoveryEngine {
 
         if (ctx.comicExists()) {
             comic.setTotalPages(pgCount);
-            comic.setFileSize(totalSize);
+            comic.setHqSize(totalSize);
             comic.setHqSize(totalSize);
             comicMapper.updateById(comic);
         } else if (totalSize > 0) {
-            comic.setFileSize(totalSize);
+            comic.setHqSize(totalSize);
             comic.setHqSize(totalSize);
             comicMapper.updateById(comic);
         }

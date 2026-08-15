@@ -375,7 +375,7 @@ public class MetadataRefreshService {
                     && (media.getHqStatus() == HqStatus.READY || media.getHqStatus() == HqStatus.MISSING)
                     && !matchedIds.contains(media.getId())) {
                 media.setHqStatus(HqStatus.MISSING);
-                media.setFileSize(0L);
+                media.setHqSize(0L);
                 toMarkMissing.add(media);
                 toUpdate.add(media);
             }
@@ -387,7 +387,7 @@ public class MetadataRefreshService {
     private void applyMatchedUpdate(Media dbRow, MediaSnapshot item) {
         boolean image = "IMAGE".equals(item.mediaType());
         dbRow.setHqStatus(HqStatus.READY);
-        dbRow.setFileSize(item.fileSize());
+        dbRow.setHqSize(item.fileSize());
         dbRow.setWidth(item.width());
         dbRow.setHeight(item.height());
         dbRow.setMediaType(item.mediaType());
@@ -418,7 +418,7 @@ public class MetadataRefreshService {
         media.setLqPath(null);
         media.setTranscodeStatus(TranscodeStatus.NOT_NEEDED);
         media.setStatus(MediaLifecycleStatus.READY);
-        media.setFileSize(item.fileSize());
+        media.setHqSize(item.fileSize());
         media.setMediaType(item.mediaType());
         media.setWidth(item.width());
         media.setHeight(item.height());
@@ -489,13 +489,12 @@ public class MetadataRefreshService {
         // hqSize/fileSize 只统计实际扫描 READY 字节（MISSING 已置 0，自然排除）
         long hqSize = merged.stream()
                 .filter(m -> m.getHqStatus() == HqStatus.READY)
-                .mapToLong(m -> m.getFileSize() == null ? 0L : m.getFileSize())
+                .mapToLong(m -> m.getHqSize() == null ? 0L : m.getHqSize())
                 .sum();
         comicMapper.update(null, new LambdaUpdateWrapper<Comic>()
                 .eq(Comic::getId, comicId)
                 .set(Comic::getTotalPages, (int) totalPages)
-                .set(Comic::getHqSize, hqSize)
-                .set(Comic::getFileSize, hqSize));
+                .set(Comic::getHqSize, hqSize));
     }
 
     private String basename(String hqPath) {

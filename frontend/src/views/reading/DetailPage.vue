@@ -70,7 +70,7 @@
             </div>
             <div class="info-item">
               <span class="info-label">大小</span>
-              <span class="info-value">{{ formatBytes(comic.fileSize) }}</span>
+              <span class="info-value">{{ formatBytes(comic.hqSize) }}</span>
             </div>
             <div class="info-item info-item--wide">
               <span class="info-label">描述</span>
