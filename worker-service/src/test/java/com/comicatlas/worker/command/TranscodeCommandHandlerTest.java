@@ -33,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -230,7 +231,8 @@ class TranscodeCommandHandlerTest {
         handler.transcode(cmd);
 
         verify(publisher).failed(eq(cmd), anyString());
-        verify(publisher, never()).completed(any(ManagementCommandRequestedEvent.class), any());
+        verify(publisher, never()).completed(any(ManagementCommandRequestedEvent.class), any(TranscodeMediaInfo.class));
+        verify(publisher, never()).completed(any(ManagementCommandRequestedEvent.class), anyList());
     }
 
     // ==================== Test 4: 漫画级成功 → 无单页实测元数据可携带，completed 传 null ====================
@@ -264,7 +266,8 @@ class TranscodeCommandHandlerTest {
 
         // 漫画级单事件无法携带逐页元数据：走无 transcode 的 completed(cmd) 重载
         verify(publisher).completed(cmd);
-        verify(publisher, never()).completed(any(ManagementCommandRequestedEvent.class), any());
+        verify(publisher, never()).completed(any(ManagementCommandRequestedEvent.class), any(TranscodeMediaInfo.class));
+        verify(publisher, never()).completed(any(ManagementCommandRequestedEvent.class), anyList());
         verify(publisher).progress(eq(cmd), eq(100), eq("转码完成"));
     }
 

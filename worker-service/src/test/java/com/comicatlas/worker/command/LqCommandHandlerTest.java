@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -75,7 +76,7 @@ class LqCommandHandlerTest {
         handler.generateChapter(regen);
 
         verify(optimizer).generateLq(eq(7L), eq(42L), any(Path.class), any(Path.class), eq(true));
-        verify(publisher).completed(regen);
+        verify(publisher).completed(eq(regen), anyList());
     }
 
     @Test

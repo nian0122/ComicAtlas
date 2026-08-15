@@ -158,11 +158,11 @@ public class MediaOperationCommandService {
 
         List<CreateManagementTaskRequest.TaskTarget> targets = new ArrayList<>();
         for (Chapter chapter : chapters) {
-            List<Media> pages = pagesByChapter.getOrDefault(chapter.getId(), List.of());
-            if (pages.isEmpty()) {
+            List<Media> mediaItems = pagesByChapter.getOrDefault(chapter.getId(), List.of());
+            if (mediaItems.isEmpty()) {
                 continue;
             }
-            validateHqDeletePrecondition(pages);
+            validateHqDeletePrecondition(mediaItems);
             targets.add(target("CHAPTER", chapter.getId(), TaskType.HQ_DELETE));
         }
         if (targets.isEmpty()) {

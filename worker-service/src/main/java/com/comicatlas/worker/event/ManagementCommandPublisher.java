@@ -9,6 +9,7 @@ import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.common.event.MediaUploadCompletedEvent;
 import com.comicatlas.common.event.MediaUploadCompletedEvent.MediaAnalysisResult;
 import com.comicatlas.common.event.MetadataRefreshScanCompletedEvent;
+import com.comicatlas.common.event.payload.LqSizeResult;
 import com.comicatlas.common.event.payload.TranscodeMediaInfo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -58,15 +59,24 @@ public class ManagementCommandPublisher {
     }
 
     public void completed(ManagementCommandRequestedEvent cmd) {
-        completed(cmd, null);
+        completed(cmd, null, null);
     }
 
     public void completed(ManagementCommandRequestedEvent cmd, TranscodeMediaInfo transcode) {
+        completed(cmd, transcode, null);
+    }
+
+    public void completed(ManagementCommandRequestedEvent cmd, List<LqSizeResult> lqSizes) {
+        completed(cmd, null, lqSizes);
+    }
+
+    private void completed(ManagementCommandRequestedEvent cmd, TranscodeMediaInfo transcode,
+                           List<LqSizeResult> lqSizes) {
         rabbitTemplate.convertAndSend(EXCHANGE, MqRoutingKeys.COMMAND_COMPLETED,
                 new ManagementCommandCompletedEvent(UUID.randomUUID(), Instant.now(), 1,
                         cmd.taskId(), cmd.itemId(), cmd.attempt(),
                         cmd.operationType(), cmd.targetType(), cmd.targetId(),
-                        transcode));
+                        transcode, lqSizes));
     }
 
     public void failed(ManagementCommandRequestedEvent cmd, String errorMessage) {
