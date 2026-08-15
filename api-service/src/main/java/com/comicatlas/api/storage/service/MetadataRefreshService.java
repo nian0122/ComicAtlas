@@ -71,6 +71,9 @@ public class MetadataRefreshService {
     /** 已删除/回收中媒体不参与活动匹配。 */
     private static final List<String> INACTIVE_STATUSES = List.of("TRASHED", "DELETED");
 
+    /** LQ 状态：READY（LQ 文件存在）。 */
+    private static final String LQ_STATUS_READY = "READY";
+
     /** 合并落库分批上限（与导入链路 MEDIA_INSERT_BATCH_SIZE 一致，控制单条 SQL 长度与参数数）。 */
     private static final int MERGE_BATCH_SIZE = 500;
 
@@ -383,7 +386,7 @@ public class MetadataRefreshService {
         return new MergePlan(toUpdate, toInsert, toMarkMissing);
     }
 
-    /** 匹配成功：更新 HQ READY、fileSize、宽高、mediaType 与视频字段（IMAGE 清空视频字段）。 */
+    /** 匹配成功：更新 HQ READY、fileSize、宽高、mediaType、视频字段与 LQ 事实（以本地文件为准）。 */
     private void applyMatchedUpdate(Media dbRow, MediaSnapshot item) {
         boolean image = "IMAGE".equals(item.mediaType());
         dbRow.setHqStatus(HqStatus.READY);
@@ -402,10 +405,31 @@ public class MetadataRefreshService {
             dbRow.setVideoCodec(item.videoCodec());
             dbRow.setAudioCodec(item.audioCodec());
         }
-        // 保留 mediaId/pageNumber/LQ root/path/status 与 transcodeStatus 不变
+        // 决策（以本地文件为准）：LQ 状态与大小以快照实测为准——LQ 文件缺失即校正
+        // NOT_GENERATED（不沿用 DB 旧 READY），存在即 READY + 实测大小。
+        // lqPath 由 hqPath 推导（{hqPath 去扩展名}.webp），LQ 根固定为 LQ，此处不重复写。
+        // 仅图片媒体有 LQ；视频保持 NOT_GENERATED。
+        if (image) {
+            applyLqFact(dbRow, item.lqStatus(), item.lqSize());
+        } else {
+            dbRow.setLqStatus(LqStatus.NOT_GENERATED);
+            dbRow.setLqSize(0L);
+        }
+        // 保留 mediaId/pageNumber/lqPath（推导一致时无需变更）与 transcodeStatus 不变
     }
 
-    /** 磁盘新增文件：插入 READY，pageNumber 从本章最大非负页码 +1 追加。 */
+    /** 按快照 LQ 事实写入 lq_status/lq_size（仅图片）；快照未携带 LQ 时按未生成处理。 */
+    private void applyLqFact(Media dbRow, String lqStatus, long lqSize) {
+        if (LQ_STATUS_READY.equals(lqStatus)) {
+            dbRow.setLqStatus(LqStatus.READY);
+            dbRow.setLqSize(lqSize);
+        } else {
+            dbRow.setLqStatus(LqStatus.NOT_GENERATED);
+            dbRow.setLqSize(0L);
+        }
+    }
+
+    /** 磁盘新增文件：插入 READY，pageNumber 从本章最大非负页码 +1 追加；LQ 事实取快照。 */
     private Media buildNewMedia(Long chapterId, MediaSnapshot item, Map<Long, Integer> nextPageByChapter) {
         Media media = new Media();
         media.setChapterId(chapterId);
@@ -413,9 +437,14 @@ public class MetadataRefreshService {
         media.setHqRoot("HQ");
         media.setHqPath(item.hqPath());
         media.setHqStatus(HqStatus.READY);
-        media.setLqStatus(LqStatus.NOT_GENERATED);
-        media.setLqRoot(null);
-        media.setLqPath(null);
+        // 新文件 LQ 事实：快照实测（存在即 READY，缺失即 NOT_GENERATED）
+        if (LQ_STATUS_READY.equals(item.lqStatus())) {
+            media.setLqStatus(LqStatus.READY);
+            media.setLqSize(item.lqSize());
+        } else {
+            media.setLqStatus(LqStatus.NOT_GENERATED);
+            media.setLqSize(0L);
+        }
         media.setTranscodeStatus(TranscodeStatus.NOT_NEEDED);
         media.setStatus(MediaLifecycleStatus.READY);
         media.setHqSize(item.fileSize());
