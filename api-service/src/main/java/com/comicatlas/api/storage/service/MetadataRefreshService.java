@@ -325,17 +325,20 @@ public class MetadataRefreshService {
 
     /** 合并计划：内存中构造待更新/待插入/待标记缺失的集合，之后一次性执行。 */
     private MergePlan buildMergePlan(MetadataRefreshSnapshotDTO snapshot, List<Media> activeMedia) {
-        // 匹配索引：chapterId + basename → 活动行（仅 READY 生命周期且 HQ READY/MISSING 行参与匹配）
+        // 匹配索引：chapterId + basename → 活动行（READY 生命周期行；正常行按 hq_path、
+        // HQ 已删除的仅 LQ 行按 lq_path 取 basename）
         Map<String, Media> index = new HashMap<>();
         Set<Long> matchedIds = new HashSet<>();
         Map<Long, Integer> nextPageByChapter = new HashMap<>();
         for (Media media : activeMedia) {
-            if (media.getStatus() != MediaLifecycleStatus.READY
-                    || (media.getHqStatus() != HqStatus.READY && media.getHqStatus() != HqStatus.MISSING)
-                    || media.getHqPath() == null) {
+            if (media.getStatus() != MediaLifecycleStatus.READY) {
                 continue;
             }
-            index.put(media.getChapterId() + "/" + basename(media.getHqPath()), media);
+            String key = matchKeyOf(media);
+            if (key == null) {
+                continue;
+            }
+            index.put(key, media);
             if (media.getPageNumber() != null && media.getPageNumber() >= 0) {
                 nextPageByChapter.merge(media.getChapterId(), media.getPageNumber(), Math::max);
             }
@@ -386,9 +389,34 @@ public class MetadataRefreshService {
         return new MergePlan(toUpdate, toInsert, toMarkMissing);
     }
 
+    /**
+     * 活动行匹配键：正常行（HQ READY/MISSING）按 hq_path basename；
+     * HQ 已删除（仅 LQ 模式）按 lq_path basename 匹配——快照同样以 LQ 文件名作为 basename。
+     * 无法参与匹配的行返回 null。
+     */
+    private String matchKeyOf(Media media) {
+        String hqPath = media.getHqPath();
+        if (hqPath != null && !hqPath.isBlank()
+                && (media.getHqStatus() == HqStatus.READY || media.getHqStatus() == HqStatus.MISSING)) {
+            return media.getChapterId() + "/" + basename(hqPath);
+        }
+        if (media.getHqStatus() == HqStatus.DELETED
+                && media.getLqPath() != null && !media.getLqPath().isBlank()) {
+            return media.getChapterId() + "/" + basename(media.getLqPath());
+        }
+        return null;
+    }
+
     /** 匹配成功：更新 HQ READY、fileSize、宽高、mediaType、视频字段与 LQ 事实（以本地文件为准）。 */
     private void applyMatchedUpdate(Media dbRow, MediaSnapshot item) {
         boolean image = "IMAGE".equals(item.mediaType());
+        if (HqStatus.DELETED.name().equals(item.hqStatus())) {
+            // 仅 LQ 模式（HQ 已删除、保留 LQ）：只校正 LQ 事实，不触碰 HQ/尺寸/视频字段
+            if (image) {
+                applyLqFact(dbRow, item.lqStatus(), item.lqSize());
+            }
+            return;
+        }
         dbRow.setHqStatus(HqStatus.READY);
         dbRow.setHqSize(item.fileSize());
         dbRow.setWidth(item.width());

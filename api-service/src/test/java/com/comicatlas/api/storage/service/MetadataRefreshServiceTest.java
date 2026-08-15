@@ -621,5 +621,75 @@ class MetadataRefreshServiceTest {
             assertThat(m103.getLqStatus()).isEqualTo(LqStatus.READY);
             assertThat(m103.getLqSize()).isEqualTo(999L);
         }
+
+        @Test
+        @DisplayName("仅 LQ 行：快照 lqStatus=READY 时校正 DB 为 READY + lqSize，HQ 字段不动")
+        void lqOnlyRow_snapshotReady_updatesDbLqReady() {
+            Chapter c42 = chapter(42L, 1);
+            when(chapterMapper.selectList(any())).thenReturn(List.of(c42));
+            Media m101 = media(101L, 42L, "1/42/001.jpg", 1, "DELETED", 0L, "IMAGE", 1);
+            m101.setHqPath(null);
+            m101.setHqRoot(null);
+            m101.setLqPath("1/42/001.webp");
+            m101.setLqStatus(LqStatus.NOT_GENERATED);
+            when(mediaMapper.selectList(any())).thenReturn(List.of(m101));
+            when(mediaMapper.updateRefreshBatch(anyList())).thenReturn(1);
+
+            // 快照条目：hqStatus=DELETED 标记仅 LQ，hqPath 为 LQ 文件名，LQ 事实 READY
+            MetadataRefreshSnapshotDTO snapshot = new MetadataRefreshSnapshotDTO(1, 1L,
+                    Instant.parse("2026-08-09T00:00:00Z"), null,
+                    List.of(new MetadataRefreshSnapshotDTO.ChapterSnapshot(42L, 1,
+                            List.of(new MetadataRefreshSnapshotDTO.MediaSnapshot(101L, 1,
+                                    "1/42/001.webp", "DELETED", "READY", 1,
+                                    0L, "IMAGE", null, null, null, null, null, null,
+                                    "READY", 8888L)),
+                            List.of())));
+            String revision = MetadataSnapshotRevision.compute(snapshot);
+            MetadataRefreshSnapshotDTO applied =
+                    new MetadataRefreshSnapshotDTO(snapshot.schemaVersion(), snapshot.comicId(),
+                            snapshot.generatedAt(), revision, snapshot.chapters());
+
+            service.applyValidatedSnapshot(applied);
+
+            assertThat(m101.getLqStatus()).isEqualTo(LqStatus.READY);
+            assertThat(m101.getLqSize()).isEqualTo(8888L);
+            assertThat(m101.getHqStatus()).isEqualTo(HqStatus.DELETED);
+            assertThat(m101.getHqPath()).isNull();
+        }
+
+        @Test
+        @DisplayName("仅 LQ 行：快照 lqStatus=NOT_GENERATED 时校正 DB 旧 READY，HQ 字段不动")
+        void lqOnlyRow_snapshotMissing_correctsDbLqReadyToNotGenerated() {
+            Chapter c42 = chapter(42L, 1);
+            when(chapterMapper.selectList(any())).thenReturn(List.of(c42));
+            Media m101 = media(101L, 42L, "1/42/001.jpg", 1, "DELETED", 0L, "IMAGE", 1);
+            m101.setHqPath(null);
+            m101.setHqRoot(null);
+            m101.setLqPath("1/42/001.webp");
+            m101.setLqStatus(LqStatus.READY); // DB 旧状态：LQ READY（但磁盘 LQ 已不存在）
+            m101.setLqSize(5555L);
+            when(mediaMapper.selectList(any())).thenReturn(List.of(m101));
+            when(mediaMapper.updateRefreshBatch(anyList())).thenReturn(1);
+
+            MetadataRefreshSnapshotDTO snapshot = new MetadataRefreshSnapshotDTO(1, 1L,
+                    Instant.parse("2026-08-09T00:00:00Z"), null,
+                    List.of(new MetadataRefreshSnapshotDTO.ChapterSnapshot(42L, 1,
+                            List.of(new MetadataRefreshSnapshotDTO.MediaSnapshot(101L, 1,
+                                    "1/42/001.webp", "DELETED", "READY", 1,
+                                    0L, "IMAGE", null, null, null, null, null, null,
+                                    "NOT_GENERATED", 0L)),
+                            List.of())));
+            String revision = MetadataSnapshotRevision.compute(snapshot);
+            MetadataRefreshSnapshotDTO applied =
+                    new MetadataRefreshSnapshotDTO(snapshot.schemaVersion(), snapshot.comicId(),
+                            snapshot.generatedAt(), revision, snapshot.chapters());
+
+            service.applyValidatedSnapshot(applied);
+
+            assertThat(m101.getLqStatus()).isEqualTo(LqStatus.NOT_GENERATED);
+            assertThat(m101.getLqSize()).isZero();
+            assertThat(m101.getHqStatus()).isEqualTo(HqStatus.DELETED);
+            assertThat(m101.getHqPath()).isNull();
+        }
     }
 }

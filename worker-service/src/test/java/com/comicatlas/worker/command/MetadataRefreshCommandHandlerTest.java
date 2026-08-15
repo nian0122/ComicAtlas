@@ -664,6 +664,92 @@ class MetadataRefreshCommandHandlerTest {
         assertEquals(0, item.get("lqSize").asLong());
     }
 
+    @Test
+    void lqOnlyScan_hqDeleted_carriesLqStatusInSnapshot() throws Exception {
+        // 仅 LQ 模式：HQ 目录不存在（hq_status=DELETED），LQ 目录存在且产物齐全
+        Files.createDirectories(tempRoot.resolve("lq/1/42"));
+        Files.writeString(tempRoot.resolve("lq/1/42/001.webp"), "lq-img-001");
+        Files.writeString(tempRoot.resolve("lq/1/42/002.webp"), "lq-img-002");
+
+        when(chapterMapper.selectByComicIdWithVersion(COMIC_ID))
+                .thenReturn(List.of(chapter(CHAPTER_ID, 1, 1)));
+        ExportMedia lqOnly = media(101L, CHAPTER_ID, null, 1, "DELETED", "READY", 1);
+        lqOnly.setMediaType("IMAGE");
+        lqOnly.setLqPath("1/42/001.webp");
+        ExportMedia lqMissing = media(102L, CHAPTER_ID, null, 2, "DELETED", "READY", 1);
+        lqMissing.setMediaType("IMAGE");
+        lqMissing.setLqPath("1/42/002.webp");
+        when(mediaMapper.selectByComicIdWithVersionAndStatus(COMIC_ID)).thenReturn(List.of(lqOnly, lqMissing));
+        newHandler();
+
+        handler.refresh(cmd());
+
+        JsonNode root = objectMapper.readTree(snapshotPath().toFile());
+        JsonNode items = root.get("chapters").get(0).get("mediaItems");
+        assertEquals(2, items.size(), "仅 LQ 章节应按 DB lq_path 产出全部行");
+        // 快照 hqPath 规范为 chapterId 形式 + LQ 文件名，hqStatus 标记 DELETED
+        assertEquals("1/42/001.webp", items.get(0).get("hqPath").asText());
+        assertEquals("DELETED", items.get(0).get("hqStatus").asText());
+        assertEquals("READY", items.get(0).get("lqStatus").asText());
+        assertTrue(items.get(0).get("lqSize").asLong() > 0, "LQ 大小应取实测字节数");
+        assertEquals(101, items.get(0).get("mediaId").asLong());
+    }
+
+    @Test
+    void lqOnlyScan_lqFileMissing_marksNotGenerated() throws Exception {
+        // 仅 LQ 模式：LQ 目录存在但对应 .webp 缺失 → 快照 NOT_GENERATED 供 API 校正过期 READY
+        Files.createDirectories(tempRoot.resolve("lq/1/42"));
+
+        when(chapterMapper.selectByComicIdWithVersion(COMIC_ID))
+                .thenReturn(List.of(chapter(CHAPTER_ID, 1, 1)));
+        ExportMedia lqOnly = media(101L, CHAPTER_ID, null, 1, "DELETED", "READY", 1);
+        lqOnly.setMediaType("IMAGE");
+        lqOnly.setLqPath("1/42/001.webp");
+        when(mediaMapper.selectByComicIdWithVersionAndStatus(COMIC_ID)).thenReturn(List.of(lqOnly));
+        newHandler();
+
+        handler.refresh(cmd());
+
+        JsonNode root = objectMapper.readTree(snapshotPath().toFile());
+        JsonNode item = root.get("chapters").get(0).get("mediaItems").get(0);
+        assertEquals("DELETED", item.get("hqStatus").asText());
+        assertEquals("NOT_GENERATED", item.get("lqStatus").asText(), "LQ 文件缺失应标 NOT_GENERATED");
+        assertEquals(0, item.get("lqSize").asLong());
+    }
+
+    @Test
+    void lqOnlyScan_ignoresNonLqFilesAndUnmatchedRows() throws Exception {
+        // 仅 LQ 模式：目录内非 .webp 产物（无关文件）忽略；DB 行 lq_path 非法时跳过
+        Files.createDirectories(tempRoot.resolve("lq/1/42"));
+        Files.writeString(tempRoot.resolve("lq/1/42/001.webp"), "lq-img-001");
+        Files.writeString(tempRoot.resolve("lq/1/42/notes.txt"), "ignored");
+
+        when(chapterMapper.selectByComicIdWithVersion(COMIC_ID))
+                .thenReturn(List.of(chapter(CHAPTER_ID, 1, 1)));
+        ExportMedia lqOnly = media(101L, CHAPTER_ID, null, 1, "DELETED", "READY", 1);
+        lqOnly.setMediaType("IMAGE");
+        lqOnly.setLqPath("1/42/001.webp");
+        ExportMedia badRow = media(102L, CHAPTER_ID, null, 2, "DELETED", "READY", 1);
+        badRow.setMediaType("IMAGE");
+        badRow.setLqPath("../escape.webp");
+        when(mediaMapper.selectByComicIdWithVersionAndStatus(COMIC_ID)).thenReturn(List.of(lqOnly, badRow));
+        newHandler();
+
+        handler.refresh(cmd());
+
+        JsonNode root = objectMapper.readTree(snapshotPath().toFile());
+        JsonNode items = root.get("chapters").get(0).get("mediaItems");
+        assertEquals(1, items.size(), "非法 lqPath 行被跳过，不产出快照条目");
+        assertEquals(101, items.get(0).get("mediaId").asLong());
+        boolean illegalWarning = false;
+        for (JsonNode w : root.get("chapters").get(0).get("warnings")) {
+            if (w.asText().contains("非法 lqPath")) {
+                illegalWarning = true;
+            }
+        }
+        assertTrue(illegalWarning, "非法 lqPath 应记结构化 warning");
+    }
+
     private static String shaHex(byte[] bytes) throws Exception {
         return sha256Hex(bytes);
     }
