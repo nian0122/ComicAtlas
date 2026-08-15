@@ -44,14 +44,21 @@ public class CatalogServiceImpl implements CatalogService {
         key = "#comicId",
         unless = "#result == null || #result.isEmpty()")
     public List<CatalogNode> buildTree(Long comicId) {
-        Comic comic = comicMapper.selectById(comicId);
+        Comic comic = comicMapper.selectOne(
+            new LambdaQueryWrapper<Comic>()
+                .select(Comic::getId, Comic::getStatus)
+                .eq(Comic::getId, comicId));
         if (comic == null || comic.getStatus() != ComicStatus.READY) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在或不可阅读");
         }
         List<Catalog> catalogs = new ArrayList<>(catalogMapper.selectList(
-            new LambdaQueryWrapper<Catalog>().eq(Catalog::getComicId, comicId).orderByAsc(Catalog::getSortOrder)));
+            new LambdaQueryWrapper<Catalog>()
+                .select(Catalog::getId, Catalog::getParentId, Catalog::getTitle, Catalog::getSortOrder)
+                .eq(Catalog::getComicId, comicId).orderByAsc(Catalog::getSortOrder)));
         List<Chapter> chapters = chapterMapper.selectList(
             new LambdaQueryWrapper<Chapter>()
+                .select(Chapter::getId, Chapter::getCatalogId, Chapter::getChapterNo,
+                        Chapter::getTitle, Chapter::getGlobalOrder, Chapter::getPageCount)
                 .eq(Chapter::getComicId, comicId)
                 .eq(Chapter::getStatus, ChapterLifecycleStatus.READY.name())
                 .orderByAsc(Chapter::getGlobalOrder));

@@ -15,7 +15,7 @@ public interface ComicMapper extends BaseMapper<Comic> {
 
     @Select("""
         <script>
-        SELECT c.* FROM comic c
+        SELECT c.id, c.title, c.author, c.total_pages, c.category_id, c.status, c.created_at FROM comic c
         <where>
             <choose>
                 <when test='query.status != null and query.status != ""'>

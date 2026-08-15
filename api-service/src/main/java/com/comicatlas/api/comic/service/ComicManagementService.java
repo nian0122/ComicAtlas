@@ -1,13 +1,13 @@
 package com.comicatlas.api.comic.service;
 
-import com.comicatlas.contract.comic.dto.BatchComicUpdateDTO;
 import com.comicatlas.contract.comic.dto.BatchUpdateResultVO;
 import com.comicatlas.contract.comic.dto.ComicDetailVO;
 import com.comicatlas.contract.comic.dto.ComicMetadataDTO;
-import com.comicatlas.contract.comic.dto.ComicMetadataUpdateDTO;
-import com.comicatlas.contract.comic.dto.ComicTagUpdateDTO;
-import com.comicatlas.contract.comic.dto.CreateComicRequest;
-import com.comicatlas.contract.comic.dto.UpdateComicRequest;
+import com.comicatlas.api.comic.dto.BatchComicUpdateRequest;
+import com.comicatlas.api.comic.dto.ComicMetadataUpdateRequest;
+import com.comicatlas.api.comic.dto.ComicTagUpdateRequest;
+import com.comicatlas.api.comic.dto.CreateComicRequest;
+import com.comicatlas.api.comic.dto.UpdateComicRequest;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
 
 /**
@@ -28,11 +28,11 @@ public interface ComicManagementService {
     ManagementTaskResponse deleteComic(Long id, String idempotencyKey);
 
     /** 更新漫画元数据 */
-    ComicMetadataDTO updateMetadata(Long id, ComicMetadataUpdateDTO dto);
+    ComicMetadataDTO updateMetadata(Long id, ComicMetadataUpdateRequest dto);
 
     /** 全量覆盖漫画标签绑定关系 */
-    void updateComicTags(Long comicId, ComicTagUpdateDTO dto);
+    void updateComicTags(Long comicId, ComicTagUpdateRequest dto);
 
     /** 批量更新漫画（分类/标签） */
-    BatchUpdateResultVO batchUpdate(BatchComicUpdateDTO dto);
+    BatchUpdateResultVO batchUpdate(BatchComicUpdateRequest dto);
 }

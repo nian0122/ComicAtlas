@@ -1,8 +1,12 @@
-package com.comicatlas.contract.reader.dto;
+package com.comicatlas.reading.dto;
 
 import lombok.Data;
+
 import java.time.LocalDateTime;
 
+/**
+ * 阅读历史视图（阅读域）。
+ */
 @Data
 public class HistoryVO {
     private Long comicId;

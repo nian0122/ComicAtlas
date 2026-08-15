@@ -1,8 +1,8 @@
 package com.comicatlas.reading.controller;
 
 import com.comicatlas.contract.common.Result;
-import com.comicatlas.contract.reader.dto.HistoryUpdateRequest;
-import com.comicatlas.contract.reader.dto.HistoryVO;
+import com.comicatlas.reading.dto.HistoryUpdateRequest;
+import com.comicatlas.reading.dto.HistoryVO;
 import com.comicatlas.reading.service.HistoryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;

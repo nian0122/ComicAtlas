@@ -1,8 +1,8 @@
 package com.comicatlas.api.comic.service;
 
-import com.comicatlas.contract.comic.dto.ChapterCreateRequest;
-import com.comicatlas.contract.comic.dto.ChapterRenameRequest;
 import com.comicatlas.contract.comic.dto.ChapterVO;
+import com.comicatlas.api.comic.dto.ChapterCreateRequest;
+import com.comicatlas.api.comic.dto.ChapterRenameRequest;
 
 /**
  * 章节管理服务：create / rename / move / reorder / trash。

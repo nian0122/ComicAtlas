@@ -1,12 +1,12 @@
 package com.comicatlas.api.comic.controller;
 
 import com.comicatlas.contract.common.Result;
-import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.comic.dto.TagDTO;
+import com.comicatlas.api.comic.dto.CreateTagRequest;
 import com.comicatlas.api.comic.service.TagManagementService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
-import java.util.Map;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -29,18 +29,14 @@ public class TagManagementController {
     private final TagManagementService tagManagementService;
 
     /**
-     * 创建标签，名称不能为空。
+     * 创建标签，名称不能为空（@Valid 边界校验）。
      *
-     * @param body 请求体，仅读取 {@code name} 字段
+     * @param request 标签信息
      * @return 创建的标签
      */
     @PostMapping
-    public Result<TagDTO> createTag(@RequestBody Map<String, String> body) {
-        String name = body.get("name");
-        if (name == null || name.isBlank()) {
-            return Result.fail(HttpStatusCodes.BAD_REQUEST, "标签名称不能为空");
-        }
-        return Result.ok(tagManagementService.createTag(name.trim()));
+    public Result<TagDTO> createTag(@Valid @RequestBody CreateTagRequest request) {
+        return Result.ok(tagManagementService.createTag(request.getName().trim()));
     }
 
     /**

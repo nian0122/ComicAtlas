@@ -55,7 +55,10 @@ public class ComicQueryServiceImpl implements ComicQueryService {
 
     @Override
     public ComicMetadataDTO getMetadata(Long id) {
-        Comic comic = comicMapper.selectById(id);
+        Comic comic = comicMapper.selectOne(
+            new LambdaQueryWrapper<Comic>()
+                .select(Comic::getTitle, Comic::getAuthor, Comic::getDescription, Comic::getCategoryId)
+                .eq(Comic::getId, id));
         if (comic == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在");
         }
@@ -70,13 +73,16 @@ public class ComicQueryServiceImpl implements ComicQueryService {
 
     @Override
     public List<Long> getComicTags(Long comicId) {
-        Comic comic = comicMapper.selectById(comicId);
+        Comic comic = comicMapper.selectOne(
+            new LambdaQueryWrapper<Comic>().select(Comic::getId).eq(Comic::getId, comicId));
         if (comic == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在");
         }
 
         return comicTagMapper.selectList(
-                        new LambdaQueryWrapper<ComicTag>().eq(ComicTag::getComicId, comicId))
+                        new LambdaQueryWrapper<ComicTag>()
+                            .select(ComicTag::getTagId)
+                            .eq(ComicTag::getComicId, comicId))
                 .stream()
                 .map(ComicTag::getTagId)
                 .toList();

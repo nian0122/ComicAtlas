@@ -80,7 +80,9 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
 
         List<Long> comicIds = comics.stream().map(Comic::getId).toList();
         Map<Long, ReadingHistory> histories = historyMapper.selectList(
-                        new LambdaQueryWrapper<ReadingHistory>().in(ReadingHistory::getComicId, comicIds))
+                        new LambdaQueryWrapper<ReadingHistory>()
+                            .select(ReadingHistory::getComicId, ReadingHistory::getChapterId, ReadingHistory::getPageNumber)
+                            .in(ReadingHistory::getComicId, comicIds))
                 .stream()
                 .collect(Collectors.toMap(ReadingHistory::getComicId, history -> history));
 

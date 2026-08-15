@@ -1,7 +1,10 @@
-package com.comicatlas.contract.reader.dto;
+package com.comicatlas.reading.dto;
 
 import lombok.Data;
 
+/**
+ * 阅读进度更新请求（阅读域，唯一写操作）。
+ */
 @Data
 public class HistoryUpdateRequest {
     private Long chapterId;

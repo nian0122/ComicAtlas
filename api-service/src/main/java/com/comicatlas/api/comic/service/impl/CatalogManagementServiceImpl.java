@@ -2,8 +2,8 @@ package com.comicatlas.api.comic.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
-import com.comicatlas.contract.comic.dto.CatalogCreateRequest;
-import com.comicatlas.contract.comic.dto.CatalogRenameRequest;
+import com.comicatlas.api.comic.dto.CatalogCreateRequest;
+import com.comicatlas.api.comic.dto.CatalogRenameRequest;
 import com.comicatlas.contract.comic.dto.CatalogVO;
 import com.comicatlas.persistence.comic.entity.Catalog;
 import com.comicatlas.persistence.comic.entity.Chapter;
