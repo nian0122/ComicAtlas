@@ -51,6 +51,8 @@ interface Props {
   forceHq: boolean
   /** HQ 资源状态（可选）：用于上层感知 HQ 是否被删除/不可用 */
   hqStatus?: string
+  /** 虚拟列表活动项标记；非活动项不启动图片请求，降低快速滚动内存压力。 */
+  active?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -58,6 +60,7 @@ const props = withDefaults(defineProps<Props>(), {
   aspectRatio: DEFAULT_ASPECT_RATIO,
   lqStatus: 'NOT_GENERATED',
   forceHq: false,
+  active: true,
 })
 
 // ── 响应式状态 ──
@@ -207,7 +210,9 @@ function applyInitialSrc(): void {
 // ── 生命周期 ──
 
 onMounted(() => {
-  applyInitialSrc()
+  if (props.active) {
+    applyInitialSrc()
+  }
 })
 
 onBeforeUnmount(() => {
@@ -216,8 +221,18 @@ onBeforeUnmount(() => {
 
 watch(() => [props.lq, props.hq, props.mode, props.lqStatus, props.forceHq], () => {
   reset()
-  applyInitialSrc()
+  if (props.active) {
+    applyInitialSrc()
+  }
 }, { flush: 'post' })
+
+watch(() => props.active, (isActive) => {
+  if (isActive) {
+    applyInitialSrc()
+  } else {
+    reset()
+  }
+})
 </script>
 
 <style scoped>

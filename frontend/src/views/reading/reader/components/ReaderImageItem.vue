@@ -21,6 +21,7 @@
       :audio-codec="page.audioCodec"
       :active="active"
       :scroller-root="scrollerRoot"
+      @started="emit('video-started', props.index)"
       :class="imageClasses"
     />
     <ProgressiveImage
@@ -31,6 +32,7 @@
       :aspect-ratio="aspectRatio"
       :lq-status="page.lqStatus"
       :force-hq="forceHq"
+      :active="active"
       :class="imageClasses"
     />
   </div>
@@ -57,6 +59,10 @@ interface Props {
 const props = defineProps<Props>()
 
 const settings = useReaderSettingsStore()
+
+const emit = defineEmits<{
+  (event: 'video-started', page: number): void
+}>()
 
 const page = computed(() => props.item)
 const aspectRatio = computed(() => {

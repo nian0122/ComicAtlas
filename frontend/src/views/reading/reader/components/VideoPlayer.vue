@@ -12,13 +12,14 @@
     >
       <!-- 浏览器端首帧预渲染：不生成独立封面文件，仅读取并解码视频首帧。 -->
       <video
+        v-if="active"
         ref="previewRef"
         class="video-preview"
         :src="hqUrl"
         muted
         playsinline
         webkit-playsinline
-        preload="auto"
+        preload="metadata"
         @loadeddata="onPreviewLoadedData"
         @loadedmetadata="onPreviewMetadata"
         @seeked="onPreviewSeeked"
@@ -107,6 +108,10 @@ const props = withDefaults(defineProps<Props>(), {
   scrollerRoot: null,
 })
 
+const emit = defineEmits<{
+  (event: 'started'): void
+}>()
+
 // ---------------------------------------------------------------------------
 // Reactive state — drives the 5-state machine
 // ---------------------------------------------------------------------------
@@ -137,7 +142,6 @@ const nativeHeight = ref(0)
 /** IntersectionObserver — wired by parent in Todo 4 (preserved pattern). */
 let visibilityObserver: IntersectionObserver | null = null
 let unloadTimer: ReturnType<typeof setTimeout> | null = null
-let previewPriming = false
 
 // ---------------------------------------------------------------------------
 // Computed
@@ -277,9 +281,6 @@ function onError(): void {
 function onPreviewLoadedData(): void {
   // loadeddata 表示当前帧已经解码，浏览器可将其绘制到 video 元素。
   previewReady.value = true
-  if (!previewPriming) {
-    previewRef.value?.pause()
-  }
 }
 
 function onPreviewMetadata(): void {
@@ -295,31 +296,6 @@ function onPreviewMetadata(): void {
     }
   }
 
-  primePreviewFrame(preview)
-}
-
-/**
- * Safari 对仅有 preload=metadata 的暂停视频不一定解码可绘制帧。
- * 静音、内联视频允许自动播放，因此短暂 play → 下一帧 pause 可稳定触发首帧解码。
- */
-function primePreviewFrame(preview: HTMLVideoElement): void {
-  if (previewPriming || previewReady.value) return
-  previewPriming = true
-  preview.muted = true
-  preview.playsInline = true
-
-  void preview.play()
-    .then(() => {
-      requestAnimationFrame(() => {
-        preview.pause()
-        previewPriming = false
-        previewReady.value = true
-      })
-    })
-    .catch(() => {
-      // Safari 的自动播放策略变化时，loadeddata/seeked 仍可提供降级预览。
-      previewPriming = false
-    })
 }
 
 function onPreviewSeeked(): void {
@@ -328,7 +304,6 @@ function onPreviewSeeked(): void {
 
 function onPreviewError(): void {
   // 首帧预览失败不影响点击后的正式播放。
-  previewPriming = false
   previewReady.value = false
 }
 
@@ -343,6 +318,7 @@ function onPlay(event: Event): void {
   if (!(event.currentTarget instanceof HTMLVideoElement)) return
   activateSession(props.mediaId ?? 0, event.currentTarget)
   playerState.value = 'playing'
+  emit('started')
 }
 
 function onPause(event: Event): void {
@@ -456,6 +432,7 @@ watch(
   () => props.active,
   (isActive) => {
     if (!isActive) {
+      previewReady.value = false
       unloadVideo('inactive')
     }
   },
