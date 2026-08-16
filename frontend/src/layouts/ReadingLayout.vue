@@ -30,7 +30,6 @@ const routeClass = computed(() => `route-${String(route.name ?? 'unknown')}`)
   padding: var(--nav-height) var(--content-gutter) var(--space-10);
 }
 
-
 @media (max-width: 1024px) {
   .reading-layout {
     background: var(--mobile-canvas);
@@ -52,7 +51,17 @@ const routeClass = computed(() => `route-${String(route.name ?? 'unknown')}`)
     padding-left: 0;
   }
 
-  /* 历史页自身管理滚动区域高度，避免与固定底部导航重复预留空间。 */
+  /* 历史页使用内部滚动容器，避免固定底部导航重复占用高度。 */
+  .main-content.route-history {
+    padding-top: var(--mobile-nav-height);
+    padding-right: var(--mobile-page-gutter);
+    padding-bottom: 0;
+    padding-left: var(--mobile-page-gutter);
+  }
+
+}
+
+@media (min-width: 1025px) {
   .main-content.route-history {
     padding-bottom: 0;
   }

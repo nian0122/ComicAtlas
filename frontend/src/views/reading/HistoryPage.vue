@@ -3,6 +3,7 @@
     <header class="page-header">
       <div class="header-left">
         <p class="page-eyebrow">LEDGER / HISTORY</p>
+        <h1 class="page-title">阅读历史</h1>
         <p v-if="recentCount > 0" class="page-subtitle">
           最近阅读 {{ recentCount }} 部漫画
         </p>
@@ -142,10 +143,11 @@ onMounted(() => {
 
 <style scoped>
 .history-page {
-  height: calc(100dvh - var(--nav-height) - var(--space-10));
-  max-width: var(--content-max);
+  height: calc(100dvh - var(--nav-height));
+  max-width: none;
   margin: 0 auto;
-  padding: var(--space-8) 0 var(--space-6);
+  box-sizing: border-box;
+  padding: 0;
   color: var(--text-secondary);
   display: flex;
   flex-direction: column;
@@ -156,9 +158,12 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: var(--space-2xl);
+  padding: var(--space-2) 0 var(--space-3);
+  margin-bottom: var(--space-2);
   gap: var(--space-base);
   flex-wrap: wrap;
+  background: linear-gradient(to bottom, var(--bg-primary) 86%, transparent);
+  border-bottom: 1px solid var(--border);
 }
 
 .header-left {
@@ -173,6 +178,15 @@ onMounted(() => {
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.14em;
+}
+
+.page-title {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--text-page);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
 }
 
 .page-subtitle {
@@ -198,8 +212,8 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: var(--space-4);
-  height: 88px;
-  padding-inline: var(--space-3);
+  height: 104px;
+  padding: var(--space-3) var(--space-4);
   box-sizing: border-box;
   border-bottom: 1px solid var(--border);
   transition:
@@ -214,8 +228,8 @@ onMounted(() => {
 }
 
 .history-thumb {
-  width: 48px;
-  height: 72px;
+  width: 64px;
+  height: 80px;
   flex: 0 0 auto;
   padding: 0;
   overflow: hidden;
@@ -335,7 +349,7 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   gap: var(--space-3);
-  height: 88px;
+  height: 104px;
   color: var(--text-muted);
   font-size: var(--text-xs);
   font-weight: 800;
