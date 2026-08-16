@@ -4,7 +4,7 @@
     <ReaderToolbar
       v-if="mode === 'desktop'"
       :mode="mode"
-      :title="comicTitle"
+      :title="toolbarTitle"
       :current-page="store.currentPage"
       :total-pages="store.totalPages"
       :prev-chapter-id="store.prevChapterId"
@@ -59,7 +59,7 @@
       <ReaderToolbar
         v-if="toolbarVisible"
         :mode="mode"
-        :title="comicTitle"
+        :title="toolbarTitle"
         @back="nav.goBack"
         @open-settings="dispatch(ReaderAction.OpenSettings)"
       />
@@ -172,12 +172,25 @@ gesture.onTap((point) => {
 
 // swipe 仅翻页模式响应：内容随手指方向前进（左划=下一页）
 gesture.onSwipe((direction) => {
-  if (!isPagedMode.value) return
-  onPageRequest(direction === 'left' ? 'next' : 'prev')
+  if (direction === 'left' || direction === 'right') {
+    if (!isPagedMode.value) return
+    onPageRequest(direction === 'left' ? 'next' : 'prev')
+    return
+  }
+
+  if (mode.value !== 'mobile') return
+  dispatch(direction === 'up' ? ReaderAction.SwipeUp : ReaderAction.SwipeDown)
 })
 
 const lastSyncedPage = ref(1)
 const comicTitle = ref('')
+const toolbarTitle = computed(() => {
+  const chapterTitle = store.chapterTitle?.trim()
+  const fallbackTitle = comicTitle.value || `漫画 #${store.comicId}`
+  if (!chapterTitle) return fallbackTitle
+  if (mode.value === 'mobile') return chapterTitle
+  return `${fallbackTitle} · ${chapterTitle}`
+})
 const saveDebounceTimer = ref<number | null>(null)
 /** 存在未确认落库的进度：翻页置位，saveProgress 成功才清除；卸载兜底据此决定是否重发 */
 const progressDirty = ref(false)

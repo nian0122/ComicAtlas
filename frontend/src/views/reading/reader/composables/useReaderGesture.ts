@@ -2,7 +2,7 @@ import { onBeforeUnmount, onMounted, watch } from 'vue'
 import type { Ref } from 'vue'
 
 /** 横向滑动方向（按手指移动方向命名：向左划为 'left'） */
-export type SwipeDirection = 'left' | 'right'
+export type SwipeDirection = 'left' | 'right' | 'up' | 'down'
 
 /** tap 触点坐标（viewport 坐标系，即 clientX/clientY） */
 export interface TapPoint {
@@ -42,6 +42,21 @@ export function isReaderInteractiveTarget(target: EventTarget | null): boolean {
   return target instanceof Element && target.closest(READER_INTERACTIVE_SELECTOR) !== null
 }
 
+/**
+ * 视频画面需要同时支持原生播放控制和阅读器手势。
+ * 键盘/滚轮仍使用 isReaderInteractiveTarget，避免干扰视频控件；
+ * 这里只放宽 Pointer Events 的手势判定。
+ */
+function isVideoSurfaceTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false
+  return target.closest('video, [data-reader-video-surface]') !== null
+}
+
+function isGestureInteractiveTarget(target: EventTarget | null): boolean {
+  if (isVideoSurfaceTarget(target)) return false
+  return isReaderInteractiveTarget(target)
+}
+
 /** tap 判定：按下到抬起的最长毫秒数 */
 const TAP_MAX_DURATION_MS = 300
 /** tap 判定：按下到抬起允许的最大位移（px），滚动拖拽位移超限故天然不会误判为 tap */
@@ -57,6 +72,7 @@ interface PointerSnapshot {
   x: number
   y: number
   time: number
+  videoSurface: boolean
 }
 
 /**
@@ -66,7 +82,7 @@ interface PointerSnapshot {
  * tap 与横向 swipe，并以标准化回调形式发出：
  * - tap：300ms 内抬起且位移（欧氏距离）< 10px；
  *   100ms 连击保护（选择显式 guard 而非依赖 300ms 窗口，语义更直白）
- * - swipe：横向位移 > 50px 且横向占优（|deltaX| > |deltaY|）
+ * - swipe：位移 > 50px 且主方向占优，返回 left/right/up/down
  *
  * 绑定时机：onMounted 覆盖常规挂载；同时 watch viewportRef 覆盖
  * 元素晚挂载（v-if 延迟渲染）与元素替换场景，两者通过 bind 内部
@@ -91,7 +107,7 @@ export function useReaderGesture(viewportRef: Ref<HTMLElement | null>): ReaderGe
   const handlePointerDown = (event: PointerEvent): void => {
     // 仅跟踪主指针 + 主键：排除多指触摸的第二根手指与鼠标右键/中键
     if (!event.isPrimary || event.button !== 0) return
-    if (isReaderInteractiveTarget(event.target)) {
+    if (isGestureInteractiveTarget(event.target)) {
       pressed = null
       return
     }
@@ -100,11 +116,12 @@ export function useReaderGesture(viewportRef: Ref<HTMLElement | null>): ReaderGe
       x: event.clientX,
       y: event.clientY,
       time: event.timeStamp,
+      videoSurface: isVideoSurfaceTarget(event.target),
     }
   }
 
   const handlePointerUp = (event: PointerEvent): void => {
-    if (isReaderInteractiveTarget(event.target)) {
+    if (isGestureInteractiveTarget(event.target)) {
       pressed = null
       return
     }
@@ -112,10 +129,13 @@ export function useReaderGesture(viewportRef: Ref<HTMLElement | null>): ReaderGe
     const deltaX = event.clientX - pressed.x
     const deltaY = event.clientY - pressed.y
     const duration = event.timeStamp - pressed.time
+    const videoSurface = pressed.videoSurface
     pressed = null
 
     // tap：短按 + 几乎无位移（位移取欧氏距离）
     if (duration <= TAP_MAX_DURATION_MS && Math.hypot(deltaX, deltaY) < TAP_MAX_MOVEMENT_PX) {
+      // 视频轻点交给播放器自身处理，避免播放/暂停时同时唤出阅读工具栏。
+      if (videoSurface) return
       if (event.timeStamp - lastTapTime < TAP_GUARD_MS) return
       lastTapTime = event.timeStamp
       const point: TapPoint = { x: event.clientX, y: event.clientY }
@@ -123,9 +143,19 @@ export function useReaderGesture(viewportRef: Ref<HTMLElement | null>): ReaderGe
       return
     }
 
-    // swipe：横向位移超阈值且横向占优；方向即手指移动方向
-    if (Math.abs(deltaX) > SWIPE_MIN_DISTANCE_PX && Math.abs(deltaX) > Math.abs(deltaY)) {
+    const absDeltaX = Math.abs(deltaX)
+    const absDeltaY = Math.abs(deltaY)
+    if (Math.max(absDeltaX, absDeltaY) <= SWIPE_MIN_DISTANCE_PX) return
+
+    // 主方向占优；纵向用于控制移动端工具栏，横向用于翻页。
+    if (absDeltaX > absDeltaY) {
       const direction: SwipeDirection = deltaX < 0 ? 'left' : 'right'
+      for (const handler of swipeHandlers) handler(direction)
+      return
+    }
+
+    if (absDeltaY > absDeltaX) {
+      const direction: SwipeDirection = deltaY < 0 ? 'up' : 'down'
       for (const handler of swipeHandlers) handler(direction)
     }
   }

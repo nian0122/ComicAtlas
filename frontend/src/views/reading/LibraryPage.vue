@@ -649,14 +649,15 @@ onMounted(() => {
     position: static;
     display: flex;
     flex-direction: column;
-    padding: var(--mobile-library-filter-offset) 0 var(--mobile-library-header-bottom);
+    gap: var(--space-4);
+    padding: var(--space-4) 0 var(--mobile-library-header-bottom);
     background: var(--mobile-canvas);
     border-bottom: 0;
   }
 
   .title-block {
-    order: 2;
-    margin-top: var(--mobile-library-title-gap);
+    order: 0;
+    margin-top: 0;
     margin-bottom: 0;
   }
 
@@ -694,25 +695,24 @@ onMounted(() => {
   }
 
   .toolbar {
-    order: 0;
+    order: 1;
+    width: 100%;
     gap: var(--space-sm);
   }
 
-  /* 搜索 + 排序合并为一行，空间不足时自动换行 */
+  /* 移动端搜索进入正常文档流，避免固定定位造成标题错位和顶部空洞。 */
   .toolbar-main {
     display: flex;
     align-items: center;
     gap: var(--space-sm);
-    width: auto;
+    width: 100%;
   }
 
   .search-input {
-    position: fixed;
-    top: var(--mobile-search-top);
-    right: var(--mobile-page-gutter);
-    z-index: calc(var(--z-nav) + 1);
-    width: var(--mobile-search-width);
-    min-width: var(--mobile-search-width);
+    position: static;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
     height: var(--mobile-search-height);
     padding-inline: var(--space-3);
     background: var(--color-surface-3);
@@ -732,10 +732,11 @@ onMounted(() => {
   .mobile-filter-stack {
     display: flex;
     flex-direction: column;
-    order: 1;
+    order: 2;
     gap: var(--mobile-library-filter-gap);
     width: calc(100% + var(--mobile-page-gutter) * 2);
     margin-left: calc(var(--mobile-page-gutter) * -1);
+    margin-top: 0;
     overflow: hidden;
   }
 
@@ -782,7 +783,7 @@ onMounted(() => {
 
   .comic-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--space-8) var(--mobile-library-grid-gap);
+    gap: var(--space-4);
   }
 
   .comic-grid :deep(.poster-frame) {
@@ -795,6 +796,13 @@ onMounted(() => {
 
   .comic-grid :deep(.poster-progress) {
     height: 4px;
+  }
+
+  /* 固定底部导航不应遮住最后一排卡片和分页。 */
+  .comic-section {
+    padding-bottom: calc(
+      var(--mobile-tabbar-height) + var(--space-8) + env(safe-area-inset-bottom)
+    );
   }
 }
 </style>

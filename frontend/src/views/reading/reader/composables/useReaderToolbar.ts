@@ -37,6 +37,10 @@ export const ReaderAction = {
   AutoHideTimeout: 3,
   /** Android 返回键（Overlay Stack 原则：优先关闭最上层） */
   AndroidBack: 4,
+  /** 移动端上滑隐藏工具栏 */
+  SwipeUp: 5,
+  /** 移动端下滑唤出工具栏 */
+  SwipeDown: 6,
 } as const
 
 export type ReaderAction = (typeof ReaderAction)[keyof typeof ReaderAction]
@@ -53,6 +57,8 @@ export const TRANSITIONS: Record<string, Record<string, ReaderUiState | 'EXIT'>>
     [ReaderAction.TapCenter]: ReaderUiState.TOOLBAR,
     /** 全屏阅读中按返回键 → 退出 Reader */
     [ReaderAction.AndroidBack]: 'EXIT',
+    /** 沉浸阅读中下滑 → 唤出工具栏 */
+    [ReaderAction.SwipeDown]: ReaderUiState.TOOLBAR,
   },
   [ReaderUiState.TOOLBAR]: {
     /** 工具栏可见时点击中央 → 收起工具栏回到全屏 */
@@ -63,6 +69,10 @@ export const TRANSITIONS: Record<string, Record<string, ReaderUiState | 'EXIT'>>
     [ReaderAction.OpenSettings]: ReaderUiState.SETTINGS,
     /** 工具栏可见时按返回键 → 先收起工具栏（不退出） */
     [ReaderAction.AndroidBack]: ReaderUiState.IMMERSIVE,
+    /** 工具栏可见时上滑 → 回到沉浸阅读 */
+    [ReaderAction.SwipeUp]: ReaderUiState.IMMERSIVE,
+    /** 下滑保持工具栏可见，并重置自动隐藏倒计时 */
+    [ReaderAction.SwipeDown]: ReaderUiState.TOOLBAR,
   },
   [ReaderUiState.SETTINGS]: {
     /** 关闭设置抽屉 → 回到工具栏（重启自动隐藏计时） */

@@ -1,8 +1,8 @@
 <template>
   <section class="hero-banner">
     <div
-      class="hero-background"
-      :style="{ backgroundImage: `url(${backgroundUrl})` }"
+      :class="['hero-background', { 'hero-background--empty': !backgroundUrl }]"
+      :style="backgroundUrl ? { backgroundImage: `url(${backgroundUrl})` } : undefined"
       aria-hidden="true"
     >
       <div class="hero-overlay" />
@@ -21,6 +21,10 @@
       </div>
 
       <div class="hero-info">
+        <p class="hero-kicker">
+          <span class="hero-kicker-dot" aria-hidden="true" />
+          {{ backgroundUrl ? 'CONTINUE YOUR SCREENING' : 'PRIVATE COMIC ARCHIVE' }}
+        </p>
         <h1 class="hero-title">{{ title }}</h1>
         <p v-if="subtitle" class="hero-subtitle">{{ subtitle }}</p>
 
@@ -118,6 +122,13 @@ const hasActions = computed(
   z-index: 0;
 }
 
+.hero-background--empty {
+  background-image:
+    radial-gradient(circle at 74% 42%, var(--accent-bg), transparent 26rem),
+    linear-gradient(120deg, var(--bg-primary), var(--bg-secondary));
+  filter: none;
+}
+
 .hero-overlay {
   position: absolute;
   inset: 0;
@@ -172,6 +183,25 @@ const hasActions = computed(
   gap: var(--space-3);
   max-width: 720px;
   padding-bottom: var(--space-2);
+}
+
+.hero-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: var(--tracking-kicker);
+}
+
+.hero-kicker-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-bg);
 }
 
 .hero-title {
@@ -285,6 +315,10 @@ const hasActions = computed(
     max-width: 100%;
     gap: var(--space-3);
     padding: 0;
+  }
+
+  .hero-kicker {
+    font-size: 10px;
   }
 
   .hero-title {
