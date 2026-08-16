@@ -9,7 +9,7 @@
       :total-pages="store.totalPages"
       :prev-chapter-id="store.prevChapterId"
       :next-chapter-id="store.nextChapterId"
-      @back="goBack"
+      @back="nav.goBack"
       @prev-chapter="goChapter(store.prevChapterId!)"
       @next-chapter="goChapter(store.nextChapterId!)"
       @jump-to-page="onPageChange"
@@ -44,6 +44,7 @@
       @page-request="onPageRequest"
       @visible-range="onVisibleRange"
       @scroll-direction="onViewportScrollDirection"
+      @video-started="onVideoStarted"
     />
     <ReaderViewport
       v-else
@@ -55,6 +56,7 @@
       @update:current-page="onPageChange"
       @visible-range="onVisibleRange"
       @scroll-direction="onViewportScrollDirection"
+      @video-started="onVideoStarted"
     />
 
     <!-- 移动端覆盖层：显隐全部由 useReaderToolbar 状态机驱动 -->
@@ -205,14 +207,6 @@ const forceHqPages = reactive(new Set<number>())
 let lastWindowScrollY = 0
 
 // 桌面端返回/章节跳转：保留迁移前实现（含 /library 兜底），移动端走 nav.*
-function goBack() {
-  if (store.comicId) {
-    router.push(`/comic/${store.comicId}`)
-  } else {
-    router.push('/library')
-  }
-}
-
 function goChapter(chId: number) {
   router.push(`/reader/${chId}?page=1`)
 }
@@ -264,11 +258,14 @@ async function loadCurrentChapter(preservePage = false, restoreProgress = true) 
 
     forceHqPages.clear()
     preloadEngine.reset(store.totalPages)
-    preloadEngine.setUrlResolver((index: number, _priority: 'immediate' | 'cascade') => {
+    preloadEngine.setUrlResolver((index: number, priority: 'immediate' | 'cascade') => {
       const page = store.pages[index]
       if (!page) return null
-      // 智能/原图模式 & 强制 HQ 页 → 预加载 HQ；省流模式 → 预加载 LQ
-      const wantHq = settings.qualityMode !== 'LQ_ONLY' || forceHqPages.has(index)
+      // 只有可视区附近的 immediate 才预加载 HQ；远处 cascade 一律优先 LQ，
+      // 避免快速滚动时同时下载和解码大量原图导致 Safari 内存崩溃。
+      const wantHq =
+        priority === 'immediate' &&
+        (settings.qualityMode !== 'LQ_ONLY' || forceHqPages.has(index))
       if (wantHq) return page.hqUrl || page.lqUrl || null
       return page.lqUrl || page.hqUrl || null
     })
@@ -277,7 +274,8 @@ async function loadCurrentChapter(preservePage = false, restoreProgress = true) 
       store.currentPage = Math.max(1, store.totalPages)
     } else {
       const pageFromQuery = Number(rawPage)
-      if (pageFromQuery >= 1 && pageFromQuery <= store.totalPages) {
+      // page=1 通常只是章节导航的默认参数，不应覆盖已保存的阅读进度。
+      if (pageFromQuery > 1 && pageFromQuery <= store.totalPages) {
         store.currentPage = pageFromQuery
       } else if (restoreProgress) {
         await store.restoreProgress()
@@ -295,6 +293,14 @@ async function loadCurrentChapter(preservePage = false, restoreProgress = true) 
     }
 
     lastSyncedPage.value = store.currentPage
+
+    // 页码参数只用于本次导航，加载完成后从地址栏移除。
+    // 否则浏览器崩溃/刷新会重复使用 ?page=1，覆盖阅读历史恢复结果。
+    if (rawPage !== undefined && route.query.page === rawPage) {
+      const nextQuery = { ...route.query }
+      delete nextQuery.page
+      await router.replace({ query: nextQuery })
+    }
   } finally {
     if (loadToken === chapterLoadToken) {
       chapterLoading.value = false
@@ -375,6 +381,23 @@ function onDblClick(e: MouseEvent) {
 function onVisibleRange(range: { start: number; end: number; total: number }) {
   if (!settings.enablePreload) return
   preloadEngine.onVisibleChange(range.start, range.end, range.total)
+}
+
+function onVideoStarted(page: number) {
+  if (page < 0 || page >= store.totalPages) return
+  const pageNumber = page + 1
+  if (store.currentPage !== pageNumber) {
+    store.currentPage = pageNumber
+  }
+  if (store.comicId <= 0 || store.chapterId <= 0) return
+
+  progressDirty.value = true
+  store.saveProgress().then((ok) => {
+    if (ok && store.currentPage === pageNumber) {
+      lastSyncedPage.value = pageNumber
+      progressDirty.value = false
+    }
+  })
 }
 
 /** 以真实滚动方向控制阅读端工具栏，避免依赖会被浏览器取消的 pointer swipe。 */

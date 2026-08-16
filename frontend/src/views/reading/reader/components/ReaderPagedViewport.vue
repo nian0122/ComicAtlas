@@ -15,6 +15,7 @@
         :audio-codec="page.audioCodec"
         :active="true"
         :scroller-root="viewportRef"
+        @started="emit('video-started', props.currentPage - 1)"
       />
       <ProgressiveImage
         v-else
@@ -51,6 +52,7 @@ const emit = defineEmits<{
   (e: 'page-request', direction: 'next' | 'prev'): void
   (e: 'visible-range', range: { start: number; end: number; total: number }): void
   (e: 'scroll-direction', direction: 'up' | 'down'): void
+  (e: 'video-started', page: number): void
 }>()
 
 const settings = useReaderSettingsStore()

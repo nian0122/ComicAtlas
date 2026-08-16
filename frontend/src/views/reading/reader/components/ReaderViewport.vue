@@ -13,7 +13,7 @@
       @scroll="onScroll"
     >
       <template #default="{ item, index, active }">
-        <div class="reader-item-wrapper"><ReaderImageItem :item="item" :index="index" :active="active" :scroller-root="scrollerEl" :item-height="item.size" :force-hq="props.forceHqPages.has(index)" /></div>
+        <div class="reader-item-wrapper"><ReaderImageItem :item="item" :index="index" :active="active" :scroller-root="scrollerEl" :item-height="item.size" :force-hq="props.forceHqPages.has(index)" @video-started="emit('video-started', $event)" /></div>
       </template>
     </RecycleScroller>
   </div>
@@ -50,6 +50,7 @@ const emit = defineEmits<{
   (e: 'update:currentPage', page: number): void
   (e: 'visible-range', range: { start: number; end: number; total: number }): void
   (e: 'scroll-direction', direction: 'up' | 'down'): void
+  (e: 'video-started', page: number): void
 }>()
 
 const settings = useReaderSettingsStore()
@@ -164,10 +165,6 @@ function scrollOffset(): number {
   return scrollerRef.value?.getScroll?.()?.start ?? 0
 }
 
-function setScrollOffset(offset: number) {
-  scrollerRef.value?.scrollToPosition(offset)
-}
-
 function viewportSize(): number {
   return containerHeight.value
 }
@@ -225,7 +222,10 @@ function scrollToPage(page: number): void {
   isProgrammaticScroll = true
   lastScrollOffset = offset
   pendingScrollDirection = null
-  setScrollOffset(offset)
+
+  // 使用 vue-virtual-scroller 官方按索引定位 API，避免自行按高度计算时
+  // 在 page-mode、不同宽高比媒体和虚拟列表重排后出现偏移。
+  scrollerRef.value?.scrollToItem(targetPage - 1, { smooth: false, align: 'start' })
 
   // 取消旧计时器，防止新旧 scrollToPage 调用互相干扰
   if (programmaticScrollTimer != null) {
