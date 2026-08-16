@@ -6,6 +6,7 @@ import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.rabbitmq.client.Channel;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.support.AmqpHeaders;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -52,6 +53,7 @@ public class CancelHandler {
      * @param mqConsumerSupport MQ 消费支持组件
      * @param workerConfig Worker 配置
      */
+    @Autowired
     public CancelHandler(StringRedisTemplate redisTemplate, MqConsumerSupport mqConsumerSupport,
                          WorkerConfig workerConfig) {
         this.redisTemplate = redisTemplate;
