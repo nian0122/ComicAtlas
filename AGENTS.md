@@ -310,6 +310,7 @@ URL 统一由 `FileUrlResolver.resolve(page)` 生成，不手拼。
 
 - 注释解释业务原因、约束和状态转换，不重复代码；公共 API、枚举状态和 MQ 事件必须有简明 Javadoc/说明。
 - 修改后端代码至少运行对应模块测试；合并前运行 `./mvnw verify`、Checkstyle 和 `git diff --check`。新增缺陷必须补充回归测试，测试名称描述行为而非实现细节。
+- 运行 `@SpringBootTest` 集成测试（如 `EntitySchemaContractTest`）前必须注入基础设施环境变量：`application.yml` 中 `REDIS_*`/`RABBITMQ_*`（含 `RABBITMQ_MANAGEMENT_PORT`）/`NACOS_*`/`MYSQL_*` 占位符均无默认值，测试 JVM 缺变量会报 "Could not bind properties"（占位符字面量绑定失败）。统一使用 `pwsh -NoProfile -File scripts/dev/run-tests.ps1 -pl <模块> test -Dtest=<测试类>` 运行测试（脚本自动从 `.env` 注入，经 FRP 隧道连 `localhost` 远端基础设施）；直接 `mvnw test` 只适合无 Spring 上下文的纯单元测试。注意 PowerShell 进程隔离：`$env:` 设置只对当次命令生效，注入与执行必须同一条命令。
 - 禁止提交调试代码、死代码、未使用导入、构建产物、日志、`.env`、凭据和宿主机个人路径；代码格式化不得夹带无关改动。
 - Review 时同时检查变量命名、异常链、资源释放、事务边界、SQL 安全、Worker 只读边界和 MQ 状态一致性。
 
