@@ -10,6 +10,7 @@ import com.comicatlas.common.event.DirectoryScanCompletedEvent;
 import com.comicatlas.common.event.DirectoryScanFailedEvent;
 import com.comicatlas.common.event.DirectoryScanRequestedEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
+import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.scan.DirectoryScanPreviews;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
@@ -52,6 +53,7 @@ public class DirectoryScanHandler {
     private final RabbitTemplate rabbitTemplate;
     private final MqConsumerSupport mqConsumerSupport;
     private final DirectoryScanPreviews scanPreviews;
+    private final WorkerConfig workerConfig;
 
     @RabbitListener(queues = MqQueues.SCAN_TASK)
     public void handle(DirectoryScanRequestedEvent event, Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
@@ -65,7 +67,8 @@ public class DirectoryScanHandler {
     }
 
     private void scanAndPublish(Long taskId, String directoryPath) {
-        ScanResultDTO result = scanPreviews.scan(directoryPath == null ? null : Path.of(directoryPath));
+        String normalizedPath = workerConfig.mapHostPathToContainer(directoryPath);
+        ScanResultDTO result = scanPreviews.scan(normalizedPath == null ? null : Path.of(normalizedPath));
         rabbitTemplate.convertAndSend(MqExchanges.SCAN, MqRoutingKeys.SCAN_COMPLETED,
                 new DirectoryScanCompletedEvent(UUID.randomUUID(), Instant.now(), taskId, result));
         log.info("扫描完成, taskId={}, total={}, warningCodes={}",

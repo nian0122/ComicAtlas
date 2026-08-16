@@ -83,6 +83,7 @@ class ImportTaskHandlerTest {
     @BeforeEach
     void setUp() {
         when(config.getMangaRoot()).thenReturn("F:/manga");
+        when(config.mapHostPathToContainer(anyString())).thenAnswer(invocation -> invocation.getArgument(0));
         when(cancelHandler.isCancelled(anyLong())).thenReturn(false);
         // 模拟 5 参 consume 编排：执行业务动作，异常时调用失败回调（与 MqConsumerSupport 语义一致）
         doAnswer(inv -> {

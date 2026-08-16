@@ -96,34 +96,38 @@ services:
       - ${MANGA_ROOT:-./manga}/hq:/storage/hq:ro
       - ${MANGA_ROOT:-./manga}/lq:/storage/lq:ro
       - ${MANGA_ROOT:-./manga}/thumbs:/storage/thumbs:ro
-  # worker-service:
-  #   build:
-  #     context: .
-  #     dockerfile: worker-service/Dockerfile
-  #   container_name: comicatlas-worker
-  #   restart: unless-stopped
-  #   environment:
-  #     NACOS_ADDR: ${REMOTE_INFRA_HOST}:${REMOTE_NACOS_HTTP_PORT}
-  #     RABBITMQ_HOST: ${REMOTE_INFRA_HOST}
-  #     RABBITMQ_PORT: ${REMOTE_RABBITMQ_PORT}
-  #     MYSQL_HOST: ${REMOTE_INFRA_HOST}
-  #     MYSQL_PORT: ${REMOTE_MYSQL_PORT}
-  #     MYSQL_USER: ${WORKER_MYSQL_USER:?请在 .env 中设置 WORKER_MYSQL_USER}
-  #     MYSQL_PASS: ${WORKER_MYSQL_PASSWORD:?请在 .env 中设置 WORKER_MYSQL_PASSWORD}
-  #     REDIS_HOST: ${REMOTE_INFRA_HOST}
-  #     REDIS_PORT: ${REMOTE_REDIS_PORT}
-  #     MANGA_ROOT: /storage
-  #     WORKER_HOST_MANGA_ROOT: ${MANGA_ROOT:-./manga}
-  #     WORKER_CONTAINER_MANGA_ROOT: /storage
-  #   volumes:
-  #     - ${MANGA_ROOT:-./manga}/hq:/storage/hq
-  #     - ${MANGA_ROOT:-./manga}/lq:/storage/lq
-  #     - ${MANGA_ROOT:-./manga}/thumbs:/storage/thumbs
-  #     - ${MANGA_ROOT:-./manga}/temp:/storage/temp
-  #     - ${MANGA_ROOT:-./manga}/metadata:/storage/metadata
-  #   depends_on:
-  #     - rabbitmq
-  #     - nacos
+  worker-service:
+    build:
+      context: .
+      dockerfile: worker-service/Dockerfile
+    container_name: comicatlas-worker
+    restart: unless-stopped
+    environment:
+      NACOS_ADDR: ${REMOTE_INFRA_HOST:?请设置 REMOTE_INFRA_HOST}:${REMOTE_NACOS_HTTP_PORT:?请设置 REMOTE_NACOS_HTTP_PORT}
+      NACOS_USER: ${REMOTE_NACOS_USER:?请设置 REMOTE_NACOS_USER}
+      NACOS_PASS: ${REMOTE_NACOS_PASSWORD:?请设置 REMOTE_NACOS_PASSWORD}
+      RABBITMQ_HOST: ${REMOTE_INFRA_HOST:?请设置 REMOTE_INFRA_HOST}
+      RABBITMQ_PORT: ${REMOTE_RABBITMQ_PORT:?请设置 REMOTE_RABBITMQ_PORT}
+      RABBITMQ_USER: ${REMOTE_RABBITMQ_USER:?请设置 REMOTE_RABBITMQ_USER}
+      RABBITMQ_PASS: ${REMOTE_RABBITMQ_PASSWORD:?请设置 REMOTE_RABBITMQ_PASSWORD}
+      MYSQL_HOST: ${REMOTE_INFRA_HOST:?请设置 REMOTE_INFRA_HOST}
+      MYSQL_PORT: ${REMOTE_MYSQL_PORT:?请设置 REMOTE_MYSQL_PORT}
+      MYSQL_USER: ${WORKER_MYSQL_USER:?请在 .env 中设置 WORKER_MYSQL_USER}
+      MYSQL_PASS: ${WORKER_MYSQL_PASSWORD:?请在 .env 中设置 WORKER_MYSQL_PASSWORD}
+      REDIS_HOST: ${REMOTE_INFRA_HOST:?请设置 REMOTE_INFRA_HOST}
+      REDIS_PORT: ${REMOTE_REDIS_PORT:?请设置 REMOTE_REDIS_PORT}
+      REDIS_PASS: ${REMOTE_REDIS_PASSWORD:?请设置 REMOTE_REDIS_PASSWORD}
+      MANGA_ROOT: /storage
+      # 前端/API 传入宿主机路径时，Worker 将其映射到容器内的共享存储路径。
+      WORKER_HOST_MANGA_ROOT: ${MANGA_ROOT:-./manga}
+      WORKER_CONTAINER_MANGA_ROOT: /storage
+      ARIA2C_PATH: /usr/bin/aria2c
+      FFMPEG_PATH: /usr/bin/ffmpeg
+      FFPROBE_PATH: /usr/bin/ffprobe
+      IMAGE_OPTIMIZER_PATH: /opt/comicatlas/tools/image-optimizer
+    volumes:
+      # 整个 MANGA_ROOT 共享，既保证导入源路径可见，也覆盖 HQ/LQ/临时/回收站/导出目录。
+      - ${MANGA_ROOT:-./manga}:/storage
 
   nginx:
     build: ./frontend
