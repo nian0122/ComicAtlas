@@ -128,7 +128,8 @@ services:
       - ${MANGA_ROOT:-./manga}/lq:/storage/lq:ro
       - ${MANGA_ROOT:-./manga}/thumbs:/storage/thumbs:ro
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost/"]
+      # 容器内 localhost 仅解析为 IPv6 ::1，而 nginx.conf 的 listen 80 只监听 IPv4，必须显式用 127.0.0.1
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
       interval: 10s
       timeout: 5s
       retries: 5
