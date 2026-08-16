@@ -14,7 +14,7 @@ import ComicStructurePage from './ComicStructurePage.vue'
 </script>
 
 <style scoped>
-.content-workspace { display: grid; gap: var(--space-5); width: 100%; }
+.content-workspace { display: grid; gap: var(--space-5); width: 100%; min-width: 0; }
 .content-header { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-5); padding-bottom: var(--space-5); border-bottom: 1px solid var(--border); }
 .eyebrow { color: var(--accent); font: 800 10px var(--mono); letter-spacing: .16em; }
 .content-header h2 { margin: var(--space-2) 0; color: var(--text-primary); font-family: Georgia, 'Times New Roman', serif; font-size: clamp(1.8rem, 3vw, 2.5rem); letter-spacing: -.04em; }

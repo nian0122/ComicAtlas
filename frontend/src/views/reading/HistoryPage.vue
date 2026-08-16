@@ -8,7 +8,7 @@
         </p>
       </div>
       <div class="header-actions">
-        <button class="ghost-btn" @click="store.refresh">刷新</button>
+        <button class="ghost-btn" :disabled="store.loading" @click="store.fetchFirstPage">刷新</button>
         <button class="primary-btn" @click="router.push('/library')">去漫画库</button>
       </div>
     </header>
@@ -23,7 +23,7 @@
     <div v-else-if="store.error" class="state error">
       <el-icon :size="32"><WarningFilled /></el-icon>
       <span>{{ store.error }}</span>
-      <button class="ghost-btn" @click="store.refresh">重试</button>
+      <button class="ghost-btn" :disabled="store.loading" @click="store.fetchFirstPage">重试</button>
     </div>
 
     <!-- 空状态 -->
@@ -42,12 +42,21 @@
       :item-size="historyItemSize"
       key-field="key"
       :buffer="200"
+      @scroll="onHistoryScroll"
     >
       <template #default="{ item }">
         <div v-if="item.kind === 'end'" class="history-end">
           <MaterialSymbolIcon name="history" class="history-end-icon" />
-          <span class="history-end-label history-end-label--desktop">END OF HISTORY</span>
-          <span class="history-end-label history-end-label--mobile">历史记录已加载完毕</span>
+          <span v-if="store.loadingMore" class="history-end-label">正在加载更多阅读记录</span>
+          <button v-else-if="store.loadMoreError" type="button" class="history-end-retry" @click="store.fetchNextPage">加载更多失败，点击重试</button>
+          <template v-else-if="store.hasMore">
+            <span class="history-end-label history-end-label--desktop">SCROLL FOR MORE</span>
+            <span class="history-end-label history-end-label--mobile">继续下滑加载更多</span>
+          </template>
+          <template v-else>
+            <span class="history-end-label history-end-label--desktop">END OF HISTORY</span>
+            <span class="history-end-label history-end-label--mobile">历史记录已加载完毕</span>
+          </template>
         </div>
         <article v-else class="history-item">
           <button type="button" class="history-thumb" @click="continueRead(item.value)">
@@ -89,7 +98,7 @@ const router = useRouter()
 const store = useHistoryStore()
 const viewportWidth = useBreakpoint()
 
-const recentCount = computed(() => store.list.length)
+const recentCount = computed(() => store.total)
 const historyItemSize = computed(() =>
   viewportWidth.value <= BREAKPOINTS.tablet ? 148 : 88
 )
@@ -119,8 +128,15 @@ function continueRead(item: HistoryVO) {
   router.push(`/reader/${item.chapterId}?page=${item.pageNumber}`)
 }
 
+function onHistoryScroll(event: Event): void {
+  const target = event.currentTarget
+  if (!(target instanceof HTMLElement)) return
+  const remainingDistance = target.scrollHeight - target.scrollTop - target.clientHeight
+  if (remainingDistance <= 240) void store.fetchNextPage()
+}
+
 onMounted(() => {
-  store.fetchList()
+  void store.fetchFirstPage()
 })
 </script>
 
@@ -281,6 +297,14 @@ onMounted(() => {
 
 .history-end-label--mobile {
   display: none;
+}
+
+.history-end-retry {
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 12px;
+  cursor: pointer;
 }
 
 .history-play {

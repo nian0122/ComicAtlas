@@ -6,7 +6,11 @@ const props = defineProps<{
   stats: StorageStats | null
 }>()
 
-const total = computed(() => props.stats?.totalBytes ?? 0)
+const total = computed(() => {
+  const stats = props.stats
+  if (!stats) return 0
+  return stats.totalBytes || stats.hqBytes + stats.lqBytes + stats.thumbBytes
+})
 const hqPercent = computed(() => percent(props.stats?.hqBytes))
 const lqPercent = computed(() => percent(props.stats?.lqBytes))
 const thumbPercent = computed(() => percent(props.stats?.thumbBytes))
@@ -31,7 +35,7 @@ function percent(bytes: number | undefined): number {
   <section class="storage-overview">
     <div class="total-card">
       <span class="overview-kicker">TOTAL STORAGE</span>
-      <strong>{{ formatSize(stats?.totalBytes) }}</strong>
+      <strong>{{ formatSize(total) }}</strong>
       <span>当前已统计的漫画文件与缩略图</span>
       <div class="capacity-bar" aria-label="存储占用分布">
         <i class="bar-hq" :style="{ width: `${hqPercent}%` }" />

@@ -281,6 +281,13 @@ export interface HistoryVO {
   updatedAt: string
 }
 
+export interface HistoryPageVO {
+  records: HistoryVO[]
+  total: number
+  current: number
+  size: number
+}
+
 export interface ComicMetadataDTO {
   title: string
   author?: string

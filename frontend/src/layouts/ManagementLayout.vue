@@ -36,10 +36,6 @@
             <el-icon :size="18"><List /></el-icon>
             <span>任务中心</span>
           </router-link>
-          <router-link to="/manage/upload" class="sidenav-link" active-class="active">
-            <el-icon :size="18"><UploadFilled /></el-icon>
-            <span>媒体上传</span>
-          </router-link>
           <router-link to="/manage/comics" class="sidenav-link" active-class="active">
             <el-icon :size="18"><Collection /></el-icon>
             <span>漫画管理</span>
@@ -285,7 +281,7 @@ onMounted(() => {
   min-height: 0;
   padding: var(--space-8) var(--content-gutter);
   overflow-y: auto;
-  overflow-x: hidden;
+  overflow-x: clip;
   background:
     radial-gradient(circle at 100% 0, var(--accent-bg), transparent 26rem),
     var(--bg-primary);

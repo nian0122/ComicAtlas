@@ -93,7 +93,7 @@ const router = createRouter({
         {
           path: 'upload',
           name: 'manage-upload',
-          component: () => import('@/views/management/MediaUploadPage.vue'),
+          redirect: { name: 'manage-comics' },
         },
         {
           path: 'structure',

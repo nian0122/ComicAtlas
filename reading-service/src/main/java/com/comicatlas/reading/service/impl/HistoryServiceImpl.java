@@ -1,6 +1,8 @@
 package com.comicatlas.reading.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;
@@ -8,6 +10,7 @@ import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.persistence.storage.FileUrlResolver;
 import com.comicatlas.reading.dto.HistoryUpdateRequest;
 import com.comicatlas.reading.dto.HistoryVO;
+import com.comicatlas.reading.dto.HistoryPageVO;
 import com.comicatlas.persistence.reader.entity.ReadingHistory;
 import com.comicatlas.persistence.reader.mapper.ReadingHistoryMapper;
 import com.comicatlas.reading.service.HistoryService;
@@ -69,6 +72,25 @@ public class HistoryServiceImpl implements HistoryService {
         return histories.stream()
                 .map(history -> buildVO(history, comicMap, chapterMap))
                 .toList();
+    }
+
+    @Override
+    public HistoryPageVO pageHistory(long page, long size) {
+        long currentPage = Math.max(page, 1);
+        long pageSize = Math.min(Math.max(size, 1), 50);
+        Page<ReadingHistory> pageRequest = new Page<>(currentPage, pageSize);
+        IPage<ReadingHistory> result = readingHistoryMapper.selectPage(pageRequest,
+                new LambdaQueryWrapper<ReadingHistory>()
+                        .select(ReadingHistory::getComicId, ReadingHistory::getChapterId,
+                                ReadingHistory::getPageNumber, ReadingHistory::getUpdatedAt)
+                        .orderByDesc(ReadingHistory::getUpdatedAt));
+
+        HistoryPageVO response = new HistoryPageVO();
+        response.setRecords(toHistoryVOs(result.getRecords()));
+        response.setTotal(result.getTotal());
+        response.setCurrent(result.getCurrent());
+        response.setSize(result.getSize());
+        return response;
     }
 
     @Override
@@ -141,5 +163,30 @@ public class HistoryServiceImpl implements HistoryService {
         }
 
         return historyVO;
+    }
+
+    private List<HistoryVO> toHistoryVOs(List<ReadingHistory> histories) {
+        if (histories.isEmpty()) {
+            return List.of();
+        }
+        List<Long> comicIds = histories.stream()
+                .map(ReadingHistory::getComicId).distinct().toList();
+        Map<Long, Comic> comicMap = comicMapper.selectList(
+                        new LambdaQueryWrapper<Comic>()
+                                .select(Comic::getId, Comic::getTitle, Comic::getTotalPages)
+                                .in(Comic::getId, comicIds))
+                .stream()
+                .collect(Collectors.toMap(Comic::getId, Function.identity(), (first, duplicate) -> first));
+        List<Long> chapterIds = histories.stream()
+                .map(ReadingHistory::getChapterId).filter(Objects::nonNull).distinct().toList();
+        Map<Long, Chapter> chapterMap = chapterIds.isEmpty()
+                ? Map.of()
+                : chapterMapper.selectList(
+                                new LambdaQueryWrapper<Chapter>()
+                                        .select(Chapter::getId, Chapter::getChapterNo)
+                                        .in(Chapter::getId, chapterIds))
+                        .stream()
+                        .collect(Collectors.toMap(Chapter::getId, Function.identity(), (first, duplicate) -> first));
+        return histories.stream().map(history -> buildVO(history, comicMap, chapterMap)).toList();
     }
 }

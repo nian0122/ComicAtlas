@@ -1,6 +1,7 @@
 package com.comicatlas.reading.service;
 
 import com.comicatlas.reading.dto.HistoryUpdateRequest;
+import com.comicatlas.reading.dto.HistoryPageVO;
 import com.comicatlas.reading.dto.HistoryVO;
 
 import java.util.List;
@@ -13,6 +14,8 @@ import java.util.List;
 public interface HistoryService {
 
     List<HistoryVO> listHistory();
+
+    HistoryPageVO pageHistory(long page, long size);
 
     HistoryVO getHistory(Long comicId);
 

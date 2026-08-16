@@ -19,7 +19,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ComicOperationsPage from './ComicOperationsPage.vue'
 import ComicEditPage from './ComicEditPage.vue'
@@ -42,13 +42,21 @@ const activeTab = ref<WorkspaceTab>(normalizeTab(route.query.tab))
 
 function handleTabChange(value: string | number): void {
   void router.replace({ query: { ...route.query, tab: normalizeTab(value), comicId: String(comicId) } })
+  resetManagementScroll()
 }
 
-watch(() => route.query.tab, (value) => { activeTab.value = normalizeTab(value) })
+function resetManagementScroll(): void {
+  void nextTick(() => {
+    const content = document.querySelector<HTMLElement>('.management-content')
+    if (content) content.scrollTop = 0
+  })
+}
+
+watch(() => route.query.tab, (value) => { activeTab.value = normalizeTab(value); resetManagementScroll() })
 </script>
 
 <style scoped>
-.comic-workspace-page { display: grid; gap: var(--space-6); }
+.comic-workspace-page { display: grid; gap: var(--space-6); min-width: 0; }
 .workspace-header { display: grid; grid-template-columns: auto 1fr auto; align-items: end; gap: var(--space-6); padding: var(--space-6) 0 var(--space-2); border-bottom: 1px solid var(--border); }
 .back-link { align-self: start; color: var(--accent); font-size: var(--text-sm); text-decoration: none; }
 .back-link:hover { text-decoration: underline; }

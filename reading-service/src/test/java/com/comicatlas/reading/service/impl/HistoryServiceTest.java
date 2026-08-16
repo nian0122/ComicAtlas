@@ -1,11 +1,13 @@
 package com.comicatlas.reading.service.impl;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.persistence.storage.FileUrlResolver;
 import com.comicatlas.reading.dto.HistoryVO;
+import com.comicatlas.reading.dto.HistoryPageVO;
 import com.comicatlas.persistence.reader.entity.ReadingHistory;
 import com.comicatlas.persistence.reader.mapper.ReadingHistoryMapper;
 import com.comicatlas.reading.service.HistoryService;
@@ -95,6 +97,25 @@ class HistoryServiceTest {
         assertEquals(1, result.size());
         assertEquals("火影", result.get(0).getComicTitle());
         verify(chapterMapper, never()).selectList(any());
+    }
+
+    @Test
+    void pageHistory_shouldReturnPagedRecordsAndMetadata() {
+        ReadingHistory history = history(1L, 10L, 100L);
+        Page<ReadingHistory> page = new Page<>(2, 20);
+        page.setRecords(List.of(history));
+        page.setTotal(21);
+        when(historyMapper.selectPage(any(), any())).thenReturn(page);
+        when(comicMapper.selectList(any())).thenReturn(List.of(comic(10L, "火影")));
+        when(chapterMapper.selectList(any())).thenReturn(List.of(chapter(100L, "1")));
+
+        HistoryPageVO result = service.pageHistory(2, 20);
+
+        assertEquals(1, result.getRecords().size());
+        assertEquals(21, result.getTotal());
+        assertEquals(2, result.getCurrent());
+        assertEquals(20, result.getSize());
+        assertEquals("火影", result.getRecords().get(0).getComicTitle());
     }
 
     private static ReadingHistory history(Long id, Long comicId, Long chapterId) {

@@ -106,6 +106,7 @@ export const readerApi = {
 
 export const historyApi = {
   list: () => api.get('/history'),
+  page: (page: number, size: number) => api.get('/history/page', { params: { page, size } }),
   get: (comicId: number) => api.get(`/history/${comicId}`),
   update: (comicId: number, data: { chapterId: number; pageNumber: number }) =>
     api.put(`/history/${comicId}`, data),
