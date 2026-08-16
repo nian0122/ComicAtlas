@@ -12,6 +12,7 @@ public class DirectoryScanTaskVO {
     private Integer totalItems;
     private ScanResultDTO result;
     private String errorMessage;
+    private Integer retryCount;
     private LocalDateTime createdAt;
     private LocalDateTime startedAt;
     private LocalDateTime endedAt;

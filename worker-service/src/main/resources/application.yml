@@ -7,17 +7,17 @@ spring:
   cloud:
     nacos:
       discovery:
-        server-addr: ${NACOS_ADDR:localhost:8848}
-        username: ${NACOS_USER:nacos}
-        password: ${NACOS_PASS:nacos}
+        server-addr: ${NACOS_ADDR}
+        username: ${NACOS_USER}
+        password: ${NACOS_PASS}
       config:
         import-check:
           enabled: false
   rabbitmq:
-    host: ${RABBITMQ_HOST:localhost}
-    port: ${RABBITMQ_PORT:5672}
-    username: ${RABBITMQ_USER:guest}
-    password: ${RABBITMQ_PASS:guest}
+    host: ${RABBITMQ_HOST}
+    port: ${RABBITMQ_PORT}
+    username: ${RABBITMQ_USER}
+    password: ${RABBITMQ_PASS}
     publisher-confirm-type: correlated
     publisher-returns: true
     template:
@@ -28,14 +28,14 @@ spring:
         acknowledge-mode: manual
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASS:}
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+      password: ${REDIS_PASS}
   datasource:
     # Worker 只读：默认使用独立只读账号（仅 GRANT SELECT），应用层强制 HikariCP read-only；
     # 密码必须由环境变量 MYSQL_PASS 提供（禁止固定默认密码）
-    url: jdbc:mysql://${MYSQL_HOST:localhost}:3306/comic_atlas?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
-    username: ${MYSQL_USER:comicatlas_ro}
+    url: jdbc:mysql://${MYSQL_HOST}:${MYSQL_PORT}/comic_atlas?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
+    username: ${MYSQL_USER}
     password: ${MYSQL_PASS}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
@@ -61,11 +61,11 @@ worker:
   lq-quality: ${LQ_QUALITY:15}
   lq-workers: ${LQ_WORKERS:4}
   hq-delete-timeout-seconds: ${HQ_DELETE_TIMEOUT_SECONDS:60}
-  ffprobe-enabled: true
+  ffprobe-enabled: ${FFPROBE_ENABLED:true}
   torrent:
-    peer-detect-timeout: 30
-    min-speed-threshold: 10240
-    speed-check-duration: 300
+    peer-detect-timeout: ${TORRENT_PEER_DETECT_TIMEOUT:30}
+    min-speed-threshold: ${TORRENT_MIN_SPEED_THRESHOLD:10240}
+    speed-check-duration: ${TORRENT_SPEED_CHECK_DURATION:300}
     timeout-minutes: ${TORRENT_TIMEOUT_MINUTES:120}
   proxy:
     host: ${PROXY_HOST:127.0.0.1}
@@ -73,12 +73,40 @@ worker:
     socks-port: ${SOCKS_PORT:7897}
   cover:
     quality: ${COVER_QUALITY:25}
+    timeout-seconds: ${COVER_TIMEOUT_SECONDS:600}
+    frame-timeout-seconds: ${COVER_FRAME_TIMEOUT_SECONDS:120}
+    workers: ${COVER_WORKERS:1}
+    frame-seek-seconds: ${COVER_FRAME_SEEK_SECONDS:2}
+    frame-count: ${COVER_FRAME_COUNT:1}
+    frame-quality: ${COVER_FRAME_QUALITY:2}
+  executor:
+    process-io-threads: ${WORKER_PROCESS_IO_THREADS:4}
+    process-io-queue-capacity: ${WORKER_PROCESS_IO_QUEUE_CAPACITY:64}
+    shutdown-timeout-seconds: ${WORKER_SHUTDOWN_TIMEOUT_SECONDS:30}
+  transcode:
+    timeout-seconds: ${TRANSCODE_TIMEOUT_SECONDS:600}
+    encoder-probe-timeout-seconds: ${TRANSCODE_ENCODER_PROBE_TIMEOUT_SECONDS:15}
+  image:
+    lq-timeout-seconds: ${LQ_TIMEOUT_SECONDS:600}
+  media:
+    ffprobe-timeout-seconds: ${FFPROBE_TIMEOUT_SECONDS:15}
+  download:
+    http-connect-timeout-seconds: ${HTTP_CONNECT_TIMEOUT_SECONDS:30}
+    archive-connect-timeout-seconds: ${ARCHIVE_CONNECT_TIMEOUT_SECONDS:60}
+    archive-request-timeout-minutes: ${ARCHIVE_REQUEST_TIMEOUT_MINUTES:30}
+    max-connection-per-server: ${TORRENT_MAX_CONNECTION_PER_SERVER:16}
+    split-count: ${TORRENT_SPLIT_COUNT:8}
+    torrent-stop-timeout-seconds: ${TORRENT_STOP_TIMEOUT_SECONDS:60}
+    seed-time-seconds: ${TORRENT_SEED_TIME_SECONDS:0}
+  lifecycle:
+    cancellation-ttl-days: ${CANCELLATION_TTL_DAYS:7}
+    metadata-refresh-attempt-ttl-days: ${METADATA_REFRESH_ATTEMPT_TTL_DAYS:7}
   zip:
-    max-entries: 100000
-    max-depth: 200
-    split-size: 2147483648
-    max-entry-size: 32212254720
-    max-total-size: 32212254720
+    max-entries: ${ZIP_MAX_ENTRIES:100000}
+    max-depth: ${ZIP_MAX_DEPTH:200}
+    split-size: ${ZIP_SPLIT_SIZE:2147483648}
+    max-entry-size: ${ZIP_MAX_ENTRY_SIZE:32212254720}
+    max-total-size: ${ZIP_MAX_TOTAL_SIZE:32212254720}
   ehentai:
     api-url: ${EHENTAI_API_URL:https://api.e-hentai.org/api.php}
     site-url: ${EHENTAI_SITE_URL:https://e-hentai.org}

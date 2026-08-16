@@ -1,6 +1,5 @@
 package com.comicatlas.worker.config;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
@@ -17,18 +16,18 @@ import java.util.concurrent.ThreadPoolExecutor;
 public class WorkerExecutorConfig {
 
     @Bean(name = "processIoExecutor", destroyMethod = "shutdown")
-    public ThreadPoolTaskExecutor processIoExecutor(
-            @Value("${worker.executor.process-io-threads:4}") int threads) {
+    public ThreadPoolTaskExecutor processIoExecutor(WorkerConfig config) {
+        WorkerConfig.Executor executorConfig = config.getExecutor();
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(threads);
-        executor.setMaxPoolSize(threads);
-        executor.setQueueCapacity(64);
+        executor.setCorePoolSize(executorConfig.getProcessIoThreads());
+        executor.setMaxPoolSize(executorConfig.getProcessIoThreads());
+        executor.setQueueCapacity(executorConfig.getProcessIoQueueCapacity());
         executor.setThreadNamePrefix("process-io-");
         // 进程输出读取任务必须异步执行：池饱和时拒绝即抛（AbortPolicy），
         // 避免 CallerRunsPolicy 让读取循环在业务线程同步阻塞，导致 waitFor 超时失效。
         executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
         executor.setWaitForTasksToCompleteOnShutdown(true);
-        executor.setAwaitTerminationSeconds(30);
+        executor.setAwaitTerminationSeconds(executorConfig.getShutdownTimeoutSeconds());
         executor.initialize();
         return executor;
     }

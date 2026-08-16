@@ -4,7 +4,7 @@
     <ReaderToolbar
       v-if="mode === 'desktop'"
       :mode="mode"
-      :title="comicTitle"
+      :title="toolbarTitle"
       :current-page="store.currentPage"
       :total-pages="store.totalPages"
       :prev-chapter-id="store.prevChapterId"
@@ -59,7 +59,7 @@
       <ReaderToolbar
         v-if="toolbarVisible"
         :mode="mode"
-        :title="comicTitle"
+        :title="toolbarTitle"
         @back="nav.goBack"
         @open-settings="dispatch(ReaderAction.OpenSettings)"
       />
@@ -172,13 +172,28 @@ gesture.onTap((point) => {
 
 // swipe 仅翻页模式响应：内容随手指方向前进（左划=下一页）
 gesture.onSwipe((direction) => {
-  if (!isPagedMode.value) return
-  onPageRequest(direction === 'left' ? 'next' : 'prev')
+  if (direction === 'left' || direction === 'right') {
+    if (!isPagedMode.value) return
+    onPageRequest(direction === 'left' ? 'next' : 'prev')
+    return
+  }
+
+  if (mode.value !== 'mobile') return
+  dispatch(direction === 'up' ? ReaderAction.SwipeUp : ReaderAction.SwipeDown)
 })
 
 const lastSyncedPage = ref(1)
 const comicTitle = ref('')
+const toolbarTitle = computed(() => {
+  const chapterTitle = store.chapterTitle?.trim()
+  const fallbackTitle = comicTitle.value || `漫画 #${store.comicId}`
+  if (!chapterTitle) return fallbackTitle
+  if (mode.value === 'mobile') return chapterTitle
+  return `${fallbackTitle} · ${chapterTitle}`
+})
 const saveDebounceTimer = ref<number | null>(null)
+/** 存在未确认落库的进度：翻页置位，saveProgress 成功才清除；卸载兜底据此决定是否重发 */
+const progressDirty = ref(false)
 /** 被双击切到 HQ 的页面索引（0-based），使用 reactive Set 保持响应性 */
 const forceHqPages = reactive(new Set<number>())
 
@@ -327,6 +342,30 @@ function onVisibleRange(range: { start: number; end: number; total: number }) {
   preloadEngine.onVisibleChange(range.start, range.end, range.total)
 }
 
+/**
+ * 页面隐藏/卸载兜底保存：清除挂起 debounce，立即用 keepalive 发送最终进度。
+ * 覆盖直接关闭标签页、刷新、移动端切后台（visibilitychange）等
+ * onBeforeUnmount 不触发、且 debounce 未到点的场景。
+ * 仅在 progressDirty 置位（存在未确认保存）时发送，axios 成功路径已清位，天然防重复。
+ */
+function flushProgressOnPageHide() {
+  if (saveDebounceTimer.value) {
+    clearTimeout(saveDebounceTimer.value)
+    saveDebounceTimer.value = null
+  }
+  if (store.comicId > 0 && progressDirty.value) {
+    lastSyncedPage.value = store.currentPage
+    progressDirty.value = false
+    store.saveProgressKeepalive()
+  }
+}
+
+function onVisibilityChange() {
+  if (document.visibilityState === 'hidden') {
+    flushProgressOnPageHide()
+  }
+}
+
 onMounted(async () => {
   // 桌面专属交互（键盘快捷键 / Ctrl+滚轮缩放 / 双击重置缩放）：
   // 移动端不注册，避免与触摸手势系统冲突。
@@ -336,14 +375,25 @@ onMounted(async () => {
     document.addEventListener('dblclick', onDblClick)
   }
 
+  // 页面卸载兜底：关闭标签页/刷新/切后台时 onBeforeUnmount 不触发，
+  // 但 debounce 也可能尚未到点，必须在此强制落库（keepalive 请求）。
+  document.addEventListener('pagehide', flushProgressOnPageHide)
+  document.addEventListener('visibilitychange', onVisibilityChange)
+
   await loadCurrentChapter()
 
   watch(() => store.currentPage, (newPage) => {
     if (store.comicId > 0 && newPage !== lastSyncedPage.value) {
+      progressDirty.value = true
       if (saveDebounceTimer.value) clearTimeout(saveDebounceTimer.value)
       saveDebounceTimer.value = window.setTimeout(() => {
-        lastSyncedPage.value = newPage
-        store.saveProgress()
+        // 保存成功才清 dirty：期间若页面卸载，keepalive 兜底重发仍未确认的进度
+        store.saveProgress().then((ok) => {
+          if (ok && store.currentPage === newPage) {
+            lastSyncedPage.value = newPage
+            progressDirty.value = false
+          }
+        })
       }, 300)
     }
   })
@@ -360,7 +410,14 @@ watch(() => route.params.chapterId, (newId, oldId) => {
     saveDebounceTimer.value = null
   }
   if (store.comicId > 0 && store.currentPage !== lastSyncedPage.value) {
-    store.saveProgress()
+    const chapterId = store.chapterId
+    const pageNumber = store.currentPage
+    store.saveProgress().then((ok) => {
+      if (ok && store.chapterId === chapterId && store.currentPage === pageNumber) {
+        lastSyncedPage.value = pageNumber
+        progressDirty.value = false
+      }
+    })
   }
   loadCurrentChapter()
 })
@@ -370,11 +427,20 @@ onBeforeUnmount(() => {
   document.removeEventListener('keydown', onKeydown)
   document.removeEventListener('wheel', onWheel)
   document.removeEventListener('dblclick', onDblClick)
+  document.removeEventListener('pagehide', flushProgressOnPageHide)
+  document.removeEventListener('visibilitychange', onVisibilityChange)
   if (saveDebounceTimer.value) {
     clearTimeout(saveDebounceTimer.value)
   }
   if (store.comicId > 0 && store.currentPage !== lastSyncedPage.value) {
-    store.saveProgress()
+    const chapterId = store.chapterId
+    const pageNumber = store.currentPage
+    store.saveProgress().then((ok) => {
+      if (ok && store.chapterId === chapterId && store.currentPage === pageNumber) {
+        lastSyncedPage.value = pageNumber
+        progressDirty.value = false
+      }
+    })
   }
   preloadEngine.destroy()
 })
@@ -383,7 +449,9 @@ onBeforeUnmount(() => {
 <style scoped>
 .reader-page {
   width: 100%;
-  height: 100dvh;
+  height: 100vh;
+  height: var(--app-viewport-height, 100dvh);
+  min-height: 0;
   display: flex;
   flex-direction: column;
   background: var(--bg);

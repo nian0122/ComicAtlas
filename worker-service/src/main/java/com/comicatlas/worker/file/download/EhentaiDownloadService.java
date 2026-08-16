@@ -1,12 +1,12 @@
 package com.comicatlas.worker.file.download;
 
 import com.comicatlas.worker.config.WorkerConfig;
-import com.comicatlas.worker.file.download.DownloadContext;
 import com.comicatlas.worker.file.extract.ZipExtractor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -21,6 +21,10 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class EhentaiDownloadService {
+
+    /** 压缩包解压产物子目录名（下载临时目录下）。 */
+    private static final String EXTRACT_DIR_NAME = "extracted";
+
     private final WorkerConfig config;
     private final DownloadContext downloadContext;
     private final ZipExtractor zipExtractor;
@@ -40,10 +44,10 @@ public class EhentaiDownloadService {
         DownloadContext.DownloadResult result = downloadContext.download(sourceRef, tempDir);
         log.info("EHENTAI 下载完成: taskId={}, method={}, bytes={}", taskId, result.method(), result.bytes());
 
-        try (var stream = Files.newDirectoryStream(tempDir)) {
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(tempDir)) {
             for (Path file : stream) {
                 if (zipExtractor.supports(file)) {
-                    Path extractDir = tempDir.resolve("extracted");
+                    Path extractDir = tempDir.resolve(EXTRACT_DIR_NAME);
                     List<Path> extracted = zipExtractor.extract(file, extractDir);
                     log.info("EHENTAI 压缩包已解压: taskId={}, entries={}, archive={}",
                             taskId, extracted.size(), file.getFileName());

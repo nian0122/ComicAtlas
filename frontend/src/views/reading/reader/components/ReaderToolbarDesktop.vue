@@ -37,67 +37,6 @@
     </div>
 
     <div class="toolbar-right">
-      <!-- Quality -->
-      <el-select
-        v-model="settings.qualityMode"
-        size="small"
-        class="toolbar-select"
-        @change="settings.setQualityMode"
-      >
-        <el-option label="省流" value="LQ_ONLY" />
-        <el-option label="智能" value="AUTO" />
-        <el-option label="原图" value="HQ_ONLY" />
-      </el-select>
-
-      <!-- Fit -->
-      <el-select
-        v-model="settings.fitMode"
-        size="small"
-        class="toolbar-select"
-        @change="settings.setFitMode"
-      >
-        <el-option label="自动" value="AUTO" />
-        <el-option label="适配宽" value="WIDTH" />
-        <el-option label="适配高" value="HEIGHT" />
-        <el-option label="原始" value="ORIGINAL" />
-      </el-select>
-
-      <!-- Direction -->
-      <el-select
-        v-model="settings.readingDirection"
-        size="small"
-        class="toolbar-select"
-        @change="settings.setReadingDirection"
-      >
-        <el-option label="纵向滚动" value="vertical" />
-        <el-option label="横向翻页" value="horizontal" />
-      </el-select>
-
-      <!-- Zoom -->
-      <div class="zoom-group">
-        <button class="tool-btn zoom-btn" @click="settings.zoomOut">-</button>
-        <span class="zoom-value">{{ settings.zoom }}%</span>
-        <button class="tool-btn zoom-btn" @click="settings.zoomIn">+</button>
-      </div>
-
-      <!-- Settings -->
-      <el-dropdown trigger="click" @command="onCommand">
-        <button class="tool-btn">
-          <el-icon :size="18"><Setting /></el-icon>
-        </button>
-        <template #dropdown>
-          <el-dropdown-menu>
-            <el-dropdown-item command="toggleToolbar">
-              {{ settings.showToolbar ? '隐藏工具栏' : '显示工具栏' }}
-            </el-dropdown-item>
-            <el-dropdown-item command="togglePreload">
-              {{ settings.enablePreload ? '关闭预加载' : '开启预加载' }}
-            </el-dropdown-item>
-            <el-dropdown-item divided command="resetZoom">重置缩放</el-dropdown-item>
-          </el-dropdown-menu>
-        </template>
-      </el-dropdown>
-
       <!-- Chapter nav -->
       <button
         v-if="prevChapterId"
@@ -113,6 +52,61 @@
       >
         下一章
       </button>
+
+      <el-popover
+        v-model:visible="settingsVisible"
+        placement="bottom-end"
+        :width="280"
+        trigger="click"
+      >
+        <template #reference>
+          <button class="tool-btn" aria-label="阅读设置" title="阅读设置">
+            <el-icon :size="18"><Setting /></el-icon>
+          </button>
+        </template>
+        <div class="desktop-settings-panel">
+          <div class="settings-panel-title">阅读设置</div>
+          <label class="settings-field">
+            <span>画质</span>
+            <el-select v-model="settings.qualityMode" size="small" @change="settings.setQualityMode">
+              <el-option label="省流" value="LQ_ONLY" />
+              <el-option label="智能" value="AUTO" />
+              <el-option label="原图" value="HQ_ONLY" />
+            </el-select>
+          </label>
+          <label class="settings-field">
+            <span>适配模式</span>
+            <el-select v-model="settings.fitMode" size="small" @change="settings.setFitMode">
+              <el-option label="自动" value="AUTO" />
+              <el-option label="适配宽" value="WIDTH" />
+              <el-option label="适配高" value="HEIGHT" />
+              <el-option label="原始" value="ORIGINAL" />
+            </el-select>
+          </label>
+          <label class="settings-field">
+            <span>阅读方向</span>
+            <el-select v-model="settings.readingDirection" size="small" @change="settings.setReadingDirection">
+              <el-option label="纵向滚动" value="vertical" />
+              <el-option label="横向翻页" value="horizontal" />
+            </el-select>
+          </label>
+          <div class="settings-field settings-zoom-field">
+            <span>缩放 {{ settings.zoom }}%</span>
+            <div class="zoom-group">
+              <button class="tool-btn zoom-btn" @click="settings.zoomOut">−</button>
+              <span class="zoom-value">{{ settings.zoom }}%</span>
+              <button class="tool-btn zoom-btn" @click="settings.zoomIn">＋</button>
+            </div>
+          </div>
+          <div class="settings-panel-actions">
+            <button class="panel-action" @click="settings.togglePreload()">
+              {{ settings.enablePreload ? '关闭预加载' : '开启预加载' }}
+            </button>
+            <button class="panel-action" @click="settings.resetZoom()">重置缩放</button>
+            <button class="panel-action" @click="settings.toggleToolbar(); settingsVisible = false">隐藏工具栏</button>
+          </div>
+        </div>
+      </el-popover>
     </div>
   </header>
 </template>
@@ -123,9 +117,6 @@ import { ArrowLeft, Setting } from '@element-plus/icons-vue'
 import {
   ElSelect,
   ElOption,
-  ElDropdown,
-  ElDropdownMenu,
-  ElDropdownItem,
   ElPopover,
   ElInputNumber,
   ElButton,
@@ -152,6 +143,7 @@ const settings = useReaderSettingsStore()
 
 const jumpVisible = ref(false)
 const jumpPage = ref(1)
+const settingsVisible = ref(false)
 
 watch(jumpVisible, (visible) => {
   if (visible) jumpPage.value = props.currentPage
@@ -162,28 +154,16 @@ function confirmJump() {
   emit('jumpToPage', jumpPage.value)
 }
 
-function onCommand(command: string) {
-  switch (command) {
-    case 'toggleToolbar':
-      settings.toggleToolbar()
-      break
-    case 'togglePreload':
-      settings.togglePreload()
-      break
-    case 'resetZoom':
-      settings.resetZoom()
-      break
-  }
-}
 </script>
 
 <style scoped>
 .reader-toolbar {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  justify-content: space-between;
   height: 56px;
-  padding: 0 var(--space-lg);
+  gap: var(--space-lg);
+  padding: 0 clamp(16px, 2vw, 32px);
   background: var(--bg-primary);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
@@ -205,6 +185,20 @@ function onCommand(command: string) {
   gap: var(--space-base);
 }
 
+.toolbar-left {
+  min-width: 0;
+}
+
+.toolbar-center {
+  justify-self: center;
+}
+
+.toolbar-right {
+  justify-self: end;
+  min-width: 0;
+  gap: 8px;
+}
+
 .toolbar-title {
   font-size: 16px;
   font-weight: 600;
@@ -212,10 +206,15 @@ function onCommand(command: string) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 300px;
+  min-width: 0;
+  max-width: min(42vw, 560px);
 }
 
 .page-indicator {
+  min-width: 84px;
+  padding-inline: 14px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
   font-size: 13px;
   color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
@@ -231,19 +230,6 @@ function onCommand(command: string) {
   flex: 1;
   width: auto;
   min-width: 0;
-}
-
-.toolbar-select {
-  width: 90px;
-}
-
-:deep(.toolbar-select .el-input__wrapper) {
-  background: var(--bg-surface);
-  box-shadow: 0 0 0 1px var(--border) inset;
-}
-
-:deep(.toolbar-select .el-input__inner) {
-  color: var(--text-primary);
 }
 
 .zoom-group {
@@ -266,6 +252,61 @@ function onCommand(command: string) {
 .zoom-btn {
   width: 28px;
   padding: 0;
+}
+
+.desktop-settings-panel {
+  display: grid;
+  gap: var(--space-3);
+  color: var(--text-primary);
+}
+
+.settings-panel-title {
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.settings-field {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.settings-field :deep(.el-select) {
+  width: 100%;
+}
+
+.settings-zoom-field {
+  grid-template-columns: 72px minmax(0, 1fr);
+}
+
+.settings-panel-actions {
+  display: flex;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+}
+
+.panel-action {
+  flex: 1;
+  min-height: 32px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.panel-action:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
 }
 
 .tool-btn {
@@ -299,6 +340,7 @@ function onCommand(command: string) {
 
 @media (max-width: 1024px) {
   .reader-toolbar {
+    display: flex;
     flex-wrap: wrap;
     height: auto;
     padding: var(--space-sm) var(--space-base);
@@ -310,6 +352,31 @@ function onCommand(command: string) {
   .toolbar-center {
     flex: 1 1 100%;
     justify-content: center;
+  }
+
+  .toolbar-left,
+  .toolbar-right,
+  .toolbar-center {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 1200px) and (min-width: 1025px) {
+  .reader-toolbar {
+    gap: 12px;
+    padding-inline: 16px;
+  }
+
+  .toolbar-right {
+    gap: 4px;
+  }
+
+  .toolbar-title {
+    max-width: 260px;
+  }
+
+  .chapter-btn {
+    padding-inline: 8px;
   }
 }
 </style>

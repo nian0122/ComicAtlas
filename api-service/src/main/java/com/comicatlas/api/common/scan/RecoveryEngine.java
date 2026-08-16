@@ -3,13 +3,14 @@ package com.comicatlas.api.common.scan;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.admin.dto.RecoveryProgressVO;
 import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
-import com.comicatlas.api.common.RestoreContext;
-import com.comicatlas.api.common.RestorePolicy;
-import com.comicatlas.api.common.RestoreSource;
-import com.comicatlas.api.common.enums.ComicStatus;
-import com.comicatlas.api.common.enums.HqStatus;
-import com.comicatlas.api.common.enums.LqStatus;
-import com.comicatlas.api.common.storage.ApiStorageProperties;
+import com.comicatlas.contract.common.RestoreContext;
+import com.comicatlas.contract.common.RestorePolicy;
+import com.comicatlas.contract.common.RestoreSource;
+import com.comicatlas.contract.common.enums.ComicStatus;
+import com.comicatlas.contract.common.enums.HqStatus;
+import com.comicatlas.contract.common.enums.LqStatus;
+import com.comicatlas.api.storage.ApiStorageProperties;
+import com.comicatlas.api.storage.service.MetadataUpdateCoordinator;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -23,14 +24,14 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import com.comicatlas.api.comic.mapper.CatalogMapper;
-import com.comicatlas.api.comic.mapper.ChapterMapper;
-import com.comicatlas.api.comic.mapper.ComicMapper;
-import com.comicatlas.api.comic.mapper.MediaMapper;
-import com.comicatlas.api.comic.entity.Catalog;
-import com.comicatlas.api.comic.entity.Chapter;
-import com.comicatlas.api.comic.entity.Comic;
-import com.comicatlas.api.comic.entity.Media;
+import com.comicatlas.persistence.comic.mapper.CatalogMapper;
+import com.comicatlas.persistence.comic.mapper.ChapterMapper;
+import com.comicatlas.persistence.comic.mapper.ComicMapper;
+import com.comicatlas.persistence.comic.mapper.MediaMapper;
+import com.comicatlas.persistence.comic.entity.Catalog;
+import com.comicatlas.persistence.comic.entity.Chapter;
+import com.comicatlas.persistence.comic.entity.Comic;
+import com.comicatlas.persistence.comic.entity.Media;
 
 /**
  * 漫画恢复引擎 — 封装每漫画目录的恢复逻辑。
@@ -47,6 +48,9 @@ import com.comicatlas.api.comic.entity.Media;
 @RequiredArgsConstructor
 public class RecoveryEngine {
 
+    /** LQ 状态：READY（LQ 文件存在）。 */
+    private static final String LQ_STATUS_READY = "READY";
+
     private final ObjectMapper objectMapper;
     private final ComicMapper comicMapper;
     private final CatalogMapper catalogMapper;
@@ -56,6 +60,7 @@ public class RecoveryEngine {
     private final CatalogCacheInvalidator catalogCacheInvalidator;
     private final ApiStorageProperties storageProperties;
     private final RecoveryMediaResolver recoveryMediaResolver;
+    private final MetadataUpdateCoordinator metadataUpdateCoordinator;
 
     // ======================== 公共 API ========================
 
@@ -141,6 +146,9 @@ public class RecoveryEngine {
             }
         });
         catalogCacheInvalidator.evict(ctx.comicId());
+        // 恢复结果落回 metadata：恢复后 DB 反映文件系统事实（含 LQ），需重导出 metadata.json，
+        // 否则下次恢复仍基于恢复前的旧 metadata（若 DB 已损坏，旧 metadata 可能过时）
+        metadataUpdateCoordinator.requestSync(ctx.comicId(), null, "恢复完成");
         return result;
     }
 
@@ -249,8 +257,16 @@ public class RecoveryEngine {
                 media.setHqPath(item.hqPath());
                 // 缺文件必须 MISSING，不得标 READY
                 media.setHqStatus(item.exists() ? HqStatus.READY : HqStatus.MISSING);
-                media.setLqStatus(LqStatus.NOT_GENERATED);
-                media.setFileSize(item.fileSize());
+                // LQ 事实：恢复时实测 LQ 目录（hqPath 推导 .webp）——HQ 缺失但 LQ 存在时
+                // 仍恢复为 LQ READY，阅读器可用 LQ 兜底（"hq 删除 lq 存在"可读）
+                if (LQ_STATUS_READY.equals(item.lqStatus())) {
+                    media.setLqStatus(LqStatus.READY);
+                    media.setLqSize(item.lqSize());
+                } else {
+                    media.setLqStatus(LqStatus.NOT_GENERATED);
+                    media.setLqSize(0L);
+                }
+                media.setHqSize(item.fileSize());
                 media.setWidth(item.width());
                 media.setHeight(item.height());
                 media.setMediaType(item.mediaType());
@@ -262,11 +278,11 @@ public class RecoveryEngine {
 
         if (ctx.comicExists()) {
             comic.setTotalPages(pgCount);
-            comic.setFileSize(totalSize);
+            comic.setHqSize(totalSize);
             comic.setHqSize(totalSize);
             comicMapper.updateById(comic);
         } else if (totalSize > 0) {
-            comic.setFileSize(totalSize);
+            comic.setHqSize(totalSize);
             comic.setHqSize(totalSize);
             comicMapper.updateById(comic);
         }

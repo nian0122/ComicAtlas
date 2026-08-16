@@ -1,6 +1,6 @@
 package com.comicatlas.api.management.controller;
 
-import com.comicatlas.api.common.Result;
+import com.comicatlas.contract.common.Result;
 import com.comicatlas.api.management.policy.AllowedOperations;
 import com.comicatlas.api.management.policy.MediaOperationEligibilityService;
 import lombok.RequiredArgsConstructor;
@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 前端不得自行复制操作矩阵。
  */
 @RestController
-@RequestMapping("/api/management/operations")
+@RequestMapping("/api/manage/operations")
 @RequiredArgsConstructor
 public class MediaOperationController {
 

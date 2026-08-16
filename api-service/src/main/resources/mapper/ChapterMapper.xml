@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.comicatlas.persistence.comic.mapper.ChapterMapper">
+
+    <!--
+      元数据刷新统计批量 UPDATE：CASE id WHEN ... THEN ... 单条 SQL 一次更新各章节 page_count，
+      消除逐章 update 的往返开销。仅更新 page_count，不触碰 version（与合并阶段语义一致，
+      版本漂移校验在合并计划阶段完成）。
+    -->
+    <update id="updatePageCountBatch">
+        UPDATE chapter
+        SET page_count = CASE id
+            <foreach collection="chapterList" item="c"> WHEN #{c.id} THEN #{c.pageCount}</foreach>
+            END
+        WHERE id IN
+        <foreach collection="chapterList" item="c" open="(" separator="," close=")">#{c.id}</foreach>
+    </update>
+
+</mapper>

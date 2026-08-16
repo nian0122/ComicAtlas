@@ -1,6 +1,6 @@
 package com.comicatlas.api.management.batch.controller;
 
-import com.comicatlas.api.common.Result;
+import com.comicatlas.contract.common.Result;
 import com.comicatlas.api.management.batch.dto.BatchCreateResponse;
 import com.comicatlas.api.management.batch.dto.BatchOperationRequest;
 import com.comicatlas.api.management.batch.dto.BatchPreviewResponse;
@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
  * 创建批量任务（危险操作需携带 preview token 二次确认）。
  */
 @RestController
-@RequestMapping("/api/management/batch")
+@RequestMapping("/api/manage/batch")
 @RequiredArgsConstructor
 public class BatchOperationController {
 

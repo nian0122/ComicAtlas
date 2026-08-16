@@ -30,7 +30,9 @@ public class ExportMedia {
 
     private String lqStatus;     // READY / NOT_GENERATED / FAILED
 
-    private Long fileSize;
+    private Long lqSize;         // LQ 文件字节数（未生成时为 null）
+
+    private Long hqSize;
 
     private Integer width;
 

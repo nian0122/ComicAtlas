@@ -60,7 +60,7 @@
         </div>
         <div>
           <span>文件大小</span>
-          <strong>{{ fileSize }}</strong>
+          <strong>{{ hqSize }}</strong>
         </div>
         <div>
           <span>来源</span>
@@ -110,10 +110,10 @@ defineEmits<{
 
 const year = computed(() => props.comic.createdAt?.slice(0, 4) || '未知年份')
 
-const fileSize = computed(() => {
-  if (!props.comic.fileSize) return '-'
+const hqSize = computed(() => {
+  if (!props.comic.hqSize) return '-'
   const units = ['B', 'KB', 'MB', 'GB', 'TB']
-  let value = props.comic.fileSize
+  let value = props.comic.hqSize
   let unitIndex = 0
   while (value >= 1024 && unitIndex < units.length - 1) {
     value /= 1024
@@ -126,7 +126,9 @@ const fileSize = computed(() => {
 <style scoped>
 .mobile-detail {
   min-height: 100dvh;
-  padding-bottom: var(--space-10);
+  padding-bottom: calc(
+    var(--mobile-tabbar-height) + var(--space-8) + env(safe-area-inset-bottom)
+  );
   background: var(--mobile-canvas);
   color: var(--text-primary);
 }
@@ -135,7 +137,7 @@ const fileSize = computed(() => {
   position: relative;
   display: grid;
   place-items: end center;
-  min-height: var(--mobile-detail-stage-height);
+  min-height: clamp(480px, 125vw, 560px);
   padding: calc(var(--mobile-nav-height) + var(--space-5)) var(--space-5) var(--space-6);
   overflow: hidden;
 }
@@ -159,7 +161,7 @@ const fileSize = computed(() => {
 .cover-poster {
   position: relative;
   z-index: 1;
-  width: var(--mobile-detail-poster-width);
+  width: min(62vw, 280px);
   aspect-ratio: 2 / 3;
   border-radius: var(--radius-md);
   object-fit: cover;
@@ -171,7 +173,7 @@ const fileSize = computed(() => {
   z-index: 1;
   display: grid;
   place-items: center;
-  width: var(--mobile-detail-poster-width);
+  width: min(62vw, 280px);
   aspect-ratio: 2 / 3;
   border-radius: var(--radius-md);
   background: var(--bg-surface);
@@ -230,8 +232,8 @@ const fileSize = computed(() => {
   justify-content: center;
   gap: var(--space-2);
   width: 100%;
-  min-height: var(--mobile-detail-action-height);
-  margin-top: var(--mobile-detail-action-gap);
+  min-height: 52px;
+  margin-top: var(--space-8);
   border: 0;
   border-radius: var(--radius-sm);
   background: var(--accent);
@@ -247,12 +249,12 @@ const fileSize = computed(() => {
 .progress-panel,
 .facts,
 .catalog {
-  margin-top: var(--mobile-detail-section-gap);
+  margin-top: var(--space-10);
 }
 
 .summary {
-  min-height: var(--mobile-detail-summary-min-height);
-  margin-top: var(--mobile-detail-summary-gap);
+  min-height: 0;
+  margin-top: var(--space-10);
 }
 
 .progress-heading {
@@ -260,6 +262,11 @@ const fileSize = computed(() => {
   align-items: flex-end;
   justify-content: space-between;
   gap: var(--space-4);
+}
+
+.progress-heading > div {
+  min-width: 0;
+  flex: 1;
 }
 
 .progress-heading p,
@@ -272,12 +279,15 @@ const fileSize = computed(() => {
 
 .progress-heading span {
   display: block;
+  max-width: 100%;
   margin-top: var(--space-1);
   color: var(--text-muted);
   font-size: 12px;
+  line-height: 1.5;
 }
 
 .progress-heading strong {
+  flex: 0 0 auto;
   color: var(--accent);
 }
 

@@ -37,7 +37,7 @@ public class HttpDownloader implements DownloadStrategy {
         }
 
         this.http = HttpClient.newBuilder()
-            .connectTimeout(java.time.Duration.ofSeconds(30))
+            .connectTimeout(java.time.Duration.ofSeconds(config.getDownload().getHttpConnectTimeoutSeconds()))
             .proxy(ProxySelector.getDefault())
             .build();
         this.objectMapper = objectMapper;

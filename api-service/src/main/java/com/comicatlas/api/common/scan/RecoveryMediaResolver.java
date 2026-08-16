@@ -1,23 +1,30 @@
 package com.comicatlas.api.common.scan;
 
-import com.comicatlas.api.common.storage.ApiStorageProperties;
+import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.common.storage.RelativePathValidator;
+import com.comicatlas.common.util.ImageDimensionsReader;
+import com.comicatlas.api.storage.ApiStorageProperties;
+import com.comicatlas.api.storage.ApiStorageRoot;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import javax.imageio.ImageIO;
-import javax.imageio.ImageReader;
-import javax.imageio.stream.ImageInputStream;
+import java.io.IOException;
+import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
 
 /**
  * 恢复媒体解析器 — 单一职责：在数据库写事务<b>之前</b>完成所有文件扫描与存在性校验。
@@ -32,10 +39,36 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class RecoveryMediaResolver {
 
-    private final ApiStorageProperties storageProperties;
-
     /** 视频文件扩展名 */
     private static final Set<String> VIDEO_EXTENSIONS = Set.of(".mp4", ".webm", ".mkv", ".mov", ".avi");
+    /** 图片文件扩展名 */
+    private static final Set<String> IMAGE_EXTENSIONS =
+            Set.of(".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp");
+    /** 媒体类型：图片。 */
+    private static final String MEDIA_TYPE_IMAGE = "IMAGE";
+    /** 媒体类型：视频。 */
+    private static final String MEDIA_TYPE_VIDEO = "VIDEO";
+
+    /** LQ 状态：READY（LQ 文件存在）。 */
+    private static final String LQ_STATUS_READY = "READY";
+    /** LQ 状态：NOT_GENERATED（LQ 文件不存在）。 */
+    private static final String LQ_STATUS_NOT_GENERATED = "NOT_GENERATED";
+    /** LQ 产物扩展名：image-optimizer.exe 固定输出 WebP。 */
+    private static final String LQ_EXTENSION = ".webp";
+
+    // metadata JSON 字段名（与 MetadataJsonBuilder 写出字段保持一致）
+    private static final String FIELD_GLOBAL_ORDER = "globalOrder";
+    private static final String FIELD_MEDIA_ITEMS = "mediaItems";
+    private static final String FIELD_PAGES = "pages";
+    private static final String FIELD_HQ_PATH = "hqPath";
+    private static final String FIELD_PAGE_NUMBER = "pageNumber";
+    private static final String FIELD_FILE_NAME = "fileName";
+    private static final String FIELD_MEDIA_TYPE = "mediaType";
+    private static final String FIELD_FILE_SIZE = "fileSize";
+    private static final String FIELD_WIDTH = "width";
+    private static final String FIELD_HEIGHT = "height";
+
+    private final ApiStorageProperties storageProperties;
 
     /**
      * 解析整本漫画各章节的媒体（与 {@code chaptersData} 一一对应）。
@@ -49,12 +82,12 @@ public class RecoveryMediaResolver {
             return List.of();
         }
         List<List<ResolvedMediaItem>> result = new ArrayList<>(chaptersData.size());
-        for (Map<String, Object> chData : chaptersData) {
-            if (chData == null) {
+        for (Map<String, Object> chapterData : chaptersData) {
+            if (chapterData == null) {
                 result.add(List.of());
                 continue;
             }
-            result.add(resolveChapter(comicId, chData));
+            result.add(resolveChapter(comicId, chapterData));
         }
         return result;
     }
@@ -64,37 +97,38 @@ public class RecoveryMediaResolver {
      * 供 {@code RecoveryEngine.scanChapterPages()} 与元数据刷新等场景复用。
      */
     public List<ScannedMediaInfo> scanChapterDir(Long comicId, int globalOrder) {
-        Path dir = storageProperties.root("HQ")
+        Path dir = storageProperties.root(StorageRootKeys.HQ)
                 .resolve(String.valueOf(comicId)).resolve(String.valueOf(globalOrder));
         if (!Files.exists(dir)) {
             return Collections.emptyList();
         }
 
         List<ScannedMediaInfo> pages = new ArrayList<>();
-        try (var stream = Files.newDirectoryStream(dir)) {
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir)) {
             for (Path file : stream) {
                 String name = file.getFileName().toString();
-                if (name.startsWith(".")) { continue; }
-
-                String lower = name.toLowerCase();
-                int dotIdx = lower.lastIndexOf('.');
-                if (dotIdx < 0) { continue; }
-                String ext = lower.substring(dotIdx);
-                String mediaType = mediaTypeOf(ext);
-                if (mediaType == null) { continue; }
-
-                long fileSize;
-                try {
-                    fileSize = Files.size(file);
-                } catch (Exception e) {
-                    fileSize = 0;
+                if (name.startsWith(".")) {
+                    continue;
                 }
 
-                ImageDimensions dims = "IMAGE".equals(mediaType) ? getImageDimensions(file) : new ImageDimensions(null, null);
+                String lower = name.toLowerCase();
+                int lastDotIndex = lower.lastIndexOf('.');
+                if (lastDotIndex < 0) {
+                    continue;
+                }
+                String ext = lower.substring(lastDotIndex);
+                String mediaType = mediaTypeOf(ext);
+                if (mediaType == null) {
+                    continue;
+                }
+
+                long fileSize = safeSize(file);
+                ImageDimensions dims = MEDIA_TYPE_IMAGE.equals(mediaType)
+                        ? getImageDimensions(file) : new ImageDimensions(null, null);
                 pages.add(new ScannedMediaInfo(name, fileSize, dims.width(), dims.height(), mediaType));
             }
-        } catch (Exception e) {
-            log.warn("扫描章节页面失败: comicId={}, globalOrder={}", comicId, globalOrder, e);
+        } catch (IOException ex) {
+            log.warn("扫描章节页面失败: comicId={}, globalOrder={}", comicId, globalOrder, ex);
             return Collections.emptyList();
         }
 
@@ -104,15 +138,15 @@ public class RecoveryMediaResolver {
 
     // ======================== 章节解析 ========================
 
-    private List<ResolvedMediaItem> resolveChapter(Long comicId, Map<String, Object> chData) {
-        int globalOrder = toInt(chData.get("globalOrder"), 0);
-        List<Map<String, Object>> items = extractItems(chData);
+    private List<ResolvedMediaItem> resolveChapter(Long comicId, Map<String, Object> chapterData) {
+        int globalOrder = toInt(chapterData.get(FIELD_GLOBAL_ORDER), 0);
+        List<Map<String, Object>> items = extractItems(chapterData);
         if (items.isEmpty()) {
             // legacy：无 mediaItems → 整目录扫描
             return resolveByDirScan(comicId, globalOrder, null);
         }
-        boolean modern = items.stream().anyMatch(RecoveryMediaResolver::hasHqPath);
-        if (modern) {
+        boolean isModern = items.stream().anyMatch(RecoveryMediaResolver::hasHqPath);
+        if (isModern) {
             return resolveModernItems(comicId, globalOrder, items);
         }
         // legacy 但带 mediaItems（fileName 无 hqPath）→ 按文件名在 globalOrder 目录中查找
@@ -124,42 +158,88 @@ public class RecoveryMediaResolver {
                                                        List<Map<String, Object>> items) {
         Map<String, ScannedMediaInfo> scanByName = indexDirScan(scanChapterDir(comicId, globalOrder));
         List<ResolvedMediaItem> result = new ArrayList<>(items.size());
-        int seq = 1;
+        int pageSequence = 1;
         for (Map<String, Object> item : items) {
-            String hqPath = (String) item.get("hqPath");
-            int pageNumber = item.get("pageNumber") != null ? toInt(item.get("pageNumber"), seq) : seq;
+            String hqPath = (String) item.get(FIELD_HQ_PATH);
+            int pageNumber = resolvePageNumber(item, pageSequence);
             String mediaType = resolveMediaType(item);
-            String fileName = (String) item.get("fileName");
-            if (fileName == null) {
-                fileName = "";
-            }
-            if (hqPath == null || hqPath.isBlank()) {
+            String fileName = resolveFileName(item);
+            if (isBlank(hqPath)) {
                 // 本条目缺 hqPath：按文件名在目录扫描中查找（legacy 回退）
                 result.add(resolveFromScan(comicId, globalOrder, item, fileName, pageNumber, scanByName));
-                seq++;
-                continue;
-            }
-            // typed-fail：绝对路径/反斜杠/目录穿越一律拒绝
-            RelativePathValidator.requireRelativeForwardSlash(hqPath);
-            Path resolved = storageProperties.root("HQ").resolve(hqPath);
-            boolean exists = Files.exists(resolved) && Files.isRegularFile(resolved);
-            long fileSize;
-            Integer width;
-            Integer height;
-            if (exists) {
-                fileSize = safeSize(resolved);
-                ImageDimensions dims = "IMAGE".equals(mediaType) ? getImageDimensions(resolved) : new ImageDimensions(null, null);
-                width = dims.width();
-                height = dims.height();
             } else {
-                fileSize = item.get("fileSize") != null ? ((Number) item.get("fileSize")).longValue() : 0;
-                width = item.get("width") != null ? ((Number) item.get("width")).intValue() : null;
-                height = item.get("height") != null ? ((Number) item.get("height")).intValue() : null;
+                result.add(resolveHqPathItem(item, fileName, pageNumber, mediaType, hqPath));
             }
-            result.add(new ResolvedMediaItem(fileName, pageNumber, fileSize, width, height, mediaType, hqPath, exists));
-            seq++;
+            pageSequence++;
         }
         return result;
+    }
+
+    /**
+     * 现代 metadata 条目：hqPath 存在性校验后原样保留。
+     * typed-fail：绝对路径/反斜杠/目录穿越一律拒绝。
+     * LQ 事实按 hqPath 推导（{hqPath 去扩展名}.webp）独立扫描——HQ 缺失时 LQ 可能仍在，
+     * 恢复为 MISSING + LQ READY（"hq 删除 lq 存在"仍可读）。
+     */
+    private ResolvedMediaItem resolveHqPathItem(Map<String, Object> item, String fileName, int pageNumber,
+                                                String mediaType, String hqPath) {
+        RelativePathValidator.requireRelativeForwardSlash(hqPath);
+        Path resolved = storageProperties.root(StorageRootKeys.HQ).resolve(hqPath);
+        boolean exists = Files.exists(resolved) && Files.isRegularFile(resolved);
+        LqFileFact lqFact = resolveLqFact(hqPath, mediaType);
+        if (exists) {
+            long fileSize = safeSize(resolved);
+            ImageDimensions dims = MEDIA_TYPE_IMAGE.equals(mediaType)
+                    ? getImageDimensions(resolved) : new ImageDimensions(null, null);
+            return new ResolvedMediaItem(fileName, pageNumber, fileSize, dims.width(), dims.height(),
+                    mediaType, hqPath, true, lqFact.status(), lqFact.size());
+        }
+        // 文件缺失：尺寸/大小回退 metadata 值（恢复为 MISSING，不得标 READY）
+        long fileSize = item.get(FIELD_FILE_SIZE) != null
+                ? ((Number) item.get(FIELD_FILE_SIZE)).longValue() : 0;
+        Integer width = item.get(FIELD_WIDTH) != null
+                ? ((Number) item.get(FIELD_WIDTH)).intValue() : null;
+        Integer height = item.get(FIELD_HEIGHT) != null
+                ? ((Number) item.get(FIELD_HEIGHT)).intValue() : null;
+        return new ResolvedMediaItem(fileName, pageNumber, fileSize, width, height, mediaType, hqPath, false,
+                lqFact.status(), lqFact.size());
+    }
+
+    /**
+     * 解析 LQ 文件事实：LQ 文件名由 hqPath 推导（{basename}.webp，与 image-optimizer.exe
+     * 输出规则一致），目录与 hqPath 同构（LQ 与 HQ 保持同目录结构）。
+     * 仅图片媒体有 LQ；LQ 文件存在且为普通文件才标 READY，否则 NOT_GENERATED。
+     * LQ 根未配置时按未生成处理（LQ 为可选增强，缺失不得阻断 HQ 恢复）。
+     *
+     * @param hqPath    相对 HQ 根的正斜杠路径
+     * @param mediaType IMAGE / VIDEO（仅 IMAGE 扫描 LQ）
+     * @return LQ 状态与字节数（视频或 LQ 缺失时为 NOT_GENERATED/0）
+     */
+    private LqFileFact resolveLqFact(String hqPath, String mediaType) {
+        if (!MEDIA_TYPE_IMAGE.equals(mediaType) || isBlank(hqPath)) {
+            return new LqFileFact(LQ_STATUS_NOT_GENERATED, 0L);
+        }
+        Map<String, ApiStorageRoot> roots = storageProperties.getRoots();
+        ApiStorageRoot lqRoot = roots == null ? null : roots.get(StorageRootKeys.LQ);
+        if (lqRoot == null) {
+            return new LqFileFact(LQ_STATUS_NOT_GENERATED, 0L);
+        }
+        String lqPath = deriveLqPath(hqPath);
+        Path lqFile = lqRoot.getPath().resolve(lqPath);
+        if (!Files.isRegularFile(lqFile)) {
+            return new LqFileFact(LQ_STATUS_NOT_GENERATED, 0L);
+        }
+        return new LqFileFact(LQ_STATUS_READY, safeSize(lqFile));
+    }
+
+    /** LQ 相对路径推导：{hqPath 去扩展名}.webp（与 LQ 生成工具输出规则一致）。 */
+    private static String deriveLqPath(String hqPath) {
+        int dot = hqPath.lastIndexOf('.');
+        return (dot > 0 ? hqPath.substring(0, dot) : hqPath) + LQ_EXTENSION;
+    }
+
+    /** LQ 文件事实：状态 + 字节数（未生成时 status=NOT_GENERATED、size=0）。 */
+    private record LqFileFact(String status, long size) {
     }
 
     /**
@@ -170,21 +250,22 @@ public class RecoveryMediaResolver {
         List<ScannedMediaInfo> scanned = scanChapterDir(comicId, globalOrder);
         if (items == null || items.isEmpty()) {
             List<ResolvedMediaItem> result = new ArrayList<>(scanned.size());
-            int seq = 1;
-            for (ScannedMediaInfo pi : scanned) {
-                result.add(new ResolvedMediaItem(pi.imageName(), seq++, pi.fileSize(), pi.width(),
-                        pi.height(), pi.mediaType(), comicId + "/" + globalOrder + "/" + pi.imageName(), true));
+            int pageSequence = 1;
+            for (ScannedMediaInfo scannedItem : scanned) {
+                result.add(new ResolvedMediaItem(scannedItem.imageName(), pageSequence++, scannedItem.fileSize(),
+                        scannedItem.width(), scannedItem.height(), scannedItem.mediaType(),
+                        comicId + "/" + globalOrder + "/" + scannedItem.imageName(), true));
             }
             return result;
         }
         Map<String, ScannedMediaInfo> scanByName = indexDirScan(scanned);
         List<ResolvedMediaItem> result = new ArrayList<>(items.size());
-        int seq = 1;
+        int pageSequence = 1;
         for (Map<String, Object> item : items) {
-            String fileName = (String) item.get("fileName");
-            int pageNumber = item.get("pageNumber") != null ? toInt(item.get("pageNumber"), seq) : seq;
-            result.add(resolveFromScan(comicId, globalOrder, item, fileName != null ? fileName : "", pageNumber, scanByName));
-            seq++;
+            String fileName = resolveFileName(item);
+            int pageNumber = resolvePageNumber(item, pageSequence);
+            result.add(resolveFromScan(comicId, globalOrder, item, fileName, pageNumber, scanByName));
+            pageSequence++;
         }
         return result;
     }
@@ -193,11 +274,14 @@ public class RecoveryMediaResolver {
                                               String fileName, int pageNumber,
                                               Map<String, ScannedMediaInfo> scanByName) {
         String hqPath = comicId + "/" + globalOrder + "/" + fileName;
-        ScannedMediaInfo info = fileName != null ? scanByName.get(fileName) : null;
+        ScannedMediaInfo info = scanByName.get(fileName);
         if (info == null) {
-            long fileSize = item.get("fileSize") != null ? ((Number) item.get("fileSize")).longValue() : 0;
-            Integer width = item.get("width") != null ? ((Number) item.get("width")).intValue() : null;
-            Integer height = item.get("height") != null ? ((Number) item.get("height")).intValue() : null;
+            long fileSize = item.get(FIELD_FILE_SIZE) != null
+                    ? ((Number) item.get(FIELD_FILE_SIZE)).longValue() : 0;
+            Integer width = item.get(FIELD_WIDTH) != null
+                    ? ((Number) item.get(FIELD_WIDTH)).intValue() : null;
+            Integer height = item.get(FIELD_HEIGHT) != null
+                    ? ((Number) item.get(FIELD_HEIGHT)).intValue() : null;
             return new ResolvedMediaItem(fileName, pageNumber, fileSize, width, height,
                     resolveMediaType(item), hqPath, false);
         }
@@ -206,20 +290,24 @@ public class RecoveryMediaResolver {
     }
 
     private Map<String, ScannedMediaInfo> indexDirScan(List<ScannedMediaInfo> scanned) {
-        Map<String, ScannedMediaInfo> map = new LinkedHashMap<>();
-        for (ScannedMediaInfo pi : scanned) {
-            map.put(pi.imageName(), pi);
+        Map<String, ScannedMediaInfo> indexedByName = new LinkedHashMap<>();
+        for (ScannedMediaInfo scannedItem : scanned) {
+            indexedByName.put(scannedItem.imageName(), scannedItem);
         }
-        return map;
+        return indexedByName;
     }
 
     // ======================== 工具方法 ========================
 
+    /**
+     * metadata 嵌套 List 反序列化为参数化 List 的强转。
+     * Jackson 原始类型无法直接参数化，属预期 unchecked 转换，转换前已做 instanceof 校验。
+     */
     @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> extractItems(Map<String, Object> chData) {
-        Object itemsObj = chData.get("mediaItems");
+    private List<Map<String, Object>> extractItems(Map<String, Object> chapterData) {
+        Object itemsObj = chapterData.get(FIELD_MEDIA_ITEMS);
         if (itemsObj == null) {
-            itemsObj = chData.get("pages");
+            itemsObj = chapterData.get(FIELD_PAGES);
         }
         if (itemsObj == null) {
             return List.of();
@@ -228,45 +316,57 @@ public class RecoveryMediaResolver {
             throw new IllegalArgumentException("metadata mediaItems 类型非法");
         }
         List<Map<String, Object>> result = new ArrayList<>(list.size());
-        for (Object o : list) {
-            if (!(o instanceof Map<?, ?> map)) {
+        for (Object item : list) {
+            if (!(item instanceof Map<?, ?> entry)) {
                 throw new IllegalArgumentException("metadata mediaItems 元素类型非法");
             }
-            result.add((Map<String, Object>) map);
+            result.add((Map<String, Object>) entry);
         }
         return result;
     }
 
     private static boolean hasHqPath(Map<String, Object> item) {
-        String hqPath = (String) item.get("hqPath");
+        String hqPath = (String) item.get(FIELD_HQ_PATH);
         return hqPath != null && !hqPath.isBlank();
     }
 
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
+
+    private static String resolveFileName(Map<String, Object> item) {
+        String fileName = (String) item.get(FIELD_FILE_NAME);
+        return fileName != null ? fileName : "";
+    }
+
+    private static int resolvePageNumber(Map<String, Object> item, int pageSequence) {
+        return item.get(FIELD_PAGE_NUMBER) != null ? toInt(item.get(FIELD_PAGE_NUMBER), pageSequence) : pageSequence;
+    }
+
     private static String resolveMediaType(Map<String, Object> item) {
-        Object type = item.get("mediaType");
+        Object type = item.get(FIELD_MEDIA_TYPE);
         if (type != null && !type.toString().isBlank()) {
             return type.toString();
         }
-        String fileName = (String) item.get("fileName");
-        if (fileName == null) {
-            return "IMAGE";
+        String fileName = resolveFileName(item);
+        if (fileName.isBlank()) {
+            return MEDIA_TYPE_IMAGE;
         }
         String lower = fileName.toLowerCase();
-        int dotIdx = lower.lastIndexOf('.');
-        if (dotIdx < 0) {
-            return "IMAGE";
+        int lastDotIndex = lower.lastIndexOf('.');
+        if (lastDotIndex < 0) {
+            return MEDIA_TYPE_IMAGE;
         }
-        String mediaType = mediaTypeOf(lower.substring(dotIdx));
-        return mediaType != null ? mediaType : "IMAGE";
+        String mediaType = mediaTypeOf(lower.substring(lastDotIndex));
+        return mediaType != null ? mediaType : MEDIA_TYPE_IMAGE;
     }
 
     private static String mediaTypeOf(String ext) {
         if (VIDEO_EXTENSIONS.contains(ext)) {
-            return "VIDEO";
+            return MEDIA_TYPE_VIDEO;
         }
-        if (ext.equals(".jpg") || ext.equals(".jpeg") || ext.equals(".png")
-                || ext.equals(".webp") || ext.equals(".gif") || ext.equals(".bmp")) {
-            return "IMAGE";
+        if (IMAGE_EXTENSIONS.contains(ext)) {
+            return MEDIA_TYPE_IMAGE;
         }
         return null;
     }
@@ -275,12 +375,12 @@ public class RecoveryMediaResolver {
         if (value == null) {
             return fallback;
         }
-        if (value instanceof Number n) {
-            return n.intValue();
+        if (value instanceof Number number) {
+            return number.intValue();
         }
         try {
             return Integer.parseInt(value.toString());
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException ex) {
             return fallback;
         }
     }
@@ -288,31 +388,33 @@ public class RecoveryMediaResolver {
     private static long safeSize(Path path) {
         try {
             return Files.size(path);
-        } catch (Exception e) {
+        } catch (IOException ex) {
             return 0;
         }
     }
 
     private ImageDimensions getImageDimensions(Path path) {
-        try (ImageInputStream in = ImageIO.createImageInputStream(path.toFile())) {
-            if (in != null) {
-                var readers = ImageIO.getImageReaders(in);
+        try (ImageInputStream input = ImageIO.createImageInputStream(path.toFile())) {
+            if (input != null) {
+                Iterator<ImageReader> readers = ImageIO.getImageReaders(input);
                 if (readers.hasNext()) {
                     ImageReader reader = readers.next();
                     try {
-                        reader.setInput(in);
+                        reader.setInput(input);
                         return new ImageDimensions(reader.getWidth(0), reader.getHeight(0));
                     } finally {
                         reader.dispose();
                     }
                 }
             }
-        } catch (Exception e) {
-            log.debug("ImageIO 读取尺寸失败: {}", path, e);
+        } catch (IOException ex) {
+            log.debug("ImageIO 读取尺寸失败: {}", path, ex);
         }
-        int[] dims = com.comicatlas.common.util.ImageDimensionsReader.read(path);
-        if (dims[0] > 0 && dims[1] > 0) {
-            return new ImageDimensions(dims[0], dims[1]);
+        int[] dimensions = ImageDimensionsReader.read(path);
+        int width = dimensions[0];
+        int height = dimensions[1];
+        if (width > 0 && height > 0) {
+            return new ImageDimensions(width, height);
         }
         return new ImageDimensions(null, null);
     }

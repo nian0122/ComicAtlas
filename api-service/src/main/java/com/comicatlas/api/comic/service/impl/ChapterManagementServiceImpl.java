@@ -6,18 +6,18 @@ import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.comic.dto.ChapterCreateRequest;
 import com.comicatlas.api.comic.dto.ChapterRenameRequest;
 import com.comicatlas.api.comic.dto.ChapterVO;
-import com.comicatlas.api.comic.entity.Catalog;
-import com.comicatlas.api.comic.entity.Chapter;
-import com.comicatlas.api.comic.entity.Comic;
-import com.comicatlas.api.comic.mapper.CatalogMapper;
-import com.comicatlas.api.comic.mapper.ChapterMapper;
-import com.comicatlas.api.comic.mapper.ComicMapper;
+import com.comicatlas.persistence.comic.entity.Catalog;
+import com.comicatlas.persistence.comic.entity.Chapter;
+import com.comicatlas.persistence.comic.entity.Comic;
+import com.comicatlas.persistence.comic.mapper.CatalogMapper;
+import com.comicatlas.persistence.comic.mapper.ChapterMapper;
+import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.api.comic.service.ChapterManagementService;
 import com.comicatlas.api.management.state.ManagementStateMachine;
 import com.comicatlas.api.management.trash.TrashLifecycleService;
-import com.comicatlas.api.common.enums.ChapterLifecycleStatus;
-import com.comicatlas.api.common.constant.HttpStatusCodes;
-import com.comicatlas.api.common.exception.BusinessException;
+import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
+import com.comicatlas.contract.common.constant.HttpStatusCodes;
+import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.common.exception.ConflictException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -80,7 +80,7 @@ public class ChapterManagementServiceImpl implements ChapterManagementService {
         catalogCacheInvalidator.evict(comicId);
         log.info("创建章节: comicId={}, chapterId={}, globalOrder={}, sortOrder={}",
                 comicId, chapter.getId(), chapter.getGlobalOrder(), chapter.getSortOrder());
-        return ChapterVO.from(chapter);
+        return toChapterVO(chapter);
     }
 
     // ======================== 重命名 ========================
@@ -104,7 +104,7 @@ public class ChapterManagementServiceImpl implements ChapterManagementService {
             throw new ConflictException("目录内已存在同编号章节");
         }
         catalogCacheInvalidator.evict(comicId);
-        return ChapterVO.from(chapter);
+        return toChapterVO(chapter);
     }
 
     // ======================== 移动（跨目录） ========================
@@ -117,7 +117,7 @@ public class ChapterManagementServiceImpl implements ChapterManagementService {
             requireCatalogInComic(comicId, catalogId);
         }
         if (Objects.equals(chapter.getCatalogId(), catalogId)) {
-            return ChapterVO.from(chapter);
+            return toChapterVO(chapter);
         }
         // 原目录：其余章节 sort_order 重排连续
         recompactChapterSortOrder(comicId, chapter.getCatalogId(), chapterId);
@@ -130,7 +130,7 @@ public class ChapterManagementServiceImpl implements ChapterManagementService {
             throw new ConflictException("目标目录已存在同编号章节");
         }
         catalogCacheInvalidator.evict(comicId);
-        return ChapterVO.from(chapter);
+        return toChapterVO(chapter);
     }
 
     // ======================== 全局重排（两阶段） ========================
@@ -169,7 +169,7 @@ public class ChapterManagementServiceImpl implements ChapterManagementService {
         }
         catalogCacheInvalidator.evict(comicId);
         log.info("重排章节: comicId={}, chapterId={}, targetGlobalOrder={}", comicId, chapterId, targetGlobalOrder);
-        return ChapterVO.from(target);
+        return toChapterVO(target);
     }
 
     // ======================== 回收（软删除） ========================
@@ -198,6 +198,20 @@ public class ChapterManagementServiceImpl implements ChapterManagementService {
         if (rows == 0) {
             throw new ConflictException("章节已被并发修改，请刷新后重试");
         }
+    }
+
+    private ChapterVO toChapterVO(Chapter chapter) {
+        ChapterVO chapterVO = new ChapterVO();
+        chapterVO.setId(chapter.getId());
+        chapterVO.setComicId(chapter.getComicId());
+        chapterVO.setCatalogId(chapter.getCatalogId());
+        chapterVO.setTitle(chapter.getTitle());
+        chapterVO.setChapterNo(chapter.getChapterNo());
+        chapterVO.setPageCount(chapter.getPageCount());
+        chapterVO.setSortOrder(chapter.getSortOrder());
+        chapterVO.setGlobalOrder(chapter.getGlobalOrder());
+        chapterVO.setStatus(chapter.getStatus() == null ? null : chapter.getStatus().name());
+        return chapterVO;
     }
 
     private void requireComic(Long comicId) {

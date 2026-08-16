@@ -27,6 +27,13 @@
             <version>${project.version}</version>
         </dependency>
 
+        <!-- 跨服务共享模型（contract + persistence） -->
+        <dependency>
+            <groupId>com.comicatlas</groupId>
+            <artifactId>comic-shared</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- Web -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

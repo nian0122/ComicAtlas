@@ -18,7 +18,7 @@ services:
       - --table-open-cache=256
       - --skip-name-resolve
     ports:
-      - "127.0.0.1:3306:3306"
+      - "127.0.0.1:${REMOTE_MYSQL_PORT:?请设置 REMOTE_MYSQL_PORT}:3306"
     volumes:
       - mysql-data:/var/lib/mysql
     healthcheck:
@@ -32,13 +32,13 @@ services:
     image: redis:7-alpine
     container_name: comicatlas-redis
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REMOTE_REDIS_PASSWORD}"]
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REMOTE_REDIS_PASSWORD:?请设置 REMOTE_REDIS_PASSWORD}"]
     ports:
-      - "127.0.0.1:6379:6379"
+      - "127.0.0.1:${REMOTE_REDIS_PORT:?请设置 REMOTE_REDIS_PORT}:6379"
     volumes:
       - redis-data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REMOTE_REDIS_PASSWORD}", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REMOTE_REDIS_PASSWORD:?请设置 REMOTE_REDIS_PASSWORD}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -48,12 +48,12 @@ services:
     container_name: comicatlas-rabbitmq
     restart: unless-stopped
     environment:
-      RABBITMQ_DEFAULT_USER: ${REMOTE_RABBITMQ_USER}
-      RABBITMQ_DEFAULT_PASS: ${REMOTE_RABBITMQ_PASSWORD}
+      RABBITMQ_DEFAULT_USER: ${REMOTE_RABBITMQ_USER:?请设置 REMOTE_RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${REMOTE_RABBITMQ_PASSWORD:?请设置 REMOTE_RABBITMQ_PASSWORD}
       RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-rabbit consumer_timeout 86400000"
     ports:
-      - "127.0.0.1:5672:5672"
-      - "127.0.0.1:15672:15672"
+      - "127.0.0.1:${REMOTE_RABBITMQ_PORT:?请设置 REMOTE_RABBITMQ_PORT}:5672"
+      - "127.0.0.1:${REMOTE_RABBITMQ_MANAGEMENT_PORT:?请设置 REMOTE_RABBITMQ_MANAGEMENT_PORT}:15672"
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
     healthcheck:
@@ -74,8 +74,8 @@ services:
       JVM_XMX: 384m
       JVM_XMN: 128m
     ports:
-      - "127.0.0.1:8848:8848"
-      - "127.0.0.1:9848:9848"
+      - "127.0.0.1:${REMOTE_NACOS_HTTP_PORT:?请设置 REMOTE_NACOS_HTTP_PORT}:8848"
+      - "127.0.0.1:${REMOTE_NACOS_GRPC_PORT:?请设置 REMOTE_NACOS_GRPC_PORT}:9848"
     volumes:
       - nacos-data:/home/nacos/data
       - nacos-logs:/home/nacos/logs

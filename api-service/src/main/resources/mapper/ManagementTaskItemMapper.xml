@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.comicatlas.api.management.mapper.ManagementTaskItemMapper">
+
+    <!--
+      目标归属任务 ID 查询：item 直接命中 target_id，或 item 目标（章节/媒体）归属于该目标。
+      漫画级操作（LQ/HQ/转码）的任务项是章节/媒体级，字面 target_id 反查会漏掉父漫画，
+      必须把 CHAPTER→chapter.comic_id、MEDIA→page.chapter.comic_id 解析进归属。
+    -->
+    <select id="selectTaskIdsByTarget" resultType="java.lang.Long">
+        SELECT DISTINCT i.task_id
+        FROM management_task_item i
+        WHERE i.target_id = #{targetId}
+           OR (i.target_type = 'CHAPTER'
+               AND i.target_id IN (SELECT id FROM chapter WHERE comic_id = #{targetId}))
+           OR (i.target_type = 'MEDIA'
+               AND i.target_id IN (SELECT p.id FROM page p
+                                   JOIN chapter c ON c.id = p.chapter_id
+                                   WHERE c.comic_id = #{targetId}))
+    </select>
+
+</mapper>

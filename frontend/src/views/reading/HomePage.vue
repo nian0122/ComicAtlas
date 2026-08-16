@@ -79,8 +79,8 @@ const recentlyAddedItems = computed<HomeRowItem[]>(() => {
 })
 
 onMounted(() => {
-  historyStore.fetchList()
-  comicStore.search({ sort: 'createdAt' })
+  void historyStore.fetchList()
+  void comicStore.search({ sort: 'createdAt' })
 })
 </script>
 

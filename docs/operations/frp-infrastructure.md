@@ -1,6 +1,6 @@
 # FRP 基础设施连接
 
-ComicAtlas 使用 FRP STCP 访问远端 MySQL、Redis、RabbitMQ、Nacos 和 FRPS Dashboard。远端服务与 Dashboard 继续只绑定 `127.0.0.1`，公网只需开放 FRP 控制端口 `7000/TCP`。
+ComicAtlas 使用 FRP STCP 访问远端 MySQL、Redis、RabbitMQ、Nacos 和 FRPS Dashboard。远端服务与 Dashboard 继续只绑定 `127.0.0.1`，公网只需开放 `.env` 中 `FRP_SERVER_PORT` 对应的 TCP 端口。
 
 连接由三个进程组成：
 
@@ -23,6 +23,13 @@ pwsh -File tools/maintenance/manage-remote-infra-frp.ps1 -Action Initialize
 ```dotenv
 FRP_SERVER_ADDR=远端服务器地址
 FRP_SERVER_PORT=7000
+FRP_DASHBOARD_PORT=7500
+REMOTE_MYSQL_PORT=3306
+REMOTE_REDIS_PORT=6379
+REMOTE_RABBITMQ_PORT=5672
+REMOTE_RABBITMQ_MANAGEMENT_PORT=15672
+REMOTE_NACOS_HTTP_PORT=8848
+REMOTE_NACOS_GRPC_PORT=9848
 FRP_AUTH_TOKEN=自动生成
 FRP_STCP_SECRET=自动生成
 FRP_VISITOR_BIND_ADDR=0.0.0.0
@@ -31,7 +38,7 @@ FRP_DASHBOARD_USER=admin
 FRP_DASHBOARD_PASSWORD=自动生成
 ```
 
-如果 `.env` 已存在 `MYSQL_BACKUP_HOST`，脚本会将它作为 `FRP_SERVER_ADDR`。`FRP_AUTH_TOKEN` 用于 frpc/frps 身份验证，`FRP_STCP_SECRET` 用于限制 visitor 访问。Provider 的每个 STCP proxy 还通过 `allowUsers = ["comicatlas-local"]` 只允许本项目 visitor 用户访问。Dashboard 用户名和随机密码也只保存在 `.env` 与远端权限为 `0600` 的环境文件中，禁止提交或复制到文档、日志。
+`FRP_SERVER_ADDR` 是唯一的远端服务器公网地址，同时供 FRP 连接和 MySQL 备份脚本使用；`REMOTE_INFRA_HOST` 则是项目容器访问本机 FRP visitor 的入口，两者职责不同。`FRP_AUTH_TOKEN` 用于 frpc/frps 身份验证，`FRP_STCP_SECRET` 用于限制 visitor 访问。Provider 的每个 STCP proxy 还通过 `allowUsers = ["comicatlas-local"]` 只允许本项目 visitor 用户访问。Dashboard 用户名和随机密码也只保存在 `.env` 与远端权限为 `0600` 的环境文件中，禁止提交或复制到文档、日志。
 
 ## 二、准备远端安装包
 
@@ -59,7 +66,7 @@ sudo systemctl enable --now frps.service frpc-provider.service
 sudo systemctl status frps.service frpc-provider.service
 ```
 
-云安全组和服务器防火墙只需新增 `7000/TCP`。不要开放 `3306`、`6379`、`5672`、`15672`、`8848`、`9848`、`7500`。
+云安全组和服务器防火墙只需开放 `FRP_SERVER_PORT/TCP`。`REMOTE_*_PORT` 与 `FRP_DASHBOARD_PORT` 只绑定回环地址，不要加入公网入站规则。
 
 ## 三、安装本地 visitor
 
@@ -83,16 +90,22 @@ pwsh -File tools/maintenance/manage-remote-infra-frp.ps1 -Action RemoveTask
 
 计划任务在登录时启动 `frpc`，进程异常退出后每分钟自动重启。FRP 客户端配置同时启用了 TLS、Wire Protocol v2、TCP mux keepalive，并在首次登录失败后持续重连。
 
-本地 visitor 启动后，在浏览器打开 [http://127.0.0.1:7500](http://127.0.0.1:7500)，使用 `.env` 中的 `FRP_DASHBOARD_USER` 和 `FRP_DASHBOARD_PASSWORD` 登录。Dashboard visitor 固定绑定 `127.0.0.1`，不会随 `FRP_VISITOR_BIND_ADDR` 暴露到局域网。
+本地 visitor 启动后，在浏览器打开 `http://127.0.0.1:${FRP_DASHBOARD_PORT}`，使用 `.env` 中的 `FRP_DASHBOARD_USER` 和 `FRP_DASHBOARD_PASSWORD` 登录。Dashboard visitor 固定绑定 `127.0.0.1`，不会随 `FRP_VISITOR_BIND_ADDR` 暴露到局域网。
 
 ## 四、安全边界
 
 - `.runtime/`、`tools/vendor/frp/` 和 `.env` 均已加入 Git 忽略规则。
 - `FRP_VISITOR_BIND_ADDR=0.0.0.0` 是为了让 Docker Desktop 通过 `host.docker.internal` 访问端口；Windows 防火墙仍应阻止局域网入站访问这六个端口。
-- FRP Dashboard 只监听远端回环地址，并通过需要 STCP secret 的 visitor 提供给本机 `127.0.0.1:7500`；不开放公网 Dashboard、HTTP vhost 或 SSH Tunnel Gateway。
+- FRP Dashboard 只监听远端回环地址，并通过需要 STCP secret 的 visitor 提供给本机 `127.0.0.1:${FRP_DASHBOARD_PORT}`；不开放公网 Dashboard、HTTP vhost 或 SSH Tunnel Gateway。
 - 升级时先更新远端 `frps`，再更新 provider 和本地 visitor。
 
 ## 五、部署日志
+
+### 2026-08-14
+
+- 将远端主机、基础设施端口、FRP 服务端口和 Dashboard 端口统一收口到本地及远端权限受限的 `.env` 环境文件，项目配置不再固化远端连接信息。
+- 远端 MySQL、Redis、RabbitMQ、RabbitMQ Management、Nacos HTTP 和 Nacos gRPC 的 Docker 发布端口统一限制为 `127.0.0.1`，公网只保留 FRP 服务端口。
+- 重新部署并验证远端 Compose、`frps.service` 和 `frpc-provider.service`；七个 FRP 代理端口、Dashboard、RabbitMQ Management、Nacos 和 Worker 只读 MySQL 登录均验证通过。
 
 ### 2026-08-09
 

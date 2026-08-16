@@ -1,4 +1,4 @@
-package com.comicatlas.api.common;
+package com.comicatlas.contract.common;
 
 /**
  * 恢复策略，控制 metadata.json 各字段的处理方式。

@@ -1,9 +1,8 @@
 package com.comicatlas.api.comic.dto;
 
-import com.comicatlas.api.comic.entity.Chapter;
 import lombok.Data;
 
-/** 章节视图对象 */
+/** 章节视图对象（管理端） */
 @Data
 public class ChapterVO {
     private Long id;
@@ -16,17 +15,4 @@ public class ChapterVO {
     private Integer globalOrder;
     private String status;
 
-    public static ChapterVO from(Chapter chapter) {
-        ChapterVO vo = new ChapterVO();
-        vo.setId(chapter.getId());
-        vo.setComicId(chapter.getComicId());
-        vo.setCatalogId(chapter.getCatalogId());
-        vo.setTitle(chapter.getTitle());
-        vo.setChapterNo(chapter.getChapterNo());
-        vo.setPageCount(chapter.getPageCount());
-        vo.setSortOrder(chapter.getSortOrder());
-        vo.setGlobalOrder(chapter.getGlobalOrder());
-        vo.setStatus(chapter.getStatus() == null ? null : chapter.getStatus().name());
-        return vo;
-    }
 }

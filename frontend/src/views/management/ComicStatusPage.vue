@@ -29,8 +29,8 @@
       <el-table-column prop="pageCount" label="页数" width="90" />
       <el-table-column label="操作" width="190">
         <template #default="{ row }">
-          <router-link :to="`/manage/operations?comicId=${row.id}`">操作与观察</router-link>
-          <router-link :to="`/manage/comics/${row.id}/edit`">编辑信息</router-link>
+          <router-link :to="`/manage/comics/${row.id}?tab=operations`">操作与观察</router-link>
+          <router-link :to="`/manage/comics/${row.id}?tab=edit`">编辑信息</router-link>
         </template>
       </el-table-column>
     </el-table></div>

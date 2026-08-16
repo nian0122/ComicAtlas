@@ -1,20 +1,20 @@
 package com.comicatlas.api.storage.service;
 
-import com.comicatlas.api.common.enums.HqStatus;
-import com.comicatlas.api.common.enums.LqStatus;
-import com.comicatlas.api.common.enums.MediaLifecycleStatus;
-import com.comicatlas.api.common.enums.TranscodeStatus;
-import com.comicatlas.api.common.exception.BusinessException;
+import com.comicatlas.contract.common.enums.HqStatus;
+import com.comicatlas.contract.common.enums.LqStatus;
+import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
+import com.comicatlas.contract.common.enums.TranscodeStatus;
+import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.common.exception.SnapshotUnavailableException;
-import com.comicatlas.api.common.storage.ApiStorageProperties;
-import com.comicatlas.api.common.storage.ApiStorageRoot;
-import com.comicatlas.api.common.storage.PathTraversalException;
-import com.comicatlas.api.comic.entity.Chapter;
-import com.comicatlas.api.comic.entity.Comic;
-import com.comicatlas.api.comic.entity.Media;
-import com.comicatlas.api.comic.mapper.ChapterMapper;
-import com.comicatlas.api.comic.mapper.ComicMapper;
-import com.comicatlas.api.comic.mapper.MediaMapper;
+import com.comicatlas.api.storage.ApiStorageProperties;
+import com.comicatlas.api.storage.ApiStorageRoot;
+import com.comicatlas.api.storage.PathTraversalException;
+import com.comicatlas.persistence.comic.entity.Chapter;
+import com.comicatlas.persistence.comic.entity.Comic;
+import com.comicatlas.persistence.comic.entity.Media;
+import com.comicatlas.persistence.comic.mapper.ChapterMapper;
+import com.comicatlas.persistence.comic.mapper.ComicMapper;
+import com.comicatlas.persistence.comic.mapper.MediaMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.common.constant.MetadataRefreshLimits;
@@ -70,6 +70,12 @@ public class MetadataRefreshService {
 
     /** 已删除/回收中媒体不参与活动匹配。 */
     private static final List<String> INACTIVE_STATUSES = List.of("TRASHED", "DELETED");
+
+    /** LQ 状态：READY（LQ 文件存在）。 */
+    private static final String LQ_STATUS_READY = "READY";
+
+    /** 合并落库分批上限（与导入链路 MEDIA_INSERT_BATCH_SIZE 一致，控制单条 SQL 长度与参数数）。 */
+    private static final int MERGE_BATCH_SIZE = 500;
 
     /**
      * 阶段一请求：事件携带的快照引用信息。
@@ -319,17 +325,20 @@ public class MetadataRefreshService {
 
     /** 合并计划：内存中构造待更新/待插入/待标记缺失的集合，之后一次性执行。 */
     private MergePlan buildMergePlan(MetadataRefreshSnapshotDTO snapshot, List<Media> activeMedia) {
-        // 匹配索引：chapterId + basename → 活动行（仅 READY 生命周期且 HQ READY/MISSING 行参与匹配）
+        // 匹配索引：chapterId + basename → 活动行（READY 生命周期行；正常行按 hq_path、
+        // HQ 已删除的仅 LQ 行按 lq_path 取 basename）
         Map<String, Media> index = new HashMap<>();
         Set<Long> matchedIds = new HashSet<>();
         Map<Long, Integer> nextPageByChapter = new HashMap<>();
         for (Media media : activeMedia) {
-            if (media.getStatus() != MediaLifecycleStatus.READY
-                    || (media.getHqStatus() != HqStatus.READY && media.getHqStatus() != HqStatus.MISSING)
-                    || media.getHqPath() == null) {
+            if (media.getStatus() != MediaLifecycleStatus.READY) {
                 continue;
             }
-            index.put(media.getChapterId() + "/" + basename(media.getHqPath()), media);
+            String key = matchKeyOf(media);
+            if (key == null) {
+                continue;
+            }
+            index.put(key, media);
             if (media.getPageNumber() != null && media.getPageNumber() >= 0) {
                 nextPageByChapter.merge(media.getChapterId(), media.getPageNumber(), Math::max);
             }
@@ -372,7 +381,7 @@ public class MetadataRefreshService {
                     && (media.getHqStatus() == HqStatus.READY || media.getHqStatus() == HqStatus.MISSING)
                     && !matchedIds.contains(media.getId())) {
                 media.setHqStatus(HqStatus.MISSING);
-                media.setFileSize(0L);
+                media.setHqSize(0L);
                 toMarkMissing.add(media);
                 toUpdate.add(media);
             }
@@ -380,11 +389,36 @@ public class MetadataRefreshService {
         return new MergePlan(toUpdate, toInsert, toMarkMissing);
     }
 
-    /** 匹配成功：更新 HQ READY、fileSize、宽高、mediaType 与视频字段（IMAGE 清空视频字段）。 */
+    /**
+     * 活动行匹配键：正常行（HQ READY/MISSING）按 hq_path basename；
+     * HQ 已删除（仅 LQ 模式）按 lq_path basename 匹配——快照同样以 LQ 文件名作为 basename。
+     * 无法参与匹配的行返回 null。
+     */
+    private String matchKeyOf(Media media) {
+        String hqPath = media.getHqPath();
+        if (hqPath != null && !hqPath.isBlank()
+                && (media.getHqStatus() == HqStatus.READY || media.getHqStatus() == HqStatus.MISSING)) {
+            return media.getChapterId() + "/" + basename(hqPath);
+        }
+        if (media.getHqStatus() == HqStatus.DELETED
+                && media.getLqPath() != null && !media.getLqPath().isBlank()) {
+            return media.getChapterId() + "/" + basename(media.getLqPath());
+        }
+        return null;
+    }
+
+    /** 匹配成功：更新 HQ READY、fileSize、宽高、mediaType、视频字段与 LQ 事实（以本地文件为准）。 */
     private void applyMatchedUpdate(Media dbRow, MediaSnapshot item) {
         boolean image = "IMAGE".equals(item.mediaType());
+        if (HqStatus.DELETED.name().equals(item.hqStatus())) {
+            // 仅 LQ 模式（HQ 已删除、保留 LQ）：只校正 LQ 事实，不触碰 HQ/尺寸/视频字段
+            if (image) {
+                applyLqFact(dbRow, item.lqStatus(), item.lqSize());
+            }
+            return;
+        }
         dbRow.setHqStatus(HqStatus.READY);
-        dbRow.setFileSize(item.fileSize());
+        dbRow.setHqSize(item.fileSize());
         dbRow.setWidth(item.width());
         dbRow.setHeight(item.height());
         dbRow.setMediaType(item.mediaType());
@@ -399,10 +433,31 @@ public class MetadataRefreshService {
             dbRow.setVideoCodec(item.videoCodec());
             dbRow.setAudioCodec(item.audioCodec());
         }
-        // 保留 mediaId/pageNumber/LQ root/path/status 与 transcodeStatus 不变
+        // 决策（以本地文件为准）：LQ 状态与大小以快照实测为准——LQ 文件缺失即校正
+        // NOT_GENERATED（不沿用 DB 旧 READY），存在即 READY + 实测大小。
+        // lqPath 由 hqPath 推导（{hqPath 去扩展名}.webp），LQ 根固定为 LQ，此处不重复写。
+        // 仅图片媒体有 LQ；视频保持 NOT_GENERATED。
+        if (image) {
+            applyLqFact(dbRow, item.lqStatus(), item.lqSize());
+        } else {
+            dbRow.setLqStatus(LqStatus.NOT_GENERATED);
+            dbRow.setLqSize(0L);
+        }
+        // 保留 mediaId/pageNumber/lqPath（推导一致时无需变更）与 transcodeStatus 不变
     }
 
-    /** 磁盘新增文件：插入 READY，pageNumber 从本章最大非负页码 +1 追加。 */
+    /** 按快照 LQ 事实写入 lq_status/lq_size（仅图片）；快照未携带 LQ 时按未生成处理。 */
+    private void applyLqFact(Media dbRow, String lqStatus, long lqSize) {
+        if (LQ_STATUS_READY.equals(lqStatus)) {
+            dbRow.setLqStatus(LqStatus.READY);
+            dbRow.setLqSize(lqSize);
+        } else {
+            dbRow.setLqStatus(LqStatus.NOT_GENERATED);
+            dbRow.setLqSize(0L);
+        }
+    }
+
+    /** 磁盘新增文件：插入 READY，pageNumber 从本章最大非负页码 +1 追加；LQ 事实取快照。 */
     private Media buildNewMedia(Long chapterId, MediaSnapshot item, Map<Long, Integer> nextPageByChapter) {
         Media media = new Media();
         media.setChapterId(chapterId);
@@ -410,12 +465,17 @@ public class MetadataRefreshService {
         media.setHqRoot("HQ");
         media.setHqPath(item.hqPath());
         media.setHqStatus(HqStatus.READY);
-        media.setLqStatus(LqStatus.NOT_GENERATED);
-        media.setLqRoot(null);
-        media.setLqPath(null);
+        // 新文件 LQ 事实：快照实测（存在即 READY，缺失即 NOT_GENERATED）
+        if (LQ_STATUS_READY.equals(item.lqStatus())) {
+            media.setLqStatus(LqStatus.READY);
+            media.setLqSize(item.lqSize());
+        } else {
+            media.setLqStatus(LqStatus.NOT_GENERATED);
+            media.setLqSize(0L);
+        }
         media.setTranscodeStatus(TranscodeStatus.NOT_NEEDED);
         media.setStatus(MediaLifecycleStatus.READY);
-        media.setFileSize(item.fileSize());
+        media.setHqSize(item.fileSize());
         media.setMediaType(item.mediaType());
         media.setWidth(item.width());
         media.setHeight(item.height());
@@ -440,13 +500,23 @@ public class MetadataRefreshService {
         return next;
     }
 
+    /** 合并落库：批量 UPDATE（updateRefreshBatch）+ 批量 INSERT（insertImportBatch），消除逐行往返。 */
     private void executeMerge(MergePlan plan) {
-        for (Media media : plan.updated()) {
-            mediaMapper.updateById(media);
+        for (List<Media> batch : partition(plan.updated(), MERGE_BATCH_SIZE)) {
+            mediaMapper.updateRefreshBatch(batch);
         }
-        for (Media media : plan.inserted()) {
-            mediaMapper.insert(media);
+        for (List<Media> batch : partition(plan.inserted(), MERGE_BATCH_SIZE)) {
+            mediaMapper.insertImportBatch(batch);
         }
+    }
+
+    /** 按固定大小分批（每批 1..size 个，空列表返回空列表）。 */
+    private static <T> List<List<T>> partition(List<T> source, int size) {
+        List<List<T>> batches = new ArrayList<>((source.size() + size - 1) / size);
+        for (int i = 0; i < source.size(); i += size) {
+            batches.add(source.subList(i, Math.min(i + size, source.size())));
+        }
+        return batches;
     }
 
     /** 刷新章节 pageCount 与漫画 totalPages/hqSize（pageCount 统计 READY 生命周期行，含 HQ MISSING）。 */
@@ -459,26 +529,29 @@ public class MetadataRefreshService {
                 .collect(Collectors.groupingBy(Media::getChapterId));
 
         long totalPages = 0;
+        List<Chapter> chaptersToUpdate = new ArrayList<>(chapterById.size());
         for (Map.Entry<Long, Chapter> entry : chapterById.entrySet()) {
             Long chapterId = entry.getKey();
             long pageCount = byChapter.getOrDefault(chapterId, List.of()).stream()
                     .filter(m -> m.getStatus() == MediaLifecycleStatus.READY)
                     .count();
             totalPages += pageCount;
-            chapterMapper.update(null, new LambdaUpdateWrapper<Chapter>()
-                    .eq(Chapter::getId, chapterId)
-                    .set(Chapter::getPageCount, (int) pageCount));
+            Chapter chapter = entry.getValue();
+            chapter.setPageCount((int) pageCount);
+            chaptersToUpdate.add(chapter);
+        }
+        for (List<Chapter> batch : partition(chaptersToUpdate, MERGE_BATCH_SIZE)) {
+            chapterMapper.updatePageCountBatch(batch);
         }
         // hqSize/fileSize 只统计实际扫描 READY 字节（MISSING 已置 0，自然排除）
         long hqSize = merged.stream()
                 .filter(m -> m.getHqStatus() == HqStatus.READY)
-                .mapToLong(m -> m.getFileSize() == null ? 0L : m.getFileSize())
+                .mapToLong(m -> m.getHqSize() == null ? 0L : m.getHqSize())
                 .sum();
         comicMapper.update(null, new LambdaUpdateWrapper<Comic>()
                 .eq(Comic::getId, comicId)
                 .set(Comic::getTotalPages, (int) totalPages)
-                .set(Comic::getHqSize, hqSize)
-                .set(Comic::getFileSize, hqSize));
+                .set(Comic::getHqSize, hqSize));
     }
 
     private String basename(String hqPath) {

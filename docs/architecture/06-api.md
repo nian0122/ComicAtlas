@@ -52,9 +52,9 @@
 |-----|------|----------|
 | `ComicListVO` | 漫画墙 / 列表 | id, title, author, coverUrl, categoryName, status, progressPercent, lastReadChapterId |
 | `ComicDetailVO` | 阅读详情 / 管理编辑 | id, title, titleJpn, author, description, coverUrl, sourceType, categoryId, status, version, chapters, tags |
-| `ComicMetadataDTO` / `ComicMetadataUpdateDTO` | 元数据读写 | title, author, description, categoryId, tagIds |
+| `ComicMetadataDTO` / `ComicMetadataUpdateRequest` | 元数据读写 | title, author, description, categoryId |
 | `CreateComicRequest` / `UpdateComicRequest` | 创建 / 更新漫画 | title, titleJpn, author, description, categoryId, tagIds（更新含 `version` 乐观锁） |
-| `ComicTagUpdateDTO` | 标签绑定 | tagIds |
+| `ComicTagUpdateRequest` | 标签绑定 | tagIds |
 | `CatalogNode` / `CatalogVO` | 目录树 / 目录项 | id, title, children, chapters |
 | `ChapterVO` / `ChapterRef` | 章节视图 / 引用 | id, chapterNo, title, pageCount |
 

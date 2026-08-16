@@ -30,6 +30,8 @@ public class DirectoryScanTask {
     private String resultJson;
     /** 失败原因 */
     private String errorMessage;
+    /** 重试次数 */
+    private Integer retryCount;
     /** 创建时间 */
     private LocalDateTime createdAt;
     /** 开始时间 */

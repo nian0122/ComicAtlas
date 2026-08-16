@@ -2,7 +2,7 @@ package com.comicatlas.api.admin.controller;
 
 import com.comicatlas.api.admin.dto.ComicDeleteStatsDTO;
 import com.comicatlas.api.admin.dto.ScanRecoverResultDTO;
-import com.comicatlas.api.common.Result;
+import com.comicatlas.contract.common.Result;
 import com.comicatlas.api.admin.service.AdminService;
 import lombok.RequiredArgsConstructor;
 
@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RequestParam;
  * 普通删除已统一走回收站，本控制器仅供本机管理端使用。
  */
 @RestController
-@RequestMapping("/api/admin")
+@RequestMapping("/api/manage/admin")
 @RequiredArgsConstructor
 public class AdminController {
 

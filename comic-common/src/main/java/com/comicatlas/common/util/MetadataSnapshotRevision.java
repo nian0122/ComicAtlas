@@ -59,7 +59,9 @@ public final class MetadataSnapshotRevision {
                         .append(normalize(media.hqPath())).append(FIELD_SEPARATOR)
                         .append(normalize(media.hqStatus())).append(FIELD_SEPARATOR)
                         .append(normalize(media.lifecycleStatus())).append(FIELD_SEPARATOR)
-                        .append(media.pageNumber()).append(RECORD_SEPARATOR);
+                        .append(media.pageNumber()).append(FIELD_SEPARATOR)
+                        .append(normalize(media.lqStatus())).append(FIELD_SEPARATOR)
+                        .append(media.lqSize()).append(RECORD_SEPARATOR);
             }
         }
         return sha256Hex(canonical.toString());

@@ -48,6 +48,9 @@ export const useReaderStore = defineStore('reader', () => {
   }
 
   let loadSeq = 0
+  type ProgressPayload = { comicId: number; chapterId: number; pageNumber: number }
+  let pendingProgress: ProgressPayload | null = null
+  let progressSavePromise: Promise<boolean> | null = null
 
   async function loadChapter(chId: number) {
     // 请求序号闸:快速连续切章时 HTTP 响应可能乱序返回,
@@ -92,17 +95,65 @@ export const useReaderStore = defineStore('reader', () => {
     }
   }
 
-  async function saveProgress() {
-    if (!state.comicId || !state.chapterId) return
+  /**
+   * 同步阅读进度到后端（upsert）。
+   *
+   * @return 保存是否成功；调用方可据此清除本地的 dirty 标志，
+   *         以便页面卸载兜底时只重发未确认的进度
+   */
+  async function saveProgress(): Promise<boolean> {
+    if (!state.comicId || !state.chapterId) return false
+    pendingProgress = {
+      comicId: state.comicId,
+      chapterId: state.chapterId,
+      pageNumber: state.currentPage,
+    }
+    if (progressSavePromise) return progressSavePromise
+    progressSavePromise = flushProgress()
+    return progressSavePromise
+  }
+
+  async function flushProgress(): Promise<boolean> {
+    let saved = true
     try {
-      await historyApi.update(state.comicId, {
+      while (pendingProgress) {
+        const payload = pendingProgress
+        pendingProgress = null
+        await historyApi.update(payload.comicId, {
+          chapterId: payload.chapterId,
+          pageNumber: payload.pageNumber,
+        })
+        useHistoryStore().updateEntry(payload.comicId, payload.chapterId, payload.pageNumber)
+      }
+    } catch {
+      saved = false
+    } finally {
+      progressSavePromise = null
+    }
+    return saved
+  }
+
+  /**
+   * 页面卸载兜底保存（fire-and-forget）。
+   * <p>
+   * 普通 axios XHR 在页面关闭/刷新卸载时可能被浏览器中止，而阅读进度
+   * 的 300ms debounce 也可能尚未触发。此方法用 fetch keepalive 发送，
+   * 确保关闭标签页/刷新/切后台时最终进度仍能送达后端。
+   * 载荷远小于 keepalive 64KB 上限，不解析响应。
+   */
+  function saveProgressKeepalive() {
+    if (!state.comicId || !state.chapterId) return
+    fetch(`/api/history/${state.comicId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         chapterId: state.chapterId,
         pageNumber: state.currentPage,
-      })
-      useHistoryStore().fetchList().catch(() => {})
-    } catch {
-      // silent fail on progress sync
-    }
+      }),
+      keepalive: true,
+    }).catch(() => {
+      // silent: 卸载兜底尽力而为，失败不打扰用户
+    })
   }
 
   function nextPage() {
@@ -127,6 +178,7 @@ export const useReaderStore = defineStore('reader', () => {
     loadChapter,
     restoreProgress,
     saveProgress,
+    saveProgressKeepalive,
     nextPage,
     prevPage,
     goToPage,

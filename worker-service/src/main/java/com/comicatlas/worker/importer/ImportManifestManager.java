@@ -12,6 +12,7 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Stream;
 
 /**
  * 导入清单管理器：位于 mangaRoot/imports/{taskId}/manifest.json。
@@ -22,12 +23,19 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ImportManifestManager {
 
+    /** 清单 schema 版本。 */
     private static final int VERSION = 1;
+    /** 导入清单目录名（MANGA_ROOT/imports/{taskId}/）。 */
+    private static final String IMPORTS_DIR_NAME = "imports";
+    /** 清单文件名。 */
+    private static final String MANIFEST_FILE_NAME = "manifest.json";
+    /** 原子写清单临时文件名。 */
+    private static final String MANIFEST_TMP_FILE_NAME = "manifest.json.tmp";
 
     private final ObjectMapper objectMapper;
 
     public Path manifestPath(Path mangaRoot, Long taskId) {
-        return mangaRoot.resolve("imports").resolve(String.valueOf(taskId)).resolve("manifest.json");
+        return mangaRoot.resolve(IMPORTS_DIR_NAME).resolve(String.valueOf(taskId)).resolve(MANIFEST_FILE_NAME);
     }
 
     public boolean exists(Path mangaRoot, Long taskId) {
@@ -37,13 +45,13 @@ public class ImportManifestManager {
     public void write(Path mangaRoot, Long taskId, ImportManifest manifest) throws IOException {
         Path target = manifestPath(mangaRoot, taskId);
         Files.createDirectories(target.getParent());
-        Path tempPath = target.resolveSibling("manifest.json.tmp");
+        Path tempPath = target.resolveSibling(MANIFEST_TMP_FILE_NAME);
         try {
             objectMapper.writerWithDefaultPrettyPrinter().writeValue(tempPath.toFile(), manifest);
             Files.move(tempPath, target, StandardCopyOption.REPLACE_EXISTING);
-        } catch (IOException e) {
+        } catch (IOException ex) {
             Files.deleteIfExists(tempPath);
-            throw e;
+            throw ex;
         }
         log.info("清单已写入: {}", target);
     }
@@ -59,11 +67,17 @@ public class ImportManifestManager {
 
     public void delete(Path mangaRoot, Long taskId) throws IOException {
         Path dir = manifestPath(mangaRoot, taskId).getParent();
-        if (!Files.exists(dir)) { return; }
-        try (var stream = Files.walk(dir)) {
+        if (!Files.exists(dir)) {
+            return;
+        }
+        try (Stream<Path> stream = Files.walk(dir)) {
             stream.sorted(Comparator.reverseOrder())
-                    .forEach(p -> {
-                        try { Files.deleteIfExists(p); } catch (IOException e) { log.warn("清理 manifest 文件失败: {}", p, e); }
+                    .forEach(path -> {
+                        try {
+                            Files.deleteIfExists(path);
+                        } catch (IOException ex) {
+                            log.warn("清理 manifest 文件失败: {}", path, ex);
+                        }
                     });
         }
         log.info("恢复点已清理: {}", dir);

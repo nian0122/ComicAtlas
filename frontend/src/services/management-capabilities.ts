@@ -27,26 +27,26 @@ export const comicStatusApi = {
 
 export const lqOperationApi = {
   generateComic: (comicId: number, regenerate: boolean) =>
-    api.post<OperationSubmitResult>(`/storage/lq/comics/${comicId}`, undefined, { params: { regenerate } }),
+    api.post<OperationSubmitResult>(`/manage/storage/lq/comics/${comicId}`, undefined, { params: { regenerate } }),
 }
 
 export const trackedTaskApi = {
   list: (params: ManagementTaskQuery) =>
     api.get<{ readonly records: readonly ManagementTaskVO[]; readonly total: number }>(
-      '/management/tasks',
+      '/manage/tasks',
       { params },
     ),
-  getItems: (id: number) => api.get<readonly ManagementTaskItemVO[]>(`/management/tasks/${id}/items`),
-  cancel: (id: number) => api.post<ManagementTaskVO>(`/management/tasks/${id}/cancel`),
-  retry: (id: number) => api.post<ManagementTaskVO>(`/management/tasks/${id}/retry`),
+  getItems: (id: number) => api.get<readonly ManagementTaskItemVO[]>(`/manage/tasks/${id}/items`),
+  cancel: (id: number) => api.post<ManagementTaskVO>(`/manage/tasks/${id}/cancel`),
+  retry: (id: number) => api.post<ManagementTaskVO>(`/manage/tasks/${id}/retry`),
 }
 
 export const trackedUploadApi = {
   createSession: (data: CreateUploadSessionRequest) =>
-    api.post<CreateUploadSessionResult>('/uploads/sessions', data),
+    api.post<CreateUploadSessionResult>('/manage/uploads/sessions', data),
   uploadChunk: (request: UploadChunkRequest) =>
     api.put<UploadChunkResult>(
-      `/uploads/sessions/${request.sessionId}/files/${request.fileId}`,
+      `/manage/uploads/sessions/${request.sessionId}/files/${request.fileId}`,
       request.chunk,
       {
         headers: {
@@ -57,6 +57,6 @@ export const trackedUploadApi = {
       },
     ),
   completeSession: (sessionId: string) =>
-    api.post<UploadCompleteResult>(`/uploads/sessions/${sessionId}/complete`),
-  cancelSession: (sessionId: string) => api.delete(`/uploads/sessions/${sessionId}`),
+    api.post<UploadCompleteResult>(`/manage/uploads/sessions/${sessionId}/complete`),
+  cancelSession: (sessionId: string) => api.delete(`/manage/uploads/sessions/${sessionId}`),
 }

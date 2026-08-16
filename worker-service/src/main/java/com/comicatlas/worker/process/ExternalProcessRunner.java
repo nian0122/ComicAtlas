@@ -44,8 +44,10 @@ public class ExternalProcessRunner {
     }
 
     /** 外部进程 stdout 保留上限（字符）。超限后继续排空但不保留旧内容，防 Worker 堆耗尽。
+     *  512KB 需容纳大章节 LQ 工具的 JSON 结果：469 页紧凑输出约 27KB，超大章节（数千页）
+     *  缩进输出可达数百 KB；过低会导致 JSON 被截断、图片全部成功仍被误判为失败。
      *  包可见：同包单元测试（ExternalProcessRunnerTest）直接引用该上限做断言。 */
-    static final int MAX_OUTPUT_CHARS = 64 * 1024;
+    static final int MAX_OUTPUT_CHARS = 512 * 1024;
 
     /** 输出读取块大小（字符）。定长块读取，避免 readLine 构造完整无换行长字符串。 */
     private static final int CHUNK_SIZE = 8192;

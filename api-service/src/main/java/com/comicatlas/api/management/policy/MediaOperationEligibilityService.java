@@ -1,16 +1,16 @@
 package com.comicatlas.api.management.policy;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.comicatlas.api.common.enums.ComicStatus;
-import com.comicatlas.api.common.enums.HqStatus;
-import com.comicatlas.api.common.enums.LqStatus;
-import com.comicatlas.api.comic.entity.Chapter;
-import com.comicatlas.api.comic.entity.Comic;
-import com.comicatlas.api.comic.entity.Media;
-import com.comicatlas.api.comic.mapper.ChapterMapper;
-import com.comicatlas.api.comic.mapper.ComicMapper;
-import com.comicatlas.api.comic.mapper.MediaMapper;
-import com.comicatlas.api.common.enums.TranscodeStatus;
+import com.comicatlas.contract.common.enums.ComicStatus;
+import com.comicatlas.contract.common.enums.HqStatus;
+import com.comicatlas.contract.common.enums.LqStatus;
+import com.comicatlas.persistence.comic.entity.Chapter;
+import com.comicatlas.persistence.comic.entity.Comic;
+import com.comicatlas.persistence.comic.entity.Media;
+import com.comicatlas.persistence.comic.mapper.ChapterMapper;
+import com.comicatlas.persistence.comic.mapper.ComicMapper;
+import com.comicatlas.persistence.comic.mapper.MediaMapper;
+import com.comicatlas.contract.common.enums.TranscodeStatus;
 import com.comicatlas.common.util.VideoPlayability;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -132,6 +132,7 @@ public class MediaOperationEligibilityService {
                 && media.getTranscodeStatus() != TranscodeStatus.READY
                 && media.getTranscodeStatus() != TranscodeStatus.QUEUED
                 && media.getTranscodeStatus() != TranscodeStatus.TRANSCODING
+                && VideoPlayability.isTranscodable(media.getWidth(), media.getHeight())
                 && !VideoPlayability.isBrowserPlayable(media.getVideoCodec(), media.getContainer())) {
             allowed.add(OperationPolicyService.OP_TRANSCODE);
         } else {
@@ -163,6 +164,7 @@ public class MediaOperationEligibilityService {
                         && p.getTranscodeStatus() != TranscodeStatus.READY
                         && p.getTranscodeStatus() != TranscodeStatus.QUEUED
                         && p.getTranscodeStatus() != TranscodeStatus.TRANSCODING
+                        && VideoPlayability.isTranscodable(p.getWidth(), p.getHeight())
                         && !VideoPlayability.isBrowserPlayable(p.getVideoCodec(), p.getContainer()));
         return ops;
     }

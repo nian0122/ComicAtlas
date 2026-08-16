@@ -2,18 +2,19 @@ package com.comicatlas.api.importer.event;
 
 import com.comicatlas.api.admin.dto.RecoveryProgressVO;
 import com.comicatlas.api.common.scan.RecoveryEngine;
-import com.comicatlas.api.common.enums.RecoveryTaskStatus;
 import com.comicatlas.api.importer.entity.RecoveryTask;
 import com.comicatlas.api.importer.mapper.RecoveryTaskMapper;
 import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
+import com.comicatlas.api.management.entity.ManagementTaskItem;
 import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.common.constant.MqQueues;
-import com.comicatlas.api.common.enums.ManagementTaskStatus;
-import com.comicatlas.api.common.enums.TaskType;
 import com.comicatlas.common.event.ComicEvent;
 import com.comicatlas.common.event.RecoveryFailedEvent;
 import com.comicatlas.common.event.RecoveryScanCompletedEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
+import com.comicatlas.api.common.enums.ManagementTaskStatus;
+import com.comicatlas.api.common.enums.RecoveryTaskStatus;
+import com.comicatlas.api.common.enums.TaskType;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,6 +45,17 @@ import java.util.EnumSet;
 @RequiredArgsConstructor
 public class RecoveryEventHandler {
 
+    /** Redis 事件幂等标记 key 前缀。 */
+    private static final String EVENT_IDEMPOTENCY_KEY_PREFIX = "mq:event:";
+    /** Redis 幂等标记保留时长。 */
+    private static final Duration IDEMPOTENCY_TTL = Duration.ofDays(1);
+    /** 统一任务目标类型：系统级（恢复任务）。 */
+    private static final String TARGET_TYPE_SYSTEM = "SYSTEM";
+    /** 统一任务项结果引用类型：恢复任务。 */
+    private static final String RESULT_REF_TYPE_RECOVERY_TASK = "RECOVERY_TASK";
+    /** 恢复进度阶段标识。 */
+    private static final String STAGE_RECOVERY = "RECOVERY";
+
     private final RecoveryEngine recoveryEngine;
     private final RecoveryTaskMapper recoveryTaskMapper;
     private final RedisTemplate<String, Object> redisTemplate;
@@ -72,20 +84,20 @@ public class RecoveryEventHandler {
 
     private void handleScanCompleted(RecoveryScanCompletedEvent event,
                                      Channel channel, long tag) {
-        String idempKey = "mq:event:" + event.eventId();
+        String idempotencyKey = EVENT_IDEMPOTENCY_KEY_PREFIX + event.eventId();
         Long taskId = event.taskId();
-        log.info("RecoveryEventHandler: 收到扫描完成事件, taskId={}, comicCount={}",
+        log.info("收到扫描完成事件, taskId={}, comicCount={}",
                 taskId, event.comicIds().size());
 
         mqConsumerSupport.consume(channel, tag, "恢复扫描完成: taskId=" + taskId,
-                () -> processScanCompleted(event, idempKey, taskId),
-                e -> markRecoveryTaskFailed(taskId, e),
+                () -> processScanCompleted(event, idempotencyKey, taskId),
+                ex -> markRecoveryTaskFailed(taskId, ex),
                 MqConsumerSupport.FailurePolicy.REJECT_TO_DLQ);
     }
 
-    private void processScanCompleted(RecoveryScanCompletedEvent event, String idempKey, Long taskId) throws Exception {
+    private void processScanCompleted(RecoveryScanCompletedEvent event, String idempotencyKey, Long taskId) {
         // 幂等检查
-        if (isEventProcessed(idempKey)) {
+        if (isEventProcessed(idempotencyKey)) {
             log.info("事件已处理，ack: eventId={}", event.eventId());
             return;
         }
@@ -93,14 +105,14 @@ public class RecoveryEventHandler {
         RecoveryTask task = recoveryTaskMapper.selectById(taskId);
         if (task == null) {
             log.warn("恢复任务不存在: taskId={}", taskId);
-            markEventProcessed(idempKey);
+            markEventProcessed(idempotencyKey);
             return;
         }
 
         // 终态检查：已 SUCCESS/FAILED 的任务不再处理（应对重试产生的新 PENDING 任务会走新事件）
         if (TERMINAL_STATUSES.contains(task.getStatus())) {
             log.info("任务已处终态，跳过: taskId={}, status={}", taskId, task.getStatus());
-            markEventProcessed(idempKey);
+            markEventProcessed(idempotencyKey);
             return;
         }
 
@@ -117,12 +129,15 @@ public class RecoveryEventHandler {
         recoveryTaskMapper.updateById(task);
 
         // 同步统一任务项为 RUNNING
-        ManagementTaskItemResponse mgmtItem = syncRecoveryItem(taskId, ManagementTaskStatus.RUNNING,
+        ManagementTaskItemResponse managementItem = syncRecoveryItem(taskId, ManagementTaskStatus.RUNNING,
                 null, null, 0L);
 
         // 逐本恢复
         int totalSoFar = 0;
-        int recovered = 0, skipped = 0, placeholder = 0, errors = 0;
+        int recovered = 0;
+        int skipped = 0;
+        int placeholder = 0;
+        int errors = 0;
 
         for (Long comicId : event.comicIds()) {
             try {
@@ -144,21 +159,21 @@ public class RecoveryEventHandler {
                 recoveryTaskMapper.updateById(task);
 
                 // 同步统一任务项进度（0-100）
-                if (mgmtItem != null && totalSoFar > 0) {
-                    int pct = Math.min(100,
+                if (managementItem != null && totalSoFar > 0) {
+                    int progressPercent = Math.min(100,
                             (recovered + skipped + placeholder + errors) * 100 / totalSoFar);
-                    managementTaskService.updateItemProgress(mgmtItem.getId(), 0, pct, "RECOVERY");
+                    managementTaskService.updateItemProgress(managementItem.getId(), 0, progressPercent, STAGE_RECOVERY);
                 }
 
                 log.debug("恢复进度: taskId={}, comicId={}, total={}, recovered={}, skipped={}, placeholder={}, error={}",
                         taskId, comicId, totalSoFar, recovered, skipped, placeholder, errors);
-            } catch (Exception e) {
+            } catch (RuntimeException ex) {
                 // 单个 comic 处理异常不中断整个任务，记录并继续
-                log.error("恢复漫画失败: taskId={}, comicId={}", taskId, comicId, e);
+                log.error("恢复漫画失败: taskId={}, comicId={}", taskId, comicId, ex);
                 errors++;
                 totalSoFar++;
                 task.setErrorComics(errors);
-                task.setErrorMessage(e.getMessage());
+                task.setErrorMessage(ex.getMessage());
                 recoveryTaskMapper.updateById(task);
             }
         }
@@ -169,11 +184,11 @@ public class RecoveryEventHandler {
         recoveryTaskMapper.updateById(task);
 
         // 同步统一任务项为 SUCCEEDED
-        syncRecoveryItem(taskId, ManagementTaskStatus.SUCCEEDED, null, "RECOVERY_TASK", taskId);
+        syncRecoveryItem(taskId, ManagementTaskStatus.SUCCEEDED, null, RESULT_REF_TYPE_RECOVERY_TASK, taskId);
 
-        markEventProcessed(idempKey);
+        markEventProcessed(idempotencyKey);
 
-        log.info("RecoveryEventHandler: 恢复完成, taskId={}, total={}, recovered={}, skipped={}, placeholder={}, error={}",
+        log.info("恢复完成, taskId={}, total={}, recovered={}, skipped={}, placeholder={}, error={}",
                 taskId, totalSoFar, recovered, skipped, placeholder, errors);
     }
 
@@ -188,39 +203,39 @@ public class RecoveryEventHandler {
                 recoveryTaskMapper.updateById(task);
                 // 同步统一任务项为 FAILED
                 syncRecoveryItem(taskId, ManagementTaskStatus.FAILED,
-                        task.getErrorMessage(), "RECOVERY_TASK", taskId);
+                        task.getErrorMessage(), RESULT_REF_TYPE_RECOVERY_TASK, taskId);
             }
-        } catch (Exception updateEx) {
-            log.error("RecoveryEventHandler: 标记任务失败时出错, taskId={}", taskId, updateEx);
+        } catch (RuntimeException updateEx) {
+            log.error("标记任务失败时出错, taskId={}", taskId, updateEx);
         }
     }
 
     // ======================== 基础设施故障处理 ========================
 
     private void handleFailed(RecoveryFailedEvent event, Channel channel, long tag) {
-        String idempKey = "mq:event:" + event.eventId();
+        String idempotencyKey = EVENT_IDEMPOTENCY_KEY_PREFIX + event.eventId();
         Long taskId = event.taskId();
-        log.warn("RecoveryEventHandler: 收到失败事件, taskId={}, error={}",
+        log.warn("收到失败事件, taskId={}, error={}",
                 taskId, event.errorMessage());
 
         mqConsumerSupport.consume(channel, tag, "恢复失败事件: taskId=" + taskId,
-                () -> processFailed(event, idempKey, taskId));
+                () -> processFailed(event, idempotencyKey, taskId));
     }
 
-    private void processFailed(RecoveryFailedEvent event, String idempKey, Long taskId) throws Exception {
-        if (isEventProcessed(idempKey)) {
+    private void processFailed(RecoveryFailedEvent event, String idempotencyKey, Long taskId) {
+        if (isEventProcessed(idempotencyKey)) {
             return;
         }
 
         RecoveryTask task = recoveryTaskMapper.selectById(taskId);
         if (task == null) {
-            markEventProcessed(idempKey);
+            markEventProcessed(idempotencyKey);
             return;
         }
 
         if (TERMINAL_STATUSES.contains(task.getStatus())) {
             log.info("任务已处终态，跳过失败事件: taskId={}, status={}", taskId, task.getStatus());
-            markEventProcessed(idempKey);
+            markEventProcessed(idempotencyKey);
             return;
         }
 
@@ -231,27 +246,27 @@ public class RecoveryEventHandler {
 
         // 同步统一任务项为 FAILED
         syncRecoveryItem(taskId, ManagementTaskStatus.FAILED,
-                event.errorMessage(), "RECOVERY_TASK", taskId);
+                event.errorMessage(), RESULT_REF_TYPE_RECOVERY_TASK, taskId);
 
-        markEventProcessed(idempKey);
+        markEventProcessed(idempotencyKey);
     }
 
     // ======================== 工具方法 ========================
 
-    private boolean isEventProcessed(String idempKey) {
+    private boolean isEventProcessed(String idempotencyKey) {
         try {
-            return Boolean.TRUE.equals(redisTemplate.hasKey(idempKey));
-        } catch (Exception e) {
-            log.warn("幂等标记读取失败，降级允许处理: key={}", idempKey, e);
+            return Boolean.TRUE.equals(redisTemplate.hasKey(idempotencyKey));
+        } catch (RuntimeException ex) {
+            log.warn("幂等标记读取失败，降级允许处理: key={}", idempotencyKey, ex);
             return false;
         }
     }
 
-    private void markEventProcessed(String idempKey) {
+    private void markEventProcessed(String idempotencyKey) {
         try {
-            redisTemplate.opsForValue().set(idempKey, "1", Duration.ofDays(1));
-        } catch (Exception e) {
-            log.warn("幂等标记写入失败: key={}", idempKey, e);
+            redisTemplate.opsForValue().set(idempotencyKey, "1", IDEMPOTENCY_TTL);
+        } catch (RuntimeException ex) {
+            log.warn("幂等标记写入失败: key={}", idempotencyKey, ex);
         }
     }
 
@@ -260,7 +275,8 @@ public class RecoveryEventHandler {
      */
     private ManagementTaskItemResponse syncRecoveryItem(Long recoveryTaskId, ManagementTaskStatus status,
                                                         String errorMessage, String refType, Long refId) {
-        var item = managementTaskService.findActiveItem("SYSTEM", recoveryTaskId, TaskType.RECOVERY);
+        ManagementTaskItem item = managementTaskService.findActiveItem(
+                TARGET_TYPE_SYSTEM, recoveryTaskId, TaskType.RECOVERY);
         if (item != null) {
             return managementTaskService.updateItemStatus(item.getId(), status, errorMessage, refType, refId);
         }

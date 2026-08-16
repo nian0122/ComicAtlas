@@ -79,4 +79,31 @@ const emit = defineEmits<{
   background: var(--accent-bg);
   border-radius: var(--radius-sm);
 }
+
+@media (max-width: 1024px) {
+  .chapter-row {
+    gap: 6px;
+    padding-right: 8px;
+  }
+
+  .chapter-no {
+    flex: 0 0 54px;
+    min-width: 54px;
+    font-size: 12px;
+  }
+
+  .chapter-title {
+    min-width: 0;
+    font-size: 12px;
+  }
+
+  .chapter-status {
+    display: none;
+  }
+
+  .chapter-pages {
+    flex: 0 0 34px;
+    text-align: right;
+  }
+}
 </style>

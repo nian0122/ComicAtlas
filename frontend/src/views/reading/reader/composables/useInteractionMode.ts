@@ -24,9 +24,7 @@ export interface InteractionContext {
 /**
  * 检测阅读器交互模式。
  *
- * 判定逻辑（双重条件，非简单 Touch 检测）：
  * 视口宽度 ≤ BREAKPOINTS.tablet 且 pointer: coarse 命中时为 'mobile'，
- * 因此手机和平板均使用触控阅读交互，
  * 否则为 'desktop'。resize 与指针类型变化均会触发响应式更新。
  */
 export function useInteractionMode(): InteractionContext {
@@ -35,7 +33,8 @@ export function useInteractionMode(): InteractionContext {
   const supportsHover = useMediaQuery('(hover: hover)')
 
   const mode = computed<InteractionMode>(() =>
-    width.value <= BREAKPOINTS.tablet && coarsePointer.value ? 'mobile' : 'desktop'
+    width.value <= BREAKPOINTS.tablet &&
+    coarsePointer.value ? 'mobile' : 'desktop'
   )
 
   return { mode, coarsePointer, supportsHover }

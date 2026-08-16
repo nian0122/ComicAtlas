@@ -26,6 +26,7 @@ import type {
   MediaOperationResult,
   MediaReorderRequest,
   MediaReorderResult,
+  MqStats,
   OperationSubmitResult,
   OutboxStats,
   ReconcileResult,
@@ -37,6 +38,21 @@ import type {
   UploadCompleteResult,
   UploadSessionStatus,
 } from '@/types'
+
+export type TrashContentVO = {
+  readonly targetType: 'COMIC' | 'CHAPTER' | 'MEDIA'
+  readonly targetId: number
+  readonly comicId: number | null
+  readonly chapterId: number | null
+  readonly title: string
+  readonly subtitle: string | null
+  readonly coverUrl: string | null
+  readonly status: string
+  readonly mediaType: string | null
+  readonly pageNumber: number | null
+  readonly createdAt: string
+  readonly trashedAt: string | null
+}
 
 const api = axios.create({ baseURL: '/api' })
 
@@ -62,19 +78,22 @@ api.interceptors.response.use(
   (error) => Promise.reject(error)
 )
 
+// ========== 阅读域（/api/**，网关路由至 reading-service） ==========
+
 export const comicApi = {
   list: (params: any) => api.get('/comics', { params }),
   detail: (id: number) => api.get<ComicDetailVO>(`/comics/${id}`),
-  delete: (id: number) => api.delete(`/comics/${id}`),
   getMetadata: (id: number) => api.get(`/comics/${id}/metadata`),
-  updateMetadata: (id: number, data: ComicMetadataUpdateDTO) =>
-    api.put(`/comics/${id}/metadata`, data),
   getTags: (id: number) => api.get(`/comics/${id}/tags`),
+  /** 阅读端列表/详情查询由阅读服务提供；写操作（delete/updateMetadata/updateTags/batchUpdate）见管理域。 */
+  delete: (id: number) => api.delete(`/manage/comics/${id}`),
+  updateMetadata: (id: number, data: ComicMetadataUpdateDTO) =>
+    api.put(`/manage/comics/${id}/metadata`, data),
   updateTags: (id: number, data: ComicTagUpdateDTO) =>
-    api.put(`/comics/${id}/tags`, data),
+    api.put(`/manage/comics/${id}/tags`, data),
   /** 批量更新漫画分类和标签 */
   batchUpdate: (data: BatchComicUpdateDTO) =>
-    api.post('/comics/batch/update', data),
+    api.post('/manage/comics/batch/update', data),
 }
 
 export const catalogApi = {
@@ -85,28 +104,9 @@ export const readerApi = {
   chapter: (chapterId: number) => api.get(`/chapters/${chapterId}`),
 }
 
-export const importApi = {
-  create: (sourceType: string, sourcePath: string) =>
-    api.post<ImportTaskVO>('/tasks/import', { sourceType, sourcePath }),
-  list: (params?: ImportTaskQuery) =>
-    api.get<{ records: ImportTaskVO[]; total: number }>('/tasks/import', { params }),
-  detail: (id: number) => api.get<ImportTaskVO>(`/tasks/import/${id}`),
-  status: (id: number) => api.get<ImportStatusVO>(`/tasks/import/${id}/status`),
-  cancel: (id: number) => api.post<void>(`/tasks/import/${id}/cancel`),
-  retry: (id: number) => api.post<void>(`/tasks/import/${id}/retry`),
-  createBatch: (data: BatchImportRequest) =>
-    api.post<BatchImportResultVO>('/tasks/import/batch', data),
-}
-
-/** 目录扫描异步任务（API 创建 → MQ → Worker 扫描 → 结果回写 → 前端轮询） */
-export const directoryScanApi = {
-  create: (parentPath: string) =>
-    api.post<DirectoryScanTaskVO>('/tasks/directory-scan', { parentPath }),
-  get: (id: number) => api.get<DirectoryScanTaskVO>(`/tasks/directory-scan/${id}`),
-}
-
 export const historyApi = {
   list: () => api.get('/history'),
+  page: (page: number, size: number) => api.get('/history/page', { params: { page, size } }),
   get: (comicId: number) => api.get(`/history/${comicId}`),
   update: (comicId: number, data: { chapterId: number; pageNumber: number }) =>
     api.put(`/history/${comicId}`, data),
@@ -114,70 +114,93 @@ export const historyApi = {
 
 export const tagApi = {
   list: () => api.get('/tags'),
-  create: (data: TagCreateDTO) => api.post('/tags', data),
-  delete: (id: number) => api.delete(`/tags/${id}`),
+  create: (data: TagCreateDTO) => api.post('/manage/tags', data),
+  delete: (id: number) => api.delete(`/manage/tags/${id}`),
 }
 
 export const categoryApi = {
   list: () => api.get('/categories'),
-  create: (name: string) => api.post('/categories', null, { params: { name } }),
-  update: (id: number, name: string) => api.put(`/categories/${id}`, null, { params: { name } }),
-  delete: (id: number) => api.delete(`/categories/${id}`),
+  create: (name: string) => api.post('/manage/categories', null, { params: { name } }),
+  update: (id: number, name: string) => api.put(`/manage/categories/${id}`, null, { params: { name } }),
+  delete: (id: number) => api.delete(`/manage/categories/${id}`),
+}
+
+// ========== 管理域（/api/manage/**，网关路由至 api-service 管理服务） ==========
+
+export const importApi = {
+  create: (sourceType: string, sourcePath: string) =>
+    api.post<ImportTaskVO>('/manage/tasks/import', { sourceType, sourcePath }),
+  list: (params?: ImportTaskQuery) =>
+    api.get<{ records: ImportTaskVO[]; total: number }>('/manage/tasks/import', { params }),
+  detail: (id: number) => api.get<ImportTaskVO>(`/manage/tasks/import/${id}`),
+  status: (id: number) => api.get<ImportStatusVO>(`/manage/tasks/import/${id}/status`),
+  cancel: (id: number) => api.post<void>(`/manage/tasks/import/${id}/cancel`),
+  retry: (id: number) => api.post<void>(`/manage/tasks/import/${id}/retry`),
+  createBatch: (data: BatchImportRequest) =>
+    api.post<BatchImportResultVO>('/manage/tasks/import/batch', data),
+}
+
+/** 目录扫描异步任务（API 创建 → MQ → Worker 扫描 → 结果回写 → 前端轮询） */
+export const directoryScanApi = {
+  create: (parentPath: string) =>
+    api.post<DirectoryScanTaskVO>('/manage/tasks/directory-scan', { parentPath }),
+  get: (id: number) => api.get<DirectoryScanTaskVO>(`/manage/tasks/directory-scan/${id}`),
 }
 
 export const lqApi = {
-  generateComic: (comicId: number) => api.post<OperationSubmitResult>(`/storage/lq/comics/${comicId}`),
-  generateChapter: (chapterId: number) => api.post<OperationSubmitResult>(`/storage/lq/chapters/${chapterId}`),
+  generateComic: (comicId: number) => api.post<OperationSubmitResult>(`/manage/storage/lq/comics/${comicId}`),
+  generateChapter: (chapterId: number) => api.post<OperationSubmitResult>(`/manage/storage/lq/chapters/${chapterId}`),
 }
 
 export const hqApi = {
-  deleteComic: (comicId: number) => api.post<OperationSubmitResult>(`/storage/delete-hq/comics/${comicId}`),
-  deleteChapter: (chapterId: number) => api.post<OperationSubmitResult>(`/storage/delete-hq/chapters/${chapterId}`),
+  deleteComic: (comicId: number) => api.post<OperationSubmitResult>(`/manage/storage/delete-hq/comics/${comicId}`),
+  deleteChapter: (chapterId: number) => api.post<OperationSubmitResult>(`/manage/storage/delete-hq/chapters/${chapterId}`),
+  transcodeMedia: (mediaId: number) => api.post<OperationSubmitResult>(`/manage/storage/transcode/media/${mediaId}`),
 }
 
 export const exportApi = {
-  createExport: (comicId: number) => api.post<ExportTaskVO>(`/storage/export/comics/${comicId}`),
-  listExports: (comicId: number) => api.get<ExportTaskVO[]>(`/storage/export/comics/${comicId}/tasks`),
-  listAllExports: () => api.get<ExportTaskVO[]>('/storage/export/tasks'),
-  getTask: (taskId: number) => api.get<ExportTaskVO>(`/storage/export/tasks/${taskId}`),
+  createExport: (comicId: number) => api.post<ExportTaskVO>(`/manage/storage/export/comics/${comicId}`),
+  listExports: (comicId: number) => api.get<ExportTaskVO[]>(`/manage/storage/export/comics/${comicId}/tasks`),
+  listAllExports: () => api.get<ExportTaskVO[]>('/manage/storage/export/tasks'),
+  getTask: (taskId: number) => api.get<ExportTaskVO>(`/manage/storage/export/tasks/${taskId}`),
   getArtifacts: (taskId: number) =>
-    api.get<ExportArtifactVO[]>(`/storage/export/tasks/${taskId}/artifacts`),
-  openDir: (taskId: number) => api.post(`/storage/export/tasks/${taskId}/open`),
+    api.get<ExportArtifactVO[]>(`/manage/storage/export/tasks/${taskId}/artifacts`),
+  openDir: (taskId: number) => api.post(`/manage/storage/export/tasks/${taskId}/open`),
 }
-
-// ========== Management Domain ==========
 
 /** 统一管理任务中心 */
 export const managementTaskApi = {
-  list: (params: ManagementTaskQuery) => api.get('/management/tasks', { params }),
-  get: (id: number) => api.get<ManagementTaskVO>(`/management/tasks/${id}`),
-  getItems: (id: number) => api.get<ManagementTaskItemVO[]>(`/management/tasks/${id}/items`),
-  create: (data: CreateManagementTaskRequest) => api.post<ManagementTaskVO>('/management/tasks', data),
-  cancel: (id: number) => api.post<ManagementTaskVO>(`/management/tasks/${id}/cancel`),
-  retry: (id: number) => api.post<ManagementTaskVO>(`/management/tasks/${id}/retry`),
+  list: (params: ManagementTaskQuery) => api.get('/manage/tasks', { params }),
+  get: (id: number) => api.get<ManagementTaskVO>(`/manage/tasks/${id}`),
+  getItems: (id: number) => api.get<ManagementTaskItemVO[]>(`/manage/tasks/${id}/items`),
+  create: (data: CreateManagementTaskRequest) => api.post<ManagementTaskVO>('/manage/tasks', data),
+  cancel: (id: number) => api.post<ManagementTaskVO>(`/manage/tasks/${id}/cancel`),
+  retry: (id: number) => api.post<ManagementTaskVO>(`/manage/tasks/${id}/retry`),
 }
 
 /** 回收站生命周期（恢复 / 永久清理 / 对账） */
 export const trashApi = {
+  list: (params: { page?: number; size?: number; status?: string; keyword?: string }) =>
+    api.get<{ readonly records: readonly TrashContentVO[]; readonly total: number }>('/manage/trash', { params }),
   restoreComic: (comicId: number) =>
-    api.post<OperationSubmitResult>(`/trash/comics/${comicId}/restore`),
+    api.post<OperationSubmitResult>(`/manage/trash/comics/${comicId}/restore`),
   restoreChapter: (comicId: number, chapterId: number) =>
-    api.post<OperationSubmitResult>(`/trash/comics/${comicId}/chapters/${chapterId}/restore`),
+    api.post<OperationSubmitResult>(`/manage/trash/comics/${comicId}/chapters/${chapterId}/restore`),
   restoreMedia: (mediaId: number) =>
-    api.post<OperationSubmitResult>(`/trash/media/${mediaId}/restore`),
+    api.post<OperationSubmitResult>(`/manage/trash/media/${mediaId}/restore`),
   purgeComic: (comicId: number, token: string) =>
-    api.post<OperationSubmitResult>(`/trash/comics/${comicId}/purge`, { token } satisfies TrashPurgeRequest),
+    api.post<OperationSubmitResult>(`/manage/trash/comics/${comicId}/purge`, { token } satisfies TrashPurgeRequest),
   purgeChapter: (comicId: number, chapterId: number, token: string) =>
     api.post<OperationSubmitResult>(
-      `/trash/comics/${comicId}/chapters/${chapterId}/purge`,
+      `/manage/trash/comics/${comicId}/chapters/${chapterId}/purge`,
       { token } satisfies TrashPurgeRequest,
     ),
   purgeMedia: (mediaId: number, token: string) =>
-    api.post<OperationSubmitResult>(`/trash/media/${mediaId}/purge`, { token } satisfies TrashPurgeRequest),
+    api.post<OperationSubmitResult>(`/manage/trash/media/${mediaId}/purge`, { token } satisfies TrashPurgeRequest),
   reconcile: (targetType: string, targetId: number) =>
-    api.get<ReconcileResult>(`/trash/${targetType}/${targetId}/reconcile`),
+    api.get<ReconcileResult>(`/manage/trash/${targetType}/${targetId}/reconcile`),
   reconcileAndRepair: (targetType: string, targetId: number) =>
-    api.post<ReconcileResult>(`/trash/${targetType}/${targetId}/reconcile`),
+    api.post<ReconcileResult>(`/manage/trash/${targetType}/${targetId}/reconcile`),
 }
 
 /**
@@ -186,9 +209,9 @@ export const trashApi = {
  */
 export const uploadApi = {
   createSession: (data: CreateUploadSessionRequest) =>
-    api.post<CreateUploadSessionResult>('/uploads/sessions', data),
+    api.post<CreateUploadSessionResult>('/manage/uploads/sessions', data),
   getSession: (sessionId: string) =>
-    api.get<UploadSessionStatus>(`/uploads/sessions/${sessionId}`),
+    api.get<UploadSessionStatus>(`/manage/uploads/sessions/${sessionId}`),
   uploadChunk: (
     sessionId: string,
     fileId: string,
@@ -196,7 +219,7 @@ export const uploadApi = {
     contentRange: string,
     chunkSha256?: string,
   ) =>
-    api.put<UploadChunkResult>(`/uploads/sessions/${sessionId}/files/${fileId}`, chunk, {
+    api.put<UploadChunkResult>(`/manage/uploads/sessions/${sessionId}/files/${fileId}`, chunk, {
       headers: {
         'Content-Type': 'application/octet-stream',
         'Content-Range': contentRange,
@@ -204,72 +227,77 @@ export const uploadApi = {
       },
     }),
   completeSession: (sessionId: string) =>
-    api.post<UploadCompleteResult>(`/uploads/sessions/${sessionId}/complete`),
+    api.post<UploadCompleteResult>(`/manage/uploads/sessions/${sessionId}/complete`),
   cancelSession: (sessionId: string) =>
-    api.delete(`/uploads/sessions/${sessionId}`),
+    api.delete(`/manage/uploads/sessions/${sessionId}`),
 }
 
 /** 跨页批量操作 */
 export const batchApi = {
-  preview: (data: BatchSubmitRequest) => api.post<BatchPreviewResult>('/management/batch/preview', data),
-  submit: (data: BatchSubmitRequest) => api.post<BatchCreateResult>('/management/batch', data),
+  preview: (data: BatchSubmitRequest) => api.post<BatchPreviewResult>('/manage/batch/preview', data),
+  submit: (data: BatchSubmitRequest) => api.post<BatchCreateResult>('/manage/batch', data),
 }
 
 /** 目录管理（create / rename / move / reorder / delete） */
 export const catalogManagementApi = {
   create: (comicId: number, data: CatalogManagementRequest) =>
-    api.post<CatalogVO>(`/comics/${comicId}/catalogs`, data),
+    api.post<CatalogVO>(`/manage/comics/${comicId}/catalogs`, data),
   rename: (comicId: number, catalogId: number, data: CatalogManagementRequest) =>
-    api.patch<CatalogVO>(`/comics/${comicId}/catalogs/${catalogId}`, data),
+    api.patch<CatalogVO>(`/manage/comics/${comicId}/catalogs/${catalogId}`, data),
   move: (comicId: number, catalogId: number, data: CatalogManagementRequest) =>
-    api.put<CatalogVO>(`/comics/${comicId}/catalogs/${catalogId}/move`, data),
+    api.put<CatalogVO>(`/manage/comics/${comicId}/catalogs/${catalogId}/move`, data),
   reorder: (comicId: number, catalogId: number, data: CatalogManagementRequest) =>
-    api.put(`/comics/${comicId}/catalogs/${catalogId}/reorder`, data),
+    api.put(`/manage/comics/${comicId}/catalogs/${catalogId}/reorder`, data),
   delete: (comicId: number, catalogId: number, reparentTo?: number) =>
-    api.delete(`/comics/${comicId}/catalogs/${catalogId}`, { params: { reparentTo } }),
+    api.delete(`/manage/comics/${comicId}/catalogs/${catalogId}`, { params: { reparentTo } }),
 }
 
 /** 章节管理（create / rename / move / reorder / trash） */
 export const chapterManagementApi = {
   create: (comicId: number, data: ChapterManagementRequest) =>
-    api.post<ChapterManagementVO>(`/comics/${comicId}/chapters`, data),
+    api.post<ChapterManagementVO>(`/manage/comics/${comicId}/chapters`, data),
   rename: (comicId: number, chapterId: number, data: ChapterManagementRequest) =>
-    api.patch<ChapterManagementVO>(`/comics/${comicId}/chapters/${chapterId}`, data),
+    api.patch<ChapterManagementVO>(`/manage/comics/${comicId}/chapters/${chapterId}`, data),
   move: (comicId: number, chapterId: number, data: ChapterManagementRequest) =>
-    api.put<ChapterManagementVO>(`/comics/${comicId}/chapters/${chapterId}/move`, data),
+    api.put<ChapterManagementVO>(`/manage/comics/${comicId}/chapters/${chapterId}/move`, data),
   reorder: (comicId: number, chapterId: number, data: ChapterManagementRequest) =>
-    api.put<ChapterManagementVO>(`/comics/${comicId}/chapters/${chapterId}/reorder`, data),
+    api.put<ChapterManagementVO>(`/manage/comics/${comicId}/chapters/${chapterId}/reorder`, data),
   trash: (comicId: number, chapterId: number) =>
-    api.delete(`/comics/${comicId}/chapters/${chapterId}`),
+    api.delete(`/manage/comics/${comicId}/chapters/${chapterId}`),
 }
 
 /** 媒体管理（章节内重排 / 回收） */
 export const mediaManagementApi = {
   reorder: (chapterId: number, data: MediaReorderRequest) =>
-    api.post<MediaReorderResult>(`/chapters/${chapterId}/media/reorder`, data),
+    api.post<MediaReorderResult>(`/manage/chapters/${chapterId}/media/reorder`, data),
   trash: (mediaId: number) =>
-    api.delete<OperationSubmitResult>(`/media/${mediaId}`),
+    api.delete<OperationSubmitResult>(`/manage/media/${mediaId}`),
 }
 
 /** 允许操作查询（按钮权限以后端判定为准） */
 export const mediaOperationApi = {
-  forComic: (comicId: number) => api.get<MediaOperationResult>(`/management/operations/comics/${comicId}`),
-  forChapter: (chapterId: number) => api.get<MediaOperationResult>(`/management/operations/chapters/${chapterId}`),
-  forMedia: (mediaId: number) => api.get<MediaOperationResult>(`/management/operations/media/${mediaId}`),
+  forComic: (comicId: number) => api.get<MediaOperationResult>(`/manage/operations/comics/${comicId}`),
+  forChapter: (chapterId: number) => api.get<MediaOperationResult>(`/manage/operations/chapters/${chapterId}`),
+  forMedia: (mediaId: number) => api.get<MediaOperationResult>(`/manage/operations/media/${mediaId}`),
 }
 
 /** Outbox 积压统计 */
 export const outboxApi = {
-  stats: () => api.get<OutboxStats>('/management/outbox/stats'),
+  stats: () => api.get<OutboxStats>('/manage/outbox/stats'),
+}
+
+/** MQ 积压与死信统计（消费层失败与堆积，覆盖僵尸队列） */
+export const mqApi = {
+  stats: () => api.get<MqStats>('/manage/mq/stats'),
 }
 
 export const adminApi = {
-  deleteComic: (id: number, mode: string) => api.delete(`/admin/comics/${id}`, { params: { mode } }),
-  refreshMetadata: (id: number) => api.post<OperationSubmitResult>(`/storage/refresh-metadata/comics/${id}`),
-  scanRecover: () => api.post('/admin/storage/scan-recover'),
-  // scanRecover 已迁移至异步恢复任务中心 POST /api/tasks/recovery
-  // 旧同步接口 POST /admin/storage/scan-recover 后端保留供兼容
-  stats: () => api.get('/storage/stats'),
+  deleteComic: (id: number, mode: string) => api.delete(`/manage/admin/comics/${id}`, { params: { mode } }),
+  refreshMetadata: (id: number) => api.post<OperationSubmitResult>(`/manage/storage/refresh-metadata/comics/${id}`),
+  scanRecover: () => api.post('/manage/admin/storage/scan-recover'),
+  // scanRecover 已迁移至异步恢复任务中心 POST /api/manage/tasks/recovery
+  // 旧同步接口 POST /manage/admin/storage/scan-recover 后端保留供兼容
+  stats: () => api.get('/manage/storage/stats'),
   storageComics: (params: {
     page?: number
     size?: number
@@ -278,27 +306,31 @@ export const adminApi = {
     sort?: 'totalSize' | 'hqSize' | 'lqSize' | 'title'
     order?: 'asc' | 'desc'
     keyword?: string
-  }) => api.get('/admin/storage/comics', { params }),
-  storageComic: (comicId: number) => api.get(`/admin/storage/comics/${comicId}`),
-  storageChapters: (comicId: number) => api.get(`/admin/storage/comics/${comicId}/chapters`),
+    category?: string
+    tag?: string
+  }) => api.get('/manage/admin/storage/comics', { params }),
+  storageComic: (comicId: number) => api.get(`/manage/admin/storage/comics/${comicId}`),
+  storageChapters: (comicId: number) => api.get(`/manage/admin/storage/comics/${comicId}/chapters`),
   transcodeVideos: (comicId: number) =>
-    api.post<OperationSubmitResult>(`/storage/transcode/comics/${comicId}`),
+    api.post<OperationSubmitResult>(`/manage/storage/transcode/comics/${comicId}`),
+  transcodeChapter: (chapterId: number) =>
+    api.post<OperationSubmitResult>(`/manage/storage/transcode/chapters/${chapterId}`),
   dlqQueues: () =>
-    api.get<readonly DlqQueueVO[]>('/admin/dlq/queues'),
+    api.get<readonly DlqQueueVO[]>('/manage/admin/dlq/queues'),
   dlqMessages: (queueName: string, count = 20) =>
     api.get<readonly DlqMessageVO[]>(
-      `/admin/dlq/queues/${encodeURIComponent(queueName)}/messages`,
+      `/manage/admin/dlq/queues/${encodeURIComponent(queueName)}/messages`,
       { params: { count } },
     ),
   dlqReplay: (queueName: string, maxMessages = 100) =>
     api.post<DlqReplayResult>(
-      `/admin/dlq/queues/${encodeURIComponent(queueName)}/replay`,
+      `/manage/admin/dlq/queues/${encodeURIComponent(queueName)}/replay`,
       undefined,
       { params: { maxMessages } },
     ),
   dlqPurge: (queueName: string) =>
     api.delete<DlqPurgeResult>(
-      `/admin/dlq/queues/${encodeURIComponent(queueName)}/messages`,
+      `/manage/admin/dlq/queues/${encodeURIComponent(queueName)}/messages`,
     ),
 }
 
@@ -338,8 +370,8 @@ export interface DlqPurgeResult {
 }
 
 export const settingsApi = {
-  get: () => api.get('/settings'),
-  update: (data: any) => api.put('/settings', data),
+  get: () => api.get('/manage/settings'),
+  update: (data: any) => api.put('/manage/settings', data),
 }
 
 export default api

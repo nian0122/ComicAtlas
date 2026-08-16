@@ -9,6 +9,7 @@ import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.common.event.MediaUploadCompletedEvent;
 import com.comicatlas.common.event.MediaUploadCompletedEvent.MediaAnalysisResult;
 import com.comicatlas.common.event.MetadataRefreshScanCompletedEvent;
+import com.comicatlas.common.event.payload.LqSizeResult;
 import com.comicatlas.common.event.payload.TranscodeMediaInfo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +35,21 @@ public class ManagementCommandPublisher {
 
     private static final String EXCHANGE = MqExchanges.MANAGEMENT;
 
+    /**
+     * FAILED 事件 errorMessage 保留上限（字符）。API 端写入 management_task_item.error_message
+     * （varchar(4096)），超长消息（如内嵌外部进程 stdout 的异常文本可达数十 KB）会导致
+     * API 消费端写库异常、结果事件进 DLQ，item 永远停在 QUEUED。截断后保留头部，
+     * 完整错误由 Worker 日志承载。
+     */
+    private static final int MAX_ERROR_MESSAGE_CHARS = 2000;
+
+    private static String truncateErrorMessage(String errorMessage) {
+        if (errorMessage == null || errorMessage.length() <= MAX_ERROR_MESSAGE_CHARS) {
+            return errorMessage;
+        }
+        return errorMessage.substring(0, MAX_ERROR_MESSAGE_CHARS) + "...（已截断，完整信息见 Worker 日志）";
+    }
+
     public void progress(ManagementCommandRequestedEvent cmd, int progress, String stage) {
         rabbitTemplate.convertAndSend(EXCHANGE, MqRoutingKeys.COMMAND_PROGRESS,
                 new ManagementCommandProgressEvent(UUID.randomUUID(), Instant.now(), 1,
@@ -43,15 +59,24 @@ public class ManagementCommandPublisher {
     }
 
     public void completed(ManagementCommandRequestedEvent cmd) {
-        completed(cmd, null);
+        completed(cmd, null, null);
     }
 
     public void completed(ManagementCommandRequestedEvent cmd, TranscodeMediaInfo transcode) {
+        completed(cmd, transcode, null);
+    }
+
+    public void completed(ManagementCommandRequestedEvent cmd, List<LqSizeResult> lqSizes) {
+        completed(cmd, null, lqSizes);
+    }
+
+    private void completed(ManagementCommandRequestedEvent cmd, TranscodeMediaInfo transcode,
+                           List<LqSizeResult> lqSizes) {
         rabbitTemplate.convertAndSend(EXCHANGE, MqRoutingKeys.COMMAND_COMPLETED,
                 new ManagementCommandCompletedEvent(UUID.randomUUID(), Instant.now(), 1,
                         cmd.taskId(), cmd.itemId(), cmd.attempt(),
                         cmd.operationType(), cmd.targetType(), cmd.targetId(),
-                        transcode));
+                        transcode, lqSizes));
     }
 
     public void failed(ManagementCommandRequestedEvent cmd, String errorMessage) {
@@ -59,7 +84,7 @@ public class ManagementCommandPublisher {
                 new ManagementCommandFailedEvent(UUID.randomUUID(), Instant.now(), 1,
                         cmd.taskId(), cmd.itemId(), cmd.attempt(),
                         cmd.operationType(), cmd.targetType(), cmd.targetId(),
-                        errorMessage));
+                        truncateErrorMessage(errorMessage)));
     }
 
     /**

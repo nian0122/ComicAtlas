@@ -2,8 +2,7 @@
   <header :class="['top-nav', `top-nav--${mobileHeaderKind}`, { scrolled: isScrolled }]">
     <div class="nav-shell">
       <router-link to="/" class="nav-logo desktop-brand" aria-label="ComicAtlas 首页">
-        <span class="logo-mark" aria-hidden="true">CA</span>
-        <span class="logo-wordmark">COMICATLAS</span>
+        <ComicAtlasLogo size="sm" />
       </router-link>
 
       <div class="mobile-header">
@@ -11,7 +10,7 @@
           <button type="button" class="mobile-header-action" aria-label="返回" @click="router.back()">
             <el-icon :size="22"><ArrowLeft /></el-icon>
           </button>
-          <router-link to="/" class="mobile-detail-brand">COMICATLAS</router-link>
+          <router-link to="/" class="mobile-detail-brand"><ComicAtlasLogo size="sm" /></router-link>
           <button type="button" class="mobile-header-action" aria-label="分享当前漫画" @click="onShare">
             <el-icon :size="21"><Share /></el-icon>
           </button>
@@ -21,14 +20,12 @@
           <span class="mobile-header-action" aria-hidden="true">
             <el-icon :size="23"><Menu /></el-icon>
           </span>
-          <router-link to="/" class="mobile-wordmark mobile-wordmark--solo">COMICATLAS</router-link>
-          <span class="mobile-header-spacer" aria-hidden="true" />
+          <router-link to="/" class="mobile-wordmark mobile-wordmark--solo"><ComicAtlasLogo size="sm" /></router-link>
         </template>
 
         <template v-else-if="mobileHeaderKind === 'history'">
           <router-link to="/" class="mobile-brand" aria-label="ComicAtlas 首页">
-            <span class="logo-mark" aria-hidden="true">CA</span>
-            <span class="mobile-wordmark">COMICATLAS</span>
+            <ComicAtlasLogo size="sm" />
           </router-link>
           <button
             type="button"
@@ -46,10 +43,8 @@
 
         <template v-else>
           <router-link to="/" class="mobile-brand" aria-label="ComicAtlas 首页">
-            <span class="logo-mark" aria-hidden="true">CA</span>
-            <span class="mobile-wordmark">COMICATLAS</span>
+            <ComicAtlasLogo size="sm" />
           </router-link>
-          <span v-if="mobileHeaderKind === 'home'" class="profile-badge" aria-label="当前用户">U</span>
         </template>
       </div>
 
@@ -63,10 +58,15 @@
         </router-link>
       </nav>
 
-      <router-link to="/manage/import" class="import-btn desktop-action" aria-label="在桌面端导入漫画">
-        <el-icon :size="18"><UploadFilled /></el-icon>
-        <span>导入漫画</span>
-      </router-link>
+      <div class="desktop-context">
+        <router-link to="/manage/import" class="import-btn desktop-action" aria-label="在桌面端导入漫画">
+          <el-icon :size="18"><UploadFilled /></el-icon>
+          <span>导入漫画</span>
+        </router-link>
+        <router-link to="/manage" class="profile-button desktop-action" aria-label="进入管理端">
+          <el-icon :size="18"><User /></el-icon>
+        </router-link>
+      </div>
     </div>
   </header>
 
@@ -95,8 +95,10 @@ import {
   Menu,
   Share,
   UploadFilled,
+  User,
 } from '@element-plus/icons-vue'
 import MaterialSymbolIcon from '@/components/icons/MaterialSymbolIcon.vue'
+import ComicAtlasLogo from '@/components/brand/ComicAtlasLogo.vue'
 import { useHistoryStore } from '@/stores/history-store'
 
 const isScrolled = ref(false)
@@ -153,28 +155,24 @@ onBeforeUnmount(() => {
   inset: 0 0 auto;
   z-index: var(--z-nav);
   height: var(--nav-height);
-  border-bottom: 1px solid transparent;
-  background: var(--nav-gradient);
-  transition:
-    background-color var(--transition-normal),
-    border-color var(--transition-normal);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-primary);
 }
 
 .top-nav.scrolled {
-  border-bottom-color: var(--border);
-  background: var(--nav-solid);
-  box-shadow: var(--nav-shadow);
+  background: var(--bg-primary);
 }
 
 .nav-shell {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
   gap: var(--space-10);
-  width: min(100%, var(--content-max));
+  width: 100%;
   height: 100%;
   margin: 0 auto;
-  padding-inline: var(--content-gutter);
+  padding-inline: var(--space-8);
+  box-sizing: border-box;
 }
 
 .nav-logo {
@@ -182,6 +180,29 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: var(--space-3);
   min-height: 44px;
+  color: var(--text-primary);
+}
+
+.desktop-brand {
+  justify-self: start;
+}
+
+.desktop-context {
+  display: flex;
+  align-items: center;
+  justify-self: end;
+  gap: var(--space-4);
+}
+
+.profile-button {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  color: var(--text-secondary);
+}
+
+.profile-button:hover {
   color: var(--text-primary);
 }
 
@@ -209,42 +230,37 @@ onBeforeUnmount(() => {
 .desktop-nav {
   display: flex;
   align-items: center;
-  gap: var(--space-6);
+  gap: var(--space-10);
 }
 
 .nav-link {
   position: relative;
   display: inline-flex;
   align-items: center;
-  min-height: 44px;
+  min-height: 100%;
   color: var(--text-secondary);
-  font-size: var(--text-sm);
-  font-weight: 600;
+  font-size: var(--text-md);
+  font-weight: 500;
 }
 
 .nav-link::after {
   position: absolute;
   right: 0;
-  bottom: 5px;
+  bottom: 0;
   left: 0;
   height: 2px;
   content: "";
-  background: var(--accent);
+  background: var(--color-brand);
   opacity: 0;
-  transform: scaleX(0.4);
-  transition:
-    opacity var(--transition-fast),
-    transform var(--transition-normal);
 }
 
 .nav-link:hover,
 .nav-link.active {
-  color: var(--text-primary);
+  color: var(--color-brand);
 }
 
 .nav-link.active::after {
   opacity: 1;
-  transform: scaleX(1);
 }
 
 .nav-link--management {
@@ -263,23 +279,19 @@ onBeforeUnmount(() => {
   justify-content: center;
   gap: var(--space-2);
   min-height: 44px;
-  padding-inline: var(--space-4);
+  padding-inline: var(--space-5);
   border: 0;
-  border-radius: var(--radius-pill);
-  background: var(--text-primary);
-  color: var(--bg-primary);
+  border-radius: var(--radius-xs);
+  background: var(--color-brand);
+  color: var(--color-on-brand);
   font-size: var(--text-sm);
   font-weight: 700;
-  transition:
-    background-color var(--transition-fast),
-    border-color var(--transition-fast),
-    transform var(--transition-fast);
+  transition: background-color var(--transition-fast), transform var(--transition-fast);
 }
 
 .import-btn:hover {
-  background: var(--accent);
+  background: var(--color-brand-hover);
   color: var(--color-on-brand);
-  transform: translateY(-2px);
 }
 
 .import-btn:active {
@@ -294,6 +306,7 @@ onBeforeUnmount(() => {
   display: none;
 }
 
+
 @media (max-width: 1024px) {
   .top-nav {
     height: var(--mobile-nav-height);
@@ -303,7 +316,7 @@ onBeforeUnmount(() => {
 
   .top-nav--home,
   .top-nav--detail {
-    background: var(--mobile-header-scrim);
+    background: transparent;
   }
 
   .top-nav--history {
@@ -315,6 +328,11 @@ onBeforeUnmount(() => {
     background: var(--mobile-tabbar-bg);
   }
 
+  .top-nav--home.scrolled {
+    border-bottom-color: transparent;
+    box-shadow: none;
+  }
+
   .nav-shell {
     display: flex;
     width: 100%;
@@ -322,7 +340,8 @@ onBeforeUnmount(() => {
   }
 
   .desktop-nav,
-  .desktop-brand {
+  .desktop-brand,
+  .desktop-context {
     display: none;
   }
 
@@ -332,6 +351,7 @@ onBeforeUnmount(() => {
     justify-content: space-between;
     width: 100%;
   }
+
 
   .desktop-action {
     display: none;
@@ -435,7 +455,9 @@ onBeforeUnmount(() => {
     z-index: var(--z-nav);
     display: grid;
     grid-template-columns: repeat(3, 1fr);
+    height: calc(var(--mobile-tabbar-height) + env(safe-area-inset-bottom));
     min-height: calc(var(--mobile-tabbar-height) + env(safe-area-inset-bottom));
+    box-sizing: border-box;
     padding: 0 var(--space-8) env(safe-area-inset-bottom);
     border-top: 1px solid var(--color-border-faint);
     background: var(--mobile-tabbar-bg);
@@ -465,11 +487,17 @@ onBeforeUnmount(() => {
   }
 
   .mobile-tabbar--library .mobile-tab.active {
-    color: var(--color-brand-pale);
+    color: var(--color-brand);
   }
 
   .mobile-tabbar--history .mobile-tab.active {
     color: var(--text-primary);
+  }
+
+  /* 历史页与列表直接衔接，不额外绘制中间分界线。 */
+  .mobile-tabbar--history {
+    border-top: 0;
+    box-shadow: none;
   }
 
   .mobile-tab.active::after {

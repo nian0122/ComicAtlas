@@ -1,5 +1,7 @@
 package com.comicatlas.api.common.exception;
 
+import com.comicatlas.contract.common.exception.BusinessException;
+
 /**
  * 冲突异常 — 映射为 HTTP 409 Conflict。
  * <p>

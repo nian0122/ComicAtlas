@@ -1,7 +1,7 @@
 package com.comicatlas.api.importer.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.comicatlas.api.common.Result;
+import com.comicatlas.contract.common.Result;
 import com.comicatlas.api.importer.dto.RecoveryTaskVO;
 import com.comicatlas.api.importer.service.RecoveryTaskService;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RequestParam;
  * 从文件重建数据库记录（恢复未登记或丢失的漫画数据），支持任务列表、详情与失败重试。
  */
 @RestController
-@RequestMapping("/api/tasks/recovery")
+@RequestMapping("/api/manage/tasks/recovery")
 @RequiredArgsConstructor
 public class RecoveryTaskController {
 

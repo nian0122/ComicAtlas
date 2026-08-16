@@ -4,7 +4,7 @@
       <div>
         <p class="page-eyebrow">LIFECYCLE / TRASH</p>
         <h1 class="page-title">回收站</h1>
-        <p class="page-subtitle">统一查看已回收漫画，并在保留期内恢复或永久清理。</p>
+        <p class="page-subtitle">统一查看已回收的漫画、章节和媒体，并在保留期内恢复或永久清理。</p>
       </div>
       <el-button :loading="loading" @click="loadItems">刷新</el-button>
     </header>
@@ -13,7 +13,7 @@
       <el-input
         v-model="keyword"
         class="filter-input"
-        placeholder="搜索漫画标题或作者"
+        placeholder="搜索漫画、章节或媒体"
         clearable
         @keyup.enter="applyFilters"
         @clear="applyFilters"
@@ -30,20 +30,23 @@
       <div class="section-heading">
         <div>
           <h2>回收内容</h2>
-          <span>{{ total }} 部漫画</span>
+          <span>{{ total }} 项回收内容</span>
         </div>
         <span class="retention-note">永久清理受保留期限制</span>
       </div>
 
-      <el-table v-loading="loading" :data="items" row-key="id" empty-text="当前没有匹配的回收内容">
-        <el-table-column prop="id" label="ID" width="84" />
-        <el-table-column label="漫画" min-width="280">
+      <el-table v-loading="loading" :data="items" :row-key="rowKey" empty-text="当前没有匹配的回收内容">
+        <el-table-column label="类型" width="90">
+          <template #default="{ row }">{{ targetTypeLabel(row.targetType) }}</template>
+        </el-table-column>
+        <el-table-column prop="targetId" label="目标 ID" width="100" />
+        <el-table-column label="内容" min-width="300">
           <template #default="{ row }">
             <div class="comic-cell">
-              <img v-if="row.coverUrl" :src="row.coverUrl" alt="" @error="hideBrokenImage">
+              <img v-if="coverUrl(row)" :src="coverUrl(row) || undefined" alt="" @error="hideBrokenImage">
               <div>
                 <strong>{{ row.title }}</strong>
-                <span>{{ row.author || '未知作者' }}</span>
+                <span>{{ row.subtitle || '—' }}</span>
               </div>
             </div>
           </template>
@@ -51,9 +54,11 @@
         <el-table-column label="生命周期" width="150">
           <template #default="{ row }">{{ statusLabel(row.status) }}</template>
         </el-table-column>
-        <el-table-column prop="pageCount" label="页数" width="90" />
-        <el-table-column label="创建时间" width="170">
-          <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
+        <el-table-column label="关联 ID" width="130">
+          <template #default="{ row }">{{ relatedId(row) }}</template>
+        </el-table-column>
+        <el-table-column label="回收时间" width="170">
+          <template #default="{ row }">{{ formatDate(row.trashedAt || row.createdAt) }}</template>
         </el-table-column>
         <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
@@ -79,10 +84,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { comicStatusApi } from '@/services/management-capabilities'
-import { trashApi } from '@/services/api'
-import type { ComicListVO, ComicStatus } from '@/types'
-import { comicStatusMeta } from '@/utils/comic-status'
+import { trashApi, type TrashContentVO } from '@/services/api'
 
 const STATUS_OPTIONS = [
   { value: 'TRASHED', label: '已回收' },
@@ -91,7 +93,7 @@ const STATUS_OPTIONS = [
   { value: 'PURGING', label: '永久清理中' },
 ] as const
 const pageSize = 20
-const items = ref<readonly ComicListVO[]>([])
+const items = ref<readonly TrashContentVO[]>([])
 const total = ref(0)
 const page = ref(1)
 const keyword = ref('')
@@ -100,21 +102,29 @@ const loading = ref(false)
 const error = ref('')
 const busyId = ref<number | null>(null)
 
-function statusLabel(value: ComicStatus): string { return comicStatusMeta(value).label }
+function statusLabel(value: string): string {
+  return ({ TRASHED: '已回收', TRASHING: '回收中', RESTORING: '恢复中', PURGING: '永久清理中' } as Record<string, string>)[value] || value
+}
+function targetTypeLabel(value: TrashContentVO['targetType']): string { return ({ COMIC: '漫画', CHAPTER: '章节', MEDIA: '媒体' })[value] }
+function relatedId(row: TrashContentVO): string { return row.targetType === 'COMIC' ? '—' : row.targetType === 'CHAPTER' ? `漫画 ${row.comicId}` : `章节 ${row.chapterId}` }
+function rowKey(row: TrashContentVO): string { return `${row.targetType}-${row.targetId}` }
+function coverUrl(row: TrashContentVO): string | null {
+  return row.coverUrl || null
+}
+function hideBrokenImage(event: Event): void { (event.currentTarget as HTMLImageElement).hidden = true }
 function formatDate(value: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
   const pad = (part: number): string => String(part).padStart(2, '0')
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
 }
-function hideBrokenImage(event: Event): void { (event.currentTarget as HTMLImageElement).hidden = true }
 function errorMessage(reason: unknown): string { return reason instanceof Error ? reason.message : '回收站加载失败' }
 
 async function loadItems(): Promise<void> {
   loading.value = true
   error.value = ''
   try {
-    const response = await comicStatusApi.list({ page: page.value, size: pageSize, keyword: keyword.value.trim() || undefined, status: status.value })
+    const response = await trashApi.list({ page: page.value, size: pageSize, keyword: keyword.value.trim() || undefined, status: status.value })
     items.value = response.data.records
     total.value = response.data.total
   } catch (reason: unknown) {
@@ -129,11 +139,13 @@ async function loadItems(): Promise<void> {
 function applyFilters(): void { page.value = 1; void loadItems() }
 function resetFilters(): void { keyword.value = ''; status.value = 'TRASHED'; applyFilters() }
 
-async function restore(row: ComicListVO): Promise<void> {
+async function restore(row: TrashContentVO): Promise<void> {
   try {
-    await ElMessageBox.confirm(`确定恢复「${row.title}」？`, '恢复漫画', { type: 'warning', confirmButtonText: '恢复' })
-    busyId.value = row.id
-    await trashApi.restoreComic(row.id)
+    await ElMessageBox.confirm(`确定恢复「${row.title}」？`, `恢复${targetTypeLabel(row.targetType)}`, { type: 'warning', confirmButtonText: '恢复' })
+    busyId.value = row.targetId
+    if (row.targetType === 'COMIC') await trashApi.restoreComic(row.targetId)
+    else if (row.targetType === 'CHAPTER') await trashApi.restoreChapter(row.comicId!, row.chapterId!)
+    else await trashApi.restoreMedia(row.targetId)
     ElMessage.success('恢复任务已提交')
     await loadItems()
   } catch (reason: unknown) {
@@ -141,11 +153,13 @@ async function restore(row: ComicListVO): Promise<void> {
   } finally { busyId.value = null }
 }
 
-async function purge(row: ComicListVO): Promise<void> {
+async function purge(row: TrashContentVO): Promise<void> {
   try {
-    const result = await ElMessageBox.prompt('请输入永久清理确认 token。永久清理不可恢复，且受 7 天保留期限制。', '永久清理漫画', { type: 'error', inputPlaceholder: '确认 token' })
-    busyId.value = row.id
-    await trashApi.purgeComic(row.id, result.value.trim())
+    const result = await ElMessageBox.prompt('请输入永久清理确认 token。永久清理不可恢复，且受 7 天保留期限制。', `永久清理${targetTypeLabel(row.targetType)}`, { type: 'error', inputPlaceholder: '确认 token' })
+    busyId.value = row.targetId
+    if (row.targetType === 'COMIC') await trashApi.purgeComic(row.targetId, result.value.trim())
+    else if (row.targetType === 'CHAPTER') await trashApi.purgeChapter(row.comicId!, row.chapterId!, result.value.trim())
+    else await trashApi.purgeMedia(row.targetId, result.value.trim())
     ElMessage.success('永久清理任务已提交')
     await loadItems()
   } catch (reason: unknown) {

@@ -118,8 +118,8 @@ func main() {
 	result.Success = result.Failed == 0
 
 	if cfg.JSON {
+		// 紧凑输出：缩进 JSON 在大章节下易超 Worker 端 stdout 保留上限（MAX_OUTPUT_CHARS），导致图片全部成功仍被误判失败
 		enc := json.NewEncoder(os.Stdout)
-		enc.SetIndent("", "  ")
 		if err := enc.Encode(result); err != nil {
 			fmt.Fprintf(os.Stderr, "JSON 编码失败: %v\n", err)
 			os.Exit(2)
@@ -260,12 +260,15 @@ func worker(id int, tasks <-chan imageTask, wg *sync.WaitGroup, cfg *CLIConfig, 
 	}
 }
 
-// inferPageNumber 从文件名推断页码，如 "001.jpg" → 1, "page_05.png" → 5
+// inferPageNumber 从文件名推断页码：取末尾连续数字段（"001.jpg" → 1, "page_05.png" → 5,
+// "…U6A6.SU…-IMG_6513.jpg" → 6513）。取末尾而非首个数字段，避免文件名前缀含数字
+// （如发布站编号 U6A6）时把页码误判成前缀数字。
 func inferPageNumber(baseName string) int64 {
 	numStr := ""
-	for _, r := range baseName {
-		if r >= '0' && r <= '9' {
-			numStr += string(r)
+	for i := len(baseName) - 1; i >= 0; i-- {
+		c := baseName[i]
+		if c >= '0' && c <= '9' {
+			numStr = string(c) + numStr
 		} else if numStr != "" {
 			break
 		}
