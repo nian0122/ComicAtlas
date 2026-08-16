@@ -43,6 +43,7 @@
       :item-size="historyItemSize"
       key-field="key"
       :buffer="200"
+      :page-mode="isMobile"
       @scroll="onHistoryScroll"
     >
       <template #default="{ item }">
@@ -86,7 +87,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onBeforeUnmount, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { RecycleScroller } from 'vue-virtual-scroller'
 import { PictureFilled, WarningFilled } from '@element-plus/icons-vue'
@@ -98,6 +99,7 @@ import type { HistoryVO } from '@/types'
 const router = useRouter()
 const store = useHistoryStore()
 const viewportWidth = useBreakpoint()
+const isMobile = computed(() => viewportWidth.value <= BREAKPOINTS.tablet)
 
 const recentCount = computed(() => store.total)
 const historyItemSize = computed(() =>
@@ -136,8 +138,21 @@ function onHistoryScroll(event: Event): void {
   if (remainingDistance <= 240) void store.fetchNextPage()
 }
 
+function onWindowHistoryScroll(): void {
+  if (!isMobile.value) return
+  const scroller = document.querySelector('.history-scroller')
+  if (!(scroller instanceof HTMLElement)) return
+  const remainingDistance = scroller.getBoundingClientRect().bottom - window.innerHeight
+  if (remainingDistance <= 240) void store.fetchNextPage()
+}
+
 onMounted(() => {
   void store.fetchFirstPage()
+  window.addEventListener('scroll', onWindowHistoryScroll, { passive: true })
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('scroll', onWindowHistoryScroll)
 })
 </script>
 
@@ -444,12 +459,11 @@ onMounted(() => {
 
 @media (max-width: 1024px) {
   .history-page {
-    height: calc(
-      100dvh - var(--mobile-nav-height) - var(--mobile-tabbar-height)
-    );
-    width: calc(100% + var(--mobile-page-gutter) + var(--mobile-page-gutter));
+    height: auto;
+    min-height: calc(100dvh - var(--mobile-nav-height) - var(--mobile-tabbar-height));
+    width: 100%;
     max-width: none;
-    margin-left: calc(var(--mobile-page-gutter) * -1);
+    margin: 0;
     box-sizing: border-box;
     padding: 0;
     overflow: visible;
@@ -465,8 +479,11 @@ onMounted(() => {
   }
 
   .history-scroller {
-    /* 外层页面已经铺满视口，滚动容器与父级保持同一宽度。 */
+    /* 与漫画库一致，直接填充主内容区，由 ReadingLayout 统一提供左右留白。 */
+    flex: none;
     width: 100%;
+    height: auto;
+    min-height: 0;
     margin-left: 0;
     box-sizing: border-box;
     border-block: 0;

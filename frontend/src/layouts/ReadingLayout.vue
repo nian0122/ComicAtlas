@@ -51,11 +51,13 @@ const routeClass = computed(() => `route-${String(route.name ?? 'unknown')}`)
     padding-left: 0;
   }
 
-  /* 历史页使用内部滚动容器，避免固定底部导航重复占用高度。 */
+  /* 历史页移动端使用 page-mode，跟随页面滚动以支持 Safari 地址栏收缩。 */
   .main-content.route-history {
     padding-top: var(--mobile-nav-height);
     padding-right: var(--mobile-page-gutter);
-    padding-bottom: 0;
+    padding-bottom: calc(
+      var(--mobile-tabbar-height) + var(--space-8) + env(safe-area-inset-bottom)
+    );
     padding-left: var(--mobile-page-gutter);
   }
 
