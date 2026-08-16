@@ -300,7 +300,7 @@ onBeforeUnmount(() => {
 
   .top-nav--home,
   .top-nav--detail {
-    background: var(--mobile-header-scrim);
+    background: transparent;
   }
 
   .top-nav--history {
@@ -310,6 +310,11 @@ onBeforeUnmount(() => {
   .top-nav--home.scrolled,
   .top-nav--detail.scrolled {
     background: var(--mobile-tabbar-bg);
+  }
+
+  .top-nav--home.scrolled {
+    border-bottom-color: transparent;
+    box-shadow: none;
   }
 
   .nav-shell {
@@ -433,7 +438,9 @@ onBeforeUnmount(() => {
     z-index: var(--z-nav);
     display: grid;
     grid-template-columns: repeat(3, 1fr);
+    height: calc(var(--mobile-tabbar-height) + env(safe-area-inset-bottom));
     min-height: calc(var(--mobile-tabbar-height) + env(safe-area-inset-bottom));
+    box-sizing: border-box;
     padding: 0 var(--space-8) env(safe-area-inset-bottom);
     border-top: 1px solid var(--color-border-faint);
     background: var(--mobile-tabbar-bg);
@@ -468,6 +475,12 @@ onBeforeUnmount(() => {
 
   .mobile-tabbar--history .mobile-tab.active {
     color: var(--text-primary);
+  }
+
+  /* 历史页与列表直接衔接，不额外绘制中间分界线。 */
+  .mobile-tabbar--history {
+    border-top: 0;
+    box-shadow: none;
   }
 
   .mobile-tab.active::after {

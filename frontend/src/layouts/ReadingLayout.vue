@@ -51,5 +51,10 @@ const routeClass = computed(() => `route-${String(route.name ?? 'unknown')}`)
     padding-right: 0;
     padding-left: 0;
   }
+
+  /* 历史页自身管理滚动区域高度，避免与固定底部导航重复预留空间。 */
+  .main-content.route-history {
+    padding-bottom: 0;
+  }
 }
 </style>

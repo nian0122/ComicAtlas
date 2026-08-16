@@ -431,17 +431,18 @@ onMounted(() => {
 @media (max-width: 1024px) {
   .history-page {
     height: calc(
-      100dvh - var(--mobile-nav-height) - var(--mobile-tabbar-height) - var(--space-8)
+      100dvh - var(--mobile-nav-height) - var(--mobile-tabbar-height)
     );
-    max-width: var(--mobile-history-content-max);
-    padding: var(--space-8) 0 var(--space-4);
+    width: calc(100% + var(--mobile-page-gutter) + var(--mobile-page-gutter));
+    max-width: none;
+    margin-left: calc(var(--mobile-page-gutter) * -1);
+    box-sizing: border-box;
+    padding: 0;
     overflow: visible;
   }
 
   .page-header {
-    height: 1px;
-    margin-bottom: var(--space-6);
-    background: var(--color-border-faint);
+    display: none;
   }
 
   .header-left,
@@ -450,14 +451,17 @@ onMounted(() => {
   }
 
   .history-scroller {
-    width: calc(100% + var(--space-4));
-    transform: translateX(calc(var(--space-2) * -1));
+    /* 外层页面已经铺满视口，滚动容器与父级保持同一宽度。 */
+    width: 100%;
+    margin-left: 0;
+    box-sizing: border-box;
     border-block: 0;
     scrollbar-width: none;
   }
 
   .history-scroller::-webkit-scrollbar {
-    display: none;
+    width: 0;
+    height: 0;
   }
 
   .history-item {
