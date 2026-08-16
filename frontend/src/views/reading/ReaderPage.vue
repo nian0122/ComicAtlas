@@ -204,7 +204,6 @@ const chapterLoading = ref(false)
 let chapterLoadToken = 0
 /** 被双击切到 HQ 的页面索引（0-based），使用 reactive Set 保持响应性 */
 const forceHqPages = reactive(new Set<number>())
-let lastWindowScrollY = 0
 
 // 桌面端返回/章节跳转：保留迁移前实现（含 /library 兜底），移动端走 nav.*
 function goChapter(chId: number) {
@@ -414,16 +413,6 @@ function onViewportScrollDirection(direction: 'up' | 'down') {
   }
 }
 
-/** pageMode 使用窗口滚动，直接从 window.scrollY 派发下滑唤出动作。 */
-function onWindowScroll() {
-  if (mode.value !== 'mobile' || isPagedMode.value) return
-  const currentScrollY = window.scrollY
-  if (currentScrollY === lastWindowScrollY) return
-  const direction = currentScrollY > lastWindowScrollY ? 'up' : 'down'
-  lastWindowScrollY = currentScrollY
-  onViewportScrollDirection(direction)
-}
-
 /**
  * 页面隐藏/卸载兜底保存：清除挂起 debounce，立即用 keepalive 发送最终进度。
  * 覆盖直接关闭标签页、刷新、移动端切后台（visibilitychange）等
@@ -449,9 +438,6 @@ function onVisibilityChange() {
 }
 
 onMounted(async () => {
-  lastWindowScrollY = window.scrollY
-  window.addEventListener('scroll', onWindowScroll, { passive: true })
-
   // 桌面专属交互（键盘快捷键 / Ctrl+滚轮缩放 / 双击重置缩放）：
   // 移动端不注册，避免与触摸手势系统冲突。
   if (mode.value === 'desktop') {
@@ -508,7 +494,6 @@ watch(() => route.params.chapterId, (newId, oldId) => {
 })
 
 onBeforeUnmount(() => {
-  window.removeEventListener('scroll', onWindowScroll)
   // 移动端未注册这些监听器，remove 为无害 no-op
   document.removeEventListener('keydown', onKeydown)
   document.removeEventListener('wheel', onWheel)
