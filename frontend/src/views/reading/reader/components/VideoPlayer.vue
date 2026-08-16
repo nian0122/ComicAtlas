@@ -2,7 +2,7 @@
   <div class="video-player" :style="containerStyle">
     <!-- ============================================================
          Placeholder state: user hasn't activated playback yet.
-         NO <video> element in DOM — zero network requests.
+         预览 <video> 仅用于浏览器端首帧解码，不会自动播放。
          ============================================================ -->
     <div
       v-if="!activated"
@@ -10,10 +10,25 @@
       data-reader-video-surface
       @click="handleActivate"
     >
+      <!-- 浏览器端首帧预渲染：不生成独立封面文件，仅读取并解码视频首帧。 -->
+      <video
+        ref="previewRef"
+        class="video-preview"
+        :src="hqUrl"
+        muted
+        playsinline
+        webkit-playsinline
+        preload="auto"
+        @loadeddata="onPreviewLoadedData"
+        @loadedmetadata="onPreviewMetadata"
+        @seeked="onPreviewSeeked"
+        @error="onPreviewError"
+      />
       <div
         class="video-placeholder-overlay"
+        :class="{ 'preview-ready': previewReady }"
       >
-        <el-icon :size="32"><VideoPlay /></el-icon>
+        <el-icon v-if="!previewReady" :size="32"><VideoPlay /></el-icon>
         <span v-if="duration" class="video-duration">{{ formatDuration(duration) }}</span>
       </div>
     </div>
@@ -109,6 +124,12 @@ const error = ref(false)
 
 const videoRef = ref<HTMLVideoElement | null>(null)
 
+/** 浏览器端首帧预览用 video，不会生成或保存封面文件。 */
+const previewRef = ref<HTMLVideoElement | null>(null)
+
+/** 首帧已经可以显示时，仅保留播放图标之外的时长信息。 */
+const previewReady = ref(false)
+
 /** Video native dimensions populated by loadedmetadata (fallback aspect ratio). */
 const nativeWidth = ref(0)
 const nativeHeight = ref(0)
@@ -116,6 +137,7 @@ const nativeHeight = ref(0)
 /** IntersectionObserver — wired by parent in Todo 4 (preserved pattern). */
 let visibilityObserver: IntersectionObserver | null = null
 let unloadTimer: ReturnType<typeof setTimeout> | null = null
+let previewPriming = false
 
 // ---------------------------------------------------------------------------
 // Computed
@@ -161,6 +183,14 @@ async function handleActivate(): Promise<void> {
   error.value = false
   activated.value = true
   playerState.value = 'loading'
+  previewReady.value = false
+
+  // 正式播放器接管前释放首帧预览元素，但不生成任何本地封面文件。
+  const preview = previewRef.value
+  if (preview !== null) {
+    preview.removeAttribute('src')
+    preview.load()
+  }
 
   await nextTick()
 
@@ -220,6 +250,7 @@ function unloadVideo(reason: string, mediaIdToSave?: number): void {
   activated.value = false
   error.value = false
   playerState.value = 'placeholder'
+  previewReady.value = false
 }
 
 defineExpose({ unloadVideo })
@@ -241,6 +272,64 @@ async function handleRetry(): Promise<void> {
 function onError(): void {
   error.value = true
   playerState.value = 'error'
+}
+
+function onPreviewLoadedData(): void {
+  // loadeddata 表示当前帧已经解码，浏览器可将其绘制到 video 元素。
+  previewReady.value = true
+  if (!previewPriming) {
+    previewRef.value?.pause()
+  }
+}
+
+function onPreviewMetadata(): void {
+  const preview = previewRef.value
+  if (preview === null || preview.readyState < 1) return
+
+  // 某些视频第 0 秒没有可显示关键帧，轻微 seek 促使浏览器解码首个可用帧。
+  if (preview.duration > 0) {
+    try {
+      preview.currentTime = Math.min(0.1, preview.duration)
+    } catch {
+      // 元数据已可用时，即使无法 seek，也不阻塞正式播放。
+    }
+  }
+
+  primePreviewFrame(preview)
+}
+
+/**
+ * Safari 对仅有 preload=metadata 的暂停视频不一定解码可绘制帧。
+ * 静音、内联视频允许自动播放，因此短暂 play → 下一帧 pause 可稳定触发首帧解码。
+ */
+function primePreviewFrame(preview: HTMLVideoElement): void {
+  if (previewPriming || previewReady.value) return
+  previewPriming = true
+  preview.muted = true
+  preview.playsInline = true
+
+  void preview.play()
+    .then(() => {
+      requestAnimationFrame(() => {
+        preview.pause()
+        previewPriming = false
+        previewReady.value = true
+      })
+    })
+    .catch(() => {
+      // Safari 的自动播放策略变化时，loadeddata/seeked 仍可提供降级预览。
+      previewPriming = false
+    })
+}
+
+function onPreviewSeeked(): void {
+  previewReady.value = true
+}
+
+function onPreviewError(): void {
+  // 首帧预览失败不影响点击后的正式播放。
+  previewPriming = false
+  previewReady.value = false
 }
 
 function onMetadata(event: Event): void {
@@ -430,12 +519,20 @@ watch(
   user-select: none;
 }
 
+.video-preview {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
 .video-placeholder:hover {
   opacity: 0.8;
 }
 
 /* 预览帧：填满占位区，contain 保持完整画面 */
-/* 占位层只展示接口返回的视频信息，不触发视频文件请求 */
+/* 首帧就绪后保留时长信息和底部渐变，避免遮挡视频画面 */
 .video-placeholder-overlay {
   position: relative;
   z-index: 1;
@@ -447,6 +544,12 @@ watch(
   width: 100%;
   height: 100%;
   pointer-events: none;
+}
+
+.video-placeholder-overlay.preview-ready {
+  justify-content: flex-end;
+  padding-bottom: var(--space-xs);
+  background: linear-gradient(transparent 60%, rgba(0, 0, 0, 0.45));
 }
 
 .video-duration {
