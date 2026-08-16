@@ -106,6 +106,7 @@ export const readerApi = {
 
 export const historyApi = {
   list: () => api.get('/history'),
+  page: (page: number, size: number) => api.get('/history/page', { params: { page, size } }),
   get: (comicId: number) => api.get(`/history/${comicId}`),
   update: (comicId: number, data: { chapterId: number; pageNumber: number }) =>
     api.put(`/history/${comicId}`, data),
@@ -154,6 +155,7 @@ export const lqApi = {
 export const hqApi = {
   deleteComic: (comicId: number) => api.post<OperationSubmitResult>(`/manage/storage/delete-hq/comics/${comicId}`),
   deleteChapter: (chapterId: number) => api.post<OperationSubmitResult>(`/manage/storage/delete-hq/chapters/${chapterId}`),
+  transcodeMedia: (mediaId: number) => api.post<OperationSubmitResult>(`/manage/storage/transcode/media/${mediaId}`),
 }
 
 export const exportApi = {
@@ -304,11 +306,15 @@ export const adminApi = {
     sort?: 'totalSize' | 'hqSize' | 'lqSize' | 'title'
     order?: 'asc' | 'desc'
     keyword?: string
+    category?: string
+    tag?: string
   }) => api.get('/manage/admin/storage/comics', { params }),
   storageComic: (comicId: number) => api.get(`/manage/admin/storage/comics/${comicId}`),
   storageChapters: (comicId: number) => api.get(`/manage/admin/storage/comics/${comicId}/chapters`),
   transcodeVideos: (comicId: number) =>
     api.post<OperationSubmitResult>(`/manage/storage/transcode/comics/${comicId}`),
+  transcodeChapter: (chapterId: number) =>
+    api.post<OperationSubmitResult>(`/manage/storage/transcode/chapters/${chapterId}`),
   dlqQueues: () =>
     api.get<readonly DlqQueueVO[]>('/manage/admin/dlq/queues'),
   dlqMessages: (queueName: string, count = 20) =>

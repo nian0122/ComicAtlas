@@ -12,7 +12,7 @@ import com.comicatlas.contract.common.enums.LqStatus;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.persistence.comic.mapper.MediaMapper;
 import com.comicatlas.contract.common.exception.BusinessException;
-import com.comicatlas.contract.common.exception.ConflictException;
+import com.comicatlas.api.common.exception.ConflictException;
 import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
 import com.comicatlas.api.management.dto.OperationSubmitResultDTO;
@@ -28,9 +28,9 @@ import com.comicatlas.api.outbox.mapper.InboxReceiptMapper;
 import com.comicatlas.api.outbox.mapper.OutboxMessageMapper;
 import com.comicatlas.api.outbox.relay.OutboxRelay;
 import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
-import com.comicatlas.contract.common.enums.ManagementTaskStatus;
+import com.comicatlas.api.common.enums.ManagementTaskStatus;
 import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
-import com.comicatlas.contract.common.enums.TaskType;
+import com.comicatlas.api.common.enums.TaskType;
 import com.comicatlas.contract.common.enums.TranscodeStatus;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO.ChapterSnapshot;
@@ -173,7 +173,7 @@ class MediaOperationPipelineIT {
         comic.setStatus(ComicStatus.READY);
         comic.setStoragePolicy("MANAGED");
         comic.setHqSize(7000L);
-        comic.setFileSize(7000L);
+        comic.setHqSize(7000L);
         comicMapper.insert(comic);
 
         chapter1 = chapter(comic.getId(), 1);
@@ -619,7 +619,7 @@ class MediaOperationPipelineIT {
                     m.getHqStatus() == null ? "READY" : m.getHqStatus().name(),
                     m.getStatus() == null ? "READY" : m.getStatus().name(),
                     m.getPageNumber() == null ? 0 : m.getPageNumber(),
-                    m.getFileSize() == null ? 0L : m.getFileSize(),
+                    m.getHqSize() == null ? 0L : m.getHqSize(),
                     m.getMediaType(),
                     m.getWidth(), m.getHeight(),
                     m.getDuration(), m.getContainer(), m.getVideoCodec(), m.getAudioCodec()
@@ -761,7 +761,7 @@ class MediaOperationPipelineIT {
         m.setHqStatus(HqStatus.READY);
         m.setLqStatus(LqStatus.NOT_GENERATED);
         m.setTranscodeStatus(TranscodeStatus.NOT_NEEDED);
-        m.setFileSize(fileSize);
+        m.setHqSize(fileSize);
         m.setStatus(MediaLifecycleStatus.READY);
         return m;
     }
@@ -777,7 +777,7 @@ class MediaOperationPipelineIT {
         m.setLqStatus(LqStatus.NOT_GENERATED);
         m.setTranscodeStatus(TranscodeStatus.NOT_NEEDED);
         m.setContainer("avi");
-        m.setFileSize(5000L);
+        m.setHqSize(5000L);
         m.setStatus(MediaLifecycleStatus.READY);
         return m;
     }

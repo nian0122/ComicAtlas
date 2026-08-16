@@ -25,7 +25,7 @@ class MetadataModelMapperTest {
         m.setPageNumber(pageNumber);
         m.setHqStatus("READY");
         m.setLqStatus("NOT_GENERATED");
-        m.setFileSize(100L);
+        m.setHqSize(100L);
         return m;
     }
 

@@ -179,11 +179,12 @@ function onCommand(command: string) {
 
 <style scoped>
 .reader-toolbar {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  justify-content: space-between;
   height: 56px;
-  padding: 0 var(--space-lg);
+  gap: var(--space-lg);
+  padding: 0 clamp(16px, 2vw, 32px);
   background: var(--bg-primary);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
@@ -205,6 +206,20 @@ function onCommand(command: string) {
   gap: var(--space-base);
 }
 
+.toolbar-left {
+  min-width: 0;
+}
+
+.toolbar-center {
+  justify-self: center;
+}
+
+.toolbar-right {
+  justify-self: end;
+  min-width: 0;
+  gap: 8px;
+}
+
 .toolbar-title {
   font-size: 16px;
   font-weight: 600;
@@ -212,10 +227,15 @@ function onCommand(command: string) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 300px;
+  min-width: 0;
+  max-width: min(42vw, 560px);
 }
 
 .page-indicator {
+  min-width: 84px;
+  padding-inline: 14px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
   font-size: 13px;
   color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
@@ -299,6 +319,7 @@ function onCommand(command: string) {
 
 @media (max-width: 1024px) {
   .reader-toolbar {
+    display: flex;
     flex-wrap: wrap;
     height: auto;
     padding: var(--space-sm) var(--space-base);
@@ -310,6 +331,35 @@ function onCommand(command: string) {
   .toolbar-center {
     flex: 1 1 100%;
     justify-content: center;
+  }
+
+  .toolbar-left,
+  .toolbar-right,
+  .toolbar-center {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 1200px) and (min-width: 1025px) {
+  .reader-toolbar {
+    gap: 12px;
+    padding-inline: 16px;
+  }
+
+  .toolbar-right {
+    gap: 4px;
+  }
+
+  .toolbar-select {
+    width: 78px;
+  }
+
+  .toolbar-title {
+    max-width: 260px;
+  }
+
+  .chapter-btn {
+    padding-inline: 8px;
   }
 }
 </style>

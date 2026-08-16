@@ -34,9 +34,7 @@ public class Comic {
     private String description;
     /** 总页数（默认 0） */
     private Integer totalPages;
-    /** 文件总大小（字节） */
-    private Long fileSize;
-    /** HQ 图片占用大小（字节） */
+    /** HQ 文件占用大小（字节） */
     private Long hqSize;
     /** LQ 图片占用大小（字节） */
     private Long lqSize;

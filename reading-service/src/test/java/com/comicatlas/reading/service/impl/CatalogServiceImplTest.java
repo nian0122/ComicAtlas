@@ -1,7 +1,7 @@
 package com.comicatlas.reading.service.impl;
 
-import com.comicatlas.contract.comic.dto.CatalogNode;
-import com.comicatlas.contract.comic.dto.ChapterRef;
+import com.comicatlas.reading.dto.CatalogNode;
+import com.comicatlas.reading.dto.ChapterRef;
 import com.comicatlas.persistence.comic.entity.Catalog;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Comic;
@@ -10,9 +10,11 @@ import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.contract.common.enums.ComicStatus;
+import com.comicatlas.reading.testutil.MybatisPlusLambdaCacheExtension;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.util.List;
 
@@ -30,6 +32,7 @@ import static org.mockito.Mockito.when;
  * <p>覆盖 buildTree 的三种兼容形态（纯平铺/纯目录/根混合）、递归后序锚点、
  * 孤儿章节归根、确定性排序与 READY 状态过滤。
  */
+@ExtendWith(MybatisPlusLambdaCacheExtension.class)
 class CatalogServiceImplTest {
 
     private static final Long COMIC_ID = 10L;
@@ -45,7 +48,7 @@ class CatalogServiceImplTest {
         Comic comic = new Comic();
         comic.setId(COMIC_ID);
         comic.setStatus(ComicStatus.READY);
-        when(comicMapper.selectById(any())).thenReturn(comic);
+        when(comicMapper.selectOne(any())).thenReturn(comic);
     }
 
     private static Catalog cat(Long id, Long parentId, String title, int sortOrder) {

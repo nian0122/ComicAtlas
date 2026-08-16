@@ -1,11 +1,11 @@
 package com.comicatlas.api.comic.controller;
 
 import com.comicatlas.contract.common.Result;
-import com.comicatlas.contract.comic.dto.ChapterCreateRequest;
-import com.comicatlas.contract.comic.dto.ChapterMoveRequest;
-import com.comicatlas.contract.comic.dto.ChapterRenameRequest;
-import com.comicatlas.contract.comic.dto.ChapterReorderRequest;
-import com.comicatlas.contract.comic.dto.ChapterVO;
+import com.comicatlas.api.comic.dto.ChapterVO;
+import com.comicatlas.api.comic.dto.ChapterCreateRequest;
+import com.comicatlas.api.comic.dto.ChapterMoveRequest;
+import com.comicatlas.api.comic.dto.ChapterRenameRequest;
+import com.comicatlas.api.comic.dto.ChapterReorderRequest;
 import com.comicatlas.api.comic.service.ChapterManagementService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

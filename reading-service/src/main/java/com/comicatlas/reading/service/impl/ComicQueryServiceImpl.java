@@ -4,9 +4,9 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.contract.comic.dto.ComicDetailVO;
-import com.comicatlas.contract.comic.dto.ComicListPage;
+import com.comicatlas.reading.dto.ComicListPage;
 import com.comicatlas.contract.comic.dto.ComicListQuery;
-import com.comicatlas.contract.comic.dto.ComicListVO;
+import com.comicatlas.reading.dto.ComicListVO;
 import com.comicatlas.contract.comic.dto.ComicMetadataDTO;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.exception.BusinessException;
@@ -16,6 +16,7 @@ import com.comicatlas.persistence.comic.entity.ComicTag;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.persistence.comic.mapper.ComicTagMapper;
 import com.comicatlas.reading.service.ComicListQueryService;
+import com.comicatlas.reading.service.ComicListQueryNormalizer;
 import com.comicatlas.reading.service.ComicQueryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -36,6 +37,7 @@ public class ComicQueryServiceImpl implements ComicQueryService {
 
     @Override
     public IPage<ComicListVO> listComics(ComicListQuery query) {
+        ComicListQueryNormalizer.normalize(query);
         // 直接调用 loadPage（走代理，触发 @Cacheable），再组装为 IPage 返回
         ComicListPage comicListPage = comicListQueryService.loadPage(query);
         Page<ComicListVO> page = new Page<>(
@@ -55,7 +57,10 @@ public class ComicQueryServiceImpl implements ComicQueryService {
 
     @Override
     public ComicMetadataDTO getMetadata(Long id) {
-        Comic comic = comicMapper.selectById(id);
+        Comic comic = comicMapper.selectOne(
+            new LambdaQueryWrapper<Comic>()
+                .select(Comic::getTitle, Comic::getAuthor, Comic::getDescription, Comic::getCategoryId)
+                .eq(Comic::getId, id));
         if (comic == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在");
         }
@@ -70,13 +75,16 @@ public class ComicQueryServiceImpl implements ComicQueryService {
 
     @Override
     public List<Long> getComicTags(Long comicId) {
-        Comic comic = comicMapper.selectById(comicId);
+        Comic comic = comicMapper.selectOne(
+            new LambdaQueryWrapper<Comic>().select(Comic::getId).eq(Comic::getId, comicId));
         if (comic == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在");
         }
 
         return comicTagMapper.selectList(
-                        new LambdaQueryWrapper<ComicTag>().eq(ComicTag::getComicId, comicId))
+                        new LambdaQueryWrapper<ComicTag>()
+                            .select(ComicTag::getTagId)
+                            .eq(ComicTag::getComicId, comicId))
                 .stream()
                 .map(ComicTag::getTagId)
                 .toList();

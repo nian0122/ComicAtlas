@@ -12,9 +12,9 @@ import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.enums.HqStatus;
 import com.comicatlas.contract.common.enums.LqStatus;
-import com.comicatlas.contract.common.enums.ManagementTaskStatus;
+import com.comicatlas.api.common.enums.ManagementTaskStatus;
 import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
-import com.comicatlas.contract.common.enums.TaskType;
+import com.comicatlas.api.common.enums.TaskType;
 import com.comicatlas.contract.common.enums.TranscodeStatus;
 import com.comicatlas.api.management.dto.OperationSubmitResultDTO;
 import com.comicatlas.api.management.entity.ManagementTask;
@@ -189,7 +189,7 @@ class MetadataRefreshRealChainIT {
         comic.setStoragePolicy("MANAGED");
         comic.setTotalPages(0);
         comic.setHqSize(0L);
-        comic.setFileSize(0L);
+        comic.setHqSize(0L);
         comicMapper.insert(comic);
 
         Chapter ch41 = chapter(41L, 1L, 0);
@@ -330,7 +330,7 @@ class MetadataRefreshRealChainIT {
 
         // ---- 差异合并断言 ----
         Media m101 = mediaMapper.selectById(101L);
-        assertThat(m101.getFileSize()).isEqualTo(2500L);          // 尺寸变化已更新
+        assertThat(m101.getHqSize()).isEqualTo(2500L);          // 尺寸变化已更新
         assertThat(m101.getHqStatus()).isEqualTo(HqStatus.READY);
         assertThat(m101.getMediaType()).isEqualTo("IMAGE");
         assertThat(m101.getPageNumber()).isEqualTo(1);
@@ -339,7 +339,7 @@ class MetadataRefreshRealChainIT {
         assertThat(m101.getLqPath()).isEqualTo("1/42/001.webp");
 
         Media m102 = mediaMapper.selectById(102L);
-        assertThat(m102.getFileSize()).isEqualTo(6000L);
+        assertThat(m102.getHqSize()).isEqualTo(6000L);
         assertThat(m102.getMediaType()).isEqualTo("VIDEO");
         assertThat(m102.getWidth()).isEqualTo(1280);
         assertThat(m102.getHeight()).isEqualTo(720);
@@ -350,7 +350,7 @@ class MetadataRefreshRealChainIT {
 
         Media m103 = mediaMapper.selectById(103L);
         assertThat(m103.getHqStatus()).isEqualTo(HqStatus.MISSING); // 缺失 HQ → MISSING
-        assertThat(m103.getFileSize()).isZero();
+        assertThat(m103.getHqSize()).isZero();
 
         // 新增图片 004.jpg：pageNumber 从本章最大页码 +1 追加
         Media new004 = mediaMapper.selectOne(new LambdaQueryWrapper<Media>()
@@ -358,7 +358,7 @@ class MetadataRefreshRealChainIT {
         assertThat(new004).isNotNull();
         assertThat(new004.getPageNumber()).isEqualTo(4);
         assertThat(new004.getHqStatus()).isEqualTo(HqStatus.READY);
-        assertThat(new004.getFileSize()).isEqualTo(8888L);
+        assertThat(new004.getHqSize()).isEqualTo(8888L);
         assertThat(new004.getLqStatus()).isEqualTo(LqStatus.NOT_GENERATED);
         assertThat(new004.getStatus()).isEqualTo(MediaLifecycleStatus.READY);
 
@@ -377,7 +377,7 @@ class MetadataRefreshRealChainIT {
         Comic reloaded = comicMapper.selectById(comic.getId());
         assertThat(reloaded.getTotalPages()).isEqualTo(5);
         assertThat(reloaded.getHqSize()).isEqualTo(18388L);
-        assertThat(reloaded.getFileSize()).isEqualTo(18388L);
+        assertThat(reloaded.getHqSize()).isEqualTo(18388L);
 
         // Outbox：metadata 重导出事件入箱（exchange/routingKey 契约）
         OutboxMessage msg = outboxMapper.selectOne(new LambdaQueryWrapper<OutboxMessage>()
@@ -417,7 +417,7 @@ class MetadataRefreshRealChainIT {
                 "task FAILED");
         assertThat(comicMapper.selectById(comic.getId()).getStatus()).isEqualTo(ComicStatus.READY);
         // 零提交
-        assertThat(mediaMapper.selectById(101L).getFileSize()).isEqualTo(1000L);
+        assertThat(mediaMapper.selectById(101L).getHqSize()).isEqualTo(1000L);
         assertThat(mediaMapper.selectCount(new LambdaQueryWrapper<Media>()
                 .eq(Media::getHqPath, "1/42/004.jpg"))).isZero();
         assertThat(outboxMapper.selectCount(new LambdaQueryWrapper<OutboxMessage>()
@@ -447,7 +447,7 @@ class MetadataRefreshRealChainIT {
 
         await(() -> taskItemMapper.selectById(item.getId()).getStatus() == ManagementTaskStatus.FAILED,
                 "item FAILED");
-        assertThat(mediaMapper.selectById(101L).getFileSize()).isEqualTo(1000L);
+        assertThat(mediaMapper.selectById(101L).getHqSize()).isEqualTo(1000L);
         assertThat(mediaMapper.selectCount(new LambdaQueryWrapper<Media>()
                 .eq(Media::getChapterId, 999L))).isZero();
     }
@@ -473,7 +473,7 @@ class MetadataRefreshRealChainIT {
 
         await(() -> taskItemMapper.selectById(item.getId()).getStatus() == ManagementTaskStatus.FAILED,
                 "item FAILED");
-        assertThat(mediaMapper.selectById(101L).getFileSize()).isEqualTo(1000L);
+        assertThat(mediaMapper.selectById(101L).getHqSize()).isEqualTo(1000L);
         assertThat(mediaMapper.selectCount(new LambdaQueryWrapper<Media>()
                 .eq(Media::getHqPath, "1/42/004.jpg"))).isZero();
     }
@@ -504,7 +504,7 @@ class MetadataRefreshRealChainIT {
         // 不二次 apply：新增 004.jpg 仍只有 1 行、101 尺寸不被覆盖
         assertThat(mediaMapper.selectCount(new LambdaQueryWrapper<Media>()
                 .eq(Media::getHqPath, "1/42/004.jpg"))).isEqualTo(1);
-        assertThat(mediaMapper.selectById(101L).getFileSize()).isEqualTo(2500L);
+        assertThat(mediaMapper.selectById(101L).getHqSize()).isEqualTo(2500L);
         assertThat(outboxMapper.selectCount(new LambdaQueryWrapper<OutboxMessage>()
                 .eq(OutboxMessage::getEventType, "MetadataRefreshEvent"))).isEqualTo(1);
     }
@@ -533,7 +533,7 @@ class MetadataRefreshRealChainIT {
         assertThat(taskItemMapper.selectById(item.getId()).getAttempt()).isEqualTo(2);
         assertThat(taskItemMapper.selectById(item.getId()).getStatus()).isEqualTo(ManagementTaskStatus.RUNNING);
         assertThat(comicMapper.selectById(comic.getId()).getStatus()).isEqualTo(ComicStatus.REFRESHING);
-        assertThat(mediaMapper.selectById(101L).getFileSize()).isEqualTo(1000L);
+        assertThat(mediaMapper.selectById(101L).getHqSize()).isEqualTo(1000L);
     }
 
     // ======================== 基础设施：快照缺失 → DLQ ========================
@@ -595,7 +595,7 @@ class MetadataRefreshRealChainIT {
                 "task SUCCEEDED");
         assertThat(taskMapper.selectById(cmd.taskId()).getAttempt()).isEqualTo(2);
         assertThat(comicMapper.selectById(comic.getId()).getStatus()).isEqualTo(ComicStatus.READY);
-        assertThat(mediaMapper.selectById(101L).getFileSize()).isEqualTo(2500L);
+        assertThat(mediaMapper.selectById(101L).getHqSize()).isEqualTo(2500L);
         assertThat(mediaMapper.selectCount(new LambdaQueryWrapper<Media>()
                 .eq(Media::getHqPath, "1/42/004.jpg"))).isEqualTo(1);
     }
@@ -760,7 +760,7 @@ class MetadataRefreshRealChainIT {
         m.setHqStatus(HqStatus.READY);
         m.setLqStatus(lqStatus);
         m.setTranscodeStatus(TranscodeStatus.NOT_NEEDED);
-        m.setFileSize(fileSize);
+        m.setHqSize(fileSize);
         m.setStatus(MediaLifecycleStatus.valueOf(lifecycleStatus));
         m.setWidth(800);
         m.setHeight(1200);

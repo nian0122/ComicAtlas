@@ -13,13 +13,13 @@ import com.comicatlas.persistence.comic.mapper.MediaMapper;
 import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.enums.HqStatus;
-import com.comicatlas.contract.common.enums.ImportTaskStatus;
+import com.comicatlas.api.common.enums.ImportTaskStatus;
 import com.comicatlas.contract.common.enums.LqStatus;
 import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
-import com.comicatlas.contract.common.enums.TaskType;
+import com.comicatlas.api.common.enums.TaskType;
 import com.comicatlas.contract.common.enums.TranscodeStatus;
-import com.comicatlas.persistence.storage.ApiStorageProperties;
-import com.comicatlas.persistence.storage.ApiStorageRoot;
+import com.comicatlas.api.storage.ApiStorageProperties;
+import com.comicatlas.api.storage.ApiStorageRoot;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.exception.ImportMetadataException;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
@@ -93,6 +93,7 @@ class ImportPersistenceServiceTest {
     @Mock private ManagementTaskService managementTaskService;
     @Mock private OutboxService outboxService;
     @Mock private ApiStorageProperties storageProperties;
+    @Mock private com.comicatlas.api.storage.service.MetadataUpdateCoordinator metadataUpdateCoordinator;
 
     @InjectMocks private ImportPersistenceServiceImpl service;
 
@@ -236,7 +237,7 @@ class ImportPersistenceServiceTest {
         media.setHqPath(chapterId + "/001.jpg");
         media.setHqStatus(HqStatus.PENDING);
         media.setStatus(MediaLifecycleStatus.STAGING);
-        media.setFileSize(1024L);
+        media.setHqSize(1024L);
         return media;
     }
 
@@ -488,7 +489,7 @@ class ImportPersistenceServiceTest {
         media.setHqPath("100/0/001.jpg");
         media.setHqStatus(HqStatus.PENDING);
         media.setStatus(MediaLifecycleStatus.STAGING);
-        media.setFileSize(1024L);
+        media.setHqSize(1024L);
         when(mediaMapper.selectList(any(Wrapper.class))).thenReturn(List.of(media));
         when(mediaMapper.selectCount(any(Wrapper.class))).thenReturn(0L);
         when(mediaMapper.markImportFinalizedByChapter(1001L, "100/1001")).thenReturn(1);

@@ -2,9 +2,9 @@ package com.comicatlas.reading.cache;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.contract.comic.cache.ComicReferenceCache;
-import com.comicatlas.contract.comic.dto.ComicListPage;
+import com.comicatlas.reading.dto.ComicListPage;
 import com.comicatlas.contract.comic.dto.ComicListQuery;
-import com.comicatlas.contract.comic.dto.ComicListVO;
+import com.comicatlas.reading.dto.ComicListVO;
 import com.comicatlas.persistence.comic.entity.Category;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.entity.Tag;
@@ -21,8 +21,10 @@ import com.comicatlas.reading.service.TagQueryService;
 import com.comicatlas.reading.service.impl.CategoryQueryServiceImpl;
 import com.comicatlas.reading.service.impl.ComicListQueryServiceImpl;
 import com.comicatlas.reading.service.impl.TagQueryServiceImpl;
+import com.comicatlas.reading.testutil.MybatisPlusLambdaCacheExtension;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
@@ -52,6 +54,7 @@ import static org.mockito.Mockito.when;
  * 不在本测试覆盖。
  */
 @SpringJUnitConfig(ComicReferenceCacheTest.TestConfig.class)
+@ExtendWith(MybatisPlusLambdaCacheExtension.class)
 class ComicReferenceCacheTest {
 
     @Autowired

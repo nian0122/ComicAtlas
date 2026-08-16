@@ -463,7 +463,7 @@ onBeforeUnmount(() => {
   }
 
   .mobile-tabbar--library .mobile-tab.active {
-    color: var(--color-brand-pale);
+    color: var(--color-brand);
   }
 
   .mobile-tabbar--history .mobile-tab.active {

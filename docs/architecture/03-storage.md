@@ -159,7 +159,7 @@ storage:
 | `lqPath` | `String` | LQ 相对路径 |
 | `hqStatus` | `String` | HQ 文件状态（如 `READY`） |
 | `lqStatus` | `String` | LQ 文件状态（如 `NOT_GENERATED`） |
-| `fileSize` | `Long` | HQ 文件大小（字节） |
+| `hqSize` | `Long` | HQ 文件大小（字节） |
 | `lqSize` | `Long` | LQ 文件大小（字节） |
 | `width` | `Integer` | 图片宽度（像素） |
 | `height` | `Integer` | 图片高度（像素） |
@@ -168,7 +168,7 @@ storage:
 
 - `hqRoot` + `hqPath` 组合定位 HQ 文件。`hqRoot` 对应 `StorageRoot` 的 map key，`hqPath` 是该根下的相对路径。
 - `hqPath` 最终形态为 `{comicId}/{chapterId}/{fileName}`；最终化前为 `{comicId}/{globalOrder}/{fileName}`（PENDING），由 API 在 finalize completed 时按事件 `targetDir` 修正。
-- `fileSize` 记录 HQ 原始文件大小，`lqSize` 记录 LQ 文件大小。注意 HQ 文件大小字段名为 `fileSize`。
+- `hqSize` 记录 HQ 原始文件大小，`lqSize` 记录 LQ 文件大小。数据库字段分别为 `hq_size` 与 `lq_size`。
 - `lqStatus` 初始值为 `NOT_GENERATED`，LQ 不自动生成，需手动触发。
 - `hq_status` 生命周期：`PENDING`（staging 落库）→ `READY`（最终化完成）→ `DELETED`（HQ 删除后），另有 `MISSING`（文件丢失）、`DELETE_QUEUED`/`DELETING`/`FAILED`。
 - `width` / `height` 为图片尺寸元数据，在导入时提取。

@@ -22,11 +22,11 @@ import com.comicatlas.common.event.payload.FinalizeMediaMapping;
 import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.enums.HqStatus;
-import com.comicatlas.contract.common.enums.ImportTaskStatus;
+import com.comicatlas.api.common.enums.ImportTaskStatus;
 import com.comicatlas.contract.common.enums.LqStatus;
-import com.comicatlas.contract.common.enums.ManagementTaskStatus;
+import com.comicatlas.api.common.enums.ManagementTaskStatus;
 import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
-import com.comicatlas.contract.common.enums.TaskType;
+import com.comicatlas.api.common.enums.TaskType;
 import com.comicatlas.contract.common.enums.TranscodeStatus;
 import com.comicatlas.persistence.comic.entity.Catalog;
 import com.comicatlas.persistence.comic.entity.Chapter;
@@ -36,7 +36,8 @@ import com.comicatlas.persistence.comic.mapper.CatalogMapper;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.persistence.comic.mapper.MediaMapper;
-import com.comicatlas.persistence.storage.ApiStorageProperties;
+import com.comicatlas.api.storage.ApiStorageProperties;
+import com.comicatlas.api.storage.service.MetadataUpdateCoordinator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -123,6 +124,7 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
     private final ManagementTaskService managementTaskService;
     private final OutboxService outboxService;
     private final ApiStorageProperties storageProperties;
+    private final MetadataUpdateCoordinator metadataUpdateCoordinator;
 
     @Value("${MANGA_ROOT:}")
     private String mangaRoot;
@@ -219,7 +221,6 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
 
         comic.setTotalPages(totalPages);
         if (totalSize > 0) {
-            comic.setFileSize(totalSize);
             comic.setHqSize(totalSize);
         }
         comicMapper.updateById(comic);
@@ -337,7 +338,7 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
             media.setTranscodeStatus(TranscodeStatus.NOT_NEEDED);
             media.setStatus(MediaLifecycleStatus.STAGING);
             if (mediaData.get("fileSize") != null) {
-                media.setFileSize(((Number) mediaData.get("fileSize")).longValue());
+                media.setHqSize(((Number) mediaData.get("fileSize")).longValue());
             }
             if (mediaData.get("width") != null) {
                 media.setWidth(((Number) mediaData.get("width")).intValue());
@@ -376,7 +377,7 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
             }
 
             mediaList.add(media);
-            totalSize += media.getFileSize() != null ? media.getFileSize() : 0;
+            totalSize += media.getHqSize() != null ? media.getHqSize() : 0;
             pageCount++;
             if (fileName != null && !fileName.isBlank()) {
                 mappings.add(new FinalizeMediaMapping(fileName, fileName));
@@ -506,14 +507,13 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
                 new LambdaQueryWrapper<Media>().in(Media::getChapterId, chapterIds));
         long totalSize = 0;
         for (Media media : allMedia) {
-            if (media.getFileSize() != null) {
-                totalSize += media.getFileSize();
+            if (media.getHqSize() != null) {
+                totalSize += media.getHqSize();
             }
         }
         ManagementStateMachine.validateComicTransition(comic.getStatus().name(), ComicStatus.READY.name());
         comic.setTotalPages(allMedia.size());
         if (totalSize > 0) {
-            comic.setFileSize(totalSize);
             comic.setHqSize(totalSize);
         }
         comic.setStatus(ComicStatus.READY);
@@ -536,6 +536,9 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
                     RESULT_REF_TYPE_IMPORT_TASK, taskId);
         }
         catalogCacheInvalidator.evict(comicId);
+        // 导入最终化完成（全 READY）：触发 metadata 同步，让 metadata.json 反映最终
+        // chapterId 布局与 READY 状态（导入写入的是 {taskId}/{comicId}.json 暂存态）
+        metadataUpdateCoordinator.requestSync(comicId, taskId, "导入最终化完成");
         log.info("导入最终化完成: comicId={}, taskId={}, mediaCount={}", comicId, taskId, allMedia.size());
     }
 

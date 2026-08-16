@@ -61,8 +61,8 @@ public class Media {
     private Integer width;
     /** 媒体高度（像素） */
     private Integer height;
-    /** 源文件字节数 */
-    private Long fileSize;
+    /** HQ 源文件字节数（图片原图或视频源文件） */
+    private Long hqSize;
     /** 媒体类型：IMAGE 或 VIDEO（默认 IMAGE，支持图片+视频混排） */
     private String mediaType;
     /** 视频时长（秒），仅 VIDEO 有意义 */

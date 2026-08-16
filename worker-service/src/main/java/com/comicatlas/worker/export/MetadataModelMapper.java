@@ -52,12 +52,13 @@ public class MetadataModelMapper {
                         media.getPageNumber() != null ? media.getPageNumber() : 0,
                         media.getHqStatus() != null ? media.getHqStatus() : "READY",
                         media.getLqStatus() != null ? media.getLqStatus() : "NOT_GENERATED",
-                        media.getFileSize() != null ? media.getFileSize() : 0L,
+                        media.getHqSize() != null ? media.getHqSize() : 0L,
                         media.getMediaType() != null ? media.getMediaType() : "IMAGE",
                         media.getWidth(), media.getHeight(),
                         media.getDuration() != null ? BigDecimal.valueOf(media.getDuration()) : null,
                         media.getContainer(),
                         media.getVideoCodec(), media.getAudioCodec(),
+                        media.getLqSize() != null ? media.getLqSize() : 0L,
                         hqPath));
             }
             chapters.add(new MetadataV3.Chapter(

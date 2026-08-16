@@ -7,7 +7,7 @@ import com.comicatlas.api.comic.service.ComicManagementService;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
-import com.comicatlas.contract.common.exception.ConflictException;
+import com.comicatlas.api.common.exception.ConflictException;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
 import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.management.trash.TrashLifecycleService;
@@ -21,14 +21,14 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
-import com.comicatlas.contract.comic.dto.BatchComicUpdateDTO;
-import com.comicatlas.contract.comic.dto.BatchUpdateResultVO;
+import com.comicatlas.api.comic.dto.BatchComicUpdateRequest;
+import com.comicatlas.api.comic.dto.ComicMetadataUpdateRequest;
+import com.comicatlas.api.comic.dto.ComicTagUpdateRequest;
+import com.comicatlas.api.comic.dto.CreateComicRequest;
+import com.comicatlas.api.comic.dto.UpdateComicRequest;
+import com.comicatlas.api.comic.dto.BatchUpdateResultVO;
 import com.comicatlas.contract.comic.dto.ComicDetailVO;
 import com.comicatlas.contract.comic.dto.ComicMetadataDTO;
-import com.comicatlas.contract.comic.dto.ComicMetadataUpdateDTO;
-import com.comicatlas.contract.comic.dto.ComicTagUpdateDTO;
-import com.comicatlas.contract.comic.dto.CreateComicRequest;
-import com.comicatlas.contract.comic.dto.UpdateComicRequest;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.mapper.CategoryMapper;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
@@ -150,7 +150,7 @@ public class ComicManagementServiceImpl implements ComicManagementService {
 
     @Override
     @Transactional
-    public ComicMetadataDTO updateMetadata(Long id, ComicMetadataUpdateDTO dto) {
+    public ComicMetadataDTO updateMetadata(Long id, ComicMetadataUpdateRequest dto) {
         Comic comic = comicMapper.selectById(id);
         if (comic == null) { throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在"); }
 
@@ -178,7 +178,7 @@ public class ComicManagementServiceImpl implements ComicManagementService {
 
     @Override
     @Transactional
-    public void updateComicTags(Long comicId, ComicTagUpdateDTO dto) {
+    public void updateComicTags(Long comicId, ComicTagUpdateRequest dto) {
         Comic comic = comicMapper.selectById(comicId);
         if (comic == null) { throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在"); }
 
@@ -206,7 +206,7 @@ public class ComicManagementServiceImpl implements ComicManagementService {
 
     @Override
     @Transactional
-    public BatchUpdateResultVO batchUpdate(BatchComicUpdateDTO dto) {
+    public BatchUpdateResultVO batchUpdate(BatchComicUpdateRequest dto) {
         List<BatchUpdateResultVO.FailedItem> failed = new ArrayList<>();
         int succeeded = 0;
 

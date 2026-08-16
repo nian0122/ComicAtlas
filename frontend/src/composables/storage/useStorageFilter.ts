@@ -55,6 +55,10 @@ export function useStorageFilter(
     page.value = 1
   })
 
+  watch([() => sort.value.field, () => sort.value.order], () => {
+    page.value = 1
+  })
+
   const filteredList = computed(() => {
     const list = getComicList()
     return Array.isArray(list) ? list : []

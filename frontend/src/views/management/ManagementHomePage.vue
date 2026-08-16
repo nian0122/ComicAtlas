@@ -60,11 +60,11 @@
             <h2 id="recent-management-title">最近管理</h2>
             <p>最近更新过的漫画。</p>
           </div>
-          <router-link to="/manage/status" class="section-link">查看全部 <span aria-hidden="true">→</span></router-link>
+          <router-link to="/manage/workbench?tab=status" class="section-link">查看全部 <span aria-hidden="true">→</span></router-link>
         </div>
 
         <div v-if="recentComics.length" class="comic-list">
-          <router-link v-for="comic in recentComics" :key="comic.id" :to="`/manage/comics/${comic.id}/edit`" class="comic-row">
+          <router-link v-for="comic in recentComics" :key="comic.id" :to="`/manage/comics/${comic.id}?tab=operations`" class="comic-row">
             <img :src="comic.coverUrl" :alt="`${comic.title} 封面`" class="comic-cover" loading="lazy" />
             <span class="comic-row-main">
               <strong>{{ comic.title }}</strong>
@@ -127,9 +127,9 @@ import type { ComicListVO, ManagementTaskStatus, ManagementTaskType, ManagementT
 
 const quickActions = [
   { to: '/manage/import', label: '导入漫画', icon: UploadFilled },
-  { to: '/manage/status', label: '扫描更新', icon: Refresh },
+  { to: '/manage/workbench?tab=status', label: '扫描更新', icon: Refresh },
   { to: '/manage/tasks', label: '任务中心', icon: List },
-  { to: '/manage/storage', label: '存储管理', icon: Coin },
+  { to: '/manage/workbench?tab=storage', label: '存储管理', icon: Coin },
   { to: '/manage/trash', label: '回收站', icon: Delete },
 ] as const
 

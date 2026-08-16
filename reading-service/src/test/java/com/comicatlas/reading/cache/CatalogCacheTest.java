@@ -1,7 +1,7 @@
 package com.comicatlas.reading.cache;
 
 import com.comicatlas.contract.comic.cache.ComicReferenceCache;
-import com.comicatlas.contract.comic.dto.CatalogNode;
+import com.comicatlas.reading.dto.CatalogNode;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.mapper.CatalogMapper;
@@ -12,8 +12,10 @@ import com.comicatlas.reading.config.RedisConfig;
 import com.comicatlas.reading.controller.CatalogController;
 import com.comicatlas.reading.service.CatalogService;
 import com.comicatlas.reading.service.impl.CatalogServiceImpl;
+import com.comicatlas.reading.testutil.MybatisPlusLambdaCacheExtension;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
@@ -51,6 +53,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 负责，其测试位于 api-service。
  */
 @SpringJUnitConfig(CatalogCacheTest.TestConfig.class)
+@ExtendWith(MybatisPlusLambdaCacheExtension.class)
 class CatalogCacheTest {
 
     @Autowired
@@ -70,7 +73,7 @@ class CatalogCacheTest {
         Comic comic = new Comic();
         comic.setId(1L);
         comic.setStatus(ComicStatus.READY);
-        when(comicMapper.selectById(any())).thenReturn(comic);
+        when(comicMapper.selectOne(any())).thenReturn(comic);
         var cache = cacheManager.getCache(ComicReferenceCache.CATALOG);
         if (cache != null) {
             cache.clear();

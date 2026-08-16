@@ -59,6 +59,7 @@ public class MetadataJsonBuilder {
                 mNode.put("lqStatus", media.lqStatus() != null ? media.lqStatus() : "NOT_GENERATED");
                 mNode.put("fileSize", media.fileSize());
                 mNode.put("mediaType", media.mediaType() != null ? media.mediaType() : "IMAGE");
+                mNode.put("lqSize", media.lqSize());
                 if (media.width() != null) { mNode.put("width", media.width()); }
                 if (media.height() != null) { mNode.put("height", media.height()); }
                 if (media.duration() != null) { mNode.put("duration", media.duration()); }

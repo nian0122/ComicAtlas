@@ -7,7 +7,7 @@ import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.enums.HqStatus;
 import com.comicatlas.contract.common.enums.LqStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
-import com.comicatlas.contract.common.exception.ConflictException;
+import com.comicatlas.api.common.exception.ConflictException;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.entity.Media;
@@ -23,7 +23,7 @@ import com.comicatlas.api.management.trash.TrashLifecycleService;
 import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
-import com.comicatlas.contract.common.enums.TaskType;
+import com.comicatlas.api.common.enums.TaskType;
 import com.comicatlas.contract.common.enums.TranscodeStatus;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.common.util.VideoPlayability;
@@ -158,11 +158,11 @@ public class MediaOperationCommandService {
 
         List<CreateManagementTaskRequest.TaskTarget> targets = new ArrayList<>();
         for (Chapter chapter : chapters) {
-            List<Media> pages = pagesByChapter.getOrDefault(chapter.getId(), List.of());
-            if (pages.isEmpty()) {
+            List<Media> mediaItems = pagesByChapter.getOrDefault(chapter.getId(), List.of());
+            if (mediaItems.isEmpty()) {
                 continue;
             }
-            validateHqDeletePrecondition(pages);
+            validateHqDeletePrecondition(mediaItems);
             targets.add(target("CHAPTER", chapter.getId(), TaskType.HQ_DELETE));
         }
         if (targets.isEmpty()) {

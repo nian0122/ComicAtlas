@@ -4,9 +4,9 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.contract.comic.cache.ComicReferenceCache;
-import com.comicatlas.contract.comic.dto.ComicListPage;
+import com.comicatlas.reading.dto.ComicListPage;
 import com.comicatlas.contract.comic.dto.ComicListQuery;
-import com.comicatlas.contract.comic.dto.ComicListVO;
+import com.comicatlas.reading.dto.ComicListVO;
 import com.comicatlas.persistence.comic.entity.Category;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.mapper.CategoryMapper;
@@ -16,6 +16,7 @@ import com.comicatlas.persistence.storage.FileUrlResolver;
 import com.comicatlas.persistence.reader.entity.ReadingHistory;
 import com.comicatlas.persistence.reader.mapper.ReadingHistoryMapper;
 import com.comicatlas.reading.service.ComicListQueryService;
+import com.comicatlas.reading.service.ComicListQueryNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -40,6 +41,7 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
 
     @Override
     public IPage<ComicListVO> listComics(ComicListQuery query) {
+        ComicListQueryNormalizer.normalize(query);
         // 直接委托 loadPage（缓存方法）。注意：本方法内部调用不触发 @Cacheable（自调用绕过代理），
         // 缓存生效路径由 ComicQueryServiceImpl 通过代理调用 loadPage 触发。
         ComicListPage comicListPage = loadPage(query);
@@ -59,8 +61,17 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
         key = "#root.target.cacheKey(#query)",
         unless = "#result == null || #result.getRecords().isEmpty()")
     public ComicListPage loadPage(ComicListQuery query) {
+        ComicListQueryNormalizer.normalize(query);
         Page<Comic> page = new Page<>(query.getPage(), query.getSize());
         IPage<Comic> result = comicMapper.selectPage(page, query);
+        long lastPage = result.getTotal() == 0
+                ? 1
+                : (result.getTotal() + query.getSize() - 1) / query.getSize();
+        if (query.getPage() > lastPage) {
+            query.setPage((int) lastPage);
+            page = new Page<>(lastPage, query.getSize());
+            result = comicMapper.selectPage(page, query);
+        }
         List<Comic> comics = result.getRecords();
         if (comics.isEmpty()) {
             IPage<ComicListVO> emptyPage = result.convert(comic ->
@@ -80,7 +91,9 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
 
         List<Long> comicIds = comics.stream().map(Comic::getId).toList();
         Map<Long, ReadingHistory> histories = historyMapper.selectList(
-                        new LambdaQueryWrapper<ReadingHistory>().in(ReadingHistory::getComicId, comicIds))
+                        new LambdaQueryWrapper<ReadingHistory>()
+                            .select(ReadingHistory::getComicId, ReadingHistory::getChapterId, ReadingHistory::getPageNumber)
+                            .in(ReadingHistory::getComicId, comicIds))
                 .stream()
                 .collect(Collectors.toMap(ReadingHistory::getComicId, history -> history));
 

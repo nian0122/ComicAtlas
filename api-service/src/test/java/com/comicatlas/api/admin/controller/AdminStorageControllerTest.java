@@ -60,6 +60,20 @@ class AdminStorageControllerTest {
     }
 
     @Test
+    void listComics_页码和每页数量超出范围时自动校正() {
+        ComicStorageQuery query = comicQuery();
+        when(storageQueryService.countComics(query)).thenReturn(21L);
+        when(storageQueryService.listComics(query, 21, 1)).thenReturn(List.of());
+
+        Result<Map<String, Object>> result = controller().listComics(99, 0, query);
+
+        Map<String, Object> data = result.getData();
+        assertEquals(21, data.get("pages"));
+        assertEquals(21, data.get("current"));
+        assertEquals(1, data.get("size"));
+    }
+
+    @Test
     void getComic_存在时返回漫画存储信息() {
         ComicStorageDTO dto = new ComicStorageDTO();
         dto.setComicId(1L);

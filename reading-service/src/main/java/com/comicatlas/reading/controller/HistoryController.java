@@ -1,8 +1,9 @@
 package com.comicatlas.reading.controller;
 
 import com.comicatlas.contract.common.Result;
-import com.comicatlas.contract.reader.dto.HistoryUpdateRequest;
-import com.comicatlas.contract.reader.dto.HistoryVO;
+import com.comicatlas.reading.dto.HistoryUpdateRequest;
+import com.comicatlas.reading.dto.HistoryPageVO;
+import com.comicatlas.reading.dto.HistoryVO;
 import com.comicatlas.reading.service.HistoryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -33,6 +35,16 @@ public class HistoryController {
     @GetMapping
     public Result<?> listHistory() {
         return Result.ok(historyService.listHistory());
+    }
+
+    /**
+     * 分页查询阅读历史，供历史页滚动加载使用。
+     */
+    @GetMapping("/page")
+    public Result<HistoryPageVO> pageHistory(
+            @RequestParam(defaultValue = "1") long page,
+            @RequestParam(defaultValue = "20") long size) {
+        return Result.ok(historyService.pageHistory(page, size));
     }
 
     /**

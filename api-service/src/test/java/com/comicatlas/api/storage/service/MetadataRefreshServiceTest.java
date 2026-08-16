@@ -5,9 +5,9 @@ import com.comicatlas.contract.common.enums.LqStatus;
 import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
 import com.comicatlas.contract.common.enums.TranscodeStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
-import com.comicatlas.persistence.storage.ApiStorageProperties;
-import com.comicatlas.persistence.storage.ApiStorageRoot;
-import com.comicatlas.persistence.storage.PathTraversalException;
+import com.comicatlas.api.storage.ApiStorageProperties;
+import com.comicatlas.api.storage.ApiStorageRoot;
+import com.comicatlas.api.storage.PathTraversalException;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.entity.Media;
@@ -296,7 +296,7 @@ class MetadataRefreshServiceTest {
             m.setLqPath(hqPath.replace(".jpg", ".webp").replace(".mp4", ".webp"));
             m.setTranscodeStatus(TranscodeStatus.NOT_NEEDED);
             m.setStatus(MediaLifecycleStatus.READY);
-            m.setFileSize(fileSize);
+            m.setHqSize(fileSize);
             m.setMediaType(mediaType);
             m.setWidth(800);
             m.setHeight(1200);
@@ -359,18 +359,18 @@ class MetadataRefreshServiceTest {
             assertThat(result.inserted()).isEqualTo(1);
 
             // m101 更新为扫描值
-            assertThat(m101.getFileSize()).isEqualTo(123456L);
+            assertThat(m101.getHqSize()).isEqualTo(123456L);
             assertThat(m101.getHqStatus()).isEqualTo(HqStatus.READY);
             assertThat(m101.getMediaType()).isEqualTo("IMAGE");
             assertThat(m101.getDuration()).isNull();
             // m102 视频字段更新
-            assertThat(m102.getFileSize()).isEqualTo(654321L);
+            assertThat(m102.getHqSize()).isEqualTo(654321L);
             assertThat(m102.getMediaType()).isEqualTo("VIDEO");
             assertThat(m102.getDuration()).isEqualByComparingTo("12.500");
             assertThat(m102.getContainer()).isEqualTo("mp4");
             // m103 未匹配 → MISSING + fileSize=0
             assertThat(m103.getHqStatus()).isEqualTo(HqStatus.MISSING);
-            assertThat(m103.getFileSize()).isZero();
+            assertThat(m103.getHqSize()).isZero();
             // m202 未匹配 → MISSING
             assertThat(m202.getHqStatus()).isEqualTo(HqStatus.MISSING);
 
@@ -528,6 +528,168 @@ class MetadataRefreshServiceTest {
 
             assertThatThrownBy(() -> service.applyValidatedSnapshot(applied))
                     .isInstanceOf(DuplicateKeyException.class);
+        }
+
+        @Test
+        @DisplayName("LQ 以本地文件为准：快照 lqStatus=READY 时更新 DB 为 READY + lqSize")
+        void lqSnapshotReady_updatesDbLqReady() {
+            Chapter c42 = chapter(42L, 1);
+            when(chapterMapper.selectList(any())).thenReturn(List.of(c42));
+            Media m101 = media(101L, 42L, "1/42/001.jpg", 1, "READY", 100L, "IMAGE", 1);
+            m101.setLqStatus(LqStatus.NOT_GENERATED);
+            when(mediaMapper.selectList(any())).thenReturn(List.of(m101));
+            when(mediaMapper.updateRefreshBatch(anyList())).thenReturn(1);
+
+            MetadataRefreshSnapshotDTO snapshot = new MetadataRefreshSnapshotDTO(1, 1L,
+                    Instant.parse("2026-08-09T00:00:00Z"), null,
+                    List.of(new MetadataRefreshSnapshotDTO.ChapterSnapshot(42L, 1,
+                            List.of(new MetadataRefreshSnapshotDTO.MediaSnapshot(101L, 1,
+                                    "1/42/001.jpg", "READY", "READY", 1,
+                                    100L, "IMAGE", 800, 1200, null, null, null, null,
+                                    "READY", 8888L)),
+                            List.of())));
+            String revision = MetadataSnapshotRevision.compute(snapshot);
+            MetadataRefreshSnapshotDTO applied =
+                    new MetadataRefreshSnapshotDTO(snapshot.schemaVersion(), snapshot.comicId(),
+                            snapshot.generatedAt(), revision, snapshot.chapters());
+
+            service.applyValidatedSnapshot(applied);
+
+            assertThat(m101.getLqStatus()).isEqualTo(LqStatus.READY);
+            assertThat(m101.getLqSize()).isEqualTo(8888L);
+        }
+
+        @Test
+        @DisplayName("LQ 以本地文件为准：快照 lqStatus=NOT_GENERATED 时校正 DB 旧 READY")
+        void lqSnapshotMissing_correctsDbLqReadyToNotGenerated() {
+            Chapter c42 = chapter(42L, 1);
+            when(chapterMapper.selectList(any())).thenReturn(List.of(c42));
+            Media m101 = media(101L, 42L, "1/42/001.jpg", 1, "READY", 100L, "IMAGE", 1);
+            m101.setLqStatus(LqStatus.READY); // DB 旧状态：LQ READY（但磁盘 LQ 已不存在）
+            m101.setLqSize(5555L);
+            when(mediaMapper.selectList(any())).thenReturn(List.of(m101));
+            when(mediaMapper.updateRefreshBatch(anyList())).thenReturn(1);
+
+            // 快照旧构造器默认 lqStatus=NOT_GENERATED、lqSize=0（扫盘未发现 LQ 文件）
+            MetadataRefreshSnapshotDTO snapshot = new MetadataRefreshSnapshotDTO(1, 1L,
+                    Instant.parse("2026-08-09T00:00:00Z"), null,
+                    List.of(new MetadataRefreshSnapshotDTO.ChapterSnapshot(42L, 1,
+                            List.of(new MetadataRefreshSnapshotDTO.MediaSnapshot(101L, 1,
+                                    "1/42/001.jpg", "READY", "READY", 1,
+                                    100L, "IMAGE", 800, 1200, null, null, null, null)),
+                            List.of())));
+            String revision = MetadataSnapshotRevision.compute(snapshot);
+            MetadataRefreshSnapshotDTO applied =
+                    new MetadataRefreshSnapshotDTO(snapshot.schemaVersion(), snapshot.comicId(),
+                            snapshot.generatedAt(), revision, snapshot.chapters());
+
+            service.applyValidatedSnapshot(applied);
+
+            // 决策 1A：以本地文件为准——LQ 文件缺失即校正 NOT_GENERATED
+            assertThat(m101.getLqStatus()).isEqualTo(LqStatus.NOT_GENERATED);
+            assertThat(m101.getLqSize()).isZero();
+        }
+
+        @Test
+        @DisplayName("LQ 未匹配行标 MISSING 时保留 LQ 状态（hq 缺失 lq 存在）")
+        void unmatchedRow_keepsLqReady() {
+            Chapter c42 = chapter(42L, 1);
+            when(chapterMapper.selectList(any())).thenReturn(List.of(c42));
+            Media m103 = media(103L, 42L, "1/42/003.jpg", 3, "READY", 200L, "IMAGE", 1);
+            m103.setLqStatus(LqStatus.READY);
+            m103.setLqSize(999L);
+            when(mediaMapper.selectList(any())).thenReturn(List.of(m103));
+            when(mediaMapper.updateRefreshBatch(anyList())).thenReturn(1);
+
+            // 快照只有 001.jpg（003.jpg 未出现 → 磁盘 HQ 缺失）
+            MetadataRefreshSnapshotDTO snapshot = new MetadataRefreshSnapshotDTO(1, 1L,
+                    Instant.parse("2026-08-09T00:00:00Z"), null,
+                    List.of(new MetadataRefreshSnapshotDTO.ChapterSnapshot(42L, 1,
+                            List.of(new MetadataRefreshSnapshotDTO.MediaSnapshot(101L, 1,
+                                    "1/42/001.jpg", "READY", "READY", 1,
+                                    100L, "IMAGE", 800, 1200, null, null, null, null)),
+                            List.of())));
+            String revision = MetadataSnapshotRevision.compute(snapshot);
+            MetadataRefreshSnapshotDTO applied =
+                    new MetadataRefreshSnapshotDTO(snapshot.schemaVersion(), snapshot.comicId(),
+                            snapshot.generatedAt(), revision, snapshot.chapters());
+
+            service.applyValidatedSnapshot(applied);
+
+            // HQ 标 MISSING，LQ 保留 READY（阅读器仍可用 LQ 兜底）
+            assertThat(m103.getHqStatus()).isEqualTo(HqStatus.MISSING);
+            assertThat(m103.getLqStatus()).isEqualTo(LqStatus.READY);
+            assertThat(m103.getLqSize()).isEqualTo(999L);
+        }
+
+        @Test
+        @DisplayName("仅 LQ 行：快照 lqStatus=READY 时校正 DB 为 READY + lqSize，HQ 字段不动")
+        void lqOnlyRow_snapshotReady_updatesDbLqReady() {
+            Chapter c42 = chapter(42L, 1);
+            when(chapterMapper.selectList(any())).thenReturn(List.of(c42));
+            Media m101 = media(101L, 42L, "1/42/001.jpg", 1, "DELETED", 0L, "IMAGE", 1);
+            m101.setHqPath(null);
+            m101.setHqRoot(null);
+            m101.setLqPath("1/42/001.webp");
+            m101.setLqStatus(LqStatus.NOT_GENERATED);
+            when(mediaMapper.selectList(any())).thenReturn(List.of(m101));
+            when(mediaMapper.updateRefreshBatch(anyList())).thenReturn(1);
+
+            // 快照条目：hqStatus=DELETED 标记仅 LQ，hqPath 为 LQ 文件名，LQ 事实 READY
+            MetadataRefreshSnapshotDTO snapshot = new MetadataRefreshSnapshotDTO(1, 1L,
+                    Instant.parse("2026-08-09T00:00:00Z"), null,
+                    List.of(new MetadataRefreshSnapshotDTO.ChapterSnapshot(42L, 1,
+                            List.of(new MetadataRefreshSnapshotDTO.MediaSnapshot(101L, 1,
+                                    "1/42/001.webp", "DELETED", "READY", 1,
+                                    0L, "IMAGE", null, null, null, null, null, null,
+                                    "READY", 8888L)),
+                            List.of())));
+            String revision = MetadataSnapshotRevision.compute(snapshot);
+            MetadataRefreshSnapshotDTO applied =
+                    new MetadataRefreshSnapshotDTO(snapshot.schemaVersion(), snapshot.comicId(),
+                            snapshot.generatedAt(), revision, snapshot.chapters());
+
+            service.applyValidatedSnapshot(applied);
+
+            assertThat(m101.getLqStatus()).isEqualTo(LqStatus.READY);
+            assertThat(m101.getLqSize()).isEqualTo(8888L);
+            assertThat(m101.getHqStatus()).isEqualTo(HqStatus.DELETED);
+            assertThat(m101.getHqPath()).isNull();
+        }
+
+        @Test
+        @DisplayName("仅 LQ 行：快照 lqStatus=NOT_GENERATED 时校正 DB 旧 READY，HQ 字段不动")
+        void lqOnlyRow_snapshotMissing_correctsDbLqReadyToNotGenerated() {
+            Chapter c42 = chapter(42L, 1);
+            when(chapterMapper.selectList(any())).thenReturn(List.of(c42));
+            Media m101 = media(101L, 42L, "1/42/001.jpg", 1, "DELETED", 0L, "IMAGE", 1);
+            m101.setHqPath(null);
+            m101.setHqRoot(null);
+            m101.setLqPath("1/42/001.webp");
+            m101.setLqStatus(LqStatus.READY); // DB 旧状态：LQ READY（但磁盘 LQ 已不存在）
+            m101.setLqSize(5555L);
+            when(mediaMapper.selectList(any())).thenReturn(List.of(m101));
+            when(mediaMapper.updateRefreshBatch(anyList())).thenReturn(1);
+
+            MetadataRefreshSnapshotDTO snapshot = new MetadataRefreshSnapshotDTO(1, 1L,
+                    Instant.parse("2026-08-09T00:00:00Z"), null,
+                    List.of(new MetadataRefreshSnapshotDTO.ChapterSnapshot(42L, 1,
+                            List.of(new MetadataRefreshSnapshotDTO.MediaSnapshot(101L, 1,
+                                    "1/42/001.webp", "DELETED", "READY", 1,
+                                    0L, "IMAGE", null, null, null, null, null, null,
+                                    "NOT_GENERATED", 0L)),
+                            List.of())));
+            String revision = MetadataSnapshotRevision.compute(snapshot);
+            MetadataRefreshSnapshotDTO applied =
+                    new MetadataRefreshSnapshotDTO(snapshot.schemaVersion(), snapshot.comicId(),
+                            snapshot.generatedAt(), revision, snapshot.chapters());
+
+            service.applyValidatedSnapshot(applied);
+
+            assertThat(m101.getLqStatus()).isEqualTo(LqStatus.NOT_GENERATED);
+            assertThat(m101.getLqSize()).isZero();
+            assertThat(m101.getHqStatus()).isEqualTo(HqStatus.DELETED);
+            assertThat(m101.getHqPath()).isNull();
         }
     }
 }

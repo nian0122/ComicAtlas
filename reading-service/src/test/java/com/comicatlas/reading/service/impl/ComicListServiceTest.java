@@ -2,7 +2,7 @@ package com.comicatlas.reading.service.impl;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.contract.comic.dto.ComicListQuery;
-import com.comicatlas.contract.comic.dto.ComicListVO;
+import com.comicatlas.reading.dto.ComicListVO;
 import com.comicatlas.persistence.comic.entity.Category;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.mapper.CategoryMapper;
@@ -11,6 +11,7 @@ import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.persistence.storage.FileUrlResolver;
 import com.comicatlas.persistence.reader.entity.ReadingHistory;
 import com.comicatlas.persistence.reader.mapper.ReadingHistoryMapper;
+import com.comicatlas.reading.testutil.MybatisPlusLambdaCacheExtension;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -29,6 +30,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
+@ExtendWith(MybatisPlusLambdaCacheExtension.class)
 class ComicListServiceTest {
 
     @Mock

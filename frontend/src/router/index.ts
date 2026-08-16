@@ -66,14 +66,19 @@ const router = createRouter({
           component: () => import('@/views/management/ManagementHomePage.vue'),
         },
         {
-          path: 'status',
-          name: 'manage-status',
-          component: () => import('@/views/management/ComicStatusPage.vue'),
+          path: 'workbench',
+          name: 'manage-workbench',
+          redirect: { name: 'manage-comics' },
         },
         {
           path: 'operations',
           name: 'manage-operations',
-          component: () => import('@/views/management/ComicOperationsPage.vue'),
+          redirect: (to) => ({ name: 'manage-comics', query: to.query }),
+        },
+        {
+          path: 'status',
+          name: 'manage-status',
+          redirect: (to) => ({ name: 'manage-comics', query: to.query }),
         },
         {
           path: 'trash',
@@ -88,7 +93,7 @@ const router = createRouter({
         {
           path: 'upload',
           name: 'manage-upload',
-          component: () => import('@/views/management/MediaUploadPage.vue'),
+          redirect: { name: 'manage-comics' },
         },
         {
           path: 'structure',
@@ -101,10 +106,15 @@ const router = createRouter({
           component: () => import('@/views/management/ComicListPage.vue'),
         },
         {
+          path: 'comics/:id',
+          name: 'manage-comic-workspace',
+          component: () => import('@/views/management/ComicWorkspacePage.vue'),
+          props: true,
+        },
+        {
           path: 'comics/:id/edit',
           name: 'manage-comic-edit',
-          component: () => import('@/views/management/ComicEditPage.vue'),
-          props: true,
+          redirect: (to) => ({ name: 'manage-comic-workspace', params: { id: to.params.id }, query: { ...to.query, tab: 'edit' } }),
         },
         {
           path: 'import',
@@ -124,8 +134,7 @@ const router = createRouter({
         {
           path: 'storage/:id',
           name: 'manage-storage-detail',
-          component: () => import('@/views/management/storage/StorageDetailPage.vue'),
-          props: true,
+          redirect: (to) => ({ name: 'manage-comic-workspace', params: { id: to.params.id }, query: { ...to.query, tab: 'storage' } }),
         },
         {
           path: 'metadata',

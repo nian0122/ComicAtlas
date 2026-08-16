@@ -13,7 +13,7 @@ import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.persistence.storage.FileUrlResolver;
-import com.comicatlas.contract.reader.dto.ReaderDTO;
+import com.comicatlas.reading.dto.ReaderDTO;
 import com.comicatlas.reading.service.ReaderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -37,12 +37,19 @@ public class ReaderServiceImpl implements ReaderService {
 
     @Override
     public ReaderDTO getChapter(Long chapterId) {
-        Chapter chapter = chapterMapper.selectById(chapterId);
+        Chapter chapter = chapterMapper.selectOne(
+            new LambdaQueryWrapper<Chapter>()
+                .select(Chapter::getId, Chapter::getComicId, Chapter::getTitle,
+                        Chapter::getStatus, Chapter::getGlobalOrder)
+                .eq(Chapter::getId, chapterId));
         if (chapter == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在");
         }
 
-        Comic comic = comicMapper.selectById(chapter.getComicId());
+        Comic comic = comicMapper.selectOne(
+            new LambdaQueryWrapper<Comic>()
+                .select(Comic::getStatus)
+                .eq(Comic::getId, chapter.getComicId()));
         if (comic == null || comic.getStatus() != ComicStatus.READY) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在或不可阅读");
         }
@@ -52,6 +59,12 @@ public class ReaderServiceImpl implements ReaderService {
 
         List<Media> mediaItems = mediaMapper.selectList(
             new LambdaQueryWrapper<Media>()
+                .select(Media::getId, Media::getChapterId, Media::getPageNumber,
+                        Media::getHqRoot, Media::getHqPath, Media::getLqRoot, Media::getLqPath,
+                        Media::getHqStatus, Media::getLqStatus, Media::getTranscodeStatus, Media::getStatus,
+                        Media::getLqSize, Media::getWidth, Media::getHeight, Media::getHqSize,
+                        Media::getMediaType, Media::getDuration, Media::getContainer,
+                        Media::getVideoCodec, Media::getAudioCodec)
                 .eq(Media::getChapterId, chapterId)
                 .eq(Media::getStatus, MediaLifecycleStatus.READY)
                 .orderByAsc(Media::getPageNumber));
@@ -64,8 +77,11 @@ public class ReaderServiceImpl implements ReaderService {
             ReaderDTO.MediaItemDTO mediaItem = new ReaderDTO.MediaItemDTO();
             mediaItem.setId(media.getId());
             mediaItem.setPageNumber(media.getPageNumber());
-            mediaItem.setFileName(extractFileName(media.getHqPath()));
+            // HQ 删除后会清空 hq_path；LQ 与 HQ 保持同名，优先用 LQ 路径保留文件名展示。
+            mediaItem.setFileName(extractFileName(
+                    media.getHqPath() != null ? media.getHqPath() : media.getLqPath()));
             mediaItem.setHqUrl(fileUrlResolver.resolve(media));
+            mediaItem.setHqStatus(media.getHqStatus() == null ? null : media.getHqStatus().name());
             mediaItem.setMediaType(media.getMediaType());
             mediaItem.setDuration(media.getDuration());
             mediaItem.setContainer(media.getContainer());
@@ -80,12 +96,16 @@ public class ReaderServiceImpl implements ReaderService {
             }
             mediaItem.setWidth(media.getWidth());
             mediaItem.setHeight(media.getHeight());
+            mediaItem.setHqSize(media.getHqSize());
+            mediaItem.setLqSize(media.getLqSize());
+            mediaItem.setTranscodeStatus(media.getTranscodeStatus() == null ? null : media.getTranscodeStatus().name());
             return mediaItem;
         }).collect(Collectors.toList()));
         readerDTO.setTotal(mediaItems.size());
 
         List<Chapter> prev = chapterMapper.selectList(
             new LambdaQueryWrapper<Chapter>()
+                .select(Chapter::getId, Chapter::getGlobalOrder)
                 .eq(Chapter::getComicId, chapter.getComicId())
                 .eq(Chapter::getStatus, ChapterLifecycleStatus.READY.name())
                 .lt(Chapter::getGlobalOrder, chapter.getGlobalOrder())
@@ -95,6 +115,7 @@ public class ReaderServiceImpl implements ReaderService {
 
         List<Chapter> next = chapterMapper.selectList(
             new LambdaQueryWrapper<Chapter>()
+                .select(Chapter::getId, Chapter::getGlobalOrder)
                 .eq(Chapter::getComicId, chapter.getComicId())
                 .eq(Chapter::getStatus, ChapterLifecycleStatus.READY.name())
                 .gt(Chapter::getGlobalOrder, chapter.getGlobalOrder())

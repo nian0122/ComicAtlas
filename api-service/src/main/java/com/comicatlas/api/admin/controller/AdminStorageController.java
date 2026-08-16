@@ -43,14 +43,18 @@ public class AdminStorageController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
             ComicStorageQuery query) {
-        List<ComicStorageDTO> records = storageQueryService.listComics(query, page, size);
+        int safeSize = Math.min(Math.max(size, 1), 100);
         long total = storageQueryService.countComics(query);
+        int pages = Math.max(1, (int) Math.ceil((double) total / safeSize));
+        int safePage = Math.min(Math.max(page, 1), pages);
+        List<ComicStorageDTO> records = storageQueryService.listComics(query, safePage, safeSize);
 
         Map<String, Object> result = new HashMap<>();
         result.put("records", records);
         result.put("total", total);
-        result.put("pages", (int) Math.ceil((double) total / size));
-        result.put("current", page);
+        result.put("pages", pages);
+        result.put("current", safePage);
+        result.put("size", safeSize);
         return Result.ok(result);
     }
 

@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.OptimisticLockerInnerInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
 import com.comicatlas.persistence.handler.EnumTypeHandlers;
+import com.comicatlas.api.config.ManagementEnumTypeHandlers;
 import com.comicatlas.api.upload.UploadSessionStatusTypeHandler;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.context.annotation.Bean;
@@ -40,17 +41,17 @@ public class MyBatisPlusConfig {
         return configuration -> {
             configuration.getTypeHandlerRegistry().register(EnumTypeHandlers.SourceTypeHandler.class);
             configuration.getTypeHandlerRegistry().register(EnumTypeHandlers.ComicStatusHandler.class);
-            configuration.getTypeHandlerRegistry().register(EnumTypeHandlers.ImportTaskStatusHandler.class);
+            configuration.getTypeHandlerRegistry().register(ManagementEnumTypeHandlers.ImportTaskStatusHandler.class);
             configuration.getTypeHandlerRegistry().register(EnumTypeHandlers.HqStatusHandler.class);
             configuration.getTypeHandlerRegistry().register(EnumTypeHandlers.LqStatusHandler.class);
-            configuration.getTypeHandlerRegistry().register(EnumTypeHandlers.ExportTaskStatusHandler.class);
-            configuration.getTypeHandlerRegistry().register(EnumTypeHandlers.RecoveryTaskStatusHandler.class);
-            configuration.getTypeHandlerRegistry().register(EnumTypeHandlers.DirectoryScanTaskStatusHandler.class);
+            configuration.getTypeHandlerRegistry().register(ManagementEnumTypeHandlers.ExportTaskStatusHandler.class);
+            configuration.getTypeHandlerRegistry().register(ManagementEnumTypeHandlers.RecoveryTaskStatusHandler.class);
+            configuration.getTypeHandlerRegistry().register(ManagementEnumTypeHandlers.DirectoryScanTaskStatusHandler.class);
             configuration.getTypeHandlerRegistry().register(EnumTypeHandlers.ChapterLifecycleStatusHandler.class);
             configuration.getTypeHandlerRegistry().register(EnumTypeHandlers.MediaLifecycleStatusHandler.class);
             configuration.getTypeHandlerRegistry().register(EnumTypeHandlers.TranscodeStatusHandler.class);
-            configuration.getTypeHandlerRegistry().register(EnumTypeHandlers.ManagementTaskStatusHandler.class);
-            configuration.getTypeHandlerRegistry().register(EnumTypeHandlers.TaskTypeHandler.class);
+            configuration.getTypeHandlerRegistry().register(ManagementEnumTypeHandlers.ManagementTaskStatusHandler.class);
+            configuration.getTypeHandlerRegistry().register(ManagementEnumTypeHandlers.TaskTypeHandler.class);
             configuration.getTypeHandlerRegistry().register(UploadSessionStatusTypeHandler.class);
         };
     }

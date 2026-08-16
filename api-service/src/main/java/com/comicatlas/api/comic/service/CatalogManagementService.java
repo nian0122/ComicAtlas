@@ -1,8 +1,8 @@
 package com.comicatlas.api.comic.service;
 
-import com.comicatlas.contract.comic.dto.CatalogCreateRequest;
-import com.comicatlas.contract.comic.dto.CatalogRenameRequest;
-import com.comicatlas.contract.comic.dto.CatalogVO;
+import com.comicatlas.api.comic.dto.CatalogVO;
+import com.comicatlas.api.comic.dto.CatalogCreateRequest;
+import com.comicatlas.api.comic.dto.CatalogRenameRequest;
 
 /**
  * 目录管理服务：create / rename / move / reorder / delete。

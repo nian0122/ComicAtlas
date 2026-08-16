@@ -2,14 +2,14 @@ package com.comicatlas.api.comic.controller;
 
 import com.comicatlas.contract.common.Result;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
-import com.comicatlas.contract.comic.dto.BatchComicUpdateDTO;
-import com.comicatlas.contract.comic.dto.BatchUpdateResultVO;
+import com.comicatlas.api.comic.dto.BatchUpdateResultVO;
 import com.comicatlas.contract.comic.dto.ComicDetailVO;
 import com.comicatlas.contract.comic.dto.ComicMetadataDTO;
-import com.comicatlas.contract.comic.dto.ComicMetadataUpdateDTO;
-import com.comicatlas.contract.comic.dto.ComicTagUpdateDTO;
-import com.comicatlas.contract.comic.dto.CreateComicRequest;
-import com.comicatlas.contract.comic.dto.UpdateComicRequest;
+import com.comicatlas.api.comic.dto.BatchComicUpdateRequest;
+import com.comicatlas.api.comic.dto.ComicMetadataUpdateRequest;
+import com.comicatlas.api.comic.dto.ComicTagUpdateRequest;
+import com.comicatlas.api.comic.dto.CreateComicRequest;
+import com.comicatlas.api.comic.dto.UpdateComicRequest;
 import com.comicatlas.api.comic.service.ComicManagementService;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
 import jakarta.validation.Valid;
@@ -83,7 +83,7 @@ public class ComicManagementController {
     @PutMapping("/{id}/metadata")
     public Result<ComicMetadataDTO> updateMetadata(
             @PathVariable Long id,
-            @Valid @RequestBody ComicMetadataUpdateDTO dto) {
+            @Valid @RequestBody ComicMetadataUpdateRequest dto) {
         return Result.ok(comicManagementService.updateMetadata(id, dto));
     }
 
@@ -96,7 +96,7 @@ public class ComicManagementController {
     @PutMapping("/{id}/tags")
     public Result<?> updateComicTags(
             @PathVariable Long id,
-            @Valid @RequestBody ComicTagUpdateDTO dto) {
+            @Valid @RequestBody ComicTagUpdateRequest dto) {
         comicManagementService.updateComicTags(id, dto);
         return Result.ok();
     }
@@ -108,7 +108,7 @@ public class ComicManagementController {
      * @return 批量更新结果（成功/失败明细）
      */
     @PostMapping("/batch/update")
-    public Result<BatchUpdateResultVO> batchUpdate(@Valid @RequestBody BatchComicUpdateDTO dto) {
+    public Result<BatchUpdateResultVO> batchUpdate(@Valid @RequestBody BatchComicUpdateRequest dto) {
         if (dto.getCategoryId() == null && (dto.getAddTagIds() == null || dto.getAddTagIds().isEmpty())) {
             return Result.fail(HttpStatusCodes.BAD_REQUEST, "至少需要提供 categoryId 或 addTagIds");
         }

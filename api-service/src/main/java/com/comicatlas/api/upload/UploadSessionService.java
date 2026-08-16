@@ -26,7 +26,7 @@ import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.enums.HqStatus;
 import com.comicatlas.contract.common.enums.LqStatus;
 import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
-import com.comicatlas.contract.common.enums.TaskType;
+import com.comicatlas.api.common.enums.TaskType;
 import com.comicatlas.contract.common.enums.TranscodeStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.persistence.comic.entity.Chapter;
@@ -406,7 +406,7 @@ public class UploadSessionService {
             media.setTranscodeStatus(TranscodeStatus.NOT_NEEDED);
             media.setStatus(MediaLifecycleStatus.STAGING);
             media.setMediaType(detection.mediaType());
-            media.setFileSize(uploadFile.getSizeBytes());
+            media.setHqSize(uploadFile.getSizeBytes());
             media.setVersion(INITIAL_VERSION);
             mediaMapper.insert(media);
 

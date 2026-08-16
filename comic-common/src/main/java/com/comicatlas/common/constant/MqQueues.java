@@ -24,10 +24,6 @@ public final class MqQueues {
     public static final String IMPORT_STORAGE_FINALIZE_FAILED = "import.storage.finalize.failed.queue";
     public static final String TASK_STATUS = "task.status.queue";
     public static final String CANCEL_TASK = "cancel.task.queue";
-    public static final String LQ_GENERATE = "lq.generate.queue";
-    public static final String LQ_RESULT = "lq.result.queue";
-    public static final String HQ_DELETE = "hq.delete.queue";
-    public static final String HQ_DELETE_RESULT = "hq.delete.result.queue";
     public static final String VIDEO_METADATA_FIX = "video.metadata.fix.queue";
     public static final String VIDEO_METADATA_FIX_RESULT = "video.metadata.fix.result.queue";
     public static final String EXPORT_TASK = "export.task.queue";
@@ -53,10 +49,6 @@ public final class MqQueues {
     public static final String IMPORT_STORAGE_FINALIZE_REQUESTED_DLQ = "import.storage.finalize.requested.dlq";
     public static final String IMPORT_STORAGE_FINALIZE_COMPLETED_DLQ = "import.storage.finalize.completed.dlq";
     public static final String IMPORT_STORAGE_FINALIZE_FAILED_DLQ = "import.storage.finalize.failed.dlq";
-    public static final String LQ_GENERATE_DLQ = "lq.generate.dlq";
-    public static final String LQ_RESULT_DLQ = "lq.result.dlq";
-    public static final String HQ_DELETE_DLQ = "hq.delete.dlq";
-    public static final String HQ_DELETE_RESULT_DLQ = "hq.delete.result.dlq";
     public static final String VIDEO_METADATA_FIX_DLQ = "video.metadata.fix.dlq";
     public static final String VIDEO_METADATA_FIX_RESULT_DLQ = "video.metadata.fix.result.dlq";
     public static final String EXPORT_TASK_DLQ = "export.task.dlq";

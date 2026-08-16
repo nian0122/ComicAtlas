@@ -36,7 +36,7 @@ erDiagram
         text description
         varchar cover_path
         int total_pages
-        bigint file_size
+        bigint hq_size
         bigint hq_size
         bigint lq_size
         varchar source_type
@@ -93,7 +93,6 @@ erDiagram
         bigint lq_size
         int width
         int height
-        bigint file_size
         varchar media_type
         decimal duration
         varchar container
@@ -147,8 +146,7 @@ erDiagram
 | `description` | TEXT | NULL | 简介 |
 | `cover_path` | VARCHAR(512) | NULL | 封面路径（DEPRECATED，封面统一用 thumbs/{comicId}/cover.webp） |
 | `total_pages` | INT | `0` | 总页数 |
-| `file_size` | BIGINT | `0` | 原始文件总大小 (字节) |
-| `hq_size` | BIGINT | `0` | HQ 图片总大小 (字节) |
+| `hq_size` | BIGINT | `0` | HQ 文件总大小 (字节) |
 | `lq_size` | BIGINT | `0` | LQ 图片总大小 (字节) |
 | `source_type` | VARCHAR(16) | NULL | 来源类型，见 [SourceType](#sourcetype) |
 | `source_gallery_id` | VARCHAR(64) | NULL | 来源画廊 ID |
@@ -243,10 +241,10 @@ erDiagram
 | `hq_status` | VARCHAR(32) | `PENDING` | HQ 状态，见 [HqStatus](#hqstatus) |
 | `lq_status` | VARCHAR(32) | `NOT_GENERATED` | LQ 状态，见 [LqStatus](#lqstatus) |
 | `transcode_status` | VARCHAR(32) | `NOT_NEEDED` | 视频转码状态，见 [TranscodeStatus](#transcodestatus) |
+| `hq_size` | BIGINT | `0` | HQ 文件大小 (字节) |
 | `lq_size` | BIGINT | `0` | LQ 文件大小 (字节) |
 | `width` | INT | NULL | 图片宽度 (像素) |
 | `height` | INT | NULL | 图片高度 (像素) |
-| `file_size` | BIGINT | NULL | HQ 文件大小 (字节) |
 | `media_type` | VARCHAR(32) | `IMAGE` | 媒体类型: IMAGE / VIDEO |
 | `duration` | DECIMAL(10,3) | NULL | 视频时长 (秒) |
 | `container` | VARCHAR(32) | NULL | 视频容器格式 (mp4/webm/mkv 等) |

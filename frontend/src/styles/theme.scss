@@ -7,8 +7,8 @@
   --el-color-primary: var(--accent);
   --el-color-primary-light-3: var(--accent-hover);
   --el-color-primary-light-5: var(--accent-hover);
-  --el-color-primary-light-7: var(--color-focus);
-  --el-color-primary-light-8: var(--color-focus);
+  --el-color-primary-light-7: var(--accent-bg);
+  --el-color-primary-light-8: var(--accent-bg);
   --el-color-primary-light-9: var(--accent-bg);
   --el-color-primary-dark-2: var(--accent);
   --el-bg-color: var(--bg-surface);
@@ -50,13 +50,13 @@
 
 .el-button--primary {
   --el-button-bg-color: var(--accent);
-  --el-button-text-color: var(--text-primary);
+  --el-button-text-color: var(--color-on-brand);
   --el-button-border-color: var(--accent);
   --el-button-hover-bg-color: var(--accent-hover);
-  --el-button-hover-text-color: var(--text-primary);
+  --el-button-hover-text-color: var(--color-on-brand);
   --el-button-hover-border-color: var(--accent-hover);
   --el-button-active-bg-color: var(--accent-hover);
-  --el-button-active-text-color: var(--text-primary);
+  --el-button-active-text-color: var(--color-on-brand);
   --el-button-active-border-color: var(--accent-hover);
   --el-button-disabled-bg-color: var(--accent-bg);
   --el-button-disabled-border-color: var(--accent-bg);
@@ -194,6 +194,17 @@
   }
 }
 
+/* Element Plus 选择器内部的搜索输入不是独立控件，不能继承全局原生 input 外观。 */
+.el-select__input {
+  min-height: 0 !important;
+  padding: 0 !important;
+  color: var(--text-primary);
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0;
+  box-shadow: none !important;
+}
+
 .el-input-number,
 .el-date-editor.el-input,
 .el-date-editor.el-input__wrapper {
@@ -232,6 +243,10 @@
 
 .el-select-dropdown__item {
   color: var(--text-primary);
+  min-height: var(--control-height);
+  padding: 0 14px;
+  border-radius: var(--radius-xs);
+  line-height: var(--control-height);
 
   &:hover,
   &.hover {

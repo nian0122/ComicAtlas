@@ -1,9 +1,9 @@
 package com.comicatlas.reading.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.comicatlas.contract.comic.dto.ComicListPage;
+import com.comicatlas.reading.dto.ComicListPage;
 import com.comicatlas.contract.comic.dto.ComicListQuery;
-import com.comicatlas.contract.comic.dto.ComicListVO;
+import com.comicatlas.reading.dto.ComicListVO;
 
 /**
  * 漫画列表分页查询接口（阅读域）。

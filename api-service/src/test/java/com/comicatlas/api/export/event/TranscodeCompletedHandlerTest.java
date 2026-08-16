@@ -68,7 +68,7 @@ class TranscodeCompletedHandlerTest {
         assertEquals("mp4", media.getContainer());
         assertEquals("h264", media.getVideoCodec());
         assertEquals("aac", media.getAudioCodec());
-        assertEquals(Long.valueOf(2048000L), media.getFileSize());
+        assertEquals(Long.valueOf(2048000L), media.getHqSize());
 
         verify(mediaMapper).updateById(media);
         verify(channel).basicAck(1L, false);

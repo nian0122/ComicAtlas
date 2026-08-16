@@ -1,6 +1,7 @@
 package com.comicatlas.api.comic.controller;
 
 import com.comicatlas.contract.comic.dto.TagDTO;
+import com.comicatlas.api.comic.dto.CreateTagRequest;
 import com.comicatlas.api.comic.service.TagManagementService;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.contract.common.exception.GlobalExceptionHandler;
@@ -14,7 +15,6 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.util.Map;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
@@ -48,7 +48,8 @@ class TagManagementControllerTest {
         dto.setName("new tag");
         when(tagManagementService.createTag("new tag")).thenReturn(dto);
 
-        Map<String, String> body = Map.of("name", "new tag");
+        CreateTagRequest body = new CreateTagRequest();
+        body.setName("new tag");
         mockMvc.perform(post("/api/manage/tags")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(body))
@@ -60,14 +61,15 @@ class TagManagementControllerTest {
 
     @Test
     void createTag_shouldReturn400_whenNameIsEmpty() throws Exception {
-        Map<String, String> body = Map.of("name", "");
+        CreateTagRequest body = new CreateTagRequest();
+        body.setName("");
         mockMvc.perform(post("/api/manage/tags")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(body))
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(400))
-                .andExpect(jsonPath("$.message").value("标签名称不能为空"));
+                .andExpect(jsonPath("$.message").value("name: 标签名称不能为空"));
     }
 
     @Test
@@ -75,7 +77,8 @@ class TagManagementControllerTest {
         when(tagManagementService.createTag("existing"))
                 .thenThrow(new BusinessException(409, "标签已存在: existing"));
 
-        Map<String, String> body = Map.of("name", "existing");
+        CreateTagRequest body = new CreateTagRequest();
+        body.setName("existing");
         mockMvc.perform(post("/api/manage/tags")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(body))

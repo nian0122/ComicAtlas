@@ -37,7 +37,7 @@
                 NULL as cover_url,
                 COUNT(DISTINCT ch.id) as chapter_count,
                 COUNT(m.id) as page_count,
-                SUM(CASE WHEN m.hq_status = 'READY' THEN COALESCE(m.file_size, 0) ELSE 0 END) as hq_size,
+                SUM(CASE WHEN m.hq_status = 'READY' THEN COALESCE(m.hq_size, 0) ELSE 0 END) as hq_size,
                 SUM(CASE WHEN m.media_type = 'IMAGE' AND m.lq_status = 'READY' THEN COALESCE(m.lq_size, 0) ELSE 0 END) as lq_size,
                 GROUP_CONCAT(DISTINCT m.hq_status) as hq_status,
                 GROUP_CONCAT(DISTINCT CASE WHEN m.media_type = 'IMAGE' THEN m.lq_status END) as lq_status,
@@ -88,7 +88,7 @@
             NULL as cover_url,
             COUNT(DISTINCT ch.id) as chapter_count,
             COUNT(m.id) as page_count,
-            SUM(CASE WHEN m.hq_status = 'READY' THEN COALESCE(m.file_size, 0) ELSE 0 END) as hq_size,
+            SUM(CASE WHEN m.hq_status = 'READY' THEN COALESCE(m.hq_size, 0) ELSE 0 END) as hq_size,
             SUM(CASE WHEN m.media_type = 'IMAGE' AND m.lq_status = 'READY' THEN COALESCE(m.lq_size, 0) ELSE 0 END) as lq_size,
             GROUP_CONCAT(DISTINCT m.hq_status) as hq_status,
             GROUP_CONCAT(DISTINCT CASE WHEN m.media_type = 'IMAGE' THEN m.lq_status END) as lq_status,
@@ -137,7 +137,7 @@
             ch.chapter_no,
             ch.title,
             COUNT(m.id) as page_count,
-            SUM(CASE WHEN m.hq_status = 'READY' THEN COALESCE(m.file_size, 0) ELSE 0 END) as hq_size,
+            SUM(CASE WHEN m.hq_status = 'READY' THEN COALESCE(m.hq_size, 0) ELSE 0 END) as hq_size,
             SUM(CASE WHEN m.media_type = 'IMAGE' AND m.lq_status = 'READY' THEN COALESCE(m.lq_size, 0) ELSE 0 END) as lq_size,
             GROUP_CONCAT(DISTINCT m.hq_status) as hq_status,
             GROUP_CONCAT(DISTINCT CASE WHEN m.media_type = 'IMAGE' THEN m.lq_status END) as lq_status,
@@ -177,7 +177,7 @@
 
     <select id="selectStorageStats" resultType="com.comicatlas.api.admin.dto.StorageStatsDTO">
         SELECT
-            COALESCE(SUM(CASE WHEN m.hq_status = 'READY' THEN COALESCE(m.file_size, 0) ELSE 0 END), 0) AS hq_bytes,
+            COALESCE(SUM(CASE WHEN m.hq_status = 'READY' THEN COALESCE(m.hq_size, 0) ELSE 0 END), 0) AS hq_bytes,
             COALESCE(SUM(CASE WHEN m.lq_status = 'READY' THEN COALESCE(m.lq_size, 0) ELSE 0 END), 0) AS lq_bytes
         FROM page m
         JOIN chapter ch ON ch.id = m.chapter_id
