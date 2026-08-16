@@ -46,7 +46,7 @@
         <!-- 移动端第二行：筛选 chips 横向滚动 -->
         <div class="toolbar-filters">
           <div class="filter-select category-select">
-            <el-select v-model="categoryFilter" aria-label="漫画分类" popper-class="library-filter-popper" @change="onSearch">
+            <el-select v-model="categoryFilter" placeholder="全部分类" aria-label="漫画分类" popper-class="library-filter-popper" @change="onSearch">
               <el-option label="全部分类" value="" />
               <el-option label="未分类" value="_NONE" />
               <el-option v-for="c in allCategories" :key="c.id" :label="c.name" :value="c.name" />
@@ -421,16 +421,28 @@ onMounted(() => {
 
 .search-input:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-bg);
+  /* 聚焦只保留一圈清晰边界，避免胶囊外再出现一圈抢眼红框。 */
+  box-shadow: 0 0 0 1px var(--accent) inset;
 }
 
 .search-input input {
   flex: 1;
-  background: transparent;
-  border: none;
-  outline: none;
+  min-height: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
   color: var(--text-primary);
   font-size: 14px;
+}
+
+.search-input input:focus,
+.search-input input:focus-visible {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 .search-input input::placeholder {
