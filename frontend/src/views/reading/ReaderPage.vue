@@ -197,6 +197,9 @@ const toolbarTitle = computed(() => {
 const saveDebounceTimer = ref<number | null>(null)
 /** 存在未确认落库的进度：翻页置位，saveProgress 成功才清除；卸载兜底据此决定是否重发 */
 const progressDirty = ref(false)
+/** 章节请求期间禁止把 store 的临时初始页码写入阅读历史。 */
+const chapterLoading = ref(false)
+let chapterLoadToken = 0
 /** 被双击切到 HQ 的页面索引（0-based），使用 reactive Set 保持响应性 */
 const forceHqPages = reactive(new Set<number>())
 let lastWindowScrollY = 0
@@ -214,61 +217,89 @@ function goChapter(chId: number) {
   router.push(`/reader/${chId}?page=1`)
 }
 
-function reload() {
-  loadCurrentChapter()
+async function reload() {
+  if (saveDebounceTimer.value) {
+    clearTimeout(saveDebounceTimer.value)
+    saveDebounceTimer.value = null
+  }
+
+  // 重载会暂时把 currentPage 重置为 1，先确认当前进度，避免重载覆盖历史。
+  let canRestoreProgress = !progressDirty.value
+  if (progressDirty.value && store.comicId > 0 && store.chapterId > 0) {
+    const chapterId = store.chapterId
+    const pageNumber = store.currentPage
+    const saved = await store.saveProgress()
+    if (saved && store.chapterId === chapterId && store.currentPage === pageNumber) {
+      lastSyncedPage.value = pageNumber
+      progressDirty.value = false
+      canRestoreProgress = true
+    }
+  }
+
+  await loadCurrentChapter(true, canRestoreProgress)
 }
 
-async function loadCurrentChapter() {
+async function loadCurrentChapter(preservePage = false, restoreProgress = true) {
   const chapterId = Number(route.params.chapterId)
-  const rawPage = route.query.page
+  const rawPage = preservePage ? undefined : route.query.page
 
   if (!chapterId) {
     store.error = '参数不完整'
     return
   }
 
-  await store.loadChapter(chapterId)
-
-  // 竞态闸:等待期间用户又切了章(HTTP 乱序),丢弃本次过期结果,
-  // 由更新导航触发的 loadCurrentChapter 接管
-  if (Number(route.params.chapterId) !== chapterId) return
-
-  if (store.error) {
-    ElMessage.error(store.error)
-    return
-  }
-
-  forceHqPages.clear()
-  preloadEngine.reset(store.totalPages)
-  preloadEngine.setUrlResolver((index: number, _priority: 'immediate' | 'cascade') => {
-    const page = store.pages[index]
-    if (!page) return null
-    // 智能/原图模式 & 强制 HQ 页 → 预加载 HQ；省流模式 → 预加载 LQ
-    const wantHq = settings.qualityMode !== 'LQ_ONLY' || forceHqPages.has(index)
-    if (wantHq) return page.hqUrl || page.lqUrl || null
-    return page.lqUrl || page.hqUrl || null
-  })
-
-  if (rawPage === 'last') {
-    store.currentPage = Math.max(1, store.totalPages)
-  } else {
-    const pageFromQuery = Number(rawPage)
-    if (pageFromQuery >= 1 && pageFromQuery <= store.totalPages) {
-      store.currentPage = pageFromQuery
-    } else {
-      await store.restoreProgress()
-    }
-  }
+  const loadToken = ++chapterLoadToken
+  chapterLoading.value = true
 
   try {
-    const detail = await comicApi.detail(store.comicId)
-    const detailData = detail.data as ComicDetailVO
-    comicTitle.value = detailData.title || `漫画 #${store.comicId}`
-  } catch {
-    comicTitle.value = `漫画 #${store.comicId}`
-  }
+    await store.loadChapter(chapterId, preservePage)
 
-  lastSyncedPage.value = store.currentPage
+    // 竞态闸：等待期间用户又切了章，丢弃本次过期结果。
+    if (loadToken !== chapterLoadToken || Number(route.params.chapterId) !== chapterId) return
+
+    if (store.error) {
+      ElMessage.error(store.error)
+      return
+    }
+
+    forceHqPages.clear()
+    preloadEngine.reset(store.totalPages)
+    preloadEngine.setUrlResolver((index: number, _priority: 'immediate' | 'cascade') => {
+      const page = store.pages[index]
+      if (!page) return null
+      // 智能/原图模式 & 强制 HQ 页 → 预加载 HQ；省流模式 → 预加载 LQ
+      const wantHq = settings.qualityMode !== 'LQ_ONLY' || forceHqPages.has(index)
+      if (wantHq) return page.hqUrl || page.lqUrl || null
+      return page.lqUrl || page.hqUrl || null
+    })
+
+    if (rawPage === 'last') {
+      store.currentPage = Math.max(1, store.totalPages)
+    } else {
+      const pageFromQuery = Number(rawPage)
+      if (pageFromQuery >= 1 && pageFromQuery <= store.totalPages) {
+        store.currentPage = pageFromQuery
+      } else if (restoreProgress) {
+        await store.restoreProgress()
+      }
+    }
+
+    if (loadToken !== chapterLoadToken || Number(route.params.chapterId) !== chapterId) return
+
+    try {
+      const detail = await comicApi.detail(store.comicId)
+      const detailData = detail.data as ComicDetailVO
+      comicTitle.value = detailData.title || `漫画 #${store.comicId}`
+    } catch {
+      comicTitle.value = `漫画 #${store.comicId}`
+    }
+
+    lastSyncedPage.value = store.currentPage
+  } finally {
+    if (loadToken === chapterLoadToken) {
+      chapterLoading.value = false
+    }
+  }
 }
 
 function onPageChange(page: number) {
@@ -414,7 +445,7 @@ onMounted(async () => {
   await loadCurrentChapter()
 
   watch(() => store.currentPage, (newPage) => {
-    if (store.comicId > 0 && newPage !== lastSyncedPage.value) {
+    if (!chapterLoading.value && store.comicId > 0 && store.chapterId > 0 && store.pages.length > 0 && newPage !== lastSyncedPage.value) {
       progressDirty.value = true
       if (saveDebounceTimer.value) clearTimeout(saveDebounceTimer.value)
       saveDebounceTimer.value = window.setTimeout(() => {
