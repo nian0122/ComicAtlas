@@ -11,7 +11,8 @@ type PreloadTask = {
  * 根据虚拟滚动可视区调度三层加载：
  * - Immediate：可视区 ±1，高优先级，立刻加载（HQ）。
  * - Cascade：从可视区边界向外各 10 页，渐进延迟 80ms（LQ）。
- * - Cancel：远离可视区 ±12 页外的 cascade 任务会被取消，避免堆积。
+ * - Cancel：远离可视区 ±12 页外的所有任务都会被取消，避免快速滚动时
+ *   immediate 图片引用持续累积，触发 Safari 内存压力崩溃。
  */
 export class PreloadEngine {
   private urlResolver: ((index: number, priority: 'immediate' | 'cascade') => string | null) | null = null
@@ -137,7 +138,6 @@ export class PreloadEngine {
     const keepBelow = Math.min(this.total - 1, visibleEnd + retainMargin)
 
     for (const [url, task] of this.active) {
-      if (task.priority !== 'cascade') continue
       if (task.index < keepAbove || task.index > keepBelow) {
         task.image.src = ''
         task.image.onload = null
