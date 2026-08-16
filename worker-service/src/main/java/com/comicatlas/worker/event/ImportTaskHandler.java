@@ -20,6 +20,7 @@ import org.springframework.stereotype.Component;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Objects;
 
 @Slf4j
 @Component
@@ -60,8 +61,8 @@ public class ImportTaskHandler {
         Path mangaRoot = Path.of(config.getMangaRoot());
 
         publisher.publishStatus(new TaskStatusUpdate(taskId, "PARSING", 0, null, 0, 0, null));
-        String normalizedPath = mapHostPathToContainer(sourcePath);
-        if (!normalizedPath.equals(sourcePath)) {
+        String normalizedPath = config.mapHostPathToContainer(sourcePath);
+        if (!Objects.equals(normalizedPath, sourcePath)) {
             log.info("Source path normalized: {} -> {}", sourcePath, normalizedPath);
         }
         routeToHandler(sourceType, normalizedPath, taskId, comicId, mangaRoot);
@@ -102,22 +103,6 @@ public class ImportTaskHandler {
             }
         }
         return ehentaiDownloadService.downloadToSourceDir(taskId, sourcePath);
-    }
-
-    private String mapHostPathToContainer(String sourcePath) {
-        if (sourcePath == null || config.getHostMangaRoot() == null || config.getHostMangaRoot().isBlank()) {
-            return sourcePath;
-        }
-        String hostRoot = config.getHostMangaRoot().replace('\\', '/');
-        String containerRoot = config.getContainerMangaRoot() != null
-                ? config.getContainerMangaRoot().replace('\\', '/')
-                : "/storage";
-        String normalized = sourcePath.replace('\\', '/');
-        if (normalized.regionMatches(true, 0, hostRoot, 0, hostRoot.length())) {
-            String suffix = normalized.substring(hostRoot.length());
-            return containerRoot + suffix;
-        }
-        return sourcePath;
     }
 
     /** 失败原因单行化并截断：避免换行/超长消息污染任务状态与 MQ 消息体。 */

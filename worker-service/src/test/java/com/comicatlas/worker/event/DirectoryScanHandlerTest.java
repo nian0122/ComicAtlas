@@ -7,6 +7,7 @@ import com.comicatlas.common.event.DirectoryScanCompletedEvent;
 import com.comicatlas.common.event.DirectoryScanFailedEvent;
 import com.comicatlas.common.event.DirectoryScanRequestedEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
+import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.scan.DirectoryScanPreviews;
 import com.rabbitmq.client.Channel;
 import org.junit.jupiter.api.BeforeEach;
@@ -53,6 +54,9 @@ class DirectoryScanHandlerTest {
     private DirectoryScanPreviews scanPreviews;
 
     @Mock
+    private WorkerConfig workerConfig;
+
+    @Mock
     private Channel channel;
 
     @InjectMocks
@@ -60,6 +64,7 @@ class DirectoryScanHandlerTest {
 
     @BeforeEach
     void setUp() {
+        when(workerConfig.mapHostPathToContainer(anyString())).thenAnswer(invocation -> invocation.getArgument(0));
         // 模拟 consume 编排：执行业务动作，异常时调用失败回调（与 MqConsumerSupport 语义一致）
         doAnswer(inv -> {
             MqConsumerSupport.ConsumeAction action = inv.getArgument(3);
@@ -107,5 +112,17 @@ class DirectoryScanHandlerTest {
         assertEquals("父目录不存在", captor.getValue().errorMessage());
         assertFalse(captor.getValue().errorMessage().contains("D:/secret"),
                 "失败事件消息不得携带宿主机绝对路径");
+    }
+
+    @Test
+    void handle_mapsHostPathBeforeScanning() {
+        when(workerConfig.mapHostPathToContainer("D:/manga/comics"))
+                .thenReturn("/storage/comics");
+        when(scanPreviews.scan(Path.of("/storage/comics")))
+                .thenReturn(new ScanResultDTO("/storage/comics", 0, List.of()));
+
+        handler.handle(request(10L, "D:/manga/comics"), channel, 1L);
+
+        verify(scanPreviews).scan(Path.of("/storage/comics"));
     }
 }

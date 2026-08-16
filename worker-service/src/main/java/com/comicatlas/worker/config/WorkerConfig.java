@@ -56,6 +56,38 @@ public class WorkerConfig {
     }
 
     /**
+     * 将 API/前端提交的宿主机路径映射为 Worker 容器内路径。
+     * <p>
+     * 单个导入和目录扫描必须使用同一套映射规则，否则批量导入会在扫描阶段找不到宿主机目录。
+     * 仅匹配配置根目录本身或其子路径，避免把 {@code D:/manga-old} 错误映射成同一存储根。
+     */
+    public String mapHostPathToContainer(String sourcePath) {
+        if (sourcePath == null || hostMangaRoot == null || hostMangaRoot.isBlank()) {
+            return sourcePath;
+        }
+        String normalizedHostRoot = normalizePathSeparators(hostMangaRoot);
+        String normalizedSourcePath = normalizePathSeparators(sourcePath);
+        while (normalizedHostRoot.length() > 1 && normalizedHostRoot.endsWith("/")) {
+            normalizedHostRoot = normalizedHostRoot.substring(0, normalizedHostRoot.length() - 1);
+        }
+        String containerRoot = containerMangaRoot == null || containerMangaRoot.isBlank()
+                ? "/storage" : normalizePathSeparators(containerMangaRoot);
+        if (normalizedSourcePath.equalsIgnoreCase(normalizedHostRoot)) {
+            return containerRoot;
+        }
+        if (normalizedSourcePath.length() > normalizedHostRoot.length()
+                && normalizedSourcePath.regionMatches(true, 0, normalizedHostRoot, 0, normalizedHostRoot.length())
+                && normalizedSourcePath.charAt(normalizedHostRoot.length()) == '/') {
+            return containerRoot + normalizedSourcePath.substring(normalizedHostRoot.length());
+        }
+        return sourcePath;
+    }
+
+    private static String normalizePathSeparators(String path) {
+        return path.replace('\\', '/');
+    }
+
+    /**
      * 解析临时目录：优先 {@code worker.temp-dir}；未配置时回退到 {@code {mangaRoot}/temp}。
      * 禁止回退到系统临时目录——转码产物体积大，需与 MANGA_ROOT 同卷且统一清理。
      */
