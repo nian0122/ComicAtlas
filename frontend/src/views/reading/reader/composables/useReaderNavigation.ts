@@ -11,10 +11,23 @@ export function useReaderNavigation() {
   const router = useRouter()
   const store = useReaderStore()
 
-  /** 返回漫画详情页；comicId 未就绪（0/falsy）时静默不跳转 */
+  /** 返回漫画详情页；无法识别漫画时退回漫画库 */
   function goBack() {
-    if (!store.comicId) return
-    router.push({ name: 'comic-detail', params: { id: store.comicId } })
+    if (!store.comicId) {
+      router.replace({ name: 'library' })
+      return
+    }
+    const detailRoute = router.resolve({ name: 'comic-detail', params: { id: store.comicId } })
+    const previousPath = router.options.history.state.back
+
+    // 从详情页进入阅读器时回退历史栈，避免 push 详情页造成“返回又回阅读器”。
+    if (typeof previousPath === 'string' && previousPath === detailRoute.fullPath) {
+      router.back()
+      return
+    }
+
+    // 直接打开阅读器或历史页进入时没有详情页可回退，用 replace 避免制造循环历史。
+    router.replace(detailRoute)
   }
 
   /** 跳转指定章节的阅读器路由（内部工具）；page 支持 'last' 哨兵 = 落到该章最后一页 */
