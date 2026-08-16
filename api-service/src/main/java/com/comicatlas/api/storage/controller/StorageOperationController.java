@@ -1,6 +1,6 @@
 package com.comicatlas.api.storage.controller;
 
-import com.comicatlas.api.common.Result;
+import com.comicatlas.contract.common.Result;
 import com.comicatlas.api.export.dto.ExportTaskVO;
 import com.comicatlas.api.management.dto.OperationSubmitResultDTO;
 import com.comicatlas.api.management.operation.MediaOperationCommandService;
@@ -35,7 +35,7 @@ import java.util.List;
  */
 @Slf4j
 @RestController
-@RequestMapping("/api/storage")
+@RequestMapping("/api/manage/storage")
 @RequiredArgsConstructor
 public class StorageOperationController {
 
@@ -110,6 +110,12 @@ public class StorageOperationController {
     @PostMapping("/transcode/comics/{comicId}")
     public Result<OperationSubmitResultDTO> transcodeComic(@PathVariable Long comicId) {
         return Result.ok(transcodeOperationService.transcodeForComic(comicId));
+    }
+
+    /** 对单个视频媒体发起转码。 */
+    @PostMapping("/transcode/media/{mediaId}")
+    public Result<OperationSubmitResultDTO> transcodeMedia(@PathVariable Long mediaId) {
+        return Result.ok(transcodeOperationService.transcodeForMedia(mediaId));
     }
 
     /**

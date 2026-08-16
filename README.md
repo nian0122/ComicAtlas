@@ -1,6 +1,6 @@
 # ComicAtlas 1.5
 
-ComicAtlas 是一个面向个人收藏的本地漫画仓库平台。它把 ZIP、本地目录和 EHENTAI 来源统一导入到受控存储中，提供漫画管理、章节目录、图片与视频混排阅读、阅读历史以及存储维护能力。
+ComicAtlas 是一个面向个人收藏的本地漫画仓库平台。它把 ZIP 和本地目录统一导入到受控存储中，提供漫画管理、章节目录、图片与视频混排阅读、阅读历史以及存储维护能力。
 
 ## 版本定位
 
@@ -8,15 +8,23 @@ ComicAtlas 是一个面向个人收藏的本地漫画仓库平台。它把 ZIP�
 
 ## 功能概览
 
-- ZIP、本地目录、EHENTAI 来源导入
-- 异步导入任务、进度查看、取消和重试
+- 漫画导入：ZIP 或本地目录导入，异步解析并写入受控存储
+- 漫画导出：按漫画 ID 导出本地 ZIP，支持大文件标准分卷
+- HQ 删除：删除高清文件并保留数据库记录与 LQ 文件
+- LQ 生成：根据 HQ 图片手动生成 LQ 图片
+- 视频转码：处理导入时标记为非标准的视频
+- 刷新元数据：按漫画 ID 重新分析本地媒体并同步数据库
+- 扫盘恢复：扫描 HQ 存储并恢复缺失的数据库记录
 - 漫画库搜索、筛选、排序和详情管理
-- 目录树与章节导航
-- 图片、视频混排阅读
-- 阅读进度与历史记录
-- LQ 生成、HQ 删除、存储统计和死信任务管理
-- 存储恢复（异步任务中心），从 HQ 文件重建数据库记录
+- 漫画元数据、分类、标签和封面管理
+- 多级目录树、章节排序和章节导航
+- 图片、视频混排阅读，以及阅读进度与历史记录
+- 管理任务中心：查看进度、失败原因、取消和重试
+- 存储统计：查看 HQ/LQ/缩略图占用与媒体状态
+- 死信队列管理：查看、重放和清理失败消息
 - 统一 MANAGED 存储，数据库只保存相对路径
+
+> 当前维护功能以以上七项为准。回收站、批量操作、媒体上传/替换、EHENTAI 等内容属于历史接口或后续能力，不能视为当前主流程入口。
 
 ### 管理控制台
 
@@ -24,14 +32,12 @@ ComicAtlas 是一个面向个人收藏的本地漫画仓库平台。它把 ZIP�
 
 - **漫画工作区**：列表、详情、编辑（乐观锁 `version`）、元数据、标签、封面
 - **目录/章节管理**：目录树的创建、重命名、移动、排序、删除；章节的创建、重排、回收
-- **媒体管理**：媒体重排、回收；图片/视频上传/替换为预留接口能力（后端接口可用、当前无前端页面入口）
-- **任务中心**：管理任务列表/详情/逐项进度、取消、重试，Outbox 积压监控
-- **回收站**：删除进回收站（软删除），7 天保留期后可恢复或永久清理，支持对账修复
-- **批量操作**：跨页按筛选或 ID 选择，预览 + 二次确认，批量 LQ/HQ/转码/元数据/回收/恢复/清理
-- **允许操作查询**：按钮权限统一由后端 `OperationPolicyService` 判定，前端不自算
-- **危险区**：永久清理、存储恢复、DLQ 管理
+- **任务中心**：查看导入、导出、LQ、HQ、转码、元数据刷新和恢复任务
+- **存储管理**：查看存储状态并触发上述维护任务
+- **导入管理**：选择 ZIP 或本地目录，确认后创建异步导入任务
+- **恢复管理**：扫描 HQ 存储并恢复缺失的数据库记录
 
-> 删除默认进入回收站而非直接物理删除；永久清理必须经过回收站并二次确认。详见[用户指南](docs/user-guide.md)的“管理后台”章节与[部署运维](docs/operations/management.md)。
+> 回收站、媒体上传/替换和其他批量管理接口目前不列入主功能清单，详见 API 文档中的兼容说明。
 
 ## 快速开始
 
@@ -44,21 +50,30 @@ ComicAtlas 是一个面向个人收藏的本地漫画仓库平台。它把 ZIP�
 
 ### 使用 Docker 部署
 
-1. 创建 `.env`，至少设置漫画存储目录及外部基础设施凭据：
+1. 复制 `.env.example` 为不受 Git 跟踪的 `.env`，按分组填写漫画存储、远端基础设施和 FRP 配置：
 
    ```dotenv
    MANGA_ROOT=F:/manga
+   REMOTE_INFRA_HOST=host.docker.internal
    MYSQL_ROOT_PASSWORD=请设置强密码
    API_MYSQL_USER=comicatlas_api
    API_MYSQL_PASSWORD=请设置强密码
    WORKER_MYSQL_USER=comicatlas_ro
    WORKER_MYSQL_PASSWORD=请设置另一组强密码
-   REMOTE_NACOS_USERNAME=nacos
-   REMOTE_NACOS_PASSWORD=nacos
+   REMOTE_MYSQL_PORT=3306
    REMOTE_REDIS_PORT=6379
+   REMOTE_RABBITMQ_PORT=5672
+   REMOTE_RABBITMQ_MANAGEMENT_PORT=15672
+   REMOTE_NACOS_HTTP_PORT=8848
+   REMOTE_NACOS_GRPC_PORT=9848
+   REMOTE_NACOS_USER=nacos
+   REMOTE_NACOS_PASSWORD=nacos
    REMOTE_REDIS_PASSWORD=
    REMOTE_RABBITMQ_USER=guest
    REMOTE_RABBITMQ_PASSWORD=guest
+   FRP_SERVER_ADDR=远端服务器公网地址
+   FRP_SERVER_PORT=7000
+   FRP_DASHBOARD_PORT=7500
    ```
 
    > 仓库级 `.env` 使用 `API_MYSQL_*` 和 `WORKER_MYSQL_*` 区分写账号与只读账号。启动脚本或 Compose 会在进程边界映射为 Spring 使用的 `MYSQL_USER` / `MYSQL_PASS`；Worker 账号仅授予 `SELECT`，详见[部署运维](docs/operations/management.md)的"数据库账号"小节。
@@ -71,7 +86,7 @@ ComicAtlas 是一个面向个人收藏的本地漫画仓库平台。它把 ZIP�
    docker compose -f docker-compose.infra.yml up -d
    ```
 
-4. 启动 Gateway、API 和 Nginx：
+4. 启动 Gateway、阅读服务、管理服务和 Nginx：
 
    ```bash
    docker compose -f docker-compose.yml up -d --build
@@ -119,7 +134,7 @@ ComicAtlas 是一个面向个人收藏的本地漫画仓库平台。它把 ZIP�
 ComicAtlas 面向单机个人仓库，管理端接口（回收站、永久清理、DLQ 等）默认不开启鉴权。请遵守：
 
 - 仅部署在可信本机环境；基础服务（`docker-compose.infra.yml`）只绑定 `127.0.0.1` 回环地址。
-- 不要把 8000/3306/15672/8848 等管理端口直接暴露到公网。
+- 不要把 Gateway 或 `.env` 中的数据库、管理台、注册中心端口直接暴露到公网；FRP 只开放 `FRP_SERVER_PORT`。
 - 在宿主机或防火墙层限制对管理后台 `/manage` 的访问，需要远程访问时使用 SSH 隧道。
 
 ## 文档

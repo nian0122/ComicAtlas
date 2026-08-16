@@ -1,12 +1,12 @@
 package com.comicatlas.api.importer.event;
 
-import com.comicatlas.api.comic.entity.Comic;
-import com.comicatlas.api.comic.mapper.ComicMapper;
-import com.comicatlas.api.common.enums.ComicStatus;
+import com.comicatlas.persistence.comic.entity.Comic;
+import com.comicatlas.persistence.comic.mapper.ComicMapper;
+import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.api.common.enums.ImportTaskStatus;
 import com.comicatlas.api.common.enums.ManagementTaskStatus;
 import com.comicatlas.api.common.enums.TaskType;
-import com.comicatlas.api.common.storage.ApiStorageProperties;
+import com.comicatlas.api.storage.ApiStorageProperties;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
 import com.comicatlas.api.importer.service.ImportPersistenceService;
@@ -123,6 +123,12 @@ public class ImportEventHandler {
         if (event.speedBytesPerSec() > 0) { task.setDownloadSpeed(event.speedBytesPerSec()); }
         if (event.etaSeconds() > 0) { task.setEtaSeconds(event.etaSeconds()); }
         if (event.downloadMethod() != null) { task.setDownloadMethod(event.downloadMethod()); }
+        // 失败原因透传：Worker 失败事件携带 errorMessage（下载/解压/解析/搬移环节），
+        // 写入任务供前端展示与重试决策（阿里规范：失败信息须包含可定位的业务上下文）
+        if ("FAILED".equals(newStatus) && event.errorMessage() != null && !event.errorMessage().isBlank()) {
+            task.setErrorMessage(event.errorMessage());
+            task.setEndTime(LocalDateTime.now());
+        }
         taskMapper.updateById(task);
 
         // 阶段状态（DOWNLOADING/EXTRACTING/PARSING）同步到统一任务 stage 列（TaskStage 枚举）
@@ -147,8 +153,14 @@ public class ImportEventHandler {
                         ? ManagementTaskStatus.CANCELLED
                         : ManagementTaskStatus.FAILED;
                 managementTaskService.updateItemStatus(
-                        mgmtItem.getId(), mgmtStatus, null, "IMPORT_TASK", task.getId());
+                        mgmtItem.getId(), mgmtStatus, task.getErrorMessage(), "IMPORT_TASK", task.getId());
             }
+        }
+
+        // Worker 导入失败只发 TaskStatusChangedEvent(FAILED)（同 task-21 注记），
+        // 若不联动 comic → IMPORT_FAILED，漫画将永久卡 IMPORTING（如 taskId=207/comicId=239）。
+        if ("FAILED".equals(newStatus)) {
+            markComicImportFailed(task);
         }
     }
 
@@ -182,14 +194,9 @@ public class ImportEventHandler {
      * 导入失败：comic → IMPORT_FAILED（可重试），并标记管理任务项失败。
      */
     private void markImportFailed(ImportTask task) {
-        Comic comic = comicMapper.selectById(task.getComicId());
+        Comic comic = markComicImportFailed(task);
         if (comic == null) {
             return;
-        }
-        if (comic.getStatus() == ComicStatus.IMPORTING) {
-            ManagementStateMachine.validateComicTransition(comic.getStatus().name(), "IMPORT_FAILED");
-            comic.setStatus(ComicStatus.IMPORT_FAILED);
-            comicMapper.updateById(comic);
         }
         ManagementTaskItem mgmtItem = managementTaskService.findActiveItem(
                 "COMIC", comic.getId(), TaskType.IMPORT);
@@ -198,6 +205,23 @@ public class ImportEventHandler {
                     mgmtItem.getId(), ManagementTaskStatus.FAILED,
                     task.getErrorMessage(), "IMPORT_TASK", task.getId());
         }
+    }
+
+    /**
+     * comic → IMPORT_FAILED（仅当处于 IMPORTING）。
+     * 供 ImportTaskFailedEvent 与 TaskStatusChangedEvent(FAILED) 两条失败路径共用。
+     *
+     * @return 加载到的 comic；不存在时返回 null
+     */
+    private Comic markComicImportFailed(ImportTask task) {
+        Comic comic = comicMapper.selectById(task.getComicId());
+        if (comic == null || comic.getStatus() != ComicStatus.IMPORTING) {
+            return comic;
+        }
+        ManagementStateMachine.validateComicTransition(comic.getStatus().name(), "IMPORT_FAILED");
+        comic.setStatus(ComicStatus.IMPORT_FAILED);
+        comicMapper.updateById(comic);
+        return comic;
     }
 
     private boolean isEventProcessed(String idempKey) {

@@ -20,7 +20,9 @@
 
     <modules>
         <module>comic-common</module>
+        <module>comic-shared</module>
         <module>api-service</module>
+        <module>reading-service</module>
         <module>worker-service</module>
         <module>gateway</module>
     </modules>

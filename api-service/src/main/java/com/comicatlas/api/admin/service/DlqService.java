@@ -1,10 +1,10 @@
 package com.comicatlas.api.admin.service;
 
-import com.comicatlas.api.common.constant.HttpStatusCodes;
-import com.comicatlas.api.common.exception.BusinessException;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.constant.MqRoutingKeys;
+import com.comicatlas.contract.common.constant.HttpStatusCodes;
+import com.comicatlas.contract.common.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -17,15 +17,16 @@ import static java.util.Map.entry;
 @RequiredArgsConstructor
 public class DlqService {
 
+    /** RabbitMQ 队列命名约定：DLQ 队列名 = 主队列名 + 本后缀。 */
+    private static final String DLQ_NAME_SUFFIX = ".dlq";
+    /** 由 DLQ 名推导主队列名时替换为的后缀。 */
+    private static final String ORIGINAL_QUEUE_SUFFIX = ".queue";
+
     private static final Map<String, DlqRoute> DLQ_ROUTES = Map.ofEntries(
         entry(MqQueues.IMPORT_TASK_DLQ, new DlqRoute(MqExchanges.IMPORT, MqRoutingKeys.TASK_CREATED)),
-        entry(MqQueues.LQ_GENERATE_DLQ, new DlqRoute(MqExchanges.IMAGE, MqRoutingKeys.LQ_GENERATE)),
-        entry(MqQueues.HQ_DELETE_DLQ, new DlqRoute(MqExchanges.IMAGE, MqRoutingKeys.HQ_DELETE_REQUESTED)),
         entry(MqQueues.EXPORT_TASK_DLQ, new DlqRoute(MqExchanges.EXPORT, MqRoutingKeys.TASK_CREATED)),
         entry(MqQueues.IMPORT_RESULT_DLQ, new DlqRoute(MqExchanges.IMPORT, MqRoutingKeys.TASK_COMPLETED)),
         entry(MqQueues.IMPORT_FAILED_DLQ, new DlqRoute(MqExchanges.IMPORT, MqRoutingKeys.TASK_FAILED)),
-        entry(MqQueues.LQ_RESULT_DLQ, new DlqRoute(MqExchanges.IMAGE, MqRoutingKeys.LQ_COMPLETED)),
-        entry(MqQueues.HQ_DELETE_RESULT_DLQ, new DlqRoute(MqExchanges.IMAGE, MqRoutingKeys.HQ_DELETE_COMPLETED)),
         entry(MqQueues.EXPORT_STARTED_RESULT_DLQ, new DlqRoute(MqExchanges.EXPORT, MqRoutingKeys.TASK_STARTED)),
         entry(MqQueues.EXPORT_COMPLETED_RESULT_DLQ, new DlqRoute(MqExchanges.EXPORT, MqRoutingKeys.TASK_COMPLETED)),
         entry(MqQueues.EXPORT_FAILED_RESULT_DLQ, new DlqRoute(MqExchanges.EXPORT, MqRoutingKeys.TASK_FAILED))
@@ -36,7 +37,7 @@ public class DlqService {
     public List<DlqQueueVO> listQueues() {
         return DLQ_ROUTES.entrySet().stream()
             .sorted(Map.Entry.comparingByKey())
-            .map(entry -> queueView(entry.getKey(), entry.getValue()))
+            .map(routeEntry -> toQueueView(routeEntry.getKey(), routeEntry.getValue()))
             .toList();
     }
 
@@ -47,7 +48,7 @@ public class DlqService {
 
     public ReplayResult replay(String queueName, int maxMessages) {
         DlqRoute route = requireRoute(queueName);
-        var result = brokerClient.replay(
+        DlqBrokerClient.ReplayBatch result = brokerClient.replay(
             queueName,
             route.exchange(),
             route.routingKey(),
@@ -68,13 +69,13 @@ public class DlqService {
         return new PurgeResult(queueName, brokerClient.purge(queueName));
     }
 
-    private DlqQueueVO queueView(String name, DlqRoute route) {
-        var stats = brokerClient.queueStats(name);
+    private DlqQueueVO toQueueView(String name, DlqRoute route) {
+        DlqBrokerClient.QueueStats stats = brokerClient.queueStats(name);
         return new DlqQueueVO(
             name,
             route.exchange(),
             route.routingKey(),
-            name.replace(".dlq", ".queue"),
+            name.replace(DLQ_NAME_SUFFIX, ORIGINAL_QUEUE_SUFFIX),
             stats.messages(),
             stats.consumers()
         );

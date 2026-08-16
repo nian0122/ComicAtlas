@@ -1,4 +1,4 @@
-package com.comicatlas.api.common;
+package com.comicatlas.contract.common;
 
 /**
  * 恢复上下文，封装一次恢复操作所需的所有参数。

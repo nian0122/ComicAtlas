@@ -6,11 +6,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Stream;
 
 /**
  * 封面生成器：负责漫画封面 WebP 的生成。
@@ -29,16 +32,10 @@ import java.util.List;
 @RequiredArgsConstructor
 public class CoverGenerator {
 
-    /** 图片优化子进程超时（秒），封面单图处理通常远快于整章 LQ */
-    private static final long COVER_TIMEOUT_SECONDS = 600;
-    /** ffmpeg 抽帧子进程超时（秒） */
-    private static final long FRAME_TIMEOUT_SECONDS = 120;
     /** 封面在 Go 工具中的固定章节标识 */
     private static final String COVER_CHAPTER_ID = "0";
     /** 封面在 Go 工具中的固定章节名 */
     private static final String COVER_CHAPTER_NO = "cover";
-    /** ffmpeg 抽帧起始时间偏移（秒），跳过片头黑场 */
-    private static final String FRAME_SEEK_SECONDS = "2";
     /** 抽出的临时帧文件名 */
     private static final String FRAME_FILE_NAME = "frame.jpg";
     /** 最终封面文件名 */
@@ -67,7 +64,7 @@ public class CoverGenerator {
 
             Path optimizerPath = config.resolveToolPath(config.getImageOptimizerPath());
 
-            List<String> cmd = new ArrayList<>(List.of(
+            List<String> command = new ArrayList<>(List.of(
                     optimizerPath.toString(),
                     "-scan-dir", tempDir.toString(),
                     "-output-dir", thumbsDir.toString(),
@@ -75,15 +72,15 @@ public class CoverGenerator {
                     "-chapter-id", COVER_CHAPTER_ID,
                     "-chapter-no", COVER_CHAPTER_NO,
                     "-quality", String.valueOf(config.getCover().getQuality()),
-                    "-workers", "1",
+                    "-workers", String.valueOf(config.getCover().getWorkers()),
                     "-json"
             ));
 
             log.info("生成封面: comicId={}, quality={}", comicId, config.getCover().getQuality());
 
-            ProcessBuilder processBuilder = new ProcessBuilder(cmd);
+            ProcessBuilder processBuilder = new ProcessBuilder(command);
             ExternalProcessRunner.ExternalProcessResult result =
-                    processRunner.run(processBuilder, COVER_TIMEOUT_SECONDS, "封面优化");
+                    processRunner.run(processBuilder, config.getCover().getTimeoutSeconds(), "封面优化");
             int exitCode = result.exitCode();
             if (exitCode != 0) {
                 throw new RuntimeException(
@@ -91,7 +88,7 @@ public class CoverGenerator {
             }
 
             Path coverFile = thumbsDir.resolve(COVER_FILE_NAME);
-            try (var stream = Files.list(thumbsDir)) {
+            try (Stream<Path> stream = Files.list(thumbsDir)) {
                 Path webpFile = stream
                         .filter(f -> f.getFileName().toString().endsWith(".webp")
                                 && !f.getFileName().toString().equals(COVER_FILE_NAME))
@@ -131,20 +128,21 @@ public class CoverGenerator {
                 throw new RuntimeException("ffmpeg 不可用: " + ffmpegPath);
             }
 
-            List<String> cmd = List.of(
+            List<String> command = List.of(
                     ffmpegPath.toString(),
-                    "-ss", FRAME_SEEK_SECONDS,
+                    "-ss", String.valueOf(config.getCover().getFrameSeekSeconds()),
                     "-i", videoPath.toString(),
-                    "-vframes", "1",
-                    "-q:v", "2",
+                    "-vframes", String.valueOf(config.getCover().getFrameCount()),
+                    "-q:v", String.valueOf(config.getCover().getFrameQuality()),
                     frameFile.toString(),
                     "-y"
             );
 
             log.info("抽取视频封面帧: comicId={}, video={}", comicId, videoPath.getFileName());
 
-            ProcessBuilder processBuilder = new ProcessBuilder(cmd);
-            ExternalProcessRunner.ExternalProcessResult result = processRunner.run(processBuilder, FRAME_TIMEOUT_SECONDS, "视频封面");
+            ProcessBuilder processBuilder = new ProcessBuilder(command);
+            ExternalProcessRunner.ExternalProcessResult result = processRunner.run(
+                    processBuilder, config.getCover().getFrameTimeoutSeconds(), "视频封面");
             int exitCode = result.exitCode();
             if (exitCode != 0 || !Files.exists(frameFile) || Files.size(frameFile) == 0) {
                 throw new RuntimeException("ffmpeg 抽帧失败 exitCode=" + exitCode + ", comicId=" + comicId);
@@ -155,9 +153,10 @@ public class CoverGenerator {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException("视频封面生成被中断: comicId=" + comicId, e);
-        } catch (RuntimeException e) {
-            throw e;
         } catch (Exception e) {
+            if (e instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
             throw new RuntimeException("视频封面生成失败: comicId=" + comicId, e);
         } finally {
             cleanupTempDir(tempDir);
@@ -168,10 +167,10 @@ public class CoverGenerator {
     private void cleanupTempDir(Path tempDir) {
         try {
             if (Files.exists(tempDir)) {
-                try (var stream = Files.walk(tempDir)) {
-                    stream.sorted(java.util.Comparator.reverseOrder())
+                try (Stream<Path> stream = Files.walk(tempDir)) {
+                    stream.sorted(Comparator.reverseOrder())
                             .map(Path::toFile)
-                            .forEach(java.io.File::delete);
+                            .forEach(File::delete);
                 }
             }
         } catch (Exception e) {

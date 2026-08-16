@@ -57,7 +57,7 @@ export interface ComicDetailVO {
   description?: string
   coverUrl: string
   pageCount: number
-  fileSize: number
+  hqSize: number
   sourceType: string
   sourceRef: string
   categoryId: number | null
@@ -108,11 +108,18 @@ export type MediaType = 'IMAGE' | 'VIDEO'
 export interface MediaItemInfo {
   id: number
   pageNumber: number
+  /** HQ 存储文件名，用于管理端媒体维护展示。 */
+  fileName?: string
   hqUrl: string
+  /** HQ 文件状态，不能用 hqUrl 是否存在推断。 */
+  hqStatus?: string
   lqUrl: string
   lqStatus: string
   width: number
   height: number
+  hqSize?: number
+  lqSize?: number
+  transcodeStatus?: string
   /** 媒体类型，缺失时默认按 IMAGE 处理 */
   mediaType?: MediaType
   /** 视频时长（秒），仅 VIDEO 有意义 */
@@ -272,6 +279,13 @@ export interface HistoryVO {
   totalPages: number
   progressPercent: number
   updatedAt: string
+}
+
+export interface HistoryPageVO {
+  records: HistoryVO[]
+  total: number
+  current: number
+  size: number
 }
 
 export interface ComicMetadataDTO {
@@ -764,6 +778,23 @@ export interface OutboxStats {
   readonly pending: number
   readonly failed: number
   readonly total: number
+}
+
+/** MQ 积压与死信统计（后端 MqStatsDTO），覆盖消费层失败与堆积 */
+export interface MqStats {
+  readonly available: boolean
+  readonly dlqTotal: number
+  readonly dlqQueues: number
+  readonly queuedTotal: number
+  readonly queues: readonly MqQueueStat[]
+}
+
+/** 单队列积压快照（后端 MqQueueStat） */
+export interface MqQueueStat {
+  readonly name: string
+  readonly messages: number
+  readonly consumers: number
+  readonly dlq: boolean
 }
 
 /** 目录管理请求（创建/重命名/移动/重排，字段按操作取用） */

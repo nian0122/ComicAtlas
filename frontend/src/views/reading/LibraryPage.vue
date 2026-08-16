@@ -12,7 +12,7 @@
           </span>
         </div>
         <p class="page-count">
-          <span class="mobile-page-count">{{ store.total }} 部作品 · {{ readingCount }} 部正在阅读</span>
+          <span class="mobile-page-count">{{ store.total }} 部作品 · 本页 {{ readingCount }} 部正在阅读</span>
         </p>
       </div>
       <div class="toolbar">
@@ -33,24 +33,24 @@
           </div>
 
           <div class="filter-select sort-select">
-            <select v-model="sort" aria-label="排序方式" @change="onSearch">
-              <option value="createdAt">最新添加</option>
-              <option value="updatedAt">最近更新</option>
-              <option value="title">标题</option>
-              <option value="pageCount">页数</option>
-              <option value="lastReadTime">最近阅读</option>
-            </select>
+            <el-select v-model="sort" aria-label="排序方式" popper-class="library-filter-popper" @change="onSearch">
+              <el-option label="最新添加" value="createdAt" />
+              <el-option label="最近更新" value="updatedAt" />
+              <el-option label="标题" value="title" />
+              <el-option label="页数" value="pageCount" />
+              <el-option label="最近阅读" value="lastReadTime" />
+            </el-select>
           </div>
         </div>
 
         <!-- 移动端第二行：筛选 chips 横向滚动 -->
         <div class="toolbar-filters">
           <div class="filter-select category-select">
-            <select v-model="categoryFilter" aria-label="漫画分类" @change="onSearch">
-              <option value="">全部分类</option>
-              <option value="_NONE">未分类</option>
-              <option v-for="c in allCategories" :key="c.id" :value="c.name">{{ c.name }}</option>
-            </select>
+            <el-select v-model="categoryFilter" placeholder="全部分类" aria-label="漫画分类" popper-class="library-filter-popper" @change="onSearch">
+              <el-option label="全部分类" value="" />
+              <el-option label="未分类" value="_NONE" />
+              <el-option v-for="c in allCategories" :key="c.id" :label="c.name" :value="c.name" />
+            </el-select>
           </div>
 
           <div class="filter-select tag-filter">
@@ -58,8 +58,10 @@
               v-model="selectedTags"
               multiple
               collapse-tags
-              placeholder="筛选标签"
+              collapse-tags-tooltip
+              placeholder="标签：选择"
               class="tag-select"
+              popper-class="library-filter-popper"
               @change="onSearch"
             >
               <el-option
@@ -73,11 +75,19 @@
           </div>
 
           <div class="filter-select tag-mode-filter">
-            <select v-model="tagMode" aria-label="标签匹配方式" @change="onSearch">
-              <option value="OR">任一标签</option>
-              <option value="AND">全部标签</option>
-            </select>
+            <el-select v-model="tagMode" aria-label="标签匹配方式" popper-class="library-filter-popper" @change="onSearch">
+              <el-option label="任一匹配" value="OR" />
+              <el-option label="全部匹配" value="AND" />
+            </el-select>
           </div>
+
+          <button v-if="hasActiveFilters" type="button" class="filter-reset" @click="clearFilters">清除筛选</button>
+        </div>
+
+        <div v-if="hasActiveFilters" class="active-filter-row" aria-label="当前筛选条件">
+          <span class="active-filter-label">当前筛选</span>
+          <span v-for="item in activeFilterSummary" :key="item" class="active-filter-chip">{{ item }}</span>
+          <button type="button" class="active-filter-clear" @click="clearFilters">清除全部</button>
         </div>
       </div>
 
@@ -169,7 +179,9 @@
           :page-size="store.query.size"
           :total="store.total"
           layout="prev, pager, next"
-          background
+          small
+          hide-on-single-page
+          :disabled="store.loading"
           @current-change="onPageChange"
         />
       </div>
@@ -199,6 +211,18 @@ const allTags = ref<TagDTO[]>([])
 const categoryFilter = ref('')
 const allCategories = ref<CategoryDTO[]>([])
 
+const hasActiveFilters = computed(() => Boolean(keyword.value || categoryFilter.value || selectedTags.value.length))
+const activeFilterSummary = computed(() => {
+  const summary: string[] = []
+  if (keyword.value) summary.push(`搜索：${keyword.value}`)
+  if (categoryFilter.value) summary.push(`分类：${categoryFilter.value === '_NONE' ? '未分类' : categoryFilter.value}`)
+  if (selectedTags.value.length) {
+    const tagText = selectedTags.value.map((tag) => tag === '_NONE' ? '无标签' : tag).join('、')
+    summary.push(`标签：${tagText} · ${selectedTags.value.length > 1 && tagMode.value === 'AND' ? '全部匹配' : '任一匹配'}`)
+  }
+  return summary
+})
+
 // 响应式视口宽度（resize 防抖更新，组件卸载时自动清理监听）
 const viewportWidth = useBreakpoint()
 
@@ -221,6 +245,14 @@ function onKeywordInput() {
 
 function clearKeyword() {
   keyword.value = ''
+  onSearch()
+}
+
+function clearFilters() {
+  keyword.value = ''
+  categoryFilter.value = ''
+  selectedTags.value = []
+  tagMode.value = 'OR'
   onSearch()
 }
 
@@ -297,6 +329,8 @@ function posterSubtitle(comic: ComicListVO): string {
 }
 
 onMounted(() => {
+  // 重新进入漫画库时清除上一次页面残留的分页条件，避免界面与实际请求不一致。
+  store.resetQuery()
   loadTags()
   loadCategories()
   store.fetchList()
@@ -387,16 +421,28 @@ onMounted(() => {
 
 .search-input:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-bg);
+  /* 聚焦只保留一圈清晰边界，避免胶囊外再出现一圈抢眼红框。 */
+  box-shadow: 0 0 0 1px var(--accent) inset;
 }
 
 .search-input input {
   flex: 1;
-  background: transparent;
-  border: none;
-  outline: none;
+  min-height: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
   color: var(--text-primary);
   font-size: 14px;
+}
+
+.search-input input:focus,
+.search-input input:focus-visible {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 .search-input input::placeholder {
@@ -413,25 +459,23 @@ onMounted(() => {
   color: var(--text-primary);
 }
 
-.filter-select select {
-  height: 44px;
+.filter-select :deep(.el-select) { width: 100%; }
+.filter-select :deep(.el-select__wrapper) {
+  min-height: 44px;
   padding: 0 var(--space-base);
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
   border-radius: var(--radius-pill);
+  background: var(--bg-surface);
+  box-shadow: 0 0 0 1px var(--border) inset;
   color: var(--text-primary);
-  font-size: 14px;
-  outline: none;
-  cursor: pointer;
-  transition: border-color var(--transition-fast);
+  transition: box-shadow var(--transition-fast), background-color var(--transition-fast);
 }
-
-.filter-select select:focus {
-  border-color: var(--border-strong);
-}
+.filter-select :deep(.el-select__wrapper:hover) { box-shadow: 0 0 0 1px var(--border-strong) inset; }
+.filter-select :deep(.el-select__wrapper.is-focused) { box-shadow: 0 0 0 1px var(--accent) inset, 0 0 0 3px var(--accent-bg); }
+.filter-select :deep(.el-select__selected-item),
+.filter-select :deep(.el-select__placeholder) { color: var(--text-primary); font-size: 14px; }
 
 .tag-filter {
-  min-width: 160px;
+  min-width: 170px;
 }
 
 .tag-filter :deep(.el-input__wrapper) {
@@ -453,6 +497,55 @@ onMounted(() => {
   min-width: 110px;
 }
 
+.sort-select { min-width: 128px; }
+.category-select { min-width: 118px; }
+
+:global(.library-filter-popper.el-popper) {
+  padding: 5px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  box-shadow: var(--card-shadow-hover);
+}
+:global(.library-filter-popper .el-select-dropdown__item) {
+  min-height: 36px;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+:global(.library-filter-popper .el-select-dropdown__item.hover),
+:global(.library-filter-popper .el-select-dropdown__item:hover) { background: var(--accent-bg); color: var(--text-primary); }
+:global(.library-filter-popper .el-select-dropdown__item.is-selected) { background: var(--accent-bg); color: var(--accent); font-weight: 650; }
+
+.filter-reset,
+.active-filter-clear {
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.filter-reset { height: 44px; padding: 0 4px; }
+.filter-reset:hover,
+.active-filter-clear:hover { color: var(--text-primary); }
+
+.active-filter-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-basis: 100%;
+  min-width: 0;
+  padding-top: 2px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.active-filter-label { color: var(--text-secondary); font-weight: 650; }
+.active-filter-chip { max-width: 240px; overflow: hidden; padding: 4px 8px; border: 1px solid var(--border); border-radius: var(--radius-pill); background: var(--bg-surface); text-overflow: ellipsis; white-space: nowrap; }
+.active-filter-clear { margin-left: auto; }
+
 /* 桌面端（>768px）：包装层不参与布局，控件直接平铺进 toolbar，
  * 并用 order 恢复原有控件顺序：搜索 → 分类 → 排序 → 标签 → 标签模式 */
 @media (min-width: 769px) {
@@ -466,6 +559,7 @@ onMounted(() => {
   .sort-select { order: 3; }
   .tag-filter { order: 4; }
   .tag-mode-filter { order: 5; }
+  .filter-reset { order: 6; }
 }
 
 .comic-section {
@@ -490,8 +584,11 @@ onMounted(() => {
 
 .pagination-wrapper {
   display: flex;
+  align-items: center;
+  gap: var(--space-3);
   justify-content: center;
-  padding: var(--space-lg) 0;
+  min-height: 36px;
+  padding: var(--space-md) 0;
 }
 
 .state {
@@ -552,14 +649,15 @@ onMounted(() => {
     position: static;
     display: flex;
     flex-direction: column;
-    padding: var(--mobile-library-filter-offset) 0 var(--mobile-library-header-bottom);
+    gap: var(--space-4);
+    padding: var(--space-4) 0 var(--mobile-library-header-bottom);
     background: var(--mobile-canvas);
     border-bottom: 0;
   }
 
   .title-block {
-    order: 2;
-    margin-top: var(--mobile-library-title-gap);
+    order: 0;
+    margin-top: 0;
     margin-bottom: 0;
   }
 
@@ -597,25 +695,24 @@ onMounted(() => {
   }
 
   .toolbar {
-    order: 0;
+    order: 1;
+    width: 100%;
     gap: var(--space-sm);
   }
 
-  /* 搜索 + 排序合并为一行，空间不足时自动换行 */
+  /* 移动端搜索进入正常文档流，避免固定定位造成标题错位和顶部空洞。 */
   .toolbar-main {
     display: flex;
     align-items: center;
     gap: var(--space-sm);
-    width: auto;
+    width: 100%;
   }
 
   .search-input {
-    position: fixed;
-    top: var(--mobile-search-top);
-    right: var(--mobile-page-gutter);
-    z-index: calc(var(--z-nav) + 1);
-    width: var(--mobile-search-width);
-    min-width: var(--mobile-search-width);
+    position: static;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
     height: var(--mobile-search-height);
     padding-inline: var(--space-3);
     background: var(--color-surface-3);
@@ -635,10 +732,11 @@ onMounted(() => {
   .mobile-filter-stack {
     display: flex;
     flex-direction: column;
-    order: 1;
+    order: 2;
     gap: var(--mobile-library-filter-gap);
     width: calc(100% + var(--mobile-page-gutter) * 2);
     margin-left: calc(var(--mobile-page-gutter) * -1);
+    margin-top: 0;
     overflow: hidden;
   }
 
@@ -685,7 +783,7 @@ onMounted(() => {
 
   .comic-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--space-8) var(--mobile-library-grid-gap);
+    gap: var(--space-4);
   }
 
   .comic-grid :deep(.poster-frame) {
@@ -698,6 +796,13 @@ onMounted(() => {
 
   .comic-grid :deep(.poster-progress) {
     height: 4px;
+  }
+
+  /* 固定底部导航不应遮住最后一排卡片和分页。 */
+  .comic-section {
+    padding-bottom: calc(
+      var(--mobile-tabbar-height) + var(--space-8) + env(safe-area-inset-bottom)
+    );
   }
 }
 </style>

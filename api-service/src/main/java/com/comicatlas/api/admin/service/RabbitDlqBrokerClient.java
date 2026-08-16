@@ -11,6 +11,7 @@ import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CodingErrorAction;
@@ -21,12 +22,18 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Component
 @RequiredArgsConstructor
 public class RabbitDlqBrokerClient implements DlqBrokerClient {
+
+    /** 消息体 UTF-8 可解码时的编码标识（DlqMessage.payloadEncoding 契约值）。 */
+    private static final String PAYLOAD_ENCODING_STRING = "string";
+    /** 消息体无法按 UTF-8 解码时回退的 Base64 编码标识。 */
+    private static final String PAYLOAD_ENCODING_BASE64 = "base64";
 
     static final long CONFIRM_TIMEOUT_MILLIS = 5_000;
 
@@ -35,7 +42,7 @@ public class RabbitDlqBrokerClient implements DlqBrokerClient {
 
     @Override
     public QueueStats queueStats(String queueName) {
-        var properties = rabbitAdmin.getQueueProperties(queueName);
+        Properties properties = rabbitAdmin.getQueueProperties(queueName);
         if (properties == null) {
             return new QueueStats(0, 0);
         }
@@ -71,8 +78,8 @@ public class RabbitDlqBrokerClient implements DlqBrokerClient {
         return rabbitAdmin.purgeQueue(queueName);
     }
 
-    private List<DlqMessage> peek(Channel channel, String queueName, int count) throws Exception {
-        var messages = new ArrayList<DlqMessage>(count);
+    private List<DlqMessage> peek(Channel channel, String queueName, int count) throws IOException {
+        List<DlqMessage> messages = new ArrayList<>(count);
         long lastDeliveryTag = 0;
         try {
             for (int index = 0; index < count; index++) {
@@ -96,9 +103,9 @@ public class RabbitDlqBrokerClient implements DlqBrokerClient {
             String queueName,
             String exchange,
             String routingKey,
-            int maxMessages) throws Exception {
-        var returned = new AtomicBoolean(false);
-        ReturnListener returnListener = channel.addReturnListener(message -> returned.set(true));
+            int maxMessages) throws IOException {
+        AtomicBoolean returned = new AtomicBoolean(false);
+        ReturnListener returnListener = channel.addReturnListener(ignored -> returned.set(true));
         int attempted = 0;
         int replayed = 0;
         int remaining = 0;
@@ -157,7 +164,7 @@ public class RabbitDlqBrokerClient implements DlqBrokerClient {
         return new ReplayBatch(attempted, replayed, remaining + 1, false, error);
     }
 
-    private static void requeue(Channel channel, GetResponse response) throws Exception {
+    private static void requeue(Channel channel, GetResponse response) throws IOException {
         channel.basicNack(response.getEnvelope().getDeliveryTag(), false, true);
     }
 
@@ -171,29 +178,29 @@ public class RabbitDlqBrokerClient implements DlqBrokerClient {
                 .onUnmappableCharacter(CodingErrorAction.REPORT)
                 .decode(ByteBuffer.wrap(body))
                 .toString();
-            encoding = "string";
+            encoding = PAYLOAD_ENCODING_STRING;
         } catch (CharacterCodingException exception) {
             payload = Base64.getEncoder().encodeToString(body);
-            encoding = "base64";
+            encoding = PAYLOAD_ENCODING_BASE64;
         }
         return new DlqMessage(
             payload,
             encoding,
-            properties(response.getProps()),
+            toPropertyMap(response.getProps()),
             response.getMessageCount()
         );
     }
 
-    private static Map<String, Object> properties(AMQP.BasicProperties properties) {
-        var values = new LinkedHashMap<String, Object>();
-        putIfPresent(values, "contentType", properties.getContentType());
-        putIfPresent(values, "contentEncoding", properties.getContentEncoding());
-        putIfPresent(values, "messageId", properties.getMessageId());
-        putIfPresent(values, "correlationId", properties.getCorrelationId());
-        putIfPresent(values, "type", properties.getType());
-        putIfPresent(values, "timestamp", properties.getTimestamp());
-        if (properties.getHeaders() != null) {
-            values.put("headers", Collections.unmodifiableMap(properties.getHeaders()));
+    private static Map<String, Object> toPropertyMap(AMQP.BasicProperties basicProperties) {
+        Map<String, Object> values = new LinkedHashMap<>();
+        putIfPresent(values, "contentType", basicProperties.getContentType());
+        putIfPresent(values, "contentEncoding", basicProperties.getContentEncoding());
+        putIfPresent(values, "messageId", basicProperties.getMessageId());
+        putIfPresent(values, "correlationId", basicProperties.getCorrelationId());
+        putIfPresent(values, "type", basicProperties.getType());
+        putIfPresent(values, "timestamp", basicProperties.getTimestamp());
+        if (basicProperties.getHeaders() != null) {
+            values.put("headers", Collections.unmodifiableMap(basicProperties.getHeaders()));
         }
         return Collections.unmodifiableMap(values);
     }

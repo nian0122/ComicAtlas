@@ -12,19 +12,19 @@
 
 ## 一、数据库账号
 
-ComicAtlas 分为 API 与 Worker 两个进程，二者对 MySQL 的权限不同，**不要混用同一个写账号**。
+ComicAtlas 分为阅读服务、管理服务与 Worker 三类进程。阅读服务负责漫画查询并写入阅读进度，管理服务是其余业务表与任务状态的唯一写入方；Worker 只读数据库，**不要混用 Worker 只读账号与两个服务的写账号**。
 
 | 账号 | 权限 | 用途 | 强制措施 |
 |------|------|------|---------|
-| API 写账号 | 全部 DDL/DML（库级） | API 服务读写业务表、outbox/inbox、管理任务 | 由 Flyway 执行迁移，`GRANT ALL` |
+| API 写账号 | 全部 DDL/DML（库级） | 管理服务读写业务表、outbox/inbox、管理任务；阅读服务写 `reading_history` | 由管理服务执行 Flyway 迁移，`GRANT ALL` |
 | Worker 只读账号（`comicatlas_ro`，生产默认） | 仅 `SELECT` | Worker 文件处理侧只读查询（导出、扫描、转码状态读取） | HikariCP `read-only=true` + `GRANT SELECT` 双层兜底 |
 
-仓库级 `.env` 按服务角色命名：API 使用 `API_MYSQL_USER` / `API_MYSQL_PASSWORD`，Worker 使用 `WORKER_MYSQL_USER` / `WORKER_MYSQL_PASSWORD`。Docker Compose 和开发启动脚本只在启动具体 JVM 时，将对应账号映射为 Spring 通用变量 `MYSQL_USER` / `MYSQL_PASS`，避免两个进程误用同一账号。
+仓库级 `.env` 按服务角色命名：管理服务与阅读服务共用 `API_MYSQL_USER` / `API_MYSQL_PASSWORD`，Worker 使用 `WORKER_MYSQL_USER` / `WORKER_MYSQL_PASSWORD`。Docker Compose 和开发启动脚本只在启动具体 JVM 时，将对应账号映射为 Spring 通用变量 `MYSQL_USER` / `MYSQL_PASS`，避免 Worker 误用写账号。
 
 ### 最小授权示例（MySQL 8）
 
 ```sql
--- API 写账号（用于 api-service 的 MYSQL_USER / MYSQL_PASS）
+-- API 写账号（用于 api-service 与 reading-service 的 MYSQL_USER / MYSQL_PASS）
 CREATE USER IF NOT EXISTS 'comicatlas_api'@'%' IDENTIFIED BY '请设置强密码';
 GRANT ALL PRIVILEGES ON comic_atlas.* TO 'comicatlas_api'@'%';
 
@@ -144,15 +144,16 @@ docker compose -f docker-compose.yml up -d --build
 
 # 3. 观察迁移与健康状态
 docker compose -f docker-compose.yml ps
-docker compose logs -f api-service
+docker compose logs -f api-service reading-service gateway
 ```
 
 Flyway 会按版本号顺序执行 `api-service/src/main/resources/db/flyway/V*.sql`（生效迁移目录，见 `db/README.md`）。当前生效迁移：V1 初始化、V2 修正 schema 漂移、V10 生命周期/乐观锁、V11 管理任务、V12 管理任务外键、V13 outbox/inbox、V14 章节全局顺序唯一、V15 上传会话、V16 回收站生命周期、V17 REGISTER→DIRECTORY、V18 视频转码状态分类、V19 Outbox/阅读历史完整性、V20 TRASH 资产清单落库；V3–V9 等历史迁移已归档到 `db/migration-archive/`，不参与执行。迁移失败时 Flyway 会停在失败版本，需要修复后重试。
 
 ### 升级后的检查清单
 
-- [ ] `GET /api/management/outbox/stats` 的 `pending`/`failed` 不为持续增长。
-- [ ] 任务中心能查询到管理任务（`GET /api/management/tasks`）。
+- [ ] `GET /api/manage/outbox/stats` 的 `pending`/`failed` 不为持续增长。
+- [ ] 任务中心能查询到管理任务（`GET /api/manage/tasks`）。
+- [ ] `reading-service` 与 `api-service` 均为 healthy，且 `GET /api/comics`、`GET /api/manage/tasks` 能分别经 Gateway 返回。
 - [ ] 回收站页面能列出 `TRASHED` 对象。
 - [ ] 旧客户端仍可调用兼容端点（见 API 文档第 19 章兼容窗口）。
 
@@ -194,8 +195,8 @@ docker compose -f docker-compose.yml up -d --build
 | 永久清理被拒 | 对象未到 7 天保留期 / 非 `TRASHED` / token 失效 | 等待保留期；重新预览确认 |
 | 回收站列表空白 | `COMIC_DELETE` 任务失败或仍在 `TRASHING` | 查看任务中心任务与逐项错误 |
 | Worker 写库报 Access denied | Worker 账号只读（预期行为） | 确认状态回写走 MQ；不要给 Worker 放开写权限 |
-| 任务状态一直 `QUEUED` | Outbox Relay 未运行或 MQ 断开 | 检查 `outbox.relay.*` 与 RabbitMQ 连通性、`/api/management/outbox/stats` 积压 |
-| DLQ 堆积 | 消费方异常或事件 payload 不兼容 | 管理后台“死信队列”查看/重放，或 `POST /api/admin/dlq/queues/{q}/replay` |
+| 任务状态一直 `QUEUED` | Outbox Relay 未运行或 MQ 断开 | 检查 `outbox.relay.*` 与 RabbitMQ 连通性、`/api/manage/outbox/stats` 积压 |
+| DLQ 堆积 | 消费方异常或事件 payload 不兼容 | 管理后台“死信队列”查看/重放，或 `POST /api/manage/admin/dlq/queues/{q}/replay` |
 | 磁盘不足 | 上传阈值/保留期设置过低 | 调整 `free-space-min-*`，清理回收站（purge）与导出目录 |
 
 ---
@@ -203,6 +204,6 @@ docker compose -f docker-compose.yml up -d --build
 ## 八、安全基线
 
 - 管理端接口默认无鉴权：只部署在可信本机，管理端口不暴露公网。
-- RabbitMQ 管理台（15672）、Nacos（8848）只绑定回环地址。
+- RabbitMQ 管理台与 Nacos 使用 `.env` 中对应的 `REMOTE_*_PORT`，并只绑定回环地址。
 - 不要把 `.env`、数据库密码、远程凭据提交到 Git 或写入文档。
 - 定期轮换 `MYSQL_ROOT_PASSWORD` 等基础设施密码。

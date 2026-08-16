@@ -2,18 +2,18 @@ package com.comicatlas.api.management.operation;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.comicatlas.api.common.constant.HttpStatusCodes;
-import com.comicatlas.api.common.enums.ComicStatus;
-import com.comicatlas.api.common.enums.HqStatus;
-import com.comicatlas.api.common.enums.LqStatus;
-import com.comicatlas.api.common.exception.BusinessException;
+import com.comicatlas.contract.common.constant.HttpStatusCodes;
+import com.comicatlas.contract.common.enums.ComicStatus;
+import com.comicatlas.contract.common.enums.HqStatus;
+import com.comicatlas.contract.common.enums.LqStatus;
+import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.common.exception.ConflictException;
-import com.comicatlas.api.comic.entity.Chapter;
-import com.comicatlas.api.comic.entity.Comic;
-import com.comicatlas.api.comic.entity.Media;
-import com.comicatlas.api.comic.mapper.ChapterMapper;
-import com.comicatlas.api.comic.mapper.ComicMapper;
-import com.comicatlas.api.comic.mapper.MediaMapper;
+import com.comicatlas.persistence.comic.entity.Chapter;
+import com.comicatlas.persistence.comic.entity.Comic;
+import com.comicatlas.persistence.comic.entity.Media;
+import com.comicatlas.persistence.comic.mapper.ChapterMapper;
+import com.comicatlas.persistence.comic.mapper.ComicMapper;
+import com.comicatlas.persistence.comic.mapper.MediaMapper;
 import com.comicatlas.api.management.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
@@ -24,7 +24,7 @@ import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.api.common.enums.TaskType;
-import com.comicatlas.api.common.enums.TranscodeStatus;
+import com.comicatlas.contract.common.enums.TranscodeStatus;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.common.util.VideoPlayability;
 import lombok.RequiredArgsConstructor;
@@ -35,8 +35,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * 媒体操作命令编排服务。
@@ -139,13 +141,28 @@ public class MediaOperationCommandService {
     public OperationSubmitResultDTO requestHqDeleteForComic(Long comicId) {
         List<Chapter> chapters = chapterMapper.selectList(
                 new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
+        if (chapters.isEmpty()) {
+            log.info("漫画 {} 无章节，跳过", comicId);
+            return OperationSubmitResultDTO.of(null, TaskType.HQ_DELETE.name(), null, 0);
+        }
+        List<Long> chapterIds = chapters.stream().map(Chapter::getId).toList();
+
+        // 一次性 IN 查询取回全部候选图片页并按章节分组，避免逐章 selectCount/selectList（N+1）
+        List<Media> deletablePages = mediaMapper.selectList(
+                new LambdaQueryWrapper<Media>()
+                        .in(Media::getChapterId, chapterIds)
+                        .eq(Media::getMediaType, "IMAGE")
+                        .in(Media::getHqStatus, HqStatus.READY, HqStatus.MISSING));
+        Map<Long, List<Media>> pagesByChapter = deletablePages.stream()
+                .collect(Collectors.groupingBy(Media::getChapterId));
 
         List<CreateManagementTaskRequest.TaskTarget> targets = new ArrayList<>();
         for (Chapter chapter : chapters) {
-            if (!hasDeletableHq(chapter.getId())) {
+            List<Media> mediaItems = pagesByChapter.getOrDefault(chapter.getId(), List.of());
+            if (mediaItems.isEmpty()) {
                 continue;
             }
-            validateHqDeletePrecondition(chapter.getId());
+            validateHqDeletePrecondition(mediaItems);
             targets.add(target("CHAPTER", chapter.getId(), TaskType.HQ_DELETE));
         }
         if (targets.isEmpty()) {
@@ -156,8 +173,11 @@ public class MediaOperationCommandService {
         ManagementTaskResponse task = createTask(TaskType.HQ_DELETE, "删除高清图片", "COMIC", targets);
         List<ManagementTaskItemResponse> items = managementTaskService.getTaskItems(task.getId());
 
+        List<Long> targetChapterIds = items.stream()
+                .map(ManagementTaskItemResponse::getTargetId)
+                .toList();
+        markHqDeleteQueued(targetChapterIds);
         for (ManagementTaskItemResponse item : items) {
-            markHqDeleteQueued(item.getTargetId());
             enqueue(TaskType.HQ_DELETE, item, "CHAPTER", item.getTargetId());
         }
         log.info("HQ 删除命令已提交: comicId={}, taskId={}, items={}",
@@ -202,6 +222,13 @@ public class MediaOperationCommandService {
                         .eq(Media::getChapterId, chapterId)
                         .eq(Media::getMediaType, "IMAGE")
                         .in(Media::getHqStatus, HqStatus.READY, HqStatus.MISSING));
+        validateHqDeletePrecondition(mediaItems);
+    }
+
+    /**
+     * HQ 删除前置条件（复用已加载页数据）：全部图片页 LQ 必须 READY。
+     */
+    private void validateHqDeletePrecondition(List<Media> mediaItems) {
         List<Media> notReady = mediaItems.stream()
                 .filter(media -> media.getLqStatus() != LqStatus.READY)
                 .toList();
@@ -217,6 +244,17 @@ public class MediaOperationCommandService {
     private void markHqDeleteQueued(Long chapterId) {
         mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
                 .eq(Media::getChapterId, chapterId)
+                .eq(Media::getMediaType, "IMAGE")
+                .in(Media::getHqStatus, HqStatus.READY, HqStatus.MISSING)
+                .set(Media::getHqStatus, HqStatus.DELETE_QUEUED));
+    }
+
+    private void markHqDeleteQueued(List<Long> chapterIds) {
+        if (chapterIds.isEmpty()) {
+            return;
+        }
+        mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
+                .in(Media::getChapterId, chapterIds)
                 .eq(Media::getMediaType, "IMAGE")
                 .in(Media::getHqStatus, HqStatus.READY, HqStatus.MISSING)
                 .set(Media::getHqStatus, HqStatus.DELETE_QUEUED));
@@ -319,6 +357,17 @@ public class MediaOperationCommandService {
             return false;
         }
         if (media.getHqStatus() == HqStatus.DELETED) {
+            return false;
+        }
+        // 超高清视频（任一边 > 4096，如 8K）硬件编码器无法处理，CPU 转码又超时，
+        // 判定为不可转码：保持原样并标记 NOT_NEEDED，避免反复进入转码队列失败
+        if (!VideoPlayability.isTranscodable(media.getWidth(), media.getHeight())) {
+            mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
+                    .eq(Media::getId, media.getId())
+                    .eq(Media::getTranscodeStatus, TranscodeStatus.REQUIRED)
+                    .set(Media::getTranscodeStatus, TranscodeStatus.NOT_NEEDED));
+            log.info("视频分辨率超出硬件转码能力，标记无需转码: mediaId={}, {}x{}",
+                    media.getId(), media.getWidth(), media.getHeight());
             return false;
         }
         TranscodeStatus status = media.getTranscodeStatus();

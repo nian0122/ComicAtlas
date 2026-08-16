@@ -20,16 +20,18 @@ public record MetadataV3(
     public record Chapter(String title, String chapterNo, int sortOrder, int globalOrder,
                           Integer catalogIndex, List<MediaItem> mediaItems) {}
 
-    /** width/height/duration/container/videoCodec/audioCodec 可选（null 时不输出）。 */
+    /** width/height/duration/container/videoCodec/audioCodec 可选（null 时不输出）；
+     *  lqSize 为 LQ 文件字节数（未生成时为 0），lqPath 可推导（hqPath 换 .webp），无需记录。 */
     public record MediaItem(String fileName, int pageNumber, String hqStatus, String lqStatus,
                             long fileSize, String mediaType, Integer width, Integer height,
                             BigDecimal duration, String container, String videoCodec, String audioCodec,
+                            long lqSize,
                             @JsonInclude(JsonInclude.Include.NON_NULL) String hqPath) {
 
         public MediaItem(String fileName, int pageNumber, String hqStatus, String lqStatus,
                          long fileSize, String mediaType, Integer width, Integer height,
                          BigDecimal duration, String container, String videoCodec, String audioCodec,
-                         String hqPath) {
+                         long lqSize, String hqPath) {
             RelativePathValidator.requireRelativeForwardSlash(hqPath);
             this.fileName = fileName;
             this.pageNumber = pageNumber;
@@ -43,15 +45,25 @@ public record MetadataV3(
             this.container = container;
             this.videoCodec = videoCodec;
             this.audioCodec = audioCodec;
+            this.lqSize = lqSize;
             this.hqPath = hqPath;
         }
 
-        /** 旧构造入口（无 hqPath），保持向后兼容。 */
+        /** 旧构造入口（无 lqSize），保持向后兼容（lqSize=0、hqPath 传入）。 */
+        public MediaItem(String fileName, int pageNumber, String hqStatus, String lqStatus,
+                         long fileSize, String mediaType, Integer width, Integer height,
+                         BigDecimal duration, String container, String videoCodec, String audioCodec,
+                         String hqPath) {
+            this(fileName, pageNumber, hqStatus, lqStatus, fileSize, mediaType, width, height,
+                    duration, container, videoCodec, audioCodec, 0L, hqPath);
+        }
+
+        /** 旧构造入口（无 lqSize/hqPath），保持向后兼容。 */
         public MediaItem(String fileName, int pageNumber, String hqStatus, String lqStatus,
                          long fileSize, String mediaType, Integer width, Integer height,
                          BigDecimal duration, String container, String videoCodec, String audioCodec) {
             this(fileName, pageNumber, hqStatus, lqStatus, fileSize, mediaType, width, height,
-                    duration, container, videoCodec, audioCodec, null);
+                    duration, container, videoCodec, audioCodec, 0L, null);
         }
     }
 }

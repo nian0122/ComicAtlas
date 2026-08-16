@@ -38,10 +38,9 @@ function clearFilters() {
   emit('update:filter', { hqStatus: 'ALL', lqStatus: 'ALL', keyword: '', category: '', tag: '' })
 }
 
-const sortModel = computed({
-  get: () => props.sort,
-  set: (val) => emit('update:sort', val)
-})
+function setSort(patch: Partial<SortState>) {
+  emit('update:sort', { ...props.sort, ...patch })
+}
 
 const categoryStore = useCategoryStore()
 const tagStore = useTagStore()
@@ -79,13 +78,13 @@ onMounted(() => { void categoryStore.fetchList(); void tagStore.fetchList() })
           <el-option label="无标签" value="_NONE" />
           <el-option v-for="tag in tagStore.list" :key="tag.id" :label="tag.name" :value="tag.name" />
         </el-select>
-        <el-select v-model="sortModel.field" placeholder="排序" class="filter-select">
+        <el-select :model-value="props.sort.field" @update:model-value="setSort({ field: $event })" placeholder="排序" class="filter-select">
           <el-option label="HQ 大小" value="hqSize" />
           <el-option label="LQ 大小" value="lqSize" />
           <el-option label="总大小" value="totalSize" />
           <el-option label="标题" value="title" />
         </el-select>
-        <el-select v-model="sortModel.order" class="filter-select--mini">
+        <el-select :model-value="props.sort.order" @update:model-value="setSort({ order: $event })" class="filter-select--mini">
           <el-option label="降序" value="desc" />
           <el-option label="升序" value="asc" />
         </el-select>

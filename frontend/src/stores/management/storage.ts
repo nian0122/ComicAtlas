@@ -10,18 +10,22 @@ export const useStorageStore = defineStore('storage', () => {
   const busyState = ref<Record<number, boolean>>({})
   const loading = ref(false)
   const serverTotal = ref(0)
+  let comicsRequestVersion = 0
 
-  async function loadComics(params?: ComicStorageQuery) {
+  async function loadComics(params?: ComicStorageQuery): Promise<void> {
+    const requestVersion = ++comicsRequestVersion
     loading.value = true
     try {
       const data = await storageService.fetchComics(params ?? {})
+      if (requestVersion !== comicsRequestVersion) return
       comicList.value = Array.isArray(data?.records) ? data.records : []
       serverTotal.value = data?.total ?? 0
     } catch {
+      if (requestVersion !== comicsRequestVersion) return
       comicList.value = []
       serverTotal.value = 0
     } finally {
-      loading.value = false
+      if (requestVersion === comicsRequestVersion) loading.value = false
     }
   }
 

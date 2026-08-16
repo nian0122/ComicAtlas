@@ -3,12 +3,13 @@
     <header class="page-header">
       <div class="header-left">
         <p class="page-eyebrow">LEDGER / HISTORY</p>
+        <h1 class="page-title">阅读历史</h1>
         <p v-if="recentCount > 0" class="page-subtitle">
           最近阅读 {{ recentCount }} 部漫画
         </p>
       </div>
       <div class="header-actions">
-        <button class="ghost-btn" @click="store.refresh">刷新</button>
+        <button class="ghost-btn" :disabled="store.loading" @click="store.fetchFirstPage">刷新</button>
         <button class="primary-btn" @click="router.push('/library')">去漫画库</button>
       </div>
     </header>
@@ -23,7 +24,7 @@
     <div v-else-if="store.error" class="state error">
       <el-icon :size="32"><WarningFilled /></el-icon>
       <span>{{ store.error }}</span>
-      <button class="ghost-btn" @click="store.refresh">重试</button>
+      <button class="ghost-btn" :disabled="store.loading" @click="store.fetchFirstPage">重试</button>
     </div>
 
     <!-- 空状态 -->
@@ -42,12 +43,21 @@
       :item-size="historyItemSize"
       key-field="key"
       :buffer="200"
+      @scroll="onHistoryScroll"
     >
       <template #default="{ item }">
         <div v-if="item.kind === 'end'" class="history-end">
           <MaterialSymbolIcon name="history" class="history-end-icon" />
-          <span class="history-end-label history-end-label--desktop">END OF HISTORY</span>
-          <span class="history-end-label history-end-label--mobile">历史记录已加载完毕</span>
+          <span v-if="store.loadingMore" class="history-end-label">正在加载更多阅读记录</span>
+          <button v-else-if="store.loadMoreError" type="button" class="history-end-retry" @click="store.fetchNextPage">加载更多失败，点击重试</button>
+          <template v-else-if="store.hasMore">
+            <span class="history-end-label history-end-label--desktop">SCROLL FOR MORE</span>
+            <span class="history-end-label history-end-label--mobile">继续下滑加载更多</span>
+          </template>
+          <template v-else>
+            <span class="history-end-label history-end-label--desktop">END OF HISTORY</span>
+            <span class="history-end-label history-end-label--mobile">历史记录已加载完毕</span>
+          </template>
         </div>
         <article v-else class="history-item">
           <button type="button" class="history-thumb" @click="continueRead(item.value)">
@@ -89,7 +99,7 @@ const router = useRouter()
 const store = useHistoryStore()
 const viewportWidth = useBreakpoint()
 
-const recentCount = computed(() => store.list.length)
+const recentCount = computed(() => store.total)
 const historyItemSize = computed(() =>
   viewportWidth.value <= BREAKPOINTS.tablet ? 148 : 88
 )
@@ -119,17 +129,25 @@ function continueRead(item: HistoryVO) {
   router.push(`/reader/${item.chapterId}?page=${item.pageNumber}`)
 }
 
+function onHistoryScroll(event: Event): void {
+  const target = event.currentTarget
+  if (!(target instanceof HTMLElement)) return
+  const remainingDistance = target.scrollHeight - target.scrollTop - target.clientHeight
+  if (remainingDistance <= 240) void store.fetchNextPage()
+}
+
 onMounted(() => {
-  store.fetchList()
+  void store.fetchFirstPage()
 })
 </script>
 
 <style scoped>
 .history-page {
-  height: calc(100dvh - var(--nav-height) - var(--space-10));
-  max-width: var(--content-max);
+  height: calc(100dvh - var(--nav-height));
+  max-width: none;
   margin: 0 auto;
-  padding: var(--space-8) 0 var(--space-6);
+  box-sizing: border-box;
+  padding: 0;
   color: var(--text-secondary);
   display: flex;
   flex-direction: column;
@@ -140,9 +158,12 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: var(--space-2xl);
+  padding: var(--space-2) 0 var(--space-3);
+  margin-bottom: var(--space-2);
   gap: var(--space-base);
   flex-wrap: wrap;
+  background: linear-gradient(to bottom, var(--bg-primary) 86%, transparent);
+  border-bottom: 1px solid var(--border);
 }
 
 .header-left {
@@ -157,6 +178,15 @@ onMounted(() => {
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.14em;
+}
+
+.page-title {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--text-page);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
 }
 
 .page-subtitle {
@@ -182,8 +212,8 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: var(--space-4);
-  height: 88px;
-  padding-inline: var(--space-3);
+  height: 104px;
+  padding: var(--space-3) var(--space-4);
   box-sizing: border-box;
   border-bottom: 1px solid var(--border);
   transition:
@@ -198,8 +228,8 @@ onMounted(() => {
 }
 
 .history-thumb {
-  width: 48px;
-  height: 72px;
+  width: 64px;
+  height: 80px;
   flex: 0 0 auto;
   padding: 0;
   overflow: hidden;
@@ -283,6 +313,14 @@ onMounted(() => {
   display: none;
 }
 
+.history-end-retry {
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 12px;
+  cursor: pointer;
+}
+
 .history-play {
   display: inline-grid;
   place-items: center;
@@ -311,7 +349,7 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   gap: var(--space-3);
-  height: 88px;
+  height: 104px;
   color: var(--text-muted);
   font-size: var(--text-xs);
   font-weight: 800;
@@ -407,17 +445,18 @@ onMounted(() => {
 @media (max-width: 1024px) {
   .history-page {
     height: calc(
-      100dvh - var(--mobile-nav-height) - var(--mobile-tabbar-height) - var(--space-8)
+      100dvh - var(--mobile-nav-height) - var(--mobile-tabbar-height)
     );
-    max-width: var(--mobile-history-content-max);
-    padding: var(--space-8) 0 var(--space-4);
+    width: calc(100% + var(--mobile-page-gutter) + var(--mobile-page-gutter));
+    max-width: none;
+    margin-left: calc(var(--mobile-page-gutter) * -1);
+    box-sizing: border-box;
+    padding: 0;
     overflow: visible;
   }
 
   .page-header {
-    height: 1px;
-    margin-bottom: var(--space-6);
-    background: var(--color-border-faint);
+    display: none;
   }
 
   .header-left,
@@ -426,14 +465,17 @@ onMounted(() => {
   }
 
   .history-scroller {
-    width: calc(100% + var(--space-4));
-    transform: translateX(calc(var(--space-2) * -1));
+    /* 外层页面已经铺满视口，滚动容器与父级保持同一宽度。 */
+    width: 100%;
+    margin-left: 0;
+    box-sizing: border-box;
     border-block: 0;
     scrollbar-width: none;
   }
 
   .history-scroller::-webkit-scrollbar {
-    display: none;
+    width: 0;
+    height: 0;
   }
 
   .history-item {

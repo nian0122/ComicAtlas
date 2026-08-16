@@ -1,7 +1,7 @@
 package com.comicatlas.api.management.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.comicatlas.api.common.Result;
+import com.comicatlas.contract.common.Result;
 import com.comicatlas.api.management.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.management.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
@@ -28,7 +28,7 @@ import org.springframework.web.bind.annotation.RequestParam;
  * 异步命令需携带 Idempotency-Key 头。
  */
 @RestController
-@RequestMapping("/api/management/tasks")
+@RequestMapping("/api/manage/tasks")
 @RequiredArgsConstructor
 public class ManagementTaskController {
 

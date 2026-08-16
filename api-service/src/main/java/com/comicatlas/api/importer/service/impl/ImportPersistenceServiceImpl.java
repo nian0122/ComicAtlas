@@ -2,24 +2,6 @@ package com.comicatlas.api.importer.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
-import com.comicatlas.api.comic.entity.Catalog;
-import com.comicatlas.api.comic.entity.Chapter;
-import com.comicatlas.api.comic.entity.Comic;
-import com.comicatlas.api.comic.entity.Media;
-import com.comicatlas.api.comic.mapper.CatalogMapper;
-import com.comicatlas.api.comic.mapper.ChapterMapper;
-import com.comicatlas.api.comic.mapper.ComicMapper;
-import com.comicatlas.api.comic.mapper.MediaMapper;
-import com.comicatlas.api.common.enums.ChapterLifecycleStatus;
-import com.comicatlas.api.common.enums.ComicStatus;
-import com.comicatlas.api.common.enums.HqStatus;
-import com.comicatlas.api.common.enums.ImportTaskStatus;
-import com.comicatlas.api.common.enums.LqStatus;
-import com.comicatlas.api.common.enums.ManagementTaskStatus;
-import com.comicatlas.api.common.enums.MediaLifecycleStatus;
-import com.comicatlas.api.common.enums.TaskType;
-import com.comicatlas.api.common.enums.TranscodeStatus;
-import com.comicatlas.api.common.storage.ApiStorageProperties;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.exception.ImportMetadataException;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
@@ -30,11 +12,32 @@ import com.comicatlas.api.management.state.ManagementStateMachine;
 import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
+import com.comicatlas.common.constant.StoragePolicies;
+import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.common.event.ImportStorageFinalizeCompletedEvent;
 import com.comicatlas.common.event.ImportStorageFinalizeFailedEvent;
 import com.comicatlas.common.event.ImportStorageFinalizeRequestedEvent;
 import com.comicatlas.common.event.ImportTaskCompletedEvent;
 import com.comicatlas.common.event.payload.FinalizeMediaMapping;
+import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
+import com.comicatlas.contract.common.enums.ComicStatus;
+import com.comicatlas.contract.common.enums.HqStatus;
+import com.comicatlas.api.common.enums.ImportTaskStatus;
+import com.comicatlas.contract.common.enums.LqStatus;
+import com.comicatlas.api.common.enums.ManagementTaskStatus;
+import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
+import com.comicatlas.api.common.enums.TaskType;
+import com.comicatlas.contract.common.enums.TranscodeStatus;
+import com.comicatlas.persistence.comic.entity.Catalog;
+import com.comicatlas.persistence.comic.entity.Chapter;
+import com.comicatlas.persistence.comic.entity.Comic;
+import com.comicatlas.persistence.comic.entity.Media;
+import com.comicatlas.persistence.comic.mapper.CatalogMapper;
+import com.comicatlas.persistence.comic.mapper.ChapterMapper;
+import com.comicatlas.persistence.comic.mapper.ComicMapper;
+import com.comicatlas.persistence.comic.mapper.MediaMapper;
+import com.comicatlas.api.storage.ApiStorageProperties;
+import com.comicatlas.api.storage.service.MetadataUpdateCoordinator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -86,6 +89,31 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
     /** 导入落库媒体批量插入批次上限：每批一次 MySQL 多值 INSERT，控制单条 SQL 长度与事务内往返。 */
     private static final int MEDIA_INSERT_BATCH_SIZE = 500;
 
+    /** 任务进度满值（0-100）。 */
+    private static final int PROGRESS_COMPLETE = 100;
+
+    /** metadata 缺省版本：无 version 字段或解析失败时回退的旧版本号。 */
+    private static final int DEFAULT_METADATA_VERSION = 2;
+
+    /** HQ 根相对 MANGA_ROOT 缺省目录名（MANGA_ROOT 无法解析时回退）。 */
+    private static final String DEFAULT_HQ_DIR_NAME = "hq";
+
+    /** 媒体类型：图片（v2 metadata 无 mediaType 字段时的默认值）。 */
+    private static final String MEDIA_TYPE_IMAGE = "IMAGE";
+
+    /** 媒体类型：视频。 */
+    private static final String MEDIA_TYPE_VIDEO = "VIDEO";
+
+    /** 管理任务项目标类型：漫画。 */
+    private static final String TARGET_TYPE_COMIC = "COMIC";
+
+    /** 管理任务项结果引用类型：导入任务。 */
+    private static final String RESULT_REF_TYPE_IMPORT_TASK = "IMPORT_TASK";
+
+    /** 标准视频容器（无需转码）。 */
+    private static final String VIDEO_CONTAINER_MP4 = "mp4";
+    private static final String VIDEO_CONTAINER_M4V = "m4v";
+
     private final TransactionTemplate transactionTemplate;
     private final ComicMapper comicMapper;
     private final CatalogMapper catalogMapper;
@@ -96,6 +124,7 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
     private final ManagementTaskService managementTaskService;
     private final OutboxService outboxService;
     private final ApiStorageProperties storageProperties;
+    private final MetadataUpdateCoordinator metadataUpdateCoordinator;
 
     @Value("${MANGA_ROOT:}")
     private String mangaRoot;
@@ -163,7 +192,7 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
         if (comicData.get("sourceGalleryId") != null) {
             comic.setSourceGalleryId(comicData.get("sourceGalleryId").toString());
         }
-        comic.setStoragePolicy("MANAGED");
+        comic.setStoragePolicy(StoragePolicies.MANAGED);
 
         // 2. catalog（无则跳过）
         Map<Integer, Long> catalogIdMap = insertCatalogs(catalogsData, comicId);
@@ -175,8 +204,8 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
         List<Media> mediaBatch = new ArrayList<>(MEDIA_INSERT_BATCH_SIZE);
         int totalPages = 0;
         long totalSize = 0;
-        for (Map<String, Object> chData : chaptersData) {
-            ChapterInsertResult inserted = prepareChapter(chData, comicId, catalogIdMap, metadataVersion);
+        for (Map<String, Object> chapterData : chaptersData) {
+            ChapterInsertResult inserted = prepareChapter(chapterData, comicId, catalogIdMap, metadataVersion);
             totalPages += inserted.pages();
             totalSize += inserted.size();
             requests.add(buildFinalizeRequest(taskId, comicId, hqPrefix, inserted.chapter(), inserted.mappings()));
@@ -192,23 +221,22 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
 
         comic.setTotalPages(totalPages);
         if (totalSize > 0) {
-            comic.setFileSize(totalSize);
             comic.setHqSize(totalSize);
         }
         comicMapper.updateById(comic);
 
         // 4. task：completed 仅表示 staging/metadata 就绪（两阶段之第一阶段），推进到非终态 IMPORTING
         task.setStatus(ImportTaskStatus.IMPORTING);
-        task.setProgress(100);
+        task.setProgress(PROGRESS_COMPLETE);
         task.setErrorMessage(null);
         taskMapper.updateById(task);
 
         // 5. 逐章最终化请求写入 Outbox（与业务同事务，relay 在提交后发布到 MQ）
-        for (FinalizeRequest req : requests) {
-            var finalizeEvent = new ImportStorageFinalizeRequestedEvent(
+        for (FinalizeRequest request : requests) {
+            ImportStorageFinalizeRequestedEvent finalizeEvent = new ImportStorageFinalizeRequestedEvent(
                     UUID.randomUUID(), Instant.now(),
-                    req.taskId(), req.comicId(), req.globalOrder(), req.chapterId(),
-                    req.sourceDir(), req.targetDir(), req.mediaMappings());
+                    request.taskId(), request.comicId(), request.globalOrder(), request.chapterId(),
+                    request.sourceDir(), request.targetDir(), request.mediaMappings());
             outboxService.enqueue(finalizeEvent,
                     MqExchanges.IMPORT, MqRoutingKeys.IMPORT_STORAGE_FINALIZE_REQUESTED);
         }
@@ -218,7 +246,7 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
     }
 
     private Map<Integer, Long> insertCatalogs(List<Map<String, Object>> catalogsData, Long comicId) {
-        Map<Integer, Long> idMap = new LinkedHashMap<>();
+        Map<Integer, Long> idMap = new LinkedHashMap<>(catalogsData.size());
         if (catalogsData.isEmpty()) {
             return idMap;
         }
@@ -227,21 +255,21 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
         // 第一遍：INSERT 全部 catalog，建立 index → DB id 映射
         for (int i = 0; i < size; i++) {
             Map<String, Object> catalogData = catalogsData.get(i);
-            Catalog cat = new Catalog();
-            cat.setComicId(comicId);
-            cat.setTitle((String) catalogData.get("title"));
-            cat.setSortOrder((Integer) catalogData.getOrDefault("sortOrder", i));
-            catalogMapper.insert(cat);
-            idMap.put(i, cat.getId());
-            inserted.add(cat);
+            Catalog catalog = new Catalog();
+            catalog.setComicId(comicId);
+            catalog.setTitle((String) catalogData.get("title"));
+            catalog.setSortOrder((Integer) catalogData.getOrDefault("sortOrder", i));
+            catalogMapper.insert(catalog);
+            idMap.put(i, catalog.getId());
+            inserted.add(catalog);
         }
         // 第二遍：恢复 parent_id；越界/缺失必须 typed-fail，不得静默挂根
         for (int i = 0; i < size; i++) {
-            Object pi = catalogsData.get(i).get("parentIndex");
-            if (pi == null) {
+            Object parentIndexValue = catalogsData.get(i).get("parentIndex");
+            if (parentIndexValue == null) {
                 continue;
             }
-            int parentIdx = ((Number) pi).intValue();
+            int parentIdx = ((Number) parentIndexValue).intValue();
             if (parentIdx < 0 || parentIdx >= size) {
                 throw new ImportMetadataException(
                         "catalog parentIndex 越界: index=" + parentIdx + ", catalogCount=" + size);
@@ -250,30 +278,25 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
             if (parentId == null) {
                 throw new ImportMetadataException("catalog parentIndex 对应节点缺失: index=" + parentIdx);
             }
-            Catalog cat = inserted.get(i);
-            cat.setParentId(parentId);
-            catalogMapper.updateById(cat);
+            Catalog catalog = inserted.get(i);
+            catalog.setParentId(parentId);
+            catalogMapper.updateById(catalog);
         }
         return idMap;
     }
 
-    private record ChapterInsertResult(Chapter chapter, int pages, long size,
-                                       List<FinalizeMediaMapping> mappings,
-                                       List<Media> mediaList) {
-    }
-
     /** 构造单章结构并插入 Chapter（须立即取得 chapterId）；media 只构造不落库，由调用方聚合批量插入。 */
-    private ChapterInsertResult prepareChapter(Map<String, Object> chData, Long comicId,
+    private ChapterInsertResult prepareChapter(Map<String, Object> chapterData, Long comicId,
                                                Map<Integer, Long> catalogIdMap, int version) {
         Chapter chapter = new Chapter();
         chapter.setComicId(comicId);
-        chapter.setTitle((String) chData.get("title"));
-        chapter.setChapterNo((String) chData.get("chapterNo"));
-        chapter.setSortOrder((Integer) chData.getOrDefault("sortOrder", 0));
-        chapter.setGlobalOrder((Integer) chData.getOrDefault("globalOrder", 0));
-        Object cid = chData.get("catalogIndex");
-        if (cid != null) {
-            int catalogIdx = ((Number) cid).intValue();
+        chapter.setTitle((String) chapterData.get("title"));
+        chapter.setChapterNo((String) chapterData.get("chapterNo"));
+        chapter.setSortOrder((Integer) chapterData.getOrDefault("sortOrder", 0));
+        chapter.setGlobalOrder((Integer) chapterData.getOrDefault("globalOrder", 0));
+        Object catalogIndexValue = chapterData.get("catalogIndex");
+        if (catalogIndexValue != null) {
+            int catalogIdx = ((Number) catalogIndexValue).intValue();
             Long mappedId = catalogIdMap.get(catalogIdx);
             if (mappedId == null) {
                 throw new ImportMetadataException("chapter catalogIndex 越界: index=" + catalogIdx);
@@ -286,20 +309,20 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
         boolean isV3 = version >= 3;
         String itemsKey = isV3 ? "mediaItems" : "pages";
         String nameKey = isV3 ? "fileName" : "imageName";
-        List<Map<String, Object>> itemList = asMapList(chData.get(itemsKey), itemsKey);
+        List<Map<String, Object>> itemList = asMapList(chapterData.get(itemsKey), itemsKey);
         chapter.setPageCount(itemList.size());
         chapterMapper.insert(chapter);
 
-        int pgCount = 0;
+        int pageCount = 0;
         long totalSize = 0;
         List<Media> mediaList = new ArrayList<>(itemList.size());
         List<FinalizeMediaMapping> mappings = new ArrayList<>(itemList.size());
         for (Map<String, Object> mediaData : itemList) {
             Media media = new Media();
             media.setChapterId(chapter.getId());
-            Object pn = mediaData.get("pageNumber");
-            media.setPageNumber(pn instanceof Number n ? n.intValue() : pgCount + 1);
-            media.setHqRoot("HQ");
+            Object pageNumberValue = mediaData.get("pageNumber");
+            media.setPageNumber(pageNumberValue instanceof Number number ? number.intValue() : pageCount + 1);
+            media.setHqRoot(StorageRootKeys.HQ);
             String fileName = (String) mediaData.get(nameKey);
             // 目标布局路径（chapterId 目录），纯字符串替换，无文件 IO
             String hqPath = (String) mediaData.get("hqPath");
@@ -315,7 +338,7 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
             media.setTranscodeStatus(TranscodeStatus.NOT_NEEDED);
             media.setStatus(MediaLifecycleStatus.STAGING);
             if (mediaData.get("fileSize") != null) {
-                media.setFileSize(((Number) mediaData.get("fileSize")).longValue());
+                media.setHqSize(((Number) mediaData.get("fileSize")).longValue());
             }
             if (mediaData.get("width") != null) {
                 media.setWidth(((Number) mediaData.get("width")).intValue());
@@ -325,14 +348,14 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
             }
 
             // mediaType: v2 强制 IMAGE；v3 读取 metadata 中的 mediaType
-            String mediaType = isV3 ? (String) mediaData.get("mediaType") : "IMAGE";
+            String mediaType = isV3 ? (String) mediaData.get("mediaType") : MEDIA_TYPE_IMAGE;
             if (mediaType == null || mediaType.isBlank()) {
-                mediaType = "IMAGE";
+                mediaType = MEDIA_TYPE_IMAGE;
             }
             media.setMediaType(mediaType);
 
             // VIDEO 专属字段
-            if ("VIDEO".equalsIgnoreCase(mediaType)) {
+            if (MEDIA_TYPE_VIDEO.equalsIgnoreCase(mediaType)) {
                 if (mediaData.get("duration") != null) {
                     media.setDuration(toBigDecimal(mediaData.get("duration")));
                 }
@@ -345,21 +368,22 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
                 if (mediaData.get("audioCodec") != null) {
                     media.setAudioCodec((String) mediaData.get("audioCodec"));
                 }
-                // 非标准视频（非 mp4/m4v）标记为待转码，供导入后手动触发转码
-                String container = normalizeContainer((String) mediaData.get("container"));
+                // 非标准视频（非 mp4/m4v）标记为待转码（REQUIRED：需转码但未入队，
+                // 等待用户手动触发；不能标 QUEUED——那表示已在转码队列中且必有任务记录）
+                String container = media.getContainer();
                 if (container == null || !isStandardVideoContainer(container)) {
-                    media.setTranscodeStatus(TranscodeStatus.QUEUED);
+                    media.setTranscodeStatus(TranscodeStatus.REQUIRED);
                 }
             }
 
             mediaList.add(media);
-            totalSize += media.getFileSize() != null ? media.getFileSize() : 0;
-            pgCount++;
+            totalSize += media.getHqSize() != null ? media.getHqSize() : 0;
+            pageCount++;
             if (fileName != null && !fileName.isBlank()) {
                 mappings.add(new FinalizeMediaMapping(fileName, fileName));
             }
         }
-        return new ChapterInsertResult(chapter, pgCount, totalSize, mappings, mediaList);
+        return new ChapterInsertResult(chapter, pageCount, totalSize, mappings, mediaList);
     }
 
     /** 批量插入媒体：空批次跳过；实际插入行数与入参不符视为数据不一致，抛异常回滚整个导入事务。 */
@@ -403,10 +427,10 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
         Long taskId = event.taskId();
         Long comicId = event.comicId();
         Long chapterId = event.chapterId();
-        String targetDir = event.targetDir();
 
         ImportTask task = taskMapper.selectById(taskId);
         if (task == null) {
+            log.warn("finalize completed 时任务不存在，跳过: taskId={}", taskId);
             return;
         }
         if (TERMINAL_STATUSES.contains(task.getStatus())) {
@@ -418,11 +442,16 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
         // 行锁串行化：同一 comic 的并发 completed/failed 串行处理，防止 lost update（锁在事务提交/回滚后释放）
         Comic comic = comicMapper.selectByIdForUpdate(comicId);
         if (comic == null) {
+            log.warn("finalize completed 时漫画不存在，跳过: comicId={}", comicId);
             return;
         }
         if (comic.getStatus() != ComicStatus.IMPORTING) {
             log.warn("finalize completed 乱序/重复（comic 状态非 IMPORTING）: comicId={}, status={}",
                     comicId, comic.getStatus());
+            return;
+        }
+        if (chapterId == null) {
+            log.warn("finalize completed 缺少 chapterId，跳过媒体确认: comicId={}", comicId);
             return;
         }
 
@@ -433,28 +462,14 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
             return;
         }
 
-        // 1) 本章 media → READY（幂等：WHERE 条件保证已 READY 行不命中），其余章节保持 PENDING
-        if (chapterId == null) {
-            log.warn("finalize completed 缺少 chapterId，跳过媒体确认: comicId={}", comicId);
-            return;
-        }
-        String hqRelative = stripHqPrefix(targetDir, hqPrefix);
+        // 1) 本章 media → READY（幂等：WHERE 条件保证已 READY 行不命中），chapter → READY（幂等）
+        String hqRelative = stripHqPrefix(event.targetDir(), hqPrefix);
         int finalized = mediaMapper.markImportFinalizedByChapter(chapterId, hqRelative);
         log.debug("最终化确认媒体批量置 READY: comicId={}, chapterId={}, updated={}",
                 comicId, chapterId, finalized);
+        markChapterReady(chapters, chapterId);
 
-        // 2) 本章 chapter → READY（幂等）
-        for (Chapter chapter : chapters) {
-            if (chapter.getId().equals(chapterId) && chapter.getStatus() != ChapterLifecycleStatus.READY) {
-                ManagementStateMachine.validateChapterTransition(
-                        chapter.getStatus() == null ? "DRAFT" : chapter.getStatus().name(), "READY");
-                chapter.setStatus(ChapterLifecycleStatus.READY);
-                chapterMapper.updateById(chapter);
-                break;
-            }
-        }
-
-        // 3) 检查该 comic 下是否还有 PENDING media：全部章节最终化完成（全 READY）才收尾
+        // 2) 检查该 comic 下是否还有 PENDING media：全部章节最终化完成（全 READY）才收尾
         //    comic/task，否则仅提交本章 READY
         List<Long> chapterIds = chapters.stream().map(Chapter::getId).toList();
         long pendingCount = mediaMapper.selectCount(new LambdaQueryWrapper<Media>()
@@ -466,19 +481,39 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
             return;
         }
 
-        // 4) 全部 READY → 收尾：comic READY（重算统计）、task SUCCESS、管理任务 SUCCEEDED、缓存失效
+        // 3) 全部 READY → 收尾：comic READY（重算统计）、task SUCCESS、管理任务 SUCCEEDED、缓存失效
+        finalizeComicAndTask(comic, task, comicId, taskId, chapterIds);
+    }
+
+    /** 本章 chapter 状态置 READY（幂等：已 READY 跳过，状态机校验通过才更新）。 */
+    private void markChapterReady(List<Chapter> chapters, Long chapterId) {
+        for (Chapter chapter : chapters) {
+            if (chapter.getId().equals(chapterId) && chapter.getStatus() != ChapterLifecycleStatus.READY) {
+                ManagementStateMachine.validateChapterTransition(
+                        chapter.getStatus() == null ? ChapterLifecycleStatus.DRAFT.name()
+                                : chapter.getStatus().name(),
+                        ChapterLifecycleStatus.READY.name());
+                chapter.setStatus(ChapterLifecycleStatus.READY);
+                chapterMapper.updateById(chapter);
+                break;
+            }
+        }
+    }
+
+    /** 全部章节 READY → 收尾：comic READY（重算统计）、task SUCCESS、管理任务 SUCCEEDED、缓存失效。 */
+    private void finalizeComicAndTask(Comic comic, ImportTask task, Long comicId, Long taskId,
+                                      List<Long> chapterIds) {
         List<Media> allMedia = mediaMapper.selectList(
                 new LambdaQueryWrapper<Media>().in(Media::getChapterId, chapterIds));
         long totalSize = 0;
         for (Media media : allMedia) {
-            if (media.getFileSize() != null) {
-                totalSize += media.getFileSize();
+            if (media.getHqSize() != null) {
+                totalSize += media.getHqSize();
             }
         }
-        ManagementStateMachine.validateComicTransition(comic.getStatus().name(), "READY");
+        ManagementStateMachine.validateComicTransition(comic.getStatus().name(), ComicStatus.READY.name());
         comic.setTotalPages(allMedia.size());
         if (totalSize > 0) {
-            comic.setFileSize(totalSize);
             comic.setHqSize(totalSize);
         }
         comic.setStatus(ComicStatus.READY);
@@ -489,17 +524,21 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
         if (task.getStartTime() != null) {
             task.setDurationMs(Duration.between(task.getStartTime(), task.getEndTime()).toMillis());
         }
-        task.setProgress(100);
+        task.setProgress(PROGRESS_COMPLETE);
         taskMapper.updateById(task);
 
         // 统一管理任务项：导入成功
-        ManagementTaskItem mgmtItem = managementTaskService.findActiveItem(
-                "COMIC", comicId, TaskType.IMPORT);
-        if (mgmtItem != null) {
+        ManagementTaskItem managementItem = managementTaskService.findActiveItem(
+                TARGET_TYPE_COMIC, comicId, TaskType.IMPORT);
+        if (managementItem != null) {
             managementTaskService.updateItemStatus(
-                    mgmtItem.getId(), ManagementTaskStatus.SUCCEEDED, null, "IMPORT_TASK", taskId);
+                    managementItem.getId(), ManagementTaskStatus.SUCCEEDED, null,
+                    RESULT_REF_TYPE_IMPORT_TASK, taskId);
         }
         catalogCacheInvalidator.evict(comicId);
+        // 导入最终化完成（全 READY）：触发 metadata 同步，让 metadata.json 反映最终
+        // chapterId 布局与 READY 状态（导入写入的是 {taskId}/{comicId}.json 暂存态）
+        metadataUpdateCoordinator.requestSync(comicId, taskId, "导入最终化完成");
         log.info("导入最终化完成: comicId={}, taskId={}, mediaCount={}", comicId, taskId, allMedia.size());
     }
 
@@ -516,6 +555,7 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
 
         ImportTask task = taskMapper.selectById(taskId);
         if (task == null) {
+            log.warn("finalize failed 时任务不存在，跳过: taskId={}", taskId);
             return;
         }
         if (TERMINAL_STATUSES.contains(task.getStatus())) {
@@ -543,18 +583,19 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
         // 行锁串行化：与 completed 相同的保护，防止并发 completed/failed 对同一 comic 的 lost update
         Comic comic = comicMapper.selectByIdForUpdate(comicId);
         if (comic != null && comic.getStatus() == ComicStatus.IMPORTING) {
-            ManagementStateMachine.validateComicTransition("IMPORTING", "IMPORT_FAILED");
+            ManagementStateMachine.validateComicTransition(
+                    ComicStatus.IMPORTING.name(), ComicStatus.IMPORT_FAILED.name());
             comic.setStatus(ComicStatus.IMPORT_FAILED);
             comicMapper.updateById(comic);
         }
 
         // 统一管理任务项：导入失败（可经 retry 重新导入）
-        ManagementTaskItem mgmtItem = managementTaskService.findActiveItem(
-                "COMIC", comicId, TaskType.IMPORT);
-        if (mgmtItem != null) {
+        ManagementTaskItem managementItem = managementTaskService.findActiveItem(
+                TARGET_TYPE_COMIC, comicId, TaskType.IMPORT);
+        if (managementItem != null) {
             managementTaskService.updateItemStatus(
-                    mgmtItem.getId(), ManagementTaskStatus.FAILED,
-                    task.getErrorMessage(), "IMPORT_TASK", taskId);
+                    managementItem.getId(), ManagementTaskStatus.FAILED,
+                    task.getErrorMessage(), RESULT_REF_TYPE_IMPORT_TASK, taskId);
         }
         catalogCacheInvalidator.evict(comicId);
         log.warn("导入存储最终化失败（可重试）: comicId={}, taskId={}, errorCode={}",
@@ -571,9 +612,9 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
 
     /** HQ 根相对 MANGA_ROOT 的相对路径前缀（如 "hq"），纯路径运算不做文件 IO。 */
     private String hqRelativePrefix() {
-        Path hqPath = storageProperties.root("HQ").getPath();
+        Path hqPath = storageProperties.root(StorageRootKeys.HQ).getPath();
         Path hqAbs = hqPath.toAbsolutePath().normalize();
-        String hqName = hqAbs.getFileName() != null ? hqAbs.getFileName().toString() : "hq";
+        String hqName = hqAbs.getFileName() != null ? hqAbs.getFileName().toString() : DEFAULT_HQ_DIR_NAME;
         if (mangaRoot == null || mangaRoot.isBlank()) {
             return hqName;
         }
@@ -584,7 +625,7 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
                 return hqName;
             }
             return relative.toString().replace('\\', '/');
-        } catch (Exception e) {
+        } catch (IllegalArgumentException ex) {
             log.warn("MANGA_ROOT 解析失败，回退 HQ 目录名: {}", mangaRoot);
             return hqName;
         }
@@ -595,7 +636,7 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
         if (targetDir == null || targetDir.isBlank()) {
             return targetDir;
         }
-        String prefix = hqPrefix == null ? "hq" : hqPrefix;
+        String prefix = hqPrefix == null ? DEFAULT_HQ_DIR_NAME : hqPrefix;
         if (targetDir.startsWith(prefix + "/")) {
             return targetDir.substring(prefix.length() + 1);
         }
@@ -615,27 +656,28 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
     }
 
     private static int resolveMetadataVersion(Map<String, Object> metadata) {
-        Object verObj = metadata.get("version");
-        if (verObj instanceof Number number) {
+        Object versionValue = metadata.get("version");
+        if (versionValue instanceof Number number) {
             return number.intValue();
         }
-        if (verObj != null) {
+        if (versionValue != null) {
             try {
-                return Integer.parseInt(verObj.toString());
-            } catch (NumberFormatException e) {
-                log.warn("解析 metadata version 失败，回退 v2: {}", verObj, e);
+                return Integer.parseInt(versionValue.toString());
+            } catch (NumberFormatException ex) {
+                log.warn("解析 metadata version 失败，回退 v2: {}", versionValue, ex);
             }
         }
-        return 2;
+        return DEFAULT_METADATA_VERSION;
     }
 
     /** 标准视频容器（无需转码）：mp4 / m4v（兼容带点写法 .mp4/.m4v），其余标记为待转码。 */
     private static boolean isStandardVideoContainer(String container) {
-        String c = normalizeContainer(container);
-        if (c == null) {
+        String normalizedContainer = normalizeContainer(container);
+        if (normalizedContainer == null) {
             return false;
         }
-        return "mp4".equals(c) || "m4v".equals(c);
+        return VIDEO_CONTAINER_MP4.equals(normalizedContainer)
+                || VIDEO_CONTAINER_M4V.equals(normalizedContainer);
     }
 
     /** 容器名统一为无点形式：{@code .mp4} → {@code mp4}；null/空白返回 null。 */
@@ -651,15 +693,16 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
         if (value == null) {
             return null;
         }
-        if (value instanceof BigDecimal bd) {
-            return bd;
+        if (value instanceof BigDecimal bigDecimal) {
+            return bigDecimal;
         }
-        if (value instanceof Number n) {
-            return BigDecimal.valueOf(n.doubleValue());
+        if (value instanceof Number number) {
+            return BigDecimal.valueOf(number.doubleValue());
         }
         try {
             return new BigDecimal(value.toString());
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException ex) {
+            log.debug("解析媒体数字字段失败，回退 null: value={}", value, ex);
             return null;
         }
     }
@@ -669,6 +712,10 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
         return message.replaceAll("[A-Za-z]:[\\\\/][^ ]*", "{PATH}");
     }
 
+    /**
+     * metadata 嵌套 Map 反序列化为参数化 Map 的强转。
+     * Jackson 原始类型无法直接参数化，属预期 unchecked 转换，转换前已做 instanceof 校验。
+     */
     @SuppressWarnings("unchecked")
     private static Map<String, Object> asMap(Object value, String field) {
         if (!(value instanceof Map<?, ?> map)) {
@@ -677,6 +724,16 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
         return (Map<String, Object>) map;
     }
 
+    /** 单章插入结果：章节实体 + 页数/尺寸汇总 + 最终化映射 + 待批量落库媒体。 */
+    private record ChapterInsertResult(Chapter chapter, int pages, long size,
+                                       List<FinalizeMediaMapping> mappings,
+                                       List<Media> mediaList) {
+    }
+
+    /**
+     * metadata 嵌套 List 反序列化为参数化 List 的强转。
+     * Jackson 原始类型无法直接参数化，属预期 unchecked 转换，转换前已做 instanceof 校验。
+     */
     @SuppressWarnings("unchecked")
     private static List<Map<String, Object>> asMapList(Object value, String field) {
         if (value == null) {

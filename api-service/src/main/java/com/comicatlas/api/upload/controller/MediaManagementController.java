@@ -1,6 +1,6 @@
 package com.comicatlas.api.upload.controller;
 
-import com.comicatlas.api.common.Result;
+import com.comicatlas.contract.common.Result;
 import com.comicatlas.api.management.dto.OperationSubmitResultDTO;
 import com.comicatlas.api.upload.MediaManagementService;
 import com.comicatlas.api.upload.dto.MediaReorderRequest;
@@ -32,7 +32,7 @@ public class MediaManagementController {
      * @param request   重排请求（媒体 ID 新顺序列表）
      * @return 重排结果（每个媒体新的 pageNumber）
      */
-    @PostMapping("/api/chapters/{chapterId}/media/reorder")
+    @PostMapping("/api/manage/chapters/{chapterId}/media/reorder")
     public Result<MediaReorderResponse> reorder(
             @PathVariable Long chapterId,
             @Valid @RequestBody MediaReorderRequest request) {
@@ -48,7 +48,7 @@ public class MediaManagementController {
      * @param mediaId 媒体 ID
      * @return 管理任务提交结果（任务 ID）
      */
-    @DeleteMapping("/api/media/{mediaId}")
+    @DeleteMapping("/api/manage/media/{mediaId}")
     public Result<OperationSubmitResultDTO> trash(@PathVariable Long mediaId) {
         return Result.ok(mediaManagementService.trash(mediaId));
     }

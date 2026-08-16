@@ -1,6 +1,7 @@
 package com.comicatlas.api.common.exception;
 
-import com.comicatlas.api.common.constant.HttpStatusCodes;
+import com.comicatlas.contract.common.constant.HttpStatusCodes;
+import com.comicatlas.contract.common.exception.BusinessException;
 
 /**
  * 元数据刷新快照产物不可用异常。

@@ -1,9 +1,9 @@
 package com.comicatlas.api.export.event;
 
-import com.comicatlas.api.comic.entity.Media;
-import com.comicatlas.api.comic.mapper.MediaMapper;
+import com.comicatlas.persistence.comic.entity.Media;
+import com.comicatlas.persistence.comic.mapper.MediaMapper;
 import com.comicatlas.common.constant.MqQueues;
-import com.comicatlas.api.common.enums.TranscodeStatus;
+import com.comicatlas.contract.common.enums.TranscodeStatus;
 import com.comicatlas.common.event.VideoTranscodeCompletedEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
 import com.rabbitmq.client.Channel;
@@ -36,7 +36,7 @@ public class TranscodeCompletedHandler {
             media.setContainer(event.container());
             media.setVideoCodec(event.videoCodec());
             media.setAudioCodec(event.audioCodec());
-            media.setFileSize(event.fileSize());
+            media.setHqSize(event.fileSize());
             media.setTranscodeStatus(TranscodeStatus.READY);
             mediaMapper.updateById(media);
             log.info("TranscodeCompleted: pageId={}, newPath={}", event.pageId(), event.newHqPath());

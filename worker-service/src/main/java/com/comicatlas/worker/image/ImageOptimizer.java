@@ -27,8 +27,6 @@ public class ImageOptimizer {
     private final ObjectMapper objectMapper;
     private final ExternalProcessRunner processRunner;
 
-    private static final long LQ_TIMEOUT_SECONDS = 600;
-
     /**
      * 对指定章节的 HQ 图片生成 LQ WebP（使用显式路径，禁止 globalOrder 拼目录）。
      *
@@ -36,9 +34,10 @@ public class ImageOptimizer {
      * @param chapterId 章节 ID（仅用于日志和 JSON 回传）
      * @param hqDir     HQ 源目录绝对路径
      * @param lqDir     LQ 目标目录绝对路径
+     * @param force     是否强制重新生成（忽略已存在的 LQ 产物，对应 LQ_REGENERATE）
      * @return Go 工具返回的详细结果
      */
-    public RunResult generateLq(Long comicId, Long chapterId, Path hqDir, Path lqDir) {
+    public RunResult generateLq(Long comicId, Long chapterId, Path hqDir, Path lqDir, boolean force) {
         String hqDirStr = hqDir.toString();
         String lqDirStr = lqDir.toString();
 
@@ -68,9 +67,12 @@ public class ImageOptimizer {
                 "-workers", String.valueOf(workers),
                 "-json"
         ));
+        if (force) {
+            cmd.add("-force");
+        }
 
-        log.info("启动图片优化: comicId={}, chapterId={}, hqDir={}, lqDir={}, workers={}, quality={}",
-                comicId, chapterId, hqDirStr, lqDirStr, workers, config.getLqQuality());
+        log.info("启动图片优化: comicId={}, chapterId={}, hqDir={}, lqDir={}, workers={}, quality={}, force={}",
+                comicId, chapterId, hqDirStr, lqDirStr, workers, config.getLqQuality(), force);
         return runOptimizer(cmd, comicId, chapterId);
     }
 
@@ -78,7 +80,7 @@ public class ImageOptimizer {
         ProcessBuilder processBuilder = new ProcessBuilder(cmd);
         ExternalProcessRunner.ExternalProcessResult result;
         try {
-            result = processRunner.run(processBuilder, LQ_TIMEOUT_SECONDS, "LQ优化");
+            result = processRunner.run(processBuilder, config.getImage().getLqTimeoutSeconds(), "LQ优化");
         } catch (InterruptedException e) {
             // runner 已恢复中断标志并销毁子进程
             throw new RuntimeException("等待图片优化被中断: comicId=" + comicId + ", chapterId=" + chapterId, e);

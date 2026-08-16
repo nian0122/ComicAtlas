@@ -4,8 +4,8 @@ import com.comicatlas.api.admin.dto.ChapterStorageDTO;
 import com.comicatlas.api.admin.dto.ComicStorageDTO;
 import com.comicatlas.api.admin.dto.ComicStorageQuery;
 import com.comicatlas.api.admin.service.StorageQueryService;
-import com.comicatlas.api.common.Result;
-import com.comicatlas.api.common.constant.HttpStatusCodes;
+import com.comicatlas.contract.common.Result;
+import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import lombok.RequiredArgsConstructor;
 
 import java.util.HashMap;
@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RequestParam;
  * 供管理端存储管理页使用。仅供本机管理端使用。
  */
 @RestController
-@RequestMapping("/api/admin/storage")
+@RequestMapping("/api/manage/admin/storage")
 @RequiredArgsConstructor
 public class AdminStorageController {
 
@@ -43,14 +43,18 @@ public class AdminStorageController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
             ComicStorageQuery query) {
-        List<ComicStorageDTO> records = storageQueryService.listComics(query, page, size);
+        int safeSize = Math.min(Math.max(size, 1), 100);
         long total = storageQueryService.countComics(query);
+        int pages = Math.max(1, (int) Math.ceil((double) total / safeSize));
+        int safePage = Math.min(Math.max(page, 1), pages);
+        List<ComicStorageDTO> records = storageQueryService.listComics(query, safePage, safeSize);
 
         Map<String, Object> result = new HashMap<>();
         result.put("records", records);
         result.put("total", total);
-        result.put("pages", (int) Math.ceil((double) total / size));
-        result.put("current", page);
+        result.put("pages", pages);
+        result.put("current", safePage);
+        result.put("size", safeSize);
         return Result.ok(result);
     }
 

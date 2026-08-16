@@ -15,9 +15,9 @@ spring:
   cloud:
     nacos:
       discovery:
-        server-addr: ${NACOS_ADDR:localhost:8848}
-        username: ${NACOS_USER:}
-        password: ${NACOS_PASS:}
+        server-addr: ${NACOS_ADDR}
+        username: ${NACOS_USER}
+        password: ${NACOS_PASS}
       config:
         import-check:
           enabled: false
@@ -27,7 +27,13 @@ spring:
           enabled: true
           lower-case-service-id: true
       routes:
-        - id: api-service
+        # 管理端路由：/api/manage/** → 管理服务（必须先于阅读路由声明，避免被 /api/** 吞掉）
+        - id: management-service
           uri: lb://comic-api-service
+          predicates:
+            - Path=/api/manage/**
+        # 阅读端路由：/api/** → 阅读服务（只读为主 + 阅读进度保存）
+        - id: reading-service
+          uri: lb://comic-reading-service
           predicates:
             - Path=/api/**

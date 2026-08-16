@@ -1,12 +1,40 @@
 # ComicAtlas 用户指南
 
-本文面向第一次部署和使用 ComicAtlas 的用户，覆盖 1.5 版本的常用流程。
+本文面向第一次部署和使用 ComicAtlas 的用户，覆盖当前版本的常用流程。
 
-> 管理控制台（回收站、批量操作、任务中心）为当前版本能力；媒体上传/替换为预留接口能力（后端接口可用、当前无前端页面入口）。部署与数据库账号等运维细节见[部署运维](operations/management.md)。
+> 当前已实现的存储维护功能只有：导入、导出、HQ 删除、LQ 生成、视频转码、刷新元数据、扫盘恢复。媒体上传/替换、回收站和其他批量管理接口不属于本文主流程；部署与数据库账号等运维细节见[部署运维](operations/management.md)。
+
+## 当前功能范围
+
+| 功能 | 作用 | 处理范围 |
+|------|------|----------|
+| 导入 | 将本地漫画登记到 MANAGED 存储 | ZIP、本地目录；文件不经过 HTTP 上传 |
+| 导出 | 将指定漫画打包为 ZIP | 按 `comicId` 导出，超大文件自动标准分卷 |
+| HQ 删除 | 释放高清文件空间 | 删除 HQ，保留数据库记录和已有 LQ |
+| LQ 生成 | 生成阅读用低质量图片 | 仅处理图片，由 HQ 生成 LQ |
+| 视频转码 | 修复非标准视频 | 处理导入时标记为需要转码的视频 |
+| 刷新元数据 | 重新分析并同步媒体信息 | 仅按指定 `comicId` 扫描，不枚举整库 |
+| 扫盘恢复 | 从存储恢复数据库记录 | 扫描 HQ 存储，依赖 `metadata.json` 恢复漫画结构 |
+
+所有功能均采用“管理端创建任务 → Worker 处理文件 → 管理端消费结果并更新数据库”的异步流程；文件字节始终留在宿主机本地，不经过 HTTP。
+
+### 基础使用功能
+
+除上述文件处理任务外，当前版本还包含以下日常使用能力：
+
+- **漫画库**：按标题、作者、分类、标签和状态搜索、筛选、排序。
+- **漫画详情**：查看封面、描述、作者、分类、标签、目录树和媒体状态。
+- **目录与章节管理**：维护多级目录，调整章节顺序，使用 `globalOrder` 进行全书阅读排序。
+- **阅读器**：图片与视频混排阅读，支持上一章、下一章、页码导航。
+- **阅读历史**：保存阅读章节和页码，支持继续阅读。
+- **元数据管理**：编辑漫画基本信息、分类和标签；封面使用导入时的候选结果或手动维护。
+- **任务中心**：查看导入、导出、LQ、HQ、转码、元数据刷新和恢复任务的状态、进度与错误信息，支持符合条件的任务重试或取消。
+- **存储统计**：查看 HQ、LQ、缩略图占用，以及漫画、章节和媒体的状态汇总。
+- **死信管理**：查看消息积压、重放可恢复消息或清理确认无用的死信。
 
 ## 一、部署前准备
 
-ComicAtlas 由前端、Gateway、API、Worker、MySQL、Redis、RabbitMQ、Nacos 和 Nginx 组成。漫画文件由 Worker 写入本地存储，Nginx 以只读方式向浏览器提供文件。
+ComicAtlas 由前端、Gateway、阅读服务、管理服务、Worker、MySQL、Redis、RabbitMQ、Nacos 和 Nginx 组成。漫画文件由 Worker 写入本地存储，Nginx 以只读方式向浏览器提供文件。
 
 准备以下环境：
 
@@ -21,21 +49,30 @@ Windows 用户建议使用正斜杠书写路径，例如 `F:/manga`，并确认 
 
 ## 二、配置存储和基础设施
 
-在项目根目录创建 `.env`：
+将项目根目录的 `.env.example` 复制为 `.env`，再按分组填写实际值：
 
 ```dotenv
 MANGA_ROOT=F:/manga
+REMOTE_INFRA_HOST=host.docker.internal
 MYSQL_ROOT_PASSWORD=请设置强密码
 API_MYSQL_USER=comicatlas_api
 API_MYSQL_PASSWORD=请设置强密码
 WORKER_MYSQL_USER=comicatlas_ro
 WORKER_MYSQL_PASSWORD=请设置另一组强密码
-REMOTE_NACOS_USERNAME=nacos
-REMOTE_NACOS_PASSWORD=nacos
+REMOTE_MYSQL_PORT=3306
 REMOTE_REDIS_PORT=6379
+REMOTE_RABBITMQ_PORT=5672
+REMOTE_RABBITMQ_MANAGEMENT_PORT=15672
+REMOTE_NACOS_HTTP_PORT=8848
+REMOTE_NACOS_GRPC_PORT=9848
+REMOTE_NACOS_USER=nacos
+REMOTE_NACOS_PASSWORD=nacos
 REMOTE_REDIS_PASSWORD=
 REMOTE_RABBITMQ_USER=guest
 REMOTE_RABBITMQ_PASSWORD=guest
+FRP_SERVER_ADDR=远端服务器公网地址
+FRP_SERVER_PORT=7000
+FRP_DASHBOARD_PORT=7500
 ```
 
 创建目录：
@@ -71,15 +108,17 @@ docker compose -f docker-compose.yml ps
 
 - 用户端：`http://localhost`
 - 管理后台：`http://localhost/manage`
-- Gateway/API：`http://localhost:8000`
+- Gateway（统一 API 入口）：`http://localhost:8000`
 
-`docker-compose.infra.yml` 包含 MySQL、Redis、RabbitMQ 和 Nacos，端口号保持为 3306、6379、5672、15672、8848、9848，并只绑定主机回环地址。如果基础设施运行在远程主机，本地不启动该文件；使用 `tools/maintenance/manage-remote-infra-frp.ps1` 建立 FRP STCP 连接，让项目容器通过 `host.docker.internal` 访问宿主机映射端口。完整配置见 [FRP 基础设施连接](operations/frp-infrastructure.md)。
+Gateway 会把阅读端 `/api/**` 请求转给阅读服务，把管理端 `/api/manage/**` 请求优先转给管理服务；浏览器和前端只需访问 Gateway，不直接访问两个服务端口。
+
+`docker-compose.infra.yml` 包含 MySQL、Redis、RabbitMQ 和 Nacos。远端宿主映射端口全部来自 `.env` 的 `REMOTE_*_PORT`，并只绑定主机回环地址；项目服务与 FRP 读取同一组端口变量。如果基础设施运行在远程主机，本地不启动该文件；使用 `tools/maintenance/manage-remote-infra-frp.ps1` 建立 FRP STCP 连接，让项目容器通过 `REMOTE_INFRA_HOST` 访问宿主机映射端口。完整配置见 [FRP 基础设施连接](operations/frp-infrastructure.md)。
 
 ### 可信本机部署
 
 管理端接口（回收站、永久清理、批量操作、DLQ）默认不开启业务鉴权，因此 ComicAtlas 只适合部署在**可信本机**：
 
-- 只在本机或受控内网使用，不要直接暴露 `8000`（Gateway）、`15672`（RabbitMQ 管理台）、`8848`（Nacos）、`3306`（MySQL）等端口到公网。
+- 只在本机或受控内网使用，不要把 Gateway 或 `.env` 中的数据库、管理台、注册中心端口直接暴露到公网。
 - 基础设施容器只绑定回环地址（见 `docker-compose.infra.yml`），远程访问通过带 token、STCP secret 和 TLS 的 FRP visitor。
 - 管理后台 `/manage` 建议配合宿主机防火墙或反向代理做访问限制。
 - 生产使用前先阅读[部署运维](operations/management.md)中的账号、备份与升级说明。
@@ -135,9 +174,9 @@ D:/downloads/ComicA
 - 每个候选的**警告**：`UNREADABLE_DIRECTORY`（目录不可读，该项被禁用）、`LIMIT_EXCEEDED`（超出批量上限）、`EMPTY_DIRECTORY`（空目录）、`MIXED_DIRECTORY`（图文混排提示）、`SYMLINK_SKIPPED`（符号链接被跳过）等。
 - 有 ERROR 级警告的项**不可勾选**；可导入项勾选后确认导入，生成真实批次并跳转任务中心。
 
-### 3. EHENTAI 导入
+### 3. 其他导入来源（非当前主流程）
 
-选择 EHENTAI 来源并填写画廊 URL。该流程需要可用的网络连接、下载工具和代理配置；请只导入你有权保存的内容。
+历史版本曾支持 EHENTAI 来源。当前主流程只维护 ZIP 和本地目录导入；如界面或接口仍显示其他来源，请不要将其作为稳定功能使用。
 
 ### 4. 查看任务
 
@@ -190,7 +229,7 @@ MANGA_ROOT/hq/{comicId}/{chapterId}/文件名
 MANGA_ROOT/lq/{comicId}/{chapterId}/文件名
 ```
 
-### 回收站
+### 回收站（非当前主流程）
 
 **删除语义**：删除漫画/章节/媒体不再直接物理删除，而是创建管理任务，把文件按清单移入 `MANGA_ROOT/trash/`，同时记录 `TrashManifest` 清单（文件恢复、对账的依据）。
 
@@ -213,7 +252,7 @@ MANGA_ROOT/lq/{comicId}/{chapterId}/文件名
 
 批量上限默认 10000 个目标（`comic.batch.max-items`），超限时预览阶段即提示。
 
-### 媒体上传（预留接口能力）
+### 媒体上传（预留接口能力，非当前主流程）
 
 > 媒体上传/替换后端接口已实现且测试可用，但**当前无前端页面入口**，也不属于漫画导入主流程。漫画内容请通过 `/manage/import` 导入；未来接入需自行实现前端上传页面。
 
@@ -226,7 +265,7 @@ MANGA_ROOT/lq/{comicId}/{chapterId}/文件名
 
 ### 导出漫画（分卷 ZIP）
 
-管理后台的存储管理可对漫画发起导出（`POST /api/storage/export/comics/{id}`）。导出是**异步打包**：任务完成后，产物以**标准分卷 ZIP** 落在宿主机本地目录：
+管理后台的存储管理可对漫画发起导出（`POST /api/manage/storage/export/comics/{id}`）。导出是**异步打包**：任务完成后，产物以**标准分卷 ZIP** 落在宿主机本地目录：
 
 ```text
 MANGA_ROOT/export/{taskId}/{书名}_{id}_{时间戳}.z01
@@ -316,8 +355,7 @@ MANGA_ROOT/export/{taskId}/{书名}_{id}_{时间戳}.zip   ← 主文件（最�
 | 导入 | `/manage/import` | ZIP / 本地目录 / EHENTAI 导入 |
 | 任务 | `/manage/import/tasks` | 导入任务与恢复任务 |
 | 任务中心 | `/manage/tasks` | 全部管理任务（LQ/HQ/转码/回收/恢复/清理等，含预留的媒体上传/替换任务） |
-| 回收站 | `/manage/trash` | 软删除对象：恢复 / 永久清理 / 对账 |
-| 存储管理 | `/manage/storage` | HQ/LQ 占用、章节明细、视频转码补偿 |
+| 存储管理 | `/manage/storage` | HQ/LQ 占用、章节明细、HQ 删除、LQ 生成、视频转码、元数据刷新 |
 | 元数据 | `/manage/metadata` | 分类与标签管理 |
 | 死信队列 | `/manage/dlq` | 查看与重放死信消息 |
 | 设置 | `/manage/settings` | 阅读默认设置 |
@@ -325,10 +363,10 @@ MANGA_ROOT/export/{taskId}/{书名}_{id}_{时间戳}.zip   ← 主文件（最�
 ### 典型工作流
 
 1. **导入**：`/manage/import` 提交 ZIP 或目录 → 任务进入 `/manage/import/tasks`，失败可重试。
-2. **校验**：任务成功后，在漫画工作区（`/manage/comics/{id}`）查看目录树、章节、媒体与允许操作。
-3. **维护**：需要清理空间时使用 HQ 删除（整本或单章）；需要生成缩略图时手动触发 LQ。
-4. **删除**：确认不再需要时删除进回收站；7 天后在回收站永久清理。
-5. **恢复**：数据库记录丢失但 HQ 文件仍在时，任务中心“从存储恢复数据库记录”。
+2. **校验**：任务成功后，在漫画工作区（`/manage/comics/{id}`）查看目录树、章节和媒体状态。
+3. **维护**：在存储管理中按漫画触发 LQ 生成、HQ 删除、视频转码或刷新元数据。
+4. **导出**：在存储管理中按漫画创建导出任务，在本地导出目录查看 ZIP 或分卷文件。
+5. **恢复**：数据库记录丢失但 HQ 文件仍在时，任务中心执行扫盘恢复。
 
 ### 移动端说明
 

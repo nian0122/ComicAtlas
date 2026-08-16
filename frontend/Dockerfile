@@ -1,8 +1,11 @@
+# syntax=docker/dockerfile:1.7
 FROM node:20-alpine AS build
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
-RUN pnpm install --frozen-lockfile
+RUN --mount=type=cache,id=comicatlas-pnpm-store,target=/pnpm/store \
+    pnpm config set store-dir /pnpm/store && \
+    pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm build
 

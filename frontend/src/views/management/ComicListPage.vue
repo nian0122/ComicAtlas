@@ -253,11 +253,11 @@ function statusLabel(s: string) {
 }
 
 function goEdit(id: number) {
-  router.push(`/manage/comics/${id}/edit`)
+  router.push(`/manage/comics/${id}?tab=edit`)
 }
 
 function goStorage(id: number) {
-  router.push(`/manage/storage/${id}`)
+  router.push(`/manage/comics/${id}?tab=storage`)
 }
 
 watch(() => filters.tags, (val) => {
@@ -470,7 +470,7 @@ function formatBytes(bytes: number | undefined): string {
 
 .comic-row:hover {
   background: var(--bg-surface);
-  box-shadow: inset 2px 0 var(--color-brand-pale);
+  box-shadow: inset 2px 0 var(--color-brand);
 }
 
 .comic-row:last-child {

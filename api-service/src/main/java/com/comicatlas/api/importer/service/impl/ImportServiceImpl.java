@@ -2,34 +2,41 @@ package com.comicatlas.api.importer.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.comicatlas.api.comic.entity.Comic;
-import com.comicatlas.api.comic.mapper.ComicMapper;
-import com.comicatlas.api.common.constant.HttpStatusCodes;
-import com.comicatlas.api.common.enums.ComicStatus;
-import com.comicatlas.api.common.enums.ImportTaskStatus;
-import com.comicatlas.api.common.enums.SourceType;
-import com.comicatlas.api.common.exception.BusinessException;
-import com.comicatlas.api.common.exception.ConflictException;
-import com.comicatlas.api.common.storage.ApiStorageProperties;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.comicatlas.api.importer.dto.BatchImportRequest;
+import com.comicatlas.api.importer.dto.BatchImportResultVO;
+import com.comicatlas.api.importer.dto.FailedItem;
+import com.comicatlas.api.importer.dto.ImportRequest;
+import com.comicatlas.api.importer.dto.ImportStatusVO;
+import com.comicatlas.api.importer.dto.ImportTaskVO;
 import com.comicatlas.api.importer.entity.ImportTask;
-import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
-import com.comicatlas.api.importer.service.ImportService;
 import com.comicatlas.api.importer.service.ImportRetryCoordinator;
+import com.comicatlas.api.importer.service.ImportService;
 import com.comicatlas.api.management.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.management.dto.ManagementTaskResponse;
 import com.comicatlas.api.management.entity.ManagementTask;
 import com.comicatlas.api.management.entity.ManagementTaskItem;
 import com.comicatlas.api.management.service.ManagementTaskService;
+import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
-import com.comicatlas.api.common.enums.ManagementTaskStatus;
-import com.comicatlas.api.common.enums.TaskType;
 import com.comicatlas.common.event.CancelTaskEvent;
 import com.comicatlas.common.event.ImportTaskCreatedEvent;
+import com.comicatlas.contract.common.constant.HttpStatusCodes;
+import com.comicatlas.contract.common.enums.ComicStatus;
+import com.comicatlas.api.common.enums.ImportTaskStatus;
+import com.comicatlas.api.common.enums.ManagementTaskStatus;
+import com.comicatlas.contract.common.enums.SourceType;
+import com.comicatlas.api.common.enums.TaskType;
+import com.comicatlas.contract.common.exception.BusinessException;
+import com.comicatlas.api.common.exception.ConflictException;
+import com.comicatlas.persistence.comic.entity.Comic;
+import com.comicatlas.persistence.comic.mapper.ComicMapper;
+import com.comicatlas.api.storage.ApiStorageProperties;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -39,29 +46,38 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.nio.file.Path;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
-import com.comicatlas.api.importer.dto.BatchImportRequest;
-import com.comicatlas.api.importer.dto.BatchImportResultVO;
-import com.comicatlas.api.importer.dto.ImportRequest;
-import com.comicatlas.api.importer.dto.ImportStatusVO;
-import com.comicatlas.api.importer.dto.ImportTaskVO;
-import com.comicatlas.api.importer.dto.FailedItem;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class ImportServiceImpl implements ImportService {
+
+    /** Redis 导入取消标记 key 前缀（与 Worker CancelHandler.KEY_PREFIX 契约一致）。 */
+    private static final String IMPORT_CANCEL_KEY_PREFIX = "import:cancel:";
+    /** Redis EHENTAI 导入去重 key 前缀。 */
+    private static final String EHENTAI_DEDUP_KEY_PREFIX = "import:dedup:E_HENTAI:";
+    /** Redis 去重/取消标记保留时长。 */
+    private static final Duration REDIS_MARK_TTL = Duration.ofDays(7);
+    /** 管理任务目标类型：漫画。 */
+    private static final String TARGET_TYPE_COMIC = "COMIC";
+    /** 管理任务项结果引用类型：导入任务。 */
+    private static final String RESULT_REF_TYPE_IMPORT_TASK = "IMPORT_TASK";
+    /** 列表分页默认页码。 */
+    private static final int DEFAULT_PAGE_NUMBER = 1;
+    /** 列表分页默认页大小。 */
+    private static final int DEFAULT_PAGE_SIZE = 20;
 
     /** EHENTAI 画廊 URL 校验正则，与 Worker 的 worker.ehentai.gallery-url-pattern 同源可配 */
     @Value("${comic.import.ehentai-url-pattern:e-hentai\\.org/g/(\\d+)/([a-f0-9]+)}")
@@ -70,7 +86,7 @@ public class ImportServiceImpl implements ImportService {
     private Pattern ehentaiPattern;
 
     @PostConstruct
-    void initEhentaiPattern() {
+    private void initEhentaiPattern() {
         ehentaiPattern = Pattern.compile(ehentaiUrlPattern);
     }
 
@@ -103,7 +119,7 @@ public class ImportServiceImpl implements ImportService {
             }
         }
 
-        String sourceType = request.getSourceType() != null ? request.getSourceType() : "EHENTAI";
+        String sourceType = request.getSourceType() != null ? request.getSourceType() : SourceType.EHENTAI.name();
         String sourcePath = request.getSourcePath();
         String sourceRef = request.getSourceRef();
 
@@ -120,33 +136,35 @@ public class ImportServiceImpl implements ImportService {
                 }
                 Matcher matcher = ehentaiPattern.matcher(sourceRef);
                 matcher.find();
-                String gid = matcher.group(1);
-                String token = matcher.group(2);
-                comic.setSourceGalleryId(gid);
-                comic.setSourceGalleryToken(token);
+                String galleryId = matcher.group(1);
+                String galleryToken = matcher.group(2);
+                comic.setSourceGalleryId(galleryId);
+                comic.setSourceGalleryToken(galleryToken);
                 comic.setSourceRef(sourceRef);
                 // Redis 去重
-                String dedupKey = "import:dedup:E_HENTAI:" + gid;
+                String dedupKey = EHENTAI_DEDUP_KEY_PREFIX + galleryId;
                 if (Boolean.TRUE.equals(redisTemplate.hasKey(dedupKey))) {
                     throw new BusinessException(HttpStatusCodes.CONFLICT, "该漫画已存在或正在导入中");
                 }
                 // DB 去重
-                var existing = comicMapper.selectOne(new LambdaQueryWrapper<Comic>()
-                    .eq(Comic::getSourceType, SourceType.EHENTAI)
-                    .eq(Comic::getSourceGalleryId, gid));
-                if (existing != null) {
-                    throw new BusinessException(HttpStatusCodes.CONFLICT, "该漫画已导入 - 漫画ID: " + existing.getId());
+                Comic existingComic = comicMapper.selectOne(new LambdaQueryWrapper<Comic>()
+                        .eq(Comic::getSourceType, SourceType.EHENTAI)
+                        .eq(Comic::getSourceGalleryId, galleryId));
+                if (existingComic != null) {
+                    throw new BusinessException(HttpStatusCodes.CONFLICT, "该漫画已导入 - 漫画ID: " + existingComic.getId());
                 }
                 try {
                     comicMapper.insert(comic);
-                } catch (DuplicateKeyException e) {
+                } catch (DuplicateKeyException ex) {
                     throw new BusinessException(HttpStatusCodes.CONFLICT, "该漫画已存在（并发导入）");
                 }
-                redisTemplate.opsForValue().set(dedupKey, "1", Duration.ofDays(7));
+                redisTemplate.opsForValue().set(dedupKey, "1", REDIS_MARK_TTL);
             }
             case "ZIP", "DIRECTORY" -> {
                 String path = sourcePath != null ? sourcePath : sourceRef;
-                if (path == null || path.isBlank()) { throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "请提供 sourcePath"); }
+                if (path == null || path.isBlank()) {
+                    throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "请提供 sourcePath");
+                }
                 String name = Path.of(path).getFileName().toString();
                 name = name.contains(".") ? name.substring(0, name.lastIndexOf('.')) : name;
                 comic.setTitle(name);
@@ -166,14 +184,15 @@ public class ImportServiceImpl implements ImportService {
         taskMapper.insert(task);
 
         // 3. 同事务创建 management task（预创建 comic 与统一任务绑定）
-        ManagementTaskResponse mgmtResp = createManagementTaskForImport(comic.getId(), idempotencyKey, payload(request));
+        ManagementTaskResponse managementTaskResponse =
+                createManagementTaskForImport(comic.getId(), idempotencyKey, payload(request));
 
         // 4. 回填 import_task.management_task_id
-        task.setManagementTaskId(mgmtResp.getId());
+        task.setManagementTaskId(managementTaskResponse.getId());
         taskMapper.updateById(task);
 
         // 5. 将事件写入 Outbox（与 DB 同事务），由 relay 异步发布到 MQ
-        var event = new ImportTaskCreatedEvent(
+        ImportTaskCreatedEvent event = new ImportTaskCreatedEvent(
                 UUID.randomUUID(), Instant.now(), task.getId(), comic.getId(), sourceType, sourcePath);
         outboxService.enqueue(event, MqExchanges.IMPORT, MqRoutingKeys.TASK_CREATED);
 
@@ -185,11 +204,12 @@ public class ImportServiceImpl implements ImportService {
     @Override
     public IPage<ImportTaskVO> listTasks(Integer page, Integer size, String status, String batchId) {
         ImportTaskStatus statusEnum = status != null ? parseImportStatus(status) : null;
-        var wrapper = new LambdaQueryWrapper<ImportTask>()
-            .eq(statusEnum != null, ImportTask::getStatus, statusEnum)
-            .eq(batchId != null, ImportTask::getBatchId, batchId)
-            .orderByDesc(ImportTask::getCreatedAt);
-        var pageRequest = new com.baomidou.mybatisplus.extension.plugins.pagination.Page<ImportTask>(page != null ? page : 1, size != null ? size : 20);
+        LambdaQueryWrapper<ImportTask> wrapper = new LambdaQueryWrapper<ImportTask>()
+                .eq(statusEnum != null, ImportTask::getStatus, statusEnum)
+                .eq(batchId != null, ImportTask::getBatchId, batchId)
+                .orderByDesc(ImportTask::getCreatedAt);
+        Page<ImportTask> pageRequest = new Page<>(
+                page != null ? page : DEFAULT_PAGE_NUMBER, size != null ? size : DEFAULT_PAGE_SIZE);
         return taskMapper.selectPage(pageRequest, wrapper).convert(this::toVO);
     }
 
@@ -201,7 +221,7 @@ public class ImportServiceImpl implements ImportService {
         }
 
         String sourceType = request.getSourceType() != null && !request.getSourceType().isBlank()
-            ? request.getSourceType() : "DIRECTORY";
+                ? request.getSourceType() : SourceType.DIRECTORY.name();
         String batchId = UUID.randomUUID().toString();
 
         List<ImportTaskVO> succeeded = new ArrayList<>();
@@ -209,7 +229,7 @@ public class ImportServiceImpl implements ImportService {
 
         for (String path : sourcePaths) {
             try {
-                long[] ids = transactionTemplate.execute(status -> {
+                long[] createdIds = transactionTemplate.execute(status -> {
                     String name = Path.of(path).getFileName().toString();
                     name = name.contains(".") ? name.substring(0, name.lastIndexOf('.')) : name;
 
@@ -229,34 +249,34 @@ public class ImportServiceImpl implements ImportService {
                     taskMapper.insert(task);
 
                     // 同步建立统一任务并回填 management_task_id
-                    ManagementTaskResponse mgmtResp = createManagementTaskForImport(comic.getId(), null, null);
-                    task.setManagementTaskId(mgmtResp.getId());
+                    ManagementTaskResponse managementTaskResponse = createManagementTaskForImport(comic.getId(), null, null);
+                    task.setManagementTaskId(managementTaskResponse.getId());
                     taskMapper.updateById(task);
 
                     // 写入 Outbox（同事务）
-                    var evt = new ImportTaskCreatedEvent(
+                    ImportTaskCreatedEvent event = new ImportTaskCreatedEvent(
                             UUID.randomUUID(), Instant.now(), task.getId(), comic.getId(), sourceType, path);
-                    outboxService.enqueue(evt, MqExchanges.IMPORT, MqRoutingKeys.TASK_CREATED);
+                    outboxService.enqueue(event, MqExchanges.IMPORT, MqRoutingKeys.TASK_CREATED);
 
                     return new long[]{task.getId(), comic.getId()};
                 });
 
-                long taskId = ids[0];
+                long taskId = createdIds[0];
 
                 ImportTask task = taskMapper.selectById(taskId);
                 succeeded.add(toVO(task));
 
-            } catch (Exception e) {
-                log.error("批量导入单任务失败: path={}, error={}", path, e.getMessage());
+            } catch (Exception ex) {
+                log.error("批量导入单任务失败: path={}", path, ex);
                 FailedItem item = new FailedItem();
                 item.setSourcePath(path);
-                item.setErrorMessage(e.getMessage());
+                item.setErrorMessage(ex.getMessage());
                 failed.add(item);
             }
         }
 
         log.info("批量导入完成: batchId={}, total={}, succeeded={}, failed={}",
-            batchId, sourcePaths.size(), succeeded.size(), failed.size());
+                batchId, sourcePaths.size(), succeeded.size(), failed.size());
 
         BatchImportResultVO result = new BatchImportResultVO();
         result.setBatchId(batchId);
@@ -269,14 +289,18 @@ public class ImportServiceImpl implements ImportService {
     @Override
     public ImportTaskVO getTaskDetail(Long id) {
         ImportTask task = taskMapper.selectById(id);
-        if (task == null) { throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在"); }
+        if (task == null) {
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在");
+        }
         return toVO(task);
     }
 
     @Override
     public ImportStatusVO getTaskStatus(Long id) {
         ImportTask task = taskMapper.selectById(id);
-        if (task == null) { throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在"); }
+        if (task == null) {
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在");
+        }
         ImportStatusVO vo = new ImportStatusVO();
         vo.setTaskId(task.getId());
         vo.setStatus(statusName(task.getStatus()));
@@ -288,7 +312,9 @@ public class ImportServiceImpl implements ImportService {
     @Transactional
     public void cancelTask(Long id) {
         ImportTask task = taskMapper.selectById(id);
-        if (task == null) { throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在"); }
+        if (task == null) {
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在");
+        }
         if (task.getStatus() != null && task.getStatus().isTerminal()) {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "终态任务不可取消");
         }
@@ -300,15 +326,16 @@ public class ImportServiceImpl implements ImportService {
 
         // 同步统一任务为 CANCELLED 真正终态（即使 item 已 RUNNING）
         if (task.getManagementTaskId() != null) {
-            ManagementTaskItem mgmtItem = managementTaskService.findActiveItem("COMIC", comicId, TaskType.IMPORT);
-            if (mgmtItem != null) {
-                managementTaskService.updateItemStatus(mgmtItem.getId(), ManagementTaskStatus.CANCELLED,
-                        "导入已取消", "IMPORT_TASK", taskId);
+            ManagementTaskItem managementItem = managementTaskService.findActiveItem(
+                    TARGET_TYPE_COMIC, comicId, TaskType.IMPORT);
+            if (managementItem != null) {
+                managementTaskService.updateItemStatus(managementItem.getId(), ManagementTaskStatus.CANCELLED,
+                        "导入已取消", RESULT_REF_TYPE_IMPORT_TASK, taskId);
             }
         }
 
         // 写入 Outbox（同事务），由 relay 发布到 MQ
-        var cancelEvent = new CancelTaskEvent(UUID.randomUUID(), Instant.now(), taskId, comicId);
+        CancelTaskEvent cancelEvent = new CancelTaskEvent(UUID.randomUUID(), Instant.now(), taskId, comicId);
         outboxService.enqueue(cancelEvent, MqExchanges.TASK, MqRoutingKeys.CANCEL_REQUESTED);
 
         // Redis 取消标记（非关键，无需事务保障）
@@ -318,9 +345,9 @@ public class ImportServiceImpl implements ImportService {
                     public void afterCommit() {
                         try {
                             redisTemplate.opsForValue().set(
-                                    "import:cancel:" + taskId, "1", Duration.ofDays(7));
-                        } catch (Exception e) {
-                            log.warn("取消标记写入失败（非关键）: taskId={}, error={}", taskId, e.getMessage());
+                                    IMPORT_CANCEL_KEY_PREFIX + taskId, "1", REDIS_MARK_TTL);
+                        } catch (RuntimeException ex) {
+                            log.warn("取消标记写入失败（非关键）: taskId={}", taskId, ex);
                         }
                     }
                 });
@@ -330,7 +357,9 @@ public class ImportServiceImpl implements ImportService {
     @Transactional
     public void retryTask(Long id) {
         ImportTask task = taskMapper.selectById(id);
-        if (task == null) { throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在"); }
+        if (task == null) {
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在");
+        }
         ImportTaskStatus taskStatus = task.getStatus();
         if (taskStatus != ImportTaskStatus.FAILED && taskStatus != ImportTaskStatus.CANCELLED) {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "仅 FAILED/CANCELLED 状态可重试");
@@ -344,9 +373,9 @@ public class ImportServiceImpl implements ImportService {
         if (task.getManagementTaskId() != null) {
             try {
                 managementTaskService.retryTask(task.getManagementTaskId());
-            } catch (BusinessException e) {
-                log.warn("统一任务重试跳过（非终态）: managementTaskId={}, error={}",
-                        task.getManagementTaskId(), e.getMessage());
+            } catch (BusinessException ex) {
+                log.warn("统一任务重试跳过（非终态）: managementTaskId={}",
+                        task.getManagementTaskId(), ex);
             }
         }
     }
@@ -360,16 +389,16 @@ public class ImportServiceImpl implements ImportService {
      * 同事务创建统一导入任务并返回其响应。
      */
     private ManagementTaskResponse createManagementTaskForImport(Long comicId, String idempotencyKey, String payload) {
-        CreateManagementTaskRequest mgmtReq = new CreateManagementTaskRequest();
-        mgmtReq.setTaskType(com.comicatlas.api.common.enums.TaskType.IMPORT);
-        mgmtReq.setOperation("导入漫画");
-        mgmtReq.setTargetType("COMIC");
+        CreateManagementTaskRequest managementTaskRequest = new CreateManagementTaskRequest();
+        managementTaskRequest.setTaskType(TaskType.IMPORT);
+        managementTaskRequest.setOperation("导入漫画");
+        managementTaskRequest.setTargetType(TARGET_TYPE_COMIC);
         CreateManagementTaskRequest.TaskTarget target = new CreateManagementTaskRequest.TaskTarget();
-        target.setTargetType("COMIC");
+        target.setTargetType(TARGET_TYPE_COMIC);
         target.setTargetId(comicId);
-        target.setOperationType(com.comicatlas.api.common.enums.TaskType.IMPORT);
-        mgmtReq.setTargets(List.of(target));
-        return managementTaskService.createTask(mgmtReq, idempotencyKey, payload);
+        target.setOperationType(TaskType.IMPORT);
+        managementTaskRequest.setTargets(List.of(target));
+        return managementTaskService.createTask(managementTaskRequest, idempotencyKey, payload);
     }
 
     private static String sha256(String input) {
@@ -377,23 +406,25 @@ public class ImportServiceImpl implements ImportService {
             MessageDigest messageDigest = MessageDigest.getInstance("SHA-256");
             byte[] hash = messageDigest.digest(input.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(hash);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 不可用", e);
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("SHA-256 不可用", ex);
         }
     }
 
     private static SourceType toSourceType(String sourceType) {
-        if (sourceType == null) { return null; }
+        if (sourceType == null) {
+            return null;
+        }
         try {
             return SourceType.valueOf(sourceType);
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException ex) {
             log.warn("未知 sourceType={}，映射为 null（调用方将按 DIRECTORY 兜底）", sourceType);
             return null;
         }
     }
 
     private static String resolveSourceType(ImportTask task) {
-        return task.getSourceType() != null ? task.getSourceType().name() : "DIRECTORY";
+        return task.getSourceType() != null ? task.getSourceType().name() : SourceType.DIRECTORY.name();
     }
 
     private static String statusName(ImportTaskStatus status) {
@@ -401,10 +432,12 @@ public class ImportServiceImpl implements ImportService {
     }
 
     private static ImportTaskStatus parseImportStatus(String status) {
-        if (status == null) { return null; }
+        if (status == null) {
+            return null;
+        }
         try {
             return ImportTaskStatus.valueOf(status);
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException ex) {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "不支持的任务状态: " + status);
         }
     }

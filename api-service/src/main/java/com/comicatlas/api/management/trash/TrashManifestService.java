@@ -1,10 +1,10 @@
 package com.comicatlas.api.management.trash;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.comicatlas.api.common.constant.HttpStatusCodes;
-import com.comicatlas.api.common.exception.BusinessException;
-import com.comicatlas.api.common.storage.ApiStorageProperties;
-import com.comicatlas.api.common.storage.ApiStorageRoot;
+import com.comicatlas.contract.common.constant.HttpStatusCodes;
+import com.comicatlas.contract.common.exception.BusinessException;
+import com.comicatlas.api.storage.ApiStorageProperties;
+import com.comicatlas.api.storage.ApiStorageRoot;
 import com.comicatlas.api.management.mapper.TrashManifestMapper;
 import com.comicatlas.common.dto.TrashManifestDTO;
 import com.comicatlas.common.dto.TrashManifestItemDTO;

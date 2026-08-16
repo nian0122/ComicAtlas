@@ -1,7 +1,7 @@
 package com.comicatlas.api.admin.event;
 
-import com.comicatlas.api.comic.entity.Media;
-import com.comicatlas.api.comic.mapper.MediaMapper;
+import com.comicatlas.persistence.comic.entity.Media;
+import com.comicatlas.persistence.comic.mapper.MediaMapper;
 import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.event.VideoMetadataFixCompletedEvent;
 import com.comicatlas.common.event.payload.VideoMetadataFixResult;

@@ -1,5 +1,11 @@
 package com.comicatlas.common.constant;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 /**
  * RabbitMQ 队列名常量（主队列 + 死信队列，契约与 AGENTS.md「RABBITMQ」表一致）。
  * <p>
@@ -18,10 +24,6 @@ public final class MqQueues {
     public static final String IMPORT_STORAGE_FINALIZE_FAILED = "import.storage.finalize.failed.queue";
     public static final String TASK_STATUS = "task.status.queue";
     public static final String CANCEL_TASK = "cancel.task.queue";
-    public static final String LQ_GENERATE = "lq.generate.queue";
-    public static final String LQ_RESULT = "lq.result.queue";
-    public static final String HQ_DELETE = "hq.delete.queue";
-    public static final String HQ_DELETE_RESULT = "hq.delete.result.queue";
     public static final String VIDEO_METADATA_FIX = "video.metadata.fix.queue";
     public static final String VIDEO_METADATA_FIX_RESULT = "video.metadata.fix.result.queue";
     public static final String EXPORT_TASK = "export.task.queue";
@@ -47,10 +49,6 @@ public final class MqQueues {
     public static final String IMPORT_STORAGE_FINALIZE_REQUESTED_DLQ = "import.storage.finalize.requested.dlq";
     public static final String IMPORT_STORAGE_FINALIZE_COMPLETED_DLQ = "import.storage.finalize.completed.dlq";
     public static final String IMPORT_STORAGE_FINALIZE_FAILED_DLQ = "import.storage.finalize.failed.dlq";
-    public static final String LQ_GENERATE_DLQ = "lq.generate.dlq";
-    public static final String LQ_RESULT_DLQ = "lq.result.dlq";
-    public static final String HQ_DELETE_DLQ = "hq.delete.dlq";
-    public static final String HQ_DELETE_RESULT_DLQ = "hq.delete.result.dlq";
     public static final String VIDEO_METADATA_FIX_DLQ = "video.metadata.fix.dlq";
     public static final String VIDEO_METADATA_FIX_RESULT_DLQ = "video.metadata.fix.result.dlq";
     public static final String EXPORT_TASK_DLQ = "export.task.dlq";
@@ -68,4 +66,25 @@ public final class MqQueues {
     public static final String MANAGEMENT_COMMAND_DLQ = "management.command.dlq";
     public static final String MANAGEMENT_CANCEL_DLQ = "management.cancel.dlq";
     public static final String MANAGEMENT_RESULT_DLQ = "management.result.dlq";
+
+    /**
+     * 契约队列名全集（主队列 + 死信队列）。
+     * <p>
+     * 通过反射读取全部 String 常量，新增队列常量时自动纳入，无需手工维护清单。
+     * 供 MQ 拓扑对账等监控逻辑判断 Broker 上是否存在契约外的僵尸队列。
+     */
+    public static Set<String> all() {
+        return Arrays.stream(MqQueues.class.getDeclaredFields())
+                .filter(field -> Modifier.isStatic(field.getModifiers()) && field.getType() == String.class)
+                .map(field -> readValue(field))
+                .collect(Collectors.toUnmodifiableSet());
+    }
+
+    private static String readValue(Field field) {
+        try {
+            return (String) field.get(null);
+        } catch (IllegalAccessException e) {
+            throw new IllegalStateException("读取队列常量失败: " + field.getName(), e);
+        }
+    }
 }

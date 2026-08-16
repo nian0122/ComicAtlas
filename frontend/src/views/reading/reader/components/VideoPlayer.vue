@@ -7,8 +7,8 @@
     <div
       v-if="!activated"
       class="video-placeholder"
+      data-reader-video-surface
       @click="handleActivate"
-      data-reader-interactive
     >
       <!-- 预览帧：静音、暂停的 <video> 加载首帧画面，仅取 metadata + 首帧，不持续下载 -->
       <video
@@ -17,6 +17,7 @@
         :src="hqUrl"
         muted
         playsinline
+        webkit-playsinline
         preload="metadata"
         @loadedmetadata="onPreviewMetadata"
         @seeked="onPreviewSeeked"
@@ -44,8 +45,8 @@
       :height="height"
       controls
       playsinline
+      webkit-playsinline
       preload="none"
-      data-reader-interactive
       @loadedmetadata="onMetadata"
       @play="onPlay"
       @pause="onPause"

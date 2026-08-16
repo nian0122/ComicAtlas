@@ -26,6 +26,13 @@ public final class VideoPlayability {
     /** 浏览器 &lt;video&gt; 支持的容器（MP4 家族 + WebM）。 */
     private static final Set<String> PLAYABLE_CONTAINERS = Set.of("mp4", "m4v", "webm");
 
+    /**
+     * 硬件编码器可处理的单边最大像素（NVENC/QSV 上限）。
+     * 超此分辨率的视频（如 8K 7680x4320）无法用硬件加速转码，
+     * CPU 转码又远超超时上限，因此视为"不可转码"直接跳过。
+     */
+    private static final int MAX_ENCODABLE_DIMENSION = 4096;
+
     private VideoPlayability() {
     }
 
@@ -47,5 +54,21 @@ public final class VideoPlayability {
             return true;
         }
         return PLAYABLE_CODECS.contains(codec);
+    }
+
+    /**
+     * 判定视频是否可被转码（当前硬件编码器能力范围内）。
+     * 超高清视频（任一边 > 4096，如 8K）无法用硬件加速转码，CPU 又超时，
+     * 返回 false 表示"不纳入转码队列"。
+     *
+     * @param width  视频宽度（像素）；null 视为可转码（未知尺寸按常规处理）
+     * @param height 视频高度（像素）；null 视为可转码
+     * @return true 表示可转码
+     */
+    public static boolean isTranscodable(Integer width, Integer height) {
+        if (width == null || height == null) {
+            return true;
+        }
+        return width <= MAX_ENCODABLE_DIMENSION && height <= MAX_ENCODABLE_DIMENSION;
     }
 }

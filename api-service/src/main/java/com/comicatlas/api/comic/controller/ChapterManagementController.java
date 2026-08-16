@@ -1,11 +1,11 @@
 package com.comicatlas.api.comic.controller;
 
-import com.comicatlas.api.common.Result;
+import com.comicatlas.contract.common.Result;
+import com.comicatlas.api.comic.dto.ChapterVO;
 import com.comicatlas.api.comic.dto.ChapterCreateRequest;
 import com.comicatlas.api.comic.dto.ChapterMoveRequest;
 import com.comicatlas.api.comic.dto.ChapterRenameRequest;
 import com.comicatlas.api.comic.dto.ChapterReorderRequest;
-import com.comicatlas.api.comic.dto.ChapterVO;
 import com.comicatlas.api.comic.service.ChapterManagementService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>所有请求携带 comicId，用于校验 path ID 属于同一漫画。
  */
 @RestController
-@RequestMapping("/api/comics/{comicId}/chapters")
+@RequestMapping("/api/manage/comics/{comicId}/chapters")
 @RequiredArgsConstructor
 public class ChapterManagementController {
 
