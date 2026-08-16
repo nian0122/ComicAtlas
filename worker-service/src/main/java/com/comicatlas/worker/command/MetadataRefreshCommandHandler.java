@@ -127,6 +127,16 @@ public class MetadataRefreshCommandHandler {
      * 生产装配构造器：@Autowired 显式声明——类含包级测试构造器，不标注时 Spring 无法决定用哪个。
      */
     @Autowired
+    /**
+     * 使用默认快照限制创建元数据刷新处理器，供兼容旧测试和本地调用。
+     *
+     * @param chapterMapper 章节查询 Mapper
+     * @param mediaMapper 媒体查询 Mapper
+     * @param mediaAnalyzer 媒体分析器
+     * @param publisher 管理命令事件发布器
+     * @param storageProperties 存储配置
+     * @param objectMapper JSON 映射器
+     */
     public MetadataRefreshCommandHandler(ExportChapterMapper chapterMapper, ExportMediaMapper mediaMapper,
                                          MediaAnalyzer mediaAnalyzer, ManagementCommandPublisher publisher,
                                          StorageProperties storageProperties, ObjectMapper objectMapper,
@@ -139,6 +149,20 @@ public class MetadataRefreshCommandHandler {
     /**
      * 包级构造器：允许测试覆盖上限常量以快速验证超限失败路径。
      * 生产装配一律走公开构造器（上限取冻结常量）。
+     */
+    /**
+     * 创建可覆盖快照限制的元数据刷新处理器。
+     *
+     * @param chapterMapper 章节查询 Mapper
+     * @param mediaMapper 媒体查询 Mapper
+     * @param mediaAnalyzer 媒体分析器
+     * @param publisher 管理命令事件发布器
+     * @param storageProperties 存储配置
+     * @param objectMapper JSON 映射器
+     * @param maxChapters 最大章节数
+     * @param maxMedia 最大媒体数
+     * @param maxSnapshotBytes 快照最大字节数
+     * @param workerConfig Worker 配置
      */
     public MetadataRefreshCommandHandler(ExportChapterMapper chapterMapper, ExportMediaMapper mediaMapper,
                                          MediaAnalyzer mediaAnalyzer, ManagementCommandPublisher publisher,

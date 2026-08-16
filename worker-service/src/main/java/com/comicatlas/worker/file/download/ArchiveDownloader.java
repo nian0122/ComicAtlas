@@ -20,6 +20,11 @@ public class ArchiveDownloader {
     private final HttpClient http;
     private final WorkerConfig config;
 
+    /**
+     * 创建 Archiver 下载器。
+     *
+     * @param config Worker 配置
+     */
     public ArchiveDownloader(WorkerConfig config) {
         this.config = config;
         this.http = HttpClient.newBuilder()

@@ -5,7 +5,6 @@ import com.comicatlas.common.event.CancelTaskEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.rabbitmq.client.Channel;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.support.AmqpHeaders;
@@ -29,7 +28,6 @@ import java.time.Duration;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class CancelHandler {
 
     public static final String KEY_PREFIX = "import:cancel:";
@@ -37,10 +35,23 @@ public class CancelHandler {
     private final StringRedisTemplate redisTemplate;
     private final MqConsumerSupport mqConsumerSupport;
 
+    /**
+     * 创建取消标记处理器，供不依赖 Spring 配置的单元测试使用。
+     *
+     * @param redisTemplate Redis 模板
+     * @param mqConsumerSupport MQ 消费支持组件
+     */
     public CancelHandler(StringRedisTemplate redisTemplate, MqConsumerSupport mqConsumerSupport) {
         this(redisTemplate, mqConsumerSupport, new WorkerConfig());
     }
 
+    /**
+     * 创建取消标记处理器。
+     *
+     * @param redisTemplate Redis 模板
+     * @param mqConsumerSupport MQ 消费支持组件
+     * @param workerConfig Worker 配置
+     */
     public CancelHandler(StringRedisTemplate redisTemplate, MqConsumerSupport mqConsumerSupport,
                          WorkerConfig workerConfig) {
         this.redisTemplate = redisTemplate;
@@ -48,6 +59,7 @@ public class CancelHandler {
         this.workerConfig = workerConfig;
     }
 
+    /** 记录任务取消标记并设置配置的 TTL。 */
     @RabbitListener(queues = MqQueues.CANCEL_TASK)
     public void handle(CancelTaskEvent event, Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         mqConsumerSupport.consume(channel, tag, "取消标记: taskId=" + event.taskId(),
@@ -56,6 +68,7 @@ public class CancelHandler {
                 null, MqConsumerSupport.FailurePolicy.REQUEUE);
     }
 
+    /** 查询任务是否已被取消。 */
     public boolean isCancelled(Long taskId) {
         return Boolean.TRUE.equals(redisTemplate.hasKey(KEY_PREFIX + taskId));
     }

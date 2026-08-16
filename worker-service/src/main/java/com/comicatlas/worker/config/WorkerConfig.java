@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+/** Worker 服务的统一外部配置模型。 */
 @Data
 @Configuration
 @ConfigurationProperties(prefix = "worker")
@@ -20,32 +21,57 @@ public class WorkerConfig {
     /** Commons Compress 分卷大小上限：2^32 - 1（无 Zip64 分卷的最大段大小）。 */
     private static final long ZIP_SPLIT_SIZE_MAX_BYTES = 4_294_967_295L;
 
+    /** 漫画统一存储根目录。 */
     private String mangaRoot;
+    /** 外部工具和导入过程的临时目录。 */
     private String tempDir;
+    /** 导入元数据目录。 */
     private String metadataDir;
+    /** Torrent 下载参数。 */
     private Torrent torrent = new Torrent();
+    /** HTTP/SOCKS 代理参数。 */
     private Proxy proxy = new Proxy();
+    /** ZIP 导入导出安全限制。 */
     private Zip zip = new Zip();
+    /** 封面生成参数。 */
     private Cover cover = new Cover();
+    /** 外部进程 IO 线程池参数。 */
     private Executor executor = new Executor();
+    /** 视频转码参数。 */
     private Transcode transcode = new Transcode();
+    /** LQ 图片处理参数。 */
     private Image image = new Image();
+    /** 媒体分析参数。 */
     private Media media = new Media();
+    /** 下载器网络和 aria2 参数。 */
     private Download download = new Download();
+    /** 取消标记和元数据快照生命周期参数。 */
     private Lifecycle lifecycle = new Lifecycle();
+    /** aria2c 可执行文件路径。 */
     private String aria2cPath;
+    /** ffprobe 可执行文件路径。 */
     private String ffprobePath;
+    /** ffmpeg 可执行文件路径。 */
     private String ffmpegPath;
+    /** 图片优化器可执行文件路径。 */
     private String imageOptimizerPath;
     /** 工具相对路径的解析基准目录；未配置时回退到 JVM 工作目录 */
     private String toolsBaseDir;
+    /** LQ 图片质量参数。 */
     private int lqQuality = 15;
+    /** LQ 图片处理并发数。 */
     private int lqWorkers = 4;
+    /** HQ 删除超时时间（秒）。 */
     private int hqDeleteTimeoutSeconds = 60;
+    /** 是否启用 ffprobe 视频元数据分析。 */
     private boolean ffprobeEnabled = true;
+    /** 存储根配置，保留用于兼容旧版 Worker 存储装配。 */
     private Map<String, String> storageRoots = new LinkedHashMap<>();
+    /** 宿主机漫画根目录，用于容器路径映射。 */
     private String hostMangaRoot;
+    /** Worker 容器内漫画根目录。 */
     private String containerMangaRoot = DEFAULT_CONTAINER_MANGA_ROOT;
+    /** EHentai 访问参数。 */
     private Ehentai ehentai = new Ehentai();
 
     /**
@@ -109,6 +135,7 @@ public class WorkerConfig {
         return Path.of(root, TEMP_DIRECTORY_NAME);
     }
 
+    /** Torrent 下载配置。 */
     @Data
     public static class Torrent {
         private int peerDetectTimeout = 30;
@@ -118,6 +145,7 @@ public class WorkerConfig {
         private int timeoutMinutes = 120;
     }
 
+    /** 网络代理配置。 */
     @Data
     public static class Proxy {
         private String host;
@@ -125,6 +153,7 @@ public class WorkerConfig {
         private int socksPort = 7897;
     }
 
+    /** 封面生成配置。 */
     @Data
     public static class Cover {
         private int quality = 25;
@@ -136,6 +165,7 @@ public class WorkerConfig {
         private int frameQuality = 2;
     }
 
+    /** 外部进程 IO 线程池配置。 */
     @Data
     public static class Executor {
         private int processIoThreads = 4;
@@ -143,22 +173,26 @@ public class WorkerConfig {
         private int shutdownTimeoutSeconds = 30;
     }
 
+    /** 视频转码配置。 */
     @Data
     public static class Transcode {
         private long timeoutSeconds = 600;
         private long encoderProbeTimeoutSeconds = 15;
     }
 
+    /** LQ 图片处理配置。 */
     @Data
     public static class Image {
         private long lqTimeoutSeconds = 600;
     }
 
+    /** 媒体分析配置。 */
     @Data
     public static class Media {
         private long ffprobeTimeoutSeconds = 15;
     }
 
+    /** 下载器网络和 aria2 参数配置。 */
     @Data
     public static class Download {
         private int httpConnectTimeoutSeconds = 30;
@@ -170,12 +204,14 @@ public class WorkerConfig {
         private int seedTimeSeconds;
     }
 
+    /** Worker 生命周期配置。 */
     @Data
     public static class Lifecycle {
         private int cancellationTtlDays = 7;
         private int metadataRefreshAttemptTtlDays = 7;
     }
 
+    /** ZIP 安全限制配置。 */
     @Data
     public static class Zip {
         private int maxEntries = 100_000;
@@ -254,6 +290,7 @@ public class WorkerConfig {
         }
     }
 
+    /** EHentai 访问配置。 */
     @Data
     public static class Ehentai {
         private String apiUrl = "https://api.e-hentai.org/api.php";
