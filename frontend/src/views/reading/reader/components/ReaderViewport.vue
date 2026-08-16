@@ -9,6 +9,7 @@
       size-field="size"
       key-field="id"
       :buffer="buffer"
+      :page-mode="props.pageMode"
       @scroll="onScroll"
     >
       <template #default="{ item, index, active }">
@@ -40,12 +41,15 @@ interface Props {
   currentPage: number
   /** 被双击强制切到 HQ 的页面索引（0-based）集合 */
   forceHqPages: ReadonlySet<number>
+  /** 移动端纵向阅读使用页面级滚动，让 Safari 能收缩地址栏。 */
+  pageMode?: boolean
 }
 
 const props = defineProps<Props>()
 const emit = defineEmits<{
   (e: 'update:currentPage', page: number): void
   (e: 'visible-range', range: { start: number; end: number; total: number }): void
+  (e: 'scroll-direction', direction: 'up' | 'down'): void
 }>()
 
 const settings = useReaderSettingsStore()
@@ -151,6 +155,8 @@ let isProgrammaticScroll = false
 let programmaticScrollTimer: number | null = null
 let lastRangeStart = -1
 let lastRangeEnd = -1
+let lastScrollOffset = 0
+let pendingScrollDirection: 'up' | 'down' | null = null
 
 // vue-virtual-scroller 2.x 组件实例不暴露 scrollTop/scrollLeft,
 // 统一走官方 exposed API(getScroll/scrollToPosition,内部按 direction 分支且处理 RTL)。
@@ -191,6 +197,11 @@ function emitVisibleRange() {
 
 function onScroll() {
   if (isProgrammaticScroll) return
+  const currentOffset = scrollOffset()
+  if (currentOffset !== lastScrollOffset) {
+    pendingScrollDirection = currentOffset > lastScrollOffset ? 'up' : 'down'
+    lastScrollOffset = currentOffset
+  }
   if (scrollRafId != null) return
   scrollRafId = requestAnimationFrame(() => {
     scrollRafId = null
@@ -200,6 +211,10 @@ function onScroll() {
       emit('update:currentPage', page)
     }
     emitVisibleRange()
+    if (pendingScrollDirection !== null) {
+      emit('scroll-direction', pendingScrollDirection)
+      pendingScrollDirection = null
+    }
   })
 }
 
@@ -208,6 +223,8 @@ function scrollToPage(page: number): void {
   const targetPage = Math.max(1, Math.min(page, props.pages.length))
   const offset = targetPage === 1 ? 0 : prefixSums.value[targetPage - 2]
   isProgrammaticScroll = true
+  lastScrollOffset = offset
+  pendingScrollDirection = null
   setScrollOffset(offset)
 
   // 取消旧计时器，防止新旧 scrollToPage 调用互相干扰
@@ -295,6 +312,21 @@ watch(() => [settings.fitMode, settings.zoom], () => {
 
 .reader-item-wrapper {
   width: 100%;
+}
+
+@media (max-width: 1024px) {
+  .reader-viewport {
+    flex: none;
+    height: 100dvh;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  .scroller {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
 }
 
 :deep(.vue-recycle-scroller__item-wrapper) {
