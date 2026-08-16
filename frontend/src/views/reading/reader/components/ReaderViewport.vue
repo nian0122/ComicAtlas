@@ -10,7 +10,7 @@
       key-field="id"
       :buffer="buffer"
       :page-mode="props.pageMode"
-      @scroll="onScroll"
+      @scroll="onScrollerScroll"
     >
       <template #default="{ item, index, active }">
         <div class="reader-item-wrapper"><ReaderImageItem :item="item" :index="index" :active="active" :scroller-root="scrollerEl" :item-height="item.size" :force-hq="props.forceHqPages.has(index)" @video-started="emit('video-started', $event)" /></div>
@@ -162,6 +162,7 @@ let pendingScrollDirection: 'up' | 'down' | null = null
 // vue-virtual-scroller 2.x 组件实例不暴露 scrollTop/scrollLeft,
 // 统一走官方 exposed API(getScroll/scrollToPosition,内部按 direction 分支且处理 RTL)。
 function scrollOffset(): number {
+  if (props.pageMode) return window.scrollY
   return scrollerRef.value?.getScroll?.()?.start ?? 0
 }
 
@@ -215,6 +216,12 @@ function onScroll() {
   })
 }
 
+/** page-mode 使用窗口滚动；将方向判断收口到视口组件，避免父组件重复派发状态。 */
+function onScrollerScroll() {
+  if (props.pageMode) return
+  onScroll()
+}
+
 function scrollToPage(page: number): void {
   if (!scrollerRef.value || props.pages.length === 0) return
   const targetPage = Math.max(1, Math.min(page, props.pages.length))
@@ -251,10 +258,16 @@ function forceUpdateScroller() {
 onMounted(() => {
   updateContainerSize()
   window.addEventListener('resize', updateContainerSize)
+  if (props.pageMode) {
+    window.addEventListener('scroll', onScroll, { passive: true })
+  }
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', updateContainerSize)
+  if (props.pageMode) {
+    window.removeEventListener('scroll', onScroll)
+  }
   if (scrollRafId != null) cancelAnimationFrame(scrollRafId)
   if (programmaticScrollTimer != null) window.clearTimeout(programmaticScrollTimer)
 })
