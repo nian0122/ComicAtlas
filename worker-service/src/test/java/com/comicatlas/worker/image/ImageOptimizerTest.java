@@ -38,6 +38,8 @@ class ImageOptimizerTest {
 
     @BeforeEach
     void setUp() throws Exception {
+        WorkerConfig.Image imageConfig = new WorkerConfig.Image();
+        when(config.getImage()).thenReturn(imageConfig);
         when(config.getImageOptimizerPath()).thenReturn("tools/image-optimizer/image-optimizer.exe");
         when(config.resolveToolPath(anyString())).thenReturn(Path.of("C:/tools/image-optimizer.exe"));
         when(config.getLqQuality()).thenReturn(15);

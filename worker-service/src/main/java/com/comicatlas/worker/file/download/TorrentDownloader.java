@@ -26,14 +26,6 @@ public class TorrentDownloader implements DownloadStrategy {
     private static final String BTIH_PARAM_PREFIX = "btih:";
     /** aria2 未完成下载文件的临时后缀。 */
     private static final String ARIA2_INCOMPLETE_SUFFIX = ".aria2";
-    /** 每服务器最大连接数。 */
-    private static final int MAX_CONNECTION_PER_SERVER = 16;
-    /** 每文件分片数。 */
-    private static final int SPLIT_COUNT = 8;
-    /** 无做种时的停止等待（秒）。 */
-    private static final int BT_STOP_TIMEOUT_SECONDS = 60;
-    /** 做种时间（秒），0 表示下载完成后立即退出。 */
-    private static final int SEED_TIME_SECONDS = 0;
     /** 分钟转秒的换算系数。 */
     private static final int SECONDS_PER_MINUTE = 60;
 
@@ -78,10 +70,10 @@ public class TorrentDownloader implements DownloadStrategy {
     private List<String> buildCommand(String magnetUrl, Path destDir) {
         return new ArrayList<>(List.of(
                 config.resolveToolPath(config.getAria2cPath()).toString(), magnetUrl,
-                "--bt-stop-timeout=" + BT_STOP_TIMEOUT_SECONDS,
-                "--seed-time=" + SEED_TIME_SECONDS,
-                "--max-connection-per-server=" + MAX_CONNECTION_PER_SERVER,
-                "--split=" + SPLIT_COUNT,
+                "--bt-stop-timeout=" + config.getDownload().getTorrentStopTimeoutSeconds(),
+                "--seed-time=" + config.getDownload().getSeedTimeSeconds(),
+                "--max-connection-per-server=" + config.getDownload().getMaxConnectionPerServer(),
+                "--split=" + config.getDownload().getSplitCount(),
                 "--bt-enable-lpd=false",
                 "-d", destDir.toString(),
                 "--stop-with-process=" + ProcessHandle.current().pid()

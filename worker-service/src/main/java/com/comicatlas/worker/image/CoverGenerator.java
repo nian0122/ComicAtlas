@@ -32,22 +32,10 @@ import java.util.stream.Stream;
 @RequiredArgsConstructor
 public class CoverGenerator {
 
-    /** 图片优化子进程超时（秒），封面单图处理通常远快于整章 LQ */
-    private static final long COVER_TIMEOUT_SECONDS = 600;
-    /** ffmpeg 抽帧子进程超时（秒） */
-    private static final long FRAME_TIMEOUT_SECONDS = 120;
     /** 封面在 Go 工具中的固定章节标识 */
     private static final String COVER_CHAPTER_ID = "0";
     /** 封面在 Go 工具中的固定章节名 */
     private static final String COVER_CHAPTER_NO = "cover";
-    /** 封面优化并发数（封面单图，固定单 worker） */
-    private static final String COVER_WORKERS = "1";
-    /** ffmpeg 抽帧起始时间偏移（秒），跳过片头黑场 */
-    private static final String FRAME_SEEK_SECONDS = "2";
-    /** ffmpeg 抽帧数量 */
-    private static final String FRAME_COUNT = "1";
-    /** ffmpeg 抽帧质量（2=高质量） */
-    private static final String FRAME_QUALITY = "2";
     /** 抽出的临时帧文件名 */
     private static final String FRAME_FILE_NAME = "frame.jpg";
     /** 最终封面文件名 */
@@ -84,7 +72,7 @@ public class CoverGenerator {
                     "-chapter-id", COVER_CHAPTER_ID,
                     "-chapter-no", COVER_CHAPTER_NO,
                     "-quality", String.valueOf(config.getCover().getQuality()),
-                    "-workers", COVER_WORKERS,
+                    "-workers", String.valueOf(config.getCover().getWorkers()),
                     "-json"
             ));
 
@@ -92,7 +80,7 @@ public class CoverGenerator {
 
             ProcessBuilder processBuilder = new ProcessBuilder(command);
             ExternalProcessRunner.ExternalProcessResult result =
-                    processRunner.run(processBuilder, COVER_TIMEOUT_SECONDS, "封面优化");
+                    processRunner.run(processBuilder, config.getCover().getTimeoutSeconds(), "封面优化");
             int exitCode = result.exitCode();
             if (exitCode != 0) {
                 throw new RuntimeException(
@@ -142,10 +130,10 @@ public class CoverGenerator {
 
             List<String> command = List.of(
                     ffmpegPath.toString(),
-                    "-ss", FRAME_SEEK_SECONDS,
+                    "-ss", String.valueOf(config.getCover().getFrameSeekSeconds()),
                     "-i", videoPath.toString(),
-                    "-vframes", FRAME_COUNT,
-                    "-q:v", FRAME_QUALITY,
+                    "-vframes", String.valueOf(config.getCover().getFrameCount()),
+                    "-q:v", String.valueOf(config.getCover().getFrameQuality()),
                     frameFile.toString(),
                     "-y"
             );
@@ -153,7 +141,8 @@ public class CoverGenerator {
             log.info("抽取视频封面帧: comicId={}, video={}", comicId, videoPath.getFileName());
 
             ProcessBuilder processBuilder = new ProcessBuilder(command);
-            ExternalProcessRunner.ExternalProcessResult result = processRunner.run(processBuilder, FRAME_TIMEOUT_SECONDS, "视频封面");
+            ExternalProcessRunner.ExternalProcessResult result = processRunner.run(
+                    processBuilder, config.getCover().getFrameTimeoutSeconds(), "视频封面");
             int exitCode = result.exitCode();
             if (exitCode != 0 || !Files.exists(frameFile) || Files.size(frameFile) == 0) {
                 throw new RuntimeException("ffmpeg 抽帧失败 exitCode=" + exitCode + ", comicId=" + comicId);

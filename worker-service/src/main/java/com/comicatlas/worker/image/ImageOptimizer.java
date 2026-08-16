@@ -27,8 +27,6 @@ public class ImageOptimizer {
     private final ObjectMapper objectMapper;
     private final ExternalProcessRunner processRunner;
 
-    private static final long LQ_TIMEOUT_SECONDS = 600;
-
     /**
      * 对指定章节的 HQ 图片生成 LQ WebP（使用显式路径，禁止 globalOrder 拼目录）。
      *
@@ -82,7 +80,7 @@ public class ImageOptimizer {
         ProcessBuilder processBuilder = new ProcessBuilder(cmd);
         ExternalProcessRunner.ExternalProcessResult result;
         try {
-            result = processRunner.run(processBuilder, LQ_TIMEOUT_SECONDS, "LQ优化");
+            result = processRunner.run(processBuilder, config.getImage().getLqTimeoutSeconds(), "LQ优化");
         } catch (InterruptedException e) {
             // runner 已恢复中断标志并销毁子进程
             throw new RuntimeException("等待图片优化被中断: comicId=" + comicId + ", chapterId=" + chapterId, e);

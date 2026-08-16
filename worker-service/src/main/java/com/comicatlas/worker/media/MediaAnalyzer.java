@@ -35,9 +35,6 @@ public class MediaAnalyzer {
     /** 视频文件扩展名集合（小写，含点）。 */
     private static final Set<String> VIDEO_EXTENSIONS = Set.of(".mp4", ".mkv", ".webm", ".mov", ".avi");
 
-    /** ffprobe 执行超时（秒）。 */
-    private static final long FFPROBE_TIMEOUT_SECONDS = 15;
-
     /** 媒体类型：视频。 */
     private static final String MEDIA_TYPE_VIDEO = "VIDEO";
 
@@ -129,7 +126,7 @@ public class MediaAnalyzer {
             // 三参重载分离 stderr：损坏流的 NAL 解码错误经 [ffprobe] tag 打日志，
             // stdout 保持纯 JSON 供解析（与 ImageOptimizer 一致），避免合并流破坏 JSON。
             ExternalProcessRunner.ExternalProcessResult result =
-                    processRunner.run(processBuilder, FFPROBE_TIMEOUT_SECONDS, "ffprobe");
+                    processRunner.run(processBuilder, workerConfig.getMedia().getFfprobeTimeoutSeconds(), "ffprobe");
             if (result.exitCode() != 0) {
                 log.warn("ffprobe exit={} for {}", result.exitCode(), file);
                 return videoFallback(name, container, size);
@@ -141,7 +138,7 @@ public class MediaAnalyzer {
             log.warn("ffprobe 读取 {} 被中断", file);
             return videoFallback(name, container, size);
         } catch (ExternalProcessRunner.ProcessTimeoutException e) {
-            log.warn("ffprobe 读取 {} 超时 ({}s)", file, FFPROBE_TIMEOUT_SECONDS);
+            log.warn("ffprobe 读取 {} 超时 ({}s)", file, workerConfig.getMedia().getFfprobeTimeoutSeconds());
             return videoFallback(name, container, size);
         } catch (Exception e) {
             log.warn("ffprobe 读取 {} 失败", file, e);

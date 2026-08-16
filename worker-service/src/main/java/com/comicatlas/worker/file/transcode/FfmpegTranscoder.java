@@ -27,8 +27,6 @@ import java.util.List;
 @RequiredArgsConstructor
 public class FfmpegTranscoder {
 
-    private static final long TRANSCODE_TIMEOUT_SECONDS = 600;
-
     /** 硬件编码器已探测但运行时失败后的禁用哨兵（进程内缓存值）。 */
     private static final String HW_DISABLED = "__disabled__";
 
@@ -96,7 +94,7 @@ public class FfmpegTranscoder {
         cmd.add(output.toString());
         ProcessBuilder processBuilder = new ProcessBuilder(cmd);
         ExternalProcessRunner.ExternalProcessResult result =
-                processRunner.run(processBuilder, TRANSCODE_TIMEOUT_SECONDS);
+                processRunner.run(processBuilder, config.getTranscode().getTimeoutSeconds());
         return result.exitCode();
     }
 
@@ -149,8 +147,8 @@ public class FfmpegTranscoder {
             ProcessBuilder probe = new ProcessBuilder(
                     ffmpegPath != null ? ffmpegPath : "ffmpeg",
                     "-hide_banner", "-encoders");
-            ExternalProcessRunner.ExternalProcessResult result =
-                    processRunner.run(probe, 15);
+            ExternalProcessRunner.ExternalProcessResult result = processRunner.run(
+                    probe, config.getTranscode().getEncoderProbeTimeoutSeconds());
             if (result.exitCode() != 0) {
                 log.debug("ffmpeg -encoders 探测失败，退出码 {}", result.exitCode());
                 return null;

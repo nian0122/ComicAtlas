@@ -144,6 +144,35 @@ class WorkerConfigTest {
     }
 
     @Test
+    @DisplayName("maxEntries=0 校验失败且消息含字段名")
+    void maxEntriesZeroFailsValidation() {
+        WorkerConfig config = validWorkerConfig();
+        config.getZip().setMaxEntries(0);
+        assertThatThrownBy(config::validateZipConfig)
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("maxEntries");
+    }
+
+    @Test
+    @DisplayName("maxDepth=0 校验失败且消息含字段名")
+    void maxDepthZeroFailsValidation() {
+        WorkerConfig config = validWorkerConfig();
+        config.getZip().setMaxDepth(0);
+        assertThatThrownBy(config::validateZipConfig)
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("maxDepth");
+    }
+
+    @Test
+    @DisplayName("外部工具路径为空时拒绝解析")
+    void blankToolPathFailsFast() {
+        WorkerConfig config = new WorkerConfig();
+        assertThatThrownBy(() -> config.resolveToolPath(" "))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("工具路径");
+    }
+
+    @Test
     @DisplayName("非法 splitSize 启动 ApplicationContext 失败、异常含字段名且无 Worker 消费者启动")
     void invalidSplitSizeFailsContextStartupWithoutConsumer() {
         new ApplicationContextRunner()

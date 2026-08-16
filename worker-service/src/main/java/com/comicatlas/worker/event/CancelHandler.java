@@ -3,6 +3,7 @@ package com.comicatlas.worker.event;
 import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.event.CancelTaskEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
+import com.comicatlas.worker.config.WorkerConfig;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,15 +33,26 @@ import java.time.Duration;
 public class CancelHandler {
 
     public static final String KEY_PREFIX = "import:cancel:";
-    private static final Duration TTL = Duration.ofDays(7);
-
+    private final WorkerConfig workerConfig;
     private final StringRedisTemplate redisTemplate;
     private final MqConsumerSupport mqConsumerSupport;
+
+    public CancelHandler(StringRedisTemplate redisTemplate, MqConsumerSupport mqConsumerSupport) {
+        this(redisTemplate, mqConsumerSupport, new WorkerConfig());
+    }
+
+    public CancelHandler(StringRedisTemplate redisTemplate, MqConsumerSupport mqConsumerSupport,
+                         WorkerConfig workerConfig) {
+        this.redisTemplate = redisTemplate;
+        this.mqConsumerSupport = mqConsumerSupport;
+        this.workerConfig = workerConfig;
+    }
 
     @RabbitListener(queues = MqQueues.CANCEL_TASK)
     public void handle(CancelTaskEvent event, Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         mqConsumerSupport.consume(channel, tag, "取消标记: taskId=" + event.taskId(),
-                () -> redisTemplate.opsForValue().set(KEY_PREFIX + event.taskId(), "1", TTL),
+                () -> redisTemplate.opsForValue().set(KEY_PREFIX + event.taskId(), "1",
+                        Duration.ofDays(workerConfig.getLifecycle().getCancellationTtlDays())),
                 null, MqConsumerSupport.FailurePolicy.REQUEUE);
     }
 

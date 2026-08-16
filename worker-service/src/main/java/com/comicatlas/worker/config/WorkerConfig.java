@@ -1,10 +1,8 @@
 package com.comicatlas.worker.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import java.nio.file.Path;
@@ -15,6 +13,8 @@ import java.util.Map;
 @Configuration
 @ConfigurationProperties(prefix = "worker")
 public class WorkerConfig {
+    private static final String DEFAULT_CONTAINER_MANGA_ROOT = "/storage";
+    private static final String TEMP_DIRECTORY_NAME = "temp";
     /** Commons Compress 分卷大小下限：64 KiB（ZIP 规范要求 split segment 不小于 64 KB）。 */
     private static final long ZIP_SPLIT_SIZE_MIN_BYTES = 64L * 1024;
     /** Commons Compress 分卷大小上限：2^32 - 1（无 Zip64 分卷的最大段大小）。 */
@@ -27,10 +27,16 @@ public class WorkerConfig {
     private Proxy proxy = new Proxy();
     private Zip zip = new Zip();
     private Cover cover = new Cover();
-    private String aria2cPath = "tools/aria2c/aria2c.exe";
-    private String ffprobePath = "tools/ffmpeg/ffprobe.exe";
-    private String ffmpegPath = "tools/ffmpeg/ffmpeg.exe";
-    private String imageOptimizerPath = "tools/image-optimizer/image-optimizer.exe";
+    private Executor executor = new Executor();
+    private Transcode transcode = new Transcode();
+    private Image image = new Image();
+    private Media media = new Media();
+    private Download download = new Download();
+    private Lifecycle lifecycle = new Lifecycle();
+    private String aria2cPath;
+    private String ffprobePath;
+    private String ffmpegPath;
+    private String imageOptimizerPath;
     /** 工具相对路径的解析基准目录；未配置时回退到 JVM 工作目录 */
     private String toolsBaseDir;
     private int lqQuality = 15;
@@ -39,13 +45,16 @@ public class WorkerConfig {
     private boolean ffprobeEnabled = true;
     private Map<String, String> storageRoots = new LinkedHashMap<>();
     private String hostMangaRoot;
-    private String containerMangaRoot = "/storage";
+    private String containerMangaRoot = DEFAULT_CONTAINER_MANGA_ROOT;
     private Ehentai ehentai = new Ehentai();
 
     /**
      * 解析外部工具路径：相对路径基于 {@code toolsBaseDir}（未配置则取 JVM 工作目录）解析为绝对路径。
      */
     public Path resolveToolPath(String toolPath) {
+        if (toolPath == null || toolPath.isBlank()) {
+            throw new IllegalArgumentException("外部工具路径不能为空");
+        }
         Path path = Path.of(toolPath);
         if (path.isAbsolute()) {
             return path;
@@ -71,7 +80,7 @@ public class WorkerConfig {
             normalizedHostRoot = normalizedHostRoot.substring(0, normalizedHostRoot.length() - 1);
         }
         String containerRoot = containerMangaRoot == null || containerMangaRoot.isBlank()
-                ? "/storage" : normalizePathSeparators(containerMangaRoot);
+                ? DEFAULT_CONTAINER_MANGA_ROOT : normalizePathSeparators(containerMangaRoot);
         if (normalizedSourcePath.equalsIgnoreCase(normalizedHostRoot)) {
             return containerRoot;
         }
@@ -97,17 +106,7 @@ public class WorkerConfig {
         }
         String root = mangaRoot != null && !mangaRoot.isBlank()
                 ? mangaRoot : System.getProperty("user.dir");
-        return Path.of(root, "temp");
-    }
-
-    @Bean
-    public ObjectMapper objectMapper() {
-        // QA 修复注记（task-21）：注册 JavaTimeModule。
-        // Worker 需读取 API 写入的 TrashManifestDTO / metadata（含 Instant createdAt），
-        // 裸 ObjectMapper 无法反序列化 Instant → 回收清单读取失败、TRASH 命令失败。
-        return com.fasterxml.jackson.databind.json.JsonMapper.builder()
-                .addModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
-                .build();
+        return Path.of(root, TEMP_DIRECTORY_NAME);
     }
 
     @Data
@@ -129,6 +128,52 @@ public class WorkerConfig {
     @Data
     public static class Cover {
         private int quality = 25;
+        private long timeoutSeconds = 600;
+        private long frameTimeoutSeconds = 120;
+        private int workers = 1;
+        private int frameSeekSeconds = 2;
+        private int frameCount = 1;
+        private int frameQuality = 2;
+    }
+
+    @Data
+    public static class Executor {
+        private int processIoThreads = 4;
+        private int processIoQueueCapacity = 64;
+        private int shutdownTimeoutSeconds = 30;
+    }
+
+    @Data
+    public static class Transcode {
+        private long timeoutSeconds = 600;
+        private long encoderProbeTimeoutSeconds = 15;
+    }
+
+    @Data
+    public static class Image {
+        private long lqTimeoutSeconds = 600;
+    }
+
+    @Data
+    public static class Media {
+        private long ffprobeTimeoutSeconds = 15;
+    }
+
+    @Data
+    public static class Download {
+        private int httpConnectTimeoutSeconds = 30;
+        private int archiveConnectTimeoutSeconds = 60;
+        private int archiveRequestTimeoutMinutes = 30;
+        private int maxConnectionPerServer = 16;
+        private int splitCount = 8;
+        private int torrentStopTimeoutSeconds = 60;
+        private int seedTimeSeconds;
+    }
+
+    @Data
+    public static class Lifecycle {
+        private int cancellationTtlDays = 7;
+        private int metadataRefreshAttemptTtlDays = 7;
     }
 
     @Data
@@ -150,7 +195,23 @@ public class WorkerConfig {
      */
     @PostConstruct
     void validateZipConfig() {
+        validateRuntimeConfig();
         Zip zipConfig = zip;
+        if (zipConfig == null) {
+            throw new IllegalArgumentException("worker.zip 配置不能为空");
+        }
+        if (zipConfig.getMaxEntries() <= 0) {
+            throw new IllegalArgumentException("worker.zip.maxEntries 必须大于 0，当前值："
+                    + zipConfig.getMaxEntries());
+        }
+        if (zipConfig.getMaxDepth() <= 0) {
+            throw new IllegalArgumentException("worker.zip.maxDepth 必须大于 0，当前值："
+                    + zipConfig.getMaxDepth());
+        }
+        if (zipConfig.getMaxTotalSize() <= 0) {
+            throw new IllegalArgumentException("worker.zip.maxTotalSize 必须大于 0，当前值："
+                    + zipConfig.getMaxTotalSize());
+        }
         if (zipConfig.getSplitSize() < ZIP_SPLIT_SIZE_MIN_BYTES || zipConfig.getSplitSize() > ZIP_SPLIT_SIZE_MAX_BYTES) {
             throw new IllegalArgumentException(
                     "worker.zip.splitSize 必须位于 [" + ZIP_SPLIT_SIZE_MIN_BYTES + ", " + ZIP_SPLIT_SIZE_MAX_BYTES
@@ -161,6 +222,35 @@ public class WorkerConfig {
                     "worker.zip.maxEntrySize 必须满足 0 < maxEntrySize <= maxTotalSize，"
                             + "当前 maxEntrySize=" + zipConfig.getMaxEntrySize()
                             + ", maxTotalSize=" + zipConfig.getMaxTotalSize());
+        }
+    }
+
+    private void validateRuntimeConfig() {
+        if (executor == null || executor.getProcessIoThreads() <= 0
+                || executor.getProcessIoQueueCapacity() <= 0
+                || executor.getShutdownTimeoutSeconds() <= 0) {
+            throw new IllegalArgumentException("worker.executor 必须配置为正数");
+        }
+        if (transcode == null || transcode.getTimeoutSeconds() <= 0
+                || transcode.getEncoderProbeTimeoutSeconds() <= 0) {
+            throw new IllegalArgumentException("worker.transcode 超时时间必须为正数");
+        }
+        if (image == null || image.getLqTimeoutSeconds() <= 0) {
+            throw new IllegalArgumentException("worker.image.lqTimeoutSeconds 必须为正数");
+        }
+        if (media == null || media.getFfprobeTimeoutSeconds() <= 0) {
+            throw new IllegalArgumentException("worker.media.ffprobeTimeoutSeconds 必须为正数");
+        }
+        if (download == null || download.getHttpConnectTimeoutSeconds() <= 0
+                || download.getArchiveConnectTimeoutSeconds() <= 0
+                || download.getArchiveRequestTimeoutMinutes() <= 0
+                || download.getMaxConnectionPerServer() <= 0 || download.getSplitCount() <= 0
+                || download.getTorrentStopTimeoutSeconds() < 0 || download.getSeedTimeSeconds() < 0) {
+            throw new IllegalArgumentException("worker.download 参数范围无效");
+        }
+        if (lifecycle == null || lifecycle.getCancellationTtlDays() <= 0
+                || lifecycle.getMetadataRefreshAttemptTtlDays() <= 0) {
+            throw new IllegalArgumentException("worker.lifecycle TTL 必须为正数");
         }
     }
 

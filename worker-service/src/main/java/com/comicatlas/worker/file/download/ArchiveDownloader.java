@@ -1,7 +1,6 @@
 package com.comicatlas.worker.file.download;
 
 import com.comicatlas.worker.config.WorkerConfig;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -16,14 +15,19 @@ import java.nio.file.StandardCopyOption;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class ArchiveDownloader {
 
-    private final HttpClient http = HttpClient.newBuilder()
-        .followRedirects(HttpClient.Redirect.ALWAYS)
-        .connectTimeout(java.time.Duration.ofSeconds(60))
-        .build();
+    private final HttpClient http;
     private final WorkerConfig config;
+
+    public ArchiveDownloader(WorkerConfig config) {
+        this.config = config;
+        this.http = HttpClient.newBuilder()
+                .followRedirects(HttpClient.Redirect.ALWAYS)
+                .connectTimeout(java.time.Duration.ofSeconds(
+                        config.getDownload().getArchiveConnectTimeoutSeconds()))
+                .build();
+    }
 
     /**
      * 通过 e-hentai Archiver 下载画廊 zip
@@ -40,7 +44,7 @@ public class ArchiveDownloader {
         HttpRequest req = HttpRequest.newBuilder()
             .uri(URI.create(url))
             .header("User-Agent", config.getEhentai().getUserAgent())
-            .timeout(java.time.Duration.ofMinutes(30))
+            .timeout(java.time.Duration.ofMinutes(config.getDownload().getArchiveRequestTimeoutMinutes()))
             .GET()
             .build();
 

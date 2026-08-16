@@ -10,6 +10,7 @@ import com.comicatlas.common.storage.RelativePathValidator;
 import com.comicatlas.common.util.MetadataSnapshotRevision;
 import com.comicatlas.worker.entity.ExportChapter;
 import com.comicatlas.worker.entity.ExportMedia;
+import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.event.ManagementCommandPublisher;
 import com.comicatlas.worker.importer.NaturalPathComparator;
 import com.comicatlas.worker.mapper.ExportChapterMapper;
@@ -79,8 +80,6 @@ public class MetadataRefreshCommandHandler {
     private static final int SNAPSHOT_SCHEMA_VERSION = 1;
 
     /** 过期 attempt 目录保留时长：7 天。 */
-    private static final Duration ATTEMPT_TTL = Duration.ofDays(7);
-
     /** HQ 存储根 key。 */
     private static final String HQ_ROOT_KEY = "HQ";
 
@@ -122,6 +121,7 @@ public class MetadataRefreshCommandHandler {
     private final int maxChapters;
     private final int maxMedia;
     private final long maxSnapshotBytes;
+    private final WorkerConfig workerConfig;
 
     /**
      * 生产装配构造器：@Autowired 显式声明——类含包级测试构造器，不标注时 Spring 无法决定用哪个。
@@ -129,20 +129,38 @@ public class MetadataRefreshCommandHandler {
     @Autowired
     public MetadataRefreshCommandHandler(ExportChapterMapper chapterMapper, ExportMediaMapper mediaMapper,
                                          MediaAnalyzer mediaAnalyzer, ManagementCommandPublisher publisher,
-                                         StorageProperties storageProperties, ObjectMapper objectMapper) {
+                                         StorageProperties storageProperties, ObjectMapper objectMapper,
+                                         WorkerConfig workerConfig) {
         this(chapterMapper, mediaMapper, mediaAnalyzer, publisher, storageProperties, objectMapper,
                 MetadataRefreshLimits.MAX_CHAPTERS, MetadataRefreshLimits.MAX_MEDIA,
-                MetadataRefreshLimits.MAX_SNAPSHOT_BYTES);
+                MetadataRefreshLimits.MAX_SNAPSHOT_BYTES, workerConfig);
     }
 
     /**
      * 包级构造器：允许测试覆盖上限常量以快速验证超限失败路径。
      * 生产装配一律走公开构造器（上限取冻结常量）。
      */
+    public MetadataRefreshCommandHandler(ExportChapterMapper chapterMapper, ExportMediaMapper mediaMapper,
+                                         MediaAnalyzer mediaAnalyzer, ManagementCommandPublisher publisher,
+                                         StorageProperties storageProperties, ObjectMapper objectMapper) {
+        this(chapterMapper, mediaMapper, mediaAnalyzer, publisher, storageProperties, objectMapper,
+                MetadataRefreshLimits.MAX_CHAPTERS, MetadataRefreshLimits.MAX_MEDIA,
+                MetadataRefreshLimits.MAX_SNAPSHOT_BYTES, new WorkerConfig());
+    }
+
     MetadataRefreshCommandHandler(ExportChapterMapper chapterMapper, ExportMediaMapper mediaMapper,
                                   MediaAnalyzer mediaAnalyzer, ManagementCommandPublisher publisher,
                                   StorageProperties storageProperties, ObjectMapper objectMapper,
                                   int maxChapters, int maxMedia, long maxSnapshotBytes) {
+        this(chapterMapper, mediaMapper, mediaAnalyzer, publisher, storageProperties, objectMapper,
+                maxChapters, maxMedia, maxSnapshotBytes, new WorkerConfig());
+    }
+
+    public MetadataRefreshCommandHandler(ExportChapterMapper chapterMapper, ExportMediaMapper mediaMapper,
+                                  MediaAnalyzer mediaAnalyzer, ManagementCommandPublisher publisher,
+                                  StorageProperties storageProperties, ObjectMapper objectMapper,
+                                  int maxChapters, int maxMedia, long maxSnapshotBytes,
+                                  WorkerConfig workerConfig) {
         this.chapterMapper = chapterMapper;
         this.mediaMapper = mediaMapper;
         this.mediaAnalyzer = mediaAnalyzer;
@@ -152,6 +170,7 @@ public class MetadataRefreshCommandHandler {
         this.maxChapters = maxChapters;
         this.maxMedia = maxMedia;
         this.maxSnapshotBytes = maxSnapshotBytes;
+        this.workerConfig = workerConfig;
     }
 
     /**
@@ -644,7 +663,8 @@ public class MetadataRefreshCommandHandler {
         if (!Files.isDirectory(root, LinkOption.NOFOLLOW_LINKS)) {
             return;
         }
-        Instant cutoff = Instant.now().minus(ATTEMPT_TTL);
+        Instant cutoff = Instant.now().minus(Duration.ofDays(
+                workerConfig.getLifecycle().getMetadataRefreshAttemptTtlDays()));
         try (Stream<Path> taskDirs = Files.list(root)) {
             for (Path taskDir : taskDirs.filter(Files::isDirectory).toList()) {
                 try (Stream<Path> itemDirs = Files.list(taskDir)) {
