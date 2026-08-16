@@ -145,6 +145,25 @@
             </div>
           </div>
 
+          <!-- 页码跳转：主动操作才定位，连续阅读过程中不参与滚动同步。 -->
+          <div class="setting-section">
+            <span class="setting-label">页码跳转</span>
+            <div class="page-jump-control">
+              <input
+                v-model.number="jumpPage"
+                type="number"
+                min="1"
+                :max="Math.max(1, totalPages)"
+                inputmode="numeric"
+                aria-label="跳转页码"
+                @keydown.enter="submitPageJump"
+                @blur="submitPageJump"
+              >
+              <span>/ {{ totalPages }} 页</span>
+              <button type="button" @click="submitPageJump">跳转</button>
+            </div>
+          </div>
+
           <!-- 高级 -->
           <div class="advanced-divider" role="separator">高级</div>
 
@@ -167,6 +186,7 @@
 </template>
 
 <script setup lang="ts">
+import { ref, watch } from 'vue'
 import { useReaderSettingsStore, ZOOM_LEVELS } from '@/stores/reader-settings-store'
 import type {
   FitMode,
@@ -179,15 +199,31 @@ import type {
 interface Props {
   /** 抽屉可见性，由父级（ReaderPage）控制 */
   visible: boolean
+  /** 当前可视页，仅用于显示和输入初始值 */
+  currentPage: number
+  /** 当前章节总页数 */
+  totalPages: number
 }
 
-defineProps<Props>()
+const props = defineProps<Props>()
 
 const emit = defineEmits<{
   (e: 'close'): void
+  (e: 'jumpToPage', page: number): void
 }>()
 
 const settings = useReaderSettingsStore()
+const jumpPage = ref(props.currentPage)
+
+watch(() => props.currentPage, (page) => {
+  jumpPage.value = page
+})
+
+function submitPageJump() {
+  const page = Math.min(Math.max(1, Math.round(Number(jumpPage.value) || props.currentPage)), Math.max(1, props.totalPages))
+  jumpPage.value = page
+  if (page !== props.currentPage) emit('jumpToPage', page)
+}
 
 /** 移动端只暴露 纵向滚动/横向翻页（ltr/rtl 仅桌面端可用） */
 const directionOptions: ReadonlyArray<{ value: ReadingDirection; label: string }> = [
@@ -242,7 +278,7 @@ function adjustZoom(delta: number) {
   left: 0;
   right: 0;
   bottom: 0;
-  max-height: 60vh;
+  max-height: min(78vh, 720px);
   display: flex;
   flex-direction: column;
   background: var(--bg-secondary);
@@ -321,28 +357,32 @@ function adjustZoom(delta: number) {
 .drawer-body {
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 0 var(--space-base) var(--space-lg);
+  padding: var(--space-sm) var(--space-base) calc(var(--space-lg) + 8px);
 }
 
-/* 单个设置区块：标签左 + 控件右 */
+/* 设置分组：标题与控件上下排列，避免窄屏标签挤压、断行错位。 */
 .setting-section {
   display: flex;
-  align-items: center;
-  gap: var(--space-md);
-  padding: var(--space-sm) 0;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding: 14px 0;
   border-bottom: 1px solid var(--border);
 }
 
 .setting-label {
-  width: 64px;
-  flex-shrink: 0;
-  font-size: 14px;
-  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
 }
 
 /* 分段单选组：2 列网格（4 项时呈 2×2，与线框图一致） */
 .segmented {
-  flex: 1;
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: var(--space-sm);
@@ -378,10 +418,70 @@ function adjustZoom(delta: number) {
 
 /* 缩放控件 */
 .zoom-control {
-  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
+}
+
+/* 页码跳转是主动操作，单独做成高对比操作卡片。 */
+.page-jump-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--accent-bg), var(--bg-surface));
+}
+
+.page-jump-control input {
+  width: 100%;
+  height: 42px;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  outline: none;
+  appearance: textfield;
+}
+
+.page-jump-control input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--control-focus-ring);
+}
+
+.page-jump-control input::-webkit-outer-spin-button,
+.page-jump-control input::-webkit-inner-spin-button {
+  margin: 0;
+  appearance: none;
+}
+
+.page-jump-control > span {
+  color: var(--text-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.page-jump-control button {
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--color-on-brand);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.page-jump-control button:active {
+  background: var(--accent-hover);
 }
 
 .zoom-row {

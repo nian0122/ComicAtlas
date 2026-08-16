@@ -53,7 +53,7 @@
       :current-page="store.currentPage"
       :force-hq-pages="forceHqPages"
       :page-mode="mode === 'mobile'"
-      @update:current-page="onPageChange"
+      @update:current-page="onViewportPageChange"
       @visible-range="onVisibleRange"
       @scroll-direction="onViewportScrollDirection"
       @video-started="onVideoStarted"
@@ -81,7 +81,10 @@
       />
       <ReaderSettingsDrawer
         :visible="isSettings"
+        :current-page="store.currentPage"
+        :total-pages="store.totalPages"
         @close="dispatch(ReaderAction.CloseSettings)"
+        @jump-to-page="onPageChange"
       />
     </template>
   </div>
@@ -310,6 +313,17 @@ async function loadCurrentChapter(preservePage = false, restoreProgress = true) 
 function onPageChange(page: number) {
   if (page >= 1 && page <= store.totalPages) {
     store.currentPage = page
+    // 连续滚动模式不依赖 currentPage watcher 回流定位，外部跳页必须显式执行定位。
+    if (!isPagedMode.value) {
+      viewportComponentRef.value?.scrollToPage?.(page)
+    }
+  }
+}
+
+/** 自然滚动只同步页码，不再次调用定位，避免滑动时页面位置被抢回。 */
+function onViewportPageChange(page: number) {
+  if (page >= 1 && page <= store.totalPages) {
+    store.currentPage = page
   }
 }
 
@@ -438,6 +452,10 @@ function onVisibilityChange() {
 }
 
 onMounted(async () => {
+  // 全局页面为导航使用 smooth，但阅读器页码跳转必须即时定位，
+  // 否则移动端窗口滚动会与自然滑动、工具栏显隐叠加造成位置抢占。
+  document.documentElement.classList.add('reader-document')
+
   // 桌面专属交互（键盘快捷键 / Ctrl+滚轮缩放 / 双击重置缩放）：
   // 移动端不注册，避免与触摸手势系统冲突。
   if (mode.value === 'desktop') {
@@ -494,6 +512,7 @@ watch(() => route.params.chapterId, (newId, oldId) => {
 })
 
 onBeforeUnmount(() => {
+  document.documentElement.classList.remove('reader-document')
   // 移动端未注册这些监听器，remove 为无害 no-op
   document.removeEventListener('keydown', onKeydown)
   document.removeEventListener('wheel', onWheel)
@@ -526,6 +545,10 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   background: var(--bg);
+}
+
+:global(html.reader-document) {
+  scroll-behavior: auto !important;
 }
 
 @media (max-width: 1024px) {

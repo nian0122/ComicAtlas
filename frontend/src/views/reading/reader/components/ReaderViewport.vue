@@ -158,6 +158,7 @@ let lastRangeStart = -1
 let lastRangeEnd = -1
 let lastScrollOffset = 0
 let pendingScrollDirection: 'up' | 'down' | null = null
+/** 最近一次由自然滚动计算并回传给父组件的页码，避免回流时反向吸附页面。 */
 
 // vue-virtual-scroller 2.x 组件实例不暴露 scrollTop/scrollLeft,
 // 统一走官方 exposed API(getScroll/scrollToPosition,内部按 direction 分支且处理 RTL)。
@@ -255,6 +256,8 @@ function forceUpdateScroller() {
   }
 }
 
+defineExpose({ scrollToPage })
+
 onMounted(() => {
   updateContainerSize()
   window.addEventListener('resize', updateContainerSize)
@@ -273,6 +276,9 @@ onBeforeUnmount(() => {
 })
 
 watch(() => props.currentPage, (newPage) => {
+  // page-mode 的 currentPage 由自然滚动产生，只同步父级状态；
+  // 外部跳页由 ReaderPage 显式调用 scrollToPage，禁止 watcher 反向吸附。
+  if (props.pageMode) return
   // 斩断回声循环:自身滚动 emit 的页码经父组件回流时,视口已在该页,跳过吸附;
   // 外部跳页(工具栏/键盘/URL)因当前位置不符,正常执行 scrollToPage。
   if (newPage === deriveCurrentPage()) return
@@ -293,6 +299,9 @@ watch(() => props.pages.length, () => {
 watch([containerWidth, containerHeight], () => {
   nextTick(() => {
     forceUpdateScroller()
+    // 移动端视口高度会随浏览器地址栏/阅读工具栏变化而调整，
+    // 这里只刷新虚拟列表，不能把当前滚动位置重新吸附到 currentPage 页首。
+    if (props.pageMode) return
     scrollToPage(props.currentPage)
   })
 })
@@ -300,6 +309,8 @@ watch([containerWidth, containerHeight], () => {
 watch(() => [settings.fitMode, settings.zoom], () => {
   nextTick(() => {
     forceUpdateScroller()
+    // 移动端调整阅读设置不属于页码跳转，保留用户当前阅读位置。
+    if (props.pageMode) return
     scrollToPage(props.currentPage)
   })
 }, { flush: 'post' })
