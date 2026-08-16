@@ -9,11 +9,6 @@
       class="progressive-skeleton"
     />
 
-    <!-- HQ 已删除轻量提示（仅 HQ_ONLY 模式下 hq 缺失但 lq 已显示时） -->
-    <div v-if="showHqDeletedHint" class="hq-deleted-hint">
-      HQ 已删除 · 当前为 LQ
-    </div>
-
     <!-- Single image layer -->
     <img
       v-if="showImage"
@@ -98,11 +93,6 @@ const showSkeleton = computed(() => {
 })
 
 const showImage = computed(() => currentSrc.value !== undefined && !error.value)
-
-// ── HQ 已删除提示：仅在 HQ_ONLY 模式下 hq 缺失但 lq 已显示 ──
-const showHqDeletedHint = computed(() => {
-  return effectiveMode.value === 'HQ_ONLY' && !props.hq && currentSrc.value === props.lq
-})
 
 const imageClasses = computed(() => ({
   'fade-in': effectiveMode.value === 'AUTO' && isHqLoaded.value && currentSrc.value === props.hq,
@@ -274,19 +264,6 @@ watch(() => [props.lq, props.hq, props.mode, props.lqStatus, props.forceHq], () 
   background: var(--surface);
   cursor: pointer;
   z-index: 3;
-}
-
-.hq-deleted-hint {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  z-index: 2;
-  padding: 4px 8px;
-  font-size: 12px;
-  color: var(--text-secondary);
-  background: rgba(0, 0, 0, 0.6);
-  border-radius: 4px;
-  pointer-events: none;
 }
 
 @keyframes pulse {

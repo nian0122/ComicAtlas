@@ -84,6 +84,7 @@ public interface ComicMapper extends BaseMapper<Comic> {
             <when test='query.sort == "updatedAt"'>c.updated_at DESC</when>
             <otherwise>c.created_at DESC</otherwise>
         </choose>
+        , c.id ASC
         </script>
     """)
     IPage<Comic> selectPage(Page<Comic> page, @Param("query") Object query);

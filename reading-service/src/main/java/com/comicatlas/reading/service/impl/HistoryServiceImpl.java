@@ -7,6 +7,10 @@ import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
+import com.comicatlas.contract.common.constant.HttpStatusCodes;
+import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
+import com.comicatlas.contract.common.enums.ComicStatus;
+import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.persistence.storage.FileUrlResolver;
 import com.comicatlas.reading.dto.HistoryUpdateRequest;
 import com.comicatlas.reading.dto.HistoryVO;
@@ -18,7 +22,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -120,21 +123,37 @@ public class HistoryServiceImpl implements HistoryService {
 
     @Override
     public void upsertHistory(Long comicId, HistoryUpdateRequest request) {
-        ReadingHistory existing = readingHistoryMapper.selectOne(
-            new LambdaQueryWrapper<ReadingHistory>()
-                .select(ReadingHistory::getId)
-                .eq(ReadingHistory::getComicId, comicId));
-        if (existing != null) {
-            existing.setChapterId(request.getChapterId());
-            existing.setPageNumber(request.getPageNumber());
-            existing.setUpdatedAt(LocalDateTime.now());
-            readingHistoryMapper.updateById(existing);
-        } else {
-            ReadingHistory history = new ReadingHistory();
-            history.setComicId(comicId);
-            history.setChapterId(request.getChapterId());
-            history.setPageNumber(request.getPageNumber());
-            readingHistoryMapper.insert(history);
+        validateProgress(comicId, request);
+        ReadingHistory history = new ReadingHistory();
+        history.setComicId(comicId);
+        history.setChapterId(request.getChapterId());
+        history.setPageNumber(request.getPageNumber());
+        readingHistoryMapper.upsert(history);
+    }
+
+    private void validateProgress(Long comicId, HistoryUpdateRequest request) {
+        if (comicId == null || comicId <= 0 || request == null
+                || request.getChapterId() == null || request.getChapterId() <= 0
+                || request.getPageNumber() == null || request.getPageNumber() <= 0) {
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "阅读进度参数无效");
+        }
+
+        Comic comic = comicMapper.selectOne(new LambdaQueryWrapper<Comic>()
+                .select(Comic::getId, Comic::getStatus)
+                .eq(Comic::getId, comicId));
+        if (comic == null || comic.getStatus() != ComicStatus.READY) {
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在或不可阅读");
+        }
+
+        Chapter chapter = chapterMapper.selectOne(new LambdaQueryWrapper<Chapter>()
+                .select(Chapter::getId, Chapter::getComicId, Chapter::getPageCount, Chapter::getStatus)
+                .eq(Chapter::getId, request.getChapterId()));
+        if (chapter == null || !comicId.equals(chapter.getComicId())
+                || chapter.getStatus() != ChapterLifecycleStatus.READY) {
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在或不可阅读");
+        }
+        if (chapter.getPageCount() == null || request.getPageNumber() > chapter.getPageCount()) {
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "阅读页码超出章节范围");
         }
     }
 

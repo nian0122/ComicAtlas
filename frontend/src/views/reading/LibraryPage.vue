@@ -12,7 +12,7 @@
           </span>
         </div>
         <p class="page-count">
-          <span class="mobile-page-count">{{ store.total }} 部作品 · {{ readingCount }} 部正在阅读</span>
+          <span class="mobile-page-count">{{ store.total }} 部作品 · 本页 {{ readingCount }} 部正在阅读</span>
         </p>
       </div>
       <div class="toolbar">
@@ -174,7 +174,6 @@
       </div>
 
       <div class="pagination-wrapper">
-        <span class="pagination-meta">第 {{ store.query.page }} / {{ pageCount }} 页</span>
         <el-pagination
           v-model:current-page="store.query.page"
           :page-size="store.query.size"
@@ -213,7 +212,6 @@ const categoryFilter = ref('')
 const allCategories = ref<CategoryDTO[]>([])
 
 const hasActiveFilters = computed(() => Boolean(keyword.value || categoryFilter.value || selectedTags.value.length))
-const pageCount = computed(() => Math.max(1, Math.ceil(store.total / (store.query.size ?? 24))))
 const activeFilterSummary = computed(() => {
   const summary: string[] = []
   if (keyword.value) summary.push(`搜索：${keyword.value}`)
@@ -331,6 +329,8 @@ function posterSubtitle(comic: ComicListVO): string {
 }
 
 onMounted(() => {
+  // 重新进入漫画库时清除上一次页面残留的分页条件，避免界面与实际请求不一致。
+  store.resetQuery()
   loadTags()
   loadCategories()
   store.fetchList()
@@ -577,13 +577,6 @@ onMounted(() => {
   justify-content: center;
   min-height: 36px;
   padding: var(--space-md) 0;
-}
-
-.pagination-meta {
-  color: var(--text-muted);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
 }
 
 .state {

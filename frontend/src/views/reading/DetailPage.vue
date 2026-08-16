@@ -53,7 +53,7 @@
       <section class="information-section">
         <div class="section-inner">
           <div class="info-section-header">
-            <h2 class="section-title">信息</h2>
+            <h2 class="section-title">作品信息</h2>
           </div>
           <div class="info-grid">
             <div class="info-item">
@@ -61,41 +61,46 @@
               <span class="info-value">{{ comic.author || '未知作者' }}</span>
             </div>
             <div class="info-item">
-              <span class="info-label">页数</span>
-              <span class="info-value">{{ comic.pageCount }} 页</span>
+              <span class="info-label">媒体数</span>
+              <span class="info-value">{{ comic.pageCount }} 个</span>
             </div>
-            <div class="info-item">
+            <div v-if="comic.categoryName" class="info-item">
               <span class="info-label">分类</span>
-              <span class="info-value">{{ comic.categoryName || '-' }}</span>
+              <span class="info-value">{{ comic.categoryName }}</span>
             </div>
             <div class="info-item">
               <span class="info-label">大小</span>
               <span class="info-value">{{ formatBytes(comic.hqSize) }}</span>
             </div>
-            <div class="info-item info-item--wide">
-              <span class="info-label">描述</span>
-              <span class="info-value">{{ comic.description || '-' }}</span>
-            </div>
-            <div class="info-item info-item--wide">
-              <span class="info-label">标签</span>
-              <span class="info-value">
-                <template v-if="comic.tags && comic.tags.length">
-                  <span v-for="tag in comic.tags" :key="tag.name" class="tag-chip">
-                    {{ tag.name }}
-                  </span>
-                </template>
-                <span v-else class="info-placeholder">-</span>
+          </div>
+
+          <div v-if="comic.description" class="description-block">
+            <span class="info-label">简介</span>
+            <p>{{ comic.description }}</p>
+          </div>
+
+          <div v-if="comic.tags && comic.tags.length" class="tags-block">
+            <span class="info-label">标签</span>
+            <div class="tag-list">
+              <span v-for="tag in comic.tags" :key="tag.name" class="tag-chip">
+                {{ tag.name }}
               </span>
             </div>
-            <div class="info-item">
-              <span class="info-label">导入时间</span>
-              <span class="info-value">{{ formatDate(comic.createdAt) }}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">来源类型</span>
-              <span class="info-value">{{ comic.sourceType || '-' }}</span>
-            </div>
           </div>
+
+          <details class="secondary-info">
+            <summary>更多信息</summary>
+            <div class="secondary-info-grid">
+              <div class="info-item">
+                <span class="info-label">导入时间</span>
+                <span class="info-value">{{ formatDate(comic.createdAt) }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">来源类型</span>
+                <span class="info-value">{{ comic.sourceType || '未知' }}</span>
+              </div>
+            </div>
+          </details>
         </div>
       </section>
 
@@ -104,7 +109,7 @@
         <div class="section-inner">
           <div class="catalog-header">
             <h2 class="section-title">目录</h2>
-            <span v-if="totalChapters > 0" class="section-count">{{ totalChapters }} 话</span>
+            <span v-if="totalChapters > 0" class="section-count">{{ totalChapters }} 个章节</span>
           </div>
 
           <CatalogTree
@@ -174,23 +179,23 @@ const totalChapters = computed(() => {
 const progressSubtitle = computed(() => {
   if (!comic.value) return ''
   const ch = lastReadChapter.value
-  const pageText = `第 ${comic.value.lastReadPage || 1} / ${comic.value.pageCount || 0} 页`
+  const progressText = `进度 ${comic.value.lastReadPage || 1} / ${comic.value.pageCount || 0}`
   if (ch) {
     const chapterLabel = ch.title || `第${ch.chapterNo}话`
-    return `阅读至 ${chapterLabel} · ${pageText}`
+    return `阅读至 ${chapterLabel} · ${progressText}`
   }
-  return pageText
+  return progressText
 })
 
 const progressMetaText = computed(() => {
   if (!comic.value) return ''
   const ch = lastReadChapter.value
-  const pageText = `第 ${comic.value.lastReadPage || 1} / ${comic.value.pageCount || 0} 页`
+  const progressText = `进度 ${comic.value.lastReadPage || 1} / ${comic.value.pageCount || 0}`
   if (ch) {
     const chapterLabel = ch.title || `第${ch.chapterNo}话`
-    return `${chapterLabel} · ${pageText}`
+    return `${chapterLabel} · ${progressText}`
   }
-  return pageText
+  return progressText
 })
 
 const progressScale = computed(
@@ -410,7 +415,7 @@ onMounted(loadData)
 
 /* Information */
 .information-section {
-  padding: var(--space-2xl) var(--page-padding);
+  padding: var(--space-xl) var(--page-padding) var(--space-2xl);
 }
 
 .section-inner {
@@ -422,7 +427,7 @@ onMounted(loadData)
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: var(--space-lg);
+  margin-bottom: var(--space-md);
 }
 
 .section-title {
@@ -448,10 +453,6 @@ onMounted(loadData)
   border-radius: var(--card-radius);
 }
 
-.info-item--wide {
-  grid-column: 1 / -1;
-}
-
 .info-label {
   font-size: 12px;
   color: var(--text-muted);
@@ -465,8 +466,29 @@ onMounted(loadData)
   line-height: 1.4;
 }
 
-.info-placeholder {
-  color: var(--text-muted);
+.description-block,
+.tags-block {
+  display: grid;
+  gap: var(--space-xs);
+  margin-top: var(--space-base);
+  padding: var(--space-base);
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+  background: color-mix(in srgb, var(--bg-surface) 72%, transparent);
+}
+
+.description-block p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
 }
 
 .tag-chip {
@@ -476,8 +498,31 @@ onMounted(loadData)
   background: var(--accent-bg);
   padding: 3px 10px;
   border-radius: var(--radius-sm);
-  margin-right: var(--space-xs);
-  margin-bottom: var(--space-xs);
+  margin: 0;
+}
+
+.secondary-info {
+  margin-top: var(--space-base);
+  border-top: 1px solid var(--border);
+}
+
+.secondary-info summary {
+  padding: var(--space-base) 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.secondary-info summary::-webkit-details-marker { display: none; }
+.secondary-info summary::after { content: '＋'; float: right; color: var(--accent); }
+.secondary-info[open] summary::after { content: '－'; }
+
+.secondary-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-base);
+  padding-bottom: var(--space-base);
 }
 
 /* Catalog */
@@ -535,7 +580,8 @@ onMounted(loadData)
 
 /* Responsive */
 @media (max-width: 1024px) {
-  .info-grid {
+  .info-grid,
+  .secondary-info-grid {
     grid-template-columns: 1fr;
   }
 }

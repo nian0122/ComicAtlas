@@ -16,6 +16,7 @@ import com.comicatlas.persistence.comic.entity.ComicTag;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.persistence.comic.mapper.ComicTagMapper;
 import com.comicatlas.reading.service.ComicListQueryService;
+import com.comicatlas.reading.service.ComicListQueryNormalizer;
 import com.comicatlas.reading.service.ComicQueryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -36,6 +37,7 @@ public class ComicQueryServiceImpl implements ComicQueryService {
 
     @Override
     public IPage<ComicListVO> listComics(ComicListQuery query) {
+        ComicListQueryNormalizer.normalize(query);
         // 直接调用 loadPage（走代理，触发 @Cacheable），再组装为 IPage 返回
         ComicListPage comicListPage = comicListQueryService.loadPage(query);
         Page<ComicListVO> page = new Page<>(

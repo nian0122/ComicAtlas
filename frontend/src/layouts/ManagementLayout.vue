@@ -28,26 +28,21 @@
             <el-icon :size="18"><HomeFilled /></el-icon>
             <span>仓库控制台</span>
           </router-link>
-          <router-link to="/manage/trash" class="sidenav-link" active-class="active">
-            <el-icon :size="18"><Delete /></el-icon>
-            <span>回收站</span>
+          <router-link to="/manage/comics" class="sidenav-link" active-class="active">
+            <el-icon :size="18"><Collection /></el-icon>
+            <span>漫画管理</span>
           </router-link>
           <router-link to="/manage/tasks" class="sidenav-link" active-class="active">
             <el-icon :size="18"><List /></el-icon>
             <span>任务中心</span>
           </router-link>
-          <router-link to="/manage/comics" class="sidenav-link" active-class="active">
-            <el-icon :size="18"><Collection /></el-icon>
-            <span>漫画管理</span>
-          </router-link>
           <router-link to="/manage/storage" class="sidenav-link" active-class="active">
             <el-icon :size="18"><Coin /></el-icon>
             <span>存储统计</span>
           </router-link>
-
-          <router-link to="/manage/import" class="sidenav-link" active-class="active">
-            <el-icon :size="18"><UploadFilled /></el-icon>
-            <span>新建导入</span>
+          <router-link to="/manage/trash" class="sidenav-link" active-class="active">
+            <el-icon :size="18"><Delete /></el-icon>
+            <span>回收站</span>
           </router-link>
           <router-link to="/manage/metadata" class="sidenav-link" active-class="active">
             <el-icon :size="18"><Tickets /></el-icon>

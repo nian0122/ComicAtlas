@@ -48,6 +48,9 @@ export const useReaderStore = defineStore('reader', () => {
   }
 
   let loadSeq = 0
+  type ProgressPayload = { comicId: number; chapterId: number; pageNumber: number }
+  let pendingProgress: ProgressPayload | null = null
+  let progressSavePromise: Promise<boolean> | null = null
 
   async function loadChapter(chId: number) {
     // 请求序号闸:快速连续切章时 HTTP 响应可能乱序返回,
@@ -100,16 +103,34 @@ export const useReaderStore = defineStore('reader', () => {
    */
   async function saveProgress(): Promise<boolean> {
     if (!state.comicId || !state.chapterId) return false
-    try {
-      await historyApi.update(state.comicId, {
-        chapterId: state.chapterId,
-        pageNumber: state.currentPage,
-      })
-      useHistoryStore().fetchList().catch(() => {})
-      return true
-    } catch {
-      return false
+    pendingProgress = {
+      comicId: state.comicId,
+      chapterId: state.chapterId,
+      pageNumber: state.currentPage,
     }
+    if (progressSavePromise) return progressSavePromise
+    progressSavePromise = flushProgress()
+    return progressSavePromise
+  }
+
+  async function flushProgress(): Promise<boolean> {
+    let saved = true
+    try {
+      while (pendingProgress) {
+        const payload = pendingProgress
+        pendingProgress = null
+        await historyApi.update(payload.comicId, {
+          chapterId: payload.chapterId,
+          pageNumber: payload.pageNumber,
+        })
+        useHistoryStore().updateEntry(payload.comicId, payload.chapterId, payload.pageNumber)
+      }
+    } catch {
+      saved = false
+    } finally {
+      progressSavePromise = null
+    }
+    return saved
   }
 
   /**

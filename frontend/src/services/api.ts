@@ -306,6 +306,8 @@ export const adminApi = {
     sort?: 'totalSize' | 'hqSize' | 'lqSize' | 'title'
     order?: 'asc' | 'desc'
     keyword?: string
+    category?: string
+    tag?: string
   }) => api.get('/manage/admin/storage/comics', { params }),
   storageComic: (comicId: number) => api.get(`/manage/admin/storage/comics/${comicId}`),
   storageChapters: (comicId: number) => api.get(`/manage/admin/storage/comics/${comicId}/chapters`),

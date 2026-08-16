@@ -94,17 +94,32 @@ export const useHistoryStore = defineStore('history', () => {
     }
   }
 
-  /**
-   * 阅读器滚动/翻页后调用：先更新服务端记录，再刷新本地列表。
-   * 这样 Reading Center 永远是实时进度。
-   */
+  /** 只更新当前已加载的历史项，避免每次翻页都重新请求整页数据。 */
+  function updateEntry(comicId: number, chapterId: number, pageNumber: number): void {
+    const index = state.list.findIndex((item) => item.comicId === comicId)
+    if (index < 0) return
+    const item = state.list[index]
+    const next = {
+      ...item,
+      chapterId,
+      pageNumber,
+      progressPercent: item.totalPages > 0
+        ? Math.round((pageNumber / item.totalPages) * 100)
+        : item.progressPercent,
+      updatedAt: new Date().toISOString(),
+    }
+    state.list.splice(index, 1)
+    state.list.unshift(next)
+  }
+
+  /** 阅读器保存成功后同步已加载的本地项，不触发全量刷新。 */
   async function recordProgress(
     comicId: number,
     chapterId: number,
     pageNumber: number
   ): Promise<void> {
     await historyApi.update(comicId, { chapterId, pageNumber })
-    await fetchFirstPage()
+    updateEntry(comicId, chapterId, pageNumber)
   }
 
   /** 刷新历史页首屏，避免刷新时再次拉取全部记录。 */
@@ -115,6 +130,7 @@ export const useHistoryStore = defineStore('history', () => {
     fetchList,
     fetchFirstPage,
     fetchNextPage,
+    updateEntry,
     refresh,
     recordProgress,
   }

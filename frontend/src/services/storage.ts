@@ -19,7 +19,7 @@ function extractMessage(err: unknown): string {
 export const storageService = {
   async fetchComics(params: ComicStorageQuery) {
     const res = await adminApi.storageComics(params)
-    return res.data as { records: import('@/types').ComicStorageItem[]; total: number }
+    return res.data as { records: import('@/types').ComicStorageItem[]; total: number; current: number; pages: number }
   },
 
   async fetchSummary() {

@@ -374,10 +374,12 @@ onMounted(async () => {
       progressDirty.value = true
       if (saveDebounceTimer.value) clearTimeout(saveDebounceTimer.value)
       saveDebounceTimer.value = window.setTimeout(() => {
-        lastSyncedPage.value = newPage
         // 保存成功才清 dirty：期间若页面卸载，keepalive 兜底重发仍未确认的进度
         store.saveProgress().then((ok) => {
-          if (ok) progressDirty.value = false
+          if (ok && store.currentPage === newPage) {
+            lastSyncedPage.value = newPage
+            progressDirty.value = false
+          }
         })
       }, 300)
     }
@@ -395,8 +397,13 @@ watch(() => route.params.chapterId, (newId, oldId) => {
     saveDebounceTimer.value = null
   }
   if (store.comicId > 0 && store.currentPage !== lastSyncedPage.value) {
+    const chapterId = store.chapterId
+    const pageNumber = store.currentPage
     store.saveProgress().then((ok) => {
-      if (ok) progressDirty.value = false
+      if (ok && store.chapterId === chapterId && store.currentPage === pageNumber) {
+        lastSyncedPage.value = pageNumber
+        progressDirty.value = false
+      }
     })
   }
   loadCurrentChapter()
@@ -413,8 +420,13 @@ onBeforeUnmount(() => {
     clearTimeout(saveDebounceTimer.value)
   }
   if (store.comicId > 0 && store.currentPage !== lastSyncedPage.value) {
+    const chapterId = store.chapterId
+    const pageNumber = store.currentPage
     store.saveProgress().then((ok) => {
-      if (ok) progressDirty.value = false
+      if (ok && store.chapterId === chapterId && store.currentPage === pageNumber) {
+        lastSyncedPage.value = pageNumber
+        progressDirty.value = false
+      }
     })
   }
   preloadEngine.destroy()

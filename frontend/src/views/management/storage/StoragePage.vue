@@ -55,11 +55,11 @@ const {
 } = useStorageFilter(() => store.comicList, () => store.serverTotal)
 
 function reload() {
-  store.loadComics(buildQuery())
+  void store.loadComics(buildQuery())
 }
 
 watch(
-  [() => filterState.value.hqStatus, () => filterState.value.lqStatus, () => filterState.value.keyword, () => filterState.value.category, () => filterState.value.tag, sortState, page, pageSize],
+  [() => filterState.value.hqStatus, () => filterState.value.lqStatus, () => filterState.value.keyword, () => filterState.value.category, () => filterState.value.tag, () => sortState.value.field, () => sortState.value.order, page, pageSize],
   reload,
 )
 
