@@ -8,10 +8,11 @@ import (
 	"testing"
 )
 
-// 生成一张某边超过 WebP 上限 16383 的 JPEG，验证工具快速失败且不残留空输出。
-// 回归场景：漫画 247 的 2129x42294 超长图——旧实现完整解码+像素转换耗时数分钟，
-// 最后 libwebp 编码失败，且已 os.Create 的空输出文件残留（Java 端误捡为封面）。
-func TestOptimizeImageToWebP_oversizedDimension_failsFastNoResidue(t *testing.T) {
+// 生成一张某边超过 WebP 上限 16383 的 JPEG，验证工具会按比例缩放后成功输出。
+func TestOptimizeImageToWebP_oversizedDimension_resizesAndSucceeds(t *testing.T) {
+	if findImageMagick() == "" {
+		t.Skip("当前环境未安装 ImageMagick，Docker Worker 镜像会提供该依赖")
+	}
 	dir := t.TempDir()
 	src := filepath.Join(dir, "tall.jpg")
 	img := image.NewRGBA(image.Rect(0, 0, 32, 16400)) // 高 16400 > 16383，宽极小以加速
@@ -26,11 +27,11 @@ func TestOptimizeImageToWebP_oversizedDimension_failsFastNoResidue(t *testing.T)
 
 	out := filepath.Join(dir, "out", "tall.webp")
 	_, err = optimizeImageToWebP(src, out, 75)
-	if err == nil {
-		t.Fatal("超限图必须快速失败")
+	if err != nil {
+		t.Fatalf("超限图应缩放后成功: %v", err)
 	}
-	if _, statErr := os.Stat(out); !os.IsNotExist(statErr) {
-		t.Fatalf("失败后不得残留空输出文件: %v", statErr)
+	if stat, statErr := os.Stat(out); statErr != nil || stat.Size() == 0 {
+		t.Fatalf("缩放后应生成非空输出: %v", statErr)
 	}
 }
 
