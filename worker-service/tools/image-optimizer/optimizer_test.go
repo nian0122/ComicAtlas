@@ -6,7 +6,40 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
+
+// 大图占用的加权额度不足时必须等待，释放额度后继续；worker 本身仍保持并行。
+func TestPixelBudget_blocksOnlyWhenAggregatePixelsExceedCapacity(t *testing.T) {
+	budget := newPixelBudget(10)
+	releaseFirst := budget.acquire(6)
+	releaseSecond := budget.acquire(4)
+	releaseSecond()
+
+	started := make(chan struct{})
+	acquired := make(chan func(), 1)
+	go func() {
+		close(started)
+		acquired <- budget.acquire(5)
+	}()
+	<-started
+
+	select {
+	case release := <-acquired:
+		release()
+		t.Fatal("总权重超过预算时不应获取额度")
+	case <-time.After(50 * time.Millisecond):
+		// 符合预期：等待前一张大图释放额度。
+	}
+
+	releaseFirst()
+	select {
+	case release := <-acquired:
+		release()
+	case <-time.After(time.Second):
+		t.Fatal("释放像素预算后应唤醒等待中的 worker")
+	}
+}
 
 // 生成一张某边超过 WebP 上限 16383 的 JPEG，验证工具会按比例缩放后成功输出。
 func TestOptimizeImageToWebP_oversizedDimension_resizesAndSucceeds(t *testing.T) {

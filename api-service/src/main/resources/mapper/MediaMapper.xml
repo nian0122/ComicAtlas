@@ -67,7 +67,8 @@
     <!--
       元数据刷新合并专用批量 UPDATE：CASE id WHEN ... THEN ... 单条 SQL 一次更新整批媒体，
       消除逐行 updateById 的往返开销。更新列固定为扫描覆盖的字段（含可空视频字段，IMAGE 行显式清空）；
-      lq_status/lq_size 为 LQ 文件事实（快照实测为准），仅 LQ 模式（HQ 已删除）同样经此列校正。
+      lq_root/lq_path/lq_status/lq_size 为 LQ 文件事实（快照实测为准），
+      文件缺失时引用与状态必须同批清空。
       version 统一自增保持乐观锁语义（漂移校验在合并计划阶段完成）。
     -->
     <update id="updateRefreshBatch">
@@ -98,6 +99,12 @@
             END,
             audio_codec = CASE id
             <foreach collection="mediaList" item="m"> WHEN #{m.id} THEN #{m.audioCodec}</foreach>
+            END,
+            lq_root = CASE id
+            <foreach collection="mediaList" item="m"> WHEN #{m.id} THEN #{m.lqRoot}</foreach>
+            END,
+            lq_path = CASE id
+            <foreach collection="mediaList" item="m"> WHEN #{m.id} THEN #{m.lqPath}</foreach>
             END,
             lq_status = CASE id
             <foreach collection="mediaList" item="m"> WHEN #{m.id} THEN #{m.lqStatus}</foreach>

@@ -61,7 +61,8 @@ public class MediaOperationCompletionService {
     // ======================== LQ 生成 Completed ========================
 
     /**
-     * LQ 生成完成：IMAGE 页置 LQ READY、写 lq_root/lq_path 与回传的 lq_size，
+     * LQ 生成完成：仅 Worker 回传有效产物大小的 IMAGE 页置 READY；
+     * 未回传的跳过页置 NOT_GENERATED 并清空 LQ 引用，禁止数据库声称存在实际不存在的文件。
      * 完成后重算整本统计（lqSize/hqSize/totalPages/pageCount）。
      */
     public void applyLqCompleted(Long chapterId, List<LqSizeResult> lqSizes) {
@@ -70,25 +71,35 @@ public class MediaOperationCompletionService {
                         .eq(Media::getChapterId, chapterId)
                         .eq(Media::getMediaType, MEDIA_TYPE_IMAGE));
         Map<Long, Long> sizeByMediaId = lqSizes == null ? Map.of() : lqSizes.stream()
-                .filter(size -> size.mediaId() != null && size.sizeBytes() != null)
+                .filter(size -> size.mediaId() != null && size.sizeBytes() != null && size.sizeBytes() > 0)
                 .collect(Collectors.toMap(LqSizeResult::mediaId, LqSizeResult::sizeBytes, (a, b) -> a));
+        int readyPages = 0;
         for (Media media : mediaItems) {
-            LambdaUpdateWrapper<Media> mediaUpdate = new LambdaUpdateWrapper<Media>()
-                    .eq(Media::getId, media.getId())
-                    .set(Media::getLqStatus, LqStatus.READY)
-                    .set(Media::getLqRoot, StorageRootKeys.LQ);
-            String hqPath = media.getHqPath();
-            if (hqPath != null && !hqPath.isBlank()) {
-                mediaUpdate.set(Media::getLqPath, deriveLqPath(hqPath));
-            }
             Long lqSize = sizeByMediaId.get(media.getId());
             if (lqSize != null) {
-                mediaUpdate.set(Media::getLqSize, lqSize);
+                LambdaUpdateWrapper<Media> mediaUpdate = new LambdaUpdateWrapper<Media>()
+                        .eq(Media::getId, media.getId())
+                        .set(Media::getLqStatus, LqStatus.READY)
+                        .set(Media::getLqRoot, StorageRootKeys.LQ)
+                        .set(Media::getLqSize, lqSize);
+                String hqPath = media.getHqPath();
+                if (hqPath != null && !hqPath.isBlank()) {
+                    mediaUpdate.set(Media::getLqPath, deriveLqPath(hqPath));
+                }
+                mediaMapper.update(null, mediaUpdate);
+                readyPages++;
+            } else {
+                mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
+                        .eq(Media::getId, media.getId())
+                        .set(Media::getLqStatus, LqStatus.NOT_GENERATED)
+                        .set(Media::getLqRoot, null)
+                        .set(Media::getLqPath, null)
+                        .set(Media::getLqSize, 0L));
             }
-            mediaMapper.update(null, mediaUpdate);
         }
         comicStatsService.refreshByChapter(chapterId);
-        log.info("LQ 完成业务更新: chapterId={}, pages={}, lqSizes={}", chapterId, mediaItems.size(), sizeByMediaId.size());
+        log.info("LQ 完成业务更新: chapterId={}, readyPages={}, notGeneratedPages={}",
+                chapterId, readyPages, mediaItems.size() - readyPages);
     }
 
     // ======================== HQ 删除 Completed ========================
