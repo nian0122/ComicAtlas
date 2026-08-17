@@ -87,17 +87,21 @@ public class CoverGenerator {
                         "封面优化工具异常退出 exitCode=" + exitCode + ", comicId=" + comicId + ", stdout=" + result.stdout());
             }
 
+            // 输出按源文件名主干命名（Go 工具行为，与 LQ 产物命名一致）。
+            // 必须校验产物非空：超大/损坏源图会让工具写出 0 字节文件且退出码仍为 0，
+            // 直接落位会产出空封面且不会触发 generateCoverFromNode 的候选兜底
+            // （事故场景：漫画 247 的 44.5MB 首图产生 0 字节 cover.webp）。
             Path coverFile = thumbsDir.resolve(COVER_FILE_NAME);
-            try (Stream<Path> stream = Files.list(thumbsDir)) {
-                Path webpFile = stream
-                        .filter(f -> f.getFileName().toString().endsWith(".webp")
-                                && !f.getFileName().toString().equals(COVER_FILE_NAME))
-                        .findFirst()
-                        .orElse(null);
-                if (webpFile != null) {
-                    Files.move(webpFile, coverFile, StandardCopyOption.REPLACE_EXISTING);
-                }
+            Path webpFile = thumbsDir.resolve(stemOf(sourceImage.getFileName().toString()) + ".webp");
+            if (!Files.exists(webpFile)) {
+                throw new RuntimeException("封面优化未生成输出文件: " + webpFile.getFileName());
             }
+            if (Files.size(webpFile) == 0) {
+                Files.deleteIfExists(webpFile);
+                throw new RuntimeException("封面优化输出为空文件（源图过大或解码失败），已清理残留: "
+                        + webpFile.getFileName());
+            }
+            Files.move(webpFile, coverFile, StandardCopyOption.REPLACE_EXISTING);
 
             log.info("封面优化完成: comicId={}, output={}", comicId, coverFile);
         } catch (InterruptedException e) {
@@ -161,6 +165,12 @@ public class CoverGenerator {
         } finally {
             cleanupTempDir(tempDir);
         }
+    }
+
+    /** 取文件名主干（去最后一个扩展名）：Go 工具输出的 WebP 与输入文件同主干命名。 */
+    private static String stemOf(String fileName) {
+        int dot = fileName.lastIndexOf('.');
+        return dot > 0 ? fileName.substring(0, dot) : fileName;
     }
 
     /** 递归删除临时目录，失败仅告警不影响主流程 */
