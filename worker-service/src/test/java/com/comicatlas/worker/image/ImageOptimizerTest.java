@@ -13,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -73,5 +74,36 @@ class ImageOptimizerTest {
         verify(processRunner).run(captor.capture(), anyLong(), anyString());
         assertThat(captor.getValue().command()).as("force=false 不应传 -force")
                 .doesNotContain("-force");
+    }
+
+    @Test
+    @DisplayName("stdout 为空且退出码非 2 时抛出带退出码的异常（工具异常退出）")
+    void generateLq_emptyStdoutNon2Exit_throwsWithExitCode() throws Exception {
+        // Windows 崩溃退出码（0xC0000005 = 访问违规，Java int 表示为 -1073741819）
+        int crashExitCode = 0xC0000005;
+        when(processRunner.run(any(ProcessBuilder.class), anyLong(), anyString()))
+                .thenReturn(new ExternalProcessRunner.ExternalProcessResult(crashExitCode, ""));
+        Path hqDir = Files.createDirectories(tempDir.resolve("hq"));
+
+        assertThatThrownBy(() -> optimizer.generateLq(1L, 2L, hqDir, tempDir.resolve("lq"), false))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining(String.valueOf(crashExitCode))
+                .hasMessageContaining("stdout 为空");
+    }
+
+    @Test
+    @DisplayName("exitCode=1 但 stdout 含合法 JSON 时仍正常解析（部分失败场景）")
+    void generateLq_exit1WithValidJson_stillParses() throws Exception {
+        when(processRunner.run(any(ProcessBuilder.class), anyLong(), anyString()))
+                .thenReturn(new ExternalProcessRunner.ExternalProcessResult(1,
+                        "{\"total\":1,\"processed\":0,\"skipped\":0,\"failed\":1,\"pages\":["
+                                + "{\"pageNumber\":1,\"status\":\"failed\",\"reason\":\"decode error\"}]}"));
+        Path hqDir = Files.createDirectories(tempDir.resolve("hq"));
+
+        ImageOptimizer.RunResult parsed = optimizer.generateLq(1L, 2L, hqDir, tempDir.resolve("lq"), false);
+
+        assertThat(parsed.getFailed()).isEqualTo(1);
+        assertThat(parsed.getPages()).singleElement().satisfies(page ->
+                assertThat(page.getReason()).isEqualTo("decode error"));
     }
 }
