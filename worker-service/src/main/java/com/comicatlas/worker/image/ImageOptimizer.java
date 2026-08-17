@@ -93,12 +93,21 @@ public class ImageOptimizer {
                             + ", stdout=" + result.stdout());
         }
 
+        String stdout = result.stdout();
+        if (stdout == null || stdout.isBlank()) {
+            // Go 工具 -json 模式无条件输出 JSON，空 stdout 仅可能由进程在输出前异常终止导致
+            throw new RuntimeException(
+                    "图片优化工具异常退出: comicId=" + comicId + ", chapterId=" + chapterId
+                            + ", exitCode=" + exitCode + ", stdout 为空（疑似进程崩溃或被终止）");
+        }
+
         RunResult parsed;
         try {
-            parsed = objectMapper.readValue(result.stdout(), RunResult.class);
+            parsed = objectMapper.readValue(stdout, RunResult.class);
         } catch (Exception e) {
             throw new RuntimeException(
-                    "解析图片优化 JSON 失败: comicId=" + comicId + ", stdout=" + result.stdout(), e);
+                    "解析图片优化 JSON 失败: comicId=" + comicId + ", chapterId=" + chapterId
+                            + ", exitCode=" + exitCode + ", stdout=" + stdout, e);
         }
 
         log.info("图片优化完成: comicId={}, chapterId={}, total={}, processed={}, skipped={}, failed={}, elapsed={}ms",
