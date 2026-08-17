@@ -22,12 +22,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -94,6 +96,7 @@ class DirectoryImportHandlerSmokeTest {
 
         com.comicatlas.worker.image.CoverGenerator coverGen =
                 mock(com.comicatlas.worker.image.CoverGenerator.class);
+        mockCoverWritesValidFile(coverGen);
         DirectoryImportHandler handler = newHandler(metadata, coverGen);
 
         handler.handle(new ImportContext("DIRECTORY", sourceRoot, false, false), TASK_ID, COMIC_ID, mangaRoot);
@@ -128,7 +131,7 @@ class DirectoryImportHandlerSmokeTest {
 
         com.comicatlas.worker.image.CoverGenerator coverGen =
                 mock(com.comicatlas.worker.image.CoverGenerator.class);
-        doThrow(new RuntimeException("第一候选损坏")).doNothing()
+        doThrow(new RuntimeException("第一候选损坏")).doAnswer(writeValidCoverAnswer())
                 .when(coverGen).generateCover(anyLong(), any(Path.class));
         DirectoryImportHandler handler = newHandler(metadata, coverGen);
 
@@ -153,6 +156,7 @@ class DirectoryImportHandlerSmokeTest {
 
         com.comicatlas.worker.image.CoverGenerator coverGen =
                 mock(com.comicatlas.worker.image.CoverGenerator.class);
+        mockVideoCoverWritesValidFile(coverGen);
         DirectoryImportHandler handler = newHandler(metadata, coverGen);
 
         handler.handle(new ImportContext("DIRECTORY", sourceRoot, false, false), TASK_ID, COMIC_ID, mangaRoot);
@@ -160,6 +164,42 @@ class DirectoryImportHandlerSmokeTest {
         // 全视频：按 globalOrder 取首个视频抽帧
         verify(coverGen, times(1)).generateCoverFromVideo(COMIC_ID, mangaRoot.resolve("hq/50/1/ch1.mp4"));
         verify(coverGen, never()).generateCover(anyLong(), any(Path.class));
+    }
+
+    @Test
+    void emptyCoverProduct_stillFallsBackToNextCandidate() throws Exception {
+        writeSource("cover.jpg");
+        writeSource("001.jpg");
+
+        ComicMetadata metadata = new ComicMetadata("测试", "", "", List.of(), List.of(),
+                List.of(chapter("", 1, List.of(
+                        media("", "cover.jpg", 1, "IMAGE"),
+                        media("", "001.jpg", 2, "IMAGE")))));
+
+        // 第一候选"成功"但 cover.webp 为空（0 字节）→ 后置校验必须降级第二候选
+        com.comicatlas.worker.image.CoverGenerator coverGen =
+                mock(com.comicatlas.worker.image.CoverGenerator.class);
+        AtomicInteger callCount = new AtomicInteger();
+        doAnswer(invocation -> {
+            Path cover = mangaRoot.resolve("thumbs").resolve(String.valueOf(COMIC_ID)).resolve("cover.webp");
+            Files.createDirectories(cover.getParent());
+            if (callCount.incrementAndGet() == 1) {
+                Files.write(cover, new byte[0]);
+            } else {
+                Files.write(cover, new byte[]{0x52, 0x49, 0x46, 0x46});
+            }
+            return null;
+        }).when(coverGen).generateCover(anyLong(), any(Path.class));
+        DirectoryImportHandler handler = newHandler(metadata, coverGen);
+
+        handler.handle(new ImportContext("DIRECTORY", sourceRoot, false, false), TASK_ID, COMIC_ID, mangaRoot);
+
+        // 空产物不被当作成功，继续尝试第二候选
+        verify(coverGen, times(2)).generateCover(anyLong(), any(Path.class));
+        verify(coverGen).generateCover(COMIC_ID, mangaRoot.resolve("hq/50/1/cover.jpg"));
+        verify(coverGen).generateCover(COMIC_ID, mangaRoot.resolve("hq/50/1/001.jpg"));
+        assertTrue(Files.size(mangaRoot.resolve("thumbs/50/cover.webp")) > 0,
+                "最终封面应为第二候选的有效产物");
     }
 
     @Test
@@ -197,6 +237,26 @@ class DirectoryImportHandlerSmokeTest {
     }
 
     // ---- helpers ----
+
+    /** mock 的 generateCover 成功时写入有效 cover.webp（模拟真实产物，通过后置校验）。 */
+    private void mockCoverWritesValidFile(com.comicatlas.worker.image.CoverGenerator coverGen) throws Exception {
+        doAnswer(writeValidCoverAnswer()).when(coverGen).generateCover(anyLong(), any(Path.class));
+    }
+
+    /** mock 的 generateCoverFromVideo 成功时写入有效 cover.webp。 */
+    private void mockVideoCoverWritesValidFile(com.comicatlas.worker.image.CoverGenerator coverGen) throws Exception {
+        doAnswer(writeValidCoverAnswer()).when(coverGen).generateCoverFromVideo(anyLong(), any(Path.class));
+    }
+
+    /** 写入有效 cover.webp 的 Answer：生成器返回成功后产物必须真实存在。 */
+    private org.mockito.stubbing.Answer<Void> writeValidCoverAnswer() {
+        return invocation -> {
+            Path cover = mangaRoot.resolve("thumbs").resolve(String.valueOf(COMIC_ID)).resolve("cover.webp");
+            Files.createDirectories(cover.getParent());
+            Files.write(cover, new byte[]{0x52, 0x49, 0x46, 0x46});
+            return null;
+        };
+    }
 
     private DirectoryImportHandler newHandler(ComicMetadata metadata,
                                               com.comicatlas.worker.image.CoverGenerator coverGen) throws Exception {
