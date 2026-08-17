@@ -587,6 +587,8 @@ class MetadataRefreshServiceTest {
 
             // 决策 1A：以本地文件为准——LQ 文件缺失即校正 NOT_GENERATED
             assertThat(m101.getLqStatus()).isEqualTo(LqStatus.NOT_GENERATED);
+            assertThat(m101.getLqRoot()).isNull();
+            assertThat(m101.getLqPath()).isNull();
             assertThat(m101.getLqSize()).isZero();
         }
 
@@ -687,6 +689,8 @@ class MetadataRefreshServiceTest {
             service.applyValidatedSnapshot(applied);
 
             assertThat(m101.getLqStatus()).isEqualTo(LqStatus.NOT_GENERATED);
+            assertThat(m101.getLqRoot()).isNull();
+            assertThat(m101.getLqPath()).isNull();
             assertThat(m101.getLqSize()).isZero();
             assertThat(m101.getHqStatus()).isEqualTo(HqStatus.DELETED);
             assertThat(m101.getHqPath()).isNull();
