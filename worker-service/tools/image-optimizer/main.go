@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -37,11 +38,11 @@ type CLIConfig struct {
 // PageResult 单页处理结果
 type PageResult struct {
 	PageNumber int64   `json:"pageNumber"`
-	Status     string  `json:"status"`                // processed, skipped, failed
-	InputSize  int64   `json:"inputSize,omitempty"`   // bytes
-	OutputSize int64   `json:"outputSize,omitempty"`  // bytes
-	Ratio      float64 `json:"ratio,omitempty"`       // output/input * 100
-	Reason     string  `json:"reason,omitempty"`      // 失败/跳过原因
+	Status     string  `json:"status"`               // processed, skipped, failed
+	InputSize  int64   `json:"inputSize,omitempty"`  // bytes
+	OutputSize int64   `json:"outputSize,omitempty"` // bytes
+	Ratio      float64 `json:"ratio,omitempty"`      // output/input * 100
+	Reason     string  `json:"reason,omitempty"`     // 失败/跳过原因
 }
 
 // RunResult 整章运行结果
@@ -106,7 +107,6 @@ func main() {
 		fmt.Fprintf(os.Stderr, "错误: 扫描目录不存在: %s\n", cfg.ScanDir)
 		os.Exit(2)
 	}
-
 	start := time.Now()
 	result := run(cfg)
 	result.ElapsedMs = time.Since(start).Milliseconds()
@@ -232,6 +232,19 @@ func worker(id int, tasks <-chan imageTask, wg *sync.WaitGroup, cfg *CLIConfig, 
 		optResult, err := optimizeImageToWebP(task.HQPath, task.LQPath, cfg.Quality)
 		page := PageResult{PageNumber: task.PageNumber}
 		if err != nil {
+			var skipErr *ImageSkipError
+			if errors.As(err, &skipErr) {
+				atomic.AddInt32(&result.Skipped, 1)
+				page.Status = "skipped"
+				page.Reason = skipErr.Error()
+				if !cfg.Quiet {
+					fmt.Fprintf(os.Stderr, "[Worker %d] 跳过: %s → %s\n", id, task.RelativePath, skipErr.Error())
+				}
+				result.mu.Lock()
+				result.Pages = append(result.Pages, page)
+				result.mu.Unlock()
+				continue
+			}
 			atomic.AddInt32(&result.Failed, 1)
 			page.Status = "failed"
 			page.Reason = err.Error()
