@@ -14,6 +14,7 @@ import com.comicatlas.contract.common.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -22,6 +23,12 @@ public class TagManagementServiceImpl implements TagManagementService {
     private final TagMapper tagMapper;
     private final ComicTagMapper comicTagMapper;
     private final CacheEvictor cacheEvictor;
+
+    @Override
+    public List<TagDTO> listTags() {
+        return tagMapper.selectList(new LambdaQueryWrapper<Tag>().orderByAsc(Tag::getName))
+                .stream().map(this::toDTO).toList();
+    }
 
     @Override
     @Transactional

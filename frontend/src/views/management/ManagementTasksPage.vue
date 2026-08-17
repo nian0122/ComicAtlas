@@ -140,7 +140,7 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
-import { comicApi } from '@/services/api'
+import { managementComicApi } from '@/services/api'
 import { ElMessage } from 'element-plus'
 import { trackedTaskApi } from '@/services/management-capabilities'
 import { MANAGEMENT_TASK_TYPES, managementTaskStatusLabel, managementTaskTypeLabel } from '@/utils/management-task'
@@ -204,7 +204,7 @@ async function loadImportNames(records: readonly ManagementTaskVO[]): Promise<vo
     const items = await trackedTaskApi.getItems(task.id)
     const target = items.data.find((item) => item.targetType === 'COMIC')
     if (!target) return null
-    const comic = await comicApi.detail(target.targetId)
+    const comic = await managementComicApi.detail(target.targetId)
     return { taskId: task.id, title: comic.data.title }
   }))
   const names = new Map(taskNames.value)

@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.GetMapping;
 
 /**
  * 分类管理接口（管理域）。
@@ -25,6 +26,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 public class CategoryManagementController {
 
     private final CategoryManagementService categoryManagementService;
+
+    @GetMapping
+    public Result<java.util.List<CategoryDTO>> listCategories() {
+        return Result.ok(categoryManagementService.listCategories());
+    }
 
     /**
      * 创建分类，名称重复时返回 400。
