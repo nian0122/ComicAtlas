@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { reactive, computed, toRefs } from 'vue'
-import { comicApi } from '@/services/management'
+import { managementComicApi } from '@/services/management'
 import type { ComicListVO, ComicListQuery } from '@/types'
 
 export interface ManagementComicState {
@@ -39,7 +39,7 @@ export const useManagementComicStore = defineStore('management-comic', () => {
     state.error = null
 
     try {
-      const res = await comicApi.list(state.query)
+      const res = await managementComicApi.list(state.query)
       state.list = res.data.records || []
       state.total = res.data.total || 0
     } catch (err: unknown) {

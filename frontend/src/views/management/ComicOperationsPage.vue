@@ -85,7 +85,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { adminApi, comicApi, exportApi, hqApi, mediaOperationApi, mqApi, outboxApi, trashApi } from '@/services/api'
+import { adminApi, managementComicApi, exportApi, hqApi, mediaOperationApi, mqApi, outboxApi, trashApi } from '@/services/api'
 import { storageService } from '@/services/storage'
 import { lqOperationApi, trackedTaskApi } from '@/services/management-capabilities'
 import ComicStatusTag from '@/components/management/ComicStatusTag.vue'
@@ -120,7 +120,7 @@ const relatedActive = computed(() => relatedTasks.value.filter((task) => ['QUEUE
 function errorMessage(reason: unknown): string { if (axios.isAxiosError<{ message?: string }>(reason)) return reason.response?.data?.message ?? reason.message; return reason instanceof Error ? reason.message : '未知错误' }
 function isAllowed(operation: string): boolean { return eligibility.value?.allowed.includes(operation) ?? false }
 function recordStatus(status: ComicStatus): void { if (statusEvents.value.at(-1)?.status !== status) statusEvents.value.push({ status, at: new Date().toLocaleString() }) }
-async function loadState(silent = false): Promise<void> { if (!silent) loading.value = true; error.value = ''; try { const [detail, operations, tasks, stats, mqStats] = await Promise.all([comicApi.detail(comicId.value), mediaOperationApi.forComic(comicId.value), trackedTaskApi.list({ page: 1, size: 20, targetId: comicId.value }), outboxApi.stats(), mqApi.stats()]); comic.value = detail.data; eligibility.value = operations.data; relatedTasks.value = tasks.data.records; relatedTaskTotal.value = tasks.data.total; outbox.value = stats.data; mq.value = mqStats.data; recordStatus(detail.data.status) } catch (reason: unknown) { error.value = errorMessage(reason) } finally { if (!silent) loading.value = false } }
+async function loadState(silent = false): Promise<void> { if (!silent) loading.value = true; error.value = ''; try { const [detail, operations, tasks, stats, mqStats] = await Promise.all([managementComicApi.detail(comicId.value), mediaOperationApi.forComic(comicId.value), trackedTaskApi.list({ page: 1, size: 20, targetId: comicId.value }), outboxApi.stats(), mqApi.stats()]); comic.value = detail.data; eligibility.value = operations.data; relatedTasks.value = tasks.data.records; relatedTaskTotal.value = tasks.data.total; outbox.value = stats.data; mq.value = mqStats.data; recordStatus(detail.data.status) } catch (reason: unknown) { error.value = errorMessage(reason) } finally { if (!silent) loading.value = false } }
 async function selectComic(): Promise<void> { await router.replace({ query: { comicId: String(comicId.value) } }); statusEvents.value = []; await loadState() }
 async function runAction(label: string, action: () => Promise<unknown>): Promise<void> { loading.value = true; try { await action(); ElMessage.success(`${label}已提交`); activeTab.value = 'history'; await loadState(true) } catch (reason: unknown) { ElMessage.error(errorMessage(reason)) } finally { loading.value = false } }
 function generateLq(regenerate: boolean): void { void runAction(regenerate ? '重新生成 LQ' : '生成 LQ', () => lqOperationApi.generateComic(comicId.value, regenerate)) }
@@ -128,7 +128,7 @@ function deleteHq(): void { void runAction('删除 HQ', () => hqApi.deleteComic(
 function transcode(): void { void runAction('视频转码', () => adminApi.transcodeVideos(comicId.value)) }
 function refreshMetadata(): void { void runAction('刷新元数据', () => storageService.requestMetadataRefresh(comicId.value)) }
 function createExport(): void { void runAction('导出', () => exportApi.createExport(comicId.value)) }
-async function trashComic(): Promise<void> { await ElMessageBox.confirm('漫画将移入回收站，可在保留期内恢复。', '确认回收', { type: 'warning' }); await runAction('回收漫画', () => comicApi.delete(comicId.value)) }
+async function trashComic(): Promise<void> { await ElMessageBox.confirm('漫画将移入回收站，可在保留期内恢复。', '确认回收', { type: 'warning' }); await runAction('回收漫画', () => managementComicApi.delete(comicId.value)) }
 function restoreComic(): void { void runAction('恢复漫画', () => trashApi.restoreComic(comicId.value)) }
 async function purgeComic(): Promise<void> { await ElMessageBox.confirm('永久清理不可恢复，并受 7 天保留期限制。', '确认永久清理', { type: 'error' }); await runAction('永久清理', () => trashApi.purgeComic(comicId.value, purgeToken.value.trim())) }
 async function reconcile(repair: boolean): Promise<void> { try { const response = repair ? await trashApi.reconcileAndRepair('COMIC', comicId.value) : await trashApi.reconcile('COMIC', comicId.value); reconcileResult.value = response.data; ElMessage.success(repair ? '对账修复完成' : '对账完成') } catch (reason: unknown) { ElMessage.error(errorMessage(reason)) } }

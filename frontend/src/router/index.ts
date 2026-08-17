@@ -96,11 +96,6 @@ const router = createRouter({
           redirect: { name: 'manage-comics' },
         },
         {
-          path: 'structure',
-          name: 'manage-structure',
-          component: () => import('@/views/management/ComicStructurePage.vue'),
-        },
-        {
           path: 'comics',
           name: 'manage-comics',
           component: () => import('@/views/management/ComicListPage.vue'),
