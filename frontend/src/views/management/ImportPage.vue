@@ -72,7 +72,7 @@
           <span v-if="creating" class="spinner-sm" />
           <span>{{ creating ? '创建中...' : '开始导入' }}</span>
         </button>
-        <router-link to="/manage/import/tasks" class="ghost-link">查看任务中心 →</router-link>
+        <router-link to="/manage/tasks" class="ghost-link">查看任务中心 →</router-link>
       </div>
     </section>
 
@@ -230,7 +230,7 @@
           </div>
         </div>
       </div>
-      <router-link v-if="store.activeTasks.length > 3" to="/manage/import/tasks" class="more-link">
+      <router-link v-if="store.activeTasks.length > 3" to="/manage/tasks" class="more-link">
         查看全部 {{ store.activeTasks.length }} 个任务 →
       </router-link>
     </section>
@@ -356,7 +356,7 @@ async function doImport() {
     ElMessage.success(`导入任务已创建：${taskName(task)}`)
     sourcePath.value = ''
     // 工作流闭环：创建后直接跳到任务中心观察进度
-    router.push('/manage/import/tasks')
+    router.push('/manage/tasks')
   } catch (err: unknown) {
     ElMessage.error(errorMessage(err) || '创建导入任务失败')
   } finally {
@@ -447,7 +447,7 @@ async function doBatchImport() {
     scanResult.value = null
     selectedPaths.value = []
     previewExpanded.value = new Set()
-    router.push(`/manage/import/tasks?batchId=${result.batchId}`)
+    router.push(`/manage/tasks?batchId=${result.batchId}`)
   } catch (err: unknown) {
     ElMessage.error(errorMessage(err) || '批量导入失败')
   } finally {
