@@ -44,6 +44,11 @@ public class ManagementComicQueryServiceImpl implements ManagementComicQueryServ
         if (query.getTagMode() == null || query.getTagMode().isBlank()) {
             query.setTagMode("OR");
         }
+        if (!"asc".equalsIgnoreCase(query.getOrder())) {
+            query.setOrder("desc");
+        } else {
+            query.setOrder("asc");
+        }
         IPage<Comic> comics = comicMapper.selectPage(new Page<>(safePage, safeSize), query);
         Page<ManagementComicListVO> result = new Page<>(safePage, safeSize, comics.getTotal());
         result.setRecords(comics.getRecords().stream().map(this::toListVO).toList());

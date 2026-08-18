@@ -19,11 +19,12 @@ export interface ComicListQuery {
   keyword?: string
   tag?: string
   tags?: string[]
-  tagMode?: 'AND' | 'OR'
+  tagMode?: 'AND' | 'OR' | 'NOT'
   status?: string
   category?: string
   sourceType?: string
   sort?: 'createdAt' | 'updatedAt' | 'title' | 'pageCount' | 'lastReadTime'
+  order?: 'asc' | 'desc'
   page?: number
   size?: number
 }
