@@ -27,7 +27,7 @@ const hasActiveFilters = computed(() =>
 )
 
 function goToTaskCenter() {
-  router.push('/manage/import/tasks')
+  router.push('/manage/tasks')
 }
 
 function setFilter(patch: Partial<FilterState>) {

@@ -117,9 +117,9 @@ const router = createRouter({
           component: () => import('@/views/management/ImportPage.vue'),
         },
         {
+          // 兼容旧书签：旧任务页已删除，只跳转到统一任务中心。
           path: 'import/tasks',
-          name: 'manage-import-tasks',
-          component: () => import('@/views/management/TaskPage.vue'),
+          redirect: (to) => ({ name: 'manage-tasks', query: to.query }),
         },
         {
           path: 'storage',
