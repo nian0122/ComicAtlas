@@ -10,10 +10,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import com.comicatlas.contract.comic.dto.ComicListQuery;
 
 /** 管理域漫画查询接口，管理端不得跨域调用阅读服务查询接口。 */
 @RestController
@@ -23,13 +23,8 @@ public class ManagementComicQueryController {
     private final ManagementComicQueryService queryService;
 
     @GetMapping
-    public Result<IPage<ManagementComicListVO>> list(
-            @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) String status,
-            @RequestParam(required = false) String category,
-            @RequestParam(defaultValue = "1") long page,
-            @RequestParam(defaultValue = "20") long size) {
-        return Result.ok(queryService.list(keyword, status, category, page, size));
+    public Result<IPage<ManagementComicListVO>> list(ComicListQuery query) {
+        return Result.ok(queryService.list(query));
     }
 
     @GetMapping("/{id}")

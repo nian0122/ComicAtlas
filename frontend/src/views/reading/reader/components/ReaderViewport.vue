@@ -224,16 +224,25 @@ function onScrollerScroll() {
 }
 
 function scrollToPage(page: number): void {
-  if (!scrollerRef.value || props.pages.length === 0) return
+  if (props.pages.length === 0) return
   const targetPage = Math.max(1, Math.min(page, props.pages.length))
   const offset = targetPage === 1 ? 0 : prefixSums.value[targetPage - 2]
   isProgrammaticScroll = true
-  lastScrollOffset = offset
   pendingScrollDirection = null
 
-  // 使用 vue-virtual-scroller 官方按索引定位 API，避免自行按高度计算时
-  // 在 page-mode、不同宽高比媒体和虚拟列表重排后出现偏移。
-  scrollerRef.value?.scrollToItem(targetPage - 1, { smooth: false, align: 'start' })
+  if (props.pageMode) {
+    // 移动端 page-mode 使用窗口滚动；不能依赖虚拟列表内部 scroller 的
+    // scrollToItem，否则页码状态会更新，但窗口位置可能不会移动。
+    const viewportTop = viewportRef.value?.getBoundingClientRect().top ?? 0
+    const targetTop = Math.max(0, window.scrollY + viewportTop + offset)
+    lastScrollOffset = targetTop
+    window.scrollTo({ top: targetTop, left: 0, behavior: 'auto' })
+  } else {
+    if (!scrollerRef.value) return
+    lastScrollOffset = offset
+    // 桌面端继续使用虚拟列表官方定位 API。
+    scrollerRef.value.scrollToItem(targetPage - 1, { smooth: false, align: 'start' })
+  }
 
   // 取消旧计时器，防止新旧 scrollToPage 调用互相干扰
   if (programmaticScrollTimer != null) {
