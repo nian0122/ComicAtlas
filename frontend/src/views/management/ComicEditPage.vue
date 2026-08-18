@@ -73,7 +73,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
-import { managementComicApi, tagApi } from '@/services/management'
+import { managementComicApi, managementTagApi } from '@/services/management'
 import { useCategoryStore } from '@/stores/management/category'
 import type {
   ComicMetadataDTO,
@@ -139,7 +139,7 @@ async function loadData() {
     const [metadataRes, tagsRes, allTagsRes] = await Promise.all([
       managementComicApi.getMetadata(comicId),
       managementComicApi.getTags(comicId),
-      tagApi.list(),
+      managementTagApi.list(),
       categoryStore.fetchList(),
     ])
     const metadata = metadataRes.data as ComicMetadataDTO
@@ -189,7 +189,7 @@ async function onCreateTag() {
     }
   } else {
     try {
-      const res = await tagApi.create({ name } as TagCreateDTO)
+      const res = await managementTagApi.create({ name } as TagCreateDTO)
       const newTag = res.data as TagDTO
       allTags.value.push(newTag)
       selectedTagIds.value.push(newTag.id)

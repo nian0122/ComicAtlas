@@ -194,7 +194,7 @@ import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { Search, PictureFilled, WarningFilled, CircleClose, Sort } from '@element-plus/icons-vue'
 import { useComicStore } from '@/stores/comic-store'
-import { tagApi, categoryApi } from '@/services/management'
+import { readingTagApi, readingCategoryApi } from '@/services/api'
 import { useBreakpoint, BREAKPOINTS } from '@/composables/useBreakpoint'
 import ComicPoster from '@/components/reading/comic/ComicPoster.vue'
 import { toPosterStatus } from '@/components/reading/comic/poster-status'
@@ -274,7 +274,7 @@ function toggleTag(tagName: string) {
 
 async function loadTags() {
   try {
-    const res = await tagApi.list()
+    const res = await readingTagApi.list()
     allTags.value = (res.data as TagDTO[]) || []
   } catch (err: unknown) {
     allTags.value = []
@@ -283,7 +283,7 @@ async function loadTags() {
 
 async function loadCategories() {
   try {
-    const res = await categoryApi.list()
+    const res = await readingCategoryApi.list()
     allCategories.value = (res.data as CategoryDTO[]) || []
   } catch (err: unknown) {
     allCategories.value = []

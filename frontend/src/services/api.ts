@@ -81,19 +81,10 @@ api.interceptors.response.use(
 // ========== 阅读域（/api/**，网关路由至 reading-service） ==========
 
 export const comicApi = {
-  list: (params: any) => api.get('/manage/comics', { params }),
-  detail: (id: number) => api.get<ComicDetailVO>(`/manage/comics/${id}`),
-  getMetadata: (id: number) => api.get(`/manage/comics/${id}/metadata`),
-  getTags: (id: number) => api.get(`/manage/comics/${id}/tags`),
-  /** 阅读端列表/详情查询由阅读服务提供；写操作（delete/updateMetadata/updateTags/batchUpdate）见管理域。 */
-  delete: (id: number) => api.delete(`/manage/comics/${id}`),
-  updateMetadata: (id: number, data: ComicMetadataUpdateDTO) =>
-    api.put(`/manage/comics/${id}/metadata`, data),
-  updateTags: (id: number, data: ComicTagUpdateDTO) =>
-    api.put(`/manage/comics/${id}/tags`, data),
-  /** 批量更新漫画分类和标签 */
-  batchUpdate: (data: BatchComicUpdateDTO) =>
-    api.post('/manage/comics/batch/update', data),
+  list: (params: any) => api.get('/comics', { params }),
+  detail: (id: number) => api.get<ComicDetailVO>(`/comics/${id}`),
+  getMetadata: (id: number) => api.get(`/comics/${id}/metadata`),
+  getTags: (id: number) => api.get(`/comics/${id}/tags`),
 }
 
 export const catalogApi = {
@@ -132,13 +123,22 @@ export const historyApi = {
     api.put(`/history/${comicId}`, data),
 }
 
-export const tagApi = {
+/** 阅读域筛选项查询，供阅读端使用。 */
+export const readingTagApi = {
+  list: () => api.get('/tags'),
+}
+
+export const readingCategoryApi = {
+  list: () => api.get('/categories'),
+}
+
+export const managementTagApi = {
   list: () => api.get('/manage/tags'),
   create: (data: TagCreateDTO) => api.post('/manage/tags', data),
   delete: (id: number) => api.delete(`/manage/tags/${id}`),
 }
 
-export const categoryApi = {
+export const managementCategoryApi = {
   list: () => api.get('/manage/categories'),
   create: (name: string) => api.post('/manage/categories', null, { params: { name } }),
   update: (id: number, name: string) => api.put(`/manage/categories/${id}`, null, { params: { name } }),
