@@ -191,7 +191,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { Search, PictureFilled, WarningFilled, CircleClose, Sort } from '@element-plus/icons-vue'
 import { useComicStore } from '@/stores/comic-store'
 import { readingTagApi, readingCategoryApi } from '@/services/api'
@@ -201,6 +201,7 @@ import { toPosterStatus } from '@/components/reading/comic/poster-status'
 import type { CategoryDTO, ComicListQuery, ComicListVO, TagDTO } from '@/types'
 
 const router = useRouter()
+const route = useRoute()
 const store = useComicStore()
 
 const keyword = ref('')
@@ -306,11 +307,49 @@ function onSearch() {
     tags: selectedTags.value.length > 0 ? selectedTags.value : undefined,
     tagMode: selectedTags.value.length > 1 ? tagMode.value : undefined,
   })
+  persistFiltersToRoute()
 }
 
 function onPageChange(page: number) {
   store.updateQuery({ page })
   store.fetchList()
+}
+
+function restoreFiltersFromStore() {
+  const routeTags = route.query.tags
+  const hasRouteFilters = ['keyword', 'category', 'tags', 'tagMode', 'sort']
+    .some((key) => route.query[key] !== undefined)
+  const tagsFromRoute = Array.isArray(routeTags)
+    ? routeTags.map(String)
+    : routeTags
+      ? [String(routeTags)]
+      : undefined
+  keyword.value = hasRouteFilters ? String(route.query.keyword || '') : (store.query.keyword || '')
+  categoryFilter.value = hasRouteFilters ? String(route.query.category || '') : (store.query.category || '')
+  selectedTags.value = hasRouteFilters ? (tagsFromRoute || []) : [...(store.query.tags || [])]
+  tagMode.value = (hasRouteFilters ? route.query.tagMode : store.query.tagMode) === 'AND' ? 'AND' : 'OR'
+  sort.value = (hasRouteFilters ? route.query.sort : store.query.sort) as NonNullable<ComicListQuery['sort']> || 'createdAt'
+  store.updateQuery({
+    keyword: keyword.value || undefined,
+    category: categoryFilter.value || undefined,
+    tags: selectedTags.value.length > 0 ? selectedTags.value : undefined,
+    tagMode: selectedTags.value.length > 1 ? tagMode.value : undefined,
+    sort: sort.value,
+    page: 1,
+  })
+}
+
+function persistFiltersToRoute() {
+  void router.replace({
+    query: {
+      ...route.query,
+      keyword: keyword.value || undefined,
+      category: categoryFilter.value || undefined,
+      tags: selectedTags.value.length > 0 ? selectedTags.value : undefined,
+      tagMode: selectedTags.value.length > 1 ? tagMode.value : undefined,
+      sort: sort.value || undefined,
+    },
+  })
 }
 
 function goDetail(id: string | number) {
@@ -329,8 +368,8 @@ function posterSubtitle(comic: ComicListVO): string {
 }
 
 onMounted(() => {
-  // 重新进入漫画库时清除上一次页面残留的分页条件，避免界面与实际请求不一致。
-  store.resetQuery()
+  // 返回漫画库时恢复 Store 中的筛选条件，避免控件与实际查询状态不一致。
+  restoreFiltersFromStore()
   loadTags()
   loadCategories()
   store.fetchList()

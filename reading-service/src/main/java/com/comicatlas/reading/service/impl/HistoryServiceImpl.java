@@ -67,7 +67,7 @@ public class HistoryServiceImpl implements HistoryService {
                 ? Map.of()
                 : chapterMapper.selectList(
                         new LambdaQueryWrapper<Chapter>()
-                            .select(Chapter::getId, Chapter::getChapterNo)
+                            .select(Chapter::getId, Chapter::getChapterNo, Chapter::getPageCount)
                             .in(Chapter::getId, chapterIds))
                     .stream()
                     .collect(Collectors.toMap(Chapter::getId, Function.identity(), (first, duplicate) -> first));
@@ -113,7 +113,7 @@ public class HistoryServiceImpl implements HistoryService {
         Chapter chapter = history.getChapterId() != null
                 ? chapterMapper.selectOne(
                         new LambdaQueryWrapper<Chapter>()
-                            .select(Chapter::getId, Chapter::getChapterNo)
+                            .select(Chapter::getId, Chapter::getChapterNo, Chapter::getPageCount)
                             .eq(Chapter::getId, history.getChapterId()))
                 : null;
         return buildVO(history,
@@ -179,6 +179,15 @@ public class HistoryServiceImpl implements HistoryService {
         Chapter chapter = history.getChapterId() != null ? chapterMap.get(history.getChapterId()) : null;
         if (chapter != null) {
             historyVO.setChapterNo(chapter.getChapterNo());
+            // pageNumber 是章节内页码，历史记录必须按当前章节页数计算进度。
+            Integer chapterPageCount = chapter.getPageCount();
+            if (chapterPageCount != null && chapterPageCount > 0) {
+                historyVO.setTotalPages(chapterPageCount);
+                if (history.getPageNumber() != null) {
+                    historyVO.setProgressPercent(
+                            Math.min(PERCENT_SCALE, history.getPageNumber() * PERCENT_SCALE / chapterPageCount));
+                }
+            }
         }
 
         return historyVO;
@@ -202,7 +211,7 @@ public class HistoryServiceImpl implements HistoryService {
                 ? Map.of()
                 : chapterMapper.selectList(
                                 new LambdaQueryWrapper<Chapter>()
-                                        .select(Chapter::getId, Chapter::getChapterNo)
+                                        .select(Chapter::getId, Chapter::getChapterNo, Chapter::getPageCount)
                                         .in(Chapter::getId, chapterIds))
                         .stream()
                         .collect(Collectors.toMap(Chapter::getId, Function.identity(), (first, duplicate) -> first));

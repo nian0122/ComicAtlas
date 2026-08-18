@@ -284,6 +284,13 @@ async function loadCurrentChapter(preservePage = false, restoreProgress = true) 
       }
     }
 
+    // 移动端连续滚动模式不监听 currentPage 回流，首次恢复历史进度后必须主动定位，
+    // 否则页码状态已是第 N 页，但窗口仍停留在章节开头。
+    if (!isPagedMode.value) {
+      await nextTick()
+      viewportComponentRef.value?.scrollToPage?.(store.currentPage)
+    }
+
     if (loadToken !== chapterLoadToken || Number(route.params.chapterId) !== chapterId) return
 
     try {

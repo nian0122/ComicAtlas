@@ -33,15 +33,17 @@ public class ManagementComicQueryServiceImpl implements ManagementComicQueryServ
     private final FileUrlResolver fileUrlResolver;
 
     @Override
-    public IPage<ManagementComicListVO> list(String keyword, String status, String category, long page, long size) {
-        long safePage = Math.max(1L, page);
-        long safeSize = Math.min(Math.max(1L, size), 100L);
-        ComicListQuery query = new ComicListQuery();
-        query.setKeyword(keyword);
-        query.setStatus(status);
-        query.setCategory(category);
+    public IPage<ManagementComicListVO> list(ComicListQuery query) {
+        if (query == null) {
+            query = new ComicListQuery();
+        }
+        long safePage = query.getPage() == null ? 1L : Math.max(1L, query.getPage());
+        long safeSize = query.getSize() == null ? 20L : Math.min(Math.max(1L, query.getSize()), 100L);
         query.setPage((int) safePage);
         query.setSize((int) safeSize);
+        if (query.getTagMode() == null || query.getTagMode().isBlank()) {
+            query.setTagMode("OR");
+        }
         IPage<Comic> comics = comicMapper.selectPage(new Page<>(safePage, safeSize), query);
         Page<ManagementComicListVO> result = new Page<>(safePage, safeSize, comics.getTotal());
         result.setRecords(comics.getRecords().stream().map(this::toListVO).toList());

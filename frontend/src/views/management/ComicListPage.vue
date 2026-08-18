@@ -298,6 +298,15 @@ function resetFilters() {
   store.fetchList()
 }
 
+function restoreFiltersFromStore() {
+  filters.keyword = store.query.keyword || ''
+  filters.category = store.query.category || ''
+  filters.status = store.query.status || ''
+  filters.tags = [...(store.query.tags || [])]
+  filters.tagMode = store.query.tagMode === 'AND' ? 'AND' : 'OR'
+  filters.sort = store.query.sort || 'createdAt'
+}
+
 function onPageChange(page: number) {
   selectedIds.value = []
   store.updateQuery({ page })
@@ -305,6 +314,7 @@ function onPageChange(page: number) {
 }
 
 onMounted(() => {
+  restoreFiltersFromStore()
   categoryStore.fetchList()
   tagStore.fetchList()
   store.fetchList()

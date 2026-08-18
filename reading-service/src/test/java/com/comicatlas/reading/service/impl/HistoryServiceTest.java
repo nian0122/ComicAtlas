@@ -124,6 +124,22 @@ class HistoryServiceTest {
     }
 
     @Test
+    void historyVO_shouldCalculateProgressByCurrentChapterPageCount() {
+        ReadingHistory history = history(1L, 10L, 100L);
+        history.setPageNumber(8);
+        when(historyMapper.selectList(any())).thenReturn(List.of(history));
+        when(comicMapper.selectList(any())).thenReturn(List.of(comic(10L, "火影")));
+        Chapter chapter = chapter(100L, "1");
+        chapter.setPageCount(20);
+        when(chapterMapper.selectList(any())).thenReturn(List.of(chapter));
+
+        HistoryVO result = service.listHistory().get(0);
+
+        assertEquals(20, result.getTotalPages());
+        assertEquals(40, result.getProgressPercent());
+    }
+
+    @Test
     void upsertHistory_shouldValidateOwnershipAndUseAtomicMapperUpsert() {
         Comic comic = comic(10L, "火影");
         comic.setStatus(ComicStatus.READY);
