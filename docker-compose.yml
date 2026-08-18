@@ -106,7 +106,8 @@ services:
     build:
       context: .
       dockerfile: worker-service/Dockerfile
-    mem_limit: 768m
+    # JVM 与四路图片解码/WebP 编码共用容器内存；像素预算会对大图自动降并发。
+    mem_limit: 2g
     container_name: comicatlas-worker
     restart: unless-stopped
     environment:
@@ -133,6 +134,8 @@ services:
       FFMPEG_PATH: /usr/bin/ffmpeg
       FFPROBE_PATH: /usr/bin/ffprobe
       IMAGE_OPTIMIZER_PATH: /opt/comicatlas/tools/image-optimizer
+      LQ_WORKERS: ${LQ_WORKERS:-4}
+      LQ_MAX_INFLIGHT_PIXELS: ${LQ_MAX_INFLIGHT_PIXELS:-80000000}
     volumes:
       # 整个 MANGA_ROOT 共享，既保证导入源路径可见，也覆盖 HQ/LQ/临时/回收站/导出目录。
       - ${MANGA_ROOT:-./manga}:/storage

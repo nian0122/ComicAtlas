@@ -184,6 +184,8 @@ public class WorkerConfig {
     @Data
     public static class Image {
         private long lqTimeoutSeconds = 600;
+        /** 所有图片 worker 同时处于解码/编码阶段的总像素预算。 */
+        private long maxInflightPixels = 80_000_000L;
     }
 
     /** 媒体分析配置。 */
@@ -271,8 +273,8 @@ public class WorkerConfig {
                 || transcode.getEncoderProbeTimeoutSeconds() <= 0) {
             throw new IllegalArgumentException("worker.transcode 超时时间必须为正数");
         }
-        if (image == null || image.getLqTimeoutSeconds() <= 0) {
-            throw new IllegalArgumentException("worker.image.lqTimeoutSeconds 必须为正数");
+        if (image == null || image.getLqTimeoutSeconds() <= 0 || image.getMaxInflightPixels() <= 0) {
+            throw new IllegalArgumentException("worker.image LQ 超时与在途像素预算必须为正数");
         }
         if (media == null || media.getFfprobeTimeoutSeconds() <= 0) {
             throw new IllegalArgumentException("worker.media.ffprobeTimeoutSeconds 必须为正数");

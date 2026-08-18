@@ -77,6 +77,23 @@ class ImageOptimizerTest {
     }
 
     @Test
+    @DisplayName("命令行保留四路 worker 并传递在途像素预算")
+    void generateLq_commandContainsWorkersAndPixelBudget() throws Exception {
+        WorkerConfig.Image imageConfig = new WorkerConfig.Image();
+        imageConfig.setMaxInflightPixels(80_000_000L);
+        when(config.getImage()).thenReturn(imageConfig);
+        Path hqDir = Files.createDirectories(tempDir.resolve("hq"));
+
+        optimizer.generateLq(1L, 2L, hqDir, tempDir.resolve("lq"), false);
+
+        ArgumentCaptor<ProcessBuilder> captor = ArgumentCaptor.forClass(ProcessBuilder.class);
+        verify(processRunner).run(captor.capture(), anyLong(), anyString());
+        assertThat(captor.getValue().command())
+                .containsSubsequence("-workers", "4")
+                .containsSubsequence("-max-inflight-pixels", "80000000");
+    }
+
+    @Test
     @DisplayName("stdout 为空且退出码非 2 时抛出带退出码的异常（工具异常退出）")
     void generateLq_emptyStdoutNon2Exit_throwsWithExitCode() throws Exception {
         // Windows 崩溃退出码（0xC0000005 = 访问违规，Java int 表示为 -1073741819）
@@ -89,6 +106,19 @@ class ImageOptimizerTest {
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining(String.valueOf(crashExitCode))
                 .hasMessageContaining("stdout 为空");
+    }
+
+    @Test
+    @DisplayName("exitCode=137 时明确报告容器内存不足")
+    void generateLq_exit137_reportsContainerOutOfMemory() throws Exception {
+        when(processRunner.run(any(ProcessBuilder.class), anyLong(), anyString()))
+                .thenReturn(new ExternalProcessRunner.ExternalProcessResult(137, ""));
+        Path hqDir = Files.createDirectories(tempDir.resolve("hq"));
+
+        assertThatThrownBy(() -> optimizer.generateLq(1L, 2L, hqDir, tempDir.resolve("lq"), false))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("exitCode=137")
+                .hasMessageContaining("容器内存不足");
     }
 
     @Test

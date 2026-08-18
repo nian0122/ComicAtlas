@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/chai2010/webp"
@@ -41,6 +42,42 @@ func (e *ImageSkipError) Error() string { return e.Reason }
 // 不会把整章永久降为单线程。
 var largeImageSemaphore = make(chan struct{}, 1)
 
+// pixelBudget 是按图片像素数加权的并发门。worker 数仍决定最大 CPU 并发度，
+// 但多张大图不会在同一时刻把解码与 WebP 编码缓冲全部展开。
+type pixelBudget struct {
+	capacity int64
+	used     int64
+	mu       sync.Mutex
+	cond     *sync.Cond
+}
+
+func newPixelBudget(capacity int64) *pixelBudget {
+	budget := &pixelBudget{capacity: capacity}
+	budget.cond = sync.NewCond(&budget.mu)
+	return budget
+}
+
+func (b *pixelBudget) acquire(pixels int64) func() {
+	weight := pixels
+	if weight < 1 || weight > b.capacity {
+		// 无法预检尺寸的图片以独占预算处理；单图超预算时也不会永久阻塞。
+		weight = b.capacity
+	}
+	b.mu.Lock()
+	for b.used+weight > b.capacity {
+		b.cond.Wait()
+	}
+	b.used += weight
+	b.mu.Unlock()
+
+	return func() {
+		b.mu.Lock()
+		b.used -= weight
+		b.cond.Broadcast()
+		b.mu.Unlock()
+	}
+}
+
 // OptimizeResult 包含单文件的优化结果
 type OptimizeResult struct {
 	InputSize  int64 // 原始文件大小（字节）
@@ -49,10 +86,16 @@ type OptimizeResult struct {
 
 // optimizeImageToWebP 将图片转换为 WebP 格式
 func optimizeImageToWebP(filePath string, outputPath string, quality int) (OptimizeResult, error) {
-	return optimizeImageToWebPWithFfmpeg(filePath, outputPath, quality, "ffmpeg")
+	return optimizeImageToWebPWithBudget(filePath, outputPath, quality, nil)
 }
 
-func optimizeImageToWebPWithFfmpeg(filePath string, outputPath string, quality int, ffmpegPath string) (OptimizeResult, error) {
+func optimizeImageToWebPWithBudget(filePath string, outputPath string, quality int,
+	decodeBudget *pixelBudget) (OptimizeResult, error) {
+	return optimizeImageToWebPWithFfmpeg(filePath, outputPath, quality, "ffmpeg", decodeBudget)
+}
+
+func optimizeImageToWebPWithFfmpeg(filePath string, outputPath string, quality int,
+	ffmpegPath string, decodeBudget *pixelBudget) (OptimizeResult, error) {
 	result := OptimizeResult{}
 
 	// 获取源文件大小
@@ -65,9 +108,20 @@ func optimizeImageToWebPWithFfmpeg(filePath string, outputPath string, quality i
 	// 先读取文件头。超大 JPEG/PNG 必须交给 FFmpeg 在解码阶段缩放，
 	// 不能先由 image.Decode 完整展开到内存后再缩放。
 	ext := strings.ToLower(filepath.Ext(filePath))
-	if width, height, ok := readImageDimension(filePath, ext); ok &&
-		(int64(width)*int64(height) > maxDecodePixels || width > maxWebpDimension || height > maxWebpDimension) {
-		return result, &ImageSkipError{Reason: fmt.Sprintf("图片尺寸超出 LQ WebP 处理范围，已跳过: %dx%d", width, height)}
+	width, height, hasDimensions := readImageDimension(filePath, ext)
+	if hasDimensions && (int64(width)*int64(height) > maxDecodePixels ||
+		width > maxWebpDimension || height > maxWebpDimension) {
+		return result, &ImageSkipError{Reason: fmt.Sprintf(
+			"图片尺寸超出 LQ WebP 处理范围，已跳过: %dx%d", width, height)}
+	}
+
+	if decodeBudget != nil {
+		pixels := int64(0)
+		if hasDimensions {
+			pixels = int64(width) * int64(height)
+		}
+		release := decodeBudget.acquire(pixels)
+		defer release()
 	}
 
 	// 打开源文件
@@ -153,6 +207,14 @@ func readImageDimension(filePath, ext string) (int, int, bool) {
 		}
 	case ".png":
 		if cfg, decodeErr := png.DecodeConfig(file); decodeErr == nil {
+			width, height = cfg.Width, cfg.Height
+		}
+	case ".webp":
+		if cfg, decodeErr := webp.DecodeConfig(file); decodeErr == nil {
+			width, height = cfg.Width, cfg.Height
+		}
+	case ".gif":
+		if cfg, decodeErr := gif.DecodeConfig(file); decodeErr == nil {
 			width, height = cfg.Width, cfg.Height
 		}
 	default:
