@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { reactive, toRefs } from 'vue'
-import { tagApi } from '@/services/management'
+import { managementTagApi } from '@/services/management'
 import type { TagDTO } from '@/types'
 
 export interface TagState {
@@ -20,7 +20,7 @@ export const useTagStore = defineStore('tag', () => {
     state.loading = true
     state.error = null
     try {
-      const res = await tagApi.list()
+      const res = await managementTagApi.list()
       state.list = ((res.data as TagDTO[]) || []).filter((t): t is TagDTO => t != null)
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
@@ -32,14 +32,14 @@ export const useTagStore = defineStore('tag', () => {
   }
 
   async function create(name: string) {
-    const res = await tagApi.create({ name })
+    const res = await managementTagApi.create({ name })
     const dto = res.data as TagDTO | null
     if (dto) state.list.push(dto)
     return dto
   }
 
   async function deleteTag(id: number) {
-    await tagApi.delete(id)
+    await managementTagApi.delete(id)
     state.list = state.list.filter((t) => t && t.id !== id)
   }
 

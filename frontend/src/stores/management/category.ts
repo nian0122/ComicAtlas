@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { reactive, toRefs } from 'vue'
-import { categoryApi } from '@/services/management'
+import { managementCategoryApi } from '@/services/management'
 import type { CategoryDTO } from '@/types'
 
 export interface CategoryState {
@@ -20,7 +20,7 @@ export const useCategoryStore = defineStore('category', () => {
     state.loading = true
     state.error = null
     try {
-      const res = await categoryApi.list()
+      const res = await managementCategoryApi.list()
       state.list = ((res.data as CategoryDTO[]) || []).filter((c): c is CategoryDTO => c != null)
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
@@ -32,14 +32,14 @@ export const useCategoryStore = defineStore('category', () => {
   }
 
   async function create(name: string) {
-    const res = await categoryApi.create(name)
+    const res = await managementCategoryApi.create(name)
     const dto = res.data as CategoryDTO | null
     if (dto) state.list.push(dto)
     return dto
   }
 
   async function update(id: number, name: string) {
-    const res = await categoryApi.update(id, name)
+    const res = await managementCategoryApi.update(id, name)
     const updated = res.data as CategoryDTO | null
     if (!updated) return
     const idx = state.list.findIndex((c) => c && c.id === id)
@@ -50,7 +50,7 @@ export const useCategoryStore = defineStore('category', () => {
   }
 
   async function remove(id: number) {
-    await categoryApi.delete(id)
+    await managementCategoryApi.delete(id)
     state.list = state.list.filter((c) => c && c.id !== id)
   }
 
