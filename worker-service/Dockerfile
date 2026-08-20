@@ -27,7 +27,6 @@ FROM eclipse-temurin:21-jre-jammy
 WORKDIR /app
 RUN apt-get update \
     && apt-get install --no-install-recommends -y \
-        aria2 \
         ca-certificates \
         ffmpeg \
         libwebp7 \
