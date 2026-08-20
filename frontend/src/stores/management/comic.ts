@@ -23,6 +23,7 @@ export const useManagementComicStore = defineStore('management-comic', () => {
       sort: 'createdAt',
     },
   })
+  let requestSequence = 0
 
   const hasMore = computed(() => state.list.length < state.total)
 
@@ -35,20 +36,26 @@ export const useManagementComicStore = defineStore('management-comic', () => {
   }
 
   async function fetchList() {
+    const requestId = ++requestSequence
     state.loading = true
     state.error = null
 
     try {
-      const res = await managementComicApi.list(state.query)
+      const res = await managementComicApi.list({
+        ...state.query,
+        tags: state.query.tags ? [...state.query.tags] : undefined,
+      })
+      if (requestId !== requestSequence) return
       state.list = res.data.records || []
       state.total = res.data.total || 0
     } catch (err: unknown) {
+      if (requestId !== requestSequence) return
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
       state.error = msg || '加载漫画列表失败'
       state.list = []
       state.total = 0
     } finally {
-      state.loading = false
+      if (requestId === requestSequence) state.loading = false
     }
   }
 
