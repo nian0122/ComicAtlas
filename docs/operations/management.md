@@ -1,10 +1,10 @@
 # ComicAtlas 部署运维手册
 
-**更新日期：** 2026-08-12
+**更新日期：** 2026-08-16
 **状态：** 生效
 **维护者：** ComicAtlas 运维组
 
-> 适用版本：v1.5。配套文档：[用户指南](../user-guide.md)、[API 文档](../api.md)。所有命令示例均可在 `scripts/qa/verify-management-docs.ps1` 中校验。
+> 适用版本：v2.0。配套文档：[用户指南](../user-guide.md)、[API 文档](../api.md)。所有命令示例均可在 `develop` 分支的 `scripts/qa/verify-management-docs.ps1` 中校验。
 
 本手册覆盖管理控制台（回收站、批量操作、媒体上传、任务中心）上线后所需的运维知识：数据库账号、存储卷、保留期、磁盘阈值、备份、升级与回滚。
 
@@ -129,7 +129,7 @@ rsync -a --delete /data/manga/metadata /data/backup/metadata
 
 ### 升级前
 
-1. 阅读 [当前发布说明](../releases/v1.5.0.md) 与历史发布说明中的版本迁移信息。
+1. 阅读 [当前发布说明](../releases/v2.0.0.md) 与历史发布说明中的版本迁移信息。
 2. 备份数据库与存储卷（见上文）。
 3. 确认 Worker、API 无进行中的任务，或接受任务中断由 DLQ/Outbox 补偿。
 

@@ -1,4 +1,4 @@
-# ComicAtlas API 文档 v1.5
+# ComicAtlas API 文档 v2.0
 
 ## 当前功能范围
 
