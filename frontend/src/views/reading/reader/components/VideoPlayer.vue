@@ -2,7 +2,7 @@
   <div class="video-player" :style="containerStyle">
     <!-- ============================================================
          Placeholder state: user hasn't activated playback yet.
-         预览 <video> 仅用于浏览器端首帧解码，不会自动播放。
+         预览 <video> 只读取元数据和首个可解码关键帧，不会自动播放。
          ============================================================ -->
     <div
       v-if="!activated"
@@ -10,7 +10,7 @@
       data-reader-video-surface
       @click="handleActivate"
     >
-      <!-- 浏览器端首帧预渲染：不生成独立封面文件，仅读取并解码视频首帧。 -->
+      <!-- 浏览器端首帧预览：通过 Range 按需读取，不生成独立预览图。 -->
       <video
         v-if="active"
         ref="previewRef"
@@ -129,10 +129,10 @@ const error = ref(false)
 
 const videoRef = ref<HTMLVideoElement | null>(null)
 
-/** 浏览器端首帧预览用 video，不会生成或保存封面文件。 */
+/** 浏览器端首帧预览用 video，不会生成或保存独立预览图。 */
 const previewRef = ref<HTMLVideoElement | null>(null)
 
-/** 首帧已经可以显示时，仅保留播放图标之外的时长信息。 */
+/** 首帧已解码并可渲染。 */
 const previewReady = ref(false)
 
 /** Video native dimensions populated by loadedmetadata (fallback aspect ratio). */
@@ -189,7 +189,7 @@ async function handleActivate(): Promise<void> {
   playerState.value = 'loading'
   previewReady.value = false
 
-  // 正式播放器接管前释放首帧预览元素，但不生成任何本地封面文件。
+  // 正式播放器接管前释放首帧预览元素。
   const preview = previewRef.value
   if (preview !== null) {
     preview.removeAttribute('src')
@@ -279,23 +279,25 @@ function onError(): void {
 }
 
 function onPreviewLoadedData(): void {
-  // loadeddata 表示当前帧已经解码，浏览器可将其绘制到 video 元素。
+  // loadeddata 表示当前帧已解码，浏览器可直接绘制。
   previewReady.value = true
 }
 
 function onPreviewMetadata(): void {
   const preview = previewRef.value
   if (preview === null || preview.readyState < 1) return
+  nativeWidth.value = preview.videoWidth
+  nativeHeight.value = preview.videoHeight
 
-  // 某些视频第 0 秒没有可显示关键帧，轻微 seek 促使浏览器解码首个可用帧。
+  // 轻微 seek 促使浏览器通过 Range 请求首个可解码关键帧，
+  // 不会因此预加载完整媒体。
   if (preview.duration > 0) {
     try {
       preview.currentTime = Math.min(0.1, preview.duration)
     } catch {
-      // 元数据已可用时，即使无法 seek，也不阻塞正式播放。
+      // 无法 seek 时保留占位状态，不阻断用户手动播放。
     }
   }
-
 }
 
 function onPreviewSeeked(): void {
@@ -508,8 +510,6 @@ watch(
   opacity: 0.8;
 }
 
-/* 预览帧：填满占位区，contain 保持完整画面 */
-/* 首帧就绪后保留时长信息和底部渐变，避免遮挡视频画面 */
 .video-placeholder-overlay {
   position: relative;
   z-index: 1;
