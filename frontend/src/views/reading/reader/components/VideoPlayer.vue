@@ -2,7 +2,7 @@
   <div class="video-player" :style="containerStyle">
     <!-- ============================================================
          Placeholder state: user hasn't activated playback yet.
-         NO <video> element in DOM — zero network requests.
+         预览 <video> 仅用于浏览器端首帧解码，不会自动播放。
          ============================================================ -->
     <div
       v-if="!activated"
@@ -10,8 +10,9 @@
       data-reader-video-surface
       @click="handleActivate"
     >
-      <!-- 预览帧：静音、暂停的 <video> 加载首帧画面，仅取 metadata + 首帧，不持续下载 -->
+      <!-- 浏览器端首帧预渲染：不生成独立封面文件，仅读取并解码视频首帧。 -->
       <video
+        v-if="active"
         ref="previewRef"
         class="video-preview"
         :src="hqUrl"
@@ -19,6 +20,7 @@
         playsinline
         webkit-playsinline
         preload="metadata"
+        @loadeddata="onPreviewLoadedData"
         @loadedmetadata="onPreviewMetadata"
         @seeked="onPreviewSeeked"
         @error="onPreviewError"
@@ -34,7 +36,7 @@
 
     <!-- ============================================================
          Video: rendered ONLY after user activation and only when no
-         error has occurred. preload="none" — no bytes until play().
+         error has occurred. Metadata was preloaded by the placeholder video.
          ============================================================ -->
     <video
       v-else-if="!error"
@@ -46,7 +48,7 @@
       controls
       playsinline
       webkit-playsinline
-      preload="none"
+      preload="metadata"
       @loadedmetadata="onMetadata"
       @play="onPlay"
       @pause="onPause"
@@ -106,6 +108,10 @@ const props = withDefaults(defineProps<Props>(), {
   scrollerRoot: null,
 })
 
+const emit = defineEmits<{
+  (event: 'started'): void
+}>()
+
 // ---------------------------------------------------------------------------
 // Reactive state — drives the 5-state machine
 // ---------------------------------------------------------------------------
@@ -123,10 +129,10 @@ const error = ref(false)
 
 const videoRef = ref<HTMLVideoElement | null>(null)
 
-/** 预览用 <video>（placeholder 状态加载首帧画面）。 */
+/** 浏览器端首帧预览用 video，不会生成或保存封面文件。 */
 const previewRef = ref<HTMLVideoElement | null>(null)
 
-/** 首帧是否已成功显示（用于控制占位 overlay 是否隐藏图标层）。 */
+/** 首帧已经可以显示时，仅保留播放图标之外的时长信息。 */
 const previewReady = ref(false)
 
 /** Video native dimensions populated by loadedmetadata (fallback aspect ratio). */
@@ -183,7 +189,7 @@ async function handleActivate(): Promise<void> {
   playerState.value = 'loading'
   previewReady.value = false
 
-  // 释放预览 <video> 资源（src 切走后 seek/播放帧不再占用内存）
+  // 正式播放器接管前释放首帧预览元素，但不生成任何本地封面文件。
   const preview = previewRef.value
   if (preview !== null) {
     preview.removeAttribute('src')
@@ -206,7 +212,13 @@ async function handleActivate(): Promise<void> {
     // play() resolved — state is set by onPlay event handler
   } catch (e: unknown) {
     // AbortError: interrupted by a new play request (expected race, ignore)
-    if (e instanceof DOMException && e.name === 'AbortError') {
+    // Safari 可能因 DOM 更新后用户手势链断开而返回 NotAllowedError。
+    // 这不是媒体损坏：保留已创建的视频和原生控件，交给用户点击播放。
+    if (
+      e instanceof DOMException &&
+      (e.name === 'AbortError' || e.name === 'NotAllowedError')
+    ) {
+      playerState.value = 'paused'
       return
     }
     console.debug('[VideoPlayer] play rejected:', e)
@@ -266,15 +278,24 @@ function onError(): void {
   playerState.value = 'error'
 }
 
+function onPreviewLoadedData(): void {
+  // loadeddata 表示当前帧已经解码，浏览器可将其绘制到 video 元素。
+  previewReady.value = true
+}
+
 function onPreviewMetadata(): void {
-  const video = previewRef.value
-  if (video === null) return
-  // 定位到首帧（0.1s 而非 0，部分编码器在 0 处无关键帧）
-  try {
-    video.currentTime = 0.1
-  } catch {
-    // 某些容器不支持 seek，忽略——保持图标占位
+  const preview = previewRef.value
+  if (preview === null || preview.readyState < 1) return
+
+  // 某些视频第 0 秒没有可显示关键帧，轻微 seek 促使浏览器解码首个可用帧。
+  if (preview.duration > 0) {
+    try {
+      preview.currentTime = Math.min(0.1, preview.duration)
+    } catch {
+      // 元数据已可用时，即使无法 seek，也不阻塞正式播放。
+    }
   }
+
 }
 
 function onPreviewSeeked(): void {
@@ -282,7 +303,7 @@ function onPreviewSeeked(): void {
 }
 
 function onPreviewError(): void {
-  // 预览帧加载失败不阻塞播放——用户仍可点击激活完整播放
+  // 首帧预览失败不影响点击后的正式播放。
   previewReady.value = false
 }
 
@@ -297,6 +318,7 @@ function onPlay(event: Event): void {
   if (!(event.currentTarget instanceof HTMLVideoElement)) return
   activateSession(props.mediaId ?? 0, event.currentTarget)
   playerState.value = 'playing'
+  emit('started')
 }
 
 function onPause(event: Event): void {
@@ -410,6 +432,7 @@ watch(
   () => props.active,
   (isActive) => {
     if (!isActive) {
+      previewReady.value = false
       unloadVideo('inactive')
     }
   },
@@ -453,7 +476,7 @@ watch(
 }
 
 /* ------------------------------------------------------------------ */
-/* Placeholder (shown before user clicks to activate)                 */
+/* Placeholder (shown before user clicks; no video request)           */
 /* ------------------------------------------------------------------ */
 
 .video-placeholder {
@@ -473,11 +496,6 @@ watch(
   user-select: none;
 }
 
-.video-placeholder:hover {
-  opacity: 0.8;
-}
-
-/* 预览帧：填满占位区，contain 保持完整画面 */
 .video-preview {
   position: absolute;
   inset: 0;
@@ -486,7 +504,12 @@ watch(
   object-fit: contain;
 }
 
-/* 覆盖层：预览就绪后仅保留时长角标，隐藏播放图标 */
+.video-placeholder:hover {
+  opacity: 0.8;
+}
+
+/* 预览帧：填满占位区，contain 保持完整画面 */
+/* 首帧就绪后保留时长信息和底部渐变，避免遮挡视频画面 */
 .video-placeholder-overlay {
   position: relative;
   z-index: 1;

@@ -9,7 +9,7 @@
       :total-pages="store.totalPages"
       :prev-chapter-id="store.prevChapterId"
       :next-chapter-id="store.nextChapterId"
-      @back="goBack"
+      @back="nav.goBack"
       @prev-chapter="goChapter(store.prevChapterId!)"
       @next-chapter="goChapter(store.nextChapterId!)"
       @jump-to-page="onPageChange"
@@ -43,6 +43,8 @@
       :force-hq-pages="forceHqPages"
       @page-request="onPageRequest"
       @visible-range="onVisibleRange"
+      @scroll-direction="onViewportScrollDirection"
+      @video-started="onVideoStarted"
     />
     <ReaderViewport
       v-else
@@ -50,8 +52,11 @@
       :pages="store.pages"
       :current-page="store.currentPage"
       :force-hq-pages="forceHqPages"
-      @update:current-page="onPageChange"
+      :page-mode="mode === 'mobile'"
+      @update:current-page="onViewportPageChange"
       @visible-range="onVisibleRange"
+      @scroll-direction="onViewportScrollDirection"
+      @video-started="onVideoStarted"
     />
 
     <!-- 移动端覆盖层：显隐全部由 useReaderToolbar 状态机驱动 -->
@@ -76,14 +81,17 @@
       />
       <ReaderSettingsDrawer
         :visible="isSettings"
+        :current-page="store.currentPage"
+        :total-pages="store.totalPages"
         @close="dispatch(ReaderAction.CloseSettings)"
+        @jump-to-page="onPageChange"
       />
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { PictureFilled, WarningFilled } from '@element-plus/icons-vue'
@@ -194,80 +202,133 @@ const toolbarTitle = computed(() => {
 const saveDebounceTimer = ref<number | null>(null)
 /** 存在未确认落库的进度：翻页置位，saveProgress 成功才清除；卸载兜底据此决定是否重发 */
 const progressDirty = ref(false)
+/** 章节请求期间禁止把 store 的临时初始页码写入阅读历史。 */
+const chapterLoading = ref(false)
+let chapterLoadToken = 0
 /** 被双击切到 HQ 的页面索引（0-based），使用 reactive Set 保持响应性 */
 const forceHqPages = reactive(new Set<number>())
 
 // 桌面端返回/章节跳转：保留迁移前实现（含 /library 兜底），移动端走 nav.*
-function goBack() {
-  if (store.comicId) {
-    router.push(`/comic/${store.comicId}`)
-  } else {
-    router.push('/library')
-  }
-}
-
 function goChapter(chId: number) {
   router.push(`/reader/${chId}?page=1`)
 }
 
-function reload() {
-  loadCurrentChapter()
+async function reload() {
+  if (saveDebounceTimer.value) {
+    clearTimeout(saveDebounceTimer.value)
+    saveDebounceTimer.value = null
+  }
+
+  // 重载会暂时把 currentPage 重置为 1，先确认当前进度，避免重载覆盖历史。
+  let canRestoreProgress = !progressDirty.value
+  if (progressDirty.value && store.comicId > 0 && store.chapterId > 0) {
+    const chapterId = store.chapterId
+    const pageNumber = store.currentPage
+    const saved = await store.saveProgress()
+    if (saved && store.chapterId === chapterId && store.currentPage === pageNumber) {
+      lastSyncedPage.value = pageNumber
+      progressDirty.value = false
+      canRestoreProgress = true
+    }
+  }
+
+  await loadCurrentChapter(true, canRestoreProgress)
 }
 
-async function loadCurrentChapter() {
+async function loadCurrentChapter(preservePage = false, restoreProgress = true) {
   const chapterId = Number(route.params.chapterId)
-  const rawPage = route.query.page
+  const rawPage = preservePage ? undefined : route.query.page
 
   if (!chapterId) {
     store.error = '参数不完整'
     return
   }
 
-  await store.loadChapter(chapterId)
-
-  // 竞态闸:等待期间用户又切了章(HTTP 乱序),丢弃本次过期结果,
-  // 由更新导航触发的 loadCurrentChapter 接管
-  if (Number(route.params.chapterId) !== chapterId) return
-
-  if (store.error) {
-    ElMessage.error(store.error)
-    return
-  }
-
-  forceHqPages.clear()
-  preloadEngine.reset(store.totalPages)
-  preloadEngine.setUrlResolver((index: number, _priority: 'immediate' | 'cascade') => {
-    const page = store.pages[index]
-    if (!page) return null
-    // 智能/原图模式 & 强制 HQ 页 → 预加载 HQ；省流模式 → 预加载 LQ
-    const wantHq = settings.qualityMode !== 'LQ_ONLY' || forceHqPages.has(index)
-    if (wantHq) return page.hqUrl || page.lqUrl || null
-    return page.lqUrl || page.hqUrl || null
-  })
-
-  if (rawPage === 'last') {
-    store.currentPage = Math.max(1, store.totalPages)
-  } else {
-    const pageFromQuery = Number(rawPage)
-    if (pageFromQuery >= 1 && pageFromQuery <= store.totalPages) {
-      store.currentPage = pageFromQuery
-    } else {
-      await store.restoreProgress()
-    }
-  }
+  const loadToken = ++chapterLoadToken
+  chapterLoading.value = true
 
   try {
-    const detail = await comicApi.detail(store.comicId)
-    const detailData = detail.data as ComicDetailVO
-    comicTitle.value = detailData.title || `漫画 #${store.comicId}`
-  } catch {
-    comicTitle.value = `漫画 #${store.comicId}`
-  }
+    await store.loadChapter(chapterId, preservePage)
 
-  lastSyncedPage.value = store.currentPage
+    // 竞态闸：等待期间用户又切了章，丢弃本次过期结果。
+    if (loadToken !== chapterLoadToken || Number(route.params.chapterId) !== chapterId) return
+
+    if (store.error) {
+      ElMessage.error(store.error)
+      return
+    }
+
+    forceHqPages.clear()
+    preloadEngine.reset(store.totalPages)
+    preloadEngine.setUrlResolver((index: number, priority: 'immediate' | 'cascade') => {
+      const page = store.pages[index]
+      if (!page) return null
+      // 只有可视区附近的 immediate 才预加载 HQ；远处 cascade 一律优先 LQ，
+      // 避免快速滚动时同时下载和解码大量原图导致 Safari 内存崩溃。
+      const wantHq =
+        priority === 'immediate' &&
+        (settings.qualityMode !== 'LQ_ONLY' || forceHqPages.has(index))
+      if (wantHq) return page.hqUrl || page.lqUrl || null
+      return page.lqUrl || page.hqUrl || null
+    })
+
+    if (rawPage === 'last') {
+      store.currentPage = Math.max(1, store.totalPages)
+    } else {
+      const pageFromQuery = Number(rawPage)
+      // page=1 通常只是章节导航的默认参数，不应覆盖已保存的阅读进度。
+      if (pageFromQuery > 1 && pageFromQuery <= store.totalPages) {
+        store.currentPage = pageFromQuery
+      } else if (restoreProgress) {
+        await store.restoreProgress()
+      }
+    }
+
+    // 移动端连续滚动模式不监听 currentPage 回流，首次恢复历史进度后必须主动定位，
+    // 否则页码状态已是第 N 页，但窗口仍停留在章节开头。
+    if (!isPagedMode.value) {
+      await nextTick()
+      viewportComponentRef.value?.scrollToPage?.(store.currentPage)
+    }
+
+    if (loadToken !== chapterLoadToken || Number(route.params.chapterId) !== chapterId) return
+
+    try {
+      const detail = await comicApi.detail(store.comicId)
+      const detailData = detail.data as ComicDetailVO
+      comicTitle.value = detailData.title || `漫画 #${store.comicId}`
+    } catch {
+      comicTitle.value = `漫画 #${store.comicId}`
+    }
+
+    lastSyncedPage.value = store.currentPage
+
+    // 页码参数只用于本次导航，加载完成后从地址栏移除。
+    // 否则浏览器崩溃/刷新会重复使用 ?page=1，覆盖阅读历史恢复结果。
+    if (rawPage !== undefined && route.query.page === rawPage) {
+      const nextQuery = { ...route.query }
+      delete nextQuery.page
+      await router.replace({ query: nextQuery })
+    }
+  } finally {
+    if (loadToken === chapterLoadToken) {
+      chapterLoading.value = false
+    }
+  }
 }
 
 function onPageChange(page: number) {
+  if (page >= 1 && page <= store.totalPages) {
+    store.currentPage = page
+    // 连续滚动模式不依赖 currentPage watcher 回流定位，外部跳页必须显式执行定位。
+    if (!isPagedMode.value) {
+      viewportComponentRef.value?.scrollToPage?.(page)
+    }
+  }
+}
+
+/** 自然滚动只同步页码，不再次调用定位，避免滑动时页面位置被抢回。 */
+function onViewportPageChange(page: number) {
   if (page >= 1 && page <= store.totalPages) {
     store.currentPage = page
   }
@@ -342,6 +403,37 @@ function onVisibleRange(range: { start: number; end: number; total: number }) {
   preloadEngine.onVisibleChange(range.start, range.end, range.total)
 }
 
+function onVideoStarted(page: number) {
+  if (page < 0 || page >= store.totalPages) return
+  const pageNumber = page + 1
+  if (store.currentPage !== pageNumber) {
+    store.currentPage = pageNumber
+  }
+  if (store.comicId <= 0 || store.chapterId <= 0) return
+
+  progressDirty.value = true
+  store.saveProgress().then((ok) => {
+    if (ok && store.currentPage === pageNumber) {
+      lastSyncedPage.value = pageNumber
+      progressDirty.value = false
+    }
+  })
+}
+
+/** 以真实滚动方向控制阅读端工具栏，避免依赖会被浏览器取消的 pointer swipe。 */
+function onViewportScrollDirection(direction: 'up' | 'down') {
+  if (mode.value === 'mobile') {
+    dispatch(direction === 'up' ? ReaderAction.SwipeUp : ReaderAction.SwipeDown)
+    return
+  }
+
+  if (direction === 'up' && settings.showToolbar) {
+    settings.toggleToolbar()
+  } else if (direction === 'down' && !settings.showToolbar) {
+    settings.toggleToolbar()
+  }
+}
+
 /**
  * 页面隐藏/卸载兜底保存：清除挂起 debounce，立即用 keepalive 发送最终进度。
  * 覆盖直接关闭标签页、刷新、移动端切后台（visibilitychange）等
@@ -367,6 +459,10 @@ function onVisibilityChange() {
 }
 
 onMounted(async () => {
+  // 全局页面为导航使用 smooth，但阅读器页码跳转必须即时定位，
+  // 否则移动端窗口滚动会与自然滑动、工具栏显隐叠加造成位置抢占。
+  document.documentElement.classList.add('reader-document')
+
   // 桌面专属交互（键盘快捷键 / Ctrl+滚轮缩放 / 双击重置缩放）：
   // 移动端不注册，避免与触摸手势系统冲突。
   if (mode.value === 'desktop') {
@@ -383,7 +479,7 @@ onMounted(async () => {
   await loadCurrentChapter()
 
   watch(() => store.currentPage, (newPage) => {
-    if (store.comicId > 0 && newPage !== lastSyncedPage.value) {
+    if (!chapterLoading.value && store.comicId > 0 && store.chapterId > 0 && store.pages.length > 0 && newPage !== lastSyncedPage.value) {
       progressDirty.value = true
       if (saveDebounceTimer.value) clearTimeout(saveDebounceTimer.value)
       saveDebounceTimer.value = window.setTimeout(() => {
@@ -423,6 +519,7 @@ watch(() => route.params.chapterId, (newId, oldId) => {
 })
 
 onBeforeUnmount(() => {
+  document.documentElement.classList.remove('reader-document')
   // 移动端未注册这些监听器，remove 为无害 no-op
   document.removeEventListener('keydown', onKeydown)
   document.removeEventListener('wheel', onWheel)
@@ -455,6 +552,18 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   background: var(--bg);
+}
+
+:global(html.reader-document) {
+  scroll-behavior: auto !important;
+}
+
+@media (max-width: 1024px) {
+  .reader-page {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
 }
 
 .reader-state {

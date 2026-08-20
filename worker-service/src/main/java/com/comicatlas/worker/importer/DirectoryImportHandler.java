@@ -51,6 +51,10 @@ public class DirectoryImportHandler {
     private static final String METADATA_DIR_NAME = "metadata";
     /** metadata JSON 文件名后缀。 */
     private static final String JSON_FILE_SUFFIX = ".json";
+    /** 封面目录名（MANGA_ROOT 下）。 */
+    private static final String THUMBS_DIR_NAME = "thumbs";
+    /** 封面文件名（前端经 FileUrlResolver 固定引用）。 */
+    private static final String COVER_FILE_NAME = "cover.webp";
 
     private final DirectoryParser parser;
     private final MetadataAssembler assembler;
@@ -120,7 +124,7 @@ public class DirectoryImportHandler {
         }
 
         // 封面：从 metadata 读取首张图片（跳过 VIDEO），从 HQ 生成，不依赖源目录
-        generateCoverFromNode(manifest.metadata(), comicId);
+        generateCoverFromNode(manifest.metadata(), comicId, mangaRoot);
 
         // metadata.json 从清单 metadata 写出
         Path metaPath = writeMetadataNode(manifest.metadata(), taskId, comicId, mangaRoot);
@@ -253,8 +257,10 @@ public class DirectoryImportHandler {
     /**
      * 封面生成：从清单 metadata 提取全部媒体项，交由 CoverCandidateSelector 按固定优先级排序，
      * 逐个候选尝试生成；单候选失败保留 cause 并继续下一候选，全部失败仅告警不阻断导入。
+     * 生成成功后再校验 cover.webp 非空——CoverGenerator 对空产物抛异常走正常兜底，
+     * 此处兜底防御"返回成功但产物为空"的异常场景，并清理陈旧空封面。
      */
-    private void generateCoverFromNode(JsonNode metadata, Long comicId) {
+    private void generateCoverFromNode(JsonNode metadata, Long comicId, Path mangaRoot) {
         List<CoverCandidateSelector.MediaCandidate> media = flattenMedia(metadata, comicId);
         if (media.isEmpty()) {
             return;
@@ -264,6 +270,8 @@ public class DirectoryImportHandler {
             log.warn("无可用的封面候选，本漫画无封面: comicId={}", comicId);
             return;
         }
+        Path coverFile = mangaRoot.resolve(THUMBS_DIR_NAME).resolve(String.valueOf(comicId))
+                .resolve(COVER_FILE_NAME);
         for (int i = 0; i < candidates.size(); i++) {
             CoverCandidateSelector.CoverCandidate candidate = candidates.get(i);
             Path sourcePath = storageService.resolve(new StorageRef(StorageRootKeys.HQ, candidate.hqPath()));
@@ -278,6 +286,11 @@ public class DirectoryImportHandler {
                 } else {
                     coverGenerator.generateCover(comicId, sourcePath);
                 }
+                if (!isValidCover(coverFile)) {
+                    log.warn("封面生成后产物仍为空，继续下一候选: comicId={}, candidateIndex={}, fileName={}",
+                            comicId, i, candidate.fileName());
+                    continue;
+                }
                 log.info("封面候选生成成功: comicId={}, candidateIndex={}, fileName={}",
                         comicId, i, candidate.fileName());
                 return;
@@ -286,8 +299,25 @@ public class DirectoryImportHandler {
                         comicId, i, candidate.fileName(), ex);
             }
         }
+        // 全部候选失败：清理残留的陈旧空封面，避免前端持续展示空图
+        if (Files.exists(coverFile) && !isValidCover(coverFile)) {
+            try {
+                Files.deleteIfExists(coverFile);
+            } catch (IOException e) {
+                log.warn("清理陈旧空封面失败: comicId={}, {}", comicId, e.getMessage());
+            }
+        }
         log.warn("全部封面候选生成失败，本漫画无封面: comicId={}, candidateCount={}",
                 comicId, candidates.size());
+    }
+
+    /** cover.webp 必须存在且非空才算有效封面。 */
+    private static boolean isValidCover(Path coverFile) {
+        try {
+            return Files.isRegularFile(coverFile) && Files.size(coverFile) > 0;
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     /**

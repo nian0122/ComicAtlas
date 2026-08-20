@@ -73,7 +73,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
-import { comicApi, tagApi } from '@/services/management'
+import { managementComicApi, managementTagApi } from '@/services/management'
 import { useCategoryStore } from '@/stores/management/category'
 import type {
   ComicMetadataDTO,
@@ -137,9 +137,9 @@ async function loadData() {
   loading.value = true
   try {
     const [metadataRes, tagsRes, allTagsRes] = await Promise.all([
-      comicApi.getMetadata(comicId),
-      comicApi.getTags(comicId),
-      tagApi.list(),
+      managementComicApi.getMetadata(comicId),
+      managementComicApi.getTags(comicId),
+      managementTagApi.list(),
       categoryStore.fetchList(),
     ])
     const metadata = metadataRes.data as ComicMetadataDTO
@@ -152,7 +152,7 @@ async function loadData() {
     selectedTagIds.value = (tagsRes.data as number[]) || []
     allTags.value = (allTagsRes.data as TagDTO[]) || []
     try {
-      const detailRes = await comicApi.detail(comicId)
+      const detailRes = await managementComicApi.detail(comicId)
       const detail = detailRes.data as ComicDetailVO
       sourceType.value = detail.sourceType || ''
       sourceRef.value = detail.sourceRef || ''
@@ -189,7 +189,7 @@ async function onCreateTag() {
     }
   } else {
     try {
-      const res = await tagApi.create({ name } as TagCreateDTO)
+      const res = await managementTagApi.create({ name } as TagCreateDTO)
       const newTag = res.data as TagDTO
       allTags.value.push(newTag)
       selectedTagIds.value.push(newTag.id)
@@ -211,13 +211,13 @@ async function handleSave() {
   saving.value = true
   try {
     await Promise.all([
-      comicApi.updateMetadata(comicId, {
+      managementComicApi.updateMetadata(comicId, {
         title: form.value.title.trim(),
         author: form.value.author?.trim() || '',
         description: form.value.description?.trim() || '',
         categoryId: form.value.categoryId,
       }),
-      comicApi.updateTags(comicId, { tagIds: selectedTagIds.value } as ComicTagUpdateDTO),
+      managementComicApi.updateTags(comicId, { tagIds: selectedTagIds.value } as ComicTagUpdateDTO),
     ])
     ElMessage.success('保存成功')
     router.push(`/manage/comics/${comicId}?tab=operations`)

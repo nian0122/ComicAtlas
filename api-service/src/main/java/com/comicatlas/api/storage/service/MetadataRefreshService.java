@@ -18,6 +18,7 @@ import com.comicatlas.persistence.comic.mapper.MediaMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.common.constant.MetadataRefreshLimits;
+import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO.ChapterSnapshot;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO.MediaSnapshot;
@@ -440,21 +441,34 @@ public class MetadataRefreshService {
         if (image) {
             applyLqFact(dbRow, item.lqStatus(), item.lqSize());
         } else {
-            dbRow.setLqStatus(LqStatus.NOT_GENERATED);
-            dbRow.setLqSize(0L);
+            clearLqFact(dbRow);
         }
-        // 保留 mediaId/pageNumber/lqPath（推导一致时无需变更）与 transcodeStatus 不变
+        // 保留 mediaId/pageNumber 与 transcodeStatus 不变
     }
 
-    /** 按快照 LQ 事实写入 lq_status/lq_size（仅图片）；快照未携带 LQ 时按未生成处理。 */
+    /** 按快照 LQ 事实写入状态、引用与大小；文件缺失时必须清空全部 LQ 事实。 */
     private void applyLqFact(Media dbRow, String lqStatus, long lqSize) {
         if (LQ_STATUS_READY.equals(lqStatus)) {
             dbRow.setLqStatus(LqStatus.READY);
+            dbRow.setLqRoot(StorageRootKeys.LQ);
+            if (dbRow.getHqPath() != null && !dbRow.getHqPath().isBlank()) {
+                dbRow.setLqPath(deriveLqPath(dbRow.getHqPath()));
+            }
             dbRow.setLqSize(lqSize);
         } else {
-            dbRow.setLqStatus(LqStatus.NOT_GENERATED);
-            dbRow.setLqSize(0L);
+            clearLqFact(dbRow);
         }
+    }
+
+    private void clearLqFact(Media dbRow) {
+        dbRow.setLqStatus(LqStatus.NOT_GENERATED);
+        dbRow.setLqRoot(null);
+        dbRow.setLqPath(null);
+        dbRow.setLqSize(0L);
+    }
+
+    private String deriveLqPath(String hqPath) {
+        return hqPath.replaceAll("\\.[^.]+$", ".webp");
     }
 
     /** 磁盘新增文件：插入 READY，pageNumber 从本章最大非负页码 +1 追加；LQ 事实取快照。 */

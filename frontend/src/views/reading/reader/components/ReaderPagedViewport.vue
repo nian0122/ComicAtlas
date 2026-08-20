@@ -1,5 +1,5 @@
 <template>
-  <div ref="viewportRef" class="paged-viewport" @wheel="onWheel">
+  <div ref="viewportRef" class="paged-viewport" @wheel="onWheel" @scroll="onScroll">
     <div v-if="page" class="paged-page" :style="pageStyle">
       <VideoPlayer
         v-if="isVideo"
@@ -15,6 +15,7 @@
         :audio-codec="page.audioCodec"
         :active="true"
         :scroller-root="viewportRef"
+        @started="emit('video-started', props.currentPage - 1)"
       />
       <ProgressiveImage
         v-else
@@ -50,6 +51,8 @@ const props = defineProps<Props>()
 const emit = defineEmits<{
   (e: 'page-request', direction: 'next' | 'prev'): void
   (e: 'visible-range', range: { start: number; end: number; total: number }): void
+  (e: 'scroll-direction', direction: 'up' | 'down'): void
+  (e: 'video-started', page: number): void
 }>()
 
 const settings = useReaderSettingsStore()
@@ -59,6 +62,15 @@ const containerHeight = ref(0)
 
 const WHEEL_PAGE_COOLDOWN_MS = 300
 let lastWheelPageTime = 0
+let lastScrollTop = 0
+
+function onScroll() {
+  const currentScrollTop = viewportRef.value?.scrollTop ?? 0
+  if (currentScrollTop === lastScrollTop) return
+  const direction = currentScrollTop > lastScrollTop ? 'up' : 'down'
+  lastScrollTop = currentScrollTop
+  emit('scroll-direction', direction)
+}
 
 function updateContainerSize() {
   if (viewportRef.value) {
@@ -149,6 +161,7 @@ watch(
     if (viewportRef.value) {
       viewportRef.value.scrollTop = 0
       viewportRef.value.scrollLeft = 0
+      lastScrollTop = 0
     }
   },
   { immediate: true }

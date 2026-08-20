@@ -65,14 +65,17 @@ public class ImageOptimizer {
                 "-chapter-no", chapterNo,
                 "-quality", String.valueOf(config.getLqQuality()),
                 "-workers", String.valueOf(workers),
+                "-max-inflight-pixels", String.valueOf(config.getImage().getMaxInflightPixels()),
                 "-json"
         ));
         if (force) {
             cmd.add("-force");
         }
 
-        log.info("启动图片优化: comicId={}, chapterId={}, hqDir={}, lqDir={}, workers={}, quality={}, force={}",
-                comicId, chapterId, hqDirStr, lqDirStr, workers, config.getLqQuality(), force);
+        log.info("启动图片优化: comicId={}, chapterId={}, hqDir={}, lqDir={}, workers={}, "
+                        + "maxInflightPixels={}, quality={}, force={}",
+                comicId, chapterId, hqDirStr, lqDirStr, workers,
+                config.getImage().getMaxInflightPixels(), config.getLqQuality(), force);
         return runOptimizer(cmd, comicId, chapterId);
     }
 
@@ -87,18 +90,33 @@ public class ImageOptimizer {
         }
 
         int exitCode = result.exitCode();
+        if (exitCode == 137) {
+            throw new RuntimeException(
+                    "图片优化工具被系统强制终止（exitCode=137，通常为容器内存不足）: comicId="
+                            + comicId + ", chapterId=" + chapterId
+                            + "，请检查 Worker 内存上限与 LQ 在途像素预算");
+        }
         if (exitCode == 2) {
             throw new RuntimeException(
                     "图片优化参数错误或目录不存在: comicId=" + comicId + ", chapterId=" + chapterId
                             + ", stdout=" + result.stdout());
         }
 
+        String stdout = result.stdout();
+        if (stdout == null || stdout.isBlank()) {
+            // Go 工具 -json 模式无条件输出 JSON，空 stdout 仅可能由进程在输出前异常终止导致
+            throw new RuntimeException(
+                    "图片优化工具异常退出: comicId=" + comicId + ", chapterId=" + chapterId
+                            + ", exitCode=" + exitCode + ", stdout 为空（疑似进程崩溃或被终止）");
+        }
+
         RunResult parsed;
         try {
-            parsed = objectMapper.readValue(result.stdout(), RunResult.class);
+            parsed = objectMapper.readValue(stdout, RunResult.class);
         } catch (Exception e) {
             throw new RuntimeException(
-                    "解析图片优化 JSON 失败: comicId=" + comicId + ", stdout=" + result.stdout(), e);
+                    "解析图片优化 JSON 失败: comicId=" + comicId + ", chapterId=" + chapterId
+                            + ", exitCode=" + exitCode + ", stdout=" + stdout, e);
         }
 
         log.info("图片优化完成: comicId={}, chapterId={}, total={}, processed={}, skipped={}, failed={}, elapsed={}ms",

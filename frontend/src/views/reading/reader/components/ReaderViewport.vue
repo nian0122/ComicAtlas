@@ -9,10 +9,11 @@
       size-field="size"
       key-field="id"
       :buffer="buffer"
-      @scroll="onScroll"
+      :page-mode="props.pageMode"
+      @scroll="onScrollerScroll"
     >
       <template #default="{ item, index, active }">
-        <div class="reader-item-wrapper"><ReaderImageItem :item="item" :index="index" :active="active" :scroller-root="scrollerEl" :item-height="item.size" :force-hq="props.forceHqPages.has(index)" /></div>
+        <div class="reader-item-wrapper"><ReaderImageItem :item="item" :index="index" :active="active" :scroller-root="scrollerEl" :item-height="item.size" :force-hq="props.forceHqPages.has(index)" @video-started="emit('video-started', $event)" /></div>
       </template>
     </RecycleScroller>
   </div>
@@ -40,12 +41,16 @@ interface Props {
   currentPage: number
   /** 被双击强制切到 HQ 的页面索引（0-based）集合 */
   forceHqPages: ReadonlySet<number>
+  /** 移动端纵向阅读使用页面级滚动，让 Safari 能收缩地址栏。 */
+  pageMode?: boolean
 }
 
 const props = defineProps<Props>()
 const emit = defineEmits<{
   (e: 'update:currentPage', page: number): void
   (e: 'visible-range', range: { start: number; end: number; total: number }): void
+  (e: 'scroll-direction', direction: 'up' | 'down'): void
+  (e: 'video-started', page: number): void
 }>()
 
 const settings = useReaderSettingsStore()
@@ -151,15 +156,15 @@ let isProgrammaticScroll = false
 let programmaticScrollTimer: number | null = null
 let lastRangeStart = -1
 let lastRangeEnd = -1
+let lastScrollOffset = 0
+let pendingScrollDirection: 'up' | 'down' | null = null
+/** 最近一次由自然滚动计算并回传给父组件的页码，避免回流时反向吸附页面。 */
 
 // vue-virtual-scroller 2.x 组件实例不暴露 scrollTop/scrollLeft,
 // 统一走官方 exposed API(getScroll/scrollToPosition,内部按 direction 分支且处理 RTL)。
 function scrollOffset(): number {
+  if (props.pageMode) return window.scrollY
   return scrollerRef.value?.getScroll?.()?.start ?? 0
-}
-
-function setScrollOffset(offset: number) {
-  scrollerRef.value?.scrollToPosition(offset)
 }
 
 function viewportSize(): number {
@@ -191,6 +196,11 @@ function emitVisibleRange() {
 
 function onScroll() {
   if (isProgrammaticScroll) return
+  const currentOffset = scrollOffset()
+  if (currentOffset !== lastScrollOffset) {
+    pendingScrollDirection = currentOffset > lastScrollOffset ? 'up' : 'down'
+    lastScrollOffset = currentOffset
+  }
   if (scrollRafId != null) return
   scrollRafId = requestAnimationFrame(() => {
     scrollRafId = null
@@ -200,15 +210,39 @@ function onScroll() {
       emit('update:currentPage', page)
     }
     emitVisibleRange()
+    if (pendingScrollDirection !== null) {
+      emit('scroll-direction', pendingScrollDirection)
+      pendingScrollDirection = null
+    }
   })
 }
 
+/** page-mode 使用窗口滚动；将方向判断收口到视口组件，避免父组件重复派发状态。 */
+function onScrollerScroll() {
+  if (props.pageMode) return
+  onScroll()
+}
+
 function scrollToPage(page: number): void {
-  if (!scrollerRef.value || props.pages.length === 0) return
+  if (props.pages.length === 0) return
   const targetPage = Math.max(1, Math.min(page, props.pages.length))
   const offset = targetPage === 1 ? 0 : prefixSums.value[targetPage - 2]
   isProgrammaticScroll = true
-  setScrollOffset(offset)
+  pendingScrollDirection = null
+
+  if (props.pageMode) {
+    // 移动端 page-mode 使用窗口滚动；不能依赖虚拟列表内部 scroller 的
+    // scrollToItem，否则页码状态会更新，但窗口位置可能不会移动。
+    const viewportTop = viewportRef.value?.getBoundingClientRect().top ?? 0
+    const targetTop = Math.max(0, window.scrollY + viewportTop + offset)
+    lastScrollOffset = targetTop
+    window.scrollTo({ top: targetTop, left: 0, behavior: 'auto' })
+  } else {
+    if (!scrollerRef.value) return
+    lastScrollOffset = offset
+    // 桌面端继续使用虚拟列表官方定位 API。
+    scrollerRef.value.scrollToItem(targetPage - 1, { smooth: false, align: 'start' })
+  }
 
   // 取消旧计时器，防止新旧 scrollToPage 调用互相干扰
   if (programmaticScrollTimer != null) {
@@ -231,18 +265,29 @@ function forceUpdateScroller() {
   }
 }
 
+defineExpose({ scrollToPage })
+
 onMounted(() => {
   updateContainerSize()
   window.addEventListener('resize', updateContainerSize)
+  if (props.pageMode) {
+    window.addEventListener('scroll', onScroll, { passive: true })
+  }
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', updateContainerSize)
+  if (props.pageMode) {
+    window.removeEventListener('scroll', onScroll)
+  }
   if (scrollRafId != null) cancelAnimationFrame(scrollRafId)
   if (programmaticScrollTimer != null) window.clearTimeout(programmaticScrollTimer)
 })
 
 watch(() => props.currentPage, (newPage) => {
+  // page-mode 的 currentPage 由自然滚动产生，只同步父级状态；
+  // 外部跳页由 ReaderPage 显式调用 scrollToPage，禁止 watcher 反向吸附。
+  if (props.pageMode) return
   // 斩断回声循环:自身滚动 emit 的页码经父组件回流时,视口已在该页,跳过吸附;
   // 外部跳页(工具栏/键盘/URL)因当前位置不符,正常执行 scrollToPage。
   if (newPage === deriveCurrentPage()) return
@@ -263,6 +308,9 @@ watch(() => props.pages.length, () => {
 watch([containerWidth, containerHeight], () => {
   nextTick(() => {
     forceUpdateScroller()
+    // 移动端视口高度会随浏览器地址栏/阅读工具栏变化而调整，
+    // 这里只刷新虚拟列表，不能把当前滚动位置重新吸附到 currentPage 页首。
+    if (props.pageMode) return
     scrollToPage(props.currentPage)
   })
 })
@@ -270,6 +318,8 @@ watch([containerWidth, containerHeight], () => {
 watch(() => [settings.fitMode, settings.zoom], () => {
   nextTick(() => {
     forceUpdateScroller()
+    // 移动端调整阅读设置不属于页码跳转，保留用户当前阅读位置。
+    if (props.pageMode) return
     scrollToPage(props.currentPage)
   })
 }, { flush: 'post' })
@@ -295,6 +345,21 @@ watch(() => [settings.fitMode, settings.zoom], () => {
 
 .reader-item-wrapper {
   width: 100%;
+}
+
+@media (max-width: 1024px) {
+  .reader-viewport {
+    flex: none;
+    height: 100dvh;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  .scroller {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
 }
 
 :deep(.vue-recycle-scroller__item-wrapper) {

@@ -68,12 +68,17 @@
         />
         <el-option label="无标签" value="_NONE" />
       </el-select>
-      <el-select v-if="filters.tags.length > 1" v-model="filters.tagMode" class="filter-select--mini" @change="applyFilters">
+      <el-select v-if="filters.tags.length > 0" v-model="filters.tagMode" class="filter-select--mini" @change="applyFilters">
         <el-option label="任一" value="OR" />
         <el-option label="全部" value="AND" />
+        <el-option label="排除" value="NOT" />
       </el-select>
       <el-select v-model="filters.sort" placeholder="排序" class="filter-select" @change="applyFilters">
         <el-option v-for="s in SORT_OPTIONS" :key="s.value" :label="s.label" :value="s.value" />
+      </el-select>
+      <el-select v-model="filters.order" placeholder="时间顺序" class="filter-select--mini" @change="applyFilters">
+        <el-option label="倒序" value="desc" />
+        <el-option label="正序" value="asc" />
       </el-select>
       <el-button text @click="resetFilters">重置</el-button>
     </div>
@@ -210,8 +215,9 @@ const filters = reactive({
   category: '',
   status: '',
   tags: [] as string[],
-  tagMode: 'OR' as 'AND' | 'OR',
+  tagMode: 'OR' as 'AND' | 'OR' | 'NOT',
   sort: 'createdAt',
+  order: 'desc' as 'asc' | 'desc',
 })
 
 const selectedIds = ref<number[]>([])
@@ -264,7 +270,10 @@ watch(() => filters.tags, (val) => {
   if (val.includes('_NONE') && val.length > 1) {
     filters.tags = ['_NONE']
   }
-  if (val.length <= 1 && filters.tagMode !== 'OR') {
+  if (val.includes('_NONE') && filters.tagMode === 'NOT') {
+    filters.tagMode = 'OR'
+  }
+  if (val.length === 0 && filters.tagMode !== 'OR') {
     filters.tagMode = 'OR'
   }
 }, { deep: true })
@@ -272,7 +281,7 @@ watch(() => filters.tags, (val) => {
 function applyFilters() {
   const normalizedTags = filters.tags.includes('_NONE') ? ['_NONE'] : [...filters.tags]
   filters.tags = normalizedTags
-  if (normalizedTags.length <= 1) {
+  if (normalizedTags.length === 0 || normalizedTags.includes('_NONE')) {
     filters.tagMode = 'OR'
   }
   selectedIds.value = []
@@ -283,6 +292,7 @@ function applyFilters() {
     tags: normalizedTags.length > 0 ? normalizedTags : undefined,
     tagMode: filters.tagMode,
     sort: filters.sort as ComicListQuery['sort'],
+    order: filters.order,
   })
 }
 
@@ -293,9 +303,20 @@ function resetFilters() {
   filters.tags = []
   filters.tagMode = 'OR'
   filters.sort = 'createdAt'
+  filters.order = 'desc'
   selectedIds.value = []
   store.resetQuery()
   store.fetchList()
+}
+
+function restoreFiltersFromStore() {
+  filters.keyword = store.query.keyword || ''
+  filters.category = store.query.category || ''
+  filters.status = store.query.status || ''
+  filters.tags = [...(store.query.tags || [])]
+  filters.tagMode = store.query.tagMode === 'AND' || store.query.tagMode === 'NOT' ? store.query.tagMode : 'OR'
+  filters.sort = store.query.sort || 'createdAt'
+  filters.order = store.query.order || 'desc'
 }
 
 function onPageChange(page: number) {
@@ -305,6 +326,7 @@ function onPageChange(page: number) {
 }
 
 onMounted(() => {
+  restoreFiltersFromStore()
   categoryStore.fetchList()
   tagStore.fetchList()
   store.fetchList()

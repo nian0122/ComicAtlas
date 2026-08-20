@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -15,33 +16,36 @@ import (
 )
 
 const (
-	defaultQuality    = 15
-	defaultExtensions = ".jpg,.jpeg,.png,.webp,.gif"
+	defaultQuality           = 15
+	defaultMaxInflightPixels = 80_000_000
+	defaultExtensions        = ".jpg,.jpeg,.png,.webp,.gif"
 )
 
 // CLIConfig 命令行配置
 type CLIConfig struct {
-	ComicID    int64
-	ChapterID  int64
-	ChapterNo  string
-	ScanDir    string
-	OutputDir  string
-	Quality    int
-	Workers    int
-	Force      bool
-	Quiet      bool
-	JSON       bool
-	Extensions map[string]bool
+	ComicID   int64
+	ChapterID int64
+	ChapterNo string
+	ScanDir   string
+	OutputDir string
+	Quality   int
+	Workers   int
+	// MaxInflightPixels 限制所有 worker 同时处于解码/编码阶段的总像素数。
+	MaxInflightPixels int64
+	Force             bool
+	Quiet             bool
+	JSON              bool
+	Extensions        map[string]bool
 }
 
 // PageResult 单页处理结果
 type PageResult struct {
 	PageNumber int64   `json:"pageNumber"`
-	Status     string  `json:"status"`                // processed, skipped, failed
-	InputSize  int64   `json:"inputSize,omitempty"`   // bytes
-	OutputSize int64   `json:"outputSize,omitempty"`  // bytes
-	Ratio      float64 `json:"ratio,omitempty"`       // output/input * 100
-	Reason     string  `json:"reason,omitempty"`      // 失败/跳过原因
+	Status     string  `json:"status"`               // processed, skipped, failed
+	InputSize  int64   `json:"inputSize,omitempty"`  // bytes
+	OutputSize int64   `json:"outputSize,omitempty"` // bytes
+	Ratio      float64 `json:"ratio,omitempty"`      // output/input * 100
+	Reason     string  `json:"reason,omitempty"`     // 失败/跳过原因
 }
 
 // RunResult 整章运行结果
@@ -70,6 +74,8 @@ func main() {
 	outputDir := flag.String("output-dir", "", "输出目录（LQ 输出目录）")
 	quality := flag.Int("quality", defaultQuality, "WebP 质量 (1-100)")
 	workers := flag.Int("workers", 0, "并发数（默认 CPU 核心数）")
+	maxInflightPixels := flag.Int64("max-inflight-pixels", defaultMaxInflightPixels,
+		"所有 worker 同时解码/编码的总像素预算")
 	force := flag.Bool("force", false, "强制重新处理")
 	quiet := flag.Bool("quiet", false, "安静模式")
 	jsonMode := flag.Bool("json", false, "JSON 输出模式")
@@ -87,26 +93,34 @@ func main() {
 	if *workers == 0 {
 		*workers = runtime.NumCPU()
 	}
+	if *workers < 1 {
+		fmt.Fprintln(os.Stderr, "错误: -workers 必须大于 0")
+		os.Exit(2)
+	}
+	if *maxInflightPixels < 1 {
+		fmt.Fprintln(os.Stderr, "错误: -max-inflight-pixels 必须大于 0")
+		os.Exit(2)
+	}
 
 	cfg := &CLIConfig{
-		ComicID:    *comicID,
-		ChapterID:  *chapterID,
-		ChapterNo:  *chapterNo,
-		ScanDir:    *scanDir,
-		OutputDir:  *outputDir,
-		Quality:    *quality,
-		Workers:    *workers,
-		Force:      *force,
-		Quiet:      *quiet,
-		JSON:       *jsonMode,
-		Extensions: parseExtensions(*extensions),
+		ComicID:           *comicID,
+		ChapterID:         *chapterID,
+		ChapterNo:         *chapterNo,
+		ScanDir:           *scanDir,
+		OutputDir:         *outputDir,
+		Quality:           *quality,
+		Workers:           *workers,
+		MaxInflightPixels: *maxInflightPixels,
+		Force:             *force,
+		Quiet:             *quiet,
+		JSON:              *jsonMode,
+		Extensions:        parseExtensions(*extensions),
 	}
 
 	if _, err := os.Stat(cfg.ScanDir); os.IsNotExist(err) {
 		fmt.Fprintf(os.Stderr, "错误: 扫描目录不存在: %s\n", cfg.ScanDir)
 		os.Exit(2)
 	}
-
 	start := time.Now()
 	result := run(cfg)
 	result.ElapsedMs = time.Since(start).Milliseconds()
@@ -147,11 +161,12 @@ func parseExtensions(s string) map[string]bool {
 func run(cfg *CLIConfig) *RunResult {
 	result := &RunResult{Pages: make([]PageResult, 0)}
 	tasks := make(chan imageTask, cfg.Workers*2)
+	decodeBudget := newPixelBudget(cfg.MaxInflightPixels)
 	var wg sync.WaitGroup
 
 	for i := 0; i < cfg.Workers; i++ {
 		wg.Add(1)
-		go worker(i, tasks, &wg, cfg, result)
+		go worker(i, tasks, &wg, cfg, result, decodeBudget)
 	}
 
 	_ = filepath.Walk(cfg.ScanDir, func(path string, info os.FileInfo, err error) error {
@@ -197,6 +212,8 @@ func run(cfg *CLIConfig) *RunResult {
 					result.Pages = append(result.Pages, PageResult{
 						PageNumber: pageNum,
 						Status:     "skipped",
+						InputSize:  info.Size(),
+						OutputSize: lqInfo.Size(),
 						Reason:     "exists",
 					})
 					result.mu.Unlock()
@@ -226,12 +243,27 @@ type imageTask struct {
 	PageNumber   int64
 }
 
-func worker(id int, tasks <-chan imageTask, wg *sync.WaitGroup, cfg *CLIConfig, result *RunResult) {
+func worker(id int, tasks <-chan imageTask, wg *sync.WaitGroup, cfg *CLIConfig,
+	result *RunResult, decodeBudget *pixelBudget) {
 	defer wg.Done()
 	for task := range tasks {
-		optResult, err := optimizeImageToWebP(task.HQPath, task.LQPath, cfg.Quality)
+		optResult, err := optimizeImageToWebPWithBudget(
+			task.HQPath, task.LQPath, cfg.Quality, decodeBudget)
 		page := PageResult{PageNumber: task.PageNumber}
 		if err != nil {
+			var skipErr *ImageSkipError
+			if errors.As(err, &skipErr) {
+				atomic.AddInt32(&result.Skipped, 1)
+				page.Status = "skipped"
+				page.Reason = skipErr.Error()
+				if !cfg.Quiet {
+					fmt.Fprintf(os.Stderr, "[Worker %d] 跳过: %s → %s\n", id, task.RelativePath, skipErr.Error())
+				}
+				result.mu.Lock()
+				result.Pages = append(result.Pages, page)
+				result.mu.Unlock()
+				continue
+			}
 			atomic.AddInt32(&result.Failed, 1)
 			page.Status = "failed"
 			page.Reason = err.Error()

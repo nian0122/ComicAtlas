@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.GetMapping;
 
 /**
  * 标签管理接口（管理域）。
@@ -27,6 +28,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 public class TagManagementController {
 
     private final TagManagementService tagManagementService;
+
+    @GetMapping
+    public Result<java.util.List<TagDTO>> listTags() {
+        return Result.ok(tagManagementService.listTags());
+    }
 
     /**
      * 创建标签，名称不能为空（@Valid 边界校验）。

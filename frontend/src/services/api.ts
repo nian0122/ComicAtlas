@@ -85,23 +85,34 @@ export const comicApi = {
   detail: (id: number) => api.get<ComicDetailVO>(`/comics/${id}`),
   getMetadata: (id: number) => api.get(`/comics/${id}/metadata`),
   getTags: (id: number) => api.get(`/comics/${id}/tags`),
-  /** 阅读端列表/详情查询由阅读服务提供；写操作（delete/updateMetadata/updateTags/batchUpdate）见管理域。 */
-  delete: (id: number) => api.delete(`/manage/comics/${id}`),
-  updateMetadata: (id: number, data: ComicMetadataUpdateDTO) =>
-    api.put(`/manage/comics/${id}/metadata`, data),
-  updateTags: (id: number, data: ComicTagUpdateDTO) =>
-    api.put(`/manage/comics/${id}/tags`, data),
-  /** 批量更新漫画分类和标签 */
-  batchUpdate: (data: BatchComicUpdateDTO) =>
-    api.post('/manage/comics/batch/update', data),
 }
 
 export const catalogApi = {
   tree: (comicId: number) => api.get(`/comics/${comicId}/catalog`),
 }
 
+export const managementCatalogApi = {
+  tree: (comicId: number) => api.get(`/manage/comics/${comicId}/catalog`),
+}
+
+/** 管理域漫画查询，管理页面专用。 */
+export const managementComicApi = {
+  list: (params: any) => api.get('/manage/comics', { params }),
+  detail: (id: number) => api.get<ComicDetailVO>(`/manage/comics/${id}`),
+  getMetadata: (id: number) => api.get(`/manage/comics/${id}/metadata`),
+  getTags: (id: number) => api.get(`/manage/comics/${id}/tags`),
+  delete: (id: number) => api.delete(`/manage/comics/${id}`),
+  updateMetadata: (id: number, data: ComicMetadataUpdateDTO) => api.put(`/manage/comics/${id}/metadata`, data),
+  updateTags: (id: number, data: ComicTagUpdateDTO) => api.put(`/manage/comics/${id}/tags`, data),
+  batchUpdate: (data: BatchComicUpdateDTO) => api.post('/manage/comics/batch/update', data),
+}
+
 export const readerApi = {
   chapter: (chapterId: number) => api.get(`/chapters/${chapterId}`),
+}
+
+export const managementReaderApi = {
+  chapter: (chapterId: number) => api.get(`/manage/chapters/${chapterId}`),
 }
 
 export const historyApi = {
@@ -112,14 +123,23 @@ export const historyApi = {
     api.put(`/history/${comicId}`, data),
 }
 
-export const tagApi = {
+/** 阅读域筛选项查询，供阅读端使用。 */
+export const readingTagApi = {
   list: () => api.get('/tags'),
+}
+
+export const readingCategoryApi = {
+  list: () => api.get('/categories'),
+}
+
+export const managementTagApi = {
+  list: () => api.get('/manage/tags'),
   create: (data: TagCreateDTO) => api.post('/manage/tags', data),
   delete: (id: number) => api.delete(`/manage/tags/${id}`),
 }
 
-export const categoryApi = {
-  list: () => api.get('/categories'),
+export const managementCategoryApi = {
+  list: () => api.get('/manage/categories'),
   create: (name: string) => api.post('/manage/categories', null, { params: { name } }),
   update: (id: number, name: string) => api.put(`/manage/categories/${id}`, null, { params: { name } }),
   delete: (id: number) => api.delete(`/manage/categories/${id}`),

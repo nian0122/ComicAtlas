@@ -12,6 +12,7 @@ import com.comicatlas.contract.common.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -19,6 +20,12 @@ public class CategoryManagementServiceImpl implements CategoryManagementService 
 
     private final CategoryMapper categoryMapper;
     private final CacheEvictor cacheEvictor;
+
+    @Override
+    public List<CategoryDTO> listCategories() {
+        return categoryMapper.selectList(new LambdaQueryWrapper<Category>().orderByAsc(Category::getSortOrder))
+                .stream().map(this::toDTO).toList();
+    }
 
     @Override
     @Transactional

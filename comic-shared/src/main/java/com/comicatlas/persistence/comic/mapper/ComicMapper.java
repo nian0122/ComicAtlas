@@ -43,6 +43,11 @@ public interface ComicMapper extends BaseMapper<Comic> {
                     </when>
                     <otherwise>
                         <choose>
+                            <when test='query.tagMode == &quot;NOT&quot;'>
+                                AND NOT EXISTS (SELECT 1 FROM comic_tag ct JOIN tag t ON t.id = ct.tag_id
+                                                WHERE ct.comic_id = c.id AND t.name IN
+                                                <foreach collection='query.tags' item='tagName' open='(' separator=',' close=')'>#{tagName}</foreach>)
+                            </when>
                             <when test='query.tagMode == &quot;AND&quot;'>
                                 AND (SELECT COUNT(DISTINCT t.name) FROM comic_tag ct JOIN tag t ON t.id = ct.tag_id
                                      WHERE ct.comic_id = c.id AND t.name IN
@@ -78,11 +83,15 @@ public interface ComicMapper extends BaseMapper<Comic> {
         </where>
         ORDER BY
         <choose>
-            <when test='query.sort == "lastReadTime"'>(SELECT MAX(rh.updated_at) FROM reading_history rh WHERE rh.comic_id = c.id) DESC</when>
-            <when test='query.sort == "title"'>c.title ASC</when>
-            <when test='query.sort == "pageCount"'>c.total_pages DESC</when>
-            <when test='query.sort == "updatedAt"'>c.updated_at DESC</when>
-            <otherwise>c.created_at DESC</otherwise>
+            <when test='query.sort == "lastReadTime"'>(SELECT MAX(rh.updated_at) FROM reading_history rh WHERE rh.comic_id = c.id)</when>
+            <when test='query.sort == "title"'>c.title</when>
+            <when test='query.sort == "pageCount"'>c.total_pages</when>
+            <when test='query.sort == "updatedAt"'>c.updated_at</when>
+            <otherwise>c.created_at</otherwise>
+        </choose>
+        <choose>
+            <when test='query.order == "asc"'> ASC</when>
+            <otherwise> DESC</otherwise>
         </choose>
         , c.id ASC
         </script>
@@ -127,6 +136,11 @@ public interface ComicMapper extends BaseMapper<Comic> {
                     </when>
                     <otherwise>
                         <choose>
+                            <when test='query.tagMode == &quot;NOT&quot;'>
+                                AND NOT EXISTS (SELECT 1 FROM comic_tag ct JOIN tag t ON t.id = ct.tag_id
+                                                WHERE ct.comic_id = c.id AND t.name IN
+                                                <foreach collection='query.tags' item='tagName' open='(' separator=',' close=')'>#{tagName}</foreach>)
+                            </when>
                             <when test='query.tagMode == &quot;AND&quot;'>
                                 AND (SELECT COUNT(DISTINCT t.name) FROM comic_tag ct JOIN tag t ON t.id = ct.tag_id
                                      WHERE ct.comic_id = c.id AND t.name IN

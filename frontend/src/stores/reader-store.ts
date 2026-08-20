@@ -52,14 +52,16 @@ export const useReaderStore = defineStore('reader', () => {
   let pendingProgress: ProgressPayload | null = null
   let progressSavePromise: Promise<boolean> | null = null
 
-  async function loadChapter(chId: number) {
+  async function loadChapter(chId: number, preservePage = false) {
     // 请求序号闸:快速连续切章时 HTTP 响应可能乱序返回,
     // 只允许最新一次请求写入 state,过期响应直接丢弃
     const seq = ++loadSeq
     state.loading = true
     state.error = null
     state.chapterId = chId
-    state.currentPage = 1
+    if (!preservePage) {
+      state.currentPage = 1
+    }
 
     try {
       const res = await readerApi.chapter(chId)
@@ -84,10 +86,13 @@ export const useReaderStore = defineStore('reader', () => {
 
   async function restoreProgress() {
     if (!state.comicId || state.pages.length === 0) return
+    const seq = loadSeq
+    const chapterId = state.chapterId
     try {
       const res = await historyApi.get(state.comicId)
       const pageNumber = res.data?.pageNumber
-      if (pageNumber && pageNumber >= 1 && pageNumber <= state.pages.length) {
+      // 历史请求可能晚于切章返回，过期响应不得覆盖新章节的当前页。
+      if (seq === loadSeq && state.chapterId === chapterId && pageNumber && pageNumber >= 1 && pageNumber <= state.pages.length) {
         state.currentPage = pageNumber
       }
     } catch {

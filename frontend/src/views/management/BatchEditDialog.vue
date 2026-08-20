@@ -48,7 +48,7 @@ import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useCategoryStore } from '@/stores/management/category'
 import { useTagStore } from '@/stores/tag-store'
-import { comicApi } from '@/services/api'
+import { managementComicApi } from '@/services/api'
 import type { BatchComicUpdateDTO } from '@/types'
 
 const props = defineProps<{
@@ -80,7 +80,7 @@ async function onConfirm() {
       categoryId: categoryId.value,
       addTagIds: addTagIds.value.length > 0 ? addTagIds.value : undefined,
     }
-    const res = await comicApi.batchUpdate(data)
+    const res = await managementComicApi.batchUpdate(data)
     const result = res.data
     if (result.succeeded === 0) {
       ElMessage.error('所有漫画更新失败')
