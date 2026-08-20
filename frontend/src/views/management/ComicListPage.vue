@@ -35,8 +35,9 @@
         placeholder="搜索标题/作者/标签"
         clearable
         class="filter-input"
-        @keyup.enter="applyFilters"
-        @clear="applyFilters"
+        @input="scheduleKeywordSearch"
+        @keyup.enter="applyKeywordSearchImmediately"
+        @clear="applyKeywordSearchImmediately"
       />
       <el-select v-model="filters.category" placeholder="分类" clearable class="filter-select" @change="applyFilters">
         <el-option label="未分类" value="_NONE" />
@@ -171,7 +172,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { PictureFilled, WarningFilled } from '@element-plus/icons-vue'
 import { useManagementComicStore } from '@/stores/management/comic'
@@ -219,6 +220,9 @@ const filters = reactive({
   sort: 'createdAt',
   order: 'desc' as 'asc' | 'desc',
 })
+
+const KEYWORD_SEARCH_DEBOUNCE_MS = 300
+let keywordSearchTimer: ReturnType<typeof setTimeout> | null = null
 
 const selectedIds = ref<number[]>([])
 const showBatchDialog = ref(false)
@@ -278,7 +282,27 @@ watch(() => filters.tags, (val) => {
   }
 }, { deep: true })
 
+function cancelPendingKeywordSearch() {
+  if (keywordSearchTimer === null) return
+  clearTimeout(keywordSearchTimer)
+  keywordSearchTimer = null
+}
+
+function scheduleKeywordSearch() {
+  cancelPendingKeywordSearch()
+  keywordSearchTimer = setTimeout(() => {
+    keywordSearchTimer = null
+    applyFilters()
+  }, KEYWORD_SEARCH_DEBOUNCE_MS)
+}
+
+function applyKeywordSearchImmediately() {
+  cancelPendingKeywordSearch()
+  applyFilters()
+}
+
 function applyFilters() {
+  cancelPendingKeywordSearch()
   const normalizedTags = filters.tags.includes('_NONE') ? ['_NONE'] : [...filters.tags]
   filters.tags = normalizedTags
   if (normalizedTags.length === 0 || normalizedTags.includes('_NONE')) {
@@ -297,6 +321,7 @@ function applyFilters() {
 }
 
 function resetFilters() {
+  cancelPendingKeywordSearch()
   filters.keyword = ''
   filters.category = ''
   filters.status = ''
@@ -331,6 +356,10 @@ onMounted(() => {
   tagStore.fetchList()
   store.fetchList()
   storageService.fetchSummary().then((stats) => { storageStats.value = stats }).catch(() => { storageStats.value = null })
+})
+
+onBeforeUnmount(() => {
+  cancelPendingKeywordSearch()
 })
 
 function formatBytes(bytes: number | undefined): string {
