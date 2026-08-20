@@ -114,6 +114,7 @@ import {
 import { useReaderNavigation } from '@/views/reading/reader/composables/useReaderNavigation'
 import { comicApi } from '@/services/reading'
 import { preloadEngine } from '@/utils/preload-engine'
+import { isVideoMedia } from '@/utils/media-type'
 import type { ComicDetailVO } from '@/types'
 
 const route = useRoute()
@@ -263,6 +264,9 @@ async function loadCurrentChapter(preservePage = false, restoreProgress = true) 
     preloadEngine.setUrlResolver((index: number, priority: 'immediate' | 'cascade') => {
       const page = store.pages[index]
       if (!page) return null
+      // 视频只由 <video preload="metadata"> 按需读取，禁止图片预加载器
+      // 把视频 URL 交给 new Image() 并发起额外媒体请求。
+      if (isVideoMedia(page)) return null
       // 只有可视区附近的 immediate 才预加载 HQ；远处 cascade 一律优先 LQ，
       // 避免快速滚动时同时下载和解码大量原图导致 Safari 内存崩溃。
       const wantHq =
