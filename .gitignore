@@ -40,6 +40,9 @@ mysql-data/
 # Manga storage (local dev)
 /manga/
 
+# Local promotional materials
+/docs/promo/
+
 # OpenCode
 .sisyphus/
 .omo/boulder.json
