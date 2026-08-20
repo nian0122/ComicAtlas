@@ -11,8 +11,15 @@
       @click="handleActivate"
     >
       <!-- 浏览器端首帧预览：通过 Range 按需读取，不生成独立预览图。 -->
+      <img
+        v-if="active && previewFrameUrl"
+        class="video-preview"
+        :src="previewFrameUrl"
+        alt=""
+        @load="previewReady = true"
+      >
       <video
-        v-if="active"
+        v-else-if="active"
         ref="previewRef"
         class="video-preview"
         :src="hqUrl"
@@ -82,6 +89,10 @@ import {
   getPosition,
   savePosition,
 } from '@/views/reading/reader/videoPlaybackCoordinator'
+import {
+  cacheVideoFirstFrame,
+  getCachedVideoFirstFrame,
+} from '@/views/reading/reader/video-first-frame-cache'
 
 // ---------------------------------------------------------------------------
 // Props
@@ -134,6 +145,10 @@ const previewRef = ref<HTMLVideoElement | null>(null)
 
 /** 首帧已解码并可渲染。 */
 const previewReady = ref(false)
+/** 会话内存中的首帧 Blob URL，用于上下滑动后直接复用。 */
+const previewFrameUrl = ref<string | null>(
+  getCachedVideoFirstFrame(props.mediaId ?? 0),
+)
 
 /** Video native dimensions populated by loadedmetadata (fallback aspect ratio). */
 const nativeWidth = ref(0)
@@ -278,9 +293,20 @@ function onError(): void {
   playerState.value = 'error'
 }
 
-function onPreviewLoadedData(): void {
+async function onPreviewLoadedData(): Promise<void> {
   // loadeddata 表示当前帧已解码，浏览器可直接绘制。
   previewReady.value = true
+  const video = previewRef.value
+  const mediaId = props.mediaId ?? 0
+  if (!video || mediaId <= 0) return
+
+  const objectUrl = await cacheVideoFirstFrame(mediaId, video)
+  if (!objectUrl || props.mediaId !== mediaId) return
+  previewFrameUrl.value = objectUrl
+
+  // Blob 首帧就绪后立即释放视频连接，后续滑动仅复用内存帧。
+  video.removeAttribute('src')
+  video.load()
 }
 
 function onPreviewMetadata(): void {
@@ -424,6 +450,8 @@ watch(
     if (oldId !== undefined && newId !== oldId) {
       // Save position for old media, release session, reset state
       unloadVideo('mediaId-changed', oldId)
+      previewFrameUrl.value = getCachedVideoFirstFrame(newId ?? 0)
+      previewReady.value = previewFrameUrl.value !== null
     }
   },
 )
@@ -436,6 +464,8 @@ watch(
     if (!isActive) {
       previewReady.value = false
       unloadVideo('inactive')
+    } else if (previewFrameUrl.value) {
+      previewReady.value = true
     }
   },
 )
