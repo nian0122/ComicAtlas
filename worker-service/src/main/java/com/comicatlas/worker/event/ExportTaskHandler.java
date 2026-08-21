@@ -56,7 +56,7 @@ public class ExportTaskHandler {
 
         ExportService.ExportOutput output;
         try {
-            output = exportService.export(event.comicId(), event.taskId());
+            output = exportService.export(event.comicId(), event.taskId(), event.format());
         } catch (Exception e) {
             publishExportFailed(event, e);
             return;

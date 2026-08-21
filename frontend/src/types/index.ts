@@ -444,6 +444,7 @@ export interface ExportArtifactVO {
 export interface ExportTaskVO {
   id: number
   comicId: number
+  format?: 'ZIP' | 'CBZ'
   status: string // PENDING | RUNNING | SUCCESS | FAILED
   progress: number // 0-100
   outputRoot?: string

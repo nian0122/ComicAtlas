@@ -31,8 +31,9 @@ import java.util.stream.Stream;
 @RequiredArgsConstructor
 public class ExportArchivePublisher {
 
-    /** ZIP 主文件扩展名（识别任务目录中的主 .zip）。 */
+    /** CBZ/ZIP 主文件扩展名（识别任务目录中的主卷）。 */
     private static final String ZIP_EXTENSION = ".zip";
+    private static final String CBZ_EXTENSION = ".cbz";
 
     private final ZipBuilder zipBuilder;
 
@@ -66,7 +67,7 @@ public class ExportArchivePublisher {
 
     private PublishResult reuseExisting(Long taskId, Path finalDir, ExportManifest manifest, Path stagingDir)
             throws IOException {
-        Path mainZip = findMainZip(finalDir);
+        Path mainZip = findMainArchive(finalDir);
         try {
             zipBuilder.verify(mainZip, manifest);
         } catch (IOException ex) {
@@ -81,7 +82,7 @@ public class ExportArchivePublisher {
     }
 
     private PublishResult buildPublishResult(Long taskId, Path finalDir) throws IOException {
-        Path mainZip = findMainZip(finalDir);
+        Path mainZip = findMainArchive(finalDir);
         String fileName = taskId + "/" + mainZip.getFileName();
         long size = 0L;
         for (Path volume : ZipVolumeResolver.resolve(mainZip)) {
@@ -90,17 +91,18 @@ public class ExportArchivePublisher {
         return new PublishResult(fileName, size);
     }
 
-    private static Path findMainZip(Path dir) throws IOException {
+    private static Path findMainArchive(Path dir) throws IOException {
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir)) {
             for (Path candidate : stream) {
                 String name = candidate.getFileName().toString();
+                String lowerName = name.toLowerCase(Locale.ROOT);
                 if (Files.isRegularFile(candidate, LinkOption.NOFOLLOW_LINKS)
-                        && name.toLowerCase(Locale.ROOT).endsWith(ZIP_EXTENSION)) {
+                        && (lowerName.endsWith(ZIP_EXTENSION) || lowerName.endsWith(CBZ_EXTENSION))) {
                     return candidate;
                 }
             }
         }
-        throw new IOException("任务目录缺少主 .zip 文件: " + dir);
+        throw new IOException("任务目录缺少主 .cbz/.zip 文件: " + dir);
     }
 
     private void deleteRecursively(Path dir) {

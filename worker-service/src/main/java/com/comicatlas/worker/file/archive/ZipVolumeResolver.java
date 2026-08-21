@@ -14,7 +14,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * 分卷 ZIP 卷解析器 — 以最终 {@code .zip} 文件为唯一入口，枚举同目录同 basename 的
+ * 分卷 ZIP/CBZ 卷解析器 — 以最终 {@code .zip/.cbz} 文件为唯一入口，枚举同目录同 basename 的
  * {@code .z01..zNN} 连续卷，返回「数字序列 + 最后卷」的有序路径列表。
  *
  * <p>校验规则：只接受最终 {@code .zip} 作为入口；拒绝缺号（如存在 .z01/.z03 缺 .z02）、
@@ -45,12 +45,14 @@ public final class ZipVolumeResolver {
     public static List<Path> resolve(Path mainZip) throws IOException {
         Path normalized = mainZip.toAbsolutePath().normalize();
         String fileName = normalized.getFileName().toString();
-        if (!fileName.toLowerCase(Locale.ROOT).endsWith(".zip")) {
-            throw new IllegalArgumentException("只接受最终 .zip 分卷作为入口: " + normalized);
+        String lowerName = fileName.toLowerCase(Locale.ROOT);
+        String extension = archiveExtension(lowerName);
+        if (extension == null) {
+            throw new IllegalArgumentException("只接受最终 .zip/.cbz 分卷作为入口: " + normalized);
         }
-        requireRegularFile(normalized, "主 .zip");
+        requireRegularFile(normalized, "主 " + extension);
 
-        String baseName = fileName.substring(0, fileName.length() - ".zip".length());
+        String baseName = fileName.substring(0, fileName.length() - extension.length());
         Path dir = normalized.getParent();
 
         Map<Integer, Path> numberedSegments = new TreeMap<>();
@@ -98,6 +100,16 @@ public final class ZipVolumeResolver {
         }
         ordered.add(normalized);
         return List.copyOf(ordered);
+    }
+
+    private static String archiveExtension(String lowerName) {
+        if (lowerName.endsWith(".zip")) {
+            return ".zip";
+        }
+        if (lowerName.endsWith(".cbz")) {
+            return ".cbz";
+        }
+        return null;
     }
 
     private static void requireRegularFile(Path path, String role) throws IOException {

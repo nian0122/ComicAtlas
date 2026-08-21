@@ -89,11 +89,8 @@ public class ZipExtractor implements ArchiveExtractor {
      */
     private List<Path> resolveVolumes(Path archive) throws IOException {
         String lowerName = archive.getFileName().toString().toLowerCase(Locale.ROOT);
-        if (lowerName.endsWith(".zip")) {
+        if (lowerName.endsWith(".zip") || lowerName.endsWith(".cbz")) {
             return ZipVolumeResolver.resolve(archive);
-        }
-        if (lowerName.endsWith(".cbz")) {
-            return List.of(archive.toAbsolutePath().normalize());
         }
         throw new IllegalArgumentException(
             "不支持的归档入口（须 .zip/.cbz，分卷以最后 .zip 为入口）: " + archive.getFileName());

@@ -1,6 +1,7 @@
 package com.comicatlas.worker.export;
 
 import com.comicatlas.common.constant.StorageRootKeys;
+import com.comicatlas.common.constant.ExportFormats;
 import com.comicatlas.worker.common.ComicTitleSanitizer;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.entity.ExportChapter;
@@ -49,8 +50,9 @@ public class ExportService {
     private static final String STAGING_DIR_PREFIX = ".staging-";
     /** 无标题章节的目录名兜底前缀。 */
     private static final String CHAPTER_DIR_PREFIX = "chapter_";
-    /** ZIP 产物扩展名。 */
+    /** ZIP/CBZ 产物扩展名。 */
     private static final String ZIP_EXTENSION = ".zip";
+    private static final String CBZ_EXTENSION = ".cbz";
     /** 导出文件名时间戳格式。 */
     private static final DateTimeFormatter TIMESTAMP_FMT = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
 
@@ -66,6 +68,10 @@ public class ExportService {
     }
 
     public ExportOutput export(Long comicId, Long taskId) throws IOException {
+        return export(comicId, taskId, ExportFormats.ZIP);
+    }
+
+    public ExportOutput export(Long comicId, Long taskId, String format) throws IOException {
         ExportCollectResult result = exportCollector.collect(comicId);
         ExportManifest manifest = buildManifest(result);
 
@@ -74,7 +80,7 @@ public class ExportService {
             throw new IllegalStateException("EXPORT 存储根未配置或路径不存在");
         }
 
-        String baseFileName = buildOutputFileName(comicId, result.comic().getTitle());
+        String baseFileName = buildOutputFileName(comicId, result.comic().getTitle(), format);
         Path stagingDir = exportRoot.resolve(STAGING_DIR_PREFIX + taskId);
         Path finalDir = exportRoot.resolve(String.valueOf(taskId));
         deleteRecursively(stagingDir);
@@ -275,9 +281,10 @@ public class ExportService {
         }
     }
 
-    private String buildOutputFileName(Long comicId, String title) {
+    private String buildOutputFileName(Long comicId, String title, String format) {
         String timestamp = LocalDateTime.now().format(TIMESTAMP_FMT);
         String safeTitle = ComicTitleSanitizer.sanitize(title);
-        return safeTitle + "_" + comicId + "_" + timestamp + ZIP_EXTENSION;
+        String extension = ExportFormats.CBZ.equalsIgnoreCase(format) ? CBZ_EXTENSION : ZIP_EXTENSION;
+        return safeTitle + "_" + comicId + "_" + timestamp + extension;
     }
 }

@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 public class ExportTaskVO {
     private Long id;
     private Long comicId;
+    private String format;
     private String status;
     private Integer progress;
     private String outputRoot;

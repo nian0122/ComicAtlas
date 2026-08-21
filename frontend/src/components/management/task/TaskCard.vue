@@ -138,7 +138,7 @@ const taskName = computed(() => {
   const parts = path.replace(/\\/g, '/').split('/')
   const last = parts[parts.length - 1]
   // 去掉 .zip 扩展名
-  return last?.replace(/\.zip$/i, '') || path
+  return last?.replace(/\.(zip|cbz)$/i, '') || path
 })
 
 const canCancel = computed(() =>

@@ -524,7 +524,8 @@ public class ManagementTaskService {
 
         ExportTaskCreatedEvent event = new ExportTaskCreatedEvent(
                 UUID.randomUUID(), Instant.now(),
-                exportTask.getId(), exportTask.getComicId());
+                exportTask.getId(), exportTask.getComicId(),
+                exportTask.getFormat() == null ? "ZIP" : exportTask.getFormat());
         outboxService.enqueue(event, MqExchanges.EXPORT, MqRoutingKeys.TASK_CREATED,
                 taskId, item.getId(), newAttempt);
         log.info("导出任务重试已重新入队: taskId={}, itemId={}, attempt={}, exportTaskId={}, comicId={}",

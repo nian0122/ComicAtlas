@@ -48,12 +48,15 @@ public class ExportZipVolumeResolver {
     public List<Path> resolve(Path mainZip) throws IOException {
         Path normalized = mainZip.toAbsolutePath().normalize();
         String fileName = normalized.getFileName().toString();
-        if (!fileName.toLowerCase(Locale.ROOT).endsWith(".zip")) {
-            throw new IllegalArgumentException("只接受最终 .zip 分卷作为入口: " + fileName);
+        String lowerName = fileName.toLowerCase(Locale.ROOT);
+        String extension = lowerName.endsWith(".zip") ? ".zip"
+                : lowerName.endsWith(".cbz") ? ".cbz" : null;
+        if (extension == null) {
+            throw new IllegalArgumentException("只接受最终 .zip/.cbz 分卷作为入口: " + fileName);
         }
-        requireRegularFile(normalized, "主 .zip");
+        requireRegularFile(normalized, "主 " + extension);
 
-        String baseName = fileName.substring(0, fileName.length() - ".zip".length());
+        String baseName = fileName.substring(0, fileName.length() - extension.length());
         Path dir = normalized.getParent();
 
         Map<Integer, Path> numberedSegments = new TreeMap<>();
