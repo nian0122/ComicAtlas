@@ -32,10 +32,14 @@ import com.comicatlas.persistence.comic.entity.Catalog;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.entity.Media;
+import com.comicatlas.persistence.comic.entity.ComicTag;
+import com.comicatlas.persistence.comic.entity.Tag;
 import com.comicatlas.persistence.comic.mapper.CatalogMapper;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.persistence.comic.mapper.MediaMapper;
+import com.comicatlas.persistence.comic.mapper.ComicTagMapper;
+import com.comicatlas.persistence.comic.mapper.TagMapper;
 import com.comicatlas.api.storage.ApiStorageProperties;
 import com.comicatlas.api.storage.service.MetadataUpdateCoordinator;
 import lombok.RequiredArgsConstructor;
@@ -51,6 +55,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -119,6 +124,8 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
     private final CatalogMapper catalogMapper;
     private final ChapterMapper chapterMapper;
     private final MediaMapper mediaMapper;
+    private final ComicTagMapper comicTagMapper;
+    private final TagMapper tagMapper;
     private final ImportTaskMapper taskMapper;
     private final CatalogCacheInvalidator catalogCacheInvalidator;
     private final ManagementTaskService managementTaskService;
@@ -188,7 +195,9 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
         comic.setTitle((String) comicData.get("title"));
         comic.setTitleJpn((String) comicData.get("titleJpn"));
         comic.setAuthor((String) comicData.get("author"));
+        comic.setDescription((String) comicData.get("description"));
         comic.setCategory((String) comicData.get("category"));
+        persistComicInfoTags(comicId, comicData.get("tags"));
         if (comicData.get("sourceGalleryId") != null) {
             comic.setSourceGalleryId(comicData.get("sourceGalleryId").toString());
         }
@@ -243,6 +252,37 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
         log.info("completed 落库完成: comicId={}, chapters={}, pages={}, finalizeRequests={}",
                 comicId, requests.size(), totalPages, requests.size());
         return requests;
+    }
+
+    /** 将 ComicInfo 的 Genre/Tags 合并结果写入标签表，并保持漫画标签关联幂等。 */
+    private void persistComicInfoTags(Long comicId, Object rawTags) {
+        if (!(rawTags instanceof List<?> values)) {
+            return;
+        }
+        Set<Long> existingTagIds = new HashSet<>(comicTagMapper.selectList(
+                new LambdaQueryWrapper<ComicTag>().eq(ComicTag::getComicId, comicId))
+                .stream().map(ComicTag::getTagId).toList());
+        for (Object rawTag : values) {
+            if (!(rawTag instanceof String tagName) || tagName.isBlank()) {
+                continue;
+            }
+            String normalizedName = tagName.trim();
+            Tag tag = tagMapper.selectOne(new LambdaQueryWrapper<Tag>()
+                    .eq(Tag::getName, normalizedName)
+                    .eq(Tag::getType, "COMICINFO"));
+            if (tag == null) {
+                tag = new Tag();
+                tag.setName(normalizedName);
+                tag.setType("COMICINFO");
+                tagMapper.insert(tag);
+            }
+            if (existingTagIds.add(tag.getId())) {
+                ComicTag comicTag = new ComicTag();
+                comicTag.setComicId(comicId);
+                comicTag.setTagId(tag.getId());
+                comicTagMapper.insert(comicTag);
+            }
+        }
     }
 
     private Map<Integer, Long> insertCatalogs(List<Map<String, Object>> catalogsData, Long comicId) {

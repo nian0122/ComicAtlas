@@ -23,6 +23,10 @@
             <el-button :disabled="!isAllowed('HQ_DELETE')" type="danger" @click="deleteHq">删除 HQ</el-button>
             <el-button :disabled="!isAllowed('TRANSCODE')" @click="transcode">视频转码</el-button>
             <el-button :disabled="!isAllowed('METADATA_REFRESH')" @click="refreshMetadata">刷新元数据</el-button>
+            <el-select v-model="exportFormat" style="width: 120px" aria-label="导出格式">
+              <el-option label="ZIP" value="ZIP" />
+              <el-option label="CBZ" value="CBZ" />
+            </el-select>
             <el-button @click="createExport">导出漫画</el-button>
           </div>
           <el-table :data="blockedRows" empty-text="当前没有被阻止的操作">
@@ -112,6 +116,7 @@ const polling = ref(true)
 const loading = ref(false)
 const error = ref('')
 const activeTab = ref('operations')
+const exportFormat = ref<'ZIP' | 'CBZ'>('ZIP')
 let timer: ReturnType<typeof setInterval> | undefined
 
 const statusMeta = computed(() => comic.value ? comicStatusMeta(comic.value.status) : comicStatusMeta('DRAFT'))
@@ -127,7 +132,7 @@ function generateLq(regenerate: boolean): void { void runAction(regenerate ? '�
 function deleteHq(): void { void runAction('删除 HQ', () => hqApi.deleteComic(comicId.value)) }
 function transcode(): void { void runAction('视频转码', () => adminApi.transcodeVideos(comicId.value)) }
 function refreshMetadata(): void { void runAction('刷新元数据', () => storageService.requestMetadataRefresh(comicId.value)) }
-function createExport(): void { void runAction('导出', () => exportApi.createExport(comicId.value)) }
+function createExport(): void { void runAction(`${exportFormat.value} 导出`, () => exportApi.createExport(comicId.value, exportFormat.value)) }
 async function trashComic(): Promise<void> { await ElMessageBox.confirm('漫画将移入回收站，可在保留期内恢复。', '确认回收', { type: 'warning' }); await runAction('回收漫画', () => managementComicApi.delete(comicId.value)) }
 function restoreComic(): void { void runAction('恢复漫画', () => trashApi.restoreComic(comicId.value)) }
 async function purgeComic(): Promise<void> { await ElMessageBox.confirm('永久清理不可恢复，并受 7 天保留期限制。', '确认永久清理', { type: 'error' }); await runAction('永久清理', () => trashApi.purgeComic(comicId.value, purgeToken.value.trim())) }

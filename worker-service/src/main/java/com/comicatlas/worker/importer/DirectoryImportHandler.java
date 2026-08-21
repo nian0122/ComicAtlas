@@ -79,7 +79,10 @@ public class DirectoryImportHandler {
             // 导入只录入文件信息 + 生成封面，不做视频转码/图片优化；
             // 转码与 LQ 优化由导入后在管理面板手动调用接口执行，加快导入时间。
             DirectoryTree tree = parser.parse(ctx.sourcePath(), ctx.sourceType());
-            ComicMetadata metadata = assembler.assemble(tree, ctx);
+            var comicInfo = ComicInfoParser.parse(tree.path());
+            ComicMetadata metadata = comicInfo.isPresent()
+                    ? assembler.assemble(tree, ctx, comicInfo.get())
+                    : assembler.assemble(tree, ctx);
 
             if (cancelHandler.isCancelled(taskId)) {
                 log.info("Task cancelled after parse: taskId={}", taskId);
@@ -168,6 +171,7 @@ public class DirectoryImportHandler {
         Map<String, Object> comic = new LinkedHashMap<>();
         comic.put("title", metadata.title());
         comic.put("author", metadata.author() != null ? metadata.author() : "");
+        comic.put("description", metadata.description() != null ? metadata.description() : "");
         comic.put("tags", metadata.tags());
 
         List<Map<String, Object>> catalogList = metadata.catalogs().stream().map(catalog -> {

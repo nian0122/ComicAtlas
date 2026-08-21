@@ -8,6 +8,7 @@ import com.comicatlas.worker.mapper.ExportCatalogMapper;
 import com.comicatlas.worker.mapper.ExportChapterMapper;
 import com.comicatlas.worker.mapper.ExportComicMapper;
 import com.comicatlas.worker.mapper.ExportMediaMapper;
+import com.comicatlas.worker.mapper.ExportTagMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -25,6 +26,7 @@ public class ExportCollector {
     private final ExportChapterMapper chapterMapper;
     private final ExportCatalogMapper catalogMapper;
     private final ExportMediaMapper mediaMapper;
+    private final ExportTagMapper exportTagMapper;
 
     /**
      * @param comicId 漫画 ID
@@ -41,6 +43,7 @@ public class ExportCollector {
 
         List<Long> chapterIds = chapters.stream().map(ExportChapter::getId).toList();
         List<ExportMedia> allMedia = chapterIds.isEmpty() ? List.of() : mediaMapper.selectByComicId(comicId);
+        comic.setTags(exportTagMapper.selectNamesByComicId(comicId));
 
         return new ExportCollectResult(comic, chapters, catalogs, allMedia, null);
     }

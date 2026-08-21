@@ -179,6 +179,7 @@ CREATE TABLE IF NOT EXISTS export_task (
     id          BIGINT AUTO_INCREMENT PRIMARY KEY,
     management_task_id BIGINT COMMENT '关联 management_task.id 一对一扩展',
     comic_id    BIGINT      NOT NULL,
+    format      VARCHAR(8)  NOT NULL DEFAULT 'ZIP',
     status      VARCHAR(20) NOT NULL DEFAULT 'PENDING',
     progress    SMALLINT    NOT NULL DEFAULT 0,
     output_root VARCHAR(20),

@@ -160,7 +160,7 @@ public class ImportServiceImpl implements ImportService {
                 }
                 redisTemplate.opsForValue().set(dedupKey, "1", REDIS_MARK_TTL);
             }
-            case "ZIP", "DIRECTORY" -> {
+            case "ZIP", "CBZ", "DIRECTORY" -> {
                 String path = sourcePath != null ? sourcePath : sourceRef;
                 if (path == null || path.isBlank()) {
                     throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "请提供 sourcePath");

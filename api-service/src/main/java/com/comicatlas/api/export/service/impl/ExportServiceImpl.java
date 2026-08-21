@@ -20,6 +20,7 @@ import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
+import com.comicatlas.common.constant.ExportFormats;
 import com.comicatlas.common.event.ExportTaskCreatedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -50,14 +51,22 @@ public class ExportServiceImpl implements ExportService {
     @Override
     @Transactional
     public ExportTaskVO createExportTask(Long comicId) {
+        return createExportTask(comicId, ExportFormats.ZIP);
+    }
+
+    @Override
+    @Transactional
+    public ExportTaskVO createExportTask(Long comicId, String format) {
         requireExportableComic(comicId);
         rejectDuplicateActiveTask(comicId);
 
-        ExportTask task = createExportTaskRecord(comicId);
+        String normalizedFormat = normalizeFormat(format);
+        ExportTask task = createExportTaskRecord(comicId, normalizedFormat);
 
         Long taskId = task.getId();
         // 写入 Outbox（同事务），由 relay 异步发布，保证 DB 与消息一致
-        outboxService.enqueue(new ExportTaskCreatedEvent(UUID.randomUUID(), Instant.now(), taskId, comicId),
+        outboxService.enqueue(new ExportTaskCreatedEvent(UUID.randomUUID(), Instant.now(), taskId, comicId,
+                        normalizedFormat),
                 MqExchanges.EXPORT, MqRoutingKeys.TASK_CREATED);
 
         log.info("导出任务创建: taskId={}, comicId={}", taskId, comicId);
@@ -107,9 +116,10 @@ public class ExportServiceImpl implements ExportService {
         }
     }
 
-    private ExportTask createExportTaskRecord(Long comicId) {
+    private ExportTask createExportTaskRecord(Long comicId, String format) {
         ExportTask task = new ExportTask();
         task.setComicId(comicId);
+        task.setFormat(format);
         task.setStatus(ExportTaskStatus.PENDING);
         task.setProgress(0);
         exportTaskMapper.insert(task);
@@ -118,6 +128,14 @@ public class ExportServiceImpl implements ExportService {
         task.setManagementTaskId(managementTaskResponse.getId());
         exportTaskMapper.updateById(task);
         return task;
+    }
+
+    private static String normalizeFormat(String format) {
+        String normalized = format == null || format.isBlank() ? ExportFormats.ZIP : format.trim().toUpperCase();
+        if (!ExportFormats.ZIP.equals(normalized) && !ExportFormats.CBZ.equals(normalized)) {
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "不支持的导出格式: " + format);
+        }
+        return normalized;
     }
 
     /**
@@ -140,6 +158,7 @@ public class ExportServiceImpl implements ExportService {
         ExportTaskVO taskVO = new ExportTaskVO();
         taskVO.setId(task.getId());
         taskVO.setComicId(task.getComicId());
+        taskVO.setFormat(task.getFormat() == null ? ExportFormats.ZIP : task.getFormat());
         taskVO.setStatus(task.getStatus() == null ? null : task.getStatus().name());
         taskVO.setProgress(task.getProgress());
         taskVO.setOutputRoot(task.getOutputRoot());

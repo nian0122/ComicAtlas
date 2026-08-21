@@ -71,8 +71,8 @@ public class ImportTaskHandler {
 
     private void routeToHandler(String sourceType, String sourcePath, Long taskId, Long comicId, Path mangaRoot) throws Exception {
         switch (sourceType) {
-            case "ZIP" -> zipHandler.importZip(
-                    new ImportContext("ZIP", Path.of(sourcePath), false, false), taskId, comicId, mangaRoot);
+            case "ZIP", "CBZ" -> zipHandler.importZip(
+                    new ImportContext(sourceType, Path.of(sourcePath), false, false), taskId, comicId, mangaRoot);
             case "DIRECTORY" -> {
                 if (sourcePath == null) { throw new IllegalArgumentException("DIRECTORY 需要 sourcePath"); }
                 directoryHandler.handle(

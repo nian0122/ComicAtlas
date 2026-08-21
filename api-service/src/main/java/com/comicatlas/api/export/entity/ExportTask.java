@@ -22,6 +22,8 @@ public class ExportTask {
     private Long managementTaskId;
     /** 被导出的漫画 ID */
     private Long comicId;
+    /** 导出格式：ZIP（默认）或 CBZ。 */
+    private String format;
     /** 任务状态：PENDING/RUNNING/SUCCESS/FAILED */
     private ExportTaskStatus status;      // PENDING, RUNNING, SUCCESS, FAILED
     /** 进度百分比 0-100，失败时为 -1 */

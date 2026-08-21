@@ -22,6 +22,10 @@ public class ExportOperationService {
         return exportService.createExportTask(comicId);
     }
 
+    public ExportTaskVO createExportTask(Long comicId, String format) {
+        return exportService.createExportTask(comicId, format);
+    }
+
     public List<ExportTaskVO> listExports(Long comicId) {
         return exportService.listExports(comicId);
     }
