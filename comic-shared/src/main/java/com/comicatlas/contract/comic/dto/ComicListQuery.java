@@ -18,4 +18,12 @@ public class ComicListQuery {
     private String order = "desc";
     private Integer page = 1;
     private Integer size = 20;
+
+    /**
+     * 返回标签筛选数量，供 MyBatis SQL 绑定使用。
+     * 集合的 {@code size} 不是稳定的 JavaBean 属性，不能直接用于参数占位符。
+     */
+    public int getTagCount() {
+        return tags == null ? 0 : tags.size();
+    }
 }

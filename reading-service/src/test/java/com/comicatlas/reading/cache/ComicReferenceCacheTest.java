@@ -158,6 +158,16 @@ class ComicReferenceCacheTest {
         q1b.setPage(1);
         assertEquals(service.cacheKey(q1), service.cacheKey(q1b), "相同条件应生成相同 key");
         org.junit.jupiter.api.Assertions.assertNotEquals(service.cacheKey(q1), service.cacheKey(q2));
+
+        ComicListQuery descending = new ComicListQuery();
+        descending.setSort("pageCount");
+        descending.setOrder("desc");
+        ComicListQuery ascending = new ComicListQuery();
+        ascending.setSort("pageCount");
+        ascending.setOrder("asc");
+        org.junit.jupiter.api.Assertions.assertNotEquals(
+                service.cacheKey(descending), service.cacheKey(ascending),
+                "升序和降序必须使用不同缓存键");
     }
 
     @Test

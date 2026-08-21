@@ -15,7 +15,7 @@ public interface ComicMapper extends BaseMapper<Comic> {
 
     @Select("""
         <script>
-        SELECT c.id, c.title, c.author, c.total_pages, c.category_id, c.status, c.created_at FROM comic c
+        SELECT c.id, c.title, c.author, c.total_pages, c.category_id, c.status, c.created_at, c.hq_size FROM comic c
         <where>
             <choose>
                 <when test='query.status != null and query.status != ""'>
@@ -52,7 +52,7 @@ public interface ComicMapper extends BaseMapper<Comic> {
                                 AND (SELECT COUNT(DISTINCT t.name) FROM comic_tag ct JOIN tag t ON t.id = ct.tag_id
                                      WHERE ct.comic_id = c.id AND t.name IN
                                      <foreach collection='query.tags' item='tagName' open='(' separator=',' close=')'>#{tagName}</foreach>
-                                    ) = #{query.tags.size}
+                                    ) = #{query.tagCount}
                             </when>
                             <otherwise>
                                 AND EXISTS (SELECT 1 FROM comic_tag ct JOIN tag t ON t.id = ct.tag_id
@@ -86,6 +86,7 @@ public interface ComicMapper extends BaseMapper<Comic> {
             <when test='query.sort == "lastReadTime"'>(SELECT MAX(rh.updated_at) FROM reading_history rh WHERE rh.comic_id = c.id)</when>
             <when test='query.sort == "title"'>c.title</when>
             <when test='query.sort == "pageCount"'>c.total_pages</when>
+            <when test='query.sort == "fileSize"'>c.hq_size</when>
             <when test='query.sort == "updatedAt"'>c.updated_at</when>
             <otherwise>c.created_at</otherwise>
         </choose>
@@ -145,7 +146,7 @@ public interface ComicMapper extends BaseMapper<Comic> {
                                 AND (SELECT COUNT(DISTINCT t.name) FROM comic_tag ct JOIN tag t ON t.id = ct.tag_id
                                      WHERE ct.comic_id = c.id AND t.name IN
                                      <foreach collection='query.tags' item='tagName' open='(' separator=',' close=')'>#{tagName}</foreach>
-                                    ) = #{query.tags.size}
+                                    ) = #{query.tagCount}
                             </when>
                             <otherwise>
                                 AND EXISTS (SELECT 1 FROM comic_tag ct JOIN tag t ON t.id = ct.tag_id
