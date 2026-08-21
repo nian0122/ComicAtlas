@@ -14,7 +14,7 @@ public final class ComicListQueryNormalizer {
     public static final int MAX_PAGE_SIZE = 60;
 
     private static final Set<String> SORT_FIELDS = Set.of(
-            "createdAt", "updatedAt", "title", "pageCount", "lastReadTime");
+            "createdAt", "updatedAt", "title", "pageCount", "lastReadTime", "fileSize");
 
     private ComicListQueryNormalizer() {
     }

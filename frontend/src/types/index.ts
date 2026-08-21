@@ -23,7 +23,7 @@ export interface ComicListQuery {
   status?: string
   category?: string
   sourceType?: string
-  sort?: 'createdAt' | 'updatedAt' | 'title' | 'pageCount' | 'lastReadTime'
+  sort?: 'createdAt' | 'updatedAt' | 'title' | 'pageCount' | 'lastReadTime' | 'fileSize'
   order?: 'asc' | 'desc'
   page?: number
   size?: number
