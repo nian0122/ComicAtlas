@@ -439,9 +439,19 @@ onMounted(() => { void loadTree() })
 .header-tools { display: flex; align-items: center; gap: var(--space-3); }
 .comic-ref { color: var(--accent); font: 700 12px var(--mono); }
 .panel-kicker { color: var(--accent); font: 800 10px var(--mono); letter-spacing: .16em; }
-.structure-browser { display: grid; grid-template-columns: minmax(220px, 260px) minmax(0, 1fr) minmax(280px, 330px); gap: var(--space-3); height: clamp(560px, calc(100vh - 270px), 820px); min-width: 0; }
+.structure-browser {
+  display: grid;
+  grid-template-columns:
+    minmax(clamp(180px, 16vw, 240px), .8fr)
+    minmax(clamp(300px, 32vw, 560px), 2.4fr)
+    minmax(clamp(220px, 20vw, 300px), 1fr);
+  gap: var(--space-3);
+  height: clamp(560px, calc(100vh - 270px), 820px);
+  min-width: 0;
+}
 .tree-panel, .detail-panel, .action-panel { min-width: 0; border: 1px solid var(--border); background: var(--bg-surface); }
-.tree-panel, .action-panel { align-self: stretch; min-height: 0; overflow: visible; padding: var(--space-4); }
+.tree-panel, .action-panel { align-self: stretch; min-height: 0; overflow: hidden; padding: var(--space-4); }
+.action-panel { overflow-y: auto; scrollbar-gutter: stable; }
 .tree-panel { display: flex; flex-direction: column; }
 .detail-panel { display: flex; min-width: 0; min-height: 0; flex-direction: column; overflow: hidden; padding: clamp(var(--space-5), 3vw, var(--space-8)); }
 .panel-topline, .selected-header, .media-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
@@ -484,9 +494,45 @@ onMounted(() => { void loadTree() })
 .empty-mark { color: var(--accent); font-size: 2rem; }
 .media-heading { align-items: center; margin: var(--space-6) 0 var(--space-3); }
 .media-heading h3 { margin: 0 0 4px; color: var(--text-primary); }
-.media-table-scroll { min-width: 0; min-height: 0; flex: 1; overflow: auto; }
-.media-table { width: 100%; min-width: 0; }
-.media-table :deep(.el-table__header-wrapper), .media-table :deep(.el-table__body-wrapper) { max-width: 100%; overflow-x: auto; }
+.media-table-scroll {
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-gutter: stable;
+}
+.media-table {
+  width: max-content;
+  min-width: 100%;
+  height: 100%;
+}
+.media-table :deep(.el-table__inner-wrapper) {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+}
+.media-table :deep(.el-table__header-wrapper),
+.media-table :deep(.el-table__body-wrapper) {
+  max-width: none;
+  overflow-x: visible;
+}
+.media-table :deep(.el-table__body-wrapper) {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+.media-table :deep(.el-table__header-wrapper) {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg-surface);
+}
+.media-table :deep(.el-table__header),
+.media-table :deep(.el-table__body) {
+  width: max-content !important;
+  min-width: 100%;
+}
 .media-table :deep(.media-row--selected > td) { background: color-mix(in srgb, var(--accent) 12%, var(--bg-surface)); }
 .media-table :deep(.el-table__row) { cursor: pointer; }
 .media-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); margin: var(--space-4) 0; }
@@ -599,12 +645,7 @@ onMounted(() => { void loadTree() })
 .media-action-buttons .el-button { width: 100%; margin: 0; }
 .action-empty { display: grid; place-items: center; min-height: 220px; gap: var(--space-2); text-align: center; }
 @media (max-width: 1500px) {
-  .structure-browser { grid-template-columns: minmax(220px, .8fr) minmax(320px, 1.4fr); height: auto; min-height: 560px; }
-  .action-panel { grid-column: 1 / -1; }
-  .action-panel .action-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); align-items: end; }
-  .action-panel .action-form .el-form-item { margin-bottom: 0; }
-  .action-panel .form-grid { grid-column: 1 / -1; }
-  .media-action { grid-column: 1 / -1; }
+  .structure-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 760px) {
   .structure-header { align-items: flex-start; flex-direction: column; }

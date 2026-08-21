@@ -107,7 +107,7 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
      * 同条件同键、不同条件不同键；loadPage 的 @Cacheable 引用此方法。
      */
     public String cacheKey(ComicListQuery query) {
-        String raw = "v2|" + String.join("|",
+        String raw = "v3|" + String.join("|",
                 nz(query.getKeyword()),
                 nz(query.getTag()),
                 query.getTags() == null ? "" : String.join(",", query.getTags()),
@@ -116,6 +116,7 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
                 nz(query.getCategory()),
                 nz(query.getSourceType()),
                 nz(query.getSort()),
+                nz(query.getOrder()),
                 String.valueOf(query.getPage()),
                 String.valueOf(query.getSize()));
         return md5(raw);

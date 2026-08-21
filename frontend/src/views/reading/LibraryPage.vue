@@ -1,19 +1,57 @@
 <template>
   <div class="comic-list-page">
-    <header class="page-header">
+    <header
+      ref="pageHeaderRef"
+      class="page-header"
+      :class="{ 'desktop-filter-hidden': isDesktopFilterHidden }"
+    >
       <div class="title-block">
         <div class="title-row">
           <h1 class="page-title">
-            <span class="mobile-page-title">我的收藏</span>
+            <span class="mobile-page-title" aria-label="筛选结果数量">
+              <strong>{{ store.total }}</strong><small>本</small>
+            </span>
           </h1>
-          <span class="mobile-recent">
-            <el-icon :size="18"><Sort /></el-icon>
-            最近阅读
-          </span>
+          <div class="mobile-recent">
+            <button
+              type="button"
+              class="mobile-sort-order"
+              :class="{ ascending: order === 'asc' }"
+              :aria-label="order === 'asc' ? '当前升序，点击切换为降序' : '当前降序，点击切换为升序'"
+              @click="toggleSortOrder"
+            >
+              <el-icon :size="18"><Sort /></el-icon>
+            </button>
+            <el-popover
+              v-model:visible="isMobileSortOpen"
+              placement="bottom-end"
+              :width="218"
+              trigger="click"
+              popper-class="mobile-sort-menu-popper"
+            >
+              <template #reference>
+                <button type="button" class="mobile-sort-trigger" aria-label="选择排序字段">
+                  <span>{{ currentSortLabel }}</span>
+                  <i aria-hidden="true" />
+                </button>
+              </template>
+
+              <div class="mobile-sort-menu">
+                <div class="mobile-sort-grid" role="group" aria-label="排序字段">
+                  <button
+                    v-for="option in sortOptions"
+                    :key="option.value"
+                    type="button"
+                    :class="{ active: sort === option.value }"
+                    @click="selectMobileSort(option.value)"
+                  >
+                    {{ option.label }}
+                  </button>
+                </div>
+              </div>
+            </el-popover>
+          </div>
         </div>
-        <p class="page-count">
-          <span class="mobile-page-count">{{ store.total }} 部作品 · 本页 {{ readingCount }} 部正在阅读</span>
-        </p>
       </div>
       <div class="toolbar">
         <!-- 移动端第一行：搜索 + 排序合并为一行；桌面端 display:contents 平铺回单行布局 -->
@@ -24,7 +62,7 @@
               v-model="keyword"
               data-library-search
               type="text"
-              placeholder="搜索漫画..."
+              placeholder="搜索"
               aria-label="搜索漫画"
               @input="onKeywordInput"
               @keyup.enter="onSearch"
@@ -32,14 +70,28 @@
             <el-icon v-if="keyword" :size="16" class="clear-icon" @click="clearKeyword"><CircleClose /></el-icon>
           </div>
 
-          <div class="filter-select sort-select">
-            <el-select v-model="sort" aria-label="排序方式" popper-class="library-filter-popper" @change="onSearch">
-              <el-option label="最新添加" value="createdAt" />
-              <el-option label="最近更新" value="updatedAt" />
-              <el-option label="标题" value="title" />
-              <el-option label="页数" value="pageCount" />
-              <el-option label="最近阅读" value="lastReadTime" />
-            </el-select>
+          <div class="desktop-sort-group">
+            <div class="filter-select sort-select">
+              <el-select v-model="sort" aria-label="排序方式" popper-class="library-filter-popper" @change="onSearch">
+                <el-option label="最新添加" value="createdAt" />
+                <el-option label="最近更新" value="updatedAt" />
+                <el-option label="标题" value="title" />
+                <el-option label="页数" value="pageCount" />
+                <el-option label="文件大小" value="fileSize" />
+                <el-option label="最近阅读" value="lastReadTime" />
+              </el-select>
+            </div>
+
+            <button
+              type="button"
+              class="desktop-sort-order"
+              :class="{ ascending: order === 'asc' }"
+              :aria-label="order === 'asc' ? '当前正序，点击切换为倒序' : '当前倒序，点击切换为正序'"
+              :title="order === 'asc' ? '正序' : '倒序'"
+              @click="toggleSortOrder"
+            >
+              <el-icon :size="18"><Sort /></el-icon>
+            </button>
           </div>
         </div>
 
@@ -74,10 +126,15 @@
             </el-select>
           </div>
 
-          <div class="filter-select tag-mode-filter">
-            <el-select v-model="tagMode" aria-label="标签匹配方式" popper-class="library-filter-popper" @change="onSearch">
-              <el-option label="任一匹配" value="OR" />
-              <el-option label="全部匹配" value="AND" />
+          <div v-if="selectedTags.length > 1" class="filter-select tag-mode-select">
+            <el-select
+              v-model="tagMode"
+              aria-label="标签匹配方式"
+              popper-class="library-filter-popper tag-mode-popper"
+              @change="onSearch"
+            >
+              <el-option label="任一" value="OR" />
+              <el-option label="同时" value="AND" />
             </el-select>
           </div>
 
@@ -92,55 +149,50 @@
       </div>
 
       <div class="mobile-filter-stack" aria-label="漫画筛选">
-        <div class="mobile-filter-row">
-          <button
-            type="button"
-            :class="{ active: !categoryFilter }"
-            @click="selectCategory('')"
-          >
-            全部
-          </button>
-          <button
-            v-for="category in allCategories"
-            :key="category.id"
-            type="button"
-            :class="{ active: categoryFilter === category.name }"
-            @click="selectCategory(category.name)"
-          >
-            {{ category.name }}
-          </button>
-          <button
-            type="button"
-            :class="{ active: categoryFilter === '_NONE' }"
-            @click="selectCategory('_NONE')"
-          >
-            未分类
-          </button>
+        <div class="mobile-filter-group-row">
+          <div class="mobile-filter-options" role="group" aria-label="按分类筛选">
+            <button type="button" :class="{ active: !categoryFilter }" @click="selectCategory('')">全部</button>
+            <button
+              v-for="category in allCategories"
+              :key="category.id"
+              type="button"
+              :class="{ active: categoryFilter === category.name }"
+              @click="selectCategory(category.name)"
+            >
+              {{ category.name }}
+            </button>
+            <button type="button" :class="{ active: categoryFilter === '_NONE' }" @click="selectCategory('_NONE')">未分类</button>
+          </div>
         </div>
-        <div class="mobile-filter-row mobile-filter-row--secondary">
-          <button
-            v-for="tag in allTags"
-            :key="tag.id"
-            type="button"
-            :class="{ active: selectedTags.includes(tag.name) }"
-            @click="toggleTag(tag.name)"
-          >
-            {{ tag.name }}
-          </button>
-          <button
-            type="button"
-            :class="{ active: selectedTags.includes('_NONE') }"
-            @click="toggleTag('_NONE')"
-          >
-            无标签
-          </button>
+
+        <div class="mobile-filter-group-row">
+          <div class="mobile-filter-options" role="group" aria-label="按标签筛选">
+            <button
+              v-for="tag in allTags"
+              :key="tag.id"
+              type="button"
+              :class="{ active: selectedTags.includes(tag.name) }"
+              @click="toggleTag(tag.name)"
+            >
+              {{ tag.name }}
+            </button>
+            <button type="button" :class="{ active: selectedTags.includes('_NONE') }" @click="toggleTag('_NONE')">
+              无标签
+            </button>
+          </div>
+        </div>
+
+        <div v-if="selectedTags.length > 1" class="mobile-filter-group-row mobile-filter-match-row">
+          <div class="mobile-match-control" role="group" aria-label="标签匹配方式">
+            <button type="button" :class="{ active: tagMode === 'OR' }" aria-label="任一标签满足" @click="setTagMode('OR')">任一</button>
+            <button type="button" :class="{ active: tagMode === 'AND' }" aria-label="所有标签同时满足" @click="setTagMode('AND')">同时</button>
+          </div>
         </div>
       </div>
     </header>
 
-    <div v-if="store.loading && store.list.length === 0" class="state loading">
+    <div v-if="store.loading && store.list.length === 0" class="state loading" aria-label="加载中">
       <div class="spinner" />
-      <span>加载中...</span>
     </div>
 
     <div v-else-if="store.error" class="state error">
@@ -152,7 +204,6 @@
     <div v-else-if="store.list.length === 0" class="state empty">
       <el-icon :size="48"><PictureFilled /></el-icon>
       <span>暂无漫画</span>
-      <p>请在电脑端导入作品，然后回到这里阅读</p>
     </div>
 
     <section v-else class="comic-section">
@@ -190,7 +241,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Search, PictureFilled, WarningFilled, CircleClose, Sort } from '@element-plus/icons-vue'
 import { useComicStore } from '@/stores/comic-store'
@@ -206,11 +257,30 @@ const store = useComicStore()
 
 const keyword = ref('')
 const sort = ref<NonNullable<ComicListQuery['sort']>>('createdAt')
+const order = ref<NonNullable<ComicListQuery['order']>>('desc')
 const selectedTags = ref<string[]>([])
 const tagMode = ref<'AND' | 'OR'>('OR')
 const allTags = ref<TagDTO[]>([])
 const categoryFilter = ref('')
 const allCategories = ref<CategoryDTO[]>([])
+const pageHeaderRef = ref<HTMLElement | null>(null)
+const isDesktopFilterHidden = ref(false)
+const isMobileSortOpen = ref(false)
+
+const sortOptions: Array<{ value: NonNullable<ComicListQuery['sort']>; label: string }> = [
+  { value: 'lastReadTime', label: '最近阅读' },
+  { value: 'createdAt', label: '最新添加' },
+  { value: 'updatedAt', label: '最近更新' },
+  { value: 'title', label: '标题' },
+  { value: 'pageCount', label: '页数' },
+  { value: 'fileSize', label: '文件大小' },
+]
+
+const DESKTOP_FILTER_BREAKPOINT = 1024
+const FILTER_HIDE_SCROLL_START = 160
+const FILTER_SCROLL_DELTA = 8
+let lastWindowScrollY = 0
+let scrollAnimationFrame: number | null = null
 
 const hasActiveFilters = computed(() => Boolean(keyword.value || categoryFilter.value || selectedTags.value.length))
 const activeFilterSummary = computed(() => {
@@ -223,6 +293,7 @@ const activeFilterSummary = computed(() => {
   }
   return summary
 })
+const currentSortLabel = computed(() => sortOptions.find((option) => option.value === sort.value)?.label || '最新添加')
 
 // 响应式视口宽度（resize 防抖更新，组件卸载时自动清理监听）
 const viewportWidth = useBreakpoint()
@@ -233,11 +304,40 @@ const posterSize = computed<'sm' | 'md' | 'lg'>(() => {
   return 'lg'
 })
 
-const readingCount = computed(() =>
-  store.list.filter((comic) => comic.progressPercent > 0 && comic.progressPercent < 100).length
-)
-
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
+
+function updateDesktopFilterVisibility() {
+  scrollAnimationFrame = null
+  const currentScrollY = Math.max(0, window.scrollY)
+
+  if (window.innerWidth <= DESKTOP_FILTER_BREAKPOINT || currentScrollY <= FILTER_HIDE_SCROLL_START) {
+    isDesktopFilterHidden.value = false
+    lastWindowScrollY = currentScrollY
+    return
+  }
+
+  // 用户正在输入或操作下拉框时，筛选栏保持可见。
+  const activeElement = document.activeElement
+  if (activeElement instanceof Node && pageHeaderRef.value?.contains(activeElement)) {
+    isDesktopFilterHidden.value = false
+    lastWindowScrollY = currentScrollY
+    return
+  }
+
+  const scrollDelta = currentScrollY - lastWindowScrollY
+  if (scrollDelta >= FILTER_SCROLL_DELTA) {
+    isDesktopFilterHidden.value = true
+    lastWindowScrollY = currentScrollY
+  } else if (scrollDelta <= -FILTER_SCROLL_DELTA) {
+    isDesktopFilterHidden.value = false
+    lastWindowScrollY = currentScrollY
+  }
+}
+
+function onWindowScroll() {
+  if (scrollAnimationFrame !== null) return
+  scrollAnimationFrame = window.requestAnimationFrame(updateDesktopFilterVisibility)
+}
 
 function onKeywordInput() {
   if (debounceTimer) clearTimeout(debounceTimer)
@@ -273,6 +373,22 @@ function toggleTag(tagName: string) {
   onSearch()
 }
 
+function setTagMode(mode: 'AND' | 'OR') {
+  tagMode.value = mode
+  onSearch()
+}
+
+function toggleSortOrder() {
+  order.value = order.value === 'asc' ? 'desc' : 'asc'
+  onSearch()
+}
+
+function selectMobileSort(nextSort: NonNullable<ComicListQuery['sort']>) {
+  sort.value = nextSort
+  isMobileSortOpen.value = false
+  onSearch()
+}
+
 async function loadTags() {
   try {
     const res = await readingTagApi.list()
@@ -304,6 +420,7 @@ function onSearch() {
     keyword: keyword.value || undefined,
     category: categoryFilter.value || undefined,
     sort: sort.value,
+    order: order.value,
     tags: selectedTags.value.length > 0 ? selectedTags.value : undefined,
     tagMode: selectedTags.value.length > 1 ? tagMode.value : undefined,
   })
@@ -312,12 +429,19 @@ function onSearch() {
 
 function onPageChange(page: number) {
   store.updateQuery({ page })
+  persistFiltersToRoute()
   store.fetchList()
+}
+
+function parseRoutePage(): number | undefined {
+  const rawPage = Array.isArray(route.query.page) ? route.query.page[0] : route.query.page
+  const page = Number(rawPage)
+  return Number.isInteger(page) && page > 0 ? page : undefined
 }
 
 function restoreFiltersFromStore() {
   const routeTags = route.query.tags
-  const hasRouteFilters = ['keyword', 'category', 'tags', 'tagMode', 'sort']
+  const hasRouteFilters = ['keyword', 'category', 'tags', 'tagMode', 'sort', 'order']
     .some((key) => route.query[key] !== undefined)
   const tagsFromRoute = Array.isArray(routeTags)
     ? routeTags.map(String)
@@ -329,13 +453,18 @@ function restoreFiltersFromStore() {
   selectedTags.value = hasRouteFilters ? (tagsFromRoute || []) : [...(store.query.tags || [])]
   tagMode.value = (hasRouteFilters ? route.query.tagMode : store.query.tagMode) === 'AND' ? 'AND' : 'OR'
   sort.value = (hasRouteFilters ? route.query.sort : store.query.sort) as NonNullable<ComicListQuery['sort']> || 'createdAt'
+  order.value = (hasRouteFilters ? route.query.order : store.query.order) === 'asc' ? 'asc' : 'desc'
+  const routePage = parseRoutePage()
   store.updateQuery({
     keyword: keyword.value || undefined,
     category: categoryFilter.value || undefined,
     tags: selectedTags.value.length > 0 ? selectedTags.value : undefined,
     tagMode: selectedTags.value.length > 1 ? tagMode.value : undefined,
     sort: sort.value,
-    page: 1,
+    order: order.value,
+    // URL 优先保证刷新可恢复；无 URL 时保留 Pinia 状态，
+    // 从详情页返回漫画库也不会跳回第一页。
+    page: routePage ?? store.query.page ?? 1,
   })
 }
 
@@ -348,6 +477,8 @@ function persistFiltersToRoute() {
       tags: selectedTags.value.length > 0 ? selectedTags.value : undefined,
       tagMode: selectedTags.value.length > 1 ? tagMode.value : undefined,
       sort: sort.value || undefined,
+      order: order.value === 'asc' ? 'asc' : undefined,
+      page: (store.query.page || 1) > 1 ? store.query.page : undefined,
     },
   })
 }
@@ -373,6 +504,20 @@ onMounted(() => {
   loadTags()
   loadCategories()
   store.fetchList()
+  lastWindowScrollY = Math.max(0, window.scrollY)
+  window.addEventListener('scroll', onWindowScroll, { passive: true })
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('scroll', onWindowScroll)
+  if (scrollAnimationFrame !== null) {
+    window.cancelAnimationFrame(scrollAnimationFrame)
+    scrollAnimationFrame = null
+  }
+  if (debounceTimer !== null) {
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+  }
 })
 </script>
 
@@ -390,6 +535,29 @@ onMounted(() => {
   margin-bottom: var(--space-2);
   background: linear-gradient(to bottom, var(--bg-primary) 86%, transparent);
   border-bottom: 1px solid var(--border);
+}
+
+@media (min-width: 1025px) {
+  .page-header {
+    transform: translate3d(0, 0, 0);
+    opacity: 1;
+    transition:
+      transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 160ms ease;
+    will-change: transform, opacity;
+  }
+
+  .page-header.desktop-filter-hidden {
+    transform: translate3d(0, calc(-100% - 1px), 0);
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-header {
+    transition: none;
+  }
 }
 
 .title-block {
@@ -424,15 +592,8 @@ onMounted(() => {
 }
 
 .mobile-recent,
-.mobile-page-count,
 .mobile-filter-stack {
   display: none;
-}
-
-.page-count {
-  color: var(--text-muted);
-  font-size: var(--text-sm);
-  font-variant-numeric: tabular-nums;
 }
 
 .toolbar {
@@ -532,12 +693,49 @@ onMounted(() => {
   color: var(--text-primary);
 }
 
-.tag-mode-filter {
-  min-width: 110px;
+.tag-mode-select {
+  width: 88px;
+  min-width: 88px;
+}
+
+.tag-mode-select :deep(.el-select__wrapper) {
+  padding-inline: 14px 10px;
+}
+
+.tag-mode-select :deep(.el-select__selected-item) {
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .sort-select { min-width: 128px; }
 .category-select { min-width: 118px; }
+
+.desktop-sort-group {
+  display: contents;
+}
+
+.desktop-sort-order {
+  display: none;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.desktop-sort-order:hover {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+
+.desktop-sort-order.ascending :deep(svg) {
+  transform: rotate(180deg);
+}
 
 :global(.library-filter-popper.el-popper) {
   padding: 5px;
@@ -555,6 +753,45 @@ onMounted(() => {
 :global(.library-filter-popper .el-select-dropdown__item.hover),
 :global(.library-filter-popper .el-select-dropdown__item:hover) { background: var(--accent-bg); color: var(--text-primary); }
 :global(.library-filter-popper .el-select-dropdown__item.is-selected) { background: var(--accent-bg); color: var(--accent); font-weight: 650; }
+:global(.tag-mode-popper) { min-width: 88px !important; }
+
+:global(.el-popper.is-light.mobile-sort-menu-popper) {
+  --el-popover-bg-color: #0d0d0d;
+  padding: 5px;
+  border: 1px solid var(--border-strong) !important;
+  border-radius: 13px;
+  background: #0d0d0d !important;
+  background-color: #0d0d0d !important;
+  box-shadow: 0 16px 44px rgb(0 0 0 / 72%) !important;
+}
+
+:global(.mobile-sort-menu-popper .el-popper__arrow) {
+  display: none;
+}
+
+.mobile-sort-grid button {
+  min-height: 30px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.mobile-sort-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.mobile-sort-grid button {
+  background: var(--bg-surface);
+}
+
+.mobile-sort-grid button.active {
+  background: var(--text-primary);
+  color: var(--bg-primary);
+}
 
 .filter-reset,
 .active-filter-clear {
@@ -595,10 +832,20 @@ onMounted(() => {
 
   .search-input { order: 1; }
   .category-select { order: 2; }
-  .sort-select { order: 3; }
-  .tag-filter { order: 4; }
-  .tag-mode-filter { order: 5; }
-  .filter-reset { order: 6; }
+  .desktop-sort-group {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-sm);
+    order: 3;
+  }
+  .desktop-sort-group .desktop-sort-order { display: inline-flex; }
+  .sort-select,
+  .desktop-sort-order { order: unset; }
+  .tag-filter { order: 5; }
+  .tag-mode-select { order: 6; }
+  .filter-reset { order: 7; }
+  /* 桌面端已在筛选控件内展示当前值，避免再重复占一整行摘要。 */
+  .active-filter-row { display: none; }
 }
 
 .comic-section {
@@ -638,11 +885,6 @@ onMounted(() => {
   gap: var(--space-base);
   padding: var(--space-3xl) 0;
   color: var(--text-secondary);
-}
-
-.state.empty p {
-  color: var(--text-muted);
-  font-size: 13px;
 }
 
 .state.error {
@@ -709,24 +951,78 @@ onMounted(() => {
     display: inline;
   }
 
+  .mobile-page-title strong {
+    font-size: 30px;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.05em;
+  }
+
+  .mobile-page-title small {
+    margin-left: 4px;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0;
+  }
+
   .desktop-page-count {
     display: none;
   }
 
-  .mobile-page-count,
-  .mobile-recent {
-    display: inline;
-  }
-
-  .mobile-recent {
-    align-items: center;
-    gap: var(--space-1);
-    color: var(--text-secondary);
-    font-size: var(--text-sm);
-  }
-
   .mobile-recent {
     display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    color: var(--text-secondary);
+  }
+
+  .mobile-sort-order {
+    display: grid;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    place-items: center;
+    border: 0;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+
+  .mobile-sort-order :deep(svg) {
+    transition: transform 180ms ease;
+  }
+
+  .mobile-sort-order.ascending :deep(svg) {
+    transform: rotate(180deg);
+  }
+
+  .mobile-sort-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    min-width: 78px;
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .mobile-sort-trigger span {
+    color: var(--text-primary);
+  }
+
+  .mobile-sort-trigger i {
+    width: 6px;
+    height: 6px;
+    margin: 0 2px 4px 0;
+    border-right: 1px solid currentColor;
+    border-bottom: 1px solid currentColor;
+    transform: rotate(45deg);
   }
 
   .page-title {
@@ -764,7 +1060,8 @@ onMounted(() => {
   }
 
   .sort-select,
-  .toolbar-filters {
+  .toolbar-filters,
+  .active-filter-row {
     display: none;
   }
 
@@ -772,52 +1069,65 @@ onMounted(() => {
     display: flex;
     flex-direction: column;
     order: 2;
-    gap: var(--mobile-library-filter-gap);
-    width: calc(100% + var(--mobile-page-gutter) * 2);
-    margin-left: calc(var(--mobile-page-gutter) * -1);
-    margin-top: 0;
+    gap: 10px;
+    width: calc(100% + var(--mobile-page-gutter));
     overflow: hidden;
   }
 
-  .mobile-filter-row {
+  .mobile-filter-group-row {
+    display: block;
+    min-height: 36px;
+  }
+
+  .mobile-filter-options {
     display: flex;
     align-items: center;
-    flex-wrap: nowrap;
-    gap: var(--space-3);
-    width: 100%;
+    gap: 7px;
     overflow-x: auto;
-    padding-inline: var(--mobile-page-gutter);
+    padding-right: var(--mobile-page-gutter);
     white-space: nowrap;
-    -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
   }
 
-  .mobile-filter-row::-webkit-scrollbar {
+  .mobile-filter-options::-webkit-scrollbar {
     display: none;
   }
 
-  .mobile-filter-row button {
+  .mobile-filter-options button,
+  .mobile-match-control button {
+    display: inline-flex;
     flex: 0 0 auto;
-    min-width: 82px;
-    min-height: 44px;
-    padding-inline: var(--space-5);
+    align-items: center;
+    justify-content: center;
+    min-height: 34px;
+    padding: 0 14px;
     border: 0;
     border-radius: var(--radius-pill);
     background: var(--bg-surface);
     color: var(--text-secondary);
-    font: inherit;
-    font-size: var(--text-sm);
+    font-size: 12px;
     font-weight: 600;
   }
 
-  .mobile-filter-row--secondary button {
-    min-width: 72px;
-    min-height: 40px;
-  }
-
-  .mobile-filter-row button.active {
+  .mobile-filter-options button.active,
+  .mobile-match-control button.active {
     background: var(--text-primary);
     color: var(--mobile-canvas);
+  }
+
+  .mobile-match-control {
+    display: inline-flex;
+    width: fit-content;
+    padding: 2px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+  }
+
+  .mobile-match-control button {
+    min-height: 28px;
+    padding-inline: 12px;
+    background: transparent;
+    font-size: 11px;
   }
 
   .comic-grid {

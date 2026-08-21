@@ -2,7 +2,7 @@
   <div class="video-player" :style="containerStyle">
     <!-- ============================================================
          Placeholder state: user hasn't activated playback yet.
-         预览 <video> 仅用于浏览器端首帧解码，不会自动播放。
+         预览 <video> 只读取元数据和首个可解码关键帧，不会自动播放。
          ============================================================ -->
     <div
       v-if="!activated"
@@ -10,9 +10,16 @@
       data-reader-video-surface
       @click="handleActivate"
     >
-      <!-- 浏览器端首帧预渲染：不生成独立封面文件，仅读取并解码视频首帧。 -->
+      <!-- 浏览器端首帧预览：通过 Range 按需读取，不生成独立预览图。 -->
+      <img
+        v-if="active && previewFrameUrl"
+        class="video-preview"
+        :src="previewFrameUrl"
+        alt=""
+        @load="previewReady = true"
+      >
       <video
-        v-if="active"
+        v-else-if="active"
         ref="previewRef"
         class="video-preview"
         :src="hqUrl"
@@ -82,6 +89,10 @@ import {
   getPosition,
   savePosition,
 } from '@/views/reading/reader/videoPlaybackCoordinator'
+import {
+  cacheVideoFirstFrame,
+  getCachedVideoFirstFrame,
+} from '@/views/reading/reader/video-first-frame-cache'
 
 // ---------------------------------------------------------------------------
 // Props
@@ -129,11 +140,15 @@ const error = ref(false)
 
 const videoRef = ref<HTMLVideoElement | null>(null)
 
-/** 浏览器端首帧预览用 video，不会生成或保存封面文件。 */
+/** 浏览器端首帧预览用 video，不会生成或保存独立预览图。 */
 const previewRef = ref<HTMLVideoElement | null>(null)
 
-/** 首帧已经可以显示时，仅保留播放图标之外的时长信息。 */
+/** 首帧已解码并可渲染。 */
 const previewReady = ref(false)
+/** 会话内存中的首帧 Blob URL，用于上下滑动后直接复用。 */
+const previewFrameUrl = ref<string | null>(
+  getCachedVideoFirstFrame(props.mediaId ?? 0),
+)
 
 /** Video native dimensions populated by loadedmetadata (fallback aspect ratio). */
 const nativeWidth = ref(0)
@@ -189,7 +204,7 @@ async function handleActivate(): Promise<void> {
   playerState.value = 'loading'
   previewReady.value = false
 
-  // 正式播放器接管前释放首帧预览元素，但不生成任何本地封面文件。
+  // 正式播放器接管前释放首帧预览元素。
   const preview = previewRef.value
   if (preview !== null) {
     preview.removeAttribute('src')
@@ -278,24 +293,37 @@ function onError(): void {
   playerState.value = 'error'
 }
 
-function onPreviewLoadedData(): void {
-  // loadeddata 表示当前帧已经解码，浏览器可将其绘制到 video 元素。
+async function onPreviewLoadedData(): Promise<void> {
+  // loadeddata 表示当前帧已解码，浏览器可直接绘制。
   previewReady.value = true
+  const video = previewRef.value
+  const mediaId = props.mediaId ?? 0
+  if (!video || mediaId <= 0) return
+
+  const objectUrl = await cacheVideoFirstFrame(mediaId, video)
+  if (!objectUrl || props.mediaId !== mediaId) return
+  previewFrameUrl.value = objectUrl
+
+  // Blob 首帧就绪后立即释放视频连接，后续滑动仅复用内存帧。
+  video.removeAttribute('src')
+  video.load()
 }
 
 function onPreviewMetadata(): void {
   const preview = previewRef.value
   if (preview === null || preview.readyState < 1) return
+  nativeWidth.value = preview.videoWidth
+  nativeHeight.value = preview.videoHeight
 
-  // 某些视频第 0 秒没有可显示关键帧，轻微 seek 促使浏览器解码首个可用帧。
+  // 轻微 seek 促使浏览器通过 Range 请求首个可解码关键帧，
+  // 不会因此预加载完整媒体。
   if (preview.duration > 0) {
     try {
       preview.currentTime = Math.min(0.1, preview.duration)
     } catch {
-      // 元数据已可用时，即使无法 seek，也不阻塞正式播放。
+      // 无法 seek 时保留占位状态，不阻断用户手动播放。
     }
   }
-
 }
 
 function onPreviewSeeked(): void {
@@ -422,6 +450,8 @@ watch(
     if (oldId !== undefined && newId !== oldId) {
       // Save position for old media, release session, reset state
       unloadVideo('mediaId-changed', oldId)
+      previewFrameUrl.value = getCachedVideoFirstFrame(newId ?? 0)
+      previewReady.value = previewFrameUrl.value !== null
     }
   },
 )
@@ -434,6 +464,8 @@ watch(
     if (!isActive) {
       previewReady.value = false
       unloadVideo('inactive')
+    } else if (previewFrameUrl.value) {
+      previewReady.value = true
     }
   },
 )
@@ -508,8 +540,6 @@ watch(
   opacity: 0.8;
 }
 
-/* 预览帧：填满占位区，contain 保持完整画面 */
-/* 首帧就绪后保留时长信息和底部渐变，避免遮挡视频画面 */
 .video-placeholder-overlay {
   position: relative;
   z-index: 1;
