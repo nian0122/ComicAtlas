@@ -7,6 +7,6 @@ import org.apache.ibatis.annotations.Select;
 @Mapper
 public interface ExportComicMapper {
 
-    @Select("SELECT id, title, author, category, status, cover_path FROM comic WHERE id = #{id}")
+    @Select("SELECT id, title, author, description, category, status, cover_path FROM comic WHERE id = #{id}")
     ExportComic selectById(Long id);
 }

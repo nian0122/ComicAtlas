@@ -40,6 +40,7 @@ public final class ComicInfoParser {
             return Optional.of(new ComicInfoMetadata(
                     value(root, "Series"), value(root, "Title"), value(root, "Number"),
                     firstNonBlank(value(root, "Writer"), value(root, "Penciller")),
+                    value(root, "Summary"),
                     tags(root)));
         } catch (ParserConfigurationException | SAXException e) {
             throw new IOException("ComicInfo.xml 解析失败: " + file.getFileName(), e);

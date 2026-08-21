@@ -30,6 +30,7 @@ class ComicInfoParserTest {
                   <Title>第 01 话</Title>
                   <Number>1</Number>
                   <Writer>作者</Writer>
+                  <Summary>这是简介</Summary>
                   <Genre>动作, 冒险</Genre>
                   <Tags>冒险;原创</Tags>
                 </ComicInfo>
@@ -41,6 +42,7 @@ class ComicInfoParserTest {
         assertEquals("第 01 话", metadata.title());
         assertEquals("1", metadata.number());
         assertEquals("作者", metadata.author());
+        assertEquals("这是简介", metadata.summary());
         assertEquals(java.util.List.of("动作", "冒险", "原创"), metadata.tags());
     }
 
@@ -62,10 +64,11 @@ class ComicInfoParserTest {
         DirectoryTree tree = new DirectoryTree(tempDir, "文件名", List.of(tempDir.resolve("001.jpg")), List.of());
         ComicMetadata metadata = new MetadataAssembler(analyzer).assemble(tree,
                 new ImportContext("CBZ", tempDir, false, false, "文件名"),
-                new ComicInfoMetadata("系列名", "单行标题", "2", "作者", List.of("动作")));
+                new ComicInfoMetadata("系列名", "单行标题", "2", "作者", "简介", List.of("动作")));
 
         assertEquals("系列名", metadata.title());
         assertEquals("作者", metadata.author());
+        assertEquals("简介", metadata.description());
         assertEquals(List.of("动作"), metadata.tags());
         assertEquals("单行标题", metadata.chapters().get(0).title());
         assertEquals("2", metadata.chapters().get(0).chapterNo());

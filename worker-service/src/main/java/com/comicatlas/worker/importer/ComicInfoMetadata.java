@@ -8,6 +8,7 @@ public record ComicInfoMetadata(
         String title,
         String number,
         String author,
+        String summary,
         List<String> tags
 ) {
 }

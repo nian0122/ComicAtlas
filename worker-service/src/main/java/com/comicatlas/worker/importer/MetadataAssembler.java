@@ -77,6 +77,7 @@ public class MetadataAssembler {
                 comicInfo == null ? null : comicInfo.title(), title);
         String author = comicInfo == null ? null : comicInfo.author();
         List<String> tags = comicInfo == null ? List.of() : comicInfo.tags();
+        String description = comicInfo == null ? null : comicInfo.summary();
         if (comicInfo != null && chapters.size() == 1) {
             ComicMetadata.ChapterInfo chapter = chapters.get(0);
             String chapterTitle = firstNonBlank(comicInfo.title(), chapter.title());
@@ -86,7 +87,7 @@ public class MetadataAssembler {
                     chapter.sourceDir(), chapter.pages()));
         }
         return new AssembleResult(
-                new ComicMetadata(resolvedTitle, author, null, tags, catalogs, chapters),
+                new ComicMetadata(resolvedTitle, author, null, tags, description, catalogs, chapters),
                 List.copyOf(warnings));
     }
 

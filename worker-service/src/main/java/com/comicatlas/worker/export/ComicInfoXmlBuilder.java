@@ -23,6 +23,9 @@ public final class ComicInfoXmlBuilder {
                 + "  <Title>" + escape(title) + "</Title>\n"
                 + "  <Number>" + escape(number) + "</Number>\n"
                 + "  <Writer>" + escape(writer) + "</Writer>\n"
+                + "  <Summary>" + escape(value(comic == null ? null : comic.getDescription())) + "</Summary>\n"
+                + "  <Tags>" + escape(comic == null || comic.getTags() == null
+                ? "" : String.join(", ", comic.getTags())) + "</Tags>\n"
                 + "</ComicInfo>\n";
     }
 

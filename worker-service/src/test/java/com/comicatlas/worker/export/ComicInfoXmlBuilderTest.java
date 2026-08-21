@@ -21,6 +21,7 @@ class ComicInfoXmlBuilderTest {
         ExportComic comic = new ExportComic();
         comic.setTitle("系列 & <特别>");
         comic.setAuthor("作者\"A");
+        comic.setTags(List.of("动作", "冒险"));
         ExportChapter chapter = new ExportChapter();
         chapter.setTitle("第 1 话");
         chapter.setChapterNo("1");
@@ -30,6 +31,7 @@ class ComicInfoXmlBuilderTest {
         assertTrue(xml.contains("<Series>系列 &amp; &lt;特别&gt;</Series>"));
         assertTrue(xml.contains("<Title>第 1 话</Title>"));
         assertTrue(xml.contains("<Writer>作者&quot;A</Writer>"));
+        assertTrue(xml.contains("<Tags>动作, 冒险</Tags>"));
     }
 
     @Test

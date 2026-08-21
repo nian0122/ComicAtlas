@@ -8,9 +8,15 @@ public record ComicMetadata(
     String author,
     String category,
     List<String> tags,
+    String description,
     List<CatalogInfo> catalogs,
     List<ChapterInfo> chapters
 ) {
+    /** 兼容无简介字段的旧构造方式。 */
+    public ComicMetadata(String title, String author, String category, List<String> tags,
+                         List<CatalogInfo> catalogs, List<ChapterInfo> chapters) {
+        this(title, author, category, tags, null, catalogs, chapters);
+    }
     public record CatalogInfo(
         String title,
         int sortOrder,

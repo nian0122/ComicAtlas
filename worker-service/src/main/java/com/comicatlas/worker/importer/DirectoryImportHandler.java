@@ -171,6 +171,7 @@ public class DirectoryImportHandler {
         Map<String, Object> comic = new LinkedHashMap<>();
         comic.put("title", metadata.title());
         comic.put("author", metadata.author() != null ? metadata.author() : "");
+        comic.put("description", metadata.description() != null ? metadata.description() : "");
         comic.put("tags", metadata.tags());
 
         List<Map<String, Object>> catalogList = metadata.catalogs().stream().map(catalog -> {
