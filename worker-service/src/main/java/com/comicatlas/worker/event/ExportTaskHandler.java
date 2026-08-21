@@ -3,6 +3,7 @@ package com.comicatlas.worker.event;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.constant.MqRoutingKeys;
+import com.comicatlas.common.constant.ExportFormats;
 import com.comicatlas.common.event.ExportTaskCompletedEvent;
 import com.comicatlas.common.event.ExportTaskCreatedEvent;
 import com.comicatlas.common.event.ExportTaskFailedEvent;
@@ -56,7 +57,9 @@ public class ExportTaskHandler {
 
         ExportService.ExportOutput output;
         try {
-            output = exportService.export(event.comicId(), event.taskId(), event.format());
+            output = ExportFormats.CBZ.equalsIgnoreCase(event.format())
+                    ? exportService.export(event.comicId(), event.taskId(), ExportFormats.CBZ)
+                    : exportService.export(event.comicId(), event.taskId());
         } catch (Exception e) {
             publishExportFailed(event, e);
             return;
