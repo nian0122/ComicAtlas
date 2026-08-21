@@ -259,7 +259,7 @@ const store = useImportStore()
 const activeTab = ref<'single' | 'batch'>('single')
 
 // ——— 单个导入 ———
-const sourceType = ref<'ZIP' | 'DIRECTORY'>('ZIP')
+const sourceType = ref<'ZIP' | 'CBZ' | 'DIRECTORY'>('ZIP')
 const sourcePath = ref('')
 const creating = ref(false)
 
@@ -304,19 +304,24 @@ const scanItemRows = computed<ScanItemRow[]>(() =>
 
 const sourceTypeOptions = [
   { value: 'ZIP' as const, label: 'ZIP 文件', desc: '压缩包，自动解压并解析目录结构' },
+  { value: 'CBZ' as const, label: 'CBZ 漫画', desc: '漫画压缩包，自动读取 ComicInfo.xml 元数据' },
   { value: 'DIRECTORY' as const, label: '本地目录', desc: '已存在的漫画目录，原样解析' },
 ]
 
 const pathPlaceholder = computed(() =>
   sourceType.value === 'ZIP'
     ? 'D:/comics/my_comic.zip'
-    : 'D:/comics/my_comic_dir'
+    : sourceType.value === 'CBZ'
+      ? 'D:/comics/my_comic.cbz'
+      : 'D:/comics/my_comic_dir'
 )
 
 const pathHint = computed(() =>
   sourceType.value === 'ZIP'
-    ? '完整 ZIP 文件路径，包含 .zip 扩展名；大导出分卷时 sourcePath 填最后一个 .zip（主文件），分卷须同目录同 basename，缺卷会失败，.z01 不可作为入口'
-    : '漫画根目录绝对路径，包含章节子目录'
+    ? '完整 ZIP 文件路径；大导出分卷时填最后一个 .zip，分卷须同目录同 basename，.z01 不可作为入口'
+    : sourceType.value === 'CBZ'
+      ? '完整 CBZ 文件路径；压缩包内可放置 ComicInfo.xml，导入时自动读取标题、作者、标签和章节信息'
+      : '漫画根目录绝对路径，包含章节子目录'
 )
 
 const canSubmit = computed(() => sourcePath.value.trim().length > 0)

@@ -170,7 +170,15 @@ public class ExportService {
                     "导出清单构建失败：comicId=" + comicId + ", 导出总量超限: " + totalBytes
                             + " 字节 > maxTotalSize=" + maxTotalSize());
         }
-        return new ExportManifest(rootDirName, metadataJson, entries);
+        String comicInfoXml = ComicInfoXmlBuilder.build(result.comic(), result.chapters());
+        long comicInfoBytes = comicInfoXml.getBytes(StandardCharsets.UTF_8).length;
+        long exportBytesWithComicInfo = addSizes(comicId, null, totalBytes, comicInfoBytes);
+        if (exportBytesWithComicInfo > maxTotalSize()) {
+            throw new ExportManifestBuildException(
+                    "导出清单构建失败：comicId=" + comicId + ", ComicInfo.xml 加入后导出总量超限: "
+                            + exportBytesWithComicInfo + " 字节 > maxTotalSize=" + maxTotalSize());
+        }
+        return new ExportManifest(rootDirName, metadataJson, comicInfoXml, entries);
     }
 
     /**

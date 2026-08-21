@@ -38,7 +38,12 @@ public class MetadataAssembler {
      * 兼容入口：仅返回规范化后的元数据。空目录等警告以日志记录。
      */
     public ComicMetadata assemble(DirectoryTree tree, ImportContext ctx) {
-        AssembleResult result = assembleWithWarnings(tree, ctx);
+        return assemble(tree, ctx, null);
+    }
+
+    /** 组装目录元数据，并用 ComicInfo.xml 覆盖标准字段。 */
+    public ComicMetadata assemble(DirectoryTree tree, ImportContext ctx, ComicInfoMetadata comicInfo) {
+        AssembleResult result = assembleWithWarnings(tree, ctx, comicInfo);
         for (AssembleResult.AssembleWarning warning : result.warnings()) {
             log.warn("目录规范化警告: code={}, relativePath={}, message={}",
                     warning.code(), warning.relativePath(), warning.message());
@@ -50,6 +55,11 @@ public class MetadataAssembler {
      * 无损规范化组装，返回元数据 + 结构化警告列表。
      */
     public AssembleResult assembleWithWarnings(DirectoryTree tree, ImportContext ctx) {
+        return assembleWithWarnings(tree, ctx, null);
+    }
+
+    public AssembleResult assembleWithWarnings(DirectoryTree tree, ImportContext ctx,
+                                                ComicInfoMetadata comicInfo) {
         String title = ctx.titleHint() != null ? ctx.titleHint() : tree.name();
         List<ComicMetadata.CatalogInfo> catalogs = new ArrayList<>();
         List<ComicMetadata.ChapterInfo> chapters = new ArrayList<>();
@@ -63,9 +73,30 @@ public class MetadataAssembler {
         processRoot(tree, root, catalogs, chapters, globalOrder, scopeSortOrders, warnings);
 
         if (chapters.isEmpty()) { throw new RuntimeException("无可用章节: " + tree.path()); }
+        String resolvedTitle = firstNonBlank(comicInfo == null ? null : comicInfo.series(),
+                comicInfo == null ? null : comicInfo.title(), title);
+        String author = comicInfo == null ? null : comicInfo.author();
+        List<String> tags = comicInfo == null ? List.of() : comicInfo.tags();
+        if (comicInfo != null && chapters.size() == 1) {
+            ComicMetadata.ChapterInfo chapter = chapters.get(0);
+            String chapterTitle = firstNonBlank(comicInfo.title(), chapter.title());
+            String chapterNo = firstNonBlank(comicInfo.number(), chapter.chapterNo());
+            chapters.set(0, new ComicMetadata.ChapterInfo(chapterTitle, chapterNo,
+                    chapter.sortOrder(), chapter.globalOrder(), chapter.catalogIndex(),
+                    chapter.sourceDir(), chapter.pages()));
+        }
         return new AssembleResult(
-                new ComicMetadata(title, null, null, List.of(), catalogs, chapters),
+                new ComicMetadata(resolvedTitle, author, null, tags, catalogs, chapters),
                 List.copyOf(warnings));
+    }
+
+    private static String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+        }
+        return null;
     }
 
     /**

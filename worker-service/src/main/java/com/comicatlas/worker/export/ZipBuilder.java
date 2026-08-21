@@ -48,6 +48,7 @@ public class ZipBuilder {
     }
 
     private static final String METADATA_FILE = "metadata.json";
+    private static final String COMIC_INFO_FILE = "ComicInfo.xml";
     private static final int COPY_BUFFER_SIZE = 64 * 1024;
     private static final int MAX_LOG_PATHS = 10;
 
@@ -105,6 +106,10 @@ public class ZipBuilder {
     private void writeEntries(ZipArchiveOutputStream zipOutputStream, ExportManifest manifest) throws IOException {
         String prefix = manifest.rootDirName() + "/";
         writeBytesEntry(zipOutputStream, prefix + METADATA_FILE, manifest.metadataJson().getBytes(StandardCharsets.UTF_8));
+        if (manifest.comicInfoXml() != null && !manifest.comicInfoXml().isBlank()) {
+            writeBytesEntry(zipOutputStream, prefix + COMIC_INFO_FILE,
+                    manifest.comicInfoXml().getBytes(StandardCharsets.UTF_8));
+        }
         for (ExportManifest.Entry entry : manifest.entries()) {
             ZipArchiveEntry zipArchiveEntry = new ZipArchiveEntry(prefix + entry.targetPath());
             zipArchiveEntry.setSize(entry.sourceSize());
@@ -128,6 +133,9 @@ public class ZipBuilder {
 
     private long manifestTotalSize(ExportManifest manifest) {
         long total = manifest.metadataJson().getBytes(StandardCharsets.UTF_8).length;
+        if (manifest.comicInfoXml() != null && !manifest.comicInfoXml().isBlank()) {
+            total = Math.addExact(total, manifest.comicInfoXml().getBytes(StandardCharsets.UTF_8).length);
+        }
         for (ExportManifest.Entry entry : manifest.entries()) {
             total = Math.addExact(total, entry.sourceSize());
         }
@@ -160,9 +168,13 @@ public class ZipBuilder {
         }
 
         String prefix = manifest.rootDirName() + "/";
-        int expectedSize = manifest.entries().size() + 1;
+        int metadataEntryCount = manifest.comicInfoXml() == null || manifest.comicInfoXml().isBlank() ? 1 : 2;
+        int expectedSize = manifest.entries().size() + metadataEntryCount;
         Set<String> expectedNames = new HashSet<>(expectedSize);
         expectedNames.add(prefix + METADATA_FILE);
+        if (manifest.comicInfoXml() != null && !manifest.comicInfoXml().isBlank()) {
+            expectedNames.add(prefix + COMIC_INFO_FILE);
+        }
         for (ExportManifest.Entry entry : manifest.entries()) {
             expectedNames.add(prefix + entry.targetPath());
         }
@@ -179,6 +191,10 @@ public class ZipBuilder {
 
             String metaName = prefix + METADATA_FILE;
             verifyBytesEntry(zipFile, metaName, manifest.metadataJson().getBytes(StandardCharsets.UTF_8));
+            if (manifest.comicInfoXml() != null && !manifest.comicInfoXml().isBlank()) {
+                verifyBytesEntry(zipFile, prefix + COMIC_INFO_FILE,
+                        manifest.comicInfoXml().getBytes(StandardCharsets.UTF_8));
+            }
 
             for (ExportManifest.Entry entry : manifest.entries()) {
                 verifyFileEntry(zipFile, prefix + entry.targetPath(), entry);

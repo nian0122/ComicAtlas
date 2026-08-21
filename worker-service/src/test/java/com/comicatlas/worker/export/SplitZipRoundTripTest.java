@@ -387,11 +387,12 @@ class SplitZipRoundTripTest {
         }
     }
 
-    /** 统计目录内媒体文件数（排除 metadata.json）。 */
+    /** 统计目录内媒体文件数（排除导出元数据文件）。 */
     private static long countMediaFiles(Path dir) throws IOException {
         try (var walk = Files.walk(dir)) {
             return walk.filter(Files::isRegularFile)
                     .filter(path -> !"metadata.json".equals(path.getFileName().toString()))
+                    .filter(path -> !"ComicInfo.xml".equals(path.getFileName().toString()))
                     .count();
         }
     }
