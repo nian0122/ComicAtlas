@@ -11,7 +11,6 @@ import com.comicatlas.worker.importer.DirectoryParser;
 import com.comicatlas.worker.importer.DirectoryTree;
 import com.comicatlas.worker.importer.ImportContext;
 import com.comicatlas.worker.importer.ZipImportHandler;
-import com.comicatlas.worker.storage.ExportFileResolver;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageRef;
 import com.comicatlas.worker.storage.StorageRoot;

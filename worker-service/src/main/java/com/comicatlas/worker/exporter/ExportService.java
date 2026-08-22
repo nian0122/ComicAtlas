@@ -6,7 +6,6 @@ import com.comicatlas.worker.shared.common.ComicTitleSanitizer;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.persistence.record.ChapterRecord;
 import com.comicatlas.worker.persistence.record.MediaRecord;
-import com.comicatlas.worker.storage.ExportFileResolver;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageRef;
 import com.comicatlas.worker.storage.StorageRoot;
