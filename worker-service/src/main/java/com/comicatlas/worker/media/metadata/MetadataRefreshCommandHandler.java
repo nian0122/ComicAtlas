@@ -81,9 +81,6 @@ public class MetadataRefreshCommandHandler {
     /** HQ 存储根 key。 */
     private static final String HQ_ROOT_KEY = StorageRootKeys.HQ;
 
-    /** STAGING 存储根 key（快照产物落盘根）。 */
-    private static final String STAGING_ROOT_KEY = StorageRootKeys.STAGING;
-
     /** LQ 存储根 key（旧布局升级时同构移动 LQ 目录）。 */
     private static final String LQ_ROOT_KEY = StorageRootKeys.LQ;
 
@@ -474,7 +471,7 @@ public class MetadataRefreshCommandHandler {
     private ChapterScanResult scanLqOnlyChapter(Long comicId, ChapterRecord chapter,
                                                 List<MediaRecord> lqOnlyRows, List<String> warnings) {
         Long chapterId = chapter.getId();
-        StorageRoot lqRoot = roots().get(LQ_ROOT_KEY);
+        StorageRoot lqRoot = StorageRootResolver.optional(storageProperties, LQ_ROOT_KEY);
         if (lqRoot == null) {
             warnings.add("LQ 存储根未配置，跳过仅 LQ 章节扫描: " + comicId + "/" + chapterId);
             return new ChapterScanResult(List.of(), warnings);
@@ -603,7 +600,7 @@ public class MetadataRefreshCommandHandler {
         StorageRoot hqRoot = requireRoot(HQ_ROOT_KEY);
         moveDirectorySafely(hqRoot.resolve(comicId + "/" + dirKey),
                 hqRoot.resolve(comicId + "/" + chapterKey), "HQ");
-        StorageRoot lqRoot = roots().get(LQ_ROOT_KEY);
+        StorageRoot lqRoot = StorageRootResolver.optional(storageProperties, LQ_ROOT_KEY);
         if (lqRoot != null) {
             Path lqSource = lqRoot.resolve(comicId + "/" + dirKey);
             if (Files.isDirectory(lqSource, LinkOption.NOFOLLOW_LINKS)) {
@@ -640,10 +637,6 @@ public class MetadataRefreshCommandHandler {
         return StorageRootResolver.required(storageProperties, key);
     }
 
-    private Map<String, StorageRoot> roots() {
-        return storageProperties.getRoots() == null ? Map.of() : storageProperties.getRoots();
-    }
-
     private static boolean isHidden(Path file) {
         try {
             return Files.isHidden(file);
@@ -678,7 +671,7 @@ public class MetadataRefreshCommandHandler {
             baseName = baseName.substring(0, dot);
         }
         String lqFileName = baseName + LQ_EXTENSION;
-        StorageRoot lqRoot = roots().get(LQ_ROOT_KEY);
+        StorageRoot lqRoot = StorageRootResolver.optional(storageProperties, LQ_ROOT_KEY);
         if (lqRoot == null) {
             return new LqFileFact(LQ_STATUS_NOT_GENERATED, 0L);
         }
