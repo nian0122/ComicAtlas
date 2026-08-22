@@ -4,7 +4,7 @@ import com.comicatlas.api.admin.dto.ChapterStorageDTO;
 import com.comicatlas.api.admin.dto.ComicStorageDTO;
 import com.comicatlas.api.admin.dto.ComicStorageQuery;
 import com.comicatlas.api.admin.dto.ComicTranscodeStatusVO;
-import com.comicatlas.api.admin.dto.StorageStatsDTO;
+import com.comicatlas.api.storage.dto.StorageStatsDTO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 

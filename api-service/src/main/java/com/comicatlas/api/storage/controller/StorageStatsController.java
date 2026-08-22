@@ -1,6 +1,6 @@
 package com.comicatlas.api.storage.controller;
 
-import com.comicatlas.api.admin.dto.StorageStatsDTO;
+import com.comicatlas.api.storage.dto.StorageStatsDTO;
 import com.comicatlas.api.admin.service.AdminService;
 import com.comicatlas.contract.common.Result;
 import lombok.RequiredArgsConstructor;

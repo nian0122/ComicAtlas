@@ -2,7 +2,7 @@ package com.comicatlas.api.admin.service;
 
 import com.comicatlas.api.admin.dto.ComicDeleteStatsDTO;
 import com.comicatlas.api.admin.dto.ScanRecoverResultDTO;
-import com.comicatlas.api.admin.dto.StorageStatsDTO;
+import com.comicatlas.api.storage.dto.StorageStatsDTO;
 
 public interface AdminService {
     ScanRecoverResultDTO scanRecover();

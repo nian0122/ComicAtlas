@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.admin.dto.ComicDeleteStatsDTO;
 import com.comicatlas.api.admin.dto.RecoveryProgressVO;
 import com.comicatlas.api.admin.dto.ScanRecoverResultDTO;
-import com.comicatlas.api.admin.dto.StorageStatsDTO;
+import com.comicatlas.api.storage.dto.StorageStatsDTO;
 import com.comicatlas.api.admin.mapper.StorageMapper;
 import com.comicatlas.api.admin.service.AdminService;
 import com.comicatlas.api.recovery.RecoveryEngine;
