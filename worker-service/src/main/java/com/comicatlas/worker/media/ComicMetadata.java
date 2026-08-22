@@ -50,7 +50,12 @@ public record ComicMetadata(
         BigDecimal duration,
         String container,
         String videoCodec,
-        String audioCodec
+        String audioCodec,
+        String format,
+        Boolean decodable,
+        Boolean needsConversion,
+        String conversionStatus,
+        String conversionError
     ) {
         /**
          * 向后兼容构造函数：仅传入图片场景的 7 个参数，
@@ -63,6 +68,13 @@ public record ComicMetadata(
                  "IMAGE", null, null, null, null);
         }
 
+        public MediaInfo(String fileName, int pageNumber, String hqStatus, String lqStatus,
+                         long fileSize, Integer width, Integer height, String mediaType,
+                         BigDecimal duration, String container, String videoCodec, String audioCodec) {
+            this(fileName, pageNumber, hqStatus, lqStatus, fileSize, width, height, mediaType,
+                    duration, container, videoCodec, audioCodec, null, null, null, null, null);
+        }
+
         /**
          * 复制并替换 pageNumber，其余字段保持不变。
          * MediaAnalyzer.analyze() 返回的 pageNumber 默认为 0，
@@ -71,7 +83,8 @@ public record ComicMetadata(
         public MediaInfo withPageNumber(int pageNumber) {
             return new MediaInfo(fileName, pageNumber, hqStatus, lqStatus,
                     fileSize, width, height, mediaType, duration,
-                    container, videoCodec, audioCodec);
+                    container, videoCodec, audioCodec, format, decodable,
+                    needsConversion, conversionStatus, conversionError);
         }
 
         /**

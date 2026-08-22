@@ -55,6 +55,8 @@ public class WorkerConfig {
     private String ffmpegPath;
     /** 图片优化器可执行文件路径。 */
     private String imageOptimizerPath;
+    /** 7z 命令行路径，用于 RAR/7z 及其分卷适配。 */
+    private String sevenZipPath = "7z";
     /** 工具相对路径的解析基准目录；未配置时回退到 JVM 工作目录 */
     private String toolsBaseDir;
     /** LQ 图片质量参数。 */

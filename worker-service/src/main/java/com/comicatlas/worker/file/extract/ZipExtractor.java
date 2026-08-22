@@ -2,6 +2,9 @@ package com.comicatlas.worker.file.extract;
 
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.file.archive.ZipVolumeResolver;
+import com.comicatlas.worker.file.archive.ArchiveEntry;
+import com.comicatlas.worker.file.archive.ArchiveFormat;
+import com.comicatlas.worker.file.archive.ArchiveReader;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
@@ -24,6 +27,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.time.Duration;
 import java.util.zip.CRC32;
 
 /**
@@ -44,7 +48,7 @@ import java.util.zip.CRC32;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class ZipExtractor implements ArchiveExtractor {
+public class ZipExtractor implements ArchiveExtractor, ArchiveReader {
 
     private static final Set<String> RESERVED_NAMES = Set.of(
         "CON", "AUX", "NUL", "PRN",
@@ -81,6 +85,89 @@ public class ZipExtractor implements ArchiveExtractor {
         String name = file.getFileName().toString().toLowerCase(Locale.ROOT);
         // .z01 永不作为入口：既不以 .zip/.cbz 结尾，也显式排除
         return (name.endsWith(".zip") || name.endsWith(".cbz")) && !name.endsWith(".z01");
+    }
+
+    @Override
+    public ArchiveFormat detectFormat(Path archive) throws IOException {
+        String name = archive.getFileName().toString().toLowerCase(Locale.ROOT);
+        if (!(name.endsWith(".zip") || name.endsWith(".cbz"))) {
+            return ArchiveFormat.UNKNOWN;
+        }
+        return ZipVolumeResolver.resolve(archive).size() > 1
+                ? ArchiveFormat.SPLIT_ZIP : ArchiveFormat.ZIP;
+    }
+
+    @Override
+    public List<Path> detectVolumes(Path archive) throws IOException {
+        return resolveVolumes(archive);
+    }
+
+    @Override
+    public ArchiveSession open(Path archive, Duration timeout) throws IOException {
+        List<Path> volumes = resolveVolumes(archive);
+        ZipFile zipFile = openZipFile(volumes);
+        return new ZipSession(zipFile);
+    }
+
+    private static final class ZipSession implements ArchiveSession {
+        private final ZipFile zipFile;
+
+        private ZipSession(ZipFile zipFile) {
+            this.zipFile = zipFile;
+        }
+
+        @Override
+        public List<ArchiveEntry> listEntries() {
+            List<ArchiveEntry> result = new ArrayList<>();
+            Enumeration<ZipArchiveEntry> entries = zipFile.getEntries();
+            while (entries.hasMoreElements()) {
+                ZipArchiveEntry entry = entries.nextElement();
+                result.add(new ArchiveEntry(entry.getName(), entry.isDirectory(), entry.getSize(),
+                        entry.getCrc() < 0 ? null : Long.toUnsignedString(entry.getCrc())));
+            }
+            return result;
+        }
+
+        @Override
+        public InputStream readEntry(String name) throws IOException {
+            ZipArchiveEntry entry = zipFile.getEntry(name);
+            if (entry == null || entry.isDirectory()) {
+                throw new IOException("压缩包条目不存在或不是文件: " + name);
+            }
+            return zipFile.getInputStream(entry);
+        }
+
+        @Override
+        public void testIntegrity() throws IOException {
+            Enumeration<ZipArchiveEntry> entries = zipFile.getEntries();
+            byte[] buffer = new byte[COPY_BUFFER_SIZE];
+            while (entries.hasMoreElements()) {
+                ZipArchiveEntry entry = entries.nextElement();
+                if (entry.isDirectory()) {
+                    continue;
+                }
+                long size = 0;
+                CRC32 crc = new CRC32();
+                try (InputStream input = zipFile.getInputStream(entry)) {
+                    int read;
+                    while ((read = input.read(buffer)) != -1) {
+                        size = Math.addExact(size, read);
+                        crc.update(buffer, 0, read);
+                    }
+                }
+                if (entry.getSize() >= 0 && entry.getSize() != size) {
+                    throw new IOException("Entry size mismatch: " + entry.getName());
+                }
+                if (entry.getCrc() >= 0 && entry.getCrc() != crc.getValue()) {
+                    throw new IOException("Entry CRC mismatch: " + entry.getName());
+                }
+            }
+        }
+
+        @Override
+        public void close() throws IOException {
+            zipFile.close();
+        }
     }
 
     /**

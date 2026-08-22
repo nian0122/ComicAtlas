@@ -3,6 +3,8 @@ package com.comicatlas.worker.media;
 import com.comicatlas.common.util.ImageDimensionsReader;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.process.ExternalProcessRunner;
+import com.comicatlas.worker.image.ImageDecoder;
+import com.comicatlas.worker.image.ImageIoDecoder;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -70,10 +72,23 @@ public class MediaAnalyzer {
         if (VIDEO_EXTENSIONS.contains(ext)) {
             return doAnalyzeVideo(file, name, container, size);
         }
-        ImageDimensions dims = exists ? readImageDims(file) : new ImageDimensions(null, null);
+        ImageDecoder.DecodeResult decoded;
+        if (!exists) {
+            decoded = new ImageDecoder.DecodeResult(null, false, null, null, "文件不存在");
+        } else {
+            try {
+                decoded = new ImageIoDecoder().inspect(file);
+            } catch (java.io.IOException e) {
+                decoded = new ImageDecoder.DecodeResult(null, false, null, null, e.getMessage());
+            }
+        }
+        String format = decoded.format() == null ? container : decoded.format().toLowerCase();
+        boolean needsConversion = !Set.of("jpeg", "jpg", "png", "gif", "webp", "bmp", "tiff").contains(format);
         return new ComicMetadata.MediaInfo(name, 0,
                 exists ? HQ_STATUS_READY : HQ_STATUS_MISSING, LQ_STATUS_NOT_GENERATED,
-                size, dims.width(), dims.height());
+                size, decoded.width(), decoded.height(), "IMAGE", null, null, null, null,
+                format, decoded.decodable(), needsConversion,
+                decoded.decodable() ? "NOT_STARTED" : "FAILED", decoded.failureReason());
     }
 
     /**
