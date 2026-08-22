@@ -1,5 +1,6 @@
 package com.comicatlas.worker.exporter;
 
+import com.comicatlas.worker.exporter.model.ExportManifest;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.shared.archive.ZipVolumeResolver;
 import lombok.extern.slf4j.Slf4j;

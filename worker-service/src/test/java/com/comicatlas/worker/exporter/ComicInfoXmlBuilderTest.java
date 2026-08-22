@@ -1,5 +1,6 @@
 package com.comicatlas.worker.exporter;
 
+import com.comicatlas.worker.exporter.model.ExportManifest;
 import com.comicatlas.worker.persistence.record.ChapterRecord;
 import com.comicatlas.worker.persistence.record.ComicRecord;
 import org.junit.jupiter.api.Test;

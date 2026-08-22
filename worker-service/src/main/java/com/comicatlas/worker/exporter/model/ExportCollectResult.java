@@ -1,4 +1,4 @@
-package com.comicatlas.worker.exporter;
+package com.comicatlas.worker.exporter.model;
 
 import com.comicatlas.worker.persistence.record.CatalogRecord;
 import com.comicatlas.worker.persistence.record.ChapterRecord;

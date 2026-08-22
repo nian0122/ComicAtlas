@@ -1,5 +1,6 @@
 package com.comicatlas.worker.exporter;
 
+import com.comicatlas.worker.exporter.model.ExportCollectResult;
 import com.comicatlas.common.metadata.MetadataV3;
 import com.comicatlas.common.constant.MediaTypes;
 import com.comicatlas.common.constant.MediaStatuses;

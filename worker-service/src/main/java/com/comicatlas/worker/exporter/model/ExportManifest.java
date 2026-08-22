@@ -1,4 +1,4 @@
-package com.comicatlas.worker.exporter;
+package com.comicatlas.worker.exporter.model;
 
 import java.nio.file.Path;
 import java.util.List;
