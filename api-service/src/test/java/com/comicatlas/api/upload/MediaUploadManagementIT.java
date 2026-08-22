@@ -27,7 +27,7 @@ import com.comicatlas.contract.common.enums.TranscodeStatus;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.worker.recovery.command.TrashCommandHandler;
 import com.comicatlas.worker.media.upload.MediaUploadCommandHandler;
-import com.comicatlas.worker.task.ManagementCommandPublisher;
+import com.comicatlas.worker.task.publisher.ManagementCommandPublisher;
 import com.comicatlas.worker.media.MediaAnalyzer;
 import com.comicatlas.worker.storage.SafeMoveStrategy;
 import com.comicatlas.worker.storage.StorageProperties;

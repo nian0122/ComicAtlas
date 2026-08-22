@@ -21,7 +21,7 @@ import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
 import com.comicatlas.api.task.enums.TaskType;
 import com.comicatlas.contract.common.enums.TranscodeStatus;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
-import com.comicatlas.worker.task.ManagementCommandPublisher;
+import com.comicatlas.worker.task.publisher.ManagementCommandPublisher;
 import com.comicatlas.worker.recovery.command.PurgeCommandHandler;
 import com.comicatlas.worker.recovery.command.RestoreCommandHandler;
 import com.comicatlas.worker.recovery.command.TrashCommandHandler;
