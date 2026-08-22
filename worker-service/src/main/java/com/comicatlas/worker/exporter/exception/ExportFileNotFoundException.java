@@ -1,4 +1,4 @@
-package com.comicatlas.worker.exporter;
+package com.comicatlas.worker.exporter.exception;
 
 /**
  * 导出文件无法解析时抛出 — HQ 缺失且 LQ 也未就绪。

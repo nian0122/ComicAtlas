@@ -1,4 +1,4 @@
-package com.comicatlas.worker.exporter;
+package com.comicatlas.worker.exporter.exception;
 
 /**
  * 导出发布冲突异常 — 最终任务目录已存在且与本次 manifest 不一致。

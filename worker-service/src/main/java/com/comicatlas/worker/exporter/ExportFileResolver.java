@@ -1,5 +1,6 @@
 package com.comicatlas.worker.exporter;
 
+import com.comicatlas.worker.exporter.exception.ExportFileNotFoundException;
 import com.comicatlas.worker.persistence.record.MediaRecord;
 import com.comicatlas.common.constant.MediaTypes;
 import com.comicatlas.common.constant.MediaStatuses;

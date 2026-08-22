@@ -1,6 +1,8 @@
 package com.comicatlas.worker.exporter;
 
 import com.comicatlas.worker.exporter.publisher.ExportArchivePublisher;
+import com.comicatlas.worker.exporter.exception.ExportFileNotFoundException;
+import com.comicatlas.worker.exporter.exception.ExportManifestBuildException;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.persistence.record.ChapterRecord;
 import com.comicatlas.worker.persistence.record.ComicRecord;

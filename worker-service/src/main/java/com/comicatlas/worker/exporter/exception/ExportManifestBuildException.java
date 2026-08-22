@@ -1,4 +1,4 @@
-package com.comicatlas.worker.exporter;
+package com.comicatlas.worker.exporter.exception;
 
 /**
  * 导出清单预检失败时抛出 — 任一媒体无可用且可读的普通文件、ZIP 目标路径冲突、
