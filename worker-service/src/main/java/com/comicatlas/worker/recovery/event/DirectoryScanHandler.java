@@ -1,13 +1,9 @@
 package com.comicatlas.worker.recovery.event;
 
-import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqQueues;
-import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.dto.ScanItemDTO;
 import com.comicatlas.common.dto.ScanResultDTO;
 import com.comicatlas.common.dto.ScanWarningDTO;
-import com.comicatlas.common.event.DirectoryScanCompletedEvent;
-import com.comicatlas.common.event.DirectoryScanFailedEvent;
 import com.comicatlas.common.event.DirectoryScanRequestedEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.worker.config.WorkerConfig;
@@ -16,17 +12,14 @@ import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.AmqpHeaders;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Path;
-import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 
 /**
  * 目录扫描任务处理器 — Worker 侧入口（漫画集根目录批量发现）。
@@ -50,7 +43,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class DirectoryScanHandler {
 
-    private final RabbitTemplate rabbitTemplate;
+    private final DirectoryScanEventPublisher eventPublisher;
     private final MqConsumerSupport mqConsumerSupport;
     private final DirectoryScanPreviews scanPreviews;
     private final WorkerConfig workerConfig;
@@ -69,8 +62,7 @@ public class DirectoryScanHandler {
     private void scanAndPublish(Long taskId, String directoryPath) {
         String normalizedPath = workerConfig.mapHostPathToContainer(directoryPath);
         ScanResultDTO result = scanPreviews.scan(normalizedPath == null ? null : Path.of(normalizedPath));
-        rabbitTemplate.convertAndSend(MqExchanges.SCAN, MqRoutingKeys.SCAN_COMPLETED,
-                new DirectoryScanCompletedEvent(UUID.randomUUID(), Instant.now(), taskId, result));
+        eventPublisher.publishCompleted(taskId, result);
         log.info("扫描完成, taskId={}, total={}, warningCodes={}",
                 taskId, result.total(), collectWarningCodes(result));
     }
@@ -91,9 +83,7 @@ public class DirectoryScanHandler {
 
     private void publishFailed(Long taskId, String errorMessage) {
         String safeMessage = errorMessage == null || errorMessage.isBlank() ? "扫描失败" : errorMessage;
-        DirectoryScanFailedEvent failEvent = new DirectoryScanFailedEvent(
-                UUID.randomUUID(), Instant.now(), taskId, safeMessage);
-        rabbitTemplate.convertAndSend(MqExchanges.SCAN, MqRoutingKeys.SCAN_FAILED, failEvent);
+        eventPublisher.publishFailed(taskId, safeMessage);
         log.info("已发布 DirectoryScanFailedEvent, taskId={}", taskId);
     }
 }

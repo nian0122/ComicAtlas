@@ -31,9 +31,6 @@ public final class MqQueues {
     public static final String EXPORT_COMPLETED_RESULT = "export.completed.result.queue";
     public static final String EXPORT_FAILED_RESULT = "export.failed.result.queue";
     public static final String METADATA_REFRESH = "metadata.refresh.queue";
-    public static final String VIDEO_TRANSCODE = "video.transcode.queue";
-    public static final String VIDEO_TRANSCODE_COMPLETED = "video.transcode.completed.queue";
-    public static final String VIDEO_TRANSCODE_FAILED = "video.transcode.failed.queue";
     public static final String RECOVERY_TASK = "recovery.task.queue";
     public static final String RECOVERY_RESULT = "recovery.result.queue";
     public static final String SCAN_TASK = "scan.task.queue";
@@ -56,9 +53,6 @@ public final class MqQueues {
     public static final String EXPORT_COMPLETED_RESULT_DLQ = "export.completed.result.dlq";
     public static final String EXPORT_FAILED_RESULT_DLQ = "export.failed.result.dlq";
     public static final String METADATA_REFRESH_DLQ = "metadata.refresh.dlq";
-    public static final String VIDEO_TRANSCODE_DLQ = "video.transcode.dlq";
-    public static final String VIDEO_TRANSCODE_COMPLETED_DLQ = "video.transcode.completed.dlq";
-    public static final String VIDEO_TRANSCODE_FAILED_DLQ = "video.transcode.failed.dlq";
     public static final String RECOVERY_TASK_DLQ = "recovery.task.dlq";
     public static final String RECOVERY_RESULT_DLQ = "recovery.result.dlq";
     public static final String SCAN_TASK_DLQ = "scan.task.dlq";

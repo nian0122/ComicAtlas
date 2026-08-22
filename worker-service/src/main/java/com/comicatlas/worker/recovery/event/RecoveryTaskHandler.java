@@ -1,12 +1,8 @@
 package com.comicatlas.worker.recovery.event;
 
-import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqQueues;
-import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.constant.StorageRootKeys;
-import com.comicatlas.common.event.RecoveryFailedEvent;
 import com.comicatlas.common.event.RecoveryRequestedEvent;
-import com.comicatlas.common.event.RecoveryScanCompletedEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageRoot;
@@ -15,7 +11,6 @@ import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.AmqpHeaders;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
@@ -23,11 +18,9 @@ import org.springframework.stereotype.Component;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.UUID;
 
 /**
  * 恢复任务处理器 — Worker 侧入口。
@@ -49,7 +42,7 @@ import java.util.UUID;
 public class RecoveryTaskHandler {
 
     private final StorageProperties storageProperties;
-    private final RabbitTemplate rabbitTemplate;
+    private final RecoveryEventPublisher eventPublisher;
     private final MqConsumerSupport mqConsumerSupport;
 
     @RabbitListener(queues = MqQueues.RECOVERY_TASK)
@@ -89,14 +82,11 @@ public class RecoveryTaskHandler {
         }
         comicIds.sort(Comparator.naturalOrder());
         log.info("扫描完成: taskId={}, 发现 {} 个漫画目录", taskId, comicIds.size());
-        rabbitTemplate.convertAndSend(MqExchanges.RECOVERY, MqRoutingKeys.RECOVERY_PROGRESS,
-                new RecoveryScanCompletedEvent(UUID.randomUUID(), Instant.now(), taskId, comicIds));
+        eventPublisher.publishScanCompleted(taskId, comicIds);
     }
 
     private void publishFailed(Long taskId, String errorMessage) {
-        RecoveryFailedEvent failEvent = new RecoveryFailedEvent(
-                UUID.randomUUID(), Instant.now(), taskId, errorMessage);
-        rabbitTemplate.convertAndSend(MqExchanges.RECOVERY, MqRoutingKeys.RECOVERY_FAILED, failEvent);
+        eventPublisher.publishFailed(taskId, errorMessage);
         log.info("已发布恢复失败事件: taskId={}, error={}", taskId, errorMessage);
     }
 }

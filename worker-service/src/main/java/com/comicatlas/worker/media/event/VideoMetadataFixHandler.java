@@ -1,9 +1,6 @@
 package com.comicatlas.worker.media.event;
 
-import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqQueues;
-import com.comicatlas.common.constant.MqRoutingKeys;
-import com.comicatlas.common.event.VideoMetadataFixCompletedEvent;
 import com.comicatlas.common.event.VideoMetadataFixRequestedEvent;
 import com.comicatlas.common.event.payload.VideoMetadataFixResult;
 import com.comicatlas.common.mq.MqConsumerSupport;
@@ -17,18 +14,15 @@ import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.AmqpHeaders;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 @Slf4j
 @Component
@@ -37,7 +31,7 @@ public class VideoMetadataFixHandler {
 
     private final MediaReadMapper exportMediaMapper;
     private final MediaAnalyzer mediaAnalyzer;
-    private final RabbitTemplate rabbitTemplate;
+    private final VideoMetadataFixPublisher publisher;
     private final MqConsumerSupport mqConsumerSupport;
     private final WorkerConfig workerConfig;
 
@@ -115,9 +109,6 @@ public class VideoMetadataFixHandler {
     }
 
     private void publishCompleted(Long comicId, List<VideoMetadataFixResult> results) {
-        VideoMetadataFixCompletedEvent completedEvent = new VideoMetadataFixCompletedEvent(
-                UUID.randomUUID(), Instant.now(), comicId, results);
-        rabbitTemplate.convertAndSend(MqExchanges.IMAGE, MqRoutingKeys.VIDEO_METADATA_FIX_COMPLETED,
-                completedEvent);
+        publisher.publishCompleted(comicId, results);
     }
 }

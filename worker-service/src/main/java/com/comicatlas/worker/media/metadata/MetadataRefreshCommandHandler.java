@@ -31,8 +31,6 @@ import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
-import java.nio.file.AtomicMoveNotSupportedException;
-import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
@@ -112,6 +110,7 @@ public class MetadataRefreshCommandHandler {
     private final MetadataSnapshotWriter snapshotWriter;
     private final MetadataSnapshotSerializer snapshotSerializer;
     private final MetadataSnapshotCleanup snapshotCleanup;
+    private final MetadataLayoutNormalizer layoutNormalizer;
 
     /**
      * 生产装配构造器：@Autowired 显式声明——类含包级测试构造器，不标注时 Spring 无法决定用哪个。
@@ -187,6 +186,7 @@ public class MetadataRefreshCommandHandler {
         this.snapshotWriter = new MetadataSnapshotWriter(storageProperties);
         this.snapshotSerializer = new MetadataSnapshotSerializer(objectMapper);
         this.snapshotCleanup = new MetadataSnapshotCleanup(storageProperties, workerConfig);
+        this.layoutNormalizer = new MetadataLayoutNormalizer(storageProperties);
     }
 
     /**
@@ -444,7 +444,7 @@ public class MetadataRefreshCommandHandler {
             if (rowDirKey != null) {
                 try {
                     if (!rowDirKey.equals(String.valueOf(chapterId))) {
-                        normalizeLayout(comicId, chapterId, scanDir);
+        layoutNormalizer.normalize(comicId, chapterId, scanDir);
                     }
                     legacyDirKey = rowDirKey;
                 } catch (Exception e) {
@@ -583,49 +583,6 @@ public class MetadataRefreshCommandHandler {
             }
         }
         return null;
-    }
-
-    /**
-     * 旧布局目录移动：将 {@code scanDir}（目录键 != chapterId）整体移动为新布局
-     * {@code hq/{comicId}/{chapterId}}，LQ 目录同构移动（存在才移）。
-     * 已是新布局（scanDir 即 chapterId 目录）时为 no-op。
-     *
-     * @throws IOException 目标目录非空或移动失败时抛出（调用方记 warning 保留原目录）
-     */
-    private void normalizeLayout(Long comicId, Long chapterId, Path scanDir) throws IOException {
-        String dirKey = scanDir.getFileName().toString();
-        String chapterKey = String.valueOf(chapterId);
-        if (dirKey.equals(chapterKey)) {
-            return;
-        }
-        StorageRoot hqRoot = requireRoot(HQ_ROOT_KEY);
-        moveDirectorySafely(hqRoot.resolve(comicId + "/" + dirKey),
-                hqRoot.resolve(comicId + "/" + chapterKey), "HQ");
-        StorageRoot lqRoot = StorageRootResolver.optional(storageProperties, LQ_ROOT_KEY);
-        if (lqRoot != null) {
-            Path lqSource = lqRoot.resolve(comicId + "/" + dirKey);
-            if (Files.isDirectory(lqSource, LinkOption.NOFOLLOW_LINKS)) {
-                moveDirectorySafely(lqSource, lqRoot.resolve(comicId + "/" + chapterKey), "LQ");
-            }
-        }
-        log.info("旧布局升级为新布局: comicId={}, chapterId={}, dir={} -> {}", comicId, chapterId, dirKey, chapterKey);
-    }
-
-    /** 同卷目录移动：目标已存在且非空拒绝覆盖（抛错）；目标为空目录先删除再移动。 */
-    private static void moveDirectorySafely(Path source, Path target, String rootLabel) throws IOException {
-        if (Files.isDirectory(target, LinkOption.NOFOLLOW_LINKS)) {
-            try (Stream<Path> entries = Files.list(target)) {
-                if (entries.findAny().isPresent()) {
-                    throw new IOException(rootLabel + " 目标目录非空，拒绝覆盖: " + target.getFileName());
-                }
-            }
-            Files.delete(target);
-        }
-        try {
-            Files.move(source, target, StandardCopyOption.ATOMIC_MOVE);
-        } catch (AtomicMoveNotSupportedException e) {
-            Files.move(source, target);
-        }
     }
 
     /**

@@ -1,12 +1,8 @@
 package com.comicatlas.worker.importer.event;
 
-import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqQueues;
-import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.constant.StorageFinalizeErrorCode;
 import com.comicatlas.common.constant.StorageRootKeys;
-import com.comicatlas.common.event.ImportStorageFinalizeCompletedEvent;
-import com.comicatlas.common.event.ImportStorageFinalizeFailedEvent;
 import com.comicatlas.common.event.ImportStorageFinalizeRequestedEvent;
 import com.comicatlas.common.event.payload.FinalizeMediaMapping;
 import com.comicatlas.common.mq.MqConsumerSupport;
@@ -22,23 +18,20 @@ import com.comicatlas.worker.storage.StorageRootResolver;
 import com.comicatlas.worker.storage.StorageService;
 import com.comicatlas.worker.storage.TransferMode;
 import com.rabbitmq.client.Channel;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.AmqpHeaders;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
@@ -69,7 +62,6 @@ import java.util.stream.Stream;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class ImportStorageFinalizeHandler {
 
     /** 按 taskId 的 JVM 锁：串行化同一导入任务的清单读改写与移动循环（单实例 Worker）。 */
@@ -80,8 +72,31 @@ public class ImportStorageFinalizeHandler {
     private final StorageProperties storageProperties;
     private final ImportManifestManager manifestManager;
     private final ChapterReadMapper exportChapterMapper;
-    private final RabbitTemplate rabbitTemplate;
+    private final ImportStorageFinalizeEventPublisher eventPublisher;
     private final MqConsumerSupport mqConsumerSupport;
+
+    @Autowired
+    public ImportStorageFinalizeHandler(WorkerConfig config, StorageService storageService,
+            StorageProperties storageProperties, ImportManifestManager manifestManager,
+            ChapterReadMapper exportChapterMapper, ImportStorageFinalizeEventPublisher eventPublisher,
+            MqConsumerSupport mqConsumerSupport) {
+        this.config = config;
+        this.storageService = storageService;
+        this.storageProperties = storageProperties;
+        this.manifestManager = manifestManager;
+        this.exportChapterMapper = exportChapterMapper;
+        this.eventPublisher = eventPublisher;
+        this.mqConsumerSupport = mqConsumerSupport;
+    }
+
+    ImportStorageFinalizeHandler(WorkerConfig config, StorageService storageService,
+            StorageProperties storageProperties, ImportManifestManager manifestManager,
+            ChapterReadMapper exportChapterMapper,
+            org.springframework.amqp.rabbit.core.RabbitTemplate rabbitTemplate,
+            MqConsumerSupport mqConsumerSupport) {
+        this(config, storageService, storageProperties, manifestManager, exportChapterMapper,
+                new ImportStorageFinalizeEventPublisher(rabbitTemplate), mqConsumerSupport);
+    }
 
     @RabbitListener(queues = MqQueues.IMPORT_STORAGE_FINALIZE_REQUESTED)
     public void handle(ImportStorageFinalizeRequestedEvent event, Channel channel,
@@ -311,11 +326,7 @@ public class ImportStorageFinalizeHandler {
     }
 
     private void publishCompleted(ImportStorageFinalizeRequestedEvent event, int mediaCount) {
-        ImportStorageFinalizeCompletedEvent completed = new ImportStorageFinalizeCompletedEvent(
-                UUID.randomUUID(), Instant.now(),
-                event.taskId(), event.comicId(), event.globalOrder(), event.chapterId(),
-                event.targetDir(), mediaCount);
-        rabbitTemplate.convertAndSend(MqExchanges.IMPORT, MqRoutingKeys.IMPORT_STORAGE_FINALIZE_COMPLETED, completed);
+        eventPublisher.publishCompleted(event, mediaCount);
         log.info("已发布 ImportStorageFinalizeCompletedEvent: taskId={}, chapterId={}, mediaCount={}",
                 event.taskId(), event.chapterId(), mediaCount);
     }
@@ -323,11 +334,7 @@ public class ImportStorageFinalizeHandler {
     private void publishFailed(ImportStorageFinalizeRequestedEvent event, Exception failure) {
         String errorCode = failure instanceof ImportStorageFinalizeException finalizeException
                 ? finalizeException.getErrorCode() : StorageFinalizeErrorCode.UNEXPECTED;
-        ImportStorageFinalizeFailedEvent failed = new ImportStorageFinalizeFailedEvent(
-                UUID.randomUUID(), Instant.now(),
-                event.taskId(), event.comicId(), event.globalOrder(), event.chapterId(),
-                errorCode, sanitize(failure.getMessage()));
-        rabbitTemplate.convertAndSend(MqExchanges.IMPORT, MqRoutingKeys.IMPORT_STORAGE_FINALIZE_FAILED, failed);
+        eventPublisher.publishFailed(event, errorCode, sanitize(failure.getMessage()));
         log.info("已发布 ImportStorageFinalizeFailedEvent: taskId={}, chapterId={}, errorCode={}",
                 event.taskId(), event.chapterId(), errorCode);
     }

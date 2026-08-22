@@ -1,26 +1,19 @@
 package com.comicatlas.worker.exporter.event;
 
-import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqQueues;
-import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.constant.ExportFormats;
-import com.comicatlas.common.event.ExportTaskCompletedEvent;
 import com.comicatlas.common.event.ExportTaskCreatedEvent;
-import com.comicatlas.common.event.ExportTaskFailedEvent;
-import com.comicatlas.common.event.ExportTaskStartedEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.worker.exporter.ExportService;
+import com.comicatlas.worker.exporter.ExportEventPublisher;
 import com.rabbitmq.client.Channel;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.AmqpHeaders;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Autowired;
 
-import java.time.Instant;
-import java.util.UUID;
 
 /**
  * 导出任务 MQ 消费者 — 只负责协议与事件发布，业务编排委托 ExportService。
@@ -31,12 +24,24 @@ import java.util.UUID;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class ExportTaskHandler {
 
-    private final RabbitTemplate rabbitTemplate;
     private final ExportService exportService;
+    private final ExportEventPublisher eventPublisher;
     private final MqConsumerSupport mqConsumerSupport;
+
+    @Autowired
+    public ExportTaskHandler(ExportService exportService, ExportEventPublisher eventPublisher,
+                             MqConsumerSupport mqConsumerSupport) {
+        this.exportService = exportService;
+        this.eventPublisher = eventPublisher;
+        this.mqConsumerSupport = mqConsumerSupport;
+    }
+
+    ExportTaskHandler(org.springframework.amqp.rabbit.core.RabbitTemplate rabbitTemplate,
+                      ExportService exportService, MqConsumerSupport mqConsumerSupport) {
+        this(exportService, new ExportEventPublisher(rabbitTemplate), mqConsumerSupport);
+    }
 
     @RabbitListener(queues = MqQueues.EXPORT_TASK)
     public void handle(ExportTaskCreatedEvent event, Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
@@ -50,9 +55,7 @@ public class ExportTaskHandler {
     }
 
     private void exportAndPublish(ExportTaskCreatedEvent event) throws Exception {
-        rabbitTemplate.convertAndSend(MqExchanges.EXPORT, MqRoutingKeys.TASK_STARTED,
-                new ExportTaskStartedEvent(UUID.randomUUID(), Instant.now(),
-                        event.taskId(), event.comicId()));
+        eventPublisher.publishStarted(event.taskId(), event.comicId());
         log.info("已发布 ExportTaskStartedEvent: taskId={}", event.taskId());
 
         ExportService.ExportOutput output;
@@ -65,10 +68,7 @@ public class ExportTaskHandler {
             return;
         }
         try {
-            rabbitTemplate.convertAndSend(MqExchanges.EXPORT, MqRoutingKeys.TASK_COMPLETED,
-                    new ExportTaskCompletedEvent(UUID.randomUUID(), Instant.now(),
-                            event.taskId(), event.comicId(), "EXPORT",
-                            output.fileName(), output.size()));
+            eventPublisher.publishCompleted(event.taskId(), event.comicId(), output);
             log.info("已发布 ExportTaskCompletedEvent: taskId={}, size={}", event.taskId(), output.size());
         } catch (Exception e) {
             throw new ExportCompletedPublishException(
@@ -78,9 +78,7 @@ public class ExportTaskHandler {
 
     private void publishExportFailed(ExportTaskCreatedEvent event, Exception failure) {
         String errorCode = exportService.classifyExportError(failure);
-        rabbitTemplate.convertAndSend(MqExchanges.EXPORT, MqRoutingKeys.TASK_FAILED,
-                new ExportTaskFailedEvent(UUID.randomUUID(), Instant.now(),
-                        event.taskId(), event.comicId(), errorCode, failure.getMessage()));
+        eventPublisher.publishFailed(event.taskId(), event.comicId(), errorCode, failure.getMessage());
     }
 
     /** completed 事件发布失败标记：不发布 failed，抛出使消息 requeue 重投。 */

@@ -1,10 +1,6 @@
 package com.comicatlas.worker.recovery.event;
 
-import com.comicatlas.common.constant.MqExchanges;
-import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.dto.ScanResultDTO;
-import com.comicatlas.common.event.DirectoryScanCompletedEvent;
-import com.comicatlas.common.event.DirectoryScanFailedEvent;
 import com.comicatlas.common.event.DirectoryScanRequestedEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.worker.config.WorkerConfig;
@@ -13,24 +9,18 @@ import com.rabbitmq.client.Channel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -45,13 +35,13 @@ import static org.mockito.Mockito.when;
 class DirectoryScanHandlerTest {
 
     @Mock
-    private RabbitTemplate rabbitTemplate;
-
-    @Mock
     private MqConsumerSupport mqConsumerSupport;
 
     @Mock
     private DirectoryScanPreviews scanPreviews;
+
+    @Mock
+    private DirectoryScanEventPublisher eventPublisher;
 
     @Mock
     private WorkerConfig workerConfig;
@@ -93,10 +83,7 @@ class DirectoryScanHandlerTest {
         handler.handle(request(7L, "D:/scans/root"), channel, 1L);
 
         verify(scanPreviews).scan(Path.of("D:/scans/root"));
-        ArgumentCaptor<DirectoryScanCompletedEvent> captor = ArgumentCaptor.forClass(DirectoryScanCompletedEvent.class);
-        verify(rabbitTemplate).convertAndSend(eq(MqExchanges.SCAN), eq(MqRoutingKeys.SCAN_COMPLETED), captor.capture());
-        assertEquals(7L, captor.getValue().taskId());
-        assertSame(result, captor.getValue().result());
+        verify(eventPublisher).publishCompleted(7L, result);
     }
 
     @Test
@@ -106,12 +93,7 @@ class DirectoryScanHandlerTest {
 
         handler.handle(request(9L, "D:/secret/root"), channel, 1L);
 
-        ArgumentCaptor<DirectoryScanFailedEvent> captor = ArgumentCaptor.forClass(DirectoryScanFailedEvent.class);
-        verify(rabbitTemplate).convertAndSend(eq(MqExchanges.SCAN), eq(MqRoutingKeys.SCAN_FAILED), captor.capture());
-        assertEquals(9L, captor.getValue().taskId());
-        assertEquals("父目录不存在", captor.getValue().errorMessage());
-        assertFalse(captor.getValue().errorMessage().contains("D:/secret"),
-                "失败事件消息不得携带宿主机绝对路径");
+        verify(eventPublisher).publishFailed(9L, "父目录不存在");
     }
 
     @Test

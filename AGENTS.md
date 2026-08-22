@@ -170,9 +170,8 @@ URL 统一由 `FileUrlResolver.resolve(page)` 生成，不手拼。
 | comic.export | task.completed | export.completed.result.queue | API ExportCompletedHandler |
 | comic.export | task.failed | export.failed.result.queue | API ExportFailedHandler |
 | comic.export | metadata.refresh.requested | metadata.refresh.queue | Worker MetadataRefreshHandler |
-| comic.video | video.transcode.requested | video.transcode.queue | Worker VideoTranscodeHandler |
-| comic.video | video.transcode.completed | video.transcode.completed.queue | API TranscodeCompletedHandler |
-| comic.video | video.transcode.failed | video.transcode.failed.queue | API TranscodeFailedHandler |
+| comic.management | command.requested (TRANSCODE) | management.command.queue | Worker TranscodeCommandHandler |
+| comic.management | command.completed / failed / progress | management.result.queue | API ManagementCommandResultHandler |
 | comic.recovery | recovery.requested | recovery.task.queue | Worker RecoveryTaskHandler |
 | comic.recovery | recovery.progress | recovery.result.queue | API RecoveryEventHandler |
 | comic.recovery | recovery.completed | recovery.result.queue | API RecoveryEventHandler |
@@ -210,9 +209,6 @@ URL 统一由 `FileUrlResolver.resolve(page)` 生成，不手拼。
 | ExportTaskCompleted | comic.export.task.completed | ExportTaskCompletedEvent |
 | ExportTaskFailed | comic.export.task.failed | ExportTaskFailedEvent |
 | MetadataRefresh | comic.export.metadata.refresh.requested | MetadataRefreshEvent |
-| VideoTranscodeRequested | comic.video.video.transcode.requested | VideoTranscodeRequestedEvent |
-| VideoTranscodeCompleted | comic.video.video.transcode.completed | VideoTranscodeCompletedEvent |
-| VideoTranscodeFailed | comic.video.video.transcode.failed | VideoTranscodeFailedEvent |
 | RecoveryRequested | comic.recovery.requested | RecoveryRequestedEvent |
 | RecoveryScanCompleted | comic.recovery.progress | RecoveryScanCompletedEvent |
 | RecoveryProgress | comic.recovery.progress | RecoveryProgressEvent |
