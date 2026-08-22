@@ -1,4 +1,4 @@
-package com.comicatlas.worker.importer;
+package com.comicatlas.worker.importer.exception;
 
 /**
  * 目录解析的确定失败异常。

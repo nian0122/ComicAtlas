@@ -1,5 +1,7 @@
 package com.comicatlas.worker.importer;
 
+import com.comicatlas.worker.importer.exception.DirectoryParseError;
+import com.comicatlas.worker.importer.exception.DirectoryParseException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
