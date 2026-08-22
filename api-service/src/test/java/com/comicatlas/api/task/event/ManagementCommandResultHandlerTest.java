@@ -4,6 +4,8 @@ import com.comicatlas.api.task.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.task.service.ManagementTaskService;
 import com.comicatlas.api.recovery.trash.TrashLifecycleCompletionService;
 import com.comicatlas.api.outbox.service.InboxService;
+import com.comicatlas.api.outbox.service.EventFingerprintService;
+import com.comicatlas.api.metadata.service.MetadataUpdateCoordinator;
 import com.comicatlas.api.storage.service.ComicStatsService;
 import com.comicatlas.api.media.service.MediaOperationCompletionService;
 import com.comicatlas.api.metadata.service.MetadataRefreshCompletionService;
@@ -25,6 +27,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -54,6 +57,7 @@ class ManagementCommandResultHandlerTest {
 
     @Mock private ManagementTaskService managementTaskService;
     @Mock private InboxService inboxService;
+    @Mock private EventFingerprintService eventFingerprintService;
     @Spy private MqConsumerSupport mqConsumerSupport = new MqConsumerSupport();
     @Mock private TransactionTemplate transactionTemplate;
     @Spy private ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
@@ -62,6 +66,11 @@ class ManagementCommandResultHandlerTest {
     @Mock private UploadCompletionService uploadCompletionService;
     @Mock private MetadataRefreshCompletionService metadataRefreshCompletionService;
     @Mock private ComicStatsService comicStatsService;
+    @Mock private MetadataUpdateCoordinator metadataUpdateCoordinator;
+
+    @Spy
+    @InjectMocks
+    private ManagementResultRouter managementResultRouter;
 
     @InjectMocks private ManagementCommandResultHandler handler;
 
@@ -69,6 +78,7 @@ class ManagementCommandResultHandlerTest {
 
     @BeforeEach
     void setUp() {
+        ReflectionTestUtils.setField(handler, "managementResultRouter", managementResultRouter);
         // 事务模板直接执行回调；Inbox 未处理（幂等放行）
         lenient().doAnswer(invocation -> {
             @SuppressWarnings("unchecked")
