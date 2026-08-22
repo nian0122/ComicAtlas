@@ -73,4 +73,19 @@ class ComicInfoParserTest {
         assertEquals("单行标题", metadata.chapters().get(0).title());
         assertEquals("2", metadata.chapters().get(0).chapterNo());
     }
+
+    @Test
+    void findsComicInfoInArchiveWrapperRoot() throws Exception {
+        Path comicRoot = Files.createDirectories(tempDir.resolve("book"));
+        Files.writeString(tempDir.resolve("ComicInfo.xml"), """
+                <ComicInfo><Series>外层系列</Series><Writer>外层作者</Writer></ComicInfo>
+                """);
+        DirectoryTree tree = new DirectoryTree(comicRoot, "book", List.of(), List.of());
+
+        ComicInfoMetadata metadata = DirectoryImportHandler.parseComicInfo(
+                new ImportContext("CBZ", tempDir, false, false, "book"), tree).orElseThrow();
+
+        assertEquals("外层系列", metadata.series());
+        assertEquals("外层作者", metadata.author());
+    }
 }

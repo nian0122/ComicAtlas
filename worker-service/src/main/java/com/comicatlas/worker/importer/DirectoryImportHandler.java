@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * 统一导入：清单驱动的安全搬运（导入两阶段最终化的<b>第一阶段（staging）</b>）。
@@ -79,7 +80,7 @@ public class DirectoryImportHandler {
             // 导入只录入文件信息 + 生成封面，不做视频转码/图片优化；
             // 转码与 LQ 优化由导入后在管理面板手动调用接口执行，加快导入时间。
             DirectoryTree tree = parser.parse(ctx.sourcePath(), ctx.sourceType());
-            var comicInfo = ComicInfoParser.parse(tree.path());
+            var comicInfo = parseComicInfo(ctx, tree);
             ComicMetadata metadata = comicInfo.isPresent()
                     ? assembler.assemble(tree, ctx, comicInfo.get())
                     : assembler.assemble(tree, ctx);
@@ -139,6 +140,18 @@ public class DirectoryImportHandler {
         // 最终化阶段将无法核对尺寸（sourceDir==targetDir 时还会静默跳过导致不发布
         // Completed，漫画卡在 IMPORTING）。
         return metaPath;
+    }
+
+    /**
+     * ComicInfo.xml 通常位于漫画根，也兼容压缩包外层包装目录中的 XML。
+     * 后者是常见 CBZ 布局：解压根只有一个漫画子目录，但 XML 放在解压根。
+     */
+    static Optional<ComicInfoMetadata> parseComicInfo(ImportContext ctx, DirectoryTree tree) throws IOException {
+        Optional<ComicInfoMetadata> sourceInfo = ComicInfoParser.parse(ctx.sourcePath());
+        if (sourceInfo.isPresent() || ctx.sourcePath().equals(tree.path())) {
+            return sourceInfo;
+        }
+        return ComicInfoParser.parse(tree.path());
     }
 
     private ManifestBuildResult buildManifestFiles(ComicMetadata metadata, Long comicId, Path importRoot) {
