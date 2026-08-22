@@ -1,10 +1,13 @@
 package com.comicatlas.worker.media.lq;
 
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
+import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.common.event.payload.LqSizeResult;
 import com.comicatlas.worker.persistence.record.MediaRecord;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageRoot;
+import com.comicatlas.worker.storage.StoragePathParser;
+import com.comicatlas.worker.storage.StorageRootResolver;
 import com.comicatlas.worker.media.image.ImageOptimizer;
 import com.comicatlas.worker.persistence.mapper.MediaReadMapper;
 import com.comicatlas.worker.task.ManagementCommandPublisher;
@@ -102,13 +105,14 @@ public class LqCommandHandler {
         if (pages.isEmpty()) {
             return new ChapterProcessResult(List.of(), List.of());
         }
-        Long comicId = deriveComicId(pages.get(0).getHqPath());
-        StorageRoot hqRoot = storageProperties.getRoots().get("HQ");
-        StorageRoot lqRoot = storageProperties.getRoots().get("LQ");
+        Long comicId = StoragePathParser.parseComicId(pages.get(0).getHqPath())
+                .stream().boxed().findFirst().orElse(null);
+        StorageRoot hqRoot = StorageRootResolver.optional(storageProperties, StorageRootKeys.HQ);
+        StorageRoot lqRoot = StorageRootResolver.optional(storageProperties, StorageRootKeys.LQ);
         if (comicId == null || hqRoot == null || lqRoot == null) {
             return new ChapterProcessResult(List.of(-1), List.of());
         }
-        String relativeDir = extractDirectory(pages.get(0).getHqPath());
+        String relativeDir = StoragePathParser.directoryOf(pages.get(0).getHqPath());
         Path hqDir = hqRoot.resolve(relativeDir);
         Path lqDir = lqRoot.resolve(relativeDir);
         ImageOptimizer.RunResult result = optimizer.generateLq(comicId, chapterId, hqDir, lqDir, force);
@@ -136,30 +140,6 @@ public class LqCommandHandler {
                 .map(p -> new LqSizeResult(mediaIdByPage.get(p.getPageNumber().intValue()), p.getOutputSize()))
                 .filter(r -> r.mediaId() != null)
                 .toList();
-    }
-
-    private static Long deriveComicId(String hqPath) {
-        if (hqPath == null || hqPath.isBlank()) {
-            return null;
-        }
-        String first = hqPath;
-        int slash = first.indexOf('/');
-        if (slash > 0) {
-            first = first.substring(0, slash);
-        }
-        try {
-            return Long.parseLong(first);
-        } catch (NumberFormatException e) {
-            return null;
-        }
-    }
-
-    private static String extractDirectory(String hqPath) {
-        if (hqPath == null) {
-            return "";
-        }
-        int lastSlash = hqPath.lastIndexOf('/');
-        return lastSlash > 0 ? hqPath.substring(0, lastSlash) : hqPath;
     }
 
     /** 单章处理结果：失败页码 + 各成功页 LQ 产物大小。 */

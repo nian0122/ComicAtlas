@@ -1,6 +1,7 @@
 package com.comicatlas.worker.media.upload;
 
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
+import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.common.event.MediaUploadCompletedEvent.MediaAnalysisResult;
 import com.comicatlas.worker.persistence.record.MediaRecord;
 import com.comicatlas.worker.persistence.record.UploadFileRecord;
@@ -10,6 +11,7 @@ import com.comicatlas.worker.media.MediaAnalyzer;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageRef;
 import com.comicatlas.worker.storage.StorageRoot;
+import com.comicatlas.worker.storage.StorageRootResolver;
 import com.comicatlas.worker.storage.StorageService;
 import com.comicatlas.worker.storage.TransferMode;
 import com.comicatlas.worker.persistence.mapper.MediaReadMapper;
@@ -67,8 +69,8 @@ public class MediaUploadCommandHandler {
 
             boolean replace = "MEDIA_REPLACE".equals(cmd.operationType());
             Long replaceMediaId = session.getReplaceMediaId();
-            StorageRoot hqRoot = storageProperties.getRoots().get("HQ");
-            StorageRoot stagingRoot = storageProperties.getRoots().get("STAGING");
+            StorageRoot hqRoot = StorageRootResolver.optional(storageProperties, StorageRootKeys.HQ);
+            StorageRoot stagingRoot = StorageRootResolver.optional(storageProperties, StorageRootKeys.STAGING);
             if (hqRoot == null || stagingRoot == null) {
                 publisher.failed(cmd, "HQ/STAGING 存储根未配置");
                 return;
@@ -144,7 +146,7 @@ public class MediaUploadCommandHandler {
      */
     private void moveOldToTrash(ManagementCommandRequestedEvent cmd, StorageRoot hqRoot,
                                 Long mediaId, String newTarget) {
-        StorageRoot trashRoot = storageProperties.getRoots().get("TRASH");
+        StorageRoot trashRoot = StorageRootResolver.optional(storageProperties, StorageRootKeys.TRASH);
         if (trashRoot == null) {
             return;
         }

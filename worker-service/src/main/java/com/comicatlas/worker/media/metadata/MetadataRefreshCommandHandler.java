@@ -1,6 +1,7 @@
 package com.comicatlas.worker.media.metadata;
 
 import com.comicatlas.common.constant.MetadataRefreshLimits;
+import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO.ChapterSnapshot;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO.MediaSnapshot;
@@ -19,6 +20,7 @@ import com.comicatlas.worker.media.ComicMetadata;
 import com.comicatlas.worker.media.MediaAnalyzer;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageRoot;
+import com.comicatlas.worker.storage.StorageRootResolver;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -81,13 +83,13 @@ public class MetadataRefreshCommandHandler {
 
     /** 过期 attempt 目录保留时长：7 天。 */
     /** HQ 存储根 key。 */
-    private static final String HQ_ROOT_KEY = "HQ";
+    private static final String HQ_ROOT_KEY = StorageRootKeys.HQ;
 
     /** STAGING 存储根 key（快照产物落盘根）。 */
-    private static final String STAGING_ROOT_KEY = "STAGING";
+    private static final String STAGING_ROOT_KEY = StorageRootKeys.STAGING;
 
     /** LQ 存储根 key（旧布局升级时同构移动 LQ 目录）。 */
-    private static final String LQ_ROOT_KEY = "LQ";
+    private static final String LQ_ROOT_KEY = StorageRootKeys.LQ;
 
     /** LQ 产物扩展名：image-optimizer.exe 固定输出 WebP。 */
     private static final String LQ_EXTENSION = ".webp";
@@ -743,15 +745,11 @@ public class MetadataRefreshCommandHandler {
     }
 
     private StorageRoot requireRoot(String key) {
-        StorageRoot root = roots().get(key);
-        if (root == null) {
-            throw new IllegalStateException("存储根未配置: " + key);
-        }
-        return root;
+        return StorageRootResolver.required(storageProperties, key);
     }
 
     private Map<String, StorageRoot> roots() {
-        return storageProperties.getRoots();
+        return storageProperties.getRoots() == null ? Map.of() : storageProperties.getRoots();
     }
 
     private static boolean isHidden(Path file) {

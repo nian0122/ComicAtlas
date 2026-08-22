@@ -24,4 +24,10 @@ public final class StorageRootKeys {
 
     /** 导出产物存储根（目录 {MANGA_ROOT}/export/，按任务 ID 存放分卷 ZIP）。 */
     public static final String EXPORT = "EXPORT";
+
+    /** Worker 暂存根（导入、上传和元数据快照临时产物）。 */
+    public static final String STAGING = "STAGING";
+
+    /** 回收站存储根。 */
+    public static final String TRASH = "TRASH";
 }

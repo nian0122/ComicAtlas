@@ -1,9 +1,12 @@
 package com.comicatlas.worker.media.hq;
 
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
+import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.worker.persistence.record.MediaRecord;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageRoot;
+import com.comicatlas.worker.storage.StoragePathParser;
+import com.comicatlas.worker.storage.StorageRootResolver;
 import com.comicatlas.worker.persistence.mapper.MediaReadMapper;
 import com.comicatlas.worker.task.ManagementCommandPublisher;
 import lombok.RequiredArgsConstructor;
@@ -59,7 +62,7 @@ public class HqDeleteCommandHandler {
             publisher.failed(cmd, "漫画无页面: " + comicId);
             return;
         }
-        StorageRoot hqRoot = storageProperties.getRoots().get("HQ");
+        StorageRoot hqRoot = StorageRootResolver.optional(storageProperties, StorageRootKeys.HQ);
         if (hqRoot == null) {
             publisher.failed(cmd, "HQ 存储根未配置");
             return;
@@ -85,8 +88,9 @@ public class HqDeleteCommandHandler {
         if (pages.isEmpty()) {
             return true;
         }
-        Long comicId = deriveComicId(pages.get(0).getHqPath());
-        StorageRoot hqRoot = storageProperties.getRoots().get("HQ");
+        Long comicId = StoragePathParser.parseComicId(pages.get(0).getHqPath())
+                .stream().boxed().findFirst().orElse(null);
+        StorageRoot hqRoot = StorageRootResolver.optional(storageProperties, StorageRootKeys.HQ);
         if (comicId == null || hqRoot == null) {
             return false;
         }
@@ -116,19 +120,4 @@ public class HqDeleteCommandHandler {
         return true;
     }
 
-    private static Long deriveComicId(String hqPath) {
-        if (hqPath == null || hqPath.isBlank()) {
-            return null;
-        }
-        String first = hqPath;
-        int slash = first.indexOf('/');
-        if (slash > 0) {
-            first = first.substring(0, slash);
-        }
-        try {
-            return Long.parseLong(first);
-        } catch (NumberFormatException e) {
-            return null;
-        }
-    }
 }

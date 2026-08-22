@@ -5,6 +5,8 @@ import com.comicatlas.common.dto.TrashManifestItemDTO;
 import com.comicatlas.worker.persistence.mapper.TrashManifestReadMapper;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageRoot;
+import com.comicatlas.common.constant.StorageRootKeys;
+import com.comicatlas.worker.storage.StorageRootResolver;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,7 +35,7 @@ public class TrashManifestStore {
     private final ObjectMapper objectMapper;
 
     public StorageRoot trashRoot() {
-        StorageRoot root = storageProperties.getRoots().get("TRASH");
+        StorageRoot root = StorageRootResolver.optional(storageProperties, StorageRootKeys.TRASH);
         if (root == null || !root.isEnabled()) {
             throw new IllegalStateException("TRASH 存储根未配置");
         }
