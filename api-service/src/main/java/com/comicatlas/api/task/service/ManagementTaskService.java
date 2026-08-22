@@ -68,6 +68,7 @@ public class ManagementTaskService {
     private final ChapterMapper chapterMapper;
     private final MediaMapper mediaMapper;
     private final TaskRetryPublisher taskRetryPublisher;
+    private final TaskResponseAssembler taskResponseAssembler;
 
     // ======================== 创建任务 ========================
 
@@ -92,7 +93,7 @@ public class ManagementTaskService {
                 String expectedHash = digestService.sha256(payload);
                 if (expectedHash.equals(existing.getIdempotencyPayloadHash())) {
                     log.info("幂等命中 idempotencyKey={}, 返回已有任务 {}", idempotencyKey, existing.getId());
-                    return toResponse(existing);
+                    return taskResponseAssembler.toResponse(existing);
                 }
                 throw new ConflictException("幂等键 " + idempotencyKey + " 已存在但 payload 不匹配");
             }
@@ -186,7 +187,7 @@ public class ManagementTaskService {
 
         log.info("创建管理任务 id={}, type={}, items={}, idempotencyKey={}",
                 task.getId(), request.getTaskType(), items.size(), idempotencyKey);
-        return toResponse(task);
+        return taskResponseAssembler.toResponse(task);
     }
 
     // ======================== 查询 ========================
@@ -235,7 +236,7 @@ public class ManagementTaskService {
         IPage<ManagementTaskResponse> responsePage = new Page<>(page, size);
         responsePage.setTotal(taskPage.getTotal());
         List<ManagementTaskResponse> responses = taskPage.getRecords().stream()
-                .map(this::toResponse)
+                .map(taskResponseAssembler::toResponse)
                 .collect(Collectors.toList());
         enrichTargetSummaries(taskPage.getRecords(), responses);
         responsePage.setRecords(responses);
@@ -250,7 +251,7 @@ public class ManagementTaskService {
         if (task == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在: " + taskId);
         }
-        ManagementTaskResponse response = toResponse(task);
+        ManagementTaskResponse response = taskResponseAssembler.toResponse(task);
         enrichTargetSummaries(List.of(task), List.of(response));
         return response;
     }
@@ -268,7 +269,7 @@ public class ManagementTaskService {
                         .eq(ManagementTaskItem::getTaskId, taskId)
                         .orderByAsc(ManagementTaskItem::getId));
         return items.stream()
-                .map(this::toItemResponse)
+                .map(taskResponseAssembler::toItemResponse)
                 .collect(Collectors.toList());
     }
 
@@ -286,7 +287,7 @@ public class ManagementTaskService {
         }
 
         if (task.getStatus() == ManagementTaskStatus.CANCELLED) {
-            return toResponse(task);
+            return taskResponseAssembler.toResponse(task);
         }
 
         if (task.getStatus().isTerminal()) {
@@ -296,7 +297,7 @@ public class ManagementTaskService {
 
         // 如果已经在取消中，不重复操作
         if (task.getStatus() == ManagementTaskStatus.CANCELLING) {
-            return toResponse(task);
+            return taskResponseAssembler.toResponse(task);
         }
 
         task.setStatus(ManagementTaskStatus.CANCELLING);
@@ -316,7 +317,7 @@ public class ManagementTaskService {
         aggregateTaskStatus(taskId);
 
         ManagementTask updated = taskMapper.selectById(taskId);
-        return toResponse(updated);
+        return taskResponseAssembler.toResponse(updated);
     }
 
     // ======================== Retry ========================
@@ -384,7 +385,7 @@ public class ManagementTaskService {
         }
 
         log.info("重试任务 id={}, newAttempt={}", taskId, newAttempt);
-        return toResponse(taskMapper.selectById(taskId));
+        return taskResponseAssembler.toResponse(taskMapper.selectById(taskId));
     }
 
     /**
@@ -529,14 +530,14 @@ public class ManagementTaskService {
         if (attempt > 0 && item.getAttempt() != null && !item.getAttempt().equals(attempt)) {
             log.info("item {} attempt={} 与结果事件 attempt={} 不匹配，忽略旧 attempt 结果 {}",
                     itemId, item.getAttempt(), attempt, newStatus);
-            return toItemResponse(item);
+            return taskResponseAssembler.toItemResponse(item);
         }
 
         // 如果已经处于终态（同一 attempt），忽略迟到结果
         if (item.getStatus().isTerminal()) {
             log.info("item {} 已处于终态 {}（attempt={}），忽略迟到状态更新 {}",
                     itemId, item.getStatus(), item.getAttempt(), newStatus);
-            return toItemResponse(item);
+            return taskResponseAssembler.toItemResponse(item);
         }
 
         item.setStatus(newStatus);
@@ -575,7 +576,7 @@ public class ManagementTaskService {
         // 重新聚合主任务状态
         aggregateTaskStatus(item.getTaskId());
 
-        return toItemResponse(itemMapper.selectById(itemId));
+        return taskResponseAssembler.toItemResponse(itemMapper.selectById(itemId));
     }
 
     /**
@@ -766,31 +767,6 @@ public class ManagementTaskService {
 
     // ======================== 辅助方法 ========================
 
-    private ManagementTaskResponse toResponse(ManagementTask task) {
-        ManagementTaskResponse response = new ManagementTaskResponse();
-        response.setId(task.getId());
-        response.setTaskType(task.getTaskType());
-        response.setOperation(task.getOperation());
-        response.setTargetType(task.getTargetType());
-        response.setBatchId(task.getBatchId());
-        response.setBatch(task.getBatch());
-        response.setStatus(task.getStatus());
-        response.setStage(task.getStage());
-        response.setProgress(task.getProgress());
-        response.setTotalCount(task.getTotalCount());
-        response.setSuccessCount(task.getSuccessCount());
-        response.setFailureCount(task.getFailureCount());
-        response.setCancelledCount(task.getCancelledCount());
-        response.setErrorMessage(task.getErrorMessage());
-        response.setAttempt(task.getAttempt());
-        response.setVersion(task.getVersion());
-        response.setCreatedAt(task.getCreatedAt());
-        response.setUpdatedAt(task.getUpdatedAt());
-        response.setStartedAt(task.getStartedAt());
-        response.setCompletedAt(task.getCompletedAt());
-        return response;
-    }
-
     private void enrichTargetSummaries(List<ManagementTask> tasks,
                                        List<ManagementTaskResponse> responses) {
         if (tasks.isEmpty()) {
@@ -899,27 +875,6 @@ public class ManagementTaskService {
             parentComicIdByTaskId.put(item.getTaskId(), parentComicId);
         }
         return parentComicIdByTaskId;
-    }
-
-    private ManagementTaskItemResponse toItemResponse(ManagementTaskItem item) {
-        ManagementTaskItemResponse response = new ManagementTaskItemResponse();
-        response.setId(item.getId());
-        response.setTaskId(item.getTaskId());
-        response.setTargetType(item.getTargetType());
-        response.setTargetId(item.getTargetId());
-        response.setOperationType(item.getOperationType());
-        response.setStatus(item.getStatus());
-        response.setAttempt(item.getAttempt());
-        response.setProgress(item.getProgress());
-        response.setResultRefType(item.getResultRefType());
-        response.setResultRefId(item.getResultRefId());
-        response.setErrorMessage(item.getErrorMessage());
-        response.setVersion(item.getVersion());
-        response.setCreatedAt(item.getCreatedAt());
-        response.setUpdatedAt(item.getUpdatedAt());
-        response.setStartedAt(item.getStartedAt());
-        response.setCompletedAt(item.getCompletedAt());
-        return response;
     }
 
 }
