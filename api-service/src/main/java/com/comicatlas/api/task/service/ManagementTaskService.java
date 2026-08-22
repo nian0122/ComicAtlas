@@ -60,6 +60,7 @@ public class ManagementTaskService {
     private final TaskResponseAssembler taskResponseAssembler;
     private final TaskQueryService taskQueryService;
     private final TaskAggregationService taskAggregationService;
+    private final TaskInternalQueryService taskInternalQueryService;
 
     // ======================== 创建任务 ========================
 
@@ -555,12 +556,7 @@ public class ManagementTaskService {
      * 内部方法，返回数据库实体 {@link ManagementTask}，禁止用于接口响应；对外使用 {@code dto/} 包对应 DTO/VO。
      */
     public ManagementTask findByIdempotencyKey(String idempotencyKey) {
-        if (idempotencyKey == null || idempotencyKey.isBlank()) {
-            return null;
-        }
-        return taskMapper.selectOne(
-                new LambdaQueryWrapper<ManagementTask>()
-                        .eq(ManagementTask::getIdempotencyKey, idempotencyKey));
+        return taskInternalQueryService.findByIdempotencyKey(idempotencyKey);
     }
 
     /**
@@ -569,17 +565,7 @@ public class ManagementTaskService {
      * 内部方法，返回数据库实体 {@link ManagementTaskItem}，禁止用于接口响应；对外使用 {@code dto/} 包对应 DTO/VO。
      */
     public ManagementTaskItem findActiveItem(String targetType, Long targetId, TaskType operationType) {
-        return itemMapper.selectOne(
-                new LambdaQueryWrapper<ManagementTaskItem>()
-                        .eq(ManagementTaskItem::getTargetType, targetType)
-                        .eq(ManagementTaskItem::getTargetId, targetId)
-                        .eq(ManagementTaskItem::getOperationType, operationType)
-                        .in(ManagementTaskItem::getStatus,
-                                ManagementTaskStatus.QUEUED,
-                                ManagementTaskStatus.RUNNING,
-                                ManagementTaskStatus.CANCELLING)
-                        .orderByDesc(ManagementTaskItem::getId)
-                        .last("LIMIT 1"));
+        return taskInternalQueryService.findActiveItem(targetType, targetId, operationType);
     }
 
     /**
@@ -587,13 +573,7 @@ public class ManagementTaskService {
      * 供结果事件处理器判断任务是否已全部完成（最后一项完成时触发整本聚合）。
      */
     public long countActiveItems(Long taskId) {
-        return itemMapper.selectCount(
-                new LambdaQueryWrapper<ManagementTaskItem>()
-                        .eq(ManagementTaskItem::getTaskId, taskId)
-                        .in(ManagementTaskItem::getStatus,
-                                ManagementTaskStatus.QUEUED,
-                                ManagementTaskStatus.RUNNING,
-                                ManagementTaskStatus.CANCELLING));
+        return taskInternalQueryService.countActiveItems(taskId);
     }
 
     // ======================== 聚合 ========================

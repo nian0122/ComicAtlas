@@ -57,6 +57,7 @@ class ManagementTaskServiceTest {
     @Mock private TaskRetryPublisher taskRetryPublisher;
     @Mock private TaskResponseAssembler taskResponseAssembler;
     @Mock private TaskQueryService taskQueryService;
+    @Mock private TaskInternalQueryService taskInternalQueryService;
     @Spy
     @InjectMocks
     private TaskAggregationService taskAggregationService;
