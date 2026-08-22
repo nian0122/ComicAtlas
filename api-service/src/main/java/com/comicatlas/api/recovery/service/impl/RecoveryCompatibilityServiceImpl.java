@@ -11,7 +11,6 @@ import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
 import com.comicatlas.api.media.operation.MediaOperationCommandService;
 import com.comicatlas.common.constant.StorageRootKeys;
-import com.comicatlas.contract.comic.cache.ComicReferenceCache;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.api.importer.enums.ImportTaskStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
@@ -30,7 +29,6 @@ import com.comicatlas.persistence.reader.mapper.ReadingHistoryMapper;
 import com.comicatlas.api.storage.ApiStorageProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,7 +38,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Stream;
 
 @Slf4j
 @Service

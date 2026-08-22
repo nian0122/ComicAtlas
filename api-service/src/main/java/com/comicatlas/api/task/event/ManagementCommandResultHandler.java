@@ -18,7 +18,6 @@ import com.comicatlas.common.event.ManagementCommandProgressEvent;
 import com.comicatlas.common.event.MediaUploadCompletedEvent;
 import com.comicatlas.common.event.MetadataRefreshScanCompletedEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
-import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.task.enums.ManagementTaskStatus;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
