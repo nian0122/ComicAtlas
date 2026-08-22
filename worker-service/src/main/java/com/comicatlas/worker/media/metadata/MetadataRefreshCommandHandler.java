@@ -7,8 +7,6 @@ import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO.ChapterSnapshot;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO.MediaSnapshot;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
-import com.comicatlas.common.storage.InvalidRelativePathException;
-import com.comicatlas.common.storage.RelativePathValidator;
 import com.comicatlas.worker.persistence.record.ChapterRecord;
 import com.comicatlas.worker.persistence.record.MediaRecord;
 import com.comicatlas.worker.config.WorkerConfig;
@@ -93,24 +91,16 @@ public class MetadataRefreshCommandHandler {
     private static final String LQ_EXTENSION = ".webp";
 
     /** LQ 未生成状态名（与 LqStatus 枚举一致）。 */
-    private static final String LQ_STATUS_NOT_GENERATED = "NOT_GENERATED";
+    private static final String LQ_STATUS_NOT_GENERATED = MetadataScanSupport.LQ_STATUS_NOT_GENERATED;
 
     /** LQ 状态：READY（文件存在）。 */
     private static final String STATUS_READY = "READY";
 
     /** HQ 状态：DELETED（HQ 文件已删除、保留 LQ 供阅读的「仅 LQ」模式）。 */
-    private static final String HQ_STATUS_DELETED = "DELETED";
+    private static final String HQ_STATUS_DELETED = MetadataScanSupport.HQ_STATUS_DELETED;
 
     /** 媒体类型：图片（仅图片有 LQ 产物）。 */
-    private static final String IMAGE_TYPE = "IMAGE";
-
-    /** 图片扩展名白名单。 */
-    private static final Set<String> IMAGE_EXTENSIONS =
-            Set.of(".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp");
-
-    /** 视频扩展名白名单。 */
-    private static final Set<String> VIDEO_EXTENSIONS =
-            Set.of(".mp4", ".mkv", ".webm", ".mov", ".avi");
+    private static final String IMAGE_TYPE = MetadataScanSupport.IMAGE_TYPE;
 
     private final ChapterReadMapper chapterMapper;
     private final MediaReadMapper mediaMapper;
@@ -243,7 +233,7 @@ public class MetadataRefreshCommandHandler {
                     return;
                 }
                 chapterSnapshots.add(new ChapterSnapshot(
-                        chapter.getId(), versionOrZero(chapter.getVersion()),
+                        chapter.getId(), MetadataScanSupport.versionOrZero(chapter.getVersion()),
                         scan.mediaItems(), scan.warnings(), scan.legacyDirKey()));
             }
 
@@ -319,15 +309,15 @@ public class MetadataRefreshCommandHandler {
         Map<String, MediaRecord> mediaByBasename = new HashMap<>();
         Set<String> parentDirKeys = new LinkedHashSet<>();
         for (MediaRecord row : dbMedia) {
-            if (isLqOnlyRow(row)) {
+            if (MetadataScanSupport.isLqOnlyRow(row)) {
                 continue;
             }
-            String dirKey = extractDirKey(row.getHqPath(), comicId);
+            String dirKey = MetadataScanSupport.extractDirKey(row.getHqPath(), comicId);
             if (dirKey == null) {
                 warnings.add("忽略非法 hqPath: " + row.getHqPath());
                 continue;
             }
-            mediaByBasename.putIfAbsent(basenameOf(row.getHqPath()), row);
+            mediaByBasename.putIfAbsent(MetadataScanSupport.basenameOf(row.getHqPath()), row);
             parentDirKeys.add(dirKey);
         }
 
@@ -350,7 +340,7 @@ public class MetadataRefreshCommandHandler {
             // 仅 LQ 模式：HQ 文件已删除（保留 LQ 供阅读）且 HQ 目录不存在时，
             // 回退扫描 LQ 目录，以物理 LQ 文件为准校正 lq_status/lq_size
             List<MediaRecord> lqOnlyRows = dbMedia.stream()
-                    .filter(MetadataRefreshCommandHandler::isLqOnlyRow)
+                    .filter(MetadataScanSupport::isLqOnlyRow)
                     .toList();
             if (!lqOnlyRows.isEmpty()) {
                 return scanLqOnlyChapter(comicId, chapter, lqOnlyRows, warnings);
@@ -388,7 +378,7 @@ public class MetadataRefreshCommandHandler {
                 }
                 continue;
             }
-            String mediaType = mediaTypeOf(extensionOf(fileName));
+            String mediaType = MetadataScanSupport.mediaTypeOf(MetadataScanSupport.extensionOf(fileName));
             if (mediaType == null) {
                 warnings.add("忽略未知扩展名: " + fileName);
                 continue;
@@ -439,7 +429,7 @@ public class MetadataRefreshCommandHandler {
 
             String relativePath = comicId + "/" + chapterId + "/" + fileName;
             mediaItems.add(new MediaSnapshot(
-                    row.getId(), versionOrZero(row.getVersion()), relativePath,
+                    row.getId(), MetadataScanSupport.versionOrZero(row.getVersion()), relativePath,
                     row.getHqStatus() != null ? row.getHqStatus() : "READY",
                     row.getStatus() != null ? row.getStatus() : "READY",
                     row.getPageNumber() != null ? row.getPageNumber() : sequence,
@@ -494,12 +484,12 @@ public class MetadataRefreshCommandHandler {
         Map<String, MediaRecord> rowByLqBasename = new HashMap<>();
         Set<String> lqDirKeys = new LinkedHashSet<>();
         for (MediaRecord row : lqOnlyRows) {
-            String dirKey = extractDirKey(row.getLqPath(), comicId);
+            String dirKey = MetadataScanSupport.extractDirKey(row.getLqPath(), comicId);
             if (dirKey == null) {
                 warnings.add("忽略非法 lqPath: " + row.getLqPath());
                 continue;
             }
-            rowByLqBasename.putIfAbsent(basenameOf(row.getLqPath()), row);
+            rowByLqBasename.putIfAbsent(MetadataScanSupport.basenameOf(row.getLqPath()), row);
             lqDirKeys.add(dirKey);
         }
         if (rowByLqBasename.isEmpty()) {
@@ -553,7 +543,7 @@ public class MetadataRefreshCommandHandler {
             }
             matchedIds.add(row.getId());
             mediaItems.add(new MediaSnapshot(
-                    row.getId(), versionOrZero(row.getVersion()),
+                    row.getId(), MetadataScanSupport.versionOrZero(row.getVersion()),
                     comicId + "/" + chapterId + "/" + fileName,
                     HQ_STATUS_DELETED, row.getStatus() != null ? row.getStatus() : STATUS_READY,
                     row.getPageNumber() != null ? row.getPageNumber() : 0,
@@ -566,12 +556,12 @@ public class MetadataRefreshCommandHandler {
             if (lqPath == null || lqPath.isBlank() || matchedIds.contains(row.getId())) {
                 continue;
             }
-            String fileName = basenameOf(lqPath);
+            String fileName = MetadataScanSupport.basenameOf(lqPath);
             if (fileName.isEmpty() || !rowByLqBasename.containsKey(fileName)) {
                 continue;
             }
             mediaItems.add(new MediaSnapshot(
-                    row.getId(), versionOrZero(row.getVersion()),
+                    row.getId(), MetadataScanSupport.versionOrZero(row.getVersion()),
                     comicId + "/" + chapterId + "/" + fileName,
                     HQ_STATUS_DELETED, row.getStatus() != null ? row.getStatus() : STATUS_READY,
                     row.getPageNumber() != null ? row.getPageNumber() : 0,
@@ -579,14 +569,6 @@ public class MetadataRefreshCommandHandler {
                     LQ_STATUS_NOT_GENERATED, 0L));
         }
         return new ChapterScanResult(mediaItems, warnings, null);
-    }
-
-    /** 仅 LQ 行判定：HQ 已删除（保留 LQ 供阅读）的图片行。 */
-    private static boolean isLqOnlyRow(MediaRecord row) {
-        return IMAGE_TYPE.equals(row.getMediaType())
-                && HQ_STATUS_DELETED.equals(row.getHqStatus())
-                && row.getLqPath() != null
-                && !row.getLqPath().isBlank();
     }
 
     /** 匹配行中首个目录键 != chapterId 的 hqPath 目录键；全部为新布局返回 null。 */
@@ -646,32 +628,6 @@ public class MetadataRefreshCommandHandler {
         } catch (AtomicMoveNotSupportedException e) {
             Files.move(source, target);
         }
-    }
-
-    /**
-     * 校验 DB hqPath 结构（{@code {comicId}/{dirKey}/{fileName}}、正斜杠、无穿越）并返回 dirKey；
-     * 结构非法（含 null）返回 null，由调用方记 warning 并跳过该行，绝不被解析。
-     */
-    private String extractDirKey(String hqPath, Long comicId) {
-        if (hqPath == null) {
-            return null;
-        }
-        try {
-            RelativePathValidator.requireRelativeForwardSlash(hqPath);
-        } catch (InvalidRelativePathException e) {
-            return null;
-        }
-        String[] segments = hqPath.split("/");
-        if (segments.length != 3 || !segments[0].equals(String.valueOf(comicId))
-                || segments[1].isBlank() || segments[2].isBlank()) {
-            return null;
-        }
-        return segments[1];
-    }
-
-    private static String basenameOf(String hqPath) {
-        int idx = hqPath.lastIndexOf('/');
-        return idx >= 0 ? hqPath.substring(idx + 1) : hqPath;
     }
 
     /**
@@ -735,25 +691,6 @@ public class MetadataRefreshCommandHandler {
 
     /** LQ 文件事实：状态 + 字节数（未生成时 status=NOT_GENERATED、size=0）。 */
     private record LqFileFact(String status, long size) {
-    }
-
-    private static String extensionOf(String fileName) {
-        int dot = fileName.lastIndexOf('.');
-        return dot >= 0 ? fileName.substring(dot).toLowerCase() : "";
-    }
-
-    private static String mediaTypeOf(String ext) {
-        if (IMAGE_EXTENSIONS.contains(ext)) {
-            return "IMAGE";
-        }
-        if (VIDEO_EXTENSIONS.contains(ext)) {
-            return "VIDEO";
-        }
-        return null;
-    }
-
-    private static int versionOrZero(Integer version) {
-        return version != null ? version : 0;
     }
 
     private static String sha256Hex(byte[] bytes) {
