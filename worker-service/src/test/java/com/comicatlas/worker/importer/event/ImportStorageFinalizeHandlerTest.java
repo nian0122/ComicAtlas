@@ -96,7 +96,7 @@ class ImportStorageFinalizeHandlerTest {
         config.setMangaRoot(mangaRoot.toString());
         handler = new ImportStorageFinalizeHandler(
                 config, storageService, storageProperties, manifestManager, exportChapterMapper,
-                rabbitTemplate, new MqConsumerSupport());
+                new ImportStorageFinalizeEventPublisher(rabbitTemplate), new MqConsumerSupport());
     }
 
     @AfterEach
@@ -331,7 +331,7 @@ class ImportStorageFinalizeHandlerTest {
         config.setMangaRoot(mangaRoot.toString());
         ImportStorageFinalizeHandler cleanupHandler = new ImportStorageFinalizeHandler(
                 config, storageService, storageProperties, failingDelete, exportChapterMapper,
-                rabbitTemplate, new MqConsumerSupport());
+                new ImportStorageFinalizeEventPublisher(rabbitTemplate), new MqConsumerSupport());
 
         cleanupHandler.handle(event(1, 100L, "001.jpg"), channel, 1L);
         ImportStorageFinalizeCompletedEvent completed = captureCompleted();
@@ -511,7 +511,7 @@ class ImportStorageFinalizeHandlerTest {
         config.setMangaRoot(mangaRoot.toString());
         ImportStorageFinalizeHandler interruptHandler = new ImportStorageFinalizeHandler(
                 config, throwingStorage, storageProperties, manifestManager, exportChapterMapper,
-                rabbitTemplate, new MqConsumerSupport());
+                new ImportStorageFinalizeEventPublisher(rabbitTemplate), new MqConsumerSupport());
 
         try {
             interruptHandler.handle(event(1, 100L, "001.jpg"), channel, 1L);

@@ -89,15 +89,6 @@ public class ImportStorageFinalizeHandler {
         this.mqConsumerSupport = mqConsumerSupport;
     }
 
-    ImportStorageFinalizeHandler(WorkerConfig config, StorageService storageService,
-            StorageProperties storageProperties, ImportManifestManager manifestManager,
-            ChapterReadMapper exportChapterMapper,
-            org.springframework.amqp.rabbit.core.RabbitTemplate rabbitTemplate,
-            MqConsumerSupport mqConsumerSupport) {
-        this(config, storageService, storageProperties, manifestManager, exportChapterMapper,
-                new ImportStorageFinalizeEventPublisher(rabbitTemplate), mqConsumerSupport);
-    }
-
     @RabbitListener(queues = MqQueues.IMPORT_STORAGE_FINALIZE_REQUESTED)
     public void handle(ImportStorageFinalizeRequestedEvent event, Channel channel,
                        @Header(AmqpHeaders.DELIVERY_TAG) long tag) {

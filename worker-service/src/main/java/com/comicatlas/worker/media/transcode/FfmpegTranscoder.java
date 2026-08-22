@@ -14,7 +14,7 @@ import java.util.List;
  * 视频转码纯技术能力：调用 ffmpeg 将视频转为 H.264 + AAC MP4。
  * <p>
  * 职责单一——只负责 ffmpeg 命令构造与进程执行；
- * 业务编排（MQ 消费、临时文件替换、DB 更新）由调用方 {@code VideoTranscodeHandler} 负责。
+ * 业务编排（MQ 消费、临时文件替换、DB 更新）由 {@code TranscodeCommandHandler} 负责。
  * 浏览器可播放判定（是否需要转码）收敛在共享模块 {@code VideoPlayability}，本类不重复实现。
  * <p>
  * 编码器选择：优先硬件加速（NVENC → QSV → AMF，按 {@code ffmpeg -encoders} 探测）。

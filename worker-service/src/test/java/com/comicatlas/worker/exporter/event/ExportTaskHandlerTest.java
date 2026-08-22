@@ -9,6 +9,7 @@ import com.comicatlas.common.event.ExportTaskStartedEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.worker.exporter.ExportManifestBuildException;
 import com.comicatlas.worker.exporter.ExportService;
+import com.comicatlas.worker.exporter.ExportEventPublisher;
 import com.rabbitmq.client.Channel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -60,7 +61,8 @@ class ExportTaskHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new ExportTaskHandler(rabbitTemplate, exportService, mqConsumerSupport);
+        handler = new ExportTaskHandler(exportService,
+                new ExportEventPublisher(rabbitTemplate), mqConsumerSupport);
     }
 
     private static ExportTaskCreatedEvent event(Long taskId, Long comicId) {

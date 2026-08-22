@@ -38,11 +38,6 @@ public class ExportTaskHandler {
         this.mqConsumerSupport = mqConsumerSupport;
     }
 
-    ExportTaskHandler(org.springframework.amqp.rabbit.core.RabbitTemplate rabbitTemplate,
-                      ExportService exportService, MqConsumerSupport mqConsumerSupport) {
-        this(exportService, new ExportEventPublisher(rabbitTemplate), mqConsumerSupport);
-    }
-
     @RabbitListener(queues = MqQueues.EXPORT_TASK)
     public void handle(ExportTaskCreatedEvent event, Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         Long taskId = event.taskId();
