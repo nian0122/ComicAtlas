@@ -60,8 +60,11 @@ class ApiPackageBoundaryTest {
     private void assertControllerDoesNotUseMapper(Path sourceFile) {
         try {
             String source = Files.readString(sourceFile);
-            assertTrue(!source.matches("(?s).*import\\s+[^;]*Mapper\\s*;.*")
-                            && !source.matches("(?s).*private\\s+final\\s+[^;]*Mapper\\s+[^;]+;.*"),
+            boolean importsPersistenceMapper = source.matches(
+                    "(?s).*import\\s+com\\.comicatlas\\.(?:api|persistence)\\.[^;]*Mapper\\s*;.*");
+            boolean declaresPersistenceMapper = source.matches(
+                    "(?s).*private\\s+final\\s+(?!ObjectMapper\\b)[^;]*Mapper\\s+[^;]+;.*");
+            assertTrue(!importsPersistenceMapper && !declaresPersistenceMapper,
                     () -> sourceFile + " 不得直接依赖 Mapper；数据库访问必须通过 Service");
         } catch (IOException exception) {
             throw new IllegalStateException("读取 API 架构门禁源码失败: " + sourceFile, exception);
