@@ -1,4 +1,4 @@
-package com.comicatlas.reading.reader;
+package com.comicatlas.reading.reader.dto;
 
 import lombok.Data;
 

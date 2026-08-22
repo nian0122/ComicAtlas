@@ -1,4 +1,4 @@
-package com.comicatlas.reading.reader.impl;
+package com.comicatlas.reading.reader.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.persistence.comic.entity.Chapter;
@@ -13,8 +13,8 @@ import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.persistence.storage.FileUrlResolver;
-import com.comicatlas.reading.reader.ReaderDTO;
-import com.comicatlas.reading.reader.ReaderService;
+import com.comicatlas.reading.reader.dto.ReaderDTO;
+import com.comicatlas.reading.reader.service.ReaderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
