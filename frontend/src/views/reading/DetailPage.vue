@@ -88,6 +88,32 @@
             </div>
           </div>
 
+          <section v-if="comic.comicInfo" class="comicinfo-block" aria-label="ComicInfo.xml 元数据">
+            <div class="comicinfo-heading">
+              <span class="info-label">ComicInfo.xml</span>
+              <span class="comicinfo-badge">已解析</span>
+            </div>
+            <div class="comicinfo-grid">
+              <div v-if="comic.comicInfo.series" class="info-item">
+                <span class="info-label">Series</span>
+                <span class="info-value">{{ comic.comicInfo.series }}</span>
+              </div>
+              <div v-if="comic.comicInfo.title" class="info-item">
+                <span class="info-label">Title</span>
+                <span class="info-value">{{ comic.comicInfo.title }}</span>
+              </div>
+              <div v-if="comic.comicInfo.number" class="info-item">
+                <span class="info-label">Number</span>
+                <span class="info-value">{{ comic.comicInfo.number }}</span>
+              </div>
+              <div v-if="comic.comicInfo.writer" class="info-item">
+                <span class="info-label">Writer</span>
+                <span class="info-value">{{ comic.comicInfo.writer }}</span>
+              </div>
+            </div>
+            <p v-if="comic.comicInfo.summary" class="comicinfo-summary">{{ comic.comicInfo.summary }}</p>
+          </section>
+
           <details class="secondary-info">
             <summary>更多信息</summary>
             <div class="secondary-info-grid">
@@ -468,7 +494,8 @@ onMounted(loadData)
 }
 
 .description-block,
-.tags-block {
+.tags-block,
+.comicinfo-block {
   display: grid;
   gap: var(--space-xs);
   margin-top: var(--space-base);
@@ -476,6 +503,32 @@ onMounted(loadData)
   border: 1px solid var(--border);
   border-radius: var(--card-radius);
   background: color-mix(in srgb, var(--bg-surface) 72%, transparent);
+}
+
+.comicinfo-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.comicinfo-badge {
+  color: var(--success);
+  font-size: 11px;
+}
+
+.comicinfo-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-base);
+}
+
+.comicinfo-summary {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre-wrap;
 }
 
 .description-block p {
