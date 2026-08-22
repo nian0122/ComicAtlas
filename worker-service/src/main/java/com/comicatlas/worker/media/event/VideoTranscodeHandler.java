@@ -9,6 +9,7 @@ import com.comicatlas.common.event.VideoTranscodeRequestedEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.media.transcode.FfmpegTranscoder;
+import com.comicatlas.worker.storage.ManagedStoragePath;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -57,8 +58,8 @@ public class VideoTranscodeHandler {
         Path tempFile = null;
         try {
             // 1. 解析 HQ 文件路径
-            Path hqDir = Path.of(config.getMangaRoot(), event.hqRoot(), event.hqPath()).getParent();
-            hqFile = Path.of(config.getMangaRoot(), event.hqRoot(), event.hqPath());
+            hqFile = ManagedStoragePath.resolve(Path.of(config.getMangaRoot()), event.hqRoot(), event.hqPath());
+            Path hqDir = hqFile.getParent();
             if (!Files.exists(hqFile)) {
                 throw new IOException("HQ 文件不存在: " + hqFile);
             }

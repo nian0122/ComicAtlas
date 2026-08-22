@@ -12,6 +12,7 @@ import com.comicatlas.worker.media.transcode.FfmpegTranscoder;
 import com.comicatlas.worker.persistence.mapper.MediaReadMapper;
 import com.comicatlas.worker.media.ComicMetadata;
 import com.comicatlas.worker.media.MediaAnalyzer;
+import com.comicatlas.worker.storage.ManagedStoragePath;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -188,7 +189,7 @@ public class TranscodeCommandHandler {
         Path hqBase = Path.of(config.getMangaRoot());
         String hqRoot = media.getHqRoot() == null ? "" : media.getHqRoot();
         String hqPath = media.getHqPath() == null ? "" : media.getHqPath();
-        return hqBase.resolve(hqRoot).resolve(hqPath);
+        return ManagedStoragePath.resolve(hqBase, hqRoot, hqPath);
     }
 
     /** 创建转码临时文件（复用 Worker 临时目录，与 MANGA_ROOT 同卷）。 */
