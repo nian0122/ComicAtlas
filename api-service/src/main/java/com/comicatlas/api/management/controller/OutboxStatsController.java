@@ -1,7 +1,7 @@
 package com.comicatlas.api.management.controller;
 
 import com.comicatlas.contract.common.Result;
-import com.comicatlas.api.outbox.mapper.OutboxMessageMapper;
+import com.comicatlas.api.outbox.service.OutboxStatsService;
 import com.comicatlas.common.dto.OutboxStatsDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,16 +18,13 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class OutboxStatsController {
 
-    private final OutboxMessageMapper outboxMapper;
+    private final OutboxStatsService outboxStatsService;
 
     /**
      * 获取 Outbox 统计信息。
      */
     @GetMapping("/stats")
     public Result<OutboxStatsDTO> stats() {
-        long pending = outboxMapper.countPending();
-        long failed = outboxMapper.countFailed();
-        long total = outboxMapper.selectCount(null);
-        return Result.ok(OutboxStatsDTO.of(pending, failed, total));
+        return Result.ok(outboxStatsService.getStats());
     }
 }

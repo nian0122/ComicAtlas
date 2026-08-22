@@ -37,6 +37,15 @@ class ApiPackageBoundaryTest {
         }
     }
 
+    @Test
+    void controllersMustNotDependOnMappers() throws IOException {
+        Path sourceRoot = resolveSourceRoot();
+        try (var files = Files.walk(sourceRoot.resolve("api"))) {
+            files.filter(path -> path.toString().endsWith("Controller.java"))
+                    .forEach(this::assertControllerDoesNotUseMapper);
+        }
+    }
+
     private void assertNoMovedCommonDependency(Path sourceFile) {
         try {
             String source = Files.readString(sourceFile);
@@ -45,6 +54,17 @@ class ApiPackageBoundaryTest {
                     () -> sourceFile + " 不得依赖已收敛到业务域的 api.common 类型");
         } catch (IOException exception) {
             throw new IllegalStateException("读取架构门禁源码失败: " + sourceFile, exception);
+        }
+    }
+
+    private void assertControllerDoesNotUseMapper(Path sourceFile) {
+        try {
+            String source = Files.readString(sourceFile);
+            assertTrue(!source.matches("(?s).*import\\s+[^;]*Mapper\\s*;.*")
+                            && !source.matches("(?s).*private\\s+final\\s+[^;]*Mapper\\s+[^;]+;.*"),
+                    () -> sourceFile + " 不得直接依赖 Mapper；数据库访问必须通过 Service");
+        } catch (IOException exception) {
+            throw new IllegalStateException("读取 API 架构门禁源码失败: " + sourceFile, exception);
         }
     }
 

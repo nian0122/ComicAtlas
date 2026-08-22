@@ -33,6 +33,15 @@ class WorkerPackageBoundaryTest {
         }
     }
 
+    @Test
+    void workerSourceMustNotContainDatabaseWriteOperations() throws IOException {
+        Path sourceRoot = resolveSourceRoot();
+        try (var files = Files.walk(sourceRoot.resolve("worker"))) {
+            files.filter(path -> path.toString().endsWith(".java"))
+                    .forEach(this::assertNoDatabaseWriteOperation);
+        }
+    }
+
     private void assertNoExporterDependency(Path sourceFile) {
         try {
             String source = Files.readString(sourceFile);
@@ -40,6 +49,19 @@ class WorkerPackageBoundaryTest {
                     () -> sourceFile + " 不得依赖 exporter.persistence；请使用 worker.persistence");
         } catch (IOException exception) {
             throw new IllegalStateException("读取架构门禁源码失败: " + sourceFile, exception);
+        }
+    }
+
+    private void assertNoDatabaseWriteOperation(Path sourceFile) {
+        try {
+            String source = Files.readString(sourceFile);
+            assertTrue(!source.contains("@Transactional")
+                            && !source.contains(".insert(")
+                            && !source.contains(".updateById(")
+                            && !source.contains(".deleteById("),
+                    () -> sourceFile + " 不得执行数据库写操作；Worker 只能读取数据库");
+        } catch (IOException exception) {
+            throw new IllegalStateException("读取 Worker 架构门禁源码失败: " + sourceFile, exception);
         }
     }
 
