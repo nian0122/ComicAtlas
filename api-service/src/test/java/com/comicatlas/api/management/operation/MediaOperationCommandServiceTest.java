@@ -18,7 +18,7 @@ import com.comicatlas.api.management.dto.OperationSubmitResultDTO;
 import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.management.trash.TrashLifecycleService;
 import com.comicatlas.api.outbox.service.OutboxService;
-import com.comicatlas.api.common.enums.ManagementTaskStatus;
+import com.comicatlas.api.management.enums.ManagementTaskStatus;
 import com.comicatlas.contract.common.enums.TranscodeStatus;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.BeforeAll;

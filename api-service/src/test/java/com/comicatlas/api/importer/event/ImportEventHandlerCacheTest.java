@@ -6,7 +6,7 @@ import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
 import com.comicatlas.api.importer.service.ImportPersistenceService;
 import com.comicatlas.contract.common.enums.ComicStatus;
-import com.comicatlas.api.common.enums.ImportTaskStatus;
+import com.comicatlas.api.importer.enums.ImportTaskStatus;
 import com.comicatlas.api.storage.ApiStorageProperties;
 import com.comicatlas.api.storage.ApiStorageRoot;
 import com.comicatlas.api.management.service.ManagementTaskService;

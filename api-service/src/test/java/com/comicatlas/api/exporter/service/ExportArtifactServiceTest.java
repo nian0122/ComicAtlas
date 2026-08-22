@@ -51,7 +51,7 @@ class ExportArtifactServiceTest {
     private ExportTask task(Long id, String status, String outputPath, Long outputSize) {
         ExportTask task = new ExportTask();
         task.setId(id);
-        task.setStatus(com.comicatlas.api.common.enums.ExportTaskStatus.valueOf(status));
+        task.setStatus(com.comicatlas.api.exporter.enums.ExportTaskStatus.valueOf(status));
         task.setOutputRoot("EXPORT");
         task.setOutputPath(outputPath);
         task.setOutputSize(outputSize);

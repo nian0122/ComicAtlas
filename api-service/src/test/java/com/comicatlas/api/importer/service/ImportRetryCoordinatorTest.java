@@ -7,7 +7,7 @@ import com.comicatlas.api.importer.mapper.ImportTaskMapper;
 import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.common.event.ImportTaskCreatedEvent;
 import com.comicatlas.contract.common.enums.ComicStatus;
-import com.comicatlas.api.common.enums.ImportTaskStatus;
+import com.comicatlas.api.importer.enums.ImportTaskStatus;
 import com.comicatlas.contract.common.enums.SourceType;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.mapper.CatalogMapper;

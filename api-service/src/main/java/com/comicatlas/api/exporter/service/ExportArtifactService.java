@@ -1,7 +1,7 @@
 package com.comicatlas.api.exporter.service;
 
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
-import com.comicatlas.api.common.enums.ExportTaskStatus;
+import com.comicatlas.api.exporter.enums.ExportTaskStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.storage.ApiStorageProperties;
 import com.comicatlas.api.storage.PathTraversalException;

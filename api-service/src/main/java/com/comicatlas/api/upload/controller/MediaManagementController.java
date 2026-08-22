@@ -2,7 +2,7 @@ package com.comicatlas.api.upload.controller;
 
 import com.comicatlas.contract.common.Result;
 import com.comicatlas.api.management.dto.OperationSubmitResultDTO;
-import com.comicatlas.api.upload.MediaManagementService;
+import com.comicatlas.api.upload.service.MediaManagementService;
 import com.comicatlas.api.upload.dto.MediaReorderRequest;
 import com.comicatlas.api.upload.dto.MediaReorderResponse;
 import jakarta.validation.Valid;

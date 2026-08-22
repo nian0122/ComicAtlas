@@ -15,7 +15,7 @@ import com.comicatlas.api.management.operation.MediaOperationCommandService;
 import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.contract.comic.cache.ComicReferenceCache;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
-import com.comicatlas.api.common.enums.ImportTaskStatus;
+import com.comicatlas.api.importer.enums.ImportTaskStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.persistence.comic.entity.Catalog;
 import com.comicatlas.persistence.comic.entity.Chapter;

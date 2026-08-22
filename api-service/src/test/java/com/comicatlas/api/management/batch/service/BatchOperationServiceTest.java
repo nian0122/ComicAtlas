@@ -2,8 +2,8 @@ package com.comicatlas.api.management.batch.service;
 
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
-import com.comicatlas.api.common.enums.ManagementTaskStatus;
-import com.comicatlas.api.common.enums.TaskType;
+import com.comicatlas.api.management.enums.ManagementTaskStatus;
+import com.comicatlas.api.management.enums.TaskType;
 import com.comicatlas.api.management.batch.BatchReasonCode;
 import com.comicatlas.api.management.batch.config.BatchProperties;
 import com.comicatlas.api.management.batch.dto.BatchCreateResponse;

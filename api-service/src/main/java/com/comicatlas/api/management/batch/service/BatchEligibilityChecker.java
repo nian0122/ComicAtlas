@@ -7,7 +7,7 @@ import com.comicatlas.api.management.batch.dto.BlockedBatchItem;
 import com.comicatlas.api.management.policy.AllowedOperations;
 import com.comicatlas.api.management.policy.MediaOperationEligibilityService;
 import com.comicatlas.api.management.policy.OperationPolicyService;
-import com.comicatlas.api.common.enums.TaskType;
+import com.comicatlas.api.management.enums.TaskType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

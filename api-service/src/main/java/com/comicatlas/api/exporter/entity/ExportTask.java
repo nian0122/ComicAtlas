@@ -3,7 +3,7 @@ package com.comicatlas.api.exporter.entity;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
-import com.comicatlas.api.common.enums.ExportTaskStatus;
+import com.comicatlas.api.exporter.enums.ExportTaskStatus;
 import lombok.Data;
 import java.time.LocalDateTime;
 
