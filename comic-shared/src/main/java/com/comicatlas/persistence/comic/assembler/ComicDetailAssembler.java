@@ -65,8 +65,11 @@ public class ComicDetailAssembler {
         detailVO.setCreatedAt(comic.getCreatedAt());
         detailVO.setUpdatedAt(comic.getUpdatedAt());
 
-        detailVO.setChapters(resolveChapters(comic.getId()));
-        detailVO.setTags(resolveTags(comic.getId()));
+        List<ComicDetailVO.ChapterVO> chapters = resolveChapters(comic.getId());
+        List<ComicDetailVO.TagRef> tags = resolveTags(comic.getId());
+        detailVO.setChapters(chapters);
+        detailVO.setTags(tags);
+        detailVO.setComicInfo(toComicInfo(comic, chapters, tags));
 
         ReadingHistory history = readingHistoryMapper.selectOne(
             new LambdaQueryWrapper<ReadingHistory>().eq(ReadingHistory::getComicId, comic.getId()));
@@ -112,6 +115,22 @@ public class ComicDetailAssembler {
         tagRef.setName(tag.getName());
         tagRef.setType(tag.getType());
         return tagRef;
+    }
+
+    private ComicDetailVO.ComicInfoVO toComicInfo(Comic comic,
+                                                   List<ComicDetailVO.ChapterVO> chapters,
+                                                   List<ComicDetailVO.TagRef> tags) {
+        ComicDetailVO.ComicInfoVO comicInfo = new ComicDetailVO.ComicInfoVO();
+        comicInfo.setSeries(comic.getTitle());
+        comicInfo.setWriter(comic.getAuthor());
+        comicInfo.setSummary(comic.getDescription());
+        comicInfo.setTags(tags.stream().map(ComicDetailVO.TagRef::getName).toList());
+        if (chapters.size() == 1) {
+            ComicDetailVO.ChapterVO chapter = chapters.get(0);
+            comicInfo.setTitle(chapter.getTitle());
+            comicInfo.setNumber(chapter.getChapterNo() == null ? null : String.valueOf(chapter.getChapterNo()));
+        }
+        return comicInfo;
     }
 
     /**
