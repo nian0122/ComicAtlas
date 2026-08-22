@@ -3,6 +3,7 @@ package com.comicatlas.api.admin.controller;
 import com.comicatlas.api.recovery.dto.ComicDeleteStatsDTO;
 import com.comicatlas.api.recovery.dto.ScanRecoverResultDTO;
 import com.comicatlas.api.recovery.service.RecoveryCompatibilityService;
+import com.comicatlas.api.recovery.controller.RecoveryCompatibilityController;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.contract.common.exception.GlobalExceptionHandler;
 import com.comicatlas.api.config.DlqSecurityConfig;
