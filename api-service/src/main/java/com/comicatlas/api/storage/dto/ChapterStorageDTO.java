@@ -1,4 +1,4 @@
-package com.comicatlas.api.admin.dto;
+package com.comicatlas.api.storage.dto;
 
 import lombok.Data;
 

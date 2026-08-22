@@ -1,9 +1,9 @@
-package com.comicatlas.api.admin.mapper;
+package com.comicatlas.api.storage.persistence.mapper;
 
-import com.comicatlas.api.admin.dto.ChapterStorageDTO;
-import com.comicatlas.api.admin.dto.ComicStorageDTO;
-import com.comicatlas.api.admin.dto.ComicStorageQuery;
-import com.comicatlas.api.admin.dto.ComicTranscodeStatusVO;
+import com.comicatlas.api.storage.dto.ChapterStorageDTO;
+import com.comicatlas.api.storage.dto.ComicStorageDTO;
+import com.comicatlas.api.storage.dto.ComicStorageQuery;
+import com.comicatlas.api.storage.dto.ComicTranscodeStatusVO;
 import com.comicatlas.api.storage.dto.StorageStatsDTO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;

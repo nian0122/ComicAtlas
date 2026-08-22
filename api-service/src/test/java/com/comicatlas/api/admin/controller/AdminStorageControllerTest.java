@@ -1,9 +1,9 @@
 package com.comicatlas.api.admin.controller;
 
-import com.comicatlas.api.admin.dto.ChapterStorageDTO;
-import com.comicatlas.api.admin.dto.ComicStorageDTO;
-import com.comicatlas.api.admin.dto.ComicStorageQuery;
-import com.comicatlas.api.admin.service.StorageQueryService;
+import com.comicatlas.api.storage.dto.ChapterStorageDTO;
+import com.comicatlas.api.storage.dto.ComicStorageDTO;
+import com.comicatlas.api.storage.dto.ComicStorageQuery;
+import com.comicatlas.api.storage.service.StorageQueryService;
 import com.comicatlas.contract.common.Result;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

@@ -1,8 +1,8 @@
-package com.comicatlas.api.admin.service;
+package com.comicatlas.api.storage.service;
 
-import com.comicatlas.api.admin.dto.ChapterStorageDTO;
-import com.comicatlas.api.admin.dto.ComicStorageDTO;
-import com.comicatlas.api.admin.dto.ComicStorageQuery;
+import com.comicatlas.api.storage.dto.ChapterStorageDTO;
+import com.comicatlas.api.storage.dto.ComicStorageDTO;
+import com.comicatlas.api.storage.dto.ComicStorageQuery;
 import java.util.List;
 
 public interface StorageQueryService {
