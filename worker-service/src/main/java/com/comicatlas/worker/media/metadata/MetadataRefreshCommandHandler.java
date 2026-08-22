@@ -35,7 +35,6 @@ import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -123,6 +122,7 @@ public class MetadataRefreshCommandHandler {
     private final WorkerConfig workerConfig;
     private final MetadataSnapshotWriter snapshotWriter;
     private final MetadataSnapshotSerializer snapshotSerializer;
+    private final MetadataSnapshotCleanup snapshotCleanup;
 
     /**
      * 生产装配构造器：@Autowired 显式声明——类含包级测试构造器，不标注时 Spring 无法决定用哪个。
@@ -197,6 +197,7 @@ public class MetadataRefreshCommandHandler {
         this.workerConfig = workerConfig;
         this.snapshotWriter = new MetadataSnapshotWriter(storageProperties);
         this.snapshotSerializer = new MetadataSnapshotSerializer(objectMapper);
+        this.snapshotCleanup = new MetadataSnapshotCleanup(storageProperties, workerConfig);
     }
 
     /**
@@ -215,7 +216,7 @@ public class MetadataRefreshCommandHandler {
             }
             Long comicId = cmd.targetId();
 
-            cleanupExpiredAttempts();
+            snapshotCleanup.cleanupExpiredAttempts();
 
             List<ChapterRecord> chapters = new ArrayList<>(
                     chapterMapper.selectByComicIdWithVersion(comicId));
@@ -673,46 +674,6 @@ public class MetadataRefreshCommandHandler {
     }
 
     /**
-     * 清理超过 7 天的 {@code STAGING/metadata-refresh/} 下 attempt 目录。
-     * 判断依据为 attempt 目录自身 mtime（最后一次写快照的时间）。
-     */
-    private void cleanupExpiredAttempts() {
-        StorageRoot stagingRoot = roots().get(STAGING_ROOT_KEY);
-        if (stagingRoot == null) {
-            log.debug("STAGING 存储根未配置，跳过元数据快照 TTL 清理");
-            return;
-        }
-        Path root = stagingRoot.resolve("metadata-refresh");
-        if (!Files.isDirectory(root, LinkOption.NOFOLLOW_LINKS)) {
-            return;
-        }
-        Instant cutoff = Instant.now().minus(Duration.ofDays(
-                workerConfig.getLifecycle().getMetadataRefreshAttemptTtlDays()));
-        try (Stream<Path> taskDirs = Files.list(root)) {
-            for (Path taskDir : taskDirs.filter(Files::isDirectory).toList()) {
-                try (Stream<Path> itemDirs = Files.list(taskDir)) {
-                    for (Path itemDir : itemDirs.filter(Files::isDirectory).toList()) {
-                        try (Stream<Path> attemptDirs = Files.list(itemDir)) {
-                            for (Path attemptDir : attemptDirs.filter(Files::isDirectory).toList()) {
-                                try {
-                                    if (Files.getLastModifiedTime(attemptDir).toInstant().isBefore(cutoff)) {
-                                        deleteRecursively(attemptDir);
-                                        log.info("清理过期元数据快照 attempt 目录: {}", attemptDir);
-                                    }
-                                } catch (IOException e) {
-                                    log.warn("清理元数据快照 attempt 目录失败: {}", attemptDir, e);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (IOException e) {
-            log.warn("扫描 metadata-refresh 目录失败，跳过 TTL 清理", e);
-        }
-    }
-
-    /**
      * 原子写入快照：同目录写 {@code .tmp} → flush/close → ATOMIC_MOVE 到目标。
      * 原子移动不受支持即失败并清理临时文件（拒绝非原子覆盖写入）。
      *
@@ -803,14 +764,4 @@ public class MetadataRefreshCommandHandler {
         }
     }
 
-    private static void deleteRecursively(Path dir) throws IOException {
-        if (!Files.exists(dir)) {
-            return;
-        }
-        try (Stream<Path> walk = Files.walk(dir)) {
-            for (Path p : walk.sorted(Comparator.comparingInt(Path::getNameCount).reversed()).toList()) {
-                Files.deleteIfExists(p);
-            }
-        }
-    }
 }
