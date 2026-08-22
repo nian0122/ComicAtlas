@@ -8,7 +8,6 @@ import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO.MediaSnapshot;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.common.storage.InvalidRelativePathException;
 import com.comicatlas.common.storage.RelativePathValidator;
-import com.comicatlas.common.util.MetadataSnapshotRevision;
 import com.comicatlas.worker.persistence.record.ChapterRecord;
 import com.comicatlas.worker.persistence.record.MediaRecord;
 import com.comicatlas.worker.config.WorkerConfig;
@@ -78,7 +77,7 @@ import java.util.stream.Stream;
 public class MetadataRefreshCommandHandler {
 
     /** 快照 schema 版本（与 MetadataRefreshSnapshotDTO 契约一致）。 */
-    private static final int SNAPSHOT_SCHEMA_VERSION = 1;
+    private static final int SNAPSHOT_SCHEMA_VERSION = MetadataSnapshotSerializer.SCHEMA_VERSION;
 
     /** 过期 attempt 目录保留时长：7 天。 */
     /** HQ 存储根 key。 */
@@ -118,12 +117,12 @@ public class MetadataRefreshCommandHandler {
     private final MediaAnalyzer mediaAnalyzer;
     private final ManagementCommandPublisher publisher;
     private final StorageProperties storageProperties;
-    private final ObjectMapper objectMapper;
     private final int maxChapters;
     private final int maxMedia;
     private final long maxSnapshotBytes;
     private final WorkerConfig workerConfig;
     private final MetadataSnapshotWriter snapshotWriter;
+    private final MetadataSnapshotSerializer snapshotSerializer;
 
     /**
      * 生产装配构造器：@Autowired 显式声明——类含包级测试构造器，不标注时 Spring 无法决定用哪个。
@@ -192,12 +191,12 @@ public class MetadataRefreshCommandHandler {
         this.mediaAnalyzer = mediaAnalyzer;
         this.publisher = publisher;
         this.storageProperties = storageProperties;
-        this.objectMapper = objectMapper;
         this.maxChapters = maxChapters;
         this.maxMedia = maxMedia;
         this.maxSnapshotBytes = maxSnapshotBytes;
         this.workerConfig = workerConfig;
         this.snapshotWriter = new MetadataSnapshotWriter(storageProperties);
+        this.snapshotSerializer = new MetadataSnapshotSerializer(objectMapper);
     }
 
     /**
@@ -249,15 +248,12 @@ public class MetadataRefreshCommandHandler {
             publisher.progress(cmd, 60, "扫描完成，写入快照");
 
             Instant generatedAt = Instant.now();
-            MetadataRefreshSnapshotDTO draft = new MetadataRefreshSnapshotDTO(
-                    SNAPSHOT_SCHEMA_VERSION, comicId, generatedAt, "", chapterSnapshots);
-            String databaseRevision = MetadataSnapshotRevision.compute(draft);
-            MetadataRefreshSnapshotDTO snapshot = new MetadataRefreshSnapshotDTO(
-                    SNAPSHOT_SCHEMA_VERSION, comicId, generatedAt, databaseRevision, chapterSnapshots);
+            MetadataRefreshSnapshotDTO snapshot = snapshotSerializer.create(
+                    comicId, chapterSnapshots, generatedAt);
 
             byte[] jsonBytes;
             try {
-                jsonBytes = objectMapper.writeValueAsBytes(snapshot);
+                jsonBytes = snapshotSerializer.serialize(snapshot);
             } catch (JsonProcessingException e) {
                 publisher.failed(cmd, "快照序列化失败: " + e.getMessage());
                 return;
