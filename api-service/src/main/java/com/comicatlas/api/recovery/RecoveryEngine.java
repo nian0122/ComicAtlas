@@ -107,7 +107,7 @@ public class RecoveryEngine {
 
     /**
      * 扫描章节目录下的媒体文件（图片 + 视频），按文件名排序。
-     * 供 {@code AdminServiceImpl.refreshMetadata()} 等场景复用。
+     * 供 {@code RecoveryCompatibilityServiceImpl.refreshMetadata()} 等场景复用。
      */
     public List<ScannedMediaInfo> scanChapterPages(Long comicId, int globalOrder) {
         return recoveryMediaResolver.scanChapterDir(comicId, globalOrder);

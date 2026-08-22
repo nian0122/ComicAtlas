@@ -1,10 +1,10 @@
-package com.comicatlas.api.admin.service.impl;
+package com.comicatlas.api.recovery.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.recovery.dto.ComicDeleteStatsDTO;
 import com.comicatlas.api.recovery.dto.RecoveryProgressVO;
 import com.comicatlas.api.recovery.dto.ScanRecoverResultDTO;
-import com.comicatlas.api.admin.service.AdminService;
+import com.comicatlas.api.recovery.service.RecoveryCompatibilityService;
 import com.comicatlas.api.recovery.RecoveryEngine;
 import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.importer.entity.ImportTask;
@@ -45,7 +45,7 @@ import java.util.stream.Stream;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class AdminServiceImpl implements AdminService {
+public class RecoveryCompatibilityServiceImpl implements RecoveryCompatibilityService {
 
     /** 删除模式：仅清理数据库记录（不删除文件）。 */
     private static final String MODE_DATABASE_ONLY = "DATABASE_ONLY";

@@ -2,7 +2,7 @@ package com.comicatlas.api.admin.controller;
 
 import com.comicatlas.api.recovery.dto.ComicDeleteStatsDTO;
 import com.comicatlas.api.recovery.dto.ScanRecoverResultDTO;
-import com.comicatlas.api.admin.service.AdminService;
+import com.comicatlas.api.recovery.service.RecoveryCompatibilityService;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.contract.common.exception.GlobalExceptionHandler;
 import com.comicatlas.api.config.DlqSecurityConfig;
@@ -20,15 +20,15 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(AdminController.class)
+@WebMvcTest(RecoveryCompatibilityController.class)
 @Import({DlqSecurityConfig.class, GlobalExceptionHandler.class})
-class AdminControllerTest {
+class RecoveryCompatibilityControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
 
     @MockBean
-    private AdminService adminService;
+    private RecoveryCompatibilityService adminService;
 
     @Test
     void deleteComic_shouldReturn200AndStats_whenSuccessful() throws Exception {

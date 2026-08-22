@@ -1,9 +1,9 @@
-package com.comicatlas.api.admin.controller;
+package com.comicatlas.api.recovery.controller;
 
 import com.comicatlas.api.recovery.dto.ComicDeleteStatsDTO;
 import com.comicatlas.api.recovery.dto.ScanRecoverResultDTO;
 import com.comicatlas.contract.common.Result;
-import com.comicatlas.api.admin.service.AdminService;
+import com.comicatlas.api.recovery.service.RecoveryCompatibilityService;
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -22,9 +22,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 @RestController
 @RequestMapping("/api/manage/admin")
 @RequiredArgsConstructor
-public class AdminController {
+public class RecoveryCompatibilityController {
 
-    private final AdminService adminService;
+    private final RecoveryCompatibilityService adminService;
 
     /**
      * 恢复被删除的漫画：扫描 HQ 目录，用 metadata.json 重建 DB 记录。

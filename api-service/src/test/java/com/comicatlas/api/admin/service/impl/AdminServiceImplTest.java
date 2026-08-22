@@ -37,7 +37,7 @@ import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.anyLong;
 
 @ExtendWith(MockitoExtension.class)
-class AdminServiceImplTest {
+class RecoveryCompatibilityServiceImplTest {
 
     @Mock
     private RecoveryEngine recoveryEngine;
@@ -63,7 +63,7 @@ class AdminServiceImplTest {
     private MediaOperationCommandService mediaOperationCommandService;
 
     @InjectMocks
-    private AdminServiceImpl service;
+    private RecoveryCompatibilityServiceImpl service;
 
     @Test
     void deleteComic_shouldThrow400_whenModeIsInvalid() {
