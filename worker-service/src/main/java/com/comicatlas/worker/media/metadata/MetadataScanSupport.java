@@ -4,13 +4,14 @@ import com.comicatlas.common.storage.InvalidRelativePathException;
 import com.comicatlas.common.storage.RelativePathValidator;
 import com.comicatlas.worker.persistence.record.MediaRecord;
 import com.comicatlas.common.constant.MediaTypes;
+import com.comicatlas.common.constant.MediaStatuses;
 
 /** 元数据扫描使用的无状态路径、媒体类型和记录判定工具。 */
 public final class MetadataScanSupport {
 
     public static final String IMAGE_TYPE = MediaTypes.IMAGE;
-    public static final String LQ_STATUS_NOT_GENERATED = "NOT_GENERATED";
-    public static final String HQ_STATUS_DELETED = "DELETED";
+    public static final String LQ_STATUS_NOT_GENERATED = MediaStatuses.NOT_GENERATED;
+    public static final String HQ_STATUS_DELETED = MediaStatuses.DELETED;
 
     private MetadataScanSupport() {
     }

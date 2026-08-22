@@ -2,6 +2,7 @@ package com.comicatlas.worker.exporter;
 
 import com.comicatlas.worker.persistence.record.MediaRecord;
 import com.comicatlas.common.constant.MediaTypes;
+import com.comicatlas.common.constant.MediaStatuses;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageRef;
 import com.comicatlas.worker.storage.StorageRoot;
@@ -23,10 +24,10 @@ public class ExportFileResolver {
         if (MediaTypes.VIDEO.equals(media.getMediaType())) {
             return new StorageRef(media.getHqRoot(), media.getHqPath());
         }
-        if ("READY".equals(media.getHqStatus())) {
+        if (MediaStatuses.READY.equals(media.getHqStatus())) {
             return new StorageRef(media.getHqRoot(), media.getHqPath());
         }
-        if ("READY".equals(media.getLqStatus())) {
+        if (MediaStatuses.READY.equals(media.getLqStatus())) {
             return new StorageRef(media.getLqRoot(), media.getLqPath());
         }
         throw new ExportFileNotFoundException("HQ 缺失且 LQ 未就绪：media=" + media.getId()

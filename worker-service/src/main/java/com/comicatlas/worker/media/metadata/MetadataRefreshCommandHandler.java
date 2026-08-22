@@ -3,6 +3,7 @@ package com.comicatlas.worker.media.metadata;
 import com.comicatlas.common.constant.MetadataRefreshLimits;
 import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.common.constant.ManagementOperationTypes;
+import com.comicatlas.common.constant.MediaStatuses;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO.ChapterSnapshot;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO.MediaSnapshot;
@@ -91,7 +92,7 @@ public class MetadataRefreshCommandHandler {
     private static final String LQ_STATUS_NOT_GENERATED = MetadataScanSupport.LQ_STATUS_NOT_GENERATED;
 
     /** LQ 状态：READY（文件存在）。 */
-    private static final String STATUS_READY = "READY";
+    private static final String STATUS_READY = MediaStatuses.READY;
 
     /** HQ 状态：DELETED（HQ 文件已删除、保留 LQ 供阅读的「仅 LQ」模式）。 */
     private static final String HQ_STATUS_DELETED = MetadataScanSupport.HQ_STATUS_DELETED;
@@ -427,8 +428,8 @@ public class MetadataRefreshCommandHandler {
             String relativePath = comicId + "/" + chapterId + "/" + fileName;
             mediaItems.add(new MediaSnapshot(
                     row.getId(), MetadataScanSupport.versionOrZero(row.getVersion()), relativePath,
-                    row.getHqStatus() != null ? row.getHqStatus() : "READY",
-                    row.getStatus() != null ? row.getStatus() : "READY",
+                    row.getHqStatus() != null ? row.getHqStatus() : MediaStatuses.READY,
+                    row.getStatus() != null ? row.getStatus() : MediaStatuses.READY,
                     row.getPageNumber() != null ? row.getPageNumber() : sequence,
                     fileSize, mediaType, width, height, duration, container, videoCodec, audioCodec,
                     lqStatus, lqSize));

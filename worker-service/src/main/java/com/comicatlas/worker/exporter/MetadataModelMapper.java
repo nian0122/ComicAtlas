@@ -2,6 +2,7 @@ package com.comicatlas.worker.exporter;
 
 import com.comicatlas.common.metadata.MetadataV3;
 import com.comicatlas.common.constant.MediaTypes;
+import com.comicatlas.common.constant.MediaStatuses;
 import com.comicatlas.worker.persistence.record.CatalogRecord;
 import com.comicatlas.worker.persistence.record.ChapterRecord;
 import com.comicatlas.worker.persistence.record.ComicRecord;
@@ -51,8 +52,8 @@ public class MetadataModelMapper {
                 mediaItems.add(new MetadataV3.MediaItem(
                         extractFileName(hqPath),
                         media.getPageNumber() != null ? media.getPageNumber() : 0,
-                        media.getHqStatus() != null ? media.getHqStatus() : "READY",
-                        media.getLqStatus() != null ? media.getLqStatus() : "NOT_GENERATED",
+                        media.getHqStatus() != null ? media.getHqStatus() : MediaStatuses.READY,
+                        media.getLqStatus() != null ? media.getLqStatus() : MediaStatuses.NOT_GENERATED,
                         media.getHqSize() != null ? media.getHqSize() : 0L,
                         media.getMediaType() != null ? media.getMediaType() : MediaTypes.IMAGE,
                         media.getWidth(), media.getHeight(),
