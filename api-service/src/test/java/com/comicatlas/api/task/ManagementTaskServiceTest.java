@@ -51,6 +51,7 @@ class ManagementTaskServiceTest {
     @Mock private OutboxService outboxService;
     @Mock private ImportTaskMapper importTaskMapper;
     @Mock private ImportRetryCoordinator importRetryCoordinator;
+    @Mock private TaskRetryPublisher taskRetryPublisher;
 
     @InjectMocks
     private ManagementTaskService service;
@@ -82,11 +83,8 @@ class ManagementTaskServiceTest {
         when(itemMapper.selectList(any())).thenReturn(List.of(item));
 
         // 导入任务非终态且非 PENDING：说明与管理任务状态不一致，重试入队应抛冲突回滚而非静默卡死
-        ImportTask importTask = new ImportTask();
-        importTask.setId(5L);
-        importTask.setStatus(ImportTaskStatus.IMPORTING);
-        when(importTaskMapper.selectOne(any())).thenReturn(importTask);
-        when(importRetryCoordinator.retry(any())).thenReturn(false);
+        org.mockito.Mockito.doThrow(new BusinessException(409, "导入任务非终态且未被重置"))
+                .when(taskRetryPublisher).publish(eq(99L), eq(item), eq(2));
 
         assertThrows(BusinessException.class, () -> service.retryTask(99L));
     }

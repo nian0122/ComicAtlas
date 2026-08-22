@@ -93,7 +93,13 @@ public class ManagementStructureQueryService {
         data.setContainer(media.getContainer()); data.setVideoCodec(media.getVideoCodec()); data.setAudioCodec(media.getAudioCodec());
         data.setTranscodeStatus(media.getTranscodeStatus() == null ? null : media.getTranscodeStatus().name()); return data;
     }
-    private String fileName(String path) { if (path == null) return ""; int i = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\')); return path.substring(i + 1); }
+    private String fileName(String path) {
+        if (path == null) {
+            return "";
+        }
+        int separatorIndex = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+        return path.substring(separatorIndex + 1);
+    }
 
     @Data public static class CatalogNode { private Long id; private String title; private List<CatalogNode> children = new ArrayList<>(); private List<ChapterRef> chapters = new ArrayList<>(); CatalogNode(Long id, String title) { this.id = id; this.title = title; } }
     public record ChapterRef(Long id, String chapterNo, String title, Integer globalOrder, Integer pageCount, String status) { }

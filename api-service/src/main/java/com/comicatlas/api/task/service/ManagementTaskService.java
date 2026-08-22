@@ -4,11 +4,6 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.comicatlas.api.exporter.entity.ExportTask;
-import com.comicatlas.api.exporter.mapper.ExportTaskMapper;
-import com.comicatlas.api.importer.entity.ImportTask;
-import com.comicatlas.api.importer.mapper.ImportTaskMapper;
-import com.comicatlas.api.importer.service.ImportRetryCoordinator;
 import com.comicatlas.api.task.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.task.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.task.dto.ManagementTaskResponse;
@@ -16,15 +11,8 @@ import com.comicatlas.api.task.entity.ManagementTask;
 import com.comicatlas.api.task.entity.ManagementTaskItem;
 import com.comicatlas.api.task.mapper.ManagementTaskItemMapper;
 import com.comicatlas.api.task.mapper.ManagementTaskMapper;
-import com.comicatlas.api.outbox.service.OutboxService;
-import com.comicatlas.common.constant.MqExchanges;
-import com.comicatlas.common.constant.MqRoutingKeys;
-import com.comicatlas.common.event.ExportTaskCreatedEvent;
-import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.enums.ComicStatus;
-import com.comicatlas.api.exporter.enums.ExportTaskStatus;
-import com.comicatlas.api.importer.enums.ImportTaskStatus;
 import com.comicatlas.api.task.enums.ManagementTaskStatus;
 import com.comicatlas.api.task.enums.TaskStage;
 import com.comicatlas.api.task.enums.TaskType;
@@ -44,15 +32,12 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -73,8 +58,6 @@ public class ManagementTaskService {
     private static final String TARGET_TYPE_CHAPTER = "CHAPTER";
     /** 目标类型：媒体。 */
     private static final String TARGET_TYPE_MEDIA = "MEDIA";
-    /** 结果引用类型：回收清单（RESTORE/PURGE 定位 manifest 目录）。 */
-    private static final String RESULT_REF_TYPE_TRASH_MANIFEST = "TRASH_MANIFEST";
     /** 初始 attempt 次数。 */
     private static final int INITIAL_ATTEMPT = 1;
     private final DigestService digestService;
@@ -84,10 +67,7 @@ public class ManagementTaskService {
     private final ComicMapper comicMapper;
     private final ChapterMapper chapterMapper;
     private final MediaMapper mediaMapper;
-    private final ExportTaskMapper exportTaskMapper;
-    private final OutboxService outboxService;
-    private final ImportTaskMapper importTaskMapper;
-    private final ImportRetryCoordinator importRetryCoordinator;
+    private final TaskRetryPublisher taskRetryPublisher;
 
     // ======================== 创建任务 ========================
 
@@ -109,7 +89,7 @@ public class ManagementTaskService {
                     new LambdaQueryWrapper<ManagementTask>()
                             .eq(ManagementTask::getIdempotencyKey, idempotencyKey));
             if (existing != null) {
-                String expectedHash = sha256(payload);
+                String expectedHash = digestService.sha256(payload);
                 if (expectedHash.equals(existing.getIdempotencyPayloadHash())) {
                     log.info("幂等命中 idempotencyKey={}, 返回已有任务 {}", idempotencyKey, existing.getId());
                     return toResponse(existing);
@@ -399,11 +379,7 @@ public class ManagementTaskService {
         for (ManagementTaskItem item : items) {
             if (item.getStatus() == ManagementTaskStatus.FAILED
                     || item.getStatus() == ManagementTaskStatus.CANCELLED) {
-                republishCommand(taskId, item, newAttempt);
-                // EXPORT 走独立导出链路（export.task.queue），单独重新入队
-                republishExportCommand(taskId, item, newAttempt);
-                // IMPORT 走独立导入链路（import.task.queue），重新发布导入事件
-                republishImportCommand(taskId, item, newAttempt);
+                taskRetryPublisher.publish(taskId, item, newAttempt);
             }
         }
 
@@ -474,105 +450,6 @@ public class ManagementTaskService {
         resetTaskAndItems(taskId, task.getAttempt() + 1, items);
     }
 
-    /**
-     * 为被重置的 item 重新发布 ManagementCommandRequestedEvent 到 Outbox。
-     * <p>
-     * 仅适用于统一命令管线操作（LQ/HQ/转码/刷新/整本删除/回收/恢复/清理）；
-     * IMPORT/RECOVERY/EXPORT/SCAN 等旧任务重试由各自流程重新入队。
-     * <p>
-     * RESTORE/PURGE 类操作通过 result_ref（TRASH_MANIFEST → 回收任务 taskId）定位清单目录。
-     */
-    private void republishCommand(Long taskId, ManagementTaskItem item, int newAttempt) {
-        TaskType operation = item.getOperationType();
-        if (operation == null || !COMMAND_OPS.contains(operation)) {
-            return;
-        }
-        Long manifestTaskId = RESULT_REF_TYPE_TRASH_MANIFEST.equals(item.getResultRefType())
-                ? item.getResultRefId() : null;
-        ManagementCommandRequestedEvent event = new ManagementCommandRequestedEvent(
-                UUID.randomUUID(), Instant.now(), INITIAL_ATTEMPT,
-                taskId, item.getId(), newAttempt,
-                operation.name(), item.getTargetType(), item.getTargetId(), manifestTaskId);
-        outboxService.enqueue(event, MqExchanges.MANAGEMENT, MqRoutingKeys.COMMAND_REQUESTED,
-                taskId, item.getId(), newAttempt);
-        log.info("重试已重新发布命令: taskId={}, itemId={}, attempt={}, op={}, target={}:{}, manifestTaskId={}",
-                taskId, item.getId(), newAttempt, operation.name(), item.getTargetType(), item.getTargetId(), manifestTaskId);
-    }
-
-    /**
-     * EXPORT 任务重试：重置导出专表为 PENDING 并重新发布 ExportTaskCreatedEvent。
-     * <p>
-     * 导出走独立链路（export.task.queue），不经 ManagementCommandDispatcher，
-     * 重试时必须主动重新入队，否则 item 重置为 QUEUED 后 Worker 永远不会收到命令而卡死。
-     */
-    private void republishExportCommand(Long taskId, ManagementTaskItem item, int newAttempt) {
-        if (item.getOperationType() != TaskType.EXPORT) {
-            return;
-        }
-        ExportTask exportTask = exportTaskMapper.selectOne(new LambdaQueryWrapper<ExportTask>()
-                .eq(ExportTask::getManagementTaskId, taskId));
-        if (exportTask == null) {
-            log.warn("导出专表不存在，跳过导出重试入队: taskId={}, itemId={}", taskId, item.getId());
-            return;
-        }
-        exportTaskMapper.update(null, new LambdaUpdateWrapper<ExportTask>()
-                .eq(ExportTask::getId, exportTask.getId())
-                .set(ExportTask::getStatus, ExportTaskStatus.PENDING)
-                .set(ExportTask::getProgress, 0)
-                .set(ExportTask::getErrorMsg, null)
-                .set(ExportTask::getCompletedAt, null));
-
-        ExportTaskCreatedEvent event = new ExportTaskCreatedEvent(
-                UUID.randomUUID(), Instant.now(),
-                exportTask.getId(), exportTask.getComicId(),
-                exportTask.getFormat() == null ? "ZIP" : exportTask.getFormat());
-        outboxService.enqueue(event, MqExchanges.EXPORT, MqRoutingKeys.TASK_CREATED,
-                taskId, item.getId(), newAttempt);
-        log.info("导出任务重试已重新入队: taskId={}, itemId={}, attempt={}, exportTaskId={}, comicId={}",
-                taskId, item.getId(), newAttempt, exportTask.getId(), exportTask.getComicId());
-    }
-
-    /**
-     * IMPORT 任务重试：委托 ImportRetryCoordinator 重新入队。
-     * <p>
-     * 导入走独立链路（import.task.queue），不经 ManagementCommandDispatcher；
-     * 重试时必须主动重新发布导入事件，否则 item 重置为 QUEUED 后 Worker 永远不会收到命令而卡死。
-     * coordinator 内置终态守卫：仅当 import_task 仍处于终态（FAILED/CANCELLED）才执行重试入队，
-     * 与导入任务页重试（ImportServiceImpl.retryTask 已先重置 import_task）并存时不会重复入队。
-     */
-    private void republishImportCommand(Long taskId, ManagementTaskItem item, int newAttempt) {
-        if (item.getOperationType() != TaskType.IMPORT) {
-            return;
-        }
-        ImportTask importTask = importTaskMapper.selectOne(
-                new LambdaQueryWrapper<ImportTask>()
-                        .eq(ImportTask::getManagementTaskId, taskId));
-        if (importTask == null) {
-            log.warn("导入任务不存在，跳过导入重试入队: taskId={}, itemId={}", taskId, item.getId());
-            return;
-        }
-        boolean retried = importRetryCoordinator.retry(importTask);
-        // 幂等防重：导入页重试已先重置 import_task 为 PENDING（ImportServiceImpl.retryTask 链路），
-        // 此处返回 false 且为 PENDING 属预期，不重复入队；其余非终态说明导入任务状态与管理任务
-        // 不一致，若静默跳过会导致管理任务重置 QUEUED 但导入永不入队，故抛冲突让本事务回滚。
-        if (!retried && importTask.getStatus() != ImportTaskStatus.PENDING) {
-            throw new BusinessException(HttpStatusCodes.CONFLICT,
-                    "导入任务非终态且未被重置，无法重试入队: taskId=" + taskId
-                            + ", importTaskId=" + importTask.getId()
-                            + ", status=" + importTask.getStatus());
-        }
-        log.info("导入任务重试已重新入队: taskId={}, itemId={}, attempt={}, importTaskId={}, retried={}",
-                taskId, item.getId(), newAttempt, importTask.getId(), retried);
-    }
-
-    /** 统一命令管线操作类型集合。 */
-    private static final Set<TaskType> COMMAND_OPS = Set.of(
-            TaskType.LQ_GENERATE, TaskType.LQ_REGENERATE, TaskType.HQ_DELETE,
-            TaskType.TRANSCODE, TaskType.METADATA_REFRESH, TaskType.COMIC_DELETE,
-            TaskType.MEDIA_UPLOAD, TaskType.MEDIA_REPLACE, TaskType.MEDIA_TRASH,
-            TaskType.CHAPTER_TRASH, TaskType.COMIC_RESTORE, TaskType.CHAPTER_RESTORE,
-            TaskType.MEDIA_RESTORE, TaskType.COMIC_PURGE, TaskType.CHAPTER_PURGE,
-            TaskType.MEDIA_PURGE);
 
     // ======================== Item 状态更新 ========================
 
