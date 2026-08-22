@@ -9,6 +9,7 @@ import com.comicatlas.api.recovery.domain.RestoreSource;
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.enums.HqStatus;
 import com.comicatlas.contract.common.enums.LqStatus;
+import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.storage.ApiStorageProperties;
 import com.comicatlas.api.metadata.service.MetadataUpdateCoordinator;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -142,7 +143,7 @@ public class RecoveryEngine {
             try {
                 return restoreComicInternal(comicData, catalogsData, chaptersData, resolvedMedia, ctx);
             } catch (Exception e) {
-                throw new RuntimeException("恢复漫画失败: comicId=" + ctx.comicId(), e);
+                throw new BusinessException("恢复漫画失败: comicId=" + ctx.comicId(), e);
             }
         });
         catalogCacheInvalidator.evict(ctx.comicId());
@@ -191,7 +192,7 @@ public class RecoveryEngine {
         if (ctx.comicExists()) {
             comic = comicMapper.selectById(comicId);
             if (comic == null) {
-                throw new RuntimeException("漫画不存在: comicId=" + comicId);
+                throw new BusinessException("漫画不存在: comicId=" + comicId);
             }
             List<Long> existingChapterIds = chapterMapper.selectList(
                 new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId))
