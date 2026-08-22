@@ -2,14 +2,12 @@ package com.comicatlas.api.importer.event;
 
 import com.comicatlas.api.importer.service.ImportPersistenceService;
 import com.comicatlas.api.outbox.service.InboxService;
+import com.comicatlas.api.outbox.service.EventFingerprintService;
 import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.event.ComicEvent;
 import com.comicatlas.common.event.ImportStorageFinalizeCompletedEvent;
 import com.comicatlas.common.event.ImportStorageFinalizeFailedEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
-import com.comicatlas.contract.common.exception.BusinessException;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,9 +17,6 @@ import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.util.HexFormat;
 
 /**
  * 导入存储最终化结果事件处理器（Worker → API，协议适配）。
@@ -39,7 +34,7 @@ public class ImportStorageFinalizeEventHandler {
     private final ImportPersistenceService importPersistenceService;
     private final InboxService inboxService;
     private final TransactionTemplate transactionTemplate;
-    private final ObjectMapper objectMapper;
+    private final EventFingerprintService eventFingerprintService;
     private final MqConsumerSupport mqConsumerSupport;
 
     @RabbitListener(queues = MqQueues.IMPORT_STORAGE_FINALIZE_COMPLETED)
@@ -61,7 +56,7 @@ public class ImportStorageFinalizeEventHandler {
     /** inbox 幂等 + 委托 Service（同一事务：业务更新 + inbox 记录原子性）。 */
     private void processEvent(ComicEvent event) {
         String eventId = event.eventId().toString();
-        String payloadHash = sha256(toJson(event));
+        String payloadHash = eventFingerprintService.fingerprint(event);
         transactionTemplate.executeWithoutResult(tx -> {
             if (inboxService.isProcessed(eventId, payloadHash)) {
                 log.debug("Inbox 幂等跳过最终化事件: eventId={}", eventId);
@@ -76,20 +71,4 @@ public class ImportStorageFinalizeEventHandler {
         });
     }
 
-    private String toJson(ComicEvent event) {
-        try {
-            return objectMapper.writeValueAsString(event);
-        } catch (JsonProcessingException e) {
-            throw new BusinessException("最终化事件序列化失败: " + event.eventId(), e);
-        }
-    }
-
-    private static String sha256(String input) {
-        try {
-            return HexFormat.of().formatHex(
-                    MessageDigest.getInstance("SHA-256").digest(input.getBytes(StandardCharsets.UTF_8)));
-        } catch (Exception e) {
-            throw new BusinessException("计算事件摘要失败", e);
-        }
-    }
 }
