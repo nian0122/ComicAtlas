@@ -4,8 +4,6 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.recovery.dto.ComicDeleteStatsDTO;
 import com.comicatlas.api.recovery.dto.RecoveryProgressVO;
 import com.comicatlas.api.recovery.dto.ScanRecoverResultDTO;
-import com.comicatlas.api.storage.dto.StorageStatsDTO;
-import com.comicatlas.api.storage.persistence.mapper.StorageMapper;
 import com.comicatlas.api.admin.service.AdminService;
 import com.comicatlas.api.recovery.RecoveryEngine;
 import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
@@ -65,7 +63,6 @@ public class AdminServiceImpl implements AdminService {
     private final ComicTagMapper comicTagMapper;
     private final ReadingHistoryMapper historyMapper;
     private final ImportTaskMapper taskMapper;
-    private final StorageMapper storageMapper;
     private final RecoveryEngine recoveryEngine;
     private final CatalogCacheInvalidator catalogCacheInvalidator;
     private final MediaOperationCommandService mediaOperationCommandService;
@@ -121,41 +118,6 @@ public class AdminServiceImpl implements AdminService {
         return stats;
     }
 
-    @Override
-    @Cacheable(
-        cacheNames = ComicReferenceCache.STORAGE_STATS,
-        key = "'" + ComicReferenceCache.ALL_KEY + "'",
-        unless = "#result == null")
-    public StorageStatsDTO getStorageStats() {
-        StorageStatsDTO stats = storageMapper.selectStorageStats();
-        if (stats == null) {
-            stats = new StorageStatsDTO();
-        }
-        Path thumbRoot = storageProperties.root(StorageRootKeys.THUMBS).getPath();
-        stats.setThumbBytes(dirSize(thumbRoot));
-        stats.setComicCount((int) storageMapper.countActiveComics());
-        return stats;
-    }
-
-    private long dirSize(Path dir) {
-        if (!Files.exists(dir)) {
-            return 0;
-        }
-        try (Stream<Path> stream = Files.walk(dir)) {
-            return stream.filter(Files::isRegularFile)
-                         .mapToLong(path -> {
-                             try {
-                                 return Files.size(path);
-                             } catch (IOException ex) {
-                                 return 0;
-                             }
-                         })
-                         .sum();
-        } catch (IOException ex) {
-            log.warn("计算目录大小失败: {}", dir, ex);
-            return 0;
-        }
-    }
 
     @Override
     public ScanRecoverResultDTO scanRecover() {
