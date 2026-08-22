@@ -5,12 +5,12 @@ import com.comicatlas.common.event.MetadataRefreshEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.common.util.MetadataFileWriter;
 import com.comicatlas.worker.shared.metadata.MetadataExporter;
+import com.comicatlas.worker.config.WorkerConfig;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.support.AmqpHeaders;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
@@ -23,8 +23,7 @@ import java.nio.file.Path;
 public class MetadataRefreshHandler {
 
     private final MetadataExporter metadataJsonExporter;
-    @Value("${worker.manga-root}")
-    private String mangaRoot;
+    private final WorkerConfig workerConfig;
     private final MqConsumerSupport mqConsumerSupport;
 
     @RabbitListener(queues = MqQueues.METADATA_REFRESH)
@@ -34,15 +33,15 @@ public class MetadataRefreshHandler {
         mqConsumerSupport.consume(channel, tag, "元数据刷新: comicId=" + comicId, () -> {
             log.info("收到 metadata 刷新请求: comicId={}", comicId);
             String metadataJson = metadataJsonExporter.exportJson(comicId);
-            Path metadataDir = Path.of(mangaRoot, "metadata");
+            Path metadataDir = workerConfig.resolveMetadataDir();
             Files.createDirectories(metadataDir);
             Path metadataFile = metadataDir.resolve(comicId + ".json");
             // 统一原子写（tmp → flush → ATOMIC_MOVE）：读者永不见半截 JSON，
             // 失败向上抛出交由 MqConsumerSupport reject/DLQ，不吞异常
             MetadataFileWriter.write(metadataFile, metadataJson);
             long fileSize = Files.size(metadataFile);
-            log.info("metadata.json 写入完成: comicId={}, path={}, size={} bytes",
-                    comicId, metadataFile, fileSize);
+            log.info("metadata.json 写入完成: comicId={}, fileName={}, size={} bytes",
+                    comicId, metadataFile.getFileName(), fileSize);
         });
     }
 }

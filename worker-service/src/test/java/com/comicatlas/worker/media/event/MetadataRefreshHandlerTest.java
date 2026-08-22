@@ -5,6 +5,7 @@ import com.comicatlas.common.metadata.MetadataJsonBuilder;
 import com.comicatlas.common.metadata.MetadataV3;
 import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.worker.exporter.MetadataJsonExporter;
+import com.comicatlas.worker.config.WorkerConfig;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.Channel;
@@ -14,7 +15,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -54,8 +54,9 @@ class MetadataRefreshHandlerTest {
     }
 
     private void newHandler() {
-        handler = new MetadataRefreshHandler(metadataJsonExporter, new MqConsumerSupport());
-        ReflectionTestUtils.setField(handler, "mangaRoot", tempRoot.toString());
+        WorkerConfig workerConfig = new WorkerConfig();
+        workerConfig.setMetadataDir(tempRoot.resolve("metadata").toString());
+        handler = new MetadataRefreshHandler(metadataJsonExporter, workerConfig, new MqConsumerSupport());
     }
 
     private Path metadataFile() {

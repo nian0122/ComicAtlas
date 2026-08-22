@@ -15,6 +15,7 @@ import org.springframework.core.env.PropertySource;
 import org.springframework.core.io.ClassPathResource;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -170,6 +171,24 @@ class WorkerConfigTest {
         assertThatThrownBy(() -> config.resolveToolPath(" "))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("工具路径");
+    }
+
+    @Test
+    @DisplayName("元数据目录优先使用显式配置")
+    void metadataDirectoryUsesExplicitConfiguration() {
+        WorkerConfig config = new WorkerConfig();
+        config.setMetadataDir("D:/managed/metadata");
+
+        assertThat(config.resolveMetadataDir()).isEqualTo(Path.of("D:/managed/metadata"));
+    }
+
+    @Test
+    @DisplayName("元数据目录未配置时回退到漫画根目录")
+    void metadataDirectoryFallsBackToMangaRoot() {
+        WorkerConfig config = new WorkerConfig();
+        config.setMangaRoot("D:/managed");
+
+        assertThat(config.resolveMetadataDir()).isEqualTo(Path.of("D:/managed/metadata"));
     }
 
     @Test

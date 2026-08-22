@@ -16,6 +16,7 @@ import java.util.Map;
 public class WorkerConfig {
     private static final String DEFAULT_CONTAINER_MANGA_ROOT = "/storage";
     private static final String TEMP_DIRECTORY_NAME = "temp";
+    private static final String METADATA_DIRECTORY_NAME = "metadata";
     /** Commons Compress 分卷大小下限：64 KiB（ZIP 规范要求 split segment 不小于 64 KB）。 */
     private static final long ZIP_SPLIT_SIZE_MIN_BYTES = 64L * 1024;
     /** Commons Compress 分卷大小上限：2^32 - 1（无 Zip64 分卷的最大段大小）。 */
@@ -135,6 +136,18 @@ public class WorkerConfig {
         String root = mangaRoot != null && !mangaRoot.isBlank()
                 ? mangaRoot : System.getProperty("user.dir");
         return Path.of(root, TEMP_DIRECTORY_NAME);
+    }
+
+    /**
+     * 解析元数据目录：优先使用显式配置；未配置时回退到 {@code {mangaRoot}/metadata}。
+     */
+    public Path resolveMetadataDir() {
+        if (metadataDir != null && !metadataDir.isBlank()) {
+            return Path.of(metadataDir);
+        }
+        String root = mangaRoot != null && !mangaRoot.isBlank()
+                ? mangaRoot : System.getProperty("user.dir");
+        return Path.of(root, METADATA_DIRECTORY_NAME);
     }
 
     /** Torrent 下载配置。 */
