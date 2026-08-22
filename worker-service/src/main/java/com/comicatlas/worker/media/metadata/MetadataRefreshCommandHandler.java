@@ -36,15 +36,12 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.HexFormat;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * 元数据扫盘刷新命令处理器（API → Worker，METADATA_REFRESH/COMIC）。
@@ -111,6 +108,9 @@ public class MetadataRefreshCommandHandler {
     private final MetadataSnapshotSerializer snapshotSerializer;
     private final MetadataSnapshotCleanup snapshotCleanup;
     private final MetadataLayoutNormalizer layoutNormalizer;
+    private final MetadataChapterScanner chapterScanner;
+    private final MetadataMediaMatcher mediaMatcher;
+    private final MetadataSnapshotAssembler snapshotAssembler;
 
     /**
      * 生产装配构造器：@Autowired 显式声明——类含包级测试构造器，不标注时 Spring 无法决定用哪个。
@@ -187,6 +187,9 @@ public class MetadataRefreshCommandHandler {
         this.snapshotSerializer = new MetadataSnapshotSerializer(objectMapper);
         this.snapshotCleanup = new MetadataSnapshotCleanup(storageProperties, workerConfig);
         this.layoutNormalizer = new MetadataLayoutNormalizer(storageProperties);
+        this.chapterScanner = new MetadataChapterScanner(storageProperties);
+        this.mediaMatcher = new MetadataMediaMatcher();
+        this.snapshotAssembler = new MetadataSnapshotAssembler();
     }
 
     /**
@@ -230,9 +233,8 @@ public class MetadataRefreshCommandHandler {
                     publisher.failed(cmd, "媒体条目超过上限: " + totalMedia + " > " + maxMedia);
                     return;
                 }
-                chapterSnapshots.add(new ChapterSnapshot(
-                        chapter.getId(), MetadataScanSupport.versionOrZero(chapter.getVersion()),
-                        scan.mediaItems(), scan.warnings(), scan.legacyDirKey()));
+                chapterSnapshots.add(snapshotAssembler.chapterSnapshot(
+                        chapter, scan.mediaItems(), scan.warnings(), scan.legacyDirKey()));
             }
 
             publisher.progress(cmd, 60, "扫描完成，写入快照");
@@ -299,40 +301,22 @@ public class MetadataRefreshCommandHandler {
     private ChapterScanResult scanChapter(Long comicId, ChapterRecord chapter,
                                           List<MediaRecord> dbMedia) {
         List<String> warnings = new ArrayList<>();
-        StorageRoot hqRoot = requireRoot(HQ_ROOT_KEY);
         Long chapterId = chapter.getId();
 
         // 合法 DB 行按 basename 索引（结构校验通过者），并收集其真实存放目录键；
         // 仅 LQ 行（HQ 已删除）不参与 HQ 定位，由 scanLqOnlyChapter 单独扫描 LQ 目录
-        Map<String, MediaRecord> mediaByBasename = new HashMap<>();
-        Set<String> parentDirKeys = new LinkedHashSet<>();
-        for (MediaRecord row : dbMedia) {
-            if (MetadataScanSupport.isLqOnlyRow(row)) {
-                continue;
-            }
-            String dirKey = MetadataScanSupport.extractDirKey(row.getHqPath(), comicId);
-            if (dirKey == null) {
-                warnings.add("忽略非法 hqPath: " + row.getHqPath());
-                continue;
-            }
-            mediaByBasename.putIfAbsent(MetadataScanSupport.basenameOf(row.getHqPath()), row);
-            parentDirKeys.add(dirKey);
-        }
+        MetadataMediaMatcher.HqIndex hqIndex = mediaMatcher.indexHqRows(dbMedia, comicId, warnings);
+        Map<String, MediaRecord> mediaByBasename = hqIndex.byBasename();
+        Set<String> parentDirKeys = hqIndex.directoryKeys();
 
         // 扫描目录选择：合法行共同父目录存在则用之（DB 真值），否则回退 chapterId 目录
         Path scanDir = null;
         if (parentDirKeys.size() == 1) {
             String dirKey = parentDirKeys.iterator().next();
-            Path candidate = hqRoot.resolve(comicId + "/" + dirKey);
-            if (Files.isDirectory(candidate, LinkOption.NOFOLLOW_LINKS)) {
-                scanDir = candidate;
-            }
+            scanDir = chapterScanner.resolveHqDirectory(comicId, chapterId, dirKey);
         }
         if (scanDir == null) {
-            Path chapterDir = hqRoot.resolve(comicId + "/" + chapterId);
-            if (Files.isDirectory(chapterDir, LinkOption.NOFOLLOW_LINKS)) {
-                scanDir = chapterDir;
-            }
+            scanDir = chapterScanner.resolveHqDirectory(comicId, chapterId, String.valueOf(chapterId));
         }
         if (scanDir == null) {
             // 仅 LQ 模式：HQ 文件已删除（保留 LQ 供阅读）且 HQ 目录不存在时，
@@ -348,8 +332,8 @@ public class MetadataRefreshCommandHandler {
         }
 
         List<Path> files;
-        try (Stream<Path> stream = Files.list(scanDir)) {
-            files = stream.collect(Collectors.toList());
+        try {
+            files = chapterScanner.list(scanDir);
         } catch (IOException e) {
             warnings.add("读取章节目录失败: " + comicId + "/" + chapterId);
             return new ChapterScanResult(List.of(), warnings);
@@ -440,7 +424,7 @@ public class MetadataRefreshCommandHandler {
         // legacyDirKey 供 API 重写 DB 前缀；移动失败保留原目录不标注（可下次重试）
         String legacyDirKey = null;
         if (!mediaItems.isEmpty()) {
-            String rowDirKey = legacyDirKeyOf(mediaByBasename, chapterId);
+            String rowDirKey = mediaMatcher.legacyDirectoryKey(mediaByBasename.values(), chapterId);
             if (rowDirKey != null) {
                 try {
                     if (!rowDirKey.equals(String.valueOf(chapterId))) {
@@ -479,17 +463,9 @@ public class MetadataRefreshCommandHandler {
         }
 
         // 合法仅 LQ 行按 lq_path basename 索引，并收集 lq_path 共同目录键
-        Map<String, MediaRecord> rowByLqBasename = new HashMap<>();
-        Set<String> lqDirKeys = new LinkedHashSet<>();
-        for (MediaRecord row : lqOnlyRows) {
-            String dirKey = MetadataScanSupport.extractDirKey(row.getLqPath(), comicId);
-            if (dirKey == null) {
-                warnings.add("忽略非法 lqPath: " + row.getLqPath());
-                continue;
-            }
-            rowByLqBasename.putIfAbsent(MetadataScanSupport.basenameOf(row.getLqPath()), row);
-            lqDirKeys.add(dirKey);
-        }
+        MetadataMediaMatcher.LqIndex lqIndex = mediaMatcher.indexLqRows(lqOnlyRows, comicId, warnings);
+        Map<String, MediaRecord> rowByLqBasename = lqIndex.byBasename();
+        Set<String> lqDirKeys = lqIndex.directoryKeys();
         if (rowByLqBasename.isEmpty()) {
             return new ChapterScanResult(List.of(), warnings);
         }
@@ -497,16 +473,10 @@ public class MetadataRefreshCommandHandler {
         // LQ 扫描目录：共同目录键存在则用之（DB 真值），否则回退 chapterId 目录
         Path lqDir = null;
         if (lqDirKeys.size() == 1) {
-            Path candidate = lqRoot.resolve(comicId + "/" + lqDirKeys.iterator().next());
-            if (Files.isDirectory(candidate, LinkOption.NOFOLLOW_LINKS)) {
-                lqDir = candidate;
-            }
+            lqDir = chapterScanner.resolveLqDirectory(comicId, chapterId, lqDirKeys.iterator().next());
         }
         if (lqDir == null) {
-            Path chapterLqDir = lqRoot.resolve(comicId + "/" + chapterId);
-            if (Files.isDirectory(chapterLqDir, LinkOption.NOFOLLOW_LINKS)) {
-                lqDir = chapterLqDir;
-            }
+            lqDir = chapterScanner.resolveLqDirectory(comicId, chapterId, String.valueOf(chapterId));
         }
         if (lqDir == null) {
             warnings.add("LQ 目录不存在: " + comicId + "/" + chapterId);
@@ -514,8 +484,8 @@ public class MetadataRefreshCommandHandler {
         }
 
         List<Path> files;
-        try (Stream<Path> stream = Files.list(lqDir)) {
-            files = stream.collect(Collectors.toList());
+        try {
+            files = chapterScanner.list(lqDir);
         } catch (IOException e) {
             warnings.add("读取 LQ 目录失败: " + comicId + "/" + chapterId);
             return new ChapterScanResult(List.of(), warnings);
@@ -567,22 +537,6 @@ public class MetadataRefreshCommandHandler {
                     LQ_STATUS_NOT_GENERATED, 0L));
         }
         return new ChapterScanResult(mediaItems, warnings, null);
-    }
-
-    /** 匹配行中首个目录键 != chapterId 的 hqPath 目录键；全部为新布局返回 null。 */
-    private static String legacyDirKeyOf(Map<String, MediaRecord> mediaByBasename, Long chapterId) {
-        String chapterKey = String.valueOf(chapterId);
-        for (MediaRecord row : mediaByBasename.values()) {
-            String hqPath = row.getHqPath();
-            if (hqPath == null) {
-                continue;
-            }
-            String[] segments = hqPath.split("/");
-            if (segments.length == 3 && !segments[1].equals(chapterKey)) {
-                return segments[1];
-            }
-        }
-        return null;
     }
 
     /**
