@@ -1,4 +1,4 @@
-package com.comicatlas.worker.exporter;
+package com.comicatlas.worker.exporter.resolver;
 
 import com.comicatlas.worker.exporter.exception.ExportFileNotFoundException;
 import com.comicatlas.worker.persistence.record.MediaRecord;

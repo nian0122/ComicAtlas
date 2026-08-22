@@ -7,7 +7,7 @@ import com.comicatlas.common.event.ExportTaskCreatedEvent;
 import com.comicatlas.common.event.ExportTaskFailedEvent;
 import com.comicatlas.common.event.ExportTaskStartedEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
-import com.comicatlas.worker.exporter.ExportService;
+import com.comicatlas.worker.exporter.service.ExportService;
 import com.comicatlas.worker.exporter.publisher.ExportEventPublisher;
 import com.comicatlas.worker.exporter.exception.ExportManifestBuildException;
 import com.rabbitmq.client.Channel;

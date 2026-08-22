@@ -1,4 +1,4 @@
-package com.comicatlas.worker.exporter;
+package com.comicatlas.worker.exporter.collector;
 
 import com.comicatlas.worker.exporter.model.ExportCollectResult;
 import com.comicatlas.worker.exporter.metadata.MetadataJsonExporter;

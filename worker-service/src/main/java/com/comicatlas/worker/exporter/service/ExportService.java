@@ -1,5 +1,7 @@
-package com.comicatlas.worker.exporter;
+package com.comicatlas.worker.exporter.service;
 
+import com.comicatlas.worker.exporter.collector.ExportCollector;
+import com.comicatlas.worker.exporter.resolver.ExportFileResolver;
 import com.comicatlas.worker.exporter.publisher.ExportArchivePublisher;
 import com.comicatlas.worker.exporter.archive.ZipBuilder;
 import com.comicatlas.worker.exporter.exception.ExportFileNotFoundException;

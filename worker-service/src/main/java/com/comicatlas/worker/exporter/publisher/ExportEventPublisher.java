@@ -5,7 +5,7 @@ import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.event.ExportTaskCompletedEvent;
 import com.comicatlas.common.event.ExportTaskFailedEvent;
 import com.comicatlas.common.event.ExportTaskStartedEvent;
-import com.comicatlas.worker.exporter.ExportService;
+import com.comicatlas.worker.exporter.service.ExportService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;

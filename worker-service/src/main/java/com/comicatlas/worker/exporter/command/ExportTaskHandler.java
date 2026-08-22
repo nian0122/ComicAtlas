@@ -4,7 +4,7 @@ import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.constant.ExportFormats;
 import com.comicatlas.common.event.ExportTaskCreatedEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
-import com.comicatlas.worker.exporter.ExportService;
+import com.comicatlas.worker.exporter.service.ExportService;
 import com.comicatlas.worker.exporter.publisher.ExportEventPublisher;
 import com.rabbitmq.client.Channel;
 import lombok.extern.slf4j.Slf4j;

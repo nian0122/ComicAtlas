@@ -14,7 +14,7 @@ import com.comicatlas.worker.config.MqConsumerSupportConfig;
 import com.comicatlas.worker.config.RabbitMqConfig;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.config.WorkerExecutorConfig;
-import com.comicatlas.worker.exporter.ExportCollector;
+import com.comicatlas.worker.exporter.collector.ExportCollector;
 import com.comicatlas.worker.exporter.metadata.MetadataJsonExporter;
 import com.comicatlas.worker.exporter.metadata.MetadataModelMapper;
 import com.comicatlas.worker.task.ManagementCommandPublisher;
