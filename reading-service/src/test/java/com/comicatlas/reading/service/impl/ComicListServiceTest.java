@@ -1,8 +1,10 @@
-package com.comicatlas.reading.service.impl;
+package com.comicatlas.reading.library.impl;
+
+import com.comicatlas.reading.library.service.impl.ComicListQueryServiceImpl;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.contract.comic.dto.ComicListQuery;
-import com.comicatlas.reading.dto.ComicListVO;
+import com.comicatlas.reading.library.dto.ComicListVO;
 import com.comicatlas.persistence.comic.entity.Category;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.mapper.CategoryMapper;

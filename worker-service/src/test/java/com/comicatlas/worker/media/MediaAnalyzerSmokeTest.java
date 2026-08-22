@@ -1,7 +1,7 @@
 package com.comicatlas.worker.media;
 
 import com.comicatlas.worker.config.WorkerConfig;
-import com.comicatlas.worker.process.ExternalProcessRunner;
+import com.comicatlas.worker.shared.process.ExternalProcessRunner;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

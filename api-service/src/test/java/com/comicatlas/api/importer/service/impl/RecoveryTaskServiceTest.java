@@ -1,12 +1,12 @@
 package com.comicatlas.api.importer.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.comicatlas.api.common.enums.RecoveryTaskStatus;
+import com.comicatlas.api.recovery.enums.RecoveryTaskStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.importer.entity.RecoveryTask;
 import com.comicatlas.api.importer.mapper.RecoveryTaskMapper;
-import com.comicatlas.api.management.dto.ManagementTaskResponse;
-import com.comicatlas.api.management.service.ManagementTaskService;
+import com.comicatlas.api.task.dto.ManagementTaskResponse;
+import com.comicatlas.api.task.service.ManagementTaskService;
 import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;

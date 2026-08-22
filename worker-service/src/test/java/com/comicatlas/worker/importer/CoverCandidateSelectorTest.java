@@ -1,7 +1,8 @@
 package com.comicatlas.worker.importer;
 
-import com.comicatlas.worker.importer.CoverCandidateSelector.CoverCandidate;
-import com.comicatlas.worker.importer.CoverCandidateSelector.MediaCandidate;
+import com.comicatlas.worker.importer.metadata.CoverCandidateSelector;
+import com.comicatlas.worker.importer.metadata.CoverCandidateSelector.CoverCandidate;
+import com.comicatlas.worker.importer.metadata.CoverCandidateSelector.MediaCandidate;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

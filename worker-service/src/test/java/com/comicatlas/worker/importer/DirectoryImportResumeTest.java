@@ -1,6 +1,14 @@
 package com.comicatlas.worker.importer;
 
-import com.comicatlas.worker.event.CancelHandler;
+import com.comicatlas.worker.importer.model.DirectoryTree;
+import com.comicatlas.worker.importer.model.ImportContext;
+import com.comicatlas.worker.importer.model.ImportManifest;
+import com.comicatlas.worker.importer.handler.DirectoryImportHandler;
+import com.comicatlas.worker.importer.parser.DirectoryParser;
+import com.comicatlas.worker.importer.metadata.MetadataAssembler;
+import com.comicatlas.worker.importer.metadata.CoverCandidateSelector;
+import com.comicatlas.worker.importer.manifest.ImportManifestManager;
+import com.comicatlas.worker.task.command.CancelHandler;
 import com.comicatlas.worker.media.ComicMetadata;
 import com.comicatlas.worker.storage.SafeMoveStrategy;
 import com.comicatlas.worker.storage.StorageProperties;
@@ -63,7 +71,7 @@ class DirectoryImportResumeTest {
                 mock(MetadataAssembler.class),
                 transferService,
                 objectMapper,
-                mock(com.comicatlas.worker.image.CoverGenerator.class),
+                mock(com.comicatlas.worker.media.image.CoverGenerator.class),
                 new CoverCandidateSelector(),
                 cancelHandler,
                 manifestManager);
@@ -86,7 +94,7 @@ class DirectoryImportResumeTest {
         assertFalse(Files.exists(sourceRoot.resolve("vol1/ch1/001.jpg")), "源 001 应被搬走");
         assertFalse(Files.exists(sourceRoot.resolve("vol1/ch1/002.jpg")), "源 002 应被搬走");
         // HQ 落位 — 新布局保留原始文件名
-        Path hqChapterDir = mangaRoot.resolve("hq/10/1");
+        Path hqChapterDir = mangaRoot.resolve("hq/.staging/100/10/1");
         assertTrue(Files.exists(hqChapterDir), "HQ 章节目录应存在");
         List<Path> hqFiles;
         try (var stream = Files.list(hqChapterDir)) {
@@ -128,7 +136,7 @@ class DirectoryImportResumeTest {
         // 这里通过第一次执行 handler 并在删除前捕获清单
         handler.handle(new ImportContext("DIRECTORY", sourceRoot, false, false), 200L, 20L, mangaRoot);
         // 从 HQ 目录获取生成的文件名
-        Path hqTempDir = mangaRoot.resolve("hq/20/1");
+        Path hqTempDir = mangaRoot.resolve("hq/.staging/200/20/1");
         List<Path> genFiles;
         try (var stream = Files.list(hqTempDir)) {
             genFiles = stream.sorted().toList();
@@ -136,12 +144,12 @@ class DirectoryImportResumeTest {
         String genName1 = genFiles.get(0).getFileName().toString();
         String genName2 = genFiles.get(1).getFileName().toString();
         // 使用 comicId=10 的路径（与第二次导入匹配）
-        String generatedName1 = "10/1/" + genName1;
-        String generatedName2 = "10/1/" + genName2;
+        String generatedName1 = ".staging/100/10/1/" + genName1;
+        String generatedName2 = ".staging/100/10/1/" + genName2;
         long size1 = Files.size(genFiles.get(0));
         long size2 = Files.size(genFiles.get(1));
         // 清理第一次导入
-        deleteRecursively(mangaRoot.resolve("hq/20"));
+        deleteRecursively(mangaRoot.resolve("hq/.staging/200"));
         deleteRecursively(mangaRoot.resolve("imports/200"));
         Files.deleteIfExists(mangaRoot.resolve("metadata/200.json"));
 
@@ -150,7 +158,7 @@ class DirectoryImportResumeTest {
         Files.writeString(sourceRoot.resolve("vol1/ch1/002.jpg"), "content-2");
 
         // 模拟中断态：001 已搬入 HQ 且文件大小匹配，002 仍在源目录
-        Path hqDir = mangaRoot.resolve("hq/10/1");
+        Path hqDir = mangaRoot.resolve("hq/.staging/100/10/1");
         Files.createDirectories(hqDir);
         Path file1 = hqDir.resolve(genFiles.get(0).getFileName().toString());
         Files.move(sourceRoot.resolve("vol1/ch1/001.jpg"), file1);
@@ -176,7 +184,7 @@ class DirectoryImportResumeTest {
         stubParseAndAssemble();
 
         // 预置：目标文件存在但大小不符（污染）
-        Path hqDir = mangaRoot.resolve("hq/10/1");
+        Path hqDir = mangaRoot.resolve("hq/.staging/100/10/1");
         Files.createDirectories(hqDir);
         // 使用 rebuiltManifestWithOneMoved 中的硬编码路径保持一致
         Files.writeString(hqDir.resolve("001.jpg"), "corrupted!!!");
@@ -220,7 +228,7 @@ class DirectoryImportResumeTest {
         handler.handle(new ImportContext("DIRECTORY", sourceRoot, false, false), 100L, 10L, mangaRoot);
 
         // 新布局使用 UUID 文件名，不检查硬编码文件名
-        Path hqChapterDir = mangaRoot.resolve("hq/10/1");
+        Path hqChapterDir = mangaRoot.resolve("hq/.staging/100/10/1");
         assertTrue(Files.exists(hqChapterDir), "HQ 章节目录应存在");
         List<Path> hqFiles;
         try (var stream = Files.list(hqChapterDir)) {
@@ -242,7 +250,7 @@ class DirectoryImportResumeTest {
         when(assembler.assemble(any(DirectoryTree.class), any(ImportContext.class)))
                 .thenReturn(sampleMetadata());
         // 重新装配 handler（@RequiredArgsConstructor 无 setter，用新实例）
-        com.comicatlas.worker.image.CoverGenerator coverGen = mock(com.comicatlas.worker.image.CoverGenerator.class);
+        com.comicatlas.worker.media.image.CoverGenerator coverGen = mock(com.comicatlas.worker.media.image.CoverGenerator.class);
         handler = new DirectoryImportHandler(parser, assembler, transferService, objectMapper,
                 coverGen, new CoverCandidateSelector(), cancelHandler, manifestManager);
     }
@@ -268,7 +276,8 @@ class DirectoryImportResumeTest {
     }
 
     private ImportManifest rebuiltManifestWithOneMoved() throws Exception {
-        return rebuiltManifestWithGeneratedNames("10/1/001.jpg", "10/1/002.jpg", 9, 9);
+        return rebuiltManifestWithGeneratedNames(".staging/100/10/1/001.jpg",
+                ".staging/100/10/1/002.jpg", 9, 9);
     }
 
     private ImportManifest rebuiltManifestWithGeneratedNames(String target1, String target2) throws Exception {

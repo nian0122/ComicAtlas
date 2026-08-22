@@ -32,11 +32,6 @@ public final class MqRoutingKeys {
     public static final String TASK_STARTED = "task.started";
     public static final String METADATA_REFRESH_REQUESTED = "metadata.refresh.requested";
 
-    // comic.video
-    public static final String VIDEO_TRANSCODE_REQUESTED = "video.transcode.requested";
-    public static final String VIDEO_TRANSCODE_COMPLETED = "video.transcode.completed";
-    public static final String VIDEO_TRANSCODE_FAILED = "video.transcode.failed";
-
     // comic.recovery
     public static final String RECOVERY_REQUESTED = "recovery.requested";
     public static final String RECOVERY_PROGRESS = "recovery.progress";

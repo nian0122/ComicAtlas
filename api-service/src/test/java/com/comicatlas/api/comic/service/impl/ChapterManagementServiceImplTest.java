@@ -1,13 +1,13 @@
-package com.comicatlas.api.comic.service.impl;
+package com.comicatlas.api.catalog.service.impl;
 
-import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
+import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.mapper.CatalogMapper;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
-import com.comicatlas.api.common.exception.ConflictException;
-import com.comicatlas.api.management.trash.TrashLifecycleService;
-import com.comicatlas.api.management.trash.TrashLifecycleService;
+import com.comicatlas.api.shared.exception.ConflictException;
+import com.comicatlas.api.recovery.trash.TrashLifecycleService;
+import com.comicatlas.api.recovery.trash.TrashLifecycleService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

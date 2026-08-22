@@ -106,7 +106,13 @@ public interface ComicMapper extends BaseMapper<Comic> {
      * 行锁读取：串行化同一漫画的并发最终化（completed/failed）处理，防止 lost update。
      * 必须在事务内调用，事务提交/回滚后释放锁。
      */
-    @Select("SELECT * FROM comic WHERE id = #{id} FOR UPDATE")
+    @Select("""
+        SELECT id, title, title_jpn, author, description, total_pages, hq_size, lq_size,
+               source_type, source_gallery_id, source_gallery_token, source_ref,
+               storage_policy, status, category_id, category, deleted_at, trashed_at,
+               version, created_at, updated_at
+        FROM comic WHERE id = #{id} FOR UPDATE
+        """)
     Comic selectByIdForUpdate(@Param("id") Long id);
 
     /**

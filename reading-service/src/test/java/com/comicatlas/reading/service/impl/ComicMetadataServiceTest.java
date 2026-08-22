@@ -1,4 +1,6 @@
-package com.comicatlas.reading.service.impl;
+package com.comicatlas.reading.library.impl;
+
+import com.comicatlas.reading.library.service.impl.ComicQueryServiceImpl;
 
 import com.comicatlas.contract.comic.dto.ComicMetadataDTO;
 import com.comicatlas.persistence.comic.entity.Comic;

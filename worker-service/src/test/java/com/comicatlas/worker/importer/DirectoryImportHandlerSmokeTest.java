@@ -1,10 +1,17 @@
 package com.comicatlas.worker.importer;
 
+import com.comicatlas.worker.importer.model.DirectoryTree;
+import com.comicatlas.worker.importer.model.ImportContext;
+import com.comicatlas.worker.importer.handler.DirectoryImportHandler;
+import com.comicatlas.worker.importer.parser.DirectoryParser;
+import com.comicatlas.worker.importer.metadata.MetadataAssembler;
+import com.comicatlas.worker.importer.metadata.CoverCandidateSelector;
+import com.comicatlas.worker.importer.manifest.ImportManifestManager;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
-import com.comicatlas.worker.event.CancelHandler;
+import com.comicatlas.worker.task.command.CancelHandler;
 import com.comicatlas.worker.media.ComicMetadata;
 import com.comicatlas.worker.storage.SafeMoveStrategy;
 import com.comicatlas.worker.storage.StorageProperties;
@@ -94,15 +101,15 @@ class DirectoryImportHandlerSmokeTest {
                         chapter("vol2/extra", 3, List.of(
                                 media("vol2/extra", "front.jpg", 1, "IMAGE")))));
 
-        com.comicatlas.worker.image.CoverGenerator coverGen =
-                mock(com.comicatlas.worker.image.CoverGenerator.class);
+        com.comicatlas.worker.media.image.CoverGenerator coverGen =
+                mock(com.comicatlas.worker.media.image.CoverGenerator.class);
         mockCoverWritesValidFile(coverGen);
         DirectoryImportHandler handler = newHandler(metadata, coverGen);
 
         handler.handle(new ImportContext("DIRECTORY", sourceRoot, false, false), TASK_ID, COMIC_ID, mangaRoot);
 
         // 浅层命名 cover.jpg（cover 优先级 0）胜出，封面.png/front.jpg 不参与生成
-        verify(coverGen, times(1)).generateCover(COMIC_ID, mangaRoot.resolve("hq/50/1/cover.jpg"));
+        verify(coverGen, times(1)).generateCover(COMIC_ID, mangaRoot.resolve("hq/.staging/500/50/1/cover.jpg"));
         verify(coverGen, never()).generateCoverFromVideo(anyLong(), any(Path.class));
         // 源媒体与 pageCount 不变：5 页全部仍在章节中
         JsonNode meta = objectMapper.readTree(mangaRoot.resolve("metadata/500.json").toFile());
@@ -129,8 +136,8 @@ class DirectoryImportHandlerSmokeTest {
                         chapter("vol3", 3, List.of(
                                 media("vol3", "cover-back.jpg", 1, "IMAGE")))));
 
-        com.comicatlas.worker.image.CoverGenerator coverGen =
-                mock(com.comicatlas.worker.image.CoverGenerator.class);
+        com.comicatlas.worker.media.image.CoverGenerator coverGen =
+                mock(com.comicatlas.worker.media.image.CoverGenerator.class);
         doThrow(new RuntimeException("第一候选损坏")).doAnswer(writeValidCoverAnswer())
                 .when(coverGen).generateCover(anyLong(), any(Path.class));
         DirectoryImportHandler handler = newHandler(metadata, coverGen);
@@ -139,8 +146,8 @@ class DirectoryImportHandlerSmokeTest {
 
         // 第一候选 cover.jpg 生成失败 → 降级第二候选 封面.png（cover-back 不误判为命名候选）
         verify(coverGen, times(2)).generateCover(anyLong(), any(Path.class));
-        verify(coverGen).generateCover(COMIC_ID, mangaRoot.resolve("hq/50/1/cover.jpg"));
-        verify(coverGen).generateCover(COMIC_ID, mangaRoot.resolve("hq/50/2/封面.png"));
+        verify(coverGen).generateCover(COMIC_ID, mangaRoot.resolve("hq/.staging/500/50/1/cover.jpg"));
+        verify(coverGen).generateCover(COMIC_ID, mangaRoot.resolve("hq/.staging/500/50/2/封面.png"));
         verify(coverGen, never()).generateCoverFromVideo(anyLong(), any(Path.class));
     }
 
@@ -154,15 +161,16 @@ class DirectoryImportHandlerSmokeTest {
                         chapter("", 1, List.of(media("", "ch1.mp4", 1, "VIDEO"))),
                         chapter("", 2, List.of(media("", "ch2.mp4", 1, "VIDEO")))));
 
-        com.comicatlas.worker.image.CoverGenerator coverGen =
-                mock(com.comicatlas.worker.image.CoverGenerator.class);
+        com.comicatlas.worker.media.image.CoverGenerator coverGen =
+                mock(com.comicatlas.worker.media.image.CoverGenerator.class);
         mockVideoCoverWritesValidFile(coverGen);
         DirectoryImportHandler handler = newHandler(metadata, coverGen);
 
         handler.handle(new ImportContext("DIRECTORY", sourceRoot, false, false), TASK_ID, COMIC_ID, mangaRoot);
 
         // 全视频：按 globalOrder 取首个视频抽帧
-        verify(coverGen, times(1)).generateCoverFromVideo(COMIC_ID, mangaRoot.resolve("hq/50/1/ch1.mp4"));
+        verify(coverGen, times(1)).generateCoverFromVideo(COMIC_ID,
+                mangaRoot.resolve("hq/.staging/500/50/1/ch1.mp4"));
         verify(coverGen, never()).generateCover(anyLong(), any(Path.class));
     }
 
@@ -177,8 +185,8 @@ class DirectoryImportHandlerSmokeTest {
                         media("", "001.jpg", 2, "IMAGE")))));
 
         // 第一候选"成功"但 cover.webp 为空（0 字节）→ 后置校验必须降级第二候选
-        com.comicatlas.worker.image.CoverGenerator coverGen =
-                mock(com.comicatlas.worker.image.CoverGenerator.class);
+        com.comicatlas.worker.media.image.CoverGenerator coverGen =
+                mock(com.comicatlas.worker.media.image.CoverGenerator.class);
         AtomicInteger callCount = new AtomicInteger();
         doAnswer(invocation -> {
             Path cover = mangaRoot.resolve("thumbs").resolve(String.valueOf(COMIC_ID)).resolve("cover.webp");
@@ -196,8 +204,8 @@ class DirectoryImportHandlerSmokeTest {
 
         // 空产物不被当作成功，继续尝试第二候选
         verify(coverGen, times(2)).generateCover(anyLong(), any(Path.class));
-        verify(coverGen).generateCover(COMIC_ID, mangaRoot.resolve("hq/50/1/cover.jpg"));
-        verify(coverGen).generateCover(COMIC_ID, mangaRoot.resolve("hq/50/1/001.jpg"));
+        verify(coverGen).generateCover(COMIC_ID, mangaRoot.resolve("hq/.staging/500/50/1/cover.jpg"));
+        verify(coverGen).generateCover(COMIC_ID, mangaRoot.resolve("hq/.staging/500/50/1/001.jpg"));
         assertTrue(Files.size(mangaRoot.resolve("thumbs/50/cover.webp")) > 0,
                 "最终封面应为第二候选的有效产物");
     }
@@ -212,8 +220,8 @@ class DirectoryImportHandlerSmokeTest {
                         media("", "cover.jpg", 1, "IMAGE"),
                         media("", "001.jpg", 2, "IMAGE")))));
 
-        com.comicatlas.worker.image.CoverGenerator coverGen =
-                mock(com.comicatlas.worker.image.CoverGenerator.class);
+        com.comicatlas.worker.media.image.CoverGenerator coverGen =
+                mock(com.comicatlas.worker.media.image.CoverGenerator.class);
         doThrow(new RuntimeException("全部损坏")).when(coverGen).generateCover(anyLong(), any(Path.class));
 
         Logger logger = (Logger) LoggerFactory.getLogger(DirectoryImportHandler.class);
@@ -239,12 +247,12 @@ class DirectoryImportHandlerSmokeTest {
     // ---- helpers ----
 
     /** mock 的 generateCover 成功时写入有效 cover.webp（模拟真实产物，通过后置校验）。 */
-    private void mockCoverWritesValidFile(com.comicatlas.worker.image.CoverGenerator coverGen) throws Exception {
+    private void mockCoverWritesValidFile(com.comicatlas.worker.media.image.CoverGenerator coverGen) throws Exception {
         doAnswer(writeValidCoverAnswer()).when(coverGen).generateCover(anyLong(), any(Path.class));
     }
 
     /** mock 的 generateCoverFromVideo 成功时写入有效 cover.webp。 */
-    private void mockVideoCoverWritesValidFile(com.comicatlas.worker.image.CoverGenerator coverGen) throws Exception {
+    private void mockVideoCoverWritesValidFile(com.comicatlas.worker.media.image.CoverGenerator coverGen) throws Exception {
         doAnswer(writeValidCoverAnswer()).when(coverGen).generateCoverFromVideo(anyLong(), any(Path.class));
     }
 
@@ -259,7 +267,7 @@ class DirectoryImportHandlerSmokeTest {
     }
 
     private DirectoryImportHandler newHandler(ComicMetadata metadata,
-                                              com.comicatlas.worker.image.CoverGenerator coverGen) throws Exception {
+                                              com.comicatlas.worker.media.image.CoverGenerator coverGen) throws Exception {
         DirectoryParser parser = mock(DirectoryParser.class);
         when(parser.parse(any(Path.class), any(String.class)))
                 .thenReturn(new DirectoryTree(sourceRoot, "src", List.of(), List.of()));

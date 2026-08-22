@@ -1,14 +1,15 @@
 package com.comicatlas.api.admin.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.comicatlas.api.admin.dto.ComicDeleteStatsDTO;
-import com.comicatlas.api.common.scan.RecoveryEngine;
-import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
+import com.comicatlas.api.recovery.dto.ComicDeleteStatsDTO;
+import com.comicatlas.api.recovery.RecoveryEngine;
+import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
-import com.comicatlas.api.management.dto.OperationSubmitResultDTO;
-import com.comicatlas.api.management.operation.MediaOperationCommandService;
+import com.comicatlas.api.task.dto.OperationSubmitResultDTO;
+import com.comicatlas.api.media.operation.MediaOperationCommandService;
+import com.comicatlas.api.recovery.service.impl.RecoveryCompatibilityServiceImpl;
 import com.comicatlas.persistence.reader.mapper.ReadingHistoryMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -37,7 +38,7 @@ import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.anyLong;
 
 @ExtendWith(MockitoExtension.class)
-class AdminServiceImplTest {
+class RecoveryCompatibilityServiceImplTest {
 
     @Mock
     private RecoveryEngine recoveryEngine;
@@ -63,7 +64,7 @@ class AdminServiceImplTest {
     private MediaOperationCommandService mediaOperationCommandService;
 
     @InjectMocks
-    private AdminServiceImpl service;
+    private RecoveryCompatibilityServiceImpl service;
 
     @Test
     void deleteComic_shouldThrow400_whenModeIsInvalid() {

@@ -57,6 +57,7 @@ worker:
   ffprobe-path: ${FFPROBE_PATH:tools/ffmpeg/ffprobe.exe}
   ffmpeg-path: ${FFMPEG_PATH:tools/ffmpeg/ffmpeg.exe}
   image-optimizer-path: ${IMAGE_OPTIMIZER_PATH:tools/image-optimizer/image-optimizer.exe}
+  seven-zip-path: ${SEVEN_ZIP_PATH:7z}
   tools-base-dir: ${TOOLS_BASE_DIR:}
   lq-quality: ${LQ_QUALITY:15}
   lq-workers: ${LQ_WORKERS:4}

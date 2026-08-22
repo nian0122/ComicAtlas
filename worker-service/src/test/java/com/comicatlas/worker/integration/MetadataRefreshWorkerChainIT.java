@@ -8,19 +8,19 @@ import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.common.event.MetadataRefreshEvent;
 import com.comicatlas.common.event.MetadataRefreshScanCompletedEvent;
 import com.comicatlas.common.util.MetadataSnapshotRevision;
-import com.comicatlas.worker.command.MetadataRefreshCommandHandler;
+import com.comicatlas.worker.media.metadata.command.MetadataRefreshCommandHandler;
 import com.comicatlas.worker.config.MetadataJsonBuilderConfig;
 import com.comicatlas.worker.config.MqConsumerSupportConfig;
 import com.comicatlas.worker.config.RabbitMqConfig;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.config.WorkerExecutorConfig;
-import com.comicatlas.worker.export.ExportCollector;
-import com.comicatlas.worker.export.MetadataJsonExporter;
-import com.comicatlas.worker.export.MetadataModelMapper;
-import com.comicatlas.worker.event.ManagementCommandPublisher;
-import com.comicatlas.worker.event.MetadataRefreshHandler;
+import com.comicatlas.worker.exporter.collector.ExportCollector;
+import com.comicatlas.worker.exporter.metadata.MetadataJsonExporter;
+import com.comicatlas.worker.exporter.metadata.MetadataModelMapper;
+import com.comicatlas.worker.task.publisher.ManagementCommandPublisher;
+import com.comicatlas.worker.media.event.MetadataRefreshHandler;
 import com.comicatlas.worker.media.MediaAnalyzer;
-import com.comicatlas.worker.process.ExternalProcessRunner;
+import com.comicatlas.worker.shared.process.ExternalProcessRunner;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -85,7 +85,7 @@ class MetadataRefreshWorkerChainIT {
 
     @SpringBootConfiguration
     @EnableAutoConfiguration(exclude = {RedisAutoConfiguration.class})
-    @org.mybatis.spring.annotation.MapperScan("com.comicatlas.worker.mapper")
+    @org.mybatis.spring.annotation.MapperScan("com.comicatlas.worker.persistence.mapper")
     @org.springframework.context.annotation.Import({
             WorkerConfig.class,
             WorkerExecutorConfig.class,

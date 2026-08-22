@@ -1,0 +1,14 @@
+package com.comicatlas.worker.importer.model;
+
+import java.util.List;
+
+/** ComicInfo.xml 中与 ComicAtlas 现有元数据模型对应的字段。 */
+public record ComicInfoMetadata(
+        String series,
+        String title,
+        String number,
+        String author,
+        String summary,
+        List<String> tags
+) {
+}

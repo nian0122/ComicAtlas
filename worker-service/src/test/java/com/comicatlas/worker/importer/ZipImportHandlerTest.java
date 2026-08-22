@@ -1,10 +1,13 @@
 package com.comicatlas.worker.importer;
 
+import com.comicatlas.worker.importer.model.ImportContext;
+import com.comicatlas.worker.importer.handler.DirectoryImportHandler;
+import com.comicatlas.worker.importer.handler.ZipImportHandler;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.comicatlas.worker.config.WorkerConfig;
-import com.comicatlas.worker.file.extract.ZipExtractor;
+import com.comicatlas.worker.importer.archive.extract.ZipExtractor;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

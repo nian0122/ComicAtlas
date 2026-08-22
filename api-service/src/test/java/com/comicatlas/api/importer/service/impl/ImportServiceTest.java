@@ -1,12 +1,12 @@
 package com.comicatlas.api.importer.service.impl;
 
 import com.comicatlas.persistence.comic.entity.Comic;
-import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
+import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.persistence.comic.mapper.CatalogMapper;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.persistence.comic.mapper.MediaMapper;
-import com.comicatlas.api.common.enums.ImportTaskStatus;
+import com.comicatlas.api.importer.enums.ImportTaskStatus;
 import com.comicatlas.contract.common.enums.SourceType;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.storage.ApiStorageProperties;
@@ -16,8 +16,9 @@ import com.comicatlas.api.importer.dto.BatchImportResultVO;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
 import com.comicatlas.api.importer.service.ImportRetryCoordinator;
-import com.comicatlas.api.management.dto.ManagementTaskResponse;
-import com.comicatlas.api.management.service.ManagementTaskService;
+import com.comicatlas.api.task.dto.ManagementTaskResponse;
+import com.comicatlas.api.task.service.ManagementTaskService;
+import com.comicatlas.api.shared.crypto.DigestService;
 import com.comicatlas.api.outbox.service.OutboxService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -69,6 +70,7 @@ class ImportServiceTest {
     @Mock private OutboxService outboxService;
     @Mock private ApiStorageProperties storageProperties;
     @Mock private ImportRetryCoordinator importRetryCoordinator;
+    @Mock private DigestService digestService;
     @InjectMocks private ImportServiceImpl service;
 
     @BeforeEach

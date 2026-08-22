@@ -831,8 +831,8 @@ git commit -m "刷新元数据收敛到存储域：统一 MetadataRefreshService
 ```java
 package com.comicatlas.api.storage.service;
 
-import com.comicatlas.api.export.dto.ExportTaskVO;
-import com.comicatlas.api.export.service.ExportService;
+import com.comicatlas.api.exporter.dto.ExportTaskVO;
+import com.comicatlas.api.exporter.service.ExportService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -884,7 +884,7 @@ public class ExportOperationService {
         return Result.ok(exportOperationService.getTask(taskId));
     }
 ```
-（新增 import：`org.springframework.http.ResponseEntity`、`org.springframework.http.HttpStatus`、`com.comicatlas.api.export.dto.ExportTaskVO`、`java.util.List`。）
+（新增 import：`org.springframework.http.ResponseEntity`、`org.springframework.http.HttpStatus`、`com.comicatlas.api.exporter.dto.ExportTaskVO`、`java.util.List`。）
 
 - [ ] **Step 3: StorageStatsController**
 

@@ -4,6 +4,7 @@ import com.comicatlas.api.outbox.entity.OutboxMessage;
 import com.comicatlas.api.outbox.mapper.OutboxMessageMapper;
 import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.common.event.ComicEvent;
+import com.comicatlas.contract.common.exception.BusinessException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -46,7 +47,7 @@ public class OutboxServiceImpl implements OutboxService {
             payload = objectMapper.writeValueAsString(event);
         } catch (JsonProcessingException e) {
             log.error("Outbox 序列化失败: eventId={}, eventType={}", event.eventId(), event.getClass().getSimpleName(), e);
-            throw new RuntimeException("Outbox 序列化失败: " + event.eventId(), e);
+            throw new BusinessException("Outbox 序列化失败: " + event.eventId(), e);
         }
 
         OutboxMessage msg = new OutboxMessage()

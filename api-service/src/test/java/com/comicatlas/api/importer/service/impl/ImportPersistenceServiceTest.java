@@ -1,7 +1,7 @@
 package com.comicatlas.api.importer.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
-import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
+import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.persistence.comic.entity.Catalog;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Comic;
@@ -13,10 +13,10 @@ import com.comicatlas.persistence.comic.mapper.MediaMapper;
 import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.enums.HqStatus;
-import com.comicatlas.api.common.enums.ImportTaskStatus;
+import com.comicatlas.api.importer.enums.ImportTaskStatus;
 import com.comicatlas.contract.common.enums.LqStatus;
 import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
-import com.comicatlas.api.common.enums.TaskType;
+import com.comicatlas.api.task.enums.TaskType;
 import com.comicatlas.contract.common.enums.TranscodeStatus;
 import com.comicatlas.api.storage.ApiStorageProperties;
 import com.comicatlas.api.storage.ApiStorageRoot;
@@ -24,7 +24,7 @@ import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.exception.ImportMetadataException;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
 import com.comicatlas.api.importer.service.ImportPersistenceService;
-import com.comicatlas.api.management.service.ManagementTaskService;
+import com.comicatlas.api.task.service.ManagementTaskService;
 import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
@@ -93,7 +93,7 @@ class ImportPersistenceServiceTest {
     @Mock private ManagementTaskService managementTaskService;
     @Mock private OutboxService outboxService;
     @Mock private ApiStorageProperties storageProperties;
-    @Mock private com.comicatlas.api.storage.service.MetadataUpdateCoordinator metadataUpdateCoordinator;
+    @Mock private com.comicatlas.api.metadata.service.MetadataUpdateCoordinator metadataUpdateCoordinator;
 
     @InjectMocks private ImportPersistenceServiceImpl service;
 
@@ -309,7 +309,7 @@ class ImportPersistenceServiceTest {
         assertThat(req.comicId()).isEqualTo(100L);
         assertThat(req.globalOrder()).isEqualTo(0);
         assertThat(req.chapterId()).isEqualTo(chapterId);
-        assertThat(req.sourceDir()).isEqualTo("hq/100/0");
+        assertThat(req.sourceDir()).isEqualTo("hq/.staging/10/100/0");
         assertThat(req.targetDir()).isEqualTo("hq/100/" + chapterId);
         assertThat(req.mediaMappings()).containsExactly(new FinalizeMediaMapping("001.jpg", "001.jpg"));
 
@@ -343,7 +343,7 @@ class ImportPersistenceServiceTest {
         assertThat(published.comicId()).isEqualTo(100L);
         assertThat(published.globalOrder()).isEqualTo(0);
         assertThat(published.chapterId()).isEqualTo(chapterId);
-        assertThat(published.sourceDir()).isEqualTo("hq/100/0");
+        assertThat(published.sourceDir()).isEqualTo("hq/.staging/10/100/0");
         assertThat(published.targetDir()).isEqualTo("hq/100/" + chapterId);
     }
 

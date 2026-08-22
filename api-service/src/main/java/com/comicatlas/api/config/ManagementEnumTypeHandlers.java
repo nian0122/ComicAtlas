@@ -1,11 +1,11 @@
 package com.comicatlas.api.config;
 
-import com.comicatlas.api.common.enums.DirectoryScanTaskStatus;
-import com.comicatlas.api.common.enums.ExportTaskStatus;
-import com.comicatlas.api.common.enums.ImportTaskStatus;
-import com.comicatlas.api.common.enums.ManagementTaskStatus;
-import com.comicatlas.api.common.enums.RecoveryTaskStatus;
-import com.comicatlas.api.common.enums.TaskType;
+import com.comicatlas.api.importer.enums.DirectoryScanTaskStatus;
+import com.comicatlas.api.exporter.enums.ExportTaskStatus;
+import com.comicatlas.api.importer.enums.ImportTaskStatus;
+import com.comicatlas.api.task.enums.ManagementTaskStatus;
+import com.comicatlas.api.recovery.enums.RecoveryTaskStatus;
+import com.comicatlas.api.task.enums.TaskType;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.ibatis.type.BaseTypeHandler;
 import org.apache.ibatis.type.JdbcType;

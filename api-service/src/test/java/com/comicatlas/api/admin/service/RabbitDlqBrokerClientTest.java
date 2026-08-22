@@ -1,4 +1,4 @@
-package com.comicatlas.api.admin.service;
+package com.comicatlas.api.dlq.service;
 
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.Channel;

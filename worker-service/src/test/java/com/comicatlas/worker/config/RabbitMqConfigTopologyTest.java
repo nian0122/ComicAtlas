@@ -1,16 +1,16 @@
 package com.comicatlas.worker.config;
 
 import com.comicatlas.common.mq.MqConsumerSupport;
-import com.comicatlas.worker.command.HqDeleteCommandHandler;
-import com.comicatlas.worker.command.LqCommandHandler;
-import com.comicatlas.worker.command.MediaUploadCommandHandler;
-import com.comicatlas.worker.command.MetadataRefreshCommandHandler;
-import com.comicatlas.worker.command.PurgeCommandHandler;
-import com.comicatlas.worker.command.RestoreCommandHandler;
-import com.comicatlas.worker.command.TranscodeCommandHandler;
-import com.comicatlas.worker.command.TrashCommandHandler;
-import com.comicatlas.worker.event.ManagementCommandDispatcher;
-import com.comicatlas.worker.event.ManagementCommandPublisher;
+import com.comicatlas.worker.media.hq.HqDeleteCommandHandler;
+import com.comicatlas.worker.media.lq.LqCommandHandler;
+import com.comicatlas.worker.media.upload.MediaUploadCommandHandler;
+import com.comicatlas.worker.media.metadata.command.MetadataRefreshCommandHandler;
+import com.comicatlas.worker.recovery.command.PurgeCommandHandler;
+import com.comicatlas.worker.recovery.command.RestoreCommandHandler;
+import com.comicatlas.worker.media.transcode.TranscodeCommandHandler;
+import com.comicatlas.worker.recovery.command.TrashCommandHandler;
+import com.comicatlas.worker.task.command.ManagementCommandDispatcher;
+import com.comicatlas.worker.task.publisher.ManagementCommandPublisher;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.core.Binding;

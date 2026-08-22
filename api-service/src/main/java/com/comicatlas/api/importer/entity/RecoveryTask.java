@@ -1,6 +1,6 @@
 package com.comicatlas.api.importer.entity;
 
-import com.comicatlas.api.common.enums.RecoveryTaskStatus;
+import com.comicatlas.api.recovery.enums.RecoveryTaskStatus;
 import lombok.Data;
 import java.time.LocalDateTime;
 import com.baomidou.mybatisplus.annotation.TableName;

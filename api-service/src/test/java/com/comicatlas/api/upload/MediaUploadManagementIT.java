@@ -1,5 +1,7 @@
 package com.comicatlas.api.upload;
 
+import com.comicatlas.api.upload.service.UploadSessionService;
+import com.comicatlas.api.upload.support.DiskSpaceChecker;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.persistence.comic.entity.Media;
 import com.comicatlas.persistence.comic.mapper.MediaMapper;
@@ -7,35 +9,35 @@ import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.contract.common.enums.HqStatus;
 import com.comicatlas.contract.common.enums.LqStatus;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
-import com.comicatlas.api.management.mapper.ManagementTaskMapper;
-import com.comicatlas.api.management.mapper.ManagementTaskItemMapper;
+import com.comicatlas.api.task.mapper.ManagementTaskMapper;
+import com.comicatlas.api.task.mapper.ManagementTaskItemMapper;
 import com.comicatlas.api.outbox.mapper.OutboxMessageMapper;
 import com.comicatlas.api.outbox.mapper.InboxReceiptMapper;
-import com.comicatlas.api.upload.entity.UploadFile;
-import com.comicatlas.api.upload.entity.UploadSession;
-import com.comicatlas.api.upload.UploadSessionStatus;
-import com.comicatlas.api.upload.mapper.UploadSessionMapper;
-import com.comicatlas.api.upload.mapper.UploadFileMapper;
+import com.comicatlas.api.upload.persistence.entity.UploadFile;
+import com.comicatlas.api.upload.persistence.entity.UploadSession;
+import com.comicatlas.api.upload.domain.UploadSessionStatus;
+import com.comicatlas.api.upload.persistence.mapper.UploadSessionMapper;
+import com.comicatlas.api.upload.persistence.mapper.UploadFileMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.comicatlas.api.management.entity.ManagementTaskItem;
+import com.comicatlas.api.task.entity.ManagementTaskItem;
 import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
-import com.comicatlas.api.common.enums.TaskType;
+import com.comicatlas.api.task.enums.TaskType;
 import com.comicatlas.contract.common.enums.TranscodeStatus;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
-import com.comicatlas.worker.command.TrashCommandHandler;
-import com.comicatlas.worker.command.MediaUploadCommandHandler;
-import com.comicatlas.worker.event.ManagementCommandPublisher;
+import com.comicatlas.worker.recovery.command.TrashCommandHandler;
+import com.comicatlas.worker.media.upload.MediaUploadCommandHandler;
+import com.comicatlas.worker.task.publisher.ManagementCommandPublisher;
 import com.comicatlas.worker.media.MediaAnalyzer;
 import com.comicatlas.worker.storage.SafeMoveStrategy;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageService;
 import com.comicatlas.worker.storage.TransferService;
-import com.comicatlas.worker.file.trash.TrashManifestStore;
-import com.comicatlas.worker.mapper.ExportMediaMapper;
-import com.comicatlas.worker.mapper.ExportUploadFileMapper;
-import com.comicatlas.worker.mapper.ExportUploadSessionMapper;
-import com.comicatlas.worker.mapper.TrashManifestReadMapper;
+import com.comicatlas.worker.recovery.trash.TrashManifestStore;
+import com.comicatlas.worker.persistence.mapper.MediaReadMapper;
+import com.comicatlas.worker.persistence.mapper.UploadFileReadMapper;
+import com.comicatlas.worker.persistence.mapper.UploadSessionReadMapper;
+import com.comicatlas.worker.persistence.mapper.TrashManifestReadMapper;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -989,7 +991,7 @@ class MediaUploadManagementIT {
      * 结果事件仍经 RabbitMQ 回传 API 结果处理器。
      */
     @org.springframework.boot.test.context.TestConfiguration
-    @org.mybatis.spring.annotation.MapperScan("com.comicatlas.worker.mapper")
+    @org.mybatis.spring.annotation.MapperScan("com.comicatlas.worker.persistence.mapper")
     static class WorkerProcessingConfig {
 
         @Bean
@@ -1027,14 +1029,14 @@ class MediaUploadManagementIT {
         }
 
         @Bean
-        com.comicatlas.worker.process.ExternalProcessRunner externalProcessRunner(
+        com.comicatlas.worker.shared.process.ExternalProcessRunner externalProcessRunner(
                 org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor processIoExecutor) {
-            return new com.comicatlas.worker.process.ExternalProcessRunner(processIoExecutor);
+            return new com.comicatlas.worker.shared.process.ExternalProcessRunner(processIoExecutor);
         }
 
         @Bean
         MediaAnalyzer mediaAnalyzer(com.comicatlas.worker.config.WorkerConfig wc, ObjectMapper om,
-                com.comicatlas.worker.process.ExternalProcessRunner processRunner) {
+                com.comicatlas.worker.shared.process.ExternalProcessRunner processRunner) {
             return new MediaAnalyzer(wc, om, processRunner);
         }
 
@@ -1045,7 +1047,7 @@ class MediaUploadManagementIT {
 
         @Bean
         MediaUploadCommandHandler mediaUploadCommandHandler(
-                ExportUploadSessionMapper usm, ExportUploadFileMapper ufm, ExportMediaMapper emm,
+                UploadSessionReadMapper usm, UploadFileReadMapper ufm, MediaReadMapper emm,
                 StorageProperties p, StorageService ss, MediaAnalyzer ma, ManagementCommandPublisher pub) {
             return new MediaUploadCommandHandler(usm, ufm, emm, p, ss, ma, pub);
         }

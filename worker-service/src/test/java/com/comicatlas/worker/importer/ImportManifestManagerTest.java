@@ -1,5 +1,7 @@
 package com.comicatlas.worker.importer;
 
+import com.comicatlas.worker.importer.model.ImportManifest;
+import com.comicatlas.worker.importer.manifest.ImportManifestManager;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
