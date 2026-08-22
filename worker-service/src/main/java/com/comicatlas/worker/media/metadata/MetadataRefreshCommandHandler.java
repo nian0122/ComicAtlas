@@ -2,6 +2,7 @@ package com.comicatlas.worker.media.metadata;
 
 import com.comicatlas.common.constant.MetadataRefreshLimits;
 import com.comicatlas.common.constant.StorageRootKeys;
+import com.comicatlas.common.constant.ManagementOperationTypes;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO.ChapterSnapshot;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO.MediaSnapshot;
@@ -209,7 +210,7 @@ public class MetadataRefreshCommandHandler {
     public void refresh(ManagementCommandRequestedEvent cmd) {
         publisher.progress(cmd, 10, "开始元数据扫盘");
         try {
-            if (!"COMIC".equals(cmd.targetType()) || cmd.targetId() == null) {
+            if (!ManagementOperationTypes.TARGET_COMIC.equals(cmd.targetType()) || cmd.targetId() == null) {
                 publisher.failed(cmd, "元数据扫盘刷新仅支持漫画级（COMIC 且 targetId 非空），当前 targetType="
                         + cmd.targetType());
                 return;

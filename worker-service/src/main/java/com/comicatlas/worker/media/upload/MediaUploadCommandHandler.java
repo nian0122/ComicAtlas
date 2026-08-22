@@ -2,6 +2,7 @@ package com.comicatlas.worker.media.upload;
 
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.common.constant.StorageRootKeys;
+import com.comicatlas.common.constant.ManagementOperationTypes;
 import com.comicatlas.common.event.MediaUploadCompletedEvent.MediaAnalysisResult;
 import com.comicatlas.worker.persistence.record.MediaRecord;
 import com.comicatlas.worker.persistence.record.UploadFileRecord;
@@ -67,7 +68,7 @@ public class MediaUploadCommandHandler {
                 return;
             }
 
-            boolean replace = "MEDIA_REPLACE".equals(cmd.operationType());
+            boolean replace = ManagementOperationTypes.MEDIA_REPLACE.equals(cmd.operationType());
             Long replaceMediaId = session.getReplaceMediaId();
             StorageRoot hqRoot = StorageRootResolver.optional(storageProperties, StorageRootKeys.HQ);
             StorageRoot stagingRoot = StorageRootResolver.optional(storageProperties, StorageRootKeys.STAGING);

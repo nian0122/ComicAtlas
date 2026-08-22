@@ -1,6 +1,7 @@
 package com.comicatlas.worker.task;
 
 import com.comicatlas.common.constant.MqQueues;
+import com.comicatlas.common.constant.ManagementOperationTypes;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.worker.media.hq.HqDeleteCommandHandler;
@@ -63,36 +64,40 @@ public class ManagementCommandDispatcher {
     }
 
     private void route(ManagementCommandRequestedEvent cmd) {
-        boolean comicScope = "COMIC".equals(cmd.targetType());
+        boolean comicScope = ManagementOperationTypes.TARGET_COMIC.equals(cmd.targetType());
         switch (cmd.operationType()) {
-            case "LQ_GENERATE", "LQ_REGENERATE" -> {
+            case ManagementOperationTypes.LQ_GENERATE, ManagementOperationTypes.LQ_REGENERATE -> {
                 if (comicScope) {
                     lqCommandHandler.generateComic(cmd);
                 } else {
                     lqCommandHandler.generateChapter(cmd);
                 }
             }
-            case "HQ_DELETE" -> {
+            case ManagementOperationTypes.HQ_DELETE -> {
                 if (comicScope) {
                     hqDeleteCommandHandler.deleteComic(cmd);
                 } else {
                     hqDeleteCommandHandler.deleteChapter(cmd);
                 }
             }
-            case "TRANSCODE" -> transcodeCommandHandler.transcode(cmd);
-            case "METADATA_REFRESH" -> {
+            case ManagementOperationTypes.TRANSCODE -> transcodeCommandHandler.transcode(cmd);
+            case ManagementOperationTypes.METADATA_REFRESH -> {
                 if (comicScope) {
                     metadataRefreshCommandHandler.refresh(cmd);
                 } else {
                     publisher.failed(cmd, "元数据扫盘刷新仅支持漫画级（COMIC）");
                 }
             }
-            case "COMIC_DELETE", "CHAPTER_TRASH", "MEDIA_TRASH" -> trashCommandHandler.trash(cmd);
-            case "COMIC_RESTORE", "CHAPTER_RESTORE", "MEDIA_RESTORE" -> restoreCommandHandler.restore(cmd);
-            case "COMIC_PURGE", "CHAPTER_PURGE", "MEDIA_PURGE" -> purgeCommandHandler.purge(cmd);
+            case ManagementOperationTypes.COMIC_DELETE, ManagementOperationTypes.CHAPTER_TRASH,
+                    ManagementOperationTypes.MEDIA_TRASH -> trashCommandHandler.trash(cmd);
+            case ManagementOperationTypes.COMIC_RESTORE, ManagementOperationTypes.CHAPTER_RESTORE,
+                    ManagementOperationTypes.MEDIA_RESTORE -> restoreCommandHandler.restore(cmd);
+            case ManagementOperationTypes.COMIC_PURGE, ManagementOperationTypes.CHAPTER_PURGE,
+                    ManagementOperationTypes.MEDIA_PURGE -> purgeCommandHandler.purge(cmd);
             // MEDIA_UPLOAD / MEDIA_REPLACE：预留接口能力（后端已实现且测试可用，
             // 当前无前端页面入口，不属于漫画导入主流程）
-            case "MEDIA_UPLOAD", "MEDIA_REPLACE" -> mediaUploadCommandHandler.handle(cmd);
+            case ManagementOperationTypes.MEDIA_UPLOAD, ManagementOperationTypes.MEDIA_REPLACE
+                    -> mediaUploadCommandHandler.handle(cmd);
             default -> throw new IllegalStateException("未知管理命令操作类型: " + cmd.operationType());
         }
     }

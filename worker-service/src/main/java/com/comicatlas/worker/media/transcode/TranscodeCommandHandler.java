@@ -1,6 +1,7 @@
 package com.comicatlas.worker.media.transcode;
 
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
+import com.comicatlas.common.constant.ManagementOperationTypes;
 import com.comicatlas.common.event.payload.TranscodeMediaInfo;
 import com.comicatlas.common.util.VideoPlayability;
 import com.comicatlas.worker.config.WorkerConfig;
@@ -38,7 +39,7 @@ import java.util.Optional;
 public class TranscodeCommandHandler {
 
     /** 命令目标类型：漫画级（批量操作 API 创建的 COMIC 目标 item）。 */
-    private static final String TARGET_TYPE_COMIC = "COMIC";
+    private static final String TARGET_TYPE_COMIC = ManagementOperationTypes.TARGET_COMIC;
 
     /** 媒体类型：视频。 */
     private static final String MEDIA_TYPE_VIDEO = "VIDEO";

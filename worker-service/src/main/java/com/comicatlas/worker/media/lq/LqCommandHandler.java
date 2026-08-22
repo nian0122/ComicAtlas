@@ -2,6 +2,7 @@ package com.comicatlas.worker.media.lq;
 
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.common.constant.StorageRootKeys;
+import com.comicatlas.common.constant.ManagementOperationTypes;
 import com.comicatlas.common.event.payload.LqSizeResult;
 import com.comicatlas.worker.persistence.record.MediaRecord;
 import com.comicatlas.worker.storage.StorageProperties;
@@ -92,7 +93,7 @@ public class LqCommandHandler {
 
     /** LQ_REGENERATE 表示强制重新生成（忽略已存在的 LQ 产物）。 */
     private static boolean isRegenerate(ManagementCommandRequestedEvent cmd) {
-        return "LQ_REGENERATE".equals(cmd.operationType());
+        return ManagementOperationTypes.LQ_REGENERATE.equals(cmd.operationType());
     }
 
     /**
