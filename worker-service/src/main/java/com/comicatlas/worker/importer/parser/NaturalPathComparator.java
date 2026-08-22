@@ -1,6 +1,5 @@
 package com.comicatlas.worker.importer.parser;
 
-import com.comicatlas.worker.importer.model.DirectoryTree;
 import java.math.BigInteger;
 import java.nio.file.Path;
 import java.util.ArrayList;

@@ -1,6 +1,5 @@
 package com.comicatlas.worker.media.metadata.scanner;
 
-import com.comicatlas.worker.importer.parser.NaturalPathComparator;
 import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.common.constant.MediaStatuses;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO.MediaSnapshot;
@@ -21,7 +20,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.HashMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
