@@ -1,10 +1,10 @@
 package com.comicatlas.worker.media.command;
 
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
-import com.comicatlas.worker.exporter.persistence.ExportMedia;
+import com.comicatlas.worker.persistence.record.MediaRecord;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageRoot;
-import com.comicatlas.worker.exporter.persistence.ExportMediaMapper;
+import com.comicatlas.worker.persistence.mapper.MediaReadMapper;
 import com.comicatlas.worker.task.ManagementCommandPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,7 +33,7 @@ import java.util.stream.Collectors;
 public class HqDeleteCommandHandler {
 
     private final StorageProperties storageProperties;
-    private final ExportMediaMapper mediaMapper;
+    private final MediaReadMapper mediaMapper;
     private final ManagementCommandPublisher publisher;
 
     public void deleteChapter(ManagementCommandRequestedEvent cmd) {
@@ -51,10 +51,10 @@ public class HqDeleteCommandHandler {
         Long comicId = cmd.targetId();
         // selectByComicId 一次性取回全部页数据后按章节分组复用实体，
         // 避免在循环内对每个章节重复 selectByChapterId（N+1）
-        List<ExportMedia> pages = mediaMapper.selectByComicId(comicId);
-        Map<Long, List<ExportMedia>> pagesByChapter = pages.stream()
+        List<MediaRecord> pages = mediaMapper.selectByComicId(comicId);
+        Map<Long, List<MediaRecord>> pagesByChapter = pages.stream()
                 .filter(page -> page.getChapterId() != null)
-                .collect(Collectors.groupingBy(ExportMedia::getChapterId));
+                .collect(Collectors.groupingBy(MediaRecord::getChapterId));
         if (pagesByChapter.isEmpty()) {
             publisher.failed(cmd, "漫画无页面: " + comicId);
             return;
@@ -81,7 +81,7 @@ public class HqDeleteCommandHandler {
 
     /** 删除单章全部 HQ 文件，返回是否成功。空章节视为成功（无内容可删）。 */
     private boolean processChapter(Long chapterId) {
-        List<ExportMedia> pages = mediaMapper.selectByChapterId(chapterId);
+        List<MediaRecord> pages = mediaMapper.selectByChapterId(chapterId);
         if (pages.isEmpty()) {
             return true;
         }
@@ -94,8 +94,8 @@ public class HqDeleteCommandHandler {
     }
 
     /** 删除单个章节的全部 HQ 文件与章节目录，返回是否成功。 */
-    private boolean deleteChapterFiles(Long comicId, Long chapterId, List<ExportMedia> pages, StorageRoot hqRoot) {
-        for (ExportMedia page : pages) {
+    private boolean deleteChapterFiles(Long comicId, Long chapterId, List<MediaRecord> pages, StorageRoot hqRoot) {
+        for (MediaRecord page : pages) {
             if (page.getHqPath() == null || page.getHqPath().isBlank()) {
                 continue;
             }

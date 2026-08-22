@@ -4,10 +4,10 @@ import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.common.event.payload.TranscodeMediaInfo;
 import com.comicatlas.common.util.VideoPlayability;
 import com.comicatlas.worker.config.WorkerConfig;
-import com.comicatlas.worker.exporter.persistence.ExportMedia;
+import com.comicatlas.worker.persistence.record.MediaRecord;
 import com.comicatlas.worker.task.ManagementCommandPublisher;
 import com.comicatlas.worker.media.transcode.FfmpegTranscoder;
-import com.comicatlas.worker.exporter.persistence.ExportMediaMapper;
+import com.comicatlas.worker.persistence.mapper.MediaReadMapper;
 import com.comicatlas.worker.media.ComicMetadata;
 import com.comicatlas.worker.media.MediaAnalyzer;
 import lombok.RequiredArgsConstructor;
@@ -58,7 +58,7 @@ public class TranscodeCommandHandler {
     /** 中断时的失败消息（发布 failed 事件）。 */
     private static final String INTERRUPTED_ERROR_MESSAGE = "转码被中断";
 
-    private final ExportMediaMapper mediaMapper;
+    private final MediaReadMapper mediaMapper;
     private final WorkerConfig config;
     private final ManagementCommandPublisher publisher;
     private final MediaAnalyzer mediaAnalyzer;
@@ -76,8 +76,8 @@ public class TranscodeCommandHandler {
     /** 漫画级：展开为所有待转码视频页逐页转码，聚合失败页列表。 */
     private void transcodeComic(ManagementCommandRequestedEvent cmd, Long comicId) {
         // selectByComicId 一次性取回全部页数据，循环复用实体，避免对每页重复查询（N+1）
-        List<ExportMedia> pages = mediaMapper.selectByComicId(comicId);
-        List<ExportMedia> videoPages = pages.stream()
+        List<MediaRecord> pages = mediaMapper.selectByComicId(comicId);
+        List<MediaRecord> videoPages = pages.stream()
                 .filter(page -> MEDIA_TYPE_VIDEO.equals(page.getMediaType()))
                 .filter(page -> VideoPlayability.isTranscodable(page.getWidth(), page.getHeight()))
                 .filter(page -> !VideoPlayability.isBrowserPlayable(page.getVideoCodec(), page.getContainer()))
@@ -89,7 +89,7 @@ public class TranscodeCommandHandler {
         }
         List<Long> failedPages = new ArrayList<>();
         boolean interrupted = false;
-        for (ExportMedia media : videoPages) {
+        for (MediaRecord media : videoPages) {
             TranscodeResult result = processPage(cmd, media);
             if (result.error() == null) {
                 continue;
@@ -130,7 +130,7 @@ public class TranscodeCommandHandler {
 
     /** 按 pageId 加载媒体实体后委托实体重载（MEDIA 级入口）。 */
     private TranscodeResult processPageById(ManagementCommandRequestedEvent cmd, Long pageId) {
-        ExportMedia media = mediaMapper.selectById(pageId);
+        MediaRecord media = mediaMapper.selectById(pageId);
         if (media == null) {
             return new TranscodeResult("媒体不存在或非视频: pageId=" + pageId, null);
         }
@@ -141,7 +141,7 @@ public class TranscodeCommandHandler {
      * 转码单个视频页（复用已加载实体，漫画级循环内不重复查询）。
      * 成功返回 TranscodeResult(null, 实测元数据)，失败返回 TranscodeResult(错误消息, null)（不在此发布事件）。
      */
-    private TranscodeResult processPage(ManagementCommandRequestedEvent cmd, ExportMedia media) {
+    private TranscodeResult processPage(ManagementCommandRequestedEvent cmd, MediaRecord media) {
         Long pageId = media.getId();
         if (!MEDIA_TYPE_VIDEO.equals(media.getMediaType())) {
             return new TranscodeResult("媒体不存在或非视频: pageId=" + pageId, null);
@@ -182,7 +182,7 @@ public class TranscodeCommandHandler {
     }
 
     /** 解析媒体 HQ 文件绝对路径（hqRoot/hqPath 为空时回退为空段）。 */
-    private Path resolveHqFile(ExportMedia media) {
+    private Path resolveHqFile(MediaRecord media) {
         Path hqBase = Path.of(config.getMangaRoot());
         String hqRoot = media.getHqRoot() == null ? "" : media.getHqRoot();
         String hqPath = media.getHqPath() == null ? "" : media.getHqPath();

@@ -1,10 +1,10 @@
 package com.comicatlas.worker.exporter;
 
 import com.comicatlas.common.metadata.MetadataV3;
-import com.comicatlas.worker.exporter.persistence.ExportCatalog;
-import com.comicatlas.worker.exporter.persistence.ExportChapter;
-import com.comicatlas.worker.exporter.persistence.ExportComic;
-import com.comicatlas.worker.exporter.persistence.ExportMedia;
+import com.comicatlas.worker.persistence.record.CatalogRecord;
+import com.comicatlas.worker.persistence.record.ChapterRecord;
+import com.comicatlas.worker.persistence.record.ComicRecord;
+import com.comicatlas.worker.persistence.record.MediaRecord;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -23,7 +23,7 @@ import java.util.stream.Collectors;
 public class MetadataModelMapper {
 
     public MetadataV3 toV3(ExportCollectResult result) {
-        ExportComic comic = result.comic();
+        ComicRecord comic = result.comic();
         MetadataV3.Comic comicInfo = new MetadataV3.Comic(
                 comic.getTitle() != null ? comic.getTitle() : "",
                 comic.getAuthor() != null ? comic.getAuthor() : "",
@@ -31,21 +31,21 @@ public class MetadataModelMapper {
 
         List<MetadataV3.Catalog> catalogs = new ArrayList<>();
         for (int i = 0; i < result.catalogs().size(); i++) {
-            ExportCatalog cat = result.catalogs().get(i);
+            CatalogRecord cat = result.catalogs().get(i);
             catalogs.add(new MetadataV3.Catalog(
                     cat.getTitle() != null ? cat.getTitle() : "",
                     cat.getSortOrder() != null ? cat.getSortOrder() : i,
                     cat.getParentId() != null ? findCatalogIndex(result.catalogs(), cat.getParentId()) : null));
         }
 
-        Map<Long, List<ExportMedia>> mediaByChapter = result.allMedia().stream()
-                .collect(Collectors.groupingBy(ExportMedia::getChapterId));
+        Map<Long, List<MediaRecord>> mediaByChapter = result.allMedia().stream()
+                .collect(Collectors.groupingBy(MediaRecord::getChapterId));
 
         List<MetadataV3.Chapter> chapters = new ArrayList<>();
         for (int i = 0; i < result.chapters().size(); i++) {
-            ExportChapter chapter = result.chapters().get(i);
+            ChapterRecord chapter = result.chapters().get(i);
             List<MetadataV3.MediaItem> mediaItems = new ArrayList<>();
-            for (ExportMedia media : mediaByChapter.getOrDefault(chapter.getId(), List.of())) {
+            for (MediaRecord media : mediaByChapter.getOrDefault(chapter.getId(), List.of())) {
                 String hqPath = requireHqPath(media);
                 mediaItems.add(new MetadataV3.MediaItem(
                         extractFileName(hqPath),
@@ -80,7 +80,7 @@ public class MetadataModelMapper {
      * @param media 媒体记录
      * @return 原样 DB hqPath（相对正斜杠，{comicId}/{chapterId}/{fileName}）；HQ 已删除时为 null
      */
-    private static String requireHqPath(ExportMedia media) {
+    private static String requireHqPath(MediaRecord media) {
         String hqPath = media.getHqPath();
         if (hqPath == null || hqPath.isBlank()) {
             return null;
@@ -95,7 +95,7 @@ public class MetadataModelMapper {
         return hqPath.substring(hqPath.lastIndexOf('/') + 1);
     }
 
-    private static Integer findCatalogIndex(List<ExportCatalog> catalogs, Long catalogId) {
+    private static Integer findCatalogIndex(List<CatalogRecord> catalogs, Long catalogId) {
         for (int i = 0; i < catalogs.size(); i++) {
             if (catalogs.get(i).getId().equals(catalogId)) {
                 return i;

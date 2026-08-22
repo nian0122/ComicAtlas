@@ -2,11 +2,11 @@ package com.comicatlas.worker.media.command;
 
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.common.event.payload.LqSizeResult;
-import com.comicatlas.worker.exporter.persistence.ExportMedia;
+import com.comicatlas.worker.persistence.record.MediaRecord;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageRoot;
 import com.comicatlas.worker.media.image.ImageOptimizer;
-import com.comicatlas.worker.exporter.persistence.ExportMediaMapper;
+import com.comicatlas.worker.persistence.mapper.MediaReadMapper;
 import com.comicatlas.worker.task.ManagementCommandPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,7 +39,7 @@ import java.util.stream.Collectors;
 public class LqCommandHandler {
 
     private final ImageOptimizer optimizer;
-    private final ExportMediaMapper mediaMapper;
+    private final MediaReadMapper mediaMapper;
     private final StorageProperties storageProperties;
     private final ManagementCommandPublisher publisher;
 
@@ -58,9 +58,9 @@ public class LqCommandHandler {
 
     public void generateComic(ManagementCommandRequestedEvent cmd) {
         Long comicId = cmd.targetId();
-        List<ExportMedia> pages = mediaMapper.selectByComicId(comicId);
+        List<MediaRecord> pages = mediaMapper.selectByComicId(comicId);
         List<Long> chapterIds = pages.stream()
-                .map(ExportMedia::getChapterId)
+                .map(MediaRecord::getChapterId)
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
@@ -98,7 +98,7 @@ public class LqCommandHandler {
      * @return 失败页码列表（空 = 全部成功）+ 各成功页的 LQ 产物大小
      */
     private ChapterProcessResult processChapter(Long chapterId, boolean force) {
-        List<ExportMedia> pages = mediaMapper.selectByChapterId(chapterId);
+        List<MediaRecord> pages = mediaMapper.selectByChapterId(chapterId);
         if (pages.isEmpty()) {
             return new ChapterProcessResult(List.of(), List.of());
         }
@@ -126,10 +126,10 @@ public class LqCommandHandler {
      * 汇总各成功页的 LQ 产物大小（优化器 outputSize → mediaId 映射），
      * 生成失败或缺失产物的页跳过，避免 API 侧写入错误的 lq_size。
      */
-    private static List<LqSizeResult> collectLqSizes(List<ExportMedia> pages, ImageOptimizer.RunResult result) {
+    private static List<LqSizeResult> collectLqSizes(List<MediaRecord> pages, ImageOptimizer.RunResult result) {
         Map<Integer, Long> mediaIdByPage = pages.stream()
                 .filter(p -> p.getPageNumber() != null)
-                .collect(Collectors.toMap(ExportMedia::getPageNumber, ExportMedia::getId, (a, b) -> a));
+                .collect(Collectors.toMap(MediaRecord::getPageNumber, MediaRecord::getId, (a, b) -> a));
         return result.getPages().stream()
                 .filter(p -> !"failed".equals(p.getStatus())
                         && p.getPageNumber() != null && p.getOutputSize() != null)

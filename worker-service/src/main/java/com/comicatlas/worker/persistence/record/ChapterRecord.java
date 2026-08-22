@@ -1,4 +1,4 @@
-package com.comicatlas.worker.exporter.persistence;
+package com.comicatlas.worker.persistence.record;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -7,7 +7,7 @@ import lombok.Data;
 
 @Data
 @TableName("chapter")
-public class ExportChapter {
+public class ChapterRecord {
 
     @TableId(type = IdType.AUTO)
     private Long id;

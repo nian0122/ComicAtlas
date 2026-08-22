@@ -1,7 +1,7 @@
 package com.comicatlas.worker.exporter;
 
-import com.comicatlas.worker.exporter.persistence.ExportChapter;
-import com.comicatlas.worker.exporter.persistence.ExportComic;
+import com.comicatlas.worker.persistence.record.ChapterRecord;
+import com.comicatlas.worker.persistence.record.ComicRecord;
 
 import java.util.List;
 
@@ -11,8 +11,8 @@ public final class ComicInfoXmlBuilder {
     private ComicInfoXmlBuilder() {
     }
 
-    public static String build(ExportComic comic, List<ExportChapter> chapters) {
-        ExportChapter first = chapters == null || chapters.isEmpty() ? null : chapters.get(0);
+    public static String build(ComicRecord comic, List<ChapterRecord> chapters) {
+        ChapterRecord first = chapters == null || chapters.isEmpty() ? null : chapters.get(0);
         String series = value(comic == null ? null : comic.getTitle());
         String title = first == null ? series : value(first.getTitle());
         String number = first == null ? "" : value(first.getChapterNo());

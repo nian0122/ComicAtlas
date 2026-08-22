@@ -1,9 +1,9 @@
 package com.comicatlas.worker.exporter;
 
 import com.comicatlas.worker.config.WorkerConfig;
-import com.comicatlas.worker.exporter.persistence.ExportChapter;
-import com.comicatlas.worker.exporter.persistence.ExportComic;
-import com.comicatlas.worker.exporter.persistence.ExportMedia;
+import com.comicatlas.worker.persistence.record.ChapterRecord;
+import com.comicatlas.worker.persistence.record.ComicRecord;
+import com.comicatlas.worker.persistence.record.MediaRecord;
 import com.comicatlas.worker.importer.archive.ZipVolumeResolver;
 import com.comicatlas.worker.importer.archive.extract.ZipExtractor;
 import com.comicatlas.worker.importer.DirectoryImportHandler;
@@ -78,7 +78,7 @@ class SplitZipRoundTripTest {
     }
 
     /** 导出夹具 — 章节、媒体记录与「ZIP 内相对条目 → 原始字节」映射。 */
-    private record ExportFixture(List<ExportChapter> chapters, List<ExportMedia> media,
+    private record ExportFixture(List<ChapterRecord> chapters, List<MediaRecord> media,
                                  Map<String, byte[]> expectedByZipRelative) {
     }
 
@@ -230,7 +230,7 @@ class SplitZipRoundTripTest {
 
     // ---------- 夹具与 mock 构造 ----------
 
-    /** 构建导出夹具：写源媒体文件到 hq 卷并生成对应 ExportMedia 记录。 */
+    /** 构建导出夹具：写源媒体文件到 hq 卷并生成对应 MediaRecord 记录。 */
     private ExportFixture buildExportFixture() throws IOException {
         List<SourceFile> sourceFiles = List.of(
                 new SourceFile("第一章", "001.jpg", "IMAGE", 16 * 1024),
@@ -239,13 +239,13 @@ class SplitZipRoundTripTest {
                 new SourceFile("第一章", "004.jpg", "IMAGE", 16 * 1024),
                 new SourceFile("第二话", "001.jpg", "IMAGE", 16 * 1024),
                 new SourceFile("第二话", "clip.mp4", "VIDEO", 300 * 1024));
-        List<ExportChapter> chapters = List.of(
+        List<ChapterRecord> chapters = List.of(
                 chapter(10L, "第一章", 1),
                 chapter(11L, "第二话", 2));
         Map<String, Long> chapterIds = Map.of("第一章", 10L, "第二话", 11L);
         Map<String, int[]> pageCounters = new LinkedHashMap<>();
 
-        List<ExportMedia> media = new ArrayList<>();
+        List<MediaRecord> media = new ArrayList<>();
         Map<String, byte[]> expectedByZipRelative = new LinkedHashMap<>();
         long mediaId = 1;
         for (SourceFile sourceFile : sourceFiles) {
@@ -259,7 +259,7 @@ class SplitZipRoundTripTest {
             Files.createDirectories(source.getParent());
             Files.write(source, content);
 
-            ExportMedia m = new ExportMedia();
+            MediaRecord m = new MediaRecord();
             m.setId(mediaId++);
             m.setChapterId(chapterId);
             m.setPageNumber(counter[0]);
@@ -284,8 +284,8 @@ class SplitZipRoundTripTest {
 
     private ExportFileResolver exportFileResolverMock() {
         ExportFileResolver resolver = mock(ExportFileResolver.class);
-        when(resolver.resolve(any(ExportMedia.class))).thenAnswer(invocation -> {
-            ExportMedia media = invocation.getArgument(0);
+        when(resolver.resolve(any(MediaRecord.class))).thenAnswer(invocation -> {
+            MediaRecord media = invocation.getArgument(0);
             return new StorageRef(media.getHqRoot(), media.getHqPath());
         });
         when(resolver.resolveToPath(any(StorageRef.class))).thenAnswer(invocation -> {
@@ -311,15 +311,15 @@ class SplitZipRoundTripTest {
         return properties;
     }
 
-    private ExportComic comic(Long id, String title) {
-        ExportComic c = new ExportComic();
+    private ComicRecord comic(Long id, String title) {
+        ComicRecord c = new ComicRecord();
         c.setId(id);
         c.setTitle(title);
         return c;
     }
 
-    private ExportChapter chapter(Long id, String title, int globalOrder) {
-        ExportChapter ch = new ExportChapter();
+    private ChapterRecord chapter(Long id, String title, int globalOrder) {
+        ChapterRecord ch = new ChapterRecord();
         ch.setId(id);
         ch.setTitle(title);
         ch.setGlobalOrder(globalOrder);

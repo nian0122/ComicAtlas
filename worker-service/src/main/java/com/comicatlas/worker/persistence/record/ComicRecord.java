@@ -1,4 +1,4 @@
-package com.comicatlas.worker.exporter.persistence;
+package com.comicatlas.worker.persistence.record;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -9,7 +9,7 @@ import java.util.List;
 
 @Data
 @TableName("comic")
-public class ExportComic {
+public class ComicRecord {
 
     @TableId(type = IdType.AUTO)
     private Long id;

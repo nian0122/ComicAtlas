@@ -1,10 +1,10 @@
 package com.comicatlas.worker.media.command;
 
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
-import com.comicatlas.worker.exporter.persistence.ExportMedia;
+import com.comicatlas.worker.persistence.record.MediaRecord;
 import com.comicatlas.worker.task.ManagementCommandPublisher;
 import com.comicatlas.worker.media.image.ImageOptimizer;
-import com.comicatlas.worker.exporter.persistence.ExportMediaMapper;
+import com.comicatlas.worker.persistence.mapper.MediaReadMapper;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageRoot;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,7 +32,7 @@ import static org.mockito.Mockito.when;
 class LqCommandHandlerTest {
 
     private final ImageOptimizer optimizer = mock(ImageOptimizer.class);
-    private final ExportMediaMapper mediaMapper = mock(ExportMediaMapper.class);
+    private final MediaReadMapper mediaMapper = mock(MediaReadMapper.class);
     private final StorageProperties storageProperties = mock(StorageProperties.class);
     private final ManagementCommandPublisher publisher = mock(ManagementCommandPublisher.class);
     private final LqCommandHandler handler =
@@ -47,8 +47,8 @@ class LqCommandHandlerTest {
         when(storageProperties.getRoots()).thenReturn(Map.of("HQ", hqRoot, "LQ", lqRoot));
     }
 
-    private static ExportMedia media(String hqPath) {
-        ExportMedia media = new ExportMedia();
+    private static MediaRecord media(String hqPath) {
+        MediaRecord media = new MediaRecord();
         media.setHqPath(hqPath);
         return media;
     }

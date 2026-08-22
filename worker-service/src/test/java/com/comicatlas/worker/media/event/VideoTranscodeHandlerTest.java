@@ -251,7 +251,7 @@ class VideoTranscodeHandlerTest {
     @Test
     void confirmNoDatabaseImports() throws Exception {
         // 通过源码级反射验证 VideoTranscodeHandler 不包含任何 Mapper/DataSource/JdbcTemplate 导入
-        String sourcePath = "worker-service/src/main/java/com/comicatlas/worker/event/VideoTranscodeHandler.java";
+        String sourcePath = "worker-service/src/main/java/com/comicatlas/worker/media/event/VideoTranscodeHandler.java";
         Path sourceFile = Path.of(System.getProperty("user.dir"), "..", sourcePath).normalize();
         if (!Files.exists(sourceFile)) {
             // 从 worker-service 模块内运行时路径可能不同

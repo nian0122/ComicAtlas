@@ -1,7 +1,7 @@
 package com.comicatlas.worker.exporter;
 
-import com.comicatlas.worker.exporter.persistence.ExportChapter;
-import com.comicatlas.worker.exporter.persistence.ExportComic;
+import com.comicatlas.worker.persistence.record.ChapterRecord;
+import com.comicatlas.worker.persistence.record.ComicRecord;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -18,11 +18,11 @@ class ComicInfoXmlBuilderTest {
 
     @Test
     void buildsEscapedComicInfoFields() {
-        ExportComic comic = new ExportComic();
+        ComicRecord comic = new ComicRecord();
         comic.setTitle("系列 & <特别>");
         comic.setAuthor("作者\"A");
         comic.setTags(List.of("动作", "冒险"));
-        ExportChapter chapter = new ExportChapter();
+        ChapterRecord chapter = new ChapterRecord();
         chapter.setTitle("第 1 话");
         chapter.setChapterNo("1");
 

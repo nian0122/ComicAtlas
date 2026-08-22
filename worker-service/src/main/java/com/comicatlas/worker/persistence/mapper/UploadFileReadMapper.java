@@ -1,13 +1,13 @@
-package com.comicatlas.worker.exporter.persistence;
+package com.comicatlas.worker.persistence.mapper;
 
-import com.comicatlas.worker.exporter.persistence.ExportUploadFile;
+import com.comicatlas.worker.persistence.record.UploadFileRecord;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Select;
 
 import java.util.List;
 
 @Mapper
-public interface ExportUploadFileMapper {
+public interface UploadFileReadMapper {
 
     @Select("""
         SELECT uf.id, uf.session_id, uf.file_id, uf.storage_name,
@@ -16,5 +16,5 @@ public interface ExportUploadFileMapper {
         WHERE uf.session_id = #{sessionId}
         ORDER BY uf.id ASC
     """)
-    List<ExportUploadFile> selectBySessionId(Long sessionId);
+    List<UploadFileRecord> selectBySessionId(Long sessionId);
 }

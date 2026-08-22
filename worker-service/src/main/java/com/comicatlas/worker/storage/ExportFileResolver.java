@@ -1,6 +1,6 @@
 package com.comicatlas.worker.storage;
 
-import com.comicatlas.worker.exporter.persistence.ExportMedia;
+import com.comicatlas.worker.persistence.record.MediaRecord;
 import com.comicatlas.worker.exporter.ExportFileNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -24,7 +24,7 @@ public class ExportFileResolver {
      * @return 文件引用（rootKey + relativePath）
      * @throws ExportFileNotFoundException HQ 缺失且 LQ 也未就绪
      */
-    public StorageRef resolve(ExportMedia media) {
+    public StorageRef resolve(MediaRecord media) {
         if ("VIDEO".equals(media.getMediaType())) {
             return new StorageRef(media.getHqRoot(), media.getHqPath());
         }

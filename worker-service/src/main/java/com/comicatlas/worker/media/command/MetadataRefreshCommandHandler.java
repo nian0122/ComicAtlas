@@ -8,13 +8,13 @@ import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.common.storage.InvalidRelativePathException;
 import com.comicatlas.common.storage.RelativePathValidator;
 import com.comicatlas.common.util.MetadataSnapshotRevision;
-import com.comicatlas.worker.exporter.persistence.ExportChapter;
-import com.comicatlas.worker.exporter.persistence.ExportMedia;
+import com.comicatlas.worker.persistence.record.ChapterRecord;
+import com.comicatlas.worker.persistence.record.MediaRecord;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.task.ManagementCommandPublisher;
 import com.comicatlas.worker.importer.NaturalPathComparator;
-import com.comicatlas.worker.exporter.persistence.ExportChapterMapper;
-import com.comicatlas.worker.exporter.persistence.ExportMediaMapper;
+import com.comicatlas.worker.persistence.mapper.ChapterReadMapper;
+import com.comicatlas.worker.persistence.mapper.MediaReadMapper;
 import com.comicatlas.worker.media.ComicMetadata;
 import com.comicatlas.worker.media.MediaAnalyzer;
 import com.comicatlas.worker.storage.StorageProperties;
@@ -112,8 +112,8 @@ public class MetadataRefreshCommandHandler {
     private static final Set<String> VIDEO_EXTENSIONS =
             Set.of(".mp4", ".mkv", ".webm", ".mov", ".avi");
 
-    private final ExportChapterMapper chapterMapper;
-    private final ExportMediaMapper mediaMapper;
+    private final ChapterReadMapper chapterMapper;
+    private final MediaReadMapper mediaMapper;
     private final MediaAnalyzer mediaAnalyzer;
     private final ManagementCommandPublisher publisher;
     private final StorageProperties storageProperties;
@@ -137,7 +137,7 @@ public class MetadataRefreshCommandHandler {
      * @param storageProperties 存储配置
      * @param objectMapper JSON 映射器
      */
-    public MetadataRefreshCommandHandler(ExportChapterMapper chapterMapper, ExportMediaMapper mediaMapper,
+    public MetadataRefreshCommandHandler(ChapterReadMapper chapterMapper, MediaReadMapper mediaMapper,
                                          MediaAnalyzer mediaAnalyzer, ManagementCommandPublisher publisher,
                                          StorageProperties storageProperties, ObjectMapper objectMapper,
                                          WorkerConfig workerConfig) {
@@ -164,7 +164,7 @@ public class MetadataRefreshCommandHandler {
      * @param maxSnapshotBytes 快照最大字节数
      * @param workerConfig Worker 配置
      */
-    public MetadataRefreshCommandHandler(ExportChapterMapper chapterMapper, ExportMediaMapper mediaMapper,
+    public MetadataRefreshCommandHandler(ChapterReadMapper chapterMapper, MediaReadMapper mediaMapper,
                                          MediaAnalyzer mediaAnalyzer, ManagementCommandPublisher publisher,
                                          StorageProperties storageProperties, ObjectMapper objectMapper) {
         this(chapterMapper, mediaMapper, mediaAnalyzer, publisher, storageProperties, objectMapper,
@@ -172,7 +172,7 @@ public class MetadataRefreshCommandHandler {
                 MetadataRefreshLimits.MAX_SNAPSHOT_BYTES, new WorkerConfig());
     }
 
-    MetadataRefreshCommandHandler(ExportChapterMapper chapterMapper, ExportMediaMapper mediaMapper,
+    MetadataRefreshCommandHandler(ChapterReadMapper chapterMapper, MediaReadMapper mediaMapper,
                                   MediaAnalyzer mediaAnalyzer, ManagementCommandPublisher publisher,
                                   StorageProperties storageProperties, ObjectMapper objectMapper,
                                   int maxChapters, int maxMedia, long maxSnapshotBytes) {
@@ -180,7 +180,7 @@ public class MetadataRefreshCommandHandler {
                 maxChapters, maxMedia, maxSnapshotBytes, new WorkerConfig());
     }
 
-    public MetadataRefreshCommandHandler(ExportChapterMapper chapterMapper, ExportMediaMapper mediaMapper,
+    public MetadataRefreshCommandHandler(ChapterReadMapper chapterMapper, MediaReadMapper mediaMapper,
                                   MediaAnalyzer mediaAnalyzer, ManagementCommandPublisher publisher,
                                   StorageProperties storageProperties, ObjectMapper objectMapper,
                                   int maxChapters, int maxMedia, long maxSnapshotBytes,
@@ -215,7 +215,7 @@ public class MetadataRefreshCommandHandler {
 
             cleanupExpiredAttempts();
 
-            List<ExportChapter> chapters = new ArrayList<>(
+            List<ChapterRecord> chapters = new ArrayList<>(
                     chapterMapper.selectByComicIdWithVersion(comicId));
             if (chapters.size() > maxChapters) {
                 publisher.failed(cmd, "章节数量超过上限: " + chapters.size() + " > " + maxChapters);
@@ -224,13 +224,13 @@ public class MetadataRefreshCommandHandler {
             // 仅按 globalOrder 排序章节，扫描路径一律使用 chapterId
             chapters.sort(Comparator.comparingInt(ch -> ch.getGlobalOrder() != null ? ch.getGlobalOrder() : 0));
 
-            Map<Long, List<ExportMedia>> mediaByChapter = mediaMapper.selectByComicIdWithVersionAndStatus(comicId).stream()
+            Map<Long, List<MediaRecord>> mediaByChapter = mediaMapper.selectByComicIdWithVersionAndStatus(comicId).stream()
                     .filter(m -> m.getChapterId() != null)
-                    .collect(Collectors.groupingBy(ExportMedia::getChapterId));
+                    .collect(Collectors.groupingBy(MediaRecord::getChapterId));
 
             List<ChapterSnapshot> chapterSnapshots = new ArrayList<>(chapters.size());
             int totalMedia = 0;
-            for (ExportChapter chapter : chapters) {
+            for (ChapterRecord chapter : chapters) {
                 ChapterScanResult scan = scanChapter(comicId, chapter,
                         mediaByChapter.getOrDefault(chapter.getId(), List.of()));
                 totalMedia += scan.mediaItems().size();
@@ -307,17 +307,17 @@ public class MetadataRefreshCommandHandler {
      * @param chapter   章节（chapterId 参与回退目录定位，globalOrder 仅排序不用于路径）
      * @param dbMedia   该章节的 DB 媒体行基线（用于匹配 mediaId/mediaVersion/pageNumber/状态）
      */
-    private ChapterScanResult scanChapter(Long comicId, ExportChapter chapter,
-                                          List<ExportMedia> dbMedia) {
+    private ChapterScanResult scanChapter(Long comicId, ChapterRecord chapter,
+                                          List<MediaRecord> dbMedia) {
         List<String> warnings = new ArrayList<>();
         StorageRoot hqRoot = requireRoot(HQ_ROOT_KEY);
         Long chapterId = chapter.getId();
 
         // 合法 DB 行按 basename 索引（结构校验通过者），并收集其真实存放目录键；
         // 仅 LQ 行（HQ 已删除）不参与 HQ 定位，由 scanLqOnlyChapter 单独扫描 LQ 目录
-        Map<String, ExportMedia> mediaByBasename = new HashMap<>();
+        Map<String, MediaRecord> mediaByBasename = new HashMap<>();
         Set<String> parentDirKeys = new LinkedHashSet<>();
-        for (ExportMedia row : dbMedia) {
+        for (MediaRecord row : dbMedia) {
             if (isLqOnlyRow(row)) {
                 continue;
             }
@@ -348,7 +348,7 @@ public class MetadataRefreshCommandHandler {
         if (scanDir == null) {
             // 仅 LQ 模式：HQ 文件已删除（保留 LQ 供阅读）且 HQ 目录不存在时，
             // 回退扫描 LQ 目录，以物理 LQ 文件为准校正 lq_status/lq_size
-            List<ExportMedia> lqOnlyRows = dbMedia.stream()
+            List<MediaRecord> lqOnlyRows = dbMedia.stream()
                     .filter(MetadataRefreshCommandHandler::isLqOnlyRow)
                     .toList();
             if (!lqOnlyRows.isEmpty()) {
@@ -394,7 +394,7 @@ public class MetadataRefreshCommandHandler {
             }
 
             sequence++;
-            ExportMedia row = mediaByBasename.get(fileName);
+            MediaRecord row = mediaByBasename.get(fileName);
             if (row == null) {
                 warnings.add("物理文件无对应DB记录: " + fileName);
                 continue;
@@ -480,8 +480,8 @@ public class MetadataRefreshCommandHandler {
      * LQ 目录定位：优先使用 DB 行 lq_path 共同目录键（兼容旧布局目录），
      * 无法定位时回退 {@code lq/{comicId}/{chapterId}}。
      */
-    private ChapterScanResult scanLqOnlyChapter(Long comicId, ExportChapter chapter,
-                                                List<ExportMedia> lqOnlyRows, List<String> warnings) {
+    private ChapterScanResult scanLqOnlyChapter(Long comicId, ChapterRecord chapter,
+                                                List<MediaRecord> lqOnlyRows, List<String> warnings) {
         Long chapterId = chapter.getId();
         StorageRoot lqRoot = roots().get(LQ_ROOT_KEY);
         if (lqRoot == null) {
@@ -490,9 +490,9 @@ public class MetadataRefreshCommandHandler {
         }
 
         // 合法仅 LQ 行按 lq_path basename 索引，并收集 lq_path 共同目录键
-        Map<String, ExportMedia> rowByLqBasename = new HashMap<>();
+        Map<String, MediaRecord> rowByLqBasename = new HashMap<>();
         Set<String> lqDirKeys = new LinkedHashSet<>();
-        for (ExportMedia row : lqOnlyRows) {
+        for (MediaRecord row : lqOnlyRows) {
             String dirKey = extractDirKey(row.getLqPath(), comicId);
             if (dirKey == null) {
                 warnings.add("忽略非法 lqPath: " + row.getLqPath());
@@ -545,7 +545,7 @@ public class MetadataRefreshCommandHandler {
                 warnings.add("忽略非 LQ 产物: " + fileName);
                 continue;
             }
-            ExportMedia row = rowByLqBasename.get(fileName);
+            MediaRecord row = rowByLqBasename.get(fileName);
             if (row == null) {
                 warnings.add("LQ 文件无对应 DB 记录: " + fileName);
                 continue;
@@ -560,7 +560,7 @@ public class MetadataRefreshCommandHandler {
                     STATUS_READY, safeSize(file)));
         }
         // DB 行存在但 LQ 文件缺失：产出 NOT_GENERATED 条目供 API 校正过期 READY
-        for (ExportMedia row : lqOnlyRows) {
+        for (MediaRecord row : lqOnlyRows) {
             String lqPath = row.getLqPath();
             if (lqPath == null || lqPath.isBlank() || matchedIds.contains(row.getId())) {
                 continue;
@@ -581,7 +581,7 @@ public class MetadataRefreshCommandHandler {
     }
 
     /** 仅 LQ 行判定：HQ 已删除（保留 LQ 供阅读）的图片行。 */
-    private static boolean isLqOnlyRow(ExportMedia row) {
+    private static boolean isLqOnlyRow(MediaRecord row) {
         return IMAGE_TYPE.equals(row.getMediaType())
                 && HQ_STATUS_DELETED.equals(row.getHqStatus())
                 && row.getLqPath() != null
@@ -589,9 +589,9 @@ public class MetadataRefreshCommandHandler {
     }
 
     /** 匹配行中首个目录键 != chapterId 的 hqPath 目录键；全部为新布局返回 null。 */
-    private static String legacyDirKeyOf(Map<String, ExportMedia> mediaByBasename, Long chapterId) {
+    private static String legacyDirKeyOf(Map<String, MediaRecord> mediaByBasename, Long chapterId) {
         String chapterKey = String.valueOf(chapterId);
-        for (ExportMedia row : mediaByBasename.values()) {
+        for (MediaRecord row : mediaByBasename.values()) {
             String hqPath = row.getHqPath();
             if (hqPath == null) {
                 continue;

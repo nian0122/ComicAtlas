@@ -1,9 +1,9 @@
 package com.comicatlas.worker.media.command;
 
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
-import com.comicatlas.worker.exporter.persistence.ExportMedia;
+import com.comicatlas.worker.persistence.record.MediaRecord;
 import com.comicatlas.worker.task.ManagementCommandPublisher;
-import com.comicatlas.worker.exporter.persistence.ExportMediaMapper;
+import com.comicatlas.worker.persistence.mapper.MediaReadMapper;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageRoot;
 import org.junit.jupiter.api.AfterEach;
@@ -35,7 +35,7 @@ import static org.mockito.Mockito.when;
  */
 class HqDeleteCommandHandlerTest {
 
-    private final ExportMediaMapper mediaMapper = mock(ExportMediaMapper.class);
+    private final MediaReadMapper mediaMapper = mock(MediaReadMapper.class);
     private final StorageProperties storageProperties = mock(StorageProperties.class);
     private final ManagementCommandPublisher publisher = mock(ManagementCommandPublisher.class);
     private final HqDeleteCommandHandler handler =
@@ -68,8 +68,8 @@ class HqDeleteCommandHandlerTest {
         }
     }
 
-    private static ExportMedia media(Long id, Long chapterId, String hqPath) {
-        ExportMedia media = new ExportMedia();
+    private static MediaRecord media(Long id, Long chapterId, String hqPath) {
+        MediaRecord media = new MediaRecord();
         media.setId(id);
         media.setChapterId(chapterId);
         media.setHqPath(hqPath);

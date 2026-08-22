@@ -1,12 +1,12 @@
-package com.comicatlas.worker.exporter.persistence;
+package com.comicatlas.worker.persistence.mapper;
 
-import com.comicatlas.worker.exporter.persistence.ExportUploadSession;
+import com.comicatlas.worker.persistence.record.UploadSessionRecord;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Select;
 
 @Mapper
-public interface ExportUploadSessionMapper {
+public interface UploadSessionReadMapper {
 
     @Select("SELECT id, session_id, comic_id, chapter_id, replace_media_id, status FROM upload_session WHERE id = #{id}")
-    ExportUploadSession selectById(Long id);
+    UploadSessionRecord selectById(Long id);
 }

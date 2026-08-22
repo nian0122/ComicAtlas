@@ -2,10 +2,10 @@ package com.comicatlas.worker.media.command;
 
 import com.comicatlas.common.constant.MetadataRefreshLimits;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
-import com.comicatlas.worker.exporter.persistence.ExportChapter;
-import com.comicatlas.worker.exporter.persistence.ExportMedia;
-import com.comicatlas.worker.exporter.persistence.ExportChapterMapper;
-import com.comicatlas.worker.exporter.persistence.ExportMediaMapper;
+import com.comicatlas.worker.persistence.record.ChapterRecord;
+import com.comicatlas.worker.persistence.record.MediaRecord;
+import com.comicatlas.worker.persistence.mapper.ChapterReadMapper;
+import com.comicatlas.worker.persistence.mapper.MediaReadMapper;
 import com.comicatlas.worker.media.ComicMetadata;
 import com.comicatlas.worker.media.MediaAnalyzer;
 import com.comicatlas.worker.storage.StorageProperties;
@@ -59,9 +59,9 @@ class MetadataRefreshCommandHandlerTest {
     Path tempRoot;
 
     @Mock
-    private ExportChapterMapper chapterMapper;
+    private ChapterReadMapper chapterMapper;
     @Mock
-    private ExportMediaMapper mediaMapper;
+    private MediaReadMapper mediaMapper;
     @Mock
     private MediaAnalyzer mediaAnalyzer;
     @Mock
@@ -138,17 +138,17 @@ class MetadataRefreshCommandHandlerTest {
         return HexFormat.of().formatHex(digest.digest(bytes));
     }
 
-    private static ExportChapter chapter(long id, int globalOrder, int version) {
-        ExportChapter ch = new ExportChapter();
+    private static ChapterRecord chapter(long id, int globalOrder, int version) {
+        ChapterRecord ch = new ChapterRecord();
         ch.setId(id);
         ch.setGlobalOrder(globalOrder);
         ch.setVersion(version);
         return ch;
     }
 
-    private static ExportMedia media(long id, long chapterId, String hqPath, int pageNumber,
+    private static MediaRecord media(long id, long chapterId, String hqPath, int pageNumber,
                                      String hqStatus, String lifecycleStatus, int version) {
-        ExportMedia m = new ExportMedia();
+        MediaRecord m = new MediaRecord();
         m.setId(id);
         m.setChapterId(chapterId);
         m.setHqRoot("HQ");
@@ -673,10 +673,10 @@ class MetadataRefreshCommandHandlerTest {
 
         when(chapterMapper.selectByComicIdWithVersion(COMIC_ID))
                 .thenReturn(List.of(chapter(CHAPTER_ID, 1, 1)));
-        ExportMedia lqOnly = media(101L, CHAPTER_ID, null, 1, "DELETED", "READY", 1);
+        MediaRecord lqOnly = media(101L, CHAPTER_ID, null, 1, "DELETED", "READY", 1);
         lqOnly.setMediaType("IMAGE");
         lqOnly.setLqPath("1/42/001.webp");
-        ExportMedia lqMissing = media(102L, CHAPTER_ID, null, 2, "DELETED", "READY", 1);
+        MediaRecord lqMissing = media(102L, CHAPTER_ID, null, 2, "DELETED", "READY", 1);
         lqMissing.setMediaType("IMAGE");
         lqMissing.setLqPath("1/42/002.webp");
         when(mediaMapper.selectByComicIdWithVersionAndStatus(COMIC_ID)).thenReturn(List.of(lqOnly, lqMissing));
@@ -702,7 +702,7 @@ class MetadataRefreshCommandHandlerTest {
 
         when(chapterMapper.selectByComicIdWithVersion(COMIC_ID))
                 .thenReturn(List.of(chapter(CHAPTER_ID, 1, 1)));
-        ExportMedia lqOnly = media(101L, CHAPTER_ID, null, 1, "DELETED", "READY", 1);
+        MediaRecord lqOnly = media(101L, CHAPTER_ID, null, 1, "DELETED", "READY", 1);
         lqOnly.setMediaType("IMAGE");
         lqOnly.setLqPath("1/42/001.webp");
         when(mediaMapper.selectByComicIdWithVersionAndStatus(COMIC_ID)).thenReturn(List.of(lqOnly));
@@ -726,10 +726,10 @@ class MetadataRefreshCommandHandlerTest {
 
         when(chapterMapper.selectByComicIdWithVersion(COMIC_ID))
                 .thenReturn(List.of(chapter(CHAPTER_ID, 1, 1)));
-        ExportMedia lqOnly = media(101L, CHAPTER_ID, null, 1, "DELETED", "READY", 1);
+        MediaRecord lqOnly = media(101L, CHAPTER_ID, null, 1, "DELETED", "READY", 1);
         lqOnly.setMediaType("IMAGE");
         lqOnly.setLqPath("1/42/001.webp");
-        ExportMedia badRow = media(102L, CHAPTER_ID, null, 2, "DELETED", "READY", 1);
+        MediaRecord badRow = media(102L, CHAPTER_ID, null, 2, "DELETED", "READY", 1);
         badRow.setMediaType("IMAGE");
         badRow.setLqPath("../escape.webp");
         when(mediaMapper.selectByComicIdWithVersionAndStatus(COMIC_ID)).thenReturn(List.of(lqOnly, badRow));

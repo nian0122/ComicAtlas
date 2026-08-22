@@ -7,10 +7,10 @@ import com.comicatlas.common.event.VideoMetadataFixCompletedEvent;
 import com.comicatlas.common.event.VideoMetadataFixRequestedEvent;
 import com.comicatlas.common.event.payload.VideoMetadataFixResult;
 import com.comicatlas.common.mq.MqConsumerSupport;
-import com.comicatlas.worker.exporter.persistence.ExportMedia;
+import com.comicatlas.worker.persistence.record.MediaRecord;
 import com.comicatlas.worker.media.ComicMetadata;
 import com.comicatlas.worker.media.MediaAnalyzer;
-import com.comicatlas.worker.exporter.persistence.ExportMediaMapper;
+import com.comicatlas.worker.persistence.mapper.MediaReadMapper;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,7 +34,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class VideoMetadataFixHandler {
 
-    private final ExportMediaMapper exportMediaMapper;
+    private final MediaReadMapper exportMediaMapper;
     private final MediaAnalyzer mediaAnalyzer;
     private final RabbitTemplate rabbitTemplate;
     private final MqConsumerSupport mqConsumerSupport;
@@ -51,7 +51,7 @@ public class VideoMetadataFixHandler {
             long start = System.currentTimeMillis();
             log.info("视频元数据修复开始: comicId={}", comicId);
 
-            List<ExportMedia> videos = exportMediaMapper.selectVideosMissingMetadataByComicId(comicId);
+            List<MediaRecord> videos = exportMediaMapper.selectVideosMissingMetadataByComicId(comicId);
 
             if (videos.isEmpty()) {
                 log.info("无需修复的视频元数据: comicId={}", comicId);
@@ -62,7 +62,7 @@ public class VideoMetadataFixHandler {
             log.info("待修复视频数量: comicId={}, count={}", comicId, videos.size());
             List<VideoMetadataFixResult> results = new ArrayList<>();
 
-            for (ExportMedia video : videos) {
+            for (MediaRecord video : videos) {
                 try {
                     Path videoFile = Path.of(mangaRoot,
                             video.getHqRoot().toLowerCase(),

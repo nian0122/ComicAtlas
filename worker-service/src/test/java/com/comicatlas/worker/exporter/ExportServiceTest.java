@@ -1,9 +1,9 @@
 package com.comicatlas.worker.exporter;
 
 import com.comicatlas.worker.config.WorkerConfig;
-import com.comicatlas.worker.exporter.persistence.ExportChapter;
-import com.comicatlas.worker.exporter.persistence.ExportComic;
-import com.comicatlas.worker.exporter.persistence.ExportMedia;
+import com.comicatlas.worker.persistence.record.ChapterRecord;
+import com.comicatlas.worker.persistence.record.ComicRecord;
+import com.comicatlas.worker.persistence.record.MediaRecord;
 import com.comicatlas.worker.storage.ExportFileResolver;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageRef;
@@ -59,23 +59,23 @@ class ExportServiceTest {
                 metadataJsonExporter, storageProperties, workerConfig, archivePublisher);
     }
 
-    private ExportComic comic(Long id, String title) {
-        ExportComic c = new ExportComic();
+    private ComicRecord comic(Long id, String title) {
+        ComicRecord c = new ComicRecord();
         c.setId(id);
         c.setTitle(title);
         return c;
     }
 
-    private ExportChapter chapter(Long id, String title, int globalOrder) {
-        ExportChapter ch = new ExportChapter();
+    private ChapterRecord chapter(Long id, String title, int globalOrder) {
+        ChapterRecord ch = new ChapterRecord();
         ch.setId(id);
         ch.setTitle(title);
         ch.setGlobalOrder(globalOrder);
         return ch;
     }
 
-    private ExportMedia media(Long id, Long chapterId, String hqPath, Integer pageNumber) {
-        ExportMedia m = new ExportMedia();
+    private MediaRecord media(Long id, Long chapterId, String hqPath, Integer pageNumber) {
+        MediaRecord m = new MediaRecord();
         m.setId(id);
         m.setChapterId(chapterId);
         m.setHqPath(hqPath);
@@ -86,7 +86,7 @@ class ExportServiceTest {
         return m;
     }
 
-    private ExportCollectResult result(ExportComic comic, List<ExportChapter> chapters, List<ExportMedia> media) {
+    private ExportCollectResult result(ComicRecord comic, List<ChapterRecord> chapters, List<MediaRecord> media) {
         return new ExportCollectResult(comic, chapters, List.of(), media, null);
     }
 
@@ -105,13 +105,13 @@ class ExportServiceTest {
 
     @Test
     void export_buildsManifestAndZip_includesHqLqImagesAndVideo() throws Exception {
-        ExportMedia imgHq = media(1L, 10L, "1/10/001.jpg", 1);
-        ExportMedia imgLq = media(2L, 10L, "1/10/002.jpg", 2);
+        MediaRecord imgHq = media(1L, 10L, "1/10/001.jpg", 1);
+        MediaRecord imgLq = media(2L, 10L, "1/10/002.jpg", 2);
         imgLq.setHqStatus("DELETED");
         imgLq.setLqRoot("LQ");
         imgLq.setLqPath("1/10/002.jpg");
         imgLq.setLqStatus("READY");
-        ExportMedia video = media(3L, 10L, "1/10/003.mp4", 3);
+        MediaRecord video = media(3L, 10L, "1/10/003.mp4", 3);
         video.setMediaType("VIDEO");
         ExportCollectResult result = result(comic(1L, "测试标题"), List.of(chapter(10L, "第一章", 1)),
                 List.of(imgHq, imgLq, video));
@@ -164,7 +164,7 @@ class ExportServiceTest {
 
     @Test
     void export_failsWhenSourceFileMissing() throws Exception {
-        ExportMedia m1 = media(1L, 10L, "1/10/001.jpg", 1);
+        MediaRecord m1 = media(1L, 10L, "1/10/001.jpg", 1);
         when(exportCollector.collect(1L)).thenReturn(result(comic(1L, "标题"), List.of(chapter(10L, "第一章", 1)), List.of(m1)));
         when(metadataJsonExporter.exportJson(1L)).thenReturn("{}");
         when(exportFileResolver.resolve(m1)).thenReturn(new StorageRef("HQ", "1/10/001.jpg"));
@@ -177,7 +177,7 @@ class ExportServiceTest {
 
     @Test
     void export_failsWhenSourcePathIsDirectory() throws Exception {
-        ExportMedia m1 = media(1L, 10L, "1/10/001.jpg", 1);
+        MediaRecord m1 = media(1L, 10L, "1/10/001.jpg", 1);
         when(exportCollector.collect(1L)).thenReturn(result(comic(1L, "标题"), List.of(chapter(10L, "第一章", 1)), List.of(m1)));
         when(metadataJsonExporter.exportJson(1L)).thenReturn("{}");
         when(exportFileResolver.resolve(m1)).thenReturn(new StorageRef("HQ", "1/10/001.jpg"));
@@ -191,7 +191,7 @@ class ExportServiceTest {
 
     @Test
     void export_failsWhenSourceFileUnreadable() throws Exception {
-        ExportMedia m1 = media(1L, 10L, "1/10/001.jpg", 1);
+        MediaRecord m1 = media(1L, 10L, "1/10/001.jpg", 1);
         when(exportCollector.collect(1L)).thenReturn(result(comic(1L, "标题"), List.of(chapter(10L, "第一章", 1)), List.of(m1)));
         when(metadataJsonExporter.exportJson(1L)).thenReturn("{}");
         when(exportFileResolver.resolve(m1)).thenReturn(new StorageRef("HQ", "1/10/001.jpg"));
@@ -208,8 +208,8 @@ class ExportServiceTest {
 
     @Test
     void export_failsOnCaseFoldedDuplicateTargetPath() throws Exception {
-        ExportMedia m1 = media(1L, 10L, "1/10/001.jpg", 1);
-        ExportMedia m2 = media(2L, 11L, "1/11/001.jpg", 1);
+        MediaRecord m1 = media(1L, 10L, "1/10/001.jpg", 1);
+        MediaRecord m2 = media(2L, 11L, "1/11/001.jpg", 1);
         when(exportCollector.collect(1L)).thenReturn(result(comic(1L, "标题"),
                 List.of(chapter(10L, "Vol.1", 1), chapter(11L, "vol.1", 2)), List.of(m1, m2)));
         when(metadataJsonExporter.exportJson(1L)).thenReturn("{}");
@@ -227,7 +227,7 @@ class ExportServiceTest {
     @Test
     void export_failsWhenEntryExceedsMaxEntrySize() throws Exception {
         workerConfig.getZip().setMaxEntrySize(2L);
-        ExportMedia m1 = media(1L, 10L, "1/10/001.jpg", 1);
+        MediaRecord m1 = media(1L, 10L, "1/10/001.jpg", 1);
         when(exportCollector.collect(1L)).thenReturn(result(comic(1L, "标题"), List.of(chapter(10L, "第一章", 1)), List.of(m1)));
         when(metadataJsonExporter.exportJson(1L)).thenReturn("{}");
         when(exportFileResolver.resolve(m1)).thenReturn(new StorageRef("HQ", "1/10/001.jpg"));
@@ -242,7 +242,7 @@ class ExportServiceTest {
     @Test
     void export_failsWhenTotalExceedsMaxTotalSize() throws Exception {
         workerConfig.getZip().setMaxTotalSize(4L);
-        ExportMedia m1 = media(1L, 10L, "1/10/001.jpg", 1);
+        MediaRecord m1 = media(1L, 10L, "1/10/001.jpg", 1);
         when(exportCollector.collect(1L)).thenReturn(result(comic(1L, "标题"), List.of(chapter(10L, "第一章", 1)), List.of(m1)));
         when(metadataJsonExporter.exportJson(1L)).thenReturn("{}");
         when(exportFileResolver.resolve(m1)).thenReturn(new StorageRef("HQ", "1/10/001.jpg"));
@@ -256,7 +256,7 @@ class ExportServiceTest {
 
     @Test
     void export_wrapsResolverFailurePreservingCause() throws Exception {
-        ExportMedia m1 = media(1L, 10L, "1/10/001.jpg", 1);
+        MediaRecord m1 = media(1L, 10L, "1/10/001.jpg", 1);
         when(exportCollector.collect(1L)).thenReturn(result(comic(1L, "标题"), List.of(chapter(10L, "第一章", 1)), List.of(m1)));
         when(metadataJsonExporter.exportJson(1L)).thenReturn("{}");
         ExportFileNotFoundException original = new ExportFileNotFoundException("HQ 缺失且 LQ 未就绪：media=1");
@@ -269,8 +269,8 @@ class ExportServiceTest {
 
     @Test
     void export_deduplicatesChapterDirs() throws Exception {
-        ExportMedia m1 = media(1L, 10L, "1/10/001.jpg", 1);
-        ExportMedia m2 = media(2L, 11L, "1/11/001.jpg", 1);
+        MediaRecord m1 = media(1L, 10L, "1/10/001.jpg", 1);
+        MediaRecord m2 = media(2L, 11L, "1/11/001.jpg", 1);
         when(exportCollector.collect(1L)).thenReturn(result(comic(1L, "标题"),
                 List.of(chapter(10L, "同名章", 1), chapter(11L, "同名章", 2)), List.of(m1, m2)));
         when(metadataJsonExporter.exportJson(1L)).thenReturn("{}");
@@ -300,7 +300,7 @@ class ExportServiceTest {
         ExportService realService = new ExportService(exportCollector, exportFileResolver, realBuilder,
                 metadataJsonExporter, storageProperties, realConfig, realPublisher);
 
-        ExportMedia m1 = media(1L, 10L, "1/10/001.jpg", 1);
+        MediaRecord m1 = media(1L, 10L, "1/10/001.jpg", 1);
         when(exportCollector.collect(1L)).thenReturn(result(comic(1L, "测试标题"),
                 List.of(chapter(10L, "第一章", 1)), List.of(m1)));
         when(metadataJsonExporter.exportJson(1L)).thenReturn("{}");
@@ -332,7 +332,7 @@ class ExportServiceTest {
 
     @Test
     void export_cleansStaleStagingBeforeRebuild() throws Exception {
-        ExportMedia m1 = media(1L, 10L, "1/10/001.jpg", 1);
+        MediaRecord m1 = media(1L, 10L, "1/10/001.jpg", 1);
         when(exportCollector.collect(1L)).thenReturn(result(comic(1L, "标题"), List.of(chapter(10L, "第一章", 1)), List.of(m1)));
         when(metadataJsonExporter.exportJson(1L)).thenReturn("{}");
         when(exportFileResolver.resolve(m1)).thenReturn(new StorageRef("HQ", "1/10/001.jpg"));

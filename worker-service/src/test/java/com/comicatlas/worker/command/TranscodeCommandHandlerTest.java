@@ -5,11 +5,11 @@ import com.comicatlas.worker.task.ManagementCommandPublisher;
 import com.comicatlas.common.event.payload.TranscodeMediaInfo;
 import com.comicatlas.worker.media.command.TranscodeCommandHandler;
 import com.comicatlas.worker.config.WorkerConfig;
-import com.comicatlas.worker.exporter.persistence.ExportMedia;
+import com.comicatlas.worker.persistence.record.MediaRecord;
 import com.comicatlas.worker.media.transcode.FfmpegTranscoder;
 import com.comicatlas.worker.media.ComicMetadata;
 import com.comicatlas.worker.media.MediaAnalyzer;
-import com.comicatlas.worker.exporter.persistence.ExportMediaMapper;
+import com.comicatlas.worker.persistence.mapper.MediaReadMapper;
 import com.comicatlas.worker.shared.process.ExternalProcessRunner;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -50,7 +50,7 @@ import static org.mockito.Mockito.when;
 class TranscodeCommandHandlerTest {
 
     @Mock
-    private ExportMediaMapper mediaMapper;
+    private MediaReadMapper mediaMapper;
 
     @Mock
     private ManagementCommandPublisher publisher;
@@ -101,7 +101,7 @@ class TranscodeCommandHandlerTest {
         Path sourceFile = chapterDir.resolve("test.webm");
         Files.writeString(sourceFile, "fake video data");
 
-        ExportMedia media = new ExportMedia();
+        MediaRecord media = new MediaRecord();
         media.setId(pageId);
         media.setHqRoot("HQ");
         media.setHqPath("1/ch01/test.webm");
@@ -144,7 +144,7 @@ class TranscodeCommandHandlerTest {
         Path chapterDir = Files.createDirectories(hqRoot.resolve("2/ch02"));
         Files.writeString(chapterDir.resolve("bad.mkv"), "fake video data");
 
-        ExportMedia media = new ExportMedia();
+        MediaRecord media = new MediaRecord();
         media.setId(pageId);
         media.setHqRoot("HQ");
         media.setHqPath("2/ch02/bad.mkv");
@@ -178,7 +178,7 @@ class TranscodeCommandHandlerTest {
         Files.writeString(chapterDir.resolve("movie.mp4"), "existing other media");
         Files.writeString(chapterDir.resolve("movie.mkv"), "source to transcode");
 
-        ExportMedia media = new ExportMedia();
+        MediaRecord media = new MediaRecord();
         media.setId(pageId);
         media.setHqRoot("HQ");
         media.setHqPath("6/ch06/movie.mkv");
@@ -214,7 +214,7 @@ class TranscodeCommandHandlerTest {
         Path chapterDir = Files.createDirectories(hqRoot.resolve("3/ch03"));
         Files.writeString(chapterDir.resolve("bad.avi"), "untranscodable data");
 
-        ExportMedia media = new ExportMedia();
+        MediaRecord media = new MediaRecord();
         media.setId(pageId);
         media.setHqRoot("HQ");
         media.setHqPath("3/ch03/bad.avi");
@@ -244,7 +244,7 @@ class TranscodeCommandHandlerTest {
         Path chapterDir = Files.createDirectories(hqRoot.resolve("1/ch04"));
         Files.writeString(chapterDir.resolve("test.mkv"), "fake video data");
 
-        ExportMedia media = new ExportMedia();
+        MediaRecord media = new MediaRecord();
         media.setId(pageId);
         media.setHqRoot("HQ");
         media.setHqPath("1/ch04/test.mkv");
@@ -280,7 +280,7 @@ class TranscodeCommandHandlerTest {
         Path chapterDir = Files.createDirectories(hqRoot.resolve("1/ch05"));
         Files.writeString(chapterDir.resolve("test.mp4"), "fake video data");
 
-        ExportMedia media = new ExportMedia();
+        MediaRecord media = new MediaRecord();
         media.setId(pageId);
         media.setHqRoot("HQ");
         media.setHqPath("1/ch05/test.mp4");
@@ -316,7 +316,7 @@ class TranscodeCommandHandlerTest {
         Files.writeString(chapterDir.resolve("a.webm"), "fake video data");
         Files.writeString(chapterDir.resolve("b.webm"), "fake video data");
 
-        ExportMedia mediaA = new ExportMedia();
+        MediaRecord mediaA = new MediaRecord();
         mediaA.setId(601L);
         mediaA.setHqRoot("HQ");
         mediaA.setHqPath("1/ch06/a.webm");
@@ -324,7 +324,7 @@ class TranscodeCommandHandlerTest {
         mediaA.setContainer("webm");
         mediaA.setVideoCodec("mpeg4");
 
-        ExportMedia mediaB = new ExportMedia();
+        MediaRecord mediaB = new MediaRecord();
         mediaB.setId(602L);
         mediaB.setHqRoot("HQ");
         mediaB.setHqPath("1/ch06/b.webm");

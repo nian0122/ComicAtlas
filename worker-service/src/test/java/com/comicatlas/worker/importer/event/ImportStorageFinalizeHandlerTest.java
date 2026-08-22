@@ -12,7 +12,7 @@ import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.importer.ImportManifest;
 import com.comicatlas.worker.importer.ImportManifestManager;
-import com.comicatlas.worker.exporter.persistence.ExportChapterMapper;
+import com.comicatlas.worker.persistence.mapper.ChapterReadMapper;
 import com.comicatlas.worker.storage.SafeMoveStrategy;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageRoot;
@@ -69,7 +69,7 @@ class ImportStorageFinalizeHandlerTest {
     private StorageProperties storageProperties;
     private RabbitTemplate rabbitTemplate;
     private Channel channel;
-    private ExportChapterMapper exportChapterMapper;
+    private ChapterReadMapper exportChapterMapper;
     private ImportStorageFinalizeHandler handler;
 
     @BeforeEach
@@ -89,7 +89,7 @@ class ImportStorageFinalizeHandlerTest {
         channel = mock(Channel.class);
 
         // 默认章节有效（存在且属于本漫画），陈旧事件测试单独覆盖
-        exportChapterMapper = mock(ExportChapterMapper.class);
+        exportChapterMapper = mock(ChapterReadMapper.class);
         when(exportChapterMapper.countByIdAndComicId(anyLong(), anyLong())).thenReturn(1);
 
         WorkerConfig config = new WorkerConfig();

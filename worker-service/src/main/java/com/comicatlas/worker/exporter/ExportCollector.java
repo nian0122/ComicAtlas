@@ -1,14 +1,14 @@
 package com.comicatlas.worker.exporter;
 
-import com.comicatlas.worker.exporter.persistence.ExportCatalog;
-import com.comicatlas.worker.exporter.persistence.ExportChapter;
-import com.comicatlas.worker.exporter.persistence.ExportComic;
-import com.comicatlas.worker.exporter.persistence.ExportMedia;
-import com.comicatlas.worker.exporter.persistence.ExportCatalogMapper;
-import com.comicatlas.worker.exporter.persistence.ExportChapterMapper;
-import com.comicatlas.worker.exporter.persistence.ExportComicMapper;
-import com.comicatlas.worker.exporter.persistence.ExportMediaMapper;
-import com.comicatlas.worker.exporter.persistence.ExportTagMapper;
+import com.comicatlas.worker.persistence.record.CatalogRecord;
+import com.comicatlas.worker.persistence.record.ChapterRecord;
+import com.comicatlas.worker.persistence.record.ComicRecord;
+import com.comicatlas.worker.persistence.record.MediaRecord;
+import com.comicatlas.worker.persistence.mapper.CatalogReadMapper;
+import com.comicatlas.worker.persistence.mapper.ChapterReadMapper;
+import com.comicatlas.worker.persistence.mapper.ComicReadMapper;
+import com.comicatlas.worker.persistence.mapper.MediaReadMapper;
+import com.comicatlas.worker.persistence.mapper.TagReadMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -22,27 +22,27 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ExportCollector {
 
-    private final ExportComicMapper comicMapper;
-    private final ExportChapterMapper chapterMapper;
-    private final ExportCatalogMapper catalogMapper;
-    private final ExportMediaMapper mediaMapper;
-    private final ExportTagMapper exportTagMapper;
+    private final ComicReadMapper comicMapper;
+    private final ChapterReadMapper chapterMapper;
+    private final CatalogReadMapper catalogMapper;
+    private final MediaReadMapper mediaMapper;
+    private final TagReadMapper exportTagMapper;
 
     /**
      * @param comicId 漫画 ID
      * @return 导出数据采集结果
      */
     public ExportCollectResult collect(Long comicId) {
-        ExportComic comic = comicMapper.selectById(comicId);
+        ComicRecord comic = comicMapper.selectById(comicId);
         if (comic == null) {
             throw new IllegalArgumentException("漫画不存在：" + comicId);
         }
 
-        List<ExportChapter> chapters = chapterMapper.selectByComicIdOrderByGlobalOrder(comicId);
-        List<ExportCatalog> catalogs = catalogMapper.selectByComicId(comicId);
+        List<ChapterRecord> chapters = chapterMapper.selectByComicIdOrderByGlobalOrder(comicId);
+        List<CatalogRecord> catalogs = catalogMapper.selectByComicId(comicId);
 
-        List<Long> chapterIds = chapters.stream().map(ExportChapter::getId).toList();
-        List<ExportMedia> allMedia = chapterIds.isEmpty() ? List.of() : mediaMapper.selectByComicId(comicId);
+        List<Long> chapterIds = chapters.stream().map(ChapterRecord::getId).toList();
+        List<MediaRecord> allMedia = chapterIds.isEmpty() ? List.of() : mediaMapper.selectByComicId(comicId);
         comic.setTags(exportTagMapper.selectNamesByComicId(comicId));
 
         return new ExportCollectResult(comic, chapters, catalogs, allMedia, null);

@@ -2,9 +2,9 @@ package com.comicatlas.worker.media.command;
 
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.common.event.MediaUploadCompletedEvent.MediaAnalysisResult;
-import com.comicatlas.worker.exporter.persistence.ExportMedia;
-import com.comicatlas.worker.exporter.persistence.ExportUploadFile;
-import com.comicatlas.worker.exporter.persistence.ExportUploadSession;
+import com.comicatlas.worker.persistence.record.MediaRecord;
+import com.comicatlas.worker.persistence.record.UploadFileRecord;
+import com.comicatlas.worker.persistence.record.UploadSessionRecord;
 import com.comicatlas.worker.media.ComicMetadata;
 import com.comicatlas.worker.media.MediaAnalyzer;
 import com.comicatlas.worker.storage.StorageProperties;
@@ -12,9 +12,9 @@ import com.comicatlas.worker.storage.StorageRef;
 import com.comicatlas.worker.storage.StorageRoot;
 import com.comicatlas.worker.storage.StorageService;
 import com.comicatlas.worker.storage.TransferMode;
-import com.comicatlas.worker.exporter.persistence.ExportMediaMapper;
-import com.comicatlas.worker.exporter.persistence.ExportUploadFileMapper;
-import com.comicatlas.worker.exporter.persistence.ExportUploadSessionMapper;
+import com.comicatlas.worker.persistence.mapper.MediaReadMapper;
+import com.comicatlas.worker.persistence.mapper.UploadFileReadMapper;
+import com.comicatlas.worker.persistence.mapper.UploadSessionReadMapper;
 import com.comicatlas.worker.task.ManagementCommandPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,9 +43,9 @@ import java.util.List;
 @RequiredArgsConstructor
 public class MediaUploadCommandHandler {
 
-    private final ExportUploadSessionMapper uploadSessionMapper;
-    private final ExportUploadFileMapper uploadFileMapper;
-    private final ExportMediaMapper mediaMapper;
+    private final UploadSessionReadMapper uploadSessionMapper;
+    private final UploadFileReadMapper uploadFileMapper;
+    private final MediaReadMapper mediaMapper;
     private final StorageProperties storageProperties;
     private final StorageService storageService;
     private final MediaAnalyzer mediaAnalyzer;
@@ -54,12 +54,12 @@ public class MediaUploadCommandHandler {
     public void handle(ManagementCommandRequestedEvent cmd) {
         Long sessionDbId = cmd.targetId();
         try {
-            ExportUploadSession session = uploadSessionMapper.selectById(sessionDbId);
+            UploadSessionRecord session = uploadSessionMapper.selectById(sessionDbId);
             if (session == null) {
                 publisher.failed(cmd, "上传会话不存在: " + sessionDbId);
                 return;
             }
-            List<ExportUploadFile> files = uploadFileMapper.selectBySessionId(sessionDbId);
+            List<UploadFileRecord> files = uploadFileMapper.selectBySessionId(sessionDbId);
             if (files.isEmpty()) {
                 publisher.failed(cmd, "会话无文件: " + sessionDbId);
                 return;
@@ -78,7 +78,7 @@ public class MediaUploadCommandHandler {
             List<MediaAnalysisResult> results = new ArrayList<>(files.size());
             String replaceNewTarget = null;
             for (int i = 0; i < files.size(); i++) {
-                ExportUploadFile uploadFile = files.get(i);
+                UploadFileRecord uploadFile = files.get(i);
                 Long mediaId = replace ? replaceMediaId : uploadFile.getMediaId();
                 if (mediaId == null) {
                     throw new IOException("缺少 mediaId: file=" + uploadFile.getFileId());
@@ -148,7 +148,7 @@ public class MediaUploadCommandHandler {
         if (trashRoot == null) {
             return;
         }
-        ExportMedia oldMedia = mediaMapper.selectById(mediaId);
+        MediaRecord oldMedia = mediaMapper.selectById(mediaId);
         if (oldMedia == null || oldMedia.getHqPath() == null || oldMedia.getHqPath().isBlank()) {
             return;
         }

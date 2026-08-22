@@ -2,10 +2,10 @@ package com.comicatlas.worker.exporter;
 
 import com.comicatlas.common.metadata.MetadataV3;
 import com.comicatlas.common.storage.InvalidRelativePathException;
-import com.comicatlas.worker.exporter.persistence.ExportCatalog;
-import com.comicatlas.worker.exporter.persistence.ExportChapter;
-import com.comicatlas.worker.exporter.persistence.ExportComic;
-import com.comicatlas.worker.exporter.persistence.ExportMedia;
+import com.comicatlas.worker.persistence.record.CatalogRecord;
+import com.comicatlas.worker.persistence.record.ChapterRecord;
+import com.comicatlas.worker.persistence.record.ComicRecord;
+import com.comicatlas.worker.persistence.record.MediaRecord;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -16,8 +16,8 @@ class MetadataModelMapperTest {
 
     private final MetadataModelMapper mapper = new MetadataModelMapper();
 
-    private ExportMedia media(Long id, Long chapterId, String hqPath, String mediaType, Integer pageNumber) {
-        ExportMedia m = new ExportMedia();
+    private MediaRecord media(Long id, Long chapterId, String hqPath, String mediaType, Integer pageNumber) {
+        MediaRecord m = new MediaRecord();
         m.setId(id);
         m.setChapterId(chapterId);
         m.setHqPath(hqPath);
@@ -31,19 +31,19 @@ class MetadataModelMapperTest {
 
     @Test
     void toV3_mapsFieldsWithCatalogIndex() {
-        ExportComic comic = new ExportComic();
+        ComicRecord comic = new ComicRecord();
         comic.setId(1L);
         comic.setTitle("标题");
         comic.setAuthor("作者");
 
-        ExportCatalog cat1 = new ExportCatalog();
+        CatalogRecord cat1 = new CatalogRecord();
         cat1.setId(10L);
         cat1.setComicId(1L);
         cat1.setTitle("目录1");
         cat1.setSortOrder(0);
         cat1.setParentId(null);
 
-        ExportChapter ch = new ExportChapter();
+        ChapterRecord ch = new ChapterRecord();
         ch.setId(20L);
         ch.setComicId(1L);
         ch.setCatalogId(10L);
@@ -52,7 +52,7 @@ class MetadataModelMapperTest {
         ch.setSortOrder(0);
         ch.setGlobalOrder(1);
 
-        ExportMedia m = media(100L, 20L, "1/20/001.jpg", "IMAGE", 1);
+        MediaRecord m = media(100L, 20L, "1/20/001.jpg", "IMAGE", 1);
 
         ExportCollectResult result = new ExportCollectResult(comic, List.of(ch), List.of(cat1), List.of(m), null);
         MetadataV3 v3 = mapper.toV3(result);
@@ -71,16 +71,16 @@ class MetadataModelMapperTest {
 
     @Test
     void toV3_hqDeletedNullHqPath_mapsToNullHqPath() {
-        ExportComic comic = new ExportComic();
+        ComicRecord comic = new ComicRecord();
         comic.setId(1L);
         comic.setTitle("标题");
-        ExportChapter ch = new ExportChapter();
+        ChapterRecord ch = new ChapterRecord();
         ch.setId(20L);
         ch.setComicId(1L);
         ch.setTitle("章节1");
         ch.setGlobalOrder(1);
         // HQ 已删除：hqPath 清空、hqStatus=DELETED、LQ 就绪（LQ 替代 HQ 的存储优化场景）
-        ExportMedia m = media(100L, 20L, null, "IMAGE", 1);
+        MediaRecord m = media(100L, 20L, null, "IMAGE", 1);
         m.setHqStatus("DELETED");
         m.setLqStatus("READY");
 
@@ -98,16 +98,16 @@ class MetadataModelMapperTest {
 
     @Test
     void toV3_invalidHqPath_throwsInvalidRelativePathException() {
-        ExportComic comic = new ExportComic();
+        ComicRecord comic = new ComicRecord();
         comic.setId(1L);
         comic.setTitle("标题");
-        ExportChapter ch = new ExportChapter();
+        ChapterRecord ch = new ChapterRecord();
         ch.setId(20L);
         ch.setComicId(1L);
         ch.setTitle("章节1");
         ch.setGlobalOrder(1);
         // 反斜杠路径违反相对路径契约，MetadataV3 构造器应自然抛 InvalidRelativePathException
-        ExportMedia m = media(100L, 20L, "1\\20\\001.jpg", "IMAGE", 1);
+        MediaRecord m = media(100L, 20L, "1\\20\\001.jpg", "IMAGE", 1);
 
         ExportCollectResult result = new ExportCollectResult(comic, List.of(ch), List.of(), List.of(m), null);
 
@@ -116,7 +116,7 @@ class MetadataModelMapperTest {
 
     @Test
     void toV3_handlesEmptyAndNull() {
-        ExportComic comic = new ExportComic();
+        ComicRecord comic = new ComicRecord();
         comic.setId(1L);
         comic.setTitle(null);
         comic.setAuthor(null);

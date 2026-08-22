@@ -4,8 +4,8 @@ import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.common.constant.ExportFormats;
 import com.comicatlas.worker.shared.common.ComicTitleSanitizer;
 import com.comicatlas.worker.config.WorkerConfig;
-import com.comicatlas.worker.exporter.persistence.ExportChapter;
-import com.comicatlas.worker.exporter.persistence.ExportMedia;
+import com.comicatlas.worker.persistence.record.ChapterRecord;
+import com.comicatlas.worker.persistence.record.MediaRecord;
 import com.comicatlas.worker.storage.ExportFileResolver;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageRef;
@@ -126,12 +126,12 @@ public class ExportService {
         String rootDirName = ComicTitleSanitizer.sanitize(result.comic().getTitle());
 
         List<ExportManifest.Entry> entries = new ArrayList<>();
-        Map<Long, List<ExportMedia>> mediaByChapter = result.allMedia().stream()
-                .collect(Collectors.groupingBy(ExportMedia::getChapterId));
+        Map<Long, List<MediaRecord>> mediaByChapter = result.allMedia().stream()
+                .collect(Collectors.groupingBy(MediaRecord::getChapterId));
 
         // 构建章节标题映射
         Map<Long, String> chapterTitles = result.chapters().stream()
-                .collect(Collectors.toMap(ExportChapter::getId, chapter ->
+                .collect(Collectors.toMap(ChapterRecord::getId, chapter ->
                         chapter.getTitle() != null && !chapter.getTitle().isBlank()
                                 ? ComicTitleSanitizer.sanitize(chapter.getTitle())
                                 : CHAPTER_DIR_PREFIX + chapter.getId()));
@@ -140,7 +140,7 @@ public class ExportService {
         Set<String> usedChapterDirs = new HashSet<>();
         Set<String> usedTargetPaths = new HashSet<>();
         long mediaTotalSize = 0L;
-        for (ExportChapter chapter : result.chapters()) {
+        for (ChapterRecord chapter : result.chapters()) {
             String chapterDir = chapterTitles.getOrDefault(chapter.getId(), CHAPTER_DIR_PREFIX + chapter.getId());
             String uniqueDir = chapterDir;
             int counter = 1;
@@ -150,13 +150,13 @@ public class ExportService {
             }
             usedChapterDirs.add(uniqueDir);
 
-            List<ExportMedia> chapterMedia = mediaByChapter.getOrDefault(chapter.getId(), List.of());
-            List<ExportMedia> sortedMedia = chapterMedia.stream()
-                    .sorted(Comparator.comparing(ExportMedia::getPageNumber,
+            List<MediaRecord> chapterMedia = mediaByChapter.getOrDefault(chapter.getId(), List.of());
+            List<MediaRecord> sortedMedia = chapterMedia.stream()
+                    .sorted(Comparator.comparing(MediaRecord::getPageNumber,
                             Comparator.nullsLast(Comparator.naturalOrder())))
                     .toList();
 
-            for (ExportMedia media : sortedMedia) {
+            for (MediaRecord media : sortedMedia) {
                 ExportManifest.Entry entry = buildEntry(comicId, media, uniqueDir, usedTargetPaths);
                 entries.add(entry);
                 mediaTotalSize = addSizes(comicId, media.getId(), mediaTotalSize, entry.sourceSize());
@@ -192,7 +192,7 @@ public class ExportService {
      *
      * @throws ExportManifestBuildException 无可用文件、文件不可读/非普通文件、大小超限或目标路径冲突
      */
-    private ExportManifest.Entry buildEntry(Long comicId, ExportMedia media, String uniqueDir,
+    private ExportManifest.Entry buildEntry(Long comicId, MediaRecord media, String uniqueDir,
                                             Set<String> usedTargetPaths) {
         Long mediaId = media.getId();
         StorageRef storageRef;
