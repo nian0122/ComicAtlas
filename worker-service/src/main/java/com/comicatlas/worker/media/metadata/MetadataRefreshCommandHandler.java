@@ -36,7 +36,6 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
@@ -350,7 +349,9 @@ public class MetadataRefreshCommandHandler {
                     .filter(MetadataScanSupport::isLqOnlyRow)
                     .toList();
             if (!lqOnlyRows.isEmpty()) {
-                return scanLqOnlyChapter(comicId, chapter, lqOnlyRows, warnings);
+                MetadataChapterScanner.ScanResult result = chapterScanner.scanLqOnlyChapter(
+                        comicId, chapterId, lqOnlyRows, warnings, mediaMatcher);
+                return new ChapterScanResult(result.mediaItems(), result.warnings(), result.legacyDirKey());
             }
             warnings.add("章节目录不存在: " + comicId + "/" + chapterId);
             return new ChapterScanResult(List.of(), warnings);
@@ -478,92 +479,6 @@ public class MetadataRefreshCommandHandler {
      * LQ 目录定位：优先使用 DB 行 lq_path 共同目录键（兼容旧布局目录），
      * 无法定位时回退 {@code lq/{comicId}/{chapterId}}。
      */
-    private ChapterScanResult scanLqOnlyChapter(Long comicId, ChapterRecord chapter,
-                                                List<MediaRecord> lqOnlyRows, List<String> warnings) {
-        Long chapterId = chapter.getId();
-        StorageRoot lqRoot = StorageRootResolver.optional(storageProperties, LQ_ROOT_KEY);
-        if (lqRoot == null) {
-            warnings.add("LQ 存储根未配置，跳过仅 LQ 章节扫描: " + comicId + "/" + chapterId);
-            return new ChapterScanResult(List.of(), warnings);
-        }
-
-        // 合法仅 LQ 行按 lq_path basename 索引，并收集 lq_path 共同目录键
-        MetadataMediaMatcher.LqIndex lqIndex = mediaMatcher.indexLqRows(lqOnlyRows, comicId, warnings);
-        Map<String, MediaRecord> rowByLqBasename = lqIndex.byBasename();
-        Set<String> lqDirKeys = lqIndex.directoryKeys();
-        if (rowByLqBasename.isEmpty()) {
-            return new ChapterScanResult(List.of(), warnings);
-        }
-
-        // LQ 扫描目录：共同目录键存在则用之（DB 真值），否则回退 chapterId 目录
-        Path lqDir = null;
-        if (lqDirKeys.size() == 1) {
-            lqDir = chapterScanner.resolveLqDirectory(comicId, chapterId, lqDirKeys.iterator().next());
-        }
-        if (lqDir == null) {
-            lqDir = chapterScanner.resolveLqDirectory(comicId, chapterId, String.valueOf(chapterId));
-        }
-        if (lqDir == null) {
-            warnings.add("LQ 目录不存在: " + comicId + "/" + chapterId);
-            return new ChapterScanResult(List.of(), warnings);
-        }
-
-        List<Path> files;
-        try {
-            files = chapterScanner.list(lqDir);
-        } catch (IOException e) {
-            warnings.add("读取 LQ 目录失败: " + comicId + "/" + chapterId);
-            return new ChapterScanResult(List.of(), warnings);
-        }
-        files.sort(NaturalPathComparator.INSTANCE);
-
-        List<MediaSnapshot> mediaItems = new ArrayList<>(rowByLqBasename.size());
-        Set<Long> matchedIds = new HashSet<>();
-        for (Path file : files) {
-            String fileName = file.getFileName().toString();
-            if (fileName.startsWith(".") || isHidden(file)
-                    || !Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) {
-                continue;
-            }
-            if (!fileName.endsWith(LQ_EXTENSION)) {
-                warnings.add("忽略非 LQ 产物: " + fileName);
-                continue;
-            }
-            MediaRecord row = rowByLqBasename.get(fileName);
-            if (row == null) {
-                warnings.add("LQ 文件无对应 DB 记录: " + fileName);
-                continue;
-            }
-            matchedIds.add(row.getId());
-            mediaItems.add(new MediaSnapshot(
-                    row.getId(), MetadataScanSupport.versionOrZero(row.getVersion()),
-                    comicId + "/" + chapterId + "/" + fileName,
-                    HQ_STATUS_DELETED, row.getStatus() != null ? row.getStatus() : STATUS_READY,
-                    row.getPageNumber() != null ? row.getPageNumber() : 0,
-                    0L, IMAGE_TYPE, null, null, null, null, null, null,
-                    STATUS_READY, safeSize(file)));
-        }
-        // DB 行存在但 LQ 文件缺失：产出 NOT_GENERATED 条目供 API 校正过期 READY
-        for (MediaRecord row : lqOnlyRows) {
-            String lqPath = row.getLqPath();
-            if (lqPath == null || lqPath.isBlank() || matchedIds.contains(row.getId())) {
-                continue;
-            }
-            String fileName = MetadataScanSupport.basenameOf(lqPath);
-            if (fileName.isEmpty() || !rowByLqBasename.containsKey(fileName)) {
-                continue;
-            }
-            mediaItems.add(new MediaSnapshot(
-                    row.getId(), MetadataScanSupport.versionOrZero(row.getVersion()),
-                    comicId + "/" + chapterId + "/" + fileName,
-                    HQ_STATUS_DELETED, row.getStatus() != null ? row.getStatus() : STATUS_READY,
-                    row.getPageNumber() != null ? row.getPageNumber() : 0,
-                    0L, IMAGE_TYPE, null, null, null, null, null, null,
-                    LQ_STATUS_NOT_GENERATED, 0L));
-        }
-        return new ChapterScanResult(mediaItems, warnings, null);
-    }
-
     /**
      * 原子写入快照：同目录写 {@code .tmp} → flush/close → ATOMIC_MOVE 到目标。
      * 原子移动不受支持即失败并清理临时文件（拒绝非原子覆盖写入）。
