@@ -59,6 +59,7 @@ public class ManagementTaskService {
     private final TaskRetryPublisher taskRetryPublisher;
     private final TaskResponseAssembler taskResponseAssembler;
     private final TaskQueryService taskQueryService;
+    private final TaskAggregationService taskAggregationService;
 
     // ======================== 创建任务 ========================
 
@@ -240,7 +241,7 @@ public class ManagementTaskService {
                 .set(ManagementTaskItem::getUpdatedAt, LocalDateTime.now()));
 
         // 重新聚合状态
-        aggregateTaskStatus(taskId);
+        taskAggregationService.aggregate(taskId);
 
         ManagementTask updated = taskMapper.selectById(taskId);
         return taskResponseAssembler.toResponse(updated);
@@ -500,7 +501,7 @@ public class ManagementTaskService {
         itemMapper.update(null, updateWrapper);
 
         // 重新聚合主任务状态
-        aggregateTaskStatus(item.getTaskId());
+        taskAggregationService.aggregate(item.getTaskId());
 
         return taskResponseAssembler.toItemResponse(itemMapper.selectById(itemId));
     }
@@ -541,7 +542,7 @@ public class ManagementTaskService {
         itemMapper.update(null, updateWrapper);
 
         if (isStarted) {
-            aggregateTaskStatus(item.getTaskId());
+            taskAggregationService.aggregate(item.getTaskId());
         }
         return true;
     }
@@ -600,95 +601,11 @@ public class ManagementTaskService {
     /**
      * 重新聚合主任务状态（供元数据刷新完成/失败流程在自定义短事务内复用现有聚合逻辑）。
      * <p>
-     * 内部调用 {@link #aggregateTaskStatus}；必须在事务内调用（自身无事务边界，
+     * 委托 {@link TaskAggregationService}；必须在事务内调用（自身无事务边界，
      * 由调用方的事务承载），全部 item 到终态时任务随之流转到 SUCCEEDED/FAILED 等。
      */
     public void reaggregateTask(Long taskId) {
-        aggregateTaskStatus(taskId);
-    }
-
-    /**
-     * 根据所有 item 状态聚合主任务状态和计数。
-     */
-    private void aggregateTaskStatus(Long taskId) {
-        List<ManagementTaskItem> items = itemMapper.selectList(
-                new LambdaQueryWrapper<ManagementTaskItem>()
-                        .eq(ManagementTaskItem::getTaskId, taskId));
-
-        ManagementTask task = taskMapper.selectById(taskId);
-        if (task == null) {
-            return;
-        }
-
-        long successCount = items.stream()
-                .filter(item -> item.getStatus() == ManagementTaskStatus.SUCCEEDED).count();
-        long failureCount = items.stream()
-                .filter(item -> item.getStatus() == ManagementTaskStatus.FAILED).count();
-        long cancelledCount = items.stream()
-                .filter(item -> item.getStatus() == ManagementTaskStatus.CANCELLED).count();
-
-        task.setSuccessCount((int) successCount);
-        task.setFailureCount((int) failureCount);
-        task.setCancelledCount((int) cancelledCount);
-
-        // 聚合进度
-        long total = items.size();
-        if (total > 0) {
-            long completed = successCount + failureCount + cancelledCount;
-            task.setProgress((int) (completed * 100 / total));
-        }
-
-        // 聚合状态
-        boolean hasRunning = items.stream()
-                .anyMatch(item -> item.getStatus() == ManagementTaskStatus.RUNNING
-                        || item.getStatus() == ManagementTaskStatus.CANCELLING);
-        boolean hasQueued = items.stream()
-                .anyMatch(item -> item.getStatus() == ManagementTaskStatus.QUEUED);
-
-        // 如果主任务正在取消中，且没有 running/queued 项了，标记为 CANCELLED
-        if (task.getStatus() == ManagementTaskStatus.CANCELLING && !hasRunning && !hasQueued) {
-            task.setStatus(ManagementTaskStatus.CANCELLED);
-            task.setCompletedAt(LocalDateTime.now());
-        } else if (!hasRunning && !hasQueued) {
-            // 所有项都到终态
-            if (successCount == total) {
-                task.setStatus(ManagementTaskStatus.SUCCEEDED);
-                task.setCompletedAt(LocalDateTime.now());
-            } else if (failureCount == total) {
-                task.setStatus(ManagementTaskStatus.FAILED);
-                task.setCompletedAt(LocalDateTime.now());
-            } else if (cancelledCount == total) {
-                task.setStatus(ManagementTaskStatus.CANCELLED);
-                task.setCompletedAt(LocalDateTime.now());
-            } else {
-                task.setStatus(ManagementTaskStatus.PARTIALLY_SUCCEEDED);
-                task.setCompletedAt(LocalDateTime.now());
-            }
-        } else if (hasRunning || task.getStatus() == ManagementTaskStatus.RUNNING) {
-            // 确保是 RUNNING 状态
-            if (task.getStatus() == ManagementTaskStatus.QUEUED) {
-                task.setStatus(ManagementTaskStatus.RUNNING);
-                task.setStartedAt(LocalDateTime.now());
-            }
-        }
-
-        task.setUpdatedAt(LocalDateTime.now());
-        taskMapper.updateById(task);
-
-        // 聚合失败原因到任务级：终态失败时汇总失败 item 的首条错误，供任务卡片/详情直接展示。
-        // 单独用 UpdateWrapper 显式更新——updateById 忽略 null 字段，其余状态须显式清空避免残留旧错误。
-        String aggregatedError = task.getStatus() == ManagementTaskStatus.FAILED
-                || task.getStatus() == ManagementTaskStatus.PARTIALLY_SUCCEEDED
-                ? items.stream()
-                        .filter(item -> item.getStatus() == ManagementTaskStatus.FAILED)
-                        .map(ManagementTaskItem::getErrorMessage)
-                        .filter(message -> message != null && !message.isBlank())
-                        .findFirst()
-                        .orElse(null)
-                : null;
-        taskMapper.update(null, new LambdaUpdateWrapper<ManagementTask>()
-                .eq(ManagementTask::getId, taskId)
-                .set(ManagementTask::getErrorMessage, aggregatedError));
+        taskAggregationService.aggregate(taskId);
     }
 
     // ======================== 辅助方法 ========================
