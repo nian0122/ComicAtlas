@@ -115,7 +115,6 @@ public class MetadataRefreshCommandHandler {
     /**
      * 生产装配构造器：@Autowired 显式声明——类含包级测试构造器，不标注时 Spring 无法决定用哪个。
      */
-    @Autowired
     /**
      * 使用默认快照限制创建元数据刷新处理器，供兼容旧测试和本地调用。
      *
@@ -132,7 +131,9 @@ public class MetadataRefreshCommandHandler {
                                          WorkerConfig workerConfig) {
         this(chapterMapper, mediaMapper, mediaAnalyzer, publisher, storageProperties, objectMapper,
                 MetadataRefreshLimits.MAX_CHAPTERS, MetadataRefreshLimits.MAX_MEDIA,
-                MetadataRefreshLimits.MAX_SNAPSHOT_BYTES, workerConfig);
+                MetadataRefreshLimits.MAX_SNAPSHOT_BYTES, workerConfig,
+                new MetadataChapterScanner(storageProperties), new MetadataMediaMatcher(),
+                new MetadataSnapshotAssembler());
     }
 
     /**
@@ -174,6 +175,30 @@ public class MetadataRefreshCommandHandler {
                                   StorageProperties storageProperties, ObjectMapper objectMapper,
                                   int maxChapters, int maxMedia, long maxSnapshotBytes,
                                   WorkerConfig workerConfig) {
+        this(chapterMapper, mediaMapper, mediaAnalyzer, publisher, storageProperties, objectMapper,
+                maxChapters, maxMedia, maxSnapshotBytes, workerConfig,
+                new MetadataChapterScanner(storageProperties), new MetadataMediaMatcher(),
+                new MetadataSnapshotAssembler());
+    }
+
+    @Autowired
+    public MetadataRefreshCommandHandler(ChapterReadMapper chapterMapper, MediaReadMapper mediaMapper,
+                                  MediaAnalyzer mediaAnalyzer, ManagementCommandPublisher publisher,
+                                  StorageProperties storageProperties, ObjectMapper objectMapper,
+                                  WorkerConfig workerConfig, MetadataChapterScanner chapterScanner,
+                                  MetadataMediaMatcher mediaMatcher, MetadataSnapshotAssembler snapshotAssembler) {
+        this(chapterMapper, mediaMapper, mediaAnalyzer, publisher, storageProperties, objectMapper,
+                MetadataRefreshLimits.MAX_CHAPTERS, MetadataRefreshLimits.MAX_MEDIA,
+                MetadataRefreshLimits.MAX_SNAPSHOT_BYTES, workerConfig,
+                chapterScanner, mediaMatcher, snapshotAssembler);
+    }
+
+    public MetadataRefreshCommandHandler(ChapterReadMapper chapterMapper, MediaReadMapper mediaMapper,
+                                  MediaAnalyzer mediaAnalyzer, ManagementCommandPublisher publisher,
+                                  StorageProperties storageProperties, ObjectMapper objectMapper,
+                                  int maxChapters, int maxMedia, long maxSnapshotBytes,
+                                  WorkerConfig workerConfig, MetadataChapterScanner chapterScanner,
+                                  MetadataMediaMatcher mediaMatcher, MetadataSnapshotAssembler snapshotAssembler) {
         this.chapterMapper = chapterMapper;
         this.mediaMapper = mediaMapper;
         this.mediaAnalyzer = mediaAnalyzer;
@@ -187,9 +212,9 @@ public class MetadataRefreshCommandHandler {
         this.snapshotSerializer = new MetadataSnapshotSerializer(objectMapper);
         this.snapshotCleanup = new MetadataSnapshotCleanup(storageProperties, workerConfig);
         this.layoutNormalizer = new MetadataLayoutNormalizer(storageProperties);
-        this.chapterScanner = new MetadataChapterScanner(storageProperties);
-        this.mediaMatcher = new MetadataMediaMatcher();
-        this.snapshotAssembler = new MetadataSnapshotAssembler();
+        this.chapterScanner = chapterScanner;
+        this.mediaMatcher = mediaMatcher;
+        this.snapshotAssembler = snapshotAssembler;
     }
 
     /**

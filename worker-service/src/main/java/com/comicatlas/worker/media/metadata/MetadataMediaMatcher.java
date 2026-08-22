@@ -7,13 +7,11 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.List;
+import org.springframework.stereotype.Component;
 
 /** 负责 DB 媒体行与磁盘文件名的索引和布局兼容判断。 */
+@Component
 public class MetadataMediaMatcher {
-
-    public HqIndex indexHqRows(Iterable<MediaRecord> rows, Long comicId) {
-        return indexHqRows(rows, comicId, List.of());
-    }
 
     public HqIndex indexHqRows(Iterable<MediaRecord> rows, Long comicId, List<String> warnings) {
         Map<String, MediaRecord> byBasename = new HashMap<>();
@@ -31,10 +29,6 @@ public class MetadataMediaMatcher {
             directoryKeys.add(dirKey);
         }
         return new HqIndex(byBasename, directoryKeys);
-    }
-
-    public LqIndex indexLqRows(Iterable<MediaRecord> rows, Long comicId) {
-        return indexLqRows(rows, comicId, List.of());
     }
 
     public LqIndex indexLqRows(Iterable<MediaRecord> rows, Long comicId, List<String> warnings) {

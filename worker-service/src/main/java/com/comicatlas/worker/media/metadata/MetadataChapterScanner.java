@@ -5,6 +5,7 @@ import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageRoot;
 import com.comicatlas.worker.storage.StorageRootResolver;
 import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -15,6 +16,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /** 负责章节 HQ/LQ 目录定位和文件枚举，不参与媒体字段组装。 */
+@Component
 @RequiredArgsConstructor
 public class MetadataChapterScanner {
 
