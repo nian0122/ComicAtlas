@@ -5,6 +5,7 @@ import com.comicatlas.api.outbox.entity.OutboxMessage;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Update;
 
 import java.util.List;
@@ -20,7 +21,10 @@ public interface OutboxMessageMapper extends BaseMapper<OutboxMessage> {
      * NULL available_at 视为立即可用。
      */
     @Select("""
-        SELECT * FROM outbox_message
+        SELECT event_id, task_id, item_id, attempt, exchange, routing_key, event_type,
+               version, payload, publish_attempts, status, available_at, published_at,
+               last_error, created_at
+        FROM outbox_message
         WHERE status = 'PENDING' AND (available_at IS NULL OR available_at <= NOW())
         ORDER BY created_at ASC
         LIMIT #{limit}
@@ -43,13 +47,13 @@ public interface OutboxMessageMapper extends BaseMapper<OutboxMessage> {
     /**
      * 删除 published_at 超过指定天数的 PUBLISHED 消息。
      */
-    @Select("DELETE FROM outbox_message WHERE status = 'PUBLISHED' AND published_at < DATE_SUB(NOW(), INTERVAL #{days} DAY)")
+    @Delete("DELETE FROM outbox_message WHERE status = 'PUBLISHED' AND published_at < DATE_SUB(NOW(), INTERVAL #{days} DAY)")
     int deletePublishedOlderThan(@Param("days") int days);
 
     /**
      * 删除 created_at 超过指定天数的 FAILED 消息。
      */
-    @Select("DELETE FROM outbox_message WHERE status = 'FAILED' AND created_at < DATE_SUB(NOW(), INTERVAL #{days} DAY)")
+    @Delete("DELETE FROM outbox_message WHERE status = 'FAILED' AND created_at < DATE_SUB(NOW(), INTERVAL #{days} DAY)")
     int deleteFailedOlderThan(@Param("days") int days);
 
     /**
