@@ -2,7 +2,7 @@ package com.comicatlas.api.exporter.service;
 
 import com.comicatlas.api.exporter.dto.ExportTaskVO;
 import com.comicatlas.api.exporter.service.ExportService;
-import com.comicatlas.api.storage.dto.ExportArtifactVO;
+import com.comicatlas.api.exporter.dto.ExportArtifactVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

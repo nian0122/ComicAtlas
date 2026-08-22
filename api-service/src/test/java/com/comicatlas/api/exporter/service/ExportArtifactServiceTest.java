@@ -5,7 +5,7 @@ import com.comicatlas.api.storage.ApiStorageProperties;
 import com.comicatlas.api.storage.ApiStorageRoot;
 import com.comicatlas.api.exporter.entity.ExportTask;
 import com.comicatlas.api.exporter.mapper.ExportTaskMapper;
-import com.comicatlas.api.storage.dto.ExportArtifactVO;
+import com.comicatlas.api.exporter.dto.ExportArtifactVO;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.Assumptions;

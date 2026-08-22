@@ -2,8 +2,8 @@ package com.comicatlas.api.management.operation;
 
 import com.comicatlas.contract.common.Result;
 import com.comicatlas.api.exporter.dto.ExportTaskVO;
+import com.comicatlas.api.exporter.dto.ExportArtifactVO;
 import com.comicatlas.api.management.dto.OperationSubmitResultDTO;
-import com.comicatlas.api.storage.dto.ExportArtifactVO;
 import com.comicatlas.api.exporter.service.ExportOperationService;
 import com.comicatlas.api.media.service.HqDeleteOperationService;
 import com.comicatlas.api.media.service.LqOperationService;

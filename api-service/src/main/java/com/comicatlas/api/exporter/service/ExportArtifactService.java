@@ -7,7 +7,7 @@ import com.comicatlas.api.storage.ApiStorageProperties;
 import com.comicatlas.api.storage.PathTraversalException;
 import com.comicatlas.api.exporter.entity.ExportTask;
 import com.comicatlas.api.exporter.mapper.ExportTaskMapper;
-import com.comicatlas.api.storage.dto.ExportArtifactVO;
+import com.comicatlas.api.exporter.dto.ExportArtifactVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
