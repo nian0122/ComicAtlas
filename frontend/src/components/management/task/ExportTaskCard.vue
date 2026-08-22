@@ -10,6 +10,7 @@
           <h3 class="task-name">导出任务 #{{ task.id }}</h3>
           <div class="task-meta-row">
             <span class="meta-chip">漫画 #{{ task.comicId }}</span>
+            <span class="meta-chip">格式 {{ formatLabel }}</span>
             <span class="meta-time">{{ formatTime(task.createdAt) }}</span>
           </div>
         </div>
@@ -74,7 +75,7 @@
       <!-- 操作区 -->
       <div class="card-actions">
         <template v-if="task.status === 'SUCCESS'">
-          <button class="action-btn primary" @click="onCopyMainZip">复制主 ZIP 路径</button>
+          <button class="action-btn primary" @click="onCopyMainZip">复制主 {{ formatLabel }} 路径</button>
           <button class="action-btn ghost" @click="onOpenDir">打开目录</button>
         </template>
       </div>
@@ -105,6 +106,7 @@ const STATUS_LABELS: Record<string, string> = {
 }
 
 const statusLabel = computed(() => STATUS_LABELS[props.task.status] || props.task.status)
+const formatLabel = computed(() => props.task.format === 'CBZ' ? 'CBZ' : 'ZIP')
 
 const totalSize = computed(() => artifacts.value.reduce((sum, a) => sum + a.size, 0))
 
@@ -167,7 +169,7 @@ async function copyText(text: string, successMsg: string) {
 }
 
 function onCopyMainZip() {
-  copyText(mainZipPath.value, '主 ZIP 路径已复制')
+  copyText(mainZipPath.value, `主 ${formatLabel.value} 路径已复制`)
 }
 
 function onCopyVolumePath(artifact: ExportArtifactVO) {

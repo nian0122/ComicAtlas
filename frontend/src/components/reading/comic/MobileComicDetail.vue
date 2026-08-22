@@ -64,7 +64,7 @@
         </div>
         <div>
           <span>来源</span>
-          <strong>{{ comic.sourceType || '-' }}</strong>
+          <strong>{{ sourceTypeLabel(comic.sourceType) }}</strong>
         </div>
       </section>
 
@@ -90,6 +90,7 @@ import { computed } from 'vue'
 import { VideoPlay } from '@element-plus/icons-vue'
 import CatalogTree from '@/components/reading/comic/CatalogTree.vue'
 import type { CatalogNode, ComicDetailVO } from '@/types'
+import { sourceTypeLabel } from '@/utils/source-format'
 
 interface Props {
   comic: ComicDetailVO
