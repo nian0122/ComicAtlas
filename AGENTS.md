@@ -266,6 +266,15 @@ URL 统一由 `FileUrlResolver.resolve(page)` 生成，不手拼。
 
 后端 Java 代码遵循《阿里巴巴 Java 开发手册》的强制规则，并结合本项目“本地个人应用、无需鉴权、Worker 只读 MySQL”的边界执行。规范优先级高于个人编码习惯；与现有架构约束冲突时，以本文件的架构约束为准。
 
+### 强制门禁声明
+
+阿里 Java 开发规范与阿里 Java 命名规范是本项目必须遵守的开发规范，不是可选建议。所有新增、修改和重构代码都必须满足本节要求；历史代码未完成整改前，不得以“Checkstyle 通过”宣称全项目已完全合规。
+
+- 命名必须表达业务语义，禁止单字母变量、拼音、无意义缩写和魔法命名；`DTO`、`VO`、`MQ`、`XML`、`CBZ`、`ZIP`、`HQ`、`LQ` 等项目或行业通用缩写按 `docs/development/java-naming.md` 允许清单执行。
+- 新增内部变量不得使用 `ctx`、`opt`、`req`、`res`、`vo`、`dto`、`tmp` 等无语义短名；应使用 `importContext`、`optionalValue`、`request`、`response`、`viewObject`、`dataTransferObject`、`tempPath` 等完整语义名称。
+- 对外 JSON、数据库列名、MQ 路由键属于冻结契约；内部 Java 名称重命名不得改变对外契约，必须通过显式映射保持兼容。
+- 每次提交前必须执行命名审查、对应模块测试、Checkstyle 和 `git diff --check`；合并前执行 `./mvnw verify`，命名规范未满足时不得合并。
+
 ### 命名与结构
 
 - 类、接口、枚举使用 UpperCamelCase；方法、参数、局部变量使用 lowerCamelCase；常量使用 `UPPER_SNAKE_CASE`。

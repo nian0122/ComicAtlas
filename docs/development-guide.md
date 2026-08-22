@@ -89,6 +89,8 @@ mvn -pl api-service test
 
 合并到 `develop` 前按 `AGENTS.md` 门禁执行：修改后端代码至少运行对应模块测试；合并前运行 `./mvnw verify`、Checkstyle 与 `git diff --check`。
 
+阿里 Java 开发规范和阿里 Java 命名规范是项目强制要求，具体命名规则、允许缩写和禁止短名见 [`docs/development/java-naming.md`](development/java-naming.md)。Checkstyle 通过不代表语义命名审查完成；合并前必须同时完成命名审查。
+
 不要提交 `.env`、密码、远程服务凭据、日志、构建产物、个人漫画文件或宿主机绝对路径。
 
 ## 合并到 develop 并推送
