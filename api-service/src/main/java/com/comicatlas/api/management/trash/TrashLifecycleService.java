@@ -9,7 +9,7 @@ import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.persistence.comic.mapper.MediaMapper;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.exception.BusinessException;
-import com.comicatlas.api.common.exception.ConflictException;
+import com.comicatlas.api.shared.exception.ConflictException;
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.api.storage.ApiStorageProperties;
 import com.comicatlas.api.storage.ApiStorageRoot;

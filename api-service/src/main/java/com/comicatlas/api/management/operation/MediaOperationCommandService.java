@@ -7,7 +7,7 @@ import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.enums.HqStatus;
 import com.comicatlas.contract.common.enums.LqStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
-import com.comicatlas.api.common.exception.ConflictException;
+import com.comicatlas.api.shared.exception.ConflictException;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.entity.Media;

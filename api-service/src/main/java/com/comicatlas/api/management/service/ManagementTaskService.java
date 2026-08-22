@@ -29,7 +29,7 @@ import com.comicatlas.api.management.enums.ManagementTaskStatus;
 import com.comicatlas.api.management.enums.TaskStage;
 import com.comicatlas.api.management.enums.TaskType;
 import com.comicatlas.contract.common.exception.BusinessException;
-import com.comicatlas.api.common.exception.ConflictException;
+import com.comicatlas.api.shared.exception.ConflictException;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.entity.Media;

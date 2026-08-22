@@ -18,7 +18,7 @@ import com.comicatlas.api.management.trash.TrashLifecycleService;
 import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.exception.BusinessException;
-import com.comicatlas.api.common.exception.ConflictException;
+import com.comicatlas.api.shared.exception.ConflictException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;

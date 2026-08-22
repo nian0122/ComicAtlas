@@ -1,4 +1,4 @@
-package com.comicatlas.api.common.exception;
+package com.comicatlas.api.shared.exception;
 
 import com.comicatlas.contract.common.exception.BusinessException;
 

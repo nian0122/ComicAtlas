@@ -5,7 +5,7 @@ import com.comicatlas.contract.common.enums.LqStatus;
 import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
 import com.comicatlas.contract.common.enums.TranscodeStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
-import com.comicatlas.api.common.exception.SnapshotUnavailableException;
+import com.comicatlas.api.shared.exception.SnapshotUnavailableException;
 import com.comicatlas.api.storage.ApiStorageProperties;
 import com.comicatlas.api.storage.ApiStorageRoot;
 import com.comicatlas.api.storage.PathTraversalException;

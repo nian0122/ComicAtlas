@@ -5,7 +5,7 @@ import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.mapper.CatalogMapper;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
-import com.comicatlas.api.common.exception.ConflictException;
+import com.comicatlas.api.shared.exception.ConflictException;
 import com.comicatlas.api.management.trash.TrashLifecycleService;
 import com.comicatlas.api.management.trash.TrashLifecycleService;
 import org.junit.jupiter.api.DisplayName;

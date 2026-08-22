@@ -17,7 +17,7 @@ import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.api.management.enums.ManagementTaskStatus;
 import com.comicatlas.api.management.enums.TaskType;
 import com.comicatlas.contract.common.exception.BusinessException;
-import com.comicatlas.api.common.exception.SnapshotUnavailableException;
+import com.comicatlas.api.shared.exception.SnapshotUnavailableException;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.api.storage.ApiStorageProperties;
