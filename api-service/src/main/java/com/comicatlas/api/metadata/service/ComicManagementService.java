@@ -1,9 +1,9 @@
 package com.comicatlas.api.metadata.service;
 
-import com.comicatlas.api.comic.dto.BatchUpdateResultVO;
+import com.comicatlas.api.management.dto.BatchUpdateResultVO;
 import com.comicatlas.contract.comic.dto.ComicDetailVO;
 import com.comicatlas.contract.comic.dto.ComicMetadataDTO;
-import com.comicatlas.api.comic.dto.BatchComicUpdateRequest;
+import com.comicatlas.api.management.dto.BatchComicUpdateRequest;
 import com.comicatlas.api.metadata.dto.ComicMetadataUpdateRequest;
 import com.comicatlas.api.metadata.dto.ComicTagUpdateRequest;
 import com.comicatlas.api.metadata.dto.CreateComicRequest;

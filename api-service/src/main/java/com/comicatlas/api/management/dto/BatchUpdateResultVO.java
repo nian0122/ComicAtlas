@@ -1,4 +1,4 @@
-package com.comicatlas.api.comic.dto;
+package com.comicatlas.api.management.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

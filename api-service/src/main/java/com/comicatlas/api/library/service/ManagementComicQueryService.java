@@ -1,7 +1,7 @@
 package com.comicatlas.api.library.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.comicatlas.api.comic.dto.ManagementComicListVO;
+import com.comicatlas.api.library.dto.ManagementComicListVO;
 import com.comicatlas.contract.comic.dto.ComicDetailVO;
 import com.comicatlas.contract.comic.dto.ComicMetadataDTO;
 import com.comicatlas.contract.comic.dto.ComicListQuery;

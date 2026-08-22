@@ -1,4 +1,4 @@
-package com.comicatlas.api.comic.dto;
+package com.comicatlas.api.library.dto;
 
 import com.comicatlas.contract.common.enums.ComicStatus;
 import lombok.Data;
