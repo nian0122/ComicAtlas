@@ -49,7 +49,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@MonitoredOperation
+@MonitoredOperation("management-task")
 public class ManagementTaskService {
 
     /** 目标类型：漫画。 */
