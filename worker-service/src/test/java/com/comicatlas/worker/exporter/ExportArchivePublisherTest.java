@@ -1,6 +1,7 @@
 package com.comicatlas.worker.exporter;
 
 import com.comicatlas.worker.exporter.publisher.ExportArchivePublisher;
+import com.comicatlas.worker.exporter.archive.ZipBuilder;
 import com.comicatlas.worker.exporter.exception.ExportPublishConflictException;
 import com.comicatlas.worker.exporter.exception.ExportPublishException;
 import com.comicatlas.worker.exporter.model.ExportManifest;

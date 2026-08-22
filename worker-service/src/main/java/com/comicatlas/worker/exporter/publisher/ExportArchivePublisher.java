@@ -1,7 +1,7 @@
 package com.comicatlas.worker.exporter.publisher;
 
 import com.comicatlas.worker.shared.archive.ZipVolumeResolver;
-import com.comicatlas.worker.exporter.ZipBuilder;
+import com.comicatlas.worker.exporter.archive.ZipBuilder;
 import com.comicatlas.worker.exporter.exception.ExportPublishConflictException;
 import com.comicatlas.worker.exporter.exception.ExportPublishException;
 import com.comicatlas.worker.exporter.model.ExportManifest;

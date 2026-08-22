@@ -1,4 +1,4 @@
-package com.comicatlas.worker.exporter;
+package com.comicatlas.worker.exporter.archive;
 
 import com.comicatlas.worker.exporter.model.ExportManifest;
 import com.comicatlas.worker.config.WorkerConfig;
