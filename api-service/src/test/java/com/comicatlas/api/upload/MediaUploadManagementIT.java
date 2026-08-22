@@ -23,15 +23,15 @@ import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
 import com.comicatlas.api.common.enums.TaskType;
 import com.comicatlas.contract.common.enums.TranscodeStatus;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
-import com.comicatlas.worker.command.TrashCommandHandler;
-import com.comicatlas.worker.command.MediaUploadCommandHandler;
-import com.comicatlas.worker.event.ManagementCommandPublisher;
+import com.comicatlas.worker.recovery.command.TrashCommandHandler;
+import com.comicatlas.worker.media.command.MediaUploadCommandHandler;
+import com.comicatlas.worker.task.ManagementCommandPublisher;
 import com.comicatlas.worker.media.MediaAnalyzer;
 import com.comicatlas.worker.storage.SafeMoveStrategy;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageService;
 import com.comicatlas.worker.storage.TransferService;
-import com.comicatlas.worker.file.trash.TrashManifestStore;
+import com.comicatlas.worker.recovery.trash.TrashManifestStore;
 import com.comicatlas.worker.exporter.persistence.ExportMediaMapper;
 import com.comicatlas.worker.exporter.persistence.ExportUploadFileMapper;
 import com.comicatlas.worker.exporter.persistence.ExportUploadSessionMapper;
@@ -1027,14 +1027,14 @@ class MediaUploadManagementIT {
         }
 
         @Bean
-        com.comicatlas.worker.process.ExternalProcessRunner externalProcessRunner(
+        com.comicatlas.worker.shared.process.ExternalProcessRunner externalProcessRunner(
                 org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor processIoExecutor) {
-            return new com.comicatlas.worker.process.ExternalProcessRunner(processIoExecutor);
+            return new com.comicatlas.worker.shared.process.ExternalProcessRunner(processIoExecutor);
         }
 
         @Bean
         MediaAnalyzer mediaAnalyzer(com.comicatlas.worker.config.WorkerConfig wc, ObjectMapper om,
-                com.comicatlas.worker.process.ExternalProcessRunner processRunner) {
+                com.comicatlas.worker.shared.process.ExternalProcessRunner processRunner) {
             return new MediaAnalyzer(wc, om, processRunner);
         }
 

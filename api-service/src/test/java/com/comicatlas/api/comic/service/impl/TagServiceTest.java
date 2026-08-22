@@ -1,4 +1,4 @@
-package com.comicatlas.api.comic.service.impl;
+package com.comicatlas.api.metadata.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.comic.cache.CacheEvictor;

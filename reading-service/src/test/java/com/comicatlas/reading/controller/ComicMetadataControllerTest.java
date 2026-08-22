@@ -1,7 +1,8 @@
 package com.comicatlas.reading.controller;
 
+import com.comicatlas.reading.library.ReadingComicController;
 import com.comicatlas.contract.comic.dto.ComicMetadataDTO;
-import com.comicatlas.reading.service.ComicQueryService;
+import com.comicatlas.reading.library.ComicQueryService;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.contract.common.exception.GlobalExceptionHandler;
 import com.fasterxml.jackson.databind.ObjectMapper;

@@ -1,4 +1,4 @@
-package com.comicatlas.api.comic.service.impl;
+package com.comicatlas.api.catalog.service.impl;
 
 import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
 import com.comicatlas.persistence.comic.entity.Chapter;

@@ -1,7 +1,8 @@
-package com.comicatlas.reading.service.impl;
+package com.comicatlas.reading.library.impl;
 
-import com.comicatlas.reading.dto.CatalogNode;
-import com.comicatlas.reading.dto.ChapterRef;
+import com.comicatlas.reading.catalog.impl.CatalogServiceImpl;
+import com.comicatlas.reading.catalog.CatalogNode;
+import com.comicatlas.reading.catalog.ChapterRef;
 import com.comicatlas.persistence.comic.entity.Catalog;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Comic;

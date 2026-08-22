@@ -1,5 +1,6 @@
-package com.comicatlas.reading.service.impl;
+package com.comicatlas.reading.library.impl;
 
+import com.comicatlas.reading.history.impl.HistoryServiceImpl;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Comic;
@@ -9,12 +10,12 @@ import com.comicatlas.persistence.storage.FileUrlResolver;
 import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
-import com.comicatlas.reading.dto.HistoryUpdateRequest;
-import com.comicatlas.reading.dto.HistoryVO;
-import com.comicatlas.reading.dto.HistoryPageVO;
+import com.comicatlas.reading.history.HistoryUpdateRequest;
+import com.comicatlas.reading.history.HistoryVO;
+import com.comicatlas.reading.history.HistoryPageVO;
 import com.comicatlas.persistence.reader.entity.ReadingHistory;
 import com.comicatlas.persistence.reader.mapper.ReadingHistoryMapper;
-import com.comicatlas.reading.service.HistoryService;
+import com.comicatlas.reading.history.HistoryService;
 import com.comicatlas.reading.testutil.MybatisPlusLambdaCacheExtension;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

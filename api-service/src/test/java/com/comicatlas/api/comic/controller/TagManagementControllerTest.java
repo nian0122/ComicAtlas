@@ -1,8 +1,8 @@
-package com.comicatlas.api.comic.controller;
+package com.comicatlas.api.metadata.controller;
 
 import com.comicatlas.contract.comic.dto.TagDTO;
 import com.comicatlas.api.comic.dto.CreateTagRequest;
-import com.comicatlas.api.comic.service.TagManagementService;
+import com.comicatlas.api.metadata.service.TagManagementService;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.contract.common.exception.GlobalExceptionHandler;
 import com.comicatlas.api.config.DlqSecurityConfig;
