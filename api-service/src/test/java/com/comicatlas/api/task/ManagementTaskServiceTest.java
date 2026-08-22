@@ -53,6 +53,7 @@ class ManagementTaskServiceTest {
     @Mock private ImportRetryCoordinator importRetryCoordinator;
     @Mock private TaskRetryPublisher taskRetryPublisher;
     @Mock private TaskResponseAssembler taskResponseAssembler;
+    @Mock private TaskQueryService taskQueryService;
 
     @InjectMocks
     private ManagementTaskService service;

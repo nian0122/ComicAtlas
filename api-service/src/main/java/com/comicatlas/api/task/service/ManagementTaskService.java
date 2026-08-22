@@ -3,7 +3,6 @@ package com.comicatlas.api.task.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.api.task.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.task.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.task.dto.ManagementTaskResponse;
@@ -20,12 +19,8 @@ import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.shared.exception.ConflictException;
 import com.comicatlas.api.shared.crypto.DigestService;
 import com.comicatlas.api.shared.monitoring.MonitoredOperation;
-import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Comic;
-import com.comicatlas.persistence.comic.entity.Media;
-import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
-import com.comicatlas.persistence.comic.mapper.MediaMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -34,11 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.stream.Collectors;
 
 /**
  * 统一管理任务服务。
@@ -65,10 +56,9 @@ public class ManagementTaskService {
     private final ManagementTaskMapper taskMapper;
     private final ManagementTaskItemMapper itemMapper;
     private final ComicMapper comicMapper;
-    private final ChapterMapper chapterMapper;
-    private final MediaMapper mediaMapper;
     private final TaskRetryPublisher taskRetryPublisher;
     private final TaskResponseAssembler taskResponseAssembler;
+    private final TaskQueryService taskQueryService;
 
     // ======================== 创建任务 ========================
 
@@ -192,85 +182,21 @@ public class ManagementTaskService {
 
     // ======================== 查询 ========================
 
-    /**
-     * 分页查询任务列表，支持 type/status/batch/target 过滤。
-     */
-    public IPage<ManagementTaskResponse> listTasks(int page, int size,
-                                                    TaskType type,
-                                                    ManagementTaskStatus status,
-                                                    String batchId,
-                                                    String targetType,
-                                                    Long targetId) {
-        LambdaQueryWrapper<ManagementTask> wrapper = new LambdaQueryWrapper<>();
-
-        if (type != null) {
-            wrapper.eq(ManagementTask::getTaskType, type);
-        }
-        if (status != null) {
-            wrapper.eq(ManagementTask::getStatus, status);
-        }
-        if (batchId != null && !batchId.isBlank()) {
-            wrapper.eq(ManagementTask::getBatchId, batchId);
-        }
-        if (targetType != null && !targetType.isBlank()) {
-            wrapper.eq(ManagementTask::getTargetType, targetType);
-        }
-
-        // targetId 过滤：经 item 归属解析找到 task_id 列表（章节/媒体级 item 归入父漫画）
-        if (targetId != null) {
-            List<Long> taskIds = itemMapper.selectTaskIdsByTarget(targetId);
-            if (taskIds.isEmpty()) {
-                // 没有匹配的目标，返回空页
-                IPage<ManagementTaskResponse> emptyPage = new Page<>(page, size);
-                emptyPage.setTotal(0);
-                emptyPage.setRecords(List.of());
-                return emptyPage;
-            }
-            wrapper.in(ManagementTask::getId, taskIds);
-        }
-
-        wrapper.orderByDesc(ManagementTask::getCreatedAt);
-
-        IPage<ManagementTask> taskPage = taskMapper.selectPage(new Page<>(page, size), wrapper);
-
-        IPage<ManagementTaskResponse> responsePage = new Page<>(page, size);
-        responsePage.setTotal(taskPage.getTotal());
-        List<ManagementTaskResponse> responses = taskPage.getRecords().stream()
-                .map(taskResponseAssembler::toResponse)
-                .collect(Collectors.toList());
-        enrichTargetSummaries(taskPage.getRecords(), responses);
-        responsePage.setRecords(responses);
-        return responsePage;
+    /** 分页查询任务列表。 */
+    public IPage<ManagementTaskResponse> listTasks(int page, int size, TaskType type,
+                                                    ManagementTaskStatus status, String batchId,
+                                                    String targetType, Long targetId) {
+        return taskQueryService.listTasks(page, size, type, status, batchId, targetType, targetId);
     }
 
-    /**
-     * 获取任务详情。
-     */
+    /** 查询任务详情。 */
     public ManagementTaskResponse getTask(Long taskId) {
-        ManagementTask task = taskMapper.selectById(taskId);
-        if (task == null) {
-            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在: " + taskId);
-        }
-        ManagementTaskResponse response = taskResponseAssembler.toResponse(task);
-        enrichTargetSummaries(List.of(task), List.of(response));
-        return response;
+        return taskQueryService.getTask(taskId);
     }
 
-    /**
-     * 获取任务的逐目标项列表。
-     */
+    /** 查询任务项。 */
     public List<ManagementTaskItemResponse> getTaskItems(Long taskId) {
-        // 验证任务存在
-        if (taskMapper.selectById(taskId) == null) {
-            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在: " + taskId);
-        }
-        List<ManagementTaskItem> items = itemMapper.selectList(
-                new LambdaQueryWrapper<ManagementTaskItem>()
-                        .eq(ManagementTaskItem::getTaskId, taskId)
-                        .orderByAsc(ManagementTaskItem::getId));
-        return items.stream()
-                .map(taskResponseAssembler::toItemResponse)
-                .collect(Collectors.toList());
+        return taskQueryService.getTaskItems(taskId);
     }
 
     // ======================== Cancel ========================
@@ -766,115 +692,5 @@ public class ManagementTaskService {
     }
 
     // ======================== 辅助方法 ========================
-
-    private void enrichTargetSummaries(List<ManagementTask> tasks,
-                                       List<ManagementTaskResponse> responses) {
-        if (tasks.isEmpty()) {
-            return;
-        }
-        Map<Long, ManagementTaskResponse> responseByTaskId = new HashMap<>();
-        for (ManagementTaskResponse response : responses) {
-            responseByTaskId.put(response.getId(), response);
-        }
-        List<ManagementTaskItem> items = itemMapper.selectList(
-                new LambdaQueryWrapper<ManagementTaskItem>()
-                        .in(ManagementTaskItem::getTaskId,
-                                tasks.stream().map(ManagementTask::getId).toList())
-                        .orderByAsc(ManagementTaskItem::getId));
-        Map<Long, ManagementTaskItem> firstItemByTaskId = new HashMap<>();
-        for (ManagementTaskItem item : items) {
-            firstItemByTaskId.putIfAbsent(item.getTaskId(), item);
-        }
-
-        // 每任务首个目标项解析到父漫画（COMIC 即自身，CHAPTER/MEDIA 向上溯源）
-        Map<Long, Long> parentComicIdByTaskId = resolveParentComicIds(firstItemByTaskId);
-
-        Map<Long, Comic> comics = new HashMap<>();
-        List<Long> comicIds = parentComicIdByTaskId.values().stream()
-                .filter(Objects::nonNull)
-                .distinct()
-                .toList();
-        if (!comicIds.isEmpty()) {
-            for (Comic comic : comicMapper.selectBatchIds(comicIds)) {
-                comics.put(comic.getId(), comic);
-            }
-        }
-        for (ManagementTaskItem item : firstItemByTaskId.values()) {
-            ManagementTaskResponse response = responseByTaskId.get(item.getTaskId());
-            if (response == null) {
-                continue;
-            }
-            Long parentComicId = parentComicIdByTaskId.get(item.getTaskId());
-            Comic comic = parentComicId != null ? comics.get(parentComicId) : null;
-            if (TARGET_TYPE_COMIC.equals(response.getTargetType()) && parentComicId != null) {
-                // 漫画级任务的目标 ID 固定为父漫画 id，而非首个章节/媒体项的 id
-                response.setTargetId(parentComicId);
-            } else {
-                response.setTargetId(item.getTargetId());
-            }
-            response.setTargetName(comic != null ? comic.getTitle() : null);
-        }
-    }
-
-    /**
-     * 批量解析任务首个目标项的父漫画 id。
-     *
-     * @param firstItemByTaskId 每任务插入序最早的目标项
-     * @return taskId → 父漫画 id（无法解析时为 null）
-     */
-    private Map<Long, Long> resolveParentComicIds(Map<Long, ManagementTaskItem> firstItemByTaskId) {
-        Map<Long, Long> parentComicIdByTaskId = new HashMap<>();
-        Map<Long, Long> chapterIdToComicId = new HashMap<>();
-        Map<Long, Long> mediaIdToChapterId = new HashMap<>();
-
-        List<Long> chapterIds = firstItemByTaskId.values().stream()
-                .filter(item -> TARGET_TYPE_CHAPTER.equals(item.getTargetType()))
-                .map(ManagementTaskItem::getTargetId)
-                .distinct()
-                .toList();
-        List<Long> mediaIds = firstItemByTaskId.values().stream()
-                .filter(item -> TARGET_TYPE_MEDIA.equals(item.getTargetType()))
-                .map(ManagementTaskItem::getTargetId)
-                .distinct()
-                .toList();
-
-        if (!chapterIds.isEmpty()) {
-            for (Chapter chapter : chapterMapper.selectBatchIds(chapterIds)) {
-                chapterIdToComicId.put(chapter.getId(), chapter.getComicId());
-            }
-        }
-        if (!mediaIds.isEmpty()) {
-            for (Media media : mediaMapper.selectBatchIds(mediaIds)) {
-                mediaIdToChapterId.put(media.getId(), media.getChapterId());
-            }
-        }
-        if (!mediaIdToChapterId.isEmpty()) {
-            List<Long> mediaChapterIds = mediaIdToChapterId.values().stream()
-                    .filter(Objects::nonNull)
-                    .distinct()
-                    .toList();
-            if (!mediaChapterIds.isEmpty()) {
-                for (Chapter chapter : chapterMapper.selectBatchIds(mediaChapterIds)) {
-                    chapterIdToComicId.putIfAbsent(chapter.getId(), chapter.getComicId());
-                }
-            }
-        }
-
-        for (ManagementTaskItem item : firstItemByTaskId.values()) {
-            Long parentComicId;
-            if (TARGET_TYPE_COMIC.equals(item.getTargetType())) {
-                parentComicId = item.getTargetId();
-            } else if (TARGET_TYPE_CHAPTER.equals(item.getTargetType())) {
-                parentComicId = chapterIdToComicId.get(item.getTargetId());
-            } else if (TARGET_TYPE_MEDIA.equals(item.getTargetType())) {
-                Long chapterId = mediaIdToChapterId.get(item.getTargetId());
-                parentComicId = chapterId != null ? chapterIdToComicId.get(chapterId) : null;
-            } else {
-                parentComicId = null;
-            }
-            parentComicIdByTaskId.put(item.getTaskId(), parentComicId);
-        }
-        return parentComicIdByTaskId;
-    }
 
 }
