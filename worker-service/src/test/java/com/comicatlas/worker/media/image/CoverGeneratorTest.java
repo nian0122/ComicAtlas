@@ -42,6 +42,7 @@ class CoverGeneratorTest {
     @BeforeEach
     void setUp() {
         when(config.getMangaRoot()).thenReturn(tempDir.toString());
+        when(config.resolveTempDir()).thenReturn(tempDir.resolve("temp"));
         when(config.getImageOptimizerPath()).thenReturn("tools/image-optimizer/image-optimizer.exe");
         when(config.resolveToolPath(anyString())).thenReturn(Path.of("C:/tools/image-optimizer.exe"));
         when(config.getCover()).thenReturn(new WorkerConfig.Cover());

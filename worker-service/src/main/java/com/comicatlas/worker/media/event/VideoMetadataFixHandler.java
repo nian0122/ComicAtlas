@@ -11,6 +11,7 @@ import com.comicatlas.worker.persistence.record.MediaRecord;
 import com.comicatlas.worker.media.ComicMetadata;
 import com.comicatlas.worker.media.MediaAnalyzer;
 import com.comicatlas.worker.persistence.mapper.MediaReadMapper;
+import com.comicatlas.worker.storage.ManagedStoragePath;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -64,18 +65,19 @@ public class VideoMetadataFixHandler {
 
             for (MediaRecord video : videos) {
                 try {
-                    Path videoFile = Path.of(mangaRoot,
-                            video.getHqRoot().toLowerCase(),
-                            video.getHqPath());
+                    Path videoFile = ManagedStoragePath.resolve(
+                            Path.of(mangaRoot), video.getHqRoot(), video.getHqPath());
 
                     if (!Files.exists(videoFile)) {
-                        log.warn("视频文件不存在: pageId={}, path={}", video.getId(), videoFile);
+                        log.warn("视频文件不存在: pageId={}, hqRoot={}, hqPath={}",
+                                video.getId(), video.getHqRoot(), video.getHqPath());
                         continue;
                     }
 
                     Optional<ComicMetadata.MediaInfo> infoOpt = mediaAnalyzer.analyzeVideo(videoFile);
                     if (infoOpt.isEmpty()) {
-                        log.warn("无法分析视频: pageId={}, path={}", video.getId(), videoFile);
+                        log.warn("无法分析视频: pageId={}, hqRoot={}, hqPath={}",
+                                video.getId(), video.getHqRoot(), video.getHqPath());
                         continue;
                     }
 

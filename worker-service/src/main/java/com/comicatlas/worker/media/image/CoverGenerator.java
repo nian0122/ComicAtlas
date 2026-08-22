@@ -53,7 +53,7 @@ public class CoverGenerator {
      * @throws RuntimeException Go 工具超时、异常退出或 IO 错误
      */
     public void generateCover(Long comicId, Path sourceImage) {
-        Path tempDir = Path.of(config.getMangaRoot(), "temp", "cover-" + comicId);
+        Path tempDir = config.resolveTempDir().resolve("cover-" + comicId).normalize();
         Path thumbsDir = Path.of(config.getMangaRoot(), "thumbs", String.valueOf(comicId));
 
         try {
@@ -122,7 +122,7 @@ public class CoverGenerator {
      * @throws RuntimeException ffmpeg 不可用、超时或异常退出
      */
     public void generateCoverFromVideo(Long comicId, Path videoPath) {
-        Path tempDir = Path.of(config.getMangaRoot(), "temp", "cover-video-" + comicId);
+        Path tempDir = config.resolveTempDir().resolve("cover-video-" + comicId).normalize();
         try {
             Files.createDirectories(tempDir);
             Path frameFile = tempDir.resolve(FRAME_FILE_NAME);
