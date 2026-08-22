@@ -9,6 +9,7 @@ import com.comicatlas.worker.persistence.record.MediaRecord;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageRef;
 import com.comicatlas.worker.storage.StorageRoot;
+import com.comicatlas.worker.storage.StorageRootResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -74,7 +75,7 @@ public class ExportService {
         ExportCollectResult result = exportCollector.collect(comicId);
         ExportManifest manifest = buildManifest(result);
 
-        StorageRoot exportRoot = storageProperties.getRoots().get(StorageRootKeys.EXPORT);
+        StorageRoot exportRoot = StorageRootResolver.optional(storageProperties, StorageRootKeys.EXPORT);
         if (exportRoot == null || !exportRoot.exists()) {
             throw new IllegalStateException("EXPORT 存储根未配置或路径不存在");
         }

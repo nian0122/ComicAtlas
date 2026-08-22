@@ -10,6 +10,7 @@ import com.comicatlas.common.event.RecoveryScanCompletedEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageRoot;
+import com.comicatlas.worker.storage.StorageRootResolver;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -63,7 +64,7 @@ public class RecoveryTaskHandler {
 
     /** 扫描 HQ 根目录收集数字命名的漫画目录 ID，排序后发布扫描完成事件。 */
     private void scanAndPublish(Long taskId) throws Exception {
-        StorageRoot hqRoot = storageProperties.getRoots().get(StorageRootKeys.HQ);
+        StorageRoot hqRoot = StorageRootResolver.optional(storageProperties, StorageRootKeys.HQ);
         Path hqRootPath = hqRoot == null ? null : hqRoot.getPath();
         if (hqRootPath == null || !Files.isDirectory(hqRootPath) || !Files.isReadable(hqRootPath)) {
             throw new IllegalStateException("HQ 根目录不可读: "

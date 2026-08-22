@@ -4,6 +4,7 @@ import com.comicatlas.worker.persistence.record.MediaRecord;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageRef;
 import com.comicatlas.worker.storage.StorageRoot;
+import com.comicatlas.worker.storage.StorageRootResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -33,7 +34,7 @@ public class ExportFileResolver {
 
     /** 将存储引用解析为文件系统绝对路径。 */
     public Path resolveToPath(StorageRef ref) {
-        StorageRoot root = storageProperties.getRoots().get(ref.rootKey());
+        StorageRoot root = StorageRootResolver.optional(storageProperties, ref.rootKey());
         if (root == null) {
             throw new IllegalStateException("存储根未找到：" + ref.rootKey());
         }

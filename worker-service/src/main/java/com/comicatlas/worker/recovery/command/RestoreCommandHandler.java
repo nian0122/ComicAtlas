@@ -5,6 +5,7 @@ import com.comicatlas.common.dto.TrashManifestItemDTO;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageRoot;
+import com.comicatlas.worker.storage.StorageRootResolver;
 import com.comicatlas.worker.recovery.trash.TrashManifestStore;
 import com.comicatlas.worker.task.ManagementCommandPublisher;
 import lombok.RequiredArgsConstructor;
@@ -64,7 +65,7 @@ public class RestoreCommandHandler {
     }
 
     private void restoreEntry(TrashManifestDTO.Entry e, Path manifestDir) throws Exception {
-        StorageRoot sourceRoot = storageProperties.getRoots().get(e.rootKey());
+        StorageRoot sourceRoot = StorageRootResolver.optional(storageProperties, e.rootKey());
         if (sourceRoot == null || !sourceRoot.isEnabled()) {
             throw new RestoreConflictException("源存储根未配置: " + e.rootKey());
         }

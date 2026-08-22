@@ -18,6 +18,7 @@ import com.comicatlas.worker.persistence.mapper.ChapterReadMapper;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageRef;
 import com.comicatlas.worker.storage.StorageRoot;
+import com.comicatlas.worker.storage.StorageRootResolver;
 import com.comicatlas.worker.storage.StorageService;
 import com.comicatlas.worker.storage.TransferMode;
 import com.rabbitmq.client.Channel;
@@ -350,7 +351,7 @@ public class ImportStorageFinalizeHandler {
     }
 
     private Path hqRootPath() {
-        StorageRoot root = storageProperties.getRoots().get(StorageRootKeys.HQ);
+        StorageRoot root = StorageRootResolver.required(storageProperties, StorageRootKeys.HQ);
         if (root == null || root.getPath() == null) {
             throw new IllegalStateException("HQ 存储根未配置");
         }
