@@ -8,7 +8,7 @@ import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.common.event.MetadataRefreshEvent;
 import com.comicatlas.common.event.MetadataRefreshScanCompletedEvent;
 import com.comicatlas.common.util.MetadataSnapshotRevision;
-import com.comicatlas.worker.media.command.MetadataRefreshCommandHandler;
+import com.comicatlas.worker.media.metadata.MetadataRefreshCommandHandler;
 import com.comicatlas.worker.config.MetadataJsonBuilderConfig;
 import com.comicatlas.worker.config.MqConsumerSupportConfig;
 import com.comicatlas.worker.config.RabbitMqConfig;

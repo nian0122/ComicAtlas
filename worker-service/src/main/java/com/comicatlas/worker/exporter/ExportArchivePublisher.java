@@ -1,6 +1,6 @@
 package com.comicatlas.worker.exporter;
 
-import com.comicatlas.worker.importer.archive.ZipVolumeResolver;
+import com.comicatlas.worker.shared.archive.ZipVolumeResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

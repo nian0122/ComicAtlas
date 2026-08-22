@@ -1,4 +1,4 @@
-package com.comicatlas.worker.media.command;
+package com.comicatlas.worker.media.metadata;
 
 import com.comicatlas.common.constant.MetadataRefreshLimits;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;

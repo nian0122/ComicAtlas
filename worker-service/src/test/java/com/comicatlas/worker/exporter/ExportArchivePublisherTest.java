@@ -1,7 +1,7 @@
 package com.comicatlas.worker.exporter;
 
 import com.comicatlas.worker.config.WorkerConfig;
-import com.comicatlas.worker.importer.archive.ZipVolumeResolver;
+import com.comicatlas.worker.shared.archive.ZipVolumeResolver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

@@ -4,7 +4,7 @@ import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.persistence.record.ChapterRecord;
 import com.comicatlas.worker.persistence.record.ComicRecord;
 import com.comicatlas.worker.persistence.record.MediaRecord;
-import com.comicatlas.worker.importer.archive.ZipVolumeResolver;
+import com.comicatlas.worker.shared.archive.ZipVolumeResolver;
 import com.comicatlas.worker.importer.archive.extract.ZipExtractor;
 import com.comicatlas.worker.importer.DirectoryImportHandler;
 import com.comicatlas.worker.importer.DirectoryParser;

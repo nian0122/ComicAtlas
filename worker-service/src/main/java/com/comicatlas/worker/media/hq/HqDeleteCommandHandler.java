@@ -1,4 +1,4 @@
-package com.comicatlas.worker.media.command;
+package com.comicatlas.worker.media.hq;
 
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.worker.persistence.record.MediaRecord;

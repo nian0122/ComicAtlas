@@ -1,4 +1,4 @@
-package com.comicatlas.worker.importer.archive;
+package com.comicatlas.worker.shared.archive;
 
 import java.io.IOException;
 import java.nio.file.DirectoryStream;

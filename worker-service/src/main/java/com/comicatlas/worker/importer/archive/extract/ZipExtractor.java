@@ -1,7 +1,7 @@
 package com.comicatlas.worker.importer.archive.extract;
 
 import com.comicatlas.worker.config.WorkerConfig;
-import com.comicatlas.worker.importer.archive.ZipVolumeResolver;
+import com.comicatlas.worker.shared.archive.ZipVolumeResolver;
 import com.comicatlas.worker.importer.archive.ArchiveEntry;
 import com.comicatlas.worker.importer.archive.ArchiveFormat;
 import com.comicatlas.worker.importer.archive.ArchiveReader;

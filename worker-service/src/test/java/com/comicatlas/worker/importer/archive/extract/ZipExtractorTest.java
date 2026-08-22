@@ -3,7 +3,7 @@ package com.comicatlas.worker.importer.archive.extract;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.exporter.ExportManifest;
 import com.comicatlas.worker.exporter.ZipBuilder;
-import com.comicatlas.worker.importer.archive.ZipVolumeResolver;
+import com.comicatlas.worker.shared.archive.ZipVolumeResolver;
 import org.apache.commons.compress.archivers.zip.UnixStat;
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
 import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream;
