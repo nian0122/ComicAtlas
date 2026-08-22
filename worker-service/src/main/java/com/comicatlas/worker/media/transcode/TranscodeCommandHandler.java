@@ -7,7 +7,7 @@ import com.comicatlas.common.event.payload.TranscodeMediaInfo;
 import com.comicatlas.common.util.VideoPlayability;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.persistence.record.MediaRecord;
-import com.comicatlas.worker.task.ManagementCommandPublisher;
+import com.comicatlas.worker.task.publisher.ManagementCommandPublisher;
 import com.comicatlas.worker.media.transcode.FfmpegTranscoder;
 import com.comicatlas.worker.persistence.mapper.MediaReadMapper;
 import com.comicatlas.worker.media.ComicMetadata;

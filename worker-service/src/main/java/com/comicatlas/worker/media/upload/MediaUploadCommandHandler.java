@@ -19,7 +19,7 @@ import com.comicatlas.worker.storage.TransferMode;
 import com.comicatlas.worker.persistence.mapper.MediaReadMapper;
 import com.comicatlas.worker.persistence.mapper.UploadFileReadMapper;
 import com.comicatlas.worker.persistence.mapper.UploadSessionReadMapper;
-import com.comicatlas.worker.task.ManagementCommandPublisher;
+import com.comicatlas.worker.task.publisher.ManagementCommandPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

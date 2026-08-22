@@ -67,7 +67,7 @@ class MetadataRefreshCommandHandlerTest {
     @Mock
     private MediaAnalyzer mediaAnalyzer;
     @Mock
-    private com.comicatlas.worker.task.ManagementCommandPublisher publisher;
+    private com.comicatlas.worker.task.publisher.ManagementCommandPublisher publisher;
 
     private ObjectMapper objectMapper;
     private StorageProperties storageProperties;

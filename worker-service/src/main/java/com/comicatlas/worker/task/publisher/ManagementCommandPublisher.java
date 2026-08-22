@@ -1,4 +1,4 @@
-package com.comicatlas.worker.task;
+package com.comicatlas.worker.task.publisher;
 
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;

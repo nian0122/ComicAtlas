@@ -1,8 +1,8 @@
 package com.comicatlas.worker.importer.event;
 
-import com.comicatlas.worker.task.CancelHandler;
-import com.comicatlas.worker.task.TaskStatusPublisher;
-import com.comicatlas.worker.task.TaskStatusUpdate;
+import com.comicatlas.worker.task.command.CancelHandler;
+import com.comicatlas.worker.task.publisher.TaskStatusPublisher;
+import com.comicatlas.worker.task.model.TaskStatusUpdate;
 import com.comicatlas.common.event.ImportTaskCreatedEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.worker.config.WorkerConfig;

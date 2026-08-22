@@ -17,7 +17,7 @@ import com.comicatlas.worker.config.WorkerExecutorConfig;
 import com.comicatlas.worker.exporter.collector.ExportCollector;
 import com.comicatlas.worker.exporter.metadata.MetadataJsonExporter;
 import com.comicatlas.worker.exporter.metadata.MetadataModelMapper;
-import com.comicatlas.worker.task.ManagementCommandPublisher;
+import com.comicatlas.worker.task.publisher.ManagementCommandPublisher;
 import com.comicatlas.worker.media.event.MetadataRefreshHandler;
 import com.comicatlas.worker.media.MediaAnalyzer;
 import com.comicatlas.worker.shared.process.ExternalProcessRunner;

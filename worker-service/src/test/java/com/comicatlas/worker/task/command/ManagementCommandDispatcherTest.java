@@ -1,5 +1,6 @@
-package com.comicatlas.worker.task;
+package com.comicatlas.worker.task.command;
 
+import com.comicatlas.worker.task.publisher.ManagementCommandPublisher;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.worker.media.hq.HqDeleteCommandHandler;

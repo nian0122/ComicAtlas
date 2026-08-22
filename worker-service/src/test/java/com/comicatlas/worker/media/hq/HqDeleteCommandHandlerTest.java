@@ -2,7 +2,7 @@ package com.comicatlas.worker.media.hq;
 
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.worker.persistence.record.MediaRecord;
-import com.comicatlas.worker.task.ManagementCommandPublisher;
+import com.comicatlas.worker.task.publisher.ManagementCommandPublisher;
 import com.comicatlas.worker.persistence.mapper.MediaReadMapper;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageRoot;

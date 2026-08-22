@@ -1,6 +1,6 @@
 package com.comicatlas.worker.importer;
 
-import com.comicatlas.worker.task.CancelHandler;
+import com.comicatlas.worker.task.command.CancelHandler;
 import com.comicatlas.worker.media.ComicMetadata;
 import com.comicatlas.worker.storage.SafeMoveStrategy;
 import com.comicatlas.worker.storage.StorageProperties;

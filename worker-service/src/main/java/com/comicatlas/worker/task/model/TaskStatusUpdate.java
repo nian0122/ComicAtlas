@@ -1,4 +1,4 @@
-package com.comicatlas.worker.task;
+package com.comicatlas.worker.task.model;
 
 /**
  * 任务状态更新参数对象：承载 {@link TaskStatusChangedEvent} 的业务载荷字段，

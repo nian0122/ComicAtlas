@@ -1,5 +1,6 @@
-package com.comicatlas.worker.task;
+package com.comicatlas.worker.task.publisher;
 
+import com.comicatlas.worker.task.model.TaskStatusUpdate;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.event.ImportTaskCompletedEvent;

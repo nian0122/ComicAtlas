@@ -1,7 +1,7 @@
 package com.comicatlas.worker.media.transcode;
 
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
-import com.comicatlas.worker.task.ManagementCommandPublisher;
+import com.comicatlas.worker.task.publisher.ManagementCommandPublisher;
 import com.comicatlas.common.event.payload.TranscodeMediaInfo;
 import com.comicatlas.worker.media.transcode.TranscodeCommandHandler;
 import com.comicatlas.worker.config.WorkerConfig;

@@ -1,4 +1,4 @@
-package com.comicatlas.worker.task;
+package com.comicatlas.worker.task.command;
 
 import com.comicatlas.common.event.CancelTaskEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
