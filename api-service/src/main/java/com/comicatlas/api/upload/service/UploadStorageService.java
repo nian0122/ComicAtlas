@@ -185,7 +185,9 @@ public class UploadStorageService {
             if (dash > 0) {
                 try {
                     max = Math.max(max, Long.parseLong(part.substring(dash + 1)));
-                } catch (NumberFormatException e) { log.warn("解析 range 结束位置失败: {}", part, e); }
+                } catch (NumberFormatException e) {
+                    log.warn("解析 range 结束位置失败: {}", part, e);
+                }
             }
         }
         return max;

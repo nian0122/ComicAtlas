@@ -275,7 +275,9 @@ public class ComicManagementServiceImpl implements ComicManagementService {
                 try {
                     Comic comic = comicMapper.selectById(comicId);
                     if (comic != null) { title = comic.getTitle(); }
-                } catch (Exception ex) { log.warn("批量更新时查询漫画标题失败: comicId={}", comicId, ex); }
+                } catch (Exception ex) {
+                    log.warn("批量更新时查询漫画标题失败: comicId={}", comicId, ex);
+                }
                 failed.add(new BatchUpdateResultVO.FailedItem(comicId, title, "系统错误"));
             }
         }
