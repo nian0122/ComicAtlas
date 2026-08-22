@@ -1,6 +1,5 @@
 package com.comicatlas.worker.task.command;
 
-import com.comicatlas.worker.importer.handler.DirectoryImportHandler;
 import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.event.CancelTaskEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;

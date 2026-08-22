@@ -1,6 +1,5 @@
 package com.comicatlas.worker.importer.model;
 
-import com.comicatlas.worker.importer.metadata.MetadataAssembler;
 import java.nio.file.Path;
 import java.util.List;
 

@@ -1,7 +1,6 @@
 package com.comicatlas.worker.importer.parser;
 
 import com.comicatlas.worker.importer.model.DirectoryTree;
-import com.comicatlas.worker.importer.metadata.MetadataAssembler;
 import com.comicatlas.worker.importer.exception.DirectoryParseError;
 import com.comicatlas.worker.importer.exception.DirectoryParseException;
 import lombok.extern.slf4j.Slf4j;

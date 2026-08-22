@@ -34,6 +34,8 @@
         <mybatis-plus.version>3.5.7</mybatis-plus.version>
         <!-- Apache Commons Compress（ZIP 分卷构建）固定版本 -->
         <commons-compress.version>1.28.0</commons-compress.version>
+        <!-- Commons Compress 1.28.0 调用 SystemProperties#getUserName(String)，需匹配 Lang 3.18.0。 -->
+        <commons-lang3.version>3.18.0</commons-lang3.version>
         <!-- Checkstyle 命名门禁版本 -->
         <checkstyle.version>13.9.0</checkstyle.version>
     </properties>
