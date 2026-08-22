@@ -1,9 +1,9 @@
-package com.comicatlas.reading.library;
+package com.comicatlas.reading.library.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.comicatlas.contract.comic.dto.ComicDetailVO;
 import com.comicatlas.contract.comic.dto.ComicListQuery;
-import com.comicatlas.reading.library.ComicListVO;
+import com.comicatlas.reading.library.dto.ComicListVO;
 import com.comicatlas.contract.comic.dto.ComicMetadataDTO;
 
 import java.util.List;

@@ -1,5 +1,7 @@
 package com.comicatlas.reading.library.impl;
 
+import com.comicatlas.reading.library.service.impl.TagQueryServiceImpl;
+
 import com.comicatlas.contract.comic.dto.TagDTO;
 import com.comicatlas.persistence.comic.entity.Tag;
 import com.comicatlas.persistence.comic.mapper.TagMapper;

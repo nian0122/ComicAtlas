@@ -1,4 +1,4 @@
-package com.comicatlas.reading.library;
+package com.comicatlas.reading.library.service;
 
 import com.comicatlas.contract.comic.dto.CategoryDTO;
 

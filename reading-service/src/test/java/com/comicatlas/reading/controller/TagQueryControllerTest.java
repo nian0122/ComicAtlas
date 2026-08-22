@@ -1,8 +1,8 @@
 package com.comicatlas.reading.controller;
 
-import com.comicatlas.reading.library.TagQueryController;
+import com.comicatlas.reading.library.controller.TagQueryController;
 import com.comicatlas.contract.comic.dto.TagDTO;
-import com.comicatlas.reading.library.TagQueryService;
+import com.comicatlas.reading.library.service.TagQueryService;
 import com.comicatlas.contract.common.exception.GlobalExceptionHandler;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

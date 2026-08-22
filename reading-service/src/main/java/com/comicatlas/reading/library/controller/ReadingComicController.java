@@ -1,12 +1,12 @@
-package com.comicatlas.reading.library;
+package com.comicatlas.reading.library.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.comicatlas.contract.common.Result;
 import com.comicatlas.contract.comic.dto.ComicDetailVO;
 import com.comicatlas.contract.comic.dto.ComicListQuery;
-import com.comicatlas.reading.library.ComicListVO;
+import com.comicatlas.reading.library.dto.ComicListVO;
 import com.comicatlas.contract.comic.dto.ComicMetadataDTO;
-import com.comicatlas.reading.library.ComicQueryService;
+import com.comicatlas.reading.library.service.ComicQueryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;

@@ -1,8 +1,8 @@
-package com.comicatlas.reading.library;
+package com.comicatlas.reading.library.controller;
 
 import com.comicatlas.contract.common.Result;
 import com.comicatlas.contract.comic.dto.TagDTO;
-import com.comicatlas.reading.library.TagQueryService;
+import com.comicatlas.reading.library.service.TagQueryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;

@@ -1,10 +1,12 @@
 package com.comicatlas.reading.library.impl;
 
+import com.comicatlas.reading.library.service.impl.ComicQueryServiceImpl;
+
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.comicatlas.reading.library.ComicListPage;
+import com.comicatlas.reading.library.dto.ComicListPage;
 import com.comicatlas.contract.comic.dto.ComicListQuery;
-import com.comicatlas.reading.library.ComicListVO;
-import com.comicatlas.reading.library.ComicListQueryService;
+import com.comicatlas.reading.library.dto.ComicListVO;
+import com.comicatlas.reading.library.service.ComicListQueryService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

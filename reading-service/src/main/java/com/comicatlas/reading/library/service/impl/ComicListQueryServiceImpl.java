@@ -1,12 +1,12 @@
-package com.comicatlas.reading.library.impl;
+package com.comicatlas.reading.library.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.contract.comic.cache.ComicReferenceCache;
-import com.comicatlas.reading.library.ComicListPage;
+import com.comicatlas.reading.library.dto.ComicListPage;
 import com.comicatlas.contract.comic.dto.ComicListQuery;
-import com.comicatlas.reading.library.ComicListVO;
+import com.comicatlas.reading.library.dto.ComicListVO;
 import com.comicatlas.persistence.comic.entity.Category;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.mapper.CategoryMapper;
@@ -15,7 +15,7 @@ import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.persistence.storage.FileUrlResolver;
 import com.comicatlas.persistence.reader.entity.ReadingHistory;
 import com.comicatlas.persistence.reader.mapper.ReadingHistoryMapper;
-import com.comicatlas.reading.library.ComicListQueryService;
+import com.comicatlas.reading.library.service.ComicListQueryService;
 import com.comicatlas.reading.library.ComicListQueryNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;

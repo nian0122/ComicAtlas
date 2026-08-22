@@ -1,12 +1,12 @@
-package com.comicatlas.reading.library.impl;
+package com.comicatlas.reading.library.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.contract.comic.dto.ComicDetailVO;
-import com.comicatlas.reading.library.ComicListPage;
+import com.comicatlas.reading.library.dto.ComicListPage;
 import com.comicatlas.contract.comic.dto.ComicListQuery;
-import com.comicatlas.reading.library.ComicListVO;
+import com.comicatlas.reading.library.dto.ComicListVO;
 import com.comicatlas.contract.comic.dto.ComicMetadataDTO;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.exception.BusinessException;
@@ -15,9 +15,9 @@ import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.entity.ComicTag;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.persistence.comic.mapper.ComicTagMapper;
-import com.comicatlas.reading.library.ComicListQueryService;
+import com.comicatlas.reading.library.service.ComicListQueryService;
 import com.comicatlas.reading.library.ComicListQueryNormalizer;
-import com.comicatlas.reading.library.ComicQueryService;
+import com.comicatlas.reading.library.service.ComicQueryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
