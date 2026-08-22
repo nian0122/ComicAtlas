@@ -2,7 +2,7 @@ package com.comicatlas.worker.recovery.trash;
 
 import com.comicatlas.common.dto.TrashManifestDTO;
 import com.comicatlas.common.dto.TrashManifestItemDTO;
-import com.comicatlas.worker.mapper.TrashManifestReadMapper;
+import com.comicatlas.worker.persistence.mapper.TrashManifestReadMapper;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageRoot;
 import com.fasterxml.jackson.databind.ObjectMapper;

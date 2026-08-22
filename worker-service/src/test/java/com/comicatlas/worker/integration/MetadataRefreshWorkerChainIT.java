@@ -85,7 +85,7 @@ class MetadataRefreshWorkerChainIT {
 
     @SpringBootConfiguration
     @EnableAutoConfiguration(exclude = {RedisAutoConfiguration.class})
-    @org.mybatis.spring.annotation.MapperScan("com.comicatlas.worker.mapper")
+    @org.mybatis.spring.annotation.MapperScan("com.comicatlas.worker.persistence.mapper")
     @org.springframework.context.annotation.Import({
             WorkerConfig.class,
             WorkerExecutorConfig.class,

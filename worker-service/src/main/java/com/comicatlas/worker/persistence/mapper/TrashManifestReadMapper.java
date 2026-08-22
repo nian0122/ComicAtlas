@@ -1,4 +1,4 @@
-package com.comicatlas.worker.mapper;
+package com.comicatlas.worker.persistence.mapper;
 
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
