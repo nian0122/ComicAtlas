@@ -3,6 +3,7 @@ import com.comicatlas.api.upload.domain.RangeTracker;
 import com.comicatlas.api.upload.domain.UploadSessionStatus;
 import com.comicatlas.api.upload.support.MediaTypeDetector;
 import com.comicatlas.api.upload.support.UploadProperties;
+import com.comicatlas.api.shared.crypto.DigestService;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -48,13 +49,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -88,8 +86,6 @@ public class UploadSessionService {
     private static final String SHA256_PATTERN = "^[0-9a-fA-F]{64}$";
     /** Content-Range 头的字节范围单位前缀。 */
     private static final String CONTENT_RANGE_PREFIX = "bytes ";
-    /** SHA-256 计算读取缓冲区大小。 */
-    private static final int SHA256_BUFFER_SIZE = 64 * 1024;
     /** 乐观锁初始版本。 */
     private static final int INITIAL_VERSION = 1;
     /** 禁止上传媒体的漫画终态集合（复用避免每次构造）。 */
@@ -107,6 +103,7 @@ public class UploadSessionService {
     private final MediaTypeDetector mediaTypeDetector;
     private final ManagementTaskService managementTaskService;
     private final OutboxService outboxService;
+    private final DigestService digestService;
 
     // ======================== 创建 ========================
 
@@ -460,17 +457,9 @@ public class UploadSessionService {
     }
 
     private String computeSha256(Path file) {
-        try {
-            MessageDigest messageDigest = MessageDigest.getInstance("SHA-256");
-            try (InputStream input = Files.newInputStream(file)) {
-                byte[] buffer = new byte[SHA256_BUFFER_SIZE];
-                int read;
-                while ((read = input.read(buffer)) > 0) {
-                    messageDigest.update(buffer, 0, read);
-                }
-            }
-            return HexFormat.of().formatHex(messageDigest.digest());
-        } catch (IOException | NoSuchAlgorithmException ex) {
+        try (InputStream input = Files.newInputStream(file)) {
+            return digestService.sha256(input);
+        } catch (IOException ex) {
             throw new BusinessException(HttpStatusCodes.INTERNAL_ERROR, "计算文件 SHA-256 失败: " + ex.getMessage());
         }
     }

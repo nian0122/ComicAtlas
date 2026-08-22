@@ -24,6 +24,7 @@ import org.apache.ibatis.builder.MapperBuilderAssistant;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.BeforeEach;
+import com.comicatlas.api.shared.crypto.DigestService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -91,7 +92,7 @@ class MetadataRefreshServiceTest {
         stagingRoot.setPath(staging);
         when(storageProperties.root("STAGING")).thenReturn(stagingRoot);
         service = new MetadataRefreshService(mediaMapper, chapterMapper, comicMapper,
-                storageProperties, MAPPER);
+                storageProperties, MAPPER, new DigestService());
     }
 
     // ======================== 阶段一：loadAndValidate ========================

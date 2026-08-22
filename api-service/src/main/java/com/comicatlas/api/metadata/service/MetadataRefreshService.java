@@ -6,6 +6,7 @@ import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
 import com.comicatlas.contract.common.enums.TranscodeStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.shared.exception.SnapshotUnavailableException;
+import com.comicatlas.api.shared.crypto.DigestService;
 import com.comicatlas.api.storage.ApiStorageProperties;
 import com.comicatlas.api.storage.ApiStorageRoot;
 import com.comicatlas.api.storage.PathTraversalException;
@@ -33,12 +34,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -68,6 +66,7 @@ public class MetadataRefreshService {
     private final ComicMapper comicMapper;
     private final ApiStorageProperties storageProperties;
     private final ObjectMapper objectMapper;
+    private final DigestService digestService;
 
     /** 已删除/回收中媒体不参与活动匹配。 */
     private static final List<String> INACTIVE_STATUSES = List.of("TRASHED", "DELETED");
@@ -123,7 +122,7 @@ public class MetadataRefreshService {
             throw new PathTraversalException("快照路径越界 STAGING: " + request.snapshotRef());
         }
         byte[] bytes = readBounded(snapshotPath, request.snapshotRef());
-        String actualSha = sha256Hex(bytes);
+        String actualSha = digestService.sha256(bytes);
         if (!actualSha.equalsIgnoreCase(request.snapshotSha256())) {
             throw new BusinessException("快照 SHA-256 与事件声明不一致");
         }
@@ -574,15 +573,6 @@ public class MetadataRefreshService {
         }
         int idx = hqPath.lastIndexOf('/');
         return idx >= 0 ? hqPath.substring(idx + 1) : hqPath;
-    }
-
-    private String sha256Hex(byte[] bytes) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            return HexFormat.of().formatHex(digest.digest(bytes));
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("JVM 不支持 SHA-256", e);
-        }
     }
 
     /** 合并计划载体。 */

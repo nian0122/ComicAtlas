@@ -10,6 +10,7 @@ import com.comicatlas.persistence.comic.mapper.MediaMapper;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.shared.exception.ConflictException;
+import com.comicatlas.api.shared.crypto.DigestService;
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.api.storage.ApiStorageProperties;
 import com.comicatlas.api.storage.ApiStorageRoot;
@@ -38,13 +39,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.security.MessageDigest;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
 
@@ -75,6 +73,7 @@ public class TrashLifecycleService {
     private final TrashManifestService trashManifestService;
     private final OperationPolicyService policyService;
     private final ApiStorageProperties storageProperties;
+    private final DigestService digestService;
 
     // ======================== 回收 ========================
 
@@ -573,12 +572,7 @@ public class TrashLifecycleService {
         return new TrashManifestDTO.Entry(rootKey, source, trash);
     }
 
-    private static String sha256(String input) {
-        try {
-            return HexFormat.of().formatHex(
-                    MessageDigest.getInstance("SHA-256").digest(input.getBytes(StandardCharsets.UTF_8)));
-        } catch (Exception e) {
-            throw new BusinessException("回收清单序列化失败", e);
-        }
+    private String sha256(String input) {
+        return digestService.sha256(input);
     }
 }
