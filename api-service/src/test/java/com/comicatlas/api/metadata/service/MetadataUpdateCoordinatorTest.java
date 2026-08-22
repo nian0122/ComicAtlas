@@ -1,6 +1,6 @@
 package com.comicatlas.api.metadata.service;
 
-import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
+import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;

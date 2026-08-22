@@ -2,7 +2,7 @@ package com.comicatlas.api.metadata.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.persistence.comic.assembler.ComicDetailAssembler;
-import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
+import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.metadata.service.ComicManagementService;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.enums.ComicStatus;

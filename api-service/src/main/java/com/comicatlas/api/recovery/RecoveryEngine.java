@@ -2,7 +2,7 @@ package com.comicatlas.api.recovery;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.recovery.dto.RecoveryProgressVO;
-import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
+import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.recovery.domain.RestoreContext;
 import com.comicatlas.api.recovery.domain.RestorePolicy;
 import com.comicatlas.api.recovery.domain.RestoreSource;

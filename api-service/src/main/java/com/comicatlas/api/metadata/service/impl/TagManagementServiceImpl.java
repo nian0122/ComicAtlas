@@ -1,7 +1,7 @@
 package com.comicatlas.api.metadata.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.comicatlas.api.comic.cache.CacheEvictor;
+import com.comicatlas.api.catalog.cache.CacheEvictor;
 import com.comicatlas.contract.comic.cache.ComicReferenceCache;
 import com.comicatlas.contract.comic.dto.TagDTO;
 import com.comicatlas.persistence.comic.entity.ComicTag;

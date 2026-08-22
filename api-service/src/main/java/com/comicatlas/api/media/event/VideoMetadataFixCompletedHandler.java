@@ -1,4 +1,4 @@
-package com.comicatlas.api.admin.event;
+package com.comicatlas.api.media.event;
 
 import com.comicatlas.persistence.comic.entity.Media;
 import com.comicatlas.persistence.comic.mapper.MediaMapper;

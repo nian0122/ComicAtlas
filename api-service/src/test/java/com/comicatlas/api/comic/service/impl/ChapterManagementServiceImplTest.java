@@ -1,6 +1,6 @@
 package com.comicatlas.api.catalog.service.impl;
 
-import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
+import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.mapper.CatalogMapper;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;

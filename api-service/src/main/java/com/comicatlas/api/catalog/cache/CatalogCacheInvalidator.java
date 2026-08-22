@@ -1,4 +1,4 @@
-package com.comicatlas.api.comic.cache;
+package com.comicatlas.api.catalog.cache;
 
 import com.comicatlas.contract.comic.cache.ComicReferenceCache;
 import lombok.RequiredArgsConstructor;

@@ -2,7 +2,7 @@ package com.comicatlas.api.task.trash;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
+import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.storage.service.ComicStatsService;
 import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.common.dto.TrashManifestItemDTO;

@@ -1,7 +1,7 @@
 package com.comicatlas.api.importer.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
+import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.exception.ImportMetadataException;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;

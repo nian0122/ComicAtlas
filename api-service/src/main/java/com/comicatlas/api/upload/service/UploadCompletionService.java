@@ -2,7 +2,7 @@ package com.comicatlas.api.upload.service;
 import com.comicatlas.api.upload.domain.UploadSessionStatus;
 
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
+import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.storage.service.ComicStatsService;
 import com.comicatlas.api.upload.persistence.entity.UploadSession;
 import com.comicatlas.api.upload.persistence.mapper.UploadSessionMapper;

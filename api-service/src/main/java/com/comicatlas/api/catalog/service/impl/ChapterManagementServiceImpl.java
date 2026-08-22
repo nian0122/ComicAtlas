@@ -2,7 +2,7 @@ package com.comicatlas.api.catalog.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
+import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.catalog.dto.ChapterCreateRequest;
 import com.comicatlas.api.catalog.dto.ChapterRenameRequest;
 import com.comicatlas.api.catalog.dto.ChapterVO;

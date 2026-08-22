@@ -1,7 +1,7 @@
 package com.comicatlas.api.importer.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
-import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
+import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.persistence.comic.entity.Catalog;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Comic;

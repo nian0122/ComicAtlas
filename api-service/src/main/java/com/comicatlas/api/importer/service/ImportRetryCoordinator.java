@@ -2,7 +2,7 @@ package com.comicatlas.api.importer.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
-import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
+import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
 import com.comicatlas.api.task.state.ManagementStateMachine;
