@@ -1,4 +1,4 @@
-package com.comicatlas.reading.catalog;
+package com.comicatlas.reading.catalog.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

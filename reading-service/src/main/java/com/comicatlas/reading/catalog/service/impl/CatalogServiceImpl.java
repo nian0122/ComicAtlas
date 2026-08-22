@@ -1,9 +1,9 @@
-package com.comicatlas.reading.catalog.impl;
+package com.comicatlas.reading.catalog.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.contract.comic.cache.ComicReferenceCache;
-import com.comicatlas.reading.catalog.CatalogNode;
-import com.comicatlas.reading.catalog.ChapterRef;
+import com.comicatlas.reading.catalog.dto.CatalogNode;
+import com.comicatlas.reading.catalog.dto.ChapterRef;
 import com.comicatlas.persistence.comic.entity.Catalog;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Comic;
@@ -14,7 +14,7 @@ import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
-import com.comicatlas.reading.catalog.CatalogService;
+import com.comicatlas.reading.catalog.service.CatalogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;

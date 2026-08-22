@@ -1,8 +1,8 @@
-package com.comicatlas.reading.catalog;
+package com.comicatlas.reading.catalog.controller;
 
 import com.comicatlas.contract.common.Result;
-import com.comicatlas.reading.catalog.CatalogNode;
-import com.comicatlas.reading.catalog.CatalogService;
+import com.comicatlas.reading.catalog.dto.CatalogNode;
+import com.comicatlas.reading.catalog.service.CatalogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;

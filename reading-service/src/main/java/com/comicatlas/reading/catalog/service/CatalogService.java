@@ -1,6 +1,6 @@
-package com.comicatlas.reading.catalog;
+package com.comicatlas.reading.catalog.service;
 
-import com.comicatlas.reading.catalog.CatalogNode;
+import com.comicatlas.reading.catalog.dto.CatalogNode;
 
 import java.util.List;
 
