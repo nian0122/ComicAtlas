@@ -4,9 +4,7 @@ import com.comicatlas.api.task.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.task.service.ManagementTaskService;
 import com.comicatlas.api.outbox.service.InboxService;
 import com.comicatlas.api.outbox.service.EventFingerprintService;
-import com.comicatlas.api.upload.service.UploadCompletionService;
 import com.comicatlas.api.metadata.service.MetadataRefreshCompletionService;
-import com.comicatlas.api.metadata.service.MetadataUpdateCoordinator;
 import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.event.ComicEvent;
 import com.comicatlas.common.event.ManagementCommandCompletedEvent;
@@ -50,10 +48,8 @@ public class ManagementCommandResultHandler {
     private final MqConsumerSupport mqConsumerSupport;
     private final TransactionTemplate transactionTemplate;
     private final EventFingerprintService eventFingerprintService;
-    private final UploadCompletionService uploadCompletionService;
     private final ManagementResultRouter managementResultRouter;
     private final MetadataRefreshCompletionService metadataRefreshCompletionService;
-    private final MetadataUpdateCoordinator metadataUpdateCoordinator;
 
     @RabbitListener(queues = MqQueues.MANAGEMENT_RESULT)
     public void handleResult(ComicEvent raw,
@@ -145,10 +141,7 @@ public class ManagementCommandResultHandler {
             log.info("upload completed 未生效（旧 attempt/已终态）: itemId={}", ev.itemId());
             return;
         }
-        uploadCompletionService.applyUploadCompletedBusiness(ev);
-        // 媒体上传/替换同样改变文件与 media 状态，统一触发 metadata 同步
-        metadataUpdateCoordinator.requestSyncForTarget(
-                ev.targetType(), ev.targetId(), ev.taskId(), "上传完成: " + ev.operationType());
+        managementResultRouter.routeUploadCompleted(ev);
     }
 
     // ======================== 辅助 ========================

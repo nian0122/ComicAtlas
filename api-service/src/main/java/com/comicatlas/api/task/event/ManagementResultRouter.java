@@ -9,6 +9,7 @@ import com.comicatlas.api.upload.service.UploadCompletionService;
 import com.comicatlas.common.event.ManagementCommandCompletedEvent;
 import com.comicatlas.common.event.ManagementCommandFailedEvent;
 import com.comicatlas.common.event.ManagementCommandProgressEvent;
+import com.comicatlas.common.event.MediaUploadCompletedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -93,6 +94,13 @@ public class ManagementResultRouter {
         } else if ("TRANSCODE".equals(event.operationType())) {
             mediaCompletionService.transitionTranscoding(event.targetId());
         }
+    }
+
+    /** 路由媒体上传/替换完成结果。 */
+    public void routeUploadCompleted(MediaUploadCompletedEvent event) {
+        uploadCompletionService.applyUploadCompletedBusiness(event);
+        metadataUpdateCoordinator.requestSyncForTarget(event.targetType(), event.targetId(),
+                event.taskId(), "上传完成: " + event.operationType());
     }
 
     private void forChapters(ManagementCommandCompletedEvent event, boolean comicScope,
