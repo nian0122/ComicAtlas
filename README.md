@@ -1,15 +1,16 @@
-# ComicAtlas 2.0
+# ComicAtlas 2.1
 
 ComicAtlas 是一个面向个人收藏的本地漫画仓库平台。它把 ZIP 和本地目录统一导入到受控存储中，提供漫画管理、章节目录、图片与视频混排阅读、阅读历史以及存储维护能力。
 
 ## 版本定位
 
-`main` 分支是面向用户使用的 2.0 稳定版本；日常功能开发进入 `develop` 分支。完整的安装、导入、阅读和维护说明见 [用户指南](docs/user-guide.md)。
+`main` 分支是面向用户使用的 2.1 稳定版本；日常功能开发进入 `develop` 分支。完整的安装、导入、阅读和维护说明见 [用户指南](docs/user-guide.md)。
 
 ## 功能概览
 
-- 漫画导入：ZIP 或本地目录导入，异步解析并写入受控存储
-- 漫画导出：按漫画 ID 导出本地 ZIP，支持大文件标准分卷
+- 漫画导入：ZIP、CBZ 或本地目录导入，异步解析并写入受控存储
+- ComicInfo：导入 CBZ 内的 `ComicInfo.xml`，并在导出时生成对应元数据
+- 漫画导出：按漫画 ID 导出 ZIP 或 CBZ，支持大文件标准分卷
 - HQ 删除：删除高清文件并保留数据库记录与 LQ 文件
 - LQ 生成：根据 HQ 图片手动生成 LQ 图片
 - 视频转码：处理导入时标记为非标准的视频
@@ -96,11 +97,34 @@ ComicAtlas 是一个面向个人收藏的本地漫画仓库平台。它把 ZIP �
 
 > `docker-compose.infra.yml` 只管理基础服务，`docker-compose.yml` 只管理项目服务。使用远端基础设施时，不要在本地启动基础服务文件；通过 `tools/maintenance/manage-remote-infra-frp.ps1` 建立 FRP STCP 连接。部署步骤见 [FRP 基础设施连接](docs/operations/frp-infrastructure.md)。
 
-### 开发与发布边界
+### 源码开发
 
-`main` 只保留可部署的正式版本内容；Maven Wrapper、开发启动脚本、QA 配置、端到端测试和迁移工具均只在 `develop` 及功能分支维护。开发说明见 [开发指南](docs/development-guide.md)。
+开发分支为 `develop`。在 Windows PowerShell 中可使用：
 
-每次将候选版本合入 `main` 前，必须执行 `scripts/release/verify-release-tree.ps1`，确保发布树未重新混入开发文件。
+```powershell
+.\scripts\dev\start-dev.ps1
+```
+
+前端单独启动：
+
+```bash
+cd frontend
+pnpm install
+pnpm dev
+```
+
+构建前端：
+
+```bash
+cd frontend
+pnpm build
+```
+
+构建后端：
+
+```bash
+.\mvnw clean package
+```
 
 ## 存储约定
 
@@ -143,14 +167,14 @@ ComicAtlas 面向单机个人仓库，管理端接口（回收站、永久清理
 - [部署运维](docs/operations/management.md)：数据库账号、存储卷、备份、升级与回滚
 - [开发流程](docs/development-guide.md)：分支、提交、合并、推送与发布
 - [API 文档](docs/api.md)：HTTP 接口与事件状态
-- [发布说明](docs/releases/v2.0.1.md)：2.0.1 小版本更新、升级说明与已知限制（历史版本见 [v2.0.0](docs/releases/v2.0.0.md)）
+- [发布说明](docs/releases/v2.1.0.md)：2.1 功能范围、升级说明与已知限制（历史版本见 [v2.0.1](docs/releases/v2.0.1.md)）
 - [架构索引](docs/architecture/00-index.md)：系统设计与模块说明
 
 ## 分支约定
 
 | 分支 | 用途 |
 |------|------|
-| `main` | 用户使用的稳定版本，发布 2.0 |
+| `main` | 用户使用的稳定版本，发布 2.1 |
 | `develop` | 日常开发、实验性功能和下一版本准备 |
 
 ## 许可证

@@ -54,9 +54,23 @@
       <section class="edit-panel source-panel">
         <div class="panel-heading"><span class="panel-number">03</span><div><h3>来源记录</h3><p>来源信息由导入流程生成，仅供追溯。</p></div></div>
         <div class="source-display">
-          <span v-if="sourceType" class="source-tag">{{ sourceType }}</span>
+          <span v-if="sourceType" class="source-tag">{{ sourceTypeLabel(sourceType) }}</span>
           <span v-if="sourceRef" class="source-ref">{{ sourceRef }}</span>
           <span v-if="!sourceType && !sourceRef" class="source-empty">暂无来源记录</span>
+        </div>
+      </section>
+
+      <section v-if="comicInfo" class="edit-panel comicinfo-panel">
+        <div class="panel-heading"><span class="panel-number">04</span><div><h3>ComicInfo.xml 元数据</h3><p>从导入文件中解析的标准漫画元数据，只读展示。</p></div></div>
+        <div class="comicinfo-grid">
+          <div v-if="comicInfo.series" class="comicinfo-item"><span>Series</span><strong>{{ comicInfo.series }}</strong></div>
+          <div v-if="comicInfo.title" class="comicinfo-item"><span>Title</span><strong>{{ comicInfo.title }}</strong></div>
+          <div v-if="comicInfo.number" class="comicinfo-item"><span>Number</span><strong>{{ comicInfo.number }}</strong></div>
+          <div v-if="comicInfo.writer" class="comicinfo-item"><span>Writer</span><strong>{{ comicInfo.writer }}</strong></div>
+        </div>
+        <p v-if="comicInfo.summary" class="comicinfo-summary">{{ comicInfo.summary }}</p>
+        <div v-if="comicInfo.tags.length" class="comicinfo-tags">
+          <span v-for="tag in comicInfo.tags" :key="tag">{{ tag }}</span>
         </div>
       </section>
 
@@ -75,10 +89,12 @@ import { ElMessage } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
 import { managementComicApi, managementTagApi } from '@/services/management'
 import { useCategoryStore } from '@/stores/management/category'
+import { sourceTypeLabel } from '@/utils/source-format'
 import type {
   ComicMetadataDTO,
   ComicMetadataUpdateDTO,
   ComicDetailVO,
+  ComicInfoVO,
   TagDTO,
   TagCreateDTO,
   ComicTagUpdateDTO,
@@ -107,6 +123,7 @@ const newTagName = ref('')
 
 const sourceType = ref('')
 const sourceRef = ref('')
+const comicInfo = ref<ComicInfoVO | null>(null)
 
 const selectedTags = computed<TagDTO[]>(() => {
   return selectedTagIds.value
@@ -156,6 +173,7 @@ async function loadData() {
       const detail = detailRes.data as ComicDetailVO
       sourceType.value = detail.sourceType || ''
       sourceRef.value = detail.sourceRef || ''
+      comicInfo.value = detail.comicInfo ?? null
     } catch { /* non-critical */ }
   } catch (err: unknown) {
     const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
@@ -293,17 +311,25 @@ onMounted(loadData)
 .field-hint { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--text-muted); }
 .field-hint :deep(.el-icon) { color: var(--accent); }
 .source-panel { grid-column: 2; grid-row: 1; background: var(--bg-surface); }
+.comicinfo-panel { grid-column: 2; grid-row: 2; }
+.comicinfo-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+.comicinfo-item { display: grid; gap: var(--space-1); min-width: 0; }
+.comicinfo-item span { color: var(--text-muted); font-size: var(--text-xs); }
+.comicinfo-item strong { overflow: hidden; color: var(--text-primary); font-size: var(--text-sm); text-overflow: ellipsis; white-space: nowrap; }
+.comicinfo-summary { margin: var(--space-4) 0 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: 1.7; white-space: pre-wrap; }
+.comicinfo-tags { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-4); }
+.comicinfo-tags span { padding: 4px 8px; border: 1px solid var(--accent-border); background: var(--accent-bg); color: var(--text-primary); font-size: var(--text-xs); }
 .source-display { display: flex; align-items: center; gap: var(--space-3); min-height: 46px; padding: 0 var(--space-4); border: 1px dashed var(--border); color: var(--text-muted); }
 .source-tag { padding: 4px 8px; background: var(--accent-bg); color: var(--accent); font-size: 11px; font-weight: 800; letter-spacing: .08em; }
 .source-ref { overflow: hidden; color: var(--text-secondary); font-size: var(--text-sm); text-overflow: ellipsis; white-space: nowrap; }
 .source-empty { font-size: var(--text-sm); }
 :global(.comic-tag-popper) { background: var(--bg-surface); border: 1px solid var(--border); box-shadow: var(--card-shadow-hover); }
-.form-actions { position: sticky; bottom: 0; z-index: 2; grid-column: 2; grid-row: 2; display: flex; justify-content: flex-end; gap: var(--space-3); padding: var(--space-4) 0 var(--space-2); background: linear-gradient(to bottom, transparent, var(--bg-primary) 28%); }
+.form-actions { position: sticky; bottom: 0; z-index: 2; grid-column: 2; grid-row: 3; display: flex; justify-content: flex-end; gap: var(--space-3); padding: var(--space-4) 0 var(--space-2); background: linear-gradient(to bottom, transparent, var(--bg-primary) 28%); }
 .form-actions :deep(.el-button--primary) { min-width: 132px; background: var(--accent); border-color: var(--accent); }
 .form-actions :deep(.el-button--primary:hover) { background: var(--accent-hover); border-color: var(--accent-hover); }
 @media (max-width: 820px) {
   .edit-form { grid-template-columns: 1fr; }
-  .edit-panel--primary, .archive-panel, .source-panel, .form-actions { grid-column: 1; grid-row: auto; }
+  .edit-panel--primary, .archive-panel, .source-panel, .comicinfo-panel, .form-actions { grid-column: 1; grid-row: auto; }
   .edit-intro { align-items: flex-start; }
   .edit-ref { min-width: auto; }
   .field-grid { grid-template-columns: 1fr; gap: 0; }

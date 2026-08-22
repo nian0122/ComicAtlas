@@ -13,7 +13,12 @@ public record MetadataV3(
         List<Chapter> chapters) {
 
     /** category/tags 为可选（api 侧输出，worker 侧为 null）。 */
-    public record Comic(String title, String author, String category, List<String> tags) {}
+    public record Comic(String title, String author, String category, List<String> tags,
+                        String description) {
+        public Comic(String title, String author, String category, List<String> tags) {
+            this(title, author, category, tags, null);
+        }
+    }
 
     public record Catalog(String title, int sortOrder, Integer parentIndex) {}
 

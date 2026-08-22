@@ -13,11 +13,11 @@ import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
 import com.comicatlas.api.importer.service.ImportRetryCoordinator;
 import com.comicatlas.api.importer.service.ImportService;
-import com.comicatlas.api.management.dto.CreateManagementTaskRequest;
-import com.comicatlas.api.management.dto.ManagementTaskResponse;
-import com.comicatlas.api.management.entity.ManagementTask;
-import com.comicatlas.api.management.entity.ManagementTaskItem;
-import com.comicatlas.api.management.service.ManagementTaskService;
+import com.comicatlas.api.task.dto.CreateManagementTaskRequest;
+import com.comicatlas.api.task.dto.ManagementTaskResponse;
+import com.comicatlas.api.task.entity.ManagementTask;
+import com.comicatlas.api.task.entity.ManagementTaskItem;
+import com.comicatlas.api.task.service.ManagementTaskService;
 import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
@@ -25,12 +25,13 @@ import com.comicatlas.common.event.CancelTaskEvent;
 import com.comicatlas.common.event.ImportTaskCreatedEvent;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.enums.ComicStatus;
-import com.comicatlas.api.common.enums.ImportTaskStatus;
-import com.comicatlas.api.common.enums.ManagementTaskStatus;
+import com.comicatlas.api.importer.enums.ImportTaskStatus;
+import com.comicatlas.api.task.enums.ManagementTaskStatus;
 import com.comicatlas.contract.common.enums.SourceType;
-import com.comicatlas.api.common.enums.TaskType;
+import com.comicatlas.api.task.enums.TaskType;
 import com.comicatlas.contract.common.exception.BusinessException;
-import com.comicatlas.api.common.exception.ConflictException;
+import com.comicatlas.api.shared.exception.ConflictException;
+import com.comicatlas.api.shared.crypto.DigestService;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.api.storage.ApiStorageProperties;
@@ -46,14 +47,10 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
 import java.util.regex.Matcher;
@@ -63,6 +60,8 @@ import java.util.regex.Pattern;
 @Service
 @RequiredArgsConstructor
 public class ImportServiceImpl implements ImportService {
+
+    private final DigestService digestService;
 
     /** Redis 导入取消标记 key 前缀（与 Worker CancelHandler.KEY_PREFIX 契约一致）。 */
     private static final String IMPORT_CANCEL_KEY_PREFIX = "import:cancel:";
@@ -106,7 +105,7 @@ public class ImportServiceImpl implements ImportService {
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {
             ManagementTask existing = managementTaskService.findByIdempotencyKey(idempotencyKey);
             if (existing != null) {
-                String expectedHash = sha256(payload(request));
+                String expectedHash = digestService.sha256(payload(request));
                 if (!expectedHash.equals(existing.getIdempotencyPayloadHash())) {
                     throw new ConflictException("幂等键 " + idempotencyKey + " 已存在但 payload 不匹配");
                 }
@@ -160,7 +159,7 @@ public class ImportServiceImpl implements ImportService {
                 }
                 redisTemplate.opsForValue().set(dedupKey, "1", REDIS_MARK_TTL);
             }
-            case "ZIP", "DIRECTORY" -> {
+            case "ZIP", "CBZ", "DIRECTORY" -> {
                 String path = sourcePath != null ? sourcePath : sourceRef;
                 if (path == null || path.isBlank()) {
                     throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "请提供 sourcePath");
@@ -192,8 +191,10 @@ public class ImportServiceImpl implements ImportService {
         taskMapper.updateById(task);
 
         // 5. 将事件写入 Outbox（与 DB 同事务），由 relay 异步发布到 MQ
+        // EHENTAI 只有 sourceRef（gallery URL），事件契约仍使用 sourcePath 字段承载 Worker 的入口参数。
+        String eventSourcePath = sourcePath != null && !sourcePath.isBlank() ? sourcePath : sourceRef;
         ImportTaskCreatedEvent event = new ImportTaskCreatedEvent(
-                UUID.randomUUID(), Instant.now(), task.getId(), comic.getId(), sourceType, sourcePath);
+                UUID.randomUUID(), Instant.now(), task.getId(), comic.getId(), sourceType, eventSourcePath);
         outboxService.enqueue(event, MqExchanges.IMPORT, MqRoutingKeys.TASK_CREATED);
 
         log.info("导入任务创建: taskId={}, comicId={}, managementTaskId={}, sourceType={}",
@@ -399,16 +400,6 @@ public class ImportServiceImpl implements ImportService {
         target.setOperationType(TaskType.IMPORT);
         managementTaskRequest.setTargets(List.of(target));
         return managementTaskService.createTask(managementTaskRequest, idempotencyKey, payload);
-    }
-
-    private static String sha256(String input) {
-        try {
-            MessageDigest messageDigest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = messageDigest.digest(input.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-        } catch (NoSuchAlgorithmException ex) {
-            throw new IllegalStateException("SHA-256 不可用", ex);
-        }
     }
 
     private static SourceType toSourceType(String sourceType) {

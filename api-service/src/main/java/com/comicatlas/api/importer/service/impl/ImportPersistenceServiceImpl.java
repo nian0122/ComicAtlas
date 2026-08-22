@@ -1,14 +1,14 @@
 package com.comicatlas.api.importer.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
+import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.exception.ImportMetadataException;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
 import com.comicatlas.api.importer.service.ImportPersistenceService;
-import com.comicatlas.api.management.entity.ManagementTaskItem;
-import com.comicatlas.api.management.service.ManagementTaskService;
-import com.comicatlas.api.management.state.ManagementStateMachine;
+import com.comicatlas.api.task.entity.ManagementTaskItem;
+import com.comicatlas.api.task.service.ManagementTaskService;
+import com.comicatlas.api.task.state.ManagementStateMachine;
 import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
@@ -19,25 +19,30 @@ import com.comicatlas.common.event.ImportStorageFinalizeFailedEvent;
 import com.comicatlas.common.event.ImportStorageFinalizeRequestedEvent;
 import com.comicatlas.common.event.ImportTaskCompletedEvent;
 import com.comicatlas.common.event.payload.FinalizeMediaMapping;
+import com.comicatlas.common.storage.ImportStagingPath;
 import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.enums.HqStatus;
-import com.comicatlas.api.common.enums.ImportTaskStatus;
+import com.comicatlas.api.importer.enums.ImportTaskStatus;
 import com.comicatlas.contract.common.enums.LqStatus;
-import com.comicatlas.api.common.enums.ManagementTaskStatus;
+import com.comicatlas.api.task.enums.ManagementTaskStatus;
 import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
-import com.comicatlas.api.common.enums.TaskType;
+import com.comicatlas.api.task.enums.TaskType;
 import com.comicatlas.contract.common.enums.TranscodeStatus;
 import com.comicatlas.persistence.comic.entity.Catalog;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.entity.Media;
+import com.comicatlas.persistence.comic.entity.ComicTag;
+import com.comicatlas.persistence.comic.entity.Tag;
 import com.comicatlas.persistence.comic.mapper.CatalogMapper;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.persistence.comic.mapper.MediaMapper;
+import com.comicatlas.persistence.comic.mapper.ComicTagMapper;
+import com.comicatlas.persistence.comic.mapper.TagMapper;
 import com.comicatlas.api.storage.ApiStorageProperties;
-import com.comicatlas.api.storage.service.MetadataUpdateCoordinator;
+import com.comicatlas.api.metadata.service.MetadataUpdateCoordinator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -51,6 +56,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -63,9 +69,9 @@ import java.util.UUID;
  * <b>两阶段语义</b>：
  * <ul>
  *   <li>第一阶段（completed → {@code persistCompleted}）：Worker 已把文件按漫画内暂存键
- *       {@code hq/{comicId}/{globalOrder}} 暂存（DB ID 未生成）。本阶段只插入 catalog/chapter/media
+ *       {@code hq/.staging/{taskId}/{comicId}/{globalOrder}} 暂存（DB ID 未生成）。本阶段只插入 catalog/chapter/media
  *       结构并保持 comic=IMPORTING、media=PENDING/STAGING；插入章节取得不可变 {@code chapterId}，
- *       逐章构造 sourceDir={comicId}/{globalOrder} → targetDir={comicId}/{chapterId} 的最终化请求
+ *       逐章构造 sourceDir=.staging/{taskId}/{comicId}/{globalOrder} → targetDir={comicId}/{chapterId} 的最终化请求
  *       （见 {@link #buildFinalizeRequest}）经 Outbox 发往 Worker。</li>
  *   <li>第二阶段（finalize completed/failed → {@code applyFinalizeCompleted}/
  *       {@code applyFinalizeFailed}）：Worker 逐章把文件移动到正式 {@code hq/{comicId}/{chapterId}}
@@ -119,6 +125,8 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
     private final CatalogMapper catalogMapper;
     private final ChapterMapper chapterMapper;
     private final MediaMapper mediaMapper;
+    private final ComicTagMapper comicTagMapper;
+    private final TagMapper tagMapper;
     private final ImportTaskMapper taskMapper;
     private final CatalogCacheInvalidator catalogCacheInvalidator;
     private final ManagementTaskService managementTaskService;
@@ -130,9 +138,9 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
     private String mangaRoot;
 
     // ======================== Phase 1: completed → 插入结构 + 逐章请求 ========================
-    // Worker 已把文件按漫画内暂存键 {comicId}/{globalOrder} 落到 HQ（DB chapterId 尚未生成）。
+    // Worker 已把文件按任务隔离暂存键 .staging/{taskId}/{comicId}/{globalOrder} 落到 HQ（DB chapterId 尚未生成）。
     // 本阶段插入章节取得不可变 chapterId，并为每章构造
-    // sourceDir={comicId}/{globalOrder} → targetDir={comicId}/{chapterId} 的最终化请求
+    // sourceDir=.staging/{taskId}/{comicId}/{globalOrder} → targetDir={comicId}/{chapterId} 的最终化请求
     // （见 buildFinalizeRequest），经 Outbox 逐章发给 Worker 搬运（两阶段之第一阶段）。
 
     @Override
@@ -188,7 +196,9 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
         comic.setTitle((String) comicData.get("title"));
         comic.setTitleJpn((String) comicData.get("titleJpn"));
         comic.setAuthor((String) comicData.get("author"));
+        comic.setDescription((String) comicData.get("description"));
         comic.setCategory((String) comicData.get("category"));
+        persistComicInfoTags(comicId, comicData.get("tags"));
         if (comicData.get("sourceGalleryId") != null) {
             comic.setSourceGalleryId(comicData.get("sourceGalleryId").toString());
         }
@@ -243,6 +253,37 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
         log.info("completed 落库完成: comicId={}, chapters={}, pages={}, finalizeRequests={}",
                 comicId, requests.size(), totalPages, requests.size());
         return requests;
+    }
+
+    /** 将 ComicInfo 的 Genre/Tags 合并结果写入标签表，并保持漫画标签关联幂等。 */
+    private void persistComicInfoTags(Long comicId, Object rawTags) {
+        if (!(rawTags instanceof List<?> values)) {
+            return;
+        }
+        Set<Long> existingTagIds = new HashSet<>(comicTagMapper.selectList(
+                new LambdaQueryWrapper<ComicTag>().eq(ComicTag::getComicId, comicId))
+                .stream().map(ComicTag::getTagId).toList());
+        for (Object rawTag : values) {
+            if (!(rawTag instanceof String tagName) || tagName.isBlank()) {
+                continue;
+            }
+            String normalizedName = tagName.trim();
+            Tag tag = tagMapper.selectOne(new LambdaQueryWrapper<Tag>()
+                    .eq(Tag::getName, normalizedName)
+                    .eq(Tag::getType, "COMICINFO"));
+            if (tag == null) {
+                tag = new Tag();
+                tag.setName(normalizedName);
+                tag.setType("COMICINFO");
+                tagMapper.insert(tag);
+            }
+            if (existingTagIds.add(tag.getId())) {
+                ComicTag comicTag = new ComicTag();
+                comicTag.setComicId(comicId);
+                comicTag.setTagId(tag.getId());
+                comicTagMapper.insert(comicTag);
+            }
+        }
     }
 
     private Map<Integer, Long> insertCatalogs(List<Map<String, Object>> catalogsData, Long comicId) {
@@ -400,20 +441,21 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
 
     /**
      * 构造单章最终化请求（两阶段目录映射）。
-     * sourceDir 使用 {@code globalOrder}——Worker 在 DB ID 生成前把文件暂存到
-     * {@code hq/{comicId}/{globalOrder}} 的漫画内暂存键；targetDir 使用本章刚生成的
+     * sourceDir 使用任务隔离的 {@code globalOrder}——Worker 在 DB ID 生成前把文件暂存到
+     * {@code hq/.staging/{taskId}/{comicId}/{globalOrder}}；targetDir 使用本章刚生成的
      * 不可变 {@code chapterId}——最终位置 {@code hq/{comicId}/{chapterId}}。
      */
     private FinalizeRequest buildFinalizeRequest(Long taskId, Long comicId, String hqPrefix,
                                                  Chapter chapter, List<FinalizeMediaMapping> mappings) {
-        String sourceDir = hqPrefix + "/" + comicId + "/" + chapter.getGlobalOrder();
+        String sourceDir = hqPrefix + "/" + ImportStagingPath.chapterRelativeToHq(
+                comicId, taskId, chapter.getGlobalOrder()).toString().replace('\\', '/');
         String targetDir = hqPrefix + "/" + comicId + "/" + chapter.getId();
         return new FinalizeRequest(
                 taskId, comicId, chapter.getGlobalOrder(), chapter.getId(), sourceDir, targetDir, mappings);
     }
 
     // ======================== Phase 2a: finalize completed → READY / SUCCESS ========================
-    // 两阶段之第二阶段：Worker 逐章把 {comicId}/{globalOrder} 暂存移动到 {comicId}/{chapterId} 后
+    // 两阶段之第二阶段：Worker 逐章把 .staging/{taskId}/{comicId}/{globalOrder} 暂存移动到 {comicId}/{chapterId} 后
     // 逐章确认。本章 media/chapter 转 READY，全部章节 READY（无 PENDING media）才收尾 comic/task。
 
     @Override

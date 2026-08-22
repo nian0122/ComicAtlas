@@ -109,8 +109,7 @@ public class OutboxRelay {
     /**
      * 发布单条消息到 RabbitMQ。
      * <p>
-     * 先同步发布（convertAndSend 返回即视为成功），然后通过异步 confirm 检测 nack。
-     * 如果 convertAndSend 成功但 confirm 返回 nack，则将消息重置为 PENDING 等待重试。
+     * 先提交发布，再以 publisher confirm 作为成功判据；confirm nack/异常时重置为 PENDING。
      */
     private void publishMessage(OutboxMessage msg) {
         // 反序列化 payload 回 ComicEvent
@@ -134,14 +133,16 @@ public class OutboxRelay {
                 String reason = confirm.getReason() != null ? confirm.getReason() : "nack";
                 log.warn("Outbox 被 nack: eventId={}, reason={}", msg.getEventId(), reason);
                 resetForRetry(msg, reason);
+            } else if (confirm != null) {
+                // 只有 broker confirm 成功后才能标记 PUBLISHED，避免发送线程与 nack 回调竞态。
+                handlePublishSuccess(msg);
             }
         });
 
         try {
             rabbitTemplate.convertAndSend(msg.getExchange(), msg.getRoutingKey(), event, correlationData);
-            // 同步发送成功 → 标记 PUBLISHED
-            log.info("OutboxRelay 发布成功: eventId={}", msg.getEventId());
-            handlePublishSuccess(msg);
+            // convertAndSend 成功只表示已提交到客户端，最终状态等待 broker confirm 回调。
+            log.info("OutboxRelay 已提交发布，等待 broker confirm: eventId={}", msg.getEventId());
         } catch (Exception e) {
             log.warn("Outbox 发送异常: eventId={}, error={}", msg.getEventId(), e.getMessage());
             handlePublishFailure(msg, e);

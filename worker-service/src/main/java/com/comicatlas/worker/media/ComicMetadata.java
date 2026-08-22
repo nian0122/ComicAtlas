@@ -1,5 +1,8 @@
 package com.comicatlas.worker.media;
 
+import com.comicatlas.worker.importer.metadata.MetadataAssembler;
+import com.comicatlas.common.constant.MediaTypes;
+
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -8,9 +11,15 @@ public record ComicMetadata(
     String author,
     String category,
     List<String> tags,
+    String description,
     List<CatalogInfo> catalogs,
     List<ChapterInfo> chapters
 ) {
+    /** 兼容无简介字段的旧构造方式。 */
+    public ComicMetadata(String title, String author, String category, List<String> tags,
+                         List<CatalogInfo> catalogs, List<ChapterInfo> chapters) {
+        this(title, author, category, tags, null, catalogs, chapters);
+    }
     public record CatalogInfo(
         String title,
         int sortOrder,
@@ -44,7 +53,12 @@ public record ComicMetadata(
         BigDecimal duration,
         String container,
         String videoCodec,
-        String audioCodec
+        String audioCodec,
+        String format,
+        Boolean decodable,
+        Boolean needsConversion,
+        String conversionStatus,
+        String conversionError
     ) {
         /**
          * 向后兼容构造函数：仅传入图片场景的 7 个参数，
@@ -54,7 +68,14 @@ public record ComicMetadata(
         public MediaInfo(String fileName, int pageNumber, String hqStatus, String lqStatus,
                          long fileSize, Integer width, Integer height) {
             this(fileName, pageNumber, hqStatus, lqStatus, fileSize, width, height,
-                 "IMAGE", null, null, null, null);
+                 MediaTypes.IMAGE, null, null, null, null);
+        }
+
+        public MediaInfo(String fileName, int pageNumber, String hqStatus, String lqStatus,
+                         long fileSize, Integer width, Integer height, String mediaType,
+                         BigDecimal duration, String container, String videoCodec, String audioCodec) {
+            this(fileName, pageNumber, hqStatus, lqStatus, fileSize, width, height, mediaType,
+                    duration, container, videoCodec, audioCodec, null, null, null, null, null);
         }
 
         /**
@@ -65,7 +86,8 @@ public record ComicMetadata(
         public MediaInfo withPageNumber(int pageNumber) {
             return new MediaInfo(fileName, pageNumber, hqStatus, lqStatus,
                     fileSize, width, height, mediaType, duration,
-                    container, videoCodec, audioCodec);
+                    container, videoCodec, audioCodec, format, decodable,
+                    needsConversion, conversionStatus, conversionError);
         }
 
         /**

@@ -113,19 +113,6 @@ public class RabbitMqConfig {
         return QueueBuilder.durable(MqQueues.VIDEO_METADATA_FIX_DLQ).build();
     }
 
-    @Bean
-    public Queue videoTranscodeQueue() {
-        return QueueBuilder.durable(MqQueues.VIDEO_TRANSCODE)
-                .deadLetterExchange(MqExchanges.VIDEO_DLX)
-                .deadLetterRoutingKey(MqQueues.VIDEO_TRANSCODE_DLQ)
-                .build();
-    }
-
-    @Bean
-    public Queue videoTranscodeDlq() {
-        return QueueBuilder.durable(MqQueues.VIDEO_TRANSCODE_DLQ).build();
-    }
-
     // ===== Bindings =====
 
     @Bean
@@ -207,18 +194,6 @@ public class RabbitMqConfig {
     public Binding videoMetadataFixDlqBinding() {
         return BindingBuilder.bind(videoMetadataFixDlq())
                 .to(imageDlxExchange()).with(MqQueues.VIDEO_METADATA_FIX_DLQ);
-    }
-
-    @Bean
-    public Binding videoTranscodeBinding() {
-        return BindingBuilder.bind(videoTranscodeQueue())
-                .to(videoExchange()).with(MqRoutingKeys.VIDEO_TRANSCODE_REQUESTED);
-    }
-
-    @Bean
-    public Binding videoTranscodeDlqBinding() {
-        return BindingBuilder.bind(videoTranscodeDlq())
-                .to(videoDlxExchange()).with(MqQueues.VIDEO_TRANSCODE_DLQ);
     }
 
     // ==================== recovery 恢复任务 ====================

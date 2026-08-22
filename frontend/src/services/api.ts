@@ -179,7 +179,8 @@ export const hqApi = {
 }
 
 export const exportApi = {
-  createExport: (comicId: number) => api.post<ExportTaskVO>(`/manage/storage/export/comics/${comicId}`),
+  createExport: (comicId: number, format: 'ZIP' | 'CBZ' = 'ZIP') =>
+    api.post<ExportTaskVO>(`/manage/storage/export/comics/${comicId}?format=${format}`),
   listExports: (comicId: number) => api.get<ExportTaskVO[]>(`/manage/storage/export/comics/${comicId}/tasks`),
   listAllExports: () => api.get<ExportTaskVO[]>('/manage/storage/export/tasks'),
   getTask: (taskId: number) => api.get<ExportTaskVO>(`/manage/storage/export/tasks/${taskId}`),

@@ -332,58 +332,6 @@ public class RabbitMqConfig {
                 .to(exportDlxExchange()).with(MqQueues.METADATA_REFRESH_DLQ);
     }
 
-    // ==================== MqExchanges.VIDEO 视频转码结果 ====================
-
-    @Bean
-    public Queue videoTranscodeCompletedQueue() {
-        return QueueBuilder.durable(MqQueues.VIDEO_TRANSCODE_COMPLETED)
-                .deadLetterExchange(MqExchanges.VIDEO_DLX)
-                .deadLetterRoutingKey(MqQueues.VIDEO_TRANSCODE_COMPLETED_DLQ)
-                .build();
-    }
-
-    @Bean
-    public Queue videoTranscodeCompletedDlq() {
-        return QueueBuilder.durable(MqQueues.VIDEO_TRANSCODE_COMPLETED_DLQ).build();
-    }
-
-    @Bean
-    public Queue videoTranscodeFailedQueue() {
-        return QueueBuilder.durable(MqQueues.VIDEO_TRANSCODE_FAILED)
-                .deadLetterExchange(MqExchanges.VIDEO_DLX)
-                .deadLetterRoutingKey(MqQueues.VIDEO_TRANSCODE_FAILED_DLQ)
-                .build();
-    }
-
-    @Bean
-    public Queue videoTranscodeFailedDlq() {
-        return QueueBuilder.durable(MqQueues.VIDEO_TRANSCODE_FAILED_DLQ).build();
-    }
-
-    @Bean
-    public Binding videoTranscodeCompletedBinding() {
-        return BindingBuilder.bind(videoTranscodeCompletedQueue())
-                .to(videoExchange()).with(MqRoutingKeys.VIDEO_TRANSCODE_COMPLETED);
-    }
-
-    @Bean
-    public Binding videoTranscodeFailedBinding() {
-        return BindingBuilder.bind(videoTranscodeFailedQueue())
-                .to(videoExchange()).with(MqRoutingKeys.VIDEO_TRANSCODE_FAILED);
-    }
-
-    @Bean
-    public Binding videoTranscodeCompletedDlqBinding() {
-        return BindingBuilder.bind(videoTranscodeCompletedDlq())
-                .to(videoDlxExchange()).with(MqQueues.VIDEO_TRANSCODE_COMPLETED_DLQ);
-    }
-
-    @Bean
-    public Binding videoTranscodeFailedDlqBinding() {
-        return BindingBuilder.bind(videoTranscodeFailedDlq())
-                .to(videoDlxExchange()).with(MqQueues.VIDEO_TRANSCODE_FAILED_DLQ);
-    }
-
     // ==================== MqExchanges.RECOVERY ====================
 
     @Bean
