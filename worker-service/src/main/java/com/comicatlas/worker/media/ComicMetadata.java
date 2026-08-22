@@ -65,7 +65,7 @@ public record ComicMetadata(
         public MediaInfo(String fileName, int pageNumber, String hqStatus, String lqStatus,
                          long fileSize, Integer width, Integer height) {
             this(fileName, pageNumber, hqStatus, lqStatus, fileSize, width, height,
-                 "IMAGE", null, null, null, null);
+                 MediaTypes.IMAGE, null, null, null, null);
         }
 
         public MediaInfo(String fileName, int pageNumber, String hqStatus, String lqStatus,

@@ -1,6 +1,7 @@
 package com.comicatlas.worker.exporter;
 
 import com.comicatlas.worker.persistence.record.MediaRecord;
+import com.comicatlas.common.constant.MediaTypes;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageRef;
 import com.comicatlas.worker.storage.StorageRoot;
@@ -19,7 +20,7 @@ public class ExportFileResolver {
 
     /** 根据媒体记录解析实际可用的文件引用。 */
     public StorageRef resolve(MediaRecord media) {
-        if ("VIDEO".equals(media.getMediaType())) {
+        if (MediaTypes.VIDEO.equals(media.getMediaType())) {
             return new StorageRef(media.getHqRoot(), media.getHqPath());
         }
         if ("READY".equals(media.getHqStatus())) {

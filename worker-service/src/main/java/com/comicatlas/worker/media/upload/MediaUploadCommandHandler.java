@@ -3,6 +3,7 @@ package com.comicatlas.worker.media.upload;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.common.constant.ManagementOperationTypes;
+import com.comicatlas.common.constant.MediaTypes;
 import com.comicatlas.common.event.MediaUploadCompletedEvent.MediaAnalysisResult;
 import com.comicatlas.worker.persistence.record.MediaRecord;
 import com.comicatlas.worker.persistence.record.UploadFileRecord;
@@ -98,7 +99,7 @@ public class MediaUploadCommandHandler {
                 Path sourceToAnalyze = ensureMoved(staging, hqTarget, targetPath, uploadFile.getSizeBytes());
                 ComicMetadata.MediaInfo info = mediaAnalyzer.analyze(sourceToAnalyze);
                 results.add(new MediaAnalysisResult(mediaId,
-                        info.mediaType() != null ? info.mediaType() : "IMAGE",
+                        info.mediaType() != null ? info.mediaType() : MediaTypes.IMAGE,
                         info.width(), info.height(), info.duration(),
                         info.container(), info.videoCodec(), info.audioCodec(),
                         info.fileSize(), "HQ", targetPath));

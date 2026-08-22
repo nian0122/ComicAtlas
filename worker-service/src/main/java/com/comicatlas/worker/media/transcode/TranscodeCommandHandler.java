@@ -2,6 +2,7 @@ package com.comicatlas.worker.media.transcode;
 
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.common.constant.ManagementOperationTypes;
+import com.comicatlas.common.constant.MediaTypes;
 import com.comicatlas.common.event.payload.TranscodeMediaInfo;
 import com.comicatlas.common.util.VideoPlayability;
 import com.comicatlas.worker.config.WorkerConfig;
@@ -42,7 +43,7 @@ public class TranscodeCommandHandler {
     private static final String TARGET_TYPE_COMIC = ManagementOperationTypes.TARGET_COMIC;
 
     /** 媒体类型：视频。 */
-    private static final String MEDIA_TYPE_VIDEO = "VIDEO";
+    private static final String MEDIA_TYPE_VIDEO = MediaTypes.VIDEO;
 
     /** 转码中断的错误标识：区别于普通失败，漫画级循环据此终止。 */
     private static final String ERROR_INTERRUPTED = "TRANSCODE_INTERRUPTED";

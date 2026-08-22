@@ -1,6 +1,7 @@
 package com.comicatlas.worker.importer;
 
 import com.comicatlas.common.constant.StorageRootKeys;
+import com.comicatlas.common.constant.MediaTypes;
 import com.comicatlas.common.storage.ImportStagingPath;
 import com.comicatlas.common.util.MetadataFileWriter;
 import com.comicatlas.worker.task.CancelHandler;
@@ -46,9 +47,9 @@ public class DirectoryImportHandler {
     /** 导入清单版本号（与 ImportManifestManager.VERSION 保持一致）。 */
     private static final int MANIFEST_VERSION = 1;
     /** 媒体类型：视频。 */
-    private static final String MEDIA_TYPE_VIDEO = "VIDEO";
+    private static final String MEDIA_TYPE_VIDEO = MediaTypes.VIDEO;
     /** 媒体类型：图片。 */
-    private static final String MEDIA_TYPE_IMAGE = "IMAGE";
+    private static final String MEDIA_TYPE_IMAGE = MediaTypes.IMAGE;
     /** metadata 目录名（MANGA_ROOT 下）。 */
     private static final String METADATA_DIR_NAME = "metadata";
     /** metadata JSON 文件名后缀。 */

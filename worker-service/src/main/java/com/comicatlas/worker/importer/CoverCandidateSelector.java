@@ -1,5 +1,7 @@
 package com.comicatlas.worker.importer;
 
+import com.comicatlas.common.constant.MediaTypes;
+
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -103,14 +105,14 @@ public final class CoverCandidateSelector {
         for (MediaCandidate item : media) {
             if (item == null || isBlank(item.fileName())) { continue; }
             String extension = extensionOf(item.fileName());
-            if ("IMAGE".equalsIgnoreCase(item.mediaType()) && IMAGE_EXTENSIONS.contains(extension)) {
+            if (MediaTypes.IMAGE.equalsIgnoreCase(item.mediaType()) && IMAGE_EXTENSIONS.contains(extension)) {
                 int namedPriority = namedPriorityOf(stemOf(item.fileName()));
                 if (namedPriority >= 0) {
                     named.add(toCandidate(item, namedPriority));
                 } else {
                     images.add(toCandidate(item, IMAGE_FALLBACK_PRIORITY));
                 }
-            } else if ("VIDEO".equalsIgnoreCase(item.mediaType()) && VIDEO_EXTENSIONS.contains(extension)) {
+            } else if (MediaTypes.VIDEO.equalsIgnoreCase(item.mediaType()) && VIDEO_EXTENSIONS.contains(extension)) {
                 videos.add(toCandidate(item, VIDEO_FALLBACK_PRIORITY));
             }
         }

@@ -3,11 +3,12 @@ package com.comicatlas.worker.media.metadata;
 import com.comicatlas.common.storage.InvalidRelativePathException;
 import com.comicatlas.common.storage.RelativePathValidator;
 import com.comicatlas.worker.persistence.record.MediaRecord;
+import com.comicatlas.common.constant.MediaTypes;
 
 /** 元数据扫描使用的无状态路径、媒体类型和记录判定工具。 */
 public final class MetadataScanSupport {
 
-    public static final String IMAGE_TYPE = "IMAGE";
+    public static final String IMAGE_TYPE = MediaTypes.IMAGE;
     public static final String LQ_STATUS_NOT_GENERATED = "NOT_GENERATED";
     public static final String HQ_STATUS_DELETED = "DELETED";
 
@@ -56,7 +57,7 @@ public final class MetadataScanSupport {
         if (SetHolder.IMAGE_EXTENSIONS.contains(extension)) {
             return IMAGE_TYPE;
         }
-        return SetHolder.VIDEO_EXTENSIONS.contains(extension) ? "VIDEO" : null;
+        return SetHolder.VIDEO_EXTENSIONS.contains(extension) ? MediaTypes.VIDEO : null;
     }
 
     public static int versionOrZero(Integer version) {
