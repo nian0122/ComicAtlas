@@ -1,4 +1,4 @@
-package com.comicatlas.worker.media.metadata;
+package com.comicatlas.worker.media.metadata.command;
 
 import com.comicatlas.common.constant.MetadataRefreshLimits;
 import com.comicatlas.common.constant.StorageRootKeys;
@@ -17,6 +17,14 @@ import com.comicatlas.worker.persistence.mapper.ChapterReadMapper;
 import com.comicatlas.worker.persistence.mapper.MediaReadMapper;
 import com.comicatlas.worker.media.ComicMetadata;
 import com.comicatlas.worker.media.MediaAnalyzer;
+import com.comicatlas.worker.media.metadata.MetadataScanSupport;
+import com.comicatlas.worker.media.metadata.layout.MetadataLayoutNormalizer;
+import com.comicatlas.worker.media.metadata.scanner.MetadataChapterScanner;
+import com.comicatlas.worker.media.metadata.matcher.MetadataMediaMatcher;
+import com.comicatlas.worker.media.metadata.assembler.MetadataSnapshotAssembler;
+import com.comicatlas.worker.media.metadata.snapshot.MetadataSnapshotCleanup;
+import com.comicatlas.worker.media.metadata.snapshot.MetadataSnapshotSerializer;
+import com.comicatlas.worker.media.metadata.snapshot.MetadataSnapshotWriter;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageRoot;
 import com.comicatlas.worker.storage.StorageRootResolver;
@@ -161,7 +169,7 @@ public class MetadataRefreshCommandHandler {
                 MetadataRefreshLimits.MAX_SNAPSHOT_BYTES, new WorkerConfig());
     }
 
-    MetadataRefreshCommandHandler(ChapterReadMapper chapterMapper, MediaReadMapper mediaMapper,
+    public MetadataRefreshCommandHandler(ChapterReadMapper chapterMapper, MediaReadMapper mediaMapper,
                                   MediaAnalyzer mediaAnalyzer, ManagementCommandPublisher publisher,
                                   StorageProperties storageProperties, ObjectMapper objectMapper,
                                   int maxChapters, int maxMedia, long maxSnapshotBytes) {

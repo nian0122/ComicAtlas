@@ -1,8 +1,9 @@
-package com.comicatlas.worker.media.metadata;
+package com.comicatlas.worker.media.metadata.assembler;
 
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO.ChapterSnapshot;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO.MediaSnapshot;
 import com.comicatlas.worker.persistence.record.ChapterRecord;
+import com.comicatlas.worker.media.metadata.MetadataScanSupport;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

@@ -4,7 +4,7 @@ import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.worker.media.hq.HqDeleteCommandHandler;
 import com.comicatlas.worker.media.lq.LqCommandHandler;
 import com.comicatlas.worker.media.upload.MediaUploadCommandHandler;
-import com.comicatlas.worker.media.metadata.MetadataRefreshCommandHandler;
+import com.comicatlas.worker.media.metadata.command.MetadataRefreshCommandHandler;
 import com.comicatlas.worker.recovery.command.PurgeCommandHandler;
 import com.comicatlas.worker.recovery.command.RestoreCommandHandler;
 import com.comicatlas.worker.media.transcode.TranscodeCommandHandler;

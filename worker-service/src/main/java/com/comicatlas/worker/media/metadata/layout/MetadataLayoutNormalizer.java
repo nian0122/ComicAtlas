@@ -1,4 +1,4 @@
-package com.comicatlas.worker.media.metadata;
+package com.comicatlas.worker.media.metadata.layout;
 
 import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.worker.storage.StorageProperties;

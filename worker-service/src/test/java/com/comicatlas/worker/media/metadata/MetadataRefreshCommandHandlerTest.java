@@ -1,5 +1,7 @@
 package com.comicatlas.worker.media.metadata;
 
+import com.comicatlas.worker.media.metadata.command.MetadataRefreshCommandHandler;
+
 import com.comicatlas.common.constant.MetadataRefreshLimits;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.worker.persistence.record.ChapterRecord;

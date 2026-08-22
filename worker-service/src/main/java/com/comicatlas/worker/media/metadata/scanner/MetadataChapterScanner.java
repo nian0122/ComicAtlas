@@ -1,4 +1,4 @@
-package com.comicatlas.worker.media.metadata;
+package com.comicatlas.worker.media.metadata.scanner;
 
 import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.common.constant.MediaStatuses;
@@ -7,6 +7,8 @@ import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageRoot;
 import com.comicatlas.worker.storage.StorageRootResolver;
 import com.comicatlas.worker.persistence.record.MediaRecord;
+import com.comicatlas.worker.media.metadata.MetadataScanSupport;
+import com.comicatlas.worker.media.metadata.matcher.MetadataMediaMatcher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

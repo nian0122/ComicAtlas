@@ -1,6 +1,7 @@
-package com.comicatlas.worker.media.metadata;
+package com.comicatlas.worker.media.metadata.matcher;
 
 import com.comicatlas.worker.persistence.record.MediaRecord;
+import com.comicatlas.worker.media.metadata.MetadataScanSupport;
 
 import java.util.HashMap;
 import java.util.LinkedHashSet;
