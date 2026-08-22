@@ -1,4 +1,4 @@
-package com.comicatlas.worker.exporter.event;
+package com.comicatlas.worker.exporter.command;
 
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
@@ -9,7 +9,7 @@ import com.comicatlas.common.event.ExportTaskStartedEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.worker.exporter.ExportManifestBuildException;
 import com.comicatlas.worker.exporter.ExportService;
-import com.comicatlas.worker.exporter.ExportEventPublisher;
+import com.comicatlas.worker.exporter.publisher.ExportEventPublisher;
 import com.rabbitmq.client.Channel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
