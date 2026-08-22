@@ -81,11 +81,7 @@ public class ManagementCommandResultHandler {
                         return;
                     }
                     business.run();
-                    try {
-                        inboxService.markProcessed(eventId, payloadHash, taskId, itemId, attempt);
-                    } catch (DuplicateKeyException e) {
-                        throw e;
-                    }
+                    inboxService.markProcessed(eventId, payloadHash, taskId, itemId, attempt);
                 });
             } catch (DuplicateKeyException e) {
                 // Inbox 并发重复结果事件：已由其他投递处理，视为成功 ack（保留原 catch 语义）
