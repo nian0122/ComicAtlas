@@ -8,9 +8,9 @@ import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.shared.exception.ConflictException;
-import com.comicatlas.api.management.dto.ManagementTaskResponse;
-import com.comicatlas.api.management.service.ManagementTaskService;
-import com.comicatlas.api.management.trash.TrashLifecycleService;
+import com.comicatlas.api.task.dto.ManagementTaskResponse;
+import com.comicatlas.api.task.service.ManagementTaskService;
+import com.comicatlas.api.task.trash.TrashLifecycleService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -21,12 +21,12 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
-import com.comicatlas.api.management.dto.BatchComicUpdateRequest;
+import com.comicatlas.api.task.dto.BatchComicUpdateRequest;
 import com.comicatlas.api.metadata.dto.ComicMetadataUpdateRequest;
 import com.comicatlas.api.metadata.dto.ComicTagUpdateRequest;
 import com.comicatlas.api.metadata.dto.CreateComicRequest;
 import com.comicatlas.api.metadata.dto.UpdateComicRequest;
-import com.comicatlas.api.management.dto.BatchUpdateResultVO;
+import com.comicatlas.api.task.dto.BatchUpdateResultVO;
 import com.comicatlas.contract.comic.dto.ComicDetailVO;
 import com.comicatlas.contract.comic.dto.ComicMetadataDTO;
 import com.comicatlas.persistence.comic.entity.Comic;
@@ -139,7 +139,7 @@ public class ComicManagementServiceImpl implements ComicManagementService {
     @Override
     @Transactional
     public ManagementTaskResponse deleteComic(Long id, String idempotencyKey) {
-        com.comicatlas.api.management.dto.OperationSubmitResultDTO result =
+        com.comicatlas.api.task.dto.OperationSubmitResultDTO result =
                 trashLifecycleService.trashComic(id, idempotencyKey);
         if (result.getTaskId() == null) {
             throw new BusinessException(HttpStatusCodes.INTERNAL_ERROR, "回收任务创建失败");

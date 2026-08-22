@@ -1,7 +1,7 @@
 package com.comicatlas.api.config;
 
-import com.comicatlas.api.management.service.RabbitManagementClient;
-import com.comicatlas.api.management.service.RabbitManagementClient.QueueSnapshot;
+import com.comicatlas.api.task.service.RabbitManagementClient;
+import com.comicatlas.api.task.service.RabbitManagementClient.QueueSnapshot;
 import com.comicatlas.common.constant.MqQueues;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

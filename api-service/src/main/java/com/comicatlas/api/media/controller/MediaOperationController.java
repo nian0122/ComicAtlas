@@ -1,8 +1,8 @@
 package com.comicatlas.api.media.controller;
 
 import com.comicatlas.contract.common.Result;
-import com.comicatlas.api.management.policy.AllowedOperations;
-import com.comicatlas.api.management.policy.MediaOperationEligibilityService;
+import com.comicatlas.api.task.policy.AllowedOperations;
+import com.comicatlas.api.task.policy.MediaOperationEligibilityService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;

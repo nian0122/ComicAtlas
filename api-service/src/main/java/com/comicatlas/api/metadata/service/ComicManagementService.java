@@ -1,14 +1,14 @@
 package com.comicatlas.api.metadata.service;
 
-import com.comicatlas.api.management.dto.BatchUpdateResultVO;
+import com.comicatlas.api.task.dto.BatchUpdateResultVO;
 import com.comicatlas.contract.comic.dto.ComicDetailVO;
 import com.comicatlas.contract.comic.dto.ComicMetadataDTO;
-import com.comicatlas.api.management.dto.BatchComicUpdateRequest;
+import com.comicatlas.api.task.dto.BatchComicUpdateRequest;
 import com.comicatlas.api.metadata.dto.ComicMetadataUpdateRequest;
 import com.comicatlas.api.metadata.dto.ComicTagUpdateRequest;
 import com.comicatlas.api.metadata.dto.CreateComicRequest;
 import com.comicatlas.api.metadata.dto.UpdateComicRequest;
-import com.comicatlas.api.management.dto.ManagementTaskResponse;
+import com.comicatlas.api.task.dto.ManagementTaskResponse;
 
 /**
  * 漫画管理接口（管理域写操作）。

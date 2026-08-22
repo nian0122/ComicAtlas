@@ -1,7 +1,7 @@
 package com.comicatlas.api.config;
 
-import com.comicatlas.api.management.service.RabbitManagementClient;
-import com.comicatlas.api.management.service.RabbitManagementClient.QueueSnapshot;
+import com.comicatlas.api.task.service.RabbitManagementClient;
+import com.comicatlas.api.task.service.RabbitManagementClient.QueueSnapshot;
 import com.comicatlas.common.constant.MqQueues;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

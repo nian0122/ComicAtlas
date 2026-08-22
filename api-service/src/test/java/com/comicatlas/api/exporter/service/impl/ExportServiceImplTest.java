@@ -7,7 +7,7 @@ import com.comicatlas.api.storage.ApiStorageRoot;
 import com.comicatlas.api.exporter.dto.ExportTaskVO;
 import com.comicatlas.api.exporter.entity.ExportTask;
 import com.comicatlas.api.exporter.mapper.ExportTaskMapper;
-import com.comicatlas.api.management.service.ManagementTaskService;
+import com.comicatlas.api.task.service.ManagementTaskService;
 import com.comicatlas.api.outbox.service.OutboxService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

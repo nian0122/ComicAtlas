@@ -1,6 +1,6 @@
 package com.comicatlas.api.outbox.cleanup;
 
-import com.comicatlas.api.management.mapper.ManagementTaskMapper;
+import com.comicatlas.api.task.mapper.ManagementTaskMapper;
 import com.comicatlas.api.outbox.mapper.InboxReceiptMapper;
 import com.comicatlas.api.outbox.mapper.OutboxMessageMapper;
 import lombok.RequiredArgsConstructor;

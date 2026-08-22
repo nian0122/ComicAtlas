@@ -2,7 +2,7 @@ package com.comicatlas.api.media.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.comicatlas.api.management.service.ManagementTaskService;
+import com.comicatlas.api.task.service.ManagementTaskService;
 import com.comicatlas.api.storage.service.ComicStatsService;
 import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.common.event.ManagementCommandCompletedEvent;

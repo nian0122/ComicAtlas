@@ -5,7 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
-import com.comicatlas.api.management.state.ManagementStateMachine;
+import com.comicatlas.api.task.state.ManagementStateMachine;
 import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
