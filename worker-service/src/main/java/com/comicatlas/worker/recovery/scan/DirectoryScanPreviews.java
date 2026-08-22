@@ -1,5 +1,8 @@
 package com.comicatlas.worker.recovery.scan;
 
+import com.comicatlas.worker.importer.model.DirectoryTree;
+import com.comicatlas.worker.importer.parser.DirectoryParser;
+import com.comicatlas.worker.importer.parser.NaturalPathComparator;
 import com.comicatlas.common.dto.ScanItemDTO;
 import com.comicatlas.common.dto.ScanNodeKind;
 import com.comicatlas.common.dto.ScanPreviewNodeDTO;
@@ -9,9 +12,9 @@ import com.comicatlas.common.dto.ScanWarningDTO;
 import com.comicatlas.common.dto.ScanWarningSeverity;
 import com.comicatlas.worker.importer.exception.DirectoryParseError;
 import com.comicatlas.worker.importer.exception.DirectoryParseException;
-import com.comicatlas.worker.importer.DirectoryParser;
-import com.comicatlas.worker.importer.DirectoryTree;
-import com.comicatlas.worker.importer.NaturalPathComparator;
+import com.comicatlas.worker.importer.parser.DirectoryParser;
+import com.comicatlas.worker.importer.model.DirectoryTree;
+import com.comicatlas.worker.importer.parser.NaturalPathComparator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

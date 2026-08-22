@@ -1,4 +1,4 @@
-package com.comicatlas.worker.importer;
+package com.comicatlas.worker.importer.model;
 
 import com.comicatlas.worker.media.ComicMetadata;
 

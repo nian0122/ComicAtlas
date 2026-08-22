@@ -1,5 +1,6 @@
-package com.comicatlas.worker.importer;
+package com.comicatlas.worker.importer.parser;
 
+import com.comicatlas.worker.importer.model.ComicInfoMetadata;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.xml.sax.SAXException;

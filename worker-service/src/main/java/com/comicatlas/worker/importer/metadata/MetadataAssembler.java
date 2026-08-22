@@ -1,5 +1,9 @@
-package com.comicatlas.worker.importer;
+package com.comicatlas.worker.importer.metadata;
 
+import com.comicatlas.worker.importer.model.AssembleResult;
+import com.comicatlas.worker.importer.model.ComicInfoMetadata;
+import com.comicatlas.worker.importer.model.DirectoryTree;
+import com.comicatlas.worker.importer.model.ImportContext;
 import com.comicatlas.worker.media.ComicMetadata;
 import com.comicatlas.worker.media.MediaAnalyzer;
 import lombok.RequiredArgsConstructor;

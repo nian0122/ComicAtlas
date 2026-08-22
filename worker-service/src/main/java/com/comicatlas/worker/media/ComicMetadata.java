@@ -1,5 +1,6 @@
 package com.comicatlas.worker.media;
 
+import com.comicatlas.worker.importer.metadata.MetadataAssembler;
 import com.comicatlas.common.constant.MediaTypes;
 
 import java.math.BigDecimal;

@@ -1,5 +1,7 @@
 package com.comicatlas.worker.importer.event;
 
+import com.comicatlas.worker.importer.model.ImportManifest;
+import com.comicatlas.worker.importer.manifest.ImportManifestManager;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.constant.StorageFinalizeErrorCode;
@@ -10,8 +12,8 @@ import com.comicatlas.common.event.payload.FinalizeMediaMapping;
 import com.comicatlas.common.storage.ImportStagingPath;
 import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.worker.config.WorkerConfig;
-import com.comicatlas.worker.importer.ImportManifest;
-import com.comicatlas.worker.importer.ImportManifestManager;
+import com.comicatlas.worker.importer.model.ImportManifest;
+import com.comicatlas.worker.importer.manifest.ImportManifestManager;
 import com.comicatlas.worker.persistence.mapper.ChapterReadMapper;
 import com.comicatlas.worker.storage.SafeMoveStrategy;
 import com.comicatlas.worker.storage.StorageProperties;

@@ -1,5 +1,7 @@
-package com.comicatlas.worker.importer;
+package com.comicatlas.worker.importer.parser;
 
+import com.comicatlas.worker.importer.model.DirectoryTree;
+import com.comicatlas.worker.importer.parser.DirectoryParser;
 import com.comicatlas.worker.importer.exception.DirectoryParseError;
 import com.comicatlas.worker.importer.exception.DirectoryParseException;
 import org.junit.jupiter.api.Assumptions;

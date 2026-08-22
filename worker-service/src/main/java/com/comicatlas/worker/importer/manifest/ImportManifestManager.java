@@ -1,5 +1,6 @@
-package com.comicatlas.worker.importer;
+package com.comicatlas.worker.importer.manifest;
 
+import com.comicatlas.worker.importer.model.ImportManifest;
 import com.comicatlas.common.storage.ImportStagingPath;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;

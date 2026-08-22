@@ -1,5 +1,7 @@
-package com.comicatlas.worker.importer;
+package com.comicatlas.worker.importer.metadata;
 
+import com.comicatlas.worker.importer.handler.DirectoryImportHandler;
+import com.comicatlas.worker.importer.parser.NaturalPathComparator;
 import com.comicatlas.common.constant.MediaTypes;
 
 import org.springframework.stereotype.Component;

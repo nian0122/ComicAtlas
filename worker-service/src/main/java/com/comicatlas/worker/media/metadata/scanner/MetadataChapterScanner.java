@@ -1,5 +1,6 @@
 package com.comicatlas.worker.media.metadata.scanner;
 
+import com.comicatlas.worker.importer.parser.NaturalPathComparator;
 import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.common.constant.MediaStatuses;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO.MediaSnapshot;
@@ -88,7 +89,7 @@ public class MetadataChapterScanner {
             warnings.add("读取 LQ 目录失败: " + comicId + "/" + chapterId);
             return new ScanResult(List.of(), warnings, null);
         }
-        files.sort(com.comicatlas.worker.importer.NaturalPathComparator.INSTANCE);
+        files.sort(com.comicatlas.worker.importer.parser.NaturalPathComparator.INSTANCE);
         List<MediaSnapshot> mediaItems = new java.util.ArrayList<>(rowsByBasename.size());
         Set<Long> matchedIds = new HashSet<>();
         for (Path file : files) {

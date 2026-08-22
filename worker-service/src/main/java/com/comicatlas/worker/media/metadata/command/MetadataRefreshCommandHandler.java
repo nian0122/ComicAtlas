@@ -1,5 +1,6 @@
 package com.comicatlas.worker.media.metadata.command;
 
+import com.comicatlas.worker.importer.parser.NaturalPathComparator;
 import com.comicatlas.common.constant.MetadataRefreshLimits;
 import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.common.constant.ManagementOperationTypes;
@@ -12,7 +13,7 @@ import com.comicatlas.worker.persistence.record.ChapterRecord;
 import com.comicatlas.worker.persistence.record.MediaRecord;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.task.publisher.ManagementCommandPublisher;
-import com.comicatlas.worker.importer.NaturalPathComparator;
+import com.comicatlas.worker.importer.parser.NaturalPathComparator;
 import com.comicatlas.worker.persistence.mapper.ChapterReadMapper;
 import com.comicatlas.worker.persistence.mapper.MediaReadMapper;
 import com.comicatlas.worker.media.ComicMetadata;

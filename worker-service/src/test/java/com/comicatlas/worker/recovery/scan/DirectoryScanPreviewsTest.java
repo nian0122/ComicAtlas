@@ -1,15 +1,19 @@
 package com.comicatlas.worker.recovery.scan;
 
+import com.comicatlas.worker.importer.model.DirectoryTree;
+import com.comicatlas.worker.importer.model.ImportContext;
+import com.comicatlas.worker.importer.parser.DirectoryParser;
+import com.comicatlas.worker.importer.metadata.MetadataAssembler;
 import com.comicatlas.common.dto.ScanItemDTO;
 import com.comicatlas.common.dto.ScanPreviewNodeDTO;
 import com.comicatlas.common.dto.ScanResultDTO;
 import com.comicatlas.common.dto.ScanWarningCode;
 import com.comicatlas.worker.importer.exception.DirectoryParseError;
 import com.comicatlas.worker.importer.exception.DirectoryParseException;
-import com.comicatlas.worker.importer.DirectoryParser;
-import com.comicatlas.worker.importer.DirectoryTree;
-import com.comicatlas.worker.importer.ImportContext;
-import com.comicatlas.worker.importer.MetadataAssembler;
+import com.comicatlas.worker.importer.parser.DirectoryParser;
+import com.comicatlas.worker.importer.model.DirectoryTree;
+import com.comicatlas.worker.importer.model.ImportContext;
+import com.comicatlas.worker.importer.metadata.MetadataAssembler;
 import com.comicatlas.worker.media.ComicMetadata;
 import com.comicatlas.worker.media.MediaAnalyzer;
 import org.junit.jupiter.api.Assumptions;

@@ -1,5 +1,12 @@
 package com.comicatlas.worker.importer;
 
+import com.comicatlas.worker.importer.model.DirectoryTree;
+import com.comicatlas.worker.importer.model.ImportContext;
+import com.comicatlas.worker.importer.handler.DirectoryImportHandler;
+import com.comicatlas.worker.importer.parser.DirectoryParser;
+import com.comicatlas.worker.importer.metadata.MetadataAssembler;
+import com.comicatlas.worker.importer.metadata.CoverCandidateSelector;
+import com.comicatlas.worker.importer.manifest.ImportManifestManager;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;

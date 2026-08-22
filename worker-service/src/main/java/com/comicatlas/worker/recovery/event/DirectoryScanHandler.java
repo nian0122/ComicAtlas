@@ -1,5 +1,6 @@
 package com.comicatlas.worker.recovery.event;
 
+import com.comicatlas.worker.importer.parser.DirectoryParser;
 import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.dto.ScanItemDTO;
 import com.comicatlas.common.dto.ScanResultDTO;
