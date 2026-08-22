@@ -17,6 +17,7 @@ import com.comicatlas.common.event.ManagementCommandProgressEvent;
 import com.comicatlas.common.event.MediaUploadCompletedEvent;
 import com.comicatlas.common.event.MetadataRefreshScanCompletedEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
+import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.management.enums.ManagementTaskStatus;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -267,7 +268,7 @@ public class ManagementCommandResultHandler {
         try {
             return objectMapper.writeValueAsString(event);
         } catch (JsonProcessingException e) {
-            throw new RuntimeException("结果事件序列化失败: " + event.eventId(), e);
+            throw new BusinessException("结果事件序列化失败: " + event.eventId(), e);
         }
     }
 
@@ -276,7 +277,7 @@ public class ManagementCommandResultHandler {
             return HexFormat.of().formatHex(
                     MessageDigest.getInstance("SHA-256").digest(input.getBytes(StandardCharsets.UTF_8)));
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw new BusinessException("计算结果事件摘要失败", e);
         }
     }
 }

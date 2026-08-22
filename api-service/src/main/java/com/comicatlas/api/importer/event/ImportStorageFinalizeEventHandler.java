@@ -7,6 +7,7 @@ import com.comicatlas.common.event.ComicEvent;
 import com.comicatlas.common.event.ImportStorageFinalizeCompletedEvent;
 import com.comicatlas.common.event.ImportStorageFinalizeFailedEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
+import com.comicatlas.contract.common.exception.BusinessException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.Channel;
@@ -79,7 +80,7 @@ public class ImportStorageFinalizeEventHandler {
         try {
             return objectMapper.writeValueAsString(event);
         } catch (JsonProcessingException e) {
-            throw new RuntimeException("最终化事件序列化失败: " + event.eventId(), e);
+            throw new BusinessException("最终化事件序列化失败: " + event.eventId(), e);
         }
     }
 
@@ -88,7 +89,7 @@ public class ImportStorageFinalizeEventHandler {
             return HexFormat.of().formatHex(
                     MessageDigest.getInstance("SHA-256").digest(input.getBytes(StandardCharsets.UTF_8)));
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw new BusinessException("计算事件摘要失败", e);
         }
     }
 }

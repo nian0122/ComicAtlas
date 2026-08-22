@@ -578,7 +578,7 @@ public class TrashLifecycleService {
             return HexFormat.of().formatHex(
                     MessageDigest.getInstance("SHA-256").digest(input.getBytes(StandardCharsets.UTF_8)));
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw new BusinessException("回收清单序列化失败", e);
         }
     }
 }

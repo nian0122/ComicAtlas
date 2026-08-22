@@ -280,7 +280,7 @@ public class MetadataRefreshCompletionService {
         try {
             return objectMapper.writeValueAsString(event);
         } catch (JsonProcessingException e) {
-            throw new RuntimeException("元数据刷新完成事件序列化失败: " + event.eventId(), e);
+            throw new BusinessException("元数据刷新完成事件序列化失败: " + event.eventId(), e);
         }
     }
 
@@ -289,7 +289,7 @@ public class MetadataRefreshCompletionService {
             return HexFormat.of().formatHex(
                     MessageDigest.getInstance("SHA-256").digest(input.getBytes(StandardCharsets.UTF_8)));
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw new BusinessException("计算元数据事件摘要失败", e);
         }
     }
 }
