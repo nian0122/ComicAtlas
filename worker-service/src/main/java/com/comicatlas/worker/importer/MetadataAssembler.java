@@ -37,13 +37,14 @@ public class MetadataAssembler {
     /**
      * 兼容入口：仅返回规范化后的元数据。空目录等警告以日志记录。
      */
-    public ComicMetadata assemble(DirectoryTree tree, ImportContext ctx) {
-        return assemble(tree, ctx, null);
+    public ComicMetadata assemble(DirectoryTree tree, ImportContext importContext) {
+        return assemble(tree, importContext, null);
     }
 
     /** 组装目录元数据，并用 ComicInfo.xml 覆盖标准字段。 */
-    public ComicMetadata assemble(DirectoryTree tree, ImportContext ctx, ComicInfoMetadata comicInfo) {
-        AssembleResult result = assembleWithWarnings(tree, ctx, comicInfo);
+    public ComicMetadata assemble(DirectoryTree tree, ImportContext importContext,
+                                  ComicInfoMetadata comicInfo) {
+        AssembleResult result = assembleWithWarnings(tree, importContext, comicInfo);
         for (AssembleResult.AssembleWarning warning : result.warnings()) {
             log.warn("目录规范化警告: code={}, relativePath={}, message={}",
                     warning.code(), warning.relativePath(), warning.message());
@@ -54,13 +55,13 @@ public class MetadataAssembler {
     /**
      * 无损规范化组装，返回元数据 + 结构化警告列表。
      */
-    public AssembleResult assembleWithWarnings(DirectoryTree tree, ImportContext ctx) {
-        return assembleWithWarnings(tree, ctx, null);
+    public AssembleResult assembleWithWarnings(DirectoryTree tree, ImportContext importContext) {
+        return assembleWithWarnings(tree, importContext, null);
     }
 
-    public AssembleResult assembleWithWarnings(DirectoryTree tree, ImportContext ctx,
+    public AssembleResult assembleWithWarnings(DirectoryTree tree, ImportContext importContext,
                                                 ComicInfoMetadata comicInfo) {
-        String title = ctx.titleHint() != null ? ctx.titleHint() : tree.name();
+        String title = importContext.titleHint() != null ? importContext.titleHint() : tree.name();
         List<ComicMetadata.CatalogInfo> catalogs = new ArrayList<>();
         List<ComicMetadata.ChapterInfo> chapters = new ArrayList<>();
         List<AssembleResult.AssembleWarning> warnings = new ArrayList<>();

@@ -71,7 +71,7 @@ public class DirectoryImportHandler {
      * 清单存在 → 中断恢复（跳过已搬文件，metadata 从清单出，绝不重新解析源目录）；
      * 清单不存在 → 全新导入（标准化 → 解析 → 组装 → 写清单 → 搬文件）。
      */
-    public Path handle(ImportContext ctx, Long taskId, Long comicId, Path mangaRoot) throws IOException {
+    public Path handle(ImportContext importContext, Long taskId, Long comicId, Path mangaRoot) throws IOException {
         ImportManifest manifest;
         if (manifestManager.exists(mangaRoot, taskId)) {
             manifest = manifestManager.read(mangaRoot, taskId);
@@ -79,11 +79,11 @@ public class DirectoryImportHandler {
         } else {
             // 导入只录入文件信息 + 生成封面，不做视频转码/图片优化；
             // 转码与 LQ 优化由导入后在管理面板手动调用接口执行，加快导入时间。
-            DirectoryTree tree = parser.parse(ctx.sourcePath(), ctx.sourceType());
-            var comicInfo = parseComicInfo(ctx, tree);
+            DirectoryTree tree = parser.parse(importContext.sourcePath(), importContext.sourceType());
+            Optional<ComicInfoMetadata> comicInfo = parseComicInfo(importContext, tree);
             ComicMetadata metadata = comicInfo.isPresent()
-                    ? assembler.assemble(tree, ctx, comicInfo.get())
-                    : assembler.assemble(tree, ctx);
+                    ? assembler.assemble(tree, importContext, comicInfo.get())
+                    : assembler.assemble(tree, importContext);
 
             if (cancelHandler.isCancelled(taskId)) {
                 log.info("Task cancelled after parse: taskId={}", taskId);
@@ -96,7 +96,7 @@ public class DirectoryImportHandler {
             List<ImportManifest.ImportFile> files = manifestBuildResult.files();
             Map<String, String> generatedNames = manifestBuildResult.nameMap();
             JsonNode metadataNode = objectMapper.valueToTree(buildMetadataMap(metadata, comicId, generatedNames));
-            manifest = new ImportManifest(MANIFEST_VERSION, taskId, ctx.sourceType(), importRoot.toString(),
+            manifest = new ImportManifest(MANIFEST_VERSION, taskId, importContext.sourceType(), importRoot.toString(),
                     metadataNode, files);
             manifestManager.write(mangaRoot, taskId, manifest);
             log.info("清单已写入: taskId={}, files={}", taskId, files.size());
@@ -146,9 +146,10 @@ public class DirectoryImportHandler {
      * ComicInfo.xml 通常位于漫画根，也兼容压缩包外层包装目录中的 XML。
      * 后者是常见 CBZ 布局：解压根只有一个漫画子目录，但 XML 放在解压根。
      */
-    static Optional<ComicInfoMetadata> parseComicInfo(ImportContext ctx, DirectoryTree tree) throws IOException {
-        Optional<ComicInfoMetadata> sourceInfo = ComicInfoParser.parse(ctx.sourcePath());
-        if (sourceInfo.isPresent() || ctx.sourcePath().equals(tree.path())) {
+    static Optional<ComicInfoMetadata> parseComicInfo(ImportContext importContext, DirectoryTree tree)
+            throws IOException {
+        Optional<ComicInfoMetadata> sourceInfo = ComicInfoParser.parse(importContext.sourcePath());
+        if (sourceInfo.isPresent() || importContext.sourcePath().equals(tree.path())) {
             return sourceInfo;
         }
         return ComicInfoParser.parse(tree.path());
