@@ -1,6 +1,6 @@
 package com.comicatlas.worker.importer;
 
-import com.comicatlas.worker.event.CancelHandler;
+import com.comicatlas.worker.task.CancelHandler;
 import com.comicatlas.worker.media.ComicMetadata;
 import com.comicatlas.worker.storage.SafeMoveStrategy;
 import com.comicatlas.worker.storage.StorageProperties;
@@ -63,7 +63,7 @@ class DirectoryImportResumeTest {
                 mock(MetadataAssembler.class),
                 transferService,
                 objectMapper,
-                mock(com.comicatlas.worker.image.CoverGenerator.class),
+                mock(com.comicatlas.worker.media.image.CoverGenerator.class),
                 new CoverCandidateSelector(),
                 cancelHandler,
                 manifestManager);
@@ -242,7 +242,7 @@ class DirectoryImportResumeTest {
         when(assembler.assemble(any(DirectoryTree.class), any(ImportContext.class)))
                 .thenReturn(sampleMetadata());
         // 重新装配 handler（@RequiredArgsConstructor 无 setter，用新实例）
-        com.comicatlas.worker.image.CoverGenerator coverGen = mock(com.comicatlas.worker.image.CoverGenerator.class);
+        com.comicatlas.worker.media.image.CoverGenerator coverGen = mock(com.comicatlas.worker.media.image.CoverGenerator.class);
         handler = new DirectoryImportHandler(parser, assembler, transferService, objectMapper,
                 coverGen, new CoverCandidateSelector(), cancelHandler, manifestManager);
     }

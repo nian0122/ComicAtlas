@@ -2,9 +2,9 @@ package com.comicatlas.worker.media;
 
 import com.comicatlas.common.util.ImageDimensionsReader;
 import com.comicatlas.worker.config.WorkerConfig;
-import com.comicatlas.worker.process.ExternalProcessRunner;
-import com.comicatlas.worker.image.ImageDecoder;
-import com.comicatlas.worker.image.ImageIoDecoder;
+import com.comicatlas.worker.shared.process.ExternalProcessRunner;
+import com.comicatlas.worker.media.image.ImageDecoder;
+import com.comicatlas.worker.media.image.ImageIoDecoder;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;

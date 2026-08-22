@@ -1,16 +1,16 @@
 package com.comicatlas.worker.command;
 
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
-import com.comicatlas.worker.event.ManagementCommandPublisher;
+import com.comicatlas.worker.task.ManagementCommandPublisher;
 import com.comicatlas.common.event.payload.TranscodeMediaInfo;
-import com.comicatlas.worker.command.TranscodeCommandHandler;
+import com.comicatlas.worker.media.command.TranscodeCommandHandler;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.exporter.persistence.ExportMedia;
-import com.comicatlas.worker.file.transcode.FfmpegTranscoder;
+import com.comicatlas.worker.media.transcode.FfmpegTranscoder;
 import com.comicatlas.worker.media.ComicMetadata;
 import com.comicatlas.worker.media.MediaAnalyzer;
 import com.comicatlas.worker.exporter.persistence.ExportMediaMapper;
-import com.comicatlas.worker.process.ExternalProcessRunner;
+import com.comicatlas.worker.shared.process.ExternalProcessRunner;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

@@ -3,8 +3,8 @@ package com.comicatlas.worker.importer;
 import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.common.storage.ImportStagingPath;
 import com.comicatlas.common.util.MetadataFileWriter;
-import com.comicatlas.worker.event.CancelHandler;
-import com.comicatlas.worker.image.CoverGenerator;
+import com.comicatlas.worker.task.CancelHandler;
+import com.comicatlas.worker.media.image.CoverGenerator;
 import com.comicatlas.worker.media.ComicMetadata;
 import com.comicatlas.worker.storage.StorageRef;
 import com.comicatlas.worker.storage.StorageService;
@@ -30,7 +30,7 @@ import java.util.Map;
  * 落到 {@code hq/.staging/{taskId}/{comicId}/{globalOrder}}（见 {@link #buildManifestFiles}）；最终目录
  * {@code hq/{comicId}/{chapterId}} 由 API 插入章节取得不可变 {@code chapterId} 后，经
  * {@code ImportStorageFinalizeRequestedEvent} 逐章请求 Worker 搬运（见
- * com.comicatlas.worker.event.ImportStorageFinalizeHandler）。
+ * com.comicatlas.worker.importer.event.ImportStorageFinalizeHandler）。
  * <p>
  * 清单存在 → 中断恢复（跳过已搬文件，metadata 从清单出，绝不重新解析源目录）；
  * 清单不存在 → 全新导入（标准化 → 解析 → 组装 → 写清单 → 搬文件）。

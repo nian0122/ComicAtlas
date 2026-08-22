@@ -4,7 +4,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
-import com.comicatlas.worker.event.CancelHandler;
+import com.comicatlas.worker.task.CancelHandler;
 import com.comicatlas.worker.media.ComicMetadata;
 import com.comicatlas.worker.storage.SafeMoveStrategy;
 import com.comicatlas.worker.storage.StorageProperties;
@@ -94,8 +94,8 @@ class DirectoryImportHandlerSmokeTest {
                         chapter("vol2/extra", 3, List.of(
                                 media("vol2/extra", "front.jpg", 1, "IMAGE")))));
 
-        com.comicatlas.worker.image.CoverGenerator coverGen =
-                mock(com.comicatlas.worker.image.CoverGenerator.class);
+        com.comicatlas.worker.media.image.CoverGenerator coverGen =
+                mock(com.comicatlas.worker.media.image.CoverGenerator.class);
         mockCoverWritesValidFile(coverGen);
         DirectoryImportHandler handler = newHandler(metadata, coverGen);
 
@@ -129,8 +129,8 @@ class DirectoryImportHandlerSmokeTest {
                         chapter("vol3", 3, List.of(
                                 media("vol3", "cover-back.jpg", 1, "IMAGE")))));
 
-        com.comicatlas.worker.image.CoverGenerator coverGen =
-                mock(com.comicatlas.worker.image.CoverGenerator.class);
+        com.comicatlas.worker.media.image.CoverGenerator coverGen =
+                mock(com.comicatlas.worker.media.image.CoverGenerator.class);
         doThrow(new RuntimeException("第一候选损坏")).doAnswer(writeValidCoverAnswer())
                 .when(coverGen).generateCover(anyLong(), any(Path.class));
         DirectoryImportHandler handler = newHandler(metadata, coverGen);
@@ -154,8 +154,8 @@ class DirectoryImportHandlerSmokeTest {
                         chapter("", 1, List.of(media("", "ch1.mp4", 1, "VIDEO"))),
                         chapter("", 2, List.of(media("", "ch2.mp4", 1, "VIDEO")))));
 
-        com.comicatlas.worker.image.CoverGenerator coverGen =
-                mock(com.comicatlas.worker.image.CoverGenerator.class);
+        com.comicatlas.worker.media.image.CoverGenerator coverGen =
+                mock(com.comicatlas.worker.media.image.CoverGenerator.class);
         mockVideoCoverWritesValidFile(coverGen);
         DirectoryImportHandler handler = newHandler(metadata, coverGen);
 
@@ -178,8 +178,8 @@ class DirectoryImportHandlerSmokeTest {
                         media("", "001.jpg", 2, "IMAGE")))));
 
         // 第一候选"成功"但 cover.webp 为空（0 字节）→ 后置校验必须降级第二候选
-        com.comicatlas.worker.image.CoverGenerator coverGen =
-                mock(com.comicatlas.worker.image.CoverGenerator.class);
+        com.comicatlas.worker.media.image.CoverGenerator coverGen =
+                mock(com.comicatlas.worker.media.image.CoverGenerator.class);
         AtomicInteger callCount = new AtomicInteger();
         doAnswer(invocation -> {
             Path cover = mangaRoot.resolve("thumbs").resolve(String.valueOf(COMIC_ID)).resolve("cover.webp");
@@ -213,8 +213,8 @@ class DirectoryImportHandlerSmokeTest {
                         media("", "cover.jpg", 1, "IMAGE"),
                         media("", "001.jpg", 2, "IMAGE")))));
 
-        com.comicatlas.worker.image.CoverGenerator coverGen =
-                mock(com.comicatlas.worker.image.CoverGenerator.class);
+        com.comicatlas.worker.media.image.CoverGenerator coverGen =
+                mock(com.comicatlas.worker.media.image.CoverGenerator.class);
         doThrow(new RuntimeException("全部损坏")).when(coverGen).generateCover(anyLong(), any(Path.class));
 
         Logger logger = (Logger) LoggerFactory.getLogger(DirectoryImportHandler.class);
@@ -240,12 +240,12 @@ class DirectoryImportHandlerSmokeTest {
     // ---- helpers ----
 
     /** mock 的 generateCover 成功时写入有效 cover.webp（模拟真实产物，通过后置校验）。 */
-    private void mockCoverWritesValidFile(com.comicatlas.worker.image.CoverGenerator coverGen) throws Exception {
+    private void mockCoverWritesValidFile(com.comicatlas.worker.media.image.CoverGenerator coverGen) throws Exception {
         doAnswer(writeValidCoverAnswer()).when(coverGen).generateCover(anyLong(), any(Path.class));
     }
 
     /** mock 的 generateCoverFromVideo 成功时写入有效 cover.webp。 */
-    private void mockVideoCoverWritesValidFile(com.comicatlas.worker.image.CoverGenerator coverGen) throws Exception {
+    private void mockVideoCoverWritesValidFile(com.comicatlas.worker.media.image.CoverGenerator coverGen) throws Exception {
         doAnswer(writeValidCoverAnswer()).when(coverGen).generateCoverFromVideo(anyLong(), any(Path.class));
     }
 
@@ -260,7 +260,7 @@ class DirectoryImportHandlerSmokeTest {
     }
 
     private DirectoryImportHandler newHandler(ComicMetadata metadata,
-                                              com.comicatlas.worker.image.CoverGenerator coverGen) throws Exception {
+                                              com.comicatlas.worker.media.image.CoverGenerator coverGen) throws Exception {
         DirectoryParser parser = mock(DirectoryParser.class);
         when(parser.parse(any(Path.class), any(String.class)))
                 .thenReturn(new DirectoryTree(sourceRoot, "src", List.of(), List.of()));

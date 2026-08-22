@@ -1,4 +1,4 @@
-package com.comicatlas.worker.scan;
+package com.comicatlas.worker.recovery.scan;
 
 import com.comicatlas.common.dto.ScanItemDTO;
 import com.comicatlas.common.dto.ScanPreviewNodeDTO;

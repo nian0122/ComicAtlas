@@ -2,7 +2,7 @@ package com.comicatlas.worker.exporter;
 
 import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.common.constant.ExportFormats;
-import com.comicatlas.worker.common.ComicTitleSanitizer;
+import com.comicatlas.worker.shared.common.ComicTitleSanitizer;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.exporter.persistence.ExportChapter;
 import com.comicatlas.worker.exporter.persistence.ExportMedia;

@@ -22,7 +22,7 @@ import java.util.Set;
  *   <li>命名候选之后遍历全书图片（自然顺序）；</li>
  *   <li>最后按 globalOrder → pageNumber 遍历视频（供抽帧）。</li>
  * </ol>
- * 只负责"选哪个文件"，封面生成仍由 {@link com.comicatlas.worker.image.CoverGenerator} 完成。
+ * 只负责"选哪个文件"，封面生成仍由 {@link com.comicatlas.worker.media.image.CoverGenerator} 完成。
  */
 @Component
 public final class CoverCandidateSelector {

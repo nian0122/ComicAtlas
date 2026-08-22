@@ -1,7 +1,7 @@
 package com.comicatlas.worker.importer;
 
 import com.comicatlas.worker.config.WorkerConfig;
-import com.comicatlas.worker.file.extract.ZipExtractor;
+import com.comicatlas.worker.importer.archive.extract.ZipExtractor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

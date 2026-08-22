@@ -1,7 +1,7 @@
 package com.comicatlas.worker.exporter;
 
 import com.comicatlas.worker.config.WorkerConfig;
-import com.comicatlas.worker.file.archive.ZipVolumeResolver;
+import com.comicatlas.worker.importer.archive.ZipVolumeResolver;
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
 import org.apache.commons.compress.archivers.zip.ZipExtraField;
 import org.apache.commons.compress.archivers.zip.ZipFile;
