@@ -1,7 +1,7 @@
 package com.comicatlas.api.storage.controller;
 
-import com.comicatlas.api.admin.dto.StorageStatsDTO;
-import com.comicatlas.api.admin.service.AdminService;
+import com.comicatlas.api.storage.dto.StorageStatsDTO;
+import com.comicatlas.api.storage.service.StorageQueryService;
 import com.comicatlas.contract.common.Result;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class StorageStatsController {
 
-    private final AdminService adminService;
+    private final StorageQueryService storageQueryService;
 
     /**
      * 查询存储统计汇总。
@@ -28,6 +28,6 @@ public class StorageStatsController {
      */
     @GetMapping("/stats")
     public Result<StorageStatsDTO> stats() {
-        return Result.ok(adminService.getStorageStats());
+        return Result.ok(storageQueryService.getStorageStats());
     }
 }

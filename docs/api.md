@@ -864,9 +864,8 @@ OP_NOT_ALLOWED, COMIC_NOT_FOUND
 | comic.export | task.completed | export.completed.result.queue | API ExportCompletedHandler |
 | comic.export | task.failed | export.failed.result.queue | API ExportFailedHandler |
 | comic.export | metadata.refresh.requested | metadata.refresh.queue | Worker MetadataRefreshHandler |
-| comic.video | video.transcode.requested | video.transcode.queue | Worker VideoTranscodeHandler |
-| comic.video | video.transcode.completed | video.transcode.completed.queue | API TranscodeCompletedHandler |
-| comic.video | video.transcode.failed | video.transcode.failed.queue | API TranscodeFailedHandler |
+| comic.management | command.requested (TRANSCODE) | management.command.queue | Worker TranscodeCommandHandler |
+| comic.management | command.completed / failed / progress | management.result.queue | API ManagementCommandResultHandler |
 | comic.recovery | recovery.requested | recovery.task.queue | Worker RecoveryTaskHandler |
 | comic.recovery | recovery.progress | recovery.result.queue | API RecoveryEventHandler |
 | comic.recovery | recovery.completed | recovery.result.queue | API RecoveryEventHandler |

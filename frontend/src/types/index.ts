@@ -69,6 +69,7 @@ export interface ComicDetailVO {
   lastReadPage: number
   chapters: ChapterVO[]
   tags: TagRef[]
+  comicInfo?: ComicInfoVO
   createdAt: string
   updatedAt: string
 }
@@ -83,6 +84,15 @@ export interface ChapterVO {
 export interface TagRef {
   name: string
   type: string
+}
+
+export interface ComicInfoVO {
+  series?: string
+  title?: string
+  number?: string
+  writer?: string
+  summary?: string
+  tags: string[]
 }
 
 export interface CatalogNode {
@@ -444,6 +454,7 @@ export interface ExportArtifactVO {
 export interface ExportTaskVO {
   id: number
   comicId: number
+  format?: 'ZIP' | 'CBZ'
   status: string // PENDING | RUNNING | SUCCESS | FAILED
   progress: number // 0-100
   outputRoot?: string

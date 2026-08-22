@@ -99,6 +99,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { ImportTaskVO } from '@/types'
+import { sourceTypeLabel } from '@/utils/source-format'
 
 const props = defineProps<{
   task: ImportTaskVO
@@ -124,13 +125,14 @@ const STATUS_LABELS: Record<string, string> = {
 
 const SOURCE_LABELS: Record<string, string> = {
   ZIP: 'ZIP',
+  CBZ: 'CBZ',
   DIRECTORY: '目录',
   REGISTER: '注册',
   EHENTAI: 'E-Hentai',
 }
 
 const statusLabel = computed(() => STATUS_LABELS[props.task.status] || props.task.status)
-const sourceLabel = computed(() => SOURCE_LABELS[props.task.sourceType] || props.task.sourceType || '未知')
+const sourceLabel = computed(() => SOURCE_LABELS[props.task.sourceType] || sourceTypeLabel(props.task.sourceType))
 
 const taskName = computed(() => {
   const path = props.task.sourcePath || props.task.sourceRef || ''
@@ -138,7 +140,7 @@ const taskName = computed(() => {
   const parts = path.replace(/\\/g, '/').split('/')
   const last = parts[parts.length - 1]
   // 去掉 .zip 扩展名
-  return last?.replace(/\.zip$/i, '') || path
+  return last?.replace(/\.(zip|cbz)$/i, '') || path
 })
 
 const canCancel = computed(() =>

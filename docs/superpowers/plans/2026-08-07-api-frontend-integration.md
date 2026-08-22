@@ -133,7 +133,7 @@ Expected: 编译失败（端点不存在）或测试失败。
             .body("无法打开文件资源管理器，目录: " + dirPath);
     }
 ```
-新增 import：`org.springframework.http.MediaType`、`org.springframework.http.ResponseEntity`、`org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody`、`java.awt.Desktop`、`java.io.IOException`、`java.nio.file.Files`、`java.nio.file.Path`、`lombok.extern.slf4j.Slf4j`（若类无 `@Slf4j` 则加）、`com.comicatlas.api.export.dto.ExportTaskVO`。
+新增 import：`org.springframework.http.MediaType`、`org.springframework.http.ResponseEntity`、`org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody`、`java.awt.Desktop`、`java.io.IOException`、`java.nio.file.Files`、`java.nio.file.Path`、`lombok.extern.slf4j.Slf4j`（若类无 `@Slf4j` 则加）、`com.comicatlas.api.exporter.dto.ExportTaskVO`。
 
 - [ ] **Step 4: 测试与提交**
 

@@ -54,12 +54,15 @@ public class MqConsumerSupport {
             LOG.warn("MQ 消费被中断，结束任务: {}", label);
         } catch (Exception e) {
             LOG.error("MQ 消费失败: {}", label, e);
-            runOnFailure(onFailure, e, label);
+            boolean callbackSucceeded = runOnFailure(onFailure, e, label);
             try {
-                if (failurePolicy == FailurePolicy.ACK_AFTER_CALLBACK) {
+                if (failurePolicy == FailurePolicy.ACK_AFTER_CALLBACK && callbackSucceeded) {
                     channel.basicAck(tag, false);
                 } else {
-                    channel.basicReject(tag, failurePolicy == FailurePolicy.REQUEUE);
+                    // 失败结果发布失败时必须重试原消息，不能 ACK 后丢失业务状态。
+                    boolean requeue = failurePolicy == FailurePolicy.REQUEUE
+                            || (failurePolicy == FailurePolicy.ACK_AFTER_CALLBACK && !callbackSucceeded);
+                    channel.basicReject(tag, requeue);
                 }
             } catch (Exception ex) {
                 LOG.warn("消息 ack/reject 失败: tag={}, label={}", tag, label, ex);
@@ -67,12 +70,14 @@ public class MqConsumerSupport {
         }
     }
 
-    private void runOnFailure(ExceptionHandler onFailure, Exception failure, String label) {
-        if (onFailure == null) { return; }
+    private boolean runOnFailure(ExceptionHandler onFailure, Exception failure, String label) {
+        if (onFailure == null) { return true; }
         try {
             onFailure.accept(failure);
+            return true;
         } catch (Exception e) {
             LOG.error("MQ 失败回调执行异常: {}", label, e);
+            return false;
         }
     }
 }

@@ -268,7 +268,7 @@ git commit -m "新增 MetadataV3 通用模型与 MetadataJsonBuilder：metadata 
 - [ ] **Step 1: 写失败测试 `MetadataModelMapperTest`**
 
 ```java
-package com.comicatlas.worker.export;
+package com.comicatlas.worker.exporter;
 
 import com.comicatlas.common.metadata.MetadataV3;
 import com.comicatlas.worker.entity.ExportCatalog;
@@ -359,7 +359,7 @@ Expected: 编译失败（MetadataModelMapper 不存在）
 - [ ] **Step 3: 实现 `MetadataModelMapper`**
 
 ```java
-package com.comicatlas.worker.export;
+package com.comicatlas.worker.exporter;
 
 import com.comicatlas.common.metadata.MetadataV3;
 import com.comicatlas.worker.entity.ExportCatalog;
@@ -448,7 +448,7 @@ Expected: 2 tests, 0 failures
 - [ ] **Step 5: 实现 `MetadataJsonExporter`**
 
 ```java
-package com.comicatlas.worker.export;
+package com.comicatlas.worker.exporter;
 
 import com.comicatlas.common.metadata.MetadataJsonBuilder;
 import lombok.RequiredArgsConstructor;
@@ -474,12 +474,12 @@ public class MetadataJsonExporter {
 - [ ] **Step 7: 实现 `ExportService`**（承接 `ExportTaskHandler` 的 buildManifest/buildOutputFileName/classifyExportError + 编排）
 
 ```java
-package com.comicatlas.worker.export;
+package com.comicatlas.worker.exporter;
 
 import com.comicatlas.worker.entity.ExportChapter;
 import com.comicatlas.worker.entity.ExportMedia;
-import com.comicatlas.worker.export.ExportFileResolver;
-import com.comicatlas.worker.export.ComicTitleSanitizer;
+import com.comicatlas.worker.exporter.ExportFileResolver;
+import com.comicatlas.worker.exporter.ComicTitleSanitizer;
 import com.comicatlas.worker.file.storage.StorageProperties;
 import com.comicatlas.worker.file.storage.StorageRef;
 import com.comicatlas.worker.file.storage.StorageRoot;
@@ -603,7 +603,7 @@ public class ExportService {
 - [ ] **Step 8: 写失败测试 `ExportServiceTest`**
 
 ```java
-package com.comicatlas.worker.export;
+package com.comicatlas.worker.exporter;
 
 import com.comicatlas.worker.entity.ExportChapter;
 import com.comicatlas.worker.entity.ExportComic;
@@ -785,7 +785,7 @@ git commit -m "重构 worker export 包：新增 ExportService/MetadataJsonExpor
 
 - `ExportFileResolver.java`：移动到 `worker-service/src/main/java/com/comicatlas/worker/file/storage/`，package 声明改为 `com.comicatlas.worker.file.storage`，import 无变化（StorageProperties/StorageRef/StorageRoot 同包）。
 - `ComicTitleSanitizer.java`：移动到 `worker-service/src/main/java/com/comicatlas/worker/common/`，package 声明改为 `com.comicatlas.worker.common`。
-- **同步更新**：`ExportService.java` 中 `import com.comicatlas.worker.export.ComicTitleSanitizer` 改为 `import com.comicatlas.worker.common.ComicTitleSanitizer`（Task 2 时该类仍在 export 包）。
+- **同步更新**：`ExportService.java` 中 `import com.comicatlas.worker.exporter.ComicTitleSanitizer` 改为 `import com.comicatlas.worker.common.ComicTitleSanitizer`（Task 2 时该类仍在 export 包）。
 
 - [ ] **Step 2: `ExportTaskHandler` 瘦身**
 
@@ -802,7 +802,7 @@ import com.comicatlas.common.event.ExportTaskCreatedEvent;
 import com.comicatlas.common.event.ExportTaskFailedEvent;
 import com.comicatlas.common.event.ExportTaskStartedEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
-import com.comicatlas.worker.export.ExportService;
+import com.comicatlas.worker.exporter.ExportService;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -870,7 +870,7 @@ package com.comicatlas.worker.event;
 import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.event.MetadataRefreshEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
-import com.comicatlas.worker.export.MetadataJsonExporter;
+import com.comicatlas.worker.exporter.MetadataJsonExporter;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

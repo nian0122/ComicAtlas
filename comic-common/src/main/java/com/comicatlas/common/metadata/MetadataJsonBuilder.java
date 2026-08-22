@@ -21,6 +21,9 @@ public class MetadataJsonBuilder {
         MetadataV3.Comic comic = metadata.comic();
         comicNode.put("title", comic.title() != null ? comic.title() : "");
         comicNode.put("author", comic.author() != null ? comic.author() : "");
+        if (comic.description() != null) {
+            comicNode.put("description", comic.description());
+        }
         if (comic.category() != null) {
             comicNode.put("category", comic.category());
         }

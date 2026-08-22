@@ -1,0 +1,179 @@
+package com.comicatlas.api.task.policy;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.comicatlas.contract.common.enums.ComicStatus;
+import com.comicatlas.contract.common.enums.HqStatus;
+import com.comicatlas.contract.common.enums.LqStatus;
+import com.comicatlas.persistence.comic.entity.Chapter;
+import com.comicatlas.persistence.comic.entity.Comic;
+import com.comicatlas.persistence.comic.entity.Media;
+import com.comicatlas.persistence.comic.mapper.ChapterMapper;
+import com.comicatlas.persistence.comic.mapper.ComicMapper;
+import com.comicatlas.persistence.comic.mapper.MediaMapper;
+import com.comicatlas.contract.common.enums.TranscodeStatus;
+import com.comicatlas.common.util.VideoPlayability;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * 媒体操作资格服务 — 依据真实 DB 资产状态返回可查询的 allowedOperations。
+ * <p>
+ * 前端按钮所需状态全部由此服务计算，不自行复制操作矩阵。
+ */
+@Service
+@RequiredArgsConstructor
+public class MediaOperationEligibilityService {
+
+    private final ChapterMapper chapterMapper;
+    private final MediaMapper mediaMapper;
+    private final ComicMapper comicMapper;
+    private final OperationPolicyService policyService;
+
+    public AllowedOperations forComic(Long comicId) {
+        Set<String> allowed = new LinkedHashSet<>();
+        Map<String, String> blocked = new LinkedHashMap<>();
+
+        boolean anyLqWork = false;
+        boolean anyLqReady = false;
+        boolean anyHqWork = false;
+        boolean hqPreconditionBlocked = false;
+        boolean anyTranscode = false;
+
+        List<Chapter> chapters = chapterMapper.selectList(
+                new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
+        for (Chapter chapter : chapters) {
+            ChapterOps ops = collectChapterAssetOps(chapter.getId());
+            anyLqWork |= ops.lqGenerateAllowed;
+            anyLqReady |= ops.lqRegenerateAllowed;
+            anyHqWork |= ops.hqDeleteAllowed;
+            hqPreconditionBlocked |= ops.hqDeleteBlocked;
+            anyTranscode |= ops.transcodeAllowed;
+        }
+
+        if (anyLqWork) {
+            allowed.add(OperationPolicyService.OP_LQ_GENERATE);
+        } else {
+            blocked.put(OperationPolicyService.OP_LQ_GENERATE, "没有需要生成 LQ 的页面");
+        }
+        if (anyLqReady) {
+            allowed.add(OperationPolicyService.OP_LQ_REGENERATE);
+        } else {
+            blocked.put(OperationPolicyService.OP_LQ_REGENERATE, "没有可重新生成 LQ 的页面");
+        }
+        if (anyHqWork) {
+            allowed.add(OperationPolicyService.OP_HQ_DELETE);
+        } else if (hqPreconditionBlocked) {
+            blocked.put(OperationPolicyService.OP_HQ_DELETE, "存在 LQ 未就绪的图片页");
+        } else {
+            blocked.put(OperationPolicyService.OP_HQ_DELETE, "没有可删除 HQ 的图片页");
+        }
+        if (anyTranscode) {
+            allowed.add(OperationPolicyService.OP_TRANSCODE);
+        } else {
+            blocked.put(OperationPolicyService.OP_TRANSCODE, "没有需要转码的视频页");
+        }
+        Comic comic = comicMapper.selectById(comicId);
+        if (comic != null && comic.getStatus() == ComicStatus.READY) {
+            allowed.add(OperationPolicyService.OP_METADATA_REFRESH);
+        } else {
+            blocked.put(OperationPolicyService.OP_METADATA_REFRESH,
+                    "漫画状态不是 READY，无法刷新元数据");
+        }
+
+        return AllowedOperations.of(allowed, blocked);
+    }
+
+    public AllowedOperations forChapter(Long chapterId) {
+        ChapterOps ops = collectChapterAssetOps(chapterId);
+        Set<String> allowed = new LinkedHashSet<>();
+        Map<String, String> blocked = new LinkedHashMap<>();
+
+        if (ops.lqGenerateAllowed) {
+            allowed.add(OperationPolicyService.OP_LQ_GENERATE);
+        } else {
+            blocked.put(OperationPolicyService.OP_LQ_GENERATE, "本章节没有需要生成 LQ 的页面");
+        }
+        if (ops.lqRegenerateAllowed) {
+            allowed.add(OperationPolicyService.OP_LQ_REGENERATE);
+        } else {
+            blocked.put(OperationPolicyService.OP_LQ_REGENERATE, "本章节没有可重新生成 LQ 的页面");
+        }
+        if (ops.hqDeleteAllowed) {
+            allowed.add(OperationPolicyService.OP_HQ_DELETE);
+        } else if (ops.hqDeleteBlocked) {
+            blocked.put(OperationPolicyService.OP_HQ_DELETE, "章节图片 LQ 未全部就绪，无法删除 HQ");
+        } else {
+            blocked.put(OperationPolicyService.OP_HQ_DELETE, "章节没有可删除的 HQ");
+        }
+        if (ops.transcodeAllowed) {
+            allowed.add(OperationPolicyService.OP_TRANSCODE);
+        } else {
+            blocked.put(OperationPolicyService.OP_TRANSCODE, "章节没有需要转码的视频页");
+        }
+        return AllowedOperations.of(allowed, blocked);
+    }
+
+    public AllowedOperations forMedia(Long mediaId) {
+        Media media = mediaMapper.selectById(mediaId);
+        if (media == null) {
+            return AllowedOperations.none("媒体页不存在");
+        }
+        Set<String> allowed = new LinkedHashSet<>();
+        Map<String, String> blocked = new LinkedHashMap<>();
+
+        if ("VIDEO".equals(media.getMediaType())
+                && media.getHqStatus() != HqStatus.DELETED
+                && media.getTranscodeStatus() != TranscodeStatus.READY
+                && media.getTranscodeStatus() != TranscodeStatus.QUEUED
+                && media.getTranscodeStatus() != TranscodeStatus.TRANSCODING
+                && VideoPlayability.isTranscodable(media.getWidth(), media.getHeight())
+                && !VideoPlayability.isBrowserPlayable(media.getVideoCodec(), media.getContainer())) {
+            allowed.add(OperationPolicyService.OP_TRANSCODE);
+        } else {
+            blocked.put(OperationPolicyService.OP_TRANSCODE, "该媒体无需转码或处于转码中");
+        }
+        return AllowedOperations.of(allowed, blocked);
+    }
+
+    private ChapterOps collectChapterAssetOps(Long chapterId) {
+        List<Media> mediaItems = mediaMapper.selectList(
+                new LambdaQueryWrapper<Media>().eq(Media::getChapterId, chapterId));
+        List<Media> imagePages = mediaItems.stream()
+                .filter(p -> "IMAGE".equals(p.getMediaType()))
+                .toList();
+        List<Media> deletableHq = imagePages.stream()
+                .filter(p -> p.getHqStatus() == HqStatus.READY || p.getHqStatus() == HqStatus.MISSING)
+                .toList();
+
+        ChapterOps ops = new ChapterOps();
+        ops.lqGenerateAllowed = imagePages.stream()
+                .anyMatch(p -> p.getHqStatus() != HqStatus.DELETED && p.getLqStatus() != LqStatus.READY);
+        ops.lqRegenerateAllowed = imagePages.stream()
+                .anyMatch(p -> p.getHqStatus() != HqStatus.DELETED);
+        ops.hqDeleteBlocked = deletableHq.stream().anyMatch(p -> p.getLqStatus() != LqStatus.READY);
+        ops.hqDeleteAllowed = !deletableHq.isEmpty() && !ops.hqDeleteBlocked;
+        ops.transcodeAllowed = mediaItems.stream().anyMatch(p ->
+                "VIDEO".equals(p.getMediaType())
+                        && p.getHqStatus() != HqStatus.DELETED
+                        && p.getTranscodeStatus() != TranscodeStatus.READY
+                        && p.getTranscodeStatus() != TranscodeStatus.QUEUED
+                        && p.getTranscodeStatus() != TranscodeStatus.TRANSCODING
+                        && VideoPlayability.isTranscodable(p.getWidth(), p.getHeight())
+                        && !VideoPlayability.isBrowserPlayable(p.getVideoCodec(), p.getContainer()));
+        return ops;
+    }
+
+    private static final class ChapterOps {
+        boolean lqGenerateAllowed;
+        boolean lqRegenerateAllowed;
+        boolean hqDeleteAllowed;
+        boolean hqDeleteBlocked;
+        boolean transcodeAllowed;
+    }
+}

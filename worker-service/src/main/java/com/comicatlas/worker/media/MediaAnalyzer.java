@@ -2,7 +2,11 @@ package com.comicatlas.worker.media;
 
 import com.comicatlas.common.util.ImageDimensionsReader;
 import com.comicatlas.worker.config.WorkerConfig;
-import com.comicatlas.worker.process.ExternalProcessRunner;
+import com.comicatlas.common.constant.MediaTypes;
+import com.comicatlas.common.constant.MediaStatuses;
+import com.comicatlas.worker.shared.process.ExternalProcessRunner;
+import com.comicatlas.worker.media.image.ImageDecoder;
+import com.comicatlas.worker.media.image.ImageIoDecoder;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -36,16 +40,16 @@ public class MediaAnalyzer {
     private static final Set<String> VIDEO_EXTENSIONS = Set.of(".mp4", ".mkv", ".webm", ".mov", ".avi");
 
     /** 媒体类型：视频。 */
-    private static final String MEDIA_TYPE_VIDEO = "VIDEO";
+    private static final String MEDIA_TYPE_VIDEO = MediaTypes.VIDEO;
 
     /** 页面 HQ 状态：文件就绪。 */
-    private static final String HQ_STATUS_READY = "READY";
+    private static final String HQ_STATUS_READY = MediaStatuses.READY;
 
     /** 页面 HQ 状态：文件缺失。 */
-    private static final String HQ_STATUS_MISSING = "MISSING";
+    private static final String HQ_STATUS_MISSING = MediaStatuses.MISSING;
 
     /** 页面 LQ 状态：未生成（导入阶段从不自动生成 LQ）。 */
-    private static final String LQ_STATUS_NOT_GENERATED = "NOT_GENERATED";
+    private static final String LQ_STATUS_NOT_GENERATED = MediaStatuses.NOT_GENERATED;
 
     /** ffprobe JSON 中表示字段值不可用的标记。 */
     private static final String UNAVAILABLE_MARKER = "N/A";
@@ -70,10 +74,23 @@ public class MediaAnalyzer {
         if (VIDEO_EXTENSIONS.contains(ext)) {
             return doAnalyzeVideo(file, name, container, size);
         }
-        ImageDimensions dims = exists ? readImageDims(file) : new ImageDimensions(null, null);
+        ImageDecoder.DecodeResult decoded;
+        if (!exists) {
+            decoded = new ImageDecoder.DecodeResult(null, false, null, null, "文件不存在");
+        } else {
+            try {
+                decoded = new ImageIoDecoder().inspect(file);
+            } catch (java.io.IOException e) {
+                decoded = new ImageDecoder.DecodeResult(null, false, null, null, e.getMessage());
+            }
+        }
+        String format = decoded.format() == null ? container : decoded.format().toLowerCase();
+        boolean needsConversion = !Set.of("jpeg", "jpg", "png", "gif", "webp", "bmp", "tiff").contains(format);
         return new ComicMetadata.MediaInfo(name, 0,
                 exists ? HQ_STATUS_READY : HQ_STATUS_MISSING, LQ_STATUS_NOT_GENERATED,
-                size, dims.width(), dims.height());
+                size, decoded.width(), decoded.height(), MediaTypes.IMAGE, null, null, null, null,
+                format, decoded.decodable(), needsConversion,
+                decoded.decodable() ? MediaStatuses.NOT_STARTED : MediaStatuses.FAILED, decoded.failureReason());
     }
 
     /**

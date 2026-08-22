@@ -34,6 +34,8 @@ public class ComicDetailVO {
     private Integer lastReadPage;
     private List<ChapterVO> chapters;
     private List<TagRef> tags;
+    /** 从 ComicInfo.xml 映射出的原始字段，供详情页明确展示来源元数据。 */
+    private ComicInfoVO comicInfo;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -49,5 +51,15 @@ public class ComicDetailVO {
     public static class TagRef {
         private String name;
         private String type;
+    }
+
+    @Data
+    public static class ComicInfoVO {
+        private String series;
+        private String title;
+        private String number;
+        private String writer;
+        private String summary;
+        private List<String> tags;
     }
 }
