@@ -1,5 +1,6 @@
 package com.comicatlas.worker.event;
 
+import com.comicatlas.common.constant.ExportFormats;
 import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.event.ImportTaskCreatedEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
@@ -56,7 +57,7 @@ public class ImportTaskHandler {
 
     private void runImport(ImportTaskCreatedEvent event, Long taskId) throws Exception {
         Long comicId = event.comicId();
-        String sourceType = event.sourceType() != null ? event.sourceType() : "ZIP";
+        String sourceType = event.sourceType() != null ? event.sourceType() : ExportFormats.ZIP;
         String sourcePath = event.sourcePath();
         Path mangaRoot = Path.of(config.getMangaRoot());
 

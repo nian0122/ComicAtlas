@@ -19,6 +19,7 @@ import com.comicatlas.api.management.mapper.ManagementTaskMapper;
 import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
+import com.comicatlas.common.constant.ExportFormats;
 import com.comicatlas.common.event.ExportTaskCreatedEvent;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
@@ -525,7 +526,7 @@ public class ManagementTaskService {
         ExportTaskCreatedEvent event = new ExportTaskCreatedEvent(
                 UUID.randomUUID(), Instant.now(),
                 exportTask.getId(), exportTask.getComicId(),
-                exportTask.getFormat() == null ? "ZIP" : exportTask.getFormat());
+                exportTask.getFormat() == null ? ExportFormats.ZIP : exportTask.getFormat());
         outboxService.enqueue(event, MqExchanges.EXPORT, MqRoutingKeys.TASK_CREATED,
                 taskId, item.getId(), newAttempt);
         log.info("导出任务重试已重新入队: taskId={}, itemId={}, attempt={}, exportTaskId={}, comicId={}",

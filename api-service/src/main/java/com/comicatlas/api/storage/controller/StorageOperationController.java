@@ -1,6 +1,7 @@
 package com.comicatlas.api.storage.controller;
 
 import com.comicatlas.contract.common.Result;
+import com.comicatlas.common.constant.ExportFormats;
 import com.comicatlas.api.export.dto.ExportTaskVO;
 import com.comicatlas.api.management.dto.OperationSubmitResultDTO;
 import com.comicatlas.api.management.operation.MediaOperationCommandService;
@@ -157,7 +158,7 @@ public class StorageOperationController {
      */
     @PostMapping("/export/comics/{comicId}")
     public ResponseEntity<ExportTaskVO> createExport(@PathVariable Long comicId,
-            @RequestParam(defaultValue = "ZIP") String format) {
+            @RequestParam(defaultValue = ExportFormats.ZIP) String format) {
         ExportTaskVO task = exportOperationService.createExportTask(comicId, format);
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(task);
     }

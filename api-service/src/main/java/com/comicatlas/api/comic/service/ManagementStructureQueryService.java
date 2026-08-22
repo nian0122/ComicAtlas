@@ -19,7 +19,6 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,19 +43,27 @@ public class ManagementStructureQueryService {
                 .eq(Chapter::getComicId, comicId).eq(Chapter::getStatus, ChapterLifecycleStatus.READY)
                 .orderByAsc(Chapter::getGlobalOrder));
         Map<Long, CatalogNode> nodes = new HashMap<>();
-        for (Catalog catalog : catalogs) nodes.put(catalog.getId(), new CatalogNode(catalog.getId(), catalog.getTitle()));
+        for (Catalog catalog : catalogs) {
+            nodes.put(catalog.getId(), new CatalogNode(catalog.getId(), catalog.getTitle()));
+        }
         List<CatalogNode> roots = new ArrayList<>();
         for (Catalog catalog : catalogs) {
             CatalogNode node = nodes.get(catalog.getId());
-            if (catalog.getParentId() == null || !nodes.containsKey(catalog.getParentId())) roots.add(node);
-            else nodes.get(catalog.getParentId()).getChildren().add(node);
+            if (catalog.getParentId() == null || !nodes.containsKey(catalog.getParentId())) {
+                roots.add(node);
+            } else {
+                nodes.get(catalog.getParentId()).getChildren().add(node);
+            }
         }
         CatalogNode root = new CatalogNode(null, null);
         for (Chapter chapter : chapters) {
             ChapterRef ref = new ChapterRef(chapter.getId(), chapter.getChapterNo(), chapter.getTitle(),
                     chapter.getGlobalOrder(), chapter.getPageCount(), chapter.getStatus().name());
-            if (chapter.getCatalogId() != null && nodes.containsKey(chapter.getCatalogId())) nodes.get(chapter.getCatalogId()).getChapters().add(ref);
-            else root.getChapters().add(ref);
+            if (chapter.getCatalogId() != null && nodes.containsKey(chapter.getCatalogId())) {
+                nodes.get(chapter.getCatalogId()).getChapters().add(ref);
+            } else {
+                root.getChapters().add(ref);
+            }
         }
         root.getChildren().addAll(roots);
         return root.getChapters().isEmpty() && root.getChildren().size() == 1 ? root.getChildren() : List.of(root);
@@ -64,7 +71,9 @@ public class ManagementStructureQueryService {
 
     public ReaderData chapter(Long chapterId) {
         Chapter chapter = chapterMapper.selectById(chapterId);
-        if (chapter == null) throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在");
+        if (chapter == null) {
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在");
+        }
         List<Media> media = mediaMapper.selectList(new LambdaQueryWrapper<Media>()
                 .eq(Media::getChapterId, chapterId).eq(Media::getStatus, MediaLifecycleStatus.READY)
                 .orderByAsc(Media::getPageNumber));
@@ -84,7 +93,13 @@ public class ManagementStructureQueryService {
         data.setContainer(media.getContainer()); data.setVideoCodec(media.getVideoCodec()); data.setAudioCodec(media.getAudioCodec());
         data.setTranscodeStatus(media.getTranscodeStatus() == null ? null : media.getTranscodeStatus().name()); return data;
     }
-    private String fileName(String path) { if (path == null) return ""; int i = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\')); return path.substring(i + 1); }
+    private String fileName(String path) {
+        if (path == null) {
+            return "";
+        }
+        int separatorIndex = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+        return path.substring(separatorIndex + 1);
+    }
 
     @Data public static class CatalogNode { private Long id; private String title; private List<CatalogNode> children = new ArrayList<>(); private List<ChapterRef> chapters = new ArrayList<>(); CatalogNode(Long id, String title) { this.id = id; this.title = title; } }
     public record ChapterRef(Long id, String chapterNo, String title, Integer globalOrder, Integer pageCount, String status) { }

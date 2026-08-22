@@ -29,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 @Slf4j
@@ -131,7 +132,8 @@ public class ExportServiceImpl implements ExportService {
     }
 
     private static String normalizeFormat(String format) {
-        String normalized = format == null || format.isBlank() ? ExportFormats.ZIP : format.trim().toUpperCase();
+        String normalized = format == null || format.isBlank()
+                ? ExportFormats.ZIP : format.trim().toUpperCase(Locale.ROOT);
         if (!ExportFormats.ZIP.equals(normalized) && !ExportFormats.CBZ.equals(normalized)) {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "不支持的导出格式: " + format);
         }
