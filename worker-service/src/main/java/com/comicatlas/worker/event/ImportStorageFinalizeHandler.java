@@ -14,7 +14,7 @@ import com.comicatlas.common.storage.ImportStagingPath;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.importer.ImportManifest;
 import com.comicatlas.worker.importer.ImportManifestManager;
-import com.comicatlas.worker.mapper.ExportChapterMapper;
+import com.comicatlas.worker.exporter.persistence.ExportChapterMapper;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageRef;
 import com.comicatlas.worker.storage.StorageRoot;

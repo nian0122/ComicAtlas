@@ -70,7 +70,7 @@ git commit -m "拆分 event 包：8 个命令执行器移至独立 command 包�
 - Move（9）：`worker-service/src/main/java/com/comicatlas/worker/file/storage/` 下全部 9 个 .java → `worker-service/src/main/java/com/comicatlas/worker/storage/`（新建）
   - `StorageProperties`、`StorageRef`、`StorageRoot`、`StorageService`、`TransferService`、`TransferMode`、`SafeMoveStrategy`、`PathTraversalException`、`ExportFileResolver`
   - package 声明：`com.comicatlas.worker.file.storage` → `com.comicatlas.worker.storage`
-  - `StorageProperties`/`StorageRef`/`StorageRoot`/`StorageService`/`TransferMode`/`SafeMoveStrategy`/`PathTraversalException`/`TransferService` 同包互引 → 删除同包 import；`ExportFileResolver` 的 `import com.comicatlas.worker.export.ExportFileNotFoundException` 保留（跨包）
+  - `StorageProperties`/`StorageRef`/`StorageRoot`/`StorageService`/`TransferMode`/`SafeMoveStrategy`/`PathTraversalException`/`TransferService` 同包互引 → 删除同包 import；`ExportFileResolver` 的 `import com.comicatlas.worker.exporter.ExportFileNotFoundException` 保留（跨包）
 - Modify（引用方 import）：`file.storage` → `storage`
   - `file/trash/TrashManifestStore.java`
   - `export/ExportService.java`

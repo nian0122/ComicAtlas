@@ -1,8 +1,8 @@
 package com.comicatlas.worker.file.extract;
 
 import com.comicatlas.worker.config.WorkerConfig;
-import com.comicatlas.worker.export.ExportManifest;
-import com.comicatlas.worker.export.ZipBuilder;
+import com.comicatlas.worker.exporter.ExportManifest;
+import com.comicatlas.worker.exporter.ZipBuilder;
 import com.comicatlas.worker.file.archive.ZipVolumeResolver;
 import org.apache.commons.compress.archivers.zip.UnixStat;
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;

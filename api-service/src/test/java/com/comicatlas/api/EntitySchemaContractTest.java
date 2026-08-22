@@ -9,7 +9,7 @@ import com.comicatlas.persistence.comic.entity.ComicTag;
 import com.comicatlas.persistence.comic.entity.Media;
 import com.comicatlas.api.importer.entity.DirectoryScanTask;
 import com.comicatlas.api.importer.entity.ImportTask;
-import com.comicatlas.api.export.entity.ExportTask;
+import com.comicatlas.api.exporter.entity.ExportTask;
 import com.comicatlas.persistence.reader.entity.ReadingHistory;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeAll;

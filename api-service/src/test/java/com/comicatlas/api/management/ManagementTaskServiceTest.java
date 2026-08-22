@@ -1,6 +1,6 @@
 package com.comicatlas.api.management.service;
 
-import com.comicatlas.api.export.mapper.ExportTaskMapper;
+import com.comicatlas.api.exporter.mapper.ExportTaskMapper;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
 import com.comicatlas.api.importer.service.ImportRetryCoordinator;

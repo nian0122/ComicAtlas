@@ -1,7 +1,7 @@
 package com.comicatlas.worker.storage;
 
-import com.comicatlas.worker.entity.ExportMedia;
-import com.comicatlas.worker.export.ExportFileNotFoundException;
+import com.comicatlas.worker.exporter.persistence.ExportMedia;
+import com.comicatlas.worker.exporter.ExportFileNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

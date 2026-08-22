@@ -2,10 +2,10 @@ package com.comicatlas.worker.command;
 
 import com.comicatlas.common.constant.MetadataRefreshLimits;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
-import com.comicatlas.worker.entity.ExportChapter;
-import com.comicatlas.worker.entity.ExportMedia;
-import com.comicatlas.worker.mapper.ExportChapterMapper;
-import com.comicatlas.worker.mapper.ExportMediaMapper;
+import com.comicatlas.worker.exporter.persistence.ExportChapter;
+import com.comicatlas.worker.exporter.persistence.ExportMedia;
+import com.comicatlas.worker.exporter.persistence.ExportChapterMapper;
+import com.comicatlas.worker.exporter.persistence.ExportMediaMapper;
 import com.comicatlas.worker.media.ComicMetadata;
 import com.comicatlas.worker.media.MediaAnalyzer;
 import com.comicatlas.worker.storage.StorageProperties;

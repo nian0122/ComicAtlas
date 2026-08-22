@@ -4,7 +4,7 @@ import com.comicatlas.common.event.MetadataRefreshEvent;
 import com.comicatlas.common.metadata.MetadataJsonBuilder;
 import com.comicatlas.common.metadata.MetadataV3;
 import com.comicatlas.common.mq.MqConsumerSupport;
-import com.comicatlas.worker.export.MetadataJsonExporter;
+import com.comicatlas.worker.exporter.MetadataJsonExporter;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.Channel;

@@ -4,7 +4,7 @@ import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.event.MetadataRefreshEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.common.util.MetadataFileWriter;
-import com.comicatlas.worker.export.MetadataJsonExporter;
+import com.comicatlas.worker.exporter.MetadataJsonExporter;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

@@ -1,11 +1,11 @@
 package com.comicatlas.api.storage.controller;
 
 import com.comicatlas.contract.common.Result;
-import com.comicatlas.api.export.dto.ExportTaskVO;
+import com.comicatlas.api.exporter.dto.ExportTaskVO;
 import com.comicatlas.api.management.dto.OperationSubmitResultDTO;
 import com.comicatlas.api.management.operation.MediaOperationCommandService;
 import com.comicatlas.api.storage.dto.ExportArtifactVO;
-import com.comicatlas.api.storage.service.ExportOperationService;
+import com.comicatlas.api.exporter.service.ExportOperationService;
 import com.comicatlas.api.storage.service.HqDeleteOperationService;
 import com.comicatlas.api.storage.service.LqOperationService;
 import com.comicatlas.api.storage.service.TranscodeOperationService;

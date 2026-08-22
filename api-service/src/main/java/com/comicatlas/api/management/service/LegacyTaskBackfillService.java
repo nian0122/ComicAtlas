@@ -1,8 +1,8 @@
 package com.comicatlas.api.management.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.comicatlas.api.export.entity.ExportTask;
-import com.comicatlas.api.export.mapper.ExportTaskMapper;
+import com.comicatlas.api.exporter.entity.ExportTask;
+import com.comicatlas.api.exporter.mapper.ExportTaskMapper;
 import com.comicatlas.api.importer.entity.DirectoryScanTask;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.entity.RecoveryTask;
