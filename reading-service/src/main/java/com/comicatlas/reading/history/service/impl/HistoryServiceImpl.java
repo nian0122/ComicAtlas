@@ -1,4 +1,4 @@
-package com.comicatlas.reading.history.impl;
+package com.comicatlas.reading.history.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -12,12 +12,12 @@ import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.persistence.storage.FileUrlResolver;
-import com.comicatlas.reading.history.HistoryUpdateRequest;
-import com.comicatlas.reading.history.HistoryVO;
-import com.comicatlas.reading.history.HistoryPageVO;
+import com.comicatlas.reading.history.dto.HistoryUpdateRequest;
+import com.comicatlas.reading.history.dto.HistoryVO;
+import com.comicatlas.reading.history.dto.HistoryPageVO;
 import com.comicatlas.persistence.reader.entity.ReadingHistory;
 import com.comicatlas.persistence.reader.mapper.ReadingHistoryMapper;
-import com.comicatlas.reading.history.HistoryService;
+import com.comicatlas.reading.history.service.HistoryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

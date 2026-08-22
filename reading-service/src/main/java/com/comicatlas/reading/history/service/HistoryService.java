@@ -1,8 +1,8 @@
-package com.comicatlas.reading.history;
+package com.comicatlas.reading.history.service;
 
-import com.comicatlas.reading.history.HistoryUpdateRequest;
-import com.comicatlas.reading.history.HistoryPageVO;
-import com.comicatlas.reading.history.HistoryVO;
+import com.comicatlas.reading.history.dto.HistoryUpdateRequest;
+import com.comicatlas.reading.history.dto.HistoryPageVO;
+import com.comicatlas.reading.history.dto.HistoryVO;
 
 import java.util.List;
 

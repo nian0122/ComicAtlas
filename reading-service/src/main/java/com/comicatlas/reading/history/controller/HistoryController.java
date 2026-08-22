@@ -1,10 +1,10 @@
-package com.comicatlas.reading.history;
+package com.comicatlas.reading.history.controller;
 
 import com.comicatlas.contract.common.Result;
-import com.comicatlas.reading.history.HistoryUpdateRequest;
-import com.comicatlas.reading.history.HistoryPageVO;
-import com.comicatlas.reading.history.HistoryVO;
-import com.comicatlas.reading.history.HistoryService;
+import com.comicatlas.reading.history.dto.HistoryUpdateRequest;
+import com.comicatlas.reading.history.dto.HistoryPageVO;
+import com.comicatlas.reading.history.dto.HistoryVO;
+import com.comicatlas.reading.history.service.HistoryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;

@@ -1,4 +1,4 @@
-package com.comicatlas.reading.history;
+package com.comicatlas.reading.history.dto;
 
 import lombok.Data;
 
