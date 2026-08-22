@@ -4,6 +4,7 @@ import com.comicatlas.worker.exporter.publisher.ExportArchivePublisher;
 import com.comicatlas.worker.exporter.archive.ZipBuilder;
 import com.comicatlas.worker.exporter.model.ExportCollectResult;
 import com.comicatlas.worker.exporter.model.ExportManifest;
+import com.comicatlas.worker.exporter.metadata.MetadataJsonExporter;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.persistence.record.ChapterRecord;
 import com.comicatlas.worker.persistence.record.ComicRecord;

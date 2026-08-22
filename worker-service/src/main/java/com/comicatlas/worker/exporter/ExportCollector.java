@@ -1,6 +1,7 @@
 package com.comicatlas.worker.exporter;
 
 import com.comicatlas.worker.exporter.model.ExportCollectResult;
+import com.comicatlas.worker.exporter.metadata.MetadataJsonExporter;
 import com.comicatlas.worker.persistence.record.CatalogRecord;
 import com.comicatlas.worker.persistence.record.ChapterRecord;
 import com.comicatlas.worker.persistence.record.ComicRecord;

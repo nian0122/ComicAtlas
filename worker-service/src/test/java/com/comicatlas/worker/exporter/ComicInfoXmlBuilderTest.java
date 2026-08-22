@@ -1,6 +1,7 @@
 package com.comicatlas.worker.exporter;
 
 import com.comicatlas.worker.exporter.archive.ZipBuilder;
+import com.comicatlas.worker.exporter.metadata.ComicInfoXmlBuilder;
 import com.comicatlas.worker.exporter.model.ExportManifest;
 import com.comicatlas.worker.persistence.record.ChapterRecord;
 import com.comicatlas.worker.persistence.record.ComicRecord;

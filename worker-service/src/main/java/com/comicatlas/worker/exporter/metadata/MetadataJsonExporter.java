@@ -1,6 +1,7 @@
-package com.comicatlas.worker.exporter;
+package com.comicatlas.worker.exporter.metadata;
 
 import com.comicatlas.common.metadata.MetadataJsonBuilder;
+import com.comicatlas.worker.exporter.ExportCollector;
 import com.comicatlas.worker.shared.metadata.MetadataExporter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

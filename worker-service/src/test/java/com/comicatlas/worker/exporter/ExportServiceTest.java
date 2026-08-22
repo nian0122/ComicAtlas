@@ -6,6 +6,7 @@ import com.comicatlas.worker.exporter.exception.ExportFileNotFoundException;
 import com.comicatlas.worker.exporter.exception.ExportManifestBuildException;
 import com.comicatlas.worker.exporter.model.ExportCollectResult;
 import com.comicatlas.worker.exporter.model.ExportManifest;
+import com.comicatlas.worker.exporter.metadata.MetadataJsonExporter;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.persistence.record.ChapterRecord;
 import com.comicatlas.worker.persistence.record.ComicRecord;

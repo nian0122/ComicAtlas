@@ -6,6 +6,8 @@ import com.comicatlas.worker.exporter.exception.ExportFileNotFoundException;
 import com.comicatlas.worker.exporter.exception.ExportManifestBuildException;
 import com.comicatlas.worker.exporter.model.ExportCollectResult;
 import com.comicatlas.worker.exporter.model.ExportManifest;
+import com.comicatlas.worker.exporter.metadata.ComicInfoXmlBuilder;
+import com.comicatlas.worker.exporter.metadata.MetadataJsonExporter;
 import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.common.constant.ExportFormats;
 import com.comicatlas.worker.shared.common.ComicTitleSanitizer;
