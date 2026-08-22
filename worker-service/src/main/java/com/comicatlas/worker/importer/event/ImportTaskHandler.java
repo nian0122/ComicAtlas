@@ -14,6 +14,7 @@ import com.comicatlas.worker.importer.ImportSourceType;
 import com.comicatlas.worker.task.CancelHandler;
 import com.comicatlas.worker.task.TaskStatusPublisher;
 import com.comicatlas.worker.task.TaskStatusUpdate;
+import com.comicatlas.worker.task.TaskCancelledException;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -54,8 +55,13 @@ public class ImportTaskHandler {
         }
         mqConsumerSupport.consume(channel, tag, "导入任务: taskId=" + taskId,
                 () -> runImport(event, taskId),
-                e -> publisher.publishStatus(new TaskStatusUpdate(
-                        taskId, "FAILED", 0, null, 0, 0, toErrorMessage(e))));
+                e -> publishFailureOrCancellation(taskId, e));
+    }
+
+    private void publishFailureOrCancellation(Long taskId, Throwable failure) {
+        String status = failure instanceof TaskCancelledException ? "CANCELLED" : "FAILED";
+        publisher.publishStatus(new TaskStatusUpdate(
+                taskId, status, 0, null, 0, 0, toErrorMessage(failure)));
     }
 
     private void runImport(ImportTaskCreatedEvent event, Long taskId) throws Exception {

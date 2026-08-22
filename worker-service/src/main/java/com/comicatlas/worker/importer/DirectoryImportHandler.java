@@ -4,6 +4,7 @@ import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.common.storage.ImportStagingPath;
 import com.comicatlas.common.util.MetadataFileWriter;
 import com.comicatlas.worker.task.CancelHandler;
+import com.comicatlas.worker.task.TaskCancelledException;
 import com.comicatlas.worker.media.image.CoverGenerator;
 import com.comicatlas.worker.media.ComicMetadata;
 import com.comicatlas.worker.storage.StorageRef;
@@ -87,7 +88,7 @@ public class DirectoryImportHandler {
 
             if (cancelHandler.isCancelled(taskId)) {
                 log.info("Task cancelled after parse: taskId={}", taskId);
-                throw new RuntimeException("Task cancelled: " + taskId);
+                throw new TaskCancelledException(taskId);
             }
 
             // 构建清单（相对路径），原子写入后再动文件
@@ -108,7 +109,7 @@ public class DirectoryImportHandler {
         for (ImportManifest.ImportFile file : manifest.files()) {
             if (cancelHandler.isCancelled(taskId)) {
                 log.info("Task cancelled during file move: taskId={}", taskId);
-                throw new RuntimeException("Task cancelled: " + taskId);
+                throw new TaskCancelledException(taskId);
             }
             Path source = sourceRoot.resolve(file.source());
             StorageRef storageRef = new StorageRef(StorageRootKeys.HQ, file.target());
