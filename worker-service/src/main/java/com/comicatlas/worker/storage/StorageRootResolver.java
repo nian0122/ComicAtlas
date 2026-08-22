@@ -22,6 +22,10 @@ public final class StorageRootResolver {
     /** 获取可选存储根；用于允许缺少某类产物的读取场景。 */
     public static StorageRoot optional(StorageProperties properties, String rootKey) {
         Map<String, StorageRoot> roots = properties == null ? null : properties.getRoots();
-        return roots == null ? null : roots.get(rootKey);
+        if (roots == null) {
+            return null;
+        }
+        StorageRoot root = roots.get(rootKey);
+        return root != null && root.isEnabled() && root.getPath() != null ? root : null;
     }
 }
