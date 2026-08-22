@@ -8,6 +8,7 @@ import com.comicatlas.common.event.VideoMetadataFixRequestedEvent;
 import com.comicatlas.common.event.payload.VideoMetadataFixResult;
 import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.worker.persistence.record.MediaRecord;
+import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.media.ComicMetadata;
 import com.comicatlas.worker.media.MediaAnalyzer;
 import com.comicatlas.worker.persistence.mapper.MediaReadMapper;
@@ -18,7 +19,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.AmqpHeaders;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
@@ -39,9 +39,7 @@ public class VideoMetadataFixHandler {
     private final MediaAnalyzer mediaAnalyzer;
     private final RabbitTemplate rabbitTemplate;
     private final MqConsumerSupport mqConsumerSupport;
-
-    @Value("${worker.manga-root}")
-    private String mangaRoot;
+    private final WorkerConfig workerConfig;
 
     @RabbitListener(queues = MqQueues.VIDEO_METADATA_FIX)
     public void handle(VideoMetadataFixRequestedEvent event,
@@ -66,7 +64,7 @@ public class VideoMetadataFixHandler {
             for (MediaRecord video : videos) {
                 try {
                     Path videoFile = ManagedStoragePath.resolve(
-                            Path.of(mangaRoot), video.getHqRoot(), video.getHqPath());
+                            Path.of(workerConfig.getMangaRoot()), video.getHqRoot(), video.getHqPath());
 
                     if (!Files.exists(videoFile)) {
                         log.warn("视频文件不存在: pageId={}, hqRoot={}, hqPath={}",
