@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -50,8 +52,12 @@ class SqlContractTest {
     private static void assertSelectAnnotationIsReadOnly(Path path) {
         try {
             String source = Files.readString(path);
-            assertTrue(!source.matches("(?is).*@Select\\s*\\(.*\\b(insert|update|delete|replace)\\b.*"),
-                    () -> path + " @Select 只能承载查询 SQL");
+            Matcher matcher = Pattern.compile("@Select\\s*\\((?s:.*?)\\)").matcher(source);
+            while (matcher.find()) {
+                String sql = matcher.group().replaceAll("(?i)\\bfor\\s+update(?:\\s+skip\\s+locked)?\\b", "");
+                assertTrue(!sql.matches("(?is).*\\b(insert|update|delete|replace)\\b.*"),
+                        () -> path + " @Select 只能承载查询 SQL");
+            }
         } catch (IOException exception) {
             throw new IllegalStateException("读取 SQL 架构门禁源码失败: " + path, exception);
         }

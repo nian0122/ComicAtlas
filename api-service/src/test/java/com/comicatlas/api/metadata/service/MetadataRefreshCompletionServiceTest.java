@@ -8,6 +8,7 @@ import com.comicatlas.api.task.entity.ManagementTaskItem;
 import com.comicatlas.api.task.mapper.ManagementTaskItemMapper;
 import com.comicatlas.api.task.service.ManagementTaskService;
 import com.comicatlas.api.outbox.service.InboxService;
+import com.comicatlas.api.outbox.service.EventFingerprintService;
 import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.api.metadata.service.MetadataRefreshService.MetadataRefreshLoadRequest;
 import com.comicatlas.common.constant.MqExchanges;
@@ -82,6 +83,7 @@ class MetadataRefreshCompletionServiceTest {
     @Mock private ComicMapper comicMapper;
     @Mock private MetadataRefreshService metadataRefreshService;
     @Mock private InboxService inboxService;
+    @Mock private EventFingerprintService eventFingerprintService;
     @Mock private OutboxService outboxService;
     @Mock private ManagementTaskService managementTaskService;
     @Mock private CatalogCacheInvalidator catalogCacheInvalidator;
@@ -98,6 +100,7 @@ class MetadataRefreshCompletionServiceTest {
 
     @BeforeEach
     void setUp() throws Exception {
+        lenient().when(eventFingerprintService.fingerprint(any())).thenReturn("test-event-hash");
         // 单元测试无 Spring 上下文：注册实体 TableInfo 以支持 LambdaUpdateWrapper 解析
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), Comic.class);
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), ManagementTaskItem.class);
