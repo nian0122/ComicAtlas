@@ -1,4 +1,4 @@
-package com.comicatlas.api.admin.dto;
+package com.comicatlas.api.recovery.dto;
 
 /**
  * 恢复进度记录 — 每处理一个漫画目录后返回，包含该次处理的计数器（0 或 1）和详情。

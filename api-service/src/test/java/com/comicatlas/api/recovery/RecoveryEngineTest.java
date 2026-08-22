@@ -1,6 +1,6 @@
 package com.comicatlas.api.recovery;
 
-import com.comicatlas.api.admin.dto.RecoveryProgressVO;
+import com.comicatlas.api.recovery.dto.RecoveryProgressVO;
 import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.mapper.CatalogMapper;

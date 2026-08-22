@@ -1,7 +1,7 @@
 package com.comicatlas.api.admin.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.comicatlas.api.admin.dto.ComicDeleteStatsDTO;
+import com.comicatlas.api.recovery.dto.ComicDeleteStatsDTO;
 import com.comicatlas.api.recovery.RecoveryEngine;
 import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
 import com.comicatlas.contract.common.exception.BusinessException;

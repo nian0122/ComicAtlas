@@ -1,4 +1,4 @@
-package com.comicatlas.api.admin.dto;
+package com.comicatlas.api.recovery.dto;
 
 import java.time.LocalDateTime;
 

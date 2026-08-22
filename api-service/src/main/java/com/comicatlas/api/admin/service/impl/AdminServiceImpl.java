@@ -1,9 +1,9 @@
 package com.comicatlas.api.admin.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.comicatlas.api.admin.dto.ComicDeleteStatsDTO;
-import com.comicatlas.api.admin.dto.RecoveryProgressVO;
-import com.comicatlas.api.admin.dto.ScanRecoverResultDTO;
+import com.comicatlas.api.recovery.dto.ComicDeleteStatsDTO;
+import com.comicatlas.api.recovery.dto.RecoveryProgressVO;
+import com.comicatlas.api.recovery.dto.ScanRecoverResultDTO;
 import com.comicatlas.api.storage.dto.StorageStatsDTO;
 import com.comicatlas.api.storage.persistence.mapper.StorageMapper;
 import com.comicatlas.api.admin.service.AdminService;

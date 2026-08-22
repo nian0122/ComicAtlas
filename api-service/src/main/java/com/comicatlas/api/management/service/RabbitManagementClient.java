@@ -1,4 +1,4 @@
-package com.comicatlas.api.admin.service;
+package com.comicatlas.api.management.service;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;

@@ -1,4 +1,4 @@
-package com.comicatlas.api.admin.controller;
+package com.comicatlas.api.storage.controller;
 
 import com.comicatlas.api.storage.dto.ChapterStorageDTO;
 import com.comicatlas.api.storage.dto.ComicStorageDTO;

@@ -1,7 +1,7 @@
 package com.comicatlas.api.admin.controller;
 
-import com.comicatlas.api.admin.dto.ComicDeleteStatsDTO;
-import com.comicatlas.api.admin.dto.ScanRecoverResultDTO;
+import com.comicatlas.api.recovery.dto.ComicDeleteStatsDTO;
+import com.comicatlas.api.recovery.dto.ScanRecoverResultDTO;
 import com.comicatlas.contract.common.Result;
 import com.comicatlas.api.admin.service.AdminService;
 import lombok.RequiredArgsConstructor;
