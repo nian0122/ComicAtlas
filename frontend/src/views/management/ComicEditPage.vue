@@ -54,7 +54,7 @@
       <section class="edit-panel source-panel">
         <div class="panel-heading"><span class="panel-number">03</span><div><h3>来源记录</h3><p>来源信息由导入流程生成，仅供追溯。</p></div></div>
         <div class="source-display">
-          <span v-if="sourceType" class="source-tag">{{ sourceType }}</span>
+          <span v-if="sourceType" class="source-tag">{{ sourceTypeLabel(sourceType) }}</span>
           <span v-if="sourceRef" class="source-ref">{{ sourceRef }}</span>
           <span v-if="!sourceType && !sourceRef" class="source-empty">暂无来源记录</span>
         </div>
@@ -75,6 +75,7 @@ import { ElMessage } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
 import { managementComicApi, managementTagApi } from '@/services/management'
 import { useCategoryStore } from '@/stores/management/category'
+import { sourceTypeLabel } from '@/utils/source-format'
 import type {
   ComicMetadataDTO,
   ComicMetadataUpdateDTO,

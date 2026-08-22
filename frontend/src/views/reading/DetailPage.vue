@@ -97,7 +97,7 @@
               </div>
               <div class="info-item">
                 <span class="info-label">来源类型</span>
-                <span class="info-value">{{ comic.sourceType || '未知' }}</span>
+                <span class="info-value">{{ sourceTypeLabel(comic.sourceType) }}</span>
               </div>
             </div>
           </details>
@@ -143,6 +143,7 @@ import { comicApi, catalogApi } from '@/services/reading'
 import type { ComicDetailVO, CatalogNode, ChapterRef } from '@/types'
 import CatalogTree from '@/components/reading/comic/CatalogTree.vue'
 import MobileComicDetail from '@/components/reading/comic/MobileComicDetail.vue'
+import { sourceTypeLabel } from '@/utils/source-format'
 import HeroBanner from '@/components/reading/HeroBanner.vue'
 import { useInteractionMode } from '@/views/reading/reader/composables/useInteractionMode'
 
