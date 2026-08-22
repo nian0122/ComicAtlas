@@ -15,6 +15,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @MapperScan({
         "com.comicatlas.api.*.mapper",
+        "com.comicatlas.api.*.persistence.mapper",
         "com.comicatlas.persistence.comic.mapper",
         "com.comicatlas.persistence.reader.mapper"
 })

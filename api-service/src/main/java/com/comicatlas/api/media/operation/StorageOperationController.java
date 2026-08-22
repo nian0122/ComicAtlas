@@ -157,7 +157,9 @@ public class StorageOperationController {
     @PostMapping("/export/comics/{comicId}")
     public ResponseEntity<ExportTaskVO> createExport(@PathVariable Long comicId,
             @RequestParam(defaultValue = "ZIP") String format) {
-        ExportTaskVO task = exportOperationService.createExportTask(comicId, format);
+        ExportTaskVO task = "ZIP".equalsIgnoreCase(format)
+                ? exportOperationService.createExportTask(comicId)
+                : exportOperationService.createExportTask(comicId, format);
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(task);
     }
 

@@ -2,6 +2,7 @@ package com.comicatlas.api.importer.event;
 
 import com.comicatlas.api.importer.service.ImportPersistenceService;
 import com.comicatlas.api.outbox.service.InboxService;
+import com.comicatlas.api.outbox.service.EventFingerprintService;
 import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.event.ImportStorageFinalizeCompletedEvent;
 import com.comicatlas.common.event.ImportStorageFinalizeFailedEvent;
@@ -41,6 +42,7 @@ class ImportStorageFinalizeHandlerTest {
 
     @Mock private ImportPersistenceService importPersistenceService;
     @Mock private InboxService inboxService;
+    @Mock private EventFingerprintService eventFingerprintService;
     @Mock private TransactionTemplate transactionTemplate;
     @Mock private Channel channel;
     @Spy private ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
@@ -49,6 +51,7 @@ class ImportStorageFinalizeHandlerTest {
     @InjectMocks private ImportStorageFinalizeEventHandler handler;
 
     private void runInTransaction() {
+        when(eventFingerprintService.fingerprint(any())).thenReturn("test-event-hash");
         doAnswer(invocation -> {
             @SuppressWarnings("unchecked")
             Consumer<TransactionStatus> consumer = invocation.getArgument(0);
