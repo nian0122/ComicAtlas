@@ -30,6 +30,8 @@ import com.comicatlas.api.task.enums.TaskStage;
 import com.comicatlas.api.task.enums.TaskType;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.shared.exception.ConflictException;
+import com.comicatlas.api.shared.crypto.DigestService;
+import com.comicatlas.api.shared.monitoring.MonitoredOperation;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.entity.Media;
@@ -42,14 +44,10 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -66,6 +64,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@MonitoredOperation
 public class ManagementTaskService {
 
     /** 目标类型：漫画。 */
@@ -78,6 +77,7 @@ public class ManagementTaskService {
     private static final String RESULT_REF_TYPE_TRASH_MANIFEST = "TRASH_MANIFEST";
     /** 初始 attempt 次数。 */
     private static final int INITIAL_ATTEMPT = 1;
+    private final DigestService digestService;
 
     private final ManagementTaskMapper taskMapper;
     private final ManagementTaskItemMapper itemMapper;
@@ -131,7 +131,7 @@ public class ManagementTaskService {
 
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {
             task.setIdempotencyKey(idempotencyKey);
-            task.setIdempotencyPayloadHash(sha256(payload));
+            task.setIdempotencyPayloadHash(digestService.sha256(payload));
         }
 
         int totalCount = 0;
@@ -1045,13 +1045,4 @@ public class ManagementTaskService {
         return response;
     }
 
-    private static String sha256(String input) {
-        try {
-            MessageDigest messageDigest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = messageDigest.digest(input.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-        } catch (NoSuchAlgorithmException ex) {
-            throw new BusinessException("SHA-256 不可用", ex);
-        }
-    }
 }
