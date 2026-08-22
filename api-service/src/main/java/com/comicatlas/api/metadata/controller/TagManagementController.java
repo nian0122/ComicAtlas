@@ -2,7 +2,7 @@ package com.comicatlas.api.metadata.controller;
 
 import com.comicatlas.contract.common.Result;
 import com.comicatlas.contract.comic.dto.TagDTO;
-import com.comicatlas.api.comic.dto.CreateTagRequest;
+import com.comicatlas.api.metadata.dto.CreateTagRequest;
 import com.comicatlas.api.metadata.service.TagManagementService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
