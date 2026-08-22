@@ -37,7 +37,7 @@ import com.comicatlas.worker.recovery.trash.TrashManifestStore;
 import com.comicatlas.worker.persistence.mapper.MediaReadMapper;
 import com.comicatlas.worker.persistence.mapper.UploadFileReadMapper;
 import com.comicatlas.worker.persistence.mapper.UploadSessionReadMapper;
-import com.comicatlas.worker.mapper.TrashManifestReadMapper;
+import com.comicatlas.worker.persistence.mapper.TrashManifestReadMapper;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -991,7 +991,7 @@ class MediaUploadManagementIT {
      * 结果事件仍经 RabbitMQ 回传 API 结果处理器。
      */
     @org.springframework.boot.test.context.TestConfiguration
-    @org.mybatis.spring.annotation.MapperScan("com.comicatlas.worker.mapper")
+    @org.mybatis.spring.annotation.MapperScan("com.comicatlas.worker.persistence.mapper")
     static class WorkerProcessingConfig {
 
         @Bean

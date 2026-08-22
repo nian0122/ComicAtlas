@@ -27,7 +27,7 @@ import com.comicatlas.worker.recovery.command.RestoreCommandHandler;
 import com.comicatlas.worker.recovery.command.TrashCommandHandler;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.recovery.trash.TrashManifestStore;
-import com.comicatlas.worker.mapper.TrashManifestReadMapper;
+import com.comicatlas.worker.persistence.mapper.TrashManifestReadMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
@@ -79,7 +79,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("test")
 @Testcontainers(disabledWithoutDocker = true)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-@org.mybatis.spring.annotation.MapperScan("com.comicatlas.worker.mapper")
+@org.mybatis.spring.annotation.MapperScan("com.comicatlas.worker.persistence.mapper")
 @DisplayName("回收站生命周期集成测试")
 class TrashLifecycleIT {
 
