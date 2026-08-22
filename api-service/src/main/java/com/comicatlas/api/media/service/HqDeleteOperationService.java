@@ -1,7 +1,7 @@
 package com.comicatlas.api.media.service;
 
 import com.comicatlas.api.task.dto.OperationSubmitResultDTO;
-import com.comicatlas.api.task.operation.MediaOperationCommandService;
+import com.comicatlas.api.media.operation.MediaOperationCommandService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

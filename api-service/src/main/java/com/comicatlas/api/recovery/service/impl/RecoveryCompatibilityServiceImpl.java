@@ -9,7 +9,7 @@ import com.comicatlas.api.recovery.RecoveryEngine;
 import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
-import com.comicatlas.api.task.operation.MediaOperationCommandService;
+import com.comicatlas.api.media.operation.MediaOperationCommandService;
 import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.contract.comic.cache.ComicReferenceCache;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;

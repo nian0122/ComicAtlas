@@ -1,4 +1,4 @@
-package com.comicatlas.api.task.trash;
+package com.comicatlas.api.recovery.trash;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;

@@ -1,7 +1,7 @@
 package com.comicatlas.api.task.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.comicatlas.api.task.trash.TrashManifestRecord;
+import com.comicatlas.api.recovery.trash.TrashManifestRecord;
 import org.apache.ibatis.annotations.Mapper;
 
 /**

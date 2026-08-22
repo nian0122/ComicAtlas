@@ -8,7 +8,7 @@ import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.importer.entity.ImportTask;
 import com.comicatlas.api.importer.mapper.ImportTaskMapper;
 import com.comicatlas.api.task.dto.OperationSubmitResultDTO;
-import com.comicatlas.api.task.operation.MediaOperationCommandService;
+import com.comicatlas.api.media.operation.MediaOperationCommandService;
 import com.comicatlas.persistence.reader.mapper.ReadingHistoryMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

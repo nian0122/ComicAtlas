@@ -1,4 +1,4 @@
-package com.comicatlas.api.task.operation;
+package com.comicatlas.api.media.operation;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -19,7 +19,7 @@ import com.comicatlas.api.task.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.task.dto.ManagementTaskResponse;
 import com.comicatlas.api.task.dto.OperationSubmitResultDTO;
 import com.comicatlas.api.task.service.ManagementTaskService;
-import com.comicatlas.api.task.trash.TrashLifecycleService;
+import com.comicatlas.api.recovery.trash.TrashLifecycleService;
 import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;

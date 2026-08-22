@@ -2,7 +2,7 @@ package com.comicatlas.api.task.event;
 
 import com.comicatlas.api.task.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.task.service.ManagementTaskService;
-import com.comicatlas.api.task.trash.TrashLifecycleCompletionService;
+import com.comicatlas.api.recovery.trash.TrashLifecycleCompletionService;
 import com.comicatlas.api.outbox.service.InboxService;
 import com.comicatlas.api.storage.service.ComicStatsService;
 import com.comicatlas.api.media.service.MediaOperationCompletionService;

@@ -1,4 +1,4 @@
-package com.comicatlas.api.task.trash;
+package com.comicatlas.api.recovery.trash;
 
 import com.comicatlas.api.task.dto.OperationSubmitResultDTO;
 import com.comicatlas.common.dto.TrashManifestDTO;

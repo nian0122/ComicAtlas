@@ -1,4 +1,4 @@
-package com.comicatlas.api.task.operation;
+package com.comicatlas.api.media.operation;
 
 import com.comicatlas.api.exporter.dto.ExportTaskVO;
 import com.comicatlas.api.task.dto.OperationSubmitResultDTO;

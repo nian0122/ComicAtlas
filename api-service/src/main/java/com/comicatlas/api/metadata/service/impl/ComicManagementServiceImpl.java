@@ -10,7 +10,7 @@ import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.shared.exception.ConflictException;
 import com.comicatlas.api.task.dto.ManagementTaskResponse;
 import com.comicatlas.api.task.service.ManagementTaskService;
-import com.comicatlas.api.task.trash.TrashLifecycleService;
+import com.comicatlas.api.recovery.trash.TrashLifecycleService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

@@ -18,7 +18,7 @@ import com.comicatlas.api.task.dto.ManagementTaskResponse;
 import com.comicatlas.api.task.dto.OperationSubmitResultDTO;
 import com.comicatlas.api.task.entity.ManagementTask;
 import com.comicatlas.api.task.entity.ManagementTaskItem;
-import com.comicatlas.api.task.operation.MediaOperationCommandService;
+import com.comicatlas.api.media.operation.MediaOperationCommandService;
 import com.comicatlas.api.task.policy.AllowedOperations;
 import com.comicatlas.api.task.policy.MediaOperationEligibilityService;
 import com.comicatlas.api.task.policy.OperationPolicyService;

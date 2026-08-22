@@ -14,7 +14,7 @@ import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.api.catalog.service.ChapterManagementService;
 import com.comicatlas.api.task.state.ManagementStateMachine;
-import com.comicatlas.api.task.trash.TrashLifecycleService;
+import com.comicatlas.api.recovery.trash.TrashLifecycleService;
 import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.exception.BusinessException;

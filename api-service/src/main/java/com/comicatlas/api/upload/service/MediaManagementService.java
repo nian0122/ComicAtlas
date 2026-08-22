@@ -10,7 +10,7 @@ import com.comicatlas.persistence.comic.entity.Media;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.MediaMapper;
 import com.comicatlas.api.task.dto.OperationSubmitResultDTO;
-import com.comicatlas.api.task.trash.TrashLifecycleService;
+import com.comicatlas.api.recovery.trash.TrashLifecycleService;
 import com.comicatlas.api.upload.dto.MediaReorderItem;
 import com.comicatlas.api.upload.dto.MediaReorderRequest;
 import com.comicatlas.api.upload.dto.MediaReorderResponse;

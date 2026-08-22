@@ -1,4 +1,4 @@
-package com.comicatlas.api.task.trash;
+package com.comicatlas.api.recovery.trash;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;

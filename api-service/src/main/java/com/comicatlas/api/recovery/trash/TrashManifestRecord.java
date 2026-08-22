@@ -1,4 +1,4 @@
-package com.comicatlas.api.task.trash;
+package com.comicatlas.api.recovery.trash;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;

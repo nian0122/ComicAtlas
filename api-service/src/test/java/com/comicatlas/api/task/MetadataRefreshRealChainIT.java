@@ -21,7 +21,7 @@ import com.comicatlas.api.task.entity.ManagementTask;
 import com.comicatlas.api.task.entity.ManagementTaskItem;
 import com.comicatlas.api.task.mapper.ManagementTaskItemMapper;
 import com.comicatlas.api.task.mapper.ManagementTaskMapper;
-import com.comicatlas.api.task.operation.MediaOperationCommandService;
+import com.comicatlas.api.media.operation.MediaOperationCommandService;
 import com.comicatlas.api.task.service.ManagementTaskService;
 import com.comicatlas.api.outbox.entity.OutboxMessage;
 import com.comicatlas.api.outbox.mapper.InboxReceiptMapper;
