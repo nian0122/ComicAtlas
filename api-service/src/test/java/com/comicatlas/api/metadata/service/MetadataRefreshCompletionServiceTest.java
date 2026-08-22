@@ -1,4 +1,4 @@
-package com.comicatlas.api.storage.service;
+package com.comicatlas.api.metadata.service;
 
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -9,7 +9,7 @@ import com.comicatlas.api.management.mapper.ManagementTaskItemMapper;
 import com.comicatlas.api.management.service.ManagementTaskService;
 import com.comicatlas.api.outbox.service.InboxService;
 import com.comicatlas.api.outbox.service.OutboxService;
-import com.comicatlas.api.storage.service.MetadataRefreshService.MetadataRefreshLoadRequest;
+import com.comicatlas.api.metadata.service.MetadataRefreshService.MetadataRefreshLoadRequest;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO;

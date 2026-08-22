@@ -1,5 +1,7 @@
-package com.comicatlas.api.storage.service;
+package com.comicatlas.api.media.service;
 
+import com.comicatlas.api.metadata.service.MetadataUpdateCoordinator;
+import com.comicatlas.api.storage.service.ComicStatsService;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Media;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;

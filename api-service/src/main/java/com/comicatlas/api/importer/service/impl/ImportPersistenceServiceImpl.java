@@ -42,7 +42,7 @@ import com.comicatlas.persistence.comic.mapper.MediaMapper;
 import com.comicatlas.persistence.comic.mapper.ComicTagMapper;
 import com.comicatlas.persistence.comic.mapper.TagMapper;
 import com.comicatlas.api.storage.ApiStorageProperties;
-import com.comicatlas.api.storage.service.MetadataUpdateCoordinator;
+import com.comicatlas.api.metadata.service.MetadataUpdateCoordinator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;

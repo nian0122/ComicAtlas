@@ -1,4 +1,4 @@
-package com.comicatlas.api.storage.service;
+package com.comicatlas.api.media.service;
 
 import com.comicatlas.api.management.dto.OperationSubmitResultDTO;
 import com.comicatlas.api.management.operation.MediaOperationCommandService;

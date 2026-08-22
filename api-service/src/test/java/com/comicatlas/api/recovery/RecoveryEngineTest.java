@@ -1,4 +1,4 @@
-package com.comicatlas.api.common.scan;
+package com.comicatlas.api.recovery;
 
 import com.comicatlas.api.admin.dto.RecoveryProgressVO;
 import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
@@ -59,7 +59,7 @@ class RecoveryEngineTest {
     @Mock
     private ApiStorageProperties storageProperties;
     @Mock
-    private com.comicatlas.api.storage.service.MetadataUpdateCoordinator metadataUpdateCoordinator;
+    private com.comicatlas.api.metadata.service.MetadataUpdateCoordinator metadataUpdateCoordinator;
 
     @TempDir
     Path tempDir;

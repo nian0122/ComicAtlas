@@ -1,4 +1,4 @@
-package com.comicatlas.api.common.scan;
+package com.comicatlas.api.recovery;
 
 import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.common.storage.RelativePathValidator;

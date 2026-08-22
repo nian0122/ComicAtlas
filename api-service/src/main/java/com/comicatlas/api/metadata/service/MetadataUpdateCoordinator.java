@@ -1,4 +1,4 @@
-package com.comicatlas.api.storage.service;
+package com.comicatlas.api.metadata.service;
 
 import com.comicatlas.api.comic.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.outbox.service.OutboxService;

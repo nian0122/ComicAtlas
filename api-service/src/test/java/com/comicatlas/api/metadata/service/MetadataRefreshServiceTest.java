@@ -1,4 +1,4 @@
-package com.comicatlas.api.storage.service;
+package com.comicatlas.api.metadata.service;
 
 import com.comicatlas.contract.common.enums.HqStatus;
 import com.comicatlas.contract.common.enums.LqStatus;

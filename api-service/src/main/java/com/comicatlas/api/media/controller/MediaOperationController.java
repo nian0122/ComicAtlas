@@ -1,4 +1,4 @@
-package com.comicatlas.api.management.controller;
+package com.comicatlas.api.media.controller;
 
 import com.comicatlas.contract.common.Result;
 import com.comicatlas.api.management.policy.AllowedOperations;

@@ -1,7 +1,7 @@
 package com.comicatlas.api.importer.event;
 
 import com.comicatlas.api.admin.dto.RecoveryProgressVO;
-import com.comicatlas.api.common.scan.RecoveryEngine;
+import com.comicatlas.api.recovery.RecoveryEngine;
 import com.comicatlas.api.importer.entity.RecoveryTask;
 import com.comicatlas.api.importer.mapper.RecoveryTaskMapper;
 import com.comicatlas.api.management.dto.ManagementTaskItemResponse;

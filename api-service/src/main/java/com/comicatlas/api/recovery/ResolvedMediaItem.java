@@ -1,4 +1,4 @@
-package com.comicatlas.api.common.scan;
+package com.comicatlas.api.recovery;
 
 /**
  * 事务前解析出的单条媒体恢复信息 — 文件扫描/存在性校验结果的数据载体。

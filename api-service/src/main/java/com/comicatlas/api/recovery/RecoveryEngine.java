@@ -1,4 +1,4 @@
-package com.comicatlas.api.common.scan;
+package com.comicatlas.api.recovery;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.admin.dto.RecoveryProgressVO;
@@ -10,7 +10,7 @@ import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.enums.HqStatus;
 import com.comicatlas.contract.common.enums.LqStatus;
 import com.comicatlas.api.storage.ApiStorageProperties;
-import com.comicatlas.api.storage.service.MetadataUpdateCoordinator;
+import com.comicatlas.api.metadata.service.MetadataUpdateCoordinator;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
