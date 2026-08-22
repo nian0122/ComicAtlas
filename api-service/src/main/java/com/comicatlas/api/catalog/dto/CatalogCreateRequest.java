@@ -1,4 +1,4 @@
-package com.comicatlas.api.comic.dto;
+package com.comicatlas.api.catalog.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;

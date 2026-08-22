@@ -1,11 +1,11 @@
 package com.comicatlas.api.catalog.controller;
 
 import com.comicatlas.contract.common.Result;
-import com.comicatlas.api.comic.dto.CatalogVO;
-import com.comicatlas.api.comic.dto.CatalogCreateRequest;
-import com.comicatlas.api.comic.dto.CatalogMoveRequest;
-import com.comicatlas.api.comic.dto.CatalogRenameRequest;
-import com.comicatlas.api.comic.dto.CatalogReorderRequest;
+import com.comicatlas.api.catalog.dto.CatalogVO;
+import com.comicatlas.api.catalog.dto.CatalogCreateRequest;
+import com.comicatlas.api.catalog.dto.CatalogMoveRequest;
+import com.comicatlas.api.catalog.dto.CatalogRenameRequest;
+import com.comicatlas.api.catalog.dto.CatalogReorderRequest;
 import com.comicatlas.api.catalog.service.CatalogManagementService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
