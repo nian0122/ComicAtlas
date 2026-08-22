@@ -28,12 +28,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.math.BigDecimal;
-import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -124,6 +123,7 @@ public class MetadataRefreshCommandHandler {
     private final int maxMedia;
     private final long maxSnapshotBytes;
     private final WorkerConfig workerConfig;
+    private final MetadataSnapshotWriter snapshotWriter;
 
     /**
      * 生产装配构造器：@Autowired 显式声明——类含包级测试构造器，不标注时 Spring 无法决定用哪个。
@@ -197,6 +197,7 @@ public class MetadataRefreshCommandHandler {
         this.maxMedia = maxMedia;
         this.maxSnapshotBytes = maxSnapshotBytes;
         this.workerConfig = workerConfig;
+        this.snapshotWriter = new MetadataSnapshotWriter(storageProperties);
     }
 
     /**
@@ -266,7 +267,7 @@ public class MetadataRefreshCommandHandler {
                 return;
             }
 
-            String snapshotRef = writeSnapshotAtomically(cmd, jsonBytes);
+            String snapshotRef = snapshotWriter.write(cmd, jsonBytes);
             String snapshotSha256 = sha256Hex(jsonBytes);
 
             publisher.metadataRefreshScanCompleted(cmd, snapshotRef, snapshotSha256,
@@ -721,29 +722,6 @@ public class MetadataRefreshCommandHandler {
      *
      * @return 快照引用路径（相对 STAGING 根，如 {@code metadata-refresh/1/2/3/snapshot.json}）
      */
-    private String writeSnapshotAtomically(ManagementCommandRequestedEvent cmd, byte[] jsonBytes)
-            throws IOException {
-        StorageRoot stagingRoot = requireRoot(STAGING_ROOT_KEY);
-        String relative = "metadata-refresh/" + cmd.taskId() + "/" + cmd.itemId() + "/" + cmd.attempt();
-        Path target = stagingRoot.resolve(relative + "/snapshot.json");
-        Path temp = target.resolveSibling("snapshot.json.tmp");
-        Files.createDirectories(target.getParent());
-        try {
-            try (OutputStream out = Files.newOutputStream(temp)) {
-                out.write(jsonBytes);
-                out.flush();
-            }
-            try {
-                Files.move(temp, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-            } catch (AtomicMoveNotSupportedException e) {
-                throw new IOException("原子移动不受支持，拒绝非原子覆盖写入: " + relative, e);
-            }
-        } finally {
-            Files.deleteIfExists(temp);
-        }
-        return relative + "/snapshot.json";
-    }
-
     private StorageRoot requireRoot(String key) {
         return StorageRootResolver.required(storageProperties, key);
     }
