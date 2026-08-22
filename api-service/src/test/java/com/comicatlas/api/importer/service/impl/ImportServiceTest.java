@@ -18,6 +18,7 @@ import com.comicatlas.api.importer.mapper.ImportTaskMapper;
 import com.comicatlas.api.importer.service.ImportRetryCoordinator;
 import com.comicatlas.api.task.dto.ManagementTaskResponse;
 import com.comicatlas.api.task.service.ManagementTaskService;
+import com.comicatlas.api.shared.crypto.DigestService;
 import com.comicatlas.api.outbox.service.OutboxService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -69,6 +70,7 @@ class ImportServiceTest {
     @Mock private OutboxService outboxService;
     @Mock private ApiStorageProperties storageProperties;
     @Mock private ImportRetryCoordinator importRetryCoordinator;
+    @Mock private DigestService digestService;
     @InjectMocks private ImportServiceImpl service;
 
     @BeforeEach

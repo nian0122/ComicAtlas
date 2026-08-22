@@ -3,12 +3,11 @@ package com.comicatlas.api.task.batch.service;
 import com.comicatlas.api.task.batch.BatchReasonCode;
 import com.comicatlas.api.task.batch.dto.BatchOperationRequest;
 import com.comicatlas.api.task.batch.dto.BatchOperationPayloadDTO;
+import com.comicatlas.api.shared.crypto.DigestService;
 import lombok.extern.slf4j.Slf4j;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.HexFormat;
 import java.util.List;
@@ -23,11 +22,13 @@ import java.util.concurrent.ConcurrentMap;
  */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class BatchPreviewTokenStore {
 
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private final ConcurrentMap<String, Entry> store = new ConcurrentHashMap<>();
+    private final DigestService digestService;
 
     private record Entry(String fingerprint, long expiresAtEpochMillis) {
     }
@@ -81,7 +82,7 @@ public class BatchPreviewTokenStore {
             sb.append('|').append(id);
         }
         sb.append('|').append(canonicalPayload(request.getPayload()));
-        return sha256(sb.toString());
+        return digestService.sha256(sb.toString());
     }
 
     private static String canonicalPayload(BatchOperationPayloadDTO payload) {
@@ -101,12 +102,4 @@ public class BatchPreviewTokenStore {
         return s == null ? "" : s;
     }
 
-    private static String sha256(String input) {
-        try {
-            return HexFormat.of().formatHex(
-                    MessageDigest.getInstance("SHA-256").digest(input.getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 不可用", e);
-        }
-    }
 }

@@ -31,6 +31,7 @@ import com.comicatlas.contract.common.enums.SourceType;
 import com.comicatlas.api.task.enums.TaskType;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.shared.exception.ConflictException;
+import com.comicatlas.api.shared.crypto.DigestService;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.api.storage.ApiStorageProperties;
@@ -46,14 +47,10 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
 import java.util.regex.Matcher;
@@ -63,6 +60,8 @@ import java.util.regex.Pattern;
 @Service
 @RequiredArgsConstructor
 public class ImportServiceImpl implements ImportService {
+
+    private final DigestService digestService;
 
     /** Redis 导入取消标记 key 前缀（与 Worker CancelHandler.KEY_PREFIX 契约一致）。 */
     private static final String IMPORT_CANCEL_KEY_PREFIX = "import:cancel:";
@@ -106,7 +105,7 @@ public class ImportServiceImpl implements ImportService {
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {
             ManagementTask existing = managementTaskService.findByIdempotencyKey(idempotencyKey);
             if (existing != null) {
-                String expectedHash = sha256(payload(request));
+                String expectedHash = digestService.sha256(payload(request));
                 if (!expectedHash.equals(existing.getIdempotencyPayloadHash())) {
                     throw new ConflictException("幂等键 " + idempotencyKey + " 已存在但 payload 不匹配");
                 }
@@ -401,16 +400,6 @@ public class ImportServiceImpl implements ImportService {
         target.setOperationType(TaskType.IMPORT);
         managementTaskRequest.setTargets(List.of(target));
         return managementTaskService.createTask(managementTaskRequest, idempotencyKey, payload);
-    }
-
-    private static String sha256(String input) {
-        try {
-            MessageDigest messageDigest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = messageDigest.digest(input.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-        } catch (NoSuchAlgorithmException ex) {
-            throw new IllegalStateException("SHA-256 不可用", ex);
-        }
     }
 
     private static SourceType toSourceType(String sourceType) {
