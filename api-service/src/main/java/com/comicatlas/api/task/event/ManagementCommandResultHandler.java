@@ -4,6 +4,7 @@ import com.comicatlas.api.task.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.task.service.ManagementTaskService;
 import com.comicatlas.api.recovery.trash.TrashLifecycleCompletionService;
 import com.comicatlas.api.outbox.service.InboxService;
+import com.comicatlas.api.outbox.service.EventFingerprintService;
 import com.comicatlas.api.storage.service.ComicStatsService;
 import com.comicatlas.api.media.service.MediaOperationCompletionService;
 import com.comicatlas.api.metadata.service.MetadataRefreshCompletionService;
@@ -19,8 +20,6 @@ import com.comicatlas.common.event.MetadataRefreshScanCompletedEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.task.enums.ManagementTaskStatus;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,9 +30,6 @@ import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.util.HexFormat;
 import java.util.Set;
 
 /**
@@ -64,7 +60,7 @@ public class ManagementCommandResultHandler {
     private final InboxService inboxService;
     private final MqConsumerSupport mqConsumerSupport;
     private final TransactionTemplate transactionTemplate;
-    private final ObjectMapper objectMapper;
+    private final EventFingerprintService eventFingerprintService;
     private final MediaOperationCompletionService mediaOperationCompletionService;
     private final TrashLifecycleCompletionService trashLifecycleCompletionService;
     private final UploadCompletionService uploadCompletionService;
@@ -96,7 +92,7 @@ public class ManagementCommandResultHandler {
                          Channel channel, long tag, Runnable business) {
         String eventId = event.eventId().toString();
         mqConsumerSupport.consume(channel, tag, "管理命令结果: itemId=" + itemId, () -> {
-            String payloadHash = sha256(toJson(event));
+            String payloadHash = eventFingerprintService.fingerprint(event);
             try {
                 transactionTemplate.executeWithoutResult(tx -> {
                     if (inboxService.isProcessed(eventId, payloadHash)) {
@@ -264,20 +260,4 @@ public class ManagementCommandResultHandler {
         return errorMessage.substring(0, MAX_ITEM_ERROR_MESSAGE_CHARS) + "...（已截断）";
     }
 
-    private String toJson(ComicEvent event) {
-        try {
-            return objectMapper.writeValueAsString(event);
-        } catch (JsonProcessingException e) {
-            throw new BusinessException("结果事件序列化失败: " + event.eventId(), e);
-        }
-    }
-
-    private static String sha256(String input) {
-        try {
-            return HexFormat.of().formatHex(
-                    MessageDigest.getInstance("SHA-256").digest(input.getBytes(StandardCharsets.UTF_8)));
-        } catch (Exception e) {
-            throw new BusinessException("计算结果事件摘要失败", e);
-        }
-    }
 }

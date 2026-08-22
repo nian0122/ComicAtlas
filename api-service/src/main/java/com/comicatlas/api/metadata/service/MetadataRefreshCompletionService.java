@@ -6,6 +6,7 @@ import com.comicatlas.api.task.entity.ManagementTaskItem;
 import com.comicatlas.api.task.mapper.ManagementTaskItemMapper;
 import com.comicatlas.api.task.service.ManagementTaskService;
 import com.comicatlas.api.outbox.service.InboxService;
+import com.comicatlas.api.outbox.service.EventFingerprintService;
 import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.api.metadata.service.MetadataRefreshService.MetadataRefreshLoadRequest;
 import com.comicatlas.common.constant.MqExchanges;
@@ -21,21 +22,16 @@ import com.comicatlas.api.shared.exception.SnapshotUnavailableException;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.api.storage.ApiStorageProperties;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.Comparator;
-import java.util.HexFormat;
 import java.util.stream.Stream;
 
 /**
@@ -78,11 +74,11 @@ public class MetadataRefreshCompletionService {
     private final CatalogCacheInvalidator catalogCacheInvalidator;
     private final ApiStorageProperties apiStorageProperties;
     private final TransactionTemplate transactionTemplate;
-    private final ObjectMapper objectMapper;
+    private final EventFingerprintService eventFingerprintService;
 
     public void handleCompleted(MetadataRefreshScanCompletedEvent ev) {
         String eventId = ev.eventId().toString();
-        String payloadHash = sha256(toJson(ev));
+        String payloadHash = eventFingerprintService.fingerprint(ev);
 
         // 1. 幂等前置检查（无事务）
         ManagementTaskItem item = managementTaskItemMapper.selectById(ev.itemId());
@@ -276,20 +272,4 @@ public class MetadataRefreshCompletionService {
                 .set(Comic::getStatus, ComicStatus.READY));
     }
 
-    private String toJson(MetadataRefreshScanCompletedEvent event) {
-        try {
-            return objectMapper.writeValueAsString(event);
-        } catch (JsonProcessingException e) {
-            throw new BusinessException("元数据刷新完成事件序列化失败: " + event.eventId(), e);
-        }
-    }
-
-    private static String sha256(String input) {
-        try {
-            return HexFormat.of().formatHex(
-                    MessageDigest.getInstance("SHA-256").digest(input.getBytes(StandardCharsets.UTF_8)));
-        } catch (Exception e) {
-            throw new BusinessException("计算元数据事件摘要失败", e);
-        }
-    }
 }
