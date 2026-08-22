@@ -10,6 +10,7 @@ import com.comicatlas.common.event.ManagementCommandCompletedEvent;
 import com.comicatlas.common.event.ManagementCommandFailedEvent;
 import com.comicatlas.common.event.ManagementCommandProgressEvent;
 import com.comicatlas.common.event.MediaUploadCompletedEvent;
+import com.comicatlas.common.event.MetadataRefreshScanCompletedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -101,6 +102,11 @@ public class ManagementResultRouter {
         uploadCompletionService.applyUploadCompletedBusiness(event);
         metadataUpdateCoordinator.requestSyncForTarget(event.targetType(), event.targetId(),
                 event.taskId(), "上传完成: " + event.operationType());
+    }
+
+    /** 路由元数据刷新专用完成事件；该流程由调用方决定是否包事务。 */
+    public void routeMetadataRefreshCompleted(MetadataRefreshScanCompletedEvent event) {
+        metadataCompletionService.handleCompleted(event);
     }
 
     private void forChapters(ManagementCommandCompletedEvent event, boolean comicScope,

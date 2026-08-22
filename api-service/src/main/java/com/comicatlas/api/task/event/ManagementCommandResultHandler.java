@@ -4,7 +4,6 @@ import com.comicatlas.api.task.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.task.service.ManagementTaskService;
 import com.comicatlas.api.outbox.service.InboxService;
 import com.comicatlas.api.outbox.service.EventFingerprintService;
-import com.comicatlas.api.metadata.service.MetadataRefreshCompletionService;
 import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.event.ComicEvent;
 import com.comicatlas.common.event.ManagementCommandCompletedEvent;
@@ -49,7 +48,6 @@ public class ManagementCommandResultHandler {
     private final TransactionTemplate transactionTemplate;
     private final EventFingerprintService eventFingerprintService;
     private final ManagementResultRouter managementResultRouter;
-    private final MetadataRefreshCompletionService metadataRefreshCompletionService;
 
     @RabbitListener(queues = MqQueues.MANAGEMENT_RESULT)
     public void handleResult(ComicEvent raw,
@@ -65,7 +63,7 @@ public class ManagementCommandResultHandler {
         } else if (raw instanceof MetadataRefreshScanCompletedEvent ev) {
             // 元数据刷新专用流程：快照读取/校验必须在事务外，不走通用 process 事务分支
             mqConsumerSupport.consume(channel, tag, "元数据刷新完成: itemId=" + ev.itemId(),
-                    () -> metadataRefreshCompletionService.handleCompleted(ev));
+                    () -> managementResultRouter.routeMetadataRefreshCompleted(ev));
         } else {
             mqConsumerSupport.consume(channel, tag, "管理命令未知事件: " + raw.eventId(), () -> { });
         }
