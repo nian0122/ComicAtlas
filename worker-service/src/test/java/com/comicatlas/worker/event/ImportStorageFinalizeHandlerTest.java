@@ -7,6 +7,7 @@ import com.comicatlas.common.event.ImportStorageFinalizeCompletedEvent;
 import com.comicatlas.common.event.ImportStorageFinalizeFailedEvent;
 import com.comicatlas.common.event.ImportStorageFinalizeRequestedEvent;
 import com.comicatlas.common.event.payload.FinalizeMediaMapping;
+import com.comicatlas.common.storage.ImportStagingPath;
 import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.importer.ImportManifest;
@@ -152,7 +153,7 @@ class ImportStorageFinalizeHandlerTest {
         assertEquals(2, c1.mediaCount());
         assertTrue(Files.exists(chapterFile(100L, "001.jpg")), "第一章应已移动到 chapterId=100");
         assertTrue(manifestManager.exists(mangaRoot, TASK_ID), "还有章节未完成时清单应保留");
-        assertEquals(List.of("10/2/003.jpg", "10/3/004.jpg"), manifestTargets(),
+        assertEquals(List.of(".staging/1000/10/2/003.jpg", ".staging/1000/10/3/004.jpg"), manifestTargets(),
                 "清单应只移除第一章条目");
 
         clearInvocations(rabbitTemplate);
@@ -162,7 +163,7 @@ class ImportStorageFinalizeHandlerTest {
         assertEquals(1, c2.mediaCount());
         assertTrue(Files.exists(chapterFile(200L, "003.jpg")), "第二章应已移动到 chapterId=200");
         assertTrue(manifestManager.exists(mangaRoot, TASK_ID));
-        assertEquals(List.of("10/3/004.jpg"), manifestTargets(), "清单应只移除第二章条目");
+        assertEquals(List.of(".staging/1000/10/3/004.jpg"), manifestTargets(), "清单应只移除第二章条目");
 
         clearInvocations(rabbitTemplate);
         handler.handle(event(3, 300L, "004.jpg"), channel, 3L);
@@ -298,7 +299,7 @@ class ImportStorageFinalizeHandlerTest {
         ImportStorageFinalizeCompletedEvent c1 = captureCompleted();
         assertEquals(1, c1.globalOrder());
         assertTrue(manifestManager.exists(mangaRoot, TASK_ID));
-        assertEquals(List.of("10/2/002.jpg", "10/2/003.jpg"), manifestTargets());
+        assertEquals(List.of(".staging/1000/10/2/002.jpg", ".staging/1000/10/2/003.jpg"), manifestTargets());
 
         clearInvocations(rabbitTemplate);
         handler.handle(event(1, 100L, "001.jpg"), channel, 2L);
@@ -534,7 +535,8 @@ class ImportStorageFinalizeHandlerTest {
         }
         return new ImportStorageFinalizeRequestedEvent(
                 UUID.randomUUID(), Instant.now(), TASK_ID, COMIC_ID, globalOrder, chapterId,
-                "hq/" + COMIC_ID + "/" + globalOrder,
+                "hq/" + ImportStagingPath.chapterRelativeToHq(COMIC_ID, TASK_ID, globalOrder)
+                        .toString().replace('\\', '/'),
                 "hq/" + COMIC_ID + "/" + chapterId,
                 mappings);
     }
@@ -550,7 +552,8 @@ class ImportStorageFinalizeHandlerTest {
     }
 
     private Path stagingDir(int globalOrder) {
-        return mangaRoot.resolve("hq").resolve(COMIC_ID + "/" + globalOrder);
+        return mangaRoot.resolve("hq").resolve(ImportStagingPath.chapterRelativeToHq(
+                COMIC_ID, TASK_ID, globalOrder));
     }
 
     private Path chapterDir(long chapterId) {
@@ -568,7 +571,9 @@ class ImportStorageFinalizeHandlerTest {
             int order = entry.getKey();
             for (String name : entry.getValue()) {
                 files.add(new ImportManifest.ImportFile(
-                        "src/" + order + "/" + name, COMIC_ID + "/" + order + "/" + name, size));
+                        "src/" + order + "/" + name,
+                        ImportStagingPath.chapterRelativeToHq(COMIC_ID, TASK_ID, order)
+                                .resolve(name).toString().replace('\\', '/'), size));
             }
         }
         ImportManifest manifest = new ImportManifest(

@@ -192,8 +192,10 @@ public class ImportServiceImpl implements ImportService {
         taskMapper.updateById(task);
 
         // 5. 将事件写入 Outbox（与 DB 同事务），由 relay 异步发布到 MQ
+        // EHENTAI 只有 sourceRef（gallery URL），事件契约仍使用 sourcePath 字段承载 Worker 的入口参数。
+        String eventSourcePath = sourcePath != null && !sourcePath.isBlank() ? sourcePath : sourceRef;
         ImportTaskCreatedEvent event = new ImportTaskCreatedEvent(
-                UUID.randomUUID(), Instant.now(), task.getId(), comic.getId(), sourceType, sourcePath);
+                UUID.randomUUID(), Instant.now(), task.getId(), comic.getId(), sourceType, eventSourcePath);
         outboxService.enqueue(event, MqExchanges.IMPORT, MqRoutingKeys.TASK_CREATED);
 
         log.info("导入任务创建: taskId={}, comicId={}, managementTaskId={}, sourceType={}",

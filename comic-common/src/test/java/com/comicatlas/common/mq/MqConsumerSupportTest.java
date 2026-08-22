@@ -74,6 +74,17 @@ class MqConsumerSupportTest {
     }
 
     @Test
+    void ackAfterCallback_callbackFailure_requeuesOriginalMessage() throws Exception {
+        Channel channel = mock(Channel.class);
+        support.consume(channel, 1L, "label",
+                () -> { throw new IllegalStateException("original"); },
+                e -> { throw new IllegalStateException("publish failed"); },
+                FailurePolicy.ACK_AFTER_CALLBACK);
+        verify(channel).basicReject(1L, true);
+        verify(channel, never()).basicAck(anyLong(), anyBoolean());
+    }
+
+    @Test
     void ackThrows_logsAndDoesNotPropagate() throws Exception {
         Channel channel = mock(Channel.class);
         doThrow(new java.io.IOException("ack fail")).when(channel).basicAck(anyLong(), anyBoolean());

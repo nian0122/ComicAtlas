@@ -309,7 +309,7 @@ class ImportPersistenceServiceTest {
         assertThat(req.comicId()).isEqualTo(100L);
         assertThat(req.globalOrder()).isEqualTo(0);
         assertThat(req.chapterId()).isEqualTo(chapterId);
-        assertThat(req.sourceDir()).isEqualTo("hq/100/0");
+        assertThat(req.sourceDir()).isEqualTo("hq/.staging/10/100/0");
         assertThat(req.targetDir()).isEqualTo("hq/100/" + chapterId);
         assertThat(req.mediaMappings()).containsExactly(new FinalizeMediaMapping("001.jpg", "001.jpg"));
 
@@ -343,7 +343,7 @@ class ImportPersistenceServiceTest {
         assertThat(published.comicId()).isEqualTo(100L);
         assertThat(published.globalOrder()).isEqualTo(0);
         assertThat(published.chapterId()).isEqualTo(chapterId);
-        assertThat(published.sourceDir()).isEqualTo("hq/100/0");
+        assertThat(published.sourceDir()).isEqualTo("hq/.staging/10/100/0");
         assertThat(published.targetDir()).isEqualTo("hq/100/" + chapterId);
     }
 

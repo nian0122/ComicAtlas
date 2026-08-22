@@ -17,6 +17,7 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.support.AmqpHeaders;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 导出启动事件处理器。
@@ -30,6 +31,7 @@ public class ExportStartedHandler {
     private final ExportTaskMapper exportTaskMapper;
     private final ManagementTaskService managementTaskService;
     private final MqConsumerSupport mqConsumerSupport;
+    private final TransactionTemplate transactionTemplate;
 
     @RabbitListener(queues = MqQueues.EXPORT_STARTED_RESULT)
     public void handle(ExportTaskStartedEvent event,
@@ -38,11 +40,17 @@ public class ExportStartedHandler {
         Long comicId = event.comicId();
         log.info("导出启动事件: taskId={}, comicId={}", taskId, comicId);
 
-        mqConsumerSupport.consume(channel, tag, "导出启动: taskId=" + taskId, () -> {
+        mqConsumerSupport.consume(channel, tag, "导出启动: taskId=" + taskId,
+                () -> transactionTemplate.executeWithoutResult(tx -> {
             ExportTask task = exportTaskMapper.selectById(taskId);
-            if (task != null) {
+            if (task != null && task.getStatus() == ExportTaskStatus.PENDING) {
                 task.setStatus(ExportTaskStatus.RUNNING);
                 exportTaskMapper.updateById(task);
+            } else if (task == null || task.getStatus() != ExportTaskStatus.RUNNING) {
+                // 旧事件或终态事件不得回退/重开任务。
+                log.info("忽略导出启动事件: taskId={}, status={}", taskId,
+                        task == null ? null : task.getStatus());
+                return;
             }
 
             // 同步统一任务项为 RUNNING
@@ -53,6 +61,6 @@ public class ExportStartedHandler {
             }
 
             log.info("导出状态更新为 RUNNING: taskId={}", taskId);
-        });
+                }));
     }
 }

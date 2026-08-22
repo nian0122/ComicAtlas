@@ -10,6 +10,7 @@ import com.comicatlas.worker.importer.ImportContext;
 import com.comicatlas.worker.importer.ImportManifest;
 import com.comicatlas.worker.importer.ImportManifestManager;
 import com.comicatlas.worker.importer.ZipImportHandler;
+import com.comicatlas.worker.importer.ImportSourceType;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,7 +46,7 @@ public class ImportTaskHandler {
         Long taskId = event.taskId();
         if (cancelHandler.isCancelled(taskId)) {
             log.info("Task cancelled, skipping: taskId={}", taskId);
-            try { channel.basicAck(tag, false); } catch (Exception ex) { log.warn("消息 ack 失败: tag={}", tag, ex); }
+            acknowledge(channel, tag);
             return;
         }
         mqConsumerSupport.consume(channel, tag, "导入任务: taskId=" + taskId,
@@ -56,7 +57,7 @@ public class ImportTaskHandler {
 
     private void runImport(ImportTaskCreatedEvent event, Long taskId) throws Exception {
         Long comicId = event.comicId();
-        String sourceType = event.sourceType() != null ? event.sourceType() : "ZIP";
+        ImportSourceType sourceType = parseSourceType(event.sourceType());
         String sourcePath = event.sourcePath();
         Path mangaRoot = Path.of(config.getMangaRoot());
 
@@ -69,22 +70,47 @@ public class ImportTaskHandler {
         publisher.publishImported(taskId, comicId);
     }
 
-    private void routeToHandler(String sourceType, String sourcePath, Long taskId, Long comicId, Path mangaRoot) throws Exception {
+    private void routeToHandler(ImportSourceType sourceType, String sourcePath, Long taskId, Long comicId, Path mangaRoot) throws Exception {
         switch (sourceType) {
-            case "ZIP", "CBZ" -> zipHandler.importZip(
-                    new ImportContext(sourceType, Path.of(sourcePath), false, false), taskId, comicId, mangaRoot);
-            case "DIRECTORY" -> {
-                if (sourcePath == null) { throw new IllegalArgumentException("DIRECTORY 需要 sourcePath"); }
+            case ZIP, CBZ -> zipHandler.importZip(
+                    new ImportContext(sourceType.name(), requireSourcePath(sourcePath), false, false), taskId, comicId, mangaRoot);
+            case DIRECTORY -> {
+                Path directory = requireSourcePath(sourcePath);
                 directoryHandler.handle(
-                        new ImportContext("DIRECTORY", Path.of(sourcePath), false, false), taskId, comicId, mangaRoot);
+                        new ImportContext(ImportSourceType.DIRECTORY.name(), directory, false, false), taskId, comicId, mangaRoot);
             }
-            case "EHENTAI" -> {
+            case EHENTAI -> {
                 Path sourceDir = resolveEhentaiSourceDir(taskId, sourcePath, mangaRoot);
                 // 保留 EHENTAI 来源类型，使 parser 能剥离下载产物中的单层传输包装目录
                 directoryHandler.handle(
-                        new ImportContext("EHENTAI", sourceDir, false, false), taskId, comicId, mangaRoot);
+                        new ImportContext(ImportSourceType.EHENTAI.name(), sourceDir, false, false), taskId, comicId, mangaRoot);
             }
-            default -> throw new IllegalArgumentException("Unknown sourceType: " + sourceType);
+        }
+    }
+
+    private static ImportSourceType parseSourceType(String sourceType) {
+        if (sourceType == null || sourceType.isBlank()) {
+            return ImportSourceType.ZIP;
+        }
+        try {
+            return ImportSourceType.valueOf(sourceType.trim().toUpperCase());
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException("不支持的导入来源类型: " + sourceType, exception);
+        }
+    }
+
+    private static Path requireSourcePath(String sourcePath) {
+        if (sourcePath == null || sourcePath.isBlank()) {
+            throw new IllegalArgumentException("导入来源路径不能为空");
+        }
+        return Path.of(sourcePath).toAbsolutePath().normalize();
+    }
+
+    private static void acknowledge(Channel channel, long tag) {
+        try {
+            channel.basicAck(tag, false);
+        } catch (Exception exception) {
+            log.warn("消息 ack 失败: tag={}", tag, exception);
         }
     }
 

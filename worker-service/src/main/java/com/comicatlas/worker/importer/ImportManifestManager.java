@@ -1,5 +1,6 @@
 package com.comicatlas.worker.importer;
 
+import com.comicatlas.common.storage.ImportStagingPath;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -91,7 +92,8 @@ public class ImportManifestManager {
     public void rewriteWithoutChapter(Path mangaRoot, Long taskId, Long comicId, Integer globalOrder)
             throws IOException {
         ImportManifest manifest = read(mangaRoot, taskId);
-        String prefix = comicId + "/" + globalOrder + "/";
+        String prefix = ImportStagingPath.chapterRelativeToHq(comicId, taskId, globalOrder)
+                .toString().replace('\\', '/') + "/";
         List<ImportManifest.ImportFile> remaining = new ArrayList<>(manifest.files().size());
         for (ImportManifest.ImportFile file : manifest.files()) {
             if (file.target() == null || !file.target().startsWith(prefix)) {

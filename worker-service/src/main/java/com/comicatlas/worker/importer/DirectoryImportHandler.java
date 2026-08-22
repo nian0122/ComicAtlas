@@ -1,6 +1,7 @@
 package com.comicatlas.worker.importer;
 
 import com.comicatlas.common.constant.StorageRootKeys;
+import com.comicatlas.common.storage.ImportStagingPath;
 import com.comicatlas.common.util.MetadataFileWriter;
 import com.comicatlas.worker.event.CancelHandler;
 import com.comicatlas.worker.image.CoverGenerator;
@@ -25,8 +26,8 @@ import java.util.Map;
 /**
  * 统一导入：清单驱动的安全搬运（导入两阶段最终化的<b>第一阶段（staging）</b>）。
  * <p>
- * <b>暂存语义</b>：Worker 在 DB 尚未生成章节 ID 时，以漫画内暂存键 {@code globalOrder} 把文件
- * 落到 {@code hq/{comicId}/{globalOrder}}（见 {@link #buildManifestFiles}）；最终目录
+ * <b>暂存语义</b>：Worker 在 DB 尚未生成章节 ID 时，以任务隔离的 {@code globalOrder} 把文件
+ * 落到 {@code hq/.staging/{taskId}/{comicId}/{globalOrder}}（见 {@link #buildManifestFiles}）；最终目录
  * {@code hq/{comicId}/{chapterId}} 由 API 插入章节取得不可变 {@code chapterId} 后，经
  * {@code ImportStorageFinalizeRequestedEvent} 逐章请求 Worker 搬运（见
  * com.comicatlas.worker.event.ImportStorageFinalizeHandler）。
@@ -91,10 +92,11 @@ public class DirectoryImportHandler {
 
             // 构建清单（相对路径），原子写入后再动文件
             Path importRoot = tree.path();
-            ManifestBuildResult manifestBuildResult = buildManifestFiles(metadata, comicId, importRoot);
+            ManifestBuildResult manifestBuildResult = buildManifestFiles(metadata, taskId, comicId, importRoot);
             List<ImportManifest.ImportFile> files = manifestBuildResult.files();
             Map<String, String> generatedNames = manifestBuildResult.nameMap();
-            JsonNode metadataNode = objectMapper.valueToTree(buildMetadataMap(metadata, comicId, generatedNames));
+            JsonNode metadataNode = objectMapper.valueToTree(
+                    buildMetadataMap(metadata, taskId, comicId, generatedNames));
             manifest = new ImportManifest(MANIFEST_VERSION, taskId, ctx.sourceType(), importRoot.toString(),
                     metadataNode, files);
             manifestManager.write(mangaRoot, taskId, manifest);
@@ -127,13 +129,13 @@ public class DirectoryImportHandler {
         }
 
         // 封面：从 metadata 读取首张图片（跳过 VIDEO），从 HQ 生成，不依赖源目录
-        generateCoverFromNode(manifest.metadata(), comicId, mangaRoot);
+        generateCoverFromNode(manifest.metadata(), taskId, comicId, mangaRoot);
 
         // metadata.json 从清单 metadata 写出
         Path metaPath = writeMetadataNode(manifest.metadata(), taskId, comicId, mangaRoot);
 
-        // 注意：此处不再删除清单（恢复点）。两阶段最终化协议中，文件先按
-        // {comicId}/{globalOrder} 暂存，Worker 逐章搬运到 {comicId}/{chapterId} 时
+            // 注意：此处不再删除清单（恢复点）。两阶段最终化协议中，文件先按
+            // .staging/{taskId}/{comicId}/{globalOrder} 暂存，Worker 逐章搬运到 {comicId}/{chapterId} 时
         // 仍需清单中的预期尺寸做幂等校验，并由 ImportStorageFinalizeHandler 在全部章节
         // 最终化完成后经 rewriteWithoutChapter 清空清单目录。若在此提前删除，
         // 最终化阶段将无法核对尺寸（sourceDir==targetDir 时还会静默跳过导致不发布
@@ -141,7 +143,8 @@ public class DirectoryImportHandler {
         return metaPath;
     }
 
-    private ManifestBuildResult buildManifestFiles(ComicMetadata metadata, Long comicId, Path importRoot) {
+    private ManifestBuildResult buildManifestFiles(ComicMetadata metadata, Long taskId,
+                                                   Long comicId, Path importRoot) {
         List<ImportManifest.ImportFile> files = new ArrayList<>();
         Map<String, String> nameMap = new LinkedHashMap<>();
         for (ComicMetadata.ChapterInfo chapter : metadata.chapters()) {
@@ -152,9 +155,10 @@ public class DirectoryImportHandler {
                 }
                 if (Files.exists(source) && page.fileSize() > 0) {
                     String relative = importRoot.relativize(source).toString().replace('\\', '/');
-                    // 目标文件名保留原始文件名（禁止 UUID 化），目录用 globalOrder——
-                    // DB chapterId 未生成前的漫画内暂存键，最终化时由 Worker 搬到 {comicId}/{chapterId}
-                    String target = comicId + "/" + chapter.globalOrder() + "/" + page.fileName();
+                    // 目标文件名保留原始文件名（禁止 UUID 化），目录使用任务隔离的 globalOrder——
+                    // DB chapterId 未生成前的暂存键，最终化时由 Worker 搬到 {comicId}/{chapterId}
+                    String target = ImportStagingPath.chapterRelativeToHq(comicId, taskId,
+                            chapter.globalOrder()).resolve(page.fileName()).toString().replace('\\', '/');
                     files.add(new ImportManifest.ImportFile(relative, target, page.fileSize()));
                     // QA 修复注记（task-21）：nameMap 键必须用相对路径而非裸 fileName，
                     // 否则多章节含同名文件（001.jpg）时后处理章节覆盖前者，
@@ -167,7 +171,8 @@ public class DirectoryImportHandler {
         return new ManifestBuildResult(files, nameMap);
     }
 
-    private Map<String, Object> buildMetadataMap(ComicMetadata metadata, Long comicId, Map<String, String> generatedNames) {
+    private Map<String, Object> buildMetadataMap(ComicMetadata metadata, Long taskId, Long comicId,
+                                                 Map<String, String> generatedNames) {
         Map<String, Object> comic = new LinkedHashMap<>();
         comic.put("title", metadata.title());
         comic.put("author", metadata.author() != null ? metadata.author() : "");
@@ -197,7 +202,7 @@ public class DirectoryImportHandler {
                 mediaMap.put("hqStatus", page.hqStatus());
                 mediaMap.put("lqStatus", page.lqStatus());
                 mediaMap.put("fileSize", page.fileSize());
-                // 新布局：写入 hqPath = {comicId}/{globalOrder}/{generatedName}（staging 暂存布局，
+                // 新布局：写入 hqPath = hq/.staging/{taskId}/{comicId}/{globalOrder}/{generatedName}（staging 暂存布局，
                 // 最终化阶段由 Worker 按 {comicId}/{chapterId} 移动后以事件真实 targetDir 修正）
                 String relKey = (chapter.sourceDir() != null && !chapter.sourceDir().isBlank())
                         ? chapter.sourceDir() + "/" + page.fileName()
@@ -264,8 +269,8 @@ public class DirectoryImportHandler {
      * 生成成功后再校验 cover.webp 非空——CoverGenerator 对空产物抛异常走正常兜底，
      * 此处兜底防御"返回成功但产物为空"的异常场景，并清理陈旧空封面。
      */
-    private void generateCoverFromNode(JsonNode metadata, Long comicId, Path mangaRoot) {
-        List<CoverCandidateSelector.MediaCandidate> media = flattenMedia(metadata, comicId);
+    private void generateCoverFromNode(JsonNode metadata, Long taskId, Long comicId, Path mangaRoot) {
+        List<CoverCandidateSelector.MediaCandidate> media = flattenMedia(metadata, taskId, comicId);
         if (media.isEmpty()) {
             return;
         }
@@ -325,10 +330,9 @@ public class DirectoryImportHandler {
     }
 
     /**
-     * 把清单 metadata 展开为选择器输入；hqPath 缺失时按
-     * {comicId}/{globalOrder}/{fileName} 兜底（与清单目标命名一致）。
+     * 把清单 metadata 展开为选择器输入；hqPath 缺失时按任务隔离 staging 路径兜底。
      */
-    private List<CoverCandidateSelector.MediaCandidate> flattenMedia(JsonNode metadata, Long comicId) {
+    private List<CoverCandidateSelector.MediaCandidate> flattenMedia(JsonNode metadata, Long taskId, Long comicId) {
         List<CoverCandidateSelector.MediaCandidate> media = new ArrayList<>();
         JsonNode chapters = metadata.path("chapters");
         for (JsonNode chapter : chapters) {
@@ -344,7 +348,8 @@ public class DirectoryImportHandler {
                 int pageNumber = item.path("pageNumber").asInt();
                 String hqPath = item.path("hqPath").asText(null);
                 if (hqPath == null || hqPath.isBlank()) {
-                    hqPath = comicId + "/" + globalOrder + "/" + fileName;
+                    hqPath = ImportStagingPath.chapterRelativeToHq(comicId, taskId, globalOrder)
+                            .resolve(fileName).toString().replace('\\', '/');
                 }
                 media.add(new CoverCandidateSelector.MediaCandidate(
                         mediaType, globalOrder, pageNumber, sourceDir, fileName, hqPath));

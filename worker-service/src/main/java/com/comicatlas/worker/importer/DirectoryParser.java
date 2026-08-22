@@ -248,8 +248,8 @@ public class DirectoryParser {
             if (!s.isEmpty()) {
                 return s;
             }
-        } catch (Exception ignored) {
-            // 兜底到文件名
+        } catch (IllegalArgumentException | SecurityException exception) {
+            // 不同文件系统根目录无法 relativize，或权限不足时只能返回脱敏文件名。
         }
         return safeName(target);
     }

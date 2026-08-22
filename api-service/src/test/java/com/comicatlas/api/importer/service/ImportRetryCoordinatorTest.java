@@ -52,6 +52,7 @@ class ImportRetryCoordinatorTest {
     @Mock private CatalogCacheInvalidator catalogCacheInvalidator;
     @Mock private OutboxService outboxService;
     @Mock private RedisTemplate<String, Object> redisTemplate;
+    private ImportRetryStorageService retryStorageService;
     private ApiStorageProperties storageProperties;
 
     private ImportRetryCoordinator coordinator;
@@ -64,9 +65,11 @@ class ImportRetryCoordinatorTest {
         hqRoot.setPath(Path.of("target/test-tmp/hq"));
         storageProperties = new ApiStorageProperties();
         storageProperties.setRoots(java.util.Map.of("METADATA", metadataRoot, "HQ", hqRoot));
+        retryStorageService = new ImportRetryStorageService(storageProperties);
         coordinator = new ImportRetryCoordinator(
                 importTaskMapper, comicMapper, chapterMapper, mediaMapper, catalogMapper,
-                catalogCacheInvalidator, outboxService, storageProperties, redisTemplate);
+                catalogCacheInvalidator, outboxService, storageProperties, redisTemplate,
+                retryStorageService);
         // 重试入队会注册事务提交后回调，统一初始化同步器（tearDown 负责清理）
         TransactionSynchronizationManager.initSynchronization();
     }
@@ -180,12 +183,12 @@ class ImportRetryCoordinatorTest {
         Files.writeString(chapterDir.resolve("001.jpg"), "finalized");
 
         coordinator.retry(task);
-        assertTrue(Files.exists(Path.of("target/test-tmp/hq/60/5/001.jpg")),
-                "反最终化应在事务内同步把文件搬回暂存目录");
+        assertTrue(Files.exists(Path.of("target/test-tmp/hq/.staging/6/60/5/001.jpg")),
+                "反最终化应把文件搬回当前任务隔离暂存目录");
         TransactionSynchronizationManager.getSynchronizations()
                 .forEach(sync -> sync.afterCommit());
 
-        Path stagingFile = Path.of("target/test-tmp/hq/60/5/001.jpg");
+        Path stagingFile = Path.of("target/test-tmp/hq/.staging/6/60/5/001.jpg");
         assertEquals("finalized", Files.readString(stagingFile));
         assertFalse(Files.exists(chapterDir), "搬空后旧章节目录应在提交后清理");
     }
@@ -201,7 +204,7 @@ class ImportRetryCoordinatorTest {
         when(chapterMapper.selectList(any())).thenReturn(List.of(ch1));
         when(comicMapper.selectById(61L)).thenReturn(null);
 
-        Path stagingFile = Path.of("target/test-tmp/hq/61/6/001.jpg");
+        Path stagingFile = Path.of("target/test-tmp/hq/.staging/7/61/6/001.jpg");
         Files.createDirectories(stagingFile.getParent());
         Files.writeString(stagingFile, "staging");
         Path chapterDir = Path.of("target/test-tmp/hq/61/7002");
@@ -228,10 +231,10 @@ class ImportRetryCoordinatorTest {
                 "{\"version\":3,\"comic\":{\"title\":\"Test\"},\"catalogs\":[],\"chapters\":["
                         + "{\"globalOrder\":1,\"mediaItems\":[{\"fileName\":\"001.jpg\",\"hqPath\":\"70/1/001.jpg\"}]},"
                         + "{\"globalOrder\":2,\"mediaItems\":[{\"fileName\":\"001.jpg\",\"hqPath\":\"70/2/001.jpg\"}]}]}");
-        Files.createDirectories(Path.of("target/test-tmp/hq/70/1"));
-        Files.writeString(Path.of("target/test-tmp/hq/70/1/001.jpg"), "a");
-        Files.createDirectories(Path.of("target/test-tmp/hq/70/2"));
-        Files.writeString(Path.of("target/test-tmp/hq/70/2/001.jpg"), "b");
+        Files.createDirectories(Path.of("target/test-tmp/hq/.staging/8/70/1"));
+        Files.writeString(Path.of("target/test-tmp/hq/.staging/8/70/1/001.jpg"), "a");
+        Files.createDirectories(Path.of("target/test-tmp/hq/.staging/8/70/2"));
+        Files.writeString(Path.of("target/test-tmp/hq/.staging/8/70/2/001.jpg"), "b");
 
         coordinator.retry(task);
 
@@ -240,7 +243,7 @@ class ImportRetryCoordinatorTest {
         JsonNode node = new ObjectMapper().readTree(manifest.toFile());
         assertEquals(1, node.get("version").asInt());
         assertEquals(2, node.get("files").size(), "重建清单应包含全部暂存章节文件");
-        assertEquals("70/1/001.jpg", node.get("files").get(0).get("target").asText());
+        assertEquals(".staging/8/70/1/001.jpg", node.get("files").get(0).get("target").asText());
     }
 
     @Test

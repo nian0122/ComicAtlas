@@ -17,6 +17,7 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.support.AmqpHeaders;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 
@@ -32,6 +33,7 @@ public class ExportCompletedHandler {
     private final ExportTaskMapper exportTaskMapper;
     private final ManagementTaskService managementTaskService;
     private final MqConsumerSupport mqConsumerSupport;
+    private final TransactionTemplate transactionTemplate;
 
     @RabbitListener(queues = MqQueues.EXPORT_COMPLETED_RESULT)
     public void handle(ExportTaskCompletedEvent event,
@@ -41,9 +43,11 @@ public class ExportCompletedHandler {
         log.info("导出完成事件: taskId={}, comicId={}, outputSize={}",
                 taskId, comicId, event.outputSize());
 
-        mqConsumerSupport.consume(channel, tag, "导出完成: taskId=" + taskId, () -> {
+        mqConsumerSupport.consume(channel, tag, "导出完成: taskId=" + taskId,
+                () -> transactionTemplate.executeWithoutResult(tx -> {
             ExportTask task = exportTaskMapper.selectById(taskId);
-            if (task != null) {
+            if (task != null && (task.getStatus() == ExportTaskStatus.PENDING
+                    || task.getStatus() == ExportTaskStatus.RUNNING)) {
                 task.setStatus(ExportTaskStatus.SUCCESS);
                 task.setOutputRoot(event.outputRoot());
                 task.setOutputPath(event.outputPath());
@@ -51,6 +55,10 @@ public class ExportCompletedHandler {
                 task.setProgress(100);
                 task.setCompletedAt(LocalDateTime.now());
                 exportTaskMapper.updateById(task);
+            } else if (task == null || task.getStatus() != ExportTaskStatus.SUCCESS) {
+                log.info("忽略导出完成事件: taskId={}, status={}", taskId,
+                        task == null ? null : task.getStatus());
+                return;
             }
 
             // 同步统一任务项为 SUCCEEDED
@@ -61,6 +69,6 @@ public class ExportCompletedHandler {
             }
 
             log.info("导出状态更新为 SUCCESS: taskId={}", taskId);
-        });
+                }));
     }
 }

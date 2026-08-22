@@ -10,6 +10,7 @@ import com.comicatlas.common.event.ImportStorageFinalizeFailedEvent;
 import com.comicatlas.common.event.ImportStorageFinalizeRequestedEvent;
 import com.comicatlas.common.event.payload.FinalizeMediaMapping;
 import com.comicatlas.common.mq.MqConsumerSupport;
+import com.comicatlas.common.storage.ImportStagingPath;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.importer.ImportManifest;
 import com.comicatlas.worker.importer.ImportManifestManager;
@@ -45,7 +46,7 @@ import java.util.stream.Stream;
  * <p>
  * 监听 {@link MqQueues#IMPORT_STORAGE_FINALIZE_REQUESTED}，消费 {@link ImportStorageFinalizeRequestedEvent}：
  * 把 API 在落库阶段生成的不可变 chapterId 作为最终目录键，逐章把
- * {@code hq/{comicId}/{globalOrder}} 暂存目录（globalOrder 是 DB ID 生成前 Worker 使用的
+ * {@code hq/.staging/{taskId}/{comicId}/{globalOrder}} 暂存目录（globalOrder 是 DB ID 生成前 Worker 使用的
  * 漫画内暂存键）移动到 {@code hq/{comicId}/{chapterId}}。
  * 移动前对事件中的全部相对路径做规范化并校验均位于 HQ 根内（防御路径穿越），校验全部通过后才执行搬运。
  * <p>
@@ -178,7 +179,8 @@ public class ImportStorageFinalizeHandler {
     private void moveFilesForChapter(ImportStorageFinalizeRequestedEvent event, FinalizeContext ctx,
                                      ImportManifest manifest) throws IOException {
         boolean isSameDir = ctx.sourceDir().equals(ctx.targetDir());
-        Map<String, Long> expectedSizes = expectedSizesForChapter(manifest, event.comicId(), event.globalOrder());
+        Map<String, Long> expectedSizes = expectedSizesForChapter(
+                manifest, event.taskId(), event.comicId(), event.globalOrder());
         for (MediaMove move : ctx.moves()) {
             boolean isSourceExists = Files.exists(move.source());
             boolean isTargetExists = Files.exists(move.target());
@@ -275,8 +277,10 @@ public class ImportStorageFinalizeHandler {
     }
 
     /** 从清单提取本章（comicId/globalOrder）文件 → 预期尺寸映射。 */
-    private Map<String, Long> expectedSizesForChapter(ImportManifest manifest, Long comicId, Integer globalOrder) {
-        String prefix = comicId + "/" + globalOrder + "/";
+    private Map<String, Long> expectedSizesForChapter(ImportManifest manifest, Long taskId,
+                                                      Long comicId, Integer globalOrder) {
+        String prefix = ImportStagingPath.chapterRelativeToHq(comicId, taskId, globalOrder)
+                .toString().replace('\\', '/') + "/";
         Map<String, Long> sizes = new HashMap<>(manifest.files().size());
         for (ImportManifest.ImportFile file : manifest.files()) {
             if (file.target() != null && file.target().startsWith(prefix)) {

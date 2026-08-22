@@ -102,7 +102,7 @@ class DirectoryImportHandlerSmokeTest {
         handler.handle(new ImportContext("DIRECTORY", sourceRoot, false, false), TASK_ID, COMIC_ID, mangaRoot);
 
         // 浅层命名 cover.jpg（cover 优先级 0）胜出，封面.png/front.jpg 不参与生成
-        verify(coverGen, times(1)).generateCover(COMIC_ID, mangaRoot.resolve("hq/50/1/cover.jpg"));
+        verify(coverGen, times(1)).generateCover(COMIC_ID, mangaRoot.resolve("hq/.staging/500/50/1/cover.jpg"));
         verify(coverGen, never()).generateCoverFromVideo(anyLong(), any(Path.class));
         // 源媒体与 pageCount 不变：5 页全部仍在章节中
         JsonNode meta = objectMapper.readTree(mangaRoot.resolve("metadata/500.json").toFile());
@@ -139,8 +139,8 @@ class DirectoryImportHandlerSmokeTest {
 
         // 第一候选 cover.jpg 生成失败 → 降级第二候选 封面.png（cover-back 不误判为命名候选）
         verify(coverGen, times(2)).generateCover(anyLong(), any(Path.class));
-        verify(coverGen).generateCover(COMIC_ID, mangaRoot.resolve("hq/50/1/cover.jpg"));
-        verify(coverGen).generateCover(COMIC_ID, mangaRoot.resolve("hq/50/2/封面.png"));
+        verify(coverGen).generateCover(COMIC_ID, mangaRoot.resolve("hq/.staging/500/50/1/cover.jpg"));
+        verify(coverGen).generateCover(COMIC_ID, mangaRoot.resolve("hq/.staging/500/50/2/封面.png"));
         verify(coverGen, never()).generateCoverFromVideo(anyLong(), any(Path.class));
     }
 
@@ -162,7 +162,8 @@ class DirectoryImportHandlerSmokeTest {
         handler.handle(new ImportContext("DIRECTORY", sourceRoot, false, false), TASK_ID, COMIC_ID, mangaRoot);
 
         // 全视频：按 globalOrder 取首个视频抽帧
-        verify(coverGen, times(1)).generateCoverFromVideo(COMIC_ID, mangaRoot.resolve("hq/50/1/ch1.mp4"));
+        verify(coverGen, times(1)).generateCoverFromVideo(COMIC_ID,
+                mangaRoot.resolve("hq/.staging/500/50/1/ch1.mp4"));
         verify(coverGen, never()).generateCover(anyLong(), any(Path.class));
     }
 
@@ -196,8 +197,8 @@ class DirectoryImportHandlerSmokeTest {
 
         // 空产物不被当作成功，继续尝试第二候选
         verify(coverGen, times(2)).generateCover(anyLong(), any(Path.class));
-        verify(coverGen).generateCover(COMIC_ID, mangaRoot.resolve("hq/50/1/cover.jpg"));
-        verify(coverGen).generateCover(COMIC_ID, mangaRoot.resolve("hq/50/1/001.jpg"));
+        verify(coverGen).generateCover(COMIC_ID, mangaRoot.resolve("hq/.staging/500/50/1/cover.jpg"));
+        verify(coverGen).generateCover(COMIC_ID, mangaRoot.resolve("hq/.staging/500/50/1/001.jpg"));
         assertTrue(Files.size(mangaRoot.resolve("thumbs/50/cover.webp")) > 0,
                 "最终封面应为第二候选的有效产物");
     }

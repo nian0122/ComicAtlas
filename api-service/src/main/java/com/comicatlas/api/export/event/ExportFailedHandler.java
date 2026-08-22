@@ -17,6 +17,7 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.support.AmqpHeaders;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 导出失败事件处理器。
@@ -30,6 +31,7 @@ public class ExportFailedHandler {
     private final ExportTaskMapper exportTaskMapper;
     private final ManagementTaskService managementTaskService;
     private final MqConsumerSupport mqConsumerSupport;
+    private final TransactionTemplate transactionTemplate;
 
     @RabbitListener(queues = MqQueues.EXPORT_FAILED_RESULT)
     public void handle(ExportTaskFailedEvent event,
@@ -39,13 +41,19 @@ public class ExportFailedHandler {
         log.info("导出失败事件: taskId={}, comicId={}, errorCode={}, errorMessage={}",
                 taskId, comicId, event.errorCode(), event.errorMessage());
 
-        mqConsumerSupport.consume(channel, tag, "导出失败: taskId=" + taskId, () -> {
+        mqConsumerSupport.consume(channel, tag, "导出失败: taskId=" + taskId,
+                () -> transactionTemplate.executeWithoutResult(tx -> {
             ExportTask task = exportTaskMapper.selectById(taskId);
-            if (task != null) {
+            if (task != null && (task.getStatus() == ExportTaskStatus.PENDING
+                    || task.getStatus() == ExportTaskStatus.RUNNING)) {
                 task.setStatus(ExportTaskStatus.FAILED);
                 task.setErrorMsg(event.errorMessage());
                 task.setProgress(-1);
                 exportTaskMapper.updateById(task);
+            } else if (task == null || task.getStatus() != ExportTaskStatus.FAILED) {
+                log.info("忽略导出失败事件: taskId={}, status={}", taskId,
+                        task == null ? null : task.getStatus());
+                return;
             }
 
             // 同步统一任务项为 FAILED
@@ -56,6 +64,6 @@ public class ExportFailedHandler {
             }
 
             log.info("导出状态更新为 FAILED: taskId={}", taskId);
-        });
+                }));
     }
 }
