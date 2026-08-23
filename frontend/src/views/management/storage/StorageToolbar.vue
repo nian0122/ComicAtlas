@@ -63,7 +63,7 @@ onMounted(() => { void categoryStore.fetchList(); void tagStore.fetchList() })
         <el-select :model-value="props.filter.hqStatus" @update:model-value="setFilter({ hqStatus: $event })" placeholder="HQ 状态" class="filter-select">
           <el-option label="全部" value="ALL" />
           <el-option label="还有 HQ" value="HAS_HQ" />
-          <el-option label="HQ 已删" value="NO_HQ" />
+          <el-option label="含 HQ 已删" value="NO_HQ" />
         </el-select>
         <el-select :model-value="props.filter.lqStatus" @update:model-value="setFilter({ lqStatus: $event })" placeholder="LQ 状态" class="filter-select">
           <el-option label="全部" value="ALL" />
