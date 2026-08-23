@@ -87,9 +87,20 @@
               <el-button class="action-submit" :type="chapterForm.action === 'trash' ? 'danger' : 'primary'" block @click="submitChapter">{{ chapterForm.action === 'trash' ? '回收当前章节' : '执行章节操作' }}</el-button>
             </el-form>
           </div>
-          <details class="action-details"><summary @click.prevent="mediaOrderDialogVisible = true"><span><span class="panel-kicker">MEDIA ORDER</span><strong>媒体顺序</strong></span><span>{{ mediaOrderItems.length }} 项</span></summary><div class="action-card media-action"><div class="action-card-head action-card-head--compact"><div><span class="panel-kicker">MEDIA ORDER</span><h3>媒体顺序</h3></div><span class="media-count">{{ mediaOrderItems.length }} 项</span></div><p>拖动媒体卡片调整顺序，保存后会同步章节阅读顺序。</p><div class="order-toolbar"><button type="button" @click="sortMediaByName">按文件名排序</button><button type="button" @click="resetMediaOrder">恢复当前顺序</button></div><div class="media-order-list" :class="{ 'is-dirty': mediaOrderDirty }"><div v-for="(item, index) in mediaOrderItems" :key="item.id" class="media-order-item" draggable="true" @dragstart="startMediaDrag(index)" @dragover.prevent @drop="dropMedia(index)"><span class="drag-handle" aria-hidden="true">⠿</span><span class="order-number">{{ String(index + 1).padStart(2, '0') }}</span><span class="order-type">{{ item.mediaType === 'VIDEO' ? 'VID' : 'IMG' }}</span><span class="order-file" :title="item.fileName || `媒体 ${item.id}`">{{ item.fileName || `媒体 ${item.id}` }}</span><span class="order-id">#{{ item.id }}</span></div><div v-if="!mediaOrderItems.length" class="order-empty">当前章节暂无可排序媒体</div></div><div class="media-order-status"><span>{{ mediaOrderDirty ? `已调整 ${mediaOrderChangeCount} 项` : '顺序未修改' }}</span><el-button type="primary" :disabled="!mediaOrderDirty" @click="reorderMedia">保存媒体顺序</el-button></div><details class="advanced-order"><summary>高级编辑：按 ID 输入顺序</summary><p>适合批量处理。ID 必须完整且不重复，提交前会覆盖上方拖拽顺序。</p><el-input v-model="mediaOrder" type="textarea" :rows="3" placeholder="例如 128905,128906,128907" /><el-button text @click="applyAdvancedMediaOrder">应用到列表</el-button></details></div></details>
-          <details class="action-details"><summary @click.prevent="openUploadDialog()"><span><span class="panel-kicker">MEDIA INTAKE</span><strong>补充媒体</strong></span><span>上传 / 替换</span></summary><div class="action-card upload-action"><div class="action-card-head action-card-head--compact"><div><span class="panel-kicker">MEDIA INTAKE</span><h3>补充媒体</h3></div><span class="media-count">当前章节</span></div><p>图片或视频会直接追加到「{{ selectedRow.title }}」，无需再次填写漫画和章节 ID。</p><el-button type="primary" block @click="openUploadDialog()">上传媒体</el-button><el-button v-if="selectedMedia" plain block @click="openReplaceSelectedMedia">替换当前媒体</el-button></div></details>
-          <details class="action-details"><summary @click.prevent="storageDialogVisible = true"><span><span class="panel-kicker">STORAGE</span><strong>章节存储</strong></span><StorageStatusTag v-if="selectedStorageChapter" :status="selectedStorageChapter.hqStatus" type="hq" /></summary><div class="action-card storage-action"><div class="action-card-head action-card-head--compact"><div><span class="panel-kicker">STORAGE</span><h3>章节存储</h3></div><StorageStatusTag v-if="selectedStorageChapter" :status="selectedStorageChapter.hqStatus" type="hq" /></div><div class="storage-mini-grid"><div><small>HQ 占用</small><strong>{{ formatSize(selectedStorageChapter?.hqSize ?? 0) }}</strong></div><div><small>LQ 占用</small><strong>{{ formatSize(selectedStorageChapter?.lqSize ?? 0) }}</strong></div></div><div class="storage-action-buttons"><el-button type="danger" plain @click="deleteChapterHq">删除本章 HQ</el-button><el-button v-if="mediaLqApplicableCount > 0" type="primary" plain @click="generateChapterLq">{{ chapterLqActionLabel }}</el-button><el-button v-if="mediaVideoCount > 0" type="warning" plain @click="transcodeChapter">转码本章视频</el-button></div></div></details>
+          <div class="chapter-feature-grid">
+            <section class="chapter-feature-card feature-order">
+              <div class="feature-card-top"><span class="panel-kicker">MEDIA ORDER</span><span class="feature-count">{{ mediaOrderItems.length }} 项</span></div>
+              <strong>媒体顺序</strong><p>调整本章阅读顺序</p><el-button plain block @click="mediaOrderDialogVisible = true">打开排序面板</el-button>
+            </section>
+            <section class="chapter-feature-card feature-intake">
+              <div class="feature-card-top"><span class="panel-kicker">MEDIA INTAKE</span><span class="feature-mark">＋</span></div>
+              <strong>补充媒体</strong><p>追加图片或替换当前媒体</p><div class="feature-button-row"><el-button type="primary" block @click="openUploadDialog()">上传媒体</el-button><el-button v-if="selectedMedia" plain block @click="openReplaceSelectedMedia">替换</el-button></div>
+            </section>
+            <section class="chapter-feature-card feature-storage">
+              <div class="feature-card-top"><span class="panel-kicker">STORAGE</span><StorageStatusTag v-if="selectedStorageChapter" :status="selectedStorageChapter.hqStatus" type="hq" /></div>
+              <strong>章节存储</strong><p>HQ {{ formatSize(selectedStorageChapter?.hqSize ?? 0) }} · LQ {{ formatSize(selectedStorageChapter?.lqSize ?? 0) }}</p><div class="feature-button-row"><el-button type="primary" plain :disabled="mediaLqApplicableCount === 0" block @click="generateChapterLq">{{ chapterLqActionLabel }}</el-button><el-button type="danger" plain block @click="deleteChapterHq">删除 HQ</el-button><el-button v-if="mediaVideoCount > 0" type="warning" plain block @click="transcodeChapter">转码视频</el-button></div>
+            </section>
+          </div>
         </template>
         <div v-else class="action-empty"><span class="empty-mark">＋</span><p>选择节点后显示可用操作。</p></div>
       </aside>
@@ -573,6 +584,14 @@ onMounted(() => { void loadTree() })
 .media-hint.is-alert { color: var(--accent); }
 .media-hint.is-info { color: var(--info); }
 .action-card { padding: var(--space-4); border: 1px solid var(--border); background: var(--bg-secondary); }
+.chapter-feature-grid { display: grid; grid-template-columns: 1fr; gap: var(--space-2); margin-top: var(--space-3); }
+.chapter-feature-card { display: grid; align-content: start; gap: 7px; min-width: 0; padding: var(--space-3); border: 1px solid var(--border); background: linear-gradient(145deg, var(--bg-secondary), color-mix(in srgb, var(--bg-surface) 88%, var(--accent) 12%)); }
+.chapter-feature-card:hover { border-color: var(--border-strong); }
+.feature-card-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 16px; }
+.chapter-feature-card strong { color: var(--text-primary); font-size: 13px; }
+.chapter-feature-card p { min-height: 30px; margin: 0; color: var(--text-muted); font-size: 10px; line-height: 1.45; }
+.feature-count, .feature-mark { color: var(--text-muted); font: 700 10px var(--mono); }.feature-mark { color: var(--accent); font-size: 16px; }
+.feature-button-row { display: grid; gap: 5px; margin-top: auto; }.feature-button-row .el-button { width: 100%; min-height: 28px; margin: 0; padding: 5px 7px; font-size: 10px; }
 .action-card + .action-card { margin-top: var(--space-3); }
 .action-details { border: 1px solid var(--border); background: var(--bg-secondary); }
 .action-details + .action-details { margin-top: var(--space-2); }
