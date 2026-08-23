@@ -40,10 +40,10 @@
         <section class="panel danger-panel">
           <div class="panel-heading"><div><span class="panel-kicker">LIFECYCLE</span><h2>回收站生命周期</h2><p>删除是可恢复的回收操作，永久清理需要确认。</p></div></div>
           <div class="actions lifecycle-actions">
-            <el-button v-if="comic.status === 'READY'" type="danger" @click="trashComic">移入回收站</el-button>
-            <el-button v-if="comic.status === 'TRASHED'" type="primary" @click="restoreComic">恢复漫画</el-button>
-            <el-input v-if="comic.status === 'TRASHED'" v-model="purgeToken" placeholder="永久清理确认 token" />
-            <el-button v-if="comic.status === 'TRASHED'" type="danger" :disabled="!purgeToken.trim()" @click="purgeComic">永久清理</el-button>
+            <el-button v-if="isAllowed('DELETE')" type="danger" @click="trashComic">移入回收站</el-button>
+            <el-button v-if="isAllowed('RECOVER')" type="primary" @click="restoreComic">恢复漫画</el-button>
+            <el-input v-if="isAllowed('PURGE')" v-model="purgeToken" placeholder="永久清理确认 token" />
+            <el-button v-if="isAllowed('PURGE')" type="danger" :disabled="!purgeToken.trim()" @click="purgeComic">永久清理</el-button>
             <el-button @click="reconcile(false)">只读对账</el-button>
             <el-button @click="reconcile(true)">对账并修复</el-button>
           </div>
@@ -138,9 +138,9 @@ function deleteHq(): void { void runAction('删除 HQ', () => hqApi.deleteComic(
 function transcode(): void { void runAction('视频转码', () => adminApi.transcodeVideos(comicId.value)) }
 function refreshMetadata(): void { void runAction('刷新元数据', () => storageService.requestMetadataRefresh(comicId.value)) }
 function createExport(): void { void runAction(`${exportFormat.value} 导出`, () => exportApi.createExport(comicId.value, exportFormat.value)) }
-async function trashComic(): Promise<void> { await ElMessageBox.confirm('漫画将移入回收站，可在保留期内恢复。', '确认回收', { type: 'warning' }); await runAction('回收漫画', () => managementComicApi.delete(comicId.value)) }
+async function trashComic(): Promise<void> { await ElMessageBox.confirm('漫画将移入回收站，可在需要时恢复。', '确认回收', { type: 'warning' }); await runAction('回收漫画', () => managementComicApi.delete(comicId.value)) }
 function restoreComic(): void { void runAction('恢复漫画', () => trashApi.restoreComic(comicId.value)) }
-async function purgeComic(): Promise<void> { await ElMessageBox.confirm('永久清理不可恢复，并受 7 天保留期限制。', '确认永久清理', { type: 'error' }); await runAction('永久清理', () => trashApi.purgeComic(comicId.value, purgeToken.value.trim())) }
+async function purgeComic(): Promise<void> { await ElMessageBox.confirm('永久清理不可恢复，请确认已输入正确 token。', '确认永久清理', { type: 'error' }); await runAction('永久清理', () => trashApi.purgeComic(comicId.value, purgeToken.value.trim())) }
 async function reconcile(repair: boolean): Promise<void> { try { const response = repair ? await trashApi.reconcileAndRepair('COMIC', comicId.value) : await trashApi.reconcile('COMIC', comicId.value); reconcileResult.value = response.data; ElMessage.success(repair ? '对账修复完成' : '对账完成') } catch (reason: unknown) { ElMessage.error(errorMessage(reason)) } }
 
 onMounted(() => { void loadState(); timer = setInterval(() => { if (polling.value && !loading.value) void loadState(true) }, 2500) })
