@@ -77,8 +77,8 @@
             <div class="action-card-head"><div><span class="panel-kicker">CHAPTER MAINTENANCE</span><h2>章节操作</h2><p>只修改当前选中的章节，不影响其他章节。</p></div><span class="action-id">CH · {{ selectedRow.id }}</span></div>
             <div class="action-context"><span class="context-mark">▱</span><div><strong>{{ selectedRow.title }}</strong><small>全书顺序 {{ selectedRow.order ?? '—' }}</small></div></div>
             <el-form label-position="top" class="action-form">
-              <div class="chapter-action-toolbar"><span>当前章节操作</span><el-button text type="primary" @click="toggleCreateChapter">{{ chapterForm.action === 'create' ? '返回当前章节' : '新建章节' }}</el-button></div>
-              <div v-if="chapterForm.action !== 'create'" class="chapter-choice"><label>选择操作</label><div class="chapter-choice-grid"><button v-for="item in CHAPTER_ACTIONS" :key="item.value" type="button" :class="{ 'is-active': chapterForm.action === item.value, 'is-danger': item.value === 'trash' }" @click="selectChapterAction(item.value)">{{ item.label }}</button></div><small class="field-help">{{ chapterActionDescription(chapterForm.action) }}</small></div>
+              <div class="chapter-action-toolbar"><div><span class="panel-kicker">COMMAND DECK</span><strong>章节命令面板</strong></div><el-button class="create-chapter-button" type="primary" plain @click="toggleCreateChapter"><span class="create-chapter-icon">＋</span>{{ chapterForm.action === 'create' ? '返回当前章节' : '新建章节' }}</el-button></div>
+              <div v-if="chapterForm.action !== 'create'" class="chapter-choice"><label>选择要执行的操作</label><div class="chapter-choice-grid"><button v-for="item in CHAPTER_ACTIONS" :key="item.value" type="button" :class="{ 'is-active': chapterForm.action === item.value, 'is-danger': item.value === 'trash' }" @click="selectChapterAction(item.value)"><span class="chapter-choice-icon">{{ chapterActionIcon(item.value) }}</span><span class="chapter-choice-copy"><strong>{{ item.label }}</strong><small>{{ chapterActionTagline(item.value) }}</small></span><span class="chapter-choice-arrow">→</span></button></div><div class="chapter-choice-help"><span class="help-mark">i</span><small>{{ chapterActionDescription(chapterForm.action) }}</small></div></div>
               <div v-else class="create-context"><span class="context-mark">＋</span><div><strong>新建章节</strong><small>将在当前漫画中创建一个新章节</small></div></div>
               <div class="form-grid" v-if="['create', 'rename'].includes(chapterForm.action)"><el-form-item label="章节标题"><el-input v-model="chapterForm.title" placeholder="输入章节标题" /></el-form-item><el-form-item label="原始章节编号"><el-input v-model="chapterForm.chapterNo" placeholder="如 01、番外" /></el-form-item></div>
               <el-form-item v-if="chapterForm.action === 'create'" label="目标目录 ID"><el-input-number v-model="chapterForm.catalogId" :min="1" :controls="false" clearable placeholder="留空为根目录" /></el-form-item>
@@ -317,6 +317,12 @@ function chapterActionDescription(action: ChapterAction): string {
     trash: '将当前章节移入回收站',
   }
   return descriptions[action]
+}
+function chapterActionIcon(action: ChapterAction): string {
+  return ({ create: '＋', rename: '✎', move: '⇄', reorder: '≡', trash: '⌫' } as const)[action]
+}
+function chapterActionTagline(action: ChapterAction): string {
+  return ({ create: '创建新章节', rename: '标题与编号', move: '调整目录归属', reorder: '改变阅读顺序', trash: '移入回收站' } as const)[action]
 }
 function selectChapterAction(action: ChapterAction): void {
   chapterForm.action = action
@@ -616,14 +622,15 @@ onMounted(() => { void loadTree() })
 .action-context strong { overflow: hidden; color: var(--text-primary); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .action-context small, .field-help, .media-action-footer small { color: var(--text-muted); font-size: 11px; }
 .action-form { margin-top: 0; }
-.chapter-action-toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-3); color: var(--text-secondary); font-size: var(--text-sm); }
-.chapter-action-toolbar .el-button { margin: 0; padding: 0; }
+.chapter-action-toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-4); color: var(--text-secondary); font-size: var(--text-sm); }.chapter-action-toolbar > div { display: grid; gap: 3px; }.chapter-action-toolbar strong { color: var(--text-primary); font-size: 13px; }
+.chapter-action-toolbar .el-button { margin: 0; }.create-chapter-button { min-height: 30px; padding: 5px 9px; font-size: 11px; }.create-chapter-icon { margin-right: 3px; font-size: 15px; line-height: 1; }
 .chapter-choice { display: grid; gap: var(--space-2); margin-bottom: var(--space-4); }
 .chapter-choice > label { color: var(--text-secondary); font-size: var(--text-sm); }
-.chapter-choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); }
-.chapter-choice-grid button { min-height: 38px; padding: 8px 10px; border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-secondary); font-size: 12px; text-align: left; cursor: pointer; transition: border-color var(--transition-fast), background-color var(--transition-fast), color var(--transition-fast); }
-.chapter-choice-grid button:hover { border-color: var(--accent); color: var(--text-primary); }
-.chapter-choice-grid button.is-active { border-color: var(--accent); background: var(--accent-bg); color: var(--accent); box-shadow: inset 2px 0 var(--accent); }
+.chapter-choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.chapter-choice-grid button { display: grid; grid-template-columns: 24px minmax(0, 1fr) 12px; align-items: center; gap: 6px; min-height: 52px; padding: 7px 8px; border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-secondary); text-align: left; cursor: pointer; transition: border-color var(--transition-fast), background-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast); }
+.chapter-choice-grid button:hover { border-color: var(--accent); color: var(--text-primary); transform: translateY(-1px); }
+.chapter-choice-grid button.is-active { border-color: var(--accent); background: var(--accent-bg); color: var(--accent); box-shadow: inset 3px 0 var(--accent); }
+.chapter-choice-icon { display: grid; place-items: center; width: 22px; height: 22px; border: 1px solid currentColor; color: var(--accent); font: 700 14px var(--mono); }.chapter-choice-copy { display: grid; gap: 3px; min-width: 0; }.chapter-choice-copy strong { overflow: hidden; color: inherit; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }.chapter-choice-copy small { overflow: hidden; color: var(--text-muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }.chapter-choice-arrow { color: var(--text-muted); font-size: 14px; }.chapter-choice-help { display: flex; align-items: flex-start; gap: 6px; margin-top: 7px; padding: 7px 8px; border: 1px dashed var(--border); color: var(--text-muted); }.chapter-choice-help small { font-size: 10px; line-height: 1.45; }.help-mark { display: grid; place-items: center; flex: 0 0 auto; width: 14px; height: 14px; border: 1px solid var(--border-strong); border-radius: 50%; color: var(--text-muted); font: 700 9px var(--mono); }
 .chapter-choice-grid button.is-danger { color: var(--text-muted); }
 .chapter-choice-grid button.is-danger.is-active { border-color: var(--danger, var(--accent)); background: color-mix(in srgb, var(--accent) 12%, var(--bg-surface)); color: var(--accent); }
 .create-context { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-4); padding: var(--space-3); border-left: 2px solid var(--accent); background: var(--bg-surface); }
