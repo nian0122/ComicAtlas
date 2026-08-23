@@ -487,7 +487,7 @@ onMounted(() => { void loadTree() })
   grid-template-columns:
     minmax(clamp(180px, 16vw, 240px), .8fr)
     minmax(0, 2.25fr)
-    minmax(300px, 1.15fr);
+    minmax(340px, 1.25fr);
   gap: var(--space-3);
   height: clamp(560px, calc(100vh - 270px), 820px);
   min-width: 0;
@@ -627,7 +627,7 @@ onMounted(() => { void loadTree() })
 .action-context div { display: grid; gap: 3px; min-width: 0; }
 .action-context strong { overflow: hidden; color: var(--text-primary); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .action-context small, .field-help, .media-action-footer small { color: var(--text-muted); font-size: 11px; }
-.chapter-workspace-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; margin: 0 0 var(--space-4); border-bottom: 1px solid var(--border); }.chapter-workspace-tabs button { display: flex; align-items: center; justify-content: center; min-height: 34px; padding: 5px 7px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--text-muted); cursor: pointer; }.chapter-workspace-tabs button > span, .chapter-workspace-tabs small { display: none; }.chapter-workspace-tabs strong { color: inherit; font-size: 11px; font-weight: 650; }.chapter-workspace-tabs button:hover { color: var(--text-primary); }.chapter-workspace-tabs button.is-active { border-bottom-color: var(--accent); color: var(--accent); }
+.chapter-workspace-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin: 0 0 var(--space-4); padding: 3px; border: 1px solid var(--border); background: var(--bg-surface); }.chapter-workspace-tabs button { display: flex; align-items: center; justify-content: center; min-height: 32px; padding: 5px 7px; border: 0; background: transparent; color: var(--text-muted); cursor: pointer; }.chapter-workspace-tabs button > span, .chapter-workspace-tabs small { display: none; }.chapter-workspace-tabs strong { color: inherit; font-size: 11px; font-weight: 650; }.chapter-workspace-tabs button:hover { color: var(--text-primary); }.chapter-workspace-tabs button.is-active { background: var(--accent-bg); color: var(--accent); }
 .action-form { margin-top: 0; }
 .chapter-action-toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-4); color: var(--text-secondary); font-size: var(--text-sm); }.chapter-action-toolbar > div { display: grid; gap: 3px; }.chapter-action-toolbar strong { color: var(--text-primary); font-size: 13px; }
 .chapter-action-toolbar .el-button { margin: 0; }.create-chapter-button { min-height: 30px; padding: 5px 9px; font-size: 11px; }.create-chapter-icon { margin-right: 3px; font-size: 15px; line-height: 1; }
