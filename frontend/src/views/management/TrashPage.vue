@@ -53,7 +53,7 @@
           >
             批量永久清理
           </el-button>
-          <span v-else class="retention-note">勾选内容后可批量恢复或清理</span>
+          <span v-else class="retention-note">勾选内容后可批量恢复或永久清理</span>
         </div>
       </div>
 
@@ -209,7 +209,7 @@ async function purgeSelected(): Promise<void> {
   if (!rows.length) return
   try {
     const result = await ElMessageBox.prompt(
-      `请输入确认 token，将永久清理已选的 ${rows.length} 项内容。此操作不可恢复，且受 7 天保留期限制。`,
+      `请输入确认 token，将永久清理已选的 ${rows.length} 项内容。此操作不可恢复。`,
       '批量永久清理',
       { type: 'error', inputPlaceholder: '确认 token' },
     )
@@ -242,7 +242,7 @@ async function restore(row: TrashContentVO): Promise<void> {
 
 async function purge(row: TrashContentVO): Promise<void> {
   try {
-    const result = await ElMessageBox.prompt('请输入永久清理确认 token。永久清理不可恢复，且受 7 天保留期限制。', `永久清理${targetTypeLabel(row.targetType)}`, { type: 'error', inputPlaceholder: '确认 token' })
+    const result = await ElMessageBox.prompt('请输入永久清理确认 token。永久清理不可恢复。', `永久清理${targetTypeLabel(row.targetType)}`, { type: 'error', inputPlaceholder: '确认 token' })
     busyId.value = row.targetId
     await submitPurge(row, result.value.trim())
     ElMessage.success('永久清理任务已提交')

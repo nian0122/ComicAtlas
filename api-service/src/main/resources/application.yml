@@ -67,6 +67,10 @@ logging:
     com.baomidou.mybatisplus: INFO
     org.mybatis: INFO
 
+# 回收完成后即可永久清理；如需保留误删保护窗口，改为正整数天数。
+trash:
+  retention-days: 0
+
 storage:
   url-prefix: /files
   roots:

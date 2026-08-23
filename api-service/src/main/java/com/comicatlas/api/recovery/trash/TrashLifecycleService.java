@@ -36,6 +36,7 @@ import com.comicatlas.api.task.enums.TaskType;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,7 +52,7 @@ import java.util.UUID;
  * <p>
  * 回收：实体 READY→TRASHING，API 基于 DB refs 创建不可变 TRASH 清单，发布命令；
  * Worker 按清单同卷移动（绝不覆盖）。恢复/清理命令携带 manifestTaskId 定位清单目录。
- * 永久清理只接受 TRASHED + 二次确认 token + 7 天保留期。
+ * 永久清理只接受 TRASHED + 二次确认 token + 配置的保留期。
  */
 @Slf4j
 @Service
@@ -59,7 +60,10 @@ import java.util.UUID;
 public class TrashLifecycleService {
 
     public static final String PURGE_CONFIRM_TOKEN = "PURGE";
-    public static final int RETENTION_DAYS = 7;
+
+    /** 个人仓库默认允许回收完成后立即清理；生产环境可按需配置保护窗口。 */
+    @Value("${trash.retention-days:0}")
+    private int retentionDays;
 
     private static final String EXCHANGE = MqExchanges.MANAGEMENT;
     private static final String ROUTING_REQUEST = MqRoutingKeys.COMMAND_REQUESTED;
@@ -559,12 +563,12 @@ public class TrashLifecycleService {
     }
 
     private void checkRetention(LocalDateTime trashedAt) {
-        if (trashedAt == null) {
-            return; // 旧数据无保留期信息，允许清理
+        if (trashedAt == null || retentionDays <= 0) {
+            return; // 旧数据或关闭保留窗口时允许清理
         }
-        LocalDateTime deadline = trashedAt.plusDays(RETENTION_DAYS);
+        LocalDateTime deadline = trashedAt.plusDays(retentionDays);
         if (LocalDateTime.now().isBefore(deadline)) {
-            throw new ConflictException("未到 7 天保留期（" + trashedAt + " + 7 天），暂不可永久清理");
+            throw new ConflictException("未到 " + retentionDays + " 天保留期（" + trashedAt + " + " + retentionDays + " 天），暂不可永久清理");
         }
     }
 
