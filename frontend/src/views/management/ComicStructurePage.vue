@@ -410,10 +410,9 @@ onMounted(() => { void loadTree() })
 
 <style scoped>
 .structure-page { display: grid; gap: var(--space-5); }
-.issue-strip { display: grid; gap: var(--space-3); padding: var(--space-4); border: 1px solid color-mix(in srgb, var(--warning) 45%, var(--border)); border-left: 3px solid var(--warning); background: color-mix(in srgb, var(--warning) 5%, var(--bg-surface)); }
-.issue-strip-heading { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4); }
-.issue-strip-heading > div { display: grid; gap: 4px; }.issue-strip-heading strong { color: var(--text-primary); }.issue-strip-heading small { color: var(--text-muted); }
-.issue-chapter-list { display: flex; flex-wrap: wrap; gap: var(--space-2); }.issue-chapter { display: grid; gap: 3px; min-width: 180px; padding: 8px 10px; border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-primary); text-align: left; cursor: pointer; }.issue-chapter:hover { border-color: var(--accent); }.issue-chapter small { color: var(--warning); font-size: 10px; }
+.issue-strip { display: flex; align-items: center; gap: var(--space-4); min-width: 0; padding: 9px 12px; border: 1px solid color-mix(in srgb, var(--warning) 45%, var(--border)); border-left: 3px solid var(--warning); background: color-mix(in srgb, var(--warning) 5%, var(--bg-surface)); }
+.issue-strip-heading { display: flex; align-items: center; flex: 0 0 auto; gap: 10px; white-space: nowrap; }.issue-strip-heading > div { display: grid; gap: 2px; }.issue-strip-heading strong { color: var(--text-primary); font-size: 12px; }.issue-strip-heading small { color: var(--text-muted); font-size: 10px; }
+.issue-chapter-list { display: flex; flex: 1 1 auto; min-width: 0; gap: 5px; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }.issue-chapter { display: grid; flex: 0 0 150px; gap: 2px; min-width: 120px; padding: 6px 8px; border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-primary); text-align: left; cursor: pointer; }.issue-chapter:hover { border-color: var(--accent); }.issue-chapter span { overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }.issue-chapter small { overflow: hidden; color: var(--warning); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
 .upload-action { display: grid; gap: var(--space-3); }
 .upload-action p { margin: 0; color: var(--text-muted); font-size: var(--text-xs); line-height: 1.6; }
 .upload-action :deep(.el-button + .el-button) { margin-left: 0; }
@@ -689,6 +688,8 @@ onMounted(() => { void loadTree() })
   .structure-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 760px) {
+  .issue-strip { align-items: flex-start; flex-direction: column; gap: 7px; }
+  .issue-chapter-list { width: 100%; }
   .structure-header { align-items: flex-start; flex-direction: column; }
   .structure-browser { grid-template-columns: 1fr; height: auto; min-height: 0; }
   .detail-panel { min-height: 420px; }
