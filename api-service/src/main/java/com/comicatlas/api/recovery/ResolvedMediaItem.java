@@ -13,6 +13,7 @@ package com.comicatlas.api.recovery;
  * @param exists     文件在磁盘上是否存在（false 时恢复为 MISSING，不得标 READY）
  * @param lqStatus   LQ 状态（READY=LQ 文件存在 / NOT_GENERATED=不存在；仅图片有 LQ）
  * @param lqSize     LQ 文件字节数（未生成为 0）
+ * @param lqPath     实际 LQ 相对路径（WebP 或 JPEG）
  */
 public record ResolvedMediaItem(
         String fileName,
@@ -24,7 +25,8 @@ public record ResolvedMediaItem(
         String hqPath,
         boolean exists,
         String lqStatus,
-        long lqSize) {
+        long lqSize,
+        String lqPath) {
 
     /** LQ 未生成状态名（与 LqStatus 枚举一致）。 */
     private static final String LQ_STATUS_NOT_GENERATED = "NOT_GENERATED";
@@ -42,6 +44,13 @@ public record ResolvedMediaItem(
             String hqPath,
             boolean exists) {
         this(fileName, pageNumber, fileSize, width, height, mediaType, hqPath, exists,
-                LQ_STATUS_NOT_GENERATED, 0L);
+                LQ_STATUS_NOT_GENERATED, 0L, null);
+    }
+
+    public ResolvedMediaItem(String fileName, int pageNumber, long fileSize, Integer width,
+                             Integer height, String mediaType, String hqPath, boolean exists,
+                             String lqStatus, long lqSize) {
+        this(fileName, pageNumber, fileSize, width, height, mediaType, hqPath, exists,
+                lqStatus, lqSize, null);
     }
 }

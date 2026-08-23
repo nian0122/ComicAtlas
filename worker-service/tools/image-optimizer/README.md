@@ -1,6 +1,6 @@
 # image-optimizer
 
-ComicAtlas 专用图片压缩工具。将 HQ 图片转换为 LQ WebP 格式。
+ComicAtlas 专用图片压缩工具。普通 HQ 图片转换为同尺寸 LQ WebP；超过 WebP 单边上限的图片转换为同尺寸 JPEG LQ。
 
 ## 编译
 
@@ -45,7 +45,7 @@ image-optimizer.exe \
 | `-comic-id` | 否 | 0 | 漫画 ID（JSON 输出用）|
 | `-chapter-id` | 否 | 0 | 章节 ID（JSON 输出用）|
 | `-chapter-no` | 否 | - | 章节编号（JSON 输出用）|
-| `-quality` | 否 | 15 | WebP 质量 1-100 |
+| `-quality` | 否 | 15 | WebP/JPEG 质量 1-100 |
 | `-workers` | 否 | CPU核心数 | 并发数 |
 | `-force` | 否 | false | 强制重新处理 |
 | `-quiet` | 否 | false | 安静模式 |
@@ -66,8 +66,8 @@ image-optimizer.exe \
   "skipped": 1,
   "failed": 1,
   "pages": [
-    {"pageNumber": 1, "status": "processed", "inputSize": 2500000, "outputSize": 150000, "ratio": 6.0},
-    {"pageNumber": 2, "status": "skipped", "reason": "exists"},
+    {"pageNumber": 1, "status": "processed", "inputSize": 2500000, "outputSize": 150000, "outputFormat": "webp", "ratio": 6.0},
+    {"pageNumber": 2, "status": "processed", "inputSize": 45000000, "outputSize": 9000000, "outputFormat": "jpeg", "ratio": 20.0},
     {"pageNumber": 5, "status": "failed", "reason": "decode error"}
   ],
   "elapsedMs": 5230,
@@ -89,3 +89,4 @@ image-optimizer.exe \
 4. **并发安全**：使用 `sync.Mutex` 保护结果数组，支持高并发处理
 5. **扩展格式支持**：新增 `.webp`、`.gif` 输入解码（原工具不支持）
 6. **退出码语义**：明确区分"全部成功/部分失败/参数错误"
+7. **超大图兜底**：超过 WebP 最大边长时使用同名 JPEG，保持原始尺寸；编码失败不发布零字节文件

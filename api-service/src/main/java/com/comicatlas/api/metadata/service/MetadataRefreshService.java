@@ -413,7 +413,7 @@ public class MetadataRefreshService {
         if (HqStatus.DELETED.name().equals(item.hqStatus())) {
             // 仅 LQ 模式（HQ 已删除、保留 LQ）：只校正 LQ 事实，不触碰 HQ/尺寸/视频字段
             if (image) {
-                applyLqFact(dbRow, item.lqStatus(), item.lqSize());
+                applyLqFact(dbRow, item.lqStatus(), item.lqSize(), item.lqPath());
             }
             return;
         }
@@ -435,10 +435,10 @@ public class MetadataRefreshService {
         }
         // 决策（以本地文件为准）：LQ 状态与大小以快照实测为准——LQ 文件缺失即校正
         // NOT_GENERATED（不沿用 DB 旧 READY），存在即 READY + 实测大小。
-        // lqPath 由 hqPath 推导（{hqPath 去扩展名}.webp），LQ 根固定为 LQ，此处不重复写。
+        // lqPath 必须由 Worker 扫描结果提供，不能根据 HQ 文件名猜测。
         // 仅图片媒体有 LQ；视频保持 NOT_GENERATED。
         if (image) {
-            applyLqFact(dbRow, item.lqStatus(), item.lqSize());
+            applyLqFact(dbRow, item.lqStatus(), item.lqSize(), item.lqPath());
         } else {
             clearLqFact(dbRow);
         }
@@ -446,12 +446,17 @@ public class MetadataRefreshService {
     }
 
     /** 按快照 LQ 事实写入状态、引用与大小；文件缺失时必须清空全部 LQ 事实。 */
-    private void applyLqFact(Media dbRow, String lqStatus, long lqSize) {
+    private void applyLqFact(Media dbRow, String lqStatus, long lqSize, String lqPath) {
         if (LQ_STATUS_READY.equals(lqStatus)) {
             dbRow.setLqStatus(LqStatus.READY);
             dbRow.setLqRoot(StorageRootKeys.LQ);
             if (dbRow.getHqPath() != null && !dbRow.getHqPath().isBlank()) {
-                dbRow.setLqPath(deriveLqPath(dbRow.getHqPath()));
+                if (lqPath != null && !lqPath.isBlank()) {
+                    dbRow.setLqPath(lqPath);
+                } else if (dbRow.getLqPath() == null || dbRow.getLqPath().isBlank()) {
+                    clearLqFact(dbRow);
+                    return;
+                }
             }
             dbRow.setLqSize(lqSize);
         } else {
@@ -466,10 +471,6 @@ public class MetadataRefreshService {
         dbRow.setLqSize(0L);
     }
 
-    private String deriveLqPath(String hqPath) {
-        return hqPath.replaceAll("\\.[^.]+$", ".webp");
-    }
-
     /** 磁盘新增文件：插入 READY，pageNumber 从本章最大非负页码 +1 追加；LQ 事实取快照。 */
     private Media buildNewMedia(Long chapterId, MediaSnapshot item, Map<Long, Integer> nextPageByChapter) {
         Media media = new Media();
@@ -479,11 +480,15 @@ public class MetadataRefreshService {
         media.setHqPath(item.hqPath());
         media.setHqStatus(HqStatus.READY);
         // 新文件 LQ 事实：快照实测（存在即 READY，缺失即 NOT_GENERATED）
-        if (LQ_STATUS_READY.equals(item.lqStatus())) {
+        if (LQ_STATUS_READY.equals(item.lqStatus()) && item.lqPath() != null && !item.lqPath().isBlank()) {
             media.setLqStatus(LqStatus.READY);
+            media.setLqRoot(StorageRootKeys.LQ);
+            media.setLqPath(item.lqPath());
             media.setLqSize(item.lqSize());
         } else {
             media.setLqStatus(LqStatus.NOT_GENERATED);
+            media.setLqRoot(null);
+            media.setLqPath(null);
             media.setLqSize(0L);
         }
         media.setTranscodeStatus(TranscodeStatus.NOT_NEEDED);

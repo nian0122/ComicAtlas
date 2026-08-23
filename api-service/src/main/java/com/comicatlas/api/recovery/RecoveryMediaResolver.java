@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -53,8 +54,7 @@ public class RecoveryMediaResolver {
     private static final String LQ_STATUS_READY = "READY";
     /** LQ 状态：NOT_GENERATED（LQ 文件不存在）。 */
     private static final String LQ_STATUS_NOT_GENERATED = "NOT_GENERATED";
-    /** LQ 产物扩展名：image-optimizer.exe 固定输出 WebP。 */
-    private static final String LQ_EXTENSION = ".webp";
+    private static final Set<String> LQ_EXTENSIONS = Set.of(".webp", ".jpg");
 
     // metadata JSON 字段名（与 MetadataJsonBuilder 写出字段保持一致）
     private static final String FIELD_GLOBAL_ORDER = "globalOrder";
@@ -178,7 +178,7 @@ public class RecoveryMediaResolver {
     /**
      * 现代 metadata 条目：hqPath 存在性校验后原样保留。
      * typed-fail：绝对路径/反斜杠/目录穿越一律拒绝。
-     * LQ 事实按 hqPath 推导（{hqPath 去扩展名}.webp）独立扫描——HQ 缺失时 LQ 可能仍在，
+     * LQ 事实按 HQ 文件主干扫描 LQ 目录中的实际产物——HQ 缺失时 LQ 可能仍在，
      * 恢复为 MISSING + LQ READY（"hq 删除 lq 存在"仍可读）。
      */
     private ResolvedMediaItem resolveHqPathItem(Map<String, Object> item, String fileName, int pageNumber,
@@ -192,7 +192,7 @@ public class RecoveryMediaResolver {
             ImageDimensions dims = MEDIA_TYPE_IMAGE.equals(mediaType)
                     ? getImageDimensions(resolved) : new ImageDimensions(null, null);
             return new ResolvedMediaItem(fileName, pageNumber, fileSize, dims.width(), dims.height(),
-                    mediaType, hqPath, true, lqFact.status(), lqFact.size());
+                    mediaType, hqPath, true, lqFact.status(), lqFact.size(), lqFact.path());
         }
         // 文件缺失：尺寸/大小回退 metadata 值（恢复为 MISSING，不得标 READY）
         long fileSize = item.get(FIELD_FILE_SIZE) != null
@@ -202,12 +202,11 @@ public class RecoveryMediaResolver {
         Integer height = item.get(FIELD_HEIGHT) != null
                 ? ((Number) item.get(FIELD_HEIGHT)).intValue() : null;
         return new ResolvedMediaItem(fileName, pageNumber, fileSize, width, height, mediaType, hqPath, false,
-                lqFact.status(), lqFact.size());
+                lqFact.status(), lqFact.size(), lqFact.path());
     }
 
     /**
-     * 解析 LQ 文件事实：LQ 文件名由 hqPath 推导（{basename}.webp，与 image-optimizer.exe
-     * 输出规则一致），目录与 hqPath 同构（LQ 与 HQ 保持同目录结构）。
+     * 解析 LQ 文件事实：在与 HQ 同构的 LQ 目录中按文件主干匹配实际产物。
      * 仅图片媒体有 LQ；LQ 文件存在且为普通文件才标 READY，否则 NOT_GENERATED。
      * LQ 根未配置时按未生成处理（LQ 为可选增强，缺失不得阻断 HQ 恢复）。
      *
@@ -217,29 +216,52 @@ public class RecoveryMediaResolver {
      */
     private LqFileFact resolveLqFact(String hqPath, String mediaType) {
         if (!MEDIA_TYPE_IMAGE.equals(mediaType) || isBlank(hqPath)) {
-            return new LqFileFact(LQ_STATUS_NOT_GENERATED, 0L);
+            return new LqFileFact(LQ_STATUS_NOT_GENERATED, 0L, null);
         }
         Map<String, ApiStorageRoot> roots = storageProperties.getRoots();
         ApiStorageRoot lqRoot = roots == null ? null : roots.get(StorageRootKeys.LQ);
         if (lqRoot == null) {
-            return new LqFileFact(LQ_STATUS_NOT_GENERATED, 0L);
+            return new LqFileFact(LQ_STATUS_NOT_GENERATED, 0L, null);
         }
-        String lqPath = deriveLqPath(hqPath);
-        Path lqFile = lqRoot.getPath().resolve(lqPath);
-        if (!Files.isRegularFile(lqFile)) {
-            return new LqFileFact(LQ_STATUS_NOT_GENERATED, 0L);
+        int lastSlash = hqPath.lastIndexOf('/');
+        String directory = lastSlash >= 0 ? hqPath.substring(0, lastSlash) : "";
+        String hqFileName = lastSlash >= 0 ? hqPath.substring(lastSlash + 1) : hqPath;
+        String baseName = stemOf(hqFileName);
+        Path lqDirectory = lqRoot.getPath().resolve(directory);
+        if (!Files.isDirectory(lqDirectory)) {
+            return new LqFileFact(LQ_STATUS_NOT_GENERATED, 0L, null);
         }
-        return new LqFileFact(LQ_STATUS_READY, safeSize(lqFile));
+        try (var files = Files.list(lqDirectory)) {
+            var actualLqFile = files
+                    .filter(file -> Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS))
+                    .filter(file -> LQ_EXTENSIONS.contains(extensionOf(file)))
+                    .filter(file -> baseName.equals(stemOf(file.getFileName().toString())))
+                    .findFirst();
+            if (actualLqFile.isPresent()) {
+                Path lqFile = actualLqFile.get();
+                String lqPath = directory.isBlank() ? lqFile.getFileName().toString()
+                        : directory + "/" + lqFile.getFileName();
+                return new LqFileFact(LQ_STATUS_READY, safeSize(lqFile), lqPath);
+            }
+        } catch (IOException e) {
+            log.debug("读取 LQ 目录失败: {}", lqDirectory, e);
+        }
+        return new LqFileFact(LQ_STATUS_NOT_GENERATED, 0L, null);
     }
 
-    /** LQ 相对路径推导：{hqPath 去扩展名}.webp（与 LQ 生成工具输出规则一致）。 */
-    private static String deriveLqPath(String hqPath) {
-        int dot = hqPath.lastIndexOf('.');
-        return (dot > 0 ? hqPath.substring(0, dot) : hqPath) + LQ_EXTENSION;
+    private static String extensionOf(Path file) {
+        String fileName = file.getFileName().toString().toLowerCase();
+        int dot = fileName.lastIndexOf('.');
+        return dot >= 0 ? fileName.substring(dot) : "";
+    }
+
+    private static String stemOf(String fileName) {
+        int dot = fileName.lastIndexOf('.');
+        return dot > 0 ? fileName.substring(0, dot) : fileName;
     }
 
     /** LQ 文件事实：状态 + 字节数（未生成时 status=NOT_GENERATED、size=0）。 */
-    private record LqFileFact(String status, long size) {
+    private record LqFileFact(String status, long size, String path) {
     }
 
     /**

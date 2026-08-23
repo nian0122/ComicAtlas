@@ -124,7 +124,8 @@ export interface MediaItemInfo {
   hqUrl: string
   /** HQ 文件状态，不能用 hqUrl 是否存在推断。 */
   hqStatus?: string
-  lqUrl: string
+  /** 后端根据实际 LQ 产物返回的完整 URL，前端不得拼接或猜测扩展名。 */
+  lqUrl: string | null
   lqStatus: string
   width: number
   height: number

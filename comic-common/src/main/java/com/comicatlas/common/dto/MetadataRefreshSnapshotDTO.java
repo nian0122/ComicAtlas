@@ -58,7 +58,7 @@ public record MetadataRefreshSnapshotDTO(
      * hqPath 为必填相对路径，构建边界校验契约（见 {@link RelativePathValidator}）。
      * lqStatus/lqSize 为 LQ 文件事实（Worker 扫 LQ 目录实测）：lqStatus 取值
      * READY（文件存在）/NOT_GENERATED（不存在），lqSize 为 LQ 文件字节数（未生成为 0）。
-     * lqPath 可推导（hqPath 换 .webp），不进入快照。
+     * lqPath 为实际 LQ 产物相对路径；普通图为 .webp，超大图兜底为 .jpg。
      */
     public record MediaSnapshot(
             Long mediaId,
@@ -76,10 +76,23 @@ public record MetadataRefreshSnapshotDTO(
             String videoCodec,
             String audioCodec,
             String lqStatus,
-            long lqSize) {
+            long lqSize,
+            String lqPath) {
 
         public MediaSnapshot {
             RelativePathValidator.requireRelativeForwardSlash(hqPath);
+            if (lqPath != null) {
+                RelativePathValidator.requireRelativeForwardSlash(lqPath);
+            }
+        }
+
+        public MediaSnapshot(Long mediaId, int mediaVersion, String hqPath, String hqStatus,
+                             String lifecycleStatus, int pageNumber, long fileSize, String mediaType,
+                             Integer width, Integer height, BigDecimal duration, String container,
+                             String videoCodec, String audioCodec, String lqStatus, long lqSize) {
+            this(mediaId, mediaVersion, hqPath, hqStatus, lifecycleStatus, pageNumber, fileSize,
+                    mediaType, width, height, duration, container, videoCodec, audioCodec,
+                    lqStatus, lqSize, null);
         }
 
         /** 旧构造入口（无 LQ 事实，lqStatus=NOT_GENERATED、lqSize=0），保持向后兼容。 */
@@ -100,7 +113,7 @@ public record MetadataRefreshSnapshotDTO(
                 String audioCodec) {
             this(mediaId, mediaVersion, hqPath, hqStatus, lifecycleStatus, pageNumber, fileSize,
                     mediaType, width, height, duration, container, videoCodec, audioCodec,
-                    LQ_STATUS_NOT_GENERATED, 0L);
+                    LQ_STATUS_NOT_GENERATED, 0L, null);
         }
 
         /** LQ 未生成状态名（与 LqStatus 枚举一致）。 */

@@ -135,12 +135,24 @@ public class LqCommandHandler {
         Map<Integer, Long> mediaIdByPage = pages.stream()
                 .filter(p -> p.getPageNumber() != null)
                 .collect(Collectors.toMap(MediaRecord::getPageNumber, MediaRecord::getId, (a, b) -> a));
+        String lqDirectory = pages.isEmpty() ? "" : StoragePathParser.directoryOf(pages.get(0).getHqPath());
         return result.getPages().stream()
                 .filter(p -> !"failed".equals(p.getStatus())
                         && p.getPageNumber() != null && p.getOutputSize() != null)
-                .map(p -> new LqSizeResult(mediaIdByPage.get(p.getPageNumber().intValue()), p.getOutputSize()))
+                .map(p -> new LqSizeResult(mediaIdByPage.get(p.getPageNumber().intValue()),
+                        p.getOutputSize(), joinRelativePath(lqDirectory, p.getOutputPath())))
                 .filter(r -> r.mediaId() != null)
                 .toList();
+    }
+
+    private static String joinRelativePath(String directory, String fileName) {
+        if (fileName == null || fileName.isBlank()) {
+            return null;
+        }
+        if (directory == null || directory.isBlank()) {
+            return fileName.replace('\\', '/');
+        }
+        return directory.replace('\\', '/') + "/" + fileName.replace('\\', '/');
     }
 
     /** 单章处理结果：失败页码 + 各成功页 LQ 产物大小。 */

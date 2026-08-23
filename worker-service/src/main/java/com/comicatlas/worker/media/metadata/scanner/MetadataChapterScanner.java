@@ -28,7 +28,7 @@ import java.util.stream.Stream;
 @RequiredArgsConstructor
 public class MetadataChapterScanner {
 
-    private static final String LQ_EXTENSION = ".webp";
+    private static final Set<String> LQ_EXTENSIONS = Set.of(".webp", ".jpg");
     private static final String LQ_STATUS_NOT_GENERATED = MetadataScanSupport.LQ_STATUS_NOT_GENERATED;
     private static final String HQ_STATUS_DELETED = MetadataScanSupport.HQ_STATUS_DELETED;
     private static final String IMAGE_TYPE = MetadataScanSupport.IMAGE_TYPE;
@@ -96,7 +96,8 @@ public class MetadataChapterScanner {
                     || !Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) {
                 continue;
             }
-            if (!fileName.endsWith(LQ_EXTENSION)) {
+            String lowerFileName = fileName.toLowerCase();
+            if (LQ_EXTENSIONS.stream().noneMatch(lowerFileName::endsWith)) {
                 warnings.add("忽略非 LQ 产物: " + fileName);
                 continue;
             }
@@ -110,7 +111,8 @@ public class MetadataChapterScanner {
                     comicId + "/" + chapterId + "/" + fileName, HQ_STATUS_DELETED,
                     row.getStatus() != null ? row.getStatus() : STATUS_READY,
                     row.getPageNumber() != null ? row.getPageNumber() : 0, 0L, IMAGE_TYPE,
-                    null, null, null, null, null, null, STATUS_READY, safeSize(file)));
+                    null, null, null, null, null, null, STATUS_READY, safeSize(file),
+                    comicId + "/" + chapterId + "/" + fileName));
         }
         for (MediaRecord row : rows) {
             if (row.getLqPath() == null || row.getLqPath().isBlank() || matchedIds.contains(row.getId())) {
@@ -124,7 +126,7 @@ public class MetadataChapterScanner {
                     comicId + "/" + chapterId + "/" + fileName, HQ_STATUS_DELETED,
                     row.getStatus() != null ? row.getStatus() : STATUS_READY,
                     row.getPageNumber() != null ? row.getPageNumber() : 0, 0L, IMAGE_TYPE,
-                    null, null, null, null, null, null, LQ_STATUS_NOT_GENERATED, 0L));
+                    null, null, null, null, null, null, LQ_STATUS_NOT_GENERATED, 0L, null));
         }
         return new ScanResult(mediaItems, warnings, null);
     }

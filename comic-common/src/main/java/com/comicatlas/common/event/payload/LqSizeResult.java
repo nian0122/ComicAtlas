@@ -9,6 +9,11 @@ package com.comicatlas.common.event.payload;
  */
 public record LqSizeResult(
     Long mediaId,
-    Long sizeBytes
+    Long sizeBytes,
+    String lqPath
 ) {
+    /** 兼容旧调用方：未携带格式时保持未知，不伪造文件扩展名。 */
+    public LqSizeResult(Long mediaId, Long sizeBytes) {
+        this(mediaId, sizeBytes, null);
+    }
 }

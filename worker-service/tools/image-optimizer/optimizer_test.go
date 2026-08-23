@@ -41,11 +41,8 @@ func TestPixelBudget_blocksOnlyWhenAggregatePixelsExceedCapacity(t *testing.T) {
 	}
 }
 
-// 生成一张某边超过 WebP 上限 16383 的 JPEG，验证工具会按比例缩放后成功输出。
-func TestOptimizeImageToWebP_oversizedDimension_resizesAndSucceeds(t *testing.T) {
-	if findImageMagick() == "" {
-		t.Skip("当前环境未安装 ImageMagick，Docker Worker 镜像会提供该依赖")
-	}
+// 生成一张某边超过 WebP 上限 16383 的 JPEG，验证工具使用同名 JPEG 兜底且不缩放。
+func TestOptimizeImageToWebP_oversizedDimension_usesJpegFallback(t *testing.T) {
 	dir := t.TempDir()
 	src := filepath.Join(dir, "tall.jpg")
 	img := image.NewRGBA(image.Rect(0, 0, 32, 16400)) // 高 16400 > 16383，宽极小以加速
@@ -59,12 +56,28 @@ func TestOptimizeImageToWebP_oversizedDimension_resizesAndSucceeds(t *testing.T)
 	f.Close()
 
 	out := filepath.Join(dir, "out", "tall.webp")
-	_, err = optimizeImageToWebP(src, out, 75)
+	result, err := optimizeImageToWebP(src, out, 75)
 	if err != nil {
-		t.Fatalf("超限图应缩放后成功: %v", err)
+		t.Fatalf("超限图应使用 JPEG 兜底成功: %v", err)
 	}
-	if stat, statErr := os.Stat(out); statErr != nil || stat.Size() == 0 {
-		t.Fatalf("缩放后应生成非空输出: %v", statErr)
+	jpegOutput := filepath.Join(dir, "out", "tall.jpg")
+	if stat, statErr := os.Stat(jpegOutput); statErr != nil || stat.Size() == 0 {
+		t.Fatalf("JPEG 兜底应生成非空输出: %v", statErr)
+	}
+	if result.OutputFormat != "jpeg" || result.OutputPath != jpegOutput {
+		t.Fatalf("应返回实际 JPEG 产物，结果为 %+v", result)
+	}
+	inputFile, err := os.Open(jpegOutput)
+	if err != nil {
+		t.Fatal(err)
+	}
+	config, err := jpeg.DecodeConfig(inputFile)
+	inputFile.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if config.Width != 32 || config.Height != 16400 {
+		t.Fatalf("JPEG 兜底不应改变尺寸，实际为 %dx%d", config.Width, config.Height)
 	}
 }
 

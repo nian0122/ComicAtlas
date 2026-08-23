@@ -48,9 +48,6 @@ public class MediaOperationCompletionService {
     /** 转码产物默认音频编码（事件未携带实测值时回退）。 */
     private static final String DEFAULT_AUDIO_CODEC = "aac";
 
-    /** LQ 缩略图扩展名。 */
-    private static final String LQ_EXTENSION = ".webp";
-
     /** 转码产物扩展名。 */
     private static final String MP4_EXTENSION = ".mp4";
 
@@ -83,12 +80,20 @@ public class MediaOperationCompletionService {
                         .set(Media::getLqStatus, LqStatus.READY)
                         .set(Media::getLqRoot, StorageRootKeys.LQ)
                         .set(Media::getLqSize, lqSize);
-                String hqPath = media.getHqPath();
-                if (hqPath != null && !hqPath.isBlank()) {
-                    mediaUpdate.set(Media::getLqPath, deriveLqPath(hqPath));
+                String actualLqPath = media.getLqPath();
+                String outputLqPath = findLqPath(lqSizes, media.getId());
+                if (outputLqPath != null && !outputLqPath.isBlank()) {
+                    actualLqPath = outputLqPath;
+                }
+                if (actualLqPath != null && !actualLqPath.isBlank()) {
+                    mediaUpdate.set(Media::getLqPath, actualLqPath);
+                    readyPages++;
+                } else {
+                    mediaUpdate.set(Media::getLqStatus, LqStatus.NOT_GENERATED)
+                            .set(Media::getLqRoot, null)
+                            .set(Media::getLqSize, 0L);
                 }
                 mediaMapper.update(null, mediaUpdate);
-                readyPages++;
             } else {
                 mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
                         .eq(Media::getId, media.getId())
@@ -242,8 +247,13 @@ public class MediaOperationCompletionService {
 
     // ======================== 辅助 ========================
 
-    private static String deriveLqPath(String hqPath) {
-        return hqPath.replaceAll("\\.[^.]+$", LQ_EXTENSION);
+    private static String findLqPath(List<LqSizeResult> lqSizes, Long mediaId) {
+        return lqSizes.stream()
+                .filter(result -> mediaId.equals(result.mediaId()))
+                .map(LqSizeResult::lqPath)
+                .filter(path -> path != null && !path.isBlank())
+                .findFirst()
+                .orElse(null);
     }
 
     private static String deriveTranscodedPath(String hqPath) {

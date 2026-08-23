@@ -9,6 +9,7 @@ import com.comicatlas.api.recovery.domain.RestoreSource;
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.enums.HqStatus;
 import com.comicatlas.contract.common.enums.LqStatus;
+import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.storage.ApiStorageProperties;
 import com.comicatlas.api.metadata.service.MetadataUpdateCoordinator;
@@ -258,11 +259,13 @@ public class RecoveryEngine {
                 media.setHqPath(item.hqPath());
                 // 缺文件必须 MISSING，不得标 READY
                 media.setHqStatus(item.exists() ? HqStatus.READY : HqStatus.MISSING);
-                // LQ 事实：恢复时实测 LQ 目录（hqPath 推导 .webp）——HQ 缺失但 LQ 存在时
+                // LQ 事实：恢复时实测 LQ 目录中的实际文件——HQ 缺失但 LQ 存在时
                 // 仍恢复为 LQ READY，阅读器可用 LQ 兜底（"hq 删除 lq 存在"可读）
                 if (LQ_STATUS_READY.equals(item.lqStatus())) {
                     media.setLqStatus(LqStatus.READY);
                     media.setLqSize(item.lqSize());
+                    media.setLqRoot(StorageRootKeys.LQ);
+                    media.setLqPath(item.lqPath());
                 } else {
                     media.setLqStatus(LqStatus.NOT_GENERATED);
                     media.setLqSize(0L);
