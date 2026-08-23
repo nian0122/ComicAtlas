@@ -17,6 +17,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -61,6 +62,16 @@ class ImageOptimizerTest {
         verify(processRunner).run(captor.capture(), anyLong(), anyString());
         assertThat(captor.getValue().command()).as("force=true 应传 -force 强制重压")
                 .contains("-force");
+    }
+
+    @Test
+    @DisplayName("章节 LQ 默认使用一小时外部进程超时")
+    void generateLq_usesOneHourTimeoutByDefault() throws Exception {
+        Path hqDir = Files.createDirectories(tempDir.resolve("hq"));
+
+        optimizer.generateLq(1L, 2L, hqDir, tempDir.resolve("lq"), false);
+
+        verify(processRunner).run(any(ProcessBuilder.class), eq(3600L), eq("LQ优化"));
     }
 
     @Test

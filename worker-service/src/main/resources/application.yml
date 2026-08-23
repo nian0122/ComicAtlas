@@ -95,7 +95,7 @@ worker:
     timeout-seconds: ${TRANSCODE_TIMEOUT_SECONDS:600}
     encoder-probe-timeout-seconds: ${TRANSCODE_ENCODER_PROBE_TIMEOUT_SECONDS:15}
   image:
-    lq-timeout-seconds: ${LQ_TIMEOUT_SECONDS:600}
+    lq-timeout-seconds: ${LQ_TIMEOUT_SECONDS:3600}
     max-inflight-pixels: ${LQ_MAX_INFLIGHT_PIXELS:80000000}
   media:
     ffprobe-timeout-seconds: ${FFPROBE_TIMEOUT_SECONDS:15}

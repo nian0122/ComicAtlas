@@ -198,7 +198,7 @@ public class WorkerConfig {
     /** LQ 图片处理配置。 */
     @Data
     public static class Image {
-        private long lqTimeoutSeconds = 600;
+        private long lqTimeoutSeconds = 3600;
         /** 所有图片 worker 同时处于解码/编码阶段的总像素预算。 */
         private long maxInflightPixels = 80_000_000L;
     }
