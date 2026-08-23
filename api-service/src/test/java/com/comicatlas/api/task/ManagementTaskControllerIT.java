@@ -45,12 +45,12 @@ import static org.hamcrest.Matchers.everyItem;
  *
  * <p>验证：
  * <ul>
- *   <li>POST /api/management/tasks — 创建任务，Idempotency-Key 支持</li>
- *   <li>GET /api/management/tasks — 分页查询，支持过滤</li>
- *   <li>GET /api/management/tasks/{id} — 任务详情</li>
- *   <li>GET /api/management/tasks/{id}/items — 逐目标项列表</li>
- *   <li>POST /api/management/tasks/{id}/cancel — 取消任务</li>
- *   <li>POST /api/management/tasks/{id}/retry — 重试任务</li>
+ *   <li>POST /api/manage/tasks — 创建任务，Idempotency-Key 支持</li>
+ *   <li>GET /api/manage/tasks — 分页查询，支持过滤</li>
+ *   <li>GET /api/manage/tasks/{id} — 任务详情</li>
+ *   <li>GET /api/manage/tasks/{id}/items — 逐目标项列表</li>
+ *   <li>POST /api/manage/tasks/{id}/cancel — 取消任务</li>
+ *   <li>POST /api/manage/tasks/{id}/retry — 重试任务</li>
  * </ul>
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
@@ -128,7 +128,7 @@ class ManagementTaskControllerIT {
     // ======================== 创建任务 ========================
 
     @Nested
-    @DisplayName("POST /api/management/tasks")
+    @DisplayName("POST /api/manage/tasks")
     class CreateTaskTests {
 
         @Test
@@ -137,7 +137,7 @@ class ManagementTaskControllerIT {
             CreateManagementTaskRequest req = buildImportRequest("CTRL-BATCH-01");
             String body = objectMapper.writeValueAsString(req);
 
-            mockMvc.perform(post("/api/management/tasks")
+            mockMvc.perform(post("/api/manage/tasks")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body))
                     .andExpect(status().isOk())
@@ -155,7 +155,7 @@ class ManagementTaskControllerIT {
             CreateManagementTaskRequest req = buildImportRequest("CTRL-IDEM-01");
             String body = objectMapper.writeValueAsString(req);
 
-            String firstResponse = mockMvc.perform(post("/api/management/tasks")
+            String firstResponse = mockMvc.perform(post("/api/manage/tasks")
                             .header("Idempotency-Key", "ctrl-idem-1")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body))
@@ -164,7 +164,7 @@ class ManagementTaskControllerIT {
 
             int firstId = objectMapper.readTree(firstResponse).get("data").get("id").asInt();
 
-            mockMvc.perform(post("/api/management/tasks")
+            mockMvc.perform(post("/api/manage/tasks")
                             .header("Idempotency-Key", "ctrl-idem-1")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body))
@@ -178,13 +178,13 @@ class ManagementTaskControllerIT {
             CreateManagementTaskRequest req1 = buildImportRequest("CTRL-IDEM-02A");
             CreateManagementTaskRequest req2 = buildImportRequest("CTRL-IDEM-02B");
 
-            mockMvc.perform(post("/api/management/tasks")
+            mockMvc.perform(post("/api/manage/tasks")
                             .header("Idempotency-Key", "ctrl-idem-2")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(req1)))
                     .andExpect(status().isOk());
 
-            mockMvc.perform(post("/api/management/tasks")
+            mockMvc.perform(post("/api/manage/tasks")
                             .header("Idempotency-Key", "ctrl-idem-2")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(req2)))
@@ -198,7 +198,7 @@ class ManagementTaskControllerIT {
         void missingRequiredFields_returns400() throws Exception {
             String invalidBody = "{\"taskType\": \"IMPORT\"}"; // 缺少 operation
 
-            mockMvc.perform(post("/api/management/tasks")
+            mockMvc.perform(post("/api/manage/tasks")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(invalidBody))
                     .andExpect(status().isOk()) // validation exception wraps in Result
@@ -209,7 +209,7 @@ class ManagementTaskControllerIT {
     // ======================== 分页查询 ========================
 
     @Nested
-    @DisplayName("GET /api/management/tasks")
+    @DisplayName("GET /api/manage/tasks")
     class ListTasksTests {
 
         @BeforeEach
@@ -221,7 +221,7 @@ class ManagementTaskControllerIT {
         @Test
         @DisplayName("默认分页返回任务列表")
         void defaultPagination_returnsList() throws Exception {
-            mockMvc.perform(get("/api/management/tasks"))
+            mockMvc.perform(get("/api/manage/tasks"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data.records").isArray())
@@ -231,7 +231,7 @@ class ManagementTaskControllerIT {
         @Test
         @DisplayName("按 type=IMPORT 过滤")
         void filterByType() throws Exception {
-            mockMvc.perform(get("/api/management/tasks")
+            mockMvc.perform(get("/api/manage/tasks")
                             .param("type", "IMPORT"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.records[*].taskType")
@@ -241,7 +241,7 @@ class ManagementTaskControllerIT {
         @Test
         @DisplayName("按 status=QUEUED 过滤")
         void filterByStatus() throws Exception {
-            mockMvc.perform(get("/api/management/tasks")
+            mockMvc.perform(get("/api/manage/tasks")
                             .param("status", "QUEUED"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.records[*].status")
@@ -251,7 +251,7 @@ class ManagementTaskControllerIT {
         @Test
         @DisplayName("分页参数生效")
         void paginationParameters() throws Exception {
-            mockMvc.perform(get("/api/management/tasks")
+            mockMvc.perform(get("/api/manage/tasks")
                             .param("page", "1")
                             .param("size", "1"))
                     .andExpect(status().isOk())
@@ -262,7 +262,7 @@ class ManagementTaskControllerIT {
     // ======================== 任务详情 ========================
 
     @Nested
-    @DisplayName("GET /api/management/tasks/{id}")
+    @DisplayName("GET /api/manage/tasks/{id}")
     class GetTaskTests {
 
         @Test
@@ -271,7 +271,7 @@ class ManagementTaskControllerIT {
             CreateManagementTaskRequest req = buildImportRequest("CTRL-DETAIL");
             ManagementTaskResponse created = managementTaskService.createTask(req, null, null);
 
-            mockMvc.perform(get("/api/management/tasks/" + created.getId()))
+            mockMvc.perform(get("/api/manage/tasks/" + created.getId()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.id").value(created.getId()))
                     .andExpect(jsonPath("$.data.taskType").value("IMPORT"));
@@ -280,7 +280,7 @@ class ManagementTaskControllerIT {
         @Test
         @DisplayName("不存在的任务返回 404")
         void nonExistingTask_returns404() throws Exception {
-            mockMvc.perform(get("/api/management/tasks/99999"))
+            mockMvc.perform(get("/api/manage/tasks/99999"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(404))
                     .andExpect(jsonPath("$.message").value(containsString("任务不存在")));
@@ -290,7 +290,7 @@ class ManagementTaskControllerIT {
     // ======================== 任务 items ========================
 
     @Nested
-    @DisplayName("GET /api/management/tasks/{id}/items")
+    @DisplayName("GET /api/manage/tasks/{id}/items")
     class GetTaskItemsTests {
 
         @Test
@@ -302,7 +302,7 @@ class ManagementTaskControllerIT {
                     TaskType.IMPORT);
             ManagementTaskResponse created = managementTaskService.createTask(req, null, null);
 
-            mockMvc.perform(get("/api/management/tasks/" + created.getId() + "/items"))
+            mockMvc.perform(get("/api/manage/tasks/" + created.getId() + "/items"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.length()").value(2))
                     .andExpect(jsonPath("$.data[*].targetType").value(everyItem(is("COMIC"))));
@@ -312,7 +312,7 @@ class ManagementTaskControllerIT {
     // ======================== 取消 ========================
 
     @Nested
-    @DisplayName("POST /api/management/tasks/{id}/cancel")
+    @DisplayName("POST /api/manage/tasks/{id}/cancel")
     class CancelTaskTests {
 
         @Test
@@ -321,7 +321,7 @@ class ManagementTaskControllerIT {
             CreateManagementTaskRequest req = buildImportRequest("CTRL-CANCEL");
             ManagementTaskResponse created = managementTaskService.createTask(req, null, null);
 
-            mockMvc.perform(post("/api/management/tasks/" + created.getId() + "/cancel"))
+            mockMvc.perform(post("/api/manage/tasks/" + created.getId() + "/cancel"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.status").value(
                             anyOf(is("CANCELLING"), is("CANCELLED"))));
@@ -331,7 +331,7 @@ class ManagementTaskControllerIT {
     // ======================== 重试 ========================
 
     @Nested
-    @DisplayName("POST /api/management/tasks/{id}/retry")
+    @DisplayName("POST /api/manage/tasks/{id}/retry")
     class RetryTaskTests {
 
         @Test
@@ -345,7 +345,7 @@ class ManagementTaskControllerIT {
             managementTaskService.updateItemStatus(items.get(0).getId(),
                     ManagementTaskStatus.FAILED, "test fail", null, null);
 
-            mockMvc.perform(post("/api/management/tasks/" + created.getId() + "/retry"))
+            mockMvc.perform(post("/api/manage/tasks/" + created.getId() + "/retry"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.attempt").value(2))
                     .andExpect(jsonPath("$.data.status").value("QUEUED"))

@@ -491,7 +491,7 @@ class BatchSnapshotIT {
             markItemFailed(taskId, failedItem.getId());
 
             // retry → 只有失败 item 被重置，成功 item 保持 SUCCEEDED
-            mockMvc.perform(post("/api/management/tasks/{id}/retry", taskId))
+            mockMvc.perform(post("/api/manage/tasks/{id}/retry", taskId))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200));
 
@@ -541,7 +541,7 @@ class BatchSnapshotIT {
     }
 
     private List<ManagementTaskItemResponse> getTaskItems(long taskId) throws Exception {
-        MvcResult result = mockMvc.perform(get("/api/management/tasks/{id}/items", taskId))
+        MvcResult result = mockMvc.perform(get("/api/manage/tasks/{id}/items", taskId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andReturn();

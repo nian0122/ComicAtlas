@@ -75,7 +75,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * 验证旧专表（import/export/recovery/directory_scan）与 management_task 主表：
  * <ul>
  *   <li>旧 ID 创建时同步建立 management_task，旧/新状态语义一致</li>
- *   <li>Export/scan/recovery 首次加载即在 /api/management/tasks 可见</li>
+ *   <li>Export/scan/recovery 首次加载即在 /api/manage/tasks 可见</li>
  *   <li>导入阶段 DOWNLOADING/EXTRACTING/PARSING → management_task.stage（TaskStage 枚举）</li>
  *   <li>import cancel 后迟到进度不回退，CANCELLED 为真正终态</li>
  *   <li>失败 item 可重试（attempt 递增）</li>
@@ -316,7 +316,7 @@ class UnifiedTaskCompatibilityIT {
     // ======================== Export / Scan / Recovery 首屏可见 ========================
 
     @Test
-    @DisplayName("导出任务创建后首屏即可在 /api/management/tasks 发现（EXPECTED_FAIL_BEFORE_FIX）")
+    @DisplayName("导出任务创建后首屏即可在 /api/manage/tasks 发现（EXPECTED_FAIL_BEFORE_FIX）")
     void exportTask_appearsInUnifiedList_onFirstLoad() throws Exception {
         Comic comic = insertReadyComic("导出漫画E");
 
@@ -325,7 +325,7 @@ class UnifiedTaskCompatibilityIT {
         assertThat(et.getManagementTaskId()).isNotNull();
 
         // 统一任务列表按 type=EXPORT 可见
-        mockMvc.perform(get("/api/management/tasks").param("type", "EXPORT"))
+        mockMvc.perform(get("/api/manage/tasks").param("type", "EXPORT"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.total").value(org.hamcrest.Matchers.greaterThanOrEqualTo(1)))
