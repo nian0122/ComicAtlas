@@ -9,7 +9,8 @@ RUN --mount=type=cache,id=comicatlas-worker-apt-lists,target=/var/lib/apt/lists,
     && apt-get update \
     && apt-get install --no-install-recommends -y \
         ca-certificates \
-        ffmpeg
+        ffmpeg \
+        libjpeg-turbo-progs
 
 FROM golang:1.22-bookworm AS image-optimizer-builder
 WORKDIR /build/image-optimizer

@@ -1,6 +1,6 @@
 # image-optimizer
 
-ComicAtlas 专用图片压缩工具。普通 HQ 图片转换为同尺寸 LQ WebP；超过 WebP 单边上限的图片转换为同尺寸 JPEG LQ。
+ComicAtlas 专用图片压缩工具。普通 HQ 图片转换为同尺寸 LQ WebP；超过 WebP 单边上限的 JPEG 图片由 libjpeg-turbo 低内存转换为同尺寸 JPEG LQ。
 
 ## 编译
 
@@ -10,6 +10,8 @@ go build -o image-optimizer.exe .
 ```
 
 **注意**：本项目依赖 `github.com/chai2010/webp`，其底层使用 CGO 绑定 libwebp。Windows 编译需要 MinGW-w64 环境。
+
+超大 JPEG 需要 libjpeg-turbo 运行时。Docker 镜像内置 `libjpeg-turbo-progs`。Windows 本地开发执行 `pwsh -NoProfile -File scripts/dev/setup-image-optimizer.ps1`，工具会下载到项目 `.runtime` 目录；`scripts/dev/start-dev.ps1` 会自动传入 `IMAGE_CJPEG_PATH`、`IMAGE_DJPEG_PATH`，不会修改系统 `Path`。
 
 ## 使用
 

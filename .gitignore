@@ -68,6 +68,7 @@ frontend/test-results/
 worker-service/tools/aria2c/
 worker-service/tools/ffmpeg/
 worker-service/tools/image-optimizer/image-optimizer.exe
+worker-service/tools/image-optimizer/.runtime/
 /tools/vendor/frp/
 /.runtime/
 

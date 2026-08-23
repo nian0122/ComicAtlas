@@ -43,6 +43,9 @@ func TestPixelBudget_blocksOnlyWhenAggregatePixelsExceedCapacity(t *testing.T) {
 
 // 生成一张某边超过 WebP 上限 16383 的 JPEG，验证工具使用同名 JPEG 兜底且不缩放。
 func TestOptimizeImageToWebP_oversizedDimension_usesJpegFallback(t *testing.T) {
+	if _, _, err := resolveJpegTurboPaths(); err != nil {
+		t.Skip("当前环境未提供 libjpeg-turbo，Docker Worker 会内置该依赖")
+	}
 	dir := t.TempDir()
 	src := filepath.Join(dir, "tall.jpg")
 	img := image.NewRGBA(image.Rect(0, 0, 32, 16400)) // 高 16400 > 16383，宽极小以加速

@@ -41,6 +41,15 @@ $env:MYSQL_PORT    = $env:REMOTE_MYSQL_PORT
 $env:MYSQL_USER    = $env:WORKER_MYSQL_USER
 $env:MYSQL_PASS    = $env:WORKER_MYSQL_PASSWORD
 $env:MANGA_ROOT    = if ($env:MANGA_ROOT) { $env:MANGA_ROOT } else { "F:/manga" }
+$localJpegTurboDirectory = Join-Path $repoRoot "worker-service\tools\image-optimizer\.runtime\libjpeg-turbo\bin"
+$localDjpegPath = Join-Path $localJpegTurboDirectory "djpeg.exe"
+$localCjpegPath = Join-Path $localJpegTurboDirectory "cjpeg.exe"
+if ((Test-Path $localDjpegPath) -and (Test-Path $localCjpegPath)) {
+    $env:IMAGE_DJPEG_PATH = $localDjpegPath
+    $env:IMAGE_CJPEG_PATH = $localCjpegPath
+} else {
+    Write-Host "WARN: 未找到项目本地 libjpeg-turbo，超大 JPEG 将无法生成 LQ。运行 scripts/dev/setup-image-optimizer.ps1 安装。" -ForegroundColor Yellow
+}
 
 $requiredSettings = @(
     "WORKER_MYSQL_USER",
@@ -74,7 +83,7 @@ if (-not $mqTest) {
 }
 
 # 5. 启动 Worker：先安装最新 comic-common，再明确指定 Worker POM 启动，避免根项目执行 spring-boot:run
-$workerCommand = "`$env:MANGA_ROOT='$env:MANGA_ROOT'; `$env:RABBITMQ_HOST='$env:RABBITMQ_HOST'; `$env:RABBITMQ_PORT='$env:RABBITMQ_PORT'; `$env:RABBITMQ_USER='$env:RABBITMQ_USER'; `$env:RABBITMQ_PASS='$env:RABBITMQ_PASS'; `$env:REDIS_HOST='$env:REDIS_HOST'; `$env:REDIS_PORT='$env:REDIS_PORT'; `$env:REDIS_PASS='$env:REDIS_PASS'; `$env:NACOS_ADDR='$env:NACOS_ADDR'; `$env:NACOS_USER='$env:NACOS_USER'; `$env:NACOS_PASS='$env:NACOS_PASS'; .\mvnw.cmd -pl comic-common -am clean install -DskipTests; if (`$LASTEXITCODE -eq 0) { .\mvnw.cmd -f worker-service/pom.xml spring-boot:run }"
+$workerCommand = "`$env:MANGA_ROOT='$env:MANGA_ROOT'; `$env:IMAGE_DJPEG_PATH='$env:IMAGE_DJPEG_PATH'; `$env:IMAGE_CJPEG_PATH='$env:IMAGE_CJPEG_PATH'; `$env:RABBITMQ_HOST='$env:RABBITMQ_HOST'; `$env:RABBITMQ_PORT='$env:RABBITMQ_PORT'; `$env:RABBITMQ_USER='$env:RABBITMQ_USER'; `$env:RABBITMQ_PASS='$env:RABBITMQ_PASS'; `$env:REDIS_HOST='$env:REDIS_HOST'; `$env:REDIS_PORT='$env:REDIS_PORT'; `$env:REDIS_PASS='$env:REDIS_PASS'; `$env:NACOS_ADDR='$env:NACOS_ADDR'; `$env:NACOS_USER='$env:NACOS_USER'; `$env:NACOS_PASS='$env:NACOS_PASS'; .\mvnw.cmd -pl comic-common -am clean install -DskipTests; if (`$LASTEXITCODE -eq 0) { .\mvnw.cmd -f worker-service/pom.xml spring-boot:run }"
 Start-Process pwsh -WorkingDirectory $repoRoot -ArgumentList "-NoExit", "-Command", $workerCommand
 # Start-Process pwsh -WorkingDirectory "$repoRoot\api-service" -ArgumentList "-NoExit", "-Command", "`$env:RABBITMQ_HOST='$env:RABBITMQ_HOST'; `$env:RABBITMQ_PORT='$env:RABBITMQ_PORT'; `$env:RABBITMQ_USER='$env:RABBITMQ_USER'; `$env:RABBITMQ_PASS='$env:RABBITMQ_PASS'; `$env:NACOS_ADDR='$env:NACOS_ADDR'; `$env:NACOS_USER='$env:NACOS_USER'; `$env:NACOS_PASS='$env:NACOS_PASS'; `$env:REDIS_PASS='$env:REDIS_PASS'; mvn clean spring-boot:run"
 
