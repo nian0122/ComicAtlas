@@ -76,7 +76,8 @@
           <div class="action-card action-card--chapter">
             <div class="action-card-head"><div><span class="panel-kicker">CHAPTER MAINTENANCE</span><h2>章节操作</h2><p>只修改当前选中的章节，不影响其他章节。</p></div><span class="action-id">CH · {{ selectedRow.id }}</span></div>
             <div class="action-context"><span class="context-mark">▱</span><div><strong>{{ selectedRow.title }}</strong><small>全书顺序 {{ selectedRow.order ?? '—' }}</small></div></div>
-            <el-form label-position="top" class="action-form">
+            <nav class="chapter-workspace-tabs" aria-label="章节功能分区"><button type="button" :class="{ 'is-active': chapterWorkspaceTab === 'chapter' }" @click="chapterWorkspaceTab = 'chapter'"><span>▱</span><strong>章节</strong><small>编辑与排序</small></button><button type="button" :class="{ 'is-active': chapterWorkspaceTab === 'media' }" @click="chapterWorkspaceTab = 'media'"><span>▤</span><strong>媒体</strong><small>排序与补充</small></button><button type="button" :class="{ 'is-active': chapterWorkspaceTab === 'storage' }" @click="chapterWorkspaceTab = 'storage'"><span>◈</span><strong>存储</strong><small>HQ / LQ</small></button></nav>
+            <el-form v-if="chapterWorkspaceTab === 'chapter'" label-position="top" class="action-form">
               <div class="chapter-action-toolbar"><div><span class="panel-kicker">COMMAND DECK</span><strong>章节命令面板</strong></div><el-button class="create-chapter-button" type="primary" plain @click="toggleCreateChapter"><span class="create-chapter-icon">＋</span>{{ chapterForm.action === 'create' ? '返回当前章节' : '新建章节' }}</el-button></div>
               <div v-if="chapterForm.action !== 'create'" class="chapter-choice"><label>选择要执行的操作</label><div class="chapter-choice-grid"><button v-for="item in CHAPTER_ACTIONS" :key="item.value" type="button" :class="{ 'is-active': chapterForm.action === item.value, 'is-danger': item.value === 'trash' }" @click="selectChapterAction(item.value)"><span class="chapter-choice-icon">{{ chapterActionIcon(item.value) }}</span><span class="chapter-choice-copy"><strong>{{ item.label }}</strong><small>{{ chapterActionTagline(item.value) }}</small></span><span class="chapter-choice-arrow">→</span></button></div><div class="chapter-choice-help"><span class="help-mark">i</span><small>{{ chapterActionDescription(chapterForm.action) }}</small></div></div>
               <div v-else class="create-context"><span class="context-mark">＋</span><div><strong>新建章节</strong><small>将在当前漫画中创建一个新章节</small></div></div>
@@ -87,7 +88,7 @@
               <el-button class="action-submit" :type="chapterForm.action === 'trash' ? 'danger' : 'primary'" block @click="submitChapter">{{ chapterForm.action === 'trash' ? '回收当前章节' : '执行章节操作' }}</el-button>
             </el-form>
           </div>
-          <div class="chapter-feature-grid">
+          <div v-if="chapterWorkspaceTab === 'media'" class="chapter-feature-grid">
             <section class="chapter-feature-card feature-order">
               <div class="feature-card-top"><span class="panel-kicker">MEDIA ORDER</span><span class="feature-count">{{ mediaOrderItems.length }} 项</span></div>
               <strong>媒体顺序</strong><p>调整本章阅读顺序</p><el-button plain block @click="mediaOrderDialogVisible = true">打开排序面板</el-button>
@@ -96,9 +97,11 @@
               <div class="feature-card-top"><span class="panel-kicker">MEDIA INTAKE</span><span class="feature-mark">＋</span></div>
               <strong>补充媒体</strong><p>追加图片或替换当前媒体</p><div class="feature-button-row"><el-button type="primary" block @click="openUploadDialog()">上传媒体</el-button><el-button v-if="selectedMedia" plain block @click="openReplaceSelectedMedia">替换</el-button></div>
             </section>
-            <section class="chapter-feature-card feature-storage">
-              <div class="feature-card-top"><span class="panel-kicker">STORAGE</span><StorageStatusTag v-if="selectedStorageChapter" :status="selectedStorageChapter.hqStatus" type="hq" /></div>
-              <strong>章节存储</strong><p>HQ {{ formatSize(selectedStorageChapter?.hqSize ?? 0) }} · LQ {{ formatSize(selectedStorageChapter?.lqSize ?? 0) }}</p><div class="feature-button-row"><el-button type="primary" plain :disabled="mediaLqApplicableCount === 0" block @click="generateChapterLq">{{ chapterLqActionLabel }}</el-button><el-button type="danger" plain block @click="deleteChapterHq">删除 HQ</el-button><el-button v-if="mediaVideoCount > 0" type="warning" plain block @click="transcodeChapter">转码视频</el-button></div>
+          </div>
+          <div v-else-if="chapterWorkspaceTab === 'storage'" class="chapter-feature-grid">
+            <section class="chapter-feature-card feature-storage feature-storage--focus">
+              <div class="feature-card-top"><span class="panel-kicker">STORAGE / CHAPTER</span><StorageStatusTag v-if="selectedStorageChapter" :status="selectedStorageChapter.hqStatus" type="hq" /></div>
+              <strong>章节存储</strong><p>HQ {{ formatSize(selectedStorageChapter?.hqSize ?? 0) }} · LQ {{ formatSize(selectedStorageChapter?.lqSize ?? 0) }}</p><div class="storage-focus-status"><span>LQ 状态</span><StorageStatusTag v-if="selectedStorageChapter" :status="selectedStorageChapter.lqStatus" type="lq" /></div><div class="feature-button-row"><el-button type="primary" plain :disabled="mediaLqApplicableCount === 0" block @click="generateChapterLq">{{ chapterLqActionLabel }}</el-button><el-button type="danger" plain block @click="deleteChapterHq">删除 HQ</el-button><el-button v-if="mediaVideoCount > 0" type="warning" plain block @click="transcodeChapter">转码视频</el-button></div>
             </section>
           </div>
         </template>
@@ -169,6 +172,7 @@ const mediaOrder = ref('')
 const draggingMediaIndex = ref<number | null>(null)
 const structureKeyword = ref('')
 const selectedRow = ref<StructureRow | null>(null)
+const chapterWorkspaceTab = ref<'chapter' | 'media' | 'storage'>('chapter')
 const loading = ref(false)
 const error = ref('')
 type UploadRow = { readonly id: string; readonly file: File; status: string; progress: number; sha256: string }
@@ -248,6 +252,7 @@ function filterStructureRows(rows: readonly StructureRow[], keyword: string): re
 function selectStructureRow(row: StructureRow): void {
   selectedMedia.value = null
   selectedRow.value = row
+  if (row.kind === 'CHAPTER') chapterWorkspaceTab.value = 'chapter'
   if (row.kind === 'CATALOG') {
     catalogForm.id = row.id
     catalogForm.parentId = row.id
@@ -273,7 +278,7 @@ function locateChapter(chapterId: number): void {
   const row = findStructureRow(structureRows.value, chapterId)
   if (row) selectStructureRow(row)
 }
-function selectMediaRow(row: MediaItemInfo): void { selectedMedia.value = row }
+function selectMediaRow(row: MediaItemInfo): void { selectedMedia.value = row; chapterWorkspaceTab.value = 'media' }
 function mediaRowClassName({ row }: { row: MediaItemInfo }): string { return selectedMedia.value?.id === row.id ? 'media-row--selected' : '' }
 function mediaLqLabel(status: string): string {
   const labels: Readonly<Record<string, string>> = { READY: '已生成', QUEUED: '排队中', GENERATING: '生成中', MISSING: '文件缺失', FAILED: '生成失败', NOT_GENERATED: '未生成' }
@@ -597,6 +602,7 @@ onMounted(() => { void loadTree() })
 .chapter-feature-card p { min-height: 30px; margin: 0; color: var(--text-muted); font-size: 10px; line-height: 1.45; }
 .feature-count, .feature-mark { color: var(--text-muted); font: 700 10px var(--mono); }.feature-mark { color: var(--accent); font-size: 16px; }
 .feature-button-row { display: grid; gap: 5px; margin-top: auto; }.feature-button-row .el-button { width: 100%; min-height: 28px; margin: 0; padding: 5px 7px; font-size: 10px; }
+.feature-storage--focus { gap: 10px; }.storage-focus-status { display: flex; align-items: center; justify-content: space-between; padding: 8px; border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-muted); font-size: 10px; }
 .action-card + .action-card { margin-top: var(--space-3); }
 .action-details { border: 1px solid var(--border); background: var(--bg-secondary); }
 .action-details + .action-details { margin-top: var(--space-2); }
@@ -621,6 +627,7 @@ onMounted(() => { void loadTree() })
 .action-context div { display: grid; gap: 3px; min-width: 0; }
 .action-context strong { overflow: hidden; color: var(--text-primary); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .action-context small, .field-help, .media-action-footer small { color: var(--text-muted); font-size: 11px; }
+.chapter-workspace-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin: 0 0 var(--space-4); padding: 4px; border: 1px solid var(--border); background: var(--bg-surface); }.chapter-workspace-tabs button { display: grid; grid-template-columns: 22px 1fr; grid-template-rows: 1fr 1fr; align-items: center; gap: 0 6px; min-height: 42px; padding: 5px 7px; border: 1px solid transparent; background: transparent; color: var(--text-muted); text-align: left; cursor: pointer; }.chapter-workspace-tabs button > span { grid-row: 1 / -1; display: grid; place-items: center; width: 20px; height: 20px; color: var(--text-muted); font: 700 13px var(--mono); }.chapter-workspace-tabs strong { color: inherit; font-size: 11px; line-height: 1; }.chapter-workspace-tabs small { color: var(--text-muted); font-size: 9px; line-height: 1; }.chapter-workspace-tabs button:hover { color: var(--text-primary); }.chapter-workspace-tabs button.is-active { border-color: var(--accent); background: var(--accent-bg); color: var(--accent); }.chapter-workspace-tabs button.is-active > span { color: var(--accent); }
 .action-form { margin-top: 0; }
 .chapter-action-toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-4); color: var(--text-secondary); font-size: var(--text-sm); }.chapter-action-toolbar > div { display: grid; gap: 3px; }.chapter-action-toolbar strong { color: var(--text-primary); font-size: 13px; }
 .chapter-action-toolbar .el-button { margin: 0; }.create-chapter-button { min-height: 30px; padding: 5px 9px; font-size: 11px; }.create-chapter-icon { margin-right: 3px; font-size: 15px; line-height: 1; }
