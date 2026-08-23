@@ -38,6 +38,16 @@ public class MediaOperationEligibilityService {
     public AllowedOperations forComic(Long comicId) {
         Set<String> allowed = new LinkedHashSet<>();
         Map<String, String> blocked = new LinkedHashMap<>();
+        Comic comic = comicMapper.selectById(comicId);
+        if (comic == null) {
+            return AllowedOperations.none("漫画不存在");
+        }
+
+        // 生命周期权限与媒体资产权限共用一个接口，避免操作台漏掉回收/恢复/永久清理入口。
+        AllowedOperations lifecycleOperations = policyService.forComic(comic.getStatus().name());
+        mergeLifecycleOperation(lifecycleOperations, OperationPolicyService.OP_DELETE, allowed, blocked);
+        mergeLifecycleOperation(lifecycleOperations, OperationPolicyService.OP_RECOVER, allowed, blocked);
+        mergeLifecycleOperation(lifecycleOperations, OperationPolicyService.OP_PURGE, allowed, blocked);
 
         boolean anyLqWork = false;
         boolean anyLqReady = false;
@@ -78,8 +88,7 @@ public class MediaOperationEligibilityService {
         } else {
             blocked.put(OperationPolicyService.OP_TRANSCODE, "没有需要转码的视频页");
         }
-        Comic comic = comicMapper.selectById(comicId);
-        if (comic != null && comic.getStatus() == ComicStatus.READY) {
+        if (comic.getStatus() == ComicStatus.READY) {
             allowed.add(OperationPolicyService.OP_METADATA_REFRESH);
         } else {
             blocked.put(OperationPolicyService.OP_METADATA_REFRESH,
@@ -87,6 +96,16 @@ public class MediaOperationEligibilityService {
         }
 
         return AllowedOperations.of(allowed, blocked);
+    }
+
+    private static void mergeLifecycleOperation(AllowedOperations lifecycleOperations, String operation,
+                                                Set<String> allowed, Map<String, String> blocked) {
+        if (lifecycleOperations.isAllowed(operation)) {
+            allowed.add(operation);
+            blocked.remove(operation);
+        } else if (lifecycleOperations.blockedReasons().containsKey(operation)) {
+            blocked.put(operation, lifecycleOperations.blockedReasons().get(operation));
+        }
     }
 
     public AllowedOperations forChapter(Long chapterId) {
