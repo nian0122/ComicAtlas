@@ -36,8 +36,10 @@
           <template v-else>
             <div class="media-heading"><div><h3>章节媒体</h3><p>{{ mediaItems.length ? `共 ${mediaItems.length} 个媒体` : '正在等待媒体加载' }}</p></div><el-button text @click="loadMedia">刷新媒体</el-button></div>
             <div class="media-summary"><div><span>HQ</span><strong>{{ mediaHqReadyCount }} / {{ mediaItems.length }}</strong><small>可访问</small></div><div><span>LQ</span><strong>{{ mediaLqReadyCount }} / {{ mediaLqApplicableCount }}</strong><small>已生成</small></div><div><span>媒体类型</span><strong>{{ mediaVideoCount ? '视频' : '图片' }}</strong><small>{{ mediaVideoCount ? `${mediaVideoCount} 个视频` : '图片媒体' }}</small></div></div>
+            <div v-if="selectedMediaIds.length" class="media-selection-toolbar"><span>已选 {{ selectedMediaIds.length }} 个媒体</span><div><el-button text @click="clearMediaSelection">清空选择</el-button><el-button type="danger" plain @click="trashSelectedMediaBatch">批量回收</el-button></div></div>
             <div class="media-table-scroll">
-            <el-table class="media-table" :data="mediaItems" row-key="id" empty-text="该章节暂无媒体" highlight-current-row :row-class-name="mediaRowClassName" @row-click="selectMediaRow">
+            <el-table ref="mediaTableRef" class="media-table" :data="mediaItems" row-key="id" empty-text="该章节暂无媒体" highlight-current-row :row-class-name="mediaRowClassName" @row-click="selectMediaRow" @selection-change="handleMediaSelection">
+              <el-table-column type="selection" width="48" reserve-selection />
               <el-table-column prop="pageNumber" label="顺序" width="76" />
               <el-table-column prop="fileName" label="文件名" min-width="190" show-overflow-tooltip />
               <el-table-column label="类型" width="90"><template #default="{ row }">{{ row.mediaType === 'VIDEO' ? 'VIDEO' : 'IMAGE' }}</template></el-table-column>
@@ -62,6 +64,14 @@
             <el-form-item v-if="catalogForm.action === 'delete'" label="重挂目标 ID"><el-input-number v-model="catalogForm.reparentTo" :min="1" :controls="false" clearable /></el-form-item>
             <el-button type="primary" block @click="submitCatalog">执行目录操作</el-button>
           </el-form>
+        </template>
+        <template v-else-if="selectedMediaIds.length">
+          <div class="action-card action-card--media-batch">
+            <div class="action-card-head"><div><span class="panel-kicker">BATCH MEDIA MAINTENANCE</span><h2>批量媒体操作</h2><p>仅处理当前章节中勾选的媒体。</p></div><span class="action-id">{{ selectedMediaIds.length }} ITEMS</span></div>
+            <div class="batch-selection-summary"><strong>{{ selectedMediaIds.length }}</strong><span>个媒体已选择</span></div>
+            <el-button type="danger" block @click="trashSelectedMediaBatch">回收选中媒体</el-button>
+            <el-button plain block @click="clearMediaSelection">取消选择</el-button>
+          </div>
         </template>
         <template v-else-if="selectedMedia">
           <div class="action-card action-card--media">
@@ -165,6 +175,8 @@ const tree = ref<readonly CatalogNode[]>([])
 const mediaItems = ref<readonly MediaItemInfo[]>([])
 const mediaOrderItems = ref<MediaItemInfo[]>([])
 const selectedMedia = ref<MediaItemInfo | null>(null)
+const selectedMediaIds = ref<number[]>([])
+const mediaTableRef = ref()
 const storageChapters = ref<readonly ChapterStorageItem[]>([])
 const selectedStorageChapter = computed(() => selectedRow.value?.kind === 'CHAPTER' ? storageChapters.value.find((chapter) => chapter.chapterId === selectedRow.value?.id) ?? null : null)
 const mediaChapterId = ref(1)
@@ -279,6 +291,8 @@ function locateChapter(chapterId: number): void {
   if (row) selectStructureRow(row)
 }
 function selectMediaRow(row: MediaItemInfo): void { selectedMedia.value = row; chapterWorkspaceTab.value = 'media' }
+function handleMediaSelection(rows: MediaItemInfo[]): void { selectedMediaIds.value = rows.map((item) => item.id) }
+function clearMediaSelection(): void { selectedMediaIds.value = []; mediaTableRef.value?.clearSelection() }
 function mediaRowClassName({ row }: { row: MediaItemInfo }): string { return selectedMedia.value?.id === row.id ? 'media-row--selected' : '' }
 function mediaLqLabel(status: string): string {
   const labels: Readonly<Record<string, string>> = { READY: '已生成', QUEUED: '排队中', GENERATING: '生成中', MISSING: '文件缺失', FAILED: '生成失败', NOT_GENERATED: '未生成' }
@@ -401,7 +415,7 @@ function assertNever(value: never): never { throw new TypeError(`未知操作: $
 async function loadTree(): Promise<void> { loading.value = true; treeState.value = 'loading'; tree.value = []; selectedRow.value = null; selectedMedia.value = null; mediaItems.value = []; error.value = ''; try { tree.value = ((await managementCatalogApi.tree(comicId.value)).data || []) as CatalogNode[]; treeState.value = tree.value.length > 0 ? 'loaded' : 'empty' } catch (reason: unknown) { treeState.value = 'error'; error.value = errorMessage(reason) } finally { loading.value = false } try { storageChapters.value = await storageService.fetchChapters(comicId.value) } catch { storageChapters.value = [] } const requestedChapterId = Number(route.query.chapterId); if (Number.isSafeInteger(requestedChapterId) && requestedChapterId > 0) locateChapter(requestedChapterId) }
 async function submitCatalog(): Promise<void> { try { const id = catalogForm.id ?? 0; switch (catalogForm.action) { case 'create': await catalogManagementApi.create(comicId.value, { title: catalogForm.title.trim(), parentId: catalogForm.parentId ?? null }); break; case 'rename': await catalogManagementApi.rename(comicId.value, id, { title: catalogForm.title.trim() }); break; case 'move': await catalogManagementApi.move(comicId.value, id, { parentId: catalogForm.parentId ?? null }); break; case 'reorder': await catalogManagementApi.reorder(comicId.value, id, { sortOrder: catalogForm.order }); break; case 'delete': await ElMessageBox.confirm('删除目录前请确认重挂目标。', '确认删除', { type: 'warning' }); await catalogManagementApi.delete(comicId.value, id, catalogForm.reparentTo); break; default: assertNever(catalogForm.action) } ElMessage.success('目录操作完成'); await loadTree() } catch (reason: unknown) { ElMessage.error(errorMessage(reason)) } }
 async function submitChapter(): Promise<void> { try { const id = chapterForm.id ?? 0; switch (chapterForm.action) { case 'create': await chapterManagementApi.create(comicId.value, { title: chapterForm.title.trim(), chapterNo: chapterForm.chapterNo.trim(), catalogId: chapterForm.catalogId ?? null }); break; case 'rename': await chapterManagementApi.rename(comicId.value, id, { title: chapterForm.title.trim() || undefined, chapterNo: chapterForm.chapterNo.trim() || undefined }); break; case 'move': await chapterManagementApi.move(comicId.value, id, { catalogId: chapterForm.catalogId ?? null }); break; case 'reorder': if (!chapterForm.order) { ElMessage.warning('请输入目标顺序'); return } if (chapterForm.order === selectedRow.value?.order) { ElMessage.info('目标顺序与当前位置相同，无需提交'); return } await chapterManagementApi.reorder(comicId.value, id, { targetGlobalOrder: chapterForm.order }); break; case 'trash': await ElMessageBox.confirm('章节将进入回收站。', '确认回收', { type: 'warning' }); await chapterManagementApi.trash(comicId.value, id); break; default: assertNever(chapterForm.action) } ElMessage.success('章节操作完成'); await loadTree() } catch (reason: unknown) { ElMessage.error(errorMessage(reason)) } }
-async function loadMedia(): Promise<void> { try { mediaItems.value = (await managementReaderApi.chapter(mediaChapterId.value)).data.pages; mediaOrderItems.value = [...mediaItems.value]; mediaOrder.value = mediaItems.value.map((item) => item.id).join(','); selectedMedia.value = null } catch (reason: unknown) { ElMessage.error(errorMessage(reason)) } }
+async function loadMedia(): Promise<void> { try { mediaItems.value = (await managementReaderApi.chapter(mediaChapterId.value)).data.pages; mediaOrderItems.value = [...mediaItems.value]; mediaOrder.value = mediaItems.value.map((item) => item.id).join(','); selectedMedia.value = null; selectedMediaIds.value = []; mediaTableRef.value?.clearSelection() } catch (reason: unknown) { ElMessage.error(errorMessage(reason)) } }
 function startMediaDrag(index: number): void { draggingMediaIndex.value = index }
 function dropMedia(targetIndex: number): void { const sourceIndex = draggingMediaIndex.value; draggingMediaIndex.value = null; if (sourceIndex === null || sourceIndex === targetIndex) return; const nextItems = [...mediaOrderItems.value]; const [movedItem] = nextItems.splice(sourceIndex, 1); if (movedItem) nextItems.splice(targetIndex, 0, movedItem); mediaOrderItems.value = nextItems; mediaOrder.value = nextItems.map((item) => item.id).join(',') }
 function resetMediaOrder(): void { mediaOrderItems.value = [...mediaItems.value]; mediaOrder.value = mediaOrderItems.value.map((item) => item.id).join(',') }
@@ -414,6 +428,7 @@ async function generateChapterLq(): Promise<void> { if (!selectedRow.value || se
 async function transcodeChapter(): Promise<void> { if (!selectedRow.value || selectedRow.value.kind !== 'CHAPTER') return; try { await ElMessageBox.confirm('确定对当前章节的视频发起转码？', '章节视频转码', { type: 'warning' }); await adminApi.transcodeChapter(selectedRow.value.id); ElMessage.success('章节视频转码任务已提交'); await loadMedia() } catch (reason: unknown) { if (reason !== 'cancel' && reason !== 'close') ElMessage.error(errorMessage(reason)) } }
 async function transcodeSelectedMedia(): Promise<void> { if (!selectedMedia.value || selectedMedia.value.mediaType !== 'VIDEO') return; try { await ElMessageBox.confirm('确定对当前视频发起转码？', '视频转码', { type: 'warning' }); await hqApi.transcodeMedia(selectedMedia.value.id); ElMessage.success('视频转码任务已提交'); await loadMedia() } catch (reason: unknown) { if (reason !== 'cancel' && reason !== 'close') ElMessage.error(errorMessage(reason)) } }
 async function trashSelectedMedia(): Promise<void> { if (!selectedMedia.value) return; try { await ElMessageBox.confirm(`确定将「${selectedMedia.value.fileName || '此媒体'}」移入回收站？`, '回收媒体', { type: 'warning' }); await mediaManagementApi.trash(selectedMedia.value.id); ElMessage.success('媒体回收任务已提交'); selectedMedia.value = null; await loadMedia() } catch (reason: unknown) { if (reason !== 'cancel' && reason !== 'close') ElMessage.error(errorMessage(reason)) } }
+async function trashSelectedMediaBatch(): Promise<void> { if (!selectedMediaIds.value.length) return; const mediaIds = [...selectedMediaIds.value]; try { await ElMessageBox.confirm(`确定将选中的 ${mediaIds.length} 个媒体移入回收站？`, '批量回收媒体', { type: 'warning' }); await Promise.all(mediaIds.map((mediaId) => mediaManagementApi.trash(mediaId))); ElMessage.success(`已提交 ${mediaIds.length} 个媒体回收任务`); selectedMedia.value = null; clearMediaSelection(); await loadMedia() } catch (reason: unknown) { if (reason !== 'cancel' && reason !== 'close') ElMessage.error(errorMessage(reason)) } }
 async function refreshStorage(): Promise<void> { try { storageChapters.value = await storageService.fetchChapters(comicId.value) } catch { storageChapters.value = [] } await loadMedia() }
 
 onMounted(() => { void loadTree() })
@@ -580,6 +595,7 @@ onMounted(() => { void loadTree() })
 .media-table :deep(.el-table__row) { cursor: pointer; }
 .media-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); margin: var(--space-4) 0; }
 .media-summary > div { display: grid; gap: 3px; padding: var(--space-3); border: 1px solid var(--border); background: var(--bg-secondary); }
+.media-selection-toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin: 0 0 var(--space-2); padding: 7px 10px; border: 1px solid var(--accent-border); background: var(--accent-bg); color: var(--accent); font-size: 11px; }.media-selection-toolbar > div { display: flex; align-items: center; gap: 4px; }.media-selection-toolbar .el-button { margin: 0; padding: 3px 6px; font-size: 10px; }
 .media-summary span, .media-summary small { color: var(--text-muted); font-size: 11px; }
 .media-summary strong { color: var(--text-primary); font-size: 15px; }
 .media-status { display: inline-flex; align-items: center; min-height: 22px; padding: 0 7px; border: 1px solid transparent; font-size: 11px; white-space: nowrap; }
@@ -697,6 +713,7 @@ onMounted(() => { void loadTree() })
 .media-operation-note { margin-bottom: var(--space-4); padding: var(--space-3); border: 1px dashed var(--border); color: var(--text-muted); font-size: 11px; line-height: 1.55; }
 .media-action-buttons { display: grid; gap: var(--space-2); }
 .media-action-buttons .el-button { width: 100%; margin: 0; }
+.action-card--media-batch { display: grid; gap: var(--space-3); }.batch-selection-summary { display: flex; align-items: baseline; gap: 8px; padding: var(--space-4); border: 1px solid var(--border); background: var(--bg-surface); }.batch-selection-summary strong { color: var(--accent); font: 700 28px var(--mono); }.batch-selection-summary span { color: var(--text-muted); font-size: 11px; }
 .action-empty { display: grid; place-items: center; min-height: 220px; gap: var(--space-2); text-align: center; }
 @media (max-width: 1500px) {
   .structure-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
