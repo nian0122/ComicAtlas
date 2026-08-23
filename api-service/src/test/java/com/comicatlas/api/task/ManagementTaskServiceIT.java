@@ -768,6 +768,30 @@ class ManagementTaskServiceIT {
             assertThat(detail.getTargetName()).isEqualTo("转码归属测试漫画");
         }
 
+        @Test
+        @DisplayName("不同目标类型使用相同 ID 时不应误归属到漫画")
+        void sameTargetIdWithDifferentTargetType_isNotFoundByComicFilter() {
+            Comic comic = new Comic();
+            comic.setId(90_003L);
+            comic.setTitle("目标类型隔离测试漫画");
+            comic.setStatus(ComicStatus.READY);
+            comicMapper.insert(comic);
+
+            CreateManagementTaskRequest request = new CreateManagementTaskRequest();
+            request.setTaskType(TaskType.RECOVERY);
+            request.setOperation("存储恢复");
+            request.setTargetType("SYSTEM");
+            request.setTargets(List.of(target("SYSTEM", comic.getId(), TaskType.RECOVERY)));
+            ManagementTaskResponse task = service.createTask(request, null, null);
+
+            IPage<ManagementTaskResponse> page = service.listTasks(
+                    1, 10, null, null, null, null, comic.getId());
+
+            assertThat(page.getRecords())
+                    .extracting(ManagementTaskResponse::getId)
+                    .doesNotContain(task.getId());
+        }
+
         private CreateManagementTaskRequest.TaskTarget target(String targetType, Long targetId,
                                                               TaskType operationType) {
             CreateManagementTaskRequest.TaskTarget target = new CreateManagementTaskRequest.TaskTarget();

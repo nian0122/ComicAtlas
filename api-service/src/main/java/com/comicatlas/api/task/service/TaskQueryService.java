@@ -60,7 +60,7 @@ public class TaskQueryService {
             wrapper.eq(ManagementTask::getTargetType, targetType);
         }
         if (targetId != null) {
-            List<Long> taskIds = itemMapper.selectTaskIdsByTarget(targetId);
+            List<Long> taskIds = itemMapper.selectTaskIdsByComicId(targetId);
             if (taskIds.isEmpty()) {
                 return emptyPage(page, size);
             }
