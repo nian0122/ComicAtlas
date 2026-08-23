@@ -584,8 +584,8 @@ onMounted(() => { void loadTree() })
 .media-hint.is-info { color: var(--info); }
 .action-card { padding: var(--space-4); border: 1px solid var(--border); background: var(--bg-secondary); }
 .chapter-feature-grid { display: grid; grid-template-columns: 1fr; gap: var(--space-2); margin-top: var(--space-3); }
-.chapter-feature-card { display: grid; align-content: start; gap: 7px; min-width: 0; padding: var(--space-3); border: 1px solid var(--border); background: linear-gradient(145deg, var(--bg-secondary), color-mix(in srgb, var(--bg-surface) 88%, var(--accent) 12%)); }
-.chapter-feature-card:hover { border-color: var(--border-strong); }
+.chapter-feature-card { display: grid; align-content: start; gap: 7px; min-width: 0; padding: var(--space-4); border: 1px solid var(--border); background: var(--bg-secondary); }
+.chapter-feature-card:hover { border-color: var(--border-strong); background: var(--bg-secondary); }
 .feature-card-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 16px; }
 .chapter-feature-card strong { color: var(--text-primary); font-size: 13px; }
 .chapter-feature-card p { min-height: 30px; margin: 0; color: var(--text-muted); font-size: 10px; line-height: 1.45; }
