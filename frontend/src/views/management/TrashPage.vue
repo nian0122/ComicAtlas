@@ -32,10 +32,40 @@
           <h2>回收内容</h2>
           <span>{{ total }} 项回收内容</span>
         </div>
-        <span class="retention-note">永久清理受保留期限制</span>
+        <div class="section-actions">
+          <span v-if="selectedItems.length" class="selection-count">已选 {{ selectedItems.length }} 项</span>
+          <el-button v-if="selectedItems.length" text @click="clearSelection">清空选择</el-button>
+          <el-button
+            v-if="selectedItems.length"
+            type="primary"
+            plain
+            :loading="batchBusy"
+            @click="restoreSelected"
+          >
+            批量恢复
+          </el-button>
+          <el-button
+            v-if="selectedItems.length"
+            type="danger"
+            plain
+            :loading="batchBusy"
+            @click="purgeSelected"
+          >
+            批量永久清理
+          </el-button>
+          <span v-else class="retention-note">勾选内容后可批量恢复或清理</span>
+        </div>
       </div>
 
-      <el-table v-loading="loading" :data="items" :row-key="rowKey" empty-text="当前没有匹配的回收内容">
+      <el-table
+        ref="trashTableRef"
+        v-loading="loading"
+        :data="items"
+        :row-key="rowKey"
+        empty-text="当前没有匹配的回收内容"
+        @selection-change="handleSelectionChange"
+      >
+        <el-table-column type="selection" width="48" reserve-selection :selectable="isSelectable" />
         <el-table-column label="类型" width="90">
           <template #default="{ row }">{{ targetTypeLabel(row.targetType) }}</template>
         </el-table-column>
@@ -94,6 +124,8 @@ const STATUS_OPTIONS = [
 ] as const
 const pageSize = 20
 const items = ref<readonly TrashContentVO[]>([])
+const selectedItems = ref<TrashContentVO[]>([])
+const trashTableRef = ref<{ clearSelection: () => void } | null>(null)
 const total = ref(0)
 const page = ref(1)
 const keyword = ref('')
@@ -101,6 +133,7 @@ const status = ref<(typeof STATUS_OPTIONS)[number]['value']>('TRASHED')
 const loading = ref(false)
 const error = ref('')
 const busyId = ref<number | null>(null)
+const batchBusy = ref(false)
 
 function statusLabel(value: string): string {
   return ({ TRASHED: '已回收', TRASHING: '回收中', RESTORING: '恢复中', PURGING: '永久清理中' } as Record<string, string>)[value] || value
@@ -108,6 +141,12 @@ function statusLabel(value: string): string {
 function targetTypeLabel(value: TrashContentVO['targetType']): string { return ({ COMIC: '漫画', CHAPTER: '章节', MEDIA: '媒体' })[value] }
 function relatedId(row: TrashContentVO): string { return row.targetType === 'COMIC' ? '—' : row.targetType === 'CHAPTER' ? `漫画 ${row.comicId}` : `章节 ${row.chapterId}` }
 function rowKey(row: TrashContentVO): string { return `${row.targetType}-${row.targetId}` }
+function isSelectable(row: TrashContentVO): boolean { return row.status === 'TRASHED' }
+function handleSelectionChange(rows: TrashContentVO[]): void { selectedItems.value = rows.filter((row) => row.status === 'TRASHED') }
+function clearSelection(): void {
+  trashTableRef.value?.clearSelection()
+  selectedItems.value = []
+}
 function coverUrl(row: TrashContentVO): string | null {
   return row.coverUrl || null
 }
@@ -127,6 +166,7 @@ async function loadItems(): Promise<void> {
     const response = await trashApi.list({ page: page.value, size: pageSize, keyword: keyword.value.trim() || undefined, status: status.value })
     items.value = response.data.records
     total.value = response.data.total
+    clearSelection()
   } catch (reason: unknown) {
     error.value = errorMessage(reason)
     items.value = []
@@ -136,6 +176,55 @@ async function loadItems(): Promise<void> {
   }
 }
 
+async function submitRestore(row: TrashContentVO): Promise<void> {
+  if (row.targetType === 'COMIC') await trashApi.restoreComic(row.targetId)
+  else if (row.targetType === 'CHAPTER') await trashApi.restoreChapter(row.comicId!, row.chapterId!)
+  else await trashApi.restoreMedia(row.targetId)
+}
+
+async function submitPurge(row: TrashContentVO, token: string): Promise<void> {
+  if (row.targetType === 'COMIC') await trashApi.purgeComic(row.targetId, token)
+  else if (row.targetType === 'CHAPTER') await trashApi.purgeChapter(row.comicId!, row.chapterId!, token)
+  else await trashApi.purgeMedia(row.targetId, token)
+}
+
+async function restoreSelected(): Promise<void> {
+  const rows = selectedItems.value.filter((row) => row.status === 'TRASHED')
+  if (!rows.length) return
+  try {
+    await ElMessageBox.confirm(`确定恢复已选的 ${rows.length} 项内容？`, '批量恢复', { type: 'warning', confirmButtonText: '恢复' })
+    batchBusy.value = true
+    const results = await Promise.allSettled(rows.map((row) => submitRestore(row)))
+    const successCount = results.filter((result) => result.status === 'fulfilled').length
+    const failureCount = results.length - successCount
+    ElMessage[failureCount ? 'warning' : 'success'](failureCount ? `${successCount} 项已提交，${failureCount} 项失败` : `${successCount} 项恢复任务已提交`)
+    await loadItems()
+  } catch (reason: unknown) {
+    if (reason !== 'cancel') ElMessage.error(errorMessage(reason))
+  } finally { batchBusy.value = false }
+}
+
+async function purgeSelected(): Promise<void> {
+  const rows = selectedItems.value.filter((row) => row.status === 'TRASHED')
+  if (!rows.length) return
+  try {
+    const result = await ElMessageBox.prompt(
+      `请输入确认 token，将永久清理已选的 ${rows.length} 项内容。此操作不可恢复，且受 7 天保留期限制。`,
+      '批量永久清理',
+      { type: 'error', inputPlaceholder: '确认 token' },
+    )
+    batchBusy.value = true
+    const token = result.value.trim()
+    const results = await Promise.allSettled(rows.map((row) => submitPurge(row, token)))
+    const successCount = results.filter((result) => result.status === 'fulfilled').length
+    const failureCount = results.length - successCount
+    ElMessage[failureCount ? 'warning' : 'success'](failureCount ? `${successCount} 项已提交，${failureCount} 项失败` : `${successCount} 项永久清理任务已提交`)
+    await loadItems()
+  } catch (reason: unknown) {
+    if (reason !== 'cancel') ElMessage.error(errorMessage(reason))
+  } finally { batchBusy.value = false }
+}
+
 function applyFilters(): void { page.value = 1; void loadItems() }
 function resetFilters(): void { keyword.value = ''; status.value = 'TRASHED'; applyFilters() }
 
@@ -143,9 +232,7 @@ async function restore(row: TrashContentVO): Promise<void> {
   try {
     await ElMessageBox.confirm(`确定恢复「${row.title}」？`, `恢复${targetTypeLabel(row.targetType)}`, { type: 'warning', confirmButtonText: '恢复' })
     busyId.value = row.targetId
-    if (row.targetType === 'COMIC') await trashApi.restoreComic(row.targetId)
-    else if (row.targetType === 'CHAPTER') await trashApi.restoreChapter(row.comicId!, row.chapterId!)
-    else await trashApi.restoreMedia(row.targetId)
+    await submitRestore(row)
     ElMessage.success('恢复任务已提交')
     await loadItems()
   } catch (reason: unknown) {
@@ -157,9 +244,7 @@ async function purge(row: TrashContentVO): Promise<void> {
   try {
     const result = await ElMessageBox.prompt('请输入永久清理确认 token。永久清理不可恢复，且受 7 天保留期限制。', `永久清理${targetTypeLabel(row.targetType)}`, { type: 'error', inputPlaceholder: '确认 token' })
     busyId.value = row.targetId
-    if (row.targetType === 'COMIC') await trashApi.purgeComic(row.targetId, result.value.trim())
-    else if (row.targetType === 'CHAPTER') await trashApi.purgeChapter(row.comicId!, row.chapterId!, result.value.trim())
-    else await trashApi.purgeMedia(row.targetId, result.value.trim())
+    await submitPurge(row, result.value.trim())
     ElMessage.success('永久清理任务已提交')
     await loadItems()
   } catch (reason: unknown) {
@@ -181,6 +266,8 @@ onMounted(() => { void loadItems() })
 .section-heading h2 { margin: 0; color: var(--text-primary); font-size: var(--text-lg); }
 .section-heading span { color: var(--text-muted); font-size: var(--text-sm); }
 .section-heading > div { display: flex; align-items: baseline; gap: var(--space-3); }
+.section-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); }
+.selection-count { color: var(--text-primary) !important; font-weight: 600; }
 .retention-note { color: var(--text-secondary) !important; }
 .comic-cell { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
 .comic-cell img { width: 38px; height: 52px; flex: 0 0 auto; border-radius: var(--radius-xs); object-fit: cover; background: var(--bg-secondary); }
