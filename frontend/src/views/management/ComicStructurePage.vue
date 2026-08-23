@@ -481,8 +481,8 @@ onMounted(() => { void loadTree() })
   display: grid;
   grid-template-columns:
     minmax(clamp(180px, 16vw, 240px), .8fr)
-    minmax(clamp(300px, 32vw, 560px), 2.4fr)
-    minmax(clamp(220px, 20vw, 300px), 1fr);
+    minmax(0, 2.25fr)
+    minmax(300px, 1.15fr);
   gap: var(--space-3);
   height: clamp(560px, calc(100vh - 270px), 820px);
   min-width: 0;
