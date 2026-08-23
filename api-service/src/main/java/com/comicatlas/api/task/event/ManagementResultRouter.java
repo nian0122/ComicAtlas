@@ -72,7 +72,8 @@ public class ManagementResultRouter {
     /** 路由失败结果并执行领域回退。 */
     public void routeFailed(ManagementCommandFailedEvent event) {
         switch (event.operationType()) {
-            case "LQ_GENERATE", "LQ_REGENERATE" -> mediaCompletionService.revertLqFailed(event.targetId());
+            case "LQ_GENERATE", "LQ_REGENERATE" -> forLqChapters(event.targetType(), event.targetId(),
+                    mediaCompletionService::revertLqFailed);
             case "HQ_DELETE" -> mediaCompletionService.revertHqDeleteFailed(event.targetId());
             case "TRANSCODE" -> mediaCompletionService.revertTranscodeFailed(event.targetId());
             case "MEDIA_UPLOAD", "MEDIA_REPLACE" -> uploadCompletionService.revertUploadFailed(event.targetId());
@@ -89,7 +90,7 @@ public class ManagementResultRouter {
     /** 路由进度结果并推进媒体状态。 */
     public void routeProgress(ManagementCommandProgressEvent event) {
         if (LQ_OPERATIONS.contains(event.operationType())) {
-            mediaCompletionService.transitionLqGenerating(event.targetId());
+            forLqChapters(event.targetType(), event.targetId(), mediaCompletionService::transitionLqGenerating);
         } else if ("HQ_DELETE".equals(event.operationType())) {
             mediaCompletionService.transitionHqDeleting(event.targetId());
         } else if ("TRANSCODE".equals(event.operationType())) {
@@ -116,5 +117,13 @@ public class ManagementResultRouter {
         } else {
             action.accept(event.targetId());
         }
+    }
+
+    private void forLqChapters(String targetType, Long targetId, java.util.function.LongConsumer action) {
+        if (COMIC_TARGET.equals(targetType)) {
+            comicStatsService.chapterIdsOf(targetId).forEach(chapterId -> action.accept(chapterId));
+            return;
+        }
+        action.accept(targetId);
     }
 }

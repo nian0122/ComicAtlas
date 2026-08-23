@@ -44,6 +44,13 @@ mybatis-plus:
     db-config:
       id-type: auto
 
+logging:
+  level:
+    com.comicatlas.persistence: INFO
+    com.comicatlas.worker.persistence: INFO
+    com.baomidou.mybatisplus: INFO
+    org.mybatis: INFO
+
 # 阅读服务仅需解析图片 URL 的读卷；无上传/回收/导出写卷。
 storage:
   url-prefix: /files

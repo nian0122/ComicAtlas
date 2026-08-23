@@ -42,7 +42,7 @@ export const storageService = {
    * 失败时抛出携带后端 message 的错误（409/404 场景由页面展示）。
    */
   async executeOperation(op: StorageOperation): Promise<OperationSubmitResult> {
-    const { type, comicId, chapterId } = op
+    const { type, comicId, chapterId, regenerate = false } = op
     try {
       switch (type) {
         case StorageOperationType.DeleteHQ:
@@ -54,10 +54,10 @@ export const storageService = {
           return deleteComicRes.data
         case StorageOperationType.GenerateLQ:
           if (chapterId != null) {
-            const res = await lqApi.generateChapter(chapterId)
+            const res = await lqApi.generateChapter(chapterId, regenerate)
             return res.data
           }
-          const generateComicRes = await lqApi.generateComic(comicId)
+          const generateComicRes = await lqApi.generateComic(comicId, regenerate)
           return generateComicRes.data
         case StorageOperationType.RefreshMetadata:
           return this.requestMetadataRefresh(comicId)

@@ -49,6 +49,13 @@ mybatis-plus:
     db-config:
       id-type: auto
 
+logging:
+  level:
+    com.comicatlas.persistence: INFO
+    com.comicatlas.worker.persistence: INFO
+    com.baomidou.mybatisplus: INFO
+    org.mybatis: INFO
+
 worker:
   manga-root: ${MANGA_ROOT:F:/manga}
   temp-dir: ${MANGA_ROOT:F:/manga}/temp

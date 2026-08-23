@@ -432,6 +432,7 @@ export interface StorageOperation {
   type: StorageOperationType
   comicId: number
   chapterId?: number
+  regenerate?: boolean
 }
 
 // ========== Export Domain ==========

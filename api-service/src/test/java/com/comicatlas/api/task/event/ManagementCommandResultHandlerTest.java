@@ -130,6 +130,21 @@ class ManagementCommandResultHandlerTest {
     }
 
     @Test
+    @DisplayName("failed LQ_GENERATE（COMIC）：按章节回退生成状态")
+    void failed_lqGenerateComic_revertsEachChapter() {
+        when(comicStatsService.chapterIdsOf(9L)).thenReturn(List.of(100L, 200L));
+        when(managementTaskService.updateItemStatus(eq(1L), eq(ManagementTaskStatus.FAILED),
+                anyString(), isNull(), isNull(), eq(1))).thenReturn(failed());
+        var ev = new ManagementCommandFailedEvent(UUID.randomUUID(), Instant.now(), 1,
+                10L, 1L, 1, "LQ_GENERATE", "COMIC", 9L, "Worker 失败");
+
+        handler.handleResult(ev, channel, 1L);
+
+        verify(mediaOperationCompletionService).revertLqFailed(100L);
+        verify(mediaOperationCompletionService).revertLqFailed(200L);
+    }
+
+    @Test
     @DisplayName("completed TRANSCODE（MEDIA）：分发转码落库并触发整本同步检查")
     void completed_transcode_delegatesToMediaOperation() {
         when(managementTaskService.updateItemStatus(eq(1L), eq(ManagementTaskStatus.SUCCEEDED),

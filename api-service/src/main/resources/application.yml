@@ -60,6 +60,13 @@ mybatis-plus:
     db-config:
       id-type: auto
 
+logging:
+  level:
+    com.comicatlas.persistence: INFO
+    com.comicatlas.worker.persistence: INFO
+    com.baomidou.mybatisplus: INFO
+    org.mybatis: INFO
+
 storage:
   url-prefix: /files
   roots:

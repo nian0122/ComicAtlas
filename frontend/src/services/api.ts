@@ -168,8 +168,8 @@ export const directoryScanApi = {
 }
 
 export const lqApi = {
-  generateComic: (comicId: number) => api.post<OperationSubmitResult>(`/manage/storage/lq/comics/${comicId}`),
-  generateChapter: (chapterId: number) => api.post<OperationSubmitResult>(`/manage/storage/lq/chapters/${chapterId}`),
+  generateComic: (comicId: number, regenerate = false) => api.post<OperationSubmitResult>(`/manage/storage/lq/comics/${comicId}`, undefined, { params: { regenerate } }),
+  generateChapter: (chapterId: number, regenerate = false) => api.post<OperationSubmitResult>(`/manage/storage/lq/chapters/${chapterId}`, undefined, { params: { regenerate } }),
 }
 
 export const hqApi = {
