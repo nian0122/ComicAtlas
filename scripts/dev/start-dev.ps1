@@ -73,8 +73,9 @@ if (-not $mqTest) {
     Write-Host "WARN: RabbitMQ 127.0.0.1:$env:RABBITMQ_PORT 不可达 — FRP 连接可能尚未建立" -ForegroundColor Yellow
 }
 
-# 5. 启动 Worker
-Start-Process pwsh -WorkingDirectory "$repoRoot\worker-service" -ArgumentList "-NoExit", "-Command", "`$env:MANGA_ROOT='$env:MANGA_ROOT'; `$env:RABBITMQ_HOST='$env:RABBITMQ_HOST'; `$env:RABBITMQ_PORT='$env:RABBITMQ_PORT'; `$env:RABBITMQ_USER='$env:RABBITMQ_USER'; `$env:RABBITMQ_PASS='$env:RABBITMQ_PASS'; `$env:REDIS_HOST='$env:REDIS_HOST'; `$env:REDIS_PORT='$env:REDIS_PORT'; `$env:REDIS_PASS='$env:REDIS_PASS'; `$env:NACOS_ADDR='$env:NACOS_ADDR'; `$env:NACOS_USER='$env:NACOS_USER'; `$env:NACOS_PASS='$env:NACOS_PASS'; mvn clean spring-boot:run"
+# 5. 启动 Worker：先安装最新 comic-common，再明确指定 Worker POM 启动，避免根项目执行 spring-boot:run
+$workerCommand = "`$env:MANGA_ROOT='$env:MANGA_ROOT'; `$env:RABBITMQ_HOST='$env:RABBITMQ_HOST'; `$env:RABBITMQ_PORT='$env:RABBITMQ_PORT'; `$env:RABBITMQ_USER='$env:RABBITMQ_USER'; `$env:RABBITMQ_PASS='$env:RABBITMQ_PASS'; `$env:REDIS_HOST='$env:REDIS_HOST'; `$env:REDIS_PORT='$env:REDIS_PORT'; `$env:REDIS_PASS='$env:REDIS_PASS'; `$env:NACOS_ADDR='$env:NACOS_ADDR'; `$env:NACOS_USER='$env:NACOS_USER'; `$env:NACOS_PASS='$env:NACOS_PASS'; .\mvnw.cmd -pl comic-common -am clean install -DskipTests; if (`$LASTEXITCODE -eq 0) { .\mvnw.cmd -f worker-service/pom.xml spring-boot:run }"
+Start-Process pwsh -WorkingDirectory $repoRoot -ArgumentList "-NoExit", "-Command", $workerCommand
 # Start-Process pwsh -WorkingDirectory "$repoRoot\api-service" -ArgumentList "-NoExit", "-Command", "`$env:RABBITMQ_HOST='$env:RABBITMQ_HOST'; `$env:RABBITMQ_PORT='$env:RABBITMQ_PORT'; `$env:RABBITMQ_USER='$env:RABBITMQ_USER'; `$env:RABBITMQ_PASS='$env:RABBITMQ_PASS'; `$env:NACOS_ADDR='$env:NACOS_ADDR'; `$env:NACOS_USER='$env:NACOS_USER'; `$env:NACOS_PASS='$env:NACOS_PASS'; `$env:REDIS_PASS='$env:REDIS_PASS'; mvn clean spring-boot:run"
 
 Write-Host "Worker 已在独立窗口启动" -ForegroundColor Green
