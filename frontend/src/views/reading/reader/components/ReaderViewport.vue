@@ -27,8 +27,11 @@ import { useReaderSettingsStore } from '@/stores/reader-settings-store'
 import ReaderImageItem from './ReaderImageItem.vue'
 import type { MediaItemInfo } from '@/types'
 import { DEFAULT_ASPECT_RATIO } from '@/types'
+import { isVideoMedia } from '@/utils/media-type'
 /** 虚拟滚动缓冲区最小高度（px） */
 const MIN_BUFFER_PX = 800
+/** 视频完整保留在复用边界内的额外安全距离（px）。 */
+const VIDEO_BUFFER_SAFETY_PX = 64
 /** 程序化滚动锁定时长（ms），防止自身滚动事件触发页码回写 */
 const SCROLL_LOCK_DURATION_MS = 100
 
@@ -77,8 +80,6 @@ function updateContainerSize() {
   containerHeight.value = viewportRef.value?.clientHeight ?? 0
 }
 
-const buffer = computed(() => Math.max(MIN_BUFFER_PX, containerHeight.value))
-
 function computeAspectRatio(page: MediaItemInfo): number {
   if (page.width && page.height && page.height > 0) {
     return page.width / page.height
@@ -119,6 +120,36 @@ const sizes = computed<number[]>(() => {
   // 使 sizes 仅在 pages/zoom/fitMode/viewport 变化时重建。
   return props.pages.map((page) => computeItemSize(page))
 })
+
+/**
+ * RecycleScroller 的 buffer 以像素衡量。连续竖屏视频在桌面端可能远高于
+ * 视口；仅按视口高度缓冲会让相邻视频过早进入复用池，首帧预览随之重建。
+ *
+ * 宽高来自后端媒体分析结果，sizes 与 RecycleScroller 实际使用的 size 字段
+ * 完全一致。只纳入视频，避免超长图片无谓扩大媒体预览的保留范围。
+ */
+const tallestVideoItemSize = computed(() => {
+  let largestSize = 0
+  for (const [index, page] of props.pages.entries()) {
+    if (!isVideoMedia(page)) continue
+    largestSize = Math.max(largestSize, sizes.value[index] ?? 0)
+  }
+  return largestSize
+})
+
+/**
+ * 至少保留一个完整视频及其安全边距；手机端通常仍由视口高度主导，桌面端会
+ * 自动适配竖屏视频的实际高度。buffer 在可视区上下两侧各生效一次。
+ */
+const buffer = computed(() =>
+  Math.ceil(
+    Math.max(
+      MIN_BUFFER_PX,
+      containerHeight.value,
+      tallestVideoItemSize.value + VIDEO_BUFFER_SAFETY_PX,
+    ),
+  ),
+)
 
 const prefixSums = computed<number[]>(() => {
   const sums: number[] = []
