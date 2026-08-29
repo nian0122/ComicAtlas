@@ -2,7 +2,8 @@
   <div class="video-player" :style="containerStyle">
     <!-- ============================================================
          Placeholder state: user hasn't activated playback yet.
-         预览 <video> 只读取元数据和首个可解码关键帧，不会自动播放。
+         预览 <video> 只按需解码首帧（必要时静音微播放一瞬后立即暂停），
+         不预加载完整媒体，也不生成独立预览图。
          ============================================================ -->
     <div
       v-if="!activated"
@@ -10,16 +11,8 @@
       data-reader-video-surface
       @click="handleActivate"
     >
-      <!-- 浏览器端首帧预览：通过 Range 按需读取，不生成独立预览图。 -->
-      <img
-        v-if="active && previewFrameUrl"
-        class="video-preview"
-        :src="previewFrameUrl"
-        alt=""
-        @load="previewReady = true"
-      >
+      <!-- 浏览器原生首帧预览：静音微播放只为解码一帧，随后立即暂停。 -->
       <video
-        v-else-if="active"
         ref="previewRef"
         class="video-preview"
         :src="hqUrl"
@@ -29,7 +22,6 @@
         preload="metadata"
         @loadeddata="onPreviewLoadedData"
         @loadedmetadata="onPreviewMetadata"
-        @seeked="onPreviewSeeked"
         @error="onPreviewError"
       />
       <div
@@ -89,10 +81,6 @@ import {
   getPosition,
   savePosition,
 } from '@/views/reading/reader/videoPlaybackCoordinator'
-import {
-  cacheVideoFirstFrame,
-  getCachedVideoFirstFrame,
-} from '@/views/reading/reader/video-first-frame-cache'
 
 // ---------------------------------------------------------------------------
 // Props
@@ -145,18 +133,16 @@ const previewRef = ref<HTMLVideoElement | null>(null)
 
 /** 首帧已解码并可渲染。 */
 const previewReady = ref(false)
-/** 会话内存中的首帧 Blob URL，用于上下滑动后直接复用。 */
-const previewFrameUrl = ref<string | null>(
-  getCachedVideoFirstFrame(props.mediaId ?? 0),
-)
 
 /** Video native dimensions populated by loadedmetadata (fallback aspect ratio). */
 const nativeWidth = ref(0)
 const nativeHeight = ref(0)
 
-/** IntersectionObserver — wired by parent in Todo 4 (preserved pattern). */
+/** 微播放等待首帧呈现的最长时间，超时放弃解码并暂停，保持占位状态。 */
+const PREVIEW_DECODE_MAX_WAIT_MS = 5000
+
+/** 正式播放器的可见性观察器：移出视窗只暂停，资源释放由 active 回收负责。 */
 let visibilityObserver: IntersectionObserver | null = null
-let unloadTimer: ReturnType<typeof setTimeout> | null = null
 
 // ---------------------------------------------------------------------------
 // Computed
@@ -204,12 +190,8 @@ async function handleActivate(): Promise<void> {
   playerState.value = 'loading'
   previewReady.value = false
 
-  // 正式播放器接管前释放首帧预览元素。
-  const preview = previewRef.value
-  if (preview !== null) {
-    preview.removeAttribute('src')
-    preview.load()
-  }
+  // 正式播放器接管前暂停并释放首帧预览（含进行中的微播放解码）。
+  releasePreviewElement()
 
   await nextTick()
 
@@ -293,20 +275,10 @@ function onError(): void {
   playerState.value = 'error'
 }
 
-async function onPreviewLoadedData(): Promise<void> {
-  // loadeddata 表示当前帧已解码，浏览器可直接绘制。
+function onPreviewLoadedData(): void {
+  // loadeddata 表示当前帧已经可绘制。部分浏览器仍需要 play() 触发首帧，
+  // 因此这里只标记已就绪，不阻止 onPreviewMetadata 启动受控微播放。
   previewReady.value = true
-  const video = previewRef.value
-  const mediaId = props.mediaId ?? 0
-  if (!video || mediaId <= 0) return
-
-  const objectUrl = await cacheVideoFirstFrame(mediaId, video)
-  if (!objectUrl || props.mediaId !== mediaId) return
-  previewFrameUrl.value = objectUrl
-
-  // Blob 首帧就绪后立即释放视频连接，后续滑动仅复用内存帧。
-  video.removeAttribute('src')
-  video.load()
 }
 
 function onPreviewMetadata(): void {
@@ -315,19 +287,61 @@ function onPreviewMetadata(): void {
   nativeWidth.value = preview.videoWidth
   nativeHeight.value = preview.videoHeight
 
-  // 轻微 seek 促使浏览器通过 Range 请求首个可解码关键帧，
-  // 不会因此预加载完整媒体。
-  if (preview.duration > 0) {
-    try {
-      preview.currentTime = Math.min(0.1, preview.duration)
-    } catch {
-      // 无法 seek 时保留占位状态，不阻断用户手动播放。
-    }
-  }
+  // preload=metadata 不保证所有浏览器绘制首帧。包括 iOS Safari 在内，
+  // 统一使用静音微播放强制解码一帧，拿到后立即暂停，不进入正式播放。
+  if (!props.active) return
+  void decodePreviewFrame(preview)
 }
 
-function onPreviewSeeked(): void {
+/** 静音微播放强制解码首帧；不会调用正式播放器，也不会持续播放。 */
+async function decodePreviewFrame(preview: HTMLVideoElement): Promise<void> {
+  if (previewReady.value) return
+
+  try {
+    await preview.play()
+  } catch {
+    // 静音自动播放被浏览器策略拒绝：保持占位状态，不阻断用户手动播放。
+    return
+  }
+
+  const framePainted = waitFirstPaintedFrame(preview)
+  const decodeTimedOut = new Promise<boolean>((resolve) => {
+    window.setTimeout(() => resolve(false), PREVIEW_DECODE_MAX_WAIT_MS)
+  })
+  const painted = await Promise.race([framePainted, decodeTimedOut])
+
+  preview.pause()
+  if (!painted || previewRef.value !== preview) return
+
+  // 微播放可能前进数帧，回到起点保证冻结画面是首帧。
+  preview.currentTime = 0
   previewReady.value = true
+}
+
+function waitFirstPaintedFrame(preview: HTMLVideoElement): Promise<boolean> {
+  if (preview.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+    return Promise.resolve(true)
+  }
+
+  return new Promise((resolve) => {
+    const videoWithFrameCallback = preview as HTMLVideoElement & {
+      requestVideoFrameCallback?: (callback: () => void) => number
+    }
+    if (typeof videoWithFrameCallback.requestVideoFrameCallback === 'function') {
+      videoWithFrameCallback.requestVideoFrameCallback(() => resolve(true))
+      return
+    }
+    preview.addEventListener('loadeddata', () => resolve(true), { once: true })
+  })
+}
+
+/** 暂停并释放预览元素，中止其网络加载与进行中的微播放解码。 */
+function releasePreviewElement(): void {
+  const preview = previewRef.value
+  if (preview === null) return
+  preview.pause()
+  preview.removeAttribute('src')
+  preview.load()
 }
 
 function onPreviewError(): void {
@@ -365,42 +379,25 @@ function onEnded(event: Event): void {
 // Visibility observer — connects when <video> element is in DOM
 // ---------------------------------------------------------------------------
 
+// 移出视窗只暂停：保留加载状态与解码帧，滑回视窗不会因为 active 切换而黑屏。
+// active 由虚拟滚动器控制，不能当作“真正离开视窗”的资源回收信号。
 function setupVisibilityObserver(): void {
   visibilityObserver?.disconnect()
   visibilityObserver = null
-  if (unloadTimer !== null) {
-    clearTimeout(unloadTimer)
-    unloadTimer = null
-  }
-  const video = videoRef.value
+
+  const video = videoRef.value ?? previewRef.value
   if (!video) return
-  const root = props.scrollerRoot ?? undefined
 
   visibilityObserver = new IntersectionObserver(
     (entries) => {
       for (const entry of entries) {
         if (entry.target !== video) continue
-        if (entry.intersectionRatio < 0.01) {
-          // Off-screen: pause immediately, start unload timer
+        if (!entry.isIntersecting || entry.intersectionRatio <= 0) {
           video.pause()
-          savePosition(props.mediaId ?? 0, video.currentTime)
-          if (unloadTimer !== null) {
-            clearTimeout(unloadTimer)
-          }
-          unloadTimer = setTimeout(() => {
-            unloadVideo('off-screen-timeout')
-            unloadTimer = null
-          }, 1200)
-        } else {
-          // Back on-screen: cancel pending unload
-          if (unloadTimer !== null) {
-            clearTimeout(unloadTimer)
-            unloadTimer = null
-          }
         }
       }
     },
-    { root, threshold: [0, 0.01] },
+    { root: props.scrollerRoot ?? undefined, threshold: [0] },
   )
   visibilityObserver.observe(video)
 }
@@ -423,21 +420,16 @@ onMounted(() => {
   // Register page visibility listener: pause active video when page is hidden
   document.addEventListener('visibilitychange', onVisibilityChange)
   document.addEventListener('pagehide', onVisibilityChange)
-
-  // If video element already exists, connect observer immediately
   setupVisibilityObserver()
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('visibilitychange', onVisibilityChange)
   document.removeEventListener('pagehide', onVisibilityChange)
+  releasePreviewElement()
   unloadVideo('component-unmount')
   visibilityObserver?.disconnect()
   visibilityObserver = null
-  if (unloadTimer !== null) {
-    clearTimeout(unloadTimer)
-    unloadTimer = null
-  }
 })
 
 // ---------------------------------------------------------------------------
@@ -450,22 +442,28 @@ watch(
     if (oldId !== undefined && newId !== oldId) {
       // Save position for old media, release session, reset state
       unloadVideo('mediaId-changed', oldId)
-      previewFrameUrl.value = getCachedVideoFirstFrame(newId ?? 0)
-      previewReady.value = previewFrameUrl.value !== null
+      releasePreviewElement()
+      previewReady.value = false
     }
   },
 )
 
-// When active becomes false (parent viewport scrolls item out of slots),
-// immediately unload the video to free GPU/memory resources.
+// active 是 RecycleScroller 的视图状态，不等于资源生命周期。
+// 这里只暂停，保留预览 DOM、src 和已解码帧；真正复用到另一条媒体时，
+// mediaId watcher 再释放旧媒体资源。
 watch(
   () => props.active,
   (isActive) => {
     if (!isActive) {
-      previewReady.value = false
-      unloadVideo('inactive')
-    } else if (previewFrameUrl.value) {
-      previewReady.value = true
+      previewRef.value?.pause()
+      videoRef.value?.pause()
+      return
+    }
+
+    setupVisibilityObserver()
+    const preview = previewRef.value
+    if (!activated.value && preview && preview.readyState >= HTMLMediaElement.HAVE_METADATA) {
+      void decodePreviewFrame(preview)
     }
   },
 )
