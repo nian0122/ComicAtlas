@@ -124,7 +124,7 @@ function sizePercent(bytes: number, total: number): number { return total > 0 ? 
 .storage-cell { display: grid; gap: 4px; min-width: 160px; }
 .storage-cell-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .storage-cell-head strong { color: var(--text-primary); font-size: 13px; }
-.storage-cell-head span, .storage-cell small { color: var(--text-muted); font-size: 10px; }
+.storage-cell-head span, .storage-cell small { color: var(--text-secondary); font-size: 10px; }
 .storage-bar { display: flex; height: 5px; overflow: hidden; background: var(--bg-primary); }
 .storage-bar i { display: block; min-width: 0; }
 .storage-bar-hq { background: var(--accent); }.storage-bar-lq { background: var(--success); }

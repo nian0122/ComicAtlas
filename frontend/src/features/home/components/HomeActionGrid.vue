@@ -105,9 +105,9 @@ import { Collection, Download, Clock, ArrowRight } from '@element-plus/icons-vue
 }
 
 .action-icon--import {
-  border-color: var(--success);
-  background: var(--bg-surface);
-  color: var(--success);
+  border-color: var(--accent-border);
+  background: var(--accent-bg);
+  color: var(--accent);
 }
 
 .action-icon--history {

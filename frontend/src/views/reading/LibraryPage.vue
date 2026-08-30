@@ -708,11 +708,17 @@ onBeforeUnmount(() => {
 }
 
 :global(.library-filter-popper.el-popper) {
-  padding: 5px;
-  border: 1px solid var(--border-strong);
+  overflow: hidden;
+  padding: 4px;
+  border: 1px solid var(--border-strong) !important;
   border-radius: var(--radius-md);
-  background: var(--bg-elevated);
+  background: var(--bg-surface) !important;
+  background-color: var(--bg-surface) !important;
   box-shadow: var(--card-shadow-hover);
+}
+:global(.library-filter-popper .el-popper__arrow::before) {
+  background: var(--bg-surface) !important;
+  border-color: var(--border-strong) !important;
 }
 :global(.library-filter-popper .el-select-dropdown__item) {
   min-height: 36px;
@@ -721,17 +727,19 @@ onBeforeUnmount(() => {
   font-size: 13px;
 }
 :global(.library-filter-popper .el-select-dropdown__item.hover),
-:global(.library-filter-popper .el-select-dropdown__item:hover) { background: var(--accent-bg); color: var(--text-primary); }
-:global(.library-filter-popper .el-select-dropdown__item.is-selected) { background: var(--accent-bg); color: var(--accent); font-weight: 650; }
+:global(.library-filter-popper .el-select-dropdown__item.is-hovering),
+:global(.library-filter-popper .el-select-dropdown__item:hover) { background: var(--surface-highlight) !important; color: var(--text-primary) !important; }
+:global(.library-filter-popper .el-select-dropdown__item.selected),
+:global(.library-filter-popper .el-select-dropdown__item.is-selected) { background: var(--accent-bg) !important; color: var(--accent) !important; font-weight: 650; }
 :global(.tag-mode-popper) { min-width: 88px !important; }
 
 :global(.el-popper.is-light.mobile-sort-menu-popper) {
-  --el-popover-bg-color: #0d0d0d;
+  --el-popover-bg-color: var(--color-surface-1);
   padding: 5px;
   border: 1px solid var(--border-strong) !important;
   border-radius: 13px;
-  background: #0d0d0d !important;
-  background-color: #0d0d0d !important;
+  background: var(--color-surface-1) !important;
+  background-color: var(--color-surface-1) !important;
   box-shadow: 0 16px 44px rgb(0 0 0 / 72%) !important;
 }
 
@@ -793,7 +801,7 @@ onBeforeUnmount(() => {
 .active-filter-clear { margin-left: auto; }
 
 /* 桌面端（>1024px）：包装层不参与布局，控件直接平铺进 toolbar，
- * 并用 order 恢复原有控件顺序：搜索 → 分类 → 排序 → 标签 → 标签模式 */
+ * 统一按筛选优先级排列：搜索 → 分类 → 标签 → 标签模式 → 排序 */
 @media (min-width: 1025px) {
   .toolbar-main,
   .toolbar-filters {
@@ -806,14 +814,14 @@ onBeforeUnmount(() => {
     display: inline-flex;
     align-items: center;
     gap: var(--space-sm);
-    order: 3;
+    order: 5;
   }
   .desktop-sort-group .desktop-sort-order { display: inline-flex; }
   .sort-select,
   .desktop-sort-order { order: unset; }
-  .tag-filter { order: 5; }
-  .tag-mode-select { order: 6; }
-  .filter-reset { order: 7; }
+  .tag-filter { order: 3; }
+  .tag-mode-select { order: 4; }
+  .filter-reset { order: 6; }
   /* 桌面端已在筛选控件内展示当前值，避免再重复占一整行摘要。 */
   .active-filter-row { display: none; }
 }

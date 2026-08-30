@@ -40,6 +40,9 @@ test('回收站入口展示已回收漫画并支持恢复', async ({ page }: { p
   await page.setViewportSize({ width: 1280, height: 720 })
   await page.screenshot({ path: 'C:\\Users\\Acer\\.codex\\visualizations\\2026\\08\\11\\trash-final.png' })
   await expect(page.getByRole('heading', { name: '回收站' })).toBeVisible()
+  await expect(page.locator('.el-table')).toHaveCSS('background-color', 'rgb(17, 17, 17)')
+  await expect(page.getByRole('button', { name: '刷新' }).first()).toHaveCSS('background-color', 'rgb(24, 24, 24)')
+  await expect(page.locator('.el-checkbox__inner').first()).toHaveCSS('background-color', 'rgb(24, 24, 24)')
   await expect(page.getByText('已回收漫画', { exact: true })).toBeVisible()
   await expect.poll(() => comicUrls.at(-1)?.searchParams.get('status')).toBe('TRASHED')
 

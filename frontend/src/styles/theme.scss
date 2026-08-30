@@ -12,7 +12,9 @@
   --el-color-primary-light-9: var(--accent-bg);
   --el-color-primary-dark-2: var(--accent);
   --el-bg-color: var(--bg-surface);
+  --el-bg-color-page: var(--bg-primary);
   --el-bg-color-overlay: var(--surface-highlight);
+  --el-fill-color: var(--bg-surface);
   --el-fill-color-blank: var(--bg-surface);
   --el-fill-color-light: var(--surface-highlight);
   --el-fill-color-lighter: var(--bg-secondary);
@@ -20,6 +22,9 @@
   --el-text-color-primary: var(--text-primary);
   --el-text-color-regular: var(--text-secondary);
   --el-text-color-secondary: var(--text-muted);
+  --el-text-color-placeholder: var(--text-muted);
+  --el-color-primary: var(--accent);
+  --el-color-info: var(--text-muted);
   --el-border-color: var(--border);
   --el-border-color-light: var(--border);
   --el-border-color-lighter: var(--border);
@@ -48,6 +53,34 @@
     box-shadow var(--transition-fast);
 }
 
+/* Element Plus 默认主题会在 table/empty/button 场景回退到白色；这里统一锁定影院黑场。 */
+.el-button:not(.el-button--primary):not(.is-text):not(.is-link) {
+  color: var(--text-primary);
+  background: var(--bg-surface) !important;
+  border-color: var(--border) !important;
+
+  &:hover:not(:disabled) {
+    color: var(--text-primary);
+    background: var(--surface-highlight) !important;
+    border-color: var(--border-strong) !important;
+  }
+
+  &:active:not(:disabled) {
+    background: var(--bg-secondary) !important;
+  }
+}
+
+.el-button:focus:not(:focus-visible) {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.el-button:focus-visible {
+  outline: 2px solid var(--accent) !important;
+  outline-offset: 2px;
+  box-shadow: none !important;
+}
+
 .el-button--primary {
   --el-button-bg-color: var(--accent);
   --el-button-text-color: var(--color-on-brand);
@@ -61,6 +94,38 @@
   --el-button-disabled-bg-color: var(--accent-bg);
   --el-button-disabled-border-color: var(--accent-bg);
   --el-button-disabled-text-color: var(--text-secondary);
+
+  color: var(--color-on-brand) !important;
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  box-shadow: none !important;
+  outline-color: var(--accent) !important;
+
+  &:hover:not(:disabled) {
+    color: var(--color-on-brand) !important;
+    background: var(--accent-hover) !important;
+    border-color: var(--accent-hover) !important;
+  }
+
+  &:active:not(:disabled) {
+    background: var(--accent-hover) !important;
+    border-color: var(--accent-hover) !important;
+  }
+}
+
+/* 禁用操作必须降级为中性灰，避免没有消息时仍被误认为可执行。 */
+.el-button--primary.is-disabled,
+.el-button--primary.is-disabled:hover,
+.el-button--primary.is-disabled:focus,
+.el-button--danger.is-disabled,
+.el-button--danger.is-disabled:hover,
+.el-button--danger.is-disabled:focus {
+  color: var(--text-muted) !important;
+  background: var(--bg-secondary) !important;
+  border-color: var(--border) !important;
+  box-shadow: none !important;
+  opacity: var(--disabled-opacity);
+  cursor: not-allowed;
 }
 
 .el-button--text,
@@ -73,6 +138,52 @@
   --el-button-hover-border-color: transparent;
   --el-button-active-bg-color: rgba(229, 9, 20, 0.25);
   --el-button-active-text-color: var(--accent);
+
+  border-color: transparent !important;
+  background: transparent !important;
+}
+
+/* 选择框沿用影院黑场，避免表格里出现突兀的白色方块。 */
+.el-checkbox {
+  --el-checkbox-text-color: var(--text-secondary);
+  --el-checkbox-input-border-color: var(--border-strong);
+  --el-checkbox-bg-color: var(--bg-surface);
+  --el-checkbox-checked-bg-color: var(--accent);
+  --el-checkbox-checked-input-border-color: var(--accent);
+  --el-checkbox-disabled-input-fill: var(--bg-secondary);
+  --el-checkbox-disabled-border-color: var(--border);
+}
+
+.el-checkbox__inner {
+  background-color: var(--bg-surface) !important;
+  border-color: var(--border-strong) !important;
+}
+
+.el-checkbox__input.is-checked .el-checkbox__inner,
+.el-checkbox__input.is-indeterminate .el-checkbox__inner {
+  background-color: var(--accent) !important;
+  border-color: var(--accent) !important;
+}
+
+.el-checkbox__input.is-disabled .el-checkbox__inner {
+  background-color: var(--bg-secondary) !important;
+  border-color: var(--border) !important;
+}
+
+.el-switch {
+  --el-switch-on-color: var(--accent);
+  --el-switch-off-color: var(--bg-surface);
+  --el-switch-border-color: var(--border-strong);
+}
+
+.el-switch .el-switch__core {
+  border-color: var(--border-strong) !important;
+  background-color: var(--bg-surface) !important;
+}
+
+.el-switch.is-checked .el-switch__core {
+  border-color: var(--accent) !important;
+  background-color: var(--accent) !important;
 }
 
 /* ---------------------------------------------------------------------------
@@ -167,16 +278,26 @@
   min-height: var(--control-height);
   padding: 0 14px;
   background: linear-gradient(180deg, var(--control-bg), var(--bg-secondary));
-  box-shadow: inset 0 0 0 1px var(--border), var(--shadow-sm);
+  --el-fill-color-blank: var(--bg-surface);
+  --el-fill-color-light: var(--bg-secondary);
+  box-shadow: inset 0 0 0 1px var(--border), var(--shadow-sm) !important;
   border-radius: var(--control-radius);
 
   &:hover:not(.is-disabled):not(.is-focused) {
-    background: var(--control-bg-hover);
-    box-shadow: inset 0 0 0 1px var(--border-strong), var(--shadow-sm);
+    background: var(--control-bg-hover) !important;
+    background-color: var(--control-bg-hover) !important;
+    box-shadow: inset 0 0 0 1px var(--border-strong), var(--shadow-sm) !important;
+  }
+
+  &.is-hovering:not(.is-disabled):not(.is-focused) {
+    --el-fill-color-blank: var(--surface-highlight);
+    background: var(--surface-highlight) !important;
+    background-color: var(--surface-highlight) !important;
+    box-shadow: inset 0 0 0 1px var(--border-strong), var(--shadow-sm) !important;
   }
 
   &.is-focused {
-    box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 3px var(--control-focus-ring), var(--shadow-sm);
+    box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 3px var(--control-focus-ring), var(--shadow-sm) !important;
   }
 
   .el-select__placeholder {
@@ -188,9 +309,16 @@
   }
 
   &.is-disabled {
-    background: var(--bg-secondary);
-    box-shadow: 0 0 0 1px var(--border) inset;
+    background: var(--bg-secondary) !important;
+    background-color: var(--bg-secondary) !important;
+    box-shadow: 0 0 0 1px var(--border) inset !important;
     opacity: var(--disabled-opacity);
+
+    .el-select__placeholder,
+    .el-select__selected-item,
+    .el-select__caret {
+      color: var(--text-muted) !important;
+    }
   }
 }
 
@@ -249,13 +377,15 @@
   line-height: var(--control-height);
 
   &:hover,
-  &.hover {
-    background-color: var(--surface-highlight);
+  &.hover,
+  &.is-hovering {
+    background-color: var(--surface-highlight) !important;
+    color: var(--text-primary) !important;
   }
 
   &.selected {
-    background-color: var(--accent-bg);
-    color: var(--accent);
+    background-color: var(--accent-bg) !important;
+    color: var(--accent) !important;
     font-weight: 600;
   }
 
@@ -293,29 +423,29 @@
   .btn-prev,
   .btn-next,
   .el-pager li {
-    background-color: var(--bg-surface);
-    border: 1px solid var(--border);
+    background-color: var(--bg-surface) !important;
+    border: 1px solid var(--border) !important;
     border-radius: var(--radius-sm);
-    color: var(--text-secondary);
+    color: var(--text-secondary) !important;
     transition: background-color var(--transition-fast),
       border-color var(--transition-fast), color var(--transition-fast);
 
     &:hover:not(:disabled):not(.disabled) {
-      background-color: var(--surface-highlight);
-      color: var(--text-primary);
+      background-color: var(--surface-highlight) !important;
+      color: var(--text-primary) !important;
     }
 
     &.active,
     &.is-active {
-      background-color: var(--accent);
-      border-color: var(--accent);
-      color: var(--text-primary);
+      background-color: var(--accent) !important;
+      border-color: var(--accent) !important;
+      color: var(--text-primary) !important;
     }
 
     &:disabled,
     &.disabled {
-      background-color: var(--bg-secondary);
-      color: var(--text-muted);
+      background-color: var(--bg-secondary) !important;
+      color: var(--text-muted) !important;
     }
   }
 
@@ -409,17 +539,113 @@
   --el-table-current-row-bg-color: var(--accent-bg);
 
   border-radius: var(--radius-md);
-  background: var(--bg-secondary);
+  background: var(--bg-secondary) !important;
+  background-color: var(--bg-secondary) !important;
+
+  .el-table__inner-wrapper,
+  .el-table__header-wrapper,
+  .el-table__body-wrapper,
+  .el-table__empty-block,
+  .el-table__footer-wrapper {
+    background: var(--bg-secondary) !important;
+    background-color: var(--bg-secondary) !important;
+  }
+
+  .el-table__empty-text {
+    color: var(--text-muted);
+  }
+
+  .el-table__header-wrapper th.el-table__cell,
+  .el-table__body-wrapper td.el-table__cell,
+  .el-table__body tr,
+  .el-table__body tr:hover > td.el-table__cell {
+    background-color: var(--bg-secondary) !important;
+  }
+
+  .el-table__header-wrapper th.el-table__cell {
+    background-color: var(--bg-surface) !important;
+    color: var(--text-secondary);
+  }
+
+  .el-table__cell {
+    border-bottom: 1px solid var(--border) !important;
+  }
 
   &::before,
   .el-table__inner-wrapper::before {
-    background-color: var(--border);
+    background-color: var(--border) !important;
   }
 
   th.el-table__cell,
   td.el-table__cell {
-    border-bottom-color: var(--border);
+    border-bottom-color: var(--border) !important;
     background: inherit;
+  }
+}
+
+/* Element Plus 默认 loading 遮罩为浅色，统一为影院黑场并使用品牌红加载环。 */
+.el-loading-mask {
+  background-color: var(--color-overlay-loading) !important;
+}
+
+.el-loading-spinner .path {
+  stroke: var(--accent) !important;
+}
+
+.el-loading-spinner .el-loading-text {
+  color: var(--text-secondary) !important;
+}
+
+.el-select,
+.el-select.is-focused,
+.el-select:focus-within {
+  --el-select-input-focus-border-color: var(--accent);
+  --el-border-color-hover: var(--border-strong);
+}
+
+.el-select.is-focused .el-select__wrapper,
+.el-select:focus-within .el-select__wrapper {
+  outline: none !important;
+  border-color: transparent !important;
+  box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 3px var(--control-focus-ring), var(--shadow-sm) !important;
+}
+
+/* Element Plus 进度条默认使用蓝色 primary，管理任务进度必须沿用品牌红。 */
+.el-progress-bar__outer {
+  background-color: var(--color-progress-track) !important;
+}
+
+.el-progress-bar__inner {
+  background-color: var(--accent) !important;
+}
+
+.el-progress--line .el-progress-bar__inner {
+  background-color: var(--accent) !important;
+}
+
+.el-progress.is-exception .el-progress-bar__inner {
+  background-color: var(--danger) !important;
+}
+
+.el-switch__label.is-active {
+  color: var(--accent) !important;
+}
+
+.el-tabs__nav-wrap::after {
+  height: 1px;
+  background-color: var(--border) !important;
+}
+
+.el-tabs__active-bar {
+  background-color: var(--accent) !important;
+}
+
+.el-tabs__item {
+  color: var(--text-muted);
+
+  &:hover,
+  &.is-active {
+    color: var(--accent) !important;
   }
 }
 
@@ -427,11 +653,22 @@
   --el-drawer-bg-color: var(--bg-secondary);
 
   border-left: 1px solid var(--border);
+  background-color: var(--bg-secondary) !important;
   color: var(--text-secondary);
 
   .el-drawer__header {
     border-bottom: 1px solid var(--border);
     color: var(--text-primary);
+  }
+
+  .el-drawer__body {
+    background-color: var(--bg-secondary) !important;
+    color: var(--text-secondary);
+  }
+
+  .el-drawer__close-btn,
+  .el-drawer__close-btn:hover {
+    color: var(--text-muted);
   }
 }
 
@@ -440,4 +677,28 @@
   --el-tag-border-color: var(--border);
   --el-tag-text-color: var(--text-secondary);
   border-radius: var(--radius-sm);
+
+  &,
+  &.el-tag--primary,
+  &.el-tag--success,
+  &.el-tag--warning,
+  &.el-tag--danger,
+  &.el-tag--info {
+    color: var(--text-secondary) !important;
+    background: var(--bg-surface) !important;
+    border-color: var(--border) !important;
+  }
+
+  .el-tag__content {
+    color: inherit !important;
+  }
+
+  .el-tag__close {
+    color: var(--text-muted) !important;
+
+    &:hover {
+      color: var(--text-primary);
+      background: var(--accent);
+    }
+  }
 }

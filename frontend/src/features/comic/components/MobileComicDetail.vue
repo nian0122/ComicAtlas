@@ -159,7 +159,7 @@ const hqSize = computed(() => {
   position: absolute;
   inset: 0;
   background-position: center top;
-  background-color: #050505;
+  background-color: var(--mobile-canvas);
   background-repeat: no-repeat;
   background-size: 100% auto;
   filter: brightness(0.68) saturate(0.92);

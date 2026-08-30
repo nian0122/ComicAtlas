@@ -44,7 +44,7 @@
                   <strong>{{ task.operation }}</strong>
                   <span class="task-meta">最近更新 {{ formatTaskTime(task.updatedAt) }}</span>
                 </div>
-                <el-tag :type="taskStatusTone(task.status)">{{ taskStatusLabel(task.status) }}</el-tag>
+                <el-tag class="task-status-tag" :type="taskStatusTone(task.status)">{{ taskStatusLabel(task.status) }}</el-tag>
               </div>
               <div class="task-card-info">
                 <span>目标：{{ taskDisplayName(task) }} · {{ task.isBatch ? '批量任务' : '单项任务' }}</span>
@@ -79,7 +79,7 @@
             <h2>{{ taskDisplayName(selectedTask) }}</h2>
             <p>{{ selectedTask.operation }} · {{ selectedTask.isBatch ? '批量任务' : '单项任务' }}</p>
           </div>
-          <el-tag size="large" :type="taskStatusTone(selectedTask.status)">{{ taskStatusLabel(selectedTask.status) }}</el-tag>
+          <el-tag class="task-status-tag" size="large" :type="taskStatusTone(selectedTask.status)">{{ taskStatusLabel(selectedTask.status) }}</el-tag>
         </header>
 
         <section class="detail-progress-panel" aria-label="任务进度">
@@ -125,7 +125,7 @@
           <el-table v-if="taskItems.length" :data="taskItems" row-key="id" class="detail-items-table">
             <el-table-column prop="targetType" label="类型" min-width="100" />
             <el-table-column prop="targetId" label="目标 ID" min-width="100" />
-            <el-table-column label="状态" min-width="100"><template #default="{ row }"><el-tag :type="taskStatusTone(row.status)">{{ taskStatusLabel(row.status) }}</el-tag></template></el-table-column>
+            <el-table-column label="状态" min-width="100"><template #default="{ row }"><el-tag class="task-status-tag" :type="taskStatusTone(row.status)">{{ taskStatusLabel(row.status) }}</el-tag></template></el-table-column>
             <el-table-column label="进度" min-width="120"><template #default="{ row }">{{ row.progress ?? 0 }}%</template></el-table-column>
             <el-table-column prop="errorMessage" label="错误" min-width="180" />
           </el-table>
@@ -177,7 +177,7 @@ function errorMessage(reason: unknown): string {
   return reason instanceof Error ? reason.message : '未知错误'
 }
 function taskStatusLabel(status: ManagementTaskStatus): string { return managementTaskStatusLabel(status) }
-function taskStatusTone(status: ManagementTaskStatus): 'success' | 'warning' | 'danger' | 'info' { if (status === 'SUCCEEDED') return 'success'; if (status === 'FAILED' || status === 'PARTIALLY_SUCCEEDED') return 'danger'; if (status === 'RUNNING' || status === 'CANCELLING') return 'warning'; return 'info' }
+function taskStatusTone(status: ManagementTaskStatus): 'success' | 'warning' | 'danger' | 'info' { if (status === 'SUCCEEDED') return 'success'; if (status === 'FAILED' || status === 'PARTIALLY_SUCCEEDED' || status === 'CANCELLED') return 'danger'; if (status === 'RUNNING' || status === 'CANCELLING') return 'warning'; return 'info' }
 function formatTaskTime(value: string): string { return new Date(value).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) }
 function formatDetailTime(value: string | null): string { return value ? new Date(value).toLocaleString('zh-CN') : '—' }
 function taskDisplayName(task: ManagementTaskVO): string {
@@ -254,6 +254,10 @@ onBeforeUnmount(() => { if (timer !== undefined) clearInterval(timer) })
 .progress-label { color: var(--text-secondary); font-size: var(--text-caption); }
 .progress-label strong { color: var(--text-primary); }
 .task-card-footer { color: var(--text-muted); font-size: var(--text-caption); }
+.task-status-tag.el-tag--success { color: var(--success) !important; background: rgb(102 197 139 / 14%) !important; border-color: rgb(102 197 139 / 52%) !important; }
+.task-status-tag.el-tag--warning { color: var(--warning) !important; background: rgb(216 165 79 / 14%) !important; border-color: rgb(216 165 79 / 52%) !important; }
+.task-status-tag.el-tag--danger { color: var(--danger) !important; background: rgb(240 107 112 / 14%) !important; border-color: rgb(240 107 112 / 52%) !important; }
+.task-status-tag.el-tag--info { color: var(--text-secondary) !important; background: var(--surface-highlight) !important; border-color: var(--border-strong) !important; }
 .task-card-error { margin: calc(var(--space-2) * -1) 0 0; color: var(--danger); font-size: var(--text-caption); line-height: 1.5; }
 .task-card-actions { display: inline-flex; align-items: center; min-height: var(--control-height); }
 .empty-state { padding: var(--space-8); color: var(--text-muted); text-align: center; border: 1px dashed var(--border); border-radius: var(--radius-md); }

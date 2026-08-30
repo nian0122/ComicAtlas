@@ -35,8 +35,17 @@ const STATUS_MAP: Record<string, Record<string, { type: string; text: string }>>
 
 const tagType = computed(() => STATUS_MAP[props.type]?.[props.status]?.type ?? '')
 const tagText = computed(() => STATUS_MAP[props.type]?.[props.status]?.text ?? props.status)
+const tagClass = computed(() => `storage-status-tag--${tagType.value || 'neutral'}`)
 </script>
 
 <template>
-  <el-tag :type="tagType" size="small">{{ tagText }}</el-tag>
+  <el-tag class="storage-status-tag" :class="tagClass" :type="tagType" size="small">{{ tagText }}</el-tag>
 </template>
+
+<style scoped>
+.storage-status-tag--success { color: var(--success) !important; border-color: var(--success) !important; background: var(--bg-surface) !important; }
+.storage-status-tag--warning { color: var(--warning) !important; border-color: var(--warning) !important; background: var(--bg-surface) !important; }
+.storage-status-tag--danger { color: var(--danger) !important; border-color: var(--danger) !important; background: var(--bg-surface) !important; }
+.storage-status-tag--info { color: var(--text-secondary) !important; border-color: var(--border-strong) !important; background: var(--bg-surface) !important; }
+.storage-status-tag--neutral { color: var(--text-muted) !important; border-color: var(--border) !important; background: var(--bg-surface) !important; }
+</style>

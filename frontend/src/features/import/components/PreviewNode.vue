@@ -95,7 +95,7 @@ const kindIcon = computed(() => kindIcons[props.node.kind] ?? kindIcons.DIRECTOR
 
 .warn-chip.severity-info {
   color: var(--info);
-  background: rgb(112 166 216 / 12%);
+  background: var(--surface-highlight);
 }
 
 @media (max-width: 640px) {

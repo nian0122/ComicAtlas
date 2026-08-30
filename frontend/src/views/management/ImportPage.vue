@@ -855,7 +855,7 @@ function errorMessage(error: unknown): string {
 
 .warn-chip.severity-info {
   color: var(--info);
-  background: rgb(112 166 216 / 12%);
+  background: var(--surface-highlight);
 }
 
 .blocked-reason {

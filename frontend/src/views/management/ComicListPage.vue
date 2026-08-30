@@ -380,19 +380,25 @@ function formatBytes(bytes: number | undefined): string {
 }
 
 .filter-input {
-  width: 200px;
-}
-
-.filter-select {
-  width: 120px;
-}
-
-.filter-select--wide {
   width: 180px;
 }
 
+.filter-select {
+  width: 108px;
+}
+
+.filter-select--wide {
+  width: 162px;
+}
+
 .filter-select--mini {
-  width: 90px;
+  width: 80px;
+}
+
+.filter-toolbar :deep(.el-input__wrapper),
+.filter-toolbar :deep(.el-select__wrapper) {
+  min-height: 36px;
+  border-radius: var(--radius-sm);
 }
 
 .comic-grid {

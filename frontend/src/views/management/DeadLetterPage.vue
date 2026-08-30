@@ -53,14 +53,14 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="消息" prop="messages" width="92" align="right">
+          <el-table-column label="消息" prop="messages" width="112" align="right">
             <template #default="{ row }">
               <span :class="['message-count', { active: row.messages > 0 }]">
                 {{ row.messages }}
               </span>
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="200" align="right">
+          <el-table-column label="操作" width="220" align="right">
             <template #default="{ row }">
               <div class="row-actions">
                 <el-button :disabled="row.messages === 0" text @click="showMessages(row)">预览</el-button>
@@ -291,6 +291,10 @@ onMounted(loadQueues)
 
 .table-scroll { overflow-x: auto; }
 
+.queue-table {
+  min-width: 782px;
+}
+
 .queue-name, .route-cell { display: grid; gap: var(--space-1); }
 .queue-name strong, .route-cell span { color: var(--text-primary); font-family: var(--mono); font-size: var(--text-xs); }
 .queue-name span, .route-cell code { color: var(--text-muted); font-family: var(--mono); font-size: var(--text-xs); }
@@ -298,7 +302,13 @@ onMounted(loadQueues)
 .message-count { color: var(--text-muted); font-family: var(--mono); font-weight: 700; }
 .message-count.active { color: var(--warning); }
 
-.row-actions { display: flex; justify-content: flex-end; gap: var(--space-1); }
+.row-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-1);
+  min-width: 196px;
+  white-space: nowrap;
+}
 
 .state {
   display: flex;

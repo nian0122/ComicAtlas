@@ -33,7 +33,7 @@
         </el-select>
       </el-form-item>
     </el-form>
-    <p style="color: #909399; font-size: 13px; margin: 0;">
+    <p class="batch-edit-hint">
       将为选中的 <strong>{{ comicIds.length }}</strong> 部漫画统一设置
     </p>
     <template #footer>
@@ -97,3 +97,11 @@ async function onConfirm() {
   }
 }
 </script>
+
+<style scoped>
+.batch-edit-hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+</style>

@@ -23,7 +23,9 @@ ComicAtlas 是一座“私人放映馆”：打开应用先看到作品，而不
 
 ## 2. Color
 
-### Palette
+### Palette（Netflix 深色基调）
+
+全局视觉基调采用 Netflix 式深色影院界面：以近黑色画布承载封面内容，以分层深灰组织界面，以 Netflix Red（`#E50914`）强调主要动作、当前状态和阅读进度。组件不得直接写颜色值，所有颜色必须从 `frontend/src/styles/tokens.css` 的 token 读取。
 
 | Role | Token | Value | Usage |
 |---|---|---:|---|
@@ -39,13 +41,13 @@ ComicAtlas 是一座“私人放映馆”：打开应用先看到作品，而不
 | Brand | `--color-brand` | `#e50914` | 继续阅读、选中、进度 |
 | Brand pale | `--color-brand-pale` | `#ffb3b6` | 漫画库移动导航选中 |
 | Brand hover | `--color-brand-hover` | `#f6121d` | 品牌交互悬浮 |
-| Focus | `--color-focus` | `#ffffff` | 键盘焦点 |
+| Focus | `--color-focus` | `var(--color-brand)` | 键盘焦点 |
 | Success | `--color-success` | `#66c58b` | 成功 |
 | Warning | `--color-warning` | `#d8a54f` | 警告、处理中 |
 | Danger | `--color-danger` | `#f06b70` | 失败、危险操作 |
-| Info | `--color-info` | `#70a6d8` | 信息状态 |
+| Info | `--color-info` | `var(--color-text-3)` | 信息状态（中性灰，避免默认蓝色） |
 
-透明叠层与环境效果也必须由 token 提供：`--color-overlay-faint`、`--color-overlay-soft`、`--color-overlay-hover`、`--color-overlay-scrim`、`--color-progress-track`、`--color-border-faint`、`--nav-gradient`、`--nav-solid`、`--nav-shadow`、`--brand-shadow`、`--title-shadow`、`--hero-mobile-gradient`、`--page-atmosphere`。组件不得自行创建新的 `rgb()` 叠层。
+透明叠层与环境效果也必须由 token 提供：`--color-overlay-faint`、`--color-overlay-soft`、`--color-overlay-hover`、`--color-overlay-scrim`、`--color-overlay-loading`、`--color-progress-track`、`--color-border-faint`、`--nav-gradient`、`--nav-solid`、`--nav-shadow`、`--brand-shadow`、`--title-shadow`、`--hero-mobile-gradient`、`--page-atmosphere`。组件不得自行创建新的 `rgb()` 叠层。
 
 ### Rules
 

@@ -20,6 +20,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 媒体操作资格服务 — 依据真实 DB 资产状态返回可查询的 allowedOperations。
@@ -57,8 +58,17 @@ public class MediaOperationEligibilityService {
 
         List<Chapter> chapters = chapterMapper.selectList(
                 new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
-        for (Chapter chapter : chapters) {
-            ChapterOps ops = collectChapterAssetOps(chapter.getId());
+        if (chapters.isEmpty()) {
+            return buildComicOperations(comic, allowed, blocked, false, false, false, false, false);
+        }
+
+        List<Long> chapterIds = chapters.stream().map(Chapter::getId).toList();
+        Map<Long, List<Media>> mediaByChapterId = mediaMapper.selectList(
+                        new LambdaQueryWrapper<Media>().in(Media::getChapterId, chapterIds))
+                .stream()
+                .collect(Collectors.groupingBy(Media::getChapterId));
+        for (Long chapterId : chapterIds) {
+            ChapterOps ops = collectChapterAssetOps(mediaByChapterId.getOrDefault(chapterId, List.of()));
             anyLqWork |= ops.lqGenerateAllowed;
             anyLqReady |= ops.lqRegenerateAllowed;
             anyHqWork |= ops.hqDeleteAllowed;
@@ -66,6 +76,15 @@ public class MediaOperationEligibilityService {
             anyTranscode |= ops.transcodeAllowed;
         }
 
+        return buildComicOperations(comic, allowed, blocked, anyLqWork, anyLqReady, anyHqWork,
+                hqPreconditionBlocked, anyTranscode);
+    }
+
+    private AllowedOperations buildComicOperations(Comic comic, Set<String> allowed,
+                                                    Map<String, String> blocked,
+                                                    boolean anyLqWork, boolean anyLqReady,
+                                                    boolean anyHqWork, boolean hqPreconditionBlocked,
+                                                    boolean anyTranscode) {
         if (anyLqWork) {
             allowed.add(OperationPolicyService.OP_LQ_GENERATE);
         } else {
@@ -160,9 +179,7 @@ public class MediaOperationEligibilityService {
         return AllowedOperations.of(allowed, blocked);
     }
 
-    private ChapterOps collectChapterAssetOps(Long chapterId) {
-        List<Media> mediaItems = mediaMapper.selectList(
-                new LambdaQueryWrapper<Media>().eq(Media::getChapterId, chapterId));
+    private ChapterOps collectChapterAssetOps(List<Media> mediaItems) {
         List<Media> imagePages = mediaItems.stream()
                 .filter(p -> "IMAGE".equals(p.getMediaType()))
                 .toList();
@@ -186,6 +203,12 @@ public class MediaOperationEligibilityService {
                         && VideoPlayability.isTranscodable(p.getWidth(), p.getHeight())
                         && !VideoPlayability.isBrowserPlayable(p.getVideoCodec(), p.getContainer()));
         return ops;
+    }
+
+    private ChapterOps collectChapterAssetOps(Long chapterId) {
+        List<Media> mediaItems = mediaMapper.selectList(
+                new LambdaQueryWrapper<Media>().eq(Media::getChapterId, chapterId));
+        return collectChapterAssetOps(mediaItems);
     }
 
     private static final class ChapterOps {
