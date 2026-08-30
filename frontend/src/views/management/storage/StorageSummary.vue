@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { StorageStats } from '@/types'
+import type { StorageStats } from '@/features/storage/types'
 
 const props = defineProps<{
   stats: StorageStats | null

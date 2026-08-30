@@ -99,7 +99,7 @@ import {
 } from '@element-plus/icons-vue'
 import MaterialSymbolIcon from '@/components/icons/MaterialSymbolIcon.vue'
 import ComicAtlasLogo from '@/components/brand/ComicAtlasLogo.vue'
-import { useHistoryStore } from '@/stores/history-store'
+import { useHistoryStore } from '@/features/history/store'
 
 const isScrolled = ref(false)
 const route = useRoute()

@@ -31,7 +31,7 @@
 </template>
 
 <script setup lang="ts">
-import type { DlqMessageVO } from '@/services/api'
+import type { DlqMessageVO } from '@/features/management/types'
 
 defineProps<{
   readonly visible: boolean

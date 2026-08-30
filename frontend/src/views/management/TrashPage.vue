@@ -114,7 +114,8 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { trashApi, type TrashContentVO } from '@/services/api'
+import type { TrashContentVO } from '@/features/trash/types'
+import { trashApi } from '@/features/trash/api'
 
 const STATUS_OPTIONS = [
   { value: 'TRASHED', label: '已回收' },

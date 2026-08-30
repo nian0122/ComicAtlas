@@ -27,14 +27,15 @@
 
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
-import HomeHero from '@/components/reading/home/HomeHero.vue'
-import HomeRow from '@/components/reading/home/HomeRow.vue'
-import HomeActionGrid from '@/components/reading/home/HomeActionGrid.vue'
-import { useHistoryStore } from '@/stores/history-store'
-import { useComicStore } from '@/stores/comic-store'
-import { useInteractionMode } from '@/views/reading/reader/composables/useInteractionMode'
-import type { HomeRowItem } from '@/components/reading/home/HomeRow.vue'
-import type { HistoryVO, ComicListVO } from '@/types'
+import HomeHero from '@/features/home/components/HomeHero.vue'
+import HomeRow from '@/features/home/components/HomeRow.vue'
+import HomeActionGrid from '@/features/home/components/HomeActionGrid.vue'
+import { useHistoryStore } from '@/features/history/store'
+import { useComicStore } from '@/features/comic/store'
+import { useInteractionMode } from '@/features/reader/composables/useInteractionMode'
+import type { HomeRowItem } from '@/features/home/components/HomeRow.vue'
+import type { ComicListVO } from '@/entities/comic/types'
+import type { HistoryVO } from '@/features/history/types'
 
 const historyStore = useHistoryStore()
 const comicStore = useComicStore()

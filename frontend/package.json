@@ -8,7 +8,10 @@
     "dev": "vite",
     "typecheck": "vue-tsc -b",
     "build": "vue-tsc -b && vite build",
-    "check": "pnpm typecheck && pnpm exec vite build --emptyOutDir=false",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check eslint.config.mjs .prettierrc.json package.json",
+    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm exec vite build --emptyOutDir=false",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -21,12 +24,20 @@
     "vue-virtual-scroller": "^2.0.1"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.61.1",
     "@types/node": "^24.13.2",
     "@vitejs/plugin-vue": "^6.0.7",
     "@vue/tsconfig": "^0.9.1",
+    "eslint": "^10.9.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-vue": "^10.10.0",
+    "globals": "^17.3.0",
+    "prettier": "^3.9.6",
     "sass": "^1.101.0",
     "typescript": "~6.0.2",
+    "typescript-eslint": "^8.68.0",
+    "unplugin-vue-components": "^28.8.0",
     "vite": "^8.1.0",
     "vue-tsc": "^3.3.5"
   }

@@ -140,11 +140,11 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
-import { managementComicApi } from '@/services/api'
+import { managementComicApi } from '@/features/management/api'
 import { ElMessage } from 'element-plus'
-import { trackedTaskApi } from '@/services/management-capabilities'
-import { MANAGEMENT_TASK_TYPES, managementTaskStatusLabel, managementTaskTypeLabel } from '@/utils/management-task'
-import type { ManagementTaskItemVO, ManagementTaskStatus, ManagementTaskType, ManagementTaskVO } from '@/types'
+import { managementTaskApi } from '@/features/task/api'
+import { MANAGEMENT_TASK_TYPES, managementTaskStatusLabel, managementTaskTypeLabel } from '@/features/task/labels'
+import type { ManagementTaskItemVO, ManagementTaskStatus, ManagementTaskType, ManagementTaskVO } from '@/features/task/types'
 
 const TASK_STATUSES = ['QUEUED', 'RUNNING', 'CANCELLING', 'CANCELLED', 'SUCCEEDED', 'PARTIALLY_SUCCEEDED', 'FAILED'] as const
 
@@ -197,11 +197,11 @@ function canRetry(task: ManagementTaskVO): boolean {
   if (task.taskType === 'RECOVERY' || task.taskType === 'DIRECTORY_SCAN') return false
   return ['FAILED', 'CANCELLED', 'PARTIALLY_SUCCEEDED'].includes(task.status)
 }
-async function loadTasks(silent = false): Promise<void> { if (!silent) loading.value = true; error.value = ''; try { const response = await trackedTaskApi.list(query); tasks.value = response.data.records; total.value = response.data.total; updatedAt.value = new Date().toLocaleTimeString(); void loadImportNames(response.data.records) } catch (reason: unknown) { error.value = errorMessage(reason) } finally { if (!silent) loading.value = false } }
+async function loadTasks(silent = false): Promise<void> { if (!silent) loading.value = true; error.value = ''; try { const response = await managementTaskApi.list(query); tasks.value = response.data.records; total.value = response.data.total; updatedAt.value = new Date().toLocaleTimeString(); void loadImportNames(response.data.records) } catch (reason: unknown) { error.value = errorMessage(reason) } finally { if (!silent) loading.value = false } }
 async function loadImportNames(records: readonly ManagementTaskVO[]): Promise<void> {
   const candidates = records.filter((task) => task.targetType === 'COMIC' && !task.targetName)
   const results = await Promise.allSettled(candidates.map(async (task) => {
-    const items = await trackedTaskApi.getItems(task.id)
+    const items = await managementTaskApi.getItems(task.id)
     const target = items.data.find((item) => item.targetType === 'COMIC')
     if (!target) return null
     const comic = await managementComicApi.detail(target.targetId)
@@ -215,9 +215,9 @@ async function loadImportNames(records: readonly ManagementTaskVO[]): Promise<vo
 }
 function resetAndLoad(): void { query.page = 1; void loadTasks() }
 function applyTarget(): void { const parsed = Number(targetIdInput.value); query.targetId = Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined; resetAndLoad() }
-async function openTask(task: ManagementTaskVO): Promise<void> { selectedTask.value = task; drawerVisible.value = true; try { taskItems.value = (await trackedTaskApi.getItems(task.id)).data } catch (reason: unknown) { ElMessage.error(errorMessage(reason)) } }
-async function cancelTask(id: number): Promise<void> { try { await trackedTaskApi.cancel(id); ElMessage.success('已请求取消'); await loadTasks() } catch (reason: unknown) { ElMessage.error(errorMessage(reason)) } }
-async function retryTask(id: number): Promise<void> { try { await trackedTaskApi.retry(id); ElMessage.success('已重新入队'); await loadTasks() } catch (reason: unknown) { ElMessage.error(errorMessage(reason)) } }
+async function openTask(task: ManagementTaskVO): Promise<void> { selectedTask.value = task; drawerVisible.value = true; try { taskItems.value = (await managementTaskApi.getItems(task.id)).data } catch (reason: unknown) { ElMessage.error(errorMessage(reason)) } }
+async function cancelTask(id: number): Promise<void> { try { await managementTaskApi.cancel(id); ElMessage.success('已请求取消'); await loadTasks() } catch (reason: unknown) { ElMessage.error(errorMessage(reason)) } }
+async function retryTask(id: number): Promise<void> { try { await managementTaskApi.retry(id); ElMessage.success('已重新入队'); await loadTasks() } catch (reason: unknown) { ElMessage.error(errorMessage(reason)) } }
 
 onMounted(() => { void loadTasks(); timer = setInterval(() => { if (autoRefresh.value && !loading.value) void loadTasks(true) }, 2500) })
 onBeforeUnmount(() => { if (timer !== undefined) clearInterval(timer) })

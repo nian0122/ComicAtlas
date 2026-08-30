@@ -1,5 +1,5 @@
 import { computed, ref, type Ref } from 'vue'
-import type { CatalogNode } from '@/types'
+import type { CatalogNode } from '@/entities/comic/types'
 import { countTreeChapters, filterChapterTree } from '../domain/chapter-search'
 
 export function useChapterSearch(catalogTree: Ref<CatalogNode[]>) {

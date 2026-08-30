@@ -1,5 +1,5 @@
 <template>
-  <div class="comic-edit-page fade-in" v-loading="loading">
+  <div v-loading="loading" class="comic-edit-page fade-in">
     <div class="edit-intro">
       <div>
         <p class="edit-eyebrow">IDENTITY / METADATA</p>
@@ -87,18 +87,12 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
-import { managementComicApi, managementTagApi } from '@/services/management'
-import { useCategoryStore } from '@/stores/management/category'
-import { sourceTypeLabel } from '@/utils/source-format'
-import type {
-  ComicMetadataDTO,
-  ComicMetadataUpdateDTO,
-  ComicDetailVO,
-  ComicInfoVO,
-  TagDTO,
-  TagCreateDTO,
-  ComicTagUpdateDTO,
-} from '@/types'
+import { managementComicApi, managementTagApi } from '@/entities/comic/api'
+import { useCategoryStore } from '@/features/category/store'
+import { sourceTypeLabel } from '@/features/comic/source-format'
+import type { ComicDetailVO, ComicInfoVO } from '@/entities/comic/types'
+import type { ComicMetadataDTO, ComicMetadataUpdateDTO } from '@/features/comic/management-types'
+import type { ComicTagUpdateDTO, TagCreateDTO, TagDTO } from '@/entities/tag/types'
 
 const route = useRoute()
 const router = useRouter()

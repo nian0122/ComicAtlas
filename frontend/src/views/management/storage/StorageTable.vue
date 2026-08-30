@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { Collection } from '@element-plus/icons-vue'
-import type { ComicStorageItem } from '@/types'
+import type { ComicStorageItem } from '@/features/storage/types'
 import StorageStatusTag from './StorageStatusTag.vue'
 
-const props = defineProps<{
+defineProps<{
   list: ComicStorageItem[]
   loading: boolean
   total: number

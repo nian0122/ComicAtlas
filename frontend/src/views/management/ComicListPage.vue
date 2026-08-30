@@ -172,16 +172,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { PictureFilled, WarningFilled } from '@element-plus/icons-vue'
-import { useManagementComicStore } from '@/stores/management/comic'
-import { useCategoryStore } from '@/stores/management/category'
-import { useTagStore } from '@/stores/tag-store'
+import { useManagementComicStore } from '@/features/comic/management-store'
+import { useCategoryStore } from '@/features/category/store'
+import { useTagStore } from '@/features/tag/store'
 import BatchEditDialog from './BatchEditDialog.vue'
-import type { ComicListQuery, StorageStats } from '@/types'
-import { storageService } from '@/services/storage'
-import { COMIC_STATUSES, comicStatusMeta } from '@/utils/comic-status'
+import type { StorageStats } from '@/features/storage/types'
+import { storageService } from '@/features/storage/service'
+import { COMIC_STATUSES, comicStatusMeta } from '@/features/comic/status'
+import { useManagementComicFilters } from '@/features/comic/composables/useManagementComicFilters'
 
 const router = useRouter()
 const store = useManagementComicStore()
@@ -211,21 +212,19 @@ const SORT_OPTIONS = [
   { label: '上次阅读', value: 'lastReadTime' },
 ]
 
-const filters = reactive({
-  keyword: '',
-  category: '',
-  status: '',
-  tags: [] as string[],
-  tagMode: 'OR' as 'AND' | 'OR' | 'NOT',
-  sort: 'createdAt',
-  order: 'desc' as 'asc' | 'desc',
-})
-
-const KEYWORD_SEARCH_DEBOUNCE_MS = 300
-let keywordSearchTimer: ReturnType<typeof setTimeout> | null = null
-
 const selectedIds = ref<number[]>([])
 const showBatchDialog = ref(false)
+
+const {
+  filters,
+  applyFilters,
+  scheduleKeywordSearch,
+  applyKeywordSearchImmediately,
+  resetFilters,
+  restoreFiltersFromStore,
+} = useManagementComicFilters(store, () => {
+  selectedIds.value = []
+})
 
 const selectAll = computed(() =>
   store.list.length > 0 && selectedIds.value.length === store.list.length
@@ -270,80 +269,6 @@ function goStorage(id: number) {
   router.push(`/manage/comics/${id}?tab=storage`)
 }
 
-watch(() => filters.tags, (val) => {
-  if (val.includes('_NONE') && val.length > 1) {
-    filters.tags = ['_NONE']
-  }
-  if (val.includes('_NONE') && filters.tagMode === 'NOT') {
-    filters.tagMode = 'OR'
-  }
-  if (val.length === 0 && filters.tagMode !== 'OR') {
-    filters.tagMode = 'OR'
-  }
-}, { deep: true })
-
-function cancelPendingKeywordSearch() {
-  if (keywordSearchTimer === null) return
-  clearTimeout(keywordSearchTimer)
-  keywordSearchTimer = null
-}
-
-function scheduleKeywordSearch() {
-  cancelPendingKeywordSearch()
-  keywordSearchTimer = setTimeout(() => {
-    keywordSearchTimer = null
-    applyFilters()
-  }, KEYWORD_SEARCH_DEBOUNCE_MS)
-}
-
-function applyKeywordSearchImmediately() {
-  cancelPendingKeywordSearch()
-  applyFilters()
-}
-
-function applyFilters() {
-  cancelPendingKeywordSearch()
-  const normalizedTags = filters.tags.includes('_NONE') ? ['_NONE'] : [...filters.tags]
-  filters.tags = normalizedTags
-  if (normalizedTags.length === 0 || normalizedTags.includes('_NONE')) {
-    filters.tagMode = 'OR'
-  }
-  selectedIds.value = []
-  store.search({
-    keyword: filters.keyword || undefined,
-    category: filters.category || undefined,
-    status: filters.status || undefined,
-    tags: normalizedTags.length > 0 ? normalizedTags : undefined,
-    tagMode: filters.tagMode,
-    sort: filters.sort as ComicListQuery['sort'],
-    order: filters.order,
-  })
-}
-
-function resetFilters() {
-  cancelPendingKeywordSearch()
-  filters.keyword = ''
-  filters.category = ''
-  filters.status = ''
-  filters.tags = []
-  filters.tagMode = 'OR'
-  filters.sort = 'createdAt'
-  filters.order = 'desc'
-  selectedIds.value = []
-  store.resetQuery()
-  store.fetchList()
-}
-
-function restoreFiltersFromStore() {
-  filters.keyword = store.query.keyword || ''
-  filters.category = store.query.category || ''
-  filters.status = store.query.status || ''
-  filters.tags = [...(store.query.tags || [])]
-  filters.tagMode = store.query.tagMode === 'AND' || store.query.tagMode === 'NOT' ? store.query.tagMode : 'OR'
-  filters.sort = store.query.sort || 'createdAt'
-  filters.order = store.query.order || 'desc'
-}
-
 function onPageChange(page: number) {
   selectedIds.value = []
   store.updateQuery({ page })
@@ -356,10 +281,6 @@ onMounted(() => {
   tagStore.fetchList()
   store.fetchList()
   storageService.fetchSummary().then((stats) => { storageStats.value = stats }).catch(() => { storageStats.value = null })
-})
-
-onBeforeUnmount(() => {
-  cancelPendingKeywordSearch()
 })
 
 function formatBytes(bytes: number | undefined): string {

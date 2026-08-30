@@ -119,11 +119,14 @@ import {
   UploadFilled,
   Warning,
 } from '@element-plus/icons-vue'
-import { comicStatusApi, trackedTaskApi } from '@/services/management-capabilities'
-import { storageService } from '@/services/storage'
-import { comicStatusMeta } from '@/utils/comic-status'
-import { managementTaskStatusLabel, managementTaskTypeLabel } from '@/utils/management-task'
-import type { ComicListVO, ManagementTaskStatus, ManagementTaskType, ManagementTaskVO, StorageStats } from '@/types'
+import { comicApi } from '@/entities/comic/api'
+import { managementTaskApi } from '@/features/task/api'
+import { storageService } from '@/features/storage/service'
+import { comicStatusMeta } from '@/features/comic/status'
+import { managementTaskStatusLabel, managementTaskTypeLabel } from '@/features/task/labels'
+import type { ComicListVO } from '@/entities/comic/types'
+import type { ManagementTaskStatus, ManagementTaskType, ManagementTaskVO } from '@/features/task/types'
+import type { StorageStats } from '@/features/storage/types'
 
 const quickActions = [
   { to: '/manage/import', label: '导入漫画', icon: UploadFilled },
@@ -179,9 +182,9 @@ function comicStatusTone(status: ComicListVO['status']): string {
 onMounted(async () => {
   try {
     const [comicSummary, comics, tasks, storageSummary] = await Promise.all([
-      comicStatusApi.list({ page: 1, size: 1 }),
-      comicStatusApi.list({ page: 1, size: 5, sort: 'updatedAt' }),
-      trackedTaskApi.list({ page: 1, size: 50 }),
+      comicApi.list({ page: 1, size: 1 }),
+      comicApi.list({ page: 1, size: 5, sort: 'updatedAt' }),
+      managementTaskApi.list({ page: 1, size: 50 }),
       storageService.fetchSummary(),
     ])
     comicTotal.value = comicSummary.data.total

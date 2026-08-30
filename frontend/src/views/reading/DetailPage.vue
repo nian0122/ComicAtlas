@@ -14,6 +14,7 @@
     <template v-else-if="comic">
       <MobileComicDetail
         v-if="mode === 'mobile'"
+        v-model:search-keyword="searchKeyword"
         :comic="comic"
         :catalog-tree="catalogTree"
         :total-chapters="totalChapters"
@@ -21,7 +22,6 @@
         :progress-scale="progressScale"
         :read-label="primaryAction?.label || '开始阅读'"
         :can-read="Boolean(primaryAction)"
-        v-model:search-keyword="searchKeyword"
         :filtered-catalog-tree="filteredCatalogTree"
         :is-searching="isSearching"
         :result-count="resultCount"
@@ -155,15 +155,16 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { PictureFilled, Search, WarningFilled } from '@element-plus/icons-vue'
-import { comicApi, catalogApi } from '@/services/reading'
+import { comicApi, catalogApi } from '@/entities/comic/api'
 
-import type { ComicDetailVO, CatalogNode, ChapterRef } from '@/types'
-import CatalogTree from '@/components/reading/comic/CatalogTree.vue'
-import MobileComicDetail from '@/components/reading/comic/MobileComicDetail.vue'
-import { sourceTypeLabel } from '@/utils/source-format'
-import HeroBanner from '@/components/reading/HeroBanner.vue'
-import { useInteractionMode } from '@/views/reading/reader/composables/useInteractionMode'
+import type { ComicDetailVO, CatalogNode, ChapterRef } from '@/entities/comic/types'
+import CatalogTree from '@/features/comic/components/CatalogTree.vue'
+import MobileComicDetail from '@/features/comic/components/MobileComicDetail.vue'
+import { sourceTypeLabel } from '@/features/comic/source-format'
+import HeroBanner from '@/features/home/components/HeroBanner.vue'
+import { useInteractionMode } from '@/features/reader/composables/useInteractionMode'
 import { ChapterSearchBox, useChapterSearch } from '@/features/chapter-search'
+import { chapterOrder, collectChapters, countChapters, findChapterById } from '@/features/comic/catalog'
 
 const route = useRoute()
 const router = useRouter()
@@ -193,7 +194,7 @@ const lastReadChapter = computed<ChapterRef | null>(() => {
 const firstChapter = computed<ChapterRef | null>(() => {
   const all = collectChapters(catalogTree.value)
   if (all.length === 0) return null
-  return all.reduce((min, ch) => (orderOf(ch) < orderOf(min) ? ch : min))
+  return all.reduce((min, chapter) => (chapterOrder(chapter) < chapterOrder(min) ? chapter : min))
 })
 
 const totalChapters = computed(() => {
@@ -246,37 +247,6 @@ const secondaryAction = computed(() => {
     onClick: startRead,
   }
 })
-
-function findChapterById(nodes: CatalogNode[], id: number): ChapterRef | null {
-  for (const node of nodes) {
-    const found = node.chapters?.find((ch) => ch.id === id)
-    if (found) return found
-    const childFound = findChapterById(node.children || [], id)
-    if (childFound) return childFound
-  }
-  return null
-}
-
-/** 递归收集全部章节（含子目录），用于按全局锚点取首章 */
-function collectChapters(nodes: CatalogNode[]): ChapterRef[] {
-  const out: ChapterRef[] = []
-  for (const node of nodes) {
-    out.push(...(node.chapters ?? []))
-    out.push(...collectChapters(node.children ?? []))
-  }
-  return out
-}
-
-/** 阅读顺序锚点；null 锚点视为最大（排最后） */
-function orderOf(ch: ChapterRef): number {
-  return ch.globalOrder ?? Number.MAX_SAFE_INTEGER
-}
-
-function countChapters(node: CatalogNode): number {
-  let n = node.chapters?.length || 0
-  for (const child of node.children || []) n += countChapters(child)
-  return n
-}
 
 function formatDate(s: string): string {
   return s?.slice(0, 10) || ''

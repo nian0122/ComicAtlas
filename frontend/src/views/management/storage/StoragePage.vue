@@ -35,8 +35,8 @@
 <script setup lang="ts">
 import { watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useStorageStore } from '@/stores/management/storage'
-import { useStorageFilter } from '@/composables/storage/useStorageFilter'
+import { useStorageStore } from '@/features/storage/store'
+import { useStorageFilter } from '@/features/storage/composables/useStorageFilter'
 import StorageSummary from './StorageSummary.vue'
 import StorageToolbar from './StorageToolbar.vue'
 import StorageTable from './StorageTable.vue'

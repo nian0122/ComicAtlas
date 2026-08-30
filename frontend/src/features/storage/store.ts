@@ -1,0 +1,96 @@
+import { defineStore } from 'pinia'
+import { ref } from 'vue'
+import { storageService } from '@/features/storage/service'
+import type { ComicStorageItem, ChapterStorageItem, StorageStats, StorageOperation, ComicStorageQuery } from '@/features/storage/types'
+
+export const useStorageStore = defineStore('storage', () => {
+  const comicList = ref<ComicStorageItem[]>([])
+  const chapters = ref<Record<number, readonly ChapterStorageItem[]>>({})
+  const summary = ref<StorageStats | null>(null)
+  const busyState = ref<Record<number, boolean>>({})
+  const loading = ref(false)
+  const serverTotal = ref(0)
+  let comicsRequestVersion = 0
+
+  async function loadComics(params?: ComicStorageQuery): Promise<void> {
+    const requestVersion = ++comicsRequestVersion
+    loading.value = true
+    try {
+      const data = await storageService.fetchComics(params ?? {})
+      if (requestVersion !== comicsRequestVersion) return
+      comicList.value = Array.isArray(data?.records) ? data.records : []
+      serverTotal.value = data?.total ?? 0
+    } catch {
+      if (requestVersion !== comicsRequestVersion) return
+      comicList.value = []
+      serverTotal.value = 0
+    } finally {
+      if (requestVersion === comicsRequestVersion) loading.value = false
+    }
+  }
+
+  async function loadSummary() {
+    try {
+      summary.value = await storageService.fetchSummary()
+    } catch {
+      // keep existing summary
+    }
+  }
+
+  async function loadChapters(comicId: number) {
+    if (chapters.value[comicId]) return
+    try {
+      chapters.value[comicId] = await storageService.fetchChapters(comicId)
+    } catch {
+      chapters.value[comicId] = []
+    }
+  }
+
+  async function executeOperation(op: StorageOperation): Promise<void> {
+    await storageService.executeOperation(op)
+  }
+
+  function replaceRow(item: ComicStorageItem) {
+    const idx = comicList.value.findIndex((c) => c.comicId === item.comicId)
+    if (idx !== -1) {
+      comicList.value[idx] = item
+    }
+  }
+
+  async function refreshRow(comicId: number) {
+    try {
+      const data = await storageService.fetchComics({ keyword: String(comicId), size: 1 })
+      const item = data.records?.find((c) => c.comicId === comicId)
+      if (item) {
+        replaceRow(item)
+      }
+    } catch {
+      // row refresh failure is non-critical
+    }
+  }
+
+  function setBusy(comicId: number, busy: boolean) {
+    busyState.value = { ...busyState.value, [comicId]: busy }
+  }
+
+  function invalidateChapters(comicId: number) {
+    delete chapters.value[comicId]
+  }
+
+  return {
+    comicList,
+    chapters,
+    summary,
+    busyState,
+    loading,
+    serverTotal,
+    loadComics,
+    loadSummary,
+    loadChapters,
+    executeOperation,
+    replaceRow,
+    refreshRow,
+    setBusy,
+    invalidateChapters,
+  }
+})

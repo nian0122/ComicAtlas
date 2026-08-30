@@ -91,7 +91,7 @@
               <div class="chapter-action-toolbar"><div><span class="panel-kicker">COMMAND DECK</span><strong>章节命令面板</strong></div><el-button class="create-chapter-button" type="primary" plain @click="toggleCreateChapter"><span class="create-chapter-icon">＋</span>{{ chapterForm.action === 'create' ? '返回当前章节' : '新建章节' }}</el-button></div>
               <div v-if="chapterForm.action !== 'create'" class="chapter-choice"><label>选择要执行的操作</label><div class="chapter-choice-grid"><button v-for="item in CHAPTER_ACTIONS" :key="item.value" type="button" :class="{ 'is-active': chapterForm.action === item.value, 'is-danger': item.value === 'trash' }" @click="selectChapterAction(item.value)"><span class="chapter-choice-icon">{{ chapterActionIcon(item.value) }}</span><span class="chapter-choice-copy"><strong>{{ item.label }}</strong><small>{{ chapterActionTagline(item.value) }}</small></span><span class="chapter-choice-arrow">→</span></button></div><div class="chapter-choice-help"><span class="help-mark">i</span><small>{{ chapterActionDescription(chapterForm.action) }}</small></div></div>
               <div v-else class="create-context"><span class="context-mark">＋</span><div><strong>新建章节</strong><small>将在当前漫画中创建一个新章节</small></div></div>
-              <div class="form-grid" v-if="['create', 'rename'].includes(chapterForm.action)"><el-form-item label="章节标题"><el-input v-model="chapterForm.title" placeholder="输入章节标题" /></el-form-item><el-form-item label="原始章节编号"><el-input v-model="chapterForm.chapterNo" placeholder="如 01、番外" /></el-form-item></div>
+              <div v-if="['create', 'rename'].includes(chapterForm.action)" class="form-grid"><el-form-item label="章节标题"><el-input v-model="chapterForm.title" placeholder="输入章节标题" /></el-form-item><el-form-item label="原始章节编号"><el-input v-model="chapterForm.chapterNo" placeholder="如 01、番外" /></el-form-item></div>
               <el-form-item v-if="chapterForm.action === 'create'" label="目标目录 ID"><el-input-number v-model="chapterForm.catalogId" :min="1" :controls="false" clearable placeholder="留空为根目录" /></el-form-item>
               <el-form-item v-if="chapterForm.action === 'move'" label="移动到目录"><el-select v-model="chapterForm.catalogId" clearable placeholder="选择目标目录，留空为根目录"><el-option label="根目录" :value="null" /><el-option v-for="catalog in catalogOptions" :key="catalog.id" :label="catalog.title" :value="catalog.id" /></el-select></el-form-item>
               <div v-if="chapterForm.action === 'reorder'" class="chapter-reorder-box"><div class="chapter-position"><span>当前位置</span><strong>{{ selectedRow?.order ?? '—' }}</strong></div><span class="position-arrow">→</span><el-form-item label="移动到第几位"><el-input-number v-model="chapterForm.order" :min="1" :controls="true" placeholder="输入新位置" /></el-form-item><small>按全书阅读顺序调整，目标位置不能与当前位置相同。</small></div>
@@ -148,27 +148,30 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { adminApi, managementCatalogApi, catalogManagementApi, chapterManagementApi, hqApi, mediaManagementApi, managementReaderApi } from '@/services/api'
-import { trackedUploadApi } from '@/services/management-capabilities'
-import { storageService } from '@/services/storage'
+import { catalogManagementApi, chapterManagementApi, mediaManagementApi } from '@/features/management/api'
+import { hqApi } from '@/features/storage/api'
+import { managementCatalogApi } from '@/entities/comic/api'
+import { managementReaderApi } from '@/features/reader/api'
+import { uploadApi as trackedUploadApi } from '@/features/upload/api'
+import { storageAdminApi } from '@/features/storage/api'
+import { storageService } from '@/features/storage/service'
+import {
+  CATALOG_ACTIONS,
+  CHAPTER_ACTIONS,
+  countRows,
+  filterStructureRows,
+  findStructureRow,
+  flattenCatalogOptions,
+  toStructureRows,
+} from '@/features/comic/structure'
+import type { CatalogAction, ChapterAction, StructureRow } from '@/features/comic/structure'
 import StorageStatusTag from './storage/StorageStatusTag.vue'
-import type { CatalogNode, ChapterStorageItem, CreateUploadSessionRequest, MediaItemInfo, UploadFileManifest } from '@/types'
-import { StorageOperationType } from '@/types'
+import type { CatalogNode } from '@/entities/comic/types'
+import type { MediaItemInfo } from '@/entities/media/types'
+import type { ChapterStorageItem } from '@/features/storage/types'
+import { StorageOperationType as StorageOperation } from '@/features/storage/types'
+import type { CreateUploadSessionRequest, UploadFileManifest } from '@/features/upload/types'
 
-type CatalogAction = 'create' | 'rename' | 'move' | 'reorder' | 'delete'
-type ChapterAction = 'create' | 'rename' | 'move' | 'reorder' | 'trash'
-interface StructureRow {
-  readonly key: string
-  readonly kind: 'CATALOG' | 'CHAPTER'
-  readonly id: number
-  readonly title: string
-  readonly chapterNo?: string
-  readonly order: number | null
-  readonly status: string | null
-  readonly children?: readonly StructureRow[]
-}
-const CATALOG_ACTIONS = [{ value: 'create', label: '新建目录' }, { value: 'rename', label: '重命名目录' }, { value: 'move', label: '移动目录' }, { value: 'reorder', label: '目录重排' }, { value: 'delete', label: '删除目录' }] as const
-const CHAPTER_ACTIONS = [{ value: 'rename', label: '重命名章节' }, { value: 'move', label: '移动章节' }, { value: 'reorder', label: '章节重排' }, { value: 'trash', label: '回收章节' }] as const
 const route = useRoute()
 const comicId = ref(Number(route.params.id) || 1)
 const tree = ref<readonly CatalogNode[]>([])
@@ -218,48 +221,8 @@ const treeState = ref<'idle' | 'loading' | 'loaded' | 'empty' | 'error'>('idle')
 const treeStateLabel = computed(() => ({ idle: '等待加载', loading: '加载中', loaded: '已加载', empty: '已加载，暂无结构', error: '加载失败' })[treeState.value])
 const emptyStateText = computed(() => ({ idle: '请输入漫画 ID 后加载目录', loading: '正在加载目录…', loaded: '目录为空', empty: '该漫画暂无目录或章节', error: '目录加载失败，请重试' })[treeState.value])
 
-function countRows(rows: readonly StructureRow[], kind: StructureRow['kind']): number {
-  return rows.reduce((count, row) => count + (row.kind === kind ? 1 : 0) + (row.children ? countRows(row.children, kind) : 0), 0)
-}
-
 function rowClassName({ row }: { row: StructureRow }): string {
   return row.kind === 'CATALOG' ? 'structure-row--catalog' : 'structure-row--chapter'
-}
-
-function toStructureRows(node: CatalogNode): readonly StructureRow[] {
-  const children = [
-    ...node.chapters.map((chapter) => ({
-      key: `chapter-${chapter.id}`,
-      kind: 'CHAPTER' as const,
-      id: chapter.id,
-      title: chapter.title,
-      chapterNo: chapter.chapterNo,
-      order: chapter.globalOrder,
-      status: chapter.status ?? null,
-    })),
-    ...node.children.flatMap(toStructureRows),
-  ].sort((left, right) => (left.order ?? Number.MAX_SAFE_INTEGER) - (right.order ?? Number.MAX_SAFE_INTEGER))
-
-  if (node.id === null) return children
-  return [{
-    key: `catalog-${node.id}`,
-    kind: 'CATALOG',
-    id: node.id,
-    title: node.title ?? '未命名目录',
-    order: node.globalOrder ?? null,
-    status: null,
-    children,
-  }]
-}
-function flattenCatalogOptions(rows: readonly StructureRow[]): readonly { id: number; title: string }[] {
-  return rows.flatMap((row) => row.kind === 'CATALOG' ? [{ id: row.id, title: row.title }, ...flattenCatalogOptions(row.children ?? [])] : [])
-}
-function filterStructureRows(rows: readonly StructureRow[], keyword: string): readonly StructureRow[] {
-  if (!keyword) return rows
-  return rows.flatMap((row) => {
-    const children = row.children ? filterStructureRows(row.children, keyword) : []
-    return row.title.toLowerCase().includes(keyword) || children.length > 0 ? [{ ...row, children }] : []
-  })
 }
 function selectStructureRow(row: StructureRow): void {
   selectedMedia.value = null
@@ -277,14 +240,6 @@ function selectStructureRow(row: StructureRow): void {
   chapterForm.order = undefined
   mediaChapterId.value = row.id
   void loadMedia()
-}
-function findStructureRow(rows: readonly StructureRow[], chapterId: number): StructureRow | null {
-  for (const row of rows) {
-    if (row.kind === 'CHAPTER' && row.id === chapterId) return row
-    const match = row.children ? findStructureRow(row.children, chapterId) : null
-    if (match) return match
-  }
-  return null
 }
 function locateChapter(chapterId: number): void {
   const row = findStructureRow(structureRows.value, chapterId)
@@ -423,9 +378,9 @@ function sortMediaByName(): void { mediaOrderItems.value = [...mediaOrderItems.v
 function applyAdvancedMediaOrder(): void { const ids = mediaOrder.value.split(',').map((value) => Number(value.trim())).filter((id) => Number.isSafeInteger(id) && id > 0); const itemById = new Map(mediaItems.value.map((item) => [item.id, item])); if (ids.length !== mediaItems.value.length || new Set(ids).size !== ids.length || ids.some((id) => !itemById.has(id))) { ElMessage.warning('媒体 ID 必须完整、有效且不能重复'); return } mediaOrderItems.value = ids.map((id) => itemById.get(id)!).filter(Boolean); ElMessage.success('已应用到排序列表') }
 async function reorderMedia(): Promise<void> { const mediaIds = mediaOrderItems.value.map((item) => item.id); if (!mediaIds.length) return; try { await mediaManagementApi.reorder(mediaChapterId.value, { mediaIds }); ElMessage.success('媒体顺序已保存'); await loadMedia() } catch (reason: unknown) { ElMessage.error(errorMessage(reason)) } }
 async function saveMediaOrderAndClose(): Promise<void> { await reorderMedia(); if (!mediaOrderDirty.value) mediaOrderDialogVisible.value = false }
-async function deleteChapterHq(): Promise<void> { if (!selectedRow.value || selectedRow.value.kind !== 'CHAPTER') return; try { await ElMessageBox.confirm('确定删除当前章节的 HQ？LQ 文件会保留。', '删除章节 HQ', { type: 'warning' }); await storageService.executeOperation({ type: StorageOperationType.DeleteHQ, comicId: comicId.value, chapterId: selectedRow.value.id }); ElMessage.success('HQ 删除任务已提交'); await refreshStorage() } catch (reason: unknown) { if (reason !== 'cancel' && reason !== 'close') ElMessage.error(errorMessage(reason)) } }
-async function generateChapterLq(): Promise<void> { if (!selectedRow.value || selectedRow.value.kind !== 'CHAPTER') return; try { const regenerate = selectedStorageChapter.value?.lqStatus === 'READY'; await storageService.executeOperation({ type: StorageOperationType.GenerateLQ, comicId: comicId.value, chapterId: selectedRow.value.id, regenerate }); ElMessage.success(regenerate ? '本章 LQ 重建任务已提交' : '本章 LQ 生成任务已提交'); await refreshStorage() } catch (reason: unknown) { ElMessage.error(errorMessage(reason)) } }
-async function transcodeChapter(): Promise<void> { if (!selectedRow.value || selectedRow.value.kind !== 'CHAPTER') return; try { await ElMessageBox.confirm('确定对当前章节的视频发起转码？', '章节视频转码', { type: 'warning' }); await adminApi.transcodeChapter(selectedRow.value.id); ElMessage.success('章节视频转码任务已提交'); await loadMedia() } catch (reason: unknown) { if (reason !== 'cancel' && reason !== 'close') ElMessage.error(errorMessage(reason)) } }
+async function deleteChapterHq(): Promise<void> { if (!selectedRow.value || selectedRow.value.kind !== 'CHAPTER') return; try { await ElMessageBox.confirm('确定删除当前章节的 HQ？LQ 文件会保留。', '删除章节 HQ', { type: 'warning' }); await storageService.executeOperation({ type: StorageOperation.DeleteHQ, comicId: comicId.value, chapterId: selectedRow.value.id }); ElMessage.success('HQ 删除任务已提交'); await refreshStorage() } catch (reason: unknown) { if (reason !== 'cancel' && reason !== 'close') ElMessage.error(errorMessage(reason)) } }
+async function generateChapterLq(): Promise<void> { if (!selectedRow.value || selectedRow.value.kind !== 'CHAPTER') return; try { const regenerate = selectedStorageChapter.value?.lqStatus === 'READY'; await storageService.executeOperation({ type: StorageOperation.GenerateLQ, comicId: comicId.value, chapterId: selectedRow.value.id, regenerate }); ElMessage.success(regenerate ? '本章 LQ 重建任务已提交' : '本章 LQ 生成任务已提交'); await refreshStorage() } catch (reason: unknown) { ElMessage.error(errorMessage(reason)) } }
+async function transcodeChapter(): Promise<void> { if (!selectedRow.value || selectedRow.value.kind !== 'CHAPTER') return; try { await ElMessageBox.confirm('确定对当前章节的视频发起转码？', '章节视频转码', { type: 'warning' }); await storageAdminApi.transcodeChapter(selectedRow.value.id); ElMessage.success('章节视频转码任务已提交'); await loadMedia() } catch (reason: unknown) { if (reason !== 'cancel' && reason !== 'close') ElMessage.error(errorMessage(reason)) } }
 async function transcodeSelectedMedia(): Promise<void> { if (!selectedMedia.value || selectedMedia.value.mediaType !== 'VIDEO') return; try { await ElMessageBox.confirm('确定对当前视频发起转码？', '视频转码', { type: 'warning' }); await hqApi.transcodeMedia(selectedMedia.value.id); ElMessage.success('视频转码任务已提交'); await loadMedia() } catch (reason: unknown) { if (reason !== 'cancel' && reason !== 'close') ElMessage.error(errorMessage(reason)) } }
 async function trashSelectedMedia(): Promise<void> { if (!selectedMedia.value) return; try { await ElMessageBox.confirm(`确定将「${selectedMedia.value.fileName || '此媒体'}」移入回收站？`, '回收媒体', { type: 'warning' }); await mediaManagementApi.trash(selectedMedia.value.id); ElMessage.success('媒体回收任务已提交'); selectedMedia.value = null; await loadMedia() } catch (reason: unknown) { if (reason !== 'cancel' && reason !== 'close') ElMessage.error(errorMessage(reason)) } }
 async function trashSelectedMediaBatch(): Promise<void> { if (!selectedMediaIds.value.length) return; const mediaIds = [...selectedMediaIds.value]; try { await ElMessageBox.confirm(`确定将选中的 ${mediaIds.length} 个媒体移入回收站？`, '批量回收媒体', { type: 'warning' }); await Promise.all(mediaIds.map((mediaId) => mediaManagementApi.trash(mediaId))); ElMessage.success(`已提交 ${mediaIds.length} 个媒体回收任务`); selectedMedia.value = null; clearMediaSelection(); await loadMedia() } catch (reason: unknown) { if (reason !== 'cancel' && reason !== 'close') ElMessage.error(errorMessage(reason)) } }

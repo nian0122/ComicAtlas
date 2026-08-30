@@ -24,7 +24,7 @@
           </el-button>
         </div>
 
-        <el-table :data="categoryStore.list" style="width: 100%" v-loading="categoryStore.loading">
+        <el-table v-loading="categoryStore.loading" :data="categoryStore.list" style="width: 100%">
           <el-table-column prop="name" label="名称" />
           <el-table-column label="操作" width="180">
             <template #default="{ row }">
@@ -75,9 +75,10 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { useCategoryStore } from '@/stores/management/category'
-import { useTagStore } from '@/stores/tag-store'
-import type { CategoryDTO, TagDTO } from '@/types'
+import { useCategoryStore } from '@/features/category/store'
+import { useTagStore } from '@/features/tag/store'
+import type { CategoryDTO } from '@/entities/comic/types'
+import type { TagDTO } from '@/entities/tag/types'
 
 const activeTab = ref('category')
 const categoryStore = useCategoryStore()

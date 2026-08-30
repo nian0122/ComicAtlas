@@ -57,8 +57,8 @@
 <script setup lang="ts">
 import { reactive, ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { settingsApi } from '@/services/management'
-import { useReaderSettingsStore } from '@/stores/reader-settings-store'
+import { settingsApi } from '@/features/management/api'
+import { useReaderSettingsStore } from '@/features/reader/settings-store'
 
 const readerSettings = useReaderSettingsStore()
 

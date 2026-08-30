@@ -210,8 +210,8 @@
       <div class="comic-grid">
         <ComicPoster
           v-for="comic in store.list"
-          :key="comic.id"
           :id="comic.id"
+          :key="comic.id"
           :cover-url="comic.coverUrl"
           :title="comic.title"
           :subtitle="posterSubtitle(comic)"
@@ -241,59 +241,54 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Search, PictureFilled, WarningFilled, CircleClose, Sort } from '@element-plus/icons-vue'
-import { useComicStore } from '@/stores/comic-store'
-import { readingTagApi, readingCategoryApi } from '@/services/api'
-import { useBreakpoint, BREAKPOINTS } from '@/composables/useBreakpoint'
-import ComicPoster from '@/components/reading/comic/ComicPoster.vue'
-import { toPosterStatus } from '@/components/reading/comic/poster-status'
-import type { CategoryDTO, ComicListQuery, ComicListVO, TagDTO } from '@/types'
+import { useComicStore } from '@/features/comic/store'
+import { readingTagApi, readingCategoryApi } from '@/entities/comic/api'
+import { useLibraryFilters } from '@/features/comic/composables/useLibraryFilters'
+import { useBreakpoint, BREAKPOINTS } from '@/shared/composables/useBreakpoint'
+import ComicPoster from '@/features/comic/components/ComicPoster.vue'
+import { toPosterStatus } from '@/features/comic/components/poster-status'
+import type { ComicListQuery, ComicListVO } from '@/entities/comic/types'
+import type { CategoryDTO } from '@/entities/comic/types'
+import type { TagDTO } from '@/entities/tag/types'
 
 const router = useRouter()
 const route = useRoute()
 const store = useComicStore()
 
-const keyword = ref('')
-const sort = ref<NonNullable<ComicListQuery['sort']>>('createdAt')
-const order = ref<NonNullable<ComicListQuery['order']>>('desc')
-const selectedTags = ref<string[]>([])
-const tagMode = ref<'AND' | 'OR'>('OR')
+const {
+  keyword,
+  sort,
+  order,
+  selectedTags,
+  tagMode,
+  categoryFilter,
+  isMobileSortOpen,
+  sortOptions,
+  hasActiveFilters,
+  activeFilterSummary,
+  currentSortLabel,
+  clearKeyword: resetKeyword,
+  clearFilters: resetFilters,
+  selectCategory: setCategory,
+  toggleTag: updateTagSelection,
+  setTagMode: updateTagMode,
+  toggleSortOrder: updateSortOrder,
+  selectMobileSort: updateMobileSort,
+  buildQuery,
+} = useLibraryFilters()
 const allTags = ref<TagDTO[]>([])
-const categoryFilter = ref('')
 const allCategories = ref<CategoryDTO[]>([])
 const pageHeaderRef = ref<HTMLElement | null>(null)
 const isDesktopFilterHidden = ref(false)
-const isMobileSortOpen = ref(false)
-
-const sortOptions: Array<{ value: NonNullable<ComicListQuery['sort']>; label: string }> = [
-  { value: 'lastReadTime', label: '最近阅读' },
-  { value: 'createdAt', label: '最新添加' },
-  { value: 'updatedAt', label: '最近更新' },
-  { value: 'title', label: '标题' },
-  { value: 'pageCount', label: '页数' },
-  { value: 'fileSize', label: '文件大小' },
-]
 
 const DESKTOP_FILTER_BREAKPOINT = 1024
 const FILTER_HIDE_SCROLL_START = 160
 const FILTER_SCROLL_DELTA = 8
 let lastWindowScrollY = 0
 let scrollAnimationFrame: number | null = null
-
-const hasActiveFilters = computed(() => Boolean(keyword.value || categoryFilter.value || selectedTags.value.length))
-const activeFilterSummary = computed(() => {
-  const summary: string[] = []
-  if (keyword.value) summary.push(`搜索：${keyword.value}`)
-  if (categoryFilter.value) summary.push(`分类：${categoryFilter.value === '_NONE' ? '未分类' : categoryFilter.value}`)
-  if (selectedTags.value.length) {
-    const tagText = selectedTags.value.map((tag) => tag === '_NONE' ? '无标签' : tag).join('、')
-    summary.push(`标签：${tagText} · ${selectedTags.value.length > 1 && tagMode.value === 'AND' ? '全部匹配' : '任一匹配'}`)
-  }
-  return summary
-})
-const currentSortLabel = computed(() => sortOptions.find((option) => option.value === sort.value)?.label || '最新添加')
 
 // 响应式视口宽度（resize 防抖更新，组件卸载时自动清理监听）
 const viewportWidth = useBreakpoint()
@@ -345,47 +340,37 @@ function onKeywordInput() {
 }
 
 function clearKeyword() {
-  keyword.value = ''
+  resetKeyword()
   onSearch()
 }
 
 function clearFilters() {
-  keyword.value = ''
-  categoryFilter.value = ''
-  selectedTags.value = []
-  tagMode.value = 'OR'
+  resetFilters()
   onSearch()
 }
 
 function selectCategory(category: string) {
-  categoryFilter.value = category
+  setCategory(category)
   onSearch()
 }
 
 function toggleTag(tagName: string) {
-  if (tagName === '_NONE') {
-    selectedTags.value = selectedTags.value.includes('_NONE') ? [] : ['_NONE']
-  } else {
-    selectedTags.value = selectedTags.value.includes(tagName)
-      ? selectedTags.value.filter((name) => name !== tagName)
-      : [...selectedTags.value.filter((name) => name !== '_NONE'), tagName]
-  }
+  updateTagSelection(tagName)
   onSearch()
 }
 
 function setTagMode(mode: 'AND' | 'OR') {
-  tagMode.value = mode
+  updateTagMode(mode)
   onSearch()
 }
 
 function toggleSortOrder() {
-  order.value = order.value === 'asc' ? 'desc' : 'asc'
+  updateSortOrder()
   onSearch()
 }
 
 function selectMobileSort(nextSort: NonNullable<ComicListQuery['sort']>) {
-  sort.value = nextSort
-  isMobileSortOpen.value = false
+  updateMobileSort(nextSort)
   onSearch()
 }
 
@@ -393,7 +378,7 @@ async function loadTags() {
   try {
     const res = await readingTagApi.list()
     allTags.value = (res.data as TagDTO[]) || []
-  } catch (err: unknown) {
+  } catch {
     allTags.value = []
   }
 }
@@ -402,28 +387,13 @@ async function loadCategories() {
   try {
     const res = await readingCategoryApi.list()
     allCategories.value = (res.data as CategoryDTO[]) || []
-  } catch (err: unknown) {
+  } catch {
     allCategories.value = []
   }
 }
 
-watch(selectedTags, (val) => {
-  if (val.includes('_NONE') && val.length > 1) {
-    nextTick(() => {
-      selectedTags.value = ['_NONE']
-    })
-  }
-}, { deep: true })
-
 function onSearch() {
-  store.search({
-    keyword: keyword.value || undefined,
-    category: categoryFilter.value || undefined,
-    sort: sort.value,
-    order: order.value,
-    tags: selectedTags.value.length > 0 ? selectedTags.value : undefined,
-    tagMode: selectedTags.value.length > 1 ? tagMode.value : undefined,
-  })
+  store.search(buildQuery())
   persistFiltersToRoute()
 }
 

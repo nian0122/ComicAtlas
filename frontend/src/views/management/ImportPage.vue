@@ -241,16 +241,12 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { useImportStore } from '@/stores/management/import'
-import PreviewNode from '@/components/management/import/PreviewNode.vue'
-import { isBlockingScanWarning } from '@/types'
+import { useImportStore } from '@/features/import/store'
+import { useImportScan } from '@/features/import/composables/useImportScan'
+import PreviewNode from '@/features/management/components/PreviewNode.vue'
 import type {
   ImportTaskVO,
-  ScanItemVO,
-  ScanPreviewNodeVO,
-  ScanResultVO,
-  ScanWarningVO,
-} from '@/types'
+} from '@/features/import/types'
 
 const router = useRouter()
 const store = useImportStore()
@@ -264,43 +260,31 @@ const sourcePath = ref('')
 const creating = ref(false)
 
 // ——— 批量导入 ———
-const batchParentPath = ref('')
-const scanning = ref(false)
-const scanResult = ref<ScanResultVO | null>(null)
-const scanError = ref('')
-const selectedPaths = ref<string[]>([])
 const batchCreating = ref(false)
-const previewExpanded = ref<Set<string>>(new Set())
-
-interface ScanItemRow {
-  item: ScanItemVO
-  preview?: ScanPreviewNodeVO
-}
-
-const hasPreview = computed(() => (scanResult.value?.preview?.length ?? 0) > 0)
-
-const importableCount = computed(
-  () => (scanResult.value?.items ?? []).filter(isImportable).length
-)
-
-const totalImageCount = computed(() =>
-  (scanResult.value?.items ?? []).reduce((sum, item) => sum + item.imageCount, 0)
-)
-
-const totalMediaCount = computed(() =>
-  (scanResult.value?.preview ?? []).reduce((sum, node) => sum + node.fileCount, 0)
-)
-
-const totalVideoCount = computed(() =>
-  Math.max(totalMediaCount.value - totalImageCount.value, 0)
-)
-
-const scanItemRows = computed<ScanItemRow[]>(() =>
-  (scanResult.value?.items ?? []).map(item => ({
-    item,
-    preview: scanResult.value?.preview?.find(p => p.name === item.name),
-  }))
-)
+const {
+  batchParentPath,
+  scanning,
+  scanResult,
+  scanError,
+  selectedPaths,
+  previewExpanded,
+  hasPreview,
+  importableCount,
+  totalImageCount,
+  totalMediaCount,
+  totalVideoCount,
+  scanItemRows,
+  isImportable,
+  nonBlockingWarnings,
+  blockingReason,
+  itemStats,
+  togglePreview,
+  selectAll,
+  deselectAll,
+  togglePath,
+  doScan,
+  resetScan,
+} = useImportScan((path) => store.scan(path))
 
 const sourceTypeOptions = [
   { value: 'ZIP' as const, label: 'ZIP 文件', desc: '压缩包，自动解压并解析目录结构' },
@@ -369,78 +353,6 @@ async function doImport() {
   }
 }
 
-// ——— 批量导入 ———
-
-function isImportable(item: ScanItemVO): boolean {
-  return !(item.warnings ?? []).some(w => isBlockingScanWarning(w.code))
-}
-
-function nonBlockingWarnings(item: ScanItemVO): ScanWarningVO[] {
-  return (item.warnings ?? []).filter(w => !isBlockingScanWarning(w.code))
-}
-
-function blockingReason(item: ScanItemVO): string {
-  const block = (item.warnings ?? []).find(w => isBlockingScanWarning(w.code))
-  return block?.message ?? ''
-}
-
-function itemStats(item: ScanItemVO, preview?: ScanPreviewNodeVO): string {
-  if (!preview) {
-    return `${item.imageCount} 张图片`
-  }
-  const video = Math.max(preview.fileCount - item.imageCount, 0)
-  return video > 0
-    ? `图片 ${item.imageCount} · 视频 ${video} · 媒体 ${preview.fileCount}`
-    : `图片 ${item.imageCount} · 媒体 ${preview.fileCount}`
-}
-
-function togglePreview(path: string) {
-  const next = new Set(previewExpanded.value)
-  if (next.has(path)) {
-    next.delete(path)
-  } else {
-    next.add(path)
-  }
-  previewExpanded.value = next
-}
-
-function selectAll() {
-  if (!scanResult.value) return
-  selectedPaths.value = scanResult.value.items.filter(isImportable).map(i => i.path)
-}
-
-function deselectAll() {
-  selectedPaths.value = []
-}
-
-function togglePath(path: string) {
-  const item = scanResult.value?.items.find(i => i.path === path)
-  if (item && !isImportable(item)) return
-  const idx = selectedPaths.value.indexOf(path)
-  if (idx >= 0) {
-    selectedPaths.value.splice(idx, 1)
-  } else {
-    selectedPaths.value.push(path)
-  }
-}
-
-async function doScan() {
-  const path = batchParentPath.value.trim()
-  if (!path) return
-  scanning.value = true
-  scanResult.value = null
-  scanError.value = ''
-  selectedPaths.value = []
-  previewExpanded.value = new Set()
-  try {
-    scanResult.value = await store.scan(path)
-  } catch (err: unknown) {
-    scanError.value = errorMessage(err) || '扫描目录失败'
-  } finally {
-    scanning.value = false
-  }
-}
-
 async function doBatchImport() {
   const paths = [...selectedPaths.value]
   if (paths.length === 0) return
@@ -448,10 +360,7 @@ async function doBatchImport() {
   try {
     const result = await store.createBatch('DIRECTORY', paths)
     ElMessage.success(`批量导入已创建，共 ${paths.length} 个任务`)
-    batchParentPath.value = ''
-    scanResult.value = null
-    selectedPaths.value = []
-    previewExpanded.value = new Set()
+    resetScan()
     router.push(`/manage/tasks?batchId=${result.batchId}`)
   } catch (err: unknown) {
     ElMessage.error(errorMessage(err) || '批量导入失败')
@@ -460,9 +369,9 @@ async function doBatchImport() {
   }
 }
 
-function errorMessage(err: unknown): string {
-  if (err instanceof Error) return err.message
-  return (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? ''
+function errorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message
+  return (error as { response?: { data?: { message?: string } } })?.response?.data?.message ?? ''
 }
 </script>
 

@@ -95,27 +95,25 @@ import { ref, reactive, computed, onMounted, onBeforeUnmount, watch, nextTick } 
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { PictureFilled, WarningFilled } from '@element-plus/icons-vue'
-import { useReaderStore } from '@/stores/reader-store'
-import { useReaderSettingsStore } from '@/stores/reader-settings-store'
-import ReaderViewport from '@/views/reading/reader/components/ReaderViewport.vue'
-import ReaderPagedViewport from '@/views/reading/reader/components/ReaderPagedViewport.vue'
-import ReaderToolbar from '@/views/reading/reader/components/ReaderToolbar.vue'
-import ReaderBottomNav from '@/views/reading/reader/components/ReaderBottomNav.vue'
-import ReaderSettingsDrawer from '@/views/reading/reader/components/ReaderSettingsDrawer.vue'
-import { useInteractionMode } from '@/views/reading/reader/composables/useInteractionMode'
-import {
-  isReaderInteractiveTarget,
-  useReaderGesture,
-} from '@/views/reading/reader/composables/useReaderGesture'
+import { useReaderStore } from '@/features/reader/store'
+import { useReaderSettingsStore } from '@/features/reader/settings-store'
+import ReaderViewport from '@/features/reader/components/ReaderViewport.vue'
+import ReaderPagedViewport from '@/features/reader/components/ReaderPagedViewport.vue'
+import ReaderToolbar from '@/features/reader/components/ReaderToolbar.vue'
+import ReaderBottomNav from '@/features/reader/components/ReaderBottomNav.vue'
+import ReaderSettingsDrawer from '@/features/reader/components/ReaderSettingsDrawer.vue'
+import { useInteractionMode } from '@/features/reader/composables/useInteractionMode'
+import { useReaderGesture } from '@/features/reader/composables/useReaderGesture'
+import { useReaderShortcuts } from '@/features/reader/composables/useReaderShortcuts'
 import {
   ReaderAction,
   useReaderToolbar,
-} from '@/views/reading/reader/composables/useReaderToolbar'
-import { useReaderNavigation } from '@/views/reading/reader/composables/useReaderNavigation'
-import { comicApi } from '@/services/reading'
-import { preloadEngine } from '@/utils/preload-engine'
-import { isVideoMedia } from '@/utils/media-type'
-import type { ComicDetailVO } from '@/types'
+} from '@/features/reader/composables/useReaderToolbar'
+import { useReaderNavigation } from '@/features/reader/composables/useReaderNavigation'
+import { comicApi } from '@/entities/comic/api'
+import { preloadEngine } from '@/features/reader/preload-engine'
+import { isVideoMedia } from '@/entities/media/guards'
+import type { ComicDetailVO } from '@/entities/comic/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -208,6 +206,14 @@ const chapterLoading = ref(false)
 let chapterLoadToken = 0
 /** 被双击切到 HQ 的页面索引（0-based），使用 reactive Set 保持响应性 */
 const forceHqPages = reactive(new Set<number>())
+
+const { onKeydown, onWheel, onDblClick } = useReaderShortcuts({
+  isPagedMode,
+  readerStore: store,
+  readerSettings: settings,
+  forceHqPages,
+  onPageRequest,
+})
 
 // 桌面端返回/章节跳转：保留迁移前实现（含 /library 兜底），移动端走 nav.*
 function goChapter(chId: number) {
@@ -335,70 +341,6 @@ function onPageChange(page: number) {
 function onViewportPageChange(page: number) {
   if (page >= 1 && page <= store.totalPages) {
     store.currentPage = page
-  }
-}
-
-function onKeydown(e: KeyboardEvent) {
-  if (isReaderInteractiveTarget(e.target)) return
-
-  if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
-    e.preventDefault()
-    if (isPagedMode.value) {
-      onPageRequest('next')
-    } else {
-      store.nextPage()
-    }
-  } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-    e.preventDefault()
-    if (isPagedMode.value) {
-      onPageRequest('prev')
-    } else {
-      store.prevPage()
-    }
-  } else if (e.key === '+' || e.key === '=') {
-    e.preventDefault()
-    settings.zoomIn()
-  } else if (e.key === '-') {
-    e.preventDefault()
-    settings.zoomOut()
-  } else if (e.key === '0') {
-    e.preventDefault()
-    settings.resetZoom()
-  }
-}
-
-function onWheel(e: WheelEvent) {
-  if (isReaderInteractiveTarget(e.target)) return
-  if (e.ctrlKey || e.metaKey) {
-    e.preventDefault()
-    if (e.deltaY < 0) {
-      settings.zoomIn()
-    } else {
-      settings.zoomOut()
-    }
-  }
-}
-
-function onDblClick(e: MouseEvent) {
-  if (isReaderInteractiveTarget(e.target) || !(e.target instanceof Element)) return
-  const target = e.target
-  const isViewport = target.closest('.reader-viewport') || target.closest('.paged-viewport')
-  const isImage = target.closest('.reader-image-item')
-
-  if (isImage) {
-    // 双击图片区域：切换当前页 HQ/LQ
-    const idx = store.currentPage - 1
-    if (forceHqPages.has(idx)) {
-      forceHqPages.delete(idx)
-    } else {
-      forceHqPages.add(idx)
-    }
-    return
-  }
-
-  if (isViewport) {
-    // 双击 viewport 空白区域：重置缩放
-    settings.resetZoom()
   }
 }
 

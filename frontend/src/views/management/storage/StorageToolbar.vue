@@ -2,9 +2,9 @@
 import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElSelect, ElOption, ElInput, ElButton } from 'element-plus'
-import type { FilterState, SortState } from '@/composables/storage/useStorageFilter'
-import { useCategoryStore } from '@/stores/management/category'
-import { useTagStore } from '@/stores/tag-store'
+import type { FilterState, SortState } from '@/features/storage/composables/useStorageFilter'
+import { useCategoryStore } from '@/features/category/store'
+import { useTagStore } from '@/features/tag/store'
 
 const props = defineProps<{
   filter: FilterState
@@ -60,35 +60,35 @@ onMounted(() => { void categoryStore.fetchList(); void tagStore.fetchList() })
     <section class="action-section">
       <h2 class="section-title">存储优化</h2>
       <div class="filter-bar">
-        <el-select :model-value="props.filter.hqStatus" @update:model-value="setFilter({ hqStatus: $event })" placeholder="HQ 状态" class="filter-select">
+        <el-select :model-value="props.filter.hqStatus" placeholder="HQ 状态" class="filter-select" @update:model-value="setFilter({ hqStatus: $event })">
           <el-option label="全部" value="ALL" />
           <el-option label="还有 HQ" value="HAS_HQ" />
           <el-option label="含 HQ 已删" value="NO_HQ" />
         </el-select>
-        <el-select :model-value="props.filter.lqStatus" @update:model-value="setFilter({ lqStatus: $event })" placeholder="LQ 状态" class="filter-select">
+        <el-select :model-value="props.filter.lqStatus" placeholder="LQ 状态" class="filter-select" @update:model-value="setFilter({ lqStatus: $event })">
           <el-option label="全部" value="ALL" />
           <el-option label="需要生成" value="NEEDS_LQ" />
           <el-option label="LQ 就绪" value="READY" />
         </el-select>
-        <el-select :model-value="props.filter.category" @update:model-value="setFilter({ category: $event })" placeholder="分类" class="filter-select" clearable>
+        <el-select :model-value="props.filter.category" placeholder="分类" class="filter-select" clearable @update:model-value="setFilter({ category: $event })">
           <el-option label="未分类" value="_NONE" />
           <el-option v-for="category in categoryStore.list" :key="category.id" :label="category.name" :value="category.name" />
         </el-select>
-        <el-select :model-value="props.filter.tag" @update:model-value="setFilter({ tag: $event })" placeholder="标签" class="filter-select" clearable>
+        <el-select :model-value="props.filter.tag" placeholder="标签" class="filter-select" clearable @update:model-value="setFilter({ tag: $event })">
           <el-option label="无标签" value="_NONE" />
           <el-option v-for="tag in tagStore.list" :key="tag.id" :label="tag.name" :value="tag.name" />
         </el-select>
-        <el-select :model-value="props.sort.field" @update:model-value="setSort({ field: $event })" placeholder="排序" class="filter-select">
+        <el-select :model-value="props.sort.field" placeholder="排序" class="filter-select" @update:model-value="setSort({ field: $event })">
           <el-option label="HQ 大小" value="hqSize" />
           <el-option label="LQ 大小" value="lqSize" />
           <el-option label="总大小" value="totalSize" />
           <el-option label="标题" value="title" />
         </el-select>
-        <el-select :model-value="props.sort.order" @update:model-value="setSort({ order: $event })" class="filter-select--mini">
+        <el-select :model-value="props.sort.order" class="filter-select--mini" @update:model-value="setSort({ order: $event })">
           <el-option label="降序" value="desc" />
           <el-option label="升序" value="asc" />
         </el-select>
-        <el-input :model-value="props.filter.keyword" @update:model-value="setFilter({ keyword: $event })" placeholder="搜索标题" clearable class="filter-input" />
+        <el-input :model-value="props.filter.keyword" placeholder="搜索标题" clearable class="filter-input" @update:model-value="setFilter({ keyword: $event })" />
         <el-button v-if="hasActiveFilters" class="filter-reset" text @click="clearFilters">清空筛选</el-button>
       </div>
     </section>

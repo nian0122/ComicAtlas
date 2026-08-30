@@ -1,4 +1,4 @@
-import type { CatalogNode, ChapterRef } from '@/types'
+import type { CatalogNode, ChapterRef } from '@/entities/comic/types'
 
 export interface ChapterSearchItem {
   readonly chapter: ChapterRef

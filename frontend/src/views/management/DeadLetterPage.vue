@@ -9,7 +9,7 @@
       <el-button :loading="loading" @click="loadQueues">刷新</el-button>
     </header>
 
-    <section class="summary-grid" aria-label="死信队列摘要" v-if="queues.length > 0">
+    <section v-if="queues.length > 0" class="summary-grid" aria-label="死信队列摘要">
       <article>
         <span>受监控队列</span>
         <strong>{{ queues.length }}</strong>
@@ -35,7 +35,7 @@
 
       <div v-if="error" class="state error">{{ error }}</div>
 
-      <div class="table-scroll" v-else-if="queues.length > 0">
+      <div v-else-if="queues.length > 0" class="table-scroll">
         <el-table :data="queues" class="queue-table" empty-text="没有可用的死信队列">
           <el-table-column label="队列" min-width="220">
             <template #default="{ row }">
@@ -86,7 +86,8 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { adminApi, type DlqMessageVO, type DlqQueueVO } from '@/services/api'
+import { adminApi } from '@/features/management/api'
+import type { DlqMessageVO, DlqQueueVO } from '@/features/management/types'
 import DlqMessageDialog from './dlq/DlqMessageDialog.vue'
 
 const queues = ref<readonly DlqQueueVO[]>([])

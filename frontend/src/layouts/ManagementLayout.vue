@@ -89,7 +89,7 @@ import {
   QuestionFilled,
   InfoFilled,
 } from '@element-plus/icons-vue'
-import { useImportStore } from '@/stores/management/import'
+import { useImportStore } from '@/features/import/store'
 import ComicAtlasLogo from '@/components/brand/ComicAtlasLogo.vue'
 
 const importStore = useImportStore()

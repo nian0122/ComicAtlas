@@ -1,20 +1,12 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import ReadingLayout from '@/layouts/ReadingLayout.vue'
-import ReaderLayout from '@/layouts/ReaderLayout.vue'
-import ManagementLayout from '@/layouts/ManagementLayout.vue'
-import { isMobileReadingDevice } from '@/utils/device'
+import { isMobileReadingDevice } from '@/shared/device'
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
     {
-      path: '/poster-test',
-      name: 'poster-test',
-      component: () => import('@/views/reading/PosterTestPage.vue'),
-    },
-    {
       path: '/',
-      component: ReadingLayout,
+      component: () => import('@/layouts/ReadingLayout.vue'),
       children: [
         {
           path: '',
@@ -41,7 +33,7 @@ const router = createRouter({
     },
     {
       path: '/reader/:chapterId',
-      component: ReaderLayout,
+      component: () => import('@/layouts/ReaderLayout.vue'),
       children: [
         {
           path: '',
@@ -58,7 +50,7 @@ const router = createRouter({
     },
     {
       path: '/manage',
-      component: ManagementLayout,
+      component: () => import('@/layouts/ManagementLayout.vue'),
       children: [
         {
           path: '',

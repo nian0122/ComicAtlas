@@ -94,13 +94,17 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { adminApi, managementComicApi, exportApi, hqApi, mediaOperationApi, mqApi, outboxApi, trashApi } from '@/services/api'
-import { storageService } from '@/services/storage'
-import { lqOperationApi, trackedTaskApi } from '@/services/management-capabilities'
-import ComicStatusTag from '@/components/management/ComicStatusTag.vue'
-import { comicStatusMeta } from '@/utils/comic-status'
-import { managementTaskStatusLabel, managementTaskTypeLabel } from '@/utils/management-task'
-import type { ComicDetailVO, ComicStatus, ManagementTaskVO, MediaOperationResult, MqStats, OutboxStats, ReconcileResult } from '@/types'
+import { managementComicApi, mediaOperationApi, mqApi, outboxApi, trashApi } from '@/features/management/api'
+import { exportApi, hqApi, lqApi, storageAdminApi } from '@/features/storage/api'
+import { storageService } from '@/features/storage/service'
+import { managementTaskApi } from '@/features/task/api'
+import ComicStatusTag from '@/features/management/components/ComicStatusTag.vue'
+import { comicStatusMeta } from '@/features/comic/status'
+import { managementTaskStatusLabel, managementTaskTypeLabel } from '@/features/task/labels'
+import type { ComicDetailVO, ComicStatus } from '@/entities/comic/types'
+import type { ManagementTaskVO } from '@/features/task/types'
+import type { MediaOperationResult, MqStats, OutboxStats } from '@/features/management/types'
+import type { ReconcileResult } from '@/features/trash/types'
 
 type StatusEvent = { readonly status: ComicStatus; readonly at: string }
 type BlockedRow = { readonly operation: string; readonly reason: string }
@@ -130,12 +134,12 @@ const relatedActive = computed(() => relatedTasks.value.filter((task) => ['QUEUE
 function errorMessage(reason: unknown): string { if (axios.isAxiosError<{ message?: string }>(reason)) return reason.response?.data?.message ?? reason.message; return reason instanceof Error ? reason.message : '未知错误' }
 function isAllowed(operation: string): boolean { return eligibility.value?.allowed.includes(operation) ?? false }
 function recordStatus(status: ComicStatus): void { if (statusEvents.value.at(-1)?.status !== status) statusEvents.value.push({ status, at: new Date().toLocaleString() }) }
-async function loadState(silent = false): Promise<void> { if (!silent) loading.value = true; error.value = ''; try { const [detail, operations, tasks, stats, mqStats] = await Promise.all([managementComicApi.detail(comicId.value), mediaOperationApi.forComic(comicId.value), trackedTaskApi.list({ page: 1, size: 20, targetId: comicId.value }), outboxApi.stats(), mqApi.stats()]); comic.value = detail.data; eligibility.value = operations.data; relatedTasks.value = tasks.data.records; relatedTaskTotal.value = tasks.data.total; outbox.value = stats.data; mq.value = mqStats.data; recordStatus(detail.data.status) } catch (reason: unknown) { error.value = errorMessage(reason) } finally { if (!silent) loading.value = false } }
+async function loadState(silent = false): Promise<void> { if (!silent) loading.value = true; error.value = ''; try { const [detail, operations, tasks, stats, mqStats] = await Promise.all([managementComicApi.detail(comicId.value), mediaOperationApi.forComic(comicId.value), managementTaskApi.list({ page: 1, size: 20, targetId: comicId.value }), outboxApi.stats(), mqApi.stats()]); comic.value = detail.data; eligibility.value = operations.data; relatedTasks.value = tasks.data.records; relatedTaskTotal.value = tasks.data.total; outbox.value = stats.data; mq.value = mqStats.data; recordStatus(detail.data.status) } catch (reason: unknown) { error.value = errorMessage(reason) } finally { if (!silent) loading.value = false } }
 async function selectComic(): Promise<void> { await router.replace({ query: { comicId: String(comicId.value) } }); statusEvents.value = []; await loadState() }
 async function runAction(label: string, action: () => Promise<unknown>): Promise<void> { loading.value = true; try { await action(); ElMessage.success(`${label}已提交`); activeTab.value = 'history'; await loadState(true) } catch (reason: unknown) { ElMessage.error(errorMessage(reason)) } finally { loading.value = false } }
-function generateLq(regenerate: boolean): void { void runAction(regenerate ? '重新生成 LQ' : '生成 LQ', () => lqOperationApi.generateComic(comicId.value, regenerate)) }
+function generateLq(regenerate: boolean): void { void runAction(regenerate ? '重新生成 LQ' : '生成 LQ', () => lqApi.generateComic(comicId.value, regenerate)) }
 function deleteHq(): void { void runAction('删除 HQ', () => hqApi.deleteComic(comicId.value)) }
-function transcode(): void { void runAction('视频转码', () => adminApi.transcodeVideos(comicId.value)) }
+function transcode(): void { void runAction('视频转码', () => storageAdminApi.transcodeComic(comicId.value)) }
 function refreshMetadata(): void { void runAction('刷新元数据', () => storageService.requestMetadataRefresh(comicId.value)) }
 function createExport(): void { void runAction(`${exportFormat.value} 导出`, () => exportApi.createExport(comicId.value, exportFormat.value)) }
 async function trashComic(): Promise<void> { await ElMessageBox.confirm('漫画将移入回收站，可在需要时恢复。', '确认回收', { type: 'warning' }); await runAction('回收漫画', () => managementComicApi.delete(comicId.value)) }

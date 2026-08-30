@@ -46,10 +46,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { useCategoryStore } from '@/stores/management/category'
-import { useTagStore } from '@/stores/tag-store'
-import { managementComicApi } from '@/services/api'
-import type { BatchComicUpdateDTO } from '@/types'
+import { useCategoryStore } from '@/features/category/store'
+import { useTagStore } from '@/features/tag/store'
+import { managementComicApi } from '@/features/management/api'
+import type { BatchComicUpdateDTO } from '@/features/comic/management-types'
 
 const props = defineProps<{
   comicIds: number[]
