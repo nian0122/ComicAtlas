@@ -156,6 +156,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { PictureFilled, Search, WarningFilled } from '@element-plus/icons-vue'
 import { comicApi, catalogApi } from '@/entities/comic/api'
+import { getApiErrorMessage } from '@/services/http'
 
 import type { ComicDetailVO, CatalogNode, ChapterRef } from '@/entities/comic/types'
 import CatalogTree from '@/features/comic/components/CatalogTree.vue'
@@ -296,11 +297,10 @@ async function loadData() {
       comicApi.detail(id),
       catalogApi.tree(id),
     ])
-    comic.value = detailRes.data as ComicDetailVO
-    catalogTree.value = (catalogRes.data || []) as CatalogNode[]
+    comic.value = detailRes.data
+    catalogTree.value = [...catalogRes.data]
   } catch (err: unknown) {
-    const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-    error.value = msg || '加载漫画详情失败'
+    error.value = getApiErrorMessage(err, '加载漫画详情失败')
   } finally {
     loading.value = false
   }

@@ -1,4 +1,5 @@
 import { computed, ref } from 'vue'
+import { getApiErrorMessage } from '@/services/http'
 import { isBlockingScanWarning } from '@/features/import/types'
 import type {
   ScanItemVO,
@@ -134,6 +135,5 @@ export function useImportScan(scan: (path: string) => Promise<ScanResultVO>) {
 }
 
 function errorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message
-  return (error as { response?: { data?: { message?: string } } })?.response?.data?.message ?? ''
+  return getApiErrorMessage(error, '')
 }

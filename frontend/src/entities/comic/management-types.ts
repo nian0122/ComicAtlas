@@ -18,18 +18,6 @@ export interface BatchComicUpdateDTO {
   addTagIds?: number[]
 }
 
-export interface BatchUpdateResultVO {
-  total: number
-  succeeded: number
-  failed: BatchFailedItem[]
-}
-
-export interface BatchFailedItem {
-  comicId: number
-  title: string | null
-  reason: string
-}
-
 /** 目录管理请求。 */
 export interface CatalogManagementRequest {
   readonly title?: string

@@ -377,7 +377,7 @@ function selectMobileSort(nextSort: NonNullable<ComicListQuery['sort']>) {
 async function loadTags() {
   try {
     const res = await readingTagApi.list()
-    allTags.value = (res.data as TagDTO[]) || []
+    allTags.value = res.data
   } catch {
     allTags.value = []
   }
@@ -386,7 +386,7 @@ async function loadTags() {
 async function loadCategories() {
   try {
     const res = await readingCategoryApi.list()
-    allCategories.value = (res.data as CategoryDTO[]) || []
+    allCategories.value = res.data
   } catch {
     allCategories.value = []
   }

@@ -57,18 +57,13 @@
 <script setup lang="ts">
 import { reactive, ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { settingsApi } from '@/features/management/api'
+import { settingsApi, type ManagementSettings } from '@/features/management/settings-api'
 import { useReaderSettingsStore } from '@/features/reader/settings-store'
+import { getApiErrorMessage } from '@/services/http'
 
 const readerSettings = useReaderSettingsStore()
 
-interface SettingsForm {
-  defaultQuality: string
-  defaultFit: string
-  defaultDirection: string
-}
-
-const form = reactive<SettingsForm>({
+const form = reactive<ManagementSettings>({
   defaultQuality: 'auto',
   defaultFit: 'auto',
   defaultDirection: 'vertical',
@@ -79,8 +74,7 @@ const saving = ref(false)
 async function loadSettings() {
   try {
     const res = await settingsApi.get()
-    const data = res.data as SettingsForm
-    if (data) Object.assign(form, data)
+    Object.assign(form, res.data)
   } catch { /* keep defaults */ }
 }
 
@@ -90,8 +84,7 @@ async function handleSave() {
     await settingsApi.update({ ...form })
     ElMessage.success('设置已保存')
   } catch (err: unknown) {
-    const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-    ElMessage.error(msg || '保存失败')
+    ElMessage.error(getApiErrorMessage(err, '保存失败'))
   } finally {
     saving.value = false
   }

@@ -87,12 +87,13 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
-import { managementComicApi, managementTagApi } from '@/entities/comic/api'
+import { getApiErrorMessage } from '@/services/http'
+import { managementComicApi, managementTagApi } from '@/features/comic/management-api'
 import { useCategoryStore } from '@/features/category/store'
 import { sourceTypeLabel } from '@/features/comic/source-format'
-import type { ComicDetailVO, ComicInfoVO } from '@/entities/comic/types'
-import type { ComicMetadataDTO, ComicMetadataUpdateDTO } from '@/features/comic/management-types'
-import type { ComicTagUpdateDTO, TagCreateDTO, TagDTO } from '@/entities/tag/types'
+import type { ComicInfoVO } from '@/entities/comic/types'
+import type { ComicMetadataUpdateDTO } from '@/entities/comic/management-types'
+import type { ComicTagUpdateDTO, TagDTO } from '@/entities/tag/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -153,25 +154,24 @@ async function loadData() {
       managementTagApi.list(),
       categoryStore.fetchList(),
     ])
-    const metadata = metadataRes.data as ComicMetadataDTO
+    const metadata = metadataRes.data
     form.value = {
       title: metadata.title || '',
       author: metadata.author || '',
       description: metadata.description || '',
       categoryId: metadata.categoryId ?? null,
     }
-    selectedTagIds.value = (tagsRes.data as number[]) || []
-    allTags.value = (allTagsRes.data as TagDTO[]) || []
+    selectedTagIds.value = tagsRes.data
+    allTags.value = allTagsRes.data
     try {
       const detailRes = await managementComicApi.detail(comicId)
-      const detail = detailRes.data as ComicDetailVO
+      const detail = detailRes.data
       sourceType.value = detail.sourceType || ''
       sourceRef.value = detail.sourceRef || ''
       comicInfo.value = detail.comicInfo ?? null
     } catch { /* non-critical */ }
   } catch (err: unknown) {
-    const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-    ElMessage.error(msg || '加载漫画信息失败')
+    ElMessage.error(getApiErrorMessage(err, '加载漫画信息失败'))
     router.push('/manage/comics')
   } finally {
     loading.value = false
@@ -201,13 +201,12 @@ async function onCreateTag() {
     }
   } else {
     try {
-      const res = await managementTagApi.create({ name } as TagCreateDTO)
-      const newTag = res.data as TagDTO
+      const res = await managementTagApi.create({ name })
+      const newTag = res.data
       allTags.value.push(newTag)
       selectedTagIds.value.push(newTag.id)
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      ElMessage.error(msg || '创建标签失败')
+      ElMessage.error(getApiErrorMessage(err, '创建标签失败'))
       return
     }
   }
@@ -234,8 +233,7 @@ async function handleSave() {
     ElMessage.success('保存成功')
     router.push(`/manage/comics/${comicId}?tab=operations`)
   } catch (err: unknown) {
-    const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-    ElMessage.error(msg || '保存失败')
+    ElMessage.error(getApiErrorMessage(err, '保存失败'))
   } finally {
     saving.value = false
   }

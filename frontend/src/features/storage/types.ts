@@ -86,10 +86,3 @@ export interface ExportTaskVO {
   createdAt: string
   completedAt?: string
 }
-
-export interface OperationSubmitResult {
-  readonly taskId: number | null
-  readonly taskType: string
-  readonly status: string | null
-  readonly itemCount: number
-}

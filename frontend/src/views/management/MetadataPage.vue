@@ -75,6 +75,7 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { getApiErrorMessage } from '@/services/http'
 import { useCategoryStore } from '@/features/category/store'
 import { useTagStore } from '@/features/tag/store'
 import type { CategoryDTO } from '@/entities/comic/types'
@@ -110,8 +111,7 @@ async function onCreateCategory() {
     ElMessage.success('分类已添加')
     newCategoryName.value = ''
   } catch (err: unknown) {
-    const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-    ElMessage.error(msg || '添加分类失败')
+    ElMessage.error(getApiErrorMessage(err, '添加分类失败'))
   }
 }
 
@@ -131,8 +131,7 @@ async function onUpdateCategory() {
     ElMessage.success('分类已更新')
     categoryEditVisible.value = false
   } catch (err: unknown) {
-    const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-    ElMessage.error(msg || '更新分类失败')
+    ElMessage.error(getApiErrorMessage(err, '更新分类失败'))
   }
 }
 
@@ -144,8 +143,7 @@ async function onDeleteCategory(id: number | null | undefined) {
     ElMessage.success('分类已删除')
   } catch (err: unknown) {
     if (err === 'cancel') return
-    const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-    ElMessage.error(msg || '删除分类失败')
+    ElMessage.error(getApiErrorMessage(err, '删除分类失败'))
   }
 }
 
@@ -157,8 +155,7 @@ async function onCreateTag() {
     ElMessage.success('标签已添加')
     newTagName.value = ''
   } catch (err: unknown) {
-    const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-    ElMessage.error(msg || '添加标签失败')
+    ElMessage.error(getApiErrorMessage(err, '添加标签失败'))
   }
 }
 
@@ -170,8 +167,7 @@ async function onDeleteTag(tag: TagDTO | null | undefined) {
     ElMessage.success('标签已删除')
   } catch (err: unknown) {
     if (err === 'cancel') return
-    const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-    ElMessage.error(msg || '删除标签失败')
+    ElMessage.error(getApiErrorMessage(err, '删除标签失败'))
   }
 }
 </script>

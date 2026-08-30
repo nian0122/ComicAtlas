@@ -241,9 +241,10 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { getApiErrorMessage } from '@/services/http'
 import { useImportStore } from '@/features/import/store'
 import { useImportScan } from '@/features/import/composables/useImportScan'
-import PreviewNode from '@/features/management/components/PreviewNode.vue'
+import PreviewNode from '@/features/import/components/PreviewNode.vue'
 import type {
   ImportTaskVO,
 } from '@/features/import/types'
@@ -370,8 +371,7 @@ async function doBatchImport() {
 }
 
 function errorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message
-  return (error as { response?: { data?: { message?: string } } })?.response?.data?.message ?? ''
+  return getApiErrorMessage(error, '')
 }
 </script>
 

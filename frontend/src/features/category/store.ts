@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { reactive, toRefs } from 'vue'
-import { managementCategoryApi } from '@/entities/comic/api'
+import { getApiErrorMessage } from '@/services/http'
+import { managementCategoryApi } from '@/features/comic/management-api'
 import type { CategoryDTO } from '@/entities/comic/types'
 
 export interface CategoryState {
@@ -21,10 +22,9 @@ export const useCategoryStore = defineStore('category', () => {
     state.error = null
     try {
       const res = await managementCategoryApi.list()
-      state.list = ((res.data as CategoryDTO[]) || []).filter((c): c is CategoryDTO => c != null)
+      state.list = res.data
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      state.error = msg || '加载分类失败'
+      state.error = getApiErrorMessage(err, '加载分类失败')
       state.list = []
     } finally {
       state.loading = false
@@ -33,14 +33,14 @@ export const useCategoryStore = defineStore('category', () => {
 
   async function create(name: string) {
     const res = await managementCategoryApi.create(name)
-    const dto = res.data as CategoryDTO | null
+    const dto = res.data
     if (dto) state.list.push(dto)
     return dto
   }
 
   async function update(id: number, name: string) {
     const res = await managementCategoryApi.update(id, name)
-    const updated = res.data as CategoryDTO | null
+    const updated = res.data
     if (!updated) return
     const idx = state.list.findIndex((c) => c && c.id === id)
     if (idx >= 0) {

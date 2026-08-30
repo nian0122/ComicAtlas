@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia'
 import { reactive, toRefs } from 'vue'
-import { historyApi } from '@/features/reader/api'
-import type { HistoryPageVO, HistoryVO } from '@/features/history/types'
+import { getApiErrorMessage } from '@/services/http'
+import { historyApi } from '@/features/history/api'
+import type { HistoryVO } from '@/features/history/types'
 
 export interface HistoryState {
   list: HistoryVO[]
@@ -34,13 +35,12 @@ export const useHistoryStore = defineStore('history', () => {
     state.loadMoreError = null
     try {
       const res = await historyApi.list()
-      state.list = (res.data || []) as HistoryVO[]
+      state.list = res.data
       state.total = state.list.length
       state.page = 1
       state.hasMore = false
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      state.error = msg || '加载阅读历史失败'
+      state.error = getApiErrorMessage(err, '加载阅读历史失败')
       state.list = []
       state.total = 0
       state.hasMore = false
@@ -57,14 +57,13 @@ export const useHistoryStore = defineStore('history', () => {
     state.page = 1
     try {
       const res = await historyApi.page(1, state.pageSize)
-      const data = res.data as HistoryPageVO
-      state.list = data.records || []
+      const data = res.data
+      state.list = data.records
       state.total = data.total || 0
       state.page = data.current || 1
       state.hasMore = state.list.length < state.total
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      state.error = msg || '加载阅读历史失败'
+      state.error = getApiErrorMessage(err, '加载阅读历史失败')
       state.list = []
       state.total = 0
       state.hasMore = false
@@ -80,15 +79,14 @@ export const useHistoryStore = defineStore('history', () => {
     try {
       const nextPage = state.page + 1
       const res = await historyApi.page(nextPage, state.pageSize)
-      const data = res.data as HistoryPageVO
+      const data = res.data
       const existingIds = new Set(state.list.map((item) => item.comicId))
       state.list.push(...(data.records || []).filter((item) => !existingIds.has(item.comicId)))
       state.total = data.total || state.total
       state.page = data.current || nextPage
       state.hasMore = state.list.length < state.total
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      state.loadMoreError = msg || '加载更多阅读历史失败'
+      state.loadMoreError = getApiErrorMessage(err, '加载更多阅读历史失败')
     } finally {
       state.loadingMore = false
     }

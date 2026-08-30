@@ -37,11 +37,6 @@ export interface DlqQueueVO {
   readonly consumers: number
 }
 
-export interface DlqCredentials {
-  readonly username: string
-  readonly password: string
-}
-
 export interface DlqMessageVO {
   readonly payload: string
   readonly payloadEncoding: 'string' | 'base64'

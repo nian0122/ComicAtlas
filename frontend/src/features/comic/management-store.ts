@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { reactive, computed, toRefs } from 'vue'
-import { managementComicApi } from '@/entities/comic/api'
+import { getApiErrorMessage } from '@/services/http'
+import { managementComicApi } from '@/features/comic/management-api'
 import type { ComicListVO, ComicListQuery } from '@/entities/comic/types'
 
 export interface ManagementComicState {
@@ -50,8 +51,7 @@ export const useManagementComicStore = defineStore('management-comic', () => {
       state.total = res.data.total || 0
     } catch (err: unknown) {
       if (requestId !== requestSequence) return
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      state.error = msg || '加载漫画列表失败'
+      state.error = getApiErrorMessage(err, '加载漫画列表失败')
       state.list = []
       state.total = 0
     } finally {

@@ -5,12 +5,12 @@
       <span class="preview-node-name" :title="node.relativePath">{{ node.name }}</span>
       <span class="preview-node-count">{{ node.fileCount }} 个媒体</span>
       <span
-        v-for="w in node.warnings ?? []"
-        :key="w.code"
+        v-for="warning in node.warnings ?? []"
+        :key="warning.code"
         class="warn-chip"
-        :class="`severity-${w.severity.toLowerCase()}`"
+        :class="`severity-${warning.severity.toLowerCase()}`"
       >
-        {{ w.message }}
+        {{ warning.message }}
       </span>
     </div>
     <div v-if="(node.children ?? []).length > 0" class="preview-node-children">

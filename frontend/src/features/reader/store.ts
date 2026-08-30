@@ -1,9 +1,10 @@
 import { defineStore } from 'pinia'
 import { reactive, computed, toRefs } from 'vue'
-import { historyApi, readerApi } from '@/features/reader/api'
+import { getApiErrorMessage } from '@/services/http'
+import { readerApi } from '@/features/reader/api'
+import { historyApi } from '@/features/history/api'
 import { useHistoryStore } from '@/features/history/store'
 import type { MediaItemInfo } from '@/entities/media/types'
-import type { ReaderDTO } from '@/features/reader/types'
 
 export interface ReaderState {
   chapterId: number
@@ -67,7 +68,7 @@ export const useReaderStore = defineStore('reader', () => {
     try {
       const res = await readerApi.chapter(chId)
       if (seq !== loadSeq) return
-      const data = res.data as ReaderDTO
+      const data = res.data
       state.comicId = data.comicId
       state.chapterTitle = data.chapterTitle
       state.pages = data.pages
@@ -75,8 +76,7 @@ export const useReaderStore = defineStore('reader', () => {
       state.nextChapterId = data.nextChapterId
     } catch (err: unknown) {
       if (seq !== loadSeq) return
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      state.error = msg || '加载章节失败'
+      state.error = getApiErrorMessage(err, '加载章节失败')
       state.pages = []
     } finally {
       if (seq === loadSeq) {

@@ -113,7 +113,6 @@ import { useReaderNavigation } from '@/features/reader/composables/useReaderNavi
 import { comicApi } from '@/entities/comic/api'
 import { preloadEngine } from '@/features/reader/preload-engine'
 import { isVideoMedia } from '@/entities/media/guards'
-import type { ComicDetailVO } from '@/entities/comic/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -305,7 +304,7 @@ async function loadCurrentChapter(preservePage = false, restoreProgress = true) 
 
     try {
       const detail = await comicApi.detail(store.comicId)
-      const detailData = detail.data as ComicDetailVO
+      const detailData = detail.data
       comicTitle.value = detailData.title || `漫画 #${store.comicId}`
     } catch {
       comicTitle.value = `漫画 #${store.comicId}`

@@ -4,9 +4,9 @@ import type {
   ComicStorageQuery,
   ExportArtifactVO,
   ExportTaskVO,
-  OperationSubmitResult,
   StorageOperation,
 } from '@/features/storage/types'
+import type { OperationSubmitResult } from '@/shared/api/types'
 import { StorageOperationType } from '@/features/storage/types'
 
 export const storageService = {

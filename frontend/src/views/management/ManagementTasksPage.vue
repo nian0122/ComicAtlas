@@ -140,7 +140,7 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
-import { managementComicApi } from '@/features/management/api'
+import { managementComicApi } from '@/features/comic/management-api'
 import { ElMessage } from 'element-plus'
 import { managementTaskApi } from '@/features/task/api'
 import { MANAGEMENT_TASK_TYPES, managementTaskStatusLabel, managementTaskTypeLabel } from '@/features/task/labels'

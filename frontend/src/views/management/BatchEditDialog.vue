@@ -48,8 +48,8 @@ import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useCategoryStore } from '@/features/category/store'
 import { useTagStore } from '@/features/tag/store'
-import { managementComicApi } from '@/features/management/api'
-import type { BatchComicUpdateDTO } from '@/features/comic/management-types'
+import { managementComicApi } from '@/features/comic/management-api'
+import type { BatchComicUpdateDTO } from '@/entities/comic/management-types'
 
 const props = defineProps<{
   comicIds: number[]

@@ -106,7 +106,6 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import axios from 'axios'
 import {
   CircleCheck,
   Clock,
@@ -119,9 +118,10 @@ import {
   UploadFilled,
   Warning,
 } from '@element-plus/icons-vue'
-import { comicApi } from '@/entities/comic/api'
+import { managementComicApi } from '@/features/comic/management-api'
 import { managementTaskApi } from '@/features/task/api'
 import { storageService } from '@/features/storage/service'
+import { getApiErrorMessage } from '@/services/http'
 import { comicStatusMeta } from '@/features/comic/status'
 import { managementTaskStatusLabel, managementTaskTypeLabel } from '@/features/task/labels'
 import type { ComicListVO } from '@/entities/comic/types'
@@ -147,8 +147,7 @@ const updatedAt = ref('')
 const error = ref('')
 
 function errorMessage(reason: unknown): string {
-  if (axios.isAxiosError<{ message?: string }>(reason)) return reason.response?.data?.message ?? reason.message
-  return reason instanceof Error ? reason.message : '未知错误'
+  return getApiErrorMessage(reason, '未知错误')
 }
 
 function formatDateTime(value: string | null): string {
@@ -182,8 +181,8 @@ function comicStatusTone(status: ComicListVO['status']): string {
 onMounted(async () => {
   try {
     const [comicSummary, comics, tasks, storageSummary] = await Promise.all([
-      comicApi.list({ page: 1, size: 1 }),
-      comicApi.list({ page: 1, size: 5, sort: 'updatedAt' }),
+      managementComicApi.list({ page: 1, size: 1 }),
+      managementComicApi.list({ page: 1, size: 5, sort: 'updatedAt' }),
       managementTaskApi.list({ page: 1, size: 50 }),
       storageService.fetchSummary(),
     ])

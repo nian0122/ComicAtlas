@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { reactive, toRefs } from 'vue'
-import { managementTagApi } from '@/entities/comic/api'
+import { getApiErrorMessage } from '@/services/http'
+import { managementTagApi } from '@/features/comic/management-api'
 import type { TagDTO } from '@/entities/tag/types'
 
 export interface TagState {
@@ -21,10 +22,9 @@ export const useTagStore = defineStore('tag', () => {
     state.error = null
     try {
       const res = await managementTagApi.list()
-      state.list = ((res.data as TagDTO[]) || []).filter((t): t is TagDTO => t != null)
+      state.list = res.data
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      state.error = msg || '加载标签失败'
+      state.error = getApiErrorMessage(err, '加载标签失败')
       state.list = []
     } finally {
       state.loading = false
@@ -33,7 +33,7 @@ export const useTagStore = defineStore('tag', () => {
 
   async function create(name: string) {
     const res = await managementTagApi.create({ name })
-    const dto = res.data as TagDTO | null
+    const dto = res.data
     if (dto) state.list.push(dto)
     return dto
   }

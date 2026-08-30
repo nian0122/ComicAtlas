@@ -1,5 +1,5 @@
 import { api } from '@/services/http'
-import type { OperationSubmitResult } from '@/features/storage/types'
+import type { OperationSubmitResult } from '@/shared/api/types'
 import type { ReconcileResult, TrashContentVO, TrashPurgeRequest } from './types'
 
 export const trashApi = {

@@ -1,12 +1,11 @@
 import { api } from '@/services/http'
-import type { PageResult } from '@/shared/api/types'
+import type { OperationSubmitResult, PageResult } from '@/shared/api/types'
 import type {
   ChapterStorageItem,
   ComicStorageItem,
   ComicStorageQuery,
   ExportArtifactVO,
   ExportTaskVO,
-  OperationSubmitResult,
   StorageStats,
 } from '@/features/storage/types'
 

@@ -86,7 +86,7 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { adminApi } from '@/features/management/api'
+import { dlqApi } from '@/features/management/dlq-api'
 import type { DlqMessageVO, DlqQueueVO } from '@/features/management/types'
 import DlqMessageDialog from './dlq/DlqMessageDialog.vue'
 
@@ -111,7 +111,7 @@ async function loadQueues() {
   loading.value = true
   error.value = ''
   try {
-    const response = await adminApi.dlqQueues()
+    const response = await dlqApi.queues()
     queues.value = response.data ?? []
   } catch {
     error.value = '无法连接管理接口，请检查 API 服务。'
@@ -126,7 +126,7 @@ async function showMessages(row: DlqQueueVO) {
   dialogVisible.value = true
   dialogLoading.value = true
   try {
-    const response = await adminApi.dlqMessages(row.name)
+    const response = await dlqApi.messages(row.name)
     messages.value = response.data ?? []
   } catch {
     ElMessage.error('消息预览失败')
@@ -139,7 +139,7 @@ async function replayQueue(row: DlqQueueVO) {
   if (!(await confirmReplay(row))) return
   replaying.value = row.name
   try {
-    const response = await adminApi.dlqReplay(row.name)
+    const response = await dlqApi.replay(row.name)
     const result = response.data
     if (result.error) {
       ElMessage.warning(`${result.error}（已重放 ${result.replayed} 条）`)
@@ -160,7 +160,7 @@ async function purgeQueue(row: DlqQueueVO) {
   if (!(await confirmPurge(row))) return
   purging.value = row.name
   try {
-    const response = await adminApi.dlqPurge(row.name)
+    const response = await dlqApi.purge(row.name)
     ElMessage.success(`已清空 ${response.data.purged} 条`)
     await loadQueues()
   } catch {

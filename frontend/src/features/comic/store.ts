@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { reactive, computed, toRefs } from 'vue'
+import { getApiErrorMessage } from '@/services/http'
 import { comicApi } from '@/entities/comic/api'
 import type { ComicListVO, ComicListQuery } from '@/entities/comic/types'
 
@@ -48,8 +49,7 @@ export const useComicStore = defineStore('comic', () => {
       state.query.page = Math.max(1, res.data.current || state.query.page || 1)
     } catch (err: unknown) {
       if (requestId !== requestSequence) return
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      state.error = msg || '加载漫画列表失败'
+      state.error = getApiErrorMessage(err, '加载漫画列表失败')
       state.list = []
       state.total = 0
     } finally {

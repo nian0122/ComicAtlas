@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { getApiErrorMessage } from '@/services/http'
 import { directoryScanApi, importApi } from '@/features/import/api'
 import type {
   BatchImportResultVO,
@@ -81,8 +82,7 @@ export const useImportStore = defineStore('import', () => {
       tasks.value = res.data?.records ?? []
       lastUpdated.value = Date.now()
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      error.value = msg || '加载任务列表失败'
+      error.value = getApiErrorMessage(err, '加载任务列表失败')
     }
   }
 
@@ -97,8 +97,7 @@ export const useImportStore = defineStore('import', () => {
       completedTasks.value = res.data?.records ?? []
       completedTotal.value = res.data?.total ?? 0
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      error.value = msg || '加载已完成任务失败'
+      error.value = getApiErrorMessage(err, '加载已完成任务失败')
     }
   }
 
