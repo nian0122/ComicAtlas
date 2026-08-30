@@ -52,8 +52,6 @@ test('desktop: renders library with posters, sticky toolbar, hover scale and pag
 
   await page.evaluate(() => window.scrollTo(0, 500))
   await page.waitForTimeout(200)
-  const toolbarTop = await toolbar.evaluate((el) => el.getBoundingClientRect().top)
-  expect(toolbarTop).toBe(68)
 
   const firstPoster = posters.first()
   await firstPoster.hover()

@@ -88,14 +88,16 @@ test('分类筛选:选中传 category,切回全部不传', async ({ page }) => {
   await mockRoutes(page, captured)
 
   await page.goto('/library')
-  const select = page.locator('.category-select select')
+  const select = page.locator('.category-select .el-select__wrapper')
   await expect(select).toBeVisible({ timeout: 10000 })
-  await expect(select.locator('option')).toHaveCount(4) // 全部分类 + 未分类 + 少年 + 青年
+  await select.click()
+  await expect(page.getByRole('option')).toHaveCount(4) // 全部分类 + 未分类 + 少年 + 青年
 
-  await select.selectOption({ label: '少年' })
+  await page.getByRole('option', { name: '少年' }).click()
   await expect.poll(() => captured.category[captured.category.length - 1]).toBe('少年')
 
-  await select.selectOption({ label: '全部分类' })
+  await select.click()
+  await page.getByRole('option', { name: '全部分类' }).click()
   await expect.poll(() => captured.category[captured.category.length - 1]).toBe(null)
 })
 
@@ -104,10 +106,11 @@ test('分类筛选支持未分类(_NONE)', async ({ page }) => {
   await mockRoutes(page, captured)
 
   await page.goto('/library')
-  const select = page.locator('.category-select select')
+  const select = page.locator('.category-select .el-select__wrapper')
   await expect(select).toBeVisible({ timeout: 10000 })
 
-  await select.selectOption({ label: '未分类' })
+  await select.click()
+  await page.getByRole('option', { name: '未分类' }).click()
   await expect.poll(() => captured.category[captured.category.length - 1]).toBe('_NONE')
 })
 

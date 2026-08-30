@@ -11,8 +11,13 @@ function success(route: Route, data: unknown) {
 test('回收站入口展示已回收漫画并支持恢复', async ({ page }: { page: Page }) => {
   const comicUrls: URL[] = []
   const restoreUrls: string[] = []
-  await page.route('/api/comics**', (route) => {
-    comicUrls.push(new URL(route.request().url()))
+  await page.route('/api/manage/trash**', (route) => {
+    const requestUrl = new URL(route.request().url())
+    if (route.request().method() === 'POST' && requestUrl.pathname.endsWith('/restore')) {
+      restoreUrls.push(route.request().url())
+      return success(route, { taskId: 12, status: 'PENDING' })
+    }
+    comicUrls.push(requestUrl)
     return success(route, {
       records: [{
         id: 7,
@@ -31,11 +36,6 @@ test('回收站入口展示已回收漫画并支持恢复', async ({ page }: { p
       total: 1,
     })
   })
-  await page.route('/api/trash/comics/7/restore', (route) => {
-    restoreUrls.push(route.request().url())
-    return success(route, { taskId: 12, status: 'PENDING' })
-  })
-
   await page.goto('/manage/trash')
   await page.setViewportSize({ width: 1280, height: 720 })
   await page.screenshot({ path: 'C:\\Users\\Acer\\.codex\\visualizations\\2026\\08\\11\\trash-final.png' })
@@ -43,7 +43,7 @@ test('回收站入口展示已回收漫画并支持恢复', async ({ page }: { p
   await expect(page.getByText('已回收漫画', { exact: true })).toBeVisible()
   await expect.poll(() => comicUrls.at(-1)?.searchParams.get('status')).toBe('TRASHED')
 
-  await page.getByRole('button', { name: '恢复' }).click()
-  await page.getByRole('button', { name: '恢复', exact: true }).last().click()
+  await page.locator('.el-table').getByRole('button', { name: '恢复' }).click()
+  await page.locator('.el-message-box__btns .el-button--primary').click()
   await expect.poll(() => restoreUrls).toHaveLength(1)
 })

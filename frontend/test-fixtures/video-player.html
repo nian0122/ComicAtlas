@@ -5,67 +5,31 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>视频播放器测试夹具</title>
     <style>
-      html,
-      body {
-        margin: 0;
-        background: #141414;
-      }
-
-      #app,
-      .video-shell {
-        width: 100%;
-        max-width: 640px;
-      }
-
-      .video-shell {
-        height: 360px;
-      }
-
-      .tap-count {
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        overflow: hidden;
-        clip-path: inset(50%);
-      }
+      html, body { margin: 0; background: #141414; }
+      #app, .video-shell { width: 100%; max-width: 640px; }
+      .video-shell { height: 360px; }
+      .tap-count { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
     </style>
   </head>
   <body>
     <div id="app"></div>
     <script type="module">
       import { createApp, h, ref } from 'vue'
-      import VideoPlayer from '/src/views/reading/reader/components/VideoPlayer.vue'
-      import { useReaderGesture } from '/src/views/reading/reader/composables/useReaderGesture.ts'
-
+      import VideoPlayer from '/src/features/reader/components/VideoPlayer.vue'
+      import { useReaderGesture } from '/src/features/reader/composables/useReaderGesture.ts'
       createApp({
         components: { VideoPlayer },
         setup() {
           const viewport = ref(null)
           const tapCount = ref(0)
           const gesture = useReaderGesture(viewport)
-          gesture.onTap(() => {
-            tapCount.value += 1
-          })
-          const videoProps = {
-            hqUrl: 'data:video/mp4;base64,AAAA',
-            mediaType: 'VIDEO',
-            width: 640,
-            height: 360,
-          }
-          return () =>
-            h('main', { ref: viewport }, [
-              h(
-                'output',
-                { class: 'tap-count', 'data-testid': 'tap-count' },
-                String(tapCount.value),
-              ),
-              h('div', { class: 'video-shell' }, [
-                h(VideoPlayer, { ...videoProps, mediaId: 1 }),
-              ]),
-              h('div', { class: 'video-shell' }, [
-                h(VideoPlayer, { ...videoProps, mediaId: 2 }),
-              ]),
-            ])
+          gesture.onTap(() => { tapCount.value += 1 })
+          const videoProps = { hqUrl: 'data:video/mp4;base64,AAAA', mediaType: 'VIDEO', width: 640, height: 360 }
+          return () => h('main', { ref: viewport }, [
+            h('output', { class: 'tap-count', 'data-testid': 'tap-count' }, String(tapCount.value)),
+            h('div', { class: 'video-shell' }, [h(VideoPlayer, { ...videoProps, mediaId: 1 })]),
+            h('div', { class: 'video-shell' }, [h(VideoPlayer, { ...videoProps, mediaId: 2 })]),
+          ])
         },
       }).mount('#app')
     </script>

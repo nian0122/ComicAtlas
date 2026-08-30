@@ -9,7 +9,7 @@ function success(route: Route, data: unknown) {
 }
 
 async function mockManagementPage(page: Page, comicUrls: URL[]) {
-  await page.route('/api/comics**', (route) => {
+  await page.route('/api/manage/comics**', (route) => {
     comicUrls.push(new URL(route.request().url()))
     return success(route, {
       records: [{
@@ -30,12 +30,12 @@ async function mockManagementPage(page: Page, comicUrls: URL[]) {
       total: 1,
     })
   })
-  await page.route('/api/categories**', (route) => success(route, []))
-  await page.route('/api/tags**', (route) => success(route, [
+  await page.route('/api/manage/categories**', (route) => success(route, []))
+  await page.route('/api/manage/tags**', (route) => success(route, [
     { id: 1, name: '热血', sortOrder: 1 },
     { id: 2, name: '冒险', sortOrder: 2 },
   ]))
-  await page.route('/api/storage/stats', (route) => success(route, {
+  await page.route('/api/manage/storage/stats', (route) => success(route, {
     hqBytes: 0,
     lqBytes: 0,
     thumbBytes: 0,

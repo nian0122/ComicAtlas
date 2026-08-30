@@ -10,12 +10,12 @@ function json(route: import('@playwright/test').Route, data: unknown) {
 
 test('存储管理筛选可清空并回到默认条件', async ({ page }) => {
   const comicRequests: string[] = []
-  await page.route('**/api/admin/storage/stats', (route) => json(route, {
+  await page.route('**/api/manage/storage/stats', (route) => json(route, {
     hqBytes: 1024,
     lqBytes: 0,
     comicCount: 1,
   }))
-  await page.route('**/api/admin/storage/comics**', (route) => {
+  await page.route('**/api/manage/admin/storage/comics**', (route) => {
     comicRequests.push(route.request().url())
     return json(route, {
       records: [{
@@ -34,8 +34,8 @@ test('存储管理筛选可清空并回到默认条件', async ({ page }) => {
       total: 1,
     })
   })
-  await page.route('**/api/categories**', (route) => json(route, [{ id: 1, name: '动作', sortOrder: 1 }]))
-  await page.route('**/api/tags**', (route) => json(route, [{ id: 2, name: '热血', sortOrder: 1 }]))
+  await page.route('**/api/manage/categories**', (route) => json(route, [{ id: 1, name: '动作', sortOrder: 1 }]))
+  await page.route('**/api/manage/tags**', (route) => json(route, [{ id: 2, name: '热血', sortOrder: 1 }]))
 
   await page.goto('/manage/storage')
   const keyword = page.getByPlaceholder('搜索标题')

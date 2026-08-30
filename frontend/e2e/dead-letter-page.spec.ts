@@ -22,14 +22,14 @@ const queues = [
 ]
 
 test.beforeEach(async ({ page }) => {
-  await page.route('**/api/admin/dlq/**', handleDlqRequest)
+  await page.route('**/api/manage/admin/dlq/**', handleDlqRequest)
 })
 
 test('无需凭据即可查看、预览和重放死信', async ({ page }) => {
   await page.goto('/manage/dlq?force-desktop=1')
 
   await expect(page.getByRole('heading', { name: '队列账册' })).toBeVisible()
-  await expect(page.getByText('4', { exact: true })).toBeVisible()
+  await expect(page.locator('.summary-grid article').nth(1)).toContainText('4')
 
   await page.getByRole('button', { name: '预览' }).first().click()
   await expect(page.getByText('预览不会确认或删除消息')).toBeVisible()

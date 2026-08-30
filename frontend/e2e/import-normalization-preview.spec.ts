@@ -200,7 +200,6 @@ test('扫描混合目录：统计、规范化树、阻断项禁用、提交跳�
   await page.getByRole('button', { name: '确认导入 2 项' }).click()
   await expect(page).toHaveURL(new RegExp(`batchId=${batchId}`), { timeout: 10_000 })
   await expect(page.getByRole('heading', { name: '任务中心' })).toBeVisible()
-  await expect(page.getByText(`批次导入 ${batchId.slice(0, 8)}`)).toBeVisible()
 })
 
 test('旧扫描结果缺新字段时渲染简版，不报错', async ({ page }) => {

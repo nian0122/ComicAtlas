@@ -15,7 +15,8 @@ test('统一管理任务页展示完整任务类型并可筛选导入任务', as
       taskType: 'IMPORT',
       operation: '导入漫画',
       targetType: 'COMIC',
-      targetId: null,
+      targetId: 501,
+      targetName: '179漫画',
       batchId: null,
       isBatch: false,
       status: 'SUCCEEDED',
@@ -67,7 +68,7 @@ test('统一管理任务页展示完整任务类型并可筛选导入任务', as
     status: 'SUCCEEDED',
     progress: 100,
   }]))
-  await page.route('/api/comics/501', (route) => success(route, { id: 501, title: '179漫画' }))
+  await page.route('/api/manage/comics/501', (route) => success(route, { id: 501, title: '179漫画' }))
   await page.goto('/manage/tasks')
 
   await expect(page.locator('.sidenav-link').filter({ hasText: '任务中心' })).toHaveAttribute('href', '/manage/tasks')
