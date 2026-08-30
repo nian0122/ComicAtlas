@@ -2,7 +2,10 @@
   <div
     class="chapter-row"
     :class="{ active: active }"
-    :style="{ paddingLeft: (indent ?? 0) + 12 + 'px' }"
+    :style="{
+      paddingLeft: (indent ?? 0) + 12 + 'px',
+      '--chapter-guide-left': (indent ?? 0) + 28 + 'px',
+    }"
     @click="emit('click')"
   >
     <span class="chapter-no">
@@ -68,11 +71,11 @@ const titleSegments = computed(() => splitText(props.chapter.title || ''))
 .chapter-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
+  gap: 10px;
+  padding: 0 12px;
   cursor: pointer;
-  border-radius: var(--radius-sm);
-  transition: background 150ms ease;
+  border-radius: 0;
+  transition: background 150ms ease, color 150ms ease;
 }
 
 .chapter-row:hover {
@@ -92,7 +95,7 @@ const titleSegments = computed(() => splitText(props.chapter.title || ''))
   font-size: 13px;
   font-weight: 600;
   color: var(--accent);
-  min-width: 70px;
+  min-width: 66px;
 }
 
 .chapter-title {
@@ -112,6 +115,7 @@ mark {
 }
 
 .chapter-pages {
+  flex: 0 0 auto;
   font-size: 11px;
   color: var(--text-muted);
 }

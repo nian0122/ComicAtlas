@@ -3,7 +3,7 @@
     <RecycleScroller
       class="catalog-scroller"
       :items="flatItems"
-      :item-size="42"
+      :item-size="40"
       key-field="flatKey"
       :buffer="100"
     >
@@ -196,6 +196,8 @@ const flatItems = computed<FlatItem[]>(() => {
 .catalog-tree {
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  border-top: 1px solid var(--border);
 }
 
 .catalog-scroller {
@@ -206,14 +208,19 @@ const flatItems = computed<FlatItem[]>(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 42px;
+  height: 40px;
   box-sizing: border-box;
   padding: 0 12px;
-  background: var(--bg-surface);
-  border-radius: var(--radius-sm);
+  margin-top: 14px;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-left: 2px solid color-mix(in srgb, var(--accent) 72%, var(--border));
+  background: linear-gradient(90deg, color-mix(in srgb, var(--bg-surface) 82%, transparent), transparent 82%);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
   cursor: pointer;
   user-select: none;
 }
+
+.node-header:first-child { margin-top: 0; }
 
 .expand-btn {
   display: flex;
@@ -234,7 +241,7 @@ const flatItems = computed<FlatItem[]>(() => {
 
 .node-title {
   flex: 1;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
 }
@@ -246,7 +253,33 @@ const flatItems = computed<FlatItem[]>(() => {
 
 /* 章节行对齐 42px 固定行高（作用于子组件根元素） */
 .chapter-row {
-  height: 42px;
+  height: 40px;
   box-sizing: border-box;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+}
+
+.catalog-tree :deep(.chapter-row) {
+  position: relative;
+  border-radius: 0;
+}
+
+.catalog-tree :deep(.chapter-row)::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--chapter-guide-left, 28px);
+  width: 1px;
+  background: color-mix(in srgb, var(--border) 72%, transparent);
+  content: '';
+}
+
+.catalog-tree :deep(.chapter-row:hover) {
+  background: color-mix(in srgb, var(--bg-surface) 72%, transparent);
+}
+
+.catalog-tree :deep(.chapter-row.active) {
+  border-left: 0;
+  background: var(--accent-bg);
+  box-shadow: inset 3px 0 var(--accent);
 }
 </style>
