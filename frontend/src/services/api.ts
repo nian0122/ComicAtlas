@@ -1,4 +1,4 @@
-import axios from 'axios'
+import { api } from '@/services/http'
 import type {
   BatchCreateResult,
   BatchImportRequest,
@@ -37,7 +37,16 @@ import type {
   UploadChunkResult,
   UploadCompleteResult,
   UploadSessionStatus,
+  ComicListQuery,
+  ComicListVO,
 } from '@/types'
+
+interface PageResult<T> {
+  records: T[]
+  total: number
+  current: number
+  pages: number
+}
 
 export type TrashContentVO = {
   readonly targetType: 'COMIC' | 'CHAPTER' | 'MEDIA'
@@ -54,34 +63,10 @@ export type TrashContentVO = {
   readonly trashedAt: string | null
 }
 
-const api = axios.create({ baseURL: '/api' })
-
-/** 后端 Result 业务成功码（Result.ok 恒为 200） */
-const RESULT_OK_CODE = 200
-
-api.interceptors.response.use(
-  (response) => {
-    const data = response.data
-    if (data && typeof data === 'object' && 'code' in data) {
-      // 后端业务失败以 HTTP 200 + 非 200 code 返回：必须转为 reject，
-      // 让各页面的 catch 统一展示后端 message，避免把 null 当成功数据继续使用（曾引发读 null.status / null.pages 崩溃）。
-      if (data.code !== RESULT_OK_CODE) {
-        const message = typeof data.message === 'string' && data.message ? data.message : '请求失败'
-        return Promise.reject(new Error(message))
-      }
-      if ('data' in data) {
-        response.data = data.data
-      }
-    }
-    return response
-  },
-  (error) => Promise.reject(error)
-)
-
 // ========== 阅读域（/api/**，网关路由至 reading-service） ==========
 
 export const comicApi = {
-  list: (params: any) => api.get('/comics', { params }),
+  list: (params?: ComicListQuery) => api.get<PageResult<ComicListVO>>('/comics', { params }),
   detail: (id: number) => api.get<ComicDetailVO>(`/comics/${id}`),
   getMetadata: (id: number) => api.get(`/comics/${id}/metadata`),
   getTags: (id: number) => api.get(`/comics/${id}/tags`),
@@ -97,7 +82,7 @@ export const managementCatalogApi = {
 
 /** 管理域漫画查询，管理页面专用。 */
 export const managementComicApi = {
-  list: (params: any) => api.get('/manage/comics', { params }),
+  list: (params?: ComicListQuery) => api.get<PageResult<ComicListVO>>('/manage/comics', { params }),
   detail: (id: number) => api.get<ComicDetailVO>(`/manage/comics/${id}`),
   getMetadata: (id: number) => api.get(`/manage/comics/${id}/metadata`),
   getTags: (id: number) => api.get(`/manage/comics/${id}/tags`),
@@ -392,7 +377,7 @@ export interface DlqPurgeResult {
 
 export const settingsApi = {
   get: () => api.get('/manage/settings'),
-  update: (data: any) => api.put('/manage/settings', data),
+  update: (data: Record<string, unknown>) => api.put('/manage/settings', data),
 }
 
 export default api

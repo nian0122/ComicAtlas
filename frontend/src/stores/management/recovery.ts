@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { recoveryApi } from '@/services/recovery'
 import type { RecoveryTaskVO } from '@/types'
+import { getApiErrorMessage } from '@/services/http'
 
 const TERMINAL_STATUSES = new Set(['SUCCESS', 'FAILED'])
 
@@ -37,31 +38,29 @@ export const useRecoveryStore = defineStore('recovery', () => {
   async function fetchTasks(params?: { page?: number; size?: number }) {
     error.value = null
     try {
-      const res: any = await recoveryApi.list({ page: 1, size: 50, ...params })
-      tasks.value = (res.data?.records || []) as RecoveryTaskVO[]
+      const res = await recoveryApi.list({ page: 1, size: 50, ...params })
+      tasks.value = res.data.records
       lastUpdated.value = Date.now()
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      error.value = msg || '加载恢复任务失败'
+      error.value = getApiErrorMessage(err, '加载恢复任务失败')
     }
   }
 
   async function createTask(): Promise<RecoveryTaskVO> {
     loading.value = true
     try {
-      const res: any = await recoveryApi.create()
-      const task = res.data as RecoveryTaskVO
+      const res = await recoveryApi.create()
+      const task = res.data
       tasks.value.unshift(task)
       lastUpdated.value = Date.now()
       if (!polling.value) startPolling()
       return task
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { status?: number; data?: { message?: string } } }
-      if (axiosErr.response?.status === 409) {
+      if (err && typeof err === 'object' && 'response' in err &&
+        (err.response as { status?: number } | undefined)?.status === 409) {
         throw new Error('已有恢复任务正在执行')
       }
-      const msg = axiosErr.response?.data?.message
-      throw new Error(msg || '创建恢复任务失败')
+      throw new Error(getApiErrorMessage(err, '创建恢复任务失败'))
     } finally {
       loading.value = false
     }
@@ -69,15 +68,14 @@ export const useRecoveryStore = defineStore('recovery', () => {
 
   async function retryTask(id: number): Promise<RecoveryTaskVO> {
     try {
-      const res: any = await recoveryApi.retry(id)
-      const task = res.data as RecoveryTaskVO
+      const res = await recoveryApi.retry(id)
+      const task = res.data
       const idx = tasks.value.findIndex(t => t.id === id)
       if (idx >= 0) tasks.value[idx] = task
       if (!polling.value) startPolling()
       return task
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      throw new Error(msg || '重试恢复任务失败')
+      throw new Error(getApiErrorMessage(err, '重试恢复任务失败'))
     }
   }
 

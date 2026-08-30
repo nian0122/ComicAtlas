@@ -1,4 +1,5 @@
 import { adminApi, exportApi, hqApi, lqApi } from '@/services/api'
+import { getApiErrorMessage } from '@/services/http'
 import type {
   ComicStorageQuery,
   ExportArtifactVO,
@@ -7,14 +8,6 @@ import type {
   StorageOperation,
 } from '@/types'
 import { StorageOperationType } from '@/types'
-
-function extractMessage(err: unknown): string {
-  if (err && typeof err === 'object' && 'response' in err) {
-    const axiosErr = err as { response?: { data?: { message?: string } } }
-    return axiosErr.response?.data?.message || '操作失败'
-  }
-  return '操作失败'
-}
 
 export const storageService = {
   async fetchComics(params: ComicStorageQuery) {
@@ -63,7 +56,7 @@ export const storageService = {
           return this.requestMetadataRefresh(comicId)
       }
     } catch (err) {
-      throw new Error(extractMessage(err))
+      throw new Error(getApiErrorMessage(err, '操作失败'))
     }
     // StorageOperationType 已穷举，此分支不可达；保留兜底以满足全路径返回
     throw new Error('未知存储操作类型')
@@ -78,7 +71,7 @@ export const storageService = {
       const res = await adminApi.refreshMetadata(comicId)
       return res.data
     } catch (err) {
-      throw new Error(extractMessage(err))
+      throw new Error(getApiErrorMessage(err, '操作失败'))
     }
   },
 
