@@ -4,21 +4,28 @@
 
     <!--
       漫画归属任务 ID 查询：item 直接命中 comic_id，或 item 目标（章节/媒体）归属于该漫画。
-      漫画级操作（LQ/HQ/转码）的任务项是章节/媒体级，字面 target_id 反查会漏掉父漫画，
-      必须把 CHAPTER→chapter.comic_id、MEDIA→page.chapter.comic_id 解析进归属。
-      直接命中必须限定 target_type=COMIC，避免漫画、章节、媒体或系统目标 ID 撞号造成误归属。
+      使用 UNION 拆开三种目标类型，让每段查询分别命中 idx_mti_target、chapter.comic_id
+      和 page 主键，避免 OR + IN 子查询在大数据量下退化为低效执行计划。
+      UNION 自带去重，保持同一任务多条 item 只返回一个 task_id。
     -->
     <select id="selectTaskIdsByComicId" resultType="java.lang.Long">
-        SELECT DISTINCT i.task_id
+        SELECT i.task_id
         FROM management_task_item i
-        WHERE (i.target_type = 'COMIC'
-               AND i.target_id = #{comicId})
-           OR (i.target_type = 'CHAPTER'
-               AND i.target_id IN (SELECT id FROM chapter WHERE comic_id = #{comicId}))
-           OR (i.target_type = 'MEDIA'
-               AND i.target_id IN (SELECT p.id FROM page p
-                                   JOIN chapter c ON c.id = p.chapter_id
-                                   WHERE c.comic_id = #{comicId}))
+        WHERE i.target_type = 'COMIC'
+          AND i.target_id = #{comicId}
+        UNION
+        SELECT i.task_id
+        FROM management_task_item i
+        INNER JOIN chapter c ON c.id = i.target_id
+        WHERE i.target_type = 'CHAPTER'
+          AND c.comic_id = #{comicId}
+        UNION
+        SELECT i.task_id
+        FROM management_task_item i
+        INNER JOIN page p ON p.id = i.target_id
+        INNER JOIN chapter c ON c.id = p.chapter_id
+        WHERE i.target_type = 'MEDIA'
+          AND c.comic_id = #{comicId}
     </select>
 
 </mapper>
