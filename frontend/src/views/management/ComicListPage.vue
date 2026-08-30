@@ -144,10 +144,6 @@
               <span>· {{ statusLabel(comic.status) }}</span>
             </p>
           </div>
-          <div class="comic-actions">
-            <button class="action-btn" @click.stop="goStorage(comic.id)">存储</button>
-            <button class="action-btn" @click.stop="goEdit(comic.id)">编辑</button>
-          </div>
         </div>
       </div>
 
@@ -263,10 +259,6 @@ function statusLabel(s: string) {
 
 function goEdit(id: number) {
   router.push(`/manage/comics/${id}?tab=edit`)
-}
-
-function goStorage(id: number) {
-  router.push(`/manage/comics/${id}?tab=storage`)
 }
 
 function onPageChange(page: number) {
@@ -514,29 +506,6 @@ function formatBytes(bytes: number | undefined): string {
 
 .comic-meta span + span {
   margin-left: 6px;
-}
-
-.comic-actions {
-  flex-shrink: 0;
-}
-
-.action-btn {
-  min-height: 36px;
-  padding: 6px 12px;
-  background: var(--bg-surface);
-  color: var(--text-secondary);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.action-btn:hover {
-  border-color: var(--text-muted);
-  background: var(--surface-highlight);
-  color: var(--text-primary);
 }
 
 .pagination-wrapper {

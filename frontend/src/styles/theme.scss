@@ -143,6 +143,34 @@
   background: transparent !important;
 }
 
+/* 表格内的 link 按钮是轻量操作，不应套用整块红色主按钮外观。 */
+.el-button.is-link {
+  min-height: 24px;
+  padding: 2px 5px;
+  border: 0 !important;
+  border-radius: var(--radius-xs);
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--text-secondary) !important;
+}
+
+.el-button.is-link.el-button--primary {
+  color: var(--accent) !important;
+}
+
+.el-button.is-link.el-button--danger {
+  color: var(--danger) !important;
+}
+
+.el-button.is-link.el-button--warning {
+  color: var(--warning) !important;
+}
+
+.el-button.is-link:hover:not(:disabled) {
+  background: var(--accent-bg) !important;
+  color: var(--text-primary) !important;
+}
+
 /* 选择框沿用影院黑场，避免表格里出现突兀的白色方块。 */
 .el-checkbox {
   --el-checkbox-text-color: var(--text-secondary);
@@ -320,6 +348,22 @@
       color: var(--text-muted) !important;
     }
   }
+}
+
+/* Element Plus 字数统计默认是白底，深色主题下会形成突兀的白块。 */
+.el-input__count,
+.el-input__count-inner {
+  color: var(--text-muted) !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  pointer-events: none;
+}
+
+.el-input__count {
+  right: 10px;
+  padding: 0 4px;
+  border-radius: var(--radius-xs);
 }
 
 /* Element Plus 选择器内部的搜索输入不是独立控件，不能继承全局原生 input 外观。 */
@@ -643,10 +687,41 @@
 .el-tabs__item {
   color: var(--text-muted);
 
+  &:focus,
+  &:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+  }
+
   &:hover,
   &.is-active {
     color: var(--accent) !important;
   }
+}
+
+/* 所有可滚动面板沿用影院黑底，避免系统滚动条露出白色轨道。 */
+* {
+  scrollbar-color: var(--border-strong) var(--bg-secondary);
+  scrollbar-width: thin;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border: 2px solid var(--bg-secondary);
+  border-radius: var(--radius-pill);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
 }
 
 .el-drawer {
