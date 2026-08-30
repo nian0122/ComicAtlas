@@ -29,6 +29,7 @@
           :chapter="item.chapter"
           :active="item.chapterId === activeChapterId"
           :indent="item.indent"
+          :highlight-keyword="highlightKeyword"
           @click="emit('select', item.chapterId)"
         />
       </template>
@@ -72,6 +73,8 @@ type FlatItem = HeaderFlatItem | ChapterFlatItem
 const props = defineProps<{
   tree: CatalogNode[]
   activeChapterId?: number | null
+  highlightKeyword?: string
+  expandedNodePaths?: readonly string[]
 }>()
 
 const emit = defineEmits<{
@@ -86,7 +89,7 @@ function toggleExpanded(key: string) {
 }
 
 function isExpanded(key: string) {
-  return expandedIds.value.has(key)
+  return expandedIds.value.has(key) || props.expandedNodePaths?.includes(key) === true
 }
 
 provide('expandedIds', expandedIds)
@@ -111,7 +114,9 @@ function countChapters(node: CatalogNode): number {
 // 默认展开顶层分组（与原 CatalogTreeNode depth=0 onMounted 自动展开行为一致）
 watch(
   () => props.tree,
-  (tree) => {
+  (tree, previousTree) => {
+    // 过滤树切换时不改写 expandedIds，确保清空搜索后恢复用户原来的折叠状态。
+    if (previousTree?.length && tree.length) return
     tree.forEach((node, index) => {
       if (node.title) expandedIds.value.add(`/${keySegmentOf(node, index)}`)
     })

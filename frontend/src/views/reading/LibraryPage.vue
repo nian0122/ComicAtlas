@@ -822,9 +822,9 @@ onBeforeUnmount(() => {
 .active-filter-chip { max-width: 240px; overflow: hidden; padding: 4px 8px; border: 1px solid var(--border); border-radius: var(--radius-pill); background: var(--bg-surface); text-overflow: ellipsis; white-space: nowrap; }
 .active-filter-clear { margin-left: auto; }
 
-/* 桌面端（>768px）：包装层不参与布局，控件直接平铺进 toolbar，
+/* 桌面端（>1024px）：包装层不参与布局，控件直接平铺进 toolbar，
  * 并用 order 恢复原有控件顺序：搜索 → 分类 → 排序 → 标签 → 标签模式 */
-@media (min-width: 769px) {
+@media (min-width: 1025px) {
   .toolbar-main,
   .toolbar-filters {
     display: contents;
@@ -974,6 +974,11 @@ onBeforeUnmount(() => {
     align-items: center;
     gap: 2px;
     color: var(--text-secondary);
+  }
+
+  /* 移动/平板端排序已由标题行的 mobile-recent 提供，避免与桌面排序组重复。 */
+  .desktop-sort-group {
+    display: none;
   }
 
   .mobile-sort-order {

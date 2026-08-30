@@ -21,6 +21,12 @@
         :progress-scale="progressScale"
         :read-label="primaryAction?.label || '开始阅读'"
         :can-read="Boolean(primaryAction)"
+        v-model:search-keyword="searchKeyword"
+        :filtered-catalog-tree="filteredCatalogTree"
+        :is-searching="isSearching"
+        :result-count="resultCount"
+        :expanded-node-paths="expandedNodePaths"
+        @clear-search="clearSearch"
         @read="readComic"
         @select="goReader"
       />
@@ -88,32 +94,6 @@
             </div>
           </div>
 
-          <section v-if="comic.comicInfo" class="comicinfo-block" aria-label="ComicInfo.xml 元数据">
-            <div class="comicinfo-heading">
-              <span class="info-label">ComicInfo.xml</span>
-              <span class="comicinfo-badge">已解析</span>
-            </div>
-            <div class="comicinfo-grid">
-              <div v-if="comic.comicInfo.series" class="info-item">
-                <span class="info-label">Series</span>
-                <span class="info-value">{{ comic.comicInfo.series }}</span>
-              </div>
-              <div v-if="comic.comicInfo.title" class="info-item">
-                <span class="info-label">Title</span>
-                <span class="info-value">{{ comic.comicInfo.title }}</span>
-              </div>
-              <div v-if="comic.comicInfo.number" class="info-item">
-                <span class="info-label">Number</span>
-                <span class="info-value">{{ comic.comicInfo.number }}</span>
-              </div>
-              <div v-if="comic.comicInfo.writer" class="info-item">
-                <span class="info-label">Writer</span>
-                <span class="info-value">{{ comic.comicInfo.writer }}</span>
-              </div>
-            </div>
-            <p v-if="comic.comicInfo.summary" class="comicinfo-summary">{{ comic.comicInfo.summary }}</p>
-          </section>
-
           <details class="secondary-info">
             <summary>更多信息</summary>
             <div class="secondary-info-grid">
@@ -135,15 +115,25 @@
         <div class="section-inner">
           <div class="catalog-header">
             <h2 class="section-title">目录</h2>
-            <span v-if="totalChapters > 0" class="section-count">{{ totalChapters }} 个章节</span>
+            <span v-if="totalChapters > 0" class="section-count">
+              {{ isSearching ? `找到 ${resultCount} 个章节` : `${totalChapters} 个章节` }}
+            </span>
+            <ChapterSearchBox v-model="searchKeyword" />
           </div>
 
           <CatalogTree
-            v-if="catalogTree.length > 0"
-            :tree="catalogTree"
+            v-if="filteredCatalogTree.length > 0"
+            :tree="filteredCatalogTree"
             :active-chapter-id="comic.lastReadChapterId"
+            :highlight-keyword="searchKeyword"
+            :expanded-node-paths="expandedNodePaths"
             @select="goReader"
           />
+          <div v-else-if="isSearching" class="state empty small">
+            <el-icon :size="32"><Search /></el-icon>
+            <span>没有找到匹配章节</span>
+            <button type="button" class="clear-search-button" @click="clearSearch">清空搜索</button>
+          </div>
           <div v-else class="state empty small">
             <el-icon :size="32"><PictureFilled /></el-icon>
             <span>暂无章节</span>
@@ -163,7 +153,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { PictureFilled, WarningFilled } from '@element-plus/icons-vue'
+import { PictureFilled, Search, WarningFilled } from '@element-plus/icons-vue'
 import { comicApi, catalogApi } from '@/services/reading'
 
 import type { ComicDetailVO, CatalogNode, ChapterRef } from '@/types'
@@ -172,6 +162,7 @@ import MobileComicDetail from '@/components/reading/comic/MobileComicDetail.vue'
 import { sourceTypeLabel } from '@/utils/source-format'
 import HeroBanner from '@/components/reading/HeroBanner.vue'
 import { useInteractionMode } from '@/views/reading/reader/composables/useInteractionMode'
+import { ChapterSearchBox, useChapterSearch } from '@/features/chapter-search'
 
 const route = useRoute()
 const router = useRouter()
@@ -183,6 +174,15 @@ const comic = ref<ComicDetailVO | null>(null)
 const catalogTree = ref<CatalogNode[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
+
+const {
+  keyword: searchKeyword,
+  isSearching,
+  filteredTree: filteredCatalogTree,
+  resultCount,
+  expandedNodePaths,
+  clearSearch,
+} = useChapterSearch(catalogTree)
 
 const lastReadChapter = computed<ChapterRef | null>(() => {
   if (!comic.value?.lastReadChapterId) return null
@@ -442,7 +442,7 @@ onMounted(loadData)
 
 /* Information */
 .information-section {
-  padding: var(--space-xl) var(--page-padding) var(--space-2xl);
+  padding: var(--space-lg) var(--page-padding) var(--space-xl);
 }
 
 .section-inner {
@@ -454,7 +454,7 @@ onMounted(loadData)
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: var(--space-md);
+  margin-bottom: var(--space-sm);
 }
 
 .section-title {
@@ -467,15 +467,15 @@ onMounted(loadData)
 
 .info-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-base);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-sm);
 }
 
 .info-item {
   display: flex;
   flex-direction: column;
-  gap: var(--space-xs);
-  padding: var(--space-base);
+  gap: 2px;
+  padding: 10px 14px;
   background: var(--bg-surface);
   border-radius: var(--card-radius);
 }
@@ -494,41 +494,14 @@ onMounted(loadData)
 }
 
 .description-block,
-.tags-block,
-.comicinfo-block {
+.tags-block {
   display: grid;
   gap: var(--space-xs);
-  margin-top: var(--space-base);
-  padding: var(--space-base);
+  margin-top: var(--space-sm);
+  padding: 12px 14px;
   border: 1px solid var(--border);
   border-radius: var(--card-radius);
   background: color-mix(in srgb, var(--bg-surface) 72%, transparent);
-}
-
-.comicinfo-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-sm);
-}
-
-.comicinfo-badge {
-  color: var(--success);
-  font-size: 11px;
-}
-
-.comicinfo-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-base);
-}
-
-.comicinfo-summary {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 1.7;
-  white-space: pre-wrap;
 }
 
 .description-block p {
@@ -591,6 +564,21 @@ onMounted(loadData)
   margin-bottom: var(--space-lg);
 }
 
+.chapter-search-box { margin-left: auto; }
+
+.clear-search-button {
+  border: 0;
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-bg);
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+
+.clear-search-button:hover { background: var(--accent); color: var(--text-primary); }
+
 .catalog-header__action {
   margin-left: auto;
 }
@@ -634,10 +622,18 @@ onMounted(loadData)
 
 /* Responsive */
 @media (max-width: 1024px) {
-  .info-grid,
+  .info-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .secondary-info-grid {
     grid-template-columns: 1fr;
   }
+}
+
+@media (max-width: 640px) {
+  .catalog-header { flex-wrap: wrap; }
+  .chapter-search-box { order: 3; flex-basis: 100%; margin-left: 0; }
 }
 
 /* ==============================

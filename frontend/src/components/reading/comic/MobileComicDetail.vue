@@ -93,14 +93,24 @@
       <section class="catalog">
         <div class="catalog-heading">
           <h2>目录</h2>
-          <span>{{ totalChapters }} 话</span>
+          <span>{{ isSearching ? `找到 ${resultCount} 个章节` : `${totalChapters} 话` }}</span>
         </div>
+        <ChapterSearchBox
+          :model-value="searchKeyword"
+          @update:model-value="$emit('update:searchKeyword', $event)"
+        />
         <CatalogTree
-          v-if="catalogTree.length"
-          :tree="catalogTree"
+          v-if="filteredCatalogTree.length"
+          :tree="filteredCatalogTree"
           :active-chapter-id="comic.lastReadChapterId"
+          :highlight-keyword="searchKeyword"
+          :expanded-node-paths="expandedNodePaths"
           @select="$emit('select', $event)"
         />
+        <div v-else-if="isSearching" class="empty-catalog">
+          <p>没有找到匹配章节</p>
+          <button type="button" class="clear-search-button" @click="$emit('clear-search')">清空搜索</button>
+        </div>
         <p v-else class="empty-catalog">暂无章节</p>
       </section>
     </div>
@@ -111,6 +121,7 @@
 import { computed } from 'vue'
 import { VideoPlay } from '@element-plus/icons-vue'
 import CatalogTree from '@/components/reading/comic/CatalogTree.vue'
+import { ChapterSearchBox } from '@/features/chapter-search'
 import type { CatalogNode, ComicDetailVO } from '@/types'
 import { sourceTypeLabel } from '@/utils/source-format'
 
@@ -122,6 +133,11 @@ interface Props {
   progressScale: number
   readLabel: string
   canRead: boolean
+  searchKeyword: string
+  filteredCatalogTree: CatalogNode[]
+  isSearching: boolean
+  resultCount: number
+  expandedNodePaths: readonly string[]
 }
 
 const props = defineProps<Props>()
@@ -129,6 +145,8 @@ const props = defineProps<Props>()
 defineEmits<{
   read: []
   select: [chapterId: number]
+  'update:searchKeyword': [keyword: string]
+  'clear-search': []
 }>()
 
 const year = computed(() => props.comic.createdAt?.slice(0, 4) || '未知年份')
@@ -428,5 +446,21 @@ const hqSize = computed(() => {
 .empty-catalog {
   color: var(--text-muted);
   text-align: center;
+}
+
+.catalog :deep(.chapter-search-box) {
+  width: 100%;
+  margin-bottom: var(--space-4);
+}
+
+.clear-search-button {
+  border: 0;
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-bg);
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
 }
 </style>

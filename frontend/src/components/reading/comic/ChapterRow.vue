@@ -5,25 +5,63 @@
     :style="{ paddingLeft: (indent ?? 0) + 12 + 'px' }"
     @click="emit('click')"
   >
-    <span class="chapter-no">{{ chapter.chapterNo ? `第${chapter.chapterNo}话` : '未知' }}</span>
-    <span class="chapter-title">{{ chapter.title || '' }}</span>
+    <span class="chapter-no">
+      <template v-for="(segment, index) in chapterNumberSegments" :key="`number-${index}`">
+        <mark v-if="segment.matched">{{ segment.text }}</mark>
+        <template v-else>{{ segment.text }}</template>
+      </template>
+    </span>
+    <span class="chapter-title">
+      <template v-for="(segment, index) in titleSegments" :key="`title-${index}`">
+        <mark v-if="segment.matched">{{ segment.text }}</mark>
+        <template v-else>{{ segment.text }}</template>
+      </template>
+    </span>
     <span v-if="active" class="chapter-status">上次阅读</span>
     <span class="chapter-pages">{{ chapter.pageCount }}p</span>
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { ChapterRef } from '@/types'
 
-defineProps<{
+interface TextSegment {
+  text: string
+  matched: boolean
+}
+
+const props = defineProps<{
   chapter: ChapterRef
   active?: boolean
   indent?: number
+  highlightKeyword?: string
 }>()
 
 const emit = defineEmits<{
   click: []
 }>()
+
+function splitText(text: string): TextSegment[] {
+  const keyword = props.highlightKeyword?.trim()
+  if (!keyword || !text) return [{ text, matched: false }]
+  const segments: TextSegment[] = []
+  const normalizedText = text.toLocaleLowerCase()
+  const normalizedKeyword = keyword.toLocaleLowerCase()
+  let cursor = 0
+  let matchIndex = normalizedText.indexOf(normalizedKeyword, cursor)
+  while (matchIndex >= 0) {
+    if (matchIndex > cursor) segments.push({ text: text.slice(cursor, matchIndex), matched: false })
+    segments.push({ text: text.slice(matchIndex, matchIndex + keyword.length), matched: true })
+    cursor = matchIndex + keyword.length
+    matchIndex = normalizedText.indexOf(normalizedKeyword, cursor)
+  }
+  if (cursor < text.length) segments.push({ text: text.slice(cursor), matched: false })
+  return segments
+}
+
+const chapterNumberSegments = computed(() => splitText(props.chapter.chapterNo ? `第${props.chapter.chapterNo}话` : '未知'))
+const titleSegments = computed(() => splitText(props.chapter.title || ''))
 </script>
 
 <style scoped>
@@ -64,6 +102,13 @@ const emit = defineEmits<{
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+mark {
+  padding: 0 1px;
+  border-radius: 2px;
+  background: var(--accent-bg);
+  color: var(--accent);
 }
 
 .chapter-pages {

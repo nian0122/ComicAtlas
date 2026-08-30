@@ -146,6 +146,28 @@ textarea:not(.el-textarea__inner):focus-visible {
   outline: none;
 }
 
+/*
+ * 自定义控件内部的原生 input 由外层容器负责边框、背景和焦点态。
+ * 否则这里的通用表单样式会再次绘制一层边框，出现双重焦点框。
+ */
+input.unstyled-input {
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+input.unstyled-input:hover:not(:disabled),
+input.unstyled-input:focus,
+input.unstyled-input:focus-visible {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
 input:not(.el-input__inner):is(:not([type]), [type="text"], [type="search"], [type="number"], [type="url"], [type="email"], [type="password"], [type="tel"]):disabled,
 select:disabled,
 textarea:not(.el-textarea__inner):disabled {
