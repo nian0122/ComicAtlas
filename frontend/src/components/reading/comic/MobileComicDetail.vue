@@ -68,28 +68,6 @@
         </div>
       </section>
 
-      <section v-if="comic.comicInfo" class="comicinfo" aria-label="ComicInfo.xml 元数据">
-        <div class="comicinfo-heading">
-          <h2>ComicInfo.xml</h2>
-          <span>已解析</span>
-        </div>
-        <dl>
-          <template v-if="comic.comicInfo.series">
-            <dt>Series</dt><dd>{{ comic.comicInfo.series }}</dd>
-          </template>
-          <template v-if="comic.comicInfo.title">
-            <dt>Title</dt><dd>{{ comic.comicInfo.title }}</dd>
-          </template>
-          <template v-if="comic.comicInfo.number">
-            <dt>Number</dt><dd>{{ comic.comicInfo.number }}</dd>
-          </template>
-          <template v-if="comic.comicInfo.writer">
-            <dt>Writer</dt><dd>{{ comic.comicInfo.writer }}</dd>
-          </template>
-        </dl>
-        <p v-if="comic.comicInfo.summary">{{ comic.comicInfo.summary }}</p>
-      </section>
-
       <section class="catalog">
         <div class="catalog-heading">
           <h2>目录</h2>
@@ -289,8 +267,7 @@ const hqSize = computed(() => {
 
 .progress-panel,
 .facts,
-.catalog,
-.comicinfo {
+.catalog {
   margin-top: var(--space-10);
 }
 
@@ -353,59 +330,6 @@ const hqSize = computed(() => {
   color: var(--text-secondary);
   font-size: var(--text-sm);
   line-height: 1.75;
-}
-
-.comicinfo {
-  padding: var(--space-5);
-  border: 1px solid var(--color-border-faint);
-  border-radius: var(--radius-sm);
-}
-
-.comicinfo-heading {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-
-.comicinfo-heading h2 {
-  margin: 0;
-  font-size: var(--text-lg);
-  font-weight: 800;
-}
-
-.comicinfo-heading span {
-  color: var(--color-success);
-  font-size: 12px;
-}
-
-.comicinfo dl {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: var(--space-2) var(--space-4);
-  margin: var(--space-4) 0 0;
-}
-
-.comicinfo dt {
-  color: var(--text-muted);
-  font-size: 12px;
-}
-
-.comicinfo dd {
-  margin: 0;
-  overflow: hidden;
-  color: var(--text-primary);
-  font-size: var(--text-sm);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.comicinfo p {
-  margin: var(--space-4) 0 0;
-  color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 1.7;
-  white-space: pre-wrap;
 }
 
 .facts {

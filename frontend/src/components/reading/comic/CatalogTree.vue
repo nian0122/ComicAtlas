@@ -199,7 +199,7 @@ const flatItems = computed<FlatItem[]>(() => {
 }
 
 .catalog-scroller {
-  max-height: min(70vh, 420px);
+  max-height: min(calc(100vh - 96px), 720px);
 }
 
 .node-header {

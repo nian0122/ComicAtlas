@@ -36,8 +36,9 @@
       <HeroBanner
         :background-url="comic.coverUrl"
         :poster-url="comic.coverUrl"
+        variant="detail"
+        kicker="漫画详情"
         :title="comic.title"
-        :subtitle="progressSubtitle"
         :primary-action="primaryAction"
         :secondary-action="secondaryAction"
       >
@@ -201,17 +202,6 @@ const totalChapters = computed(() => {
     count += countChapters(node)
   }
   return count
-})
-
-const progressSubtitle = computed(() => {
-  if (!comic.value) return ''
-  const ch = lastReadChapter.value
-  const progressText = `进度 ${comic.value.lastReadPage || 1} / ${comic.value.pageCount || 0}`
-  if (ch) {
-    const chapterLabel = ch.title || `第${ch.chapterNo}话`
-    return `阅读至 ${chapterLabel} · ${progressText}`
-  }
-  return progressText
 })
 
 const progressMetaText = computed(() => {

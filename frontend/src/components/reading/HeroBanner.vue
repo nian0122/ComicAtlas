@@ -1,5 +1,5 @@
 <template>
-  <section class="hero-banner">
+  <section :class="['hero-banner', `hero-banner--${variant}`]">
     <div
       :class="['hero-background', { 'hero-background--empty': !backgroundUrl }]"
       :style="backgroundUrl ? { backgroundImage: `url(${backgroundUrl})` } : undefined"
@@ -23,7 +23,7 @@
       <div class="hero-info">
         <p class="hero-kicker">
           <span class="hero-kicker-dot" aria-hidden="true" />
-          {{ backgroundUrl ? 'CONTINUE YOUR SCREENING' : 'PRIVATE COMIC ARCHIVE' }}
+          {{ kicker || (backgroundUrl ? 'CONTINUE YOUR SCREENING' : 'PRIVATE COMIC ARCHIVE') }}
         </p>
         <h1 class="hero-title">{{ title }}</h1>
         <p v-if="subtitle" class="hero-subtitle">{{ subtitle }}</p>
@@ -71,6 +71,8 @@ interface HeroAction {
 interface HeroBannerProps {
   backgroundUrl: string
   posterUrl?: string
+  variant?: 'default' | 'detail'
+  kicker?: string
   title: string
   subtitle?: string
   description?: string
@@ -79,6 +81,8 @@ interface HeroBannerProps {
 }
 
 const props = defineProps<HeroBannerProps>()
+
+const variant = computed(() => props.variant || 'default')
 
 defineSlots<{
   description?: () => unknown
@@ -107,6 +111,63 @@ const hasActions = computed(
   min-height: var(--home-hero-height);
   overflow: hidden;
   color: var(--text-primary);
+}
+
+/* 详情页专属沉浸式 Hero：首页 Hero 保持原有节奏，避免样式相互影响。 */
+.hero-banner--detail {
+  min-height: clamp(420px, 54vh, 620px);
+  background: var(--bg-primary);
+}
+
+.hero-banner--detail .hero-background {
+  background-position: center 24%;
+  filter: saturate(0.78) brightness(0.46);
+  transform: translateX(-50%) scale(1.07);
+}
+
+.hero-banner--detail .hero-overlay {
+  background:
+    linear-gradient(90deg, rgb(0 0 0 / 70%) 0%, rgb(0 0 0 / 34%) 62%, rgb(0 0 0 / 12%) 100%),
+    linear-gradient(0deg, var(--bg-primary) 0%, rgb(0 0 0 / 78%) 22%, transparent 68%);
+}
+
+.hero-banner--detail .hero-content {
+  display: flex;
+  align-items: flex-end;
+  min-height: inherit;
+  box-sizing: border-box;
+  padding-top: clamp(180px, 26vh, 280px);
+  padding-bottom: clamp(var(--space-8), 9vh, var(--space-16));
+}
+
+.hero-banner--detail .hero-poster {
+  display: none;
+}
+
+.hero-banner--detail .hero-info {
+  max-width: min(820px, 76vw);
+}
+
+.hero-banner--detail .hero-kicker {
+  color: rgb(255 255 255 / 68%);
+}
+
+.hero-banner--detail .hero-title {
+  max-width: 18ch;
+  font-size: clamp(2.4rem, 5vw, 4.8rem);
+  text-wrap: balance;
+}
+
+.hero-banner--detail .hero-subtitle {
+  color: rgb(255 255 255 / 78%);
+}
+
+.hero-banner--detail .progress-block {
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: var(--radius-sm);
+  background: rgb(0 0 0 / 22%);
+  backdrop-filter: blur(8px);
 }
 
 .hero-background {
@@ -293,6 +354,10 @@ const hasActions = computed(
   .hero-background {
     background-position: center 16%;
     filter: saturate(0.94) brightness(0.68);
+  }
+
+  .hero-banner--detail .hero-background {
+    filter: saturate(0.92) brightness(0.7);
   }
 
   .hero-poster {
