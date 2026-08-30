@@ -2,35 +2,34 @@
   <div class="mobile-detail">
     <section class="cover-stage" aria-label="漫画封面">
       <div class="cover-backdrop" :style="{ backgroundImage: `url(${comic.coverUrl})` }" />
-      <img v-if="comic.coverUrl" class="cover-poster" :src="comic.coverUrl" :alt="comic.title">
-      <div v-else class="cover-placeholder" aria-label="暂无封面">
+      <div v-if="!comic.coverUrl" class="cover-placeholder" aria-label="暂无封面">
         <el-icon :size="64"><VideoPlay /></el-icon>
+      </div>
+      <div class="cover-content">
+        <header class="title-block">
+          <h1>{{ comic.title }}</h1>
+          <div class="metadata">
+            <span>{{ year }}</span>
+            <span>{{ totalChapters }} 话</span>
+            <span>{{ comic.pageCount }} 页</span>
+          </div>
+          <div v-if="comic.tags && comic.tags.length" class="tags" aria-label="漫画标签">
+            <span v-for="tag in comic.tags" :key="tag.name">{{ tag.name }}</span>
+          </div>
+        </header>
+        <button
+          type="button"
+          class="read-button"
+          :disabled="!canRead"
+          @click="$emit('read')"
+        >
+          <el-icon :size="21"><VideoPlay /></el-icon>
+          {{ readLabel }}
+        </button>
       </div>
     </section>
 
     <div class="detail-body">
-      <header class="title-block">
-        <h1>{{ comic.title }}</h1>
-        <div class="metadata">
-          <span>{{ year }}</span>
-          <span>{{ totalChapters }} 话</span>
-          <span>{{ comic.pageCount }} 页</span>
-        </div>
-        <div v-if="comic.tags && comic.tags.length" class="tags" aria-label="漫画标签">
-          <span v-for="tag in comic.tags" :key="tag.name">{{ tag.name }}</span>
-        </div>
-      </header>
-
-      <button
-        type="button"
-        class="read-button"
-        :disabled="!canRead"
-        @click="$emit('read')"
-      >
-        <el-icon :size="21"><VideoPlay /></el-icon>
-        {{ readLabel }}
-      </button>
-
       <section class="progress-panel" aria-labelledby="mobile-progress-title">
         <div class="progress-heading">
           <div>
@@ -44,9 +43,9 @@
         </div>
       </section>
 
-      <section class="summary">
+      <section v-if="comic.description" class="summary">
         <h2>剧情摘要</h2>
-        <p>{{ comic.description || '暂无简介' }}</p>
+        <p>{{ comic.description }}</p>
       </section>
 
       <section class="facts" aria-label="漫画信息">
@@ -61,10 +60,6 @@
         <div>
           <span>文件大小</span>
           <strong>{{ hqSize }}</strong>
-        </div>
-        <div>
-          <span>来源</span>
-          <strong>{{ sourceTypeLabel(comic.sourceType) }}</strong>
         </div>
       </section>
 
@@ -101,7 +96,6 @@ import { VideoPlay } from '@element-plus/icons-vue'
 import CatalogTree from '@/components/reading/comic/CatalogTree.vue'
 import { ChapterSearchBox } from '@/features/chapter-search'
 import type { CatalogNode, ComicDetailVO } from '@/types'
-import { sourceTypeLabel } from '@/utils/source-format'
 
 interface Props {
   comic: ComicDetailVO
@@ -154,37 +148,46 @@ const hqSize = computed(() => {
 
 .cover-stage {
   position: relative;
-  display: grid;
-  place-items: end center;
-  min-height: clamp(480px, 125vw, 560px);
-  padding: calc(var(--mobile-nav-height) + var(--space-5)) var(--space-5) var(--space-6);
+  display: flex;
+  align-items: flex-end;
+  min-height: clamp(420px, 118vw, 580px);
+  padding: calc(var(--mobile-nav-height) + var(--space-5)) var(--mobile-page-gutter) var(--space-6);
   overflow: hidden;
 }
 
 .cover-backdrop {
   position: absolute;
   inset: 0;
-  background-position: center 20%;
-  background-size: cover;
-  filter: blur(var(--mobile-detail-backdrop-blur)) brightness(0.42) saturate(0.85);
-  transform: scale(var(--mobile-detail-backdrop-scale));
+  background-position: center top;
+  background-color: #050505;
+  background-repeat: no-repeat;
+  background-size: 100% auto;
+  filter: brightness(0.68) saturate(0.92);
+  transform: scale(1.02);
 }
 
 .cover-stage::after {
   position: absolute;
   inset: 0;
   content: "";
-  background: var(--mobile-detail-stage-scrim);
+  background:
+    linear-gradient(
+      180deg,
+      rgb(0 0 0 / 0%) 34%,
+      rgb(0 0 0 / 8%) 49%,
+      rgb(0 0 0 / 58%) 74%,
+      var(--mobile-canvas) 100%
+    );
 }
 
 .cover-poster {
+  display: none;
+}
+
+.cover-content {
   position: relative;
   z-index: 1;
-  width: min(62vw, 280px);
-  aspect-ratio: 2 / 3;
-  border-radius: var(--radius-md);
-  object-fit: cover;
-  box-shadow: var(--shadow-lg);
+  width: 100%;
 }
 
 .cover-placeholder {
@@ -208,12 +211,17 @@ const hqSize = computed(() => {
 
 .title-block h1 {
   margin: 0;
-  color: var(--accent);
-  font-size: var(--mobile-detail-title-size);
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: clamp(24px, 7vw, 34px);
   font-weight: 800;
   letter-spacing: -0.04em;
   line-height: 1.08;
   text-align: center;
+  text-shadow: 0 2px 18px rgb(0 0 0 / 70%);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
 }
 
 .metadata {
@@ -222,7 +230,7 @@ const hqSize = computed(() => {
   justify-content: center;
   gap: var(--space-4);
   margin-top: var(--space-3);
-  color: var(--text-secondary);
+  color: rgb(255 255 255 / 82%);
   font-size: var(--text-sm);
   font-weight: 600;
 }
@@ -239,9 +247,10 @@ const hqSize = computed(() => {
 .tags span {
   flex: 0 0 auto;
   padding: 6px 12px;
-  border: 1px solid var(--color-line-strong);
+  border: 1px solid rgb(255 255 255 / 24%);
   border-radius: var(--radius-pill);
-  color: var(--text-secondary);
+  background: rgb(0 0 0 / 18%);
+  color: rgb(255 255 255 / 86%);
   font-size: 12px;
 }
 
@@ -251,14 +260,15 @@ const hqSize = computed(() => {
   justify-content: center;
   gap: var(--space-2);
   width: 100%;
-  min-height: 52px;
-  margin-top: var(--space-8);
-  border: 0;
+  min-height: 48px;
+  margin-top: var(--space-5);
+  border: 1px solid rgb(255 255 255 / 12%);
   border-radius: var(--radius-sm);
   background: var(--accent);
   color: var(--color-on-brand);
   font: inherit;
   font-weight: 800;
+  box-shadow: 0 10px 24px rgb(0 0 0 / 28%);
 }
 
 .read-button:disabled {
@@ -268,12 +278,17 @@ const hqSize = computed(() => {
 .progress-panel,
 .facts,
 .catalog {
-  margin-top: var(--space-10);
+  margin-top: var(--space-6);
+}
+
+.progress-panel {
+  padding-bottom: var(--space-5);
+  border-bottom: 1px solid var(--color-border-faint);
 }
 
 .summary {
   min-height: 0;
-  margin-top: var(--space-10);
+  margin-top: var(--space-6);
 }
 
 .progress-heading {
@@ -335,8 +350,8 @@ const hqSize = computed(() => {
 .facts {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-5) var(--space-4);
-  padding-block: var(--space-6);
+  gap: var(--space-4) var(--space-4);
+  padding-block: var(--space-5);
   border-block: 1px solid var(--color-border-faint);
 }
 
