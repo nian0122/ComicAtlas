@@ -18,7 +18,7 @@ services:
       NACOS_USER: ${REMOTE_NACOS_USER:?请设置 REMOTE_NACOS_USER}
       NACOS_PASS: ${REMOTE_NACOS_PASSWORD:?请设置 REMOTE_NACOS_PASSWORD}
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8000/actuator/health"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8000/actuator/health"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -56,7 +56,7 @@ services:
       SPRING_SECURITY_USER_PASSWORD: ${REMOTE_RABBITMQ_PASSWORD:?请设置 REMOTE_RABBITMQ_PASSWORD}
       MANGA_ROOT: /storage
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8010/actuator/health"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8010/actuator/health"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -95,7 +95,7 @@ services:
       REDIS_PASS: ${REMOTE_REDIS_PASSWORD:?请设置 REMOTE_REDIS_PASSWORD}
       MANGA_ROOT: /storage
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8011/actuator/health"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8011/actuator/health"]
       interval: 10s
       timeout: 5s
       retries: 10
