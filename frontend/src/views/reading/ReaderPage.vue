@@ -285,8 +285,8 @@ async function loadCurrentChapter(preservePage = false, restoreProgress = true) 
       store.currentPage = Math.max(1, store.totalPages)
     } else {
       const pageFromQuery = Number(rawPage)
-      // page=1 通常只是章节导航的默认参数，不应覆盖已保存的阅读进度。
-      if (pageFromQuery > 1 && pageFromQuery <= store.totalPages) {
+      // 显式页码代表本次导航意图：切换章节的 page=1 必须从章节开头开始，不能被上一章历史覆盖。
+      if (rawPage !== undefined && pageFromQuery >= 1 && pageFromQuery <= store.totalPages) {
         store.currentPage = pageFromQuery
       } else if (restoreProgress) {
         await store.restoreProgress()

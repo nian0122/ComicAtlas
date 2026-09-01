@@ -91,9 +91,18 @@ export const useReaderStore = defineStore('reader', () => {
     const chapterId = state.chapterId
     try {
       const res = await historyApi.get(state.comicId)
+      const historyChapterId = res.data?.chapterId
       const pageNumber = res.data?.pageNumber
       // 历史请求可能晚于切章返回，过期响应不得覆盖新章节的当前页。
-      if (seq === loadSeq && state.chapterId === chapterId && pageNumber && pageNumber >= 1 && pageNumber <= state.pages.length) {
+      // reading_history 保存的是漫画最近一次阅读位置，只有历史章节与当前章节一致时才能恢复章节内页码。
+      if (
+        seq === loadSeq &&
+        state.chapterId === chapterId &&
+        historyChapterId === chapterId &&
+        pageNumber &&
+        pageNumber >= 1 &&
+        pageNumber <= state.pages.length
+      ) {
         state.currentPage = pageNumber
       }
     } catch {
