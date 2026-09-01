@@ -54,8 +54,8 @@ export function useReaderShortcuts(options: {
 
     if (isImage) {
       const pageIndex = readerStore.currentPage - 1
-      if (forceHqPages.has(pageIndex)) forceHqPages.delete(pageIndex)
-      else forceHqPages.add(pageIndex)
+      // 双击是幂等的“提升为原图”操作：重复双击不得切回 LQ 或重复改变状态。
+      forceHqPages.add(pageIndex)
     } else if (isViewport) {
       readerSettings.resetZoom()
     }
