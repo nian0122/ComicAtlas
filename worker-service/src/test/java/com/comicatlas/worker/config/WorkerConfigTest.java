@@ -37,6 +37,26 @@ class WorkerConfigTest {
     private static final long SPLIT_SIZE_MAX_BYTES = 4_294_967_295L;
 
     @Test
+    @DisplayName("LQ 默认最大长边为 3840、质量为 70")
+    void defaultLqConfigBalancesReaderQualityAndProcessingCost() {
+        WorkerConfig config = new WorkerConfig();
+
+        assertThat(config.getImage().getMaxLongEdge()).isEqualTo(3840);
+        assertThat(config.getLqQuality()).isEqualTo(70);
+    }
+
+    @Test
+    @DisplayName("LQ 最大长边超过 WebP 上限时校验失败")
+    void lqMaxLongEdgeAboveWebpLimitFailsValidation() {
+        WorkerConfig config = validWorkerConfig();
+        config.getImage().setMaxLongEdge(16_384);
+
+        assertThatThrownBy(config::validateZipConfig)
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("最大长边");
+    }
+
+    @Test
     @DisplayName("默认 splitSize=2GiB、maxEntrySize=maxTotalSize=30GiB，long 不溢出")
     void defaultZipConfigUsesLongCapacitiesWithoutOverflow() {
         WorkerConfig.Zip zip = new WorkerConfig().getZip();

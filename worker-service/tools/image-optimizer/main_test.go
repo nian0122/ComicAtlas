@@ -52,6 +52,7 @@ func TestRun_existingLqReportsActualOutputSize(t *testing.T) {
 		ScanDir:           scanDir,
 		OutputDir:         outputDir,
 		Workers:           1,
+		MaxLongEdge:       defaultMaxLongEdge,
 		MaxInflightPixels: defaultMaxInflightPixels,
 		Quiet:             true,
 		Extensions:        parseExtensions(defaultExtensions),

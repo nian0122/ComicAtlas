@@ -7,7 +7,7 @@ import (
 	"image/gif"
 	"image/jpeg"
 	"image/png"
-	"io"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -16,6 +16,8 @@ import (
 	"time"
 
 	"github.com/chai2010/webp"
+	"golang.org/x/image/bmp"
+	"golang.org/x/image/draw"
 )
 
 const maxWebpDimension = 16383
@@ -61,13 +63,13 @@ type OptimizeResult struct {
 	OutputFormat string
 }
 
-// optimizeImageToWebP 将图片转换为 WebP；超过 WebP 边长限制时使用同名 JPEG 兜底。
+// optimizeImageToWebP 将图片等比缩放到 LQ 尺寸并统一转换为 WebP。
 func optimizeImageToWebP(filePath string, outputPath string, quality int) (OptimizeResult, error) {
-	return optimizeImageToWebPWithBudget(filePath, outputPath, quality, nil)
+	return optimizeImageToWebPWithBudget(filePath, outputPath, quality, defaultMaxLongEdge, nil)
 }
 
 func optimizeImageToWebPWithBudget(filePath string, outputPath string, quality int,
-	decodeBudget *pixelBudget) (OptimizeResult, error) {
+	maxLongEdge int, decodeBudget *pixelBudget) (OptimizeResult, error) {
 	result := OptimizeResult{}
 	sourceInfo, err := os.Stat(filePath)
 	if err != nil {
@@ -77,49 +79,53 @@ func optimizeImageToWebPWithBudget(filePath string, outputPath string, quality i
 
 	extension := strings.ToLower(filepath.Ext(filePath))
 	width, height, hasDimensions := readImageDimension(filePath, extension)
+	if maxLongEdge < 1 {
+		return result, fmt.Errorf("LQ 最大长边必须大于 0: %d", maxLongEdge)
+	}
+	turboDecode := false
+	turboScaleNumerator := 8
+	if hasDimensions && isJpegExtension(extension) && needsResize(width, height, maxLongEdge) {
+		if _, resolveErr := resolveDjpegPath(); resolveErr == nil {
+			turboDecode = true
+			turboScaleNumerator = jpegTurboScaleNumerator(width, height, maxLongEdge)
+		}
+	}
 	if decodeBudget != nil {
 		pixels := int64(0)
 		if hasDimensions {
-			pixels = int64(width) * int64(height)
+			pixels = estimatedDecodePixels(width, height, turboDecode, turboScaleNumerator)
 		}
 		release := decodeBudget.acquire(pixels)
 		defer release()
 	}
-	if hasDimensions && (width > maxWebpDimension || height > maxWebpDimension) {
-		return optimizeOversizedJpegWithTurbo(filePath, outputPath, extension, quality, result)
+
+	outputDirectory := filepath.Dir(outputPath)
+	if err := os.MkdirAll(outputDirectory, 0755); err != nil {
+		return result, fmt.Errorf("创建输出目录失败: %w", err)
 	}
 
-	inputFile, err := os.Open(filePath)
-	if err != nil {
-		return result, fmt.Errorf("打开源文件失败: %w", err)
+	var imageData image.Image
+	if turboDecode {
+		imageData, err = decodeScaledJpegWithTurbo(filePath, outputDirectory, turboScaleNumerator)
+	} else {
+		imageData, err = decodeImageFile(filePath, extension)
 	}
-	defer inputFile.Close()
-
-	if _, err := inputFile.Seek(0, io.SeekStart); err != nil {
-		return result, fmt.Errorf("重置源文件指针失败: %w", err)
-	}
-	imageData, err := decodeImage(inputFile, extension)
 	if err != nil {
 		return result, fmt.Errorf("解码图片失败: %w", err)
 	}
 
-	if !hasDimensions {
-		bounds := imageData.Bounds()
-		width, height = bounds.Dx(), bounds.Dy()
+	imageData = resizeToLongEdge(imageData, maxLongEdge)
+	outputBounds := imageData.Bounds()
+	if outputBounds.Dx() <= 0 || outputBounds.Dy() <= 0 {
+		return result, fmt.Errorf("缩放后图片尺寸无效: %dx%d", outputBounds.Dx(), outputBounds.Dy())
 	}
-	if width <= 0 || height <= 0 {
-		return result, fmt.Errorf("图片尺寸无效: %dx%d", width, height)
+	if outputBounds.Dx() > maxWebpDimension || outputBounds.Dy() > maxWebpDimension {
+		return result, fmt.Errorf("缩放后图片尺寸仍超出 WebP 上限: %dx%d",
+			outputBounds.Dx(), outputBounds.Dy())
 	}
 
-	encodeWebP := width <= maxWebpDimension && height <= maxWebpDimension
-	outputExtension := ".webp"
-	outputFormat := "webp"
-	if !encodeWebP {
-		outputExtension = ".jpg"
-		outputFormat = "jpeg"
-	}
-	actualOutputPath := replaceExtension(outputPath, outputExtension)
-	if err := encodeImageAtomically(actualOutputPath, imageData, quality, encodeWebP); err != nil {
+	actualOutputPath := replaceExtension(outputPath, ".webp")
+	if err := encodeWebPAtomically(actualOutputPath, imageData, quality); err != nil {
 		return result, err
 	}
 
@@ -130,115 +136,140 @@ func optimizeImageToWebPWithBudget(filePath string, outputPath string, quality i
 	if outputInfo.Size() == 0 {
 		return result, fmt.Errorf("输出文件为空: %s", actualOutputPath)
 	}
-	if !encodeWebP {
-		// JPEG 兜底时删除旧 WebP，避免读取端误命中旧版本。
-		_ = os.Remove(replaceExtension(outputPath, ".webp"))
-	}
+	// 新版 LQ 统一输出 WebP，删除旧版超限图片可能遗留的同名 JPEG。
+	_ = os.Remove(replaceExtension(outputPath, ".jpg"))
 	result.OutputSize = outputInfo.Size()
 	result.OutputPath = actualOutputPath
-	result.OutputFormat = outputFormat
+	result.OutputFormat = "webp"
 	return result, nil
 }
 
-func optimizeOversizedJpegWithTurbo(filePath string, outputPath string, extension string,
-	quality int, result OptimizeResult) (OptimizeResult, error) {
-	if extension != ".jpg" && extension != ".jpeg" {
-		return result, fmt.Errorf("超大图片仅支持 JPEG 低内存兜底，当前格式: %s", extension)
-	}
-	djpegPath, cjpegPath, err := resolveJpegTurboPaths()
+func decodeImageFile(filePath string, extension string) (image.Image, error) {
+	inputFile, err := os.Open(filePath)
 	if err != nil {
-		return result, err
+		return nil, fmt.Errorf("打开源文件失败: %w", err)
 	}
-	outputFilePath := replaceExtension(outputPath, ".jpg")
-	outputDirectory := filepath.Dir(outputFilePath)
-	if err := os.MkdirAll(outputDirectory, 0755); err != nil {
-		return result, fmt.Errorf("创建 JPEG 输出目录失败: %w", err)
-	}
-	temporaryFile, err := os.CreateTemp(outputDirectory, ".image-optimizer-*.jpg")
+	defer inputFile.Close()
+	return decodeImage(inputFile, extension)
+}
+
+// decodeScaledJpegWithTurbo 利用 JPEG DCT 缩放在完整像素解码前降低分辨率，
+// 避免超大 JPEG 先在 Go 堆中展开为数 GB 图像。
+func decodeScaledJpegWithTurbo(filePath string, temporaryDirectory string,
+	scaleNumerator int) (image.Image, error) {
+	djpegPath, err := resolveDjpegPath()
 	if err != nil {
-		return result, fmt.Errorf("创建 JPEG 临时文件失败: %w", err)
+		return nil, err
+	}
+	temporaryFile, err := os.CreateTemp(temporaryDirectory, ".image-optimizer-*.bmp")
+	if err != nil {
+		return nil, fmt.Errorf("创建缩放解码临时文件失败: %w", err)
 	}
 	temporaryPath := temporaryFile.Name()
-	if err := temporaryFile.Close(); err != nil {
+	if closeErr := temporaryFile.Close(); closeErr != nil {
 		_ = os.Remove(temporaryPath)
-		return result, fmt.Errorf("关闭 JPEG 临时文件失败: %w", err)
+		return nil, fmt.Errorf("关闭缩放解码临时文件失败: %w", closeErr)
 	}
 	defer os.Remove(temporaryPath)
-	ppmFile, err := os.CreateTemp(outputDirectory, ".image-optimizer-*.ppm")
-	if err != nil {
-		return result, fmt.Errorf("创建 JPEG 中间文件失败: %w", err)
-	}
-	ppmPath := ppmFile.Name()
-	if err := ppmFile.Close(); err != nil {
-		_ = os.Remove(ppmPath)
-		return result, fmt.Errorf("关闭 JPEG 中间文件失败: %w", err)
-	}
-	defer os.Remove(ppmPath)
 
-	qualityValue := quality
-	if qualityValue < 1 {
-		qualityValue = 1
-	}
-	if qualityValue > 100 {
-		qualityValue = 100
-	}
 	contextValue, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
-	decodeCommand := exec.CommandContext(contextValue, djpegPath, "-onepass", "-maxmemory", "65536",
-		"-outfile", ppmPath, filePath)
+	decodeCommand := exec.CommandContext(contextValue, djpegPath,
+		"-scale", fmt.Sprintf("%d/8", scaleNumerator),
+		"-bmp", "-outfile", temporaryPath, filePath)
 	decodeOutput, decodeErr := decodeCommand.CombinedOutput()
 	if contextValue.Err() != nil {
-		return result, fmt.Errorf("libjpeg-turbo JPEG 处理超时: %w", contextValue.Err())
+		return nil, fmt.Errorf("libjpeg-turbo 缩放解码超时: %w", contextValue.Err())
 	}
 	if decodeErr != nil {
-		return result, fmt.Errorf("libjpeg-turbo JPEG 解码失败: %w: %s", decodeErr,
+		return nil, fmt.Errorf("libjpeg-turbo 缩放解码失败: %w: %s", decodeErr,
 			strings.TrimSpace(string(decodeOutput)))
 	}
-	encodeCommand := exec.CommandContext(contextValue, cjpegPath,
-		"-quality", fmt.Sprint(qualityValue), "-optimize", "-outfile", temporaryPath, ppmPath)
-	encodeOutput, encodeErr := encodeCommand.CombinedOutput()
-	if contextValue.Err() != nil {
-		return result, fmt.Errorf("libjpeg-turbo JPEG 处理超时: %w", contextValue.Err())
+
+	decodedFile, err := os.Open(temporaryPath)
+	if err != nil {
+		return nil, fmt.Errorf("打开缩放解码产物失败: %w", err)
 	}
-	if encodeErr != nil {
-		return result, fmt.Errorf("libjpeg-turbo JPEG 编码失败: %w: %s", encodeErr,
-			strings.TrimSpace(string(encodeOutput)))
+	defer decodedFile.Close()
+	decodedImage, err := bmp.Decode(decodedFile)
+	if err != nil {
+		return nil, fmt.Errorf("读取缩放解码产物失败: %w", err)
 	}
-	outputInfo, err := os.Stat(temporaryPath)
-	if err != nil || outputInfo.Size() == 0 {
-		if err != nil {
-			return result, fmt.Errorf("libjpeg-turbo 未生成有效 JPEG: %w", err)
-		}
-		return result, fmt.Errorf("libjpeg-turbo 未生成有效 JPEG")
-	}
-	if err := os.Remove(outputFilePath); err != nil && !os.IsNotExist(err) {
-		return result, fmt.Errorf("替换旧 JPEG 文件失败: %w", err)
-	}
-	if err := os.Rename(temporaryPath, outputFilePath); err != nil {
-		return result, fmt.Errorf("发布 JPEG 文件失败: %w", err)
-	}
-	_ = os.Remove(replaceExtension(outputPath, ".webp"))
-	result.OutputSize = outputInfo.Size()
-	result.OutputPath = outputFilePath
-	result.OutputFormat = "jpeg"
-	return result, nil
+	return decodedImage, nil
 }
 
-func resolveJpegTurboPaths() (string, string, error) {
+func resizeToLongEdge(sourceImage image.Image, maxLongEdge int) image.Image {
+	sourceBounds := sourceImage.Bounds()
+	sourceWidth := sourceBounds.Dx()
+	sourceHeight := sourceBounds.Dy()
+	targetWidth, targetHeight := scaledDimensions(sourceWidth, sourceHeight, maxLongEdge)
+	if targetWidth == sourceWidth && targetHeight == sourceHeight {
+		return sourceImage
+	}
+	targetImage := image.NewRGBA(image.Rect(0, 0, targetWidth, targetHeight))
+	draw.CatmullRom.Scale(targetImage, targetImage.Bounds(), sourceImage, sourceBounds, draw.Src, nil)
+	return targetImage
+}
+
+func scaledDimensions(width int, height int, maxLongEdge int) (int, int) {
+	if width <= 0 || height <= 0 || maxLongEdge <= 0 || !needsResize(width, height, maxLongEdge) {
+		return width, height
+	}
+	longEdge := width
+	if height > longEdge {
+		longEdge = height
+	}
+	scale := float64(maxLongEdge) / float64(longEdge)
+	targetWidth := max(1, int(math.Round(float64(width)*scale)))
+	targetHeight := max(1, int(math.Round(float64(height)*scale)))
+	return targetWidth, targetHeight
+}
+
+func needsResize(width int, height int, maxLongEdge int) bool {
+	return width > maxLongEdge || height > maxLongEdge
+}
+
+func jpegTurboScaleNumerator(width int, height int, maxLongEdge int) int {
+	longEdge := width
+	if height > longEdge {
+		longEdge = height
+	}
+	if longEdge <= maxLongEdge {
+		return 8
+	}
+	numerator := int(math.Ceil(float64(maxLongEdge) * 8 / float64(longEdge)))
+	if numerator < 1 {
+		return 1
+	}
+	if numerator > 8 {
+		return 8
+	}
+	return numerator
+}
+
+func estimatedDecodePixels(width int, height int, turboDecode bool, turboScaleNumerator int) int64 {
+	pixels := int64(width) * int64(height)
+	if !turboDecode {
+		return pixels
+	}
+	scaleNumerator := int64(turboScaleNumerator)
+	return max(1, pixels*scaleNumerator*scaleNumerator/64)
+}
+
+func isJpegExtension(extension string) bool {
+	return extension == ".jpg" || extension == ".jpeg"
+}
+
+func resolveDjpegPath() (string, error) {
 	djpegPath := os.Getenv("IMAGE_DJPEG_PATH")
-	cjpegPath := os.Getenv("IMAGE_CJPEG_PATH")
 	if djpegPath == "" {
 		djpegPath = "djpeg"
 	}
-	if cjpegPath == "" {
-		cjpegPath = "cjpeg"
+	resolvedPath, err := resolveExecutablePath(djpegPath)
+	if err != nil {
+		return "", fmt.Errorf("JPEG 缩放解码需要 libjpeg-turbo，请配置 IMAGE_DJPEG_PATH: %w", err)
 	}
-	resolvedDjpegPath, djpegErr := resolveExecutablePath(djpegPath)
-	resolvedCjpegPath, cjpegErr := resolveExecutablePath(cjpegPath)
-	if djpegErr != nil || cjpegErr != nil {
-		return "", "", fmt.Errorf("超大 JPEG 需要 libjpeg-turbo，请配置 IMAGE_DJPEG_PATH/IMAGE_CJPEG_PATH")
-	}
-	return resolvedDjpegPath, resolvedCjpegPath, nil
+	return resolvedPath, nil
 }
 
 func resolveExecutablePath(path string) (string, error) {
@@ -296,7 +327,7 @@ func readImageDimension(filePath string, extension string) (int, int, bool) {
 	return width, height, width > 0 && height > 0
 }
 
-func encodeImageAtomically(outputPath string, imageData image.Image, quality int, encodeWebP bool) error {
+func encodeWebPAtomically(outputPath string, imageData image.Image, quality int) error {
 	outputDirectory := filepath.Dir(outputPath)
 	if err := os.MkdirAll(outputDirectory, 0755); err != nil {
 		return fmt.Errorf("创建输出目录失败: %w", err)
@@ -308,17 +339,13 @@ func encodeImageAtomically(outputPath string, imageData image.Image, quality int
 	temporaryPath := temporaryFile.Name()
 	defer os.Remove(temporaryPath)
 
-	if encodeWebP {
-		options := &webp.Options{Lossless: false, Quality: float32(quality)}
-		err = webp.Encode(temporaryFile, imageData, options)
-	} else {
-		err = jpeg.Encode(temporaryFile, imageData, &jpeg.Options{Quality: quality})
-	}
+	options := &webp.Options{Lossless: false, Quality: float32(quality)}
+	err = webp.Encode(temporaryFile, imageData, options)
 	if closeErr := temporaryFile.Close(); err == nil {
 		err = closeErr
 	}
 	if err != nil {
-		return fmt.Errorf("编码 %s 失败: %w", outputFormatName(encodeWebP), err)
+		return fmt.Errorf("编码 WebP 失败: %w", err)
 	}
 	if err := os.Remove(outputPath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("替换旧输出文件失败: %w", err)
@@ -327,13 +354,6 @@ func encodeImageAtomically(outputPath string, imageData image.Image, quality int
 		return fmt.Errorf("发布输出文件失败: %w", err)
 	}
 	return nil
-}
-
-func outputFormatName(encodeWebP bool) string {
-	if encodeWebP {
-		return "WebP"
-	}
-	return "JPEG"
 }
 
 func replaceExtension(filePath string, extension string) string {

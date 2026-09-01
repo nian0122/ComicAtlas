@@ -65,6 +65,7 @@ public class ImageOptimizer {
                 "-chapter-no", chapterNo,
                 "-quality", String.valueOf(config.getLqQuality()),
                 "-workers", String.valueOf(workers),
+                "-max-long-edge", String.valueOf(config.getImage().getMaxLongEdge()),
                 "-max-inflight-pixels", String.valueOf(config.getImage().getMaxInflightPixels()),
                 "-json"
         ));
@@ -73,9 +74,10 @@ public class ImageOptimizer {
         }
 
         log.info("启动图片优化: comicId={}, chapterId={}, hqDir={}, lqDir={}, workers={}, "
-                        + "maxInflightPixels={}, quality={}, force={}",
+                        + "maxLongEdge={}, maxInflightPixels={}, quality={}, force={}",
                 comicId, chapterId, hqDirStr, lqDirStr, workers,
-                config.getImage().getMaxInflightPixels(), config.getLqQuality(), force);
+                config.getImage().getMaxLongEdge(), config.getImage().getMaxInflightPixels(),
+                config.getLqQuality(), force);
         return runOptimizer(cmd, comicId, chapterId);
     }
 

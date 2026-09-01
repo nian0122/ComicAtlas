@@ -15,7 +15,8 @@ import (
 )
 
 const (
-	defaultQuality           = 15
+	defaultQuality           = 70
+	defaultMaxLongEdge       = 3840
 	defaultMaxInflightPixels = 80_000_000
 	defaultExtensions        = ".jpg,.jpeg,.png,.webp,.gif"
 )
@@ -29,6 +30,8 @@ type CLIConfig struct {
 	OutputDir string
 	Quality   int
 	Workers   int
+	// MaxLongEdge 限制 LQ 输出图片的最长边，保持原始宽高比且禁止放大。
+	MaxLongEdge int
 	// MaxInflightPixels 限制所有 worker 同时处于解码/编码阶段的总像素数。
 	MaxInflightPixels int64
 	Force             bool
@@ -75,6 +78,7 @@ func main() {
 	outputDir := flag.String("output-dir", "", "输出目录（LQ 输出目录）")
 	quality := flag.Int("quality", defaultQuality, "WebP 质量 (1-100)")
 	workers := flag.Int("workers", 0, "并发数（默认 CPU 核心数）")
+	maxLongEdge := flag.Int("max-long-edge", defaultMaxLongEdge, "LQ 输出图片最大长边")
 	maxInflightPixels := flag.Int64("max-inflight-pixels", defaultMaxInflightPixels,
 		"所有 worker 同时解码/编码的总像素预算")
 	force := flag.Bool("force", false, "强制重新处理")
@@ -98,6 +102,14 @@ func main() {
 		fmt.Fprintln(os.Stderr, "错误: -workers 必须大于 0")
 		os.Exit(2)
 	}
+	if *quality < 1 || *quality > 100 {
+		fmt.Fprintln(os.Stderr, "错误: -quality 必须位于 1..100")
+		os.Exit(2)
+	}
+	if *maxLongEdge < 1 || *maxLongEdge > maxWebpDimension {
+		fmt.Fprintf(os.Stderr, "错误: -max-long-edge 必须位于 1..%d\n", maxWebpDimension)
+		os.Exit(2)
+	}
 	if *maxInflightPixels < 1 {
 		fmt.Fprintln(os.Stderr, "错误: -max-inflight-pixels 必须大于 0")
 		os.Exit(2)
@@ -111,6 +123,7 @@ func main() {
 		OutputDir:         *outputDir,
 		Quality:           *quality,
 		Workers:           *workers,
+		MaxLongEdge:       *maxLongEdge,
 		MaxInflightPixels: *maxInflightPixels,
 		Force:             *force,
 		Quiet:             *quiet,
@@ -258,7 +271,7 @@ func worker(id int, tasks <-chan imageTask, wg *sync.WaitGroup, cfg *CLIConfig,
 	defer wg.Done()
 	for task := range tasks {
 		optResult, err := optimizeImageToWebPWithBudget(
-			task.HQPath, task.LQPath, cfg.Quality, decodeBudget)
+			task.HQPath, task.LQPath, cfg.Quality, cfg.MaxLongEdge, decodeBudget)
 		page := PageResult{PageNumber: task.PageNumber}
 		if err != nil {
 			atomic.AddInt32(&result.Failed, 1)

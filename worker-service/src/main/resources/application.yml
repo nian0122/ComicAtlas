@@ -66,7 +66,7 @@ worker:
   image-optimizer-path: ${IMAGE_OPTIMIZER_PATH:tools/image-optimizer/image-optimizer.exe}
   seven-zip-path: ${SEVEN_ZIP_PATH:7z}
   tools-base-dir: ${TOOLS_BASE_DIR:}
-  lq-quality: ${LQ_QUALITY:15}
+  lq-quality: ${LQ_QUALITY:70}
   lq-workers: ${LQ_WORKERS:4}
   hq-delete-timeout-seconds: ${HQ_DELETE_TIMEOUT_SECONDS:60}
   ffprobe-enabled: ${FFPROBE_ENABLED:true}
@@ -96,6 +96,7 @@ worker:
     encoder-probe-timeout-seconds: ${TRANSCODE_ENCODER_PROBE_TIMEOUT_SECONDS:15}
   image:
     lq-timeout-seconds: ${LQ_TIMEOUT_SECONDS:3600}
+    max-long-edge: ${LQ_MAX_LONG_EDGE:3840}
     max-inflight-pixels: ${LQ_MAX_INFLIGHT_PIXELS:80000000}
   media:
     ffprobe-timeout-seconds: ${FFPROBE_TIMEOUT_SECONDS:15}

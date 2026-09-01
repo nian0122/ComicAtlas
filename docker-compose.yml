@@ -137,7 +137,9 @@ services:
       FFMPEG_PATH: /usr/bin/ffmpeg
       FFPROBE_PATH: /usr/bin/ffprobe
       IMAGE_OPTIMIZER_PATH: /opt/comicatlas/tools/image-optimizer
+      LQ_QUALITY: ${LQ_QUALITY:-70}
       LQ_WORKERS: ${LQ_WORKERS:-4}
+      LQ_MAX_LONG_EDGE: ${LQ_MAX_LONG_EDGE:-3840}
       LQ_MAX_INFLIGHT_PIXELS: ${LQ_MAX_INFLIGHT_PIXELS:-80000000}
     volumes:
       # 整个 MANGA_ROOT 共享，既保证导入源路径可见，也覆盖 HQ/LQ/临时/回收站/导出目录。
