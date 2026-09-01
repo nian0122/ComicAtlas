@@ -61,7 +61,7 @@ public class WorkerConfig {
     /** 工具相对路径的解析基准目录；未配置时回退到 JVM 工作目录 */
     private String toolsBaseDir;
     /** LQ 图片质量参数。 */
-    private int lqQuality = 15;
+    private int lqQuality = 70;
     /** LQ 图片处理并发数。 */
     private int lqWorkers = 4;
     /** HQ 删除超时时间（秒）。 */
@@ -199,6 +199,8 @@ public class WorkerConfig {
     @Data
     public static class Image {
         private long lqTimeoutSeconds = 3600;
+        /** LQ 输出图片的最大长边，保持宽高比且不放大。 */
+        private int maxLongEdge = 3840;
         /** 所有图片 worker 同时处于解码/编码阶段的总像素预算。 */
         private long maxInflightPixels = 80_000_000L;
     }
@@ -279,6 +281,9 @@ public class WorkerConfig {
     }
 
     private void validateRuntimeConfig() {
+        if (lqQuality < 1 || lqQuality > 100 || lqWorkers <= 0) {
+            throw new IllegalArgumentException("worker LQ 质量必须位于 1..100 且并发数必须为正数");
+        }
         if (executor == null || executor.getProcessIoThreads() <= 0
                 || executor.getProcessIoQueueCapacity() <= 0
                 || executor.getShutdownTimeoutSeconds() <= 0) {
@@ -288,8 +293,9 @@ public class WorkerConfig {
                 || transcode.getEncoderProbeTimeoutSeconds() <= 0) {
             throw new IllegalArgumentException("worker.transcode 超时时间必须为正数");
         }
-        if (image == null || image.getLqTimeoutSeconds() <= 0 || image.getMaxInflightPixels() <= 0) {
-            throw new IllegalArgumentException("worker.image LQ 超时与在途像素预算必须为正数");
+        if (image == null || image.getLqTimeoutSeconds() <= 0 || image.getMaxInflightPixels() <= 0
+                || image.getMaxLongEdge() <= 0 || image.getMaxLongEdge() > 16_383) {
+            throw new IllegalArgumentException("worker.image LQ 超时、最大长边与在途像素预算范围无效");
         }
         if (media == null || media.getFfprobeTimeoutSeconds() <= 0) {
             throw new IllegalArgumentException("worker.media.ffprobeTimeoutSeconds 必须为正数");

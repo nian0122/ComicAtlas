@@ -44,7 +44,7 @@ class ImageOptimizerTest {
         when(config.getImage()).thenReturn(imageConfig);
         when(config.getImageOptimizerPath()).thenReturn("tools/image-optimizer/image-optimizer.exe");
         when(config.resolveToolPath(anyString())).thenReturn(Path.of("C:/tools/image-optimizer.exe"));
-        when(config.getLqQuality()).thenReturn(15);
+        when(config.getLqQuality()).thenReturn(70);
         when(config.getLqWorkers()).thenReturn(4);
         when(processRunner.run(any(ProcessBuilder.class), anyLong(), anyString()))
                 .thenReturn(new ExternalProcessRunner.ExternalProcessResult(0,
@@ -88,7 +88,7 @@ class ImageOptimizerTest {
     }
 
     @Test
-    @DisplayName("命令行保留四路 worker 并传递在途像素预算")
+    @DisplayName("命令行保留四路 worker 并传递最大长边与在途像素预算")
     void generateLq_commandContainsWorkersAndPixelBudget() throws Exception {
         WorkerConfig.Image imageConfig = new WorkerConfig.Image();
         imageConfig.setMaxInflightPixels(80_000_000L);
@@ -101,6 +101,7 @@ class ImageOptimizerTest {
         verify(processRunner).run(captor.capture(), anyLong(), anyString());
         assertThat(captor.getValue().command())
                 .containsSubsequence("-workers", "4")
+                .containsSubsequence("-max-long-edge", "3840")
                 .containsSubsequence("-max-inflight-pixels", "80000000");
     }
 
