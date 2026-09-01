@@ -206,6 +206,11 @@ let chapterLoadToken = 0
 /** 被双击切到 HQ 的页面索引（0-based），使用 reactive Set 保持响应性 */
 const forceHqPages = reactive(new Set<number>())
 
+// 移动端不依赖浏览器 dblclick：触控双击同一图片后，幂等加载当前页 HQ。
+gesture.onDoubleTap(() => {
+  forceHqPages.add(store.currentPage - 1)
+})
+
 const { onKeydown, onWheel, onDblClick } = useReaderShortcuts({
   isPagedMode,
   readerStore: store,

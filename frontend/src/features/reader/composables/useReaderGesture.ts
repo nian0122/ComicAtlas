@@ -13,13 +13,15 @@ export interface TapPoint {
 /**
  * 手势注册 API。
  *
- * 仅负责事件标准化：检测到 tap / swipe 后回调已注册的 handler，
+ * 仅负责事件标准化：检测到 tap / double tap / swipe 后回调已注册的 handler，
  * 具体行为完全由调用方（ReaderPage）决定，本 composable
  * 不访问 store、不操作任何状态。
  */
 export interface ReaderGestureControls {
   /** 注册 tap（轻点）回调，可多次调用注册多个；回调收到触点坐标（可忽略） */
   onTap: (handler: (point: TapPoint) => void) => void
+  /** 注册触控双击图片回调；双击命中时不会再派发对应的单击。 */
+  onDoubleTap: (handler: (point: TapPoint) => void) => void
   /** 注册横向 swipe（滑动）回调，参数为手指移动方向 */
   onSwipe: (handler: (direction: SwipeDirection) => void) => void
 }
@@ -65,13 +67,83 @@ const TAP_MAX_MOVEMENT_PX = 10
 const SWIPE_MIN_DISTANCE_PX = 50
 /** 连击保护：距上次 tap 触发不足该毫秒数的 tap 被忽略，防止快速连点触发过多事件 */
 const TAP_GUARD_MS = 100
+/** 触控双击允许的最大间隔（ms） */
+const DOUBLE_TAP_MAX_INTERVAL_MS = 300
+/** 触控双击两次落点允许的最大距离（px） */
+const DOUBLE_TAP_MAX_DISTANCE_PX = 24
+
+interface TouchTapCandidate {
+  point: TapPoint
+  timeStamp: number
+  imageTarget: Element
+}
+
+/**
+ * 延迟图片上的首次触控点击，以便在窗口期内区分单击和双击。
+ * 非图片触控和鼠标点击不经过此解析器，不会增加交互延迟。
+ */
+export function createTouchTapResolver(onSingleTap: (point: TapPoint) => void, onDoubleTap: (point: TapPoint) => void) {
+  let pendingCandidate: TouchTapCandidate | null = null
+  let pendingTimer: ReturnType<typeof setTimeout> | null = null
+
+  const clearPendingTimer = (): void => {
+    if (pendingTimer === null) return
+    clearTimeout(pendingTimer)
+    pendingTimer = null
+  }
+
+  const dispatchPendingSingleTap = (): void => {
+    if (pendingCandidate === null) return
+    const point = pendingCandidate.point
+    pendingCandidate = null
+    clearPendingTimer()
+    onSingleTap(point)
+  }
+
+  const handleTouchTap = (candidate: TouchTapCandidate): void => {
+    if (pendingCandidate !== null) {
+      const interval = candidate.timeStamp - pendingCandidate.timeStamp
+      const distance = Math.hypot(
+        candidate.point.x - pendingCandidate.point.x,
+        candidate.point.y - pendingCandidate.point.y,
+      )
+      const isSameImage = candidate.imageTarget === pendingCandidate.imageTarget
+
+      if (
+        interval >= 0 &&
+        interval <= DOUBLE_TAP_MAX_INTERVAL_MS &&
+        distance <= DOUBLE_TAP_MAX_DISTANCE_PX &&
+        isSameImage
+      ) {
+        pendingCandidate = null
+        clearPendingTimer()
+        onDoubleTap(candidate.point)
+        return
+      }
+
+      dispatchPendingSingleTap()
+    }
+
+    pendingCandidate = candidate
+    pendingTimer = setTimeout(dispatchPendingSingleTap, DOUBLE_TAP_MAX_INTERVAL_MS)
+  }
+
+  const dispose = (): void => {
+    pendingCandidate = null
+    clearPendingTimer()
+  }
+
+  return { handleTouchTap, dispose }
+}
 
 /** 主指针按下时的快照，用于抬起时计算位移与时长 */
 interface PointerSnapshot {
   pointerId: number
+  pointerType: string
   x: number
   y: number
   time: number
+  target: EventTarget | null
   videoSurface: boolean
 }
 
@@ -81,7 +153,8 @@ interface PointerSnapshot {
  * 通过 Pointer Events（pointerdown / pointerup / pointercancel）检测
  * tap 与横向 swipe，并以标准化回调形式发出：
  * - tap：300ms 内抬起且位移（欧氏距离）< 10px；
- *   100ms 连击保护（选择显式 guard 而非依赖 300ms 窗口，语义更直白）
+ *   图片触控单击延迟 300ms，以便与双击互斥；其他点击保留 100ms 连击保护
+ * - double tap：300ms 内连续触控同一图片，且两次落点距离不超过 24px
  * - swipe：位移 > 50px 且主方向占优，返回 left/right/up/down
  *
  * 绑定时机：onMounted 覆盖常规挂载；同时 watch viewportRef 覆盖
@@ -95,7 +168,16 @@ interface PointerSnapshot {
  */
 export function useReaderGesture(viewportRef: Ref<HTMLElement | null>): ReaderGestureControls {
   const tapHandlers: Array<(point: TapPoint) => void> = []
+  const doubleTapHandlers: Array<(point: TapPoint) => void> = []
   const swipeHandlers: Array<(direction: SwipeDirection) => void> = []
+
+  const dispatchTap = (point: TapPoint): void => {
+    for (const handler of tapHandlers) handler(point)
+  }
+
+  const touchTapResolver = createTouchTapResolver(dispatchTap, (point) => {
+    for (const handler of doubleTapHandlers) handler(point)
+  })
 
   /** 当前按下中的主指针快照，null 表示无按下 */
   let pressed: PointerSnapshot | null = null
@@ -113,9 +195,11 @@ export function useReaderGesture(viewportRef: Ref<HTMLElement | null>): ReaderGe
     }
     pressed = {
       pointerId: event.pointerId,
+      pointerType: event.pointerType,
       x: event.clientX,
       y: event.clientY,
       time: event.timeStamp,
+      target: event.target,
       videoSurface: isVideoSurfaceTarget(event.target),
     }
   }
@@ -129,6 +213,8 @@ export function useReaderGesture(viewportRef: Ref<HTMLElement | null>): ReaderGe
     const deltaX = event.clientX - pressed.x
     const deltaY = event.clientY - pressed.y
     const duration = event.timeStamp - pressed.time
+    const pointerType = pressed.pointerType
+    const pressedTarget = pressed.target
     const videoSurface = pressed.videoSurface
     pressed = null
 
@@ -136,10 +222,19 @@ export function useReaderGesture(viewportRef: Ref<HTMLElement | null>): ReaderGe
     if (duration <= TAP_MAX_DURATION_MS && Math.hypot(deltaX, deltaY) < TAP_MAX_MOVEMENT_PX) {
       // 视频轻点交给播放器自身处理，避免播放/暂停时同时唤出阅读工具栏。
       if (videoSurface) return
+      const imageTarget = pressedTarget instanceof Element ? pressedTarget.closest('.progressive-image') : null
+      if (pointerType === 'touch' && imageTarget !== null && doubleTapHandlers.length > 0) {
+        touchTapResolver.handleTouchTap({
+          point: { x: event.clientX, y: event.clientY },
+          timeStamp: event.timeStamp,
+          imageTarget,
+        })
+        return
+      }
       if (event.timeStamp - lastTapTime < TAP_GUARD_MS) return
       lastTapTime = event.timeStamp
       const point: TapPoint = { x: event.clientX, y: event.clientY }
-      for (const handler of tapHandlers) handler(point)
+      dispatchTap(point)
       return
     }
 
@@ -200,14 +295,19 @@ export function useReaderGesture(viewportRef: Ref<HTMLElement | null>): ReaderGe
 
   // 卸载前移除全部监听器
   onBeforeUnmount(unbind)
+  onBeforeUnmount(touchTapResolver.dispose)
 
   const onTap = (handler: (point: TapPoint) => void): void => {
     tapHandlers.push(handler)
+  }
+
+  const onDoubleTap = (handler: (point: TapPoint) => void): void => {
+    doubleTapHandlers.push(handler)
   }
 
   const onSwipe = (handler: (direction: SwipeDirection) => void): void => {
     swipeHandlers.push(handler)
   }
 
-  return { onTap, onSwipe }
+  return { onTap, onDoubleTap, onSwipe }
 }
