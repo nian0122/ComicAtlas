@@ -11,10 +11,8 @@ import com.comicatlas.api.storage.ApiStorageProperties;
 import com.comicatlas.api.storage.ApiStorageRoot;
 import com.comicatlas.api.storage.PathTraversalException;
 import com.comicatlas.persistence.comic.entity.Chapter;
-import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.entity.Media;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;
-import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.persistence.comic.mapper.MediaMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -51,7 +49,8 @@ import java.util.stream.Collectors;
  * <p>
  * <b>阶段二 {@link #applyValidatedSnapshot}（事务内）</b>：批量预取章节与活动媒体，
  * 重算 {@code databaseRevision} 比对后执行差异合并（更新/新增/标记 MISSING），
- * 并刷新章节页数与漫画统计。任何失败路径零提交（整体事务回滚）。
+ * 并刷新快照覆盖章节的页数。整本漫画统计由任务全部章节终态后统一重算；
+ * 任何失败路径零提交（整体事务回滚）。
  * <p>
  * 安全重导出（DB→JSON）由 {@link MediaMetadataSyncService} 在转码完成等场景触发，
  * 不在本服务职责范围（本服务只做 DB 合并）。
@@ -63,7 +62,6 @@ public class MetadataRefreshService {
 
     private final MediaMapper mediaMapper;
     private final ChapterMapper chapterMapper;
-    private final ComicMapper comicMapper;
     private final ApiStorageProperties storageProperties;
     private final ObjectMapper objectMapper;
     private final DigestService digestService;
@@ -156,11 +154,13 @@ public class MetadataRefreshService {
                 .collect(Collectors.toMap(Chapter::getId, c -> c));
         validateChapters(snapshot, chapterById);
 
-        // 批量预取活动媒体（一次查询：全部章节 + 非回收/删除）
-        List<Long> chapterIds = chapters.stream().map(Chapter::getId).toList();
-        List<Media> activeMedia = chapterIds.isEmpty() ? List.of() : mediaMapper.selectList(
+        // 仅预取快照覆盖章节的活动媒体。章节级快照绝不得将其他章节误判为 MISSING。
+        List<Long> snapshotChapterIds = snapshot.chapters().stream()
+                .map(ChapterSnapshot::chapterId)
+                .toList();
+        List<Media> activeMedia = snapshotChapterIds.isEmpty() ? List.of() : mediaMapper.selectList(
                 new LambdaQueryWrapper<Media>()
-                        .in(Media::getChapterId, chapterIds)
+                        .in(Media::getChapterId, snapshotChapterIds)
                         .notIn(Media::getStatus, INACTIVE_STATUSES));
 
         MergePlan plan = buildMergePlan(snapshot, activeMedia);
@@ -168,7 +168,7 @@ public class MetadataRefreshService {
         // 旧布局升级：快照标注 legacyDirKey 的章节（Worker 已移动文件），在合并之后重写 page 行
         // hq_path/lq_path 前缀为新布局——必须先于合并执行，否则 updateById 会把预取的旧前缀整行写回覆盖
         normalizeLegacyLayouts(snapshot, comicId);
-        refreshStats(comicId, chapterById, activeMedia, plan);
+        refreshChapterStats(snapshotChapterIds, chapterById, activeMedia, plan);
 
         log.info("元数据刷新合并完成: comicId={}, updated={}, inserted={}, missing={}",
                 comicId, plan.updatedCount(), plan.inserted().size(), plan.missing().size());
@@ -537,39 +537,27 @@ public class MetadataRefreshService {
         return batches;
     }
 
-    /** 刷新章节 pageCount 与漫画 totalPages/hqSize（pageCount 统计 READY 生命周期行，含 HQ MISSING）。 */
-    private void refreshStats(Long comicId, Map<Long, Chapter> chapterById,
-                              List<Media> activeMedia, MergePlan plan) {
+    /** 仅刷新快照覆盖章节的 pageCount（统计 READY 生命周期行，含 HQ MISSING）。 */
+    private void refreshChapterStats(List<Long> snapshotChapterIds, Map<Long, Chapter> chapterById,
+                                     List<Media> activeMedia, MergePlan plan) {
         // 合并后媒体集合 = 活动行（已就地更新）+ 新增行
         List<Media> merged = new ArrayList<>(activeMedia);
         merged.addAll(plan.inserted());
         Map<Long, List<Media>> byChapter = merged.stream()
                 .collect(Collectors.groupingBy(Media::getChapterId));
 
-        long totalPages = 0;
-        List<Chapter> chaptersToUpdate = new ArrayList<>(chapterById.size());
-        for (Map.Entry<Long, Chapter> entry : chapterById.entrySet()) {
-            Long chapterId = entry.getKey();
+        List<Chapter> chaptersToUpdate = new ArrayList<>(snapshotChapterIds.size());
+        for (Long chapterId : snapshotChapterIds) {
             long pageCount = byChapter.getOrDefault(chapterId, List.of()).stream()
                     .filter(m -> m.getStatus() == MediaLifecycleStatus.READY)
                     .count();
-            totalPages += pageCount;
-            Chapter chapter = entry.getValue();
+            Chapter chapter = chapterById.get(chapterId);
             chapter.setPageCount((int) pageCount);
             chaptersToUpdate.add(chapter);
         }
         for (List<Chapter> batch : partition(chaptersToUpdate, MERGE_BATCH_SIZE)) {
             chapterMapper.updatePageCountBatch(batch);
         }
-        // hqSize/fileSize 只统计实际扫描 READY 字节（MISSING 已置 0，自然排除）
-        long hqSize = merged.stream()
-                .filter(m -> m.getHqStatus() == HqStatus.READY)
-                .mapToLong(m -> m.getHqSize() == null ? 0L : m.getHqSize())
-                .sum();
-        comicMapper.update(null, new LambdaUpdateWrapper<Comic>()
-                .eq(Comic::getId, comicId)
-                .set(Comic::getTotalPages, (int) totalPages)
-                .set(Comic::getHqSize, hqSize));
     }
 
     private String basename(String hqPath) {

@@ -3,6 +3,7 @@ package com.comicatlas.api.media.operation;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.comicatlas.persistence.comic.entity.Chapter;
+import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.entity.Media;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
@@ -10,11 +11,13 @@ import com.comicatlas.persistence.comic.mapper.MediaMapper;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.enums.HqStatus;
 import com.comicatlas.contract.common.enums.LqStatus;
+import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.shared.exception.ConflictException;
 import com.comicatlas.api.task.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.task.dto.ManagementTaskResponse;
 import com.comicatlas.api.task.dto.OperationSubmitResultDTO;
+import com.comicatlas.api.task.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.task.service.ManagementTaskService;
 import com.comicatlas.api.recovery.trash.TrashLifecycleService;
 import com.comicatlas.api.outbox.service.OutboxService;
@@ -25,6 +28,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -58,6 +62,43 @@ class MediaOperationCommandServiceTest {
     static void initMybatisLambdaCache() {
         // 单元测试无 Spring 上下文，需注册 Media 的 TableInfo 以支持 LambdaQueryWrapper 解析
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), Media.class);
+        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), Chapter.class);
+        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), Comic.class);
+    }
+
+    @Test
+    void requestMetadataRefresh_漫画入口按章节创建并入队() {
+        Comic comic = new Comic();
+        comic.setId(1L);
+        comic.setStatus(ComicStatus.READY);
+        when(comicMapper.selectById(1L)).thenReturn(comic);
+        Chapter firstChapter = new Chapter();
+        firstChapter.setId(11L);
+        Chapter secondChapter = new Chapter();
+        secondChapter.setId(12L);
+        when(chapterMapper.selectList(any())).thenReturn(List.of(firstChapter, secondChapter));
+
+        ManagementTaskResponse task = new ManagementTaskResponse();
+        task.setId(100L);
+        task.setStatus(ManagementTaskStatus.QUEUED);
+        when(managementTaskService.createTask(any(), any(), any())).thenReturn(task);
+        ManagementTaskItemResponse firstItem = managementItem(201L, 11L);
+        ManagementTaskItemResponse secondItem = managementItem(202L, 12L);
+        when(managementTaskService.getTaskItems(100L)).thenReturn(List.of(firstItem, secondItem));
+
+        OperationSubmitResultDTO result = service.requestMetadataRefresh(1L);
+
+        assertEquals(2, result.getItemCount());
+        ArgumentCaptor<CreateManagementTaskRequest> requestCaptor =
+                ArgumentCaptor.forClass(CreateManagementTaskRequest.class);
+        verify(managementTaskService).createTask(requestCaptor.capture(), any(), any());
+        assertEquals(List.of("CHAPTER", "CHAPTER"), requestCaptor.getValue().getTargets().stream()
+                .map(CreateManagementTaskRequest.TaskTarget::getTargetType)
+                .toList());
+        assertEquals(List.of(11L, 12L), requestCaptor.getValue().getTargets().stream()
+                .map(CreateManagementTaskRequest.TaskTarget::getTargetId)
+                .toList());
+        verify(outboxService, times(2)).enqueue(any(), any(), any(), any(), any(), anyInt());
     }
 
     @Test
@@ -334,5 +375,15 @@ class MediaOperationCommandServiceTest {
         media.setHqStatus(hqStatus);
         media.setLqStatus(lqStatus);
         return media;
+    }
+
+    private static ManagementTaskItemResponse managementItem(Long itemId, Long chapterId) {
+        ManagementTaskItemResponse item = new ManagementTaskItemResponse();
+        item.setId(itemId);
+        item.setTaskId(100L);
+        item.setTargetType("CHAPTER");
+        item.setTargetId(chapterId);
+        item.setAttempt(1);
+        return item;
     }
 }

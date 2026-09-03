@@ -172,8 +172,8 @@ class ManagementCommandResultHandlerTest {
     }
 
     @Test
-    @DisplayName("failed METADATA_REFRESH：释放 comic REFRESHING 锁")
-    void failed_metadataRefresh_releasesComic() {
+    @DisplayName("failed METADATA_REFRESH：按任务与目标尝试收尾")
+    void failed_metadataRefresh_finalizesTargetWhenInactive() {
         when(managementTaskService.updateItemStatus(eq(1L), eq(ManagementTaskStatus.FAILED),
                 anyString(), isNull(), isNull(), eq(1))).thenReturn(failed());
         var ev = new ManagementCommandFailedEvent(UUID.randomUUID(), Instant.now(), 1,
@@ -181,7 +181,7 @@ class ManagementCommandResultHandlerTest {
 
         handler.handleResult(ev, channel, 1L);
 
-        verify(metadataRefreshCompletionService).releaseComicRefreshing(9L);
+        verify(metadataRefreshCompletionService).handleCommandFailed(10L, 1L, 1, "COMIC", 9L);
     }
 
     @Test

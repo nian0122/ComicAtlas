@@ -392,7 +392,7 @@ public class MediaOperationCommandService {
      * 请求元数据扫盘刷新：重读 HQ 目录生成快照 → Worker 合并 DB（异步执行）。
      * <p>
      * 与 LQ/HQ/转码同一命令管线：同事务 CAS 漫画 READY→REFRESHING（0 行 = 并发被占用 409）、
-     * 创建单个 COMIC/METADATA_REFRESH item（零章节也创建），并发布命令到 Outbox。
+     * 按章节创建 CHAPTER/METADATA_REFRESH item；零章节漫画保留单个 COMIC 空扫描项。
      * 漫画不存在 404；非 READY 状态 409。
      */
     @Transactional
@@ -405,14 +405,24 @@ public class MediaOperationCommandService {
             throw new ConflictException("漫画状态 " + comic.getStatus() + " 不支持元数据刷新，仅 READY 可刷新");
         }
 
-        ManagementTaskResponse task = createTask(TaskType.METADATA_REFRESH, "刷新元数据", "COMIC",
-                List.of(target("COMIC", comicId, TaskType.METADATA_REFRESH)));
-        ManagementTaskItemResponse item = managementTaskService.getTaskItems(task.getId()).get(0);
-
-        enqueue(TaskType.METADATA_REFRESH, item, "COMIC", comicId);
-        log.info("元数据刷新命令已提交: comicId={}, taskId={}", comicId, task.getId());
+        List<Chapter> chapters = chapterMapper.selectList(new LambdaQueryWrapper<Chapter>()
+                .eq(Chapter::getComicId, comicId)
+                .orderByAsc(Chapter::getGlobalOrder));
+        List<CreateManagementTaskRequest.TaskTarget> targets = chapters.stream()
+                .map(chapter -> target("CHAPTER", chapter.getId(), TaskType.METADATA_REFRESH))
+                .toList();
+        if (targets.isEmpty()) {
+            targets = List.of(target("COMIC", comicId, TaskType.METADATA_REFRESH));
+        }
+        ManagementTaskResponse task = createTask(TaskType.METADATA_REFRESH, "刷新元数据", "COMIC", targets);
+        List<ManagementTaskItemResponse> items = managementTaskService.getTaskItems(task.getId());
+        for (ManagementTaskItemResponse item : items) {
+            enqueue(TaskType.METADATA_REFRESH, item, item.getTargetType(), item.getTargetId());
+        }
+        log.info("元数据刷新命令已提交: comicId={}, taskId={}, chapters={}",
+                comicId, task.getId(), items.size());
         return OperationSubmitResultDTO.of(task.getId(), TaskType.METADATA_REFRESH.name(),
-                task.getStatus().name(), 1);
+                task.getStatus().name(), items.size());
     }
 
     // ======================== 整本删除（回收/永久清理重定向） ========================

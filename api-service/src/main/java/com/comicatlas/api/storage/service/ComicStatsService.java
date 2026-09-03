@@ -15,7 +15,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 漫画统计聚合服务（派生数据单一收口）。
@@ -33,6 +36,7 @@ public class ComicStatsService {
 
     private static final String MEDIA_TYPE_IMAGE = "IMAGE";
     private static final String MEDIA_TYPE_VIDEO = "VIDEO";
+    private static final int UPDATE_BATCH_SIZE = 500;
 
     private final MediaMapper mediaMapper;
     private final ChapterMapper chapterMapper;
@@ -61,7 +65,7 @@ public class ComicStatsService {
         refreshTotalPages(comic.getId());
     }
 
-    /** 整本一次性刷新（转码任务全部完成等场景）：各章节页数 + 整本统计。 */
+    /** 整本一次性刷新：一次预取媒体，批量更新各章节页数与整本统计。 */
     public void refreshByComic(Long comicId) {
         if (comicId == null) {
             return;
@@ -69,18 +73,28 @@ public class ComicStatsService {
         List<Chapter> chapters = chapterMapper.selectList(
                 new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
         if (chapters.isEmpty()) {
+            updateComicStats(comicId, 0, 0L, 0L);
             return;
         }
+        List<Long> chapterIds = chapters.stream().map(Chapter::getId).toList();
+        List<Media> mediaItems = mediaMapper.selectList(
+                new LambdaQueryWrapper<Media>().in(Media::getChapterId, chapterIds));
+        Map<Long, Long> pageCountByChapter = mediaItems.stream()
+                .filter(media -> media.getStatus() != MediaLifecycleStatus.DELETED
+                        && media.getStatus() != MediaLifecycleStatus.TRASHED)
+                .collect(Collectors.groupingBy(Media::getChapterId, Collectors.counting()));
         for (Chapter chapter : chapters) {
-            long pageCount = mediaMapper.selectCount(new LambdaQueryWrapper<Media>()
-                    .eq(Media::getChapterId, chapter.getId())
-                    .notIn(Media::getStatus, MediaLifecycleStatus.DELETED, MediaLifecycleStatus.TRASHED));
-            chapterMapper.update(null, new LambdaUpdateWrapper<Chapter>()
-                    .eq(Chapter::getId, chapter.getId())
-                    .set(Chapter::getPageCount, (int) pageCount));
+            chapter.setPageCount(Math.toIntExact(pageCountByChapter.getOrDefault(chapter.getId(), 0L)));
         }
-        recomputeComicStats(comicId);
-        refreshTotalPages(comicId);
+        for (List<Chapter> batch : partition(chapters, UPDATE_BATCH_SIZE)) {
+            chapterMapper.updatePageCountBatch(batch);
+        }
+        int totalPages = Math.toIntExact(pageCountByChapter.values().stream().mapToLong(Long::longValue).sum());
+        long hqSize = calculateHqSize(mediaItems);
+        long lqSize = calculateLqSize(mediaItems);
+        updateComicStats(comicId, totalPages, hqSize, lqSize);
+        log.debug("批量重算 comic 统计: comicId={}, chapters={}, hqSize={}, lqSize={}",
+                comicId, chapters.size(), hqSize, lqSize);
     }
 
     /** 漫画 ID → 章节 ID 列表（批量操作创建的 COMIC 目标 item 展开处理）。 */
@@ -115,15 +129,8 @@ public class ComicStatsService {
         List<Long> chapterIds = chapters.stream().map(Chapter::getId).toList();
         List<Media> mediaItems = mediaMapper.selectList(
                 new LambdaQueryWrapper<Media>().in(Media::getChapterId, chapterIds));
-        long hqSize = mediaItems.stream()
-                .filter(media -> media.getHqStatus() != HqStatus.DELETED)
-                .mapToLong(media -> media.getHqSize() != null ? media.getHqSize() : 0L)
-                .sum();
-        long lqSize = mediaItems.stream()
-                .filter(media -> MEDIA_TYPE_IMAGE.equals(media.getMediaType())
-                        && media.getLqStatus() == LqStatus.READY)
-                .mapToLong(media -> media.getLqSize() != null ? media.getLqSize() : 0L)
-                .sum();
+        long hqSize = calculateHqSize(mediaItems);
+        long lqSize = calculateLqSize(mediaItems);
         comicMapper.update(null, new LambdaUpdateWrapper<Comic>()
                 .eq(Comic::getId, comicId)
                 .set(Comic::getHqSize, hqSize)
@@ -143,5 +150,36 @@ public class ComicStatsService {
         comicMapper.update(null, new LambdaUpdateWrapper<Comic>()
                 .eq(Comic::getId, comicId)
                 .set(Comic::getTotalPages, (int) totalPages));
+    }
+
+    private long calculateHqSize(List<Media> mediaItems) {
+        return mediaItems.stream()
+                .filter(media -> media.getHqStatus() != HqStatus.DELETED)
+                .mapToLong(media -> media.getHqSize() != null ? media.getHqSize() : 0L)
+                .sum();
+    }
+
+    private long calculateLqSize(List<Media> mediaItems) {
+        return mediaItems.stream()
+                .filter(media -> MEDIA_TYPE_IMAGE.equals(media.getMediaType())
+                        && media.getLqStatus() == LqStatus.READY)
+                .mapToLong(media -> media.getLqSize() != null ? media.getLqSize() : 0L)
+                .sum();
+    }
+
+    private void updateComicStats(Long comicId, int totalPages, long hqSize, long lqSize) {
+        comicMapper.update(null, new LambdaUpdateWrapper<Comic>()
+                .eq(Comic::getId, comicId)
+                .set(Comic::getTotalPages, totalPages)
+                .set(Comic::getHqSize, hqSize)
+                .set(Comic::getLqSize, lqSize));
+    }
+
+    private static <T> List<List<T>> partition(List<T> source, int batchSize) {
+        List<List<T>> batches = new ArrayList<>((source.size() + batchSize - 1) / batchSize);
+        for (int index = 0; index < source.size(); index += batchSize) {
+            batches.add(source.subList(index, Math.min(index + batchSize, source.size())));
+        }
+        return batches;
     }
 }

@@ -78,15 +78,15 @@ public class MetadataChapterScanner {
                 ? index.directoryKeys().iterator().next() : String.valueOf(chapterId);
         Path directory = resolveLqDirectory(comicId, chapterId, directoryKey);
         if (directory == null) {
-            warnings.add("LQ 目录不存在: " + comicId + "/" + chapterId);
-            return new ScanResult(List.of(), warnings, null);
+            throw new IllegalStateException("仅 LQ 章节目录不存在，拒绝应用不完整扫描: "
+                    + comicId + "/" + chapterId);
         }
         List<Path> files;
         try {
             files = list(directory);
         } catch (IOException e) {
-            warnings.add("读取 LQ 目录失败: " + comicId + "/" + chapterId);
-            return new ScanResult(List.of(), warnings, null);
+            throw new IllegalStateException("读取仅 LQ 章节目录失败，拒绝应用不完整扫描: "
+                    + comicId + "/" + chapterId, e);
         }
         files.sort(com.comicatlas.worker.importer.parser.NaturalPathComparator.INSTANCE);
         List<MediaSnapshot> mediaItems = new java.util.ArrayList<>(rowsByBasename.size());
@@ -112,7 +112,8 @@ public class MetadataChapterScanner {
                     comicId + "/" + chapterId + "/" + fileName, HQ_STATUS_DELETED,
                     row.getStatus() != null ? row.getStatus() : STATUS_READY,
                     row.getPageNumber() != null ? row.getPageNumber() : 0, 0L, IMAGE_TYPE,
-                    null, null, null, null, null, null, STATUS_READY, safeSize(file),
+                    null, null, null, null, null, null, STATUS_READY,
+                    requiredSize(file, comicId, chapterId),
                     comicId + "/" + chapterId + "/" + fileName));
         }
         for (MediaRecord row : rows) {
@@ -140,11 +141,12 @@ public class MetadataChapterScanner {
         }
     }
 
-    private static long safeSize(Path file) {
+    private static long requiredSize(Path file, Long comicId, Long chapterId) {
         try {
             return Files.size(file);
         } catch (IOException e) {
-            return 0L;
+            throw new IllegalStateException("读取 LQ 文件大小失败，拒绝应用不完整扫描: "
+                    + comicId + "/" + chapterId + "/" + file.getFileName(), e);
         }
     }
 

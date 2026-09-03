@@ -20,6 +20,11 @@ public interface ChapterReadMapper {
     @Select("SELECT id, comic_id, catalog_id, title, chapter_no, global_order, version FROM chapter WHERE comic_id = #{comicId} ORDER BY global_order ASC")
     List<ChapterRecord> selectByComicIdWithVersion(Long comicId);
 
+    /** 章节级元数据刷新：读取章节归属与乐观锁版本。 */
+    @Select("SELECT id, comic_id, catalog_id, title, chapter_no, global_order, version "
+            + "FROM chapter WHERE id = #{chapterId}")
+    ChapterRecord selectByIdWithVersion(Long chapterId);
+
     /**
      * 最终化陈旧事件保护专用只读查询：章节必须仍存在且属于本漫画，
      * 否则旧 attempt 的最终化事件不得再移动文件（防止搬入重试后已不存在的孤儿目录）。

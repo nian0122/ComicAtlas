@@ -21,6 +21,7 @@ public final class ManagementOperationTypes {
     public static final String MEDIA_REPLACE = "MEDIA_REPLACE";
 
     public static final String TARGET_COMIC = "COMIC";
+    public static final String TARGET_CHAPTER = "CHAPTER";
 
     private ManagementOperationTypes() {
     }

@@ -1,6 +1,5 @@
 package com.comicatlas.worker.media.metadata.command;
 
-import com.comicatlas.worker.importer.parser.NaturalPathComparator;
 import com.comicatlas.common.constant.MetadataRefreshLimits;
 import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.common.constant.ManagementOperationTypes;
@@ -52,7 +51,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * 元数据扫盘刷新命令处理器（API → Worker，METADATA_REFRESH/COMIC）。
+ * 元数据扫盘刷新命令处理器（API → Worker，漫画级提交、章节级执行）。
  * <p>
  * 职责：重读 HQ 中 DB hqPath 指向的真实媒体文件（旧布局 {@code hq/{comicId}/{stagingKey}} 与现布局
  * {@code hq/{comicId}/{chapterId}} 均可），生成原子落盘的结构快照
@@ -96,9 +95,6 @@ public class MetadataRefreshCommandHandler {
 
     /** LQ 状态：READY（文件存在）。 */
     private static final String STATUS_READY = MediaStatuses.READY;
-
-    /** HQ 状态：DELETED（HQ 文件已删除、保留 LQ 供阅读的「仅 LQ」模式）。 */
-    private static final String HQ_STATUS_DELETED = MetadataScanSupport.HQ_STATUS_DELETED;
 
     /** 媒体类型：图片（仅图片有 LQ 产物）。 */
     private static final String IMAGE_TYPE = MetadataScanSupport.IMAGE_TYPE;
@@ -229,22 +225,20 @@ public class MetadataRefreshCommandHandler {
      * 执行元数据扫盘刷新：清理过期 attempt → 只读查询基线 → 逐章扫描 HQ 目录 →
      * 组装快照 → 原子落盘 → 发布完成事件。任何异常统一转 FAILED 事件（业务结果，正常 ack）。
      *
-     * @param cmd 管理命令请求（operationType=METADATA_REFRESH, targetType=COMIC, targetId=comicId）
+     * @param cmd 管理命令请求（CHAPTER 为常规执行粒度，COMIC 仅兼容零章节/旧任务）
      */
     public void refresh(ManagementCommandRequestedEvent cmd) {
         publisher.progress(cmd, 10, "开始元数据扫盘");
         try {
-            if (!ManagementOperationTypes.TARGET_COMIC.equals(cmd.targetType()) || cmd.targetId() == null) {
-                publisher.failed(cmd, "元数据扫盘刷新仅支持漫画级（COMIC 且 targetId 非空），当前 targetType="
-                        + cmd.targetType());
+            if (cmd.targetId() == null) {
+                publisher.failed(cmd, "元数据扫盘刷新 targetId 不能为空");
                 return;
             }
-            Long comicId = cmd.targetId();
 
             snapshotCleanup.cleanupExpiredAttempts();
-
-            List<ChapterRecord> chapters = new ArrayList<>(
-                    chapterMapper.selectByComicIdWithVersion(comicId));
+            TargetScanContext targetContext = loadTargetContext(cmd);
+            Long comicId = targetContext.comicId();
+            List<ChapterRecord> chapters = new ArrayList<>(targetContext.chapters());
             if (chapters.size() > maxChapters) {
                 publisher.failed(cmd, "章节数量超过上限: " + chapters.size() + " > " + maxChapters);
                 return;
@@ -252,9 +246,7 @@ public class MetadataRefreshCommandHandler {
             // 仅按 globalOrder 排序章节，扫描路径一律使用 chapterId
             chapters.sort(Comparator.comparingInt(ch -> ch.getGlobalOrder() != null ? ch.getGlobalOrder() : 0));
 
-            Map<Long, List<MediaRecord>> mediaByChapter = mediaMapper.selectByComicIdWithVersionAndStatus(comicId).stream()
-                    .filter(m -> m.getChapterId() != null)
-                    .collect(Collectors.groupingBy(MediaRecord::getChapterId));
+            Map<Long, List<MediaRecord>> mediaByChapter = targetContext.mediaByChapter();
 
             List<ChapterSnapshot> chapterSnapshots = new ArrayList<>(chapters.size());
             int totalMedia = 0;
@@ -304,13 +296,34 @@ public class MetadataRefreshCommandHandler {
         }
     }
 
+    private TargetScanContext loadTargetContext(ManagementCommandRequestedEvent command) {
+        if (ManagementOperationTypes.TARGET_COMIC.equals(command.targetType())) {
+            Long comicId = command.targetId();
+            List<ChapterRecord> chapters = chapterMapper.selectByComicIdWithVersion(comicId);
+            Map<Long, List<MediaRecord>> mediaByChapter =
+                    mediaMapper.selectByComicIdWithVersionAndStatus(comicId).stream()
+                            .filter(media -> media.getChapterId() != null)
+                            .collect(Collectors.groupingBy(MediaRecord::getChapterId));
+            return new TargetScanContext(comicId, chapters, mediaByChapter);
+        }
+        if (ManagementOperationTypes.TARGET_CHAPTER.equals(command.targetType())) {
+            ChapterRecord chapter = chapterMapper.selectByIdWithVersion(command.targetId());
+            if (chapter == null || chapter.getComicId() == null) {
+                throw new IllegalArgumentException("元数据刷新章节不存在: " + command.targetId());
+            }
+            List<MediaRecord> mediaItems = mediaMapper.selectByChapterIdWithVersionAndStatus(chapter.getId());
+            return new TargetScanContext(chapter.getComicId(), List.of(chapter),
+                    Map.of(chapter.getId(), mediaItems));
+        }
+        throw new IllegalArgumentException("元数据扫盘刷新不支持目标类型: " + command.targetType());
+    }
+
+    private record TargetScanContext(Long comicId, List<ChapterRecord> chapters,
+                                     Map<Long, List<MediaRecord>> mediaByChapter) {
+    }
+
     /** 单章扫描结果：媒体快照列表 + 结构化 warning 列表 + 旧布局升级信号（已移动成功时为旧目录键，否则 null）。 */
     private record ChapterScanResult(List<MediaSnapshot> mediaItems, List<String> warnings, String legacyDirKey) {
-
-        /** 空扫描/失败路径：未涉及布局升级。 */
-        private ChapterScanResult(List<MediaSnapshot> mediaItems, List<String> warnings) {
-            this(mediaItems, warnings, null);
-        }
     }
 
     /**
@@ -362,18 +375,19 @@ public class MetadataRefreshCommandHandler {
                         comicId, chapterId, lqOnlyRows, warnings, mediaMatcher);
                 return new ChapterScanResult(result.mediaItems(), result.warnings(), result.legacyDirKey());
             }
-            warnings.add("章节目录不存在: " + comicId + "/" + chapterId);
-            return new ChapterScanResult(List.of(), warnings);
+            throw new IllegalStateException("章节 HQ 目录不存在，拒绝应用不完整扫描: "
+                    + comicId + "/" + chapterId);
         }
 
         List<Path> files;
         try {
             files = chapterScanner.list(scanDir);
         } catch (IOException e) {
-            warnings.add("读取章节目录失败: " + comicId + "/" + chapterId);
-            return new ChapterScanResult(List.of(), warnings);
+            throw new IllegalStateException("读取章节 HQ 目录失败，拒绝应用不完整扫描: "
+                    + comicId + "/" + chapterId, e);
         }
         files.sort(NaturalPathComparator.INSTANCE);
+        Map<String, Path> lqFilesByStem = loadLqFilesByStem(comicId, chapterId);
 
         List<MediaSnapshot> mediaItems = new ArrayList<>(files.size());
         int sequence = 0;
@@ -408,7 +422,7 @@ public class MetadataRefreshCommandHandler {
                 continue;
             }
 
-            long fileSize = safeSize(file);
+            long fileSize = requiredSize(file, comicId, chapterId);
             Integer width = null;
             Integer height = null;
             BigDecimal duration = null;
@@ -440,7 +454,7 @@ public class MetadataRefreshCommandHandler {
             long lqSize = 0L;
             String lqPath = null;
             if (IMAGE_TYPE.equals(mediaType)) {
-                LqFileFact lqFact = resolveLqFact(comicId, chapterId, fileName);
+                LqFileFact lqFact = resolveLqFact(comicId, chapterId, fileName, lqFilesByStem);
                 lqStatus = lqFact.status();
                 lqSize = lqFact.size();
                 lqPath = lqFact.path();
@@ -508,11 +522,12 @@ public class MetadataRefreshCommandHandler {
         }
     }
 
-    private static long safeSize(Path file) {
+    private static long requiredSize(Path file, Long comicId, Long chapterId) {
         try {
             return Files.size(file);
         } catch (IOException e) {
-            return 0L;
+            throw new IllegalStateException("读取媒体文件大小失败，拒绝应用不完整扫描: "
+                    + comicId + "/" + chapterId + "/" + file.getFileName(), e);
         }
     }
 
@@ -520,41 +535,53 @@ public class MetadataRefreshCommandHandler {
      * 解析 LQ 文件事实：在 LQ 目录中按文件主干匹配实际产物。文件存在且为普通文件
      * （NOFOLLOW_LINKS）计大小并标 READY；
      * 符号链接、非常规文件或缺失一律按未生成处理——以本地文件为准，绝不沿用 DB 旧状态。
-     * LQ 根未配置/目录不存在时按未生成处理（LQ 为可选增强，缺失不得阻断 HQ 扫盘）。
+     * LQ 章节目录不存在时按未生成处理；根配置或目录读取异常则终止本章扫描。
      *
      * @param comicId   漫画 ID（LQ 相对路径首段）
      * @param chapterId 章节 ID（LQ 相对路径次段）
      * @param hqFileName HQ 文件名（仅用于匹配 LQ 文件主干）
      * @return LQ 状态与字节数
      */
-    private LqFileFact resolveLqFact(Long comicId, Long chapterId, String hqFileName) {
+    private Map<String, Path> loadLqFilesByStem(Long comicId, Long chapterId) {
+        StorageRoot lqRoot = requireRoot(LQ_ROOT_KEY);
+        Path lqDirectory = lqRoot.resolve(comicId + "/" + chapterId);
+        if (!Files.exists(lqDirectory, LinkOption.NOFOLLOW_LINKS)) {
+            return Map.of();
+        }
+        if (!Files.isDirectory(lqDirectory, LinkOption.NOFOLLOW_LINKS)) {
+            throw new IllegalStateException("LQ 路径不是目录，拒绝应用不完整扫描: "
+                    + comicId + "/" + chapterId);
+        }
+        try (var files = Files.list(lqDirectory)) {
+            Map<String, Path> indexedFiles = new java.util.HashMap<>();
+            files.filter(file -> Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS))
+                    .filter(file -> LQ_EXTENSION.equals(extensionOf(file)))
+                    .forEach(file -> {
+                        String stem = stemOf(file.getFileName().toString());
+                        Path duplicate = indexedFiles.putIfAbsent(stem, file);
+                        if (duplicate != null) {
+                            throw new IllegalStateException("LQ 目录存在重复文件主干: "
+                                    + comicId + "/" + chapterId + "/" + stem);
+                        }
+                    });
+            return Map.copyOf(indexedFiles);
+        } catch (IOException e) {
+            throw new IllegalStateException("读取 LQ 目录失败，拒绝应用不完整扫描: "
+                    + comicId + "/" + chapterId, e);
+        }
+    }
+
+    private LqFileFact resolveLqFact(Long comicId, Long chapterId, String hqFileName,
+                                     Map<String, Path> lqFilesByStem) {
         String baseName = hqFileName;
         int dot = baseName.lastIndexOf('.');
         if (dot > 0) {
             baseName = baseName.substring(0, dot);
         }
-        String expectedBaseName = baseName;
-        StorageRoot lqRoot = StorageRootResolver.optional(storageProperties, LQ_ROOT_KEY);
-        if (lqRoot == null) {
-            return new LqFileFact(LQ_STATUS_NOT_GENERATED, 0L, null);
-        }
-        Path lqDirectory = lqRoot.resolve(comicId + "/" + chapterId);
-        if (!Files.isDirectory(lqDirectory, LinkOption.NOFOLLOW_LINKS)) {
-            return new LqFileFact(LQ_STATUS_NOT_GENERATED, 0L, null);
-        }
-        try (var files = Files.list(lqDirectory)) {
-            var actualLqFile = files
-                    .filter(file -> Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS))
-                    .filter(file -> LQ_EXTENSION.equals(extensionOf(file)))
-                    .filter(file -> expectedBaseName.equals(stemOf(file.getFileName().toString())))
-                    .findFirst();
-            if (actualLqFile.isPresent()) {
-                Path lqFile = actualLqFile.get();
-                return new LqFileFact(STATUS_READY, safeSize(lqFile),
-                        comicId + "/" + chapterId + "/" + lqFile.getFileName());
-            }
-        } catch (IOException e) {
-            log.debug("读取 LQ 目录失败: comicId={}, chapterId={}", comicId, chapterId, e);
+        Path lqFile = lqFilesByStem.get(baseName);
+        if (lqFile != null) {
+            return new LqFileFact(STATUS_READY, requiredSize(lqFile, comicId, chapterId),
+                    comicId + "/" + chapterId + "/" + lqFile.getFileName());
         }
         return new LqFileFact(LQ_STATUS_NOT_GENERATED, 0L, null);
     }

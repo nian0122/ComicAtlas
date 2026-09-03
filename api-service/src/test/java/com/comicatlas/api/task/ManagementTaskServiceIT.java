@@ -667,6 +667,23 @@ class ManagementTaskServiceIT {
                     .isInstanceOf(ConflictException.class);
         }
 
+        @Test
+        @DisplayName("章节级 METADATA_REFRESH 只统计同一漫画的活跃任务项")
+        void countActiveMetadataItems_chapterTargets_countsByComic() {
+            Chapter firstChapter = insertChapter(comic.getId(), 1);
+            Chapter secondChapter = insertChapter(comic.getId(), 2);
+            CreateManagementTaskRequest request = metadataRefreshRequest(
+                    List.of(firstChapter.getId(), secondChapter.getId()));
+
+            ManagementTaskResponse task = service.createTask(request, null, null);
+            List<ManagementTaskItemResponse> items = service.getTaskItems(task.getId());
+
+            assertThat(service.countActiveMetadataItems(task.getId(), comic.getId())).isEqualTo(2L);
+            service.updateItemStatus(items.get(0).getId(), ManagementTaskStatus.SUCCEEDED,
+                    null, null, null);
+            assertThat(service.countActiveMetadataItems(task.getId(), comic.getId())).isEqualTo(1L);
+        }
+
         private CreateManagementTaskRequest metadataRefreshRequest(Long comicId) {
             CreateManagementTaskRequest req = new CreateManagementTaskRequest();
             req.setTaskType(TaskType.METADATA_REFRESH);
@@ -680,6 +697,34 @@ class ManagementTaskServiceIT {
 
             req.setTargets(List.of(target));
             return req;
+        }
+
+        private CreateManagementTaskRequest metadataRefreshRequest(List<Long> chapterIds) {
+            CreateManagementTaskRequest request = new CreateManagementTaskRequest();
+            request.setTaskType(TaskType.METADATA_REFRESH);
+            request.setOperation("刷新元数据");
+            request.setTargetType("CHAPTER");
+            request.setTargets(chapterIds.stream().map(chapterId -> {
+                CreateManagementTaskRequest.TaskTarget target = new CreateManagementTaskRequest.TaskTarget();
+                target.setTargetType("CHAPTER");
+                target.setTargetId(chapterId);
+                target.setOperationType(TaskType.METADATA_REFRESH);
+                return target;
+            }).toList());
+            return request;
+        }
+
+        private Chapter insertChapter(Long comicId, int globalOrder) {
+            Chapter chapter = new Chapter();
+            chapter.setComicId(comicId);
+            chapter.setTitle("章节" + globalOrder);
+            chapter.setChapterNo(String.valueOf(globalOrder));
+            chapter.setGlobalOrder(globalOrder);
+            chapter.setSortOrder(globalOrder);
+            chapter.setStatus(ChapterLifecycleStatus.READY);
+            chapter.setPageCount(0);
+            chapterMapper.insert(chapter);
+            return chapter;
         }
     }
 

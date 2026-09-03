@@ -91,7 +91,7 @@ class MetadataRefreshServiceTest {
         ApiStorageRoot stagingRoot = new ApiStorageRoot();
         stagingRoot.setPath(staging);
         when(storageProperties.root("STAGING")).thenReturn(stagingRoot);
-        service = new MetadataRefreshService(mediaMapper, chapterMapper, comicMapper,
+        service = new MetadataRefreshService(mediaMapper, chapterMapper,
                 storageProperties, MAPPER, new DigestService());
     }
 
@@ -382,6 +382,36 @@ class MetadataRefreshServiceTest {
             verify(chapterMapper, times(1)).updatePageCountBatch(anyList());
             // 应用阶段不触碰存储根（无文件 IO）
             verifyNoInteractions(storageProperties);
+        }
+
+        @Test
+        @DisplayName("单章快照：只更新目标章节，不重算其他章节页数")
+        void chapterSnapshot_updatesOnlyCoveredChapter() {
+            Chapter targetChapter = chapter(42L, 1);
+            Chapter untouchedChapter = chapter(43L, 1);
+            untouchedChapter.setPageCount(9);
+            when(chapterMapper.selectList(any())).thenReturn(List.of(targetChapter, untouchedChapter));
+            Media targetMedia = media(101L, 42L, "1/42/001.jpg", 1,
+                    "READY", 100L, "IMAGE", 1);
+            when(mediaMapper.selectList(any())).thenReturn(List.of(targetMedia));
+            when(mediaMapper.updateRefreshBatch(anyList())).thenReturn(1);
+            MetadataRefreshSnapshotDTO rawSnapshot = new MetadataRefreshSnapshotDTO(
+                    1, 1L, Instant.parse("2026-08-09T00:00:00Z"), null,
+                    List.of(new MetadataRefreshSnapshotDTO.ChapterSnapshot(42L, 1,
+                            List.of(new MetadataRefreshSnapshotDTO.MediaSnapshot(101L, 1,
+                                    "1/42/001.jpg", "READY", "READY", 1,
+                                    123L, "IMAGE", 800, 1200,
+                                    null, null, null, null)), List.of())));
+            MetadataRefreshSnapshotDTO snapshot = new MetadataRefreshSnapshotDTO(
+                    rawSnapshot.schemaVersion(), rawSnapshot.comicId(), rawSnapshot.generatedAt(),
+                    MetadataSnapshotRevision.compute(rawSnapshot), rawSnapshot.chapters());
+
+            service.applyValidatedSnapshot(snapshot);
+
+            ArgumentCaptor<List<Chapter>> chaptersCaptor = ArgumentCaptor.forClass(List.class);
+            verify(chapterMapper).updatePageCountBatch(chaptersCaptor.capture());
+            assertThat(chaptersCaptor.getValue()).extracting(Chapter::getId).containsExactly(42L);
+            assertThat(untouchedChapter.getPageCount()).isEqualTo(9);
         }
 
         @Test

@@ -83,11 +83,7 @@ public class ManagementCommandDispatcher {
             }
             case ManagementOperationTypes.TRANSCODE -> transcodeCommandHandler.transcode(cmd);
             case ManagementOperationTypes.METADATA_REFRESH -> {
-                if (comicScope) {
-                    metadataRefreshCommandHandler.refresh(cmd);
-                } else {
-                    publisher.failed(cmd, "元数据扫盘刷新仅支持漫画级（COMIC）");
-                }
+                metadataRefreshCommandHandler.refresh(cmd);
             }
             case ManagementOperationTypes.COMIC_DELETE, ManagementOperationTypes.CHAPTER_TRASH,
                     ManagementOperationTypes.MEDIA_TRASH -> trashCommandHandler.trash(cmd);

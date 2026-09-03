@@ -40,6 +40,20 @@ public interface MediaReadMapper {
     """)
     List<MediaRecord> selectByComicIdWithVersionAndStatus(Long comicId);
 
+    /** 章节级元数据刷新：只读取一个章节的媒体基线。 */
+    @Select("""
+        SELECT id, chapter_id, page_number, media_type,
+               hq_root, hq_path, hq_status,
+               lq_root, lq_path, lq_status, lq_size,
+               hq_size, width, height,
+               duration, container, video_codec, audio_codec,
+               status, version
+        FROM page
+        WHERE chapter_id = #{chapterId}
+        ORDER BY page_number ASC
+    """)
+    List<MediaRecord> selectByChapterIdWithVersionAndStatus(Long chapterId);
+
     @Select("""
         SELECT p.id, p.chapter_id, p.page_number, p.media_type,
                p.hq_root, p.hq_path, p.hq_status,

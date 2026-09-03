@@ -28,4 +28,30 @@
           AND c.comic_id = #{comicId}
     </select>
 
+    <!--
+      每个章节结果完成时只做一次数据库计数，避免反复加载整本章节和全部任务项。
+      UNION ALL 的两段分别利用任务项条件和章节主键关联，外层只汇总计数。
+    -->
+    <select id="countActiveMetadataItems" resultType="long">
+        SELECT COUNT(*)
+        FROM (
+            SELECT i.id
+            FROM management_task_item i
+            WHERE i.task_id = #{taskId}
+              AND i.operation_type = 'METADATA_REFRESH'
+              AND i.status IN ('QUEUED', 'RUNNING', 'CANCELLING')
+              AND i.target_type = 'COMIC'
+              AND i.target_id = #{comicId}
+            UNION ALL
+            SELECT i.id
+            FROM management_task_item i
+            INNER JOIN chapter c ON c.id = i.target_id
+            WHERE i.task_id = #{taskId}
+              AND i.operation_type = 'METADATA_REFRESH'
+              AND i.status IN ('QUEUED', 'RUNNING', 'CANCELLING')
+              AND i.target_type = 'CHAPTER'
+              AND c.comic_id = #{comicId}
+        ) active_item
+    </select>
+
 </mapper>

@@ -5,6 +5,7 @@ import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.task.entity.ManagementTaskItem;
 import com.comicatlas.api.task.mapper.ManagementTaskItemMapper;
 import com.comicatlas.api.task.service.ManagementTaskService;
+import com.comicatlas.api.storage.service.ComicStatsService;
 import com.comicatlas.api.outbox.service.InboxService;
 import com.comicatlas.api.outbox.service.EventFingerprintService;
 import com.comicatlas.api.outbox.service.OutboxService;
@@ -20,11 +21,14 @@ import com.comicatlas.api.task.enums.TaskType;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.shared.exception.SnapshotUnavailableException;
 import com.comicatlas.persistence.comic.entity.Comic;
+import com.comicatlas.persistence.comic.entity.Chapter;
+import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.api.storage.ApiStorageProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.IOException;
@@ -32,6 +36,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.Objects;
 import java.util.stream.Stream;
 
 /**
@@ -41,10 +46,11 @@ import java.util.stream.Stream;
  * 若塞入把 {@code business.run()} 整体包进事务的 generic 分支，文件 IO 将进入事务，
  * 且业务失败无法区分「快照不可信 → FAILED + ACK」与「基础设施故障 → DLQ」。
  * <p>
- * 流程：幂等前置检查（无事务）→ 事务外校验快照 → 成功短事务（comic 释放 + item CAS
- * + 差异合并 + Inbox + Outbox 入箱 + 任务聚合）→ 提交后清理快照。
+ * 流程：幂等前置检查（无事务）→ 事务外校验章节快照 → 成功短事务（item CAS
+ * + 章节差异合并 + Inbox + 任务聚合）。最后一个 item 收尾时才重算整本统计、
+ * 释放 comic REFRESHING 并写入一次元数据重导出 Outbox。
  * <p>
- * <b>幂等条件</b>：item 已终态 / attempt 不匹配 / 非 COMIC·METADATA_REFRESH 直接 ACK；
+ * <b>幂等条件</b>：item 已终态 / attempt 不匹配 / 非 COMIC|CHAPTER·METADATA_REFRESH 直接 ACK；
  * 同 attempt 不同 eventId 的重复完成事件由 item CAS 竞争，只有胜者 apply。
  * <p>
  * <b>失败区分</b>：业务错误（摘要/schema/目标/数量/结构漂移）→ 独立短事务 item/task
@@ -58,6 +64,8 @@ public class MetadataRefreshCompletionService {
 
     /** 命令目标类型：漫画级（批量操作展开）。 */
     private static final String TARGET_TYPE_COMIC = "COMIC";
+    /** 命令目标类型：章节级。 */
+    private static final String TARGET_TYPE_CHAPTER = "CHAPTER";
 
     /** 暂存卷存储根键。 */
     private static final String ROOT_KEY_STAGING = "STAGING";
@@ -67,7 +75,9 @@ public class MetadataRefreshCompletionService {
 
     private final ManagementTaskItemMapper managementTaskItemMapper;
     private final ComicMapper comicMapper;
+    private final ChapterMapper chapterMapper;
     private final MetadataRefreshService metadataRefreshService;
+    private final ComicStatsService comicStatsService;
     private final InboxService inboxService;
     private final OutboxService outboxService;
     private final ManagementTaskService managementTaskService;
@@ -85,7 +95,7 @@ public class MetadataRefreshCompletionService {
         if (shouldSkip(ev, item, eventId)) {
             return;
         }
-        Long comicId = item.getTargetId();
+        Long comicId = resolveComicId(item.getTargetType(), item.getTargetId());
 
         // 2. 事务外读取并校验静态快照（SHA-256 + JSON 解析 + 结构校验）
         MetadataRefreshSnapshotDTO snapshot;
@@ -93,20 +103,21 @@ public class MetadataRefreshCompletionService {
             snapshot = metadataRefreshService.loadAndValidate(
                     new MetadataRefreshLoadRequest(comicId, ev.snapshotRef(), ev.snapshotSha256(),
                             ev.snapshotBytes(), ev.schemaVersion()));
+            validateTargetSnapshot(item, snapshot);
         } catch (BusinessException e) {
             if (isSnapshotIoFailure(e)) {
                 throw e;
             }
-            applyBusinessFailure(ev, eventId, payloadHash, e.getMessage());
+            applyBusinessFailure(ev, item, comicId, eventId, payloadHash, e.getMessage());
             return;
         }
 
         // 3. 成功短事务；复核 databaseRevision 漂移抛 BusinessException → 整事务回滚 → 失败短事务
         Boolean applied;
         try {
-            applied = transactionTemplate.execute(tx -> applySuccess(ev, eventId, payloadHash, snapshot));
+            applied = transactionTemplate.execute(tx -> applySuccess(ev, comicId, eventId, payloadHash, snapshot));
         } catch (BusinessException e) {
-            applyBusinessFailure(ev, eventId, payloadHash, e.getMessage());
+            applyBusinessFailure(ev, item, comicId, eventId, payloadHash, e.getMessage());
             return;
         }
 
@@ -132,7 +143,14 @@ public class MetadataRefreshCompletionService {
                     ev.itemId(), ev.attempt(), item.getAttempt());
             return true;
         }
-        if (item.getOperationType() != TaskType.METADATA_REFRESH || !TARGET_TYPE_COMIC.equals(item.getTargetType())) {
+        boolean supportedTarget = TARGET_TYPE_COMIC.equals(item.getTargetType())
+                || TARGET_TYPE_CHAPTER.equals(item.getTargetType());
+        boolean metadataOperation = item.getOperationType() == TaskType.METADATA_REFRESH;
+        boolean eventMatchesItem = Objects.equals(item.getTargetType(), ev.targetType())
+                && Objects.equals(item.getTargetId(), ev.targetId())
+                && metadataOperation
+                && item.getOperationType().name().equals(ev.operationType());
+        if (!metadataOperation || !supportedTarget || !eventMatchesItem) {
             log.warn("元数据刷新完成事件 target/op 不匹配，防御性忽略: itemId={}, op={}, target={}",
                     ev.itemId(), item.getOperationType(), item.getTargetType());
             return true;
@@ -141,26 +159,18 @@ public class MetadataRefreshCompletionService {
     }
 
     /**
-     * 成功短事务：comic 行锁 + CAS 释放 → item CAS → 差异合并 → Inbox → Outbox → 任务聚合。
+     * 成功短事务：comic 行锁 → item CAS → 章节差异合并 → Inbox → 按漫画收尾 → 任务聚合。
      * <p>
      * item CAS 影响行数 0 表示已被其他 eventId 处理（同 attempt 重复完成事件），
      * 幂等跳过 apply/Outbox/聚合，仅记录 Inbox 后返回 false（快照由胜者清理）。
      *
      * @return true 表示本事件是本次 attempt 的 CAS 胜者并已完整 apply
      */
-    private boolean applySuccess(MetadataRefreshScanCompletedEvent ev,
+    private boolean applySuccess(MetadataRefreshScanCompletedEvent ev, Long comicId,
                                  String eventId, String payloadHash,
                                  MetadataRefreshSnapshotDTO snapshot) {
-        Long comicId = snapshot.comicId();
-
-        // 行锁读取 + CAS 释放 REFRESHING → READY（0 行视为并发已释放，继续不失败）
-        Comic locked = comicMapper.selectByIdForUpdate(comicId);
-        if (locked != null && locked.getStatus() == ComicStatus.REFRESHING) {
-            comicMapper.update(null, new LambdaUpdateWrapper<Comic>()
-                    .eq(Comic::getId, comicId)
-                    .eq(Comic::getStatus, ComicStatus.REFRESHING)
-                    .set(Comic::getStatus, ComicStatus.READY));
-        }
+        // 同一漫画的章节完成事务串行化，确保最后一个 item 能稳定观测 active=0。
+        comicMapper.selectByIdForUpdate(comicId);
 
         // item CAS：当前 attempt 非终态 → SUCCEEDED；0 行 = 已被其他 eventId 处理 → 幂等跳过 apply
         int rows = managementTaskItemMapper.update(null, new LambdaUpdateWrapper<ManagementTaskItem>()
@@ -181,31 +191,28 @@ public class MetadataRefreshCompletionService {
 
         // 复核 databaseRevision 并执行差异合并（内部事务；漂移抛 BusinessException → 整体回滚 → 失败路径）
         metadataRefreshService.applyValidatedSnapshot(snapshot);
-        catalogCacheInvalidator.evict(comicId);
 
         // 写 Inbox（eventId 幂等键）
         inboxService.markProcessed(eventId, payloadHash, ev.taskId(), ev.itemId(), ev.attempt());
 
-        // metadata 重导出走 Outbox（DB→JSON，relay 后发 MQ）；禁止 MediaMetadataSyncService 吞异常的 direct publish
-        outboxService.enqueue(new MetadataRefreshEvent(null, null, comicId),
-                MqExchanges.EXPORT, MqRoutingKeys.METADATA_REFRESH_REQUESTED,
-                ev.taskId(), ev.itemId(), ev.attempt());
-
         // 任务状态聚合（item 到终态，全部完成则 task SUCCEEDED）——本次提交 = 管理任务成功点
+        finalizeComicIfTaskComplete(comicId, ev.taskId(), ev.itemId(), ev.attempt());
         managementTaskService.reaggregateTask(ev.taskId());
         return true;
     }
 
     /**
-     * 业务失败短事务：item/task → FAILED（记录 errorMessage）、comic REFRESHING → READY、
-     * Inbox 记录后 ACK，保留快照（供重试/排查）。
+     * 业务失败短事务：item/task → FAILED（记录 errorMessage）、Inbox 记录后 ACK，
+     * 保留快照（供重试/排查）。同漫画所有项终态后才释放 REFRESHING。
      * <p>
      * 仅当前 attempt 且非终态时生效（CAS），不影响已成功的重复事件。事务内异常向上传播 → DLQ。
      */
     private void applyBusinessFailure(MetadataRefreshScanCompletedEvent ev,
+                                      ManagementTaskItem item, Long comicId,
                                       String eventId, String payloadHash, String errorMessage) {
         log.warn("元数据刷新业务失败，置 FAILED 并 ACK: itemId={}, error={}", ev.itemId(), errorMessage);
         transactionTemplate.executeWithoutResult(tx -> {
+            comicMapper.selectByIdForUpdate(comicId);
             managementTaskItemMapper.update(null, new LambdaUpdateWrapper<ManagementTaskItem>()
                     .eq(ManagementTaskItem::getId, ev.itemId())
                     .eq(ManagementTaskItem::getAttempt, ev.attempt())
@@ -217,10 +224,61 @@ public class MetadataRefreshCompletionService {
                     .set(ManagementTaskItem::getCompletedAt, LocalDateTime.now())
                     .set(ManagementTaskItem::getLockKey, null)
                     .set(ManagementTaskItem::getUpdatedAt, LocalDateTime.now()));
-            releaseComicRefreshing(ev.targetId());
-            managementTaskService.reaggregateTask(ev.taskId());
             inboxService.markProcessed(eventId, payloadHash, ev.taskId(), ev.itemId(), ev.attempt());
+            finalizeComicIfTaskComplete(comicId, ev.taskId(), item.getId(), ev.attempt());
+            managementTaskService.reaggregateTask(ev.taskId());
         });
+    }
+
+    /** 通用 failed 事件已将 item 置为终态后，按所属漫画尝试整任务收尾。 */
+    @Transactional
+    public void handleCommandFailed(Long taskId, Long itemId, int attempt,
+                                    String targetType, Long targetId) {
+        Long comicId = resolveComicId(targetType, targetId);
+        comicMapper.selectByIdForUpdate(comicId);
+        finalizeComicIfTaskComplete(comicId, taskId, itemId, attempt);
+    }
+
+    private void finalizeComicIfTaskComplete(Long comicId, Long taskId, Long itemId, int attempt) {
+        if (managementTaskService.countActiveMetadataItems(taskId, comicId) > 0) {
+            return;
+        }
+        comicStatsService.refreshByComic(comicId);
+        int releasedRows = comicMapper.update(null, new LambdaUpdateWrapper<Comic>()
+                .eq(Comic::getId, comicId)
+                .eq(Comic::getStatus, ComicStatus.REFRESHING)
+                .set(Comic::getStatus, ComicStatus.READY));
+        if (releasedRows == 0) {
+            return;
+        }
+        catalogCacheInvalidator.evict(comicId);
+        outboxService.enqueue(new MetadataRefreshEvent(null, null, comicId),
+                MqExchanges.EXPORT, MqRoutingKeys.METADATA_REFRESH_REQUESTED,
+                taskId, itemId, attempt);
+    }
+
+    private Long resolveComicId(String targetType, Long targetId) {
+        if (TARGET_TYPE_COMIC.equals(targetType)) {
+            return targetId;
+        }
+        if (TARGET_TYPE_CHAPTER.equals(targetType)) {
+            Chapter chapter = chapterMapper.selectById(targetId);
+            if (chapter == null) {
+                throw new BusinessException("元数据刷新章节不存在: " + targetId);
+            }
+            return chapter.getComicId();
+        }
+        throw new BusinessException("元数据刷新目标类型不支持: " + targetType);
+    }
+
+    private void validateTargetSnapshot(ManagementTaskItem item, MetadataRefreshSnapshotDTO snapshot) {
+        if (!TARGET_TYPE_CHAPTER.equals(item.getTargetType())) {
+            return;
+        }
+        if (snapshot.chapters().size() != 1
+                || !item.getTargetId().equals(snapshot.chapters().get(0).chapterId())) {
+            throw new BusinessException("章节刷新快照与 item 目标不一致: " + item.getTargetId());
+        }
     }
 
     /** 提交后删除当前 attempt 快照目录（STAGING/metadata-refresh/{taskId}/{itemId}/{attempt}）。 */
@@ -262,14 +320,6 @@ public class MetadataRefreshCompletionService {
             }
         }
         return false;
-    }
-
-    /** 释放漫画元数据刷新锁（REFRESHING → READY），仅仍为 REFRESHING 时生效（CAS）。 */
-    public void releaseComicRefreshing(Long comicId) {
-        comicMapper.update(null, new LambdaUpdateWrapper<Comic>()
-                .eq(Comic::getId, comicId)
-                .eq(Comic::getStatus, ComicStatus.REFRESHING)
-                .set(Comic::getStatus, ComicStatus.READY));
     }
 
 }

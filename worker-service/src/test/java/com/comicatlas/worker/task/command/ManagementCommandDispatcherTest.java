@@ -25,7 +25,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 /**
- * 管理命令分发器单元测试：METADATA_REFRESH（COMIC 级）路由到元数据扫盘刷新
+ * 管理命令分发器单元测试：METADATA_REFRESH（COMIC/CHAPTER）路由到元数据扫盘刷新
  * 处理器执行扫盘，不再 fail-closed 直接回 FAILED；其他命令处理器不被误触。
  */
 class ManagementCommandDispatcherTest {
@@ -60,5 +60,18 @@ class ManagementCommandDispatcherTest {
                 mediaUploadCommandHandler);
         // 扫盘由 handler 内部发布 completed/failed：命令正常 ack，不进入 DLQ
         verify(channel).basicAck(1L, false);
+    }
+
+    @Test
+    void chapterMetadataRefresh命令路由到扫盘处理器() throws Exception {
+        ManagementCommandRequestedEvent command = new ManagementCommandRequestedEvent(
+                UUID.randomUUID(), Instant.now(), 1, 2L, 3L, 1,
+                "METADATA_REFRESH", "CHAPTER", 42L);
+
+        dispatcher.handle(command, channel, 2L);
+
+        verify(metadataRefreshCommandHandler).refresh(command);
+        verify(publisher, never()).failed(eq(command), anyString());
+        verify(channel).basicAck(2L, false);
     }
 }

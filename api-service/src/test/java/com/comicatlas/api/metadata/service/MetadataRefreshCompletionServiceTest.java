@@ -7,6 +7,7 @@ import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.task.entity.ManagementTaskItem;
 import com.comicatlas.api.task.mapper.ManagementTaskItemMapper;
 import com.comicatlas.api.task.service.ManagementTaskService;
+import com.comicatlas.api.storage.service.ComicStatsService;
 import com.comicatlas.api.outbox.service.InboxService;
 import com.comicatlas.api.outbox.service.EventFingerprintService;
 import com.comicatlas.api.outbox.service.OutboxService;
@@ -22,6 +23,8 @@ import com.comicatlas.api.task.enums.TaskType;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.shared.exception.SnapshotUnavailableException;
 import com.comicatlas.persistence.comic.entity.Comic;
+import com.comicatlas.persistence.comic.entity.Chapter;
+import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.api.storage.ApiStorageProperties;
 import com.comicatlas.api.storage.ApiStorageRoot;
@@ -81,7 +84,9 @@ class MetadataRefreshCompletionServiceTest {
 
     @Mock private ManagementTaskItemMapper managementTaskItemMapper;
     @Mock private ComicMapper comicMapper;
+    @Mock private ChapterMapper chapterMapper;
     @Mock private MetadataRefreshService metadataRefreshService;
+    @Mock private ComicStatsService comicStatsService;
     @Mock private InboxService inboxService;
     @Mock private EventFingerprintService eventFingerprintService;
     @Mock private OutboxService outboxService;
@@ -151,6 +156,26 @@ class MetadataRefreshCompletionServiceTest {
         return new MetadataRefreshSnapshotDTO(1, 1L, Instant.parse("2026-08-09T00:00:00Z"), "rev", List.of());
     }
 
+    private ManagementTaskItem runningChapterItem() {
+        ManagementTaskItem item = runningItem();
+        item.setTargetType("CHAPTER");
+        item.setTargetId(42L);
+        return item;
+    }
+
+    private MetadataRefreshSnapshotDTO chapterSnapshot() {
+        return new MetadataRefreshSnapshotDTO(1, 1L, Instant.parse("2026-08-09T00:00:00Z"), "rev",
+                List.of(new MetadataRefreshSnapshotDTO.ChapterSnapshot(42L, 1, List.of(), List.of())));
+    }
+
+    private MetadataRefreshScanCompletedEvent chapterCompletedEvent() throws Exception {
+        MetadataRefreshScanCompletedEvent event = completedEvent();
+        return new MetadataRefreshScanCompletedEvent(
+                event.eventId(), event.occurredAt(), event.version(), event.taskId(), event.itemId(),
+                event.attempt(), event.operationType(), "CHAPTER", 42L, event.snapshotRef(),
+                event.snapshotSha256(), event.snapshotBytes(), event.schemaVersion());
+    }
+
     private MetadataRefreshScanCompletedEvent completedEvent() throws Exception {
         snapshotDir = staging.resolve("metadata-refresh/10/100/1");
         Path snapshotFile = snapshotDir.resolve("snapshot.json");
@@ -188,6 +213,26 @@ class MetadataRefreshCompletionServiceTest {
         verify(catalogCacheInvalidator).evict(1L);
         // 提交后清理快照目录
         assertThat(Files.exists(snapshotDir)).isFalse();
+    }
+
+    @Test
+    @DisplayName("章节项完成但同漫画仍有活跃项：应用单章快照但不提前释放漫画")
+    void chapterCompleted_withActiveSibling_doesNotFinalizeComic() throws Exception {
+        when(managementTaskItemMapper.selectById(100L)).thenReturn(runningChapterItem());
+        Chapter chapter = new Chapter();
+        chapter.setId(42L);
+        chapter.setComicId(1L);
+        when(chapterMapper.selectById(42L)).thenReturn(chapter);
+        when(metadataRefreshService.loadAndValidate(any())).thenReturn(chapterSnapshot());
+        when(managementTaskItemMapper.update(isNull(), any())).thenReturn(1);
+        when(managementTaskService.countActiveMetadataItems(10L, 1L)).thenReturn(1L);
+
+        service.handleCompleted(chapterCompletedEvent());
+
+        verify(metadataRefreshService).applyValidatedSnapshot(chapterSnapshot());
+        verify(comicStatsService, never()).refreshByComic(any());
+        verify(comicMapper, never()).update(isNull(), any());
+        verify(outboxService, never()).enqueue(any(), anyString(), anyString());
     }
 
     // ======================== 幂等前置检查（事务外，直接返回） ========================
@@ -246,7 +291,6 @@ class MetadataRefreshCompletionServiceTest {
         when(managementTaskItemMapper.selectById(100L)).thenReturn(runningItem());
         when(metadataRefreshService.loadAndValidate(any())).thenReturn(snapshot());
         when(comicMapper.selectByIdForUpdate(1L)).thenReturn(refreshingComic());
-        when(comicMapper.update(isNull(), any())).thenReturn(1);
         when(managementTaskItemMapper.update(isNull(), any())).thenReturn(0);
 
         MetadataRefreshScanCompletedEvent ev = completedEvent();
@@ -281,9 +325,10 @@ class MetadataRefreshCompletionServiceTest {
         verify(comicMapper).update(isNull(), any(LambdaUpdateWrapper.class));
         verify(managementTaskService).reaggregateTask(10L);
         verify(inboxService).markProcessed(eq(ev.eventId().toString()), anyString(), eq(10L), eq(100L), eq(1));
-        // 不 apply 快照、不重导出
+        // 不 apply 快照；本 item 为最后一项时仍收尾重导出，以保留先前成功章节的变更。
         verify(metadataRefreshService, never()).applyValidatedSnapshot(any());
-        verify(outboxService, never()).enqueue(any(), anyString(), anyString());
+        verify(outboxService).enqueue(any(MetadataRefreshEvent.class), anyString(), anyString(),
+                eq(10L), eq(100L), eq(1));
         // 快照保留（供重试/排查）
         assertThat(Files.exists(snapshotDir)).isTrue();
     }
@@ -305,10 +350,11 @@ class MetadataRefreshCompletionServiceTest {
         // 成功短事务内 apply 已调用（抛出后整体回滚），随后失败短事务执行
         verify(metadataRefreshService).applyValidatedSnapshot(any());
         verify(managementTaskItemMapper, times(2)).update(isNull(), any(LambdaUpdateWrapper.class));
-        verify(comicMapper, times(2)).update(isNull(), any(LambdaUpdateWrapper.class));
+        verify(comicMapper).update(isNull(), any(LambdaUpdateWrapper.class));
         verify(managementTaskService).reaggregateTask(10L);
         verify(inboxService).markProcessed(eq(ev.eventId().toString()), anyString(), eq(10L), eq(100L), eq(1));
-        verify(outboxService, never()).enqueue(any(), anyString(), anyString());
+        verify(outboxService).enqueue(any(MetadataRefreshEvent.class), anyString(), anyString(),
+                eq(10L), eq(100L), eq(1));
         assertThat(Files.exists(snapshotDir)).isTrue();
     }
 

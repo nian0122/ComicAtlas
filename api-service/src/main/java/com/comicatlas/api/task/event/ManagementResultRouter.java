@@ -77,7 +77,8 @@ public class ManagementResultRouter {
             case "HQ_DELETE" -> mediaCompletionService.revertHqDeleteFailed(event.targetId());
             case "TRANSCODE" -> mediaCompletionService.revertTranscodeFailed(event.targetId());
             case "MEDIA_UPLOAD", "MEDIA_REPLACE" -> uploadCompletionService.revertUploadFailed(event.targetId());
-            case METADATA_REFRESH -> metadataCompletionService.releaseComicRefreshing(event.targetId());
+            case METADATA_REFRESH -> metadataCompletionService.handleCommandFailed(
+                    event.taskId(), event.itemId(), event.attempt(), event.targetType(), event.targetId());
             case "COMIC_DELETE", "CHAPTER_TRASH", "MEDIA_TRASH" ->
                     trashCompletionService.applyTrashFailed(event.targetType(), event.targetId(), event.taskId());
             case "COMIC_RESTORE", "CHAPTER_RESTORE", "MEDIA_RESTORE", "COMIC_PURGE", "CHAPTER_PURGE", "MEDIA_PURGE" ->

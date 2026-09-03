@@ -6,6 +6,7 @@ import com.comicatlas.api.importer.mapper.ImportTaskMapper;
 import com.comicatlas.api.importer.service.ImportRetryCoordinator;
 import com.comicatlas.api.task.entity.ManagementTask;
 import com.comicatlas.api.task.entity.ManagementTaskItem;
+import com.comicatlas.api.task.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.task.mapper.ManagementTaskItemMapper;
 import com.comicatlas.api.task.mapper.ManagementTaskMapper;
 import com.comicatlas.api.outbox.service.OutboxService;
@@ -14,6 +15,9 @@ import com.comicatlas.api.task.enums.ManagementTaskStatus;
 import com.comicatlas.api.task.enums.TaskType;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
+import com.comicatlas.persistence.comic.mapper.ChapterMapper;
+import com.comicatlas.persistence.comic.entity.Chapter;
+import com.comicatlas.persistence.comic.entity.Comic;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -36,8 +40,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
 /**
@@ -50,6 +56,7 @@ class ManagementTaskServiceTest {
     @Mock private ManagementTaskMapper taskMapper;
     @Mock private ManagementTaskItemMapper itemMapper;
     @Mock private ComicMapper comicMapper;
+    @Mock private ChapterMapper chapterMapper;
     @Mock private ExportTaskMapper exportTaskMapper;
     @Mock private OutboxService outboxService;
     @Mock private ImportTaskMapper importTaskMapper;
@@ -71,6 +78,8 @@ class ManagementTaskServiceTest {
         MybatisConfiguration configuration = new MybatisConfiguration();
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(configuration, ""), ManagementTask.class);
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(configuration, ""), ManagementTaskItem.class);
+        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(configuration, ""), Chapter.class);
+        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(configuration, ""), Comic.class);
     }
 
     @BeforeEach
@@ -101,6 +110,37 @@ class ManagementTaskServiceTest {
                 .when(taskRetryPublisher).publish(eq(99L), eq(item), eq(2));
 
         assertThrows(BusinessException.class, () -> service.retryTask(99L));
+    }
+
+    @Test
+    void createMetadataRefreshTask_同漫画多章节只占用一次漫画状态() {
+        CreateManagementTaskRequest request = new CreateManagementTaskRequest();
+        request.setTaskType(TaskType.METADATA_REFRESH);
+        request.setOperation("刷新元数据");
+        request.setTargetType("COMIC");
+        request.setTargets(List.of(chapterTarget(11L), chapterTarget(12L)));
+        Chapter firstChapter = new Chapter();
+        firstChapter.setId(11L);
+        firstChapter.setComicId(1L);
+        Chapter secondChapter = new Chapter();
+        secondChapter.setId(12L);
+        secondChapter.setComicId(1L);
+        when(chapterMapper.selectBatchIds(any())).thenReturn(List.of(firstChapter, secondChapter));
+        when(comicMapper.update(isNull(), any())).thenReturn(1);
+        when(itemMapper.selectCount(any())).thenReturn(0L);
+
+        service.createTask(request, null, "{}");
+
+        verify(comicMapper, times(1)).update(isNull(), any(LambdaUpdateWrapper.class));
+        verify(itemMapper, times(2)).insert(any(ManagementTaskItem.class));
+    }
+
+    private static CreateManagementTaskRequest.TaskTarget chapterTarget(Long chapterId) {
+        CreateManagementTaskRequest.TaskTarget target = new CreateManagementTaskRequest.TaskTarget();
+        target.setTargetType("CHAPTER");
+        target.setTargetId(chapterId);
+        target.setOperationType(TaskType.METADATA_REFRESH);
+        return target;
     }
 
     @Test

@@ -43,6 +43,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -128,6 +130,12 @@ class MetadataRefreshCommandHandlerTest {
                 "METADATA_REFRESH", "COMIC", COMIC_ID);
     }
 
+    private ManagementCommandRequestedEvent chapterCommand() {
+        return new ManagementCommandRequestedEvent(
+                UUID.randomUUID(), Instant.now(), 1, TASK_ID, ITEM_ID, ATTEMPT,
+                "METADATA_REFRESH", "CHAPTER", CHAPTER_ID);
+    }
+
     private Path snapshotPath() {
         return tempRoot.resolve("staging")
                 .resolve("metadata-refresh").resolve(String.valueOf(TASK_ID))
@@ -143,6 +151,7 @@ class MetadataRefreshCommandHandlerTest {
     private static ChapterRecord chapter(long id, int globalOrder, int version) {
         ChapterRecord ch = new ChapterRecord();
         ch.setId(id);
+        ch.setComicId(COMIC_ID);
         ch.setGlobalOrder(globalOrder);
         ch.setVersion(version);
         return ch;
@@ -180,6 +189,27 @@ class MetadataRefreshCommandHandlerTest {
     }
 
     // ==================== happy：完整扫盘成功 ====================
+
+    @Test
+    void chapterTarget_scansOnlyRequestedChapter() throws Exception {
+        Path chapterDirectory = Files.createDirectories(tempRoot.resolve("hq/1/42"));
+        Files.writeString(chapterDirectory.resolve("001.jpg"), "img-001");
+        ChapterRecord targetChapter = chapter(CHAPTER_ID, 1, 7);
+        when(chapterMapper.selectByIdWithVersion(CHAPTER_ID)).thenReturn(targetChapter);
+        when(mediaMapper.selectByChapterIdWithVersionAndStatus(CHAPTER_ID)).thenReturn(List.of(
+                media(101L, CHAPTER_ID, "1/42/001.jpg", 1, "READY", "READY", 1)));
+        stubAnalyzerByExtension();
+        newHandler();
+
+        handler.refresh(chapterCommand());
+
+        JsonNode root = objectMapper.readTree(snapshotPath().toFile());
+        assertEquals(COMIC_ID, root.get("comicId").asLong());
+        assertEquals(1, root.get("chapters").size());
+        assertEquals(CHAPTER_ID, root.get("chapters").get(0).get("chapterId").asLong());
+        verify(chapterMapper, never()).selectByComicIdWithVersion(any());
+        verify(mediaMapper, never()).selectByComicIdWithVersionAndStatus(any());
+    }
 
     @Test
     void happyPath_scansChapterIdDir_naturalOrder_writesSnapshotAndPublishesCompleted() throws Exception {
@@ -357,31 +387,22 @@ class MetadataRefreshCommandHandlerTest {
         assertTrue(warningFound, "未知扩展名应记录结构化 warning");
     }
 
-    // ==================== 章节目录缺失：空扫描 + warning ====================
+    // ==================== 章节目录缺失：拒绝不完整快照 ====================
 
     @Test
-    void missingChapterDir_emptyScanWithWarning_commandStillCompletes() throws Exception {
+    void missingChapterDir_publishesFailureWithoutSnapshot() {
         when(chapterMapper.selectByComicIdWithVersion(COMIC_ID))
                 .thenReturn(List.of(chapter(CHAPTER_ID, 1, 1)));
-        // DB 有媒体行但目录缺失 → 空扫描，API 侧据此标记 MISSING
+        // DB 有媒体行但目录缺失，不得用空快照将整章误标为 MISSING。
         when(mediaMapper.selectByComicIdWithVersionAndStatus(COMIC_ID))
                 .thenReturn(List.of(media(101L, CHAPTER_ID, "1/42/001.jpg", 1, "READY", "READY", 1)));
         newHandler();
 
-        handler.refresh(cmd());
+        ManagementCommandRequestedEvent command = cmd();
+        handler.refresh(command);
 
-        JsonNode root = objectMapper.readTree(snapshotPath().toFile());
-        JsonNode chapter = root.get("chapters").get(0);
-        assertTrue(chapter.get("mediaItems").isEmpty(), "章节目录缺失应得到空扫描");
-        boolean warningFound = false;
-        for (JsonNode w : chapter.get("warnings")) {
-            if (w.asText().contains("章节目录不存在")) {
-                warningFound = true;
-                break;
-            }
-        }
-        assertTrue(warningFound, "章节目录缺失应记录 warning");
-        verify(publisher, never()).failed(any(ManagementCommandRequestedEvent.class), any(String.class));
+        assertFalse(Files.exists(snapshotPath()), "章节目录缺失时不应产生快照");
+        verify(publisher).failed(eq(command), contains("章节 HQ 目录不存在"));
     }
 
     // ==================== 越界路径：DB 中带 ../ 的 hqPath 不会被解析/不会触发穿越 ====================

@@ -25,4 +25,13 @@ public interface ManagementTaskItemMapper extends BaseMapper<ManagementTaskItem>
      * @return 归属该漫画的任务 ID 列表（已去重，可为空）
      */
     List<Long> selectTaskIdsByComicId(@Param("comicId") Long comicId);
+
+    /**
+     * 统计指定漫画在元数据刷新任务中尚未终态的任务项。
+     *
+     * @param taskId 任务 ID
+     * @param comicId 漫画 ID
+     * @return 活跃任务项数量
+     */
+    long countActiveMetadataItems(@Param("taskId") Long taskId, @Param("comicId") Long comicId);
 }
