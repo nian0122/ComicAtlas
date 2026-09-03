@@ -48,4 +48,21 @@ public interface MediaMapper extends BaseMapper<Media> {
      * @return 受影响行数（应等于 mediaList.size()）
      */
     int updateRefreshBatch(@Param("mediaList") List<Media> mediaList);
+
+    /**
+     * LQ 结果专用批量 UPDATE：按媒体 ID 批量写入 READY、LQ 根、WebP 路径和大小。
+     * chapterId 作为额外边界，防止错误事件跨章节更新页面。
+     *
+     * @param chapterId 章节 ID
+     * @param mediaList 已确认存在 LQ 产物的媒体列表（须非空）
+     * @return 实际更新行数
+     */
+    int updateLqReadyBatch(@Param("chapterId") Long chapterId,
+                           @Param("mediaList") List<Media> mediaList);
+
+    /** LQ 完成回写前，将本章图片统一重置为未生成。 */
+    int resetLqNotGeneratedByChapter(@Param("chapterId") Long chapterId);
+
+    /** LQ 失败回写时，将本章仍处于排队或生成中的图片统一置为失败。 */
+    int markLqFailedByChapter(@Param("chapterId") Long chapterId);
 }

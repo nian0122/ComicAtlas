@@ -1,6 +1,8 @@
 # image-optimizer
 
-ComicAtlas 专用图片压缩工具。HQ 图片按比例缩小到配置的最大长边后统一转换为 LQ WebP；JPEG 优先通过 libjpeg-turbo 在完整解码前执行 DCT 缩放，降低超大图片的内存和编码耗时。
+ComicAtlas 专用图片压缩工具。HQ 图片按比例缩小到配置的最大长边后统一转换为 LQ WebP；JPEG 仅在 DCT 档位小于 `8/8`、能够真实减少像素时使用 libjpeg-turbo 预缩放。其 BMP 中间文件写入系统临时目录，避免与 HQ/LQ 存储盘争抢 I/O。
+
+普通生成只跳过有效且不早于 HQ 的 WebP。旧版遗留的 LQ JPG 不再视为完成项，会自动重新生成 WebP，并在成功后删除同名 JPG。
 
 ## 编译
 

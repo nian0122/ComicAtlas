@@ -212,35 +212,28 @@ func run(cfg *CLIConfig) *RunResult {
 		baseName := strings.TrimSuffix(filepath.Base(relPath), filepath.Ext(relPath))
 		pageNum := inferPageNumber(baseName)
 		lqPath := filepath.Join(cfg.OutputDir, filepath.Dir(relPath), baseName+".webp")
-		jpegLqPath := filepath.Join(cfg.OutputDir, filepath.Dir(relPath), baseName+".jpg")
 
 		atomic.AddInt32(&result.Total, 1)
 
 		if !cfg.Force {
-			for _, existingLqPath := range []string{lqPath, jpegLqPath} {
-				if lqInfo, err := os.Stat(existingLqPath); err == nil {
-					if lqInfo.ModTime().Unix() >= info.ModTime().Unix() {
-						outputFormat := "webp"
-						if strings.EqualFold(filepath.Ext(existingLqPath), ".jpg") {
-							outputFormat = "jpeg"
-						}
-						atomic.AddInt32(&result.Skipped, 1)
-						if !cfg.Quiet {
-							fmt.Fprintf(os.Stderr, "跳过: %s | 已存在最新版本 (%s)\n", relPath, formatSize(lqInfo.Size()))
-						}
-						result.mu.Lock()
-						result.Pages = append(result.Pages, PageResult{
-							PageNumber:   pageNum,
-							Status:       "skipped",
-							InputSize:    info.Size(),
-							OutputSize:   lqInfo.Size(),
-							Reason:       "exists",
-							OutputPath:   relativeLqPath(cfg.OutputDir, existingLqPath),
-							OutputFormat: outputFormat,
-						})
-						result.mu.Unlock()
-						return nil
+			if lqInfo, statErr := os.Stat(lqPath); statErr == nil {
+				if lqInfo.ModTime().Unix() >= info.ModTime().Unix() {
+					atomic.AddInt32(&result.Skipped, 1)
+					if !cfg.Quiet {
+						fmt.Fprintf(os.Stderr, "跳过: %s | 已存在最新版本 (%s)\n", relPath, formatSize(lqInfo.Size()))
 					}
+					result.mu.Lock()
+					result.Pages = append(result.Pages, PageResult{
+						PageNumber:   pageNum,
+						Status:       "skipped",
+						InputSize:    info.Size(),
+						OutputSize:   lqInfo.Size(),
+						Reason:       "exists",
+						OutputPath:   relativeLqPath(cfg.OutputDir, lqPath),
+						OutputFormat: "webp",
+					})
+					result.mu.Unlock()
+					return nil
 				}
 			}
 		}

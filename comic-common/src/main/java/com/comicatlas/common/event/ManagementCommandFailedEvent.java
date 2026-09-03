@@ -1,6 +1,9 @@
 package com.comicatlas.common.event;
 
+import com.comicatlas.common.event.payload.LqSizeResult;
+
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -19,8 +22,17 @@ public record ManagementCommandFailedEvent(
     String operationType,
     String targetType,
     Long targetId,
-    String errorMessage
+    String errorMessage,
+    List<LqSizeResult> lqSizes
 ) implements ComicEvent {
+
+    /** 兼容不携带 LQ 部分成功结果的失败事件构造方式。 */
+    public ManagementCommandFailedEvent(
+            UUID eventId, Instant occurredAt, int version, Long taskId, Long itemId, int attempt,
+            String operationType, String targetType, Long targetId, String errorMessage) {
+        this(eventId, occurredAt, version, taskId, itemId, attempt,
+                operationType, targetType, targetId, errorMessage, null);
+    }
 
     @Override
     public int version() {

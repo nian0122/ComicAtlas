@@ -1,6 +1,7 @@
 package com.comicatlas.worker.media.lq;
 
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
+import com.comicatlas.common.event.payload.LqSizeResult;
 import com.comicatlas.worker.persistence.record.MediaRecord;
 import com.comicatlas.worker.task.publisher.ManagementCommandPublisher;
 import com.comicatlas.worker.media.image.ImageOptimizer;
@@ -89,5 +90,32 @@ class LqCommandHandlerTest {
         handler.generateChapter(cmd("LQ_GENERATE"));
 
         verify(optimizer).generateLq(eq(7L), eq(42L), any(Path.class), any(Path.class), eq(false));
+    }
+
+    @Test
+    @DisplayName("部分失败时回传已成功页的 LQ 产物")
+    void partiallyFailedCommand_publishesSuccessfulLqResults() {
+        MediaRecord media = media("7/42/001.jpg");
+        media.setId(99L);
+        media.setPageNumber(1);
+        when(mediaMapper.selectByChapterId(42L)).thenReturn(List.of(media));
+        ImageOptimizer.PageResult pageResult = new ImageOptimizer.PageResult();
+        pageResult.setPageNumber(1L);
+        pageResult.setStatus("processed");
+        pageResult.setOutputSize(1234L);
+        pageResult.setOutputPath("001.webp");
+        ImageOptimizer.PageResult failedResult = new ImageOptimizer.PageResult();
+        failedResult.setPageNumber(2L);
+        failedResult.setStatus("failed");
+        ImageOptimizer.RunResult runResult = new ImageOptimizer.RunResult();
+        runResult.setPages(List.of(pageResult, failedResult));
+        when(optimizer.generateLq(eq(7L), eq(42L), any(Path.class), any(Path.class), eq(false)))
+                .thenReturn(runResult);
+        ManagementCommandRequestedEvent command = cmd("LQ_GENERATE");
+
+        handler.generateChapter(command);
+
+        verify(publisher).failed(eq(command), eq("LQ 生成失败页: [2]"),
+                eq(List.of(new LqSizeResult(99L, 1234L, "7/42/001.webp"))));
     }
 }

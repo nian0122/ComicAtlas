@@ -18,7 +18,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -51,6 +50,9 @@ public class MediaOperationCompletionService {
     /** 转码产物扩展名。 */
     private static final String MP4_EXTENSION = ".mp4";
 
+    /** 单条 CASE UPDATE 的最大页面数，控制 SQL 长度与参数数量。 */
+    private static final int LQ_UPDATE_BATCH_SIZE = 500;
+
     private final MediaMapper mediaMapper;
     private final ManagementTaskService managementTaskService;
     private final MediaMetadataSyncService mediaMetadataSyncService;
@@ -64,48 +66,11 @@ public class MediaOperationCompletionService {
      * 完成后重算整本统计（lqSize/hqSize/totalPages/pageCount）。
      */
     public void applyLqCompleted(Long chapterId, List<LqSizeResult> lqSizes) {
-        List<Media> mediaItems = mediaMapper.selectList(
-                new LambdaQueryWrapper<Media>()
-                        .eq(Media::getChapterId, chapterId)
-                        .eq(Media::getMediaType, MEDIA_TYPE_IMAGE));
-        Map<Long, Long> sizeByMediaId = lqSizes == null ? Map.of() : lqSizes.stream()
-                .filter(size -> size.mediaId() != null && size.sizeBytes() != null && size.sizeBytes() > 0)
-                .collect(Collectors.toMap(LqSizeResult::mediaId, LqSizeResult::sizeBytes, (a, b) -> a));
-        int readyPages = 0;
-        for (Media media : mediaItems) {
-            Long lqSize = sizeByMediaId.get(media.getId());
-            if (lqSize != null) {
-                LambdaUpdateWrapper<Media> mediaUpdate = new LambdaUpdateWrapper<Media>()
-                        .eq(Media::getId, media.getId())
-                        .set(Media::getLqStatus, LqStatus.READY)
-                        .set(Media::getLqRoot, StorageRootKeys.LQ)
-                        .set(Media::getLqSize, lqSize);
-                String actualLqPath = media.getLqPath();
-                String outputLqPath = findLqPath(lqSizes, media.getId());
-                if (outputLqPath != null && !outputLqPath.isBlank()) {
-                    actualLqPath = outputLqPath;
-                }
-                if (actualLqPath != null && !actualLqPath.isBlank()) {
-                    mediaUpdate.set(Media::getLqPath, actualLqPath);
-                    readyPages++;
-                } else {
-                    mediaUpdate.set(Media::getLqStatus, LqStatus.NOT_GENERATED)
-                            .set(Media::getLqRoot, null)
-                            .set(Media::getLqSize, 0L);
-                }
-                mediaMapper.update(null, mediaUpdate);
-            } else {
-                mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
-                        .eq(Media::getId, media.getId())
-                        .set(Media::getLqStatus, LqStatus.NOT_GENERATED)
-                        .set(Media::getLqRoot, null)
-                        .set(Media::getLqPath, null)
-                        .set(Media::getLqSize, 0L));
-            }
-        }
+        int imagePages = mediaMapper.resetLqNotGeneratedByChapter(chapterId);
+        int readyPages = updateLqReadyInBatches(chapterId, lqSizes);
         comicStatsService.refreshByChapter(chapterId);
         log.info("LQ 完成业务更新: chapterId={}, readyPages={}, notGeneratedPages={}",
-                chapterId, readyPages, mediaItems.size() - readyPages);
+                chapterId, readyPages, Math.max(0, imagePages - readyPages));
     }
 
     // ======================== HQ 删除 Completed ========================
@@ -194,13 +159,22 @@ public class MediaOperationCompletionService {
 
     // ======================== Failed 回退 ========================
 
-    /** LQ 生成失败：QUEUED/GENERATING → FAILED。 */
+    /**
+     * LQ 生成部分失败：成功页仍按 Worker 实际产物置 READY，
+     * 未回传产物的 QUEUED/GENERATING 页置 FAILED。
+     */
+    public void applyLqFailed(Long chapterId, List<LqSizeResult> lqSizes) {
+        int readyPages = updateLqReadyInBatches(chapterId, lqSizes);
+        int failedPages = mediaMapper.markLqFailedByChapter(chapterId);
+        comicStatsService.refreshByChapter(chapterId);
+        log.warn("LQ 部分失败业务更新: chapterId={}, readyPages={}, failedPages={}",
+                chapterId, readyPages, failedPages);
+    }
+
+    /** LQ 生成整体失败的兼容入口。 */
     public void revertLqFailed(Long chapterId) {
-        mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
-                .eq(Media::getChapterId, chapterId)
-                .eq(Media::getMediaType, MEDIA_TYPE_IMAGE)
-                .in(Media::getLqStatus, LqStatus.QUEUED, LqStatus.GENERATING)
-                .set(Media::getLqStatus, LqStatus.FAILED));
+        mediaMapper.markLqFailedByChapter(chapterId);
+        comicStatsService.refreshByChapter(chapterId);
     }
 
     /** HQ 删除失败：DELETE_QUEUED/DELETING → FAILED。 */
@@ -247,13 +221,35 @@ public class MediaOperationCompletionService {
 
     // ======================== 辅助 ========================
 
-    private static String findLqPath(List<LqSizeResult> lqSizes, Long mediaId) {
-        return lqSizes.stream()
-                .filter(result -> mediaId.equals(result.mediaId()))
-                .map(LqSizeResult::lqPath)
-                .filter(path -> path != null && !path.isBlank())
-                .findFirst()
-                .orElse(null);
+    private int updateLqReadyInBatches(Long chapterId, List<LqSizeResult> lqSizes) {
+        if (lqSizes == null || lqSizes.isEmpty()) {
+            return 0;
+        }
+        List<Media> readyMedia = lqSizes.stream()
+                .filter(result -> result.mediaId() != null
+                        && result.sizeBytes() != null && result.sizeBytes() > 0
+                        && result.lqPath() != null && !result.lqPath().isBlank())
+                .collect(Collectors.toMap(LqSizeResult::mediaId, result -> result,
+                        (first, ignored) -> first))
+                .values().stream()
+                .map(MediaOperationCompletionService::toLqReadyMedia)
+                .toList();
+        int updatedPages = 0;
+        for (int start = 0; start < readyMedia.size(); start += LQ_UPDATE_BATCH_SIZE) {
+            int end = Math.min(start + LQ_UPDATE_BATCH_SIZE, readyMedia.size());
+            updatedPages += mediaMapper.updateLqReadyBatch(chapterId, readyMedia.subList(start, end));
+        }
+        return updatedPages;
+    }
+
+    private static Media toLqReadyMedia(LqSizeResult result) {
+        Media media = new Media();
+        media.setId(result.mediaId());
+        media.setLqStatus(LqStatus.READY);
+        media.setLqRoot(StorageRootKeys.LQ);
+        media.setLqPath(result.lqPath());
+        media.setLqSize(result.sizeBytes());
+        return media;
     }
 
     private static String deriveTranscodedPath(String hqPath) {

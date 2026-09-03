@@ -73,7 +73,7 @@ public class ManagementResultRouter {
     public void routeFailed(ManagementCommandFailedEvent event) {
         switch (event.operationType()) {
             case "LQ_GENERATE", "LQ_REGENERATE" -> forLqChapters(event.targetType(), event.targetId(),
-                    mediaCompletionService::revertLqFailed);
+                    chapterId -> mediaCompletionService.applyLqFailed(chapterId, event.lqSizes()));
             case "HQ_DELETE" -> mediaCompletionService.revertHqDeleteFailed(event.targetId());
             case "TRANSCODE" -> mediaCompletionService.revertTranscodeFailed(event.targetId());
             case "MEDIA_UPLOAD", "MEDIA_REPLACE" -> uploadCompletionService.revertUploadFailed(event.targetId());

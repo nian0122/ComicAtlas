@@ -35,6 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -124,8 +125,20 @@ public class MediaOperationCommandService {
                         .eq(Media::getMediaType, "IMAGE"));
         return mediaItems.stream()
                 .filter(media -> media.getHqStatus() != HqStatus.DELETED)
-                .filter(media -> regenerate || media.getLqStatus() != LqStatus.READY)
+                .filter(media -> requiresLqGeneration(media, regenerate))
                 .toList();
+    }
+
+    /**
+     * 仅 READY 且路径指向 WebP 的页面可跳过普通生成。
+     * 旧 JPG、空路径与异常扩展名必须重新进入任务，由 Worker 生成 WebP 并回写真实路径。
+     */
+    private static boolean requiresLqGeneration(Media media, boolean regenerate) {
+        if (regenerate || media.getLqStatus() != LqStatus.READY) {
+            return true;
+        }
+        String lqPath = media.getLqPath();
+        return lqPath == null || !lqPath.toLowerCase(Locale.ROOT).endsWith(".webp");
     }
 
     private void markLqQueued(Long chapterId) {

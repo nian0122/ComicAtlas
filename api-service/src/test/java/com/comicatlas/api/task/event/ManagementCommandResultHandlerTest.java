@@ -140,8 +140,8 @@ class ManagementCommandResultHandlerTest {
 
         handler.handleResult(ev, channel, 1L);
 
-        verify(mediaOperationCompletionService).revertLqFailed(100L);
-        verify(mediaOperationCompletionService).revertLqFailed(200L);
+        verify(mediaOperationCompletionService).applyLqFailed(eq(100L), isNull());
+        verify(mediaOperationCompletionService).applyLqFailed(eq(200L), isNull());
     }
 
     @Test
