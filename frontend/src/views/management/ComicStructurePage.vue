@@ -35,7 +35,7 @@
           </template>
           <template v-else>
             <div class="media-heading"><div><h3>章节媒体</h3><p>{{ mediaItems.length ? `共 ${mediaItems.length} 个媒体` : '正在等待媒体加载' }}</p></div><el-button text @click="loadMedia">刷新媒体</el-button></div>
-            <div class="media-summary"><div><span>HQ</span><strong>{{ mediaHqReadyCount }} / {{ mediaItems.length }}</strong><small>可访问</small></div><div><span>LQ</span><strong>{{ mediaLqReadyCount }} / {{ mediaLqApplicableCount }}</strong><small>已生成</small></div><div><span>媒体类型</span><strong>{{ mediaVideoCount ? '视频' : '图片' }}</strong><small>{{ mediaVideoCount ? `${mediaVideoCount} 个视频` : '图片媒体' }}</small></div></div>
+            <div class="media-summary"><div><span>HQ</span><strong>{{ mediaHqReadyCount }} / {{ mediaItems.length }}</strong><small>可访问</small></div><div><span>LQ</span><strong>{{ mediaLqReadyCount }} / {{ mediaLqApplicableCount }}</strong><small>{{ mediaLqApplicableCount === 0 ? '不适用' : mediaLqReadyCount === mediaLqApplicableCount ? '已生成' : '未生成' }}</small></div><div><span>媒体类型</span><strong>{{ mediaVideoCount ? '视频' : '图片' }}</strong><small>{{ mediaVideoCount ? `${mediaVideoCount} 个视频` : '图片媒体' }}</small></div></div>
             <div v-if="selectedMediaIds.length" class="media-selection-toolbar"><span>已选 {{ selectedMediaIds.length }} 个媒体</span><div><el-button text @click="clearMediaSelection">清空选择</el-button><el-button type="danger" plain @click="trashSelectedMediaBatch">批量回收</el-button></div></div>
             <div class="media-table-scroll">
             <el-table ref="mediaTableRef" class="media-table" :data="mediaItems" row-key="id" empty-text="该章节暂无媒体" highlight-current-row :row-class-name="mediaRowClassName" @row-click="selectMediaRow" @selection-change="handleMediaSelection">
@@ -111,7 +111,7 @@
           <div v-else-if="chapterWorkspaceTab === 'storage'" class="chapter-feature-grid">
             <section class="chapter-feature-card feature-storage feature-storage--focus">
               <div class="feature-card-top"><span class="panel-kicker">STORAGE / CHAPTER</span><StorageStatusTag v-if="selectedStorageChapter" :status="selectedStorageChapter.hqStatus" type="hq" /></div>
-              <strong>章节存储</strong><p>HQ {{ formatSize(selectedStorageChapter?.hqSize ?? 0) }} · LQ {{ formatSize(selectedStorageChapter?.lqSize ?? 0) }}</p><div class="storage-focus-status"><span>LQ 状态</span><StorageStatusTag v-if="selectedStorageChapter" :status="selectedStorageChapter.lqStatus" type="lq" /></div><div class="feature-button-row"><el-button type="primary" plain :disabled="mediaLqApplicableCount === 0" block @click="generateChapterLq">{{ chapterLqActionLabel }}</el-button><el-button type="danger" plain block @click="deleteChapterHq">删除 HQ</el-button><el-button v-if="mediaVideoCount > 0" type="warning" plain block @click="transcodeChapter">转码视频</el-button></div>
+              <strong>章节存储</strong><p>HQ {{ formatSize(selectedStorageChapter?.hqSize ?? 0) }} · LQ {{ formatSize(selectedStorageChapter?.lqSize ?? 0) }}</p><div class="storage-focus-status"><span>LQ 状态</span><span v-if="mediaLqApplicableCount === 0" class="media-status is-na">不适用</span><StorageStatusTag v-else-if="selectedStorageChapter" :status="selectedStorageChapter.lqStatus" type="lq" /></div><div class="feature-button-row"><el-button type="primary" plain :disabled="mediaLqApplicableCount === 0" block @click="generateChapterLq">{{ chapterLqActionLabel }}</el-button><el-button type="danger" plain block @click="deleteChapterHq">删除 HQ</el-button><el-button v-if="mediaVideoCount > 0" type="warning" plain block @click="transcodeChapter">转码视频</el-button></div>
             </section>
           </div>
         </template>
@@ -210,7 +210,7 @@ const rootChapterCount = computed(() => structureRows.value.filter((row) => row.
 const mediaHqReadyCount = computed(() => mediaItems.value.filter((item) => normalizedHqStatus(item) === 'READY').length)
 const mediaLqApplicableCount = computed(() => mediaItems.value.filter((item) => item.mediaType !== 'VIDEO').length)
 const mediaLqReadyCount = computed(() => mediaItems.value.filter((item) => item.mediaType !== 'VIDEO' && item.lqStatus === 'READY').length)
-const lqIssueChapters = computed(() => storageChapters.value.filter((chapter) => ['MIXED', 'NOT_GENERATED', 'FAILED', 'MISSING', 'QUEUED', 'GENERATING'].includes(chapter.lqStatus)))
+const lqIssueChapters = computed(() => storageChapters.value.filter((chapter) => chapter.mediaType !== 'VIDEO' && ['MIXED', 'NOT_GENERATED', 'FAILED', 'MISSING', 'QUEUED', 'GENERATING'].includes(chapter.lqStatus)))
 const chapterLqActionLabel = computed(() => selectedStorageChapter.value?.lqStatus === 'READY' ? '重新生成本章 LQ' : '生成本章 LQ')
 const mediaVideoCount = computed(() => mediaItems.value.filter((item) => item.mediaType === 'VIDEO').length)
 const mediaOrderDirty = computed(() => mediaOrderItems.value.some((item, index) => item.id !== mediaItems.value[index]?.id))
