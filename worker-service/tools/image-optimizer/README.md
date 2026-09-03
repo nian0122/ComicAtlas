@@ -1,6 +1,8 @@
 # image-optimizer
 
-ComicAtlas 专用图片压缩工具。HQ 图片按比例缩小到配置的最大长边后统一转换为 LQ WebP；JPEG 优先通过 libjpeg-turbo 在完整解码前执行 DCT 缩放，降低超大图片的内存和编码耗时。
+ComicAtlas 专用图片压缩工具。HQ 图片按比例缩小到配置的最大长边后统一转换为 LQ WebP；JPEG 仅在 DCT 档位小于 `8/8`、能够真实减少像素时使用 libjpeg-turbo 预缩放。其 BMP 中间文件写入系统临时目录，避免与 HQ/LQ 存储盘争抢 I/O。
+
+普通生成只检查并跳过有效且不早于 HQ 的 WebP。
 
 ## 编译
 
@@ -71,8 +73,8 @@ image-optimizer.exe \
   "skipped": 1,
   "failed": 1,
   "pages": [
-    {"pageNumber": 1, "status": "processed", "inputSize": 2500000, "outputSize": 150000, "outputFormat": "webp", "ratio": 6.0},
-    {"pageNumber": 2, "status": "processed", "inputSize": 45000000, "outputSize": 900000, "outputFormat": "webp", "ratio": 2.0},
+    {"pageNumber": 1, "status": "processed", "inputSize": 2500000, "outputSize": 150000, "ratio": 6.0},
+    {"pageNumber": 2, "status": "processed", "inputSize": 45000000, "outputSize": 900000, "ratio": 2.0},
     {"pageNumber": 5, "status": "failed", "reason": "decode error"}
   ],
   "elapsedMs": 5230,
@@ -95,4 +97,4 @@ image-optimizer.exe \
 5. **扩展格式支持**：新增 `.webp`、`.gif` 输入解码（原工具不支持）
 6. **退出码语义**：明确区分"全部成功/部分失败/参数错误"
 7. **超大 JPEG 低内存缩放**：通过 libjpeg-turbo DCT 缩放后再精确缩放和编码，避免完整展开原始像素
-8. **统一 WebP 派生格式**：LQ 最长边受控，不再产生超限 JPEG 兜底文件
+8. **统一 WebP 派生格式**：所有 LQ 输出均为缩放后的 WebP

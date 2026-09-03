@@ -55,7 +55,7 @@ public class LqCommandHandler {
             publisher.completed(cmd, result.lqSizes());
             log.info("LQ 命令完成: chapterId={}", chapterId);
         } else {
-            publisher.failed(cmd, "LQ 生成失败页: " + result.failedPages());
+            publisher.failed(cmd, "LQ 生成失败页: " + result.failedPages(), result.lqSizes());
             log.warn("LQ 命令部分失败: chapterId={}, failedPages={}", chapterId, result.failedPages());
         }
     }
@@ -86,7 +86,7 @@ public class LqCommandHandler {
             publisher.completed(cmd, allSizes);
             log.info("LQ 命令完成（漫画）: comicId={}, chapters={}", comicId, chapterIds.size());
         } else {
-            publisher.failed(cmd, "LQ 生成失败章节: " + failedChapters);
+            publisher.failed(cmd, "LQ 生成失败章节: " + failedChapters, allSizes);
             log.warn("LQ 命令部分失败（漫画）: comicId={}, failedChapters={}", comicId, failedChapters);
         }
     }

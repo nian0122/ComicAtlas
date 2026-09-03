@@ -42,14 +42,13 @@ type CLIConfig struct {
 
 // PageResult 单页处理结果
 type PageResult struct {
-	PageNumber   int64   `json:"pageNumber"`
-	Status       string  `json:"status"`               // processed, skipped, failed
-	InputSize    int64   `json:"inputSize,omitempty"`  // bytes
-	OutputSize   int64   `json:"outputSize,omitempty"` // bytes
-	Ratio        float64 `json:"ratio,omitempty"`      // output/input * 100
-	Reason       string  `json:"reason,omitempty"`     // 失败/跳过原因
-	OutputPath   string  `json:"outputPath,omitempty"`
-	OutputFormat string  `json:"outputFormat,omitempty"`
+	PageNumber int64   `json:"pageNumber"`
+	Status     string  `json:"status"`               // processed, skipped, failed
+	InputSize  int64   `json:"inputSize,omitempty"`  // bytes
+	OutputSize int64   `json:"outputSize,omitempty"` // bytes
+	Ratio      float64 `json:"ratio,omitempty"`      // output/input * 100
+	Reason     string  `json:"reason,omitempty"`     // 失败/跳过原因
+	OutputPath string  `json:"outputPath,omitempty"`
 }
 
 // RunResult 整章运行结果
@@ -212,35 +211,27 @@ func run(cfg *CLIConfig) *RunResult {
 		baseName := strings.TrimSuffix(filepath.Base(relPath), filepath.Ext(relPath))
 		pageNum := inferPageNumber(baseName)
 		lqPath := filepath.Join(cfg.OutputDir, filepath.Dir(relPath), baseName+".webp")
-		jpegLqPath := filepath.Join(cfg.OutputDir, filepath.Dir(relPath), baseName+".jpg")
 
 		atomic.AddInt32(&result.Total, 1)
 
 		if !cfg.Force {
-			for _, existingLqPath := range []string{lqPath, jpegLqPath} {
-				if lqInfo, err := os.Stat(existingLqPath); err == nil {
-					if lqInfo.ModTime().Unix() >= info.ModTime().Unix() {
-						outputFormat := "webp"
-						if strings.EqualFold(filepath.Ext(existingLqPath), ".jpg") {
-							outputFormat = "jpeg"
-						}
-						atomic.AddInt32(&result.Skipped, 1)
-						if !cfg.Quiet {
-							fmt.Fprintf(os.Stderr, "跳过: %s | 已存在最新版本 (%s)\n", relPath, formatSize(lqInfo.Size()))
-						}
-						result.mu.Lock()
-						result.Pages = append(result.Pages, PageResult{
-							PageNumber:   pageNum,
-							Status:       "skipped",
-							InputSize:    info.Size(),
-							OutputSize:   lqInfo.Size(),
-							Reason:       "exists",
-							OutputPath:   relativeLqPath(cfg.OutputDir, existingLqPath),
-							OutputFormat: outputFormat,
-						})
-						result.mu.Unlock()
-						return nil
+			if lqInfo, statErr := os.Stat(lqPath); statErr == nil {
+				if lqInfo.ModTime().Unix() >= info.ModTime().Unix() {
+					atomic.AddInt32(&result.Skipped, 1)
+					if !cfg.Quiet {
+						fmt.Fprintf(os.Stderr, "跳过: %s | 已存在最新版本 (%s)\n", relPath, formatSize(lqInfo.Size()))
 					}
+					result.mu.Lock()
+					result.Pages = append(result.Pages, PageResult{
+						PageNumber: pageNum,
+						Status:     "skipped",
+						InputSize:  info.Size(),
+						OutputSize: lqInfo.Size(),
+						Reason:     "exists",
+						OutputPath: relativeLqPath(cfg.OutputDir, lqPath),
+					})
+					result.mu.Unlock()
+					return nil
 				}
 			}
 		}
@@ -289,7 +280,6 @@ func worker(id int, tasks <-chan imageTask, wg *sync.WaitGroup, cfg *CLIConfig,
 				page.Ratio = float64(optResult.OutputSize) / float64(optResult.InputSize) * 100
 			}
 			page.OutputPath = relativeLqPath(cfg.OutputDir, optResult.OutputPath)
-			page.OutputFormat = optResult.OutputFormat
 			if !cfg.Quiet {
 				fmt.Fprintf(os.Stderr, "[Worker %d] 完成: %s | %s → %s (%.1f%%)\n",
 					id, task.RelativePath,

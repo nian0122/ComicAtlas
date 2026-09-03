@@ -88,7 +88,8 @@ public class MetadataRefreshCommandHandler {
     /** LQ 存储根 key（旧布局升级时同构移动 LQ 目录）。 */
     private static final String LQ_ROOT_KEY = StorageRootKeys.LQ;
 
-    private static final Set<String> LQ_EXTENSIONS = Set.of(".webp", ".jpg");
+    /** LQ 派生文件唯一扩展名。 */
+    private static final String LQ_EXTENSION = ".webp";
 
     /** LQ 未生成状态名（与 LqStatus 枚举一致）。 */
     private static final String LQ_STATUS_NOT_GENERATED = MetadataScanSupport.LQ_STATUS_NOT_GENERATED;
@@ -544,7 +545,7 @@ public class MetadataRefreshCommandHandler {
         try (var files = Files.list(lqDirectory)) {
             var actualLqFile = files
                     .filter(file -> Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS))
-                    .filter(file -> LQ_EXTENSIONS.contains(extensionOf(file)))
+                    .filter(file -> LQ_EXTENSION.equals(extensionOf(file)))
                     .filter(file -> expectedBaseName.equals(stemOf(file.getFileName().toString())))
                     .findFirst();
             if (actualLqFile.isPresent()) {

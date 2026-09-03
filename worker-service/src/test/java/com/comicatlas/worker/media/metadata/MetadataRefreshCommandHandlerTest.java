@@ -646,10 +646,11 @@ class MetadataRefreshCommandHandlerTest {
 
     @Test
     void lqScan_lqFileMissing_marksNotGenerated() throws Exception {
-        // LQ 目录存在但无对应 .webp 文件（或 LQ 根未配置）→ 快照 lqStatus=NOT_GENERATED
+        // 旧 JPG 不能再作为 LQ 事实；没有对应 .webp 时必须标 NOT_GENERATED
         Path hqDir = Files.createDirectories(tempRoot.resolve("hq/1/42"));
         Files.writeString(hqDir.resolve("001.jpg"), "img-001");
-        Files.createDirectories(tempRoot.resolve("lq/1/42")); // LQ 目录存在但空
+        Files.createDirectories(tempRoot.resolve("lq/1/42"));
+        Files.writeString(tempRoot.resolve("lq/1/42/001.jpg"), "legacy-lq-jpg");
 
         when(chapterMapper.selectByComicIdWithVersion(COMIC_ID))
                 .thenReturn(List.of(chapter(CHAPTER_ID, 1, 1)));
@@ -662,7 +663,7 @@ class MetadataRefreshCommandHandlerTest {
 
         JsonNode root = objectMapper.readTree(snapshotPath().toFile());
         JsonNode item = root.get("chapters").get(0).get("mediaItems").get(0);
-        assertEquals("NOT_GENERATED", item.get("lqStatus").asText(), "LQ 文件缺失应标 NOT_GENERATED");
+        assertEquals("NOT_GENERATED", item.get("lqStatus").asText(), "仅存在旧 JPG 时应标 NOT_GENERATED");
         assertEquals(0, item.get("lqSize").asLong());
     }
 

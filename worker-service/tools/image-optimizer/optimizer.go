@@ -57,10 +57,9 @@ func (budget *pixelBudget) acquire(pixels int64) func() {
 
 // OptimizeResult 描述单个媒体的实际 LQ 产物。
 type OptimizeResult struct {
-	InputSize    int64
-	OutputSize   int64
-	OutputPath   string
-	OutputFormat string
+	InputSize  int64
+	OutputSize int64
+	OutputPath string
 }
 
 // optimizeImageToWebP 将图片等比缩放到 LQ 尺寸并统一转换为 WebP。
@@ -85,9 +84,12 @@ func optimizeImageToWebPWithBudget(filePath string, outputPath string, quality i
 	turboDecode := false
 	turboScaleNumerator := 8
 	if hasDimensions && isJpegExtension(extension) && needsResize(width, height, maxLongEdge) {
-		if _, resolveErr := resolveDjpegPath(); resolveErr == nil {
-			turboDecode = true
-			turboScaleNumerator = jpegTurboScaleNumerator(width, height, maxLongEdge)
+		turboScaleNumerator, turboDecode = jpegTurboDecodeStrategy(width, height, maxLongEdge)
+		if turboDecode {
+			_, resolveErr := resolveDjpegPath()
+			if resolveErr != nil {
+				turboDecode = false
+			}
 		}
 	}
 	if decodeBudget != nil {
@@ -99,14 +101,13 @@ func optimizeImageToWebPWithBudget(filePath string, outputPath string, quality i
 		defer release()
 	}
 
-	outputDirectory := filepath.Dir(outputPath)
-	if err := os.MkdirAll(outputDirectory, 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
 		return result, fmt.Errorf("创建输出目录失败: %w", err)
 	}
 
 	var imageData image.Image
 	if turboDecode {
-		imageData, err = decodeScaledJpegWithTurbo(filePath, outputDirectory, turboScaleNumerator)
+		imageData, err = decodeScaledJpegWithTurbo(filePath, turboScaleNumerator)
 	} else {
 		imageData, err = decodeImageFile(filePath, extension)
 	}
@@ -136,11 +137,8 @@ func optimizeImageToWebPWithBudget(filePath string, outputPath string, quality i
 	if outputInfo.Size() == 0 {
 		return result, fmt.Errorf("输出文件为空: %s", actualOutputPath)
 	}
-	// 新版 LQ 统一输出 WebP，删除旧版超限图片可能遗留的同名 JPEG。
-	_ = os.Remove(replaceExtension(outputPath, ".jpg"))
 	result.OutputSize = outputInfo.Size()
 	result.OutputPath = actualOutputPath
-	result.OutputFormat = "webp"
 	return result, nil
 }
 
@@ -153,15 +151,14 @@ func decodeImageFile(filePath string, extension string) (image.Image, error) {
 	return decodeImage(inputFile, extension)
 }
 
-// decodeScaledJpegWithTurbo 利用 JPEG DCT 缩放在完整像素解码前降低分辨率，
-// 避免超大 JPEG 先在 Go 堆中展开为数 GB 图像。
-func decodeScaledJpegWithTurbo(filePath string, temporaryDirectory string,
-	scaleNumerator int) (image.Image, error) {
+// decodeScaledJpegWithTurbo 利用 JPEG DCT 缩放在完整像素解码前降低分辨率。
+// BMP 中间文件必须写入系统临时目录，避免与 HQ/LQ 所在机械盘争抢读写。
+func decodeScaledJpegWithTurbo(filePath string, scaleNumerator int) (image.Image, error) {
 	djpegPath, err := resolveDjpegPath()
 	if err != nil {
 		return nil, err
 	}
-	temporaryFile, err := os.CreateTemp(temporaryDirectory, ".image-optimizer-*.bmp")
+	temporaryFile, err := os.CreateTemp("", ".image-optimizer-*.bmp")
 	if err != nil {
 		return nil, fmt.Errorf("创建缩放解码临时文件失败: %w", err)
 	}
@@ -245,6 +242,13 @@ func jpegTurboScaleNumerator(width int, height int, maxLongEdge int) int {
 		return 8
 	}
 	return numerator
+}
+
+// jpegTurboDecodeStrategy 仅在 DCT 档位能够真实减少像素时启用外部解码。
+// 8/8 不产生预缩放，直接内存解码可避免完整 BMP 的磁盘往返。
+func jpegTurboDecodeStrategy(width int, height int, maxLongEdge int) (int, bool) {
+	numerator := jpegTurboScaleNumerator(width, height, maxLongEdge)
+	return numerator, needsResize(width, height, maxLongEdge) && numerator < 8
 }
 
 func estimatedDecodePixels(width int, height int, turboDecode bool, turboScaleNumerator int) int64 {

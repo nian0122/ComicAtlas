@@ -238,6 +238,24 @@ class MediaOperationCommandServiceTest {
     }
 
     @Test
+    void requestLqForChapter_READY无需重复生成() {
+        Chapter chapter = new Chapter();
+        chapter.setId(9L);
+        when(chapterMapper.selectById(9L)).thenReturn(chapter);
+
+        Media readyWebpLq = image(31L, 9L, HqStatus.READY, LqStatus.READY);
+        readyWebpLq.setLqPath("236/1089/037.webp");
+        when(mediaMapper.selectList(any())).thenReturn(List.of(readyWebpLq));
+
+        OperationSubmitResultDTO result = service.requestLqForChapter(9L, false);
+
+        assertNull(result.getTaskId());
+        assertEquals(0, result.getItemCount());
+        verify(managementTaskService, never()).createTask(any(), any(), any());
+        verify(outboxService, never()).enqueue(any(), any(), any(), any(), any(), anyInt());
+    }
+
+    @Test
     void requestHqDeleteForComic_单次IN查询批量校验与置状态() {
         Chapter chapterA = new Chapter();
         chapterA.setId(10L);

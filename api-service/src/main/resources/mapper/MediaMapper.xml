@@ -117,4 +117,45 @@
         <foreach collection="mediaList" item="m" open="(" separator="," close=")">#{m.id}</foreach>
     </update>
 
+    <!-- LQ 结果专用批量回写：每批单条 CASE UPDATE，避免逐页数据库往返。 -->
+    <update id="updateLqReadyBatch">
+        UPDATE page
+        SET lq_status = 'READY',
+            lq_root = 'LQ',
+            lq_path = CASE id
+            <foreach collection="mediaList" item="media">
+                WHEN #{media.id} THEN #{media.lqPath}
+            </foreach>
+            END,
+            lq_size = CASE id
+            <foreach collection="mediaList" item="media">
+                WHEN #{media.id} THEN #{media.lqSize}
+            </foreach>
+            END
+        WHERE chapter_id = #{chapterId}
+          AND media_type = 'IMAGE'
+          AND id IN
+        <foreach collection="mediaList" item="media" open="(" separator="," close=")">
+            #{media.id}
+        </foreach>
+    </update>
+
+    <update id="resetLqNotGeneratedByChapter">
+        UPDATE page
+        SET lq_status = 'NOT_GENERATED',
+            lq_root = NULL,
+            lq_path = NULL,
+            lq_size = 0
+        WHERE chapter_id = #{chapterId}
+          AND media_type = 'IMAGE'
+    </update>
+
+    <update id="markLqFailedByChapter">
+        UPDATE page
+        SET lq_status = 'FAILED'
+        WHERE chapter_id = #{chapterId}
+          AND media_type = 'IMAGE'
+          AND lq_status IN ('QUEUED', 'GENERATING')
+    </update>
+
 </mapper>

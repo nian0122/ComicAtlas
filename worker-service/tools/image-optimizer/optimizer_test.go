@@ -63,7 +63,7 @@ func TestOptimizeImageToWebP_oversizedDimension_scalesAndOutputsWebP(t *testing.
 	if stat, statErr := os.Stat(out); statErr != nil || stat.Size() == 0 {
 		t.Fatalf("缩放后应生成非空 WebP: %v", statErr)
 	}
-	if result.OutputFormat != "webp" || result.OutputPath != out {
+	if result.OutputPath != out {
 		t.Fatalf("应返回实际 WebP 产物，结果为 %+v", result)
 	}
 	width, height, ok := readImageDimension(out, ".webp")
@@ -108,12 +108,25 @@ func TestScaledDimensions_preservesAspectRatioWithoutUpscaling(t *testing.T) {
 }
 
 func TestJpegTurboScaleNumerator_decodesNearTargetSize(t *testing.T) {
-	numerator := jpegTurboScaleNumerator(10652, 14204, 3840)
+	numerator, useTurboDecode := jpegTurboDecodeStrategy(10652, 14204, 3840)
 	if numerator != 3 {
 		t.Fatalf("DCT 缩放应选择 3/8，实际为 %d/8", numerator)
+	}
+	if !useTurboDecode {
+		t.Fatal("3/8 能显著减少解码像素，应启用 libjpeg-turbo 预缩放")
 	}
 	pixels := estimatedDecodePixels(10652, 14204, true, numerator)
 	if pixels >= int64(10652*14204) {
 		t.Fatalf("缩放解码像素应显著小于原图，实际为 %d", pixels)
+	}
+}
+
+func TestJpegTurboDecodeStrategy_nearThreshold_skipsEightEighthsDecode(t *testing.T) {
+	numerator, useTurboDecode := jpegTurboDecodeStrategy(2728, 4096, 3840)
+	if numerator != 8 {
+		t.Fatalf("接近目标尺寸的 JPEG 应计算为 8/8，实际为 %d/8", numerator)
+	}
+	if useTurboDecode {
+		t.Fatal("8/8 不减少像素，不应生成完整 BMP 中间文件")
 	}
 }
