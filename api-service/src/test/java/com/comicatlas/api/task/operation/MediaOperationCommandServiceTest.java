@@ -238,38 +238,7 @@ class MediaOperationCommandServiceTest {
     }
 
     @Test
-    void requestLqForChapter_READY旧JPG仍进入WebP迁移任务() {
-        Chapter chapter = new Chapter();
-        chapter.setId(9L);
-        when(chapterMapper.selectById(9L)).thenReturn(chapter);
-
-        Media legacyJpegLq = image(31L, 9L, HqStatus.READY, LqStatus.READY);
-        legacyJpegLq.setLqPath("236/1089/037.jpg");
-        when(mediaMapper.selectList(any())).thenReturn(List.of(legacyJpegLq));
-
-        ManagementTaskResponse task = new ManagementTaskResponse();
-        task.setId(100L);
-        task.setStatus(ManagementTaskStatus.QUEUED);
-        when(managementTaskService.createTask(any(), any(), any())).thenReturn(task);
-
-        ManagementTaskItemResponse item = new ManagementTaskItemResponse();
-        item.setId(200L);
-        item.setTaskId(100L);
-        item.setTargetType("CHAPTER");
-        item.setTargetId(9L);
-        item.setAttempt(1);
-        when(managementTaskService.getTaskItems(100L)).thenReturn(List.of(item));
-
-        OperationSubmitResultDTO result = service.requestLqForChapter(9L, false);
-
-        assertEquals(100L, result.getTaskId());
-        assertEquals("LQ_GENERATE", result.getTaskType());
-        assertEquals(1, result.getItemCount());
-        verify(outboxService).enqueue(any(), any(), any(), any(), any(), anyInt());
-    }
-
-    @Test
-    void requestLqForChapter_READY的WebP无需重复生成() {
+    void requestLqForChapter_READY无需重复生成() {
         Chapter chapter = new Chapter();
         chapter.setId(9L);
         when(chapterMapper.selectById(9L)).thenReturn(chapter);

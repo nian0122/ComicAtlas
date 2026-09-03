@@ -57,10 +57,9 @@ func (budget *pixelBudget) acquire(pixels int64) func() {
 
 // OptimizeResult 描述单个媒体的实际 LQ 产物。
 type OptimizeResult struct {
-	InputSize    int64
-	OutputSize   int64
-	OutputPath   string
-	OutputFormat string
+	InputSize  int64
+	OutputSize int64
+	OutputPath string
 }
 
 // optimizeImageToWebP 将图片等比缩放到 LQ 尺寸并统一转换为 WebP。
@@ -138,11 +137,8 @@ func optimizeImageToWebPWithBudget(filePath string, outputPath string, quality i
 	if outputInfo.Size() == 0 {
 		return result, fmt.Errorf("输出文件为空: %s", actualOutputPath)
 	}
-	// 新版 LQ 统一输出 WebP，删除旧版超限图片可能遗留的同名 JPEG。
-	_ = os.Remove(replaceExtension(outputPath, ".jpg"))
 	result.OutputSize = outputInfo.Size()
 	result.OutputPath = actualOutputPath
-	result.OutputFormat = "webp"
 	return result, nil
 }
 

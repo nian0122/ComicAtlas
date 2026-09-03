@@ -54,7 +54,8 @@ public class RecoveryMediaResolver {
     private static final String LQ_STATUS_READY = "READY";
     /** LQ 状态：NOT_GENERATED（LQ 文件不存在）。 */
     private static final String LQ_STATUS_NOT_GENERATED = "NOT_GENERATED";
-    private static final Set<String> LQ_EXTENSIONS = Set.of(".webp", ".jpg");
+    /** LQ 派生文件唯一扩展名。 */
+    private static final String LQ_EXTENSION = ".webp";
 
     // metadata JSON 字段名（与 MetadataJsonBuilder 写出字段保持一致）
     private static final String FIELD_GLOBAL_ORDER = "globalOrder";
@@ -234,7 +235,7 @@ public class RecoveryMediaResolver {
         try (var files = Files.list(lqDirectory)) {
             var actualLqFile = files
                     .filter(file -> Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS))
-                    .filter(file -> LQ_EXTENSIONS.contains(extensionOf(file)))
+                    .filter(file -> LQ_EXTENSION.equals(extensionOf(file)))
                     .filter(file -> baseName.equals(stemOf(file.getFileName().toString())))
                     .findFirst();
             if (actualLqFile.isPresent()) {

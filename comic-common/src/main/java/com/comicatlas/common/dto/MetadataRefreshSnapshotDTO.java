@@ -58,7 +58,7 @@ public record MetadataRefreshSnapshotDTO(
      * hqPath 为必填相对路径，构建边界校验契约（见 {@link RelativePathValidator}）。
      * lqStatus/lqSize 为 LQ 文件事实（Worker 扫 LQ 目录实测）：lqStatus 取值
      * READY（文件存在）/NOT_GENERATED（不存在），lqSize 为 LQ 文件字节数（未生成为 0）。
-     * lqPath 为实际 LQ 产物相对路径；普通图为 .webp，超大图兜底为 .jpg。
+     * lqPath 为实际 LQ WebP 产物相对路径。
      */
     public record MediaSnapshot(
             Long mediaId,

@@ -152,6 +152,5 @@ public class ImageOptimizer {
         private Double ratio;
         private String reason;
         private String outputPath;
-        private String outputFormat;
     }
 }

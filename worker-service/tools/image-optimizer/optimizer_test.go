@@ -63,7 +63,7 @@ func TestOptimizeImageToWebP_oversizedDimension_scalesAndOutputsWebP(t *testing.
 	if stat, statErr := os.Stat(out); statErr != nil || stat.Size() == 0 {
 		t.Fatalf("缩放后应生成非空 WebP: %v", statErr)
 	}
-	if result.OutputFormat != "webp" || result.OutputPath != out {
+	if result.OutputPath != out {
 		t.Fatalf("应返回实际 WebP 产物，结果为 %+v", result)
 	}
 	width, height, ok := readImageDimension(out, ".webp")

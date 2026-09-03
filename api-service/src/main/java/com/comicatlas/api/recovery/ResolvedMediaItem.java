@@ -13,7 +13,7 @@ package com.comicatlas.api.recovery;
  * @param exists     文件在磁盘上是否存在（false 时恢复为 MISSING，不得标 READY）
  * @param lqStatus   LQ 状态（READY=LQ 文件存在 / NOT_GENERATED=不存在；仅图片有 LQ）
  * @param lqSize     LQ 文件字节数（未生成为 0）
- * @param lqPath     实际 LQ 相对路径（WebP 或 JPEG）
+ * @param lqPath     实际 LQ WebP 相对路径
  */
 public record ResolvedMediaItem(
         String fileName,

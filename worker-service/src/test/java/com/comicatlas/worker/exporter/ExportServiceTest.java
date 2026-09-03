@@ -118,7 +118,7 @@ class ExportServiceTest {
         MediaRecord imgLq = media(2L, 10L, "1/10/002.jpg", 2);
         imgLq.setHqStatus("DELETED");
         imgLq.setLqRoot("LQ");
-        imgLq.setLqPath("1/10/002.jpg");
+        imgLq.setLqPath("1/10/002.webp");
         imgLq.setLqStatus("READY");
         MediaRecord video = media(3L, 10L, "1/10/003.mp4", 3);
         video.setMediaType("VIDEO");
@@ -128,11 +128,11 @@ class ExportServiceTest {
         when(exportCollector.collect(1L)).thenReturn(result);
         when(metadataJsonExporter.exportJson(1L)).thenReturn("{}");
         when(exportFileResolver.resolve(imgHq)).thenReturn(new StorageRef("HQ", "1/10/001.jpg"));
-        when(exportFileResolver.resolve(imgLq)).thenReturn(new StorageRef("LQ", "1/10/002.jpg"));
+        when(exportFileResolver.resolve(imgLq)).thenReturn(new StorageRef("LQ", "1/10/002.webp"));
         when(exportFileResolver.resolve(video)).thenReturn(new StorageRef("HQ", "1/10/003.mp4"));
         writeFile("hq/1/10/001.jpg", "a");
         writeFile("hq/1/10/003.mp4", "v");
-        writeFile("lq/1/10/002.jpg", "b");
+        writeFile("lq/1/10/002.webp", "b");
         stubResolverToRoot();
         when(zipBuilder.build(any(), any())).thenReturn(
                 new ZipBuilder.ZipBuildResult(tempDir.resolve("out.zip"), List.of(tempDir.resolve("out.zip")), 1234L));
@@ -165,7 +165,7 @@ class ExportServiceTest {
                 "媒体条目数必须与采集媒体数严格相等，metadata 另计一条");
         assertEquals("第一章/001.jpg", manifest.entries().get(0).targetPath());
         assertEquals(1L, manifest.entries().get(0).sourceSize(), "条目应记录已知源文件大小");
-        assertEquals("第一章/002.jpg", manifest.entries().get(1).targetPath(), "图片 LQ 回退条目按 LQ 文件名");
+        assertEquals("第一章/002.webp", manifest.entries().get(1).targetPath(), "仅 LQ 图片按 WebP 文件名导出");
         assertEquals(1L, manifest.entries().get(1).sourceSize());
         assertEquals("第一章/003.mp4", manifest.entries().get(2).targetPath(), "视频必须走 HQ");
         assertEquals("{}", manifest.metadataJson());

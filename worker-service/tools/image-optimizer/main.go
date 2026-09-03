@@ -42,14 +42,13 @@ type CLIConfig struct {
 
 // PageResult 单页处理结果
 type PageResult struct {
-	PageNumber   int64   `json:"pageNumber"`
-	Status       string  `json:"status"`               // processed, skipped, failed
-	InputSize    int64   `json:"inputSize,omitempty"`  // bytes
-	OutputSize   int64   `json:"outputSize,omitempty"` // bytes
-	Ratio        float64 `json:"ratio,omitempty"`      // output/input * 100
-	Reason       string  `json:"reason,omitempty"`     // 失败/跳过原因
-	OutputPath   string  `json:"outputPath,omitempty"`
-	OutputFormat string  `json:"outputFormat,omitempty"`
+	PageNumber int64   `json:"pageNumber"`
+	Status     string  `json:"status"`               // processed, skipped, failed
+	InputSize  int64   `json:"inputSize,omitempty"`  // bytes
+	OutputSize int64   `json:"outputSize,omitempty"` // bytes
+	Ratio      float64 `json:"ratio,omitempty"`      // output/input * 100
+	Reason     string  `json:"reason,omitempty"`     // 失败/跳过原因
+	OutputPath string  `json:"outputPath,omitempty"`
 }
 
 // RunResult 整章运行结果
@@ -224,13 +223,12 @@ func run(cfg *CLIConfig) *RunResult {
 					}
 					result.mu.Lock()
 					result.Pages = append(result.Pages, PageResult{
-						PageNumber:   pageNum,
-						Status:       "skipped",
-						InputSize:    info.Size(),
-						OutputSize:   lqInfo.Size(),
-						Reason:       "exists",
-						OutputPath:   relativeLqPath(cfg.OutputDir, lqPath),
-						OutputFormat: "webp",
+						PageNumber: pageNum,
+						Status:     "skipped",
+						InputSize:  info.Size(),
+						OutputSize: lqInfo.Size(),
+						Reason:     "exists",
+						OutputPath: relativeLqPath(cfg.OutputDir, lqPath),
 					})
 					result.mu.Unlock()
 					return nil
@@ -282,7 +280,6 @@ func worker(id int, tasks <-chan imageTask, wg *sync.WaitGroup, cfg *CLIConfig,
 				page.Ratio = float64(optResult.OutputSize) / float64(optResult.InputSize) * 100
 			}
 			page.OutputPath = relativeLqPath(cfg.OutputDir, optResult.OutputPath)
-			page.OutputFormat = optResult.OutputFormat
 			if !cfg.Quiet {
 				fmt.Fprintf(os.Stderr, "[Worker %d] 完成: %s | %s → %s (%.1f%%)\n",
 					id, task.RelativePath,

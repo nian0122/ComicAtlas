@@ -286,8 +286,11 @@ class RecoveryEngineTest {
 
     @Test
     void resolveMedia_shouldReturnMissing_whenHqPathFileAbsent() throws Exception {
-        // hqPath 指向不存在的文件 → exists=false（恢复时标 MISSING，不得 READY）
+        // hqPath 指向不存在的文件，旧 JPG LQ 也不能恢复为 READY
         Long comicId = 7700003L;
+        Path legacyLqDir = tempDir.resolve("lq").resolve(String.valueOf(comicId)).resolve("99");
+        Files.createDirectories(legacyLqDir);
+        Files.writeString(legacyLqDir.resolve("001.jpg"), "legacy-lq-jpg");
         Map<String, Object> chapter = mapOf(
             "title", "第1话", "chapterNo", "1", "sortOrder", 0, "globalOrder", 0, "catalogIndex", null,
             "mediaItems", List.of(mapOf(
@@ -300,7 +303,7 @@ class RecoveryEngineTest {
         List<ResolvedMediaItem> items = resolved.get(0);
         assertEquals(1, items.size());
         assertFalse(items.get(0).exists(), "缺文件必须识别为缺失，不得标 READY");
-        assertEquals("NOT_GENERATED", items.get(0).lqStatus(), "无 LQ 文件时 lqStatus 应为 NOT_GENERATED");
+        assertEquals("NOT_GENERATED", items.get(0).lqStatus(), "仅存在旧 JPG 时 lqStatus 应为 NOT_GENERATED");
     }
 
     @Test

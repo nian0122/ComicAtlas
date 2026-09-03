@@ -28,7 +28,8 @@ import java.util.stream.Stream;
 @RequiredArgsConstructor
 public class MetadataChapterScanner {
 
-    private static final Set<String> LQ_EXTENSIONS = Set.of(".webp", ".jpg");
+    /** LQ 派生文件唯一扩展名。 */
+    private static final String LQ_EXTENSION = ".webp";
     private static final String LQ_STATUS_NOT_GENERATED = MetadataScanSupport.LQ_STATUS_NOT_GENERATED;
     private static final String HQ_STATUS_DELETED = MetadataScanSupport.HQ_STATUS_DELETED;
     private static final String IMAGE_TYPE = MetadataScanSupport.IMAGE_TYPE;
@@ -97,7 +98,7 @@ public class MetadataChapterScanner {
                 continue;
             }
             String lowerFileName = fileName.toLowerCase();
-            if (LQ_EXTENSIONS.stream().noneMatch(lowerFileName::endsWith)) {
+            if (!lowerFileName.endsWith(LQ_EXTENSION)) {
                 warnings.add("忽略非 LQ 产物: " + fileName);
                 continue;
             }
