@@ -148,4 +148,24 @@ class ImageOptimizerTest {
         assertThat(parsed.getPages()).singleElement().satisfies(page ->
                 assertThat(page.getReason()).isEqualTo("decode error"));
     }
+
+    @Test
+    @DisplayName("优化器返回新增字段时保持向前兼容并保留真实失败原因")
+    void generateLq_resultContainsUnknownField_preservesFailureReason() throws Exception {
+        when(processRunner.run(any(ProcessBuilder.class), anyLong(), anyString()))
+                .thenReturn(new ExternalProcessRunner.ExternalProcessResult(1,
+                        "{\"total\":1,\"processed\":0,\"skipped\":0,\"failed\":1,\"pages\":["
+                                + "{\"pageNumber\":18,\"status\":\"failed\","
+                                + "\"reason\":\"解码图片失败: invalid JPEG format: short Huffman data\","
+                                + "\"outputFormat\":\"webp\"}],\"success\":false}"));
+        Path hqDir = Files.createDirectories(tempDir.resolve("hq"));
+
+        ImageOptimizer.RunResult parsed = optimizer.generateLq(1L, 2L, hqDir, tempDir.resolve("lq"), false);
+
+        assertThat(parsed.getSuccess()).isFalse();
+        assertThat(parsed.getPages()).singleElement().satisfies(page -> {
+            assertThat(page.getPageNumber()).isEqualTo(18L);
+            assertThat(page.getReason()).contains("short Huffman data");
+        });
+    }
 }

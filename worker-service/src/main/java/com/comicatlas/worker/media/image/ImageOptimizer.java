@@ -2,6 +2,7 @@ package com.comicatlas.worker.media.image;
 
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.shared.process.ExternalProcessRunner;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -128,6 +129,7 @@ public class ImageOptimizer {
     }
 
     @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class RunResult {
         private Long comicId;
         private Long chapterId;
@@ -144,6 +146,7 @@ public class ImageOptimizer {
     }
 
     @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class PageResult {
         private Long pageNumber;
         private String status;
