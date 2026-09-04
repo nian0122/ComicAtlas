@@ -175,8 +175,8 @@ Handler (来源特定) → DirectoryParser → MetadataAssembler → StorageServ
 
 ## 参考
 
-- 核心架构文档：`docs/superpowers/specs/2026-07-01-ComicAtlas-core-architecture.md` §2
-- 设计文档：`docs/superpowers/specs/2026-07-16-project-docs-update-phase1-design.md` §3.4
+- 当前架构总览：`docs/architecture/README.md` §4
+- 导入流水线详细设计：`docs/architecture/02-import-pipeline.md`
 - 实现代码：
   - `worker-service/.../event/ImportTaskHandler.java`：MQ 消费，路由到具体 Handler
   - `worker-service/.../importer/DirectoryImportHandler.java`：统一导入逻辑
