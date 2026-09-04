@@ -1,6 +1,6 @@
 # ComicAtlas 系统全景
 
-本文档是 ComicAtlas 项目的架构入口。目标：让新维护者在 5 分钟内理解系统由哪些模块组成、各自职责边界在哪里、数据如何流转。
+本文档是 ComicAtlas 2.1 项目的架构入口。目标：让新维护者在 5 分钟内理解系统由哪些模块组成、各自职责边界在哪里、数据如何流转。
 
 ---
 
@@ -45,7 +45,7 @@ ComicAtlas 由五个运行时模块和一组基础设施组成。
 - **Gateway**: Spring Cloud Gateway。负责路由转发和 Nacos 服务发现。`/api/manage/**` 优先转发给管理服务，其他 `/api/**` 转发给阅读服务。
 - **Reading Service**: 阅读服务。提供漫画列表、详情、目录、章节阅读、分类与标签查询；写入 `reading_history` 阅读进度。使用 Redis 共享查询缓存，不消费 MQ，不执行 Flyway。
 - **Management API Service**: 管理服务。提供 `/api/manage/**` 写操作与管理查询，消费 Worker 发回的 MQ 结果事件，是除阅读进度外数据库业务写入和 Flyway 迁移的唯一执行方。不碰文件系统。
-- **Worker Service**: 文件处理服务。消费 MQ 任务消息、解析来源文件、搬运图片到存储根目录、写 metadata.json；元数据刷新时扫描 HQ 目录生成 STAGING 快照。不写数据库业务表。
+- **Worker Service**: 文件处理服务。消费 MQ 任务消息、解析 ZIP/CBZ/目录/EHENTAI 来源、搬运媒体到存储根目录、写 metadata.json；元数据刷新时扫描 HQ 目录生成 STAGING 快照。不写数据库业务表。
 - **Infrastructure**: MySQL 持久化、Redis 缓存与幂等标记、RabbitMQ 异步消息、Nginx 静态文件代理（`/files/{root}/{path}` 映射到存储目录）。
 
 ---
@@ -91,8 +91,9 @@ ImportController (管理服务)
         v
 ImportTaskHandler (Worker)  <-- 消费 import.task.queue
   - 按 sourceType 路由:
-    +-- ZIP        --> ZipImportHandler (解压) --> DirectoryImportHandler
+    +-- ZIP/CBZ    --> ZipImportHandler (解压) --> DirectoryImportHandler
     +-- DIRECTORY  --> DirectoryImportHandler
+    +-- EHENTAI    --> EhentaiDownloadService --> DirectoryImportHandler
         |
         v
 DirectoryImportHandler (Worker)   <-- 两阶段之第一阶段：staging
@@ -148,7 +149,7 @@ flowchart TD
 |------|------|------|
 | 阅读 | 用户打开章节 | Frontend → Gateway → 阅读服务 `ReaderService` → `FileUrlResolver` → Nginx 静态文件 |
 | LQ 生成 | 用户手动触发 | 管理服务创建管理任务（`LQ_GENERATE`）→ MQ `comic.management.command.requested` → Worker `LqCommandHandler` → 生成 LQ 图片 |
-| 漫画删除（回收） | 用户删除漫画 | 管理服务创建管理任务（`COMIC_DELETE`）→ MQ `comic.management.command.requested` → Worker 移入 trash 卷 → 管理服务更新生命周期为 `TRASHED`；永久删除走 `purge`（`TRASHED` + 7 天保留期 + 二次确认） |
+| 漫画删除（回收） | 用户删除漫画 | 管理服务创建管理任务（`COMIC_DELETE`）→ MQ `comic.management.command.requested` → Worker 移入 trash 卷 → 管理服务更新生命周期为 `TRASHED`；永久删除走 `purge`（`TRASHED` + 配置保留期 + 二次确认） |
 | 任务状态同步 | Worker 进度变化 | Worker `TaskStatusPublisher` → MQ `comic.task.status.changed` → 管理服务 `ImportEventHandler` 更新 import_task |
 
 ---

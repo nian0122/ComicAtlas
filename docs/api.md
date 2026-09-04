@@ -1,10 +1,10 @@
-# ComicAtlas API 文档 v2.0
+# ComicAtlas API 文档 v2.1
 
 ## 当前功能范围
 
-当前对外维护的文件处理能力为：漫画导入、漫画导出、HQ 删除、LQ 生成、视频转码、按漫画刷新元数据、扫盘恢复。上述操作均由管理端创建任务，Worker 处理本地文件，结果通过消息队列回写管理端数据库。
+当前对外维护的文件处理能力为：ZIP/CBZ/目录导入、ZIP/CBZ 导出、HQ 删除、LQ 生成、视频转码、按漫画刷新元数据、扫盘恢复。上述操作均由管理端创建任务，Worker 处理本地文件，结果通过消息队列回写管理端数据库。
 
-导入和导出只传输本地路径、任务状态及分卷元数据，漫画文件字节不经过 HTTP。媒体上传/替换、回收站及其他历史接口不属于当前主流程，相关章节仅保留兼容说明。
+导入和导出只传输本地路径、任务状态及分卷元数据，漫画文件字节不经过 HTTP。回收站和批量操作属于当前管理能力；媒体上传/替换仍是后端预留接口，相关章节会明确其边界。
 
 基础业务接口还包括漫画库查询、漫画详情与元数据编辑、分类/标签、封面、目录与章节管理、阅读器、阅读历史、任务中心、存储统计和死信队列管理。
 
@@ -29,7 +29,7 @@ GET /api/comics?keyword=&tag=&status=&category=&sourceType=&sort=createdAt&page=
 | tag | 精确标签名筛选 |
 | status | IMPORTING / READY / REFRESHING / DELETING / DELETED / RESCANNING |
 | category | 分类 |
-| sourceType | ZIP / REGISTER / EHENTAI |
+| sourceType | ZIP / CBZ / DIRECTORY / EHENTAI |
 | sort | createdAt / updatedAt / title / pageCount / lastReadTime |
 
 ### 详情
@@ -74,7 +74,7 @@ GET /api/comics/{id}/catalog
 ```
 DELETE /api/manage/comics/{id}
 ```
-**v1.0 行为变更**：删除不再硬删，而是创建回收任务（`COMIC_DELETE`）把漫画移入回收站，响应体为 `ManagementTaskResponse`。永久删除需走 `POST /api/manage/trash/comics/{id}/purge`（只接受 `TRASHED` 状态 + 二次确认 token + 7 天保留期）。支持可选 `Idempotency-Key` 请求头。
+**v1.0 行为变更**：删除不再硬删，而是创建回收任务（`COMIC_DELETE`）把漫画移入回收站，响应体为 `ManagementTaskResponse`。永久删除需走 `POST /api/manage/trash/comics/{id}/purge`（只接受 `TRASHED` 状态 + 二次确认 token + `trash.retention-days` 配置的保留期）。支持可选 `Idempotency-Key` 请求头。
 
 > 兼容说明：`DELETE /api/manage/admin/comics/{id}?mode=DATABASE_ONLY|DELETE_FILES` 同样重定向到回收站，不再绕过回收站；该旧入口保留用于兼容旧调用方，永久清理统一走 `/api/trash`。
 
@@ -112,7 +112,8 @@ PUT    /api/history/{comicId}    # 更新进度 { chapterId, pageNumber }
 ```
 POST /api/manage/tasks/import
 { "sourceType": "ZIP", "sourcePath": "D:/downloads/comic.zip" }
-{ "sourceType": "REGISTER", "sourcePath": "D:/manga/temp/ComicA" }
+{ "sourceType": "CBZ", "sourcePath": "D:/downloads/comic.cbz" }
+{ "sourceType": "DIRECTORY", "sourcePath": "D:/manga/temp/ComicA" }
 { "sourceType": "EHENTAI", "sourcePath": "https://e-hentai.org/g/123456/abc123" }
 ```
 
@@ -158,7 +159,7 @@ SUCCESS
 | `SUCCESS` | 导入完成，metadata.json 已写入，API 侧已落库 |
 | `FAILED` | 导入失败，可通过 retry 重置回 PENDING |
 
-> v1.0 起任务状态统一收敛到 `ManagementTaskStatus`（QUEUED/RUNNING/.../SUCCEEDED/FAILED）与 `TaskStage`（DOWNLOADING/EXTRACTING/PARSING 子阶段）。`ImportTaskStatus` 枚举保留为导入进度状态（`PENDING/PARSING/IMPORTING/SUCCESS/FAILED`），终态为 SUCCESS/FAILED。
+> 任务状态统一收敛到 `ManagementTaskStatus`（QUEUED/RUNNING/.../SUCCEEDED/FAILED）与 `TaskStage`（DOWNLOADING/EXTRACTING/PARSING 子阶段）。`ImportTaskStatus` 保留导入进度状态（`PENDING/PARSING/IMPORTING/SUCCESS/FAILED/CANCELLED`），其中 `CANCELLED` 与 SUCCESS/FAILED 一样是终态。
 
 > 完整导入流水线设计见 [`docs/architecture/02-import-pipeline.md`](architecture/02-import-pipeline.md)。
 
@@ -209,7 +210,7 @@ GET  /api/manage/tasks/directory-scan/{id}
 
 批量导入支持一次提交多个来源。目录扫描为「漫画集根目录批量发现」异步任务：`parentPath` 作为漫画集根目录，其直接子目录各是一本候选漫画，Worker 对每个候选内部递归预览所有层级的媒体与警告；前端轮询 `GET /api/manage/tasks/directory-scan/{id}` 直到 `status` 为 `SUCCESS`/`FAILED` 后读取 `result`。
 
-> v1.0 新增 `POST /api/manage/tasks/import` 支持可选 `Idempotency-Key` 头，同键同 payload 重放不重复建任务；`POST /api/manage/tasks/import` 请求体字段为 `sourceType`（EHENTAI/ZIP/DIRECTORY）、`sourcePath`（ZIP 文件或目录路径）、`sourceRef`（EHENTAI 画廊 URL）。跨页批量元数据操作请使用新领域接口 `POST /api/manage/batch`（见 13.6）。
+> `POST /api/manage/tasks/import` 支持可选 `Idempotency-Key` 头，同键同 payload 重放不重复建任务；请求体字段为 `sourceType`（ZIP/CBZ/DIRECTORY/EHENTAI）、`sourcePath`（ZIP/CBZ 文件或目录路径）、`sourceRef`（EHENTAI 画廊 URL）。跨页批量元数据操作请使用 `POST /api/manage/batch`（见 13.6）。
 
 ---
 
@@ -594,7 +595,7 @@ GET   /api/manage/trash/{targetType}/{targetId}/reconcile          # 对账（�
 POST  /api/manage/trash/{targetType}/{targetId}/reconcile          # 对账并修复可安全恢复的 DB 状态
 ```
 
-`purge` 请求体：`{ "token": "..." }`。永久清理前置条件：目标必须处于 `TRASHED` 状态、距 `trashed_at` 超过 7 天保留期（`RETENTION_DAYS = 7`）、token 二次确认。回收站列表通过 `GET /api/comics?status=TRASHED` 获取。
+`purge` 请求体：`{ "token": "..." }`。永久清理前置条件：目标必须处于 `TRASHED` 状态、已达到 `trash.retention-days` 配置的保留期（默认 `0`，表示不等待）、token 二次确认。回收站列表通过 `GET /api/comics?status=TRASHED` 获取。
 
 ### 13.8 分块上传（Upload Session）
 
@@ -714,7 +715,7 @@ COMIC_PURGE, CHAPTER_PURGE, MEDIA_PURGE
 
 **HqStatus**：`PENDING / READY / MISSING / DELETE_QUEUED / DELETING / DELETED / FAILED`
 **LqStatus**：`NOT_GENERATED / QUEUED / GENERATING / READY / MISSING / FAILED`
-**TranscodeStatus**：`NOT_NEEDED / QUEUED / TRANSCODING / READY / FAILED`
+**TranscodeStatus**：`NOT_NEEDED / REQUIRED / QUEUED / TRANSCODING / READY / FAILED`
 **UploadSessionStatus**：`ACTIVE / COMPLETED / CANCELLED / EXPIRED / FAILED`
 **TrashManifestStatus**：`TRASHED / COMPENSATED / PARTIAL / RESTORED / PURGED`
 

@@ -1,7 +1,7 @@
 # 03 — 用户流程
 
 **更新日期：** 2026-08-16
-**状态：** 与 v2.0 路由结构同步
+**状态：** 与 v2.1 路由结构同步
 **维护者：** ComicAtlas 前端组
 
 > 用户怎么完成一个核心任务。每条流程从入口到出口，只记录关键步骤。
@@ -49,12 +49,12 @@ Reader（阅读器 /reader/:chapterId）
     │
     ▼
 管理端 Import（/manage/import）
-    │ 选择来源 ZIP 文件 / DIRECTORY 本地目录
+    │ 选择来源 ZIP / CBZ 文件 / DIRECTORY 本地目录
     │ 输入文件路径（ZIP 文件路径 或 本地目录路径）
     │ （EHENTAI 由 API 提交，前端暂未开放入口）
     │ 点击"开始导入"（批量仅支持本地目录）
     ▼
-任务中心（/manage/import/tasks）
+任务中心（/manage/tasks）
     │ 看到进度条变化
     │ 等待完成 → SUCCESS
     │ 失败 → 查看错误 → 重试
@@ -102,7 +102,7 @@ Reader 中自动使用 LQ（如果开启）
 Comic Detail 或 管理端漫画工作区
     │ 点击"删除" → 确认
     ▼
-进入回收站流程（软删除，7 天保留期）
+进入回收站流程（软删除，保留期可配置）
     │ 永久清理需在回收站经过保留期并二次确认
     ▼
 返回 Library（漫画已从列表移除）
@@ -129,11 +129,11 @@ Comic Detail 或 管理端漫画工作区
                  │  Reader  │
                  └──────────┘
 
-阅读端管理：Import（/manage/import）→ Tasks（/manage/import/tasks）→ Library
+阅读端管理：Import（/manage/import）→ Tasks（/manage/tasks）→ Library
 ```
 
 核心用户路径只有两条：
 - **Home/Library → Detail → Reader**（探索 + 阅读）
 - **History → Reader**（快速恢复）
 
-导入路径：**/manage/import → /manage/import/tasks**（管理端任务中心）。
+导入路径：**/manage/import → /manage/tasks**（管理端任务中心）。

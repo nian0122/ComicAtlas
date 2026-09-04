@@ -2,7 +2,9 @@
 
 **版本**: 0.2  
 **日期**: 2026-07-16  
-**状态**: Canonical
+**状态**: 历史归档（0.2 设计）
+
+> 本文的路由示例属于 0.2 设计基线。当前路由以 `frontend/src/router/index.ts` 和 [`docs/frontend/04-pages.md`](../frontend/04-pages.md) 为准。
 
 ---
 

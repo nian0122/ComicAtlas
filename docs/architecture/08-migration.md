@@ -2,7 +2,9 @@
 
 **版本**: 0.2  
 **日期**: 2026-07-16  
-**状态**: Canonical
+**状态**: 历史归档（0.2 迁移计划）
+
+> 本文是已完成的早期迁移计划，不是当前待办。当前架构边界与能力总览见 [`09-media-lifecycle-capabilities.md`](09-media-lifecycle-capabilities.md)。
 
 ---
 

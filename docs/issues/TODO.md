@@ -1,79 +1,36 @@
 # ComicAtlas 问题与待办总览
 
-> 本文件汇总已修复问题与后续阶段待办。详细内容见 `docs/issues/BUG-XXX.md` 与 `docs/superpowers/plans/`。
+**最后更新**：2026-09-04
+**状态**：现行待办
 
-## 已修复（Beta v0.1）
+本文只维护当前仍有价值的待办和已关闭问题索引。历史阶段计划已归档到 `docs/superpowers/`，不能当作当前实施清单；版本验收记录见 `docs/testing/`。已关闭问题保留在本目录，用于追踪历史修复背景（例如 [BUG-001](BUG-001.md)）。
 
-| 编号 | 模块 | 标题 | 状态 |
-|------|------|------|------|
-| BUG-001 | Reader | Reader 忽略 URL 中的 page 参数，导致 Detail/History 跳转页码丢失 | 已修复 |
-| BUG-002 | Reader / History | Reader 保存进度后不刷新 Reading Center | 已修复 |
-| BUG-003 | Task Center | PARSING 状态仍显示取消按钮但后端拒绝 | 已修复 |
-| BUG-004 | API / History | HistoryVO coverUrl 路径错误，封面 404 | 已修复 |
-| BUG-005 | Build / Docker | Dockerfile 直接 COPY 旧 target jar，容器代码与 Git 不一致 | 已修复 |
-| BUG-006 | Worker / RabbitMQ | Worker 无法反序列化 Instant 字段，导入任务永远 PENDING | 已修复 |
-| BUG-007 | Import / Docker | 宿主机路径与容器路径不一致，Docker 部署下导入失败 | 已修复 |
+## 已关闭问题
 
-## Phase I：Reader Enhancement
+`BUG-001` 至 `BUG-007` 均已解决，详细复现过程和修复记录保留在 [`docs/issues/`](.)。后续若出现新问题，请复制 [`BUG-TEMPLATE.md`](BUG-TEMPLATE.md) 创建新的 BUG 记录，不要复用已关闭编号。
 
-拆分为两个子阶段，每个阶段独立可验收。详见 [`docs/superpowers/plans/2026-07-08-reader-enhancement-phase1.md`](../superpowers/plans/2026-07-08-reader-enhancement-phase1.md)。
+## 当前已交付能力
 
-### Phase I-A：Reader 渲染层重构（性能）
+- ZIP、CBZ、本地目录导入；CBZ 支持读取 `ComicInfo.xml`。
+- 图片/视频混排阅读、阅读历史、目录树和章节管理。
+- LQ 生成/重生成、HQ 删除、视频转码、按漫画刷新元数据。
+- ZIP/CBZ 导出、标准分卷、ComicInfo 元数据导出。
+- 回收站、恢复、永久清理、对账和跨页批量操作。
+- Outbox/Inbox、管理任务中心、DLQ 管理和存储恢复。
 
-| 优先级 | 模块 | 标题 | 状态 |
-|--------|------|------|------|
-| P0 | Reader | 新增 ReaderSettings Store，拆分业务状态与用户偏好 | 已完成 |
-| P0 | Reader | 新增 `ReaderViewport` / `ReaderImageItem` / `ProgressiveImage` 组件 | 已完成 |
-| P0 | Reader | `ReaderPage` 改用 `vue-virtual-scroller` 的 `RecycleScroller` | 已完成 |
-| P0 | Reader | LQ → HQ 渐进加载，画质模式改为 AUTO/HQ_ONLY/LQ_ONLY | 已完成 |
-| P0 | Reader | 图片预加载：当前页 HQ、下一页后台 HQ、±2 页 LQ | 已完成 |
+## 后续待办
 
-### Phase I-B：Reader Interaction（P0）
-
-| 优先级 | 模块 | 标题 | 状态 |
-|--------|------|------|------|
-| P0 | Reader | Fit 模式：AUTO / WIDTH / HEIGHT / ORIGINAL | 已完成 |
-| P0 | Reader | 离散 Zoom：50/75/100/125/150/200%，Ctrl+滚轮、+/-、双击恢复 | 已完成 |
-| P0 | Reader | ReaderToolbar：页码、画质、Fit、Zoom、方向、设置 | 已完成 |
-| P0 | Reader | 阅读方向：纵向 / 横向滚动 | 已完成 |
-| P0 | Reader | E2E：Zoom / Fit / 阅读方向 测试 | 已完成 |
-
-## 当前阶段：导入稳定性（Phase 1.1）
-
-当前交付只覆盖 ZIP/DIRECTORY → MANAGED → Library/Reader 的可靠闭环；EHENTAI、EXTERNAL 和 LQ 不在本阶段实现。
-
-| 优先级 | 模块 | 标题 | 状态 |
-|--------|------|------|------|
-| P0 | Import / MQ | 统一事件契约、事务后确认、失败可重试且终态不可回退 | 待实现 |
-| P0 | Import / Storage | MANAGED 路径统一为 `hq/{comicId}/{globalOrder}/`，平铺/树状目录一致 | 待实现 |
-| P0 | Import / Metadata | 多级 Catalog 父子关系、章节源路径、Page 引用完整落库 | 待实现 |
-| P0 | Import / ZIP | 保留压缩包目录结构，限制文件数与解压体积，拒绝异常归档 | 待实现 |
-| P0 | Import / Task | 取消、失败、重试与 Worker 实际执行状态一致 | 待实现 |
-| P1 | Delete | 发布 `delete.requested`、消费 `delete.completed`，仅在文件删除成功后落终态 | 待实现 |
-
-### Phase II（后续规划）
-
-| 优先级 | 模块 | 标题 | 状态 |
-|--------|------|------|------|
-| P1 | Reader | 阅读方向切换（LTR / RTL / vertical） | 待规划 |
-| P1 | Reader | 工具栏自动隐藏 / 显隐切换 | 待规划 |
-| P1 | Reader | 页码缩略图快速跳转 | 待规划 |
-| P2 | Reader | 全屏模式 | 待规划 |
-| P2 | Reader | 双页模式 | 待规划 |
-| P2 | Reader | 移动端触摸手势 | 待规划 |
-
-## 后续阶段（待定）
-
-| 优先级 | 模块 | 标题 | 计划阶段 |
+| 优先级 | 模块 | 内容 | 当前状态 |
 |--------|------|------|----------|
-| ⭐⭐⭐⭐ | LQ | 手动触发、批量生成、文件变化后的过期检测与重建策略 | Phase II |
-| ⭐⭐⭐ | Dashboard | 统计图表 | Phase III |
-| ⭐⭐ | Settings | 系统配置页面 | Phase IV |
+| P1 | 导入 | 为 EHENTAI 后端能力补充稳定的前端入口和端到端验收 | 后端保留，前端未开放 |
+| P1 | 元数据 | 自动分类、自动标签 | 未实现 |
+| P1 | 媒体 | 媒体上传/替换前端页面 | 后端接口预留 |
+| P2 | 运维 | 补充 Windows 原生备份命令示例，减少对 `rsync` 的依赖 | 待安排 |
 
-## 全链路走查记录
+## 变更记录
 
-| 日期 | 执行人 | 结论 | 备注 |
-|------|--------|------|------|
-| 2026-07-07 | Sisyphus | 静态代码走查 + Docker 环境启动 + Playwright smoke 通过 | 修复 BUG-001~005；发现 BUG-006/007 阻塞导入链路 |
-| 2026-07-08 | Sisyphus | 全链路 Happy Path 验证 + Playwright E2E 4/4 通过 | 修复 BUG-006/007；修复前端 API 解包与阅读器问题；提交 dc17870/d225395 |
-| 2026-07-08 | Sisyphus | 发布 v0.1.0 | 清理测试数据、修复 RabbitMQ 队列声明冲突、创建 tag `v0.1.0` |
+| 日期 | 内容 |
+|------|------|
+| 2026-07-08 | Beta v0.1 验收完成，关闭 BUG-001～BUG-007。 |
+| 2026-08-22 | 2.1 发布，加入 CBZ/ComicInfo 与 V24 导出格式。 |
+| 2026-09-04 | 移除已完成的 Phase I/Phase 1.1 伪待办，统一维护当前待办。 |

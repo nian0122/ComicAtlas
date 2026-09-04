@@ -2,7 +2,9 @@
 
 **版本**: 0.2  
 **日期**: 2026-07-16  
-**状态**: Canonical
+**状态**: 历史归档（0.2 设计）
+
+> 本文中的 `/api/management`、`/api/storage`、`/api/trash` 等路径是早期设计示例，不是当前 HTTP 契约。当前管理端统一使用 `/api/manage/**`，请改读 [`docs/api.md`](../api.md)。
 
 ---
 

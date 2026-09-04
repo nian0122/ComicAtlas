@@ -1,7 +1,7 @@
 # 04 — 页面规划
 
 **更新日期：** 2026-08-16
-**状态：** 与 v2.0 路由结构同步
+**状态：** 与 v2.1 路由结构同步
 **维护者：** ComicAtlas 前端组
 
 > 确定每个页面的路由、职责、核心组件和当前状态。路由定义见 `frontend/src/router/index.ts`（阅读端 6 条 + 管理端 8 条主页面路由）。
@@ -27,8 +27,9 @@
 |------|------|------|
 | `/manage/comics` | ComicListPage（漫画工作区） | 管理端列表、筛选、批量选择 |
 | `/manage/comics/:id/edit` | ComicEditPage（漫画编辑） | 元数据 / 标签 / 分类 / 封面（乐观锁） |
-| `/manage/import` | ImportPage（导入） | ZIP / DIRECTORY 导入（批量仅 DIRECTORY；EHENTAI 由 API 支持） |
-| `/manage/import/tasks` | TaskPage（任务中心） | 导入任务进度、取消、重试 |
+| `/manage/import` | ImportPage（导入） | ZIP / CBZ / DIRECTORY 导入（批量仅 DIRECTORY；EHENTAI 由 API 支持） |
+| `/manage/tasks` | ManagementTasksPage（任务中心） | 全部管理任务进度、取消、重试 |
+| `/manage/trash` | TrashPage（回收站） | 查看、恢复和永久清理已回收对象 |
 | `/manage/storage` | StoragePage（存储管理） | 存储统计、HQ/LQ 状态、批量操作 |
 | `/manage/storage/:id` | StorageDetailPage（章节明细） | 单本漫画的章节级 HQ/LQ 状态与操作 |
 | `/manage/metadata` | MetadataPage（元数据管理） | 分类与标签维护 |
@@ -116,8 +117,8 @@
 **路由**：`/manage/import`
 
 **职责**：
-- 选择来源类型（ZIP 文件 / DIRECTORY 本地目录；EHENTAI 由 API 支持，前端暂未提供选项）
-- 输入文件路径（ZIP 文件路径或本地目录路径）
+- 选择来源类型（ZIP / CBZ 文件、DIRECTORY 本地目录；EHENTAI 由 API 支持，前端暂未提供选项）
+- 输入文件路径（ZIP/CBZ 文件路径或本地目录路径）
 - 批量导入（多条本地目录路径）
 - 提交后跳转任务中心
 
@@ -125,7 +126,7 @@
 
 ## 任务中心（管理端）
 
-**路由**：`/manage/import/tasks`
+**路由**：`/manage/tasks`
 
 **职责**：
 - 展示所有导入任务

@@ -1,15 +1,16 @@
-# ComicAtlas 2.0
+# ComicAtlas 2.1
 
 ComicAtlas 是一个面向个人收藏的本地漫画仓库平台。它把 ZIP 和本地目录统一导入到受控存储中，提供漫画管理、章节目录、图片与视频混排阅读、阅读历史以及存储维护能力。
 
 ## 版本定位
 
-`main` 分支是面向用户使用的 2.0 稳定版本；日常功能开发进入 `develop` 分支。完整的安装、导入、阅读和维护说明见 [用户指南](docs/user-guide.md)。
+`main` 分支是面向用户使用的 2.1 稳定版本；日常功能开发进入 `develop` 分支。完整的安装、导入、阅读和维护说明见 [用户指南](docs/user-guide.md)。
 
 ## 功能概览
 
-- 漫画导入：ZIP 或本地目录导入，异步解析并写入受控存储
-- 漫画导出：按漫画 ID 导出本地 ZIP，支持大文件标准分卷
+- 漫画导入：ZIP、CBZ 或本地目录导入，异步解析并写入受控存储
+- ComicInfo：读取 CBZ 内的 `ComicInfo.xml`，并在导出时生成对应元数据
+- 漫画导出：按漫画 ID 导出 ZIP 或 CBZ，支持大文件标准分卷
 - HQ 删除：删除高清文件并保留数据库记录与 LQ 文件
 - LQ 生成：根据 HQ 图片手动生成 LQ 图片
 - 视频转码：处理导入时标记为非标准的视频
@@ -24,7 +25,7 @@ ComicAtlas 是一个面向个人收藏的本地漫画仓库平台。它把 ZIP �
 - 死信队列管理：查看、重放和清理失败消息
 - 统一 MANAGED 存储，数据库只保存相对路径
 
-> 当前维护功能以上述清单为准。EHENTAI 下载对接、自动分类/标签、媒体上传/替换等内容属于历史接口或后续能力，不能视为当前主流程入口。
+> 当前维护功能以上述清单为准。自动分类/标签、媒体上传/替换仍不是管理后台的主流程入口；EHENTAI 由后端保留来源类型和下载链路，前端导入页暂不提供该入口。
 
 ### 管理控制台
 
@@ -34,10 +35,11 @@ ComicAtlas 是一个面向个人收藏的本地漫画仓库平台。它把 ZIP �
 - **目录/章节管理**：目录树的创建、重命名、移动、排序、删除；章节的创建、重排、回收
 - **任务中心**：查看导入、导出、LQ、HQ、转码、元数据刷新和恢复任务
 - **存储管理**：查看存储状态并触发上述维护任务
-- **导入管理**：选择 ZIP 或本地目录，确认后创建异步导入任务
+- **导入管理**：选择 ZIP、CBZ 或本地目录，确认后创建异步导入任务
 - **恢复管理**：扫描 HQ 存储并恢复缺失的数据库记录
+- **回收站与批量操作**：恢复、永久清理和跨页批量维护
 
-> 回收站、媒体上传/替换和其他批量管理接口目前不列入主功能清单，详见 API 文档中的兼容说明。
+> 媒体上传/替换后端接口仍是预留能力，当前没有正式前端页面入口。
 
 ## 快速开始
 
@@ -78,7 +80,7 @@ ComicAtlas 是一个面向个人收藏的本地漫画仓库平台。它把 ZIP �
 
    > 仓库级 `.env` 使用 `API_MYSQL_*` 和 `WORKER_MYSQL_*` 区分写账号与只读账号。启动脚本或 Compose 会在进程边界映射为 Spring 使用的 `MYSQL_USER` / `MYSQL_PASS`；Worker 账号仅授予 `SELECT`，详见[部署运维](docs/operations/management.md)的"数据库账号"小节。
 
-2. 确认 `MANGA_ROOT` 下存在 `hq`、`lq`、`thumbs`、`metadata`、`temp` 目录。
+2. 确认 `MANGA_ROOT` 下存在 `hq`、`lq`、`thumbs`、`metadata`、`staging`、`trash` 和 `export` 目录。
 
 3. 如需在当前主机运行基础服务，单独启动 MySQL、Redis、RabbitMQ 和 Nacos：
 
@@ -135,7 +137,7 @@ pnpm build
 {MANGA_ROOT}/thumbs/
 {MANGA_ROOT}/metadata/
 {MANGA_ROOT}/staging/        # 上传临时目录（API 可写，不对外暴露）
-{MANGA_ROOT}/trash/          # 回收站文件卷（软删除后移入，7 天保留期）
+{MANGA_ROOT}/trash/          # 回收站文件卷（软删除后移入，保留期可配置）
 {MANGA_ROOT}/export/         # 导出产物目录
 ```
 
@@ -166,14 +168,14 @@ ComicAtlas 面向单机个人仓库，管理端接口（回收站、永久清理
 - [部署运维](docs/operations/management.md)：数据库账号、存储卷、备份、升级与回滚
 - [开发流程](docs/development-guide.md)：分支、提交、合并、推送与发布
 - [API 文档](docs/api.md)：HTTP 接口与事件状态
-- [发布说明](docs/releases/v2.0.0.md)：2.0 功能范围、升级说明与已知限制（历史版本见 [v1.5.0](docs/releases/v1.5.0.md)）
-- [架构索引](docs/architecture/00-index.md)：系统设计与模块说明
+- [发布说明](docs/releases/v2.1.0.md)：2.1 功能范围、升级说明与已知限制（历史版本见 [v2.0.0](docs/releases/v2.0.0.md)）
+- [架构总览](docs/architecture/README.md)：当前系统边界、数据流与扩展规则（专题索引见 [00-index.md](docs/architecture/00-index.md)）
 
 ## 分支约定
 
 | 分支 | 用途 |
 |------|------|
-| `main` | 用户使用的稳定版本，发布 2.0 |
+| `main` | 用户使用的稳定版本，发布 2.1 |
 | `develop` | 日常开发、实验性功能和下一版本准备 |
 
 ## 许可证

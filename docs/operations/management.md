@@ -4,7 +4,7 @@
 **状态：** 生效
 **维护者：** ComicAtlas 运维组
 
-> 适用版本：v2.0。配套文档：[用户指南](../user-guide.md)、[API 文档](../api.md)。所有命令示例均可在 `develop` 分支的 `scripts/qa/verify-management-docs.ps1` 中校验。
+> 适用版本：v2.1。配套文档：[用户指南](../user-guide.md)、[API 文档](../api.md)。所有命令示例均可在 `develop` 分支的 `scripts/qa/verify-management-docs.ps1` 中校验。
 
 本手册覆盖管理控制台（回收站、批量操作、媒体上传、任务中心）上线后所需的运维知识：数据库账号、存储卷、保留期、磁盘阈值、备份、升级与回滚。
 
@@ -56,7 +56,7 @@ Worker 只读账号的密码没有固定默认值，必须在仓库 `.env` 中�
 | `{MANGA_ROOT}/trash/` | API + Worker 写 | **否** | 回收站文件卷（软删除移入） |
 | `{MANGA_ROOT}/export/` | Worker 写 | 否 | 导出产物 |
 
-> `staging` 为上传临时目录，不经 Nginx 暴露，避免未完成上传被公网访问；`trash` 为回收站文件卷，存放软删除文件，配合 7 天保留期。
+> `staging` 为上传临时目录，不经 Nginx 暴露，避免未完成上传被公网访问；`trash` 为回收站文件卷，存放软删除文件，保留期由 `trash.retention-days` 配置（默认 `0`）。
 
 ### 磁盘布局建议
 
@@ -71,7 +71,7 @@ Worker 只读账号的密码没有固定默认值，必须在仓库 `.env` 中�
 ### 回收站保留期
 
 - 对象进入回收站后生命周期为 `TRASHED`。
-- **永久清理前置条件**：处于 `TRASHED`、距 `trashed_at` 超过 **7 天**（`TrashLifecycleService.RETENTION_DAYS = 7`）、二次确认 token。
+- **永久清理前置条件**：处于 `TRASHED`、达到 `trash.retention-days` 配置的保留期（默认 `0`，表示不等待）、二次确认 token。
 - 恢复（restore）不受保留期限制，保留期内可随时恢复。
 
 ### 上传磁盘阈值
@@ -129,7 +129,7 @@ rsync -a --delete /data/manga/metadata /data/backup/metadata
 
 ### 升级前
 
-1. 阅读 [当前发布说明](../releases/v2.0.0.md) 与历史发布说明中的版本迁移信息。
+1. 阅读 [当前发布说明](../releases/v2.1.0.md) 与历史发布说明中的版本迁移信息。
 2. 备份数据库与存储卷（见上文）。
 3. 确认 Worker、API 无进行中的任务，或接受任务中断由 DLQ/Outbox 补偿。
 
@@ -147,7 +147,7 @@ docker compose -f docker-compose.yml ps
 docker compose logs -f api-service reading-service gateway
 ```
 
-Flyway 会按版本号顺序执行 `api-service/src/main/resources/db/flyway/V*.sql`（生效迁移目录，见 `db/README.md`）。当前生效迁移：V1 初始化、V2 修正 schema 漂移、V10 生命周期/乐观锁、V11 管理任务、V12 管理任务外键、V13 outbox/inbox、V14 章节全局顺序唯一、V15 上传会话、V16 回收站生命周期、V17 REGISTER→DIRECTORY、V18 视频转码状态分类、V19 Outbox/阅读历史完整性、V20 TRASH 资产清单落库；V3–V9 等历史迁移已归档到 `db/migration-archive/`，不参与执行。迁移失败时 Flyway 会停在失败版本，需要修复后重试。
+Flyway 会按版本号顺序执行 `api-service/src/main/resources/db/flyway/V*.sql`（生效迁移目录，见 `db/README.md`）。当前生效迁移包括 V1、V2、V10–V24，其中 V17 将 `REGISTER` 存量数据迁移为 `DIRECTORY`，V23 分离 HQ/LQ 大小，V24 新增导出格式（ZIP/CBZ）；V3–V9 等历史迁移已归档到 `db/migration-archive/`，不参与执行。迁移失败时 Flyway 会停在失败版本，需要修复后重试。
 
 ### 升级后的检查清单
 
@@ -192,7 +192,7 @@ docker compose -f docker-compose.yml up -d --build
 |------|---------|----------|
 | 上传分块返回 500 | 磁盘剩余空间低于阈值（`free-space-min-*`） | 清理磁盘；确认 `staging` 卷可写 |
 | 上传会话无法完成 | 文件清单 `size` 与 `Content-Range` 的 total 不一致 | 核对前端清单与分块头；重新创建会话 |
-| 永久清理被拒 | 对象未到 7 天保留期 / 非 `TRASHED` / token 失效 | 等待保留期；重新预览确认 |
+| 永久清理被拒 | 对象未达到配置保留期 / 非 `TRASHED` / token 失效 | 等待保留期或调整配置；重新预览确认 |
 | 回收站列表空白 | `COMIC_DELETE` 任务失败或仍在 `TRASHING` | 查看任务中心任务与逐项错误 |
 | Worker 写库报 Access denied | Worker 账号只读（预期行为） | 确认状态回写走 MQ；不要给 Worker 放开写权限 |
 | 任务状态一直 `QUEUED` | Outbox Relay 未运行或 MQ 断开 | 检查 `outbox.relay.*` 与 RabbitMQ 连通性、`/api/manage/outbox/stats` 积压 |

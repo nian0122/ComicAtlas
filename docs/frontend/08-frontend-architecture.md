@@ -1,7 +1,7 @@
 # 08 — 前端技术架构
 
 **更新日期：** 2026-08-16
-**状态：** 与 v2.0 源码结构同步
+**状态：** 与 v2.1 源码结构同步
 **维护者：** ComicAtlas 前端组
 
 > Vue3 项目的技术层设计：Router、Pinia、API、Types、组件层级、目录结构。
@@ -80,7 +80,7 @@ frontend/src/
   ├── /manage/comics           manage-comics
   ├── /manage/comics/:id/edit  manage-comic-edit
   ├── /manage/import           manage-import
-  ├── /manage/import/tasks     manage-import-tasks
+  ├── /manage/tasks            manage-tasks
   ├── /manage/storage          manage-storage
   ├── /manage/storage/:id      manage-storage-detail
   ├── /manage/metadata         manage-metadata

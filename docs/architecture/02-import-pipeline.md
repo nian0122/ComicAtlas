@@ -8,7 +8,7 @@
 
 ## 1. 概述
 
-ComicAtlas 采用统一导入流水线处理所有漫画来源（ZIP、目录、EHentai 等）。不同来源最终都走同一条路径：解析来源 → 目录规范化 → 生成结构化元数据 → 暂存搬文件 → 两阶段落库 → 逐章最终化确认。
+ComicAtlas 采用统一导入流水线处理所有漫画来源（ZIP、CBZ、目录、EHENTAI）。不同来源最终都走同一条路径：解析来源 → 目录规范化 → 生成结构化元数据 → 暂存搬文件 → 两阶段落库 → 逐章最终化确认。
 
 统一模型的好处：新增来源只需实现一个 Handler 和可选 Parser，无需改动 API 侧落库逻辑。
 
@@ -25,7 +25,7 @@ Acquire → ImportTask → Handler routing → DirectoryParser → DirectoryTree
 
 ## 2. 为什么统一导入流水线
 
-不同来源（ZIP、REGISTER、EHENTAI、未来 Torrent）最终都需要：
+不同来源（ZIP、CBZ、DIRECTORY、EHENTAI）最终都需要：
 
 1. 解析来源（文件系统或网络）
 2. 生成结构化元数据（catalog/chapter/page）
@@ -50,7 +50,7 @@ Acquire → ImportTask → Handler routing → DirectoryParser → DirectoryTree
 ## 3. 数据流详细图
 
 ```
-Source (ZIP / Directory / EHentai)
+Source (ZIP / CBZ / Directory / EHentai)
          │
          ▼
 ImportController (API Service)
@@ -64,14 +64,14 @@ MQ: task.created → import.task.queue
          ▼
 Worker ImportTaskHandler (消费 MQ)
          │
-         ├─ sourceType="ZIP" ──────────► ZipImportHandler
+         ├─ sourceType="ZIP/CBZ" ──────► ZipImportHandler
          │                                    │
          │                                    ▼ 解压到 temp
          │                                    │
          │                                    ▼ 委托 DirectoryImportHandler
          │
          ├─ sourceType="DIRECTORY" ────► DirectoryImportHandler
-         │  (REGISTER 的别名)               │
+         │                                  │
          │                                  ▼ DirectoryParser
          │
           └─ sourceType="EHENTAI" ─────► EhentaiDownloadService (下载→解压→委托 DirectoryImportHandler)
@@ -440,14 +440,14 @@ public record ImportContext(
 
 ```java
 switch (sourceType) {
-    case "ZIP" -> {
-        ImportContext ctx = new ImportContext("ZIP", Path.of(normalizedPath), false, false);
-        zipHandler.importZip(ctx, taskId, comicId, mangaRoot);
+    case "ZIP", "CBZ" -> {
+        ImportContext importContext = new ImportContext(sourceType, Path.of(normalizedPath), false, false);
+        zipHandler.importZip(importContext, taskId, comicId, mangaRoot);
     }
-    case "DIRECTORY" -> {  // 旧 REGISTER 已由 V17 迁移为 DIRECTORY
+    case "DIRECTORY" -> {
         if (normalizedPath == null) throw new IllegalArgumentException("DIRECTORY 需要 sourcePath");
-        ImportContext ctx = new ImportContext("DIRECTORY", Path.of(normalizedPath), false, false);
-        directoryHandler.handle(ctx, taskId, comicId, mangaRoot);
+        ImportContext importContext = new ImportContext("DIRECTORY", Path.of(normalizedPath), false, false);
+        directoryHandler.handle(importContext, taskId, comicId, mangaRoot);
     }
     case "EHENTAI" -> {
         Path sourceDir = ehentaiDownloadService.downloadToSourceDir(taskId, sourcePath);
@@ -460,10 +460,10 @@ switch (sourceType) {
 
 **注意**：`"REGISTER"` 来源类型已由迁移脚本 `V17__source_type_register_to_directory.sql` 统一迁移为 `"DIRECTORY"`（同一目录导入逻辑）。
 
-**SourceType 枚举**（`api-service/.../common/enums/SourceType.java`）：
+**SourceType 枚举**（`comic-shared/.../contract/common/enums/SourceType.java`）：
 
 ```java
-public enum SourceType { ZIP, DIRECTORY, EHENTAI }
+public enum SourceType { ZIP, CBZ, DIRECTORY, EHENTAI }
 ```
 
 ---
