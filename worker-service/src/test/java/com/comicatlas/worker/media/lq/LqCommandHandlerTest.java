@@ -118,4 +118,45 @@ class LqCommandHandlerTest {
         verify(publisher).failed(eq(command), eq("LQ 生成失败页: [2]"),
                 eq(List.of(new LqSizeResult(99L, 1234L, "7/42/001.webp"))));
     }
+
+    @Test
+    @DisplayName("文件名页码与数据库页码不同时按源路径映射")
+    void fileNamePageNumberDiffersFromDatabase_mapsBySourcePath() {
+        MediaRecord firstCover = media("7/42/0000-cover.jpg");
+        firstCover.setId(101L);
+        firstCover.setPageNumber(1);
+        MediaRecord ordinaryPage = media("7/42/01.jpg");
+        ordinaryPage.setId(102L);
+        ordinaryPage.setPageNumber(2);
+        MediaRecord secondCover = media("7/42/0001-cover.jpg");
+        secondCover.setId(103L);
+        secondCover.setPageNumber(3);
+        when(mediaMapper.selectByChapterId(42L))
+                .thenReturn(List.of(firstCover, ordinaryPage, secondCover));
+
+        ImageOptimizer.PageResult processedPage = new ImageOptimizer.PageResult();
+        processedPage.setPageNumber(1L);
+        processedPage.setSourcePath("01.jpg");
+        processedPage.setStatus("processed");
+        processedPage.setOutputSize(1234L);
+        processedPage.setOutputPath("01.webp");
+        ImageOptimizer.PageResult failedFirstCover = new ImageOptimizer.PageResult();
+        failedFirstCover.setPageNumber(0L);
+        failedFirstCover.setSourcePath("0000-cover.jpg");
+        failedFirstCover.setStatus("failed");
+        ImageOptimizer.PageResult failedSecondCover = new ImageOptimizer.PageResult();
+        failedSecondCover.setPageNumber(1L);
+        failedSecondCover.setSourcePath("0001-cover.jpg");
+        failedSecondCover.setStatus("failed");
+        ImageOptimizer.RunResult runResult = new ImageOptimizer.RunResult();
+        runResult.setPages(List.of(processedPage, failedFirstCover, failedSecondCover));
+        when(optimizer.generateLq(eq(7L), eq(42L), any(Path.class), any(Path.class), eq(false)))
+                .thenReturn(runResult);
+        ManagementCommandRequestedEvent command = cmd("LQ_GENERATE");
+
+        handler.generateChapter(command);
+
+        verify(publisher).failed(eq(command), eq("LQ 生成失败页: [1, 3]"),
+                eq(List.of(new LqSizeResult(102L, 1234L, "7/42/01.webp"))));
+    }
 }

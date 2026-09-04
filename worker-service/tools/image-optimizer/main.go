@@ -43,6 +43,7 @@ type CLIConfig struct {
 // PageResult 单页处理结果
 type PageResult struct {
 	PageNumber int64   `json:"pageNumber"`
+	SourcePath string  `json:"sourcePath,omitempty"`
 	Status     string  `json:"status"`               // processed, skipped, failed
 	InputSize  int64   `json:"inputSize,omitempty"`  // bytes
 	OutputSize int64   `json:"outputSize,omitempty"` // bytes
@@ -224,6 +225,7 @@ func run(cfg *CLIConfig) *RunResult {
 					result.mu.Lock()
 					result.Pages = append(result.Pages, PageResult{
 						PageNumber: pageNum,
+						SourcePath: filepath.ToSlash(relPath),
 						Status:     "skipped",
 						InputSize:  info.Size(),
 						OutputSize: lqInfo.Size(),
@@ -263,7 +265,10 @@ func worker(id int, tasks <-chan imageTask, wg *sync.WaitGroup, cfg *CLIConfig,
 	for task := range tasks {
 		optResult, err := optimizeImageToWebPWithBudget(
 			task.HQPath, task.LQPath, cfg.Quality, cfg.MaxLongEdge, decodeBudget)
-		page := PageResult{PageNumber: task.PageNumber}
+		page := PageResult{
+			PageNumber: task.PageNumber,
+			SourcePath: filepath.ToSlash(task.RelativePath),
+		}
 		if err != nil {
 			atomic.AddInt32(&result.Failed, 1)
 			page.Status = "failed"

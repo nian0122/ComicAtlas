@@ -149,6 +149,7 @@ public class ImageOptimizer {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class PageResult {
         private Long pageNumber;
+        private String sourcePath;
         private String status;
         private Long inputSize;
         private Long outputSize;

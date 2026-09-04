@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"image"
 	"image/gif"
 	"image/jpeg"
 	"image/png"
+	"io"
 	"math"
 	"os"
 	"os/exec"
@@ -147,8 +149,68 @@ func decodeImageFile(filePath string, extension string) (image.Image, error) {
 	if err != nil {
 		return nil, fmt.Errorf("打开源文件失败: %w", err)
 	}
+	decodedImage, decodeErr := decodeImage(inputFile, extension)
+	closeErr := inputFile.Close()
+	if decodeErr == nil {
+		if closeErr != nil {
+			return nil, fmt.Errorf("关闭源文件失败: %w", closeErr)
+		}
+		return decodedImage, nil
+	}
+	if !isJpegExtension(extension) || hasJpegEndMarker(filePath) {
+		return nil, decodeErr
+	}
+	return decodeJpegWithAppendedEndMarker(filePath, decodeErr)
+}
+
+// decodeJpegWithAppendedEndMarker 仅在源文件缺少 EOI 时通过内存流补齐 FF D9 后重试，
+// 不修改 HQ 文件。若像素数据本身也损坏，第二次解码仍会失败并保留原始错误上下文。
+func decodeJpegWithAppendedEndMarker(filePath string, originalError error) (image.Image, error) {
+	inputFile, err := os.Open(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("重新打开截断 JPEG 失败: %w", err)
+	}
 	defer inputFile.Close()
-	return decodeImage(inputFile, extension)
+	fileData, readErr := io.ReadAll(inputFile)
+	if readErr != nil {
+		return nil, fmt.Errorf("读取截断 JPEG 失败: %w", readErr)
+	}
+	decodedImage, decodeErr := jpeg.Decode(bytes.NewReader(append(fileData, 0xff, 0xd9)))
+	if decodeErr == nil {
+		return decodedImage, nil
+	}
+	// 源文件可能不仅缺少 EOI，还截断了最后一小段 Huffman 数据。djpeg 能用
+	// 已完整解出的扫描线生成可用 BMP；其结果仍需经过 BMP 解码校验。
+	turboDecodedImage, turboDecodeErr := decodeScaledJpegWithTurbo(filePath, 8)
+	if turboDecodeErr == nil {
+		return turboDecodedImage, nil
+	}
+	ffmpegDecodedImage, ffmpegDecodeErr := decodeJpegWithFfmpeg(filePath)
+	if ffmpegDecodeErr == nil {
+		return ffmpegDecodedImage, nil
+	}
+	return nil, fmt.Errorf("截断 JPEG 容错解码失败: 标准解码=%v，补齐 EOI=%v，libjpeg-turbo=%v，FFmpeg=%w",
+		originalError, decodeErr, turboDecodeErr, ffmpegDecodeErr)
+}
+
+func hasJpegEndMarker(filePath string) bool {
+	inputFile, err := os.Open(filePath)
+	if err != nil {
+		return false
+	}
+	defer inputFile.Close()
+	fileInfo, err := inputFile.Stat()
+	if err != nil || fileInfo.Size() < 2 {
+		return false
+	}
+	if _, err = inputFile.Seek(-2, io.SeekEnd); err != nil {
+		return false
+	}
+	endMarker := make([]byte, 2)
+	if _, err = inputFile.Read(endMarker); err != nil {
+		return false
+	}
+	return endMarker[0] == 0xff && endMarker[1] == 0xd9
 }
 
 // decodeScaledJpegWithTurbo 利用 JPEG DCT 缩放在完整像素解码前降低分辨率。
@@ -178,7 +240,7 @@ func decodeScaledJpegWithTurbo(filePath string, scaleNumerator int) (image.Image
 	if contextValue.Err() != nil {
 		return nil, fmt.Errorf("libjpeg-turbo 缩放解码超时: %w", contextValue.Err())
 	}
-	if decodeErr != nil {
+	if decodeErr != nil && !isRecoverableTruncatedJpegWarning(decodeOutput) {
 		return nil, fmt.Errorf("libjpeg-turbo 缩放解码失败: %w: %s", decodeErr,
 			strings.TrimSpace(string(decodeOutput)))
 	}
@@ -190,9 +252,20 @@ func decodeScaledJpegWithTurbo(filePath string, scaleNumerator int) (image.Image
 	defer decodedFile.Close()
 	decodedImage, err := bmp.Decode(decodedFile)
 	if err != nil {
+		if decodeErr != nil {
+			return nil, fmt.Errorf("libjpeg-turbo 对截断 JPEG 生成了无效产物: %w: %s",
+				decodeErr, strings.TrimSpace(string(decodeOutput)))
+		}
 		return nil, fmt.Errorf("读取缩放解码产物失败: %w", err)
 	}
 	return decodedImage, nil
+}
+
+// isRecoverableTruncatedJpegWarning 判断 djpeg 是否仅因缺少 JPEG EOI 标记返回告警。
+// 部分来源生成的 JPEG 像素数据完整但缺少结尾 FF D9；djpeg 会返回退出码 2，
+// 同时仍生成可用 BMP。调用方还必须成功解码 BMP 后才能接受该产物。
+func isRecoverableTruncatedJpegWarning(decodeOutput []byte) bool {
+	return strings.Contains(string(decodeOutput), "Premature end of JPEG file")
 }
 
 func resizeToLongEdge(sourceImage image.Image, maxLongEdge int) image.Image {
@@ -272,6 +345,65 @@ func resolveDjpegPath() (string, error) {
 	resolvedPath, err := resolveExecutablePath(djpegPath)
 	if err != nil {
 		return "", fmt.Errorf("JPEG 缩放解码需要 libjpeg-turbo，请配置 IMAGE_DJPEG_PATH: %w", err)
+	}
+	return resolvedPath, nil
+}
+
+// decodeJpegWithFfmpeg 是截断 JPEG 的最后一级容错。FFmpeg 对缺失扫描段的图片
+// 可使用已解出的宏块生成完整 PNG；临时产物必须成功通过 PNG 解码才会被接受。
+func decodeJpegWithFfmpeg(filePath string) (image.Image, error) {
+	ffmpegPath, err := resolveFfmpegPath()
+	if err != nil {
+		return nil, err
+	}
+	temporaryFile, err := os.CreateTemp("", ".image-optimizer-*.png")
+	if err != nil {
+		return nil, fmt.Errorf("创建 FFmpeg 解码临时文件失败: %w", err)
+	}
+	temporaryPath := temporaryFile.Name()
+	if closeErr := temporaryFile.Close(); closeErr != nil {
+		_ = os.Remove(temporaryPath)
+		return nil, fmt.Errorf("关闭 FFmpeg 解码临时文件失败: %w", closeErr)
+	}
+	defer os.Remove(temporaryPath)
+
+	contextValue, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	defer cancel()
+	decodeCommand := exec.CommandContext(contextValue, ffmpegPath,
+		"-hide_banner", "-loglevel", "error", "-y", "-i", filePath,
+		"-frames:v", "1", "-update", "1", temporaryPath)
+	decodeOutput, decodeErr := decodeCommand.CombinedOutput()
+	if contextValue.Err() != nil {
+		return nil, fmt.Errorf("FFmpeg JPEG 解码超时: %w", contextValue.Err())
+	}
+	if decodeErr != nil {
+		return nil, fmt.Errorf("FFmpeg JPEG 解码失败: %w: %s", decodeErr,
+			strings.TrimSpace(string(decodeOutput)))
+	}
+
+	decodedFile, err := os.Open(temporaryPath)
+	if err != nil {
+		return nil, fmt.Errorf("打开 FFmpeg 解码产物失败: %w", err)
+	}
+	defer decodedFile.Close()
+	decodedImage, err := png.Decode(decodedFile)
+	if err != nil {
+		return nil, fmt.Errorf("读取 FFmpeg 解码产物失败: %w", err)
+	}
+	return decodedImage, nil
+}
+
+func resolveFfmpegPath() (string, error) {
+	ffmpegPath := os.Getenv("IMAGE_FFMPEG_PATH")
+	if ffmpegPath == "" {
+		ffmpegPath = os.Getenv("FFMPEG_PATH")
+	}
+	if ffmpegPath == "" {
+		ffmpegPath = "ffmpeg"
+	}
+	resolvedPath, err := resolveExecutablePath(ffmpegPath)
+	if err != nil {
+		return "", fmt.Errorf("JPEG 容错解码需要 FFmpeg，请配置 FFMPEG_PATH: %w", err)
 	}
 	return resolvedPath, nil
 }

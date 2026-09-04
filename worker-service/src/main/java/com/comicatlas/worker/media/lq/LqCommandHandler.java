@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -120,29 +121,84 @@ public class LqCommandHandler {
         if (result.getPages() == null) {
             return new ChapterProcessResult(List.of(), List.of());
         }
+        Map<String, MediaRecord> mediaBySourcePath = buildMediaBySourcePath(pages, relativeDir);
         List<Integer> failedPages = result.getPages().stream()
                 .filter(p -> "failed".equals(p.getStatus()))
-                .map(p -> p.getPageNumber().intValue())
+                .map(p -> resolvePageNumber(p, mediaBySourcePath))
                 .toList();
-        return new ChapterProcessResult(failedPages, collectLqSizes(pages, result));
+        return new ChapterProcessResult(failedPages,
+                collectLqSizes(pages, result, mediaBySourcePath, relativeDir));
     }
 
     /**
      * 汇总各成功页的 LQ 产物大小（优化器 outputSize → mediaId 映射），
      * 生成失败或缺失产物的页跳过，避免 API 侧写入错误的 lq_size。
      */
-    private static List<LqSizeResult> collectLqSizes(List<MediaRecord> pages, ImageOptimizer.RunResult result) {
+    private static List<LqSizeResult> collectLqSizes(List<MediaRecord> pages, ImageOptimizer.RunResult result,
+                                                     Map<String, MediaRecord> mediaBySourcePath,
+                                                     String lqDirectory) {
         Map<Integer, Long> mediaIdByPage = pages.stream()
                 .filter(p -> p.getPageNumber() != null)
                 .collect(Collectors.toMap(MediaRecord::getPageNumber, MediaRecord::getId, (a, b) -> a));
-        String lqDirectory = pages.isEmpty() ? "" : StoragePathParser.directoryOf(pages.get(0).getHqPath());
         return result.getPages().stream()
                 .filter(p -> !"failed".equals(p.getStatus())
                         && p.getPageNumber() != null && p.getOutputSize() != null)
-                .map(p -> new LqSizeResult(mediaIdByPage.get(p.getPageNumber().intValue()),
+                .map(p -> new LqSizeResult(resolveMediaId(p, mediaBySourcePath, mediaIdByPage),
                         p.getOutputSize(), joinRelativePath(lqDirectory, p.getOutputPath())))
                 .filter(r -> r.mediaId() != null)
                 .toList();
+    }
+
+    private static Map<String, MediaRecord> buildMediaBySourcePath(List<MediaRecord> pages, String directory) {
+        return pages.stream()
+                .filter(media -> media.getHqPath() != null)
+                .collect(Collectors.toMap(
+                        media -> relativePath(directory, media.getHqPath()),
+                        Function.identity(),
+                        (first, ignored) -> first));
+    }
+
+    private static Integer resolvePageNumber(ImageOptimizer.PageResult pageResult,
+                                             Map<String, MediaRecord> mediaBySourcePath) {
+        MediaRecord media = resolveMedia(pageResult, mediaBySourcePath);
+        if (media != null && media.getPageNumber() != null) {
+            return media.getPageNumber();
+        }
+        return pageResult.getPageNumber() == null ? -1 : pageResult.getPageNumber().intValue();
+    }
+
+    private static Long resolveMediaId(ImageOptimizer.PageResult pageResult,
+                                       Map<String, MediaRecord> mediaBySourcePath,
+                                       Map<Integer, Long> mediaIdByPage) {
+        MediaRecord media = resolveMedia(pageResult, mediaBySourcePath);
+        if (media != null) {
+            return media.getId();
+        }
+        if (pageResult.getSourcePath() != null && !pageResult.getSourcePath().isBlank()) {
+            return null;
+        }
+        return pageResult.getPageNumber() == null
+                ? null : mediaIdByPage.get(pageResult.getPageNumber().intValue());
+    }
+
+    private static MediaRecord resolveMedia(ImageOptimizer.PageResult pageResult,
+                                            Map<String, MediaRecord> mediaBySourcePath) {
+        if (pageResult.getSourcePath() == null || pageResult.getSourcePath().isBlank()) {
+            return null;
+        }
+        return mediaBySourcePath.get(normalizePath(pageResult.getSourcePath()));
+    }
+
+    private static String relativePath(String directory, String path) {
+        String normalizedDirectory = normalizePath(directory);
+        String normalizedPath = normalizePath(path);
+        String directoryPrefix = normalizedDirectory.isBlank() ? "" : normalizedDirectory + "/";
+        return normalizedPath.startsWith(directoryPrefix)
+                ? normalizedPath.substring(directoryPrefix.length()) : normalizedPath;
+    }
+
+    private static String normalizePath(String path) {
+        return path == null ? "" : path.replace('\\', '/').replaceAll("^/+|/+$", "");
     }
 
     private static String joinRelativePath(String directory, String fileName) {

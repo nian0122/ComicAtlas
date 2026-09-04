@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"image"
 	"image/jpeg"
 	"os"
@@ -96,6 +97,47 @@ func TestOptimizeImageToWebP_normalDimension_succeeds(t *testing.T) {
 	}
 }
 
+// 部分来源 JPEG 仅缺少 EOI（FF D9），像素数据仍完整；优化时应在内存中补齐，且不改 HQ。
+func TestOptimizeImageToWebP_missingJpegEndMarker_recoversWithoutChangingSource(t *testing.T) {
+	dir := t.TempDir()
+	sourcePath := filepath.Join(dir, "truncated.jpg")
+	imageData := image.NewRGBA(image.Rect(0, 0, 320, 240))
+	outputFile, err := os.Create(sourcePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := jpeg.Encode(outputFile, imageData, &jpeg.Options{Quality: 75}); err != nil {
+		t.Fatal(err)
+	}
+	if err := outputFile.Close(); err != nil {
+		t.Fatal(err)
+	}
+	encodedData, err := os.ReadFile(sourcePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	truncatedData := encodedData[:len(encodedData)-2]
+	if err := os.WriteFile(sourcePath, truncatedData, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	outputPath := filepath.Join(dir, "out", "truncated.webp")
+	result, err := optimizeImageToWebP(sourcePath, outputPath, 75)
+	if err != nil {
+		t.Fatalf("仅缺少 EOI 的 JPEG 应成功生成 LQ: %v", err)
+	}
+	if result.OutputSize <= 0 {
+		t.Fatal("修复解码后应生成非空 WebP")
+	}
+	currentSource, err := os.ReadFile(sourcePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(currentSource, truncatedData) {
+		t.Fatal("容错解码不得修改 HQ 源文件")
+	}
+}
+
 func TestScaledDimensions_preservesAspectRatioWithoutUpscaling(t *testing.T) {
 	width, height := scaledDimensions(10652, 14204, 3840)
 	if width != 2880 || height != 3840 {
@@ -128,5 +170,14 @@ func TestJpegTurboDecodeStrategy_nearThreshold_skipsEightEighthsDecode(t *testin
 	}
 	if useTurboDecode {
 		t.Fatal("8/8 不减少像素，不应生成完整 BMP 中间文件")
+	}
+}
+
+func TestIsRecoverableTruncatedJpegWarning_onlyAcceptsMissingEoiWarning(t *testing.T) {
+	if !isRecoverableTruncatedJpegWarning([]byte("Premature end of JPEG file\n")) {
+		t.Fatal("缺少 JPEG EOI 标记应识别为可恢复告警")
+	}
+	if isRecoverableTruncatedJpegWarning([]byte("Invalid JPEG file structure")) {
+		t.Fatal("其他 JPEG 结构错误不得按可恢复告警处理")
 	}
 }
