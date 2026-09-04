@@ -30,7 +30,7 @@
 | `CategoryController` | Category | 分类管理 |
 | `SettingsController` | Settings | 系统设置（Redis 存储） |
 | `StorageStatsController` | Storage | 存储统计（`/api/storage/stats`） |
-| `StorageOperationController` | Storage | LQ 生成、HQ 删除、HQ 媒体登记、转码、导出、刷新元数据（`/api/storage/*`） |
+| `StorageOperationController` | Storage | LQ 生成、HQ 删除、转码、导出、刷新元数据（`/api/storage/*`） |
 | `AdminController` | Admin | 旧管理入口（scan-recover 已废弃、删除兼容） |
 | `AdminStorageController` | Admin | 漫画/章节级存储查询（`/api/admin/storage/comics*`） |
 | `AdminDlqController` | Admin | DLQ 死信管理（`/api/admin/dlq/*`） |
@@ -92,14 +92,13 @@ POST   /api/comics/{comicId}/chapters           # 章节 CRUD（创建/重命名
 POST   /api/management/tasks                    # 管理任务中心（创建/列表/取消/重试）
 POST   /api/management/batch                    # 批量操作（预览 + 创建）
 GET    /api/management/operations/...           # 允许操作查询
-POST   /api/storage/{op}/comics/{id}            # 存储操作（lq/delete-hq/register-hq/transcode/export/refresh-metadata）
+POST   /api/storage/{op}/comics/{id}            # 存储操作（lq/delete-hq/transcode/export/refresh-metadata）
 POST   /api/trash/comics/{comicId}/restore      # 回收站（恢复/永久清理/对账）
 POST   /api/uploads/sessions                    # 分块上传会话
 ```
 
 > **刷新元数据（异步任务）**：`POST /api/storage/refresh-metadata/comics/{id}` 仅接受 `READY` 漫画（不存在 404、非 READY/并发 409），成功返回 `202` + `OperationSubmitResultDTO`（taskId）。Worker 按 `HQ/{comicId}/{chapterId}` 逐章扫描生成 STAGING 快照（SHA-256 + `databaseRevision`），API 校验后事务合并已有媒体元数据；HQ 中新增文件只进入“已发现”结果，不在刷新流程创建媒体行；缺失文件置 `HQ MISSING`，成功后 CAS 释放 `REFRESHING → READY` 并经 Outbox 重导出 `metadata.json`。HTTP 全程不传输文件字节。
 
-> **HQ 媒体登记（异步任务）**：`POST /api/storage/register-hq/comics/{id}` 或 `/chapters/{id}` 复用 Worker 的 HQ 扫描/媒体分析快照，API 事务仅登记 `mediaId=null` 的新增媒体；不移动 HQ 文件、不生成 LQ，新增媒体的 LQ 状态保持 `NOT_GENERATED`。
 
 > v1.0 起封面候选/设置接口已移除（封面 URL 由 `FileUrlResolver.resolveCover(comicId)` 生成），`DELETE /api/comics/{id}` 语义由硬删改为进入回收站。完整端点见 [`docs/api.md`](../api.md)。
 

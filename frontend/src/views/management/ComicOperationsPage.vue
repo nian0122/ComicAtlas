@@ -23,7 +23,6 @@
             <el-button :disabled="!isAllowed('HQ_DELETE')" type="danger" @click="deleteHq">删除 HQ</el-button>
             <el-button :disabled="!isAllowed('TRANSCODE')" @click="transcode">视频转码</el-button>
             <el-button :disabled="!isAllowed('METADATA_REFRESH')" @click="refreshMetadata">刷新元数据</el-button>
-            <el-button :disabled="!isAllowed('HQ_MEDIA_REGISTER')" @click="registerHq">登记新增 HQ</el-button>
           </div></div>
           <div class="operation-group"><span class="group-label">导出</span><div class="actions export-actions">
             <el-select v-model="exportFormat" style="width: 120px" aria-label="导出格式">
@@ -144,7 +143,6 @@ function generateLq(regenerate: boolean): void { void runAction(regenerate ? '�
 function deleteHq(): void { void runAction('删除 HQ', () => hqApi.deleteComic(comicId.value)) }
 function transcode(): void { void runAction('视频转码', () => storageAdminApi.transcodeComic(comicId.value)) }
 function refreshMetadata(): void { void runAction('刷新元数据', () => storageService.requestMetadataRefresh(comicId.value)) }
-function registerHq(): void { void runAction('登记新增 HQ', () => storageService.registerHqMedia(comicId.value)) }
 function createExport(): void { void runAction(`${exportFormat.value} 导出`, () => exportApi.createExport(comicId.value, exportFormat.value)) }
 async function trashComic(): Promise<void> { await ElMessageBox.confirm('漫画将移入回收站，可在需要时恢复。', '确认回收', { type: 'warning' }); await runAction('回收漫画', () => managementComicApi.delete(comicId.value)) }
 function restoreComic(): void { void runAction('恢复漫画', () => trashApi.restoreComic(comicId.value)) }

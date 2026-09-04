@@ -1,6 +1,5 @@
 package com.comicatlas.api.media.service;
 
-import com.comicatlas.api.storage.service.ComicStatsService;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO;
 import com.comicatlas.common.util.MetadataSnapshotRevision;
 import com.comicatlas.contract.common.enums.HqStatus;
@@ -31,9 +30,8 @@ class HqMediaRegistrationServiceTest {
 
     private final MediaMapper mediaMapper = mock(MediaMapper.class);
     private final ChapterMapper chapterMapper = mock(ChapterMapper.class);
-    private final ComicStatsService comicStatsService = mock(ComicStatsService.class);
     private final HqMediaRegistrationService service = new HqMediaRegistrationService(
-            mediaMapper, chapterMapper, comicStatsService);
+            mediaMapper, chapterMapper);
 
     @Test
     @DisplayName("只登记未入库 HQ 媒体并保持 LQ 未生成")
@@ -70,7 +68,6 @@ class HqMediaRegistrationServiceTest {
         assertThat(inserted.getLqSize()).isZero();
         assertThat(inserted.getTranscodeStatus()).isEqualTo(TranscodeStatus.NOT_NEEDED);
         assertThat(result.inserted()).isEqualTo(1);
-        verify(comicStatsService).refreshByComic(1L);
     }
 
     private static Media existingMedia() {

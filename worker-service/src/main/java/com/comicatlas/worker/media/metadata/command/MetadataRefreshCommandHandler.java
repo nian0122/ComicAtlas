@@ -229,8 +229,7 @@ public class MetadataRefreshCommandHandler {
      * @param cmd 管理命令请求（CHAPTER 为常规执行粒度，COMIC 仅兼容零章节/旧任务）
      */
     public void refresh(ManagementCommandRequestedEvent cmd) {
-        boolean registerHqMedia = ManagementOperationTypes.HQ_MEDIA_REGISTER.equals(cmd.operationType());
-        publisher.progress(cmd, 10, registerHqMedia ? "开始 HQ 媒体登记扫描" : "开始元数据扫盘");
+        publisher.progress(cmd, 10, "开始元数据扫盘");
         try {
             if (cmd.targetId() == null) {
                 publisher.failed(cmd, "元数据扫盘刷新 targetId 不能为空");
@@ -264,7 +263,7 @@ public class MetadataRefreshCommandHandler {
                         chapter, scan.mediaItems(), scan.warnings(), scan.legacyDirKey()));
             }
 
-            publisher.progress(cmd, 60, registerHqMedia ? "扫描完成，写入 HQ 登记快照" : "扫描完成，写入元数据快照");
+            publisher.progress(cmd, 60, "扫描完成，写入元数据快照");
 
             Instant generatedAt = Instant.now();
             MetadataRefreshSnapshotDTO snapshot = snapshotSerializer.create(
@@ -282,20 +281,13 @@ public class MetadataRefreshCommandHandler {
                 return;
             }
 
-            String snapshotDirectory = registerHqMedia ? "hq-media-register" : "metadata-refresh";
-            String snapshotRef = snapshotWriter.write(cmd, jsonBytes, snapshotDirectory);
+            String snapshotRef = snapshotWriter.write(cmd, jsonBytes);
             String snapshotSha256 = sha256Hex(jsonBytes);
 
-            if (registerHqMedia) {
-                publisher.hqMediaRegistrationScanCompleted(cmd, snapshotRef, snapshotSha256,
-                        jsonBytes.length, SNAPSHOT_SCHEMA_VERSION);
-            } else {
-                publisher.metadataRefreshScanCompleted(cmd, snapshotRef, snapshotSha256,
-                        jsonBytes.length, SNAPSHOT_SCHEMA_VERSION);
-            }
-            publisher.progress(cmd, 100, registerHqMedia ? "HQ 媒体登记扫描完成" : "元数据扫盘完成");
-            log.info("元数据扫描完成: operation={}, comicId={}, taskId={}, itemId={}, attempt={}, chapters={}, media={}, bytes={}",
-                    cmd.operationType(),
+            publisher.metadataRefreshScanCompleted(cmd, snapshotRef, snapshotSha256,
+                    jsonBytes.length, SNAPSHOT_SCHEMA_VERSION);
+            publisher.progress(cmd, 100, "元数据扫盘完成");
+            log.info("元数据扫盘完成: comicId={}, taskId={}, itemId={}, attempt={}, chapters={}, media={}, bytes={}",
                     comicId, cmd.taskId(), cmd.itemId(), cmd.attempt(),
                     chapterSnapshots.size(), totalMedia, jsonBytes.length);
         } catch (Exception e) {

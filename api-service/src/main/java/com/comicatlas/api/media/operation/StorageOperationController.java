@@ -146,22 +146,6 @@ public class StorageOperationController {
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(Result.ok(dto));
     }
 
-    // ======================== HQ 媒体登记 ========================
-
-    /** 登记整本漫画 HQ 目录中尚未入库的图片和视频，不生成 LQ。 */
-    @PostMapping("/register-hq/comics/{comicId}")
-    public ResponseEntity<Result<OperationSubmitResultDTO>> registerComicHq(@PathVariable Long comicId) {
-        OperationSubmitResultDTO dto = commandService.requestHqMediaRegistrationForComic(comicId);
-        return ResponseEntity.status(HttpStatus.ACCEPTED).body(Result.ok(dto));
-    }
-
-    /** 登记单个章节 HQ 目录中尚未入库的图片和视频，不生成 LQ。 */
-    @PostMapping("/register-hq/chapters/{chapterId}")
-    public ResponseEntity<Result<OperationSubmitResultDTO>> registerChapterHq(@PathVariable Long chapterId) {
-        OperationSubmitResultDTO dto = commandService.requestHqMediaRegistrationForChapter(chapterId);
-        return ResponseEntity.status(HttpStatus.ACCEPTED).body(Result.ok(dto));
-    }
-
     // ======================== 导出 ========================
 
     /**

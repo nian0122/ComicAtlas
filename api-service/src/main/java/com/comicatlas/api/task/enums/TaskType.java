@@ -24,8 +24,6 @@ public enum TaskType {
     TRANSCODE,
     /** 元数据刷新 */
     METADATA_REFRESH,
-    /** 登记本地 HQ 中尚未入库的媒体 */
-    HQ_MEDIA_REGISTER,
     /** 批量元数据更新（分类/标签/标题等，API 侧同步执行） */
     METADATA_UPDATE,
     /** 整本漫画删除（回收/永久清理重定向） */

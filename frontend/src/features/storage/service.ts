@@ -75,16 +75,6 @@ export const storageService = {
     }
   },
 
-  /** 登记 HQ 目录中尚未入库的媒体，不生成 LQ。 */
-  async registerHqMedia(comicId: number): Promise<OperationSubmitResult> {
-    try {
-      const res = await storageAdminApi.registerHqComic(comicId)
-      return res.data
-    } catch (err) {
-      throw new Error(getApiErrorMessage(err, '操作失败'))
-    }
-  },
-
   async transcodeVideos(comicId: number): Promise<OperationSubmitResult> {
     const res = await storageAdminApi.transcodeComic(comicId)
     return res.data

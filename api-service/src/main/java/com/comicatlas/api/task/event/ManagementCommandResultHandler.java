@@ -61,9 +61,9 @@ public class ManagementCommandResultHandler {
         } else if (raw instanceof MediaUploadCompletedEvent ev) {
             process(ev, ev.taskId(), ev.itemId(), ev.attempt(), channel, tag, () -> handleUploadCompleted(ev));
         } else if (raw instanceof MetadataRefreshScanCompletedEvent ev) {
-            // 元数据类扫描专用流程：快照读取/校验必须在事务外，不走通用 process 事务分支
-            mqConsumerSupport.consume(channel, tag, "元数据扫描完成: itemId=" + ev.itemId(),
-                    () -> managementResultRouter.routeMetadataScanCompleted(ev));
+            // 元数据刷新专用流程：快照读取/校验必须在事务外，不走通用 process 事务分支
+            mqConsumerSupport.consume(channel, tag, "元数据刷新完成: itemId=" + ev.itemId(),
+                    () -> managementResultRouter.routeMetadataRefreshCompleted(ev));
         } else {
             mqConsumerSupport.consume(channel, tag, "管理命令未知事件: " + raw.eventId(), () -> { });
         }

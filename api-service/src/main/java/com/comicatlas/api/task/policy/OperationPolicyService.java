@@ -31,7 +31,6 @@ public class OperationPolicyService {
     public static final String OP_HQ_DELETE    = "HQ_DELETE";
     public static final String OP_TRANSCODE    = "TRANSCODE";
     public static final String OP_METADATA_REFRESH = "METADATA_REFRESH";
-    public static final String OP_HQ_MEDIA_REGISTER = "HQ_MEDIA_REGISTER";
 
     // ======================== Comic 操作矩阵 ========================
 
@@ -57,7 +56,7 @@ public class OperationPolicyService {
                 break;
             case "READY":
                 allowed.addAll(Set.of(OP_READ, OP_EDIT, OP_DELETE,
-                    OP_LQ_GENERATE, OP_HQ_DELETE, OP_METADATA_REFRESH, OP_HQ_MEDIA_REGISTER));
+                    OP_LQ_GENERATE, OP_HQ_DELETE, OP_METADATA_REFRESH));
                 break;
             case "RECOVERY_REQUIRED":
                 allowed.addAll(Set.of(OP_RECOVER, OP_DELETE));
@@ -100,7 +99,7 @@ public class OperationPolicyService {
                 break;
             case "READY":
                 allowed.addAll(Set.of(OP_READ, OP_EDIT, OP_DELETE,
-                    OP_LQ_GENERATE, OP_HQ_DELETE, OP_HQ_MEDIA_REGISTER));
+                    OP_LQ_GENERATE, OP_HQ_DELETE));
                 break;
             case "DELETING":
                 blocked.put("*", "章节正在删除中");

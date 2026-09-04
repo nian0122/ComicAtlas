@@ -1,7 +1,6 @@
 package com.comicatlas.api.media.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.comicatlas.api.storage.service.ComicStatsService;
 import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO.ChapterSnapshot;
@@ -29,7 +28,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * HQ 媒体登记服务。
+ * 元数据刷新中的 HQ 媒体登记服务。
  * <p>
  * Worker 只负责扫描本地 HQ 并返回快照，本服务在事务内把快照中的未登记媒体写入 page。
  * 登记不移动文件、不更新已有媒体元数据、不生成 LQ。
@@ -45,7 +44,6 @@ public class HqMediaRegistrationService {
 
     private final MediaMapper mediaMapper;
     private final ChapterMapper chapterMapper;
-    private final ComicStatsService comicStatsService;
 
     /** 登记已完成完整性校验的 HQ 扫描快照。 */
     @Transactional
@@ -109,10 +107,6 @@ public class HqMediaRegistrationService {
         for (List<Media> batch : partition(mediaToInsert, 500)) {
             mediaMapper.insertImportBatch(batch);
         }
-        if (!mediaToInsert.isEmpty()) {
-            comicStatsService.refreshByComic(snapshot.comicId());
-        }
-
         log.info("HQ 媒体登记完成: comicId={}, inserted={}, skippedExisting={}, skippedInvalid={}",
                 snapshot.comicId(), mediaToInsert.size(), skippedExisting, skippedInvalid);
         return new HqMediaRegistrationResult(snapshot.comicId(), mediaToInsert.size(),

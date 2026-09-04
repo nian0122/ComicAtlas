@@ -11,7 +11,7 @@ import java.util.UUID;
  * 元数据类扫描完成事件（Worker → API）。
  * <p>
  * Worker 完成 HQ 目录重扫并落盘快照 JSON 后发送此事件。{@code operationType=METADATA_REFRESH}
- * 时由 API 刷新已有媒体；{@code operationType=HQ_MEDIA_REGISTER} 时由 API 登记快照中的未登记媒体。
+ * 由 API 刷新已有媒体并登记快照中发现的新增媒体。
  * 两种流程都只由 Worker 读取和分析文件，数据库写入由 API 负责。
  * <p>
  * 消息契约：复用 {@link MqExchanges#MANAGEMENT} + {@link MqRoutingKeys#COMMAND_COMPLETED}

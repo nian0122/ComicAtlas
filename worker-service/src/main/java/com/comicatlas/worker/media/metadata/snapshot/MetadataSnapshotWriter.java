@@ -28,14 +28,8 @@ public final class MetadataSnapshotWriter {
      * @return 相对 STAGING 根的快照引用
      */
     public String write(ManagementCommandRequestedEvent command, byte[] content) throws IOException {
-        return write(command, content, "metadata-refresh");
-    }
-
-    /** 将指定类型的扫描快照写入 STAGING 根并原子发布。 */
-    public String write(ManagementCommandRequestedEvent command, byte[] content,
-                        String snapshotDirectory) throws IOException {
         StorageRoot stagingRoot = StorageRootResolver.required(storageProperties, StorageRootKeys.STAGING);
-        String relativeDirectory = snapshotDirectory + "/" + command.taskId() + "/"
+        String relativeDirectory = "metadata-refresh/" + command.taskId() + "/"
                 + command.itemId() + "/" + command.attempt();
         Path target = stagingRoot.resolve(relativeDirectory + "/snapshot.json");
         Path temporary = target.resolveSibling("snapshot.json.tmp");

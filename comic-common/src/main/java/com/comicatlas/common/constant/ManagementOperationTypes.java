@@ -8,7 +8,6 @@ public final class ManagementOperationTypes {
     public static final String HQ_DELETE = "HQ_DELETE";
     public static final String TRANSCODE = "TRANSCODE";
     public static final String METADATA_REFRESH = "METADATA_REFRESH";
-    public static final String HQ_MEDIA_REGISTER = "HQ_MEDIA_REGISTER";
     public static final String COMIC_DELETE = "COMIC_DELETE";
     public static final String CHAPTER_TRASH = "CHAPTER_TRASH";
     public static final String MEDIA_TRASH = "MEDIA_TRASH";

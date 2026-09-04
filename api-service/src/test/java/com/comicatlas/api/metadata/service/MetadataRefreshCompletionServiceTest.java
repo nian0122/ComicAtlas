@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
+import com.comicatlas.api.media.service.HqMediaRegistrationService;
 import com.comicatlas.api.task.entity.ManagementTaskItem;
 import com.comicatlas.api.task.mapper.ManagementTaskItemMapper;
 import com.comicatlas.api.task.service.ManagementTaskService;
@@ -86,6 +87,7 @@ class MetadataRefreshCompletionServiceTest {
     @Mock private ComicMapper comicMapper;
     @Mock private ChapterMapper chapterMapper;
     @Mock private MetadataRefreshService metadataRefreshService;
+    @Mock private HqMediaRegistrationService hqMediaRegistrationService;
     @Mock private ComicStatsService comicStatsService;
     @Mock private InboxService inboxService;
     @Mock private EventFingerprintService eventFingerprintService;
@@ -106,6 +108,10 @@ class MetadataRefreshCompletionServiceTest {
     @BeforeEach
     void setUp() throws Exception {
         lenient().when(eventFingerprintService.fingerprint(any())).thenReturn("test-event-hash");
+        lenient().when(hqMediaRegistrationService.registerValidatedSnapshot(any()))
+                .thenReturn(new HqMediaRegistrationService.HqMediaRegistrationResult(1L, 0, 0, 0));
+        lenient().when(metadataRefreshService.applyValidatedSnapshot(any()))
+                .thenReturn(new MetadataRefreshService.MetadataRefreshApplyResult(1L, 0, 0, 0));
         // 单元测试无 Spring 上下文：注册实体 TableInfo 以支持 LambdaUpdateWrapper 解析
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), Comic.class);
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), ManagementTaskItem.class);
@@ -205,6 +211,7 @@ class MetadataRefreshCompletionServiceTest {
         verify(managementTaskItemMapper).update(isNull(), any(LambdaUpdateWrapper.class));
         verify(comicMapper).update(isNull(), any(LambdaUpdateWrapper.class));
         // 差异合并 + Inbox + Outbox 入箱 MetadataRefreshEvent + 任务聚合 + 缓存失效
+        verify(hqMediaRegistrationService).registerValidatedSnapshot(any());
         verify(metadataRefreshService).applyValidatedSnapshot(any());
         verify(inboxService).markProcessed(eq(ev.eventId().toString()), anyString(), eq(10L), eq(100L), eq(1));
         verify(outboxService).enqueue(any(MetadataRefreshEvent.class), eq(MqExchanges.EXPORT),
@@ -368,7 +375,6 @@ class MetadataRefreshCompletionServiceTest {
         when(comicMapper.selectByIdForUpdate(1L)).thenReturn(refreshingComic());
         when(comicMapper.update(isNull(), any())).thenReturn(1);
         when(managementTaskItemMapper.update(isNull(), any())).thenReturn(1);
-        when(metadataRefreshService.applyValidatedSnapshot(any())).thenReturn(null);
         doThrow(new RuntimeException("Outbox 序列化失败"))
                 .when(outboxService).enqueue(any(MetadataRefreshEvent.class), anyString(), anyString(), any(), any(), anyInt());
 

@@ -32,10 +32,6 @@ export const storageAdminApi = {
     api.get<readonly ChapterStorageItem[]>(`/manage/admin/storage/comics/${comicId}/chapters`),
   refreshMetadata: (comicId: number) =>
     api.post<OperationSubmitResult>(`/manage/storage/refresh-metadata/comics/${comicId}`),
-  registerHqComic: (comicId: number) =>
-    api.post<OperationSubmitResult>(`/manage/storage/register-hq/comics/${comicId}`),
-  registerHqChapter: (chapterId: number) =>
-    api.post<OperationSubmitResult>(`/manage/storage/register-hq/chapters/${chapterId}`),
   transcodeComic: (comicId: number) =>
     api.post<OperationSubmitResult>(`/manage/storage/transcode/comics/${comicId}`),
   transcodeChapter: (chapterId: number) =>

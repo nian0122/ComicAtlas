@@ -3,7 +3,6 @@ package com.comicatlas.api.task.event;
 import com.comicatlas.api.media.service.MediaOperationCompletionService;
 import com.comicatlas.api.metadata.service.MetadataRefreshCompletionService;
 import com.comicatlas.api.metadata.service.MetadataUpdateCoordinator;
-import com.comicatlas.api.media.service.HqMediaRegistrationCompletionService;
 import com.comicatlas.api.recovery.trash.TrashLifecycleCompletionService;
 import com.comicatlas.api.storage.service.ComicStatsService;
 import com.comicatlas.api.upload.service.UploadCompletionService;
@@ -32,7 +31,6 @@ public class ManagementResultRouter {
     private final TrashLifecycleCompletionService trashCompletionService;
     private final UploadCompletionService uploadCompletionService;
     private final MetadataRefreshCompletionService metadataCompletionService;
-    private final HqMediaRegistrationCompletionService hqMediaRegistrationCompletionService;
     private final ComicStatsService comicStatsService;
     private final MetadataUpdateCoordinator metadataUpdateCoordinator;
 
@@ -108,12 +106,8 @@ public class ManagementResultRouter {
                 event.taskId(), "上传完成: " + event.operationType());
     }
 
-    /** 路由元数据类扫描完成事件；具体流程由 operationType 分流。 */
-    public void routeMetadataScanCompleted(MetadataRefreshScanCompletedEvent event) {
-        if ("HQ_MEDIA_REGISTER".equals(event.operationType())) {
-            hqMediaRegistrationCompletionService.handleCompleted(event);
-            return;
-        }
+    /** 路由元数据刷新扫描完成事件。 */
+    public void routeMetadataRefreshCompleted(MetadataRefreshScanCompletedEvent event) {
         metadataCompletionService.handleCompleted(event);
     }
 

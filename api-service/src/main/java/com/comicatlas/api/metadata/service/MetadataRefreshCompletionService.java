@@ -11,6 +11,7 @@ import com.comicatlas.api.outbox.service.EventFingerprintService;
 import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.api.metadata.service.MetadataRefreshService.MetadataRefreshApplyResult;
 import com.comicatlas.api.metadata.service.MetadataRefreshService.MetadataRefreshLoadRequest;
+import com.comicatlas.api.media.service.HqMediaRegistrationService;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO;
@@ -78,6 +79,7 @@ public class MetadataRefreshCompletionService {
     private final ComicMapper comicMapper;
     private final ChapterMapper chapterMapper;
     private final MetadataRefreshService metadataRefreshService;
+    private final HqMediaRegistrationService hqMediaRegistrationService;
     private final ComicStatsService comicStatsService;
     private final InboxService inboxService;
     private final OutboxService outboxService;
@@ -190,10 +192,14 @@ public class MetadataRefreshCompletionService {
             return false;
         }
 
+        // 先登记快照发现的新增 HQ 媒体，再执行刷新差异合并；两者同属本次刷新事务。
+        HqMediaRegistrationService.HqMediaRegistrationResult registrationResult =
+                hqMediaRegistrationService.registerValidatedSnapshot(snapshot);
         // 复核 databaseRevision 并执行差异合并（内部事务；漂移抛 BusinessException → 整体回滚 → 失败路径）
         MetadataRefreshApplyResult applyResult = metadataRefreshService.applyValidatedSnapshot(snapshot);
-        log.info("元数据刷新已完成: comicId={}, updated={}, discovered={}, missing={}",
-                comicId, applyResult.updated(), applyResult.discovered(), applyResult.missing());
+        log.info("元数据刷新已完成: comicId={}, registered={}, updated={}, discovered={}, missing={}",
+                comicId, registrationResult.inserted(), applyResult.updated(), applyResult.discovered(),
+                applyResult.missing());
 
         // 写 Inbox（eventId 幂等键）
         inboxService.markProcessed(eventId, payloadHash, ev.taskId(), ev.itemId(), ev.attempt());
