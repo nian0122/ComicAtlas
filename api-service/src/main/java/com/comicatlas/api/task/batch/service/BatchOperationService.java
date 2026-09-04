@@ -54,6 +54,7 @@ public class BatchOperationService {
     private static final Set<TaskType> COMMAND_OPS = Set.of(
             TaskType.LQ_GENERATE, TaskType.LQ_REGENERATE, TaskType.HQ_DELETE,
             TaskType.TRANSCODE, TaskType.METADATA_REFRESH, TaskType.COMIC_DELETE,
+            TaskType.HQ_MEDIA_REGISTER,
             TaskType.COMIC_RESTORE, TaskType.COMIC_PURGE);
 
     private final BatchSelectionResolver selectionResolver;
@@ -231,6 +232,7 @@ public class BatchOperationService {
             case HQ_DELETE -> "批量删除高清图";
             case TRANSCODE -> "批量视频转码";
             case METADATA_REFRESH -> "批量刷新元数据";
+            case HQ_MEDIA_REGISTER -> "批量登记 HQ 媒体";
             case COMIC_DELETE -> "批量回收漫画";
             case COMIC_RESTORE -> "批量恢复漫画";
             case COMIC_PURGE -> "批量永久清理";

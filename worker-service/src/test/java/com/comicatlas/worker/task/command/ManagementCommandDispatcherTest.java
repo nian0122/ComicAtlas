@@ -74,4 +74,17 @@ class ManagementCommandDispatcherTest {
         verify(publisher, never()).failed(eq(command), anyString());
         verify(channel).basicAck(2L, false);
     }
+
+    @Test
+    void hqMediaRegister命令路由到同一扫盘处理器() throws Exception {
+        ManagementCommandRequestedEvent command = new ManagementCommandRequestedEvent(
+                UUID.randomUUID(), Instant.now(), 1, 3L, 4L, 1,
+                "HQ_MEDIA_REGISTER", "CHAPTER", 42L);
+
+        dispatcher.handle(command, channel, 3L);
+
+        verify(metadataRefreshCommandHandler).refresh(command);
+        verify(publisher, never()).failed(eq(command), anyString());
+        verify(channel).basicAck(3L, false);
+    }
 }

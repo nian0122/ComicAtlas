@@ -8,10 +8,11 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * 元数据扫盘刷新扫描完成事件（Worker → API）。
+ * 元数据类扫描完成事件（Worker → API）。
  * <p>
- * Worker 完成 HQ 目录重扫并落盘快照 JSON 后发送此事件。API 端依据
- * taskId/itemId/attempt 更新管理任务项状态，并按快照内容与数据库比对刷新元数据。
+ * Worker 完成 HQ 目录重扫并落盘快照 JSON 后发送此事件。{@code operationType=METADATA_REFRESH}
+ * 时由 API 刷新已有媒体；{@code operationType=HQ_MEDIA_REGISTER} 时由 API 登记快照中的未登记媒体。
+ * 两种流程都只由 Worker 读取和分析文件，数据库写入由 API 负责。
  * <p>
  * 消息契约：复用 {@link MqExchanges#MANAGEMENT} + {@link MqRoutingKeys#COMMAND_COMPLETED}
  * + {@link MqQueues#MANAGEMENT_RESULT}，<b>不新增队列</b>——本事件只是元数据扫盘

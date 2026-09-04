@@ -85,6 +85,9 @@ public class ManagementCommandDispatcher {
             case ManagementOperationTypes.METADATA_REFRESH -> {
                 metadataRefreshCommandHandler.refresh(cmd);
             }
+            case ManagementOperationTypes.HQ_MEDIA_REGISTER -> {
+                metadataRefreshCommandHandler.refresh(cmd);
+            }
             case ManagementOperationTypes.COMIC_DELETE, ManagementOperationTypes.CHAPTER_TRASH,
                     ManagementOperationTypes.MEDIA_TRASH -> trashCommandHandler.trash(cmd);
             case ManagementOperationTypes.COMIC_RESTORE, ManagementOperationTypes.CHAPTER_RESTORE,

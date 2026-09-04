@@ -261,29 +261,33 @@ class MetadataRefreshCommandHandlerTest {
         assertEquals(CHAPTER_ID, root.get("chapters").get(0).get("chapterId").asLong());
         assertEquals(7, root.get("chapters").get(0).get("chapterVersion").asInt());
         JsonNode items = root.get("chapters").get(0).get("mediaItems");
-        assertEquals(2, items.size(), "快照只含磁盘∩DB 的媒体（001.jpg 与 003.mp4），孤儿 002.jpg 不导入");
+        assertEquals(3, items.size(), "快照包含已登记媒体与发现的 HQ 媒体（001.jpg、002.jpg、003.mp4）");
 
-        // 自然排序：001.jpg < 003.mp4
+        // 自然排序：001.jpg < 002.jpg < 003.mp4
         assertEquals("1/42/001.jpg", items.get(0).get("hqPath").asText());
-        assertEquals("1/42/003.mp4", items.get(1).get("hqPath").asText());
+        assertEquals("1/42/002.jpg", items.get(1).get("hqPath").asText());
+        assertEquals("1/42/003.mp4", items.get(2).get("hqPath").asText());
 
         // 尺寸/视频字段来自 MediaAnalyzer
         assertEquals(800, items.get(0).get("width").asInt());
         assertEquals(1200, items.get(0).get("height").asInt());
         assertEquals("IMAGE", items.get(0).get("mediaType").asText());
-        assertEquals(1280, items.get(1).get("width").asInt());
-        assertEquals("VIDEO", items.get(1).get("mediaType").asText());
-        assertEquals(0, new BigDecimal(items.get(1).get("duration").asText()).compareTo(new BigDecimal("12.34")));
-        assertEquals("mp4", items.get(1).get("container").asText());
-        assertEquals("h264", items.get(1).get("videoCodec").asText());
-        assertEquals("aac", items.get(1).get("audioCodec").asText());
+        assertEquals(1280, items.get(2).get("width").asInt());
+        assertEquals("VIDEO", items.get(2).get("mediaType").asText());
+        assertEquals(0, new BigDecimal(items.get(2).get("duration").asText()).compareTo(new BigDecimal("12.34")));
+        assertEquals("mp4", items.get(2).get("container").asText());
+        assertEquals("h264", items.get(2).get("videoCodec").asText());
+        assertEquals("aac", items.get(2).get("audioCodec").asText());
 
         // DB 身份：mediaId/mediaVersion/pageNumber 取自匹配行
         assertEquals(101, items.get(0).get("mediaId").asLong());
         assertEquals(1, items.get(0).get("mediaVersion").asInt());
         assertEquals(1, items.get(0).get("pageNumber").asInt());
-        assertEquals(103, items.get(1).get("mediaId").asLong());
-        assertEquals(3, items.get(1).get("pageNumber").asInt());
+        assertTrue(items.get(1).get("mediaId").isNull());
+        assertEquals(0, items.get(1).get("mediaVersion").asInt());
+        assertEquals(2, items.get(1).get("pageNumber").asInt());
+        assertEquals(103, items.get(2).get("mediaId").asLong());
+        assertEquals(3, items.get(2).get("pageNumber").asInt());
 
         // 孤儿文件（磁盘存在无 DB 行）应记 warning
         boolean orphanWarning = false;

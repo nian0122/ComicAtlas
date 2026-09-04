@@ -3,7 +3,6 @@ package com.comicatlas.api.metadata.service;
 import com.comicatlas.contract.common.enums.HqStatus;
 import com.comicatlas.contract.common.enums.LqStatus;
 import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
-import com.comicatlas.contract.common.enums.TranscodeStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.shared.exception.SnapshotUnavailableException;
 import com.comicatlas.api.shared.crypto.DigestService;
@@ -48,8 +47,9 @@ import java.util.stream.Collectors;
  * 本阶段不做任何数据库写入，事务内禁止文件 IO 的约束天然满足。
  * <p>
  * <b>阶段二 {@link #applyValidatedSnapshot}（事务内）</b>：批量预取章节与活动媒体，
- * 重算 {@code databaseRevision} 比对后执行差异合并（更新/新增/标记 MISSING），
- * 并刷新快照覆盖章节的页数。整本漫画统计由任务全部章节终态后统一重算；
+ * 重算 {@code databaseRevision} 比对后执行差异合并（更新/发现/标记 MISSING），
+ * 并刷新快照覆盖章节的页数。磁盘存在但数据库没有的媒体只计入发现结果，
+ * 不在本流程创建 page 行。整本漫画统计由任务全部章节终态后统一重算；
  * 任何失败路径零提交（整体事务回滚）。
  * <p>
  * 安全重导出（DB→JSON）由 {@link MediaMetadataSyncService} 在转码完成等场景触发，
@@ -98,7 +98,7 @@ public class MetadataRefreshService {
     public record MetadataRefreshApplyResult(
             Long comicId,
             int updated,
-            int inserted,
+            int discovered,
             int missing) {
     }
 
@@ -170,10 +170,10 @@ public class MetadataRefreshService {
         normalizeLegacyLayouts(snapshot, comicId);
         refreshChapterStats(snapshotChapterIds, chapterById, activeMedia, plan);
 
-        log.info("元数据刷新合并完成: comicId={}, updated={}, inserted={}, missing={}",
-                comicId, plan.updatedCount(), plan.inserted().size(), plan.missing().size());
+        log.info("元数据刷新合并完成: comicId={}, updated={}, discovered={}, missing={}",
+                comicId, plan.updatedCount(), plan.discovered().size(), plan.missing().size());
         return new MetadataRefreshApplyResult(comicId, plan.updatedCount(),
-                plan.inserted().size(), plan.missing().size());
+                plan.discovered().size(), plan.missing().size());
     }
 
     // ======================== 阶段一内部 ========================
@@ -323,13 +323,12 @@ public class MetadataRefreshService {
         }
     }
 
-    /** 合并计划：内存中构造待更新/待插入/待标记缺失的集合，之后一次性执行。 */
+    /** 合并计划：内存中构造待更新/待发现/待标记缺失的集合，之后一次性执行。 */
     private MergePlan buildMergePlan(MetadataRefreshSnapshotDTO snapshot, List<Media> activeMedia) {
         // 匹配索引：chapterId + basename → 活动行（READY 生命周期行；正常行按 hq_path、
         // HQ 已删除的仅 LQ 行按 lq_path 取 basename）
         Map<String, Media> index = new HashMap<>();
         Set<Long> matchedIds = new HashSet<>();
-        Map<Long, Integer> nextPageByChapter = new HashMap<>();
         for (Media media : activeMedia) {
             if (media.getStatus() != MediaLifecycleStatus.READY) {
                 continue;
@@ -339,13 +338,10 @@ public class MetadataRefreshService {
                 continue;
             }
             index.put(key, media);
-            if (media.getPageNumber() != null && media.getPageNumber() >= 0) {
-                nextPageByChapter.merge(media.getChapterId(), media.getPageNumber(), Math::max);
-            }
         }
 
         List<Media> toUpdate = new ArrayList<>();
-        List<Media> toInsert = new ArrayList<>();
+        List<MediaSnapshot> discovered = new ArrayList<>();
         List<Media> toMarkMissing = new ArrayList<>();
 
         List<ChapterSnapshot> chapters = snapshot.chapters() == null ? List.of() : snapshot.chapters();
@@ -368,9 +364,10 @@ public class MetadataRefreshService {
                     matchedIds.add(dbRow.getId());
                     applyMatchedUpdate(dbRow, item);
                     toUpdate.add(dbRow);
-                } else if (item.fileSize() > 0 && !INACTIVE_STATUSES.contains(item.lifecycleStatus())) {
-                    Media created = buildNewMedia(cs.chapterId(), item, nextPageByChapter);
-                    toInsert.add(created);
+                } else if (item.mediaId() == null && item.fileSize() > 0
+                        && !INACTIVE_STATUSES.contains(item.lifecycleStatus())) {
+                    // 刷新阶段只发现 HQ 孤儿文件，不负责创建 page 行；新增媒体另走独立流程。
+                    discovered.add(item);
                 }
                 // fileSize==0 且无匹配行：跳过；TRASHED/DELETED 同名行（Worker 基线含回收/删除行）不复活
             }
@@ -386,7 +383,7 @@ public class MetadataRefreshService {
                 toUpdate.add(media);
             }
         }
-        return new MergePlan(toUpdate, toInsert, toMarkMissing);
+        return new MergePlan(toUpdate, discovered, toMarkMissing);
     }
 
     /**
@@ -471,60 +468,10 @@ public class MetadataRefreshService {
         dbRow.setLqSize(0L);
     }
 
-    /** 磁盘新增文件：插入 READY，pageNumber 从本章最大非负页码 +1 追加；LQ 事实取快照。 */
-    private Media buildNewMedia(Long chapterId, MediaSnapshot item, Map<Long, Integer> nextPageByChapter) {
-        Media media = new Media();
-        media.setChapterId(chapterId);
-        media.setPageNumber(nextPageNumber(chapterId, nextPageByChapter));
-        media.setHqRoot("HQ");
-        media.setHqPath(item.hqPath());
-        media.setHqStatus(HqStatus.READY);
-        // 新文件 LQ 事实：快照实测（存在即 READY，缺失即 NOT_GENERATED）
-        if (LQ_STATUS_READY.equals(item.lqStatus()) && item.lqPath() != null && !item.lqPath().isBlank()) {
-            media.setLqStatus(LqStatus.READY);
-            media.setLqRoot(StorageRootKeys.LQ);
-            media.setLqPath(item.lqPath());
-            media.setLqSize(item.lqSize());
-        } else {
-            media.setLqStatus(LqStatus.NOT_GENERATED);
-            media.setLqRoot(null);
-            media.setLqPath(null);
-            media.setLqSize(0L);
-        }
-        media.setTranscodeStatus(TranscodeStatus.NOT_NEEDED);
-        media.setStatus(MediaLifecycleStatus.READY);
-        media.setHqSize(item.fileSize());
-        media.setMediaType(item.mediaType());
-        media.setWidth(item.width());
-        media.setHeight(item.height());
-        if ("IMAGE".equals(item.mediaType())) {
-            media.setDuration(null);
-            media.setContainer(null);
-            media.setVideoCodec(null);
-            media.setAudioCodec(null);
-        } else {
-            media.setDuration(item.duration());
-            media.setContainer(item.container());
-            media.setVideoCodec(item.videoCodec());
-            media.setAudioCodec(item.audioCodec());
-        }
-        return media;
-    }
-
-    /** 追加页码：初始为本章现存最大非负页码 +1，逐条递增。 */
-    private int nextPageNumber(Long chapterId, Map<Long, Integer> nextPageByChapter) {
-        int next = nextPageByChapter.getOrDefault(chapterId, 0) + 1;
-        nextPageByChapter.put(chapterId, next);
-        return next;
-    }
-
-    /** 合并落库：批量 UPDATE（updateRefreshBatch）+ 批量 INSERT（insertImportBatch），消除逐行往返。 */
+    /** 合并落库：只批量 UPDATE 已有媒体；新增媒体不在刷新流程落库。 */
     private void executeMerge(MergePlan plan) {
         for (List<Media> batch : partition(plan.updated(), MERGE_BATCH_SIZE)) {
             mediaMapper.updateRefreshBatch(batch);
-        }
-        for (List<Media> batch : partition(plan.inserted(), MERGE_BATCH_SIZE)) {
-            mediaMapper.insertImportBatch(batch);
         }
     }
 
@@ -540,9 +487,8 @@ public class MetadataRefreshService {
     /** 仅刷新快照覆盖章节的 pageCount（统计 READY 生命周期行，含 HQ MISSING）。 */
     private void refreshChapterStats(List<Long> snapshotChapterIds, Map<Long, Chapter> chapterById,
                                      List<Media> activeMedia, MergePlan plan) {
-        // 合并后媒体集合 = 活动行（已就地更新）+ 新增行
+        // 合并后媒体集合仅包含活动行；新增媒体尚未落库，不参与本次页数统计
         List<Media> merged = new ArrayList<>(activeMedia);
-        merged.addAll(plan.inserted());
         Map<Long, List<Media>> byChapter = merged.stream()
                 .collect(Collectors.groupingBy(Media::getChapterId));
 
@@ -569,7 +515,7 @@ public class MetadataRefreshService {
     }
 
     /** 合并计划载体。 */
-    private record MergePlan(List<Media> updated, List<Media> inserted, List<Media> missing) {
+    private record MergePlan(List<Media> updated, List<MediaSnapshot> discovered, List<Media> missing) {
         private int updatedCount() {
             return updated.size() - missing.size();
         }

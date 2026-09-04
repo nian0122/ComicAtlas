@@ -109,9 +109,12 @@ public class MediaOperationEligibilityService {
         }
         if (comic.getStatus() == ComicStatus.READY) {
             allowed.add(OperationPolicyService.OP_METADATA_REFRESH);
+            allowed.add(OperationPolicyService.OP_HQ_MEDIA_REGISTER);
         } else {
             blocked.put(OperationPolicyService.OP_METADATA_REFRESH,
                     "漫画状态不是 READY，无法刷新元数据");
+            blocked.put(OperationPolicyService.OP_HQ_MEDIA_REGISTER,
+                    "漫画状态不是 READY，无法登记 HQ 媒体");
         }
 
         return AllowedOperations.of(allowed, blocked);
@@ -129,8 +132,16 @@ public class MediaOperationEligibilityService {
 
     public AllowedOperations forChapter(Long chapterId) {
         ChapterOps ops = collectChapterAssetOps(chapterId);
+        Chapter chapter = chapterMapper.selectById(chapterId);
         Set<String> allowed = new LinkedHashSet<>();
         Map<String, String> blocked = new LinkedHashMap<>();
+
+        if (chapter != null && chapter.getStatus() != null && "READY".equals(chapter.getStatus().name())) {
+            allowed.add(OperationPolicyService.OP_HQ_MEDIA_REGISTER);
+        } else {
+            blocked.put(OperationPolicyService.OP_HQ_MEDIA_REGISTER,
+                    "章节状态不是 READY，无法登记 HQ 媒体");
+        }
 
         if (ops.lqGenerateAllowed) {
             allowed.add(OperationPolicyService.OP_LQ_GENERATE);

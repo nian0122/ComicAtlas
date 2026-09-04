@@ -29,7 +29,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -58,7 +57,7 @@ import org.mockito.InOrder;
  * MetadataRefreshService 两阶段单元测试 — 阶段一（事务外受限读取/校验）+ 阶段二（事务内差异合并）。
  * <p>
  * 覆盖：SHA-256 校验、STAGING containment、schema/comicId/大小/重复键校验、
- * 差异合并（更新已有/插入新增/标记缺失/保留 TRASHED）、零提交失败路径、
+ * 差异合并（更新已有/发现新增/标记缺失/保留 TRASHED）、零提交失败路径、
  * 事务边界（loadAndValidate 无事务、applyValidatedSnapshot 事务内）与批量查询次数。
  */
 @DisplayName("MetadataRefreshServiceTest — 快照受限读取与原子合并")
@@ -331,8 +330,8 @@ class MetadataRefreshServiceTest {
         }
 
         @Test
-        @DisplayName("happy：更新已有（IMAGE 清空视频、VIDEO 更新）、插入新增、标记缺失")
-        void happy_mergeUpdatesInsertsAndMarksMissing() {
+        @DisplayName("happy：更新已有（IMAGE 清空视频、VIDEO 更新）、发现新增、标记缺失")
+        void happy_mergeUpdatesDiscoversAndMarksMissing() {
             Chapter c42 = chapter(42L, 1);
             Chapter c43 = chapter(43L, 1);
             when(chapterMapper.selectList(any())).thenReturn(List.of(c42, c43));
@@ -355,9 +354,9 @@ class MetadataRefreshServiceTest {
 
             // m101/m102/m201 匹配更新；m103/m202 未匹配标 MISSING → 5 行一次批量 UPDATE
             verify(mediaMapper, times(1)).updateRefreshBatch(anyList());
-            // 004.jpg 新增 → 1 行一次批量 INSERT
-            verify(mediaMapper, times(1)).insertImportBatch(anyList());
-            assertThat(result.inserted()).isEqualTo(1);
+            // 004.jpg 只发现，不在刷新阶段插入
+            verify(mediaMapper, never()).insertImportBatch(anyList());
+            assertThat(result.discovered()).isEqualTo(1);
 
             // m101 更新为扫描值
             assertThat(m101.getHqSize()).isEqualTo(123456L);
@@ -545,8 +544,8 @@ class MetadataRefreshServiceTest {
         }
 
         @Test
-        @DisplayName("DB 唯一键冲突（insert 抛 DuplicateKeyException）时异常向上传播")
-        void duplicateKeyException_propagates() {
+        @DisplayName("发现媒体不执行数据库插入")
+        void discoveredMedia_doesNotInsert() {
             MetadataRefreshSnapshotDTO snapshot = snapshotForApply();
             String revision = MetadataSnapshotRevision.compute(snapshot);
             MetadataRefreshSnapshotDTO applied =
@@ -554,11 +553,11 @@ class MetadataRefreshServiceTest {
                             snapshot.generatedAt(), revision, snapshot.chapters());
             when(chapterMapper.selectList(any())).thenReturn(List.of(chapter(42L, 1), chapter(43L, 1)));
             when(mediaMapper.selectList(any())).thenReturn(List.of());
-            when(mediaMapper.insertImportBatch(anyList()))
-                    .thenThrow(new DuplicateKeyException("唯一键冲突"));
+            MetadataRefreshService.MetadataRefreshApplyResult result =
+                    service.applyValidatedSnapshot(applied);
 
-            assertThatThrownBy(() -> service.applyValidatedSnapshot(applied))
-                    .isInstanceOf(DuplicateKeyException.class);
+            verify(mediaMapper, never()).insertImportBatch(anyList());
+            assertThat(result.discovered()).isEqualTo(1);
         }
 
         @Test

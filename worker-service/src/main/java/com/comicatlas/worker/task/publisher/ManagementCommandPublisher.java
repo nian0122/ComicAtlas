@@ -109,6 +109,13 @@ public class ManagementCommandPublisher {
                         snapshotRef, snapshotSha256, snapshotBytes, schemaVersion));
     }
 
+    /** HQ 媒体登记扫描完成事件；沿用元数据快照契约，由 API 端按 operationType 分流。 */
+    public void hqMediaRegistrationScanCompleted(ManagementCommandRequestedEvent cmd,
+                                                  String snapshotRef, String snapshotSha256,
+                                                  long snapshotBytes, int schemaVersion) {
+        metadataRefreshScanCompleted(cmd, snapshotRef, snapshotSha256, snapshotBytes, schemaVersion);
+    }
+
     public void uploadCompleted(ManagementCommandRequestedEvent cmd,
                                 List<MediaAnalysisResult> results) {
         rabbitTemplate.convertAndSend(EXCHANGE, MqRoutingKeys.COMMAND_COMPLETED,

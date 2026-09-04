@@ -13,7 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 
-/** 元数据刷新快照的原子文件写入器。 */
+/** 元数据类扫描快照的原子文件写入器。 */
 public final class MetadataSnapshotWriter {
 
     private final StorageProperties storageProperties;
@@ -28,8 +28,14 @@ public final class MetadataSnapshotWriter {
      * @return 相对 STAGING 根的快照引用
      */
     public String write(ManagementCommandRequestedEvent command, byte[] content) throws IOException {
+        return write(command, content, "metadata-refresh");
+    }
+
+    /** 将指定类型的扫描快照写入 STAGING 根并原子发布。 */
+    public String write(ManagementCommandRequestedEvent command, byte[] content,
+                        String snapshotDirectory) throws IOException {
         StorageRoot stagingRoot = StorageRootResolver.required(storageProperties, StorageRootKeys.STAGING);
-        String relativeDirectory = "metadata-refresh/" + command.taskId() + "/"
+        String relativeDirectory = snapshotDirectory + "/" + command.taskId() + "/"
                 + command.itemId() + "/" + command.attempt();
         Path target = stagingRoot.resolve(relativeDirectory + "/snapshot.json");
         Path temporary = target.resolveSibling("snapshot.json.tmp");

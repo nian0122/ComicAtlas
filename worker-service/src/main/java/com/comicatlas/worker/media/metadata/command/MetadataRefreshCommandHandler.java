@@ -61,7 +61,8 @@ import java.util.stream.Collectors;
  * <p>
  * 过滤规则（NOFOLLOW_LINKS 语义）：忽略符号链接、隐藏项（点前缀或系统隐藏位）、子目录与
  * 未知扩展名（记结构化 warning）；仅允许 jpg/jpeg/png/webp/gif/bmp/mp4/mkv/webm/mov/avi
- * 进入 MediaAnalyzer 提取尺寸/视频字段，文件名自然排序。
+ * 进入 MediaAnalyzer 提取尺寸/视频字段，文件名自然排序。磁盘存在但数据库没有的 HQ
+ * 媒体也会进入快照，使用空 mediaId 表示“已发现、待后续新增”，本流程不写数据库。
  * <p>
  * 路径安全：扫描目录仅由 {@link StorageRoot#resolve}（防御 {@code ../} 穿越）构建，且只接受
  * 结构合法（{@code {comicId}/{dirKey}/{fileName}}、无穿越）的 DB hqPath 参与定位；快照 hqPath
@@ -228,7 +229,8 @@ public class MetadataRefreshCommandHandler {
      * @param cmd 管理命令请求（CHAPTER 为常规执行粒度，COMIC 仅兼容零章节/旧任务）
      */
     public void refresh(ManagementCommandRequestedEvent cmd) {
-        publisher.progress(cmd, 10, "开始元数据扫盘");
+        boolean registerHqMedia = ManagementOperationTypes.HQ_MEDIA_REGISTER.equals(cmd.operationType());
+        publisher.progress(cmd, 10, registerHqMedia ? "开始 HQ 媒体登记扫描" : "开始元数据扫盘");
         try {
             if (cmd.targetId() == null) {
                 publisher.failed(cmd, "元数据扫盘刷新 targetId 不能为空");
@@ -262,7 +264,7 @@ public class MetadataRefreshCommandHandler {
                         chapter, scan.mediaItems(), scan.warnings(), scan.legacyDirKey()));
             }
 
-            publisher.progress(cmd, 60, "扫描完成，写入快照");
+            publisher.progress(cmd, 60, registerHqMedia ? "扫描完成，写入 HQ 登记快照" : "扫描完成，写入元数据快照");
 
             Instant generatedAt = Instant.now();
             MetadataRefreshSnapshotDTO snapshot = snapshotSerializer.create(
@@ -280,13 +282,20 @@ public class MetadataRefreshCommandHandler {
                 return;
             }
 
-            String snapshotRef = snapshotWriter.write(cmd, jsonBytes);
+            String snapshotDirectory = registerHqMedia ? "hq-media-register" : "metadata-refresh";
+            String snapshotRef = snapshotWriter.write(cmd, jsonBytes, snapshotDirectory);
             String snapshotSha256 = sha256Hex(jsonBytes);
 
-            publisher.metadataRefreshScanCompleted(cmd, snapshotRef, snapshotSha256,
-                    jsonBytes.length, SNAPSHOT_SCHEMA_VERSION);
-            publisher.progress(cmd, 100, "元数据扫盘完成");
-            log.info("元数据扫盘完成: comicId={}, taskId={}, itemId={}, attempt={}, chapters={}, media={}, bytes={}",
+            if (registerHqMedia) {
+                publisher.hqMediaRegistrationScanCompleted(cmd, snapshotRef, snapshotSha256,
+                        jsonBytes.length, SNAPSHOT_SCHEMA_VERSION);
+            } else {
+                publisher.metadataRefreshScanCompleted(cmd, snapshotRef, snapshotSha256,
+                        jsonBytes.length, SNAPSHOT_SCHEMA_VERSION);
+            }
+            publisher.progress(cmd, 100, registerHqMedia ? "HQ 媒体登记扫描完成" : "元数据扫盘完成");
+            log.info("元数据扫描完成: operation={}, comicId={}, taskId={}, itemId={}, attempt={}, chapters={}, media={}, bytes={}",
+                    cmd.operationType(),
                     comicId, cmd.taskId(), cmd.itemId(), cmd.attempt(),
                     chapterSnapshots.size(), totalMedia, jsonBytes.length);
         } catch (Exception e) {
@@ -335,10 +344,10 @@ public class MetadataRefreshCommandHandler {
      * （API 侧据此标记 MISSING）。行按 basename 与磁盘文件匹配，快照 hqPath 统一规范
      * {@code {comicId}/{chapterId}/{fileName}}（API 按 chapterId+basename 匹配，与磁盘实际存放目录解耦）。
      * <p>
-     * 快照只包含「磁盘文件 ∩ DB 媒体行」：匹配行的媒体身份（mediaId/mediaVersion/pageNumber/状态）
-     * 取自 DB，尺寸/视频字段取自 MediaAnalyzer 实测；磁盘存在但 DB 无记录的孤儿文件不导入
-     * （快照 mediaId 契约非空），仅记 warning；DB 存在但磁盘缺失的媒体行不在快照中，
-     * 由 API 侧比对后标记 MISSING。
+     * 快照包含 HQ 目录中的合法媒体文件：匹配行的媒体身份（mediaId/mediaVersion/pageNumber/状态）
+     * 取自 DB，尺寸/视频字段取自 MediaAnalyzer 实测；磁盘存在但 DB 无记录的文件以
+     * {@code mediaId=null} 进入快照并记 warning，表示“已发现、待后续新增”；DB 存在但磁盘缺失
+     * 的媒体行不在快照中，由 API 侧比对后标记 MISSING。
      *
      * @param comicId   漫画 ID（用于构建相对路径，不参与目录定位）
      * @param chapter   章节（chapterId 参与回退目录定位，globalOrder 仅排序不用于路径）
@@ -418,8 +427,7 @@ public class MetadataRefreshCommandHandler {
             sequence++;
             MediaRecord row = mediaByBasename.get(fileName);
             if (row == null) {
-                warnings.add("物理文件无对应DB记录: " + fileName);
-                continue;
+                warnings.add("发现未登记 HQ 媒体（无对应DB记录）: " + fileName);
             }
 
             long fileSize = requiredSize(file, comicId, chapterId);
@@ -453,7 +461,7 @@ public class MetadataRefreshCommandHandler {
             String lqStatus = LQ_STATUS_NOT_GENERATED;
             long lqSize = 0L;
             String lqPath = null;
-            if (IMAGE_TYPE.equals(mediaType)) {
+            if (row != null && IMAGE_TYPE.equals(mediaType)) {
                 LqFileFact lqFact = resolveLqFact(comicId, chapterId, fileName, lqFilesByStem);
                 lqStatus = lqFact.status();
                 lqSize = lqFact.size();
@@ -462,10 +470,11 @@ public class MetadataRefreshCommandHandler {
 
             String relativePath = comicId + "/" + chapterId + "/" + fileName;
             mediaItems.add(new MediaSnapshot(
-                    row.getId(), MetadataScanSupport.versionOrZero(row.getVersion()), relativePath,
-                    row.getHqStatus() != null ? row.getHqStatus() : MediaStatuses.READY,
-                    row.getStatus() != null ? row.getStatus() : MediaStatuses.READY,
-                    row.getPageNumber() != null ? row.getPageNumber() : sequence,
+                    row == null ? null : row.getId(),
+                    row == null ? 0 : MetadataScanSupport.versionOrZero(row.getVersion()), relativePath,
+                    row == null || row.getHqStatus() == null ? MediaStatuses.READY : row.getHqStatus(),
+                    row == null || row.getStatus() == null ? MediaStatuses.READY : row.getStatus(),
+                    row == null || row.getPageNumber() == null ? sequence : row.getPageNumber(),
                     fileSize, mediaType, width, height, duration, container, videoCodec, audioCodec,
                     lqStatus, lqSize, lqPath));
         }

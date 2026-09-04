@@ -425,6 +425,61 @@ public class MediaOperationCommandService {
                 task.getStatus().name(), items.size());
     }
 
+    // ======================== HQ 媒体登记 ========================
+
+    /**
+     * 登记整本漫画 HQ 目录中尚未入库的媒体。Worker 只扫描并分析文件，API 负责事务内插入 page；
+     * 不移动 HQ 文件，也不触发 LQ 生成。
+     */
+    @Transactional
+    public OperationSubmitResultDTO requestHqMediaRegistrationForComic(Long comicId) {
+        Comic comic = comicMapper.selectById(comicId);
+        validateReadyComic(comic, comicId, "HQ 媒体登记");
+        List<Chapter> chapters = chapterMapper.selectList(new LambdaQueryWrapper<Chapter>()
+                .eq(Chapter::getComicId, comicId));
+        if (chapters.isEmpty()) {
+            log.info("漫画 {} 无章节，跳过 HQ 媒体登记", comicId);
+            return OperationSubmitResultDTO.of(null, TaskType.HQ_MEDIA_REGISTER.name(), null, 0);
+        }
+
+        ManagementTaskResponse task = createTask(TaskType.HQ_MEDIA_REGISTER, "登记 HQ 媒体", "COMIC",
+                List.of(target("COMIC", comicId, TaskType.HQ_MEDIA_REGISTER)));
+        ManagementTaskItemResponse item = managementTaskService.getTaskItems(task.getId()).get(0);
+        enqueue(TaskType.HQ_MEDIA_REGISTER, item, "COMIC", comicId);
+        log.info("HQ 媒体登记命令已提交: comicId={}, taskId={}", comicId, task.getId());
+        return OperationSubmitResultDTO.of(task.getId(), TaskType.HQ_MEDIA_REGISTER.name(),
+                task.getStatus().name(), 1);
+    }
+
+    /** 登记单个章节 HQ 目录中尚未入库的媒体。 */
+    @Transactional
+    public OperationSubmitResultDTO requestHqMediaRegistrationForChapter(Long chapterId) {
+        Chapter chapter = chapterMapper.selectById(chapterId);
+        if (chapter == null) {
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在: " + chapterId);
+        }
+        Comic comic = comicMapper.selectById(chapter.getComicId());
+        validateReadyComic(comic, chapter.getComicId(), "HQ 媒体登记");
+
+        ManagementTaskResponse task = createTask(TaskType.HQ_MEDIA_REGISTER, "登记 HQ 媒体", "CHAPTER",
+                List.of(target("CHAPTER", chapterId, TaskType.HQ_MEDIA_REGISTER)));
+        ManagementTaskItemResponse item = managementTaskService.getTaskItems(task.getId()).get(0);
+        enqueue(TaskType.HQ_MEDIA_REGISTER, item, "CHAPTER", chapterId);
+        log.info("HQ 媒体登记命令已提交: chapterId={}, taskId={}", chapterId, task.getId());
+        return OperationSubmitResultDTO.of(task.getId(), TaskType.HQ_MEDIA_REGISTER.name(),
+                task.getStatus().name(), 1);
+    }
+
+    private void validateReadyComic(Comic comic, Long comicId, String operationLabel) {
+        if (comic == null) {
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在: " + comicId);
+        }
+        if (comic.getStatus() != ComicStatus.READY) {
+            throw new ConflictException("漫画状态 " + comic.getStatus()
+                    + " 不支持" + operationLabel + "，仅 READY 可执行");
+        }
+    }
+
     // ======================== 整本删除（回收/永久清理重定向） ========================
 
     public OperationSubmitResultDTO requestComicDelete(Long comicId) {

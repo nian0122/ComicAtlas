@@ -31,7 +31,8 @@ public class BatchEligibilityChecker {
 
     private static final Set<TaskType> ASSET_OPS = Set.of(
             TaskType.LQ_GENERATE, TaskType.LQ_REGENERATE,
-            TaskType.HQ_DELETE, TaskType.TRANSCODE, TaskType.METADATA_REFRESH);
+            TaskType.HQ_DELETE, TaskType.TRANSCODE, TaskType.METADATA_REFRESH,
+            TaskType.HQ_MEDIA_REGISTER);
 
     /**
      * 按操作所需权限逐漫画校验，返回 [eligibleIds, blocked]。
@@ -78,6 +79,7 @@ public class BatchEligibilityChecker {
             case HQ_DELETE -> OperationPolicyService.OP_HQ_DELETE;
             case TRANSCODE -> OperationPolicyService.OP_TRANSCODE;
             case METADATA_REFRESH -> OperationPolicyService.OP_METADATA_REFRESH;
+            case HQ_MEDIA_REGISTER -> OperationPolicyService.OP_HQ_MEDIA_REGISTER;
             default -> null;
         };
     }

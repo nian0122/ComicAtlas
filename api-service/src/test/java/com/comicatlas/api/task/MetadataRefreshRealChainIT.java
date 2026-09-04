@@ -75,7 +75,7 @@ import static org.assertj.core.api.Assertions.fail;
  * MetadataRefreshWorkerChainIT）验证，重写段由 worker-service 侧验证，三段共享同一契约。
  * <p>
  * fixture 覆盖：两章（chapterId=41 globalOrder=0、chapterId=42 globalOrder=1）、已有图片（尺寸变化）、
- * 新增图片（mediaId=null）、缺失 HQ、视频（尺寸变化 + 视频字段）、LQ READY 保留、TRASHED/DELETED 同名行
+ * 发现新增图片（mediaId=null，不创建 page 行）、缺失 HQ、视频（尺寸变化 + 视频字段）、LQ READY 保留、TRASHED/DELETED 同名行
  * 不复活、隐藏文件/未知扩展名/symlink（Windows 不可建则记录跳过）、真实磁盘文件。
  * <p>
  * 失败场景：篡改摘要、未知章节、revision 并发漂移、重复事件幂等、旧 attempt 忽略、
@@ -226,7 +226,7 @@ class MetadataRefreshRealChainIT {
         mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
                 .eq(Media::getId, 106L).set(Media::getHqStatus, HqStatus.DELETED));
         writeFile(hq("1/42/006.jpg"), 888);
-        // 磁盘新增：004.jpg（无 DB 行 → 快照 mediaId=null 项 → API 插入分支）
+        // 磁盘新增：004.jpg（无 DB 行 → 快照 mediaId=null 项 → 刷新只发现，不插入）
         writeFile(hq("1/42/004.jpg"), 8888);
         // 过滤项：隐藏文件、未知扩展名、symlink（Windows 不可建则记录）
         writeFile(hq("1/42/.hidden.jpg"), 66);
@@ -352,15 +352,10 @@ class MetadataRefreshRealChainIT {
         assertThat(m103.getHqStatus()).isEqualTo(HqStatus.MISSING); // 缺失 HQ → MISSING
         assertThat(m103.getHqSize()).isZero();
 
-        // 新增图片 004.jpg：pageNumber 从本章最大页码 +1 追加
+        // 新增图片 004.jpg：刷新只发现，不创建 page 行
         Media new004 = mediaMapper.selectOne(new LambdaQueryWrapper<Media>()
                 .eq(Media::getChapterId, 42L).eq(Media::getHqPath, "1/42/004.jpg"));
-        assertThat(new004).isNotNull();
-        assertThat(new004.getPageNumber()).isEqualTo(4);
-        assertThat(new004.getHqStatus()).isEqualTo(HqStatus.READY);
-        assertThat(new004.getHqSize()).isEqualTo(8888L);
-        assertThat(new004.getLqStatus()).isEqualTo(LqStatus.NOT_GENERATED);
-        assertThat(new004.getStatus()).isEqualTo(MediaLifecycleStatus.READY);
+        assertThat(new004).isNull();
 
         // TRASHED/DELETED 同名行不复活
         assertThat(mediaMapper.selectCount(new LambdaQueryWrapper<Media>()
@@ -373,11 +368,11 @@ class MetadataRefreshRealChainIT {
 
         // 章节页数与漫画统计
         assertThat(chapterMapper.selectById(41L).getPageCount()).isEqualTo(1);
-        assertThat(chapterMapper.selectById(42L).getPageCount()).isEqualTo(4);
+        assertThat(chapterMapper.selectById(42L).getPageCount()).isEqualTo(3);
         Comic reloaded = comicMapper.selectById(comic.getId());
-        assertThat(reloaded.getTotalPages()).isEqualTo(5);
-        assertThat(reloaded.getHqSize()).isEqualTo(18388L);
-        assertThat(reloaded.getHqSize()).isEqualTo(18388L);
+        assertThat(reloaded.getTotalPages()).isEqualTo(4);
+        assertThat(reloaded.getHqSize()).isEqualTo(9500L);
+        assertThat(reloaded.getHqSize()).isEqualTo(9500L);
 
         // Outbox：metadata 重导出事件入箱（exchange/routingKey 契约）
         OutboxMessage msg = outboxMapper.selectOne(new LambdaQueryWrapper<OutboxMessage>()

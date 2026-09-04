@@ -240,13 +240,15 @@ class MetadataRefreshWorkerChainIT {
         assertEquals(42L, chapter.get("chapterId").asLong());
         assertEquals(7, chapter.get("chapterVersion").asInt());
         JsonNode items = chapter.get("mediaItems");
-        assertEquals(2, items.size(), "快照只含磁盘∩DB 的媒体（001.jpg 与 003.mp4）");
+        assertEquals(3, items.size(), "快照包含已登记媒体与发现的 HQ 媒体（001.jpg、002.jpg、003.mp4）");
         assertEquals("1/42/001.jpg", items.get(0).get("hqPath").asText());
         assertEquals(101L, items.get(0).get("mediaId").asLong());
-        assertEquals("1/42/003.mp4", items.get(1).get("hqPath").asText());
-        assertEquals(103L, items.get(1).get("mediaId").asLong());
-        assertEquals("VIDEO", items.get(1).get("mediaType").asText());
-        assertTrue(items.get(1).get("container").asText().equals("mp4"), "视频容器来自扩展名回退");
+        assertEquals("1/42/002.jpg", items.get(1).get("hqPath").asText());
+        assertTrue(items.get(1).get("mediaId").isNull(), "新增 HQ 媒体使用空 mediaId");
+        assertEquals("1/42/003.mp4", items.get(2).get("hqPath").asText());
+        assertEquals(103L, items.get(2).get("mediaId").asLong());
+        assertEquals("VIDEO", items.get(2).get("mediaType").asText());
+        assertTrue(items.get(2).get("container").asText().equals("mp4"), "视频容器来自扩展名回退");
         boolean orphanWarning = false;
         for (JsonNode w : chapter.get("warnings")) {
             if (w.asText().contains("002.jpg") && w.asText().contains("无对应DB记录")) {

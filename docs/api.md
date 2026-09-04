@@ -2,7 +2,7 @@
 
 ## 当前功能范围
 
-当前对外维护的文件处理能力为：漫画导入、漫画导出、HQ 删除、LQ 生成、视频转码、按漫画刷新元数据、扫盘恢复。上述操作均由管理端创建任务，Worker 处理本地文件，结果通过消息队列回写管理端数据库。
+当前对外维护的文件处理能力为：漫画导入、漫画导出、HQ 删除、HQ 媒体登记、LQ 生成、视频转码、按漫画刷新元数据、扫盘恢复。上述操作均由管理端创建任务，Worker 处理本地文件，结果通过消息队列回写管理端数据库。
 
 导入和导出只传输本地路径、任务状态及分卷元数据，漫画文件字节不经过 HTTP。媒体上传/替换、回收站及其他历史接口不属于当前主流程，相关章节仅保留兼容说明。
 
@@ -509,7 +509,7 @@ GET /api/manage/operations/media/{mediaId}
 响应 `AllowedOperations`：
 
 ```json
-{ "allowed": ["READ","EDIT","DELETE","LQ_GENERATE","HQ_DELETE","METADATA_REFRESH"],
+{ "allowed": ["READ","EDIT","DELETE","LQ_GENERATE","HQ_DELETE","METADATA_REFRESH","HQ_MEDIA_REGISTER"],
   "blockedReasons": { "TRANSCODE": "媒体类型不是视频" } }
 ```
 
@@ -696,7 +696,7 @@ GET /api/manage/outbox/stats
 ```
 IMPORT, RECOVERY, EXPORT, DIRECTORY_SCAN,
 LQ_GENERATE, LQ_REGENERATE, HQ_DELETE, TRANSCODE,
-METADATA_REFRESH, METADATA_UPDATE,
+METADATA_REFRESH, HQ_MEDIA_REGISTER, METADATA_UPDATE,
 COMIC_DELETE, MEDIA_UPLOAD, MEDIA_REPLACE, MEDIA_TRASH, CHAPTER_TRASH,
 COMIC_RESTORE, CHAPTER_RESTORE, MEDIA_RESTORE,
 COMIC_PURGE, CHAPTER_PURGE, MEDIA_PURGE
@@ -704,7 +704,7 @@ COMIC_PURGE, CHAPTER_PURGE, MEDIA_PURGE
 
 ### 14.3 操作名（OperationName）
 
-`READ / EDIT / DELETE / RECOVER / PURGE / RECONCILE / IMPORT / RETRY_IMPORT / LQ_GENERATE / LQ_REGENERATE / HQ_DELETE / TRANSCODE / METADATA_REFRESH`
+`READ / EDIT / DELETE / RECOVER / PURGE / RECONCILE / IMPORT / RETRY_IMPORT / LQ_GENERATE / LQ_REGENERATE / HQ_DELETE / TRANSCODE / METADATA_REFRESH / HQ_MEDIA_REGISTER`
 
 ### 14.4 目标类型（TargetType）
 
@@ -781,12 +781,12 @@ Transcode: NOT_NEEDED → QUEUED           QUEUED → TRANSCODING, FAILED
 |------|------|---------|
 | Comic | `DRAFT` | IMPORT, EDIT, DELETE |
 | Comic | `IMPORT_FAILED` | RETRY_IMPORT, EDIT, DELETE |
-| Comic | `READY` | READ, EDIT, DELETE, LQ_GENERATE, HQ_DELETE, METADATA_REFRESH |
+| Comic | `READY` | READ, EDIT, DELETE, LQ_GENERATE, HQ_DELETE, METADATA_REFRESH, HQ_MEDIA_REGISTER |
 | Comic | `RECOVERY_REQUIRED` | RECOVER, DELETE |
 | Comic | `TRASHED` | RECOVER, PURGE |
 | Comic | `IMPORTING/DELETING/RESTORING/PURGING/DELETED` | 全部阻塞（`"*"`） |
 | Comic | `TRASHING` | RECONCILE |
-| Chapter | `READY` | READ, EDIT, DELETE, LQ_GENERATE, HQ_DELETE |
+| Chapter | `READY` | READ, EDIT, DELETE, LQ_GENERATE, HQ_DELETE, HQ_MEDIA_REGISTER |
 | Chapter | `TRASHED` | RECOVER, PURGE |
 | Media | `READY` | READ, DELETE, LQ_GENERATE, HQ_DELETE, TRANSCODE |
 | Media | `STAGING` | 全部阻塞（`"*"`） |
@@ -919,6 +919,7 @@ OP_NOT_ALLOWED, COMIC_NOT_FOUND
 | 导出分卷清单 | `GET /api/manage/storage/export/tasks/{taskId}/artifacts` |
 | 导出打开目录 | `POST /api/manage/storage/export/tasks/{taskId}/open` |
 | 刷新 Metadata | `POST /api/manage/storage/refresh-metadata/comics/{id}` |
+| 登记 HQ 媒体 | `POST /api/manage/storage/register-hq/comics/{id}` 或 `/chapters/{id}` |
 | 存储统计 | `GET /api/manage/storage/stats` |
 
 > 旧端点（`/comics/{id}/lq`、`/admin/storage/comics/{id}/transcode-videos` 等）已随接口收敛全部移除，存储操作统一使用上表 `/api/manage/storage/*` 形态。
@@ -926,11 +927,13 @@ OP_NOT_ALLOWED, COMIC_NOT_FOUND
 > **导出为本地路径交互**：导出产物落在宿主机 `EXPORT/{taskId}/{base}.z01..zNN + {base}.zip`（标准分卷，主 `.zip` 为最后卷）。`GET /api/manage/storage/export/tasks/{taskId}/artifacts` 返回有序分卷**元数据**（1-based index、文件名、字节大小、是否最后 `.zip`、本地物理路径），**不提供任何文件字节下载**；`POST /api/manage/storage/export/tasks/{taskId}/open` 仅在宿主机打开文件管理器。HTTP 全程只传输任务/路径/状态/卷元数据，文件字节不经过 HTTP——把最后 `.zip` 的本地路径作为 `sourcePath` 即可重新导入该分卷（缺任一卷会失败，`.z01` 不可作为入口）。
 >
 > **METADATA_REFRESH（刷新元数据，异步任务）**：`POST /api/manage/storage/refresh-metadata/comics/{id}` 走统一命令管线，同一事务 CAS 漫画 `READY → REFRESHING`、创建 COMIC 级管理任务并发布命令到 Outbox。漫画不存在返回 `404`；非 `READY` 或并发被占用返回 `409`；成功返回 `202 Accepted` 与 `OperationSubmitResultDTO`（含 `taskId`）。
+
+> **HQ_MEDIA_REGISTER（登记 HQ 媒体，异步任务）**：`POST /api/manage/storage/register-hq/comics/{id}` 或 `/chapters/{id}` 由 Worker 扫描并分析 HQ 目录，API 仅将快照中的未登记媒体插入 `page`，不移动文件、不调用媒体上传接口、不生成 LQ。新增图片和视频均以 `lq_status=NOT_GENERATED` 登记，成功后只更新章节/漫画统计并重导出 `metadata.json`。
 >
 > 执行链路（全程无 HTTP 文件传输，HTTP 只传任务信息、快照引用与 SHA-256 校验值）：
 > 1. Worker 只读 DB 基线（章节/媒体 + 版本），按 `HQ/{comicId}/{chapterId}` **逐章扫描**目录，识别图片/视频媒体，记录缺失文件；
 > 2. 组装 **STAGING 快照**（schemaVersion=1，含确定性 SHA-256 结构摘要 `databaseRevision`），原子落盘后回传 `snapshotRef` + `snapshotSha256` + 字节数；
-> 3. API 校验快照（SHA/schema/comicId/章节版本漂移）后在同一事务内执行**差异合并**：匹配行刷新 HQ 尺寸/媒体类型与视频字段；磁盘新增文件插入 READY 媒体；DB 有记录但磁盘缺失的行标记 `HQ MISSING` 且 `fileSize=0`（保留 LQ/视频/转码状态）；
+> 3. API 校验快照（SHA/schema/comicId/章节版本漂移）后在同一事务内执行**差异合并**：匹配行刷新 HQ 尺寸/媒体类型与视频字段；磁盘新增文件只记录为“已发现”，不在刷新流程创建媒体行；DB 有记录但磁盘缺失的行标记 `HQ MISSING` 且 `fileSize=0`（保留 LQ/视频/转码状态）；
 > 4. **成功点** = 合并提交 + CAS 释放 `REFRESHING → READY` + Outbox 重导出 `metadata.json`（`MetadataRefreshEvent`，安全 DB→JSON 链）；业务失败则任务 FAILED、释放锁并保留快照供排查。
 >
 > 批量 `METADATA_REFRESH` 资格与单项一致（仅 READY 漫画可执行）。

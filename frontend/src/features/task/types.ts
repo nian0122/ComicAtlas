@@ -10,6 +10,7 @@ export type ManagementTaskType =
   | 'HQ_DELETE'
   | 'TRANSCODE'
   | 'METADATA_REFRESH'
+  | 'HQ_MEDIA_REGISTER'
   | 'METADATA_UPDATE'
   | 'COMIC_DELETE'
   | 'MEDIA_UPLOAD'

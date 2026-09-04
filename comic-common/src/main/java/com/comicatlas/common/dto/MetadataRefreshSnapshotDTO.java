@@ -17,8 +17,9 @@ import java.util.List;
  * <ul>
  *   <li>{@code generatedAt} 为扫描时刻时间戳，仅供审计/日志，<b>不得参与</b>结构摘要；</li>
  *   <li>{@code databaseRevision} 为确定性结构摘要（十六进制），由摘要工具计算后回填；</li>
- *   <li>{@link MediaSnapshot#hqPath()} 必须是 DB 中真实相对路径（正斜杠，如 {@code 1/42/001.jpg}），
- *       构建时经 {@link RelativePathValidator} 校验，非法路径抛 {@code InvalidRelativePathException}。</li>
+ *   <li>{@link MediaSnapshot#hqPath()} 必须是 HQ 中真实相对路径（正斜杠，如 {@code 1/42/001.jpg}），
+ *       已登记媒体与未登记发现项均使用该路径；构建时经 {@link RelativePathValidator} 校验，非法路径抛
+ *       {@code InvalidRelativePathException}。</li>
  * </ul>
  */
 public record MetadataRefreshSnapshotDTO(
@@ -52,7 +53,8 @@ public record MetadataRefreshSnapshotDTO(
     }
 
     /**
-     * 媒体快照：媒体行结构字段。
+     * 媒体快照：媒体行结构字段。{@code mediaId=null} 表示 HQ 扫描发现但数据库尚未登记的媒体，
+     * 由后续独立新增流程处理。
      * <p>
      * width/height/duration/container/videoCodec/audioCodec 为可空视频元数据（图片媒体为 null）。
      * hqPath 为必填相对路径，构建边界校验契约（见 {@link RelativePathValidator}）。
