@@ -561,6 +561,36 @@ class MetadataRefreshServiceTest {
         }
 
         @Test
+        @DisplayName("新增候选已在刷新事务内登记后按路径合并，不误报版本漂移")
+        void discoveredCandidate_registeredBeforeMerge_matchesByPath() {
+            Chapter chapter = chapter(42L, 1);
+            Media registeredMedia = media(301L, 42L, "1/42/004.jpg", 4, "READY", 9999L, "IMAGE", 1);
+            when(chapterMapper.selectList(any())).thenReturn(List.of(chapter));
+            when(mediaMapper.selectList(any())).thenReturn(List.of(registeredMedia));
+            when(mediaMapper.updateRefreshBatch(anyList())).thenReturn(1);
+
+            MetadataRefreshSnapshotDTO snapshot = new MetadataRefreshSnapshotDTO(1, 1L,
+                    Instant.parse("2026-08-09T00:00:00Z"), null,
+                    List.of(new MetadataRefreshSnapshotDTO.ChapterSnapshot(42L, 1,
+                            List.of(new MetadataRefreshSnapshotDTO.MediaSnapshot(null, 0,
+                                    "1/42/004.jpg", "READY", "READY", 0,
+                                    8888L, "IMAGE", 400, 600, null, null, null, null)),
+                            List.of())));
+            String revision = MetadataSnapshotRevision.compute(snapshot);
+            MetadataRefreshSnapshotDTO applied = new MetadataRefreshSnapshotDTO(
+                    snapshot.schemaVersion(), snapshot.comicId(), snapshot.generatedAt(), revision,
+                    snapshot.chapters());
+
+            MetadataRefreshService.MetadataRefreshApplyResult result =
+                    service.applyValidatedSnapshot(applied);
+
+            assertThat(result.updated()).isEqualTo(1);
+            assertThat(result.discovered()).isZero();
+            assertThat(registeredMedia.getHqSize()).isEqualTo(8888L);
+            verify(mediaMapper, never()).insertImportBatch(anyList());
+        }
+
+        @Test
         @DisplayName("LQ 以本地文件为准：快照 lqStatus=READY 时更新 DB 为 READY + lqSize")
         void lqSnapshotReady_updatesDbLqReady() {
             Chapter c42 = chapter(42L, 1);

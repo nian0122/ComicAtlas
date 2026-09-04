@@ -351,13 +351,14 @@ public class MetadataRefreshService {
                 String key = cs.chapterId() + "/" + basename(item.hqPath());
                 Media dbRow = index.get(key);
                 if (dbRow != null) {
-                    // 媒体版本漂移校验：快照记录的 mediaVersion 须与 DB 一致
+                    // 只有带 mediaId 的已有媒体才校验版本；mediaId=null 是本次扫描发现的候选，
+                    // 可能已由刷新事务前置登记并获得新的数据库版本，不能拿扫描时的 0 做乐观锁校验。
                     int dbVersion = dbRow.getVersion() == null ? 0 : dbRow.getVersion();
                     if (item.mediaId() != null && !item.mediaId().equals(dbRow.getId())) {
                         throw new BusinessException("媒体 ID 漂移: key=" + key
                                 + ", snapshot=" + item.mediaId() + ", db=" + dbRow.getId());
                     }
-                    if (item.mediaVersion() != dbVersion) {
+                    if (item.mediaId() != null && item.mediaVersion() != dbVersion) {
                         throw new BusinessException("媒体版本漂移: key=" + key
                                 + ", snapshot=" + item.mediaVersion() + ", db=" + dbVersion);
                     }
@@ -366,7 +367,7 @@ public class MetadataRefreshService {
                     toUpdate.add(dbRow);
                 } else if (item.mediaId() == null && item.fileSize() > 0
                         && !INACTIVE_STATUSES.contains(item.lifecycleStatus())) {
-                    // 刷新阶段只发现 HQ 孤儿文件，不负责创建 page 行；新增媒体另走独立流程。
+                    // 扫描阶段只产出 HQ 孤儿候选；登记由元数据刷新完成事务的前置步骤负责。
                     discovered.add(item);
                 }
                 // fileSize==0 且无匹配行：跳过；TRASHED/DELETED 同名行（Worker 基线含回收/删除行）不复活
