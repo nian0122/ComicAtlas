@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { formatBytes as formatSize } from '@/shared/format/bytes'
 import { computed } from 'vue'
 import type { StorageStats } from '@/features/storage/types'
 
@@ -16,14 +17,6 @@ const lqPercent = computed(() => percent(props.stats?.lqBytes))
 const thumbPercent = computed(() => percent(props.stats?.thumbBytes))
 const unknownPercent = computed(() => Math.max(0, 100 - hqPercent.value - lqPercent.value - thumbPercent.value))
 
-function formatSize(bytes: number | undefined): string {
-  if (!bytes || bytes < 0) return '0 B'
-  const units = ['B', 'KB', 'MB', 'GB', 'TB']
-  let i = 0
-  let size = bytes
-  while (size >= 1024 && i < units.length - 1) { size /= 1024; i++ }
-  return `${size.toFixed(i > 0 ? 1 : 0)} ${units[i]}`
-}
 
 function percent(bytes: number | undefined): number {
   if (!bytes || total.value <= 0) return 0

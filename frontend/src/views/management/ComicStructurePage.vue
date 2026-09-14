@@ -144,6 +144,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatBytes as formatSize } from '@/shared/format/bytes'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
@@ -312,12 +313,6 @@ function toggleCreateChapter(): void {
   chapterForm.id = undefined
   chapterForm.title = ''
   chapterForm.chapterNo = ''
-}
-function formatSize(bytes: number): string {
-  if (!bytes) return '0 B'
-  const units = ['B', 'KB', 'MB', 'GB', 'TB']
-  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
-  return `${(bytes / 1024 ** index).toFixed(index === 0 ? 0 : 1)} ${units[index]}`
 }
 function normalizedHqStatus(item: MediaItemInfo): string {
   return item.hqStatus || (item.hqUrl ? 'READY' : 'UNKNOWN')

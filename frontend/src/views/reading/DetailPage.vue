@@ -157,6 +157,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { PictureFilled, Search, WarningFilled } from '@element-plus/icons-vue'
 import { comicApi, catalogApi } from '@/entities/comic/api'
 import { getApiErrorMessage } from '@/services/http'
+import { formatBytes as formatFileBytes } from '@/shared/format/bytes'
 
 import type { ComicDetailVO, CatalogNode, ChapterRef } from '@/entities/comic/types'
 import CatalogTree from '@/features/comic/components/CatalogTree.vue'
@@ -254,15 +255,7 @@ function formatDate(s: string): string {
 }
 
 function formatBytes(bytes: number): string {
-  if (bytes == null || bytes === 0) return '-'
-  const units = ['B', 'KB', 'MB', 'GB', 'TB']
-  let i = 0
-  let size = bytes
-  while (size >= 1024 && i < units.length - 1) {
-    size /= 1024
-    i++
-  }
-  return `${size.toFixed(i === 0 ? 0 : 2)} ${units[i]}`
+  return bytes == null || bytes === 0 ? '-' : formatFileBytes(bytes, 2)
 }
 
 function continueRead() {
