@@ -23,7 +23,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 FROM maven:3.9-eclipse-temurin-21-alpine AS builder
 WORKDIR /build
-COPY settings.xml /root/.m2/settings.xml
+COPY config/maven/settings.xml /root/.m2/settings.xml
 COPY pom.xml .
 COPY comic-common/pom.xml comic-common/pom.xml
 COPY comic-shared/pom.xml comic-shared/pom.xml
