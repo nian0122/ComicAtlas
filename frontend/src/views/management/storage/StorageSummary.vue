@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import StatGrid from '@/components/management/StatGrid.vue'
+import StatCard from '@/components/management/StatCard.vue'
 import { formatBytes as formatSize } from '@/shared/format/bytes'
 import { computed } from 'vue'
 import type { StorageStats } from '@/features/storage/types'
@@ -38,11 +40,11 @@ function percent(bytes: number | undefined): number {
       </div>
       <div class="distribution-legend"><span><i class="dot dot-hq" />HQ {{ hqPercent }}%</span><span><i class="dot dot-lq" />LQ {{ lqPercent }}%</span><span><i class="dot dot-thumb" />缩略图 {{ thumbPercent }}%</span></div>
     </div>
-    <div class="stat-grid">
-      <div class="stat-card stat-card--hq"><span class="stat-label">HQ 主文件</span><strong class="stat-value">{{ formatSize(stats?.hqBytes) }}</strong><span class="stat-meta">原始质量 · {{ hqPercent }}%</span></div>
-      <div class="stat-card stat-card--lq"><span class="stat-label">LQ 衍生文件</span><strong class="stat-value">{{ formatSize(stats?.lqBytes) }}</strong><span class="stat-meta">阅读优化 · {{ lqPercent }}%</span></div>
-      <div class="stat-card stat-card--thumb"><span class="stat-label">缩略图</span><strong class="stat-value">{{ formatSize(stats?.thumbBytes) }}</strong><span class="stat-meta">列表预览 · {{ thumbPercent }}%</span></div>
-    </div>
+    <StatGrid class="stat-grid" :columns="3">
+      <StatCard label="HQ 主文件" :value="formatSize(stats?.hqBytes)" :description="'原始质量 · ' + hqPercent + '%'" tone="primary" />
+      <StatCard label="LQ 衍生文件" :value="formatSize(stats?.lqBytes)" :description="'阅读优化 · ' + lqPercent + '%'" tone="success" />
+      <StatCard label="缩略图" :value="formatSize(stats?.thumbBytes)" :description="'列表预览 · ' + thumbPercent + '%'" tone="warning" />
+    </StatGrid>
   </section>
 </template>
 
@@ -57,37 +59,6 @@ function percent(bytes: number | undefined): number {
 .bar-hq, .dot-hq { background: var(--accent); }.bar-lq, .dot-lq { background: var(--success); }.bar-thumb, .dot-thumb { background: var(--warning); }.bar-unknown { background: var(--border-strong); }
 .distribution-legend { display: flex; flex-wrap: wrap; gap: var(--space-3); color: var(--text-secondary); font-size: 10px; }
 .distribution-legend span { display: inline-flex; align-items: center; gap: 5px; }.dot { width: 7px; height: 7px; border-radius: 50%; }
-.stat-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-base);
-}
-
-.stat-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-  justify-content: center;
-  min-height: 140px;
-  padding: var(--space-lg);
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-}
-
-.stat-card--hq { border-top: 2px solid var(--accent); }.stat-card--lq { border-top: 2px solid var(--success); }.stat-card--thumb { border-top: 2px solid var(--warning); }
-
-.stat-value {
-  font-size: 24px;
-  font-weight: 800;
-  color: var(--text-primary);
-}
-
-.stat-label {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-.stat-meta { color: var(--text-muted); font-size: 10px; }
 
 @media (max-width: 900px) { .storage-overview { grid-template-columns: 1fr; } }
-@media (max-width: 520px) { .stat-grid { grid-template-columns: 1fr; } }
 </style>

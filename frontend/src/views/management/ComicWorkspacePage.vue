@@ -66,8 +66,6 @@ watch(() => route.query.tab, (value) => { activeTab.value = normalizeTab(value);
 .workspace-heading p:last-child { margin: 0; color: var(--text-muted); }
 .comic-id { padding: 6px 9px; border: 1px solid var(--border); color: var(--text-muted); font: 700 11px ui-monospace, SFMono-Regular, Consolas, monospace; }
 .workspace-tabs :deep(.el-tabs__header) { margin-bottom: var(--space-6); }
-.workspace-tabs :deep(.el-tabs__active-bar) { height: 3px; background: var(--accent); }
-.workspace-tabs :deep(.el-tabs__item) { color: var(--text-muted); }
-.workspace-tabs :deep(.el-tabs__item.is-active) { color: var(--text-primary); }
-@media (max-width: 640px) { .workspace-header { grid-template-columns: 1fr auto; gap: var(--space-3); } .workspace-heading { grid-column: 1 / -1; grid-row: 2; } .workspace-tabs :deep(.el-tabs__item) { padding: 0 var(--space-2); font-size: 12px; } }
+.workspace-tabs :deep(.el-tabs__active-bar) { height: 3px; }
+@media (max-width: 640px) { .workspace-tabs :deep(.el-tabs__item) { padding: 0 var(--space-2); font-size: 12px; } .workspace-header { grid-template-columns: 1fr auto; gap: var(--space-3); } .workspace-heading { grid-column: 1 / -1; grid-row: 2; } }
 </style>

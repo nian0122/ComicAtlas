@@ -1,19 +1,15 @@
 <template>
   <div class="management-tasks-page">
-    <header class="page-header">
-      <div>
-        <h1>任务中心</h1>
-        <p>自动刷新，统一查看存储、回收、上传、导出和元数据任务。</p>
-      </div>
+    <ManagementPageHeader title="任务中心" description="自动刷新，统一查看存储、回收、上传、导出和元数据任务。">
       <el-button :loading="loading" @click="loadTasks">立即刷新</el-button>
-    </header>
+    </ManagementPageHeader>
 
-    <section class="summary-grid" aria-label="当前查询统计">
-      <article><span>匹配任务</span><strong>{{ total }}</strong><small>全部分页结果</small></article>
-      <article><span>运行中</span><strong>{{ activeCount }}</strong><small>当前页</small></article>
-      <article><span>成功</span><strong>{{ successCount }}</strong><small>当前页</small></article>
-      <article><span>失败/部分失败</span><strong>{{ failureCount }}</strong><small>当前页</small></article>
-    </section>
+    <StatGrid class="summary-grid" aria-label="当前查询统计" :columns="4">
+      <StatCard label="匹配任务" :value="total" description="全部分页结果" />
+      <StatCard label="运行中" :value="activeCount" description="当前页" />
+      <StatCard label="成功" :value="successCount" description="当前页" />
+      <StatCard label="失败/部分失败" :value="failureCount" description="当前页" />
+    </StatGrid>
 
     <div class="filters">
       <el-select v-model="query.type" placeholder="任务类型" clearable @change="resetAndLoad">
@@ -44,7 +40,7 @@
                   <strong>{{ task.operation }}</strong>
                   <span class="task-meta">最近更新 {{ formatTaskTime(task.updatedAt) }}</span>
                 </div>
-                <el-tag class="task-status-tag" :type="taskStatusTone(task.status)">{{ taskStatusLabel(task.status) }}</el-tag>
+                <TaskStatusTag class="task-status-tag" :status="task.status" />
               </div>
               <div class="task-card-info">
                 <span>目标：{{ taskDisplayName(task) }} · {{ task.isBatch ? '批量任务' : '单项任务' }}</span>
@@ -67,7 +63,7 @@
           </article>
         </div>
       </section>
-      <div v-if="groupedTasks.length === 0" class="empty-state">当前筛选条件下暂无任务</div>
+      <EmptyState v-if="groupedTasks.length === 0" description="当前筛选条件下暂无任务" bordered />
     </div>
     <el-pagination v-model:current-page="query.page" :page-size="query.size" :total="total" layout="prev, pager, next" @current-change="loadTasks" />
 
@@ -79,7 +75,7 @@
             <h2>{{ taskDisplayName(selectedTask) }}</h2>
             <p>{{ selectedTask.operation }} · {{ selectedTask.isBatch ? '批量任务' : '单项任务' }}</p>
           </div>
-          <el-tag class="task-status-tag" size="large" :type="taskStatusTone(selectedTask.status)">{{ taskStatusLabel(selectedTask.status) }}</el-tag>
+          <TaskStatusTag class="task-status-tag" :status="selectedTask.status" size="large" />
         </header>
 
         <section class="detail-progress-panel" aria-label="任务进度">
@@ -125,7 +121,7 @@
           <el-table v-if="taskItems.length" :data="taskItems" row-key="id" class="detail-items-table">
             <el-table-column prop="targetType" label="类型" min-width="100" />
             <el-table-column prop="targetId" label="目标 ID" min-width="100" />
-            <el-table-column label="状态" min-width="100"><template #default="{ row }"><el-tag class="task-status-tag" :type="taskStatusTone(row.status)">{{ taskStatusLabel(row.status) }}</el-tag></template></el-table-column>
+            <el-table-column label="状态" min-width="100"><template #default="{ row }"><TaskStatusTag class="task-status-tag" :status="row.status" /></template></el-table-column>
             <el-table-column label="进度" min-width="120"><template #default="{ row }">{{ row.progress ?? 0 }}%</template></el-table-column>
             <el-table-column prop="errorMessage" label="错误" min-width="180" />
           </el-table>
@@ -137,6 +133,11 @@
 </template>
 
 <script setup lang="ts">
+import StatGrid from '@/components/management/StatGrid.vue'
+import TaskStatusTag from '@/features/task/components/TaskStatusTag.vue'
+import EmptyState from '@/components/management/EmptyState.vue'
+import StatCard from '@/components/management/StatCard.vue'
+import ManagementPageHeader from '@/components/management/ManagementPageHeader.vue'
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
@@ -177,7 +178,6 @@ function errorMessage(reason: unknown): string {
   return reason instanceof Error ? reason.message : '未知错误'
 }
 function taskStatusLabel(status: ManagementTaskStatus): string { return managementTaskStatusLabel(status) }
-function taskStatusTone(status: ManagementTaskStatus): 'success' | 'warning' | 'danger' | 'info' { if (status === 'SUCCEEDED') return 'success'; if (status === 'FAILED' || status === 'PARTIALLY_SUCCEEDED' || status === 'CANCELLED') return 'danger'; if (status === 'RUNNING' || status === 'CANCELLING') return 'warning'; return 'info' }
 function formatTaskTime(value: string): string { return new Date(value).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) }
 function formatDetailTime(value: string | null): string { return value ? new Date(value).toLocaleString('zh-CN') : '—' }
 function taskDisplayName(task: ManagementTaskVO): string {
@@ -225,13 +225,8 @@ onBeforeUnmount(() => { if (timer !== undefined) clearInterval(timer) })
 
 <style scoped>
 .management-tasks-page { display: grid; gap: var(--space-6); }
-.page-header, .filters { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
-.page-header h1 { margin: 0; color: var(--text-primary); font-size: var(--text-page); }
-.page-header p, .updated-at { color: var(--text-muted); }
-.summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-4); }
-.summary-grid article { display: grid; gap: var(--space-2); padding: var(--space-5); background: var(--bg-surface); border: 1px solid var(--border); }
-.summary-grid span, .summary-grid small { color: var(--text-muted); }
-.summary-grid strong { color: var(--text-primary); font-size: 2rem; }
+.filters { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+.updated-at { color: var(--text-muted); }
 .filters :deep(.el-input), .filters :deep(.el-select) { width: 180px; }
 .task-groups { display: grid; gap: var(--space-6); min-height: 180px; }
 .task-group { display: grid; gap: var(--space-3); }
@@ -254,13 +249,8 @@ onBeforeUnmount(() => { if (timer !== undefined) clearInterval(timer) })
 .progress-label { color: var(--text-secondary); font-size: var(--text-caption); }
 .progress-label strong { color: var(--text-primary); }
 .task-card-footer { color: var(--text-muted); font-size: var(--text-caption); }
-.task-status-tag.el-tag--success { color: var(--success) !important; background: rgb(102 197 139 / 14%) !important; border-color: rgb(102 197 139 / 52%) !important; }
-.task-status-tag.el-tag--warning { color: var(--warning) !important; background: rgb(216 165 79 / 14%) !important; border-color: rgb(216 165 79 / 52%) !important; }
-.task-status-tag.el-tag--danger { color: var(--danger) !important; background: rgb(240 107 112 / 14%) !important; border-color: rgb(240 107 112 / 52%) !important; }
-.task-status-tag.el-tag--info { color: var(--text-secondary) !important; background: var(--surface-highlight) !important; border-color: var(--border-strong) !important; }
 .task-card-error { margin: calc(var(--space-2) * -1) 0 0; color: var(--danger); font-size: var(--text-caption); line-height: 1.5; }
 .task-card-actions { display: inline-flex; align-items: center; min-height: var(--control-height); }
-.empty-state { padding: var(--space-8); color: var(--text-muted); text-align: center; border: 1px dashed var(--border); border-radius: var(--radius-md); }
 .task-detail { display: grid; gap: var(--space-6); padding-bottom: var(--space-6); }
 .detail-hero { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); padding-bottom: var(--space-5); border-bottom: 1px solid var(--border); }
 .detail-eyebrow { color: var(--accent); font-size: var(--text-caption); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
@@ -281,9 +271,7 @@ onBeforeUnmount(() => { if (timer !== undefined) clearInterval(timer) })
 .detail-fields strong { overflow: hidden; color: var(--text-primary); font-size: var(--text-caption); text-overflow: ellipsis; white-space: nowrap; }
 .detail-empty { padding: var(--space-5); color: var(--text-muted); text-align: center; border: 1px dashed var(--border); border-radius: var(--radius-md); }
 .detail-items-table { width: 100%; }
-@media (max-width: 900px) { .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 480px) {
-  .summary-grid { grid-template-columns: minmax(0, 1fr); }
   .filters :deep(.el-input), .filters :deep(.el-select) { width: 100%; }
   .task-cards { grid-template-columns: minmax(0, 1fr); }
   .detail-stat-grid, .detail-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }

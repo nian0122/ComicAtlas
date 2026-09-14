@@ -28,3 +28,15 @@ const MANAGEMENT_TASK_STATUS_LABELS: Readonly<Record<ManagementTaskStatus, strin
 export function managementTaskStatusLabel(status: ManagementTaskStatus): string {
   return MANAGEMENT_TASK_STATUS_LABELS[status]
 }
+
+/** 列表摘要弱化已取消任务；任务明细保留原有的危险色提示。 */
+export function managementTaskStatusTone(
+  status: ManagementTaskStatus,
+  appearance: 'tag' | 'dot' = 'tag',
+): 'success' | 'warning' | 'danger' | 'info' {
+  if (status === 'SUCCEEDED') return 'success'
+  if (status === 'FAILED' || status === 'PARTIALLY_SUCCEEDED') return 'danger'
+  if (status === 'CANCELLED' && appearance === 'tag') return 'danger'
+  if (status === 'RUNNING' || status === 'CANCELLING') return 'warning'
+  return 'info'
+}

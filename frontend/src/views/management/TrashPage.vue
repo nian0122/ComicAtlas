@@ -1,13 +1,8 @@
 <template>
   <div class="trash-page">
-    <header class="page-header">
-      <div>
-        <p class="page-eyebrow">LIFECYCLE / TRASH</p>
-        <h1 class="page-title">回收站</h1>
-        <p class="page-subtitle">统一查看已回收的漫画、章节和媒体，并在保留期内恢复或永久清理。</p>
-      </div>
+    <ManagementPageHeader title="回收站" description="统一查看已回收的漫画、章节和媒体，并在保留期内恢复或永久清理。" eyebrow="LIFECYCLE / TRASH">
       <el-button :loading="loading" @click="loadItems">刷新</el-button>
-    </header>
+    </ManagementPageHeader>
 
     <section class="filter-toolbar" aria-label="回收站筛选">
       <el-input
@@ -26,13 +21,8 @@
 
     <el-alert v-if="error" :title="error" type="error" show-icon />
 
-    <section class="trash-card" aria-label="回收站内容">
-      <div class="section-heading">
-        <div>
-          <h2>回收内容</h2>
-          <span>{{ total }} 项回收内容</span>
-        </div>
-        <div class="section-actions">
+    <ManagementPanel flush class="trash-card" aria-label="回收站内容">
+      <PanelHeader class="trash-heading" title="回收内容" :description="`${total} 项回收内容`">
           <span v-if="selectedItems.length" class="selection-count">已选 {{ selectedItems.length }} 项</span>
           <el-button v-if="selectedItems.length" text @click="clearSelection">清空选择</el-button>
           <el-button
@@ -54,8 +44,7 @@
             批量永久清理
           </el-button>
           <span v-else class="retention-note">勾选内容后可批量恢复或永久清理</span>
-        </div>
-      </div>
+        </PanelHeader>
 
       <el-table
         ref="trashTableRef"
@@ -107,11 +96,14 @@
         background
         @current-change="loadItems"
       />
-    </section>
+    </ManagementPanel>
   </div>
 </template>
 
 <script setup lang="ts">
+import ManagementPanel from '@/components/management/ManagementPanel.vue'
+import PanelHeader from '@/components/management/PanelHeader.vue'
+import ManagementPageHeader from '@/components/management/ManagementPageHeader.vue'
 import { onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { TrashContentVO } from '@/features/trash/types'
@@ -257,17 +249,12 @@ onMounted(() => { void loadItems() })
 </script>
 
 <style scoped>
+.trash-heading { padding: var(--space-5) var(--space-6); border-bottom: 1px solid var(--border); }
+
 .trash-page { display: grid; gap: var(--space-6); }
-.page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-6); }
 .filter-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
 .filter-input { width: min(100%, 280px); }
 .filter-select { width: 160px; }
-.trash-card { overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-surface); }
-.section-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); padding: var(--space-5) var(--space-6); border-bottom: 1px solid var(--border); }
-.section-heading h2 { margin: 0; color: var(--text-primary); font-size: var(--text-lg); }
-.section-heading span { color: var(--text-muted); font-size: var(--text-sm); }
-.section-heading > div { display: flex; align-items: baseline; gap: var(--space-3); }
-.section-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); }
 .selection-count { color: var(--text-primary) !important; font-weight: 600; }
 .retention-note { color: var(--text-secondary) !important; }
 .comic-cell { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
@@ -276,5 +263,5 @@ onMounted(() => { void loadItems() })
 .comic-cell strong { overflow: hidden; color: var(--text-primary); text-overflow: ellipsis; white-space: nowrap; }
 .comic-cell span { color: var(--text-muted); font-size: var(--text-sm); }
 .trash-card :deep(.el-pagination) { justify-content: flex-end; padding: var(--space-5) var(--space-6); }
-@media (max-width: 700px) { .section-heading { align-items: flex-start; flex-direction: column; } .retention-note { display: none; } }
+@media (max-width: 700px) { .retention-note { display: none; } }
 </style>

@@ -1,16 +1,11 @@
 <template>
   <div class="storage-page">
-    <header class="page-header">
-      <div>
-        <span class="page-kicker">COMIC / STORAGE</span>
-        <h1 class="page-title">存储统计</h1>
-        <p class="page-description">查看 HQ、LQ 与缩略图的占用分布，并定位需要处理的漫画。</p>
-      </div>
+    <ManagementPageHeader spaced title="存储统计" description="查看 HQ、LQ 与缩略图的占用分布，并定位需要处理的漫画。" eyebrow="COMIC / STORAGE">
       <div class="page-actions">
         <span class="comic-count">{{ store.serverTotal }} 本漫画</span>
         <el-button :loading="store.loading" @click="reload">刷新统计</el-button>
       </div>
-    </header>
+    </ManagementPageHeader>
 
     <StorageSummary :stats="store.summary" />
 
@@ -33,6 +28,7 @@
 </template>
 
 <script setup lang="ts">
+import ManagementPageHeader from '@/components/management/ManagementPageHeader.vue'
 import { watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useStorageStore } from '@/features/storage/store'
@@ -77,20 +73,8 @@ onMounted(async () => {
 .storage-page {
   max-width: 1440px;
 }
-
-.page-header { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-xl); margin-bottom: var(--space-xl); padding-bottom: var(--space-lg); border-bottom: 1px solid var(--border); }
-.page-kicker { color: var(--accent); font: 800 10px var(--mono); letter-spacing: .16em; }
-.page-description { margin: var(--space-sm) 0 0; color: var(--text-muted); font-size: var(--text-sm); }
 .page-actions { display: flex; align-items: center; gap: var(--space-base); }
 .comic-count { color: var(--text-secondary); font: 700 11px var(--mono); white-space: nowrap; }
 
-.page-title {
-  margin: var(--space-sm) 0 0;
-  font-size: clamp(2rem, 3vw, 2.7rem);
-  font-family: Georgia, 'Times New Roman', serif;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-@media (max-width: 720px) { .page-header { align-items: flex-start; flex-direction: column; } .page-actions { width: 100%; justify-content: space-between; } }
+@media (max-width: 720px) { .page-actions { width: 100%; justify-content: space-between; } }
 </style>

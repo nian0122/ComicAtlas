@@ -1,37 +1,19 @@
 <template>
   <div class="dlq-page">
-    <header class="page-header">
-      <div>
-        <span class="eyebrow">MESSAGE RECOVERY</span>
-        <h1>死信队列</h1>
-        <p>检查失败消息，并重放到原始业务路由。</p>
-      </div>
+    <ManagementPageHeader title="死信队列" description="检查失败消息，并重放到原始业务路由。" eyebrow="MESSAGE RECOVERY">
       <el-button :loading="loading" @click="loadQueues">刷新</el-button>
-    </header>
+    </ManagementPageHeader>
 
-    <section v-if="queues.length > 0" class="summary-grid" aria-label="死信队列摘要">
-      <article>
-        <span>受监控队列</span>
-        <strong>{{ queues.length }}</strong>
-      </article>
-      <article>
-        <span>待处理死信</span>
-        <strong>{{ totalMessages }}</strong>
-      </article>
-      <article>
-        <span>受影响队列</span>
-        <strong>{{ affectedQueues }}</strong>
-      </article>
-    </section>
+    <StatGrid v-if="queues.length > 0" class="summary-grid" aria-label="死信队列摘要" :columns="3">
+      <StatCard label="受监控队列" :value="queues.length" />
+      <StatCard label="待处理死信" :value="totalMessages" />
+      <StatCard label="受影响队列" :value="affectedQueues" />
+    </StatGrid>
 
-    <section v-loading="loading" class="queue-panel">
-      <header class="panel-header">
-        <div>
-          <h2>队列账册</h2>
-          <p>查看操作为只读预览；重放每批最多处理 100 条。</p>
-        </div>
+    <ManagementPanel v-loading="loading" flush class="queue-panel">
+      <PanelHeader class="queue-heading" title="队列账册" description="查看操作为只读预览；重放每批最多处理 100 条。">
         <el-button :loading="loading" @click="loadQueues">刷新</el-button>
-      </header>
+      </PanelHeader>
 
       <div v-if="error" class="state error">{{ error }}</div>
 
@@ -72,7 +54,7 @@
         </el-table>
       </div>
       <div v-else-if="!loading" class="state empty">没有可用的死信队列</div>
-    </section>
+    </ManagementPanel>
 
     <DlqMessageDialog
       v-model:visible="dialogVisible"
@@ -84,6 +66,11 @@
 </template>
 
 <script setup lang="ts">
+import ManagementPanel from '@/components/management/ManagementPanel.vue'
+import StatGrid from '@/components/management/StatGrid.vue'
+import PanelHeader from '@/components/management/PanelHeader.vue'
+import StatCard from '@/components/management/StatCard.vue'
+import ManagementPageHeader from '@/components/management/ManagementPageHeader.vue'
 import { computed, ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { dlqApi } from '@/features/management/dlq-api'
@@ -196,97 +183,12 @@ onMounted(loadQueues)
 </script>
 
 <style scoped>
+.queue-heading { padding: var(--space-5); border-bottom: 1px solid var(--border); }
 .dlq-page {
   display: grid;
   gap: var(--space-6);
   width: 100%;
   max-width: none;
-}
-
-.page-header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--space-6);
-}
-
-.eyebrow {
-  color: var(--accent);
-  font-size: var(--text-xs);
-  font-weight: 800;
-  letter-spacing: var(--tracking-kicker);
-}
-
-.page-header h1 {
-  margin: var(--space-2) 0;
-  color: var(--text-primary);
-  font-family: var(--font-editorial);
-  font-size: var(--text-page);
-  line-height: 1.15;
-}
-
-.page-header p {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: var(--text-sm);
-}
-
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-secondary);
-}
-
-.summary-grid article {
-  display: grid;
-  gap: var(--space-3);
-  padding: var(--space-5) var(--space-6);
-}
-
-.summary-grid article + article {
-  border-left: 1px solid var(--border);
-}
-
-.summary-grid span {
-  color: var(--text-muted);
-  font-size: var(--text-xs);
-  font-weight: 700;
-}
-
-.summary-grid strong {
-  color: var(--text-primary);
-  font-size: var(--text-section);
-  font-variant-numeric: tabular-nums;
-}
-
-.queue-panel {
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-secondary);
-}
-
-.panel-header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  padding: var(--space-5) var(--space-6);
-  border-bottom: 1px solid var(--border);
-  gap: var(--space-6);
-}
-
-.panel-header h2 {
-  margin: 0 0 var(--space-1);
-  color: var(--text-primary);
-  font-size: var(--text-lg);
-}
-
-.panel-header p {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: var(--text-sm);
 }
 
 .table-scroll { overflow-x: auto; }

@@ -1,23 +1,15 @@
 <template>
   <div class="management-home-page">
-    <header class="page-header">
-      <div>
-        <h1>仓库控制台</h1>
-        <p>本地漫画仓库的最近活动与运行状态。</p>
-      </div>
+    <ManagementPageHeader title="仓库控制台" description="本地漫画仓库的最近活动与运行状态。">
       <span class="page-updated">{{ updatedAt ? `更新于 ${updatedAt}` : '正在加载' }}</span>
-    </header>
+    </ManagementPageHeader>
 
     <el-alert v-if="error" :title="error" type="warning" show-icon />
 
-    <section class="task-panel" aria-labelledby="recent-task-title">
-      <div class="section-heading">
-        <div>
-          <h2 id="recent-task-title">最近任务</h2>
-          <p>导入、整理和存储操作的最新状态。</p>
-        </div>
+    <ManagementPanel class="task-panel" aria-labelledby="recent-task-title">
+      <PanelHeader title-id="recent-task-title" title="最近任务" description="导入、整理和存储操作的最新状态。">
         <router-link to="/manage/tasks" class="section-link">查看全部 <span aria-hidden="true">→</span></router-link>
-      </div>
+      </PanelHeader>
 
       <div v-if="recentTasks.length" class="task-table-wrap">
         <table class="task-table">
@@ -36,9 +28,7 @@
               <td class="task-name">{{ task.targetName || task.operation }}</td>
               <td>{{ taskTypeLabel(task.taskType) }}</td>
               <td>
-                <span :class="['status-text', `status-text--${taskStatusTone(task.status)}`]">
-                  <i aria-hidden="true" />{{ taskStatusLabel(task.status) }}
-                </span>
+                <TaskStatusTag :status="task.status" appearance="dot" />
               </td>
               <td class="progress-cell">
                 <span>{{ task.progress ?? 0 }}%</span>
@@ -50,18 +40,14 @@
           </tbody>
         </table>
       </div>
-      <div v-else class="empty-state">暂无管理任务</div>
-    </section>
+      <EmptyState v-else description="暂无管理任务" />
+    </ManagementPanel>
 
     <div class="dashboard-columns">
-      <section class="recent-panel" aria-labelledby="recent-management-title">
-        <div class="section-heading">
-          <div>
-            <h2 id="recent-management-title">最近管理</h2>
-            <p>最近更新过的漫画。</p>
-          </div>
+      <ManagementPanel class="recent-panel" aria-labelledby="recent-management-title">
+        <PanelHeader title-id="recent-management-title" title="最近管理" description="最近更新过的漫画。">
           <router-link to="/manage/workbench?tab=status" class="section-link">查看全部 <span aria-hidden="true">→</span></router-link>
-        </div>
+        </PanelHeader>
 
         <div v-if="recentComics.length" class="comic-list">
           <router-link v-for="comic in recentComics" :key="comic.id" :to="`/manage/comics/${comic.id}?tab=operations`" class="comic-row">
@@ -71,19 +57,15 @@
               <small>{{ comic.pageCount }} 页 · {{ comic.author || '作者未知' }}</small>
             </span>
             <span class="comic-row-action">编辑信息</span>
-            <span :class="['status-text', `status-text--${comicStatusTone(comic.status)}`]"><i aria-hidden="true" />{{ comicStatusLabel(comic.status) }}</span>
+            <ComicStatusTag :status="comic.status" appearance="dot" />
           </router-link>
         </div>
-        <div v-else class="empty-state">暂无漫画记录</div>
-      </section>
+        <EmptyState v-else description="暂无漫画记录" />
+      </ManagementPanel>
 
-      <section class="quick-panel" aria-labelledby="quick-action-title">
-        <div class="section-heading">
-          <div>
-            <h2 id="quick-action-title">快速操作</h2>
-            <p>常用管理入口。</p>
-          </div>
-        </div>
+      <ManagementPanel class="quick-panel" aria-labelledby="quick-action-title">
+        <PanelHeader title-id="quick-action-title" title="快速操作" description="常用管理入口。">
+        </PanelHeader>
         <nav class="quick-actions" aria-label="快速操作">
           <router-link v-for="action in quickActions" :key="action.to" :to="action.to" class="quick-action">
             <el-icon :size="18"><component :is="action.icon" /></el-icon>
@@ -91,20 +73,28 @@
             <span class="quick-arrow" aria-hidden="true">›</span>
           </router-link>
         </nav>
-      </section>
+      </ManagementPanel>
     </div>
 
-    <section class="stats-strip" aria-label="仓库概览">
-      <div class="stat-item"><el-icon :size="24"><Collection /></el-icon><span>漫画总数</span><strong>{{ comicTotal ?? '—' }} <small>本</small></strong></div>
-      <div class="stat-item"><el-icon :size="24"><FolderOpened /></el-icon><span>存储占用</span><strong>{{ formatBytes(storage?.totalBytes) }}</strong></div>
-      <div class="stat-item"><el-icon :size="24"><CircleCheck /></el-icon><span>任务总数</span><strong>{{ taskTotal ?? '—' }} <small>个</small></strong></div>
-      <div class="stat-item stat-item--warning"><el-icon :size="24"><Warning /></el-icon><span>任务异常</span><strong>{{ failedTaskCount ?? '—' }} <small>个</small></strong></div>
-      <div class="stat-item"><el-icon :size="24"><Clock /></el-icon><span>任务运行中</span><strong>{{ activeTaskCount ?? '—' }} <small>个</small></strong></div>
-    </section>
+    <StatGrid class="stats-strip" aria-label="仓库概览" :columns="5">
+      <StatCard label="漫画总数" :value="comicTotal ?? '—'" unit="本"><template #icon><el-icon :size="24"><Collection /></el-icon></template></StatCard>
+      <StatCard label="存储占用" :value="formatBytes(storage?.totalBytes)"><template #icon><el-icon :size="24"><FolderOpened /></el-icon></template></StatCard>
+      <StatCard label="任务总数" :value="taskTotal ?? '—'" unit="个"><template #icon><el-icon :size="24"><CircleCheck /></el-icon></template></StatCard>
+      <StatCard label="任务异常" :value="failedTaskCount ?? '—'" unit="个" tone="warning"><template #icon><el-icon :size="24"><Warning /></el-icon></template></StatCard>
+      <StatCard label="任务运行中" :value="activeTaskCount ?? '—'" unit="个"><template #icon><el-icon :size="24"><Clock /></el-icon></template></StatCard>
+    </StatGrid>
   </div>
 </template>
 
 <script setup lang="ts">
+import ManagementPanel from '@/components/management/ManagementPanel.vue'
+import StatGrid from '@/components/management/StatGrid.vue'
+import ComicStatusTag from '@/features/comic/components/ComicStatusTag.vue'
+import TaskStatusTag from '@/features/task/components/TaskStatusTag.vue'
+import StatCard from '@/components/management/StatCard.vue'
+import PanelHeader from '@/components/management/PanelHeader.vue'
+import EmptyState from '@/components/management/EmptyState.vue'
+import ManagementPageHeader from '@/components/management/ManagementPageHeader.vue'
 import { onMounted, ref } from 'vue'
 import {
   CircleCheck,
@@ -122,10 +112,9 @@ import { managementComicApi } from '@/features/comic/management-api'
 import { managementTaskApi } from '@/features/task/api'
 import { storageService } from '@/features/storage/service'
 import { getApiErrorMessage } from '@/services/http'
-import { comicStatusMeta } from '@/features/comic/status'
-import { managementTaskStatusLabel, managementTaskTypeLabel } from '@/features/task/labels'
+import { managementTaskTypeLabel } from '@/features/task/labels'
 import type { ComicListVO } from '@/entities/comic/types'
-import type { ManagementTaskStatus, ManagementTaskType, ManagementTaskVO } from '@/features/task/types'
+import type { ManagementTaskType, ManagementTaskVO } from '@/features/task/types'
 import type { StorageStats } from '@/features/storage/types'
 
 const quickActions = [
@@ -163,20 +152,8 @@ function formatBytes(bytes: number | undefined): string {
 }
 
 function taskTypeLabel(type: ManagementTaskType): string { return managementTaskTypeLabel(type) }
-function taskStatusLabel(status: ManagementTaskStatus): string { return managementTaskStatusLabel(status) }
-function taskStatusTone(status: ManagementTaskStatus): string {
-  if (status === 'SUCCEEDED') return 'success'
-  if (status === 'FAILED' || status === 'PARTIALLY_SUCCEEDED') return 'danger'
-  if (status === 'RUNNING' || status === 'CANCELLING') return 'warning'
-  return 'muted'
-}
-function comicStatusLabel(status: ComicListVO['status']): string { return comicStatusMeta(status).label }
-function comicStatusTone(status: ComicListVO['status']): string {
-  if (status === 'READY') return 'success'
-  if (['IMPORT_FAILED', 'DELETED'].includes(status)) return 'danger'
-  if (['IMPORTING', 'REFRESHING', 'TRASHING', 'RESTORING'].includes(status)) return 'warning'
-  return 'muted'
-}
+
+
 
 onMounted(async () => {
   try {
@@ -206,39 +183,8 @@ onMounted(async () => {
   gap: var(--space-6);
   min-width: 0;
 }
-
-.page-header,
-.section-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-4);
-}
-
-.page-header h1,
-.section-heading h2 {
-  margin: 0;
-  color: var(--text-primary);
-}
-
-.page-header h1 { font-size: var(--text-page); }
-.section-heading h2 { font-size: var(--text-lg); }
-.page-header p,
-.page-updated,
-.section-heading p { margin: var(--space-1) 0 0; color: var(--text-muted); font-size: var(--text-sm); }
+.page-updated { margin: var(--space-1) 0 0; color: var(--text-muted); font-size: var(--text-sm); }
 .page-updated { white-space: nowrap; }
-
-.task-panel,
-.recent-panel,
-.quick-panel,
-.stats-strip {
-  min-width: 0;
-  padding: var(--space-5);
-  border: 1px solid var(--border);
-  border-radius: var(--card-radius);
-  background: var(--bg-surface);
-  box-shadow: var(--shadow-sm);
-}
 
 .section-link { color: var(--text-muted); font-size: var(--text-sm); white-space: nowrap; }
 .section-link:hover { color: var(--text-primary); }
@@ -252,13 +198,6 @@ onMounted(async () => {
 .task-table td { color: var(--text-secondary); }
 .task-table tr:last-child td { border-bottom: 0; }
 .task-name { max-width: 240px; overflow: hidden; color: var(--text-primary) !important; text-overflow: ellipsis; }
-
-.status-text { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--text-secondary); }
-.status-text i { width: var(--status-dot-size); height: var(--status-dot-size); border-radius: 50%; background: var(--text-muted); }
-.status-text--success i { background: var(--success); }
-.status-text--warning i { background: var(--warning); }
-.status-text--danger i { background: var(--danger); }
-.status-text--muted i { background: var(--text-muted); }
 
 .progress-cell { display: grid; grid-template-columns: 42px minmax(90px, 1fr); align-items: center; gap: var(--space-2); }
 .progress-track { display: block; height: 4px; overflow: hidden; border-radius: var(--radius-pill); background: var(--color-progress-track); }
@@ -280,29 +219,11 @@ onMounted(async () => {
 .quick-action:hover { border-color: var(--border-strong); background: var(--surface-highlight); color: var(--text-primary); }
 .quick-arrow { color: var(--text-muted); font-size: 22px; line-height: 1; }
 
-.stats-strip { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: center; padding-block: var(--space-4); }
-.stat-item { display: grid; grid-template-columns: 30px 1fr; grid-template-rows: auto auto; column-gap: var(--space-3); padding-inline: var(--space-4); border-right: 1px solid var(--border); }
-.stat-item:first-child { padding-left: 0; }
-.stat-item:last-child { padding-right: 0; border-right: 0; }
-.stat-item :deep(.el-icon) { grid-row: 1 / 3; align-self: center; color: var(--text-secondary); }
-.stat-item span { color: var(--text-muted); font-size: var(--text-xs); }
-.stat-item strong { color: var(--text-primary); font-size: var(--text-lg); font-variant-numeric: tabular-nums; }
-.stat-item strong small { color: var(--text-muted); font-size: var(--text-xs); font-weight: 400; }
-.stat-item--warning :deep(.el-icon), .stat-item--warning strong { color: var(--warning); }
-.empty-state { padding: var(--space-8); color: var(--text-muted); text-align: center; }
-
 @media (max-width: 1100px) {
   .dashboard-columns { grid-template-columns: minmax(0, 1fr); }
-  .stats-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4) 0; }
-  .stat-item:nth-child(3) { border-right: 0; }
-  .stat-item:nth-child(n + 4) { padding-top: var(--space-3); }
 }
 
 @media (max-width: 700px) {
-  .page-header { display: grid; }
-  .stats-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .stat-item:nth-child(3) { border-right: 1px solid var(--border); }
-  .stat-item:nth-child(even) { border-right: 0; }
   .comic-row { grid-template-columns: 36px minmax(0, 1fr) auto; }
   .comic-row-action { display: none; }
 }

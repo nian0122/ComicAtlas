@@ -1,8 +1,6 @@
 <template>
   <div class="settings-page">
-    <header class="page-header">
-      <h1 class="page-title">设置</h1>
-    </header>
+    <ManagementPageHeader spaced title="设置" />
 
     <section class="settings-card">
       <h2 class="section-title">阅读默认设置</h2>
@@ -55,6 +53,7 @@
 </template>
 
 <script setup lang="ts">
+import ManagementPageHeader from '@/components/management/ManagementPageHeader.vue'
 import { reactive, ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { settingsApi, type ManagementSettings } from '@/features/management/settings-api'
@@ -97,13 +96,6 @@ onMounted(loadSettings)
 .settings-page {
   width: 100%;
   max-width: 1120px;
-}
-
-.page-title {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0 0 var(--space-xl);
 }
 
 .settings-card {

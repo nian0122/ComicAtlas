@@ -1,33 +1,17 @@
 <template>
   <div class="manage-comic-list-page">
-    <header class="page-header">
-      <div class="header-left">
-        <p class="page-eyebrow">CATALOG / CONTROL</p>
-        <h1 class="page-title">漫画管理</h1>
-        <p class="page-subtitle">共 {{ store.total }} 部漫画</p>
-      </div>
+    <ManagementPageHeader spaced title="漫画管理" eyebrow="CATALOG / CONTROL">
+      <template #description>共 {{ store.total }} 部漫画</template>
       <div class="header-actions">
         <button class="primary-btn" @click="router.push('/manage/import')">+ 导入漫画</button>
       </div>
-    </header>
+    </ManagementPageHeader>
 
-    <section class="repository-stats" aria-label="仓库统计">
-      <article class="repository-stat repository-stat--wide">
-        <span>已索引漫画</span>
-        <strong>{{ store.total.toLocaleString() }}</strong>
-        <small>来自当前漫画目录</small>
-      </article>
-      <article class="repository-stat">
-        <span>存储池</span>
-        <strong>{{ formatBytes(storageTotalBytes) }}</strong>
-        <small>HQ {{ formatBytes(storageStats?.hqBytes) }}</small>
-      </article>
-      <article class="repository-stat">
-        <span>低画质缓存</span>
-        <strong>{{ formatBytes(storageStats?.lqBytes) }}</strong>
-        <small>缩略图 {{ formatBytes(storageStats?.thumbBytes) }}</small>
-      </article>
-    </section>
+    <StatGrid spaced class="repository-stats" aria-label="仓库统计" :columns="3">
+      <StatCard label="已索引漫画" :value="store.total.toLocaleString()" description="来自当前漫画目录" />
+      <StatCard label="存储池" :value="formatBytes(storageTotalBytes)" :description="'HQ ' + (formatBytes(storageStats?.hqBytes))" />
+      <StatCard label="低画质缓存" :value="formatBytes(storageStats?.lqBytes)" :description="'缩略图 ' + (formatBytes(storageStats?.thumbBytes))" />
+    </StatGrid>
 
     <div class="filter-toolbar">
       <el-input
@@ -168,6 +152,9 @@
 </template>
 
 <script setup lang="ts">
+import StatGrid from '@/components/management/StatGrid.vue'
+import StatCard from '@/components/management/StatCard.vue'
+import ManagementPageHeader from '@/components/management/ManagementPageHeader.vue'
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { PictureFilled, WarningFilled } from '@element-plus/icons-vue'
@@ -289,42 +276,6 @@ function formatBytes(bytes: number | undefined): string {
   max-width: none;
 }
 
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: var(--space-2xl);
-  gap: var(--space-base);
-  flex-wrap: wrap;
-}
-
-.header-left {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-}
-
-.page-eyebrow {
-  margin-bottom: var(--space-1);
-  color: var(--accent);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-}
-
-.page-title {
-  font-size: var(--text-page);
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0;
-}
-
-.page-subtitle {
-  font-size: 14px;
-  color: var(--text-secondary);
-  margin: 0;
-}
-
 .header-actions {
   display: flex;
   gap: var(--space-sm);
@@ -402,28 +353,6 @@ function formatBytes(bytes: number | undefined): string {
   border-radius: var(--radius-sm);
   margin-bottom: var(--space-xl);
 }
-
-.repository-stats {
-  display: grid;
-  grid-template-columns: 1.5fr repeat(2, minmax(180px, 1fr));
-  gap: var(--space-4);
-  margin-bottom: var(--space-8);
-}
-
-.repository-stat {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  min-height: 128px;
-  padding: var(--space-5);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg-primary);
-}
-
-.repository-stat span,
-.repository-stat small { color: var(--text-muted); font-size: var(--text-sm); }
-.repository-stat strong { color: var(--text-primary); font-size: clamp(1.75rem, 3vw, 2.5rem); font-variant-numeric: tabular-nums; }
 
 .comic-row {
   position: relative;

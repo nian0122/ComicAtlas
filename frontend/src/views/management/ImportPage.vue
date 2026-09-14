@@ -1,9 +1,6 @@
 <template>
   <div class="import-page">
-    <header class="page-header">
-      <h1 class="page-title">导入漫画</h1>
-      <p class="page-subtitle">选择来源类型并输入路径，开始你的导入流程</p>
-    </header>
+    <ManagementPageHeader spaced title="导入漫画" description="选择来源类型并输入路径，开始你的导入流程" />
 
     <!-- 导入模式切换 -->
     <div class="import-tabs">
@@ -238,6 +235,7 @@
 </template>
 
 <script setup lang="ts">
+import ManagementPageHeader from '@/components/management/ManagementPageHeader.vue'
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
@@ -383,23 +381,6 @@ function errorMessage(error: unknown): string {
   padding: 0 0 var(--space-3xl);
   background: var(--bg-primary);
   min-height: 100%;
-}
-
-.page-header {
-  margin-bottom: var(--space-xl);
-}
-
-.page-title {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0 0 8px;
-}
-
-.page-subtitle {
-  font-size: 14px;
-  color: var(--text-secondary);
-  margin: 0;
 }
 
 /* Form card */

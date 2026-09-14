@@ -1,9 +1,8 @@
 <template>
   <div class="comic-operations-page">
-    <header class="page-header">
-      <div><h1>漫画操作台</h1><p>触发存储与生命周期操作，并实时观察漫画和任务状态变化。</p></div>
+    <ManagementPageHeader title="漫画操作台" description="触发存储与生命周期操作，并实时观察漫画和任务状态变化。">
       <div class="target-input"><el-input-number v-model="comicId" :min="1" :controls="false" /><el-button type="primary" @click="selectComic">加载漫画</el-button></div>
-    </header>
+    </ManagementPageHeader>
 
     <el-alert v-if="error" :title="error" type="error" show-icon />
     <section v-if="comic" class="current-state">
@@ -16,7 +15,7 @@
     <el-tabs v-if="comic" v-model="activeTab">
       <el-tab-pane label="可执行操作" name="operations">
         <section class="panel">
-          <div class="panel-heading"><div><span class="panel-kicker">COMMANDS</span><h2>存储与媒体</h2><p>只显示当前漫画允许执行的操作。</p></div></div>
+          <PanelHeader title="存储与媒体" description="只显示当前漫画允许执行的操作。" eyebrow="COMMANDS" />
           <div class="operation-group"><span class="group-label">媒体处理</span><div class="actions">
             <el-button :disabled="!isAllowed('LQ_GENERATE')" @click="generateLq(false)">生成 LQ</el-button>
             <el-button :disabled="!isAllowed('LQ_REGENERATE')" @click="generateLq(true)">重新生成 LQ</el-button>
@@ -35,10 +34,10 @@
             <el-table-column prop="operation" label="被阻止操作" width="180" />
             <el-table-column prop="reason" label="后端判定原因" />
           </el-table>
-          <div v-else class="empty-note">当前没有被阻止的操作</div>
+          <EmptyState v-else description="当前没有被阻止的操作" bordered />
         </section>
         <section class="panel danger-panel">
-          <div class="panel-heading"><div><span class="panel-kicker">LIFECYCLE</span><h2>回收站生命周期</h2><p>删除是可恢复的回收操作，永久清理需要确认。</p></div></div>
+          <PanelHeader title="回收站生命周期" description="删除是可恢复的回收操作，永久清理需要确认。" eyebrow="LIFECYCLE" />
           <div class="actions lifecycle-actions">
             <el-button v-if="isAllowed('DELETE')" type="danger" @click="trashComic">移入回收站</el-button>
             <el-button v-if="isAllowed('RECOVER')" type="primary" @click="restoreComic">恢复漫画</el-button>
@@ -57,8 +56,8 @@
 
       <el-tab-pane label="状态变化" name="history">
         <section class="panel">
-          <div class="panel-heading"><div><span class="panel-kicker">ACTIVITY</span><h2>状态变化</h2><p>记录本次打开页面后的生命周期变化。</p></div></div>
-          <div v-if="!statusEvents.length" class="empty-note">暂时没有新的状态变化</div>
+          <PanelHeader title="状态变化" description="记录本次打开页面后的生命周期变化。" eyebrow="ACTIVITY" />
+          <EmptyState v-if="!statusEvents.length" description="暂时没有新的状态变化" bordered />
           <el-timeline>
             <el-timeline-item v-for="event in statusEvents" :key="`${event.at}-${event.status}`" :timestamp="event.at">
               <ComicStatusTag :status="event.status" />
@@ -68,15 +67,15 @@
       </el-tab-pane>
 
       <el-tab-pane label="相关任务与统计" name="tasks">
-        <div class="panel-heading tasks-heading"><div><span class="panel-kicker">TASKS / TELEMETRY</span><h2>相关任务与统计</h2><p>查看漫画任务链路和基础设施积压。</p></div></div>
-        <section class="summary-grid">
-          <article><span>相关任务</span><strong>{{ relatedTaskTotal }}</strong><small>该漫画全部任务</small></article>
-          <article><span>当前页运行中</span><strong>{{ relatedActive }}</strong><small>排队、执行、取消中</small></article>
-          <article><span>Outbox 待发送</span><strong>{{ outbox?.pending ?? '—' }}</strong><small>总计 {{ outbox?.total ?? '—' }}</small></article>
-          <article><span>Outbox 失败</span><strong>{{ outbox?.failed ?? '—' }}</strong><small>应及时检查</small></article>
-          <article><span>MQ 堆积</span><strong>{{ mq?.available ? mq.queuedTotal : '—' }}</strong><small>主队列待消费</small></article>
-          <article><span>DLQ 死信</span><strong>{{ mq?.available ? mq.dlqTotal : '—' }}</strong><small>{{ mq?.available ? `${mq.dlqQueues} 个队列需处理` : '管理 API 不可用' }}</small></article>
-        </section>
+        <PanelHeader title="相关任务与统计" description="查看漫画任务链路和基础设施积压。" eyebrow="TASKS / TELEMETRY" />
+        <StatGrid spaced class="summary-grid" :columns="3">
+      <StatCard label="相关任务" :value="relatedTaskTotal" description="该漫画全部任务" />
+      <StatCard label="当前页运行中" :value="relatedActive" description="排队、执行、取消中" />
+      <StatCard label="Outbox 待发送" :value="outbox?.pending ?? '—'" :description="'总计 ' + (outbox?.total ?? '—')" />
+      <StatCard tone="danger" label="Outbox 失败" :value="outbox?.failed ?? '—'" description="应及时检查" />
+      <StatCard label="MQ 堆积" :value="mq?.available ? mq.queuedTotal : '—'" description="主队列待消费" />
+      <StatCard tone="danger" label="DLQ 死信" :value="mq?.available ? mq.dlqTotal : '—'" :description="mq?.available ? `${mq.dlqQueues} 个队列需处理` : '管理 API 不可用'" />
+    </StatGrid>
         <el-table :data="relatedTasks" row-key="id">
           <el-table-column prop="id" label="任务 ID" width="90" />
           <el-table-column label="类型"><template #default="{ row }">{{ managementTaskTypeLabel(row.taskType) }}</template></el-table-column>
@@ -90,6 +89,11 @@
 </template>
 
 <script setup lang="ts">
+import StatGrid from '@/components/management/StatGrid.vue'
+import PanelHeader from '@/components/management/PanelHeader.vue'
+import EmptyState from '@/components/management/EmptyState.vue'
+import StatCard from '@/components/management/StatCard.vue'
+import ManagementPageHeader from '@/components/management/ManagementPageHeader.vue'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
@@ -155,18 +159,16 @@ onBeforeUnmount(() => { if (timer !== undefined) clearInterval(timer) })
 
 <style scoped>
 .comic-operations-page { display: grid; gap: var(--space-4); }
-.page-header, .target-input, .actions { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
-.page-header { padding-bottom: var(--space-4); border-bottom: 1px solid var(--border); }.page-header h1, .panel h2 { margin: 0; color: var(--text-primary); }.page-header h1 { font-size: clamp(1.7rem, 3vw, 2.25rem); }.page-header p { margin: 5px 0 0; }
-.page-header p, .current-state span, .current-state small, .summary-grid span, .summary-grid small { color: var(--text-muted); }
-.current-state { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3); }.summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
-.current-state > div, .summary-grid article, .panel { display: grid; gap: var(--space-2); padding: var(--space-4); border: 1px solid var(--border); background: var(--bg-surface); }.current-state > div { min-height: 102px; align-content: space-between; }
-.current-state strong, .summary-grid strong { color: var(--text-primary); font-size: 1.35rem; }.current-state > div:nth-child(2) :deep(.comic-status-tag) { justify-self: start; width: auto; }
+.target-input, .actions { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }.panel h2 { margin: 0; color: var(--text-primary); }
+.current-state span, .current-state small { color: var(--text-muted); }
+.current-state { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3); }
+.current-state > div, .panel { display: grid; gap: var(--space-2); padding: var(--space-4); border: 1px solid var(--border); background: var(--bg-surface); }.current-state > div { min-height: 102px; align-content: space-between; }
+.current-state strong { color: var(--text-primary); font-size: 1.35rem; }.current-state > div:nth-child(2) :deep(.comic-status-tag) { justify-self: start; width: auto; }
 .panel { margin-bottom: var(--space-4); }
-.panel-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); padding-bottom: var(--space-3); border-bottom: 1px solid var(--border); }.panel-heading h2 { margin: 4px 0 3px; font-size: 1.25rem; }.panel-heading p { margin: 0; color: var(--text-muted); font-size: 11px; line-height: 1.45; }.panel-kicker { color: var(--accent); font: 800 10px var(--mono); letter-spacing: .16em; }
-.operation-group { display: grid; gap: 8px; padding: var(--space-3) 0; border-bottom: 1px solid var(--border); }.operation-group:last-of-type { border-bottom: 0; }.group-label { color: var(--accent); font: 700 10px var(--mono); letter-spacing: .08em; }.operation-group .actions { justify-content: flex-start; }.operation-group .el-button { margin: 0; }.export-actions { align-items: center; }.blocked-table { margin-top: var(--space-3); overflow: hidden; border-radius: var(--radius-sm); }.empty-note { padding: var(--space-4); border: 1px dashed var(--border); color: var(--text-muted); font-size: 11px; }.lifecycle-actions { justify-content: flex-start; }.tasks-heading { margin-bottom: var(--space-2); padding: 0 0 var(--space-3); border: 0; border-bottom: 1px solid var(--border); background: transparent; }
+.operation-group { display: grid; gap: 8px; padding: var(--space-3) 0; border-bottom: 1px solid var(--border); }.operation-group:last-of-type { border-bottom: 0; }.group-label { color: var(--accent); font: 700 10px var(--mono); letter-spacing: .08em; }.operation-group .actions { justify-content: flex-start; }.operation-group .el-button { margin: 0; }.export-actions { align-items: center; }.blocked-table { margin-top: var(--space-3); overflow: hidden; border-radius: var(--radius-sm); }.lifecycle-actions { justify-content: flex-start; }
 .actions { justify-content: flex-start; }
 .actions :deep(.el-input) { max-width: 320px; }
-.danger-panel { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); }.summary-grid article:nth-child(4), .summary-grid article:nth-child(6) { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); }.summary-grid + :deep(.el-table) { border: 1px solid var(--border); }.target-input :deep(.el-input-number) { width: 150px; }.target-input :deep(.el-button) { margin: 0; }
-@media (max-width: 900px) { .current-state, .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 480px) { .current-state, .summary-grid { grid-template-columns: minmax(0, 1fr); } }
+.danger-panel { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); }.summary-grid + :deep(.el-table) { border: 1px solid var(--border); }.target-input :deep(.el-input-number) { width: 150px; }.target-input :deep(.el-button) { margin: 0; }
+@media (max-width: 900px) { .current-state { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px) { .current-state { grid-template-columns: minmax(0, 1fr); } }
 </style>

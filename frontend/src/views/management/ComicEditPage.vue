@@ -11,7 +11,7 @@
 
     <el-form ref="formRef" :model="form" :rules="rules" label-position="top" class="edit-form">
       <section class="edit-panel edit-panel--primary">
-        <div class="panel-heading"><span class="panel-number">01</span><div><h3>基本信息</h3><p>这些字段会直接影响漫画在列表和详情页中的呈现。</p></div></div>
+        <PanelHeader class="edit-panel-heading" level="h3" title="基本信息" description="这些字段会直接影响漫画在列表和详情页中的呈现。"><template #leading>01</template></PanelHeader>
         <el-form-item label="标题" prop="title" class="title-field">
           <el-input v-model="form.title" placeholder="输入漫画标题" maxlength="255" show-word-limit size="large" />
         </el-form-item>
@@ -31,7 +31,7 @@
       </section>
 
       <section class="edit-panel archive-panel">
-        <div class="panel-heading"><span class="panel-number">02</span><div><h3>归档与检索</h3><p>用分类和标签建立你的漫画索引。</p></div></div>
+        <PanelHeader class="edit-panel-heading" level="h3" title="归档与检索" description="用分类和标签建立你的漫画索引。"><template #leading>02</template></PanelHeader>
         <el-form-item label="标签" prop="tags">
           <div class="tag-editor">
             <div v-if="selectedTags.length" class="selected-tags">
@@ -52,7 +52,7 @@
       </section>
 
       <section class="edit-panel source-panel">
-        <div class="panel-heading"><span class="panel-number">03</span><div><h3>来源记录</h3><p>来源信息由导入流程生成，仅供追溯。</p></div></div>
+        <PanelHeader class="edit-panel-heading" level="h3" title="来源记录" description="来源信息由导入流程生成，仅供追溯。"><template #leading>03</template></PanelHeader>
         <div class="source-display">
           <span v-if="sourceType" class="source-tag">{{ sourceTypeLabel(sourceType) }}</span>
           <span v-if="sourceRef" class="source-ref">{{ sourceRef }}</span>
@@ -61,7 +61,7 @@
       </section>
 
       <section v-if="comicInfo" class="edit-panel comicinfo-panel">
-        <div class="panel-heading"><span class="panel-number">04</span><div><h3>ComicInfo.xml 元数据</h3><p>从导入文件中解析的标准漫画元数据，只读展示。</p></div></div>
+        <PanelHeader class="edit-panel-heading" level="h3" title="ComicInfo.xml 元数据" description="从导入文件中解析的标准漫画元数据，只读展示。"><template #leading>04</template></PanelHeader>
         <div class="comicinfo-grid">
           <div v-if="comicInfo.series" class="comicinfo-item"><span>Series</span><strong>{{ comicInfo.series }}</strong></div>
           <div v-if="comicInfo.title" class="comicinfo-item"><span>Title</span><strong>{{ comicInfo.title }}</strong></div>
@@ -83,6 +83,7 @@
 </template>
 
 <script setup lang="ts">
+import PanelHeader from '@/components/management/PanelHeader.vue'
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
@@ -247,6 +248,7 @@ onMounted(loadData)
 </script>
 
 <style scoped>
+.edit-panel-heading { margin-bottom: var(--space-6); }
 .comic-edit-page {
   display: grid;
   gap: var(--space-5);
@@ -263,7 +265,7 @@ onMounted(loadData)
   padding: 0 0 var(--space-5);
   border-bottom: 1px solid var(--border);
 }
-.edit-eyebrow, .panel-number { color: var(--accent); font: 800 11px ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .16em;
+.edit-eyebrow { color: var(--accent); font: 800 11px ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .16em;
 }
 .edit-intro h2 { margin: var(--space-2) 0; font-family: Georgia, 'Times New Roman', serif; font-size: clamp(1.7rem, 3vw, 2.35rem); letter-spacing: -.04em;
 }
@@ -281,10 +283,6 @@ onMounted(loadData)
 }
 .edit-panel--primary { grid-column: 1; grid-row: 1; }
 .archive-panel { grid-column: 1; grid-row: 2; }
-.panel-heading { display: flex; align-items: flex-start; gap: var(--space-4); margin-bottom: var(--space-6); }
-.panel-heading h3 { margin: 0 0 5px; color: var(--text-primary); font-size: 17px; }
-.panel-heading p { margin: 0; color: var(--text-muted); font-size: var(--text-sm); }
-.panel-number { padding-top: 3px; }
 .field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-5); }
 .edit-form :deep(.el-form-item) { margin-bottom: var(--space-5); }
 .edit-form :deep(.el-form-item__label) { color: var(--text-secondary); font-weight: 700; }

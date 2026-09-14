@@ -3,7 +3,7 @@ import { formatBytes as formatSize } from '@/shared/format/bytes'
 import { reactive, ref } from 'vue'
 import { Collection } from '@element-plus/icons-vue'
 import type { ComicStorageItem } from '@/features/storage/types'
-import StorageStatusTag from './StorageStatusTag.vue'
+import StorageStatusTag from '@/features/storage/components/StorageStatusTag.vue'
 
 defineProps<{
   list: ComicStorageItem[]

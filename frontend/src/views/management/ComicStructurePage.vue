@@ -1,15 +1,14 @@
 <template>
   <div class="structure-page">
-    <header class="structure-header">
-      <div class="page-heading"><span class="eyebrow">COMIC / STRUCTURE</span><h1>目录与媒体</h1><p>从目录树定位章节，再在右侧完成维护。</p></div>
+    <ManagementPageHeader class="structure-header" title="目录与媒体" description="从目录树定位章节，再在右侧完成维护。" eyebrow="COMIC / STRUCTURE">
       <div class="header-tools"><span class="comic-ref">漫画 #{{ comicId }}</span><el-button :loading="loading" @click="loadTree">刷新结构</el-button></div>
-    </header>
-    <section class="structure-summary" aria-label="结构概览">
-      <div><span>目录节点</span><strong>{{ catalogCount }}</strong><small>{{ rootChapterCount ? `${rootChapterCount} 个根章节` : '暂无根章节' }}</small></div>
-      <div><span>章节总数</span><strong>{{ chapterCount }}</strong><small>包含目录下的全部章节</small></div>
-      <div><span>当前章节媒体</span><strong>{{ mediaItems.length || '—' }}</strong><small>{{ selectedRow?.kind === 'CHAPTER' ? selectedRow.title : '选择章节后统计' }}</small></div>
-      <div class="summary-hint"><span>目录结构状态</span><strong>{{ treeStateLabel }}</strong><small>{{ structureRows.length }} 个根节点</small></div>
-    </section>
+    </ManagementPageHeader>
+    <StatGrid class="structure-summary" aria-label="结构概览" :columns="4">
+      <StatCard label="目录节点" :value="catalogCount" :description="rootChapterCount ? `${rootChapterCount} 个根章节` : '暂无根章节'" />
+      <StatCard label="章节总数" :value="chapterCount" description="包含目录下的全部章节" />
+      <StatCard label="当前章节媒体" :value="mediaItems.length || '—'" :description="selectedRow?.kind === 'CHAPTER' ? selectedRow.title : '选择章节后统计'" />
+      <StatCard label="目录结构状态" :value="treeStateLabel" :description="(structureRows.length) + ' 个根节点'" />
+    </StatGrid>
     <el-alert v-if="error" :title="error" type="error" show-icon />
     <section v-if="lqIssueChapters.length" class="issue-strip" aria-label="LQ 异常章节">
       <div class="issue-strip-heading"><div><span class="panel-kicker">LQ / ATTENTION</span><strong>{{ lqIssueChapters.length }} 个章节需要检查</strong></div><small>点击章节可直接定位到媒体明细</small></div>
@@ -18,7 +17,7 @@
 
     <section class="structure-browser">
       <aside class="tree-panel">
-        <div class="panel-topline"><div><span class="panel-kicker">NAVIGATOR</span><h2>目录树</h2></div><span class="node-count">{{ structureRows.length }} 个根节点</span></div>
+        <PanelHeader title="目录树" eyebrow="NAVIGATOR"><span class="node-count">{{ structureRows.length }} 个根节点</span></PanelHeader>
         <el-input v-model="structureKeyword" clearable placeholder="搜索目录或章节" class="tree-search" />
         <el-table v-loading="loading" class="structure-table" :data="filteredStructureRows" row-key="key" :tree-props="{ children: 'children' }" :row-class-name="rowClassName" :empty-text="emptyStateText" highlight-current-row @row-click="selectStructureRow">
           <el-table-column prop="title" min-width="0"><template #default="{ row }"><div class="tree-title"><span class="tree-icon">{{ row.kind === 'CATALOG' ? '▰' : '▱' }}</span><span>{{ row.title }}</span></div></template></el-table-column>
@@ -55,7 +54,7 @@
 
       <aside class="action-panel">
         <template v-if="selectedRow?.kind === 'CATALOG'">
-          <div class="panel-topline"><div><span class="panel-kicker">MAINTENANCE</span><h2>目录操作</h2></div></div>
+          <PanelHeader title="目录操作" eyebrow="MAINTENANCE" />
           <el-form label-position="top" class="action-form">
             <el-form-item label="操作"><el-select v-model="catalogForm.action"><el-option v-for="item in CATALOG_ACTIONS" :key="item.value" :label="item.label" :value="item.value" /></el-select></el-form-item>
             <el-form-item v-if="['create', 'rename'].includes(catalogForm.action)" label="目录标题"><el-input v-model="catalogForm.title" placeholder="输入目录标题" /></el-form-item>
@@ -144,6 +143,10 @@
 </template>
 
 <script setup lang="ts">
+import StatGrid from '@/components/management/StatGrid.vue'
+import PanelHeader from '@/components/management/PanelHeader.vue'
+import StatCard from '@/components/management/StatCard.vue'
+import ManagementPageHeader from '@/components/management/ManagementPageHeader.vue'
 import { formatBytes as formatSize } from '@/shared/format/bytes'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
@@ -164,7 +167,7 @@ import {
   toStructureRows,
 } from '@/features/comic/structure'
 import type { CatalogAction, ChapterAction, StructureRow } from '@/features/comic/structure'
-import StorageStatusTag from './storage/StorageStatusTag.vue'
+import StorageStatusTag from '@/features/storage/components/StorageStatusTag.vue'
 import type { CatalogNode } from '@/entities/comic/types'
 import type { MediaItemInfo } from '@/entities/media/types'
 import type { ChapterStorageItem } from '@/features/storage/types'
@@ -416,21 +419,11 @@ onMounted(() => { void loadTree() })
 .order-dialog-status { margin-right: auto; color: var(--text-muted); font-size: 11px; }
 .storage-dialog-body { display: grid; gap: var(--space-4); }
 .storage-dialog-status { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: var(--space-3); padding: var(--space-3); border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-muted); font-size: 11px; }
-.page-header, .form-panel { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
-.page-heading { display: grid; gap: var(--space-2); }
-.eyebrow { color: var(--accent); font-size: var(--text-xs); font-weight: 700; letter-spacing: .12em; }
-.page-header h1 { margin: 0; color: var(--text-primary); font-size: var(--text-page); letter-spacing: -.02em; }
-.page-header p { margin: 0; color: var(--text-muted); font-size: var(--text-sm); }
+.form-panel { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
 .load-card { display: grid; gap: var(--space-2); min-width: 300px; padding: var(--space-4); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-surface); }
 .load-card label { color: var(--text-muted); font-size: var(--text-xs); }
 .load-controls { display: flex; gap: var(--space-2); }
 .load-controls :deep(.el-input-number) { width: 150px; }
-.structure-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3); }
-.structure-summary > div { display: grid; gap: var(--space-1); padding: var(--space-4); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-surface); }
-.structure-summary span { color: var(--text-muted); font-size: var(--text-xs); }
-.structure-summary strong { color: var(--text-primary); font-size: var(--text-lg); }
-.structure-summary small { overflow: hidden; color: var(--text-muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
-.summary-hint strong { color: var(--success); font-size: var(--text-sm); }
 .structure-table { border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; }
 .structure-table :deep(.el-table__header th) { background: var(--bg-elevated); color: var(--text-secondary); font-size: var(--text-xs); }
 .structure-table :deep(.el-table__row--level-0) { background: color-mix(in srgb, var(--accent) 3%, var(--bg-surface)); }
@@ -439,9 +432,6 @@ onMounted(() => { void loadTree() })
 .maintenance-tabs { padding: var(--space-2) var(--space-4) var(--space-4); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-surface); }
 .form-panel { justify-content: flex-start; padding: var(--space-4) 0 var(--space-2); }
 .form-panel :deep(.el-input), .form-panel :deep(.el-select), .form-panel :deep(.el-input-number) { width: 220px; }
-.structure-header { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-5); padding-bottom: var(--space-6); border-bottom: 1px solid var(--border); }
-.structure-header h1 { margin: var(--space-2) 0; color: var(--text-primary); font-family: Georgia, 'Times New Roman', serif; font-size: clamp(2rem, 3vw, 2.7rem); letter-spacing: -.04em; }
-.structure-header p { color: var(--text-muted); font-size: var(--text-sm); }
 .header-tools { display: flex; align-items: center; gap: var(--space-3); }
 .comic-ref { color: var(--accent); font: 700 12px var(--mono); }
 .panel-kicker { color: var(--accent); font: 800 10px var(--mono); letter-spacing: .16em; }
@@ -460,8 +450,8 @@ onMounted(() => { void loadTree() })
 .action-panel { overflow-y: auto; scrollbar-gutter: stable; }
 .tree-panel { display: flex; flex-direction: column; }
 .detail-panel { display: flex; min-width: 0; min-height: 0; flex-direction: column; overflow: hidden; padding: clamp(var(--space-5), 3vw, var(--space-8)); }
-.panel-topline, .selected-header, .media-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
-.panel-topline h2, .selected-header h2 { margin: var(--space-1) 0 0; color: var(--text-primary); font-size: var(--text-lg); }
+.selected-header, .media-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
+.selected-header h2 { margin: var(--space-1) 0 0; color: var(--text-primary); font-size: var(--text-lg); }
 .node-count, .selected-header p, .media-heading p { color: var(--text-muted); font-size: var(--text-xs); }
 .tree-search { margin: var(--space-4) 0; }
 .tree-panel .structure-table { display: flex; flex: 1 1 auto; min-height: 0; height: auto; max-height: none; flex-direction: column; }
@@ -663,18 +653,13 @@ onMounted(() => { void loadTree() })
 .media-action-buttons .el-button { width: 100%; margin: 0; }
 .action-card--media-batch { display: grid; gap: var(--space-3); }.batch-selection-summary { display: flex; align-items: baseline; gap: 8px; padding: var(--space-4); border: 1px solid var(--border); background: var(--bg-surface); }.batch-selection-summary strong { color: var(--accent); font: 700 28px var(--mono); }.batch-selection-summary span { color: var(--text-muted); font-size: 11px; }
 .action-empty { display: grid; place-items: center; min-height: 220px; gap: var(--space-2); text-align: center; }
-@media (max-width: 1500px) {
-  .structure-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
 @media (max-width: 760px) {
   .issue-strip { align-items: flex-start; flex-direction: column; gap: 7px; }
   .issue-chapter-list { width: 100%; }
-  .structure-header { align-items: flex-start; flex-direction: column; }
   .structure-browser { grid-template-columns: 1fr; height: auto; min-height: 0; }
   .detail-panel { min-height: 420px; }
   .action-panel { grid-column: auto; }
   .action-panel .action-form { display: grid; grid-template-columns: 1fr; }
   .load-card { width: 100%; min-width: 0; }
-  .structure-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 </style>

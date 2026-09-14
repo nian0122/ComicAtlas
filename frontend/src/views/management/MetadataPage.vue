@@ -1,14 +1,12 @@
 <template>
   <div class="metadata-page">
-    <header class="page-header">
-      <h1 class="page-title">元数据管理</h1>
-    </header>
+    <ManagementPageHeader spaced title="元数据管理" />
 
-    <section class="metadata-summary" aria-label="元数据统计">
-      <article><span>分类</span><strong>{{ categoryStore.list.length }}</strong><small>可用于仓库筛选</small></article>
-      <article><span>标签</span><strong>{{ tagStore.list.length }}</strong><small>用于漫画检索与归档</small></article>
-      <article><span>维护状态</span><strong :class="metadataHealthy ? 'status-ready' : 'status-error'">{{ metadataStatusLabel }}</strong><small>{{ metadataStatusHint }}</small></article>
-    </section>
+    <StatGrid spaced class="metadata-summary" aria-label="元数据统计" :columns="3">
+      <StatCard label="分类" :value="categoryStore.list.length" description="可用于仓库筛选" />
+      <StatCard label="标签" :value="tagStore.list.length" description="用于漫画检索与归档" />
+      <StatCard label="维护状态" :value="metadataStatusLabel" :description="metadataStatusHint" :tone="metadataHealthy ? 'success' : 'danger'" />
+    </StatGrid>
 
     <el-tabs v-model="activeTab" class="metadata-tabs">
       <el-tab-pane label="分类" name="category">
@@ -73,6 +71,9 @@
 </template>
 
 <script setup lang="ts">
+import StatGrid from '@/components/management/StatGrid.vue'
+import StatCard from '@/components/management/StatCard.vue'
+import ManagementPageHeader from '@/components/management/ManagementPageHeader.vue'
 import { computed, ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getApiErrorMessage } from '@/services/http'
@@ -178,43 +179,12 @@ async function onDeleteTag(tag: TagDTO | null | undefined) {
   max-width: none;
 }
 
-.page-title {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0 0 var(--space-xl);
-}
-
 .tab-toolbar {
   display: flex;
   align-items: center;
   gap: var(--space-base);
   margin-bottom: var(--space-lg);
 }
-
-.metadata-summary {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-4);
-  margin-bottom: var(--space-8);
-}
-
-.metadata-summary article {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  min-height: 116px;
-  padding: var(--space-5);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg-primary);
-}
-
-.metadata-summary span,
-.metadata-summary small { color: var(--text-muted); font-size: var(--text-sm); }
-.metadata-summary strong { color: var(--text-primary); font-size: 2rem; }
-.metadata-summary .status-ready { color: var(--success); font-size: var(--text-lg); }
-.metadata-summary .status-error { color: var(--danger); font-size: var(--text-lg); }
 
 .tag-list {
   display: flex;
