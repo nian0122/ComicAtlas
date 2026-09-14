@@ -1,20 +1,18 @@
 package com.comicatlas.api.outbox.service.impl;
 
 import com.comicatlas.api.outbox.entity.OutboxMessage;
+import com.comicatlas.api.outbox.enums.OutboxMessageStatus;
 import com.comicatlas.api.outbox.mapper.OutboxMessageMapper;
 import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.common.event.ComicEvent;
+import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import jakarta.annotation.PostConstruct;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-
-import java.time.LocalDateTime;
 
 /**
  * Outbox 服务实现。
@@ -26,31 +24,34 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class OutboxServiceImpl implements OutboxService {
 
-    private final OutboxMessageMapper outboxMapper;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private static final int INITIAL_PUBLISH_ATTEMPTS = 0;
+    private static final int MINIMUM_ATTEMPT = 0;
 
-    @PostConstruct
-    void init() {
-        objectMapper.registerModule(new JavaTimeModule());
-    }
+    private final OutboxMessageMapper outboxMapper;
+    private final ObjectMapper objectMapper;
 
     @Override
     public void enqueue(@NonNull ComicEvent event, @NonNull String exchange, @NonNull String routingKey) {
-        enqueue(event, exchange, routingKey, null, null, 0);
+        enqueue(event, exchange, routingKey, null, null, MINIMUM_ATTEMPT);
     }
 
     @Override
     public void enqueue(@NonNull ComicEvent event, @NonNull String exchange, @NonNull String routingKey,
                         Long taskId, Long itemId, int attempt) {
+        validateDestination(exchange, routingKey);
+        if (attempt < MINIMUM_ATTEMPT) {
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "Outbox attempt 不能为负数");
+        }
+
         String payload;
         try {
             payload = objectMapper.writeValueAsString(event);
-        } catch (JsonProcessingException e) {
-            log.error("Outbox 序列化失败: eventId={}, eventType={}", event.eventId(), event.getClass().getSimpleName(), e);
-            throw new BusinessException("Outbox 序列化失败: " + event.eventId(), e);
+        } catch (JsonProcessingException exception) {
+            log.error("Outbox 序列化失败: eventId={}, eventType={}", event.eventId(), event.getClass().getSimpleName(), exception);
+            throw new BusinessException("Outbox 序列化失败: " + event.eventId(), exception);
         }
 
-        OutboxMessage msg = new OutboxMessage()
+        OutboxMessage outboxMessage = new OutboxMessage()
                 .setEventId(event.eventId().toString())
                 .setTaskId(taskId)
                 .setItemId(itemId)
@@ -60,12 +61,20 @@ public class OutboxServiceImpl implements OutboxService {
                 .setEventType(event.getClass().getSimpleName())
                 .setVersion(event.version())
                 .setPayload(payload)
-                .setPublishAttempts(0)
-                .setStatus("PENDING")
-                .setAvailableAt(null) // 交由 MySQL CURRENT_TIMESTAMP 默认值，避免时钟偏差
-                .setCreatedAt(LocalDateTime.now());
+                .setPublishAttempts(INITIAL_PUBLISH_ATTEMPTS)
+                // 交由 MySQL CURRENT_TIMESTAMP 默认值，避免多实例 JVM 时钟偏差。
+                .setStatus(OutboxMessageStatus.PENDING.name());
 
-        outboxMapper.insert(msg);
+        outboxMapper.insert(outboxMessage);
         log.debug("Outbox 写入: eventId={}, exchange={}, routingKey={}", event.eventId(), exchange, routingKey);
+    }
+
+    private void validateDestination(String exchange, String routingKey) {
+        if (exchange.isBlank()) {
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "Outbox exchange 不能为空");
+        }
+        if (routingKey.isBlank()) {
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "Outbox routingKey 不能为空");
+        }
     }
 }
