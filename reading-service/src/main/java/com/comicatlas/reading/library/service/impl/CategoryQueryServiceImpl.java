@@ -29,15 +29,15 @@ public class CategoryQueryServiceImpl implements CategoryQueryService {
         return new ArrayList<>(categoryMapper.selectList(new LambdaQueryWrapper<Category>().orderByAsc(Category::getSortOrder))
                 .stream()
                 .map(this::toDTO)
-                .sorted(Comparator.comparingInt(c -> c.getSortOrder() == null ? 0 : c.getSortOrder()))
+                .sorted(Comparator.comparingInt(category -> category.getSortOrder() == null ? 0 : category.getSortOrder()))
                 .toList());
     }
 
-    private CategoryDTO toDTO(Category c) {
-        CategoryDTO dto = new CategoryDTO();
-        dto.setId(c.getId());
-        dto.setName(c.getName());
-        dto.setSortOrder(c.getSortOrder());
-        return dto;
+    private CategoryDTO toDTO(Category category) {
+        CategoryDTO categoryData = new CategoryDTO();
+        categoryData.setId(category.getId());
+        categoryData.setName(category.getName());
+        categoryData.setSortOrder(category.getSortOrder());
+        return categoryData;
     }
 }

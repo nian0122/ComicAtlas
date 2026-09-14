@@ -130,14 +130,14 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
         try {
             MessageDigest digest = MessageDigest.getInstance("MD5");
             byte[] bytes = digest.digest(input.getBytes(StandardCharsets.UTF_8));
-            StringBuilder sb = new StringBuilder(bytes.length * 2);
-            for (byte b : bytes) {
-                sb.append(Character.forDigit((b >> 4) & 0xF, 16));
-                sb.append(Character.forDigit(b & 0xF, 16));
+            StringBuilder hexBuilder = new StringBuilder(bytes.length * 2);
+            for (byte digestByte : bytes) {
+                hexBuilder.append(Character.forDigit((digestByte >> 4) & 0xF, 16));
+                hexBuilder.append(Character.forDigit(digestByte & 0xF, 16));
             }
-            return sb.toString();
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("MD5 不可用", e);
+            return hexBuilder.toString();
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("MD5 不可用", exception);
         }
     }
 
@@ -145,24 +145,24 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
             Comic comic,
             Map<Long, String> categoryNames,
             Map<Long, ReadingHistory> histories) {
-        ComicListVO vo = new ComicListVO();
-        vo.setId(comic.getId());
-        vo.setTitle(comic.getTitle());
-        vo.setAuthor(comic.getAuthor());
-        vo.setCoverUrl(fileUrlResolver.resolveCover(comic.getId()));
-        vo.setPageCount(comic.getTotalPages());
-        vo.setCategoryId(comic.getCategoryId());
-        vo.setCategoryName(categoryNames.get(comic.getCategoryId()));
-        vo.setStatus(toStatus(comic.getStatus() == null ? null : comic.getStatus().name()));
-        vo.setCreatedAt(comic.getCreatedAt());
+        ComicListVO comicListView = new ComicListVO();
+        comicListView.setId(comic.getId());
+        comicListView.setTitle(comic.getTitle());
+        comicListView.setAuthor(comic.getAuthor());
+        comicListView.setCoverUrl(fileUrlResolver.resolveCover(comic.getId()));
+        comicListView.setPageCount(comic.getTotalPages());
+        comicListView.setCategoryId(comic.getCategoryId());
+        comicListView.setCategoryName(categoryNames.get(comic.getCategoryId()));
+        comicListView.setStatus(toStatus(comic.getStatus() == null ? null : comic.getStatus().name()));
+        comicListView.setCreatedAt(comic.getCreatedAt());
 
         ReadingHistory history = histories.get(comic.getId());
         if (history != null && comic.getTotalPages() != null && comic.getTotalPages() > 0) {
-            vo.setLastReadChapterId(history.getChapterId());
-            vo.setLastReadPage(history.getPageNumber());
-            vo.setProgressPercent(history.getPageNumber() * 100 / comic.getTotalPages());
+            comicListView.setLastReadChapterId(history.getChapterId());
+            comicListView.setLastReadPage(history.getPageNumber());
+            comicListView.setProgressPercent(history.getPageNumber() * 100 / comic.getTotalPages());
         }
-        return vo;
+        return comicListView;
     }
 
     private static ComicStatus toStatus(String status) {
@@ -171,7 +171,7 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
         }
         try {
             return ComicStatus.valueOf(status);
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException exception) {
             return null;
         }
     }
