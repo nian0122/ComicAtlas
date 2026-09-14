@@ -4,7 +4,7 @@
 **日期**: 2026-07-22
 **状态**: 历史归档（0.2 设计）
 
-> 本文保留早期前端目录草案。当前目录和路由以 [`docs/frontend/08-frontend-architecture.md`](../frontend/08-frontend-architecture.md) 及源码为准。
+> 本文保留早期前端目录草案。当前目录和路由以 [`docs/frontend/08-frontend-architecture.md`](../../../frontend/08-frontend-architecture.md) 及源码为准。
 
 ---
 

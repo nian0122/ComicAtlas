@@ -4,7 +4,7 @@
 **日期**: 2026-07-16  
 **状态**: 历史归档（0.2 设计）
 
-> 本文保留早期领域模型草案。当前表结构和状态枚举以 [`docs/database/schema.md`](../database/schema.md) 为准。
+> 本文保留早期领域模型草案。当前表结构和状态枚举以 [`docs/database/schema.md`](../../../database/schema.md) 为准。
 
 ---
 

@@ -10,10 +10,14 @@
 | `config/checkstyle/` | Java 静态检查规则 |
 | `config/maven/settings.xml` | Docker 构建使用的 Maven 镜像配置 |
 | `docs/frontend/` | 前端设计文档，视觉规范入口为 `design-system.md` |
+| `docs/frontend/archive/` | 早期视觉方案 |
+| `docs/architecture/archive/v0.2/` | 已归档的早期架构设计 |
 | `docs/development/` | 命名规范和目录维护约定 |
 | `scripts/dev/`、`scripts/qa/`、`scripts/db/`、`scripts/release/` | 开发、测试、数据库和发布脚本 |
 | `tools/` | 迁移、维护和第三方工具 |
 | `e2e/` | 跨服务端到端测试 |
+
+目录入口：[脚本导航](../../scripts/README.md)、[工具导航](../../tools/README.md)、[测试导航](../../e2e/README.md)、[前端文档](../frontend/README.md)。现行设计契约统一放在 `docs/frontend/design-system.md`；源码目录通过前端 README 链接到该文档。
 
 本地 `.runtime/`、`logs/`、各模块 `target/`、`node_modules/` 和 IDE 缓存不进入提交。旧 `comic-persistence/` 已不在父 POM 模块列表中，当前本地目录仅残留 `target/`，不应恢复为源码模块。
 

@@ -19,7 +19,7 @@
 | [../frontend/08-frontend-architecture.md](../frontend/08-frontend-architecture.md) | 当前前端目录与路由结构 | 前端 |
 | [../database/schema.md](../database/schema.md) | 当前数据库结构与状态枚举 | 后端 |
 
-> `01-product.md`、`02-navigation.md`、`03-reading.md`、`04-management.md`、`05-domain.md`、`06-api.md`、`07-frontend.md`、`08-migration.md` 是 0.2 时代历史设计稿，仅保留决策背景；不要用其中的旧路由、旧包名或未完成计划指导当前实现。当前接口以 [`docs/api.md`](../api.md) 为准。
+> 0.2 时代的 8 份设计稿已移入 [历史归档](archive/v0.2/README.md)，仅保留决策背景。当前接口以 [`docs/api.md`](../api.md) 为准。
 
 ---
 

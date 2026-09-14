@@ -4,7 +4,7 @@
 **日期**: 2026-07-16  
 **状态**: 历史归档（0.2 设计）
 
-> 本文中的 `/api/management`、`/api/storage`、`/api/trash` 等路径是早期设计示例，不是当前 HTTP 契约。当前管理端统一使用 `/api/manage/**`，请改读 [`docs/api.md`](../api.md)。
+> 本文中的 `/api/management`、`/api/storage`、`/api/trash` 等路径是早期设计示例，不是当前 HTTP 契约。当前管理端统一使用 `/api/manage/**`，请改读 [`docs/api.md`](../../../api.md)。
 
 ---
 
@@ -102,7 +102,7 @@ POST   /api/uploads/sessions                    # 分块上传会话
 > **刷新元数据（异步任务）**：`POST /api/storage/refresh-metadata/comics/{id}` 仅接受 `READY` 漫画（不存在 404、非 READY/并发 409），成功返回 `202` + `OperationSubmitResultDTO`（taskId）。Worker 按 `HQ/{comicId}/{chapterId}` 逐章扫描生成 STAGING 快照（SHA-256 + `databaseRevision`），API 校验后事务合并已有媒体元数据；HQ 中新增文件只进入“已发现”结果，不在刷新流程创建媒体行；缺失文件置 `HQ MISSING`，成功后 CAS 释放 `REFRESHING → READY` 并经 Outbox 重导出 `metadata.json`。HTTP 全程不传输文件字节。
 
 
-> v1.0 起封面候选/设置接口已移除（封面 URL 由 `FileUrlResolver.resolveCover(comicId)` 生成），`DELETE /api/comics/{id}` 语义由硬删改为进入回收站。完整端点见 [`docs/api.md`](../api.md)。
+> v1.0 起封面候选/设置接口已移除（封面 URL 由 `FileUrlResolver.resolveCover(comicId)` 生成），`DELETE /api/comics/{id}` 语义由硬删改为进入回收站。完整端点见 [`docs/api.md`](../../../api.md)。
 
 **决策**：0.2 优先保留现有 URL，通过 DTO 解耦；管理领域按资源拆出 `/api/management`、`/api/storage`、`/api/trash`、`/api/uploads` 前缀，未使用 `/api/manage/*`。
 
@@ -121,7 +121,7 @@ POST   /api/uploads/sessions                    # 分块上传会话
 
 ## 事件与 MQ
 
-共享事件 DTO 定义在 `comic-common/.../event/`，共 **37 个 record**（`ComicEvent` sealed 接口 + 各域事件），Jackson 多态序列化（`eventType` 字段）。全部路由到 RabbitMQ，exchange/queue/routingKey 契约见 [`docs/api.md`](../api.md) 第 18.4 节，与 AGENTS.md 的 RABBITMQ 表一致。
+共享事件 DTO 定义在 `comic-common/.../event/`，共 **37 个 record**（`ComicEvent` sealed 接口 + 各域事件），Jackson 多态序列化（`eventType` 字段）。全部路由到 RabbitMQ，exchange/queue/routingKey 契约见 [`docs/api.md`](../../../api.md) 第 18.4 节，与 AGENTS.md 的 RABBITMQ 表一致。
 
 要点：
 

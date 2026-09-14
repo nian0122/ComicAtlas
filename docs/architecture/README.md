@@ -296,4 +296,4 @@ Gateway + API Service + Reading Service + Worker Service + Nginx
 | 跨服务模块边界 | [shared-module-boundaries.md](./shared-module-boundaries.md) |
 | 发布、回滚和故障处理 | [operations/management.md](../operations/management.md) |
 
-`01-product.md` 至 `08-migration.md` 属于 0.2 时代历史设计稿，仍保留用于追溯产品和架构背景，但不是当前接口、目录结构或状态机依据。临时实施计划不纳入当前架构入口。
+0.2 时代的产品、导航、阅读、管理、领域、API、前端与迁移设计稿已统一移入 [历史架构归档](archive/v0.2/README.md)，用于追溯决策背景。临时实施计划不纳入当前架构入口。

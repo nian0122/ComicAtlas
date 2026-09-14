@@ -164,6 +164,8 @@ ComicAtlas 面向单机个人仓库，管理端接口（回收站、永久清理
 
 ## 文档
 
+- [文档导航](docs/README.md)：按用户、开发、运维和设计主题查找资料
+- [目录维护约定](docs/development/project-layout.md)：模块职责、脚本与工具入口、测试目录及历史归档位置
 - [用户指南](docs/user-guide.md)：安装、配置、导入、阅读、管理和故障排查
 - [部署运维](docs/operations/management.md)：数据库账号、存储卷、备份、升级与回滚
 - [开发流程](docs/development-guide.md)：分支、提交、合并、推送与发布

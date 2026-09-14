@@ -4,7 +4,7 @@
 **日期**: 2026-07-16（目录树形态更新 2026-08-09）
 **状态**: 历史归档（0.2 设计）
 
-> 本文保留早期阅读域设计。当前接口和阅读器实现以 [`docs/api.md`](../api.md) 及 `frontend/src/views/reading/` 为准。
+> 本文保留早期阅读域设计。当前接口和阅读器实现以 [`docs/api.md`](../../../api.md) 及 `frontend/src/views/reading/` 为准。
 
 ---
 

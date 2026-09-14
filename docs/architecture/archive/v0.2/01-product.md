@@ -4,7 +4,7 @@
 **日期**: 2026-07-16  
 **状态**: 历史归档（0.2 设计）
 
-> 当前产品范围以仓库根目录 `README.md` 和 [`docs/user-guide.md`](../user-guide.md) 为准；本文仅保留早期定位决策。
+> 当前产品范围以仓库根目录 `README.md` 和 [`docs/user-guide.md`](../../../user-guide.md) 为准；本文仅保留早期定位决策。
 
 ---
 

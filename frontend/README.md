@@ -2,6 +2,8 @@
 
 基于 Vue 3、TypeScript、Vite、Pinia 和 Element Plus 的漫画阅读与管理前端。
 
+[设计系统](../docs/frontend/design-system.md) · [前端文档导航](../docs/frontend/README.md) · [测试目录说明](../e2e/README.md)
+
 ## 开发命令
 
 ```bash

@@ -13,10 +13,14 @@
 | `development/` | 开发约定（java-naming） |
 | [`development/project-layout.md`](development/project-layout.md) | 项目目录用途、配置位置和本地产物边界 |
 | `issues/` | 当前待办 |
-| `database/` `frontend/` | 数据库与前端专项说明 |
+| [`database/schema.md`](database/schema.md) | 数据库结构 |
+| [`frontend/README.md`](frontend/README.md) | 前端文档与设计规范导航 |
+| [`../scripts/README.md`](../scripts/README.md) | 开发、测试与发布脚本入口 |
+| [`../tools/README.md`](../tools/README.md) | 维护工具入口 |
+| [`../e2e/README.md`](../e2e/README.md) | 浏览器与前端测试目录说明 |
 
 ## 阅读规则
 
 - 当前行为以 `README.md`、`user-guide.md`、`api.md`、`operations/` 和架构索引中的“现行”文档为准。
-- `architecture/` 中标为“历史归档”的 0.2 设计稿只保留决策背景，不应作为接口、目录结构或状态机依据。
+- `architecture/archive/v0.2/` 与 `frontend/archive/` 只保留历史设计背景，不应作为当前接口、目录结构或视觉实现依据。
 - `releases/` 中的旧版本说明是历史记录，不代表当前接口或部署流程。
