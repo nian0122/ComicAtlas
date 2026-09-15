@@ -20,6 +20,18 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class TagQueryServiceImplTest {
 
+    @Test
+    void listTagsSortsNumericNamesNaturally() {
+        Tag laterTag = new Tag();
+        laterTag.setId(1L);
+        laterTag.setName("系列10");
+        Tag earlierTag = new Tag();
+        earlierTag.setId(2L);
+        earlierTag.setName("系列2");
+        when(tagMapper.selectList(null)).thenReturn(List.of(laterTag, earlierTag));
+        assertEquals(List.of("系列2", "系列10"), service.listTags().stream().map(TagDTO::getName).toList());
+    }
+
     @Mock
     private TagMapper tagMapper;
 

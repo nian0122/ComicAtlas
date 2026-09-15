@@ -36,12 +36,19 @@
         <commons-compress.version>1.28.0</commons-compress.version>
         <!-- Commons Compress 1.28.0 调用 SystemProperties#getUserName(String)，需匹配 Lang 3.18.0。 -->
         <commons-lang3.version>3.18.0</commons-lang3.version>
+        <!-- 排序键持久化：升级 ICU 时必须新增全量重建排序键的迁移。 -->
+        <icu4j.version>78.3</icu4j.version>
         <!-- Checkstyle 命名门禁版本 -->
         <checkstyle.version>13.9.0</checkstyle.version>
     </properties>
 
     <dependencyManagement>
         <dependencies>
+            <dependency>
+                <groupId>com.ibm.icu</groupId>
+                <artifactId>icu4j</artifactId>
+                <version>${icu4j.version}</version>
+            </dependency>
             <!-- Spring Cloud -->
             <dependency>
                 <groupId>org.springframework.cloud</groupId>

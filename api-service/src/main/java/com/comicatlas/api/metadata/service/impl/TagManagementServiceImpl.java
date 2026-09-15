@@ -15,6 +15,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
+import java.util.Comparator;
+import com.comicatlas.contract.common.util.NaturalNameOrder;
 
 @Service
 @RequiredArgsConstructor
@@ -26,8 +28,9 @@ public class TagManagementServiceImpl implements TagManagementService {
 
     @Override
     public List<TagDTO> listTags() {
-        return tagMapper.selectList(new LambdaQueryWrapper<Tag>().orderByAsc(Tag::getName))
-                .stream().map(this::toDTO).toList();
+        return tagMapper.selectList(null).stream()
+                .sorted(Comparator.comparing(Tag::getName, NaturalNameOrder.COMPARATOR).thenComparing(Tag::getId))
+                .map(this::toDTO).toList();
     }
 
     @Override

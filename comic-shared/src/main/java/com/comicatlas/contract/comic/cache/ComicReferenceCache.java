@@ -15,7 +15,7 @@ public final class ComicReferenceCache {
     public static final String CATEGORIES = "comicCategories";
 
     /** 标签列表缓存（全量快照，key="all"）。 */
-    public static final String TAGS = "comicTags";
+    public static final String TAGS = "comicTagsNaturalV1";
 
     /** 漫画列表查询缓存（组合键，短 TTL）。 */
     public static final String COMIC_LIST = "comicList";

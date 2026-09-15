@@ -21,6 +21,10 @@
     </properties>
 
     <dependencies>
+        <dependency>
+            <groupId>com.ibm.icu</groupId>
+            <artifactId>icu4j</artifactId>
+        </dependency>
         <!-- Spring Web（全局异常处理器与协议适配） -->
         <dependency>
             <groupId>org.springframework</groupId>
