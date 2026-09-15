@@ -112,10 +112,11 @@ class DatabaseMigrationTest {
             java.net.URI uri = resource.toURI();
             java.nio.file.Path dir = java.nio.file.Paths.get(uri);
             try (var stream = java.nio.file.Files.list(dir)) {
-                return stream
+                return java.util.stream.Stream.concat(stream
                         .map(p -> p.getFileName().toString())
                         .filter(name -> name.matches("V\\d+__.*\\.sql"))
-                        .map(name -> name.replaceFirst("V(\\d+)__.*\\.sql", "$1"))
+                        .map(name -> name.replaceFirst("V(\\d+)__.*\\.sql", "$1")),
+                        java.util.stream.Stream.of(new db.flyway.TitleSortKeyMigration().getVersion().getVersion()))
                         .sorted(Comparator.comparingLong(Long::parseLong))
                         .toList();
             }

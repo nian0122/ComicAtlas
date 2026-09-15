@@ -31,6 +31,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @ExtendWith(MockitoExtension.class)
 class TagServiceTest {
 
+    @Test
+    void listTagsSortsNumericNamesNaturally() {
+        when(tagMapper.selectList(null)).thenReturn(java.util.List.of(
+                createTag(1L, "系列10"), createTag(2L, "系列2")));
+        assertEquals(java.util.List.of("系列2", "系列10"),
+                service.listTags().stream().map(TagDTO::getName).toList());
+    }
+
     @Mock
     private TagMapper tagMapper;
 

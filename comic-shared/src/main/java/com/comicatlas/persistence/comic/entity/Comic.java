@@ -2,6 +2,7 @@ package com.comicatlas.persistence.comic.entity;
 
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.enums.SourceType;
+import com.comicatlas.contract.common.util.NaturalNameOrder;
 import lombok.Data;
 import java.time.LocalDateTime;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -26,6 +27,15 @@ public class Comic {
     private Long id;
     /** 漫画标题（必填） */
     private String title;
+    /** 标题派生排序键，与标题在同一次数据库写入中更新。 */
+    @TableField(select = false)
+    private byte[] titleSortKey;
+
+    /** 所有实体写入入口统一维护派生排序键，覆盖导入、编辑、批量修改和恢复。 */
+    public void setTitle(String title) {
+        this.title = title;
+        this.titleSortKey = title == null ? null : NaturalNameOrder.sortKey(title);
+    }
     /** 日文原标题（可选） */
     private String titleJpn;
     /** 作者（可选） */

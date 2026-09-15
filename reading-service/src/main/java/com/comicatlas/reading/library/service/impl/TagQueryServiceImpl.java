@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Comparator;
+import com.comicatlas.contract.common.util.NaturalNameOrder;
 
 @Service
 @RequiredArgsConstructor
@@ -25,7 +27,9 @@ public class TagQueryServiceImpl implements TagQueryService {
         unless = "#result == null || #result.isEmpty()")
     public List<TagDTO> listTags() {
         List<Tag> tags = tagMapper.selectList(null);
-        return new ArrayList<>(tags.stream().map(this::toDTO).toList());
+        return new ArrayList<>(tags.stream()
+                .sorted(Comparator.comparing(Tag::getName, NaturalNameOrder.COMPARATOR).thenComparing(Tag::getId))
+                .map(this::toDTO).toList());
     }
 
     private TagDTO toDTO(Tag tag) {

@@ -1,6 +1,7 @@
 CREATE TABLE IF NOT EXISTS comic (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     title VARCHAR(255) NOT NULL,
+    title_sort_key VARBINARY(16384) NOT NULL COMMENT 'ICU 78.3 中文数字排序键',
     title_jpn VARCHAR(255),
     author VARCHAR(255),
     description TEXT,

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.persistence.comic.entity.Comic;
+import com.comicatlas.contract.comic.dto.ComicListQuery;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -84,7 +85,7 @@ public interface ComicMapper extends BaseMapper<Comic> {
         ORDER BY
         <choose>
             <when test='query.sort == "lastReadTime"'>(SELECT MAX(rh.updated_at) FROM reading_history rh WHERE rh.comic_id = c.id)</when>
-            <when test='query.sort == "title"'>c.title</when>
+            <when test='query.sort == "title"'>c.title_sort_key</when>
             <when test='query.sort == "pageCount"'>c.total_pages</when>
             <when test='query.sort == "fileSize"'>c.hq_size</when>
             <when test='query.sort == "updatedAt"'>c.updated_at</when>
@@ -97,9 +98,16 @@ public interface ComicMapper extends BaseMapper<Comic> {
         , c.id ASC
         </script>
     """)
-    IPage<Comic> selectPage(Page<Comic> page, @Param("query") Object query);
+    IPage<Comic> selectPage(Page<Comic> page, @Param("query") ComicListQuery query);
 
-    @Select("SELECT title FROM comic WHERE title LIKE #{pattern} OR title_jpn LIKE #{pattern} LIMIT #{limit}")
+    /** 数据库按 ICU 排序键去重和截取，禁止在应用层全量读取后排序。 */
+    @Select("""
+        SELECT MIN(title) AS title FROM comic
+        WHERE title LIKE #{pattern} OR title_jpn LIKE #{pattern}
+        GROUP BY BINARY title, title_sort_key
+        ORDER BY title_sort_key ASC, MIN(id) ASC
+        LIMIT #{limit}
+        """)
     List<String> selectTitlesLike(@Param("pattern") String pattern, @Param("limit") int limit);
 
     /**
