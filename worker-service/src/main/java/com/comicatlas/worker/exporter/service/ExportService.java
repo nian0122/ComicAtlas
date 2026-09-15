@@ -4,6 +4,7 @@ import com.comicatlas.worker.exporter.collector.ExportCollector;
 import com.comicatlas.worker.exporter.resolver.ExportFileResolver;
 import com.comicatlas.worker.exporter.publisher.ExportArchivePublisher;
 import com.comicatlas.worker.exporter.archive.ZipBuilder;
+import com.comicatlas.worker.exporter.archive.ExportStagingCleanup;
 import com.comicatlas.worker.exporter.exception.ExportFileNotFoundException;
 import com.comicatlas.worker.exporter.exception.ExportManifestBuildException;
 import com.comicatlas.worker.exporter.model.ExportCollectResult;
@@ -25,6 +26,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -37,8 +39,10 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /** 导出编排：收集 → 构建清单 → 打包 ZIP → 原子发布任务目录。 */
 @Slf4j
@@ -73,6 +77,8 @@ public class ExportService {
     private final StorageProperties storageProperties;
     private final WorkerConfig workerConfig;
     private final ExportArchivePublisher archivePublisher;
+    /** 每个 Worker 顺序执行磁盘密集型导出，重投不得同时清理同一任务的 staging。 */
+    private final ReentrantLock exportLock = new ReentrantLock(true);
 
     public record ExportOutput(Long taskId, Long comicId, String fileName, long size) {
     }
@@ -82,8 +88,27 @@ public class ExportService {
     }
 
     public ExportOutput export(Long comicId, Long taskId, String format) throws IOException {
+        try {
+            exportLock.lockInterruptibly();
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            InterruptedIOException interrupted = new InterruptedIOException("等待导出执行时被中断");
+            interrupted.initCause(exception);
+            throw interrupted;
+        }
+        try {
+            return exportExclusive(comicId, taskId, format);
+        } finally {
+            exportLock.unlock();
+        }
+    }
+
+    private ExportOutput exportExclusive(Long comicId, Long taskId, String format) throws IOException {
+        long started = System.nanoTime();
         ExportCollectResult result = exportCollector.collect(comicId);
         ExportManifest manifest = buildManifest(result);
+        log.info("导出清单就绪：taskId={}, comicId={}, entries={}, collectMs={}", taskId, comicId,
+                manifest.entries().size(), TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
 
         StorageRoot exportRoot = StorageRootResolver.optional(storageProperties, StorageRootKeys.EXPORT);
         if (exportRoot == null || !exportRoot.exists()) {
@@ -93,12 +118,25 @@ public class ExportService {
         String baseFileName = buildOutputFileName(comicId, result.comic().getTitle(), format);
         Path stagingDir = exportRoot.resolve(STAGING_DIR_PREFIX + taskId);
         Path finalDir = exportRoot.resolve(String.valueOf(taskId));
-        deleteRecursively(stagingDir);
-        // 打包到 staging（发布由 archivePublisher 原子执行）
-        zipBuilder.build(manifest, stagingDir.resolve(baseFileName));
-        ExportArchivePublisher.PublishResult publishResult = archivePublisher.publish(
-                taskId, stagingDir, finalDir, manifest);
-        return new ExportOutput(taskId, comicId, publishResult.fileName(), publishResult.size());
+        ExportStagingCleanup.delete(stagingDir);
+        try {
+            Optional<ExportArchivePublisher.PublishResult> existing = archivePublisher.reuseIfPresent(
+                    taskId, finalDir, manifest);
+            if (existing.isPresent()) {
+                return new ExportOutput(taskId, comicId, existing.get().fileName(), existing.get().size());
+            }
+            zipBuilder.build(manifest, stagingDir.resolve(baseFileName));
+            if (Thread.currentThread().isInterrupted()) {
+                throw new InterruptedIOException("导出发布前被中断");
+            }
+            ExportArchivePublisher.PublishResult published = archivePublisher.publish(
+                    taskId, stagingDir, finalDir, manifest);
+            return new ExportOutput(taskId, comicId, published.fileName(), published.size());
+        } catch (IOException | RuntimeException exception) {
+            // 覆盖打包、校验与发布失败；最终目录始终由发布器单独管理。
+            ExportStagingCleanup.afterFailure(stagingDir, exception);
+            throw exception;
+        }
     }
 
     /** 供 handler 发失败事件使用。 */
@@ -178,7 +216,7 @@ public class ExportService {
                             + entries.size() + ", allMedia=" + result.allMedia().size());
         }
 
-        String metadataJson = metadataJsonExporter.exportJson(result.comic().getId());
+        String metadataJson = metadataJsonExporter.exportJson(result);
         long metadataBytes = metadataJson.getBytes(StandardCharsets.UTF_8).length;
         long totalBytes = addSizes(comicId, null, mediaTotalSize, metadataBytes);
         if (totalBytes > maxTotalSize()) {
@@ -272,23 +310,6 @@ public class ExportService {
 
     private long maxTotalSize() {
         return workerConfig.getZip().getMaxTotalSize();
-    }
-
-    private void deleteRecursively(Path dir) {
-        if (dir == null || !Files.exists(dir)) {
-            return;
-        }
-        try (Stream<Path> walk = Files.walk(dir)) {
-            walk.sorted(Comparator.reverseOrder()).forEach(path -> {
-                try {
-                    Files.deleteIfExists(path);
-                } catch (IOException ex) {
-                    log.warn("清理 staging 目录失败: {}", path, ex);
-                }
-            });
-        } catch (IOException ex) {
-            log.warn("清理 staging 目录失败: {}", dir, ex);
-        }
     }
 
     private String buildOutputFileName(Long comicId, String title, String format) {

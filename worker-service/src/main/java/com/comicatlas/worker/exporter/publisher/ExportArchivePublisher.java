@@ -2,6 +2,7 @@ package com.comicatlas.worker.exporter.publisher;
 
 import com.comicatlas.worker.shared.archive.ZipVolumeResolver;
 import com.comicatlas.worker.exporter.archive.ZipBuilder;
+import com.comicatlas.worker.exporter.archive.ExportStagingCleanup;
 import com.comicatlas.worker.exporter.exception.ExportPublishConflictException;
 import com.comicatlas.worker.exporter.exception.ExportPublishException;
 import com.comicatlas.worker.exporter.model.ExportManifest;
@@ -10,15 +11,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.Comparator;
 import java.util.Locale;
-import java.util.stream.Stream;
+import java.util.Optional;
 
 /**
  * 导出产物发布器 — 将 staging 任务目录原子发布为最终 {@code EXPORT/{taskId}} 目录。
@@ -41,6 +42,15 @@ public class ExportArchivePublisher {
 
     private final ZipBuilder zipBuilder;
 
+    /** 重投时先验证最终产物，通过后直接返回，避免重新压缩整个漫画。 */
+    public Optional<PublishResult> reuseIfPresent(Long taskId, Path finalDir, ExportManifest manifest)
+            throws IOException {
+        if (!Files.exists(finalDir, LinkOption.NOFOLLOW_LINKS)) {
+            return Optional.empty();
+        }
+        return Optional.of(reuseExisting(taskId, finalDir, manifest, null));
+    }
+
     /**
      * 发布 staging 任务目录到最终任务目录。
      *
@@ -54,7 +64,7 @@ public class ExportArchivePublisher {
      */
     public PublishResult publish(Long taskId, Path stagingDir, Path finalDir, ExportManifest manifest)
             throws IOException {
-        if (Files.exists(finalDir)) {
+        if (Files.exists(finalDir, LinkOption.NOFOLLOW_LINKS)) {
             return reuseExisting(taskId, finalDir, manifest, stagingDir);
         }
         try {
@@ -71,16 +81,18 @@ public class ExportArchivePublisher {
 
     private PublishResult reuseExisting(Long taskId, Path finalDir, ExportManifest manifest, Path stagingDir)
             throws IOException {
-        Path mainZip = findMainArchive(finalDir);
         try {
+            Path mainZip = findMainArchive(finalDir);
             zipBuilder.verify(mainZip, manifest);
-        } catch (IOException ex) {
-            deleteRecursively(stagingDir);
+        } catch (InterruptedIOException exception) {
+            throw exception;
+        } catch (IOException | IllegalArgumentException ex) {
+            ExportStagingCleanup.afterFailure(stagingDir, ex);
             throw new ExportPublishConflictException(
                     "EXPORT 发布冲突：最终任务目录已存在且与本次 manifest 不一致，拒绝覆盖/删除 taskId="
                             + taskId, ex);
         }
-        deleteRecursively(stagingDir);
+        ExportStagingCleanup.delete(stagingDir);
         log.info("幂等复用既有导出任务目录（与本次 manifest 完全一致，不重写文件）: taskId={}", taskId);
         return buildPublishResult(taskId, finalDir);
     }
@@ -96,34 +108,27 @@ public class ExportArchivePublisher {
     }
 
     private static Path findMainArchive(Path dir) throws IOException {
+        if (!Files.isDirectory(dir, LinkOption.NOFOLLOW_LINKS)) {
+            throw new IOException("EXPORT 最终任务目录不是普通目录");
+        }
+        Path mainArchive = null;
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir)) {
             for (Path candidate : stream) {
                 String name = candidate.getFileName().toString();
                 String lowerName = name.toLowerCase(Locale.ROOT);
                 if (Files.isRegularFile(candidate, LinkOption.NOFOLLOW_LINKS)
                         && (lowerName.endsWith(ZIP_EXTENSION) || lowerName.endsWith(CBZ_EXTENSION))) {
-                    return candidate;
+                    if (mainArchive != null) {
+                        throw new IOException("EXPORT 任务目录存在多个主归档");
+                    }
+                    mainArchive = candidate;
                 }
             }
         }
-        throw new IOException("任务目录缺少主 .cbz/.zip 文件: " + dir);
-    }
-
-    private void deleteRecursively(Path dir) {
-        if (dir == null || !Files.exists(dir, LinkOption.NOFOLLOW_LINKS)) {
-            return;
+        if (mainArchive == null) {
+            throw new IOException("EXPORT 任务目录缺少主 .cbz/.zip 文件");
         }
-        try (Stream<Path> walk = Files.walk(dir)) {
-            walk.sorted(Comparator.reverseOrder()).forEach(path -> {
-                try {
-                    Files.deleteIfExists(path);
-                } catch (IOException ex) {
-                    log.warn("清理 staging 目录失败: {}", path, ex);
-                }
-            });
-        } catch (IOException ex) {
-            log.warn("清理 staging 目录失败: {}", dir, ex);
-        }
+        return mainArchive;
     }
 
     /** 发布结果 — fileName 为 EXPORT 根相对路径，size 为全部卷总大小。 */

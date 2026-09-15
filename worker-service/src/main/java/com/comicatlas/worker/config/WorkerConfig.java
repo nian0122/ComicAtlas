@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Configuration;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.zip.Deflater;
 
 /** Worker 服务的统一外部配置模型。 */
 @Data
@@ -233,6 +234,10 @@ public class WorkerConfig {
     /** ZIP 安全限制配置。 */
     @Data
     public static class Zip {
+        /** 普通条目与元数据的压缩级别（0..9），默认快速压缩。 */
+        private int compressionLevel = Deflater.BEST_SPEED;
+        /** 已压缩媒体的压缩级别（0..9），默认 0 使用 STORE 直接打包，不预扫描 CRC。 */
+        private int mediaCompressionLevel = Deflater.NO_COMPRESSION;
         private int maxEntries = 100_000;
         private int maxDepth = 200;
         /** 分卷导出单卷最大大小（字节），默认 2 GiB，须落在 Commons Compress 分卷支持范围（64 KiB..4 GiB）。 */
@@ -254,6 +259,12 @@ public class WorkerConfig {
         Zip zipConfig = zip;
         if (zipConfig == null) {
             throw new IllegalArgumentException("worker.zip 配置不能为空");
+        }
+        if (zipConfig.getCompressionLevel() < Deflater.NO_COMPRESSION
+                || zipConfig.getCompressionLevel() > Deflater.BEST_COMPRESSION
+                || zipConfig.getMediaCompressionLevel() < Deflater.NO_COMPRESSION
+                || zipConfig.getMediaCompressionLevel() > Deflater.BEST_COMPRESSION) {
+            throw new IllegalArgumentException("worker.zip.compressionLevel 和 mediaCompressionLevel 必须位于 0..9");
         }
         if (zipConfig.getMaxEntries() <= 0) {
             throw new IllegalArgumentException("worker.zip.maxEntries 必须大于 0，当前值："
