@@ -309,7 +309,7 @@ class SplitZipRoundTripTest {
 
     private MetadataJsonExporter metadataJsonExporterMock() {
         MetadataJsonExporter exporter = mock(MetadataJsonExporter.class);
-        when(exporter.exportJson(COMIC_ID)).thenReturn("{\"version\":3}");
+        when(exporter.exportJson(any(ExportCollectResult.class))).thenReturn("{\"version\":3}");
         return exporter;
     }
 

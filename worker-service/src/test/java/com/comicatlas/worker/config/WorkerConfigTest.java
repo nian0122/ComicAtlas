@@ -32,6 +32,20 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 @DisplayName("WorkerConfigTest — 分卷容量配置与边界校验契约")
 class WorkerConfigTest {
+    @Test
+    @DisplayName("导出默认媒体免压缩，普通条目快速压缩，非法级别在启动时拒绝")
+    void exportCompressionLevelsAreValidated() {
+        WorkerConfig config = validWorkerConfig();
+        assertThat(config.getZip().getCompressionLevel()).isEqualTo(1);
+        assertThat(config.getZip().getMediaCompressionLevel()).isZero();
+        config.getZip().setCompressionLevel(-1);
+        assertThatThrownBy(config::validateZipConfig).hasMessageContaining("compressionLevel");
+        config.getZip().setCompressionLevel(9);
+        config.getZip().setMediaCompressionLevel(10);
+        assertThatThrownBy(config::validateZipConfig).hasMessageContaining("mediaCompressionLevel");
+        config.getZip().setMediaCompressionLevel(9);
+        assertThatCode(config::validateZipConfig).doesNotThrowAnyException();
+    }
 
     private static final long SPLIT_SIZE_MIN_BYTES = 64L * 1024;
     private static final long SPLIT_SIZE_MAX_BYTES = 4_294_967_295L;

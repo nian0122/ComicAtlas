@@ -11,6 +11,7 @@
 | `operations/` | 部署运维 |
 | `releases/` | 发布说明（当前稳定版 v2.1.0，历史版本归档） |
 | `development/` | 开发约定（java-naming） |
+| [`development/export-performance.md`](development/export-performance.md) | 导出压缩策略、完整性校验与性能基准 |
 | [`development/project-layout.md`](development/project-layout.md) | 项目目录用途、配置位置和本地产物边界 |
 | `issues/` | 当前待办 |
 | [`database/schema.md`](database/schema.md) | 数据库结构 |

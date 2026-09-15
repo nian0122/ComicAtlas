@@ -265,6 +265,8 @@ class ZipBuilderTest {
 
         assertThrows(IOException.class, () -> assertReadableWithCrc(out),
                 "翻转分卷字节后回读必须失败");
+        assertThrows(IOException.class, () -> zipBuilder.verify(out, manifest),
+                "生产校验器也必须拒绝损坏分卷");
     }
 
     @Test

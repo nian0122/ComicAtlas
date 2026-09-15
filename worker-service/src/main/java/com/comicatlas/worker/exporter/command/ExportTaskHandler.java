@@ -14,6 +14,8 @@ import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.io.InterruptedIOException;
+import java.nio.channels.ClosedByInterruptException;
 
 /**
  * 导出任务 MQ 消费者 — 只负责协议与事件发布，业务编排委托 ExportService。
@@ -38,7 +40,7 @@ public class ExportTaskHandler {
         this.mqConsumerSupport = mqConsumerSupport;
     }
 
-    @RabbitListener(queues = MqQueues.EXPORT_TASK)
+    @RabbitListener(queues = MqQueues.EXPORT_TASK, concurrency = "1")
     public void handle(ExportTaskCreatedEvent event, Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {
         Long taskId = event.taskId();
         Long comicId = event.comicId();
@@ -58,16 +60,23 @@ public class ExportTaskHandler {
             output = ExportFormats.CBZ.equalsIgnoreCase(event.format())
                     ? exportService.export(event.comicId(), event.taskId(), ExportFormats.CBZ)
                     : exportService.export(event.comicId(), event.taskId());
-        } catch (Exception e) {
-            publishExportFailed(event, e);
+        } catch (Exception failure) {
+            if (failure instanceof InterruptedIOException || failure instanceof ClosedByInterruptException
+                    || failure instanceof InterruptedException || Thread.currentThread().isInterrupted()) {
+                Thread.currentThread().interrupt();
+                InterruptedException interrupted = new InterruptedException("导出中断，保留未确认消息供恢复后重投");
+                interrupted.initCause(failure);
+                throw interrupted;
+            }
+            publishExportFailed(event, failure);
             return;
         }
         try {
             eventPublisher.publishCompleted(event.taskId(), event.comicId(), output);
             log.info("已发布 ExportTaskCompletedEvent: taskId={}, size={}", event.taskId(), output.size());
-        } catch (Exception e) {
+        } catch (Exception failure) {
             throw new ExportCompletedPublishException(
-                    "导出完成事件发布失败：taskId=" + event.taskId() + ", comicId=" + event.comicId(), e);
+                    "导出完成事件发布失败：taskId=" + event.taskId() + ", comicId=" + event.comicId(), failure);
         }
     }
 

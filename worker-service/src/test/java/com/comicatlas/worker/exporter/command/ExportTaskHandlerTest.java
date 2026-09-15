@@ -46,6 +46,23 @@ import static org.mockito.Mockito.when;
  */
 @ExtendWith(MockitoExtension.class)
 class ExportTaskHandlerTest {
+    @Test
+    @DisplayName("导出中断：保留中断标记，不发失败或完成事件，消息保持未确认")
+    void interruptedExportDoesNotPublishBusinessFailureOrAcknowledge() throws Exception {
+        when(exportService.export(1L, 99L)).thenThrow(new java.io.InterruptedIOException("导出中断"));
+        try {
+            handler.handle(event(99L, 1L), channel, 5L);
+            org.junit.jupiter.api.Assertions.assertTrue(Thread.currentThread().isInterrupted());
+        } finally {
+            Thread.interrupted();
+        }
+        verify(channel, never()).basicAck(anyLong(), anyBoolean());
+        verify(channel, never()).basicReject(anyLong(), anyBoolean());
+        verify(rabbitTemplate, never()).convertAndSend(eq(MqExchanges.EXPORT),
+                eq(MqRoutingKeys.TASK_FAILED), (Object) any());
+        verify(rabbitTemplate, never()).convertAndSend(eq(MqExchanges.EXPORT),
+                eq(MqRoutingKeys.TASK_COMPLETED), (Object) any());
+    }
 
     @Mock
     private RabbitTemplate rabbitTemplate;

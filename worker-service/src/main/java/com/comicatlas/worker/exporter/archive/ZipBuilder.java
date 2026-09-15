@@ -2,43 +2,30 @@ package com.comicatlas.worker.exporter.archive;
 
 import com.comicatlas.worker.exporter.model.ExportManifest;
 import com.comicatlas.worker.config.WorkerConfig;
-import com.comicatlas.worker.shared.archive.ZipVolumeResolver;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.compress.archivers.zip.Zip64Mode;
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
 import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream;
-import org.apache.commons.compress.archivers.zip.ZipFile;
-import org.apache.commons.compress.archivers.zip.ZipSplitReadOnlySeekableByteChannel;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.channels.SeekableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.LinkOption;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.Set;
-import java.util.stream.Stream;
-import java.util.zip.CRC32;
 import java.util.zip.ZipEntry;
+import java.util.zip.Deflater;
 
 /**
- * 根据 {@link ExportManifest} 构建（分卷）ZIP 文件 — 流式写入，避免内存爆炸。
- *
- * <p>清单总大小未超过 {@code worker.zip.splitSize} 时生成单个 {@code .zip}；超过阈值时使用
- * Commons Compress 分卷构造器生成 {@code .z01... .zip} 标准分卷。条目统一 DEFLATED + UTF-8 名称，
- * Zip64 按需启用，每个条目写入前设置已知大小。构建完成后使用 {@link ZipVolumeResolver} +
- * {@link ZipSplitReadOnlySeekableByteChannel}/{@link ZipFile} 完整读回，对条目集合、长度与 CRC
- * 逐一校验，返回主 .zip、有序分卷与全部卷总大小。任何异常清理整个 staging 目录（输出父目录）
- * 并保留原始 cause。
+ * 流式构建标准 ZIP/CBZ 与分卷 ZIP，媒体默认跳过重复压缩，其他条目快速压缩。
+ * 写入时记录实际 CRC，构建后完整读回验证长度、内容和条目集合，避免再次读取源文件。
+ * 不使用中间压缩文件或额外线程；内存占用与文件大小无关。失败时清理 staging。
  */
 @Slf4j
 @Component
@@ -50,8 +37,10 @@ public class ZipBuilder {
 
     private static final String METADATA_FILE = "metadata.json";
     private static final String COMIC_INFO_FILE = "ComicInfo.xml";
-    private static final int COPY_BUFFER_SIZE = 64 * 1024;
-    private static final int MAX_LOG_PATHS = 10;
+    /** 这些格式已经包含媒体编码，默认使用 STORE 直接打包。 */
+    private static final Set<String> COMPRESSED_MEDIA_EXTENSIONS = Set.of(
+            "jpg", "jpeg", "png", "webp", "gif", "avif", "jxl", "heic", "heif",
+            "mp4", "m4v", "webm", "mkv", "mov", "avi", "mpeg", "mpg", "3gp", "ogv");
 
     private final WorkerConfig workerConfig;
 
@@ -69,31 +58,40 @@ public class ZipBuilder {
         Path stagingDir = outputPath.toAbsolutePath().getParent();
         Files.createDirectories(stagingDir);
         try {
-            if (manifestTotalSize(manifest) > workerConfig.getZip().getSplitSize()) {
-                return buildSplit(manifest, outputPath);
+            ArchiveStreams.checkInterrupted();
+            long sourceSize = validateManifest(manifest);
+            long started = System.nanoTime();
+            boolean requiresSplit = sourceSize > workerConfig.getZip().getSplitSize();
+            Path archivePath = requiresSplit ? splitArchivePath(outputPath) : outputPath;
+            Map<String, Long> writtenChecksums;
+            try (ZipArchiveOutputStream output = requiresSplit
+                    ? new ZipArchiveOutputStream(archivePath, workerConfig.getZip().getSplitSize())
+                    : new ZipArchiveOutputStream(archivePath.toFile())) {
+                configure(output);
+                writtenChecksums = writeEntries(output, manifest);
             }
-            return buildSingle(manifest, outputPath);
-        } catch (IOException | RuntimeException ex) {
-            deleteRecursively(stagingDir);
-            throw ex;
+            if (!archivePath.equals(outputPath)) {
+                // Commons 分卷关闭时固定生成 .zip 主卷；只在未发布的 staging 内恢复请求的 .cbz 名称。
+                Files.move(archivePath, outputPath);
+            }
+            long written = System.nanoTime();
+            ZipBuildResult result = ZipVerifier.verify(outputPath, manifest, writtenChecksums);
+            log.info("导出 ZIP 校验通过：entries={}, sourceBytes={}, outputBytes={}, volumes={}, writeMs={}, verifyMs={}",
+                    writtenChecksums.size(), sourceSize, result.totalSize(), result.orderedVolumes().size(),
+                    TimeUnit.NANOSECONDS.toMillis(written - started),
+                    TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - written));
+            return result;
+        } catch (IOException | RuntimeException exception) {
+            ExportStagingCleanup.afterFailure(stagingDir, exception);
+            throw exception;
         }
     }
 
-    private ZipBuildResult buildSingle(ExportManifest manifest, Path outputPath) throws IOException {
-        try (ZipArchiveOutputStream zipOutputStream = new ZipArchiveOutputStream(outputPath.toFile())) {
-            configure(zipOutputStream);
-            writeEntries(zipOutputStream, manifest);
-        }
-        return verifyAndReturn(outputPath, manifest);
-    }
-
-    private ZipBuildResult buildSplit(ExportManifest manifest, Path outputPath) throws IOException {
-        long splitSize = workerConfig.getZip().getSplitSize();
-        try (ZipArchiveOutputStream zipOutputStream = new ZipArchiveOutputStream(outputPath, splitSize)) {
-            configure(zipOutputStream);
-            writeEntries(zipOutputStream, manifest);
-        }
-        return verifyAndReturn(outputPath, manifest);
+    private Path splitArchivePath(Path outputPath) {
+        String fileName = outputPath.getFileName().toString();
+        int extensionStart = fileName.lastIndexOf('.');
+        String baseName = extensionStart >= 0 ? fileName.substring(0, extensionStart) : fileName;
+        return outputPath.resolveSibling(baseName + ".zip");
     }
 
     private void configure(ZipArchiveOutputStream zipOutputStream) {
@@ -104,7 +102,10 @@ public class ZipBuilder {
         zipOutputStream.setFallbackToUTF8(true);
     }
 
-    private void writeEntries(ZipArchiveOutputStream zipOutputStream, ExportManifest manifest) throws IOException {
+    private Map<String, Long> writeEntries(ZipArchiveOutputStream zipOutputStream, ExportManifest manifest)
+            throws IOException {
+        Map<String, Long> writtenChecksums = new HashMap<>(manifest.entries().size());
+        byte[] buffer = ArchiveStreams.newBuffer();
         String prefix = manifest.rootDirName() + "/";
         writeBytesEntry(zipOutputStream, prefix + METADATA_FILE, manifest.metadataJson().getBytes(StandardCharsets.UTF_8));
         if (manifest.comicInfoXml() != null && !manifest.comicInfoXml().isBlank()) {
@@ -114,183 +115,85 @@ public class ZipBuilder {
         for (ExportManifest.Entry entry : manifest.entries()) {
             ZipArchiveEntry zipArchiveEntry = new ZipArchiveEntry(prefix + entry.targetPath());
             zipArchiveEntry.setSize(entry.sourceSize());
-            zipArchiveEntry.setMethod(ZipEntry.DEFLATED);
+            int level = compressionLevel(entry.targetPath());
+            // 1.28.0 的普通文件和分卷输出均可回写 CRC；仅不可回写的输出退回 0 级 DEFLATE。
+            zipArchiveEntry.setMethod(level == Deflater.NO_COMPRESSION && zipOutputStream.isSeekable()
+                    ? ZipEntry.STORED : ZipEntry.DEFLATED);
+            zipOutputStream.setLevel(level);
             zipOutputStream.putArchiveEntry(zipArchiveEntry);
-            try (InputStream in = Files.newInputStream(entry.sourceFile())) {
-                in.transferTo(zipOutputStream);
-            }
+            long checksum = ArchiveStreams.copySource(entry, zipOutputStream, buffer);
             zipOutputStream.closeArchiveEntry();
+            writtenChecksums.put(zipArchiveEntry.getName(), checksum);
         }
+        return writtenChecksums;
+    }
+
+    private int compressionLevel(String targetPath) {
+        int extensionStart = targetPath.lastIndexOf('.');
+        String extension = targetPath.substring(extensionStart + 1).toLowerCase(Locale.ROOT);
+        return COMPRESSED_MEDIA_EXTENSIONS.contains(extension)
+                ? workerConfig.getZip().getMediaCompressionLevel() : workerConfig.getZip().getCompressionLevel();
     }
 
     private void writeBytesEntry(ZipArchiveOutputStream zipOutputStream, String name, byte[] content) throws IOException {
         ZipArchiveEntry zipArchiveEntry = new ZipArchiveEntry(name);
         zipArchiveEntry.setSize(content.length);
         zipArchiveEntry.setMethod(ZipEntry.DEFLATED);
+        ArchiveStreams.checkInterrupted();
+        zipOutputStream.setLevel(workerConfig.getZip().getCompressionLevel());
         zipOutputStream.putArchiveEntry(zipArchiveEntry);
         zipOutputStream.write(content);
         zipOutputStream.closeArchiveEntry();
     }
 
-    private long manifestTotalSize(ExportManifest manifest) {
-        long total = manifest.metadataJson().getBytes(StandardCharsets.UTF_8).length;
+    private long validateManifest(ExportManifest manifest) throws IOException {
+        Set<String> names = ZipVerifier.expectedNames(manifest);
+        if (names.size() > workerConfig.getZip().getMaxEntries()) {
+            throw new IOException("ZIP 清单条目数超过上限");
+        }
+        Set<String> foldedNames = new HashSet<>(names.size());
+        for (String name : names) {
+            if (name.startsWith("/") || name.contains("\\") || name.contains(":") || name.indexOf('\0') >= 0
+                    || !foldedNames.add(name.toLowerCase(Locale.ROOT))) {
+                throw new IOException("ZIP 清单路径无效或大小写冲突");
+            }
+            String[] segments = name.split("/", -1);
+            if (segments.length > workerConfig.getZip().getMaxDepth()) {
+                throw new IOException("ZIP 清单路径深度超过上限");
+            }
+            for (String segment : segments) {
+                if (segment.isEmpty() || ".".equals(segment) || "..".equals(segment)) {
+                    throw new IOException("ZIP 清单路径不允许空段或目录穿越");
+                }
+            }
+        }
+        long total = metadataSize(manifest.metadataJson());
         if (manifest.comicInfoXml() != null && !manifest.comicInfoXml().isBlank()) {
-            total = Math.addExact(total, manifest.comicInfoXml().getBytes(StandardCharsets.UTF_8).length);
+            total = Math.addExact(total, metadataSize(manifest.comicInfoXml()));
         }
         for (ExportManifest.Entry entry : manifest.entries()) {
+            if (entry.sourceSize() < 0 || entry.sourceSize() > workerConfig.getZip().getMaxEntrySize()) {
+                throw new IOException("ZIP 清单单文件大小超过上限");
+            }
             total = Math.addExact(total, entry.sourceSize());
+        }
+        if (total > workerConfig.getZip().getMaxTotalSize()) {
+            throw new IOException("ZIP 清单总大小超过上限");
         }
         return total;
     }
 
-    /**
-     * 对既有 ZIP 产物执行与构建一致的读回校验（条目集合、长度与 CRC）。
-     *
-     * <p>供发布器在最终任务目录已存在时判断是否与本次 manifest 完全一致（幂等复用）。
-     *
-     * @param mainZip  最终 .zip 文件路径（其父目录内同 basename 的 .zNN 视为分卷）
-     * @param manifest 当前导出清单
-     * @return 主 .zip、有序分卷与全部卷总大小
-     * @throws IOException 回读校验失败或分卷解析失败
-     */
+    private long metadataSize(String content) throws IOException {
+        long size = content.getBytes(StandardCharsets.UTF_8).length;
+        if (size > workerConfig.getZip().getMaxEntrySize()) {
+            throw new IOException("ZIP 元数据条目大小超过上限");
+        }
+        return size;
+    }
+
+    /** 独立校验既有产物，读取当前源文件确认幂等复用的内容仍然一致。 */
     public ZipBuildResult verify(Path mainZip, ExportManifest manifest) throws IOException {
-        return verifyAndReturn(mainZip, manifest);
+        return ZipVerifier.verify(mainZip, manifest, Map.of());
     }
 
-    /**
-     * 回读校验：用 {@link ZipVolumeResolver} 解析有序分卷，{@link ZipSplitReadOnlySeekableByteChannel}/
-     * {@link ZipFile} 读回每个条目，逐一校验条目集合、长度与 CRC。
-     */
-    private ZipBuildResult verifyAndReturn(Path mainZip, ExportManifest manifest) throws IOException {
-        List<Path> volumes = ZipVolumeResolver.resolve(mainZip);
-        long totalSize = 0L;
-        for (Path volume : volumes) {
-            totalSize = Math.addExact(totalSize, Files.size(volume));
-        }
-
-        String prefix = manifest.rootDirName() + "/";
-        int metadataEntryCount = manifest.comicInfoXml() == null || manifest.comicInfoXml().isBlank() ? 1 : 2;
-        int expectedSize = manifest.entries().size() + metadataEntryCount;
-        Set<String> expectedNames = new HashSet<>(expectedSize);
-        expectedNames.add(prefix + METADATA_FILE);
-        if (manifest.comicInfoXml() != null && !manifest.comicInfoXml().isBlank()) {
-            expectedNames.add(prefix + COMIC_INFO_FILE);
-        }
-        for (ExportManifest.Entry entry : manifest.entries()) {
-            expectedNames.add(prefix + entry.targetPath());
-        }
-
-        try (ZipFile zipFile = openZipFile(volumes)) {
-            Set<String> actualNames = new HashSet<>(expectedSize);
-            Enumeration<ZipArchiveEntry> entries = zipFile.getEntries();
-            while (entries.hasMoreElements()) {
-                actualNames.add(entries.nextElement().getName());
-            }
-            if (!actualNames.equals(expectedNames)) {
-                throw new IOException("ZIP 回读校验失败：条目集合不一致 expected=" + expectedNames + ", actual=" + actualNames);
-            }
-
-            String metaName = prefix + METADATA_FILE;
-            verifyBytesEntry(zipFile, metaName, manifest.metadataJson().getBytes(StandardCharsets.UTF_8));
-            if (manifest.comicInfoXml() != null && !manifest.comicInfoXml().isBlank()) {
-                verifyBytesEntry(zipFile, prefix + COMIC_INFO_FILE,
-                        manifest.comicInfoXml().getBytes(StandardCharsets.UTF_8));
-            }
-
-            for (ExportManifest.Entry entry : manifest.entries()) {
-                verifyFileEntry(zipFile, prefix + entry.targetPath(), entry);
-            }
-        }
-        return new ZipBuildResult(mainZip, volumes, totalSize);
-    }
-
-    private ZipFile openZipFile(List<Path> volumes) throws IOException {
-        ZipFile.Builder builder = ZipFile.builder().setUseUnicodeExtraFields(true);
-        if (volumes.size() == 1) {
-            SeekableByteChannel channel = Files.newByteChannel(volumes.get(0), StandardOpenOption.READ);
-            return builder.setSeekableByteChannel(channel).get();
-        }
-        return builder.setSeekableByteChannel(
-                ZipSplitReadOnlySeekableByteChannel.forPaths(volumes.toArray(Path[]::new))).get();
-    }
-
-    private void verifyBytesEntry(ZipFile zipFile, String name, byte[] expected) throws IOException {
-        ZipArchiveEntry zipArchiveEntry = zipFile.getEntry(name);
-        if (zipArchiveEntry == null) {
-            throw new IOException("ZIP 回读校验失败：缺少条目 " + name);
-        }
-        if (zipArchiveEntry.getSize() != expected.length) {
-            throw new IOException("ZIP 回读校验失败：条目长度不一致 name=" + name
-                    + ", stored=" + zipArchiveEntry.getSize() + ", expected=" + expected.length);
-        }
-        byte[] actual;
-        try (InputStream in = zipFile.getInputStream(zipArchiveEntry)) {
-            actual = in.readAllBytes();
-        }
-        if (!Arrays.equals(actual, expected)) {
-            throw new IOException("ZIP 回读校验失败：条目内容不一致 name=" + name);
-        }
-    }
-
-    private void verifyFileEntry(ZipFile zipFile, String name, ExportManifest.Entry entry) throws IOException {
-        ZipArchiveEntry zipArchiveEntry = zipFile.getEntry(name);
-        if (zipArchiveEntry == null) {
-            throw new IOException("ZIP 回读校验失败：缺少条目 " + name);
-        }
-        if (zipArchiveEntry.getSize() != entry.sourceSize()) {
-            throw new IOException("ZIP 回读校验失败：条目长度不一致 name=" + name
-                    + ", stored=" + zipArchiveEntry.getSize() + ", expected=" + entry.sourceSize());
-        }
-        long sourceCrc;
-        try (InputStream sourceIn = Files.newInputStream(entry.sourceFile())) {
-            sourceCrc = calculateCrc32(sourceIn);
-        }
-        if (zipArchiveEntry.getCrc() != sourceCrc) {
-            throw new IOException("ZIP 回读校验失败：条目 CRC 与源文件不一致 name=" + name);
-        }
-        long readCrc;
-        try (InputStream storedIn = zipFile.getInputStream(zipArchiveEntry)) {
-            readCrc = calculateCrc32(storedIn);
-        }
-        if (readCrc != zipArchiveEntry.getCrc()) {
-            throw new IOException("ZIP 回读校验失败：条目读回 CRC 与存储 CRC 不一致 name=" + name);
-        }
-    }
-
-    private static long calculateCrc32(InputStream in) throws IOException {
-        CRC32 crc = new CRC32();
-        byte[] buffer = new byte[COPY_BUFFER_SIZE];
-        int read;
-        while ((read = in.read(buffer)) != -1) {
-            crc.update(buffer, 0, read);
-        }
-        return crc.getValue();
-    }
-
-    private void deleteRecursively(Path dir) {
-        if (dir == null || !Files.exists(dir, LinkOption.NOFOLLOW_LINKS)) {
-            return;
-        }
-        List<Path> undeleted = new ArrayList<>();
-        IOException[] firstFailure = new IOException[1];
-        try (Stream<Path> walk = Files.walk(dir)) {
-            walk.sorted(Comparator.reverseOrder()).forEach(path -> {
-                try {
-                    Files.deleteIfExists(path);
-                } catch (IOException ex) {
-                    if (firstFailure[0] == null) {
-                        firstFailure[0] = ex;
-                    }
-                    undeleted.add(path);
-                }
-            });
-        } catch (IOException ex) {
-            log.warn("清理 staging 目录失败: {}", dir, ex);
-            return;
-        }
-        if (!undeleted.isEmpty()) {
-            log.warn("清理 staging 目录失败，共 {} 个文件未删除，示例: {}，首个失败原因: {}",
-                    undeleted.size(), undeleted.stream().limit(MAX_LOG_PATHS).toList(), firstFailure[0]);
-        }
-    }
 }

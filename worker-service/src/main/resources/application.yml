@@ -112,6 +112,8 @@ worker:
     cancellation-ttl-days: ${CANCELLATION_TTL_DAYS:7}
     metadata-refresh-attempt-ttl-days: ${METADATA_REFRESH_ATTEMPT_TTL_DAYS:7}
   zip:
+    compression-level: ${ZIP_COMPRESSION_LEVEL:1}
+    media-compression-level: ${ZIP_MEDIA_COMPRESSION_LEVEL:0}
     max-entries: ${ZIP_MAX_ENTRIES:100000}
     max-depth: ${ZIP_MAX_DEPTH:200}
     split-size: ${ZIP_SPLIT_SIZE:2147483648}
