@@ -96,9 +96,8 @@
 }
 
 .el-button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-  box-shadow: none;
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent);
 }
 
 .el-button--primary {
@@ -352,8 +351,8 @@
 }
 
 .el-radio-button__original-radio:focus-visible + .el-radio-button__inner {
-  outline: 2px solid var(--accent) !important;
-  outline-offset: -2px;
+  outline: none !important;
+  box-shadow: inset 0 0 0 2px var(--accent) !important;
 }
 
 .el-radio-button__original-radio:focus:not(:focus-visible) + .el-radio-button__inner {
