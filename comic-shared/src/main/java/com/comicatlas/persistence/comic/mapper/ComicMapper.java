@@ -1,15 +1,14 @@
 package com.comicatlas.persistence.comic.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.persistence.comic.entity.Comic;
-import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.comic.dto.ComicListQuery;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 import java.util.List;
 
@@ -17,20 +16,12 @@ import java.util.List;
 public interface ComicMapper extends BaseMapper<Comic> {
 
     /** 仅在 READY 时锁定漫画，保证刷新任务并发互斥。 */
-    default int lockForMetadataRefresh(Long comicId) {
-        return update(null, new LambdaUpdateWrapper<Comic>()
-                .eq(Comic::getId, comicId)
-                .eq(Comic::getStatus, ComicStatus.READY)
-                .set(Comic::getStatus, ComicStatus.REFRESHING));
-    }
+    @Update("UPDATE comic SET status = 'REFRESHING' WHERE id = #{comicId} AND status = 'READY'")
+    int lockForMetadataRefresh(@Param("comicId") Long comicId);
 
     /** 取消刷新时仅释放仍处于 REFRESHING 的漫画。 */
-    default int releaseMetadataRefresh(Long comicId) {
-        return update(null, new LambdaUpdateWrapper<Comic>()
-                .eq(Comic::getId, comicId)
-                .eq(Comic::getStatus, ComicStatus.REFRESHING)
-                .set(Comic::getStatus, ComicStatus.READY));
-    }
+    @Update("UPDATE comic SET status = 'READY' WHERE id = #{comicId} AND status = 'REFRESHING'")
+    int releaseMetadataRefresh(@Param("comicId") Long comicId);
 
     @Select("""
         <script>

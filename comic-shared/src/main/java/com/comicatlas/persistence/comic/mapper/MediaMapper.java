@@ -1,14 +1,10 @@
 package com.comicatlas.persistence.comic.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.persistence.comic.entity.Media;
-import com.comicatlas.contract.common.enums.HqStatus;
-import com.comicatlas.contract.common.enums.LqStatus;
-import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
-import com.comicatlas.contract.common.enums.TranscodeStatus;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Update;
 
 import java.util.List;
 
@@ -22,55 +18,23 @@ import java.util.List;
 public interface MediaMapper extends BaseMapper<Media> {
 
     /** 将章节内媒体页码临时置为互不冲突的负值，供重排第二阶段写回。 */
-    default int updatePageNumberToTemporaryNegative(Long chapterId) {
-        return update(null, new LambdaUpdateWrapper<Media>()
-                .eq(Media::getChapterId, chapterId)
-                .setSql("page_number = -id"));
-    }
+    @Update("UPDATE page SET page_number = -id WHERE chapter_id = #{chapterId}")
+    int updatePageNumberToTemporaryNegative(@Param("chapterId") Long chapterId);
 
     /** 按章节且仅匹配旧前缀重写 HQ 路径。 */
-    default int normalizeLegacyHqPath(Long chapterId, String oldPrefix, String newPrefix) {
-        return update(null, new LambdaUpdateWrapper<Media>()
-                .eq(Media::getChapterId, chapterId)
-                .likeRight(Media::getHqPath, oldPrefix)
-                .setSql("hq_path = REPLACE(hq_path, {0}, {1})", oldPrefix, newPrefix));
-    }
+    @Update("UPDATE page SET hq_path = REPLACE(hq_path, #{oldPrefix}, #{newPrefix}) WHERE chapter_id = #{chapterId} AND hq_path LIKE CONCAT(#{oldPrefix}, '%')")
+    int normalizeLegacyHqPath(@Param("chapterId") Long chapterId,
+                              @Param("oldPrefix") String oldPrefix,
+                              @Param("newPrefix") String newPrefix);
 
     /** 按章节且仅匹配旧前缀重写 LQ 路径。 */
-    default int normalizeLegacyLqPath(Long chapterId, String oldPrefix, String newPrefix) {
-        return update(null, new LambdaUpdateWrapper<Media>()
-                .eq(Media::getChapterId, chapterId)
-                .isNotNull(Media::getLqPath)
-                .likeRight(Media::getLqPath, oldPrefix)
-                .setSql("lq_path = REPLACE(lq_path, {0}, {1})", oldPrefix, newPrefix));
-    }
+    @Update("UPDATE page SET lq_path = REPLACE(lq_path, #{oldPrefix}, #{newPrefix}) WHERE chapter_id = #{chapterId} AND lq_path IS NOT NULL AND lq_path LIKE CONCAT(#{oldPrefix}, '%')")
+    int normalizeLegacyLqPath(@Param("chapterId") Long chapterId,
+                              @Param("oldPrefix") String oldPrefix,
+                              @Param("newPrefix") String newPrefix);
 
     /** 应用上传分析结果，并在替换场景重置派生媒体状态。 */
-    default int applyUploadCompleted(Media media, boolean replace) {
-        LambdaUpdateWrapper<Media> updateWrapper = new LambdaUpdateWrapper<Media>()
-                .eq(Media::getId, media.getId())
-                .set(Media::getStatus, MediaLifecycleStatus.READY)
-                .set(Media::getHqStatus, HqStatus.READY)
-                .set(Media::getWidth, media.getWidth())
-                .set(Media::getHeight, media.getHeight())
-                .set(Media::getHqSize, media.getHqSize())
-                .set(Media::getMediaType, media.getMediaType())
-                .set(Media::getDuration, media.getDuration())
-                .set(Media::getContainer, media.getContainer())
-                .set(Media::getVideoCodec, media.getVideoCodec())
-                .set(Media::getAudioCodec, media.getAudioCodec());
-        if (media.getHqRoot() != null && !media.getHqRoot().isBlank()) {
-            updateWrapper.set(Media::getHqRoot, media.getHqRoot());
-        }
-        if (media.getHqPath() != null && !media.getHqPath().isBlank()) {
-            updateWrapper.set(Media::getHqPath, media.getHqPath());
-        }
-        if (replace) {
-            updateWrapper.set(Media::getLqStatus, LqStatus.NOT_GENERATED)
-                    .set(Media::getTranscodeStatus, TranscodeStatus.NOT_NEEDED);
-        }
-        return update(null, updateWrapper);
-    }
+    int applyUploadCompleted(@Param("media") Media media, @Param("replace") boolean replace);
 
     /**
      * 导入落库专用批量 INSERT：一次插入多条 page 记录（多值 VALUES）。
