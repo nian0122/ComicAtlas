@@ -6,6 +6,7 @@ import com.comicatlas.api.importer.persistence.entity.ImportTask;
 import com.comicatlas.api.importer.exception.ImportMetadataException;
 import com.comicatlas.api.importer.persistence.mapper.ImportTaskMapper;
 import com.comicatlas.api.importer.service.ImportPersistenceService;
+import com.comicatlas.api.importer.service.ImportFinalizationService;
 import com.comicatlas.api.task.persistence.entity.ManagementTaskItem;
 import com.comicatlas.api.task.service.ManagementTaskService;
 import com.comicatlas.api.task.state.ManagementStateMachine;
@@ -88,8 +89,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ImportPersistenceServiceImpl implements ImportPersistenceService {
 
-    // TODO(DECOUPLE-02): 本实现同时解析元数据、装配实体、导入落库和最终化状态机，需拆分计划构建与持久化/最终化职责。
-
     /** 终态集合：到达这些状态后不可回退到非终态（含 CANCELLED 真正终态）。 */
     private static final Set<ImportTaskStatus> TERMINAL_STATUSES =
             EnumSet.of(ImportTaskStatus.SUCCESS, ImportTaskStatus.FAILED, ImportTaskStatus.CANCELLED);
@@ -135,6 +134,7 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
     private final OutboxService outboxService;
     private final ApiStorageProperties storageProperties;
     private final MetadataUpdateCoordinator metadataUpdateCoordinator;
+    private final ImportFinalizationService importFinalizationService;
 
     @Value("${MANGA_ROOT:}")
     private String mangaRoot;
@@ -462,9 +462,13 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
 
     @Override
     public void applyFinalizeCompleted(ImportStorageFinalizeCompletedEvent event) {
+        importFinalizationService.applyCompleted(event);
+        return;
+        /*
         // HQ 前缀计算在事务外完成（纯路径运算），事务内不做任何文件 IO
         String hqPrefix = hqRelativePrefix();
         transactionTemplate.executeWithoutResult(status -> applyFinalizeCompletedInTxn(event, hqPrefix));
+        */
     }
 
     private void applyFinalizeCompletedInTxn(ImportStorageFinalizeCompletedEvent event, String hqPrefix) {
@@ -590,7 +594,11 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
 
     @Override
     public void applyFinalizeFailed(ImportStorageFinalizeFailedEvent event) {
+        importFinalizationService.applyFailed(event);
+        return;
+        /*
         transactionTemplate.executeWithoutResult(status -> applyFinalizeFailedInTxn(event));
+        */
     }
 
     private void applyFinalizeFailedInTxn(ImportStorageFinalizeFailedEvent event) {
