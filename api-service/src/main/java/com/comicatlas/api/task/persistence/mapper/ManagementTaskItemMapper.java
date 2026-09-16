@@ -1,6 +1,7 @@
 package com.comicatlas.api.task.persistence.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.api.task.persistence.entity.ManagementTaskItem;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -12,6 +13,14 @@ import java.util.List;
  */
 @Mapper
 public interface ManagementTaskItemMapper extends BaseMapper<ManagementTaskItem> {
+
+    /** 绑定回收清单引用，供后续 Worker 命令读取。 */
+    default int bindTrashManifest(Long itemId, Long manifestTaskId) {
+        return update(null, new LambdaUpdateWrapper<ManagementTaskItem>()
+                .eq(ManagementTaskItem::getId, itemId)
+                .set(ManagementTaskItem::getResultRefType, "TRASH_MANIFEST")
+                .set(ManagementTaskItem::getResultRefId, manifestTaskId));
+    }
 
     /**
      * 查询归属指定漫画的任务 ID 列表（去重）。
