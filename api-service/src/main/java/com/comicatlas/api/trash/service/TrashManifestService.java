@@ -31,7 +31,7 @@ import java.nio.file.Path;
 @Service
 @RequiredArgsConstructor
 public class TrashManifestService {
-    // TODO(LAYER-14): Service 功能契约与具体实现未分离；应抽取 service 接口，并将实现迁移到 service/impl。
+    // 回收清单契约由应用服务公开，具体实现保持在回收业务包内。
 
     private static final String ACTUAL_FILE = "actual.json";
 

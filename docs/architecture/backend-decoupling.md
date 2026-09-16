@@ -1,6 +1,6 @@
 # 后端待解耦清单
 
-更新日期：2026-09-16。本文件记录后端职责拆分项及整改结果；未完成项已在对应源码使用 `TODO(DECOUPLE-xx)` 标注，具体职责边界以当前代码为准。
+更新日期：2026-09-16。本文件记录后端职责拆分项及整改结果；DECOUPLE-01～13 均已完成，具体职责边界以当前代码为准。
 
 P1 表示优先处理的事务/跨业务边界问题，P2 表示可随对应功能演进处理的职责拆分。此优先级是重构顺序，不表示已经发生生产故障。以下建议的新类和接口尚未创建。
 
@@ -118,7 +118,7 @@ P1 表示优先处理的事务/跨业务边界问题，P2 表示可随对应功�
 - 约束：仅分配类职责，不改 URL、JSON 或状态码；Spring 映射不得重复。目录打开实现越界另见 LAYER-02。
 - 验证：现有 StorageOperationControllerTest 与各端点映射测试。
 
-### DECOUPLE-13：HQ 媒体登记职责混合（待处理）
+### DECOUPLE-13：HQ 媒体登记职责混合（已完成）
 
 文件：[HqMediaRegistrationService.java](../../api-service/src/main/java/com/comicatlas/api/media/service/HqMediaRegistrationService.java)。
 

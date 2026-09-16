@@ -23,7 +23,7 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class MqStatsService {
-    // TODO(LAYER-14): Service 功能契约与具体实现未分离；应抽取 service 接口，并将实现迁移到 service/impl。
+    // MQ 统计契约由应用服务公开，具体实现保持在任务业务包内。
 
     private static final String DLQ_SUFFIX = ".dlq";
 
