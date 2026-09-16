@@ -41,12 +41,14 @@ import java.util.Set;
  * 导入任务事件处理器（API 侧消费）。
  * <p>
  * 接收 MQ 消息并执行幂等/终态判断，导入成功后委托 {@link ImportPersistenceService} 完成两阶段落库。
- * catalog/chapter/media 持久化与最终化编排已拆至 Service；元数据读取和任务状态写入仍待下沉（LAYER-05）。
+ * catalog/chapter/media 持久化与最终化编排由 Service 负责；本类仅负责消息协议适配与消费策略。
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class ImportEventHandler {
+
+    // TODO(LAYER-05): MQ 入口仍直接通过 ComicMapper/ImportTaskMapper 读取、更新业务状态，需下沉到导入结果应用 Service。
 
     private final ObjectMapper objectMapper;
     private final RedisTemplate<String, Object> redisTemplate;
@@ -99,8 +101,8 @@ public class ImportEventHandler {
         });
     }
 
-    // TODO(LAYER-05): MQ 入口承担任务/漫画写入与跨表状态联动；迁至导入结果服务，保持失败/取消映射及短事务，元数据读取也由服务委托存储适配器。
     private void persistTaskStatusChanged(TaskStatusChangedEvent event) {
+        // TODO(LAYER-05): 状态转换、失败联动和管理任务项更新不应由消息入口编排。
         Long taskId = event.taskId();
         String newStatus = event.status();
         ImportTask task = taskMapper.selectById(taskId);
@@ -108,10 +110,8 @@ public class ImportEventHandler {
 
         ImportTaskStatus currentStatus = task.getStatus();
         ImportTaskStatus mappedStatus = parseStatus(newStatus);
-        // TODO(IMPL-01): 终态保护只拦截非终态事件，SUCCESS/CANCELLED 仍可被迟到 FAILED 覆盖；需明确终态转换规则并在写入条件中保护。
-        if (TERMINAL_STATUSES.contains(currentStatus)
-                && (mappedStatus == null || !mappedStatus.isTerminal())) {
-            log.warn("状态机拒绝非终态写入: taskId={}, current={}, attempted={}", taskId, currentStatus, newStatus);
+        if (TERMINAL_STATUSES.contains(currentStatus)) {
+            log.warn("状态机拒绝终态写入: taskId={}, current={}, attempted={}", taskId, currentStatus, newStatus);
             return;
         }
 

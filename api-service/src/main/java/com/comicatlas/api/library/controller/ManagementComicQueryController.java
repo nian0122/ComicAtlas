@@ -1,6 +1,7 @@
 package com.comicatlas.api.library.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.comicatlas.contract.common.dto.PageResponse;
 import com.comicatlas.api.library.dto.ManagementComicListVO;
 import com.comicatlas.api.library.service.ManagementComicQueryService;
 import com.comicatlas.contract.common.Result;
@@ -23,9 +24,9 @@ public class ManagementComicQueryController {
     private final ManagementComicQueryService queryService;
 
     @GetMapping
-    // TODO(LAYER-07): 分页接口暴露 MyBatis IPage；改用框架无关分页 DTO，并兼容当前 JSON 字段及前端分页语义。
-    public Result<IPage<ManagementComicListVO>> list(ComicListQuery query) {
-        return Result.ok(queryService.list(query));
+    public Result<PageResponse<ManagementComicListVO>> list(ComicListQuery query) {
+        IPage<ManagementComicListVO> page = queryService.list(query);
+        return Result.ok(PageResponse.of(page.getRecords(), page.getTotal(), page.getCurrent(), page.getSize()));
     }
 
     @GetMapping("/{id}")

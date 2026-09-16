@@ -47,6 +47,8 @@ import java.util.Set;
 @MonitoredOperation("management-task")
 public class ManagementTaskService {
 
+    // TODO(DECOUPLE-05): 通用任务服务直接识别 METADATA_REFRESH 并修改漫画业务状态，需改为注入业务域策略。
+
     /** 目标类型：漫画。 */
     private static final String TARGET_TYPE_COMIC = "COMIC";
     /** 目标类型：章节。 */
@@ -55,6 +57,11 @@ public class ManagementTaskService {
     private static final String TARGET_TYPE_MEDIA = "MEDIA";
     /** 初始 attempt 次数。 */
     private static final int INITIAL_ATTEMPT = 1;
+    private static final List<ManagementTaskStatus> TERMINAL_ITEM_STATUSES = List.of(
+            ManagementTaskStatus.CANCELLED,
+            ManagementTaskStatus.SUCCEEDED,
+            ManagementTaskStatus.PARTIALLY_SUCCEEDED,
+            ManagementTaskStatus.FAILED);
     private final DigestService digestService;
 
     private final ManagementTaskMapper taskMapper;
@@ -244,7 +251,6 @@ public class ManagementTaskService {
         return taskResponseAssembler.toResponse(updated);
     }
 
-    // TODO(DECOUPLE-05): 通用任务服务依赖元数据刷新业务；提取取消/重试策略接口，由元数据域实现，保持 attempt 校验与释放动作同事务。
     private void releaseCancelledMetadataRefresh(ManagementTask task, Long taskId) {
         if (task.getTaskType() != TaskType.METADATA_REFRESH
                 || taskInternalQueryService.countActiveItems(taskId) > 0) {
@@ -481,22 +487,24 @@ public class ManagementTaskService {
             return taskResponseAssembler.toItemResponse(item);
         }
 
-        // TODO(IMPL-02): attempt/终态只在读取后判断，后续 UPDATE 仅按 ID；并发结果或重试可穿过检查，需条件更新并根据受影响行数决定后续聚合。
-        item.setStatus(newStatus);
-        item.setUpdatedAt(LocalDateTime.now());
-
-        if (newStatus == ManagementTaskStatus.RUNNING && item.getStartedAt() == null) {
-            item.setStartedAt(LocalDateTime.now());
-        }
+        Integer expectedAttempt = item.getAttempt();
+        boolean isFirstRunning = newStatus == ManagementTaskStatus.RUNNING && item.getStartedAt() == null;
+        LocalDateTime updateTime = LocalDateTime.now();
+        LocalDateTime startedTime = isFirstRunning ? updateTime : item.getStartedAt();
 
         LambdaUpdateWrapper<ManagementTaskItem> updateWrapper = new LambdaUpdateWrapper<ManagementTaskItem>()
                 .eq(ManagementTaskItem::getId, itemId)
+                .notIn(ManagementTaskItem::getStatus, TERMINAL_ITEM_STATUSES)
                 .set(ManagementTaskItem::getStatus, newStatus)
-                .set(ManagementTaskItem::getUpdatedAt, LocalDateTime.now());
+                .set(ManagementTaskItem::getUpdatedAt, updateTime);
 
-        if (newStatus == ManagementTaskStatus.RUNNING && item.getStartedAt() == null) {
-            // TODO(IMPL-07): updateItemStatus 已先给 item.startedAt 赋值，导致包围此语句的空值判断恒不成立；首次 RUNNING 的 started_at 未写入更新语句。
-            updateWrapper.set(ManagementTaskItem::getStartedAt, LocalDateTime.now());
+        if (expectedAttempt == null) {
+            updateWrapper.isNull(ManagementTaskItem::getAttempt);
+        } else {
+            updateWrapper.eq(ManagementTaskItem::getAttempt, expectedAttempt);
+        }
+        if (isFirstRunning) {
+            updateWrapper.set(ManagementTaskItem::getStartedAt, startedTime);
         }
 
         if (newStatus.isTerminal()) {
@@ -514,7 +522,12 @@ public class ManagementTaskService {
             updateWrapper.set(ManagementTaskItem::getResultRefId, resultRefId);
         }
 
-        itemMapper.update(null, updateWrapper);
+        int affectedRows = itemMapper.update(null, updateWrapper);
+        if (affectedRows == 0) {
+            log.info("任务项状态更新因并发状态或 attempt 变化被忽略: itemId={}, attempt={}, status={}",
+                    itemId, attempt, newStatus);
+            return taskResponseAssembler.toItemResponse(itemMapper.selectById(itemId));
+        }
 
         // 重新聚合主任务状态
         taskAggregationService.aggregate(item.getTaskId());
@@ -530,7 +543,6 @@ public class ManagementTaskService {
      * @return true 表示进度已更新
      */
     @Transactional
-    // TODO(IMPL-02): 进度更新的 attempt/终态检查与仅按 ID 的 UPDATE 不原子；并发完成或重试时可能覆盖新状态/进度，需持久化条件保护。
     public boolean updateItemProgress(Long itemId, int attempt, int progress, String stage) {
         ManagementTaskItem item = itemMapper.selectById(itemId);
         if (item == null) {
@@ -547,8 +559,14 @@ public class ManagementTaskService {
 
         LambdaUpdateWrapper<ManagementTaskItem> updateWrapper = new LambdaUpdateWrapper<ManagementTaskItem>()
                 .eq(ManagementTaskItem::getId, itemId)
+                .notIn(ManagementTaskItem::getStatus, TERMINAL_ITEM_STATUSES)
                 .set(ManagementTaskItem::getProgress, progress)
                 .set(ManagementTaskItem::getUpdatedAt, LocalDateTime.now());
+        if (item.getAttempt() == null) {
+            updateWrapper.isNull(ManagementTaskItem::getAttempt);
+        } else {
+            updateWrapper.eq(ManagementTaskItem::getAttempt, item.getAttempt());
+        }
         boolean isStarted = item.getStatus() == ManagementTaskStatus.QUEUED;
         if (isStarted) {
             updateWrapper.set(ManagementTaskItem::getStatus, ManagementTaskStatus.RUNNING);
@@ -556,7 +574,10 @@ public class ManagementTaskService {
                 updateWrapper.set(ManagementTaskItem::getStartedAt, LocalDateTime.now());
             }
         }
-        itemMapper.update(null, updateWrapper);
+        int affectedRows = itemMapper.update(null, updateWrapper);
+        if (affectedRows == 0) {
+            return false;
+        }
 
         if (isStarted) {
             taskAggregationService.aggregate(item.getTaskId());

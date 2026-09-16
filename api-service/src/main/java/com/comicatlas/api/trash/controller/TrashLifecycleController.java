@@ -4,6 +4,7 @@ import com.comicatlas.api.trash.dto.PurgeRequest;
 import com.comicatlas.api.trash.dto.TrashReconcileReport;
 import com.comicatlas.api.trash.service.TrashLifecycleService;
 import com.comicatlas.api.trash.service.TrashManifestService;
+import com.comicatlas.api.trash.service.TrashCoverService;
 import com.comicatlas.api.trash.service.TrashQueryService;
 
 import com.comicatlas.api.task.dto.OperationSubmitResultDTO;
@@ -22,8 +23,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -41,32 +40,16 @@ public class TrashLifecycleController {
     private final TrashLifecycleService trashLifecycleService;
     private final TrashQueryService trashQueryService;
     private final TrashManifestService trashManifestService;
-
-    /** THUMBS 存储根 key（回收清单 rootKey 匹配用）。 */
-    private static final String THUMBS_ROOT_KEY = "THUMBS";
+    private final TrashCoverService trashCoverService;
 
     /** WebP 封面 MIME 类型（Spring MediaType 未内置 WebP 常量）。 */
     private static final String WEBP_CONTENT_TYPE = "image/webp";
 
     /** 回收后封面已移入 TRASH，提供受管理端保护的只读封面读取端点。 */
-    // TODO(LAYER-01): Controller 解释清单并拼接/探测磁盘路径，越过协议边界；迁至回收封面查询服务与存储适配器，校验路径仍处于受管根内。
     @GetMapping(value = "/comics/{comicId}/cover", produces = WEBP_CONTENT_TYPE)
     public ResponseEntity<Resource> cover(@PathVariable Long comicId) {
-        TrashManifestDTO manifest = trashManifestService.readLatestManifest("COMIC", comicId);
-        if (manifest == null) {
-            return ResponseEntity.notFound().build();
-        }
-        for (TrashManifestDTO.Entry entry : manifest.entries()) {
-            if (!THUMBS_ROOT_KEY.equalsIgnoreCase(entry.rootKey())) {
-                continue;
-            }
-            Path file = trashManifestService.manifestDir("COMIC", comicId, manifest.taskId())
-                    .resolve(entry.trashRelativePath()).resolve("cover.webp").normalize();
-            if (Files.isRegularFile(file)) {
-                return ResponseEntity.ok(new FileSystemResource(file));
-            }
-        }
-        return ResponseEntity.notFound().build();
+        Resource cover = trashCoverService.findCover(comicId);
+        return cover == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(cover);
     }
 
     /** 查询漫画、章节和媒体的统一回收内容。 */

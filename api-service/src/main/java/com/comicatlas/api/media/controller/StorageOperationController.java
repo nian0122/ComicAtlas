@@ -7,11 +7,12 @@ import com.comicatlas.api.exporter.dto.ExportTaskVO;
 import com.comicatlas.api.exporter.dto.ExportArtifactVO;
 import com.comicatlas.api.task.dto.OperationSubmitResultDTO;
 import com.comicatlas.api.exporter.service.ExportOperationService;
+import com.comicatlas.api.exporter.service.ExportDirectoryService;
+import com.comicatlas.api.exporter.service.ExportDirectoryOpenResult;
 import com.comicatlas.api.media.service.HqDeleteOperationService;
 import com.comicatlas.api.media.service.LqOperationService;
 import com.comicatlas.api.media.service.TranscodeOperationService;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,10 +22,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.awt.Desktop;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
 
 /**
@@ -34,18 +31,19 @@ import java.util.List;
  * 包含全部存储操作端点：LQ 生成、HQ 删除（保留 LQ）、视频转码、刷新元数据、导出及导出分卷清单/打开目录。
  * 存储统计端点见 {@link StorageStatsController}。
  */
-@Slf4j
 @RestController
 @RequestMapping("/api/manage/storage")
 @RequiredArgsConstructor
-// TODO(DECOUPLE-12): 同一入口类混合媒体、元数据刷新与导出业务；按业务拆分 Controller，保持所有既有 URL/状态码，避免重叠映射。
 public class StorageOperationController {
+
+    // TODO(DECOUPLE-12): Controller 聚合 LQ/HQ/转码、元数据刷新和导出端点，需按业务域拆分 Controller 并保持现有 URL 契约。
 
     private final LqOperationService lqOperationService;
     private final HqDeleteOperationService hqDeleteOperationService;
     private final TranscodeOperationService transcodeOperationService;
     private final ExportOperationService exportOperationService;
     private final MediaOperationCommandService commandService;
+    private final ExportDirectoryService exportDirectoryService;
 
     // ======================== LQ 生成 ========================
 
@@ -212,27 +210,15 @@ public class StorageOperationController {
     /**
      * 打开导出文件所在目录（Windows/Linux/macOS 通用，Desktop API；失败回退 501）。
      */
-    // TODO(LAYER-02): Controller 直接探测文件并调用 Desktop；由导出服务协调本机目录打开适配器，Controller 只映射已有 200/404/501 响应。
     @PostMapping("/export/tasks/{taskId}/open")
     public ResponseEntity<?> openExportDir(@PathVariable Long taskId) {
-        ExportTaskVO task = exportOperationService.getTask(taskId);
-        String physicalPath = task.getPhysicalPath();
-        if (physicalPath == null) {
+        ExportDirectoryOpenResult result = exportDirectoryService.open(taskId);
+        if (result.status() == ExportDirectoryOpenResult.Status.OPENED) {
+            return ResponseEntity.ok().build();
+        }
+        if (result.status() == ExportDirectoryOpenResult.Status.NOT_FOUND) {
             return ResponseEntity.notFound().build();
         }
-        Path dirPath = Path.of(physicalPath.replace("/", java.io.File.separator)).getParent();
-        if (dirPath == null || !Files.exists(dirPath)) {
-            return ResponseEntity.notFound().build();
-        }
-        if (Desktop.isDesktopSupported()) {
-            try {
-                Desktop.getDesktop().open(dirPath.toFile());
-                return ResponseEntity.ok().build();
-            } catch (IOException e) {
-                log.warn("Desktop.open 失败: dir={}, error={}", dirPath, e.getMessage());
-            }
-        }
-        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED)
-            .body("无法打开文件资源管理器，目录: " + dirPath);
+        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).body(result.message());
     }
 }

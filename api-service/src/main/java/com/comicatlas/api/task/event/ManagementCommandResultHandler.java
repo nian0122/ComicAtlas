@@ -38,6 +38,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 @RequiredArgsConstructor
 public class ManagementCommandResultHandler {
 
+    // TODO(DECOUPLE-09): 消息适配器仍协调 Inbox 幂等、事务、任务项状态和业务结果路由，需下沉结果应用 Service。
+
     /** 失败原因写入列上限（字符）：management_task_item.error_message 为 varchar(4096)。
      *  防御 Worker 或其他来源的超长 errorMessage 导致写库异常、结果事件进 DLQ、item 永久 QUEUED。 */
     private static final int MAX_ITEM_ERROR_MESSAGE_CHARS = 4000;
@@ -69,7 +71,6 @@ public class ManagementCommandResultHandler {
         }
     }
 
-    // TODO(DECOUPLE-09): 消费 ACK/DLQ、Inbox 事务及任务结果流程耦合；提取结果应用服务统一事务，保留业务落库与 Inbox 原子性及元数据快照事务外读取。
     private void process(ComicEvent event, Long taskId, Long itemId, int attempt,
                          Channel channel, long tag, Runnable business) {
         String eventId = event.eventId().toString();

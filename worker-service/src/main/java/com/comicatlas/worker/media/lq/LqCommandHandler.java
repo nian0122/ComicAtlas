@@ -1,218 +1,69 @@
 package com.comicatlas.worker.media.lq;
 
-import com.comicatlas.common.event.ManagementCommandRequestedEvent;
-import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.common.constant.ManagementOperationTypes;
+import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.common.event.payload.LqSizeResult;
-import com.comicatlas.worker.persistence.record.MediaRecord;
-import com.comicatlas.worker.storage.StorageProperties;
-import com.comicatlas.worker.storage.StorageRoot;
-import com.comicatlas.worker.storage.StoragePathParser;
-import com.comicatlas.worker.storage.StorageRootResolver;
-import com.comicatlas.worker.media.image.ImageOptimizer;
 import com.comicatlas.worker.persistence.mapper.MediaReadMapper;
+import com.comicatlas.worker.persistence.record.MediaRecord;
 import com.comicatlas.worker.task.publisher.ManagementCommandPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
-/**
- * LQ 生成命令处理器（新 envelope 路由）。
- * <p>
- * 依据 command.targetId 处理 LQ 生成：CHAPTER 级针对单个章节，COMIC 级
- * （批量操作 API 创建的 COMIC 目标 item）展开为漫画下所有章节逐章生成，
- * 最终按 item 聚合回传一次 progress/completed/failed。
- * <p>
- * QA 修复注记（task-21）：原实现只有 generateChapter，批量操作
- * （/api/management/batch）创建 COMIC 目标 item 时会把 comicId 误当
- * chapterId 处理，导致批量 LQ 处理到错误的章节。本修复补充 COMIC 级展开。
- * <p>
- * completed 事件回传每页 LQ 产物大小（{@link LqSizeResult}），
- * API 端写入 media.lq_size 供整本 lqSize 统计聚合。
- */
+/** LQ 生成命令适配器，负责命令分派及结果事件发布。 */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class LqCommandHandler {
-
-    private final ImageOptimizer optimizer;
     private final MediaReadMapper mediaMapper;
-    private final StorageProperties storageProperties;
     private final ManagementCommandPublisher publisher;
+    private final LqChapterProcessingService chapterProcessingService;
 
-    public void generateChapter(ManagementCommandRequestedEvent cmd) {
-        Long chapterId = cmd.targetId();
-        ChapterProcessResult result = processChapter(chapterId, isRegenerate(cmd));
-        if (result.failedPages().isEmpty()) {
-            publisher.progress(cmd, 100, "LQ 生成完成");
-            publisher.completed(cmd, result.lqSizes());
-            log.info("LQ 命令完成: chapterId={}", chapterId);
-        } else {
-            publisher.failed(cmd, "LQ 生成失败页: " + result.failedPages(), result.lqSizes());
-            log.warn("LQ 命令部分失败: chapterId={}, failedPages={}", chapterId, result.failedPages());
-        }
+    public void generateChapter(ManagementCommandRequestedEvent command) {
+        LqChapterProcessingService.ChapterProcessResult result = chapterProcessingService.process(
+                command.targetId(), isRegenerate(command));
+        publishResult(command, result, "chapterId=" + command.targetId());
     }
 
-    public void generateComic(ManagementCommandRequestedEvent cmd) {
-        Long comicId = cmd.targetId();
-        List<MediaRecord> pages = mediaMapper.selectByComicId(comicId);
-        List<Long> chapterIds = pages.stream()
-                .map(MediaRecord::getChapterId)
-                .filter(Objects::nonNull)
-                .distinct()
-                .toList();
+    public void generateComic(ManagementCommandRequestedEvent command) {
+        List<MediaRecord> pages = mediaMapper.selectByComicId(command.targetId());
+        List<Long> chapterIds = pages.stream().map(MediaRecord::getChapterId).filter(Objects::nonNull).distinct().toList();
         if (chapterIds.isEmpty()) {
-            publisher.failed(cmd, "漫画无页面: " + comicId);
+            publisher.failed(command, "漫画无页面: " + command.targetId());
             return;
         }
         List<Long> failedChapters = new ArrayList<>();
-        List<LqSizeResult> allSizes = new ArrayList<>();
+        List<LqSizeResult> sizes = new ArrayList<>();
         for (Long chapterId : chapterIds) {
-            ChapterProcessResult result = processChapter(chapterId, isRegenerate(cmd));
-            allSizes.addAll(result.lqSizes());
-            if (!result.failedPages().isEmpty()) {
-                failedChapters.add(chapterId);
-            }
+            LqChapterProcessingService.ChapterProcessResult result = chapterProcessingService.process(
+                    chapterId, isRegenerate(command));
+            sizes.addAll(result.lqSizes());
+            if (!result.failedPages().isEmpty()) failedChapters.add(chapterId);
         }
         if (failedChapters.isEmpty()) {
-            publisher.progress(cmd, 100, "LQ 生成完成");
-            publisher.completed(cmd, allSizes);
-            log.info("LQ 命令完成（漫画）: comicId={}, chapters={}", comicId, chapterIds.size());
+            publisher.progress(command, 100, "LQ 生成完成");
+            publisher.completed(command, sizes);
         } else {
-            publisher.failed(cmd, "LQ 生成失败章节: " + failedChapters, allSizes);
-            log.warn("LQ 命令部分失败（漫画）: comicId={}, failedChapters={}", comicId, failedChapters);
+            publisher.failed(command, "LQ 生成失败章节: " + failedChapters, sizes);
         }
     }
 
-    /** LQ_REGENERATE 表示强制重新生成（忽略已存在的 LQ 产物）。 */
-    private static boolean isRegenerate(ManagementCommandRequestedEvent cmd) {
-        return ManagementOperationTypes.LQ_REGENERATE.equals(cmd.operationType());
-    }
-
-    /**
-     * 处理单个章节的 LQ 生成。
-     *
-     * @return 失败页码列表（空 = 全部成功）+ 各成功页的 LQ 产物大小
-     */
-    // TODO(DECOUPLE-07): 命令适配混合媒体查询、优化执行和结果匹配；提取章节优化服务，命令层保留进度及完成/失败事件发布。
-    private ChapterProcessResult processChapter(Long chapterId, boolean force) {
-        List<MediaRecord> pages = mediaMapper.selectByChapterId(chapterId);
-        if (pages.isEmpty()) {
-            return new ChapterProcessResult(List.of(), List.of());
+    private void publishResult(ManagementCommandRequestedEvent command,
+                               LqChapterProcessingService.ChapterProcessResult result, String target) {
+        if (result.failedPages().isEmpty()) {
+            publisher.progress(command, 100, "LQ 生成完成");
+            publisher.completed(command, result.lqSizes());
+            log.info("LQ 命令完成: {}", target);
+        } else {
+            publisher.failed(command, "LQ 生成失败页: " + result.failedPages(), result.lqSizes());
         }
-        Long comicId = StoragePathParser.parseComicId(pages.get(0).getHqPath())
-                .stream().boxed().findFirst().orElse(null);
-        StorageRoot hqRoot = StorageRootResolver.optional(storageProperties, StorageRootKeys.HQ);
-        StorageRoot lqRoot = StorageRootResolver.optional(storageProperties, StorageRootKeys.LQ);
-        if (comicId == null || hqRoot == null || lqRoot == null) {
-            return new ChapterProcessResult(List.of(-1), List.of());
-        }
-        String relativeDir = StoragePathParser.directoryOf(pages.get(0).getHqPath());
-        Path hqDir = hqRoot.resolve(relativeDir);
-        Path lqDir = lqRoot.resolve(relativeDir);
-        ImageOptimizer.RunResult result = optimizer.generateLq(comicId, chapterId, hqDir, lqDir, force);
-        if (result.getPages() == null) {
-            return new ChapterProcessResult(List.of(), List.of());
-        }
-        Map<String, MediaRecord> mediaBySourcePath = buildMediaBySourcePath(pages, relativeDir);
-        List<Integer> failedPages = result.getPages().stream()
-                .filter(p -> "failed".equals(p.getStatus()))
-                .map(p -> resolvePageNumber(p, mediaBySourcePath))
-                .toList();
-        return new ChapterProcessResult(failedPages,
-                collectLqSizes(pages, result, mediaBySourcePath, relativeDir));
     }
 
-    /**
-     * 汇总各成功页的 LQ 产物大小（优化器 outputSize → mediaId 映射），
-     * 生成失败或缺失产物的页跳过，避免 API 侧写入错误的 lq_size。
-     */
-    private static List<LqSizeResult> collectLqSizes(List<MediaRecord> pages, ImageOptimizer.RunResult result,
-                                                     Map<String, MediaRecord> mediaBySourcePath,
-                                                     String lqDirectory) {
-        Map<Integer, Long> mediaIdByPage = pages.stream()
-                .filter(p -> p.getPageNumber() != null)
-                .collect(Collectors.toMap(MediaRecord::getPageNumber, MediaRecord::getId, (a, b) -> a));
-        return result.getPages().stream()
-                .filter(p -> !"failed".equals(p.getStatus())
-                        && p.getPageNumber() != null && p.getOutputSize() != null)
-                .map(p -> new LqSizeResult(resolveMediaId(p, mediaBySourcePath, mediaIdByPage),
-                        p.getOutputSize(), joinRelativePath(lqDirectory, p.getOutputPath())))
-                .filter(r -> r.mediaId() != null)
-                .toList();
-    }
-
-    private static Map<String, MediaRecord> buildMediaBySourcePath(List<MediaRecord> pages, String directory) {
-        return pages.stream()
-                .filter(media -> media.getHqPath() != null)
-                .collect(Collectors.toMap(
-                        media -> relativePath(directory, media.getHqPath()),
-                        Function.identity(),
-                        (first, ignored) -> first));
-    }
-
-    private static Integer resolvePageNumber(ImageOptimizer.PageResult pageResult,
-                                             Map<String, MediaRecord> mediaBySourcePath) {
-        MediaRecord media = resolveMedia(pageResult, mediaBySourcePath);
-        if (media != null && media.getPageNumber() != null) {
-            return media.getPageNumber();
-        }
-        return pageResult.getPageNumber() == null ? -1 : pageResult.getPageNumber().intValue();
-    }
-
-    private static Long resolveMediaId(ImageOptimizer.PageResult pageResult,
-                                       Map<String, MediaRecord> mediaBySourcePath,
-                                       Map<Integer, Long> mediaIdByPage) {
-        MediaRecord media = resolveMedia(pageResult, mediaBySourcePath);
-        if (media != null) {
-            return media.getId();
-        }
-        if (pageResult.getSourcePath() != null && !pageResult.getSourcePath().isBlank()) {
-            return null;
-        }
-        return pageResult.getPageNumber() == null
-                ? null : mediaIdByPage.get(pageResult.getPageNumber().intValue());
-    }
-
-    private static MediaRecord resolveMedia(ImageOptimizer.PageResult pageResult,
-                                            Map<String, MediaRecord> mediaBySourcePath) {
-        if (pageResult.getSourcePath() == null || pageResult.getSourcePath().isBlank()) {
-            return null;
-        }
-        return mediaBySourcePath.get(normalizePath(pageResult.getSourcePath()));
-    }
-
-    private static String relativePath(String directory, String path) {
-        String normalizedDirectory = normalizePath(directory);
-        String normalizedPath = normalizePath(path);
-        String directoryPrefix = normalizedDirectory.isBlank() ? "" : normalizedDirectory + "/";
-        return normalizedPath.startsWith(directoryPrefix)
-                ? normalizedPath.substring(directoryPrefix.length()) : normalizedPath;
-    }
-
-    private static String normalizePath(String path) {
-        return path == null ? "" : path.replace('\\', '/').replaceAll("^/+|/+$", "");
-    }
-
-    private static String joinRelativePath(String directory, String fileName) {
-        if (fileName == null || fileName.isBlank()) {
-            return null;
-        }
-        if (directory == null || directory.isBlank()) {
-            return fileName.replace('\\', '/');
-        }
-        return directory.replace('\\', '/') + "/" + fileName.replace('\\', '/');
-    }
-
-    /** 单章处理结果：失败页码 + 各成功页 LQ 产物大小。 */
-    private record ChapterProcessResult(List<Integer> failedPages, List<LqSizeResult> lqSizes) {
+    private static boolean isRegenerate(ManagementCommandRequestedEvent command) {
+        return ManagementOperationTypes.LQ_REGENERATE.equals(command.operationType());
     }
 }

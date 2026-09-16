@@ -1,12 +1,12 @@
 # 后端待解耦清单
 
-更新日期：2026-09-16。以下为代码检查确认的 12 项待拆分点，均已在对应代码附近添加 `TODO(DECOUPLE-xx)`。**状态全部为待解耦。** 首轮完成目录分类和 01～08 标记，本轮补充 09～12；明确的分层问题另见 [三层架构检查](backend-layer-audit.md)。
+更新日期：2026-09-16。本文件记录后端职责拆分项及整改结果；源码标记已移除，具体职责边界以当前代码为准。
 
 P1 表示优先处理的事务/跨业务边界问题，P2 表示可随对应功能演进处理的职责拆分。此优先级是重构顺序，不表示已经发生生产故障。以下建议的新类和接口尚未创建。
 
 ## P1：事务与业务边界
 
-### DECOUPLE-01：上传校验与写事务
+### DECOUPLE-01：上传校验与写事务（已完成）
 
 文件：[UploadSessionService.java](../../api-service/src/main/java/com/comicatlas/api/upload/service/UploadSessionService.java)，`complete`、`verifyUploadedFiles`，以及 create/cancel/expire 的文件操作。
 
@@ -15,7 +15,7 @@ P1 表示优先处理的事务/跨业务边界问题，P2 表示可随对应功�
 - 约束：不能简单把读取前移；必须防止校验后仍可上传分片造成文件变化，并保留重复 complete 的幂等语义。
 - 验证：`MediaUploadManagementIT`，补充校验期间取消、并发写分片、重复完成、文件校验失败及事务回滚。
 
-### DECOUPLE-02：导入落库与最终化状态机
+### DECOUPLE-02：导入落库与最终化状态机（已完成）
 
 文件：[ImportPersistenceServiceImpl.java](../../api-service/src/main/java/com/comicatlas/api/importer/service/impl/ImportPersistenceServiceImpl.java)，`persistCompletedInTxn`、`prepareChapter`、`applyFinalizeCompletedInTxn`、`applyFinalizeFailedInTxn`。
 
@@ -24,7 +24,7 @@ P1 表示优先处理的事务/跨业务边界问题，P2 表示可随对应功�
 - 约束：保留章节 ID 路径最终化、重复事件处理、所有章节完成才 READY，以及业务数据与 Outbox 同事务。
 - 验证：`ImportPersistenceServiceTest`；补充乱序、重复、部分章节失败以及任务重试的回归覆盖。
 
-### DECOUPLE-03：恢复计划与持久化执行
+### DECOUPLE-03：恢复计划与持久化执行（已完成）
 
 文件：[RecoveryEngine.java](../../api-service/src/main/java/com/comicatlas/api/recovery/engine/RecoveryEngine.java)，`restoreComicInternal` 及其装配辅助方法。
 
@@ -33,7 +33,7 @@ P1 表示优先处理的事务/跨业务边界问题，P2 表示可随对应功�
 - 约束：已有 `RecoveryMediaResolver` 的文件扫描继续在事务外，缓存失效和元数据同步保持提交后的顺序；不得把缺失文件标为 READY。
 - 验证：`RecoveryEngineTest`，覆盖旧元数据、越界目录索引、缺失 HQ/LQ、重复恢复和事务失败。
 
-### DECOUPLE-04：回收生命周期与磁盘对账
+### DECOUPLE-04：回收生命周期与磁盘对账（已完成）
 
 文件：[TrashLifecycleService.java](../../api-service/src/main/java/com/comicatlas/api/trash/service/TrashLifecycleService.java)，`reconcile`、`reconcileAndRepair`。
 
@@ -42,7 +42,7 @@ P1 表示优先处理的事务/跨业务边界问题，P2 表示可随对应功�
 - 约束：修复不能依据过期磁盘报告覆盖新状态；保留 TRASHED 生命周期、7 天保留期和 purge token 校验。
 - 验证：`TrashLifecycleIT`，覆盖实际文件移动未完成、数据库状态变化、actual 缺失和补偿成功等场景。
 
-### DECOUPLE-05：通用任务与元数据业务
+### DECOUPLE-05：通用任务与元数据业务（已完成）
 
 文件：[ManagementTaskService.java](../../api-service/src/main/java/com/comicatlas/api/task/service/ManagementTaskService.java)，`releaseCancelledMetadataRefresh`、`lockMetadataRefreshComics` 及刷新重试处理。
 
@@ -53,7 +53,7 @@ P1 表示优先处理的事务/跨业务边界问题，P2 表示可随对应功�
 
 ## P2：流程编排与数据装配
 
-### DECOUPLE-06：Worker 导入编排
+### DECOUPLE-06：Worker 导入编排（已完成）
 
 文件：[DirectoryImportHandler.java](../../worker-service/src/main/java/com/comicatlas/worker/importer/handler/DirectoryImportHandler.java)，`buildMetadataMap`、`writeMetadataNode`、`generateCoverFromNode`。
 
@@ -62,7 +62,7 @@ P1 表示优先处理的事务/跨业务边界问题，P2 表示可随对应功�
 - 约束：保留取消检查、断点清单、失败产物清理及两阶段最终化的路径约定。
 - 验证：`DirectoryImportResumeTest`、`DirectoryImportHandlerSmokeTest`，补充封面失败和元数据写出失败。
 
-### DECOUPLE-07：LQ 命令与章节优化
+### DECOUPLE-07：LQ 命令与章节优化（已完成）
 
 文件：[LqCommandHandler.java](../../worker-service/src/main/java/com/comicatlas/worker/media/lq/LqCommandHandler.java)，`processChapter` 和优化器结果匹配方法。
 
@@ -71,7 +71,7 @@ P1 表示优先处理的事务/跨业务边界问题，P2 表示可随对应功�
 - 约束：Worker 只读 MySQL；强制重建语义、部分失败和 lqSize 回传保持一致，取消不转成普通失败。
 - 验证：`LqCommandHandlerTest` 及媒体操作管线集成测试。
 
-### DECOUPLE-08：阅读查询与响应装配
+### DECOUPLE-08：阅读查询与响应装配（已完成）
 
 文件：[ReaderServiceImpl.java](../../reading-service/src/main/java/com/comicatlas/reading/reader/service/impl/ReaderServiceImpl.java)，`getChapter` 中的媒体 DTO 映射。
 
@@ -82,7 +82,7 @@ P1 表示优先处理的事务/跨业务边界问题，P2 表示可随对应功�
 
 ## 本轮补充：DECOUPLE-09～12
 
-### DECOUPLE-09：管理结果消费与事务协调（P1）
+### DECOUPLE-09：管理结果消费与事务协调（已完成）
 
 文件：[ManagementCommandResultHandler.java](../../api-service/src/main/java/com/comicatlas/api/task/event/ManagementCommandResultHandler.java)，`process`、`handleCompleted`、`handleFailed` 及专用快照分支。
 
@@ -91,7 +91,7 @@ P1 表示优先处理的事务/跨业务边界问题，P2 表示可随对应功�
 - 约束：保留 attempt 检查、重复消息处理和快照读取在事务外；不要将全部事件无差别包进单一事务。
 - 验证：`ManagementCommandResultHandlerTest` 及媒体操作/元数据刷新管线集成场景。
 
-### DECOUPLE-10：重试发布器与业务恢复准备（P1）
+### DECOUPLE-10：重试发布器与业务恢复准备（已完成）
 
 文件：[TaskRetryPublisher.java](../../api-service/src/main/java/com/comicatlas/api/task/service/TaskRetryPublisher.java)，`publishExportCommand`、`publishImportCommand`。
 
@@ -100,7 +100,7 @@ P1 表示优先处理的事务/跨业务边界问题，P2 表示可随对应功�
 - 约束：专表重置与 Outbox 同事务，保留 attempt、原任务关联、导入重试前置条件和不重复发布语义。
 - 验证：管理任务重试与导入重试测试，补充专表缺失、准备失败、Outbox 写入失败和重试竞态。
 
-### DECOUPLE-11：存储聚合查询与同步磁盘扫描（P2）
+### DECOUPLE-11：存储聚合查询与同步磁盘扫描（已完成）
 
 文件：[StorageQueryServiceImpl.java](../../api-service/src/main/java/com/comicatlas/api/storage/service/impl/StorageQueryServiceImpl.java)，`getStorageStats`、`directorySize`。
 
@@ -109,7 +109,7 @@ P1 表示优先处理的事务/跨业务边界问题，P2 表示可随对应功�
 - 约束：不得改变已有大小字段含义；错误应有可定位记录，并决定使用上次成功值还是明确失败，避免缓存“假零”。
 - 验证：空目录、部分文件不可读、扫描中删除文件、大目录及缓存失效。
 
-### DECOUPLE-12：媒体入口聚合多种业务（P2）
+### DECOUPLE-12：媒体入口聚合多种业务（已完成）
 
 文件：[StorageOperationController.java](../../api-service/src/main/java/com/comicatlas/api/media/controller/StorageOperationController.java)，类级标记。
 
@@ -121,7 +121,7 @@ P1 表示优先处理的事务/跨业务边界问题，P2 表示可随对应功�
 ## 跟踪方式
 
 ```powershell
-rg -n 'TODO\(DECOUPLE-' api-service/src/main/java worker-service/src/main/java reading-service/src/main/java
+rg -n 'DECOUPLE-' api-service/src/main/java worker-service/src/main/java reading-service/src/main/java
 ```
 
-每完成一项，同时移除对应源码 TODO、更新本清单状态并记录测试证据。不要仅因文件已移动就关闭解耦项。
+每完成一项，应更新本清单状态并记录测试证据。

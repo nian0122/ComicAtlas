@@ -44,6 +44,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -75,6 +76,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class UploadSessionService {
 
+    // TODO(DECOUPLE-01): complete 同时执行大文件校验、磁盘操作和上传媒体/任务/Outbox 写事务，需拆分事务外校验与独立提交服务。
+
     /** 管理命令交换器。 */
     private static final String MANAGEMENT_EXCHANGE = MqExchanges.MANAGEMENT;
     /** 管理命令请求路由键。 */
@@ -104,6 +107,7 @@ public class UploadSessionService {
     private final ManagementTaskService managementTaskService;
     private final OutboxService outboxService;
     private final DigestService digestService;
+    private final TransactionTemplate transactionTemplate;
 
     // ======================== 创建 ========================
 
@@ -325,20 +329,48 @@ public class UploadSessionService {
 
     // ======================== complete ========================
 
-    // TODO(DECOUPLE-01): 上传完整性校验与事务落库混合；先提取只读文件校验器，再以会话状态复核和幂等提交衔接短事务。
-    @Transactional
-    // TODO(IMPL-05): 本方法事务覆盖 verifyUploadedFiles 的逐文件 SHA-256/魔数读取，大文件会拉长事务；拆出校验时须冻结文件并复核会话状态。
     public UploadCompleteResponse complete(String sessionId) {
         UploadSession session = getBySessionId(sessionId);
         if (session.getStatus() != UploadSessionStatus.ACTIVE) {
             throw new BusinessException(HttpStatusCodes.CONFLICT, "会话状态 " + session.getStatus() + " 不允许 complete");
         }
+        int frozenRows = sessionMapper.update(null, new LambdaUpdateWrapper<UploadSession>()
+                .eq(UploadSession::getId, session.getId())
+                .eq(UploadSession::getStatus, UploadSessionStatus.ACTIVE)
+                .set(UploadSession::getStatus, UploadSessionStatus.VERIFYING));
+        if (frozenRows != 1) {
+            throw new BusinessException(HttpStatusCodes.CONFLICT, "上传会话正在被其他操作处理");
+        }
         List<UploadFile> files = filesOf(session);
         if (files.isEmpty()) {
+            restoreActive(session.getId());
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "会话为空，无文件可提交");
         }
 
-        List<MediaTypeDetector.Detection> detections = verifyUploadedFiles(session, files);
+        List<MediaTypeDetector.Detection> detections;
+        try {
+            detections = verifyUploadedFiles(session, files);
+        } catch (RuntimeException exception) {
+            restoreActive(session.getId());
+            throw exception;
+        }
+        try {
+            return transactionTemplate.execute(status -> completePersisted(
+                    session.getId(), sessionId, files, detections));
+        } catch (RuntimeException exception) {
+            restoreActive(session.getId());
+            throw exception;
+        }
+    }
+
+    /** 在文件校验完成后执行短事务落库；此时会话必须仍处于 VERIFYING。 */
+    private UploadCompleteResponse completePersisted(Long sessionDatabaseId, String sessionId,
+                                                     List<UploadFile> files,
+                                                     List<MediaTypeDetector.Detection> detections) {
+        UploadSession session = sessionMapper.selectById(sessionDatabaseId);
+        if (session == null || session.getStatus() != UploadSessionStatus.VERIFYING) {
+            throw new BusinessException(HttpStatusCodes.CONFLICT, "上传会话状态已变化，请重新提交");
+        }
         boolean replace = session.getReplaceMediaId() != null;
         TaskType operation = replace ? TaskType.MEDIA_REPLACE : TaskType.MEDIA_UPLOAD;
         List<Long> mediaIds = replace
@@ -364,6 +396,13 @@ public class UploadSessionService {
         log.info("上传会话 complete: sessionId={}, op={}, taskId={}, mediaIds={}",
                 sessionId, operation, managementTask.getId(), mediaIds);
         return response;
+    }
+
+    private void restoreActive(Long sessionDatabaseId) {
+        sessionMapper.update(null, new LambdaUpdateWrapper<UploadSession>()
+                .eq(UploadSession::getId, sessionDatabaseId)
+                .eq(UploadSession::getStatus, UploadSessionStatus.VERIFYING)
+                .set(UploadSession::getStatus, UploadSessionStatus.ACTIVE));
     }
 
     /** 校验全部文件：分片完整 + SHA-256 总校验 + 魔数检测，返回各文件媒体类型检测结果。 */
@@ -462,8 +501,7 @@ public class UploadSessionService {
         try (InputStream input = Files.newInputStream(file)) {
             return digestService.sha256(input);
         } catch (IOException ex) {
-            // TODO(IMPL-06): 仅拼接异常 message 丢失 IOException cause 和原始堆栈；转换业务异常时保留异常链，并避免将敏感路径透传给调用方。
-            throw new BusinessException(HttpStatusCodes.INTERNAL_ERROR, "计算文件 SHA-256 失败: " + ex.getMessage());
+            throw new BusinessException("计算文件 SHA-256 失败", ex);
         }
     }
 
