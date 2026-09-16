@@ -1,0 +1,47 @@
+package com.comicatlas.api.exporter.service;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.comicatlas.api.exporter.enums.ExportTaskStatus;
+import com.comicatlas.api.exporter.persistence.entity.ExportTask;
+import com.comicatlas.api.exporter.persistence.mapper.ExportTaskMapper;
+import com.comicatlas.api.outbox.service.OutboxService;
+import com.comicatlas.api.task.persistence.entity.ManagementTaskItem;
+import com.comicatlas.common.constant.MqExchanges;
+import com.comicatlas.common.constant.MqRoutingKeys;
+import com.comicatlas.common.event.ExportTaskCreatedEvent;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+import java.time.Instant;
+import java.util.UUID;
+
+/** 导出领域重试策略：恢复导出专表并重新发布导出任务。 */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class ExportRetryService {
+    private final ExportTaskMapper exportTaskMapper;
+    private final OutboxService outboxService;
+
+    public void retry(Long taskId, ManagementTaskItem item, int attempt) {
+        ExportTask exportTask = exportTaskMapper.selectOne(new LambdaQueryWrapper<ExportTask>()
+                .eq(ExportTask::getManagementTaskId, taskId));
+        if (exportTask == null) {
+            log.warn("导出专表不存在，跳过导出重试入队: taskId={}, itemId={}", taskId, item.getId());
+            return;
+        }
+        exportTaskMapper.update(null, new LambdaUpdateWrapper<ExportTask>()
+                .eq(ExportTask::getId, exportTask.getId())
+                .set(ExportTask::getStatus, ExportTaskStatus.PENDING)
+                .set(ExportTask::getProgress, 0)
+                .set(ExportTask::getErrorMsg, null)
+                .set(ExportTask::getCompletedAt, null));
+        ExportTaskCreatedEvent event = new ExportTaskCreatedEvent(UUID.randomUUID(), Instant.now(),
+                exportTask.getId(), exportTask.getComicId(),
+                exportTask.getFormat() == null ? "ZIP" : exportTask.getFormat());
+        outboxService.enqueue(event, MqExchanges.EXPORT, MqRoutingKeys.TASK_CREATED,
+                taskId, item.getId(), attempt);
+    }
+}
