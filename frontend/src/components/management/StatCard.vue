@@ -7,7 +7,7 @@ withDefaults(
     unit?: string
     tone?: 'neutral' | 'primary' | 'success' | 'warning' | 'danger'
   }>(),
-  { tone: 'neutral' },
+  { description: undefined, unit: undefined, tone: 'neutral' },
 )
 </script>
 

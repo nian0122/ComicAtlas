@@ -7,7 +7,7 @@ withDefaults(
     titleId?: string
     level?: 'h1' | 'h2' | 'h3'
   }>(),
-  { level: 'h2' },
+  { description: undefined, eyebrow: undefined, titleId: undefined, level: 'h2' },
 )
 </script>
 

@@ -4,20 +4,8 @@
 
     <!-- 导入模式切换 -->
     <div class="import-tabs">
-      <div
-        class="import-tab"
-        :class="{ active: activeTab === 'single' }"
-        @click="activeTab = 'single'"
-      >
-        单个导入
-      </div>
-      <div
-        class="import-tab"
-        :class="{ active: activeTab === 'batch' }"
-        @click="activeTab = 'batch'"
-      >
-        批量导入
-      </div>
+      <div class="import-tab" :class="{ active: activeTab === 'single' }" @click="activeTab = 'single'">单个导入</div>
+      <div class="import-tab" :class="{ active: activeTab === 'batch' }" @click="activeTab = 'batch'">批量导入</div>
     </div>
 
     <!-- 单个导入 -->
@@ -32,12 +20,7 @@
             class="source-type-radio"
             :class="{ active: sourceType === opt.value }"
           >
-            <input
-              v-model="sourceType"
-              type="radio"
-              :value="opt.value"
-              class="radio-input"
-            />
+            <input v-model="sourceType" type="radio" :value="opt.value" class="radio-input" />
             <span class="radio-label">
               <span class="radio-title">{{ opt.label }}</span>
               <span class="radio-desc">{{ opt.desc }}</span>
@@ -61,11 +44,7 @@
 
       <!-- 提交 -->
       <div class="form-actions">
-        <button
-          class="primary-btn large"
-          :disabled="!canSubmit || creating"
-          @click="doImport"
-        >
+        <button class="primary-btn large" :disabled="!canSubmit || creating" @click="doImport">
           <span v-if="creating" class="spinner-sm" />
           <span>{{ creating ? '创建中...' : '开始导入' }}</span>
         </button>
@@ -86,11 +65,7 @@
             placeholder="F:/games/comics/..."
             @keyup.enter="doScan"
           />
-          <button
-            class="primary-btn"
-            :disabled="!batchParentPath.trim() || scanning"
-            @click="doScan"
-          >
+          <button class="primary-btn" :disabled="!batchParentPath.trim() || scanning" @click="doScan">
             <span v-if="scanning" class="spinner-sm" />
             <span>{{ scanning ? '扫描中...' : '扫描' }}</span>
           </button>
@@ -110,7 +85,10 @@
         <el-alert v-else-if="scanError" type="error" :title="scanError" show-icon />
 
         <!-- 空结果 -->
-        <el-empty v-else-if="!scanResult || scanResult.items.length === 0" description="此漫画集根目录下未发现候选漫画（直接子目录）" />
+        <el-empty
+          v-else-if="!scanResult || scanResult.items.length === 0"
+          description="此漫画集根目录下未发现候选漫画（直接子目录）"
+        />
 
         <!-- 成功 -->
         <div v-else class="scan-results">
@@ -126,10 +104,18 @@
           <!-- 规范化统计与扫描级警告 -->
           <div class="scan-summary">
             <div v-if="hasPreview" class="scan-stats" aria-label="扫描统计">
-              <span class="stat-item">候选 <strong>{{ scanResult.total }}</strong></span>
-              <span class="stat-item">图片 <strong>{{ totalImageCount }}</strong></span>
-              <span class="stat-item">视频 <strong>{{ totalVideoCount }}</strong></span>
-              <span class="stat-item">媒体 <strong>{{ totalMediaCount }}</strong></span>
+              <span class="stat-item"
+                >候选 <strong>{{ scanResult.total }}</strong></span
+              >
+              <span class="stat-item"
+                >图片 <strong>{{ totalImageCount }}</strong></span
+              >
+              <span class="stat-item"
+                >视频 <strong>{{ totalVideoCount }}</strong></span
+              >
+              <span class="stat-item"
+                >媒体 <strong>{{ totalMediaCount }}</strong></span
+              >
             </div>
             <div v-if="(scanResult.warnings ?? []).length > 0" class="scan-warnings" aria-label="扫描警告">
               <span
@@ -236,26 +222,19 @@
 
 <script setup lang="ts">
 import ManagementPageHeader from '@/components/management/ManagementPageHeader.vue'
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getApiErrorMessage } from '@/services/http'
 import { useImportStore } from '@/features/import/store'
 import { useImportScan } from '@/features/import/composables/useImportScan'
 import PreviewNode from '@/features/import/components/PreviewNode.vue'
-import type {
-  ImportTaskVO,
-} from '@/features/import/types'
+import { useImportPageForm } from './composables/useImportPageForm'
 
 const router = useRouter()
 const store = useImportStore()
 
-// ——— Tab ———
-const activeTab = ref<'single' | 'batch'>('single')
-
-// ——— 单个导入 ———
-const sourceType = ref<'ZIP' | 'CBZ' | 'DIRECTORY'>('ZIP')
-const sourcePath = ref('')
+const { activeTab, sourceType, sourcePath, pathPlaceholder, pathHint, canSubmit, taskName } = useImportPageForm()
 const creating = ref(false)
 
 // ——— 批量导入 ———
@@ -289,25 +268,8 @@ const sourceTypeOptions = [
   { value: 'ZIP' as const, label: 'ZIP 文件', desc: '压缩包，自动解压并解析目录结构' },
   { value: 'CBZ' as const, label: 'CBZ 漫画', desc: '漫画压缩包，自动读取 ComicInfo.xml 元数据' },
   { value: 'DIRECTORY' as const, label: '本地目录', desc: '已存在的漫画目录，原样解析' },
+  { value: 'EHENTAI' as const, label: 'E-Hentai 画廊', desc: '输入画廊 URL，后台下载后自动导入' },
 ]
-
-const pathPlaceholder = computed(() =>
-  sourceType.value === 'ZIP'
-    ? 'D:/comics/my_comic.zip'
-    : sourceType.value === 'CBZ'
-      ? 'D:/comics/my_comic.cbz'
-      : 'D:/comics/my_comic_dir'
-)
-
-const pathHint = computed(() =>
-  sourceType.value === 'ZIP'
-    ? '完整 ZIP 文件路径；大导出分卷时填最后一个 .zip，分卷须同目录同 basename，.z01 不可作为入口'
-    : sourceType.value === 'CBZ'
-      ? '完整 CBZ 文件路径；压缩包内可放置 ComicInfo.xml，导入时自动读取标题、作者、标签和章节信息'
-      : '漫画根目录绝对路径，包含章节子目录'
-)
-
-const canSubmit = computed(() => sourcePath.value.trim().length > 0)
 
 const STATUS_LABELS: Record<string, string> = {
   PENDING: '等待中',
@@ -322,14 +284,6 @@ const STATUS_LABELS: Record<string, string> = {
 
 function statusLabel(s: string) {
   return STATUS_LABELS[s] || s
-}
-
-function taskName(task: ImportTaskVO): string {
-  const path = task.sourcePath || task.sourceRef || ''
-  if (!path) return `任务 #${task.id}`
-  const parts = path.replace(/\\/g, '/').split('/')
-  const last = parts[parts.length - 1]
-  return last || path
 }
 
 async function doImport() {
@@ -920,7 +874,9 @@ function errorMessage(error: unknown): string {
 
 /* Shared */
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (max-width: 640px) {

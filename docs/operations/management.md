@@ -117,6 +117,27 @@ rsync -a --delete /data/manga/thumbs /data/backup/thumbs
 rsync -a --delete /data/manga/metadata /data/backup/metadata
 ```
 
+Windows 原生环境可使用 PowerShell 的 `robocopy`，返回码 `0` 至 `7` 表示复制完成或存在可接受的文件差异，`8` 及以上才表示失败：
+
+```powershell
+$sourceRoot = 'F:\manga'
+$backupRoot = 'E:\ComicAtlasBackup'
+$backupDate = Get-Date -Format 'yyyy-MM-dd'
+$backupTarget = Join-Path $backupRoot $backupDate
+
+New-Item -ItemType Directory -Force -Path $backupTarget | Out-Null
+foreach ($volumeName in @('hq', 'lq', 'thumbs', 'metadata')) {
+    $sourcePath = Join-Path $sourceRoot $volumeName
+    $targetPath = Join-Path $backupTarget $volumeName
+    robocopy $sourcePath $targetPath /E /COPY:DAT /DCOPY:DAT /R:3 /W:5 /XJ /NP
+    if ($LASTEXITCODE -ge 8) {
+        throw "备份目录 $volumeName 失败，robocopy 返回码：$LASTEXITCODE"
+    }
+}
+```
+
+将 `$sourceRoot` 改为实际 `MANGA_ROOT`，将 `$backupRoot` 改为独立备份卷；如需镜像删除目标中的历史文件，可在确认目标目录专用且可接受删除后，为 `robocopy` 增加 `/MIR`，不要对共享目录使用该参数。数据库仍需按上方 `mysqldump` 示例备份。
+
 > 备份前确认当前无进行中的永久清理（`PURGING`）与删除任务，或备份后立即做一次恢复演练。回收站文件属于软删除对象，`trash` 目录是否备份取决于你是否希望保留已删除内容，建议纳入备份。
 
 ### 恢复演练建议

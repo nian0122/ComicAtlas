@@ -1,6 +1,6 @@
 # 08 — 前端技术架构
 
-**更新日期：** 2026-08-16
+**更新日期：** 2026-09-16
 **状态：** 与 v2.1 源码结构同步
 **维护者：** ComicAtlas 前端组
 
@@ -21,29 +21,15 @@ frontend/src/
 │   ├── ReadingLayout.vue    # 阅读端（Home/Library/Detail/History）
 │   ├── ReaderLayout.vue     # 阅读器（全屏）
 │   └── ManagementLayout.vue # 管理端（TopNav + <router-view>）
-├── stores/                  # Pinia
-│   ├── comic-store.ts       # 漫画列表 / 搜索 / 分页
-│   ├── reader-store.ts      # 阅读器状态
-│   ├── history-store.ts     # 阅读记录
-│   ├── tag-store.ts         # 标签
-│   ├── app-store.ts         # 全局状态
-│   ├── reader-settings-store.ts  # 阅读偏好（localStorage 持久化）
-│   ├── reading.ts           # 阅读端 store barrel
-│   └── management/          # 管理端 store
-│       ├── comic.ts         # management-comic（漫画工作区）
-│       ├── import.ts        # 导入任务
-│       ├── storage.ts       # 存储管理
-│       ├── category.ts      # 分类
-│       └── recovery.ts      # 恢复任务
-├── services/                # API 服务层
-│   ├── api.ts               # axios 实例 + 全部领域 API + DLQ 类型
-│   ├── storage.ts           # storageService / exportService（存储域封装）
-│   ├── recovery.ts          # recoveryApi（恢复任务）
-│   ├── reading.ts           # 阅读端 API barrel
-│   ├── management.ts        # 管理端 API barrel
+├── entities/                # 跨页面共享实体类型与 API（comic / media / tag）
+├── features/                # 按业务能力组织 store、API、composable 与组件
+│   ├── comic/、import/、reader/、storage/
+│   └── task/、trash/、recovery/、upload/、category/、tag/
+├── shared/                  # HTTP 类型、格式化、设备与通用组合逻辑
+│   ├── api/types.ts、composables/、format/
+├── services/                # 跨领域服务
+│   ├── http.ts              # axios 实例、响应解包与统一错误处理
 │   └── media-url.ts         # 媒体 URL 解析
-├── types/
-│   └── index.ts             # 接口定义（阅读 + 管理 + 存储类型）
 ├── components/              # 可复用组件
 │   ├── layout/TopNav.vue    # 全局导航
 │   ├── reading/             # 阅读端组件（home / comic / HeroBanner）
@@ -52,8 +38,10 @@ frontend/src/
 │   └── icons/               # MaterialSymbolIcon
 ├── views/                   # 页面（路由级组件）
 │   ├── reading/             # HomePage / LibraryPage / DetailPage / HistoryPage / ReaderPage / PosterTestPage
+│   │   └── composables/     # 页面级布局与生命周期编排
 │   │   └── reader/components/  # ReaderViewport / ProgressiveImage / VideoPlayer 等
-│   └── management/          # ComicListPage / ComicEditPage / ImportPage / TaskPage /
+│   └── management/          # ComicListPage / ComicEditPage / ImportPage / ComicStructurePage / TaskPage /
+│       └── composables/     # 页面级表单、媒体排序与工作区状态
 │                            # storage/ / dlq/ / MetadataPage / SettingsPage / InterceptPage
 └── utils/
     ├── device.ts            # 移动阅读设备判定（isMobileReadingDevice）
@@ -96,25 +84,24 @@ frontend/src/
 
 | Store | 文件 | 职责 |
 |-------|------|------|
-| `comic` | `stores/comic-store.ts` | 漫画列表、搜索、筛选、分页 |
-| `reader` | `stores/reader-store.ts` | 当前章节、页码、prev/next |
-| `reader-settings` | `stores/reader-settings-store.ts` | 阅读偏好（画质/适配/缩放/方向/预加载） |
-| `history` | `stores/history-store.ts` | 阅读记录 |
-| `tag` | `stores/tag-store.ts` | 标签 |
-| `app` | `stores/app-store.ts` | 全局状态 |
-| `management-comic` | `stores/management/comic.ts` | 漫画工作区（列表/编辑/批量） |
-| `import` | `stores/management/import.ts` | 导入任务 |
-| `storage` | `stores/management/storage.ts` | 存储管理 |
-| `category` | `stores/management/category.ts` | 分类 |
-| `recovery` | `stores/management/recovery.ts` | 恢复任务 |
+| `comic` | `features/comic/store.ts` | 漫画列表、搜索、筛选、分页 |
+| `reader` | `features/reader/store.ts` | 当前章节、页码、prev/next |
+| `reader-settings` | `features/reader/settings-store.ts` | 阅读偏好（画质/适配/缩放/方向/预加载） |
+| `history` | `features/history/store.ts` | 阅读记录 |
+| `tag` | `features/tag/store.ts` | 标签 |
+| `management-comic` | `features/comic/management-store.ts` | 漫画工作区（列表/编辑/批量） |
+| `import` | `features/import/store.ts` | 导入任务 |
+| `storage` | `features/storage/store.ts` | 存储管理 |
+| `category` | `features/category/store.ts` | 分类 |
+| `recovery` | `features/recovery/store.ts` | 恢复任务 |
 
-`stores/reading.ts` 为阅读端 store barrel（统一导出阅读端 stores）。
+页面级复杂交互下沉到 `views/**/composables` 或对应 feature composable；页面仅保留路由、数据加载编排和模板组合。当前页面组合逻辑包括 `useLibraryPageLayout`（筛选栏滚动与海报断点）、`useComicEditTags`（标签选择/创建）、`useImportPageForm`（导入表单派生状态）和 `useMediaOrder`（章节媒体排序）。
 
 ---
 
 ## API 服务层
 
-`services/api.ts` 创建 axios 实例（`baseURL: '/api'`，响应拦截器统一解包 `{ code, data }`），按域导出：
+`services/http.ts` 创建 axios 实例（`baseURL: '/api'`，响应拦截器统一解包 `{ code, data }`），领域 API 位于 `entities/*/api.ts` 和 `features/*/api.ts`：
 
 | API 对象 | 接口域 |
 |----------|--------|
@@ -138,7 +125,7 @@ frontend/src/
 
 ## Types
 
-`types/index.ts` 覆盖阅读与管理全部 DTO：
+类型按实体、领域和共享协议拆分到 `entities/*`、`features/*/types.ts` 与 `shared/api/types.ts`，不再集中于 `types/index.ts`：
 
 ```typescript
 // 阅读端
@@ -179,9 +166,10 @@ ReaderLayout
     └── ReaderSettingsDrawer / ReaderBottomNav
 
 ManagementLayout
-├── ComicListPage（BatchEditDialog）
-├── ComicEditPage
-├── ImportPage → TaskPage（TaskCard[] / ExportTaskCard / RecoveryTaskCard）
+├── ComicListPage → features/comic/components/BatchEditDialog.vue
+├── ComicEditPage（useComicEditTags）
+├── ImportPage（useImportPageForm + useImportScan + PreviewNode） → TaskPage
+├── ComicStructurePage（目录结构 + 媒体工作区 + useMediaOrder + 上传对话框）
 ├── StoragePage / StorageDetailPage（storage/ 子组件）
 ├── MetadataPage
 ├── DeadLetterPage（dlq/ 子组件）

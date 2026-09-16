@@ -4,9 +4,7 @@
       <div class="header-left">
         <p class="page-eyebrow">LEDGER / HISTORY</p>
         <h1 class="page-title">阅读历史</h1>
-        <p v-if="recentCount > 0" class="page-subtitle">
-          最近阅读 {{ recentCount }} 部漫画
-        </p>
+        <p v-if="recentCount > 0" class="page-subtitle">最近阅读 {{ recentCount }} 部漫画</p>
       </div>
       <div class="header-actions">
         <button class="ghost-btn" :disabled="store.loading" @click="store.fetchFirstPage">刷新</button>
@@ -50,7 +48,9 @@
         <div v-if="item.kind === 'end'" class="history-end">
           <MaterialSymbolIcon name="history" class="history-end-icon" />
           <span v-if="store.loadingMore" class="history-end-label">正在加载更多阅读记录</span>
-          <button v-else-if="store.loadMoreError" type="button" class="history-end-retry" @click="store.fetchNextPage">加载更多失败，点击重试</button>
+          <button v-else-if="store.loadMoreError" type="button" class="history-end-retry" @click="store.fetchNextPage">
+            加载更多失败，点击重试
+          </button>
           <template v-else-if="store.hasMore">
             <span class="history-end-label history-end-label--desktop">SCROLL FOR MORE</span>
             <span class="history-end-label history-end-label--mobile">继续下滑加载更多</span>
@@ -62,7 +62,7 @@
         </div>
         <article v-else class="history-item">
           <button type="button" class="history-thumb" @click="continueRead(item.value)">
-            <img :src="item.value.coverUrl" :alt="item.value.comicTitle || `漫画 #${item.value.comicId}`">
+            <img :src="item.value.coverUrl" :alt="item.value.comicTitle || `漫画 #${item.value.comicId}`" />
             <span class="history-thumb-progress" aria-hidden="true">
               <span :style="{ width: `${progressFor(item.value)}%` }" />
             </span>
@@ -102,13 +102,9 @@ const viewportWidth = useBreakpoint()
 const isMobile = computed(() => viewportWidth.value <= BREAKPOINTS.tablet)
 
 const recentCount = computed(() => store.total)
-const historyItemSize = computed(() =>
-  viewportWidth.value <= BREAKPOINTS.tablet ? 148 : 88
-)
+const historyItemSize = computed(() => (viewportWidth.value <= BREAKPOINTS.tablet ? 148 : 88))
 
-type HistoryScrollerItem =
-  | { kind: 'history'; key: string; value: HistoryVO }
-  | { kind: 'end'; key: 'history-end' }
+type HistoryScrollerItem = { kind: 'history'; key: string; value: HistoryVO } | { kind: 'end'; key: 'history-end' }
 
 const historyItems = computed<HistoryScrollerItem[]>(() => [
   ...store.list.map((value) => ({
@@ -420,7 +416,9 @@ onBeforeUnmount(() => {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Buttons */
@@ -569,7 +567,7 @@ onBeforeUnmount(() => {
     position: absolute;
     inset: var(--mobile-history-play-inset);
     border-radius: 50%;
-    content: "";
+    content: '';
     background: var(--color-overlay-faint);
   }
 

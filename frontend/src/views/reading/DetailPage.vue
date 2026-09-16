@@ -32,115 +32,115 @@
       />
 
       <template v-else>
-      <!-- Hero -->
-      <HeroBanner
-        :background-url="comic.coverUrl"
-        :poster-url="comic.coverUrl"
-        variant="detail"
-        kicker="漫画详情"
-        :title="comic.title"
-        :primary-action="primaryAction"
-        :secondary-action="secondaryAction"
-      >
-        <template #description>
-          <div class="progress-block">
-            <p class="progress-label">阅读进度</p>
-            <div class="progress-meta">
-              <span>{{ progressMetaText }}</span>
-              <span class="progress-percent">{{ comic.progressPercent || 0 }}%</span>
+        <!-- Hero -->
+        <HeroBanner
+          :background-url="comic.coverUrl"
+          :poster-url="comic.coverUrl"
+          variant="detail"
+          kicker="漫画详情"
+          :title="comic.title"
+          :primary-action="primaryAction"
+          :secondary-action="secondaryAction"
+        >
+          <template #description>
+            <div class="progress-block">
+              <p class="progress-label">阅读进度</p>
+              <div class="progress-meta">
+                <span>{{ progressMetaText }}</span>
+                <span class="progress-percent">{{ comic.progressPercent || 0 }}%</span>
+              </div>
+              <div class="progress-bar">
+                <div class="progress-fill" :style="{ transform: `scaleX(${progressScale})` }" />
+              </div>
             </div>
-            <div class="progress-bar">
-              <div class="progress-fill" :style="{ transform: `scaleX(${progressScale})` }" />
-            </div>
-          </div>
-        </template>
-      </HeroBanner>
+          </template>
+        </HeroBanner>
 
-      <!-- Information -->
-      <section class="information-section">
-        <div class="section-inner">
-          <div class="info-section-header">
-            <h2 class="section-title">作品信息</h2>
-          </div>
-          <div class="info-grid">
-            <div class="info-item">
-              <span class="info-label">作者</span>
-              <span class="info-value">{{ comic.author || '未知作者' }}</span>
+        <!-- Information -->
+        <section class="information-section">
+          <div class="section-inner">
+            <div class="info-section-header">
+              <h2 class="section-title">作品信息</h2>
             </div>
-            <div class="info-item">
-              <span class="info-label">媒体数</span>
-              <span class="info-value">{{ comic.pageCount }} 个</span>
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="info-label">作者</span>
+                <span class="info-value">{{ comic.author || '未知作者' }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">媒体数</span>
+                <span class="info-value">{{ comic.pageCount }} 个</span>
+              </div>
+              <div v-if="comic.categoryName" class="info-item">
+                <span class="info-label">分类</span>
+                <span class="info-value">{{ comic.categoryName }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">大小</span>
+                <span class="info-value">{{ formatBytes(comic.hqSize) }}</span>
+              </div>
             </div>
-            <div v-if="comic.categoryName" class="info-item">
-              <span class="info-label">分类</span>
-              <span class="info-value">{{ comic.categoryName }}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">大小</span>
-              <span class="info-value">{{ formatBytes(comic.hqSize) }}</span>
-            </div>
-          </div>
 
-          <div v-if="comic.description" class="description-block">
-            <span class="info-label">简介</span>
-            <p>{{ comic.description }}</p>
-          </div>
+            <div v-if="comic.description" class="description-block">
+              <span class="info-label">简介</span>
+              <p>{{ comic.description }}</p>
+            </div>
 
-          <div v-if="comic.tags && comic.tags.length" class="tags-block">
-            <span class="info-label">标签</span>
-            <div class="tag-list">
-              <span v-for="tag in comic.tags" :key="tag.name" class="tag-chip">
-                {{ tag.name }}
+            <div v-if="comic.tags && comic.tags.length" class="tags-block">
+              <span class="info-label">标签</span>
+              <div class="tag-list">
+                <span v-for="tag in comic.tags" :key="tag.name" class="tag-chip">
+                  {{ tag.name }}
+                </span>
+              </div>
+            </div>
+
+            <details class="secondary-info">
+              <summary>更多信息</summary>
+              <div class="secondary-info-grid">
+                <div class="info-item">
+                  <span class="info-label">导入时间</span>
+                  <span class="info-value">{{ formatDate(comic.createdAt) }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">来源类型</span>
+                  <span class="info-value">{{ sourceTypeLabel(comic.sourceType) }}</span>
+                </div>
+              </div>
+            </details>
+          </div>
+        </section>
+
+        <!-- Catalog -->
+        <section class="catalog-section">
+          <div class="section-inner">
+            <div class="catalog-header">
+              <h2 class="section-title">目录</h2>
+              <span v-if="totalChapters > 0" class="section-count">
+                {{ isSearching ? `找到 ${resultCount} 个章节` : `${totalChapters} 个章节` }}
               </span>
+              <ChapterSearchBox v-model="searchKeyword" />
+            </div>
+
+            <CatalogTree
+              v-if="filteredCatalogTree.length > 0"
+              :tree="filteredCatalogTree"
+              :active-chapter-id="comic.lastReadChapterId"
+              :highlight-keyword="searchKeyword"
+              :expanded-node-paths="expandedNodePaths"
+              @select="goReader"
+            />
+            <div v-else-if="isSearching" class="state empty small">
+              <el-icon :size="32"><Search /></el-icon>
+              <span>没有找到匹配章节</span>
+              <button type="button" class="clear-search-button" @click="clearSearch">清空搜索</button>
+            </div>
+            <div v-else class="state empty small">
+              <el-icon :size="32"><PictureFilled /></el-icon>
+              <span>暂无章节</span>
             </div>
           </div>
-
-          <details class="secondary-info">
-            <summary>更多信息</summary>
-            <div class="secondary-info-grid">
-              <div class="info-item">
-                <span class="info-label">导入时间</span>
-                <span class="info-value">{{ formatDate(comic.createdAt) }}</span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">来源类型</span>
-                <span class="info-value">{{ sourceTypeLabel(comic.sourceType) }}</span>
-              </div>
-            </div>
-          </details>
-        </div>
-      </section>
-
-      <!-- Catalog -->
-      <section class="catalog-section">
-        <div class="section-inner">
-          <div class="catalog-header">
-            <h2 class="section-title">目录</h2>
-            <span v-if="totalChapters > 0" class="section-count">
-              {{ isSearching ? `找到 ${resultCount} 个章节` : `${totalChapters} 个章节` }}
-            </span>
-            <ChapterSearchBox v-model="searchKeyword" />
-          </div>
-
-          <CatalogTree
-            v-if="filteredCatalogTree.length > 0"
-            :tree="filteredCatalogTree"
-            :active-chapter-id="comic.lastReadChapterId"
-            :highlight-keyword="searchKeyword"
-            :expanded-node-paths="expandedNodePaths"
-            @select="goReader"
-          />
-          <div v-else-if="isSearching" class="state empty small">
-            <el-icon :size="32"><Search /></el-icon>
-            <span>没有找到匹配章节</span>
-            <button type="button" class="clear-search-button" @click="clearSearch">清空搜索</button>
-          </div>
-          <div v-else class="state empty small">
-            <el-icon :size="32"><PictureFilled /></el-icon>
-            <span>暂无章节</span>
-          </div>
-        </div>
-      </section>
+        </section>
       </template>
     </template>
 
@@ -218,9 +218,7 @@ const progressMetaText = computed(() => {
   return progressText
 })
 
-const progressScale = computed(
-  () => Math.min(100, Math.max(0, comic.value?.progressPercent || 0)) / 100
-)
+const progressScale = computed(() => Math.min(100, Math.max(0, comic.value?.progressPercent || 0)) / 100)
 
 const primaryAction = computed(() => {
   // 有阅读历史 → 继续阅读（桌面端与移动端一致）
@@ -286,10 +284,7 @@ async function loadData() {
   loading.value = true
   error.value = null
   try {
-    const [detailRes, catalogRes] = await Promise.all([
-      comicApi.detail(id),
-      catalogApi.tree(id),
-    ])
+    const [detailRes, catalogRes] = await Promise.all([comicApi.detail(id), catalogApi.tree(id)])
     comic.value = detailRes.data
     catalogTree.value = [...catalogRes.data]
   } catch (err: unknown) {
@@ -323,7 +318,9 @@ onMounted(loadData)
   font-weight: 600;
   line-height: 1;
   cursor: pointer;
-  transition: transform var(--transition-fast), background-color var(--transition-fast);
+  transition:
+    transform var(--transition-fast),
+    background-color var(--transition-fast);
 }
 
 .hero-btn:hover {
@@ -494,9 +491,17 @@ onMounted(loadData)
   list-style: none;
 }
 
-.secondary-info summary::-webkit-details-marker { display: none; }
-.secondary-info summary::after { content: '＋'; float: right; color: var(--accent); }
-.secondary-info[open] summary::after { content: '－'; }
+.secondary-info summary::-webkit-details-marker {
+  display: none;
+}
+.secondary-info summary::after {
+  content: '＋';
+  float: right;
+  color: var(--accent);
+}
+.secondary-info[open] summary::after {
+  content: '－';
+}
 
 .secondary-info-grid {
   display: grid;
@@ -517,7 +522,9 @@ onMounted(loadData)
   margin-bottom: var(--space-lg);
 }
 
-.chapter-search-box { margin-left: auto; }
+.chapter-search-box {
+  margin-left: auto;
+}
 
 .clear-search-button {
   border: 0;
@@ -530,7 +537,10 @@ onMounted(loadData)
   font-size: 12px;
 }
 
-.clear-search-button:hover { background: var(--accent); color: var(--text-primary); }
+.clear-search-button:hover {
+  background: var(--accent);
+  color: var(--text-primary);
+}
 
 .catalog-header__action {
   margin-left: auto;
@@ -570,7 +580,9 @@ onMounted(loadData)
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Responsive */
@@ -585,8 +597,14 @@ onMounted(loadData)
 }
 
 @media (max-width: 640px) {
-  .catalog-header { flex-wrap: wrap; }
-  .chapter-search-box { order: 3; flex-basis: 100%; margin-left: 0; }
+  .catalog-header {
+    flex-wrap: wrap;
+  }
+  .chapter-search-box {
+    order: 3;
+    flex-basis: 100%;
+    margin-left: 0;
+  }
 }
 
 /* ==============================

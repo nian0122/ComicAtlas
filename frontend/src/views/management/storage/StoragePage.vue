@@ -1,6 +1,11 @@
 <template>
   <div class="storage-page">
-    <ManagementPageHeader spaced title="存储统计" description="查看 HQ、LQ 与缩略图的占用分布，并定位需要处理的漫画。" eyebrow="COMIC / STORAGE">
+    <ManagementPageHeader
+      spaced
+      title="存储统计"
+      description="查看 HQ、LQ 与缩略图的占用分布，并定位需要处理的漫画。"
+      eyebrow="COMIC / STORAGE"
+    >
       <div class="page-actions">
         <span class="comic-count">{{ store.serverTotal }} 本漫画</span>
         <el-button :loading="store.loading" @click="reload">刷新统计</el-button>
@@ -9,10 +14,7 @@
 
     <StorageSummary :stats="store.summary" />
 
-    <StorageToolbar
-      v-model:filter="filterState"
-      v-model:sort="sortState"
-    />
+    <StorageToolbar v-model:filter="filterState" v-model:sort="sortState" />
 
     <StorageTable
       :list="pagedList"
@@ -48,14 +50,27 @@ const {
   pagedList,
   pagination,
   buildQuery,
-} = useStorageFilter(() => store.comicList, () => store.serverTotal)
+} = useStorageFilter(
+  () => store.comicList,
+  () => store.serverTotal,
+)
 
 function reload() {
   void store.loadComics(buildQuery())
 }
 
 watch(
-  [() => filterState.value.hqStatus, () => filterState.value.lqStatus, () => filterState.value.keyword, () => filterState.value.category, () => filterState.value.tag, () => sortState.value.field, () => sortState.value.order, page, pageSize],
+  [
+    () => filterState.value.hqStatus,
+    () => filterState.value.lqStatus,
+    () => filterState.value.keyword,
+    () => filterState.value.category,
+    () => filterState.value.tag,
+    () => sortState.value.field,
+    () => sortState.value.order,
+    page,
+    pageSize,
+  ],
   reload,
 )
 
@@ -73,8 +88,21 @@ onMounted(async () => {
 .storage-page {
   max-width: 1440px;
 }
-.page-actions { display: flex; align-items: center; gap: var(--space-base); }
-.comic-count { color: var(--text-secondary); font: 700 11px var(--mono); white-space: nowrap; }
+.page-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-base);
+}
+.comic-count {
+  color: var(--text-secondary);
+  font: 700 11px var(--mono);
+  white-space: nowrap;
+}
 
-@media (max-width: 720px) { .page-actions { width: 100%; justify-content: space-between; } }
+@media (max-width: 720px) {
+  .page-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
 </style>

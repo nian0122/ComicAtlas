@@ -1,15 +1,12 @@
 <template>
   <div class="comic-list-page">
-    <header
-      ref="pageHeaderRef"
-      class="page-header"
-      :class="{ 'desktop-filter-hidden': isDesktopFilterHidden }"
-    >
+    <header ref="pageHeaderRef" class="page-header" :class="{ 'desktop-filter-hidden': isDesktopFilterHidden }">
       <div class="title-block">
         <div class="title-row">
           <h1 class="page-title">
             <span class="mobile-page-title" aria-label="筛选结果数量">
-              <strong>{{ store.total }}</strong><small>本</small>
+              <strong>{{ store.total }}</strong
+              ><small>本</small>
             </span>
           </h1>
           <div class="mobile-recent">
@@ -66,7 +63,7 @@
               aria-label="搜索漫画"
               @input="onKeywordInput"
               @keyup.enter="onSearch"
-            >
+            />
             <el-icon v-if="keyword" :size="16" class="clear-icon" @click="clearKeyword"><CircleClose /></el-icon>
           </div>
 
@@ -98,7 +95,13 @@
         <!-- 移动端第二行：筛选 chips 横向滚动 -->
         <div class="toolbar-filters">
           <div class="filter-select category-select">
-            <el-select v-model="categoryFilter" placeholder="全部分类" aria-label="漫画分类" popper-class="library-filter-popper" @change="onSearch">
+            <el-select
+              v-model="categoryFilter"
+              placeholder="全部分类"
+              aria-label="漫画分类"
+              popper-class="library-filter-popper"
+              @change="onSearch"
+            >
               <el-option label="全部分类" value="" />
               <el-option label="未分类" value="_NONE" />
               <el-option v-for="c in allCategories" :key="c.id" :label="c.name" :value="c.name" />
@@ -116,12 +119,7 @@
               popper-class="library-filter-popper"
               @change="onSearch"
             >
-              <el-option
-                v-for="tag in allTags"
-                :key="tag.id"
-                :label="tag.name"
-                :value="tag.name"
-              />
+              <el-option v-for="tag in allTags" :key="tag.id" :label="tag.name" :value="tag.name" />
               <el-option label="无标签" value="_NONE" />
             </el-select>
           </div>
@@ -161,7 +159,9 @@
             >
               {{ category.name }}
             </button>
-            <button type="button" :class="{ active: categoryFilter === '_NONE' }" @click="selectCategory('_NONE')">未分类</button>
+            <button type="button" :class="{ active: categoryFilter === '_NONE' }" @click="selectCategory('_NONE')">
+              未分类
+            </button>
           </div>
         </div>
 
@@ -184,8 +184,22 @@
 
         <div v-if="selectedTags.length > 1" class="mobile-filter-group-row mobile-filter-match-row">
           <div class="mobile-match-control" role="group" aria-label="标签匹配方式">
-            <button type="button" :class="{ active: tagMode === 'OR' }" aria-label="任一标签满足" @click="setTagMode('OR')">任一</button>
-            <button type="button" :class="{ active: tagMode === 'AND' }" aria-label="所有标签同时满足" @click="setTagMode('AND')">同时</button>
+            <button
+              type="button"
+              :class="{ active: tagMode === 'OR' }"
+              aria-label="任一标签满足"
+              @click="setTagMode('OR')"
+            >
+              任一
+            </button>
+            <button
+              type="button"
+              :class="{ active: tagMode === 'AND' }"
+              aria-label="所有标签同时满足"
+              @click="setTagMode('AND')"
+            >
+              同时
+            </button>
           </div>
         </div>
       </div>
@@ -241,13 +255,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Search, PictureFilled, WarningFilled, CircleClose, Sort } from '@element-plus/icons-vue'
 import { useComicStore } from '@/features/comic/store'
-import { readingTagApi, readingCategoryApi } from '@/entities/comic/api'
+import { categoryApi } from '@/features/category/api'
+import { tagApi } from '@/features/tag/api'
 import { useLibraryFilters } from '@/features/comic/composables/useLibraryFilters'
-import { useBreakpoint, BREAKPOINTS } from '@/shared/composables/useBreakpoint'
+import { useLibraryPageLayout } from './composables/useLibraryPageLayout'
 import ComicPoster from '@/features/comic/components/ComicPoster.vue'
 import { toPosterStatus } from '@/features/comic/components/poster-status'
 import type { ComicListQuery, ComicListVO } from '@/entities/comic/types'
@@ -282,57 +297,9 @@ const {
 const allTags = ref<TagDTO[]>([])
 const allCategories = ref<CategoryDTO[]>([])
 const pageHeaderRef = ref<HTMLElement | null>(null)
-const isDesktopFilterHidden = ref(false)
-
-const DESKTOP_FILTER_BREAKPOINT = 1024
-const FILTER_HIDE_SCROLL_START = 160
-const FILTER_SCROLL_DELTA = 8
-let lastWindowScrollY = 0
-let scrollAnimationFrame: number | null = null
-
-// 响应式视口宽度（resize 防抖更新，组件卸载时自动清理监听）
-const viewportWidth = useBreakpoint()
-
-// 海报尺寸随断点响应式推导（替代原先读取一次视口宽度、手动挂 resize 监听的写法）
-const posterSize = computed<'sm' | 'md' | 'lg'>(() => {
-  if (viewportWidth.value <= BREAKPOINTS.tablet) return 'sm'
-  return 'lg'
-})
+const { posterSize, isDesktopFilterHidden } = useLibraryPageLayout(pageHeaderRef)
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
-
-function updateDesktopFilterVisibility() {
-  scrollAnimationFrame = null
-  const currentScrollY = Math.max(0, window.scrollY)
-
-  if (window.innerWidth <= DESKTOP_FILTER_BREAKPOINT || currentScrollY <= FILTER_HIDE_SCROLL_START) {
-    isDesktopFilterHidden.value = false
-    lastWindowScrollY = currentScrollY
-    return
-  }
-
-  // 用户正在输入或操作下拉框时，筛选栏保持可见。
-  const activeElement = document.activeElement
-  if (activeElement instanceof Node && pageHeaderRef.value?.contains(activeElement)) {
-    isDesktopFilterHidden.value = false
-    lastWindowScrollY = currentScrollY
-    return
-  }
-
-  const scrollDelta = currentScrollY - lastWindowScrollY
-  if (scrollDelta >= FILTER_SCROLL_DELTA) {
-    isDesktopFilterHidden.value = true
-    lastWindowScrollY = currentScrollY
-  } else if (scrollDelta <= -FILTER_SCROLL_DELTA) {
-    isDesktopFilterHidden.value = false
-    lastWindowScrollY = currentScrollY
-  }
-}
-
-function onWindowScroll() {
-  if (scrollAnimationFrame !== null) return
-  scrollAnimationFrame = window.requestAnimationFrame(updateDesktopFilterVisibility)
-}
 
 function onKeywordInput() {
   if (debounceTimer) clearTimeout(debounceTimer)
@@ -376,7 +343,7 @@ function selectMobileSort(nextSort: NonNullable<ComicListQuery['sort']>) {
 
 async function loadTags() {
   try {
-    const res = await readingTagApi.list()
+    const res = await tagApi.list()
     allTags.value = res.data
   } catch {
     allTags.value = []
@@ -385,7 +352,7 @@ async function loadTags() {
 
 async function loadCategories() {
   try {
-    const res = await readingCategoryApi.list()
+    const res = await categoryApi.list()
     allCategories.value = res.data
   } catch {
     allCategories.value = []
@@ -411,18 +378,16 @@ function parseRoutePage(): number | undefined {
 
 function restoreFiltersFromStore() {
   const routeTags = route.query.tags
-  const hasRouteFilters = ['keyword', 'category', 'tags', 'tagMode', 'sort', 'order']
-    .some((key) => route.query[key] !== undefined)
-  const tagsFromRoute = Array.isArray(routeTags)
-    ? routeTags.map(String)
-    : routeTags
-      ? [String(routeTags)]
-      : undefined
-  keyword.value = hasRouteFilters ? String(route.query.keyword || '') : (store.query.keyword || '')
-  categoryFilter.value = hasRouteFilters ? String(route.query.category || '') : (store.query.category || '')
-  selectedTags.value = hasRouteFilters ? (tagsFromRoute || []) : [...(store.query.tags || [])]
+  const hasRouteFilters = ['keyword', 'category', 'tags', 'tagMode', 'sort', 'order'].some(
+    (key) => route.query[key] !== undefined,
+  )
+  const tagsFromRoute = Array.isArray(routeTags) ? routeTags.map(String) : routeTags ? [String(routeTags)] : undefined
+  keyword.value = hasRouteFilters ? String(route.query.keyword || '') : store.query.keyword || ''
+  categoryFilter.value = hasRouteFilters ? String(route.query.category || '') : store.query.category || ''
+  selectedTags.value = hasRouteFilters ? tagsFromRoute || [] : [...(store.query.tags || [])]
   tagMode.value = (hasRouteFilters ? route.query.tagMode : store.query.tagMode) === 'AND' ? 'AND' : 'OR'
-  sort.value = (hasRouteFilters ? route.query.sort : store.query.sort) as NonNullable<ComicListQuery['sort']> || 'createdAt'
+  sort.value =
+    ((hasRouteFilters ? route.query.sort : store.query.sort) as NonNullable<ComicListQuery['sort']>) || 'createdAt'
   order.value = (hasRouteFilters ? route.query.order : store.query.order) === 'asc' ? 'asc' : 'desc'
   const routePage = parseRoutePage()
   store.updateQuery({
@@ -474,16 +439,9 @@ onMounted(() => {
   loadTags()
   loadCategories()
   store.fetchList()
-  lastWindowScrollY = Math.max(0, window.scrollY)
-  window.addEventListener('scroll', onWindowScroll, { passive: true })
 })
 
 onBeforeUnmount(() => {
-  window.removeEventListener('scroll', onWindowScroll)
-  if (scrollAnimationFrame !== null) {
-    window.cancelAnimationFrame(scrollAnimationFrame)
-    scrollAnimationFrame = null
-  }
   if (debounceTimer !== null) {
     clearTimeout(debounceTimer)
     debounceTimer = null
@@ -629,7 +587,9 @@ onBeforeUnmount(() => {
   color: var(--text-primary);
 }
 
-.filter-select :deep(.el-select) { width: 100%; }
+.filter-select :deep(.el-select) {
+  width: 100%;
+}
 .filter-select :deep(.el-select__wrapper) {
   min-height: 44px;
   padding: 0 var(--space-base);
@@ -637,12 +597,23 @@ onBeforeUnmount(() => {
   background: var(--bg-surface);
   box-shadow: 0 0 0 1px var(--border) inset;
   color: var(--text-primary);
-  transition: box-shadow var(--transition-fast), background-color var(--transition-fast);
+  transition:
+    box-shadow var(--transition-fast),
+    background-color var(--transition-fast);
 }
-.filter-select :deep(.el-select__wrapper:hover) { box-shadow: 0 0 0 1px var(--border-strong) inset; }
-.filter-select :deep(.el-select__wrapper.is-focused) { box-shadow: 0 0 0 1px var(--accent) inset, 0 0 0 3px var(--accent-bg); }
+.filter-select :deep(.el-select__wrapper:hover) {
+  box-shadow: 0 0 0 1px var(--border-strong) inset;
+}
+.filter-select :deep(.el-select__wrapper.is-focused) {
+  box-shadow:
+    0 0 0 1px var(--accent) inset,
+    0 0 0 3px var(--accent-bg);
+}
 .filter-select :deep(.el-select__selected-item),
-.filter-select :deep(.el-select__placeholder) { color: var(--text-primary); font-size: 14px; }
+.filter-select :deep(.el-select__placeholder) {
+  color: var(--text-primary);
+  font-size: 14px;
+}
 
 .tag-filter {
   min-width: 170px;
@@ -677,8 +648,12 @@ onBeforeUnmount(() => {
   font-weight: 600;
 }
 
-.sort-select { min-width: 128px; }
-.category-select { min-width: 118px; }
+.sort-select {
+  min-width: 128px;
+}
+.category-select {
+  min-width: 118px;
+}
 
 .desktop-sort-group {
   display: contents;
@@ -695,7 +670,10 @@ onBeforeUnmount(() => {
   background: var(--bg-surface);
   color: var(--text-secondary);
   cursor: pointer;
-  transition: border-color var(--transition-fast), color var(--transition-fast), background-color var(--transition-fast);
+  transition:
+    border-color var(--transition-fast),
+    color var(--transition-fast),
+    background-color var(--transition-fast);
 }
 
 .desktop-sort-order:hover {
@@ -728,10 +706,19 @@ onBeforeUnmount(() => {
 }
 :global(.library-filter-popper .el-select-dropdown__item.hover),
 :global(.library-filter-popper .el-select-dropdown__item.is-hovering),
-:global(.library-filter-popper .el-select-dropdown__item:hover) { background: var(--surface-highlight) !important; color: var(--text-primary) !important; }
+:global(.library-filter-popper .el-select-dropdown__item:hover) {
+  background: var(--surface-highlight) !important;
+  color: var(--text-primary) !important;
+}
 :global(.library-filter-popper .el-select-dropdown__item.selected),
-:global(.library-filter-popper .el-select-dropdown__item.is-selected) { background: var(--accent-bg) !important; color: var(--accent) !important; font-weight: 650; }
-:global(.tag-mode-popper) { min-width: 88px !important; }
+:global(.library-filter-popper .el-select-dropdown__item.is-selected) {
+  background: var(--accent-bg) !important;
+  color: var(--accent) !important;
+  font-weight: 650;
+}
+:global(.tag-mode-popper) {
+  min-width: 88px !important;
+}
 
 :global(.el-popper.is-light.mobile-sort-menu-popper) {
   --el-popover-bg-color: var(--color-surface-1);
@@ -781,9 +768,14 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
-.filter-reset { height: 44px; padding: 0 4px; }
+.filter-reset {
+  height: 44px;
+  padding: 0 4px;
+}
 .filter-reset:hover,
-.active-filter-clear:hover { color: var(--text-primary); }
+.active-filter-clear:hover {
+  color: var(--text-primary);
+}
 
 .active-filter-row {
   display: flex;
@@ -796,9 +788,23 @@ onBeforeUnmount(() => {
   font-size: 11px;
 }
 
-.active-filter-label { color: var(--text-secondary); font-weight: 650; }
-.active-filter-chip { max-width: 240px; overflow: hidden; padding: 4px 8px; border: 1px solid var(--border); border-radius: var(--radius-pill); background: var(--bg-surface); text-overflow: ellipsis; white-space: nowrap; }
-.active-filter-clear { margin-left: auto; }
+.active-filter-label {
+  color: var(--text-secondary);
+  font-weight: 650;
+}
+.active-filter-chip {
+  max-width: 240px;
+  overflow: hidden;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--bg-surface);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.active-filter-clear {
+  margin-left: auto;
+}
 
 /* 桌面端（>1024px）：包装层不参与布局，控件直接平铺进 toolbar，
  * 统一按筛选优先级排列：搜索 → 分类 → 标签 → 标签模式 → 排序 */
@@ -808,22 +814,38 @@ onBeforeUnmount(() => {
     display: contents;
   }
 
-  .search-input { order: 1; }
-  .category-select { order: 2; }
+  .search-input {
+    order: 1;
+  }
+  .category-select {
+    order: 2;
+  }
   .desktop-sort-group {
     display: inline-flex;
     align-items: center;
     gap: var(--space-sm);
     order: 5;
   }
-  .desktop-sort-group .desktop-sort-order { display: inline-flex; }
+  .desktop-sort-group .desktop-sort-order {
+    display: inline-flex;
+  }
   .sort-select,
-  .desktop-sort-order { order: unset; }
-  .tag-filter { order: 3; }
-  .tag-mode-select { order: 4; }
-  .filter-reset { order: 6; }
+  .desktop-sort-order {
+    order: unset;
+  }
+  .tag-filter {
+    order: 3;
+  }
+  .tag-mode-select {
+    order: 4;
+  }
+  .filter-reset {
+    order: 6;
+  }
   /* 桌面端已在筛选控件内展示当前值，避免再重复占一整行摘要。 */
-  .active-filter-row { display: none; }
+  .active-filter-row {
+    display: none;
+  }
 }
 
 .comic-section {
@@ -836,10 +858,7 @@ onBeforeUnmount(() => {
 .comic-grid {
   display: grid;
   gap: var(--poster-gap);
-  grid-template-columns: repeat(
-    auto-fit,
-    minmax(min(var(--poster-width-md), 100%), 1fr)
-  );
+  grid-template-columns: repeat(auto-fit, minmax(min(var(--poster-width-md), 100%), 1fr));
 }
 
 .comic-grid :deep(.comic-poster) {
@@ -879,7 +898,9 @@ onBeforeUnmount(() => {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .primary-btn {
@@ -1132,9 +1153,7 @@ onBeforeUnmount(() => {
 
   /* 固定底部导航不应遮住最后一排卡片和分页。 */
   .comic-section {
-    padding-bottom: calc(
-      var(--mobile-tabbar-height) + var(--space-8) + env(safe-area-inset-bottom)
-    );
+    padding-bottom: calc(var(--mobile-tabbar-height) + var(--space-8) + env(safe-area-inset-bottom));
   }
 }
 </style>

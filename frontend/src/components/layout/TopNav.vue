@@ -53,9 +53,7 @@
         <router-link to="/library" class="nav-link" active-class="active">漫画库</router-link>
         <router-link to="/history" class="nav-link" active-class="active">阅读历史</router-link>
         <span class="nav-divider" aria-hidden="true" />
-        <router-link to="/manage" class="nav-link nav-link--management" active-class="active">
-          仓库管理
-        </router-link>
+        <router-link to="/manage" class="nav-link nav-link--management" active-class="active"> 仓库管理 </router-link>
       </nav>
 
       <div class="desktop-context">
@@ -87,16 +85,11 @@
 </template>
 
 <script setup lang="ts">
+// TopNav 是应用级业务组合组件，保留导入状态协作；components 目录不因此整体成为业务层。
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import {
-  ArrowLeft,
-  Menu,
-  Share,
-  UploadFilled,
-  User,
-} from '@element-plus/icons-vue'
+import { ArrowLeft, Menu, Share, UploadFilled, User } from '@element-plus/icons-vue'
 import MaterialSymbolIcon from '@/components/icons/MaterialSymbolIcon.vue'
 import ComicAtlasLogo from '@/components/brand/ComicAtlasLogo.vue'
 import { useHistoryStore } from '@/features/history/store'
@@ -249,7 +242,7 @@ onBeforeUnmount(() => {
   bottom: 0;
   left: 0;
   height: 2px;
-  content: "";
+  content: '';
   background: var(--color-brand);
   opacity: 0;
 }
@@ -286,7 +279,9 @@ onBeforeUnmount(() => {
   color: var(--color-on-brand);
   font-size: var(--text-sm);
   font-weight: 700;
-  transition: background-color var(--transition-fast), transform var(--transition-fast);
+  transition:
+    background-color var(--transition-fast),
+    transform var(--transition-fast);
 }
 
 .import-btn:hover {
@@ -305,7 +300,6 @@ onBeforeUnmount(() => {
 .mobile-header {
   display: none;
 }
-
 
 @media (max-width: 1024px) {
   .top-nav {
@@ -351,7 +345,6 @@ onBeforeUnmount(() => {
     justify-content: space-between;
     width: 100%;
   }
-
 
   .desktop-action {
     display: none;
@@ -507,7 +500,7 @@ onBeforeUnmount(() => {
     left: 26%;
     height: 2px;
     border-radius: var(--radius-pill);
-    content: "";
+    content: '';
     background: var(--accent);
     opacity: 0;
   }

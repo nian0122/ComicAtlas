@@ -1,5 +1,9 @@
 <template>
   <div class="reader-page">
+    <div v-if="store.progressSaveError && !store.loading && !store.error" class="progress-save-error" role="alert">
+      <span>阅读进度暂未保存：{{ store.progressSaveError }}</span>
+      <button class="ghost-btn" @click="retryProgressSave">重试保存</button>
+    </div>
     <!-- 桌面工具栏：迁移前行为 100% 保留（常驻渲染，隐藏由 settings.showToolbar 的 CSS 类控制，不进移动端状态机） -->
     <ReaderToolbar
       v-if="mode === 'desktop'"
@@ -105,10 +109,7 @@ import ReaderSettingsDrawer from '@/features/reader/components/ReaderSettingsDra
 import { useInteractionMode } from '@/features/reader/composables/useInteractionMode'
 import { useReaderGesture } from '@/features/reader/composables/useReaderGesture'
 import { useReaderShortcuts } from '@/features/reader/composables/useReaderShortcuts'
-import {
-  ReaderAction,
-  useReaderToolbar,
-} from '@/features/reader/composables/useReaderToolbar'
+import { ReaderAction, useReaderToolbar } from '@/features/reader/composables/useReaderToolbar'
 import { useReaderNavigation } from '@/features/reader/composables/useReaderNavigation'
 import { comicApi } from '@/entities/comic/api'
 import { preloadEngine } from '@/features/reader/preload-engine'
@@ -279,9 +280,7 @@ async function loadCurrentChapter(preservePage = false, restoreProgress = true) 
       if (isVideoMedia(page)) return null
       // 只有可视区附近的 immediate 才预加载 HQ；远处 cascade 一律优先 LQ，
       // 避免快速滚动时同时下载和解码大量原图导致 Safari 内存崩溃。
-      const wantHq =
-        priority === 'immediate' &&
-        (settings.qualityMode !== 'LQ_ONLY' || forceHqPages.has(index))
+      const wantHq = priority === 'immediate' && (settings.qualityMode !== 'LQ_ONLY' || forceHqPages.has(index))
       if (wantHq) return page.hqUrl || page.lqUrl || null
       return page.lqUrl || page.hqUrl || null
     })
@@ -370,6 +369,17 @@ function onVideoStarted(page: number) {
   })
 }
 
+async function retryProgressSave(): Promise<void> {
+  const chapterId = store.chapterId
+  const pageNumber = store.currentPage
+  progressDirty.value = true
+  const saved = await store.saveProgress()
+  if (saved && store.chapterId === chapterId && store.currentPage === pageNumber) {
+    lastSyncedPage.value = pageNumber
+    progressDirty.value = false
+  }
+}
+
 /** 以真实滚动方向控制阅读端工具栏，避免依赖会被浏览器取消的 pointer swipe。 */
 function onViewportScrollDirection(direction: 'up' | 'down') {
   if (mode.value === 'mobile') {
@@ -428,45 +438,57 @@ onMounted(async () => {
 
   await loadCurrentChapter()
 
-  watch(() => store.currentPage, (newPage) => {
-    if (!chapterLoading.value && store.comicId > 0 && store.chapterId > 0 && store.pages.length > 0 && newPage !== lastSyncedPage.value) {
-      progressDirty.value = true
-      if (saveDebounceTimer.value) clearTimeout(saveDebounceTimer.value)
-      saveDebounceTimer.value = window.setTimeout(() => {
-        // 保存成功才清 dirty：期间若页面卸载，keepalive 兜底重发仍未确认的进度
-        store.saveProgress().then((ok) => {
-          if (ok && store.currentPage === newPage) {
-            lastSyncedPage.value = newPage
-            progressDirty.value = false
-          }
-        })
-      }, 300)
-    }
-  })
+  watch(
+    () => store.currentPage,
+    (newPage) => {
+      if (
+        !chapterLoading.value &&
+        store.comicId > 0 &&
+        store.chapterId > 0 &&
+        store.pages.length > 0 &&
+        newPage !== lastSyncedPage.value
+      ) {
+        progressDirty.value = true
+        if (saveDebounceTimer.value) clearTimeout(saveDebounceTimer.value)
+        saveDebounceTimer.value = window.setTimeout(() => {
+          // 保存成功才清 dirty：期间若页面卸载，keepalive 兜底重发仍未确认的进度
+          store.saveProgress().then((ok) => {
+            if (ok && store.currentPage === newPage) {
+              lastSyncedPage.value = newPage
+              progressDirty.value = false
+            }
+          })
+        }, 300)
+      }
+    },
+  )
 })
 
 // 同名路由仅换参数时 Vue Router 复用组件实例,onMounted 不会重跑——
 // 章节切换(工具栏/BottomNav/自动跳章)必须显式监听 chapterId 重载。
-watch(() => route.params.chapterId, (newId, oldId) => {
-  if (!newId || newId === oldId) return
-  // 清掉挂起的进度 debounce,防其在新章加载后用旧章页码写脏数据;
-  // 再同步落袋旧章进度(payload 同步构造,读到的仍是旧 chapterId)
-  if (saveDebounceTimer.value) {
-    clearTimeout(saveDebounceTimer.value)
-    saveDebounceTimer.value = null
-  }
-  if (store.comicId > 0 && store.currentPage !== lastSyncedPage.value) {
-    const chapterId = store.chapterId
-    const pageNumber = store.currentPage
-    store.saveProgress().then((ok) => {
-      if (ok && store.chapterId === chapterId && store.currentPage === pageNumber) {
-        lastSyncedPage.value = pageNumber
-        progressDirty.value = false
-      }
-    })
-  }
-  loadCurrentChapter()
-})
+watch(
+  () => route.params.chapterId,
+  (newId, oldId) => {
+    if (!newId || newId === oldId) return
+    // 清掉挂起的进度 debounce,防其在新章加载后用旧章页码写脏数据;
+    // 再同步落袋旧章进度(payload 同步构造,读到的仍是旧 chapterId)
+    if (saveDebounceTimer.value) {
+      clearTimeout(saveDebounceTimer.value)
+      saveDebounceTimer.value = null
+    }
+    if (store.comicId > 0 && store.currentPage !== lastSyncedPage.value) {
+      const chapterId = store.chapterId
+      const pageNumber = store.currentPage
+      store.saveProgress().then((ok) => {
+        if (ok && store.chapterId === chapterId && store.currentPage === pageNumber) {
+          lastSyncedPage.value = pageNumber
+          progressDirty.value = false
+        }
+      })
+    }
+    loadCurrentChapter()
+  },
+)
 
 onBeforeUnmount(() => {
   document.documentElement.classList.remove('reader-document')
@@ -502,6 +524,22 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   background: var(--bg);
+}
+
+.progress-save-error {
+  position: fixed;
+  z-index: 20;
+  top: var(--space-sm);
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  border: 1px solid var(--warning);
+  border-radius: var(--radius-sm);
+  transform: translateX(-50%);
 }
 
 :global(html.reader-document) {
@@ -540,7 +578,9 @@ onBeforeUnmount(() => {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .primary-btn {

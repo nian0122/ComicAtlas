@@ -33,5 +33,51 @@ export default typescriptEslint.config(
       'preserve-caught-error': 'off',
     },
   },
+  {
+    files: ['src/shared/**/*.{js,mjs,cjs,ts,vue}'],
+    rules: {
+      // shared 只能向下依赖基础设施，不能反向引用领域、功能或页面层。
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@/entities/**', '@/features/**', '@/views/**', '@/components/**'],
+              message: 'shared 不得反向依赖业务层。',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/entities/**/*.{js,mjs,cjs,ts,vue}'],
+    rules: {
+      // entities 可以复用 shared 契约，但不能依赖功能实现或页面。
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@/features/**', '@/views/**', '@/components/**'],
+              message: 'entities 不得依赖功能实现或页面层。',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/features/**/*.{js,mjs,cjs,ts,vue}'],
+    rules: {
+      // feature 之间的协作通过各自公开的 API/Store 完成；feature 不得反向依赖页面。
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [{ group: ['@/views/**'], message: 'features 不得依赖 views；页面应组合 feature。' }],
+        },
+      ],
+    },
+  },
   eslintConfigPrettier,
 )

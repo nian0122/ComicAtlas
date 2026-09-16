@@ -37,8 +37,9 @@ function markCoverFailed(comicId: number) {
   failedCoverIds.add(comicId)
 }
 
-
-function sizePercent(bytes: number, total: number): number { return total > 0 ? Math.max(0, Math.min(100, Math.round((bytes / total) * 100))) : 0 }
+function sizePercent(bytes: number, total: number): number {
+  return total > 0 ? Math.max(0, Math.min(100, Math.round((bytes / total) * 100))) : 0
+}
 </script>
 
 <template>
@@ -59,7 +60,7 @@ function sizePercent(bytes: number, total: number): number { return total > 0 ? 
           loading="lazy"
           alt=""
           @error="markCoverFailed(row.comicId)"
-        >
+        />
         <div v-else class="cover-placeholder" aria-label="暂无封面">
           <el-icon :size="20"><Collection /></el-icon>
         </div>
@@ -67,16 +68,40 @@ function sizePercent(bytes: number, total: number): number { return total > 0 ? 
     </el-table-column>
     <el-table-column prop="title" label="漫画名称" min-width="180" show-overflow-tooltip />
     <el-table-column label="存储状态" width="150">
-      <template #default="{ row }"><div class="status-stack"><StorageStatusTag :status="row.hqStatus" type="hq" /><StorageStatusTag :status="row.lqStatus" type="lq" /></div></template>
+      <template #default="{ row }"
+        ><div class="status-stack">
+          <StorageStatusTag :status="row.hqStatus" type="hq" /><StorageStatusTag
+            :status="row.lqStatus"
+            type="lq"
+          /></div
+      ></template>
     </el-table-column>
     <el-table-column label="类型" width="76" align="center">
-      <template #default="{ row }"><span class="media-type">{{ row.mediaType === 'MIXED' ? '混合' : row.mediaType === 'VIDEO' ? '视频' : '图片' }}</span></template>
+      <template #default="{ row }"
+        ><span class="media-type">{{
+          row.mediaType === 'MIXED' ? '混合' : row.mediaType === 'VIDEO' ? '视频' : '图片'
+        }}</span></template
+      >
     </el-table-column>
     <el-table-column label="章节数" width="70" align="center">
       <template #default="{ row }">{{ row.chapterCount ?? '-' }}</template>
     </el-table-column>
     <el-table-column label="占用情况" min-width="190">
-      <template #default="{ row }"><div class="storage-cell"><div class="storage-cell-head"><strong>{{ formatSize(row.totalSize) }}</strong><span>{{ row.pageCount ?? 0 }} 个媒体</span></div><div class="storage-bar"><i class="storage-bar-hq" :style="{ width: `${sizePercent(row.hqSize, row.totalSize)}%` }" /><i class="storage-bar-lq" :style="{ width: `${sizePercent(row.lqSize, row.totalSize)}%` }" /></div><small>HQ {{ formatSize(row.hqSize) }} · LQ {{ formatSize(row.lqSize) }}</small></div></template>
+      <template #default="{ row }"
+        ><div class="storage-cell">
+          <div class="storage-cell-head">
+            <strong>{{ formatSize(row.totalSize) }}</strong
+            ><span>{{ row.pageCount ?? 0 }} 个媒体</span>
+          </div>
+          <div class="storage-bar">
+            <i class="storage-bar-hq" :style="{ width: `${sizePercent(row.hqSize, row.totalSize)}%` }" /><i
+              class="storage-bar-lq"
+              :style="{ width: `${sizePercent(row.lqSize, row.totalSize)}%` }"
+            />
+          </div>
+          <small>HQ {{ formatSize(row.hqSize) }} · LQ {{ formatSize(row.lqSize) }}</small>
+        </div></template
+      >
     </el-table-column>
   </el-table>
   <el-pagination
@@ -112,15 +137,51 @@ function sizePercent(bytes: number, total: number): number { return total > 0 ? 
   color: var(--text-muted);
 }
 
-.status-stack { display: flex; flex-wrap: wrap; gap: 4px; }
-.media-type { color: var(--text-secondary); font: 700 10px var(--mono); }
-.storage-cell { display: grid; gap: 4px; min-width: 160px; }
-.storage-cell-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.storage-cell-head strong { color: var(--text-primary); font-size: 13px; }
-.storage-cell-head span, .storage-cell small { color: var(--text-secondary); font-size: 10px; }
-.storage-bar { display: flex; height: 5px; overflow: hidden; background: var(--bg-primary); }
-.storage-bar i { display: block; min-width: 0; }
-.storage-bar-hq { background: var(--accent); }.storage-bar-lq { background: var(--success); }
+.status-stack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.media-type {
+  color: var(--text-secondary);
+  font: 700 10px var(--mono);
+}
+.storage-cell {
+  display: grid;
+  gap: 4px;
+  min-width: 160px;
+}
+.storage-cell-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.storage-cell-head strong {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+.storage-cell-head span,
+.storage-cell small {
+  color: var(--text-secondary);
+  font-size: 10px;
+}
+.storage-bar {
+  display: flex;
+  height: 5px;
+  overflow: hidden;
+  background: var(--bg-primary);
+}
+.storage-bar i {
+  display: block;
+  min-width: 0;
+}
+.storage-bar-hq {
+  background: var(--accent);
+}
+.storage-bar-lq {
+  background: var(--success);
+}
 
 .pagination-bar {
   margin-top: var(--space-base);

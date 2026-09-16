@@ -141,6 +141,16 @@ const batchResultFixture = {
   failed: [],
 }
 
+const ehentaiTaskFixture = {
+  id: 21,
+  comicId: 31,
+  sourceRef: 'https://e-hentai.org/g/1234567/abcdef1234/',
+  sourceType: 'EHENTAI',
+  sourcePath: '',
+  status: 'PENDING',
+  progress: 0,
+}
+
 type ScanMode = 'new' | 'legacy' | 'fail-first'
 
 /** 测试共享的扫描返回模式；beforeEach 重置，路由 handler 读取 */
@@ -245,6 +255,37 @@ test('扫描失败可重试，阻断项保持禁用', async ({ page }) => {
   await expect(page.getByLabel('扫描统计')).toContainText('候选 3')
 })
 
+test('EHENTAI 入口提交画廊 URL 到 sourceRef，并跳转任务中心', async ({ page }) => {
+  await setScanMode(page, 'new')
+  await page.goto('/manage/import?force-desktop=1')
+
+  const sourceCard = page.locator('.source-type-radio', { hasText: 'E-Hentai 画廊' })
+  await sourceCard.click()
+  const sourceInput = page.getByPlaceholder('https://e-hentai.org/g/1234567/abcdef1234/')
+  await sourceInput.fill('https://e-hentai.org/g/1234567/abcdef1234/')
+
+  const requestPromise = page.waitForRequest(
+    (request) => request.method() === 'POST' && request.url().endsWith('/manage/tasks/import'),
+  )
+  await page.getByRole('button', { name: '开始导入' }).click()
+
+  const request = await requestPromise
+  expect(request.postDataJSON()).toEqual({
+    sourceType: 'EHENTAI',
+    sourceRef: 'https://e-hentai.org/g/1234567/abcdef1234/',
+  })
+  await expect(page).toHaveURL(/\/manage\/tasks$/)
+  await expect(page.getByRole('heading', { name: '任务中心' })).toBeVisible()
+})
+
+test('EHENTAI 入口拒绝非画廊 URL', async ({ page }) => {
+  await setScanMode(page, 'new')
+  await page.goto('/manage/import?force-desktop=1')
+  await page.locator('.source-type-radio', { hasText: 'E-Hentai 画廊' }).click()
+  await page.getByPlaceholder('https://e-hentai.org/g/1234567/abcdef1234/').fill('https://example.com/gallery')
+  await expect(page.getByRole('button', { name: '开始导入' })).toBeDisabled()
+})
+
 async function openBatchPanel(page: Page) {
   await page.goto('/manage/import?force-desktop=1')
   await page.locator('.import-tab', { hasText: '批量导入' }).click()
@@ -275,8 +316,7 @@ async function handleApi(route: Route) {
       })
       return
     }
-    const result =
-      scanMode === 'legacy' ? legacyScanResultFixture : scanResultFixture
+    const result = scanMode === 'legacy' ? legacyScanResultFixture : scanResultFixture
     await json(route, {
       id: scanTaskId,
       status: 'SUCCESS',
@@ -288,6 +328,10 @@ async function handleApi(route: Route) {
   }
   if (request.method() === 'POST' && path.endsWith('/tasks/import/batch')) {
     await json(route, batchResultFixture)
+    return
+  }
+  if (request.method() === 'POST' && path.endsWith('/tasks/import')) {
+    await json(route, ehentaiTaskFixture)
     return
   }
   if (request.method() === 'GET' && path.endsWith('/tasks/import')) {

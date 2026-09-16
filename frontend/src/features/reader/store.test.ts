@@ -94,4 +94,21 @@ describe('阅读器进度恢复', () => {
 
     expect(readerStore.currentPage).toBe(1)
   })
+
+  it('进度保存失败时保留错误并允许下一次保存恢复', async () => {
+    mockedChapterGet.mockResolvedValue(chapterResponse(103))
+    mockedHistoryGet.mockResolvedValue(historyResponse(103, 1))
+    const mockedHistoryUpdate = vi.mocked(historyApi.update)
+    mockedHistoryUpdate.mockRejectedValueOnce(new Error('网络暂不可用')).mockResolvedValueOnce(apiResponse(undefined))
+    const readerStore = useReaderStore()
+
+    await readerStore.loadChapter(103)
+    readerStore.currentPage = 8
+    expect(await readerStore.saveProgress()).toBe(false)
+    expect(readerStore.progressSaveError).toBe('网络暂不可用')
+
+    expect(await readerStore.saveProgress()).toBe(true)
+    expect(readerStore.progressSaveError).toBeNull()
+    expect(mockedHistoryUpdate).toHaveBeenCalledTimes(2)
+  })
 })

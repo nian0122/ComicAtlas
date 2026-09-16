@@ -1,12 +1,6 @@
 <template>
   <div class="catalog-tree">
-    <RecycleScroller
-      class="catalog-scroller"
-      :items="flatItems"
-      :item-size="40"
-      key-field="flatKey"
-      :buffer="100"
-    >
+    <RecycleScroller class="catalog-scroller" :items="flatItems" :item-size="40" key-field="flatKey" :buffer="100">
       <template #default="{ item }">
         <div
           v-if="item.type === 'header'"
@@ -14,11 +8,7 @@
           :style="{ paddingLeft: item.depth * 16 + 12 + 'px' }"
           @click="toggleExpanded(item.nodePath)"
         >
-          <button
-            type="button"
-            class="expand-btn"
-            :class="{ expanded: isExpanded(item.nodePath) }"
-          >
+          <button type="button" class="expand-btn" :class="{ expanded: isExpanded(item.nodePath) }">
             <el-icon :size="12"><ArrowRight /></el-icon>
           </button>
           <span class="node-title">{{ item.title }}</span>
@@ -121,7 +111,7 @@ watch(
       if (node.title) expandedIds.value.add(`/${keySegmentOf(node, index)}`)
     })
   },
-  { immediate: true }
+  { immediate: true },
 )
 
 /**
@@ -220,7 +210,9 @@ const flatItems = computed<FlatItem[]>(() => {
   user-select: none;
 }
 
-.node-header:first-child { margin-top: 0; }
+.node-header:first-child {
+  margin-top: 0;
+}
 
 .expand-btn {
   display: flex;

@@ -13,8 +13,8 @@
     "build": "vue-tsc -b && vite build",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --check eslint.config.mjs .prettierrc.json package.json",
-    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm exec vite build --emptyOutDir=false",
+    "format:check": "prettier --check . --end-of-line auto",
+    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test:unit && pnpm test:e2e && pnpm build",
     "preview": "vite preview"
   },
   "dependencies": {

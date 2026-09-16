@@ -13,7 +13,17 @@
       @scroll="onScrollerScroll"
     >
       <template #default="{ item, index, active }">
-        <div class="reader-item-wrapper"><ReaderImageItem :item="item" :index="index" :active="active" :scroller-root="scrollerEl" :item-height="item.size" :force-hq="props.forceHqPages.has(index)" @video-started="emit('video-started', $event)" /></div>
+        <div class="reader-item-wrapper">
+          <ReaderImageItem
+            :item="item"
+            :index="index"
+            :active="active"
+            :scroller-root="scrollerEl"
+            :item-height="item.size"
+            :force-hq="props.forceHqPages.has(index)"
+            @video-started="emit('video-started', $event)"
+          />
+        </div>
       </template>
     </RecycleScroller>
   </div>
@@ -142,13 +152,7 @@ const tallestVideoItemSize = computed(() => {
  * 自动适配竖屏视频的实际高度。buffer 在可视区上下两侧各生效一次。
  */
 const buffer = computed(() =>
-  Math.ceil(
-    Math.max(
-      MIN_BUFFER_PX,
-      containerHeight.value,
-      tallestVideoItemSize.value + VIDEO_BUFFER_SAFETY_PX,
-    ),
-  ),
+  Math.ceil(Math.max(MIN_BUFFER_PX, containerHeight.value, tallestVideoItemSize.value + VIDEO_BUFFER_SAFETY_PX)),
 )
 
 const prefixSums = computed<number[]>(() => {
@@ -165,7 +169,7 @@ const scrollerItems = computed<ScrollerItem[]>(() =>
   props.pages.map((page, index) => ({
     ...page,
     size: sizes.value[index],
-  }))
+  })),
 )
 
 function upperBound(arr: number[], value: number): number {
@@ -315,26 +319,33 @@ onBeforeUnmount(() => {
   if (programmaticScrollTimer != null) window.clearTimeout(programmaticScrollTimer)
 })
 
-watch(() => props.currentPage, (newPage) => {
-  // page-mode 的 currentPage 由自然滚动产生，只同步父级状态；
-  // 外部跳页由 ReaderPage 显式调用 scrollToPage，禁止 watcher 反向吸附。
-  if (props.pageMode) return
-  // 斩断回声循环:自身滚动 emit 的页码经父组件回流时,视口已在该页,跳过吸附;
-  // 外部跳页(工具栏/键盘/URL)因当前位置不符,正常执行 scrollToPage。
-  if (newPage === deriveCurrentPage()) return
-  scrollToPage(newPage)
-}, { flush: 'post' })
+watch(
+  () => props.currentPage,
+  (newPage) => {
+    // page-mode 的 currentPage 由自然滚动产生，只同步父级状态；
+    // 外部跳页由 ReaderPage 显式调用 scrollToPage，禁止 watcher 反向吸附。
+    if (props.pageMode) return
+    // 斩断回声循环:自身滚动 emit 的页码经父组件回流时,视口已在该页,跳过吸附;
+    // 外部跳页(工具栏/键盘/URL)因当前位置不符,正常执行 scrollToPage。
+    if (newPage === deriveCurrentPage()) return
+    scrollToPage(newPage)
+  },
+  { flush: 'post' },
+)
 
-watch(() => props.pages.length, () => {
-  // 重置 visible-range 去重状态:新章节即使 range 数值相同也必须重发,
-  // 否则 preloadEngine reset 后收不到首次可视区,预加载不启动。
-  lastRangeStart = -1
-  lastRangeEnd = -1
-  nextTick(() => {
-    updateContainerSize()
-    scrollToPage(props.currentPage)
-  })
-})
+watch(
+  () => props.pages.length,
+  () => {
+    // 重置 visible-range 去重状态:新章节即使 range 数值相同也必须重发,
+    // 否则 preloadEngine reset 后收不到首次可视区,预加载不启动。
+    lastRangeStart = -1
+    lastRangeEnd = -1
+    nextTick(() => {
+      updateContainerSize()
+      scrollToPage(props.currentPage)
+    })
+  },
+)
 
 watch([containerWidth, containerHeight], () => {
   nextTick(() => {
@@ -346,14 +357,18 @@ watch([containerWidth, containerHeight], () => {
   })
 })
 
-watch(() => [settings.fitMode, settings.zoom], () => {
-  nextTick(() => {
-    forceUpdateScroller()
-    // 移动端调整阅读设置不属于页码跳转，保留用户当前阅读位置。
-    if (props.pageMode) return
-    scrollToPage(props.currentPage)
-  })
-}, { flush: 'post' })
+watch(
+  () => [settings.fitMode, settings.zoom],
+  () => {
+    nextTick(() => {
+      forceUpdateScroller()
+      // 移动端调整阅读设置不属于页码跳转，保留用户当前阅读位置。
+      if (props.pageMode) return
+      scrollToPage(props.currentPage)
+    })
+  },
+  { flush: 'post' },
+)
 </script>
 
 <style scoped>
