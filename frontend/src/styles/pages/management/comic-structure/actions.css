@@ -1,4 +1,5 @@
 .action-card {
+  min-width: 0;
   padding: var(--space-4);
   border: 1px solid var(--border);
   background: var(--bg-secondary);
@@ -241,6 +242,10 @@
   color: var(--text-secondary);
   font-size: var(--text-sm);
 }
+.chapter-action-toolbar .create-chapter-button {
+  flex: 0 0 auto;
+  max-width: 100%;
+}
 .chapter-action-toolbar > div {
   display: grid;
   gap: 3px;
@@ -446,6 +451,15 @@
 .action-form :deep(.el-form-item__content) {
   display: grid;
   gap: 5px;
+}
+.action-form :deep(.el-input),
+.action-form :deep(.el-select),
+.action-form :deep(.el-input-number),
+.action-form :deep(.el-input__wrapper),
+.action-form :deep(.el-select__wrapper) {
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 .form-grid {
   display: grid;
@@ -716,5 +730,60 @@
   .load-card {
     width: 100%;
     min-width: 0;
+  }
+}
+
+@media (max-width: 420px) {
+  .action-panel {
+    padding: 10px;
+  }
+  .action-card {
+    padding: 12px;
+  }
+  .action-card-head {
+    flex-direction: column;
+    gap: 8px;
+    padding-bottom: 12px;
+  }
+  .action-card-head h2 {
+    font-size: var(--text-md);
+  }
+  .action-id {
+    align-self: flex-start;
+  }
+  .action-context {
+    margin: 12px 0 14px;
+    padding: 9px;
+  }
+  .chapter-workspace-tabs {
+    margin-bottom: 12px;
+  }
+  .chapter-workspace-tabs button {
+    min-width: 0;
+    padding-inline: 4px;
+  }
+  .chapter-action-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .chapter-action-toolbar .create-chapter-button {
+    width: 100%;
+  }
+  .chapter-choice-grid {
+    grid-template-columns: 1fr;
+  }
+  .chapter-choice-grid button {
+    min-height: 46px;
+  }
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .chapter-reorder-box {
+    grid-template-columns: 1fr;
+  }
+  .position-arrow {
+    display: none;
   }
 }
