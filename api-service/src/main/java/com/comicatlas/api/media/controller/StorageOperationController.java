@@ -3,12 +3,7 @@ package com.comicatlas.api.media.controller;
 import com.comicatlas.api.media.service.MediaOperationCommandService;
 
 import com.comicatlas.contract.common.Result;
-import com.comicatlas.api.exporter.dto.ExportTaskVO;
-import com.comicatlas.api.exporter.dto.ExportArtifactVO;
 import com.comicatlas.api.task.dto.OperationSubmitResultDTO;
-import com.comicatlas.api.exporter.service.ExportOperationService;
-import com.comicatlas.api.exporter.service.ExportDirectoryService;
-import com.comicatlas.api.exporter.service.ExportDirectoryOpenResult;
 import com.comicatlas.api.media.service.HqDeleteOperationService;
 import com.comicatlas.api.media.service.LqOperationService;
 import com.comicatlas.api.media.service.TranscodeOperationService;
@@ -22,13 +17,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
 
 /**
  * 存储操作统一入口（存储操作域）。
  * <p>
  * URL 形态：POST /api/storage/{operation}/{targetType}/{targetId}，targetType = comics | chapters。
- * 包含全部存储操作端点：LQ 生成、HQ 删除（保留 LQ）、视频转码、刷新元数据、导出及导出分卷清单/打开目录。
+ * 包含媒体存储操作端点：LQ 生成、HQ 删除（保留 LQ）、视频转码和刷新元数据。
  * 存储统计端点见 {@link StorageStatsController}。
  */
 @RestController
@@ -36,14 +30,10 @@ import java.util.List;
 @RequiredArgsConstructor
 public class StorageOperationController {
 
-    // TODO(DECOUPLE-12): Controller 聚合 LQ/HQ/转码、元数据刷新和导出端点，需按业务域拆分 Controller 并保持现有 URL 契约。
-
     private final LqOperationService lqOperationService;
     private final HqDeleteOperationService hqDeleteOperationService;
     private final TranscodeOperationService transcodeOperationService;
-    private final ExportOperationService exportOperationService;
     private final MediaOperationCommandService commandService;
-    private final ExportDirectoryService exportDirectoryService;
 
     // ======================== LQ 生成 ========================
 
@@ -147,78 +137,4 @@ public class StorageOperationController {
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(Result.ok(dto));
     }
 
-    // ======================== 导出 ========================
-
-    /**
-     * 为漫画创建导出任务（异步打包，任务就绪后经 MQ 通知）。
-     *
-     * @param comicId 漫画 ID
-     * @return 202 Accepted + 导出任务信息
-     */
-    @PostMapping("/export/comics/{comicId}")
-    public ResponseEntity<ExportTaskVO> createExport(@PathVariable Long comicId,
-            @RequestParam(defaultValue = "ZIP") String format) {
-        ExportTaskVO task = "ZIP".equalsIgnoreCase(format)
-                ? exportOperationService.createExportTask(comicId)
-                : exportOperationService.createExportTask(comicId, format);
-        return ResponseEntity.status(HttpStatus.ACCEPTED).body(task);
-    }
-
-    /**
-     * 查询漫画的导出任务列表。
-     *
-     * @param comicId 漫画 ID
-     * @return 导出任务列表
-     */
-    @GetMapping("/export/comics/{comicId}/tasks")
-    public Result<List<ExportTaskVO>> listExports(@PathVariable Long comicId) {
-        return Result.ok(exportOperationService.listExports(comicId));
-    }
-
-    /**
-     * 查询全局导出任务列表（跨漫画，按创建时间倒序），供任务中心展示全部导出记录。
-     *
-     * @return 导出任务列表
-     */
-    @GetMapping("/export/tasks")
-    public Result<List<ExportTaskVO>> listAllExports() {
-        return Result.ok(exportOperationService.listAllExports());
-    }
-
-    /**
-     * 查询导出任务详情（含导出产物物理路径）。
-     *
-     * @param taskId 导出任务 ID
-     * @return 导出任务详情
-     */
-    @GetMapping("/export/tasks/{taskId}")
-    public Result<ExportTaskVO> getExportTask(@PathVariable Long taskId) {
-        return Result.ok(exportOperationService.getTask(taskId));
-    }
-
-    /**
-     * 查询导出任务的分卷清单（仅元数据：卷名/大小/本地物理路径，不提供文件字节）。
-     *
-     * @param taskId 导出任务 ID
-     * @return 有序分卷清单，最后一个为 .zip 主卷
-     */
-    @GetMapping("/export/tasks/{taskId}/artifacts")
-    public Result<List<ExportArtifactVO>> getExportArtifacts(@PathVariable Long taskId) {
-        return Result.ok(exportOperationService.listArtifacts(taskId));
-    }
-
-    /**
-     * 打开导出文件所在目录（Windows/Linux/macOS 通用，Desktop API；失败回退 501）。
-     */
-    @PostMapping("/export/tasks/{taskId}/open")
-    public ResponseEntity<?> openExportDir(@PathVariable Long taskId) {
-        ExportDirectoryOpenResult result = exportDirectoryService.open(taskId);
-        if (result.status() == ExportDirectoryOpenResult.Status.OPENED) {
-            return ResponseEntity.ok().build();
-        }
-        if (result.status() == ExportDirectoryOpenResult.Status.NOT_FOUND) {
-            return ResponseEntity.notFound().build();
-        }
-        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).body(result.message());
-    }
 }
