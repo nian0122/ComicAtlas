@@ -1,6 +1,5 @@
 package com.comicatlas.api.task.service;
 
-// 架构说明：Service 策略直接构造 LambdaUpdateWrapper 更新漫画状态；条件更新应收口到 ComicMapper。
 import com.comicatlas.api.shared.exception.ConflictException;
 import com.comicatlas.api.task.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.task.enums.ManagementTaskStatus;
@@ -8,10 +7,8 @@ import com.comicatlas.api.task.enums.TaskType;
 import com.comicatlas.api.task.persistence.entity.ManagementTask;
 import com.comicatlas.api.task.persistence.entity.ManagementTaskItem;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
-import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.persistence.comic.entity.Chapter;
-import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import lombok.RequiredArgsConstructor;
