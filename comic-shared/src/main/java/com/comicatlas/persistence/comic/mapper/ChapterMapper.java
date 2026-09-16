@@ -12,6 +12,17 @@ import java.util.List;
 @Mapper
 public interface ChapterMapper extends BaseMapper<Chapter> {
 
+    @Select("SELECT id, comic_id, title, status, global_order FROM chapter WHERE id = #{chapterId}")
+    Chapter selectReaderChapter(@Param("chapterId") Long chapterId);
+
+    @Select("SELECT id FROM chapter WHERE comic_id = #{comicId} AND status = 'READY' "
+            + "AND global_order < #{globalOrder} ORDER BY global_order DESC LIMIT 1")
+    Long selectPreviousReadyChapterId(@Param("comicId") Long comicId, @Param("globalOrder") Integer globalOrder);
+
+    @Select("SELECT id FROM chapter WHERE comic_id = #{comicId} AND status = 'READY' "
+            + "AND global_order > #{globalOrder} ORDER BY global_order ASC LIMIT 1")
+    Long selectNextReadyChapterId(@Param("comicId") Long comicId, @Param("globalOrder") Integer globalOrder);
+
     @Select("SELECT id, comic_id, catalog_id, title, chapter_no, page_count, global_order, status "
             + "FROM chapter WHERE comic_id = #{comicId} AND status = 'READY' ORDER BY chapter_no ASC")
     List<Chapter> selectReadyByComicIdOrderByChapterNo(@Param("comicId") Long comicId);
