@@ -233,7 +233,7 @@
   padding: 0 14px;
   color: var(--text-secondary) !important;
   background: var(--bg-surface) !important;
-  border-color: var(--border) !important;
+  border: 1px solid var(--border) !important;
   box-shadow: none !important;
   line-height: var(--control-height);
 }
@@ -258,6 +258,15 @@
   color: var(--color-on-brand) !important;
   background: var(--accent-hover) !important;
   border-color: var(--accent-hover) !important;
+}
+
+.el-radio-button__original-radio:focus-visible + .el-radio-button__inner {
+  outline: 2px solid var(--accent) !important;
+  outline-offset: -2px;
+}
+
+.el-radio-button__original-radio:focus:not(:focus-visible) + .el-radio-button__inner {
+  outline: none !important;
 }
 
 .el-radio-button.is-disabled .el-radio-button__inner {
