@@ -154,9 +154,7 @@
   box-shadow: 0 0 0 1px var(--border-strong) inset;
 }
 .filter-select :deep(.el-select__wrapper.is-focused) {
-  box-shadow:
-    0 0 0 1px var(--accent) inset,
-    0 0 0 3px var(--accent-bg);
+  box-shadow: 0 0 0 1px var(--accent) inset !important;
 }
 .filter-select :deep(.el-select__selected-item),
 .filter-select :deep(.el-select__placeholder) {

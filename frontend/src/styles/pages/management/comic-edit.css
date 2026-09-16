@@ -99,9 +99,7 @@
   box-shadow: 0 0 0 1px var(--border) inset;
 }
 .edit-form :deep(.el-textarea__inner:focus) {
-  box-shadow:
-    0 0 0 1px var(--accent) inset,
-    0 0 0 3px var(--control-focus-ring);
+  box-shadow: 0 0 0 1px var(--accent) inset !important;
 }
 .edit-form .el-select {
   width: 100%;
@@ -138,9 +136,10 @@
     var(--shadow-sm);
 }
 .tag-select :deep(.el-select__wrapper.is-focused) {
-  box-shadow:
-    inset 0 0 0 1px var(--accent),
-    0 0 0 3px var(--control-focus-ring);
+  box-shadow: inset 0 0 0 1px var(--accent) !important;
+}
+.new-tag-input :deep(.el-input__wrapper.is-focus) {
+  box-shadow: inset 0 0 0 1px var(--accent), var(--shadow-sm) !important;
 }
 .new-tag-input {
   flex: 1;
