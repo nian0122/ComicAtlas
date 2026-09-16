@@ -546,6 +546,14 @@
   box-shadow: inset 0 0 0 1px var(--border), var(--shadow-sm) !important;
 }
 
+/* 输入组件根节点不绘制第二层边框，焦点只由内部 wrapper 负责。 */
+.el-input,
+.el-input:focus-within {
+  border-color: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
 .el-input .el-input__wrapper:hover,
 .el-select .el-select__wrapper:hover:not(.is-disabled):not(.is-focused) {
   background: var(--control-bg-hover) !important;
@@ -1003,10 +1011,7 @@
 .el-select:focus-within .el-select__wrapper {
   outline: none;
   border-color: transparent;
-  box-shadow:
-    inset 0 0 0 1px var(--accent),
-    0 0 0 3px var(--control-focus-ring),
-    var(--shadow-sm);
+  box-shadow: inset 0 0 0 1px var(--accent), var(--shadow-sm);
 }
 
 /* Element Plus 进度条默认使用蓝色 primary，管理任务进度必须沿用品牌红。 */
