@@ -11,6 +11,7 @@ import com.comicatlas.worker.exporter.model.ExportCollectResult;
 import com.comicatlas.worker.exporter.model.ExportManifest;
 import com.comicatlas.worker.exporter.metadata.MetadataJsonExporter;
 import com.comicatlas.worker.exporter.service.ExportService;
+import com.comicatlas.worker.exporter.service.impl.ExportServiceImpl;
 import com.comicatlas.worker.exporter.collector.ExportCollector;
 import com.comicatlas.worker.exporter.resolver.ExportFileResolver;
 import com.comicatlas.worker.config.WorkerConfig;
@@ -118,7 +119,7 @@ class SplitZipRoundTripTest {
     void splitExportRoundTrip_reimportsFromLastZip_localPathsOnly() throws Exception {
         ExportFixture fixture = buildExportFixture();
         ZipBuilder realBuilder = new ZipBuilder(realConfig);
-        ExportService realService = new ExportService(
+        ExportService realService = new ExportServiceImpl(
                 exportCollectorMock(fixture),
                 exportFileResolverMock(),
                 realBuilder,
