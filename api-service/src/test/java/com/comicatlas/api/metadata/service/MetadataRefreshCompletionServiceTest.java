@@ -38,6 +38,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.InjectMocks;
+import com.comicatlas.api.metadata.service.impl.MetadataRefreshCompletionServiceImpl;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -98,7 +99,7 @@ class MetadataRefreshCompletionServiceTest {
     @Mock private TransactionTemplate transactionTemplate;
     @Spy private ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
-    @InjectMocks private MetadataRefreshCompletionService service;
+    @InjectMocks private MetadataRefreshCompletionServiceImpl service;
 
     @TempDir Path tempDir;
 
@@ -112,6 +113,11 @@ class MetadataRefreshCompletionServiceTest {
                 .thenReturn(new HqMediaRegistrationService.HqMediaRegistrationResult(1L, 0, 0, 0));
         lenient().when(metadataRefreshService.applyValidatedSnapshot(any()))
                 .thenReturn(new MetadataRefreshService.MetadataRefreshApplyResult(1L, 0, 0, 0));
+        lenient().when(managementTaskItemMapper.markSucceededIfActive(any(), anyInt(), any(), any()))
+                .thenReturn(1);
+        lenient().when(managementTaskItemMapper.markFailedIfActive(any(), anyInt(), anyString(), any(), any()))
+                .thenReturn(1);
+        lenient().when(comicMapper.markRefreshCompleted(any())).thenReturn(1);
         // 单元测试无 Spring 上下文：注册实体 TableInfo 以支持 LambdaUpdateWrapper 解析
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), Comic.class);
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), ManagementTaskItem.class);
@@ -201,15 +207,13 @@ class MetadataRefreshCompletionServiceTest {
         when(managementTaskItemMapper.selectById(100L)).thenReturn(runningItem());
         when(metadataRefreshService.loadAndValidate(any())).thenReturn(snapshot());
         when(comicMapper.selectByIdForUpdate(1L)).thenReturn(refreshingComic());
-        when(comicMapper.update(isNull(), any())).thenReturn(1);
-        when(managementTaskItemMapper.update(isNull(), any())).thenReturn(1);
 
         MetadataRefreshScanCompletedEvent ev = completedEvent();
         service.handleCompleted(ev);
 
         // item CAS → SUCCEEDED；comic CAS → READY
-        verify(managementTaskItemMapper).update(isNull(), any(LambdaUpdateWrapper.class));
-        verify(comicMapper).update(isNull(), any(LambdaUpdateWrapper.class));
+        verify(managementTaskItemMapper).markSucceededIfActive(any(), anyInt(), any(), any());
+        verify(comicMapper).markRefreshCompleted(1L);
         // 差异合并 + Inbox + Outbox 入箱 MetadataRefreshEvent + 任务聚合 + 缓存失效
         verify(hqMediaRegistrationService).registerValidatedSnapshot(any());
         verify(metadataRefreshService).applyValidatedSnapshot(any());
@@ -231,14 +235,13 @@ class MetadataRefreshCompletionServiceTest {
         chapter.setComicId(1L);
         when(chapterMapper.selectById(42L)).thenReturn(chapter);
         when(metadataRefreshService.loadAndValidate(any())).thenReturn(chapterSnapshot());
-        when(managementTaskItemMapper.update(isNull(), any())).thenReturn(1);
         when(managementTaskService.countActiveMetadataItems(10L, 1L)).thenReturn(1L);
 
         service.handleCompleted(chapterCompletedEvent());
 
         verify(metadataRefreshService).applyValidatedSnapshot(chapterSnapshot());
         verify(comicStatsService, never()).refreshByComic(any());
-        verify(comicMapper, never()).update(isNull(), any());
+        verify(comicMapper, never()).markRefreshCompleted(any());
         verify(outboxService, never()).enqueue(any(), anyString(), anyString());
     }
 
@@ -298,7 +301,7 @@ class MetadataRefreshCompletionServiceTest {
         when(managementTaskItemMapper.selectById(100L)).thenReturn(runningItem());
         when(metadataRefreshService.loadAndValidate(any())).thenReturn(snapshot());
         when(comicMapper.selectByIdForUpdate(1L)).thenReturn(refreshingComic());
-        when(managementTaskItemMapper.update(isNull(), any())).thenReturn(0);
+        when(managementTaskItemMapper.markSucceededIfActive(any(), anyInt(), any(), any())).thenReturn(0);
 
         MetadataRefreshScanCompletedEvent ev = completedEvent();
         service.handleCompleted(ev);
@@ -321,15 +324,13 @@ class MetadataRefreshCompletionServiceTest {
         when(managementTaskItemMapper.selectById(100L)).thenReturn(runningItem());
         when(metadataRefreshService.loadAndValidate(any()))
                 .thenThrow(new BusinessException("快照 SHA-256 与事件声明不一致"));
-        when(managementTaskItemMapper.update(isNull(), any())).thenReturn(1);
-        when(comicMapper.update(isNull(), any())).thenReturn(1);
 
         MetadataRefreshScanCompletedEvent ev = completedEvent();
         service.handleCompleted(ev);
 
         // 失败短事务：item FAILED + comic READY + 任务聚合 + Inbox
-        verify(managementTaskItemMapper).update(isNull(), any(LambdaUpdateWrapper.class));
-        verify(comicMapper).update(isNull(), any(LambdaUpdateWrapper.class));
+        verify(managementTaskItemMapper).markFailedIfActive(any(), anyInt(), anyString(), any(), any());
+        verify(comicMapper).markRefreshCompleted(1L);
         verify(managementTaskService).reaggregateTask(10L);
         verify(inboxService).markProcessed(eq(ev.eventId().toString()), anyString(), eq(10L), eq(100L), eq(1));
         // 不 apply 快照；本 item 为最后一项时仍收尾重导出，以保留先前成功章节的变更。
@@ -346,8 +347,6 @@ class MetadataRefreshCompletionServiceTest {
         when(managementTaskItemMapper.selectById(100L)).thenReturn(runningItem());
         when(metadataRefreshService.loadAndValidate(any())).thenReturn(snapshot());
         when(comicMapper.selectByIdForUpdate(1L)).thenReturn(refreshingComic());
-        when(comicMapper.update(isNull(), any())).thenReturn(1);
-        when(managementTaskItemMapper.update(isNull(), any())).thenReturn(1);
         when(metadataRefreshService.applyValidatedSnapshot(any()))
                 .thenThrow(new BusinessException("快照结构摘要与自带 databaseRevision 不一致"));
 
@@ -356,8 +355,8 @@ class MetadataRefreshCompletionServiceTest {
 
         // 成功短事务内 apply 已调用（抛出后整体回滚），随后失败短事务执行
         verify(metadataRefreshService).applyValidatedSnapshot(any());
-        verify(managementTaskItemMapper, times(2)).update(isNull(), any(LambdaUpdateWrapper.class));
-        verify(comicMapper).update(isNull(), any(LambdaUpdateWrapper.class));
+        verify(managementTaskItemMapper).markSucceededIfActive(any(), anyInt(), any(), any());
+        verify(comicMapper).markRefreshCompleted(1L);
         verify(managementTaskService).reaggregateTask(10L);
         verify(inboxService).markProcessed(eq(ev.eventId().toString()), anyString(), eq(10L), eq(100L), eq(1));
         verify(outboxService).enqueue(any(MetadataRefreshEvent.class), anyString(), anyString(),
@@ -373,8 +372,6 @@ class MetadataRefreshCompletionServiceTest {
         when(managementTaskItemMapper.selectById(100L)).thenReturn(runningItem());
         when(metadataRefreshService.loadAndValidate(any())).thenReturn(snapshot());
         when(comicMapper.selectByIdForUpdate(1L)).thenReturn(refreshingComic());
-        when(comicMapper.update(isNull(), any())).thenReturn(1);
-        when(managementTaskItemMapper.update(isNull(), any())).thenReturn(1);
         doThrow(new RuntimeException("Outbox 序列化失败"))
                 .when(outboxService).enqueue(any(MetadataRefreshEvent.class), anyString(), anyString(), any(), any(), anyInt());
 
@@ -400,7 +397,7 @@ class MetadataRefreshCompletionServiceTest {
                 .isInstanceOf(SnapshotUnavailableException.class);
 
         // 失败短事务未执行（不标记 FAILED，等 DLQ 重放）
-        verify(managementTaskItemMapper, never()).update(isNull(), any(LambdaUpdateWrapper.class));
+        verify(managementTaskItemMapper, never()).markSucceededIfActive(any(), anyInt(), any(), any());
     }
 
     @Test
@@ -413,6 +410,6 @@ class MetadataRefreshCompletionServiceTest {
         assertThatThrownBy(() -> service.handleCompleted(completedEvent()))
                 .isInstanceOf(SnapshotUnavailableException.class);
 
-        verify(managementTaskItemMapper, never()).update(isNull(), any(LambdaUpdateWrapper.class));
+        verify(managementTaskItemMapper, never()).markSucceededIfActive(any(), anyInt(), any(), any());
     }
 }

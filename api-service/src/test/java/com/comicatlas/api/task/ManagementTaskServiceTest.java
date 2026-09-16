@@ -18,8 +18,8 @@ import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Comic;
+import com.comicatlas.contract.common.enums.ComicStatus;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
-import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
@@ -32,6 +32,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import com.comicatlas.api.task.service.impl.ManagementTaskServiceImpl;
+import com.comicatlas.api.task.service.impl.TaskAggregationServiceImpl;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
@@ -40,7 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.times;
@@ -70,10 +72,10 @@ class ManagementTaskServiceTest {
     private MetadataRefreshTaskPolicy metadataRefreshTaskPolicy;
     @Spy
     @InjectMocks
-    private TaskAggregationService taskAggregationService;
+    private TaskAggregationServiceImpl taskAggregationService;
 
     @InjectMocks
-    private ManagementTaskService service;
+    private ManagementTaskServiceImpl service;
 
     /** 纯 mock 环境无 MyBatis 容器，需预注册 TableInfo 供 LambdaUpdateWrapper 解析列名。 */
     @BeforeAll
@@ -130,12 +132,11 @@ class ManagementTaskServiceTest {
         secondChapter.setId(12L);
         secondChapter.setComicId(1L);
         when(chapterMapper.selectBatchIds(any())).thenReturn(List.of(firstChapter, secondChapter));
-        when(comicMapper.update(isNull(), any())).thenReturn(1);
+        when(comicMapper.lockForMetadataRefresh(1L)).thenReturn(1);
         when(itemMapper.selectCount(any())).thenReturn(0L);
 
         service.createTask(request, null, "{}");
 
-        verify(comicMapper, times(1)).update(isNull(), any(LambdaUpdateWrapper.class));
         verify(itemMapper, times(2)).insert(any(ManagementTaskItem.class));
     }
 
@@ -191,8 +192,8 @@ class ManagementTaskServiceTest {
 
         service.resetTaskState(201L);
 
-        verify(taskMapper).update(eq(null), any());
-        verify(itemMapper).update(eq(null), any());
+        verify(taskMapper).resetForRetry(eq(201L), eq(2), any());
+        verify(itemMapper).resetForRetry(eq(2L), eq(2), anyString(), any());
         verify(importRetryCoordinator, never()).retry(any());
         verify(outboxService, never()).enqueue(any(), any(), any());
     }
@@ -217,15 +218,14 @@ class ManagementTaskServiceTest {
         failedItem.setStatus(ManagementTaskStatus.FAILED);
         failedItem.setErrorMessage("转码失败: ffmpeg 超时");
         when(itemMapper.selectList(any())).thenReturn(List.of(failedItem));
-        when(itemMapper.update(any(), any())).thenReturn(1);
+        when(itemMapper.updateStatusIfActive(any(), any(), anyString(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(1);
 
         service.updateItemStatus(3L, ManagementTaskStatus.FAILED, "转码失败: ffmpeg 超时", null, null, 1);
 
-        @SuppressWarnings("unchecked")
-        LambdaUpdateWrapper<ManagementTask> errorWrapper = captorTaskErrorUpdate();
-        assertTrue(errorWrapper.getSqlSet().contains("error_message"),
+        ManagementTask updatedTask = captorTaskErrorUpdate();
+        assertTrue(updatedTask.getErrorMessage().contains("转码失败: ffmpeg 超时"),
                 "任务级 errorMessage 应聚合失败 item 的错误");
-        assertTrue(errorWrapper.getParamNameValuePairs().containsValue("转码失败: ffmpeg 超时"));
     }
 
     @Test
@@ -247,21 +247,20 @@ class ManagementTaskServiceTest {
         succeededItem.setTaskId(302L);
         succeededItem.setStatus(ManagementTaskStatus.SUCCEEDED);
         when(itemMapper.selectList(any())).thenReturn(List.of(succeededItem));
-        when(itemMapper.update(any(), any())).thenReturn(1);
+        when(itemMapper.updateStatusIfActive(any(), any(), anyString(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(1);
 
         service.updateItemStatus(4L, ManagementTaskStatus.SUCCEEDED, null, null, null, 1);
 
-        @SuppressWarnings("unchecked")
-        LambdaUpdateWrapper<ManagementTask> errorWrapper = captorTaskErrorUpdate();
-        assertTrue(errorWrapper.getSqlSet().contains("error_message"),
+        ManagementTask updatedTask = captorTaskErrorUpdate();
+        assertTrue(updatedTask.getErrorMessage() == null,
                 "非失败终态应显式清空任务级 errorMessage");
     }
 
-    /** 捕获 aggregateTaskStatus 末尾的任务级 errorMessage 条件更新（唯一 update(null, wrapper) 调用）。 */
-    @SuppressWarnings("unchecked")
-    private LambdaUpdateWrapper<ManagementTask> captorTaskErrorUpdate() {
-        ArgumentCaptor<Wrapper<ManagementTask>> captor = ArgumentCaptor.forClass(Wrapper.class);
-        verify(taskMapper).update(eq(null), captor.capture());
-        return (LambdaUpdateWrapper<ManagementTask>) captor.getValue();
+    /** 捕获 aggregateTaskStatus 末尾的任务级状态更新。 */
+    private ManagementTask captorTaskErrorUpdate() {
+        ArgumentCaptor<ManagementTask> captor = ArgumentCaptor.forClass(ManagementTask.class);
+        verify(taskMapper).updateById(captor.capture());
+        return captor.getValue();
     }
 }

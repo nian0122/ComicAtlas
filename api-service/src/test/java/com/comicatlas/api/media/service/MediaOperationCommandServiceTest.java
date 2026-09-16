@@ -31,6 +31,7 @@ import org.mockito.InjectMocks;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import com.comicatlas.api.media.service.impl.MediaOperationCommandServiceImpl;
 
 import java.util.List;
 
@@ -56,7 +57,7 @@ class MediaOperationCommandServiceTest {
     @Mock private ManagementTaskService managementTaskService;
     @Mock private OutboxService outboxService;
     @Mock private TrashLifecycleService trashLifecycleService;
-    @InjectMocks private MediaOperationCommandService service;
+    @InjectMocks private MediaOperationCommandServiceImpl service;
 
     @BeforeAll
     static void initMybatisLambdaCache() {
@@ -134,7 +135,7 @@ class MediaOperationCommandServiceTest {
         // 仅 1 个 MEDIA target：mp4 兼容视频不进入转码目标
         verify(managementTaskService).createTask(any(), any(), any());
         // markTranscodeQueued 仅对 11L 生效一次
-        verify(mediaMapper, times(1)).update(any(), any());
+        verify(mediaMapper, times(1)).markTranscodeQueued(11L);
         // enqueue 仅一次
         verify(outboxService, times(1)).enqueue(any(), any(), any(), any(), any(), anyInt());
     }
@@ -337,7 +338,7 @@ class MediaOperationCommandServiceTest {
 
         // N+1 回归：候选页一次 IN 查询取回，置 DELETE_QUEUED 仅一次批量 UPDATE
         verify(mediaMapper, times(1)).selectList(any());
-        verify(mediaMapper, times(1)).update(any(), any());
+        verify(mediaMapper, times(1)).markHqDeleteQueued(List.of(10L, 20L));
         verify(outboxService, times(2)).enqueue(any(), any(), any(), any(), any(), anyInt());
     }
 

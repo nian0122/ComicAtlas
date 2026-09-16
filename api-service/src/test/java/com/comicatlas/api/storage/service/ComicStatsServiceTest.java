@@ -19,6 +19,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import com.comicatlas.api.storage.service.impl.ComicStatsServiceImpl;
 
 import java.util.List;
 
@@ -36,7 +37,7 @@ class ComicStatsServiceTest {
     @Mock private MediaMapper mediaMapper;
     @Mock private ChapterMapper chapterMapper;
     @Mock private ComicMapper comicMapper;
-    @InjectMocks private ComicStatsService service;
+    @InjectMocks private ComicStatsServiceImpl service;
 
     @BeforeAll
     static void initMybatisTableInfo() {
@@ -62,7 +63,7 @@ class ComicStatsServiceTest {
         ArgumentCaptor<List<Chapter>> chaptersCaptor = ArgumentCaptor.forClass(List.class);
         verify(chapterMapper, times(1)).updatePageCountBatch(chaptersCaptor.capture());
         assertThat(chaptersCaptor.getValue()).extracting(Chapter::getPageCount).containsExactly(2, 0);
-        verify(comicMapper, times(1)).update(isNull(), any());
+        verify(comicMapper, times(1)).updateAllStats(1L, 2, 400L, 40L);
     }
 
     private static Chapter chapter(Long chapterId) {

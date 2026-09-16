@@ -45,6 +45,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import com.comicatlas.api.importer.service.impl.ImportFinalizationServiceImpl;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
@@ -96,7 +97,7 @@ class ImportPersistenceServiceTest {
     @Mock private OutboxService outboxService;
     @Mock private ApiStorageProperties storageProperties;
     @Mock private com.comicatlas.api.metadata.service.MetadataUpdateCoordinator metadataUpdateCoordinator;
-    @Spy @InjectMocks private ImportFinalizationService importFinalizationService;
+    @Spy @InjectMocks private ImportFinalizationServiceImpl importFinalizationService;
 
     @InjectMocks private ImportPersistenceServiceImpl service;
 

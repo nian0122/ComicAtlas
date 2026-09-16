@@ -75,7 +75,7 @@ class ManagementCommandResultHandlerTest {
     private ManagementResultRouter managementResultRouter;
 
     @InjectMocks private ManagementCommandResultHandler handler;
-    @Spy @InjectMocks private ManagementResultApplicationService managementResultApplicationService;
+    @Spy @InjectMocks private ManagementResultApplicationServiceImpl managementResultApplicationService;
 
     @Mock private Channel channel;
 
