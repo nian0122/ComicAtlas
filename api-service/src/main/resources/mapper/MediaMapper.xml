@@ -158,4 +158,29 @@
           AND lq_status IN ('QUEUED', 'GENERATING')
     </update>
 
+    <update id="applyUploadCompleted">
+        UPDATE page
+        SET status = 'READY',
+            hq_status = 'READY',
+            width = #{media.width},
+            height = #{media.height},
+            hq_size = #{media.hqSize},
+            media_type = #{media.mediaType},
+            duration = #{media.duration},
+            container = #{media.container},
+            video_codec = #{media.videoCodec},
+            audio_codec = #{media.audioCodec}
+            <if test="media.hqRoot != null and media.hqRoot != ''">
+                , hq_root = #{media.hqRoot}
+            </if>
+            <if test="media.hqPath != null and media.hqPath != ''">
+                , hq_path = #{media.hqPath}
+            </if>
+            <if test="replace">
+                , lq_status = 'NOT_GENERATED',
+                  transcode_status = 'NOT_NEEDED'
+            </if>
+        WHERE id = #{media.id}
+    </update>
+
 </mapper>

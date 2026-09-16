@@ -1,10 +1,10 @@
 package com.comicatlas.persistence.comic.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Update;
 
 import java.util.List;
 
@@ -14,11 +14,8 @@ public interface ChapterMapper extends BaseMapper<Chapter> {
     /**
      * 将漫画章节临时置为互不冲突的负序号，供全局重排的第二阶段使用。
      */
-    default int updateGlobalOrderToTemporaryNegative(Long comicId) {
-        return update(null, new LambdaUpdateWrapper<Chapter>()
-                .eq(Chapter::getComicId, comicId)
-                .setSql("global_order = -id"));
-    }
+    @Update("UPDATE chapter SET global_order = -id WHERE comic_id = #{comicId}")
+    int updateGlobalOrderToTemporaryNegative(@Param("comicId") Long comicId);
 
     /**
      * 元数据刷新统计批量 UPDATE：按 id 一次性更新各章节 page_count（CASE WHEN 单条 UPDATE），
