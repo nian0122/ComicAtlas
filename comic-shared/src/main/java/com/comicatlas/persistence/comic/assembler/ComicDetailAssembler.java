@@ -1,7 +1,5 @@
 package com.comicatlas.persistence.comic.assembler;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.contract.comic.dto.ComicDetailVO;
 import com.comicatlas.persistence.comic.entity.Category;
 import com.comicatlas.persistence.comic.entity.Chapter;
@@ -71,8 +69,7 @@ public class ComicDetailAssembler {
         detailVO.setTags(tags);
         detailVO.setComicInfo(toComicInfo(comic, chapters, tags));
 
-        ReadingHistory history = readingHistoryMapper.selectOne(
-            new LambdaQueryWrapper<ReadingHistory>().eq(ReadingHistory::getComicId, comic.getId()));
+        ReadingHistory history = readingHistoryMapper.selectByComicId(comic.getId());
         if (history != null && comic.getTotalPages() != null && comic.getTotalPages() > 0) {
             detailVO.setLastReadChapterId(history.getChapterId());
             detailVO.setLastReadPage(history.getPageNumber());
@@ -82,17 +79,12 @@ public class ComicDetailAssembler {
     }
 
     private List<ComicDetailVO.ChapterVO> resolveChapters(Long comicId) {
-        List<Chapter> chapters = chapterMapper.selectList(
-            new LambdaQueryWrapper<Chapter>()
-                .eq(Chapter::getComicId, comicId)
-                .eq(Chapter::getStatus, ChapterLifecycleStatus.READY.name())
-                .orderByAsc(Chapter::getChapterNo));
+        List<Chapter> chapters = chapterMapper.selectReadyByComicIdOrderByChapterNo(comicId);
         return chapters.stream().map(this::toChapterVO).collect(Collectors.toList());
     }
 
     private List<ComicDetailVO.TagRef> resolveTags(Long comicId) {
-        List<ComicTag> comicTags = comicTagMapper.selectList(
-            new LambdaQueryWrapper<ComicTag>().eq(ComicTag::getComicId, comicId));
+        List<ComicTag> comicTags = comicTagMapper.selectByComicId(comicId);
         if (comicTags.isEmpty()) {
             return List.of();
         }
