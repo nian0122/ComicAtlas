@@ -327,6 +327,7 @@ public class UploadSessionService {
 
     // TODO(DECOUPLE-01): 上传完整性校验与事务落库混合；先提取只读文件校验器，再以会话状态复核和幂等提交衔接短事务。
     @Transactional
+    // TODO(IMPL-05): 本方法事务覆盖 verifyUploadedFiles 的逐文件 SHA-256/魔数读取，大文件会拉长事务；拆出校验时须冻结文件并复核会话状态。
     public UploadCompleteResponse complete(String sessionId) {
         UploadSession session = getBySessionId(sessionId);
         if (session.getStatus() != UploadSessionStatus.ACTIVE) {
@@ -461,6 +462,7 @@ public class UploadSessionService {
         try (InputStream input = Files.newInputStream(file)) {
             return digestService.sha256(input);
         } catch (IOException ex) {
+            // TODO(IMPL-06): 仅拼接异常 message 丢失 IOException cause 和原始堆栈；转换业务异常时保留异常链，并避免将敏感路径透传给调用方。
             throw new BusinessException(HttpStatusCodes.INTERNAL_ERROR, "计算文件 SHA-256 失败: " + ex.getMessage());
         }
     }
