@@ -8,8 +8,6 @@ import com.comicatlas.api.shared.crypto.DigestService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 // 条件更新由上传业务服务维护会话状态机与事务边界，Mapper 执行参数化更新。
 // 架构说明：Service 直接构造 LambdaUpdateWrapper 更新上传会话/文件；条件更新应收口到对应 Mapper。
-// TODO(MAPPER-02): Service 直接构造 LambdaUpdateWrapper 更新上传会话/文件；条件更新应收口到对应 Mapper。
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.api.task.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.task.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.task.dto.ManagementTaskResponse;
@@ -337,10 +335,7 @@ public class UploadSessionService {
         if (session.getStatus() != UploadSessionStatus.ACTIVE) {
             throw new BusinessException(HttpStatusCodes.CONFLICT, "会话状态 " + session.getStatus() + " 不允许 complete");
         }
-        int frozenRows = sessionMapper.update(null, new LambdaUpdateWrapper<UploadSession>()
-                .eq(UploadSession::getId, session.getId())
-                .eq(UploadSession::getStatus, UploadSessionStatus.ACTIVE)
-                .set(UploadSession::getStatus, UploadSessionStatus.VERIFYING));
+        int frozenRows = sessionMapper.freezeForVerification(session.getId());
         if (frozenRows != 1) {
             throw new BusinessException(HttpStatusCodes.CONFLICT, "上传会话正在被其他操作处理");
         }
@@ -402,10 +397,7 @@ public class UploadSessionService {
     }
 
     private void restoreActive(Long sessionDatabaseId) {
-        sessionMapper.update(null, new LambdaUpdateWrapper<UploadSession>()
-                .eq(UploadSession::getId, sessionDatabaseId)
-                .eq(UploadSession::getStatus, UploadSessionStatus.VERIFYING)
-                .set(UploadSession::getStatus, UploadSessionStatus.ACTIVE));
+        sessionMapper.restoreActiveFromVerification(sessionDatabaseId);
     }
 
     /** 校验全部文件：分片完整 + SHA-256 总校验 + 魔数检测，返回各文件媒体类型检测结果。 */
@@ -455,9 +447,7 @@ public class UploadSessionService {
             media.setVersion(INITIAL_VERSION);
             mediaMapper.insert(media);
 
-            fileMapper.update(null, new LambdaUpdateWrapper<UploadFile>()
-                    .eq(UploadFile::getId, uploadFile.getId())
-                    .set(UploadFile::getMediaId, media.getId()));
+            fileMapper.bindMedia(uploadFile.getId(), media.getId());
             mediaIds.add(media.getId());
         }
         return mediaIds;
