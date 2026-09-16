@@ -103,6 +103,7 @@
 
 .search-input input {
   flex: 1;
+  /* TODO(FE-STYLE): 该页面样式仍有多处 !important；逐条确认第三方控件覆盖原因并收敛到主题或组件变体。 */
   min-height: 0 !important;
   padding: 0 !important;
   background: transparent !important;

@@ -16,7 +16,7 @@
 frontend/src/
 ├── App.vue                  # 根组件
 ├── main.ts                  # 入口
-├── style.css                # 旧样式入口兼容层，新代码不再引用
+├── styles/index.scss        # 全局样式唯一入口
 ├── styles/                  # index.scss 统一入口、tokens/base/theme/animation 和 pages 页面样式
 ├── router/
 │   └── index.ts             # 路由定义（阅读端 6 + 管理端 8 主路由）

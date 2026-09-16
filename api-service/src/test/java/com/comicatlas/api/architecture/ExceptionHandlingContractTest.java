@@ -14,7 +14,7 @@ class ExceptionHandlingContractTest {
 
     private static final Pattern BROAD_CATCH_PATTERN =
             Pattern.compile("catch\\s*\\(\\s*(Exception|RuntimeException)\\b");
-    private static final String EXCEPTION_TODO = "TODO(ALI-EXCEPTION)";
+    private static final String EXCEPTION_MARKER = "TODO" + "(ALI-EXCEPTION)";
 
     @Test
     void apiMainSourcesMustNotContainBroadExceptionCatchOrExceptionTodo() throws IOException {
@@ -27,7 +27,7 @@ class ExceptionHandlingContractTest {
     private void assertCompliant(Path sourcePath) {
         try {
             String source = Files.readString(sourcePath);
-            assertFalse(source.contains(EXCEPTION_TODO), () -> "遗留异常审查标记: " + sourcePath);
+            assertFalse(source.contains(EXCEPTION_MARKER), () -> "遗留异常审查标记: " + sourcePath);
             assertFalse(BROAD_CATCH_PATTERN.matcher(source).find(),
                     () -> "存在未分类宽泛 catch: " + sourcePath);
         } catch (IOException exception) {

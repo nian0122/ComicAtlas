@@ -543,6 +543,7 @@ onBeforeUnmount(() => {
 }
 
 :global(html.reader-document) {
+  /* TODO(FE-STYLE): 核对页面级 !important 是否仍需要；优先通过更准确的作用域选择器或 CSS 变量覆盖。 */
   scroll-behavior: auto !important;
 }
 
