@@ -1,6 +1,7 @@
 package com.comicatlas.persistence.comic.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.persistence.comic.entity.Media;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -15,6 +16,13 @@ import java.util.List;
  */
 @Mapper
 public interface MediaMapper extends BaseMapper<Media> {
+
+    /** 将章节内媒体页码临时置为互不冲突的负值，供重排第二阶段写回。 */
+    default int updatePageNumberToTemporaryNegative(Long chapterId) {
+        return update(null, new LambdaUpdateWrapper<Media>()
+                .eq(Media::getChapterId, chapterId)
+                .setSql("page_number = -id"));
+    }
 
     /**
      * 导入落库专用批量 INSERT：一次插入多条 page 记录（多值 VALUES）。
