@@ -417,10 +417,7 @@
 
     &.is-focus {
       background: var(--control-bg);
-      box-shadow:
-        inset 0 0 0 1px var(--accent),
-        0 0 0 3px var(--control-focus-ring),
-        var(--shadow-sm);
+      box-shadow: inset 0 0 0 1px var(--accent), var(--shadow-sm);
     }
   }
 
@@ -469,10 +466,7 @@
 
   &:focus {
     background: var(--control-bg);
-    box-shadow:
-      inset 0 0 0 1px var(--accent),
-      0 0 0 3px var(--control-focus-ring),
-      var(--shadow-sm);
+    box-shadow: inset 0 0 0 1px var(--accent), var(--shadow-sm);
   }
 
   &:disabled {
@@ -519,10 +513,7 @@
   }
 
   &.is-focused {
-    box-shadow:
-      inset 0 0 0 1px var(--accent),
-      0 0 0 3px var(--control-focus-ring),
-      var(--shadow-sm);
+    box-shadow: inset 0 0 0 1px var(--accent), var(--shadow-sm);
   }
 
   .el-select__placeholder {
@@ -564,10 +555,7 @@
 .el-input .el-input__wrapper.is-focus,
 .el-select .el-select__wrapper.is-focused,
 .el-select:focus-within .el-select__wrapper {
-  box-shadow:
-    inset 0 0 0 1px var(--accent),
-    0 0 0 3px var(--control-focus-ring),
-    var(--shadow-sm) !important;
+  box-shadow: inset 0 0 0 1px var(--accent), var(--shadow-sm) !important;
 }
 
 /* Element Plus 字数统计默认是白底，深色主题下会形成突兀的白块。 */
