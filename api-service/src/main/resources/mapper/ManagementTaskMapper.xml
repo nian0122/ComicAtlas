@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.comicatlas.api.task.persistence.mapper.ManagementTaskMapper">
+    <update id="updateStage">
+        UPDATE management_task
+        SET stage = #{stage}, updated_at = #{updatedAt}
+        <if test="progress != null and progress &gt;= 0">, progress = #{progress}</if>
+        <if test="startTask">, status = 'RUNNING', started_at = #{startedAt}</if>
+        WHERE id = #{taskId}
+    </update>
+</mapper>

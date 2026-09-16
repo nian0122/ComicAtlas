@@ -1,57 +1,38 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.comicatlas.api.task.persistence.mapper.ManagementTaskItemMapper">
+    <update id="cancelQueuedByTask">
+        UPDATE management_task_item
+        SET status = 'CANCELLED', lock_key = NULL, completed_at = #{completedAt}, updated_at = #{updatedAt}
+        WHERE task_id = #{taskId} AND status = 'QUEUED'
+    </update>
 
-    <!--
-      漫画归属任务 ID 查询：item 直接命中 comic_id，或 item 目标（章节/媒体）归属于该漫画。
-      使用 UNION 拆开三种目标类型，让每段查询分别命中 idx_mti_target、chapter.comic_id
-      和 page 主键，避免 OR + IN 子查询在大数据量下退化为低效执行计划。
-      UNION 自带去重，保持同一任务多条 item 只返回一个 task_id。
-    -->
-    <select id="selectTaskIdsByComicId" resultType="java.lang.Long">
-        SELECT i.task_id
-        FROM management_task_item i
-        WHERE i.target_type = 'COMIC'
-          AND i.target_id = #{comicId}
-        UNION
-        SELECT i.task_id
-        FROM management_task_item i
-        INNER JOIN chapter c ON c.id = i.target_id
-        WHERE i.target_type = 'CHAPTER'
-          AND c.comic_id = #{comicId}
-        UNION
-        SELECT i.task_id
-        FROM management_task_item i
-        INNER JOIN page p ON p.id = i.target_id
-        INNER JOIN chapter c ON c.id = p.chapter_id
-        WHERE i.target_type = 'MEDIA'
-          AND c.comic_id = #{comicId}
-    </select>
+    <update id="resetForRetry">
+        UPDATE management_task_item
+        SET status = 'QUEUED', attempt = #{attempt}, progress = 0, error_message = NULL,
+            started_at = NULL, completed_at = NULL, lock_key = #{lockKey}, updated_at = #{updatedAt}
+        WHERE id = #{itemId}
+    </update>
 
-    <!--
-      每个章节结果完成时只做一次数据库计数，避免反复加载整本章节和全部任务项。
-      UNION ALL 的两段分别利用任务项条件和章节主键关联，外层只汇总计数。
-    -->
-    <select id="countActiveMetadataItems" resultType="long">
-        SELECT COUNT(*)
-        FROM (
-            SELECT i.id
-            FROM management_task_item i
-            WHERE i.task_id = #{taskId}
-              AND i.operation_type = 'METADATA_REFRESH'
-              AND i.status IN ('QUEUED', 'RUNNING', 'CANCELLING')
-              AND i.target_type = 'COMIC'
-              AND i.target_id = #{comicId}
-            UNION ALL
-            SELECT i.id
-            FROM management_task_item i
-            INNER JOIN chapter c ON c.id = i.target_id
-            WHERE i.task_id = #{taskId}
-              AND i.operation_type = 'METADATA_REFRESH'
-              AND i.status IN ('QUEUED', 'RUNNING', 'CANCELLING')
-              AND i.target_type = 'CHAPTER'
-              AND c.comic_id = #{comicId}
-        ) active_item
-    </select>
+    <update id="updateStatusIfActive">
+        UPDATE management_task_item
+        SET status = #{newStatus}, updated_at = #{updatedAt}
+        <if test="startedAt != null">, started_at = #{startedAt}</if>
+        <if test="completedAt != null">, completed_at = #{completedAt}, lock_key = NULL</if>
+        <if test="errorMessage != null">, error_message = #{errorMessage}</if>
+        <if test="resultRefType != null">, result_ref_type = #{resultRefType}</if>
+        <if test="resultRefId != null">, result_ref_id = #{resultRefId}</if>
+        WHERE id = #{itemId}
+          AND status NOT IN ('SUCCEEDED', 'PARTIALLY_SUCCEEDED', 'FAILED', 'CANCELLED')
+          <choose><when test="attempt == null">AND attempt IS NULL</when><otherwise>AND attempt = #{attempt}</otherwise></choose>
+    </update>
 
+    <update id="updateProgressIfActive">
+        UPDATE management_task_item
+        SET progress = #{progress}, updated_at = #{updatedAt}
+        <if test="startItem">, status = 'RUNNING', started_at = #{startedAt}</if>
+        WHERE id = #{itemId}
+          AND status NOT IN ('SUCCEEDED', 'PARTIALLY_SUCCEEDED', 'FAILED', 'CANCELLED')
+          <choose><when test="attempt == null">AND attempt IS NULL</when><otherwise>AND attempt = #{attempt}</otherwise></choose>
+    </update>
 </mapper>

@@ -26,6 +26,22 @@ public interface ManagementTaskItemMapper extends BaseMapper<ManagementTaskItem>
                            @Param("completedAt") LocalDateTime completedAt,
                            @Param("updatedAt") LocalDateTime updatedAt);
 
+    int cancelQueuedByTask(@Param("taskId") Long taskId, @Param("completedAt") LocalDateTime completedAt,
+                           @Param("updatedAt") LocalDateTime updatedAt);
+
+    int resetForRetry(@Param("itemId") Long itemId, @Param("attempt") int attempt,
+                      @Param("lockKey") String lockKey, @Param("updatedAt") LocalDateTime updatedAt);
+
+    int updateStatusIfActive(@Param("itemId") Long itemId, @Param("attempt") Integer attempt,
+                             @Param("newStatus") String newStatus, @Param("errorMessage") String errorMessage,
+                             @Param("resultRefType") String resultRefType, @Param("resultRefId") Long resultRefId,
+                             @Param("startedAt") LocalDateTime startedAt, @Param("completedAt") LocalDateTime completedAt,
+                             @Param("updatedAt") LocalDateTime updatedAt);
+
+    int updateProgressIfActive(@Param("itemId") Long itemId, @Param("attempt") Integer attempt,
+                               @Param("progress") int progress, @Param("startItem") boolean startItem,
+                               @Param("startedAt") LocalDateTime startedAt, @Param("updatedAt") LocalDateTime updatedAt);
+
     /** 绑定回收清单引用，供后续 Worker 命令读取。 */
     @Update("UPDATE management_task_item SET result_ref_type = 'TRASH_MANIFEST', result_ref_id = #{manifestTaskId} WHERE id = #{itemId}")
     int bindTrashManifest(@Param("itemId") Long itemId, @Param("manifestTaskId") Long manifestTaskId);
