@@ -9,8 +9,8 @@ import com.comicatlas.api.storage.dto.ComicTranscodeStatusVO;
 import com.comicatlas.api.storage.dto.StorageStatsDTO;
 import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.contract.comic.cache.ComicReferenceCache;
-import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.storage.persistence.mapper.StorageMapper;
+import com.comicatlas.api.storage.service.StorageCapacityAdapter;
 import com.comicatlas.persistence.storage.FileUrlResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -19,10 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.io.IOException;
-import java.util.stream.Stream;
 import org.springframework.cache.annotation.Cacheable;
 import com.comicatlas.api.storage.ApiStorageProperties;
 
@@ -30,11 +27,10 @@ import com.comicatlas.api.storage.ApiStorageProperties;
 @RequiredArgsConstructor
 public class StorageQueryServiceImpl implements StorageQueryService {
 
-    // TODO(DECOUPLE-11): 存储查询 Service 同步递归扫描磁盘并组合数据库统计，需拆分容量统计适配器。
-
     private final StorageMapper storageMapper;
     private final FileUrlResolver fileUrlResolver;
     private final ApiStorageProperties storageProperties;
+    private final StorageCapacityAdapter storageCapacityAdapter;
 
     @Override
     @Cacheable(cacheNames = ComicReferenceCache.STORAGE_STATS,
@@ -45,30 +41,9 @@ public class StorageQueryServiceImpl implements StorageQueryService {
             stats = new StorageStatsDTO();
         }
         Path thumbRoot = storageProperties.root(StorageRootKeys.THUMBS).getPath();
-        stats.setThumbBytes(directorySize(thumbRoot));
+        stats.setThumbBytes(storageCapacityAdapter.directorySize(thumbRoot));
         stats.setComicCount((int) storageMapper.countActiveComics());
         return stats;
-    }
-
-    private long directorySize(Path directory) {
-        if (!Files.exists(directory)) {
-            return 0L;
-        }
-        try (Stream<Path> paths = Files.walk(directory)) {
-            long totalBytes = 0L;
-            var pathIterator = paths.filter(Files::isRegularFile).iterator();
-            while (pathIterator.hasNext()) {
-                Path path = pathIterator.next();
-                try {
-                    totalBytes += Files.size(path);
-                } catch (IOException exception) {
-                    throw new BusinessException("读取存储容量失败", exception);
-                }
-            }
-            return totalBytes;
-        } catch (IOException exception) {
-            throw new BusinessException("扫描存储容量失败", exception);
-        }
     }
 
     @Override
