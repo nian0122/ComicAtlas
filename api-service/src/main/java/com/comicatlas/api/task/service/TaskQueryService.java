@@ -28,6 +28,7 @@ import java.util.stream.Collectors;
 
 /** 管理任务查询服务，负责查询模型组装和目标摘要聚合。 */
 @Service
+// TODO(LAYER-14): 具体 Service 实现位于 service 包，未与 Service 接口及 service/impl 实现分离。
 @RequiredArgsConstructor
 public class TaskQueryService {
     // 任务查询契约由应用服务公开，具体实现保持在任务业务包内。

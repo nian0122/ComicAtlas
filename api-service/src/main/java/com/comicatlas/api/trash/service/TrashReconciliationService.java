@@ -27,6 +27,7 @@ import java.util.List;
 /** 只读生成回收对账报告，并在复核实际清单后执行安全状态修复。 */
 @Slf4j
 @Service
+// TODO(LAYER-14): 具体 Service 实现位于 service 包，未与 Service 接口及 service/impl 实现分离。
 @RequiredArgsConstructor
 public class TrashReconciliationService {
     private final ComicMapper comicMapper;

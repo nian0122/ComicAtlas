@@ -3,6 +3,7 @@ package com.comicatlas.api.task.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 // 条件更新由任务聚合服务维护状态机与事务边界，Mapper 执行参数化更新。
 // 架构说明：Service 直接构造 LambdaUpdateWrapper 聚合更新任务状态；条件更新应收口到 ManagementTaskMapper。
+// TODO(MAPPER-02): Service 直接构造 LambdaUpdateWrapper 聚合更新任务状态；条件更新应收口到 ManagementTaskMapper。
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.api.task.persistence.entity.ManagementTask;
 import com.comicatlas.api.task.persistence.entity.ManagementTaskItem;
@@ -17,6 +18,7 @@ import java.util.List;
 
 /** 根据任务项状态聚合管理任务进度、计数和终态。 */
 @Service
+// TODO(LAYER-14): 具体 Service 实现位于 service 包，未与 Service 接口及 service/impl 实现分离。
 @RequiredArgsConstructor
 public class TaskAggregationService {
     // 任务聚合契约由应用服务公开，具体实现保持在任务业务包内。

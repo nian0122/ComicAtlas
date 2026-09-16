@@ -26,6 +26,7 @@ import java.util.Set;
 
 /** 导入结果应用服务：统一承载结果事件的文件读取、状态流转和失败联动。 */
 @Service
+// TODO(LAYER-14): 具体 Service 实现位于 service 包，未与 Service 接口及 service/impl 实现分离。
 @RequiredArgsConstructor
 public class ImportResultService {
     private static final Set<ImportTaskStatus> TERMINAL_STATUSES =

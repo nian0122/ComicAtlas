@@ -3,6 +3,7 @@ import com.comicatlas.api.upload.domain.UploadSessionStatus;
 
 // 条件更新由上传结果服务维护跨表状态机与事务边界，Mapper 执行参数化更新。
 // 架构说明：Service 直接构造 LambdaUpdateWrapper 更新媒体/上传会话；条件更新应收口到对应 Mapper。
+// TODO(MAPPER-02): Service 直接构造 LambdaUpdateWrapper 更新媒体/上传会话；条件更新应收口到对应 Mapper。
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.storage.service.ComicStatsService;
@@ -32,6 +33,7 @@ import org.springframework.stereotype.Service;
  */
 @Slf4j
 @Service
+// TODO(LAYER-14): 具体 Service 实现位于 service 包，未与 Service 接口及 service/impl 实现分离。
 @RequiredArgsConstructor
 public class UploadCompletionService {
     // 上传结果契约由应用服务公开，具体实现保持在上传业务包内。

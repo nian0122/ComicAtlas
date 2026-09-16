@@ -17,6 +17,7 @@ import java.util.List;
 /** HQ 媒体登记应用服务：查询快照上下文、提交规划后的媒体实体。 */
 @Slf4j
 @Service
+// TODO(LAYER-14): 具体 Service 实现位于 service 包，未与 Service 接口及 service/impl 实现分离。
 public class HqMediaRegistrationService {
     private final MediaMapper mediaMapper;
     private final ChapterMapper chapterMapper;

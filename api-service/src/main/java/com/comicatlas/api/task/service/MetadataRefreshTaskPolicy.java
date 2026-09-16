@@ -1,6 +1,7 @@
 package com.comicatlas.api.task.service;
 
 // 架构说明：Service 策略直接构造 LambdaUpdateWrapper 更新漫画状态；条件更新应收口到 ComicMapper。
+// TODO(MAPPER-02): Service 策略直接构造 LambdaUpdateWrapper 更新漫画状态；条件更新应收口到 ComicMapper。
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.api.shared.exception.ConflictException;
 import com.comicatlas.api.task.dto.CreateManagementTaskRequest;

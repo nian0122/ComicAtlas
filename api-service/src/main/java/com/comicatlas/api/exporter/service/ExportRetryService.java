@@ -2,6 +2,7 @@ package com.comicatlas.api.exporter.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 // 架构说明：Service 直接构造 LambdaUpdateWrapper 重置导出任务；条件更新应收口到 ExportTaskMapper。
+// TODO(MAPPER-02): Service 直接构造 LambdaUpdateWrapper 重置导出任务；条件更新应收口到 ExportTaskMapper。
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.api.exporter.enums.ExportTaskStatus;
 import com.comicatlas.api.exporter.persistence.entity.ExportTask;
@@ -21,6 +22,7 @@ import java.util.UUID;
 /** 导出领域重试策略：恢复导出专表并重新发布导出任务。 */
 @Slf4j
 @Service
+// TODO(LAYER-14): 具体 Service 实现位于 service 包，未与 Service 接口及 service/impl 实现分离。
 @RequiredArgsConstructor
 public class ExportRetryService {
     private final ExportTaskMapper exportTaskMapper;

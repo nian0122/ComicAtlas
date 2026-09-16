@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 /** 导入领域重试策略：检查导入专表并委托导入重试协调器。 */
 @Slf4j
 @Service
+// TODO(LAYER-14): 具体 Service 实现位于 service 包，未与 Service 接口及 service/impl 实现分离。
 @RequiredArgsConstructor
 public class ImportRetryService {
     private final ImportTaskMapper importTaskMapper;

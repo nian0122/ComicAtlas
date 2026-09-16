@@ -8,6 +8,7 @@ import com.comicatlas.api.shared.crypto.DigestService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 // 条件更新由上传业务服务维护会话状态机与事务边界，Mapper 执行参数化更新。
 // 架构说明：Service 直接构造 LambdaUpdateWrapper 更新上传会话/文件；条件更新应收口到对应 Mapper。
+// TODO(MAPPER-02): Service 直接构造 LambdaUpdateWrapper 更新上传会话/文件；条件更新应收口到对应 Mapper。
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.api.task.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.task.dto.ManagementTaskItemResponse;
@@ -75,6 +76,7 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Service
+// TODO(LAYER-14): 具体 Service 实现位于 service 包，未与 Service 接口及 service/impl 实现分离。
 @RequiredArgsConstructor
 public class UploadSessionService {
     // 上传会话契约由 Controller/事件适配器固定，具体实现保持在上传业务包内。

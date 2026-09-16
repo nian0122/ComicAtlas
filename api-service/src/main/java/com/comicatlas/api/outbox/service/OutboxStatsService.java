@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 
 /** Outbox 统计查询服务。 */
 @Service
+// TODO(LAYER-14): 具体 Service 实现位于 service 包，未与 Service 接口及 service/impl 实现分离。
 @RequiredArgsConstructor
 public class OutboxStatsService {
     // Outbox 统计契约由应用服务公开，具体实现保持在业务包内。

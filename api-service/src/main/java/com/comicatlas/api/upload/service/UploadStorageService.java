@@ -6,6 +6,7 @@ import com.comicatlas.api.upload.config.UploadProperties;
 
 // 条件更新由上传业务服务维护会话状态机与并发边界，Mapper 执行参数化更新。
 // 架构说明：Service 直接构造 LambdaUpdateWrapper 更新上传文件；条件更新应收口到 UploadFileMapper。
+// TODO(MAPPER-02): Service 直接构造 LambdaUpdateWrapper 更新上传文件；条件更新应收口到 UploadFileMapper。
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.exception.BusinessException;
