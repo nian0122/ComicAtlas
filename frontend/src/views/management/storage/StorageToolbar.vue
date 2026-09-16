@@ -243,6 +243,6 @@ onMounted(() => {
 }
 .filter-bar :deep(.el-select__wrapper.is-focused),
 .filter-bar :deep(.el-input__wrapper.is-focus) {
-  box-shadow: none !important;
+  box-shadow: inset 0 0 0 1px var(--accent), var(--shadow-sm) !important;
 }
 </style>
