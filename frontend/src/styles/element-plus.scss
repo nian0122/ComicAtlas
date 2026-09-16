@@ -393,6 +393,29 @@
   }
 }
 
+/* 按需组件样式可能在页面组件之后注入，显式锁定全局控件契约，避免回退到 Element Plus 蓝/白默认主题。 */
+.el-input .el-input__wrapper,
+.el-select .el-select__wrapper {
+  border: 0 !important;
+  background: linear-gradient(180deg, var(--control-bg), var(--bg-secondary)) !important;
+  box-shadow: inset 0 0 0 1px var(--border), var(--shadow-sm) !important;
+}
+
+.el-input .el-input__wrapper:hover,
+.el-select .el-select__wrapper:hover:not(.is-disabled):not(.is-focused) {
+  background: var(--control-bg-hover) !important;
+  box-shadow: inset 0 0 0 1px var(--border-strong), var(--shadow-sm) !important;
+}
+
+.el-input .el-input__wrapper.is-focus,
+.el-select .el-select__wrapper.is-focused,
+.el-select:focus-within .el-select__wrapper {
+  box-shadow:
+    inset 0 0 0 1px var(--accent),
+    0 0 0 3px var(--control-focus-ring),
+    var(--shadow-sm) !important;
+}
+
 /* Element Plus 字数统计默认是白底，深色主题下会形成突兀的白块。 */
 .el-input__count,
 .el-input__count-inner {
@@ -614,6 +637,44 @@
   }
 }
 
+/* Drawer 与 Dialog 使用同一层级、边框和标题对比度，避免出现白色系统面板。 */
+.el-drawer {
+  --el-drawer-bg-color: var(--bg-secondary);
+  --el-drawer-padding-primary: var(--space-lg);
+
+  background: var(--bg-secondary) !important;
+  border-left: 1px solid var(--border);
+  box-shadow: var(--card-shadow-hover);
+}
+
+.el-drawer__header {
+  margin-bottom: 0;
+  padding: var(--space-base) var(--space-lg);
+  color: var(--text-primary) !important;
+  background: var(--bg-secondary) !important;
+  border-bottom: 1px solid var(--border) !important;
+}
+
+.el-drawer__title {
+  color: var(--text-primary) !important;
+  font-weight: 600;
+}
+
+.el-drawer__close-btn {
+  color: var(--text-muted);
+
+  &:hover {
+    color: var(--text-primary);
+    background: var(--surface-highlight);
+  }
+}
+
+.el-drawer__body {
+  padding: var(--space-lg);
+  color: var(--text-secondary) !important;
+  background: var(--bg-secondary) !important;
+}
+
 /* ---------------------------------------------------------------------------
  * Table & Drawer
  * ------------------------------------------------------------------------- */
@@ -756,6 +817,18 @@
   &.is-active {
     color: var(--accent);
   }
+}
+
+/* Tab 的 active/hover/focus 状态统一使用品牌红，不接受 Element Plus 默认蓝色。 */
+.el-tabs__item:hover,
+.el-tabs__item.is-active,
+.el-tabs__item:focus,
+.el-tabs__item:focus-visible {
+  color: var(--accent) !important;
+}
+
+.el-tabs__active-bar {
+  background-color: var(--accent) !important;
 }
 
 /* 所有可滚动面板沿用影院黑底，避免系统滚动条露出白色轨道。 */
