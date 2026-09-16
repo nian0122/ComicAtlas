@@ -17,4 +17,11 @@ public interface UploadFileMapper extends BaseMapper<UploadFile> {
                 .set(UploadFile::getReceivedBytes, receivedBytes)
                 .set(UploadFile::getReceivedRanges, receivedRanges));
     }
+
+    /** 绑定上传文件对应的 STAGING 媒体。 */
+    default int bindMedia(Long fileId, Long mediaId) {
+        return update(null, new LambdaUpdateWrapper<UploadFile>()
+                .eq(UploadFile::getId, fileId)
+                .set(UploadFile::getMediaId, mediaId));
+    }
 }
