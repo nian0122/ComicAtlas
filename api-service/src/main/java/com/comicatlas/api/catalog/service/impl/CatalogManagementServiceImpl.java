@@ -1,6 +1,5 @@
 package com.comicatlas.api.catalog.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.catalog.dto.CatalogCreateRequest;
 import com.comicatlas.api.catalog.dto.CatalogRenameRequest;
@@ -144,14 +143,8 @@ public class CatalogManagementServiceImpl implements CatalogManagementService {
     @Transactional
     public void deleteCatalog(Long comicId, Long catalogId, Long reparentTo) {
         Catalog cat = requireCatalogInComic(comicId, catalogId);
-        List<Catalog> children = catalogMapper.selectList(
-                new LambdaQueryWrapper<Catalog>()
-                        .eq(Catalog::getComicId, comicId)
-                        .eq(Catalog::getParentId, catalogId));
-        List<Chapter> chapters = chapterMapper.selectList(
-                new LambdaQueryWrapper<Chapter>()
-                        .eq(Chapter::getComicId, comicId)
-                        .eq(Chapter::getCatalogId, catalogId));
+        List<Catalog> children = catalogMapper.selectChildrenByComicIdAndParentId(comicId, catalogId);
+        List<Chapter> chapters = chapterMapper.selectByComicIdAndCatalogId(comicId, catalogId);
 
         if (children.isEmpty() && chapters.isEmpty()) {
             catalogMapper.deleteById(catalogId);
@@ -252,15 +245,8 @@ public class CatalogManagementServiceImpl implements CatalogManagementService {
     }
 
     private List<Catalog> selectSiblings(Long comicId, Long parentId) {
-        LambdaQueryWrapper<Catalog> wrapper = new LambdaQueryWrapper<Catalog>()
-                .eq(Catalog::getComicId, comicId)
-                .orderByAsc(Catalog::getSortOrder, Catalog::getId);
-        if (parentId == null) {
-            wrapper.isNull(Catalog::getParentId);
-        } else {
-            wrapper.eq(Catalog::getParentId, parentId);
-        }
-        return catalogMapper.selectList(wrapper);
+        return parentId == null ? catalogMapper.selectRootByComicId(comicId)
+                : catalogMapper.selectChildrenByComicIdAndParentId(comicId, parentId);
     }
 
     private int nextSiblingSortOrder(Long comicId, Long parentId) {
@@ -283,16 +269,9 @@ public class CatalogManagementServiceImpl implements CatalogManagementService {
     }
 
     private int nextChapterSortOrder(Long comicId, Long catalogId) {
-        LambdaQueryWrapper<Chapter> wrapper = new LambdaQueryWrapper<Chapter>()
-                .eq(Chapter::getComicId, comicId)
-                .orderByDesc(Chapter::getSortOrder)
-                .last("LIMIT 1");
-        if (catalogId == null) {
-            wrapper.isNull(Chapter::getCatalogId);
-        } else {
-            wrapper.eq(Chapter::getCatalogId, catalogId);
-        }
-        List<Chapter> list = chapterMapper.selectList(wrapper);
-        return list.isEmpty() ? 1 : list.get(0).getSortOrder() + 1;
+        Chapter chapter = catalogId == null
+                ? chapterMapper.selectLastByComicIdWithoutCatalog(comicId)
+                : chapterMapper.selectLastByComicIdAndCatalogId(comicId, catalogId);
+        return chapter == null ? 1 : chapter.getSortOrder() + 1;
     }
 }

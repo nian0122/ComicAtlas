@@ -1,8 +1,8 @@
 package com.comicatlas.api.admin.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.recovery.dto.ComicDeleteStatsDTO;
 import com.comicatlas.api.recovery.engine.RecoveryEngine;
+import com.comicatlas.api.recovery.persistence.mapper.RecoveryDataMapper;
 import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.importer.persistence.entity.ImportTask;
@@ -62,6 +62,8 @@ class RecoveryCompatibilityServiceImplTest {
     private ImportTaskMapper taskMapper;
     @Mock
     private MediaOperationCommandService mediaOperationCommandService;
+    @Mock
+    private RecoveryDataMapper recoveryDataMapper;
 
     @InjectMocks
     private RecoveryCompatibilityServiceImpl service;
@@ -95,7 +97,7 @@ class RecoveryCompatibilityServiceImplTest {
         Comic comic = new Comic();
         comic.setId(1L);
         when(comicMapper.selectById(1L)).thenReturn(comic);
-        when(taskMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(1L);
+        when(recoveryDataMapper.countImportTasks(anyLong(), any())).thenReturn(1L);
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> service.deleteComic(1L, "DATABASE_ONLY"));
@@ -109,18 +111,18 @@ class RecoveryCompatibilityServiceImplTest {
         comic.setId(1L);
         comic.setTitle("Test Comic");
         when(comicMapper.selectById(1L)).thenReturn(comic);
-        when(taskMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+        when(recoveryDataMapper.countImportTasks(anyLong(), any())).thenReturn(0L);
 
         Chapter ch1 = new Chapter();
         ch1.setId(101L);
         Chapter ch2 = new Chapter();
         ch2.setId(102L);
-        when(chapterMapper.selectList(any(LambdaQueryWrapper.class)))
+        when(chapterMapper.selectByComicIdOrderByGlobalOrder(anyLong()))
                 .thenReturn(List.of(ch1, ch2));
-        when(mediaMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(50L);
-        when(catalogMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(3L);
-        when(comicTagMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(5L);
-        when(historyMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(10L);
+        when(recoveryDataMapper.countMediaByChapterIds(any())).thenReturn(50L);
+        when(catalogMapper.countByComicId(anyLong())).thenReturn(3L);
+        when(recoveryDataMapper.countComicTags(anyLong())).thenReturn(5L);
+        when(recoveryDataMapper.countReadingHistory(anyLong())).thenReturn(10L);
         when(mediaOperationCommandService.requestComicDelete(1L))
                 .thenReturn(OperationSubmitResultDTO.of(9L, "COMIC_DELETE", "QUEUED", 1));
 
@@ -145,12 +147,12 @@ class RecoveryCompatibilityServiceImplTest {
         Comic comic = new Comic();
         comic.setId(1L);
         when(comicMapper.selectById(1L)).thenReturn(comic);
-        when(taskMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
-        when(chapterMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
+        when(recoveryDataMapper.countImportTasks(anyLong(), any())).thenReturn(0L);
+        when(chapterMapper.selectByComicIdOrderByGlobalOrder(anyLong())).thenReturn(List.of());
 
-        when(catalogMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(2L);
-        when(comicTagMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(3L);
-        when(historyMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(1L);
+        when(catalogMapper.countByComicId(anyLong())).thenReturn(2L);
+        when(recoveryDataMapper.countComicTags(anyLong())).thenReturn(3L);
+        when(recoveryDataMapper.countReadingHistory(anyLong())).thenReturn(1L);
         when(mediaOperationCommandService.requestComicDelete(1L))
                 .thenReturn(OperationSubmitResultDTO.of(10L, "COMIC_DELETE", "QUEUED", 1));
 

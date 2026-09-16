@@ -1,6 +1,5 @@
 package com.comicatlas.api.exporter.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 // 架构说明：Service 直接构造 LambdaUpdateWrapper 重置导出任务；条件更新应收口到 ExportTaskMapper。
 import com.comicatlas.api.exporter.enums.ExportTaskStatus;
 import com.comicatlas.api.exporter.persistence.entity.ExportTask;
@@ -26,8 +25,7 @@ public class ExportRetryServiceImpl implements com.comicatlas.api.exporter.servi
     private final OutboxService outboxService;
 
     public void retry(Long taskId, ManagementTaskItem item, int attempt) {
-        ExportTask exportTask = exportTaskMapper.selectOne(new LambdaQueryWrapper<ExportTask>()
-                .eq(ExportTask::getManagementTaskId, taskId));
+        ExportTask exportTask = exportTaskMapper.selectByManagementTaskId(taskId);
         if (exportTask == null) {
             log.warn("导出专表不存在，跳过导出重试入队: taskId={}, itemId={}", taskId, item.getId());
             return;

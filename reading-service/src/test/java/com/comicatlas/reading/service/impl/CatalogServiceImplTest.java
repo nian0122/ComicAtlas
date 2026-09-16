@@ -22,7 +22,6 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
@@ -49,7 +48,7 @@ class CatalogServiceImplTest {
         Comic comic = new Comic();
         comic.setId(COMIC_ID);
         comic.setStatus(ComicStatus.READY);
-        when(comicMapper.selectOne(any())).thenReturn(comic);
+        when(comicMapper.selectStatusById(COMIC_ID)).thenReturn(comic);
     }
 
     private static Catalog cat(Long id, Long parentId, String title, int sortOrder) {
@@ -76,8 +75,8 @@ class CatalogServiceImplTest {
     }
 
     private void stubTree(List<Catalog> catalogs, List<Chapter> chapters) {
-        when(catalogMapper.selectList(any())).thenReturn(catalogs);
-        when(chapterMapper.selectList(any())).thenReturn(chapters);
+        when(catalogMapper.selectTreeNodesByComicId(COMIC_ID)).thenReturn(catalogs);
+        when(chapterMapper.selectReadyCatalogChapters(COMIC_ID)).thenReturn(chapters);
     }
 
     private static List<Long> chapterIds(List<ChapterRef> refs) {

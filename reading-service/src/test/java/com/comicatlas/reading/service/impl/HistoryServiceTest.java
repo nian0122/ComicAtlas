@@ -54,15 +54,15 @@ class HistoryServiceTest {
     void listHistory_shouldBatchLoadComicsAndChapters_notPerRow() {
         ReadingHistory h1 = history(1L, 10L, 100L);
         ReadingHistory h2 = history(2L, 20L, 200L);
-        when(historyMapper.selectList(any())).thenReturn(List.of(h1, h2));
+        when(historyMapper.selectRecentHistory()).thenReturn(List.of(h1, h2));
 
         Comic comic1 = comic(10L, "火影");
         Comic comic2 = comic(20L, "海贼");
-        when(comicMapper.selectList(any())).thenReturn(List.of(comic1, comic2));
+        when(comicMapper.selectHistoryComicsByIds(any())).thenReturn(List.of(comic1, comic2));
 
         Chapter ch1 = chapter(100L, "1");
         Chapter ch2 = chapter(200L, "2");
-        when(chapterMapper.selectList(any())).thenReturn(List.of(ch1, ch2));
+        when(chapterMapper.selectHistoryChaptersByIds(any())).thenReturn(List.of(ch1, ch2));
 
         List<HistoryVO> result = service.listHistory();
 
@@ -72,18 +72,18 @@ class HistoryServiceTest {
         assertEquals("海贼", result.get(1).getComicTitle());
         assertEquals("2", result.get(1).getChapterNo());
 
-        verify(comicMapper).selectList(any());
+        verify(comicMapper).selectHistoryComicsByIds(any());
         verify(comicMapper, never()).selectById(any());
-        verify(chapterMapper).selectList(any());
+        verify(chapterMapper).selectHistoryChaptersByIds(any());
         verify(chapterMapper, never()).selectById(any());
     }
 
     @Test
     void listHistory_shouldHandleMissingComicOrChapter() {
         ReadingHistory h = history(1L, 99L, 999L);
-        when(historyMapper.selectList(any())).thenReturn(List.of(h));
-        when(comicMapper.selectList(any())).thenReturn(List.of());
-        when(chapterMapper.selectList(any())).thenReturn(List.of());
+        when(historyMapper.selectRecentHistory()).thenReturn(List.of(h));
+        when(comicMapper.selectHistoryComicsByIds(any())).thenReturn(List.of());
+        when(chapterMapper.selectHistoryChaptersByIds(any())).thenReturn(List.of());
 
         List<HistoryVO> result = service.listHistory();
 
@@ -95,14 +95,14 @@ class HistoryServiceTest {
     @Test
     void listHistory_shouldSkipChapterBatch_whenNoChapterIds() {
         ReadingHistory h = history(1L, 10L, null);
-        when(historyMapper.selectList(any())).thenReturn(List.of(h));
-        when(comicMapper.selectList(any())).thenReturn(List.of(comic(10L, "火影")));
+        when(historyMapper.selectRecentHistory()).thenReturn(List.of(h));
+        when(comicMapper.selectHistoryComicsByIds(any())).thenReturn(List.of(comic(10L, "火影")));
 
         List<HistoryVO> result = service.listHistory();
 
         assertEquals(1, result.size());
         assertEquals("火影", result.get(0).getComicTitle());
-        verify(chapterMapper, never()).selectList(any());
+        verify(chapterMapper, never()).selectHistoryChaptersByIds(any());
     }
 
     @Test
@@ -111,9 +111,9 @@ class HistoryServiceTest {
         Page<ReadingHistory> page = new Page<>(2, 20);
         page.setRecords(List.of(history));
         page.setTotal(21);
-        when(historyMapper.selectPage(any(), any())).thenReturn(page);
-        when(comicMapper.selectList(any())).thenReturn(List.of(comic(10L, "火影")));
-        when(chapterMapper.selectList(any())).thenReturn(List.of(chapter(100L, "1")));
+        when(historyMapper.selectRecentHistoryPage(any())).thenReturn(page);
+        when(comicMapper.selectHistoryComicsByIds(any())).thenReturn(List.of(comic(10L, "火影")));
+        when(chapterMapper.selectHistoryChaptersByIds(any())).thenReturn(List.of(chapter(100L, "1")));
 
         HistoryPageVO result = service.pageHistory(2, 20);
 
@@ -128,11 +128,11 @@ class HistoryServiceTest {
     void historyVO_shouldCalculateProgressByCurrentChapterPageCount() {
         ReadingHistory history = history(1L, 10L, 100L);
         history.setPageNumber(8);
-        when(historyMapper.selectList(any())).thenReturn(List.of(history));
-        when(comicMapper.selectList(any())).thenReturn(List.of(comic(10L, "火影")));
+        when(historyMapper.selectRecentHistory()).thenReturn(List.of(history));
+        when(comicMapper.selectHistoryComicsByIds(any())).thenReturn(List.of(comic(10L, "火影")));
         Chapter chapter = chapter(100L, "1");
         chapter.setPageCount(20);
-        when(chapterMapper.selectList(any())).thenReturn(List.of(chapter));
+        when(chapterMapper.selectHistoryChaptersByIds(any())).thenReturn(List.of(chapter));
 
         HistoryVO result = service.listHistory().get(0);
 
@@ -148,8 +148,8 @@ class HistoryServiceTest {
         chapter.setComicId(10L);
         chapter.setPageCount(20);
         chapter.setStatus(ChapterLifecycleStatus.READY);
-        when(comicMapper.selectOne(any())).thenReturn(comic);
-        when(chapterMapper.selectOne(any())).thenReturn(chapter);
+        when(comicMapper.selectStatusById(10L)).thenReturn(comic);
+        when(chapterMapper.selectReadableById(100L)).thenReturn(chapter);
 
         HistoryUpdateRequest request = new HistoryUpdateRequest();
         request.setChapterId(100L);
@@ -168,8 +168,8 @@ class HistoryServiceTest {
         chapter.setComicId(10L);
         chapter.setPageCount(20);
         chapter.setStatus(ChapterLifecycleStatus.READY);
-        when(comicMapper.selectOne(any())).thenReturn(comic);
-        when(chapterMapper.selectOne(any())).thenReturn(chapter);
+        when(comicMapper.selectStatusById(10L)).thenReturn(comic);
+        when(chapterMapper.selectReadableById(100L)).thenReturn(chapter);
 
         HistoryUpdateRequest request = new HistoryUpdateRequest();
         request.setChapterId(100L);
@@ -187,8 +187,8 @@ class HistoryServiceTest {
         chapter.setComicId(11L);
         chapter.setPageCount(20);
         chapter.setStatus(ChapterLifecycleStatus.READY);
-        when(comicMapper.selectOne(any())).thenReturn(comic);
-        when(chapterMapper.selectOne(any())).thenReturn(chapter);
+        when(comicMapper.selectStatusById(10L)).thenReturn(comic);
+        when(chapterMapper.selectReadableById(100L)).thenReturn(chapter);
 
         HistoryUpdateRequest request = new HistoryUpdateRequest();
         request.setChapterId(100L);

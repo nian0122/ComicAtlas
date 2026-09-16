@@ -1,13 +1,11 @@
 package com.comicatlas.api.media.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.task.service.ManagementTaskService;
 import com.comicatlas.api.storage.service.ComicStatsService;
 import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.common.event.ManagementCommandCompletedEvent;
 import com.comicatlas.common.event.payload.LqSizeResult;
 import com.comicatlas.common.event.payload.TranscodeMediaInfo;
-import com.comicatlas.contract.common.enums.HqStatus;
 import com.comicatlas.contract.common.enums.LqStatus;
 import com.comicatlas.persistence.comic.entity.Media;
 import com.comicatlas.persistence.comic.mapper.MediaMapper;
@@ -35,9 +33,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class MediaOperationCompletionServiceImpl implements MediaOperationCompletionService {
     // 媒体结果契约由应用服务公开，具体实现保持在媒体业务包内。
-
-    /** 媒体类型：图片（LQ/HQ 删除仅作用于 IMAGE 页，VIDEO 不受影响）。 */
-    private static final String MEDIA_TYPE_IMAGE = "IMAGE";
 
     /** 转码产物默认容器（事件未携带实测值时回退）。 */
     private static final String DEFAULT_CONTAINER = "mp4";
@@ -81,11 +76,7 @@ public class MediaOperationCompletionServiceImpl implements MediaOperationComple
      * 完成后重算整本 hqSize（非 DELETED 行的 fileSize 之和）。
      */
     public void applyHqDeleteCompleted(Long chapterId) {
-        List<Media> mediaItems = mediaMapper.selectList(
-                new LambdaQueryWrapper<Media>()
-                        .eq(Media::getChapterId, chapterId)
-                        .eq(Media::getMediaType, MEDIA_TYPE_IMAGE)
-                        .in(Media::getHqStatus, HqStatus.READY, HqStatus.DELETE_QUEUED, HqStatus.DELETING, HqStatus.MISSING));
+        List<Media> mediaItems = mediaMapper.selectHqDeleteCandidates(chapterId);
         for (Media media : mediaItems) {
             mediaMapper.markHqDeleted(media.getId());
         }

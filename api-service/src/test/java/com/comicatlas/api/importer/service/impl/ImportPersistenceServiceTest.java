@@ -64,6 +64,7 @@ import java.util.function.Consumer;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -259,7 +260,7 @@ class ImportPersistenceServiceTest {
         runInTransaction();
         when(taskMapper.selectById(10L)).thenReturn(task(ImportTaskStatus.PARSING));
         when(comicMapper.selectById(100L)).thenReturn(comic(ComicStatus.IMPORTING));
-        when(chapterMapper.selectCount(any(Wrapper.class))).thenReturn(0L);
+        when(chapterMapper.countByComicId(anyLong())).thenReturn(0L);
         stubCatalogInsert();
         stubChapterInsert();
         stubMediaBatchInsert();
@@ -296,7 +297,7 @@ class ImportPersistenceServiceTest {
         runInTransaction();
         when(taskMapper.selectById(10L)).thenReturn(task(ImportTaskStatus.PARSING));
         when(comicMapper.selectById(100L)).thenReturn(comic(ComicStatus.IMPORTING));
-        when(chapterMapper.selectCount(any(Wrapper.class))).thenReturn(0L);
+        when(chapterMapper.countByComicId(anyLong())).thenReturn(0L);
         stubCatalogInsert();
         stubChapterInsert();
         stubMediaBatchInsert();
@@ -358,7 +359,7 @@ class ImportPersistenceServiceTest {
         runInTransaction();
         when(taskMapper.selectById(10L)).thenReturn(task(ImportTaskStatus.PARSING));
         when(comicMapper.selectById(100L)).thenReturn(comic(ComicStatus.IMPORTING));
-        when(chapterMapper.selectCount(any(Wrapper.class))).thenReturn(0L);
+        when(chapterMapper.countByComicId(anyLong())).thenReturn(0L);
         stubCatalogInsert();
         stubChapterInsert();
         stubMediaBatchInsert();
@@ -391,7 +392,7 @@ class ImportPersistenceServiceTest {
         runInTransaction();
         when(taskMapper.selectById(10L)).thenReturn(task(ImportTaskStatus.IMPORTING));
         when(comicMapper.selectById(100L)).thenReturn(comic(ComicStatus.IMPORTING));
-        when(chapterMapper.selectCount(any(Wrapper.class))).thenReturn(3L);
+        when(chapterMapper.countByComicId(anyLong())).thenReturn(3L);
 
         List<ImportPersistenceService.FinalizeRequest> requests =
                 service.persistCompleted(completedEvent(), metadataV3());
@@ -436,7 +437,7 @@ class ImportPersistenceServiceTest {
         runInTransaction();
         when(taskMapper.selectById(10L)).thenReturn(task(ImportTaskStatus.PARSING));
         when(comicMapper.selectById(100L)).thenReturn(comic(ComicStatus.IMPORTING));
-        when(chapterMapper.selectCount(any(Wrapper.class))).thenReturn(0L);
+        when(chapterMapper.countByComicId(anyLong())).thenReturn(0L);
         stubCatalogInsert();
 
         Map<String, Object> metadata = metadataV3();
@@ -455,7 +456,7 @@ class ImportPersistenceServiceTest {
         runInTransaction();
         when(taskMapper.selectById(10L)).thenReturn(task(ImportTaskStatus.PARSING));
         when(comicMapper.selectById(100L)).thenReturn(comic(ComicStatus.IMPORTING));
-        when(chapterMapper.selectCount(any(Wrapper.class))).thenReturn(0L);
+        when(chapterMapper.countByComicId(anyLong())).thenReturn(0L);
 
         Map<String, Object> metadata = metadataV3();
         @SuppressWarnings("unchecked")
@@ -483,7 +484,7 @@ class ImportPersistenceServiceTest {
         chapter.setComicId(100L);
         chapter.setGlobalOrder(0);
         chapter.setStatus(ChapterLifecycleStatus.DRAFT);
-        when(chapterMapper.selectList(any(Wrapper.class))).thenReturn(List.of(chapter));
+        when(chapterMapper.selectByComicId(anyLong())).thenReturn(List.of(chapter));
 
         Media media = new Media();
         media.setId(2001L);
@@ -495,8 +496,8 @@ class ImportPersistenceServiceTest {
         media.setHqStatus(HqStatus.PENDING);
         media.setStatus(MediaLifecycleStatus.STAGING);
         media.setHqSize(1024L);
-        when(mediaMapper.selectList(any(Wrapper.class))).thenReturn(List.of(media));
-        when(mediaMapper.selectCount(any(Wrapper.class))).thenReturn(0L);
+        when(mediaMapper.selectAllByChapterIds(anyList())).thenReturn(List.of(media));
+        when(mediaMapper.countByChapterIdsAndHqStatusNot(anyList(), anyString())).thenReturn(0L);
         when(mediaMapper.markImportFinalizedByChapter(1001L, "100/1001")).thenReturn(1);
 
         when(managementTaskService.findActiveItem("COMIC", 100L, TaskType.IMPORT)).thenReturn(null);
@@ -565,7 +566,7 @@ class ImportPersistenceServiceTest {
 
         Chapter ch1 = chapter(1001L, 0);
         Chapter ch2 = chapter(1002L, 1);
-        when(chapterMapper.selectList(any(Wrapper.class))).thenReturn(List.of(ch1, ch2));
+        when(chapterMapper.selectByComicId(anyLong())).thenReturn(List.of(ch1, ch2));
 
         Media m1 = pendingMedia(2001L, 1001L);
         Media m2 = pendingMedia(2002L, 1002L);
@@ -573,8 +574,8 @@ class ImportPersistenceServiceTest {
         // 批量确认：每章一次 UPDATE；第一章后仍有 PENDING（selectCount=1），第二章后全部完成（=0）
         when(mediaMapper.markImportFinalizedByChapter(1001L, "100/1001")).thenReturn(1);
         when(mediaMapper.markImportFinalizedByChapter(1002L, "100/1002")).thenReturn(1);
-        when(mediaMapper.selectList(any(Wrapper.class))).thenReturn(List.of(m1, m2));
-        when(mediaMapper.selectCount(any(Wrapper.class)))
+        when(mediaMapper.selectAllByChapterIds(anyList())).thenReturn(List.of(m1, m2));
+        when(mediaMapper.countByChapterIdsAndHqStatusNot(anyList(), anyString()))
                 .thenReturn(1L)
                 .thenReturn(0L);
         when(managementTaskService.findActiveItem("COMIC", 100L, TaskType.IMPORT)).thenReturn(null);
@@ -606,11 +607,11 @@ class ImportPersistenceServiceTest {
                 .thenReturn(comic(ComicStatus.IMPORTING))
                 .thenReturn(comic(ComicStatus.READY));
 
-        when(chapterMapper.selectList(any(Wrapper.class))).thenReturn(List.of(chapter(1001L, 0)));
+        when(chapterMapper.selectByComicId(anyLong())).thenReturn(List.of(chapter(1001L, 0)));
 
         when(mediaMapper.markImportFinalizedByChapter(1001L, "100/1001")).thenReturn(1);
-        when(mediaMapper.selectList(any(Wrapper.class))).thenReturn(List.of(pendingMedia(2001L, 1001L)));
-        when(mediaMapper.selectCount(any(Wrapper.class))).thenReturn(0L);
+        when(mediaMapper.selectAllByChapterIds(anyList())).thenReturn(List.of(pendingMedia(2001L, 1001L)));
+        when(mediaMapper.countByChapterIdsAndHqStatusNot(anyList(), anyString())).thenReturn(0L);
         when(managementTaskService.findActiveItem("COMIC", 100L, TaskType.IMPORT)).thenReturn(null);
 
         service.applyFinalizeCompleted(completedEventFor(1001L));
@@ -709,7 +710,7 @@ class ImportPersistenceServiceTest {
         runInTransaction();
         when(taskMapper.selectById(10L)).thenReturn(task(ImportTaskStatus.PARSING));
         when(comicMapper.selectById(100L)).thenReturn(comic(ComicStatus.IMPORTING));
-        when(chapterMapper.selectCount(any(Wrapper.class))).thenReturn(0L);
+        when(chapterMapper.countByComicId(anyLong())).thenReturn(0L);
         stubCatalogInsert();
         stubChapterInsert();
         stubMediaBatchInsert();

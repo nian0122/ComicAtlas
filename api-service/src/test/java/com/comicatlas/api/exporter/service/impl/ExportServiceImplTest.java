@@ -98,7 +98,7 @@ class ExportServiceImplTest {
         task.setOutputSize(100L);
 
         ExportTaskMapper taskMapper = mock(ExportTaskMapper.class);
-        when(taskMapper.selectList(any())).thenReturn(List.of(task));
+        when(taskMapper.selectAllOrderByCreatedAtDesc()).thenReturn(List.of(task));
 
         ApiStorageRoot exportRoot = new ApiStorageRoot();
         exportRoot.setPath(tempDir);

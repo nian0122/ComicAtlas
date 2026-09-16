@@ -2,7 +2,6 @@ package com.comicatlas.api.trash.service.impl;
 
 import com.comicatlas.api.trash.dto.TrashReconcileReport;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.entity.Media;
@@ -29,6 +28,7 @@ import com.comicatlas.api.task.service.ManagementTaskService;
 import com.comicatlas.api.trash.service.TrashLifecycleService;
 import com.comicatlas.api.trash.service.TrashManifestService;
 import com.comicatlas.api.trash.service.TrashReconciliationService;
+import com.comicatlas.api.trash.persistence.mapper.TrashDataMapper;
 import com.comicatlas.api.task.state.ManagementStateMachine;
 import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.common.constant.MqExchanges;
@@ -79,6 +79,7 @@ public class TrashLifecycleServiceImpl implements TrashLifecycleService {
     private final MediaMapper mediaMapper;
     private final ManagementTaskService managementTaskService;
     private final ManagementTaskItemMapper itemMapper;
+    private final TrashDataMapper trashDataMapper;
     private final OutboxService outboxService;
     private final TrashManifestService trashManifestService;
     private final OperationPolicyService policyService;
@@ -494,13 +495,8 @@ public class TrashLifecycleServiceImpl implements TrashLifecycleService {
             case "MEDIA" -> TaskType.MEDIA_TRASH;
             default -> throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "未知目标类型: " + targetType);
         };
-        List<ManagementTaskItem> items = itemMapper.selectList(new LambdaQueryWrapper<ManagementTaskItem>()
-                .eq(ManagementTaskItem::getTargetType, targetType)
-                .eq(ManagementTaskItem::getTargetId, targetId)
-                .eq(ManagementTaskItem::getOperationType, trashOp)
-                .orderByDesc(ManagementTaskItem::getId)
-                .last("LIMIT 1"));
-        return items.isEmpty() ? null : items.get(0).getTaskId();
+        ManagementTaskItem item = trashDataMapper.selectLatestTaskItem(targetType, targetId, trashOp);
+        return item == null ? null : item.getTaskId();
     }
 
     private Chapter requireChapterInComic(Long comicId, Long chapterId) {

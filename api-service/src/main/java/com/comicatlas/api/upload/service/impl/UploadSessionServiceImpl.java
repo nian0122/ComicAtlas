@@ -5,7 +5,6 @@ import com.comicatlas.api.upload.support.MediaTypeDetector;
 import com.comicatlas.api.upload.config.UploadProperties;
 import com.comicatlas.api.shared.crypto.DigestService;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 // 条件更新由上传业务服务维护会话状态机与事务边界，Mapper 执行参数化更新。
 // 架构说明：Service 直接构造 LambdaUpdateWrapper 更新上传会话/文件；条件更新应收口到对应 Mapper。
 import com.comicatlas.api.task.dto.CreateManagementTaskRequest;
@@ -239,8 +238,7 @@ public class UploadSessionServiceImpl implements UploadSessionService {
      * @return 上传会话实体
      */
     public UploadSession getBySessionId(String sessionId) {
-        UploadSession session = sessionMapper.selectOne(
-                new LambdaQueryWrapper<UploadSession>().eq(UploadSession::getSessionId, sessionId));
+        UploadSession session = sessionMapper.selectBySessionId(sessionId);
         if (session == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "上传会话不存在: " + sessionId);
         }
@@ -248,10 +246,7 @@ public class UploadSessionServiceImpl implements UploadSessionService {
     }
 
     public List<UploadFile> filesOf(UploadSession session) {
-        return fileMapper.selectList(
-                new LambdaQueryWrapper<UploadFile>()
-                        .eq(UploadFile::getSessionId, session.getId())
-                        .orderByAsc(UploadFile::getId));
+        return fileMapper.selectBySessionId(session.getId());
     }
 
     public UploadSessionStatusResponse status(String sessionId) {
@@ -284,10 +279,7 @@ public class UploadSessionServiceImpl implements UploadSessionService {
                                            String contentRange, String chunkSha256,
                                            InputStream input) {
         UploadSession session = getBySessionId(sessionId);
-        UploadFile file = fileMapper.selectOne(
-                new LambdaQueryWrapper<UploadFile>()
-                        .eq(UploadFile::getSessionId, session.getId())
-                        .eq(UploadFile::getFileId, fileId));
+        UploadFile file = fileMapper.selectBySessionIdAndFileId(session.getId(), fileId);
         if (file == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "会话中不存在文件: " + fileId);
         }
@@ -482,8 +474,7 @@ public class UploadSessionServiceImpl implements UploadSessionService {
     }
 
     private int nextPageNumber(Long chapterId) {
-        return mediaMapper.selectList(
-                        new LambdaQueryWrapper<Media>().eq(Media::getChapterId, chapterId))
+        return mediaMapper.selectByChapterId(chapterId)
                 .stream()
                 .map(Media::getPageNumber)
                 .filter(pageNumber -> pageNumber != null)
@@ -511,8 +502,7 @@ public class UploadSessionServiceImpl implements UploadSessionService {
             throw new BusinessException(HttpStatusCodes.CONFLICT, "会话已 complete，无法取消");
         }
         storageService.deleteStagingDir(session);
-        fileMapper.delete(new LambdaQueryWrapper<UploadFile>()
-                .eq(UploadFile::getSessionId, session.getId()));
+        fileMapper.deleteBySessionId(session.getId());
         session.setStatus(UploadSessionStatus.CANCELLED);
         sessionMapper.updateById(session);
         log.info("取消上传会话: sessionId={}", sessionId);
@@ -523,14 +513,10 @@ public class UploadSessionServiceImpl implements UploadSessionService {
      */
     @Transactional
     public int expireExpiredSessions() {
-        List<UploadSession> expired = sessionMapper.selectList(
-                new LambdaQueryWrapper<UploadSession>()
-                        .eq(UploadSession::getStatus, UploadSessionStatus.ACTIVE)
-                        .lt(UploadSession::getExpiresAt, LocalDateTime.now()));
+        List<UploadSession> expired = sessionMapper.selectExpiredActive(LocalDateTime.now());
         for (UploadSession session : expired) {
             storageService.deleteStagingDir(session);
-            fileMapper.delete(new LambdaQueryWrapper<UploadFile>()
-                    .eq(UploadFile::getSessionId, session.getId()));
+            fileMapper.deleteBySessionId(session.getId());
             session.setStatus(UploadSessionStatus.EXPIRED);
             sessionMapper.updateById(session);
         }
@@ -552,8 +538,7 @@ public class UploadSessionServiceImpl implements UploadSessionService {
             return;
         }
         storageService.deleteStagingDir(session);
-        fileMapper.delete(new LambdaQueryWrapper<UploadFile>()
-                .eq(UploadFile::getSessionId, sessionId));
+        fileMapper.deleteBySessionId(sessionId);
         sessionMapper.deleteById(sessionId);
         log.info("会话处理完成，清理 STAGING 与会话行: sessionId={}", session.getSessionId());
     }

@@ -1,6 +1,5 @@
 package com.comicatlas.reading.history.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.persistence.comic.entity.Chapter;
@@ -43,21 +42,14 @@ public class HistoryServiceImpl implements HistoryService {
 
     @Override
     public List<HistoryVO> listHistory() {
-        List<ReadingHistory> histories = readingHistoryMapper.selectList(
-            new LambdaQueryWrapper<ReadingHistory>()
-                .select(ReadingHistory::getComicId, ReadingHistory::getChapterId,
-                        ReadingHistory::getPageNumber, ReadingHistory::getUpdatedAt)
-                .orderByDesc(ReadingHistory::getUpdatedAt));
+        List<ReadingHistory> histories = readingHistoryMapper.selectRecentHistory();
         if (histories.isEmpty()) {
             return List.of();
         }
 
         List<Long> comicIds = histories.stream()
                 .map(ReadingHistory::getComicId).distinct().toList();
-        Map<Long, Comic> comicMap = comicMapper.selectList(
-                        new LambdaQueryWrapper<Comic>()
-                            .select(Comic::getId, Comic::getTitle, Comic::getTotalPages)
-                            .in(Comic::getId, comicIds))
+        Map<Long, Comic> comicMap = comicMapper.selectHistoryComicsByIds(comicIds)
                 .stream()
                 .collect(Collectors.toMap(Comic::getId, Function.identity(), (first, duplicate) -> first));
 
@@ -65,10 +57,7 @@ public class HistoryServiceImpl implements HistoryService {
                 .map(ReadingHistory::getChapterId).filter(Objects::nonNull).distinct().toList();
         Map<Long, Chapter> chapterMap = chapterIds.isEmpty()
                 ? Map.of()
-                : chapterMapper.selectList(
-                        new LambdaQueryWrapper<Chapter>()
-                            .select(Chapter::getId, Chapter::getChapterNo, Chapter::getPageCount)
-                            .in(Chapter::getId, chapterIds))
+                : chapterMapper.selectHistoryChaptersByIds(chapterIds)
                     .stream()
                     .collect(Collectors.toMap(Chapter::getId, Function.identity(), (first, duplicate) -> first));
 
@@ -82,11 +71,7 @@ public class HistoryServiceImpl implements HistoryService {
         long currentPage = Math.max(page, 1);
         long pageSize = Math.min(Math.max(size, 1), 50);
         Page<ReadingHistory> pageRequest = new Page<>(currentPage, pageSize);
-        IPage<ReadingHistory> result = readingHistoryMapper.selectPage(pageRequest,
-                new LambdaQueryWrapper<ReadingHistory>()
-                        .select(ReadingHistory::getComicId, ReadingHistory::getChapterId,
-                                ReadingHistory::getPageNumber, ReadingHistory::getUpdatedAt)
-                        .orderByDesc(ReadingHistory::getUpdatedAt));
+        IPage<ReadingHistory> result = readingHistoryMapper.selectRecentHistoryPage(pageRequest);
 
         HistoryPageVO response = new HistoryPageVO();
         response.setRecords(toHistoryVOs(result.getRecords()));
@@ -98,23 +83,13 @@ public class HistoryServiceImpl implements HistoryService {
 
     @Override
     public HistoryVO getHistory(Long comicId) {
-        ReadingHistory history = readingHistoryMapper.selectOne(
-            new LambdaQueryWrapper<ReadingHistory>()
-                .select(ReadingHistory::getComicId, ReadingHistory::getChapterId,
-                        ReadingHistory::getPageNumber, ReadingHistory::getUpdatedAt)
-                .eq(ReadingHistory::getComicId, comicId));
+        ReadingHistory history = readingHistoryMapper.selectByComicId(comicId);
         if (history == null) {
             return null;
         }
-        Comic comic = comicMapper.selectOne(
-            new LambdaQueryWrapper<Comic>()
-                .select(Comic::getId, Comic::getTitle, Comic::getTotalPages)
-                .eq(Comic::getId, history.getComicId()));
+        Comic comic = comicMapper.selectHistoryComicById(history.getComicId());
         Chapter chapter = history.getChapterId() != null
-                ? chapterMapper.selectOne(
-                        new LambdaQueryWrapper<Chapter>()
-                            .select(Chapter::getId, Chapter::getChapterNo, Chapter::getPageCount)
-                            .eq(Chapter::getId, history.getChapterId()))
+                ? chapterMapper.selectHistoryChapterById(history.getChapterId())
                 : null;
         return buildVO(history,
                 comic != null ? Map.of(comic.getId(), comic) : Map.of(),
@@ -138,16 +113,12 @@ public class HistoryServiceImpl implements HistoryService {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "阅读进度参数无效");
         }
 
-        Comic comic = comicMapper.selectOne(new LambdaQueryWrapper<Comic>()
-                .select(Comic::getId, Comic::getStatus)
-                .eq(Comic::getId, comicId));
+        Comic comic = comicMapper.selectStatusById(comicId);
         if (comic == null || comic.getStatus() != ComicStatus.READY) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在或不可阅读");
         }
 
-        Chapter chapter = chapterMapper.selectOne(new LambdaQueryWrapper<Chapter>()
-                .select(Chapter::getId, Chapter::getComicId, Chapter::getPageCount, Chapter::getStatus)
-                .eq(Chapter::getId, request.getChapterId()));
+        Chapter chapter = chapterMapper.selectReadableById(request.getChapterId());
         if (chapter == null || !comicId.equals(chapter.getComicId())
                 || chapter.getStatus() != ChapterLifecycleStatus.READY) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在或不可阅读");
@@ -199,20 +170,14 @@ public class HistoryServiceImpl implements HistoryService {
         }
         List<Long> comicIds = histories.stream()
                 .map(ReadingHistory::getComicId).distinct().toList();
-        Map<Long, Comic> comicMap = comicMapper.selectList(
-                        new LambdaQueryWrapper<Comic>()
-                                .select(Comic::getId, Comic::getTitle, Comic::getTotalPages)
-                                .in(Comic::getId, comicIds))
+        Map<Long, Comic> comicMap = comicMapper.selectHistoryComicsByIds(comicIds)
                 .stream()
                 .collect(Collectors.toMap(Comic::getId, Function.identity(), (first, duplicate) -> first));
         List<Long> chapterIds = histories.stream()
                 .map(ReadingHistory::getChapterId).filter(Objects::nonNull).distinct().toList();
         Map<Long, Chapter> chapterMap = chapterIds.isEmpty()
                 ? Map.of()
-                : chapterMapper.selectList(
-                                new LambdaQueryWrapper<Chapter>()
-                                        .select(Chapter::getId, Chapter::getChapterNo, Chapter::getPageCount)
-                                        .in(Chapter::getId, chapterIds))
+                : chapterMapper.selectHistoryChaptersByIds(chapterIds)
                         .stream()
                         .collect(Collectors.toMap(Chapter::getId, Function.identity(), (first, duplicate) -> first));
         return histories.stream().map(history -> buildVO(history, comicMap, chapterMap)).toList();

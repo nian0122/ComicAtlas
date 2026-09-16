@@ -1,6 +1,5 @@
 package com.comicatlas.api.metadata.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.catalog.cache.CacheEvictor;
 import com.comicatlas.contract.comic.cache.ComicReferenceCache;
 import com.comicatlas.contract.comic.dto.CategoryDTO;
@@ -23,7 +22,7 @@ public class CategoryManagementServiceImpl implements CategoryManagementService 
 
     @Override
     public List<CategoryDTO> listCategories() {
-        return categoryMapper.selectList(new LambdaQueryWrapper<Category>().orderByAsc(Category::getSortOrder))
+        return categoryMapper.selectAllOrderedBySortOrder()
                 .stream().map(this::toDTO).toList();
     }
 
@@ -34,14 +33,13 @@ public class CategoryManagementServiceImpl implements CategoryManagementService 
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "分类名称不能为空");
         }
         String trimmed = name.trim();
-        Long count = categoryMapper.selectCount(
-                new LambdaQueryWrapper<Category>().eq(Category::getName, trimmed));
-        if (count != null && count > 0) {
+        long count = categoryMapper.countByName(trimmed);
+        if (count > 0) {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "分类已存在");
         }
         Category category = new Category();
         category.setName(trimmed);
-        category.setSortOrder((int) (categoryMapper.selectCount(new LambdaQueryWrapper<>()) + 1));
+        category.setSortOrder((int) (categoryMapper.countAll() + 1));
         categoryMapper.insert(category);
         cacheEvictor.evict(ComicReferenceCache.CATEGORIES, ComicReferenceCache.ALL_KEY);
         cacheEvictor.evictComicList();
@@ -59,9 +57,8 @@ public class CategoryManagementServiceImpl implements CategoryManagementService 
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "分类不存在");
         }
         String trimmed = name.trim();
-        Long count = categoryMapper.selectCount(
-                new LambdaQueryWrapper<Category>().eq(Category::getName, trimmed).ne(Category::getId, id));
-        if (count != null && count > 0) {
+        long count = categoryMapper.countByNameExcludingId(trimmed, id);
+        if (count > 0) {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "分类名称已存在");
         }
         category.setName(trimmed);

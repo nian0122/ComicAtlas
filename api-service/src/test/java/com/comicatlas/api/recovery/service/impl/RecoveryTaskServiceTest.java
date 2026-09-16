@@ -2,7 +2,6 @@ package com.comicatlas.api.recovery.service.impl;
 
 import com.comicatlas.api.recovery.service.impl.RecoveryTaskServiceImpl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.recovery.enums.RecoveryTaskStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.recovery.persistence.entity.RecoveryTask;
@@ -63,7 +62,7 @@ class RecoveryTaskServiceTest {
      */
     @Test
     void createRecoveryTask_shouldCreatePendingTask_whenNoActiveTask() {
-        when(recoveryTaskMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+        when(recoveryTaskMapper.countActiveTasks()).thenReturn(0L);
 
         // 捕获 insert 的参数以验证任务初始状态
         ArgumentCaptor<RecoveryTask> taskCaptor = ArgumentCaptor.forClass(RecoveryTask.class);
@@ -89,7 +88,7 @@ class RecoveryTaskServiceTest {
 
     @Test
     void createRecoveryTask_shouldThrow409_whenRunningTaskExists() {
-        when(recoveryTaskMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(1L);
+        when(recoveryTaskMapper.countActiveTasks()).thenReturn(1L);
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> service.createRecoveryTask());
@@ -101,7 +100,7 @@ class RecoveryTaskServiceTest {
 
     @Test
     void createRecoveryTask_shouldThrow409_whenPendingTaskExists() {
-        when(recoveryTaskMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(1L);
+        when(recoveryTaskMapper.countActiveTasks()).thenReturn(1L);
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> service.createRecoveryTask());

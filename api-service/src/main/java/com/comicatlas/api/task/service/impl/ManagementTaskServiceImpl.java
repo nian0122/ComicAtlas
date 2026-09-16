@@ -1,6 +1,5 @@
 package com.comicatlas.api.task.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.comicatlas.api.task.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.task.dto.ManagementTaskItemResponse;
@@ -81,9 +80,7 @@ public class ManagementTaskServiceImpl implements ManagementTaskService {
                                               String payload) {
         // 幂等检查
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {
-            ManagementTask existing = taskMapper.selectOne(
-                    new LambdaQueryWrapper<ManagementTask>()
-                            .eq(ManagementTask::getIdempotencyKey, idempotencyKey));
+            ManagementTask existing = taskMapper.selectByIdempotencyKey(idempotencyKey);
             if (existing != null) {
                 String expectedHash = digestService.sha256(payload);
                 if (expectedHash.equals(existing.getIdempotencyPayloadHash())) {
@@ -136,9 +133,7 @@ public class ManagementTaskServiceImpl implements ManagementTaskService {
                         target.getTargetType(), target.getTargetId(), opType);
 
                 // 检查目标冲突锁：查询是否有活跃项占用此 lock_key
-                Long activeCount = itemMapper.selectCount(
-                        new LambdaQueryWrapper<ManagementTaskItem>()
-                                .eq(ManagementTaskItem::getLockKey, lockKey));
+                Long activeCount = itemMapper.countByLockKey(lockKey);
                 if (activeCount > 0) {
                     throw new ConflictException(
                             String.format("目标 %s:%d 在操作 %s 中已有活跃任务项，无法创建新任务",
@@ -231,8 +226,7 @@ public class ManagementTaskServiceImpl implements ManagementTaskService {
 
         // 重新聚合状态
         taskAggregationService.aggregate(taskId);
-        List<ManagementTaskItem> cancelledItems = itemMapper.selectList(
-                new LambdaQueryWrapper<ManagementTaskItem>().eq(ManagementTaskItem::getTaskId, taskId));
+        List<ManagementTaskItem> cancelledItems = itemMapper.selectByTaskId(taskId);
         metadataRefreshTaskPolicy.releaseAfterCancel(task, taskId,
                 taskInternalQueryService.countActiveItems(taskId), cancelledItems);
 
@@ -272,9 +266,7 @@ public class ManagementTaskServiceImpl implements ManagementTaskService {
         }
 
         // 元数据刷新重试：章节项先归并到漫画，同一本漫画只执行一次 CAS。
-        List<ManagementTaskItem> items = itemMapper.selectList(
-                new LambdaQueryWrapper<ManagementTaskItem>()
-                        .eq(ManagementTaskItem::getTaskId, taskId));
+        List<ManagementTaskItem> items = itemMapper.selectByTaskId(taskId);
         metadataRefreshTaskPolicy.prepareRetry(task.getTaskType(), items);
 
         int newAttempt = task.getAttempt() + 1;
@@ -327,9 +319,7 @@ public class ManagementTaskServiceImpl implements ManagementTaskService {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST,
                     "任务 " + taskId + " 处于 " + task.getStatus() + "，仅终态可重置");
         }
-        List<ManagementTaskItem> items = itemMapper.selectList(
-                new LambdaQueryWrapper<ManagementTaskItem>()
-                        .eq(ManagementTaskItem::getTaskId, taskId));
+        List<ManagementTaskItem> items = itemMapper.selectByTaskId(taskId);
         resetTaskAndItems(taskId, task.getAttempt() + 1, items);
     }
 

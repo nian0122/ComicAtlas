@@ -1,6 +1,5 @@
 package com.comicatlas.api.task.batch.service;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.persistence.comic.entity.Category;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.entity.ComicTag;
@@ -85,9 +84,7 @@ public class BatchMetadataExecutor {
             if (tags.size() != payload.getAddTagIds().size()) {
                 throw new IllegalArgumentException("部分标签不存在");
             }
-            List<Long> existing = comicTagMapper.selectList(
-                            new LambdaQueryWrapper<ComicTag>().eq(ComicTag::getComicId, comicId))
-                    .stream().map(ComicTag::getTagId).toList();
+            List<Long> existing = comicTagMapper.selectTagIdsByComicId(comicId);
             for (Long tagId : payload.getAddTagIds()) {
                 if (!existing.contains(tagId)) {
                     ComicTag comicTag = new ComicTag();

@@ -94,22 +94,22 @@ class ComicReferenceCacheTest {
 
     @Test
     void listCategories_shouldReuseCachedResult() {
-        when(categoryMapper.selectList(any())).thenReturn(List.of(category(1L, "冒险", 1)));
+        when(categoryMapper.selectAllOrderedBySortOrder()).thenReturn(List.of(category(1L, "冒险", 1)));
 
         categoryService.listCategories();
         categoryService.listCategories();
 
-        verify(categoryMapper).selectList(any());
+        verify(categoryMapper).selectAllOrderedBySortOrder();
     }
 
     @Test
     void listCategories_shouldNotCacheEmptyResult() {
-        when(categoryMapper.selectList(any())).thenReturn(List.of());
+        when(categoryMapper.selectAllOrderedBySortOrder()).thenReturn(List.of());
 
         categoryService.listCategories();
         categoryService.listCategories();
 
-        verify(categoryMapper, times(2)).selectList(any());
+        verify(categoryMapper, times(2)).selectAllOrderedBySortOrder();
     }
 
     // ==================== 标签列表 ====================

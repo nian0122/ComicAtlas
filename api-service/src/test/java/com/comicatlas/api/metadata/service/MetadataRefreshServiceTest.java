@@ -41,6 +41,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.inOrder;
@@ -335,13 +336,13 @@ class MetadataRefreshServiceTest {
         void happy_mergeUpdatesDiscoversAndMarksMissing() {
             Chapter c42 = chapter(42L, 1);
             Chapter c43 = chapter(43L, 1);
-            when(chapterMapper.selectList(any())).thenReturn(List.of(c42, c43));
+            when(chapterMapper.selectByComicId(anyLong())).thenReturn(List.of(c42, c43));
             Media m101 = media(101L, 42L, "1/42/001.jpg", 1, "READY", 100L, "IMAGE", 1);
             Media m102 = media(102L, 42L, "1/42/002.mp4", 2, "READY", 500L, "VIDEO", 1);
             Media m103 = media(103L, 42L, "1/42/003.jpg", 3, "READY", 200L, "IMAGE", 1);
             Media m201 = media(201L, 43L, "1/43/001.jpg", 1, "READY", 30L, "IMAGE", 1);
             Media m202 = media(202L, 43L, "1/43/002.jpg", 2, "READY", 60L, "IMAGE", 1);
-            when(mediaMapper.selectList(any())).thenReturn(List.of(m101, m102, m103, m201, m202));
+            when(mediaMapper.selectActiveByChapterIds(anyList(), anyList())).thenReturn(List.of(m101, m102, m103, m201, m202));
             when(mediaMapper.insertImportBatch(anyList())).thenReturn(1);
             when(mediaMapper.updateRefreshBatch(anyList())).thenReturn(1);
 
@@ -376,8 +377,8 @@ class MetadataRefreshServiceTest {
             assertThat(m202.getHqStatus()).isEqualTo(HqStatus.MISSING);
 
             // 批量查询次数：章节一次 + 媒体一次
-            verify(chapterMapper, times(1)).selectList(any());
-            verify(mediaMapper, times(1)).selectList(any());
+            verify(chapterMapper, times(1)).selectByComicId(anyLong());
+            verify(mediaMapper, times(1)).selectActiveByChapterIds(anyList(), anyList());
             // 章节 pageCount 统计：两章一次批量 UPDATE
             verify(chapterMapper, times(1)).updatePageCountBatch(anyList());
             // 应用阶段不触碰存储根（无文件 IO）
@@ -390,10 +391,10 @@ class MetadataRefreshServiceTest {
             Chapter targetChapter = chapter(42L, 1);
             Chapter untouchedChapter = chapter(43L, 1);
             untouchedChapter.setPageCount(9);
-            when(chapterMapper.selectList(any())).thenReturn(List.of(targetChapter, untouchedChapter));
+            when(chapterMapper.selectByComicId(anyLong())).thenReturn(List.of(targetChapter, untouchedChapter));
             Media targetMedia = media(101L, 42L, "1/42/001.jpg", 1,
                     "READY", 100L, "IMAGE", 1);
-            when(mediaMapper.selectList(any())).thenReturn(List.of(targetMedia));
+            when(mediaMapper.selectActiveByChapterIds(anyList(), anyList())).thenReturn(List.of(targetMedia));
             when(mediaMapper.updateRefreshBatch(anyList())).thenReturn(1);
             MetadataRefreshSnapshotDTO rawSnapshot = new MetadataRefreshSnapshotDTO(
                     1, 1L, Instant.parse("2026-08-09T00:00:00Z"), null,
@@ -442,13 +443,13 @@ class MetadataRefreshServiceTest {
             MetadataRefreshSnapshotDTO applied =
                     new MetadataRefreshSnapshotDTO(snapshot.schemaVersion(), snapshot.comicId(),
                             snapshot.generatedAt(), revision, snapshot.chapters());
-            when(chapterMapper.selectList(any())).thenReturn(List.of(chapter(99L, 1)));
+            when(chapterMapper.selectByComicId(anyLong())).thenReturn(List.of(chapter(99L, 1)));
 
             assertThatThrownBy(() -> service.applyValidatedSnapshot(applied))
                     .isInstanceOf(BusinessException.class)
                     .hasMessageContaining("章节");
 
-            verify(mediaMapper, never()).selectList(any());
+            verify(mediaMapper, never()).selectActiveByChapterIds(anyList(), anyList());
             verify(mediaMapper, never()).insertImportBatch(anyList());
             verify(mediaMapper, never()).updateRefreshBatch(anyList());
         }
@@ -463,13 +464,13 @@ class MetadataRefreshServiceTest {
                             snapshot.generatedAt(), revision, snapshot.chapters());
             Chapter c42 = chapter(42L, 99); // DB 版本已推进
             Chapter c43 = chapter(43L, 1);
-            when(chapterMapper.selectList(any())).thenReturn(List.of(c42, c43));
+            when(chapterMapper.selectByComicId(anyLong())).thenReturn(List.of(c42, c43));
 
             assertThatThrownBy(() -> service.applyValidatedSnapshot(applied))
                     .isInstanceOf(BusinessException.class)
                     .hasMessageContaining("漂移");
 
-            verify(mediaMapper, never()).selectList(any());
+            verify(mediaMapper, never()).selectActiveByChapterIds(anyList(), anyList());
             verify(mediaMapper, never()).insertImportBatch(anyList());
             verify(mediaMapper, never()).updateRefreshBatch(anyList());
         }
@@ -492,13 +493,13 @@ class MetadataRefreshServiceTest {
             MetadataRefreshSnapshotDTO applied =
                     new MetadataRefreshSnapshotDTO(dup.schemaVersion(), dup.comicId(),
                             dup.generatedAt(), revision, dup.chapters());
-            when(chapterMapper.selectList(any())).thenReturn(List.of(chapter(42L, 1)));
+            when(chapterMapper.selectByComicId(anyLong())).thenReturn(List.of(chapter(42L, 1)));
 
             assertThatThrownBy(() -> service.applyValidatedSnapshot(applied))
                     .isInstanceOf(BusinessException.class)
                     .hasMessageContaining("重复");
 
-            verify(mediaMapper, never()).selectList(any());
+            verify(mediaMapper, never()).selectActiveByChapterIds(anyList(), anyList());
             verify(mediaMapper, never()).insertImportBatch(anyList());
             verify(mediaMapper, never()).updateRefreshBatch(anyList());
         }
@@ -507,9 +508,9 @@ class MetadataRefreshServiceTest {
         @DisplayName("旧布局升级：章节携带 legacyDirKey 时重写 hq_path/lq_path 前缀")
         void legacyLayout_migratesPrefix_whenChapterCarriesLegacyDirKey() {
             Chapter c42 = chapter(42L, 1);
-            when(chapterMapper.selectList(any())).thenReturn(List.of(c42));
+            when(chapterMapper.selectByComicId(anyLong())).thenReturn(List.of(c42));
             Media m101 = media(101L, 42L, "1/0/001.jpg", 1, "READY", 100L, "IMAGE", 1);
-            when(mediaMapper.selectList(any())).thenReturn(List.of(m101));
+            when(mediaMapper.selectActiveByChapterIds(anyList(), anyList())).thenReturn(List.of(m101));
             when(mediaMapper.updateRefreshBatch(anyList())).thenReturn(1);
 
             MetadataRefreshSnapshotDTO snapshot = new MetadataRefreshSnapshotDTO(1, 1L,
@@ -543,8 +544,8 @@ class MetadataRefreshServiceTest {
             MetadataRefreshSnapshotDTO applied =
                     new MetadataRefreshSnapshotDTO(snapshot.schemaVersion(), snapshot.comicId(),
                             snapshot.generatedAt(), revision, snapshot.chapters());
-            when(chapterMapper.selectList(any())).thenReturn(List.of(chapter(42L, 1), chapter(43L, 1)));
-            when(mediaMapper.selectList(any())).thenReturn(List.of());
+            when(chapterMapper.selectByComicId(anyLong())).thenReturn(List.of(chapter(42L, 1), chapter(43L, 1)));
+            when(mediaMapper.selectActiveByChapterIds(anyList(), anyList())).thenReturn(List.of());
             MetadataRefreshService.MetadataRefreshApplyResult result =
                     service.applyValidatedSnapshot(applied);
 
@@ -557,8 +558,8 @@ class MetadataRefreshServiceTest {
         void discoveredCandidate_registeredBeforeMerge_matchesByPath() {
             Chapter chapter = chapter(42L, 1);
             Media registeredMedia = media(301L, 42L, "1/42/004.jpg", 4, "READY", 9999L, "IMAGE", 1);
-            when(chapterMapper.selectList(any())).thenReturn(List.of(chapter));
-            when(mediaMapper.selectList(any())).thenReturn(List.of(registeredMedia));
+            when(chapterMapper.selectByComicId(anyLong())).thenReturn(List.of(chapter));
+            when(mediaMapper.selectActiveByChapterIds(anyList(), anyList())).thenReturn(List.of(registeredMedia));
             when(mediaMapper.updateRefreshBatch(anyList())).thenReturn(1);
 
             MetadataRefreshSnapshotDTO snapshot = new MetadataRefreshSnapshotDTO(1, 1L,
@@ -586,10 +587,10 @@ class MetadataRefreshServiceTest {
         @DisplayName("LQ 以本地文件为准：快照 lqStatus=READY 时更新 DB 为 READY + lqSize")
         void lqSnapshotReady_updatesDbLqReady() {
             Chapter c42 = chapter(42L, 1);
-            when(chapterMapper.selectList(any())).thenReturn(List.of(c42));
+            when(chapterMapper.selectByComicId(anyLong())).thenReturn(List.of(c42));
             Media m101 = media(101L, 42L, "1/42/001.jpg", 1, "READY", 100L, "IMAGE", 1);
             m101.setLqStatus(LqStatus.NOT_GENERATED);
-            when(mediaMapper.selectList(any())).thenReturn(List.of(m101));
+            when(mediaMapper.selectActiveByChapterIds(anyList(), anyList())).thenReturn(List.of(m101));
             when(mediaMapper.updateRefreshBatch(anyList())).thenReturn(1);
 
             MetadataRefreshSnapshotDTO snapshot = new MetadataRefreshSnapshotDTO(1, 1L,
@@ -615,11 +616,11 @@ class MetadataRefreshServiceTest {
         @DisplayName("LQ 以本地文件为准：快照 lqStatus=NOT_GENERATED 时校正 DB 旧 READY")
         void lqSnapshotMissing_correctsDbLqReadyToNotGenerated() {
             Chapter c42 = chapter(42L, 1);
-            when(chapterMapper.selectList(any())).thenReturn(List.of(c42));
+            when(chapterMapper.selectByComicId(anyLong())).thenReturn(List.of(c42));
             Media m101 = media(101L, 42L, "1/42/001.jpg", 1, "READY", 100L, "IMAGE", 1);
             m101.setLqStatus(LqStatus.READY); // DB 旧状态：LQ READY（但磁盘 LQ 已不存在）
             m101.setLqSize(5555L);
-            when(mediaMapper.selectList(any())).thenReturn(List.of(m101));
+            when(mediaMapper.selectActiveByChapterIds(anyList(), anyList())).thenReturn(List.of(m101));
             when(mediaMapper.updateRefreshBatch(anyList())).thenReturn(1);
 
             // 快照旧构造器默认 lqStatus=NOT_GENERATED、lqSize=0（扫盘未发现 LQ 文件）
@@ -648,11 +649,11 @@ class MetadataRefreshServiceTest {
         @DisplayName("LQ 未匹配行标 MISSING 时保留 LQ 状态（hq 缺失 lq 存在）")
         void unmatchedRow_keepsLqReady() {
             Chapter c42 = chapter(42L, 1);
-            when(chapterMapper.selectList(any())).thenReturn(List.of(c42));
+            when(chapterMapper.selectByComicId(anyLong())).thenReturn(List.of(c42));
             Media m103 = media(103L, 42L, "1/42/003.jpg", 3, "READY", 200L, "IMAGE", 1);
             m103.setLqStatus(LqStatus.READY);
             m103.setLqSize(999L);
-            when(mediaMapper.selectList(any())).thenReturn(List.of(m103));
+            when(mediaMapper.selectActiveByChapterIds(anyList(), anyList())).thenReturn(List.of(m103));
             when(mediaMapper.updateRefreshBatch(anyList())).thenReturn(1);
 
             // 快照只有 001.jpg（003.jpg 未出现 → 磁盘 HQ 缺失）
@@ -680,13 +681,13 @@ class MetadataRefreshServiceTest {
         @DisplayName("仅 LQ 行：快照 lqStatus=READY 时校正 DB 为 READY + lqSize，HQ 字段不动")
         void lqOnlyRow_snapshotReady_updatesDbLqReady() {
             Chapter c42 = chapter(42L, 1);
-            when(chapterMapper.selectList(any())).thenReturn(List.of(c42));
+            when(chapterMapper.selectByComicId(anyLong())).thenReturn(List.of(c42));
             Media m101 = media(101L, 42L, "1/42/001.jpg", 1, "DELETED", 0L, "IMAGE", 1);
             m101.setHqPath(null);
             m101.setHqRoot(null);
             m101.setLqPath("1/42/001.webp");
             m101.setLqStatus(LqStatus.NOT_GENERATED);
-            when(mediaMapper.selectList(any())).thenReturn(List.of(m101));
+            when(mediaMapper.selectActiveByChapterIds(anyList(), anyList())).thenReturn(List.of(m101));
             when(mediaMapper.updateRefreshBatch(anyList())).thenReturn(1);
 
             // 快照条目：hqStatus=DELETED 标记仅 LQ，hqPath 为 LQ 文件名，LQ 事实 READY
@@ -715,14 +716,14 @@ class MetadataRefreshServiceTest {
         @DisplayName("仅 LQ 行：快照 lqStatus=NOT_GENERATED 时校正 DB 旧 READY，HQ 字段不动")
         void lqOnlyRow_snapshotMissing_correctsDbLqReadyToNotGenerated() {
             Chapter c42 = chapter(42L, 1);
-            when(chapterMapper.selectList(any())).thenReturn(List.of(c42));
+            when(chapterMapper.selectByComicId(anyLong())).thenReturn(List.of(c42));
             Media m101 = media(101L, 42L, "1/42/001.jpg", 1, "DELETED", 0L, "IMAGE", 1);
             m101.setHqPath(null);
             m101.setHqRoot(null);
             m101.setLqPath("1/42/001.webp");
             m101.setLqStatus(LqStatus.READY); // DB 旧状态：LQ READY（但磁盘 LQ 已不存在）
             m101.setLqSize(5555L);
-            when(mediaMapper.selectList(any())).thenReturn(List.of(m101));
+            when(mediaMapper.selectActiveByChapterIds(anyList(), anyList())).thenReturn(List.of(m101));
             when(mediaMapper.updateRefreshBatch(anyList())).thenReturn(1);
 
             MetadataRefreshSnapshotDTO snapshot = new MetadataRefreshSnapshotDTO(1, 1L,

@@ -1,6 +1,5 @@
 package com.comicatlas.api.importer.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.importer.persistence.entity.ImportTask;
 import com.comicatlas.api.importer.exception.ImportMetadataException;
@@ -178,9 +177,8 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
                     comicId, comic.getStatus());
             return List.of();
         }
-        Long existingChapters = chapterMapper.selectCount(
-                new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
-        if (existingChapters != null && existingChapters > 0) {
+        long existingChapters = chapterMapper.countByComicId(comicId);
+        if (existingChapters > 0) {
             log.warn("completed 事件重复投递（章节结构已存在），跳过插入: comicId={}", comicId);
             return List.of();
         }
@@ -262,17 +260,13 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
         if (!(rawTags instanceof List<?> values)) {
             return;
         }
-        Set<Long> existingTagIds = new HashSet<>(comicTagMapper.selectList(
-                new LambdaQueryWrapper<ComicTag>().eq(ComicTag::getComicId, comicId))
-                .stream().map(ComicTag::getTagId).toList());
+        Set<Long> existingTagIds = new HashSet<>(comicTagMapper.selectTagIdsByComicId(comicId));
         for (Object rawTag : values) {
             if (!(rawTag instanceof String tagName) || tagName.isBlank()) {
                 continue;
             }
             String normalizedName = tagName.trim();
-            Tag tag = tagMapper.selectOne(new LambdaQueryWrapper<Tag>()
-                    .eq(Tag::getName, normalizedName)
-                    .eq(Tag::getType, "COMICINFO"));
+            Tag tag = tagMapper.selectByNameAndType(normalizedName, "COMICINFO");
             if (tag == null) {
                 tag = new Tag();
                 tag.setName(normalizedName);
@@ -503,8 +497,7 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
             return;
         }
 
-        List<Chapter> chapters = chapterMapper.selectList(
-                new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
+        List<Chapter> chapters = chapterMapper.selectByComicId(comicId);
         if (chapters.isEmpty()) {
             log.warn("finalize completed 时无章节结构，跳过: comicId={}", comicId);
             return;
@@ -520,9 +513,7 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
         // 2) 检查该 comic 下是否还有 PENDING media：全部章节最终化完成（全 READY）才收尾
         //    comic/task，否则仅提交本章 READY
         List<Long> chapterIds = chapters.stream().map(Chapter::getId).toList();
-        long pendingCount = mediaMapper.selectCount(new LambdaQueryWrapper<Media>()
-                .in(Media::getChapterId, chapterIds)
-                .ne(Media::getHqStatus, HqStatus.READY));
+        long pendingCount = mediaMapper.countByChapterIdsAndHqStatusNot(chapterIds, HqStatus.READY.name());
         if (pendingCount > 0) {
             log.info("仍有章节未最终化，仅提交本章 READY: comicId={}, taskId={}, chapterId={}, pending={}",
                     comicId, taskId, chapterId, pendingCount);
@@ -551,8 +542,7 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
     /** 全部章节 READY → 收尾：comic READY（重算统计）、task SUCCESS、管理任务 SUCCEEDED、缓存失效。 */
     private void finalizeComicAndTask(Comic comic, ImportTask task, Long comicId, Long taskId,
                                       List<Long> chapterIds) {
-        List<Media> allMedia = mediaMapper.selectList(
-                new LambdaQueryWrapper<Media>().in(Media::getChapterId, chapterIds));
+        List<Media> allMedia = mediaMapper.selectAllByChapterIds(chapterIds);
         long totalSize = 0;
         for (Media media : allMedia) {
             if (media.getHqSize() != null) {

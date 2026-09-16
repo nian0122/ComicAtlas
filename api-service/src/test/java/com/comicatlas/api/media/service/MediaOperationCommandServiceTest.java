@@ -77,7 +77,7 @@ class MediaOperationCommandServiceTest {
         firstChapter.setId(11L);
         Chapter secondChapter = new Chapter();
         secondChapter.setId(12L);
-        when(chapterMapper.selectList(any())).thenReturn(List.of(firstChapter, secondChapter));
+        when(chapterMapper.selectByComicIdOrderByGlobalOrder(1L)).thenReturn(List.of(firstChapter, secondChapter));
 
         ManagementTaskResponse task = new ManagementTaskResponse();
         task.setId(100L);
@@ -111,7 +111,7 @@ class MediaOperationCommandServiceTest {
         // 待转码：container=null（需要转码）；兼容：container=mp4（无需转码）
         Media needTranscode = video(11L, 9L, null, TranscodeStatus.NOT_NEEDED);
         Media alreadyCompat = video(12L, 9L, "mp4", TranscodeStatus.NOT_NEEDED);
-        when(mediaMapper.selectList(any())).thenReturn(List.of(needTranscode, alreadyCompat));
+        when(mediaMapper.selectVideosByChapterId(9L)).thenReturn(List.of(needTranscode, alreadyCompat));
 
         ManagementTaskResponse task = new ManagementTaskResponse();
         task.setId(100L);
@@ -148,7 +148,7 @@ class MediaOperationCommandServiceTest {
 
         // 全部已就绪（READY 的 mp4 视频）
         Media alreadyReady = video(12L, 9L, "mp4", TranscodeStatus.READY);
-        when(mediaMapper.selectList(any())).thenReturn(List.of(alreadyReady));
+        when(mediaMapper.selectVideosByChapterId(9L)).thenReturn(List.of(alreadyReady));
 
         OperationSubmitResultDTO result = service.requestTranscodeForChapter(9L);
 
@@ -176,7 +176,7 @@ class MediaOperationCommandServiceTest {
 
         // 回归：V18 迁移把不兼容视频标记为 REQUIRED，此前枚举缺失导致 NPE
         Media required = video(11L, 9L, "mkv", TranscodeStatus.REQUIRED);
-        when(mediaMapper.selectList(any())).thenReturn(List.of(required));
+        when(mediaMapper.selectVideosByChapterId(9L)).thenReturn(List.of(required));
 
         ManagementTaskResponse task = new ManagementTaskResponse();
         task.setId(100L);
@@ -206,7 +206,7 @@ class MediaOperationCommandServiceTest {
 
         // 回归：EnumTypeHandlers.safeValueOf 对未知枚举值返回 null，此前 Set.contains(null) 抛 NPE
         Media unknown = video(11L, 9L, "mkv", null);
-        when(mediaMapper.selectList(any())).thenReturn(List.of(unknown));
+        when(mediaMapper.selectVideosByChapterId(9L)).thenReturn(List.of(unknown));
 
         ManagementTaskResponse task = new ManagementTaskResponse();
         task.setId(100L);
@@ -238,7 +238,7 @@ class MediaOperationCommandServiceTest {
         // 此前 isTranscodeEligible 只看容器名导致 mpeg4-in-mp4 被误判"无需转码"
         Media mpeg4InMp4 = video(11L, 9L, "mp4", TranscodeStatus.NOT_NEEDED);
         mpeg4InMp4.setVideoCodec("mpeg4");
-        when(mediaMapper.selectList(any())).thenReturn(List.of(mpeg4InMp4));
+        when(mediaMapper.selectVideosByChapterId(9L)).thenReturn(List.of(mpeg4InMp4));
 
         ManagementTaskResponse task = new ManagementTaskResponse();
         task.setId(100L);
@@ -269,7 +269,7 @@ class MediaOperationCommandServiceTest {
         // 浏览器可直接播放的 mp4+h264 不应进入转码目标
         Media h264InMp4 = video(12L, 9L, "mp4", TranscodeStatus.NOT_NEEDED);
         h264InMp4.setVideoCodec("h264");
-        when(mediaMapper.selectList(any())).thenReturn(List.of(h264InMp4));
+        when(mediaMapper.selectVideosByChapterId(9L)).thenReturn(List.of(h264InMp4));
 
         OperationSubmitResultDTO result = service.requestTranscodeForChapter(9L);
 
@@ -287,7 +287,7 @@ class MediaOperationCommandServiceTest {
 
         Media readyWebpLq = image(31L, 9L, HqStatus.READY, LqStatus.READY);
         readyWebpLq.setLqPath("236/1089/037.webp");
-        when(mediaMapper.selectList(any())).thenReturn(List.of(readyWebpLq));
+        when(mediaMapper.selectImagesByChapterId(9L)).thenReturn(List.of(readyWebpLq));
 
         OperationSubmitResultDTO result = service.requestLqForChapter(9L, false);
 
@@ -303,10 +303,10 @@ class MediaOperationCommandServiceTest {
         chapterA.setId(10L);
         Chapter chapterB = new Chapter();
         chapterB.setId(20L);
-        when(chapterMapper.selectList(any())).thenReturn(List.of(chapterA, chapterB));
+        when(chapterMapper.selectByComicIdOrderByGlobalOrder(1L)).thenReturn(List.of(chapterA, chapterB));
 
         // 两个章节共 3 个 IMAGE 页，LQ 均 READY
-        when(mediaMapper.selectList(any())).thenReturn(List.of(
+        when(mediaMapper.selectDeletableImagesByChapterIds(List.of(10L, 20L))).thenReturn(List.of(
                 image(31L, 10L, HqStatus.READY, LqStatus.READY),
                 image(32L, 10L, HqStatus.MISSING, LqStatus.READY),
                 image(33L, 20L, HqStatus.READY, LqStatus.READY)));
@@ -337,7 +337,7 @@ class MediaOperationCommandServiceTest {
         assertEquals(2, result.getItemCount());
 
         // N+1 回归：候选页一次 IN 查询取回，置 DELETE_QUEUED 仅一次批量 UPDATE
-        verify(mediaMapper, times(1)).selectList(any());
+        verify(mediaMapper, times(1)).selectDeletableImagesByChapterIds(List.of(10L, 20L));
         verify(mediaMapper, times(1)).markHqDeleteQueued(List.of(10L, 20L));
         verify(outboxService, times(2)).enqueue(any(), any(), any(), any(), any(), anyInt());
     }
@@ -346,10 +346,10 @@ class MediaOperationCommandServiceTest {
     void requestHqDeleteForComic_LQ未就绪章节抛409且不建任务() {
         Chapter chapter = new Chapter();
         chapter.setId(10L);
-        when(chapterMapper.selectList(any())).thenReturn(List.of(chapter));
+        when(chapterMapper.selectByComicIdOrderByGlobalOrder(1L)).thenReturn(List.of(chapter));
 
         Media notReady = image(31L, 10L, HqStatus.READY, LqStatus.NOT_GENERATED);
-        when(mediaMapper.selectList(any())).thenReturn(List.of(notReady));
+        when(mediaMapper.selectDeletableImagesByChapterIds(List.of(10L))).thenReturn(List.of(notReady));
 
         assertThrows(ConflictException.class, () -> service.requestHqDeleteForComic(1L));
         verify(managementTaskService, never()).createTask(any(), any(), any());

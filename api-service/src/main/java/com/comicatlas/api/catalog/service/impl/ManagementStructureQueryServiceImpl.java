@@ -1,9 +1,6 @@
 package com.comicatlas.api.catalog.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
-import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
-import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.persistence.comic.entity.Catalog;
 import com.comicatlas.persistence.comic.entity.Chapter;
@@ -37,11 +34,8 @@ public class ManagementStructureQueryServiceImpl implements ManagementStructureQ
         if (comicMapper.selectById(comicId) == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在");
         }
-        List<Catalog> catalogs = catalogMapper.selectList(new LambdaQueryWrapper<Catalog>()
-                .eq(Catalog::getComicId, comicId).orderByAsc(Catalog::getSortOrder));
-        List<Chapter> chapters = chapterMapper.selectList(new LambdaQueryWrapper<Chapter>()
-                .eq(Chapter::getComicId, comicId).eq(Chapter::getStatus, ChapterLifecycleStatus.READY)
-                .orderByAsc(Chapter::getGlobalOrder));
+        List<Catalog> catalogs = catalogMapper.selectByComicIdOrderBySortOrder(comicId);
+        List<Chapter> chapters = chapterMapper.selectReadyCatalogChapters(comicId);
         Map<Long, CatalogNode> nodes = new HashMap<>();
         for (Catalog catalog : catalogs) {
             nodes.put(catalog.getId(), new CatalogNode(catalog.getId(), catalog.getTitle()));
@@ -74,9 +68,7 @@ public class ManagementStructureQueryServiceImpl implements ManagementStructureQ
         if (chapter == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在");
         }
-        List<Media> media = mediaMapper.selectList(new LambdaQueryWrapper<Media>()
-                .eq(Media::getChapterId, chapterId).eq(Media::getStatus, MediaLifecycleStatus.READY)
-                .orderByAsc(Media::getPageNumber));
+        List<Media> media = mediaMapper.selectReadyByChapterIdForManagement(chapterId);
         ReaderData data = new ReaderData();
         data.setChapterId(chapterId); data.setComicId(chapter.getComicId()); data.setChapterTitle(chapter.getTitle());
         data.setPages(media.stream().map(this::toMedia).toList()); data.setTotal(media.size());

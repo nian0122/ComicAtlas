@@ -9,7 +9,6 @@ import com.comicatlas.persistence.comic.mapper.MediaMapper;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.contract.common.enums.ComicStatus;
-import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.reading.reader.dto.ReaderDTO;
 import com.comicatlas.reading.reader.assembler.ReaderAssembler;

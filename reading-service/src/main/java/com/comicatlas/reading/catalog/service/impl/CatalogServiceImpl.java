@@ -10,7 +10,6 @@ import com.comicatlas.persistence.comic.mapper.CatalogMapper;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
-import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.reading.catalog.service.CatalogService;

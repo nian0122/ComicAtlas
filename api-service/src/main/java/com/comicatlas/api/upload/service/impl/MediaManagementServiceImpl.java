@@ -1,6 +1,5 @@
 package com.comicatlas.api.upload.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 // 条件更新由媒体管理服务维护状态机与并发边界，Mapper 执行参数化更新。
 // 架构说明：Service 直接构造 LambdaUpdateWrapper 更新媒体排序/状态；条件更新应收口到 MediaMapper。
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
@@ -54,8 +53,7 @@ public class MediaManagementServiceImpl implements com.comicatlas.api.upload.ser
         if (new HashSet<>(mediaIds).size() != mediaIds.size()) {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "媒体列表存在重复项");
         }
-        List<Media> existing = mediaMapper.selectList(
-                new LambdaQueryWrapper<Media>().eq(Media::getChapterId, chapterId));
+        List<Media> existing = mediaMapper.selectByChapterId(chapterId);
         Set<Long> existingIds = new HashSet<>();
         for (Media media : existing) {
             existingIds.add(media.getId());

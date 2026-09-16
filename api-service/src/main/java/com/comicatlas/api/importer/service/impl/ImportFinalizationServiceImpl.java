@@ -1,6 +1,5 @@
 package com.comicatlas.api.importer.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.importer.enums.ImportTaskStatus;
 import com.comicatlas.api.importer.persistence.entity.ImportTask;
@@ -69,8 +68,7 @@ public class ImportFinalizationServiceImpl implements com.comicatlas.api.importe
             if (comic == null || comic.getStatus() != ComicStatus.IMPORTING) {
                 return;
             }
-            List<Chapter> chapters = chapterMapper.selectList(new LambdaQueryWrapper<Chapter>()
-                    .eq(Chapter::getComicId, event.comicId()));
+            List<Chapter> chapters = chapterMapper.selectByComicId(event.comicId());
             mediaMapper.markImportFinalizedByChapter(event.chapterId(), strip(event.targetDir(), hqPrefix));
             for (Chapter chapter : chapters) {
                 if (chapter.getId().equals(event.chapterId())
@@ -79,12 +77,12 @@ public class ImportFinalizationServiceImpl implements com.comicatlas.api.importe
                 }
             }
             List<Long> chapterIds = chapters.stream().map(Chapter::getId).toList();
-            long pending = chapterIds.isEmpty() ? 0 : mediaMapper.selectCount(new LambdaQueryWrapper<Media>()
-                    .in(Media::getChapterId, chapterIds).ne(Media::getHqStatus, HqStatus.READY));
+            long pending = chapterIds.isEmpty() ? 0
+                    : mediaMapper.countByChapterIdsAndHqStatusNot(chapterIds, HqStatus.READY.name());
             if (pending > 0) {
                 return;
             }
-            List<Media> media = mediaMapper.selectList(new LambdaQueryWrapper<Media>().in(Media::getChapterId, chapterIds));
+            List<Media> media = mediaMapper.selectAllByChapterIds(chapterIds);
             comic.setTotalPages(media.size()); comic.setStatus(ComicStatus.READY);
             comic.setHqSize(media.stream().map(Media::getHqSize).filter(java.util.Objects::nonNull).mapToLong(Long::longValue).sum());
             comicMapper.updateById(comic);

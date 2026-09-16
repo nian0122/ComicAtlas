@@ -11,4 +11,7 @@ public interface TagMapper extends BaseMapper<Tag> {
 
     @Select("SELECT COUNT(*) FROM tag WHERE name = #{name}")
     long countByName(@Param("name") String name);
+
+    @Select("SELECT id, name, type FROM tag WHERE name = #{name} AND type = #{type} LIMIT 1")
+    Tag selectByNameAndType(@Param("name") String name, @Param("type") String type);
 }

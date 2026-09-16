@@ -37,6 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -112,7 +113,7 @@ class ImportRetryCoordinatorTest {
         ImportTask task = failedTask(2L, 10L, SourceType.DIRECTORY);
         task.setErrorMessage("模拟失败");
         when(importTaskMapper.update(eq(null), any(Wrapper.class))).thenReturn(1);
-        when(chapterMapper.selectList(any())).thenReturn(List.of());
+        when(chapterMapper.selectByComicId(anyLong())).thenReturn(List.of());
         when(comicMapper.selectById(10L)).thenReturn(null);
 
         boolean retried = coordinator.retry(task);
@@ -133,14 +134,14 @@ class ImportRetryCoordinatorTest {
 
         assertFalse(retried);
         verify(outboxService, never()).enqueue(any(), any(), any());
-        verify(chapterMapper, never()).selectList(any());
+        verify(chapterMapper, never()).selectByComicId(anyLong());
     }
 
     @Test
     void retry_marksComicImporting_whenImportFailed() {
         ImportTask task = failedTask(3L, 11L, SourceType.DIRECTORY);
         when(importTaskMapper.update(eq(null), any(Wrapper.class))).thenReturn(1);
-        when(chapterMapper.selectList(any())).thenReturn(List.of());
+        when(chapterMapper.selectByComicId(anyLong())).thenReturn(List.of());
         com.comicatlas.persistence.comic.entity.Comic comic = new com.comicatlas.persistence.comic.entity.Comic();
         comic.setId(11L);
         comic.setStatus(ComicStatus.IMPORT_FAILED);
@@ -157,7 +158,7 @@ class ImportRetryCoordinatorTest {
         ImportTask task = failedTask(5L, 12L, SourceType.EHENTAI);
         task.setSourceRef("https://e-hentai.org/g/12345");
         when(importTaskMapper.update(eq(null), any(Wrapper.class))).thenReturn(1);
-        when(chapterMapper.selectList(any())).thenReturn(List.of());
+        when(chapterMapper.selectByComicId(anyLong())).thenReturn(List.of());
         when(comicMapper.selectById(12L)).thenReturn(null);
 
         coordinator.retry(task);
@@ -176,7 +177,7 @@ class ImportRetryCoordinatorTest {
         ch1.setComicId(60L);
         ch1.setGlobalOrder(5);
         when(importTaskMapper.update(eq(null), any(Wrapper.class))).thenReturn(1);
-        when(chapterMapper.selectList(any())).thenReturn(List.of(ch1));
+        when(chapterMapper.selectByComicId(anyLong())).thenReturn(List.of(ch1));
         when(comicMapper.selectById(60L)).thenReturn(null);
 
         Path chapterDir = Path.of("target/test-tmp/hq/60/7001");
@@ -202,7 +203,7 @@ class ImportRetryCoordinatorTest {
         ch1.setComicId(61L);
         ch1.setGlobalOrder(6);
         when(importTaskMapper.update(eq(null), any(Wrapper.class))).thenReturn(1);
-        when(chapterMapper.selectList(any())).thenReturn(List.of(ch1));
+        when(chapterMapper.selectByComicId(anyLong())).thenReturn(List.of(ch1));
         when(comicMapper.selectById(61L)).thenReturn(null);
 
         Path stagingFile = Path.of("target/test-tmp/hq/.staging/7/61/6/001.jpg");
@@ -222,7 +223,7 @@ class ImportRetryCoordinatorTest {
     void retry_rebuildsManifest_whenComicMetadataExists() throws Exception {
         ImportTask task = failedTask(8L, 70L, SourceType.DIRECTORY);
         when(importTaskMapper.update(eq(null), any(Wrapper.class))).thenReturn(1);
-        when(chapterMapper.selectList(any())).thenReturn(List.of());
+        when(chapterMapper.selectByComicId(anyLong())).thenReturn(List.of());
         when(comicMapper.selectById(70L)).thenReturn(null);
 
         // persist 已发生：写出完整漫画元数据（staging 布局 hqPath）与两个暂存章节文件
@@ -251,7 +252,7 @@ class ImportRetryCoordinatorTest {
     void retry_keepsOriginalManifest_whenNoComicMetadata() {
         ImportTask task = failedTask(9L, 71L, SourceType.DIRECTORY);
         when(importTaskMapper.update(eq(null), any(Wrapper.class))).thenReturn(1);
-        when(chapterMapper.selectList(any())).thenReturn(List.of());
+        when(chapterMapper.selectByComicId(anyLong())).thenReturn(List.of());
         when(comicMapper.selectById(71L)).thenReturn(null);
 
         coordinator.retry(task);
@@ -267,7 +268,7 @@ class ImportRetryCoordinatorTest {
         ch1.setId(7001L);
         ch1.setComicId(60L);
         when(importTaskMapper.update(eq(null), any(Wrapper.class))).thenReturn(1);
-        when(chapterMapper.selectList(any())).thenReturn(List.of(ch1));
+        when(chapterMapper.selectByComicId(anyLong())).thenReturn(List.of(ch1));
         when(comicMapper.selectById(60L)).thenReturn(null);
 
         Path orphanDir = Path.of("target/test-tmp/hq/60/7001");

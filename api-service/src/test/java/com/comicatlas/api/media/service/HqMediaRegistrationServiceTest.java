@@ -18,7 +18,6 @@ import org.mockito.ArgumentCaptor;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -42,8 +41,8 @@ class HqMediaRegistrationServiceTest {
         chapter.setComicId(1L);
         chapter.setVersion(3);
         Media existingMedia = existingMedia();
-        when(chapterMapper.selectList(any())).thenReturn(List.of(chapter));
-        when(mediaMapper.selectList(any())).thenReturn(List.of(existingMedia));
+        when(chapterMapper.selectByComicIdOrderByGlobalOrder(1L)).thenReturn(List.of(chapter));
+        when(mediaMapper.selectByChapterIds(List.of(42L))).thenReturn(List.of(existingMedia));
         when(mediaMapper.insertImportBatch(anyList())).thenAnswer(invocation ->
                 ((List<?>) invocation.getArgument(0)).size());
 

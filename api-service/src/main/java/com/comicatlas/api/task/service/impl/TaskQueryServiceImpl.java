@@ -1,6 +1,5 @@
 package com.comicatlas.api.task.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.api.task.dto.ManagementTaskItemResponse;
@@ -49,29 +48,16 @@ public class TaskQueryServiceImpl implements TaskQueryService {
     public IPage<ManagementTaskResponse> listTasks(int page, int size, TaskType type,
                                                     ManagementTaskStatus status, String batchId,
                                                     String targetType, Long targetId) {
-        LambdaQueryWrapper<ManagementTask> wrapper = new LambdaQueryWrapper<>();
-        if (type != null) {
-            wrapper.eq(ManagementTask::getTaskType, type);
-        }
-        if (status != null) {
-            wrapper.eq(ManagementTask::getStatus, status);
-        }
-        if (batchId != null && !batchId.isBlank()) {
-            wrapper.eq(ManagementTask::getBatchId, batchId);
-        }
-        if (targetType != null && !targetType.isBlank()) {
-            wrapper.eq(ManagementTask::getTargetType, targetType);
-        }
+        List<Long> targetTaskIds = null;
         if (targetId != null) {
-            List<Long> taskIds = itemMapper.selectTaskIdsByComicId(targetId);
-            if (taskIds.isEmpty()) {
+            targetTaskIds = itemMapper.selectTaskIdsByComicId(targetId);
+            if (targetTaskIds.isEmpty()) {
                 return emptyPage(page, size);
             }
-            wrapper.in(ManagementTask::getId, taskIds);
         }
-        wrapper.orderByDesc(ManagementTask::getCreatedAt);
-
-        IPage<ManagementTask> taskPage = taskMapper.selectPage(new Page<>(page, size), wrapper);
+        IPage<ManagementTask> taskPage = taskMapper.selectPageByCondition(new Page<>(page, size),
+                type == null ? null : type.name(), status == null ? null : status.name(), batchId,
+                targetType, targetTaskIds);
         List<ManagementTaskResponse> responses = taskPage.getRecords().stream()
                 .map(taskResponseAssembler::toResponse)
                 .collect(Collectors.toList());
@@ -93,9 +79,7 @@ public class TaskQueryServiceImpl implements TaskQueryService {
     /** 查询任务项。 */
     public List<ManagementTaskItemResponse> getTaskItems(Long taskId) {
         requireTask(taskId);
-        return itemMapper.selectList(new LambdaQueryWrapper<ManagementTaskItem>()
-                        .eq(ManagementTaskItem::getTaskId, taskId)
-                        .orderByAsc(ManagementTaskItem::getId))
+        return itemMapper.selectByTaskId(taskId)
                 .stream()
                 .map(taskResponseAssembler::toItemResponse)
                 .collect(Collectors.toList());
@@ -123,9 +107,8 @@ public class TaskQueryServiceImpl implements TaskQueryService {
         }
         Map<Long, ManagementTaskResponse> responseByTaskId = new HashMap<>();
         responses.forEach(response -> responseByTaskId.put(response.getId(), response));
-        List<ManagementTaskItem> items = itemMapper.selectList(new LambdaQueryWrapper<ManagementTaskItem>()
-                .in(ManagementTaskItem::getTaskId, tasks.stream().map(ManagementTask::getId).toList())
-                .orderByAsc(ManagementTaskItem::getId));
+        List<ManagementTaskItem> items = itemMapper.selectByTaskIds(
+                tasks.stream().map(ManagementTask::getId).toList());
         Map<Long, ManagementTaskItem> firstItems = new HashMap<>();
         items.forEach(item -> firstItems.putIfAbsent(item.getTaskId(), item));
         Map<Long, Long> parentComicIds = resolveParentComicIds(firstItems);

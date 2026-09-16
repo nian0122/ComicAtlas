@@ -66,7 +66,7 @@ class ComicListServiceTest {
 
         when(comicMapper.selectPage(any(Page.class), same(query))).thenReturn(comicPage);
         when(categoryMapper.selectBatchIds(List.of(10L))).thenReturn(List.of(category));
-        when(historyMapper.selectList(any())).thenReturn(List.of(history));
+        when(historyMapper.selectByComicIds(List.of(1L, 2L))).thenReturn(List.of(history));
 
         var result = service.listComics(query);
 
@@ -82,9 +82,8 @@ class ComicListServiceTest {
         assertEquals(25, records.get(0).getProgressPercent());
         assertNull(records.get(1).getLastReadChapterId());
         verify(categoryMapper).selectBatchIds(List.of(10L));
-        verify(historyMapper).selectList(any());
+        verify(historyMapper).selectByComicIds(List.of(1L, 2L));
         verify(categoryMapper, never()).selectById(any());
-        verify(historyMapper, never()).selectOne(any());
     }
 
     @Test

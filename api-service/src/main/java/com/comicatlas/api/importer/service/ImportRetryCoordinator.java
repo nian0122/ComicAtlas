@@ -1,6 +1,5 @@
 package com.comicatlas.api.importer.service;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.importer.persistence.entity.ImportTask;
@@ -14,10 +13,8 @@ import com.comicatlas.common.event.ImportTaskCreatedEvent;
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.api.importer.enums.ImportTaskStatus;
 import com.comicatlas.contract.common.enums.SourceType;
-import com.comicatlas.persistence.comic.entity.Catalog;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Comic;
-import com.comicatlas.persistence.comic.entity.Media;
 import com.comicatlas.persistence.comic.mapper.CatalogMapper;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
@@ -117,7 +114,7 @@ public class ImportRetryCoordinator {
 
         Long comicId = task.getComicId();
         List<Chapter> chapters = comicId != null
-                ? chapterMapper.selectList(new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId))
+                ? chapterMapper.selectByComicId(comicId)
                 : List.of();
         if (comicId != null) {
             catalogCacheInvalidator.evict(comicId);
@@ -182,10 +179,10 @@ public class ImportRetryCoordinator {
         }
         List<Long> chapterIds = chapters.stream().map(Chapter::getId).toList();
         if (!chapterIds.isEmpty()) {
-            mediaMapper.delete(new LambdaQueryWrapper<Media>().in(Media::getChapterId, chapterIds));
+            mediaMapper.deleteByChapterIds(chapterIds);
         }
-        chapterMapper.delete(new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
-        catalogMapper.delete(new LambdaQueryWrapper<Catalog>().eq(Catalog::getComicId, comicId));
+        chapterMapper.deleteByComicId(comicId);
+        catalogMapper.deleteByComicId(comicId);
         return chapterIds;
     }
 

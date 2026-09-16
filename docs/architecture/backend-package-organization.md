@@ -2,6 +2,8 @@
 
 更新日期：2026-09-16。
 
+后续分类待办见 [后端文件分类 TODO](backend-classification-todo.md)。该清单仅标记待调整归属，不执行代码迁移；下文“本次归类”和验证记录描述此前已经完成的整理。
+
 采用 **Maven 模块划分运行边界，Java 包先按业务、再按框架职责分类**。查找恢复功能时，先进入 `recovery`，再找 `controller`、`service`、`event` 或 `persistence`。目录迁移不等于职责已经解耦；待拆分代码见 [解耦清单](backend-decoupling.md)。
 
 ## 模块边界

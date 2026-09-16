@@ -12,8 +12,39 @@ import java.util.List;
 @Mapper
 public interface ChapterMapper extends BaseMapper<Chapter> {
 
+    @Select("SELECT id, comic_id, catalog_id, chapter_no, title, status, page_count, sort_order, global_order FROM chapter WHERE comic_id = #{comicId} ORDER BY global_order ASC")
+    List<Chapter> selectByComicIdOrderByGlobalOrder(@Param("comicId") Long comicId);
+
+    @Select("SELECT id, comic_id, catalog_id, chapter_no, title, status, page_count, sort_order, global_order FROM chapter WHERE comic_id = #{comicId} AND catalog_id = #{catalogId} ORDER BY sort_order DESC, id DESC LIMIT 1")
+    Chapter selectLastByComicIdAndCatalogId(@Param("comicId") Long comicId, @Param("catalogId") Long catalogId);
+
+    @Select("SELECT id, comic_id, catalog_id, chapter_no, title, status, page_count, sort_order, global_order FROM chapter WHERE comic_id = #{comicId} AND catalog_id IS NULL ORDER BY sort_order DESC, id DESC LIMIT 1")
+    Chapter selectLastByComicIdWithoutCatalog(@Param("comicId") Long comicId);
+
+    @Select("SELECT id, comic_id, catalog_id, chapter_no, title, status, page_count, sort_order, global_order FROM chapter WHERE comic_id = #{comicId} AND catalog_id = #{catalogId} ORDER BY sort_order ASC, id ASC")
+    List<Chapter> selectByComicIdAndCatalogId(@Param("comicId") Long comicId, @Param("catalogId") Long catalogId);
+
+    @Select("SELECT id, comic_id, catalog_id, chapter_no, title, status, page_count, sort_order, global_order FROM chapter WHERE comic_id = #{comicId} AND catalog_id IS NULL ORDER BY sort_order ASC, id ASC")
+    List<Chapter> selectByComicIdWithoutCatalog(@Param("comicId") Long comicId);
+
+    @Select("SELECT id, comic_id, catalog_id, chapter_no, title, status, page_count, sort_order, global_order FROM chapter WHERE comic_id = #{comicId} ORDER BY global_order DESC LIMIT 1")
+    Chapter selectLastByComicId(@Param("comicId") Long comicId);
+
+    @org.apache.ibatis.annotations.Delete("DELETE FROM chapter WHERE comic_id = #{comicId}")
+    int deleteByComicId(@Param("comicId") Long comicId);
+
     @Select("SELECT id, comic_id, title, status, global_order FROM chapter WHERE id = #{chapterId}")
     Chapter selectReaderChapter(@Param("chapterId") Long chapterId);
+
+    @Select("SELECT id, comic_id, page_count, status FROM chapter WHERE id = #{chapterId}")
+    Chapter selectReadableById(@Param("chapterId") Long chapterId);
+
+    @Select("SELECT id, chapter_no, page_count FROM chapter WHERE id = #{chapterId}")
+    Chapter selectHistoryChapterById(@Param("chapterId") Long chapterId);
+
+    @Select("<script>SELECT id, chapter_no, page_count FROM chapter WHERE id IN "
+            + "<foreach collection='chapterIds' item='chapterId' open='(' separator=',' close=')'>#{chapterId}</foreach></script>")
+    List<Chapter> selectHistoryChaptersByIds(@Param("chapterIds") List<Long> chapterIds);
 
     @Select("SELECT id, catalog_id, chapter_no, title, global_order, page_count FROM chapter "
             + "WHERE comic_id = #{comicId} AND status = 'READY' ORDER BY global_order ASC")
@@ -30,6 +61,13 @@ public interface ChapterMapper extends BaseMapper<Chapter> {
     @Select("SELECT id, comic_id, catalog_id, title, chapter_no, page_count, global_order, status "
             + "FROM chapter WHERE comic_id = #{comicId} AND status = 'READY' ORDER BY chapter_no ASC")
     List<Chapter> selectReadyByComicIdOrderByChapterNo(@Param("comicId") Long comicId);
+
+    @Select("SELECT id, comic_id, catalog_id, chapter_no, title, global_order, page_count, status "
+            + "FROM chapter WHERE comic_id = #{comicId}")
+    List<Chapter> selectByComicId(@Param("comicId") Long comicId);
+
+    @Select("SELECT COUNT(*) FROM chapter WHERE comic_id = #{comicId}")
+    long countByComicId(@Param("comicId") Long comicId);
 
     /**
      * 将漫画章节临时置为互不冲突的负序号，供全局重排的第二阶段使用。

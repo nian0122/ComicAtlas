@@ -1,6 +1,5 @@
 package com.comicatlas.api.importer.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.api.importer.dto.BatchImportRequest;
@@ -109,8 +108,7 @@ public class ImportServiceImpl implements ImportService {
                 if (!expectedHash.equals(existing.getIdempotencyPayloadHash())) {
                     throw new ConflictException("幂等键 " + idempotencyKey + " 已存在但 payload 不匹配");
                 }
-                ImportTask existingImport = taskMapper.selectOne(new LambdaQueryWrapper<ImportTask>()
-                        .eq(ImportTask::getManagementTaskId, existing.getId()));
+                ImportTask existingImport = taskMapper.selectByManagementTaskId(existing.getId());
                 if (existingImport != null) {
                     log.info("导入幂等命中 idempotencyKey={}, 返回已有任务 {}", idempotencyKey, existingImport.getId());
                     return toVO(existingImport);
@@ -146,9 +144,7 @@ public class ImportServiceImpl implements ImportService {
                     throw new BusinessException(HttpStatusCodes.CONFLICT, "该漫画已存在或正在导入中");
                 }
                 // DB 去重
-                Comic existingComic = comicMapper.selectOne(new LambdaQueryWrapper<Comic>()
-                        .eq(Comic::getSourceType, SourceType.EHENTAI)
-                        .eq(Comic::getSourceGalleryId, galleryId));
+                Comic existingComic = comicMapper.selectBySourceTypeAndGalleryId(SourceType.EHENTAI.name(), galleryId);
                 if (existingComic != null) {
                     throw new BusinessException(HttpStatusCodes.CONFLICT, "该漫画已导入 - 漫画ID: " + existingComic.getId());
                 }
@@ -205,13 +201,9 @@ public class ImportServiceImpl implements ImportService {
     @Override
     public IPage<ImportTaskVO> listTasks(Integer page, Integer size, String status, String batchId) {
         ImportTaskStatus statusEnum = status != null ? parseImportStatus(status) : null;
-        LambdaQueryWrapper<ImportTask> wrapper = new LambdaQueryWrapper<ImportTask>()
-                .eq(statusEnum != null, ImportTask::getStatus, statusEnum)
-                .eq(batchId != null, ImportTask::getBatchId, batchId)
-                .orderByDesc(ImportTask::getCreatedAt);
         Page<ImportTask> pageRequest = new Page<>(
                 page != null ? page : DEFAULT_PAGE_NUMBER, size != null ? size : DEFAULT_PAGE_SIZE);
-        return taskMapper.selectPage(pageRequest, wrapper).convert(this::toVO);
+        return taskMapper.selectPageByConditions(pageRequest, statusEnum, batchId).convert(this::toVO);
     }
 
     @Override

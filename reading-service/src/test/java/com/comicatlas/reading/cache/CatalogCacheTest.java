@@ -73,7 +73,7 @@ class CatalogCacheTest {
         Comic comic = new Comic();
         comic.setId(1L);
         comic.setStatus(ComicStatus.READY);
-        when(comicMapper.selectOne(any())).thenReturn(comic);
+        when(comicMapper.selectStatusById(1L)).thenReturn(comic);
         var cache = cacheManager.getCache(ComicReferenceCache.CATALOG);
         if (cache != null) {
             cache.clear();
@@ -89,14 +89,14 @@ class CatalogCacheTest {
         chapter.setTitle("第一章");
         chapter.setGlobalOrder(0);
         chapter.setPageCount(20);
-        when(catalogMapper.selectList(any())).thenReturn(List.of());
-        when(chapterMapper.selectList(any())).thenReturn(List.of(chapter));
+        when(catalogMapper.selectTreeNodesByComicId(1L)).thenReturn(List.of());
+        when(chapterMapper.selectReadyCatalogChapters(1L)).thenReturn(List.of(chapter));
 
         catalogService.buildTree(1L);
         catalogService.buildTree(1L);
 
-        verify(catalogMapper).selectList(any());
-        verify(chapterMapper).selectList(any());
+        verify(catalogMapper).selectTreeNodesByComicId(1L);
+        verify(chapterMapper).selectReadyCatalogChapters(1L);
     }
 
     @Test
@@ -108,8 +108,8 @@ class CatalogCacheTest {
         chapter.setTitle("第一章");
         chapter.setGlobalOrder(0);
         chapter.setPageCount(20);
-        when(catalogMapper.selectList(any())).thenReturn(List.of());
-        when(chapterMapper.selectList(any())).thenReturn(List.of(chapter));
+        when(catalogMapper.selectTreeNodesByComicId(1L)).thenReturn(List.of());
+        when(chapterMapper.selectReadyCatalogChapters(1L)).thenReturn(List.of(chapter));
         MockMvc mockMvc = MockMvcBuilders
                 .standaloneSetup(new CatalogController(catalogService))
                 .build();
@@ -121,20 +121,24 @@ class CatalogCacheTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].chapters[0].pageCount").value(20));
 
-        verify(catalogMapper).selectList(any());
-        verify(chapterMapper).selectList(any());
+        verify(catalogMapper).selectTreeNodesByComicId(1L);
+        verify(chapterMapper).selectReadyCatalogChapters(1L);
     }
 
     @Test
     void buildTree_shouldNotCacheEmptyResult() {
-        when(catalogMapper.selectList(any())).thenReturn(List.of());
-        when(chapterMapper.selectList(any())).thenReturn(List.of());
+        Comic comic = new Comic();
+        comic.setId(2L);
+        comic.setStatus(ComicStatus.READY);
+        when(comicMapper.selectStatusById(2L)).thenReturn(comic);
+        when(catalogMapper.selectTreeNodesByComicId(2L)).thenReturn(List.of());
+        when(chapterMapper.selectReadyCatalogChapters(2L)).thenReturn(List.of());
 
         catalogService.buildTree(2L);
         catalogService.buildTree(2L);
 
-        verify(catalogMapper, times(2)).selectList(any());
-        verify(chapterMapper, times(2)).selectList(any());
+        verify(catalogMapper, times(2)).selectTreeNodesByComicId(2L);
+        verify(chapterMapper, times(2)).selectReadyCatalogChapters(2L);
     }
 
     @Test
