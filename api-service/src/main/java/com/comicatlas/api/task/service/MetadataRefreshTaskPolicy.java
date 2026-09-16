@@ -1,8 +1,6 @@
 package com.comicatlas.api.task.service;
 
 // 架构说明：Service 策略直接构造 LambdaUpdateWrapper 更新漫画状态；条件更新应收口到 ComicMapper。
-// TODO(MAPPER-02): Service 策略直接构造 LambdaUpdateWrapper 更新漫画状态；条件更新应收口到 ComicMapper。
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.api.shared.exception.ConflictException;
 import com.comicatlas.api.task.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.task.enums.ManagementTaskStatus;
@@ -38,9 +36,7 @@ public class MetadataRefreshTaskPolicy {
             return;
         }
         for (Long comicId : resolveFromTargets(taskType, targets)) {
-            int rows = comicMapper.update(null, new LambdaUpdateWrapper<Comic>()
-                    .eq(Comic::getId, comicId).eq(Comic::getStatus, ComicStatus.READY)
-                    .set(Comic::getStatus, ComicStatus.REFRESHING));
+            int rows = comicMapper.lockForMetadataRefresh(comicId);
             if (rows == 0) {
                 throw new ConflictException(String.format(
                         "漫画 %d 不是 READY 或已被其他任务占用，无法创建元数据刷新任务", comicId));
@@ -54,9 +50,7 @@ public class MetadataRefreshTaskPolicy {
             return;
         }
         for (Long comicId : resolveFromItems(items)) {
-            comicMapper.update(null, new LambdaUpdateWrapper<Comic>()
-                    .eq(Comic::getId, comicId).eq(Comic::getStatus, ComicStatus.REFRESHING)
-                    .set(Comic::getStatus, ComicStatus.READY));
+            comicMapper.releaseMetadataRefresh(comicId);
         }
     }
 
@@ -68,9 +62,7 @@ public class MetadataRefreshTaskPolicy {
                 .filter(item -> item.getStatus() == ManagementTaskStatus.FAILED
                         || item.getStatus() == ManagementTaskStatus.CANCELLED).toList();
         for (Long comicId : resolveFromItems(retriedItems)) {
-            int rows = comicMapper.update(null, new LambdaUpdateWrapper<Comic>()
-                    .eq(Comic::getId, comicId).eq(Comic::getStatus, ComicStatus.READY)
-                    .set(Comic::getStatus, ComicStatus.REFRESHING));
+            int rows = comicMapper.lockForMetadataRefresh(comicId);
             if (rows == 0) {
                 throw new ConflictException(String.format(
                         "漫画 %d 不是 READY 或已被其他任务占用，无法重试元数据刷新", comicId));

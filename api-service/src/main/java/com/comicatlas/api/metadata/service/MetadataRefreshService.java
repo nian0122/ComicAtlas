@@ -16,8 +16,6 @@ import com.comicatlas.persistence.comic.mapper.MediaMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 // 条件更新由元数据业务服务维护状态机与并发边界，Mapper 执行参数化更新。
 // 架构说明：Service 直接构造 LambdaUpdateWrapper 更新媒体刷新字段；条件更新应收口到 MediaMapper。
-// TODO(MAPPER-02): Service 直接构造 LambdaUpdateWrapper 更新媒体刷新字段；条件更新应收口到 MediaMapper。
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.common.constant.MetadataRefreshLimits;
 import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO;
@@ -314,15 +312,8 @@ public class MetadataRefreshService {
             }
             String oldPrefix = comicId + "/" + cs.legacyDirKey() + "/";
             String newPrefix = comicId + "/" + cs.chapterId() + "/";
-            int hqUpdated = mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
-                    .eq(Media::getChapterId, cs.chapterId())
-                    .likeRight(Media::getHqPath, oldPrefix)
-                    .setSql("hq_path = REPLACE(hq_path, {0}, {1})", oldPrefix, newPrefix));
-            int lqUpdated = mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
-                    .eq(Media::getChapterId, cs.chapterId())
-                    .isNotNull(Media::getLqPath)
-                    .likeRight(Media::getLqPath, oldPrefix)
-                    .setSql("lq_path = REPLACE(lq_path, {0}, {1})", oldPrefix, newPrefix));
+            int hqUpdated = mediaMapper.normalizeLegacyHqPath(cs.chapterId(), oldPrefix, newPrefix);
+            int lqUpdated = mediaMapper.normalizeLegacyLqPath(cs.chapterId(), oldPrefix, newPrefix);
             log.info("旧布局前缀重写: comicId={}, chapterId={}, dir={} -> {}, hq={}, lq={}",
                     comicId, cs.chapterId(), cs.legacyDirKey(), cs.chapterId(), hqUpdated, lqUpdated);
         }

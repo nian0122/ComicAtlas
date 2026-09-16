@@ -24,6 +24,23 @@ public interface MediaMapper extends BaseMapper<Media> {
                 .setSql("page_number = -id"));
     }
 
+    /** 按章节且仅匹配旧前缀重写 HQ 路径。 */
+    default int normalizeLegacyHqPath(Long chapterId, String oldPrefix, String newPrefix) {
+        return update(null, new LambdaUpdateWrapper<Media>()
+                .eq(Media::getChapterId, chapterId)
+                .likeRight(Media::getHqPath, oldPrefix)
+                .setSql("hq_path = REPLACE(hq_path, {0}, {1})", oldPrefix, newPrefix));
+    }
+
+    /** 按章节且仅匹配旧前缀重写 LQ 路径。 */
+    default int normalizeLegacyLqPath(Long chapterId, String oldPrefix, String newPrefix) {
+        return update(null, new LambdaUpdateWrapper<Media>()
+                .eq(Media::getChapterId, chapterId)
+                .isNotNull(Media::getLqPath)
+                .likeRight(Media::getLqPath, oldPrefix)
+                .setSql("lq_path = REPLACE(lq_path, {0}, {1})", oldPrefix, newPrefix));
+    }
+
     /**
      * 导入落库专用批量 INSERT：一次插入多条 page 记录（多值 VALUES）。
      * 仅写入导入所需列；id/version/created_at/lq_size 使用数据库默认值。
