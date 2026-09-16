@@ -60,7 +60,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * 分卷导出 → 重新导入 round-trip 契约测试（Todo 8）。
+ * 分卷导出 → 重新导入 round-trip 契约测试。
  *
  * <p>happy：用 64 KiB 小阈值真实导出「metadata + 图片 + 跨卷二进制媒体」的分卷 ZIP，直接从
  * EXPORT 本地任务目录验证所有卷按序存在；再以最后 {@code .zip} 的本地路径作为 sourcePath 经
