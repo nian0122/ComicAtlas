@@ -78,8 +78,6 @@ import java.util.stream.Collectors;
 public class UploadSessionService {
     // TODO(LAYER-14): Service 功能契约与具体实现未分离；应抽取 service 接口，并将实现迁移到 service/impl。
 
-    // TODO(DECOUPLE-01): complete 同时执行大文件校验、磁盘操作和上传媒体/任务/Outbox 写事务，需拆分事务外校验与独立提交服务。
-
     /** 管理命令交换器。 */
     private static final String MANAGEMENT_EXCHANGE = MqExchanges.MANAGEMENT;
     /** 管理命令请求路由键。 */
