@@ -46,7 +46,7 @@ public interface ChapterMapper extends BaseMapper<Chapter> {
             + "<foreach collection='chapterIds' item='chapterId' open='(' separator=',' close=')'>#{chapterId}</foreach></script>")
     List<Chapter> selectHistoryChaptersByIds(@Param("chapterIds") List<Long> chapterIds);
 
-    @Select("SELECT id, catalog_id, chapter_no, title, global_order, page_count FROM chapter "
+    @Select("SELECT id, catalog_id, chapter_no, title, global_order, page_count, status FROM chapter "
             + "WHERE comic_id = #{comicId} AND status = 'READY' ORDER BY global_order ASC")
     List<Chapter> selectReadyCatalogChapters(@Param("comicId") Long comicId);
 
