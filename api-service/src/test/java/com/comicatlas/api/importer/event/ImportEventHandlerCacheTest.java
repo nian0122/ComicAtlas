@@ -26,9 +26,7 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
-import org.springframework.transaction.TransactionStatus;
-import org.springframework.transaction.support.TransactionCallback;
-import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.io.File;
 import java.nio.file.Path;
@@ -36,12 +34,10 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -55,13 +51,18 @@ class ImportEventHandlerCacheTest {
     @Mock private ValueOperations<String, Object> valueOperations;
     @Mock private ComicMapper comicMapper;
     @Mock private ImportTaskMapper taskMapper;
-    @Mock private TransactionTemplate transactionTemplate;
     @Mock private ManagementTaskService managementTaskService;
     @Mock private ApiStorageProperties storageProperties;
     @Mock private ImportPersistenceService importPersistenceService;
+    @Spy @InjectMocks private com.comicatlas.api.importer.service.ImportResultService importResultService;
     @Mock private Channel channel;
     @Spy private MqConsumerSupport mqConsumerSupport = new MqConsumerSupport();
     @InjectMocks private ImportEventHandler handler;
+
+    @org.junit.jupiter.api.BeforeEach
+    void injectRefactoredService() {
+        ReflectionTestUtils.setField(handler, "importResultService", importResultService);
+    }
 
     /**
      * completed 事件：Handler 只做协议适配——幂等检查 → 事务外读 metadata → 委托
@@ -94,14 +95,8 @@ class ImportEventHandlerCacheTest {
         verify(channel).basicAck(1L, false);
     }
 
-    /** 让 transactionTemplate.executeWithoutResult 内联执行 Consumer，并在此"事务"中运行 action。 */
+    /** 执行测试动作。 */
     private void runInTransaction(Runnable action) {
-        doAnswer(invocation -> {
-            @SuppressWarnings("unchecked")
-            Consumer<TransactionStatus> consumer = invocation.getArgument(0);
-            consumer.accept(null);
-            return null;
-        }).when(transactionTemplate).executeWithoutResult(any());
         action.run();
     }
 

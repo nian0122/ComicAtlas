@@ -25,18 +25,32 @@ public class VideoMetadataFixService {
         int fixed = 0;
         for (VideoMetadataFixResult result : event.results()) {
             Media media = mediaMapper.selectById(result.pageId());
-            if (media == null) continue;
+            if (media == null) {
+                continue;
+            }
             Chapter chapter = chapterMapper.selectById(media.getChapterId());
             if (chapter == null || !event.comicId().equals(chapter.getComicId())) {
                 log.warn("忽略不属于事件漫画的媒体修复结果: comicId={}, mediaId={}", event.comicId(), result.pageId());
                 continue;
             }
-            if (result.width() != null) media.setWidth(result.width());
-            if (result.height() != null) media.setHeight(result.height());
-            if (result.duration() != null) media.setDuration(result.duration());
-            if (result.container() != null) media.setContainer(result.container());
-            if (result.videoCodec() != null) media.setVideoCodec(result.videoCodec());
-            if (result.audioCodec() != null) media.setAudioCodec(result.audioCodec());
+            if (result.width() != null) {
+                media.setWidth(result.width());
+            }
+            if (result.height() != null) {
+                media.setHeight(result.height());
+            }
+            if (result.duration() != null) {
+                media.setDuration(result.duration());
+            }
+            if (result.container() != null) {
+                media.setContainer(result.container());
+            }
+            if (result.videoCodec() != null) {
+                media.setVideoCodec(result.videoCodec());
+            }
+            if (result.audioCodec() != null) {
+                media.setAudioCodec(result.audioCodec());
+            }
             mediaMapper.updateById(media);
             fixed++;
         }

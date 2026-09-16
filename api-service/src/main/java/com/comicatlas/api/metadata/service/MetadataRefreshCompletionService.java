@@ -1,6 +1,7 @@
 package com.comicatlas.api.metadata.service;
 
 // 条件更新由结果应用服务维护跨表状态机与事务边界，Mapper 执行参数化更新。
+// 架构说明：Service 直接构造 LambdaUpdateWrapper 更新任务项/漫画状态；条件更新应收口到对应 Mapper。
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.task.persistence.entity.ManagementTaskItem;

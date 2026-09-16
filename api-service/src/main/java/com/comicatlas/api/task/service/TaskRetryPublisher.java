@@ -2,8 +2,8 @@ package com.comicatlas.api.task.service;
 
 import com.comicatlas.api.exporter.service.ExportRetryService;
 import com.comicatlas.api.importer.service.ImportRetryService;
-import com.comicatlas.api.task.enums.TaskType;
 import com.comicatlas.api.task.persistence.entity.ManagementTaskItem;
+import com.comicatlas.api.task.enums.TaskType;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
@@ -37,13 +37,19 @@ public class TaskRetryPublisher {
 
     public void publish(Long taskId, ManagementTaskItem item, int attempt) {
         publishManagementCommand(taskId, item, attempt);
-        if (item.getOperationType() == TaskType.EXPORT) exportRetryService.retry(taskId, item, attempt);
-        if (item.getOperationType() == TaskType.IMPORT) importRetryService.retry(taskId, item);
+        if (item.getOperationType() == TaskType.EXPORT) {
+            exportRetryService.retry(taskId, item, attempt);
+        }
+        if (item.getOperationType() == TaskType.IMPORT) {
+            importRetryService.retry(taskId, item);
+        }
     }
 
     private void publishManagementCommand(Long taskId, ManagementTaskItem item, int attempt) {
         TaskType operation = item.getOperationType();
-        if (operation == null || !COMMAND_OPERATIONS.contains(operation)) return;
+        if (operation == null || !COMMAND_OPERATIONS.contains(operation)) {
+            return;
+        }
         Long manifestTaskId = TRASH_MANIFEST_REF.equals(item.getResultRefType())
                 ? item.getResultRefId() : null;
         ManagementCommandRequestedEvent event = new ManagementCommandRequestedEvent(

@@ -51,16 +51,26 @@ public class ImportResultService {
     public void applyStatus(Long taskId, String newStatus, Integer progress, long speed,
                             Integer eta, String downloadMethod, String errorMessage) {
         ImportTask task = taskMapper.selectById(taskId);
-        if (task == null || TERMINAL_STATUSES.contains(task.getStatus())) return;
+        if (task == null || TERMINAL_STATUSES.contains(task.getStatus())) {
+            return;
+        }
         ImportTaskStatus mappedStatus = parseStatus(newStatus);
-        if (mappedStatus != null) task.setStatus(mappedStatus);
+        if (mappedStatus != null) {
+            task.setStatus(mappedStatus);
+        }
         if ("DOWNLOADING".equals(newStatus) && task.getStartTime() == null) {
             task.setStartTime(LocalDateTime.now());
         }
         task.setProgress(progress);
-        if (speed > 0) task.setDownloadSpeed(speed);
-        if (eta != null && eta > 0) task.setEtaSeconds(eta);
-        if (downloadMethod != null) task.setDownloadMethod(downloadMethod);
+        if (speed > 0) {
+            task.setDownloadSpeed(speed);
+        }
+        if (eta != null && eta > 0) {
+            task.setEtaSeconds(eta);
+        }
+        if (downloadMethod != null) {
+            task.setDownloadMethod(downloadMethod);
+        }
         if ("FAILED".equals(newStatus) && errorMessage != null && !errorMessage.isBlank()) {
             task.setErrorMessage(errorMessage);
             task.setEndTime(LocalDateTime.now());
@@ -68,7 +78,9 @@ public class ImportResultService {
         taskMapper.updateById(task);
         if (task.getManagementTaskId() != null) {
             var stage = com.comicatlas.api.task.enums.TaskStage.fromStatus(newStatus);
-            if (stage != null) managementTaskService.updateStage(task.getManagementTaskId(), stage, progress);
+            if (stage != null) {
+                managementTaskService.updateStage(task.getManagementTaskId(), stage, progress);
+            }
         }
         if (task.getManagementTaskId() != null
                 && ("FAILED".equals(newStatus) || "CANCELLED".equals(newStatus))) {
@@ -81,33 +93,47 @@ public class ImportResultService {
                         task.getErrorMessage(), "IMPORT_TASK", task.getId());
             }
         }
-        if ("FAILED".equals(newStatus)) markComicImportFailed(task);
+        if ("FAILED".equals(newStatus)) {
+            markComicImportFailed(task);
+        }
     }
 
     @Transactional
     public void applyFailed(Long taskId, String errorCode, String errorMessage) {
         ImportTask task = taskMapper.selectById(taskId);
-        if (task == null || TERMINAL_STATUSES.contains(task.getStatus())) return;
+        if (task == null || TERMINAL_STATUSES.contains(task.getStatus())) {
+            return;
+        }
         task.setStatus(ImportTaskStatus.FAILED);
         task.setEndTime(LocalDateTime.now());
-        if (errorCode != null) task.setErrorMessage(errorCode + ": " + errorMessage);
-        else if (errorMessage != null) task.setErrorMessage(errorMessage);
+        if (errorCode != null) {
+            task.setErrorMessage(errorCode + ": " + errorMessage);
+        }
+        else if (errorMessage != null) {
+            task.setErrorMessage(errorMessage);
+        }
         taskMapper.updateById(task);
         markImportFailed(task);
     }
 
     private void markImportFailed(ImportTask task) {
         Comic comic = markComicImportFailed(task);
-        if (comic == null) return;
+        if (comic == null) {
+            return;
+        }
         ManagementTaskItem item = managementTaskService.findActiveItem(
                 "COMIC", comic.getId(), TaskType.IMPORT);
-        if (item != null) managementTaskService.updateItemStatus(item.getId(),
-                ManagementTaskStatus.FAILED, task.getErrorMessage(), "IMPORT_TASK", task.getId());
+        if (item != null) {
+            managementTaskService.updateItemStatus(item.getId(),
+                    ManagementTaskStatus.FAILED, task.getErrorMessage(), "IMPORT_TASK", task.getId());
+        }
     }
 
     private Comic markComicImportFailed(ImportTask task) {
         Comic comic = comicMapper.selectById(task.getComicId());
-        if (comic == null || comic.getStatus() != ComicStatus.IMPORTING) return comic;
+        if (comic == null || comic.getStatus() != ComicStatus.IMPORTING) {
+            return comic;
+        }
         ManagementStateMachine.validateComicTransition(comic.getStatus().name(), "IMPORT_FAILED");
         comic.setStatus(ComicStatus.IMPORT_FAILED);
         comicMapper.updateById(comic);
@@ -115,7 +141,9 @@ public class ImportResultService {
     }
 
     private static ImportTaskStatus parseStatus(String status) {
-        if (status == null) return null;
+        if (status == null) {
+            return null;
+        }
         try { return ImportTaskStatus.valueOf(status); }
         catch (IllegalArgumentException exception) { return null; }
     }

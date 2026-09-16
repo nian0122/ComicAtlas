@@ -1,5 +1,6 @@
 package com.comicatlas.api.task.service;
 
+// 架构说明：Service 策略直接构造 LambdaUpdateWrapper 更新漫画状态；条件更新应收口到 ComicMapper。
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.api.shared.exception.ConflictException;
 import com.comicatlas.api.task.dto.CreateManagementTaskRequest;
@@ -104,7 +105,9 @@ public class MetadataRefreshTaskPolicy {
     }
 
     private void addChapterComicIds(List<Long> chapterIds, Set<Long> comicIds) {
-        if (chapterIds.isEmpty()) return;
+        if (chapterIds.isEmpty()) {
+            return;
+        }
         List<Chapter> chapters = chapterMapper.selectBatchIds(chapterIds);
         if (chapters.size() != new LinkedHashSet<>(chapterIds).size()) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "元数据刷新包含不存在的章节");

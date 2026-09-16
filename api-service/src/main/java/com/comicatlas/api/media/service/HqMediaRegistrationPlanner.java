@@ -12,7 +12,6 @@ import com.comicatlas.contract.common.enums.TranscodeStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Media;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -66,20 +65,32 @@ public class HqMediaRegistrationPlanner {
     private void validateChapters(List<ChapterSnapshot> snapshots, Map<Long, Chapter> chapterById) {
         Set<Long> seen = new HashSet<>();
         for (ChapterSnapshot snapshot : snapshots) {
-            if (!seen.add(snapshot.chapterId())) throw new BusinessException("HQ 登记快照重复章节: " + snapshot.chapterId());
+            if (!seen.add(snapshot.chapterId())) {
+                throw new BusinessException("HQ 登记快照重复章节: " + snapshot.chapterId());
+            }
             Chapter chapter = chapterById.get(snapshot.chapterId());
-            if (chapter == null) throw new BusinessException("HQ 登记快照包含未知章节: " + snapshot.chapterId());
+            if (chapter == null) {
+                throw new BusinessException("HQ 登记快照包含未知章节: " + snapshot.chapterId());
+            }
             int version = chapter.getVersion() == null ? 0 : chapter.getVersion();
-            if (version != snapshot.chapterVersion()) throw new BusinessException("HQ 登记章节版本漂移: chapterId=" + snapshot.chapterId());
+            if (version != snapshot.chapterVersion()) {
+                throw new BusinessException("HQ 登记章节版本漂移: chapterId=" + snapshot.chapterId());
+            }
         }
     }
 
     private void validateExistingMedia(Long chapterId, MediaSnapshot item, Map<Long, Media> mediaById) {
         Media media = mediaById.get(item.mediaId());
-        if (media == null) throw new BusinessException("HQ 登记快照包含未知媒体: " + item.mediaId());
-        if (!chapterId.equals(media.getChapterId())) throw new BusinessException("HQ 登记快照媒体章节不一致: mediaId=" + item.mediaId());
+        if (media == null) {
+            throw new BusinessException("HQ 登记快照包含未知媒体: " + item.mediaId());
+        }
+        if (!chapterId.equals(media.getChapterId())) {
+            throw new BusinessException("HQ 登记快照媒体章节不一致: mediaId=" + item.mediaId());
+        }
         int version = media.getVersion() == null ? 0 : media.getVersion();
-        if (version != item.mediaVersion()) throw new BusinessException("HQ 登记媒体版本漂移: mediaId=" + item.mediaId());
+        if (version != item.mediaVersion()) {
+            throw new BusinessException("HQ 登记媒体版本漂移: mediaId=" + item.mediaId());
+        }
     }
 
     private Map<Long, Integer> nextPageByChapter(List<Media> media) {

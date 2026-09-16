@@ -24,6 +24,7 @@ import com.comicatlas.api.importer.persistence.entity.ImportTask;
 import com.comicatlas.api.importer.exception.ImportMetadataException;
 import com.comicatlas.api.importer.persistence.mapper.ImportTaskMapper;
 import com.comicatlas.api.importer.service.ImportPersistenceService;
+import com.comicatlas.api.importer.service.ImportFinalizationService;
 import com.comicatlas.api.task.service.ManagementTaskService;
 import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.common.constant.MqExchanges;
@@ -42,6 +43,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.TransactionStatus;
@@ -94,6 +96,7 @@ class ImportPersistenceServiceTest {
     @Mock private OutboxService outboxService;
     @Mock private ApiStorageProperties storageProperties;
     @Mock private com.comicatlas.api.metadata.service.MetadataUpdateCoordinator metadataUpdateCoordinator;
+    @Spy @InjectMocks private ImportFinalizationService importFinalizationService;
 
     @InjectMocks private ImportPersistenceServiceImpl service;
 
@@ -101,6 +104,7 @@ class ImportPersistenceServiceTest {
 
     @BeforeEach
     void setUp() {
+        ReflectionTestUtils.setField(service, "importFinalizationService", importFinalizationService);
         mediaBatchSnapshots.clear();
         ReflectionTestUtils.setField(service, "mangaRoot", "F:/manga");
         ApiStorageRoot hqRoot = new ApiStorageRoot();

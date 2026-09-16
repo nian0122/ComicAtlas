@@ -8,15 +8,13 @@ import com.comicatlas.api.trash.service.TrashCoverService;
 import com.comicatlas.api.trash.service.TrashQueryService;
 
 import com.comicatlas.api.task.dto.OperationSubmitResultDTO;
-import com.comicatlas.common.dto.TrashManifestDTO;
 import com.comicatlas.contract.common.Result;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;

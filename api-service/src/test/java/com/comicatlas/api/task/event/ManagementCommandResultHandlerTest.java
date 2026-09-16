@@ -2,6 +2,7 @@ package com.comicatlas.api.task.event;
 
 import com.comicatlas.api.task.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.task.service.ManagementTaskService;
+import com.comicatlas.api.task.service.ManagementResultApplicationService;
 import com.comicatlas.api.trash.service.TrashLifecycleCompletionService;
 import com.comicatlas.api.outbox.service.InboxService;
 import com.comicatlas.api.outbox.service.EventFingerprintService;
@@ -73,11 +74,15 @@ class ManagementCommandResultHandlerTest {
     private ManagementResultRouter managementResultRouter;
 
     @InjectMocks private ManagementCommandResultHandler handler;
+    @Spy @InjectMocks private ManagementResultApplicationService managementResultApplicationService;
 
     @Mock private Channel channel;
 
     @BeforeEach
     void setUp() {
+        managementResultApplicationService = new ManagementResultApplicationService(managementTaskService,
+                inboxService, transactionTemplate, eventFingerprintService, managementResultRouter);
+        ReflectionTestUtils.setField(handler, "managementResultApplicationService", managementResultApplicationService);
         ReflectionTestUtils.setField(handler, "managementResultRouter", managementResultRouter);
         // 事务模板直接执行回调；Inbox 未处理（幂等放行）
         lenient().doAnswer(invocation -> {

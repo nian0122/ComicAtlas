@@ -3,8 +3,8 @@ package com.comicatlas.api.exporter.service;
 import com.comicatlas.api.exporter.enums.ExportTaskStatus;
 import com.comicatlas.api.exporter.persistence.entity.ExportTask;
 import com.comicatlas.api.exporter.persistence.mapper.ExportTaskMapper;
-import com.comicatlas.api.task.enums.ManagementTaskStatus;
 import com.comicatlas.api.task.enums.TaskType;
+import com.comicatlas.api.task.enums.ManagementTaskStatus;
 import com.comicatlas.api.task.persistence.entity.ManagementTaskItem;
 import com.comicatlas.api.task.service.ManagementTaskService;
 import com.comicatlas.common.event.ExportTaskCompletedEvent;
@@ -30,7 +30,9 @@ public class ExportResultService {
     public void applyStarted(ExportTaskStartedEvent event) {
         ExportTask task = exportTaskMapper.selectById(event.taskId());
         if (task == null || task.getStatus() == ExportTaskStatus.SUCCESS
-                || task.getStatus() == ExportTaskStatus.FAILED) return;
+                || task.getStatus() == ExportTaskStatus.FAILED) {
+            return;
+        }
         if (task.getStatus() == ExportTaskStatus.PENDING) {
             task.setStatus(ExportTaskStatus.RUNNING);
             exportTaskMapper.updateById(task);
@@ -41,7 +43,9 @@ public class ExportResultService {
     @Transactional
     public void applyCompleted(ExportTaskCompletedEvent event) {
         ExportTask task = exportTaskMapper.selectById(event.taskId());
-        if (task == null || task.getStatus() == ExportTaskStatus.FAILED) return;
+        if (task == null || task.getStatus() == ExportTaskStatus.FAILED) {
+            return;
+        }
         if (task.getStatus() != ExportTaskStatus.SUCCESS) {
             task.setStatus(ExportTaskStatus.SUCCESS);
             task.setOutputRoot(event.outputRoot());
@@ -57,7 +61,9 @@ public class ExportResultService {
     @Transactional
     public void applyFailed(ExportTaskFailedEvent event) {
         ExportTask task = exportTaskMapper.selectById(event.taskId());
-        if (task == null || task.getStatus() == ExportTaskStatus.SUCCESS) return;
+        if (task == null || task.getStatus() == ExportTaskStatus.SUCCESS) {
+            return;
+        }
         if (task.getStatus() != ExportTaskStatus.FAILED) {
             task.setStatus(ExportTaskStatus.FAILED);
             task.setErrorMsg(event.errorMessage());
@@ -65,8 +71,7 @@ public class ExportResultService {
             exportTaskMapper.updateById(task);
         }
         updateItem(event.comicId(), ManagementTaskStatus.FAILED, event.errorMessage(), event.taskId());
-    }
-
+}
     private void updateItem(Long comicId, ManagementTaskStatus status, String errorMessage, Long exportTaskId) {
         ManagementTaskItem item = managementTaskService.findActiveItem(TARGET_TYPE_COMIC, comicId, TaskType.EXPORT);
         if (item != null) {

@@ -6,6 +6,9 @@ import com.comicatlas.api.exporter.dto.ExportTaskVO;
 import com.comicatlas.api.task.dto.OperationSubmitResultDTO;
 import com.comicatlas.api.exporter.dto.ExportArtifactVO;
 import com.comicatlas.api.exporter.service.ExportOperationService;
+import com.comicatlas.api.exporter.controller.ExportController;
+import com.comicatlas.api.exporter.service.ExportDirectoryService;
+import com.comicatlas.api.exporter.service.ExportDirectoryOpenResult;
 import com.comicatlas.api.media.service.HqDeleteOperationService;
 import com.comicatlas.api.media.service.LqOperationService;
 import com.comicatlas.api.media.service.TranscodeOperationService;
@@ -30,9 +33,11 @@ class StorageOperationControllerTest {
     private final HqDeleteOperationService hqService = new HqDeleteOperationService(commandService);
     private final TranscodeOperationService transcodeService = new TranscodeOperationService(commandService);
     private final ExportOperationService exportOperationService = mock(ExportOperationService.class);
+    private final ExportDirectoryService exportDirectoryService = mock(ExportDirectoryService.class);
     private final StorageOperationController controller =
             new StorageOperationController(lqService, hqService, transcodeService, exportOperationService, commandService);
-    private final MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+    private final MockMvc mvc = MockMvcBuilders.standaloneSetup(controller,
+            new ExportController(exportOperationService, exportDirectoryService)).build();
 
     @Test
     void generateComicLq_委托命令服务并返回提交结果() throws Exception {
@@ -212,10 +217,8 @@ class StorageOperationControllerTest {
 
     @Test
     void openDirExport_文件不存在返回404() throws Exception {
-        ExportTaskVO vo = new ExportTaskVO();
-        vo.setId(1L);
-        vo.setPhysicalPath("/nonexistent/dir");
-        when(exportOperationService.getTask(1L)).thenReturn(vo);
+        when(exportDirectoryService.open(1L)).thenReturn(
+                new ExportDirectoryOpenResult(ExportDirectoryOpenResult.Status.NOT_FOUND, "目录不存在"));
         mvc.perform(post("/api/manage/storage/export/tasks/1/open"))
                 .andExpect(status().isNotFound());
     }
