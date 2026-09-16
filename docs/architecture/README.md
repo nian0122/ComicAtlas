@@ -297,6 +297,7 @@ Gateway + API Service + Reading Service + Worker Service + Nginx
 | [后端代码分类](backend-package-organization.md) | 业务域、框架职责与文件归属 |
 | [后端待解耦清单](backend-decoupling.md) | 源码标记、拆分约束与回归要求 |
 | [后端三层架构检查](backend-layer-audit.md) | 接口层越界、持久化框架类型泄漏和处理约束 |
+| [后端实现问题标记](backend-implementation-issues.md) | 状态并发、事务、计算与异常处理问题 |
 | 发布、回滚和故障处理 | [operations/management.md](../operations/management.md) |
 
 0.2 时代的产品、导航、阅读、管理、领域、API、前端与迁移设计稿已统一移入 [历史架构归档](archive/v0.2/README.md)，用于追溯决策背景。临时实施计划不纳入当前架构入口。

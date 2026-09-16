@@ -161,6 +161,7 @@ public class RecoveryEventHandler {
 
                 // 同步统一任务项进度（0-100）
                 if (managementItem != null && totalSoFar > 0) {
+                    // TODO(IMPL-03): 分母 totalSoFar 是已处理数量，与分子通常相等，首本处理完即计算为 100%；应以批次总数计算并覆盖多本场景。
                     int progressPercent = Math.min(100,
                             (recovered + skipped + placeholder + errors) * 100 / totalSoFar);
                     managementTaskService.updateItemProgress(managementItem.getId(), 0, progressPercent, STAGE_RECOVERY);

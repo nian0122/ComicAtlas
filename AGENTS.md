@@ -35,6 +35,7 @@ comic-atlas/
 - 当前目录说明：[后端代码分类](docs/architecture/backend-package-organization.md)。
 - 待拆分代码以 `TODO(DECOUPLE-xx)` 标记，原因、目标职责与验证要求见 [后端待解耦清单](docs/architecture/backend-decoupling.md)。移动目录不代表已完成解耦。
 - 接口层越界与分页框架类型泄漏使用 `TODO(LAYER-xx)` 标记，参见 [后端三层架构检查](docs/architecture/backend-layer-audit.md)；正常 Service→Mapper 调用不算违规。
+- 具体实现缺陷使用 `TODO(IMPL-xx)` 标记，触发场景与回归要求见 [后端实现问题标记](docs/architecture/backend-implementation-issues.md)；标记本身不代表修复。
 
 ## WHERE TO LOOK
 | 任务 | 位置 | Notes |
