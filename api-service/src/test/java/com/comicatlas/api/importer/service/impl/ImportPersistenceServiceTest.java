@@ -3,10 +3,15 @@ package com.comicatlas.api.importer.service.impl;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.persistence.comic.entity.Catalog;
+import com.comicatlas.persistence.comic.entity.Category;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.entity.Media;
+import com.comicatlas.persistence.comic.entity.Tag;
 import com.comicatlas.persistence.comic.mapper.CatalogMapper;
+import com.comicatlas.persistence.comic.mapper.CategoryMapper;
+import com.comicatlas.persistence.comic.mapper.ComicTagMapper;
+import com.comicatlas.persistence.comic.mapper.TagMapper;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.persistence.comic.mapper.MediaMapper;
@@ -90,6 +95,9 @@ class ImportPersistenceServiceTest {
     @Mock private TransactionTemplate transactionTemplate;
     @Mock private ComicMapper comicMapper;
     @Mock private CatalogMapper catalogMapper;
+    @Mock private CategoryMapper categoryMapper;
+    @Mock private ComicTagMapper comicTagMapper;
+    @Mock private TagMapper tagMapper;
     @Mock private ChapterMapper chapterMapper;
     @Mock private MediaMapper mediaMapper;
     @Mock private ImportTaskMapper taskMapper;
@@ -351,6 +359,49 @@ class ImportPersistenceServiceTest {
         assertThat(published.chapterId()).isEqualTo(chapterId);
         assertThat(published.sourceDir()).isEqualTo("hq/.staging/10/100/0");
         assertThat(published.targetDir()).isEqualTo("hq/100/" + chapterId);
+    }
+
+    @Test
+    @DisplayName("completed 导入：缺失分类时写入已有分类，并把关键词写成 AUTO 标签")
+    void persistCompleted_autoEnrichesCategoryAndTags() {
+        runInTransaction();
+        when(taskMapper.selectById(10L)).thenReturn(task(ImportTaskStatus.PARSING));
+        when(comicMapper.selectById(100L)).thenReturn(comic(ComicStatus.IMPORTING));
+        when(chapterMapper.countByComicId(anyLong())).thenReturn(0L);
+        stubCatalogInsert();
+        stubChapterInsert();
+        stubMediaBatchInsert();
+
+        Category category = new Category();
+        category.setId(7L);
+        category.setName("彩色漫画");
+        when(categoryMapper.selectAllOrderedBySortOrder()).thenReturn(List.of(category));
+        when(comicTagMapper.selectTagIdsByComicId(100L)).thenReturn(List.of());
+        doAnswer(invocation -> {
+            Tag tag = invocation.getArgument(0);
+            tag.setId(idSeq.incrementAndGet());
+            return 1;
+        }).when(tagMapper).insert(any(Tag.class));
+
+        Map<String, Object> metadata = metadataV3();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> comicData = (Map<String, Object>) metadata.get("comic");
+        comicData.put("title", "彩色漫画合集");
+        comicData.put("description", "短篇作品");
+        comicData.put("tags", List.of());
+
+        service.persistCompleted(completedEvent(), metadata);
+
+        ArgumentCaptor<Comic> comicCaptor = ArgumentCaptor.forClass(Comic.class);
+        verify(comicMapper).updateById(comicCaptor.capture());
+        assertThat(comicCaptor.getValue().getCategoryId()).isEqualTo(7L);
+        assertThat(comicCaptor.getValue().getCategory()).isEqualTo("彩色漫画");
+        ArgumentCaptor<Tag> tagCaptor = ArgumentCaptor.forClass(Tag.class);
+        verify(tagMapper, times(3)).insert(tagCaptor.capture());
+        assertThat(tagCaptor.getAllValues()).extracting(Tag::getType)
+                .containsOnly("AUTO");
+        assertThat(tagCaptor.getAllValues()).extracting(Tag::getName)
+                .containsExactlyInAnyOrder("彩色", "合集", "短篇");
     }
 
     @Test
