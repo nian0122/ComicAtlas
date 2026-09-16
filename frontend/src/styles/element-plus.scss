@@ -747,6 +747,71 @@
   background: var(--bg-secondary) !important;
 }
 
+/* Alert 也必须遵循暗色画布；默认浅色底会在接口报错时形成整块白框。 */
+.el-alert {
+  --el-alert-padding: 12px 14px;
+  --el-alert-title-font-size: var(--text-sm);
+
+  color: var(--text-secondary) !important;
+  background: var(--bg-surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-sm);
+}
+
+.el-alert__title,
+.el-alert__description,
+.el-alert__close-btn {
+  color: var(--text-secondary) !important;
+}
+
+.el-alert__icon {
+  color: var(--text-muted) !important;
+}
+
+.el-alert--error {
+  background: color-mix(in srgb, var(--danger) 12%, var(--bg-surface)) !important;
+  border-color: color-mix(in srgb, var(--danger) 46%, var(--border)) !important;
+}
+
+.el-alert--error .el-alert__title,
+.el-alert--error .el-alert__icon,
+.el-alert--error .el-alert__close-btn {
+  color: var(--danger) !important;
+}
+
+.el-alert--success {
+  background: color-mix(in srgb, var(--success) 12%, var(--bg-surface)) !important;
+  border-color: color-mix(in srgb, var(--success) 46%, var(--border)) !important;
+}
+
+.el-alert--success .el-alert__title,
+.el-alert--success .el-alert__icon,
+.el-alert--success .el-alert__close-btn {
+  color: var(--success) !important;
+}
+
+.el-alert--warning {
+  background: color-mix(in srgb, var(--warning) 12%, var(--bg-surface)) !important;
+  border-color: color-mix(in srgb, var(--warning) 46%, var(--border)) !important;
+}
+
+.el-alert--warning .el-alert__title,
+.el-alert--warning .el-alert__icon,
+.el-alert--warning .el-alert__close-btn {
+  color: var(--warning) !important;
+}
+
+.el-alert--info {
+  background: color-mix(in srgb, var(--info) 12%, var(--bg-surface)) !important;
+  border-color: color-mix(in srgb, var(--info) 46%, var(--border)) !important;
+}
+
+.el-alert--info .el-alert__title,
+.el-alert--info .el-alert__icon,
+.el-alert--info .el-alert__close-btn {
+  color: var(--info) !important;
+}
+
 /* ---------------------------------------------------------------------------
  * Table & Drawer
  * ------------------------------------------------------------------------- */
