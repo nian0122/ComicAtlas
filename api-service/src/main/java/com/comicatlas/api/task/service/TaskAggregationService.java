@@ -3,8 +3,6 @@ package com.comicatlas.api.task.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 // 条件更新由任务聚合服务维护状态机与事务边界，Mapper 执行参数化更新。
 // 架构说明：Service 直接构造 LambdaUpdateWrapper 聚合更新任务状态；条件更新应收口到 ManagementTaskMapper。
-// TODO(MAPPER-02): Service 直接构造 LambdaUpdateWrapper 聚合更新任务状态；条件更新应收口到 ManagementTaskMapper。
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.api.task.persistence.entity.ManagementTask;
 import com.comicatlas.api.task.persistence.entity.ManagementTaskItem;
 import com.comicatlas.api.task.enums.ManagementTaskStatus;
@@ -55,16 +53,14 @@ public class TaskAggregationService {
         updateTaskStatus(task, total, successCount, failureCount, cancelledCount, hasRunning, hasQueued);
 
         task.setUpdatedAt(LocalDateTime.now());
-        taskMapper.updateById(task);
         String aggregatedError = task.getStatus() == ManagementTaskStatus.FAILED
                 || task.getStatus() == ManagementTaskStatus.PARTIALLY_SUCCEEDED
                 ? items.stream().filter(item -> item.getStatus() == ManagementTaskStatus.FAILED)
                 .map(ManagementTaskItem::getErrorMessage)
                 .filter(message -> message != null && !message.isBlank())
                 .findFirst().orElse(null) : null;
-        taskMapper.update(null, new LambdaUpdateWrapper<ManagementTask>()
-                .eq(ManagementTask::getId, taskId)
-                .set(ManagementTask::getErrorMessage, aggregatedError));
+        task.setErrorMessage(aggregatedError);
+        taskMapper.updateById(task);
     }
 
     private long count(List<ManagementTaskItem> items, ManagementTaskStatus status) {
