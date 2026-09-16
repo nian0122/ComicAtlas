@@ -7,12 +7,24 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Update;
 
 import java.util.List;
+import java.time.LocalDateTime;
 
 /**
  * 管理任务目标项 Mapper。
  */
 @Mapper
 public interface ManagementTaskItemMapper extends BaseMapper<ManagementTaskItem> {
+
+    @Update("UPDATE management_task_item SET status = 'SUCCEEDED', completed_at = #{completedAt}, lock_key = NULL, updated_at = #{updatedAt} WHERE id = #{itemId} AND attempt = #{attempt} AND status NOT IN ('CANCELLED', 'SUCCEEDED', 'PARTIALLY_SUCCEEDED', 'FAILED')")
+    int markSucceededIfActive(@Param("itemId") Long itemId, @Param("attempt") int attempt,
+                              @Param("completedAt") LocalDateTime completedAt,
+                              @Param("updatedAt") LocalDateTime updatedAt);
+
+    @Update("UPDATE management_task_item SET status = 'FAILED', error_message = #{errorMessage}, completed_at = #{completedAt}, lock_key = NULL, updated_at = #{updatedAt} WHERE id = #{itemId} AND attempt = #{attempt} AND status NOT IN ('CANCELLED', 'SUCCEEDED', 'PARTIALLY_SUCCEEDED', 'FAILED')")
+    int markFailedIfActive(@Param("itemId") Long itemId, @Param("attempt") int attempt,
+                           @Param("errorMessage") String errorMessage,
+                           @Param("completedAt") LocalDateTime completedAt,
+                           @Param("updatedAt") LocalDateTime updatedAt);
 
     /** 绑定回收清单引用，供后续 Worker 命令读取。 */
     @Update("UPDATE management_task_item SET result_ref_type = 'TRASH_MANIFEST', result_ref_id = #{manifestTaskId} WHERE id = #{itemId}")

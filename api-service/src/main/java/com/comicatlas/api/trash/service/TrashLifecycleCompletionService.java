@@ -1,10 +1,6 @@
 package com.comicatlas.api.trash.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-// 条件更新由回收结果服务维护生命周期状态机，Mapper 执行参数化更新。
-// 架构说明：Service 直接构造 LambdaUpdateWrapper 更新回收生命周期；状态更新应收口到对应 Mapper。
-// TODO(MAPPER-02): Service 直接构造 LambdaUpdateWrapper 更新回收生命周期；状态更新应收口到对应 Mapper。
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.storage.service.ComicStatsService;
 import com.comicatlas.common.constant.StorageRootKeys;
@@ -103,18 +99,12 @@ public class TrashLifecycleCompletionService {
         }
         Long chapterId = media.getChapterId();
         String originalHqPath = media.getHqPath();
-        LambdaUpdateWrapper<Media> mediaUpdate = new LambdaUpdateWrapper<Media>()
-                .eq(Media::getId, mediaId)
-                .set(Media::getStatus, MediaLifecycleStatus.TRASHED)
-                .set(Media::getTrashedAt, LocalDateTime.now())
-                .set(Media::getHqStatus, HqStatus.DELETED);
+        String trashRef = null;
         if (originalHqPath != null && !originalHqPath.isBlank()) {
-            String trashRef = TRASH_REF_PREFIX + mediaId + "/" + ev.taskId() + TRASH_HQ_MARKER + originalHqPath;
-            mediaUpdate.set(Media::getHqRoot, ROOT_KEY_TRASH).set(Media::getHqPath, trashRef);
-        } else {
-            mediaUpdate.set(Media::getHqRoot, null).set(Media::getHqPath, null);
+            trashRef = TRASH_REF_PREFIX + mediaId + "/" + ev.taskId() + TRASH_HQ_MARKER + originalHqPath;
         }
-        mediaMapper.update(null, mediaUpdate);
+        mediaMapper.markTrashed(mediaId, LocalDateTime.now(),
+                trashRef == null ? null : ROOT_KEY_TRASH, trashRef);
         comicStatsService.refreshByChapter(chapterId);
         Chapter chapter = chapterMapper.selectById(chapterId);
         if (chapter != null) {
@@ -164,14 +154,7 @@ public class TrashLifecycleCompletionService {
                 ? media.getOriginalPageNumber() : media.getPageNumber();
         targetPage = firstFreePageNumber(chapterId, targetPage, mediaId);
 
-        mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
-                .eq(Media::getId, mediaId)
-                .set(Media::getStatus, MediaLifecycleStatus.READY)
-                .set(Media::getHqStatus, HqStatus.READY)
-                .set(Media::getHqRoot, StorageRootKeys.HQ)
-                .set(Media::getHqPath, originalPath)
-                .set(Media::getPageNumber, targetPage)
-                .set(Media::getTrashedAt, null));
+        mediaMapper.markRestored(mediaId, StorageRootKeys.HQ, originalPath, targetPage);
         comicStatsService.refreshByChapter(chapterId);
         Chapter chapter = chapterMapper.selectById(chapterId);
         if (chapter != null) {

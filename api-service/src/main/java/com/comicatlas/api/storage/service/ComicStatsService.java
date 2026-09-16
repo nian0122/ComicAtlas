@@ -1,10 +1,6 @@
 package com.comicatlas.api.storage.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-// 条件更新由统计服务维护派生数据一致性，Mapper 执行参数化更新。
-// 架构说明：Service 直接构造 LambdaUpdateWrapper 更新派生统计；条件更新应收口到对应 Mapper。
-// TODO(MAPPER-02): Service 直接构造 LambdaUpdateWrapper 更新派生统计；条件更新应收口到对应 Mapper。
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.contract.common.enums.HqStatus;
 import com.comicatlas.contract.common.enums.LqStatus;
 import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
@@ -59,9 +55,7 @@ public class ComicStatsService {
         long pageCount = mediaMapper.selectCount(new LambdaQueryWrapper<Media>()
                 .eq(Media::getChapterId, chapterId)
                 .notIn(Media::getStatus, MediaLifecycleStatus.DELETED, MediaLifecycleStatus.TRASHED));
-        chapterMapper.update(null, new LambdaUpdateWrapper<Chapter>()
-                .eq(Chapter::getId, chapterId)
-                .set(Chapter::getPageCount, (int) pageCount));
+        chapterMapper.updatePageCount(chapterId, (int) pageCount);
         Comic comic = comicMapper.selectById(chapter.getComicId());
         if (comic == null) {
             return;
@@ -136,10 +130,7 @@ public class ComicStatsService {
                 new LambdaQueryWrapper<Media>().in(Media::getChapterId, chapterIds));
         long hqSize = calculateHqSize(mediaItems);
         long lqSize = calculateLqSize(mediaItems);
-        comicMapper.update(null, new LambdaUpdateWrapper<Comic>()
-                .eq(Comic::getId, comicId)
-                .set(Comic::getHqSize, hqSize)
-                .set(Comic::getLqSize, lqSize));
+        comicMapper.updateStorageStats(comicId, hqSize, lqSize);
         log.debug("重算 comic 统计: comicId={}, hqSize={}, lqSize={}", comicId, hqSize, lqSize);
     }
 
@@ -152,9 +143,7 @@ public class ComicStatsService {
         long totalPages = mediaMapper.selectCount(new LambdaQueryWrapper<Media>()
                 .in(Media::getChapterId, chapterIds)
                 .notIn(Media::getStatus, MediaLifecycleStatus.DELETED, MediaLifecycleStatus.TRASHED));
-        comicMapper.update(null, new LambdaUpdateWrapper<Comic>()
-                .eq(Comic::getId, comicId)
-                .set(Comic::getTotalPages, (int) totalPages));
+        comicMapper.updateTotalPages(comicId, (int) totalPages);
     }
 
     private long calculateHqSize(List<Media> mediaItems) {
@@ -173,11 +162,7 @@ public class ComicStatsService {
     }
 
     private void updateComicStats(Long comicId, int totalPages, long hqSize, long lqSize) {
-        comicMapper.update(null, new LambdaUpdateWrapper<Comic>()
-                .eq(Comic::getId, comicId)
-                .set(Comic::getTotalPages, totalPages)
-                .set(Comic::getHqSize, hqSize)
-                .set(Comic::getLqSize, lqSize));
+        comicMapper.updateAllStats(comicId, totalPages, hqSize, lqSize);
     }
 
     private static <T> List<List<T>> partition(List<T> source, int batchSize) {
