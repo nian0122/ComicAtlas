@@ -6,8 +6,6 @@ import com.comicatlas.api.upload.config.UploadProperties;
 
 // 条件更新由上传业务服务维护会话状态机与并发边界，Mapper 执行参数化更新。
 // 架构说明：Service 直接构造 LambdaUpdateWrapper 更新上传文件；条件更新应收口到 UploadFileMapper。
-// TODO(MAPPER-02): Service 直接构造 LambdaUpdateWrapper 更新上传文件；条件更新应收口到 UploadFileMapper。
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.storage.ApiStorageProperties;
@@ -145,10 +143,7 @@ public class UploadStorageService {
             }
             String merged = RangeTracker.merge(file.getReceivedRanges(), start, end);
             long received = maxEnd(merged) + 1;
-            uploadFileMapper.update(null, new LambdaUpdateWrapper<UploadFile>()
-                    .eq(UploadFile::getId, file.getId())
-                    .set(UploadFile::getReceivedBytes, received)
-                    .set(UploadFile::getReceivedRanges, merged));
+            uploadFileMapper.updateReceivedRange(file.getId(), received, merged);
             file.setReceivedBytes(received);
             file.setReceivedRanges(merged);
             return merged;
