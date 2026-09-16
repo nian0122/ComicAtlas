@@ -1,10 +1,8 @@
 package com.comicatlas.api.metadata.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.catalog.cache.CacheEvictor;
 import com.comicatlas.contract.comic.cache.ComicReferenceCache;
 import com.comicatlas.contract.comic.dto.TagDTO;
-import com.comicatlas.persistence.comic.entity.ComicTag;
 import com.comicatlas.persistence.comic.entity.Tag;
 import com.comicatlas.persistence.comic.mapper.ComicTagMapper;
 import com.comicatlas.persistence.comic.mapper.TagMapper;
@@ -37,8 +35,7 @@ public class TagManagementServiceImpl implements TagManagementService {
     @Transactional
     public TagDTO createTag(String name) {
         // check duplicate by name
-        Long count = tagMapper.selectCount(
-                new LambdaQueryWrapper<Tag>().eq(Tag::getName, name));
+        long count = tagMapper.countByName(name);
         if (count > 0) {
             throw new BusinessException(HttpStatusCodes.CONFLICT, "标签已存在: " + name);
         }
@@ -60,8 +57,7 @@ public class TagManagementServiceImpl implements TagManagementService {
         }
 
         // check if tag is bound to any comic
-        Long boundCount = comicTagMapper.selectCount(
-                new LambdaQueryWrapper<ComicTag>().eq(ComicTag::getTagId, id));
+        long boundCount = comicTagMapper.countByTagId(id);
         if (boundCount > 0) {
             throw new BusinessException(HttpStatusCodes.CONFLICT, "标签已被漫画使用，无法删除");
         }
