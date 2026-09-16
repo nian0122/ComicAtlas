@@ -8,7 +8,6 @@ import com.comicatlas.common.dto.TrashManifestItemDTO;
 import com.comicatlas.common.event.ManagementCommandCompletedEvent;
 import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.contract.common.enums.ComicStatus;
-import com.comicatlas.contract.common.enums.HqStatus;
 import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
 import com.comicatlas.persistence.comic.entity.Catalog;
 import com.comicatlas.persistence.comic.entity.Chapter;

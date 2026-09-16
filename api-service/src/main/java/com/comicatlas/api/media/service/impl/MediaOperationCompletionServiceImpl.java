@@ -9,7 +9,6 @@ import com.comicatlas.common.event.payload.LqSizeResult;
 import com.comicatlas.common.event.payload.TranscodeMediaInfo;
 import com.comicatlas.contract.common.enums.HqStatus;
 import com.comicatlas.contract.common.enums.LqStatus;
-import com.comicatlas.contract.common.enums.TranscodeStatus;
 import com.comicatlas.persistence.comic.entity.Media;
 import com.comicatlas.persistence.comic.mapper.MediaMapper;
 import com.comicatlas.api.media.service.MediaOperationCompletionService;

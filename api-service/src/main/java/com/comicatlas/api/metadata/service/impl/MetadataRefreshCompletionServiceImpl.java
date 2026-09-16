@@ -19,7 +19,6 @@ import com.comicatlas.common.event.MetadataRefreshScanCompletedEvent;
 import com.comicatlas.api.task.enums.TaskType;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.shared.exception.SnapshotUnavailableException;
-import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
