@@ -3,8 +3,6 @@ package com.comicatlas.api.catalog.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 // 条件更新由事务业务服务维护状态机与并发边界，Mapper 执行参数化更新。
 // 架构说明：ServiceImpl 直接构造 LambdaUpdateWrapper 更新章节；条件更新应收口到 ChapterMapper。
-// TODO(MAPPER-02): ServiceImpl 直接构造 LambdaUpdateWrapper 更新章节；条件更新应收口到 ChapterMapper。
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.catalog.dto.ChapterCreateRequest;
 import com.comicatlas.api.catalog.dto.ChapterRenameRequest;
@@ -159,9 +157,7 @@ public class ChapterManagementServiceImpl implements ChapterManagementService {
         reordered.add(pos, target);
 
         // 阶段一：临时偏移，全部置为唯一负值，避免阶段二唯一键瞬时冲突
-        chapterMapper.update(null, new LambdaUpdateWrapper<Chapter>()
-                .eq(Chapter::getComicId, comicId)
-                .setSql("global_order = -id"));
+        chapterMapper.updateGlobalOrderToTemporaryNegative(comicId);
 
         // 阶段二：按新顺序写回 1..N，并重算各目录内 sort_order
         Map<Long, Integer> sortCounter = new HashMap<>();

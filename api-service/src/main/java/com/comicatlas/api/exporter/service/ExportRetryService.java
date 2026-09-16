@@ -2,8 +2,6 @@ package com.comicatlas.api.exporter.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 // 架构说明：Service 直接构造 LambdaUpdateWrapper 重置导出任务；条件更新应收口到 ExportTaskMapper。
-// TODO(MAPPER-02): Service 直接构造 LambdaUpdateWrapper 重置导出任务；条件更新应收口到 ExportTaskMapper。
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.api.exporter.enums.ExportTaskStatus;
 import com.comicatlas.api.exporter.persistence.entity.ExportTask;
 import com.comicatlas.api.exporter.persistence.mapper.ExportTaskMapper;
@@ -35,12 +33,7 @@ public class ExportRetryService {
             log.warn("导出专表不存在，跳过导出重试入队: taskId={}, itemId={}", taskId, item.getId());
             return;
         }
-        exportTaskMapper.update(null, new LambdaUpdateWrapper<ExportTask>()
-                .eq(ExportTask::getId, exportTask.getId())
-                .set(ExportTask::getStatus, ExportTaskStatus.PENDING)
-                .set(ExportTask::getProgress, 0)
-                .set(ExportTask::getErrorMsg, null)
-                .set(ExportTask::getCompletedAt, null));
+        exportTaskMapper.resetForRetry(exportTask.getId(), ExportTaskStatus.PENDING);
         ExportTaskCreatedEvent event = new ExportTaskCreatedEvent(UUID.randomUUID(), Instant.now(),
                 exportTask.getId(), exportTask.getComicId(),
                 exportTask.getFormat() == null ? "ZIP" : exportTask.getFormat());
