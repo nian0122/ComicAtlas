@@ -12,7 +12,9 @@ pnpm dev
 pnpm check
 ```
 
-`pnpm check` 会依次执行类型检查、ESLint、配置文件格式检查和生产构建。
+`pnpm check` 是提交前统一门禁，会依次执行 TypeScript 类型检查、ESLint、全源码 Prettier 格式检查、Vitest 单元测试、Playwright Chromium E2E 测试和生产构建。E2E 脚本会按 `playwright.config.ts` 自动启动或复用本地 Vite 服务；CI 环境设置 `CI` 后会等待独立服务并启用失败重试。
+
+单独执行 `pnpm format:check` 会检查整个前端源码树，并自动兼容仓库现有的 LF/CRLF 换行风格；`node_modules`、构建产物和测试产物由 `.prettierignore` 排除。需要自动修复格式时执行 `pnpm format`。
 
 ## 目录约定
 

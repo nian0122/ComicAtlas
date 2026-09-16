@@ -100,10 +100,11 @@ comic-atlas/
 | 存储管理 API | `api-service/.../storage/controller/AdminStorageController.java` | stats/comics/chapters |
 | 存储查询 | `api-service/.../storage/service/StorageQueryService.java` | 聚合 HQ/LQ 大小+状态 |
 | 前端路由 | `frontend/src/router/index.ts` | 14 routes（reading 6 + management 8） |
-| Pinia Store | `frontend/src/stores/` | comic/reader/import/history/tag/app/management-comic/storage/category/reader-settings + reading.ts barrel |
-| API 服务 | `frontend/src/services/api.ts` | comic/catalog/reader/import/lq/hq/admin |
-| 存储服务 | `frontend/src/services/storage.ts` | fetchComics/fetchSummary/fetchChapters/executeOperation |
-| 类型定义 | `frontend/src/types/index.ts` | CatalogNode/ChapterRef/ReaderDTO 等 + 存储类型 |
+<!-- 前端位置说明已同步至 frontend/src/features、entities、shared 与 services/http.ts 分层。 -->
+| Pinia Store | `frontend/src/features/*/store.ts` | 按领域拆分 comic/reader/import/history/tag/storage/category/task/recovery |
+| API 服务 | `frontend/src/features/*/api.ts`、`frontend/src/services/http.ts` | 按领域封装 API，http.ts 统一请求与错误处理 |
+| 存储服务 | `frontend/src/features/storage/service.ts` | 存储查询、操作与转码编排 |
+| 类型定义 | `frontend/src/entities/*`、`frontend/src/features/*/types.ts`、`frontend/src/shared/api/types.ts` | 按实体、领域和共享协议分层 |
 | 视频播放器 | `frontend/src/views/reading/reader/components/VideoPlayer.vue` | VIDEO 类型播放 |
 
 ## IMPORT FLOW

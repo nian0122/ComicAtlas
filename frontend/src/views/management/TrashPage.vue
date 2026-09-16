@@ -1,6 +1,10 @@
 <template>
   <div class="trash-page">
-    <ManagementPageHeader title="回收站" description="统一查看已回收的漫画、章节和媒体，并在保留期内恢复或永久清理。" eyebrow="LIFECYCLE / TRASH">
+    <ManagementPageHeader
+      title="回收站"
+      description="统一查看已回收的漫画、章节和媒体，并在保留期内恢复或永久清理。"
+      eyebrow="LIFECYCLE / TRASH"
+    >
       <el-button :loading="loading" @click="loadItems">刷新</el-button>
     </ManagementPageHeader>
 
@@ -23,28 +27,16 @@
 
     <ManagementPanel flush class="trash-card" aria-label="回收站内容">
       <PanelHeader class="trash-heading" title="回收内容" :description="`${total} 项回收内容`">
-          <span v-if="selectedItems.length" class="selection-count">已选 {{ selectedItems.length }} 项</span>
-          <el-button v-if="selectedItems.length" text @click="clearSelection">清空选择</el-button>
-          <el-button
-            v-if="selectedItems.length"
-            type="primary"
-            plain
-            :loading="batchBusy"
-            @click="restoreSelected"
-          >
-            批量恢复
-          </el-button>
-          <el-button
-            v-if="selectedItems.length"
-            type="danger"
-            plain
-            :loading="batchBusy"
-            @click="purgeSelected"
-          >
-            批量永久清理
-          </el-button>
-          <span v-else class="retention-note">勾选内容后可批量恢复或永久清理</span>
-        </PanelHeader>
+        <span v-if="selectedItems.length" class="selection-count">已选 {{ selectedItems.length }} 项</span>
+        <el-button v-if="selectedItems.length" text @click="clearSelection">清空选择</el-button>
+        <el-button v-if="selectedItems.length" type="primary" plain :loading="batchBusy" @click="restoreSelected">
+          批量恢复
+        </el-button>
+        <el-button v-if="selectedItems.length" type="danger" plain :loading="batchBusy" @click="purgeSelected">
+          批量永久清理
+        </el-button>
+        <span v-else class="retention-note">勾选内容后可批量恢复或永久清理</span>
+      </PanelHeader>
 
       <el-table
         ref="trashTableRef"
@@ -62,7 +54,7 @@
         <el-table-column label="内容" min-width="300">
           <template #default="{ row }">
             <div class="comic-cell">
-              <img v-if="coverUrl(row)" :src="coverUrl(row) || undefined" alt="" @error="hideBrokenImage">
+              <img v-if="coverUrl(row)" :src="coverUrl(row) || undefined" alt="" @error="hideBrokenImage" />
               <div>
                 <strong>{{ row.title }}</strong>
                 <span>{{ row.subtitle || '—' }}</span>
@@ -81,8 +73,22 @@
         </el-table-column>
         <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
-            <el-button link type="primary" :loading="busyId === row.id" :disabled="row.status !== 'TRASHED'" @click="restore(row)">恢复</el-button>
-            <el-button link type="danger" :loading="busyId === row.id" :disabled="row.status !== 'TRASHED'" @click="purge(row)">永久清理</el-button>
+            <el-button
+              link
+              type="primary"
+              :loading="busyId === row.id"
+              :disabled="row.status !== 'TRASHED'"
+              @click="restore(row)"
+              >恢复</el-button
+            >
+            <el-button
+              link
+              type="danger"
+              :loading="busyId === row.id"
+              :disabled="row.status !== 'TRASHED'"
+              @click="purge(row)"
+              >永久清理</el-button
+            >
           </template>
         </el-table-column>
       </el-table>
@@ -129,13 +135,31 @@ const busyId = ref<number | null>(null)
 const batchBusy = ref(false)
 
 function statusLabel(value: string): string {
-  return ({ TRASHED: '已回收', TRASHING: '回收中', RESTORING: '恢复中', PURGING: '永久清理中' } as Record<string, string>)[value] || value
+  return (
+    ({ TRASHED: '已回收', TRASHING: '回收中', RESTORING: '恢复中', PURGING: '永久清理中' } as Record<string, string>)[
+      value
+    ] || value
+  )
 }
-function targetTypeLabel(value: TrashContentVO['targetType']): string { return ({ COMIC: '漫画', CHAPTER: '章节', MEDIA: '媒体' })[value] }
-function relatedId(row: TrashContentVO): string { return row.targetType === 'COMIC' ? '—' : row.targetType === 'CHAPTER' ? `漫画 ${row.comicId}` : `章节 ${row.chapterId}` }
-function rowKey(row: TrashContentVO): string { return `${row.targetType}-${row.targetId}` }
-function isSelectable(row: TrashContentVO): boolean { return row.status === 'TRASHED' }
-function handleSelectionChange(rows: TrashContentVO[]): void { selectedItems.value = rows.filter((row) => row.status === 'TRASHED') }
+function targetTypeLabel(value: TrashContentVO['targetType']): string {
+  return { COMIC: '漫画', CHAPTER: '章节', MEDIA: '媒体' }[value]
+}
+function relatedId(row: TrashContentVO): string {
+  return row.targetType === 'COMIC'
+    ? '—'
+    : row.targetType === 'CHAPTER'
+      ? `漫画 ${row.comicId}`
+      : `章节 ${row.chapterId}`
+}
+function rowKey(row: TrashContentVO): string {
+  return `${row.targetType}-${row.targetId}`
+}
+function isSelectable(row: TrashContentVO): boolean {
+  return row.status === 'TRASHED'
+}
+function handleSelectionChange(rows: TrashContentVO[]): void {
+  selectedItems.value = rows.filter((row) => row.status === 'TRASHED')
+}
 function clearSelection(): void {
   trashTableRef.value?.clearSelection()
   selectedItems.value = []
@@ -143,20 +167,29 @@ function clearSelection(): void {
 function coverUrl(row: TrashContentVO): string | null {
   return row.coverUrl || null
 }
-function hideBrokenImage(event: Event): void { (event.currentTarget as HTMLImageElement).hidden = true }
+function hideBrokenImage(event: Event): void {
+  ;(event.currentTarget as HTMLImageElement).hidden = true
+}
 function formatDate(value: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
   const pad = (part: number): string => String(part).padStart(2, '0')
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
 }
-function errorMessage(reason: unknown): string { return reason instanceof Error ? reason.message : '回收站加载失败' }
+function errorMessage(reason: unknown): string {
+  return reason instanceof Error ? reason.message : '回收站加载失败'
+}
 
 async function loadItems(): Promise<void> {
   loading.value = true
   error.value = ''
   try {
-    const response = await trashApi.list({ page: page.value, size: pageSize, keyword: keyword.value.trim() || undefined, status: status.value })
+    const response = await trashApi.list({
+      page: page.value,
+      size: pageSize,
+      keyword: keyword.value.trim() || undefined,
+      status: status.value,
+    })
     items.value = response.data.records
     total.value = response.data.total
     clearSelection()
@@ -185,16 +218,23 @@ async function restoreSelected(): Promise<void> {
   const rows = selectedItems.value.filter((row) => row.status === 'TRASHED')
   if (!rows.length) return
   try {
-    await ElMessageBox.confirm(`确定恢复已选的 ${rows.length} 项内容？`, '批量恢复', { type: 'warning', confirmButtonText: '恢复' })
+    await ElMessageBox.confirm(`确定恢复已选的 ${rows.length} 项内容？`, '批量恢复', {
+      type: 'warning',
+      confirmButtonText: '恢复',
+    })
     batchBusy.value = true
     const results = await Promise.allSettled(rows.map((row) => submitRestore(row)))
     const successCount = results.filter((result) => result.status === 'fulfilled').length
     const failureCount = results.length - successCount
-    ElMessage[failureCount ? 'warning' : 'success'](failureCount ? `${successCount} 项已提交，${failureCount} 项失败` : `${successCount} 项恢复任务已提交`)
+    ElMessage[failureCount ? 'warning' : 'success'](
+      failureCount ? `${successCount} 项已提交，${failureCount} 项失败` : `${successCount} 项恢复任务已提交`,
+    )
     await loadItems()
   } catch (reason: unknown) {
     if (reason !== 'cancel') ElMessage.error(errorMessage(reason))
-  } finally { batchBusy.value = false }
+  } finally {
+    batchBusy.value = false
+  }
 }
 
 async function purgeSelected(): Promise<void> {
@@ -211,57 +251,132 @@ async function purgeSelected(): Promise<void> {
     const results = await Promise.allSettled(rows.map((row) => submitPurge(row, token)))
     const successCount = results.filter((result) => result.status === 'fulfilled').length
     const failureCount = results.length - successCount
-    ElMessage[failureCount ? 'warning' : 'success'](failureCount ? `${successCount} 项已提交，${failureCount} 项失败` : `${successCount} 项永久清理任务已提交`)
+    ElMessage[failureCount ? 'warning' : 'success'](
+      failureCount ? `${successCount} 项已提交，${failureCount} 项失败` : `${successCount} 项永久清理任务已提交`,
+    )
     await loadItems()
   } catch (reason: unknown) {
     if (reason !== 'cancel') ElMessage.error(errorMessage(reason))
-  } finally { batchBusy.value = false }
+  } finally {
+    batchBusy.value = false
+  }
 }
 
-function applyFilters(): void { page.value = 1; void loadItems() }
-function resetFilters(): void { keyword.value = ''; status.value = 'TRASHED'; applyFilters() }
+function applyFilters(): void {
+  page.value = 1
+  void loadItems()
+}
+function resetFilters(): void {
+  keyword.value = ''
+  status.value = 'TRASHED'
+  applyFilters()
+}
 
 async function restore(row: TrashContentVO): Promise<void> {
   try {
-    await ElMessageBox.confirm(`确定恢复「${row.title}」？`, `恢复${targetTypeLabel(row.targetType)}`, { type: 'warning', confirmButtonText: '恢复' })
+    await ElMessageBox.confirm(`确定恢复「${row.title}」？`, `恢复${targetTypeLabel(row.targetType)}`, {
+      type: 'warning',
+      confirmButtonText: '恢复',
+    })
     busyId.value = row.targetId
     await submitRestore(row)
     ElMessage.success('恢复任务已提交')
     await loadItems()
   } catch (reason: unknown) {
     if (reason !== 'cancel') ElMessage.error(errorMessage(reason))
-  } finally { busyId.value = null }
+  } finally {
+    busyId.value = null
+  }
 }
 
 async function purge(row: TrashContentVO): Promise<void> {
   try {
-    const result = await ElMessageBox.prompt('请输入永久清理确认 token。永久清理不可恢复。', `永久清理${targetTypeLabel(row.targetType)}`, { type: 'error', inputPlaceholder: '确认 token' })
+    const result = await ElMessageBox.prompt(
+      '请输入永久清理确认 token。永久清理不可恢复。',
+      `永久清理${targetTypeLabel(row.targetType)}`,
+      { type: 'error', inputPlaceholder: '确认 token' },
+    )
     busyId.value = row.targetId
     await submitPurge(row, result.value.trim())
     ElMessage.success('永久清理任务已提交')
     await loadItems()
   } catch (reason: unknown) {
     if (reason !== 'cancel') ElMessage.error(errorMessage(reason))
-  } finally { busyId.value = null }
+  } finally {
+    busyId.value = null
+  }
 }
 
-onMounted(() => { void loadItems() })
+onMounted(() => {
+  void loadItems()
+})
 </script>
 
 <style scoped>
-.trash-heading { padding: var(--space-5) var(--space-6); border-bottom: 1px solid var(--border); }
+.trash-heading {
+  padding: var(--space-5) var(--space-6);
+  border-bottom: 1px solid var(--border);
+}
 
-.trash-page { display: grid; gap: var(--space-6); }
-.filter-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
-.filter-input { width: min(100%, 280px); }
-.filter-select { width: 160px; }
-.selection-count { color: var(--text-primary) !important; font-weight: 600; }
-.retention-note { color: var(--text-secondary) !important; }
-.comic-cell { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
-.comic-cell img { width: 38px; height: 52px; flex: 0 0 auto; border-radius: var(--radius-xs); object-fit: cover; background: var(--bg-secondary); }
-.comic-cell div { display: grid; gap: var(--space-1); min-width: 0; }
-.comic-cell strong { overflow: hidden; color: var(--text-primary); text-overflow: ellipsis; white-space: nowrap; }
-.comic-cell span { color: var(--text-muted); font-size: var(--text-sm); }
-.trash-card :deep(.el-pagination) { justify-content: flex-end; padding: var(--space-5) var(--space-6); }
-@media (max-width: 700px) { .retention-note { display: none; } }
+.trash-page {
+  display: grid;
+  gap: var(--space-6);
+}
+.filter-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+.filter-input {
+  width: min(100%, 280px);
+}
+.filter-select {
+  width: 160px;
+}
+.selection-count {
+  color: var(--text-primary) !important;
+  font-weight: 600;
+}
+.retention-note {
+  color: var(--text-secondary) !important;
+}
+.comic-cell {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.comic-cell img {
+  width: 38px;
+  height: 52px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-xs);
+  object-fit: cover;
+  background: var(--bg-secondary);
+}
+.comic-cell div {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.comic-cell strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.comic-cell span {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+.trash-card :deep(.el-pagination) {
+  justify-content: flex-end;
+  padding: var(--space-5) var(--space-6);
+}
+@media (max-width: 700px) {
+  .retention-note {
+    display: none;
+  }
+}
 </style>

@@ -1,35 +1,14 @@
 <template>
-  <el-dialog
-    v-model="visible"
-    title="批量编辑"
-    width="480px"
-    :close-on-click-modal="false"
-    destroy-on-close
-  >
+  <el-dialog v-model="visible" title="批量编辑" width="480px" :close-on-click-modal="false" destroy-on-close>
     <el-form label-width="60px">
       <el-form-item label="分类">
         <el-select v-model="categoryId" placeholder="不修改" clearable>
-          <el-option
-            v-for="cat in categoryStore.list"
-            :key="cat.id"
-            :label="cat.name"
-            :value="cat.id"
-          />
+          <el-option v-for="cat in categoryStore.list" :key="cat.id" :label="cat.name" :value="cat.id" />
         </el-select>
       </el-form-item>
       <el-form-item label="标签">
-        <el-select
-          v-model="addTagIds"
-          multiple
-          filterable
-          placeholder="选择要追加的标签"
-        >
-          <el-option
-            v-for="tag in tagStore.list"
-            :key="tag.id"
-            :label="tag.name"
-            :value="tag.id"
-          />
+        <el-select v-model="addTagIds" multiple filterable placeholder="选择要追加的标签">
+          <el-option v-for="tag in tagStore.list" :key="tag.id" :label="tag.name" :value="tag.id" />
         </el-select>
       </el-form-item>
     </el-form>
@@ -45,6 +24,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { isAxiosError } from 'axios'
 import { ElMessage } from 'element-plus'
 import { useCategoryStore } from '@/features/category/store'
 import { useTagStore } from '@/features/tag/store'
@@ -68,6 +48,23 @@ const categoryId = ref<number | null>(null)
 const addTagIds = ref<number[]>([])
 const saving = ref(false)
 
+function isErrorResponse(value: unknown): value is { message?: unknown } {
+  return typeof value === 'object' && value !== null && 'message' in value
+}
+
+function getErrorMessage(error: unknown): string {
+  if (isAxiosError<unknown>(error)) {
+    const responseData = error.response?.data
+    if (isErrorResponse(responseData) && typeof responseData.message === 'string') {
+      return responseData.message
+    }
+  }
+  if (error instanceof Error) {
+    return error.message
+  }
+  return '操作失败'
+}
+
 async function onConfirm() {
   if (categoryId.value === null && addTagIds.value.length === 0) {
     ElMessage.warning('请至少选择分类或标签')
@@ -90,8 +87,8 @@ async function onConfirm() {
       ElMessage.success(`已为 ${result.succeeded} 部漫画更新`)
     }
     emit('saved')
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.message || e?.message || '操作失败')
+  } catch (error: unknown) {
+    ElMessage.error(getErrorMessage(error))
   } finally {
     saving.value = false
   }

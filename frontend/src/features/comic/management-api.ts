@@ -1,7 +1,7 @@
 import { api } from '@/services/http'
 import type { OperationSubmitResult, PageResult } from '@/shared/api/types'
-import type { CatalogNode, CategoryDTO, ComicDetailVO, ComicListQuery, ComicListVO } from '@/entities/comic/types'
-import type { ComicTagUpdateDTO, TagCreateDTO, TagDTO } from '@/entities/tag/types'
+import type { CatalogNode, ComicDetailVO, ComicListQuery, ComicListVO } from '@/entities/comic/types'
+import type { ComicTagUpdateDTO } from '@/entities/tag/types'
 import type {
   BatchComicUpdateDTO,
   CatalogManagementRequest,
@@ -33,19 +33,6 @@ export const managementComicApi = {
   batchUpdate: (data: BatchComicUpdateDTO) => api.post('/manage/comics/batch/update', data),
 }
 
-export const managementTagApi = {
-  list: () => api.get<TagDTO[]>('/manage/tags'),
-  create: (data: TagCreateDTO) => api.post<TagDTO>('/manage/tags', data),
-  delete: (id: number) => api.delete(`/manage/tags/${id}`),
-}
-
-export const managementCategoryApi = {
-  list: () => api.get<CategoryDTO[]>('/manage/categories'),
-  create: (name: string) => api.post<CategoryDTO>('/manage/categories', null, { params: { name } }),
-  update: (id: number, name: string) => api.put<CategoryDTO>(`/manage/categories/${id}`, null, { params: { name } }),
-  delete: (id: number) => api.delete(`/manage/categories/${id}`),
-}
-
 export const catalogManagementApi = {
   create: (comicId: number, data: CatalogManagementRequest) =>
     api.post<CatalogVO>(`/manage/comics/${comicId}/catalogs`, data),
@@ -68,13 +55,11 @@ export const chapterManagementApi = {
     api.put<ChapterManagementVO>(`/manage/comics/${comicId}/chapters/${chapterId}/move`, data),
   reorder: (comicId: number, chapterId: number, data: ChapterManagementRequest) =>
     api.put<ChapterManagementVO>(`/manage/comics/${comicId}/chapters/${chapterId}/reorder`, data),
-  trash: (comicId: number, chapterId: number) =>
-    api.delete(`/manage/comics/${comicId}/chapters/${chapterId}`),
+  trash: (comicId: number, chapterId: number) => api.delete(`/manage/comics/${comicId}/chapters/${chapterId}`),
 }
 
 export const mediaManagementApi = {
   reorder: (chapterId: number, data: MediaReorderRequest) =>
     api.post<MediaReorderResult>(`/manage/chapters/${chapterId}/media/reorder`, data),
-  trash: (mediaId: number) =>
-    api.delete<OperationSubmitResult>(`/manage/media/${mediaId}`),
+  trash: (mediaId: number) => api.delete<OperationSubmitResult>(`/manage/media/${mediaId}`),
 }

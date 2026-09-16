@@ -1,8 +1,5 @@
 <template>
-  <header
-    class="reader-toolbar"
-    :class="{ 'toolbar-hidden': !settings.showToolbar }"
-  >
+  <header class="reader-toolbar" :class="{ 'toolbar-hidden': !settings.showToolbar }">
     <div class="toolbar-left">
       <button class="tool-btn" @click="emit('back')">
         <el-icon :size="20"><ArrowLeft /></el-icon>
@@ -11,16 +8,9 @@
     </div>
 
     <div class="toolbar-center">
-      <el-popover
-        v-model:visible="jumpVisible"
-        placement="bottom"
-        :width="220"
-        trigger="click"
-      >
+      <el-popover v-model:visible="jumpVisible" placement="bottom" :width="220" trigger="click">
         <template #reference>
-          <button class="tool-btn page-indicator" title="点击跳转页码">
-            {{ currentPage }} / {{ totalPages }}
-          </button>
+          <button class="tool-btn page-indicator" title="点击跳转页码">{{ currentPage }} / {{ totalPages }}</button>
         </template>
         <div class="jump-panel">
           <el-input-number
@@ -38,27 +28,10 @@
 
     <div class="toolbar-right">
       <!-- Chapter nav -->
-      <button
-        v-if="prevChapterId"
-        class="tool-btn chapter-btn"
-        @click="emit('prevChapter')"
-      >
-        上一章
-      </button>
-      <button
-        v-if="nextChapterId"
-        class="tool-btn chapter-btn primary"
-        @click="emit('nextChapter')"
-      >
-        下一章
-      </button>
+      <button v-if="prevChapterId" class="tool-btn chapter-btn" @click="emit('prevChapter')">上一章</button>
+      <button v-if="nextChapterId" class="tool-btn chapter-btn primary" @click="emit('nextChapter')">下一章</button>
 
-      <el-popover
-        v-model:visible="settingsVisible"
-        placement="bottom-end"
-        :width="280"
-        trigger="click"
-      >
+      <el-popover v-model:visible="settingsVisible" placement="bottom-end" :width="280" trigger="click">
         <template #reference>
           <button class="tool-btn" aria-label="阅读设置" title="阅读设置">
             <el-icon :size="18"><Setting /></el-icon>
@@ -103,7 +76,15 @@
               {{ settings.enablePreload ? '关闭预加载' : '开启预加载' }}
             </button>
             <button class="panel-action" @click="settings.resetZoom()">重置缩放</button>
-            <button class="panel-action" @click="settings.toggleToolbar(); settingsVisible = false">隐藏工具栏</button>
+            <button
+              class="panel-action"
+              @click="
+                settings.toggleToolbar();
+                settingsVisible = false
+              "
+            >
+              隐藏工具栏
+            </button>
           </div>
         </div>
       </el-popover>
@@ -114,13 +95,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { ArrowLeft, Setting } from '@element-plus/icons-vue'
-import {
-  ElSelect,
-  ElOption,
-  ElPopover,
-  ElInputNumber,
-  ElButton,
-} from 'element-plus'
+import { ElSelect, ElOption, ElPopover, ElInputNumber, ElButton } from 'element-plus'
 import { useReaderSettingsStore } from '@/features/reader/settings-store'
 
 interface Props {
@@ -153,7 +128,6 @@ function confirmJump() {
   jumpVisible.value = false
   emit('jumpToPage', jumpPage.value)
 }
-
 </script>
 
 <style scoped>
@@ -168,7 +142,9 @@ function confirmJump() {
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
   z-index: 10;
-  transition: transform 200ms ease, opacity 200ms ease;
+  transition:
+    transform 200ms ease,
+    opacity 200ms ease;
 }
 
 .reader-toolbar.toolbar-hidden {

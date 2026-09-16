@@ -6,12 +6,20 @@
         <h2>编辑漫画信息</h2>
         <p>维护阅读端展示的标题、归属和检索标签。</p>
       </div>
-      <div class="edit-ref"><span>RECORD</span><strong>#{{ comicId }}</strong></div>
+      <div class="edit-ref">
+        <span>RECORD</span><strong>#{{ comicId }}</strong>
+      </div>
     </div>
 
     <el-form ref="formRef" :model="form" :rules="rules" label-position="top" class="edit-form">
       <section class="edit-panel edit-panel--primary">
-        <PanelHeader class="edit-panel-heading" level="h3" title="基本信息" description="这些字段会直接影响漫画在列表和详情页中的呈现。"><template #leading>01</template></PanelHeader>
+        <PanelHeader
+          class="edit-panel-heading"
+          level="h3"
+          title="基本信息"
+          description="这些字段会直接影响漫画在列表和详情页中的呈现。"
+          ><template #leading>01</template></PanelHeader
+        >
         <el-form-item label="标题" prop="title" class="title-field">
           <el-input v-model="form.title" placeholder="输入漫画标题" maxlength="255" show-word-limit size="large" />
         </el-form-item>
@@ -26,33 +34,76 @@
           </el-form-item>
         </div>
         <el-form-item label="描述" prop="description">
-          <el-input v-model="form.description" type="textarea" :rows="5" placeholder="写下这部漫画的简介、备注或阅读提示（可选）" maxlength="4000" show-word-limit />
+          <el-input
+            v-model="form.description"
+            type="textarea"
+            :rows="5"
+            placeholder="写下这部漫画的简介、备注或阅读提示（可选）"
+            maxlength="4000"
+            show-word-limit
+          />
         </el-form-item>
       </section>
 
       <section class="edit-panel archive-panel">
-        <PanelHeader class="edit-panel-heading" level="h3" title="归档与检索" description="用分类和标签建立你的漫画索引。"><template #leading>02</template></PanelHeader>
+        <PanelHeader
+          class="edit-panel-heading"
+          level="h3"
+          title="归档与检索"
+          description="用分类和标签建立你的漫画索引。"
+          ><template #leading>02</template></PanelHeader
+        >
         <el-form-item label="标签" prop="tags">
           <div class="tag-editor">
             <div v-if="selectedTags.length" class="selected-tags">
-              <el-tag v-for="tag in selectedTags" :key="tag.id" closable class="selected-tag" @close="removeTag(tag.id)">{{ tag.name }}</el-tag>
+              <el-tag
+                v-for="tag in selectedTags"
+                :key="tag.id"
+                closable
+                class="selected-tag"
+                @close="removeTag(tag.id)"
+                >{{ tag.name }}</el-tag
+              >
             </div>
             <div class="tag-add-row">
-              <el-select v-model="tagInput" filterable default-first-option placeholder="搜索或选择标签" class="tag-select" popper-class="comic-tag-popper" @change="onExistingTagSelect">
-                <template #prefix><el-icon><Search /></el-icon></template>
+              <el-select
+                v-model="tagInput"
+                filterable
+                default-first-option
+                placeholder="搜索或选择标签"
+                class="tag-select"
+                popper-class="comic-tag-popper"
+                @change="onExistingTagSelect"
+              >
+                <template #prefix
+                  ><el-icon><Search /></el-icon
+                ></template>
                 <el-option v-for="tag in availableTags" :key="tag.id" :label="tag.name" :value="tag.id" />
               </el-select>
               <span class="or-divider">或</span>
-              <el-input v-model="newTagName" placeholder="创建新标签" class="new-tag-input" @keyup.enter="onCreateTag" />
+              <el-input
+                v-model="newTagName"
+                placeholder="创建新标签"
+                class="new-tag-input"
+                @keyup.enter="onCreateTag"
+              />
               <el-button type="primary" plain @click="onCreateTag">添加</el-button>
             </div>
-            <small class="field-hint"><el-icon><Search /></el-icon>可输入关键词搜索已有标签；标签只用于搜索和筛选，不会改变原始文件。</small>
+            <small class="field-hint"
+              ><el-icon><Search /></el-icon>可输入关键词搜索已有标签；标签只用于搜索和筛选，不会改变原始文件。</small
+            >
           </div>
         </el-form-item>
       </section>
 
       <section class="edit-panel source-panel">
-        <PanelHeader class="edit-panel-heading" level="h3" title="来源记录" description="来源信息由导入流程生成，仅供追溯。"><template #leading>03</template></PanelHeader>
+        <PanelHeader
+          class="edit-panel-heading"
+          level="h3"
+          title="来源记录"
+          description="来源信息由导入流程生成，仅供追溯。"
+          ><template #leading>03</template></PanelHeader
+        >
         <div class="source-display">
           <span v-if="sourceType" class="source-tag">{{ sourceTypeLabel(sourceType) }}</span>
           <span v-if="sourceRef" class="source-ref">{{ sourceRef }}</span>
@@ -61,12 +112,26 @@
       </section>
 
       <section v-if="comicInfo" class="edit-panel comicinfo-panel">
-        <PanelHeader class="edit-panel-heading" level="h3" title="ComicInfo.xml 元数据" description="从导入文件中解析的标准漫画元数据，只读展示。"><template #leading>04</template></PanelHeader>
+        <PanelHeader
+          class="edit-panel-heading"
+          level="h3"
+          title="ComicInfo.xml 元数据"
+          description="从导入文件中解析的标准漫画元数据，只读展示。"
+          ><template #leading>04</template></PanelHeader
+        >
         <div class="comicinfo-grid">
-          <div v-if="comicInfo.series" class="comicinfo-item"><span>Series</span><strong>{{ comicInfo.series }}</strong></div>
-          <div v-if="comicInfo.title" class="comicinfo-item"><span>Title</span><strong>{{ comicInfo.title }}</strong></div>
-          <div v-if="comicInfo.number" class="comicinfo-item"><span>Number</span><strong>{{ comicInfo.number }}</strong></div>
-          <div v-if="comicInfo.writer" class="comicinfo-item"><span>Writer</span><strong>{{ comicInfo.writer }}</strong></div>
+          <div v-if="comicInfo.series" class="comicinfo-item">
+            <span>Series</span><strong>{{ comicInfo.series }}</strong>
+          </div>
+          <div v-if="comicInfo.title" class="comicinfo-item">
+            <span>Title</span><strong>{{ comicInfo.title }}</strong>
+          </div>
+          <div v-if="comicInfo.number" class="comicinfo-item">
+            <span>Number</span><strong>{{ comicInfo.number }}</strong>
+          </div>
+          <div v-if="comicInfo.writer" class="comicinfo-item">
+            <span>Writer</span><strong>{{ comicInfo.writer }}</strong>
+          </div>
         </div>
         <p v-if="comicInfo.summary" class="comicinfo-summary">{{ comicInfo.summary }}</p>
         <div v-if="comicInfo.tags.length" class="comicinfo-tags">
@@ -84,17 +149,19 @@
 
 <script setup lang="ts">
 import PanelHeader from '@/components/management/PanelHeader.vue'
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
 import { getApiErrorMessage } from '@/services/http'
-import { managementComicApi, managementTagApi } from '@/features/comic/management-api'
+import { managementComicApi } from '@/features/comic/management-api'
+import { managementTagApi } from '@/features/tag/api'
 import { useCategoryStore } from '@/features/category/store'
 import { sourceTypeLabel } from '@/features/comic/source-format'
 import type { ComicInfoVO } from '@/entities/comic/types'
 import type { ComicMetadataUpdateDTO } from '@/entities/comic/management-types'
-import type { ComicTagUpdateDTO, TagDTO } from '@/entities/tag/types'
+import type { ComicTagUpdateDTO } from '@/entities/tag/types'
+import { useComicEditTags } from './composables/useComicEditTags'
 
 const route = useRoute()
 const router = useRouter()
@@ -112,33 +179,28 @@ const form = ref<ComicMetadataUpdateDTO>({
   categoryId: null,
 })
 
-const selectedTagIds = ref<number[]>([])
-const allTags = ref<TagDTO[]>([])
-const tagInput = ref<number | undefined>(undefined)
-const newTagName = ref('')
+const {
+  selectedTagIds,
+  allTags,
+  tagInput,
+  newTagName,
+  selectedTags,
+  availableTags,
+  removeTag,
+  onExistingTagSelect,
+  onCreateTag,
+} = useComicEditTags()
 
 const sourceType = ref('')
 const sourceRef = ref('')
 const comicInfo = ref<ComicInfoVO | null>(null)
-
-const selectedTags = computed<TagDTO[]>(() => {
-  return selectedTagIds.value
-    .map((id) => allTags.value.find((t) => t && t.id === id))
-    .filter((t): t is TagDTO => !!t && typeof t.id === 'number')
-})
-
-const availableTags = computed<TagDTO[]>(() => {
-  return allTags.value.filter((t) => t && t.id !== undefined && !selectedTagIds.value.includes(t.id))
-})
 
 const rules = {
   title: [
     { required: true, message: '标题不能为空', trigger: 'blur' },
     { max: 255, message: '标题长度不能超过 255 个字符', trigger: 'blur' },
   ],
-  author: [
-    { max: 128, message: '作者长度不能超过 128 个字符', trigger: 'blur' },
-  ],
+  author: [{ max: 128, message: '作者长度不能超过 128 个字符', trigger: 'blur' }],
 }
 
 async function loadData() {
@@ -170,49 +232,15 @@ async function loadData() {
       sourceType.value = detail.sourceType || ''
       sourceRef.value = detail.sourceRef || ''
       comicInfo.value = detail.comicInfo ?? null
-    } catch { /* non-critical */ }
+    } catch {
+      /* non-critical */
+    }
   } catch (err: unknown) {
     ElMessage.error(getApiErrorMessage(err, '加载漫画信息失败'))
     router.push('/manage/comics')
   } finally {
     loading.value = false
   }
-}
-
-function removeTag(id: number) {
-  selectedTagIds.value = selectedTagIds.value.filter((tid) => tid !== id)
-}
-
-function onExistingTagSelect(value: number | undefined | null) {
-  if (value === undefined || value === null) return
-  if (!selectedTagIds.value.includes(value)) {
-    selectedTagIds.value.push(value)
-  }
-  tagInput.value = undefined
-}
-
-async function onCreateTag() {
-  const name = newTagName.value.trim()
-  if (!name) return
-
-  const existing = allTags.value.find((t) => t && t.name === name)
-  if (existing) {
-    if (!selectedTagIds.value.includes(existing.id)) {
-      selectedTagIds.value.push(existing.id)
-    }
-  } else {
-    try {
-      const res = await managementTagApi.create({ name })
-      const newTag = res.data
-      allTags.value.push(newTag)
-      selectedTagIds.value.push(newTag.id)
-    } catch (err: unknown) {
-      ElMessage.error(getApiErrorMessage(err, '创建标签失败'))
-      return
-    }
-  }
-
-  newTagName.value = ''
 }
 
 async function handleSave() {
@@ -248,7 +276,9 @@ onMounted(loadData)
 </script>
 
 <style scoped>
-.edit-panel-heading { margin-bottom: var(--space-6); }
+.edit-panel-heading {
+  margin-bottom: var(--space-6);
+}
 .comic-edit-page {
   display: grid;
   gap: var(--space-5);
@@ -265,66 +295,284 @@ onMounted(loadData)
   padding: 0 0 var(--space-5);
   border-bottom: 1px solid var(--border);
 }
-.edit-eyebrow { color: var(--accent); font: 800 11px ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .16em;
+.edit-eyebrow {
+  color: var(--accent);
+  font:
+    800 11px ui-monospace,
+    SFMono-Regular,
+    Consolas,
+    monospace;
+  letter-spacing: 0.16em;
 }
-.edit-intro h2 { margin: var(--space-2) 0; font-family: Georgia, 'Times New Roman', serif; font-size: clamp(1.7rem, 3vw, 2.35rem); letter-spacing: -.04em;
+.edit-intro h2 {
+  margin: var(--space-2) 0;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(1.7rem, 3vw, 2.35rem);
+  letter-spacing: -0.04em;
 }
-.edit-intro p:last-child { margin: 0; color: var(--text-muted); font-size: var(--text-sm);
+.edit-intro p:last-child {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
 }
-.edit-ref { display: grid; gap: 4px; min-width: 88px; padding: 9px 12px; border: 1px solid var(--border); text-align: right;
+.edit-ref {
+  display: grid;
+  gap: 4px;
+  min-width: 88px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  text-align: right;
 }
-.edit-ref span { color: var(--text-muted); font-size: 10px; letter-spacing: .15em;
+.edit-ref span {
+  color: var(--text-muted);
+  font-size: 10px;
+  letter-spacing: 0.15em;
 }
-.edit-ref strong { color: var(--accent); font: 700 15px ui-monospace, SFMono-Regular, Consolas, monospace;
+.edit-ref strong {
+  color: var(--accent);
+  font:
+    700 15px ui-monospace,
+    SFMono-Regular,
+    Consolas,
+    monospace;
 }
-.edit-form { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(280px, .85fr); align-items: start; gap: var(--space-4); width: 100%; max-width: none; margin: 0;
+.edit-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(280px, 0.85fr);
+  align-items: start;
+  gap: var(--space-4);
+  width: 100%;
+  max-width: none;
+  margin: 0;
 }
-.edit-panel { padding: clamp(var(--space-5), 4vw, var(--space-8)); border: 1px solid var(--border); background: var(--bg-surface); box-shadow: none;
+.edit-panel {
+  padding: clamp(var(--space-5), 4vw, var(--space-8));
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  box-shadow: none;
 }
-.edit-panel--primary { grid-column: 1; grid-row: 1; }
-.archive-panel { grid-column: 1; grid-row: 2; }
-.field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-5); }
-.edit-form :deep(.el-form-item) { margin-bottom: var(--space-5); }
-.edit-form :deep(.el-form-item__label) { color: var(--text-secondary); font-weight: 700; }
-.edit-form :deep(.el-input__wrapper), .edit-form :deep(.el-textarea__inner) { background: color-mix(in srgb, var(--bg-primary) 72%, transparent); box-shadow: 0 0 0 1px var(--border) inset; }
-.edit-form :deep(.el-textarea__inner:focus) { box-shadow: 0 0 0 1px var(--accent) inset, 0 0 0 3px var(--control-focus-ring); }
-.edit-form :deep(.el-select) { width: 100%; }
-.tag-editor { display: grid; gap: var(--space-3); }
-.selected-tags { display: flex; flex-wrap: wrap; gap: var(--space-2); min-height: 26px; }
-.selected-tag { border-color: var(--accent-border); background: var(--accent-bg); color: var(--text-primary); }
-.tag-add-row { display: flex; align-items: center; gap: var(--space-3); }
-.tag-select { flex: 1; min-width: 190px; }
-.tag-select :deep(.el-select__wrapper) { width: 100%; background: linear-gradient(180deg, var(--control-bg), var(--bg-secondary)); box-shadow: inset 0 0 0 1px var(--border), var(--shadow-sm); }
-.tag-select :deep(.el-select__wrapper.is-focused) { box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 3px var(--control-focus-ring); }
-.new-tag-input { flex: 1; min-width: 150px; }
-.or-divider { color: var(--text-muted); font-size: var(--text-xs); }
-.field-hint { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--text-muted); }
-.field-hint :deep(.el-icon) { color: var(--accent); }
-.source-panel { grid-column: 2; grid-row: 1; background: var(--bg-surface); }
-.comicinfo-panel { grid-column: 2; grid-row: 2; }
-.comicinfo-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
-.comicinfo-item { display: grid; gap: var(--space-1); min-width: 0; }
-.comicinfo-item span { color: var(--text-muted); font-size: var(--text-xs); }
-.comicinfo-item strong { overflow: hidden; color: var(--text-primary); font-size: var(--text-sm); text-overflow: ellipsis; white-space: nowrap; }
-.comicinfo-summary { margin: var(--space-4) 0 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: 1.7; white-space: pre-wrap; }
-.comicinfo-tags { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-4); }
-.comicinfo-tags span { padding: 4px 8px; border: 1px solid var(--accent-border); background: var(--accent-bg); color: var(--text-primary); font-size: var(--text-xs); }
-.source-display { display: flex; align-items: center; gap: var(--space-3); min-height: 46px; padding: 0 var(--space-4); border: 1px dashed var(--border); color: var(--text-muted); }
-.source-tag { padding: 4px 8px; background: var(--accent-bg); color: var(--accent); font-size: 11px; font-weight: 800; letter-spacing: .08em; }
-.source-ref { overflow: hidden; color: var(--text-secondary); font-size: var(--text-sm); text-overflow: ellipsis; white-space: nowrap; }
-.source-empty { font-size: var(--text-sm); }
-:global(.comic-tag-popper) { background: var(--bg-surface); border: 1px solid var(--border); box-shadow: var(--card-shadow-hover); }
-.form-actions { position: sticky; bottom: 0; z-index: 2; grid-column: 2; grid-row: 3; display: flex; justify-content: flex-end; gap: var(--space-3); padding: var(--space-4) 0 var(--space-2); background: linear-gradient(to bottom, transparent, var(--bg-primary) 28%); }
-.form-actions :deep(.el-button--primary) { min-width: 132px; background: var(--accent); border-color: var(--accent); }
-.form-actions :deep(.el-button--primary:hover) { background: var(--accent-hover); border-color: var(--accent-hover); }
+.edit-panel--primary {
+  grid-column: 1;
+  grid-row: 1;
+}
+.archive-panel {
+  grid-column: 1;
+  grid-row: 2;
+}
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-5);
+}
+.edit-form :deep(.el-form-item) {
+  margin-bottom: var(--space-5);
+}
+.edit-form :deep(.el-form-item__label) {
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+.edit-form :deep(.el-input__wrapper),
+.edit-form :deep(.el-textarea__inner) {
+  background: color-mix(in srgb, var(--bg-primary) 72%, transparent);
+  box-shadow: 0 0 0 1px var(--border) inset;
+}
+.edit-form :deep(.el-textarea__inner:focus) {
+  box-shadow:
+    0 0 0 1px var(--accent) inset,
+    0 0 0 3px var(--control-focus-ring);
+}
+.edit-form :deep(.el-select) {
+  width: 100%;
+}
+.tag-editor {
+  display: grid;
+  gap: var(--space-3);
+}
+.selected-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-height: 26px;
+}
+.selected-tag {
+  border-color: var(--accent-border);
+  background: var(--accent-bg);
+  color: var(--text-primary);
+}
+.tag-add-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.tag-select {
+  flex: 1;
+  min-width: 190px;
+}
+.tag-select :deep(.el-select__wrapper) {
+  width: 100%;
+  background: linear-gradient(180deg, var(--control-bg), var(--bg-secondary));
+  box-shadow:
+    inset 0 0 0 1px var(--border),
+    var(--shadow-sm);
+}
+.tag-select :deep(.el-select__wrapper.is-focused) {
+  box-shadow:
+    inset 0 0 0 1px var(--accent),
+    0 0 0 3px var(--control-focus-ring);
+}
+.new-tag-input {
+  flex: 1;
+  min-width: 150px;
+}
+.or-divider {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+.field-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--text-muted);
+}
+.field-hint :deep(.el-icon) {
+  color: var(--accent);
+}
+.source-panel {
+  grid-column: 2;
+  grid-row: 1;
+  background: var(--bg-surface);
+}
+.comicinfo-panel {
+  grid-column: 2;
+  grid-row: 2;
+}
+.comicinfo-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+.comicinfo-item {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.comicinfo-item span {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+.comicinfo-item strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.comicinfo-summary {
+  margin: var(--space-4) 0 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+.comicinfo-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+.comicinfo-tags span {
+  padding: 4px 8px;
+  border: 1px solid var(--accent-border);
+  background: var(--accent-bg);
+  color: var(--text-primary);
+  font-size: var(--text-xs);
+}
+.source-display {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 46px;
+  padding: 0 var(--space-4);
+  border: 1px dashed var(--border);
+  color: var(--text-muted);
+}
+.source-tag {
+  padding: 4px 8px;
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+.source-ref {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.source-empty {
+  font-size: var(--text-sm);
+}
+:global(.comic-tag-popper) {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--card-shadow-hover);
+}
+.form-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  grid-column: 2;
+  grid-row: 3;
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  padding: var(--space-4) 0 var(--space-2);
+  background: linear-gradient(to bottom, transparent, var(--bg-primary) 28%);
+}
+.form-actions :deep(.el-button--primary) {
+  min-width: 132px;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.form-actions :deep(.el-button--primary:hover) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
 @media (max-width: 820px) {
-  .edit-form { grid-template-columns: 1fr; }
-  .edit-panel--primary, .archive-panel, .source-panel, .comicinfo-panel, .form-actions { grid-column: 1; grid-row: auto; }
-  .edit-intro { align-items: flex-start; }
-  .edit-ref { min-width: auto; }
-  .field-grid { grid-template-columns: 1fr; gap: 0; }
-  .tag-add-row { align-items: stretch; flex-wrap: wrap; }
-  .tag-select, .new-tag-input { min-width: calc(100% - 0px); flex-basis: 100%; }
-  .or-divider { display: none; }
+  .edit-form {
+    grid-template-columns: 1fr;
+  }
+  .edit-panel--primary,
+  .archive-panel,
+  .source-panel,
+  .comicinfo-panel,
+  .form-actions {
+    grid-column: 1;
+    grid-row: auto;
+  }
+  .edit-intro {
+    align-items: flex-start;
+  }
+  .edit-ref {
+    min-width: auto;
+  }
+  .field-grid {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .tag-add-row {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+  .tag-select,
+  .new-tag-input {
+    min-width: calc(100% - 0px);
+    flex-basis: 100%;
+  }
+  .or-divider {
+    display: none;
+  }
 }
 </style>

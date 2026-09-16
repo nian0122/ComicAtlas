@@ -5,6 +5,7 @@ import { readerApi } from '@/features/reader/api'
 import { historyApi } from '@/features/history/api'
 import { useHistoryStore } from '@/features/history/store'
 import type { MediaItemInfo } from '@/entities/media/types'
+import { clientLogger } from '@/services/logger'
 
 export interface ReaderState {
   chapterId: number
@@ -16,6 +17,7 @@ export interface ReaderState {
   comicId: number
   loading: boolean
   error: string | null
+  progressSaveError: string | null
 }
 
 export const useReaderStore = defineStore('reader', () => {
@@ -29,13 +31,14 @@ export const useReaderStore = defineStore('reader', () => {
     comicId: 0,
     loading: false,
     error: null,
+    progressSaveError: null,
   })
 
   const totalPages = computed(() => state.pages.length)
   const hasPrevPage = computed(() => state.currentPage > 1)
   const hasNextPage = computed(() => state.currentPage < state.pages.length)
   const progress = computed(() =>
-    state.pages.length > 0 ? Math.round((state.currentPage / state.pages.length) * 100) : 0
+    state.pages.length > 0 ? Math.round((state.currentPage / state.pages.length) * 100) : 0,
   )
 
   function reset() {
@@ -47,6 +50,7 @@ export const useReaderStore = defineStore('reader', () => {
     state.nextChapterId = null
     state.loading = false
     state.error = null
+    state.progressSaveError = null
   }
 
   let loadSeq = 0
@@ -130,18 +134,29 @@ export const useReaderStore = defineStore('reader', () => {
 
   async function flushProgress(): Promise<boolean> {
     let saved = true
+    let failedPayload: ProgressPayload | null = null
     try {
       while (pendingProgress) {
         const payload = pendingProgress
+        failedPayload = payload
         pendingProgress = null
         await historyApi.update(payload.comicId, {
           chapterId: payload.chapterId,
           pageNumber: payload.pageNumber,
         })
         useHistoryStore().updateEntry(payload.comicId, payload.chapterId, payload.pageNumber)
+        state.progressSaveError = null
+        failedPayload = null
       }
-    } catch {
+    } catch (error: unknown) {
       saved = false
+      // 进度保存不应阻断翻页，但必须保留错误状态供页面恢复，并留下可检索诊断信息。
+      state.progressSaveError = getApiErrorMessage(error, '阅读进度保存失败')
+      clientLogger.error('阅读进度保存失败', {
+        operation: 'history.update',
+        comicId: failedPayload?.comicId,
+        chapterId: failedPayload?.chapterId,
+      })
     } finally {
       progressSavePromise = null
     }
@@ -166,8 +181,13 @@ export const useReaderStore = defineStore('reader', () => {
         pageNumber: state.currentPage,
       }),
       keepalive: true,
-    }).catch(() => {
-      // silent: 卸载兜底尽力而为，失败不打扰用户
+    }).catch((error: unknown) => {
+      clientLogger.error('页面卸载时阅读进度上报失败', {
+        operation: 'history.update.keepalive',
+        comicId: state.comicId,
+        chapterId: state.chapterId,
+        reason: error instanceof Error ? error.name : 'unknown',
+      })
     })
   }
 

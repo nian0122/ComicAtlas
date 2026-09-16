@@ -9,8 +9,16 @@
 
     <StatGrid spaced class="repository-stats" aria-label="仓库统计" :columns="3">
       <StatCard label="已索引漫画" :value="store.total.toLocaleString()" description="来自当前漫画目录" />
-      <StatCard label="存储池" :value="formatBytes(storageTotalBytes)" :description="'HQ ' + (formatBytes(storageStats?.hqBytes))" />
-      <StatCard label="低画质缓存" :value="formatBytes(storageStats?.lqBytes)" :description="'缩略图 ' + (formatBytes(storageStats?.thumbBytes))" />
+      <StatCard
+        label="存储池"
+        :value="formatBytes(storageTotalBytes)"
+        :description="'HQ ' + formatBytes(storageStats?.hqBytes)"
+      />
+      <StatCard
+        label="低画质缓存"
+        :value="formatBytes(storageStats?.lqBytes)"
+        :description="'缩略图 ' + formatBytes(storageStats?.thumbBytes)"
+      />
     </StatGrid>
 
     <div class="filter-toolbar">
@@ -25,12 +33,7 @@
       />
       <el-select v-model="filters.category" placeholder="分类" clearable class="filter-select" @change="applyFilters">
         <el-option label="未分类" value="_NONE" />
-        <el-option
-          v-for="c in categoryStore.list"
-          :key="c.id"
-          :label="c.name"
-          :value="c.name"
-        />
+        <el-option v-for="c in categoryStore.list" :key="c.id" :label="c.name" :value="c.name" />
       </el-select>
       <el-select v-model="filters.status" placeholder="状态" clearable class="filter-select" @change="applyFilters">
         <el-option v-for="s in STATUS_OPTIONS" :key="s.value" :label="s.label" :value="s.value" />
@@ -45,15 +48,15 @@
         class="filter-select--wide"
         @change="applyFilters"
       >
-        <el-option
-          v-for="t in tagStore.list"
-          :key="t.id"
-          :label="t.name"
-          :value="t.name"
-        />
+        <el-option v-for="t in tagStore.list" :key="t.id" :label="t.name" :value="t.name" />
         <el-option label="无标签" value="_NONE" />
       </el-select>
-      <el-select v-if="filters.tags.length > 0" v-model="filters.tagMode" class="filter-select--mini" @change="applyFilters">
+      <el-select
+        v-if="filters.tags.length > 0"
+        v-model="filters.tagMode"
+        class="filter-select--mini"
+        @change="applyFilters"
+      >
         <el-option label="任一" value="OR" />
         <el-option label="全部" value="AND" />
         <el-option label="排除" value="NOT" />
@@ -69,16 +72,10 @@
     </div>
 
     <div v-if="selectedIds.length > 0" class="batch-toolbar">
-      <el-checkbox
-        v-model="selectAll"
-        :indeterminate="isIndeterminate"
-        @change="handleSelectAll"
-      >
+      <el-checkbox v-model="selectAll" :indeterminate="isIndeterminate" @change="handleSelectAll">
         全选 ({{ selectedIds.length }} / {{ store.list.length }})
       </el-checkbox>
-      <el-button type="primary" @click="showBatchDialog = true">
-        批量编辑
-      </el-button>
+      <el-button type="primary" @click="showBatchDialog = true"> 批量编辑 </el-button>
     </div>
 
     <div v-if="store.loading && store.list.length === 0" class="state loading">
@@ -100,12 +97,7 @@
 
     <section v-else class="comic-table-section">
       <div class="comic-grid">
-        <div
-          v-for="comic in store.list"
-          :key="comic.id"
-          class="comic-row"
-          @click="goEdit(comic.id)"
-        >
+        <div v-for="comic in store.list" :key="comic.id" class="comic-row" @click="goEdit(comic.id)">
           <el-checkbox
             class="comic-checkbox"
             :model-value="selectedIds.includes(comic.id)"
@@ -113,12 +105,7 @@
             @click.stop
           />
           <div class="comic-cover">
-            <img
-              v-if="comic.coverUrl"
-              :src="comic.coverUrl"
-              alt=""
-              @error="hideBrokenImage"
-            >
+            <img v-if="comic.coverUrl" :src="comic.coverUrl" alt="" @error="hideBrokenImage" />
           </div>
           <div class="comic-info">
             <h3 class="comic-title">{{ comic.title }}</h3>
@@ -143,11 +130,14 @@
       </div>
     </section>
 
-    <BatchEditDialog
-      v-model:visible="showBatchDialog"
-      :comic-ids="selectedIds"
-      @saved="onBatchSaved"
-    />
+    <div v-if="storageSummaryError" class="inline-error" role="alert">
+      <span>{{ storageSummaryError }}</span>
+      <button class="ghost-btn" :disabled="storageSummaryLoading" @click="loadStorageSummary">
+        {{ storageSummaryLoading ? '重试中...' : '重试' }}
+      </button>
+    </div>
+
+    <BatchEditDialog v-model:visible="showBatchDialog" :comic-ids="selectedIds" @saved="onBatchSaved" />
   </div>
 </template>
 
@@ -161,7 +151,7 @@ import { PictureFilled, WarningFilled } from '@element-plus/icons-vue'
 import { useManagementComicStore } from '@/features/comic/management-store'
 import { useCategoryStore } from '@/features/category/store'
 import { useTagStore } from '@/features/tag/store'
-import BatchEditDialog from './BatchEditDialog.vue'
+import BatchEditDialog from '@/features/comic/components/BatchEditDialog.vue'
 import type { StorageStats } from '@/features/storage/types'
 import { storageService } from '@/features/storage/service'
 import { COMIC_STATUSES, comicStatusMeta } from '@/features/comic/status'
@@ -172,6 +162,8 @@ const store = useManagementComicStore()
 const categoryStore = useCategoryStore()
 const tagStore = useTagStore()
 const storageStats = ref<StorageStats | null>(null)
+const storageSummaryError = ref<string | null>(null)
+const storageSummaryLoading = ref(false)
 const storageTotalBytes = computed(() => {
   if (!storageStats.value) return undefined
   return storageStats.value.hqBytes + storageStats.value.lqBytes + storageStats.value.thumbBytes
@@ -209,12 +201,8 @@ const {
   selectedIds.value = []
 })
 
-const selectAll = computed(() =>
-  store.list.length > 0 && selectedIds.value.length === store.list.length
-)
-const isIndeterminate = computed(() =>
-  selectedIds.value.length > 0 && selectedIds.value.length < store.list.length
-)
+const selectAll = computed(() => store.list.length > 0 && selectedIds.value.length === store.list.length)
+const isIndeterminate = computed(() => selectedIds.value.length > 0 && selectedIds.value.length < store.list.length)
 
 function toggleSelect(id: number) {
   const idx = selectedIds.value.indexOf(id)
@@ -227,7 +215,7 @@ function toggleSelect(id: number) {
 
 function handleSelectAll(val: string | number | boolean) {
   if (val) {
-    selectedIds.value = store.list.map(c => c.id)
+    selectedIds.value = store.list.map((c) => c.id)
   } else {
     selectedIds.value = []
   }
@@ -259,8 +247,21 @@ onMounted(() => {
   categoryStore.fetchList()
   tagStore.fetchList()
   store.fetchList()
-  storageService.fetchSummary().then((stats) => { storageStats.value = stats }).catch(() => { storageStats.value = null })
+  void loadStorageSummary()
 })
+
+async function loadStorageSummary(): Promise<void> {
+  storageSummaryLoading.value = true
+  storageSummaryError.value = null
+  try {
+    storageStats.value = await storageService.fetchSummary()
+  } catch (error: unknown) {
+    storageStats.value = null
+    storageSummaryError.value = error instanceof Error && error.message ? error.message : '存储统计加载失败，请重试'
+  } finally {
+    storageSummaryLoading.value = false
+  }
+}
 
 function formatBytes(bytes: number | undefined): string {
   if (!bytes) return '0 B'
@@ -391,7 +392,7 @@ function formatBytes(bytes: number | undefined): string {
   inset: 0;
   display: grid;
   place-items: center;
-  content: "CA";
+  content: 'CA';
   color: var(--text-muted);
   font-size: 10px;
   font-weight: 800;
@@ -453,6 +454,19 @@ function formatBytes(bytes: number | undefined): string {
   text-align: center;
 }
 
+.inline-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+  padding: var(--space-md);
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-sm);
+}
+
 .state.loading {
   color: var(--text-secondary);
 }
@@ -475,6 +489,8 @@ function formatBytes(bytes: number | undefined): string {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>

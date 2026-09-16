@@ -1,7 +1,6 @@
 import { api } from '@/services/http'
 import type { PageResult } from '@/shared/api/types'
-import type { CatalogNode, CategoryDTO, ComicDetailVO, ComicListQuery, ComicListVO } from '@/entities/comic/types'
-import type { TagDTO } from '@/entities/tag/types'
+import type { CatalogNode, ComicDetailVO, ComicListQuery, ComicListVO } from '@/entities/comic/types'
 
 export const comicApi = {
   list: (params?: ComicListQuery) => api.get<PageResult<ComicListVO>>('/comics', { params }),
@@ -12,12 +11,4 @@ export const comicApi = {
 
 export const catalogApi = {
   tree: (comicId: number) => api.get<readonly CatalogNode[]>(`/comics/${comicId}/catalog`),
-}
-
-export const readingTagApi = {
-  list: () => api.get<TagDTO[]>('/tags'),
-}
-
-export const readingCategoryApi = {
-  list: () => api.get<CategoryDTO[]>('/categories'),
 }

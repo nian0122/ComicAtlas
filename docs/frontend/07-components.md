@@ -57,7 +57,7 @@
 | `storage/StorageStatusTag.vue` | HQ/LQ 状态标签 |
 | `dlq/DlqAccessPanel.vue` | DLQ 队列访问面板 |
 | `dlq/DlqMessageDialog.vue` | DLQ 消息查看对话框 |
-| `BatchEditDialog.vue` | 批量编辑对话框（漫画工作区） |
+| `features/comic/components/BatchEditDialog.vue` | 批量编辑对话框（漫画工作区） |
 
 ---
 

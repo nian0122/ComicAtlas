@@ -17,12 +17,7 @@
             <span v-for="tag in comic.tags" :key="tag.name">{{ tag.name }}</span>
           </div>
         </header>
-        <button
-          type="button"
-          class="read-button"
-          :disabled="!canRead"
-          @click="$emit('read')"
-        >
+        <button type="button" class="read-button" :disabled="!canRead" @click="$emit('read')">
           <el-icon :size="21"><VideoPlay /></el-icon>
           {{ readLabel }}
         </button>
@@ -68,10 +63,7 @@
           <h2>目录</h2>
           <span>{{ isSearching ? `找到 ${resultCount} 个章节` : `${totalChapters} 话` }}</span>
         </div>
-        <ChapterSearchBox
-          :model-value="searchKeyword"
-          @update:model-value="$emit('update:searchKeyword', $event)"
-        />
+        <ChapterSearchBox :model-value="searchKeyword" @update:model-value="$emit('update:searchKeyword', $event)" />
         <CatalogTree
           v-if="filteredCatalogTree.length"
           :tree="filteredCatalogTree"
@@ -139,9 +131,7 @@ const hqSize = computed(() => {
 <style scoped>
 .mobile-detail {
   min-height: 100dvh;
-  padding-bottom: calc(
-    var(--mobile-tabbar-height) + var(--space-8) + env(safe-area-inset-bottom)
-  );
+  padding-bottom: calc(var(--mobile-tabbar-height) + var(--space-8) + env(safe-area-inset-bottom));
   background: var(--mobile-canvas);
   color: var(--text-primary);
 }
@@ -169,15 +159,14 @@ const hqSize = computed(() => {
 .cover-stage::after {
   position: absolute;
   inset: 0;
-  content: "";
-  background:
-    linear-gradient(
-      180deg,
-      rgb(0 0 0 / 0%) 34%,
-      rgb(0 0 0 / 8%) 49%,
-      rgb(0 0 0 / 58%) 74%,
-      var(--mobile-canvas) 100%
-    );
+  content: '';
+  background: linear-gradient(
+    180deg,
+    rgb(0 0 0 / 0%) 34%,
+    rgb(0 0 0 / 8%) 49%,
+    rgb(0 0 0 / 58%) 74%,
+    var(--mobile-canvas) 100%
+  );
 }
 
 .cover-poster {

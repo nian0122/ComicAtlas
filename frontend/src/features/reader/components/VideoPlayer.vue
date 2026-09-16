@@ -5,12 +5,7 @@
          预览 <video> 只按需解码首帧（必要时静音微播放一瞬后立即暂停），
          不预加载完整媒体，也不生成独立预览图。
          ============================================================ -->
-    <div
-      v-if="!activated"
-      class="video-placeholder"
-      data-reader-video-surface
-      @click="handleActivate"
-    >
+    <div v-if="!activated" class="video-placeholder" data-reader-video-surface @click="handleActivate">
       <!-- 浏览器原生首帧预览：静音微播放只为解码一帧，随后立即暂停。 -->
       <video
         ref="previewRef"
@@ -24,10 +19,7 @@
         @loadedmetadata="onPreviewMetadata"
         @error="onPreviewError"
       />
-      <div
-        class="video-placeholder-overlay"
-        :class="{ 'preview-ready': previewReady }"
-      >
+      <div class="video-placeholder-overlay" :class="{ 'preview-ready': previewReady }">
         <el-icon v-if="!previewReady" :size="32"><VideoPlay /></el-icon>
         <span v-if="duration" class="video-duration">{{ formatDuration(duration) }}</span>
       </div>
@@ -75,12 +67,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { VideoPlay } from '@element-plus/icons-vue'
-import {
-  activateSession,
-  releaseSession,
-  getPosition,
-  savePosition,
-} from '@/features/reader/videoPlaybackCoordinator'
+import { activateSession, releaseSession, getPosition, savePosition } from '@/features/reader/videoPlaybackCoordinator'
+import { clientLogger } from '@/services/logger'
 
 // ---------------------------------------------------------------------------
 // Props
@@ -173,9 +161,7 @@ const containerStyle = computed(() => ({
   width: '100%',
 }))
 
-const hasCodecInfo = computed(
-  () => !!(props.container || props.videoCodec || props.audioCodec),
-)
+const hasCodecInfo = computed(() => !!(props.container || props.videoCodec || props.audioCodec))
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -218,14 +204,15 @@ async function handleActivate(): Promise<void> {
     // AbortError: interrupted by a new play request (expected race, ignore)
     // Safari 可能因 DOM 更新后用户手势链断开而返回 NotAllowedError。
     // 这不是媒体损坏：保留已创建的视频和原生控件，交给用户点击播放。
-    if (
-      e instanceof DOMException &&
-      (e.name === 'AbortError' || e.name === 'NotAllowedError')
-    ) {
+    if (e instanceof DOMException && (e.name === 'AbortError' || e.name === 'NotAllowedError')) {
       playerState.value = 'paused'
       return
     }
-    console.debug('[VideoPlayer] play rejected:', e)
+    clientLogger.error('视频播放启动失败', {
+      operation: 'video.play',
+      mediaId: props.mediaId,
+      reason: e instanceof Error ? e.name : 'unknown',
+    })
     error.value = true
     playerState.value = 'error'
   }
@@ -236,7 +223,7 @@ async function handleActivate(): Promise<void> {
 // ---------------------------------------------------------------------------
 
 function unloadVideo(reason: string, mediaIdToSave?: number): void {
-  console.debug('[VideoPlayer] unloadVideo:', reason)
+  clientLogger.debug('视频播放器释放', { operation: 'video.unload', reason, mediaId: props.mediaId })
   const id = mediaIdToSave ?? props.mediaId ?? 0
   const video = videoRef.value
   if (video === null) {

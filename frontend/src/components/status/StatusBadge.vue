@@ -7,7 +7,7 @@ withDefaults(
     appearance?: 'tag' | 'dot'
     size?: 'small' | 'default' | 'large'
   }>(),
-  { tone: 'neutral', appearance: 'tag', size: 'default' },
+  { tone: 'neutral', code: undefined, appearance: 'tag', size: 'default' },
 )
 </script>
 

@@ -11,8 +11,12 @@
         <router-link to="/manage" class="active">管理</router-link>
       </nav>
       <div class="header-context">
-        <router-link to="/manage/import" class="header-import"><el-icon :size="16"><UploadFilled /></el-icon>导入</router-link>
-        <router-link to="/" class="profile-button" aria-label="返回阅读端"><el-icon :size="18"><User /></el-icon></router-link>
+        <router-link to="/manage/import" class="header-import"
+          ><el-icon :size="16"><UploadFilled /></el-icon>导入</router-link
+        >
+        <router-link to="/" class="profile-button" aria-label="返回阅读端"
+          ><el-icon :size="18"><User /></el-icon
+        ></router-link>
       </div>
     </header>
 
@@ -22,7 +26,9 @@
           <strong>Management</strong>
           <span>Private Console</span>
         </div>
-        <router-link to="/manage/import" class="new-import-link"><el-icon :size="18"><Plus /></el-icon>新建导入</router-link>
+        <router-link to="/manage/import" class="new-import-link"
+          ><el-icon :size="18"><Plus /></el-icon>新建导入</router-link
+        >
         <nav class="sidenav-menu" aria-label="管理导航">
           <router-link to="/manage" class="sidenav-link" exact-active-class="active">
             <el-icon :size="18"><HomeFilled /></el-icon>
@@ -64,8 +70,12 @@
         </nav>
 
         <div class="sidenav-footer">
-          <span><el-icon :size="18"><QuestionFilled /></el-icon>支持</span>
-          <span><el-icon :size="18"><InfoFilled /></el-icon>系统</span>
+          <span
+            ><el-icon :size="18"><QuestionFilled /></el-icon>支持</span
+          >
+          <span
+            ><el-icon :size="18"><InfoFilled /></el-icon>系统</span
+          >
         </div>
       </aside>
 
@@ -111,7 +121,6 @@ onMounted(() => {
   overflow: hidden;
   background: var(--bg-primary);
 }
-
 
 .management-header {
   z-index: var(--z-nav);
@@ -231,7 +240,7 @@ onMounted(() => {
   bottom: 9px;
   left: -16px;
   width: 3px;
-  content: "";
+  content: '';
   background: var(--accent);
   opacity: 0;
 }
@@ -281,9 +290,7 @@ onMounted(() => {
   padding: var(--space-8) var(--content-gutter);
   overflow-y: auto;
   overflow-x: clip;
-  background:
-    radial-gradient(circle at 100% 0, var(--accent-bg), transparent 26rem),
-    var(--bg-primary);
+  background: radial-gradient(circle at 100% 0, var(--accent-bg), transparent 26rem), var(--bg-primary);
 }
 
 /* Stitch 管理端：编辑台式布局，沿用阅读端同一组影院色阶。 */
@@ -330,7 +337,7 @@ onMounted(() => {
   left: 0;
   height: 2px;
   background: var(--color-brand);
-  content: "";
+  content: '';
 }
 
 .header-context {
