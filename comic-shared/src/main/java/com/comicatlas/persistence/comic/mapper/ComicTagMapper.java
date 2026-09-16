@@ -11,6 +11,9 @@ import java.util.List;
 @Mapper
 public interface ComicTagMapper extends BaseMapper<ComicTag> {
 
+    @Select("SELECT COUNT(*) FROM comic_tag WHERE tag_id = #{tagId}")
+    long countByTagId(@Param("tagId") Long tagId);
+
     @Select("SELECT tag_id FROM comic_tag WHERE comic_id = #{comicId}")
     List<ComicTag> selectByComicId(@Param("comicId") Long comicId);
 
