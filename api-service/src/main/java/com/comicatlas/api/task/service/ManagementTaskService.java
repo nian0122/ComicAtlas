@@ -481,6 +481,7 @@ public class ManagementTaskService {
             return taskResponseAssembler.toItemResponse(item);
         }
 
+        // TODO(IMPL-02): attempt/终态只在读取后判断，后续 UPDATE 仅按 ID；并发结果或重试可穿过检查，需条件更新并根据受影响行数决定后续聚合。
         item.setStatus(newStatus);
         item.setUpdatedAt(LocalDateTime.now());
 
@@ -494,6 +495,7 @@ public class ManagementTaskService {
                 .set(ManagementTaskItem::getUpdatedAt, LocalDateTime.now());
 
         if (newStatus == ManagementTaskStatus.RUNNING && item.getStartedAt() == null) {
+            // TODO(IMPL-07): updateItemStatus 已先给 item.startedAt 赋值，导致包围此语句的空值判断恒不成立；首次 RUNNING 的 started_at 未写入更新语句。
             updateWrapper.set(ManagementTaskItem::getStartedAt, LocalDateTime.now());
         }
 
@@ -528,6 +530,7 @@ public class ManagementTaskService {
      * @return true 表示进度已更新
      */
     @Transactional
+    // TODO(IMPL-02): 进度更新的 attempt/终态检查与仅按 ID 的 UPDATE 不原子；并发完成或重试时可能覆盖新状态/进度，需持久化条件保护。
     public boolean updateItemProgress(Long itemId, int attempt, int progress, String stage) {
         ManagementTaskItem item = itemMapper.selectById(itemId);
         if (item == null) {

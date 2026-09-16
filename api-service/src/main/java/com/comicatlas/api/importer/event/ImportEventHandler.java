@@ -108,6 +108,7 @@ public class ImportEventHandler {
 
         ImportTaskStatus currentStatus = task.getStatus();
         ImportTaskStatus mappedStatus = parseStatus(newStatus);
+        // TODO(IMPL-01): 终态保护只拦截非终态事件，SUCCESS/CANCELLED 仍可被迟到 FAILED 覆盖；需明确终态转换规则并在写入条件中保护。
         if (TERMINAL_STATUSES.contains(currentStatus)
                 && (mappedStatus == null || !mappedStatus.isTerminal())) {
             log.warn("状态机拒绝非终态写入: taskId={}, current={}, attempted={}", taskId, currentStatus, newStatus);

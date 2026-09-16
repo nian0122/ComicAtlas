@@ -11,6 +11,7 @@
 | [后端代码分类](architecture/backend-package-organization.md) | 业务域、框架职责与文件归属 |
 | [后端待解耦清单](architecture/backend-decoupling.md) | 源码标记、拆分约束与回归要求 |
 | [后端三层架构检查](architecture/backend-layer-audit.md) | 接口层越界、持久化框架类型泄漏和处理约束 |
+| [后端实现问题标记](architecture/backend-implementation-issues.md) | 状态并发、事务、计算与异常处理问题 |
 | `operations/` | 部署运维 |
 | `releases/` | 发布说明（当前稳定版 v2.1.0，历史版本归档） |
 | `development/` | 开发约定（java-naming） |
