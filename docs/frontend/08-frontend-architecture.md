@@ -10,11 +10,14 @@
 
 ## 目录结构（当前）
 
+样式与公共组件的归属以 [前端目录约定](../../frontend/README.md)、[样式目录规范](../../frontend/src/styles/README.md) 和 [公共组件规范](../../frontend/src/components/README.md) 为准。保留业务模块聚合；全局样式从 `styles/index.scss` 加载，抽离的页面样式集中在 `styles/pages/`，仍由页面通过 `scoped src` 按需引用。
+
 ```
 frontend/src/
 ├── App.vue                  # 根组件
 ├── main.ts                  # 入口
-├── style.css                # CSS 变量 / 设计 Token
+├── style.css                # 旧样式入口兼容层，新代码不再引用
+├── styles/                  # index.scss 统一入口、tokens/base/theme/animation 和 pages 页面样式
 ├── router/
 │   └── index.ts             # 路由定义（阅读端 6 + 管理端 8 主路由）
 ├── layouts/                 # 布局
