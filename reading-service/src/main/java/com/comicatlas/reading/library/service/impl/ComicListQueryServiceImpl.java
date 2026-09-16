@@ -16,7 +16,7 @@ import com.comicatlas.persistence.storage.FileUrlResolver;
 import com.comicatlas.persistence.reader.entity.ReadingHistory;
 import com.comicatlas.persistence.reader.mapper.ReadingHistoryMapper;
 import com.comicatlas.reading.library.service.ComicListQueryService;
-import com.comicatlas.reading.library.ComicListQueryNormalizer;
+import com.comicatlas.reading.library.support.ComicListQueryNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;

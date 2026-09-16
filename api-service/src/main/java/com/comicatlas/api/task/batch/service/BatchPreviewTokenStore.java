@@ -1,6 +1,6 @@
 package com.comicatlas.api.task.batch.service;
 
-import com.comicatlas.api.task.batch.BatchReasonCode;
+import com.comicatlas.api.task.batch.enums.BatchReasonCode;
 import com.comicatlas.api.task.batch.dto.BatchOperationRequest;
 import com.comicatlas.api.task.batch.dto.BatchOperationPayloadDTO;
 import com.comicatlas.api.shared.crypto.DigestService;

@@ -27,68 +27,76 @@ comic-atlas/
 └── docker-compose.infra.yml # 基础设施：MySQL + Redis + RabbitMQ + Nacos
 ```
 
+## 后端代码分类与解耦标记
+
+- Java 源码按“业务域 → 框架职责”分类；API 的 Controller、DTO、Service、数据库 Entity/Mapper 分别归业务域下的 `controller`、`dto`、`service`、`persistence.entity` / `persistence.mapper`。
+- `recovery` 负责磁盘元数据恢复数据库；`trash` 负责回收生命周期；导入候选目录扫描在 API 和 Worker 均归 `importer`。
+- 业务专属配置归业务 `config`；应用级框架装配保留根 `config`；Worker 数据库访问保持只读 `persistence`。
+- 当前目录说明：[后端代码分类](docs/architecture/backend-package-organization.md)。
+- 待拆分代码以 `TODO(DECOUPLE-xx)` 标记，原因、目标职责与验证要求见 [后端待解耦清单](docs/architecture/backend-decoupling.md)。移动目录不代表已完成解耦。
+
 ## WHERE TO LOOK
 | 任务 | 位置 | Notes |
 |------|------|-------|
-| 漫画列表/详情（读） | `reading-service/.../controller/ReadingComicController.java` | GET `/api/comics` + `/api/comics/{id}` + metadata/tags/autocomplete |
-| 漫画管理（写） | `api-service/.../controller/ComicManagementController.java` | POST/PUT/DELETE `/api/manage/comics/**` |
-| 目录树 | `reading-service/.../controller/CatalogController.java` | GET `/api/comics/{id}/catalog` |
-| 章节阅读 | `reading-service/.../controller/ReaderController.java` | GET `/api/chapters/{id}` 返回 pages+prev/next |
-| 阅读历史 | `reading-service/.../controller/HistoryController.java` | GET/PUT `/api/history/**`（进度保存为阅读端唯一写操作） |
-| Catalog Service | `reading-service/.../service/impl/CatalogServiceImpl.java` | buildTree 组装 ViewModel，缓存失效由管理端 CatalogCacheInvalidator 触发 |
-| Reader Service | `reading-service/.../service/impl/ReaderServiceImpl.java` | 按 global_order 取 prev/next |
-| 导入 API | `api-service/.../controller/ImportController.java` | POST `/api/manage/tasks/import` sourceType+sourcePath + batch/scan |
-| 导入 Service | `api-service/.../service/impl/ImportServiceImpl.java` | 预创建 comic+task → MQ |
-| LQ 生成 API | `api-service/.../storage/controller/StorageOperationController.java` | POST `/api/manage/storage/lq/{comics|chapters}/{id}`（regenerate 参数强制重建） |
-| HQ 删除 API | `api-service/.../storage/controller/StorageOperationController.java` | POST `/api/manage/storage/delete-hq/{comics|chapters}/{id}`（保留 LQ） |
-| MQ 消费 | `api-service/.../event/ImportEventHandler.java` | 读 metadata.json → INSERT |
-| LQ 完成处理 | `api-service/.../storage/service/MediaOperationCompletionService.java` | applyLqCompleted 更新 media.lq_status/lq_path/lq_size（Worker 回传 lqSize） |
-| HQ 删除完成 | `api-service/.../storage/service/MediaOperationCompletionService.java` | applyHqDeleteCompleted 置 media.hq_status=DELETED + ComicStatsService 重算 |
-| 结果分发 | `api-service/.../management/event/ManagementCommandResultHandler.java` | 纯状态机：Inbox 幂等 + item 流转 + 按操作类型路由到各 completion service |
+| 漫画列表/详情（读） | `reading-service/.../library/controller/ReadingComicController.java` | GET `/api/comics` + `/api/comics/{id}` + metadata/tags/autocomplete |
+| 漫画管理（写） | `api-service/.../metadata/controller/ComicManagementController.java` | POST/PUT/DELETE `/api/manage/comics/**` |
+| 目录树 | `reading-service/.../catalog/controller/CatalogController.java` | GET `/api/comics/{id}/catalog` |
+| 章节阅读 | `reading-service/.../reader/controller/ReaderController.java` | GET `/api/chapters/{id}` 返回 pages+prev/next |
+| 阅读历史 | `reading-service/.../history/controller/HistoryController.java` | GET/PUT `/api/history/**`（进度保存为阅读端唯一写操作） |
+| Catalog Service | `reading-service/.../catalog/service/impl/CatalogServiceImpl.java` | buildTree 组装 ViewModel，缓存失效由管理端 CatalogCacheInvalidator 触发 |
+| Reader Service | `reading-service/.../reader/service/impl/ReaderServiceImpl.java` | 按 global_order 取 prev/next |
+| 导入 API | `api-service/.../importer/controller/ImportController.java` | POST `/api/manage/tasks/import` sourceType+sourcePath + batch/scan |
+| 导入 Service | `api-service/.../importer/service/impl/ImportServiceImpl.java` | 预创建 comic+task → MQ |
+| LQ 生成 API | `api-service/.../media/controller/StorageOperationController.java` | POST `/api/manage/storage/lq/{comics|chapters}/{id}`（regenerate 参数强制重建） |
+| HQ 删除 API | `api-service/.../media/controller/StorageOperationController.java` | POST `/api/manage/storage/delete-hq/{comics|chapters}/{id}`（保留 LQ） |
+| MQ 消费 | `api-service/.../importer/event/ImportEventHandler.java` | 读 metadata.json → INSERT |
+| LQ 完成处理 | `api-service/.../media/service/MediaOperationCompletionService.java` | applyLqCompleted 更新 media.lq_status/lq_path/lq_size（Worker 回传 lqSize） |
+| HQ 删除完成 | `api-service/.../media/service/MediaOperationCompletionService.java` | applyHqDeleteCompleted 置 media.hq_status=DELETED + ComicStatsService 重算 |
+| 结果分发 | `api-service/.../task/event/ManagementCommandResultHandler.java` | 纯状态机：Inbox 幂等 + item 流转 + 按操作类型路由到各 completion service |
 | 统计聚合 | `api-service/.../storage/service/ComicStatsService.java` | 派生数据单一收口：hqSize/lqSize/totalPages/pageCount 从 media/chapter 行重算 |
-| 回收站/永久清理 | `api-service/.../management/trash/TrashLifecycleController.java` | POST /api/trash/... restore/purge/reconcile（删除=回收，永久删除=purge） |
+| 回收站/永久清理 | `api-service/.../trash/controller/TrashLifecycleController.java` | POST /api/trash/... restore/purge/reconcile（删除=回收，永久删除=purge） |
 | 目录扫描 | `api-service/.../importer/controller/DirectoryScanTaskController.java` | POST /api/tasks/directory-scan，漫画集根目录批量发现（直接子目录=候选漫画） |
 | 媒体上传（预留能力） | `api-service/.../upload/` | 分块上传后端可用、无前端入口，接口能力预留 |
-| 恢复任务 API | `api-service/.../controller/RecoveryTaskController.java` | POST /api/tasks/recovery |
-| 恢复任务 Service | `api-service/.../service/impl/RecoveryTaskServiceImpl.java` | 创建/重试/列表 |
-| 恢复事件发布 | `api-service/.../event/RecoveryEventPublisher.java` | 发送恢复事件到 MQ |
-| 恢复事件处理 | `api-service/.../event/RecoveryEventHandler.java` | 消费 MQ 事件，逐本调用 RecoveryEngine |
-| 恢复引擎 | `api-service/.../recovery/RecoveryEngine.java` | 单本漫画的 DB 恢复逻辑 |
-| Worker 恢复入口 | `worker-service/.../event/RecoveryTaskHandler.java` | 扫描 HQ 目录，发布 comicId 列表 |
+| 恢复任务 API | `api-service/.../recovery/controller/RecoveryTaskController.java` | POST /api/tasks/recovery |
+| 恢复任务 Service | `api-service/.../recovery/service/impl/RecoveryTaskServiceImpl.java` | 创建/重试/列表 |
+| 恢复事件发布 | `worker-service/.../recovery/event/RecoveryEventPublisher.java` | 发送恢复事件到 MQ |
+| 恢复事件处理 | `api-service/.../recovery/event/RecoveryEventHandler.java` | 消费 MQ 事件，逐本调用 RecoveryEngine |
+| 恢复引擎 | `api-service/.../recovery/engine/RecoveryEngine.java` | 单本漫画的 DB 恢复逻辑 |
+| Worker 恢复入口 | `worker-service/.../recovery/event/RecoveryTaskHandler.java` | 扫描 HQ 目录，发布 comicId 列表 |
 | 事件 DTO | `comic-common/.../event/` | 33 个事件 record + ComicEvent sealed interface + payload/（数据载体） |
 | MQ 常量 | `comic-common/.../constant/` | MqExchanges/MqQueues/MqRoutingKeys（exchange/queue/routingKey 契约） |
 | 元数据构建 | `comic-common/.../metadata/` | MetadataV3/MetadataJsonBuilder（V3 元数据模型） |
 | MQ 消费支持 | `comic-common/.../mq/` | MqConsumerSupport（统一 ACK/Reject/DLQ 策略） |
 | 工具类 | `comic-common/.../util/` | ImageDimensionsReader（图片尺寸读取） |
 | DTO | `comic-common/.../dto/` | ScanItemDTO/ScanResultDTO/TrashManifestDTO/TrashManifestItemDTO/OutboxStatsDTO 等 |
-| 枚举 | `api-service/.../common/enums/` | TaskType/TaskStage/ManagementTaskStatus/TranscodeStatus 等（仅 api 消费） |
-| Worker 入口 | `worker-service/.../event/ImportTaskHandler.java` | sourceType 路由到统一 handler |
-| 取消任务 | `worker-service/.../event/CancelHandler.java` | ConcurrentHashMap 标记 |
-| LQ 生成 | `worker-service/.../command/LqCommandHandler.java` | 调用 ImageOptimizer 外部工具 |
-| HQ 删除 | `worker-service/.../command/HqDeleteCommandHandler.java` | 按章节/漫画删除 HQ 文件 |
-| 目录解析 | `worker-service/.../importer/DirectoryParser.java` | 输出 DirectoryTree（纯树，无业务语义） |
-| 元数据组装 | `worker-service/.../importer/MetadataAssembler.java` | DirectoryTree → ComicMetadata（注入 Catalog/Chapter） |
+| 枚举 | `api-service/.../{task,importer,recovery,exporter}/enums/` | TaskType/TaskStage/ManagementTaskStatus/TranscodeStatus 等（仅 api 消费） |
+| Worker 入口 | `worker-service/.../importer/event/ImportTaskHandler.java` | sourceType 路由到统一 handler |
+| 取消任务 | `worker-service/.../task/command/CancelHandler.java` | ConcurrentHashMap 标记 |
+| LQ 生成 | `worker-service/.../media/lq/LqCommandHandler.java` | 调用 ImageOptimizer 外部工具 |
+| HQ 删除 | `worker-service/.../media/hq/HqDeleteCommandHandler.java` | 按章节/漫画删除 HQ 文件 |
+| 目录解析 | `worker-service/.../importer/parser/DirectoryParser.java` | 输出 DirectoryTree（纯树，无业务语义） |
+| 元数据组装 | `worker-service/.../importer/metadata/MetadataAssembler.java` | DirectoryTree → ComicMetadata（注入 Catalog/Chapter） |
 | 媒体分析 | `worker-service/.../media/MediaAnalyzer.java` | 图片尺寸 + ffprobe 视频元数据 |
-| 统一导入 | `worker-service/.../importer/DirectoryImportHandler.java` | handle() 解析→暂存文件到 HQ→写metadata |
-| 导入最终化 | `worker-service/.../event/ImportStorageFinalizeHandler.java` | 两阶段最终化：hq/{comicId}/{globalOrder} → hq/{comicId}/{chapterId} |
+| 统一导入 | `worker-service/.../importer/handler/DirectoryImportHandler.java` | handle() 解析→暂存文件到 HQ→写metadata |
+| 导入最终化 | `worker-service/.../importer/event/ImportStorageFinalizeHandler.java` | 两阶段最终化：hq/{comicId}/{globalOrder} → hq/{comicId}/{chapterId} |
 | 最终化落库 | `api-service/.../importer/service/impl/ImportPersistenceServiceImpl.java` | 逐章收尾，全 READY → comic READY / task SUCCESS |
-| ZIP 导入 | `worker-service/.../importer/ZipImportHandler.java` | 解压→委托 DirectoryImportHandler；入口必须是最后 `.zip`，缺任一卷失败，`.z01` 不可作为入口 |
-| 分卷解析 | `worker-service/.../file/archive/ZipVolumeResolver.java` | 最后 `.zip` 为唯一入口 → 有序 `.z01..zNN`+主文件（缺号/重复/非法命名/非普通文件拒绝） |
-| ZIP 解压 | `worker-service/.../file/extract/ZipExtractor.java` | Commons ZipFile 随机访问 + 标准分卷 + 安全校验；`.z01` 永不作为入口 |
-| 导出编排 | `worker-service/.../export/ExportService.java` | collect → manifest → ZipBuilder → 原子发布 `EXPORT/{taskId}`（本地路径产物，无下载端点） |
-| 分卷 ZIP 构建 | `worker-service/.../export/ZipBuilder.java` | `ZipBuildResult(主 .zip, 有序分卷, 总大小)`；manifest 总未压缩 > `zip.splitSize` 才分卷 |
-| EHENTAI 导入 | `worker-service/.../file/download/EhentaiDownloadService.java` | 下载(Archiver优先→Torrent兜底)→解压→返回源目录，委托 DirectoryImportHandler |
+| ZIP 导入 | `worker-service/.../importer/handler/ZipImportHandler.java` | 解压→委托 DirectoryImportHandler；入口必须是最后 `.zip`，缺任一卷失败，`.z01` 不可作为入口 |
+| 分卷解析 | `worker-service/.../shared/archive/ZipVolumeResolver.java` | 最后 `.zip` 为唯一入口 → 有序 `.z01..zNN`+主文件（缺号/重复/非法命名/非普通文件拒绝） |
+| ZIP 解压 | `worker-service/.../importer/archive/extract/ZipExtractor.java` | Commons ZipFile 随机访问 + 标准分卷 + 安全校验；`.z01` 永不作为入口 |
+| 导出编排 | `worker-service/.../exporter/service/ExportService.java` | collect → manifest → ZipBuilder → 原子发布 `EXPORT/{taskId}`（本地路径产物，无下载端点） |
+| 分卷 ZIP 构建 | `worker-service/.../exporter/archive/ZipBuilder.java` | `ZipBuildResult(主 .zip, 有序分卷, 总大小)`；manifest 总未压缩 > `zip.splitSize` 才分卷 |
+| EHENTAI 导入 | `worker-service/.../importer/download/EhentaiDownloadService.java` | 下载(Archiver优先→Torrent兜底)→解压→返回源目录，委托 DirectoryImportHandler |
 | 存储服务 | `worker-service/.../storage/StorageService.java` | store/resolve/exists/delete |
 | 存储根 | `worker-service/.../storage/StorageRoot.java` | path + resolve() + exists() |
 | 文件引用 | `worker-service/.../storage/StorageRef.java` | rootKey + relativePath |
-| 图片优化 | `worker-service/.../image/ImageOptimizer.java` | 外部 Go 工具生成 WebP LQ |
-| URL 解析 | `api-service/.../storage/FileUrlResolver.java` | Page → /files/{root}/{path} |
+| 图片优化 | `worker-service/.../media/image/ImageOptimizer.java` | 外部 Go 工具生成 WebP LQ |
+| URL 解析 | `comic-shared/.../storage/FileUrlResolver.java` | Page → /files/{root}/{path} |
 | 路径布局 | `api-service/.../storage/StorageLayout.java` | forPage(comicId, chapterId, imageName) |
 | 元数据模型 | `worker-service/.../media/ComicMetadata.java` | catalogs + chapters + mediaItems(IMAGE/VIDEO) |
-| 导入上下文 | `worker-service/.../importer/ImportContext.java` | sourceType + sourcePath |
-| 命令执行器 | `worker-service/.../command/` | TranscodeCommandHandler/TrashCommandHandler 等 8 个（ManagementCommandDispatcher 路由） |
-| 存储管理 API | `api-service/.../controller/AdminStorageController.java` | stats/comics/chapters |
-| 存储查询 | `api-service/.../service/StorageQueryService.java` | 聚合 HQ/LQ 大小+状态 |
+| 导入上下文 | `worker-service/.../importer/model/ImportContext.java` | sourceType + sourcePath |
+| 命令执行器 | `worker-service/.../{media,trash,task}/` | TranscodeCommandHandler/TrashCommandHandler 等 8 个（ManagementCommandDispatcher 路由） |
+| 存储管理 API | `api-service/.../storage/controller/AdminStorageController.java` | stats/comics/chapters |
+| 存储查询 | `api-service/.../storage/service/StorageQueryService.java` | 聚合 HQ/LQ 大小+状态 |
 | 前端路由 | `frontend/src/router/index.ts` | 14 routes（reading 6 + management 8） |
 | Pinia Store | `frontend/src/stores/` | comic/reader/import/history/tag/app/management-comic/storage/category/reader-settings + reading.ts barrel |
 | API 服务 | `frontend/src/services/api.ts` | comic/catalog/reader/import/lq/hq/admin |

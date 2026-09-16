@@ -1,5 +1,7 @@
 package com.comicatlas.api.recovery.trash;
 
+import com.comicatlas.api.trash.persistence.entity.TrashManifestRecord;
+
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Comic;
@@ -10,10 +12,10 @@ import com.comicatlas.persistence.comic.mapper.MediaMapper;
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.enums.HqStatus;
 import com.comicatlas.contract.common.enums.LqStatus;
-import com.comicatlas.api.task.entity.ManagementTaskItem;
-import com.comicatlas.api.task.mapper.ManagementTaskItemMapper;
-import com.comicatlas.api.task.mapper.ManagementTaskMapper;
-import com.comicatlas.api.task.mapper.TrashManifestMapper;
+import com.comicatlas.api.task.persistence.entity.ManagementTaskItem;
+import com.comicatlas.api.task.persistence.mapper.ManagementTaskItemMapper;
+import com.comicatlas.api.task.persistence.mapper.ManagementTaskMapper;
+import com.comicatlas.api.trash.persistence.mapper.TrashManifestMapper;
 import com.comicatlas.persistence.reader.entity.ReadingHistory;
 import com.comicatlas.persistence.reader.mapper.ReadingHistoryMapper;
 import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
@@ -22,11 +24,11 @@ import com.comicatlas.api.task.enums.TaskType;
 import com.comicatlas.contract.common.enums.TranscodeStatus;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.worker.task.publisher.ManagementCommandPublisher;
-import com.comicatlas.worker.recovery.command.PurgeCommandHandler;
-import com.comicatlas.worker.recovery.command.RestoreCommandHandler;
-import com.comicatlas.worker.recovery.command.TrashCommandHandler;
+import com.comicatlas.worker.trash.command.PurgeCommandHandler;
+import com.comicatlas.worker.trash.command.RestoreCommandHandler;
+import com.comicatlas.worker.trash.command.TrashCommandHandler;
 import com.comicatlas.worker.storage.StorageProperties;
-import com.comicatlas.worker.recovery.trash.TrashManifestStore;
+import com.comicatlas.worker.trash.manifest.TrashManifestStore;
 import com.comicatlas.worker.persistence.mapper.TrashManifestReadMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;

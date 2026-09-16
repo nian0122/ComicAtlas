@@ -1,10 +1,10 @@
 package com.comicatlas.api.outbox;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.comicatlas.api.outbox.entity.InboxReceipt;
-import com.comicatlas.api.outbox.entity.OutboxMessage;
-import com.comicatlas.api.outbox.mapper.InboxReceiptMapper;
-import com.comicatlas.api.outbox.mapper.OutboxMessageMapper;
+import com.comicatlas.api.outbox.persistence.entity.InboxReceipt;
+import com.comicatlas.api.outbox.persistence.entity.OutboxMessage;
+import com.comicatlas.api.outbox.persistence.mapper.InboxReceiptMapper;
+import com.comicatlas.api.outbox.persistence.mapper.OutboxMessageMapper;
 import com.comicatlas.api.outbox.service.InboxService;
 import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.common.dto.OutboxStatsDTO;

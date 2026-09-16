@@ -102,6 +102,7 @@ public class LqCommandHandler {
      *
      * @return 失败页码列表（空 = 全部成功）+ 各成功页的 LQ 产物大小
      */
+    // TODO(DECOUPLE-07): 命令适配混合媒体查询、优化执行和结果匹配；提取章节优化服务，命令层保留进度及完成/失败事件发布。
     private ChapterProcessResult processChapter(Long chapterId, boolean force) {
         List<MediaRecord> pages = mediaMapper.selectByChapterId(chapterId);
         if (pages.isEmpty()) {

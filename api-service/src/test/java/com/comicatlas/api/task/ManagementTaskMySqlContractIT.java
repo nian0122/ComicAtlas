@@ -1,7 +1,7 @@
 package com.comicatlas.api.task;
 
-import com.comicatlas.api.task.entity.ManagementTask;
-import com.comicatlas.api.task.mapper.ManagementTaskMapper;
+import com.comicatlas.api.task.persistence.entity.ManagementTask;
+import com.comicatlas.api.task.persistence.mapper.ManagementTaskMapper;
 import com.comicatlas.api.task.enums.ManagementTaskStatus;
 import com.comicatlas.api.task.enums.TaskType;
 import org.junit.jupiter.api.DisplayName;

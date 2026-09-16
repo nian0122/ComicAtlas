@@ -16,7 +16,7 @@ import com.comicatlas.persistence.comic.entity.ComicTag;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.persistence.comic.mapper.ComicTagMapper;
 import com.comicatlas.reading.library.service.ComicListQueryService;
-import com.comicatlas.reading.library.ComicListQueryNormalizer;
+import com.comicatlas.reading.library.support.ComicListQueryNormalizer;
 import com.comicatlas.reading.library.service.ComicQueryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

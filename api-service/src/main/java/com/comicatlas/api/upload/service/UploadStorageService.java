@@ -2,7 +2,7 @@ package com.comicatlas.api.upload.service;
 import com.comicatlas.api.upload.domain.RangeTracker;
 import com.comicatlas.api.upload.domain.UploadSessionStatus;
 import com.comicatlas.api.upload.support.DiskSpaceChecker;
-import com.comicatlas.api.upload.support.UploadProperties;
+import com.comicatlas.api.upload.config.UploadProperties;
 
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;

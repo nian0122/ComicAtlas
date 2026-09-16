@@ -6,7 +6,7 @@ import com.comicatlas.api.recovery.service.RecoveryCompatibilityService;
 import com.comicatlas.api.recovery.controller.RecoveryCompatibilityController;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.contract.common.exception.GlobalExceptionHandler;
-import com.comicatlas.api.config.DlqSecurityConfig;
+import com.comicatlas.api.dlq.config.DlqSecurityConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;

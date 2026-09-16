@@ -8,6 +8,8 @@
 | [`frontend/design-system.md`](frontend/design-system.md) | 前端视觉设计规范；实现令牌位于 `frontend/src/styles/tokens.css` |
 | [`architecture/README.md`](architecture/README.md) | 当前架构总览；专题设计与 ADR 位于 `architecture/` |
 | `architecture/shared-module-boundaries.md` | 跨服务契约与持久化模块边界 |
+| [后端代码分类](architecture/backend-package-organization.md) | 业务域、框架职责与文件归属 |
+| [后端待解耦清单](architecture/backend-decoupling.md) | 源码标记、拆分约束与回归要求 |
 | `operations/` | 部署运维 |
 | `releases/` | 发布说明（当前稳定版 v2.1.0，历史版本归档） |
 | `development/` | 开发约定（java-naming） |

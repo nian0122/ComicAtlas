@@ -1,9 +1,9 @@
 package com.comicatlas.api.exporter.event;
 
 import com.comicatlas.api.exporter.enums.ExportTaskStatus;
-import com.comicatlas.api.exporter.entity.ExportTask;
-import com.comicatlas.api.exporter.mapper.ExportTaskMapper;
-import com.comicatlas.api.task.entity.ManagementTaskItem;
+import com.comicatlas.api.exporter.persistence.entity.ExportTask;
+import com.comicatlas.api.exporter.persistence.mapper.ExportTaskMapper;
+import com.comicatlas.api.task.persistence.entity.ManagementTaskItem;
 import com.comicatlas.api.task.service.ManagementTaskService;
 import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.api.task.enums.ManagementTaskStatus;

@@ -193,6 +193,7 @@ public class DirectoryImportHandler {
         return new ManifestBuildResult(files, nameMap);
     }
 
+    // TODO(DECOUPLE-06): 导入编排还构造元数据并选择/生成封面；提取元数据写出与封面生成服务，保留清单恢复和取消检查顺序。
     private Map<String, Object> buildMetadataMap(ComicMetadata metadata, Long taskId, Long comicId,
                                                  Map<String, String> generatedNames) {
         Map<String, Object> comic = new LinkedHashMap<>();

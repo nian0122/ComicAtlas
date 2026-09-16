@@ -2,8 +2,8 @@ package com.comicatlas.api.importer.service.impl;
 
 import com.comicatlas.api.importer.enums.DirectoryScanTaskStatus;
 import com.comicatlas.api.importer.dto.DirectoryScanTaskVO;
-import com.comicatlas.api.importer.entity.DirectoryScanTask;
-import com.comicatlas.api.importer.mapper.DirectoryScanTaskMapper;
+import com.comicatlas.api.importer.persistence.entity.DirectoryScanTask;
+import com.comicatlas.api.importer.persistence.mapper.DirectoryScanTaskMapper;
 import com.comicatlas.api.task.service.ManagementTaskService;
 import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.common.constant.MqExchanges;

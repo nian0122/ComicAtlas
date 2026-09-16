@@ -1,12 +1,12 @@
 package com.comicatlas.api.task.batch.service;
 
-import com.comicatlas.api.task.batch.BatchConflictException;
-import com.comicatlas.api.task.batch.BatchReasonCode;
+import com.comicatlas.api.task.batch.exception.BatchConflictException;
+import com.comicatlas.api.task.batch.enums.BatchReasonCode;
 import com.comicatlas.api.task.batch.config.BatchProperties;
 import com.comicatlas.api.task.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.task.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.task.dto.ManagementTaskResponse;
-import com.comicatlas.api.task.entity.ManagementTask;
+import com.comicatlas.api.task.persistence.entity.ManagementTask;
 import com.comicatlas.api.task.service.ManagementTaskService;
 import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.common.constant.MqExchanges;

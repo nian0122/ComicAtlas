@@ -2,8 +2,8 @@ package com.comicatlas.api.metadata.service;
 
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
-import com.comicatlas.api.task.entity.ManagementTaskItem;
-import com.comicatlas.api.task.mapper.ManagementTaskItemMapper;
+import com.comicatlas.api.task.persistence.entity.ManagementTaskItem;
+import com.comicatlas.api.task.persistence.mapper.ManagementTaskItemMapper;
 import com.comicatlas.api.task.service.ManagementTaskService;
 import com.comicatlas.api.storage.service.ComicStatsService;
 import com.comicatlas.api.outbox.service.InboxService;

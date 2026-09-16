@@ -17,15 +17,15 @@ import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
 import com.comicatlas.api.task.enums.TaskType;
 import com.comicatlas.contract.common.enums.TranscodeStatus;
 import com.comicatlas.api.task.dto.OperationSubmitResultDTO;
-import com.comicatlas.api.task.entity.ManagementTask;
-import com.comicatlas.api.task.entity.ManagementTaskItem;
-import com.comicatlas.api.task.mapper.ManagementTaskItemMapper;
-import com.comicatlas.api.task.mapper.ManagementTaskMapper;
-import com.comicatlas.api.media.operation.MediaOperationCommandService;
+import com.comicatlas.api.task.persistence.entity.ManagementTask;
+import com.comicatlas.api.task.persistence.entity.ManagementTaskItem;
+import com.comicatlas.api.task.persistence.mapper.ManagementTaskItemMapper;
+import com.comicatlas.api.task.persistence.mapper.ManagementTaskMapper;
+import com.comicatlas.api.media.service.MediaOperationCommandService;
 import com.comicatlas.api.task.service.ManagementTaskService;
-import com.comicatlas.api.outbox.entity.OutboxMessage;
-import com.comicatlas.api.outbox.mapper.InboxReceiptMapper;
-import com.comicatlas.api.outbox.mapper.OutboxMessageMapper;
+import com.comicatlas.api.outbox.persistence.entity.OutboxMessage;
+import com.comicatlas.api.outbox.persistence.mapper.InboxReceiptMapper;
+import com.comicatlas.api.outbox.persistence.mapper.OutboxMessageMapper;
 import com.comicatlas.api.outbox.relay.OutboxRelay;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO.ChapterSnapshot;
@@ -494,8 +494,8 @@ class MetadataRefreshRealChainIT {
 
         // 重放同一事件（同 eventId）
         rabbitTemplate.convertAndSend("comic.management", "command.completed", completed);
-        await(() -> inboxMapper.selectCount(new LambdaQueryWrapper<com.comicatlas.api.outbox.entity.InboxReceipt>()
-                .eq(com.comicatlas.api.outbox.entity.InboxReceipt::getEventId,
+        await(() -> inboxMapper.selectCount(new LambdaQueryWrapper<com.comicatlas.api.outbox.persistence.entity.InboxReceipt>()
+                .eq(com.comicatlas.api.outbox.persistence.entity.InboxReceipt::getEventId,
                         completed.eventId().toString())) == 1, "Inbox 记录");
         Thread.sleep(800);
         // 不二次 apply：新增 004.jpg 仍只有 1 行、101 尺寸不被覆盖

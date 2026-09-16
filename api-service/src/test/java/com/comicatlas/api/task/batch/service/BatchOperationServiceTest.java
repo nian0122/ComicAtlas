@@ -4,7 +4,7 @@ import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.api.task.enums.ManagementTaskStatus;
 import com.comicatlas.api.task.enums.TaskType;
-import com.comicatlas.api.task.batch.BatchReasonCode;
+import com.comicatlas.api.task.batch.enums.BatchReasonCode;
 import com.comicatlas.api.task.batch.config.BatchProperties;
 import com.comicatlas.api.task.batch.dto.BatchCreateResponse;
 import com.comicatlas.api.task.batch.dto.BatchOperationRequest;
