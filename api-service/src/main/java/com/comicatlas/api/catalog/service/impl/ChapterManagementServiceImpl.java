@@ -44,7 +44,6 @@ import java.util.Objects;
  */
 @Slf4j
 @Service
-// TODO(LAYER-14): 具体 Service 实现位于 service 包，未与 Service 接口及 service/impl 实现分离。
 @RequiredArgsConstructor
 public class ChapterManagementServiceImpl implements ChapterManagementService {
 
