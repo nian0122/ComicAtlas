@@ -63,7 +63,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
- * 元数据扫盘刷新 Worker 真实链路验收（Todo 8 / Wave 3，扫描段 + 重写段）。
+ * 元数据扫盘刷新 Worker 真实链路验收（Wave 3，扫描段 + 重写段）。
  * <p>
  * 真实 Testcontainers MySQL（worker_user 只读 + api_user 可写）+ RabbitMQ + 真实 HQ/STAGING/METADATA
  * 临时根。扫描段：真实 {@link MetadataRefreshCommandHandler} 读取真实 DB 基线 + 真实磁盘 HQ 目录，

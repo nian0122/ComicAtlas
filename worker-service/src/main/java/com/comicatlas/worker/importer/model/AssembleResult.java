@@ -15,7 +15,7 @@ public record AssembleResult(
     List<AssembleWarning> warnings
 ) {
 
-    /** 空目录警告码：对应 Todo 1 ScanWarningCode 的 EMPTY_DIRECTORY 语义。 */
+    /** 空目录警告码：对应 ScanWarningCode 的 EMPTY_DIRECTORY 语义。 */
     public static final String CODE_EMPTY_DIRECTORY = "EMPTY_DIRECTORY";
 
     /**

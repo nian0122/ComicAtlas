@@ -65,7 +65,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 
 /**
- * 元数据扫盘刷新真实链路闭环验收（Todo 8 / Wave 3）。
+ * 元数据扫盘刷新真实链路闭环验收（Wave 3）。
  * <p>
  * 真实 Testcontainers MySQL + RabbitMQ + 共享 STAGING/HQ 临时根。分段验收的应用段：
  * 直接命令触发 → 模拟 Worker 落盘快照（按 Worker 契约：STAGING/metadata-refresh/

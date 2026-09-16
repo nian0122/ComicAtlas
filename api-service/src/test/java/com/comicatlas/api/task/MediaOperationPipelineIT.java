@@ -551,7 +551,7 @@ class MediaOperationPipelineIT {
         assertThat(outboxMapper.selectCount(new LambdaQueryWrapper<>())).isEqualTo(1);
     }
 
-    // ======================== 元数据刷新完成事件（Todo 5 专用流程） ========================
+    // ======================== 元数据刷新完成事件专用流程 ========================
 
     @Test
     @DisplayName("元数据刷新完成：completed → item SUCCEEDED、comic READY、Outbox 入箱并 relay 发布、快照清理")

@@ -43,7 +43,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SemanticNamingContractTest {
 
     /**
-     * 固定禁用声明表：类型 + 变量名 → 推荐命名。覆盖命名标准化 Todo 2-6 的全部固定映射。
+     * 固定禁用声明表：类型 + 变量名 → 推荐命名，覆盖命名标准化阶段的全部固定映射。
      *
      * <p><b>不变式：</b>必须与 {@link #DETECTION_FIXTURES} 逐项一致（含顺序）。
      * 新增或删除规则时两处必须同步修改，否则检测有效性测试会失败。
