@@ -58,7 +58,9 @@ public class ReaderAssembler {
     }
 
     private String extractFileName(String path) {
-        if (path == null || path.isBlank()) return "";
+        if (path == null || path.isBlank()) {
+            return "";
+        }
         int separator = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
         return separator >= 0 ? path.substring(separator + 1) : path;
     }
