@@ -4,12 +4,17 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
 import java.util.List;
 
 @Mapper
 public interface ChapterMapper extends BaseMapper<Chapter> {
+
+    @Select("SELECT id, comic_id, catalog_id, title, chapter_no, page_count, global_order, status "
+            + "FROM chapter WHERE comic_id = #{comicId} AND status = 'READY' ORDER BY chapter_no ASC")
+    List<Chapter> selectReadyByComicIdOrderByChapterNo(@Param("comicId") Long comicId);
 
     /**
      * 将漫画章节临时置为互不冲突的负序号，供全局重排的第二阶段使用。

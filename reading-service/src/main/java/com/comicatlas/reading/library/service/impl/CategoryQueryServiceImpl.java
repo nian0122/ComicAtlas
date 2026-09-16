@@ -1,6 +1,5 @@
 package com.comicatlas.reading.library.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.contract.comic.cache.ComicReferenceCache;
 import com.comicatlas.contract.comic.dto.CategoryDTO;
 import com.comicatlas.persistence.comic.entity.Category;
@@ -26,7 +25,7 @@ public class CategoryQueryServiceImpl implements CategoryQueryService {
         key = "'" + ComicReferenceCache.ALL_KEY + "'",
         unless = "#result == null || #result.isEmpty()")
     public List<CategoryDTO> listCategories() {
-        return new ArrayList<>(categoryMapper.selectList(new LambdaQueryWrapper<Category>().orderByAsc(Category::getSortOrder))
+        return new ArrayList<>(categoryMapper.selectAllOrderedBySortOrder()
                 .stream()
                 .map(this::toDTO)
                 .sorted(Comparator.comparingInt(category -> category.getSortOrder() == null ? 0 : category.getSortOrder()))

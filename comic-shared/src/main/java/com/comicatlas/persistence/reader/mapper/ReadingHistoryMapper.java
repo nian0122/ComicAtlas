@@ -4,9 +4,14 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.comicatlas.persistence.reader.entity.ReadingHistory;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 
 @Mapper
 public interface ReadingHistoryMapper extends BaseMapper<ReadingHistory> {
+
+    @Select("SELECT comic_id, chapter_id, page_number, updated_at FROM reading_history WHERE comic_id = #{comicId}")
+    ReadingHistory selectByComicId(@Param("comicId") Long comicId);
 
     /**
      * 按漫画唯一键原子写入最近阅读进度，避免并发请求在 select-then-insert 之间产生重复记录。
