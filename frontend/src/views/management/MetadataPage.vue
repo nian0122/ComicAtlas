@@ -210,7 +210,7 @@ async function onDeleteTag(tag: TagDTO | null | undefined) {
 }
 
 .metadata-page :deep(.el-input__wrapper.is-focus) {
-  box-shadow: 0 0 0 1px var(--accent) inset;
+  box-shadow: none !important;
 }
 
 .tag-list {
