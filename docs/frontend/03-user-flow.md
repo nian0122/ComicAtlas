@@ -51,7 +51,7 @@ Reader（阅读器 /reader/:chapterId）
 管理端 Import（/manage/import）
     │ 选择来源 ZIP / CBZ 文件 / DIRECTORY 本地目录
     │ 输入文件路径（ZIP 文件路径 或 本地目录路径）
-    │ （EHENTAI 由 API 提交，前端暂未开放入口）
+    │ （EHENTAI 画廊 URL 由导入页提交）
     │ 点击"开始导入"（批量仅支持本地目录）
     ▼
 任务中心（/manage/tasks）

@@ -328,6 +328,7 @@ function errorMessage(error: unknown): string {
 </script>
 
 <style scoped>
+/* TODO(FE-STYLE): 页面样式块约 577 行；将导入表单、扫描预览区拆为就近组件，让样式与界面区域一起维护。 */
 .import-page {
   width: 100%;
   max-width: 1120px;

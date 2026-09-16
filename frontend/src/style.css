@@ -1,3 +1,4 @@
+/* TODO(FE-STYLE): 基础样式、原生表单、焦点和滚动条规则仍集中在根目录；整理到 styles/base.css，并由统一样式入口加载。 */
 :root {
   font: 14px/1.5 var(--font-ui);
   color-scheme: dark;

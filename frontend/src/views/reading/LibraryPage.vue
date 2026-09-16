@@ -450,6 +450,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+/* TODO(FE-STYLE): 页面样式块约 708 行；将筛选面板和列表区域拆为就近组件，减少页面承载的大块样式。 */
 .comic-list-page {
   max-width: var(--content-max);
   margin: 0 auto;

@@ -250,6 +250,7 @@ const flatItems = computed<FlatItem[]>(() => {
   border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
 }
 
+/* TODO(FE-STYLE): 避免父组件通过 :deep 覆盖章节行外观；由章节行自身变体或 CSS 变量表达状态。 */
 .catalog-tree :deep(.chapter-row) {
   position: relative;
   border-radius: 0;

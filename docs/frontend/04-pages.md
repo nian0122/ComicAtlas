@@ -117,8 +117,8 @@
 **路由**：`/manage/import`
 
 **职责**：
-- 选择来源类型（ZIP / CBZ 文件、DIRECTORY 本地目录；EHENTAI 由 API 支持，前端暂未提供选项）
-- 输入文件路径（ZIP/CBZ 文件路径或本地目录路径）
+- 选择来源类型（ZIP / CBZ 文件、DIRECTORY 本地目录或 EHENTAI 画廊 URL）
+- 输入来源值（ZIP/CBZ 文件路径、本地目录路径或 EHENTAI 画廊 URL）
 - 批量导入（多条本地目录路径）
 - 提交后跳转任务中心
 

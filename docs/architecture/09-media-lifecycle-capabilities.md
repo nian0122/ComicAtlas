@@ -33,7 +33,7 @@
 
 ## 导入
 
-支持的 `sourceType` 为 `ZIP`、`CBZ`、`DIRECTORY` 和后端保留的 `EHENTAI`。前端当前提供 ZIP、CBZ 和本地目录入口。
+支持的 `sourceType` 为 `ZIP`、`CBZ`、`DIRECTORY` 和 `EHENTAI`。前端当前提供四种来源入口，并对 EHENTAI 画廊 URL 做格式校验。
 
 ```text
 API 创建 comic(IMPORTING) + import_task(PENDING)
