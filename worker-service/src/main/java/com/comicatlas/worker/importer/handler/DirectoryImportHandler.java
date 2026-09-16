@@ -22,8 +22,8 @@ import com.comicatlas.worker.task.exception.TaskCancelledException;
 import com.comicatlas.worker.storage.TransferService;
 import com.comicatlas.worker.media.image.CoverGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -38,7 +38,6 @@ import java.util.Optional;
 /** 清单驱动的导入编排：解析、搬运和恢复，文件产物由专用服务负责。 */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class DirectoryImportHandler {
     private static final int MANIFEST_VERSION = 1;
 
@@ -49,6 +48,20 @@ public class DirectoryImportHandler {
     private final ImportCoverService importCoverService;
     private final CancelHandler cancelHandler;
     private final ImportManifestManager manifestManager;
+
+    @Autowired
+    public DirectoryImportHandler(DirectoryParser parser, MetadataAssembler assembler,
+            StorageService storageService, ImportMetadataArtifactService metadataArtifactService,
+            ImportCoverService importCoverService, CancelHandler cancelHandler,
+            ImportManifestManager manifestManager) {
+        this.parser = parser;
+        this.assembler = assembler;
+        this.storageService = storageService;
+        this.metadataArtifactService = metadataArtifactService;
+        this.importCoverService = importCoverService;
+        this.cancelHandler = cancelHandler;
+        this.manifestManager = manifestManager;
+    }
 
     /** 兼容已有单元测试与扩展点的旧依赖构造器；实际职责仍由两个专用服务承担。 */
     public DirectoryImportHandler(DirectoryParser parser, MetadataAssembler assembler,
