@@ -71,8 +71,7 @@ import java.util.stream.Collectors;
  * 预建 STAGING media rows + 创建管理任务 + 同事务 Outbox 发布命令；
  * cancel/expire → 清理 STAGING 文件与会话。
  * <p>
- * 预留接口能力：媒体上传/替换功能契约已实现且测试可用（见 MediaUploadManagementIT），
- * 但当前无前端页面入口，不属于漫画导入主流程。
+ * 媒体上传/替换会话服务；前端入口为 {@code /manage/upload}，不属于漫画导入主流程。
  */
 @Slf4j
 @Service

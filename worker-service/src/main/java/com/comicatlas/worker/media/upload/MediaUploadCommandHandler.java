@@ -39,8 +39,7 @@ import java.util.List;
  * replace 流程额外将旧 HQ 文件移入 TRASH；完成后回传每媒体分析结果，
  * 由 API 将 STAGING 更新为 READY。Worker 不写数据库。
  * <p>
- * 预留接口能力：媒体上传/替换功能契约已实现且测试可用（见 MediaUploadManagementIT），
- * 但当前无前端页面入口，不属于漫画导入主流程。
+ * 媒体上传/替换命令处理器；前端入口为 {@code /manage/upload}，不属于漫画导入主流程。
  */
 @Slf4j
 @Component

@@ -58,7 +58,7 @@ comic-atlas/
 | 统计聚合 | `api-service/.../storage/service/ComicStatsService.java` | 派生数据单一收口：hqSize/lqSize/totalPages/pageCount 从 media/chapter 行重算 |
 | 回收站/永久清理 | `api-service/.../trash/controller/TrashLifecycleController.java` | POST /api/trash/... restore/purge/reconcile（删除=回收，永久删除=purge） |
 | 目录扫描 | `api-service/.../importer/controller/DirectoryScanTaskController.java` | POST /api/tasks/directory-scan，漫画集根目录批量发现（直接子目录=候选漫画） |
-| 媒体上传（预留能力） | `api-service/.../upload/` | 分块上传后端可用、无前端入口，接口能力预留 |
+| 媒体上传 | `api-service/.../upload/`、`frontend/src/views/management/MediaUploadPage.vue` | 分块上传/替换接口与 `/manage/upload` 页面 |
 | 恢复任务 API | `api-service/.../recovery/controller/RecoveryTaskController.java` | POST /api/tasks/recovery |
 | 恢复任务 Service | `api-service/.../recovery/service/impl/RecoveryTaskServiceImpl.java` | 创建/重试/列表 |
 | 恢复事件发布 | `worker-service/.../recovery/event/RecoveryEventPublisher.java` | 发送恢复事件到 MQ |

@@ -531,6 +531,7 @@ onMounted(loadData)
   padding: var(--space-4) 0 var(--space-2);
   background: linear-gradient(to bottom, transparent, var(--bg-primary) 28%);
 }
+/* TODO(FE-STYLE): 主按钮外观已由 styles/theme.scss 统一定义；此处只保留页面布局，删除重复颜色/边框规则。 */
 .form-actions :deep(.el-button--primary) {
   min-width: 132px;
   background: var(--accent);

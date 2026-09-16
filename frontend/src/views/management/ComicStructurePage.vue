@@ -1305,6 +1305,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* TODO(FE-STYLE): 页面样式块约 1416 行；按结构、媒体、上传等独立界面区域拆分组件，使样式与职责一并归属。 */
 .structure-page {
   display: grid;
   gap: var(--space-5);

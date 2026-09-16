@@ -100,7 +100,7 @@ Gateway 的管理路由必须排在通用阅读路由之前，避免 `/api/manag
 
 ## 4. 导入架构
 
-当前支持的来源类型为 `ZIP`、`CBZ`、`DIRECTORY`、`EHENTAI`。CBZ 使用 ZIP 容器格式，并可选携带根目录 `ComicInfo.xml`；EHENTAI 保留后端/Worker 能力，前端暂未提供直接入口。
+当前支持的来源类型为 `ZIP`、`CBZ`、`DIRECTORY`、`EHENTAI`。CBZ 使用 ZIP 容器格式，并可选携带根目录 `ComicInfo.xml`；管理端导入页已提供 EHENTAI 画廊 URL 入口。
 
 ```text
 POST /api/manage/tasks/import
