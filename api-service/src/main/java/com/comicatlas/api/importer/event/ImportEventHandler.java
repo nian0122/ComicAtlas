@@ -40,8 +40,8 @@ import java.util.Set;
 /**
  * 导入任务事件处理器（API 侧消费）。
  * <p>
- * 只做协议适配：MQ 消费 → 幂等/终态判断 → 委托 {@link ImportPersistenceService} 完成两阶段落库。
- * catalog/chapter/media 持久化与最终化编排已拆至 Service，本类不再触碰文件系统。
+ * 接收 MQ 消息并执行幂等/终态判断，导入成功后委托 {@link ImportPersistenceService} 完成两阶段落库。
+ * catalog/chapter/media 持久化与最终化编排已拆至 Service；元数据读取和任务状态写入仍待下沉（LAYER-05）。
  */
 @Slf4j
 @Component
@@ -99,6 +99,7 @@ public class ImportEventHandler {
         });
     }
 
+    // TODO(LAYER-05): MQ 入口承担任务/漫画写入与跨表状态联动；迁至导入结果服务，保持失败/取消映射及短事务，元数据读取也由服务委托存储适配器。
     private void persistTaskStatusChanged(TaskStatusChangedEvent event) {
         Long taskId = event.taskId();
         String newStatus = event.status();

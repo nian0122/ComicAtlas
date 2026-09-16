@@ -36,6 +36,7 @@ public class ReadingComicController {
      * @return 漫画分页数据（列表 VO）
      */
     @GetMapping("/comics")
+    // TODO(LAYER-07): 分页接口暴露 MyBatis IPage；改用框架无关分页 DTO，并兼容当前 JSON 字段及前端分页语义。
     public Result<IPage<ComicListVO>> listComics(ComicListQuery query) {
         return Result.ok(comicQueryService.listComics(query));
     }

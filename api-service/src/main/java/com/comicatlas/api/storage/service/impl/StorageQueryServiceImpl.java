@@ -47,6 +47,7 @@ public class StorageQueryServiceImpl implements StorageQueryService {
         return stats;
     }
 
+    // TODO(DECOUPLE-11): 存储查询混合数据库聚合与同步递归扫描，且扫描异常按零处理；提取容量统计适配器，区分空目录与读取失败并定义缓存刷新策略。
     private long directorySize(Path directory) {
         if (!Files.exists(directory)) {
             return 0L;

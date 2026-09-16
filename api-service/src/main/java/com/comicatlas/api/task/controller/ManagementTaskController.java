@@ -39,6 +39,7 @@ public class ManagementTaskController {
      * 支持 type/status/batchId/targetType/targetId 过滤。
      */
     @GetMapping
+    // TODO(LAYER-07): 分页接口暴露 MyBatis IPage；改用框架无关分页 DTO，并兼容当前 JSON 字段及前端分页语义。
     public Result<IPage<ManagementTaskResponse>> listTasks(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,

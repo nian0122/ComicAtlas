@@ -26,6 +26,7 @@ public class VideoMetadataFixCompletedHandler {
     private final MediaMapper mediaMapper;
     private final MqConsumerSupport mqConsumerSupport;
 
+    // TODO(LAYER-04): MQ 入口直接查询/更新媒体实体；提取视频修复结果应用服务，明确漫画归属校验、批次事务和重复投递语义。
     @RabbitListener(queues = MqQueues.VIDEO_METADATA_FIX_RESULT)
     public void handle(VideoMetadataFixCompletedEvent event,
             Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {

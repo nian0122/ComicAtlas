@@ -23,6 +23,7 @@ public class ManagementComicQueryController {
     private final ManagementComicQueryService queryService;
 
     @GetMapping
+    // TODO(LAYER-07): 分页接口暴露 MyBatis IPage；改用框架无关分页 DTO，并兼容当前 JSON 字段及前端分页语义。
     public Result<IPage<ManagementComicListVO>> list(ComicListQuery query) {
         return Result.ok(queryService.list(query));
     }

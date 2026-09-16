@@ -1,6 +1,6 @@
 # 后端待解耦清单
 
-更新日期：2026-09-16。以下为代码检查确认的 8 处待拆分点，均已在对应方法附近添加 `TODO(DECOUPLE-xx)`。**状态全部为待解耦；本次只完成目录分类、引用迁移和标记。**
+更新日期：2026-09-16。以下为代码检查确认的 12 项待拆分点，均已在对应代码附近添加 `TODO(DECOUPLE-xx)`。**状态全部为待解耦。** 首轮完成目录分类和 01～08 标记，本轮补充 09～12；明确的分层问题另见 [三层架构检查](backend-layer-audit.md)。
 
 P1 表示优先处理的事务/跨业务边界问题，P2 表示可随对应功能演进处理的职责拆分。此优先级是重构顺序，不表示已经发生生产故障。以下建议的新类和接口尚未创建。
 
@@ -79,6 +79,44 @@ P1 表示优先处理的事务/跨业务边界问题，P2 表示可随对应功�
 - 拆分：提取 `reader.assembler.ReaderAssembler`，查询服务保留可读状态筛选、章节/媒体查询和前后章定位。
 - 约束：URL 继续经 FileUrlResolver；HQ 已删除时保留 LQ 文件名回退，顺序仍由 global_order 决定。
 - 验证：阅读服务已有测试；拆分时增加图片/视频混排、HQ 删除保留 LQ 和不可读章节场景。
+
+## 本轮补充：DECOUPLE-09～12
+
+### DECOUPLE-09：管理结果消费与事务协调（P1）
+
+文件：[ManagementCommandResultHandler.java](../../api-service/src/main/java/com/comicatlas/api/task/event/ManagementCommandResultHandler.java)，`process`、`handleCompleted`、`handleFailed` 及专用快照分支。
+
+- 证据：无直接 Mapper 依赖，但同一类协调 Rabbit 消费失败处理、Inbox 去重、事务、任务项状态及业务结果路由。
+- 拆分：结果应用服务负责 Inbox 与业务状态原子提交，消息适配层负责事件识别及 ACK/DLQ。
+- 约束：保留 attempt 检查、重复消息处理和快照读取在事务外；不要将全部事件无差别包进单一事务。
+- 验证：`ManagementCommandResultHandlerTest` 及媒体操作/元数据刷新管线集成场景。
+
+### DECOUPLE-10：重试发布器与业务恢复准备（P1）
+
+文件：[TaskRetryPublisher.java](../../api-service/src/main/java/com/comicatlas/api/task/service/TaskRetryPublisher.java)，`publishExportCommand`、`publishImportCommand`。
+
+- 证据：名为发布器，实际直接重置导出专表、读取导入专表、调用导入重试协调器，再构造并写入 Outbox。
+- 拆分：业务域提供重试策略，分别承担恢复准备和消息构造；task 层选择策略并协调重试事务。与 DECOUPLE-05 共用策略设计，避免两套扩展机制。
+- 约束：专表重置与 Outbox 同事务，保留 attempt、原任务关联、导入重试前置条件和不重复发布语义。
+- 验证：管理任务重试与导入重试测试，补充专表缺失、准备失败、Outbox 写入失败和重试竞态。
+
+### DECOUPLE-11：存储聚合查询与同步磁盘扫描（P2）
+
+文件：[StorageQueryServiceImpl.java](../../api-service/src/main/java/com/comicatlas/api/storage/service/impl/StorageQueryServiceImpl.java)，`getStorageStats`、`directorySize`。
+
+- 证据：数据库统计请求同步递归遍历缩略图目录；读取异常直接按 0 计入结果，与空目录无法区分。
+- 拆分：容量统计适配器负责文件访问，查询服务组合统计结果；明确容量缓存刷新频率，必要时由后台采集提供快照。
+- 约束：不得改变已有大小字段含义；错误应有可定位记录，并决定使用上次成功值还是明确失败，避免缓存“假零”。
+- 验证：空目录、部分文件不可读、扫描中删除文件、大目录及缓存失效。
+
+### DECOUPLE-12：媒体入口聚合多种业务（P2）
+
+文件：[StorageOperationController.java](../../api-service/src/main/java/com/comicatlas/api/media/controller/StorageOperationController.java)，类级标记。
+
+- 证据：同一 Controller 承载 LQ/HQ/转码、元数据刷新、导出提交、导出产物查询和打开目录。
+- 拆分：将导出端点交由 exporter 的 Controller，媒体端点保留 media，元数据刷新按业务归属分配。
+- 约束：仅分配类职责，不改 URL、JSON 或状态码；Spring 映射不得重复。目录打开实现越界另见 LAYER-02。
+- 验证：现有 StorageOperationControllerTest 与各端点映射测试。
 
 ## 跟踪方式
 

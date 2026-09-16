@@ -38,6 +38,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/manage/storage")
 @RequiredArgsConstructor
+// TODO(DECOUPLE-12): 同一入口类混合媒体、元数据刷新与导出业务；按业务拆分 Controller，保持所有既有 URL/状态码，避免重叠映射。
 public class StorageOperationController {
 
     private final LqOperationService lqOperationService;
@@ -211,6 +212,7 @@ public class StorageOperationController {
     /**
      * 打开导出文件所在目录（Windows/Linux/macOS 通用，Desktop API；失败回退 501）。
      */
+    // TODO(LAYER-02): Controller 直接探测文件并调用 Desktop；由导出服务协调本机目录打开适配器，Controller 只映射已有 200/404/501 响应。
     @PostMapping("/export/tasks/{taskId}/open")
     public ResponseEntity<?> openExportDir(@PathVariable Long taskId) {
         ExportTaskVO task = exportOperationService.getTask(taskId);

@@ -69,6 +69,7 @@ public class ManagementCommandResultHandler {
         }
     }
 
+    // TODO(DECOUPLE-09): 消费 ACK/DLQ、Inbox 事务及任务结果流程耦合；提取结果应用服务统一事务，保留业务落库与 Inbox 原子性及元数据快照事务外读取。
     private void process(ComicEvent event, Long taskId, Long itemId, int attempt,
                          Channel channel, long tag, Runnable business) {
         String eventId = event.eventId().toString();

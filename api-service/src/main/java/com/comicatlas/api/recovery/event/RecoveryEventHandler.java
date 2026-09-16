@@ -95,6 +95,7 @@ public class RecoveryEventHandler {
                 MqConsumerSupport.FailurePolicy.REJECT_TO_DLQ);
     }
 
+    // TODO(LAYER-06): MQ 入口直接持久化恢复任务并逐本编排恢复；提取恢复批次服务，保留单本失败继续、可见进度及消费失败策略。
     private void processScanCompleted(RecoveryScanCompletedEvent event, String idempotencyKey, Long taskId) {
         // 幂等检查
         if (isEventProcessed(idempotencyKey)) {
