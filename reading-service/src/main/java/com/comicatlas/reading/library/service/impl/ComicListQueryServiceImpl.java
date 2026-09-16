@@ -1,6 +1,5 @@
 package com.comicatlas.reading.library.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.contract.comic.cache.ComicReferenceCache;
@@ -90,10 +89,7 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
                         .collect(Collectors.toMap(Category::getId, Category::getName));
 
         List<Long> comicIds = comics.stream().map(Comic::getId).toList();
-        Map<Long, ReadingHistory> histories = historyMapper.selectList(
-                        new LambdaQueryWrapper<ReadingHistory>()
-                            .select(ReadingHistory::getComicId, ReadingHistory::getChapterId, ReadingHistory::getPageNumber)
-                            .in(ReadingHistory::getComicId, comicIds))
+        Map<Long, ReadingHistory> histories = historyMapper.selectByComicIds(comicIds)
                 .stream()
                 .collect(Collectors.toMap(ReadingHistory::getComicId, history -> history));
 

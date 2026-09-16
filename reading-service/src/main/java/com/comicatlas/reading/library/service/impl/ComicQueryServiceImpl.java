@@ -1,6 +1,5 @@
 package com.comicatlas.reading.library.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.contract.comic.dto.ComicDetailVO;
@@ -12,7 +11,6 @@ import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.persistence.comic.assembler.ComicDetailAssembler;
 import com.comicatlas.persistence.comic.entity.Comic;
-import com.comicatlas.persistence.comic.entity.ComicTag;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.persistence.comic.mapper.ComicTagMapper;
 import com.comicatlas.reading.library.service.ComicListQueryService;
@@ -57,10 +55,7 @@ public class ComicQueryServiceImpl implements ComicQueryService {
 
     @Override
     public ComicMetadataDTO getMetadata(Long id) {
-        Comic comic = comicMapper.selectOne(
-            new LambdaQueryWrapper<Comic>()
-                .select(Comic::getTitle, Comic::getAuthor, Comic::getDescription, Comic::getCategoryId)
-                .eq(Comic::getId, id));
+        Comic comic = comicMapper.selectMetadataById(id);
         if (comic == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在");
         }
@@ -75,19 +70,12 @@ public class ComicQueryServiceImpl implements ComicQueryService {
 
     @Override
     public List<Long> getComicTags(Long comicId) {
-        Comic comic = comicMapper.selectOne(
-            new LambdaQueryWrapper<Comic>().select(Comic::getId).eq(Comic::getId, comicId));
+        Comic comic = comicMapper.selectReferenceById(comicId);
         if (comic == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在");
         }
 
-        return comicTagMapper.selectList(
-                        new LambdaQueryWrapper<ComicTag>()
-                            .select(ComicTag::getTagId)
-                            .eq(ComicTag::getComicId, comicId))
-                .stream()
-                .map(ComicTag::getTagId)
-                .toList();
+        return comicTagMapper.selectTagIdsByComicId(comicId);
     }
 
     @Override
