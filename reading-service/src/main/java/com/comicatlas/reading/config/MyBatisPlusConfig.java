@@ -11,7 +11,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-// TODO(MAPPER-01): 统一评估共享 Mapper 的注册范围；Lambda 查询仍依赖 Mapper Bean，不能因 SQL 写法改变而取消扫描。
+// Mapper 扫描范围按阅读应用边界集中声明，仅注册阅读端需要的共享 Mapper。
 @MapperScan({
         "com.comicatlas.persistence.comic.mapper",
         "com.comicatlas.persistence.reader.mapper"
