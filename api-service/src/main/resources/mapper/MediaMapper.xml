@@ -2,6 +2,47 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.comicatlas.persistence.comic.mapper.MediaMapper">
 
+    <update id="markHqDeleteQueued">
+        UPDATE page
+        SET hq_status = 'DELETE_QUEUED'
+        WHERE chapter_id IN
+        <foreach collection="chapterIds" item="chapterId" open="(" separator="," close=")">
+            #{chapterId}
+        </foreach>
+        AND media_type = 'IMAGE'
+        AND hq_status IN ('READY', 'MISSING')
+    </update>
+
+    <update id="markHqDeleteQueuedByChapter">
+        UPDATE page
+        SET hq_status = 'DELETE_QUEUED'
+        WHERE chapter_id = #{chapterId}
+        AND media_type = 'IMAGE'
+        AND hq_status IN ('READY', 'MISSING')
+    </update>
+
+    <update id="applyTranscodeCompleted">
+        UPDATE page
+        SET transcode_status = 'READY',
+            container = #{container},
+            video_codec = #{videoCodec},
+            audio_codec = #{audioCodec}
+        <if test="duration != null">, duration = #{duration}</if>
+        <if test="hqSize != null">, hq_size = #{hqSize}</if>
+        <if test="hqPath != null and hqPath != ''">, hq_path = #{hqPath}</if>
+        WHERE id = #{mediaId}
+    </update>
+
+    <update id="markTrashed">
+        UPDATE page
+        SET status = 'TRASHED', trashed_at = #{trashedAt}, hq_status = 'DELETED'
+        <choose>
+            <when test="hqPath != null and hqPath != ''">, hq_root = #{hqRoot}, hq_path = #{hqPath}</when>
+            <otherwise>, hq_root = NULL, hq_path = NULL</otherwise>
+        </choose>
+        WHERE id = #{mediaId}
+    </update>
+
     <!--
       导入落库专用批量 INSERT：全书聚合、固定批次上限（MEDIA_INSERT_BATCH_SIZE）、MySQL 多值 INSERT。
       仅覆盖导入时显式写入的列；id/version/created_at/lq_size 等使用数据库默认值。

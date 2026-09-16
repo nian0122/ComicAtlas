@@ -1,10 +1,6 @@
 package com.comicatlas.api.media.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-// 条件更新由媒体结果服务维护状态机与并发边界，Mapper 执行参数化更新。
-// 架构说明：Service 直接构造 LambdaUpdateWrapper 应用媒体操作结果；状态更新应收口到 MediaMapper。
-// TODO(MAPPER-02): Service 直接构造 LambdaUpdateWrapper 应用媒体操作结果；状态更新应收口到 MediaMapper。
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.api.task.service.ManagementTaskService;
 import com.comicatlas.api.storage.service.ComicStatsService;
 import com.comicatlas.common.constant.StorageRootKeys;
@@ -91,11 +87,7 @@ public class MediaOperationCompletionService {
                         .eq(Media::getMediaType, MEDIA_TYPE_IMAGE)
                         .in(Media::getHqStatus, HqStatus.READY, HqStatus.DELETE_QUEUED, HqStatus.DELETING, HqStatus.MISSING));
         for (Media media : mediaItems) {
-            mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
-                    .eq(Media::getId, media.getId())
-                    .set(Media::getHqStatus, HqStatus.DELETED)
-                    .set(Media::getHqRoot, null)
-                    .set(Media::getHqPath, null));
+            mediaMapper.markHqDeleted(media.getId());
         }
         comicStatsService.refreshByChapter(chapterId);
         log.info("HQ 删除完成业务更新: chapterId={}, pages={}", chapterId, mediaItems.size());
@@ -116,33 +108,19 @@ public class MediaOperationCompletionService {
         }
         TranscodeMediaInfo transcode = ev.transcode();
         String hqPath = media.getHqPath();
-        LambdaUpdateWrapper<Media> mediaUpdate = new LambdaUpdateWrapper<Media>()
-                .eq(Media::getId, mediaId)
-                .set(Media::getTranscodeStatus, TranscodeStatus.READY)
-                .set(Media::getContainer, transcode != null && transcode.container() != null
-                        ? transcode.container() : DEFAULT_CONTAINER)
-                .set(Media::getVideoCodec, transcode != null && transcode.videoCodec() != null
-                        ? transcode.videoCodec() : DEFAULT_VIDEO_CODEC)
-                .set(Media::getAudioCodec, transcode != null && transcode.audioCodec() != null
-                        ? transcode.audioCodec() : DEFAULT_AUDIO_CODEC);
-        if (transcode != null) {
-            if (transcode.duration() != null) {
-                mediaUpdate.set(Media::getDuration, transcode.duration());
-            }
-            if (transcode.fileSize() != null) {
-                mediaUpdate.set(Media::getHqSize, transcode.fileSize());
-            }
-        }
+        String newHqPath = null;
         if (hqPath != null && !hqPath.isBlank()) {
-            // 优先使用 Worker 实测写入路径（含防撞名 {base}.transcoded-{mediaId}.mp4 场景）；
-            // 老消息无 newHqPath 时回退 deriveTranscodedPath（{base}.mp4）
-            String newHqPath = transcode != null && transcode.newHqPath() != null
+            // 优先使用 Worker 实测写入路径（含防撞名）；老消息回退派生路径。
+            newHqPath = transcode != null && transcode.newHqPath() != null
                     && !transcode.newHqPath().isBlank()
-                    ? transcode.newHqPath()
-                    : deriveTranscodedPath(hqPath);
-            mediaUpdate.set(Media::getHqPath, newHqPath);
+                    ? transcode.newHqPath() : deriveTranscodedPath(hqPath);
         }
-        mediaMapper.update(null, mediaUpdate);
+        mediaMapper.applyTranscodeCompleted(mediaId,
+                transcode != null && transcode.container() != null ? transcode.container() : DEFAULT_CONTAINER,
+                transcode != null && transcode.videoCodec() != null ? transcode.videoCodec() : DEFAULT_VIDEO_CODEC,
+                transcode != null && transcode.audioCodec() != null ? transcode.audioCodec() : DEFAULT_AUDIO_CODEC,
+                transcode == null ? null : transcode.duration(),
+                transcode == null ? null : transcode.fileSize(), newHqPath);
         log.info("转码完成业务更新: mediaId={}", mediaId);
     }
 
@@ -184,44 +162,29 @@ public class MediaOperationCompletionService {
 
     /** HQ 删除失败：DELETE_QUEUED/DELETING → FAILED。 */
     public void revertHqDeleteFailed(Long targetId) {
-        mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
-                .eq(Media::getChapterId, targetId)
-                .in(Media::getHqStatus, HqStatus.DELETE_QUEUED, HqStatus.DELETING)
-                .set(Media::getHqStatus, HqStatus.FAILED));
+        mediaMapper.markHqDeleteFailed(targetId);
     }
 
     /** 转码失败：QUEUED/TRANSCODING → FAILED。 */
     public void revertTranscodeFailed(Long mediaId) {
-        mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
-                .eq(Media::getId, mediaId)
-                .in(Media::getTranscodeStatus, TranscodeStatus.QUEUED, TranscodeStatus.TRANSCODING)
-                .set(Media::getTranscodeStatus, TranscodeStatus.FAILED));
+        mediaMapper.markTranscodeFailed(mediaId);
     }
 
     // ======================== Progress 状态转换 ========================
 
     /** LQ 生成开始：QUEUED → GENERATING。 */
     public void transitionLqGenerating(Long chapterId) {
-        mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
-                .eq(Media::getChapterId, chapterId)
-                .eq(Media::getLqStatus, LqStatus.QUEUED)
-                .set(Media::getLqStatus, LqStatus.GENERATING));
+        mediaMapper.transitionLqGenerating(chapterId);
     }
 
     /** HQ 删除开始：DELETE_QUEUED → DELETING。 */
     public void transitionHqDeleting(Long chapterId) {
-        mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
-                .eq(Media::getChapterId, chapterId)
-                .eq(Media::getHqStatus, HqStatus.DELETE_QUEUED)
-                .set(Media::getHqStatus, HqStatus.DELETING));
+        mediaMapper.transitionHqDeleting(chapterId);
     }
 
     /** 转码开始：QUEUED → TRANSCODING。 */
     public void transitionTranscoding(Long mediaId) {
-        mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
-                .eq(Media::getId, mediaId)
-                .eq(Media::getTranscodeStatus, TranscodeStatus.QUEUED)
-                .set(Media::getTranscodeStatus, TranscodeStatus.TRANSCODING));
+        mediaMapper.transitionTranscoding(mediaId);
     }
 
     // ======================== 辅助 ========================

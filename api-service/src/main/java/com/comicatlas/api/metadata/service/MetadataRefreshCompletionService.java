@@ -1,9 +1,5 @@
 package com.comicatlas.api.metadata.service;
 
-// 条件更新由结果应用服务维护跨表状态机与事务边界，Mapper 执行参数化更新。
-// 架构说明：Service 直接构造 LambdaUpdateWrapper 更新任务项/漫画状态；条件更新应收口到对应 Mapper。
-// TODO(MAPPER-02): Service 直接构造 LambdaUpdateWrapper 更新任务项/漫画状态；条件更新应收口到对应 Mapper。
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.task.persistence.entity.ManagementTaskItem;
 import com.comicatlas.api.task.persistence.mapper.ManagementTaskItemMapper;
@@ -20,8 +16,6 @@ import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO;
 import com.comicatlas.common.event.MetadataRefreshEvent;
 import com.comicatlas.common.event.MetadataRefreshScanCompletedEvent;
-import com.comicatlas.contract.common.enums.ComicStatus;
-import com.comicatlas.api.task.enums.ManagementTaskStatus;
 import com.comicatlas.api.task.enums.TaskType;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.shared.exception.SnapshotUnavailableException;
@@ -181,16 +175,9 @@ public class MetadataRefreshCompletionService {
         comicMapper.selectByIdForUpdate(comicId);
 
         // item CAS：当前 attempt 非终态 → SUCCEEDED；0 行 = 已被其他 eventId 处理 → 幂等跳过 apply
-        int rows = managementTaskItemMapper.update(null, new LambdaUpdateWrapper<ManagementTaskItem>()
-                .eq(ManagementTaskItem::getId, ev.itemId())
-                .eq(ManagementTaskItem::getAttempt, ev.attempt())
-                .notIn(ManagementTaskItem::getStatus, ManagementTaskStatus.CANCELLED,
-                        ManagementTaskStatus.SUCCEEDED, ManagementTaskStatus.PARTIALLY_SUCCEEDED,
-                        ManagementTaskStatus.FAILED)
-                .set(ManagementTaskItem::getStatus, ManagementTaskStatus.SUCCEEDED)
-                .set(ManagementTaskItem::getCompletedAt, LocalDateTime.now())
-                .set(ManagementTaskItem::getLockKey, null)
-                .set(ManagementTaskItem::getUpdatedAt, LocalDateTime.now()));
+        LocalDateTime updateTime = LocalDateTime.now();
+        int rows = managementTaskItemMapper.markSucceededIfActive(
+                ev.itemId(), ev.attempt(), updateTime, updateTime);
         if (rows == 0) {
             log.info("元数据刷新 item 已被其他 eventId 置为终态，幂等跳过 apply: itemId={}", ev.itemId());
             inboxService.markProcessed(eventId, payloadHash, ev.taskId(), ev.itemId(), ev.attempt());
@@ -227,17 +214,9 @@ public class MetadataRefreshCompletionService {
         log.warn("元数据刷新业务失败，置 FAILED 并 ACK: itemId={}, error={}", ev.itemId(), errorMessage);
         transactionTemplate.executeWithoutResult(tx -> {
             comicMapper.selectByIdForUpdate(comicId);
-            managementTaskItemMapper.update(null, new LambdaUpdateWrapper<ManagementTaskItem>()
-                    .eq(ManagementTaskItem::getId, ev.itemId())
-                    .eq(ManagementTaskItem::getAttempt, ev.attempt())
-                    .notIn(ManagementTaskItem::getStatus, ManagementTaskStatus.CANCELLED,
-                            ManagementTaskStatus.SUCCEEDED, ManagementTaskStatus.PARTIALLY_SUCCEEDED,
-                            ManagementTaskStatus.FAILED)
-                    .set(ManagementTaskItem::getStatus, ManagementTaskStatus.FAILED)
-                    .set(ManagementTaskItem::getErrorMessage, errorMessage)
-                    .set(ManagementTaskItem::getCompletedAt, LocalDateTime.now())
-                    .set(ManagementTaskItem::getLockKey, null)
-                    .set(ManagementTaskItem::getUpdatedAt, LocalDateTime.now()));
+            LocalDateTime updateTime = LocalDateTime.now();
+            managementTaskItemMapper.markFailedIfActive(
+                    ev.itemId(), ev.attempt(), errorMessage, updateTime, updateTime);
             inboxService.markProcessed(eventId, payloadHash, ev.taskId(), ev.itemId(), ev.attempt());
             finalizeComicIfTaskComplete(comicId, ev.taskId(), item.getId(), ev.attempt());
             managementTaskService.reaggregateTask(ev.taskId());
@@ -258,10 +237,7 @@ public class MetadataRefreshCompletionService {
             return;
         }
         comicStatsService.refreshByComic(comicId);
-        int releasedRows = comicMapper.update(null, new LambdaUpdateWrapper<Comic>()
-                .eq(Comic::getId, comicId)
-                .eq(Comic::getStatus, ComicStatus.REFRESHING)
-                .set(Comic::getStatus, ComicStatus.READY));
+        int releasedRows = comicMapper.markRefreshCompleted(comicId);
         if (releasedRows == 0) {
             return;
         }

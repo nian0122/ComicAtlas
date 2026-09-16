@@ -1,10 +1,6 @@
 package com.comicatlas.api.media.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-// 条件更新由媒体命令服务维护状态机与并发边界，Mapper 执行参数化更新。
-// 架构说明：Service 直接构造 LambdaUpdateWrapper 更新媒体操作状态；条件更新应收口到 MediaMapper。
-// TODO(MAPPER-02): Service 直接构造 LambdaUpdateWrapper 更新媒体操作状态；条件更新应收口到 MediaMapper。
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.enums.HqStatus;
@@ -134,11 +130,7 @@ public class MediaOperationCommandService {
     }
 
     private void markLqQueued(Long chapterId) {
-        mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
-                .eq(Media::getChapterId, chapterId)
-                .eq(Media::getMediaType, "IMAGE")
-                .ne(Media::getHqStatus, HqStatus.DELETED)
-                .set(Media::getLqStatus, LqStatus.QUEUED));
+        mediaMapper.markLqQueued(chapterId);
     }
 
     // ======================== HQ 删除 ========================
@@ -247,22 +239,14 @@ public class MediaOperationCommandService {
     }
 
     private void markHqDeleteQueued(Long chapterId) {
-        mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
-                .eq(Media::getChapterId, chapterId)
-                .eq(Media::getMediaType, "IMAGE")
-                .in(Media::getHqStatus, HqStatus.READY, HqStatus.MISSING)
-                .set(Media::getHqStatus, HqStatus.DELETE_QUEUED));
+        mediaMapper.markHqDeleteQueuedByChapter(chapterId);
     }
 
     private void markHqDeleteQueued(List<Long> chapterIds) {
         if (chapterIds.isEmpty()) {
             return;
         }
-        mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
-                .in(Media::getChapterId, chapterIds)
-                .eq(Media::getMediaType, "IMAGE")
-                .in(Media::getHqStatus, HqStatus.READY, HqStatus.MISSING)
-                .set(Media::getHqStatus, HqStatus.DELETE_QUEUED));
+        mediaMapper.markHqDeleteQueued(chapterIds);
     }
 
     // ======================== 视频转码 ========================
@@ -367,10 +351,7 @@ public class MediaOperationCommandService {
         // 超高清视频（任一边 > 4096，如 8K）硬件编码器无法处理，CPU 转码又超时，
         // 判定为不可转码：保持原样并标记 NOT_NEEDED，避免反复进入转码队列失败
         if (!VideoPlayability.isTranscodable(media.getWidth(), media.getHeight())) {
-            mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
-                    .eq(Media::getId, media.getId())
-                    .eq(Media::getTranscodeStatus, TranscodeStatus.REQUIRED)
-                    .set(Media::getTranscodeStatus, TranscodeStatus.NOT_NEEDED));
+            mediaMapper.markTranscodeNotNeeded(media.getId());
             log.info("视频分辨率超出硬件转码能力，标记无需转码: mediaId={}, {}x{}",
                     media.getId(), media.getWidth(), media.getHeight());
             return false;
@@ -386,9 +367,7 @@ public class MediaOperationCommandService {
     }
 
     private void markTranscodeQueued(Long mediaId) {
-        mediaMapper.update(null, new LambdaUpdateWrapper<Media>()
-                .eq(Media::getId, mediaId)
-                .set(Media::getTranscodeStatus, TranscodeStatus.QUEUED));
+        mediaMapper.markTranscodeQueued(mediaId);
     }
 
     // ======================== 元数据刷新 ========================

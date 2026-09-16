@@ -17,6 +17,9 @@ public interface ChapterMapper extends BaseMapper<Chapter> {
     @Update("UPDATE chapter SET global_order = -id WHERE comic_id = #{comicId}")
     int updateGlobalOrderToTemporaryNegative(@Param("comicId") Long comicId);
 
+    @Update("UPDATE chapter SET page_count = #{pageCount} WHERE id = #{chapterId}")
+    int updatePageCount(@Param("chapterId") Long chapterId, @Param("pageCount") int pageCount);
+
     /**
      * 元数据刷新统计批量 UPDATE：按 id 一次性更新各章节 page_count（CASE WHEN 单条 UPDATE），
      * 消除逐章 {@code update} 的往返开销。

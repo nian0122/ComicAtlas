@@ -7,6 +7,8 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Update;
 
 import java.util.List;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 /**
  * 媒体页 Mapper。
@@ -16,6 +18,52 @@ import java.util.List;
  */
 @Mapper
 public interface MediaMapper extends BaseMapper<Media> {
+
+    @Update("UPDATE page SET lq_status = 'QUEUED' WHERE chapter_id = #{chapterId} AND media_type = 'IMAGE' AND hq_status <> 'DELETED'")
+    int markLqQueued(@Param("chapterId") Long chapterId);
+
+    @Update("UPDATE page SET transcode_status = 'NOT_NEEDED' WHERE id = #{mediaId} AND transcode_status = 'REQUIRED'")
+    int markTranscodeNotNeeded(@Param("mediaId") Long mediaId);
+
+    @Update("UPDATE page SET transcode_status = 'QUEUED' WHERE id = #{mediaId}")
+    int markTranscodeQueued(@Param("mediaId") Long mediaId);
+
+    @Update("UPDATE page SET hq_status = 'DELETED', hq_root = NULL, hq_path = NULL WHERE id = #{mediaId}")
+    int markHqDeleted(@Param("mediaId") Long mediaId);
+
+    @Update("UPDATE page SET hq_status = 'FAILED' WHERE chapter_id = #{chapterId} AND hq_status IN ('DELETE_QUEUED', 'DELETING')")
+    int markHqDeleteFailed(@Param("chapterId") Long chapterId);
+
+    @Update("UPDATE page SET transcode_status = 'FAILED' WHERE id = #{mediaId} AND transcode_status IN ('QUEUED', 'TRANSCODING')")
+    int markTranscodeFailed(@Param("mediaId") Long mediaId);
+
+    @Update("UPDATE page SET lq_status = 'GENERATING' WHERE chapter_id = #{chapterId} AND lq_status = 'QUEUED'")
+    int transitionLqGenerating(@Param("chapterId") Long chapterId);
+
+    @Update("UPDATE page SET hq_status = 'DELETING' WHERE chapter_id = #{chapterId} AND hq_status = 'DELETE_QUEUED'")
+    int transitionHqDeleting(@Param("chapterId") Long chapterId);
+
+    @Update("UPDATE page SET transcode_status = 'TRANSCODING' WHERE id = #{mediaId} AND transcode_status = 'QUEUED'")
+    int transitionTranscoding(@Param("mediaId") Long mediaId);
+
+    int markHqDeleteQueued(@Param("chapterIds") List<Long> chapterIds);
+
+    int markHqDeleteQueuedByChapter(@Param("chapterId") Long chapterId);
+
+    int applyTranscodeCompleted(@Param("mediaId") Long mediaId,
+                                @Param("container") String container,
+                                @Param("videoCodec") String videoCodec,
+                                @Param("audioCodec") String audioCodec,
+                                @Param("duration") BigDecimal duration,
+                                @Param("hqSize") Long hqSize,
+                                @Param("hqPath") String hqPath);
+
+    int markTrashed(@Param("mediaId") Long mediaId, @Param("trashedAt") LocalDateTime trashedAt,
+                    @Param("hqRoot") String hqRoot, @Param("hqPath") String hqPath);
+
+    @Update("UPDATE page SET status = 'READY', hq_status = 'READY', hq_root = #{hqRoot}, hq_path = #{hqPath}, page_number = #{pageNumber}, trashed_at = NULL WHERE id = #{mediaId} AND status = 'RESTORING'")
+    int markRestored(@Param("mediaId") Long mediaId, @Param("hqRoot") String hqRoot,
+                     @Param("hqPath") String hqPath, @Param("pageNumber") int pageNumber);
 
     /** 将章节内媒体页码临时置为互不冲突的负值，供重排第二阶段写回。 */
     @Update("UPDATE page SET page_number = -id WHERE chapter_id = #{chapterId}")

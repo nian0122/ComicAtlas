@@ -23,6 +23,21 @@ public interface ComicMapper extends BaseMapper<Comic> {
     @Update("UPDATE comic SET status = 'READY' WHERE id = #{comicId} AND status = 'REFRESHING'")
     int releaseMetadataRefresh(@Param("comicId") Long comicId);
 
+    /** 仅释放仍处于刷新状态的漫画，避免覆盖并发产生的新状态。 */
+    @Update("UPDATE comic SET status = 'READY' WHERE id = #{comicId} AND status = 'REFRESHING'")
+    int markRefreshCompleted(@Param("comicId") Long comicId);
+
+    @Update("UPDATE comic SET hq_size = #{hqSize}, lq_size = #{lqSize} WHERE id = #{comicId}")
+    int updateStorageStats(@Param("comicId") Long comicId, @Param("hqSize") long hqSize,
+                           @Param("lqSize") long lqSize);
+
+    @Update("UPDATE comic SET total_pages = #{totalPages} WHERE id = #{comicId}")
+    int updateTotalPages(@Param("comicId") Long comicId, @Param("totalPages") int totalPages);
+
+    @Update("UPDATE comic SET total_pages = #{totalPages}, hq_size = #{hqSize}, lq_size = #{lqSize} WHERE id = #{comicId}")
+    int updateAllStats(@Param("comicId") Long comicId, @Param("totalPages") int totalPages,
+                       @Param("hqSize") long hqSize, @Param("lqSize") long lqSize);
+
     @Select("""
         <script>
         SELECT c.id, c.title, c.author, c.total_pages, c.category_id, c.status, c.created_at, c.hq_size FROM comic c
