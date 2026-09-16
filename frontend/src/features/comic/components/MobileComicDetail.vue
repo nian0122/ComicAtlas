@@ -376,7 +376,8 @@ const hqSize = computed(() => {
   text-align: center;
 }
 
-.catalog :deep(.chapter-search-box) {
+/* ChapterSearchBox 的根节点由可复用子组件控制，此处仅做目录区域的移动端宽度适配。 */
+.mobile-detail .catalog > :deep(.chapter-search-box) {
   width: 100%;
   margin-bottom: var(--space-4);
 }

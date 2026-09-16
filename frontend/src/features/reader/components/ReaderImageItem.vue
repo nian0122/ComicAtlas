@@ -106,13 +106,13 @@ const imageClasses = computed(() => ({
  * 居中显示——用户滚动查看不同区域。此规则同时消除了"图片间缝隙"问题
  * （容器高度严格等于 slot 高度，不存在 flexbox 居中产生的间隙）。
  */
-.reader-image-item :deep(.progressive-image) {
+.reader-image-item > .progressive-image {
   width: 100%;
   height: 100%;
 }
 
 /* WIDTH 模式：与默认一致，填满 slot */
-.reader-image-item.fit-width :deep(.progressive-image) {
+.reader-image-item.fit-width > .progressive-image {
   width: 100%;
   height: 100%;
 }
@@ -121,7 +121,7 @@ const imageClasses = computed(() => ({
  * HEIGHT 模式：高度填满 slot，宽度由 aspect-ratio 自动推导。
  * max-width: 100% 防止超宽图片溢出视口。
  */
-.reader-image-item.fit-height :deep(.progressive-image) {
+.reader-image-item.fit-height > .progressive-image {
   width: auto;
   height: 100%;
   max-width: 100%;
@@ -132,7 +132,7 @@ const imageClasses = computed(() => ({
  * 注意：zoom ≠ 100% 时可能与 slot 尺寸不一致，属于已知局限。
  * overflow: hidden 由 .progressive-image 基类提供。
  */
-.reader-image-item.fit-original :deep(.progressive-image) {
+.reader-image-item.fit-original > .progressive-image {
   width: auto;
   height: auto;
   max-width: none;

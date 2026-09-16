@@ -12,7 +12,13 @@
     </StatGrid>
 
     <div class="filters">
-      <el-select v-model="query.type" placeholder="任务类型" clearable @change="resetAndLoad">
+      <el-select
+        v-model="query.type"
+        class="task-filter task-filter-select"
+        placeholder="任务类型"
+        clearable
+        @change="resetAndLoad"
+      >
         <el-option
           v-for="type in MANAGEMENT_TASK_TYPES"
           :key="type"
@@ -20,10 +26,22 @@
           :value="type"
         />
       </el-select>
-      <el-select v-model="query.status" placeholder="任务状态" clearable @change="resetAndLoad">
+      <el-select
+        v-model="query.status"
+        class="task-filter task-filter-select"
+        placeholder="任务状态"
+        clearable
+        @change="resetAndLoad"
+      >
         <el-option v-for="status in TASK_STATUSES" :key="status" :label="taskStatusLabel(status)" :value="status" />
       </el-select>
-      <el-input v-model="targetIdInput" placeholder="目标 ID" clearable @keyup.enter="applyTarget" />
+      <el-input
+        v-model="targetIdInput"
+        class="task-filter task-filter-input"
+        placeholder="目标 ID"
+        clearable
+        @keyup.enter="applyTarget"
+      />
       <el-button @click="applyTarget">筛选</el-button>
       <el-switch v-model="autoRefresh" active-text="自动刷新" />
       <span class="updated-at">{{ updatedAt ? `更新于 ${updatedAt}` : '尚未更新' }}</span>
@@ -404,8 +422,7 @@ onBeforeUnmount(() => {
 .updated-at {
   color: var(--text-muted);
 }
-.filters :deep(.el-input),
-.filters :deep(.el-select) {
+.task-filter {
   width: 180px;
 }
 .task-groups {
@@ -648,8 +665,7 @@ onBeforeUnmount(() => {
   width: 100%;
 }
 @media (max-width: 480px) {
-  .filters :deep(.el-input),
-  .filters :deep(.el-select) {
+  .task-filter {
     width: 100%;
   }
   .task-cards {

@@ -33,9 +33,7 @@ const tabs: readonly WorkspaceTab[] = ['operations', 'edit', 'content']
 
 function normalizeTab(value: unknown): WorkspaceTab {
   if (value === 'structure' || value === 'storage') return 'content'
-  return typeof value === 'string' && tabs.includes(value as WorkspaceTab)
-    ? value as WorkspaceTab
-    : 'operations'
+  return typeof value === 'string' && tabs.includes(value as WorkspaceTab) ? (value as WorkspaceTab) : 'operations'
 }
 
 const activeTab = ref<WorkspaceTab>(normalizeTab(route.query.tab))
@@ -52,20 +50,88 @@ function resetManagementScroll(): void {
   })
 }
 
-watch(() => route.query.tab, (value) => { activeTab.value = normalizeTab(value); resetManagementScroll() })
+watch(
+  () => route.query.tab,
+  (value) => {
+    activeTab.value = normalizeTab(value)
+    resetManagementScroll()
+  },
+)
 </script>
 
 <style scoped>
-.comic-workspace-page { display: grid; gap: var(--space-6); min-width: 0; }
-.workspace-header { display: grid; grid-template-columns: auto 1fr auto; align-items: end; gap: var(--space-6); padding: var(--space-6) 0 var(--space-2); border-bottom: 1px solid var(--border); }
-.back-link { align-self: start; color: var(--accent); font-size: var(--text-sm); text-decoration: none; }
-.back-link:hover { text-decoration: underline; }
-.workspace-heading { display: grid; gap: var(--space-2); }
-.eyebrow { margin: 0; color: var(--accent); font-size: 11px; font-weight: 800; letter-spacing: .2em; }
-.workspace-heading h1 { margin: 0; color: var(--text-primary); font-family: Georgia, 'Times New Roman', serif; font-size: clamp(2rem, 4vw, 3rem); letter-spacing: -.04em; }
-.workspace-heading p:last-child { margin: 0; color: var(--text-muted); }
-.comic-id { padding: 6px 9px; border: 1px solid var(--border); color: var(--text-muted); font: 700 11px ui-monospace, SFMono-Regular, Consolas, monospace; }
-.workspace-tabs :deep(.el-tabs__header) { margin-bottom: var(--space-6); }
-.workspace-tabs :deep(.el-tabs__active-bar) { height: 3px; }
-@media (max-width: 640px) { .workspace-tabs :deep(.el-tabs__item) { padding: 0 var(--space-2); font-size: 12px; } .workspace-header { grid-template-columns: 1fr auto; gap: var(--space-3); } .workspace-heading { grid-column: 1 / -1; grid-row: 2; } }
+.comic-workspace-page {
+  display: grid;
+  gap: var(--space-6);
+  min-width: 0;
+}
+.workspace-header {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: end;
+  gap: var(--space-6);
+  padding: var(--space-6) 0 var(--space-2);
+  border-bottom: 1px solid var(--border);
+}
+.back-link {
+  align-self: start;
+  color: var(--accent);
+  font-size: var(--text-sm);
+  text-decoration: none;
+}
+.back-link:hover {
+  text-decoration: underline;
+}
+.workspace-heading {
+  display: grid;
+  gap: var(--space-2);
+}
+.eyebrow {
+  margin: 0;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+}
+.workspace-heading h1 {
+  margin: 0;
+  color: var(--text-primary);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(2rem, 4vw, 3rem);
+  letter-spacing: -0.04em;
+}
+.workspace-heading p:last-child {
+  margin: 0;
+  color: var(--text-muted);
+}
+.comic-id {
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font:
+    700 11px ui-monospace,
+    SFMono-Regular,
+    Consolas,
+    monospace;
+}
+.workspace-tabs > :deep(.el-tabs__header) {
+  margin-bottom: var(--space-6);
+}
+.workspace-tabs > :deep(.el-tabs__header > .el-tabs__nav-wrap .el-tabs__active-bar) {
+  height: 3px;
+}
+@media (max-width: 640px) {
+  .workspace-tabs > :deep(.el-tabs__header > .el-tabs__nav-wrap .el-tabs__item) {
+    padding: 0 var(--space-2);
+    font-size: 12px;
+  }
+  .workspace-header {
+    grid-template-columns: 1fr auto;
+    gap: var(--space-3);
+  }
+  .workspace-heading {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
 </style>

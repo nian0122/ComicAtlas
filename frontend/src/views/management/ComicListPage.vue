@@ -339,8 +339,10 @@ function formatBytes(bytes: number | undefined): string {
   width: 80px;
 }
 
-.filter-toolbar :deep(.el-input__wrapper),
-.filter-toolbar :deep(.el-select__wrapper) {
+.filter-toolbar > :deep(.filter-input .el-input__wrapper),
+.filter-toolbar > :deep(.filter-select .el-select__wrapper),
+.filter-toolbar > :deep(.filter-select--wide .el-select__wrapper),
+.filter-toolbar > :deep(.filter-select--mini .el-select__wrapper) {
   min-height: 36px;
   border-radius: var(--radius-sm);
 }

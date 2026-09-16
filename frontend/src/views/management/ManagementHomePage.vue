@@ -46,11 +46,18 @@
     <div class="dashboard-columns">
       <ManagementPanel class="recent-panel" aria-labelledby="recent-management-title">
         <PanelHeader title-id="recent-management-title" title="最近管理" description="最近更新过的漫画。">
-          <router-link to="/manage/workbench?tab=status" class="section-link">查看全部 <span aria-hidden="true">→</span></router-link>
+          <router-link to="/manage/workbench?tab=status" class="section-link"
+            >查看全部 <span aria-hidden="true">→</span></router-link
+          >
         </PanelHeader>
 
         <div v-if="recentComics.length" class="comic-list">
-          <router-link v-for="comic in recentComics" :key="comic.id" :to="`/manage/comics/${comic.id}?tab=operations`" class="comic-row">
+          <router-link
+            v-for="comic in recentComics"
+            :key="comic.id"
+            :to="`/manage/comics/${comic.id}?tab=operations`"
+            class="comic-row"
+          >
             <img :src="comic.coverUrl" :alt="`${comic.title} 封面`" class="comic-cover" loading="lazy" />
             <span class="comic-row-main">
               <strong>{{ comic.title }}</strong>
@@ -64,8 +71,7 @@
       </ManagementPanel>
 
       <ManagementPanel class="quick-panel" aria-labelledby="quick-action-title">
-        <PanelHeader title-id="quick-action-title" title="快速操作" description="常用管理入口。">
-        </PanelHeader>
+        <PanelHeader title-id="quick-action-title" title="快速操作" description="常用管理入口。"> </PanelHeader>
         <nav class="quick-actions" aria-label="快速操作">
           <router-link v-for="action in quickActions" :key="action.to" :to="action.to" class="quick-action">
             <el-icon :size="18"><component :is="action.icon" /></el-icon>
@@ -77,11 +83,26 @@
     </div>
 
     <StatGrid class="stats-strip" aria-label="仓库概览" :columns="5">
-      <StatCard label="漫画总数" :value="comicTotal ?? '—'" unit="本"><template #icon><el-icon :size="24"><Collection /></el-icon></template></StatCard>
-      <StatCard label="存储占用" :value="formatBytes(storage?.totalBytes)"><template #icon><el-icon :size="24"><FolderOpened /></el-icon></template></StatCard>
-      <StatCard label="任务总数" :value="taskTotal ?? '—'" unit="个"><template #icon><el-icon :size="24"><CircleCheck /></el-icon></template></StatCard>
-      <StatCard label="任务异常" :value="failedTaskCount ?? '—'" unit="个" tone="warning"><template #icon><el-icon :size="24"><Warning /></el-icon></template></StatCard>
-      <StatCard label="任务运行中" :value="activeTaskCount ?? '—'" unit="个"><template #icon><el-icon :size="24"><Clock /></el-icon></template></StatCard>
+      <StatCard label="漫画总数" :value="comicTotal ?? '—'" unit="本"
+        ><template #icon
+          ><el-icon :size="24"><Collection /></el-icon></template
+      ></StatCard>
+      <StatCard label="存储占用" :value="formatBytes(storage?.totalBytes)"
+        ><template #icon
+          ><el-icon :size="24"><FolderOpened /></el-icon></template
+      ></StatCard>
+      <StatCard label="任务总数" :value="taskTotal ?? '—'" unit="个"
+        ><template #icon
+          ><el-icon :size="24"><CircleCheck /></el-icon></template
+      ></StatCard>
+      <StatCard label="任务异常" :value="failedTaskCount ?? '—'" unit="个" tone="warning"
+        ><template #icon
+          ><el-icon :size="24"><Warning /></el-icon></template
+      ></StatCard>
+      <StatCard label="任务运行中" :value="activeTaskCount ?? '—'" unit="个"
+        ><template #icon
+          ><el-icon :size="24"><Clock /></el-icon></template
+      ></StatCard>
     </StatGrid>
   </div>
 </template>
@@ -141,7 +162,12 @@ function errorMessage(reason: unknown): string {
 
 function formatDateTime(value: string | null): string {
   if (!value) return '—'
-  return new Date(value).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+  return new Date(value).toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
 function formatBytes(bytes: number | undefined): string {
@@ -151,9 +177,9 @@ function formatBytes(bytes: number | undefined): string {
   return `${(bytes / 1024 ** 2).toFixed(1)} MB`
 }
 
-function taskTypeLabel(type: ManagementTaskType): string { return managementTaskTypeLabel(type) }
-
-
+function taskTypeLabel(type: ManagementTaskType): string {
+  return managementTaskTypeLabel(type)
+}
 
 onMounted(async () => {
   try {
@@ -167,8 +193,12 @@ onMounted(async () => {
     recentComics.value = comics.data.records
     recentTasks.value = tasks.data.records.slice(0, 5)
     taskTotal.value = tasks.data.total
-    failedTaskCount.value = tasks.data.records.filter((task) => ['FAILED', 'PARTIALLY_SUCCEEDED'].includes(task.status)).length
-    activeTaskCount.value = tasks.data.records.filter((task) => ['QUEUED', 'RUNNING', 'CANCELLING'].includes(task.status)).length
+    failedTaskCount.value = tasks.data.records.filter((task) =>
+      ['FAILED', 'PARTIALLY_SUCCEEDED'].includes(task.status),
+    ).length
+    activeTaskCount.value = tasks.data.records.filter((task) =>
+      ['QUEUED', 'RUNNING', 'CANCELLING'].includes(task.status),
+    ).length
     storage.value = storageSummary
     updatedAt.value = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
   } catch (reason: unknown) {
@@ -183,49 +213,178 @@ onMounted(async () => {
   gap: var(--space-6);
   min-width: 0;
 }
-.page-updated { margin: var(--space-1) 0 0; color: var(--text-muted); font-size: var(--text-sm); }
-.page-updated { white-space: nowrap; }
+.page-updated {
+  margin: var(--space-1) 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+.page-updated {
+  white-space: nowrap;
+}
 
-.section-link { color: var(--text-muted); font-size: var(--text-sm); white-space: nowrap; }
-.section-link:hover { color: var(--text-primary); }
+.section-link {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+.section-link:hover {
+  color: var(--text-primary);
+}
 
 .task-table-wrap,
-.comic-list { margin-top: var(--space-5); overflow-x: auto; }
-.task-table { width: 100%; min-width: 820px; border-collapse: collapse; font-size: var(--text-sm); }
+.comic-list {
+  margin-top: var(--space-5);
+  overflow-x: auto;
+}
+.task-table {
+  width: 100%;
+  min-width: 820px;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
 .task-table th,
-.task-table td { padding: var(--space-3) var(--space-2); border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
-.task-table th { color: var(--text-muted); font-size: var(--text-xs); font-weight: 600; }
-.task-table td { color: var(--text-secondary); }
-.task-table tr:last-child td { border-bottom: 0; }
-/* TODO(FE-STYLE): 核对页面级 !important 是否与主题/公共组件规则竞争；优先移除优先级覆盖。 */
-.task-name { max-width: 240px; overflow: hidden; color: var(--text-primary) !important; text-overflow: ellipsis; }
+.task-table td {
+  padding: var(--space-3) var(--space-2);
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+}
+.task-table th {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.task-table td {
+  color: var(--text-secondary);
+}
+.task-table tr:last-child td {
+  border-bottom: 0;
+}
+.task-table > tbody > tr > td.task-name {
+  max-width: 240px;
+  overflow: hidden;
+  color: var(--text-primary);
+  text-overflow: ellipsis;
+}
 
-.progress-cell { display: grid; grid-template-columns: 42px minmax(90px, 1fr); align-items: center; gap: var(--space-2); }
-.progress-track { display: block; height: 4px; overflow: hidden; border-radius: var(--radius-pill); background: var(--color-progress-track); }
-.progress-track span { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
+.progress-cell {
+  display: grid;
+  grid-template-columns: 42px minmax(90px, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+}
+.progress-track {
+  display: block;
+  height: 4px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--color-progress-track);
+}
+.progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
 
-.dashboard-columns { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr); gap: var(--space-6); min-width: 0; }
-.comic-list { display: grid; gap: 0; }
-.comic-row { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto auto; align-items: center; gap: var(--space-3); min-width: 0; padding: var(--space-3) 0; border-bottom: 1px solid var(--border); }
-.comic-row:last-child { border-bottom: 0; }
-.comic-row:hover strong { color: var(--accent); }
-.comic-cover { width: 36px; height: 48px; border-radius: var(--radius-xs); object-fit: cover; background: var(--bg-secondary); }
-.comic-row-main { display: grid; gap: var(--space-1); min-width: 0; }
-.comic-row-main strong { overflow: hidden; color: var(--text-primary); text-overflow: ellipsis; white-space: nowrap; transition: color var(--transition-fast); }
-.comic-row-main small { overflow: hidden; color: var(--text-muted); text-overflow: ellipsis; white-space: nowrap; }
-.comic-row-action { color: var(--text-muted); font-size: var(--text-xs); }
+.dashboard-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr);
+  gap: var(--space-6);
+  min-width: 0;
+}
+.comic-list {
+  display: grid;
+  gap: 0;
+}
+.comic-row {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border);
+}
+.comic-row:last-child {
+  border-bottom: 0;
+}
+.comic-row:hover strong {
+  color: var(--accent);
+}
+.comic-cover {
+  width: 36px;
+  height: 48px;
+  border-radius: var(--radius-xs);
+  object-fit: cover;
+  background: var(--bg-secondary);
+}
+.comic-row-main {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.comic-row-main strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color var(--transition-fast);
+}
+.comic-row-main small {
+  overflow: hidden;
+  color: var(--text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.comic-row-action {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
 
-.quick-actions { display: grid; gap: var(--space-2); margin-top: var(--space-5); }
-.quick-action { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); min-height: 44px; padding: 0 var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-secondary); transition: border-color var(--transition-fast), background-color var(--transition-fast), color var(--transition-fast); }
-.quick-action:hover { border-color: var(--border-strong); background: var(--surface-highlight); color: var(--text-primary); }
-.quick-arrow { color: var(--text-muted); font-size: 22px; line-height: 1; }
+.quick-actions {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+}
+.quick-action {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  transition:
+    border-color var(--transition-fast),
+    background-color var(--transition-fast),
+    color var(--transition-fast);
+}
+.quick-action:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-highlight);
+  color: var(--text-primary);
+}
+.quick-arrow {
+  color: var(--text-muted);
+  font-size: 22px;
+  line-height: 1;
+}
 
 @media (max-width: 1100px) {
-  .dashboard-columns { grid-template-columns: minmax(0, 1fr); }
+  .dashboard-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 @media (max-width: 700px) {
-  .comic-row { grid-template-columns: 36px minmax(0, 1fr) auto; }
-  .comic-row-action { display: none; }
+  .comic-row {
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+  }
+  .comic-row-action {
+    display: none;
+  }
 }
 </style>

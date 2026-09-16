@@ -352,9 +352,8 @@
   z-index: 2;
   background: var(--bg-surface);
 }
-.media-table :deep(.el-table__header),
-.media-table :deep(.el-table__body) {
-  /* TODO(FE-STYLE): 核对表格宽度覆盖是否可通过组件配置或更准确选择器实现，避免无必要的优先级竞争。 */
+.media-table-scroll > .media-table :deep(.el-table__header-wrapper > table.el-table__header),
+.media-table-scroll > .media-table :deep(.el-table__body-wrapper > table.el-table__body) {
   width: max-content !important;
   min-width: 100%;
 }

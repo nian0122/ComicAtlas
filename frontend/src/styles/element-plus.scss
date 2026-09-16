@@ -1,5 +1,4 @@
-/* TODO(FE-STYLE): 逐条核对剩余 !important，优先改用 Element Plus 变量或更准确的主题选择器。
- * Element Plus Midnight Index 映射。
+/* Element Plus Midnight Index 映射。
  * token 由 styles/index.scss 先行加载，本文件不重复导入或定义视觉值。
  */
 
@@ -184,11 +183,20 @@
   --el-checkbox-checked-input-border-color: var(--accent);
   --el-checkbox-disabled-input-fill: var(--bg-secondary);
   --el-checkbox-disabled-border-color: var(--border);
+
+  /* 双类选择器优先于 Element Plus 的按需注入默认变量，保证普通复选框使用黑场。 */
+  &.el-checkbox {
+    --el-checkbox-bg-color: var(--bg-surface);
+    --el-checkbox-checked-bg-color: var(--accent);
+    --el-checkbox-checked-input-border-color: var(--accent);
+    --el-checkbox-disabled-input-fill: var(--bg-secondary);
+    --el-checkbox-disabled-border-color: var(--border);
+  }
 }
 
-.el-checkbox__inner {
-  /* Element Plus 的状态选择器覆盖了组件变量，未选中态也必须保持深色。 */
-  background-color: var(--bg-surface) !important;
+.el-checkbox .el-checkbox__input:not(.is-checked):not(.is-indeterminate):not(.is-disabled) .el-checkbox__inner {
+  /* 仅覆盖未选中且可用状态，避免干扰 checked/indeterminate/disabled 的组件契约。 */
+  background-color: var(--el-checkbox-bg-color);
   border-color: var(--border-strong);
 }
 
@@ -621,8 +629,18 @@
 
   border-radius: var(--radius-md);
   background: var(--bg-secondary);
-  /* Element Plus 的布局层会以更高优先级回填白色，表格黑场是全局视觉契约。 */
-  background-color: var(--bg-secondary) !important;
+  /* 双类选择器同时锁定主题变量和根背景，覆盖 Element Plus 按需注入的同名默认变量。 */
+  &.el-table {
+    --el-table-bg-color: var(--bg-secondary);
+    --el-table-tr-bg-color: var(--bg-secondary);
+    --el-table-header-bg-color: var(--bg-surface);
+    --el-table-row-hover-bg-color: var(--surface-highlight);
+    --el-table-border-color: var(--border);
+    --el-table-text-color: var(--text-secondary);
+    --el-table-header-text-color: var(--text-primary);
+    --el-table-current-row-bg-color: var(--accent-bg);
+    background-color: var(--el-table-bg-color);
+  }
 
   .el-table__inner-wrapper,
   .el-table__header-wrapper,

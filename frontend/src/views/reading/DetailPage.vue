@@ -34,6 +34,7 @@
       <template v-else>
         <!-- Hero -->
         <HeroBanner
+          class="detail-hero"
           :background-url="comic.coverUrl"
           :poster-url="comic.coverUrl"
           variant="detail"
@@ -611,28 +612,29 @@ onMounted(loadData)
    移动端布局（由 useInteractionMode 驱动；桌面端无 is-mobile 类，完全不受影响）
    ============================== */
 
+/* HeroBanner 的内容结构属于子组件，页面变体需要跨作用域调整其移动端布局。 */
 /* Hero：PC 左右两栏 → 移动端纵向堆叠（stretch 让 hero-info 撑满，主按钮才能真正全宽） */
-.comic-detail-page.is-mobile :deep(.hero-content) {
+.comic-detail-page.is-mobile > .detail-hero :deep(.hero-content) {
   flex-direction: column;
   align-items: stretch;
   gap: var(--space-lg);
 }
 
 /* 封面居中，宽度不超过 50% 且最大 220px */
-.comic-detail-page.is-mobile :deep(.hero-poster) {
+.comic-detail-page.is-mobile > .detail-hero :deep(.hero-poster) {
   width: min(50%, 220px);
   margin: 0 auto;
 }
 
 /* 标题与进度信息居中展示 */
-.comic-detail-page.is-mobile :deep(.hero-info) {
+.comic-detail-page.is-mobile > .detail-hero :deep(.hero-info) {
   max-width: 100%;
   align-items: center;
   text-align: center;
 }
 
 /* 长标题最多两行，超出省略 */
-.comic-detail-page.is-mobile :deep(.hero-title) {
+.comic-detail-page.is-mobile > .detail-hero :deep(.hero-title) {
   font-size: 24px;
   max-width: 100%;
   overflow: hidden;
@@ -643,11 +645,11 @@ onMounted(loadData)
 }
 
 /* 单一主操作按钮：全宽、触控高度 ≥ 48px（次按钮已在 secondaryAction 中按 mode 置空） */
-.comic-detail-page.is-mobile :deep(.hero-actions) {
+.comic-detail-page.is-mobile > .detail-hero :deep(.hero-actions) {
   width: 100%;
 }
 
-.comic-detail-page.is-mobile :deep(.hero-btn--primary) {
+.comic-detail-page.is-mobile > .detail-hero :deep(.hero-btn--primary) {
   width: 100%;
   min-height: 48px;
   font-size: 16px;
