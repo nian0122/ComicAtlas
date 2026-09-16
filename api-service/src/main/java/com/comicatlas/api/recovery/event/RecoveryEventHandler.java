@@ -1,6 +1,7 @@
 package com.comicatlas.api.recovery.event;
 
 import com.comicatlas.api.recovery.service.RecoveryBatchService;
+import com.comicatlas.api.recovery.service.impl.RecoveryBatchServiceImpl;
 import com.comicatlas.api.recovery.engine.RecoveryEngine;
 import com.comicatlas.api.recovery.persistence.mapper.RecoveryTaskMapper;
 import com.comicatlas.api.task.service.ManagementTaskService;
@@ -36,7 +37,7 @@ public class RecoveryEventHandler {
     public RecoveryEventHandler(RecoveryEngine recoveryEngine, RecoveryTaskMapper recoveryTaskMapper,
             RedisTemplate<String, Object> redisTemplate, ManagementTaskService managementTaskService,
             MqConsumerSupport mqConsumerSupport) {
-        this(new RecoveryBatchService(recoveryEngine, recoveryTaskMapper, redisTemplate, managementTaskService),
+        this(new RecoveryBatchServiceImpl(recoveryEngine, recoveryTaskMapper, redisTemplate, managementTaskService),
                 mqConsumerSupport);
     }
 
