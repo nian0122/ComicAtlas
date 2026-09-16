@@ -1,12 +1,12 @@
 package com.comicatlas.api.task.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.comicatlas.api.task.entity.ManagementTask;
-import com.comicatlas.api.task.entity.ManagementTaskItem;
+import com.comicatlas.api.task.persistence.entity.ManagementTask;
+import com.comicatlas.api.task.persistence.entity.ManagementTaskItem;
 import com.comicatlas.api.task.enums.ManagementTaskStatus;
 import com.comicatlas.api.task.enums.TaskType;
-import com.comicatlas.api.task.mapper.ManagementTaskItemMapper;
-import com.comicatlas.api.task.mapper.ManagementTaskMapper;
+import com.comicatlas.api.task.persistence.mapper.ManagementTaskItemMapper;
+import com.comicatlas.api.task.persistence.mapper.ManagementTaskMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

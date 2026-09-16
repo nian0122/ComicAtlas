@@ -2,8 +2,8 @@ package com.comicatlas.api.task.service;
 
 import com.comicatlas.api.task.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.task.dto.ManagementTaskResponse;
-import com.comicatlas.api.task.entity.ManagementTask;
-import com.comicatlas.api.task.entity.ManagementTaskItem;
+import com.comicatlas.api.task.persistence.entity.ManagementTask;
+import com.comicatlas.api.task.persistence.entity.ManagementTaskItem;
 import org.springframework.stereotype.Component;
 
 /** 管理任务实体到接口响应模型的转换器。 */

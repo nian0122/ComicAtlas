@@ -2,8 +2,8 @@ package com.comicatlas.api.importer.service;
 
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
-import com.comicatlas.api.importer.entity.ImportTask;
-import com.comicatlas.api.importer.mapper.ImportTaskMapper;
+import com.comicatlas.api.importer.persistence.entity.ImportTask;
+import com.comicatlas.api.importer.persistence.mapper.ImportTaskMapper;
 import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.common.event.ImportTaskCreatedEvent;
 import com.comicatlas.contract.common.enums.ComicStatus;

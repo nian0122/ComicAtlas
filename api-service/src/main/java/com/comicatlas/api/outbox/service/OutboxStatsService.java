@@ -1,6 +1,6 @@
 package com.comicatlas.api.outbox.service;
 
-import com.comicatlas.api.outbox.mapper.OutboxMessageMapper;
+import com.comicatlas.api.outbox.persistence.mapper.OutboxMessageMapper;
 import com.comicatlas.common.dto.OutboxStatsDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

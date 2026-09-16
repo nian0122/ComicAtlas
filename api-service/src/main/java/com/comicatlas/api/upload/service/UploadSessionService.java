@@ -2,7 +2,7 @@ package com.comicatlas.api.upload.service;
 import com.comicatlas.api.upload.domain.RangeTracker;
 import com.comicatlas.api.upload.domain.UploadSessionStatus;
 import com.comicatlas.api.upload.support.MediaTypeDetector;
-import com.comicatlas.api.upload.support.UploadProperties;
+import com.comicatlas.api.upload.config.UploadProperties;
 import com.comicatlas.api.shared.crypto.DigestService;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -325,6 +325,7 @@ public class UploadSessionService {
 
     // ======================== complete ========================
 
+    // TODO(DECOUPLE-01): 上传完整性校验与事务落库混合；先提取只读文件校验器，再以会话状态复核和幂等提交衔接短事务。
     @Transactional
     public UploadCompleteResponse complete(String sessionId) {
         UploadSession session = getBySessionId(sessionId);

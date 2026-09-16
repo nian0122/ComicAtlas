@@ -20,6 +20,7 @@ class ApiPackageBoundaryTest {
             "api/metadata",
             "api/media",
             "api/recovery",
+            "api/trash",
             "api/upload");
 
     @Test
@@ -43,6 +44,48 @@ class ApiPackageBoundaryTest {
         try (var files = Files.walk(sourceRoot.resolve("api"))) {
             files.filter(path -> path.toString().endsWith("Controller.java"))
                     .forEach(this::assertControllerDoesNotUseMapper);
+        }
+    }
+
+    @Test
+    void frameworkTypesMustStayInTheirBusinessLayers() throws IOException {
+        Path sourceRoot = resolveSourceRoot().resolve("api");
+        try (var files = Files.walk(sourceRoot)) {
+            for (Path sourceFile : files.filter(path -> path.toString().endsWith(".java")).toList()) {
+                String fileName = sourceFile.getFileName().toString();
+                String packagePath = sourceRoot.relativize(sourceFile.getParent()).toString().replace('\\', '/');
+                String source = Files.readString(sourceFile);
+                if (fileName.endsWith("Controller.java")) {
+                    assertTrue(packagePath.endsWith("/controller"), () -> sourceFile + " 应归属业务 controller 包");
+                }
+                if (fileName.endsWith("Mapper.java")) {
+                    assertTrue(packagePath.endsWith("/persistence/mapper"),
+                            () -> sourceFile + " 应归属业务 persistence.mapper 包");
+                }
+                if (source.contains("@TableName(")) {
+                    assertTrue(packagePath.endsWith("/persistence/entity"),
+                            () -> sourceFile + " 应归属业务 persistence.entity 包");
+                }
+            }
+        }
+    }
+
+    @Test
+    void configuredMapperScanMustDiscoverEveryBusinessMapper() throws IOException {
+        var registry = new org.springframework.beans.factory.support.DefaultListableBeanFactory();
+        var scanner = new org.mybatis.spring.mapper.ClassPathMapperScanner(registry);
+        scanner.registerFilters();
+        var mapperScan = com.comicatlas.api.config.MyBatisPlusConfig.class
+                .getAnnotation(org.mybatis.spring.annotation.MapperScan.class);
+        scanner.scan(mapperScan.value());
+        Path sourceRoot = resolveSourceRoot().resolve("api");
+        try (var files = Files.walk(sourceRoot)) {
+            for (Path sourceFile : files.filter(path -> path.toString().endsWith("Mapper.java")).toList()) {
+                String typeName = sourceFile.getFileName().toString().replace(".java", "");
+                String beanName = java.beans.Introspector.decapitalize(typeName);
+                assertTrue(registry.containsBeanDefinition(beanName),
+                        () -> sourceFile + " 未被实际 MyBatis 扫描配置发现");
+            }
         }
     }
 

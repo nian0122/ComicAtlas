@@ -1,14 +1,14 @@
 package com.comicatlas.api.task.service;
 
-import com.comicatlas.api.exporter.mapper.ExportTaskMapper;
-import com.comicatlas.api.importer.entity.ImportTask;
-import com.comicatlas.api.importer.mapper.ImportTaskMapper;
+import com.comicatlas.api.exporter.persistence.mapper.ExportTaskMapper;
+import com.comicatlas.api.importer.persistence.entity.ImportTask;
+import com.comicatlas.api.importer.persistence.mapper.ImportTaskMapper;
 import com.comicatlas.api.importer.service.ImportRetryCoordinator;
-import com.comicatlas.api.task.entity.ManagementTask;
-import com.comicatlas.api.task.entity.ManagementTaskItem;
+import com.comicatlas.api.task.persistence.entity.ManagementTask;
+import com.comicatlas.api.task.persistence.entity.ManagementTaskItem;
 import com.comicatlas.api.task.dto.CreateManagementTaskRequest;
-import com.comicatlas.api.task.mapper.ManagementTaskItemMapper;
-import com.comicatlas.api.task.mapper.ManagementTaskMapper;
+import com.comicatlas.api.task.persistence.mapper.ManagementTaskItemMapper;
+import com.comicatlas.api.task.persistence.mapper.ManagementTaskMapper;
 import com.comicatlas.api.outbox.service.OutboxService;
 import com.comicatlas.api.importer.enums.ImportTaskStatus;
 import com.comicatlas.api.task.enums.ManagementTaskStatus;

@@ -1,6 +1,6 @@
 package com.comicatlas.api.task.controller;
 
-import com.comicatlas.api.config.DlqSecurityConfig;
+import com.comicatlas.api.dlq.config.DlqSecurityConfig;
 import com.comicatlas.api.task.service.MqStatsService;
 import com.comicatlas.common.dto.MqStatsDTO;
 import com.comicatlas.contract.common.exception.GlobalExceptionHandler;

@@ -1,5 +1,7 @@
 package com.comicatlas.api.storage.service;
 
+import com.comicatlas.api.storage.service.impl.StorageQueryServiceImpl;
+
 import com.comicatlas.api.storage.dto.ComicStorageDTO;
 import com.comicatlas.api.storage.dto.ComicStorageQuery;
 import com.comicatlas.api.storage.dto.ComicTranscodeStatusVO;

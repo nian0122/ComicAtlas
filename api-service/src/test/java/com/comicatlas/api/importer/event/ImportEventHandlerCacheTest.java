@@ -2,8 +2,8 @@ package com.comicatlas.api.importer.event;
 
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
-import com.comicatlas.api.importer.entity.ImportTask;
-import com.comicatlas.api.importer.mapper.ImportTaskMapper;
+import com.comicatlas.api.importer.persistence.entity.ImportTask;
+import com.comicatlas.api.importer.persistence.mapper.ImportTaskMapper;
 import com.comicatlas.api.importer.service.ImportPersistenceService;
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.api.importer.enums.ImportTaskStatus;

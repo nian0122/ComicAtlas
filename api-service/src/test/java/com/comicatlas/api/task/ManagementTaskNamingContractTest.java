@@ -1,7 +1,7 @@
 package com.comicatlas.api.task;
 
 import com.comicatlas.api.task.dto.ManagementTaskResponse;
-import com.comicatlas.api.task.entity.ManagementTask;
+import com.comicatlas.api.task.persistence.entity.ManagementTask;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;

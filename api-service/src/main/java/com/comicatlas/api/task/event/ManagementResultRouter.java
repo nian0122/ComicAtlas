@@ -3,7 +3,7 @@ package com.comicatlas.api.task.event;
 import com.comicatlas.api.media.service.MediaOperationCompletionService;
 import com.comicatlas.api.metadata.service.MetadataRefreshCompletionService;
 import com.comicatlas.api.metadata.service.MetadataUpdateCoordinator;
-import com.comicatlas.api.recovery.trash.TrashLifecycleCompletionService;
+import com.comicatlas.api.trash.service.TrashLifecycleCompletionService;
 import com.comicatlas.api.storage.service.ComicStatsService;
 import com.comicatlas.api.upload.service.UploadCompletionService;
 import com.comicatlas.common.event.ManagementCommandCompletedEvent;

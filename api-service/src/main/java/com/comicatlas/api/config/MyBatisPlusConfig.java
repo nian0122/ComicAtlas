@@ -7,14 +7,13 @@ import com.baomidou.mybatisplus.extension.plugins.inner.OptimisticLockerInnerInt
 import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
 import com.comicatlas.persistence.handler.EnumTypeHandlers;
 import com.comicatlas.api.config.ManagementEnumTypeHandlers;
-import com.comicatlas.api.upload.support.UploadSessionStatusTypeHandler;
+import com.comicatlas.api.upload.persistence.handler.UploadSessionStatusTypeHandler;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
 @MapperScan({
-        "com.comicatlas.api.*.mapper",
         "com.comicatlas.api.*.persistence.mapper",
         "com.comicatlas.persistence.comic.mapper",
         "com.comicatlas.persistence.reader.mapper"

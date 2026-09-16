@@ -1,8 +1,8 @@
 package com.comicatlas.api.outbox.relay;
 
-import com.comicatlas.api.outbox.entity.OutboxMessage;
+import com.comicatlas.api.outbox.persistence.entity.OutboxMessage;
 import com.comicatlas.api.outbox.enums.OutboxMessageStatus;
-import com.comicatlas.api.outbox.mapper.OutboxMessageMapper;
+import com.comicatlas.api.outbox.persistence.mapper.OutboxMessageMapper;
 import com.comicatlas.common.event.ComicEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;

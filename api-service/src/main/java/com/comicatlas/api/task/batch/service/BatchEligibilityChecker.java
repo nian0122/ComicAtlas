@@ -2,7 +2,7 @@ package com.comicatlas.api.task.batch.service;
 
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
-import com.comicatlas.api.task.batch.BatchReasonCode;
+import com.comicatlas.api.task.batch.enums.BatchReasonCode;
 import com.comicatlas.api.task.batch.dto.BlockedBatchItem;
 import com.comicatlas.api.task.policy.AllowedOperations;
 import com.comicatlas.api.task.policy.MediaOperationEligibilityService;

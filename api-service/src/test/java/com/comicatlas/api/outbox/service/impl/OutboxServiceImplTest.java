@@ -1,7 +1,7 @@
 package com.comicatlas.api.outbox.service.impl;
 
-import com.comicatlas.api.outbox.entity.OutboxMessage;
-import com.comicatlas.api.outbox.mapper.OutboxMessageMapper;
+import com.comicatlas.api.outbox.persistence.entity.OutboxMessage;
+import com.comicatlas.api.outbox.persistence.mapper.OutboxMessageMapper;
 import com.comicatlas.common.event.ImportTaskCreatedEvent;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.fasterxml.jackson.databind.ObjectMapper;

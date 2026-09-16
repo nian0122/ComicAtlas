@@ -69,6 +69,7 @@ public class ReaderServiceImpl implements ReaderService {
                 .eq(Media::getStatus, MediaLifecycleStatus.READY)
                 .orderByAsc(Media::getPageNumber));
 
+        // TODO(DECOUPLE-08): 章节查询内嵌媒体展示映射；提取 ReaderAssembler，统一视频 LQ 占位与文件名回退，继续通过 FileUrlResolver 生成 URL。
         ReaderDTO readerDTO = new ReaderDTO();
         readerDTO.setChapterId(chapter.getId());
         readerDTO.setComicId(chapter.getComicId());

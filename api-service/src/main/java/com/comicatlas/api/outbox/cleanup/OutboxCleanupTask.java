@@ -1,8 +1,8 @@
 package com.comicatlas.api.outbox.cleanup;
 
-import com.comicatlas.api.task.mapper.ManagementTaskMapper;
-import com.comicatlas.api.outbox.mapper.InboxReceiptMapper;
-import com.comicatlas.api.outbox.mapper.OutboxMessageMapper;
+import com.comicatlas.api.task.persistence.mapper.ManagementTaskMapper;
+import com.comicatlas.api.outbox.persistence.mapper.InboxReceiptMapper;
+import com.comicatlas.api.outbox.persistence.mapper.OutboxMessageMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;

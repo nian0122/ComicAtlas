@@ -7,10 +7,10 @@ import com.comicatlas.worker.media.hq.HqDeleteCommandHandler;
 import com.comicatlas.worker.media.lq.LqCommandHandler;
 import com.comicatlas.worker.media.upload.MediaUploadCommandHandler;
 import com.comicatlas.worker.media.metadata.command.MetadataRefreshCommandHandler;
-import com.comicatlas.worker.recovery.command.PurgeCommandHandler;
-import com.comicatlas.worker.recovery.command.RestoreCommandHandler;
+import com.comicatlas.worker.trash.command.PurgeCommandHandler;
+import com.comicatlas.worker.trash.command.RestoreCommandHandler;
 import com.comicatlas.worker.media.transcode.TranscodeCommandHandler;
-import com.comicatlas.worker.recovery.command.TrashCommandHandler;
+import com.comicatlas.worker.trash.command.TrashCommandHandler;
 import com.rabbitmq.client.Channel;
 import org.junit.jupiter.api.Test;
 

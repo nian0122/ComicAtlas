@@ -2,11 +2,11 @@ package com.comicatlas.api.importer.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
-import com.comicatlas.api.importer.entity.ImportTask;
+import com.comicatlas.api.importer.persistence.entity.ImportTask;
 import com.comicatlas.api.importer.exception.ImportMetadataException;
-import com.comicatlas.api.importer.mapper.ImportTaskMapper;
+import com.comicatlas.api.importer.persistence.mapper.ImportTaskMapper;
 import com.comicatlas.api.importer.service.ImportPersistenceService;
-import com.comicatlas.api.task.entity.ManagementTaskItem;
+import com.comicatlas.api.task.persistence.entity.ManagementTaskItem;
 import com.comicatlas.api.task.service.ManagementTaskService;
 import com.comicatlas.api.task.state.ManagementStateMachine;
 import com.comicatlas.api.outbox.service.OutboxService;
@@ -152,6 +152,7 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
         return requests != null ? requests : List.of();
     }
 
+    // TODO(DECOUPLE-02): 元数据解码、目录媒体装配与最终化状态机集中于此类；提取解码/装配器和最终化服务，保留落库与 Outbox 同事务。
     private List<FinalizeRequest> persistCompletedInTxn(ImportTaskCompletedEvent event,
                                                         Map<String, Object> metadata, String hqPrefix) {
         Long taskId = event.taskId();

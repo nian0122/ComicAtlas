@@ -6,10 +6,10 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.comicatlas.api.task.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.task.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.task.dto.ManagementTaskResponse;
-import com.comicatlas.api.task.entity.ManagementTask;
-import com.comicatlas.api.task.entity.ManagementTaskItem;
-import com.comicatlas.api.task.mapper.ManagementTaskItemMapper;
-import com.comicatlas.api.task.mapper.ManagementTaskMapper;
+import com.comicatlas.api.task.persistence.entity.ManagementTask;
+import com.comicatlas.api.task.persistence.entity.ManagementTaskItem;
+import com.comicatlas.api.task.persistence.mapper.ManagementTaskItemMapper;
+import com.comicatlas.api.task.persistence.mapper.ManagementTaskMapper;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.api.task.enums.ManagementTaskStatus;
@@ -244,6 +244,7 @@ public class ManagementTaskService {
         return taskResponseAssembler.toResponse(updated);
     }
 
+    // TODO(DECOUPLE-05): 通用任务服务依赖元数据刷新业务；提取取消/重试策略接口，由元数据域实现，保持 attempt 校验与释放动作同事务。
     private void releaseCancelledMetadataRefresh(ManagementTask task, Long taskId) {
         if (task.getTaskType() != TaskType.METADATA_REFRESH
                 || taskInternalQueryService.countActiveItems(taskId) > 0) {
