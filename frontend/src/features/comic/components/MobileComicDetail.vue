@@ -217,7 +217,7 @@ const hqSize = computed(() => {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: var(--space-4);
+  gap: var(--space-2) var(--space-4);
   margin-top: var(--space-3);
   color: rgb(255 255 255 / 82%);
   font-size: var(--text-sm);
@@ -227,7 +227,7 @@ const hqSize = computed(() => {
 .tags {
   display: flex;
   justify-content: center;
-  gap: var(--space-2);
+  gap: var(--space-1) var(--space-2);
   margin-top: var(--space-4);
   overflow-x: auto;
   scrollbar-width: none;
@@ -368,7 +368,7 @@ const hqSize = computed(() => {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-3);
 }
 
 .empty-catalog {
@@ -379,7 +379,7 @@ const hqSize = computed(() => {
 /* ChapterSearchBox 的根节点由可复用子组件控制，此处仅做目录区域的移动端宽度适配。 */
 .mobile-detail .catalog > :deep(.chapter-search-box) {
   width: 100%;
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-3);
 }
 
 .clear-search-button {

@@ -47,7 +47,7 @@
             <div class="progress-block">
               <p class="progress-label">阅读进度</p>
               <div class="progress-meta">
-                <span>{{ progressMetaText }}</span>
+                <span class="progress-pages">{{ progressMetaText }}</span>
                 <span class="progress-percent">{{ comic.progressPercent || 0 }}%</span>
               </div>
               <div class="progress-bar">
@@ -349,7 +349,8 @@ onMounted(loadData)
 /* Progress */
 .progress-block {
   width: 100%;
-  max-width: 520px;
+  max-width: none;
+  box-sizing: border-box;
 }
 
 .progress-label {
@@ -365,9 +366,15 @@ onMounted(loadData)
   display: flex;
   justify-content: space-between;
   align-items: center;
+  width: 100%;
   font-size: 13px;
   color: var(--text-secondary);
   margin: 0 0 var(--space-sm);
+}
+
+.progress-pages {
+  min-width: 0;
+  overflow-wrap: break-word;
 }
 
 .progress-percent {

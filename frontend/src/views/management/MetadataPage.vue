@@ -5,7 +5,12 @@
     <StatGrid spaced class="metadata-summary" aria-label="元数据统计" :columns="3">
       <StatCard label="分类" :value="categoryStore.list.length" description="可用于仓库筛选" />
       <StatCard label="标签" :value="tagStore.list.length" description="用于漫画检索与归档" />
-      <StatCard label="维护状态" :value="metadataStatusLabel" :description="metadataStatusHint" :tone="metadataHealthy ? 'success' : 'danger'" />
+      <StatCard
+        label="维护状态"
+        :value="metadataStatusLabel"
+        :description="metadataStatusHint"
+        :tone="metadataHealthy ? 'success' : 'danger'"
+      />
     </StatGrid>
 
     <el-tabs v-model="activeTab" class="metadata-tabs">
@@ -14,12 +19,10 @@
           <el-input
             v-model="newCategoryName"
             placeholder="新分类名称"
-            style="width: 240px"
+            class="metadata-input"
             @keyup.enter="onCreateCategory"
           />
-          <el-button type="primary" :loading="categoryStore.loading" @click="onCreateCategory">
-            添加分类
-          </el-button>
+          <el-button type="primary" :loading="categoryStore.loading" @click="onCreateCategory"> 添加分类 </el-button>
         </div>
 
         <el-table v-loading="categoryStore.loading" :data="categoryStore.list" style="width: 100%">
@@ -35,15 +38,8 @@
 
       <el-tab-pane label="标签" name="tag">
         <div class="tab-toolbar">
-          <el-input
-            v-model="newTagName"
-            placeholder="新标签名称"
-            style="width: 240px"
-            @keyup.enter="onCreateTag"
-          />
-          <el-button type="primary" :loading="tagStore.loading" @click="onCreateTag">
-            添加标签
-          </el-button>
+          <el-input v-model="newTagName" placeholder="新标签名称" class="metadata-input" @keyup.enter="onCreateTag" />
+          <el-button type="primary" :loading="tagStore.loading" @click="onCreateTag"> 添加标签 </el-button>
         </div>
 
         <div class="tag-list">
@@ -93,7 +89,7 @@ const editCategoryName = ref('')
 
 const newTagName = ref('')
 const metadataHealthy = computed(() => !categoryStore.error && !tagStore.error)
-const metadataStatusLabel = computed(() => metadataHealthy.value ? '正常' : '接口异常')
+const metadataStatusLabel = computed(() => (metadataHealthy.value ? '正常' : '接口异常'))
 const metadataStatusHint = computed(() => {
   if (metadataHealthy.value) return '接口同步可用'
   return categoryStore.error || tagStore.error || '请稍后重试'
@@ -177,13 +173,44 @@ async function onDeleteTag(tag: TagDTO | null | undefined) {
 .metadata-page {
   width: 100%;
   max-width: none;
+  --el-border-color: var(--border);
+  --el-border-color-hover: var(--border-strong);
+  --el-border-color-light: var(--border);
+  --el-border-color-lighter: var(--border);
 }
 
 .tab-toolbar {
   display: flex;
   align-items: center;
-  gap: var(--space-base);
-  margin-bottom: var(--space-lg);
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-base);
+}
+
+.metadata-input {
+  flex: 0 1 240px;
+  width: 240px;
+  min-width: 180px;
+}
+
+.metadata-tabs :deep(.el-tabs__header) {
+  margin-bottom: var(--space-base);
+}
+
+.metadata-tabs :deep(.el-tabs__nav-wrap::after) {
+  background-color: var(--border);
+}
+
+.metadata-page :deep(.el-input__wrapper) {
+  box-shadow: 0 0 0 1px var(--border) inset;
+}
+
+.metadata-page :deep(.el-input__wrapper:hover) {
+  box-shadow: 0 0 0 1px var(--border-strong) inset;
+}
+
+.metadata-page :deep(.el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 1px var(--accent) inset;
 }
 
 .tag-list {
@@ -194,6 +221,13 @@ async function onDeleteTag(tag: TagDTO | null | undefined) {
 
 .tag-item {
   font-size: 13px;
-  padding: 6px 10px;
+  padding: 4px 9px;
+}
+
+@media (max-width: 560px) {
+  .metadata-input {
+    flex-basis: 100%;
+    width: 100%;
+  }
 }
 </style>

@@ -10,11 +10,7 @@
 
     <div class="hero-content">
       <div class="hero-poster">
-        <div
-          v-if="posterUrl"
-          class="hero-poster-bg"
-          :style="{ backgroundImage: `url(${posterUrl})` }"
-        />
+        <div v-if="posterUrl" class="hero-poster-bg" :style="{ backgroundImage: `url(${posterUrl})` }" />
         <div v-else class="hero-poster-placeholder">
           <el-icon :size="64"><VideoPlay /></el-icon>
         </div>
@@ -91,14 +87,9 @@ defineSlots<{
 
 const slots = useSlots()
 
-const hasDescription = computed(
-  () => Boolean(slots.description) || Boolean(props.description)
-)
+const hasDescription = computed(() => Boolean(slots.description) || Boolean(props.description))
 const hasActions = computed(
-  () =>
-    Boolean(slots.actions) ||
-    Boolean(props.primaryAction) ||
-    Boolean(props.secondaryAction)
+  () => Boolean(slots.actions) || Boolean(props.primaryAction) || Boolean(props.secondaryAction),
 )
 </script>
 
@@ -153,9 +144,10 @@ const hasActions = computed(
 }
 
 .hero-banner--detail .hero-title {
-  max-width: 18ch;
+  max-width: min(100%, 48rem);
   font-size: clamp(2.4rem, 5vw, 4.8rem);
   text-wrap: balance;
+  overflow-wrap: break-word;
 }
 
 .hero-banner--detail .hero-subtitle {
@@ -319,7 +311,8 @@ const hasActions = computed(
   font-weight: 700;
   line-height: 1;
   cursor: pointer;
-  transition: transform var(--transition-fast),
+  transition:
+    transform var(--transition-fast),
     background-color var(--transition-fast);
 }
 
@@ -387,7 +380,7 @@ const hasActions = computed(
   }
 
   .hero-title {
-    max-width: 18ch;
+    max-width: 100%;
     font-size: clamp(1.75rem, 8vw, 2.5rem);
     letter-spacing: -0.04em;
   }

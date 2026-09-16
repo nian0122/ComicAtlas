@@ -102,7 +102,7 @@ textarea {
   -webkit-tap-highlight-color: transparent;
 }
 
-input:not(.el-input__inner):is(
+input:not(.el-input__inner):not(.unstyled-input):is(
     :not([type]),
     [type='text'],
     [type='search'],
@@ -127,7 +127,7 @@ textarea:not(.el-textarea__inner) {
     box-shadow var(--transition-fast);
 }
 
-input:not(.el-input__inner):is(
+input:not(.el-input__inner):not(.unstyled-input):is(
     :not([type]),
     [type='text'],
     [type='search'],
@@ -143,7 +143,7 @@ textarea:not(.el-textarea__inner):hover:not(:disabled) {
   border-color: var(--border-strong);
 }
 
-input:not(.el-input__inner):is(
+input:not(.el-input__inner):not(.unstyled-input):is(
     :not([type]),
     [type='text'],
     [type='search'],
@@ -161,7 +161,7 @@ textarea:not(.el-textarea__inner):focus {
     var(--shadow-sm);
 }
 
-input:not(.el-input__inner):is(
+input:not(.el-input__inner):not(.unstyled-input):is(
     :not([type]),
     [type='text'],
     [type='search'],
@@ -180,7 +180,7 @@ textarea.el-textarea__inner:focus-visible {
   outline: none;
 }
 
-input:not(.el-input__inner):is(
+input:not(.el-input__inner):not(.unstyled-input):is(
     :not([type]),
     [type='text'],
     [type='search'],
