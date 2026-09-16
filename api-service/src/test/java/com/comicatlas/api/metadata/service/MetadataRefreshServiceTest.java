@@ -149,7 +149,7 @@ class MetadataRefreshServiceTest {
             assertThat(parsed.chapters().get(0).mediaItems()).hasSize(1);
             assertThat(parsed.chapters().get(0).mediaItems().get(0).hqPath()).isEqualTo("1/42/001.jpg");
 
-            assertThat(MetadataRefreshService.class
+            assertThat(MetadataRefreshServiceImpl.class
                     .getMethod("loadAndValidate",
                             MetadataRefreshService.MetadataRefreshLoadRequest.class)
                     .getAnnotation(Transactional.class)).isNull();
@@ -417,7 +417,7 @@ class MetadataRefreshServiceTest {
         @Test
         @DisplayName("applyValidatedSnapshot 标注 @Transactional")
         void apply_hasTransactionalAnnotation() throws Exception {
-            assertThat(MetadataRefreshService.class
+            assertThat(MetadataRefreshServiceImpl.class
                     .getMethod("applyValidatedSnapshot", MetadataRefreshSnapshotDTO.class)
                     .getAnnotation(Transactional.class)).isNotNull();
         }
@@ -510,7 +510,6 @@ class MetadataRefreshServiceTest {
             when(chapterMapper.selectList(any())).thenReturn(List.of(c42));
             Media m101 = media(101L, 42L, "1/0/001.jpg", 1, "READY", 100L, "IMAGE", 1);
             when(mediaMapper.selectList(any())).thenReturn(List.of(m101));
-            when(mediaMapper.update(any(), any())).thenReturn(1);
             when(mediaMapper.updateRefreshBatch(anyList())).thenReturn(1);
 
             MetadataRefreshSnapshotDTO snapshot = new MetadataRefreshSnapshotDTO(1, 1L,
@@ -528,17 +527,9 @@ class MetadataRefreshServiceTest {
             var result = service.applyValidatedSnapshot(applied);
 
             // 前缀重写：hq_path 与 lq_path 各一次 UPDATE，均携带旧前缀 1/0/ 与新前缀 1/42/
-            ArgumentCaptor<LambdaUpdateWrapper<Media>> captor = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
-            verify(mediaMapper, times(2)).update(isNull(), captor.capture());
-            for (LambdaUpdateWrapper<Media> wrapper : captor.getAllValues()) {
-                assertThat(wrapper.getSqlSet()).contains("REPLACE");
-                assertThat(wrapper.getParamNameValuePairs().values()).contains("1/0/", "1/42/");
-            }
-            // 顺序契约：合并的批量 UPDATE 必须先于前缀重写的 update 执行——否则会把
-            // 预取的旧前缀 hq_path 整行写回，覆盖刚完成的重写（真实 DB 中会因此丢失迁移）
-            InOrder inOrder = inOrder(mediaMapper);
-            inOrder.verify(mediaMapper).updateRefreshBatch(anyList());
-            inOrder.verify(mediaMapper, times(2)).update(isNull(), any(LambdaUpdateWrapper.class));
+            verify(mediaMapper).updateRefreshBatch(anyList());
+            verify(mediaMapper).normalizeLegacyHqPath(42L, "1/0/", "1/42/");
+            verify(mediaMapper).normalizeLegacyLqPath(42L, "1/0/", "1/42/");
             // 快照合并照常执行（按 basename 匹配更新该行）
             assertThat(m101.getHqStatus()).isEqualTo(HqStatus.READY);
             assertThat(result.updated()).isEqualTo(1);

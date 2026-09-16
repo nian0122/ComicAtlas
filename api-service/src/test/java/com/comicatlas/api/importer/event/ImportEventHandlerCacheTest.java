@@ -24,6 +24,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import com.comicatlas.api.importer.service.impl.ImportResultServiceImpl;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -54,7 +55,7 @@ class ImportEventHandlerCacheTest {
     @Mock private ManagementTaskService managementTaskService;
     @Mock private ApiStorageProperties storageProperties;
     @Mock private ImportPersistenceService importPersistenceService;
-    @Spy @InjectMocks private com.comicatlas.api.importer.service.ImportResultService importResultService;
+    @Spy @InjectMocks private ImportResultServiceImpl importResultService;
     @Mock private Channel channel;
     @Spy private MqConsumerSupport mqConsumerSupport = new MqConsumerSupport();
     @InjectMocks private ImportEventHandler handler;
