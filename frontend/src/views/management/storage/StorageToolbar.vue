@@ -219,6 +219,7 @@ onMounted(() => {
   .filter-select,
   .filter-select--mini,
   .filter-input {
+    /* TODO(FE-STYLE): 核对工具栏局部 !important 是否仅为覆盖组件库默认宽度，优先改用组件属性或准确选择器。 */
     width: 100% !important;
   }
 }

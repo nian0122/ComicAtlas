@@ -5,7 +5,7 @@
 **维护者：** ComicAtlas 前端组
 
 > 颜色、字体、间距、阴影、圆角、过渡。确定整个应用的视觉语言。
-> 组件实现基于 Element Plus，通过 CSS 变量（`style.css`）叠加项目设计 Token。
+> 组件实现基于 Element Plus，通过 `styles/element-plus.scss` 与 CSS 变量叠加项目设计 Token。
 
 ---
 
@@ -43,7 +43,7 @@
 | `--warning` | `#f59e0b` | 进行中、警告 |
 | `--danger` | `#ef4444` | 失败、删除、错误 |
 
-### 当前 CSS 变量（`style.css`）
+### 当前 CSS 变量（`styles/tokens.css`）
 
 项目中已定义 `--bg`, `--text`, `--text-h`, `--border`, `--code-bg`, `--accent`, `--social-bg`。设计阶段保持现有变量名，增加缺失的 `--surface`、`--success`、`--warning`、`--danger`、`--accent-hover`。
 

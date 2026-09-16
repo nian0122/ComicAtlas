@@ -197,6 +197,7 @@ onMounted(async () => {
 .task-table th { color: var(--text-muted); font-size: var(--text-xs); font-weight: 600; }
 .task-table td { color: var(--text-secondary); }
 .task-table tr:last-child td { border-bottom: 0; }
+/* TODO(FE-STYLE): 核对页面级 !important 是否与主题/公共组件规则竞争；优先移除优先级覆盖。 */
 .task-name { max-width: 240px; overflow: hidden; color: var(--text-primary) !important; text-overflow: ellipsis; }
 
 .progress-cell { display: grid; grid-template-columns: 42px minmax(90px, 1fr); align-items: center; gap: var(--space-2); }

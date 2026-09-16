@@ -335,6 +335,7 @@ onMounted(() => {
   width: 160px;
 }
 .selection-count {
+  /* TODO(FE-STYLE): 核对回收站页面级 !important 是否可由主题变量或组件变体替代。 */
   color: var(--text-primary) !important;
   font-weight: 600;
 }
