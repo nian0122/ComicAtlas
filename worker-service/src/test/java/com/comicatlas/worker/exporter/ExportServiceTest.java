@@ -8,6 +8,7 @@ import com.comicatlas.worker.exporter.model.ExportCollectResult;
 import com.comicatlas.worker.exporter.model.ExportManifest;
 import com.comicatlas.worker.exporter.metadata.MetadataJsonExporter;
 import com.comicatlas.worker.exporter.service.ExportService;
+import com.comicatlas.worker.exporter.service.impl.ExportServiceImpl;
 import com.comicatlas.worker.exporter.collector.ExportCollector;
 import com.comicatlas.worker.exporter.resolver.ExportFileResolver;
 import com.comicatlas.worker.config.WorkerConfig;
@@ -85,7 +86,7 @@ class ExportServiceTest {
     void redeliveryVerifiesExistingArtifactWithoutRebuildingOrCollectingMetadataTwice() throws Exception {
         ZipBuilder realBuilder = spy(new ZipBuilder(workerConfig));
         ExportArchivePublisher realPublisher = new ExportArchivePublisher(realBuilder);
-        ExportService realService = new ExportService(exportCollector, exportFileResolver, realBuilder,
+        ExportService realService = new ExportServiceImpl(exportCollector, exportFileResolver, realBuilder,
                 metadataJsonExporter, storageProperties, workerConfig, realPublisher);
         MediaRecord media = media(1L, 10L, "1/10/001.jpg", 1);
         ExportCollectResult collected = result(comic(1L, "测试标题"), List.of(chapter(10L, "第一章", 1)), List.of(media));
@@ -112,7 +113,7 @@ class ExportServiceTest {
     @Test
     void publishFailureCleansBuiltStagingButKeepsSourceFiles() throws Exception {
         ZipBuilder realBuilder = new ZipBuilder(workerConfig);
-        ExportService realService = new ExportService(exportCollector, exportFileResolver, realBuilder,
+        ExportService realService = new ExportServiceImpl(exportCollector, exportFileResolver, realBuilder,
                 metadataJsonExporter, storageProperties, workerConfig, archivePublisher);
         MediaRecord media = media(1L, 10L, "1/10/001.jpg", 1);
         when(exportCollector.collect(1L)).thenReturn(result(comic(1L, "标题"),
@@ -157,7 +158,7 @@ class ExportServiceTest {
         when(archivePublisher.publish(anyLong(), any(), any(), any()))
                 .thenReturn(new ExportArchivePublisher.PublishResult("99/out.zip", 1234L));
 
-        service = new ExportService(exportCollector, exportFileResolver, zipBuilder,
+        service = new ExportServiceImpl(exportCollector, exportFileResolver, zipBuilder,
                 metadataJsonExporter, storageProperties, workerConfig, archivePublisher);
     }
 
@@ -399,7 +400,7 @@ class ExportServiceTest {
         WorkerConfig realConfig = new WorkerConfig();
         ZipBuilder realBuilder = new ZipBuilder(realConfig);
         ExportArchivePublisher realPublisher = new ExportArchivePublisher(realBuilder);
-        ExportService realService = new ExportService(exportCollector, exportFileResolver, realBuilder,
+        ExportService realService = new ExportServiceImpl(exportCollector, exportFileResolver, realBuilder,
                 metadataJsonExporter, storageProperties, realConfig, realPublisher);
 
         MediaRecord m1 = media(1L, 10L, "1/10/001.jpg", 1);
