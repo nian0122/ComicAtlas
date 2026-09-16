@@ -27,6 +27,7 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 public class ManagementStructureQueryService {
+    // TODO(LAYER-14): Service 功能契约与具体实现未分离；应抽取 service 接口，并将实现迁移到 service/impl。
     private final ComicMapper comicMapper;
     private final CatalogMapper catalogMapper;
     private final ChapterMapper chapterMapper;

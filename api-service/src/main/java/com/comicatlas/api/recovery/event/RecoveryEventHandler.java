@@ -203,6 +203,7 @@ public class RecoveryEventHandler {
     /** 处理失败时标记恢复任务为 FAILED 并同步管理项（原 catch 副作用，作为 onFailure 回调）。 */
     private void markRecoveryTaskFailed(Long taskId, Exception failure) {
         try {
+            // TODO(LAYER-06): 消费失败回调仍直接持久化恢复任务并同步管理项，应交由恢复批次 Service 统一处理。
             RecoveryTask task = recoveryTaskMapper.selectById(taskId);
             if (task != null && !TERMINAL_STATUSES.contains(task.getStatus())) {
                 task.setStatus(RecoveryTaskStatus.FAILED);
@@ -231,6 +232,7 @@ public class RecoveryEventHandler {
     }
 
     private void processFailed(RecoveryFailedEvent event, String idempotencyKey, Long taskId) {
+        // TODO(LAYER-06): 失败事件的状态转换、持久化和管理任务项联动不应由 MQ Handler 编排。
         if (isEventProcessed(idempotencyKey)) {
             return;
         }

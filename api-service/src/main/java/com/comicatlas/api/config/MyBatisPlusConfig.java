@@ -13,6 +13,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
+// TODO(MAPPER-01): 统一评估 Mapper 注册范围；当前 Lambda 查询仍通过这些 Mapper Bean 执行，不能直接移除扫描配置。
 @MapperScan({
         "com.comicatlas.api.*.persistence.mapper",
         "com.comicatlas.persistence.comic.mapper",
