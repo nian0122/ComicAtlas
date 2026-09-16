@@ -61,6 +61,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class TrashLifecycleService {
 
+    // TODO(DECOUPLE-04): 生命周期服务同时生成对账报告、扫描磁盘并修复数据库状态，需拆分只读对账与修复服务。
+
     public static final String PURGE_CONFIRM_TOKEN = "PURGE";
 
     /** 个人仓库默认允许回收完成后立即清理；生产环境可按需配置保护窗口。 */
@@ -272,7 +274,6 @@ public class TrashLifecycleService {
     // ======================== 对账 ========================
 
     /** 生成对账报告（只读）。 */
-    // TODO(DECOUPLE-04): 回收编排同时承担磁盘核对和修复；提取核对服务返回只读报告，修复服务复核状态后独立提交。
     public TrashReconcileReport reconcile(String targetType, Long targetId) {
         Long taskId = findTrashTaskId(targetType, targetId);
         String dbStatus = resolveDbStatus(targetType, targetId);

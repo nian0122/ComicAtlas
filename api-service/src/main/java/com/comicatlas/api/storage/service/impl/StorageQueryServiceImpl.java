@@ -9,6 +9,7 @@ import com.comicatlas.api.storage.dto.ComicTranscodeStatusVO;
 import com.comicatlas.api.storage.dto.StorageStatsDTO;
 import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.contract.comic.cache.ComicReferenceCache;
+import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.storage.persistence.mapper.StorageMapper;
 import com.comicatlas.persistence.storage.FileUrlResolver;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,8 @@ import com.comicatlas.api.storage.ApiStorageProperties;
 @RequiredArgsConstructor
 public class StorageQueryServiceImpl implements StorageQueryService {
 
+    // TODO(DECOUPLE-11): 存储查询 Service 同步递归扫描磁盘并组合数据库统计，需拆分容量统计适配器。
+
     private final StorageMapper storageMapper;
     private final FileUrlResolver fileUrlResolver;
     private final ApiStorageProperties storageProperties;
@@ -47,22 +50,24 @@ public class StorageQueryServiceImpl implements StorageQueryService {
         return stats;
     }
 
-    // TODO(DECOUPLE-11): 存储查询混合数据库聚合与同步递归扫描，且扫描异常按零处理；提取容量统计适配器，区分空目录与读取失败并定义缓存刷新策略。
-    // TODO(IMPL-04): IOException 被静默转为 0，无法区分空目录与统计失败且可能缓存错误容量；需保留异常上下文并定义降级结果。
     private long directorySize(Path directory) {
         if (!Files.exists(directory)) {
             return 0L;
         }
         try (Stream<Path> paths = Files.walk(directory)) {
-            return paths.filter(Files::isRegularFile).mapToLong(path -> {
+            long totalBytes = 0L;
+            var pathIterator = paths.filter(Files::isRegularFile).iterator();
+            while (pathIterator.hasNext()) {
+                Path path = pathIterator.next();
                 try {
-                    return Files.size(path);
+                    totalBytes += Files.size(path);
                 } catch (IOException exception) {
-                    return 0L;
+                    throw new BusinessException("读取存储容量失败", exception);
                 }
-            }).sum();
+            }
+            return totalBytes;
         } catch (IOException exception) {
-            return 0L;
+            throw new BusinessException("扫描存储容量失败", exception);
         }
     }
 

@@ -52,6 +52,8 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class DirectoryImportHandler {
 
+    // TODO(DECOUPLE-06): 导入 Handler 仍负责完整元数据 Map 构建、文件写出和封面生成，需拆分元数据写出与封面服务。
+
     /** metadata V3 版本号（与 MetadataV3 模型一致）。 */
     private static final int METADATA_VERSION = 3;
     /** 导入清单版本号（与 ImportManifestManager.VERSION 保持一致）。 */
@@ -193,7 +195,6 @@ public class DirectoryImportHandler {
         return new ManifestBuildResult(files, nameMap);
     }
 
-    // TODO(DECOUPLE-06): 导入编排还构造元数据并选择/生成封面；提取元数据写出与封面生成服务，保留清单恢复和取消检查顺序。
     private Map<String, Object> buildMetadataMap(ComicMetadata metadata, Long taskId, Long comicId,
                                                  Map<String, String> generatedNames) {
         Map<String, Object> comic = new LinkedHashMap<>();

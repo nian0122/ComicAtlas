@@ -2,6 +2,7 @@ package com.comicatlas.api.task.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.comicatlas.contract.common.Result;
+import com.comicatlas.contract.common.dto.PageResponse;
 import com.comicatlas.api.task.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.task.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.task.dto.ManagementTaskResponse;
@@ -39,8 +40,7 @@ public class ManagementTaskController {
      * 支持 type/status/batchId/targetType/targetId 过滤。
      */
     @GetMapping
-    // TODO(LAYER-07): 分页接口暴露 MyBatis IPage；改用框架无关分页 DTO，并兼容当前 JSON 字段及前端分页语义。
-    public Result<IPage<ManagementTaskResponse>> listTasks(
+    public Result<PageResponse<ManagementTaskResponse>> listTasks(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) TaskType type,
@@ -48,8 +48,10 @@ public class ManagementTaskController {
             @RequestParam(required = false) String batchId,
             @RequestParam(required = false) String targetType,
             @RequestParam(required = false) Long targetId) {
-        return Result.ok(managementTaskService.listTasks(page, size, type, status, batchId,
-                targetType, targetId));
+        IPage<ManagementTaskResponse> taskPage = managementTaskService.listTasks(page, size, type, status,
+                batchId, targetType, targetId);
+        return Result.ok(PageResponse.of(taskPage.getRecords(), taskPage.getTotal(),
+                taskPage.getCurrent(), taskPage.getSize()));
     }
 
     /**

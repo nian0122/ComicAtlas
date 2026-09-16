@@ -88,6 +88,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ImportPersistenceServiceImpl implements ImportPersistenceService {
 
+    // TODO(DECOUPLE-02): 本实现同时解析元数据、装配实体、导入落库和最终化状态机，需拆分计划构建与持久化/最终化职责。
+
     /** 终态集合：到达这些状态后不可回退到非终态（含 CANCELLED 真正终态）。 */
     private static final Set<ImportTaskStatus> TERMINAL_STATUSES =
             EnumSet.of(ImportTaskStatus.SUCCESS, ImportTaskStatus.FAILED, ImportTaskStatus.CANCELLED);
@@ -152,7 +154,6 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
         return requests != null ? requests : List.of();
     }
 
-    // TODO(DECOUPLE-02): 元数据解码、目录媒体装配与最终化状态机集中于此类；提取解码/装配器和最终化服务，保留落库与 Outbox 同事务。
     private List<FinalizeRequest> persistCompletedInTxn(ImportTaskCompletedEvent event,
                                                         Map<String, Object> metadata, String hqPrefix) {
         Long taskId = event.taskId();

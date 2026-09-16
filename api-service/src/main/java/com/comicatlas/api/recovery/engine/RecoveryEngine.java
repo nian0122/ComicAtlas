@@ -50,6 +50,8 @@ import com.comicatlas.persistence.comic.entity.Media;
 @RequiredArgsConstructor
 public class RecoveryEngine {
 
+    // TODO(DECOUPLE-03): 恢复引擎同时解释元数据、生成实体并写入多表，还协调缓存/同步，需拆分恢复计划与写入服务。
+
     /** LQ 状态：READY（LQ 文件存在）。 */
     private static final String LQ_STATUS_READY = "READY";
 
@@ -182,7 +184,6 @@ public class RecoveryEngine {
         }
     }
 
-    // TODO(DECOUPLE-03): 恢复兼容映射与实体写入混合；提取强类型恢复计划和持久化执行器，保持文件扫描在事务外、缓存失效在提交后。
     private Map<String, Object> restoreComicInternal(Map<String, Object> comicData,
                                                      List<Map<String, Object>> catalogsData,
                                                      List<Map<String, Object>> chaptersData,

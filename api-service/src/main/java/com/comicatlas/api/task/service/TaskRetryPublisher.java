@@ -37,6 +37,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class TaskRetryPublisher {
 
+    // TODO(DECOUPLE-10): 重试发布器仍直接处理导出/导入专表恢复准备，需由业务域重试策略负责并由 task 协调。
+
     private static final int EVENT_ATTEMPT = 1;
     private static final String TRASH_MANIFEST_REF = "TRASH_MANIFEST";
     private static final Set<TaskType> COMMAND_OPERATIONS = Set.of(
@@ -82,7 +84,6 @@ public class TaskRetryPublisher {
                 taskId, item.getId(), attempt, operation);
     }
 
-    // TODO(DECOUPLE-10): 通用任务发布器还重置导出表并依赖导入重试实现；按业务注册重试策略，保留专表重置与 Outbox 同事务及 attempt 传播。
     private void publishExportCommand(Long taskId, ManagementTaskItem item, int attempt) {
         if (item.getOperationType() != TaskType.EXPORT) {
             return;

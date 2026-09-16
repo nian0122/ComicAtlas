@@ -45,6 +45,8 @@ import java.util.EnumSet;
 @RequiredArgsConstructor
 public class RecoveryEventHandler {
 
+    // TODO(LAYER-06): MQ 入口仍承担逐本恢复、进度累计和 RecoveryTaskMapper 持久化，应下沉到恢复批次 Service。
+
     /** Redis 事件幂等标记 key 前缀。 */
     private static final String EVENT_IDEMPOTENCY_KEY_PREFIX = "mq:event:";
     /** Redis 幂等标记保留时长。 */
@@ -95,8 +97,8 @@ public class RecoveryEventHandler {
                 MqConsumerSupport.FailurePolicy.REJECT_TO_DLQ);
     }
 
-    // TODO(LAYER-06): MQ 入口直接持久化恢复任务并逐本编排恢复；提取恢复批次服务，保留单本失败继续、可见进度及消费失败策略。
     private void processScanCompleted(RecoveryScanCompletedEvent event, String idempotencyKey, Long taskId) {
+        // TODO(LAYER-06): 逐本循环、失败继续和任务终态流转属于业务编排，不应放在事件处理器。
         // 幂等检查
         if (isEventProcessed(idempotencyKey)) {
             log.info("事件已处理，ack: eventId={}", event.eventId());
@@ -135,6 +137,7 @@ public class RecoveryEventHandler {
 
         // 逐本恢复
         int totalSoFar = 0;
+        int batchTotal = event.comicIds().size();
         int recovered = 0;
         int skipped = 0;
         int placeholder = 0;
@@ -160,10 +163,9 @@ public class RecoveryEventHandler {
                 recoveryTaskMapper.updateById(task);
 
                 // 同步统一任务项进度（0-100）
-                if (managementItem != null && totalSoFar > 0) {
-                    // TODO(IMPL-03): 分母 totalSoFar 是已处理数量，与分子通常相等，首本处理完即计算为 100%；应以批次总数计算并覆盖多本场景。
+                if (managementItem != null && batchTotal > 0) {
                     int progressPercent = Math.min(100,
-                            (recovered + skipped + placeholder + errors) * 100 / totalSoFar);
+                            (recovered + skipped + placeholder + errors) * 100 / batchTotal);
                     managementTaskService.updateItemProgress(managementItem.getId(), 0, progressPercent, STAGE_RECOVERY);
                 }
 
@@ -177,6 +179,10 @@ public class RecoveryEventHandler {
                 task.setErrorComics(errors);
                 task.setErrorMessage(ex.getMessage());
                 recoveryTaskMapper.updateById(task);
+                if (managementItem != null && batchTotal > 0) {
+                    int progressPercent = Math.min(100, totalSoFar * 100 / batchTotal);
+                    managementTaskService.updateItemProgress(managementItem.getId(), 0, progressPercent, STAGE_RECOVERY);
+                }
             }
         }
 

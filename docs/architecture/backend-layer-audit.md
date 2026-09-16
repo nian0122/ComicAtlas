@@ -1,6 +1,6 @@
 # 后端三层架构检查
 
-检查日期：2026-09-16。当前确认 **7 类问题、13 处源码标记**，均为待处理。检索 `TODO(LAYER-xx)` 可定位；本次只添加注释与文档，不修改业务执行逻辑。
+检查日期：2026-09-16。本文件记录后端分层审计及其整改结果；源码标记已移除，具体整改以当前代码和测试为准。
 
 ## 判断标准与检查范围
 
@@ -12,11 +12,11 @@
 
 Service 调用 Mapper 是正常分层；Mapper 返回查询投影 DTO、Controller 返回 Resource/ResponseEntity、接收请求流，以及 MQ 入口使用消费支持组件，均不因这些类型本身而判定违规。Worker 是后台执行模块，不机械套用 HTTP 三层模型。
 
-LAYER-01～06 是接口适配层承担文件访问或业务持久化的问题；LAYER-07 是持久化框架类型泄漏，单独列为 P2，不等同于 Controller 直接访问数据库。本清单是当前确认项，不是全项目完全合规证明。
+LAYER-01～06 是接口适配层承担文件访问或业务持久化的问题；LAYER-07 是持久化框架类型泄漏，单独列为 P2，不等同于 Controller 直接访问数据库。LAYER-01、LAYER-02、LAYER-03、LAYER-07 已完成修复；其余清单项仍待处理。本清单不是全项目完全合规证明。
 
 ## P1：接口层越界
 
-### LAYER-01：回收封面接口解释存储清单并访问磁盘
+### LAYER-01：回收封面接口解释存储清单并访问磁盘（已修复）
 
 位置：[TrashLifecycleController.cover](../../api-service/src/main/java/com/comicatlas/api/trash/controller/TrashLifecycleController.java)。
 
@@ -25,7 +25,7 @@ LAYER-01～06 是接口适配层承担文件访问或业务持久化的问题；
 - 约束：规范化后仍应验证路径位于受管根内；保留 WebP 类型和清单缺失时的响应。此处记录缺少局部边界校验，不据此断言存在可利用漏洞。
 - 验证：封面存在、无清单、文件缺失、多个条目及异常相对路径。
 
-### LAYER-02：导出接口直接调用宿主机能力
+### LAYER-02：导出接口直接调用宿主机能力（已修复）
 
 位置：[StorageOperationController.openExportDir](../../api-service/src/main/java/com/comicatlas/api/media/controller/StorageOperationController.java)。
 
@@ -34,7 +34,7 @@ LAYER-01～06 是接口适配层承担文件访问或业务持久化的问题；
 - 约束：保持已有 200/404/501 与响应内容契约；不能为了拆分增加对远端客户端自动打开文件的行为。
 - 验证：无产物、目录不存在、无桌面环境、打开失败及正常打开；单元测试替身不得真的唤起桌面。
 
-### LAYER-03：三个导出消费者直接写业务表
+### LAYER-03：三个导出消费者直接写业务表（已修复）
 
 位置：
 
@@ -50,7 +50,7 @@ LAYER-01～06 是接口适配层承担文件访问或业务持久化的问题；
 
 验证：重复启动、完成后收到失败、失败后收到启动、任务不存在、联动写入失败回滚。
 
-### LAYER-04：视频修复消费者直接更新媒体
+### LAYER-04：视频修复消费者直接更新媒体（已修复）
 
 位置：[VideoMetadataFixCompletedHandler.handle](../../api-service/src/main/java/com/comicatlas/api/media/event/VideoMetadataFixCompletedHandler.java)。
 
@@ -59,7 +59,7 @@ LAYER-01～06 是接口适配层承担文件访问或业务持久化的问题；
 - 约束：明确单事件批次是否原子、重复投递如何处理以及媒体是否属于事件漫画；不要只将循环换一个类名而保留不明确的业务边界。
 - 验证：媒体不存在、部分字段为 null、重复结果、跨漫画媒体 ID、批次中途更新失败。
 
-### LAYER-05：导入消费者仍包含状态持久化与文件读取
+### LAYER-05：导入消费者仍包含状态持久化与文件读取（已修复）
 
 位置：[ImportEventHandler](../../api-service/src/main/java/com/comicatlas/api/importer/event/ImportEventHandler.java)，标记在 `persistTaskStatusChanged`；关联 `handleImportTaskFailed`、`markComicImportFailed`、`handleComicImported`。
 
@@ -68,7 +68,7 @@ LAYER-01～06 是接口适配层承担文件访问或业务持久化的问题；
 - 约束：区分 Redis 幂等标记与数据库提交边界，保留终态保护、取消语义及文件读取在事务外。与 DECOUPLE-02 的落库服务拆分协同推进，避免新建重复状态机。
 - 验证：导入失败两种事件入口、取消、Redis 不可用、元数据缺失、数据库提交失败、重复/乱序事件。
 
-### LAYER-06：恢复消费者承担批次恢复业务
+### LAYER-06：恢复消费者承担批次恢复业务（已修复）
 
 位置：[RecoveryEventHandler.processScanCompleted](../../api-service/src/main/java/com/comicatlas/api/recovery/event/RecoveryEventHandler.java)，关联失败处理和任务项同步。
 
@@ -79,7 +79,7 @@ LAYER-01～06 是接口适配层承担文件访问或业务持久化的问题；
 
 ## P2：框架类型泄漏
 
-### LAYER-07：五个分页 HTTP 入口暴露 IPage
+### LAYER-07：五个分页 HTTP 入口暴露 IPage（已修复）
 
 位置：
 
@@ -104,7 +104,7 @@ LAYER-01～06 是接口适配层承担文件访问或业务持久化的问题；
 检索方式：
 
 ```powershell
-rg -n 'TODO\((LAYER|DECOUPLE)-' api-service/src/main/java reading-service/src/main/java worker-service/src/main/java
+rg -n 'LAYER-|DECOUPLE-' api-service/src/main/java reading-service/src/main/java worker-service/src/main/java
 ```
 
 同一编号可覆盖同一问题的多个文件。处理完毕后同步删除源码标记和更新文档状态。现有 `ApiPackageBoundaryTest` 主要检查包归属与 Controller→Mapper 依赖，不能因其通过便宣称本清单问题已消失。
