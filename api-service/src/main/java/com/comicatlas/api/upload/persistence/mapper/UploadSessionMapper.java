@@ -9,6 +9,13 @@ import org.apache.ibatis.annotations.Mapper;
 @Mapper
 public interface UploadSessionMapper extends BaseMapper<UploadSession> {
 
+    /** 上传处理失败时将会话置为 FAILED。 */
+    default int markFailed(Long sessionId) {
+        return update(null, new LambdaUpdateWrapper<UploadSession>()
+                .eq(UploadSession::getId, sessionId)
+                .set(UploadSession::getStatus, UploadSessionStatus.FAILED));
+    }
+
     /** 仅冻结仍处于 ACTIVE 的上传会话。 */
     default int freezeForVerification(Long sessionId) {
         return update(null, new LambdaUpdateWrapper<UploadSession>()
