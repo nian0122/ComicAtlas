@@ -70,7 +70,7 @@ onMounted(() => {
           class="filter-select"
           @update:model-value="setFilter({ hqStatus: $event })"
         >
-          <el-option label="全部" value="ALL" />
+          <el-option label="全部 HQ" value="ALL" />
           <el-option label="还有 HQ" value="HAS_HQ" />
           <el-option label="含 HQ 已删" value="NO_HQ" />
         </el-select>
@@ -80,7 +80,7 @@ onMounted(() => {
           class="filter-select"
           @update:model-value="setFilter({ lqStatus: $event })"
         >
-          <el-option label="全部" value="ALL" />
+          <el-option label="全部 LQ" value="ALL" />
           <el-option label="需要生成" value="NEEDS_LQ" />
           <el-option label="LQ 就绪" value="READY" />
         </el-select>
@@ -187,22 +187,26 @@ onMounted(() => {
   border-color: var(--accent);
 }
 .filter-bar {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--space-sm);
   margin-bottom: var(--space-base);
   align-items: center;
 }
 .filter-select,
-.filter-select--mini,
 .filter-input {
-  width: 100%;
-  min-width: 0;
+  flex: 1 1 156px;
+  min-width: 140px;
+}
+.filter-select--mini {
+  flex: 0 1 112px;
+  min-width: 104px;
 }
 .filter-input {
-  grid-column: auto;
+  flex-basis: 220px;
 }
 .filter-reset {
+  flex: 0 0 auto;
   padding-inline: 8px;
   color: var(--text-secondary);
 }
@@ -213,13 +217,32 @@ onMounted(() => {
 @media (max-width: 768px) {
   .filter-bar {
     display: flex;
-    flex-direction: column;
     align-items: stretch;
   }
   .filter-bar > .filter-select.el-select,
   .filter-bar > .filter-select--mini.el-select,
   .filter-bar > .filter-input.el-input {
+    flex-basis: 100%;
     width: 100%;
   }
+}
+
+.filter-bar {
+  --el-border-color: var(--border);
+  --el-border-color-hover: var(--border-strong);
+  --el-border-color-light: var(--border);
+  --el-border-color-lighter: var(--border);
+}
+.filter-bar :deep(.el-select__wrapper),
+.filter-bar :deep(.el-input__wrapper) {
+  box-shadow: 0 0 0 1px var(--border) inset;
+}
+.filter-bar :deep(.el-select__wrapper:hover),
+.filter-bar :deep(.el-input__wrapper:hover) {
+  box-shadow: 0 0 0 1px var(--border-strong) inset;
+}
+.filter-bar :deep(.el-select__wrapper.is-focused),
+.filter-bar :deep(.el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 1px var(--accent) inset;
 }
 </style>

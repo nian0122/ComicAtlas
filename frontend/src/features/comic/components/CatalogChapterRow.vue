@@ -63,7 +63,9 @@ function splitText(text: string): TextSegment[] {
   return segments
 }
 
-const chapterNumberSegments = computed(() => splitText(props.chapter.chapterNo ? `第${props.chapter.chapterNo}话` : '未知'))
+const chapterNumberSegments = computed(() =>
+  splitText(props.chapter.chapterNo ? `第${props.chapter.chapterNo}话` : '未知'),
+)
 const titleSegments = computed(() => splitText(props.chapter.title || ''))
 </script>
 
@@ -79,7 +81,9 @@ const titleSegments = computed(() => splitText(props.chapter.title || ''))
   border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
   border-radius: 0;
   cursor: pointer;
-  transition: background 150ms ease, color 150ms ease;
+  transition:
+    background 150ms ease,
+    color 150ms ease;
 }
 
 .chapter-row::before {
@@ -168,6 +172,23 @@ mark {
   .chapter-pages {
     flex: 0 0 34px;
     text-align: right;
+  }
+}
+
+@media (max-width: 480px) {
+  .chapter-row {
+    gap: 4px;
+    height: 38px;
+    padding-right: 6px;
+  }
+
+  .chapter-no {
+    flex: 0 0 48px;
+    min-width: 48px;
+  }
+
+  .chapter-pages {
+    flex-basis: 30px;
   }
 }
 </style>
