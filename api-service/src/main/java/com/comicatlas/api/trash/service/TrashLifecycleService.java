@@ -62,8 +62,6 @@ import java.util.UUID;
 public class TrashLifecycleService {
     // TODO(LAYER-14): Service 功能契约与具体实现未分离；应抽取 service 接口，并将实现迁移到 service/impl。
 
-    // TODO(DECOUPLE-04): 生命周期服务同时生成对账报告、扫描磁盘并修复数据库状态，需拆分只读对账与修复服务。
-
     public static final String PURGE_CONFIRM_TOKEN = "PURGE";
 
     /** 个人仓库默认允许回收完成后立即清理；生产环境可按需配置保护窗口。 */
@@ -83,6 +81,7 @@ public class TrashLifecycleService {
     private final OperationPolicyService policyService;
     private final ApiStorageProperties storageProperties;
     private final DigestService digestService;
+    private final TrashReconciliationService trashReconciliationService;
 
     // ======================== 回收 ========================
 
@@ -277,52 +276,14 @@ public class TrashLifecycleService {
     /** 生成对账报告（只读）。 */
     public TrashReconcileReport reconcile(String targetType, Long targetId) {
         Long taskId = findTrashTaskId(targetType, targetId);
-        String dbStatus = resolveDbStatus(targetType, targetId);
-        TrashManifestDTO manifest = taskId != null
-                ? trashManifestService.readManifest(targetType, targetId, taskId) : null;
-        TrashManifestItemDTO actual = taskId != null
-                ? trashManifestService.readActual(targetType, targetId, taskId) : null;
-
-        List<TrashReconcileReport.EntryReport> entries = new ArrayList<>();
-        if (manifest != null) {
-            for (TrashManifestDTO.Entry e : manifest.entries()) {
-                boolean sourceExists = existsInRoot(e.rootKey(), e.sourceRelativePath());
-                boolean trashExists = existsInTrash(targetType, targetId, taskId, e.trashRelativePath());
-                String state = trashExists ? (sourceExists ? "BOTH" : "IN_TRASH")
-                        : (sourceExists ? "AT_SOURCE" : "MISSING");
-                entries.add(new TrashReconcileReport.EntryReport(
-                        e.rootKey(), e.sourceRelativePath(), sourceExists, trashExists, state));
-            }
-        }
-        boolean consistent = computeConsistency(dbStatus, actual, entries);
-        return new TrashReconcileReport(targetType, targetId, dbStatus, taskId,
-                actual != null ? actual.status() : null, consistent, entries);
+        return trashReconciliationService.reconcile(targetType, targetId, taskId);
     }
 
     /** 对账并修复可安全自动恢复的 DB 状态（迟到的结果事件恢复）。 */
     @Transactional
     public TrashReconcileReport reconcileAndRepair(String targetType, Long targetId) {
         Long taskId = findTrashTaskId(targetType, targetId);
-        TrashManifestItemDTO actual = taskId != null
-                ? trashManifestService.readActual(targetType, targetId, taskId) : null;
-        if (actual == null) {
-            return reconcile(targetType, targetId);
-        }
-        String dbStatus = resolveDbStatus(targetType, targetId);
-        String repaired = null;
-        if (TrashManifestItemDTO.STATUS_TRASHED.equals(actual.status()) && "TRASHING".equals(dbStatus)) {
-            if (markTrashed(targetType, targetId)) {
-                repaired = "TRASHED";
-            }
-        } else if (TrashManifestItemDTO.STATUS_COMPENSATED.equals(actual.status()) && "TRASHING".equals(dbStatus)) {
-            if (markReady(targetType, targetId)) {
-                repaired = "READY";
-            }
-        }
-        if (repaired != null) {
-            log.info("对账修复: {}/{} -> {}", targetType, targetId, repaired);
-        }
-        return reconcile(targetType, targetId);
+        return trashReconciliationService.reconcileAndRepair(targetType, targetId, taskId);
     }
 
     private boolean markTrashed(String targetType, Long targetId) {
