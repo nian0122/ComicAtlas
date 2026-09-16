@@ -10,7 +10,7 @@ CREATE TABLE upload_session (
     comic_id         BIGINT       NOT NULL COMMENT '目标漫画',
     chapter_id       BIGINT       NOT NULL COMMENT '目标章节',
     replace_media_id BIGINT       NULL     COMMENT '替换目标媒体 ID（replace 流程）',
-    status           VARCHAR(16)  NOT NULL DEFAULT 'ACTIVE' COMMENT 'ACTIVE/VERIFYING/COMPLETED/CANCELLED/EXPIRED/FAILED',
+    status           VARCHAR(16)  NOT NULL DEFAULT 'ACTIVE' COMMENT 'ACTIVE/COMPLETED/CANCELLED/EXPIRED/FAILED',
     total_bytes      BIGINT       NOT NULL DEFAULT 0 COMMENT '会话总字节数',
     total_files      INT          NOT NULL DEFAULT 0 COMMENT '文件数',
     expires_at       DATETIME     NOT NULL COMMENT '未完成过期时间',

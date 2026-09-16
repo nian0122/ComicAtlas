@@ -8,8 +8,8 @@ import com.comicatlas.worker.persistence.record.MediaRecord;
 import com.comicatlas.worker.task.publisher.ManagementCommandPublisher;
 import com.comicatlas.worker.media.image.ImageOptimizer;
 import com.comicatlas.worker.storage.StorageProperties;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -19,11 +19,18 @@ import java.util.Objects;
 /** LQ 生成命令适配器，负责命令分派及结果事件发布。 */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class LqCommandHandler {
     private final MediaReadMapper mediaMapper;
     private final ManagementCommandPublisher publisher;
     private final LqChapterProcessingService chapterProcessingService;
+
+    @Autowired
+    public LqCommandHandler(MediaReadMapper mediaMapper, ManagementCommandPublisher publisher,
+            LqChapterProcessingService chapterProcessingService) {
+        this.mediaMapper = mediaMapper;
+        this.publisher = publisher;
+        this.chapterProcessingService = chapterProcessingService;
+    }
 
     /** 兼容旧测试构造器，业务处理统一转交章节服务。 */
     public LqCommandHandler(ImageOptimizer optimizer, MediaReadMapper mediaMapper,
