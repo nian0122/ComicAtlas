@@ -36,7 +36,7 @@ public class PurgeCommandHandler {
             deleteTree(targetDir);
             publisher.completed(cmd);
             log.info("永久清理命令完成: {}/{}", targetType, targetId);
-        } catch (Exception e) {
+        } catch (IOException | RuntimeException e) {
             log.error("永久清理命令异常: {}/{}", targetType, targetId, e);
             publisher.failed(cmd, e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
         }

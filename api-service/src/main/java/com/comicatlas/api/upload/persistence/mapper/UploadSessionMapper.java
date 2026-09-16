@@ -13,10 +13,10 @@ import java.util.List;
 @Mapper
 public interface UploadSessionMapper extends BaseMapper<UploadSession> {
 
-    @Select("SELECT * FROM upload_session WHERE session_id = #{sessionId}")
+    @Select("SELECT id, session_id, comic_id, chapter_id, replace_media_id, status, total_bytes, total_files, expires_at, completed_at, created_at FROM upload_session WHERE session_id = #{sessionId}")
     UploadSession selectBySessionId(@Param("sessionId") String sessionId);
 
-    @Select("SELECT * FROM upload_session WHERE status = 'ACTIVE' AND expires_at < #{now}")
+    @Select("SELECT id, session_id, comic_id, chapter_id, replace_media_id, status, total_bytes, total_files, expires_at, completed_at, created_at FROM upload_session WHERE status = 'ACTIVE' AND expires_at < #{now}")
     List<UploadSession> selectExpiredActive(@Param("now") LocalDateTime now);
 
     /** 上传处理失败时将会话置为 FAILED。 */

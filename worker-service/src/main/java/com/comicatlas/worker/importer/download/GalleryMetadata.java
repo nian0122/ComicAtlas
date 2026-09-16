@@ -28,11 +28,7 @@ public record GalleryMetadata(
     }
 
     private static String urlEncode(String s) {
-        try {
-            return java.net.URLEncoder.encode(s, "UTF-8").replace("+", "%20");
-        } catch (Exception e) {
-            return s;
-        }
+        return java.net.URLEncoder.encode(s, java.nio.charset.StandardCharsets.UTF_8).replace("+", "%20");
     }
 
     public record TorrentInfo(

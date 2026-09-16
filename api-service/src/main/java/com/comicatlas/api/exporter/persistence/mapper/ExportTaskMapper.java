@@ -12,17 +12,17 @@ import java.util.List;
 @Mapper
 public interface ExportTaskMapper extends BaseMapper<ExportTask> {
 
-    @Select("SELECT * FROM export_task WHERE comic_id = #{comicId} ORDER BY created_at DESC")
+    @Select("SELECT id, management_task_id, comic_id, format, status, progress, output_root, output_path, output_size, error_msg, created_at, completed_at FROM export_task WHERE comic_id = #{comicId} ORDER BY created_at DESC")
     List<ExportTask> selectByComicIdOrderByCreatedAtDesc(@Param("comicId") Long comicId);
 
-    @Select("SELECT * FROM export_task ORDER BY created_at DESC")
+    @Select("SELECT id, management_task_id, comic_id, format, status, progress, output_root, output_path, output_size, error_msg, created_at, completed_at FROM export_task ORDER BY created_at DESC")
     List<ExportTask> selectAllOrderByCreatedAtDesc();
 
-    @Select("SELECT * FROM export_task WHERE comic_id = #{comicId} "
+    @Select("SELECT id, management_task_id, comic_id, format, status, progress, output_root, output_path, output_size, error_msg, created_at, completed_at FROM export_task WHERE comic_id = #{comicId} "
             + "AND status IN ('PENDING', 'RUNNING') LIMIT 1")
     ExportTask selectActiveByComicId(@Param("comicId") Long comicId);
 
-    @Select("SELECT * FROM export_task WHERE management_task_id = #{managementTaskId} LIMIT 1")
+    @Select("SELECT id, management_task_id, comic_id, format, status, progress, output_root, output_path, output_size, error_msg, created_at, completed_at FROM export_task WHERE management_task_id = #{managementTaskId} LIMIT 1")
     ExportTask selectByManagementTaskId(@Param("managementTaskId") Long managementTaskId);
 
     /**

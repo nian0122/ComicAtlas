@@ -33,7 +33,7 @@ public class CacheEvictor {
                 try {
                     cache.evict(cacheKey);
                     log.debug("缓存失效: cache={}, key={}", cacheName, cacheKey);
-                } catch (RuntimeException e) {
+                } catch (IllegalStateException e) {
                     log.warn("缓存失效失败，继续使用数据库结果: cache={}, key={}", cacheName, cacheKey, e);
                 }
             }
@@ -71,7 +71,7 @@ public class CacheEvictor {
             }
             try {
                 cache.clear();
-            } catch (RuntimeException e) {
+            } catch (IllegalStateException e) {
                 log.warn("缓存清空失败，继续使用数据库结果: cache={}", cacheName, e);
             }
         };

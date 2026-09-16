@@ -30,7 +30,7 @@ public class ImageIoDecoder implements ImageDecoder {
             } finally {
                 reader.dispose();
             }
-        } catch (Exception e) {
+        } catch (IOException | RuntimeException e) {
             return new DecodeResult(null, false, null, null, e.getMessage());
         }
     }

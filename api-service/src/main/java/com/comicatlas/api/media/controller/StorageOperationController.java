@@ -152,8 +152,8 @@ public class StorageOperationController {
      */
     @PostMapping("/refresh-metadata/comics/{comicId}")
     public ResponseEntity<Result<OperationSubmitResultDTO>> refreshMetadata(@PathVariable Long comicId) {
-        OperationSubmitResultDTO dto = commandService.requestMetadataRefresh(comicId);
-        return ResponseEntity.status(HttpStatus.ACCEPTED).body(Result.ok(dto));
+        OperationSubmitResultDTO operationResult = commandService.requestMetadataRefresh(comicId);
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(Result.ok(operationResult));
     }
 
 }

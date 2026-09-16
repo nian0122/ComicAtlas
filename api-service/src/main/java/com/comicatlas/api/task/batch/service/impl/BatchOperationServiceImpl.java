@@ -201,11 +201,11 @@ public class BatchOperationServiceImpl implements BatchOperationService {
     private ManagementTaskResponse materializeTask(BatchOperationRequest request,
                                                    List<Long> eligible, String payload,
                                                    String idempotencyKey) {
-        CreateManagementTaskRequest req = new CreateManagementTaskRequest();
-        req.setTaskType(request.getOperation());
-        req.setOperation(operationLabel(request.getOperation()));
-        req.setTargetType("COMIC");
-        req.setBatchId(UUID.randomUUID().toString());
+        CreateManagementTaskRequest taskRequest = new CreateManagementTaskRequest();
+        taskRequest.setTaskType(request.getOperation());
+        taskRequest.setOperation(operationLabel(request.getOperation()));
+        taskRequest.setTargetType("COMIC");
+        taskRequest.setBatchId(UUID.randomUUID().toString());
         List<CreateManagementTaskRequest.TaskTarget> targets = new ArrayList<>();
         for (Long comicId : eligible) {
             CreateManagementTaskRequest.TaskTarget target = new CreateManagementTaskRequest.TaskTarget();
@@ -214,8 +214,8 @@ public class BatchOperationServiceImpl implements BatchOperationService {
             target.setOperationType(request.getOperation());
             targets.add(target);
         }
-        req.setTargets(targets);
-        return managementTaskService.createTask(req, idempotencyKey, payload);
+        taskRequest.setTargets(targets);
+        return managementTaskService.createTask(taskRequest, idempotencyKey, payload);
     }
 
     private void enqueueCommand(TaskType operation, ManagementTaskItemResponse item) {

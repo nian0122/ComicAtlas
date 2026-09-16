@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.dao.DataAccessException;
 
 import java.time.Instant;
 import java.util.Map;
@@ -163,7 +164,7 @@ public class MetadataUpdateCoordinator {
             });
             log.info("metadata 同步已入 Outbox: comicId={}, taskId={}, source={}",
                     comicId, taskId, source);
-        } catch (RuntimeException e) {
+        } catch (DataAccessException e) {
             log.error("metadata 同步入 Outbox 失败: comicId={}, taskId={}, source={}",
                     comicId, taskId, source, e);
         }

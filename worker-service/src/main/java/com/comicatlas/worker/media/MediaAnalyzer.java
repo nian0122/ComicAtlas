@@ -157,7 +157,7 @@ public class MediaAnalyzer {
         } catch (ExternalProcessRunner.ProcessTimeoutException e) {
             log.warn("ffprobe 读取 {} 超时 ({}s)", file, workerConfig.getMedia().getFfprobeTimeoutSeconds());
             return videoFallback(name, container, size);
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             log.warn("ffprobe 读取 {} 失败", file, e);
             return videoFallback(name, container, size);
         }
@@ -173,7 +173,7 @@ public class MediaAnalyzer {
     private long readFileSize(Path file) {
         try {
             return Files.size(file);
-        } catch (Exception e) {
+        } catch (java.io.IOException | SecurityException e) {
             log.warn("读取文件大小失败: {}", file, e);
             return 0L;
         }
@@ -198,7 +198,7 @@ public class MediaAnalyzer {
             if (durationText != null && !durationText.isEmpty() && !UNAVAILABLE_MARKER.equals(durationText)) {
                 try {
                     duration = new BigDecimal(durationText);
-                } catch (Exception e) {
+                } catch (NumberFormatException e) {
                     log.warn("解析视频时长失败: {}", durationText, e);
                 }
             }
@@ -227,7 +227,7 @@ public class MediaAnalyzer {
                     }
                 }
             }
-        } catch (Exception e) {
+        } catch (java.io.IOException | RuntimeException e) {
             log.warn("解析 ffprobe JSON 失败: {}", e.getMessage(), e);
         }
         return new ComicMetadata.MediaInfo(name, 0, HQ_STATUS_READY, LQ_STATUS_NOT_GENERATED,
@@ -282,7 +282,7 @@ public class MediaAnalyzer {
                     }
                 }
             }
-        } catch (Exception e) {
+        } catch (java.io.IOException | RuntimeException e) {
             log.debug("ImageIO 读取尺寸失败: {}", path, e);
         }
         // 2. 回退：直接解析文件头

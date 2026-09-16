@@ -24,7 +24,7 @@ public class CatalogCacheInvalidator {
             if (cache != null) {
                 try {
                     cache.evict(comicId);
-                } catch (RuntimeException e) {
+                } catch (IllegalStateException e) {
                     log.warn("目录缓存失效失败，继续使用数据库结果: comicId={}", comicId, e);
                 }
             }
@@ -57,7 +57,7 @@ public class CatalogCacheInvalidator {
         }
         try {
             cache.clear();
-        } catch (RuntimeException e) {
+        } catch (IllegalStateException e) {
             log.warn("漫画列表缓存失效失败，继续使用数据库结果", e);
         }
     }

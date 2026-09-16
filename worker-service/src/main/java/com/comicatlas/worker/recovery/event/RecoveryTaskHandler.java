@@ -75,8 +75,8 @@ public class RecoveryTaskHandler {
                     if (comicId > 0) {
                         comicIds.add(comicId);
                     }
-                } catch (NumberFormatException ignored) {
-                    log.debug("跳过非数字目录: {}", dirName);
+                } catch (NumberFormatException exception) {
+                    log.debug("跳过非数字目录: {}", dirName, exception);
                 }
             }
         }

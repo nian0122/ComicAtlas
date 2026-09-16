@@ -54,7 +54,7 @@ public class TrashManifestStore {
         }
         try {
             return objectMapper.readValue(json, TrashManifestDTO.class);
-        } catch (Exception e) {
+        } catch (com.fasterxml.jackson.core.JsonProcessingException | RuntimeException e) {
             log.warn("解析 TRASH 清单(DB)失败: taskId={}", taskId, e);
             return null;
         }

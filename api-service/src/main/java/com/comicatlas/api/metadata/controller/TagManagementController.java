@@ -1,5 +1,4 @@
 package com.comicatlas.api.metadata.controller;
-
 import com.comicatlas.contract.common.Result;
 import com.comicatlas.contract.comic.dto.TagDTO;
 import com.comicatlas.api.metadata.dto.CreateTagRequest;
@@ -29,6 +28,11 @@ public class TagManagementController {
 
     private final TagManagementService tagManagementService;
 
+    /**
+     * 查询管理端可用的标签列表；该查询不改变标签或漫画状态。
+     *
+     * @return 标签列表
+     */
     @GetMapping
     public Result<java.util.List<TagDTO>> listTags() {
         return Result.ok(tagManagementService.listTags());
@@ -46,8 +50,9 @@ public class TagManagementController {
     }
 
     /**
-     * 删除标签；已被漫画引用时返回 409。
+     * 删除标签；已被漫画引用的标签由服务层拒绝删除，成功后不再出现在可用标签中。
      *
+     * @param id 标签 ID
      * @return 空结果
      */
     @DeleteMapping("/{id}")

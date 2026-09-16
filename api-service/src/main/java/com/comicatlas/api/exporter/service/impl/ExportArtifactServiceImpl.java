@@ -69,17 +69,17 @@ public class ExportArtifactServiceImpl implements com.comicatlas.api.exporter.se
 
         List<ExportArtifactVO> artifacts = new ArrayList<>(volumes.size());
         long totalSize = 0;
-        for (int i = 0; i < volumes.size(); i++) {
-            Path volume = volumes.get(i);
+        for (int volumeIndex = 0; volumeIndex < volumes.size(); volumeIndex++) {
+            Path volume = volumes.get(volumeIndex);
             long size = fileSize(volume, taskId);
             totalSize += size;
-            ExportArtifactVO vo = new ExportArtifactVO();
-            vo.setIndex(i + 1);
-            vo.setFileName(volume.getFileName().toString());
-            vo.setSize(size);
-            vo.setLastSegment(i == volumes.size() - 1);
-            vo.setPhysicalPath(volume.toAbsolutePath().normalize().toString());
-            artifacts.add(vo);
+            ExportArtifactVO artifactView = new ExportArtifactVO();
+            artifactView.setIndex(volumeIndex + 1);
+            artifactView.setFileName(volume.getFileName().toString());
+            artifactView.setSize(size);
+            artifactView.setLastSegment(volumeIndex == volumes.size() - 1);
+            artifactView.setPhysicalPath(volume.toAbsolutePath().normalize().toString());
+            artifacts.add(artifactView);
         }
 
         Long expectedSize = task.getOutputSize();

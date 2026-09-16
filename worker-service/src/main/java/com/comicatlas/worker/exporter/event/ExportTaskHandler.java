@@ -60,7 +60,7 @@ public class ExportTaskHandler {
             output = ExportFormats.CBZ.equalsIgnoreCase(event.format())
                     ? exportService.export(event.comicId(), event.taskId(), ExportFormats.CBZ)
                     : exportService.export(event.comicId(), event.taskId());
-        } catch (Exception failure) {
+        } catch (java.io.IOException | RuntimeException failure) {
             if (failure instanceof InterruptedIOException || failure instanceof ClosedByInterruptException
                     || failure instanceof InterruptedException || Thread.currentThread().isInterrupted()) {
                 Thread.currentThread().interrupt();
@@ -74,7 +74,7 @@ public class ExportTaskHandler {
         try {
             eventPublisher.publishCompleted(event.taskId(), event.comicId(), output);
             log.info("已发布 ExportTaskCompletedEvent: taskId={}, size={}", event.taskId(), output.size());
-        } catch (Exception failure) {
+        } catch (RuntimeException failure) {
             throw new ExportCompletedPublishException(
                     "导出完成事件发布失败：taskId=" + event.taskId() + ", comicId=" + event.comicId(), failure);
         }

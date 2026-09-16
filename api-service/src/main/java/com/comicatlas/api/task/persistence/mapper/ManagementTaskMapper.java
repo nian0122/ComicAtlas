@@ -18,7 +18,7 @@ import java.util.List;
 @Mapper
 public interface ManagementTaskMapper extends BaseMapper<ManagementTask> {
 
-    @Select("SELECT * FROM management_task WHERE idempotency_key = #{idempotencyKey} LIMIT 1")
+    @Select("SELECT id, task_type, operation, target_type, batch_id, is_batch, status, stage, progress, total_count, success_count, failure_count, cancelled_count, idempotency_key, idempotency_payload_hash, error_message, error_detail, attempt, version, created_at, updated_at, started_at, completed_at FROM management_task WHERE idempotency_key = #{idempotencyKey} LIMIT 1")
     ManagementTask selectByIdempotencyKey(@Param("idempotencyKey") String idempotencyKey);
 
     IPage<ManagementTask> selectPageByCondition(IPage<ManagementTask> page,

@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
+import org.springframework.dao.DataAccessException;
 
 /**
  * 启动时为历史专表任务回填 management_task 主表。
@@ -24,7 +25,7 @@ public class LegacyTaskBackfillRunner implements ApplicationRunner {
         try {
             int count = backfillService.backfillAll();
             log.info("启动回填历史任务完成: {} 条", count);
-        } catch (Exception e) {
+        } catch (DataAccessException e) {
             log.error("启动回填历史任务失败（不影响启动）", e);
         }
     }

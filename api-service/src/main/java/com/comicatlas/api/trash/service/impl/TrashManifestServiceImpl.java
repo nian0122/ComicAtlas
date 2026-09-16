@@ -71,7 +71,7 @@ public class TrashManifestServiceImpl implements TrashManifestService {
         }
         try {
             return objectMapper.readValue(record.getManifestJson(), TrashManifestDTO.class);
-        } catch (Exception e) {
+        } catch (IOException e) {
             log.warn("读取 TRASH 清单(DB)失败: taskId={}", taskId, e);
             return null;
         }
@@ -85,7 +85,7 @@ public class TrashManifestServiceImpl implements TrashManifestService {
         }
         try {
             return objectMapper.readValue(record.getManifestJson(), TrashManifestDTO.class);
-        } catch (Exception e) {
+        } catch (IOException e) {
             log.warn("读取 TRASH 清单(DB)失败: targetType={}, targetId={}", targetType, targetId, e);
             return null;
         }
@@ -99,7 +99,7 @@ public class TrashManifestServiceImpl implements TrashManifestService {
         }
         try {
             return objectMapper.readValue(Files.readString(file, StandardCharsets.UTF_8), TrashManifestItemDTO.class);
-        } catch (Exception e) {
+        } catch (IOException e) {
             log.warn("读取 TRASH 实际结果失败: {}", file, e);
             return null;
         }
@@ -109,7 +109,7 @@ public class TrashManifestServiceImpl implements TrashManifestService {
         try {
             return objectMapper.writeValueAsString(obj);
         } catch (IOException e) {
-            throw new BusinessException(HttpStatusCodes.INTERNAL_ERROR, "TRASH 清单序列化失败: " + e.getMessage());
+            throw new BusinessException("TRASH 清单序列化失败", e);
         }
     }
 }

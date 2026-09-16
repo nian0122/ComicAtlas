@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.support.AmqpHeaders;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.RedisSystemException;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
@@ -86,7 +87,7 @@ public class ImportEventHandler {
     private boolean isEventProcessed(String idempKey) {
         try {
             return Boolean.TRUE.equals(redisTemplate.hasKey(idempKey));
-        } catch (Exception e) {
+        } catch (RedisSystemException e) {
             log.warn("幂等标记读取失败，降级使用 DB 状态判断: key={}", idempKey, e);
             return false;
         }
@@ -95,7 +96,7 @@ public class ImportEventHandler {
     private void markEventProcessed(String idempKey) {
         try {
             redisTemplate.opsForValue().set(idempKey, "1", Duration.ofDays(1));
-        } catch (Exception e) {
+        } catch (RedisSystemException e) {
             log.warn("幂等标记写入失败: key={}", idempKey, e);
         }
     }

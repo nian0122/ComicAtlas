@@ -6,6 +6,7 @@ import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.GetResponse;
 import com.rabbitmq.client.ReturnListener;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.core.AmqpAdmin;
 import org.springframework.amqp.rabbit.core.RabbitAdmin;
@@ -29,6 +30,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class RabbitDlqBrokerClient implements DlqBrokerClient {
 
     /** 消息体 UTF-8 可解码时的编码标识（DlqMessage.payloadEncoding 契约值）。 */
@@ -146,7 +148,8 @@ public class RabbitDlqBrokerClient implements DlqBrokerClient {
                 } catch (TimeoutException | AmqpException exception) {
                     requeue(channel, response);
                     return failed(attempted, replayed, remaining, "发布确认超时或失败，原消息已重新入队");
-                } catch (Exception exception) {
+                } catch (IOException exception) {
+                    log.warn("消息重放 I/O 失败，原消息将重新入队", exception);
                     requeue(channel, response);
                     return failed(attempted, replayed, remaining, "消息重放失败，原消息已重新入队");
                 }

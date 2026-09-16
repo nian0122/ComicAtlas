@@ -5,6 +5,7 @@ import com.comicatlas.api.outbox.enums.OutboxMessageStatus;
 import com.comicatlas.api.outbox.persistence.mapper.OutboxMessageMapper;
 import com.comicatlas.common.event.ComicEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,6 +14,8 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.amqp.AmqpException;
+import org.springframework.dao.DataAccessException;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
@@ -87,7 +90,7 @@ public class OutboxRelay {
         try {
             messages = transactionTemplate.execute(status ->
                     outboxMapper.pollPending(batchSize));
-        } catch (Exception exception) {
+        } catch (DataAccessException exception) {
             log.warn("Outbox 轮询异常", exception);
             return;
         }
@@ -102,7 +105,7 @@ public class OutboxRelay {
         for (OutboxMessage outboxMessage : messages) {
             try {
                 publishMessage(outboxMessage);
-            } catch (Exception exception) {
+            } catch (AmqpException exception) {
                 log.error("Outbox 发布异常: eventId={}, error={}", outboxMessage.getEventId(), exception.getMessage(), exception);
                 handlePublishFailure(outboxMessage, exception);
             }
@@ -119,7 +122,7 @@ public class OutboxRelay {
         ComicEvent event;
         try {
             event = objectMapper.readValue(outboxMessage.getPayload(), ComicEvent.class);
-        } catch (Exception exception) {
+        } catch (JsonProcessingException exception) {
             log.error("Outbox 反序列化失败: eventId={}, error={}", outboxMessage.getEventId(), exception.getMessage(), exception);
             markFailed(outboxMessage, "反序列化失败: " + exception.getMessage());
             return;
@@ -146,7 +149,7 @@ public class OutboxRelay {
             rabbitTemplate.convertAndSend(outboxMessage.getExchange(), outboxMessage.getRoutingKey(), event, correlationData);
             // convertAndSend 成功只表示已提交到客户端，最终状态等待 broker confirm 回调。
             log.debug("OutboxRelay 已提交发布，等待 broker confirm: eventId={}", outboxMessage.getEventId());
-        } catch (Exception exception) {
+        } catch (AmqpException exception) {
             log.warn("Outbox 发送异常: eventId={}, error={}", outboxMessage.getEventId(), exception.getMessage(), exception);
             handlePublishFailure(outboxMessage, exception);
         }
@@ -166,7 +169,7 @@ public class OutboxRelay {
         int backoffSeconds = (int) Math.min((long) Math.pow(backoffBase, nextAttempt), backoffMax);
         try {
             outboxMapper.resetForRetryBySql(outboxMessage.getEventId(), nextAttempt, backoffSeconds, errorMessage);
-        } catch (Exception exception) {
+        } catch (DataAccessException exception) {
             log.error("Outbox 重置失败: eventId={}", outboxMessage.getEventId(), exception);
         }
     }
@@ -184,7 +187,7 @@ public class OutboxRelay {
                 outboxMapper.updateById(update);
             });
             log.debug("Outbox 发布确认: eventId={}", outboxMessage.getEventId());
-        } catch (Exception exception) {
+        } catch (DataAccessException exception) {
             log.error("Outbox 标记 PUBLISHED 失败: eventId={}", outboxMessage.getEventId(), exception);
         }
     }
@@ -208,7 +211,7 @@ public class OutboxRelay {
             outboxMapper.updateFailureBackoff(outboxMessage.getEventId(), nextAttempt, backoffSeconds, errorMessage);
             log.info("Outbox 发布失败，将在 {} 秒后重试: eventId={}, attempt={}/{}",
                     backoffSeconds, outboxMessage.getEventId(), nextAttempt, maxAttempts);
-        } catch (Exception exception) {
+        } catch (DataAccessException exception) {
             log.error("Outbox 更新重试信息失败: eventId={}", outboxMessage.getEventId(), exception);
         }
     }
@@ -230,7 +233,7 @@ public class OutboxRelay {
             });
             log.error("Outbox 发布彻底失败: eventId={}, attempts={}, error={}",
                     outboxMessage.getEventId(), outboxMessage.getPublishAttempts() + 1, errorMessage);
-        } catch (Exception exception) {
+        } catch (DataAccessException exception) {
             log.error("Outbox 标记 FAILED 失败: eventId={}", outboxMessage.getEventId(), exception);
         }
     }

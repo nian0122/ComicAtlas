@@ -16,10 +16,10 @@ import java.time.LocalDateTime;
 @Mapper
 public interface ManagementTaskItemMapper extends BaseMapper<ManagementTaskItem> {
 
-    @Select("SELECT * FROM management_task_item WHERE task_id = #{taskId} ORDER BY id")
+    @Select("SELECT id, task_id, target_type, target_id, operation_type, status, attempt, progress, result_ref_type, result_ref_id, error_message, lock_key, version, created_at, updated_at, started_at, completed_at FROM management_task_item WHERE task_id = #{taskId} ORDER BY id")
     List<ManagementTaskItem> selectByTaskId(@Param("taskId") Long taskId);
 
-    @Select("SELECT * FROM management_task_item WHERE target_type = #{targetType} AND target_id = #{targetId} AND operation_type = #{operationType} AND status IN ('QUEUED','RUNNING','CANCELLING') ORDER BY id DESC LIMIT 1")
+    @Select("SELECT id, task_id, target_type, target_id, operation_type, status, attempt, progress, result_ref_type, result_ref_id, error_message, lock_key, version, created_at, updated_at, started_at, completed_at FROM management_task_item WHERE target_type = #{targetType} AND target_id = #{targetId} AND operation_type = #{operationType} AND status IN ('QUEUED','RUNNING','CANCELLING') ORDER BY id DESC LIMIT 1")
     ManagementTaskItem selectActiveByTarget(@Param("targetType") String targetType,
             @Param("targetId") Long targetId, @Param("operationType") String operationType);
 
@@ -29,7 +29,7 @@ public interface ManagementTaskItemMapper extends BaseMapper<ManagementTaskItem>
     @Select("SELECT COUNT(*) FROM management_task_item WHERE lock_key = #{lockKey}")
     long countByLockKey(@Param("lockKey") String lockKey);
 
-    @Select("<script>SELECT * FROM management_task_item WHERE task_id IN <foreach collection='taskIds' item='taskId' open='(' separator=',' close=')'>#{taskId}</foreach> ORDER BY id</script>")
+    @Select("<script>SELECT id, task_id, target_type, target_id, operation_type, status, attempt, progress, result_ref_type, result_ref_id, error_message, lock_key, version, created_at, updated_at, started_at, completed_at FROM management_task_item WHERE task_id IN <foreach collection='taskIds' item='taskId' open='(' separator=',' close=')'>#{taskId}</foreach> ORDER BY id</script>")
     List<ManagementTaskItem> selectByTaskIds(@Param("taskIds") List<Long> taskIds);
 
     @Update("UPDATE management_task_item SET status = 'SUCCEEDED', completed_at = #{completedAt}, lock_key = NULL, updated_at = #{updatedAt} WHERE id = #{itemId} AND attempt = #{attempt} AND status NOT IN ('CANCELLED', 'SUCCEEDED', 'PARTIALLY_SUCCEEDED', 'FAILED')")

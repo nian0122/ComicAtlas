@@ -37,8 +37,8 @@ public class ZipImportHandler {
     private final WorkerConfig config;
     private final DirectoryImportHandler directoryHandler;
 
-    public Path importZip(ImportContext ctx, Long taskId, Long comicId, Path mangaRoot) throws Exception {
-        Path zipFile = ctx.sourcePath();
+    public Path importZip(ImportContext importContext, Long taskId, Long comicId, Path mangaRoot) throws Exception {
+        Path zipFile = importContext.sourcePath();
         if (!Files.exists(zipFile)) {
             throw new IllegalArgumentException("ZIP 文件不存在: " + zipFile.getFileName());
         }
@@ -57,10 +57,10 @@ public class ZipImportHandler {
             String titleHint = lastDotIndex >= 0 ? fileName.substring(0, lastDotIndex) : fileName;
             // 保留原始来源类型（ZIP），使 parser 对解压根执行"恰有一个有效子目录时剥离一层
             // 传输包装"的语义；不得改写成 DIRECTORY，否则单层包装目录无法被剥离。
-            ImportContext extractCtx = new ImportContext(
-                ctx.sourceType(), extractDir, ctx.generateLq(), ctx.overwrite(), titleHint
+            ImportContext extractionContext = new ImportContext(
+                importContext.sourceType(), extractDir, importContext.generateLq(), importContext.overwrite(), titleHint
             );
-            return directoryHandler.handle(extractCtx, taskId, comicId, mangaRoot);
+            return directoryHandler.handle(extractionContext, taskId, comicId, mangaRoot);
         } finally {
             deleteRecursively(tempRoot);
         }

@@ -394,12 +394,12 @@ public class MediaOperationCommandServiceImpl implements MediaOperationCommandSe
     private ManagementTaskResponse createTask(TaskType operation, String operationLabel,
                                               String targetType,
                                               List<CreateManagementTaskRequest.TaskTarget> targets) {
-        CreateManagementTaskRequest req = new CreateManagementTaskRequest();
-        req.setTaskType(operation);
-        req.setOperation(operationLabel);
-        req.setTargetType(targetType);
-        req.setTargets(targets);
-        return managementTaskService.createTask(req, null, null);
+        CreateManagementTaskRequest taskRequest = new CreateManagementTaskRequest();
+        taskRequest.setTaskType(operation);
+        taskRequest.setOperation(operationLabel);
+        taskRequest.setTargetType(targetType);
+        taskRequest.setTargets(targets);
+        return managementTaskService.createTask(taskRequest, null, null);
     }
 
     private void enqueue(TaskType operation, ManagementTaskItemResponse item,

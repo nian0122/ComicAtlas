@@ -55,31 +55,31 @@ public class StorageQueryServiceImpl implements StorageQueryService {
         Map<Long, String> transcodeStatusMap = storageMapper.selectTranscodeStatusList(comicIds).stream()
                 .collect(Collectors.toMap(ComicTranscodeStatusVO::comicId, ComicTranscodeStatusVO::transcodeStatus));
 
-        for (ComicStorageDTO dto : list) {
-            dto.setCoverUrl(fileUrlResolver.resolveCover(dto.getComicId()));
-            boolean isEmpty = dto.getPageCount() == null || dto.getPageCount() == 0;
-            dto.setHqStatus(aggregateHqStatus(dto.getHqStatus(), isEmpty));
-            dto.setLqStatus(aggregateLqStatus(dto.getLqStatus(), isEmpty));
-            dto.setTranscodeStatus(aggregateTranscodeStatus(transcodeStatusMap.get(dto.getComicId())));
-            long hqSize = dto.getHqSize() != null ? dto.getHqSize() : 0;
-            long lqSize = dto.getLqSize() != null ? dto.getLqSize() : 0;
-            dto.setTotalSize(hqSize + lqSize);
+        for (ComicStorageDTO comicStorage : list) {
+            comicStorage.setCoverUrl(fileUrlResolver.resolveCover(comicStorage.getComicId()));
+            boolean isEmpty = comicStorage.getPageCount() == null || comicStorage.getPageCount() == 0;
+            comicStorage.setHqStatus(aggregateHqStatus(comicStorage.getHqStatus(), isEmpty));
+            comicStorage.setLqStatus(aggregateLqStatus(comicStorage.getLqStatus(), isEmpty));
+            comicStorage.setTranscodeStatus(aggregateTranscodeStatus(transcodeStatusMap.get(comicStorage.getComicId())));
+            long hqSize = comicStorage.getHqSize() != null ? comicStorage.getHqSize() : 0;
+            long lqSize = comicStorage.getLqSize() != null ? comicStorage.getLqSize() : 0;
+            comicStorage.setTotalSize(hqSize + lqSize);
         }
         return list;
     }
 
     @Override
     public ComicStorageDTO getComic(Long comicId) {
-        ComicStorageDTO dto = storageMapper.selectComicStorageById(comicId);
-        if (dto == null) { return null; }
-        boolean isEmpty = dto.getPageCount() == null || dto.getPageCount() == 0;
-        dto.setCoverUrl(fileUrlResolver.resolveCover(comicId));
-        dto.setHqStatus(aggregateHqStatus(dto.getHqStatus(), isEmpty));
-        dto.setLqStatus(aggregateLqStatus(dto.getLqStatus(), isEmpty));
-        long hqSize = dto.getHqSize() != null ? dto.getHqSize() : 0;
-        long lqSize = dto.getLqSize() != null ? dto.getLqSize() : 0;
-        dto.setTotalSize(hqSize + lqSize);
-        return dto;
+        ComicStorageDTO comicStorage = storageMapper.selectComicStorageById(comicId);
+        if (comicStorage == null) { return null; }
+        boolean isEmpty = comicStorage.getPageCount() == null || comicStorage.getPageCount() == 0;
+        comicStorage.setCoverUrl(fileUrlResolver.resolveCover(comicId));
+        comicStorage.setHqStatus(aggregateHqStatus(comicStorage.getHqStatus(), isEmpty));
+        comicStorage.setLqStatus(aggregateLqStatus(comicStorage.getLqStatus(), isEmpty));
+        long hqSize = comicStorage.getHqSize() != null ? comicStorage.getHqSize() : 0;
+        long lqSize = comicStorage.getLqSize() != null ? comicStorage.getLqSize() : 0;
+        comicStorage.setTotalSize(hqSize + lqSize);
+        return comicStorage;
     }
 
     @Override
@@ -90,10 +90,10 @@ public class StorageQueryServiceImpl implements StorageQueryService {
     @Override
     public List<ChapterStorageDTO> listChapters(Long comicId) {
         List<ChapterStorageDTO> list = storageMapper.selectChapterStorageList(comicId);
-        for (ChapterStorageDTO dto : list) {
-            boolean isEmpty = dto.getPageCount() == null || dto.getPageCount() == 0;
-            dto.setHqStatus(aggregateHqStatus(dto.getHqStatus(), isEmpty));
-            dto.setLqStatus(aggregateLqStatus(dto.getLqStatus(), isEmpty));
+        for (ChapterStorageDTO chapterStorage : list) {
+            boolean isEmpty = chapterStorage.getPageCount() == null || chapterStorage.getPageCount() == 0;
+            chapterStorage.setHqStatus(aggregateHqStatus(chapterStorage.getHqStatus(), isEmpty));
+            chapterStorage.setLqStatus(aggregateLqStatus(chapterStorage.getLqStatus(), isEmpty));
         }
         return list;
     }

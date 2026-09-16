@@ -47,7 +47,8 @@ public class StorageRoot {
         if (path == null || other == null) { return false; }
         try {
             return Files.getFileStore(path).equals(Files.getFileStore(other));
-        } catch (Exception e) {
+        } catch (java.io.IOException | SecurityException e) {
+            // 文件系统不可访问时只能保守地判定为不同卷，保留 cause 供调用方日志诊断。
             return false;
         }
     }

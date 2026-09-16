@@ -11,10 +11,10 @@ import com.comicatlas.api.importer.enums.ImportTaskStatus;
 @Mapper
 public interface ImportTaskMapper extends BaseMapper<ImportTask> {
 
-    @Select("SELECT * FROM import_task WHERE management_task_id = #{managementTaskId} LIMIT 1")
+    @Select("SELECT id, management_task_id, comic_id, source_ref, source_type, source_path, batch_id, status, progress, total_pages, downloaded_pages, download_method, download_speed, eta_seconds, error_message, retry_count, start_time, end_time, duration_ms, created_at, updated_at FROM import_task WHERE management_task_id = #{managementTaskId} LIMIT 1")
     ImportTask selectByManagementTaskId(@Param("managementTaskId") Long managementTaskId);
 
-    @Select({"<script>", "SELECT * FROM import_task", "<where>",
+            @Select({"<script>", "SELECT id, management_task_id, comic_id, source_ref, source_type, source_path, batch_id, status, progress, total_pages, downloaded_pages, download_method, download_speed, eta_seconds, error_message, retry_count, start_time, end_time, duration_ms, created_at, updated_at FROM import_task", "<where>",
             "<if test='status != null'>AND status = #{status}</if>",
             "<if test='batchId != null'>AND batch_id = #{batchId}</if>",
             "</where> ORDER BY created_at DESC", "</script>"})

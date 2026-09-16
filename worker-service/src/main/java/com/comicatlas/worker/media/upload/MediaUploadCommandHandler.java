@@ -114,7 +114,7 @@ public class MediaUploadCommandHandler {
             publisher.uploadCompleted(cmd, results);
             log.info("媒体上传/替换命令完成: op={}, session={}, files={}",
                     cmd.operationType(), sessionDbId, files.size());
-        } catch (Exception e) {
+        } catch (IOException | RuntimeException e) {
             log.error("媒体上传/替换命令失败: session={}", sessionDbId, e);
             publisher.failed(cmd, e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
         }

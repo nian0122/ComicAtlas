@@ -58,13 +58,14 @@ public class RestoreCommandHandler {
         } catch (RestoreConflictException e) {
             log.warn("恢复冲突（RESTORE_CONFLICT）: {}/{}", targetType, targetId, e);
             publisher.failed(cmd, "RESTORE_CONFLICT: " + e.getMessage());
-        } catch (Exception e) {
+        } catch (IOException | RuntimeException e) {
             log.error("恢复命令异常: {}/{}", targetType, targetId, e);
             publisher.failed(cmd, e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
         }
     }
 
-    private void restoreEntry(TrashManifestDTO.Entry e, Path manifestDir) throws Exception {
+    private void restoreEntry(TrashManifestDTO.Entry e, Path manifestDir)
+            throws IOException, RestoreConflictException {
         StorageRoot sourceRoot = StorageRootResolver.optional(storageProperties, e.rootKey());
         if (sourceRoot == null || !sourceRoot.isEnabled()) {
             throw new RestoreConflictException("源存储根未配置: " + e.rootKey());
@@ -84,7 +85,7 @@ public class RestoreCommandHandler {
         try {
             Files.move(src, dst);
         } catch (IOException ex) {
-            throw new RestoreConflictException("恢复移动失败: " + src + " -> " + dst + ": " + ex.getMessage());
+            throw new RestoreConflictException("恢复移动失败: " + src + " -> " + dst + ": " + ex.getMessage(), ex);
         }
     }
 
@@ -92,6 +93,10 @@ public class RestoreCommandHandler {
     private static final class RestoreConflictException extends Exception {
         RestoreConflictException(String message) {
             super(message);
+        }
+
+        RestoreConflictException(String message, Throwable cause) {
+            super(message, cause);
         }
     }
 }

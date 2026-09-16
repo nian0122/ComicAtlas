@@ -30,6 +30,18 @@ class MqConsumerSupportTest {
     }
 
     @Test
+    void failure_callbackReceivesOriginalCause() throws Exception {
+        Channel channel = mock(Channel.class);
+        IllegalStateException original = new IllegalStateException("boom");
+
+        support.consume(channel, 1L, "label",
+                () -> { throw original; },
+                failure -> assertSame(original, failure), FailurePolicy.REJECT_TO_DLQ);
+
+        verify(channel).basicReject(1L, false);
+    }
+
+    @Test
     void failure_requeue_rejectsWithTrue() throws Exception {
         Channel channel = mock(Channel.class);
         support.consume(channel, 1L, "label",

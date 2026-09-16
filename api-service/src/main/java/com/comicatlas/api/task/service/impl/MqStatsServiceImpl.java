@@ -8,6 +8,7 @@ import com.comicatlas.common.dto.MqStatsDTO.MqQueueStat;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClientException;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -52,8 +53,8 @@ public class MqStatsServiceImpl implements MqStatsService {
             }
             busyQueues.sort(Comparator.comparingLong(MqQueueStat::messages).reversed());
             return new MqStatsDTO(true, dlqTotal, dlqQueues, queuedTotal, List.copyOf(busyQueues));
-        } catch (Exception e) {
-            log.warn("MQ 积压统计不可用（Management API 异常）: {}", e.getMessage());
+        } catch (RestClientException e) {
+            log.warn("MQ 积压统计不可用（Management API 异常）: {}", e.getMessage(), e);
             return MqStatsDTO.unavailable();
         }
     }

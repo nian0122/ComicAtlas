@@ -13,6 +13,7 @@ import com.comicatlas.api.trash.service.TrashLifecycleService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DataAccessException;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
@@ -264,13 +265,13 @@ public class ComicManagementServiceImpl implements ComicManagementService {
                 }
 
                 succeeded++;
-            } catch (Exception e) {
+            } catch (BusinessException | DataAccessException e) {
                 log.error("批量更新漫画 {} 失败", comicId, e);
                 String title = null;
                 try {
                     Comic comic = comicMapper.selectById(comicId);
                     if (comic != null) { title = comic.getTitle(); }
-                } catch (Exception ex) {
+                } catch (DataAccessException ex) {
                     log.warn("批量更新时查询漫画标题失败: comicId={}", comicId, ex);
                 }
                 failed.add(new BatchUpdateResultVO.FailedItem(comicId, title, "系统错误"));
