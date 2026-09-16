@@ -7,6 +7,7 @@ import com.comicatlas.api.task.dto.OperationSubmitResultDTO;
 import com.comicatlas.api.media.service.HqDeleteOperationService;
 import com.comicatlas.api.media.service.LqOperationService;
 import com.comicatlas.api.media.service.TranscodeOperationService;
+import com.comicatlas.api.exporter.service.ExportOperationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -34,6 +35,15 @@ public class StorageOperationController {
     private final HqDeleteOperationService hqDeleteOperationService;
     private final TranscodeOperationService transcodeOperationService;
     private final MediaOperationCommandService commandService;
+
+    /** 兼容历史测试构造器；导出端点已由 ExportController 承担。 */
+    public StorageOperationController(LqOperationService lqOperationService,
+            HqDeleteOperationService hqDeleteOperationService,
+            TranscodeOperationService transcodeOperationService,
+            ExportOperationService ignoredExportOperationService,
+            MediaOperationCommandService commandService) {
+        this(lqOperationService, hqDeleteOperationService, transcodeOperationService, commandService);
+    }
 
     // ======================== LQ 生成 ========================
 

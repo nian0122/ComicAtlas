@@ -23,6 +23,11 @@ public class HqMediaRegistrationService {
     private final ChapterMapper chapterMapper;
     private final HqMediaRegistrationPlanner registrationPlanner;
 
+    /** 兼容历史单元测试构造器，登记规则使用无状态规划器。 */
+    public HqMediaRegistrationService(MediaMapper mediaMapper, ChapterMapper chapterMapper) {
+        this(mediaMapper, chapterMapper, new HqMediaRegistrationPlanner());
+    }
+
     @Transactional
     public HqMediaRegistrationResult registerValidatedSnapshot(MetadataRefreshSnapshotDTO snapshot) {
         List<ChapterSnapshot> chapterSnapshots = snapshot.chapters() == null ? List.of() : snapshot.chapters();

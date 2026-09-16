@@ -1,6 +1,10 @@
 package com.comicatlas.api.recovery.event;
 
 import com.comicatlas.api.recovery.service.RecoveryBatchService;
+import com.comicatlas.api.recovery.engine.RecoveryEngine;
+import com.comicatlas.api.recovery.persistence.mapper.RecoveryTaskMapper;
+import com.comicatlas.api.task.service.ManagementTaskService;
+import org.springframework.data.redis.core.RedisTemplate;
 import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.event.ComicEvent;
 import com.comicatlas.common.event.RecoveryFailedEvent;
@@ -21,6 +25,14 @@ import org.springframework.stereotype.Component;
 public class RecoveryEventHandler {
     private final RecoveryBatchService recoveryBatchService;
     private final MqConsumerSupport mqConsumerSupport;
+
+    /** 兼容历史单元测试构造器，旧依赖组装为新的批次服务。 */
+    public RecoveryEventHandler(RecoveryEngine recoveryEngine, RecoveryTaskMapper recoveryTaskMapper,
+            RedisTemplate<String, Object> redisTemplate, ManagementTaskService managementTaskService,
+            MqConsumerSupport mqConsumerSupport) {
+        this(new RecoveryBatchService(recoveryEngine, recoveryTaskMapper, redisTemplate, managementTaskService),
+                mqConsumerSupport);
+    }
 
     @RabbitListener(queues = MqQueues.RECOVERY_RESULT)
     public void handle(ComicEvent event, Channel channel,

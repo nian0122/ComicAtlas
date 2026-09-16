@@ -2,7 +2,6 @@ package com.comicatlas.worker.importer.metadata;
 
 import com.comicatlas.common.util.MetadataFileWriter;
 import com.comicatlas.worker.media.ComicMetadata;
-import com.comicatlas.worker.importer.model.ImportManifest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -51,14 +50,28 @@ public class ImportMetadataArtifactService {
                 String relativePath = chapter.sourceDir() != null && !chapter.sourceDir().isBlank()
                         ? chapter.sourceDir() + "/" + page.fileName() : page.fileName();
                 String generatedPath = generatedNames.get(relativePath);
-                if (generatedPath != null) item.put("hqPath", generatedPath);
-                if (page.width() != null) item.put("width", page.width());
-                if (page.height() != null) item.put("height", page.height());
-                item.put("mediaType", page.mediaType());
-                if (page.duration() != null) item.put("duration", page.duration());
-                if (page.container() != null) item.put("container", page.container());
-                if (page.videoCodec() != null) item.put("videoCodec", page.videoCodec());
-                if (page.audioCodec() != null) item.put("audioCodec", page.audioCodec());
+                 if (generatedPath != null) {
+                     item.put("hqPath", generatedPath);
+                 }
+                 if (page.width() != null) {
+                     item.put("width", page.width());
+                 }
+                 if (page.height() != null) {
+                     item.put("height", page.height());
+                 }
+                 item.put("mediaType", page.mediaType());
+                 if (page.duration() != null) {
+                     item.put("duration", page.duration());
+                 }
+                 if (page.container() != null) {
+                     item.put("container", page.container());
+                 }
+                 if (page.videoCodec() != null) {
+                     item.put("videoCodec", page.videoCodec());
+                 }
+                 if (page.audioCodec() != null) {
+                     item.put("audioCodec", page.audioCodec());
+                 }
                 return item;
             }).toList());
             return value;
