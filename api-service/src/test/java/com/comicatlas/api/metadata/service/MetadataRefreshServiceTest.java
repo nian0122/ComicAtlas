@@ -90,7 +90,7 @@ class MetadataRefreshServiceTest {
         ApiStorageRoot stagingRoot = new ApiStorageRoot();
         stagingRoot.setPath(staging);
         when(storageProperties.root("STAGING")).thenReturn(stagingRoot);
-        service = new MetadataRefreshService(mediaMapper, chapterMapper,
+        service = new MetadataRefreshServiceImpl(mediaMapper, chapterMapper,
                 storageProperties, MAPPER, new DigestService());
     }
 
