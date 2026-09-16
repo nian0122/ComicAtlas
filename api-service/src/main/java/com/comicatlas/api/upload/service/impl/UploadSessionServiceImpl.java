@@ -45,6 +45,7 @@ import com.comicatlas.persistence.comic.mapper.MediaMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DataAccessException;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -341,14 +342,14 @@ public class UploadSessionServiceImpl implements UploadSessionService {
         List<MediaTypeDetector.Detection> detections;
         try {
             detections = verifyUploadedFiles(session, files);
-        } catch (RuntimeException exception) {
+        } catch (BusinessException | DataAccessException exception) {
             restoreActive(session.getId());
             throw exception;
         }
         try {
             return transactionTemplate.execute(status -> completePersisted(
                     session.getId(), sessionId, files, detections));
-        } catch (RuntimeException exception) {
+        } catch (BusinessException | DataAccessException exception) {
             restoreActive(session.getId());
             throw exception;
         }

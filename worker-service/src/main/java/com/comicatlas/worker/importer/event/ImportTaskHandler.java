@@ -124,8 +124,10 @@ public class ImportTaskHandler {
     private static void acknowledge(Channel channel, long tag) {
         try {
             channel.basicAck(tag, false);
-        } catch (Exception exception) {
+        } catch (java.io.IOException exception) {
             log.warn("消息 ack 失败: tag={}", tag, exception);
+        } catch (RuntimeException exception) {
+            log.warn("消息 ack 因客户端运行时异常失败: tag={}", tag, exception);
         }
     }
 

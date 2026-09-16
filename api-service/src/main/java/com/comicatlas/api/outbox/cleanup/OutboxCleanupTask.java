@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.dao.DataAccessException;
 
 /**
  * Outbox/Inbox 清理任务。
@@ -66,7 +67,7 @@ public class OutboxCleanupTask {
             if (deletedTasks > 0) {
                 log.info("管理任务清理: 删除 {} 条已完成任务（>{}天）", deletedTasks, taskRetentionDays);
             }
-        } catch (Exception e) {
+        } catch (DataAccessException e) {
             log.error("Outbox/Inbox 清理失败", e);
         }
     }

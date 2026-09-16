@@ -403,7 +403,7 @@ public class TrashLifecycleServiceImpl implements TrashLifecycleService {
         }
         try {
             return Files.exists(root.resolve(relative));
-        } catch (Exception e) {
+        } catch (IllegalArgumentException e) {
             return false;
         }
     }
@@ -412,7 +412,7 @@ public class TrashLifecycleServiceImpl implements TrashLifecycleService {
         try {
             return Files.exists(trashManifestService.manifestDir(targetType, targetId, taskId)
                     .resolve(trashRelative));
-        } catch (Exception e) {
+        } catch (IllegalArgumentException e) {
             return false;
         }
     }
@@ -452,16 +452,16 @@ public class TrashLifecycleServiceImpl implements TrashLifecycleService {
 
     private ManagementTaskResponse createTask(TaskType operation, String operationLabel, String targetType,
                                               Long targetId, String idempotencyKey, String payload) {
-        CreateManagementTaskRequest req = new CreateManagementTaskRequest();
-        req.setTaskType(operation);
-        req.setOperation(operationLabel);
-        req.setTargetType(targetType);
+        CreateManagementTaskRequest taskRequest = new CreateManagementTaskRequest();
+        taskRequest.setTaskType(operation);
+        taskRequest.setOperation(operationLabel);
+        taskRequest.setTargetType(targetType);
         CreateManagementTaskRequest.TaskTarget target = new CreateManagementTaskRequest.TaskTarget();
         target.setTargetType(targetType);
         target.setTargetId(targetId);
         target.setOperationType(operation);
-        req.setTargets(List.of(target));
-        return managementTaskService.createTask(req, idempotencyKey, payload);
+        taskRequest.setTargets(List.of(target));
+        return managementTaskService.createTask(taskRequest, idempotencyKey, payload);
     }
 
     private void enqueueCommand(TaskType operation, ManagementTaskItemResponse item,

@@ -8,6 +8,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import org.springframework.web.client.RestClientException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -68,7 +69,7 @@ class MqStatsServiceTest {
 
     @Test
     void returnsUnavailableStatsWhenManagementApiFails() {
-        when(managementClient.listQueues()).thenThrow(new RuntimeException("connect timeout"));
+        when(managementClient.listQueues()).thenThrow(new RestClientException("connect timeout"));
 
         var stats = service.stats();
 

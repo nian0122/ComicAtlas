@@ -47,7 +47,7 @@ public class ImageOptimizer {
         }
         try {
             Files.createDirectories(lqDir);
-        } catch (Exception e) {
+        } catch (java.io.IOException | RuntimeException e) {
             throw new RuntimeException("创建 LQ 目录失败: " + lqDirStr, e);
         }
 
@@ -116,7 +116,7 @@ public class ImageOptimizer {
         RunResult parsed;
         try {
             parsed = objectMapper.readValue(stdout, RunResult.class);
-        } catch (Exception e) {
+        } catch (com.fasterxml.jackson.core.JsonProcessingException | RuntimeException e) {
             throw new RuntimeException(
                     "解析图片优化 JSON 失败: comicId=" + comicId + ", chapterId=" + chapterId
                             + ", exitCode=" + exitCode + ", stdout=" + stdout, e);

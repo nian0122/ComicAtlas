@@ -23,6 +23,7 @@ import com.comicatlas.api.storage.config.ApiStorageProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.RedisSystemException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -194,7 +195,7 @@ public class ImportRetryCoordinator {
         }
         try {
             redisTemplate.delete(IMPORT_CANCEL_KEY_PREFIX + taskId);
-        } catch (RuntimeException ex) {
+        } catch (RedisSystemException ex) {
             log.warn("取消标记清理失败（非关键）: taskId={}", taskId, ex);
         }
         cleanupOrphanHqChapterDirs(comicId, orphanChapterIds);

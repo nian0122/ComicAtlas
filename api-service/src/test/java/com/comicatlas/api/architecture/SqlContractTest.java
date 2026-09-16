@@ -20,7 +20,7 @@ class SqlContractTest {
                 continue;
             }
             try (var files = Files.walk(sourceRoot)) {
-                files.filter(path -> path.toString().endsWith(".java"))
+                files.filter(SqlContractTest::isProductionSqlSource)
                         .forEach(path -> assertNoSelectStar(path));
             }
         }
@@ -33,7 +33,7 @@ class SqlContractTest {
                 continue;
             }
             try (var files = Files.walk(sourceRoot)) {
-                files.filter(path -> path.toString().endsWith(".java"))
+                files.filter(SqlContractTest::isProductionSqlSource)
                         .forEach(path -> assertSelectAnnotationIsReadOnly(path));
             }
         }
@@ -66,9 +66,18 @@ class SqlContractTest {
     private static Path[] sourceRoots() {
         return new Path[]{
                 Path.of("src/main/java"),
+                Path.of("src/main/resources"),
                 Path.of("../comic-shared/src/main/java"),
+                Path.of("../comic-shared/src/main/resources"),
                 Path.of("../reading-service/src/main/java"),
-                Path.of("../worker-service/src/main/java")
+                Path.of("../reading-service/src/main/resources"),
+                Path.of("../worker-service/src/main/java"),
+                Path.of("../worker-service/src/main/resources")
         };
+    }
+
+    private static boolean isProductionSqlSource(Path path) {
+        String fileName = path.toString();
+        return fileName.endsWith(".java") || fileName.endsWith(".xml");
     }
 }

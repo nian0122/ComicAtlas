@@ -80,11 +80,11 @@ public class CategoryManagementServiceImpl implements CategoryManagementService 
         cacheEvictor.evictComicList();
     }
 
-    private CategoryDTO toDTO(Category c) {
-        CategoryDTO dto = new CategoryDTO();
-        dto.setId(c.getId());
-        dto.setName(c.getName());
-        dto.setSortOrder(c.getSortOrder());
-        return dto;
+    private CategoryDTO toDTO(Category category) {
+        CategoryDTO categoryData = new CategoryDTO();
+        categoryData.setId(category.getId());
+        categoryData.setName(category.getName());
+        categoryData.setSortOrder(category.getSortOrder());
+        return categoryData;
     }
 }

@@ -290,7 +290,7 @@ public class MetadataRefreshCommandHandler {
             log.info("元数据扫盘完成: comicId={}, taskId={}, itemId={}, attempt={}, chapters={}, media={}, bytes={}",
                     comicId, cmd.taskId(), cmd.itemId(), cmd.attempt(),
                     chapterSnapshots.size(), totalMedia, jsonBytes.length);
-        } catch (Exception e) {
+        } catch (java.io.IOException | RuntimeException e) {
             log.warn("元数据扫盘失败: taskId={}, itemId={}, attempt={}",
                     cmd.taskId(), cmd.itemId(), cmd.attempt(), e);
             publisher.failed(cmd, e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
@@ -442,7 +442,7 @@ public class MetadataRefreshCommandHandler {
                         fileSize = info.fileSize();
                     }
                 }
-            } catch (Exception e) {
+            } catch (RuntimeException e) {
                 warnings.add("媒体分析失败: " + fileName);
                 log.debug("媒体分析失败: comicId={}, chapterId={}, file={}", comicId, chapterId, fileName, e);
             }
@@ -483,7 +483,7 @@ public class MetadataRefreshCommandHandler {
         layoutNormalizer.normalize(comicId, chapterId, scanDir);
                     }
                     legacyDirKey = rowDirKey;
-                } catch (Exception e) {
+                } catch (java.io.IOException | RuntimeException e) {
                     warnings.add("旧布局升级失败（保留原目录）: " + rowDirKey);
                     log.warn("旧布局升级失败: comicId={}, chapterId={}, dir={}",
                             comicId, chapterId, rowDirKey, e);

@@ -46,20 +46,20 @@ public class ArchiveDownloader {
 
         Files.createDirectories(destFile.getParent());
 
-        HttpRequest req = HttpRequest.newBuilder()
+        HttpRequest httpRequest = HttpRequest.newBuilder()
             .uri(URI.create(url))
             .header("User-Agent", config.getEhentai().getUserAgent())
             .timeout(java.time.Duration.ofMinutes(config.getDownload().getArchiveRequestTimeoutMinutes()))
             .GET()
             .build();
 
-        HttpResponse<InputStream> resp = http.send(req, HttpResponse.BodyHandlers.ofInputStream());
-        if (resp.statusCode() != 200) {
-            throw new RuntimeException("Archive download failed: HTTP " + resp.statusCode());
+        HttpResponse<InputStream> httpResponse = http.send(httpRequest, HttpResponse.BodyHandlers.ofInputStream());
+        if (httpResponse.statusCode() != 200) {
+            throw new RuntimeException("Archive download failed: HTTP " + httpResponse.statusCode());
         }
 
-        try (InputStream in = resp.body()) {
-            Files.copy(in, destFile, StandardCopyOption.REPLACE_EXISTING);
+        try (InputStream responseBody = httpResponse.body()) {
+            Files.copy(responseBody, destFile, StandardCopyOption.REPLACE_EXISTING);
         }
 
         long size = Files.size(destFile);

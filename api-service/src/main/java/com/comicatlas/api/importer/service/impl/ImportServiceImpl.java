@@ -39,7 +39,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.RedisSystemException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -259,7 +261,7 @@ public class ImportServiceImpl implements ImportService {
                 ImportTask task = taskMapper.selectById(taskId);
                 succeeded.add(toVO(task));
 
-            } catch (Exception ex) {
+            } catch (BusinessException | DataAccessException ex) {
                 log.error("批量导入单任务失败: path={}", path, ex);
                 FailedItem item = new FailedItem();
                 item.setSourcePath(path);
@@ -294,11 +296,11 @@ public class ImportServiceImpl implements ImportService {
         if (task == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在");
         }
-        ImportStatusVO vo = new ImportStatusVO();
-        vo.setTaskId(task.getId());
-        vo.setStatus(statusName(task.getStatus()));
-        vo.setProgress(task.getProgress());
-        return vo;
+        ImportStatusVO statusView = new ImportStatusVO();
+        statusView.setTaskId(task.getId());
+        statusView.setStatus(statusName(task.getStatus()));
+        statusView.setProgress(task.getProgress());
+        return statusView;
     }
 
     @Override
@@ -339,7 +341,7 @@ public class ImportServiceImpl implements ImportService {
                         try {
                             redisTemplate.opsForValue().set(
                                     IMPORT_CANCEL_KEY_PREFIX + taskId, "1", REDIS_MARK_TTL);
-                        } catch (RuntimeException ex) {
+                        } catch (RedisSystemException ex) {
                             log.warn("取消标记写入失败（非关键）: taskId={}", taskId, ex);
                         }
                     }
@@ -426,26 +428,26 @@ public class ImportServiceImpl implements ImportService {
     }
 
     private ImportTaskVO toVO(ImportTask task) {
-        ImportTaskVO vo = new ImportTaskVO();
-        vo.setId(task.getId());
-        vo.setComicId(task.getComicId());
-        vo.setSourceRef(task.getSourceRef());
-        vo.setSourceType(resolveSourceType(task));
-        vo.setSourcePath(task.getSourcePath());
-        vo.setBatchId(task.getBatchId());
-        vo.setStatus(statusName(task.getStatus()));
-        vo.setProgress(task.getProgress());
-        vo.setTotalPages(task.getTotalPages());
-        vo.setDownloadedPages(task.getDownloadedPages());
-        vo.setDownloadMethod(task.getDownloadMethod());
-        vo.setDownloadSpeed(task.getDownloadSpeed());
-        vo.setEtaSeconds(task.getEtaSeconds());
-        vo.setErrorMessage(task.getErrorMessage());
-        vo.setRetryCount(task.getRetryCount());
-        vo.setDurationMs(task.getDurationMs());
-        vo.setStartTime(task.getStartTime());
-        vo.setEndTime(task.getEndTime());
-        vo.setCreatedAt(task.getCreatedAt());
-        return vo;
+        ImportTaskVO taskView = new ImportTaskVO();
+        taskView.setId(task.getId());
+        taskView.setComicId(task.getComicId());
+        taskView.setSourceRef(task.getSourceRef());
+        taskView.setSourceType(resolveSourceType(task));
+        taskView.setSourcePath(task.getSourcePath());
+        taskView.setBatchId(task.getBatchId());
+        taskView.setStatus(statusName(task.getStatus()));
+        taskView.setProgress(task.getProgress());
+        taskView.setTotalPages(task.getTotalPages());
+        taskView.setDownloadedPages(task.getDownloadedPages());
+        taskView.setDownloadMethod(task.getDownloadMethod());
+        taskView.setDownloadSpeed(task.getDownloadSpeed());
+        taskView.setEtaSeconds(task.getEtaSeconds());
+        taskView.setErrorMessage(task.getErrorMessage());
+        taskView.setRetryCount(task.getRetryCount());
+        taskView.setDurationMs(task.getDurationMs());
+        taskView.setStartTime(task.getStartTime());
+        taskView.setEndTime(task.getEndTime());
+        taskView.setCreatedAt(task.getCreatedAt());
+        return taskView;
     }
 }

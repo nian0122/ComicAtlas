@@ -14,7 +14,9 @@ import com.comicatlas.api.task.enums.ManagementTaskStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.dao.DataAccessException;
 import org.springframework.transaction.annotation.Transactional;
+import com.comicatlas.contract.common.exception.BusinessException;
 
 import java.util.List;
 
@@ -43,7 +45,7 @@ public class BatchMetadataExecutor {
             apply(comicId, payload);
             managementTaskService.updateItemStatus(itemId, ManagementTaskStatus.SUCCEEDED,
                     null, null, null);
-        } catch (Exception e) {
+        } catch (BusinessException | DataAccessException e) {
             log.warn("批量元数据更新失败: itemId={}, comicId={}", itemId, comicId, e);
             managementTaskService.updateItemStatus(itemId, ManagementTaskStatus.FAILED,
                     e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName(),

@@ -1,5 +1,4 @@
 package com.comicatlas.api.importer.event;
-
 import com.comicatlas.api.importer.service.DirectoryScanTaskService;
 import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.event.ComicEvent;
@@ -17,11 +16,22 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @RequiredArgsConstructor
+/**
+ * 目录扫描结果消费者，将 Worker 返回的扫描结果应用到 API 侧目录扫描任务。
+ * <p>成功事件更新候选目录统计，失败事件将任务置为失败；未知事件仅记录并确认，不改变任务状态。</p>
+ */
 public class DirectoryScanEventHandler {
 
     private final DirectoryScanTaskService scanTaskService;
     private final MqConsumerSupport mqConsumerSupport;
 
+    /**
+     * 分发目录扫描完成或失败事件。
+     *
+     * @param event 目录扫描结果事件
+     * @param channel 当前 RabbitMQ 通道
+     * @param tag 当前消息投递标签
+     */
     @RabbitListener(queues = MqQueues.SCAN_RESULT)
     public void handle(ComicEvent event,
                        Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {

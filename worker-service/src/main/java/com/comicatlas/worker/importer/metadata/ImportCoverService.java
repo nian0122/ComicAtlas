@@ -56,7 +56,7 @@ public class ImportCoverService {
         if (Files.exists(coverFile) && !valid(coverFile)) {
             try {
                 Files.deleteIfExists(coverFile);
-            } catch (IOException exception) {
+            } catch (IOException | SecurityException exception) {
                 log.warn("清理空封面失败: comicId={}", comicId, exception);
             }
         }
@@ -89,7 +89,7 @@ public class ImportCoverService {
     private boolean valid(Path coverFile) {
         try {
             return Files.isRegularFile(coverFile) && Files.size(coverFile) > 0;
-        } catch (IOException exception) {
+        } catch (IOException | SecurityException exception) {
             return false;
         }
     }

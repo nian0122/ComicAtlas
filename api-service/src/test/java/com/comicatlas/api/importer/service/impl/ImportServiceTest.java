@@ -161,7 +161,8 @@ class ImportServiceTest {
             Comic c = inv.getArgument(0);
             c.setId(100L);
             return 1;
-        }).doThrow(new RuntimeException("Path not found")).when(comicMapper).insert(any(Comic.class));
+        }).doThrow(new org.springframework.dao.DataAccessResourceFailureException("Path not found"))
+                .when(comicMapper).insert(any(Comic.class));
 
         doAnswer(inv -> {
             ImportTask t = inv.getArgument(0);

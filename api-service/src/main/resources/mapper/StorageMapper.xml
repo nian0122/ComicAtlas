@@ -30,7 +30,9 @@
     </sql>
 
     <select id="selectComicStorageList" resultType="com.comicatlas.api.storage.dto.ComicStorageDTO">
-        SELECT * FROM (
+        SELECT t.comic_id, t.title, t.cover_url, t.chapter_count, t.page_count,
+               t.hq_size, t.lq_size, t.hq_status, t.lq_status, t.media_type
+        FROM (
             SELECT
                 c.id as comic_id,
                 c.title,

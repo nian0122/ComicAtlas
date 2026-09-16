@@ -130,36 +130,36 @@ public class ImportStorageFinalizeHandler {
         }
     }
 
-    private void finalizeStorageLocked(ImportStorageFinalizeRequestedEvent event, FinalizeContext ctx)
+    private void finalizeStorageLocked(ImportStorageFinalizeRequestedEvent event, FinalizeContext finalizeContext)
             throws IOException {
         // 陈旧事件保护：重试已删除旧章节结构，旧 attempt 的最终化事件不得再移动文件
         //（避免把 staging 文件搬入重试后已不存在的孤儿 chapterId 目录，导致新尝试源缺失）
         if (!isChapterStillActive(event.chapterId(), event.comicId())) {
             log.info("最终化陈旧事件跳过（章节已不存在）: taskId={}, comicId={}, chapterId={}",
                     event.taskId(), event.comicId(), event.chapterId());
-            deleteIfEmpty(ctx.sourceDir());
+            deleteIfEmpty(finalizeContext.sourceDir());
             return;
         }
 
         // 2) 读取清单获取预期尺寸；清单缺失说明该任务清单已清理（全部章此前已最终化）
-        ImportManifest manifest = readManifestOrNull(event.taskId(), ctx.mangaRoot());
+        ImportManifest manifest = readManifestOrNull(event.taskId(), finalizeContext.mangaRoot());
         if (manifest == null) {
             // 幂等：清单已清理 → 目标齐全即视为已最终化，静默 ACK 不重复发布 Completed
-            verifyManifestCleared(event, ctx);
+            verifyManifestCleared(event, finalizeContext);
             return;
         }
 
         // 3) 幂等移动：目标存在且尺寸匹配视为已完成，冲突/不完整则失败保留现场
-        moveFilesForChapter(event, ctx, manifest);
+        moveFilesForChapter(event, finalizeContext, manifest);
 
         // 4) 清理空暂存目录
-        deleteIfEmpty(ctx.sourceDir());
+        deleteIfEmpty(finalizeContext.sourceDir());
 
         // 5) 每章独立确认：本章移动/校验成功即发布 Completed（API 按章节累加确认）
-        publishCompleted(event, ctx.moves().size());
+        publishCompleted(event, finalizeContext.moves().size());
 
         // 6) 逐章移除清单条目：清空才删除，否则重写；清理失败延后处理（下次事件可再清理）
-        cleanupManifestAfterChapter(event, ctx.mangaRoot());
+        cleanupManifestAfterChapter(event, finalizeContext.mangaRoot());
     }
 
     /** 读取任务清单；不存在返回 null（该任务清单已清理）。 */
@@ -168,14 +168,14 @@ public class ImportStorageFinalizeHandler {
     }
 
     /** 清单已清理时的幂等校验：所有目标必须齐全，否则视为数据缺失。 */
-    private void verifyManifestCleared(ImportStorageFinalizeRequestedEvent event, FinalizeContext ctx) {
-        for (MediaMove move : ctx.moves()) {
+    private void verifyManifestCleared(ImportStorageFinalizeRequestedEvent event, FinalizeContext finalizeContext) {
+        for (MediaMove move : finalizeContext.moves()) {
             if (!Files.exists(move.target())) {
                 throw new ImportStorageFinalizeException(StorageFinalizeErrorCode.MANIFEST_MISSING,
                         "清单缺失且目标不完整: " + relativeRef(event, move));
             }
         }
-        deleteIfEmpty(ctx.sourceDir());
+        deleteIfEmpty(finalizeContext.sourceDir());
         log.info("清单已清理，章节此前已最终化，幂等跳过: taskId={}, chapterId={}",
                 event.taskId(), event.chapterId());
     }
@@ -185,12 +185,12 @@ public class ImportStorageFinalizeHandler {
      * 源目录与目标目录相同（chapterId == globalOrder 时暂存即最终位置）时无需移动，
      * 文件已在最终位置，仅校验存在与尺寸匹配。
      */
-    private void moveFilesForChapter(ImportStorageFinalizeRequestedEvent event, FinalizeContext ctx,
+    private void moveFilesForChapter(ImportStorageFinalizeRequestedEvent event, FinalizeContext finalizeContext,
                                      ImportManifest manifest) throws IOException {
-        boolean isSameDir = ctx.sourceDir().equals(ctx.targetDir());
+        boolean isSameDir = finalizeContext.sourceDir().equals(finalizeContext.targetDir());
         Map<String, Long> expectedSizes = expectedSizesForChapter(
                 manifest, event.taskId(), event.comicId(), event.globalOrder());
-        for (MediaMove move : ctx.moves()) {
+        for (MediaMove move : finalizeContext.moves()) {
             boolean isSourceExists = Files.exists(move.source());
             boolean isTargetExists = Files.exists(move.target());
             if (isTargetExists) {
@@ -213,7 +213,7 @@ public class ImportStorageFinalizeHandler {
                 throw new ImportStorageFinalizeException(StorageFinalizeErrorCode.SOURCE_MISSING,
                         "源与目标均不存在: " + relativeRef(event, move));
             }
-            moveFile(move, ctx.hqRoot());
+            moveFile(move, finalizeContext.hqRoot());
         }
     }
 
@@ -234,7 +234,7 @@ public class ImportStorageFinalizeHandler {
         }
         try {
             return exportChapterMapper.countByIdAndComicId(chapterId, comicId) > 0;
-        } catch (Exception ex) {
+        } catch (RuntimeException ex) {
             // 只读查询异常：保守跳过移动，避免陈旧事件把文件搬入孤儿目录
             log.warn("章节有效性校验失败，跳过最终化: chapterId={}, comicId={}", chapterId, comicId, ex);
             return false;

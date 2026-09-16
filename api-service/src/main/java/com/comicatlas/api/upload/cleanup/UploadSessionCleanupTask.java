@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.dao.DataAccessException;
 
 /**
  * 上传会话过期清理 — 定期将未完成的 ACTIVE 会话标记 EXPIRED 并清理 STAGING。
@@ -23,7 +24,7 @@ public class UploadSessionCleanupTask {
             if (n > 0) {
                 log.info("上传会话过期清理完成: {}", n);
             }
-        } catch (Exception e) {
+        } catch (DataAccessException e) {
             log.warn("上传会话过期清理失败", e);
         }
     }

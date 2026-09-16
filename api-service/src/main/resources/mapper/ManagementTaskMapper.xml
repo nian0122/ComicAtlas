@@ -2,7 +2,11 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.comicatlas.api.task.persistence.mapper.ManagementTaskMapper">
     <select id="selectPageByCondition" resultType="com.comicatlas.api.task.persistence.entity.ManagementTask">
-        SELECT * FROM management_task
+        SELECT id, task_type, operation, target_type, batch_id, is_batch, status, stage, progress,
+               total_count, success_count, failure_count, cancelled_count, idempotency_key,
+               idempotency_payload_hash, error_message, error_detail, attempt, version,
+               created_at, updated_at, started_at, completed_at
+        FROM management_task
         <where>
             <if test="taskType != null and taskType != ''">AND task_type = #{taskType}</if>
             <if test="status != null and status != ''">AND status = #{status}</if>

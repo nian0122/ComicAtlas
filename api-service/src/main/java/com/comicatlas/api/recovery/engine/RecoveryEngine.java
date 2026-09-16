@@ -15,12 +15,14 @@ import com.comicatlas.api.metadata.service.MetadataUpdateCoordinator;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -118,7 +120,7 @@ public class RecoveryEngine {
                 int chapters = (int) restored.getOrDefault("chapters", 0);
                 int pages = (int) restored.getOrDefault("pages", 0);
                 return new RecoveryProgressVO(totalSoFar + 1, 1, 0, 0, 0, null, chapters, pages);
-            } catch (Exception e) {
+            } catch (IOException | BusinessException e) {
                 log.error("恢复漫画失败: comicId={}", comicId, e);
                 return new RecoveryProgressVO(totalSoFar + 1, 0, 0, 0, 1, e.getMessage(), 0, 0);
             }
@@ -128,7 +130,7 @@ public class RecoveryEngine {
         try {
             createPlaceholder(comicId);
             return new RecoveryProgressVO(totalSoFar + 1, 0, 0, 1, 0, null, 0, 0);
-        } catch (Exception e) {
+        } catch (BusinessException | DataAccessException e) {
             log.error("创建占位漫画失败: comicId={}", comicId, e);
             return new RecoveryProgressVO(totalSoFar + 1, 0, 0, 0, 1, "创建占位失败 - " + e.getMessage(), 0, 0);
         }
@@ -166,7 +168,7 @@ public class RecoveryEngine {
             try {
                 return restoreComicInternal(recoveryPlan.comicData(), recoveryPlan.catalogs(),
                         recoveryPlan.chapters(), recoveryPlan.resolvedMedia(), recoveryPlan.context());
-            } catch (Exception e) {
+            } catch (BusinessException | DataAccessException e) {
                 throw new BusinessException("恢复漫画失败: comicId=" + ctx.comicId(), e);
             }
         });

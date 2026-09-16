@@ -64,8 +64,10 @@ public class MqConsumerSupport {
                             || (failurePolicy == FailurePolicy.ACK_AFTER_CALLBACK && !callbackSucceeded);
                     channel.basicReject(tag, requeue);
                 }
-            } catch (Exception ex) {
+            } catch (java.io.IOException ex) {
                 LOG.warn("消息 ack/reject 失败: tag={}, label={}", tag, label, ex);
+            } catch (RuntimeException ex) {
+                LOG.warn("消息 ack/reject 因客户端运行时异常失败: tag={}, label={}", tag, label, ex);
             }
         }
     }
@@ -76,6 +78,7 @@ public class MqConsumerSupport {
             onFailure.accept(failure);
             return true;
         } catch (Exception e) {
+            // ExceptionHandler 明确允许业务回调抛出任意受检异常；此处是消费边界，必须转为失败结果并保留 cause。
             LOG.error("MQ 失败回调执行异常: {}", label, e);
             return false;
         }

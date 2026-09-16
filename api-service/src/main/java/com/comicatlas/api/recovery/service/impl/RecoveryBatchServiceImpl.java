@@ -15,6 +15,9 @@ import com.comicatlas.common.event.RecoveryScanCompletedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.RedisSystemException;
+import org.springframework.dao.DataAccessException;
+import com.comicatlas.contract.common.exception.BusinessException;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -71,7 +74,7 @@ public class RecoveryBatchServiceImpl implements RecoveryBatchService {
                 }
                 recoveryTaskMapper.updateById(task);
                 updateProgress(item, processed, event.comicIds().size(), event.taskId(), recovered, skipped, placeholder, errors);
-            } catch (RuntimeException exception) {
+            } catch (BusinessException exception) {
                 log.error("恢复漫画失败: taskId={}, comicId={}", event.taskId(), comicId, exception);
                 errors++; processed++; task.setErrorComics(errors);
                 task.setErrorMessage(exception.getMessage()); recoveryTaskMapper.updateById(task);
@@ -114,7 +117,7 @@ public class RecoveryBatchServiceImpl implements RecoveryBatchService {
                 recoveryTaskMapper.updateById(task);
                 syncItem(taskId, ManagementTaskStatus.FAILED, task.getErrorMessage(), RESULT_REF_TYPE, taskId);
             }
-        } catch (RuntimeException updateException) {
+        } catch (DataAccessException updateException) {
             log.error("标记恢复任务失败时出错, taskId={}", taskId, updateException);
         }
     }
@@ -128,11 +131,11 @@ public class RecoveryBatchServiceImpl implements RecoveryBatchService {
 
     private boolean isProcessed(String key) {
         try { return Boolean.TRUE.equals(redisTemplate.hasKey(key)); }
-        catch (RuntimeException exception) { log.warn("幂等标记读取失败: key={}", key, exception); return false; }
+        catch (RedisSystemException exception) { log.warn("幂等标记读取失败: key={}", key, exception); return false; }
     }
 
     private void markProcessed(String key) {
         try { redisTemplate.opsForValue().set(key, "1", IDEMPOTENCY_TTL); }
-        catch (RuntimeException exception) { log.warn("幂等标记写入失败: key={}", key, exception); }
+        catch (RedisSystemException exception) { log.warn("幂等标记写入失败: key={}", key, exception); }
     }
 }

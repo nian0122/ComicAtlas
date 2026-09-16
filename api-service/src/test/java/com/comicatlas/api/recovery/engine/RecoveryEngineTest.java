@@ -177,7 +177,7 @@ class RecoveryEngineTest {
             filesMock.when(() -> Files.exists(any(Path.class))).thenReturn(true);
 
             when(objectMapper.readValue(any(java.io.File.class), any(TypeReference.class)))
-                .thenThrow(new RuntimeException("JSON 解析失败"));
+                .thenThrow(new java.io.IOException("JSON 解析失败"));
 
             RecoveryProgressVO result = recoveryEngine.processComicDir(4L, 0);
 
@@ -201,7 +201,7 @@ class RecoveryEngineTest {
         try (MockedStatic<Files> filesMock = mockStatic(Files.class)) {
             filesMock.when(() -> Files.exists(any(Path.class))).thenReturn(false);
 
-            doThrow(new RuntimeException("DB 写入失败"))
+            doThrow(new org.springframework.dao.DataAccessResourceFailureException("DB 写入失败"))
                 .when(transactionTemplate).executeWithoutResult(any());
 
             RecoveryProgressVO result = recoveryEngine.processComicDir(5L, 3);

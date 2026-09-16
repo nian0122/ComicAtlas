@@ -68,9 +68,9 @@ public class TagManagementServiceImpl implements TagManagementService {
     }
 
     private TagDTO toDTO(Tag tag) {
-        TagDTO dto = new TagDTO();
-        dto.setId(tag.getId());
-        dto.setName(tag.getName());
-        return dto;
+        TagDTO tagData = new TagDTO();
+        tagData.setId(tag.getId());
+        tagData.setName(tag.getName());
+        return tagData;
     }
 }

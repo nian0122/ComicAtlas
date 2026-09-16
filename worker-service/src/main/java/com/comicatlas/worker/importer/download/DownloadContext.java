@@ -55,7 +55,7 @@ public class DownloadContext {
             } catch (Exception ex) {
                 // 回退策略：Archiver 任何非中断失败（IO/超时/解析）都回退 Torrent，
                 // 必须捕获全部非中断异常并记录现场，故在此宽泛捕获
-                log.warn("Archiver failed, fallback to torrent: {}", ex.getMessage());
+                log.warn("Archiver failed, fallback to torrent: {}", ex.getMessage(), ex);
             }
         }
 

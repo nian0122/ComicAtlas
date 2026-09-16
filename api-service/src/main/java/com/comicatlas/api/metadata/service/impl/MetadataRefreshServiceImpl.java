@@ -179,7 +179,7 @@ public class MetadataRefreshServiceImpl implements MetadataRefreshService {
     private MetadataRefreshSnapshotDTO parse(byte[] bytes) {
         try {
             return objectMapper.readValue(bytes, MetadataRefreshSnapshotDTO.class);
-        } catch (Exception e) {
+        } catch (IOException e) {
             throw new BusinessException("快照 JSON 解析失败", e);
         }
     }

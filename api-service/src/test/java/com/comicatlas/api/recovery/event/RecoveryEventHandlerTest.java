@@ -174,7 +174,7 @@ class RecoveryEventHandlerTest {
 
         // 第2个漫画失败（抛出异常）
         when(recoveryEngine.processComicDir(eq(20L), anyInt()))
-                .thenThrow(new RuntimeException("metadata 损坏"));
+                .thenThrow(new com.comicatlas.contract.common.exception.BusinessException(500, "metadata 损坏"));
 
         when(recoveryTaskMapper.updateById(any(RecoveryTask.class))).thenReturn(1);
         doNothing().when(channel).basicAck(anyLong(), eq(false));

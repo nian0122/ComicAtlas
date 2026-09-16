@@ -73,7 +73,7 @@ public class TrashCommandHandler {
             manifestStore.writeActual(actual(manifest, status, message, results));
             publisher.failed(cmd, message);
             log.warn("回收命令失败: {}/{} status={}", targetType, targetId, status);
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             log.error("回收命令异常: {}/{}", targetType, targetId, e);
             publisher.failed(cmd, e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
         }
@@ -104,7 +104,7 @@ public class TrashCommandHandler {
             return new TrashManifestItemDTO.Entry(e.rootKey(), e.sourceRelativePath(),
                     e.trashRelativePath(), TrashManifestItemDTO.Entry.STATE_TRASHED, null);
         } catch (IOException ex) {
-            throw new TrashMoveException("移动失败: " + source + " -> " + target + ": " + ex.getMessage());
+            throw new TrashMoveException("移动失败: " + source + " -> " + target + ": " + ex.getMessage(), ex);
         }
     }
 
@@ -132,7 +132,7 @@ public class TrashCommandHandler {
                 Files.move(src, dst);
                 results.set(i, new TrashManifestItemDTO.Entry(resultEntry.rootKey(), resultEntry.sourceRelativePath(),
                         resultEntry.trashRelativePath(), TrashManifestItemDTO.Entry.STATE_SOURCE, "已回滚"));
-            } catch (Exception e) {
+            } catch (IOException | RuntimeException e) {
                 log.warn("补偿失败: {} -> {}", src, dst, e);
                 allOk = false;
             }
@@ -151,6 +151,10 @@ public class TrashCommandHandler {
     private static final class TrashMoveException extends Exception {
         TrashMoveException(String message) {
             super(message);
+        }
+
+        TrashMoveException(String message, Throwable cause) {
+            super(message, cause);
         }
     }
 }

@@ -68,12 +68,12 @@ public class ManagementComicQueryServiceImpl implements ManagementComicQueryServ
         if (comic == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在");
         }
-        ComicMetadataDTO dto = new ComicMetadataDTO();
-        dto.setTitle(comic.getTitle());
-        dto.setAuthor(comic.getAuthor());
-        dto.setDescription(comic.getDescription());
-        dto.setCategoryId(comic.getCategoryId());
-        return dto;
+        ComicMetadataDTO metadata = new ComicMetadataDTO();
+        metadata.setTitle(comic.getTitle());
+        metadata.setAuthor(comic.getAuthor());
+        metadata.setDescription(comic.getDescription());
+        metadata.setCategoryId(comic.getCategoryId());
+        return metadata;
     }
 
     @Override
@@ -85,21 +85,21 @@ public class ManagementComicQueryServiceImpl implements ManagementComicQueryServ
     }
 
     private ManagementComicListVO toListVO(Comic comic) {
-        ManagementComicListVO vo = new ManagementComicListVO();
-        vo.setId(comic.getId());
-        vo.setTitle(comic.getTitle());
-        vo.setAuthor(comic.getAuthor());
-        vo.setCoverUrl(fileUrlResolver.resolveCover(comic.getId()));
-        vo.setPageCount(comic.getTotalPages());
-        vo.setCategoryId(comic.getCategoryId());
-        vo.setStatus(comic.getStatus());
-        vo.setCreatedAt(comic.getCreatedAt());
+        ManagementComicListVO listView = new ManagementComicListVO();
+        listView.setId(comic.getId());
+        listView.setTitle(comic.getTitle());
+        listView.setAuthor(comic.getAuthor());
+        listView.setCoverUrl(fileUrlResolver.resolveCover(comic.getId()));
+        listView.setPageCount(comic.getTotalPages());
+        listView.setCategoryId(comic.getCategoryId());
+        listView.setStatus(comic.getStatus());
+        listView.setCreatedAt(comic.getCreatedAt());
         if (comic.getCategoryId() != null) {
             Category category = categoryMapper.selectById(comic.getCategoryId());
             if (category != null) {
-                vo.setCategoryName(category.getName());
+                listView.setCategoryName(category.getName());
             }
         }
-        return vo;
+        return listView;
     }
 }

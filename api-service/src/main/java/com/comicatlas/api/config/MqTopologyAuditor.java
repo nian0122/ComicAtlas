@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClientException;
 
 import java.util.Comparator;
 import java.util.List;
@@ -50,8 +51,8 @@ public class MqTopologyAuditor {
         AuditResult result;
         try {
             result = audit();
-        } catch (Exception e) {
-            log.warn("MQ 拓扑对账跳过: Management API 不可用, error={}", e.getMessage());
+        } catch (RestClientException e) {
+            log.warn("MQ 拓扑对账跳过: Management API 不可用, error={}", e.getMessage(), e);
             return;
         }
         result.zombieQueues().forEach(snapshot -> log.warn(
