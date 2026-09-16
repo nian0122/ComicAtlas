@@ -48,12 +48,29 @@
   --el-button-disabled-bg-color: var(--bg-surface);
   --el-button-disabled-border-color: var(--border);
 
+  min-height: 32px;
+  padding: 0 14px;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1;
   border-radius: var(--radius-sm);
   transition:
     background-color var(--transition-fast),
     border-color var(--transition-fast),
     color var(--transition-fast),
     box-shadow var(--transition-fast);
+}
+
+.el-button--small {
+  min-height: 28px;
+  padding: 0 10px;
+  font-size: 11px;
+}
+
+.el-button--large {
+  min-height: 38px;
+  padding: 0 18px;
+  font-size: 13px;
 }
 
 /* Element Plus 默认主题会在 table/empty/button 场景回退到白色；这里统一锁定影院黑场。 */
@@ -114,6 +131,74 @@
     background: var(--accent-hover);
     border-color: var(--accent-hover);
   }
+}
+
+.el-button--primary.is-plain {
+  color: var(--accent);
+  background: transparent;
+  border-color: var(--accent);
+}
+
+.el-button--primary.is-plain:hover:not(:disabled),
+.el-button--primary.is-plain:active:not(:disabled) {
+  color: var(--accent);
+  background: var(--accent-bg);
+  border-color: var(--accent);
+}
+
+.el-button--danger {
+  --el-button-bg-color: var(--danger);
+  --el-button-text-color: var(--color-on-brand);
+  --el-button-border-color: var(--danger);
+  --el-button-hover-bg-color: var(--danger-hover, var(--accent-hover));
+  --el-button-hover-text-color: var(--color-on-brand);
+  --el-button-hover-border-color: var(--danger-hover, var(--accent-hover));
+  --el-button-active-bg-color: var(--danger-hover, var(--accent-hover));
+  --el-button-active-text-color: var(--color-on-brand);
+  --el-button-active-border-color: var(--danger-hover, var(--accent-hover));
+
+  color: var(--color-on-brand);
+  background: var(--danger);
+  border-color: var(--danger);
+}
+
+.el-button--danger:hover:not(:disabled),
+.el-button--danger:active:not(:disabled) {
+  color: var(--color-on-brand);
+  background: var(--danger-hover, var(--accent-hover));
+  border-color: var(--danger-hover, var(--accent-hover));
+}
+
+.el-button--danger.is-plain {
+  color: var(--danger);
+  background: transparent;
+  border-color: var(--danger);
+}
+
+.el-button--danger.is-plain:hover:not(:disabled),
+.el-button--danger.is-plain:active:not(:disabled) {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  border-color: var(--danger);
+}
+
+.el-button--warning {
+  --el-button-bg-color: var(--warning);
+  --el-button-text-color: var(--bg-primary);
+  --el-button-border-color: var(--warning);
+  --el-button-hover-bg-color: var(--warning);
+  --el-button-hover-text-color: var(--bg-primary);
+  --el-button-hover-border-color: var(--warning);
+
+  color: var(--bg-primary);
+  background: var(--warning);
+  border-color: var(--warning);
+}
+
+.el-button--warning.is-plain {
+  color: var(--warning);
+  background: transparent;
+  border-color: var(--warning);
 }
 
 /* 禁用操作必须降级为中性灰，避免没有消息时仍被误认为可执行。 */
