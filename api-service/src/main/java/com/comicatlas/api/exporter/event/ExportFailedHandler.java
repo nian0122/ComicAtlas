@@ -33,6 +33,7 @@ public class ExportFailedHandler {
     private final MqConsumerSupport mqConsumerSupport;
     private final TransactionTemplate transactionTemplate;
 
+    // TODO(LAYER-03): MQ 入口直接改导出表并联动管理任务；下沉导出结果服务，与启动/完成分支统一事务和终态判断，入口保留 ACK/DLQ。
     @RabbitListener(queues = MqQueues.EXPORT_FAILED_RESULT)
     public void handle(ExportTaskFailedEvent event,
             Channel channel, @Header(AmqpHeaders.DELIVERY_TAG) long tag) {

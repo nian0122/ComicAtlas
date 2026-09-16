@@ -82,6 +82,7 @@ public class TaskRetryPublisher {
                 taskId, item.getId(), attempt, operation);
     }
 
+    // TODO(DECOUPLE-10): 通用任务发布器还重置导出表并依赖导入重试实现；按业务注册重试策略，保留专表重置与 Outbox 同事务及 attempt 传播。
     private void publishExportCommand(Long taskId, ManagementTaskItem item, int attempt) {
         if (item.getOperationType() != TaskType.EXPORT) {
             return;
