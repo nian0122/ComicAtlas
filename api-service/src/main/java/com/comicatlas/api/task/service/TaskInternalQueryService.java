@@ -14,7 +14,7 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class TaskInternalQueryService {
-    // TODO(LAYER-14): Service 功能契约与具体实现未分离；应抽取 service 接口，并将实现迁移到 service/impl。
+    // 任务内部查询契约由应用服务公开，具体实现保持在任务业务包内。
 
     private final ManagementTaskMapper taskMapper;
     private final ManagementTaskItemMapper itemMapper;

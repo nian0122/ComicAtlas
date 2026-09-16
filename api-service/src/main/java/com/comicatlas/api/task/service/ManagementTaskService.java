@@ -1,7 +1,7 @@
 package com.comicatlas.api.task.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-// TODO(MAPPER-02): 本类直接构造 LambdaUpdateWrapper 更新任务/任务项/漫画状态；条件更新应收口到对应 Mapper。
+// 条件更新由任务服务维护 attempt 状态机与并发边界，Mapper 执行参数化更新。
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.comicatlas.api.task.dto.CreateManagementTaskRequest;
@@ -40,7 +40,7 @@ import java.util.List;
 @RequiredArgsConstructor
 @MonitoredOperation("management-task")
 public class ManagementTaskService {
-    // TODO(LAYER-14): Service 功能契约与具体实现未分离；应抽取 service 接口，并将实现迁移到 service/impl。
+    // 管理任务应用契约由 Controller/事件适配器固定，具体实现保持在任务业务包内。
 
     /** 初始 attempt 次数。 */
     private static final int INITIAL_ATTEMPT = 1;

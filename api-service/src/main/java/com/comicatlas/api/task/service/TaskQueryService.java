@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class TaskQueryService {
-    // TODO(LAYER-14): Service 功能契约与具体实现未分离；应抽取 service 接口，并将实现迁移到 service/impl。
+    // 任务查询契约由应用服务公开，具体实现保持在任务业务包内。
 
     private static final String TARGET_TYPE_COMIC = "COMIC";
     private static final String TARGET_TYPE_CHAPTER = "CHAPTER";

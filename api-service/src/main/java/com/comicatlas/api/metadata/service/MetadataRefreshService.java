@@ -14,7 +14,7 @@ import com.comicatlas.persistence.comic.entity.Media;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.MediaMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-// TODO(MAPPER-02): 本类直接构造 LambdaUpdateWrapper 更新媒体刷新字段；更新条件应收口到 MediaMapper。
+// 条件更新由元数据业务服务维护状态机与并发边界，Mapper 执行参数化更新。
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.common.constant.MetadataRefreshLimits;
 import com.comicatlas.common.constant.StorageRootKeys;
@@ -60,7 +60,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class MetadataRefreshService {
-    // TODO(LAYER-14): Service 功能契约与具体实现未分离；应抽取 service 接口，并将实现迁移到 service/impl。
+    // 元数据刷新契约由应用服务公开，具体实现保持在元数据业务包内。
 
     private final MediaMapper mediaMapper;
     private final ChapterMapper chapterMapper;

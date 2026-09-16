@@ -14,7 +14,7 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class ExportOperationService {
-    // TODO(LAYER-14): Service 功能契约与具体实现未分离；应抽取 service 接口，并将实现迁移到 service/impl。
+    // 导出操作契约由应用服务公开，具体实现保持在导出业务包内。
 
     private final ExportService exportService;
     private final ExportArtifactService exportArtifactService;

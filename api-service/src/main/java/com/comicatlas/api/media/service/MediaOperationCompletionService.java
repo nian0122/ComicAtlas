@@ -1,7 +1,7 @@
 package com.comicatlas.api.media.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-// TODO(MAPPER-02): 本类直接构造 LambdaUpdateWrapper 应用媒体操作结果；状态更新条件应收口到 MediaMapper。
+// 条件更新由媒体结果服务维护状态机与并发边界，Mapper 执行参数化更新。
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.api.task.service.ManagementTaskService;
 import com.comicatlas.api.storage.service.ComicStatsService;
@@ -35,7 +35,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class MediaOperationCompletionService {
-    // TODO(LAYER-14): Service 功能契约与具体实现未分离；应抽取 service 接口，并将实现迁移到 service/impl。
+    // 媒体结果契约由应用服务公开，具体实现保持在媒体业务包内。
 
     /** 媒体类型：图片（LQ/HQ 删除仅作用于 IMAGE 页，VIDEO 不受影响）。 */
     private static final String MEDIA_TYPE_IMAGE = "IMAGE";

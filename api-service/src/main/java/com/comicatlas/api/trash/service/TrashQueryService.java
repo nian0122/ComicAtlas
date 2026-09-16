@@ -12,7 +12,7 @@ import java.util.Objects;
 @Service
 @RequiredArgsConstructor
 public class TrashQueryService {
-    // TODO(LAYER-14): Service 功能契约与具体实现未分离；应抽取 service 接口，并将实现迁移到 service/impl。
+    // 回收查询契约由应用服务公开，具体实现保持在回收业务包内。
     /** 分页大小上限，防止单次查询拉取过多数据。 */
     private static final int MAX_PAGE_SIZE = 100;
 

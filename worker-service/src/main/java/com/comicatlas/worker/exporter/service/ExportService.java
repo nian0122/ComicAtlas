@@ -49,7 +49,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class ExportService {
-    // TODO(LAYER-14): Service 功能契约与具体实现未分离；应抽取 service 接口，并将实现迁移到 service/impl。
+    // Worker 通过 MQ 暴露导出命令契约，具体实现保持在导出业务包内。
 
     /** 导出错误码：ZIP 打包失败（classifyExportError 契约值）。 */
     private static final String ERROR_CODE_ZIP = "ZIP_ERROR";

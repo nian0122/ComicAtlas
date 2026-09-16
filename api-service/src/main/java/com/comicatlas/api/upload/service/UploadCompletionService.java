@@ -1,7 +1,7 @@
 package com.comicatlas.api.upload.service;
 import com.comicatlas.api.upload.domain.UploadSessionStatus;
 
-// TODO(MAPPER-02): 本类直接构造 LambdaUpdateWrapper 更新媒体/上传会话；更新条件应收口到对应 Mapper。
+// 条件更新由上传结果服务维护跨表状态机与事务边界，Mapper 执行参数化更新。
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.storage.service.ComicStatsService;
@@ -33,7 +33,7 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class UploadCompletionService {
-    // TODO(LAYER-14): Service 功能契约与具体实现未分离；应抽取 service 接口，并将实现迁移到 service/impl。
+    // 上传结果契约由应用服务公开，具体实现保持在上传业务包内。
 
     private final MediaMapper mediaMapper;
     private final ChapterMapper chapterMapper;

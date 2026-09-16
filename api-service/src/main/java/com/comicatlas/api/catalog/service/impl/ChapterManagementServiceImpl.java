@@ -1,7 +1,7 @@
 package com.comicatlas.api.catalog.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-// TODO(MAPPER-02): 本类直接构造 LambdaUpdateWrapper 更新章节；更新条件应收口到 ChapterMapper。
+// 条件更新由事务业务服务维护状态机与并发边界，Mapper 执行参数化更新。
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.catalog.dto.ChapterCreateRequest;

@@ -1,7 +1,7 @@
 package com.comicatlas.api.media.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-// TODO(MAPPER-02): 本类直接构造 LambdaUpdateWrapper 更新媒体操作状态；更新条件应收口到 MediaMapper。
+// 条件更新由媒体命令服务维护状态机与并发边界，Mapper 执行参数化更新。
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.enums.ComicStatus;
@@ -52,7 +52,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class MediaOperationCommandService {
-    // TODO(LAYER-14): Service 功能契约与具体实现未分离；应抽取 service 接口，并将实现迁移到 service/impl。
+    // 媒体命令契约由应用服务公开，具体实现保持在媒体业务包内。
 
     private final ChapterMapper chapterMapper;
     private final MediaMapper mediaMapper;

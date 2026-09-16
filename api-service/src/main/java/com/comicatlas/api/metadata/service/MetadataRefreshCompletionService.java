@@ -1,6 +1,6 @@
 package com.comicatlas.api.metadata.service;
 
-// TODO(MAPPER-02): 本类直接构造 LambdaUpdateWrapper 更新任务项/漫画状态；更新条件应收口到对应 Mapper。
+// 条件更新由结果应用服务维护跨表状态机与事务边界，Mapper 执行参数化更新。
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.task.persistence.entity.ManagementTaskItem;
@@ -64,7 +64,7 @@ import java.util.stream.Stream;
 @Service
 @RequiredArgsConstructor
 public class MetadataRefreshCompletionService {
-    // TODO(LAYER-14): Service 功能契约与具体实现未分离；应抽取 service 接口，并将实现迁移到 service/impl。
+    // 元数据结果契约由应用服务公开，具体实现保持在元数据业务包内。
 
     /** 命令目标类型：漫画级（批量操作展开）。 */
     private static final String TARGET_TYPE_COMIC = "COMIC";

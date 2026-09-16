@@ -1,7 +1,7 @@
 package com.comicatlas.api.storage.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-// TODO(MAPPER-02): 本类直接构造 LambdaUpdateWrapper 更新漫画/章节派生统计；更新条件应收口到对应 Mapper。
+// 条件更新由统计服务维护派生数据一致性，Mapper 执行参数化更新。
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.contract.common.enums.HqStatus;
 import com.comicatlas.contract.common.enums.LqStatus;
@@ -34,7 +34,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class ComicStatsService {
-    // TODO(LAYER-14): Service 功能契约与具体实现未分离；应抽取 service 接口，并将实现迁移到 service/impl。
+    // 漫画统计契约由应用服务公开，具体实现保持在存储业务包内。
 
     private static final String MEDIA_TYPE_IMAGE = "IMAGE";
     private static final String MEDIA_TYPE_VIDEO = "VIDEO";

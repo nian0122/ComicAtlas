@@ -16,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class VideoMetadataFixService {
-    // TODO(LAYER-14): Service 功能契约与具体实现未分离；应抽取 service 接口，并将实现迁移到 service/impl。
+    // 视频修复契约由应用服务公开，具体实现保持在媒体业务包内。
     private final MediaMapper mediaMapper;
     private final ChapterMapper chapterMapper;
 

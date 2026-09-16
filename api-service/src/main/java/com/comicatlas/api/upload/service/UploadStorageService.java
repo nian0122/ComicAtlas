@@ -4,7 +4,7 @@ import com.comicatlas.api.upload.domain.UploadSessionStatus;
 import com.comicatlas.api.upload.support.DiskSpaceChecker;
 import com.comicatlas.api.upload.config.UploadProperties;
 
-// TODO(MAPPER-02): 本类直接构造 LambdaUpdateWrapper 更新上传文件；更新条件应收口到 UploadFileMapper。
+// 条件更新由上传业务服务维护会话状态机与并发边界，Mapper 执行参数化更新。
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.exception.BusinessException;

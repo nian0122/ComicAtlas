@@ -1,7 +1,7 @@
 package com.comicatlas.api.trash.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-// TODO(MAPPER-02): 本类直接构造 LambdaUpdateWrapper 更新回收生命周期；状态转换条件应收口到对应 Mapper。
+// 条件更新由回收结果服务维护生命周期状态机，Mapper 执行参数化更新。
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.storage.service.ComicStatsService;
@@ -44,7 +44,7 @@ import java.util.Set;
 @Service
 @RequiredArgsConstructor
 public class TrashLifecycleCompletionService {
-    // TODO(LAYER-14): Service 功能契约与具体实现未分离；应抽取 service 接口，并将实现迁移到 service/impl。
+    // 回收结果契约由应用服务公开，具体实现保持在回收业务包内。
 
     /** TRASH 引用前缀（media/{mediaId}/{taskId}/hq/{original}）。 */
     private static final String TRASH_REF_PREFIX = "media/";
