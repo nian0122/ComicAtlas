@@ -50,8 +50,6 @@ import com.comicatlas.persistence.comic.entity.Media;
 @RequiredArgsConstructor
 public class RecoveryEngine {
 
-    // TODO(DECOUPLE-03): 恢复引擎同时解释元数据、生成实体并写入多表，还协调缓存/同步，需拆分恢复计划与写入服务。
-
     /** LQ 状态：READY（LQ 文件存在）。 */
     private static final String LQ_STATUS_READY = "READY";
 
@@ -64,6 +62,7 @@ public class RecoveryEngine {
     private final CatalogCacheInvalidator catalogCacheInvalidator;
     private final ApiStorageProperties storageProperties;
     private final RecoveryMediaResolver recoveryMediaResolver;
+    private final RecoveryPlanBuilder recoveryPlanBuilder;
     private final MetadataUpdateCoordinator metadataUpdateCoordinator;
 
     // ======================== 公共 API ========================
@@ -134,17 +133,12 @@ public class RecoveryEngine {
     }
 
     private Map<String, Object> restoreComic(Map<String, Object> metadata, RestoreContext ctx) {
-        // 事务外：结构校验（typed-fail）与文件扫描/存在性读取，事务内不得做任何文件 IO
-        Map<String, Object> comicData = asMap(metadata.get("comic"), "comic");
-        List<Map<String, Object>> catalogsData = asMapList(metadata.get("catalogs"), "catalogs");
-        List<Map<String, Object>> chaptersData = asMapList(metadata.get("chapters"), "chapters");
-        validateIndexes(catalogsData, chaptersData);
-        List<List<ResolvedMediaItem>> resolvedMedia =
-                recoveryMediaResolver.resolveMedia(ctx.comicId(), chaptersData);
+        RecoveryPlanBuilder.RecoveryPlan recoveryPlan = recoveryPlanBuilder.build(metadata, ctx);
 
         Map<String, Object> result = transactionTemplate.execute(status -> {
             try {
-                return restoreComicInternal(comicData, catalogsData, chaptersData, resolvedMedia, ctx);
+                return restoreComicInternal(recoveryPlan.comicData(), recoveryPlan.catalogs(),
+                        recoveryPlan.chapters(), recoveryPlan.resolvedMedia(), recoveryPlan.context());
             } catch (Exception e) {
                 throw new BusinessException("恢复漫画失败: comicId=" + ctx.comicId(), e);
             }
@@ -156,33 +150,6 @@ public class RecoveryEngine {
         return result;
     }
 
-    /**
-     * 事务前校验 parentIndex/catalogIndex 边界，越界必须 typed-fail，不得静默挂根。
-     */
-    private static void validateIndexes(List<Map<String, Object>> catalogsData,
-                                        List<Map<String, Object>> chaptersData) {
-        int catalogCount = catalogsData.size();
-        for (Map<String, Object> catalogData : catalogsData) {
-            Object pi = catalogData.get("parentIndex");
-            if (pi != null) {
-                int parentIdx = ((Number) pi).intValue();
-                if (parentIdx < 0 || parentIdx >= catalogCount) {
-                    throw new IllegalArgumentException("catalog parentIndex 越界: index="
-                            + parentIdx + ", catalogCount=" + catalogCount);
-                }
-            }
-        }
-        for (Map<String, Object> chData : chaptersData) {
-            Object cid = chData.get("catalogIndex");
-            if (cid != null) {
-                int catalogIdx = ((Number) cid).intValue();
-                if (catalogIdx < 0 || catalogIdx >= catalogCount) {
-                    throw new IllegalArgumentException("chapter catalogIndex 越界: index="
-                            + catalogIdx + ", catalogCount=" + catalogCount);
-                }
-            }
-        }
-    }
 
     private Map<String, Object> restoreComicInternal(Map<String, Object> comicData,
                                                      List<Map<String, Object>> catalogsData,
@@ -331,31 +298,4 @@ public class RecoveryEngine {
         return idMap;
     }
 
-    // ======================== metadata 结构解析 ========================
-
-    @SuppressWarnings("unchecked")
-    private static Map<String, Object> asMap(Object value, String field) {
-        if (!(value instanceof Map<?, ?> map)) {
-            throw new IllegalArgumentException("metadata 字段类型非法: " + field);
-        }
-        return (Map<String, Object>) map;
-    }
-
-    @SuppressWarnings("unchecked")
-    private static List<Map<String, Object>> asMapList(Object value, String field) {
-        if (value == null) {
-            return List.of();
-        }
-        if (!(value instanceof List<?> list)) {
-            throw new IllegalArgumentException("metadata 字段类型非法: " + field);
-        }
-        List<Map<String, Object>> result = new ArrayList<>(list.size());
-        for (Object item : list) {
-            if (!(item instanceof Map<?, ?> map)) {
-                throw new IllegalArgumentException("metadata 字段元素类型非法: " + field);
-            }
-            result.add((Map<String, Object>) map);
-        }
-        return result;
-    }
 }
