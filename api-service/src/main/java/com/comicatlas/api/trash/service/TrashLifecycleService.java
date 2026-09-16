@@ -440,11 +440,7 @@ public class TrashLifecycleService {
         List<ManagementTaskItemResponse> items = managementTaskService.getTaskItems(task.getId());
         for (ManagementTaskItemResponse item : items) {
             // 条件更新由回收业务服务维护任务状态机，Mapper 执行参数化更新。
-            // TODO(MAPPER-02): Service 直接构造 LambdaUpdateWrapper 更新任务项；条件更新应收口到 ManagementTaskItemMapper。
-            itemMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ManagementTaskItem>()
-                    .eq(ManagementTaskItem::getId, item.getId())
-                    .set(ManagementTaskItem::getResultRefType, "TRASH_MANIFEST")
-                    .set(ManagementTaskItem::getResultRefId, manifestTaskId));
+            itemMapper.bindTrashManifest(item.getId(), manifestTaskId);
             enqueueCommand(operation, item, targetType, targetId, manifestTaskId);
         }
         log.info("命令已提交: {}/{} taskId={}, manifestTaskId={}", targetType, targetId, task.getId(), manifestTaskId);
