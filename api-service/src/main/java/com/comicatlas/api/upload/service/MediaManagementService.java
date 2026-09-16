@@ -3,6 +3,7 @@ package com.comicatlas.api.upload.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 // 条件更新由媒体管理服务维护状态机与并发边界，Mapper 执行参数化更新。
 // 架构说明：Service 直接构造 LambdaUpdateWrapper 更新媒体排序/状态；条件更新应收口到 MediaMapper。
+// TODO(MAPPER-02): Service 直接构造 LambdaUpdateWrapper 更新媒体排序/状态；条件更新应收口到 MediaMapper。
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.exception.BusinessException;
@@ -31,6 +32,7 @@ import java.util.Set;
  */
 @Slf4j
 @Service
+// TODO(LAYER-14): 具体 Service 实现位于 service 包，未与 Service 接口及 service/impl 实现分离。
 @RequiredArgsConstructor
 public class MediaManagementService {
     // 媒体管理契约由应用服务公开，具体实现保持在上传业务包内。

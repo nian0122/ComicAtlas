@@ -25,6 +25,7 @@ import java.util.Map;
 
 /** 管理域目录与媒体查询，避免管理端调用阅读器接口。 */
 @Service
+// TODO(LAYER-14): 具体 Service 实现位于 service 包，未与 Service 接口及 service/impl 实现分离。
 @RequiredArgsConstructor
 public class ManagementStructureQueryService {
     // 查询契约由 Controller/DTO 固定，服务实现保持在业务包内。

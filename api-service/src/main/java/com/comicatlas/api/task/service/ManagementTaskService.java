@@ -3,6 +3,7 @@ package com.comicatlas.api.task.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 // 条件更新由任务服务维护 attempt 状态机与并发边界，Mapper 执行参数化更新。
 // 架构说明：Service 直接构造 LambdaUpdateWrapper 更新任务/任务项/漫画状态；条件更新应收口到对应 Mapper。
+// TODO(MAPPER-02): Service 直接构造 LambdaUpdateWrapper 更新任务/任务项/漫画状态；条件更新应收口到对应 Mapper。
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.comicatlas.api.task.dto.CreateManagementTaskRequest;
@@ -38,6 +39,7 @@ import java.util.List;
  */
 @Slf4j
 @Service
+// TODO(LAYER-14): 具体 Service 实现位于 service 包，未与 Service 接口及 service/impl 实现分离。
 @RequiredArgsConstructor
 @MonitoredOperation("management-task")
 public class ManagementTaskService {

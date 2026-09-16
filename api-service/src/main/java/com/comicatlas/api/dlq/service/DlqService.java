@@ -15,6 +15,7 @@ import java.util.Map;
 import static java.util.Map.entry;
 
 @Service
+// TODO(LAYER-14): 具体 Service 实现位于 service 包，未与 Service 接口及 service/impl 实现分离。
 @RequiredArgsConstructor
 public class DlqService {
     // DLQ 应用契约由 Controller/DTO 固定，服务实现保持在业务包内。

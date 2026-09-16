@@ -3,6 +3,7 @@ package com.comicatlas.api.storage.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 // 条件更新由统计服务维护派生数据一致性，Mapper 执行参数化更新。
 // 架构说明：Service 直接构造 LambdaUpdateWrapper 更新派生统计；条件更新应收口到对应 Mapper。
+// TODO(MAPPER-02): Service 直接构造 LambdaUpdateWrapper 更新派生统计；条件更新应收口到对应 Mapper。
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.contract.common.enums.HqStatus;
 import com.comicatlas.contract.common.enums.LqStatus;
@@ -33,6 +34,7 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Service
+// TODO(LAYER-14): 具体 Service 实现位于 service 包，未与 Service 接口及 service/impl 实现分离。
 @RequiredArgsConstructor
 public class ComicStatsService {
     // 漫画统计契约由应用服务公开，具体实现保持在存储业务包内。

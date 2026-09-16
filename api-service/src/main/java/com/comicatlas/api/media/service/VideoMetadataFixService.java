@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 /** 视频元数据修复结果应用服务。 */
 @Slf4j
 @Service
+// TODO(LAYER-14): 具体 Service 实现位于 service 包，未与 Service 接口及 service/impl 实现分离。
 @RequiredArgsConstructor
 public class VideoMetadataFixService {
     // 视频修复契约由应用服务公开，具体实现保持在媒体业务包内。

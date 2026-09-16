@@ -58,6 +58,7 @@ import java.util.UUID;
  */
 @Slf4j
 @Service
+// TODO(LAYER-14): 具体 Service 实现位于 service 包，未与 Service 接口及 service/impl 实现分离。
 @RequiredArgsConstructor
 public class TrashLifecycleService {
     // 回收生命周期契约由应用服务公开，具体实现保持在回收业务包内。
@@ -439,7 +440,7 @@ public class TrashLifecycleService {
         List<ManagementTaskItemResponse> items = managementTaskService.getTaskItems(task.getId());
         for (ManagementTaskItemResponse item : items) {
             // 条件更新由回收业务服务维护任务状态机，Mapper 执行参数化更新。
-            // 架构说明：Service 直接构造 LambdaUpdateWrapper 更新任务项；条件更新应收口到 ManagementTaskItemMapper。
+            // TODO(MAPPER-02): Service 直接构造 LambdaUpdateWrapper 更新任务项；条件更新应收口到 ManagementTaskItemMapper。
             itemMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ManagementTaskItem>()
                     .eq(ManagementTaskItem::getId, item.getId())
                     .set(ManagementTaskItem::getResultRefType, "TRASH_MANIFEST")

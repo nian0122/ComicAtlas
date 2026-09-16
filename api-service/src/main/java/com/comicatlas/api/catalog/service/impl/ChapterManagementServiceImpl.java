@@ -3,6 +3,7 @@ package com.comicatlas.api.catalog.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 // 条件更新由事务业务服务维护状态机与并发边界，Mapper 执行参数化更新。
 // 架构说明：ServiceImpl 直接构造 LambdaUpdateWrapper 更新章节；条件更新应收口到 ChapterMapper。
+// TODO(MAPPER-02): ServiceImpl 直接构造 LambdaUpdateWrapper 更新章节；条件更新应收口到 ChapterMapper。
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.catalog.dto.ChapterCreateRequest;
@@ -45,6 +46,7 @@ import java.util.Objects;
  */
 @Slf4j
 @Service
+// TODO(LAYER-14): 具体 Service 实现位于 service 包，未与 Service 接口及 service/impl 实现分离。
 @RequiredArgsConstructor
 public class ChapterManagementServiceImpl implements ChapterManagementService {
 

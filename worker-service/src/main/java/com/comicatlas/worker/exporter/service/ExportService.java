@@ -47,6 +47,7 @@ import java.util.stream.Collectors;
 /** 导出编排：收集 → 构建清单 → 打包 ZIP → 原子发布任务目录。 */
 @Slf4j
 @Service
+// TODO(LAYER-14): 具体 Service 实现位于 service 包，未与 Service 接口及 service/impl 实现分离。
 @RequiredArgsConstructor
 public class ExportService {
     // Worker 通过 MQ 暴露导出命令契约，具体实现保持在导出业务包内。

@@ -23,6 +23,7 @@ import java.util.EnumSet;
 /** 恢复批次业务编排：执行逐本恢复、累计进度并维护恢复任务生命周期。 */
 @Slf4j
 @Service
+// TODO(LAYER-14): 具体 Service 实现位于 service 包，未与 Service 接口及 service/impl 实现分离。
 @RequiredArgsConstructor
 public class RecoveryBatchService {
     private static final String EVENT_KEY_PREFIX = "mq:event:";

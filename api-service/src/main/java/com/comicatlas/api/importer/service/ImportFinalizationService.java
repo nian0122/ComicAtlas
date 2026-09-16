@@ -39,6 +39,7 @@ import java.util.Set;
 /** 导入存储最终化结果应用服务，维护章节及漫画的最终状态。 */
 @Slf4j
 @Service
+// TODO(LAYER-14): 具体 Service 实现位于 service 包，未与 Service 接口及 service/impl 实现分离。
 @RequiredArgsConstructor
 public class ImportFinalizationService {
     private static final String TARGET_TYPE_COMIC = "COMIC";

@@ -12,6 +12,7 @@ import java.util.List;
  * 导出操作服务（存储操作域）。委托 ExportService 与 ExportArtifactService，端点归位到 /api/storage/export。
  */
 @Service
+// TODO(LAYER-14): 具体 Service 实现位于 service 包，未与 Service 接口及 service/impl 实现分离。
 @RequiredArgsConstructor
 public class ExportOperationService {
     // 导出操作契约由应用服务公开，具体实现保持在导出业务包内。

@@ -19,6 +19,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 /** 管理命令结果应用服务，负责 Inbox 幂等、事务和领域结果路由。 */
 @Slf4j
 @Service
+// TODO(LAYER-14): 具体 Service 实现位于 service 包，未与 Service 接口及 service/impl 实现分离。
 @RequiredArgsConstructor
 public class ManagementResultApplicationService {
     private static final int MAX_ITEM_ERROR_MESSAGE_CHARS = 4000;
