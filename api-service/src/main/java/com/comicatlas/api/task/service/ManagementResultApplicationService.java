@@ -50,44 +50,72 @@ public class ManagementResultApplicationService {
         if (event instanceof ManagementCommandCompletedEvent completed) {
             ManagementTaskItemResponse item = managementTaskService.updateItemStatus(completed.itemId(),
                     ManagementTaskStatus.SUCCEEDED, null, null, null, completed.attempt());
-            if (item.getStatus() == ManagementTaskStatus.SUCCEEDED) managementResultRouter.routeCompleted(completed);
+            if (item.getStatus() == ManagementTaskStatus.SUCCEEDED) {
+                managementResultRouter.routeCompleted(completed);
+            }
         } else if (event instanceof ManagementCommandFailedEvent failed) {
             ManagementTaskItemResponse item = managementTaskService.updateItemStatus(failed.itemId(),
                     ManagementTaskStatus.FAILED, truncate(failed.errorMessage()), null, null, failed.attempt());
-            if (item.getStatus() == ManagementTaskStatus.FAILED) managementResultRouter.routeFailed(failed);
+            if (item.getStatus() == ManagementTaskStatus.FAILED) {
+                managementResultRouter.routeFailed(failed);
+            }
         } else if (event instanceof ManagementCommandProgressEvent progress) {
             if (managementTaskService.updateItemProgress(progress.itemId(), progress.attempt(),
-                    progress.progress(), progress.stage())) managementResultRouter.routeProgress(progress);
+                    progress.progress(), progress.stage())) {
+                managementResultRouter.routeProgress(progress);
+            }
         } else if (event instanceof MediaUploadCompletedEvent upload) {
             ManagementTaskItemResponse item = managementTaskService.updateItemStatus(upload.itemId(),
                     ManagementTaskStatus.SUCCEEDED, null, null, null, upload.attempt());
-            if (item.getStatus() == ManagementTaskStatus.SUCCEEDED) managementResultRouter.routeUploadCompleted(upload);
+            if (item.getStatus() == ManagementTaskStatus.SUCCEEDED) {
+                managementResultRouter.routeUploadCompleted(upload);
+            }
         }
     }
 
     private Long taskId(ComicEvent event) {
-        if (event instanceof ManagementCommandCompletedEvent value) return value.taskId();
-        if (event instanceof ManagementCommandFailedEvent value) return value.taskId();
-        if (event instanceof ManagementCommandProgressEvent value) return value.taskId();
+        if (event instanceof ManagementCommandCompletedEvent value) {
+            return value.taskId();
+        }
+        if (event instanceof ManagementCommandFailedEvent value) {
+            return value.taskId();
+        }
+        if (event instanceof ManagementCommandProgressEvent value) {
+            return value.taskId();
+        }
         return ((MediaUploadCompletedEvent) event).taskId();
     }
 
     private Long itemId(ComicEvent event) {
-        if (event instanceof ManagementCommandCompletedEvent value) return value.itemId();
-        if (event instanceof ManagementCommandFailedEvent value) return value.itemId();
-        if (event instanceof ManagementCommandProgressEvent value) return value.itemId();
+        if (event instanceof ManagementCommandCompletedEvent value) {
+            return value.itemId();
+        }
+        if (event instanceof ManagementCommandFailedEvent value) {
+            return value.itemId();
+        }
+        if (event instanceof ManagementCommandProgressEvent value) {
+            return value.itemId();
+        }
         return ((MediaUploadCompletedEvent) event).itemId();
     }
 
     private int attempt(ComicEvent event) {
-        if (event instanceof ManagementCommandCompletedEvent value) return value.attempt();
-        if (event instanceof ManagementCommandFailedEvent value) return value.attempt();
-        if (event instanceof ManagementCommandProgressEvent value) return value.attempt();
+        if (event instanceof ManagementCommandCompletedEvent value) {
+            return value.attempt();
+        }
+        if (event instanceof ManagementCommandFailedEvent value) {
+            return value.attempt();
+        }
+        if (event instanceof ManagementCommandProgressEvent value) {
+            return value.attempt();
+        }
         return ((MediaUploadCompletedEvent) event).attempt();
     }
 
     private static String truncate(String errorMessage) {
-        if (errorMessage == null || errorMessage.length() <= MAX_ITEM_ERROR_MESSAGE_CHARS) return errorMessage;
+        if (errorMessage == null || errorMessage.length() <= MAX_ITEM_ERROR_MESSAGE_CHARS) {
+            return errorMessage;
+        }
         return errorMessage.substring(0, MAX_ITEM_ERROR_MESSAGE_CHARS) + "...（已截断）";
     }
 }

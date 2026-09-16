@@ -67,6 +67,9 @@ class ManagementTaskServiceTest {
     @Mock private TaskInternalQueryService taskInternalQueryService;
     @Spy
     @InjectMocks
+    private MetadataRefreshTaskPolicy metadataRefreshTaskPolicy;
+    @Spy
+    @InjectMocks
     private TaskAggregationService taskAggregationService;
 
     @InjectMocks
@@ -85,6 +88,7 @@ class ManagementTaskServiceTest {
     @BeforeEach
     void injectAggregationService() {
         ReflectionTestUtils.setField(service, "taskAggregationService", taskAggregationService);
+        ReflectionTestUtils.setField(service, "metadataRefreshTaskPolicy", metadataRefreshTaskPolicy);
     }
 
     @Test
@@ -213,6 +217,7 @@ class ManagementTaskServiceTest {
         failedItem.setStatus(ManagementTaskStatus.FAILED);
         failedItem.setErrorMessage("转码失败: ffmpeg 超时");
         when(itemMapper.selectList(any())).thenReturn(List.of(failedItem));
+        when(itemMapper.update(any(), any())).thenReturn(1);
 
         service.updateItemStatus(3L, ManagementTaskStatus.FAILED, "转码失败: ffmpeg 超时", null, null, 1);
 
@@ -242,6 +247,7 @@ class ManagementTaskServiceTest {
         succeededItem.setTaskId(302L);
         succeededItem.setStatus(ManagementTaskStatus.SUCCEEDED);
         when(itemMapper.selectList(any())).thenReturn(List.of(succeededItem));
+        when(itemMapper.update(any(), any())).thenReturn(1);
 
         service.updateItemStatus(4L, ManagementTaskStatus.SUCCEEDED, null, null, null, 1);
 

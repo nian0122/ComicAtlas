@@ -35,7 +35,9 @@ public class RecoveryPlanBuilder {
     }
 
     private static void validateIndex(Object value, int count, String field) {
-        if (value == null) return;
+        if (value == null) {
+            return;
+        }
         int index = ((Number) value).intValue();
         if (index < 0 || index >= count) {
             throw new BusinessException(field + " 越界: index=" + index + ", catalogCount=" + count);
@@ -44,17 +46,25 @@ public class RecoveryPlanBuilder {
 
     @SuppressWarnings("unchecked")
     private static Map<String, Object> asMap(Object value, String field) {
-        if (!(value instanceof Map<?, ?> map)) throw new BusinessException("metadata 字段类型非法: " + field);
+        if (!(value instanceof Map<?, ?> map)) {
+            throw new BusinessException("metadata 字段类型非法: " + field);
+        }
         return (Map<String, Object>) map;
     }
 
     @SuppressWarnings("unchecked")
     private static List<Map<String, Object>> asMapList(Object value, String field) {
-        if (value == null) return List.of();
-        if (!(value instanceof List<?> list)) throw new BusinessException("metadata 字段类型非法: " + field);
+        if (value == null) {
+            return List.of();
+        }
+        if (!(value instanceof List<?> list)) {
+            throw new BusinessException("metadata 字段类型非法: " + field);
+        }
         java.util.ArrayList<Map<String, Object>> result = new java.util.ArrayList<>(list.size());
         for (Object item : list) {
-            if (!(item instanceof Map<?, ?> map)) throw new BusinessException("metadata 字段元素类型非法: " + field);
+            if (!(item instanceof Map<?, ?> map)) {
+                throw new BusinessException("metadata 字段元素类型非法: " + field);
+            }
             result.add((Map<String, Object>) map);
         }
         return result;

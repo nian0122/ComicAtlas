@@ -2,6 +2,7 @@ package com.comicatlas.api.trash.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 // 条件更新由回收结果服务维护生命周期状态机，Mapper 执行参数化更新。
+// 架构说明：Service 直接构造 LambdaUpdateWrapper 更新回收生命周期；状态更新应收口到对应 Mapper。
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.storage.service.ComicStatsService;

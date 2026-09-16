@@ -6,7 +6,6 @@ import com.comicatlas.api.importer.persistence.entity.ImportTask;
 import com.comicatlas.api.importer.persistence.mapper.ImportTaskMapper;
 import com.comicatlas.api.importer.service.ImportRetryCoordinator;
 import com.comicatlas.api.task.persistence.entity.ManagementTaskItem;
-import com.comicatlas.api.task.enums.TaskType;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.exception.BusinessException;
 import lombok.RequiredArgsConstructor;

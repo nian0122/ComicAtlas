@@ -15,6 +15,7 @@ import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.MediaMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 // 条件更新由元数据业务服务维护状态机与并发边界，Mapper 执行参数化更新。
+// 架构说明：Service 直接构造 LambdaUpdateWrapper 更新媒体刷新字段；条件更新应收口到 MediaMapper。
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.common.constant.MetadataRefreshLimits;
 import com.comicatlas.common.constant.StorageRootKeys;

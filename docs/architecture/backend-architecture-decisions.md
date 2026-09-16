@@ -37,20 +37,20 @@ Mapper 是数据库访问的唯一边界。Mapper 接口统一位于 `persistenc
 
 ### LambdaWrapper 迁移规则
 
-ServiceImpl 中直接使用 `LambdaQueryWrapper` 或 `LambdaUpdateWrapper` 访问 Mapper 的代码视为待整改项，必须标注 `TODO(MAPPER-02)`。
+ServiceImpl 中直接使用 `LambdaQueryWrapper` 或 `LambdaUpdateWrapper` 访问 Mapper 的代码视为待整改项，必须记录对应的 MAPPER-02 编号。
 
 - 简单单表查询可在后续整理时迁移到 Mapper 查询方法。
 - 条件更新、批量更新、CAS 更新、状态流转和跨表删除必须优先迁移到具名 Mapper 方法。
 - Mapper 方法可以在接口上使用 MyBatis-Plus 条件参数、注解 SQL 或 XML 实现；调用方不应感知 SQL 细节。
 - 迁移时必须保留原有事务边界、乐观锁、受影响行数检查和状态转换语义。
 
-`@Mapper` 和 `@MapperScan` 只是 Bean 注册机制，不因 SQL 使用 Lambda 而删除；其扫描范围另以 `TODO(MAPPER-01)` 跟踪评估。
+`@Mapper` 和 `@MapperScan` 只是 Bean 注册机制，不因 SQL 使用 Lambda 而删除；其扫描范围另以 MAPPER-01 编号跟踪评估。
 
 ## 现有整改标记
 
-- `TODO(LAYER-14)`：Service 功能接口与具体实现尚未分离。
-- `TODO(MAPPER-01)`：Mapper Bean 扫描范围待统一评估。
-- `TODO(MAPPER-02)`：ServiceImpl/Service 中直接构造 Lambda 更新条件，待迁移到 Mapper。
-- `TODO(LAYER-05/06)`：MQ 入口仍包含导入/恢复业务编排或持久化。
+- `LAYER-14`：Service 功能接口与具体实现尚未分离。
+- `MAPPER-01`：Mapper Bean 扫描范围待统一评估。
+- `MAPPER-02`：ServiceImpl/Service 中直接构造 Lambda 更新条件，待迁移到 Mapper。
+- `LAYER-05/06`：MQ 入口仍包含导入/恢复业务编排或持久化。
 
-新增或修改后端代码必须遵守上述分层；完成整改后删除对应 TODO，并补充对应模块测试、Checkstyle 和 `git diff --check` 验证记录。
+新增或修改后端代码必须遵守上述分层；完成整改后删除对应待办标记，并补充对应模块测试、Checkstyle 和 `git diff --check` 验证记录。

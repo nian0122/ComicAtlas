@@ -40,7 +40,9 @@ public class RecoveryBatchService {
 
     public void processScanCompleted(RecoveryScanCompletedEvent event) {
         String key = EVENT_KEY_PREFIX + event.eventId();
-        if (isProcessed(key)) return;
+        if (isProcessed(key)) {
+            return;
+        }
         RecoveryTask task = recoveryTaskMapper.selectById(event.taskId());
         if (task == null || TERMINAL_STATUSES.contains(task.getStatus())) {
             markProcessed(key);
@@ -63,7 +65,9 @@ public class RecoveryBatchService {
                 errors += progress.errorComics();
                 task.setRecoveredComics(recovered); task.setSkippedComics(skipped);
                 task.setPlaceholderComics(placeholder); task.setErrorComics(errors);
-                if (progress.lastError() != null) task.setErrorMessage(progress.lastError());
+                if (progress.lastError() != null) {
+                    task.setErrorMessage(progress.lastError());
+                }
                 recoveryTaskMapper.updateById(task);
                 updateProgress(item, processed, event.comicIds().size(), event.taskId(), recovered, skipped, placeholder, errors);
             } catch (RuntimeException exception) {
@@ -89,7 +93,9 @@ public class RecoveryBatchService {
 
     public void processFailed(RecoveryFailedEvent event) {
         String key = EVENT_KEY_PREFIX + event.eventId();
-        if (isProcessed(key)) return;
+        if (isProcessed(key)) {
+            return;
+        }
         RecoveryTask task = recoveryTaskMapper.selectById(event.taskId());
         if (task == null || TERMINAL_STATUSES.contains(task.getStatus())) { markProcessed(key); return; }
         task.setStatus(RecoveryTaskStatus.FAILED); task.setEndedAt(LocalDateTime.now());

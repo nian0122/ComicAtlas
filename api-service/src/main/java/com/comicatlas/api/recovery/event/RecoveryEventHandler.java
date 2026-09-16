@@ -11,20 +11,26 @@ import com.comicatlas.common.event.RecoveryFailedEvent;
 import com.comicatlas.common.event.RecoveryScanCompletedEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
 import com.rabbitmq.client.Channel;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.support.AmqpHeaders;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
 /** 恢复结果消息适配器，仅负责事件分派和消费策略。 */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class RecoveryEventHandler {
     private final RecoveryBatchService recoveryBatchService;
     private final MqConsumerSupport mqConsumerSupport;
+
+    @Autowired
+    public RecoveryEventHandler(RecoveryBatchService recoveryBatchService,
+            MqConsumerSupport mqConsumerSupport) {
+        this.recoveryBatchService = recoveryBatchService;
+        this.mqConsumerSupport = mqConsumerSupport;
+    }
 
     /** 兼容历史单元测试构造器，旧依赖组装为新的批次服务。 */
     public RecoveryEventHandler(RecoveryEngine recoveryEngine, RecoveryTaskMapper recoveryTaskMapper,

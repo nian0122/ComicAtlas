@@ -7,6 +7,7 @@ import com.comicatlas.api.shared.crypto.DigestService;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 // 条件更新由上传业务服务维护会话状态机与事务边界，Mapper 执行参数化更新。
+// 架构说明：Service 直接构造 LambdaUpdateWrapper 更新上传会话/文件；条件更新应收口到对应 Mapper。
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.api.task.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.task.dto.ManagementTaskItemResponse;

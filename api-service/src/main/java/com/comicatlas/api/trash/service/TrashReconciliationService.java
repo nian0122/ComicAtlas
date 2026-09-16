@@ -2,9 +2,9 @@ package com.comicatlas.api.trash.service;
 
 import com.comicatlas.api.storage.ApiStorageProperties;
 import com.comicatlas.api.storage.ApiStorageRoot;
-import com.comicatlas.common.dto.TrashManifestDTO;
 import com.comicatlas.common.dto.TrashManifestItemDTO;
 import com.comicatlas.api.trash.dto.TrashReconcileReport;
+import com.comicatlas.common.dto.TrashManifestDTO;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.entity.Media;
@@ -40,13 +40,15 @@ public class TrashReconciliationService {
         TrashManifestDTO manifest = taskId == null ? null : trashManifestService.readManifest(targetType, targetId, taskId);
         TrashManifestItemDTO actual = taskId == null ? null : trashManifestService.readActual(targetType, targetId, taskId);
         List<TrashReconcileReport.EntryReport> entries = new ArrayList<>();
-        if (manifest != null) for (TrashManifestDTO.Entry entry : manifest.entries()) {
+        if (manifest != null) {
+            for (TrashManifestDTO.Entry entry : manifest.entries()) {
             boolean sourceExists = existsInRoot(entry.rootKey(), entry.sourceRelativePath());
             boolean trashExists = existsInTrash(targetType, targetId, taskId, entry.trashRelativePath());
             String state = trashExists ? (sourceExists ? "BOTH" : "IN_TRASH")
                     : (sourceExists ? "AT_SOURCE" : "MISSING");
             entries.add(new TrashReconcileReport.EntryReport(entry.rootKey(), entry.sourceRelativePath(),
                     sourceExists, trashExists, state));
+            }
         }
         boolean conflict = entries.stream().anyMatch(entry -> "BOTH".equals(entry.state()));
         boolean consistent = !conflict && isConsistent(dbStatus, actual);
@@ -58,14 +60,20 @@ public class TrashReconciliationService {
     public TrashReconcileReport reconcileAndRepair(String targetType, Long targetId, Long taskId) {
         TrashManifestItemDTO actual = taskId == null ? null : trashManifestService.readActual(targetType, targetId, taskId);
         if (actual != null && "TRASHING".equals(resolveDbStatus(targetType, targetId))) {
-            if (TrashManifestItemDTO.STATUS_TRASHED.equals(actual.status())) markTrashed(targetType, targetId);
-            if (TrashManifestItemDTO.STATUS_COMPENSATED.equals(actual.status())) markReady(targetType, targetId);
+            if (TrashManifestItemDTO.STATUS_TRASHED.equals(actual.status())) {
+                markTrashed(targetType, targetId);
+            }
+            if (TrashManifestItemDTO.STATUS_COMPENSATED.equals(actual.status())) {
+                markReady(targetType, targetId);
+            }
         }
         return reconcile(targetType, targetId, taskId);
     }
 
     private boolean isConsistent(String dbStatus, TrashManifestItemDTO actual) {
-        if (actual == null) return "TRASHING".equals(dbStatus);
+        if (actual == null) {
+            return "TRASHING".equals(dbStatus);
+        }
         return switch (actual.status()) {
             case TrashManifestItemDTO.STATUS_TRASHED, TrashManifestItemDTO.STATUS_PURGED ->
                     "TRASHED".equals(dbStatus) || "PURGING".equals(dbStatus);

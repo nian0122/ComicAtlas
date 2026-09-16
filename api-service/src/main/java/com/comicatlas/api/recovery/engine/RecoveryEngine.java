@@ -15,14 +15,13 @@ import com.comicatlas.api.storage.ApiStorageProperties;
 import com.comicatlas.api.metadata.service.MetadataUpdateCoordinator;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,7 +46,6 @@ import com.comicatlas.persistence.comic.entity.Media;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class RecoveryEngine {
 
     /** LQ 状态：READY（LQ 文件存在）。 */
@@ -64,6 +62,25 @@ public class RecoveryEngine {
     private final RecoveryMediaResolver recoveryMediaResolver;
     private final RecoveryPlanBuilder recoveryPlanBuilder;
     private final MetadataUpdateCoordinator metadataUpdateCoordinator;
+
+    @Autowired
+    public RecoveryEngine(ObjectMapper objectMapper, ComicMapper comicMapper,
+            CatalogMapper catalogMapper, ChapterMapper chapterMapper, MediaMapper mediaMapper,
+            TransactionTemplate transactionTemplate, CatalogCacheInvalidator catalogCacheInvalidator,
+            ApiStorageProperties storageProperties, RecoveryMediaResolver recoveryMediaResolver,
+            RecoveryPlanBuilder recoveryPlanBuilder, MetadataUpdateCoordinator metadataUpdateCoordinator) {
+        this.objectMapper = objectMapper;
+        this.comicMapper = comicMapper;
+        this.catalogMapper = catalogMapper;
+        this.chapterMapper = chapterMapper;
+        this.mediaMapper = mediaMapper;
+        this.transactionTemplate = transactionTemplate;
+        this.catalogCacheInvalidator = catalogCacheInvalidator;
+        this.storageProperties = storageProperties;
+        this.recoveryMediaResolver = recoveryMediaResolver;
+        this.recoveryPlanBuilder = recoveryPlanBuilder;
+        this.metadataUpdateCoordinator = metadataUpdateCoordinator;
+    }
 
     /** 兼容历史单元测试构造器，恢复计划由当前媒体解析器构建。 */
     public RecoveryEngine(ObjectMapper objectMapper, ComicMapper comicMapper,

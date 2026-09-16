@@ -7,8 +7,8 @@ import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Media;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.MediaMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,11 +17,18 @@ import java.util.List;
 /** HQ 媒体登记应用服务：查询快照上下文、提交规划后的媒体实体。 */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class HqMediaRegistrationService {
     private final MediaMapper mediaMapper;
     private final ChapterMapper chapterMapper;
     private final HqMediaRegistrationPlanner registrationPlanner;
+
+    @Autowired
+    public HqMediaRegistrationService(MediaMapper mediaMapper, ChapterMapper chapterMapper,
+            HqMediaRegistrationPlanner registrationPlanner) {
+        this.mediaMapper = mediaMapper;
+        this.chapterMapper = chapterMapper;
+        this.registrationPlanner = registrationPlanner;
+    }
 
     /** 兼容历史单元测试构造器，登记规则使用无状态规划器。 */
     public HqMediaRegistrationService(MediaMapper mediaMapper, ChapterMapper chapterMapper) {
@@ -38,7 +45,9 @@ public class HqMediaRegistrationService {
                 new LambdaQueryWrapper<Media>().in(Media::getChapterId, chapterIds));
         HqMediaRegistrationPlanner.RegistrationPlan plan = registrationPlanner.plan(
                 snapshot, chapters, databaseMedia);
-        for (List<Media> batch : partition(plan.media(), 500)) mediaMapper.insertImportBatch(batch);
+        for (List<Media> batch : partition(plan.media(), 500)) {
+            mediaMapper.insertImportBatch(batch);
+        }
         log.info("HQ 媒体登记完成: comicId={}, inserted={}, skippedExisting={}, skippedInvalid={}",
                 snapshot.comicId(), plan.media().size(), plan.skippedExisting(), plan.skippedInvalid());
         return new HqMediaRegistrationResult(snapshot.comicId(), plan.media().size(),

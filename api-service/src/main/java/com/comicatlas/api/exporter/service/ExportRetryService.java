@@ -1,6 +1,7 @@
 package com.comicatlas.api.exporter.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+// 架构说明：Service 直接构造 LambdaUpdateWrapper 重置导出任务；条件更新应收口到 ExportTaskMapper。
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.api.exporter.enums.ExportTaskStatus;
 import com.comicatlas.api.exporter.persistence.entity.ExportTask;

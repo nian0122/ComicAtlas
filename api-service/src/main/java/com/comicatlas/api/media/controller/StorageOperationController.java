@@ -8,10 +8,9 @@ import com.comicatlas.api.media.service.HqDeleteOperationService;
 import com.comicatlas.api.media.service.LqOperationService;
 import com.comicatlas.api.media.service.TranscodeOperationService;
 import com.comicatlas.api.exporter.service.ExportOperationService;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -28,13 +27,23 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/manage/storage")
-@RequiredArgsConstructor
 public class StorageOperationController {
 
     private final LqOperationService lqOperationService;
     private final HqDeleteOperationService hqDeleteOperationService;
     private final TranscodeOperationService transcodeOperationService;
     private final MediaOperationCommandService commandService;
+
+    @Autowired
+    public StorageOperationController(LqOperationService lqOperationService,
+            HqDeleteOperationService hqDeleteOperationService,
+            TranscodeOperationService transcodeOperationService,
+            MediaOperationCommandService commandService) {
+        this.lqOperationService = lqOperationService;
+        this.hqDeleteOperationService = hqDeleteOperationService;
+        this.transcodeOperationService = transcodeOperationService;
+        this.commandService = commandService;
+    }
 
     /** 兼容历史测试构造器；导出端点已由 ExportController 承担。 */
     public StorageOperationController(LqOperationService lqOperationService,

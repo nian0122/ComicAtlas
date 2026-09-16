@@ -2,6 +2,7 @@ package com.comicatlas.api.upload.service;
 import com.comicatlas.api.upload.domain.UploadSessionStatus;
 
 // 条件更新由上传结果服务维护跨表状态机与事务边界，Mapper 执行参数化更新。
+// 架构说明：Service 直接构造 LambdaUpdateWrapper 更新媒体/上传会话；条件更新应收口到对应 Mapper。
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.storage.service.ComicStatsService;
