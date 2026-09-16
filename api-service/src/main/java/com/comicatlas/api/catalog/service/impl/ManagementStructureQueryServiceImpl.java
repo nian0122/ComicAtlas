@@ -52,7 +52,8 @@ public class ManagementStructureQueryServiceImpl implements ManagementStructureQ
         CatalogNode root = new CatalogNode(null, null);
         for (Chapter chapter : chapters) {
             ChapterRef ref = new ChapterRef(chapter.getId(), chapter.getChapterNo(), chapter.getTitle(),
-                    chapter.getGlobalOrder(), chapter.getPageCount(), chapter.getStatus().name());
+                    chapter.getGlobalOrder(), chapter.getPageCount(),
+                    chapter.getStatus() == null ? null : chapter.getStatus().name());
             if (chapter.getCatalogId() != null && nodes.containsKey(chapter.getCatalogId())) {
                 nodes.get(chapter.getCatalogId()).getChapters().add(ref);
             } else {

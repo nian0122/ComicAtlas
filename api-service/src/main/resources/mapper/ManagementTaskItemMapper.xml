@@ -1,6 +1,20 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.comicatlas.api.task.persistence.mapper.ManagementTaskItemMapper">
+    <select id="selectTaskIdsByComicId" resultType="java.lang.Long">
+        SELECT DISTINCT item.task_id
+        FROM management_task_item item
+        LEFT JOIN chapter chapter_direct
+            ON item.target_type = 'CHAPTER' AND chapter_direct.id = item.target_id
+        LEFT JOIN page media_page
+            ON item.target_type = 'MEDIA' AND media_page.id = item.target_id
+        LEFT JOIN chapter media_chapter
+            ON media_chapter.id = media_page.chapter_id
+        WHERE (item.target_type = 'COMIC' AND item.target_id = #{comicId})
+           OR (item.target_type = 'CHAPTER' AND chapter_direct.comic_id = #{comicId})
+           OR (item.target_type = 'MEDIA' AND media_chapter.comic_id = #{comicId})
+    </select>
+
     <update id="cancelQueuedByTask">
         UPDATE management_task_item
         SET status = 'CANCELLED', lock_key = NULL, completed_at = #{completedAt}, updated_at = #{updatedAt}

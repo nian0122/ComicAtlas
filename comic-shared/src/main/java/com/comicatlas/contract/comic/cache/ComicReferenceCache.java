@@ -21,7 +21,7 @@ public final class ComicReferenceCache {
     public static final String COMIC_LIST = "comicList";
 
     /** 存储统计缓存（含文件系统扫描的 thumb 大小，短 TTL）。 */
-    public static final String STORAGE_STATS = "storageStats";
+    public static final String STORAGE_STATS = "storageStatsV2";
 
     /** 全量快照类缓存的统一 key。 */
     public static final String ALL_KEY = "all";
