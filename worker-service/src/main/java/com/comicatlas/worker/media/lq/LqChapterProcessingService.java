@@ -12,7 +12,6 @@ import com.comicatlas.worker.storage.StorageRootResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -28,15 +27,21 @@ public class LqChapterProcessingService {
 
     public ChapterProcessResult process(Long chapterId, boolean force) {
         List<MediaRecord> pages = mediaMapper.selectByChapterId(chapterId);
-        if (pages.isEmpty()) return new ChapterProcessResult(List.of(), List.of());
+        if (pages.isEmpty()) {
+            return new ChapterProcessResult(List.of(), List.of());
+        }
         Long comicId = StoragePathParser.parseComicId(pages.get(0).getHqPath()).stream().boxed().findFirst().orElse(null);
         StorageRoot hqRoot = StorageRootResolver.optional(storageProperties, StorageRootKeys.HQ);
         StorageRoot lqRoot = StorageRootResolver.optional(storageProperties, StorageRootKeys.LQ);
-        if (comicId == null || hqRoot == null || lqRoot == null) return new ChapterProcessResult(List.of(-1), List.of());
+        if (comicId == null || hqRoot == null || lqRoot == null) {
+            return new ChapterProcessResult(List.of(-1), List.of());
+        }
         String relativeDir = StoragePathParser.directoryOf(pages.get(0).getHqPath());
         ImageOptimizer.RunResult result = optimizer.generateLq(comicId, chapterId,
                 hqRoot.resolve(relativeDir), lqRoot.resolve(relativeDir), force);
-        if (result.getPages() == null) return new ChapterProcessResult(List.of(), List.of());
+        if (result.getPages() == null) {
+            return new ChapterProcessResult(List.of(), List.of());
+        }
         Map<String, MediaRecord> mediaBySourcePath = pages.stream().filter(page -> page.getHqPath() != null)
                 .collect(Collectors.toMap(page -> relativePath(relativeDir, page.getHqPath()), Function.identity(), (first, ignored) -> first));
         List<Integer> failedPages = result.getPages().stream().filter(page -> "failed".equals(page.getStatus()))
@@ -60,8 +65,12 @@ public class LqChapterProcessingService {
     private static Long resolveMediaId(ImageOptimizer.PageResult page, Map<String, MediaRecord> byPath,
                                        Map<Integer, Long> byPage) {
         MediaRecord media = resolveMedia(page, byPath);
-        if (media != null) return media.getId();
-        if (page.getSourcePath() != null && !page.getSourcePath().isBlank()) return null;
+        if (media != null) {
+            return media.getId();
+        }
+        if (page.getSourcePath() != null && !page.getSourcePath().isBlank()) {
+            return null;
+        }
         return page.getPageNumber() == null ? null : byPage.get(page.getPageNumber().intValue());
     }
 
@@ -82,7 +91,9 @@ public class LqChapterProcessingService {
     }
 
     private static String joinRelativePath(String directory, String fileName) {
-        if (fileName == null || fileName.isBlank()) return null;
+        if (fileName == null || fileName.isBlank()) {
+            return null;
+        }
         return directory == null || directory.isBlank() ? fileName.replace('\\', '/')
                 : directory.replace('\\', '/') + "/" + fileName.replace('\\', '/');
     }

@@ -65,6 +65,17 @@ public class RecoveryEngine {
     private final RecoveryPlanBuilder recoveryPlanBuilder;
     private final MetadataUpdateCoordinator metadataUpdateCoordinator;
 
+    /** 兼容历史单元测试构造器，恢复计划由当前媒体解析器构建。 */
+    public RecoveryEngine(ObjectMapper objectMapper, ComicMapper comicMapper,
+            CatalogMapper catalogMapper, ChapterMapper chapterMapper, MediaMapper mediaMapper,
+            TransactionTemplate transactionTemplate, CatalogCacheInvalidator catalogCacheInvalidator,
+            ApiStorageProperties storageProperties, RecoveryMediaResolver recoveryMediaResolver,
+            MetadataUpdateCoordinator metadataUpdateCoordinator) {
+        this(objectMapper, comicMapper, catalogMapper, chapterMapper, mediaMapper, transactionTemplate,
+                catalogCacheInvalidator, storageProperties, recoveryMediaResolver,
+                new RecoveryPlanBuilder(recoveryMediaResolver), metadataUpdateCoordinator);
+    }
+
     // ======================== 公共 API ========================
 
     /**

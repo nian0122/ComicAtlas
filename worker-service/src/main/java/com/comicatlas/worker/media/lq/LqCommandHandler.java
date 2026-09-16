@@ -6,6 +6,8 @@ import com.comicatlas.common.event.payload.LqSizeResult;
 import com.comicatlas.worker.persistence.mapper.MediaReadMapper;
 import com.comicatlas.worker.persistence.record.MediaRecord;
 import com.comicatlas.worker.task.publisher.ManagementCommandPublisher;
+import com.comicatlas.worker.media.image.ImageOptimizer;
+import com.comicatlas.worker.storage.StorageProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -22,6 +24,12 @@ public class LqCommandHandler {
     private final MediaReadMapper mediaMapper;
     private final ManagementCommandPublisher publisher;
     private final LqChapterProcessingService chapterProcessingService;
+
+    /** 兼容旧测试构造器，业务处理统一转交章节服务。 */
+    public LqCommandHandler(ImageOptimizer optimizer, MediaReadMapper mediaMapper,
+            StorageProperties storageProperties, ManagementCommandPublisher publisher) {
+        this(mediaMapper, publisher, new LqChapterProcessingService(optimizer, mediaMapper, storageProperties));
+    }
 
     public void generateChapter(ManagementCommandRequestedEvent command) {
         LqChapterProcessingService.ChapterProcessResult result = chapterProcessingService.process(
@@ -42,7 +50,9 @@ public class LqCommandHandler {
             LqChapterProcessingService.ChapterProcessResult result = chapterProcessingService.process(
                     chapterId, isRegenerate(command));
             sizes.addAll(result.lqSizes());
-            if (!result.failedPages().isEmpty()) failedChapters.add(chapterId);
+            if (!result.failedPages().isEmpty()) {
+                failedChapters.add(chapterId);
+            }
         }
         if (failedChapters.isEmpty()) {
             publisher.progress(command, 100, "LQ 生成完成");

@@ -3,7 +3,6 @@ package com.comicatlas.worker.importer.metadata;
 import com.comicatlas.common.constant.MediaTypes;
 import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.common.storage.ImportStagingPath;
-import com.comicatlas.worker.media.ComicMetadata;
 import com.comicatlas.worker.media.image.CoverGenerator;
 import com.comicatlas.worker.storage.StorageRef;
 import com.comicatlas.worker.storage.StorageService;
@@ -27,31 +26,41 @@ public class ImportCoverService {
     private final CoverCandidateSelector coverCandidateSelector;
     private final StorageService storageService;
 
-    public void generate(JsonNode metadata, Long taskId, Long comicId, Path mangaRoot) {
+    public boolean generate(JsonNode metadata, Long taskId, Long comicId, Path mangaRoot) {
         List<CoverCandidateSelector.MediaCandidate> media = flatten(metadata, taskId, comicId);
         List<CoverCandidateSelector.CoverCandidate> candidates = coverCandidateSelector.select(media);
-        if (candidates.isEmpty()) return;
+        if (candidates.isEmpty()) {
+            return false;
+        }
         Path coverFile = mangaRoot.resolve("thumbs").resolve(String.valueOf(comicId)).resolve("cover.webp");
         for (int index = 0; index < candidates.size(); index++) {
             CoverCandidateSelector.CoverCandidate candidate = candidates.get(index);
             Path sourcePath = storageService.resolve(new StorageRef(StorageRootKeys.HQ, candidate.hqPath()));
-            if (!Files.exists(sourcePath)) continue;
+            if (!Files.exists(sourcePath)) {
+                continue;
+            }
             try {
                 if (MediaTypes.VIDEO.equalsIgnoreCase(candidate.mediaType())) {
                     coverGenerator.generateCoverFromVideo(comicId, sourcePath);
                 } else {
                     coverGenerator.generateCover(comicId, sourcePath);
                 }
-                if (valid(coverFile)) return;
+                if (valid(coverFile)) {
+                    return true;
+                }
             } catch (RuntimeException exception) {
                 log.warn("封面候选生成失败，继续下一候选: comicId={}, candidateIndex={}, fileName={}",
                         comicId, index, candidate.fileName(), exception);
             }
         }
         if (Files.exists(coverFile) && !valid(coverFile)) {
-            try { Files.deleteIfExists(coverFile); }
-            catch (IOException exception) { log.warn("清理空封面失败: comicId={}", comicId, exception); }
+            try {
+                Files.deleteIfExists(coverFile);
+            } catch (IOException exception) {
+                log.warn("清理空封面失败: comicId={}", comicId, exception);
+            }
         }
+        return false;
     }
 
     private List<CoverCandidateSelector.MediaCandidate> flatten(JsonNode metadata, Long taskId, Long comicId) {
@@ -61,7 +70,9 @@ public class ImportCoverService {
             String sourceDir = chapter.hasNonNull("sourceDir") ? chapter.path("sourceDir").asText() : null;
             for (JsonNode item : chapter.path("mediaItems")) {
                 String fileName = item.path("fileName").asText(null);
-                if (fileName == null || fileName.isBlank()) continue;
+                if (fileName == null || fileName.isBlank()) {
+                    continue;
+                }
                 String hqPath = item.path("hqPath").asText(null);
                 if (hqPath == null || hqPath.isBlank()) {
                     hqPath = ImportStagingPath.chapterRelativeToHq(comicId, taskId, globalOrder)
@@ -76,7 +87,10 @@ public class ImportCoverService {
     }
 
     private boolean valid(Path coverFile) {
-        try { return Files.isRegularFile(coverFile) && Files.size(coverFile) > 0; }
-        catch (IOException exception) { return false; }
+        try {
+            return Files.isRegularFile(coverFile) && Files.size(coverFile) > 0;
+        } catch (IOException exception) {
+            return false;
+        }
     }
 }
