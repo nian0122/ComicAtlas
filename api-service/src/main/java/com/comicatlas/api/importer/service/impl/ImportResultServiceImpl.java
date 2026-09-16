@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.comicatlas.api.importer.enums.ImportTaskStatus;
 import com.comicatlas.api.importer.persistence.entity.ImportTask;
 import com.comicatlas.api.importer.persistence.mapper.ImportTaskMapper;
-import com.comicatlas.api.storage.ApiStorageProperties;
+import com.comicatlas.api.storage.config.ApiStorageProperties;
 import com.comicatlas.api.task.enums.ManagementTaskStatus;
 import com.comicatlas.api.task.enums.TaskType;
 import com.comicatlas.api.task.persistence.entity.ManagementTaskItem;

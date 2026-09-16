@@ -6,7 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.contract.comic.dto.ComicListQuery;
 import com.comicatlas.reading.library.dto.ComicListVO;
 import com.comicatlas.reading.library.service.ComicQueryService;
-import com.comicatlas.contract.common.exception.GlobalExceptionHandler;
+import com.comicatlas.web.exception.GlobalExceptionHandler;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;

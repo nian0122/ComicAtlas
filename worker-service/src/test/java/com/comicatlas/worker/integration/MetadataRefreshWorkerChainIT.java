@@ -7,7 +7,7 @@ import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.common.event.MetadataRefreshEvent;
 import com.comicatlas.common.event.MetadataRefreshScanCompletedEvent;
-import com.comicatlas.common.util.MetadataSnapshotRevision;
+import com.comicatlas.common.metadata.revision.MetadataSnapshotRevision;
 import com.comicatlas.worker.media.metadata.command.MetadataRefreshCommandHandler;
 import com.comicatlas.worker.config.MetadataJsonBuilderConfig;
 import com.comicatlas.worker.config.MqConsumerSupportConfig;

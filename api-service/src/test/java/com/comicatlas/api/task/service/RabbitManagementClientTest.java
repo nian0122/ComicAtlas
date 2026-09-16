@@ -1,6 +1,7 @@
 package com.comicatlas.api.task.service;
 
-import com.comicatlas.api.task.service.RabbitManagementClient.QueueSnapshot;
+import com.comicatlas.api.task.adapter.RabbitManagementClient;
+import com.comicatlas.api.task.adapter.RabbitManagementClient.QueueSnapshot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;

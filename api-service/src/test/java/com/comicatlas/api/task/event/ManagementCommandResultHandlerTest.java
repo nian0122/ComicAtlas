@@ -4,6 +4,7 @@ import com.comicatlas.api.task.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.task.service.ManagementTaskService;
 import com.comicatlas.api.task.service.ManagementResultApplicationService;
 import com.comicatlas.api.task.service.impl.ManagementResultApplicationServiceImpl;
+import com.comicatlas.api.task.service.routing.ManagementResultRouter;
 import com.comicatlas.api.trash.service.TrashLifecycleCompletionService;
 import com.comicatlas.api.outbox.service.InboxService;
 import com.comicatlas.api.outbox.service.EventFingerprintService;

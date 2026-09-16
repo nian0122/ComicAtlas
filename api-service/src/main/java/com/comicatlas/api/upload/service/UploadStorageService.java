@@ -8,7 +8,7 @@ import com.comicatlas.api.upload.config.UploadProperties;
 // 架构说明：Service 直接构造 LambdaUpdateWrapper 更新上传文件；条件更新应收口到 UploadFileMapper。
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.exception.BusinessException;
-import com.comicatlas.api.storage.ApiStorageProperties;
+import com.comicatlas.api.storage.config.ApiStorageProperties;
 import com.comicatlas.api.storage.ApiStorageRoot;
 import com.comicatlas.api.upload.persistence.entity.UploadFile;
 import com.comicatlas.api.upload.persistence.entity.UploadSession;

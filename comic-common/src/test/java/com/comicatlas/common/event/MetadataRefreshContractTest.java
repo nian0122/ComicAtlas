@@ -4,7 +4,7 @@ import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO.ChapterSnapshot;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO.MediaSnapshot;
 import com.comicatlas.common.storage.InvalidRelativePathException;
-import com.comicatlas.common.util.MetadataSnapshotRevision;
+import com.comicatlas.common.metadata.revision.MetadataSnapshotRevision;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.DisplayName;

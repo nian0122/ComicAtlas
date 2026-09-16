@@ -1,6 +1,6 @@
 package com.comicatlas.worker.media;
 
-import com.comicatlas.common.util.ImageDimensionsReader;
+import com.comicatlas.common.media.image.ImageDimensionsReader;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.common.constant.MediaTypes;
 import com.comicatlas.common.constant.MediaStatuses;

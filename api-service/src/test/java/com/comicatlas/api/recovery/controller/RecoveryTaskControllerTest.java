@@ -3,7 +3,7 @@ package com.comicatlas.api.recovery.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.contract.common.exception.BusinessException;
-import com.comicatlas.contract.common.exception.GlobalExceptionHandler;
+import com.comicatlas.web.exception.GlobalExceptionHandler;
 import com.comicatlas.api.dlq.config.DlqSecurityConfig;
 import com.comicatlas.api.recovery.dto.RecoveryTaskVO;
 import com.comicatlas.api.recovery.service.RecoveryTaskService;

@@ -1,6 +1,6 @@
 package com.comicatlas.api.trash.service.impl;
 
-import com.comicatlas.api.storage.ApiStorageProperties;
+import com.comicatlas.api.storage.config.ApiStorageProperties;
 import com.comicatlas.api.storage.ApiStorageRoot;
 import com.comicatlas.common.dto.TrashManifestItemDTO;
 import com.comicatlas.api.trash.dto.TrashReconcileReport;

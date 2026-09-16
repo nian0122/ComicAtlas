@@ -10,7 +10,7 @@ import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.persistence.comic.mapper.MediaMapper;
 import com.comicatlas.contract.common.enums.TranscodeStatus;
-import com.comicatlas.common.util.VideoPlayability;
+import com.comicatlas.common.media.video.VideoPlayability;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

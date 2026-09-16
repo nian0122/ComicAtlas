@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.comicatlas.api.importer.persistence.entity.ImportTask;
-import com.comicatlas.api.storage.ApiStorageProperties;
+import com.comicatlas.api.storage.config.ApiStorageProperties;
 import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.common.storage.ImportStagingPath;
 import com.comicatlas.contract.common.enums.SourceType;

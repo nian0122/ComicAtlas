@@ -4,7 +4,7 @@ import com.comicatlas.contract.comic.dto.TagDTO;
 import com.comicatlas.api.metadata.dto.CreateTagRequest;
 import com.comicatlas.api.metadata.service.TagManagementService;
 import com.comicatlas.contract.common.exception.BusinessException;
-import com.comicatlas.contract.common.exception.GlobalExceptionHandler;
+import com.comicatlas.web.exception.GlobalExceptionHandler;
 import com.comicatlas.api.dlq.config.DlqSecurityConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;

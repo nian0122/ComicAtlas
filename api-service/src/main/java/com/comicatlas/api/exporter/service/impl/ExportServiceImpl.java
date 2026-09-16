@@ -7,7 +7,7 @@ import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.api.exporter.enums.ExportTaskStatus;
 import com.comicatlas.api.task.enums.TaskType;
 import com.comicatlas.contract.common.exception.BusinessException;
-import com.comicatlas.api.storage.ApiStorageProperties;
+import com.comicatlas.api.storage.config.ApiStorageProperties;
 import com.comicatlas.api.storage.PathTraversalException;
 import com.comicatlas.api.exporter.dto.ExportTaskVO;
 import com.comicatlas.api.exporter.persistence.entity.ExportTask;

@@ -4,7 +4,7 @@ import com.comicatlas.api.trash.persistence.entity.TrashManifestRecord;
 
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.exception.BusinessException;
-import com.comicatlas.api.storage.ApiStorageProperties;
+import com.comicatlas.api.storage.config.ApiStorageProperties;
 import com.comicatlas.api.storage.ApiStorageRoot;
 import com.comicatlas.api.trash.persistence.mapper.TrashManifestMapper;
 import com.comicatlas.common.dto.TrashManifestDTO;

@@ -9,7 +9,7 @@ import com.comicatlas.persistence.comic.mapper.MediaMapper;
 import com.comicatlas.api.importer.enums.ImportTaskStatus;
 import com.comicatlas.contract.common.enums.SourceType;
 import com.comicatlas.contract.common.exception.BusinessException;
-import com.comicatlas.api.storage.ApiStorageProperties;
+import com.comicatlas.api.storage.config.ApiStorageProperties;
 import com.comicatlas.api.storage.ApiStorageRoot;
 import com.comicatlas.api.importer.dto.BatchImportRequest;
 import com.comicatlas.api.importer.dto.BatchImportResultVO;

@@ -4,7 +4,7 @@ import com.comicatlas.reading.library.controller.ReadingComicController;
 import com.comicatlas.contract.comic.dto.ComicMetadataDTO;
 import com.comicatlas.reading.library.service.ComicQueryService;
 import com.comicatlas.contract.common.exception.BusinessException;
-import com.comicatlas.contract.common.exception.GlobalExceptionHandler;
+import com.comicatlas.web.exception.GlobalExceptionHandler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

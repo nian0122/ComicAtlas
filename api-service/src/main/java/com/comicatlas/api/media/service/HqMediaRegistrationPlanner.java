@@ -4,7 +4,7 @@ import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO.ChapterSnapshot;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO.MediaSnapshot;
-import com.comicatlas.common.util.MetadataSnapshotRevision;
+import com.comicatlas.common.metadata.revision.MetadataSnapshotRevision;
 import com.comicatlas.contract.common.enums.HqStatus;
 import com.comicatlas.contract.common.enums.LqStatus;
 import com.comicatlas.contract.common.enums.MediaLifecycleStatus;

@@ -10,11 +10,11 @@ import com.comicatlas.api.task.persistence.mapper.ManagementTaskItemMapper;
 import com.comicatlas.api.task.persistence.mapper.ManagementTaskMapper;
 import com.comicatlas.api.task.service.ManagementTaskService;
 import com.comicatlas.api.task.service.TaskRetryPublisher;
-import com.comicatlas.api.task.service.TaskResponseAssembler;
+import com.comicatlas.api.task.assembler.TaskResponseAssembler;
 import com.comicatlas.api.task.service.TaskQueryService;
 import com.comicatlas.api.task.service.TaskAggregationService;
 import com.comicatlas.api.task.service.TaskInternalQueryService;
-import com.comicatlas.api.task.service.MetadataRefreshTaskPolicy;
+import com.comicatlas.api.task.service.TaskLifecyclePolicy;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.api.task.enums.ManagementTaskStatus;
 import com.comicatlas.api.task.enums.TaskStage;
@@ -62,7 +62,7 @@ public class ManagementTaskServiceImpl implements ManagementTaskService {
     private final TaskQueryService taskQueryService;
     private final TaskAggregationService taskAggregationService;
     private final TaskInternalQueryService taskInternalQueryService;
-    private final MetadataRefreshTaskPolicy metadataRefreshTaskPolicy;
+    private final TaskLifecyclePolicy taskLifecyclePolicy;
 
     // ======================== 创建任务 ========================
 
@@ -119,7 +119,7 @@ public class ManagementTaskServiceImpl implements ManagementTaskService {
         taskMapper.insert(task);
 
         // 元数据刷新可能展开为多个章节项；同一本漫画只允许执行一次 READY→REFRESHING CAS。
-        metadataRefreshTaskPolicy.lockOnCreate(request.getTaskType(), request.getTargets());
+        taskLifecyclePolicy.lockOnCreate(request.getTaskType(), request.getTargets());
 
         // 创建目标项（带目标冲突锁检查）
         List<ManagementTaskItem> items = new ArrayList<>();
@@ -227,7 +227,7 @@ public class ManagementTaskServiceImpl implements ManagementTaskService {
         // 重新聚合状态
         taskAggregationService.aggregate(taskId);
         List<ManagementTaskItem> cancelledItems = itemMapper.selectByTaskId(taskId);
-        metadataRefreshTaskPolicy.releaseAfterCancel(task, taskId,
+        taskLifecyclePolicy.releaseAfterCancel(task, taskId,
                 taskInternalQueryService.countActiveItems(taskId), cancelledItems);
 
         ManagementTask updated = taskMapper.selectById(taskId);
@@ -267,7 +267,7 @@ public class ManagementTaskServiceImpl implements ManagementTaskService {
 
         // 元数据刷新重试：章节项先归并到漫画，同一本漫画只执行一次 CAS。
         List<ManagementTaskItem> items = itemMapper.selectByTaskId(taskId);
-        metadataRefreshTaskPolicy.prepareRetry(task.getTaskType(), items);
+        taskLifecyclePolicy.prepareRetry(task.getTaskType(), items);
 
         int newAttempt = task.getAttempt() + 1;
         resetTaskAndItems(taskId, newAttempt, items);

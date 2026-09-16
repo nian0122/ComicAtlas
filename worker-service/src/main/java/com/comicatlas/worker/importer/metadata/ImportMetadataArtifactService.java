@@ -1,6 +1,6 @@
 package com.comicatlas.worker.importer.metadata;
 
-import com.comicatlas.common.util.MetadataFileWriter;
+import com.comicatlas.common.metadata.file.MetadataFileWriter;
 import com.comicatlas.worker.media.ComicMetadata;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;

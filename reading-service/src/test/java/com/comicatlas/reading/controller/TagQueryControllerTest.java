@@ -3,7 +3,7 @@ package com.comicatlas.reading.controller;
 import com.comicatlas.reading.library.controller.TagQueryController;
 import com.comicatlas.contract.comic.dto.TagDTO;
 import com.comicatlas.reading.library.service.TagQueryService;
-import com.comicatlas.contract.common.exception.GlobalExceptionHandler;
+import com.comicatlas.web.exception.GlobalExceptionHandler;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;

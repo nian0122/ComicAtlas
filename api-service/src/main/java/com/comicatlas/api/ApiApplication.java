@@ -6,6 +6,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @SpringBootApplication(scanBasePackages = {
         "com.comicatlas.api",
         "com.comicatlas.contract",
+        "com.comicatlas.web",
         "com.comicatlas.persistence"
 })
 public class ApiApplication {

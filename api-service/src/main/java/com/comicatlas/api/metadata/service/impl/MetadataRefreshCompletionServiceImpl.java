@@ -22,7 +22,7 @@ import com.comicatlas.api.shared.exception.SnapshotUnavailableException;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
-import com.comicatlas.api.storage.ApiStorageProperties;
+import com.comicatlas.api.storage.config.ApiStorageProperties;
 import com.comicatlas.api.metadata.service.MetadataRefreshCompletionService;
 import com.comicatlas.api.metadata.service.MetadataRefreshService;
 import lombok.RequiredArgsConstructor;

@@ -6,7 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.OptimisticLockerInnerInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
 import com.comicatlas.persistence.handler.EnumTypeHandlers;
-import com.comicatlas.api.config.ManagementEnumTypeHandlers;
+import com.comicatlas.api.shared.persistence.handler.ManagementEnumTypeHandlers;
 import com.comicatlas.api.upload.persistence.handler.UploadSessionStatusTypeHandler;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.context.annotation.Bean;

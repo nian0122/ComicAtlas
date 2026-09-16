@@ -1,8 +1,8 @@
 package com.comicatlas.api.task.service.impl;
 
-import com.comicatlas.api.task.service.RabbitManagementClient;
+import com.comicatlas.api.task.adapter.RabbitManagementClient;
 import com.comicatlas.api.task.service.MqStatsService;
-import com.comicatlas.api.task.service.RabbitManagementClient.QueueSnapshot;
+import com.comicatlas.api.task.adapter.RabbitManagementClient.QueueSnapshot;
 import com.comicatlas.common.dto.MqStatsDTO;
 import com.comicatlas.common.dto.MqStatsDTO.MqQueueStat;
 import lombok.RequiredArgsConstructor;

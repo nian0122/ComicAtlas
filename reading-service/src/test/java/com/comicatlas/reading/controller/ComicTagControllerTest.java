@@ -3,7 +3,7 @@ package com.comicatlas.reading.controller;
 import com.comicatlas.reading.library.controller.ReadingComicController;
 import com.comicatlas.reading.library.service.ComicQueryService;
 import com.comicatlas.contract.common.exception.BusinessException;
-import com.comicatlas.contract.common.exception.GlobalExceptionHandler;
+import com.comicatlas.web.exception.GlobalExceptionHandler;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;

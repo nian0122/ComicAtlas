@@ -4,7 +4,7 @@ import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.common.constant.ManagementOperationTypes;
 import com.comicatlas.common.constant.MediaTypes;
 import com.comicatlas.common.event.payload.TranscodeMediaInfo;
-import com.comicatlas.common.util.VideoPlayability;
+import com.comicatlas.common.media.video.VideoPlayability;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.persistence.record.MediaRecord;
 import com.comicatlas.worker.task.publisher.ManagementCommandPublisher;
