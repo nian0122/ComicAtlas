@@ -12,7 +12,6 @@ import com.comicatlas.api.task.persistence.entity.ManagementTaskItem;
 import com.comicatlas.api.task.persistence.mapper.ManagementTaskItemMapper;
 import com.comicatlas.api.task.persistence.mapper.ManagementTaskMapper;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
-import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.api.task.enums.ManagementTaskStatus;
 import com.comicatlas.api.task.enums.TaskStage;
 import com.comicatlas.api.task.enums.TaskType;
@@ -20,10 +19,6 @@ import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.shared.exception.ConflictException;
 import com.comicatlas.api.shared.crypto.DigestService;
 import com.comicatlas.api.shared.monitoring.MonitoredOperation;
-import com.comicatlas.persistence.comic.entity.Comic;
-import com.comicatlas.persistence.comic.entity.Chapter;
-import com.comicatlas.persistence.comic.mapper.ChapterMapper;
-import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -32,9 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 
 /**
  * 统一管理任务服务。
@@ -49,14 +42,6 @@ import java.util.Set;
 public class ManagementTaskService {
     // TODO(LAYER-14): Service 功能契约与具体实现未分离；应抽取 service 接口，并将实现迁移到 service/impl。
 
-    // TODO(DECOUPLE-05): 通用任务服务直接识别 METADATA_REFRESH 并修改漫画业务状态，需改为注入业务域策略。
-
-    /** 目标类型：漫画。 */
-    private static final String TARGET_TYPE_COMIC = "COMIC";
-    /** 目标类型：章节。 */
-    private static final String TARGET_TYPE_CHAPTER = "CHAPTER";
-    /** 目标类型：媒体。 */
-    private static final String TARGET_TYPE_MEDIA = "MEDIA";
     /** 初始 attempt 次数。 */
     private static final int INITIAL_ATTEMPT = 1;
     private static final List<ManagementTaskStatus> TERMINAL_ITEM_STATUSES = List.of(
@@ -68,13 +53,12 @@ public class ManagementTaskService {
 
     private final ManagementTaskMapper taskMapper;
     private final ManagementTaskItemMapper itemMapper;
-    private final ComicMapper comicMapper;
-    private final ChapterMapper chapterMapper;
     private final TaskRetryPublisher taskRetryPublisher;
     private final TaskResponseAssembler taskResponseAssembler;
     private final TaskQueryService taskQueryService;
     private final TaskAggregationService taskAggregationService;
     private final TaskInternalQueryService taskInternalQueryService;
+    private final MetadataRefreshTaskPolicy metadataRefreshTaskPolicy;
 
     // ======================== 创建任务 ========================
 
@@ -133,7 +117,7 @@ public class ManagementTaskService {
         taskMapper.insert(task);
 
         // 元数据刷新可能展开为多个章节项；同一本漫画只允许执行一次 READY→REFRESHING CAS。
-        lockMetadataRefreshComics(request.getTaskType(), request.getTargets());
+        metadataRefreshTaskPolicy.lockOnCreate(request.getTaskType(), request.getTargets());
 
         // 创建目标项（带目标冲突锁检查）
         List<ManagementTaskItem> items = new ArrayList<>();
@@ -247,26 +231,13 @@ public class ManagementTaskService {
 
         // 重新聚合状态
         taskAggregationService.aggregate(taskId);
-        releaseCancelledMetadataRefresh(task, taskId);
+        List<ManagementTaskItem> cancelledItems = itemMapper.selectList(
+                new LambdaQueryWrapper<ManagementTaskItem>().eq(ManagementTaskItem::getTaskId, taskId));
+        metadataRefreshTaskPolicy.releaseAfterCancel(task, taskId,
+                taskInternalQueryService.countActiveItems(taskId), cancelledItems);
 
         ManagementTask updated = taskMapper.selectById(taskId);
         return taskResponseAssembler.toResponse(updated);
-    }
-
-    private void releaseCancelledMetadataRefresh(ManagementTask task, Long taskId) {
-        if (task.getTaskType() != TaskType.METADATA_REFRESH
-                || taskInternalQueryService.countActiveItems(taskId) > 0) {
-            return;
-        }
-        List<ManagementTaskItem> items = itemMapper.selectList(
-                new LambdaQueryWrapper<ManagementTaskItem>()
-                        .eq(ManagementTaskItem::getTaskId, taskId));
-        for (Long comicId : resolveMetadataComicIdsFromItems(items)) {
-            comicMapper.update(null, new LambdaUpdateWrapper<Comic>()
-                    .eq(Comic::getId, comicId)
-                    .eq(Comic::getStatus, ComicStatus.REFRESHING)
-                    .set(Comic::getStatus, ComicStatus.READY));
-        }
     }
 
     // ======================== Retry ========================
@@ -304,23 +275,7 @@ public class ManagementTaskService {
         List<ManagementTaskItem> items = itemMapper.selectList(
                 new LambdaQueryWrapper<ManagementTaskItem>()
                         .eq(ManagementTaskItem::getTaskId, taskId));
-        if (task.getTaskType() == TaskType.METADATA_REFRESH) {
-            List<ManagementTaskItem> retriedItems = items.stream()
-                    .filter(item -> item.getStatus() == ManagementTaskStatus.FAILED
-                            || item.getStatus() == ManagementTaskStatus.CANCELLED)
-                    .toList();
-            for (Long comicId : resolveMetadataComicIdsFromItems(retriedItems)) {
-                int casRows = comicMapper.update(null, new LambdaUpdateWrapper<Comic>()
-                        .eq(Comic::getId, comicId)
-                        .eq(Comic::getStatus, ComicStatus.READY)
-                        .set(Comic::getStatus, ComicStatus.REFRESHING));
-                if (casRows == 0) {
-                    throw new ConflictException(
-                            String.format("漫画 %d 不是 READY 或已被其他任务占用，无法重试元数据刷新",
-                                    comicId));
-                }
-            }
-        }
+        metadataRefreshTaskPolicy.prepareRetry(task.getTaskType(), items);
 
         int newAttempt = task.getAttempt() + 1;
         resetTaskAndItems(taskId, newAttempt, items);
@@ -630,74 +585,6 @@ public class ManagementTaskService {
      */
     public void reaggregateTask(Long taskId) {
         taskAggregationService.aggregate(taskId);
-    }
-
-    /** 元数据刷新创建时按漫画维度占用 REFRESHING 状态，章节展开不得重复 CAS。 */
-    private void lockMetadataRefreshComics(TaskType taskType,
-                                           List<CreateManagementTaskRequest.TaskTarget> targets) {
-        if (taskType != TaskType.METADATA_REFRESH || targets == null || targets.isEmpty()) {
-            return;
-        }
-        for (Long comicId : resolveMetadataComicIdsFromTargets(taskType, targets)) {
-            int casRows = comicMapper.update(null, new LambdaUpdateWrapper<Comic>()
-                    .eq(Comic::getId, comicId)
-                    .eq(Comic::getStatus, ComicStatus.READY)
-                    .set(Comic::getStatus, ComicStatus.REFRESHING));
-            if (casRows == 0) {
-                throw new ConflictException(
-                        String.format("漫画 %d 不是 READY 或已被其他任务占用，无法创建元数据刷新任务", comicId));
-            }
-        }
-    }
-
-    private Set<Long> resolveMetadataComicIdsFromTargets(
-            TaskType taskType, List<CreateManagementTaskRequest.TaskTarget> targets) {
-        List<Long> chapterIds = targets.stream()
-                .filter(target -> effectiveOperationType(target.getOperationType(), taskType)
-                        == TaskType.METADATA_REFRESH)
-                .filter(target -> TARGET_TYPE_CHAPTER.equals(target.getTargetType()))
-                .map(CreateManagementTaskRequest.TaskTarget::getTargetId)
-                .toList();
-        Set<Long> comicIds = new LinkedHashSet<>();
-        targets.stream()
-                .filter(target -> effectiveOperationType(target.getOperationType(), taskType)
-                        == TaskType.METADATA_REFRESH)
-                .filter(target -> TARGET_TYPE_COMIC.equals(target.getTargetType()))
-                .map(CreateManagementTaskRequest.TaskTarget::getTargetId)
-                .forEach(comicIds::add);
-        addChapterComicIds(chapterIds, comicIds);
-        return comicIds;
-    }
-
-    private TaskType effectiveOperationType(TaskType operationType, TaskType taskType) {
-        return operationType != null ? operationType : taskType;
-    }
-
-    private Set<Long> resolveMetadataComicIdsFromItems(List<ManagementTaskItem> items) {
-        List<Long> chapterIds = items.stream()
-                .filter(item -> item.getOperationType() == TaskType.METADATA_REFRESH)
-                .filter(item -> TARGET_TYPE_CHAPTER.equals(item.getTargetType()))
-                .map(ManagementTaskItem::getTargetId)
-                .toList();
-        Set<Long> comicIds = new LinkedHashSet<>();
-        items.stream()
-                .filter(item -> item.getOperationType() == TaskType.METADATA_REFRESH)
-                .filter(item -> TARGET_TYPE_COMIC.equals(item.getTargetType()))
-                .map(ManagementTaskItem::getTargetId)
-                .forEach(comicIds::add);
-        addChapterComicIds(chapterIds, comicIds);
-        return comicIds;
-    }
-
-    private void addChapterComicIds(List<Long> chapterIds, Set<Long> comicIds) {
-        if (chapterIds.isEmpty()) {
-            return;
-        }
-        List<Chapter> chapters = chapterMapper.selectBatchIds(chapterIds);
-        if (chapters.size() != new LinkedHashSet<>(chapterIds).size()) {
-            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "元数据刷新包含不存在的章节");
-        }
-        chapters.stream().map(Chapter::getComicId).forEach(comicIds::add);
     }
 
     // ======================== 辅助方法 ========================
