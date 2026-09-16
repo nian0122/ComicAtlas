@@ -17,6 +17,7 @@ import static java.util.Map.entry;
 @Service
 @RequiredArgsConstructor
 public class DlqService {
+    // TODO(LAYER-14): Service 功能契约与具体实现未分离；应抽取 service 接口，并将实现迁移到 service/impl。
 
     /** RabbitMQ 队列命名约定：DLQ 队列名 = 主队列名 + 本后缀。 */
     private static final String DLQ_NAME_SUFFIX = ".dlq";

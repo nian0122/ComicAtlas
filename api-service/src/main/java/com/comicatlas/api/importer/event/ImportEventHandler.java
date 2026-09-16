@@ -80,6 +80,7 @@ public class ImportEventHandler {
                 return;
             }
 
+            // TODO(LAYER-05): MQ 入口不应直接读取元数据文件；文件定位、读取和格式校验应由导入结果 Service/存储适配器负责。
             // metadata 在事务外读取（短事务内不做文件 IO），交由 Service 校验并落库
             Map<String, Object> metadata = objectMapper.readValue(
                 storageProperties.root("METADATA").resolve(taskId + ".json").toFile(),
@@ -174,6 +175,7 @@ public class ImportEventHandler {
                 taskId, event.errorCode(), event.errorMessage());
 
         mqConsumerSupport.consume(channel, tag, "导入失败: taskId=" + taskId, () -> {
+            // TODO(LAYER-05): 失败事件入口仍直接读取并更新 ImportTask，状态机和失败联动应下沉到导入结果 Service。
             transactionTemplate.executeWithoutResult(status -> {
                 ImportTask task = taskMapper.selectById(taskId);
                 if (task == null || TERMINAL_STATUSES.contains(task.getStatus())) {
@@ -216,6 +218,7 @@ public class ImportEventHandler {
      * @return 加载到的 comic；不存在时返回 null
      */
     private Comic markComicImportFailed(ImportTask task) {
+        // TODO(LAYER-05): 漫画状态转换与 Mapper 写入属于导入结果 Service，不应由 MQ Handler 的辅助方法执行。
         Comic comic = comicMapper.selectById(task.getComicId());
         if (comic == null || comic.getStatus() != ComicStatus.IMPORTING) {
             return comic;

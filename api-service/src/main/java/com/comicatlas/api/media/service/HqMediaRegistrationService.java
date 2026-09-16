@@ -37,6 +37,9 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class HqMediaRegistrationService {
+    // TODO(LAYER-14): Service 功能契约与具体实现未分离；应抽取 service 接口，并将实现迁移到 service/impl。
+
+    // TODO(DECOUPLE-13): 本服务同时负责快照校验、媒体匹配、实体装配和批量持久化，需拆分登记规则/装配器与持久化提交职责。
 
     private static final String READY = "READY";
     private static final String IMAGE = "IMAGE";
@@ -48,6 +51,7 @@ public class HqMediaRegistrationService {
     /** 登记已完成完整性校验的 HQ 扫描快照。 */
     @Transactional
     public HqMediaRegistrationResult registerValidatedSnapshot(MetadataRefreshSnapshotDTO snapshot) {
+        // TODO(DECOUPLE-13): 方法内的校验、查询、业务匹配、分页组装和 Mapper 写入形成过长编排链，应下沉到独立组件。
         String recomputedRevision = MetadataSnapshotRevision.compute(snapshot);
         if (!recomputedRevision.equals(snapshot.databaseRevision())) {
             throw new BusinessException("HQ 登记快照结构摘要与自带 databaseRevision 不一致");

@@ -118,6 +118,15 @@ P1 表示优先处理的事务/跨业务边界问题，P2 表示可随对应功�
 - 约束：仅分配类职责，不改 URL、JSON 或状态码；Spring 映射不得重复。目录打开实现越界另见 LAYER-02。
 - 验证：现有 StorageOperationControllerTest 与各端点映射测试。
 
+### DECOUPLE-13：HQ 媒体登记职责混合（待处理）
+
+文件：[HqMediaRegistrationService.java](../../api-service/src/main/java/com/comicatlas/api/media/service/HqMediaRegistrationService.java)。
+
+- 证据：同一方法同时执行快照版本校验、章节和媒体查询、媒体匹配、实体装配以及批量写入。
+- 拆分：登记规则负责快照与数据库状态匹配，媒体装配器负责构建待写入实体，持久化服务负责事务内批量提交。
+- 约束：保留版本漂移校验、重复媒体跳过、无效快照统计、页码连续性和单批 500 条写入限制。
+- 验证：覆盖重复候选、章节/媒体版本变化、无效媒体、空快照和批量写入失败。
+
 ## 跟踪方式
 
 ```powershell

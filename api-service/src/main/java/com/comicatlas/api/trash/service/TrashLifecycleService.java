@@ -60,6 +60,7 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class TrashLifecycleService {
+    // TODO(LAYER-14): Service 功能契约与具体实现未分离；应抽取 service 接口，并将实现迁移到 service/impl。
 
     // TODO(DECOUPLE-04): 生命周期服务同时生成对账报告、扫描磁盘并修复数据库状态，需拆分只读对账与修复服务。
 
@@ -476,6 +477,7 @@ public class TrashLifecycleService {
         ManagementTaskResponse task = createTask(operation, operationLabel, targetType, targetId, null, null);
         List<ManagementTaskItemResponse> items = managementTaskService.getTaskItems(task.getId());
         for (ManagementTaskItemResponse item : items) {
+            // TODO(MAPPER-02): 此处直接构造 LambdaUpdateWrapper 更新任务项；条件更新应收口到 ManagementTaskItemMapper。
             itemMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ManagementTaskItem>()
                     .eq(ManagementTaskItem::getId, item.getId())
                     .set(ManagementTaskItem::getResultRefType, "TRASH_MANIFEST")

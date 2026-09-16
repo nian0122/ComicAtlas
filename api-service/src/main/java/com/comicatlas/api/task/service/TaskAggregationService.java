@@ -1,6 +1,7 @@
 package com.comicatlas.api.task.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+// TODO(MAPPER-02): 本类直接构造 LambdaUpdateWrapper 聚合更新任务状态；更新条件应收口到 ManagementTaskMapper。
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.api.task.persistence.entity.ManagementTask;
 import com.comicatlas.api.task.persistence.entity.ManagementTaskItem;
@@ -17,6 +18,7 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class TaskAggregationService {
+    // TODO(LAYER-14): Service 功能契约与具体实现未分离；应抽取 service 接口，并将实现迁移到 service/impl。
 
     private final ManagementTaskMapper taskMapper;
     private final ManagementTaskItemMapper itemMapper;

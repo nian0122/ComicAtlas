@@ -45,6 +45,7 @@ import com.comicatlas.api.task.batch.dto.BlockedBatchItem;
 @Service
 @RequiredArgsConstructor
 public class BatchOperationService {
+    // TODO(LAYER-14): Service 功能契约与具体实现未分离；应抽取 service 接口，并将实现迁移到 service/impl。
 
     private static final String EXCHANGE = MqExchanges.MANAGEMENT;
     private static final String ROUTING_REQUEST = MqRoutingKeys.COMMAND_REQUESTED;

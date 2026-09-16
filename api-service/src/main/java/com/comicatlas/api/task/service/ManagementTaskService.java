@@ -1,6 +1,7 @@
 package com.comicatlas.api.task.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+// TODO(MAPPER-02): 本类直接构造 LambdaUpdateWrapper 更新任务/任务项/漫画状态；条件更新应收口到对应 Mapper。
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.comicatlas.api.task.dto.CreateManagementTaskRequest;
@@ -46,6 +47,7 @@ import java.util.Set;
 @RequiredArgsConstructor
 @MonitoredOperation("management-task")
 public class ManagementTaskService {
+    // TODO(LAYER-14): Service 功能契约与具体实现未分离；应抽取 service 接口，并将实现迁移到 service/impl。
 
     // TODO(DECOUPLE-05): 通用任务服务直接识别 METADATA_REFRESH 并修改漫画业务状态，需改为注入业务域策略。
 

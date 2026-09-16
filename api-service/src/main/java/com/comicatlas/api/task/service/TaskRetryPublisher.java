@@ -1,6 +1,7 @@
 package com.comicatlas.api.task.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+// TODO(MAPPER-02): 本类直接构造 LambdaUpdateWrapper 重置业务任务；重试状态更新应收口到对应 Mapper。
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.api.exporter.persistence.entity.ExportTask;
 import com.comicatlas.api.exporter.enums.ExportTaskStatus;

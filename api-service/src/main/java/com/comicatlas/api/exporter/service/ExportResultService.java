@@ -20,6 +20,7 @@ import java.time.LocalDateTime;
 @Service
 @RequiredArgsConstructor
 public class ExportResultService {
+    // TODO(LAYER-14): Service 功能契约与具体实现未分离；应抽取 service 接口，并将实现迁移到 service/impl。
     private static final String TARGET_TYPE_COMIC = "COMIC";
     private static final String RESULT_REF_TYPE = "EXPORT_TASK";
     private final ExportTaskMapper exportTaskMapper;

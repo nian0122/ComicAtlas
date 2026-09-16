@@ -15,6 +15,7 @@ import java.nio.file.Path;
 @Service
 @RequiredArgsConstructor
 public class ExportDirectoryService {
+    // TODO(LAYER-14): Service 功能契约与具体实现未分离；应抽取 service 接口，并将实现迁移到 service/impl。
     private final ExportOperationService exportOperationService;
 
     public ExportDirectoryOpenResult open(Long taskId) {
