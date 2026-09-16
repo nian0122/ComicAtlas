@@ -7,11 +7,17 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
+import java.util.List;
+
 @Mapper
 public interface ReadingHistoryMapper extends BaseMapper<ReadingHistory> {
 
     @Select("SELECT comic_id, chapter_id, page_number, updated_at FROM reading_history WHERE comic_id = #{comicId}")
     ReadingHistory selectByComicId(@Param("comicId") Long comicId);
+
+    @Select("<script>SELECT comic_id, chapter_id, page_number FROM reading_history WHERE comic_id IN "
+            + "<foreach collection='comicIds' item='comicId' open='(' separator=',' close=')'>#{comicId}</foreach></script>")
+    List<ReadingHistory> selectByComicIds(@Param("comicIds") List<Long> comicIds);
 
     /**
      * 按漫画唯一键原子写入最近阅读进度，避免并发请求在 select-then-insert 之间产生重复记录。

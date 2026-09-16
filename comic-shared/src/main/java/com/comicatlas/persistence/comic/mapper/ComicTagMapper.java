@@ -13,4 +13,7 @@ public interface ComicTagMapper extends BaseMapper<ComicTag> {
 
     @Select("SELECT tag_id FROM comic_tag WHERE comic_id = #{comicId}")
     List<ComicTag> selectByComicId(@Param("comicId") Long comicId);
+
+    @Select("SELECT tag_id FROM comic_tag WHERE comic_id = #{comicId}")
+    List<Long> selectTagIdsByComicId(@Param("comicId") Long comicId);
 }

@@ -15,6 +15,12 @@ import java.util.List;
 @Mapper
 public interface ComicMapper extends BaseMapper<Comic> {
 
+    @Select("SELECT title, author, description, category_id FROM comic WHERE id = #{comicId}")
+    Comic selectMetadataById(@Param("comicId") Long comicId);
+
+    @Select("SELECT id FROM comic WHERE id = #{comicId}")
+    Comic selectReferenceById(@Param("comicId") Long comicId);
+
     /** 仅在 READY 时锁定漫画，保证刷新任务并发互斥。 */
     @Update("UPDATE comic SET status = 'REFRESHING' WHERE id = #{comicId} AND status = 'READY'")
     int lockForMetadataRefresh(@Param("comicId") Long comicId);
