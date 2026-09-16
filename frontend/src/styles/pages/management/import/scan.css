@@ -1,0 +1,325 @@
+/* ——— Tab switch ——— */
+.import-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: var(--space-xl);
+  border-bottom: 2px solid var(--border);
+}
+
+.import-tab {
+  padding: 10px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: all 150ms ease;
+}
+
+.import-tab:hover {
+  color: var(--text-primary);
+}
+
+.import-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* ——— Batch panel ——— */
+.batch-panel {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-xl);
+  margin-bottom: var(--space-2xl);
+}
+
+.scan-input-row {
+  display: flex;
+  gap: var(--space-base);
+}
+
+.scan-input-row .path-input {
+  flex: 1;
+}
+
+.scan-input-row .primary-btn {
+  flex-shrink: 0;
+}
+
+/* Scan result area */
+.scan-result-area {
+  margin-top: var(--space-xl);
+}
+
+.scan-loading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xl);
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* Scan results header */
+.scan-results-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-base);
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--border);
+}
+
+.check-all-links {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.link {
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.link-sep {
+  color: var(--text-muted);
+  margin: 0 2px;
+}
+
+.scan-count {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Scan items list */
+.scan-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.scan-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.scan-item:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-primary);
+}
+
+.scan-item.selected {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+
+.scan-item.blocked {
+  opacity: var(--disabled-opacity);
+  cursor: not-allowed;
+}
+
+.scan-item.blocked:hover {
+  border-color: var(--border);
+  background: transparent;
+}
+
+.scan-checkbox {
+  flex-shrink: 0;
+  pointer-events: auto;
+}
+
+.scan-item-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.scan-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-base);
+  min-width: 0;
+}
+
+.scan-item-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scan-item-count {
+  font-size: 12px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.scan-item-warnings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.warn-chip {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.warn-chip.severity-error {
+  color: var(--danger);
+  background: rgb(240 107 112 / 12%);
+}
+
+.warn-chip.severity-warning {
+  color: var(--warning);
+  background: rgb(216 165 79 / 12%);
+}
+
+.warn-chip.severity-info {
+  color: var(--info);
+  background: var(--surface-highlight);
+}
+
+.blocked-reason {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--danger);
+}
+
+.scan-item-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.preview-toggle {
+  align-self: flex-start;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 150ms ease;
+}
+
+.preview-toggle:hover {
+  color: var(--accent-hover);
+}
+
+.preview-toggle:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+
+.preview-tree {
+  margin-top: var(--space-sm);
+  padding: var(--space-sm);
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+/* 扫描统计与警告摘要 */
+.scan-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-base);
+}
+
+.scan-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-base);
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.stat-item strong {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.scan-warnings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* Scan actions */
+.scan-actions {
+  margin-top: var(--space-lg);
+  display: flex;
+  gap: var(--space-lg);
+  align-items: center;
+}
+
+/* Shared */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 640px) {
+  .source-types {
+    grid-template-columns: 1fr;
+  }
+  .form-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .ghost-link {
+    text-align: center;
+  }
+  .scan-stats {
+    gap: var(--space-sm);
+  }
+  .scan-item-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+  .scan-item-count {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}

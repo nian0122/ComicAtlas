@@ -14,7 +14,7 @@
           <span class="node-title">{{ item.title }}</span>
           <span v-if="item.count > 0" class="node-count">{{ item.count }} 话</span>
         </div>
-        <ChapterRow
+          <CatalogChapterRow
           v-else
           :chapter="item.chapter"
           :active="item.chapterId === activeChapterId"
@@ -32,7 +32,7 @@ import { computed, provide, ref, watch } from 'vue'
 import { RecycleScroller } from 'vue-virtual-scroller'
 import { ArrowRight } from '@element-plus/icons-vue'
 import type { CatalogNode, ChapterRef } from '@/entities/comic/types'
-import ChapterRow from './ChapterRow.vue'
+import CatalogChapterRow from './CatalogChapterRow.vue'
 
 /** 扁平化后的分组标题行 */
 interface HeaderFlatItem {
@@ -243,36 +243,4 @@ const flatItems = computed<FlatItem[]>(() => {
   color: var(--text-muted);
 }
 
-/* 章节行对齐 42px 固定行高（作用于子组件根元素） */
-.chapter-row {
-  height: 40px;
-  box-sizing: border-box;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
-}
-
-/* TODO(FE-STYLE): 避免父组件通过 :deep 覆盖章节行外观；由章节行自身变体或 CSS 变量表达状态。 */
-.catalog-tree :deep(.chapter-row) {
-  position: relative;
-  border-radius: 0;
-}
-
-.catalog-tree :deep(.chapter-row)::before {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: var(--chapter-guide-left, 28px);
-  width: 1px;
-  background: color-mix(in srgb, var(--border) 72%, transparent);
-  content: '';
-}
-
-.catalog-tree :deep(.chapter-row:hover) {
-  background: color-mix(in srgb, var(--bg-surface) 72%, transparent);
-}
-
-.catalog-tree :deep(.chapter-row.active) {
-  border-left: 0;
-  background: var(--accent-bg);
-  box-shadow: inset 3px 0 var(--accent);
-}
 </style>

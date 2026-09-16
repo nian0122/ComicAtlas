@@ -18,6 +18,10 @@ pnpm check
 
 ## 目录约定
 
+[样式目录规范](src/styles/README.md) · [公共组件归属](src/components/README.md)
+
+保留 `entities` 和 `features` 的业务聚合结构。全局样式统一从 `styles/index.scss` 加载，抽离的页面 CSS 集中在 `styles/pages/` 并由页面以 `scoped src` 引用；组件私有样式就近维护。公共组件集中在 `components/`，业务专属组件保留在对应 feature。
+
 ```text
 src/
 ├── entities/       # 漫画、媒体、标签等稳定领域模型与实体 API

@@ -1,0 +1,10 @@
+/* ComicAtlas 全局样式唯一入口。
+ * 顺序固定：第三方基础样式 → 视觉 token → 原生基础层 → 组件主题 → 动画工具。
+ * 主题必须在 Element Plus 之后加载，才能只用必要的选择器覆盖默认值。
+ */
+@import 'element-plus/dist/index.css';
+@import 'vue-virtual-scroller/dist/vue-virtual-scroller.css';
+@import './tokens.css';
+@import './base.css';
+@import './theme.scss';
+@import './animation.css';
