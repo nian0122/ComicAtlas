@@ -2,6 +2,7 @@ package com.comicatlas.api.task.service;
 
 import com.comicatlas.api.task.service.RabbitManagementClient;
 import com.comicatlas.api.task.service.RabbitManagementClient.QueueSnapshot;
+import com.comicatlas.api.task.service.impl.MqStatsServiceImpl;
 import com.comicatlas.common.dto.MqStatsDTO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,7 +21,7 @@ class MqStatsServiceTest {
     @BeforeEach
     void setUp() {
         managementClient = mock(RabbitManagementClient.class);
-        service = new MqStatsService(managementClient);
+        service = new MqStatsServiceImpl(managementClient);
     }
 
     @Test

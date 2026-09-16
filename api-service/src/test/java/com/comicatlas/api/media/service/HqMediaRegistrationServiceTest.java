@@ -10,6 +10,7 @@ import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Media;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.MediaMapper;
+import com.comicatlas.api.media.service.impl.HqMediaRegistrationServiceImpl;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -30,7 +31,7 @@ class HqMediaRegistrationServiceTest {
 
     private final MediaMapper mediaMapper = mock(MediaMapper.class);
     private final ChapterMapper chapterMapper = mock(ChapterMapper.class);
-    private final HqMediaRegistrationService service = new HqMediaRegistrationService(
+    private final HqMediaRegistrationService service = new HqMediaRegistrationServiceImpl(
             mediaMapper, chapterMapper);
 
     @Test

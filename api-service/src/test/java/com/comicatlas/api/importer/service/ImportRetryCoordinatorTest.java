@@ -16,6 +16,7 @@ import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.persistence.comic.mapper.MediaMapper;
 import com.comicatlas.api.storage.ApiStorageProperties;
 import com.comicatlas.api.storage.ApiStorageRoot;
+import com.comicatlas.api.importer.service.impl.ImportRetryStorageServiceImpl;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
@@ -65,7 +66,7 @@ class ImportRetryCoordinatorTest {
         hqRoot.setPath(Path.of("target/test-tmp/hq"));
         storageProperties = new ApiStorageProperties();
         storageProperties.setRoots(java.util.Map.of("METADATA", metadataRoot, "HQ", hqRoot));
-        retryStorageService = new ImportRetryStorageService(storageProperties);
+        retryStorageService = new ImportRetryStorageServiceImpl(storageProperties);
         coordinator = new ImportRetryCoordinator(
                 importTaskMapper, comicMapper, chapterMapper, mediaMapper, catalogMapper,
                 catalogCacheInvalidator, outboxService, storageProperties, redisTemplate,

@@ -6,6 +6,7 @@ import com.comicatlas.api.storage.ApiStorageRoot;
 import com.comicatlas.api.exporter.persistence.entity.ExportTask;
 import com.comicatlas.api.exporter.persistence.mapper.ExportTaskMapper;
 import com.comicatlas.api.exporter.dto.ExportArtifactVO;
+import com.comicatlas.api.exporter.service.impl.ExportArtifactServiceImpl;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.Assumptions;
@@ -33,11 +34,11 @@ class ExportArtifactServiceTest {
     private final ExportTaskMapper taskMapper = mock(ExportTaskMapper.class);
 
     private ExportArtifactService service() {
-        return new ExportArtifactService(taskMapper, storageProperties(), new ExportZipVolumeResolver());
+        return new ExportArtifactServiceImpl(taskMapper, storageProperties(), new ExportZipVolumeResolver());
     }
 
     private ExportArtifactService service(ExportZipVolumeResolver resolver) {
-        return new ExportArtifactService(taskMapper, storageProperties(), resolver);
+        return new ExportArtifactServiceImpl(taskMapper, storageProperties(), resolver);
     }
 
     private ApiStorageProperties storageProperties() {

@@ -18,6 +18,7 @@ import com.comicatlas.api.task.policy.MediaOperationEligibilityService;
 import com.comicatlas.api.task.policy.OperationPolicyService;
 import com.comicatlas.api.task.service.ManagementTaskService;
 import com.comicatlas.api.outbox.service.OutboxService;
+import com.comicatlas.api.task.batch.service.impl.BatchOperationServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -51,7 +52,7 @@ class BatchOperationServiceTest {
     @Mock private ObjectMapper objectMapper;
 
     private BatchOperationService newService(BatchEligibilityChecker checker) {
-        return new BatchOperationService(selectionResolver, checker, previewTokenStore,
+        return new BatchOperationServiceImpl(selectionResolver, checker, previewTokenStore,
                 metadataExecutor, batchProperties, managementTaskService, outboxService, objectMapper);
     }
 
