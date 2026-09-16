@@ -266,6 +266,22 @@
   border-color: var(--border) !important;
 }
 
+/* 组件按需样式晚注入时，仍然保持开关的品牌红状态。 */
+.el-switch .el-switch__core,
+.el-switch.is-checked .el-switch__core {
+  border-color: var(--accent) !important;
+  background-color: var(--accent) !important;
+}
+
+.el-switch:not(.is-checked) .el-switch__core {
+  border-color: var(--border-strong) !important;
+  background-color: var(--bg-surface) !important;
+}
+
+.el-switch__label.is-active {
+  color: var(--accent) !important;
+}
+
 /* ---------------------------------------------------------------------------
  * Input
  * ------------------------------------------------------------------------- */
@@ -469,6 +485,14 @@
   right: 10px;
   padding: 0 4px;
   border-radius: var(--radius-xs);
+}
+
+.el-input__count,
+.el-input__count-inner {
+  color: var(--text-muted) !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
 }
 
 /* Element Plus 选择器内部的搜索输入不是独立控件，不能继承全局原生 input 外观。 */
@@ -868,6 +892,17 @@
 
 .el-tabs__active-bar {
   background-color: var(--accent) !important;
+}
+
+.el-tabs__nav-wrap::after {
+  background-color: var(--border) !important;
+}
+
+.el-tabs__item:focus,
+.el-tabs__item:focus-visible,
+.el-tabs__item.is-focus {
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 /* 所有可滚动面板沿用影院黑底，避免系统滚动条露出白色轨道。 */
