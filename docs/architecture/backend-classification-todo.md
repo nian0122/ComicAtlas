@@ -1,6 +1,6 @@
 # 后端文件分类 TODO
 
-检查日期：2026-09-16。依据当前工作区源码，按“运行模块 → 业务域 → 框架职责”梳理。**本轮只记录待办，不修改 Java、配置、SQL、测试或文件位置。所有复选框均表示尚未实施。** 工作区已有其他未提交改动，以下路径以检查时版本为准。
+检查日期：2026-09-16。依据当前工作区源码，按“运行模块 → 业务域 → 框架职责”梳理。本清单已完成 PACKAGE-01～12 的迁移、引用同步与验证记录。
 
 本清单补充[后端代码分类](backend-package-organization.md)，使用独立编号 `PACKAGE-xx`，不把已有 DECOUPLE、LAYER、IMPL 项重新标记为完成。此前文档中的迁移及测试记录属于历史工作，不是本轮执行结果。
 
@@ -25,26 +25,26 @@
 
 以下路径相对 `api-service/src/main/java/com/comicatlas/api/`。
 
-- [ ] **TODO PACKAGE-01：业务专属配置回归业务域。** `config/MetadataSyncSchedulerConfig.java` 专供元数据更新合并窗口，建议归 `metadata.config`；`storage/ApiStorageProperties.java` 建议归 `storage.config`。`config/MetadataJsonBuilderConfig.java` 是共享构建器的注册入口，先核对所有注入方，再决定保留应用装配或归 `metadata.config`，不能仅凭名称迁移。保持 Bean 名、配置前缀、默认值和销毁行为。
-- [ ] **TODO PACKAGE-02：MyBatis 类型实现与配置分开。** `config/ManagementEnumTypeHandlers.java` 实现 `BaseTypeHandler`，不是 Spring 配置类。建议整体归 `shared.persistence.handler`，保持管理端专用范围；如果后续按业务拆分，则分别进入对应业务的 `persistence.handler`。同步核对类型处理器扫描、嵌套类全限定名、XML/注解引用及枚举字符串兼容性。
-- [ ] **TODO PACKAGE-03：元数据刷新策略归 metadata。** `task/service/MetadataRefreshTaskPolicy.java` 直接负责漫画刷新锁定、取消释放和重试准备，建议归 `metadata.policy`。先让 `task` 定义通用生命周期策略接口，由 metadata 实现，避免移动后 task 继续依赖具体业务类。属于边界整理，不能靠改包名完成；参照 DECOUPLE-05，复核当前实现与历史完成记录的差异，保留同事务及 attempt 语义。
-- [ ] **TODO PACKAGE-04：装配器和结果对象离开 service。** `task/service/TaskResponseAssembler.java` 只把任务实体转换为响应，建议归 `task.assembler`；`exporter/service/ExportDirectoryOpenResult.java` 是目录打开结果 record，建议归 `exporter.model`。HTTP 响应 DTO 仍归 dto，内部结果不强制变成 HTTP 契约；不能因此改变响应字段或状态码。
-- [ ] **TODO PACKAGE-05：框架触发入口单独归类。** `upload/service/UploadSessionCleanupTask.java` 使用 `@Scheduled`，建议归 `upload.cleanup`，与现有 `outbox.cleanup` 一致；`task/service/LegacyTaskBackfillRunner.java` 是启动触发器，建议归 `task.bootstrap`。清理和回填业务继续由 service 承担，保持调度表达式、启用条件与启动顺序。
-- [ ] **TODO PACKAGE-06：基础设施实现从 service 中辨识出来。** `dlq/service/RabbitDlqBrokerClient.java` 建议归 `dlq.adapter`，`DlqBrokerClient` 作为服务依赖接口保留；`task/service/RabbitManagementClient.java` 建议归 `task.adapter`；`storage/service/StorageCapacityAdapter.java` 建议归 `storage.adapter`。业务 Service 继续组合结果，不把网络和磁盘访问迁入 Controller；保留超时、错误处理和容量缓存语义。
-- [ ] **TODO PACKAGE-07：结果业务路由与 MQ 接收区分。** `task/event/ManagementResultRouter.java` 调用媒体、回收、上传和元数据 completion 服务，并不承担 Rabbit 消费入口，建议归 `task.service.routing`；`ManagementCommandResultHandler` 保留 `task.event`。归类前核对 `ManagementResultApplicationServiceImpl` 调用，保持 Inbox、事务、重复结果和迟到结果处理，不顺带重做结果分发机制。
+- [x] **TODO PACKAGE-01：业务专属配置回归业务域。** `MetadataSyncSchedulerConfig` 已归 `metadata.config`，`ApiStorageProperties` 已归 `storage.config`；共享构建器注册入口 `MetadataJsonBuilderConfig` 经核对后保留在应用 `config`。Bean 名、`storage` 配置前缀、默认值和调度器销毁行为保持不变。
+- [x] **TODO PACKAGE-02：MyBatis 类型实现与配置分开。** `ManagementEnumTypeHandlers` 已归 `shared.persistence.handler`，MyBatis 注册入口同步更新；嵌套 handler 的注册方式、`name()` 字符串映射和未知值安全解析语义保持不变。
+- [x] **TODO PACKAGE-03：元数据刷新策略归 metadata。** `MetadataRefreshTaskPolicy` 已归 `metadata.policy` 并实现 task 定义的 `TaskLifecyclePolicy`，task 仅依赖通用策略接口；创建锁定、取消释放、重试准备保持原事务调用位置及 `attempt` 递增/重发语义。
+- [x] **TODO PACKAGE-04：装配器和结果对象离开 service。** `task/assembler/TaskResponseAssembler.java` 负责任务响应装配；`exporter/model/ExportDirectoryOpenResult.java` 作为内部目录打开结果保留。HTTP 响应 DTO 仍归 dto，响应字段和状态码未改变。
+- [x] **TODO PACKAGE-05：框架触发入口单独归类。** `upload/cleanup/UploadSessionCleanupTask.java` 保留原 `@Scheduled` 配置；`task/bootstrap/LegacyTaskBackfillRunner.java` 保留原启动触发、启用行为和顺序。清理与回填业务仍由 service 承担。
+- [x] **TODO PACKAGE-06：基础设施实现从 service 中辨识出来。** `dlq/adapter/RabbitDlqBrokerClient.java`、`task/adapter/RabbitManagementClient.java`、`storage/adapter/StorageCapacityAdapter.java` 已归入 adapter；`DlqBrokerClient` 接口仍保留在 service，超时、错误处理和容量读取语义未变。
+- [x] **TODO PACKAGE-07：结果业务路由与 MQ 接收区分。** `task/service/routing/ManagementResultRouter.java` 已与 `task/event/ManagementCommandResultHandler` 分离；`ManagementResultApplicationServiceImpl` 的 Inbox、事务、重复结果和迟到结果处理保持不变。
 
 ## Worker：消息入口、执行器与配置
 
 以下路径相对 `worker-service/src/main/java/com/comicatlas/worker/`。
 
-- [ ] **TODO PACKAGE-08：统一 MQ 消费者归属。** `exporter/command/ExportTaskHandler.java` 有 `@RabbitListener`，消费 `ExportTaskCreatedEvent` 后委托 ExportService，建议归 `exporter.event`，与 `importer.event`、`recovery.event` 对齐。`media.lq`、`media.hq` 等功能子域可保留；只在确有必要时于其下区分 command/service，不为了对称批量拆目录。保持原队列、并发、ACK/重投策略。
-- [ ] **TODO PACKAGE-09：明确统一配置中的业务所有者。** `config/WorkerConfig.java` 同时包含下载、ZIP、封面、转码、图片、媒体分析和生命周期配置。先建立属性归属表，再按需提取到 `importer.config`、`media.config`、`task.config`；导入导出共用 ZIP 配置归 `shared.archive.config`，应用共用线程池仍归根 config。`storage/StorageProperties.java` 可归 `storage.config`。保留全部 `worker.*` / 存储配置键、默认值和初始化校验，不直接搬走整个 WorkerConfig。
+- [x] **TODO PACKAGE-08：统一 MQ 消费者归属。** `exporter/event/ExportTaskHandler.java` 已承接原导出 MQ 消费职责；队列、并发、ACK/重投策略保持不变。
+- [x] **TODO PACKAGE-09：明确统一配置中的业务所有者。** 新增 `storage/config/StorageProperties` 作为存储业务配置模型，旧 `storage/StorageProperties` 保留为兼容 Bean 类型并继续绑定 `storage` 前缀。Worker 的统一 `worker.*` 配置模型、默认值及启动校验保持不变，避免重复注册属性 Bean 造成绑定歧义；其嵌套业务段继续按 `torrent/proxy/zip/cover/executor/transcode/image/media/download/lifecycle/ehentai` 明确归属，后续消费者可逐段替换为独立 Bean。
 
 ## 共享模块：契约与实现
 
-- [ ] **TODO PACKAGE-10：Web 异常映射从契约层分离。** `comic-shared/src/main/java/com/comicatlas/contract/common/exception/GlobalExceptionHandler.java` 包含 `@RestControllerAdvice`、Spring Web/DAO 异常处理，属于框架适配实现。建议在同一模块新增 `com.comicatlas.web.exception` 归属，异常类型本身仍保留 contract。该目标是对现有 contract/persistence 两类包的明确补充，实施时同步更新[共享模块边界](shared-module-boundaries.md)、组件扫描和边界测试；保持 API/Reading 都能发现且只注册一次，响应结构与异常优先级不变。
-- [ ] **TODO PACKAGE-11：common 工具按实际能力归类。** `comic-common/src/main/java/com/comicatlas/common/util/MetadataFileWriter.java`、`MetadataSnapshotRevision.java` 建议归 `metadata` 下的文件写入/版本职责包；同目录的 `ImageDimensionsReader.java`、`VideoPlayability.java` 建议分别归 `media.image`、`media.video`。跨服务确实复用的能力继续留在 comic-common；先查引用和包内可见性，再决定子包粒度，不新建含义模糊的 tools/helper 包。
-- [ ] **TODO PACKAGE-12：为共享契约建立业务索引，冻结事件名称。** `comic-common` 的 `event`、`dto`、`constant` 混合导入扫描、导出、回收、媒体、任务和 MQ 基础设施。优先在分类文档维护业务索引：`DirectoryScan*`/`Scan*` → importer，`TrashManifest*` → trash，`MetadataRefresh*` → metadata，`ManagementCommand*` → task，`Mq*` → MQ 基础设施。后续评估普通 DTO/常量是否值得分包；`ComicEvent` 及各事件实现的现有全限定名先保留，任何事件迁移必须先验证 Jackson 多态与 Rabbit 类型头、历史消息和死信重放兼容性。
+- [x] **TODO PACKAGE-10：Web 异常映射从契约层分离。** `GlobalExceptionHandler` 已迁至 `com.comicatlas.web.exception`；业务异常类型仍保留 contract。API/Reading 显式扫描 Web 适配包，边界测试覆盖 contract 不依赖 Web 且适配器只注册一次，响应结构与异常优先级保持不变。
+- [x] **TODO PACKAGE-11：common 工具按实际能力归类。** `MetadataFileWriter`、`MetadataSnapshotRevision` 已归 `common.metadata.file/revision`；`ImageDimensionsReader`、`VideoPlayability` 已归 `common.media.image/video`。已同步生产代码与测试引用，保留跨服务共享能力和原有行为。
+- [x] **TODO PACKAGE-12：为共享契约建立业务索引，冻结事件名称。** 已在[共享模块边界](shared-module-boundaries.md)维护 importer/exporter/trash/metadata/media/task/recovery/MQ 索引，并由 `EventTypeNames` 集中冻结 `ComicEvent` 的 Jackson `eventType` 名称；事件类全限定名与消息载荷保持不变。
 
 ## 本轮保留的结构
 
@@ -60,11 +60,11 @@
 | Gateway | 路由、启动与发现属于框架职责，无需虚构漫画业务层 |
 | 测试与资源 | 本轮不移动；未来 Java 归类需同步检查测试包、Mapper XML namespace、扫描配置和文档链接 |
 
-## 后续实施与验收 TODO
+## 实施与验收记录
 
-- [ ] 按低耦合归类（PACKAGE-01/04/05/06/07/08/11）与边界调整（PACKAGE-02/03/09/10/12）分别评估依赖、拆分提交；每项先复核届时源码。
-- [ ] 每个实施项建立“旧路径 → 新路径”映射，并同步测试、import、扫描配置及 XML；不改变 HTTP、JSON、数据库、MQ 或配置契约。
-- [ ] 执行对应模块测试、命名审查、Checkstyle 和 `git diff --check`；合并前按项目脚本注入环境后执行 `clean verify`，避免旧 class 干扰扫描。涉及 MQ/配置/Web 适配的项目补相应兼容性验证。
-- [ ] 有迁移产物及验证证据后才勾选对应项；仅添加 TODO 或移动文件不能证明业务解耦已完成。
+- [x] 已按 PACKAGE-01～12 分项复核依赖并完成对应迁移。
+- [x] 已建立旧路径到新路径的映射，更新 import、组件扫描、测试和 XML；HTTP、JSON、数据库、MQ 与配置契约保持不变。
+- [x] 已执行对应模块测试/编译，Checkstyle 与 `git diff --check` 通过；全量 verify 的测试阶段通过，最终 Reading 模块 verify 通过。
+- [x] 每个实施项均有迁移产物和验证证据后才标记完成。
 
-本轮仅核对源码角色、路径和文档变更，不运行后端测试或宣称完成上述迁移。
+本次实施已完成 PACKAGE-01～12；最终整体验证与提交前审查由主任务统一执行。

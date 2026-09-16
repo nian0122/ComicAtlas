@@ -32,7 +32,7 @@ import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO.ChapterSnapshot;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO.MediaSnapshot;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.common.event.MetadataRefreshScanCompletedEvent;
-import com.comicatlas.common.util.MetadataSnapshotRevision;
+import com.comicatlas.common.metadata.revision.MetadataSnapshotRevision;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;

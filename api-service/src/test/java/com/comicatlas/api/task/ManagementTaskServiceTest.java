@@ -1,5 +1,6 @@
 package com.comicatlas.api.task.service;
 
+import com.comicatlas.api.task.assembler.TaskResponseAssembler;
 import com.comicatlas.api.exporter.persistence.mapper.ExportTaskMapper;
 import com.comicatlas.api.importer.persistence.entity.ImportTask;
 import com.comicatlas.api.importer.persistence.mapper.ImportTaskMapper;
@@ -33,6 +34,7 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import com.comicatlas.api.task.service.impl.ManagementTaskServiceImpl;
+import com.comicatlas.api.metadata.policy.MetadataRefreshTaskPolicy;
 import com.comicatlas.api.task.service.impl.TaskAggregationServiceImpl;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -90,7 +92,7 @@ class ManagementTaskServiceTest {
     @BeforeEach
     void injectAggregationService() {
         ReflectionTestUtils.setField(service, "taskAggregationService", taskAggregationService);
-        ReflectionTestUtils.setField(service, "metadataRefreshTaskPolicy", metadataRefreshTaskPolicy);
+        ReflectionTestUtils.setField(service, "taskLifecyclePolicy", metadataRefreshTaskPolicy);
     }
 
     @Test

@@ -3,7 +3,7 @@ package com.comicatlas.api.exporter.service.impl;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.api.exporter.enums.ExportTaskStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
-import com.comicatlas.api.storage.ApiStorageProperties;
+import com.comicatlas.api.storage.config.ApiStorageProperties;
 import com.comicatlas.api.storage.PathTraversalException;
 import com.comicatlas.api.exporter.persistence.entity.ExportTask;
 import com.comicatlas.api.exporter.persistence.mapper.ExportTaskMapper;

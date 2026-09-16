@@ -3,7 +3,7 @@ package com.comicatlas.api.task.controller;
 import com.comicatlas.api.dlq.config.DlqSecurityConfig;
 import com.comicatlas.api.task.service.MqStatsService;
 import com.comicatlas.common.dto.MqStatsDTO;
-import com.comicatlas.contract.common.exception.GlobalExceptionHandler;
+import com.comicatlas.web.exception.GlobalExceptionHandler;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;

@@ -2,7 +2,7 @@ package com.comicatlas.api.dlq.controller;
 
 import com.comicatlas.api.dlq.service.DlqService;
 import com.comicatlas.api.dlq.config.DlqSecurityConfig;
-import com.comicatlas.contract.common.exception.GlobalExceptionHandler;
+import com.comicatlas.web.exception.GlobalExceptionHandler;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;

@@ -24,7 +24,7 @@ import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.api.task.enums.TaskType;
 import com.comicatlas.contract.common.enums.TranscodeStatus;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
-import com.comicatlas.common.util.VideoPlayability;
+import com.comicatlas.common.media.video.VideoPlayability;
 import com.comicatlas.api.media.service.MediaOperationCommandService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

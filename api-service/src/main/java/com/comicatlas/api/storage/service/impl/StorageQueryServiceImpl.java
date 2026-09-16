@@ -10,7 +10,7 @@ import com.comicatlas.api.storage.dto.StorageStatsDTO;
 import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.contract.comic.cache.ComicReferenceCache;
 import com.comicatlas.api.storage.persistence.mapper.StorageMapper;
-import com.comicatlas.api.storage.service.StorageCapacityAdapter;
+import com.comicatlas.api.storage.adapter.StorageCapacityAdapter;
 import com.comicatlas.persistence.storage.FileUrlResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -21,7 +21,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.nio.file.Path;
 import org.springframework.cache.annotation.Cacheable;
-import com.comicatlas.api.storage.ApiStorageProperties;
+import com.comicatlas.api.storage.config.ApiStorageProperties;
 
 @Service
 @RequiredArgsConstructor

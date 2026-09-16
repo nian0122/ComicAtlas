@@ -29,6 +29,15 @@ class SharedPackageBoundaryTest {
         }
     }
 
+    @Test
+    void webAdapterMustStayOutsideContract() throws IOException {
+        Path handler = sourceRoot().resolve("web/exception/GlobalExceptionHandler.java");
+        assertTrue(Files.exists(handler), "Web 异常映射应位于 web 适配包");
+        assertTrue(Files.readString(handler).contains("@RestControllerAdvice"));
+        assertTrue(!Files.exists(sourceRoot().resolve("contract/common/exception/GlobalExceptionHandler.java")),
+                "contract 不得保留 Web 异常映射实现");
+    }
+
     private static void assertNoForbiddenImport(Path path, String... fragments) {
         try {
             String source = Files.readString(path);

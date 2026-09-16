@@ -8,7 +8,7 @@ import com.comicatlas.api.exporter.dto.ExportArtifactVO;
 import com.comicatlas.api.exporter.service.ExportOperationService;
 import com.comicatlas.api.exporter.controller.ExportController;
 import com.comicatlas.api.exporter.service.ExportDirectoryService;
-import com.comicatlas.api.exporter.service.ExportDirectoryOpenResult;
+import com.comicatlas.api.exporter.model.ExportDirectoryOpenResult;
 import com.comicatlas.api.media.service.HqDeleteOperationService;
 import com.comicatlas.api.media.service.LqOperationService;
 import com.comicatlas.api.media.service.TranscodeOperationService;

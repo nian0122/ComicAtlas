@@ -4,7 +4,7 @@ import com.comicatlas.api.outbox.service.EventFingerprintService;
 import com.comicatlas.api.outbox.service.InboxService;
 import com.comicatlas.api.task.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.task.enums.ManagementTaskStatus;
-import com.comicatlas.api.task.event.ManagementResultRouter;
+import com.comicatlas.api.task.service.routing.ManagementResultRouter;
 import com.comicatlas.common.event.ComicEvent;
 import com.comicatlas.common.event.ManagementCommandCompletedEvent;
 import com.comicatlas.common.event.ManagementCommandFailedEvent;

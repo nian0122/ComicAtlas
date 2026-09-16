@@ -43,7 +43,7 @@ import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.common.event.MetadataRefreshEvent;
 import com.comicatlas.common.event.MetadataRefreshScanCompletedEvent;
 import com.comicatlas.common.event.payload.LqSizeResult;
-import com.comicatlas.common.util.MetadataSnapshotRevision;
+import com.comicatlas.common.metadata.revision.MetadataSnapshotRevision;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;

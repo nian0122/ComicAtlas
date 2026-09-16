@@ -1,7 +1,7 @@
 package com.comicatlas.api.exporter.service.impl;
 
 import com.comicatlas.api.exporter.dto.ExportTaskVO;
-import com.comicatlas.api.exporter.service.ExportDirectoryOpenResult;
+import com.comicatlas.api.exporter.model.ExportDirectoryOpenResult;
 import com.comicatlas.api.exporter.service.ExportOperationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

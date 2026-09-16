@@ -3,7 +3,7 @@ package com.comicatlas.worker.media.event;
 import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.event.MetadataRefreshEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
-import com.comicatlas.common.util.MetadataFileWriter;
+import com.comicatlas.common.metadata.file.MetadataFileWriter;
 import com.comicatlas.worker.shared.metadata.MetadataExporter;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.rabbitmq.client.Channel;

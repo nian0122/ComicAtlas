@@ -2,7 +2,7 @@ package com.comicatlas.api.exporter.controller;
 
 import com.comicatlas.api.exporter.dto.ExportArtifactVO;
 import com.comicatlas.api.exporter.dto.ExportTaskVO;
-import com.comicatlas.api.exporter.service.ExportDirectoryOpenResult;
+import com.comicatlas.api.exporter.model.ExportDirectoryOpenResult;
 import com.comicatlas.api.exporter.service.ExportDirectoryService;
 import com.comicatlas.api.exporter.service.ExportOperationService;
 import com.comicatlas.contract.common.Result;

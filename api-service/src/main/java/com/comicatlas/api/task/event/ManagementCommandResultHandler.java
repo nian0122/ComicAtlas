@@ -1,6 +1,7 @@
 package com.comicatlas.api.task.event;
 
 import com.comicatlas.api.task.service.ManagementResultApplicationService;
+import com.comicatlas.api.task.service.routing.ManagementResultRouter;
 import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.event.ComicEvent;
 import com.comicatlas.common.event.ManagementCommandCompletedEvent;
