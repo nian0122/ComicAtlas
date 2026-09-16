@@ -15,6 +15,10 @@ public interface ChapterMapper extends BaseMapper<Chapter> {
     @Select("SELECT id, comic_id, title, status, global_order FROM chapter WHERE id = #{chapterId}")
     Chapter selectReaderChapter(@Param("chapterId") Long chapterId);
 
+    @Select("SELECT id, catalog_id, chapter_no, title, global_order, page_count FROM chapter "
+            + "WHERE comic_id = #{comicId} AND status = 'READY' ORDER BY global_order ASC")
+    List<Chapter> selectReadyCatalogChapters(@Param("comicId") Long comicId);
+
     @Select("SELECT id FROM chapter WHERE comic_id = #{comicId} AND status = 'READY' "
             + "AND global_order < #{globalOrder} ORDER BY global_order DESC LIMIT 1")
     Long selectPreviousReadyChapterId(@Param("comicId") Long comicId, @Param("globalOrder") Integer globalOrder);
