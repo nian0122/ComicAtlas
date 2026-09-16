@@ -548,10 +548,23 @@
 
 /* 输入组件根节点不绘制第二层边框，焦点只由内部 wrapper 负责。 */
 .el-input,
-.el-input:focus-within {
-  border-color: transparent !important;
+.el-select {
+  border: 1px solid transparent !important;
+  border-radius: var(--control-radius);
   box-shadow: none !important;
   outline: none !important;
+}
+
+.el-input:focus-within,
+.el-select:focus-within,
+.el-select.is-focused {
+  border-color: var(--accent) !important;
+}
+
+.el-input:focus-within .el-input__wrapper,
+.el-select:focus-within .el-select__wrapper,
+.el-select.is-focused .el-select__wrapper {
+  box-shadow: none !important;
 }
 
 .el-input .el-input__wrapper:hover,
@@ -1011,7 +1024,7 @@
 .el-select:focus-within .el-select__wrapper {
   outline: none;
   border-color: transparent;
-  box-shadow: inset 0 0 0 1px var(--accent), var(--shadow-sm);
+  box-shadow: none !important;
 }
 
 /* Element Plus 进度条默认使用蓝色 primary，管理任务进度必须沿用品牌红。 */
