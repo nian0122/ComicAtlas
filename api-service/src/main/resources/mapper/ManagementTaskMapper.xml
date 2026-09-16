@@ -1,6 +1,19 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.comicatlas.api.task.persistence.mapper.ManagementTaskMapper">
+    <select id="selectPageByCondition" resultType="com.comicatlas.api.task.persistence.entity.ManagementTask">
+        SELECT * FROM management_task
+        <where>
+            <if test="taskType != null and taskType != ''">AND task_type = #{taskType}</if>
+            <if test="status != null and status != ''">AND status = #{status}</if>
+            <if test="batchId != null and batchId != ''">AND batch_id = #{batchId}</if>
+            <if test="targetType != null and targetType != ''">AND target_type = #{targetType}</if>
+            <if test="taskIds != null and !taskIds.isEmpty()">
+                AND id IN <foreach collection="taskIds" item="taskId" open="(" separator="," close=")">#{taskId}</foreach>
+            </if>
+        </where>
+        ORDER BY created_at DESC
+    </select>
     <update id="updateStage">
         UPDATE management_task
         SET stage = #{stage}, updated_at = #{updatedAt}

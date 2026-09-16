@@ -1,6 +1,5 @@
 package com.comicatlas.api.recovery.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
@@ -63,12 +62,10 @@ public class RecoveryTaskServiceImpl implements RecoveryTaskService {
 
     @Override
     public IPage<RecoveryTaskVO> listTasks(Integer page, Integer size) {
-        LambdaQueryWrapper<RecoveryTask> wrapper = new LambdaQueryWrapper<RecoveryTask>()
-            .orderByDesc(RecoveryTask::getCreatedAt);
         Page<RecoveryTask> pageRequest = new Page<>(
             page != null ? page : DEFAULT_PAGE,
             size != null ? size : DEFAULT_PAGE_SIZE);
-        return recoveryTaskMapper.selectPage(pageRequest, wrapper).convert(this::toVO);
+        return recoveryTaskMapper.selectPageOrderByCreatedAtDesc(pageRequest).convert(this::toVO);
     }
 
     @Override
@@ -137,10 +134,7 @@ public class RecoveryTaskServiceImpl implements RecoveryTaskService {
     }
 
     private void rejectActiveTask() {
-        long runningCount = recoveryTaskMapper.selectCount(
-            new LambdaQueryWrapper<RecoveryTask>()
-                .in(RecoveryTask::getStatus, RecoveryTaskStatus.RUNNING, RecoveryTaskStatus.QUEUED)
-        );
+        long runningCount = recoveryTaskMapper.countActiveTasks();
         if (runningCount > 0) {
             throw new BusinessException(HttpStatusCodes.CONFLICT, "已有恢复任务正在执行");
         }

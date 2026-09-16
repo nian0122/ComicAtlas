@@ -1,6 +1,5 @@
 package com.comicatlas.api.metadata.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.persistence.comic.assembler.ComicDetailAssembler;
 import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.metadata.service.ComicManagementService;
@@ -190,8 +189,7 @@ public class ComicManagementServiceImpl implements ComicManagementService {
             }
         }
 
-        comicTagMapper.delete(
-                new LambdaQueryWrapper<ComicTag>().eq(ComicTag::getComicId, comicId));
+        comicTagMapper.deleteByComicId(comicId);
 
         if (tagIds != null) {
             for (Long tagId : tagIds) {
@@ -252,10 +250,7 @@ public class ComicManagementServiceImpl implements ComicManagementService {
                     }
 
                     // Query existing comic tags
-                    List<Long> existingComicTagIds = comicTagMapper.selectList(
-                                    new LambdaQueryWrapper<ComicTag>()
-                                            .eq(ComicTag::getComicId, comicId))
-                            .stream().map(ComicTag::getTagId).toList();
+                    List<Long> existingComicTagIds = comicTagMapper.selectTagIdsByComicId(comicId);
 
                     // Insert only non-existing tag associations
                     for (Long tagId : validTagIds) {

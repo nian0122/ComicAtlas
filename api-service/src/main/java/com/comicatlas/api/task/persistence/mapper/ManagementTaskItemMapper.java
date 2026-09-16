@@ -5,6 +5,7 @@ import com.comicatlas.api.task.persistence.entity.ManagementTaskItem;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Update;
+import org.apache.ibatis.annotations.Select;
 
 import java.util.List;
 import java.time.LocalDateTime;
@@ -14,6 +15,22 @@ import java.time.LocalDateTime;
  */
 @Mapper
 public interface ManagementTaskItemMapper extends BaseMapper<ManagementTaskItem> {
+
+    @Select("SELECT * FROM management_task_item WHERE task_id = #{taskId} ORDER BY id")
+    List<ManagementTaskItem> selectByTaskId(@Param("taskId") Long taskId);
+
+    @Select("SELECT * FROM management_task_item WHERE target_type = #{targetType} AND target_id = #{targetId} AND operation_type = #{operationType} AND status IN ('QUEUED','RUNNING','CANCELLING') ORDER BY id DESC LIMIT 1")
+    ManagementTaskItem selectActiveByTarget(@Param("targetType") String targetType,
+            @Param("targetId") Long targetId, @Param("operationType") String operationType);
+
+    @Select("SELECT COUNT(*) FROM management_task_item WHERE task_id = #{taskId} AND status IN ('QUEUED','RUNNING','CANCELLING')")
+    long countActiveByTaskId(@Param("taskId") Long taskId);
+
+    @Select("SELECT COUNT(*) FROM management_task_item WHERE lock_key = #{lockKey}")
+    long countByLockKey(@Param("lockKey") String lockKey);
+
+    @Select("<script>SELECT * FROM management_task_item WHERE task_id IN <foreach collection='taskIds' item='taskId' open='(' separator=',' close=')'>#{taskId}</foreach> ORDER BY id</script>")
+    List<ManagementTaskItem> selectByTaskIds(@Param("taskIds") List<Long> taskIds);
 
     @Update("UPDATE management_task_item SET status = 'SUCCEEDED', completed_at = #{completedAt}, lock_key = NULL, updated_at = #{updatedAt} WHERE id = #{itemId} AND attempt = #{attempt} AND status NOT IN ('CANCELLED', 'SUCCEEDED', 'PARTIALLY_SUCCEEDED', 'FAILED')")
     int markSucceededIfActive(@Param("itemId") Long itemId, @Param("attempt") int attempt,

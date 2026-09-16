@@ -1,6 +1,5 @@
 package com.comicatlas.api.storage.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.contract.common.enums.HqStatus;
 import com.comicatlas.contract.common.enums.LqStatus;
 import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
@@ -52,9 +51,7 @@ public class ComicStatsServiceImpl implements ComicStatsService {
         if (chapter == null) {
             return;
         }
-        long pageCount = mediaMapper.selectCount(new LambdaQueryWrapper<Media>()
-                .eq(Media::getChapterId, chapterId)
-                .notIn(Media::getStatus, MediaLifecycleStatus.DELETED, MediaLifecycleStatus.TRASHED));
+        long pageCount = mediaMapper.countActiveByChapterId(chapterId);
         chapterMapper.updatePageCount(chapterId, (int) pageCount);
         Comic comic = comicMapper.selectById(chapter.getComicId());
         if (comic == null) {
@@ -69,15 +66,13 @@ public class ComicStatsServiceImpl implements ComicStatsService {
         if (comicId == null) {
             return;
         }
-        List<Chapter> chapters = chapterMapper.selectList(
-                new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
+        List<Chapter> chapters = chapterMapper.selectByComicIdOrderByGlobalOrder(comicId);
         if (chapters.isEmpty()) {
             updateComicStats(comicId, 0, 0L, 0L);
             return;
         }
         List<Long> chapterIds = chapters.stream().map(Chapter::getId).toList();
-        List<Media> mediaItems = mediaMapper.selectList(
-                new LambdaQueryWrapper<Media>().in(Media::getChapterId, chapterIds));
+        List<Media> mediaItems = mediaMapper.selectByChapterIds(chapterIds);
         Map<Long, Long> pageCountByChapter = mediaItems.stream()
                 .filter(media -> media.getStatus() != MediaLifecycleStatus.DELETED
                         && media.getStatus() != MediaLifecycleStatus.TRASHED)
@@ -98,7 +93,7 @@ public class ComicStatsServiceImpl implements ComicStatsService {
 
     /** 漫画 ID → 章节 ID 列表（批量操作创建的 COMIC 目标 item 展开处理）。 */
     public List<Long> chapterIdsOf(Long comicId) {
-        return chapterMapper.selectList(new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId))
+        return chapterMapper.selectByComicIdOrderByGlobalOrder(comicId)
                 .stream()
                 .map(Chapter::getId)
                 .toList();
@@ -110,9 +105,7 @@ public class ComicStatsServiceImpl implements ComicStatsService {
         if (chapterIds.isEmpty()) {
             return List.of();
         }
-        return mediaMapper.selectList(new LambdaQueryWrapper<Media>()
-                        .in(Media::getChapterId, chapterIds)
-                        .eq(Media::getMediaType, MEDIA_TYPE_VIDEO))
+        return mediaMapper.selectVideosByChapterIds(chapterIds)
                 .stream()
                 .map(Media::getId)
                 .toList();
@@ -120,14 +113,12 @@ public class ComicStatsServiceImpl implements ComicStatsService {
 
     /** 整本媒体行重算：hqSize（HQ 非 DELETED 的 fileSize 之和）+ lqSize（IMAGE 且 LQ READY 的 lqSize 之和）。 */
     private void recomputeComicStats(Long comicId) {
-        List<Chapter> chapters = chapterMapper.selectList(
-                new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
+        List<Chapter> chapters = chapterMapper.selectByComicIdOrderByGlobalOrder(comicId);
         if (chapters.isEmpty()) {
             return;
         }
         List<Long> chapterIds = chapters.stream().map(Chapter::getId).toList();
-        List<Media> mediaItems = mediaMapper.selectList(
-                new LambdaQueryWrapper<Media>().in(Media::getChapterId, chapterIds));
+        List<Media> mediaItems = mediaMapper.selectByChapterIds(chapterIds);
         long hqSize = calculateHqSize(mediaItems);
         long lqSize = calculateLqSize(mediaItems);
         comicMapper.updateStorageStats(comicId, hqSize, lqSize);
@@ -140,9 +131,7 @@ public class ComicStatsServiceImpl implements ComicStatsService {
         if (chapterIds.isEmpty()) {
             return;
         }
-        long totalPages = mediaMapper.selectCount(new LambdaQueryWrapper<Media>()
-                .in(Media::getChapterId, chapterIds)
-                .notIn(Media::getStatus, MediaLifecycleStatus.DELETED, MediaLifecycleStatus.TRASHED));
+        long totalPages = mediaMapper.countActiveByChapterIds(chapterIds);
         comicMapper.updateTotalPages(comicId, (int) totalPages);
     }
 

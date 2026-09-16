@@ -20,11 +20,98 @@ import java.time.LocalDateTime;
 @Mapper
 public interface MediaMapper extends BaseMapper<Media> {
 
+    @Select("SELECT id, chapter_id, page_number FROM page WHERE chapter_id = #{chapterId} ORDER BY page_number ASC")
+    List<Media> selectPageNumbersByChapterId(@Param("chapterId") Long chapterId);
+
+    @Select("SELECT id, chapter_id, page_number, hq_root, hq_path, lq_root, lq_path, hq_status, lq_status, status, lq_size, width, height, hq_size, media_type, duration, container, video_codec, audio_codec FROM page WHERE chapter_id = #{chapterId} AND status = 'READY' ORDER BY page_number ASC")
+    List<Media> selectReadyByChapterIdForManagement(@Param("chapterId") Long chapterId);
+
+    @Select("<script>SELECT COUNT(*) FROM page WHERE chapter_id IN <foreach collection='chapterIds' item='chapterId' open='(' separator=',' close=')'>#{chapterId}</foreach></script>")
+    long countByChapterIds(@Param("chapterIds") List<Long> chapterIds);
+
+    @org.apache.ibatis.annotations.Delete("<script>DELETE FROM page WHERE chapter_id IN <foreach collection='chapterIds' item='chapterId' open='(' separator=',' close=')'>#{chapterId}</foreach></script>")
+    int deleteByChapterIds(@Param("chapterIds") List<Long> chapterIds);
+
+    @org.apache.ibatis.annotations.Delete("DELETE FROM page WHERE chapter_id = #{chapterId}")
+    int deleteByChapterId(@Param("chapterId") Long chapterId);
+
+    @Select("SELECT id FROM page WHERE chapter_id = #{chapterId} AND media_type = 'IMAGE' "
+            + "AND hq_status IN ('READY', 'DELETE_QUEUED', 'DELETING', 'MISSING')")
+    List<Media> selectHqDeleteCandidates(@Param("chapterId") Long chapterId);
+
     @Select("SELECT id, chapter_id, page_number, hq_root, hq_path, lq_root, lq_path, hq_status, lq_status, "
             + "transcode_status, status, lq_size, width, height, hq_size, media_type, duration, container, "
             + "video_codec, audio_codec FROM page WHERE chapter_id = #{chapterId} AND status = 'READY' "
             + "ORDER BY page_number ASC")
     List<Media> selectReadyByChapterId(@Param("chapterId") Long chapterId);
+
+    @Select({"<script>",
+            "SELECT COUNT(*) FROM page WHERE chapter_id IN",
+            "<foreach collection='chapterIds' item='chapterId' open='(' separator=',' close=')'>#{chapterId}</foreach>",
+            "AND hq_status &lt;&gt; #{readyStatus}",
+            "</script>"})
+    long countByChapterIdsAndHqStatusNot(@Param("chapterIds") List<Long> chapterIds,
+                                         @Param("readyStatus") String readyStatus);
+
+    @Select({"<script>",
+            "SELECT id, chapter_id, page_number, hq_root, hq_path, lq_root, lq_path, hq_status, lq_status,",
+            "transcode_status, status, lq_size, width, height, hq_size, media_type, duration, container,",
+            "video_codec, audio_codec FROM page WHERE chapter_id IN",
+            "<foreach collection='chapterIds' item='chapterId' open='(' separator=',' close=')'>#{chapterId}</foreach>",
+            "</script>"})
+    List<Media> selectAllByChapterIds(@Param("chapterIds") List<Long> chapterIds);
+
+    @Select({"<script>",
+            "SELECT id, chapter_id, page_number, hq_root, hq_path, lq_root, lq_path, hq_status, lq_status,",
+            "transcode_status, status, lq_size, width, height, hq_size, media_type, duration, container,",
+            "video_codec, audio_codec FROM page WHERE chapter_id IN",
+            "<foreach collection='chapterIds' item='chapterId' open='(' separator=',' close=')'>#{chapterId}</foreach>",
+            "AND status NOT IN",
+            "<foreach collection='inactiveStatuses' item='status' open='(' separator=',' close=')'>#{status}</foreach>",
+            "</script>"})
+    List<Media> selectActiveByChapterIds(@Param("chapterIds") List<Long> chapterIds,
+                                         @Param("inactiveStatuses") List<String> inactiveStatuses);
+
+    @Select("SELECT id, chapter_id, page_number, hq_root, hq_path, lq_root, lq_path, hq_status, lq_status, "
+            + "transcode_status, status, lq_size, width, height, hq_size, media_type, duration, container, "
+            + "video_codec, audio_codec FROM page WHERE chapter_id = #{chapterId} ORDER BY page_number ASC")
+    List<Media> selectByChapterId(@Param("chapterId") Long chapterId);
+
+    @Select("SELECT id, chapter_id, page_number, hq_root, hq_path, lq_root, lq_path, hq_status, lq_status, "
+            + "transcode_status, status, lq_size, width, height, hq_size, media_type, duration, container, "
+            + "video_codec, audio_codec FROM page WHERE chapter_id = #{chapterId} AND media_type = 'IMAGE' "
+            + "ORDER BY page_number ASC")
+    List<Media> selectImagesByChapterId(@Param("chapterId") Long chapterId);
+
+    @Select("<script>SELECT id, chapter_id, page_number, hq_root, hq_path, lq_root, lq_path, hq_status, lq_status, "
+            + "transcode_status, status, lq_size, width, height, hq_size, media_type, duration, container, video_codec, audio_codec "
+            + "FROM page WHERE chapter_id IN <foreach collection='chapterIds' item='chapterId' open='(' separator=',' close=')'>#{chapterId}</foreach> "
+            + "ORDER BY chapter_id, page_number</script>")
+    List<Media> selectByChapterIds(@Param("chapterIds") List<Long> chapterIds);
+
+    @Select("<script>SELECT id, chapter_id, page_number, hq_root, hq_path, lq_root, lq_path, hq_status, lq_status, "
+            + "transcode_status, status, lq_size, width, height, hq_size, media_type, duration, container, video_codec, audio_codec "
+            + "FROM page WHERE chapter_id IN <foreach collection='chapterIds' item='chapterId' open='(' separator=',' close=')'>#{chapterId}</foreach> "
+            + "AND media_type = 'IMAGE' AND hq_status IN ('READY','MISSING') ORDER BY chapter_id, page_number</script>")
+    List<Media> selectDeletableImagesByChapterIds(@Param("chapterIds") List<Long> chapterIds);
+
+    @Select("SELECT COUNT(*) FROM page WHERE chapter_id = #{chapterId} AND media_type = 'IMAGE' AND hq_status IN ('READY','MISSING')")
+    long countDeletableImagesByChapterId(@Param("chapterId") Long chapterId);
+
+    @Select("<script>SELECT id, chapter_id, page_number, hq_root, hq_path, lq_root, lq_status, hq_status, "
+            + "transcode_status, status, lq_size, width, height, hq_size, media_type, duration, container, video_codec, audio_codec "
+            + "FROM page WHERE chapter_id IN <foreach collection='chapterIds' item='chapterId' open='(' separator=',' close=')'>#{chapterId}</foreach> "
+            + "AND media_type = 'VIDEO' ORDER BY chapter_id, page_number</script>")
+    List<Media> selectVideosByChapterIds(@Param("chapterIds") List<Long> chapterIds);
+
+    @Select("SELECT id, chapter_id, page_number, hq_root, hq_path, lq_root, lq_path, hq_status, lq_status, transcode_status, status, lq_size, width, height, hq_size, media_type, duration, container, video_codec, audio_codec FROM page WHERE chapter_id = #{chapterId} AND media_type = 'VIDEO' ORDER BY page_number")
+    List<Media> selectVideosByChapterId(@Param("chapterId") Long chapterId);
+
+    @Select("SELECT COUNT(*) FROM page WHERE chapter_id = #{chapterId} AND status NOT IN ('DELETED','TRASHED')")
+    long countActiveByChapterId(@Param("chapterId") Long chapterId);
+
+    @Select("<script>SELECT COUNT(*) FROM page WHERE chapter_id IN <foreach collection='chapterIds' item='chapterId' open='(' separator=',' close=')'>#{chapterId}</foreach> AND status NOT IN ('DELETED','TRASHED')</script>")
+    long countActiveByChapterIds(@Param("chapterIds") List<Long> chapterIds);
 
     @Update("UPDATE page SET lq_status = 'QUEUED' WHERE chapter_id = #{chapterId} AND media_type = 'IMAGE' AND hq_status <> 'DELETED'")
     int markLqQueued(@Param("chapterId") Long chapterId);

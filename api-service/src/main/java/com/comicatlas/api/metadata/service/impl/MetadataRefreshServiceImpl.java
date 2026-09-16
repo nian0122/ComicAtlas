@@ -13,7 +13,6 @@ import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Media;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.MediaMapper;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 // 条件更新由元数据业务服务维护状态机与并发边界，Mapper 执行参数化更新。
 // 架构说明：Service 直接构造 LambdaUpdateWrapper 更新媒体刷新字段；条件更新应收口到 MediaMapper。
 import com.comicatlas.common.constant.MetadataRefreshLimits;
@@ -133,8 +132,7 @@ public class MetadataRefreshServiceImpl implements MetadataRefreshService {
         }
 
         // 批量预取章节（一次查询）
-        List<Chapter> chapters = chapterMapper.selectList(
-                new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
+        List<Chapter> chapters = chapterMapper.selectByComicId(comicId);
         Map<Long, Chapter> chapterById = chapters.stream()
                 .collect(Collectors.toMap(Chapter::getId, c -> c));
         validateChapters(snapshot, chapterById);
@@ -143,10 +141,8 @@ public class MetadataRefreshServiceImpl implements MetadataRefreshService {
         List<Long> snapshotChapterIds = snapshot.chapters().stream()
                 .map(ChapterSnapshot::chapterId)
                 .toList();
-        List<Media> activeMedia = snapshotChapterIds.isEmpty() ? List.of() : mediaMapper.selectList(
-                new LambdaQueryWrapper<Media>()
-                        .in(Media::getChapterId, snapshotChapterIds)
-                        .notIn(Media::getStatus, INACTIVE_STATUSES));
+        List<Media> activeMedia = snapshotChapterIds.isEmpty() ? List.of()
+                : mediaMapper.selectActiveByChapterIds(snapshotChapterIds, INACTIVE_STATUSES);
 
         MergePlan plan = buildMergePlan(snapshot, activeMedia);
         executeMerge(plan);

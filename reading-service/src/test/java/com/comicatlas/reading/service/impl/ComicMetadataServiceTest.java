@@ -14,7 +14,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -40,19 +39,19 @@ class ComicMetadataServiceTest {
         comic.setTitle("Test Title");
         comic.setAuthor("Test Author");
         comic.setDescription("Test Description");
-        when(comicMapper.selectOne(any())).thenReturn(comic);
+        when(comicMapper.selectMetadataById(1L)).thenReturn(comic);
 
         ComicMetadataDTO result = service.getMetadata(1L);
 
         assertEquals("Test Title", result.getTitle());
         assertEquals("Test Author", result.getAuthor());
         assertEquals("Test Description", result.getDescription());
-        verify(comicMapper).selectOne(any());
+        verify(comicMapper).selectMetadataById(1L);
     }
 
     @Test
     void getMetadata_shouldThrow404_whenComicNotFound() {
-        when(comicMapper.selectOne(any())).thenReturn(null);
+        when(comicMapper.selectMetadataById(99L)).thenReturn(null);
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> service.getMetadata(99L));

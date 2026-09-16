@@ -1,6 +1,5 @@
 package com.comicatlas.api.importer.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.importer.enums.ImportTaskStatus;
 import com.comicatlas.api.importer.persistence.entity.ImportTask;
 import com.comicatlas.api.importer.persistence.mapper.ImportTaskMapper;
@@ -21,8 +20,7 @@ public class ImportRetryServiceImpl implements com.comicatlas.api.importer.servi
     private final ImportRetryCoordinator importRetryCoordinator;
 
     public void retry(Long taskId, ManagementTaskItem item) {
-        ImportTask importTask = importTaskMapper.selectOne(new LambdaQueryWrapper<ImportTask>()
-                .eq(ImportTask::getManagementTaskId, taskId));
+        ImportTask importTask = importTaskMapper.selectByManagementTaskId(taskId);
         if (importTask == null) {
             log.warn("导入任务不存在，跳过导入重试入队: taskId={}, itemId={}", taskId, item.getId());
             return;

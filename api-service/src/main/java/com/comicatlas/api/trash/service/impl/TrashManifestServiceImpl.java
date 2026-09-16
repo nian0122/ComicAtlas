@@ -2,7 +2,6 @@ package com.comicatlas.api.trash.service.impl;
 
 import com.comicatlas.api.trash.persistence.entity.TrashManifestRecord;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.storage.ApiStorageProperties;
@@ -80,12 +79,7 @@ public class TrashManifestServiceImpl implements TrashManifestService {
 
     /** 从 DB 读指定目标最近一次清单（对账/恢复定位用，不存在返回 null） */
     public TrashManifestDTO readLatestManifest(String targetType, Long targetId) {
-        TrashManifestRecord record = trashManifestMapper.selectOne(
-                new LambdaQueryWrapper<TrashManifestRecord>()
-                        .eq(TrashManifestRecord::getTargetType, targetType)
-                        .eq(TrashManifestRecord::getTargetId, targetId)
-                        .orderByDesc(TrashManifestRecord::getTaskId)
-                        .last("LIMIT 1"));
+        TrashManifestRecord record = trashManifestMapper.selectLatest(targetType, targetId);
         if (record == null) {
             return null;
         }

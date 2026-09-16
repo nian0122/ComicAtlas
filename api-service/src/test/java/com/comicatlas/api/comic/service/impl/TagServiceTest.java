@@ -1,6 +1,5 @@
 package com.comicatlas.api.metadata.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.catalog.cache.CacheEvictor;
 import com.comicatlas.contract.comic.dto.TagDTO;
 import com.comicatlas.persistence.comic.entity.ComicTag;
@@ -56,7 +55,7 @@ class TagServiceTest {
 
     @Test
     void createTag_shouldReturnDto_whenNameIsUnique() {
-        when(tagMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+        when(tagMapper.countByName("new tag")).thenReturn(0L);
 
         TagDTO result = service.createTag("new tag");
 
@@ -67,7 +66,7 @@ class TagServiceTest {
 
     @Test
     void createTag_shouldThrow409_whenNameExists() {
-        when(tagMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(1L);
+        when(tagMapper.countByName("existing tag")).thenReturn(1L);
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> service.createTag("existing tag"));
@@ -79,7 +78,7 @@ class TagServiceTest {
     void deleteTag_shouldSucceed_whenTagNotBound() {
         Tag tag = createTag(1L, "tag");
         when(tagMapper.selectById(1L)).thenReturn(tag);
-        when(comicTagMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+        when(comicTagMapper.countByTagId(1L)).thenReturn(0L);
 
         service.deleteTag(1L);
 
@@ -99,7 +98,7 @@ class TagServiceTest {
     @Test
     void deleteTag_shouldThrow409_whenTagIsBound() {
         when(tagMapper.selectById(1L)).thenReturn(createTag(1L, "bound tag"));
-        when(comicTagMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(3L);
+        when(comicTagMapper.countByTagId(1L)).thenReturn(3L);
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> service.deleteTag(1L));

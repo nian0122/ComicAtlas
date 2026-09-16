@@ -1,6 +1,5 @@
 package com.comicatlas.api.recovery.engine;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.recovery.dto.RecoveryProgressVO;
 import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.recovery.domain.RestoreContext;
@@ -192,14 +191,13 @@ public class RecoveryEngine {
             if (comic == null) {
                 throw new BusinessException("漫画不存在: comicId=" + comicId);
             }
-            List<Long> existingChapterIds = chapterMapper.selectList(
-                new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId))
+            List<Long> existingChapterIds = chapterMapper.selectByComicIdOrderByGlobalOrder(comicId)
                 .stream().map(Chapter::getId).toList();
             if (!existingChapterIds.isEmpty()) {
-                mediaMapper.delete(new LambdaQueryWrapper<Media>().in(Media::getChapterId, existingChapterIds));
+                mediaMapper.deleteByChapterIds(existingChapterIds);
             }
-            chapterMapper.delete(new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
-            catalogMapper.delete(new LambdaQueryWrapper<Catalog>().eq(Catalog::getComicId, comicId));
+            chapterMapper.deleteByComicId(comicId);
+            catalogMapper.deleteByComicId(comicId);
 
             comic.setStatus(ComicStatus.READY);
             comic.setStoragePolicy("MANAGED");

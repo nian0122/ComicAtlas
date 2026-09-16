@@ -1,9 +1,7 @@
 package com.comicatlas.api.task.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.task.persistence.entity.ManagementTask;
 import com.comicatlas.api.task.persistence.entity.ManagementTaskItem;
-import com.comicatlas.api.task.enums.ManagementTaskStatus;
 import com.comicatlas.api.task.enums.TaskType;
 import com.comicatlas.api.task.persistence.mapper.ManagementTaskItemMapper;
 import com.comicatlas.api.task.persistence.mapper.ManagementTaskMapper;
@@ -25,27 +23,16 @@ public class TaskInternalQueryServiceImpl implements TaskInternalQueryService {
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
             return null;
         }
-        return taskMapper.selectOne(new LambdaQueryWrapper<ManagementTask>()
-                .eq(ManagementTask::getIdempotencyKey, idempotencyKey));
+        return taskMapper.selectByIdempotencyKey(idempotencyKey);
     }
 
     /** 查询目标当前活跃任务项。 */
     public ManagementTaskItem findActiveItem(String targetType, Long targetId, TaskType operationType) {
-        return itemMapper.selectOne(new LambdaQueryWrapper<ManagementTaskItem>()
-                .eq(ManagementTaskItem::getTargetType, targetType)
-                .eq(ManagementTaskItem::getTargetId, targetId)
-                .eq(ManagementTaskItem::getOperationType, operationType)
-                .in(ManagementTaskItem::getStatus, ManagementTaskStatus.QUEUED,
-                        ManagementTaskStatus.RUNNING, ManagementTaskStatus.CANCELLING)
-                .orderByDesc(ManagementTaskItem::getId)
-                .last("LIMIT 1"));
+        return itemMapper.selectActiveByTarget(targetType, targetId, operationType.name());
     }
 
     /** 统计任务下尚未结束的任务项数量。 */
     public long countActiveItems(Long taskId) {
-        return itemMapper.selectCount(new LambdaQueryWrapper<ManagementTaskItem>()
-                .eq(ManagementTaskItem::getTaskId, taskId)
-                .in(ManagementTaskItem::getStatus, ManagementTaskStatus.QUEUED,
-                        ManagementTaskStatus.RUNNING, ManagementTaskStatus.CANCELLING));
+        return itemMapper.countActiveByTaskId(taskId);
     }
 }

@@ -1,6 +1,5 @@
 package com.comicatlas.api.library.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.api.library.dto.ManagementComicListVO;
@@ -13,7 +12,6 @@ import com.comicatlas.contract.comic.dto.ComicListQuery;
 import com.comicatlas.persistence.comic.assembler.ComicDetailAssembler;
 import com.comicatlas.persistence.comic.entity.Category;
 import com.comicatlas.persistence.comic.entity.Comic;
-import com.comicatlas.persistence.comic.entity.ComicTag;
 import com.comicatlas.persistence.comic.mapper.CategoryMapper;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.persistence.comic.mapper.ComicTagMapper;
@@ -83,9 +81,7 @@ public class ManagementComicQueryServiceImpl implements ManagementComicQueryServ
         if (comicMapper.selectById(comicId) == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在");
         }
-        return comicTagMapper.selectList(new LambdaQueryWrapper<ComicTag>()
-                .select(ComicTag::getTagId).eq(ComicTag::getComicId, comicId))
-                .stream().map(ComicTag::getTagId).toList();
+        return comicTagMapper.selectTagIdsByComicId(comicId);
     }
 
     private ManagementComicListVO toListVO(Comic comic) {

@@ -1,6 +1,5 @@
 package com.comicatlas.api.task.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.exporter.persistence.entity.ExportTask;
 import com.comicatlas.api.exporter.persistence.mapper.ExportTaskMapper;
 import com.comicatlas.api.importer.persistence.entity.DirectoryScanTask;
@@ -13,6 +12,7 @@ import com.comicatlas.api.task.persistence.entity.ManagementTask;
 import com.comicatlas.api.task.persistence.entity.ManagementTaskItem;
 import com.comicatlas.api.task.persistence.mapper.ManagementTaskItemMapper;
 import com.comicatlas.api.task.persistence.mapper.ManagementTaskMapper;
+import com.comicatlas.api.task.persistence.mapper.LegacyTaskMapper;
 import com.comicatlas.api.task.service.LegacyTaskBackfillService;
 import com.comicatlas.api.task.enums.ManagementTaskStatus;
 import com.comicatlas.api.task.enums.TaskType;
@@ -42,6 +42,7 @@ public class LegacyTaskBackfillServiceImpl implements LegacyTaskBackfillService 
     private final DirectoryScanTaskMapper directoryScanTaskMapper;
     private final ManagementTaskMapper managementTaskMapper;
     private final ManagementTaskItemMapper managementTaskItemMapper;
+    private final LegacyTaskMapper legacyTaskMapper;
 
     /**
      * 回填全部四类历史任务，返回新建 management_task 数量。
@@ -60,8 +61,7 @@ public class LegacyTaskBackfillServiceImpl implements LegacyTaskBackfillService 
     }
 
     private int backfillImports() {
-        List<ImportTask> rows = importTaskMapper.selectList(
-                new LambdaQueryWrapper<ImportTask>().isNull(ImportTask::getManagementTaskId));
+        List<ImportTask> rows = legacyTaskMapper.selectUnboundImports();
         int count = 0;
         for (ImportTask task : rows) {
             String legacyStatus = task.getStatus() == null ? null : task.getStatus().name();
@@ -85,8 +85,7 @@ public class LegacyTaskBackfillServiceImpl implements LegacyTaskBackfillService 
     }
 
     private int backfillRecoveries() {
-        List<RecoveryTask> rows = recoveryTaskMapper.selectList(
-                new LambdaQueryWrapper<RecoveryTask>().isNull(RecoveryTask::getManagementTaskId));
+        List<RecoveryTask> rows = legacyTaskMapper.selectUnboundRecoveries();
         int count = 0;
         for (RecoveryTask recoveryTask : rows) {
             String legacyStatus = recoveryTask.getStatus() == null ? null : recoveryTask.getStatus().name();
@@ -105,8 +104,7 @@ public class LegacyTaskBackfillServiceImpl implements LegacyTaskBackfillService 
     }
 
     private int backfillExports() {
-        List<ExportTask> rows = exportTaskMapper.selectList(
-                new LambdaQueryWrapper<ExportTask>().isNull(ExportTask::getManagementTaskId));
+        List<ExportTask> rows = legacyTaskMapper.selectUnboundExports();
         int count = 0;
         for (ExportTask task : rows) {
             String legacyStatus = task.getStatus() == null ? null : task.getStatus().name();
@@ -125,8 +123,7 @@ public class LegacyTaskBackfillServiceImpl implements LegacyTaskBackfillService 
     }
 
     private int backfillScans() {
-        List<DirectoryScanTask> rows = directoryScanTaskMapper.selectList(
-                new LambdaQueryWrapper<DirectoryScanTask>().isNull(DirectoryScanTask::getManagementTaskId));
+        List<DirectoryScanTask> rows = legacyTaskMapper.selectUnboundScans();
         int count = 0;
         for (DirectoryScanTask task : rows) {
             String legacyStatus = task.getStatus() == null ? null : task.getStatus().name();

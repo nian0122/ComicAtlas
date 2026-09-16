@@ -24,6 +24,18 @@ public interface ComicMapper extends BaseMapper<Comic> {
     @Select("SELECT id FROM comic WHERE id = #{comicId}")
     Comic selectReferenceById(@Param("comicId") Long comicId);
 
+    @Select("SELECT id, title, source_type, source_gallery_id, status FROM comic "
+            + "WHERE source_type = #{sourceType} AND source_gallery_id = #{galleryId} LIMIT 1")
+    Comic selectBySourceTypeAndGalleryId(@Param("sourceType") String sourceType,
+                                         @Param("galleryId") String galleryId);
+
+    @Select("SELECT id, title, total_pages FROM comic WHERE id = #{comicId}")
+    Comic selectHistoryComicById(@Param("comicId") Long comicId);
+
+    @Select("<script>SELECT id, title, total_pages FROM comic WHERE id IN "
+            + "<foreach collection='comicIds' item='comicId' open='(' separator=',' close=')'>#{comicId}</foreach></script>")
+    List<Comic> selectHistoryComicsByIds(@Param("comicIds") List<Long> comicIds);
+
     /** 仅在 READY 时锁定漫画，保证刷新任务并发互斥。 */
     @Update("UPDATE comic SET status = 'REFRESHING' WHERE id = #{comicId} AND status = 'READY'")
     int lockForMetadataRefresh(@Param("comicId") Long comicId);

@@ -5,9 +5,21 @@ import com.comicatlas.api.upload.persistence.entity.UploadFile;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Update;
+import org.apache.ibatis.annotations.Select;
+
+import java.util.List;
 
 @Mapper
 public interface UploadFileMapper extends BaseMapper<UploadFile> {
+
+    @Select("SELECT * FROM upload_file WHERE session_id = #{sessionId} ORDER BY id")
+    List<UploadFile> selectBySessionId(@Param("sessionId") Long sessionId);
+
+    @Select("SELECT * FROM upload_file WHERE session_id = #{sessionId} AND file_id = #{fileId}")
+    UploadFile selectBySessionIdAndFileId(@Param("sessionId") Long sessionId, @Param("fileId") String fileId);
+
+    @org.apache.ibatis.annotations.Delete("DELETE FROM upload_file WHERE session_id = #{sessionId}")
+    int deleteBySessionId(@Param("sessionId") Long sessionId);
 
     /**
      * 原子更新分片接收进度，避免上传服务直接依赖 MyBatis-Plus 更新构造器。

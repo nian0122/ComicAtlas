@@ -1,6 +1,5 @@
 package com.comicatlas.api.media.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO.ChapterSnapshot;
 import com.comicatlas.persistence.comic.entity.Chapter;
@@ -40,11 +39,9 @@ public class HqMediaRegistrationServiceImpl implements HqMediaRegistrationServic
     @Transactional
     public HqMediaRegistrationResult registerValidatedSnapshot(MetadataRefreshSnapshotDTO snapshot) {
         List<ChapterSnapshot> chapterSnapshots = snapshot.chapters() == null ? List.of() : snapshot.chapters();
-        List<Chapter> chapters = chapterMapper.selectList(new LambdaQueryWrapper<Chapter>()
-                .eq(Chapter::getComicId, snapshot.comicId()));
+        List<Chapter> chapters = chapterMapper.selectByComicIdOrderByGlobalOrder(snapshot.comicId());
         List<Long> chapterIds = chapterSnapshots.stream().map(ChapterSnapshot::chapterId).toList();
-        List<Media> databaseMedia = chapterIds.isEmpty() ? List.of() : mediaMapper.selectList(
-                new LambdaQueryWrapper<Media>().in(Media::getChapterId, chapterIds));
+        List<Media> databaseMedia = chapterIds.isEmpty() ? List.of() : mediaMapper.selectByChapterIds(chapterIds);
         HqMediaRegistrationPlanner.RegistrationPlan plan = registrationPlanner.plan(
                 snapshot, chapters, databaseMedia);
         for (List<Media> batch : partition(plan.media(), 500)) {

@@ -24,8 +24,6 @@ import com.comicatlas.api.storage.service.impl.ComicStatsServiceImpl;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -51,15 +49,15 @@ class ComicStatsServiceTest {
     void refreshByComic_一次查询媒体并批量回写章节页数() {
         Chapter firstChapter = chapter(11L);
         Chapter secondChapter = chapter(12L);
-        when(chapterMapper.selectList(any())).thenReturn(List.of(firstChapter, secondChapter));
-        when(mediaMapper.selectList(any())).thenReturn(List.of(
+        when(chapterMapper.selectByComicIdOrderByGlobalOrder(1L)).thenReturn(List.of(firstChapter, secondChapter));
+        when(mediaMapper.selectByChapterIds(List.of(11L, 12L))).thenReturn(List.of(
                 media(11L, 100L, 10L, HqStatus.READY, LqStatus.READY, MediaLifecycleStatus.READY),
                 media(11L, 200L, 20L, HqStatus.DELETED, LqStatus.NOT_GENERATED, MediaLifecycleStatus.READY),
                 media(12L, 300L, 30L, HqStatus.READY, LqStatus.READY, MediaLifecycleStatus.TRASHED)));
 
         service.refreshByComic(1L);
 
-        verify(mediaMapper, times(1)).selectList(any());
+        verify(mediaMapper, times(1)).selectByChapterIds(List.of(11L, 12L));
         ArgumentCaptor<List<Chapter>> chaptersCaptor = ArgumentCaptor.forClass(List.class);
         verify(chapterMapper, times(1)).updatePageCountBatch(chaptersCaptor.capture());
         assertThat(chaptersCaptor.getValue()).extracting(Chapter::getPageCount).containsExactly(2, 0);

@@ -1,6 +1,5 @@
 package com.comicatlas.api.media.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.enums.HqStatus;
@@ -66,8 +65,7 @@ public class MediaOperationCommandServiceImpl implements MediaOperationCommandSe
     // ======================== LQ 生成 ========================
 
     public OperationSubmitResultDTO requestLqForComic(Long comicId, boolean regenerate) {
-        List<Chapter> chapters = chapterMapper.selectList(
-                new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
+        List<Chapter> chapters = chapterMapper.selectByComicIdOrderByGlobalOrder(comicId);
         TaskType operation = regenerate ? TaskType.LQ_REGENERATE : TaskType.LQ_GENERATE;
 
         List<CreateManagementTaskRequest.TaskTarget> targets = new ArrayList<>();
@@ -119,10 +117,7 @@ public class MediaOperationCommandServiceImpl implements MediaOperationCommandSe
     }
 
     private List<Media> eligibleLqPages(Long chapterId, boolean regenerate) {
-        List<Media> mediaItems = mediaMapper.selectList(
-                new LambdaQueryWrapper<Media>()
-                        .eq(Media::getChapterId, chapterId)
-                        .eq(Media::getMediaType, "IMAGE"));
+        List<Media> mediaItems = mediaMapper.selectImagesByChapterId(chapterId);
         return mediaItems.stream()
                 .filter(media -> media.getHqStatus() != HqStatus.DELETED)
                 .filter(media -> regenerate || media.getLqStatus() != LqStatus.READY)
@@ -136,8 +131,7 @@ public class MediaOperationCommandServiceImpl implements MediaOperationCommandSe
     // ======================== HQ 删除 ========================
 
     public OperationSubmitResultDTO requestHqDeleteForComic(Long comicId) {
-        List<Chapter> chapters = chapterMapper.selectList(
-                new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
+        List<Chapter> chapters = chapterMapper.selectByComicIdOrderByGlobalOrder(comicId);
         if (chapters.isEmpty()) {
             log.info("漫画 {} 无章节，跳过", comicId);
             return OperationSubmitResultDTO.of(null, TaskType.HQ_DELETE.name(), null, 0);
@@ -145,11 +139,7 @@ public class MediaOperationCommandServiceImpl implements MediaOperationCommandSe
         List<Long> chapterIds = chapters.stream().map(Chapter::getId).toList();
 
         // 一次性 IN 查询取回全部候选图片页并按章节分组，避免逐章 selectCount/selectList（N+1）
-        List<Media> deletablePages = mediaMapper.selectList(
-                new LambdaQueryWrapper<Media>()
-                        .in(Media::getChapterId, chapterIds)
-                        .eq(Media::getMediaType, "IMAGE")
-                        .in(Media::getHqStatus, HqStatus.READY, HqStatus.MISSING));
+        List<Media> deletablePages = mediaMapper.selectDeletableImagesByChapterIds(chapterIds);
         Map<Long, List<Media>> pagesByChapter = deletablePages.stream()
                 .collect(Collectors.groupingBy(Media::getChapterId));
 
@@ -204,21 +194,14 @@ public class MediaOperationCommandServiceImpl implements MediaOperationCommandSe
     }
 
     private boolean hasDeletableHq(Long chapterId) {
-        return mediaMapper.selectCount(new LambdaQueryWrapper<Media>()
-                .eq(Media::getChapterId, chapterId)
-                .eq(Media::getMediaType, "IMAGE")
-                .in(Media::getHqStatus, HqStatus.READY, HqStatus.MISSING)) > 0;
+        return mediaMapper.countDeletableImagesByChapterId(chapterId) > 0;
     }
 
     /**
      * HQ 删除前置条件：全部图片页 LQ 必须 READY。
      */
     private void validateHqDeletePrecondition(Long chapterId) {
-        List<Media> mediaItems = mediaMapper.selectList(
-                new LambdaQueryWrapper<Media>()
-                        .eq(Media::getChapterId, chapterId)
-                        .eq(Media::getMediaType, "IMAGE")
-                        .in(Media::getHqStatus, HqStatus.READY, HqStatus.MISSING));
+        List<Media> mediaItems = mediaMapper.selectDeletableImagesByChapterIds(List.of(chapterId));
         validateHqDeletePrecondition(mediaItems);
     }
 
@@ -255,17 +238,13 @@ public class MediaOperationCommandServiceImpl implements MediaOperationCommandSe
             Set.of(TranscodeStatus.QUEUED, TranscodeStatus.TRANSCODING);
 
     public OperationSubmitResultDTO requestTranscodeForComic(Long comicId) {
-        List<Chapter> chapters = chapterMapper.selectList(
-                new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
+        List<Chapter> chapters = chapterMapper.selectByComicIdOrderByGlobalOrder(comicId);
         if (chapters.isEmpty()) {
             return OperationSubmitResultDTO.of(null, TaskType.TRANSCODE.name(), null, 0);
         }
         List<Long> chapterIds = chapters.stream().map(Chapter::getId).toList();
 
-        List<Media> toTranscode = mediaMapper.selectList(
-                new LambdaQueryWrapper<Media>()
-                        .in(Media::getChapterId, chapterIds)
-                        .eq(Media::getMediaType, "VIDEO"));
+        List<Media> toTranscode = mediaMapper.selectVideosByChapterIds(chapterIds);
         List<Media> eligible = toTranscode.stream()
                 .filter(this::isTranscodeEligible)
                 .toList();
@@ -294,10 +273,7 @@ public class MediaOperationCommandServiceImpl implements MediaOperationCommandSe
         if (chapter == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在: " + chapterId);
         }
-        List<Media> toTranscode = mediaMapper.selectList(
-                new LambdaQueryWrapper<Media>()
-                        .eq(Media::getChapterId, chapterId)
-                        .eq(Media::getMediaType, "VIDEO"));
+        List<Media> toTranscode = mediaMapper.selectVideosByChapterId(chapterId);
         List<Media> eligible = toTranscode.stream()
                 .filter(this::isTranscodeEligible)
                 .toList();
@@ -389,9 +365,7 @@ public class MediaOperationCommandServiceImpl implements MediaOperationCommandSe
             throw new ConflictException("漫画状态 " + comic.getStatus() + " 不支持元数据刷新，仅 READY 可刷新");
         }
 
-        List<Chapter> chapters = chapterMapper.selectList(new LambdaQueryWrapper<Chapter>()
-                .eq(Chapter::getComicId, comicId)
-                .orderByAsc(Chapter::getGlobalOrder));
+        List<Chapter> chapters = chapterMapper.selectByComicIdOrderByGlobalOrder(comicId);
         List<CreateManagementTaskRequest.TaskTarget> targets = chapters.stream()
                 .map(chapter -> target("CHAPTER", chapter.getId(), TaskType.METADATA_REFRESH))
                 .toList();

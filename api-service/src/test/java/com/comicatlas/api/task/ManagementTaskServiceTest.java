@@ -109,7 +109,7 @@ class ManagementTaskServiceTest {
         item.setTargetId(10L);
         item.setOperationType(TaskType.IMPORT);
         item.setStatus(ManagementTaskStatus.FAILED);
-        when(itemMapper.selectList(any())).thenReturn(List.of(item));
+        when(itemMapper.selectByTaskId(99L)).thenReturn(List.of(item));
 
         // 导入任务非终态且非 PENDING：说明与管理任务状态不一致，重试入队应抛冲突回滚而非静默卡死
         org.mockito.Mockito.doThrow(new BusinessException(409, "导入任务非终态且未被重置"))
@@ -133,7 +133,7 @@ class ManagementTaskServiceTest {
         secondChapter.setComicId(1L);
         when(chapterMapper.selectBatchIds(any())).thenReturn(List.of(firstChapter, secondChapter));
         when(comicMapper.lockForMetadataRefresh(1L)).thenReturn(1);
-        when(itemMapper.selectCount(any())).thenReturn(0L);
+        when(itemMapper.countByLockKey(anyString())).thenReturn(0L);
 
         service.createTask(request, null, "{}");
 
@@ -157,7 +157,7 @@ class ManagementTaskServiceTest {
         when(taskMapper.selectById(100L)).thenReturn(task);
 
         assertThrows(BusinessException.class, () -> service.retryTask(100L));
-        verify(itemMapper, never()).selectList(any());
+        verify(itemMapper, never()).selectByTaskId(any());
     }
 
     @Test
@@ -169,7 +169,7 @@ class ManagementTaskServiceTest {
         when(taskMapper.selectById(101L)).thenReturn(task);
 
         assertThrows(BusinessException.class, () -> service.retryTask(101L));
-        verify(itemMapper, never()).selectList(any());
+        verify(itemMapper, never()).selectByTaskId(any());
     }
 
     @Test
@@ -188,7 +188,7 @@ class ManagementTaskServiceTest {
         item.setTargetId(7L);
         item.setOperationType(TaskType.RECOVERY);
         item.setStatus(ManagementTaskStatus.FAILED);
-        when(itemMapper.selectList(any())).thenReturn(List.of(item));
+        when(itemMapper.selectByTaskId(201L)).thenReturn(List.of(item));
 
         service.resetTaskState(201L);
 
@@ -217,7 +217,7 @@ class ManagementTaskServiceTest {
         failedItem.setTaskId(301L);
         failedItem.setStatus(ManagementTaskStatus.FAILED);
         failedItem.setErrorMessage("转码失败: ffmpeg 超时");
-        when(itemMapper.selectList(any())).thenReturn(List.of(failedItem));
+        when(itemMapper.selectByTaskId(301L)).thenReturn(List.of(failedItem));
         when(itemMapper.updateStatusIfActive(any(), any(), anyString(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(1);
 
@@ -246,7 +246,7 @@ class ManagementTaskServiceTest {
         succeededItem.setId(4L);
         succeededItem.setTaskId(302L);
         succeededItem.setStatus(ManagementTaskStatus.SUCCEEDED);
-        when(itemMapper.selectList(any())).thenReturn(List.of(succeededItem));
+        when(itemMapper.selectByTaskId(302L)).thenReturn(List.of(succeededItem));
         when(itemMapper.updateStatusIfActive(any(), any(), anyString(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(1);
 

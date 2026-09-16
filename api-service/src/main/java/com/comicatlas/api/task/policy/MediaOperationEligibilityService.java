@@ -1,6 +1,5 @@
 package com.comicatlas.api.task.policy;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.enums.HqStatus;
 import com.comicatlas.contract.common.enums.LqStatus;
@@ -56,15 +55,13 @@ public class MediaOperationEligibilityService {
         boolean hqPreconditionBlocked = false;
         boolean anyTranscode = false;
 
-        List<Chapter> chapters = chapterMapper.selectList(
-                new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
+        List<Chapter> chapters = chapterMapper.selectByComicIdOrderByGlobalOrder(comicId);
         if (chapters.isEmpty()) {
             return buildComicOperations(comic, allowed, blocked, false, false, false, false, false);
         }
 
         List<Long> chapterIds = chapters.stream().map(Chapter::getId).toList();
-        Map<Long, List<Media>> mediaByChapterId = mediaMapper.selectList(
-                        new LambdaQueryWrapper<Media>().in(Media::getChapterId, chapterIds))
+        Map<Long, List<Media>> mediaByChapterId = mediaMapper.selectByChapterIds(chapterIds)
                 .stream()
                 .collect(Collectors.groupingBy(Media::getChapterId));
         for (Long chapterId : chapterIds) {
@@ -206,8 +203,7 @@ public class MediaOperationEligibilityService {
     }
 
     private ChapterOps collectChapterAssetOps(Long chapterId) {
-        List<Media> mediaItems = mediaMapper.selectList(
-                new LambdaQueryWrapper<Media>().eq(Media::getChapterId, chapterId));
+        List<Media> mediaItems = mediaMapper.selectByChapterId(chapterId);
         return collectChapterAssetOps(mediaItems);
     }
 

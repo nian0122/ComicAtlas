@@ -19,7 +19,6 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -51,7 +50,6 @@ class MediaOperationCompletionServiceTest {
         verify(mediaMapper, times(3)).updateLqReadyBatch(eq(chapterId), batchCaptor.capture());
         assertThat(batchCaptor.getAllValues()).extracting(List::size).containsExactly(500, 500, 1);
         verify(mediaMapper).resetLqNotGeneratedByChapter(chapterId);
-        verify(mediaMapper, never()).selectList(org.mockito.ArgumentMatchers.any());
         verify(comicStatsService).refreshByChapter(chapterId);
     }
 
@@ -68,7 +66,6 @@ class MediaOperationCompletionServiceTest {
         InOrder updateOrder = inOrder(mediaMapper);
         updateOrder.verify(mediaMapper).updateLqReadyBatch(eq(chapterId), anyList());
         updateOrder.verify(mediaMapper).markLqFailedByChapter(chapterId);
-        verify(mediaMapper, never()).selectList(org.mockito.ArgumentMatchers.any());
         verify(comicStatsService).refreshByChapter(chapterId);
     }
 

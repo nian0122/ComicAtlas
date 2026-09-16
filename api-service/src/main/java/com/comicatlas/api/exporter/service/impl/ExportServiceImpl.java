@@ -1,6 +1,5 @@
 package com.comicatlas.api.exporter.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
@@ -76,16 +75,13 @@ public class ExportServiceImpl implements ExportService {
 
     @Override
     public List<ExportTaskVO> listExports(Long comicId) {
-        List<ExportTask> tasks = exportTaskMapper.selectList(new LambdaQueryWrapper<ExportTask>()
-            .eq(ExportTask::getComicId, comicId)
-            .orderByDesc(ExportTask::getCreatedAt));
+        List<ExportTask> tasks = exportTaskMapper.selectByComicIdOrderByCreatedAtDesc(comicId);
         return tasks.stream().map(this::toVO).toList();
     }
 
     @Override
     public List<ExportTaskVO> listAllExports() {
-        List<ExportTask> tasks = exportTaskMapper.selectList(new LambdaQueryWrapper<ExportTask>()
-            .orderByDesc(ExportTask::getCreatedAt));
+        List<ExportTask> tasks = exportTaskMapper.selectAllOrderByCreatedAtDesc();
         return tasks.stream().map(this::toVO).toList();
     }
 
@@ -109,9 +105,7 @@ public class ExportServiceImpl implements ExportService {
     }
 
     private void rejectDuplicateActiveTask(Long comicId) {
-        ExportTask existing = exportTaskMapper.selectOne(new LambdaQueryWrapper<ExportTask>()
-            .eq(ExportTask::getComicId, comicId)
-            .and(wrapper -> wrapper.eq(ExportTask::getStatus, ExportTaskStatus.PENDING).or().eq(ExportTask::getStatus, ExportTaskStatus.RUNNING)));
+        ExportTask existing = exportTaskMapper.selectActiveByComicId(comicId);
         if (existing != null) {
             throw new BusinessException(HttpStatusCodes.CONFLICT, "该漫画已有进行中的导出任务，任务ID: " + existing.getId());
         }

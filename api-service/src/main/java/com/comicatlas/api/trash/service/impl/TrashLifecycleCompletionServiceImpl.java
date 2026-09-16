@@ -1,6 +1,5 @@
 package com.comicatlas.api.trash.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.storage.service.ComicStatsService;
 import com.comicatlas.common.constant.StorageRootKeys;
@@ -9,18 +8,14 @@ import com.comicatlas.common.event.ManagementCommandCompletedEvent;
 import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
-import com.comicatlas.persistence.comic.entity.Catalog;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Comic;
-import com.comicatlas.persistence.comic.entity.ComicTag;
 import com.comicatlas.persistence.comic.entity.Media;
 import com.comicatlas.persistence.comic.mapper.CatalogMapper;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
-import com.comicatlas.persistence.comic.mapper.ComicTagMapper;
 import com.comicatlas.persistence.comic.mapper.MediaMapper;
-import com.comicatlas.persistence.reader.entity.ReadingHistory;
-import com.comicatlas.persistence.reader.mapper.ReadingHistoryMapper;
+import com.comicatlas.api.trash.persistence.mapper.TrashDataMapper;
 import com.comicatlas.api.trash.service.TrashLifecycleCompletionService;
 import com.comicatlas.api.trash.service.TrashManifestService;
 import lombok.RequiredArgsConstructor;
@@ -58,11 +53,10 @@ public class TrashLifecycleCompletionServiceImpl implements TrashLifecycleComple
     private final ChapterMapper chapterMapper;
     private final ComicMapper comicMapper;
     private final CatalogMapper catalogMapper;
-    private final ComicTagMapper comicTagMapper;
-    private final ReadingHistoryMapper readingHistoryMapper;
     private final TrashManifestService trashManifestService;
     private final CatalogCacheInvalidator catalogCacheInvalidator;
     private final ComicStatsService comicStatsService;
+    private final TrashDataMapper trashDataMapper;
 
     // ======================== 回收 Completed ========================
 
@@ -169,19 +163,15 @@ public class TrashLifecycleCompletionServiceImpl implements TrashLifecycleComple
      * 漫画永久清理：Worker 已清文件，级联删除子行，漫画保留 DELETED tombstone。
      */
     public void applyComicPurgeCompleted(Long comicId) {
-        List<Chapter> chapters = chapterMapper.selectList(
-                new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
+        List<Chapter> chapters = chapterMapper.selectByComicIdOrderByGlobalOrder(comicId);
         List<Long> chapterIds = chapters.stream().map(Chapter::getId).toList();
         if (!chapterIds.isEmpty()) {
-            mediaMapper.delete(new LambdaQueryWrapper<Media>().in(Media::getChapterId, chapterIds));
+            mediaMapper.deleteByChapterIds(chapterIds);
         }
-        readingHistoryMapper.delete(new LambdaQueryWrapper<ReadingHistory>()
-                .eq(ReadingHistory::getComicId, comicId));
-        chapterMapper.delete(new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
-        catalogMapper.delete(new LambdaQueryWrapper<Catalog>()
-                .eq(Catalog::getComicId, comicId));
-        comicTagMapper.delete(new LambdaQueryWrapper<ComicTag>()
-                .eq(ComicTag::getComicId, comicId));
+        trashDataMapper.deleteReadingHistoryByComicId(comicId);
+        chapterMapper.deleteByComicId(comicId);
+        catalogMapper.deleteByComicId(comicId);
+        trashDataMapper.deleteComicTagsByComicId(comicId);
 
         Comic comic = comicMapper.selectById(comicId);
         if (comic != null && comic.getStatus() == ComicStatus.PURGING) {
@@ -195,7 +185,7 @@ public class TrashLifecycleCompletionServiceImpl implements TrashLifecycleComple
 
     /** 章节永久清理：删除媒体行，章节置 DELETED。 */
     public void applyChapterPurgeCompleted(Long chapterId) {
-        mediaMapper.delete(new LambdaQueryWrapper<Media>().eq(Media::getChapterId, chapterId));
+        mediaMapper.deleteByChapterId(chapterId);
         Chapter chapter = chapterMapper.selectById(chapterId);
         if (chapter != null && chapter.getStatus() == ChapterLifecycleStatus.PURGING) {
             chapter.setStatus(ChapterLifecycleStatus.DELETED);
@@ -319,9 +309,7 @@ public class TrashLifecycleCompletionServiceImpl implements TrashLifecycleComple
      * 计算恢复页码：优先复用 originalPageNumber；被占用时取 1..N+1 的首个空位。
      */
     private int firstFreePageNumber(Long chapterId, int preferred, Long mediaId) {
-        List<Media> existing = mediaMapper.selectList(new LambdaQueryWrapper<Media>()
-                .eq(Media::getChapterId, chapterId)
-                .select(Media::getId, Media::getPageNumber));
+        List<Media> existing = mediaMapper.selectPageNumbersByChapterId(chapterId);
         Set<Integer> occupied = new HashSet<>();
         for (Media media : existing) {
             if (!media.getId().equals(mediaId) && media.getPageNumber() != null) {
