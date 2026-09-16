@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.comicatlas.persistence.comic.entity.Media;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
 import java.util.List;
@@ -18,6 +19,12 @@ import java.time.LocalDateTime;
  */
 @Mapper
 public interface MediaMapper extends BaseMapper<Media> {
+
+    @Select("SELECT id, chapter_id, page_number, hq_root, hq_path, lq_root, lq_path, hq_status, lq_status, "
+            + "transcode_status, status, lq_size, width, height, hq_size, media_type, duration, container, "
+            + "video_codec, audio_codec FROM page WHERE chapter_id = #{chapterId} AND status = 'READY' "
+            + "ORDER BY page_number ASC")
+    List<Media> selectReadyByChapterId(@Param("chapterId") Long chapterId);
 
     @Update("UPDATE page SET lq_status = 'QUEUED' WHERE chapter_id = #{chapterId} AND media_type = 'IMAGE' AND hq_status <> 'DELETED'")
     int markLqQueued(@Param("chapterId") Long chapterId);

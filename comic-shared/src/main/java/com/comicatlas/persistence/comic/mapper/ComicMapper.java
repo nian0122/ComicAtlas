@@ -15,6 +15,9 @@ import java.util.List;
 @Mapper
 public interface ComicMapper extends BaseMapper<Comic> {
 
+    @Select("SELECT status FROM comic WHERE id = #{comicId}")
+    Comic selectStatusById(@Param("comicId") Long comicId);
+
     @Select("SELECT title, author, description, category_id FROM comic WHERE id = #{comicId}")
     Comic selectMetadataById(@Param("comicId") Long comicId);
 
