@@ -1,20 +1,13 @@
 package com.comicatlas.api.upload.service;
-import com.comicatlas.api.upload.domain.UploadSessionStatus;
 
 // 条件更新由上传结果服务维护跨表状态机与事务边界，Mapper 执行参数化更新。
 // 架构说明：Service 直接构造 LambdaUpdateWrapper 更新媒体/上传会话；条件更新应收口到对应 Mapper。
-// TODO(MAPPER-02): Service 直接构造 LambdaUpdateWrapper 更新媒体/上传会话；条件更新应收口到对应 Mapper。
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.storage.service.ComicStatsService;
 import com.comicatlas.api.upload.persistence.entity.UploadSession;
 import com.comicatlas.api.upload.persistence.mapper.UploadSessionMapper;
 import com.comicatlas.common.event.MediaUploadCompletedEvent;
 import com.comicatlas.common.event.MediaUploadCompletedEvent.MediaAnalysisResult;
-import com.comicatlas.contract.common.enums.HqStatus;
-import com.comicatlas.contract.common.enums.LqStatus;
-import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
-import com.comicatlas.contract.common.enums.TranscodeStatus;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Media;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;
@@ -52,30 +45,19 @@ public class UploadCompletionService {
             if (result.mediaId() == null) {
                 continue;
             }
-            LambdaUpdateWrapper<Media> mediaUpdate = new LambdaUpdateWrapper<Media>()
-                    .eq(Media::getId, result.mediaId())
-                    .set(Media::getStatus, MediaLifecycleStatus.READY)
-                    .set(Media::getHqStatus, HqStatus.READY)
-                    .set(Media::getWidth, result.width())
-                    .set(Media::getHeight, result.height())
-                    .set(Media::getHqSize, result.fileSize())
-                    .set(Media::getMediaType, result.mediaType())
-                    .set(Media::getDuration, result.duration())
-                    .set(Media::getContainer, result.container())
-                    .set(Media::getVideoCodec, result.videoCodec())
-                    .set(Media::getAudioCodec, result.audioCodec());
-            if (result.hqRoot() != null && !result.hqRoot().isBlank()) {
-                mediaUpdate.set(Media::getHqRoot, result.hqRoot());
-            }
-            if (result.hqPath() != null && !result.hqPath().isBlank()) {
-                mediaUpdate.set(Media::getHqPath, result.hqPath());
-            }
-            if (replace) {
-                // 原子替换：保留 mediaId/pageNumber，重置 LQ/transcode
-                mediaUpdate.set(Media::getLqStatus, LqStatus.NOT_GENERATED)
-                        .set(Media::getTranscodeStatus, TranscodeStatus.NOT_NEEDED);
-            }
-            mediaMapper.update(null, mediaUpdate);
+            Media media = new Media();
+            media.setId(result.mediaId());
+            media.setWidth(result.width());
+            media.setHeight(result.height());
+            media.setHqSize(result.fileSize());
+            media.setMediaType(result.mediaType());
+            media.setDuration(result.duration());
+            media.setContainer(result.container());
+            media.setVideoCodec(result.videoCodec());
+            media.setAudioCodec(result.audioCodec());
+            media.setHqRoot(result.hqRoot());
+            media.setHqPath(result.hqPath());
+            mediaMapper.applyUploadCompleted(media, replace);
         }
 
         UploadSession session = uploadSessionMapper.selectById(ev.targetId());
@@ -93,8 +75,6 @@ public class UploadCompletionService {
 
     /** 上传/替换失败：会话置 FAILED。 */
     public void revertUploadFailed(Long targetId) {
-        uploadSessionMapper.update(null, new LambdaUpdateWrapper<UploadSession>()
-                .eq(UploadSession::getId, targetId)
-                .set(UploadSession::getStatus, UploadSessionStatus.FAILED));
+        uploadSessionMapper.markFailed(targetId);
     }
 }
