@@ -430,17 +430,17 @@
 .chapter-reorder-box > small {
   grid-column: 1 / -1;
 }
-.action-form :deep(.el-form-item) {
+.action-form .el-form-item {
   margin-bottom: var(--space-4);
 }
-.action-form :deep(.el-select),
-.action-form :deep(.el-input-number) {
+.action-form .el-select,
+.action-form .el-input-number {
   width: 100%;
 }
 .action-form :deep(.el-input-number .el-input__wrapper) {
   width: 100%;
 }
-.action-form :deep(.el-button--block) {
+.action-form .el-button--block {
   width: 100%;
 }
 .action-form :deep(.el-form-item__content) {

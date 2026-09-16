@@ -86,7 +86,7 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-5);
 }
-.edit-form :deep(.el-form-item) {
+.edit-form .el-form-item {
   margin-bottom: var(--space-5);
 }
 .edit-form :deep(.el-form-item__label) {
@@ -103,7 +103,7 @@
     0 0 0 1px var(--accent) inset,
     0 0 0 3px var(--control-focus-ring);
 }
-.edit-form :deep(.el-select) {
+.edit-form .el-select {
   width: 100%;
 }
 .tag-editor {
@@ -156,7 +156,7 @@
   gap: var(--space-1);
   color: var(--text-muted);
 }
-.field-hint :deep(.el-icon) {
+.field-hint > .el-icon {
   color: var(--accent);
 }
 .source-panel {
@@ -253,7 +253,7 @@
   padding: var(--space-4) 0 var(--space-2);
   background: linear-gradient(to bottom, transparent, var(--bg-primary) 28%);
 }
-.form-actions :deep(.el-button--primary) {
+.form-actions > .el-button--primary {
   min-width: 132px;
 }
 @media (max-width: 820px) {

@@ -1,12 +1,13 @@
 <template>
   <div class="home-page fade-in" :class="{ 'is-mobile': mode === 'mobile' }">
-    <HomeHero :history-item="heroHistory" />
+    <HomeHero class="home-hero" :history-item="heroHistory" />
 
     <HomeRow
       v-if="continueReadingItems.length"
       title="继续阅读"
       :items="continueReadingItems"
       more-link="/history"
+      :is-mobile="mode === 'mobile'"
     />
 
     <HomeRow
@@ -14,6 +15,7 @@
       title="最近更新"
       :items="recentlyAddedItems"
       more-link="/library"
+      :is-mobile="mode === 'mobile'"
     />
 
     <HomeActionGrid />
@@ -58,7 +60,10 @@ function toHistoryRowItem(h: HistoryVO): HomeRowItem {
 }
 
 const continueReadingItems = computed<HomeRowItem[]>(() =>
-  historyStore.list.filter((h) => h.progressPercent > 0 && h.progressPercent < 100).slice(0, 8).map(toHistoryRowItem)
+  historyStore.list
+    .filter((h) => h.progressPercent > 0 && h.progressPercent < 100)
+    .slice(0, 8)
+    .map(toHistoryRowItem),
 )
 
 function toComicRowItem(c: ComicListVO): HomeRowItem {
@@ -73,9 +78,7 @@ function toComicRowItem(c: ComicListVO): HomeRowItem {
 }
 
 const recentlyAddedItems = computed<HomeRowItem[]>(() => {
-  const sorted = [...comicStore.list].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  )
+  const sorted = [...comicStore.list].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
   return sorted.slice(0, 8).map(toComicRowItem)
 })
 
@@ -110,39 +113,16 @@ onMounted(() => {
 
 /* ==========================================================================
    移动端布局（由 useInteractionMode 驱动；桌面端无 is-mobile 类，完全不受影响）
-   遵循设计规范 §5：Layout 负责响应式，业务组件保持设备无关，故统一从父级 :deep() 覆盖
+   HomeHero 的内容结构属于子组件，移动端布局需要跨组件作用域覆盖其内部布局节点。
    ========================================================================== */
 
 /* HomeHero：保持全宽，页面留白从 --page-padding(32px) 收紧到 --space-base(16px) */
-.home-page.is-mobile :deep(.hero-content) {
+.home-page.is-mobile > .home-hero :deep(.hero-content) {
   padding: 0 var(--mobile-page-gutter) var(--space-8);
 }
 
-/* HomeRow：横向滚动 + scroll-snap，逐张封面吸附 */
-.home-page.is-mobile :deep(.row-track) {
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-}
-
-.home-page.is-mobile :deep(.row-header) {
-  padding: 0 var(--mobile-page-gutter);
-}
-
-.home-page.is-mobile :deep(.row-items) {
-  gap: var(--space-2);
-  padding-right: var(--mobile-page-gutter);
-  padding-left: var(--mobile-page-gutter);
-}
-
-/* 每张封面：吸附起点对齐；flex-basis 70vw 覆盖固定宽度，max-width 收口到 160px */
-.home-page.is-mobile :deep(.row-items .comic-poster) {
-  scroll-snap-align: start;
-  flex: 0 0 min(43vw, 160px);
-  max-width: 160px;
-}
-
 /* 移动端阅读入口保持内容优先，不展示仓库操作捷径。 */
-.home-page.is-mobile :deep(.home-actions) {
+.home-page.is-mobile > .home-actions {
   display: none;
 }
 

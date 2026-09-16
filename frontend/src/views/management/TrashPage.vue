@@ -96,6 +96,7 @@
       <el-pagination
         v-if="total > pageSize"
         v-model:current-page="page"
+        class="trash-pagination"
         :page-size="pageSize"
         :total="total"
         layout="prev, pager, next"
@@ -334,13 +335,12 @@ onMounted(() => {
 .filter-select {
   width: 160px;
 }
-.selection-count {
-  /* TODO(FE-STYLE): 核对回收站页面级 !important 是否可由主题变量或组件变体替代。 */
-  color: var(--text-primary) !important;
+.trash-heading .selection-count {
+  color: var(--text-primary);
   font-weight: 600;
 }
-.retention-note {
-  color: var(--text-secondary) !important;
+.trash-heading .retention-note {
+  color: var(--text-secondary);
 }
 .comic-cell {
   display: flex;
@@ -371,12 +371,12 @@ onMounted(() => {
   color: var(--text-muted);
   font-size: var(--text-sm);
 }
-.trash-card :deep(.el-pagination) {
+.trash-card .trash-pagination {
   justify-content: flex-end;
   padding: var(--space-5) var(--space-6);
 }
 @media (max-width: 700px) {
-  .retention-note {
+  .trash-heading .retention-note {
     display: none;
   }
 }

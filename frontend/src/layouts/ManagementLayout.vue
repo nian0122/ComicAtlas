@@ -469,31 +469,36 @@ onMounted(() => {
   box-sizing: border-box;
 }
 
-.management-content :deep(.page-header) {
+/*
+ * 管理壳需要跨 router-view 统一页面标题、卡片和主操作的视觉契约；
+ * 这些节点由不同管理页渲染，无法通过本组件的 scoped 普通选择器命中，
+ * 因此仅对已约定的根类保留 :deep，Element Plus 按钮则改由上方变量控制。
+ */
+.management-content :deep(.management-page-header) {
   padding-bottom: var(--space-8);
   margin-bottom: var(--space-8);
   border-bottom: 1px solid var(--border);
 }
 
-.management-content :deep(.page-title) {
+.management-content :deep(.management-page-header .panel-header__title) {
   color: var(--text-primary);
   font-size: clamp(2rem, 3.3vw, 3rem);
   letter-spacing: -0.04em;
 }
 
-.management-content :deep(.page-subtitle),
+.management-content :deep(.management-page-header .panel-header__description),
 .management-content :deep(.section-desc) {
   color: var(--text-muted);
   font-size: var(--text-lg);
 }
 
+/* 各管理页通过这些业务根类声明卡片边界，壳层负责保持跨页面一致。 */
 .management-content :deep(.settings-card),
 .management-content :deep(.import-form-card),
 .management-content :deep(.batch-panel),
 .management-content :deep(.recent-section),
 .management-content :deep(.comic-table-section),
 .management-content :deep(.task-card),
-.management-content :deep(.settings-card),
 .management-content :deep(.storage-summary),
 .management-content :deep(.metadata-card) {
   border-color: var(--border);
@@ -501,8 +506,9 @@ onMounted(() => {
   background: var(--bg-surface);
 }
 
-.management-content :deep(.primary-btn),
-.management-content :deep(.el-button--primary) {
+/* Element Plus 按钮由路由子页渲染，精确命中其根类；:deep 仅用于跨 router-view 的壳层主题适配。 */
+.management-content :deep(.el-button.el-button--primary),
+.management-content :deep(.primary-btn) {
   border-radius: var(--radius-xs);
   background: var(--color-brand);
   color: var(--color-on-brand);

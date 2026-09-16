@@ -76,15 +76,7 @@
               {{ settings.enablePreload ? '关闭预加载' : '开启预加载' }}
             </button>
             <button class="panel-action" @click="settings.resetZoom()">重置缩放</button>
-            <button
-              class="panel-action"
-              @click="
-                settings.toggleToolbar();
-                settingsVisible = false
-              "
-            >
-              隐藏工具栏
-            </button>
+            <button class="panel-action" @click="hideToolbar">隐藏工具栏</button>
           </div>
         </div>
       </el-popover>
@@ -127,6 +119,11 @@ watch(jumpVisible, (visible) => {
 function confirmJump() {
   jumpVisible.value = false
   emit('jumpToPage', jumpPage.value)
+}
+
+function hideToolbar() {
+  settings.toggleToolbar()
+  settingsVisible.value = false
 }
 </script>
 
@@ -252,7 +249,7 @@ function confirmJump() {
   font-size: 12px;
 }
 
-.settings-field :deep(.el-select) {
+.settings-field > .el-select {
   width: 100%;
 }
 

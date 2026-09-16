@@ -408,6 +408,7 @@ watch(
   }
 }
 
+/* vue-virtual-scroller 生成的 item wrapper 不属于本组件模板，必须穿透作用域。 */
 :deep(.vue-recycle-scroller__item-wrapper) {
   width: 100%;
 }
@@ -424,6 +425,7 @@ watch(
  * 配合 ReaderImageItem 的明确像素高度（= scroller size），
  * 内容高度与 slot 高度数学上严格一致。
  */
+/* 同上：这些节点由第三方虚拟列表创建，不能通过组件属性传递样式。 */
 :deep(.vue-recycle-scroller.ready .vue-recycle-scroller__item-view) {
   margin: 0;
   padding: 0;

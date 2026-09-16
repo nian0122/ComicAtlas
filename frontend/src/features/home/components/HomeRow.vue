@@ -1,5 +1,5 @@
 <template>
-  <section v-if="items.length" class="home-row">
+  <section v-if="items.length" class="home-row" :class="{ 'is-mobile': props.isMobile }">
     <div class="row-header">
       <h2 class="row-title">{{ title }}</h2>
       <router-link v-if="moreLink" :to="moreLink" class="row-more">
@@ -8,12 +8,7 @@
       </router-link>
     </div>
 
-    <div
-      ref="trackRef"
-      class="row-track"
-      @mouseenter="showArrows = true"
-      @mouseleave="showArrows = false"
-    >
+    <div ref="trackRef" class="row-track" @mouseenter="showArrows = true" @mouseleave="showArrows = false">
       <button
         v-show="showArrows && canScrollLeft"
         type="button"
@@ -74,9 +69,12 @@ interface HomeRowProps {
   title: string
   items: HomeRowItem[]
   moreLink?: string
+  isMobile?: boolean
 }
 
-defineProps<HomeRowProps>()
+const props = withDefaults(defineProps<HomeRowProps>(), {
+  isMobile: false,
+})
 const router = useRouter()
 
 const trackRef = ref<HTMLElement | null>(null)
@@ -175,7 +173,7 @@ onBeforeUnmount(() => {
 .row-title::before {
   width: 2px;
   height: 1em;
-  content: "";
+  content: '';
   background: var(--accent);
 }
 
@@ -218,8 +216,30 @@ onBeforeUnmount(() => {
   padding: var(--space-3) var(--space-1) var(--space-5);
 }
 
-.row-items :deep(.size--md) {
+.row-items > .comic-poster.size--md {
   width: var(--home-row-card-width);
+}
+
+.home-row.is-mobile .row-track {
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+}
+
+.home-row.is-mobile .row-header {
+  padding: 0 var(--mobile-page-gutter);
+}
+
+.home-row.is-mobile .row-items {
+  gap: var(--space-2);
+  padding-right: var(--mobile-page-gutter);
+  padding-left: var(--mobile-page-gutter);
+}
+
+/* ComicPoster 的根节点可由父组件精确命中，移动端只调整卡片尺寸与吸附行为。 */
+.home-row.is-mobile .row-items > .comic-poster.size--md {
+  scroll-snap-align: start;
+  flex: 0 0 min(43vw, 160px);
+  max-width: 160px;
 }
 
 .row-arrow {
