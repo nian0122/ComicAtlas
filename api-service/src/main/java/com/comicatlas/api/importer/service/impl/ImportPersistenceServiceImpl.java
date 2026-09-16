@@ -30,12 +30,14 @@ import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
 import com.comicatlas.api.task.enums.TaskType;
 import com.comicatlas.contract.common.enums.TranscodeStatus;
 import com.comicatlas.persistence.comic.entity.Catalog;
+import com.comicatlas.persistence.comic.entity.Category;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.entity.Media;
 import com.comicatlas.persistence.comic.entity.ComicTag;
 import com.comicatlas.persistence.comic.entity.Tag;
 import com.comicatlas.persistence.comic.mapper.CatalogMapper;
+import com.comicatlas.persistence.comic.mapper.CategoryMapper;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.persistence.comic.mapper.MediaMapper;
@@ -43,6 +45,7 @@ import com.comicatlas.persistence.comic.mapper.ComicTagMapper;
 import com.comicatlas.persistence.comic.mapper.TagMapper;
 import com.comicatlas.api.storage.config.ApiStorageProperties;
 import com.comicatlas.api.metadata.service.MetadataUpdateCoordinator;
+import com.comicatlas.api.metadata.service.AutomaticMetadataClassifier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -123,6 +126,7 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
     private final TransactionTemplate transactionTemplate;
     private final ComicMapper comicMapper;
     private final CatalogMapper catalogMapper;
+    private final CategoryMapper categoryMapper;
     private final ChapterMapper chapterMapper;
     private final MediaMapper mediaMapper;
     private final ComicTagMapper comicTagMapper;
@@ -197,8 +201,17 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
         comic.setTitleJpn((String) comicData.get("titleJpn"));
         comic.setAuthor((String) comicData.get("author"));
         comic.setDescription((String) comicData.get("description"));
-        comic.setCategory((String) comicData.get("category"));
-        persistComicInfoTags(comicId, comicData.get("tags"));
+        String explicitCategory = (String) comicData.get("category");
+        List<String> importedTags = stringValues(comicData.get("tags"));
+        AutomaticMetadataClassifier.Enrichment enrichment = AutomaticMetadataClassifier.classify(
+                explicitCategory, safeCategories(), (String) comicData.get("title"),
+                (String) comicData.get("titleJpn"), (String) comicData.get("author"),
+                (String) comicData.get("description"), importedTags);
+        comic.setCategory(enrichment.category() == null ? explicitCategory : enrichment.category().getName());
+        if (enrichment.category() != null) {
+            comic.setCategoryId(enrichment.category().getId());
+        }
+        persistComicInfoTags(comicId, importedTags, enrichment.inferredTags(), enrichment.inferredTagType());
         if (comicData.get("sourceGalleryId") != null) {
             comic.setSourceGalleryId(comicData.get("sourceGalleryId").toString());
         }
@@ -256,21 +269,25 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
     }
 
     /** 将 ComicInfo 的 Genre/Tags 合并结果写入标签表，并保持漫画标签关联幂等。 */
-    private void persistComicInfoTags(Long comicId, Object rawTags) {
-        if (!(rawTags instanceof List<?> values)) {
+    private void persistComicInfoTags(Long comicId, List<String> importedTags,
+                                      List<String> inferredTags, String inferredTagType) {
+        List<Long> currentTagIds = comicTagMapper.selectTagIdsByComicId(comicId);
+        Set<Long> existingTagIds = new HashSet<>(currentTagIds == null ? List.of() : currentTagIds);
+        persistTags(comicId, existingTagIds, importedTags, "COMICINFO");
+        persistTags(comicId, existingTagIds, inferredTags, inferredTagType);
+    }
+
+    private void persistTags(Long comicId, Set<Long> existingTagIds, List<String> tagNames, String tagType) {
+        if (tagNames == null || tagNames.isEmpty()) {
             return;
         }
-        Set<Long> existingTagIds = new HashSet<>(comicTagMapper.selectTagIdsByComicId(comicId));
-        for (Object rawTag : values) {
-            if (!(rawTag instanceof String tagName) || tagName.isBlank()) {
-                continue;
-            }
+        for (String tagName : tagNames) {
             String normalizedName = tagName.trim();
-            Tag tag = tagMapper.selectByNameAndType(normalizedName, "COMICINFO");
+            Tag tag = tagMapper.selectByNameAndType(normalizedName, tagType);
             if (tag == null) {
                 tag = new Tag();
                 tag.setName(normalizedName);
-                tag.setType("COMICINFO");
+                tag.setType(tagType);
                 tagMapper.insert(tag);
             }
             if (existingTagIds.add(tag.getId())) {
@@ -280,6 +297,19 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
                 comicTagMapper.insert(comicTag);
             }
         }
+    }
+
+    private List<Category> safeCategories() {
+        List<Category> categories = categoryMapper.selectAllOrderedBySortOrder();
+        return categories == null ? List.of() : categories;
+    }
+
+    private List<String> stringValues(Object rawValues) {
+        if (!(rawValues instanceof List<?> values)) {
+            return List.of();
+        }
+        return values.stream().filter(String.class::isInstance).map(String.class::cast)
+                .filter(value -> !value.isBlank()).map(String::trim).toList();
     }
 
     private Map<Integer, Long> insertCatalogs(List<Map<String, Object>> catalogsData, Long comicId) {
