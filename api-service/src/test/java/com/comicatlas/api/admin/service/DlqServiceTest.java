@@ -1,6 +1,7 @@
 package com.comicatlas.api.dlq.service;
 
 import com.comicatlas.api.dlq.service.DlqBrokerClient.QueueStats;
+import com.comicatlas.api.dlq.service.impl.DlqServiceImpl;
 import com.comicatlas.contract.common.exception.BusinessException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,7 +22,7 @@ class DlqServiceTest {
     @BeforeEach
     void setUp() {
         brokerClient = mock(DlqBrokerClient.class);
-        service = new DlqService(brokerClient);
+        service = new DlqServiceImpl(brokerClient);
     }
 
     @Test

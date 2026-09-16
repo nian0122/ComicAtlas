@@ -12,6 +12,9 @@ import com.comicatlas.api.exporter.service.ExportDirectoryOpenResult;
 import com.comicatlas.api.media.service.HqDeleteOperationService;
 import com.comicatlas.api.media.service.LqOperationService;
 import com.comicatlas.api.media.service.TranscodeOperationService;
+import com.comicatlas.api.media.service.impl.HqDeleteOperationServiceImpl;
+import com.comicatlas.api.media.service.impl.LqOperationServiceImpl;
+import com.comicatlas.api.media.service.impl.TranscodeOperationServiceImpl;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -29,9 +32,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class StorageOperationControllerTest {
 
     private final MediaOperationCommandService commandService = mock(MediaOperationCommandService.class);
-    private final LqOperationService lqService = new LqOperationService(commandService);
-    private final HqDeleteOperationService hqService = new HqDeleteOperationService(commandService);
-    private final TranscodeOperationService transcodeService = new TranscodeOperationService(commandService);
+    private final LqOperationService lqService = new LqOperationServiceImpl(commandService);
+    private final HqDeleteOperationService hqService = new HqDeleteOperationServiceImpl(commandService);
+    private final TranscodeOperationService transcodeService = new TranscodeOperationServiceImpl(commandService);
     private final ExportOperationService exportOperationService = mock(ExportOperationService.class);
     private final ExportDirectoryService exportDirectoryService = mock(ExportDirectoryService.class);
     private final StorageOperationController controller =

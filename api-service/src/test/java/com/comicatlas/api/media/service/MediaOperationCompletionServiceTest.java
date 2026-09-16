@@ -5,6 +5,7 @@ import com.comicatlas.api.task.service.ManagementTaskService;
 import com.comicatlas.common.event.payload.LqSizeResult;
 import com.comicatlas.persistence.comic.entity.Media;
 import com.comicatlas.persistence.comic.mapper.MediaMapper;
+import com.comicatlas.api.media.service.impl.MediaOperationCompletionServiceImpl;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -31,7 +32,7 @@ class MediaOperationCompletionServiceTest {
     private final ManagementTaskService managementTaskService = mock(ManagementTaskService.class);
     private final MediaMetadataSyncService mediaMetadataSyncService = mock(MediaMetadataSyncService.class);
     private final ComicStatsService comicStatsService = mock(ComicStatsService.class);
-    private final MediaOperationCompletionService service = new MediaOperationCompletionService(
+    private final MediaOperationCompletionService service = new MediaOperationCompletionServiceImpl(
             mediaMapper, managementTaskService, mediaMetadataSyncService, comicStatsService);
 
     @Test
