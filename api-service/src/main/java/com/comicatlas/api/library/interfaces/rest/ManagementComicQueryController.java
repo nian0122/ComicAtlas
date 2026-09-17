@@ -1,5 +1,5 @@
 package com.comicatlas.api.library.interfaces.rest;
-import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.comicatlas.api.shared.application.model.PageResult;
 import com.comicatlas.contract.common.dto.PageResponse;
 import com.comicatlas.api.library.interfaces.rest.dto.ManagementComicListVO;
 import com.comicatlas.api.library.application.port.in.ManagementComicQueryService;
@@ -33,7 +33,7 @@ public class ManagementComicQueryController {
      */
     @GetMapping
     public Result<PageResponse<ManagementComicListVO>> list(ComicListQuery query) {
-        IPage<ManagementComicListVO> page = queryService.list(query);
+        PageResult<ManagementComicListVO> page = queryService.list(query);
         return Result.ok(PageResponse.of(page.getRecords(), page.getTotal(), page.getCurrent(), page.getSize()));
     }
 

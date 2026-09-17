@@ -1,7 +1,7 @@
 package com.comicatlas.api.importer.application.port.out;
 
-import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.comicatlas.api.importer.domain.model.ImportTaskStatus;
+import com.comicatlas.api.shared.application.model.PageResult;
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.enums.SourceType;
 import java.time.LocalDateTime;
@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 public interface ImportCommandPersistencePort {
     ImportTaskSnapshot findImportTask(Long taskId);
     ImportTaskSnapshot findByManagementTaskId(Long managementTaskId);
-    IPage<ImportTaskSnapshot> findPage(int page, int size, ImportTaskStatus status, String batchId);
+    PageResult<ImportTaskSnapshot> findPage(int page, int size, ImportTaskStatus status, String batchId);
     Long insertImportTask(CreateTaskCommand command);
     int updateImportTask(UpdateTaskCommand command);
     ComicSnapshot findComicBySourceGallery(String sourceType, String galleryId);

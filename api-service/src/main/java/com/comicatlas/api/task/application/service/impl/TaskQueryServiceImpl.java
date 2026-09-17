@@ -1,6 +1,6 @@
 package com.comicatlas.api.task.application.service.impl;
 
-import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.comicatlas.api.shared.application.model.PageResult;
 import com.comicatlas.api.task.interfaces.rest.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.task.interfaces.rest.dto.ManagementTaskResponse;
 import com.comicatlas.api.task.domain.model.ManagementTaskStatus;
@@ -37,7 +37,7 @@ public class TaskQueryServiceImpl implements TaskQueryService {
     private final TaskResponseAssembler taskResponseAssembler;
 
     /** 分页查询管理任务。 */
-    public IPage<ManagementTaskResponse> listTasks(int page, int size, TaskType type,
+    public PageResult<ManagementTaskResponse> listTasks(int page, int size, TaskType type,
                                                     ManagementTaskStatus status, String batchId,
                                                     String targetType, Long targetId) {
         List<Long> targetTaskIds = null;
@@ -47,17 +47,14 @@ public class TaskQueryServiceImpl implements TaskQueryService {
                 return emptyPage(page, size);
             }
         }
-        IPage<TaskSnapshot> taskPage = persistencePort.findTaskPage(page, size,
+        PageResult<TaskSnapshot> taskPage = persistencePort.findTaskPage(page, size,
                 type == null ? null : type.name(), status == null ? null : status.name(), batchId,
                 targetType, targetTaskIds);
-        List<ManagementTaskResponse> responses = taskPage.getRecords().stream()
+        List<ManagementTaskResponse> responses = taskPage.records().stream()
                 .map(taskResponseAssembler::toResponse)
                 .collect(Collectors.toList());
-        enrichTargetSummaries(taskPage.getRecords(), responses);
-        IPage<ManagementTaskResponse> responsePage = new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(page, size);
-        responsePage.setTotal(taskPage.getTotal());
-        responsePage.setRecords(responses);
-        return responsePage;
+        enrichTargetSummaries(taskPage.records(), responses);
+        return new PageResult<>(taskPage.current(), taskPage.size(), taskPage.total(), responses);
     }
 
     /** 查询任务详情。 */
@@ -85,11 +82,8 @@ public class TaskQueryServiceImpl implements TaskQueryService {
         return task;
     }
 
-    private IPage<ManagementTaskResponse> emptyPage(int page, int size) {
-        IPage<ManagementTaskResponse> emptyPage = new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(page, size);
-        emptyPage.setTotal(0);
-        emptyPage.setRecords(List.of());
-        return emptyPage;
+    private PageResult<ManagementTaskResponse> emptyPage(int page, int size) {
+        return new PageResult<>(page, size, 0, List.of());
     }
 
     private void enrichTargetSummaries(List<TaskSnapshot> tasks,

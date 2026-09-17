@@ -1,7 +1,5 @@
 package com.comicatlas.api.library.application.service.impl;
 
-import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.api.library.interfaces.rest.dto.ManagementComicListVO;
 import com.comicatlas.api.library.application.port.in.ManagementComicQueryService;
 import com.comicatlas.api.library.application.port.out.ManagementComicQueryPersistencePort;
@@ -11,6 +9,7 @@ import com.comicatlas.contract.comic.dto.ComicDetailVO;
 import com.comicatlas.contract.comic.dto.ComicMetadataDTO;
 import com.comicatlas.contract.comic.dto.ComicListQuery;
 import com.comicatlas.api.shared.application.port.out.FileUrlResolverPort;
+import com.comicatlas.api.shared.application.model.PageResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -24,7 +23,7 @@ public class ManagementComicQueryServiceImpl implements ManagementComicQueryServ
     private final FileUrlResolverPort fileUrlResolver;
 
     @Override
-    public IPage<ManagementComicListVO> list(ComicListQuery query) {
+    public PageResult<ManagementComicListVO> list(ComicListQuery query) {
         if (query == null) {
             query = new ComicListQuery();
         }
@@ -42,9 +41,8 @@ public class ManagementComicQueryServiceImpl implements ManagementComicQueryServ
         }
         ManagementComicQueryPersistencePort.ComicPageSnapshot comics =
                 persistencePort.findPage(safePage, safeSize, query);
-        Page<ManagementComicListVO> result = new Page<>(safePage, safeSize, comics.total());
-        result.setRecords(comics.records().stream().map(this::toListVO).toList());
-        return result;
+        return new PageResult<>(safePage, safeSize, comics.total(),
+                comics.records().stream().map(this::toListVO).toList());
     }
 
     @Override

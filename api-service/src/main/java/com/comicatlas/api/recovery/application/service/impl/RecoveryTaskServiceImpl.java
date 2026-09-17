@@ -1,6 +1,6 @@
 package com.comicatlas.api.recovery.application.service.impl;
 
-import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.comicatlas.api.shared.application.model.PageResult;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.api.recovery.domain.model.RecoveryTaskStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
@@ -62,9 +62,11 @@ public class RecoveryTaskServiceImpl implements RecoveryTaskService {
     }
 
     @Override
-    public IPage<RecoveryTaskVO> listTasks(Integer page, Integer size) {
-        return persistencePort.findPage(page != null ? page : DEFAULT_PAGE,
-                size != null ? size : DEFAULT_PAGE_SIZE).convert(this::toVO);
+    public PageResult<RecoveryTaskVO> listTasks(Integer page, Integer size) {
+        PageResult<RecoveryTaskSnapshot> result = persistencePort.findPage(page != null ? page : DEFAULT_PAGE,
+                size != null ? size : DEFAULT_PAGE_SIZE);
+        return new PageResult<>(result.current(), result.size(), result.total(),
+                result.records().stream().map(this::toVO).toList());
     }
 
     @Override

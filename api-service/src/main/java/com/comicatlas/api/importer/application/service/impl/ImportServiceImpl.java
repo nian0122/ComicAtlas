@@ -1,6 +1,6 @@
 package com.comicatlas.api.importer.application.service.impl;
 
-import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.comicatlas.api.shared.application.model.PageResult;
 import com.comicatlas.api.importer.interfaces.rest.dto.BatchImportRequest;
 import com.comicatlas.api.importer.interfaces.rest.dto.BatchImportResultVO;
 import com.comicatlas.api.importer.interfaces.rest.dto.FailedItem;
@@ -199,10 +199,12 @@ public class ImportServiceImpl implements ImportService {
     }
 
     @Override
-    public IPage<ImportTaskVO> listTasks(Integer page, Integer size, String status, String batchId) {
+    public PageResult<ImportTaskVO> listTasks(Integer page, Integer size, String status, String batchId) {
         ImportTaskStatus statusEnum = status != null ? parseImportStatus(status) : null;
-        return persistencePort.findPage(page != null ? page : DEFAULT_PAGE_NUMBER,
-                size != null ? size : DEFAULT_PAGE_SIZE, statusEnum, batchId).convert(this::toVO);
+        PageResult<ImportTaskSnapshot> result = persistencePort.findPage(page != null ? page : DEFAULT_PAGE_NUMBER,
+                size != null ? size : DEFAULT_PAGE_SIZE, statusEnum, batchId);
+        return new PageResult<>(result.current(), result.size(), result.total(),
+                result.records().stream().map(this::toVO).toList());
     }
 
     @Override

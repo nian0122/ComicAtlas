@@ -1,6 +1,6 @@
 package com.comicatlas.api.task.application.service.impl;
 
-import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.comicatlas.api.shared.application.model.PageResult;
 import com.comicatlas.api.task.interfaces.rest.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.task.interfaces.rest.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.task.interfaces.rest.dto.ManagementTaskResponse;
@@ -149,7 +149,7 @@ public class ManagementTaskServiceImpl implements ManagementTaskService {
     // ======================== 查询 ========================
 
     /** 分页查询任务列表。 */
-    public IPage<ManagementTaskResponse> listTasks(int page, int size, TaskType type,
+    public PageResult<ManagementTaskResponse> listTasks(int page, int size, TaskType type,
                                                     ManagementTaskStatus status, String batchId,
                                                     String targetType, Long targetId) {
         return taskQueryService.listTasks(page, size, type, status, batchId, targetType, targetId);

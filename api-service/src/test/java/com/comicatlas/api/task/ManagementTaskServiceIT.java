@@ -2,7 +2,7 @@ package com.comicatlas.api.task;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.comicatlas.api.shared.application.model.PageResult;
 import com.comicatlas.api.shared.exception.ConflictException;
 import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.contract.common.enums.ComicStatus;
@@ -312,7 +312,7 @@ class ManagementTaskServiceIT {
         @Test
         @DisplayName("按 taskType 过滤")
         void filterByType() {
-            IPage<ManagementTaskResponse> page = service.listTasks(
+            PageResult<ManagementTaskResponse> page = service.listTasks(
                     1, 10, TaskType.IMPORT, null, null, null, null);
             assertThat(page.getTotal()).isGreaterThanOrEqualTo(1);
             assertThat(page.getRecords()).allMatch(t -> t.getTaskType() == TaskType.IMPORT);
@@ -321,7 +321,7 @@ class ManagementTaskServiceIT {
         @Test
         @DisplayName("按 status 过滤")
         void filterByStatus() {
-            IPage<ManagementTaskResponse> page = service.listTasks(
+            PageResult<ManagementTaskResponse> page = service.listTasks(
                     1, 10, null, ManagementTaskStatus.QUEUED, null, null, null);
             assertThat(page.getRecords()).allMatch(t -> t.getStatus() == ManagementTaskStatus.QUEUED);
         }
@@ -329,7 +329,7 @@ class ManagementTaskServiceIT {
         @Test
         @DisplayName("按 batchId 过滤")
         void filterByBatchId() {
-            IPage<ManagementTaskResponse> page = service.listTasks(
+            PageResult<ManagementTaskResponse> page = service.listTasks(
                     1, 10, null, null, "BATCH-001", null, null);
             assertThat(page.getTotal()).isEqualTo(1);
             assertThat(page.getRecords().get(0).getBatchId()).isEqualTo("BATCH-001");
@@ -338,7 +338,7 @@ class ManagementTaskServiceIT {
         @Test
         @DisplayName("组合过滤 type + status")
         void filterByTypeAndStatus() {
-            IPage<ManagementTaskResponse> page = service.listTasks(
+            PageResult<ManagementTaskResponse> page = service.listTasks(
                     1, 10, TaskType.EXPORT, ManagementTaskStatus.QUEUED, null, null, null);
             assertThat(page.getRecords())
                 .allMatch(t -> t.getTaskType() == TaskType.EXPORT
@@ -352,7 +352,7 @@ class ManagementTaskServiceIT {
             CreateManagementTaskRequest req = buildRequestWithTarget("COMIC", 600L, TaskType.IMPORT);
             ManagementTaskResponse task = service.createTask(req, null, null);
 
-            IPage<ManagementTaskResponse> page = service.listTasks(
+            PageResult<ManagementTaskResponse> page = service.listTasks(
                     1, 10, null, null, null, null, 600L);
             assertThat(page.getTotal()).isGreaterThanOrEqualTo(1);
             assertThat(page.getRecords()).anyMatch(t -> t.getId().equals(task.getId()));
@@ -760,7 +760,7 @@ class ManagementTaskServiceIT {
             request.setTargets(targets);
             ManagementTaskResponse task = service.createTask(request, null, null);
 
-            IPage<ManagementTaskResponse> page = service.listTasks(
+            PageResult<ManagementTaskResponse> page = service.listTasks(
                     1, 10, null, null, null, null, comic.getId());
             assertThat(page.getRecords())
                     .extracting(ManagementTaskResponse::getId)
@@ -802,7 +802,7 @@ class ManagementTaskServiceIT {
             request.setTargets(List.of(target("MEDIA", media.getId(), TaskType.TRANSCODE)));
             ManagementTaskResponse task = service.createTask(request, null, null);
 
-            IPage<ManagementTaskResponse> page = service.listTasks(
+            PageResult<ManagementTaskResponse> page = service.listTasks(
                     1, 10, null, null, null, null, comic.getId());
             assertThat(page.getRecords())
                     .extracting(ManagementTaskResponse::getId)
@@ -829,7 +829,7 @@ class ManagementTaskServiceIT {
             request.setTargets(List.of(target("SYSTEM", comic.getId(), TaskType.RECOVERY)));
             ManagementTaskResponse task = service.createTask(request, null, null);
 
-            IPage<ManagementTaskResponse> page = service.listTasks(
+            PageResult<ManagementTaskResponse> page = service.listTasks(
                     1, 10, null, null, null, null, comic.getId());
 
             assertThat(page.getRecords())

@@ -1,6 +1,6 @@
 package com.comicatlas.api.importer.interfaces.rest;
 
-import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.comicatlas.api.shared.application.model.PageResult;
 import com.comicatlas.contract.common.dto.PageResponse;
 import com.comicatlas.contract.common.Result;
 import com.comicatlas.api.importer.application.port.in.ImportService;
@@ -66,7 +66,7 @@ public class ImportController {
             @RequestParam(defaultValue = "20") Integer size,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String batchId) {
-        IPage<ImportTaskVO> taskPage = importService.listTasks(page, size, status, batchId);
+        PageResult<ImportTaskVO> taskPage = importService.listTasks(page, size, status, batchId);
         return Result.ok(PageResponse.of(taskPage.getRecords(), taskPage.getTotal(),
                 taskPage.getCurrent(), taskPage.getSize()));
     }

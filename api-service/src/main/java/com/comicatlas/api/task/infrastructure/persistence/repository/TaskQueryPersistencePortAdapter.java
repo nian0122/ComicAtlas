@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.api.task.application.port.out.TaskQueryPersistencePort;
 import com.comicatlas.api.task.application.port.out.TaskViewQueryPort;
+import com.comicatlas.api.shared.application.model.PageResult;
 import com.comicatlas.api.task.domain.model.TaskType;
 import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTask;
 import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTaskItem;
@@ -29,14 +30,12 @@ public class TaskQueryPersistencePortAdapter implements TaskQueryPersistencePort
     private final ChapterMapper chapterMapper;
     private final MediaMapper mediaMapper;
     @Override
-    public IPage<TaskViewQueryPort.TaskSnapshot> findTaskPage(int page, int size, String taskType, String status,
+    public PageResult<TaskViewQueryPort.TaskSnapshot> findTaskPage(int page, int size, String taskType, String status,
                                             String batchId, String targetType, List<Long> taskIds) {
         IPage<ManagementTask> sourcePage = taskMapper.selectPageByCondition(new Page<>(page, size), taskType, status,
                 batchId, targetType, taskIds);
-        Page<TaskViewQueryPort.TaskSnapshot> targetPage = new Page<>(page, size);
-        targetPage.setTotal(sourcePage.getTotal());
-        targetPage.setRecords(sourcePage.getRecords().stream().map(this::toTaskSnapshot).toList());
-        return targetPage;
+        return new PageResult<>(sourcePage.getCurrent(), sourcePage.getSize(), sourcePage.getTotal(),
+                sourcePage.getRecords().stream().map(this::toTaskSnapshot).toList());
     }
 
     @Override public TaskViewQueryPort.TaskSnapshot findTaskView(Long taskId) {
@@ -87,14 +86,12 @@ public class TaskQueryPersistencePortAdapter implements TaskQueryPersistencePort
     public List<Long> findTaskIdsByComicId(Long comicId) { return itemMapper.selectTaskIdsByComicId(comicId); }
 
     @Override
-    public IPage<TaskQueryPersistencePort.TaskSnapshot> findPage(int page, int size, String taskType, String status,
+    public PageResult<TaskQueryPersistencePort.TaskSnapshot> findPage(int page, int size, String taskType, String status,
                                           String batchId, String targetType, List<Long> taskIds) {
         IPage<ManagementTask> sourcePage = taskMapper.selectPageByCondition(new Page<>(page, size), taskType, status,
                 batchId, targetType, taskIds);
-        Page<TaskQueryPersistencePort.TaskSnapshot> targetPage = new Page<>(page, size);
-        targetPage.setTotal(sourcePage.getTotal());
-        targetPage.setRecords(sourcePage.getRecords().stream().map(this::toCommandTaskSnapshot).toList());
-        return targetPage;
+        return new PageResult<>(sourcePage.getCurrent(), sourcePage.getSize(), sourcePage.getTotal(),
+                sourcePage.getRecords().stream().map(this::toCommandTaskSnapshot).toList());
     }
 
     @Override

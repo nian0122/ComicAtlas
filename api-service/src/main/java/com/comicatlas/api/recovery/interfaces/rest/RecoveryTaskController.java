@@ -1,6 +1,6 @@
 package com.comicatlas.api.recovery.interfaces.rest;
 
-import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.comicatlas.api.shared.application.model.PageResult;
 import com.comicatlas.contract.common.dto.PageResponse;
 import com.comicatlas.contract.common.Result;
 import com.comicatlas.api.recovery.interfaces.rest.dto.RecoveryTaskVO;
@@ -50,7 +50,7 @@ public class RecoveryTaskController {
     public Result<PageResponse<RecoveryTaskVO>> listTasks(
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "20") Integer size) {
-        IPage<RecoveryTaskVO> taskPage = recoveryTaskService.listTasks(page, size);
+        PageResult<RecoveryTaskVO> taskPage = recoveryTaskService.listTasks(page, size);
         return Result.ok(PageResponse.of(taskPage.getRecords(), taskPage.getTotal(),
                 taskPage.getCurrent(), taskPage.getSize()));
     }

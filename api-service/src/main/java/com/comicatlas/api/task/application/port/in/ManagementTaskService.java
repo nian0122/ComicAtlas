@@ -1,6 +1,6 @@
 package com.comicatlas.api.task.application.port.in;
 
-import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.comicatlas.api.shared.application.model.PageResult;
 import com.comicatlas.api.task.interfaces.rest.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.task.interfaces.rest.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.task.interfaces.rest.dto.ManagementTaskResponse;
@@ -13,7 +13,7 @@ import java.util.List;
 /** 管理任务应用服务契约。 */
 public interface ManagementTaskService {
     ManagementTaskResponse createTask(CreateManagementTaskRequest request, String idempotencyKey, String payload);
-    IPage<ManagementTaskResponse> listTasks(int page, int size, TaskType type, ManagementTaskStatus status,
+    PageResult<ManagementTaskResponse> listTasks(int page, int size, TaskType type, ManagementTaskStatus status,
                                             String batchId, String targetType, Long targetId);
     ManagementTaskResponse getTask(Long taskId);
     List<ManagementTaskItemResponse> getTaskItems(Long taskId);

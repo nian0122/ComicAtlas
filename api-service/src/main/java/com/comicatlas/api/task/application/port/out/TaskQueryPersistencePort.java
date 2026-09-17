@@ -1,6 +1,6 @@
 package com.comicatlas.api.task.application.port.out;
 
-import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.comicatlas.api.shared.application.model.PageResult;
 import com.comicatlas.api.task.domain.model.TaskType;
 import com.comicatlas.api.task.domain.model.ManagementTaskStatus;
 
@@ -12,7 +12,7 @@ public interface TaskQueryPersistencePort {
 
     List<Long> findTaskIdsByComicId(Long comicId);
 
-    IPage<TaskSnapshot> findPage(int page, int size, String taskType, String status,
+    PageResult<TaskSnapshot> findPage(int page, int size, String taskType, String status,
                                     String batchId, String targetType, List<Long> taskIds);
 
     TaskSnapshot findTask(Long taskId);

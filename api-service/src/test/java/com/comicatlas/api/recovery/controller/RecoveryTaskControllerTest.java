@@ -1,7 +1,6 @@
 package com.comicatlas.api.recovery.interfaces.rest;
 
-import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.comicatlas.api.shared.application.model.PageResult;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.web.exception.GlobalExceptionHandler;
 import com.comicatlas.api.dlq.infrastructure.config.DlqSecurityConfig;
@@ -68,9 +67,7 @@ class RecoveryTaskControllerTest {
     void listTasks_shouldReturnPaginatedList() throws Exception {
         RecoveryTaskVO vo1 = buildVO(1L, "SUCCESS", 10, 8, 1, 1, 0);
         RecoveryTaskVO vo2 = buildVO(2L, "RUNNING", 5, 2, 0, 0, 0);
-        Page<RecoveryTaskVO> page = new Page<>(1, 20);
-        page.setRecords(List.of(vo2, vo1));
-        page.setTotal(2);
+        PageResult<RecoveryTaskVO> page = new PageResult<>(1, 20, 2, List.of(vo2, vo1));
 
         when(recoveryTaskService.listTasks(1, 20)).thenReturn(page);
 

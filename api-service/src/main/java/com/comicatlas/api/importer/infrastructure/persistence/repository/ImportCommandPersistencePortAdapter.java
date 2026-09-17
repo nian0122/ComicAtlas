@@ -3,6 +3,7 @@ package com.comicatlas.api.importer.infrastructure.persistence.repository;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.api.importer.application.port.out.ImportCommandPersistencePort;
+import com.comicatlas.api.shared.application.model.PageResult;
 import com.comicatlas.api.importer.domain.model.ImportTaskStatus;
 import com.comicatlas.api.importer.infrastructure.persistence.entity.ImportTask;
 import com.comicatlas.api.importer.infrastructure.persistence.mapper.ImportTaskMapper;
@@ -24,10 +25,11 @@ public class ImportCommandPersistencePortAdapter implements ImportCommandPersist
     @Override public ImportCommandPersistencePort.ImportTaskSnapshot findByManagementTaskId(Long managementTaskId) {
         return toSnapshot(importTaskMapper.selectByManagementTaskId(managementTaskId));
     }
-    @Override public IPage<ImportCommandPersistencePort.ImportTaskSnapshot> findPage(
+    @Override public PageResult<ImportCommandPersistencePort.ImportTaskSnapshot> findPage(
             int page, int size, ImportTaskStatus status, String batchId) {
         IPage<ImportTask> result = importTaskMapper.selectPageByConditions(new Page<>(page, size), status, batchId);
-        return result.convert(this::toSnapshot);
+        return new PageResult<>(result.getCurrent(), result.getSize(), result.getTotal(),
+                result.getRecords().stream().map(this::toSnapshot).toList());
     }
     @Override public Long insertImportTask(ImportCommandPersistencePort.CreateTaskCommand command) {
         ImportTask task = new ImportTask();

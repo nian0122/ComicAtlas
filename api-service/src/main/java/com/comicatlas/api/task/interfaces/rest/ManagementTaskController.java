@@ -1,6 +1,6 @@
 package com.comicatlas.api.task.interfaces.rest;
 
-import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.comicatlas.api.shared.application.model.PageResult;
 import com.comicatlas.contract.common.Result;
 import com.comicatlas.contract.common.dto.PageResponse;
 import com.comicatlas.api.task.interfaces.rest.dto.CreateManagementTaskRequest;
@@ -48,7 +48,7 @@ public class ManagementTaskController {
             @RequestParam(required = false) String batchId,
             @RequestParam(required = false) String targetType,
             @RequestParam(required = false) Long targetId) {
-        IPage<ManagementTaskResponse> taskPage = managementTaskService.listTasks(page, size, type, status,
+        PageResult<ManagementTaskResponse> taskPage = managementTaskService.listTasks(page, size, type, status,
                 batchId, targetType, targetId);
         return Result.ok(PageResponse.of(taskPage.getRecords(), taskPage.getTotal(),
                 taskPage.getCurrent(), taskPage.getSize()));

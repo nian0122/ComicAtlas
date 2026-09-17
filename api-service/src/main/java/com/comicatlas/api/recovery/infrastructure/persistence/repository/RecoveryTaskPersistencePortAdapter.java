@@ -3,6 +3,7 @@ package com.comicatlas.api.recovery.infrastructure.persistence.repository;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.api.recovery.application.port.out.RecoveryTaskPersistencePort;
+import com.comicatlas.api.shared.application.model.PageResult;
 import com.comicatlas.api.recovery.application.port.out.RecoveryTaskPersistencePort.CreateCommand;
 import com.comicatlas.api.recovery.application.port.out.RecoveryTaskPersistencePort.RecoveryTaskSnapshot;
 import com.comicatlas.api.recovery.application.port.out.RecoveryTaskPersistencePort.UpdateCommand;
@@ -19,12 +20,10 @@ public class RecoveryTaskPersistencePortAdapter implements RecoveryTaskPersisten
     private final RecoveryTaskMapper recoveryTaskMapper;
 
     @Override
-    public IPage<RecoveryTaskSnapshot> findPage(int page, int size) {
+    public PageResult<RecoveryTaskSnapshot> findPage(int page, int size) {
         IPage<RecoveryTask> sourcePage = recoveryTaskMapper.selectPageOrderByCreatedAtDesc(new Page<>(page, size));
-        IPage<RecoveryTaskSnapshot> targetPage = new Page<>(page, size);
-        targetPage.setTotal(sourcePage.getTotal());
-        targetPage.setRecords(sourcePage.getRecords().stream().map(this::toSnapshot).toList());
-        return targetPage;
+        return new PageResult<>(sourcePage.getCurrent(), sourcePage.getSize(), sourcePage.getTotal(),
+                sourcePage.getRecords().stream().map(this::toSnapshot).toList());
     }
 
     @Override

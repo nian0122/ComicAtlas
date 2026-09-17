@@ -1,14 +1,14 @@
 package com.comicatlas.api.recovery.application.port.out;
 
-import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.comicatlas.api.recovery.domain.model.RecoveryTaskStatus;
+import com.comicatlas.api.shared.application.model.PageResult;
 
 import java.time.LocalDateTime;
 
 /** 恢复任务应用服务访问持久化层的输出端口。 */
 public interface RecoveryTaskPersistencePort {
 
-    IPage<RecoveryTaskSnapshot> findPage(int page, int size);
+    PageResult<RecoveryTaskSnapshot> findPage(int page, int size);
 
     RecoveryTaskSnapshot findById(Long taskId);
 

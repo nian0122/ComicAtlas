@@ -1,13 +1,13 @@
 package com.comicatlas.api.recovery.application.port.in;
 
-import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.comicatlas.api.shared.application.model.PageResult;
 import com.comicatlas.api.recovery.interfaces.rest.dto.RecoveryTaskVO;
 
 public interface RecoveryTaskService {
 
     RecoveryTaskVO createRecoveryTask();
 
-    IPage<RecoveryTaskVO> listTasks(Integer page, Integer size);
+    PageResult<RecoveryTaskVO> listTasks(Integer page, Integer size);
 
     RecoveryTaskVO getTaskDetail(Long id);
 

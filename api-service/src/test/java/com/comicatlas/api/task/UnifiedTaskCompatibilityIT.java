@@ -1,7 +1,7 @@
 package com.comicatlas.api.task;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.comicatlas.api.shared.application.model.PageResult;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.contract.common.enums.ComicStatus;
@@ -373,7 +373,7 @@ class UnifiedTaskCompatibilityIT {
         DirectoryScanTask st = directoryScanTaskMapper.selectById(scan.getId());
         assertThat(st.getManagementTaskId()).isNotNull();
 
-        IPage<ManagementTaskResponse> page = managementTaskService.listTasks(
+        PageResult<ManagementTaskResponse> page = managementTaskService.listTasks(
                 1, 10, TaskType.DIRECTORY_SCAN, null, null, null, null);
         assertThat(page.getTotal()).isGreaterThanOrEqualTo(1);
         assertThat(page.getRecords()).anyMatch(t -> t.getId().equals(st.getManagementTaskId()));
@@ -386,7 +386,7 @@ class UnifiedTaskCompatibilityIT {
         RecoveryTask rt = recoveryTaskMapper.selectById(vo.getId());
         assertThat(rt.getManagementTaskId()).isNotNull();
 
-        IPage<ManagementTaskResponse> page = managementTaskService.listTasks(
+        PageResult<ManagementTaskResponse> page = managementTaskService.listTasks(
                 1, 10, TaskType.RECOVERY, null, null, null, null);
         assertThat(page.getTotal()).isGreaterThanOrEqualTo(1);
         assertThat(page.getRecords()).anyMatch(t -> t.getId().equals(rt.getManagementTaskId()));
@@ -400,17 +400,17 @@ class UnifiedTaskCompatibilityIT {
         ImportTaskVO vo = importService.createImportTask(buildRequest("/mnt/import/过滤漫画F"), null);
         ImportTask it = importTaskMapper.selectById(vo.getId());
 
-        IPage<ManagementTaskResponse> byType = managementTaskService.listTasks(
+        PageResult<ManagementTaskResponse> byType = managementTaskService.listTasks(
                 1, 10, TaskType.IMPORT, null, null, null, null);
         assertThat(byType.getRecords()).isNotEmpty();
         assertThat(byType.getRecords()).allMatch(t -> t.getTaskType() == TaskType.IMPORT);
 
-        IPage<ManagementTaskResponse> byStatus = managementTaskService.listTasks(
+        PageResult<ManagementTaskResponse> byStatus = managementTaskService.listTasks(
                 1, 10, null, ManagementTaskStatus.QUEUED, null, null, null);
         assertThat(byStatus.getRecords()).isNotEmpty();
         assertThat(byStatus.getRecords()).allMatch(t -> t.getStatus() == ManagementTaskStatus.QUEUED);
 
-        IPage<ManagementTaskResponse> byTarget = managementTaskService.listTasks(
+        PageResult<ManagementTaskResponse> byTarget = managementTaskService.listTasks(
                 1, 10, null, null, null, null, it.getComicId());
         assertThat(byTarget.getRecords()).anyMatch(t -> t.getId().equals(it.getManagementTaskId()));
     }
