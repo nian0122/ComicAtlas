@@ -1,15 +1,17 @@
 package com.comicatlas.api.trash.application.port.out;
 
-import com.comicatlas.persistence.comic.entity.Chapter;
-import com.comicatlas.persistence.comic.entity.Comic;
-import com.comicatlas.persistence.comic.entity.Media;
-
+import java.time.LocalDateTime;
 /** 回收对账服务访问实体状态的输出端口。 */
 public interface TrashReconciliationPersistencePort {
-    Comic findComic(Long comicId);
-    Chapter findChapter(Long chapterId);
-    Media findMedia(Long mediaId);
-    void updateComic(Comic comic);
-    void updateChapter(Chapter chapter);
-    void updateMedia(Media media);
+    TargetSnapshot findComic(Long comicId);
+    TargetSnapshot findChapter(Long chapterId);
+    TargetSnapshot findMedia(Long mediaId);
+    void updateTarget(TargetUpdateCommand command);
+
+    record TargetSnapshot(Long id, String status, LocalDateTime trashedAt, Integer originalPageNumber) {
+    }
+
+    record TargetUpdateCommand(String targetType, Long id, String status,
+                               LocalDateTime trashedAt, Integer pageNumber) {
+    }
 }

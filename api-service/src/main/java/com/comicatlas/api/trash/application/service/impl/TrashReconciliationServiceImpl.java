@@ -5,13 +5,7 @@ import com.comicatlas.api.storage.ApiStorageRoot;
 import com.comicatlas.common.dto.TrashManifestItemDTO;
 import com.comicatlas.api.trash.interfaces.rest.dto.TrashReconcileReport;
 import com.comicatlas.common.dto.TrashManifestDTO;
-import com.comicatlas.persistence.comic.entity.Chapter;
-import com.comicatlas.persistence.comic.entity.Comic;
-import com.comicatlas.persistence.comic.entity.Media;
 import com.comicatlas.api.trash.application.port.out.TrashReconciliationPersistencePort;
-import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
-import com.comicatlas.contract.common.enums.ComicStatus;
-import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
 import com.comicatlas.api.trash.application.port.in.TrashReconciliationService;
 import com.comicatlas.api.trash.application.port.in.TrashManifestService;
 import lombok.RequiredArgsConstructor;
@@ -82,24 +76,36 @@ public class TrashReconciliationServiceImpl implements TrashReconciliationServic
     }
 
     private boolean markTrashed(String type, Long id) {
-        if ("COMIC".equals(type)) { Comic value = persistencePort.findComic(id); if (value != null && value.getStatus() == ComicStatus.TRASHING) { value.setStatus(ComicStatus.TRASHED); value.setTrashedAt(LocalDateTime.now()); persistencePort.updateComic(value); return true; } }
-        if ("CHAPTER".equals(type)) { Chapter value = persistencePort.findChapter(id); if (value != null && value.getStatus() == ChapterLifecycleStatus.TRASHING) { value.setStatus(ChapterLifecycleStatus.TRASHED); value.setTrashedAt(LocalDateTime.now()); persistencePort.updateChapter(value); return true; } }
-        if ("MEDIA".equals(type)) { Media value = persistencePort.findMedia(id); if (value != null && value.getStatus() == MediaLifecycleStatus.TRASHING) { value.setStatus(MediaLifecycleStatus.TRASHED); value.setTrashedAt(LocalDateTime.now()); persistencePort.updateMedia(value); return true; } }
-        return false;
+        TrashReconciliationPersistencePort.TargetSnapshot value = findTarget(type, id);
+        if (value == null || !"TRASHING".equals(value.status())) { return false; }
+        persistencePort.updateTarget(new TrashReconciliationPersistencePort.TargetUpdateCommand(
+                type, id, "TRASHED", LocalDateTime.now(), null));
+        return true;
     }
 
     private boolean markReady(String type, Long id) {
-        if ("COMIC".equals(type)) { Comic value = persistencePort.findComic(id); if (value != null && value.getStatus() == ComicStatus.TRASHING) { value.setStatus(ComicStatus.READY); value.setTrashedAt(null); persistencePort.updateComic(value); return true; } }
-        if ("CHAPTER".equals(type)) { Chapter value = persistencePort.findChapter(id); if (value != null && value.getStatus() == ChapterLifecycleStatus.TRASHING) { value.setStatus(ChapterLifecycleStatus.READY); value.setTrashedAt(null); persistencePort.updateChapter(value); return true; } }
-        if ("MEDIA".equals(type)) { Media value = persistencePort.findMedia(id); if (value != null && value.getStatus() == MediaLifecycleStatus.TRASHING) { value.setStatus(MediaLifecycleStatus.READY); value.setTrashedAt(null); value.setPageNumber(value.getOriginalPageNumber()); persistencePort.updateMedia(value); return true; } }
-        return false;
+        TrashReconciliationPersistencePort.TargetSnapshot value = findTarget(type, id);
+        if (value == null || !"TRASHING".equals(value.status())) { return false; }
+        persistencePort.updateTarget(new TrashReconciliationPersistencePort.TargetUpdateCommand(
+                type, id, "READY", null, value.originalPageNumber()));
+        return true;
     }
 
     private String resolveDbStatus(String type, Long id) {
         return switch (type) {
-            case "COMIC" -> { Comic value = persistencePort.findComic(id); yield value == null || value.getStatus() == null ? null : value.getStatus().name(); }
-            case "CHAPTER" -> { Chapter value = persistencePort.findChapter(id); yield value == null || value.getStatus() == null ? null : value.getStatus().name(); }
-            case "MEDIA" -> { Media value = persistencePort.findMedia(id); yield value == null || value.getStatus() == null ? null : value.getStatus().name(); }
+            case "COMIC", "CHAPTER", "MEDIA" -> {
+                TrashReconciliationPersistencePort.TargetSnapshot value = findTarget(type, id);
+                yield value == null ? null : value.status();
+            }
+            default -> null;
+        };
+    }
+
+    private TrashReconciliationPersistencePort.TargetSnapshot findTarget(String type, Long id) {
+        return switch (type) {
+            case "COMIC" -> persistencePort.findComic(id);
+            case "CHAPTER" -> persistencePort.findChapter(id);
+            case "MEDIA" -> persistencePort.findMedia(id);
             default -> null;
         };
     }
