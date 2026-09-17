@@ -81,7 +81,7 @@ class ImportEventHandlerCacheTest {
 
         when(redisTemplate.hasKey(any())).thenReturn(false);
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(importResultPersistencePort.findImportTask(10L)).thenReturn(task);
+        when(importResultPersistencePort.findImportTask(10L)).thenReturn(snapshot(task));
         doReturn(metadata).when(objectMapper).readValue(any(File.class), any(TypeReference.class));
         when(importPersistenceService.persistCompleted(event, metadata)).thenReturn(List.of());
         ApiStorageRoot metadataRoot = new ApiStorageRoot();
@@ -106,7 +106,7 @@ class ImportEventHandlerCacheTest {
         task.setId(30L);
         task.setStatus(null);
 
-        when(importResultPersistencePort.findImportTask(30L)).thenReturn(task);
+        when(importResultPersistencePort.findImportTask(30L)).thenReturn(snapshot(task));
 
         ImportTaskFailedEvent event = new ImportTaskFailedEvent(
                 UUID.randomUUID(), Instant.now(), 30L, 300L, "DOWNLOAD_FAILED", "下载失败");
@@ -114,8 +114,10 @@ class ImportEventHandlerCacheTest {
         runInTransaction(() -> assertDoesNotThrow(() -> handler.handleImportTaskFailed(event, channel, 1L)));
         verify(channel).basicAck(1L, false);
 
-        verify(importResultPersistencePort).updateImportTask(task);
-        assertThat(task.getStatus()).isEqualTo(ImportTaskStatus.FAILED);
+        ArgumentCaptor<ImportResultPersistencePort.ImportTaskUpdateCommand> updateCaptor =
+                ArgumentCaptor.forClass(ImportResultPersistencePort.ImportTaskUpdateCommand.class);
+        verify(importResultPersistencePort).updateImportTask(updateCaptor.capture());
+        assertThat(updateCaptor.getValue().status()).isEqualTo(ImportTaskStatus.FAILED);
     }
 
     /** 遗留 status=null 行收到终态事件：正常写入终态，不得 NPE。 */
@@ -125,7 +127,7 @@ class ImportEventHandlerCacheTest {
         task.setId(31L);
         task.setStatus(null);
 
-        when(importResultPersistencePort.findImportTask(31L)).thenReturn(task);
+        when(importResultPersistencePort.findImportTask(31L)).thenReturn(snapshot(task));
 
         TaskStatusChangedEvent event = new TaskStatusChangedEvent(
                 UUID.randomUUID(), Instant.now(), 31L, "FAILED", 0, null, 0, 0, null);
@@ -133,8 +135,7 @@ class ImportEventHandlerCacheTest {
         runInTransaction(() -> assertDoesNotThrow(() -> handler.handleTaskStatusChanged(event, channel, 1L)));
         verify(channel).basicAck(1L, false);
 
-        verify(importResultPersistencePort).updateImportTask(task);
-        assertThat(task.getStatus()).isEqualTo(ImportTaskStatus.FAILED);
+        verify(importResultPersistencePort).updateImportTask(any(ImportResultPersistencePort.ImportTaskUpdateCommand.class));
     }
 
     /** 遗留 status=null 行收到阶段事件：不抛异常，status 保持 null（阶段仅写 management_task.stage）。 */
@@ -144,7 +145,7 @@ class ImportEventHandlerCacheTest {
         task.setId(32L);
         task.setStatus(null);
 
-        when(importResultPersistencePort.findImportTask(32L)).thenReturn(task);
+        when(importResultPersistencePort.findImportTask(32L)).thenReturn(snapshot(task));
 
         TaskStatusChangedEvent event = new TaskStatusChangedEvent(
                 UUID.randomUUID(), Instant.now(), 32L, "DOWNLOADING", 42, "HTTP", 1024, 7, null);
@@ -152,8 +153,7 @@ class ImportEventHandlerCacheTest {
         runInTransaction(() -> assertDoesNotThrow(() -> handler.handleTaskStatusChanged(event, channel, 1L)));
         verify(channel).basicAck(1L, false);
 
-        verify(importResultPersistencePort).updateImportTask(task);
-        assertThat(task.getStatus()).isNull();
+        verify(importResultPersistencePort).updateImportTask(any(ImportResultPersistencePort.ImportTaskUpdateCommand.class));
     }
 
     /**
@@ -171,7 +171,7 @@ class ImportEventHandlerCacheTest {
         comic.setId(40L);
         comic.setStatus(ComicStatus.IMPORTING);
 
-        when(importResultPersistencePort.findImportTask(33L)).thenReturn(task);
+        when(importResultPersistencePort.findImportTask(33L)).thenReturn(snapshot(task));
         when(importResultPersistencePort.findComic(40L)).thenReturn(
                 new ImportResultPersistencePort.ComicSnapshot(40L, comic.getStatus(), comic.getVersion()));
 
@@ -193,7 +193,7 @@ class ImportEventHandlerCacheTest {
         task.setComicId(41L);
         task.setStatus(ImportTaskStatus.PARSING);
 
-        when(importResultPersistencePort.findImportTask(34L)).thenReturn(task);
+        when(importResultPersistencePort.findImportTask(34L)).thenReturn(snapshot(task));
 
         TaskStatusChangedEvent event = new TaskStatusChangedEvent(
                 UUID.randomUUID(), Instant.now(), 34L, "DOWNLOADING", 10, "HTTP", 0, 0, null);
@@ -210,7 +210,7 @@ class ImportEventHandlerCacheTest {
         task.setId(35L);
         task.setStatus(ImportTaskStatus.PARSING);
 
-        when(importResultPersistencePort.findImportTask(35L)).thenReturn(task);
+        when(importResultPersistencePort.findImportTask(35L)).thenReturn(snapshot(task));
 
         TaskStatusChangedEvent event = new TaskStatusChangedEvent(
                 UUID.randomUUID(), Instant.now(), 35L, "FAILED", 0, null, 0, 0,
@@ -219,7 +219,15 @@ class ImportEventHandlerCacheTest {
         runInTransaction(() -> handler.handleTaskStatusChanged(event, channel, 1L));
         verify(channel).basicAck(1L, false);
 
-        verify(importResultPersistencePort).updateImportTask(task);
-        assertThat(task.getErrorMessage()).isEqualTo("源文件缺失: D:/comics/ComicA/001.jpg");
+        ArgumentCaptor<ImportResultPersistencePort.ImportTaskUpdateCommand> updateCaptor =
+                ArgumentCaptor.forClass(ImportResultPersistencePort.ImportTaskUpdateCommand.class);
+        verify(importResultPersistencePort).updateImportTask(updateCaptor.capture());
+        assertThat(updateCaptor.getValue().errorMessage()).isEqualTo("源文件缺失: D:/comics/ComicA/001.jpg");
+    }
+
+    private ImportResultPersistencePort.ImportTaskSnapshot snapshot(ImportTask task) {
+        return new ImportResultPersistencePort.ImportTaskSnapshot(
+                task.getId(), task.getComicId(), task.getManagementTaskId(), task.getStatus(),
+                task.getStartTime(), task.getErrorMessage());
     }
 }

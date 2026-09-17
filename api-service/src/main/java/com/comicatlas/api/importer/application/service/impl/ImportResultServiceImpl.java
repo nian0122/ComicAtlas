@@ -3,7 +3,6 @@ package com.comicatlas.api.importer.application.service.impl;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.comicatlas.api.importer.domain.model.ImportTaskStatus;
-import com.comicatlas.api.importer.infrastructure.persistence.entity.ImportTask;
 import com.comicatlas.api.importer.application.port.out.ImportResultPersistencePort;
 import com.comicatlas.api.importer.application.port.out.ImportManagementTaskQueryPort;
 import com.comicatlas.api.storage.infrastructure.config.ApiStorageProperties;
@@ -41,54 +40,52 @@ public class ImportResultServiceImpl implements com.comicatlas.api.importer.appl
     }
 
     public boolean isTerminal(Long taskId) {
-        ImportTask task = persistencePort.findImportTask(taskId);
-        return task != null && TERMINAL_STATUSES.contains(task.getStatus());
+        ImportResultPersistencePort.ImportTaskSnapshot task = persistencePort.findImportTask(taskId);
+        return task != null && TERMINAL_STATUSES.contains(task.status());
     }
 
     @Transactional
     public void applyStatus(Long taskId, String newStatus, Integer progress, long speed,
                             Integer eta, String downloadMethod, String errorMessage) {
-        ImportTask task = persistencePort.findImportTask(taskId);
-        if (task == null || TERMINAL_STATUSES.contains(task.getStatus())) {
+        ImportResultPersistencePort.ImportTaskSnapshot task = persistencePort.findImportTask(taskId);
+        if (task == null || TERMINAL_STATUSES.contains(task.status())) {
             return;
         }
         ImportTaskStatus mappedStatus = parseStatus(newStatus);
-        if (mappedStatus != null) {
-            task.setStatus(mappedStatus);
+        if (mappedStatus == null) {
+            mappedStatus = task.status();
         }
-        if ("DOWNLOADING".equals(newStatus) && task.getStartTime() == null) {
-            task.setStartTime(LocalDateTime.now());
+        LocalDateTime startTime = task.startTime();
+        if ("DOWNLOADING".equals(newStatus) && startTime == null) {
+            startTime = LocalDateTime.now();
         }
-        task.setProgress(progress);
-        if (speed > 0) {
-            task.setDownloadSpeed(speed);
-        }
-        if (eta != null && eta > 0) {
-            task.setEtaSeconds(eta);
-        }
-        if (downloadMethod != null) {
-            task.setDownloadMethod(downloadMethod);
-        }
+        Long downloadSpeed = speed > 0 ? speed : null;
+        Integer etaSeconds = eta != null && eta > 0 ? eta : null;
+        String resolvedDownloadMethod = downloadMethod;
+        String resolvedErrorMessage = task.errorMessage();
+        LocalDateTime endTime = null;
         if ("FAILED".equals(newStatus) && errorMessage != null && !errorMessage.isBlank()) {
-            task.setErrorMessage(errorMessage);
-            task.setEndTime(LocalDateTime.now());
+            resolvedErrorMessage = errorMessage;
+            endTime = LocalDateTime.now();
         }
-        persistencePort.updateImportTask(task);
-        if (task.getManagementTaskId() != null) {
+        persistencePort.updateImportTask(new ImportResultPersistencePort.ImportTaskUpdateCommand(
+                task.id(), task.comicId(), task.managementTaskId(), mappedStatus, progress, downloadSpeed,
+                etaSeconds, resolvedDownloadMethod, resolvedErrorMessage, startTime, endTime));
+        if (task.managementTaskId() != null) {
             var stage = com.comicatlas.api.task.domain.model.TaskStage.fromStatus(newStatus);
             if (stage != null) {
-                managementTaskService.updateStage(task.getManagementTaskId(), stage, progress);
+                managementTaskService.updateStage(task.managementTaskId(), stage, progress);
             }
         }
-        if (task.getManagementTaskId() != null
+        if (task.managementTaskId() != null
                 && ("FAILED".equals(newStatus) || "CANCELLED".equals(newStatus))) {
             ImportManagementTaskQueryPort.ItemSnapshot item = managementTaskQueryPort.findActiveItem(
-                    "COMIC", task.getComicId(), TaskType.IMPORT);
+                    "COMIC", task.comicId(), TaskType.IMPORT);
             if (item != null) {
                 ManagementTaskStatus itemStatus = "CANCELLED".equals(newStatus)
                         ? ManagementTaskStatus.CANCELLED : ManagementTaskStatus.FAILED;
                 managementTaskService.updateItemStatus(item.id(), itemStatus,
-                        task.getErrorMessage(), "IMPORT_TASK", task.getId());
+                        resolvedErrorMessage, "IMPORT_TASK", task.id());
             }
         }
         if ("FAILED".equals(newStatus)) {
@@ -98,23 +95,25 @@ public class ImportResultServiceImpl implements com.comicatlas.api.importer.appl
 
     @Transactional
     public void applyFailed(Long taskId, String errorCode, String errorMessage) {
-        ImportTask task = persistencePort.findImportTask(taskId);
-        if (task == null || TERMINAL_STATUSES.contains(task.getStatus())) {
+        ImportResultPersistencePort.ImportTaskSnapshot task = persistencePort.findImportTask(taskId);
+        if (task == null || TERMINAL_STATUSES.contains(task.status())) {
             return;
         }
-        task.setStatus(ImportTaskStatus.FAILED);
-        task.setEndTime(LocalDateTime.now());
+        LocalDateTime endTime = LocalDateTime.now();
+        String resolvedErrorMessage = task.errorMessage();
         if (errorCode != null) {
-            task.setErrorMessage(errorCode + ": " + errorMessage);
+            resolvedErrorMessage = errorCode + ": " + errorMessage;
         }
         else if (errorMessage != null) {
-            task.setErrorMessage(errorMessage);
+            resolvedErrorMessage = errorMessage;
         }
-        persistencePort.updateImportTask(task);
-        markImportFailed(task);
+        persistencePort.updateImportTask(new ImportResultPersistencePort.ImportTaskUpdateCommand(
+                task.id(), task.comicId(), task.managementTaskId(), ImportTaskStatus.FAILED, 0, null,
+                null, null, resolvedErrorMessage, task.startTime(), endTime));
+        markImportFailed(task, resolvedErrorMessage);
     }
 
-    private void markImportFailed(ImportTask task) {
+    private void markImportFailed(ImportResultPersistencePort.ImportTaskSnapshot task, String errorMessage) {
         ImportResultPersistencePort.ComicSnapshot comic = markComicImportFailed(task);
         if (comic == null) {
             return;
@@ -123,12 +122,13 @@ public class ImportResultServiceImpl implements com.comicatlas.api.importer.appl
                 "COMIC", comic.id(), TaskType.IMPORT);
         if (item != null) {
             managementTaskService.updateItemStatus(item.id(),
-                    ManagementTaskStatus.FAILED, task.getErrorMessage(), "IMPORT_TASK", task.getId());
+                    ManagementTaskStatus.FAILED, errorMessage, "IMPORT_TASK", task.id());
         }
     }
 
-    private ImportResultPersistencePort.ComicSnapshot markComicImportFailed(ImportTask task) {
-        ImportResultPersistencePort.ComicSnapshot comic = persistencePort.findComic(task.getComicId());
+    private ImportResultPersistencePort.ComicSnapshot markComicImportFailed(
+            ImportResultPersistencePort.ImportTaskSnapshot task) {
+        ImportResultPersistencePort.ComicSnapshot comic = persistencePort.findComic(task.comicId());
         if (comic == null || comic.status() != ComicStatus.IMPORTING) {
             return comic;
         }
