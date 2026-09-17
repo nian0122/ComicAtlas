@@ -2,7 +2,6 @@ package com.comicatlas.api.task.application.port.out;
 
 import com.comicatlas.api.exporter.application.port.in.ExportRetryService;
 import com.comicatlas.api.importer.application.port.in.ImportRetryService;
-import com.comicatlas.api.exporter.application.port.in.ExportRetryService.RetryItem;
 import com.comicatlas.api.task.domain.model.TaskType;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
@@ -51,7 +50,7 @@ public class TaskRetryPublisher {
     public record RetryItem(Long id, TaskType operationType, String resultRefType, Long resultRefId,
                             String targetType, Long targetId) { }
 
-    private void publishManagementCommand(Long taskId, ManagementTaskItem item, int attempt) {
+    private void publishManagementCommand(Long taskId, RetryItem item, int attempt) {
         TaskType operation = item.operationType();
         if (operation == null || !COMMAND_OPERATIONS.contains(operation)) {
             return;

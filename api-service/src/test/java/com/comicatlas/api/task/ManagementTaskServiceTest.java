@@ -40,7 +40,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.comicatlas.api.task.application.service.impl.ManagementTaskServiceImpl;
 import com.comicatlas.api.task.application.port.in.TaskQueryService;
 import com.comicatlas.api.task.application.port.out.TaskRetryPublisher;
+import com.comicatlas.api.task.application.port.out.TaskQueryPersistencePort;
 import com.comicatlas.api.metadata.application.service.MetadataRefreshTaskPolicy;
+import com.comicatlas.api.metadata.application.port.out.MetadataRefreshTaskPersistencePort;
 import com.comicatlas.api.task.application.service.impl.TaskAggregationServiceImpl;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -73,6 +75,8 @@ class ManagementTaskServiceTest {
     @Mock private ImportTaskMapper importTaskMapper;
     @Mock private ImportRetryCoordinator importRetryCoordinator;
     @Mock private TaskRetryPublisher taskRetryPublisher;
+    @Mock private TaskQueryPersistencePort taskQueryPersistencePort;
+    @Mock private MetadataRefreshTaskPersistencePort metadataRefreshTaskPersistencePort;
     @Mock private ManagementTaskAggregationRepository aggregationRepository;
     @Mock private TaskResponseAssembler taskResponseAssembler;
     @Mock private TaskQueryService taskQueryService;
@@ -110,7 +114,7 @@ class ManagementTaskServiceTest {
         task.setTaskType(TaskType.IMPORT);
         task.setStatus(ManagementTaskStatus.FAILED);
         task.setAttempt(1);
-        when(taskMapper.selectById(99L)).thenReturn(task);
+        when(taskQueryPersistencePort.findTask(99L)).thenReturn(task);
 
         ManagementTaskItem item = new ManagementTaskItem();
         item.setId(1L);
@@ -119,11 +123,13 @@ class ManagementTaskServiceTest {
         item.setTargetId(10L);
         item.setOperationType(TaskType.IMPORT);
         item.setStatus(ManagementTaskStatus.FAILED);
-        when(itemMapper.selectByTaskId(99L)).thenReturn(List.of(item));
+        when(taskQueryPersistencePort.findItemsByTaskId(99L)).thenReturn(List.of(item));
 
         // 导入任务非终态且非 PENDING：说明与管理任务状态不一致，重试入队应抛冲突回滚而非静默卡死
         org.mockito.Mockito.doThrow(new BusinessException(409, "导入任务非终态且未被重置"))
-                .when(taskRetryPublisher).publish(eq(99L), eq(item), eq(2));
+                .when(taskRetryPublisher).publish(eq(99L), eq(new TaskRetryPublisher.RetryItem(
+                        item.getId(), item.getOperationType(), item.getResultRefType(), item.getResultRefId(),
+                        item.getTargetType(), item.getTargetId())), eq(2));
 
         assertThrows(BusinessException.class, () -> service.retryTask(99L));
     }
@@ -135,19 +141,13 @@ class ManagementTaskServiceTest {
         request.setOperation("刷新元数据");
         request.setTargetType("COMIC");
         request.setTargets(List.of(chapterTarget(11L), chapterTarget(12L)));
-        Chapter firstChapter = new Chapter();
-        firstChapter.setId(11L);
-        firstChapter.setComicId(1L);
-        Chapter secondChapter = new Chapter();
-        secondChapter.setId(12L);
-        secondChapter.setComicId(1L);
-        when(chapterMapper.selectBatchIds(any())).thenReturn(List.of(firstChapter, secondChapter));
-        when(comicMapper.lockForMetadataRefresh(1L)).thenReturn(1);
-        when(itemMapper.countByLockKey(anyString())).thenReturn(0L);
+        when(metadataRefreshTaskPersistencePort.findComicIdsByChapterIds(any())).thenReturn(List.of(1L, 1L));
+        when(metadataRefreshTaskPersistencePort.lockComicForRefresh(1L)).thenReturn(1);
+        when(taskQueryPersistencePort.countItemsByLockKey(anyString())).thenReturn(0L);
 
         service.createTask(request, null, "{}");
 
-        verify(itemMapper, times(2)).insert(any(ManagementTaskItem.class));
+        verify(taskQueryPersistencePort, times(2)).insertTaskItem(any(ManagementTaskItem.class));
     }
 
     private static CreateManagementTaskRequest.TaskTarget chapterTarget(Long chapterId) {
@@ -164,10 +164,10 @@ class ManagementTaskServiceTest {
         task.setId(100L);
         task.setTaskType(TaskType.RECOVERY);
         task.setStatus(ManagementTaskStatus.FAILED);
-        when(taskMapper.selectById(100L)).thenReturn(task);
+        when(taskQueryPersistencePort.findTask(100L)).thenReturn(task);
 
         assertThrows(BusinessException.class, () -> service.retryTask(100L));
-        verify(itemMapper, never()).selectByTaskId(any());
+        verify(taskQueryPersistencePort, never()).findItemsByTaskId(any());
     }
 
     @Test
@@ -176,10 +176,10 @@ class ManagementTaskServiceTest {
         task.setId(101L);
         task.setTaskType(TaskType.DIRECTORY_SCAN);
         task.setStatus(ManagementTaskStatus.FAILED);
-        when(taskMapper.selectById(101L)).thenReturn(task);
+        when(taskQueryPersistencePort.findTask(101L)).thenReturn(task);
 
         assertThrows(BusinessException.class, () -> service.retryTask(101L));
-        verify(itemMapper, never()).selectByTaskId(any());
+        verify(taskQueryPersistencePort, never()).findItemsByTaskId(any());
     }
 
     @Test
@@ -189,7 +189,7 @@ class ManagementTaskServiceTest {
         task.setTaskType(TaskType.RECOVERY);
         task.setStatus(ManagementTaskStatus.FAILED);
         task.setAttempt(1);
-        when(taskMapper.selectById(201L)).thenReturn(task);
+        when(taskQueryPersistencePort.findTask(201L)).thenReturn(task);
 
         ManagementTaskItem item = new ManagementTaskItem();
         item.setId(2L);
@@ -198,12 +198,12 @@ class ManagementTaskServiceTest {
         item.setTargetId(7L);
         item.setOperationType(TaskType.RECOVERY);
         item.setStatus(ManagementTaskStatus.FAILED);
-        when(itemMapper.selectByTaskId(201L)).thenReturn(List.of(item));
+        when(taskQueryPersistencePort.findItemsByTaskId(201L)).thenReturn(List.of(item));
 
         service.resetTaskState(201L);
 
-        verify(taskMapper).resetForRetry(eq(201L), eq(2), any());
-        verify(itemMapper).resetForRetry(eq(2L), eq(2), anyString(), any());
+        verify(taskQueryPersistencePort).resetTask(eq(201L), eq(2), any());
+        verify(taskQueryPersistencePort).resetItem(eq(2L), eq(2), anyString(), any());
         verify(importRetryCoordinator, never()).retry(any());
         verify(outboxService, never()).enqueue(any(), any(), any());
     }
@@ -215,13 +215,13 @@ class ManagementTaskServiceTest {
         item.setTaskId(301L);
         item.setStatus(ManagementTaskStatus.RUNNING);
         item.setAttempt(1);
-        when(itemMapper.selectById(3L)).thenReturn(item);
+        when(taskQueryPersistencePort.findItem(3L)).thenReturn(item);
 
         when(aggregationRepository.findByTaskId(301L)).thenReturn(Optional.of(
                 new ManagementTaskAggregationSnapshot(301L, ManagementTaskStatus.RUNNING, null,
                         List.of(new ManagementTaskItemSnapshot(ManagementTaskStatus.FAILED,
                                 "转码失败: ffmpeg 超时")))));
-        when(itemMapper.updateStatusIfActive(any(), any(), anyString(), any(), any(), any(), any(), any(), any()))
+        when(taskQueryPersistencePort.updateItemStatus(any(), any(), anyString(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(1);
 
         service.updateItemStatus(3L, ManagementTaskStatus.FAILED, "转码失败: ffmpeg 超时", null, null, 1);
@@ -238,12 +238,12 @@ class ManagementTaskServiceTest {
         item.setTaskId(302L);
         item.setStatus(ManagementTaskStatus.RUNNING);
         item.setAttempt(1);
-        when(itemMapper.selectById(4L)).thenReturn(item);
+        when(taskQueryPersistencePort.findItem(4L)).thenReturn(item);
 
         when(aggregationRepository.findByTaskId(302L)).thenReturn(Optional.of(
                 new ManagementTaskAggregationSnapshot(302L, ManagementTaskStatus.RUNNING, null,
                         List.of(new ManagementTaskItemSnapshot(ManagementTaskStatus.SUCCEEDED, null)))));
-        when(itemMapper.updateStatusIfActive(any(), any(), anyString(), any(), any(), any(), any(), any(), any()))
+        when(taskQueryPersistencePort.updateItemStatus(any(), any(), anyString(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(1);
 
         service.updateItemStatus(4L, ManagementTaskStatus.SUCCEEDED, null, null, null, 1);
