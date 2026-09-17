@@ -57,10 +57,12 @@
 }
 .feature-button-row .el-button {
   width: 100%;
-  min-height: 28px;
+  min-height: 40px;
   margin: 0;
-  padding: 5px 7px;
-  font-size: 10px;
+  padding: 0 var(--space-4);
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: var(--control-radius);
 }
 .feature-storage--focus {
   gap: 10px;

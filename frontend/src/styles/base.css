@@ -117,10 +117,10 @@ textarea:not(.el-textarea__inner) {
   min-height: var(--control-height);
   padding: 0 14px;
   color: var(--text-primary);
-  background: linear-gradient(180deg, var(--control-bg), var(--bg-secondary));
-  border: 1px solid var(--border);
+  background: var(--control-bg);
+  border: 1px solid var(--control-border);
   border-radius: var(--control-radius);
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 1px 1px rgb(0 0 0 / 28%);
   transition:
     background-color var(--transition-fast),
     border-color var(--transition-fast),
@@ -140,7 +140,7 @@ input:not(.el-input__inner):not(.unstyled-input):is(
 select:hover:not(:disabled),
 textarea:not(.el-textarea__inner):hover:not(:disabled) {
   background: var(--control-bg-hover);
-  border-color: var(--border-strong);
+  border-color: var(--control-border-hover);
 }
 
 input:not(.el-input__inner):not(.unstyled-input):is(
@@ -155,7 +155,7 @@ input:not(.el-input__inner):not(.unstyled-input):is(
   ):focus,
 select:focus,
 textarea:not(.el-textarea__inner):focus {
-  border-color: var(--accent);
+  border-color: var(--control-focus-border);
   box-shadow:
     0 0 0 3px var(--control-focus-ring),
     var(--shadow-sm);
