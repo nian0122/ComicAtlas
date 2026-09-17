@@ -332,7 +332,7 @@ class ImportServiceTest {
 
         service.retryTask(301L);
 
-        verify(importRetryCoordinator).retry(t);
+        verify(importRetryCoordinator).retry(any(com.comicatlas.api.importer.application.port.out.ImportTaskPersistencePort.ImportTaskSnapshot.class));
         verify(managementTaskService).retryTask(207L);
     }
 
@@ -349,7 +349,7 @@ class ImportServiceTest {
 
         service.retryTask(10L);
 
-        verify(importRetryCoordinator).retry(task);
+        verify(importRetryCoordinator).retry(any(com.comicatlas.api.importer.application.port.out.ImportTaskPersistencePort.ImportTaskSnapshot.class));
         verify(managementTaskService, org.mockito.Mockito.never())
                 .retryTask(org.mockito.ArgumentMatchers.anyLong());
     }

@@ -1,7 +1,7 @@
 package com.comicatlas.api.importer.application.service.impl;
 
 import com.comicatlas.api.importer.domain.model.ImportTaskStatus;
-import com.comicatlas.api.importer.infrastructure.persistence.entity.ImportTask;
+import com.comicatlas.api.importer.application.port.out.ImportTaskPersistencePort.ImportTaskSnapshot;
 import com.comicatlas.api.importer.application.port.out.ImportTaskPersistencePort;
 import com.comicatlas.api.importer.application.service.ImportRetryCoordinator;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
@@ -19,17 +19,17 @@ public class ImportRetryServiceImpl implements com.comicatlas.api.importer.appli
     private final ImportRetryCoordinator importRetryCoordinator;
 
     public void retry(Long taskId, Long itemId) {
-        ImportTask importTask = persistencePort.findByManagementTaskId(taskId);
+        ImportTaskSnapshot importTask = persistencePort.findByManagementTaskId(taskId);
         if (importTask == null) {
             log.warn("导入任务不存在，跳过导入重试入队: taskId={}, itemId={}", taskId, itemId);
             return;
         }
         boolean retried = importRetryCoordinator.retry(importTask);
-        if (!retried && importTask.getStatus() != ImportTaskStatus.PENDING) {
+        if (!retried && importTask.status() != ImportTaskStatus.PENDING) {
             throw new BusinessException(HttpStatusCodes.CONFLICT,
                     "导入任务非终态且未被重置，无法重试入队: taskId=" + taskId
-                            + ", importTaskId=" + importTask.getId()
-                            + ", status=" + importTask.getStatus());
+                            + ", importTaskId=" + importTask.id()
+                            + ", status=" + importTask.status());
         }
     }
 }

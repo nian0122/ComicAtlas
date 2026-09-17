@@ -1,6 +1,6 @@
 package com.comicatlas.api.importer.application.port.in;
 
-import com.comicatlas.api.importer.infrastructure.persistence.entity.ImportTask;
+import com.comicatlas.api.importer.application.port.out.ImportTaskPersistencePort.ImportTaskSnapshot;
 import com.comicatlas.api.importer.application.port.out.ImportRetryPersistencePort;
 import java.util.List;
 
@@ -8,5 +8,5 @@ import java.util.List;
 public interface ImportRetryStorageService {
     void restoreFinalizedToStaging(Long taskId, Long comicId,
                                    List<ImportRetryPersistencePort.ChapterSnapshot> chapters);
-    void rebuildManifest(ImportTask task, Long comicId);
+    void rebuildManifest(ImportTaskSnapshot task, Long comicId);
 }

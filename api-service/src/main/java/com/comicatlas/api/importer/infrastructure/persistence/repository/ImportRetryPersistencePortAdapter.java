@@ -26,12 +26,12 @@ public class ImportRetryPersistencePortAdapter implements ImportRetryPersistence
     private final CatalogMapper catalogMapper;
 
     @Override
-    public int resetImportTask(ImportTask task, int retryCount) {
+    public int resetImportTask(ImportRetryPersistencePort.ResetImportTaskCommand command) {
         return importTaskMapper.update(null, new UpdateWrapper<ImportTask>()
-                .eq("id", task.getId())
+                .eq("id", command.id())
                 .in("status", ImportTaskStatus.FAILED.name(), ImportTaskStatus.CANCELLED.name())
                 .set("status", ImportTaskStatus.PENDING.name())
-                .set("retry_count", retryCount)
+                .set("retry_count", command.retryCount())
                 .set("error_message", null)
                 .set("end_time", null)
                 .set("progress", 0));

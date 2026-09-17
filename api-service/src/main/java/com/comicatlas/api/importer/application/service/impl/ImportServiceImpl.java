@@ -361,7 +361,9 @@ public class ImportServiceImpl implements ImportService {
         }
 
         // 统一重试编排：清理旧章节 → import_task 重置 PENDING → comic IMPORTING → 重发 ImportTaskCreatedEvent
-        importRetryCoordinator.retry(task);
+        importRetryCoordinator.retry(new com.comicatlas.api.importer.application.port.out.ImportTaskPersistencePort.ImportTaskSnapshot(
+                task.getId(), task.getComicId(), task.getManagementTaskId(), task.getStatus(), task.getRetryCount(),
+                task.getSourceType(), task.getSourcePath(), task.getSourceRef()));
 
         // 同步统一任务：终态统一任务重置回 QUEUED（attempt 递增，失败/取消 item 重新入队）
         // IMPORT 类型 item 由 ImportRetryCoordinator 幂等守卫保证不重复入队（此时 import_task 已非终态）

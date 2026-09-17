@@ -1,6 +1,7 @@
 package com.comicatlas.api.importer.application.service;
 
 import com.comicatlas.api.importer.application.port.in.ImportRetryStorageService;
+import com.comicatlas.api.importer.application.port.out.ImportTaskPersistencePort.ImportTaskSnapshot;
 
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.comicatlas.api.catalog.infrastructure.cache.CatalogCacheInvalidator;
@@ -107,7 +108,7 @@ class ImportRetryCoordinatorTest {
         task.setId(1L);
         task.setStatus(ImportTaskStatus.PENDING);
 
-        boolean retried = coordinator.retry(task);
+        boolean retried = coordinator.retry(snapshot(task));
 
         assertFalse(retried);
         verify(importTaskMapper, never()).update(any(), any());
@@ -122,11 +123,9 @@ class ImportRetryCoordinatorTest {
         when(chapterMapper.selectByComicId(anyLong())).thenReturn(List.of());
         when(comicMapper.selectById(10L)).thenReturn(null);
 
-        boolean retried = coordinator.retry(task);
+        boolean retried = coordinator.retry(snapshot(task));
 
         assertTrue(retried);
-        assertEquals(ImportTaskStatus.PENDING, task.getStatus());
-        assertEquals(1, task.getRetryCount());
         verify(importTaskMapper).update(eq(null), any(Wrapper.class));
         verify(outboxService).enqueue(any(ImportTaskCreatedEvent.class), eq("comic.import"), eq("task.created"));
     }
@@ -136,7 +135,7 @@ class ImportRetryCoordinatorTest {
         ImportTask task = failedTask(2L, 10L, SourceType.DIRECTORY);
         when(importTaskMapper.update(eq(null), any(Wrapper.class))).thenReturn(0);
 
-        boolean retried = coordinator.retry(task);
+        boolean retried = coordinator.retry(snapshot(task));
 
         assertFalse(retried);
         verify(outboxService, never()).enqueue(any(), any(), any());
@@ -153,7 +152,7 @@ class ImportRetryCoordinatorTest {
         comic.setStatus(ComicStatus.IMPORT_FAILED);
         when(comicMapper.selectById(11L)).thenReturn(comic);
 
-        coordinator.retry(task);
+        coordinator.retry(snapshot(task));
 
         verify(comicMapper).updateById(argThat((Comic updatedComic) ->
                 updatedComic.getId().equals(11L)
@@ -168,7 +167,7 @@ class ImportRetryCoordinatorTest {
         when(chapterMapper.selectByComicId(anyLong())).thenReturn(List.of());
         when(comicMapper.selectById(12L)).thenReturn(null);
 
-        coordinator.retry(task);
+        coordinator.retry(snapshot(task));
 
         ArgumentCaptor<ImportTaskCreatedEvent> eventCaptor =
                 ArgumentCaptor.forClass(ImportTaskCreatedEvent.class);
@@ -191,7 +190,7 @@ class ImportRetryCoordinatorTest {
         Files.createDirectories(chapterDir);
         Files.writeString(chapterDir.resolve("001.jpg"), "finalized");
 
-        coordinator.retry(task);
+        coordinator.retry(snapshot(task));
         assertTrue(Files.exists(Path.of("target/test-tmp/hq/.staging/6/60/5/001.jpg")),
                 "反最终化应把文件搬回当前任务隔离暂存目录");
         TransactionSynchronizationManager.getSynchronizations()
@@ -220,7 +219,7 @@ class ImportRetryCoordinatorTest {
         Files.createDirectories(chapterDir);
         Files.writeString(chapterDir.resolve("001.jpg"), "chapter");
 
-        coordinator.retry(task);
+        coordinator.retry(snapshot(task));
 
         assertEquals("staging", Files.readString(stagingFile), "暂存已有同大小文件时保留暂存版本");
         assertFalse(Files.exists(chapterDir.resolve("001.jpg")), "章节目录副本应被去重删除");
@@ -245,7 +244,7 @@ class ImportRetryCoordinatorTest {
         Files.createDirectories(Path.of("target/test-tmp/hq/.staging/8/70/2"));
         Files.writeString(Path.of("target/test-tmp/hq/.staging/8/70/2/001.jpg"), "b");
 
-        coordinator.retry(task);
+        coordinator.retry(snapshot(task));
 
         Path manifest = Path.of("target/test-tmp/imports/8/manifest.json");
         assertTrue(Files.exists(manifest), "persist 已发生时重试应重建完整清单");
@@ -262,7 +261,7 @@ class ImportRetryCoordinatorTest {
         when(chapterMapper.selectByComicId(anyLong())).thenReturn(List.of());
         when(comicMapper.selectById(71L)).thenReturn(null);
 
-        coordinator.retry(task);
+        coordinator.retry(snapshot(task));
 
         assertFalse(Files.exists(Path.of("target/test-tmp/imports/9/manifest.json")),
                 "persist 未发生时不应重建清单（原清单完整，保留恢复点）");
@@ -282,10 +281,15 @@ class ImportRetryCoordinatorTest {
         Files.createDirectories(orphanDir);
         Files.writeString(orphanDir.resolve("001.jpg"), "orphan");
 
-        coordinator.retry(task);
+        coordinator.retry(snapshot(task));
         TransactionSynchronizationManager.getSynchronizations()
                 .forEach(sync -> sync.afterCommit());
 
         assertFalse(Files.exists(orphanDir), "重试提交后旧 chapterId 目录应被清理");
+    }
+
+    private static ImportTaskSnapshot snapshot(ImportTask task) {
+        return new ImportTaskSnapshot(task.getId(), task.getComicId(), task.getManagementTaskId(), task.getStatus(),
+                task.getRetryCount(), task.getSourceType(), task.getSourcePath(), task.getSourceRef());
     }
 }

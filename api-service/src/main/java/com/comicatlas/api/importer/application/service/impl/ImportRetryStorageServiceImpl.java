@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.comicatlas.api.importer.infrastructure.persistence.entity.ImportTask;
+import com.comicatlas.api.importer.application.port.out.ImportTaskPersistencePort.ImportTaskSnapshot;
 import com.comicatlas.api.storage.infrastructure.config.ApiStorageProperties;
 import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.common.storage.ImportStagingPath;
@@ -77,26 +77,26 @@ public class ImportRetryStorageServiceImpl implements com.comicatlas.api.importe
 
     /** 根据漫画元数据和当前任务暂存目录重建完整导入清单。 */
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    public void rebuildManifest(ImportTask task, Long comicId) {
+    public void rebuildManifest(ImportTaskSnapshot task, Long comicId) {
         Path comicMeta = storageProperties.root(StorageRootKeys.METADATA).getPath()
                 .resolve(comicId + ".json");
         if (!Files.exists(comicMeta)) {
-            log.debug("重试保留原导入清单（persist 未发生，清单完整）: taskId={}", task.getId());
+            log.debug("重试保留原导入清单（persist 未发生，清单完整）: taskId={}", task.id());
             return;
         }
         try {
             JsonNode metadata = MANIFEST_MAPPER.readTree(comicMeta.toFile());
             Path hqRoot = storageProperties.root(StorageRootKeys.HQ).getPath();
-            List<ManifestFileEntry> files = scanStagingFiles(hqRoot, task.getId(), comicId);
+            List<ManifestFileEntry> files = scanStagingFiles(hqRoot, task.id(), comicId);
             files.sort(Comparator.comparing(ManifestFileEntry::target));
 
             ObjectNode manifest = MANIFEST_MAPPER.createObjectNode();
             manifest.put("version", MANIFEST_VERSION);
-            manifest.put("taskId", task.getId());
-            manifest.put("sourceType", task.getSourceType() != null
-                    ? task.getSourceType().name() : SourceType.DIRECTORY.name());
+            manifest.put("taskId", task.id());
+            manifest.put("sourceType", task.sourceType() != null
+                    ? task.sourceType().name() : SourceType.DIRECTORY.name());
             Path stagingRoot = hqRoot.resolve(ImportStagingPath.chapterRelativeToHq(
-                    comicId, task.getId(), 1)).getParent();
+                    comicId, task.id(), 1)).getParent();
             manifest.put("sourceRoot", stagingRoot.toString());
             manifest.set("metadata", metadata);
             ArrayNode fileNodes = manifest.putArray("files");
@@ -108,14 +108,14 @@ public class ImportRetryStorageServiceImpl implements com.comicatlas.api.importe
             }
 
             Path target = storageProperties.root(StorageRootKeys.METADATA).getPath().getParent()
-                    .resolve(IMPORTS_DIR_NAME).resolve(String.valueOf(task.getId()))
+                    .resolve(IMPORTS_DIR_NAME).resolve(String.valueOf(task.id()))
                     .resolve("manifest.json");
             writeManifestAtomically(manifest, target);
             log.info("重试已重建完整导入清单: taskId={}, comicId={}, files={}",
-                    task.getId(), comicId, files.size());
+                    task.id(), comicId, files.size());
         } catch (IOException ex) {
             log.warn("重建导入清单失败（非关键，重试可能沿用残缺清单）: taskId={}, comicId={}",
-                    task.getId(), comicId, ex);
+                    task.id(), comicId, ex);
         }
     }
 

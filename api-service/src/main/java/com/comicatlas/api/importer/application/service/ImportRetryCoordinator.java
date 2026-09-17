@@ -1,7 +1,7 @@
 package com.comicatlas.api.importer.application.service;
 
 import com.comicatlas.api.catalog.infrastructure.cache.CatalogCacheInvalidator;
-import com.comicatlas.api.importer.infrastructure.persistence.entity.ImportTask;
+import com.comicatlas.api.importer.application.port.out.ImportTaskPersistencePort.ImportTaskSnapshot;
 import com.comicatlas.api.importer.application.port.out.ImportRetryPersistencePort;
 import com.comicatlas.api.task.domain.service.ManagementStateMachine;
 import com.comicatlas.api.outbox.application.port.in.OutboxService;
@@ -75,28 +75,26 @@ public class ImportRetryCoordinator {
     /**
      * 重试导入任务并重新入队。
      *
-     * @param task 导入任务实体（必须处于 FAILED/CANCELLED 终态，否则幂等跳过）
+     * @param task 导入任务快照（必须处于 FAILED/CANCELLED 终态，否则幂等跳过）
      * @return true 表示已执行重试入队；false 表示非终态或已被并发重试处理（调用方应视为已处理）
      */
-    public boolean retry(ImportTask task) {
-        ImportTaskStatus status = task.getStatus();
+    public boolean retry(ImportTaskSnapshot task) {
+        ImportTaskStatus status = task.status();
         if (status != ImportTaskStatus.FAILED && status != ImportTaskStatus.CANCELLED) {
-            log.info("导入任务非终态，跳过重试入队: taskId={}, status={}", task.getId(), status);
+            log.info("导入任务非终态，跳过重试入队: taskId={}, status={}", task.id(), status);
             return false;
         }
 
         // CAS 并发互斥：仅当仍处于终态时重置为 PENDING；影响 0 行说明并发重试已抢先处理
         // 列名以字符串形式绑定（UpdateWrapper 标准用法，mock 单元测试无 MyBatis-Plus lambda cache）
-        int retryCount = task.getRetryCount() != null ? task.getRetryCount() + 1 : 1;
-        int updated = persistencePort.resetImportTask(task, retryCount);
+        int retryCount = task.retryCount() != null ? task.retryCount() + 1 : 1;
+        int updated = persistencePort.resetImportTask(new ImportRetryPersistencePort.ResetImportTaskCommand(
+                task.id(), retryCount));
         if (updated == 0) {
-            log.info("导入任务已被其他重试处理，跳过入队: taskId={}", task.getId());
+            log.info("导入任务已被其他重试处理，跳过入队: taskId={}", task.id());
             return false;
         }
-        task.setStatus(ImportTaskStatus.PENDING);
-        task.setRetryCount(retryCount);
-
-        Long comicId = task.getComicId();
+        Long comicId = task.comicId();
         List<ImportRetryPersistencePort.ChapterSnapshot> chapters = comicId != null
                 ? persistencePort.findChapters(comicId)
                 : List.of();
@@ -106,7 +104,7 @@ public class ImportRetryCoordinator {
 
         // 反最终化必须先于删除 DB 章节：需要 chapterId → globalOrder 映射把文件搬回暂存
         if (!chapters.isEmpty()) {
-            retryStorageService.restoreFinalizedToStaging(task.getId(), comicId, chapters);
+            retryStorageService.restoreFinalizedToStaging(task.id(), comicId, chapters);
         }
 
         // 删除旧章节的 media/chapter/catalog（重试将生成全新 chapterId），返回被清理的章节 ID
@@ -124,36 +122,38 @@ public class ImportRetryCoordinator {
 
         // 重建完整导入清单：persist 已发生（comicId.json 存在）时原清单可能已被最终化逐章 rewrite
         if (comicId != null) {
-            retryStorageService.rebuildManifest(task, comicId);
+            retryStorageService.rebuildManifest(new ImportTaskSnapshot(task.id(), task.comicId(),
+                    task.managementTaskId(), ImportTaskStatus.PENDING, retryCount, task.sourceType(),
+                    task.sourcePath(), task.sourceRef()), comicId);
         }
 
         // 重发导入事件到 Outbox（与业务同事务，relay 异步发布到 MQ）
-        String sourceType = task.getSourceType() != null ? task.getSourceType().name() : SourceType.DIRECTORY.name();
+        String sourceType = task.sourceType() != null ? task.sourceType().name() : SourceType.DIRECTORY.name();
         String sourcePath = resolveRepublishSourcePath(task);
         ImportTaskCreatedEvent event = new ImportTaskCreatedEvent(
-                UUID.randomUUID(), Instant.now(), task.getId(), comicId, sourceType, sourcePath);
+                UUID.randomUUID(), Instant.now(), task.id(), comicId, sourceType, sourcePath);
         outboxService.enqueue(event, MqExchanges.IMPORT, MqRoutingKeys.TASK_CREATED);
 
         log.info("导入任务重试已入队: taskId={}, comicId={}, sourceType={}, retryCount={}",
-                task.getId(), comicId, sourceType, retryCount);
+                task.id(), comicId, sourceType, retryCount);
 
         // 非关键清理操作（不参与事务）
         List<Long> orphanChapterIdsSnapshot = new ArrayList<>(orphanChapterIds);
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                cleanupAfterCommit(task.getId(), comicId, orphanChapterIdsSnapshot);
+                        cleanupAfterCommit(task.id(), comicId, orphanChapterIdsSnapshot);
             }
         });
         return true;
     }
 
     /** 重试重发事件时的来源路径：sourcePath 为空时兜底 sourceRef（EHENTAI 创建方可能仅传 sourceRef）。 */
-    private String resolveRepublishSourcePath(ImportTask task) {
-        if (task.getSourcePath() != null && !task.getSourcePath().isBlank()) {
-            return task.getSourcePath();
+    private String resolveRepublishSourcePath(ImportTaskSnapshot task) {
+        if (task.sourcePath() != null && !task.sourcePath().isBlank()) {
+            return task.sourcePath();
         }
-        return task.getSourceRef();
+        return task.sourceRef();
     }
 
     /** 删除漫画下旧章节的 media/chapter/catalog，返回被清理的章节 ID。 */

@@ -1,13 +1,12 @@
 package com.comicatlas.api.importer.application.port.out;
 
-import com.comicatlas.api.importer.infrastructure.persistence.entity.ImportTask;
 import com.comicatlas.contract.common.enums.ComicStatus;
 
 import java.util.List;
 
 /** 导入重试协调所需的持久化输出端口。 */
 public interface ImportRetryPersistencePort {
-    int resetImportTask(ImportTask task, int retryCount);
+    int resetImportTask(ResetImportTaskCommand command);
     List<ChapterSnapshot> findChapters(Long comicId);
     ComicSnapshot findComic(Long comicId);
     int updateComic(ComicStatusUpdateCommand command);
@@ -22,5 +21,8 @@ public interface ImportRetryPersistencePort {
     }
 
     record ComicStatusUpdateCommand(Long id, ComicStatus status, Integer version) {
+    }
+
+    record ResetImportTaskCommand(Long id, int retryCount) {
     }
 }

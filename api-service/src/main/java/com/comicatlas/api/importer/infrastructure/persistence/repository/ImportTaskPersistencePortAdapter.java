@@ -13,7 +13,13 @@ public class ImportTaskPersistencePortAdapter implements ImportTaskPersistencePo
     private final ImportTaskMapper importTaskMapper;
 
     @Override
-    public ImportTask findByManagementTaskId(Long managementTaskId) {
-        return importTaskMapper.selectByManagementTaskId(managementTaskId);
+    public ImportTaskPersistencePort.ImportTaskSnapshot findByManagementTaskId(Long managementTaskId) {
+        ImportTask importTask = importTaskMapper.selectByManagementTaskId(managementTaskId);
+        if (importTask == null) {
+            return null;
+        }
+        return new ImportTaskPersistencePort.ImportTaskSnapshot(importTask.getId(), importTask.getComicId(),
+                importTask.getManagementTaskId(), importTask.getStatus(), importTask.getRetryCount(),
+                importTask.getSourceType(), importTask.getSourcePath(), importTask.getSourceRef());
     }
 }
