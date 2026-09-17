@@ -5,10 +5,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.comicatlas.api.importer.domain.model.ImportTaskStatus;
 import com.comicatlas.api.importer.infrastructure.persistence.entity.ImportTask;
 import com.comicatlas.api.importer.application.port.out.ImportResultPersistencePort;
+import com.comicatlas.api.importer.application.port.out.ImportManagementTaskQueryPort;
 import com.comicatlas.api.storage.infrastructure.config.ApiStorageProperties;
 import com.comicatlas.api.task.domain.model.ManagementTaskStatus;
 import com.comicatlas.api.task.domain.model.TaskType;
-import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTaskItem;
 import com.comicatlas.api.task.application.port.in.ManagementTaskService;
 import com.comicatlas.api.task.domain.service.ManagementStateMachine;
 import com.comicatlas.contract.common.enums.ComicStatus;
@@ -33,6 +33,7 @@ public class ImportResultServiceImpl implements com.comicatlas.api.importer.appl
     private final ApiStorageProperties storageProperties;
     private final ImportResultPersistencePort persistencePort;
     private final ManagementTaskService managementTaskService;
+    private final ImportManagementTaskQueryPort managementTaskQueryPort;
 
     public Map<String, Object> readMetadata(Long taskId) throws IOException {
         return objectMapper.readValue(storageProperties.root("METADATA").resolve(taskId + ".json").toFile(),
@@ -81,12 +82,12 @@ public class ImportResultServiceImpl implements com.comicatlas.api.importer.appl
         }
         if (task.getManagementTaskId() != null
                 && ("FAILED".equals(newStatus) || "CANCELLED".equals(newStatus))) {
-            ManagementTaskItem item = managementTaskService.findActiveItem(
+            ImportManagementTaskQueryPort.ItemSnapshot item = managementTaskQueryPort.findActiveItem(
                     "COMIC", task.getComicId(), TaskType.IMPORT);
             if (item != null) {
                 ManagementTaskStatus itemStatus = "CANCELLED".equals(newStatus)
                         ? ManagementTaskStatus.CANCELLED : ManagementTaskStatus.FAILED;
-                managementTaskService.updateItemStatus(item.getId(), itemStatus,
+                managementTaskService.updateItemStatus(item.id(), itemStatus,
                         task.getErrorMessage(), "IMPORT_TASK", task.getId());
             }
         }
@@ -118,10 +119,10 @@ public class ImportResultServiceImpl implements com.comicatlas.api.importer.appl
         if (comic == null) {
             return;
         }
-        ManagementTaskItem item = managementTaskService.findActiveItem(
+        ImportManagementTaskQueryPort.ItemSnapshot item = managementTaskQueryPort.findActiveItem(
                 "COMIC", comic.id(), TaskType.IMPORT);
         if (item != null) {
-            managementTaskService.updateItemStatus(item.getId(),
+            managementTaskService.updateItemStatus(item.id(),
                     ManagementTaskStatus.FAILED, task.getErrorMessage(), "IMPORT_TASK", task.getId());
         }
     }

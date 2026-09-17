@@ -4,10 +4,10 @@ import com.comicatlas.api.catalog.infrastructure.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.importer.domain.model.ImportTaskStatus;
 import com.comicatlas.api.importer.infrastructure.persistence.entity.ImportTask;
 import com.comicatlas.api.importer.application.port.out.ImportFinalizationPersistencePort;
+import com.comicatlas.api.importer.application.port.out.ImportManagementTaskQueryPort;
 import com.comicatlas.api.metadata.application.service.MetadataUpdateCoordinator;
 import com.comicatlas.api.task.domain.model.ManagementTaskStatus;
 import com.comicatlas.api.task.domain.model.TaskType;
-import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTaskItem;
 import com.comicatlas.api.task.application.port.in.ManagementTaskService;
 import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.common.event.ImportStorageFinalizeCompletedEvent;
@@ -42,6 +42,7 @@ public class ImportFinalizationServiceImpl implements com.comicatlas.api.importe
     private final TransactionTemplate transactionTemplate;
     private final ImportFinalizationPersistencePort persistencePort;
     private final ManagementTaskService managementTaskService;
+    private final ImportManagementTaskQueryPort managementTaskQueryPort;
     private final CatalogCacheInvalidator catalogCacheInvalidator;
     private final MetadataUpdateCoordinator metadataUpdateCoordinator;
     private final ApiStorageProperties storageProperties;
@@ -87,9 +88,10 @@ public class ImportFinalizationServiceImpl implements com.comicatlas.api.importe
                 task.setDurationMs(Duration.between(task.getStartTime(), task.getEndTime()).toMillis());
             }
             task.setProgress(100); persistencePort.updateImportTask(task);
-            ManagementTaskItem item = managementTaskService.findActiveItem(TARGET_TYPE_COMIC, event.comicId(), TaskType.IMPORT);
+            ImportManagementTaskQueryPort.ItemSnapshot item = managementTaskQueryPort.findActiveItem(
+                    TARGET_TYPE_COMIC, event.comicId(), TaskType.IMPORT);
             if (item != null) {
-                managementTaskService.updateItemStatus(item.getId(), ManagementTaskStatus.SUCCEEDED,
+                managementTaskService.updateItemStatus(item.id(), ManagementTaskStatus.SUCCEEDED,
                         null, RESULT_REF_TYPE, event.taskId());
             }
             catalogCacheInvalidator.evict(event.comicId());
@@ -117,9 +119,10 @@ public class ImportFinalizationServiceImpl implements com.comicatlas.api.importe
                 persistencePort.updateComic(new ImportFinalizationPersistencePort.ComicStatusUpdateCommand(
                         comic.id(), ComicStatus.IMPORT_FAILED, null, null, comic.version()));
             }
-            ManagementTaskItem item = managementTaskService.findActiveItem(TARGET_TYPE_COMIC, event.comicId(), TaskType.IMPORT);
+            ImportManagementTaskQueryPort.ItemSnapshot item = managementTaskQueryPort.findActiveItem(
+                    TARGET_TYPE_COMIC, event.comicId(), TaskType.IMPORT);
             if (item != null) {
-                managementTaskService.updateItemStatus(item.getId(), ManagementTaskStatus.FAILED,
+                managementTaskService.updateItemStatus(item.id(), ManagementTaskStatus.FAILED,
                         task.getErrorMessage(), RESULT_REF_TYPE, event.taskId());
             }
             catalogCacheInvalidator.evict(event.comicId());
