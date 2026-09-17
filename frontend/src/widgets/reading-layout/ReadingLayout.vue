@@ -10,7 +10,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import TopNav from '@/widgets/navigation/TopNav.vue'
+import { TopNav } from '@/widgets/navigation'
 
 const route = useRoute()
 const routeClass = computed(() => `route-${String(route.name ?? 'unknown')}`)

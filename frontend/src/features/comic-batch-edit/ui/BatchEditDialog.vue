@@ -26,10 +26,10 @@
 import { ref } from 'vue'
 import { isAxiosError } from 'axios'
 import { ElMessage } from 'element-plus'
-import { useCategoryStore } from '@/features/category/store'
-import { useTagStore } from '@/features/tag/store'
-import { managementComicApi } from '@/entities/comic/api/management-api'
-import type { BatchComicUpdateDTO } from '@/entities/comic/model/management-types'
+import { useCategoryStore } from '@/features/category'
+import { useTagStore } from '@/features/tag'
+import { managementComicApi } from '@/entities/comic'
+import type { BatchComicUpdateDTO } from '@/entities/comic'
 
 const props = defineProps<{
   comicIds: number[]

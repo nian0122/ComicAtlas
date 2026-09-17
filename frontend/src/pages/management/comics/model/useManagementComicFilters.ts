@@ -1,9 +1,8 @@
 import { onBeforeUnmount, reactive, watch } from 'vue'
-import type { ComicListQuery } from '@/entities/comic/model/types'
-import type { useManagementComicStore } from '@/pages/management/comics/model/management-comic-store'
+import type { ComicListQuery } from '@/entities/comic'
+import type { useManagementComicStore } from './management-comic-store'
 
 type ManagementComicStore = ReturnType<typeof useManagementComicStore>
-
 const KEYWORD_SEARCH_DEBOUNCE_MS = 300
 
 export function useManagementComicFilters(comicStore: ManagementComicStore, onApply?: () => void) {
@@ -16,7 +15,6 @@ export function useManagementComicFilters(comicStore: ManagementComicStore, onAp
     sort: 'createdAt',
     order: 'desc' as 'asc' | 'desc',
   })
-
   let keywordSearchTimer: ReturnType<typeof setTimeout> | null = null
 
   watch(
@@ -96,7 +94,6 @@ export function useManagementComicFilters(comicStore: ManagementComicStore, onAp
   }
 
   onBeforeUnmount(cancelPendingKeywordSearch)
-
   return {
     filters,
     buildQuery,

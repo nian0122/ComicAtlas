@@ -1,8 +1,8 @@
 import { defineStore } from 'pinia'
 import { reactive, toRefs } from 'vue'
 import { getApiErrorMessage } from '@/shared/api/http'
-import { historyApi } from '@/entities/history/api/history-api'
-import type { HistoryVO } from '@/entities/history/model/types'
+import { historyApi } from '@/entities/history'
+import type { HistoryVO } from '@/entities/history'
 
 export interface HistoryState {
   list: HistoryVO[]

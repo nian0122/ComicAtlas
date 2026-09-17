@@ -6,7 +6,7 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      component: () => import('@/widgets/reading-layout/ReadingLayout.vue'),
+      component: () => import('@/widgets/reading-layout').then(({ ReadingLayout }) => ReadingLayout),
       children: [
         {
           path: '',
@@ -33,7 +33,7 @@ const router = createRouter({
     },
     {
       path: '/reader/:chapterId',
-      component: () => import('@/widgets/reader/ReaderLayout.vue'),
+      component: () => import('@/widgets/reader').then(({ ReaderLayout }) => ReaderLayout),
       children: [
         {
           path: '',
@@ -50,7 +50,7 @@ const router = createRouter({
     },
     {
       path: '/manage',
-      component: () => import('@/widgets/management-layout/ManagementLayout.vue'),
+      component: () => import('@/widgets/management-layout').then(({ ManagementLayout }) => ManagementLayout),
       children: [
         {
           path: '',

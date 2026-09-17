@@ -1,7 +1,7 @@
 import { api } from '@/shared/api/http'
 import type { OperationSubmitResult, PageResult } from '@/shared/api/types'
 import type { CatalogNode, ComicDetailVO, ComicListQuery, ComicListVO } from '@/entities/comic/model/types'
-import type { ComicTagUpdateDTO } from '@/entities/tag/model/types'
+import type { ComicTagUpdateDTO } from '@/entities/tag'
 import type {
   BatchComicUpdateDTO,
   CatalogManagementRequest,

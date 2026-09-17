@@ -1,8 +1,8 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { useReaderSettingsStore } from '@/features/reader-settings/model/settings-store'
-import { useReaderStore } from '@/features/reader-navigation/model/reader-store'
+import { useReaderSettingsStore } from '@/features/reader-settings'
+import { useReaderStore } from '@/features/reader-navigation'
 import { useReaderShortcuts } from './useReaderShortcuts'
 
 class ReaderImageElement {

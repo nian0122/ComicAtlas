@@ -73,10 +73,10 @@ import { PageHeader } from '@/shared/ui/page-header'
 import { computed, ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getApiErrorMessage } from '@/shared/api/http'
-import { useCategoryStore } from '@/features/category/store'
-import { useTagStore } from '@/features/tag/store'
-import type { CategoryDTO } from '@/entities/comic/model/types'
-import type { TagDTO } from '@/entities/tag/model/types'
+import { useCategoryStore } from '@/features/category'
+import { useTagStore } from '@/features/tag'
+import type { CategoryDTO } from '@/entities/category'
+import type { TagDTO } from '@/entities/tag'
 
 const activeTab = ref('category')
 const categoryStore = useCategoryStore()

@@ -7,7 +7,7 @@ import type {
   StorageStats,
   StorageOperation,
   ComicStorageQuery,
-} from '@/entities/storage/model/types'
+} from '@/entities/storage'
 
 export const useStorageStore = defineStore('storage', () => {
   const comicList = ref<ComicStorageItem[]>([])

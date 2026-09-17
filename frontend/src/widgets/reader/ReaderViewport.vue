@@ -33,11 +33,10 @@
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { RecycleScroller } from 'vue-virtual-scroller'
 import type { RecycleScrollerExposed } from 'vue-virtual-scroller'
-import { useReaderSettingsStore } from '@/features/reader-settings/model/settings-store'
+import { useReaderSettingsStore } from '@/features/reader-settings'
 import ReaderImageItem from './ReaderImageItem.vue'
-import type { MediaItemInfo } from '@/entities/media/types'
-import { DEFAULT_ASPECT_RATIO } from '@/entities/media/constants'
-import { isVideoMedia } from '@/entities/media/guards'
+import type { MediaItemInfo } from '@/entities/media'
+import { DEFAULT_ASPECT_RATIO, isVideoMedia } from '@/entities/media'
 /** 虚拟滚动缓冲区最小高度（px） */
 const MIN_BUFFER_PX = 800
 /** 视频完整保留在复用边界内的额外安全距离（px）。 */

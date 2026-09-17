@@ -93,7 +93,7 @@ import { ElMessage } from 'element-plus'
 import { ArrowLeft, Menu, Share, UploadFilled, User } from '@element-plus/icons-vue'
 import { MaterialSymbolIcon } from '@/shared/ui/icon'
 import { ComicAtlasLogo } from '@/shared/ui/logo'
-import { useHistoryStore } from '@/features/history/store'
+import { useHistoryStore } from '@/features/history'
 
 const isScrolled = ref(false)
 const route = useRoute()

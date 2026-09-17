@@ -1,4 +1,4 @@
-import type { CatalogNode, ChapterRef } from '@/entities/comic/model/types'
+import type { CatalogNode, ChapterRef } from '@/entities/comic'
 import type { ChapterSearchItem, ChapterSearchResult, ChapterSearchTreeResult } from './chapter-search.types'
 
 function normalizeText(value: string | null | undefined): string {

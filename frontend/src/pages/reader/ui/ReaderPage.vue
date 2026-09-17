@@ -95,21 +95,26 @@ import { ref, reactive, computed, onMounted, onBeforeUnmount, watch, nextTick } 
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { PictureFilled } from '@element-plus/icons-vue'
-import { useReaderStore } from '@/features/reader-navigation/model/reader-store'
-import { useReaderSettingsStore } from '@/features/reader-settings/model/settings-store'
-import ReaderViewport from '@/widgets/reader/ReaderViewport.vue'
-import ReaderPagedViewport from '@/widgets/reader/ReaderPagedViewport.vue'
-import ReaderToolbar from '@/widgets/reader/ReaderToolbar.vue'
-import ReaderBottomNav from '@/widgets/reader/ReaderBottomNav.vue'
-import ReaderSettingsDrawer from '@/widgets/reader/ReaderSettingsDrawer.vue'
-import { useInteractionMode } from '@/features/reader-interaction/model/useInteractionMode'
-import { useReaderGesture } from '@/features/reader-interaction/model/useReaderGesture'
-import { useReaderShortcuts } from '@/features/reader-interaction/model/useReaderShortcuts'
-import { ReaderAction, useReaderToolbar } from '@/features/reader-interaction/model/useReaderToolbar'
-import { useReaderNavigation } from '@/features/reader-interaction/model/useReaderNavigation'
-import { comicApi } from '@/entities/comic/api/reading-api'
-import { preloadEngine } from '@/widgets/reader/model/preload-engine'
-import { isVideoMedia } from '@/entities/media/guards'
+import { useReaderStore } from '@/features/reader-navigation'
+import { useReaderSettingsStore } from '@/features/reader-settings'
+import {
+  ReaderViewport,
+  ReaderPagedViewport,
+  ReaderToolbar,
+  ReaderBottomNav,
+  ReaderSettingsDrawer,
+} from '@/widgets/reader'
+import {
+  ReaderAction,
+  useInteractionMode,
+  useReaderGesture,
+  useReaderNavigation,
+  useReaderShortcuts,
+  useReaderToolbar,
+} from '@/features/reader-interaction'
+import { comicApi } from '@/entities/comic'
+import { preloadEngine } from '@/widgets/reader'
+import { isVideoMedia } from '@/entities/media'
 
 const route = useRoute()
 const router = useRouter()

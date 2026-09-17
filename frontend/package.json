@@ -13,9 +13,10 @@
     "build": "vue-tsc -b && vite build",
     "lint": "eslint .",
     "check:ui": "node scripts/check-ui-consolidation.mjs",
+    "check:fsd": "node scripts/check-fsd-imports.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check . --end-of-line auto",
-    "check": "pnpm check:ui && pnpm typecheck && pnpm lint && pnpm format:check && pnpm test:unit && pnpm test:e2e && pnpm build",
+    "check": "pnpm check:ui && pnpm check:fsd && pnpm typecheck && pnpm lint && pnpm format:check && pnpm test:unit && pnpm test:e2e && pnpm build",
     "preview": "vite preview"
   },
   "dependencies": {

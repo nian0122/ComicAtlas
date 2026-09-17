@@ -1,6 +1,6 @@
 import { computed, ref, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import type { MediaItemInfo } from '@/entities/media/types'
+import type { MediaItemInfo } from '@/entities/media'
 
 /** 章节媒体排序的纯交互状态；保存动作仍由页面调用管理 API。 */
 export function useMediaOrder(mediaItems: Ref<readonly MediaItemInfo[]>) {

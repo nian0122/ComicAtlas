@@ -1,8 +1,8 @@
 # 公共组件归属
 
-> **TODO FSD-05 / FSD-20**：本目录是迁移前的公共组件过渡层。纯展示组件将迁入 `shared/ui`，应用级组合组件将迁入 `widgets`；完整范围、依赖方向和验收要求见[前端 FSD 改造 TODO](../../../docs/frontend/fsd-refactoring-todo.md)。在对应迁移完成前，不得在此目录新增业务组件。
+该目录仅保留迁移兼容说明，不再新增源码。纯展示组件位于 `src/shared/ui/`，应用级组合组件位于 `src/widgets/`；完整范围、依赖方向和验收要求见[前端 FSD 改造 TODO](../../../docs/frontend/fsd-refactoring-todo.md)。
 
-此目录集中管理跨业务复用的组件。业务专属组件继续放在 `features/<业务>/components/`，页面私有组件放在所属页面附近的 `components/` 子目录。
+业务专属组件放在对应 feature，页面私有组件放在所属 page slice 的 `ui/` 内。
 
 | 目录          | 职责                                         |
 | ------------- | -------------------------------------------- |

@@ -86,9 +86,9 @@
 import { AppButton } from '@/shared/ui/button'
 import { computed } from 'vue'
 import { VideoPlay } from '@element-plus/icons-vue'
-import CatalogTree from '@/entities/comic/ui/CatalogTree.vue'
+import { CatalogTree } from '@/entities/comic/ui'
 import { ChapterSearchBox } from '@/features/chapter-search'
-import type { CatalogNode, ComicDetailVO } from '@/entities/comic/model/types'
+import type { CatalogNode, ComicDetailVO } from '@/entities/comic'
 
 interface Props {
   comic: ComicDetailVO

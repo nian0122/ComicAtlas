@@ -5,7 +5,7 @@
  * 统一使用命名路由（禁止手拼路径字符串），并对空 id 做静默守卫。
  */
 import { useRouter } from 'vue-router'
-import { useReaderStore } from '@/features/reader-navigation/model/reader-store'
+import { useReaderStore } from '@/features/reader-navigation'
 
 export function useReaderNavigation() {
   const router = useRouter()

@@ -1,20 +1,20 @@
 import { AxiosHeaders, type AxiosResponse } from 'axios'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { historyApi } from '@/entities/history/api/history-api'
-import type { HistoryVO } from '@/entities/history/model/types'
-import { readerApi } from '@/entities/chapter/api/reader-api'
-import type { ReaderDTO } from '@/entities/chapter/model/reader-types'
+import { historyApi } from '@/entities/history'
+import type { HistoryVO } from '@/entities/history'
+import { readerApi } from '@/entities/chapter'
+import type { ReaderDTO } from '@/entities/chapter'
 import { useReaderStore } from './reader-store'
 
-vi.mock('@/entities/history/api/history-api', () => ({
+vi.mock('@/entities/history', () => ({
   historyApi: {
     get: vi.fn(),
     update: vi.fn(),
   },
 }))
 
-vi.mock('@/entities/chapter/api/reader-api', () => ({
+vi.mock('@/entities/chapter', () => ({
   readerApi: {
     chapter: vi.fn(),
   },

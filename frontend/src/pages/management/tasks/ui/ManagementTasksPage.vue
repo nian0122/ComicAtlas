@@ -220,23 +220,18 @@
 
 <script setup lang="ts">
 import { StatGrid } from '@/shared/ui/management-panel'
-import TaskStatusTag from '@/features/task/components/TaskStatusTag.vue'
+import { TaskStatusTag } from '@/features/task'
 import { EmptyState } from '@/shared/ui/management-panel'
 import { StatCard } from '@/shared/ui/management-panel'
 import { PageHeader } from '@/shared/ui/page-header'
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
-import { managementComicApi } from '@/entities/comic/api/management-api'
+import { managementComicApi } from '@/entities/comic'
 import { ElMessage } from 'element-plus'
-import { managementTaskApi } from '@/entities/task/api/task-api'
-import { MANAGEMENT_TASK_TYPES, managementTaskStatusLabel, managementTaskTypeLabel } from '@/entities/task/model/labels'
-import type {
-  ManagementTaskItemVO,
-  ManagementTaskStatus,
-  ManagementTaskType,
-  ManagementTaskVO,
-} from '@/entities/task/model/types'
+import { managementTaskApi } from '@/entities/task'
+import { MANAGEMENT_TASK_TYPES, managementTaskStatusLabel, managementTaskTypeLabel } from '@/entities/task'
+import type { ManagementTaskItemVO, ManagementTaskStatus, ManagementTaskType, ManagementTaskVO } from '@/entities/task'
 
 const TASK_STATUSES = [
   'QUEUED',

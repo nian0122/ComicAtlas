@@ -1,8 +1,8 @@
 import { defineStore } from 'pinia'
 import { reactive, toRefs } from 'vue'
 import { getApiErrorMessage } from '@/shared/api/http'
-import { managementCategoryApi } from '@/entities/category/api/category-api'
-import type { CategoryDTO } from '@/entities/comic/model/types'
+import { managementCategoryApi } from '@/entities/category'
+import type { CategoryDTO } from '@/entities/category'
 
 export interface CategoryState {
   list: CategoryDTO[]

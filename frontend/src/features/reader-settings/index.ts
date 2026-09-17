@@ -1,2 +1,3 @@
-// features/reader-settings 的稳定 public API；新增导出必须在此登记。
-export {}
+// features/reader-settings 的稳定 public API。
+export { useReaderSettingsStore, ZOOM_LEVELS } from './model/settings-store'
+export type { FitMode, QualityMode, ReadingDirection } from './model/settings-store'

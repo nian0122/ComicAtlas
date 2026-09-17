@@ -1,5 +1,5 @@
 import { api } from '@/shared/api/http'
-import type { CategoryDTO } from '@/entities/comic/model/types'
+import type { CategoryDTO } from '@/entities/category/model/types'
 
 export const categoryApi = {
   list: () => api.get<CategoryDTO[]>('/categories'),

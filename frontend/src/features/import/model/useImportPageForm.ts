@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue'
-import type { ImportTaskVO } from '@/features/import/model/types'
+import type { ImportTaskVO } from './types'
 
 export function useImportPageForm() {
   const activeTab = ref<'single' | 'batch'>('single')

@@ -25,7 +25,7 @@
 <script setup lang="ts">
 import ReaderToolbarDesktop from './ReaderToolbarDesktop.vue'
 import ReaderToolbarMobile from './ReaderToolbarMobile.vue'
-import type { InteractionMode } from '@/features/reader-interaction/model/useInteractionMode'
+import type { InteractionMode } from '@/features/reader-interaction'
 
 // 哑组件：mode 由父级（ReaderPage）注入，自身不调用 useInteractionMode。
 interface Props {

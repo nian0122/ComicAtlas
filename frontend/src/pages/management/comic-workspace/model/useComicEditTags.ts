@@ -1,8 +1,8 @@
 import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getApiErrorMessage } from '@/shared/api/http'
-import { managementTagApi } from '@/entities/tag/api/tag-api'
-import type { TagDTO } from '@/entities/tag/model/types'
+import { managementTagApi } from '@/entities/tag'
+import type { TagDTO } from '@/entities/tag'
 
 /** 编辑页标签选择与创建逻辑，页面只负责表单编排。 */
 export function useComicEditTags() {

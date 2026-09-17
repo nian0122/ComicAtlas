@@ -1,5 +1,5 @@
 import { computed, nextTick, ref, watch } from 'vue'
-import type { ComicListQuery } from '@/entities/comic/model/types'
+import type { ComicListQuery } from '@/entities/comic'
 
 export const LIBRARY_SORT_OPTIONS: Array<{
   value: NonNullable<ComicListQuery['sort']>

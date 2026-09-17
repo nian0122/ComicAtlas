@@ -56,8 +56,8 @@
 import { PageHeader } from '@/shared/ui/page-header'
 import { reactive, ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { settingsApi, type ManagementSettings } from '@/entities/system-settings/api/settings-api'
-import { useReaderSettingsStore } from '@/features/reader-settings/model/settings-store'
+import { settingsApi, type ManagementSettings } from '@/entities/system-settings'
+import { useReaderSettingsStore } from '@/features/reader-settings'
 import { getApiErrorMessage } from '@/shared/api/http'
 
 const readerSettings = useReaderSettingsStore()

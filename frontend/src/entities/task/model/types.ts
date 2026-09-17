@@ -1,4 +1,4 @@
-import type { ComicListQuery } from '@/entities/comic/model/types'
+import type { ComicListQuery } from '@/entities/comic'
 
 export type ManagementTaskType =
   | 'IMPORT'
