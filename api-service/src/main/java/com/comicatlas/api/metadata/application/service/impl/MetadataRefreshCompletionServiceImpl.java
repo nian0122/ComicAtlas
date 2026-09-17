@@ -1,7 +1,6 @@
 package com.comicatlas.api.metadata.application.service.impl;
 
 import com.comicatlas.api.catalog.infrastructure.cache.CatalogCacheInvalidator;
-import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTaskItem;
 import com.comicatlas.api.metadata.application.port.out.MetadataRefreshCompletionPersistencePort;
 import com.comicatlas.api.task.application.port.in.ManagementTaskService;
 import com.comicatlas.api.storage.application.port.in.ComicStatsService;
@@ -88,11 +87,11 @@ public class MetadataRefreshCompletionServiceImpl implements MetadataRefreshComp
         String payloadHash = eventFingerprintService.fingerprint(ev);
 
         // 1. 幂等前置检查（无事务）
-        ManagementTaskItem item = persistencePort.findItem(ev.itemId());
+        MetadataRefreshCompletionPersistencePort.ItemSnapshot item = persistencePort.findItem(ev.itemId());
         if (shouldSkip(ev, item, eventId)) {
             return;
         }
-        Long comicId = resolveComicId(item.getTargetType(), item.getTargetId());
+        Long comicId = resolveComicId(item.targetType(), item.targetId());
 
         // 2. 事务外读取并校验静态快照（SHA-256 + JSON 解析 + 结构校验）
         MetadataRefreshSnapshotDTO snapshot;
@@ -126,30 +125,30 @@ public class MetadataRefreshCompletionServiceImpl implements MetadataRefreshComp
 
     /** 元数据刷新完成事件幂等前置检查：命中任一条件直接 ACK（返回 true）。 */
     private boolean shouldSkip(MetadataRefreshScanCompletedEvent ev,
-                               ManagementTaskItem item, String eventId) {
+                               MetadataRefreshCompletionPersistencePort.ItemSnapshot item, String eventId) {
         if (item == null) {
             log.info("元数据刷新完成事件引用不存在的 item，忽略: itemId={}", ev.itemId());
             return true;
         }
-        if (item.getStatus() != null && item.getStatus().isTerminal()) {
-            log.info("元数据刷新完成事件 item 已终态 {}，幂等跳过: itemId={}", item.getStatus(), ev.itemId());
+        if (item.isTerminal()) {
+            log.info("元数据刷新完成事件 item 已终态 {}，幂等跳过: itemId={}", item.status(), ev.itemId());
             return true;
         }
-        if (item.getAttempt() != null && !item.getAttempt().equals(ev.attempt())) {
+        if (item.attempt() != null && !item.attempt().equals(ev.attempt())) {
             log.info("元数据刷新完成事件 attempt 不匹配，忽略旧 attempt 结果: itemId={}, event={}, item={}",
-                    ev.itemId(), ev.attempt(), item.getAttempt());
+                    ev.itemId(), ev.attempt(), item.attempt());
             return true;
         }
-        boolean supportedTarget = TARGET_TYPE_COMIC.equals(item.getTargetType())
-                || TARGET_TYPE_CHAPTER.equals(item.getTargetType());
-        boolean metadataOperation = item.getOperationType() == TaskType.METADATA_REFRESH;
-        boolean eventMatchesItem = Objects.equals(item.getTargetType(), ev.targetType())
-                && Objects.equals(item.getTargetId(), ev.targetId())
+        boolean supportedTarget = TARGET_TYPE_COMIC.equals(item.targetType())
+                || TARGET_TYPE_CHAPTER.equals(item.targetType());
+        boolean metadataOperation = item.operationType() == TaskType.METADATA_REFRESH;
+        boolean eventMatchesItem = Objects.equals(item.targetType(), ev.targetType())
+                && Objects.equals(item.targetId(), ev.targetId())
                 && metadataOperation
-                && item.getOperationType().name().equals(ev.operationType());
+                && item.operationType().name().equals(ev.operationType());
         if (!metadataOperation || !supportedTarget || !eventMatchesItem) {
             log.warn("元数据刷新完成事件 target/op 不匹配，防御性忽略: itemId={}, op={}, target={}",
-                    ev.itemId(), item.getOperationType(), item.getTargetType());
+                    ev.itemId(), item.operationType(), item.targetType());
             return true;
         }
         return false;
@@ -204,7 +203,7 @@ public class MetadataRefreshCompletionServiceImpl implements MetadataRefreshComp
      * 仅当前 attempt 且非终态时生效（CAS），不影响已成功的重复事件。事务内异常向上传播 → DLQ。
      */
     private void applyBusinessFailure(MetadataRefreshScanCompletedEvent ev,
-                                      ManagementTaskItem item, Long comicId,
+                                      MetadataRefreshCompletionPersistencePort.ItemSnapshot item, Long comicId,
                                       String eventId, String payloadHash, String errorMessage) {
         log.warn("元数据刷新业务失败，置 FAILED 并 ACK: itemId={}, error={}", ev.itemId(), errorMessage);
         transactionTemplate.executeWithoutResult(tx -> {
@@ -213,7 +212,7 @@ public class MetadataRefreshCompletionServiceImpl implements MetadataRefreshComp
             persistencePort.markFailedIfActive(
                     ev.itemId(), ev.attempt(), errorMessage, updateTime, updateTime);
             inboxService.markProcessed(eventId, payloadHash, ev.taskId(), ev.itemId(), ev.attempt());
-            finalizeComicIfTaskComplete(comicId, ev.taskId(), item.getId(), ev.attempt());
+            finalizeComicIfTaskComplete(comicId, ev.taskId(), item.id(), ev.attempt());
             managementTaskService.reaggregateTask(ev.taskId());
         });
     }
@@ -256,13 +255,14 @@ public class MetadataRefreshCompletionServiceImpl implements MetadataRefreshComp
         throw new BusinessException("元数据刷新目标类型不支持: " + targetType);
     }
 
-    private void validateTargetSnapshot(ManagementTaskItem item, MetadataRefreshSnapshotDTO snapshot) {
-        if (!TARGET_TYPE_CHAPTER.equals(item.getTargetType())) {
+    private void validateTargetSnapshot(MetadataRefreshCompletionPersistencePort.ItemSnapshot item,
+                                        MetadataRefreshSnapshotDTO snapshot) {
+        if (!TARGET_TYPE_CHAPTER.equals(item.targetType())) {
             return;
         }
         if (snapshot.chapters().size() != 1
-                || !item.getTargetId().equals(snapshot.chapters().get(0).chapterId())) {
-            throw new BusinessException("章节刷新快照与 item 目标不一致: " + item.getTargetId());
+                || !item.targetId().equals(snapshot.chapters().get(0).chapterId())) {
+            throw new BusinessException("章节刷新快照与 item 目标不一致: " + item.targetId());
         }
     }
 

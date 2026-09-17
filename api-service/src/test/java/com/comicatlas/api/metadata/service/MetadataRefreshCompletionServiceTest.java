@@ -113,7 +113,7 @@ class MetadataRefreshCompletionServiceTest {
     @BeforeEach
     void setUp() throws Exception {
         lenient().when(persistencePort.findItem(any())).thenAnswer(invocation ->
-                managementTaskItemMapper.selectById(invocation.getArgument(0)));
+                toItemSnapshot(managementTaskItemMapper.selectById(invocation.getArgument(0))));
         lenient().doAnswer(invocation -> {
             comicMapper.selectByIdForUpdate(invocation.getArgument(0));
             return null;
@@ -196,6 +196,12 @@ class MetadataRefreshCompletionServiceTest {
         item.setTargetType("CHAPTER");
         item.setTargetId(42L);
         return item;
+    }
+
+    private MetadataRefreshCompletionPersistencePort.ItemSnapshot toItemSnapshot(ManagementTaskItem item) {
+        return item == null ? null : new MetadataRefreshCompletionPersistencePort.ItemSnapshot(
+                item.getId(), item.getTargetType(), item.getTargetId(), item.getOperationType(),
+                item.getStatus() == null ? null : item.getStatus().name(), item.getAttempt());
     }
 
     private MetadataRefreshSnapshotDTO chapterSnapshot() {

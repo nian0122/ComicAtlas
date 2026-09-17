@@ -21,7 +21,12 @@ public class MetadataRefreshCompletionPersistencePortAdapter
     private final ComicMapper comicMapper;
     private final ChapterMapper chapterMapper;
 
-    @Override public ManagementTaskItem findItem(Long itemId) { return managementTaskItemMapper.selectById(itemId); }
+    @Override public MetadataRefreshCompletionPersistencePort.ItemSnapshot findItem(Long itemId) {
+        ManagementTaskItem item = managementTaskItemMapper.selectById(itemId);
+        return item == null ? null : new MetadataRefreshCompletionPersistencePort.ItemSnapshot(
+                item.getId(), item.getTargetType(), item.getTargetId(), item.getOperationType(),
+                item.getStatus() == null ? null : item.getStatus().name(), item.getAttempt());
+    }
     @Override public void lockComic(Long comicId) { comicMapper.selectByIdForUpdate(comicId); }
     @Override public int markSucceededIfActive(Long itemId, int attempt, LocalDateTime completedAt,
                                                LocalDateTime updatedAt) {
