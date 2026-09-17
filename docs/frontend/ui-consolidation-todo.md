@@ -1,6 +1,6 @@
 # 前端公共 UI 收敛 TODO
 
-更新日期：2026-09-17。本清单以当前 `frontend/src` 为准，目标是把跨页面重复的 UI 外观和交互抽到 FSD 的 `shared/ui`，使每一种按钮、状态、页面状态与基础容器只有一个实现。本轮已完成代码迁移、公共入口收敛和自动检查。
+更新日期：2026-09-17。本清单以当前 `frontend/src` 为准，目标是把跨页面重复的 UI 外观和交互抽到 FSD 的 `shared/ui`，使每一种按钮、状态、页面状态和基础容器只有一个实现。当前统一 UI 基础层已完成，后续新增页面必须复用现有 public API。
 
 ## 收敛规则
 
@@ -34,7 +34,7 @@
 
 ### UI-04：统一加载、错误与空态
 
-- [x] **TODO UI-04**：扩展现有 `shared/ui/management-panel/EmptyState.vue` 或迁为 `shared/ui/content-state/`，提供 `loading`、`error`、`empty` 三种语义状态及 action 插槽；spinner 也由该切片唯一实现。
+- [x] **TODO UI-04**：统一使用 `shared/ui/content-state/ContentState.vue`，提供 `loading`、`error`、`empty` 三种语义状态及 action/icon 插槽；spinner 由该切片唯一实现，原 `management-panel/EmptyState.vue` 已删除。
 - 替换范围：`pages/management/comics/ui/ComicListPage.vue`、`pages/reading/history/ui/HistoryPage.vue`、`pages/reading/library/ui/LibraryPage.vue`、`pages/management/dlq/ui/DeadLetterPage.vue` 及其余含 `.state/.spinner/.empty-*` 的页面。
 - 约束：空态文案、图标和重试动作属于调用方；公共组件不吞掉错误信息，也不发起重试请求。
 - 验证：`rg -n '\\.(state|spinner|empty-title|empty-desc)' frontend/src/pages` 只保留页面布局特例，不再保留重复的状态容器和旋转动画。

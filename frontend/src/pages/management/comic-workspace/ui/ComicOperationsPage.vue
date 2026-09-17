@@ -62,7 +62,7 @@
             <el-table-column prop="operation" label="被阻止操作" width="180" />
             <el-table-column prop="reason" label="后端判定原因" />
           </el-table>
-          <EmptyState v-else description="当前没有被阻止的操作" bordered />
+          <ContentState v-else state="empty" message="当前没有被阻止的操作" bordered />
         </section>
         <section class="panel danger-panel">
           <PanelHeader
@@ -98,7 +98,7 @@
       <el-tab-pane label="状态变化" name="history">
         <section class="panel">
           <PanelHeader title="状态变化" description="记录本次打开页面后的生命周期变化。" eyebrow="ACTIVITY" />
-          <EmptyState v-if="!statusEvents.length" description="暂时没有新的状态变化" bordered />
+          <ContentState v-if="!statusEvents.length" state="empty" message="暂时没有新的状态变化" bordered />
           <el-timeline>
             <el-timeline-item v-for="event in statusEvents" :key="`${event.at}-${event.status}`" :timestamp="event.at">
               <ComicStatusTag :status="event.status" />
@@ -149,7 +149,7 @@
 <script setup lang="ts">
 import { StatGrid } from '@/shared/ui/management-panel'
 import { PanelHeader } from '@/shared/ui/management-panel'
-import { EmptyState } from '@/shared/ui/management-panel'
+import { ContentState } from '@/shared/ui/content-state'
 import { StatCard } from '@/shared/ui/management-panel'
 import { PageHeader } from '@/shared/ui/page-header'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
