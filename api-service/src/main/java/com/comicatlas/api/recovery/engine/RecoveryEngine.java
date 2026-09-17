@@ -5,6 +5,12 @@ import com.comicatlas.api.catalog.infrastructure.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.recovery.domain.RestoreContext;
 import com.comicatlas.api.recovery.domain.RestorePolicy;
 import com.comicatlas.api.recovery.domain.RestoreSource;
+import com.comicatlas.api.recovery.application.port.out.RecoveryPersistencePort;
+import com.comicatlas.api.recovery.application.port.out.RecoveryPersistencePort.CatalogModel;
+import com.comicatlas.api.recovery.application.port.out.RecoveryPersistencePort.ChapterModel;
+import com.comicatlas.api.recovery.application.port.out.RecoveryPersistencePort.ComicModel;
+import com.comicatlas.api.recovery.application.port.out.RecoveryPersistencePort.MediaModel;
+import com.comicatlas.api.recovery.infrastructure.persistence.repository.RecoveryPersistencePortAdapter;
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.enums.HqStatus;
 import com.comicatlas.contract.common.enums.LqStatus;
@@ -30,10 +36,6 @@ import com.comicatlas.persistence.comic.mapper.CatalogMapper;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.persistence.comic.mapper.MediaMapper;
-import com.comicatlas.persistence.comic.entity.Catalog;
-import com.comicatlas.persistence.comic.entity.Chapter;
-import com.comicatlas.persistence.comic.entity.Comic;
-import com.comicatlas.persistence.comic.entity.Media;
 
 /**
  * 漫画恢复引擎 — 封装每漫画目录的恢复逻辑。
@@ -53,10 +55,7 @@ public class RecoveryEngine {
     private static final String LQ_STATUS_READY = "READY";
 
     private final ObjectMapper objectMapper;
-    private final ComicMapper comicMapper;
-    private final CatalogMapper catalogMapper;
-    private final ChapterMapper chapterMapper;
-    private final MediaMapper mediaMapper;
+    private final RecoveryPersistencePort persistencePort;
     private final TransactionTemplate transactionTemplate;
     private final CatalogCacheInvalidator catalogCacheInvalidator;
     private final ApiStorageProperties storageProperties;
@@ -65,16 +64,12 @@ public class RecoveryEngine {
     private final MetadataUpdateCoordinator metadataUpdateCoordinator;
 
     @Autowired
-    public RecoveryEngine(ObjectMapper objectMapper, ComicMapper comicMapper,
-            CatalogMapper catalogMapper, ChapterMapper chapterMapper, MediaMapper mediaMapper,
+    public RecoveryEngine(ObjectMapper objectMapper, RecoveryPersistencePort persistencePort,
             TransactionTemplate transactionTemplate, CatalogCacheInvalidator catalogCacheInvalidator,
             ApiStorageProperties storageProperties, RecoveryMediaResolver recoveryMediaResolver,
             RecoveryPlanBuilder recoveryPlanBuilder, MetadataUpdateCoordinator metadataUpdateCoordinator) {
         this.objectMapper = objectMapper;
-        this.comicMapper = comicMapper;
-        this.catalogMapper = catalogMapper;
-        this.chapterMapper = chapterMapper;
-        this.mediaMapper = mediaMapper;
+        this.persistencePort = persistencePort;
         this.transactionTemplate = transactionTemplate;
         this.catalogCacheInvalidator = catalogCacheInvalidator;
         this.storageProperties = storageProperties;
@@ -89,7 +84,8 @@ public class RecoveryEngine {
             TransactionTemplate transactionTemplate, CatalogCacheInvalidator catalogCacheInvalidator,
             ApiStorageProperties storageProperties, RecoveryMediaResolver recoveryMediaResolver,
             MetadataUpdateCoordinator metadataUpdateCoordinator) {
-        this(objectMapper, comicMapper, catalogMapper, chapterMapper, mediaMapper, transactionTemplate,
+        this(objectMapper, new RecoveryPersistencePortAdapter(comicMapper, catalogMapper, chapterMapper, mediaMapper),
+                transactionTemplate,
                 catalogCacheInvalidator, storageProperties, recoveryMediaResolver,
                 new RecoveryPlanBuilder(recoveryMediaResolver), metadataUpdateCoordinator);
     }
@@ -105,7 +101,7 @@ public class RecoveryEngine {
      */
     public RecoveryProgressVO processComicDir(Long comicId, int totalSoFar) {
         // 1. 已存在 → 跳过
-        if (comicMapper.selectById(comicId) != null) {
+        if (persistencePort.findComic(comicId) != null) {
             log.debug("漫画已存在，跳过: comicId={}", comicId);
             return new RecoveryProgressVO(totalSoFar + 1, 0, 1, 0, 0, null, 0, 0);
         }
@@ -148,12 +144,12 @@ public class RecoveryEngine {
 
     private void createPlaceholder(Long comicId) {
         transactionTemplate.executeWithoutResult(s -> {
-            Comic placeholder = new Comic();
+            ComicModel placeholder = new ComicModel();
             placeholder.setId(comicId);
             placeholder.setTitle("待恢复漫画 " + comicId);
             placeholder.setStatus(ComicStatus.RECOVERY_REQUIRED);
             placeholder.setStoragePolicy("MANAGED");
-            comicMapper.insert(placeholder);
+            persistencePort.insertComic(placeholder);
         });
     }
 
@@ -186,20 +182,19 @@ public class RecoveryEngine {
                                                      List<List<ResolvedMediaItem>> resolvedMedia,
                                                      RestoreContext ctx) {
         Long comicId = ctx.comicId();
-        Comic comic;
+        ComicModel comic;
 
         if (ctx.comicExists()) {
-            comic = comicMapper.selectById(comicId);
+            comic = persistencePort.findComic(comicId);
             if (comic == null) {
                 throw new BusinessException("漫画不存在: comicId=" + comicId);
             }
-            List<Long> existingChapterIds = chapterMapper.selectByComicIdOrderByGlobalOrder(comicId)
-                .stream().map(Chapter::getId).toList();
+            List<Long> existingChapterIds = persistencePort.findChapterIds(comicId);
             if (!existingChapterIds.isEmpty()) {
-                mediaMapper.deleteByChapterIds(existingChapterIds);
+                persistencePort.deleteMediaByChapterIds(existingChapterIds);
             }
-            chapterMapper.deleteByComicId(comicId);
-            catalogMapper.deleteByComicId(comicId);
+            persistencePort.deleteChaptersByComicId(comicId);
+            persistencePort.deleteCatalogsByComicId(comicId);
 
             comic.setStatus(ComicStatus.READY);
             comic.setStoragePolicy("MANAGED");
@@ -209,14 +204,14 @@ public class RecoveryEngine {
                 if (comicData.get("category") != null) { comic.setCategory((String) comicData.get("category")); }
             }
         } else {
-            comic = new Comic();
+            comic = new ComicModel();
             comic.setId(comicId);
             comic.setTitle((String) comicData.get("title"));
             comic.setAuthor((String) comicData.get("author"));
             comic.setStatus(ComicStatus.READY);
             comic.setStoragePolicy("MANAGED");
             if (comicData.get("category") != null) { comic.setCategory((String) comicData.get("category")); }
-            comicMapper.insert(comic);
+            persistencePort.insertComic(comic);
         }
 
         int catalogCount = catalogsData.size();
@@ -229,7 +224,7 @@ public class RecoveryEngine {
             List<ResolvedMediaItem> chapterItems = resolvedMedia != null && i < resolvedMedia.size()
                     ? resolvedMedia.get(i) : List.of();
 
-            Chapter chapter = new Chapter();
+            ChapterModel chapter = new ChapterModel();
             chapter.setComicId(comicId);
             chapter.setTitle((String) chData.get("title"));
             chapter.setChapterNo((String) chData.get("chapterNo"));
@@ -242,14 +237,14 @@ public class RecoveryEngine {
                 // 事务前已校验边界，此处必然命中
                 chapter.setCatalogId(catalogIdMap.get(((Number) cid).intValue()));
             }
-            chapterMapper.insert(chapter);
+            persistencePort.insertChapter(chapter);
             chCount++;
 
             chapter.setPageCount(chapterItems.size());
-            chapterMapper.updateById(chapter);
+            persistencePort.updateChapter(chapter);
 
             for (ResolvedMediaItem item : chapterItems) {
-                Media media = new Media();
+                MediaModel media = new MediaModel();
                 media.setChapterId(chapter.getId());
                 media.setPageNumber(item.pageNumber());
                 media.setHqRoot("HQ");
@@ -271,7 +266,7 @@ public class RecoveryEngine {
                 media.setWidth(item.width());
                 media.setHeight(item.height());
                 media.setMediaType(item.mediaType());
-                mediaMapper.insert(media);
+                persistencePort.insertMedia(media);
                 totalSize += item.fileSize();
                 pgCount++;
             }
@@ -281,11 +276,11 @@ public class RecoveryEngine {
             comic.setTotalPages(pgCount);
             comic.setHqSize(totalSize);
             comic.setHqSize(totalSize);
-            comicMapper.updateById(comic);
+            persistencePort.updateComic(comic);
         } else if (totalSize > 0) {
             comic.setHqSize(totalSize);
             comic.setHqSize(totalSize);
-            comicMapper.updateById(comic);
+            persistencePort.updateComic(comic);
         }
 
         log.info("恢复完成: comicId={}, title={}, chapters={}, pages={}",
@@ -301,12 +296,12 @@ public class RecoveryEngine {
 
         for (int i = 0; i < size; i++) {
             Map<String, Object> catalogData = catalogsData.get(i);
-            Catalog cat = new Catalog();
+            CatalogModel cat = new CatalogModel();
             cat.setComicId(comicId);
             cat.setTitle((String) catalogData.get("title"));
             cat.setSortOrder(catalogData.get("sortOrder") != null
                     ? ((Number) catalogData.get("sortOrder")).intValue() : i);
-            catalogMapper.insert(cat);
+            persistencePort.insertCatalog(cat);
             idMap.put(i, cat.getId());
         }
 
@@ -316,10 +311,10 @@ public class RecoveryEngine {
             Object pi = catalogData.get("parentIndex");
             if (pi == null) { continue; }
             int parentIdx = ((Number) pi).intValue();
-            Catalog cat = catalogMapper.selectById(idMap.get(i));
+            CatalogModel cat = persistencePort.findCatalog(idMap.get(i));
             if (cat != null) {
                 cat.setParentId(idMap.get(parentIdx));
-                catalogMapper.updateById(cat);
+                persistencePort.updateCatalog(cat);
             }
         }
 
