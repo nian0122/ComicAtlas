@@ -281,7 +281,9 @@ public class ManagementTaskServiceImpl implements ManagementTaskService {
         for (ManagementTaskItem item : items) {
             if (item.getStatus() == ManagementTaskStatus.FAILED
                     || item.getStatus() == ManagementTaskStatus.CANCELLED) {
-                taskRetryPublisher.publish(taskId, item, newAttempt);
+                taskRetryPublisher.publish(taskId, new TaskRetryPublisher.RetryItem(
+                        item.getId(), item.getOperationType(), item.getResultRefType(), item.getResultRefId(),
+                        item.getTargetType(), item.getTargetId()), newAttempt);
             }
         }
 

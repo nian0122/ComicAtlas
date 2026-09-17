@@ -2,7 +2,6 @@ package com.comicatlas.api.task.application.port.out;
 
 import com.comicatlas.api.exporter.application.port.in.ExportRetryService;
 import com.comicatlas.api.importer.application.port.in.ImportRetryService;
-import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTaskItem;
 import com.comicatlas.api.exporter.application.port.in.ExportRetryService.RetryItem;
 import com.comicatlas.api.task.domain.model.TaskType;
 import com.comicatlas.common.constant.MqExchanges;
@@ -36,30 +35,35 @@ public class TaskRetryPublisher {
     private final ExportRetryService exportRetryService;
     private final ImportRetryService importRetryService;
 
-    public void publish(Long taskId, ManagementTaskItem item, int attempt) {
+    public void publish(Long taskId, RetryItem item, int attempt) {
         publishManagementCommand(taskId, item, attempt);
-        if (item.getOperationType() == TaskType.EXPORT) {
+        if (item.operationType() == TaskType.EXPORT) {
             exportRetryService.retry(taskId,
-                    new RetryItem(item.getId(), item.getResultRefType(), item.getResultRefId()), attempt);
+                    new com.comicatlas.api.exporter.application.port.in.ExportRetryService.RetryItem(
+                            item.id(), item.resultRefType(), item.resultRefId()), attempt);
         }
-        if (item.getOperationType() == TaskType.IMPORT) {
-            importRetryService.retry(taskId, item.getId());
+        if (item.operationType() == TaskType.IMPORT) {
+            importRetryService.retry(taskId, item.id());
         }
     }
 
+    /** 管理任务重试所需的最小应用快照。 */
+    public record RetryItem(Long id, TaskType operationType, String resultRefType, Long resultRefId,
+                            String targetType, Long targetId) { }
+
     private void publishManagementCommand(Long taskId, ManagementTaskItem item, int attempt) {
-        TaskType operation = item.getOperationType();
+        TaskType operation = item.operationType();
         if (operation == null || !COMMAND_OPERATIONS.contains(operation)) {
             return;
         }
-        Long manifestTaskId = TRASH_MANIFEST_REF.equals(item.getResultRefType())
-                ? item.getResultRefId() : null;
+        Long manifestTaskId = TRASH_MANIFEST_REF.equals(item.resultRefType())
+                ? item.resultRefId() : null;
         ManagementCommandRequestedEvent event = new ManagementCommandRequestedEvent(
-                UUID.randomUUID(), Instant.now(), EVENT_ATTEMPT, taskId, item.getId(), attempt,
-                operation.name(), item.getTargetType(), item.getTargetId(), manifestTaskId);
+                UUID.randomUUID(), Instant.now(), EVENT_ATTEMPT, taskId, item.id(), attempt,
+                operation.name(), item.targetType(), item.targetId(), manifestTaskId);
         outboxService.enqueue(event, MqExchanges.MANAGEMENT, MqRoutingKeys.COMMAND_REQUESTED,
-                taskId, item.getId(), attempt);
+                taskId, item.id(), attempt);
         log.info("重试已重新发布管理命令: taskId={}, itemId={}, attempt={}, operation={}",
-                taskId, item.getId(), attempt, operation);
+                taskId, item.id(), attempt, operation);
     }
 }
