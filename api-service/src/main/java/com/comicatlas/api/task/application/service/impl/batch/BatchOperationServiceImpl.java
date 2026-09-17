@@ -6,7 +6,7 @@ import com.comicatlas.api.task.infrastructure.config.BatchProperties;
 import com.comicatlas.api.task.interfaces.rest.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.task.interfaces.rest.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.task.interfaces.rest.dto.ManagementTaskResponse;
-import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTask;
+import com.comicatlas.api.task.application.port.out.TaskIdempotencyQueryPort;
 import com.comicatlas.api.task.application.port.in.ManagementTaskService;
 import com.comicatlas.api.outbox.application.port.in.OutboxService;
 import com.comicatlas.common.constant.MqExchanges;
@@ -68,6 +68,7 @@ public class BatchOperationServiceImpl implements BatchOperationService {
     private final BatchMetadataExecutor metadataExecutor;
     private final BatchProperties batchProperties;
     private final ManagementTaskService managementTaskService;
+    private final TaskIdempotencyQueryPort idempotencyQueryPort;
     private final OutboxService outboxService;
     private final ObjectMapper objectMapper;
 
@@ -128,16 +129,17 @@ public class BatchOperationServiceImpl implements BatchOperationService {
 
         // 幂等重放：同键同 payload 直接返回既有任务，不重复物化
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {
-            ManagementTask existing = managementTaskService.findByIdempotencyKey(idempotencyKey);
+            TaskIdempotencyQueryPort.TaskSnapshot existing =
+                    idempotencyQueryPort.findByIdempotencyKey(idempotencyKey);
             if (existing != null) {
                 String expectedHash = sha256(payload);
-                if (!expectedHash.equals(existing.getIdempotencyPayloadHash())) {
+                if (!expectedHash.equals(existing.idempotencyPayloadHash())) {
                     throw new BatchConflictException(BatchReasonCode.IDEMPOTENCY_CONFLICT,
                             "幂等键 " + idempotencyKey + " 已存在但 payload 不匹配");
                 }
                 BatchPreviewResponse replay = preview(request);
                 BatchCreateResponse resp = new BatchCreateResponse();
-                resp.setTask(managementTaskService.getTask(existing.getId()));
+                resp.setTask(managementTaskService.getTask(existing.id()));
                 resp.setSelectedCount(replay.getSelectedCount());
                 resp.setEligibleCount(replay.getEligibleCount());
                 resp.setBlocked(replay.getBlocked());

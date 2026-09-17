@@ -17,6 +17,7 @@ import com.comicatlas.api.task.domain.policy.AllowedOperations;
 import com.comicatlas.api.task.application.port.in.MediaOperationEligibilityService;
 import com.comicatlas.api.task.domain.policy.OperationPolicyService;
 import com.comicatlas.api.task.application.port.in.ManagementTaskService;
+import com.comicatlas.api.task.application.port.out.TaskIdempotencyQueryPort;
 import com.comicatlas.api.task.application.port.in.batch.BatchOperationService;
 import com.comicatlas.api.outbox.application.port.in.OutboxService;
 import com.comicatlas.api.task.application.service.batch.impl.BatchOperationServiceImpl;
@@ -50,12 +51,14 @@ class BatchOperationServiceTest {
     @Mock private BatchMetadataExecutor metadataExecutor;
     @Mock private BatchProperties batchProperties;
     @Mock private ManagementTaskService managementTaskService;
+    @Mock private TaskIdempotencyQueryPort idempotencyQueryPort;
     @Mock private OutboxService outboxService;
     @Mock private ObjectMapper objectMapper;
 
     private BatchOperationService newService(BatchEligibilityChecker checker) {
         return new BatchOperationServiceImpl(selectionResolver, checker, previewTokenStore,
-                metadataExecutor, batchProperties, managementTaskService, outboxService, objectMapper);
+                metadataExecutor, batchProperties, managementTaskService, idempotencyQueryPort,
+                outboxService, objectMapper);
     }
 
     /** 真实资格校验器：METADATA_REFRESH 走资产资格（comic READY），ComicMapper 返回存在的漫画。 */
