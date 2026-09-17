@@ -14,7 +14,7 @@ import com.comicatlas.api.task.interfaces.rest.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.task.interfaces.rest.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.task.interfaces.rest.dto.ManagementTaskResponse;
 import com.comicatlas.api.task.interfaces.rest.dto.OperationSubmitResultDTO;
-import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTask;
+import com.comicatlas.api.task.application.port.out.TaskIdempotencyQueryPort;
 import com.comicatlas.api.task.domain.policy.AllowedOperations;
 import com.comicatlas.api.task.domain.policy.OperationPolicyService;
 import com.comicatlas.api.task.application.port.in.ManagementTaskService;
@@ -67,6 +67,7 @@ public class TrashLifecycleServiceImpl implements TrashLifecycleService {
     private final TrashLifecycleCommandPersistencePort persistencePort;
     private final TrashTargetPort targetPort;
     private final ManagementTaskService managementTaskService;
+    private final TaskIdempotencyQueryPort idempotencyQueryPort;
     private final OutboxService outboxService;
     private final TrashManifestService trashManifestService;
     private final OperationPolicyService policyService;
@@ -451,15 +452,15 @@ public class TrashLifecycleServiceImpl implements TrashLifecycleService {
 
     /** 幂等命中检查：同键同 payload 返回已有任务结果。 */
     private OperationSubmitResultDTO idempotencyHit(String idempotencyKey, String payload) {
-        ManagementTask existing = managementTaskService.findByIdempotencyKey(idempotencyKey);
+        TaskIdempotencyQueryPort.TaskSnapshot existing = idempotencyQueryPort.findByIdempotencyKey(idempotencyKey);
         if (existing == null) {
             return null;
         }
-        if (!sha256(payload).equals(existing.getIdempotencyPayloadHash())) {
+        if (!sha256(payload).equals(existing.idempotencyPayloadHash())) {
             throw new ConflictException("幂等键 " + idempotencyKey + " 已存在但 payload 不匹配");
         }
-        return OperationSubmitResultDTO.of(existing.getId(), existing.getTaskType().name(),
-                existing.getStatus().name(), existing.getTotalCount());
+        return OperationSubmitResultDTO.of(existing.id(), existing.taskType().name(),
+                existing.status(), existing.totalCount());
     }
 
     /** 查找目标最近一次回收任务的 taskId（作为清单目录定位）。 */

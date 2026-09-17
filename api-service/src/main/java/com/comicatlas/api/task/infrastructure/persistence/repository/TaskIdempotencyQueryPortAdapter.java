@@ -15,6 +15,7 @@ public class TaskIdempotencyQueryPortAdapter implements TaskIdempotencyQueryPort
     @Override
     public TaskSnapshot findByIdempotencyKey(String idempotencyKey) {
         ManagementTask task = persistencePort.findByIdempotencyKey(idempotencyKey);
-        return task == null ? null : new TaskSnapshot(task.getId(), task.getIdempotencyPayloadHash());
+        return task == null ? null : new TaskSnapshot(task.getId(), task.getIdempotencyPayloadHash(),
+                task.getTaskType(), task.getStatus() == null ? null : task.getStatus().name(), task.getTotalCount());
     }
 }
