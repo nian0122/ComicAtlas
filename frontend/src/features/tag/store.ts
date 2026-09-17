@@ -1,8 +1,8 @@
 import { defineStore } from 'pinia'
 import { reactive, toRefs } from 'vue'
-import { getApiErrorMessage } from '@/services/http'
-import { managementTagApi } from '@/features/tag/api'
-import type { TagDTO } from '@/entities/tag/types'
+import { getApiErrorMessage } from '@/shared/api/http'
+import { managementTagApi } from '@/entities/tag/api/tag-api'
+import type { TagDTO } from '@/entities/tag/model/types'
 
 export interface TagState {
   list: TagDTO[]

@@ -1,8 +1,8 @@
 import { defineStore } from 'pinia'
 import { reactive, toRefs } from 'vue'
-import { getApiErrorMessage } from '@/services/http'
-import { historyApi } from '@/features/history/api'
-import type { HistoryVO } from '@/features/history/types'
+import { getApiErrorMessage } from '@/shared/api/http'
+import { historyApi } from '@/entities/history/api/history-api'
+import type { HistoryVO } from '@/entities/history/model/types'
 
 export interface HistoryState {
   list: HistoryVO[]
@@ -101,9 +101,7 @@ export const useHistoryStore = defineStore('history', () => {
       ...item,
       chapterId,
       pageNumber,
-      progressPercent: item.totalPages > 0
-        ? Math.round((pageNumber / item.totalPages) * 100)
-        : item.progressPercent,
+      progressPercent: item.totalPages > 0 ? Math.round((pageNumber / item.totalPages) * 100) : item.progressPercent,
       updatedAt: new Date().toISOString(),
     }
     state.list.splice(index, 1)
@@ -111,11 +109,7 @@ export const useHistoryStore = defineStore('history', () => {
   }
 
   /** 阅读器保存成功后同步已加载的本地项，不触发全量刷新。 */
-  async function recordProgress(
-    comicId: number,
-    chapterId: number,
-    pageNumber: number
-  ): Promise<void> {
+  async function recordProgress(comicId: number, chapterId: number, pageNumber: number): Promise<void> {
     await historyApi.update(comicId, { chapterId, pageNumber })
     updateEntry(comicId, chapterId, pageNumber)
   }

@@ -1,4 +1,4 @@
-export { default as ChapterSearchBox } from './components/ChapterSearchBox.vue'
-export { useChapterSearch } from './composables/useChapterSearch'
-export { buildChapterSearchIndex, filterChapterTree, searchChapters } from './domain/chapter-search'
-export type * from './domain/chapter-search.types'
+export { default as ChapterSearchBox } from './ui/ChapterSearchBox.vue'
+export { useChapterSearch } from './model/useChapterSearch'
+export * from './lib/chapter-search'
+export type * from './lib/chapter-search.types'

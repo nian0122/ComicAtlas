@@ -42,7 +42,15 @@ export default typescriptEslint.config(
         {
           patterns: [
             {
-              group: ['@/entities/**', '@/features/**', '@/views/**', '@/components/**'],
+              group: [
+                '@/app/**',
+                '@/pages/**',
+                '@/widgets/**',
+                '@/features/**',
+                '@/entities/**',
+                '@/views/**',
+                '@/components/**',
+              ],
               message: 'shared 不得反向依赖业务层。',
             },
           ],
@@ -59,7 +67,7 @@ export default typescriptEslint.config(
         {
           patterns: [
             {
-              group: ['@/features/**', '@/views/**', '@/components/**'],
+              group: ['@/app/**', '@/pages/**', '@/widgets/**', '@/features/**', '@/views/**', '@/components/**'],
               message: 'entities 不得依赖功能实现或页面层。',
             },
           ],
@@ -74,7 +82,12 @@ export default typescriptEslint.config(
       'no-restricted-imports': [
         'error',
         {
-          patterns: [{ group: ['@/views/**'], message: 'features 不得依赖 views；页面应组合 feature。' }],
+          patterns: [
+            {
+              group: ['@/app/**', '@/pages/**', '@/widgets/**', '@/views/**', '@/components/**'],
+              message: 'features 不得依赖上层；页面应组合 feature。',
+            },
+          ],
         },
       ],
     },

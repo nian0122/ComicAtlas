@@ -12,6 +12,7 @@
 | [组件设计基线](06-design-system.md) | 早期组件样式说明；视觉值以现行设计系统为准 |
 | [组件说明](07-components.md) | 组件职责 |
 | [前端架构](08-frontend-architecture.md) | 分层与目录约定 |
+| [Feature-Sliced Design 改造 TODO](fsd-refactoring-todo.md) | 当前源码的 FSD 迁移标记、目标归属与验证约束；本轮仅标记、未迁移 |
 | [开发计划](09-development-plan.md) | 规划背景，完成情况以代码和测试为准 |
 | [早期视觉方案](archive/legacy-design-system.md) | 历史归档 |
 
