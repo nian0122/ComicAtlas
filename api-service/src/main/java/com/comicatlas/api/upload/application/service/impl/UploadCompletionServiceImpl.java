@@ -4,11 +4,8 @@ package com.comicatlas.api.upload.application.service.impl;
 // 架构说明：Service 直接构造 LambdaUpdateWrapper 更新媒体/上传会话；条件更新应收口到对应 Mapper。
 import com.comicatlas.api.catalog.infrastructure.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.storage.application.port.in.ComicStatsService;
-import com.comicatlas.api.upload.infrastructure.persistence.entity.UploadSession;
 import com.comicatlas.common.event.MediaUploadCompletedEvent;
 import com.comicatlas.common.event.MediaUploadCompletedEvent.MediaAnalysisResult;
-import com.comicatlas.persistence.comic.entity.Chapter;
-import com.comicatlas.persistence.comic.entity.Media;
 import com.comicatlas.api.upload.application.port.in.UploadSessionService;
 import com.comicatlas.api.upload.application.port.out.UploadCompletionPersistencePort;
 import lombok.RequiredArgsConstructor;
@@ -41,27 +38,18 @@ public class UploadCompletionServiceImpl implements com.comicatlas.api.upload.ap
             if (result.mediaId() == null) {
                 continue;
             }
-            Media media = new Media();
-            media.setId(result.mediaId());
-            media.setWidth(result.width());
-            media.setHeight(result.height());
-            media.setHqSize(result.fileSize());
-            media.setMediaType(result.mediaType());
-            media.setDuration(result.duration());
-            media.setContainer(result.container());
-            media.setVideoCodec(result.videoCodec());
-            media.setAudioCodec(result.audioCodec());
-            media.setHqRoot(result.hqRoot());
-            media.setHqPath(result.hqPath());
-            persistencePort.applyMediaCompleted(media, replace);
+            persistencePort.applyMediaCompleted(new UploadCompletionPersistencePort.MediaCompletedCommand(
+                    result.mediaId(), result.width(), result.height(), result.fileSize(), result.mediaType(),
+                    result.duration(), result.container(), result.videoCodec(), result.audioCodec(),
+                    result.hqRoot(), result.hqPath()), replace);
         }
 
-        UploadSession session = persistencePort.findSession(ev.targetId());
+        UploadCompletionPersistencePort.UploadSessionSnapshot session = persistencePort.findSession(ev.targetId());
         if (session != null) {
-            comicStatsService.refreshByChapter(session.getChapterId());
-            Chapter chapter = persistencePort.findChapter(session.getChapterId());
+            comicStatsService.refreshByChapter(session.chapterId());
+            UploadCompletionPersistencePort.ChapterSnapshot chapter = persistencePort.findChapter(session.chapterId());
             if (chapter != null) {
-                catalogCacheInvalidator.evict(chapter.getComicId());
+                catalogCacheInvalidator.evict(chapter.comicId());
             }
         }
         uploadSessionService.cleanupSessionAfterProcessed(ev.targetId());
