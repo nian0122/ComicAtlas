@@ -85,6 +85,7 @@ infrastructure ──┼──> application ──> domain
 
 - [x] `task`：状态机、状态聚合规则、领域异常、应用服务、REST/MQ 接口、持久化与基础设施已按职责分目录；任务聚合已通过 `domain.repository` 端口访问持久化适配器，入站用例统一位于 `application.port.in`，任务重试发布位于 `application.port.out`。
 - [x] `metadata`、`catalog`、`media`、`storage`、`trash`、`recovery`、`exporter`、`upload`、`library`、`settings`、`outbox`、`dlq`：已完成现有代码的领域/应用/接口/基础设施目录迁移，并已将主要写用例收敛到快照/命令端口。
-- [~] `importer`：目录迁移及导入命令、重试、最终化部分端口已完成；元数据首次落库仍需继续拆分共享漫画实体访问。
-- [~] `task`：目录迁移及查询模型已完成；统一任务写模型仍需继续拆分管理任务实体访问。
-- [ ] 下一阶段：完成 `importer` 元数据落库和 `task` 写模型的实体隔离，并统一检查所有应用层不得返回数据库 Entity 或 MyBatis-Plus 分页类型；在此之前，本分支不宣称严格端口隔离已全部完成。
+- [x] `importer`：导入命令、重试、最终化及首次落库均通过应用端口和应用模型访问持久化，ORM Entity 仅位于基础设施适配器。
+- [x] `task`：状态机、查询模型和统一任务写模型均通过应用端口访问持久化，ORM Entity 仅位于基础设施适配器。
+- [~] `recovery`：恢复任务端口已完成；恢复引擎仍需将 Mapper/Entity 访问继续下沉到基础设施适配器。
+- [ ] 下一阶段：完成恢复引擎实体隔离，并统一检查所有应用层不得返回数据库 Entity 或 MyBatis-Plus 分页类型；在此之前，本分支不宣称严格端口隔离已全部完成。
