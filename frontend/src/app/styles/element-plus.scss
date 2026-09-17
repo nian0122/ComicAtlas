@@ -314,14 +314,16 @@
 
 /* 分段单选按钮与普通按钮保持同一套暗色/品牌红契约，禁止默认蓝色与白色选中面。 */
 .el-radio-button__inner {
-  min-height: 32px;
-  padding: 0 14px;
+  min-height: var(--control-height);
+  padding: 0 16px;
   border-radius: 0;
   color: var(--text-secondary) !important;
   background: var(--bg-surface) !important;
   border: 1px solid var(--border) !important;
   box-shadow: none !important;
-  line-height: 30px;
+  font-size: var(--text-sm);
+  font-weight: 650;
+  line-height: calc(var(--control-height) - 2px);
 }
 
 .el-radio-button:first-child .el-radio-button__inner {
