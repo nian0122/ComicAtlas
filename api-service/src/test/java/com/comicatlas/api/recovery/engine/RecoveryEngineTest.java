@@ -1,12 +1,9 @@
 package com.comicatlas.api.recovery.engine;
 
 import com.comicatlas.api.recovery.interfaces.rest.dto.RecoveryProgressVO;
+import com.comicatlas.api.recovery.application.port.out.RecoveryPersistencePort;
+import com.comicatlas.api.recovery.application.port.out.RecoveryPersistencePort.ComicModel;
 import com.comicatlas.api.catalog.infrastructure.cache.CatalogCacheInvalidator;
-import com.comicatlas.persistence.comic.entity.Comic;
-import com.comicatlas.persistence.comic.mapper.CatalogMapper;
-import com.comicatlas.persistence.comic.mapper.ChapterMapper;
-import com.comicatlas.persistence.comic.mapper.ComicMapper;
-import com.comicatlas.persistence.comic.mapper.MediaMapper;
 import com.comicatlas.api.storage.infrastructure.config.ApiStorageProperties;
 import com.comicatlas.api.storage.ApiStorageRoot;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -45,13 +42,7 @@ class RecoveryEngineTest {
     @Mock
     private ObjectMapper objectMapper;
     @Mock
-    private ComicMapper comicMapper;
-    @Mock
-    private CatalogMapper catalogMapper;
-    @Mock
-    private ChapterMapper chapterMapper;
-    @Mock
-    private MediaMapper mediaMapper;
+    private RecoveryPersistencePort persistencePort;
     @Mock
     private TransactionTemplate transactionTemplate;
     @Mock
@@ -84,7 +75,7 @@ class RecoveryEngineTest {
 
         realResolver = new RecoveryMediaResolver(storageProperties);
         recoveryEngine = new RecoveryEngine(
-                objectMapper, comicMapper, catalogMapper, chapterMapper, mediaMapper,
+                objectMapper, persistencePort,
                 transactionTemplate, catalogCacheInvalidator, storageProperties, realResolver,
                 metadataUpdateCoordinator);
     }
@@ -93,10 +84,10 @@ class RecoveryEngineTest {
 
     @Test
     void processComicDir_shouldReturnSkipped_whenComicExistsInDb() {
-        Comic existing = new Comic();
+        ComicModel existing = new ComicModel();
         existing.setId(1L);
         existing.setTitle("Test");
-        when(comicMapper.selectById(1L)).thenReturn(existing);
+        when(persistencePort.findComic(1L)).thenReturn(existing);
 
         RecoveryProgressVO result = recoveryEngine.processComicDir(1L, 5);
 
@@ -114,7 +105,7 @@ class RecoveryEngineTest {
 
     @Test
     void processComicDir_shouldReturnRecovered_whenMetadataExists() throws Exception {
-        when(comicMapper.selectById(2L)).thenReturn(null);
+        when(persistencePort.findComic(2L)).thenReturn(null);
 
         Map<String, Object> metadata = Map.of(
             "comic", Map.of("title", "Test Comic", "author", "Author"),
@@ -147,7 +138,7 @@ class RecoveryEngineTest {
 
     @Test
     void processComicDir_shouldReturnPlaceholder_whenMetadataMissing() {
-        when(comicMapper.selectById(3L)).thenReturn(null);
+        when(persistencePort.findComic(3L)).thenReturn(null);
 
         try (MockedStatic<Files> filesMock = mockStatic(Files.class)) {
             filesMock.when(() -> Files.exists(any(Path.class))).thenReturn(false);
@@ -171,7 +162,7 @@ class RecoveryEngineTest {
 
     @Test
     void processComicDir_shouldReturnError_whenMetadataIsBroken() throws Exception {
-        when(comicMapper.selectById(4L)).thenReturn(null);
+        when(persistencePort.findComic(4L)).thenReturn(null);
 
         try (MockedStatic<Files> filesMock = mockStatic(Files.class)) {
             filesMock.when(() -> Files.exists(any(Path.class))).thenReturn(true);
@@ -196,7 +187,7 @@ class RecoveryEngineTest {
 
     @Test
     void processComicDir_shouldReturnError_whenPlaceholderCreationFails() {
-        when(comicMapper.selectById(5L)).thenReturn(null);
+        when(persistencePort.findComic(5L)).thenReturn(null);
 
         try (MockedStatic<Files> filesMock = mockStatic(Files.class)) {
             filesMock.when(() -> Files.exists(any(Path.class))).thenReturn(false);
@@ -219,9 +210,9 @@ class RecoveryEngineTest {
 
     @Test
     void processComicDir_shouldBeIdempotent_forSameComicId() {
-        Comic existing = new Comic();
+        ComicModel existing = new ComicModel();
         existing.setId(6L);
-        when(comicMapper.selectById(6L)).thenReturn(existing);
+        when(persistencePort.findComic(6L)).thenReturn(existing);
 
         RecoveryProgressVO first = recoveryEngine.processComicDir(6L, 0);
         RecoveryProgressVO second = recoveryEngine.processComicDir(6L, 0);
@@ -389,7 +380,7 @@ class RecoveryEngineTest {
 
     @Test
     void processComicDir_shouldTypedFail_whenCatalogParentIndexOutOfRange() throws Exception {
-        when(comicMapper.selectById(8L)).thenReturn(null);
+        when(persistencePort.findComic(8L)).thenReturn(null);
 
         Map<String, Object> metadata = Map.of(
             "comic", Map.of("title", "坏索引漫画", "author", "A"),
@@ -414,7 +405,7 @@ class RecoveryEngineTest {
 
     @Test
     void processComicDir_shouldTypedFail_whenChapterCatalogIndexOutOfRange() throws Exception {
-        when(comicMapper.selectById(9L)).thenReturn(null);
+        when(persistencePort.findComic(9L)).thenReturn(null);
 
         Map<String, Object> metadata = Map.of(
             "comic", Map.of("title", "坏索引漫画", "author", "A"),

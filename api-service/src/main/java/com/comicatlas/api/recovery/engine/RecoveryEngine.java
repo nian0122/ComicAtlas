@@ -10,7 +10,6 @@ import com.comicatlas.api.recovery.application.port.out.RecoveryPersistencePort.
 import com.comicatlas.api.recovery.application.port.out.RecoveryPersistencePort.ChapterModel;
 import com.comicatlas.api.recovery.application.port.out.RecoveryPersistencePort.ComicModel;
 import com.comicatlas.api.recovery.application.port.out.RecoveryPersistencePort.MediaModel;
-import com.comicatlas.api.recovery.infrastructure.persistence.repository.RecoveryPersistencePortAdapter;
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.enums.HqStatus;
 import com.comicatlas.contract.common.enums.LqStatus;
@@ -32,10 +31,6 @@ import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import com.comicatlas.persistence.comic.mapper.CatalogMapper;
-import com.comicatlas.persistence.comic.mapper.ChapterMapper;
-import com.comicatlas.persistence.comic.mapper.ComicMapper;
-import com.comicatlas.persistence.comic.mapper.MediaMapper;
 
 /**
  * 漫画恢复引擎 — 封装每漫画目录的恢复逻辑。
@@ -78,16 +73,13 @@ public class RecoveryEngine {
         this.metadataUpdateCoordinator = metadataUpdateCoordinator;
     }
 
-    /** 兼容历史单元测试构造器，恢复计划由当前媒体解析器构建。 */
-    public RecoveryEngine(ObjectMapper objectMapper, ComicMapper comicMapper,
-            CatalogMapper catalogMapper, ChapterMapper chapterMapper, MediaMapper mediaMapper,
+    /** 兼容不显式注入恢复计划构建器的调用方。 */
+    public RecoveryEngine(ObjectMapper objectMapper, RecoveryPersistencePort persistencePort,
             TransactionTemplate transactionTemplate, CatalogCacheInvalidator catalogCacheInvalidator,
             ApiStorageProperties storageProperties, RecoveryMediaResolver recoveryMediaResolver,
             MetadataUpdateCoordinator metadataUpdateCoordinator) {
-        this(objectMapper, new RecoveryPersistencePortAdapter(comicMapper, catalogMapper, chapterMapper, mediaMapper),
-                transactionTemplate,
-                catalogCacheInvalidator, storageProperties, recoveryMediaResolver,
-                new RecoveryPlanBuilder(recoveryMediaResolver), metadataUpdateCoordinator);
+        this(objectMapper, persistencePort, transactionTemplate, catalogCacheInvalidator, storageProperties,
+                recoveryMediaResolver, new RecoveryPlanBuilder(recoveryMediaResolver), metadataUpdateCoordinator);
     }
 
     // ======================== 公共 API ========================
