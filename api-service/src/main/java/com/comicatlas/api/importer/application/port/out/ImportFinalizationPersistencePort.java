@@ -1,15 +1,16 @@
 package com.comicatlas.api.importer.application.port.out;
 
-import com.comicatlas.api.importer.infrastructure.persistence.entity.ImportTask;
 import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.contract.common.enums.ComicStatus;
+import com.comicatlas.api.importer.domain.model.ImportTaskStatus;
 import java.util.List;
+import java.time.LocalDateTime;
 
 /** 导入存储最终化所需的持久化端口。 */
 public interface ImportFinalizationPersistencePort {
-    ImportTask findImportTask(Long taskId);
+    ImportTaskSnapshot findImportTask(Long taskId);
     ComicSnapshot findComicForUpdate(Long comicId);
-    void updateImportTask(ImportTask task);
+    void updateImportTask(ImportTaskUpdateCommand command);
     List<ChapterSnapshot> findChapters(Long comicId);
     ChapterSnapshot findChapter(Long chapterId);
     void updateChapter(ChapterStatusUpdateCommand command);
@@ -25,6 +26,13 @@ public interface ImportFinalizationPersistencePort {
     }
 
     record MediaSnapshot(Long id, Long hqSize) {
+    }
+
+    record ImportTaskSnapshot(Long id, ImportTaskStatus status, LocalDateTime startTime) {
+    }
+
+    record ImportTaskUpdateCommand(Long id, ImportTaskStatus status, LocalDateTime endTime,
+                                   Long durationMs, Integer progress, String errorMessage) {
     }
 
     record ChapterStatusUpdateCommand(Long id, ChapterLifecycleStatus status) {

@@ -2,7 +2,6 @@ package com.comicatlas.api.importer.application.service.impl;
 
 import com.comicatlas.api.catalog.infrastructure.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.importer.domain.model.ImportTaskStatus;
-import com.comicatlas.api.importer.infrastructure.persistence.entity.ImportTask;
 import com.comicatlas.api.importer.application.port.out.ImportFinalizationPersistencePort;
 import com.comicatlas.api.importer.application.port.out.ImportManagementTaskQueryPort;
 import com.comicatlas.api.metadata.application.service.MetadataUpdateCoordinator;
@@ -52,8 +51,8 @@ public class ImportFinalizationServiceImpl implements com.comicatlas.api.importe
     public void applyCompleted(ImportStorageFinalizeCompletedEvent event) {
         String hqPrefix = hqPrefix();
         transactionTemplate.executeWithoutResult(status -> {
-            ImportTask task = persistencePort.findImportTask(event.taskId());
-            if (task == null || TERMINAL.contains(task.getStatus()) || event.chapterId() == null) {
+            ImportFinalizationPersistencePort.ImportTaskSnapshot task = persistencePort.findImportTask(event.taskId());
+            if (task == null || TERMINAL.contains(task.status()) || event.chapterId() == null) {
                 return;
             }
             ImportFinalizationPersistencePort.ComicSnapshot comic =
@@ -83,11 +82,11 @@ public class ImportFinalizationServiceImpl implements com.comicatlas.api.importe
                     .filter(java.util.Objects::nonNull).mapToLong(Long::longValue).sum();
             persistencePort.updateComic(new ImportFinalizationPersistencePort.ComicStatusUpdateCommand(
                     comic.id(), ComicStatus.READY, media.size(), hqSize, comic.version()));
-            task.setStatus(ImportTaskStatus.SUCCESS); task.setEndTime(LocalDateTime.now());
-            if (task.getStartTime() != null) {
-                task.setDurationMs(Duration.between(task.getStartTime(), task.getEndTime()).toMillis());
-            }
-            task.setProgress(100); persistencePort.updateImportTask(task);
+            LocalDateTime completionTime = LocalDateTime.now();
+            Long durationMs = task.startTime() == null ? null
+                    : Duration.between(task.startTime(), completionTime).toMillis();
+            persistencePort.updateImportTask(new ImportFinalizationPersistencePort.ImportTaskUpdateCommand(
+                    task.id(), ImportTaskStatus.SUCCESS, completionTime, durationMs, 100, null));
             ImportManagementTaskQueryPort.ItemSnapshot item = managementTaskQueryPort.findActiveItem(
                     TARGET_TYPE_COMIC, event.comicId(), TaskType.IMPORT);
             if (item != null) {
@@ -101,8 +100,8 @@ public class ImportFinalizationServiceImpl implements com.comicatlas.api.importe
 
     public void applyFailed(ImportStorageFinalizeFailedEvent event) {
         transactionTemplate.executeWithoutResult(status -> {
-            ImportTask task = persistencePort.findImportTask(event.taskId());
-            if (task == null || TERMINAL.contains(task.getStatus())) {
+            ImportFinalizationPersistencePort.ImportTaskSnapshot task = persistencePort.findImportTask(event.taskId());
+            if (task == null || TERMINAL.contains(task.status())) {
                 return;
             }
             ImportFinalizationPersistencePort.ChapterSnapshot chapter =
@@ -110,9 +109,11 @@ public class ImportFinalizationServiceImpl implements com.comicatlas.api.importe
             if (chapter == null || !event.comicId().equals(chapter.comicId())) {
                 return;
             }
-            task.setStatus(ImportTaskStatus.FAILED); task.setEndTime(LocalDateTime.now());
-            task.setErrorMessage(event.errorCode() + ": " + (event.errorMessage() == null ? "导入存储最终化失败" : event.errorMessage()));
-            persistencePort.updateImportTask(task);
+            LocalDateTime completionTime = LocalDateTime.now();
+            String errorMessage = event.errorCode() + ": "
+                    + (event.errorMessage() == null ? "导入存储最终化失败" : event.errorMessage());
+            persistencePort.updateImportTask(new ImportFinalizationPersistencePort.ImportTaskUpdateCommand(
+                    task.id(), ImportTaskStatus.FAILED, completionTime, null, 0, errorMessage));
             ImportFinalizationPersistencePort.ComicSnapshot comic =
                     persistencePort.findComicForUpdate(event.comicId());
             if (comic != null && comic.status() == ComicStatus.IMPORTING) {
@@ -123,7 +124,7 @@ public class ImportFinalizationServiceImpl implements com.comicatlas.api.importe
                     TARGET_TYPE_COMIC, event.comicId(), TaskType.IMPORT);
             if (item != null) {
                 managementTaskService.updateItemStatus(item.id(), ManagementTaskStatus.FAILED,
-                        task.getErrorMessage(), RESULT_REF_TYPE, event.taskId());
+                        errorMessage, RESULT_REF_TYPE, event.taskId());
             }
             catalogCacheInvalidator.evict(event.comicId());
         });

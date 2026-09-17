@@ -20,13 +20,26 @@ public class ImportFinalizationPersistencePortAdapter implements ImportFinalizat
     private final ComicMapper comicMapper;
     private final ChapterMapper chapterMapper;
     private final MediaMapper mediaMapper;
-    @Override public ImportTask findImportTask(Long taskId) { return importTaskMapper.selectById(taskId); }
+    @Override public ImportFinalizationPersistencePort.ImportTaskSnapshot findImportTask(Long taskId) {
+        ImportTask task = importTaskMapper.selectById(taskId);
+        return task == null ? null : new ImportFinalizationPersistencePort.ImportTaskSnapshot(
+                task.getId(), task.getStatus(), task.getStartTime());
+    }
     @Override public ImportFinalizationPersistencePort.ComicSnapshot findComicForUpdate(Long comicId) {
         Comic comic = comicMapper.selectByIdForUpdate(comicId);
         return comic == null ? null : new ImportFinalizationPersistencePort.ComicSnapshot(
                 comic.getId(), comic.getStatus(), comic.getVersion());
     }
-    @Override public void updateImportTask(ImportTask task) { importTaskMapper.updateById(task); }
+    @Override public void updateImportTask(ImportFinalizationPersistencePort.ImportTaskUpdateCommand command) {
+        ImportTask task = new ImportTask();
+        task.setId(command.id());
+        task.setStatus(command.status());
+        task.setEndTime(command.endTime());
+        task.setDurationMs(command.durationMs());
+        task.setProgress(command.progress());
+        task.setErrorMessage(command.errorMessage());
+        importTaskMapper.updateById(task);
+    }
     @Override public List<ImportFinalizationPersistencePort.ChapterSnapshot> findChapters(Long comicId) {
         return chapterMapper.selectByComicId(comicId).stream()
                 .map(chapter -> new ImportFinalizationPersistencePort.ChapterSnapshot(
