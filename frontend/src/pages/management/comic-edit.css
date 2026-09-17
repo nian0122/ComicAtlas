@@ -148,7 +148,7 @@
 .new-tag-input {
   min-width: 0;
 }
-.tag-add-row > :deep(.el-button) {
+.tag-add-row > :deep(.app-button) {
   height: 52px;
   min-height: 52px;
   padding-inline: var(--space-4);
@@ -250,11 +250,11 @@
   border-top: 1px solid var(--border);
   background: linear-gradient(to bottom, var(--bg-primary) 28%, var(--bg-primary));
 }
-.form-actions > .el-button {
+.form-actions > .app-button {
   min-height: var(--control-height);
   padding-inline: 18px;
 }
-.form-actions > .el-button--primary {
+.form-actions > .app-button--primary {
   min-width: 132px;
 }
 @media (max-width: 1200px) {

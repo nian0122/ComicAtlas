@@ -16,13 +16,14 @@
       将为选中的 <strong>{{ comicIds.length }}</strong> 部漫画统一设置
     </p>
     <template #footer>
-      <el-button @click="visible = false">取消</el-button>
-      <el-button type="primary" :loading="saving" @click="onConfirm">确认</el-button>
+      <AppButton variant="secondary" @click="visible = false">取消</AppButton>
+      <AppButton variant="primary" :loading="saving" @click="onConfirm">确认</AppButton>
     </template>
   </el-dialog>
 </template>
 
 <script setup lang="ts">
+import { AppButton } from '@/shared/ui/button'
 import { ref } from 'vue'
 import { isAxiosError } from 'axios'
 import { ElMessage } from 'element-plus'

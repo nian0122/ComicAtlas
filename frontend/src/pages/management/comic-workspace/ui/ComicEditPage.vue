@@ -88,7 +88,7 @@
                   class="new-tag-input"
                   @keyup.enter="onCreateTag"
                 />
-                <el-button type="primary" plain @click="onCreateTag">添加</el-button>
+                <AppButton variant="ghost" @click="onCreateTag">添加</AppButton>
               </div>
               <small class="field-hint"
                 ><el-icon><Search /></el-icon>可输入关键词搜索已有标签；标签只用于搜索和筛选，不会改变原始文件。</small
@@ -144,8 +144,8 @@
       </aside>
 
       <div class="form-actions">
-        <el-button @click="goBack">取消</el-button>
-        <el-button type="primary" size="large" :loading="saving" @click="handleSave">保存修改</el-button>
+        <AppButton variant="secondary" @click="goBack">取消</AppButton>
+        <AppButton variant="primary" size="lg" :loading="saving" @click="handleSave">保存修改</AppButton>
       </div>
     </el-form>
   </div>
@@ -153,6 +153,7 @@
 
 <script setup lang="ts">
 import { PanelHeader } from '@/shared/ui/management-panel'
+import { AppButton } from '@/shared/ui/button'
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'

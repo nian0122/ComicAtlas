@@ -68,14 +68,14 @@
         <el-option label="倒序" value="desc" />
         <el-option label="正序" value="asc" />
       </el-select>
-      <el-button text @click="resetFilters">重置</el-button>
+      <AppButton variant="text" @click="resetFilters">重置</AppButton>
     </div>
 
     <div v-if="selectedIds.length > 0" class="batch-toolbar">
       <el-checkbox v-model="selectAll" :indeterminate="isIndeterminate" @change="handleSelectAll">
         全选 ({{ selectedIds.length }} / {{ store.list.length }})
       </el-checkbox>
-      <el-button type="primary" @click="showBatchDialog = true"> 批量编辑 </el-button>
+      <AppButton variant="primary" @click="showBatchDialog = true"> 批量编辑 </AppButton>
     </div>
 
     <ContentState v-if="store.loading && store.list.length === 0" state="loading" message="加载中..." />

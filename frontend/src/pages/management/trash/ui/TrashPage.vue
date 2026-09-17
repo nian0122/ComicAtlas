@@ -5,7 +5,7 @@
       description="统一查看已回收的漫画、章节和媒体，并在保留期内恢复或永久清理。"
       eyebrow="LIFECYCLE / TRASH"
     >
-      <el-button :loading="loading" @click="loadItems">刷新</el-button>
+      <AppButton :loading="loading" @click="loadItems">刷新</AppButton>
     </PageHeader>
 
     <section class="filter-toolbar" aria-label="回收站筛选">
@@ -20,7 +20,7 @@
       <el-select v-model="status" class="filter-select" @change="applyFilters">
         <el-option v-for="option in STATUS_OPTIONS" :key="option.value" :label="option.label" :value="option.value" />
       </el-select>
-      <el-button text @click="resetFilters">重置</el-button>
+      <AppButton variant="text" @click="resetFilters">重置</AppButton>
     </section>
 
     <el-alert v-if="error" :title="error" type="error" show-icon />
@@ -28,13 +28,13 @@
     <ManagementPanel flush class="trash-card" aria-label="回收站内容">
       <PanelHeader class="trash-heading" title="回收内容" :description="`${total} 项回收内容`">
         <span v-if="selectedItems.length" class="selection-count">已选 {{ selectedItems.length }} 项</span>
-        <el-button v-if="selectedItems.length" text @click="clearSelection">清空选择</el-button>
-        <el-button v-if="selectedItems.length" type="primary" plain :loading="batchBusy" @click="restoreSelected">
+        <AppButton v-if="selectedItems.length" variant="text" @click="clearSelection">清空选择</AppButton>
+        <AppButton v-if="selectedItems.length" variant="primary" :loading="batchBusy" @click="restoreSelected">
           批量恢复
-        </el-button>
-        <el-button v-if="selectedItems.length" type="danger" plain :loading="batchBusy" @click="purgeSelected">
+        </AppButton>
+        <AppButton v-if="selectedItems.length" variant="danger" :loading="batchBusy" @click="purgeSelected">
           批量永久清理
-        </el-button>
+        </AppButton>
         <span v-else class="retention-note">勾选内容后可批量恢复或永久清理</span>
       </PanelHeader>
 
@@ -73,21 +73,19 @@
         </el-table-column>
         <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
-            <el-button
-              link
-              type="primary"
+            <AppButton
+              variant="primary"
               :loading="busyId === row.id"
               :disabled="row.status !== 'TRASHED'"
               @click="restore(row)"
-              >恢复</el-button
+              >恢复</AppButton
             >
-            <el-button
-              link
-              type="danger"
+            <AppButton
+              variant="danger"
               :loading="busyId === row.id"
               :disabled="row.status !== 'TRASHED'"
               @click="purge(row)"
-              >永久清理</el-button
+              >永久清理</AppButton
             >
           </template>
         </el-table-column>
@@ -108,6 +106,7 @@
 </template>
 
 <script setup lang="ts">
+import { AppButton } from '@/shared/ui/button'
 import { ManagementPanel } from '@/shared/ui/management-panel'
 import { PanelHeader } from '@/shared/ui/management-panel'
 import { PageHeader } from '@/shared/ui/page-header'

@@ -1,7 +1,7 @@
 <template>
   <div class="management-tasks-page">
     <PageHeader title="任务中心" description="自动刷新，统一查看存储、回收、上传、导出和元数据任务。">
-      <el-button :loading="loading" @click="loadTasks">立即刷新</el-button>
+      <AppButton :loading="loading" @click="loadTasks">立即刷新</AppButton>
     </PageHeader>
 
     <StatGrid class="summary-grid" aria-label="当前查询统计" :columns="4">
@@ -42,7 +42,7 @@
         clearable
         @keyup.enter="applyTarget"
       />
-      <el-button @click="applyTarget">筛选</el-button>
+      <AppButton @click="applyTarget">筛选</AppButton>
       <el-switch v-model="autoRefresh" active-text="自动刷新" />
       <span class="updated-at">{{ updatedAt ? `更新于 ${updatedAt}` : '尚未更新' }}</span>
     </div>
@@ -87,10 +87,10 @@
                   {{ task.cancelledCount ?? 0 }}</span
                 >
                 <span class="task-card-actions">
-                  <el-button v-if="canCancel(task.status)" link type="warning" @click.stop="cancelTask(task.id)"
-                    >取消</el-button
+                  <AppButton v-if="canCancel(task.status)" variant="warning" @click.stop="cancelTask(task.id)"
+                    >取消</AppButton
                   >
-                  <el-button v-if="canRetry(task)" link type="primary" @click.stop="retryTask(task.id)">重试</el-button>
+                  <AppButton v-if="canRetry(task)" variant="text" @click.stop="retryTask(task.id)">重试</AppButton>
                   <span v-if="!canCancel(task.status) && !canRetry(task)" class="detail-hint">查看明细</span>
                 </span>
               </div>
@@ -219,6 +219,7 @@
 </template>
 
 <script setup lang="ts">
+import { AppButton } from '@/shared/ui/button'
 import { StatGrid } from '@/shared/ui/management-panel'
 import { TaskStatusTag } from '@/features/task'
 import { ContentState } from '@/shared/ui/content-state'

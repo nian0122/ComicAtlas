@@ -2,8 +2,10 @@
   <div class="comic-operations-page">
     <PageHeader title="漫画操作台" description="触发存储与生命周期操作，并实时观察漫画和任务状态变化。">
       <div class="target-input">
-        <el-input-number v-model="comicId" :min="1" :controls="false" /><el-button type="primary" @click="selectComic"
-          >加载漫画</el-button
+        <el-input-number v-model="comicId" :min="1" :controls="false" /><AppButton
+          variant="primary"
+          @click="selectComic"
+          >加载漫画</AppButton
         >
       </div>
     </PageHeader>
@@ -36,11 +38,11 @@
           <div class="operation-group">
             <span class="group-label">媒体处理</span>
             <div class="actions">
-              <el-button :disabled="!isAllowed('LQ_GENERATE')" @click="generateLq(false)">生成 LQ</el-button>
-              <el-button :disabled="!isAllowed('LQ_REGENERATE')" @click="generateLq(true)">重新生成 LQ</el-button>
-              <el-button :disabled="!isAllowed('HQ_DELETE')" type="danger" @click="deleteHq">删除 HQ</el-button>
-              <el-button :disabled="!isAllowed('TRANSCODE')" @click="transcode">视频转码</el-button>
-              <el-button :disabled="!isAllowed('METADATA_REFRESH')" @click="refreshMetadata">刷新元数据</el-button>
+              <AppButton :disabled="!isAllowed('LQ_GENERATE')" @click="generateLq(false)">生成 LQ</AppButton>
+              <AppButton :disabled="!isAllowed('LQ_REGENERATE')" @click="generateLq(true)">重新生成 LQ</AppButton>
+              <AppButton :disabled="!isAllowed('HQ_DELETE')" variant="danger" @click="deleteHq">删除 HQ</AppButton>
+              <AppButton :disabled="!isAllowed('TRANSCODE')" @click="transcode">视频转码</AppButton>
+              <AppButton :disabled="!isAllowed('METADATA_REFRESH')" @click="refreshMetadata">刷新元数据</AppButton>
             </div>
           </div>
           <div class="operation-group">
@@ -50,7 +52,7 @@
                 <el-option label="ZIP" value="ZIP" />
                 <el-option label="CBZ" value="CBZ" />
               </el-select>
-              <el-button @click="createExport">导出漫画</el-button>
+              <AppButton @click="createExport">导出漫画</AppButton>
             </div>
           </div>
           <el-table
@@ -71,19 +73,19 @@
             eyebrow="LIFECYCLE"
           />
           <div class="actions lifecycle-actions">
-            <el-button v-if="isAllowed('DELETE')" type="danger" @click="trashComic">移入回收站</el-button>
-            <el-button v-if="isAllowed('RECOVER')" type="primary" @click="restoreComic">恢复漫画</el-button>
+            <AppButton v-if="isAllowed('DELETE')" variant="danger" @click="trashComic">移入回收站</AppButton>
+            <AppButton v-if="isAllowed('RECOVER')" variant="primary" @click="restoreComic">恢复漫画</AppButton>
             <el-input
               v-if="isAllowed('PURGE')"
               v-model="purgeToken"
               class="purge-token-input"
               placeholder="永久清理确认 token"
             />
-            <el-button v-if="isAllowed('PURGE')" type="danger" :disabled="!purgeToken.trim()" @click="purgeComic"
-              >永久清理</el-button
+            <AppButton v-if="isAllowed('PURGE')" variant="danger" :disabled="!purgeToken.trim()" @click="purgeComic"
+              >永久清理</AppButton
             >
-            <el-button @click="reconcile(false)">只读对账</el-button>
-            <el-button @click="reconcile(true)">对账并修复</el-button>
+            <AppButton @click="reconcile(false)">只读对账</AppButton>
+            <AppButton @click="reconcile(true)">对账并修复</AppButton>
           </div>
           <el-descriptions v-if="reconcileResult" :column="3" border>
             <el-descriptions-item label="数据库状态">{{ reconcileResult.dbStatus || '—' }}</el-descriptions-item>
@@ -147,6 +149,7 @@
 </template>
 
 <script setup lang="ts">
+import { AppButton } from '@/shared/ui/button'
 import { StatGrid } from '@/shared/ui/management-panel'
 import { PanelHeader } from '@/shared/ui/management-panel'
 import { ContentState } from '@/shared/ui/content-state'
@@ -366,7 +369,7 @@ onBeforeUnmount(() => {
 .operation-group .actions {
   justify-content: flex-start;
 }
-.operation-group .el-button {
+.operation-group .app-button {
   margin: 0;
 }
 .export-actions {
@@ -395,7 +398,7 @@ onBeforeUnmount(() => {
 .target-input .el-input-number {
   width: 150px;
 }
-.target-input .el-button {
+.target-input .app-button {
   margin: 0;
 }
 @media (max-width: 900px) {

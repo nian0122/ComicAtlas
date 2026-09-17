@@ -7,7 +7,7 @@ const componentSource = readFileSync(resolve(dirname(fileURLToPath(import.meta.u
 
 describe('AppButton 公共契约', () => {
   it('声明完整 variant、尺寸和交互属性', () => {
-    expect(componentSource).toContain("'primary' | 'secondary' | 'ghost' | 'danger' | 'text' | 'overlay'")
+    expect(componentSource).toContain("'primary' | 'secondary' | 'ghost' | 'danger' | 'warning' | 'text' | 'overlay'")
     expect(componentSource).toContain("'sm' | 'default' | 'lg'")
     expect(componentSource).toContain('loading?: boolean')
     expect(componentSource).toContain('iconOnly?: boolean')

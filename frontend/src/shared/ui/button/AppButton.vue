@@ -1,11 +1,12 @@
 <script setup lang="ts">
 withDefaults(
   defineProps<{
-    variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'text' | 'overlay'
+    variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'warning' | 'text' | 'overlay'
     size?: 'sm' | 'default' | 'lg'
     loading?: boolean
     disabled?: boolean
     iconOnly?: boolean
+    block?: boolean
     type?: 'button' | 'submit' | 'reset'
   }>(),
   { variant: 'secondary', size: 'default', loading: false, disabled: false, iconOnly: false, type: 'button' },
@@ -16,7 +17,11 @@ withDefaults(
   <button
     :type="type"
     class="app-button"
-    :class="[`app-button--${variant}`, `app-button--${size}`, { 'app-button--icon-only': iconOnly }]"
+    :class="[
+      `app-button--${variant}`,
+      `app-button--${size}`,
+      { 'app-button--icon-only': iconOnly, 'app-button--block': block },
+    ]"
     :disabled="disabled || loading"
     :aria-busy="loading || undefined"
   >
@@ -82,6 +87,11 @@ withDefaults(
   --button-border: var(--danger);
   --button-color: var(--color-on-brand);
 }
+.app-button--warning {
+  --button-bg: var(--warning);
+  --button-border: var(--warning);
+  --button-color: var(--bg-primary);
+}
 .app-button--ghost {
   --button-bg: transparent;
 }
@@ -109,6 +119,9 @@ withDefaults(
 .app-button--icon-only {
   width: var(--control-min-size);
   padding: 0;
+}
+.app-button--block {
+  width: 100%;
 }
 .app-button__spinner {
   width: 1em;

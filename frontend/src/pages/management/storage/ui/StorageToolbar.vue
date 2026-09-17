@@ -2,7 +2,7 @@
 import { AppButton } from '@/shared/ui/button'
 import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElSelect, ElOption, ElInput, ElButton } from 'element-plus'
+import { ElSelect, ElOption, ElInput } from 'element-plus'
 import type { FilterState, SortState } from '@/features/storage'
 import { useCategoryStore } from '@/features/category'
 import { useTagStore } from '@/features/tag'
@@ -136,7 +136,9 @@ onMounted(() => {
           class="filter-input"
           @update:model-value="setFilter({ keyword: $event })"
         />
-        <el-button v-if="hasActiveFilters" class="filter-reset" text @click="clearFilters">清空筛选</el-button>
+        <AppButton v-if="hasActiveFilters" class="filter-reset" variant="text" @click="clearFilters"
+          >清空筛选</AppButton
+        >
       </div>
     </section>
   </div>

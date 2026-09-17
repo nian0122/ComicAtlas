@@ -8,7 +8,7 @@
     >
       <div class="header-tools">
         <span class="comic-ref">漫画 #{{ comicId }}</span
-        ><el-button :loading="loading" @click="loadTree">刷新结构</el-button>
+        ><AppButton :loading="loading" @click="loadTree">刷新结构</AppButton>
       </div>
     </PageHeader>
     <StatGrid class="structure-summary" aria-label="结构概览" :columns="4">
@@ -119,7 +119,7 @@
                 <h3>章节媒体</h3>
                 <p>{{ mediaItems.length ? `共 ${mediaItems.length} 个媒体` : '正在等待媒体加载' }}</p>
               </div>
-              <el-button text @click="loadMedia">刷新媒体</el-button>
+              <AppButton variant="text" @click="loadMedia">刷新媒体</AppButton>
             </div>
             <div class="media-summary">
               <div>
@@ -144,8 +144,8 @@
             <div v-if="selectedMediaIds.length" class="media-selection-toolbar">
               <span>已选 {{ selectedMediaIds.length }} 个媒体</span>
               <div>
-                <el-button text @click="clearMediaSelection">清空选择</el-button
-                ><el-button type="danger" plain @click="trashSelectedMediaBatch">批量回收</el-button>
+                <AppButton variant="text" @click="clearMediaSelection">清空选择</AppButton
+                ><AppButton variant="danger" @click="trashSelectedMediaBatch">批量回收</AppButton>
               </div>
             </div>
             <div class="media-table-scroll">
@@ -228,7 +228,7 @@
             <el-form-item v-if="catalogForm.action === 'delete'" label="重挂目标 ID"
               ><el-input-number v-model="catalogForm.reparentTo" :min="1" :controls="false" clearable
             /></el-form-item>
-            <el-button type="primary" block @click="submitCatalog">执行目录操作</el-button>
+            <AppButton variant="primary" block @click="submitCatalog">执行目录操作</AppButton>
           </el-form>
         </template>
         <template v-else-if="selectedMediaIds.length">
@@ -245,8 +245,8 @@
               <strong>{{ selectedMediaIds.length }}</strong
               ><span>个媒体已选择</span>
             </div>
-            <el-button type="danger" block @click="trashSelectedMediaBatch">回收选中媒体</el-button>
-            <el-button plain block @click="clearMediaSelection">取消选择</el-button>
+            <AppButton variant="danger" block @click="trashSelectedMediaBatch">回收选中媒体</AppButton>
+            <AppButton block @click="clearMediaSelection">取消选择</AppButton>
           </div>
         </template>
         <template v-else-if="selectedMedia">
@@ -311,14 +311,13 @@
               HQ 删除和 LQ 生成属于章节级操作。当前媒体面板只执行针对这一份文件的操作。
             </div>
             <div class="media-action-buttons">
-              <el-button
+              <AppButton
                 v-if="selectedMedia.mediaType === 'VIDEO'"
-                type="warning"
-                plain
+                variant="warning"
                 block
                 @click="transcodeSelectedMedia"
-                >转码此视频</el-button
-              ><el-button type="danger" plain block @click="trashSelectedMedia">回收此媒体</el-button>
+                >转码此视频</AppButton
+              ><AppButton variant="danger" block @click="trashSelectedMedia">回收此媒体</AppButton>
             </div>
           </div>
         </template>
@@ -363,9 +362,9 @@
             <el-form v-if="chapterWorkspaceTab === 'chapter'" label-position="top" class="action-form">
               <div class="chapter-action-toolbar">
                 <div><span class="panel-kicker">COMMAND DECK</span><strong>章节命令面板</strong></div>
-                <el-button class="create-chapter-button" type="primary" plain @click="toggleCreateChapter"
+                <AppButton class="create-chapter-button" variant="primary" @click="toggleCreateChapter"
                   ><span class="create-chapter-icon">＋</span
-                  >{{ chapterForm.action === 'create' ? '返回当前章节' : '新建章节' }}</el-button
+                  >{{ chapterForm.action === 'create' ? '返回当前章节' : '新建章节' }}</AppButton
                 >
               </div>
               <div v-if="chapterForm.action !== 'create'" class="chapter-choice">
@@ -429,12 +428,12 @@
                     placeholder="输入新位置" /></el-form-item
                 ><small>按全书阅读顺序调整，目标位置不能与当前位置相同。</small>
               </div>
-              <el-button
+              <AppButton
                 class="action-submit"
-                :type="chapterForm.action === 'trash' ? 'danger' : 'primary'"
+                :variant="chapterForm.action === 'trash' ? 'danger' : 'primary'"
                 block
                 @click="submitChapter"
-                >{{ chapterForm.action === 'trash' ? '回收当前章节' : '执行章节操作' }}</el-button
+                >{{ chapterForm.action === 'trash' ? '回收当前章节' : '执行章节操作' }}</AppButton
               >
             </el-form>
           </div>
@@ -446,7 +445,7 @@
               </div>
               <strong>媒体顺序</strong>
               <p>调整本章阅读顺序</p>
-              <el-button plain block @click="mediaOrderDialogVisible = true">打开排序面板</el-button>
+              <AppButton block @click="mediaOrderDialogVisible = true">打开排序面板</AppButton>
             </section>
             <section class="chapter-feature-card feature-intake">
               <div class="feature-card-top">
@@ -455,8 +454,8 @@
               <strong>补充媒体</strong>
               <p>追加图片或替换当前媒体</p>
               <div class="feature-button-row">
-                <el-button type="primary" block @click="openUploadDialog()">上传媒体</el-button
-                ><el-button v-if="selectedMedia" plain block @click="openReplaceSelectedMedia">替换</el-button>
+                <AppButton variant="primary" block @click="openUploadDialog()">上传媒体</AppButton
+                ><AppButton v-if="selectedMedia" block @click="openReplaceSelectedMedia">替换</AppButton>
               </div>
             </section>
           </div>
@@ -480,16 +479,15 @@
                 />
               </div>
               <div class="feature-button-row">
-                <el-button
-                  type="primary"
-                  plain
+                <AppButton
+                  variant="primary"
                   :disabled="mediaLqApplicableCount === 0"
                   block
                   @click="generateChapterLq"
-                  >{{ chapterLqActionLabel }}</el-button
-                ><el-button type="danger" plain block @click="deleteChapterHq">删除 HQ</el-button
-                ><el-button v-if="mediaVideoCount > 0" type="warning" plain block @click="transcodeChapter"
-                  >转码视频</el-button
+                  >{{ chapterLqActionLabel }}</AppButton
+                ><AppButton variant="danger" block @click="deleteChapterHq">删除 HQ</AppButton
+                ><AppButton v-if="mediaVideoCount > 0" variant="warning" block @click="transcodeChapter"
+                  >转码视频</AppButton
                 >
               </div>
             </section>
@@ -548,14 +546,14 @@
       </div>
     </div>
     <template #footer
-      ><el-button @click="uploadDialogVisible = false">关闭</el-button
-      ><el-button v-if="uploadSessionId && uploadRunning" type="danger" plain @click="cancelUpload">取消上传</el-button
-      ><el-button
-        type="primary"
+      ><AppButton @click="uploadDialogVisible = false">关闭</AppButton
+      ><AppButton v-if="uploadSessionId && uploadRunning" variant="danger" @click="cancelUpload">取消上传</AppButton
+      ><AppButton
+        variant="primary"
         :loading="uploadRunning"
         :disabled="!uploadRows.length || uploadRunning"
         @click="startUpload"
-        >开始上传</el-button
+        >开始上传</AppButton
       ></template
     >
   </el-dialog>
@@ -601,10 +599,10 @@
       <details class="advanced-order">
         <summary>高级编辑：按 ID 输入顺序</summary>
         <p>适合批量处理。ID 必须完整且不重复，提交前会覆盖上方拖拽顺序。</p>
-        <el-input v-model="mediaOrder" type="textarea" :rows="3" placeholder="例如 128905,128906,128907" /><el-button
-          text
+        <el-input v-model="mediaOrder" type="textarea" :rows="3" placeholder="例如 128905,128906,128907" /><AppButton
+          variant="text"
           @click="applyAdvancedMediaOrder"
-          >应用到列表</el-button
+          >应用到列表</AppButton
         >
       </details>
     </div>
@@ -612,9 +610,9 @@
       ><span class="order-dialog-status">{{
         mediaOrderDirty ? `已调整 ${mediaOrderChangeCount} 项` : '顺序未修改'
       }}</span
-      ><el-button @click="mediaOrderDialogVisible = false">关闭</el-button
-      ><el-button type="primary" :disabled="!mediaOrderDirty" @click="saveMediaOrderAndClose"
-        >保存媒体顺序</el-button
+      ><AppButton @click="mediaOrderDialogVisible = false">关闭</AppButton
+      ><AppButton variant="primary" :disabled="!mediaOrderDirty" @click="saveMediaOrderAndClose"
+        >保存媒体顺序</AppButton
       ></template
     >
   </el-dialog>
@@ -647,11 +645,11 @@
         ><StorageStatusTag v-if="selectedStorageChapter" :status="selectedStorageChapter.lqStatus" type="lq" />
       </div>
       <div class="storage-action-buttons">
-        <el-button type="danger" plain @click="deleteChapterHq">删除本章 HQ</el-button
-        ><el-button v-if="mediaLqApplicableCount > 0" type="primary" plain @click="generateChapterLq">{{
+        <AppButton variant="danger" @click="deleteChapterHq">删除本章 HQ</AppButton
+        ><AppButton v-if="mediaLqApplicableCount > 0" variant="primary" @click="generateChapterLq">{{
           chapterLqActionLabel
-        }}</el-button
-        ><el-button v-if="mediaVideoCount > 0" type="warning" plain @click="transcodeChapter">转码本章视频</el-button>
+        }}</AppButton
+        ><AppButton v-if="mediaVideoCount > 0" variant="warning" @click="transcodeChapter">转码本章视频</AppButton>
       </div>
     </div>
   </el-dialog>
