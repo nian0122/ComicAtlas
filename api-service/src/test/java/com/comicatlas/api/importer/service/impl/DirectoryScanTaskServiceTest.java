@@ -5,6 +5,7 @@ import com.comicatlas.api.importer.interfaces.rest.dto.DirectoryScanTaskVO;
 import com.comicatlas.api.importer.infrastructure.persistence.entity.DirectoryScanTask;
 import com.comicatlas.api.importer.infrastructure.persistence.mapper.DirectoryScanTaskMapper;
 import com.comicatlas.api.importer.infrastructure.persistence.repository.DirectoryScanTaskPersistencePortAdapter;
+import com.comicatlas.api.importer.application.port.out.DirectoryScanManagementTaskQueryPort;
 import com.comicatlas.api.task.application.port.in.ManagementTaskService;
 import com.comicatlas.api.outbox.application.port.in.OutboxService;
 import com.comicatlas.common.constant.MqExchanges;
@@ -63,6 +64,9 @@ class DirectoryScanTaskServiceTest {
     @Mock
     private ManagementTaskService managementTaskService;
 
+    @Mock
+    private DirectoryScanManagementTaskQueryPort managementTaskQueryPort;
+
     private ObjectMapper objectMapper;
     private DirectoryScanTaskServiceImpl service;
 
@@ -71,7 +75,7 @@ class DirectoryScanTaskServiceTest {
         objectMapper = new ObjectMapper();
         service = new DirectoryScanTaskServiceImpl(
                 new DirectoryScanTaskPersistencePortAdapter(scanTaskMapper), outboxService, objectMapper,
-                managementTaskService);
+                managementTaskService, managementTaskQueryPort);
     }
 
     private static DirectoryScanTask taskWithJson(Long id, String resultJson) {
@@ -145,7 +149,7 @@ class DirectoryScanTaskServiceTest {
         task.setStatus(DirectoryScanTaskStatus.PENDING);
         when(scanTaskMapper.selectById(3L)).thenReturn(task);
         when(scanTaskMapper.updateById(any(DirectoryScanTask.class))).thenReturn(1);
-        when(managementTaskService.findActiveItem(any(), any(), any())).thenReturn(null);
+        when(managementTaskQueryPort.findActiveItem(any(), any(), any())).thenReturn(null);
 
         ScanResultDTO result = new ScanResultDTO(
                 "D:/scans/root", 1,

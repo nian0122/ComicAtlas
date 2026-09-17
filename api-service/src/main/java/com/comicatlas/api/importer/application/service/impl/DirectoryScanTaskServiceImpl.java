@@ -4,10 +4,10 @@ import com.comicatlas.api.importer.interfaces.rest.dto.DirectoryScanTaskVO;
 import com.comicatlas.api.importer.infrastructure.persistence.entity.DirectoryScanTask;
 import com.comicatlas.api.importer.application.port.in.DirectoryScanTaskService;
 import com.comicatlas.api.importer.application.port.out.DirectoryScanTaskPersistencePort;
+import com.comicatlas.api.importer.application.port.out.DirectoryScanManagementTaskQueryPort;
 import com.comicatlas.api.task.interfaces.rest.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.task.interfaces.rest.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.task.interfaces.rest.dto.ManagementTaskResponse;
-import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTaskItem;
 import com.comicatlas.api.task.application.port.in.ManagementTaskService;
 import com.comicatlas.api.outbox.application.port.in.OutboxService;
 import com.comicatlas.common.constant.MqExchanges;
@@ -47,6 +47,7 @@ public class DirectoryScanTaskServiceImpl implements DirectoryScanTaskService {
     private final OutboxService outboxService;
     private final ObjectMapper objectMapper;
     private final ManagementTaskService managementTaskService;
+    private final DirectoryScanManagementTaskQueryPort managementTaskQueryPort;
 
     @Override
     @Transactional
@@ -204,11 +205,11 @@ public class DirectoryScanTaskServiceImpl implements DirectoryScanTaskService {
      * 同步统一扫描任务项状态；无活跃项时跳过（终态/旧事件幂等）。
      */
     private ManagementTaskItemResponse syncScanItem(Long scanTaskId, ManagementTaskStatus status, String errorMessage) {
-        ManagementTaskItem item = managementTaskService.findActiveItem(
+        DirectoryScanManagementTaskQueryPort.ItemSnapshot item = managementTaskQueryPort.findActiveItem(
                 TARGET_TYPE_SYSTEM, scanTaskId, TaskType.DIRECTORY_SCAN);
         if (item != null) {
             return managementTaskService.updateItemStatus(
-                    item.getId(), status, errorMessage, RESULT_REF_TYPE_SCAN_TASK, scanTaskId);
+                    item.id(), status, errorMessage, RESULT_REF_TYPE_SCAN_TASK, scanTaskId);
         }
         return null;
     }
