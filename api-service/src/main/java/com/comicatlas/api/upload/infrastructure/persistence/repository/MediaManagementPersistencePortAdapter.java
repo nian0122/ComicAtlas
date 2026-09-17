@@ -17,13 +17,29 @@ public class MediaManagementPersistencePortAdapter implements MediaManagementPer
     private final ChapterMapper chapterMapper;
     private final MediaMapper mediaMapper;
 
-    @Override public Chapter findChapter(Long chapterId) { return chapterMapper.selectById(chapterId); }
-    @Override public List<Media> findMediaByChapter(Long chapterId) {
-        return mediaMapper.selectByChapterId(chapterId);
+    @Override public MediaManagementPersistencePort.ChapterSnapshot findChapter(Long chapterId) {
+        Chapter chapter = chapterMapper.selectById(chapterId);
+        return chapter == null ? null : new MediaManagementPersistencePort.ChapterSnapshot(chapter.getId());
     }
-    @Override public Media findMedia(Long mediaId) { return mediaMapper.selectById(mediaId); }
+    @Override public List<MediaManagementPersistencePort.MediaSnapshot> findMediaByChapter(Long chapterId) {
+        return mediaMapper.selectByChapterId(chapterId).stream()
+                .map(media -> new MediaManagementPersistencePort.MediaSnapshot(
+                        media.getId(), media.getChapterId(), media.getPageNumber(), media.getVersion()))
+                .toList();
+    }
+    @Override public MediaManagementPersistencePort.MediaSnapshot findMedia(Long mediaId) {
+        Media media = mediaMapper.selectById(mediaId);
+        return media == null ? null : new MediaManagementPersistencePort.MediaSnapshot(
+                media.getId(), media.getChapterId(), media.getPageNumber(), media.getVersion());
+    }
     @Override public int movePageNumbersToTemporaryNegative(Long chapterId) {
         return mediaMapper.updatePageNumberToTemporaryNegative(chapterId);
     }
-    @Override public int updateMedia(Media media) { return mediaMapper.updateById(media); }
+    @Override public int updateMedia(MediaManagementPersistencePort.MediaPageNumberUpdateCommand command) {
+        Media media = new Media();
+        media.setId(command.id());
+        media.setPageNumber(command.pageNumber());
+        media.setVersion(command.version());
+        return mediaMapper.updateById(media);
+    }
 }

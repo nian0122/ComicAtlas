@@ -5,8 +5,6 @@ package com.comicatlas.api.upload.application.service.impl;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.shared.exception.ConflictException;
-import com.comicatlas.persistence.comic.entity.Chapter;
-import com.comicatlas.persistence.comic.entity.Media;
 import com.comicatlas.api.upload.application.port.out.MediaManagementPersistencePort;
 import com.comicatlas.api.task.interfaces.rest.dto.OperationSubmitResultDTO;
 import com.comicatlas.api.trash.application.port.in.TrashLifecycleService;
@@ -43,7 +41,7 @@ public class MediaManagementServiceImpl implements com.comicatlas.api.upload.app
      */
     @Transactional
     public MediaReorderResponse reorder(Long chapterId, MediaReorderRequest request) {
-        Chapter chapter = persistencePort.findChapter(chapterId);
+        MediaManagementPersistencePort.ChapterSnapshot chapter = persistencePort.findChapter(chapterId);
         if (chapter == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在: " + chapterId);
         }
@@ -51,10 +49,10 @@ public class MediaManagementServiceImpl implements com.comicatlas.api.upload.app
         if (new HashSet<>(mediaIds).size() != mediaIds.size()) {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "媒体列表存在重复项");
         }
-        List<Media> existing = persistencePort.findMediaByChapter(chapterId);
+        List<MediaManagementPersistencePort.MediaSnapshot> existing = persistencePort.findMediaByChapter(chapterId);
         Set<Long> existingIds = new HashSet<>();
-        for (Media media : existing) {
-            existingIds.add(media.getId());
+        for (MediaManagementPersistencePort.MediaSnapshot media : existing) {
+            existingIds.add(media.id());
         }
         for (Long id : mediaIds) {
             if (!existingIds.contains(id)) {
@@ -71,14 +69,14 @@ public class MediaManagementServiceImpl implements com.comicatlas.api.upload.app
         // 阶段二：按新顺序写回 1..N（乐观锁校验）
         List<MediaReorderItem> items = new ArrayList<>(mediaIds.size());
         for (int i = 0; i < mediaIds.size(); i++) {
-            Media media = persistencePort.findMedia(mediaIds.get(i));
-            media.setPageNumber(i + 1);
-            int rows = persistencePort.updateMedia(media);
+            MediaManagementPersistencePort.MediaSnapshot media = persistencePort.findMedia(mediaIds.get(i));
+            int rows = persistencePort.updateMedia(new MediaManagementPersistencePort.MediaPageNumberUpdateCommand(
+                    media.id(), i + 1, media.version()));
             if (rows == 0) {
                 throw new ConflictException("媒体已被并发修改，请刷新后重试");
             }
             MediaReorderItem item = new MediaReorderItem();
-            item.setMediaId(media.getId());
+            item.setMediaId(media.id());
             item.setPageNumber(i + 1);
             items.add(item);
         }
