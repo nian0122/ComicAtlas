@@ -14,9 +14,8 @@ import com.comicatlas.api.importer.application.service.ImportRetryCoordinator;
 import com.comicatlas.api.importer.application.port.in.ImportService;
 import com.comicatlas.api.task.interfaces.rest.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.task.interfaces.rest.dto.ManagementTaskResponse;
-import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTask;
-import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTaskItem;
 import com.comicatlas.api.task.application.port.in.ManagementTaskService;
+import com.comicatlas.api.importer.application.port.out.ImportManagementTaskQueryPort;
 import com.comicatlas.api.outbox.application.port.in.OutboxService;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
@@ -93,6 +92,7 @@ public class ImportServiceImpl implements ImportService {
     private final RedisTemplate<String, Object> redisTemplate;
     private final TransactionTemplate transactionTemplate;
     private final ManagementTaskService managementTaskService;
+    private final ImportManagementTaskQueryPort managementTaskQueryPort;
     private final ApiStorageProperties storageProperties;
     private final ImportRetryCoordinator importRetryCoordinator;
 
@@ -101,13 +101,14 @@ public class ImportServiceImpl implements ImportService {
     public ImportTaskVO createImportTask(ImportRequest request, String idempotencyKey) {
         // 幂等：同 Idempotency-Key 同 payload 直接返回已有任务
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {
-            ManagementTask existing = managementTaskService.findByIdempotencyKey(idempotencyKey);
+            ImportManagementTaskQueryPort.TaskSnapshot existing =
+                    managementTaskQueryPort.findByIdempotencyKey(idempotencyKey);
             if (existing != null) {
                 String expectedHash = digestService.sha256(payload(request));
-                if (!expectedHash.equals(existing.getIdempotencyPayloadHash())) {
+                if (!expectedHash.equals(existing.idempotencyPayloadHash())) {
                     throw new ConflictException("幂等键 " + idempotencyKey + " 已存在但 payload 不匹配");
                 }
-                ImportTask existingImport = persistencePort.findByManagementTaskId(existing.getId());
+                ImportTask existingImport = persistencePort.findByManagementTaskId(existing.id());
                 if (existingImport != null) {
                     log.info("导入幂等命中 idempotencyKey={}, 返回已有任务 {}", idempotencyKey, existingImport.getId());
                     return toVO(existingImport);
@@ -320,10 +321,10 @@ public class ImportServiceImpl implements ImportService {
 
         // 同步统一任务为 CANCELLED 真正终态（即使 item 已 RUNNING）
         if (task.getManagementTaskId() != null) {
-            ManagementTaskItem managementItem = managementTaskService.findActiveItem(
+            ImportManagementTaskQueryPort.ItemSnapshot managementItem = managementTaskQueryPort.findActiveItem(
                     TARGET_TYPE_COMIC, comicId, TaskType.IMPORT);
             if (managementItem != null) {
-                managementTaskService.updateItemStatus(managementItem.getId(), ManagementTaskStatus.CANCELLED,
+                managementTaskService.updateItemStatus(managementItem.id(), ManagementTaskStatus.CANCELLED,
                         "导入已取消", RESULT_REF_TYPE_IMPORT_TASK, taskId);
             }
         }
