@@ -3,6 +3,7 @@ package com.comicatlas.api.task.application.port.out;
 import com.comicatlas.api.exporter.application.port.in.ExportRetryService;
 import com.comicatlas.api.importer.application.port.in.ImportRetryService;
 import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTaskItem;
+import com.comicatlas.api.exporter.application.port.in.ExportRetryService.RetryItem;
 import com.comicatlas.api.task.domain.model.TaskType;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
@@ -38,7 +39,8 @@ public class TaskRetryPublisher {
     public void publish(Long taskId, ManagementTaskItem item, int attempt) {
         publishManagementCommand(taskId, item, attempt);
         if (item.getOperationType() == TaskType.EXPORT) {
-            exportRetryService.retry(taskId, item, attempt);
+            exportRetryService.retry(taskId,
+                    new RetryItem(item.getId(), item.getResultRefType(), item.getResultRefId()), attempt);
         }
         if (item.getOperationType() == TaskType.IMPORT) {
             importRetryService.retry(taskId, item.getId());

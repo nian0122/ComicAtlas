@@ -5,7 +5,6 @@ import com.comicatlas.api.exporter.domain.model.ExportTaskStatus;
 import com.comicatlas.api.exporter.infrastructure.persistence.entity.ExportTask;
 import com.comicatlas.api.exporter.application.port.out.ExportPersistencePort;
 import com.comicatlas.api.outbox.application.port.in.OutboxService;
-import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTaskItem;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.event.ExportTaskCreatedEvent;
@@ -24,10 +23,11 @@ public class ExportRetryServiceImpl implements com.comicatlas.api.exporter.appli
     private final ExportPersistencePort persistencePort;
     private final OutboxService outboxService;
 
-    public void retry(Long taskId, ManagementTaskItem item, int attempt) {
+    public void retry(Long taskId, com.comicatlas.api.exporter.application.port.in.ExportRetryService.RetryItem item,
+                      int attempt) {
         ExportTask exportTask = persistencePort.findTaskByManagementTaskId(taskId);
         if (exportTask == null) {
-            log.warn("导出专表不存在，跳过导出重试入队: taskId={}, itemId={}", taskId, item.getId());
+            log.warn("导出专表不存在，跳过导出重试入队: taskId={}, itemId={}", taskId, item.id());
             return;
         }
         persistencePort.resetTask(exportTask.getId(), ExportTaskStatus.PENDING);
@@ -35,6 +35,6 @@ public class ExportRetryServiceImpl implements com.comicatlas.api.exporter.appli
                 exportTask.getId(), exportTask.getComicId(),
                 exportTask.getFormat() == null ? "ZIP" : exportTask.getFormat());
         outboxService.enqueue(event, MqExchanges.EXPORT, MqRoutingKeys.TASK_CREATED,
-                taskId, item.getId(), attempt);
+                taskId, item.id(), attempt);
     }
 }
