@@ -9,7 +9,6 @@ import com.comicatlas.api.task.domain.model.ManagementTaskStatus;
 import com.comicatlas.api.task.domain.model.TaskType;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.exception.BusinessException;
-import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.api.task.application.port.in.TaskQueryService;
 import com.comicatlas.api.task.application.assembler.TaskResponseAssembler;
 import com.comicatlas.api.task.application.port.out.TaskQueryPersistencePort;
@@ -103,10 +102,10 @@ public class TaskQueryServiceImpl implements TaskQueryService {
         Map<Long, ManagementTaskItem> firstItems = new HashMap<>();
         items.forEach(item -> firstItems.putIfAbsent(item.getTaskId(), item));
         Map<Long, Long> parentComicIds = resolveParentComicIds(firstItems);
-        Map<Long, Comic> comics = new HashMap<>();
+        Map<Long, TaskQueryPersistencePort.ComicSnapshot> comics = new HashMap<>();
         List<Long> comicIds = parentComicIds.values().stream().filter(Objects::nonNull).distinct().toList();
         if (!comicIds.isEmpty()) {
-            persistencePort.findComicsByIds(comicIds).forEach(comic -> comics.put(comic.getId(), comic));
+            persistencePort.findComicsByIds(comicIds).forEach(comic -> comics.put(comic.id(), comic));
         }
         firstItems.values().forEach(item -> {
             ManagementTaskResponse response = responseByTaskId.get(item.getTaskId());
@@ -114,10 +113,11 @@ public class TaskQueryServiceImpl implements TaskQueryService {
                 return;
             }
             Long parentComicId = parentComicIds.get(item.getTaskId());
-            Comic comic = parentComicId == null ? null : comics.get(parentComicId);
+            TaskQueryPersistencePort.ComicSnapshot comic = parentComicId == null
+                    ? null : comics.get(parentComicId);
             response.setTargetId(TARGET_TYPE_COMIC.equals(response.getTargetType())
                     && parentComicId != null ? parentComicId : item.getTargetId());
-            response.setTargetName(comic == null ? null : comic.getTitle());
+            response.setTargetName(comic == null ? null : comic.title());
         });
     }
 
@@ -133,17 +133,17 @@ public class TaskQueryServiceImpl implements TaskQueryService {
                 .map(ManagementTaskItem::getTargetId).distinct().toList();
         if (!chapterIds.isEmpty()) {
             persistencePort.findChaptersByIds(chapterIds)
-                    .forEach(chapter -> chapterComicIds.put(chapter.getId(), chapter.getComicId()));
+                    .forEach(chapter -> chapterComicIds.put(chapter.id(), chapter.comicId()));
         }
         if (!mediaIds.isEmpty()) {
             persistencePort.findMediaByIds(mediaIds)
-                    .forEach(media -> mediaChapterIds.put(media.getId(), media.getChapterId()));
+                    .forEach(media -> mediaChapterIds.put(media.id(), media.chapterId()));
         }
         List<Long> mediaChapterIdList = mediaChapterIds.values().stream()
                 .filter(Objects::nonNull).distinct().toList();
         if (!mediaChapterIdList.isEmpty()) {
             persistencePort.findChaptersByIds(mediaChapterIdList)
-                    .forEach(chapter -> chapterComicIds.putIfAbsent(chapter.getId(), chapter.getComicId()));
+                    .forEach(chapter -> chapterComicIds.putIfAbsent(chapter.id(), chapter.comicId()));
         }
         firstItems.values().forEach(item -> {
             Long comicId = switch (item.getTargetType()) {

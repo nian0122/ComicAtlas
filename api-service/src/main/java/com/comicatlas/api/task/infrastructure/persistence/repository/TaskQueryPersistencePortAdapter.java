@@ -8,9 +8,6 @@ import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTask;
 import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTaskItem;
 import com.comicatlas.api.task.infrastructure.persistence.mapper.ManagementTaskItemMapper;
 import com.comicatlas.api.task.infrastructure.persistence.mapper.ManagementTaskMapper;
-import com.comicatlas.persistence.comic.entity.Chapter;
-import com.comicatlas.persistence.comic.entity.Comic;
-import com.comicatlas.persistence.comic.entity.Media;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.persistence.comic.mapper.MediaMapper;
@@ -121,11 +118,25 @@ public class TaskQueryPersistencePortAdapter implements TaskQueryPersistencePort
     public ManagementTaskItem findItem(Long itemId) { return itemMapper.selectById(itemId); }
 
     @Override
-    public List<Comic> findComicsByIds(List<Long> comicIds) { return comicMapper.selectBatchIds(comicIds); }
+    public List<TaskQueryPersistencePort.ComicSnapshot> findComicsByIds(List<Long> comicIds) {
+        return comicMapper.selectBatchIds(comicIds).stream()
+                .map(comic -> new TaskQueryPersistencePort.ComicSnapshot(comic.getId(), comic.getTitle()))
+                .toList();
+    }
 
     @Override
-    public List<Chapter> findChaptersByIds(List<Long> chapterIds) { return chapterMapper.selectBatchIds(chapterIds); }
+    public List<TaskQueryPersistencePort.ChapterSnapshot> findChaptersByIds(List<Long> chapterIds) {
+        return chapterMapper.selectBatchIds(chapterIds).stream()
+                .map(chapter -> new TaskQueryPersistencePort.ChapterSnapshot(
+                        chapter.getId(), chapter.getComicId()))
+                .toList();
+    }
 
     @Override
-    public List<Media> findMediaByIds(List<Long> mediaIds) { return mediaMapper.selectBatchIds(mediaIds); }
+    public List<TaskQueryPersistencePort.MediaSnapshot> findMediaByIds(List<Long> mediaIds) {
+        return mediaMapper.selectBatchIds(mediaIds).stream()
+                .map(media -> new TaskQueryPersistencePort.MediaSnapshot(
+                        media.getId(), media.getChapterId()))
+                .toList();
+    }
 }

@@ -4,9 +4,6 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTask;
 import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTaskItem;
 import com.comicatlas.api.task.domain.model.TaskType;
-import com.comicatlas.persistence.comic.entity.Chapter;
-import com.comicatlas.persistence.comic.entity.Comic;
-import com.comicatlas.persistence.comic.entity.Media;
 
 import java.util.List;
 import java.time.LocalDateTime;
@@ -59,9 +56,18 @@ public interface TaskQueryPersistencePort {
 
     ManagementTaskItem findItem(Long itemId);
 
-    List<Comic> findComicsByIds(List<Long> comicIds);
+    List<ComicSnapshot> findComicsByIds(List<Long> comicIds);
 
-    List<Chapter> findChaptersByIds(List<Long> chapterIds);
+    List<ChapterSnapshot> findChaptersByIds(List<Long> chapterIds);
 
-    List<Media> findMediaByIds(List<Long> mediaIds);
+    List<MediaSnapshot> findMediaByIds(List<Long> mediaIds);
+
+    record ComicSnapshot(Long id, String title) {
+    }
+
+    record ChapterSnapshot(Long id, Long comicId) {
+    }
+
+    record MediaSnapshot(Long id, Long chapterId) {
+    }
 }
