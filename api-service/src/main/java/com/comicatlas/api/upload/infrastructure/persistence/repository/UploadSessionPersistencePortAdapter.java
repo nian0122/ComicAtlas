@@ -57,7 +57,22 @@ public class UploadSessionPersistencePortAdapter implements UploadSessionPersist
     }
     @Override public void insertSession(UploadSession session) { sessionMapper.insert(session); }
     @Override public void insertFile(UploadFile file) { fileMapper.insert(file); }
-    @Override public void insertMedia(Media media) { mediaMapper.insert(media); }
+    @Override public Long insertMedia(UploadSessionPersistencePort.MediaCreateCommand command) {
+        Media media = new Media();
+        media.setChapterId(command.chapterId());
+        media.setPageNumber(command.pageNumber());
+        media.setHqRoot(command.hqRoot());
+        media.setHqPath(command.hqPath());
+        media.setHqStatus(com.comicatlas.contract.common.enums.HqStatus.PENDING);
+        media.setLqStatus(com.comicatlas.contract.common.enums.LqStatus.NOT_GENERATED);
+        media.setTranscodeStatus(com.comicatlas.contract.common.enums.TranscodeStatus.NOT_NEEDED);
+        media.setStatus(com.comicatlas.contract.common.enums.MediaLifecycleStatus.STAGING);
+        media.setMediaType(command.mediaType());
+        media.setHqSize(command.hqSize());
+        media.setVersion(1);
+        mediaMapper.insert(media);
+        return media.getId();
+    }
     @Override public int bindMedia(Long fileId, Long mediaId) { return fileMapper.bindMedia(fileId, mediaId); }
     @Override public int freezeForVerification(Long sessionId) { return sessionMapper.freezeForVerification(sessionId); }
     @Override public int restoreActive(Long sessionId) { return sessionMapper.restoreActiveFromVerification(sessionId); }

@@ -29,13 +29,9 @@ import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.enums.ComicStatus;
-import com.comicatlas.contract.common.enums.HqStatus;
-import com.comicatlas.contract.common.enums.LqStatus;
 import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
 import com.comicatlas.api.task.domain.model.TaskType;
-import com.comicatlas.contract.common.enums.TranscodeStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
-import com.comicatlas.persistence.comic.entity.Media;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -84,8 +80,6 @@ public class UploadSessionServiceImpl implements UploadSessionService {
     private static final String SHA256_PATTERN = "^[0-9a-fA-F]{64}$";
     /** Content-Range 头的字节范围单位前缀。 */
     private static final String CONTENT_RANGE_PREFIX = "bytes ";
-    /** 乐观锁初始版本。 */
-    private static final int INITIAL_VERSION = 1;
     /** 禁止上传媒体的漫画终态集合（复用避免每次构造）。 */
     private static final Set<ComicStatus> NON_UPLOADABLE_STATUSES =
             Set.of(ComicStatus.DELETED, ComicStatus.DELETING, ComicStatus.TRASHED,
@@ -418,22 +412,13 @@ public class UploadSessionServiceImpl implements UploadSessionService {
         for (int index = 0; index < files.size(); index++) {
             UploadFile uploadFile = files.get(index);
             MediaTypeDetector.Detection detection = detections.get(index);
-            Media media = new Media();
-            media.setChapterId(session.getChapterId());
-            media.setPageNumber(nextPage + index);
-            media.setHqRoot(StorageRootKeys.HQ);
-            media.setHqPath(session.getComicId() + "/" + session.getChapterId() + "/" + uploadFile.getStorageName());
-            media.setHqStatus(HqStatus.PENDING);
-            media.setLqStatus(LqStatus.NOT_GENERATED);
-            media.setTranscodeStatus(TranscodeStatus.NOT_NEEDED);
-            media.setStatus(MediaLifecycleStatus.STAGING);
-            media.setMediaType(detection.mediaType());
-            media.setHqSize(uploadFile.getSizeBytes());
-            media.setVersion(INITIAL_VERSION);
-            persistencePort.insertMedia(media);
+            Long mediaId = persistencePort.insertMedia(new UploadSessionPersistencePort.MediaCreateCommand(
+                    session.getChapterId(), nextPage + index, StorageRootKeys.HQ,
+                    session.getComicId() + "/" + session.getChapterId() + "/" + uploadFile.getStorageName(),
+                    detection.mediaType(), uploadFile.getSizeBytes()));
 
-            persistencePort.bindMedia(uploadFile.getId(), media.getId());
-            mediaIds.add(media.getId());
+            persistencePort.bindMedia(uploadFile.getId(), mediaId);
+            mediaIds.add(mediaId);
         }
         return mediaIds;
     }

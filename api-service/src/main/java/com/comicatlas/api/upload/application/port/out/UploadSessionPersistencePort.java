@@ -4,7 +4,6 @@ import com.comicatlas.api.upload.infrastructure.persistence.entity.UploadFile;
 import com.comicatlas.api.upload.infrastructure.persistence.entity.UploadSession;
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
-import com.comicatlas.persistence.comic.entity.Media;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -22,7 +21,7 @@ public interface UploadSessionPersistencePort {
     UploadFile findFile(Long sessionId, String fileId);
     void insertSession(UploadSession session);
     void insertFile(UploadFile file);
-    void insertMedia(Media media);
+    Long insertMedia(MediaCreateCommand command);
     int bindMedia(Long fileId, Long mediaId);
     int freezeForVerification(Long sessionId);
     int restoreActive(Long sessionId);
@@ -37,5 +36,9 @@ public interface UploadSessionPersistencePort {
     }
 
     record MediaSnapshot(Long id, Long chapterId, Integer pageNumber, MediaLifecycleStatus status) {
+    }
+
+    record MediaCreateCommand(Long chapterId, Integer pageNumber, String hqRoot, String hqPath,
+                              String mediaType, Long hqSize) {
     }
 }
