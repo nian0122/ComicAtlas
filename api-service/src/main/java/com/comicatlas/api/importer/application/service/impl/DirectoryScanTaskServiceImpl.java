@@ -1,7 +1,6 @@
 package com.comicatlas.api.importer.application.service.impl;
 
 import com.comicatlas.api.importer.interfaces.rest.dto.DirectoryScanTaskVO;
-import com.comicatlas.api.importer.infrastructure.persistence.entity.DirectoryScanTask;
 import com.comicatlas.api.importer.application.port.in.DirectoryScanTaskService;
 import com.comicatlas.api.importer.application.port.out.DirectoryScanTaskPersistencePort;
 import com.comicatlas.api.importer.application.port.out.DirectoryScanManagementTaskQueryPort;
@@ -56,28 +55,25 @@ public class DirectoryScanTaskServiceImpl implements DirectoryScanTaskService {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "请提供目录路径");
         }
 
-        DirectoryScanTask task = new DirectoryScanTask();
-        task.setStatus(DirectoryScanTaskStatus.PENDING);
-        task.setDirectoryPath(directoryPath);
-        task.setTotalItems(0);
-        task.setRetryCount(0);
-        persistencePort.insert(task);
+        Long taskId = persistencePort.insert(new DirectoryScanTaskPersistencePort.CreateCommand(
+                DirectoryScanTaskStatus.PENDING, directoryPath, 0, 0));
 
         // 同事务创建统一扫描任务并回填 management_task_id
-        ManagementTaskResponse managementResponse = createManagementTaskForScan(task.getId());
-        task.setManagementTaskId(managementResponse.getId());
-        persistencePort.update(task);
+        ManagementTaskResponse managementResponse = createManagementTaskForScan(taskId);
+        persistencePort.update(new DirectoryScanTaskPersistencePort.UpdateCommand(taskId,
+                managementResponse.getId(), DirectoryScanTaskStatus.PENDING, directoryPath, 0,
+                null, null, 0, null, null));
 
-        Long taskId = task.getId();
         enqueueScanRequested(taskId, directoryPath);
 
         log.info("目录扫描任务创建: taskId={}, directoryPath={}", taskId, directoryPath);
-        return toVO(task);
+        return toVO(new DirectoryScanTaskPersistencePort.Snapshot(taskId, managementResponse.getId(),
+                DirectoryScanTaskStatus.PENDING, directoryPath, 0, null, null, 0, null, null, null));
     }
 
     @Override
     public DirectoryScanTaskVO getTaskDetail(Long id) {
-        DirectoryScanTask task = persistencePort.findById(id);
+        DirectoryScanTaskPersistencePort.Snapshot task = persistencePort.findById(id);
         if (task == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "扫描任务不存在");
         }
@@ -87,49 +83,45 @@ public class DirectoryScanTaskServiceImpl implements DirectoryScanTaskService {
     @Override
     @Transactional
     public DirectoryScanTaskVO retryTask(Long id) {
-        DirectoryScanTask task = persistencePort.findById(id);
+        DirectoryScanTaskPersistencePort.Snapshot task = persistencePort.findById(id);
         if (task == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "扫描任务不存在");
         }
-        if (task.getStatus() != DirectoryScanTaskStatus.FAILED) {
+        if (task.status() != DirectoryScanTaskStatus.FAILED) {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "仅 FAILED 状态可重试");
         }
 
-        task.setStatus(DirectoryScanTaskStatus.PENDING);
-        task.setRetryCount(task.getRetryCount() != null ? task.getRetryCount() + 1 : 1);
-        task.setErrorMessage(null);
-        task.setStartedAt(null);
-        task.setEndedAt(null);
-        persistencePort.update(task);
+        int retryCount = task.retryCount() != null ? task.retryCount() + 1 : 1;
+        persistencePort.update(new DirectoryScanTaskPersistencePort.UpdateCommand(task.id(),
+                task.managementTaskId(), DirectoryScanTaskStatus.PENDING, task.directoryPath(),
+                task.totalItems(), task.resultJson(), null, retryCount, null, null));
 
         // 同步统一任务重置（仅状态，不在此重新入队——扫描事件由下方 Outbox 重发）
-        if (task.getManagementTaskId() != null) {
-            managementTaskService.resetTaskState(task.getManagementTaskId());
+        if (task.managementTaskId() != null) {
+            managementTaskService.resetTaskState(task.managementTaskId());
         }
 
-        Long taskId = task.getId();
-        enqueueScanRequested(taskId, task.getDirectoryPath());
+        Long taskId = task.id();
+        enqueueScanRequested(taskId, task.directoryPath());
 
         log.info("目录扫描任务重试: taskId={}", taskId);
-        return toVO(task);
+        return toVO(new DirectoryScanTaskPersistencePort.Snapshot(task.id(), task.managementTaskId(),
+                DirectoryScanTaskStatus.PENDING, task.directoryPath(), task.totalItems(), task.resultJson(),
+                null, retryCount, task.createdAt(), null, null));
     }
 
-    private DirectoryScanTaskVO toVO(DirectoryScanTask task) {
+    private DirectoryScanTaskVO toVO(DirectoryScanTaskPersistencePort.Snapshot task) {
         DirectoryScanTaskVO viewObject = new DirectoryScanTaskVO();
-        viewObject.setId(task.getId());
-        viewObject.setStatus(task.getStatus() == null ? null : task.getStatus().name());
-        viewObject.setDirectoryPath(task.getDirectoryPath());
-        viewObject.setTotalItems(task.getTotalItems());
-        viewObject.setErrorMessage(task.getErrorMessage());
-        viewObject.setRetryCount(task.getRetryCount());
-        viewObject.setCreatedAt(task.getCreatedAt());
-        viewObject.setStartedAt(task.getStartedAt());
-        viewObject.setEndedAt(task.getEndedAt());
-        if (task.getResultJson() != null && !task.getResultJson().isBlank()) {
+        viewObject.setId(task.id()); viewObject.setStatus(task.status() == null ? null : task.status().name());
+        viewObject.setDirectoryPath(task.directoryPath()); viewObject.setTotalItems(task.totalItems());
+        viewObject.setErrorMessage(task.errorMessage()); viewObject.setRetryCount(task.retryCount());
+        viewObject.setCreatedAt(task.createdAt()); viewObject.setStartedAt(task.startedAt());
+        viewObject.setEndedAt(task.endedAt());
+        if (task.resultJson() != null && !task.resultJson().isBlank()) {
             try {
-                viewObject.setResult(objectMapper.readValue(task.getResultJson(), ScanResultDTO.class));
+                viewObject.setResult(objectMapper.readValue(task.resultJson(), ScanResultDTO.class));
             } catch (JsonProcessingException | IllegalArgumentException e) {
-                log.warn("扫描结果 JSON 解析失败: taskId={}", task.getId(), e);
+                log.warn("扫描结果 JSON 解析失败: taskId={}", task.id(), e);
             }
         }
         return viewObject;
@@ -138,41 +130,43 @@ public class DirectoryScanTaskServiceImpl implements DirectoryScanTaskService {
     @Override
     @Transactional
     public void applyResult(Long taskId, ScanResultDTO result) {
-        DirectoryScanTask task = persistencePort.findById(taskId);
+        DirectoryScanTaskPersistencePort.Snapshot task = persistencePort.findById(taskId);
         if (task == null) {
             log.warn("扫描结果回写跳过：任务不存在 taskId={}", taskId);
             return;
         }
-        task.setStatus(DirectoryScanTaskStatus.SUCCESS);
-        task.setTotalItems(result.total());
+        DirectoryScanTaskStatus status = DirectoryScanTaskStatus.SUCCESS;
+        String resultJson = null;
+        String failureMessage = null;
         try {
-            task.setResultJson(objectMapper.writeValueAsString(result));
+            resultJson = objectMapper.writeValueAsString(result);
         } catch (JsonProcessingException e) {
             log.error("扫描结果 JSON 序列化失败: taskId={}", taskId, e);
-            task.setStatus(DirectoryScanTaskStatus.FAILED);
-            task.setErrorMessage("扫描结果序列化失败: " + e.getMessage());
+            status = DirectoryScanTaskStatus.FAILED;
+            failureMessage = "扫描结果序列化失败: " + e.getMessage();
         }
-        task.setEndedAt(LocalDateTime.now());
-        persistencePort.update(task);
+        persistencePort.update(new DirectoryScanTaskPersistencePort.UpdateCommand(task.id(),
+                task.managementTaskId(), status, task.directoryPath(), result.total(), resultJson,
+                failureMessage, task.retryCount(), task.startedAt(), LocalDateTime.now()));
 
         // 同步统一任务项状态
-        ManagementTaskStatus status = task.getStatus() == DirectoryScanTaskStatus.SUCCESS
+        ManagementTaskStatus managementStatus = status == DirectoryScanTaskStatus.SUCCESS
                 ? ManagementTaskStatus.SUCCEEDED : ManagementTaskStatus.FAILED;
-        syncScanItem(taskId, status, task.getErrorMessage());
+        syncScanItem(taskId, managementStatus, failureMessage);
     }
 
     @Override
     @Transactional
     public void applyFailure(Long taskId, String errorMessage) {
-        DirectoryScanTask task = persistencePort.findById(taskId);
+        DirectoryScanTaskPersistencePort.Snapshot task = persistencePort.findById(taskId);
         if (task == null) {
             log.warn("扫描失败回写跳过：任务不存在 taskId={}", taskId);
             return;
         }
-        task.setStatus(DirectoryScanTaskStatus.FAILED);
-        task.setErrorMessage(errorMessage);
-        task.setEndedAt(LocalDateTime.now());
-        persistencePort.update(task);
+        persistencePort.update(new DirectoryScanTaskPersistencePort.UpdateCommand(task.id(),
+                task.managementTaskId(), DirectoryScanTaskStatus.FAILED, task.directoryPath(),
+                task.totalItems(), task.resultJson(), errorMessage, task.retryCount(), task.startedAt(),
+                LocalDateTime.now()));
 
         // 同步统一任务项为 FAILED
         syncScanItem(taskId, ManagementTaskStatus.FAILED, errorMessage);
