@@ -3,9 +3,9 @@ package com.comicatlas.api.exporter.application.service.impl;
 import com.comicatlas.api.exporter.domain.model.ExportTaskStatus;
 import com.comicatlas.api.exporter.infrastructure.persistence.entity.ExportTask;
 import com.comicatlas.api.exporter.application.port.out.ExportPersistencePort;
+import com.comicatlas.api.exporter.application.port.out.ExportManagementTaskQueryPort;
 import com.comicatlas.api.task.domain.model.TaskType;
 import com.comicatlas.api.task.domain.model.ManagementTaskStatus;
-import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTaskItem;
 import com.comicatlas.api.task.application.port.in.ManagementTaskService;
 import com.comicatlas.common.event.ExportTaskCompletedEvent;
 import com.comicatlas.common.event.ExportTaskFailedEvent;
@@ -25,6 +25,7 @@ public class ExportResultServiceImpl implements com.comicatlas.api.exporter.appl
     private static final String RESULT_REF_TYPE = "EXPORT_TASK";
     private final ExportPersistencePort persistencePort;
     private final ManagementTaskService managementTaskService;
+    private final ExportManagementTaskQueryPort managementTaskQueryPort;
 
     @Transactional
     public void applyStarted(ExportTaskStartedEvent event) {
@@ -73,9 +74,10 @@ public class ExportResultServiceImpl implements com.comicatlas.api.exporter.appl
         updateItem(event.comicId(), ManagementTaskStatus.FAILED, event.errorMessage(), event.taskId());
 }
     private void updateItem(Long comicId, ManagementTaskStatus status, String errorMessage, Long exportTaskId) {
-        ManagementTaskItem item = managementTaskService.findActiveItem(TARGET_TYPE_COMIC, comicId, TaskType.EXPORT);
+        ExportManagementTaskQueryPort.ItemSnapshot item = managementTaskQueryPort.findActiveItem(
+                TARGET_TYPE_COMIC, comicId, TaskType.EXPORT);
         if (item != null) {
-            managementTaskService.updateItemStatus(item.getId(), status, errorMessage, RESULT_REF_TYPE, exportTaskId);
+            managementTaskService.updateItemStatus(item.id(), status, errorMessage, RESULT_REF_TYPE, exportTaskId);
         }
     }
 }
