@@ -3,6 +3,7 @@ package com.comicatlas.api.task.infrastructure.persistence.repository;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.api.task.application.port.out.TaskQueryPersistencePort;
+import com.comicatlas.api.task.application.port.out.TaskViewQueryPort;
 import com.comicatlas.api.task.domain.model.TaskType;
 import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTask;
 import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTaskItem;
@@ -20,14 +21,67 @@ import java.time.LocalDateTime;
 /** 任务查询输出端口的 MyBatis 实现。 */
 @Component
 @RequiredArgsConstructor
-public class TaskQueryPersistencePortAdapter implements TaskQueryPersistencePort {
+public class TaskQueryPersistencePortAdapter implements TaskQueryPersistencePort, TaskViewQueryPort {
 
     private final ManagementTaskMapper taskMapper;
     private final ManagementTaskItemMapper itemMapper;
     private final ComicMapper comicMapper;
     private final ChapterMapper chapterMapper;
     private final MediaMapper mediaMapper;
+    @Override
+    public IPage<TaskSnapshot> findTaskPage(int page, int size, String taskType, String status,
+                                            String batchId, String targetType, List<Long> taskIds) {
+        IPage<ManagementTask> sourcePage = findPage(page, size, taskType, status, batchId, targetType, taskIds);
+        Page<TaskSnapshot> targetPage = new Page<>(page, size);
+        targetPage.setTotal(sourcePage.getTotal());
+        targetPage.setRecords(sourcePage.getRecords().stream().map(this::toTaskSnapshot).toList());
+        return targetPage;
+    }
 
+    @Override public TaskSnapshot findTaskView(Long taskId) {
+        ManagementTask task = findTaskEntity(taskId);
+        return task == null ? null : toTaskSnapshot(task);
+    }
+
+    @Override public List<TaskViewQueryPort.ItemSnapshot> findTaskItemsById(Long taskId) {
+        return itemMapper.selectByTaskId(taskId).stream().map(this::toItemSnapshot).toList();
+    }
+
+    @Override public List<TaskViewQueryPort.ItemSnapshot> findTaskItemsByIds(List<Long> taskIds) {
+        return itemMapper.selectByTaskIds(taskIds).stream().map(this::toItemSnapshot).toList();
+    }
+
+    @Override public List<TaskViewQueryPort.ComicSnapshot> findComicViewsByIds(List<Long> comicIds) {
+        return comicMapper.selectBatchIds(comicIds).stream()
+                .map(comic -> new TaskViewQueryPort.ComicSnapshot(comic.getId(), comic.getTitle())).toList();
+    }
+
+    @Override public List<TaskViewQueryPort.ChapterSnapshot> findChapterViewsByIds(List<Long> chapterIds) {
+        return chapterMapper.selectBatchIds(chapterIds).stream()
+                .map(chapter -> new TaskViewQueryPort.ChapterSnapshot(chapter.getId(), chapter.getComicId())).toList();
+    }
+
+    @Override public List<TaskViewQueryPort.MediaSnapshot> findMediaViewsByIds(List<Long> mediaIds) {
+        return mediaMapper.selectBatchIds(mediaIds).stream()
+                .map(media -> new TaskViewQueryPort.MediaSnapshot(media.getId(), media.getChapterId())).toList();
+    }
+
+    private ManagementTask findTaskEntity(Long taskId) { return taskMapper.selectById(taskId); }
+
+    private TaskViewQueryPort.TaskSnapshot toTaskSnapshot(ManagementTask task) {
+        return new TaskViewQueryPort.TaskSnapshot(task.getId(), task.getTaskType(), task.getOperation(),
+                task.getTargetType(), task.getBatchId(), task.getBatch(), task.getStatus(), task.getStage(),
+                task.getProgress(), task.getTotalCount(), task.getSuccessCount(), task.getFailureCount(),
+                task.getCancelledCount(), task.getErrorMessage(), task.getAttempt(), task.getVersion(),
+                task.getCreatedAt(), task.getUpdatedAt(), task.getStartedAt(), task.getCompletedAt());
+    }
+
+    private TaskViewQueryPort.ItemSnapshot toItemSnapshot(ManagementTaskItem item) {
+        return new TaskViewQueryPort.ItemSnapshot(item.getId(), item.getTaskId(), item.getTargetType(),
+                item.getTargetId(), item.getOperationType(), item.getStatus(), item.getAttempt(), item.getProgress(),
+                item.getResultRefType(), item.getResultRefId(), item.getErrorMessage(), item.getVersion(),
+                item.getCreatedAt(), item.getUpdatedAt(), item.getStartedAt(), item.getCompletedAt());
+    }
     @Override
     public List<Long> findTaskIdsByComicId(Long comicId) { return itemMapper.selectTaskIdsByComicId(comicId); }
 
