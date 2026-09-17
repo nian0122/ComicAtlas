@@ -7,7 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /** 漫画详情查询端口的基础设施适配器。 */
-@Component
+@Component("metadataComicDetailQueryPortAdapter")
 @RequiredArgsConstructor
 public class ComicDetailQueryPortAdapter implements ComicDetailQueryPort {
     private final ComicMapper comicMapper;

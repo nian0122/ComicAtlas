@@ -70,9 +70,17 @@ public class ImportPersistencePortAdapter implements ImportPersistencePort {
                 .map(category -> new CategorySnapshot(category.getId(), category.getName(), category.getSortOrder()))
                 .toList();
     }
-    @Override public void insertCatalog(CatalogModel model) { catalogMapper.insert(copy(model, Catalog.class)); }
+    @Override public void insertCatalog(CatalogModel model) {
+        Catalog entity = copy(model, Catalog.class);
+        catalogMapper.insert(entity);
+        BeanUtils.copyProperties(entity, model);
+    }
     @Override public void updateCatalog(CatalogModel model) { catalogMapper.updateById(copy(model, Catalog.class)); }
-    @Override public void insertChapter(ChapterModel model) { chapterMapper.insert(copy(model, Chapter.class)); }
+    @Override public void insertChapter(ChapterModel model) {
+        Chapter entity = copy(model, Chapter.class);
+        chapterMapper.insert(entity);
+        BeanUtils.copyProperties(entity, model);
+    }
     @Override public List<ChapterModel> findChapters(Long comicId) {
         return chapterMapper.selectByComicId(comicId).stream()
                 .map(entity -> copy(entity, ChapterModel.class)).toList();

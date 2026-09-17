@@ -9,7 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /** 共享详情装配器的基础设施适配器。 */
-@Component
+@Component("libraryComicDetailQueryPortAdapter")
 @RequiredArgsConstructor
 public class ComicDetailQueryPortAdapter implements ComicDetailQueryPort {
     private final ComicDetailAssembler comicDetailAssembler;

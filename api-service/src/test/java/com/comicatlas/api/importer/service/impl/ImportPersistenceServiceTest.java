@@ -32,6 +32,7 @@ import com.comicatlas.api.importer.infrastructure.persistence.repository.ImportF
 import com.comicatlas.api.importer.infrastructure.persistence.repository.ImportPersistencePortAdapter;
 import com.comicatlas.api.importer.application.port.in.ImportPersistenceService;
 import com.comicatlas.api.importer.application.port.in.ImportFinalizationService;
+import com.comicatlas.api.importer.application.port.out.ImportManagementTaskQueryPort;
 import com.comicatlas.api.task.application.port.in.ManagementTaskService;
 import com.comicatlas.api.outbox.application.port.in.OutboxService;
 import com.comicatlas.common.constant.MqExchanges;
@@ -105,6 +106,7 @@ class ImportPersistenceServiceTest {
     @Mock private ImportTaskMapper taskMapper;
     @Mock private CatalogCacheInvalidator catalogCacheInvalidator;
     @Mock private ManagementTaskService managementTaskService;
+    @Mock private ImportManagementTaskQueryPort managementTaskQueryPort;
     @Mock private OutboxService outboxService;
     @Mock private ApiStorageProperties storageProperties;
     @Mock private com.comicatlas.api.metadata.application.service.MetadataUpdateCoordinator metadataUpdateCoordinator;
@@ -122,6 +124,7 @@ class ImportPersistenceServiceTest {
         ReflectionTestUtils.setField(service, "importFinalizationService", importFinalizationService);
         ReflectionTestUtils.setField(importFinalizationService, "persistencePort",
                 new ImportFinalizationPersistencePortAdapter(taskMapper, comicMapper, chapterMapper, mediaMapper));
+        ReflectionTestUtils.setField(importFinalizationService, "managementTaskQueryPort", managementTaskQueryPort);
         mediaBatchSnapshots.clear();
         ReflectionTestUtils.setField(service, "mangaRoot", "F:/manga");
         ApiStorageRoot hqRoot = new ApiStorageRoot();
@@ -558,7 +561,7 @@ class ImportPersistenceServiceTest {
         when(mediaMapper.countByChapterIdsAndHqStatusNot(anyList(), anyString())).thenReturn(0L);
         when(mediaMapper.markImportFinalizedByChapter(1001L, "100/1001")).thenReturn(1);
 
-        when(managementTaskService.findActiveItem("COMIC", 100L, TaskType.IMPORT)).thenReturn(null);
+        when(managementTaskQueryPort.findActiveItem("COMIC", 100L, TaskType.IMPORT)).thenReturn(null);
 
         ImportStorageFinalizeCompletedEvent event = new ImportStorageFinalizeCompletedEvent(
                 UUID.randomUUID(), Instant.now(), 10L, 100L, 0, 1001L, "hq/100/1001", 1);
@@ -636,7 +639,7 @@ class ImportPersistenceServiceTest {
         when(mediaMapper.countByChapterIdsAndHqStatusNot(anyList(), anyString()))
                 .thenReturn(1L)
                 .thenReturn(0L);
-        when(managementTaskService.findActiveItem("COMIC", 100L, TaskType.IMPORT)).thenReturn(null);
+        when(managementTaskQueryPort.findActiveItem("COMIC", 100L, TaskType.IMPORT)).thenReturn(null);
 
         service.applyFinalizeCompleted(completedEventFor(1001L));
         verify(mediaMapper).markImportFinalizedByChapter(1001L, "100/1001");
@@ -670,7 +673,7 @@ class ImportPersistenceServiceTest {
         when(mediaMapper.markImportFinalizedByChapter(1001L, "100/1001")).thenReturn(1);
         when(mediaMapper.selectAllByChapterIds(anyList())).thenReturn(List.of(pendingMedia(2001L, 1001L)));
         when(mediaMapper.countByChapterIdsAndHqStatusNot(anyList(), anyString())).thenReturn(0L);
-        when(managementTaskService.findActiveItem("COMIC", 100L, TaskType.IMPORT)).thenReturn(null);
+        when(managementTaskQueryPort.findActiveItem("COMIC", 100L, TaskType.IMPORT)).thenReturn(null);
 
         service.applyFinalizeCompleted(completedEventFor(1001L));
         service.applyFinalizeCompleted(completedEventFor(1001L));
@@ -691,7 +694,7 @@ class ImportPersistenceServiceTest {
         when(taskMapper.selectById(10L)).thenReturn(task(ImportTaskStatus.IMPORTING));
         when(chapterMapper.selectById(1001L)).thenReturn(chapter(1001L, 0));
         when(comicMapper.selectByIdForUpdate(100L)).thenReturn(comic(ComicStatus.IMPORTING));
-        when(managementTaskService.findActiveItem("COMIC", 100L, TaskType.IMPORT)).thenReturn(null);
+        when(managementTaskQueryPort.findActiveItem("COMIC", 100L, TaskType.IMPORT)).thenReturn(null);
 
         ImportStorageFinalizeFailedEvent event = new ImportStorageFinalizeFailedEvent(
                 UUID.randomUUID(), Instant.now(), 10L, 100L, 0, 1001L,
