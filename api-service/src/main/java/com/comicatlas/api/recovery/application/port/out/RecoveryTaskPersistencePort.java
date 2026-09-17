@@ -1,18 +1,35 @@
 package com.comicatlas.api.recovery.application.port.out;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.comicatlas.api.recovery.infrastructure.persistence.entity.RecoveryTask;
+import com.comicatlas.api.recovery.domain.model.RecoveryTaskStatus;
+
+import java.time.LocalDateTime;
 
 /** 恢复任务应用服务访问持久化层的输出端口。 */
 public interface RecoveryTaskPersistencePort {
 
-    IPage<RecoveryTask> findPage(int page, int size);
+    IPage<RecoveryTaskSnapshot> findPage(int page, int size);
 
-    RecoveryTask findById(Long taskId);
+    RecoveryTaskSnapshot findById(Long taskId);
 
     long countActiveTasks();
 
-    void insert(RecoveryTask task);
+    Long insert(CreateCommand command);
 
-    void update(RecoveryTask task);
+    void update(UpdateCommand command);
+
+    record RecoveryTaskSnapshot(Long id, Long managementTaskId, RecoveryTaskStatus status,
+                                Integer totalComics, Integer recoveredComics, Integer skippedComics,
+                                Integer placeholderComics, Integer errorComics, String errorMessage,
+                                String errorDetails, Integer retryCount, LocalDateTime createdAt,
+                                LocalDateTime startedAt, LocalDateTime endedAt) { }
+
+    record CreateCommand(RecoveryTaskStatus status, Integer totalComics, Integer recoveredComics,
+                         Integer skippedComics, Integer placeholderComics, Integer errorComics,
+                         Integer retryCount) { }
+
+    record UpdateCommand(Long id, Long managementTaskId, RecoveryTaskStatus status, Integer totalComics,
+                         Integer recoveredComics, Integer skippedComics, Integer placeholderComics,
+                         Integer errorComics, String errorMessage, String errorDetails, Integer retryCount,
+                         LocalDateTime startedAt, LocalDateTime endedAt) { }
 }

@@ -3,8 +3,8 @@ package com.comicatlas.api.recovery.application.service.impl;
 import com.comicatlas.api.recovery.interfaces.rest.dto.RecoveryProgressVO;
 import com.comicatlas.api.recovery.engine.RecoveryEngine;
 import com.comicatlas.api.recovery.domain.model.RecoveryTaskStatus;
-import com.comicatlas.api.recovery.infrastructure.persistence.entity.RecoveryTask;
 import com.comicatlas.api.recovery.application.port.out.RecoveryTaskPersistencePort;
+import com.comicatlas.api.recovery.application.port.out.RecoveryTaskPersistencePort.RecoveryTaskSnapshot;
 import com.comicatlas.api.task.interfaces.rest.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.task.domain.model.ManagementTaskStatus;
 import com.comicatlas.api.task.domain.model.TaskType;
@@ -47,18 +47,14 @@ public class RecoveryBatchServiceImpl implements RecoveryBatchService {
         if (isProcessed(key)) {
             return;
         }
-        RecoveryTask task = persistencePort.findById(event.taskId());
-        if (task == null || TERMINAL_STATUSES.contains(task.getStatus())) {
+        RecoveryTaskSnapshot task = persistencePort.findById(event.taskId());
+        if (task == null || TERMINAL_STATUSES.contains(task.status())) {
             markProcessed(key);
             return;
         }
-        task.setStatus(RecoveryTaskStatus.RUNNING);
-        task.setStartedAt(LocalDateTime.now());
-        task.setTotalComics(event.comicIds().size());
-        task.setRecoveredComics(0); task.setSkippedComics(0);
-        task.setPlaceholderComics(0); task.setErrorComics(0);
-        task.setErrorMessage(null); task.setErrorDetails(null);
-        persistencePort.update(task);
+        LocalDateTime startedAt = LocalDateTime.now();
+        task = save(task, RecoveryTaskStatus.RUNNING, event.comicIds().size(), 0, 0, 0, 0,
+                null, null, startedAt, task.endedAt());
         ManagementTaskItemResponse item = syncItem(event.taskId(), ManagementTaskStatus.RUNNING, null, null, null);
         int processed = 0, recovered = 0, skipped = 0, placeholder = 0, errors = 0;
         for (Long comicId : event.comicIds()) {
@@ -67,22 +63,20 @@ public class RecoveryBatchServiceImpl implements RecoveryBatchService {
                 processed = progress.totalComics(); recovered += progress.recoveredComics();
                 skipped += progress.skippedComics(); placeholder += progress.placeholderComics();
                 errors += progress.errorComics();
-                task.setRecoveredComics(recovered); task.setSkippedComics(skipped);
-                task.setPlaceholderComics(placeholder); task.setErrorComics(errors);
-                if (progress.lastError() != null) {
-                    task.setErrorMessage(progress.lastError());
-                }
-                persistencePort.update(task);
+                String errorMessage = progress.lastError() != null ? progress.lastError() : task.errorMessage();
+                task = save(task, RecoveryTaskStatus.RUNNING, event.comicIds().size(), recovered, skipped,
+                        placeholder, errors, errorMessage, task.errorDetails(), task.startedAt(), task.endedAt());
                 updateProgress(item, processed, event.comicIds().size(), event.taskId(), recovered, skipped, placeholder, errors);
             } catch (BusinessException exception) {
                 log.error("恢复漫画失败: taskId={}, comicId={}", event.taskId(), comicId, exception);
-                errors++; processed++; task.setErrorComics(errors);
-                task.setErrorMessage(exception.getMessage()); persistencePort.update(task);
+                errors++; processed++;
+                task = save(task, RecoveryTaskStatus.RUNNING, event.comicIds().size(), recovered, skipped,
+                        placeholder, errors, exception.getMessage(), task.errorDetails(), task.startedAt(), task.endedAt());
                 updateProgress(item, processed, event.comicIds().size(), event.taskId(), recovered, skipped, placeholder, errors);
             }
         }
-        task.setStatus(RecoveryTaskStatus.SUCCEEDED); task.setEndedAt(LocalDateTime.now());
-        persistencePort.update(task);
+        task = save(task, RecoveryTaskStatus.SUCCEEDED, task.totalComics(), recovered, skipped, placeholder,
+                errors, task.errorMessage(), task.errorDetails(), task.startedAt(), LocalDateTime.now());
         syncItem(event.taskId(), ManagementTaskStatus.SUCCEEDED, null, RESULT_REF_TYPE, event.taskId());
         markProcessed(key);
     }
@@ -100,26 +94,43 @@ public class RecoveryBatchServiceImpl implements RecoveryBatchService {
         if (isProcessed(key)) {
             return;
         }
-        RecoveryTask task = persistencePort.findById(event.taskId());
-        if (task == null || TERMINAL_STATUSES.contains(task.getStatus())) { markProcessed(key); return; }
-        task.setStatus(RecoveryTaskStatus.FAILED); task.setEndedAt(LocalDateTime.now());
-        task.setErrorMessage(event.errorMessage()); persistencePort.update(task);
+        RecoveryTaskSnapshot task = persistencePort.findById(event.taskId());
+        if (task == null || TERMINAL_STATUSES.contains(task.status())) { markProcessed(key); return; }
+        save(task, RecoveryTaskStatus.FAILED, task.totalComics(), task.recoveredComics(), task.skippedComics(),
+                task.placeholderComics(), task.errorComics(), event.errorMessage(), task.errorDetails(),
+                task.startedAt(), LocalDateTime.now());
         syncItem(event.taskId(), ManagementTaskStatus.FAILED, event.errorMessage(), RESULT_REF_TYPE, event.taskId());
         markProcessed(key);
     }
 
     public void markProcessingFailure(Long taskId, Exception exception) {
         try {
-            RecoveryTask task = persistencePort.findById(taskId);
-            if (task != null && !TERMINAL_STATUSES.contains(task.getStatus())) {
-                task.setStatus(RecoveryTaskStatus.FAILED); task.setEndedAt(LocalDateTime.now());
-                task.setErrorMessage("事件处理异常: " + exception.getMessage());
-                persistencePort.update(task);
-                syncItem(taskId, ManagementTaskStatus.FAILED, task.getErrorMessage(), RESULT_REF_TYPE, taskId);
+            RecoveryTaskSnapshot task = persistencePort.findById(taskId);
+            if (task != null && !TERMINAL_STATUSES.contains(task.status())) {
+                String errorMessage = "事件处理异常: " + exception.getMessage();
+                save(task, RecoveryTaskStatus.FAILED, task.totalComics(), task.recoveredComics(),
+                        task.skippedComics(), task.placeholderComics(), task.errorComics(), errorMessage,
+                        task.errorDetails(), task.startedAt(), LocalDateTime.now());
+                syncItem(taskId, ManagementTaskStatus.FAILED, errorMessage, RESULT_REF_TYPE, taskId);
             }
         } catch (DataAccessException updateException) {
             log.error("标记恢复任务失败时出错, taskId={}", taskId, updateException);
         }
+    }
+
+    private RecoveryTaskSnapshot save(RecoveryTaskSnapshot task, RecoveryTaskStatus status, Integer totalComics,
+                                      Integer recoveredComics, Integer skippedComics, Integer placeholderComics,
+                                      Integer errorComics, String errorMessage, String errorDetails,
+                                      LocalDateTime startedAt, LocalDateTime endedAt) {
+        RecoveryTaskSnapshot updatedTask = new RecoveryTaskSnapshot(task.id(), task.managementTaskId(), status,
+                totalComics, recoveredComics, skippedComics, placeholderComics, errorComics, errorMessage,
+                errorDetails, task.retryCount(), task.createdAt(), startedAt, endedAt);
+        persistencePort.update(new RecoveryTaskPersistencePort.UpdateCommand(updatedTask.id(),
+                updatedTask.managementTaskId(), updatedTask.status(), updatedTask.totalComics(),
+                updatedTask.recoveredComics(), updatedTask.skippedComics(), updatedTask.placeholderComics(),
+                updatedTask.errorComics(), updatedTask.errorMessage(), updatedTask.errorDetails(),
+                updatedTask.retryCount(), updatedTask.startedAt(), updatedTask.endedAt()));
+        return updatedTask;
     }
 
     private ManagementTaskItemResponse syncItem(Long taskId, ManagementTaskStatus status,

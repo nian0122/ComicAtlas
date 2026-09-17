@@ -5,9 +5,11 @@ import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.api.recovery.domain.model.RecoveryTaskStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.recovery.interfaces.rest.dto.RecoveryTaskVO;
-import com.comicatlas.api.recovery.infrastructure.persistence.entity.RecoveryTask;
 import com.comicatlas.api.recovery.application.port.in.RecoveryTaskService;
 import com.comicatlas.api.recovery.application.port.out.RecoveryTaskPersistencePort;
+import com.comicatlas.api.recovery.application.port.out.RecoveryTaskPersistencePort.CreateCommand;
+import com.comicatlas.api.recovery.application.port.out.RecoveryTaskPersistencePort.RecoveryTaskSnapshot;
+import com.comicatlas.api.recovery.application.port.out.RecoveryTaskPersistencePort.UpdateCommand;
 import com.comicatlas.api.task.interfaces.rest.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.task.interfaces.rest.dto.ManagementTaskResponse;
 import com.comicatlas.api.task.application.port.in.ManagementTaskService;
@@ -48,9 +50,9 @@ public class RecoveryTaskServiceImpl implements RecoveryTaskService {
     public RecoveryTaskVO createRecoveryTask() {
         rejectActiveTask();
 
-        RecoveryTask task = createRecoveryTaskRecord();
+        RecoveryTaskSnapshot task = createRecoveryTaskRecord();
 
-        Long taskId = task.getId();
+        Long taskId = task.id();
         // 写入 Outbox（同事务），由 relay 异步发布，保证 DB 与消息一致
         outboxService.enqueue(new RecoveryRequestedEvent(UUID.randomUUID(), Instant.now(), taskId),
                 MqExchanges.RECOVERY, MqRoutingKeys.RECOVERY_REQUESTED);
@@ -67,7 +69,7 @@ public class RecoveryTaskServiceImpl implements RecoveryTaskService {
 
     @Override
     public RecoveryTaskVO getTaskDetail(Long id) {
-        RecoveryTask recoveryTask = persistencePort.findById(id);
+        RecoveryTaskSnapshot recoveryTask = persistencePort.findById(id);
         if (recoveryTask == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在");
         }
@@ -77,57 +79,57 @@ public class RecoveryTaskServiceImpl implements RecoveryTaskService {
     @Override
     @Transactional
     public RecoveryTaskVO retryTask(Long id) {
-        RecoveryTask recoveryTask = persistencePort.findById(id);
+        RecoveryTaskSnapshot recoveryTask = persistencePort.findById(id);
         if (recoveryTask == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在");
         }
-        if (recoveryTask.getStatus() != RecoveryTaskStatus.FAILED) {
+        if (recoveryTask.status() != RecoveryTaskStatus.FAILED) {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "仅 FAILED 状态可重试");
         }
 
-        recoveryTask.setStatus(RecoveryTaskStatus.QUEUED);
-        recoveryTask.setRetryCount(recoveryTask.getRetryCount() + 1);
-        recoveryTask.setErrorMessage(null);
-        recoveryTask.setStartedAt(null);
-        recoveryTask.setEndedAt(null);
-        persistencePort.update(recoveryTask);
+        int retryCount = recoveryTask.retryCount() + 1;
+        persistencePort.update(new UpdateCommand(recoveryTask.id(), recoveryTask.managementTaskId(),
+                RecoveryTaskStatus.QUEUED, recoveryTask.totalComics(), recoveryTask.recoveredComics(),
+                recoveryTask.skippedComics(), recoveryTask.placeholderComics(), recoveryTask.errorComics(), null,
+                recoveryTask.errorDetails(), retryCount, null, null));
 
         // 同步统一任务重置（仅状态，不在此重新入队——恢复事件由下方 Outbox 重发）
-        if (recoveryTask.getManagementTaskId() != null) {
-            managementTaskService.resetTaskState(recoveryTask.getManagementTaskId());
+        if (recoveryTask.managementTaskId() != null) {
+            managementTaskService.resetTaskState(recoveryTask.managementTaskId());
         }
 
-        Long taskId = recoveryTask.getId();
+        Long taskId = recoveryTask.id();
         // 写入 Outbox（同事务），由 relay 异步发布
         outboxService.enqueue(new RecoveryRequestedEvent(UUID.randomUUID(), Instant.now(), taskId),
                 MqExchanges.RECOVERY, MqRoutingKeys.RECOVERY_REQUESTED);
 
         log.info("恢复任务重试: taskId={}", taskId);
-        return toVO(recoveryTask);
+        return toVO(new RecoveryTaskSnapshot(recoveryTask.id(), recoveryTask.managementTaskId(),
+                RecoveryTaskStatus.QUEUED, recoveryTask.totalComics(), recoveryTask.recoveredComics(),
+                recoveryTask.skippedComics(), recoveryTask.placeholderComics(), recoveryTask.errorComics(), null,
+                recoveryTask.errorDetails(), retryCount, recoveryTask.createdAt(), null, null));
     }
 
     @Override
     @Transactional
     public void updateTask(RecoveryTaskVO taskVO) {
-        RecoveryTask recoveryTask = persistencePort.findById(taskVO.getId());
+        RecoveryTaskSnapshot recoveryTask = persistencePort.findById(taskVO.getId());
         if (recoveryTask == null) {
             return;
         }
 
-        if (taskVO.getStatus() != null) {
-            recoveryTask.setStatus(fromName(taskVO.getStatus()));
-        }
-        if (taskVO.getTotalComics() != null) { recoveryTask.setTotalComics(taskVO.getTotalComics()); }
-        if (taskVO.getRecoveredComics() != null) { recoveryTask.setRecoveredComics(taskVO.getRecoveredComics()); }
-        if (taskVO.getSkippedComics() != null) { recoveryTask.setSkippedComics(taskVO.getSkippedComics()); }
-        if (taskVO.getPlaceholderComics() != null) { recoveryTask.setPlaceholderComics(taskVO.getPlaceholderComics()); }
-        if (taskVO.getErrorComics() != null) { recoveryTask.setErrorComics(taskVO.getErrorComics()); }
-        if (taskVO.getErrorMessage() != null) { recoveryTask.setErrorMessage(taskVO.getErrorMessage()); }
-        if (taskVO.getErrorDetails() != null) { recoveryTask.setErrorDetails(taskVO.getErrorDetails()); }
-        if (taskVO.getStartedAt() != null) { recoveryTask.setStartedAt(taskVO.getStartedAt()); }
-        if (taskVO.getEndedAt() != null) { recoveryTask.setEndedAt(taskVO.getEndedAt()); }
-
-        persistencePort.update(recoveryTask);
+        persistencePort.update(new UpdateCommand(recoveryTask.id(), recoveryTask.managementTaskId(),
+                taskVO.getStatus() == null ? recoveryTask.status() : fromName(taskVO.getStatus()),
+                valueOrDefault(taskVO.getTotalComics(), recoveryTask.totalComics()),
+                valueOrDefault(taskVO.getRecoveredComics(), recoveryTask.recoveredComics()),
+                valueOrDefault(taskVO.getSkippedComics(), recoveryTask.skippedComics()),
+                valueOrDefault(taskVO.getPlaceholderComics(), recoveryTask.placeholderComics()),
+                valueOrDefault(taskVO.getErrorComics(), recoveryTask.errorComics()),
+                taskVO.getErrorMessage() == null ? recoveryTask.errorMessage() : taskVO.getErrorMessage(),
+                taskVO.getErrorDetails() == null ? recoveryTask.errorDetails() : taskVO.getErrorDetails(),
+                recoveryTask.retryCount(),
+                taskVO.getStartedAt() == null ? recoveryTask.startedAt() : taskVO.getStartedAt(),
+                taskVO.getEndedAt() == null ? recoveryTask.endedAt() : taskVO.getEndedAt()));
     }
 
     private void rejectActiveTask() {
@@ -137,21 +139,14 @@ public class RecoveryTaskServiceImpl implements RecoveryTaskService {
         }
     }
 
-    private RecoveryTask createRecoveryTaskRecord() {
-        RecoveryTask task = new RecoveryTask();
-        task.setStatus(RecoveryTaskStatus.QUEUED);
-        task.setTotalComics(0);
-        task.setRecoveredComics(0);
-        task.setSkippedComics(0);
-        task.setPlaceholderComics(0);
-        task.setErrorComics(0);
-        task.setRetryCount(0);
-        persistencePort.insert(task);
+    private RecoveryTaskSnapshot createRecoveryTaskRecord() {
+        Long taskId = persistencePort.insert(new CreateCommand(RecoveryTaskStatus.QUEUED, 0, 0, 0, 0, 0, 0));
 
-        ManagementTaskResponse mgmtResp = createManagementTaskForRecovery(task.getId());
-        task.setManagementTaskId(mgmtResp.getId());
-        persistencePort.update(task);
-        return task;
+        ManagementTaskResponse mgmtResp = createManagementTaskForRecovery(taskId);
+        persistencePort.update(new UpdateCommand(taskId, mgmtResp.getId(), RecoveryTaskStatus.QUEUED,
+                0, 0, 0, 0, 0, null, null, 0, null, null));
+        return new RecoveryTaskSnapshot(taskId, mgmtResp.getId(), RecoveryTaskStatus.QUEUED,
+                0, 0, 0, 0, 0, null, null, 0, null, null, null);
     }
 
     /**
@@ -170,22 +165,21 @@ public class RecoveryTaskServiceImpl implements RecoveryTaskService {
         return managementTaskService.createTask(managementTaskRequest, null, null);
     }
 
-    private RecoveryTaskVO toVO(RecoveryTask recoveryTask) {
+    private RecoveryTaskVO toVO(RecoveryTaskSnapshot recoveryTask) {
         RecoveryTaskVO taskVO = new RecoveryTaskVO();
-        taskVO.setId(recoveryTask.getId());
-        taskVO.setStatus(recoveryTask.getStatus() == null ? null : recoveryTask.getStatus().name());
-        taskVO.setTotalComics(recoveryTask.getTotalComics());
-        taskVO.setRecoveredComics(recoveryTask.getRecoveredComics());
-        taskVO.setSkippedComics(recoveryTask.getSkippedComics());
-        taskVO.setPlaceholderComics(recoveryTask.getPlaceholderComics());
-        taskVO.setErrorComics(recoveryTask.getErrorComics());
-        taskVO.setErrorMessage(recoveryTask.getErrorMessage());
-        taskVO.setErrorDetails(recoveryTask.getErrorDetails());
-        taskVO.setRetryCount(recoveryTask.getRetryCount());
-        taskVO.setCreatedAt(recoveryTask.getCreatedAt());
-        taskVO.setStartedAt(recoveryTask.getStartedAt());
-        taskVO.setEndedAt(recoveryTask.getEndedAt());
+        taskVO.setId(recoveryTask.id());
+        taskVO.setStatus(recoveryTask.status() == null ? null : recoveryTask.status().name());
+        taskVO.setTotalComics(recoveryTask.totalComics()); taskVO.setRecoveredComics(recoveryTask.recoveredComics());
+        taskVO.setSkippedComics(recoveryTask.skippedComics()); taskVO.setPlaceholderComics(recoveryTask.placeholderComics());
+        taskVO.setErrorComics(recoveryTask.errorComics()); taskVO.setErrorMessage(recoveryTask.errorMessage());
+        taskVO.setErrorDetails(recoveryTask.errorDetails()); taskVO.setRetryCount(recoveryTask.retryCount());
+        taskVO.setCreatedAt(recoveryTask.createdAt()); taskVO.setStartedAt(recoveryTask.startedAt());
+        taskVO.setEndedAt(recoveryTask.endedAt());
         return taskVO;
+    }
+
+    private static Integer valueOrDefault(Integer value, Integer fallback) {
+        return value == null ? fallback : value;
     }
 
     /**
