@@ -88,4 +88,4 @@ infrastructure ──┼──> application ──> domain
 - [x] `importer`：导入命令、重试、最终化及首次落库均通过应用端口和应用模型访问持久化，ORM Entity 仅位于基础设施适配器。
 - [x] `task`：状态机、查询模型和统一任务写模型均通过应用端口访问持久化，ORM Entity 仅位于基础设施适配器。
 - [x] `recovery`：恢复任务与恢复引擎均通过应用端口访问持久化，ORM Entity/Mapper 仅位于基础设施适配器。
-- [~] 下一阶段：将应用层入站/出站端口中的 MyBatis-Plus 分页类型替换为应用层分页模型；在此之前，本分支仅对实体/Mapper 越界完成严格端口隔离，不宣称所有框架类型均已清除。
+- [x] 应用层入站/出站端口统一使用 `PageResult`，MyBatis-Plus `IPage`/`Page` 仅保留在基础设施 Mapper/Adapter 内；应用层不再暴露持久化框架分页类型。
