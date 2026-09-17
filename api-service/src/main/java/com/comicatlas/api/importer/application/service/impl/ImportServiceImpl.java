@@ -1,14 +1,13 @@
 package com.comicatlas.api.importer.application.service.impl;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.api.importer.interfaces.rest.dto.BatchImportRequest;
 import com.comicatlas.api.importer.interfaces.rest.dto.BatchImportResultVO;
 import com.comicatlas.api.importer.interfaces.rest.dto.FailedItem;
 import com.comicatlas.api.importer.interfaces.rest.dto.ImportRequest;
 import com.comicatlas.api.importer.interfaces.rest.dto.ImportStatusVO;
 import com.comicatlas.api.importer.interfaces.rest.dto.ImportTaskVO;
-import com.comicatlas.api.importer.infrastructure.persistence.entity.ImportTask;
+import com.comicatlas.api.importer.application.port.out.ImportCommandPersistencePort.ImportTaskSnapshot;
 import com.comicatlas.api.importer.application.port.out.ImportCommandPersistencePort;
 import com.comicatlas.api.importer.application.service.ImportRetryCoordinator;
 import com.comicatlas.api.importer.application.port.in.ImportService;
@@ -108,9 +107,9 @@ public class ImportServiceImpl implements ImportService {
                 if (!expectedHash.equals(existing.idempotencyPayloadHash())) {
                     throw new ConflictException("幂等键 " + idempotencyKey + " 已存在但 payload 不匹配");
                 }
-                ImportTask existingImport = persistencePort.findByManagementTaskId(existing.id());
+                ImportTaskSnapshot existingImport = persistencePort.findByManagementTaskId(existing.id());
                 if (existingImport != null) {
-                    log.info("导入幂等命中 idempotencyKey={}, 返回已有任务 {}", idempotencyKey, existingImport.getId());
+                    log.info("导入幂等命中 idempotencyKey={}, 返回已有任务 {}", idempotencyKey, existingImport.id());
                     return toVO(existingImport);
                 }
             }
@@ -174,40 +173,36 @@ public class ImportServiceImpl implements ImportService {
         }
 
         // 2. 创建 import_task
-        ImportTask task = new ImportTask();
-        task.setComicId(comic.id());
-        task.setSourceRef(sourceRef);
-        task.setSourceType(toSourceType(sourceType));
-        task.setSourcePath(sourcePath);
-        task.setStatus(ImportTaskStatus.PENDING);
-        persistencePort.insertImportTask(task);
+        Long taskId = persistencePort.insertImportTask(new ImportCommandPersistencePort.CreateTaskCommand(
+                comic.id(), sourceRef, toSourceType(sourceType), sourcePath, null, ImportTaskStatus.PENDING));
 
         // 3. 同事务创建 management task（预创建 comic 与统一任务绑定）
         ManagementTaskResponse managementTaskResponse =
                 createManagementTaskForImport(comic.id(), idempotencyKey, payload(request));
 
         // 4. 回填 import_task.management_task_id
-        task.setManagementTaskId(managementTaskResponse.getId());
-        persistencePort.updateImportTask(task);
+        persistencePort.updateImportTask(new ImportCommandPersistencePort.UpdateTaskCommand(taskId,
+                managementTaskResponse.getId(), ImportTaskStatus.PENDING, null, null, null));
 
         // 5. 将事件写入 Outbox（与 DB 同事务），由 relay 异步发布到 MQ
         // EHENTAI 只有 sourceRef（gallery URL），事件契约仍使用 sourcePath 字段承载 Worker 的入口参数。
         String eventSourcePath = sourcePath != null && !sourcePath.isBlank() ? sourcePath : sourceRef;
         ImportTaskCreatedEvent event = new ImportTaskCreatedEvent(
-                UUID.randomUUID(), Instant.now(), task.getId(), comic.id(), sourceType, eventSourcePath);
+                UUID.randomUUID(), Instant.now(), taskId, comic.id(), sourceType, eventSourcePath);
         outboxService.enqueue(event, MqExchanges.IMPORT, MqRoutingKeys.TASK_CREATED);
 
         log.info("导入任务创建: taskId={}, comicId={}, managementTaskId={}, sourceType={}",
-                task.getId(), comic.id(), task.getManagementTaskId(), sourceType);
-        return toVO(task);
+                taskId, comic.id(), managementTaskResponse.getId(), sourceType);
+        return toVO(new ImportTaskSnapshot(taskId, managementTaskResponse.getId(), comic.id(), sourceRef,
+                toSourceType(sourceType), sourcePath, null, ImportTaskStatus.PENDING, null, null, null,
+                null, null, null, null, null, null, null, null, null));
     }
 
     @Override
     public IPage<ImportTaskVO> listTasks(Integer page, Integer size, String status, String batchId) {
         ImportTaskStatus statusEnum = status != null ? parseImportStatus(status) : null;
-        Page<ImportTask> pageRequest = new Page<>(
-                page != null ? page : DEFAULT_PAGE_NUMBER, size != null ? size : DEFAULT_PAGE_SIZE);
-        return persistencePort.findPage(pageRequest, statusEnum, batchId).convert(this::toVO);
+        return persistencePort.findPage(page != null ? page : DEFAULT_PAGE_NUMBER,
+                size != null ? size : DEFAULT_PAGE_SIZE, statusEnum, batchId).convert(this::toVO);
     }
 
     @Override
@@ -235,30 +230,25 @@ public class ImportServiceImpl implements ImportService {
                                     toSourceType(sourceType), ComicStatus.IMPORTING, name,
                                     null, null, path));
 
-                    ImportTask task = new ImportTask();
-                    task.setComicId(comic.id());
-                    task.setSourceType(toSourceType(sourceType));
-                    task.setSourcePath(path);
-                    task.setBatchId(batchId);
-                    task.setStatus(ImportTaskStatus.PENDING);
-                    persistencePort.insertImportTask(task);
+                    Long taskId = persistencePort.insertImportTask(new ImportCommandPersistencePort.CreateTaskCommand(
+                            comic.id(), null, toSourceType(sourceType), path, batchId, ImportTaskStatus.PENDING));
 
                     // 同步建立统一任务并回填 management_task_id
                     ManagementTaskResponse managementTaskResponse = createManagementTaskForImport(comic.id(), null, null);
-                    task.setManagementTaskId(managementTaskResponse.getId());
-                    persistencePort.updateImportTask(task);
+                    persistencePort.updateImportTask(new ImportCommandPersistencePort.UpdateTaskCommand(taskId,
+                            managementTaskResponse.getId(), ImportTaskStatus.PENDING, null, null, null));
 
                     // 写入 Outbox（同事务）
                     ImportTaskCreatedEvent event = new ImportTaskCreatedEvent(
-                            UUID.randomUUID(), Instant.now(), task.getId(), comic.id(), sourceType, path);
+                            UUID.randomUUID(), Instant.now(), taskId, comic.id(), sourceType, path);
                     outboxService.enqueue(event, MqExchanges.IMPORT, MqRoutingKeys.TASK_CREATED);
 
-                    return new long[]{task.getId(), comic.id()};
+                    return new long[]{taskId, comic.id()};
                 });
 
                 long taskId = createdIds[0];
 
-                ImportTask task = persistencePort.findImportTask(taskId);
+                ImportTaskSnapshot task = persistencePort.findImportTask(taskId);
                 succeeded.add(toVO(task));
 
             } catch (BusinessException | DataAccessException ex) {
@@ -283,7 +273,7 @@ public class ImportServiceImpl implements ImportService {
 
     @Override
     public ImportTaskVO getTaskDetail(Long id) {
-        ImportTask task = persistencePort.findImportTask(id);
+        ImportTaskSnapshot task = persistencePort.findImportTask(id);
         if (task == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在");
         }
@@ -292,35 +282,36 @@ public class ImportServiceImpl implements ImportService {
 
     @Override
     public ImportStatusVO getTaskStatus(Long id) {
-        ImportTask task = persistencePort.findImportTask(id);
+        ImportTaskSnapshot task = persistencePort.findImportTask(id);
         if (task == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在");
         }
         ImportStatusVO statusView = new ImportStatusVO();
-        statusView.setTaskId(task.getId());
-        statusView.setStatus(statusName(task.getStatus()));
-        statusView.setProgress(task.getProgress());
+        statusView.setTaskId(task.id());
+        statusView.setStatus(statusName(task.status()));
+        statusView.setProgress(task.progress());
         return statusView;
     }
 
     @Override
     @Transactional
     public void cancelTask(Long id) {
-        ImportTask task = persistencePort.findImportTask(id);
+        ImportTaskSnapshot task = persistencePort.findImportTask(id);
         if (task == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在");
         }
-        if (task.getStatus() != null && task.getStatus().isTerminal()) {
+        if (task.status() != null && task.status().isTerminal()) {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "终态任务不可取消");
         }
-        task.setStatus(ImportTaskStatus.CANCELLED);
-        persistencePort.updateImportTask(task);
+        persistencePort.updateImportTask(new ImportCommandPersistencePort.UpdateTaskCommand(
+                task.id(), task.managementTaskId(), ImportTaskStatus.CANCELLED, task.progress(),
+                task.errorMessage(), task.retryCount()));
 
-        Long taskId = task.getId();
-        Long comicId = task.getComicId();
+        Long taskId = task.id();
+        Long comicId = task.comicId();
 
         // 同步统一任务为 CANCELLED 真正终态（即使 item 已 RUNNING）
-        if (task.getManagementTaskId() != null) {
+        if (task.managementTaskId() != null) {
             ImportManagementTaskQueryPort.ItemSnapshot managementItem = managementTaskQueryPort.findActiveItem(
                     TARGET_TYPE_COMIC, comicId, TaskType.IMPORT);
             if (managementItem != null) {
@@ -351,28 +342,28 @@ public class ImportServiceImpl implements ImportService {
     @Override
     @Transactional
     public void retryTask(Long id) {
-        ImportTask task = persistencePort.findImportTask(id);
+        ImportTaskSnapshot task = persistencePort.findImportTask(id);
         if (task == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在");
         }
-        ImportTaskStatus taskStatus = task.getStatus();
+        ImportTaskStatus taskStatus = task.status();
         if (taskStatus != ImportTaskStatus.FAILED && taskStatus != ImportTaskStatus.CANCELLED) {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "仅 FAILED/CANCELLED 状态可重试");
         }
 
         // 统一重试编排：清理旧章节 → import_task 重置 PENDING → comic IMPORTING → 重发 ImportTaskCreatedEvent
         importRetryCoordinator.retry(new com.comicatlas.api.importer.application.port.out.ImportTaskPersistencePort.ImportTaskSnapshot(
-                task.getId(), task.getComicId(), task.getManagementTaskId(), task.getStatus(), task.getRetryCount(),
-                task.getSourceType(), task.getSourcePath(), task.getSourceRef()));
+                task.id(), task.comicId(), task.managementTaskId(), task.status(), task.retryCount(),
+                task.sourceType(), task.sourcePath(), task.sourceRef()));
 
         // 同步统一任务：终态统一任务重置回 QUEUED（attempt 递增，失败/取消 item 重新入队）
         // IMPORT 类型 item 由 ImportRetryCoordinator 幂等守卫保证不重复入队（此时 import_task 已非终态）
-        if (task.getManagementTaskId() != null) {
+        if (task.managementTaskId() != null) {
             try {
-                managementTaskService.retryTask(task.getManagementTaskId());
+                managementTaskService.retryTask(task.managementTaskId());
             } catch (BusinessException ex) {
                 log.warn("统一任务重试跳过（非终态）: managementTaskId={}",
-                        task.getManagementTaskId(), ex);
+                        task.managementTaskId(), ex);
             }
         }
     }
@@ -410,8 +401,8 @@ public class ImportServiceImpl implements ImportService {
         }
     }
 
-    private static String resolveSourceType(ImportTask task) {
-        return task.getSourceType() != null ? task.getSourceType().name() : SourceType.DIRECTORY.name();
+    private static String resolveSourceType(ImportTaskSnapshot task) {
+        return task.sourceType() != null ? task.sourceType().name() : SourceType.DIRECTORY.name();
     }
 
     private static String statusName(ImportTaskStatus status) {
@@ -429,27 +420,20 @@ public class ImportServiceImpl implements ImportService {
         }
     }
 
-    private ImportTaskVO toVO(ImportTask task) {
+    private ImportTaskVO toVO(ImportTaskSnapshot task) {
         ImportTaskVO taskView = new ImportTaskVO();
-        taskView.setId(task.getId());
-        taskView.setComicId(task.getComicId());
-        taskView.setSourceRef(task.getSourceRef());
+        taskView.setId(task.id());
+        taskView.setComicId(task.comicId());
+        taskView.setSourceRef(task.sourceRef());
         taskView.setSourceType(resolveSourceType(task));
-        taskView.setSourcePath(task.getSourcePath());
-        taskView.setBatchId(task.getBatchId());
-        taskView.setStatus(statusName(task.getStatus()));
-        taskView.setProgress(task.getProgress());
-        taskView.setTotalPages(task.getTotalPages());
-        taskView.setDownloadedPages(task.getDownloadedPages());
-        taskView.setDownloadMethod(task.getDownloadMethod());
-        taskView.setDownloadSpeed(task.getDownloadSpeed());
-        taskView.setEtaSeconds(task.getEtaSeconds());
-        taskView.setErrorMessage(task.getErrorMessage());
-        taskView.setRetryCount(task.getRetryCount());
-        taskView.setDurationMs(task.getDurationMs());
-        taskView.setStartTime(task.getStartTime());
-        taskView.setEndTime(task.getEndTime());
-        taskView.setCreatedAt(task.getCreatedAt());
+        taskView.setSourcePath(task.sourcePath()); taskView.setBatchId(task.batchId());
+        taskView.setStatus(statusName(task.status())); taskView.setProgress(task.progress());
+        taskView.setTotalPages(task.totalPages()); taskView.setDownloadedPages(task.downloadedPages());
+        taskView.setDownloadMethod(task.downloadMethod()); taskView.setDownloadSpeed(task.downloadSpeed());
+        taskView.setEtaSeconds(task.etaSeconds()); taskView.setErrorMessage(task.errorMessage());
+        taskView.setRetryCount(task.retryCount()); taskView.setDurationMs(task.durationMs());
+        taskView.setStartTime(task.startTime()); taskView.setEndTime(task.endTime());
+        taskView.setCreatedAt(task.createdAt());
         return taskView;
     }
 }

@@ -1,19 +1,18 @@
 package com.comicatlas.api.importer.application.port.out;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.api.importer.domain.model.ImportTaskStatus;
-import com.comicatlas.api.importer.infrastructure.persistence.entity.ImportTask;
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.enums.SourceType;
+import java.time.LocalDateTime;
 
 /** 导入任务创建、查询和取消所需的持久化输出端口。 */
 public interface ImportCommandPersistencePort {
-    ImportTask findImportTask(Long taskId);
-    ImportTask findByManagementTaskId(Long managementTaskId);
-    IPage<ImportTask> findPage(Page<ImportTask> page, ImportTaskStatus status, String batchId);
-    void insertImportTask(ImportTask task);
-    int updateImportTask(ImportTask task);
+    ImportTaskSnapshot findImportTask(Long taskId);
+    ImportTaskSnapshot findByManagementTaskId(Long managementTaskId);
+    IPage<ImportTaskSnapshot> findPage(int page, int size, ImportTaskStatus status, String batchId);
+    Long insertImportTask(CreateTaskCommand command);
+    int updateImportTask(UpdateTaskCommand command);
     ComicSnapshot findComicBySourceGallery(String sourceType, String galleryId);
     ComicSnapshot insertComic(ComicCreateCommand command);
 
@@ -22,5 +21,22 @@ public interface ImportCommandPersistencePort {
 
     record ComicCreateCommand(SourceType sourceType, ComicStatus status, String title,
                               String sourceGalleryId, String sourceGalleryToken, String sourceRef) {
+    }
+
+    record ImportTaskSnapshot(Long id, Long managementTaskId, Long comicId, String sourceRef,
+                              SourceType sourceType, String sourcePath, String batchId,
+                              ImportTaskStatus status, Integer progress, Integer totalPages,
+                              Integer downloadedPages, String downloadMethod, Long downloadSpeed,
+                              Integer etaSeconds, String errorMessage, Integer retryCount,
+                              LocalDateTime startTime, LocalDateTime endTime, Long durationMs,
+                              LocalDateTime createdAt) {
+    }
+
+    record CreateTaskCommand(Long comicId, String sourceRef, SourceType sourceType, String sourcePath,
+                             String batchId, ImportTaskStatus status) {
+    }
+
+    record UpdateTaskCommand(Long id, Long managementTaskId, ImportTaskStatus status, Integer progress,
+                             String errorMessage, Integer retryCount) {
     }
 }

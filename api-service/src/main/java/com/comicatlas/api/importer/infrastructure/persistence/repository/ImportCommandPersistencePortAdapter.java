@@ -18,15 +18,32 @@ public class ImportCommandPersistencePortAdapter implements ImportCommandPersist
     private final ImportTaskMapper importTaskMapper;
     private final ComicMapper comicMapper;
 
-    @Override public ImportTask findImportTask(Long taskId) { return importTaskMapper.selectById(taskId); }
-    @Override public ImportTask findByManagementTaskId(Long managementTaskId) {
-        return importTaskMapper.selectByManagementTaskId(managementTaskId);
+    @Override public ImportCommandPersistencePort.ImportTaskSnapshot findImportTask(Long taskId) {
+        return toSnapshot(importTaskMapper.selectById(taskId));
     }
-    @Override public IPage<ImportTask> findPage(Page<ImportTask> page, ImportTaskStatus status, String batchId) {
-        return importTaskMapper.selectPageByConditions(page, status, batchId);
+    @Override public ImportCommandPersistencePort.ImportTaskSnapshot findByManagementTaskId(Long managementTaskId) {
+        return toSnapshot(importTaskMapper.selectByManagementTaskId(managementTaskId));
     }
-    @Override public void insertImportTask(ImportTask task) { importTaskMapper.insert(task); }
-    @Override public int updateImportTask(ImportTask task) { return importTaskMapper.updateById(task); }
+    @Override public IPage<ImportCommandPersistencePort.ImportTaskSnapshot> findPage(
+            int page, int size, ImportTaskStatus status, String batchId) {
+        IPage<ImportTask> result = importTaskMapper.selectPageByConditions(new Page<>(page, size), status, batchId);
+        return result.convert(this::toSnapshot);
+    }
+    @Override public Long insertImportTask(ImportCommandPersistencePort.CreateTaskCommand command) {
+        ImportTask task = new ImportTask();
+        task.setComicId(command.comicId()); task.setSourceRef(command.sourceRef());
+        task.setSourceType(command.sourceType()); task.setSourcePath(command.sourcePath());
+        task.setBatchId(command.batchId()); task.setStatus(command.status());
+        importTaskMapper.insert(task);
+        return task.getId();
+    }
+    @Override public int updateImportTask(ImportCommandPersistencePort.UpdateTaskCommand command) {
+        ImportTask task = new ImportTask();
+        task.setId(command.id()); task.setManagementTaskId(command.managementTaskId());
+        task.setStatus(command.status()); task.setProgress(command.progress());
+        task.setErrorMessage(command.errorMessage()); task.setRetryCount(command.retryCount());
+        return importTaskMapper.updateById(task);
+    }
     @Override public ImportCommandPersistencePort.ComicSnapshot findComicBySourceGallery(
             String sourceType, String galleryId) {
         Comic comic = comicMapper.selectBySourceTypeAndGalleryId(sourceType, galleryId);
@@ -45,5 +62,14 @@ public class ImportCommandPersistencePortAdapter implements ImportCommandPersist
         comicMapper.insert(comic);
         return new ImportCommandPersistencePort.ComicSnapshot(
                 comic.getId(), comic.getStatus(), comic.getVersion());
+    }
+
+    private ImportCommandPersistencePort.ImportTaskSnapshot toSnapshot(ImportTask task) {
+        return task == null ? null : new ImportCommandPersistencePort.ImportTaskSnapshot(task.getId(),
+                task.getManagementTaskId(), task.getComicId(), task.getSourceRef(), task.getSourceType(),
+                task.getSourcePath(), task.getBatchId(), task.getStatus(), task.getProgress(), task.getTotalPages(),
+                task.getDownloadedPages(), task.getDownloadMethod(), task.getDownloadSpeed(), task.getEtaSeconds(),
+                task.getErrorMessage(), task.getRetryCount(), task.getStartTime(), task.getEndTime(),
+                task.getDurationMs(), task.getCreatedAt());
     }
 }
