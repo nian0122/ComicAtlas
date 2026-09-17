@@ -1,0 +1,65 @@
+import { api } from '@/shared/api/http'
+import type { OperationSubmitResult, PageResult } from '@/shared/api/types'
+import type { CatalogNode, ComicDetailVO, ComicListQuery, ComicListVO } from '@/entities/comic/model/types'
+import type { ComicTagUpdateDTO } from '@/entities/tag'
+import type {
+  BatchComicUpdateDTO,
+  CatalogManagementRequest,
+  CatalogVO,
+  ChapterManagementRequest,
+  ChapterManagementVO,
+  ComicMetadataDTO,
+  ComicMetadataUpdateDTO,
+  MediaReorderRequest,
+  MediaReorderResult,
+} from '@/entities/comic/model/management-types'
+
+export const managementChapterApi = {
+  detail: (chapterId: number) => api.get(`/manage/chapters/${chapterId}`),
+}
+
+export const managementCatalogApi = {
+  tree: (comicId: number) => api.get<readonly CatalogNode[]>(`/manage/comics/${comicId}/catalog`),
+}
+
+export const managementComicApi = {
+  list: (params?: ComicListQuery) => api.get<PageResult<ComicListVO>>('/manage/comics', { params }),
+  detail: (id: number) => api.get<ComicDetailVO>(`/manage/comics/${id}`),
+  getMetadata: (id: number) => api.get<ComicMetadataDTO>(`/manage/comics/${id}/metadata`),
+  getTags: (id: number) => api.get<number[]>(`/manage/comics/${id}/tags`),
+  delete: (id: number) => api.delete(`/manage/comics/${id}`),
+  updateMetadata: (id: number, data: ComicMetadataUpdateDTO) => api.put(`/manage/comics/${id}/metadata`, data),
+  updateTags: (id: number, data: ComicTagUpdateDTO) => api.put(`/manage/comics/${id}/tags`, data),
+  batchUpdate: (data: BatchComicUpdateDTO) => api.post('/manage/comics/batch/update', data),
+}
+
+export const catalogManagementApi = {
+  create: (comicId: number, data: CatalogManagementRequest) =>
+    api.post<CatalogVO>(`/manage/comics/${comicId}/catalogs`, data),
+  rename: (comicId: number, catalogId: number, data: CatalogManagementRequest) =>
+    api.patch<CatalogVO>(`/manage/comics/${comicId}/catalogs/${catalogId}`, data),
+  move: (comicId: number, catalogId: number, data: CatalogManagementRequest) =>
+    api.put<CatalogVO>(`/manage/comics/${comicId}/catalogs/${catalogId}/move`, data),
+  reorder: (comicId: number, catalogId: number, data: CatalogManagementRequest) =>
+    api.put(`/manage/comics/${comicId}/catalogs/${catalogId}/reorder`, data),
+  delete: (comicId: number, catalogId: number, reparentTo?: number) =>
+    api.delete(`/manage/comics/${comicId}/catalogs/${catalogId}`, { params: { reparentTo } }),
+}
+
+export const chapterManagementApi = {
+  create: (comicId: number, data: ChapterManagementRequest) =>
+    api.post<ChapterManagementVO>(`/manage/comics/${comicId}/chapters`, data),
+  rename: (comicId: number, chapterId: number, data: ChapterManagementRequest) =>
+    api.patch<ChapterManagementVO>(`/manage/comics/${comicId}/chapters/${chapterId}`, data),
+  move: (comicId: number, chapterId: number, data: ChapterManagementRequest) =>
+    api.put<ChapterManagementVO>(`/manage/comics/${comicId}/chapters/${chapterId}/move`, data),
+  reorder: (comicId: number, chapterId: number, data: ChapterManagementRequest) =>
+    api.put<ChapterManagementVO>(`/manage/comics/${comicId}/chapters/${chapterId}/reorder`, data),
+  trash: (comicId: number, chapterId: number) => api.delete(`/manage/comics/${comicId}/chapters/${chapterId}`),
+}
+
+export const mediaManagementApi = {
+  reorder: (chapterId: number, data: MediaReorderRequest) =>
+    api.post<MediaReorderResult>(`/manage/chapters/${chapterId}/media/reorder`, data),
+  trash: (mediaId: number) => api.delete<OperationSubmitResult>(`/manage/media/${mediaId}`),
+}

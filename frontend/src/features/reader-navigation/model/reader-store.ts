@@ -1,0 +1,221 @@
+import { defineStore } from 'pinia'
+import { reactive, computed, toRefs } from 'vue'
+import { getApiErrorMessage } from '@/shared/api/http'
+import { readerApi } from '@/entities/chapter'
+import { historyApi } from '@/entities/history'
+import { useHistoryStore } from '@/features/history'
+import type { MediaItemInfo } from '@/entities/media'
+import { clientLogger } from '@/shared/lib/logger'
+
+export interface ReaderState {
+  chapterId: number
+  chapterTitle: string
+  pages: MediaItemInfo[]
+  currentPage: number
+  prevChapterId: number | null
+  nextChapterId: number | null
+  comicId: number
+  loading: boolean
+  error: string | null
+  progressSaveError: string | null
+}
+
+export const useReaderStore = defineStore('reader', () => {
+  const state = reactive<ReaderState>({
+    chapterId: 0,
+    chapterTitle: '',
+    pages: [],
+    currentPage: 1,
+    prevChapterId: null,
+    nextChapterId: null,
+    comicId: 0,
+    loading: false,
+    error: null,
+    progressSaveError: null,
+  })
+
+  const totalPages = computed(() => state.pages.length)
+  const hasPrevPage = computed(() => state.currentPage > 1)
+  const hasNextPage = computed(() => state.currentPage < state.pages.length)
+  const progress = computed(() =>
+    state.pages.length > 0 ? Math.round((state.currentPage / state.pages.length) * 100) : 0,
+  )
+
+  function reset() {
+    state.chapterId = 0
+    state.chapterTitle = ''
+    state.pages = []
+    state.currentPage = 1
+    state.prevChapterId = null
+    state.nextChapterId = null
+    state.loading = false
+    state.error = null
+    state.progressSaveError = null
+  }
+
+  let loadSeq = 0
+  type ProgressPayload = { comicId: number; chapterId: number; pageNumber: number }
+  let pendingProgress: ProgressPayload | null = null
+  let progressSavePromise: Promise<boolean> | null = null
+
+  async function loadChapter(chId: number, preservePage = false) {
+    // 请求序号闸:快速连续切章时 HTTP 响应可能乱序返回,
+    // 只允许最新一次请求写入 state,过期响应直接丢弃
+    const seq = ++loadSeq
+    state.loading = true
+    state.error = null
+    state.chapterId = chId
+    if (!preservePage) {
+      state.currentPage = 1
+    }
+
+    try {
+      const res = await readerApi.chapter(chId)
+      if (seq !== loadSeq) return
+      const data = res.data
+      state.comicId = data.comicId
+      state.chapterTitle = data.chapterTitle
+      state.pages = data.pages
+      state.prevChapterId = data.prevChapterId
+      state.nextChapterId = data.nextChapterId
+    } catch (err: unknown) {
+      if (seq !== loadSeq) return
+      state.error = getApiErrorMessage(err, '加载章节失败')
+      state.pages = []
+    } finally {
+      if (seq === loadSeq) {
+        state.loading = false
+      }
+    }
+  }
+
+  async function restoreProgress() {
+    if (!state.comicId || state.pages.length === 0) return
+    const seq = loadSeq
+    const chapterId = state.chapterId
+    try {
+      const res = await historyApi.get(state.comicId)
+      const historyChapterId = res.data?.chapterId
+      const pageNumber = res.data?.pageNumber
+      // 历史请求可能晚于切章返回，过期响应不得覆盖新章节的当前页。
+      // reading_history 保存的是漫画最近一次阅读位置，只有历史章节与当前章节一致时才能恢复章节内页码。
+      if (
+        seq === loadSeq &&
+        state.chapterId === chapterId &&
+        historyChapterId === chapterId &&
+        pageNumber &&
+        pageNumber >= 1 &&
+        pageNumber <= state.pages.length
+      ) {
+        state.currentPage = pageNumber
+      }
+    } catch {
+      // silent: start from page 1
+    }
+  }
+
+  /**
+   * 同步阅读进度到后端（upsert）。
+   *
+   * @return 保存是否成功；调用方可据此清除本地的 dirty 标志，
+   *         以便页面卸载兜底时只重发未确认的进度
+   */
+  async function saveProgress(): Promise<boolean> {
+    if (!state.comicId || !state.chapterId) return false
+    pendingProgress = {
+      comicId: state.comicId,
+      chapterId: state.chapterId,
+      pageNumber: state.currentPage,
+    }
+    if (progressSavePromise) return progressSavePromise
+    progressSavePromise = flushProgress()
+    return progressSavePromise
+  }
+
+  async function flushProgress(): Promise<boolean> {
+    let saved = true
+    let failedPayload: ProgressPayload | null = null
+    try {
+      while (pendingProgress) {
+        const payload = pendingProgress
+        failedPayload = payload
+        pendingProgress = null
+        await historyApi.update(payload.comicId, {
+          chapterId: payload.chapterId,
+          pageNumber: payload.pageNumber,
+        })
+        useHistoryStore().updateEntry(payload.comicId, payload.chapterId, payload.pageNumber)
+        state.progressSaveError = null
+        failedPayload = null
+      }
+    } catch (error: unknown) {
+      saved = false
+      // 进度保存不应阻断翻页，但必须保留错误状态供页面恢复，并留下可检索诊断信息。
+      state.progressSaveError = getApiErrorMessage(error, '阅读进度保存失败')
+      clientLogger.error('阅读进度保存失败', {
+        operation: 'history.update',
+        comicId: failedPayload?.comicId,
+        chapterId: failedPayload?.chapterId,
+      })
+    } finally {
+      progressSavePromise = null
+    }
+    return saved
+  }
+
+  /**
+   * 页面卸载兜底保存（fire-and-forget）。
+   * <p>
+   * 普通 axios XHR 在页面关闭/刷新卸载时可能被浏览器中止，而阅读进度
+   * 的 300ms debounce 也可能尚未触发。此方法用 fetch keepalive 发送，
+   * 确保关闭标签页/刷新/切后台时最终进度仍能送达后端。
+   * 载荷远小于 keepalive 64KB 上限，不解析响应。
+   */
+  function saveProgressKeepalive() {
+    if (!state.comicId || !state.chapterId) return
+    fetch(`/api/history/${state.comicId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chapterId: state.chapterId,
+        pageNumber: state.currentPage,
+      }),
+      keepalive: true,
+    }).catch((error: unknown) => {
+      clientLogger.error('页面卸载时阅读进度上报失败', {
+        operation: 'history.update.keepalive',
+        comicId: state.comicId,
+        chapterId: state.chapterId,
+        reason: error instanceof Error ? error.name : 'unknown',
+      })
+    })
+  }
+
+  function nextPage() {
+    if (state.currentPage < state.pages.length) state.currentPage++
+  }
+
+  function prevPage() {
+    if (state.currentPage > 1) state.currentPage--
+  }
+
+  function goToPage(page: number) {
+    if (page >= 1 && page <= state.pages.length) state.currentPage = page
+  }
+
+  return {
+    ...toRefs(state),
+    totalPages,
+    hasPrevPage,
+    hasNextPage,
+    progress,
+    reset,
+    loadChapter,
+    restoreProgress,
+    saveProgress,
+    saveProgressKeepalive,
+    nextPage,
+    prevPage,
+    goToPage,
+  }
+})

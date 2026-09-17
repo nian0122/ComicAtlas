@@ -1,7 +1,13 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { storageService } from '@/features/storage/service'
-import type { ComicStorageItem, ChapterStorageItem, StorageStats, StorageOperation, ComicStorageQuery } from '@/features/storage/types'
+import type {
+  ComicStorageItem,
+  ChapterStorageItem,
+  StorageStats,
+  StorageOperation,
+  ComicStorageQuery,
+} from '@/entities/storage'
 
 export const useStorageStore = defineStore('storage', () => {
   const comicList = ref<ComicStorageItem[]>([])

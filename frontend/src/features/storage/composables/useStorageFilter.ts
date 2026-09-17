@@ -1,5 +1,5 @@
 import { ref, computed, watch } from 'vue'
-import type { ComicStorageItem, ComicStorageQuery } from '@/features/storage/types'
+import type { ComicStorageItem, ComicStorageQuery } from '@/entities/storage'
 
 export type HqStatusFilter = 'ALL' | 'HAS_HQ' | 'NO_HQ'
 export type LqStatusFilter = 'ALL' | 'NEEDS_LQ' | 'READY'
@@ -24,10 +24,7 @@ export interface PaginationState {
   total: number
 }
 
-export function useStorageFilter(
-  getComicList: () => ComicStorageItem[],
-  getServerTotal: () => number,
-) {
+export function useStorageFilter(getComicList: () => ComicStorageItem[], getServerTotal: () => number) {
   const filter = ref<FilterState>({
     hqStatus: 'ALL',
     lqStatus: 'ALL',
@@ -45,7 +42,13 @@ export function useStorageFilter(
   const pageSize = ref(20)
 
   watch(
-    [() => filter.value.hqStatus, () => filter.value.lqStatus, () => filter.value.keyword, () => filter.value.category, () => filter.value.tag],
+    [
+      () => filter.value.hqStatus,
+      () => filter.value.lqStatus,
+      () => filter.value.keyword,
+      () => filter.value.category,
+      () => filter.value.tag,
+    ],
     () => {
       page.value = 1
     },

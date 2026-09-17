@@ -6,9 +6,11 @@
 
 > Vue3 项目的技术层设计：Router、Pinia、API、Types、组件层级、目录结构。
 
+前端当前按 Feature-Sliced Design 六层组织；迁移遗留与边界收口以 [Feature-Sliced Design 改造 TODO](fsd-refactoring-todo.md) 为准。
+
 ---
 
-## 目录结构（当前）
+## 目录结构
 
 样式与公共组件的归属以 [前端目录约定](../../frontend/README.md)、[样式目录规范](../../frontend/src/styles/README.md) 和 [公共组件规范](../../frontend/src/components/README.md) 为准。保留业务模块聚合；全局样式从 `styles/index.scss` 加载，抽离的页面样式集中在 `styles/pages/`，仍由页面通过 `scoped src` 按需引用。
 

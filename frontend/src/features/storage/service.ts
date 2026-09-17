@@ -1,13 +1,8 @@
-import { exportApi, hqApi, lqApi, storageAdminApi } from '@/features/storage/api'
-import { getApiErrorMessage } from '@/services/http'
-import type {
-  ComicStorageQuery,
-  ExportArtifactVO,
-  ExportTaskVO,
-  StorageOperation,
-} from '@/features/storage/types'
+import { exportApi, hqApi, lqApi, storageAdminApi } from '@/entities/storage/api'
+import { getApiErrorMessage } from '@/shared/api/http'
+import type { ComicStorageQuery, ExportArtifactVO, ExportTaskVO, StorageOperation } from '@/entities/storage'
 import type { OperationSubmitResult } from '@/shared/api/types'
-import { StorageOperationType } from '@/features/storage/types'
+import { StorageOperationType } from '@/entities/storage'
 
 export const storageService = {
   async fetchComics(params: ComicStorageQuery) {
