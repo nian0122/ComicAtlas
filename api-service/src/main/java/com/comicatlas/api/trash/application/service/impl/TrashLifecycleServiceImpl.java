@@ -2,15 +2,12 @@ package com.comicatlas.api.trash.application.service.impl;
 
 import com.comicatlas.api.trash.interfaces.rest.dto.TrashReconcileReport;
 
-import com.comicatlas.persistence.comic.entity.Chapter;
-import com.comicatlas.persistence.comic.entity.Comic;
-import com.comicatlas.persistence.comic.entity.Media;
 import com.comicatlas.api.trash.application.port.out.TrashLifecycleCommandPersistencePort;
+import com.comicatlas.api.trash.application.port.out.TrashTargetPort;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.shared.exception.ConflictException;
 import com.comicatlas.api.shared.crypto.DigestService;
-import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.api.storage.infrastructure.config.ApiStorageProperties;
 import com.comicatlas.api.storage.ApiStorageRoot;
 import com.comicatlas.api.task.interfaces.rest.dto.CreateManagementTaskRequest;
@@ -18,7 +15,6 @@ import com.comicatlas.api.task.interfaces.rest.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.task.interfaces.rest.dto.ManagementTaskResponse;
 import com.comicatlas.api.task.interfaces.rest.dto.OperationSubmitResultDTO;
 import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTask;
-import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTaskItem;
 import com.comicatlas.api.task.domain.policy.AllowedOperations;
 import com.comicatlas.api.task.domain.policy.OperationPolicyService;
 import com.comicatlas.api.task.application.port.in.ManagementTaskService;
@@ -31,8 +27,6 @@ import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.dto.TrashManifestDTO;
 import com.comicatlas.common.dto.TrashManifestItemDTO;
-import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
-import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
 import com.comicatlas.api.task.domain.model.TaskType;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import lombok.RequiredArgsConstructor;
@@ -71,6 +65,7 @@ public class TrashLifecycleServiceImpl implements TrashLifecycleService {
     private static final String ROUTING_REQUEST = MqRoutingKeys.COMMAND_REQUESTED;
 
     private final TrashLifecycleCommandPersistencePort persistencePort;
+    private final TrashTargetPort targetPort;
     private final ManagementTaskService managementTaskService;
     private final OutboxService outboxService;
     private final TrashManifestService trashManifestService;
@@ -83,7 +78,7 @@ public class TrashLifecycleServiceImpl implements TrashLifecycleService {
 
     @Transactional
     public OperationSubmitResultDTO trashComic(Long comicId, String idempotencyKey) {
-        Comic comic = persistencePort.findComic(comicId);
+        TrashTargetPort.TargetSnapshot comic = targetPort.find("COMIC", comicId);
         if (comic == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在: " + comicId);
         }
@@ -93,9 +88,9 @@ public class TrashLifecycleServiceImpl implements TrashLifecycleService {
                 return existing;
             }
         }
-        requireAllowed(policyService.forComic(comicStatusName(comic)), OperationPolicyService.OP_DELETE,
-                "漫画状态 " + comic.getStatus() + " 不可回收");
-        ManagementStateMachine.validateComicTransition(comicStatusName(comic), "TRASHING");
+        requireAllowed(policyService.forComic(comic.status()), OperationPolicyService.OP_DELETE,
+                "漫画状态 " + comic.status() + " 不可回收");
+        ManagementStateMachine.validateComicTransition(comic.status(), "TRASHING");
 
         List<TrashManifestDTO.Entry> entries = List.of(
                 entry("HQ", comicId.toString(), "hq/" + comicId),
@@ -103,52 +98,49 @@ public class TrashLifecycleServiceImpl implements TrashLifecycleService {
                 entry("THUMBS", comicId.toString(), "thumbs/" + comicId),
                 entry("METADATA", comicId + ".json", "metadata/" + comicId + ".json"));
 
-        comic.setStatus(ComicStatus.TRASHING);
-        persistencePort.updateComic(comic);
+        targetPort.transition(new TrashTargetPort.TargetUpdateCommand(
+                "COMIC", comicId, "TRASHING", null, null, null));
         return createTrashTask("COMIC", comicId, TaskType.COMIC_DELETE, "回收漫画", entries,
                 idempotencyKey, "comic-delete:" + comicId);
     }
 
     @Transactional
     public OperationSubmitResultDTO trashChapter(Long comicId, Long chapterId) {
-        Chapter chapter = requireChapterInComic(comicId, chapterId);
-        requireAllowed(policyService.forChapter(chapter.getStatus() == null ? null : chapter.getStatus().name()),
+        TrashTargetPort.TargetSnapshot chapter = requireChapterInComic(comicId, chapterId);
+        requireAllowed(policyService.forChapter(chapter.status()),
                 OperationPolicyService.OP_DELETE,
-                "章节状态 " + chapter.getStatus() + " 不可回收");
-        ManagementStateMachine.validateChapterTransition(
-                chapter.getStatus() == null ? null : chapter.getStatus().name(), "TRASHING");
+                "章节状态 " + chapter.status() + " 不可回收");
+        ManagementStateMachine.validateChapterTransition(chapter.status(), "TRASHING");
 
-        String rel = comicId + "/" + chapter.getGlobalOrder();
+        String rel = comicId + "/" + chapter.globalOrder();
         List<TrashManifestDTO.Entry> entries = List.of(
                 entry("HQ", rel, "hq/" + rel),
                 entry("LQ", rel, "lq/" + rel));
 
-        chapter.setStatus(ChapterLifecycleStatus.TRASHING);
-        persistencePort.updateChapter(chapter);
+        targetPort.transition(new TrashTargetPort.TargetUpdateCommand(
+                "CHAPTER", chapterId, "TRASHING", null, null, null));
         return createTrashTask("CHAPTER", chapterId, TaskType.CHAPTER_TRASH, "回收章节", entries,
                 null, null);
     }
 
     @Transactional
     public OperationSubmitResultDTO trashMedia(Long mediaId) {
-        Media media = persistencePort.findMedia(mediaId);
+        TrashTargetPort.TargetSnapshot media = targetPort.find("MEDIA", mediaId);
         if (media == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "媒体不存在: " + mediaId);
         }
-        requireAllowed(policyService.forMedia(mediaStatusName(media)), OperationPolicyService.OP_DELETE,
-                "媒体状态 " + media.getStatus() + " 不可回收");
-        ManagementStateMachine.validateMediaTransition(mediaStatusName(media), "TRASHING");
+        requireAllowed(policyService.forMedia(media.status()), OperationPolicyService.OP_DELETE,
+                "媒体状态 " + media.status() + " 不可回收");
+        ManagementStateMachine.validateMediaTransition(media.status(), "TRASHING");
 
         List<TrashManifestDTO.Entry> entries = new ArrayList<>();
-        if (media.getHqPath() != null && !media.getHqPath().isBlank()) {
-            entries.add(entry("HQ", media.getHqPath(), "hq/" + media.getHqPath()));
+        if (media.hqPath() != null && !media.hqPath().isBlank()) {
+            entries.add(entry("HQ", media.hqPath(), "hq/" + media.hqPath()));
         }
 
         // 释放页码槽位：回收期间 pageNumber = -id（唯一负值），原页码存入 original_page_number
-        media.setStatus(MediaLifecycleStatus.TRASHING);
-        media.setOriginalPageNumber(media.getPageNumber());
-        media.setPageNumber(-media.getId().intValue());
-        persistencePort.updateMedia(media);
+        targetPort.transition(new TrashTargetPort.TargetUpdateCommand(
+                "MEDIA", mediaId, "TRASHING", null, -media.id().intValue(), media.pageNumber()));
         return createTrashTask("MEDIA", mediaId, TaskType.MEDIA_TRASH, "回收媒体", entries,
                 null, null);
     }
@@ -157,48 +149,47 @@ public class TrashLifecycleServiceImpl implements TrashLifecycleService {
 
     @Transactional
     public OperationSubmitResultDTO restoreComic(Long comicId) {
-        Comic comic = persistencePort.findComic(comicId);
+        TrashTargetPort.TargetSnapshot comic = targetPort.find("COMIC", comicId);
         if (comic == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在: " + comicId);
         }
-        requireAllowed(policyService.forComic(comicStatusName(comic)), OperationPolicyService.OP_RECOVER,
-                "漫画状态 " + comic.getStatus() + " 不可恢复");
-        ManagementStateMachine.validateComicTransition(comicStatusName(comic), "RESTORING");
+        requireAllowed(policyService.forComic(comic.status()), OperationPolicyService.OP_RECOVER,
+                "漫画状态 " + comic.status() + " 不可恢复");
+        ManagementStateMachine.validateComicTransition(comic.status(), "RESTORING");
         Long manifestTaskId = findTrashTaskId("COMIC", comicId);
 
-        comic.setStatus(ComicStatus.RESTORING);
-        persistencePort.updateComic(comic);
+        targetPort.transition(new TrashTargetPort.TargetUpdateCommand(
+                "COMIC", comicId, "RESTORING", comic.trashedAt(), null, null));
         return createCommandTask("COMIC", comicId, TaskType.COMIC_RESTORE, "恢复漫画", manifestTaskId);
     }
 
     @Transactional
     public OperationSubmitResultDTO restoreChapter(Long comicId, Long chapterId) {
-        Chapter chapter = requireChapterInComic(comicId, chapterId);
-        requireAllowed(policyService.forChapter(chapter.getStatus() == null ? null : chapter.getStatus().name()),
+        TrashTargetPort.TargetSnapshot chapter = requireChapterInComic(comicId, chapterId);
+        requireAllowed(policyService.forChapter(chapter.status()),
                 OperationPolicyService.OP_RECOVER,
-                "章节状态 " + chapter.getStatus() + " 不可恢复");
-        ManagementStateMachine.validateChapterTransition(
-                chapter.getStatus() == null ? null : chapter.getStatus().name(), "RESTORING");
+                "章节状态 " + chapter.status() + " 不可恢复");
+        ManagementStateMachine.validateChapterTransition(chapter.status(), "RESTORING");
         Long manifestTaskId = findTrashTaskId("CHAPTER", chapterId);
 
-        chapter.setStatus(ChapterLifecycleStatus.RESTORING);
-        persistencePort.updateChapter(chapter);
+        targetPort.transition(new TrashTargetPort.TargetUpdateCommand(
+                "CHAPTER", chapterId, "RESTORING", chapter.trashedAt(), null, null));
         return createCommandTask("CHAPTER", chapterId, TaskType.CHAPTER_RESTORE, "恢复章节", manifestTaskId);
     }
 
     @Transactional
     public OperationSubmitResultDTO restoreMedia(Long mediaId) {
-        Media media = persistencePort.findMedia(mediaId);
+        TrashTargetPort.TargetSnapshot media = targetPort.find("MEDIA", mediaId);
         if (media == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "媒体不存在: " + mediaId);
         }
-        requireAllowed(policyService.forMedia(mediaStatusName(media)), OperationPolicyService.OP_RECOVER,
-                "媒体状态 " + media.getStatus() + " 不可恢复");
-        ManagementStateMachine.validateMediaTransition(mediaStatusName(media), "RESTORING");
+        requireAllowed(policyService.forMedia(media.status()), OperationPolicyService.OP_RECOVER,
+                "媒体状态 " + media.status() + " 不可恢复");
+        ManagementStateMachine.validateMediaTransition(media.status(), "RESTORING");
         Long manifestTaskId = findTrashTaskId("MEDIA", mediaId);
 
-        media.setStatus(MediaLifecycleStatus.RESTORING);
-        persistencePort.updateMedia(media);
+        targetPort.transition(new TrashTargetPort.TargetUpdateCommand(
+                "MEDIA", mediaId, "RESTORING", media.trashedAt(), media.pageNumber(), media.originalPageNumber()));
         return createCommandTask("MEDIA", mediaId, TaskType.MEDIA_RESTORE, "恢复媒体", manifestTaskId);
     }
 
@@ -206,53 +197,52 @@ public class TrashLifecycleServiceImpl implements TrashLifecycleService {
 
     @Transactional
     public OperationSubmitResultDTO purgeComic(Long comicId, String token) {
-        Comic comic = persistencePort.findComic(comicId);
+        TrashTargetPort.TargetSnapshot comic = targetPort.find("COMIC", comicId);
         if (comic == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在: " + comicId);
         }
         return purge("COMIC", comicId, token,
                 () -> {
-                    requireAllowed(policyService.forComic(comicStatusName(comic)), OperationPolicyService.OP_PURGE,
-                            "漫画状态 " + comic.getStatus() + " 不可永久清理");
-                    ManagementStateMachine.validateComicTransition(comicStatusName(comic), "PURGING");
-                    checkRetention(comic.getTrashedAt());
-                    comic.setStatus(ComicStatus.PURGING);
-                    persistencePort.updateComic(comic);
+                    requireAllowed(policyService.forComic(comic.status()), OperationPolicyService.OP_PURGE,
+                            "漫画状态 " + comic.status() + " 不可永久清理");
+                    ManagementStateMachine.validateComicTransition(comic.status(), "PURGING");
+                    checkRetention(comic.trashedAt());
+                    targetPort.transition(new TrashTargetPort.TargetUpdateCommand(
+                            "COMIC", comicId, "PURGING", comic.trashedAt(), null, null));
                 },
                 TaskType.COMIC_PURGE, "永久清理漫画");
     }
 
     @Transactional
     public OperationSubmitResultDTO purgeChapter(Long comicId, Long chapterId, String token) {
-        Chapter chapter = requireChapterInComic(comicId, chapterId);
+        TrashTargetPort.TargetSnapshot chapter = requireChapterInComic(comicId, chapterId);
         return purge("CHAPTER", chapterId, token,
                 () -> {
-                    requireAllowed(policyService.forChapter(chapter.getStatus() == null ? null : chapter.getStatus().name()),
+                    requireAllowed(policyService.forChapter(chapter.status()),
                             OperationPolicyService.OP_PURGE,
-                            "章节状态 " + chapter.getStatus() + " 不可永久清理");
-                    ManagementStateMachine.validateChapterTransition(
-                            chapter.getStatus() == null ? null : chapter.getStatus().name(), "PURGING");
-                    checkRetention(chapter.getTrashedAt());
-                    chapter.setStatus(ChapterLifecycleStatus.PURGING);
-                    persistencePort.updateChapter(chapter);
+                            "章节状态 " + chapter.status() + " 不可永久清理");
+                    ManagementStateMachine.validateChapterTransition(chapter.status(), "PURGING");
+                    checkRetention(chapter.trashedAt());
+                    targetPort.transition(new TrashTargetPort.TargetUpdateCommand(
+                            "CHAPTER", chapterId, "PURGING", chapter.trashedAt(), null, null));
                 },
                 TaskType.CHAPTER_PURGE, "永久清理章节");
     }
 
     @Transactional
     public OperationSubmitResultDTO purgeMedia(Long mediaId, String token) {
-        Media media = persistencePort.findMedia(mediaId);
+        TrashTargetPort.TargetSnapshot media = targetPort.find("MEDIA", mediaId);
         if (media == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "媒体不存在: " + mediaId);
         }
         return purge("MEDIA", mediaId, token,
                 () -> {
-                    requireAllowed(policyService.forMedia(mediaStatusName(media)), OperationPolicyService.OP_PURGE,
-                            "媒体状态 " + media.getStatus() + " 不可永久清理");
-                    ManagementStateMachine.validateMediaTransition(mediaStatusName(media), "PURGING");
-                    checkRetention(media.getTrashedAt());
-                    media.setStatus(MediaLifecycleStatus.PURGING);
-                    persistencePort.updateMedia(media);
+                    requireAllowed(policyService.forMedia(media.status()), OperationPolicyService.OP_PURGE,
+                            "媒体状态 " + media.status() + " 不可永久清理");
+                    ManagementStateMachine.validateMediaTransition(media.status(), "PURGING");
+                    checkRetention(media.trashedAt());
+                    targetPort.transition(new TrashTargetPort.TargetUpdateCommand(
+                            "MEDIA", mediaId, "PURGING", media.trashedAt(), media.pageNumber(), media.originalPageNumber()));
                 },
                 TaskType.MEDIA_PURGE, "永久清理媒体");
     }
@@ -285,29 +275,26 @@ public class TrashLifecycleServiceImpl implements TrashLifecycleService {
     private boolean markTrashed(String targetType, Long targetId) {
         switch (targetType) {
             case "COMIC" -> {
-                Comic comic = persistencePort.findComic(targetId);
-                if (comic != null && comic.getStatus() == ComicStatus.TRASHING) {
-                    comic.setStatus(ComicStatus.TRASHED);
-                    comic.setTrashedAt(LocalDateTime.now());
-                    persistencePort.updateComic(comic);
+                TrashTargetPort.TargetSnapshot comic = targetPort.find(targetType, targetId);
+                if (comic != null && "TRASHING".equals(comic.status())) {
+                    targetPort.transition(new TrashTargetPort.TargetUpdateCommand(
+                            targetType, targetId, "TRASHED", LocalDateTime.now(), null, null));
                     return true;
                 }
             }
             case "CHAPTER" -> {
-                Chapter chapter = persistencePort.findChapter(targetId);
-                if (chapter != null && chapter.getStatus() == ChapterLifecycleStatus.TRASHING) {
-                    chapter.setStatus(ChapterLifecycleStatus.TRASHED);
-                    chapter.setTrashedAt(LocalDateTime.now());
-                    persistencePort.updateChapter(chapter);
+                TrashTargetPort.TargetSnapshot chapter = targetPort.find(targetType, targetId);
+                if (chapter != null && "TRASHING".equals(chapter.status())) {
+                    targetPort.transition(new TrashTargetPort.TargetUpdateCommand(
+                            targetType, targetId, "TRASHED", LocalDateTime.now(), null, null));
                     return true;
                 }
             }
             case "MEDIA" -> {
-                Media media = persistencePort.findMedia(targetId);
-                if (media != null && media.getStatus() == MediaLifecycleStatus.TRASHING) {
-                    media.setStatus(MediaLifecycleStatus.TRASHED);
-                    media.setTrashedAt(LocalDateTime.now());
-                    persistencePort.updateMedia(media);
+                TrashTargetPort.TargetSnapshot media = targetPort.find(targetType, targetId);
+                if (media != null && "TRASHING".equals(media.status())) {
+                    targetPort.transition(new TrashTargetPort.TargetUpdateCommand(
+                            targetType, targetId, "TRASHED", LocalDateTime.now(), media.pageNumber(), media.originalPageNumber()));
                     return true;
                 }
             }
@@ -319,30 +306,26 @@ public class TrashLifecycleServiceImpl implements TrashLifecycleService {
     private boolean markReady(String targetType, Long targetId) {
         switch (targetType) {
             case "COMIC" -> {
-                Comic comic = persistencePort.findComic(targetId);
-                if (comic != null && comic.getStatus() == ComicStatus.TRASHING) {
-                    comic.setStatus(ComicStatus.READY);
-                    comic.setTrashedAt(null);
-                    persistencePort.updateComic(comic);
+                TrashTargetPort.TargetSnapshot comic = targetPort.find(targetType, targetId);
+                if (comic != null && "TRASHING".equals(comic.status())) {
+                    targetPort.transition(new TrashTargetPort.TargetUpdateCommand(
+                            targetType, targetId, "READY", null, null, null));
                     return true;
                 }
             }
             case "CHAPTER" -> {
-                Chapter chapter = persistencePort.findChapter(targetId);
-                if (chapter != null && chapter.getStatus() == ChapterLifecycleStatus.TRASHING) {
-                    chapter.setStatus(ChapterLifecycleStatus.READY);
-                    chapter.setTrashedAt(null);
-                    persistencePort.updateChapter(chapter);
+                TrashTargetPort.TargetSnapshot chapter = targetPort.find(targetType, targetId);
+                if (chapter != null && "TRASHING".equals(chapter.status())) {
+                    targetPort.transition(new TrashTargetPort.TargetUpdateCommand(
+                            targetType, targetId, "READY", null, null, null));
                     return true;
                 }
             }
             case "MEDIA" -> {
-                Media media = persistencePort.findMedia(targetId);
-                if (media != null && media.getStatus() == MediaLifecycleStatus.TRASHING) {
-                    media.setStatus(MediaLifecycleStatus.READY);
-                    media.setTrashedAt(null);
-                    media.setPageNumber(media.getOriginalPageNumber());
-                    persistencePort.updateMedia(media);
+                TrashTargetPort.TargetSnapshot media = targetPort.find(targetType, targetId);
+                if (media != null && "TRASHING".equals(media.status())) {
+                    targetPort.transition(new TrashTargetPort.TargetUpdateCommand(
+                            targetType, targetId, "READY", null, media.originalPageNumber(), media.originalPageNumber()));
                     return true;
                 }
             }
@@ -373,16 +356,16 @@ public class TrashLifecycleServiceImpl implements TrashLifecycleService {
     private String resolveDbStatus(String targetType, Long targetId) {
         return switch (targetType) {
             case "COMIC" -> {
-                Comic comic = persistencePort.findComic(targetId);
-                yield comic == null || comic.getStatus() == null ? null : comic.getStatus().name();
+                TrashTargetPort.TargetSnapshot comic = targetPort.find(targetType, targetId);
+                yield comic == null ? null : comic.status();
             }
             case "CHAPTER" -> {
-                Chapter chapter = persistencePort.findChapter(targetId);
-                yield chapter == null || chapter.getStatus() == null ? null : chapter.getStatus().name();
+                TrashTargetPort.TargetSnapshot chapter = targetPort.find(targetType, targetId);
+                yield chapter == null ? null : chapter.status();
             }
             case "MEDIA" -> {
-                Media media = persistencePort.findMedia(targetId);
-                yield media == null ? null : mediaStatusName(media);
+                TrashTargetPort.TargetSnapshot media = targetPort.find(targetType, targetId);
+                yield media == null ? null : media.status();
             }
             default -> null;
         };
@@ -481,33 +464,21 @@ public class TrashLifecycleServiceImpl implements TrashLifecycleService {
 
     /** 查找目标最近一次回收任务的 taskId（作为清单目录定位）。 */
     private Long findTrashTaskId(String targetType, Long targetId) {
-        TaskType trashOp = switch (targetType) {
-            case "COMIC" -> TaskType.COMIC_DELETE;
-            case "CHAPTER" -> TaskType.CHAPTER_TRASH;
-            case "MEDIA" -> TaskType.MEDIA_TRASH;
-            default -> throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "未知目标类型: " + targetType);
-        };
-        ManagementTaskItem item = persistencePort.findLatestTaskItem(targetType, targetId, trashOp);
-        return item == null ? null : item.getTaskId();
+        if (!List.of("COMIC", "CHAPTER", "MEDIA").contains(targetType)) {
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "未知目标类型: " + targetType);
+        }
+        return targetPort.findLatestTrashTaskId(targetType, targetId);
     }
 
-    private Chapter requireChapterInComic(Long comicId, Long chapterId) {
-        Chapter chapter = persistencePort.findChapter(chapterId);
+    private TrashTargetPort.TargetSnapshot requireChapterInComic(Long comicId, Long chapterId) {
+        TrashTargetPort.TargetSnapshot chapter = targetPort.find("CHAPTER", chapterId);
         if (chapter == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在: " + chapterId);
         }
-        if (!chapter.getComicId().equals(comicId)) {
+        if (!chapter.comicId().equals(comicId)) {
             throw new ConflictException("章节不属于该漫画");
         }
         return chapter;
-    }
-
-    private static String comicStatusName(Comic comic) {
-        return comic.getStatus() == null ? null : comic.getStatus().name();
-    }
-
-    private static String mediaStatusName(Media media) {
-        return media.getStatus() == null ? null : media.getStatus().name();
     }
 
     private void requireAllowed(AllowedOperations ops, String op, String message) {
