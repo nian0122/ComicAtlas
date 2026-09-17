@@ -1,16 +1,13 @@
 package com.comicatlas.api.recovery.application.port.out;
 
-import com.comicatlas.persistence.comic.entity.Chapter;
-import com.comicatlas.persistence.comic.entity.Comic;
-
 import java.util.List;
 
 /** 恢复兼容流程访问漫画及跨域统计数据的输出端口。 */
 public interface RecoveryCompatibilityPersistencePort {
 
-    Comic findComic(Long comicId);
+    ComicSnapshot findComic(Long comicId);
 
-    List<Chapter> findChapters(Long comicId);
+    List<ChapterSnapshot> findChapters(Long comicId);
 
     long countCatalogs(Long comicId);
 
@@ -21,4 +18,10 @@ public interface RecoveryCompatibilityPersistencePort {
     long countComicTags(Long comicId);
 
     long countReadingHistory(Long comicId);
+
+    record ComicSnapshot(Long id, String title) {
+    }
+
+    record ChapterSnapshot(Long id) {
+    }
 }

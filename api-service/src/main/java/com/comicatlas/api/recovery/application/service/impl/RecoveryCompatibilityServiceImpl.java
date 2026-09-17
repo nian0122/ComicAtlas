@@ -11,8 +11,6 @@ import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.api.importer.domain.model.ImportTaskStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
-import com.comicatlas.persistence.comic.entity.Chapter;
-import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.api.recovery.application.port.out.RecoveryCompatibilityPersistencePort;
 import com.comicatlas.api.storage.infrastructure.config.ApiStorageProperties;
 import lombok.RequiredArgsConstructor;
@@ -55,7 +53,7 @@ public class RecoveryCompatibilityServiceImpl implements RecoveryCompatibilitySe
                     "不支持的模式: " + mode + "，当前支持 DATABASE_ONLY 和 DELETE_FILES");
         }
 
-        Comic comic = persistencePort.findComic(comicId);
+        RecoveryCompatibilityPersistencePort.ComicSnapshot comic = persistencePort.findComic(comicId);
         if (comic == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在");
         }
@@ -68,8 +66,9 @@ public class RecoveryCompatibilityServiceImpl implements RecoveryCompatibilitySe
         }
 
         // 统计待处理数量（不再先删 DB，删除重定向到统一任务管线 → 回收/永久清理）
-        List<Chapter> chapters = persistencePort.findChapters(comicId);
-        List<Long> chapterIds = chapters.stream().map(Chapter::getId).toList();
+        List<RecoveryCompatibilityPersistencePort.ChapterSnapshot> chapters = persistencePort.findChapters(comicId);
+        List<Long> chapterIds = chapters.stream()
+                .map(RecoveryCompatibilityPersistencePort.ChapterSnapshot::id).toList();
         int pageCount = chapterIds.isEmpty() ? 0
                 : Math.toIntExact(persistencePort.countMedia(chapterIds));
         int catalogCount = Math.toIntExact(persistencePort.countCatalogs(comicId));
@@ -88,7 +87,7 @@ public class RecoveryCompatibilityServiceImpl implements RecoveryCompatibilitySe
         stats.setHistory(historyCount);
 
         log.info("整本删除已重定向到统一任务管线: comicId={}, title={}, pendingPage={}",
-                comicId, comic.getTitle(), pageCount);
+                comicId, comic.title(), pageCount);
         return stats;
     }
 

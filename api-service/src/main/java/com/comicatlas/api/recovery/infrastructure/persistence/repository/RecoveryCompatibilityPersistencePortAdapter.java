@@ -2,7 +2,6 @@ package com.comicatlas.api.recovery.infrastructure.persistence.repository;
 
 import com.comicatlas.api.recovery.application.port.out.RecoveryCompatibilityPersistencePort;
 import com.comicatlas.api.recovery.infrastructure.persistence.mapper.RecoveryDataMapper;
-import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.mapper.CatalogMapper;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;
@@ -23,11 +22,17 @@ public class RecoveryCompatibilityPersistencePortAdapter implements RecoveryComp
     private final RecoveryDataMapper recoveryDataMapper;
 
     @Override
-    public Comic findComic(Long comicId) { return comicMapper.selectById(comicId); }
+    public RecoveryCompatibilityPersistencePort.ComicSnapshot findComic(Long comicId) {
+        Comic comic = comicMapper.selectById(comicId);
+        return comic == null ? null : new RecoveryCompatibilityPersistencePort.ComicSnapshot(
+                comic.getId(), comic.getTitle());
+    }
 
     @Override
-    public List<Chapter> findChapters(Long comicId) {
-        return chapterMapper.selectByComicIdOrderByGlobalOrder(comicId);
+    public List<RecoveryCompatibilityPersistencePort.ChapterSnapshot> findChapters(Long comicId) {
+        return chapterMapper.selectByComicIdOrderByGlobalOrder(comicId).stream()
+                .map(chapter -> new RecoveryCompatibilityPersistencePort.ChapterSnapshot(chapter.getId()))
+                .toList();
     }
 
     @Override
