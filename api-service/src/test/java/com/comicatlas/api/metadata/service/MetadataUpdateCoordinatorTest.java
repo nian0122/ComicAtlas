@@ -1,12 +1,13 @@
-package com.comicatlas.api.metadata.service;
+package com.comicatlas.api.metadata.application.service;
 
-import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
-import com.comicatlas.api.outbox.service.OutboxService;
+import com.comicatlas.api.catalog.infrastructure.cache.CatalogCacheInvalidator;
+import com.comicatlas.api.outbox.application.port.in.OutboxService;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.event.MetadataRefreshEvent;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
+import com.comicatlas.api.metadata.application.port.out.MetadataTargetPersistencePort;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -21,6 +22,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.Optional;
 import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -61,6 +63,8 @@ class MetadataUpdateCoordinatorTest {
     private com.comicatlas.persistence.comic.mapper.ChapterMapper chapterMapper;
     @Mock
     private com.comicatlas.persistence.comic.mapper.MediaMapper mediaMapper;
+    @Mock
+    private MetadataTargetPersistencePort persistencePort;
 
     @InjectMocks
     private MetadataUpdateCoordinator coordinator;
@@ -69,6 +73,26 @@ class MetadataUpdateCoordinatorTest {
 
     @BeforeEach
     void setUp() throws Exception {
+        lenient().when(persistencePort.existsComic(any())).thenAnswer(invocation ->
+                comicMapper.selectById(invocation.getArgument(0)) != null);
+        lenient().when(persistencePort.resolveComicId(any(), any())).thenAnswer(invocation -> {
+            String targetType = invocation.getArgument(0);
+            Long targetId = invocation.getArgument(1);
+            if ("COMIC".equals(targetType)) {
+                return comicMapper.selectById(targetId) == null ? Optional.empty() : Optional.of(targetId);
+            }
+            if ("CHAPTER".equals(targetType)) {
+                var chapter = chapterMapper.selectById(targetId);
+                return chapter == null ? Optional.empty() : Optional.ofNullable(chapter.getComicId());
+            }
+            if ("MEDIA".equals(targetType)) {
+                var media = mediaMapper.selectById(targetId);
+                if (media == null || media.getChapterId() == null) return Optional.empty();
+                var chapter = chapterMapper.selectById(media.getChapterId());
+                return chapter == null ? Optional.empty() : Optional.ofNullable(chapter.getComicId());
+            }
+            return Optional.empty();
+        });
         scheduler = new ThreadPoolTaskScheduler();
         scheduler.setPoolSize(1);
         scheduler.setThreadNamePrefix("test-metadata-sync-");

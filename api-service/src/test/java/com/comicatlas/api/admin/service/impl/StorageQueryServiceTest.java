@@ -1,11 +1,11 @@
-package com.comicatlas.api.storage.service;
+package com.comicatlas.api.storage.application.service;
 
-import com.comicatlas.api.storage.service.impl.StorageQueryServiceImpl;
+import com.comicatlas.api.storage.application.service.impl.StorageQueryServiceImpl;
 
-import com.comicatlas.api.storage.dto.ComicStorageDTO;
-import com.comicatlas.api.storage.dto.ComicStorageQuery;
-import com.comicatlas.api.storage.dto.ComicTranscodeStatusVO;
-import com.comicatlas.api.storage.persistence.mapper.StorageMapper;
+import com.comicatlas.api.storage.interfaces.rest.dto.ComicStorageDTO;
+import com.comicatlas.api.storage.interfaces.rest.dto.ComicStorageQuery;
+import com.comicatlas.api.storage.interfaces.rest.dto.ComicTranscodeStatusVO;
+import com.comicatlas.api.storage.infrastructure.persistence.mapper.StorageMapper;
 import com.comicatlas.persistence.storage.FileUrlResolver;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

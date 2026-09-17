@@ -1,12 +1,12 @@
-package com.comicatlas.api.recovery.controller;
+package com.comicatlas.api.recovery.interfaces.rest;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.web.exception.GlobalExceptionHandler;
-import com.comicatlas.api.dlq.config.DlqSecurityConfig;
-import com.comicatlas.api.recovery.dto.RecoveryTaskVO;
-import com.comicatlas.api.recovery.service.RecoveryTaskService;
+import com.comicatlas.api.dlq.infrastructure.config.DlqSecurityConfig;
+import com.comicatlas.api.recovery.interfaces.rest.dto.RecoveryTaskVO;
+import com.comicatlas.api.recovery.application.port.in.RecoveryTaskService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;

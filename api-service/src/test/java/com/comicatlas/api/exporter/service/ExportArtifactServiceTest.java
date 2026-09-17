@@ -1,12 +1,14 @@
-package com.comicatlas.api.exporter.service;
+package com.comicatlas.api.exporter.application.service;
+
+import com.comicatlas.api.exporter.application.port.in.ExportArtifactService;
 
 import com.comicatlas.contract.common.exception.BusinessException;
-import com.comicatlas.api.storage.config.ApiStorageProperties;
+import com.comicatlas.api.storage.infrastructure.config.ApiStorageProperties;
 import com.comicatlas.api.storage.ApiStorageRoot;
-import com.comicatlas.api.exporter.persistence.entity.ExportTask;
-import com.comicatlas.api.exporter.persistence.mapper.ExportTaskMapper;
-import com.comicatlas.api.exporter.dto.ExportArtifactVO;
-import com.comicatlas.api.exporter.service.impl.ExportArtifactServiceImpl;
+import com.comicatlas.api.exporter.infrastructure.persistence.entity.ExportTask;
+import com.comicatlas.api.exporter.application.port.out.ExportPersistencePort;
+import com.comicatlas.api.exporter.interfaces.rest.dto.ExportArtifactVO;
+import com.comicatlas.api.exporter.application.service.impl.ExportArtifactServiceImpl;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.Assumptions;
@@ -31,14 +33,14 @@ class ExportArtifactServiceTest {
     @TempDir
     Path tempDir;
 
-    private final ExportTaskMapper taskMapper = mock(ExportTaskMapper.class);
+    private final ExportPersistencePort persistencePort = mock(ExportPersistencePort.class);
 
     private ExportArtifactService service() {
-        return new ExportArtifactServiceImpl(taskMapper, storageProperties(), new ExportZipVolumeResolver());
+        return new ExportArtifactServiceImpl(persistencePort, storageProperties(), new ExportZipVolumeResolver());
     }
 
     private ExportArtifactService service(ExportZipVolumeResolver resolver) {
-        return new ExportArtifactServiceImpl(taskMapper, storageProperties(), resolver);
+        return new ExportArtifactServiceImpl(persistencePort, storageProperties(), resolver);
     }
 
     private ApiStorageProperties storageProperties() {
@@ -52,7 +54,7 @@ class ExportArtifactServiceTest {
     private ExportTask task(Long id, String status, String outputPath, Long outputSize) {
         ExportTask task = new ExportTask();
         task.setId(id);
-        task.setStatus(com.comicatlas.api.exporter.enums.ExportTaskStatus.valueOf(status));
+        task.setStatus(com.comicatlas.api.exporter.domain.model.ExportTaskStatus.valueOf(status));
         task.setOutputRoot("EXPORT");
         task.setOutputPath(outputPath);
         task.setOutputSize(outputSize);
@@ -70,7 +72,7 @@ class ExportArtifactServiceTest {
         writeFile("7/base.z01", "aaa");
         writeFile("7/base.z02", "bbbbb");
         writeFile("7/base.zip", "cc");
-        when(taskMapper.selectById(7L)).thenReturn(task(7L, "SUCCESS", "7/base.zip", 10L));
+        when(persistencePort.findTask(7L)).thenReturn(task(7L, "SUCCESS", "7/base.zip", 10L));
 
         List<ExportArtifactVO> artifacts = service().listArtifacts(7L);
 
@@ -99,7 +101,7 @@ class ExportArtifactServiceTest {
     @Test
     void listArtifacts_单个zip无分卷兄弟时仅返回一项() throws Exception {
         writeFile("8/base.zip", "hello");
-        when(taskMapper.selectById(8L)).thenReturn(task(8L, "SUCCESS", "8/base.zip", 5L));
+        when(persistencePort.findTask(8L)).thenReturn(task(8L, "SUCCESS", "8/base.zip", 5L));
 
         List<ExportArtifactVO> artifacts = service().listArtifacts(8L);
 
@@ -111,7 +113,7 @@ class ExportArtifactServiceTest {
 
     @Test
     void listArtifacts_任务不存在返回404() {
-        when(taskMapper.selectById(99L)).thenReturn(null);
+        when(persistencePort.findTask(99L)).thenReturn(null);
 
         BusinessException ex = assertThrows(BusinessException.class, () -> service().listArtifacts(99L));
 
@@ -120,7 +122,7 @@ class ExportArtifactServiceTest {
 
     @Test
     void listArtifacts_任务未完成返回409() {
-        when(taskMapper.selectById(7L)).thenReturn(task(7L, "RUNNING", "7/base.zip", 10L));
+        when(persistencePort.findTask(7L)).thenReturn(task(7L, "RUNNING", "7/base.zip", 10L));
 
         BusinessException ex = assertThrows(BusinessException.class, () -> service().listArtifacts(7L));
 
@@ -130,7 +132,7 @@ class ExportArtifactServiceTest {
 
     @Test
     void listArtifacts_路径穿越返回409且不泄露根路径() {
-        when(taskMapper.selectById(7L)).thenReturn(task(7L, "SUCCESS", "../evil.zip", 10L));
+        when(persistencePort.findTask(7L)).thenReturn(task(7L, "SUCCESS", "../evil.zip", 10L));
 
         BusinessException ex = assertThrows(BusinessException.class, () -> service().listArtifacts(7L));
 
@@ -141,7 +143,7 @@ class ExportArtifactServiceTest {
 
     @Test
     void listArtifacts_主zip缺失返回404() {
-        when(taskMapper.selectById(7L)).thenReturn(task(7L, "SUCCESS", "7/missing.zip", 10L));
+        when(persistencePort.findTask(7L)).thenReturn(task(7L, "SUCCESS", "7/missing.zip", 10L));
 
         BusinessException ex = assertThrows(BusinessException.class, () -> service().listArtifacts(7L));
 
@@ -153,7 +155,7 @@ class ExportArtifactServiceTest {
         writeFile("7/base.z01", "aaa");
         writeFile("7/base.z03", "ccc");
         writeFile("7/base.zip", "zip");
-        when(taskMapper.selectById(7L)).thenReturn(task(7L, "SUCCESS", "7/base.zip", 100L));
+        when(persistencePort.findTask(7L)).thenReturn(task(7L, "SUCCESS", "7/base.zip", 100L));
 
         BusinessException ex = assertThrows(BusinessException.class, () -> service().listArtifacts(7L));
 
@@ -167,7 +169,7 @@ class ExportArtifactServiceTest {
         // 删除 base.z02
         writeFile("7/base.zip", "cc");
         // outputSize 仍为三卷总和
-        when(taskMapper.selectById(7L)).thenReturn(task(7L, "SUCCESS", "7/base.zip", 10L));
+        when(persistencePort.findTask(7L)).thenReturn(task(7L, "SUCCESS", "7/base.zip", 10L));
 
         BusinessException ex = assertThrows(BusinessException.class, () -> service().listArtifacts(7L));
 
@@ -182,7 +184,7 @@ class ExportArtifactServiceTest {
         ExportZipVolumeResolver resolver = mock(ExportZipVolumeResolver.class);
         when(resolver.resolve(any(Path.class)))
                 .thenThrow(new IllegalArgumentException("分卷 .z02 是符号链接，拒绝: base.z02"));
-        when(taskMapper.selectById(7L)).thenReturn(task(7L, "SUCCESS", "7/base.zip", 100L));
+        when(persistencePort.findTask(7L)).thenReturn(task(7L, "SUCCESS", "7/base.zip", 100L));
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> service(resolver).listArtifacts(7L));
@@ -198,7 +200,7 @@ class ExportArtifactServiceTest {
         writeFile("7/base.zip", "zip");
         Path target = writeFile("7/base.z01", "aaa");
         Files.createSymbolicLink(tempDir.resolve("7").resolve("base.z02"), target);
-        when(taskMapper.selectById(7L)).thenReturn(task(7L, "SUCCESS", "7/base.zip", 100L));
+        when(persistencePort.findTask(7L)).thenReturn(task(7L, "SUCCESS", "7/base.zip", 100L));
 
         BusinessException ex = assertThrows(BusinessException.class, () -> service().listArtifacts(7L));
 

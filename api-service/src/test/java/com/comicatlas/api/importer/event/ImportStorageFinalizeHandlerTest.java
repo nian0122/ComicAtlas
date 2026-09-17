@@ -1,8 +1,8 @@
-package com.comicatlas.api.importer.event;
+package com.comicatlas.api.importer.interfaces.messaging;
 
-import com.comicatlas.api.importer.service.ImportPersistenceService;
-import com.comicatlas.api.outbox.service.InboxService;
-import com.comicatlas.api.outbox.service.EventFingerprintService;
+import com.comicatlas.api.importer.application.port.in.ImportPersistenceService;
+import com.comicatlas.api.outbox.application.port.in.InboxService;
+import com.comicatlas.api.outbox.application.port.in.EventFingerprintService;
 import com.comicatlas.common.constant.MqQueues;
 import com.comicatlas.common.event.ImportStorageFinalizeCompletedEvent;
 import com.comicatlas.common.event.ImportStorageFinalizeFailedEvent;

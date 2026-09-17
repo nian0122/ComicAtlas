@@ -1,7 +1,10 @@
-package com.comicatlas.api.dlq.service;
+package com.comicatlas.api.dlq.application.service;
 
-import com.comicatlas.api.dlq.service.DlqBrokerClient.QueueStats;
-import com.comicatlas.api.dlq.service.impl.DlqServiceImpl;
+import com.comicatlas.api.dlq.application.port.out.DlqBrokerClient;
+import com.comicatlas.api.dlq.application.port.in.DlqService;
+
+import com.comicatlas.api.dlq.application.port.out.DlqBrokerClient.QueueStats;
+import com.comicatlas.api.dlq.application.service.impl.DlqServiceImpl;
 import com.comicatlas.contract.common.exception.BusinessException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

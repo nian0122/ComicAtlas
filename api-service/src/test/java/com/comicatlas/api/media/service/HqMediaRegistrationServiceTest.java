@@ -1,4 +1,7 @@
-package com.comicatlas.api.media.service;
+package com.comicatlas.api.media.application.service;
+
+import com.comicatlas.api.media.application.port.in.HqMediaRegistrationService;
+import com.comicatlas.api.media.application.port.out.HqMediaRegistrationPersistencePort;
 
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO;
 import com.comicatlas.common.metadata.revision.MetadataSnapshotRevision;
@@ -8,9 +11,7 @@ import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
 import com.comicatlas.contract.common.enums.TranscodeStatus;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Media;
-import com.comicatlas.persistence.comic.mapper.ChapterMapper;
-import com.comicatlas.persistence.comic.mapper.MediaMapper;
-import com.comicatlas.api.media.service.impl.HqMediaRegistrationServiceImpl;
+import com.comicatlas.api.media.application.service.impl.HqMediaRegistrationServiceImpl;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -18,7 +19,6 @@ import org.mockito.ArgumentCaptor;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -28,10 +28,9 @@ import static org.mockito.Mockito.when;
 @DisplayName("HqMediaRegistrationService")
 class HqMediaRegistrationServiceTest {
 
-    private final MediaMapper mediaMapper = mock(MediaMapper.class);
-    private final ChapterMapper chapterMapper = mock(ChapterMapper.class);
+    private final HqMediaRegistrationPersistencePort persistencePort = mock(HqMediaRegistrationPersistencePort.class);
     private final HqMediaRegistrationService service = new HqMediaRegistrationServiceImpl(
-            mediaMapper, chapterMapper);
+            persistencePort);
 
     @Test
     @DisplayName("只登记未入库 HQ 媒体并保持 LQ 未生成")
@@ -41,10 +40,9 @@ class HqMediaRegistrationServiceTest {
         chapter.setComicId(1L);
         chapter.setVersion(3);
         Media existingMedia = existingMedia();
-        when(chapterMapper.selectByComicIdOrderByGlobalOrder(1L)).thenReturn(List.of(chapter));
-        when(mediaMapper.selectByChapterIds(List.of(42L))).thenReturn(List.of(existingMedia));
-        when(mediaMapper.insertImportBatch(anyList())).thenAnswer(invocation ->
-                ((List<?>) invocation.getArgument(0)).size());
+        when(persistencePort.findChapters(1L)).thenReturn(List.of(
+                new HqMediaRegistrationPersistencePort.ChapterSnapshot(chapter.getId(), chapter.getVersion())));
+        when(persistencePort.findMediaByChapters(List.of(42L))).thenReturn(List.of(toSnapshot(existingMedia)));
 
         MetadataRefreshSnapshotDTO rawSnapshot = snapshot();
         MetadataRefreshSnapshotDTO snapshot = new MetadataRefreshSnapshotDTO(
@@ -55,18 +53,18 @@ class HqMediaRegistrationServiceTest {
                 service.registerValidatedSnapshot(snapshot);
 
         @SuppressWarnings("unchecked")
-        ArgumentCaptor<List<Media>> mediaCaptor = ArgumentCaptor.forClass(List.class);
-        verify(mediaMapper, times(1)).insertImportBatch(mediaCaptor.capture());
-        List<Media> insertedMedia = mediaCaptor.getValue();
+        ArgumentCaptor<List<HqMediaRegistrationPersistencePort.MediaRegistrationCommand>> mediaCaptor =
+                ArgumentCaptor.forClass(List.class);
+        verify(persistencePort, times(1)).insertMediaBatch(mediaCaptor.capture());
+        List<HqMediaRegistrationPersistencePort.MediaRegistrationCommand> insertedMedia = mediaCaptor.getValue();
         assertThat(insertedMedia).hasSize(1);
-        Media inserted = insertedMedia.get(0);
-        assertThat(inserted.getHqPath()).isEqualTo("1/42/004.jpg");
-        assertThat(inserted.getPageNumber()).isEqualTo(5);
-        assertThat(inserted.getHqStatus()).isEqualTo(HqStatus.READY);
-        assertThat(inserted.getLqStatus()).isEqualTo(LqStatus.NOT_GENERATED);
-        assertThat(inserted.getLqPath()).isNull();
-        assertThat(inserted.getLqSize()).isZero();
-        assertThat(inserted.getTranscodeStatus()).isEqualTo(TranscodeStatus.NOT_NEEDED);
+        HqMediaRegistrationPersistencePort.MediaRegistrationCommand inserted = insertedMedia.get(0);
+        assertThat(inserted.hqPath()).isEqualTo("1/42/004.jpg");
+        assertThat(inserted.pageNumber()).isEqualTo(5);
+        assertThat(inserted.hqStatus()).isEqualTo(HqStatus.READY.name());
+        assertThat(inserted.lqStatus()).isEqualTo(LqStatus.NOT_GENERATED.name());
+        assertThat(inserted.lqSize()).isZero();
+        assertThat(inserted.transcodeStatus()).isEqualTo(TranscodeStatus.NOT_NEEDED.name());
         assertThat(result.inserted()).isEqualTo(1);
     }
 
@@ -80,6 +78,11 @@ class HqMediaRegistrationServiceTest {
         media.setHqStatus(HqStatus.READY);
         media.setVersion(1);
         return media;
+    }
+
+    private static HqMediaRegistrationPersistencePort.MediaSnapshot toSnapshot(Media media) {
+        return new HqMediaRegistrationPersistencePort.MediaSnapshot(media.getId(), media.getChapterId(),
+                media.getPageNumber(), media.getHqPath(), media.getStatus().name(), media.getVersion());
     }
 
     private static MetadataRefreshSnapshotDTO snapshot() {

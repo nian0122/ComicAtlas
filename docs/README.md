@@ -9,6 +9,7 @@
 | [`architecture/README.md`](architecture/README.md) | 当前架构总览；专题设计与 ADR 位于 `architecture/` |
 | `architecture/shared-module-boundaries.md` | 跨服务契约与持久化模块边界 |
 | [后端代码分类](architecture/backend-package-organization.md) | 业务域、框架职责与文件归属 |
+| [管理后端 DDD 目录与依赖规范](architecture/backend-ddd-management.md) | `api-service` 的限界上下文、目录结构与依赖方向 |
 | [后端文件分类 TODO](architecture/backend-classification-todo.md) | 按业务与框架角色记录待调整文件、目标归属及兼容约束；未实施 |
 | [后端待解耦清单](architecture/backend-decoupling.md) | 源码标记、拆分约束与回归要求 |
 | [后端三层架构检查](architecture/backend-layer-audit.md) | 接口层越界、持久化框架类型泄漏和处理约束 |

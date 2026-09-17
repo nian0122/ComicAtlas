@@ -1,19 +1,23 @@
-package com.comicatlas.api.task.service;
+package com.comicatlas.api.task.application.service;
 
-import com.comicatlas.api.task.assembler.TaskResponseAssembler;
-import com.comicatlas.api.exporter.persistence.mapper.ExportTaskMapper;
-import com.comicatlas.api.importer.persistence.entity.ImportTask;
-import com.comicatlas.api.importer.persistence.mapper.ImportTaskMapper;
-import com.comicatlas.api.importer.service.ImportRetryCoordinator;
-import com.comicatlas.api.task.persistence.entity.ManagementTask;
-import com.comicatlas.api.task.persistence.entity.ManagementTaskItem;
-import com.comicatlas.api.task.dto.CreateManagementTaskRequest;
-import com.comicatlas.api.task.persistence.mapper.ManagementTaskItemMapper;
-import com.comicatlas.api.task.persistence.mapper.ManagementTaskMapper;
-import com.comicatlas.api.outbox.service.OutboxService;
-import com.comicatlas.api.importer.enums.ImportTaskStatus;
-import com.comicatlas.api.task.enums.ManagementTaskStatus;
-import com.comicatlas.api.task.enums.TaskType;
+import com.comicatlas.api.task.application.assembler.TaskResponseAssembler;
+import com.comicatlas.api.exporter.infrastructure.persistence.mapper.ExportTaskMapper;
+import com.comicatlas.api.importer.infrastructure.persistence.entity.ImportTask;
+import com.comicatlas.api.importer.infrastructure.persistence.mapper.ImportTaskMapper;
+import com.comicatlas.api.importer.application.service.ImportRetryCoordinator;
+import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTask;
+import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTaskItem;
+import com.comicatlas.api.task.interfaces.rest.dto.CreateManagementTaskRequest;
+import com.comicatlas.api.task.infrastructure.persistence.mapper.ManagementTaskItemMapper;
+import com.comicatlas.api.task.infrastructure.persistence.mapper.ManagementTaskMapper;
+import com.comicatlas.api.task.domain.repository.ManagementTaskAggregationRepository;
+import com.comicatlas.api.task.domain.repository.ManagementTaskAggregationRepository.ManagementTaskAggregationSnapshot;
+import com.comicatlas.api.task.domain.repository.ManagementTaskAggregationRepository.ManagementTaskAggregationUpdate;
+import com.comicatlas.api.task.domain.repository.ManagementTaskAggregationRepository.ManagementTaskItemSnapshot;
+import com.comicatlas.api.outbox.application.port.in.OutboxService;
+import com.comicatlas.api.importer.domain.model.ImportTaskStatus;
+import com.comicatlas.api.task.domain.model.ManagementTaskStatus;
+import com.comicatlas.api.task.domain.model.TaskType;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;
@@ -33,12 +37,15 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
-import com.comicatlas.api.task.service.impl.ManagementTaskServiceImpl;
-import com.comicatlas.api.metadata.policy.MetadataRefreshTaskPolicy;
-import com.comicatlas.api.task.service.impl.TaskAggregationServiceImpl;
+import com.comicatlas.api.task.application.service.impl.ManagementTaskServiceImpl;
+import com.comicatlas.api.task.application.port.in.TaskQueryService;
+import com.comicatlas.api.task.application.port.out.TaskRetryPublisher;
+import com.comicatlas.api.metadata.application.service.MetadataRefreshTaskPolicy;
+import com.comicatlas.api.task.application.service.impl.TaskAggregationServiceImpl;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -66,6 +73,7 @@ class ManagementTaskServiceTest {
     @Mock private ImportTaskMapper importTaskMapper;
     @Mock private ImportRetryCoordinator importRetryCoordinator;
     @Mock private TaskRetryPublisher taskRetryPublisher;
+    @Mock private ManagementTaskAggregationRepository aggregationRepository;
     @Mock private TaskResponseAssembler taskResponseAssembler;
     @Mock private TaskQueryService taskQueryService;
     @Mock private TaskInternalQueryService taskInternalQueryService;
@@ -202,11 +210,6 @@ class ManagementTaskServiceTest {
 
     @Test
     void updateItemStatus_failedItem_aggregatesErrorMessageToTask() {
-        ManagementTask task = new ManagementTask();
-        task.setId(301L);
-        task.setStatus(ManagementTaskStatus.RUNNING);
-        when(taskMapper.selectById(301L)).thenReturn(task);
-
         ManagementTaskItem item = new ManagementTaskItem();
         item.setId(3L);
         item.setTaskId(301L);
@@ -214,29 +217,22 @@ class ManagementTaskServiceTest {
         item.setAttempt(1);
         when(itemMapper.selectById(3L)).thenReturn(item);
 
-        ManagementTaskItem failedItem = new ManagementTaskItem();
-        failedItem.setId(3L);
-        failedItem.setTaskId(301L);
-        failedItem.setStatus(ManagementTaskStatus.FAILED);
-        failedItem.setErrorMessage("转码失败: ffmpeg 超时");
-        when(itemMapper.selectByTaskId(301L)).thenReturn(List.of(failedItem));
+        when(aggregationRepository.findByTaskId(301L)).thenReturn(Optional.of(
+                new ManagementTaskAggregationSnapshot(301L, ManagementTaskStatus.RUNNING, null,
+                        List.of(new ManagementTaskItemSnapshot(ManagementTaskStatus.FAILED,
+                                "转码失败: ffmpeg 超时")))));
         when(itemMapper.updateStatusIfActive(any(), any(), anyString(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(1);
 
         service.updateItemStatus(3L, ManagementTaskStatus.FAILED, "转码失败: ffmpeg 超时", null, null, 1);
 
-        ManagementTask updatedTask = captorTaskErrorUpdate();
-        assertTrue(updatedTask.getErrorMessage().contains("转码失败: ffmpeg 超时"),
+        ManagementTaskAggregationUpdate updatedTask = captorTaskErrorUpdate();
+        assertTrue(updatedTask.errorMessage().contains("转码失败: ffmpeg 超时"),
                 "任务级 errorMessage 应聚合失败 item 的错误");
     }
 
     @Test
     void updateItemStatus_success_clearsTaskErrorMessage() {
-        ManagementTask task = new ManagementTask();
-        task.setId(302L);
-        task.setStatus(ManagementTaskStatus.RUNNING);
-        when(taskMapper.selectById(302L)).thenReturn(task);
-
         ManagementTaskItem item = new ManagementTaskItem();
         item.setId(4L);
         item.setTaskId(302L);
@@ -244,25 +240,24 @@ class ManagementTaskServiceTest {
         item.setAttempt(1);
         when(itemMapper.selectById(4L)).thenReturn(item);
 
-        ManagementTaskItem succeededItem = new ManagementTaskItem();
-        succeededItem.setId(4L);
-        succeededItem.setTaskId(302L);
-        succeededItem.setStatus(ManagementTaskStatus.SUCCEEDED);
-        when(itemMapper.selectByTaskId(302L)).thenReturn(List.of(succeededItem));
+        when(aggregationRepository.findByTaskId(302L)).thenReturn(Optional.of(
+                new ManagementTaskAggregationSnapshot(302L, ManagementTaskStatus.RUNNING, null,
+                        List.of(new ManagementTaskItemSnapshot(ManagementTaskStatus.SUCCEEDED, null)))));
         when(itemMapper.updateStatusIfActive(any(), any(), anyString(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(1);
 
         service.updateItemStatus(4L, ManagementTaskStatus.SUCCEEDED, null, null, null, 1);
 
-        ManagementTask updatedTask = captorTaskErrorUpdate();
-        assertTrue(updatedTask.getErrorMessage() == null,
+        ManagementTaskAggregationUpdate updatedTask = captorTaskErrorUpdate();
+        assertTrue(updatedTask.errorMessage() == null,
                 "非失败终态应显式清空任务级 errorMessage");
     }
 
     /** 捕获 aggregateTaskStatus 末尾的任务级状态更新。 */
-    private ManagementTask captorTaskErrorUpdate() {
-        ArgumentCaptor<ManagementTask> captor = ArgumentCaptor.forClass(ManagementTask.class);
-        verify(taskMapper).updateById(captor.capture());
+    private ManagementTaskAggregationUpdate captorTaskErrorUpdate() {
+        ArgumentCaptor<ManagementTaskAggregationUpdate> captor =
+                ArgumentCaptor.forClass(ManagementTaskAggregationUpdate.class);
+        verify(aggregationRepository).update(any(), captor.capture());
         return captor.getValue();
     }
 }

@@ -1,13 +1,13 @@
 package com.comicatlas.api.recovery.engine;
 
-import com.comicatlas.api.recovery.dto.RecoveryProgressVO;
-import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
+import com.comicatlas.api.recovery.interfaces.rest.dto.RecoveryProgressVO;
+import com.comicatlas.api.catalog.infrastructure.cache.CatalogCacheInvalidator;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.mapper.CatalogMapper;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.persistence.comic.mapper.MediaMapper;
-import com.comicatlas.api.storage.config.ApiStorageProperties;
+import com.comicatlas.api.storage.infrastructure.config.ApiStorageProperties;
 import com.comicatlas.api.storage.ApiStorageRoot;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -59,7 +59,7 @@ class RecoveryEngineTest {
     @Mock
     private ApiStorageProperties storageProperties;
     @Mock
-    private com.comicatlas.api.metadata.service.MetadataUpdateCoordinator metadataUpdateCoordinator;
+    private com.comicatlas.api.metadata.application.service.MetadataUpdateCoordinator metadataUpdateCoordinator;
 
     @TempDir
     Path tempDir;

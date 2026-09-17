@@ -1,9 +1,9 @@
 package com.comicatlas.api.task;
 
-import com.comicatlas.api.task.persistence.entity.ManagementTask;
-import com.comicatlas.api.task.persistence.mapper.ManagementTaskMapper;
-import com.comicatlas.api.task.enums.ManagementTaskStatus;
-import com.comicatlas.api.task.enums.TaskType;
+import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTask;
+import com.comicatlas.api.task.infrastructure.persistence.mapper.ManagementTaskMapper;
+import com.comicatlas.api.task.domain.model.ManagementTaskStatus;
+import com.comicatlas.api.task.domain.model.TaskType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

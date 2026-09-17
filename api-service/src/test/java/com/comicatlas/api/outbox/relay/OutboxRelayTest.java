@@ -1,7 +1,7 @@
-package com.comicatlas.api.outbox.relay;
+package com.comicatlas.api.outbox.infrastructure.relay;
 
-import com.comicatlas.api.outbox.persistence.entity.OutboxMessage;
-import com.comicatlas.api.outbox.persistence.mapper.OutboxMessageMapper;
+import com.comicatlas.api.outbox.infrastructure.persistence.entity.OutboxMessage;
+import com.comicatlas.api.outbox.infrastructure.persistence.mapper.OutboxMessageMapper;
 import com.comicatlas.common.event.ImportTaskCreatedEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;

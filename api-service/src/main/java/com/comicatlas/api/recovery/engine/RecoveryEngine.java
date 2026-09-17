@@ -1,7 +1,7 @@
 package com.comicatlas.api.recovery.engine;
 
-import com.comicatlas.api.recovery.dto.RecoveryProgressVO;
-import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
+import com.comicatlas.api.recovery.interfaces.rest.dto.RecoveryProgressVO;
+import com.comicatlas.api.catalog.infrastructure.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.recovery.domain.RestoreContext;
 import com.comicatlas.api.recovery.domain.RestorePolicy;
 import com.comicatlas.api.recovery.domain.RestoreSource;
@@ -10,8 +10,8 @@ import com.comicatlas.contract.common.enums.HqStatus;
 import com.comicatlas.contract.common.enums.LqStatus;
 import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.contract.common.exception.BusinessException;
-import com.comicatlas.api.storage.config.ApiStorageProperties;
-import com.comicatlas.api.metadata.service.MetadataUpdateCoordinator;
+import com.comicatlas.api.storage.infrastructure.config.ApiStorageProperties;
+import com.comicatlas.api.metadata.application.service.MetadataUpdateCoordinator;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;

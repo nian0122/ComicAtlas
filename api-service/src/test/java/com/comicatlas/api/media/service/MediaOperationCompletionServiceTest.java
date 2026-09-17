@@ -1,11 +1,13 @@
-package com.comicatlas.api.media.service;
+package com.comicatlas.api.media.application.service;
 
-import com.comicatlas.api.storage.service.ComicStatsService;
-import com.comicatlas.api.task.service.ManagementTaskService;
+import com.comicatlas.api.media.application.port.in.MediaMetadataSyncService;
+import com.comicatlas.api.media.application.port.in.MediaOperationCompletionService;
+import com.comicatlas.api.media.application.port.out.MediaOperationPersistencePort;
+
+import com.comicatlas.api.storage.application.port.in.ComicStatsService;
+import com.comicatlas.api.task.application.port.in.ManagementTaskService;
 import com.comicatlas.common.event.payload.LqSizeResult;
-import com.comicatlas.persistence.comic.entity.Media;
-import com.comicatlas.persistence.comic.mapper.MediaMapper;
-import com.comicatlas.api.media.service.impl.MediaOperationCompletionServiceImpl;
+import com.comicatlas.api.media.application.service.impl.MediaOperationCompletionServiceImpl;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -27,29 +29,30 @@ import static org.mockito.Mockito.when;
 @DisplayName("MediaOperationCompletionService LQ 批量回写")
 class MediaOperationCompletionServiceTest {
 
-    private final MediaMapper mediaMapper = mock(MediaMapper.class);
+    private final MediaOperationPersistencePort persistencePort = mock(MediaOperationPersistencePort.class);
     private final ManagementTaskService managementTaskService = mock(ManagementTaskService.class);
     private final MediaMetadataSyncService mediaMetadataSyncService = mock(MediaMetadataSyncService.class);
     private final ComicStatsService comicStatsService = mock(ComicStatsService.class);
     private final MediaOperationCompletionService service = new MediaOperationCompletionServiceImpl(
-            mediaMapper, managementTaskService, mediaMetadataSyncService, comicStatsService);
+            persistencePort, managementTaskService, mediaMetadataSyncService, comicStatsService);
 
     @Test
     @DisplayName("整章完成时每 500 页执行一次批量更新且不逐页查询更新")
     void applyLqCompleted_updatesReadyPagesInFixedBatches() {
         Long chapterId = 42L;
         List<LqSizeResult> results = lqResults(1001);
-        when(mediaMapper.resetLqNotGeneratedByChapter(chapterId)).thenReturn(1002);
-        when(mediaMapper.updateLqReadyBatch(eq(chapterId), anyList()))
+        when(persistencePort.resetLqNotGeneratedByChapter(chapterId)).thenReturn(1002);
+        when(persistencePort.updateLqReadyBatch(eq(chapterId), anyList()))
                 .thenAnswer(invocation -> ((List<?>) invocation.getArgument(1)).size());
 
         service.applyLqCompleted(chapterId, results);
 
         @SuppressWarnings("unchecked")
-        ArgumentCaptor<List<Media>> batchCaptor = ArgumentCaptor.forClass(List.class);
-        verify(mediaMapper, times(3)).updateLqReadyBatch(eq(chapterId), batchCaptor.capture());
+        ArgumentCaptor<List<MediaOperationPersistencePort.LqReadyUpdate>> batchCaptor =
+                ArgumentCaptor.forClass(List.class);
+        verify(persistencePort, times(3)).updateLqReadyBatch(eq(chapterId), batchCaptor.capture());
         assertThat(batchCaptor.getAllValues()).extracting(List::size).containsExactly(500, 500, 1);
-        verify(mediaMapper).resetLqNotGeneratedByChapter(chapterId);
+        verify(persistencePort).resetLqNotGeneratedByChapter(chapterId);
         verify(comicStatsService).refreshByChapter(chapterId);
     }
 
@@ -58,14 +61,14 @@ class MediaOperationCompletionServiceTest {
     void applyLqFailed_preservesSuccessfulPagesBeforeMarkingFailures() {
         Long chapterId = 43L;
         List<LqSizeResult> results = lqResults(2);
-        when(mediaMapper.updateLqReadyBatch(eq(chapterId), anyList())).thenReturn(2);
-        when(mediaMapper.markLqFailedByChapter(chapterId)).thenReturn(1);
+        when(persistencePort.updateLqReadyBatch(eq(chapterId), anyList())).thenReturn(2);
+        when(persistencePort.markLqFailedByChapter(chapterId)).thenReturn(1);
 
         service.applyLqFailed(chapterId, results);
 
-        InOrder updateOrder = inOrder(mediaMapper);
-        updateOrder.verify(mediaMapper).updateLqReadyBatch(eq(chapterId), anyList());
-        updateOrder.verify(mediaMapper).markLqFailedByChapter(chapterId);
+        InOrder updateOrder = inOrder(persistencePort);
+        updateOrder.verify(persistencePort).updateLqReadyBatch(eq(chapterId), anyList());
+        updateOrder.verify(persistencePort).markLqFailedByChapter(chapterId);
         verify(comicStatsService).refreshByChapter(chapterId);
     }
 

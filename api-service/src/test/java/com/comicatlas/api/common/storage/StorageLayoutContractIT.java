@@ -1,7 +1,7 @@
 package com.comicatlas.api.common.storage;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.comicatlas.api.storage.config.ApiStorageProperties;
+import com.comicatlas.api.storage.infrastructure.config.ApiStorageProperties;
 import com.comicatlas.api.storage.ApiStorageRoot;
 import com.comicatlas.api.storage.PathTraversalException;
 import com.comicatlas.api.storage.StorageLayout;

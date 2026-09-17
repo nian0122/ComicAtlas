@@ -48,6 +48,46 @@ class ApiPackageBoundaryTest {
     }
 
     @Test
+    void applicationLayerMustNotDependOnMappers() throws IOException {
+        Path sourceRoot = resolveSourceRoot().resolve("api");
+        try (var files = Files.walk(sourceRoot)) {
+            for (Path sourceFile : files.filter(path -> path.toString().endsWith(".java")).toList()) {
+                String packagePath = sourceRoot.relativize(sourceFile.getParent()).toString().replace('\\', '/');
+                if (!packagePath.contains("/application")) {
+                    continue;
+                }
+                String source = Files.readString(sourceFile);
+                boolean importsPersistenceMapper = source.matches(
+                        "(?s).*import\\s+com\\.comicatlas\\.(?:api|persistence)\\.[^;]*Mapper\\s*;.*");
+                boolean declaresPersistenceMapper = source.matches(
+                        "(?s).*private\\s+final\\s+(?!ObjectMapper\\b)[^;]*Mapper\\s+[^;]+;.*");
+                assertTrue(!importsPersistenceMapper && !declaresPersistenceMapper,
+                        () -> sourceFile + " 应通过 application.port.out 访问持久化，禁止直接依赖 Mapper");
+            }
+        }
+    }
+
+    @Test
+    void domainLayerMustRemainFrameworkIndependent() throws IOException {
+        Path sourceRoot = resolveSourceRoot().resolve("api");
+        try (var files = Files.walk(sourceRoot)) {
+            for (Path sourceFile : files.filter(path -> path.toString().endsWith(".java")).toList()) {
+                String packagePath = sourceRoot.relativize(sourceFile.getParent()).toString().replace('\\', '/');
+                if (!(packagePath.startsWith("domain") || packagePath.contains("/domain"))) {
+                    continue;
+                }
+                String source = Files.readString(sourceFile);
+                boolean importsFramework = source.matches(
+                        "(?s).*import\\s+(?:org\\.springframework|com\\.baomidou|jakarta\\.)[^;]*;.*");
+                boolean importsInfrastructure = source.matches(
+                        "(?s).*import\\s+com\\.comicatlas\\.(?:api\\.[^;]*infrastructure|persistence)\\.[^;]*;.*");
+                assertTrue(!importsFramework && !importsInfrastructure,
+                        () -> sourceFile + " 的 domain 层不得依赖框架或 infrastructure 类型");
+            }
+        }
+    }
+
+    @Test
     void frameworkTypesMustStayInTheirBusinessLayers() throws IOException {
         Path sourceRoot = resolveSourceRoot().resolve("api");
         try (var files = Files.walk(sourceRoot)) {
@@ -56,11 +96,14 @@ class ApiPackageBoundaryTest {
                 String packagePath = sourceRoot.relativize(sourceFile.getParent()).toString().replace('\\', '/');
                 String source = Files.readString(sourceFile);
                 if (fileName.endsWith("Controller.java")) {
-                    assertTrue(packagePath.endsWith("/controller"), () -> sourceFile + " 应归属业务 controller 包");
+                    assertTrue(packagePath.startsWith("interfaces/rest")
+                                    || packagePath.contains("/interfaces/rest"),
+                            () -> sourceFile + " 应归属业务 interfaces.rest 包");
                 }
                 if (fileName.endsWith("Mapper.java")) {
-                    assertTrue(packagePath.endsWith("/persistence/mapper"),
-                            () -> sourceFile + " 应归属业务 persistence.mapper 包");
+                    assertTrue(packagePath.endsWith("/infrastructure/persistence/mapper")
+                                    || packagePath.endsWith("/persistence/mapper"),
+                            () -> sourceFile + " 应归属业务 infrastructure.persistence.mapper 包");
                 }
                 if (source.contains("@TableName(")) {
                     assertTrue(packagePath.endsWith("/persistence/entity"),

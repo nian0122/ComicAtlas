@@ -16,17 +16,17 @@ public class FileUrlResolver {
     private String urlPrefix;
 
     public String resolve(Media media) {
-        if (media.getHqRoot() == null || media.getHqPath() == null) { return null; }
-        if (!EXPOSED_ROOTS.contains(media.getHqRoot().toLowerCase())) { return null; }
-        return urlPrefix + "/" + media.getHqRoot().toLowerCase()
-            + "/" + media.getHqPath().replace('\\', '/');
+        return resolve(media.getHqRoot(), media.getHqPath());
     }
 
     public String resolveLq(Media media) {
-        if (media.getLqRoot() == null || media.getLqPath() == null) { return null; }
-        if (!EXPOSED_ROOTS.contains(media.getLqRoot().toLowerCase())) { return null; }
-        return urlPrefix + "/" + media.getLqRoot().toLowerCase()
-            + "/" + media.getLqPath().replace('\\', '/');
+        return resolve(media.getLqRoot(), media.getLqPath());
+    }
+
+    public String resolve(String root, String path) {
+        if (root == null || path == null) { return null; }
+        if (!EXPOSED_ROOTS.contains(root.toLowerCase())) { return null; }
+        return urlPrefix + "/" + root.toLowerCase() + "/" + path.replace('\\', '/');
     }
 
     public String resolveCover(Long comicId) {

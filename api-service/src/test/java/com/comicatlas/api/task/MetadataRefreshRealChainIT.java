@@ -12,21 +12,21 @@ import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.enums.HqStatus;
 import com.comicatlas.contract.common.enums.LqStatus;
-import com.comicatlas.api.task.enums.ManagementTaskStatus;
+import com.comicatlas.api.task.domain.model.ManagementTaskStatus;
 import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
-import com.comicatlas.api.task.enums.TaskType;
+import com.comicatlas.api.task.domain.model.TaskType;
 import com.comicatlas.contract.common.enums.TranscodeStatus;
-import com.comicatlas.api.task.dto.OperationSubmitResultDTO;
-import com.comicatlas.api.task.persistence.entity.ManagementTask;
-import com.comicatlas.api.task.persistence.entity.ManagementTaskItem;
-import com.comicatlas.api.task.persistence.mapper.ManagementTaskItemMapper;
-import com.comicatlas.api.task.persistence.mapper.ManagementTaskMapper;
-import com.comicatlas.api.media.service.MediaOperationCommandService;
-import com.comicatlas.api.task.service.ManagementTaskService;
-import com.comicatlas.api.outbox.persistence.entity.OutboxMessage;
-import com.comicatlas.api.outbox.persistence.mapper.InboxReceiptMapper;
-import com.comicatlas.api.outbox.persistence.mapper.OutboxMessageMapper;
-import com.comicatlas.api.outbox.relay.OutboxRelay;
+import com.comicatlas.api.task.interfaces.rest.dto.OperationSubmitResultDTO;
+import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTask;
+import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTaskItem;
+import com.comicatlas.api.task.infrastructure.persistence.mapper.ManagementTaskItemMapper;
+import com.comicatlas.api.task.infrastructure.persistence.mapper.ManagementTaskMapper;
+import com.comicatlas.api.media.application.port.in.MediaOperationCommandService;
+import com.comicatlas.api.task.application.port.in.ManagementTaskService;
+import com.comicatlas.api.outbox.infrastructure.persistence.entity.OutboxMessage;
+import com.comicatlas.api.outbox.infrastructure.persistence.mapper.InboxReceiptMapper;
+import com.comicatlas.api.outbox.infrastructure.persistence.mapper.OutboxMessageMapper;
+import com.comicatlas.api.outbox.infrastructure.relay.OutboxRelay;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO.ChapterSnapshot;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO.MediaSnapshot;
@@ -494,8 +494,8 @@ class MetadataRefreshRealChainIT {
 
         // 重放同一事件（同 eventId）
         rabbitTemplate.convertAndSend("comic.management", "command.completed", completed);
-        await(() -> inboxMapper.selectCount(new LambdaQueryWrapper<com.comicatlas.api.outbox.persistence.entity.InboxReceipt>()
-                .eq(com.comicatlas.api.outbox.persistence.entity.InboxReceipt::getEventId,
+        await(() -> inboxMapper.selectCount(new LambdaQueryWrapper<com.comicatlas.api.outbox.infrastructure.persistence.entity.InboxReceipt>()
+                .eq(com.comicatlas.api.outbox.infrastructure.persistence.entity.InboxReceipt::getEventId,
                         completed.eventId().toString())) == 1, "Inbox 记录");
         Thread.sleep(800);
         // 不二次 apply：新增 004.jpg 仍只有 1 行、101 尺寸不被覆盖

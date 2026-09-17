@@ -1,11 +1,12 @@
-package com.comicatlas.api.importer.service.impl;
+package com.comicatlas.api.importer.application.service.impl;
 
-import com.comicatlas.api.importer.enums.DirectoryScanTaskStatus;
-import com.comicatlas.api.importer.dto.DirectoryScanTaskVO;
-import com.comicatlas.api.importer.persistence.entity.DirectoryScanTask;
-import com.comicatlas.api.importer.persistence.mapper.DirectoryScanTaskMapper;
-import com.comicatlas.api.task.service.ManagementTaskService;
-import com.comicatlas.api.outbox.service.OutboxService;
+import com.comicatlas.api.importer.domain.model.DirectoryScanTaskStatus;
+import com.comicatlas.api.importer.interfaces.rest.dto.DirectoryScanTaskVO;
+import com.comicatlas.api.importer.infrastructure.persistence.entity.DirectoryScanTask;
+import com.comicatlas.api.importer.infrastructure.persistence.mapper.DirectoryScanTaskMapper;
+import com.comicatlas.api.importer.infrastructure.persistence.repository.DirectoryScanTaskPersistencePortAdapter;
+import com.comicatlas.api.task.application.port.in.ManagementTaskService;
+import com.comicatlas.api.outbox.application.port.in.OutboxService;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.dto.ScanItemDTO;
@@ -69,7 +70,8 @@ class DirectoryScanTaskServiceTest {
     void setUp() {
         objectMapper = new ObjectMapper();
         service = new DirectoryScanTaskServiceImpl(
-                scanTaskMapper, outboxService, objectMapper, managementTaskService);
+                new DirectoryScanTaskPersistencePortAdapter(scanTaskMapper), outboxService, objectMapper,
+                managementTaskService);
     }
 
     private static DirectoryScanTask taskWithJson(Long id, String resultJson) {

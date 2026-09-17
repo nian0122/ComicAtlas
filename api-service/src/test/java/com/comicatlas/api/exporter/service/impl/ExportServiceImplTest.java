@@ -1,14 +1,13 @@
-package com.comicatlas.api.exporter.service.impl;
+package com.comicatlas.api.exporter.application.service.impl;
 
-import com.comicatlas.persistence.comic.mapper.ComicMapper;
-import com.comicatlas.api.exporter.enums.ExportTaskStatus;
-import com.comicatlas.api.storage.config.ApiStorageProperties;
+import com.comicatlas.api.exporter.application.port.out.ExportPersistencePort;
+import com.comicatlas.api.exporter.domain.model.ExportTaskStatus;
+import com.comicatlas.api.storage.infrastructure.config.ApiStorageProperties;
 import com.comicatlas.api.storage.ApiStorageRoot;
-import com.comicatlas.api.exporter.dto.ExportTaskVO;
-import com.comicatlas.api.exporter.persistence.entity.ExportTask;
-import com.comicatlas.api.exporter.persistence.mapper.ExportTaskMapper;
-import com.comicatlas.api.task.service.ManagementTaskService;
-import com.comicatlas.api.outbox.service.OutboxService;
+import com.comicatlas.api.exporter.interfaces.rest.dto.ExportTaskVO;
+import com.comicatlas.api.exporter.infrastructure.persistence.entity.ExportTask;
+import com.comicatlas.api.task.application.port.in.ManagementTaskService;
+import com.comicatlas.api.outbox.application.port.in.OutboxService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -31,15 +30,15 @@ class ExportServiceImplTest {
     Path tempDir;
 
     private ExportServiceImpl service(ExportTask task) {
-        ExportTaskMapper taskMapper = mock(ExportTaskMapper.class);
-        when(taskMapper.selectById(task.getId())).thenReturn(task);
+        ExportPersistencePort persistencePort = mock(ExportPersistencePort.class);
+        when(persistencePort.findTask(task.getId())).thenReturn(task);
 
         ApiStorageRoot exportRoot = new ApiStorageRoot();
         exportRoot.setPath(tempDir);
         ApiStorageProperties props = new ApiStorageProperties();
         props.setRoots(Map.of("EXPORT", exportRoot));
 
-        return new ExportServiceImpl(mock(ComicMapper.class), taskMapper,
+        return new ExportServiceImpl(persistencePort,
                 mock(OutboxService.class), mock(ManagementTaskService.class), props);
     }
 
@@ -97,15 +96,15 @@ class ExportServiceImplTest {
         task.setOutputPath("7/base.zip");
         task.setOutputSize(100L);
 
-        ExportTaskMapper taskMapper = mock(ExportTaskMapper.class);
-        when(taskMapper.selectAllOrderByCreatedAtDesc()).thenReturn(List.of(task));
+        ExportPersistencePort persistencePort = mock(ExportPersistencePort.class);
+        when(persistencePort.findAllTasks()).thenReturn(List.of(task));
 
         ApiStorageRoot exportRoot = new ApiStorageRoot();
         exportRoot.setPath(tempDir);
         ApiStorageProperties props = new ApiStorageProperties();
         props.setRoots(Map.of("EXPORT", exportRoot));
 
-        ExportServiceImpl svc = new ExportServiceImpl(mock(ComicMapper.class), taskMapper,
+        ExportServiceImpl svc = new ExportServiceImpl(persistencePort,
                 mock(OutboxService.class), mock(ManagementTaskService.class), props);
 
         List<ExportTaskVO> vos = svc.listAllExports();

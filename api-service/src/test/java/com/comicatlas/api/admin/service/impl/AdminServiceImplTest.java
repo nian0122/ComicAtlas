@@ -1,15 +1,15 @@
 package com.comicatlas.api.admin.service.impl;
 
-import com.comicatlas.api.recovery.dto.ComicDeleteStatsDTO;
+import com.comicatlas.api.recovery.interfaces.rest.dto.ComicDeleteStatsDTO;
 import com.comicatlas.api.recovery.engine.RecoveryEngine;
-import com.comicatlas.api.recovery.persistence.mapper.RecoveryDataMapper;
-import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
+import com.comicatlas.api.recovery.infrastructure.persistence.mapper.RecoveryDataMapper;
+import com.comicatlas.api.catalog.infrastructure.cache.CatalogCacheInvalidator;
 import com.comicatlas.contract.common.exception.BusinessException;
-import com.comicatlas.api.importer.persistence.entity.ImportTask;
-import com.comicatlas.api.importer.persistence.mapper.ImportTaskMapper;
-import com.comicatlas.api.task.dto.OperationSubmitResultDTO;
-import com.comicatlas.api.media.service.MediaOperationCommandService;
-import com.comicatlas.api.recovery.service.impl.RecoveryCompatibilityServiceImpl;
+import com.comicatlas.api.importer.infrastructure.persistence.entity.ImportTask;
+import com.comicatlas.api.importer.infrastructure.persistence.mapper.ImportTaskMapper;
+import com.comicatlas.api.task.interfaces.rest.dto.OperationSubmitResultDTO;
+import com.comicatlas.api.media.application.port.in.MediaOperationCommandService;
+import com.comicatlas.api.recovery.application.service.impl.RecoveryCompatibilityServiceImpl;
 import com.comicatlas.persistence.reader.mapper.ReadingHistoryMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

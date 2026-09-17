@@ -1,11 +1,13 @@
-package com.comicatlas.api.metadata.service;
+package com.comicatlas.api.metadata.application.service;
+
+import com.comicatlas.api.metadata.application.port.in.MetadataRefreshService;
 
 import com.comicatlas.contract.common.enums.HqStatus;
 import com.comicatlas.contract.common.enums.LqStatus;
 import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
 import com.comicatlas.contract.common.enums.TranscodeStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
-import com.comicatlas.api.storage.config.ApiStorageProperties;
+import com.comicatlas.api.storage.infrastructure.config.ApiStorageProperties;
 import com.comicatlas.api.storage.ApiStorageRoot;
 import com.comicatlas.api.storage.PathTraversalException;
 import com.comicatlas.persistence.comic.entity.Chapter;
@@ -25,7 +27,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.BeforeEach;
 import com.comicatlas.api.shared.crypto.DigestService;
-import com.comicatlas.api.metadata.service.impl.MetadataRefreshServiceImpl;
+import com.comicatlas.api.metadata.application.service.impl.MetadataRefreshServiceImpl;
+import com.comicatlas.api.metadata.infrastructure.persistence.repository.MetadataRefreshPersistencePortAdapter;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -43,6 +46,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -92,7 +96,7 @@ class MetadataRefreshServiceTest {
         ApiStorageRoot stagingRoot = new ApiStorageRoot();
         stagingRoot.setPath(staging);
         when(storageProperties.root("STAGING")).thenReturn(stagingRoot);
-        service = new MetadataRefreshServiceImpl(mediaMapper, chapterMapper,
+        service = new MetadataRefreshServiceImpl(new MetadataRefreshPersistencePortAdapter(chapterMapper, mediaMapper),
                 storageProperties, MAPPER, new DigestService());
     }
 
@@ -361,20 +365,23 @@ class MetadataRefreshServiceTest {
             assertThat(result.discovered()).isEqualTo(1);
 
             // m101 更新为扫描值
-            assertThat(m101.getHqSize()).isEqualTo(123456L);
-            assertThat(m101.getHqStatus()).isEqualTo(HqStatus.READY);
-            assertThat(m101.getMediaType()).isEqualTo("IMAGE");
-            assertThat(m101.getDuration()).isNull();
+            Media updatedM101 = updatedMedia(101L);
+            assertThat(updatedM101.getHqSize()).isEqualTo(123456L);
+            assertThat(updatedM101.getHqStatus()).isEqualTo(HqStatus.READY);
+            assertThat(updatedM101.getMediaType()).isEqualTo("IMAGE");
+            assertThat(updatedM101.getDuration()).isNull();
             // m102 视频字段更新
-            assertThat(m102.getHqSize()).isEqualTo(654321L);
-            assertThat(m102.getMediaType()).isEqualTo("VIDEO");
-            assertThat(m102.getDuration()).isEqualByComparingTo("12.500");
-            assertThat(m102.getContainer()).isEqualTo("mp4");
+            Media updatedM102 = updatedMedia(102L);
+            assertThat(updatedM102.getHqSize()).isEqualTo(654321L);
+            assertThat(updatedM102.getMediaType()).isEqualTo("VIDEO");
+            assertThat(updatedM102.getDuration()).isEqualByComparingTo("12.500");
+            assertThat(updatedM102.getContainer()).isEqualTo("mp4");
             // m103 未匹配 → MISSING + fileSize=0
-            assertThat(m103.getHqStatus()).isEqualTo(HqStatus.MISSING);
-            assertThat(m103.getHqSize()).isZero();
+            Media updatedM103 = updatedMedia(103L);
+            assertThat(updatedM103.getHqStatus()).isEqualTo(HqStatus.MISSING);
+            assertThat(updatedM103.getHqSize()).isZero();
             // m202 未匹配 → MISSING
-            assertThat(m202.getHqStatus()).isEqualTo(HqStatus.MISSING);
+            assertThat(updatedMedia(202L).getHqStatus()).isEqualTo(HqStatus.MISSING);
 
             // 批量查询次数：章节一次 + 媒体一次
             verify(chapterMapper, times(1)).selectByComicId(anyLong());
@@ -532,7 +539,7 @@ class MetadataRefreshServiceTest {
             verify(mediaMapper).normalizeLegacyHqPath(42L, "1/0/", "1/42/");
             verify(mediaMapper).normalizeLegacyLqPath(42L, "1/0/", "1/42/");
             // 快照合并照常执行（按 basename 匹配更新该行）
-            assertThat(m101.getHqStatus()).isEqualTo(HqStatus.READY);
+            assertThat(updatedMedia(101L).getHqStatus()).isEqualTo(HqStatus.READY);
             assertThat(result.updated()).isEqualTo(1);
         }
 
@@ -579,7 +586,7 @@ class MetadataRefreshServiceTest {
 
             assertThat(result.updated()).isEqualTo(1);
             assertThat(result.discovered()).isZero();
-            assertThat(registeredMedia.getHqSize()).isEqualTo(8888L);
+            assertThat(updatedMedia(301L).getHqSize()).isEqualTo(8888L);
             verify(mediaMapper, never()).insertImportBatch(anyList());
         }
 
@@ -608,8 +615,9 @@ class MetadataRefreshServiceTest {
 
             service.applyValidatedSnapshot(applied);
 
-            assertThat(m101.getLqStatus()).isEqualTo(LqStatus.READY);
-            assertThat(m101.getLqSize()).isEqualTo(8888L);
+            Media updatedM101 = updatedMedia(101L);
+            assertThat(updatedM101.getLqStatus()).isEqualTo(LqStatus.READY);
+            assertThat(updatedM101.getLqSize()).isEqualTo(8888L);
         }
 
         @Test
@@ -639,10 +647,11 @@ class MetadataRefreshServiceTest {
             service.applyValidatedSnapshot(applied);
 
             // 决策 1A：以本地文件为准——LQ 文件缺失即校正 NOT_GENERATED
-            assertThat(m101.getLqStatus()).isEqualTo(LqStatus.NOT_GENERATED);
-            assertThat(m101.getLqRoot()).isNull();
-            assertThat(m101.getLqPath()).isNull();
-            assertThat(m101.getLqSize()).isZero();
+            Media updatedM101 = updatedMedia(101L);
+            assertThat(updatedM101.getLqStatus()).isEqualTo(LqStatus.NOT_GENERATED);
+            assertThat(updatedM101.getLqRoot()).isNull();
+            assertThat(updatedM101.getLqPath()).isNull();
+            assertThat(updatedM101.getLqSize()).isZero();
         }
 
         @Test
@@ -672,9 +681,10 @@ class MetadataRefreshServiceTest {
             service.applyValidatedSnapshot(applied);
 
             // HQ 标 MISSING，LQ 保留 READY（阅读器仍可用 LQ 兜底）
-            assertThat(m103.getHqStatus()).isEqualTo(HqStatus.MISSING);
-            assertThat(m103.getLqStatus()).isEqualTo(LqStatus.READY);
-            assertThat(m103.getLqSize()).isEqualTo(999L);
+            Media updatedM103 = updatedMedia(103L);
+            assertThat(updatedM103.getHqStatus()).isEqualTo(HqStatus.MISSING);
+            assertThat(updatedM103.getLqStatus()).isEqualTo(LqStatus.READY);
+            assertThat(updatedM103.getLqSize()).isEqualTo(999L);
         }
 
         @Test
@@ -706,10 +716,11 @@ class MetadataRefreshServiceTest {
 
             service.applyValidatedSnapshot(applied);
 
-            assertThat(m101.getLqStatus()).isEqualTo(LqStatus.READY);
-            assertThat(m101.getLqSize()).isEqualTo(8888L);
-            assertThat(m101.getHqStatus()).isEqualTo(HqStatus.DELETED);
-            assertThat(m101.getHqPath()).isNull();
+            Media updatedM101 = updatedMedia(101L);
+            assertThat(updatedM101.getLqStatus()).isEqualTo(LqStatus.READY);
+            assertThat(updatedM101.getLqSize()).isEqualTo(8888L);
+            assertThat(updatedM101.getHqStatus()).isEqualTo(HqStatus.DELETED);
+            assertThat(updatedM101.getHqPath()).isNull();
         }
 
         @Test
@@ -741,12 +752,23 @@ class MetadataRefreshServiceTest {
 
             service.applyValidatedSnapshot(applied);
 
-            assertThat(m101.getLqStatus()).isEqualTo(LqStatus.NOT_GENERATED);
-            assertThat(m101.getLqRoot()).isNull();
-            assertThat(m101.getLqPath()).isNull();
-            assertThat(m101.getLqSize()).isZero();
-            assertThat(m101.getHqStatus()).isEqualTo(HqStatus.DELETED);
-            assertThat(m101.getHqPath()).isNull();
+            Media updatedM101 = updatedMedia(101L);
+            assertThat(updatedM101.getLqStatus()).isEqualTo(LqStatus.NOT_GENERATED);
+            assertThat(updatedM101.getLqRoot()).isNull();
+            assertThat(updatedM101.getLqPath()).isNull();
+            assertThat(updatedM101.getLqSize()).isZero();
+            assertThat(updatedM101.getHqStatus()).isEqualTo(HqStatus.DELETED);
+            assertThat(updatedM101.getHqPath()).isNull();
         }
+    }
+
+    private Media updatedMedia(Long mediaId) {
+        ArgumentCaptor<List<Media>> updateCaptor = ArgumentCaptor.forClass(List.class);
+        verify(mediaMapper, atLeastOnce()).updateRefreshBatch(updateCaptor.capture());
+        return updateCaptor.getAllValues().stream()
+                .flatMap(List::stream)
+                .filter(media -> mediaId.equals(media.getId()))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("未找到媒体更新命令: " + mediaId));
     }
 }

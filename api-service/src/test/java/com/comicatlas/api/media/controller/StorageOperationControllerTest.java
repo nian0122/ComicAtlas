@@ -1,20 +1,20 @@
-package com.comicatlas.api.media.controller;
+package com.comicatlas.api.media.interfaces.rest;
 
-import com.comicatlas.api.media.service.MediaOperationCommandService;
+import com.comicatlas.api.media.application.port.in.MediaOperationCommandService;
 
-import com.comicatlas.api.exporter.dto.ExportTaskVO;
-import com.comicatlas.api.task.dto.OperationSubmitResultDTO;
-import com.comicatlas.api.exporter.dto.ExportArtifactVO;
-import com.comicatlas.api.exporter.service.ExportOperationService;
-import com.comicatlas.api.exporter.controller.ExportController;
-import com.comicatlas.api.exporter.service.ExportDirectoryService;
-import com.comicatlas.api.exporter.model.ExportDirectoryOpenResult;
-import com.comicatlas.api.media.service.HqDeleteOperationService;
-import com.comicatlas.api.media.service.LqOperationService;
-import com.comicatlas.api.media.service.TranscodeOperationService;
-import com.comicatlas.api.media.service.impl.HqDeleteOperationServiceImpl;
-import com.comicatlas.api.media.service.impl.LqOperationServiceImpl;
-import com.comicatlas.api.media.service.impl.TranscodeOperationServiceImpl;
+import com.comicatlas.api.exporter.interfaces.rest.dto.ExportTaskVO;
+import com.comicatlas.api.task.interfaces.rest.dto.OperationSubmitResultDTO;
+import com.comicatlas.api.exporter.interfaces.rest.dto.ExportArtifactVO;
+import com.comicatlas.api.exporter.application.port.in.ExportOperationService;
+import com.comicatlas.api.exporter.interfaces.rest.ExportController;
+import com.comicatlas.api.exporter.application.port.in.ExportDirectoryService;
+import com.comicatlas.api.exporter.domain.model.ExportDirectoryOpenResult;
+import com.comicatlas.api.media.application.port.in.HqDeleteOperationService;
+import com.comicatlas.api.media.application.port.in.LqOperationService;
+import com.comicatlas.api.media.application.port.in.TranscodeOperationService;
+import com.comicatlas.api.media.application.service.impl.HqDeleteOperationServiceImpl;
+import com.comicatlas.api.media.application.service.impl.LqOperationServiceImpl;
+import com.comicatlas.api.media.application.service.impl.TranscodeOperationServiceImpl;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;

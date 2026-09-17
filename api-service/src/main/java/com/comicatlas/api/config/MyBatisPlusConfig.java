@@ -7,7 +7,7 @@ import com.baomidou.mybatisplus.extension.plugins.inner.OptimisticLockerInnerInt
 import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
 import com.comicatlas.persistence.handler.EnumTypeHandlers;
 import com.comicatlas.api.shared.persistence.handler.ManagementEnumTypeHandlers;
-import com.comicatlas.api.upload.persistence.handler.UploadSessionStatusTypeHandler;
+import com.comicatlas.api.upload.infrastructure.persistence.handler.UploadSessionStatusTypeHandler;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -15,6 +15,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 // Mapper 扫描范围按应用边界集中声明：管理端额外扫描 api 专属 Mapper，共享 Mapper 仅注册一次。
 @MapperScan({
+        "com.comicatlas.api.*.infrastructure.persistence.mapper",
         "com.comicatlas.api.*.persistence.mapper",
         "com.comicatlas.persistence.comic.mapper",
         "com.comicatlas.persistence.reader.mapper"

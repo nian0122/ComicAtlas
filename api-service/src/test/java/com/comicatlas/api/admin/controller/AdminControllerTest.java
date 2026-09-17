@@ -1,12 +1,12 @@
 package com.comicatlas.api.admin.controller;
 
-import com.comicatlas.api.recovery.dto.ComicDeleteStatsDTO;
-import com.comicatlas.api.recovery.dto.ScanRecoverResultDTO;
-import com.comicatlas.api.recovery.service.RecoveryCompatibilityService;
-import com.comicatlas.api.recovery.controller.RecoveryCompatibilityController;
+import com.comicatlas.api.recovery.interfaces.rest.dto.ComicDeleteStatsDTO;
+import com.comicatlas.api.recovery.interfaces.rest.dto.ScanRecoverResultDTO;
+import com.comicatlas.api.recovery.application.port.in.RecoveryCompatibilityService;
+import com.comicatlas.api.recovery.interfaces.rest.RecoveryCompatibilityController;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.web.exception.GlobalExceptionHandler;
-import com.comicatlas.api.dlq.config.DlqSecurityConfig;
+import com.comicatlas.api.dlq.infrastructure.config.DlqSecurityConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;

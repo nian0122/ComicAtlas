@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.comicatlas.api.storage.persistence.mapper.StorageMapper">
+<mapper namespace="com.comicatlas.api.storage.infrastructure.persistence.mapper.StorageMapper">
 
     <sql id="storageStatusHaving">
         HAVING 1 = 1
@@ -29,7 +29,7 @@
         </if>
     </sql>
 
-    <select id="selectComicStorageList" resultType="com.comicatlas.api.storage.dto.ComicStorageDTO">
+    <select id="selectComicStorageList" resultType="com.comicatlas.api.storage.interfaces.rest.dto.ComicStorageDTO">
         SELECT t.comic_id, t.title, t.cover_url, t.chapter_count, t.page_count,
                t.hq_size, t.lq_size, t.hq_status, t.lq_status, t.media_type
         FROM (
@@ -83,7 +83,7 @@
         LIMIT #{offset}, #{size}
     </select>
 
-    <select id="selectComicStorageById" resultType="com.comicatlas.api.storage.dto.ComicStorageDTO">
+    <select id="selectComicStorageById" resultType="com.comicatlas.api.storage.interfaces.rest.dto.ComicStorageDTO">
         SELECT
             c.id as comic_id,
             c.title,
@@ -133,7 +133,7 @@
         ) t
     </select>
 
-    <select id="selectChapterStorageList" resultType="com.comicatlas.api.storage.dto.ChapterStorageDTO">
+    <select id="selectChapterStorageList" resultType="com.comicatlas.api.storage.interfaces.rest.dto.ChapterStorageDTO">
         SELECT
             ch.id as chapter_id,
             ch.chapter_no,
@@ -163,7 +163,7 @@
         WHERE c.id = #{comicId}
     </select>
 
-    <select id="selectTranscodeStatusList" resultType="com.comicatlas.api.storage.dto.ComicTranscodeStatusVO">
+    <select id="selectTranscodeStatusList" resultType="com.comicatlas.api.storage.interfaces.rest.dto.ComicTranscodeStatusVO">
         SELECT
             c.id as comic_id,
             GROUP_CONCAT(DISTINCT m.transcode_status) as transcode_status
@@ -177,7 +177,7 @@
         GROUP BY c.id
     </select>
 
-    <select id="selectStorageStats" resultType="com.comicatlas.api.storage.dto.StorageStatsDTO">
+    <select id="selectStorageStats" resultType="com.comicatlas.api.storage.interfaces.rest.dto.StorageStatsDTO">
         SELECT
             COALESCE(SUM(CASE WHEN m.hq_status = 'READY' THEN COALESCE(m.hq_size, 0) ELSE 0 END), 0) AS hq_bytes,
             COALESCE(SUM(CASE WHEN m.lq_status = 'READY' THEN COALESCE(m.lq_size, 0) ELSE 0 END), 0) AS lq_bytes

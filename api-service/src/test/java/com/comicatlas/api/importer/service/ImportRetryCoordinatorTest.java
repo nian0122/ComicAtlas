@@ -1,22 +1,26 @@
-package com.comicatlas.api.importer.service;
+package com.comicatlas.api.importer.application.service;
+
+import com.comicatlas.api.importer.application.port.in.ImportRetryStorageService;
 
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
-import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
-import com.comicatlas.api.importer.persistence.entity.ImportTask;
-import com.comicatlas.api.importer.persistence.mapper.ImportTaskMapper;
-import com.comicatlas.api.outbox.service.OutboxService;
+import com.comicatlas.api.catalog.infrastructure.cache.CatalogCacheInvalidator;
+import com.comicatlas.api.importer.infrastructure.persistence.entity.ImportTask;
+import com.comicatlas.api.importer.infrastructure.persistence.mapper.ImportTaskMapper;
+import com.comicatlas.api.importer.infrastructure.persistence.repository.ImportRetryPersistencePortAdapter;
+import com.comicatlas.api.outbox.application.port.in.OutboxService;
 import com.comicatlas.common.event.ImportTaskCreatedEvent;
 import com.comicatlas.contract.common.enums.ComicStatus;
-import com.comicatlas.api.importer.enums.ImportTaskStatus;
+import com.comicatlas.api.importer.domain.model.ImportTaskStatus;
 import com.comicatlas.contract.common.enums.SourceType;
 import com.comicatlas.persistence.comic.entity.Chapter;
+import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.mapper.CatalogMapper;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.persistence.comic.mapper.MediaMapper;
-import com.comicatlas.api.storage.config.ApiStorageProperties;
+import com.comicatlas.api.storage.infrastructure.config.ApiStorageProperties;
 import com.comicatlas.api.storage.ApiStorageRoot;
-import com.comicatlas.api.importer.service.impl.ImportRetryStorageServiceImpl;
+import com.comicatlas.api.importer.application.service.impl.ImportRetryStorageServiceImpl;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
@@ -38,6 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -69,7 +74,8 @@ class ImportRetryCoordinatorTest {
         storageProperties.setRoots(java.util.Map.of("METADATA", metadataRoot, "HQ", hqRoot));
         retryStorageService = new ImportRetryStorageServiceImpl(storageProperties);
         coordinator = new ImportRetryCoordinator(
-                importTaskMapper, comicMapper, chapterMapper, mediaMapper, catalogMapper,
+                new ImportRetryPersistencePortAdapter(importTaskMapper, comicMapper, chapterMapper, mediaMapper,
+                        catalogMapper),
                 catalogCacheInvalidator, outboxService, storageProperties, redisTemplate,
                 retryStorageService);
         // 重试入队会注册事务提交后回调，统一初始化同步器（tearDown 负责清理）
@@ -149,8 +155,9 @@ class ImportRetryCoordinatorTest {
 
         coordinator.retry(task);
 
-        verify(comicMapper).updateById(comic);
-        assertTrue(comic.getStatus() == ComicStatus.IMPORTING);
+        verify(comicMapper).updateById(argThat((Comic updatedComic) ->
+                updatedComic.getId().equals(11L)
+                        && updatedComic.getStatus() == ComicStatus.IMPORTING));
     }
 
     @Test

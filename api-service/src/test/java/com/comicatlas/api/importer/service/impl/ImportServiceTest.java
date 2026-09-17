@@ -1,25 +1,26 @@
-package com.comicatlas.api.importer.service.impl;
+package com.comicatlas.api.importer.application.service.impl;
 
 import com.comicatlas.persistence.comic.entity.Comic;
-import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
+import com.comicatlas.api.catalog.infrastructure.cache.CatalogCacheInvalidator;
 import com.comicatlas.persistence.comic.mapper.CatalogMapper;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.persistence.comic.mapper.MediaMapper;
-import com.comicatlas.api.importer.enums.ImportTaskStatus;
+import com.comicatlas.api.importer.domain.model.ImportTaskStatus;
 import com.comicatlas.contract.common.enums.SourceType;
 import com.comicatlas.contract.common.exception.BusinessException;
-import com.comicatlas.api.storage.config.ApiStorageProperties;
+import com.comicatlas.api.storage.infrastructure.config.ApiStorageProperties;
 import com.comicatlas.api.storage.ApiStorageRoot;
-import com.comicatlas.api.importer.dto.BatchImportRequest;
-import com.comicatlas.api.importer.dto.BatchImportResultVO;
-import com.comicatlas.api.importer.persistence.entity.ImportTask;
-import com.comicatlas.api.importer.persistence.mapper.ImportTaskMapper;
-import com.comicatlas.api.importer.service.ImportRetryCoordinator;
-import com.comicatlas.api.task.dto.ManagementTaskResponse;
-import com.comicatlas.api.task.service.ManagementTaskService;
+import com.comicatlas.api.importer.interfaces.rest.dto.BatchImportRequest;
+import com.comicatlas.api.importer.interfaces.rest.dto.BatchImportResultVO;
+import com.comicatlas.api.importer.infrastructure.persistence.entity.ImportTask;
+import com.comicatlas.api.importer.infrastructure.persistence.mapper.ImportTaskMapper;
+import com.comicatlas.api.importer.application.service.ImportRetryCoordinator;
+import com.comicatlas.api.importer.infrastructure.persistence.repository.ImportCommandPersistencePortAdapter;
+import com.comicatlas.api.task.interfaces.rest.dto.ManagementTaskResponse;
+import com.comicatlas.api.task.application.port.in.ManagementTaskService;
 import com.comicatlas.api.shared.crypto.DigestService;
-import com.comicatlas.api.outbox.service.OutboxService;
+import com.comicatlas.api.outbox.application.port.in.OutboxService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,6 +35,7 @@ import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.nio.file.Path;
 import java.time.Duration;
@@ -75,6 +77,8 @@ class ImportServiceTest {
 
     @BeforeEach
     void setUp() {
+        ReflectionTestUtils.setField(service, "persistencePort",
+                new ImportCommandPersistencePortAdapter(taskMapper, comicMapper));
         lenient().when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
             TransactionCallback<?> callback = invocation.getArgument(0);
             return callback.doInTransaction(null);

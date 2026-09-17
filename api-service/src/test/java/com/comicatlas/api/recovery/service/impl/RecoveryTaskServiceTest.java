@@ -1,14 +1,14 @@
-package com.comicatlas.api.recovery.service.impl;
+package com.comicatlas.api.recovery.application.service.impl;
 
-import com.comicatlas.api.recovery.service.impl.RecoveryTaskServiceImpl;
+import com.comicatlas.api.recovery.application.service.impl.RecoveryTaskServiceImpl;
 
-import com.comicatlas.api.recovery.enums.RecoveryTaskStatus;
+import com.comicatlas.api.recovery.domain.model.RecoveryTaskStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
-import com.comicatlas.api.recovery.persistence.entity.RecoveryTask;
-import com.comicatlas.api.recovery.persistence.mapper.RecoveryTaskMapper;
-import com.comicatlas.api.task.dto.ManagementTaskResponse;
-import com.comicatlas.api.task.service.ManagementTaskService;
-import com.comicatlas.api.outbox.service.OutboxService;
+import com.comicatlas.api.recovery.infrastructure.persistence.entity.RecoveryTask;
+import com.comicatlas.api.recovery.infrastructure.persistence.mapper.RecoveryTaskMapper;
+import com.comicatlas.api.task.interfaces.rest.dto.ManagementTaskResponse;
+import com.comicatlas.api.task.application.port.in.ManagementTaskService;
+import com.comicatlas.api.outbox.application.port.in.OutboxService;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.event.RecoveryRequestedEvent;

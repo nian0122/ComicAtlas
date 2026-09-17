@@ -1,33 +1,34 @@
-package com.comicatlas.api.metadata.service;
+package com.comicatlas.api.metadata.application.service;
 
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
-import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
-import com.comicatlas.api.media.service.HqMediaRegistrationService;
-import com.comicatlas.api.task.persistence.entity.ManagementTaskItem;
-import com.comicatlas.api.task.persistence.mapper.ManagementTaskItemMapper;
-import com.comicatlas.api.task.service.ManagementTaskService;
-import com.comicatlas.api.storage.service.ComicStatsService;
-import com.comicatlas.api.outbox.service.InboxService;
-import com.comicatlas.api.outbox.service.EventFingerprintService;
-import com.comicatlas.api.outbox.service.OutboxService;
-import com.comicatlas.api.metadata.service.MetadataRefreshService.MetadataRefreshLoadRequest;
+import com.comicatlas.api.catalog.infrastructure.cache.CatalogCacheInvalidator;
+import com.comicatlas.api.media.application.port.in.HqMediaRegistrationService;
+import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTaskItem;
+import com.comicatlas.api.task.infrastructure.persistence.mapper.ManagementTaskItemMapper;
+import com.comicatlas.api.task.application.port.in.ManagementTaskService;
+import com.comicatlas.api.storage.application.port.in.ComicStatsService;
+import com.comicatlas.api.outbox.application.port.in.InboxService;
+import com.comicatlas.api.outbox.application.port.in.EventFingerprintService;
+import com.comicatlas.api.outbox.application.port.in.OutboxService;
+import com.comicatlas.api.metadata.application.port.in.MetadataRefreshService.MetadataRefreshLoadRequest;
+import com.comicatlas.api.metadata.application.port.in.MetadataRefreshService;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO;
 import com.comicatlas.common.event.MetadataRefreshEvent;
 import com.comicatlas.common.event.MetadataRefreshScanCompletedEvent;
 import com.comicatlas.contract.common.enums.ComicStatus;
-import com.comicatlas.api.task.enums.ManagementTaskStatus;
-import com.comicatlas.api.task.enums.TaskType;
+import com.comicatlas.api.task.domain.model.ManagementTaskStatus;
+import com.comicatlas.api.task.domain.model.TaskType;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.shared.exception.SnapshotUnavailableException;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
-import com.comicatlas.api.storage.config.ApiStorageProperties;
+import com.comicatlas.api.storage.infrastructure.config.ApiStorageProperties;
 import com.comicatlas.api.storage.ApiStorageRoot;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -38,7 +39,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.InjectMocks;
-import com.comicatlas.api.metadata.service.impl.MetadataRefreshCompletionServiceImpl;
+import com.comicatlas.api.metadata.application.service.impl.MetadataRefreshCompletionServiceImpl;
+import com.comicatlas.api.metadata.application.port.out.MetadataRefreshCompletionPersistencePort;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -51,6 +53,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
 
@@ -87,6 +90,7 @@ class MetadataRefreshCompletionServiceTest {
     @Mock private ManagementTaskItemMapper managementTaskItemMapper;
     @Mock private ComicMapper comicMapper;
     @Mock private ChapterMapper chapterMapper;
+    @Mock private MetadataRefreshCompletionPersistencePort persistencePort;
     @Mock private MetadataRefreshService metadataRefreshService;
     @Mock private HqMediaRegistrationService hqMediaRegistrationService;
     @Mock private ComicStatsService comicStatsService;
@@ -108,6 +112,25 @@ class MetadataRefreshCompletionServiceTest {
 
     @BeforeEach
     void setUp() throws Exception {
+        lenient().when(persistencePort.findItem(any())).thenAnswer(invocation ->
+                managementTaskItemMapper.selectById(invocation.getArgument(0)));
+        lenient().doAnswer(invocation -> {
+            comicMapper.selectByIdForUpdate(invocation.getArgument(0));
+            return null;
+        }).when(persistencePort).lockComic(any());
+        lenient().when(persistencePort.markSucceededIfActive(any(), anyInt(), any(), any()))
+                .thenAnswer(invocation -> managementTaskItemMapper.markSucceededIfActive(
+                        invocation.getArgument(0), invocation.getArgument(1),
+                        invocation.getArgument(2), invocation.getArgument(3)));
+        lenient().when(persistencePort.markFailedIfActive(any(), anyInt(), anyString(), any(), any()))
+                .thenAnswer(invocation -> managementTaskItemMapper.markFailedIfActive(
+                        invocation.getArgument(0), invocation.getArgument(1), invocation.getArgument(2),
+                        invocation.getArgument(3), invocation.getArgument(4)));
+        lenient().when(persistencePort.markRefreshCompleted(any()))
+                .thenAnswer(invocation -> comicMapper.markRefreshCompleted(invocation.getArgument(0)));
+        lenient().when(persistencePort.findChapterComicId(any()))
+                .thenAnswer(invocation -> Optional.ofNullable(chapterMapper.selectById(invocation.getArgument(0)))
+                        .map(Chapter::getComicId));
         lenient().when(eventFingerprintService.fingerprint(any())).thenReturn("test-event-hash");
         lenient().when(hqMediaRegistrationService.registerValidatedSnapshot(any()))
                 .thenReturn(new HqMediaRegistrationService.HqMediaRegistrationResult(1L, 0, 0, 0));

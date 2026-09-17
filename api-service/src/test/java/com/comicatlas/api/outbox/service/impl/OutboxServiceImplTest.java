@@ -1,7 +1,7 @@
-package com.comicatlas.api.outbox.service.impl;
+package com.comicatlas.api.outbox.application.service.impl;
 
-import com.comicatlas.api.outbox.persistence.entity.OutboxMessage;
-import com.comicatlas.api.outbox.persistence.mapper.OutboxMessageMapper;
+import com.comicatlas.api.outbox.infrastructure.persistence.entity.OutboxMessage;
+import com.comicatlas.api.outbox.application.port.out.OutboxPersistencePort;
 import com.comicatlas.common.event.ImportTaskCreatedEvent;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -24,14 +24,14 @@ import static org.mockito.Mockito.verify;
 class OutboxServiceImplTest {
 
     @Mock
-    private OutboxMessageMapper outboxMapper;
+    private OutboxPersistencePort outboxPersistencePort;
 
     private OutboxServiceImpl outboxService;
 
     @BeforeEach
     void setUp() {
         ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
-        outboxService = new OutboxServiceImpl(outboxMapper, objectMapper);
+        outboxService = new OutboxServiceImpl(outboxPersistencePort, objectMapper);
     }
 
     @Test
@@ -42,7 +42,7 @@ class OutboxServiceImplTest {
         outboxService.enqueue(event, "comic.import", "task.created", 3L, 4L, 2);
 
         ArgumentCaptor<OutboxMessage> messageCaptor = ArgumentCaptor.forClass(OutboxMessage.class);
-        verify(outboxMapper).insert(messageCaptor.capture());
+        verify(outboxPersistencePort).insertOutbox(messageCaptor.capture());
         OutboxMessage message = messageCaptor.getValue();
         assertThat(message.getEventId()).isEqualTo(event.eventId().toString());
         assertThat(message.getStatus()).isEqualTo("PENDING");

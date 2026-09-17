@@ -1,4 +1,4 @@
-package com.comicatlas.api.catalog.cache;
+package com.comicatlas.api.catalog.infrastructure.cache;
 
 import com.comicatlas.contract.comic.cache.ComicReferenceCache;
 import org.junit.jupiter.api.Test;

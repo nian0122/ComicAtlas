@@ -1,11 +1,11 @@
-package com.comicatlas.api.recovery.event;
+package com.comicatlas.api.recovery.interfaces.messaging;
 
-import com.comicatlas.api.recovery.dto.RecoveryProgressVO;
+import com.comicatlas.api.recovery.interfaces.rest.dto.RecoveryProgressVO;
 import com.comicatlas.api.recovery.engine.RecoveryEngine;
-import com.comicatlas.api.recovery.enums.RecoveryTaskStatus;
-import com.comicatlas.api.recovery.persistence.entity.RecoveryTask;
-import com.comicatlas.api.recovery.persistence.mapper.RecoveryTaskMapper;
-import com.comicatlas.api.task.service.ManagementTaskService;
+import com.comicatlas.api.recovery.domain.model.RecoveryTaskStatus;
+import com.comicatlas.api.recovery.infrastructure.persistence.entity.RecoveryTask;
+import com.comicatlas.api.recovery.application.port.out.RecoveryTaskPersistencePort;
+import com.comicatlas.api.task.application.port.in.ManagementTaskService;
 import com.comicatlas.common.event.RecoveryFailedEvent;
 import com.comicatlas.common.event.RecoveryScanCompletedEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
@@ -47,7 +47,7 @@ class RecoveryEventHandlerTest {
     private RecoveryEngine recoveryEngine;
 
     @Mock
-    private RecoveryTaskMapper recoveryTaskMapper;
+    private RecoveryTaskPersistencePort persistencePort;
 
     @Mock
     private RedisTemplate<String, Object> redisTemplate;
@@ -65,7 +65,7 @@ class RecoveryEventHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new RecoveryEventHandler(recoveryEngine, recoveryTaskMapper, redisTemplate, managementTaskService, new MqConsumerSupport());
+        handler = new RecoveryEventHandler(recoveryEngine, persistencePort, redisTemplate, managementTaskService, new MqConsumerSupport());
         lenient().when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         lenient().when(redisTemplate.hasKey(anyString())).thenReturn(false);
         lenient().doNothing().when(valueOperations).set(anyString(), any(), any(Duration.class));
@@ -83,12 +83,12 @@ class RecoveryEventHandlerTest {
         RecoveryTask task = new RecoveryTask();
         task.setId(taskId);
         task.setStatus(RecoveryTaskStatus.QUEUED);
-        when(recoveryTaskMapper.selectById(taskId)).thenReturn(task);
+        when(persistencePort.findById(taskId)).thenReturn(task);
 
         RecoveryProgressVO progress = new RecoveryProgressVO(1, 1, 0, 0, 0, null, 3, 30);
         when(recoveryEngine.processComicDir(anyLong(), anyInt())).thenReturn(progress);
 
-        when(recoveryTaskMapper.updateById(any(RecoveryTask.class))).thenReturn(1);
+        doNothing().when(persistencePort).update(any(RecoveryTask.class));
         doNothing().when(channel).basicAck(anyLong(), eq(false));
 
         RecoveryScanCompletedEvent event = new RecoveryScanCompletedEvent(
@@ -104,7 +104,7 @@ class RecoveryEventHandlerTest {
 
         // 验证任务状态更新为 SUCCEEDED
         ArgumentCaptor<RecoveryTask> taskCaptor = ArgumentCaptor.forClass(RecoveryTask.class);
-        verify(recoveryTaskMapper, atLeastOnce()).updateById(taskCaptor.capture());
+        verify(persistencePort, atLeastOnce()).update(taskCaptor.capture());
         RecoveryTask lastUpdate = taskCaptor.getAllValues().get(taskCaptor.getAllValues().size() - 1);
         assertEquals(RecoveryTaskStatus.SUCCEEDED, lastUpdate.getStatus());
         assertNotNull(lastUpdate.getEndedAt());
@@ -121,7 +121,7 @@ class RecoveryEventHandlerTest {
         RecoveryTask task = new RecoveryTask();
         task.setId(taskId);
         task.setStatus(RecoveryTaskStatus.SUCCEEDED);
-        when(recoveryTaskMapper.selectById(taskId)).thenReturn(task);
+        when(persistencePort.findById(taskId)).thenReturn(task);
 
         doNothing().when(channel).basicAck(anyLong(), eq(false));
 
@@ -144,7 +144,7 @@ class RecoveryEventHandlerTest {
         RecoveryTask task = new RecoveryTask();
         task.setId(taskId);
         task.setStatus(RecoveryTaskStatus.FAILED);
-        when(recoveryTaskMapper.selectById(taskId)).thenReturn(task);
+        when(persistencePort.findById(taskId)).thenReturn(task);
 
         doNothing().when(channel).basicAck(anyLong(), eq(false));
 
@@ -166,7 +166,7 @@ class RecoveryEventHandlerTest {
         RecoveryTask task = new RecoveryTask();
         task.setId(taskId);
         task.setStatus(RecoveryTaskStatus.QUEUED);
-        when(recoveryTaskMapper.selectById(taskId)).thenReturn(task);
+        when(persistencePort.findById(taskId)).thenReturn(task);
 
         // 第1个漫画成功
         RecoveryProgressVO success = new RecoveryProgressVO(1, 1, 0, 0, 0, null, 1, 10);
@@ -176,7 +176,7 @@ class RecoveryEventHandlerTest {
         when(recoveryEngine.processComicDir(eq(20L), anyInt()))
                 .thenThrow(new com.comicatlas.contract.common.exception.BusinessException(500, "metadata 损坏"));
 
-        when(recoveryTaskMapper.updateById(any(RecoveryTask.class))).thenReturn(1);
+        doNothing().when(persistencePort).update(any(RecoveryTask.class));
         doNothing().when(channel).basicAck(anyLong(), eq(false));
 
         RecoveryScanCompletedEvent event = new RecoveryScanCompletedEvent(
@@ -189,7 +189,7 @@ class RecoveryEventHandlerTest {
 
         // 最终状态应该是 SUCCEEDED（单个失败不中断整体）
         ArgumentCaptor<RecoveryTask> taskCaptor = ArgumentCaptor.forClass(RecoveryTask.class);
-        verify(recoveryTaskMapper, atLeastOnce()).updateById(taskCaptor.capture());
+        verify(persistencePort, atLeastOnce()).update(taskCaptor.capture());
         RecoveryTask lastUpdate = taskCaptor.getAllValues().get(taskCaptor.getAllValues().size() - 1);
         assertEquals(RecoveryTaskStatus.SUCCEEDED, lastUpdate.getStatus());
         assertEquals(1, lastUpdate.getErrorComics()); // 1 个 comic 出错
@@ -207,9 +207,9 @@ class RecoveryEventHandlerTest {
         RecoveryTask task = new RecoveryTask();
         task.setId(taskId);
         task.setStatus(RecoveryTaskStatus.RUNNING);
-        when(recoveryTaskMapper.selectById(taskId)).thenReturn(task);
+        when(persistencePort.findById(taskId)).thenReturn(task);
 
-        when(recoveryTaskMapper.updateById(any(RecoveryTask.class))).thenReturn(1);
+        doNothing().when(persistencePort).update(any(RecoveryTask.class));
         doNothing().when(channel).basicAck(anyLong(), eq(false));
 
         RecoveryFailedEvent event = new RecoveryFailedEvent(
@@ -218,7 +218,7 @@ class RecoveryEventHandlerTest {
         handler.handle(event, channel, 1L);
 
         ArgumentCaptor<RecoveryTask> taskCaptor = ArgumentCaptor.forClass(RecoveryTask.class);
-        verify(recoveryTaskMapper).updateById(taskCaptor.capture());
+        verify(persistencePort).update(taskCaptor.capture());
         RecoveryTask updated = taskCaptor.getValue();
         assertEquals(RecoveryTaskStatus.FAILED, updated.getStatus());
         assertEquals("Worker 磁盘空间不足", updated.getErrorMessage());
@@ -235,7 +235,7 @@ class RecoveryEventHandlerTest {
         RecoveryTask task = new RecoveryTask();
         task.setId(taskId);
         task.setStatus(RecoveryTaskStatus.SUCCEEDED);
-        when(recoveryTaskMapper.selectById(taskId)).thenReturn(task);
+        when(persistencePort.findById(taskId)).thenReturn(task);
 
         doNothing().when(channel).basicAck(anyLong(), eq(false));
 
@@ -245,7 +245,7 @@ class RecoveryEventHandlerTest {
         handler.handle(event, channel, 1L);
 
         // 不应更新
-        verify(recoveryTaskMapper, never()).updateById(any(RecoveryTask.class));
+        verify(persistencePort, never()).update(any(RecoveryTask.class));
         verify(channel).basicAck(1L, false);
     }
 
@@ -262,7 +262,7 @@ class RecoveryEventHandlerTest {
 
         handler.handle(event, channel, 1L);
 
-        verify(recoveryTaskMapper, never()).selectById(anyLong());
+        verify(persistencePort, never()).findById(anyLong());
         verify(recoveryEngine, never()).processComicDir(anyLong(), anyInt());
         verify(channel).basicAck(1L, false);
     }

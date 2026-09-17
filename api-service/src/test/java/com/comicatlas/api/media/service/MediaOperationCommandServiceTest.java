@@ -1,37 +1,31 @@
-package com.comicatlas.api.media.service;
+package com.comicatlas.api.media.application.service;
 
-import com.baomidou.mybatisplus.core.MybatisConfiguration;
-import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import com.comicatlas.api.media.application.port.out.MediaCommandPersistencePort;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.entity.Media;
-import com.comicatlas.persistence.comic.mapper.ChapterMapper;
-import com.comicatlas.persistence.comic.mapper.ComicMapper;
-import com.comicatlas.persistence.comic.mapper.MediaMapper;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.enums.HqStatus;
 import com.comicatlas.contract.common.enums.LqStatus;
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.shared.exception.ConflictException;
-import com.comicatlas.api.task.dto.ManagementTaskItemResponse;
-import com.comicatlas.api.task.dto.ManagementTaskResponse;
-import com.comicatlas.api.task.dto.OperationSubmitResultDTO;
-import com.comicatlas.api.task.dto.CreateManagementTaskRequest;
-import com.comicatlas.api.task.service.ManagementTaskService;
-import com.comicatlas.api.trash.service.TrashLifecycleService;
-import com.comicatlas.api.outbox.service.OutboxService;
-import com.comicatlas.api.task.enums.ManagementTaskStatus;
+import com.comicatlas.api.task.interfaces.rest.dto.ManagementTaskItemResponse;
+import com.comicatlas.api.task.interfaces.rest.dto.ManagementTaskResponse;
+import com.comicatlas.api.task.interfaces.rest.dto.OperationSubmitResultDTO;
+import com.comicatlas.api.task.interfaces.rest.dto.CreateManagementTaskRequest;
+import com.comicatlas.api.task.application.port.in.ManagementTaskService;
+import com.comicatlas.api.trash.application.port.in.TrashLifecycleService;
+import com.comicatlas.api.outbox.application.port.in.OutboxService;
+import com.comicatlas.api.task.domain.model.ManagementTaskStatus;
 import com.comicatlas.contract.common.enums.TranscodeStatus;
-import org.apache.ibatis.builder.MapperBuilderAssistant;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import com.comicatlas.api.media.service.impl.MediaOperationCommandServiceImpl;
+import com.comicatlas.api.media.application.service.impl.MediaOperationCommandServiceImpl;
 
 import java.util.List;
 
@@ -51,33 +45,27 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class MediaOperationCommandServiceTest {
 
-    @Mock private ChapterMapper chapterMapper;
-    @Mock private MediaMapper mediaMapper;
-    @Mock private ComicMapper comicMapper;
+    @Mock private MediaCommandPersistencePort persistencePort;
     @Mock private ManagementTaskService managementTaskService;
     @Mock private OutboxService outboxService;
     @Mock private TrashLifecycleService trashLifecycleService;
     @InjectMocks private MediaOperationCommandServiceImpl service;
 
-    @BeforeAll
-    static void initMybatisLambdaCache() {
-        // 单元测试无 Spring 上下文，需注册 Media 的 TableInfo 以支持 LambdaQueryWrapper 解析
-        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), Media.class);
-        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), Chapter.class);
-        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), Comic.class);
-    }
 
     @Test
     void requestMetadataRefresh_漫画入口按章节创建并入队() {
         Comic comic = new Comic();
         comic.setId(1L);
         comic.setStatus(ComicStatus.READY);
-        when(comicMapper.selectById(1L)).thenReturn(comic);
+        when(persistencePort.findComic(1L)).thenReturn(new MediaCommandPersistencePort.ComicSnapshot(1L,
+                ComicStatus.READY));
         Chapter firstChapter = new Chapter();
         firstChapter.setId(11L);
         Chapter secondChapter = new Chapter();
         secondChapter.setId(12L);
-        when(chapterMapper.selectByComicIdOrderByGlobalOrder(1L)).thenReturn(List.of(firstChapter, secondChapter));
+        when(persistencePort.findChapters(1L)).thenReturn(List.of(
+                new MediaCommandPersistencePort.ChapterSnapshot(firstChapter.getId()),
+                new MediaCommandPersistencePort.ChapterSnapshot(secondChapter.getId())));
 
         ManagementTaskResponse task = new ManagementTaskResponse();
         task.setId(100L);
@@ -106,12 +94,12 @@ class MediaOperationCommandServiceTest {
     void requestTranscodeForChapter_仅选中章节下待转码视频() {
         Chapter chapter = new Chapter();
         chapter.setId(9L);
-        when(chapterMapper.selectById(9L)).thenReturn(chapter);
+        when(persistencePort.findChapter(9L)).thenReturn(new MediaCommandPersistencePort.ChapterSnapshot(chapter.getId()));
 
         // 待转码：container=null（需要转码）；兼容：container=mp4（无需转码）
         Media needTranscode = video(11L, 9L, null, TranscodeStatus.NOT_NEEDED);
         Media alreadyCompat = video(12L, 9L, "mp4", TranscodeStatus.NOT_NEEDED);
-        when(mediaMapper.selectVideosByChapterId(9L)).thenReturn(List.of(needTranscode, alreadyCompat));
+        when(persistencePort.findVideos(9L)).thenReturn(List.of(toSnapshot(needTranscode), toSnapshot(alreadyCompat)));
 
         ManagementTaskResponse task = new ManagementTaskResponse();
         task.setId(100L);
@@ -135,7 +123,7 @@ class MediaOperationCommandServiceTest {
         // 仅 1 个 MEDIA target：mp4 兼容视频不进入转码目标
         verify(managementTaskService).createTask(any(), any(), any());
         // markTranscodeQueued 仅对 11L 生效一次
-        verify(mediaMapper, times(1)).markTranscodeQueued(11L);
+        verify(persistencePort, times(1)).markTranscodeQueued(11L);
         // enqueue 仅一次
         verify(outboxService, times(1)).enqueue(any(), any(), any(), any(), any(), anyInt());
     }
@@ -144,11 +132,11 @@ class MediaOperationCommandServiceTest {
     void requestTranscodeForChapter_无待转码时返回空任务() {
         Chapter chapter = new Chapter();
         chapter.setId(9L);
-        when(chapterMapper.selectById(9L)).thenReturn(chapter);
+        when(persistencePort.findChapter(9L)).thenReturn(new MediaCommandPersistencePort.ChapterSnapshot(chapter.getId()));
 
         // 全部已就绪（READY 的 mp4 视频）
         Media alreadyReady = video(12L, 9L, "mp4", TranscodeStatus.READY);
-        when(mediaMapper.selectVideosByChapterId(9L)).thenReturn(List.of(alreadyReady));
+        when(persistencePort.findVideos(9L)).thenReturn(List.of(toSnapshot(alreadyReady)));
 
         OperationSubmitResultDTO result = service.requestTranscodeForChapter(9L);
 
@@ -160,7 +148,7 @@ class MediaOperationCommandServiceTest {
 
     @Test
     void requestTranscodeForChapter_章节不存在抛出404() {
-        when(chapterMapper.selectById(9L)).thenReturn(null);
+        when(persistencePort.findChapter(9L)).thenReturn(null);
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> service.requestTranscodeForChapter(9L));
@@ -172,11 +160,11 @@ class MediaOperationCommandServiceTest {
     void requestTranscodeForChapter_状态REQUIRED的视频可被转码() {
         Chapter chapter = new Chapter();
         chapter.setId(9L);
-        when(chapterMapper.selectById(9L)).thenReturn(chapter);
+        when(persistencePort.findChapter(9L)).thenReturn(new MediaCommandPersistencePort.ChapterSnapshot(chapter.getId()));
 
         // 回归：V18 迁移把不兼容视频标记为 REQUIRED，此前枚举缺失导致 NPE
         Media required = video(11L, 9L, "mkv", TranscodeStatus.REQUIRED);
-        when(mediaMapper.selectVideosByChapterId(9L)).thenReturn(List.of(required));
+        when(persistencePort.findVideos(9L)).thenReturn(List.of(toSnapshot(required)));
 
         ManagementTaskResponse task = new ManagementTaskResponse();
         task.setId(100L);
@@ -202,11 +190,11 @@ class MediaOperationCommandServiceTest {
     void requestTranscodeForChapter_未知状态映射为null时不抛NPE() {
         Chapter chapter = new Chapter();
         chapter.setId(9L);
-        when(chapterMapper.selectById(9L)).thenReturn(chapter);
+        when(persistencePort.findChapter(9L)).thenReturn(new MediaCommandPersistencePort.ChapterSnapshot(chapter.getId()));
 
         // 回归：EnumTypeHandlers.safeValueOf 对未知枚举值返回 null，此前 Set.contains(null) 抛 NPE
         Media unknown = video(11L, 9L, "mkv", null);
-        when(mediaMapper.selectVideosByChapterId(9L)).thenReturn(List.of(unknown));
+        when(persistencePort.findVideos(9L)).thenReturn(List.of(toSnapshot(unknown)));
 
         ManagementTaskResponse task = new ManagementTaskResponse();
         task.setId(100L);
@@ -232,13 +220,13 @@ class MediaOperationCommandServiceTest {
     void requestTranscodeForChapter_mp4容器mpeg4编码需要转码() {
         Chapter chapter = new Chapter();
         chapter.setId(9L);
-        when(chapterMapper.selectById(9L)).thenReturn(chapter);
+        when(persistencePort.findChapter(9L)).thenReturn(new MediaCommandPersistencePort.ChapterSnapshot(chapter.getId()));
 
         // 回归：mp4 容器 + mpeg4(MPEG-4 Part 2) 编码浏览器无法解码（只出声不出画），
         // 此前 isTranscodeEligible 只看容器名导致 mpeg4-in-mp4 被误判"无需转码"
         Media mpeg4InMp4 = video(11L, 9L, "mp4", TranscodeStatus.NOT_NEEDED);
-        mpeg4InMp4.setVideoCodec("mpeg4");
-        when(mediaMapper.selectVideosByChapterId(9L)).thenReturn(List.of(mpeg4InMp4));
+        mpeg4InMp4 = video(11L, 9L, "mp4", "mpeg4", TranscodeStatus.NOT_NEEDED);
+        when(persistencePort.findVideos(9L)).thenReturn(List.of(toSnapshot(mpeg4InMp4)));
 
         ManagementTaskResponse task = new ManagementTaskResponse();
         task.setId(100L);
@@ -264,12 +252,12 @@ class MediaOperationCommandServiceTest {
     void requestTranscodeForChapter_mp4容器h264编码无需转码() {
         Chapter chapter = new Chapter();
         chapter.setId(9L);
-        when(chapterMapper.selectById(9L)).thenReturn(chapter);
+        when(persistencePort.findChapter(9L)).thenReturn(new MediaCommandPersistencePort.ChapterSnapshot(chapter.getId()));
 
         // 浏览器可直接播放的 mp4+h264 不应进入转码目标
         Media h264InMp4 = video(12L, 9L, "mp4", TranscodeStatus.NOT_NEEDED);
-        h264InMp4.setVideoCodec("h264");
-        when(mediaMapper.selectVideosByChapterId(9L)).thenReturn(List.of(h264InMp4));
+        h264InMp4 = video(12L, 9L, "mp4", "h264", TranscodeStatus.NOT_NEEDED);
+        when(persistencePort.findVideos(9L)).thenReturn(List.of(toSnapshot(h264InMp4)));
 
         OperationSubmitResultDTO result = service.requestTranscodeForChapter(9L);
 
@@ -283,11 +271,10 @@ class MediaOperationCommandServiceTest {
     void requestLqForChapter_READY无需重复生成() {
         Chapter chapter = new Chapter();
         chapter.setId(9L);
-        when(chapterMapper.selectById(9L)).thenReturn(chapter);
+        when(persistencePort.findChapter(9L)).thenReturn(new MediaCommandPersistencePort.ChapterSnapshot(chapter.getId()));
 
         Media readyWebpLq = image(31L, 9L, HqStatus.READY, LqStatus.READY);
-        readyWebpLq.setLqPath("236/1089/037.webp");
-        when(mediaMapper.selectImagesByChapterId(9L)).thenReturn(List.of(readyWebpLq));
+        when(persistencePort.findImages(9L)).thenReturn(List.of(toSnapshot(readyWebpLq)));
 
         OperationSubmitResultDTO result = service.requestLqForChapter(9L, false);
 
@@ -303,13 +290,15 @@ class MediaOperationCommandServiceTest {
         chapterA.setId(10L);
         Chapter chapterB = new Chapter();
         chapterB.setId(20L);
-        when(chapterMapper.selectByComicIdOrderByGlobalOrder(1L)).thenReturn(List.of(chapterA, chapterB));
+        when(persistencePort.findChapters(1L)).thenReturn(List.of(
+                new MediaCommandPersistencePort.ChapterSnapshot(chapterA.getId()),
+                new MediaCommandPersistencePort.ChapterSnapshot(chapterB.getId())));
 
         // 两个章节共 3 个 IMAGE 页，LQ 均 READY
-        when(mediaMapper.selectDeletableImagesByChapterIds(List.of(10L, 20L))).thenReturn(List.of(
-                image(31L, 10L, HqStatus.READY, LqStatus.READY),
-                image(32L, 10L, HqStatus.MISSING, LqStatus.READY),
-                image(33L, 20L, HqStatus.READY, LqStatus.READY)));
+        when(persistencePort.findDeletableImages(List.of(10L, 20L))).thenReturn(List.of(
+                toSnapshot(image(31L, 10L, HqStatus.READY, LqStatus.READY)),
+                toSnapshot(image(32L, 10L, HqStatus.MISSING, LqStatus.READY)),
+                toSnapshot(image(33L, 20L, HqStatus.READY, LqStatus.READY))));
 
         ManagementTaskResponse task = new ManagementTaskResponse();
         task.setId(300L);
@@ -337,8 +326,8 @@ class MediaOperationCommandServiceTest {
         assertEquals(2, result.getItemCount());
 
         // N+1 回归：候选页一次 IN 查询取回，置 DELETE_QUEUED 仅一次批量 UPDATE
-        verify(mediaMapper, times(1)).selectDeletableImagesByChapterIds(List.of(10L, 20L));
-        verify(mediaMapper, times(1)).markHqDeleteQueued(List.of(10L, 20L));
+        verify(persistencePort, times(1)).findDeletableImages(List.of(10L, 20L));
+        verify(persistencePort, times(1)).markHqDeleteQueued(List.of(10L, 20L));
         verify(outboxService, times(2)).enqueue(any(), any(), any(), any(), any(), anyInt());
     }
 
@@ -346,10 +335,11 @@ class MediaOperationCommandServiceTest {
     void requestHqDeleteForComic_LQ未就绪章节抛409且不建任务() {
         Chapter chapter = new Chapter();
         chapter.setId(10L);
-        when(chapterMapper.selectByComicIdOrderByGlobalOrder(1L)).thenReturn(List.of(chapter));
+        when(persistencePort.findChapters(1L)).thenReturn(List.of(
+                new MediaCommandPersistencePort.ChapterSnapshot(chapter.getId())));
 
         Media notReady = image(31L, 10L, HqStatus.READY, LqStatus.NOT_GENERATED);
-        when(mediaMapper.selectDeletableImagesByChapterIds(List.of(10L))).thenReturn(List.of(notReady));
+        when(persistencePort.findDeletableImages(List.of(10L))).thenReturn(List.of(toSnapshot(notReady)));
 
         assertThrows(ConflictException.class, () -> service.requestHqDeleteForComic(1L));
         verify(managementTaskService, never()).createTask(any(), any(), any());
@@ -364,6 +354,13 @@ class MediaOperationCommandServiceTest {
         media.setHqStatus(HqStatus.READY);
         media.setContainer(container);
         media.setTranscodeStatus(status);
+        return media;
+    }
+
+    private static Media video(Long id, Long chapterId, String container, String videoCodec,
+                               TranscodeStatus status) {
+        Media media = video(id, chapterId, container, status);
+        media.setVideoCodec(videoCodec);
         return media;
     }
 
@@ -386,5 +383,12 @@ class MediaOperationCommandServiceTest {
         item.setTargetId(chapterId);
         item.setAttempt(1);
         return item;
+    }
+
+    private static MediaCommandPersistencePort.MediaSnapshot toSnapshot(Media media) {
+        return new MediaCommandPersistencePort.MediaSnapshot(media.getId(), media.getChapterId(),
+                media.getPageNumber(), media.getMediaType(), media.getHqStatus(), media.getLqStatus(),
+                media.getTranscodeStatus(), media.getWidth(), media.getHeight(), media.getVideoCodec(),
+                media.getContainer());
     }
 }

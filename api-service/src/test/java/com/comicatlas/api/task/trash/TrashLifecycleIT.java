@@ -1,6 +1,6 @@
 package com.comicatlas.api.recovery.trash;
 
-import com.comicatlas.api.trash.persistence.entity.TrashManifestRecord;
+import com.comicatlas.api.trash.infrastructure.persistence.entity.TrashManifestRecord;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.comicatlas.persistence.comic.entity.Chapter;
@@ -12,15 +12,15 @@ import com.comicatlas.persistence.comic.mapper.MediaMapper;
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.enums.HqStatus;
 import com.comicatlas.contract.common.enums.LqStatus;
-import com.comicatlas.api.task.persistence.entity.ManagementTaskItem;
-import com.comicatlas.api.task.persistence.mapper.ManagementTaskItemMapper;
-import com.comicatlas.api.task.persistence.mapper.ManagementTaskMapper;
-import com.comicatlas.api.trash.persistence.mapper.TrashManifestMapper;
+import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTaskItem;
+import com.comicatlas.api.task.infrastructure.persistence.mapper.ManagementTaskItemMapper;
+import com.comicatlas.api.task.infrastructure.persistence.mapper.ManagementTaskMapper;
+import com.comicatlas.api.trash.infrastructure.persistence.mapper.TrashManifestMapper;
 import com.comicatlas.persistence.reader.entity.ReadingHistory;
 import com.comicatlas.persistence.reader.mapper.ReadingHistoryMapper;
 import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
-import com.comicatlas.api.task.enums.TaskType;
+import com.comicatlas.api.task.domain.model.TaskType;
 import com.comicatlas.contract.common.enums.TranscodeStatus;
 import com.comicatlas.common.event.ManagementCommandRequestedEvent;
 import com.comicatlas.worker.task.publisher.ManagementCommandPublisher;

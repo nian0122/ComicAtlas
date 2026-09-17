@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.comicatlas.api.task.persistence.mapper.ManagementTaskItemMapper">
+<mapper namespace="com.comicatlas.api.task.infrastructure.persistence.mapper.ManagementTaskItemMapper">
     <select id="selectTaskIdsByComicId" resultType="java.lang.Long">
         SELECT DISTINCT item.task_id
         FROM management_task_item item

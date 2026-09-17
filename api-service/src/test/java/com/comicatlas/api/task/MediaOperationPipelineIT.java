@@ -13,24 +13,24 @@ import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.persistence.comic.mapper.MediaMapper;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.shared.exception.ConflictException;
-import com.comicatlas.api.task.dto.ManagementTaskItemResponse;
-import com.comicatlas.api.task.dto.ManagementTaskResponse;
-import com.comicatlas.api.task.dto.OperationSubmitResultDTO;
-import com.comicatlas.api.task.persistence.entity.ManagementTask;
-import com.comicatlas.api.task.persistence.entity.ManagementTaskItem;
-import com.comicatlas.api.media.service.MediaOperationCommandService;
-import com.comicatlas.api.task.policy.AllowedOperations;
-import com.comicatlas.api.task.policy.MediaOperationEligibilityService;
-import com.comicatlas.api.task.policy.OperationPolicyService;
-import com.comicatlas.api.task.service.ManagementTaskService;
-import com.comicatlas.api.outbox.persistence.entity.OutboxMessage;
-import com.comicatlas.api.outbox.persistence.mapper.InboxReceiptMapper;
-import com.comicatlas.api.outbox.persistence.mapper.OutboxMessageMapper;
-import com.comicatlas.api.outbox.relay.OutboxRelay;
+import com.comicatlas.api.task.interfaces.rest.dto.ManagementTaskItemResponse;
+import com.comicatlas.api.task.interfaces.rest.dto.ManagementTaskResponse;
+import com.comicatlas.api.task.interfaces.rest.dto.OperationSubmitResultDTO;
+import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTask;
+import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTaskItem;
+import com.comicatlas.api.media.application.port.in.MediaOperationCommandService;
+import com.comicatlas.api.task.domain.policy.AllowedOperations;
+import com.comicatlas.api.task.application.port.in.MediaOperationEligibilityService;
+import com.comicatlas.api.task.domain.policy.OperationPolicyService;
+import com.comicatlas.api.task.application.port.in.ManagementTaskService;
+import com.comicatlas.api.outbox.infrastructure.persistence.entity.OutboxMessage;
+import com.comicatlas.api.outbox.infrastructure.persistence.mapper.InboxReceiptMapper;
+import com.comicatlas.api.outbox.infrastructure.persistence.mapper.OutboxMessageMapper;
+import com.comicatlas.api.outbox.infrastructure.relay.OutboxRelay;
 import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
-import com.comicatlas.api.task.enums.ManagementTaskStatus;
+import com.comicatlas.api.task.domain.model.ManagementTaskStatus;
 import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
-import com.comicatlas.api.task.enums.TaskType;
+import com.comicatlas.api.task.domain.model.TaskType;
 import com.comicatlas.contract.common.enums.TranscodeStatus;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO;
 import com.comicatlas.common.dto.MetadataRefreshSnapshotDTO.ChapterSnapshot;
@@ -157,8 +157,8 @@ class MediaOperationPipelineIT {
     @Autowired private OutboxRelay outboxRelay;
     @Autowired private RabbitTemplate rabbitTemplate;
     @Autowired private ObjectMapper objectMapper;
-    @Autowired private com.comicatlas.api.task.persistence.mapper.ManagementTaskMapper taskMapper;
-    @Autowired private com.comicatlas.api.task.persistence.mapper.ManagementTaskItemMapper taskItemMapper;
+    @Autowired private com.comicatlas.api.task.infrastructure.persistence.mapper.ManagementTaskMapper taskMapper;
+    @Autowired private com.comicatlas.api.task.infrastructure.persistence.mapper.ManagementTaskItemMapper taskItemMapper;
 
     private Comic comic;
     private Chapter chapter1;
@@ -252,8 +252,8 @@ class MediaOperationPipelineIT {
         Thread.sleep(800);
         assertThat(lqStatuses(chapter1.getId())).containsExactly("READY", "READY");
         // 该完成事件只有 1 条 receipt（重复投递被幂等跳过）
-        assertThat(inboxMapper.selectCount(new LambdaQueryWrapper<com.comicatlas.api.outbox.persistence.entity.InboxReceipt>()
-                .eq(com.comicatlas.api.outbox.persistence.entity.InboxReceipt::getEventId, completed.eventId().toString())))
+        assertThat(inboxMapper.selectCount(new LambdaQueryWrapper<com.comicatlas.api.outbox.infrastructure.persistence.entity.InboxReceipt>()
+                .eq(com.comicatlas.api.outbox.infrastructure.persistence.entity.InboxReceipt::getEventId, completed.eventId().toString())))
                 .isEqualTo(1);
     }
 

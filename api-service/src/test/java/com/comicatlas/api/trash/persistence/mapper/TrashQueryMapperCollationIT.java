@@ -1,6 +1,6 @@
-package com.comicatlas.api.trash.persistence.mapper;
+package com.comicatlas.api.trash.infrastructure.persistence.mapper;
 
-import com.comicatlas.api.trash.dto.TrashContentVO;
+import com.comicatlas.api.trash.interfaces.rest.dto.TrashContentVO;
 import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.enums.MediaLifecycleStatus;

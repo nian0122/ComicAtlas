@@ -1,14 +1,14 @@
 package com.comicatlas.api.task;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.comicatlas.api.task.dto.CreateManagementTaskRequest;
-import com.comicatlas.api.task.dto.ManagementTaskItemResponse;
-import com.comicatlas.api.task.dto.ManagementTaskResponse;
-import com.comicatlas.api.task.persistence.mapper.ManagementTaskItemMapper;
-import com.comicatlas.api.task.persistence.mapper.ManagementTaskMapper;
-import com.comicatlas.api.task.service.ManagementTaskService;
-import com.comicatlas.api.task.enums.ManagementTaskStatus;
-import com.comicatlas.api.task.enums.TaskType;
+import com.comicatlas.api.task.interfaces.rest.dto.CreateManagementTaskRequest;
+import com.comicatlas.api.task.interfaces.rest.dto.ManagementTaskItemResponse;
+import com.comicatlas.api.task.interfaces.rest.dto.ManagementTaskResponse;
+import com.comicatlas.api.task.infrastructure.persistence.mapper.ManagementTaskItemMapper;
+import com.comicatlas.api.task.infrastructure.persistence.mapper.ManagementTaskMapper;
+import com.comicatlas.api.task.application.port.in.ManagementTaskService;
+import com.comicatlas.api.task.domain.model.ManagementTaskStatus;
+import com.comicatlas.api.task.domain.model.TaskType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;

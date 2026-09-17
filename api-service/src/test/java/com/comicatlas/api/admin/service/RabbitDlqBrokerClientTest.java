@@ -1,4 +1,4 @@
-package com.comicatlas.api.dlq.adapter;
+package com.comicatlas.api.dlq.infrastructure.adapter;
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Envelope;

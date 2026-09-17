@@ -1,13 +1,9 @@
-package com.comicatlas.api.catalog.service.impl;
+package com.comicatlas.api.catalog.application.service.impl;
 
-import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
-import com.comicatlas.persistence.comic.entity.Chapter;
-import com.comicatlas.persistence.comic.mapper.CatalogMapper;
-import com.comicatlas.persistence.comic.mapper.ChapterMapper;
-import com.comicatlas.persistence.comic.mapper.ComicMapper;
+import com.comicatlas.api.catalog.infrastructure.cache.CatalogCacheInvalidator;
+import com.comicatlas.api.catalog.application.port.out.CatalogCommandPersistencePort;
 import com.comicatlas.api.shared.exception.ConflictException;
-import com.comicatlas.api.trash.service.TrashLifecycleService;
-import com.comicatlas.api.trash.service.TrashLifecycleService;
+import com.comicatlas.api.trash.application.port.in.TrashLifecycleService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -24,11 +20,9 @@ import static org.mockito.Mockito.when;
  */
 class ChapterManagementServiceImplTest {
 
-    private ChapterManagementServiceImpl buildService(ChapterMapper chapterMapper) {
+    private ChapterManagementServiceImpl buildService(CatalogCommandPersistencePort persistencePort) {
         return new ChapterManagementServiceImpl(
-                chapterMapper,
-                mock(CatalogMapper.class),
-                mock(ComicMapper.class),
+                persistencePort,
                 mock(CatalogCacheInvalidator.class),
                 mock(TrashLifecycleService.class));
     }
@@ -36,13 +30,12 @@ class ChapterManagementServiceImplTest {
     @Test
     @DisplayName("updateById 返回 0 行（版本冲突）→ 抛 409 Conflict")
     void checkedUpdate_zeroRows_throwsConflict() {
-        ChapterMapper mapper = mock(ChapterMapper.class);
-        when(mapper.updateById(any(Chapter.class))).thenReturn(0);
+        CatalogCommandPersistencePort persistencePort = mock(CatalogCommandPersistencePort.class);
+        when(persistencePort.updateChapter(any(CatalogCommandPersistencePort.ChapterCommand.class))).thenReturn(0);
 
-        ChapterManagementServiceImpl service = buildService(mapper);
-        Chapter chapter = new Chapter();
-        chapter.setId(1L);
-        chapter.setVersion(1);
+        ChapterManagementServiceImpl service = buildService(persistencePort);
+        CatalogCommandPersistencePort.ChapterCommand chapter = new CatalogCommandPersistencePort.ChapterCommand(
+                1L, 1L, null, "title", "1", 1, 1, null, 1);
 
         assertThatThrownBy(() -> service.checkedUpdate(chapter))
                 .isInstanceOf(ConflictException.class)
@@ -52,14 +45,12 @@ class ChapterManagementServiceImplTest {
     @Test
     @DisplayName("updateById 返回 1 行 → 正常通过")
     void checkedUpdate_oneRow_passes() {
-        ChapterMapper mapper = mock(ChapterMapper.class);
-        when(mapper.updateById(any(Chapter.class))).thenReturn(1);
+        CatalogCommandPersistencePort persistencePort = mock(CatalogCommandPersistencePort.class);
+        when(persistencePort.updateChapter(any(CatalogCommandPersistencePort.ChapterCommand.class))).thenReturn(1);
 
-        ChapterManagementServiceImpl service = buildService(mapper);
-        Chapter chapter = new Chapter();
-        chapter.setId(1L);
-        chapter.setVersion(1);
-
+        ChapterManagementServiceImpl service = buildService(persistencePort);
+        CatalogCommandPersistencePort.ChapterCommand chapter = new CatalogCommandPersistencePort.ChapterCommand(
+                1L, 1L, null, "title", "1", 1, 1, null, 1);
         service.checkedUpdate(chapter);
     }
 }

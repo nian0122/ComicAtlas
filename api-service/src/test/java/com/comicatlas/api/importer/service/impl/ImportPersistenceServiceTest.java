@@ -1,7 +1,7 @@
-package com.comicatlas.api.importer.service.impl;
+package com.comicatlas.api.importer.application.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
-import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
+import com.comicatlas.api.catalog.infrastructure.cache.CatalogCacheInvalidator;
 import com.comicatlas.persistence.comic.entity.Catalog;
 import com.comicatlas.persistence.comic.entity.Category;
 import com.comicatlas.persistence.comic.entity.Chapter;
@@ -18,20 +18,22 @@ import com.comicatlas.persistence.comic.mapper.MediaMapper;
 import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.enums.HqStatus;
-import com.comicatlas.api.importer.enums.ImportTaskStatus;
+import com.comicatlas.api.importer.domain.model.ImportTaskStatus;
 import com.comicatlas.contract.common.enums.LqStatus;
 import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
-import com.comicatlas.api.task.enums.TaskType;
+import com.comicatlas.api.task.domain.model.TaskType;
 import com.comicatlas.contract.common.enums.TranscodeStatus;
-import com.comicatlas.api.storage.config.ApiStorageProperties;
+import com.comicatlas.api.storage.infrastructure.config.ApiStorageProperties;
 import com.comicatlas.api.storage.ApiStorageRoot;
-import com.comicatlas.api.importer.persistence.entity.ImportTask;
-import com.comicatlas.api.importer.exception.ImportMetadataException;
-import com.comicatlas.api.importer.persistence.mapper.ImportTaskMapper;
-import com.comicatlas.api.importer.service.ImportPersistenceService;
-import com.comicatlas.api.importer.service.ImportFinalizationService;
-import com.comicatlas.api.task.service.ManagementTaskService;
-import com.comicatlas.api.outbox.service.OutboxService;
+import com.comicatlas.api.importer.infrastructure.persistence.entity.ImportTask;
+import com.comicatlas.api.importer.domain.exception.ImportMetadataException;
+import com.comicatlas.api.importer.infrastructure.persistence.mapper.ImportTaskMapper;
+import com.comicatlas.api.importer.infrastructure.persistence.repository.ImportFinalizationPersistencePortAdapter;
+import com.comicatlas.api.importer.infrastructure.persistence.repository.ImportPersistencePortAdapter;
+import com.comicatlas.api.importer.application.port.in.ImportPersistenceService;
+import com.comicatlas.api.importer.application.port.in.ImportFinalizationService;
+import com.comicatlas.api.task.application.port.in.ManagementTaskService;
+import com.comicatlas.api.outbox.application.port.in.OutboxService;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.constant.StorageFinalizeErrorCode;
@@ -50,7 +52,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
-import com.comicatlas.api.importer.service.impl.ImportFinalizationServiceImpl;
+import com.comicatlas.api.importer.application.service.impl.ImportFinalizationServiceImpl;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
@@ -105,7 +107,7 @@ class ImportPersistenceServiceTest {
     @Mock private ManagementTaskService managementTaskService;
     @Mock private OutboxService outboxService;
     @Mock private ApiStorageProperties storageProperties;
-    @Mock private com.comicatlas.api.metadata.service.MetadataUpdateCoordinator metadataUpdateCoordinator;
+    @Mock private com.comicatlas.api.metadata.application.service.MetadataUpdateCoordinator metadataUpdateCoordinator;
     @Spy @InjectMocks private ImportFinalizationServiceImpl importFinalizationService;
 
     @InjectMocks private ImportPersistenceServiceImpl service;
@@ -114,7 +116,12 @@ class ImportPersistenceServiceTest {
 
     @BeforeEach
     void setUp() {
+        ReflectionTestUtils.setField(service, "persistencePort",
+                new ImportPersistencePortAdapter(taskMapper, comicMapper, catalogMapper,
+                        categoryMapper, chapterMapper, mediaMapper, comicTagMapper, tagMapper));
         ReflectionTestUtils.setField(service, "importFinalizationService", importFinalizationService);
+        ReflectionTestUtils.setField(importFinalizationService, "persistencePort",
+                new ImportFinalizationPersistencePortAdapter(taskMapper, comicMapper, chapterMapper, mediaMapper));
         mediaBatchSnapshots.clear();
         ReflectionTestUtils.setField(service, "mangaRoot", "F:/manga");
         ApiStorageRoot hqRoot = new ApiStorageRoot();

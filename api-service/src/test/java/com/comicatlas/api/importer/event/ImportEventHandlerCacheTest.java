@@ -1,15 +1,14 @@
-package com.comicatlas.api.importer.event;
+package com.comicatlas.api.importer.interfaces.messaging;
 
 import com.comicatlas.persistence.comic.entity.Comic;
-import com.comicatlas.persistence.comic.mapper.ComicMapper;
-import com.comicatlas.api.importer.persistence.entity.ImportTask;
-import com.comicatlas.api.importer.persistence.mapper.ImportTaskMapper;
-import com.comicatlas.api.importer.service.ImportPersistenceService;
+import com.comicatlas.api.importer.infrastructure.persistence.entity.ImportTask;
+import com.comicatlas.api.importer.application.port.in.ImportPersistenceService;
+import com.comicatlas.api.importer.application.port.out.ImportResultPersistencePort;
 import com.comicatlas.contract.common.enums.ComicStatus;
-import com.comicatlas.api.importer.enums.ImportTaskStatus;
-import com.comicatlas.api.storage.config.ApiStorageProperties;
+import com.comicatlas.api.importer.domain.model.ImportTaskStatus;
+import com.comicatlas.api.storage.infrastructure.config.ApiStorageProperties;
 import com.comicatlas.api.storage.ApiStorageRoot;
-import com.comicatlas.api.task.service.ManagementTaskService;
+import com.comicatlas.api.task.application.port.in.ManagementTaskService;
 import com.comicatlas.common.event.ImportTaskCompletedEvent;
 import com.comicatlas.common.event.ImportTaskFailedEvent;
 import com.comicatlas.common.event.TaskStatusChangedEvent;
@@ -24,7 +23,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
-import com.comicatlas.api.importer.service.impl.ImportResultServiceImpl;
+import com.comicatlas.api.importer.application.service.impl.ImportResultServiceImpl;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -50,8 +49,7 @@ class ImportEventHandlerCacheTest {
     @Mock private ObjectMapper objectMapper;
     @Mock private RedisTemplate<String, Object> redisTemplate;
     @Mock private ValueOperations<String, Object> valueOperations;
-    @Mock private ComicMapper comicMapper;
-    @Mock private ImportTaskMapper taskMapper;
+    @Mock private ImportResultPersistencePort importResultPersistencePort;
     @Mock private ManagementTaskService managementTaskService;
     @Mock private ApiStorageProperties storageProperties;
     @Mock private ImportPersistenceService importPersistenceService;
@@ -83,7 +81,7 @@ class ImportEventHandlerCacheTest {
 
         when(redisTemplate.hasKey(any())).thenReturn(false);
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(taskMapper.selectById(10L)).thenReturn(task);
+        when(importResultPersistencePort.findImportTask(10L)).thenReturn(task);
         doReturn(metadata).when(objectMapper).readValue(any(File.class), any(TypeReference.class));
         when(importPersistenceService.persistCompleted(event, metadata)).thenReturn(List.of());
         ApiStorageRoot metadataRoot = new ApiStorageRoot();
@@ -108,7 +106,7 @@ class ImportEventHandlerCacheTest {
         task.setId(30L);
         task.setStatus(null);
 
-        when(taskMapper.selectById(30L)).thenReturn(task);
+        when(importResultPersistencePort.findImportTask(30L)).thenReturn(task);
 
         ImportTaskFailedEvent event = new ImportTaskFailedEvent(
                 UUID.randomUUID(), Instant.now(), 30L, 300L, "DOWNLOAD_FAILED", "下载失败");
@@ -116,9 +114,8 @@ class ImportEventHandlerCacheTest {
         runInTransaction(() -> assertDoesNotThrow(() -> handler.handleImportTaskFailed(event, channel, 1L)));
         verify(channel).basicAck(1L, false);
 
-        ArgumentCaptor<ImportTask> captor = ArgumentCaptor.forClass(ImportTask.class);
-        verify(taskMapper).updateById(captor.capture());
-        assertThat(captor.getValue().getStatus()).isEqualTo(ImportTaskStatus.FAILED);
+        verify(importResultPersistencePort).updateImportTask(task);
+        assertThat(task.getStatus()).isEqualTo(ImportTaskStatus.FAILED);
     }
 
     /** 遗留 status=null 行收到终态事件：正常写入终态，不得 NPE。 */
@@ -128,7 +125,7 @@ class ImportEventHandlerCacheTest {
         task.setId(31L);
         task.setStatus(null);
 
-        when(taskMapper.selectById(31L)).thenReturn(task);
+        when(importResultPersistencePort.findImportTask(31L)).thenReturn(task);
 
         TaskStatusChangedEvent event = new TaskStatusChangedEvent(
                 UUID.randomUUID(), Instant.now(), 31L, "FAILED", 0, null, 0, 0, null);
@@ -136,9 +133,8 @@ class ImportEventHandlerCacheTest {
         runInTransaction(() -> assertDoesNotThrow(() -> handler.handleTaskStatusChanged(event, channel, 1L)));
         verify(channel).basicAck(1L, false);
 
-        ArgumentCaptor<ImportTask> captor = ArgumentCaptor.forClass(ImportTask.class);
-        verify(taskMapper).updateById(captor.capture());
-        assertThat(captor.getValue().getStatus()).isEqualTo(ImportTaskStatus.FAILED);
+        verify(importResultPersistencePort).updateImportTask(task);
+        assertThat(task.getStatus()).isEqualTo(ImportTaskStatus.FAILED);
     }
 
     /** 遗留 status=null 行收到阶段事件：不抛异常，status 保持 null（阶段仅写 management_task.stage）。 */
@@ -148,7 +144,7 @@ class ImportEventHandlerCacheTest {
         task.setId(32L);
         task.setStatus(null);
 
-        when(taskMapper.selectById(32L)).thenReturn(task);
+        when(importResultPersistencePort.findImportTask(32L)).thenReturn(task);
 
         TaskStatusChangedEvent event = new TaskStatusChangedEvent(
                 UUID.randomUUID(), Instant.now(), 32L, "DOWNLOADING", 42, "HTTP", 1024, 7, null);
@@ -156,9 +152,8 @@ class ImportEventHandlerCacheTest {
         runInTransaction(() -> assertDoesNotThrow(() -> handler.handleTaskStatusChanged(event, channel, 1L)));
         verify(channel).basicAck(1L, false);
 
-        ArgumentCaptor<ImportTask> captor = ArgumentCaptor.forClass(ImportTask.class);
-        verify(taskMapper).updateById(captor.capture());
-        assertThat(captor.getValue().getStatus()).isNull();
+        verify(importResultPersistencePort).updateImportTask(task);
+        assertThat(task.getStatus()).isNull();
     }
 
     /**
@@ -176,8 +171,9 @@ class ImportEventHandlerCacheTest {
         comic.setId(40L);
         comic.setStatus(ComicStatus.IMPORTING);
 
-        when(taskMapper.selectById(33L)).thenReturn(task);
-        when(comicMapper.selectById(40L)).thenReturn(comic);
+        when(importResultPersistencePort.findImportTask(33L)).thenReturn(task);
+        when(importResultPersistencePort.findComic(40L)).thenReturn(
+                new ImportResultPersistencePort.ComicSnapshot(40L, comic.getStatus(), comic.getVersion()));
 
         TaskStatusChangedEvent event = new TaskStatusChangedEvent(
                 UUID.randomUUID(), Instant.now(), 33L, "FAILED", 0, null, 0, 0, null);
@@ -185,9 +181,8 @@ class ImportEventHandlerCacheTest {
         runInTransaction(() -> handler.handleTaskStatusChanged(event, channel, 1L));
         verify(channel).basicAck(1L, false);
 
-        ArgumentCaptor<Comic> captor = ArgumentCaptor.forClass(Comic.class);
-        verify(comicMapper).updateById(captor.capture());
-        assertThat(captor.getValue().getStatus()).isEqualTo(ComicStatus.IMPORT_FAILED);
+        verify(importResultPersistencePort).updateComic(
+                new ImportResultPersistencePort.ComicStatusUpdateCommand(40L, ComicStatus.IMPORT_FAILED, null));
     }
 
     /** 非 FAILED 状态（如 READY/阶段值）不得触发 comic 联动。 */
@@ -198,14 +193,14 @@ class ImportEventHandlerCacheTest {
         task.setComicId(41L);
         task.setStatus(ImportTaskStatus.PARSING);
 
-        when(taskMapper.selectById(34L)).thenReturn(task);
+        when(importResultPersistencePort.findImportTask(34L)).thenReturn(task);
 
         TaskStatusChangedEvent event = new TaskStatusChangedEvent(
                 UUID.randomUUID(), Instant.now(), 34L, "DOWNLOADING", 10, "HTTP", 0, 0, null);
 
         runInTransaction(() -> handler.handleTaskStatusChanged(event, channel, 1L));
 
-        verify(comicMapper, never()).updateById(any(Comic.class));
+        verify(importResultPersistencePort, never()).updateComic(any());
     }
 
     /** Worker 失败事件携带 errorMessage：必须写入任务，供前端展示与重试决策。 */
@@ -215,7 +210,7 @@ class ImportEventHandlerCacheTest {
         task.setId(35L);
         task.setStatus(ImportTaskStatus.PARSING);
 
-        when(taskMapper.selectById(35L)).thenReturn(task);
+        when(importResultPersistencePort.findImportTask(35L)).thenReturn(task);
 
         TaskStatusChangedEvent event = new TaskStatusChangedEvent(
                 UUID.randomUUID(), Instant.now(), 35L, "FAILED", 0, null, 0, 0,
@@ -224,8 +219,7 @@ class ImportEventHandlerCacheTest {
         runInTransaction(() -> handler.handleTaskStatusChanged(event, channel, 1L));
         verify(channel).basicAck(1L, false);
 
-        ArgumentCaptor<ImportTask> captor = ArgumentCaptor.forClass(ImportTask.class);
-        verify(taskMapper).updateById(captor.capture());
-        assertThat(captor.getValue().getErrorMessage()).isEqualTo("源文件缺失: D:/comics/ComicA/001.jpg");
+        verify(importResultPersistencePort).updateImportTask(task);
+        assertThat(task.getErrorMessage()).isEqualTo("源文件缺失: D:/comics/ComicA/001.jpg");
     }
 }

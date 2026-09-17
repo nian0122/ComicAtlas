@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.comicatlas.api.task.persistence.mapper.ManagementTaskMapper">
-    <select id="selectPageByCondition" resultType="com.comicatlas.api.task.persistence.entity.ManagementTask">
+<mapper namespace="com.comicatlas.api.task.infrastructure.persistence.mapper.ManagementTaskMapper">
+    <select id="selectPageByCondition" resultType="com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTask">
         SELECT id, task_type, operation, target_type, batch_id, is_batch, status, stage, progress,
                total_count, success_count, failure_count, cancelled_count, idempotency_key,
                idempotency_payload_hash, error_message, error_detail, attempt, version,

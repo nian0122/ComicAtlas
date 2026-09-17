@@ -1,6 +1,6 @@
-package com.comicatlas.api.metadata.service.impl;
+package com.comicatlas.api.metadata.application.service.impl;
 
-import com.comicatlas.api.catalog.cache.CacheEvictor;
+import com.comicatlas.api.catalog.infrastructure.cache.CacheEvictor;
 import com.comicatlas.contract.comic.dto.TagDTO;
 import com.comicatlas.persistence.comic.entity.ComicTag;
 import com.comicatlas.persistence.comic.entity.Tag;

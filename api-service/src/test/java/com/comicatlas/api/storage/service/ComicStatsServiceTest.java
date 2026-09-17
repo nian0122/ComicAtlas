@@ -1,25 +1,18 @@
-package com.comicatlas.api.storage.service;
+package com.comicatlas.api.storage.application.service;
 
-import com.baomidou.mybatisplus.core.MybatisConfiguration;
-import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.comicatlas.contract.common.enums.HqStatus;
 import com.comicatlas.contract.common.enums.LqStatus;
 import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
-import com.comicatlas.persistence.comic.entity.Chapter;
-import com.comicatlas.persistence.comic.entity.Comic;
-import com.comicatlas.persistence.comic.entity.Media;
-import com.comicatlas.persistence.comic.mapper.ChapterMapper;
-import com.comicatlas.persistence.comic.mapper.ComicMapper;
-import com.comicatlas.persistence.comic.mapper.MediaMapper;
-import org.apache.ibatis.builder.MapperBuilderAssistant;
-import org.junit.jupiter.api.BeforeAll;
+import com.comicatlas.api.storage.application.port.out.ComicStatsPersistencePort;
+import com.comicatlas.api.storage.application.port.out.ComicStatsPersistencePort.ChapterStatisticsSnapshot;
+import com.comicatlas.api.storage.application.port.out.ComicStatsPersistencePort.MediaStatisticsSnapshot;
+import com.comicatlas.api.storage.application.service.impl.ComicStatsServiceImpl;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import com.comicatlas.api.storage.service.impl.ComicStatsServiceImpl;
+import com.comicatlas.api.storage.application.service.impl.ComicStatsServiceImpl;
 
 import java.util.List;
 
@@ -32,55 +25,34 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class ComicStatsServiceTest {
 
-    @Mock private MediaMapper mediaMapper;
-    @Mock private ChapterMapper chapterMapper;
-    @Mock private ComicMapper comicMapper;
+    @Mock private ComicStatsPersistencePort persistencePort;
     @InjectMocks private ComicStatsServiceImpl service;
-
-    @BeforeAll
-    static void initMybatisTableInfo() {
-        MybatisConfiguration configuration = new MybatisConfiguration();
-        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(configuration, ""), Chapter.class);
-        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(configuration, ""), Comic.class);
-        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(configuration, ""), Media.class);
-    }
 
     @Test
     void refreshByComic_一次查询媒体并批量回写章节页数() {
-        Chapter firstChapter = chapter(11L);
-        Chapter secondChapter = chapter(12L);
-        when(chapterMapper.selectByComicIdOrderByGlobalOrder(1L)).thenReturn(List.of(firstChapter, secondChapter));
-        when(mediaMapper.selectByChapterIds(List.of(11L, 12L))).thenReturn(List.of(
+        when(persistencePort.findChaptersByComic(1L)).thenReturn(List.of(
+                chapter(11L), chapter(12L)));
+        when(persistencePort.findMediaByChapterIds(List.of(11L, 12L))).thenReturn(List.of(
                 media(11L, 100L, 10L, HqStatus.READY, LqStatus.READY, MediaLifecycleStatus.READY),
                 media(11L, 200L, 20L, HqStatus.DELETED, LqStatus.NOT_GENERATED, MediaLifecycleStatus.READY),
                 media(12L, 300L, 30L, HqStatus.READY, LqStatus.READY, MediaLifecycleStatus.TRASHED)));
 
         service.refreshByComic(1L);
 
-        verify(mediaMapper, times(1)).selectByChapterIds(List.of(11L, 12L));
-        ArgumentCaptor<List<Chapter>> chaptersCaptor = ArgumentCaptor.forClass(List.class);
-        verify(chapterMapper, times(1)).updatePageCountBatch(chaptersCaptor.capture());
-        assertThat(chaptersCaptor.getValue()).extracting(Chapter::getPageCount).containsExactly(2, 0);
-        verify(comicMapper, times(1)).updateAllStats(1L, 2, 400L, 40L);
+        verify(persistencePort, times(1)).findMediaByChapterIds(List.of(11L, 12L));
+        verify(persistencePort, times(1)).updateChapterPageCountBatch(List.of(
+                new ChapterStatisticsSnapshot(11L, 1L, 2),
+                new ChapterStatisticsSnapshot(12L, 1L, 0)));
+        verify(persistencePort, times(1)).updateAllStats(1L, 2, 400L, 40L);
     }
 
-    private static Chapter chapter(Long chapterId) {
-        Chapter chapter = new Chapter();
-        chapter.setId(chapterId);
-        chapter.setComicId(1L);
-        return chapter;
+    private static ChapterStatisticsSnapshot chapter(Long chapterId) {
+        return new ChapterStatisticsSnapshot(chapterId, 1L, 0);
     }
 
-    private static Media media(Long chapterId, Long hqSize, Long lqSize, HqStatus hqStatus,
+    private static MediaStatisticsSnapshot media(Long chapterId, Long hqSize, Long lqSize, HqStatus hqStatus,
                                LqStatus lqStatus, MediaLifecycleStatus lifecycleStatus) {
-        Media media = new Media();
-        media.setChapterId(chapterId);
-        media.setMediaType("IMAGE");
-        media.setHqSize(hqSize);
-        media.setLqSize(lqSize);
-        media.setHqStatus(hqStatus);
-        media.setLqStatus(lqStatus);
-        media.setStatus(lifecycleStatus);
-        return media;
+        return new MediaStatisticsSnapshot(null, chapterId, "IMAGE", hqSize, lqSize,
+                hqStatus, lqStatus, lifecycleStatus);
     }
 }

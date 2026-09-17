@@ -3,7 +3,7 @@ package com.comicatlas.api.recovery.engine;
 import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.common.storage.RelativePathValidator;
 import com.comicatlas.common.media.image.ImageDimensionsReader;
-import com.comicatlas.api.storage.config.ApiStorageProperties;
+import com.comicatlas.api.storage.infrastructure.config.ApiStorageProperties;
 import com.comicatlas.api.storage.ApiStorageRoot;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
