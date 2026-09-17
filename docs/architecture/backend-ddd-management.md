@@ -87,5 +87,5 @@ infrastructure ──┼──> application ──> domain
 - [x] `metadata`、`catalog`、`media`、`storage`、`trash`、`recovery`、`exporter`、`upload`、`library`、`settings`、`outbox`、`dlq`：已完成现有代码的领域/应用/接口/基础设施目录迁移，并已将主要写用例收敛到快照/命令端口。
 - [x] `importer`：导入命令、重试、最终化及首次落库均通过应用端口和应用模型访问持久化，ORM Entity 仅位于基础设施适配器。
 - [x] `task`：状态机、查询模型和统一任务写模型均通过应用端口访问持久化，ORM Entity 仅位于基础设施适配器。
-- [~] `recovery`：恢复任务端口已完成；恢复引擎仍需将 Mapper/Entity 访问继续下沉到基础设施适配器。
-- [ ] 下一阶段：完成恢复引擎实体隔离，并统一检查所有应用层不得返回数据库 Entity 或 MyBatis-Plus 分页类型；在此之前，本分支不宣称严格端口隔离已全部完成。
+- [x] `recovery`：恢复任务与恢复引擎均通过应用端口访问持久化，ORM Entity/Mapper 仅位于基础设施适配器。
+- [~] 下一阶段：将应用层入站/出站端口中的 MyBatis-Plus 分页类型替换为应用层分页模型；在此之前，本分支仅对实体/Mapper 越界完成严格端口隔离，不宣称所有框架类型均已清除。
