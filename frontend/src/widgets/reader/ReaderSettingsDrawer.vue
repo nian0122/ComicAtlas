@@ -7,7 +7,7 @@
         <header class="drawer-header">
           <span class="drawer-header-spacer" aria-hidden="true" />
           <span class="drawer-title">阅读设置</span>
-          <button class="drawer-close" type="button" aria-label="关闭" @click="emit('close')">
+          <AppButton class="drawer-close" type="button" aria-label="关闭" @click="emit('close')">
             <svg
               width="22"
               height="22"
@@ -20,7 +20,7 @@
             >
               <path d="M18 6L6 18M6 6l12 12" />
             </svg>
-          </button>
+          </AppButton>
         </header>
 
         <div class="drawer-body">
@@ -75,7 +75,7 @@
             <span class="setting-label">缩放</span>
             <div class="zoom-control">
               <div class="zoom-row">
-                <button
+                <AppButton
                   class="zoom-btn"
                   type="button"
                   aria-label="缩小"
@@ -83,7 +83,7 @@
                   @click="adjustZoom(-ZOOM_STEP)"
                 >
                   −
-                </button>
+                </AppButton>
                 <input
                   class="zoom-slider"
                   type="range"
@@ -94,7 +94,7 @@
                   aria-label="缩放比例"
                   @input="onZoomInput"
                 />
-                <button
+                <AppButton
                   class="zoom-btn"
                   type="button"
                   aria-label="放大"
@@ -102,7 +102,7 @@
                   @click="adjustZoom(ZOOM_STEP)"
                 >
                   +
-                </button>
+                </AppButton>
               </div>
               <span class="zoom-value">{{ settings.zoom }}%</span>
             </div>
@@ -146,7 +146,7 @@
                 @blur="submitPageJump"
               />
               <span>/ {{ totalPages }} 页</span>
-              <button type="button" @click="submitPageJump">跳转</button>
+              <AppButton type="button" @click="submitPageJump">跳转</AppButton>
             </div>
           </div>
 
@@ -172,6 +172,7 @@
 </template>
 
 <script setup lang="ts">
+import { AppButton } from '@/shared/ui/button'
 import { ref, watch } from 'vue'
 import { useReaderSettingsStore, ZOOM_LEVELS } from '@/features/reader-settings/model/settings-store'
 import type { FitMode, QualityMode, ReadingDirection } from '@/features/reader-settings/model/settings-store'

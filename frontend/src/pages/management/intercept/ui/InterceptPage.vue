@@ -9,12 +9,13 @@
         阅读功能支持手机和平板。管理功能为了更高的编辑效率，仅支持<span class="no-break">桌面浏览器</span
         >。请使用电脑访问<span class="no-break">管理后台</span>。
       </p>
-      <button class="intercept-button" type="button" @click="goHome">回到阅读首页</button>
+      <AppButton class="intercept-button" type="button" @click="goHome">回到阅读首页</AppButton>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { AppButton } from '@/shared/ui/button'
 import { Monitor } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 

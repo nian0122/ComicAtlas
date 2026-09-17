@@ -7,13 +7,13 @@
 
       <div class="mobile-header">
         <template v-if="mobileHeaderKind === 'detail'">
-          <button type="button" class="mobile-header-action" aria-label="返回" @click="router.back()">
+          <AppButton type="button" class="mobile-header-action" aria-label="返回" @click="router.back()">
             <el-icon :size="22"><ArrowLeft /></el-icon>
-          </button>
+          </AppButton>
           <router-link to="/" class="mobile-detail-brand"><ComicAtlasLogo size="sm" /></router-link>
-          <button type="button" class="mobile-header-action" aria-label="分享当前漫画" @click="onShare">
+          <AppButton type="button" class="mobile-header-action" aria-label="分享当前漫画" @click="onShare">
             <el-icon :size="21"><Share /></el-icon>
-          </button>
+          </AppButton>
         </template>
 
         <template v-else-if="mobileHeaderKind === 'library'">
@@ -27,7 +27,7 @@
           <router-link to="/" class="mobile-brand" aria-label="ComicAtlas 首页">
             <ComicAtlasLogo size="sm" />
           </router-link>
-          <button
+          <AppButton
             type="button"
             class="mobile-header-action"
             :disabled="historyStore.loading"
@@ -38,7 +38,7 @@
               name="refresh"
               :class="['mobile-history-refresh-icon', { 'refresh-icon--loading': historyStore.loading }]"
             />
-          </button>
+          </AppButton>
         </template>
 
         <template v-else>
@@ -85,13 +85,14 @@
 </template>
 
 <script setup lang="ts">
+import { AppButton } from '@/shared/ui/button'
 // TopNav 是应用级业务组合组件，保留导入状态协作；components 目录不因此整体成为业务层。
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft, Menu, Share, UploadFilled, User } from '@element-plus/icons-vue'
-import MaterialSymbolIcon from '@/shared/ui/icon/MaterialSymbolIcon.vue'
-import ComicAtlasLogo from '@/shared/ui/logo/ComicAtlasLogo.vue'
+import { MaterialSymbolIcon } from '@/shared/ui/icon'
+import { ComicAtlasLogo } from '@/shared/ui/logo'
 import { useHistoryStore } from '@/features/history/store'
 
 const isScrolled = ref(false)

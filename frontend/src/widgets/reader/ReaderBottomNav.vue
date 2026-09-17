@@ -7,18 +7,19 @@
 
     <div class="nav-buttons">
       <!-- 上一话（无上一话时禁用，保持布局稳定） -->
-      <button class="nav-btn" type="button" :disabled="!hasPrev" @click="emit('prevChapter')">← 上一话</button>
+      <AppButton class="nav-btn" type="button" :disabled="!hasPrev" @click="emit('prevChapter')">← 上一话</AppButton>
 
       <!-- 目录 -->
-      <button class="nav-btn" type="button" @click="emit('catalog')">目录</button>
+      <AppButton class="nav-btn" type="button" @click="emit('catalog')">目录</AppButton>
 
       <!-- 下一话（无下一话时禁用） -->
-      <button class="nav-btn" type="button" :disabled="!hasNext" @click="emit('nextChapter')">下一话 →</button>
+      <AppButton class="nav-btn" type="button" :disabled="!hasNext" @click="emit('nextChapter')">下一话 →</AppButton>
     </div>
   </nav>
 </template>
 
 <script setup lang="ts">
+import { AppButton } from '@/shared/ui/button'
 // 哑组件：只负责导航展示，不接触 store / composable。
 // 显示与隐藏由父级（ReaderPage）通过 v-if 控制。
 interface Props {

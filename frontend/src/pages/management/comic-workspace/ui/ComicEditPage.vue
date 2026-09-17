@@ -152,7 +152,7 @@
 </template>
 
 <script setup lang="ts">
-import PanelHeader from '@/shared/ui/management-panel/PanelHeader.vue'
+import { PanelHeader } from '@/shared/ui/management-panel'
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'

@@ -2,7 +2,7 @@
   <!-- 移动端顶部工具栏：返回 / 漫画名 / 更多（打开设置抽屉） -->
   <header class="reader-toolbar-mobile">
     <!-- 返回按钮 -->
-    <button class="toolbar-btn" type="button" aria-label="返回" @click="emit('back')">
+    <AppButton class="toolbar-btn" type="button" aria-label="返回" @click="emit('back')">
       <svg
         width="24"
         height="24"
@@ -16,23 +16,24 @@
       >
         <path d="M15 18l-6-6 6-6" />
       </svg>
-    </button>
+    </AppButton>
 
     <!-- 漫画标题（超长省略） -->
     <span class="toolbar-title">{{ title }}</span>
 
     <!-- 更多入口 ⋯（打开设置抽屉） -->
-    <button class="toolbar-btn" type="button" aria-label="阅读设置" @click="emit('openSettings')">
+    <AppButton class="toolbar-btn" type="button" aria-label="阅读设置" @click="emit('openSettings')">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
         <circle cx="5" cy="12" r="2" />
         <circle cx="12" cy="12" r="2" />
         <circle cx="19" cy="12" r="2" />
       </svg>
-    </button>
+    </AppButton>
   </header>
 </template>
 
 <script setup lang="ts">
+import { AppButton } from '@/shared/ui/button'
 // 哑组件：props 进、emits 出，不接触任何 store / composable。
 // 显示与隐藏由父级（ReaderPage）通过 v-if 控制。
 interface Props {

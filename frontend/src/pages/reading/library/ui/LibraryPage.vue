@@ -10,7 +10,7 @@
             </span>
           </h1>
           <div class="mobile-recent">
-            <button
+            <AppButton
               type="button"
               class="mobile-sort-order"
               :class="{ ascending: order === 'asc' }"
@@ -18,7 +18,7 @@
               @click="toggleSortOrder"
             >
               <el-icon :size="18"><Sort /></el-icon>
-            </button>
+            </AppButton>
             <el-popover
               v-model:visible="isMobileSortOpen"
               placement="bottom-end"
@@ -27,15 +27,15 @@
               popper-class="mobile-sort-menu-popper"
             >
               <template #reference>
-                <button type="button" class="mobile-sort-trigger" aria-label="选择排序字段">
+                <AppButton type="button" class="mobile-sort-trigger" aria-label="选择排序字段">
                   <span>{{ currentSortLabel }}</span>
                   <i aria-hidden="true" />
-                </button>
+                </AppButton>
               </template>
 
               <div class="mobile-sort-menu">
                 <div class="mobile-sort-grid" role="group" aria-label="排序字段">
-                  <button
+                  <AppButton
                     v-for="option in sortOptions"
                     :key="option.value"
                     type="button"
@@ -43,7 +43,7 @@
                     @click="selectMobileSort(option.value)"
                   >
                     {{ option.label }}
-                  </button>
+                  </AppButton>
                 </div>
               </div>
             </el-popover>
@@ -79,7 +79,7 @@
               </el-select>
             </div>
 
-            <button
+            <AppButton
               type="button"
               class="desktop-sort-order"
               :class="{ ascending: order === 'asc' }"
@@ -88,7 +88,7 @@
               @click="toggleSortOrder"
             >
               <el-icon :size="18"><Sort /></el-icon>
-            </button>
+            </AppButton>
           </div>
         </div>
 
@@ -136,21 +136,23 @@
             </el-select>
           </div>
 
-          <button v-if="hasActiveFilters" type="button" class="filter-reset" @click="clearFilters">清除筛选</button>
+          <AppButton v-if="hasActiveFilters" type="button" class="filter-reset" @click="clearFilters"
+            >清除筛选</AppButton
+          >
         </div>
 
         <div v-if="hasActiveFilters" class="active-filter-row" aria-label="当前筛选条件">
           <span class="active-filter-label">当前筛选</span>
           <span v-for="item in activeFilterSummary" :key="item" class="active-filter-chip">{{ item }}</span>
-          <button type="button" class="active-filter-clear" @click="clearFilters">清除全部</button>
+          <AppButton type="button" class="active-filter-clear" @click="clearFilters">清除全部</AppButton>
         </div>
       </div>
 
       <div class="mobile-filter-stack" aria-label="漫画筛选">
         <div class="mobile-filter-group-row">
           <div class="mobile-filter-options" role="group" aria-label="按分类筛选">
-            <button type="button" :class="{ active: !categoryFilter }" @click="selectCategory('')">全部</button>
-            <button
+            <AppButton type="button" :class="{ active: !categoryFilter }" @click="selectCategory('')">全部</AppButton>
+            <AppButton
               v-for="category in allCategories"
               :key="category.id"
               type="button"
@@ -158,16 +160,16 @@
               @click="selectCategory(category.name)"
             >
               {{ category.name }}
-            </button>
-            <button type="button" :class="{ active: categoryFilter === '_NONE' }" @click="selectCategory('_NONE')">
+            </AppButton>
+            <AppButton type="button" :class="{ active: categoryFilter === '_NONE' }" @click="selectCategory('_NONE')">
               未分类
-            </button>
+            </AppButton>
           </div>
         </div>
 
         <div class="mobile-filter-group-row">
           <div class="mobile-filter-options" role="group" aria-label="按标签筛选">
-            <button
+            <AppButton
               v-for="tag in allTags"
               :key="tag.id"
               type="button"
@@ -175,50 +177,41 @@
               @click="toggleTag(tag.name)"
             >
               {{ tag.name }}
-            </button>
-            <button type="button" :class="{ active: selectedTags.includes('_NONE') }" @click="toggleTag('_NONE')">
+            </AppButton>
+            <AppButton type="button" :class="{ active: selectedTags.includes('_NONE') }" @click="toggleTag('_NONE')">
               无标签
-            </button>
+            </AppButton>
           </div>
         </div>
 
         <div v-if="selectedTags.length > 1" class="mobile-filter-group-row mobile-filter-match-row">
           <div class="mobile-match-control" role="group" aria-label="标签匹配方式">
-            <button
+            <AppButton
               type="button"
               :class="{ active: tagMode === 'OR' }"
               aria-label="任一标签满足"
               @click="setTagMode('OR')"
             >
               任一
-            </button>
-            <button
+            </AppButton>
+            <AppButton
               type="button"
               :class="{ active: tagMode === 'AND' }"
               aria-label="所有标签同时满足"
               @click="setTagMode('AND')"
             >
               同时
-            </button>
+            </AppButton>
           </div>
         </div>
       </div>
     </header>
 
-    <div v-if="store.loading && store.list.length === 0" class="state loading" aria-label="加载中">
-      <div class="spinner" />
-    </div>
-
-    <div v-else-if="store.error" class="state error">
-      <el-icon :size="48"><WarningFilled /></el-icon>
-      <span>{{ store.error }}</span>
-      <button class="primary-btn" @click="store.fetchList()">重试</button>
-    </div>
-
-    <div v-else-if="store.list.length === 0" class="state empty">
-      <el-icon :size="48"><PictureFilled /></el-icon>
-      <span>暂无漫画</span>
-    </div>
+    <ContentState v-if="store.loading && store.list.length === 0" state="loading" message="加载中..." />
+    <ContentState v-else-if="store.error" state="error" :message="store.error">
+      <AppButton variant="primary" @click="store.fetchList()">重试</AppButton>
+    </ContentState>
+    <ContentState v-else-if="store.list.length === 0" state="empty" message="暂无漫画" />
 
     <section v-else class="comic-section">
       <div class="comic-grid">
@@ -255,9 +248,11 @@
 </template>
 
 <script setup lang="ts">
+import { AppButton } from '@/shared/ui/button'
+import { ContentState } from '@/shared/ui/content-state'
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Search, PictureFilled, WarningFilled, CircleClose, Sort } from '@element-plus/icons-vue'
+import { Search, CircleClose, Sort } from '@element-plus/icons-vue'
 import { useComicStore } from '@/pages/reading/library/model/comic-store'
 import { categoryApi } from '@/entities/category/api/category-api'
 import { tagApi } from '@/entities/tag/api/tag-api'

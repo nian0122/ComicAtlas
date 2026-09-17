@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import StatusBadge from '@/shared/ui/status-badge/StatusBadge.vue'
+import { StatusBadge } from '@/shared/ui/status-badge'
 import { managementTaskStatusLabel, managementTaskStatusTone } from '@/entities/task/model/labels'
 import type { ManagementTaskStatus } from '@/entities/task/model/types'
 

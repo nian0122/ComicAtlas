@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { AppButton } from '@/shared/ui/button'
 import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElSelect, ElOption, ElInput, ElButton } from 'element-plus'
@@ -56,8 +57,8 @@ onMounted(() => {
     <section class="action-section">
       <h2 class="section-title">操作</h2>
       <div class="action-list">
-        <button class="action-btn primary" @click="goToTaskCenter">在任务中心中恢复</button>
-        <button class="action-btn danger" disabled>清理未引用文件</button>
+        <AppButton class="action-btn primary" @click="goToTaskCenter">在任务中心中恢复</AppButton>
+        <AppButton class="action-btn danger" disabled>清理未引用文件</AppButton>
       </div>
     </section>
 

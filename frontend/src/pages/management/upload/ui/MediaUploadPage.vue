@@ -1,12 +1,8 @@
 <template>
   <div class="media-upload-page">
-    <ManagementPageHeader
-      title="媒体上传"
-      description="向现有章节追加媒体，或用新文件替换单个媒体。"
-      eyebrow="MEDIA / INTAKE"
-    >
+    <PageHeader title="媒体上传" description="向现有章节追加媒体，或用新文件替换单个媒体。" eyebrow="MEDIA / INTAKE">
       <router-link class="back-link" to="/manage/comics">返回漫画管理</router-link>
-    </ManagementPageHeader>
+    </PageHeader>
 
     <el-alert v-if="errorMessage" :title="errorMessage" type="error" show-icon closable @close="errorMessage = ''" />
     <section class="upload-workbench">
@@ -141,7 +137,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import axios from 'axios'
-import ManagementPageHeader from '@/shared/ui/management-panel/ManagementPageHeader.vue'
+import { PageHeader } from '@/shared/ui/page-header'
 import { managementCatalogApi, managementChapterApi, managementComicApi } from '@/entities/comic/api/management-api'
 import { uploadApi } from '@/features/upload/model/api'
 import type { CreateUploadSessionRequest, UploadFileManifest } from '@/features/upload/model/types'

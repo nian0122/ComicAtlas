@@ -452,22 +452,6 @@
   }
 }
 
-.primary-btn {
-  padding: var(--space-sm) var(--space-lg);
-  background: var(--accent);
-  color: var(--text-primary);
-  border: none;
-  border-radius: var(--radius-sm);
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background var(--transition-fast);
-}
-
-.primary-btn:hover {
-  background: var(--accent-hover);
-}
-
 /* ===== 移动阅读端（手机与平板，≤1024px）===== */
 @media (max-width: 1024px) {
   .comic-list-page {

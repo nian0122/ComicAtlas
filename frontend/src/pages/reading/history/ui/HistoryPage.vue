@@ -7,31 +7,25 @@
         <p v-if="recentCount > 0" class="page-subtitle">最近阅读 {{ recentCount }} 部漫画</p>
       </div>
       <div class="header-actions">
-        <button class="ghost-btn" :disabled="store.loading" @click="store.fetchFirstPage">刷新</button>
-        <button class="primary-btn" @click="router.push('/library')">去漫画库</button>
+        <AppButton variant="ghost" :disabled="store.loading" @click="store.fetchFirstPage">刷新</AppButton>
+        <AppButton variant="primary" @click="router.push('/library')">去漫画库</AppButton>
       </div>
     </header>
 
     <!-- 加载 -->
-    <div v-if="store.loading && store.list.length === 0" class="state loading">
-      <div class="spinner" />
-      <span>加载中...</span>
-    </div>
+    <ContentState v-if="store.loading && store.list.length === 0" state="loading" message="加载中..." />
 
     <!-- 错误 -->
-    <div v-else-if="store.error" class="state error">
-      <el-icon :size="32"><WarningFilled /></el-icon>
-      <span>{{ store.error }}</span>
-      <button class="ghost-btn" :disabled="store.loading" @click="store.fetchFirstPage">重试</button>
-    </div>
+    <ContentState v-else-if="store.error" state="error" :message="store.error">
+      <AppButton variant="ghost" :disabled="store.loading" @click="store.fetchFirstPage">重试</AppButton>
+    </ContentState>
 
     <!-- 空状态 -->
-    <div v-else-if="store.list.length === 0" class="state empty">
-      <el-icon :size="56"><PictureFilled /></el-icon>
-      <h2 class="empty-title">还没有阅读记录</h2>
-      <p class="empty-desc">阅读任意漫画后，这里会显示你的最近进度</p>
-      <button class="primary-btn" @click="router.push('/library')">开始阅读</button>
-    </div>
+    <ContentState v-else-if="store.list.length === 0" state="empty" message="还没有阅读记录">
+      <template #icon><PictureFilled /></template>
+      <p>阅读任意漫画后，这里会显示你的最近进度</p>
+      <AppButton variant="primary" @click="router.push('/library')">开始阅读</AppButton>
+    </ContentState>
 
     <!-- 列表（虚拟滚动：500+ 条记录仅渲染可视区行） -->
     <RecycleScroller
@@ -48,9 +42,14 @@
         <div v-if="item.kind === 'end'" class="history-end">
           <MaterialSymbolIcon name="history" class="history-end-icon" />
           <span v-if="store.loadingMore" class="history-end-label">正在加载更多阅读记录</span>
-          <button v-else-if="store.loadMoreError" type="button" class="history-end-retry" @click="store.fetchNextPage">
+          <AppButton
+            v-else-if="store.loadMoreError"
+            type="button"
+            class="history-end-retry"
+            @click="store.fetchNextPage"
+          >
             加载更多失败，点击重试
-          </button>
+          </AppButton>
           <template v-else-if="store.hasMore">
             <span class="history-end-label history-end-label--desktop">SCROLL FOR MORE</span>
             <span class="history-end-label history-end-label--mobile">继续下滑加载更多</span>
@@ -61,13 +60,13 @@
           </template>
         </div>
         <article v-else class="history-item">
-          <button type="button" class="history-thumb" @click="continueRead(item.value)">
+          <AppButton type="button" class="history-thumb" @click="continueRead(item.value)">
             <img :src="item.value.coverUrl" :alt="item.value.comicTitle || `漫画 #${item.value.comicId}`" />
             <span class="history-thumb-progress" aria-hidden="true">
               <span :style="{ width: `${progressFor(item.value)}%` }" />
             </span>
-          </button>
-          <button type="button" class="history-copy" @click="continueRead(item.value)">
+          </AppButton>
+          <AppButton type="button" class="history-copy" @click="continueRead(item.value)">
             <span class="history-title">{{ item.value.comicTitle || `漫画 #${item.value.comicId}` }}</span>
             <span class="history-meta">{{ subtitleFor(item.value) }}</span>
             <span class="history-progress-row">
@@ -76,10 +75,10 @@
               </span>
               <span class="history-percent">{{ progressFor(item.value) }}%</span>
             </span>
-          </button>
-          <button type="button" class="history-play" aria-label="继续阅读" @click="continueRead(item.value)">
+          </AppButton>
+          <AppButton type="button" class="history-play" aria-label="继续阅读" @click="continueRead(item.value)">
             <MaterialSymbolIcon name="play" class="history-play-icon" />
-          </button>
+          </AppButton>
         </article>
       </template>
     </RecycleScroller>
@@ -87,11 +86,13 @@
 </template>
 
 <script setup lang="ts">
+import { AppButton } from '@/shared/ui/button'
+import { ContentState } from '@/shared/ui/content-state'
 import { computed, onBeforeUnmount, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { RecycleScroller } from 'vue-virtual-scroller'
-import { PictureFilled, WarningFilled } from '@element-plus/icons-vue'
-import MaterialSymbolIcon from '@/shared/ui/icon/MaterialSymbolIcon.vue'
+import { PictureFilled } from '@element-plus/icons-vue'
+import { MaterialSymbolIcon } from '@/shared/ui/icon'
 import { BREAKPOINTS, useBreakpoint } from '@/shared/lib/composables/useBreakpoint'
 import { useHistoryStore } from '@/features/history/store'
 import type { HistoryVO } from '@/entities/history/model/types'
@@ -406,54 +407,7 @@ onBeforeUnmount(() => {
   margin: 0;
 }
 
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid var(--border-strong);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 /* Buttons */
-.primary-btn {
-  padding: 8px 16px;
-  background: var(--accent);
-  color: var(--text-primary);
-  border: none;
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background var(--transition-fast);
-}
-
-.primary-btn:hover {
-  background: var(--accent-hover);
-}
-
-.ghost-btn {
-  padding: 8px 16px;
-  background: transparent;
-  color: var(--text-primary);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.ghost-btn:hover {
-  background: var(--bg-surface);
-  border-color: var(--text-muted);
-}
 
 @media (max-width: 1024px) {
   .history-page {

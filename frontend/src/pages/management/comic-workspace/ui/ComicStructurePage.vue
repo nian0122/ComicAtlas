@@ -1,6 +1,6 @@
 <template>
   <div class="structure-page">
-    <ManagementPageHeader
+    <PageHeader
       class="structure-header"
       title="目录与媒体"
       description="从目录树定位章节，再在右侧完成维护。"
@@ -10,7 +10,7 @@
         <span class="comic-ref">漫画 #{{ comicId }}</span
         ><el-button :loading="loading" @click="loadTree">刷新结构</el-button>
       </div>
-    </ManagementPageHeader>
+    </PageHeader>
     <StatGrid class="structure-summary" aria-label="结构概览" :columns="4">
       <StatCard
         label="目录节点"
@@ -34,7 +34,7 @@
         <small>点击章节可直接定位到媒体明细</small>
       </div>
       <div class="issue-chapter-list">
-        <button
+        <AppButton
           v-for="chapter in lqIssueChapters"
           :key="chapter.chapterId"
           type="button"
@@ -43,7 +43,7 @@
         >
           <span>{{ chapter.title || `章节 ${chapter.chapterNo}` }}</span
           ><small>{{ mediaLqLabel(chapter.lqStatus) }} · {{ chapter.pageCount }} 个媒体</small>
-        </button>
+        </AppButton>
       </div>
     </section>
 
@@ -101,7 +101,7 @@
               ><span>个下级节点</span>
             </div>
             <div class="child-list">
-              <button
+              <AppButton
                 v-for="child in selectedRow.children"
                 :key="child.key"
                 type="button"
@@ -109,7 +109,7 @@
               >
                 <span>{{ child.kind === 'CATALOG' ? '▰' : '▱' }}</span
                 >{{ child.title }}<small>{{ child.kind === 'CATALOG' ? '目录' : '章节' }}</small>
-              </button>
+              </AppButton>
               <div v-if="!selectedRow.children?.length" class="empty-copy">这个目录还没有下级节点。</div>
             </div>
           </template>
@@ -340,25 +340,25 @@
               </div>
             </div>
             <nav class="chapter-workspace-tabs" aria-label="章节功能分区">
-              <button
+              <AppButton
                 type="button"
                 :class="{ 'is-active': chapterWorkspaceTab === 'chapter' }"
                 @click="chapterWorkspaceTab = 'chapter'"
               >
-                <span>▱</span><strong>章节</strong><small>编辑与排序</small></button
-              ><button
+                <span>▱</span><strong>章节</strong><small>编辑与排序</small></AppButton
+              ><AppButton
                 type="button"
                 :class="{ 'is-active': chapterWorkspaceTab === 'media' }"
                 @click="chapterWorkspaceTab = 'media'"
               >
-                <span>▤</span><strong>媒体</strong><small>排序与补充</small></button
-              ><button
+                <span>▤</span><strong>媒体</strong><small>排序与补充</small></AppButton
+              ><AppButton
                 type="button"
                 :class="{ 'is-active': chapterWorkspaceTab === 'storage' }"
                 @click="chapterWorkspaceTab = 'storage'"
               >
                 <span>◈</span><strong>存储</strong><small>HQ / LQ</small>
-              </button>
+              </AppButton>
             </nav>
             <el-form v-if="chapterWorkspaceTab === 'chapter'" label-position="top" class="action-form">
               <div class="chapter-action-toolbar">
@@ -371,7 +371,7 @@
               <div v-if="chapterForm.action !== 'create'" class="chapter-choice">
                 <label>选择要执行的操作</label>
                 <div class="chapter-choice-grid">
-                  <button
+                  <AppButton
                     v-for="item in CHAPTER_ACTIONS"
                     :key="item.value"
                     type="button"
@@ -383,7 +383,7 @@
                       ><strong>{{ item.label }}</strong
                       ><small>{{ chapterActionTagline(item.value) }}</small></span
                     ><span class="chapter-choice-arrow">→</span>
-                  </button>
+                  </AppButton>
                 </div>
                 <div class="chapter-choice-help">
                   <span class="help-mark">i</span><small>{{ chapterActionDescription(chapterForm.action) }}</small>
@@ -574,8 +574,8 @@
     >
     <div class="media-order-dialog-body">
       <div class="order-toolbar">
-        <button type="button" @click="sortMediaByName">按文件名排序</button
-        ><button type="button" @click="resetMediaOrder">恢复当前顺序</button
+        <AppButton type="button" @click="sortMediaByName">按文件名排序</AppButton
+        ><AppButton type="button" @click="resetMediaOrder">恢复当前顺序</AppButton
         ><span class="order-dialog-hint">拖动卡片调整阅读顺序</span>
       </div>
       <div class="media-order-list media-order-list--dialog" :class="{ 'is-dirty': mediaOrderDirty }">
@@ -658,10 +658,11 @@
 </template>
 
 <script setup lang="ts">
-import StatGrid from '@/shared/ui/management-panel/StatGrid.vue'
-import PanelHeader from '@/shared/ui/management-panel/PanelHeader.vue'
-import StatCard from '@/shared/ui/management-panel/StatCard.vue'
-import ManagementPageHeader from '@/shared/ui/management-panel/ManagementPageHeader.vue'
+import { AppButton } from '@/shared/ui/button'
+import { StatGrid } from '@/shared/ui/management-panel'
+import { PanelHeader } from '@/shared/ui/management-panel'
+import { StatCard } from '@/shared/ui/management-panel'
+import { PageHeader } from '@/shared/ui/page-header'
 import { formatBytes as formatSize } from '@/shared/lib/format/bytes'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'

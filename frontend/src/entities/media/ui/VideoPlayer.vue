@@ -59,12 +59,13 @@
         <span v-if="videoCodec">视频编码: {{ videoCodec }}</span>
         <span v-if="audioCodec">音频编码: {{ audioCodec }}</span>
       </div>
-      <button class="video-retry-btn" @click="handleRetry">重试</button>
+      <AppButton class="video-retry-btn" @click="handleRetry">重试</AppButton>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { AppButton } from '@/shared/ui/button'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { VideoPlay } from '@element-plus/icons-vue'
 import { activateSession, releaseSession, getPosition, savePosition } from '@/shared/lib/video/videoPlaybackCoordinator'

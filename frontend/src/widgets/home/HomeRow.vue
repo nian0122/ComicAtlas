@@ -9,7 +9,7 @@
     </div>
 
     <div ref="trackRef" class="row-track" @mouseenter="showArrows = true" @mouseleave="showArrows = false">
-      <button
+      <AppButton
         v-show="showArrows && canScrollLeft"
         type="button"
         class="row-arrow row-arrow--left"
@@ -17,7 +17,7 @@
         @click="scrollBy(-1)"
       >
         <el-icon :size="24"><ArrowLeft /></el-icon>
-      </button>
+      </AppButton>
 
       <div class="row-items">
         <ComicPoster
@@ -36,7 +36,7 @@
         />
       </div>
 
-      <button
+      <AppButton
         v-show="showArrows && canScrollRight"
         type="button"
         class="row-arrow row-arrow--right"
@@ -44,12 +44,13 @@
         @click="scrollBy(1)"
       >
         <el-icon :size="24"><ArrowRight /></el-icon>
-      </button>
+      </AppButton>
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
+import { AppButton } from '@/shared/ui/button'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowLeft, ArrowRight } from '@element-plus/icons-vue'

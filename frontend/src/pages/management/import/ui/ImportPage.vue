@@ -1,6 +1,6 @@
 <template>
   <div class="import-page">
-    <ManagementPageHeader spaced title="导入漫画" description="选择来源类型并输入路径，开始你的导入流程" />
+    <PageHeader spaced title="导入漫画" description="选择来源类型并输入路径，开始你的导入流程" />
 
     <!-- 导入模式切换 -->
     <div class="import-tabs">
@@ -44,10 +44,10 @@
 
       <!-- 提交 -->
       <div class="form-actions">
-        <button class="primary-btn large" :disabled="!canSubmit || creating" @click="doImport">
+        <AppButton :disabled="!canSubmit || creating" @click="doImport">
           <span v-if="creating" class="spinner-sm" />
           <span>{{ creating ? '创建中...' : '开始导入' }}</span>
-        </button>
+        </AppButton>
         <router-link to="/manage/tasks" class="ghost-link">查看任务中心 →</router-link>
       </div>
     </section>
@@ -65,10 +65,10 @@
             placeholder="F:/games/comics/..."
             @keyup.enter="doScan"
           />
-          <button class="primary-btn" :disabled="!batchParentPath.trim() || scanning" @click="doScan">
+          <AppButton :disabled="!batchParentPath.trim() || scanning" @click="doScan">
             <span v-if="scanning" class="spinner-sm" />
             <span>{{ scanning ? '扫描中...' : '扫描' }}</span>
-          </button>
+          </AppButton>
         </div>
         <p class="form-hint">输入漫画集根目录路径，其直接子目录各是一本候选漫画，自动批量发现并递归预览媒体与警告</p>
       </div>
@@ -165,13 +165,13 @@
                   不可导入：{{ blockingReason(row.item) }}
                 </div>
                 <div v-if="row.preview" class="scan-item-preview">
-                  <button
+                  <AppButton
                     class="preview-toggle"
                     :aria-expanded="previewExpanded.has(row.item.path)"
                     @click.stop="togglePreview(row.item.path)"
                   >
                     {{ previewExpanded.has(row.item.path) ? '收起' : '展开' }}规范化预览
-                  </button>
+                  </AppButton>
                   <div
                     v-if="previewExpanded.has(row.item.path)"
                     class="preview-tree"
@@ -185,15 +185,10 @@
           </div>
 
           <div class="scan-actions">
-            <button
-              class="primary-btn large"
-              :disabled="selectedPaths.length === 0"
-              :loading="batchCreating"
-              @click="doBatchImport"
-            >
+            <AppButton :disabled="selectedPaths.length === 0" :loading="batchCreating" @click="doBatchImport">
               <span v-if="batchCreating" class="spinner-sm" />
               <span>{{ batchCreating ? '导入中...' : `确认导入 ${selectedPaths.length} 项` }}</span>
-            </button>
+            </AppButton>
           </div>
         </div>
       </div>
@@ -221,7 +216,8 @@
 </template>
 
 <script setup lang="ts">
-import ManagementPageHeader from '@/shared/ui/management-panel/ManagementPageHeader.vue'
+import { AppButton } from '@/shared/ui/button'
+import { PageHeader } from '@/shared/ui/page-header'
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'

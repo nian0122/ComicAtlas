@@ -2,7 +2,7 @@
   <div class="reader-page">
     <div v-if="store.progressSaveError && !store.loading && !store.error" class="progress-save-error" role="alert">
       <span>阅读进度暂未保存：{{ store.progressSaveError }}</span>
-      <button class="ghost-btn" @click="retryProgressSave">重试保存</button>
+      <AppButton variant="ghost" @click="retryProgressSave">重试保存</AppButton>
     </div>
     <!-- 桌面工具栏：迁移前行为 100% 保留（常驻渲染，隐藏由 settings.showToolbar 的 CSS 类控制，不进移动端状态机） -->
     <ReaderToolbar
@@ -20,23 +20,17 @@
     />
 
     <!-- Loading -->
-    <div v-if="store.loading" class="reader-state">
-      <div class="spinner" />
-      <span>加载中...</span>
-    </div>
+    <ContentState v-if="store.loading" state="loading" message="加载中..." />
 
     <!-- Error -->
-    <div v-else-if="store.error" class="reader-state error">
-      <el-icon :size="48"><WarningFilled /></el-icon>
-      <span>{{ store.error }}</span>
-      <button class="primary-btn" @click="reload">重试</button>
-    </div>
+    <ContentState v-else-if="store.error" state="error" :message="store.error">
+      <AppButton variant="primary" @click="reload">重试</AppButton>
+    </ContentState>
 
     <!-- Empty -->
-    <div v-else-if="store.pages.length === 0" class="reader-state">
-      <el-icon :size="48"><PictureFilled /></el-icon>
-      <span>暂无页面</span>
-    </div>
+    <ContentState v-else-if="store.pages.length === 0" state="empty" message="暂无页面">
+      <template #icon><PictureFilled /></template>
+    </ContentState>
 
     <!-- Reader Viewport:纵向=连续滚动,横向=单页翻页(§需求 2026-07) -->
     <ReaderPagedViewport
@@ -95,10 +89,12 @@
 </template>
 
 <script setup lang="ts">
+import { AppButton } from '@/shared/ui/button'
+import { ContentState } from '@/shared/ui/content-state'
 import { ref, reactive, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { PictureFilled, WarningFilled } from '@element-plus/icons-vue'
+import { PictureFilled } from '@element-plus/icons-vue'
 import { useReaderStore } from '@/features/reader-navigation/model/reader-store'
 import { useReaderSettingsStore } from '@/features/reader-settings/model/settings-store'
 import ReaderViewport from '@/widgets/reader/ReaderViewport.vue'
@@ -566,36 +562,5 @@ onBeforeUnmount(() => {
 
 .reader-state.error {
   color: var(--danger);
-}
-
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid var(--border-strong);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.primary-btn {
-  padding: 8px 20px;
-  background: var(--accent);
-  color: var(--color-on-brand);
-  border: none;
-  border-radius: var(--radius-sm);
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color var(--transition-fast);
-}
-
-.primary-btn:hover {
-  background: var(--accent-hover);
 }
 </style>

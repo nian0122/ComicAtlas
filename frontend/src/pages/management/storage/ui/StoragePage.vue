@@ -1,6 +1,6 @@
 <template>
   <div class="storage-page">
-    <ManagementPageHeader
+    <PageHeader
       spaced
       title="存储统计"
       description="查看 HQ、LQ 与缩略图的占用分布，并定位需要处理的漫画。"
@@ -10,7 +10,7 @@
         <span class="comic-count">{{ store.serverTotal }} 本漫画</span>
         <el-button :loading="store.loading" @click="reload">刷新统计</el-button>
       </div>
-    </ManagementPageHeader>
+    </PageHeader>
 
     <StorageSummary :stats="store.summary" />
 
@@ -30,7 +30,7 @@
 </template>
 
 <script setup lang="ts">
-import ManagementPageHeader from '@/shared/ui/management-panel/ManagementPageHeader.vue'
+import { PageHeader } from '@/shared/ui/page-header'
 import { watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useStorageStore } from '@/features/storage/store'

@@ -14,13 +14,12 @@
         <el-icon :size="sizeIcon"><PictureFilled /></el-icon>
       </div>
 
-      <div
+      <StatusBadge
         v-if="props.status && props.status !== 'ready'"
         class="poster-status-badge"
-        :class="`status--${props.status}`"
-      >
-        {{ statusLabel }}
-      </div>
+        :label="statusLabel"
+        :tone="statusTone"
+      />
 
       <div v-if="props.showProgress && props.progress && props.progress > 0" class="poster-progress">
         <div
@@ -33,14 +32,8 @@
 
       <div v-if="props.showHover" class="poster-overlay" :class="{ 'has-buttons': props.showButtons }">
         <div class="poster-overlay__actions">
-          <button
-            v-if="props.showButtons"
-            class="poster-btn poster-btn--primary"
-            @click.stop="emit('continue', props.id)"
-          >
-            继续阅读
-          </button>
-          <button v-if="props.showButtons" class="poster-btn" @click.stop="emit('detail', props.id)">详情</button>
+          <AppButton v-if="props.showButtons" @click.stop="emit('continue', props.id)"> 继续阅读 </AppButton>
+          <AppButton v-if="props.showButtons" @click.stop="emit('detail', props.id)">详情</AppButton>
         </div>
       </div>
     </div>
@@ -55,6 +48,8 @@
 </template>
 
 <script setup lang="ts">
+import { AppButton } from '@/shared/ui/button'
+import { StatusBadge } from '@/shared/ui/status-badge'
 import { computed } from 'vue'
 import { PictureFilled } from '@element-plus/icons-vue'
 import type { PosterProps } from '../model/poster-status'
@@ -84,6 +79,12 @@ const statusLabel = computed(() => {
     default:
       return ''
   }
+})
+
+const statusTone = computed(() => {
+  if (props.status === 'failed') return 'danger'
+  if (props.status === 'importing') return 'warning'
+  return 'info'
 })
 
 const sizeIcon = computed(() => {
@@ -165,27 +166,7 @@ const sizeIcon = computed(() => {
   position: absolute;
   top: var(--space-sm);
   right: var(--space-sm);
-  padding: var(--space-xs) var(--space-sm);
-  border-radius: var(--radius-sm);
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-primary);
-  background: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
   z-index: 3;
-}
-
-.status--importing {
-  background: var(--warning);
-}
-
-.status--pending {
-  background: var(--text-muted);
-}
-
-.status--failed {
-  background: var(--danger);
 }
 
 .poster-progress {
@@ -229,34 +210,6 @@ const sizeIcon = computed(() => {
   gap: var(--space-sm);
   align-items: center;
   padding: var(--space-base);
-}
-
-.poster-btn {
-  min-width: 96px;
-  padding: var(--space-sm) var(--space-base);
-  border: none;
-  border-radius: var(--radius-pill);
-  background: var(--color-overlay-soft);
-  color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition:
-    background-color var(--transition-fast),
-    transform var(--transition-fast);
-}
-
-.poster-btn:hover {
-  background: var(--color-overlay-hover);
-  transform: translateY(-1px);
-}
-
-.poster-btn--primary {
-  background: var(--accent);
-}
-
-.poster-btn--primary:hover {
-  background: var(--accent-hover);
 }
 
 .poster-info {

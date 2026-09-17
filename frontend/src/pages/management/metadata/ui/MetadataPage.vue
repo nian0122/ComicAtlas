@@ -1,6 +1,6 @@
 <template>
   <div class="metadata-page">
-    <ManagementPageHeader spaced title="元数据管理" />
+    <PageHeader spaced title="元数据管理" />
 
     <StatGrid spaced class="metadata-summary" aria-label="元数据统计" :columns="3">
       <StatCard label="分类" :value="categoryStore.list.length" description="可用于仓库筛选" />
@@ -67,9 +67,9 @@
 </template>
 
 <script setup lang="ts">
-import StatGrid from '@/shared/ui/management-panel/StatGrid.vue'
-import StatCard from '@/shared/ui/management-panel/StatCard.vue'
-import ManagementPageHeader from '@/shared/ui/management-panel/ManagementPageHeader.vue'
+import { StatGrid } from '@/shared/ui/management-panel'
+import { StatCard } from '@/shared/ui/management-panel'
+import { PageHeader } from '@/shared/ui/page-header'
 import { computed, ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getApiErrorMessage } from '@/shared/api/http'

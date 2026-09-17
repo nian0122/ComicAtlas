@@ -10,13 +10,14 @@
       aria-label="搜索章节"
       @keydown.esc="clear"
     />
-    <button v-if="modelValue" type="button" class="clear-button" aria-label="清空搜索" @click="clear">
+    <AppButton v-if="modelValue" type="button" class="clear-button" aria-label="清空搜索" @click="clear">
       <el-icon :size="14"><Close /></el-icon>
-    </button>
+    </AppButton>
   </div>
 </template>
 
 <script setup lang="ts">
+import { AppButton } from '@/shared/ui/button'
 import { ref } from 'vue'
 import { Close, Search } from '@element-plus/icons-vue'
 

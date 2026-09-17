@@ -14,15 +14,11 @@
       </div>
 
       <div class="card-overlay">
-        <button v-if="canContinue" class="overlay-btn primary" @click.stop="emit('continue', comic.id)">
-          继续阅读
-        </button>
-        <button v-else class="overlay-btn" @click.stop="emit('click', comic.id)">查看详情</button>
+        <AppButton v-if="canContinue" @click.stop="emit('continue', comic.id)"> 继续阅读 </AppButton>
+        <AppButton v-else @click.stop="emit('click', comic.id)">查看详情</AppButton>
       </div>
 
-      <div v-if="statusLabel" class="status-badge" :class="statusClass">
-        {{ statusLabel }}
-      </div>
+      <ComicStatusTag v-if="comic.status !== 'READY'" class="comic-card__status" :status="comic.status" />
     </div>
 
     <div class="card-info">
@@ -36,10 +32,11 @@
 </template>
 
 <script setup lang="ts">
+import { AppButton } from '@/shared/ui/button'
+import ComicStatusTag from './ComicStatusTag.vue'
 import { computed } from 'vue'
 import { PictureFilled } from '@element-plus/icons-vue'
 import type { ComicListVO } from '@/entities/comic/model/types'
-import { comicStatusMeta } from '@/entities/comic/model/status'
 
 const props = defineProps<{
   comic: ComicListVO
@@ -53,16 +50,6 @@ const emit = defineEmits<{
 const showProgress = computed(() => props.comic.progressPercent > 0 && props.comic.progressPercent < 100)
 
 const canContinue = computed(() => props.comic.lastReadChapterId && props.comic.lastReadChapterId > 0)
-
-const statusLabel = computed(() => {
-  if (props.comic.status === 'READY') return ''
-  return comicStatusMeta(props.comic.status).label
-})
-
-const statusClass = computed(() => {
-  if (props.comic.status === 'READY') return ''
-  return comicStatusMeta(props.comic.status).tone
-})
 </script>
 
 <style scoped>
@@ -129,31 +116,7 @@ const statusClass = computed(() => {
   transition: opacity 200ms ease;
 }
 
-.overlay-btn {
-  padding: 8px 16px;
-  background: rgba(255, 255, 255, 0.2);
-  color: #fff;
-  border: none;
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 150ms ease;
-}
-
-.overlay-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
-}
-
-.overlay-btn.primary {
-  background: var(--accent);
-}
-
-.overlay-btn.primary:hover {
-  background: var(--accent-hover);
-}
-
-.status-badge {
+.comic-card__status {
   position: absolute;
   top: 8px;
   right: 8px;
@@ -161,18 +124,6 @@ const statusClass = computed(() => {
   border-radius: var(--radius-sm);
   font-size: 11px;
   font-weight: 700;
-  color: #fff;
-  background: var(--text-muted);
-}
-
-.status-badge.warning {
-  background: var(--warning);
-}
-.status-badge.danger {
-  background: var(--danger);
-}
-.status-badge.info {
-  background: var(--text-muted);
 }
 
 .card-info {
