@@ -5,7 +5,6 @@ import com.comicatlas.api.exporter.application.port.in.ExportArtifactService;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.storage.infrastructure.config.ApiStorageProperties;
 import com.comicatlas.api.storage.ApiStorageRoot;
-import com.comicatlas.api.exporter.infrastructure.persistence.entity.ExportTask;
 import com.comicatlas.api.exporter.application.port.out.ExportPersistencePort;
 import com.comicatlas.api.exporter.interfaces.rest.dto.ExportArtifactVO;
 import com.comicatlas.api.exporter.application.service.impl.ExportArtifactServiceImpl;
@@ -51,14 +50,11 @@ class ExportArtifactServiceTest {
         return props;
     }
 
-    private ExportTask task(Long id, String status, String outputPath, Long outputSize) {
-        ExportTask task = new ExportTask();
-        task.setId(id);
-        task.setStatus(com.comicatlas.api.exporter.domain.model.ExportTaskStatus.valueOf(status));
-        task.setOutputRoot("EXPORT");
-        task.setOutputPath(outputPath);
-        task.setOutputSize(outputSize);
-        return task;
+    private ExportPersistencePort.ExportTaskSnapshot task(Long id, String status,
+                                                           String outputPath, Long outputSize) {
+        return new ExportPersistencePort.ExportTaskSnapshot(id, null, null, null,
+                com.comicatlas.api.exporter.domain.model.ExportTaskStatus.valueOf(status), null,
+                "EXPORT", outputPath, outputSize, null, null, null);
     }
 
     private Path writeFile(String relativePath, String content) throws IOException {

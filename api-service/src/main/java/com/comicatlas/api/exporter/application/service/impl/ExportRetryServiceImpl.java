@@ -2,7 +2,6 @@ package com.comicatlas.api.exporter.application.service.impl;
 
 // 架构说明：Service 直接构造 LambdaUpdateWrapper 重置导出任务；条件更新应收口到 ExportTaskMapper。
 import com.comicatlas.api.exporter.domain.model.ExportTaskStatus;
-import com.comicatlas.api.exporter.infrastructure.persistence.entity.ExportTask;
 import com.comicatlas.api.exporter.application.port.out.ExportPersistencePort;
 import com.comicatlas.api.outbox.application.port.in.OutboxService;
 import com.comicatlas.common.constant.MqExchanges;
@@ -25,15 +24,15 @@ public class ExportRetryServiceImpl implements com.comicatlas.api.exporter.appli
 
     public void retry(Long taskId, com.comicatlas.api.exporter.application.port.in.ExportRetryService.RetryItem item,
                       int attempt) {
-        ExportTask exportTask = persistencePort.findTaskByManagementTaskId(taskId);
+        ExportPersistencePort.ExportTaskSnapshot exportTask = persistencePort.findTaskByManagementTaskId(taskId);
         if (exportTask == null) {
             log.warn("导出专表不存在，跳过导出重试入队: taskId={}, itemId={}", taskId, item.id());
             return;
         }
-        persistencePort.resetTask(exportTask.getId(), ExportTaskStatus.PENDING);
+        persistencePort.resetTask(exportTask.id(), ExportTaskStatus.PENDING);
         ExportTaskCreatedEvent event = new ExportTaskCreatedEvent(UUID.randomUUID(), Instant.now(),
-                exportTask.getId(), exportTask.getComicId(),
-                exportTask.getFormat() == null ? "ZIP" : exportTask.getFormat());
+                exportTask.id(), exportTask.comicId(),
+                exportTask.format() == null ? "ZIP" : exportTask.format());
         outboxService.enqueue(event, MqExchanges.EXPORT, MqRoutingKeys.TASK_CREATED,
                 taskId, item.id(), attempt);
     }

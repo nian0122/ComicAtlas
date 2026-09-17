@@ -5,7 +5,6 @@ import com.comicatlas.api.exporter.domain.model.ExportTaskStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.storage.infrastructure.config.ApiStorageProperties;
 import com.comicatlas.api.storage.PathTraversalException;
-import com.comicatlas.api.exporter.infrastructure.persistence.entity.ExportTask;
 import com.comicatlas.api.exporter.application.port.out.ExportPersistencePort;
 import com.comicatlas.api.exporter.interfaces.rest.dto.ExportArtifactVO;
 import com.comicatlas.api.exporter.application.service.ExportZipVolumeResolver;
@@ -47,15 +46,15 @@ public class ExportArtifactServiceImpl implements com.comicatlas.api.exporter.ap
      * @throws BusinessException 任务不存在(404)、任务未完成/路径非法/卷校验失败/大小漂移(409)
      */
     public List<ExportArtifactVO> listArtifacts(Long taskId) {
-        ExportTask task = persistencePort.findTask(taskId);
+        ExportPersistencePort.ExportTaskSnapshot task = persistencePort.findTask(taskId);
         if (task == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "导出任务不存在: taskId=" + taskId);
         }
-        if (task.getStatus() != ExportTaskStatus.SUCCESS) {
+        if (task.status() != ExportTaskStatus.SUCCESS) {
             throw new BusinessException(HttpStatusCodes.CONFLICT,
-                    "导出任务未完成，无法提供产物清单，当前状态: " + task.getStatus());
+                    "导出任务未完成，无法提供产物清单，当前状态: " + task.status());
         }
-        String outputPath = task.getOutputPath();
+        String outputPath = task.outputPath();
         if (outputPath == null || outputPath.isBlank()) {
             throw new BusinessException(HttpStatusCodes.CONFLICT, "导出任务缺少产物路径: taskId=" + taskId);
         }
@@ -82,7 +81,7 @@ public class ExportArtifactServiceImpl implements com.comicatlas.api.exporter.ap
             artifacts.add(artifactView);
         }
 
-        Long expectedSize = task.getOutputSize();
+        Long expectedSize = task.outputSize();
         if (expectedSize != null && !expectedSize.equals(totalSize)) {
             throw new BusinessException(HttpStatusCodes.CONFLICT,
                     "导出产物大小不一致: taskId=" + taskId + ", 期望=" + expectedSize + ", 实际=" + totalSize);
@@ -90,9 +89,9 @@ public class ExportArtifactServiceImpl implements com.comicatlas.api.exporter.ap
         return List.copyOf(artifacts);
     }
 
-    private Path resolveMainZip(ExportTask task, String outputPath, Long taskId) {
-        String rootKey = task.getOutputRoot() != null && !task.getOutputRoot().isBlank()
-                ? task.getOutputRoot() : DEFAULT_OUTPUT_ROOT;
+    private Path resolveMainZip(ExportPersistencePort.ExportTaskSnapshot task, String outputPath, Long taskId) {
+        String rootKey = task.outputRoot() != null && !task.outputRoot().isBlank()
+                ? task.outputRoot() : DEFAULT_OUTPUT_ROOT;
         try {
             return storageProperties.root(rootKey).resolve(outputPath);
         } catch (PathTraversalException e) {

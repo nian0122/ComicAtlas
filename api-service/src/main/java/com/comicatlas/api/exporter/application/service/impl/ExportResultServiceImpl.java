@@ -1,7 +1,6 @@
 package com.comicatlas.api.exporter.application.service.impl;
 
 import com.comicatlas.api.exporter.domain.model.ExportTaskStatus;
-import com.comicatlas.api.exporter.infrastructure.persistence.entity.ExportTask;
 import com.comicatlas.api.exporter.application.port.out.ExportPersistencePort;
 import com.comicatlas.api.exporter.application.port.out.ExportManagementTaskQueryPort;
 import com.comicatlas.api.task.domain.model.TaskType;
@@ -29,47 +28,40 @@ public class ExportResultServiceImpl implements com.comicatlas.api.exporter.appl
 
     @Transactional
     public void applyStarted(ExportTaskStartedEvent event) {
-        ExportTask task = persistencePort.findTask(event.taskId());
-        if (task == null || task.getStatus() == ExportTaskStatus.SUCCESS
-                || task.getStatus() == ExportTaskStatus.FAILED) {
+        ExportPersistencePort.ExportTaskSnapshot task = persistencePort.findTask(event.taskId());
+        if (task == null || task.status() == ExportTaskStatus.SUCCESS
+                || task.status() == ExportTaskStatus.FAILED) {
             return;
         }
-        if (task.getStatus() == ExportTaskStatus.PENDING) {
-            task.setStatus(ExportTaskStatus.RUNNING);
-            persistencePort.updateTask(task);
+        if (task.status() == ExportTaskStatus.PENDING) {
+            persistencePort.updateTask(update(task, ExportTaskStatus.RUNNING, task.progress(),
+                    null, null, null, null, null));
         }
         updateItem(event.comicId(), ManagementTaskStatus.RUNNING, null, event.taskId());
     }
 
     @Transactional
     public void applyCompleted(ExportTaskCompletedEvent event) {
-        ExportTask task = persistencePort.findTask(event.taskId());
-        if (task == null || task.getStatus() == ExportTaskStatus.FAILED) {
+        ExportPersistencePort.ExportTaskSnapshot task = persistencePort.findTask(event.taskId());
+        if (task == null || task.status() == ExportTaskStatus.FAILED) {
             return;
         }
-        if (task.getStatus() != ExportTaskStatus.SUCCESS) {
-            task.setStatus(ExportTaskStatus.SUCCESS);
-            task.setOutputRoot(event.outputRoot());
-            task.setOutputPath(event.outputPath());
-            task.setOutputSize(event.outputSize());
-            task.setProgress(100);
-            task.setCompletedAt(LocalDateTime.now());
-            persistencePort.updateTask(task);
+        if (task.status() != ExportTaskStatus.SUCCESS) {
+            persistencePort.updateTask(update(task, ExportTaskStatus.SUCCESS, 100,
+                    event.outputRoot(), event.outputPath(), event.outputSize(), null, LocalDateTime.now()));
         }
         updateItem(event.comicId(), ManagementTaskStatus.SUCCEEDED, null, event.taskId());
     }
 
     @Transactional
     public void applyFailed(ExportTaskFailedEvent event) {
-        ExportTask task = persistencePort.findTask(event.taskId());
-        if (task == null || task.getStatus() == ExportTaskStatus.SUCCESS) {
+        ExportPersistencePort.ExportTaskSnapshot task = persistencePort.findTask(event.taskId());
+        if (task == null || task.status() == ExportTaskStatus.SUCCESS) {
             return;
         }
-        if (task.getStatus() != ExportTaskStatus.FAILED) {
-            task.setStatus(ExportTaskStatus.FAILED);
-            task.setErrorMsg(event.errorMessage());
-            task.setProgress(-1);
-            persistencePort.updateTask(task);
+        if (task.status() != ExportTaskStatus.FAILED) {
+            persistencePort.updateTask(update(task, ExportTaskStatus.FAILED, -1,
+                    null, null, null, event.errorMessage(), LocalDateTime.now()));
         }
         updateItem(event.comicId(), ManagementTaskStatus.FAILED, event.errorMessage(), event.taskId());
 }
@@ -79,5 +71,16 @@ public class ExportResultServiceImpl implements com.comicatlas.api.exporter.appl
         if (item != null) {
             managementTaskService.updateItemStatus(item.id(), status, errorMessage, RESULT_REF_TYPE, exportTaskId);
         }
+    }
+
+    private ExportPersistencePort.UpdateTaskCommand update(
+            ExportPersistencePort.ExportTaskSnapshot task, ExportTaskStatus status, Integer progress,
+            String outputRoot, String outputPath, Long outputSize, String errorMessage,
+            LocalDateTime completedAt) {
+        return new ExportPersistencePort.UpdateTaskCommand(task.id(), task.managementTaskId(), status, progress,
+                outputRoot == null ? task.outputRoot() : outputRoot,
+                outputPath == null ? task.outputPath() : outputPath,
+                outputSize == null ? task.outputSize() : outputSize,
+                errorMessage == null ? task.errorMsg() : errorMessage, completedAt);
     }
 }

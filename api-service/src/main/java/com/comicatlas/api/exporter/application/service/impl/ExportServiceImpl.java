@@ -8,7 +8,6 @@ import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.storage.infrastructure.config.ApiStorageProperties;
 import com.comicatlas.api.storage.PathTraversalException;
 import com.comicatlas.api.exporter.interfaces.rest.dto.ExportTaskVO;
-import com.comicatlas.api.exporter.infrastructure.persistence.entity.ExportTask;
 import com.comicatlas.api.exporter.application.port.in.ExportService;
 import com.comicatlas.api.exporter.application.port.out.ExportPersistencePort;
 import com.comicatlas.api.task.interfaces.rest.dto.CreateManagementTaskRequest;
@@ -58,9 +57,9 @@ public class ExportServiceImpl implements ExportService {
         rejectDuplicateActiveTask(comicId);
 
         String normalizedFormat = normalizeFormat(format);
-        ExportTask task = createExportTaskRecord(comicId, normalizedFormat);
+        ExportPersistencePort.ExportTaskSnapshot task = createExportTaskRecord(comicId, normalizedFormat);
 
-        Long taskId = task.getId();
+        Long taskId = task.id();
         // 写入 Outbox（同事务），由 relay 异步发布，保证 DB 与消息一致
         outboxService.enqueue(new ExportTaskCreatedEvent(UUID.randomUUID(), Instant.now(), taskId, comicId,
                         normalizedFormat),
@@ -72,19 +71,19 @@ public class ExportServiceImpl implements ExportService {
 
     @Override
     public List<ExportTaskVO> listExports(Long comicId) {
-        List<ExportTask> tasks = persistencePort.findTasksByComicId(comicId);
+        List<ExportPersistencePort.ExportTaskSnapshot> tasks = persistencePort.findTasksByComicId(comicId);
         return tasks.stream().map(this::toVO).toList();
     }
 
     @Override
     public List<ExportTaskVO> listAllExports() {
-        List<ExportTask> tasks = persistencePort.findAllTasks();
+        List<ExportPersistencePort.ExportTaskSnapshot> tasks = persistencePort.findAllTasks();
         return tasks.stream().map(this::toVO).toList();
     }
 
     @Override
     public ExportTaskVO getTask(Long taskId) {
-        ExportTask task = persistencePort.findTask(taskId);
+        ExportPersistencePort.ExportTaskSnapshot task = persistencePort.findTask(taskId);
         if (task == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "导出任务不存在");
         }
@@ -102,24 +101,21 @@ public class ExportServiceImpl implements ExportService {
     }
 
     private void rejectDuplicateActiveTask(Long comicId) {
-        ExportTask existing = persistencePort.findActiveTask(comicId);
+        ExportPersistencePort.ExportTaskSnapshot existing = persistencePort.findActiveTask(comicId);
         if (existing != null) {
-            throw new BusinessException(HttpStatusCodes.CONFLICT, "该漫画已有进行中的导出任务，任务ID: " + existing.getId());
+            throw new BusinessException(HttpStatusCodes.CONFLICT, "该漫画已有进行中的导出任务，任务ID: " + existing.id());
         }
     }
 
-    private ExportTask createExportTaskRecord(Long comicId, String format) {
-        ExportTask task = new ExportTask();
-        task.setComicId(comicId);
-        task.setFormat(format);
-        task.setStatus(ExportTaskStatus.PENDING);
-        task.setProgress(0);
-        persistencePort.insertTask(task);
+    private ExportPersistencePort.ExportTaskSnapshot createExportTaskRecord(Long comicId, String format) {
+        Long taskId = persistencePort.insertTask(new ExportPersistencePort.CreateTaskCommand(
+                comicId, format, ExportTaskStatus.PENDING, 0));
 
         ManagementTaskResponse managementTaskResponse = createManagementTaskForExport(comicId);
-        task.setManagementTaskId(managementTaskResponse.getId());
-        persistencePort.updateTask(task);
-        return task;
+        persistencePort.updateTask(new ExportPersistencePort.UpdateTaskCommand(taskId,
+                managementTaskResponse.getId(), ExportTaskStatus.PENDING, 0, null, null, null, null, null));
+        return new ExportPersistencePort.ExportTaskSnapshot(taskId, managementTaskResponse.getId(), comicId,
+                format, ExportTaskStatus.PENDING, 0, null, null, null, null, null, null);
     }
 
     private static String normalizeFormat(String format) {
@@ -147,28 +143,24 @@ public class ExportServiceImpl implements ExportService {
         return managementTaskService.createTask(mgmtReq, null, null);
     }
 
-    private ExportTaskVO toVO(ExportTask task) {
+    private ExportTaskVO toVO(ExportPersistencePort.ExportTaskSnapshot task) {
         ExportTaskVO taskVO = new ExportTaskVO();
-        taskVO.setId(task.getId());
-        taskVO.setComicId(task.getComicId());
-        taskVO.setFormat(task.getFormat() == null ? ExportFormats.ZIP : task.getFormat());
-        taskVO.setStatus(task.getStatus() == null ? null : task.getStatus().name());
-        taskVO.setProgress(task.getProgress());
-        taskVO.setOutputRoot(task.getOutputRoot());
-        taskVO.setOutputPath(task.getOutputPath());
-        taskVO.setOutputSize(task.getOutputSize());
-        taskVO.setErrorMsg(task.getErrorMsg());
-        taskVO.setCreatedAt(task.getCreatedAt());
-        taskVO.setCompletedAt(task.getCompletedAt());
+        taskVO.setId(task.id()); taskVO.setComicId(task.comicId());
+        taskVO.setFormat(task.format() == null ? ExportFormats.ZIP : task.format());
+        taskVO.setStatus(task.status() == null ? null : task.status().name());
+        taskVO.setProgress(task.progress()); taskVO.setOutputRoot(task.outputRoot());
+        taskVO.setOutputPath(task.outputPath()); taskVO.setOutputSize(task.outputSize());
+        taskVO.setErrorMsg(task.errorMsg()); taskVO.setCreatedAt(task.createdAt());
+        taskVO.setCompletedAt(task.completedAt());
 
         // 计算物理路径：经逻辑存储根（默认 EXPORT）安全解析 outputPath，而非字符串拼接
-        if (task.getOutputPath() != null && !task.getOutputPath().isBlank()) {
-            String rootKey = task.getOutputRoot() != null && !task.getOutputRoot().isBlank()
-                    ? task.getOutputRoot() : DEFAULT_OUTPUT_ROOT;
+        if (task.outputPath() != null && !task.outputPath().isBlank()) {
+            String rootKey = task.outputRoot() != null && !task.outputRoot().isBlank()
+                    ? task.outputRoot() : DEFAULT_OUTPUT_ROOT;
             try {
-                taskVO.setPhysicalPath(storageProperties.root(rootKey).resolve(task.getOutputPath()).toString());
+                taskVO.setPhysicalPath(storageProperties.root(rootKey).resolve(task.outputPath()).toString());
             } catch (PathTraversalException e) {
-                log.warn("导出任务物理路径穿越被拒绝: taskId={}", task.getId());
+                log.warn("导出任务物理路径穿越被拒绝: taskId={}", task.id());
                 taskVO.setPhysicalPath(null);
             }
         }

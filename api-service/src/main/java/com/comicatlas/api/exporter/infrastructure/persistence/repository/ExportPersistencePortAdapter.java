@@ -25,32 +25,62 @@ public class ExportPersistencePortAdapter implements ExportPersistencePort {
     }
 
     @Override
-    public ExportTask findTask(Long taskId) { return exportTaskMapper.selectById(taskId); }
+    public ExportTaskSnapshot findTask(Long taskId) { return toSnapshot(exportTaskMapper.selectById(taskId)); }
 
     @Override
-    public ExportTask findTaskByManagementTaskId(Long managementTaskId) {
-        return exportTaskMapper.selectByManagementTaskId(managementTaskId);
+    public ExportTaskSnapshot findTaskByManagementTaskId(Long managementTaskId) {
+        return toSnapshot(exportTaskMapper.selectByManagementTaskId(managementTaskId));
     }
 
     @Override
-    public ExportTask findActiveTask(Long comicId) { return exportTaskMapper.selectActiveByComicId(comicId); }
-
-    @Override
-    public List<ExportTask> findTasksByComicId(Long comicId) {
-        return exportTaskMapper.selectByComicIdOrderByCreatedAtDesc(comicId);
+    public ExportTaskSnapshot findActiveTask(Long comicId) {
+        return toSnapshot(exportTaskMapper.selectActiveByComicId(comicId));
     }
 
     @Override
-    public List<ExportTask> findAllTasks() { return exportTaskMapper.selectAllOrderByCreatedAtDesc(); }
+    public List<ExportTaskSnapshot> findTasksByComicId(Long comicId) {
+        return exportTaskMapper.selectByComicIdOrderByCreatedAtDesc(comicId).stream().map(this::toSnapshot).toList();
+    }
 
     @Override
-    public void insertTask(ExportTask task) { exportTaskMapper.insert(task); }
+    public List<ExportTaskSnapshot> findAllTasks() {
+        return exportTaskMapper.selectAllOrderByCreatedAtDesc().stream().map(this::toSnapshot).toList();
+    }
 
     @Override
-    public void updateTask(ExportTask task) { exportTaskMapper.updateById(task); }
+    public Long insertTask(ExportPersistencePort.CreateTaskCommand command) {
+        ExportTask task = new ExportTask();
+        task.setComicId(command.comicId());
+        task.setFormat(command.format());
+        task.setStatus(command.status());
+        task.setProgress(command.progress());
+        exportTaskMapper.insert(task);
+        return task.getId();
+    }
+
+    @Override
+    public void updateTask(ExportPersistencePort.UpdateTaskCommand command) {
+        ExportTask task = new ExportTask();
+        task.setId(command.id());
+        task.setManagementTaskId(command.managementTaskId());
+        task.setStatus(command.status());
+        task.setProgress(command.progress());
+        task.setOutputRoot(command.outputRoot());
+        task.setOutputPath(command.outputPath());
+        task.setOutputSize(command.outputSize());
+        task.setErrorMsg(command.errorMsg());
+        task.setCompletedAt(command.completedAt());
+        exportTaskMapper.updateById(task);
+    }
 
     @Override
     public int resetTask(Long taskId, ExportTaskStatus pendingStatus) {
         return exportTaskMapper.resetForRetry(taskId, pendingStatus);
+    }
+
+    private ExportTaskSnapshot toSnapshot(ExportTask task) {
+        return task == null ? null : new ExportTaskSnapshot(task.getId(), task.getManagementTaskId(), task.getComicId(),
+                task.getFormat(), task.getStatus(), task.getProgress(), task.getOutputRoot(), task.getOutputPath(),
+                task.getOutputSize(), task.getErrorMsg(), task.getCreatedAt(), task.getCompletedAt());
     }
 }

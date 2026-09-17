@@ -5,7 +5,6 @@ import com.comicatlas.api.exporter.domain.model.ExportTaskStatus;
 import com.comicatlas.api.storage.infrastructure.config.ApiStorageProperties;
 import com.comicatlas.api.storage.ApiStorageRoot;
 import com.comicatlas.api.exporter.interfaces.rest.dto.ExportTaskVO;
-import com.comicatlas.api.exporter.infrastructure.persistence.entity.ExportTask;
 import com.comicatlas.api.task.application.port.in.ManagementTaskService;
 import com.comicatlas.api.outbox.application.port.in.OutboxService;
 import org.junit.jupiter.api.Test;
@@ -29,9 +28,9 @@ class ExportServiceImplTest {
     @TempDir
     Path tempDir;
 
-    private ExportServiceImpl service(ExportTask task) {
+    private ExportServiceImpl service(ExportPersistencePort.ExportTaskSnapshot task) {
         ExportPersistencePort persistencePort = mock(ExportPersistencePort.class);
-        when(persistencePort.findTask(task.getId())).thenReturn(task);
+        when(persistencePort.findTask(task.id())).thenReturn(task);
 
         ApiStorageRoot exportRoot = new ApiStorageRoot();
         exportRoot.setPath(tempDir);
@@ -44,12 +43,8 @@ class ExportServiceImplTest {
 
     @Test
     void getTask_physicalPath通过EXPORT根解析输出路径() {
-        ExportTask task = new ExportTask();
-        task.setId(7L);
-        task.setStatus(ExportTaskStatus.SUCCESS);
-        task.setOutputRoot("EXPORT");
-        task.setOutputPath("7/base.zip");
-        task.setOutputSize(100L);
+        ExportPersistencePort.ExportTaskSnapshot task = snapshot(7L, 2L, ExportTaskStatus.SUCCESS,
+                "EXPORT", "7/base.zip", 100L);
 
         ExportTaskVO vo = service(task).getTask(7L);
 
@@ -63,11 +58,8 @@ class ExportServiceImplTest {
 
     @Test
     void getTask_输出根为空时回退EXPORT根解析() {
-        ExportTask task = new ExportTask();
-        task.setId(8L);
-        task.setStatus(ExportTaskStatus.SUCCESS);
-        task.setOutputPath("old/base.zip");
-        task.setOutputSize(50L);
+        ExportPersistencePort.ExportTaskSnapshot task = snapshot(8L, null, ExportTaskStatus.SUCCESS,
+                null, "old/base.zip", 50L);
 
         ExportTaskVO vo = service(task).getTask(8L);
 
@@ -76,9 +68,8 @@ class ExportServiceImplTest {
 
     @Test
     void getTask_无输出路径时物理路径为空() {
-        ExportTask task = new ExportTask();
-        task.setId(9L);
-        task.setStatus(ExportTaskStatus.PENDING);
+        ExportPersistencePort.ExportTaskSnapshot task = snapshot(9L, null, ExportTaskStatus.PENDING,
+                null, null, null);
 
         ExportTaskVO vo = service(task).getTask(9L);
 
@@ -88,13 +79,8 @@ class ExportServiceImplTest {
 
     @Test
     void listAllExports_返回全部导出任务并解析物理路径() {
-        ExportTask task = new ExportTask();
-        task.setId(7L);
-        task.setComicId(42L);
-        task.setStatus(ExportTaskStatus.SUCCESS);
-        task.setOutputRoot("EXPORT");
-        task.setOutputPath("7/base.zip");
-        task.setOutputSize(100L);
+        ExportPersistencePort.ExportTaskSnapshot task = snapshot(7L, 42L, ExportTaskStatus.SUCCESS,
+                "EXPORT", "7/base.zip", 100L);
 
         ExportPersistencePort persistencePort = mock(ExportPersistencePort.class);
         when(persistencePort.findAllTasks()).thenReturn(List.of(task));
@@ -114,5 +100,12 @@ class ExportServiceImplTest {
         assertThat(vos.get(0).getComicId()).isEqualTo(42L);
         assertThat(vos.get(0).getStatus()).isEqualTo("SUCCESS");
         assertThat(vos.get(0).getPhysicalPath()).isEqualTo(tempDir.resolve("7/base.zip").toString());
+    }
+
+    private ExportPersistencePort.ExportTaskSnapshot snapshot(Long taskId, Long comicId,
+                                                               ExportTaskStatus status, String outputRoot,
+                                                               String outputPath, Long outputSize) {
+        return new ExportPersistencePort.ExportTaskSnapshot(taskId, null, comicId, "ZIP", status,
+                0, outputRoot, outputPath, outputSize, null, null, null);
     }
 }
