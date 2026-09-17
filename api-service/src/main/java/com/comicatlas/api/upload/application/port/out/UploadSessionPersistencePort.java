@@ -1,7 +1,6 @@
 package com.comicatlas.api.upload.application.port.out;
 
-import com.comicatlas.api.upload.infrastructure.persistence.entity.UploadFile;
-import com.comicatlas.api.upload.infrastructure.persistence.entity.UploadSession;
+import com.comicatlas.api.upload.domain.UploadSessionStatus;
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
 
@@ -14,18 +13,18 @@ public interface UploadSessionPersistencePort {
     ChapterSnapshot findChapter(Long chapterId);
     MediaSnapshot findMedia(Long mediaId);
     List<MediaSnapshot> findMediaByChapter(Long chapterId);
-    UploadSession findBySessionId(String sessionId);
-    UploadSession findById(Long sessionId);
-    List<UploadSession> findExpiredActive(LocalDateTime now);
-    List<UploadFile> findFiles(Long sessionId);
-    UploadFile findFile(Long sessionId, String fileId);
-    void insertSession(UploadSession session);
-    void insertFile(UploadFile file);
+    SessionSnapshot findBySessionId(String sessionId);
+    SessionSnapshot findById(Long sessionId);
+    List<SessionSnapshot> findExpiredActive(LocalDateTime now);
+    List<FileSnapshot> findFiles(Long sessionId);
+    FileSnapshot findFile(Long sessionId, String fileId);
+    Long insertSession(CreateSessionCommand command);
+    Long insertFile(CreateFileCommand command);
     Long insertMedia(MediaCreateCommand command);
     int bindMedia(Long fileId, Long mediaId);
     int freezeForVerification(Long sessionId);
     int restoreActive(Long sessionId);
-    void updateSession(UploadSession session);
+    void updateSession(UpdateSessionCommand command);
     int deleteFiles(Long sessionId);
     int deleteSession(Long sessionId);
 
@@ -40,5 +39,28 @@ public interface UploadSessionPersistencePort {
 
     record MediaCreateCommand(Long chapterId, Integer pageNumber, String hqRoot, String hqPath,
                               String mediaType, Long hqSize) {
+    }
+
+    record SessionSnapshot(Long id, String sessionId, Long comicId, Long chapterId, Long replaceMediaId,
+                           UploadSessionStatus status, Long totalBytes, Integer totalFiles,
+                           LocalDateTime expiresAt, LocalDateTime completedAt) {
+    }
+
+    record FileSnapshot(Long id, Long sessionId, String fileId, String originalName, String contentType,
+                        Long sizeBytes, String sha256, String storageName, Long receivedBytes,
+                        String receivedRanges) {
+    }
+
+    record CreateSessionCommand(String sessionId, Long comicId, Long chapterId, Long replaceMediaId,
+                                UploadSessionStatus status, Long totalBytes, Integer totalFiles,
+                                LocalDateTime expiresAt) {
+    }
+
+    record CreateFileCommand(Long sessionId, String fileId, String originalName, String contentType,
+                             Long sizeBytes, String sha256, String storageName, Long receivedBytes,
+                             String receivedRanges) {
+    }
+
+    record UpdateSessionCommand(Long id, UploadSessionStatus status, LocalDateTime completedAt) {
     }
 }

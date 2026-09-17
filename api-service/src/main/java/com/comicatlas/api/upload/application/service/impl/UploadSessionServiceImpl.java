@@ -18,8 +18,6 @@ import com.comicatlas.api.upload.interfaces.rest.dto.UploadChunkResponse;
 import com.comicatlas.api.upload.interfaces.rest.dto.UploadCompleteResponse;
 import com.comicatlas.api.upload.interfaces.rest.dto.UploadFileResponse;
 import com.comicatlas.api.upload.interfaces.rest.dto.UploadSessionStatusResponse;
-import com.comicatlas.api.upload.infrastructure.persistence.entity.UploadFile;
-import com.comicatlas.api.upload.infrastructure.persistence.entity.UploadSession;
 import com.comicatlas.api.upload.application.port.in.UploadSessionService;
 import com.comicatlas.api.upload.application.port.out.UploadStoragePort;
 import com.comicatlas.api.upload.application.port.out.UploadSessionPersistencePort;
@@ -105,28 +103,26 @@ public class UploadSessionServiceImpl implements UploadSessionService {
         long totalBytes = validateManifest(request.getFiles());
         storageService.ensureEnoughFreeSpace(totalBytes);
 
-        UploadSession session = new UploadSession();
-        session.setSessionId(UUID.randomUUID().toString());
-        session.setComicId(comicId);
-        session.setChapterId(chapterId);
-        session.setReplaceMediaId(request.getReplaceMediaId());
-        session.setStatus(UploadSessionStatus.ACTIVE);
-        session.setTotalBytes(totalBytes);
-        session.setTotalFiles(request.getFiles().size());
-        session.setExpiresAt(LocalDateTime.now().plus(uploadProperties.getSessionTtl()));
-        persistencePort.insertSession(session);
-        storageService.ensureStagingDir(session.getSessionId());
+        String sessionId = UUID.randomUUID().toString();
+        LocalDateTime expiresAt = LocalDateTime.now().plus(uploadProperties.getSessionTtl());
+        Long sessionDatabaseId = persistencePort.insertSession(new UploadSessionPersistencePort.CreateSessionCommand(
+                sessionId, comicId, chapterId, request.getReplaceMediaId(), UploadSessionStatus.ACTIVE,
+                totalBytes, request.getFiles().size(), expiresAt));
+        UploadSessionPersistencePort.SessionSnapshot session = new UploadSessionPersistencePort.SessionSnapshot(
+                sessionDatabaseId, sessionId, comicId, chapterId, request.getReplaceMediaId(),
+                UploadSessionStatus.ACTIVE, totalBytes, request.getFiles().size(), expiresAt, null);
+        storageService.ensureStagingDir(session.sessionId());
 
         List<UploadFileResponse> fileResponses = insertFiles(session, request.getFiles());
 
         CreateUploadSessionResponse response = new CreateUploadSessionResponse();
-        response.setSessionId(session.getSessionId());
+        response.setSessionId(session.sessionId());
         response.setChunkSize(uploadProperties.getChunkSize());
-        response.setExpiresAt(session.getExpiresAt());
+        response.setExpiresAt(session.expiresAt());
         response.setTotalBytes(totalBytes);
         response.setFiles(fileResponses);
         log.info("创建上传会话: sessionId={}, comicId={}, chapterId={}, files={}, bytes={}",
-                session.getSessionId(), comicId, chapterId, request.getFiles().size(), totalBytes);
+                session.sessionId(), comicId, chapterId, request.getFiles().size(), totalBytes);
         return response;
     }
 
@@ -159,28 +155,21 @@ public class UploadSessionServiceImpl implements UploadSessionService {
     }
 
     /** 为清单中每个文件生成 storageName 并插入 upload_file 行，返回对外文件响应列表。 */
-    private List<UploadFileResponse> insertFiles(UploadSession session,
+    private List<UploadFileResponse> insertFiles(UploadSessionPersistencePort.SessionSnapshot session,
                                                  List<CreateUploadSessionRequest.FileManifest> manifest) {
         List<UploadFileResponse> fileResponses = new ArrayList<>(manifest.size());
         for (CreateUploadSessionRequest.FileManifest fileManifest : manifest) {
             String ext = mediaTypeDetector.validateAndExtractExtension(fileManifest.getName());
-            UploadFile uploadFile = new UploadFile();
-            uploadFile.setSessionId(session.getId());
-            uploadFile.setFileId(fileManifest.getFileId());
-            uploadFile.setOriginalName(fileManifest.getName());
-            uploadFile.setContentType(fileManifest.getContentType());
-            uploadFile.setSizeBytes(fileManifest.getSize());
-            uploadFile.setSha256(fileManifest.getSha256().toLowerCase(Locale.ROOT));
-            uploadFile.setStorageName(UUID.randomUUID().toString() + "." + ext);
-            uploadFile.setReceivedBytes(0L);
-            uploadFile.setReceivedRanges(null);
-            persistencePort.insertFile(uploadFile);
+            String storageName = UUID.randomUUID() + "." + ext;
+            persistencePort.insertFile(new UploadSessionPersistencePort.CreateFileCommand(
+                    session.id(), fileManifest.getFileId(), fileManifest.getName(), fileManifest.getContentType(),
+                    fileManifest.getSize(), fileManifest.getSha256().toLowerCase(Locale.ROOT), storageName, 0L, null));
 
             UploadFileResponse fileResponse = new UploadFileResponse();
-            fileResponse.setFileId(uploadFile.getFileId());
-            fileResponse.setStorageName(uploadFile.getStorageName());
+            fileResponse.setFileId(fileManifest.getFileId());
+            fileResponse.setStorageName(storageName);
             fileResponse.setReceivedBytes(0);
-            fileResponse.setSizeBytes(uploadFile.getSizeBytes());
+            fileResponse.setSizeBytes(fileManifest.getSize());
             fileResponse.setComplete(false);
             fileResponses.add(fileResponse);
         }
@@ -215,44 +204,45 @@ public class UploadSessionServiceImpl implements UploadSessionService {
     /**
      * 按对外会话 ID 查询上传会话，不存在抛出 404。
      * <p>
-     * 内部方法，返回数据库实体 {@link UploadSession}，禁止用于接口响应；对外使用 {@code dto/} 包对应 DTO/VO。
+     * 内部方法返回应用层会话快照，禁止将持久化模型泄漏到接口层。
      *
      * @param sessionId 对外 opaque 会话 ID
      * @return 上传会话实体
      */
-    private UploadSession getBySessionId(String sessionId) {
-        UploadSession session = persistencePort.findBySessionId(sessionId);
+    private UploadSessionPersistencePort.SessionSnapshot getBySessionId(String sessionId) {
+        UploadSessionPersistencePort.SessionSnapshot session = persistencePort.findBySessionId(sessionId);
         if (session == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "上传会话不存在: " + sessionId);
         }
         return session;
     }
 
-    private List<UploadFile> filesOf(UploadSession session) {
-        return persistencePort.findFiles(session.getId());
+    private List<UploadSessionPersistencePort.FileSnapshot> filesOf(
+            UploadSessionPersistencePort.SessionSnapshot session) {
+        return persistencePort.findFiles(session.id());
     }
 
     public UploadSessionStatusResponse status(String sessionId) {
-        UploadSession session = getBySessionId(sessionId);
+        UploadSessionPersistencePort.SessionSnapshot session = getBySessionId(sessionId);
         UploadSessionStatusResponse response = new UploadSessionStatusResponse();
-        response.setSessionId(session.getSessionId());
-        response.setStatus(session.getStatus() == null ? null : session.getStatus().name());
-        response.setTotalBytes(session.getTotalBytes());
-        response.setTotalFiles(session.getTotalFiles());
-        response.setExpiresAt(session.getExpiresAt());
-        response.setCompletedAt(session.getCompletedAt());
+        response.setSessionId(session.sessionId());
+        response.setStatus(session.status() == null ? null : session.status().name());
+        response.setTotalBytes(session.totalBytes());
+        response.setTotalFiles(session.totalFiles());
+        response.setExpiresAt(session.expiresAt());
+        response.setCompletedAt(session.completedAt());
         response.setFiles(filesOf(session).stream().map(this::toFileResponse).toList());
         return response;
     }
 
-    private UploadFileResponse toFileResponse(UploadFile uploadFile) {
+    private UploadFileResponse toFileResponse(UploadSessionPersistencePort.FileSnapshot uploadFile) {
         UploadFileResponse fileResponse = new UploadFileResponse();
-        fileResponse.setFileId(uploadFile.getFileId());
-        fileResponse.setStorageName(uploadFile.getStorageName());
-        fileResponse.setReceivedBytes(uploadFile.getReceivedBytes() != null ? uploadFile.getReceivedBytes() : 0);
-        fileResponse.setSizeBytes(uploadFile.getSizeBytes());
-        fileResponse.setComplete(RangeTracker.isFullyReceived(uploadFile.getReceivedRanges(), uploadFile.getSizeBytes()));
-        fileResponse.setReceivedRanges(uploadFile.getReceivedRanges() != null ? uploadFile.getReceivedRanges() : "");
+        fileResponse.setFileId(uploadFile.fileId());
+        fileResponse.setStorageName(uploadFile.storageName());
+        fileResponse.setReceivedBytes(uploadFile.receivedBytes() != null ? uploadFile.receivedBytes() : 0);
+        fileResponse.setSizeBytes(uploadFile.sizeBytes());
+        fileResponse.setComplete(RangeTracker.isFullyReceived(uploadFile.receivedRanges(), uploadFile.sizeBytes()));
+        fileResponse.setReceivedRanges(uploadFile.receivedRanges() != null ? uploadFile.receivedRanges() : "");
         return fileResponse;
     }
 
@@ -261,22 +251,22 @@ public class UploadSessionServiceImpl implements UploadSessionService {
     public UploadChunkResponse uploadChunk(String sessionId, String fileId,
                                            String contentRange, String chunkSha256,
                                            InputStream input) {
-        UploadSession session = getBySessionId(sessionId);
-        UploadFile file = persistencePort.findFile(session.getId(), fileId);
+        UploadSessionPersistencePort.SessionSnapshot session = getBySessionId(sessionId);
+        UploadSessionPersistencePort.FileSnapshot file = persistencePort.findFile(session.id(), fileId);
         if (file == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "会话中不存在文件: " + fileId);
         }
-        long[] byteRange = parseContentRange(contentRange, file.getSizeBytes());
+        long[] byteRange = parseContentRange(contentRange, file.sizeBytes());
         UploadStoragePort.WriteChunkResult writeResult = storageService.writeChunk(
-                session.getSessionId(), file.getId(), file.getStorageName(), session.getStatus(),
-                file.getSizeBytes(), file.getReceivedRanges(), byteRange[0], byteRange[1], byteRange[2],
+                session.sessionId(), file.id(), file.storageName(), session.status(),
+                file.sizeBytes(), file.receivedRanges(), byteRange[0], byteRange[1], byteRange[2],
                 chunkSha256, input);
         String merged = writeResult.receivedRanges();
 
         UploadChunkResponse response = new UploadChunkResponse();
-        response.setFileId(file.getFileId());
+        response.setFileId(file.fileId());
         response.setReceivedBytes(writeResult.receivedBytes());
-        response.setComplete(RangeTracker.isFullyReceived(merged, file.getSizeBytes()));
+        response.setComplete(RangeTracker.isFullyReceived(merged, file.sizeBytes()));
         response.setReceivedRanges(merged);
         return response;
     }
@@ -310,17 +300,17 @@ public class UploadSessionServiceImpl implements UploadSessionService {
     // ======================== complete ========================
 
     public UploadCompleteResponse complete(String sessionId) {
-        UploadSession session = getBySessionId(sessionId);
-        if (session.getStatus() != UploadSessionStatus.ACTIVE) {
-            throw new BusinessException(HttpStatusCodes.CONFLICT, "会话状态 " + session.getStatus() + " 不允许 complete");
+        UploadSessionPersistencePort.SessionSnapshot session = getBySessionId(sessionId);
+        if (session.status() != UploadSessionStatus.ACTIVE) {
+            throw new BusinessException(HttpStatusCodes.CONFLICT, "会话状态 " + session.status() + " 不允许 complete");
         }
-        int frozenRows = persistencePort.freezeForVerification(session.getId());
+        int frozenRows = persistencePort.freezeForVerification(session.id());
         if (frozenRows != 1) {
             throw new BusinessException(HttpStatusCodes.CONFLICT, "上传会话正在被其他操作处理");
         }
-        List<UploadFile> files = filesOf(session);
+        List<UploadSessionPersistencePort.FileSnapshot> files = filesOf(session);
         if (files.isEmpty()) {
-            restoreActive(session.getId());
+            restoreActive(session.id());
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "会话为空，无文件可提交");
         }
 
@@ -328,41 +318,40 @@ public class UploadSessionServiceImpl implements UploadSessionService {
         try {
             detections = verifyUploadedFiles(session, files);
         } catch (BusinessException | DataAccessException exception) {
-            restoreActive(session.getId());
+            restoreActive(session.id());
             throw exception;
         }
         try {
             return transactionTemplate.execute(status -> completePersisted(
-                    session.getId(), sessionId, files, detections));
+                    session.id(), sessionId, files, detections));
         } catch (BusinessException | DataAccessException exception) {
-            restoreActive(session.getId());
+            restoreActive(session.id());
             throw exception;
         }
     }
 
     /** 在文件校验完成后执行短事务落库；此时会话必须仍处于 VERIFYING。 */
     private UploadCompleteResponse completePersisted(Long sessionDatabaseId, String sessionId,
-                                                     List<UploadFile> files,
+                                                     List<UploadSessionPersistencePort.FileSnapshot> files,
                                                      List<MediaTypeDetector.Detection> detections) {
-        UploadSession session = persistencePort.findById(sessionDatabaseId);
-        if (session == null || session.getStatus() != UploadSessionStatus.VERIFYING) {
+        UploadSessionPersistencePort.SessionSnapshot session = persistencePort.findById(sessionDatabaseId);
+        if (session == null || session.status() != UploadSessionStatus.VERIFYING) {
             throw new BusinessException(HttpStatusCodes.CONFLICT, "上传会话状态已变化，请重新提交");
         }
-        boolean replace = session.getReplaceMediaId() != null;
+        boolean replace = session.replaceMediaId() != null;
         TaskType operation = replace ? TaskType.MEDIA_REPLACE : TaskType.MEDIA_UPLOAD;
         List<Long> mediaIds = replace
-                ? List.of(session.getReplaceMediaId())
+                ? List.of(session.replaceMediaId())
                 : insertStagingMedia(session, files, detections);
 
-        String idempotencyKey = "upload:" + session.getSessionId();
+        String idempotencyKey = "upload:" + session.sessionId();
         ManagementTaskResponse managementTask = managementTaskService.createTask(
                 buildTaskRequest(operation, session), idempotencyKey,
-                "{\"session\":\"" + session.getSessionId() + "\"}");
+                "{\"session\":\"" + session.sessionId() + "\"}");
         publishUploadCommands(managementTask, operation, session);
 
-        session.setStatus(UploadSessionStatus.COMPLETED);
-        session.setCompletedAt(LocalDateTime.now());
-        persistencePort.updateSession(session);
+        persistencePort.updateSession(new UploadSessionPersistencePort.UpdateSessionCommand(
+                session.id(), UploadSessionStatus.COMPLETED, LocalDateTime.now()));
 
         UploadCompleteResponse response = new UploadCompleteResponse();
         response.setTaskId(managementTask.getId());
@@ -380,44 +369,47 @@ public class UploadSessionServiceImpl implements UploadSessionService {
     }
 
     /** 校验全部文件：分片完整 + SHA-256 总校验 + 魔数检测，返回各文件媒体类型检测结果。 */
-    private List<MediaTypeDetector.Detection> verifyUploadedFiles(UploadSession session, List<UploadFile> files) {
+    private List<MediaTypeDetector.Detection> verifyUploadedFiles(
+            UploadSessionPersistencePort.SessionSnapshot session,
+            List<UploadSessionPersistencePort.FileSnapshot> files) {
         List<MediaTypeDetector.Detection> detections = new ArrayList<>(files.size());
-        for (UploadFile uploadFile : files) {
-            if (!RangeTracker.isFullyReceived(uploadFile.getReceivedRanges(), uploadFile.getSizeBytes())) {
+        for (UploadSessionPersistencePort.FileSnapshot uploadFile : files) {
+            if (!RangeTracker.isFullyReceived(uploadFile.receivedRanges(), uploadFile.sizeBytes())) {
                 List<long[]> missingRanges = RangeTracker.missingRanges(
-                        uploadFile.getReceivedRanges(), uploadFile.getSizeBytes());
+                        uploadFile.receivedRanges(), uploadFile.sizeBytes());
                 String miss = missingRanges.stream()
                         .map(byteRange -> byteRange[0] + "-" + byteRange[1])
                         .collect(Collectors.joining(";"));
                 throw new BusinessException(HttpStatusCodes.BAD_REQUEST,
-                        "文件 " + uploadFile.getFileId() + " 未完整接收，缺失区间: " + miss);
+                        "文件 " + uploadFile.fileId() + " 未完整接收，缺失区间: " + miss);
             }
-            Path staging = storageService.stagingPath(session.getSessionId(), uploadFile.getStorageName());
+            Path staging = storageService.stagingPath(session.sessionId(), uploadFile.storageName());
             String actualSha = computeSha256(staging);
-            if (!uploadFile.getSha256().equalsIgnoreCase(actualSha)) {
+            if (!uploadFile.sha256().equalsIgnoreCase(actualSha)) {
                 throw new BusinessException(HttpStatusCodes.BAD_REQUEST,
-                        "文件 " + uploadFile.getFileId() + " 总校验失败: 声明=" + uploadFile.getSha256() + " 实际=" + actualSha);
+                        "文件 " + uploadFile.fileId() + " 总校验失败: 声明=" + uploadFile.sha256() + " 实际=" + actualSha);
             }
-            String ext = mediaTypeDetector.validateAndExtractExtension(uploadFile.getStorageName());
+            String ext = mediaTypeDetector.validateAndExtractExtension(uploadFile.storageName());
             detections.add(mediaTypeDetector.detect(staging, ext));
         }
         return detections;
     }
 
     /** 为新增上传预建 STAGING media 行（追加到章节末尾 pageNumber），返回媒体 ID 列表。 */
-    private List<Long> insertStagingMedia(UploadSession session, List<UploadFile> files,
+    private List<Long> insertStagingMedia(UploadSessionPersistencePort.SessionSnapshot session,
+                                          List<UploadSessionPersistencePort.FileSnapshot> files,
                                           List<MediaTypeDetector.Detection> detections) {
         List<Long> mediaIds = new ArrayList<>(files.size());
-        int nextPage = nextPageNumber(session.getChapterId());
+        int nextPage = nextPageNumber(session.chapterId());
         for (int index = 0; index < files.size(); index++) {
-            UploadFile uploadFile = files.get(index);
+            UploadSessionPersistencePort.FileSnapshot uploadFile = files.get(index);
             MediaTypeDetector.Detection detection = detections.get(index);
             Long mediaId = persistencePort.insertMedia(new UploadSessionPersistencePort.MediaCreateCommand(
-                    session.getChapterId(), nextPage + index, StorageRootKeys.HQ,
-                    session.getComicId() + "/" + session.getChapterId() + "/" + uploadFile.getStorageName(),
-                    detection.mediaType(), uploadFile.getSizeBytes()));
+                    session.chapterId(), nextPage + index, StorageRootKeys.HQ,
+                    session.comicId() + "/" + session.chapterId() + "/" + uploadFile.storageName(),
+                    detection.mediaType(), uploadFile.sizeBytes()));
 
-            persistencePort.bindMedia(uploadFile.getId(), mediaId);
+            persistencePort.bindMedia(uploadFile.id(), mediaId);
             mediaIds.add(mediaId);
         }
         return mediaIds;
@@ -425,26 +417,27 @@ public class UploadSessionServiceImpl implements UploadSessionService {
 
     /** 同事务向 Outbox 逐项发布上传命令事件（提交后由 relay 发布到 MQ）。 */
     private void publishUploadCommands(ManagementTaskResponse managementTask, TaskType operation,
-                                       UploadSession session) {
+                                       UploadSessionPersistencePort.SessionSnapshot session) {
         List<ManagementTaskItemResponse> items = managementTaskService.getTaskItems(managementTask.getId());
         for (ManagementTaskItemResponse item : items) {
             outboxService.enqueue(new ManagementCommandRequestedEvent(
                     UUID.randomUUID(), Instant.now(), 1,
                     item.getTaskId(), item.getId(), item.getAttempt(),
-                    operation.name(), TARGET_TYPE_UPLOAD_SESSION, session.getId()),
+                    operation.name(), TARGET_TYPE_UPLOAD_SESSION, session.id()),
                     MANAGEMENT_EXCHANGE, COMMAND_REQUEST_ROUTING_KEY,
                     item.getTaskId(), item.getId(), item.getAttempt());
         }
     }
 
-    private CreateManagementTaskRequest buildTaskRequest(TaskType operation, UploadSession session) {
+    private CreateManagementTaskRequest buildTaskRequest(
+            TaskType operation, UploadSessionPersistencePort.SessionSnapshot session) {
         CreateManagementTaskRequest request = new CreateManagementTaskRequest();
         request.setTaskType(operation);
         request.setOperation("媒体上传" + (operation == TaskType.MEDIA_REPLACE ? "替换" : ""));
         request.setTargetType(TARGET_TYPE_UPLOAD_SESSION);
         CreateManagementTaskRequest.TaskTarget target = new CreateManagementTaskRequest.TaskTarget();
         target.setTargetType(TARGET_TYPE_UPLOAD_SESSION);
-        target.setTargetId(session.getId());
+        target.setTargetId(session.id());
         target.setOperationType(operation);
         request.setTargets(List.of(target));
         return request;
@@ -471,17 +464,17 @@ public class UploadSessionServiceImpl implements UploadSessionService {
 
     @Transactional
     public void cancel(String sessionId) {
-        UploadSession session = getBySessionId(sessionId);
-        if (session.getStatus() == UploadSessionStatus.CANCELLED) {
+        UploadSessionPersistencePort.SessionSnapshot session = getBySessionId(sessionId);
+        if (session.status() == UploadSessionStatus.CANCELLED) {
             return;
         }
-        if (session.getStatus() == UploadSessionStatus.COMPLETED) {
+        if (session.status() == UploadSessionStatus.COMPLETED) {
             throw new BusinessException(HttpStatusCodes.CONFLICT, "会话已 complete，无法取消");
         }
-        storageService.deleteStagingDir(session.getSessionId());
-        persistencePort.deleteFiles(session.getId());
-        session.setStatus(UploadSessionStatus.CANCELLED);
-        persistencePort.updateSession(session);
+        storageService.deleteStagingDir(session.sessionId());
+        persistencePort.deleteFiles(session.id());
+        persistencePort.updateSession(new UploadSessionPersistencePort.UpdateSessionCommand(
+                session.id(), UploadSessionStatus.CANCELLED, session.completedAt()));
         log.info("取消上传会话: sessionId={}", sessionId);
     }
 
@@ -490,12 +483,13 @@ public class UploadSessionServiceImpl implements UploadSessionService {
      */
     @Transactional
     public int expireExpiredSessions() {
-        List<UploadSession> expired = persistencePort.findExpiredActive(LocalDateTime.now());
-        for (UploadSession session : expired) {
-            storageService.deleteStagingDir(session.getSessionId());
-            persistencePort.deleteFiles(session.getId());
-            session.setStatus(UploadSessionStatus.EXPIRED);
-        persistencePort.updateSession(session);
+        List<UploadSessionPersistencePort.SessionSnapshot> expired =
+                persistencePort.findExpiredActive(LocalDateTime.now());
+        for (UploadSessionPersistencePort.SessionSnapshot session : expired) {
+            storageService.deleteStagingDir(session.sessionId());
+            persistencePort.deleteFiles(session.id());
+            persistencePort.updateSession(new UploadSessionPersistencePort.UpdateSessionCommand(
+                    session.id(), UploadSessionStatus.EXPIRED, session.completedAt()));
         }
         if (!expired.isEmpty()) {
             log.info("过期清理上传会话: {}", expired.size());
@@ -510,13 +504,13 @@ public class UploadSessionServiceImpl implements UploadSessionService {
      */
     @Transactional
     public void cleanupSessionAfterProcessed(Long sessionId) {
-        UploadSession session = persistencePort.findById(sessionId);
+        UploadSessionPersistencePort.SessionSnapshot session = persistencePort.findById(sessionId);
         if (session == null) {
             return;
         }
-            storageService.deleteStagingDir(session.getSessionId());
+            storageService.deleteStagingDir(session.sessionId());
         persistencePort.deleteFiles(sessionId);
         persistencePort.deleteSession(sessionId);
-        log.info("会话处理完成，清理 STAGING 与会话行: sessionId={}", session.getSessionId());
+        log.info("会话处理完成，清理 STAGING 与会话行: sessionId={}", session.sessionId());
     }
 }

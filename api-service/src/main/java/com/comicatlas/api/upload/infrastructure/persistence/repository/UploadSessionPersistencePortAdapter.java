@@ -48,15 +48,48 @@ public class UploadSessionPersistencePortAdapter implements UploadSessionPersist
                         media.getId(), media.getChapterId(), media.getPageNumber(), media.getStatus()))
                 .toList();
     }
-    @Override public UploadSession findBySessionId(String sessionId) { return sessionMapper.selectBySessionId(sessionId); }
-    @Override public UploadSession findById(Long sessionId) { return sessionMapper.selectById(sessionId); }
-    @Override public List<UploadSession> findExpiredActive(LocalDateTime now) { return sessionMapper.selectExpiredActive(now); }
-    @Override public List<UploadFile> findFiles(Long sessionId) { return fileMapper.selectBySessionId(sessionId); }
-    @Override public UploadFile findFile(Long sessionId, String fileId) {
-        return fileMapper.selectBySessionIdAndFileId(sessionId, fileId);
+    @Override public UploadSessionPersistencePort.SessionSnapshot findBySessionId(String sessionId) {
+        return toSnapshot(sessionMapper.selectBySessionId(sessionId));
     }
-    @Override public void insertSession(UploadSession session) { sessionMapper.insert(session); }
-    @Override public void insertFile(UploadFile file) { fileMapper.insert(file); }
+    @Override public UploadSessionPersistencePort.SessionSnapshot findById(Long sessionId) {
+        return toSnapshot(sessionMapper.selectById(sessionId));
+    }
+    @Override public List<UploadSessionPersistencePort.SessionSnapshot> findExpiredActive(LocalDateTime now) {
+        return sessionMapper.selectExpiredActive(now).stream().map(this::toSnapshot).toList();
+    }
+    @Override public List<UploadSessionPersistencePort.FileSnapshot> findFiles(Long sessionId) {
+        return fileMapper.selectBySessionId(sessionId).stream().map(this::toSnapshot).toList();
+    }
+    @Override public UploadSessionPersistencePort.FileSnapshot findFile(Long sessionId, String fileId) {
+        return toSnapshot(fileMapper.selectBySessionIdAndFileId(sessionId, fileId));
+    }
+    @Override public Long insertSession(UploadSessionPersistencePort.CreateSessionCommand command) {
+        UploadSession session = new UploadSession();
+        session.setSessionId(command.sessionId());
+        session.setComicId(command.comicId());
+        session.setChapterId(command.chapterId());
+        session.setReplaceMediaId(command.replaceMediaId());
+        session.setStatus(command.status());
+        session.setTotalBytes(command.totalBytes());
+        session.setTotalFiles(command.totalFiles());
+        session.setExpiresAt(command.expiresAt());
+        sessionMapper.insert(session);
+        return session.getId();
+    }
+    @Override public Long insertFile(UploadSessionPersistencePort.CreateFileCommand command) {
+        UploadFile file = new UploadFile();
+        file.setSessionId(command.sessionId());
+        file.setFileId(command.fileId());
+        file.setOriginalName(command.originalName());
+        file.setContentType(command.contentType());
+        file.setSizeBytes(command.sizeBytes());
+        file.setSha256(command.sha256());
+        file.setStorageName(command.storageName());
+        file.setReceivedBytes(command.receivedBytes());
+        file.setReceivedRanges(command.receivedRanges());
+        fileMapper.insert(file);
+        return file.getId();
+    }
     @Override public Long insertMedia(UploadSessionPersistencePort.MediaCreateCommand command) {
         Media media = new Media();
         media.setChapterId(command.chapterId());
@@ -76,7 +109,26 @@ public class UploadSessionPersistencePortAdapter implements UploadSessionPersist
     @Override public int bindMedia(Long fileId, Long mediaId) { return fileMapper.bindMedia(fileId, mediaId); }
     @Override public int freezeForVerification(Long sessionId) { return sessionMapper.freezeForVerification(sessionId); }
     @Override public int restoreActive(Long sessionId) { return sessionMapper.restoreActiveFromVerification(sessionId); }
-    @Override public void updateSession(UploadSession session) { sessionMapper.updateById(session); }
+    @Override public void updateSession(UploadSessionPersistencePort.UpdateSessionCommand command) {
+        UploadSession session = new UploadSession();
+        session.setId(command.id());
+        session.setStatus(command.status());
+        session.setCompletedAt(command.completedAt());
+        sessionMapper.updateById(session);
+    }
     @Override public int deleteFiles(Long sessionId) { return fileMapper.deleteBySessionId(sessionId); }
     @Override public int deleteSession(Long sessionId) { return sessionMapper.deleteById(sessionId); }
+
+    private UploadSessionPersistencePort.SessionSnapshot toSnapshot(UploadSession session) {
+        return session == null ? null : new UploadSessionPersistencePort.SessionSnapshot(session.getId(),
+                session.getSessionId(), session.getComicId(), session.getChapterId(), session.getReplaceMediaId(),
+                session.getStatus(), session.getTotalBytes(), session.getTotalFiles(), session.getExpiresAt(),
+                session.getCompletedAt());
+    }
+
+    private UploadSessionPersistencePort.FileSnapshot toSnapshot(UploadFile file) {
+        return file == null ? null : new UploadSessionPersistencePort.FileSnapshot(file.getId(), file.getSessionId(),
+                file.getFileId(), file.getOriginalName(), file.getContentType(), file.getSizeBytes(), file.getSha256(),
+                file.getStorageName(), file.getReceivedBytes(), file.getReceivedRanges());
+    }
 }
