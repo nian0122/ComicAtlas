@@ -1,7 +1,5 @@
 package com.comicatlas.api.trash.infrastructure.persistence.repository;
 
-import com.comicatlas.api.task.domain.model.TaskType;
-import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTaskItem;
 import com.comicatlas.api.task.infrastructure.persistence.mapper.ManagementTaskItemMapper;
 import com.comicatlas.api.trash.application.port.out.TrashLifecycleCommandPersistencePort;
 import com.comicatlas.api.trash.infrastructure.persistence.mapper.TrashDataMapper;
@@ -91,9 +89,6 @@ public class TrashLifecycleCommandPersistencePortAdapter implements TrashLifecyc
     @Override public int deleteCatalogsByComicId(Long comicId) { return catalogMapper.deleteByComicId(comicId); }
     @Override public int bindTrashManifest(Long itemId, Long manifestTaskId) {
         return itemMapper.bindTrashManifest(itemId, manifestTaskId);
-    }
-    @Override public ManagementTaskItem findLatestTaskItem(String targetType, Long targetId, TaskType operationType) {
-        return trashDataMapper.selectLatestTaskItem(targetType, targetId, operationType);
     }
     @Override public int deleteReadingHistory(Long comicId) {
         return trashDataMapper.deleteReadingHistoryByComicId(comicId);

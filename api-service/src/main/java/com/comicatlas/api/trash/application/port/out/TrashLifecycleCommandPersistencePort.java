@@ -1,7 +1,5 @@
 package com.comicatlas.api.trash.application.port.out;
 
-import com.comicatlas.api.task.domain.model.TaskType;
-import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTaskItem;
 import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
@@ -27,7 +25,6 @@ public interface TrashLifecycleCommandPersistencePort {
     int deleteChaptersByComicId(Long comicId);
     int deleteCatalogsByComicId(Long comicId);
     int bindTrashManifest(Long itemId, Long manifestTaskId);
-    ManagementTaskItem findLatestTaskItem(String targetType, Long targetId, TaskType operationType);
     int deleteReadingHistory(Long comicId);
     int deleteComicTags(Long comicId);
 
