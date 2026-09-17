@@ -1,7 +1,5 @@
 package com.comicatlas.api.trash.application.service.impl;
 
-import com.comicatlas.api.trash.infrastructure.persistence.entity.TrashManifestRecord;
-
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.storage.infrastructure.config.ApiStorageProperties;
@@ -53,24 +51,20 @@ public class TrashManifestServiceImpl implements TrashManifestService {
 
     /** 写入不可变 manifest 到 DB（幂等：同 taskId 覆盖为同一内容由调用方保证） */
     public TrashManifestDTO writeManifest(TrashManifestDTO manifest) {
-        TrashManifestRecord record = new TrashManifestRecord();
-        record.setTaskId(manifest.taskId());
-        record.setTargetType(manifest.targetType());
-        record.setTargetId(manifest.targetId());
-        record.setManifestJson(toJson(manifest));
-        persistencePort.insert(record);
+        persistencePort.insert(new TrashManifestPersistencePort.CreateCommand(manifest.taskId(),
+                manifest.targetType(), manifest.targetId(), toJson(manifest)));
         log.info("写入 TRASH 清单(DB): taskId={}", manifest.taskId());
         return manifest;
     }
 
     /** 从 DB 读 manifest（不存在返回 null） */
     public TrashManifestDTO readManifest(String targetType, Long targetId, Long taskId) {
-        TrashManifestRecord record = persistencePort.findByTaskId(taskId);
+        TrashManifestPersistencePort.Snapshot record = persistencePort.findByTaskId(taskId);
         if (record == null) {
             return null;
         }
         try {
-            return objectMapper.readValue(record.getManifestJson(), TrashManifestDTO.class);
+            return objectMapper.readValue(record.manifestJson(), TrashManifestDTO.class);
         } catch (IOException e) {
             log.warn("读取 TRASH 清单(DB)失败: taskId={}", taskId, e);
             return null;
@@ -79,12 +73,12 @@ public class TrashManifestServiceImpl implements TrashManifestService {
 
     /** 从 DB 读指定目标最近一次清单（对账/恢复定位用，不存在返回 null） */
     public TrashManifestDTO readLatestManifest(String targetType, Long targetId) {
-        TrashManifestRecord record = persistencePort.findLatest(targetType, targetId);
+        TrashManifestPersistencePort.Snapshot record = persistencePort.findLatest(targetType, targetId);
         if (record == null) {
             return null;
         }
         try {
-            return objectMapper.readValue(record.getManifestJson(), TrashManifestDTO.class);
+            return objectMapper.readValue(record.manifestJson(), TrashManifestDTO.class);
         } catch (IOException e) {
             log.warn("读取 TRASH 清单(DB)失败: targetType={}, targetId={}", targetType, targetId, e);
             return null;

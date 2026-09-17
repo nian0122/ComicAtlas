@@ -14,13 +14,25 @@ public class TrashManifestPersistencePortAdapter implements TrashManifestPersist
     private final TrashManifestMapper trashManifestMapper;
 
     @Override
-    public TrashManifestRecord findByTaskId(Long taskId) { return trashManifestMapper.selectById(taskId); }
-
-    @Override
-    public TrashManifestRecord findLatest(String targetType, Long targetId) {
-        return trashManifestMapper.selectLatest(targetType, targetId);
+    public TrashManifestPersistencePort.Snapshot findByTaskId(Long taskId) {
+        return toSnapshot(trashManifestMapper.selectById(taskId));
     }
 
     @Override
-    public void insert(TrashManifestRecord record) { trashManifestMapper.insert(record); }
+    public TrashManifestPersistencePort.Snapshot findLatest(String targetType, Long targetId) {
+        return toSnapshot(trashManifestMapper.selectLatest(targetType, targetId));
+    }
+
+    @Override
+    public void insert(TrashManifestPersistencePort.CreateCommand command) {
+        TrashManifestRecord record = new TrashManifestRecord();
+        record.setTaskId(command.taskId()); record.setTargetType(command.targetType());
+        record.setTargetId(command.targetId()); record.setManifestJson(command.manifestJson());
+        trashManifestMapper.insert(record);
+    }
+
+    private TrashManifestPersistencePort.Snapshot toSnapshot(TrashManifestRecord record) {
+        return record == null ? null : new TrashManifestPersistencePort.Snapshot(record.getTaskId(),
+                record.getTargetType(), record.getTargetId(), record.getManifestJson());
+    }
 }
