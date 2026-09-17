@@ -31,14 +31,63 @@ public class LegacyTaskBackfillPersistencePortAdapter implements LegacyTaskBackf
     private final ManagementTaskItemMapper managementTaskItemMapper;
     private final LegacyTaskMapper legacyTaskMapper;
 
-    @Override public List<ImportTask> findUnboundImports() { return legacyTaskMapper.selectUnboundImports(); }
-    @Override public List<RecoveryTask> findUnboundRecoveries() { return legacyTaskMapper.selectUnboundRecoveries(); }
-    @Override public List<ExportTask> findUnboundExports() { return legacyTaskMapper.selectUnboundExports(); }
-    @Override public List<DirectoryScanTask> findUnboundScans() { return legacyTaskMapper.selectUnboundScans(); }
-    @Override public void updateImport(ImportTask task) { importTaskMapper.updateById(task); }
-    @Override public void updateRecovery(RecoveryTask task) { recoveryTaskMapper.updateById(task); }
-    @Override public void updateExport(ExportTask task) { exportTaskMapper.updateById(task); }
-    @Override public void updateScan(DirectoryScanTask task) { directoryScanTaskMapper.updateById(task); }
-    @Override public void insertTask(ManagementTask task) { managementTaskMapper.insert(task); }
-    @Override public void insertItem(ManagementTaskItem item) { managementTaskItemMapper.insert(item); }
+    @Override public List<LegacyTaskSnapshot> findUnboundImports() {
+        return legacyTaskMapper.selectUnboundImports().stream()
+                .map(task -> new LegacyTaskSnapshot(task.getId(), task.getComicId(), task.getBatchId(),
+                        task.getStatus() == null ? null : task.getStatus().name(), task.getProgress(),
+                        task.getStartTime(), task.getEndTime())).toList();
+    }
+    @Override public List<LegacyTaskSnapshot> findUnboundRecoveries() {
+        return legacyTaskMapper.selectUnboundRecoveries().stream()
+                .map(task -> new LegacyTaskSnapshot(task.getId(), null, null,
+                        task.getStatus() == null ? null : task.getStatus().name(), null,
+                        task.getStartedAt(), task.getEndedAt())).toList();
+    }
+    @Override public List<LegacyTaskSnapshot> findUnboundExports() {
+        return legacyTaskMapper.selectUnboundExports().stream()
+                .map(task -> new LegacyTaskSnapshot(task.getId(), task.getComicId(), null,
+                        task.getStatus() == null ? null : task.getStatus().name(), task.getProgress(),
+                        null, task.getCompletedAt())).toList();
+    }
+    @Override public List<LegacyTaskSnapshot> findUnboundScans() {
+        return legacyTaskMapper.selectUnboundScans().stream()
+                .map(task -> new LegacyTaskSnapshot(task.getId(), null, null,
+                        task.getStatus() == null ? null : task.getStatus().name(), null,
+                        task.getStartedAt(), task.getEndedAt())).toList();
+    }
+    @Override public void bindImport(Long legacyTaskId, Long managementTaskId) {
+        ImportTask task = new ImportTask(); task.setId(legacyTaskId); task.setManagementTaskId(managementTaskId);
+        importTaskMapper.updateById(task);
+    }
+    @Override public void bindRecovery(Long legacyTaskId, Long managementTaskId) {
+        RecoveryTask task = new RecoveryTask(); task.setId(legacyTaskId); task.setManagementTaskId(managementTaskId);
+        recoveryTaskMapper.updateById(task);
+    }
+    @Override public void bindExport(Long legacyTaskId, Long managementTaskId) {
+        ExportTask task = new ExportTask(); task.setId(legacyTaskId); task.setManagementTaskId(managementTaskId);
+        exportTaskMapper.updateById(task);
+    }
+    @Override public void bindScan(Long legacyTaskId, Long managementTaskId) {
+        DirectoryScanTask task = new DirectoryScanTask(); task.setId(legacyTaskId);
+        task.setManagementTaskId(managementTaskId); directoryScanTaskMapper.updateById(task);
+    }
+    @Override public Long insertTask(TaskCreateCommand command) {
+        ManagementTask task = new ManagementTask();
+        task.setTaskType(command.taskType()); task.setOperation(command.operation());
+        task.setTargetType(command.targetType()); task.setBatchId(command.batchId()); task.setBatch(false);
+        task.setStatus(command.status()); task.setProgress(command.progress()); task.setTotalCount(command.totalCount());
+        task.setSuccessCount(command.successCount()); task.setFailureCount(command.failureCount());
+        task.setCancelledCount(command.cancelledCount()); task.setAttempt(command.attempt());
+        task.setStartedAt(command.startedAt()); task.setCompletedAt(command.completedAt());
+        managementTaskMapper.insert(task);
+        return task.getId();
+    }
+    @Override public void insertItem(ItemCreateCommand command) {
+        ManagementTaskItem item = new ManagementTaskItem();
+        item.setTaskId(command.taskId()); item.setTargetType(command.targetType()); item.setTargetId(command.targetId());
+        item.setOperationType(command.operationType()); item.setStatus(command.status()); item.setAttempt(command.attempt());
+        item.setProgress(command.progress()); item.setLockKey(command.lockKey()); item.setStartedAt(command.startedAt());
+        item.setCompletedAt(command.completedAt());
+        managementTaskItemMapper.insert(item);
+    }
 }

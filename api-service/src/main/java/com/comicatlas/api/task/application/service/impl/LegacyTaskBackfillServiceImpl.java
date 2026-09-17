@@ -1,12 +1,9 @@
 package com.comicatlas.api.task.application.service.impl;
 
-import com.comicatlas.api.exporter.infrastructure.persistence.entity.ExportTask;
-import com.comicatlas.api.importer.infrastructure.persistence.entity.DirectoryScanTask;
-import com.comicatlas.api.importer.infrastructure.persistence.entity.ImportTask;
-import com.comicatlas.api.recovery.infrastructure.persistence.entity.RecoveryTask;
 import com.comicatlas.api.task.application.port.out.LegacyTaskBackfillPersistencePort;
-import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTask;
-import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTaskItem;
+import com.comicatlas.api.task.application.port.out.LegacyTaskBackfillPersistencePort.ItemCreateCommand;
+import com.comicatlas.api.task.application.port.out.LegacyTaskBackfillPersistencePort.LegacyTaskSnapshot;
+import com.comicatlas.api.task.application.port.out.LegacyTaskBackfillPersistencePort.TaskCreateCommand;
 import com.comicatlas.api.task.application.port.in.LegacyTaskBackfillService;
 import com.comicatlas.api.task.domain.model.ManagementTaskStatus;
 import com.comicatlas.api.task.domain.model.TaskType;
@@ -49,21 +46,18 @@ public class LegacyTaskBackfillServiceImpl implements LegacyTaskBackfillService 
     }
 
     private int backfillImports() {
-        List<ImportTask> rows = persistencePort.findUnboundImports();
+        List<LegacyTaskSnapshot> rows = persistencePort.findUnboundImports();
         int count = 0;
-        for (ImportTask task : rows) {
-            String legacyStatus = task.getStatus() == null ? null : task.getStatus().name();
-            boolean hasComicTarget = task.getComicId() != null;
+        for (LegacyTaskSnapshot task : rows) {
+            String legacyStatus = task.status();
+            boolean hasComicTarget = task.comicId() != null;
             String targetType = hasComicTarget ? "COMIC" : "IMPORT_TASK";
-            Long targetId = hasComicTarget ? task.getComicId() : task.getId();
-            ManagementTask managementTask = baseTask(TaskType.IMPORT, "导入漫画", targetType,
-                    task.getBatchId(), legacyStatus, task.getProgress(),
-                    task.getStartTime(), task.getEndTime());
-            ManagementTaskItem item = baseItem(
-                    managementTask, targetType, targetId, TaskType.IMPORT, legacyStatus);
-            insertPair(managementTask, item);
-            task.setManagementTaskId(managementTask.getId());
-            persistencePort.updateImport(task);
+            Long targetId = hasComicTarget ? task.comicId() : task.id();
+            TaskCreateCommand managementTask = baseTask(TaskType.IMPORT, "导入漫画", targetType,
+                    task.batchId(), legacyStatus, task.progress(), task.startedAt(), task.completedAt());
+            ItemCreateCommand item = baseItem(targetType, targetId, TaskType.IMPORT, managementTask);
+            Long managementTaskId = insertPair(managementTask, item);
+            persistencePort.bindImport(task.id(), managementTaskId);
             count++;
         }
         if (count > 0) {
@@ -73,16 +67,15 @@ public class LegacyTaskBackfillServiceImpl implements LegacyTaskBackfillService 
     }
 
     private int backfillRecoveries() {
-        List<RecoveryTask> rows = persistencePort.findUnboundRecoveries();
+        List<LegacyTaskSnapshot> rows = persistencePort.findUnboundRecoveries();
         int count = 0;
-        for (RecoveryTask recoveryTask : rows) {
-            String legacyStatus = recoveryTask.getStatus() == null ? null : recoveryTask.getStatus().name();
-            ManagementTask managementTask = baseTask(TaskType.RECOVERY, "存储恢复", "SYSTEM",
-                    null, legacyStatus, null, recoveryTask.getStartedAt(), recoveryTask.getEndedAt());
-            ManagementTaskItem item = baseItem(managementTask, "SYSTEM", recoveryTask.getId(), TaskType.RECOVERY, legacyStatus);
-            insertPair(managementTask, item);
-            recoveryTask.setManagementTaskId(managementTask.getId());
-            persistencePort.updateRecovery(recoveryTask);
+        for (LegacyTaskSnapshot recoveryTask : rows) {
+            String legacyStatus = recoveryTask.status();
+            TaskCreateCommand managementTask = baseTask(TaskType.RECOVERY, "存储恢复", "SYSTEM",
+                    null, legacyStatus, null, recoveryTask.startedAt(), recoveryTask.completedAt());
+            ItemCreateCommand item = baseItem("SYSTEM", recoveryTask.id(), TaskType.RECOVERY, managementTask);
+            Long managementTaskId = insertPair(managementTask, item);
+            persistencePort.bindRecovery(recoveryTask.id(), managementTaskId);
             count++;
         }
         if (count > 0) {
@@ -92,16 +85,15 @@ public class LegacyTaskBackfillServiceImpl implements LegacyTaskBackfillService 
     }
 
     private int backfillExports() {
-        List<ExportTask> rows = persistencePort.findUnboundExports();
+        List<LegacyTaskSnapshot> rows = persistencePort.findUnboundExports();
         int count = 0;
-        for (ExportTask task : rows) {
-            String legacyStatus = task.getStatus() == null ? null : task.getStatus().name();
-            ManagementTask managementTask = baseTask(TaskType.EXPORT, "导出漫画", "COMIC",
-                    null, legacyStatus, task.getProgress(), null, task.getCompletedAt());
-            ManagementTaskItem item = baseItem(managementTask, "COMIC", task.getComicId(), TaskType.EXPORT, legacyStatus);
-            insertPair(managementTask, item);
-            task.setManagementTaskId(managementTask.getId());
-            persistencePort.updateExport(task);
+        for (LegacyTaskSnapshot task : rows) {
+            String legacyStatus = task.status();
+            TaskCreateCommand managementTask = baseTask(TaskType.EXPORT, "导出漫画", "COMIC",
+                    null, legacyStatus, task.progress(), null, task.completedAt());
+            ItemCreateCommand item = baseItem("COMIC", task.comicId(), TaskType.EXPORT, managementTask);
+            Long managementTaskId = insertPair(managementTask, item);
+            persistencePort.bindExport(task.id(), managementTaskId);
             count++;
         }
         if (count > 0) {
@@ -111,16 +103,15 @@ public class LegacyTaskBackfillServiceImpl implements LegacyTaskBackfillService 
     }
 
     private int backfillScans() {
-        List<DirectoryScanTask> rows = persistencePort.findUnboundScans();
+        List<LegacyTaskSnapshot> rows = persistencePort.findUnboundScans();
         int count = 0;
-        for (DirectoryScanTask task : rows) {
-            String legacyStatus = task.getStatus() == null ? null : task.getStatus().name();
-            ManagementTask managementTask = baseTask(TaskType.DIRECTORY_SCAN, "目录扫描", "SYSTEM",
-                    null, legacyStatus, null, task.getStartedAt(), task.getEndedAt());
-            ManagementTaskItem item = baseItem(managementTask, "SYSTEM", task.getId(), TaskType.DIRECTORY_SCAN, legacyStatus);
-            insertPair(managementTask, item);
-            task.setManagementTaskId(managementTask.getId());
-            persistencePort.updateScan(task);
+        for (LegacyTaskSnapshot task : rows) {
+            String legacyStatus = task.status();
+            TaskCreateCommand managementTask = baseTask(TaskType.DIRECTORY_SCAN, "目录扫描", "SYSTEM",
+                    null, legacyStatus, null, task.startedAt(), task.completedAt());
+            ItemCreateCommand item = baseItem("SYSTEM", task.id(), TaskType.DIRECTORY_SCAN, managementTask);
+            Long managementTaskId = insertPair(managementTask, item);
+            persistencePort.bindScan(task.id(), managementTaskId);
             count++;
         }
         if (count > 0) {
@@ -129,51 +120,32 @@ public class LegacyTaskBackfillServiceImpl implements LegacyTaskBackfillService 
         return count;
     }
 
-    private ManagementTask baseTask(TaskType type, String operation, String targetType,
+    private TaskCreateCommand baseTask(TaskType type, String operation, String targetType,
                                     String batchId, String legacyStatus, Integer progress,
                                     LocalDateTime startedAt, LocalDateTime completedAt) {
-        ManagementTask managementTask = new ManagementTask();
-        managementTask.setTaskType(type);
-        managementTask.setOperation(operation);
-        managementTask.setTargetType(targetType);
-        managementTask.setBatchId(batchId);
-        managementTask.setBatch(false);
         ManagementTaskStatus st = mapStatus(legacyStatus);
-        managementTask.setStatus(st);
-        managementTask.setProgress(progress != null ? progress : 0);
-        managementTask.setTotalCount(1);
-        managementTask.setSuccessCount(st == ManagementTaskStatus.SUCCEEDED ? 1 : 0);
-        managementTask.setFailureCount(st == ManagementTaskStatus.FAILED ? 1 : 0);
-        managementTask.setCancelledCount(st == ManagementTaskStatus.CANCELLED ? 1 : 0);
-        managementTask.setAttempt(1);
-        managementTask.setStartedAt(startedAt);
-        managementTask.setCompletedAt(completedAt);
-        return managementTask;
+        return new TaskCreateCommand(type, operation, targetType, batchId, st,
+                progress != null ? progress : 0, 1,
+                st == ManagementTaskStatus.SUCCEEDED ? 1 : 0,
+                st == ManagementTaskStatus.FAILED ? 1 : 0,
+                st == ManagementTaskStatus.CANCELLED ? 1 : 0,
+                1, startedAt, completedAt);
     }
 
-    private ManagementTaskItem baseItem(ManagementTask managementTask, String targetType, Long targetId,
-                                        TaskType operation, String legacyStatus) {
-        ManagementTaskItem item = new ManagementTaskItem();
-        item.setTaskId(managementTask.getId());
-        item.setTargetType(targetType);
-        item.setTargetId(targetId);
-        item.setOperationType(operation);
-        ManagementTaskStatus st = managementTask.getStatus();
-        item.setStatus(st);
-        item.setAttempt(1);
-        item.setProgress(managementTask.getProgress());
-        if (st.isProcessing()) {
-            item.setLockKey(ManagementTaskItem.buildLockKey(targetType, targetId, operation));
-        }
-        item.setStartedAt(managementTask.getStartedAt());
-        item.setCompletedAt(managementTask.getCompletedAt());
-        return item;
+    private ItemCreateCommand baseItem(String targetType, Long targetId, TaskType operation,
+                                        TaskCreateCommand managementTask) {
+        String lockKey = managementTask.status().isProcessing()
+                ? targetType + ":" + targetId + ":" + operation.name() : null;
+        return new ItemCreateCommand(null, targetType, targetId, operation, managementTask.status(),
+                1, managementTask.progress(), lockKey, managementTask.startedAt(), managementTask.completedAt());
     }
 
-    private void insertPair(ManagementTask managementTask, ManagementTaskItem item) {
-        persistencePort.insertTask(managementTask);
-        item.setTaskId(managementTask.getId());
-        persistencePort.insertItem(item);
+    private Long insertPair(TaskCreateCommand managementTask, ItemCreateCommand item) {
+        Long managementTaskId = persistencePort.insertTask(managementTask);
+        persistencePort.insertItem(new ItemCreateCommand(managementTaskId, item.targetType(), item.targetId(),
+                item.operationType(), item.status(), item.attempt(), item.progress(), item.lockKey(),
+                item.startedAt(), item.completedAt()));
+        return managementTaskId;
     }
 
     /**
