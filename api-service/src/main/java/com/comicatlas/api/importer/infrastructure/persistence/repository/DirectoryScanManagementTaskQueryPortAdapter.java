@@ -2,8 +2,8 @@ package com.comicatlas.api.importer.infrastructure.persistence.repository;
 
 import com.comicatlas.api.importer.application.port.out.DirectoryScanManagementTaskQueryPort;
 import com.comicatlas.api.task.application.port.in.ManagementTaskService;
+import com.comicatlas.api.task.application.service.TaskInternalQueryService;
 import com.comicatlas.api.task.domain.model.TaskType;
-import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTaskItem;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -15,7 +15,8 @@ public class DirectoryScanManagementTaskQueryPortAdapter implements DirectorySca
 
     @Override
     public ItemSnapshot findActiveItem(String targetType, Long targetId, TaskType operationType) {
-        ManagementTaskItem item = managementTaskService.findActiveItem(targetType, targetId, operationType);
-        return item == null ? null : new ItemSnapshot(item.getId());
+        TaskInternalQueryService.ItemSnapshot item = managementTaskService.findActiveItem(targetType, targetId,
+                operationType);
+        return item == null ? null : new ItemSnapshot(item.id());
     }
 }

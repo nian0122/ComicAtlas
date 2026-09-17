@@ -6,7 +6,7 @@ import com.comicatlas.api.importer.domain.exception.ImportMetadataException;
 import com.comicatlas.api.importer.application.port.out.ImportPersistencePort;
 import com.comicatlas.api.importer.application.port.in.ImportPersistenceService;
 import com.comicatlas.api.importer.application.port.in.ImportFinalizationService;
-import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTaskItem;
+import com.comicatlas.api.task.application.service.TaskInternalQueryService;
 import com.comicatlas.api.task.application.port.in.ManagementTaskService;
 import com.comicatlas.api.task.domain.service.ManagementStateMachine;
 import com.comicatlas.api.outbox.application.port.in.OutboxService;
@@ -582,11 +582,11 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
         persistencePort.updateImportTask(task);
 
         // 统一管理任务项：导入成功
-        ManagementTaskItem managementItem = managementTaskService.findActiveItem(
+        TaskInternalQueryService.ItemSnapshot managementItem = managementTaskService.findActiveItem(
                 TARGET_TYPE_COMIC, comicId, TaskType.IMPORT);
         if (managementItem != null) {
             managementTaskService.updateItemStatus(
-                    managementItem.getId(), ManagementTaskStatus.SUCCEEDED, null,
+                    managementItem.id(), ManagementTaskStatus.SUCCEEDED, null,
                     RESULT_REF_TYPE_IMPORT_TASK, taskId);
         }
         catalogCacheInvalidator.evict(comicId);
@@ -648,11 +648,11 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
         }
 
         // 统一管理任务项：导入失败（可经 retry 重新导入）
-        ManagementTaskItem managementItem = managementTaskService.findActiveItem(
+        TaskInternalQueryService.ItemSnapshot managementItem = managementTaskService.findActiveItem(
                 TARGET_TYPE_COMIC, comicId, TaskType.IMPORT);
         if (managementItem != null) {
             managementTaskService.updateItemStatus(
-                    managementItem.getId(), ManagementTaskStatus.FAILED,
+                    managementItem.id(), ManagementTaskStatus.FAILED,
                     task.getErrorMessage(), RESULT_REF_TYPE_IMPORT_TASK, taskId);
         }
         catalogCacheInvalidator.evict(comicId);

@@ -472,7 +472,7 @@ public class ManagementTaskServiceImpl implements ManagementTaskService {
      * <p>
      * 内部方法，返回数据库实体 {@link ManagementTask}，禁止用于接口响应；对外使用 {@code dto/} 包对应 DTO/VO。
      */
-    public ManagementTask findByIdempotencyKey(String idempotencyKey) {
+    public TaskInternalQueryService.TaskSnapshot findByIdempotencyKey(String idempotencyKey) {
         return taskInternalQueryService.findByIdempotencyKey(idempotencyKey);
     }
 
@@ -481,7 +481,7 @@ public class ManagementTaskServiceImpl implements ManagementTaskService {
      * <p>
      * 内部方法，返回数据库实体 {@link ManagementTaskItem}，禁止用于接口响应；对外使用 {@code dto/} 包对应 DTO/VO。
      */
-    public ManagementTaskItem findActiveItem(String targetType, Long targetId, TaskType operationType) {
+    public TaskInternalQueryService.ItemSnapshot findActiveItem(String targetType, Long targetId, TaskType operationType) {
         return taskInternalQueryService.findActiveItem(targetType, targetId, operationType);
     }
 

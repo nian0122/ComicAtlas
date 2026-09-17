@@ -252,10 +252,10 @@ class UnifiedTaskCompatibilityIT {
         ImportTaskVO vo = importService.createImportTask(buildRequest("/mnt/import/测试漫画D"), null);
         ImportTask it = importTaskMapper.selectById(vo.getId());
 
-        com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTaskItem activeItem =
+        var activeItem =
                 managementTaskService.findActiveItem("COMIC", it.getComicId(), TaskType.IMPORT);
         assertThat(activeItem).isNotNull();
-        managementTaskService.updateItemStatus(activeItem.getId(), ManagementTaskStatus.FAILED,
+        managementTaskService.updateItemStatus(activeItem.id(), ManagementTaskStatus.FAILED,
                 "模拟导入失败", "IMPORT_TASK", it.getId());
 
         ManagementTaskResponse failedTask = managementTaskService.getTask(it.getManagementTaskId());
@@ -277,10 +277,10 @@ class UnifiedTaskCompatibilityIT {
         assertThat(mgmtTaskId).isNotNull();
 
         // 模拟导入失败：item 标记 FAILED，import_task 同步 FAILED，comic IMPORT_FAILED
-        ManagementTaskItem activeItem = managementTaskService.findActiveItem(
+        var activeItem = managementTaskService.findActiveItem(
                 "COMIC", it.getComicId(), TaskType.IMPORT);
         assertThat(activeItem).isNotNull();
-        managementTaskService.updateItemStatus(activeItem.getId(), ManagementTaskStatus.FAILED,
+        managementTaskService.updateItemStatus(activeItem.id(), ManagementTaskStatus.FAILED,
                 "模拟导入失败", "IMPORT_TASK", it.getId());
 
         Comic comic = comicMapper.selectById(it.getComicId());
@@ -343,10 +343,10 @@ class UnifiedTaskCompatibilityIT {
         assertThat(mgmtTaskId).isNotNull();
 
         // 模拟导出失败：item 标记 FAILED（与 ExportFailedHandler 行为一致）
-        ManagementTaskItem activeItem = managementTaskService.findActiveItem(
+        var activeItem = managementTaskService.findActiveItem(
                 "COMIC", comic.getId(), TaskType.EXPORT);
         assertThat(activeItem).isNotNull();
-        managementTaskService.updateItemStatus(activeItem.getId(), ManagementTaskStatus.FAILED,
+        managementTaskService.updateItemStatus(activeItem.id(), ManagementTaskStatus.FAILED,
                 "模拟导出失败", "EXPORT_TASK", et.getId());
 
         ManagementTaskResponse failed = managementTaskService.getTask(mgmtTaskId);

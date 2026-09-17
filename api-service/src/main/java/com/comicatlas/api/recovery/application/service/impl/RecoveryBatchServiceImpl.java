@@ -125,7 +125,7 @@ public class RecoveryBatchServiceImpl implements RecoveryBatchService {
     private ManagementTaskItemResponse syncItem(Long taskId, ManagementTaskStatus status,
             String errorMessage, String refType, Long refId) {
         var item = managementTaskService.findActiveItem(TARGET_TYPE_SYSTEM, taskId, TaskType.RECOVERY);
-        return item == null ? null : managementTaskService.updateItemStatus(item.getId(), status,
+        return item == null ? null : managementTaskService.updateItemStatus(item.id(), status,
                 errorMessage, refType, refId);
     }
 

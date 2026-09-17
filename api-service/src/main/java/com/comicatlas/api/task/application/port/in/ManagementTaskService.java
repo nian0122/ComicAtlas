@@ -7,8 +7,7 @@ import com.comicatlas.api.task.interfaces.rest.dto.ManagementTaskResponse;
 import com.comicatlas.api.task.domain.model.ManagementTaskStatus;
 import com.comicatlas.api.task.domain.model.TaskStage;
 import com.comicatlas.api.task.domain.model.TaskType;
-import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTask;
-import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTaskItem;
+import com.comicatlas.api.task.application.service.TaskInternalQueryService;
 import java.util.List;
 
 /** 管理任务应用服务契约。 */
@@ -28,8 +27,8 @@ public interface ManagementTaskService {
                                                  String errorMessage, String resultRefType, Long resultRefId,
                                                  int attempt);
     boolean updateItemProgress(Long itemId, int attempt, int progress, String stage);
-    ManagementTask findByIdempotencyKey(String idempotencyKey);
-    ManagementTaskItem findActiveItem(String targetType, Long targetId, TaskType operationType);
+    TaskInternalQueryService.TaskSnapshot findByIdempotencyKey(String idempotencyKey);
+    TaskInternalQueryService.ItemSnapshot findActiveItem(String targetType, Long targetId, TaskType operationType);
     long countActiveItems(Long taskId);
     long countActiveMetadataItems(Long taskId, Long comicId);
     void reaggregateTask(Long taskId);
