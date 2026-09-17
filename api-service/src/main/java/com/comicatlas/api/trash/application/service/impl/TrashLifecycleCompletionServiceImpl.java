@@ -8,11 +8,15 @@ import com.comicatlas.common.event.ManagementCommandCompletedEvent;
 import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
-import com.comicatlas.persistence.comic.entity.Chapter;
-import com.comicatlas.persistence.comic.entity.Comic;
-import com.comicatlas.persistence.comic.entity.Media;
 import com.comicatlas.api.trash.application.port.in.TrashLifecycleCompletionService;
 import com.comicatlas.api.trash.application.port.out.TrashLifecycleCommandPersistencePort;
+import com.comicatlas.api.trash.application.port.out.TrashLifecycleCommandPersistencePort.ChapterSnapshot;
+import com.comicatlas.api.trash.application.port.out.TrashLifecycleCommandPersistencePort.ChapterUpdateCommand;
+import com.comicatlas.api.trash.application.port.out.TrashLifecycleCommandPersistencePort.ComicSnapshot;
+import com.comicatlas.api.trash.application.port.out.TrashLifecycleCommandPersistencePort.ComicUpdateCommand;
+import com.comicatlas.api.trash.application.port.out.TrashLifecycleCommandPersistencePort.MediaPageSnapshot;
+import com.comicatlas.api.trash.application.port.out.TrashLifecycleCommandPersistencePort.MediaSnapshot;
+import com.comicatlas.api.trash.application.port.out.TrashLifecycleCommandPersistencePort.MediaUpdateCommand;
 import com.comicatlas.api.trash.application.port.in.TrashManifestService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -54,11 +58,10 @@ public class TrashLifecycleCompletionServiceImpl implements TrashLifecycleComple
 
     /** 漫画回收完成：status → TRASHED。 */
     public void applyComicTrashCompleted(Long comicId) {
-        Comic comic = persistencePort.findComic(comicId);
-        if (comic != null && comic.getStatus() != ComicStatus.DELETED) {
-            comic.setStatus(ComicStatus.TRASHED);
-            comic.setTrashedAt(LocalDateTime.now());
-            persistencePort.updateComic(comic);
+        ComicSnapshot comic = persistencePort.findComic(comicId);
+        if (comic != null && comic.status() != ComicStatus.DELETED) {
+            persistencePort.updateComic(new ComicUpdateCommand(comicId, ComicStatus.TRASHED,
+                    LocalDateTime.now(), comic.deletedAt()));
             catalogCacheInvalidator.evict(comicId);
             log.info("整本回收完成业务更新（回收站）: comicId={}", comicId);
         }
@@ -66,12 +69,11 @@ public class TrashLifecycleCompletionServiceImpl implements TrashLifecycleComple
 
     /** 章节回收完成：status → TRASHED。媒体引用不变（文件在 TRASH，恢复时移回）。 */
     public void applyChapterTrashCompleted(Long chapterId) {
-        Chapter chapter = persistencePort.findChapter(chapterId);
-        if (chapter != null && chapter.getStatus() != ChapterLifecycleStatus.DELETED) {
-            chapter.setStatus(ChapterLifecycleStatus.TRASHED);
-            chapter.setTrashedAt(LocalDateTime.now());
-            persistencePort.updateChapter(chapter);
-            catalogCacheInvalidator.evict(chapter.getComicId());
+        ChapterSnapshot chapter = persistencePort.findChapter(chapterId);
+        if (chapter != null && chapter.status() != ChapterLifecycleStatus.DELETED) {
+            persistencePort.updateChapter(new ChapterUpdateCommand(chapterId, ChapterLifecycleStatus.TRASHED,
+                    LocalDateTime.now()));
+            catalogCacheInvalidator.evict(chapter.comicId());
             log.info("章节回收完成业务更新: chapterId={}", chapterId);
         }
     }
@@ -79,12 +81,12 @@ public class TrashLifecycleCompletionServiceImpl implements TrashLifecycleComple
     /** 媒体回收完成：status → TRASHED，HQ 引用指向 TRASH（保留恢复路径）。 */
     public void applyMediaTrashCompleted(ManagementCommandCompletedEvent ev) {
         Long mediaId = ev.targetId();
-        Media media = persistencePort.findMedia(mediaId);
+        MediaSnapshot media = persistencePort.findMedia(mediaId);
         if (media == null) {
             return;
         }
-        Long chapterId = media.getChapterId();
-        String originalHqPath = media.getHqPath();
+        Long chapterId = media.chapterId();
+        String originalHqPath = media.hqPath();
         String trashRef = null;
         if (originalHqPath != null && !originalHqPath.isBlank()) {
             trashRef = TRASH_REF_PREFIX + mediaId + "/" + ev.taskId() + TRASH_HQ_MARKER + originalHqPath;
@@ -92,9 +94,9 @@ public class TrashLifecycleCompletionServiceImpl implements TrashLifecycleComple
         persistencePort.markMediaTrashed(mediaId, LocalDateTime.now(),
                 trashRef == null ? null : ROOT_KEY_TRASH, trashRef);
         comicStatsService.refreshByChapter(chapterId);
-        Chapter chapter = persistencePort.findChapter(chapterId);
+        ChapterSnapshot chapter = persistencePort.findChapter(chapterId);
         if (chapter != null) {
-            catalogCacheInvalidator.evict(chapter.getComicId());
+            catalogCacheInvalidator.evict(chapter.comicId());
         }
         log.info("媒体回收完成业务更新: mediaId={}", mediaId);
     }
@@ -103,11 +105,9 @@ public class TrashLifecycleCompletionServiceImpl implements TrashLifecycleComple
 
     /** 漫画恢复完成：RESTORING → READY。 */
     public void applyComicRestoreCompleted(Long comicId) {
-        Comic comic = persistencePort.findComic(comicId);
-        if (comic != null && comic.getStatus() == ComicStatus.RESTORING) {
-            comic.setStatus(ComicStatus.READY);
-            comic.setTrashedAt(null);
-            persistencePort.updateComic(comic);
+        ComicSnapshot comic = persistencePort.findComic(comicId);
+        if (comic != null && comic.status() == ComicStatus.RESTORING) {
+            persistencePort.updateComic(new ComicUpdateCommand(comicId, ComicStatus.READY, null, comic.deletedAt()));
             catalogCacheInvalidator.evict(comicId);
             log.info("漫画恢复完成业务更新: comicId={}", comicId);
         }
@@ -115,12 +115,10 @@ public class TrashLifecycleCompletionServiceImpl implements TrashLifecycleComple
 
     /** 章节恢复完成：RESTORING → READY。 */
     public void applyChapterRestoreCompleted(Long chapterId) {
-        Chapter chapter = persistencePort.findChapter(chapterId);
-        if (chapter != null && chapter.getStatus() == ChapterLifecycleStatus.RESTORING) {
-            chapter.setStatus(ChapterLifecycleStatus.READY);
-            chapter.setTrashedAt(null);
-            persistencePort.updateChapter(chapter);
-            catalogCacheInvalidator.evict(chapter.getComicId());
+        ChapterSnapshot chapter = persistencePort.findChapter(chapterId);
+        if (chapter != null && chapter.status() == ChapterLifecycleStatus.RESTORING) {
+            persistencePort.updateChapter(new ChapterUpdateCommand(chapterId, ChapterLifecycleStatus.READY, null));
+            catalogCacheInvalidator.evict(chapter.comicId());
             log.info("章节恢复完成业务更新: chapterId={}", chapterId);
         }
     }
@@ -130,21 +128,21 @@ public class TrashLifecycleCompletionServiceImpl implements TrashLifecycleComple
      * 槽位被占用时事务内插入到首个合法空位。
      */
     public void applyMediaRestoreCompleted(Long mediaId) {
-        Media media = persistencePort.findMedia(mediaId);
-        if (media == null || media.getStatus() != MediaLifecycleStatus.RESTORING) {
+        MediaSnapshot media = persistencePort.findMedia(mediaId);
+        if (media == null || media.status() != MediaLifecycleStatus.RESTORING) {
             return;
         }
-        Long chapterId = media.getChapterId();
-        String originalPath = extractOriginalHqPath(media.getHqPath());
-        int targetPage = media.getOriginalPageNumber() != null
-                ? media.getOriginalPageNumber() : media.getPageNumber();
+        Long chapterId = media.chapterId();
+        String originalPath = extractOriginalHqPath(media.hqPath());
+        int targetPage = media.originalPageNumber() != null
+                ? media.originalPageNumber() : media.pageNumber();
         targetPage = firstFreePageNumber(chapterId, targetPage, mediaId);
 
         persistencePort.markMediaRestored(mediaId, StorageRootKeys.HQ, originalPath, targetPage);
         comicStatsService.refreshByChapter(chapterId);
-        Chapter chapter = persistencePort.findChapter(chapterId);
+        ChapterSnapshot chapter = persistencePort.findChapter(chapterId);
         if (chapter != null) {
-            catalogCacheInvalidator.evict(chapter.getComicId());
+            catalogCacheInvalidator.evict(chapter.comicId());
         }
         log.info("媒体恢复完成业务更新: mediaId={}, pageNumber={}", mediaId, targetPage);
     }
@@ -155,8 +153,8 @@ public class TrashLifecycleCompletionServiceImpl implements TrashLifecycleComple
      * 漫画永久清理：Worker 已清文件，级联删除子行，漫画保留 DELETED tombstone。
      */
     public void applyComicPurgeCompleted(Long comicId) {
-        List<Chapter> chapters = persistencePort.findChapters(comicId);
-        List<Long> chapterIds = chapters.stream().map(Chapter::getId).toList();
+        List<ChapterSnapshot> chapters = persistencePort.findChapters(comicId);
+        List<Long> chapterIds = chapters.stream().map(ChapterSnapshot::id).toList();
         if (!chapterIds.isEmpty()) {
             persistencePort.deleteMediaByChapterIds(chapterIds);
         }
@@ -165,11 +163,10 @@ public class TrashLifecycleCompletionServiceImpl implements TrashLifecycleComple
         persistencePort.deleteCatalogsByComicId(comicId);
         persistencePort.deleteComicTags(comicId);
 
-        Comic comic = persistencePort.findComic(comicId);
-        if (comic != null && comic.getStatus() == ComicStatus.PURGING) {
-            comic.setStatus(ComicStatus.DELETED);
-            comic.setDeletedAt(LocalDateTime.now());
-            persistencePort.updateComic(comic);
+        ComicSnapshot comic = persistencePort.findComic(comicId);
+        if (comic != null && comic.status() == ComicStatus.PURGING) {
+            persistencePort.updateComic(new ComicUpdateCommand(comicId, ComicStatus.DELETED,
+                    comic.trashedAt(), LocalDateTime.now()));
         }
         catalogCacheInvalidator.evict(comicId);
         log.info("漫画永久清理完成: comicId={}, chapters={}, media={}", comicId, chapters.size(), chapterIds.size());
@@ -178,25 +175,25 @@ public class TrashLifecycleCompletionServiceImpl implements TrashLifecycleComple
     /** 章节永久清理：删除媒体行，章节置 DELETED。 */
     public void applyChapterPurgeCompleted(Long chapterId) {
         persistencePort.deleteMediaByChapterId(chapterId);
-        Chapter chapter = persistencePort.findChapter(chapterId);
-        if (chapter != null && chapter.getStatus() == ChapterLifecycleStatus.PURGING) {
-            chapter.setStatus(ChapterLifecycleStatus.DELETED);
-            persistencePort.updateChapter(chapter);
-            catalogCacheInvalidator.evict(chapter.getComicId());
+        ChapterSnapshot chapter = persistencePort.findChapter(chapterId);
+        if (chapter != null && chapter.status() == ChapterLifecycleStatus.PURGING) {
+            persistencePort.updateChapter(new ChapterUpdateCommand(chapterId, ChapterLifecycleStatus.DELETED,
+                    chapter.trashedAt()));
+            catalogCacheInvalidator.evict(chapter.comicId());
         }
         log.info("章节永久清理完成: chapterId={}", chapterId);
     }
 
     /** 媒体永久清理：删除媒体行。 */
     public void applyMediaPurgeCompleted(Long mediaId) {
-        Media media = persistencePort.findMedia(mediaId);
-        Long chapterId = media != null ? media.getChapterId() : null;
+        MediaSnapshot media = persistencePort.findMedia(mediaId);
+        Long chapterId = media != null ? media.chapterId() : null;
         persistencePort.deleteMedia(mediaId);
         if (chapterId != null) {
             comicStatsService.refreshByChapter(chapterId);
-        Chapter chapter = persistencePort.findChapter(chapterId);
+        ChapterSnapshot chapter = persistencePort.findChapter(chapterId);
             if (chapter != null) {
-                catalogCacheInvalidator.evict(chapter.getComicId());
+                catalogCacheInvalidator.evict(chapter.comicId());
             }
         }
         log.info("媒体永久清理完成: mediaId={}", mediaId);
@@ -223,27 +220,27 @@ public class TrashLifecycleCompletionServiceImpl implements TrashLifecycleComple
     public void revertToTrashed(String targetType, Long targetId) {
         switch (targetType) {
             case "COMIC" -> {
-                Comic comic = persistencePort.findComic(targetId);
-                if (comic != null && (comic.getStatus() == ComicStatus.RESTORING
-                        || comic.getStatus() == ComicStatus.PURGING)) {
-                    comic.setStatus(ComicStatus.TRASHED);
-            persistencePort.updateComic(comic);
+                ComicSnapshot comic = persistencePort.findComic(targetId);
+                if (comic != null && (comic.status() == ComicStatus.RESTORING
+                        || comic.status() == ComicStatus.PURGING)) {
+                    persistencePort.updateComic(new ComicUpdateCommand(targetId, ComicStatus.TRASHED,
+                            comic.trashedAt(), comic.deletedAt()));
                 }
             }
             case "CHAPTER" -> {
-                Chapter chapter = persistencePort.findChapter(targetId);
-                if (chapter != null && (chapter.getStatus() == ChapterLifecycleStatus.RESTORING
-                        || chapter.getStatus() == ChapterLifecycleStatus.PURGING)) {
-                    chapter.setStatus(ChapterLifecycleStatus.TRASHED);
-            persistencePort.updateChapter(chapter);
+                ChapterSnapshot chapter = persistencePort.findChapter(targetId);
+                if (chapter != null && (chapter.status() == ChapterLifecycleStatus.RESTORING
+                        || chapter.status() == ChapterLifecycleStatus.PURGING)) {
+                    persistencePort.updateChapter(new ChapterUpdateCommand(targetId, ChapterLifecycleStatus.TRASHED,
+                            chapter.trashedAt()));
                 }
             }
             case "MEDIA" -> {
-                Media media = persistencePort.findMedia(targetId);
-                if (media != null && (media.getStatus() == MediaLifecycleStatus.RESTORING
-                        || media.getStatus() == MediaLifecycleStatus.PURGING)) {
-                    media.setStatus(MediaLifecycleStatus.TRASHED);
-                    persistencePort.updateMedia(media);
+                MediaSnapshot media = persistencePort.findMedia(targetId);
+                if (media != null && (media.status() == MediaLifecycleStatus.RESTORING
+                        || media.status() == MediaLifecycleStatus.PURGING)) {
+                    persistencePort.updateMedia(new MediaUpdateCommand(targetId, MediaLifecycleStatus.TRASHED,
+                            null, media.pageNumber()));
                 }
             }
             default -> { }
@@ -254,30 +251,25 @@ public class TrashLifecycleCompletionServiceImpl implements TrashLifecycleComple
     public void revertToReady(String targetType, Long targetId) {
         switch (targetType) {
             case "COMIC" -> {
-                Comic comic = persistencePort.findComic(targetId);
-                if (comic != null && comic.getStatus() == ComicStatus.TRASHING) {
-                    comic.setStatus(ComicStatus.READY);
-                    comic.setTrashedAt(null);
-                    persistencePort.updateComic(comic);
+                ComicSnapshot comic = persistencePort.findComic(targetId);
+                if (comic != null && comic.status() == ComicStatus.TRASHING) {
+                    persistencePort.updateComic(new ComicUpdateCommand(targetId, ComicStatus.READY, null,
+                            comic.deletedAt()));
                 }
             }
             case "CHAPTER" -> {
-                Chapter chapter = persistencePort.findChapter(targetId);
-                if (chapter != null && chapter.getStatus() == ChapterLifecycleStatus.TRASHING) {
-                    chapter.setStatus(ChapterLifecycleStatus.READY);
-                    chapter.setTrashedAt(null);
-                    persistencePort.updateChapter(chapter);
+                ChapterSnapshot chapter = persistencePort.findChapter(targetId);
+                if (chapter != null && chapter.status() == ChapterLifecycleStatus.TRASHING) {
+                    persistencePort.updateChapter(new ChapterUpdateCommand(targetId, ChapterLifecycleStatus.READY, null));
                 }
             }
             case "MEDIA" -> {
-                Media media = persistencePort.findMedia(targetId);
-                if (media != null && media.getStatus() == MediaLifecycleStatus.TRASHING) {
-                    media.setStatus(MediaLifecycleStatus.READY);
-                    media.setTrashedAt(null);
-                    if (media.getOriginalPageNumber() != null) {
-                        media.setPageNumber(media.getOriginalPageNumber());
-                    }
-                    persistencePort.updateMedia(media);
+                MediaSnapshot media = persistencePort.findMedia(targetId);
+                if (media != null && media.status() == MediaLifecycleStatus.TRASHING) {
+                    Integer pageNumber = media.originalPageNumber() != null
+                            ? media.originalPageNumber() : media.pageNumber();
+                    persistencePort.updateMedia(new MediaUpdateCommand(targetId, MediaLifecycleStatus.READY,
+                            null, pageNumber));
                 }
             }
             default -> { }
@@ -301,11 +293,11 @@ public class TrashLifecycleCompletionServiceImpl implements TrashLifecycleComple
      * 计算恢复页码：优先复用 originalPageNumber；被占用时取 1..N+1 的首个空位。
      */
     private int firstFreePageNumber(Long chapterId, int preferred, Long mediaId) {
-        List<Media> existing = persistencePort.findPageNumbers(chapterId);
+        List<MediaPageSnapshot> existing = persistencePort.findPageNumbers(chapterId);
         Set<Integer> occupied = new HashSet<>();
-        for (Media media : existing) {
-            if (!media.getId().equals(mediaId) && media.getPageNumber() != null) {
-                occupied.add(media.getPageNumber());
+        for (MediaPageSnapshot media : existing) {
+            if (!media.id().equals(mediaId) && media.pageNumber() != null) {
+                occupied.add(media.pageNumber());
             }
         }
         if (!occupied.contains(preferred)) {
