@@ -2,7 +2,7 @@ package com.comicatlas.api.catalog.application.service.impl;
 
 import com.comicatlas.api.catalog.application.port.in.ManagementStructureQueryService;
 import com.comicatlas.api.catalog.application.port.out.CatalogStructureQueryPort;
-import com.comicatlas.persistence.storage.FileUrlResolver;
+import com.comicatlas.api.shared.application.port.out.FileUrlResolverPort;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +18,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ManagementStructureQueryServiceImpl implements ManagementStructureQueryService {
     private final CatalogStructureQueryPort queryPort;
-    private final FileUrlResolver fileUrlResolver;
+    private final FileUrlResolverPort fileUrlResolver;
 
     @Override
     public List<CatalogNode> tree(Long comicId) {

@@ -10,7 +10,7 @@ import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.contract.comic.dto.ComicDetailVO;
 import com.comicatlas.contract.comic.dto.ComicMetadataDTO;
 import com.comicatlas.contract.comic.dto.ComicListQuery;
-import com.comicatlas.persistence.storage.FileUrlResolver;
+import com.comicatlas.api.shared.application.port.out.FileUrlResolverPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -21,7 +21,7 @@ import java.util.List;
 public class ManagementComicQueryServiceImpl implements ManagementComicQueryService {
     private final ManagementComicQueryPersistencePort persistencePort;
     private final com.comicatlas.api.library.application.port.out.ComicDetailQueryPort comicDetailQueryPort;
-    private final FileUrlResolver fileUrlResolver;
+    private final FileUrlResolverPort fileUrlResolver;
 
     @Override
     public IPage<ManagementComicListVO> list(ComicListQuery query) {

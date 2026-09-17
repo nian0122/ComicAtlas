@@ -11,7 +11,7 @@ import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.contract.comic.cache.ComicReferenceCache;
 import com.comicatlas.api.storage.application.port.out.StorageQueryPersistencePort;
 import com.comicatlas.api.storage.infrastructure.adapter.StorageCapacityAdapter;
-import com.comicatlas.persistence.storage.FileUrlResolver;
+import com.comicatlas.api.shared.application.port.out.FileUrlResolverPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -28,7 +28,7 @@ import com.comicatlas.api.storage.infrastructure.config.ApiStorageProperties;
 public class StorageQueryServiceImpl implements StorageQueryService {
 
     private final StorageQueryPersistencePort persistencePort;
-    private final FileUrlResolver fileUrlResolver;
+    private final FileUrlResolverPort fileUrlResolver;
     private final ApiStorageProperties storageProperties;
     private final StorageCapacityAdapter storageCapacityAdapter;
 
