@@ -109,10 +109,17 @@
   --content-gutter: clamp(16px, 3vw, 40px);
   --control-min-size: 44px;
   --control-height: 42px;
-  --control-radius: 10px;
-  --control-bg: var(--color-surface-2);
-  --control-bg-hover: var(--color-surface-3);
-  --control-focus-ring: rgb(229 9 20 / 18%);
+  --control-radius: 8px;
+  /* 控件使用略深于面板的石墨底色，避免出现大面积发灰的“塑料块”。 */
+  --control-bg: #151515;
+  --control-bg-hover: #1c1c1c;
+  --control-border: #353535;
+  --control-border-hover: #5a5a5a;
+  /* 焦点使用暖灰，而非与破坏性操作相同的红色。 */
+  --control-focus-border: #aaa9a2;
+  --control-focus-ring: rgb(170 169 162 / 16%);
+  --control-error-border: #e8777d;
+  --control-error-ring: rgb(232 119 125 / 14%);
   --status-dot-size: 8px;
   --disabled-opacity: 0.55;
   --sidebar-width: 232px;

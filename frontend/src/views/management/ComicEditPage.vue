@@ -12,91 +12,94 @@
     </div>
 
     <el-form ref="formRef" :model="form" :rules="rules" label-position="top" class="edit-form">
-      <section class="edit-panel edit-panel--primary">
-        <PanelHeader
-          class="edit-panel-heading"
-          level="h3"
-          title="基本信息"
-          description="这些字段会直接影响漫画在列表和详情页中的呈现。"
-          ><template #leading>01</template></PanelHeader
-        >
-        <el-form-item label="标题" prop="title" class="title-field">
-          <el-input v-model="form.title" placeholder="输入漫画标题" maxlength="255" show-word-limit size="large" />
-        </el-form-item>
-        <div class="field-grid">
-          <el-form-item label="作者" prop="author">
-            <el-input v-model="form.author" placeholder="输入作者名（可选）" maxlength="128" show-word-limit />
+      <div class="edit-main-column">
+        <section class="edit-panel edit-panel--primary">
+          <PanelHeader
+            class="edit-panel-heading"
+            level="h3"
+            title="基本信息"
+            description="这些字段会直接影响漫画在列表和详情页中的呈现。"
+            ><template #leading>01</template></PanelHeader
+          >
+          <el-form-item label="标题" prop="title" class="title-field">
+            <el-input v-model="form.title" placeholder="输入漫画标题" maxlength="255" show-word-limit size="large" />
           </el-form-item>
-          <el-form-item label="分类" prop="categoryId">
-            <el-select v-model="form.categoryId" placeholder="选择分类" clearable>
-              <el-option v-for="cat in categoryStore.list" :key="cat.id" :label="cat.name" :value="cat.id" />
-            </el-select>
-          </el-form-item>
-        </div>
-        <el-form-item label="描述" prop="description">
-          <el-input
-            v-model="form.description"
-            type="textarea"
-            :rows="5"
-            placeholder="写下这部漫画的简介、备注或阅读提示（可选）"
-            maxlength="4000"
-            show-word-limit
-          />
-        </el-form-item>
-      </section>
-
-      <section class="edit-panel archive-panel">
-        <PanelHeader
-          class="edit-panel-heading"
-          level="h3"
-          title="归档与检索"
-          description="用分类和标签建立你的漫画索引。"
-          ><template #leading>02</template></PanelHeader
-        >
-        <el-form-item label="标签" prop="tags">
-          <div class="tag-editor">
-            <div v-if="selectedTags.length" class="selected-tags">
-              <el-tag
-                v-for="tag in selectedTags"
-                :key="tag.id"
-                closable
-                class="selected-tag"
-                @close="removeTag(tag.id)"
-                >{{ tag.name }}</el-tag
-              >
-            </div>
-            <div class="tag-add-row">
-              <el-select
-                v-model="tagInput"
-                filterable
-                default-first-option
-                placeholder="搜索或选择标签"
-                class="tag-select"
-                popper-class="comic-tag-popper"
-                @change="onExistingTagSelect"
-              >
-                <template #prefix
-                  ><el-icon><Search /></el-icon
-                ></template>
-                <el-option v-for="tag in availableTags" :key="tag.id" :label="tag.name" :value="tag.id" />
+          <div class="field-grid">
+            <el-form-item label="作者" prop="author">
+              <el-input v-model="form.author" placeholder="输入作者名（可选）" maxlength="128" show-word-limit />
+            </el-form-item>
+            <el-form-item label="分类" prop="categoryId">
+              <el-select v-model="form.categoryId" placeholder="选择分类" clearable>
+                <el-option v-for="cat in categoryStore.list" :key="cat.id" :label="cat.name" :value="cat.id" />
               </el-select>
-              <span class="or-divider">或</span>
-              <el-input
-                v-model="newTagName"
-                placeholder="创建新标签"
-                class="new-tag-input"
-                @keyup.enter="onCreateTag"
-              />
-              <el-button type="primary" plain @click="onCreateTag">添加</el-button>
-            </div>
-            <small class="field-hint"
-              ><el-icon><Search /></el-icon>可输入关键词搜索已有标签；标签只用于搜索和筛选，不会改变原始文件。</small
-            >
+            </el-form-item>
           </div>
-        </el-form-item>
-      </section>
+          <el-form-item label="描述" prop="description">
+            <el-input
+              v-model="form.description"
+              type="textarea"
+              :rows="5"
+              placeholder="写下这部漫画的简介、备注或阅读提示（可选）"
+              maxlength="4000"
+              show-word-limit
+            />
+          </el-form-item>
+        </section>
 
-      <section class="edit-panel source-panel">
+        <section class="edit-panel archive-panel">
+          <PanelHeader
+            class="edit-panel-heading"
+            level="h3"
+            title="归档与检索"
+            description="用分类和标签建立你的漫画索引。"
+            ><template #leading>02</template></PanelHeader
+          >
+          <el-form-item label="标签" prop="tags">
+            <div class="tag-editor">
+              <div v-if="selectedTags.length" class="selected-tags">
+                <el-tag
+                  v-for="tag in selectedTags"
+                  :key="tag.id"
+                  closable
+                  class="selected-tag"
+                  @close="removeTag(tag.id)"
+                  >{{ tag.name }}</el-tag
+                >
+              </div>
+              <div class="tag-add-row">
+                <el-select
+                  v-model="tagInput"
+                  filterable
+                  default-first-option
+                  placeholder="搜索或选择标签"
+                  class="tag-select"
+                  popper-class="comic-tag-popper"
+                  @change="onExistingTagSelect"
+                >
+                  <template #prefix
+                    ><el-icon><Search /></el-icon
+                  ></template>
+                  <el-option v-for="tag in availableTags" :key="tag.id" :label="tag.name" :value="tag.id" />
+                </el-select>
+                <span class="or-divider">或</span>
+                <el-input
+                  v-model="newTagName"
+                  placeholder="创建新标签"
+                  class="new-tag-input"
+                  @keyup.enter="onCreateTag"
+                />
+                <el-button type="primary" plain @click="onCreateTag">添加</el-button>
+              </div>
+              <small class="field-hint"
+                ><el-icon><Search /></el-icon>可输入关键词搜索已有标签；标签只用于搜索和筛选，不会改变原始文件。</small
+              >
+            </div>
+          </el-form-item>
+        </section>
+      </div>
+
+      <aside class="edit-side-column">
+        <section class="edit-panel source-panel">
         <PanelHeader
           class="edit-panel-heading"
           level="h3"
@@ -109,9 +112,9 @@
           <span v-if="sourceRef" class="source-ref">{{ sourceRef }}</span>
           <span v-if="!sourceType && !sourceRef" class="source-empty">暂无来源记录</span>
         </div>
-      </section>
+        </section>
 
-      <section v-if="comicInfo" class="edit-panel comicinfo-panel">
+        <section v-if="comicInfo" class="edit-panel comicinfo-panel">
         <PanelHeader
           class="edit-panel-heading"
           level="h3"
@@ -137,10 +140,11 @@
         <div v-if="comicInfo.tags.length" class="comicinfo-tags">
           <span v-for="tag in comicInfo.tags" :key="tag">{{ tag }}</span>
         </div>
-      </section>
+        </section>
+      </aside>
 
       <div class="form-actions">
-        <el-button text @click="goBack">取消</el-button>
+        <el-button @click="goBack">取消</el-button>
         <el-button type="primary" size="large" :loading="saving" @click="handleSave">保存修改</el-button>
       </div>
     </el-form>

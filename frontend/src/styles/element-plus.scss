@@ -48,12 +48,12 @@
   --el-button-disabled-bg-color: var(--bg-surface);
   --el-button-disabled-border-color: var(--border);
 
-  min-height: 32px;
+  min-height: 36px;
   padding: 0 14px;
   font-size: 12px;
   font-weight: 650;
   line-height: 1;
-  border-radius: var(--radius-sm);
+  border-radius: var(--control-radius);
   transition:
     background-color var(--transition-fast),
     border-color var(--transition-fast),
@@ -68,7 +68,7 @@
 }
 
 .el-button--large {
-  min-height: 38px;
+  min-height: 40px;
   padding: 0 18px;
   font-size: 13px;
 }
@@ -97,7 +97,7 @@
 
 .el-button:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-bg);
 }
 
 .el-button--primary {
@@ -387,9 +387,9 @@
 .el-input {
   --el-input-bg-color: var(--bg-surface);
   --el-input-text-color: var(--text-primary);
-  --el-input-border-color: var(--border);
-  --el-input-hover-border-color: var(--border-strong);
-  --el-input-focus-border-color: var(--accent);
+  --el-input-border-color: var(--control-border);
+  --el-input-hover-border-color: var(--control-border-hover);
+  --el-input-focus-border-color: var(--control-focus-border);
   --el-input-placeholder-color: var(--text-muted);
   --el-input-disabled-bg-color: var(--bg-secondary);
   --el-input-disabled-text-color: var(--text-muted);
@@ -398,10 +398,10 @@
   .el-input__wrapper {
     min-height: var(--control-height);
     padding: 0 14px;
-    background: linear-gradient(180deg, var(--control-bg), var(--bg-secondary));
+    background: var(--control-bg);
     box-shadow:
-      inset 0 0 0 1px var(--border),
-      var(--shadow-sm);
+      inset 0 0 0 1px var(--control-border),
+      0 1px 1px rgb(0 0 0 / 28%);
     border-radius: var(--control-radius);
     transition:
       background-color var(--transition-fast),
@@ -411,13 +411,13 @@
     &:hover {
       background: var(--control-bg-hover);
       box-shadow:
-        inset 0 0 0 1px var(--border-strong),
-        var(--shadow-sm);
+        inset 0 0 0 1px var(--control-border-hover),
+        0 2px 5px rgb(0 0 0 / 20%);
     }
 
     &.is-focus {
       background: var(--control-bg);
-      box-shadow: inset 0 0 0 1px var(--accent), var(--shadow-sm);
+      box-shadow: inset 0 0 0 1px var(--control-focus-border);
     }
   }
 
@@ -447,12 +447,12 @@
   min-height: calc(var(--control-height) * 2);
   padding: 11px 14px;
   color: var(--text-primary);
-  background: linear-gradient(180deg, var(--control-bg), var(--bg-secondary));
+  background: var(--control-bg);
   border: 0;
   border-radius: var(--control-radius);
   box-shadow:
-    inset 0 0 0 1px var(--border),
-    var(--shadow-sm);
+    inset 0 0 0 1px var(--control-border),
+    0 1px 1px rgb(0 0 0 / 28%);
   transition:
     background-color var(--transition-fast),
     box-shadow var(--transition-fast);
@@ -460,13 +460,13 @@
   &:hover {
     background: var(--control-bg-hover);
     box-shadow:
-      inset 0 0 0 1px var(--border-strong),
-      var(--shadow-sm);
+      inset 0 0 0 1px var(--control-border-hover),
+      0 2px 5px rgb(0 0 0 / 20%);
   }
 
   &:focus {
     background: var(--control-bg);
-    box-shadow: inset 0 0 0 1px var(--accent), var(--shadow-sm);
+    box-shadow: inset 0 0 0 1px var(--control-focus-border);
   }
 
   &:disabled {
@@ -487,20 +487,20 @@
 .el-select__wrapper {
   min-height: var(--control-height);
   padding: 0 14px;
-  background: linear-gradient(180deg, var(--control-bg), var(--bg-secondary));
+  background: var(--control-bg);
   --el-fill-color-blank: var(--bg-surface);
   --el-fill-color-light: var(--bg-secondary);
   box-shadow:
-    inset 0 0 0 1px var(--border),
-    var(--shadow-sm);
+    inset 0 0 0 1px var(--control-border),
+    0 1px 1px rgb(0 0 0 / 28%);
   border-radius: var(--control-radius);
 
   &:hover:not(.is-disabled):not(.is-focused) {
     background: var(--control-bg-hover);
     background-color: var(--control-bg-hover);
     box-shadow:
-      inset 0 0 0 1px var(--border-strong),
-      var(--shadow-sm);
+      inset 0 0 0 1px var(--control-border-hover),
+      0 2px 5px rgb(0 0 0 / 20%);
   }
 
   &.is-hovering:not(.is-disabled):not(.is-focused) {
@@ -508,12 +508,12 @@
     background: var(--surface-highlight);
     background-color: var(--surface-highlight);
     box-shadow:
-      inset 0 0 0 1px var(--border-strong),
-      var(--shadow-sm);
+      inset 0 0 0 1px var(--control-border-hover),
+      0 2px 5px rgb(0 0 0 / 20%);
   }
 
   &.is-focused {
-    box-shadow: inset 0 0 0 1px var(--accent), var(--shadow-sm);
+    box-shadow: inset 0 0 0 1px var(--control-focus-border);
   }
 
   .el-select__placeholder {
@@ -542,20 +542,27 @@
 .el-input .el-input__wrapper,
 .el-select .el-select__wrapper {
   border: 0 !important;
-  background: linear-gradient(180deg, var(--control-bg), var(--bg-secondary)) !important;
-  box-shadow: inset 0 0 0 1px var(--border), var(--shadow-sm) !important;
+  background: var(--control-bg) !important;
+  box-shadow: inset 0 0 0 1px var(--control-border), 0 1px 1px rgb(0 0 0 / 28%) !important;
 }
 
 .el-input .el-input__wrapper:hover,
 .el-select .el-select__wrapper:hover:not(.is-disabled):not(.is-focused) {
   background: var(--control-bg-hover) !important;
-  box-shadow: inset 0 0 0 1px var(--border-strong), var(--shadow-sm) !important;
+  box-shadow: inset 0 0 0 1px var(--control-border-hover), 0 2px 5px rgb(0 0 0 / 20%) !important;
 }
 
 .el-input .el-input__wrapper.is-focus,
 .el-select .el-select__wrapper.is-focused,
 .el-select:focus-within .el-select__wrapper {
-  box-shadow: inset 0 0 0 1px var(--accent), var(--shadow-sm) !important;
+  box-shadow: inset 0 0 0 1px var(--control-focus-border) !important;
+}
+
+/* 表单错误是信息提示而非第二层容器：只改变控件描边，避免焦点和校验态叠成粗红框。 */
+.el-form-item.is-error .el-input__wrapper,
+.el-form-item.is-error .el-select__wrapper,
+.el-form-item.is-error .el-textarea__inner {
+  box-shadow: inset 0 0 0 1px var(--control-error-border) !important;
 }
 
 /* Element Plus 字数统计默认是白底，深色主题下会形成突兀的白块。 */
@@ -582,15 +589,24 @@
   box-shadow: none !important;
 }
 
-/* Element Plus 选择器内部的搜索输入不是独立控件，不能继承全局原生 input 外观。 */
-.el-select__input {
+/*
+ * Element Plus 的可过滤选择器把原生 input 放进控件容器中。基础层的原生
+ * input 规则具有更高选择器优先级；这里须显式清空所有盒模型视觉属性，
+ * 否则会在选择框内部再次画出一只输入框。
+ */
+input.el-select__input,
+input.el-input__inner {
   min-height: 0;
   padding: 0;
-  color: var(--text-primary);
-  background: transparent;
-  border: 0;
+  background: transparent !important;
+  border: 0 !important;
   border-radius: 0;
-  box-shadow: none;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+input.el-select__input {
+  color: var(--text-primary);
 }
 
 .el-input-number,
@@ -623,7 +639,6 @@
   --el-bg-color-overlay: var(--bg-surface);
   --el-border-color-light: var(--border);
 
-  min-width: 0 !important;
   max-width: min(560px, calc(100vw - 20px));
   overflow: hidden;
   background-color: var(--bg-surface) !important;
@@ -995,15 +1010,15 @@
 .el-select,
 .el-select.is-focused,
 .el-select:focus-within {
-  --el-select-input-focus-border-color: var(--accent);
-  --el-border-color-hover: var(--border-strong);
+  --el-select-input-focus-border-color: var(--control-focus-border);
+  --el-border-color-hover: var(--control-border-hover);
 }
 
 .el-select.is-focused .el-select__wrapper,
 .el-select:focus-within .el-select__wrapper {
   outline: none;
   border-color: transparent;
-  box-shadow: inset 0 0 0 1px var(--accent), var(--shadow-sm) !important;
+  box-shadow: inset 0 0 0 1px var(--control-focus-border) !important;
 }
 
 /* Element Plus 进度条默认使用蓝色 primary，管理任务进度必须沿用品牌红。 */
@@ -1126,6 +1141,7 @@
   --el-tag-bg-color: var(--bg-surface);
   --el-tag-border-color: var(--border);
   --el-tag-text-color: var(--text-secondary);
+  --el-tag-hover-color: var(--accent);
   border-radius: var(--radius-sm);
 
   &,
@@ -1144,11 +1160,16 @@
   }
 
   .el-tag__close {
-    color: var(--text-muted);
+    color: var(--text-muted) !important;
+
+    &:focus-visible {
+      outline: 2px solid var(--accent) !important;
+      outline-offset: 2px;
+    }
 
     &:hover {
-      color: var(--text-primary);
-      background: var(--accent);
+      color: var(--color-on-brand) !important;
+      background: var(--accent) !important;
     }
   }
 }
