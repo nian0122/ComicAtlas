@@ -35,8 +35,6 @@ import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
 import com.comicatlas.api.task.domain.model.TaskType;
 import com.comicatlas.contract.common.enums.TranscodeStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
-import com.comicatlas.persistence.comic.entity.Chapter;
-import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.entity.Media;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -195,28 +193,27 @@ public class UploadSessionServiceImpl implements UploadSessionService {
         return fileResponses;
     }
 
-    private Chapter validateTarget(Long comicId, Long chapterId, Long replaceMediaId) {
-        Comic comic = persistencePort.findComic(comicId);
+    private void validateTarget(Long comicId, Long chapterId, Long replaceMediaId) {
+        UploadSessionPersistencePort.ComicSnapshot comic = persistencePort.findComic(comicId);
         if (comic == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在: " + comicId);
         }
-        if (NON_UPLOADABLE_STATUSES.contains(comic.getStatus())) {
-            throw new BusinessException(HttpStatusCodes.CONFLICT, "漫画状态 " + comic.getStatus() + " 不允许上传媒体");
+        if (NON_UPLOADABLE_STATUSES.contains(comic.status())) {
+            throw new BusinessException(HttpStatusCodes.CONFLICT, "漫画状态 " + comic.status() + " 不允许上传媒体");
         }
-        Chapter chapter = persistencePort.findChapter(chapterId);
-        if (chapter == null || !chapter.getComicId().equals(comicId)) {
+        UploadSessionPersistencePort.ChapterSnapshot chapter = persistencePort.findChapter(chapterId);
+        if (chapter == null || !chapter.comicId().equals(comicId)) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在或不属于该漫画: " + chapterId);
         }
         if (replaceMediaId != null) {
-            Media media = persistencePort.findMedia(replaceMediaId);
-            if (media == null || !media.getChapterId().equals(chapterId)) {
+            UploadSessionPersistencePort.MediaSnapshot media = persistencePort.findMedia(replaceMediaId);
+            if (media == null || !media.chapterId().equals(chapterId)) {
                 throw new BusinessException(HttpStatusCodes.NOT_FOUND, "替换目标媒体不存在或不属于该章节: " + replaceMediaId);
             }
-            if (media.getStatus() != MediaLifecycleStatus.READY) {
-                throw new BusinessException(HttpStatusCodes.CONFLICT, "替换目标媒体状态 " + media.getStatus() + " 不允许替换");
+            if (media.status() != MediaLifecycleStatus.READY) {
+                throw new BusinessException(HttpStatusCodes.CONFLICT, "替换目标媒体状态 " + media.status() + " 不允许替换");
             }
         }
-        return chapter;
     }
 
     // ======================== 查询 ========================
@@ -471,7 +468,7 @@ public class UploadSessionServiceImpl implements UploadSessionService {
     private int nextPageNumber(Long chapterId) {
         return persistencePort.findMediaByChapter(chapterId)
                 .stream()
-                .map(Media::getPageNumber)
+                .map(UploadSessionPersistencePort.MediaSnapshot::pageNumber)
                 .filter(pageNumber -> pageNumber != null)
                 .max(Comparator.naturalOrder())
                 .orElse(0);

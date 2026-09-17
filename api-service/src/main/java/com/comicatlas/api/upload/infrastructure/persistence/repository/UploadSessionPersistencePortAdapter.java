@@ -27,10 +27,27 @@ public class UploadSessionPersistencePortAdapter implements UploadSessionPersist
     private final ChapterMapper chapterMapper;
     private final MediaMapper mediaMapper;
 
-    @Override public Comic findComic(Long comicId) { return comicMapper.selectById(comicId); }
-    @Override public Chapter findChapter(Long chapterId) { return chapterMapper.selectById(chapterId); }
-    @Override public Media findMedia(Long mediaId) { return mediaMapper.selectById(mediaId); }
-    @Override public List<Media> findMediaByChapter(Long chapterId) { return mediaMapper.selectByChapterId(chapterId); }
+    @Override public UploadSessionPersistencePort.ComicSnapshot findComic(Long comicId) {
+        Comic comic = comicMapper.selectById(comicId);
+        return comic == null ? null : new UploadSessionPersistencePort.ComicSnapshot(
+                comic.getId(), comic.getStatus());
+    }
+    @Override public UploadSessionPersistencePort.ChapterSnapshot findChapter(Long chapterId) {
+        Chapter chapter = chapterMapper.selectById(chapterId);
+        return chapter == null ? null : new UploadSessionPersistencePort.ChapterSnapshot(
+                chapter.getId(), chapter.getComicId());
+    }
+    @Override public UploadSessionPersistencePort.MediaSnapshot findMedia(Long mediaId) {
+        Media media = mediaMapper.selectById(mediaId);
+        return media == null ? null : new UploadSessionPersistencePort.MediaSnapshot(
+                media.getId(), media.getChapterId(), media.getPageNumber(), media.getStatus());
+    }
+    @Override public List<UploadSessionPersistencePort.MediaSnapshot> findMediaByChapter(Long chapterId) {
+        return mediaMapper.selectByChapterId(chapterId).stream()
+                .map(media -> new UploadSessionPersistencePort.MediaSnapshot(
+                        media.getId(), media.getChapterId(), media.getPageNumber(), media.getStatus()))
+                .toList();
+    }
     @Override public UploadSession findBySessionId(String sessionId) { return sessionMapper.selectBySessionId(sessionId); }
     @Override public UploadSession findById(Long sessionId) { return sessionMapper.selectById(sessionId); }
     @Override public List<UploadSession> findExpiredActive(LocalDateTime now) { return sessionMapper.selectExpiredActive(now); }
