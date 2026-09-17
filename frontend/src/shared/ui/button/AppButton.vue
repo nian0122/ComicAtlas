@@ -93,8 +93,8 @@ withDefaults(
   --button-color: var(--accent);
 }
 .app-button--overlay {
-  --button-bg: rgb(0 0 0 / 70%);
-  --button-border: rgb(255 255 255 / 28%);
+  --button-bg: var(--color-overlay-scrim);
+  --button-border: var(--color-overlay-soft);
   --button-color: var(--color-on-brand);
 }
 .app-button--sm {

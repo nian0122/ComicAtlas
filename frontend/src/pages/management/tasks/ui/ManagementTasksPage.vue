@@ -98,7 +98,7 @@
           </article>
         </div>
       </section>
-      <EmptyState v-if="groupedTasks.length === 0" description="当前筛选条件下暂无任务" bordered />
+      <ContentState v-if="groupedTasks.length === 0" state="empty" message="当前筛选条件下暂无任务" bordered />
     </div>
     <el-pagination
       v-model:current-page="query.page"
@@ -221,7 +221,7 @@
 <script setup lang="ts">
 import { StatGrid } from '@/shared/ui/management-panel'
 import { TaskStatusTag } from '@/features/task'
-import { EmptyState } from '@/shared/ui/management-panel'
+import { ContentState } from '@/shared/ui/content-state'
 import { StatCard } from '@/shared/ui/management-panel'
 import { PageHeader } from '@/shared/ui/page-header'
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'

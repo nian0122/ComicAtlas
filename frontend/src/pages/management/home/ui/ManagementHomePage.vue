@@ -40,7 +40,7 @@
           </tbody>
         </table>
       </div>
-      <EmptyState v-else description="暂无管理任务" />
+      <ContentState v-else state="empty" message="暂无管理任务" />
     </ManagementPanel>
 
     <div class="dashboard-columns">
@@ -67,7 +67,7 @@
             <ComicStatusTag :status="comic.status" appearance="dot" />
           </router-link>
         </div>
-        <EmptyState v-else description="暂无漫画记录" />
+        <ContentState v-else state="empty" message="暂无漫画记录" />
       </ManagementPanel>
 
       <ManagementPanel class="quick-panel" aria-labelledby="quick-action-title">
@@ -114,7 +114,7 @@ import { ComicStatusTag } from '@/entities/comic/ui'
 import { TaskStatusTag } from '@/features/task'
 import { StatCard } from '@/shared/ui/management-panel'
 import { PanelHeader } from '@/shared/ui/management-panel'
-import { EmptyState } from '@/shared/ui/management-panel'
+import { ContentState } from '@/shared/ui/content-state'
 import { PageHeader } from '@/shared/ui/page-header'
 import { onMounted, ref } from 'vue'
 import {
