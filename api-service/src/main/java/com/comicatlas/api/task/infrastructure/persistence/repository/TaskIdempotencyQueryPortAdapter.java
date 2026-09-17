@@ -2,7 +2,6 @@ package com.comicatlas.api.task.infrastructure.persistence.repository;
 
 import com.comicatlas.api.task.application.port.out.TaskIdempotencyQueryPort;
 import com.comicatlas.api.task.application.port.out.TaskQueryPersistencePort;
-import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTask;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -14,8 +13,8 @@ public class TaskIdempotencyQueryPortAdapter implements TaskIdempotencyQueryPort
 
     @Override
     public TaskSnapshot findByIdempotencyKey(String idempotencyKey) {
-        ManagementTask task = persistencePort.findByIdempotencyKey(idempotencyKey);
-        return task == null ? null : new TaskSnapshot(task.getId(), task.getIdempotencyPayloadHash(),
-                task.getTaskType(), task.getStatus() == null ? null : task.getStatus().name(), task.getTotalCount());
+        TaskQueryPersistencePort.TaskSnapshot task = persistencePort.findByIdempotencyKey(idempotencyKey);
+        return task == null ? null : new TaskSnapshot(task.id(), task.idempotencyPayloadHash(),
+                task.taskType(), task.status() == null ? null : task.status().name(), task.totalCount());
     }
 }

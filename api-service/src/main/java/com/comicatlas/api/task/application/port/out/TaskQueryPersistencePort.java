@@ -1,9 +1,8 @@
 package com.comicatlas.api.task.application.port.out;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTask;
-import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTaskItem;
 import com.comicatlas.api.task.domain.model.TaskType;
+import com.comicatlas.api.task.domain.model.ManagementTaskStatus;
 
 import java.util.List;
 import java.time.LocalDateTime;
@@ -13,30 +12,30 @@ public interface TaskQueryPersistencePort {
 
     List<Long> findTaskIdsByComicId(Long comicId);
 
-    IPage<ManagementTask> findPage(int page, int size, String taskType, String status,
+    IPage<TaskSnapshot> findPage(int page, int size, String taskType, String status,
                                     String batchId, String targetType, List<Long> taskIds);
 
-    ManagementTask findTask(Long taskId);
+    TaskSnapshot findTask(Long taskId);
 
-    List<ManagementTaskItem> findItemsByTaskId(Long taskId);
+    List<ItemSnapshot> findItemsByTaskId(Long taskId);
 
-    List<ManagementTaskItem> findItemsByTaskIds(List<Long> taskIds);
+    List<ItemSnapshot> findItemsByTaskIds(List<Long> taskIds);
 
-    ManagementTask findByIdempotencyKey(String idempotencyKey);
+    TaskSnapshot findByIdempotencyKey(String idempotencyKey);
 
-    ManagementTaskItem findActiveItem(String targetType, Long targetId, TaskType operationType);
+    ItemSnapshot findActiveItem(String targetType, Long targetId, TaskType operationType);
 
     long countActiveItems(Long taskId);
 
     long countActiveMetadataItems(Long taskId, Long comicId);
 
-    void insertTask(ManagementTask task);
+    Long insertTask(CreateTaskCommand command);
 
-    void updateTask(ManagementTask task);
+    int updateTask(UpdateTaskCommand command);
 
     long countItemsByLockKey(String lockKey);
 
-    void insertTaskItem(ManagementTaskItem item);
+    Long insertTaskItem(CreateItemCommand command);
 
     int resetTask(Long taskId, int attempt, LocalDateTime updatedAt);
 
@@ -54,7 +53,7 @@ public interface TaskQueryPersistencePort {
     int updateItemProgress(Long itemId, Integer attempt, int progress, boolean startItem,
                            LocalDateTime startedAt, LocalDateTime updatedAt);
 
-    ManagementTaskItem findItem(Long itemId);
+    ItemSnapshot findItem(Long itemId);
 
     List<ComicSnapshot> findComicsByIds(List<Long> comicIds);
 
@@ -69,5 +68,33 @@ public interface TaskQueryPersistencePort {
     }
 
     record MediaSnapshot(Long id, Long chapterId) {
+    }
+
+    record TaskSnapshot(Long id, TaskType taskType, String operation, String targetType,
+                        String batchId, Boolean batch, ManagementTaskStatus status, String stage,
+                        Integer progress, Integer totalCount, Integer successCount, Integer failureCount,
+                        Integer cancelledCount, String errorMessage, Integer attempt, Integer version,
+                        String idempotencyPayloadHash, LocalDateTime createdAt, LocalDateTime updatedAt,
+                        LocalDateTime startedAt, LocalDateTime completedAt) {
+    }
+
+    record ItemSnapshot(Long id, Long taskId, String targetType, Long targetId, TaskType operationType,
+                        ManagementTaskStatus status, Integer attempt, Integer progress, String lockKey,
+                        String resultRefType, Long resultRefId, String errorMessage, Integer version,
+                        LocalDateTime createdAt, LocalDateTime updatedAt, LocalDateTime startedAt,
+                        LocalDateTime completedAt) {
+    }
+
+    record CreateTaskCommand(TaskType taskType, String operation, String targetType, String batchId,
+                             Boolean batch, ManagementTaskStatus status, Integer progress, Integer attempt,
+                             String idempotencyKey, String idempotencyPayloadHash, Integer totalCount,
+                             Integer successCount, Integer failureCount, Integer cancelledCount) {
+    }
+
+    record UpdateTaskCommand(Long id, ManagementTaskStatus status, LocalDateTime updatedAt) {
+    }
+
+    record CreateItemCommand(Long taskId, String targetType, Long targetId, TaskType operationType,
+                             ManagementTaskStatus status, Integer attempt, Integer progress, String lockKey) {
     }
 }

@@ -4,8 +4,6 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.comicatlas.api.task.interfaces.rest.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.task.interfaces.rest.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.task.interfaces.rest.dto.ManagementTaskResponse;
-import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTask;
-import com.comicatlas.api.task.infrastructure.persistence.entity.ManagementTaskItem;
 import com.comicatlas.api.task.application.port.in.ManagementTaskService;
 import com.comicatlas.api.task.application.port.out.TaskRetryPublisher;
 import com.comicatlas.api.task.application.assembler.TaskResponseAssembler;
@@ -14,10 +12,16 @@ import com.comicatlas.api.task.application.service.TaskAggregationService;
 import com.comicatlas.api.task.application.service.TaskInternalQueryService;
 import com.comicatlas.api.task.application.port.out.TaskLifecyclePolicy;
 import com.comicatlas.api.task.application.port.out.TaskQueryPersistencePort;
+import com.comicatlas.api.task.application.port.out.TaskQueryPersistencePort.TaskSnapshot;
+import com.comicatlas.api.task.application.port.out.TaskQueryPersistencePort.ItemSnapshot;
+import com.comicatlas.api.task.application.port.out.TaskQueryPersistencePort.CreateTaskCommand;
+import com.comicatlas.api.task.application.port.out.TaskQueryPersistencePort.CreateItemCommand;
+import com.comicatlas.api.task.application.port.out.TaskQueryPersistencePort.UpdateTaskCommand;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.api.task.domain.model.ManagementTaskStatus;
 import com.comicatlas.api.task.domain.model.TaskStage;
 import com.comicatlas.api.task.domain.model.TaskType;
+import com.comicatlas.api.task.domain.model.TaskLockKey;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.shared.exception.ConflictException;
 import com.comicatlas.api.shared.crypto.DigestService;
@@ -29,7 +33,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -78,11 +81,11 @@ public class ManagementTaskServiceImpl implements ManagementTaskService {
                                               String payload) {
         // 幂等检查
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {
-            ManagementTask existing = persistencePort.findByIdempotencyKey(idempotencyKey);
+            TaskSnapshot existing = persistencePort.findByIdempotencyKey(idempotencyKey);
             if (existing != null) {
                 String expectedHash = digestService.sha256(payload);
-                if (expectedHash.equals(existing.getIdempotencyPayloadHash())) {
-                    log.info("幂等命中 idempotencyKey={}, 返回已有任务 {}", idempotencyKey, existing.getId());
+                if (expectedHash.equals(existing.idempotencyPayloadHash())) {
+                    log.info("幂等命中 idempotencyKey={}, 返回已有任务 {}", idempotencyKey, existing.id());
                     return taskResponseAssembler.toResponse(existing);
                 }
                 throw new ConflictException("幂等键 " + idempotencyKey + " 已存在但 payload 不匹配");
@@ -90,31 +93,16 @@ public class ManagementTaskServiceImpl implements ManagementTaskService {
         }
 
         // 构建主任务
-        ManagementTask task = new ManagementTask();
-        task.setTaskType(request.getTaskType());
-        task.setOperation(request.getOperation());
-        task.setTargetType(request.getTargetType());
-        task.setBatchId(request.getBatchId());
-        task.setBatch(request.getTargets() != null && request.getTargets().size() > 1);
-        task.setStatus(ManagementTaskStatus.QUEUED);
-        task.setProgress(0);
-        task.setAttempt(INITIAL_ATTEMPT);
-
-        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
-            task.setIdempotencyKey(idempotencyKey);
-            task.setIdempotencyPayloadHash(digestService.sha256(payload));
-        }
-
         int totalCount = 0;
         if (request.getTargets() != null) {
             totalCount = request.getTargets().size();
         }
-        task.setTotalCount(totalCount);
-        task.setSuccessCount(0);
-        task.setFailureCount(0);
-        task.setCancelledCount(0);
-
-        persistencePort.insertTask(task);
+        String payloadHash = idempotencyKey == null || idempotencyKey.isBlank()
+                ? null : digestService.sha256(payload);
+        Long taskId = persistencePort.insertTask(new CreateTaskCommand(request.getTaskType(), request.getOperation(),
+                request.getTargetType(), request.getBatchId(), request.getTargets() != null
+                && request.getTargets().size() > 1, ManagementTaskStatus.QUEUED, 0, INITIAL_ATTEMPT,
+                idempotencyKey, payloadHash, totalCount, 0, 0, 0));
 
         // 元数据刷新可能展开为多个章节项；同一本漫画只允许执行一次 READY→REFRESHING CAS。
         taskLifecyclePolicy.lockOnCreate(request.getTaskType(), request.getTargets().stream()
@@ -123,14 +111,14 @@ public class ManagementTaskServiceImpl implements ManagementTaskService {
                 .toList());
 
         // 创建目标项（带目标冲突锁检查）
-        List<ManagementTaskItem> items = new ArrayList<>();
+        int itemCount = 0;
         if (request.getTargets() != null) {
             for (CreateManagementTaskRequest.TaskTarget target : request.getTargets()) {
                 TaskType opType = target.getOperationType() != null
                         ? target.getOperationType()
                         : request.getTaskType();
 
-                String lockKey = ManagementTaskItem.buildLockKey(
+                String lockKey = TaskLockKey.of(
                         target.getTargetType(), target.getTargetId(), opType);
 
                 // 检查目标冲突锁：查询是否有活跃项占用此 lock_key
@@ -141,35 +129,22 @@ public class ManagementTaskServiceImpl implements ManagementTaskService {
                                     target.getTargetType(), target.getTargetId(), opType));
                 }
 
-                ManagementTaskItem item = new ManagementTaskItem();
-                item.setTaskId(task.getId());
-                item.setTargetType(target.getTargetType());
-                item.setTargetId(target.getTargetId());
-                item.setOperationType(opType);
-                item.setStatus(ManagementTaskStatus.QUEUED);
-                item.setAttempt(INITIAL_ATTEMPT);
-                item.setProgress(0);
-                item.setLockKey(lockKey);
-                items.add(item);
-            }
-        }
-
-        if (!items.isEmpty()) {
-            for (ManagementTaskItem item : items) {
                 try {
-                    persistencePort.insertTaskItem(item);
+                    persistencePort.insertTaskItem(new CreateItemCommand(taskId, target.getTargetType(),
+                            target.getTargetId(), opType, ManagementTaskStatus.QUEUED, INITIAL_ATTEMPT, 0, lockKey));
+                    itemCount++;
                 } catch (DuplicateKeyException ex) {
-                    throw new ConflictException(
-                            String.format("目标 %s:%d 在操作 %s 中已有活跃任务项",
-                                    item.getTargetType(), item.getTargetId(), item.getOperationType()));
+                    throw new ConflictException(String.format("目标 %s:%d 在操作 %s 中已有活跃任务项",
+                            target.getTargetType(), target.getTargetId(), opType));
                 }
             }
         }
 
         log.info("创建管理任务 id={}, type={}, items={}, idempotencyKey={}",
-                task.getId(), request.getTaskType(), items.size(), idempotencyKey);
-        return taskResponseAssembler.toResponse(task);
+                taskId, request.getTaskType(), itemCount, idempotencyKey);
+        return taskResponseAssembler.toResponse(persistencePort.findTask(taskId));
     }
+
 
     // ======================== 查询 ========================
 
@@ -198,28 +173,27 @@ public class ManagementTaskServiceImpl implements ManagementTaskService {
      */
     @Transactional
     public ManagementTaskResponse cancelTask(Long taskId) {
-        ManagementTask task = persistencePort.findTask(taskId);
+        TaskSnapshot task = persistencePort.findTask(taskId);
         if (task == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在: " + taskId);
         }
 
-        if (task.getStatus() == ManagementTaskStatus.CANCELLED) {
+        if (task.status() == ManagementTaskStatus.CANCELLED) {
             return taskResponseAssembler.toResponse(task);
         }
 
-        if (task.getStatus().isTerminal()) {
+        if (task.status().isTerminal()) {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST,
-                    "任务 " + taskId + " 已处于终态 " + task.getStatus() + "，无法取消");
+                    "任务 " + taskId + " 已处于终态 " + task.status() + "，无法取消");
         }
 
         // 如果已经在取消中，不重复操作
-        if (task.getStatus() == ManagementTaskStatus.CANCELLING) {
+        if (task.status() == ManagementTaskStatus.CANCELLING) {
             return taskResponseAssembler.toResponse(task);
         }
 
-        task.setStatus(ManagementTaskStatus.CANCELLING);
-        task.setUpdatedAt(LocalDateTime.now());
-        persistencePort.updateTask(task);
+        LocalDateTime updateTime = LocalDateTime.now();
+        persistencePort.updateTask(new UpdateTaskCommand(taskId, ManagementTaskStatus.CANCELLING, updateTime));
 
         // 将未开始的 item 标记为 CANCELLED
         LocalDateTime cancelTime = LocalDateTime.now();
@@ -227,13 +201,12 @@ public class ManagementTaskServiceImpl implements ManagementTaskService {
 
         // 重新聚合状态
         taskAggregationService.aggregate(taskId);
-        List<ManagementTaskItem> cancelledItems = persistencePort.findItemsByTaskId(taskId);
-        taskLifecyclePolicy.releaseAfterCancel(task.getTaskType(), taskInternalQueryService.countActiveItems(taskId),
-                cancelledItems.stream().map(item -> new TaskLifecyclePolicy.TaskItemReference(item.getTargetType(),
-                        item.getTargetId(), item.getOperationType(), item.getStatus())).toList());
+        List<ItemSnapshot> cancelledItems = persistencePort.findItemsByTaskId(taskId);
+        taskLifecyclePolicy.releaseAfterCancel(task.taskType(), taskInternalQueryService.countActiveItems(taskId),
+                cancelledItems.stream().map(item -> new TaskLifecyclePolicy.TaskItemReference(item.targetType(),
+                        item.targetId(), item.operationType(), item.status())).toList());
 
-        ManagementTask updated = persistencePort.findTask(taskId);
-        return taskResponseAssembler.toResponse(updated);
+        return taskResponseAssembler.toResponse(persistencePort.findTask(taskId));
     }
 
     // ======================== Retry ========================
@@ -246,44 +219,44 @@ public class ManagementTaskServiceImpl implements ManagementTaskService {
      */
     @Transactional
     public ManagementTaskResponse retryTask(Long taskId) {
-        ManagementTask task = persistencePort.findTask(taskId);
+        TaskSnapshot task = persistencePort.findTask(taskId);
         if (task == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在: " + taskId);
         }
 
-        if (!task.getStatus().isTerminal()) {
+        if (!task.status().isTerminal()) {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST,
-                    "任务 " + taskId + " 处于 " + task.getStatus() + "，仅终态可重试");
+                    "任务 " + taskId + " 处于 " + task.status() + "，仅终态可重试");
         }
 
         // RECOVERY/SCAN 走各自专用重试入口（恢复页/扫描页会自行重置任务并重发执行事件）；
         // 若在此重置 QUEUED 而不重新入队，Worker 永不执行导致任务永久卡死。
-        if (task.getTaskType() == TaskType.RECOVERY) {
+        if (task.taskType() == TaskType.RECOVERY) {
             throw new BusinessException(HttpStatusCodes.CONFLICT,
                     "恢复任务请使用专用重试入口: /api/manage/tasks/recovery/{id}/retry");
         }
-        if (task.getTaskType() == TaskType.DIRECTORY_SCAN) {
+        if (task.taskType() == TaskType.DIRECTORY_SCAN) {
             throw new BusinessException(HttpStatusCodes.CONFLICT,
                     "目录扫描任务请使用专用重试入口: /api/manage/tasks/directory-scan/{id}/retry");
         }
 
         // 元数据刷新重试：章节项先归并到漫画，同一本漫画只执行一次 CAS。
-        List<ManagementTaskItem> items = persistencePort.findItemsByTaskId(taskId);
-        taskLifecyclePolicy.prepareRetry(task.getTaskType(), items.stream()
-                .map(item -> new TaskLifecyclePolicy.TaskItemReference(item.getTargetType(), item.getTargetId(),
-                        item.getOperationType(), item.getStatus()))
+        List<ItemSnapshot> items = persistencePort.findItemsByTaskId(taskId);
+        taskLifecyclePolicy.prepareRetry(task.taskType(), items.stream()
+                .map(item -> new TaskLifecyclePolicy.TaskItemReference(item.targetType(), item.targetId(),
+                        item.operationType(), item.status()))
                 .toList());
 
-        int newAttempt = task.getAttempt() + 1;
+        int newAttempt = task.attempt() + 1;
         resetTaskAndItems(taskId, newAttempt, items);
 
         // 重新入队：按 item 类型发布对应事件，Worker 按新 attempt 重新执行
-        for (ManagementTaskItem item : items) {
-            if (item.getStatus() == ManagementTaskStatus.FAILED
-                    || item.getStatus() == ManagementTaskStatus.CANCELLED) {
+        for (ItemSnapshot item : items) {
+            if (item.status() == ManagementTaskStatus.FAILED
+                    || item.status() == ManagementTaskStatus.CANCELLED) {
                 taskRetryPublisher.publish(taskId, new TaskRetryPublisher.RetryItem(
-                        item.getId(), item.getOperationType(), item.getResultRefType(), item.getResultRefId(),
-                        item.getTargetType(), item.getTargetId()), newAttempt);
+                        item.id(), item.operationType(), item.resultRefType(), item.resultRefId(),
+                        item.targetType(), item.targetId()), newAttempt);
             }
         }
 
@@ -297,17 +270,16 @@ public class ManagementTaskServiceImpl implements ManagementTaskService {
      * 不包含任何重新入队——重新入队由各任务类型流程负责（retryTask 内按类型 republish，
      * RECOVERY/SCAN 由各自专用重试入口在事务提交后重发执行事件）。
      */
-    private void resetTaskAndItems(Long taskId, int newAttempt, List<ManagementTaskItem> items) {
+    private void resetTaskAndItems(Long taskId, int newAttempt, List<ItemSnapshot> items) {
         // 主任务重置由 Mapper 一次性写入全部状态字段。
         persistencePort.resetTask(taskId, newAttempt, LocalDateTime.now());
 
         // 失败/取消的 item 重置由 Mapper 统一处理 nullable 字段。
-        for (ManagementTaskItem item : items) {
-            if (item.getStatus() == ManagementTaskStatus.FAILED
-                    || item.getStatus() == ManagementTaskStatus.CANCELLED) {
-                String lockKey = ManagementTaskItem.buildLockKey(
-                        item.getTargetType(), item.getTargetId(), item.getOperationType());
-                persistencePort.resetItem(item.getId(), newAttempt, lockKey, LocalDateTime.now());
+        for (ItemSnapshot item : items) {
+            if (item.status() == ManagementTaskStatus.FAILED
+                    || item.status() == ManagementTaskStatus.CANCELLED) {
+                String lockKey = TaskLockKey.of(item.targetType(), item.targetId(), item.operationType());
+                persistencePort.resetItem(item.id(), newAttempt, lockKey, LocalDateTime.now());
             }
         }
     }
@@ -318,16 +290,16 @@ public class ManagementTaskServiceImpl implements ManagementTaskService {
      */
     @Transactional
     public void resetTaskState(Long taskId) {
-        ManagementTask task = persistencePort.findTask(taskId);
+        TaskSnapshot task = persistencePort.findTask(taskId);
         if (task == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务不存在: " + taskId);
         }
-        if (!task.getStatus().isTerminal()) {
+        if (!task.status().isTerminal()) {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST,
-                    "任务 " + taskId + " 处于 " + task.getStatus() + "，仅终态可重置");
+                    "任务 " + taskId + " 处于 " + task.status() + "，仅终态可重置");
         }
-        List<ManagementTaskItem> items = persistencePort.findItemsByTaskId(taskId);
-        resetTaskAndItems(taskId, task.getAttempt() + 1, items);
+        List<ItemSnapshot> items = persistencePort.findItemsByTaskId(taskId);
+        resetTaskAndItems(taskId, task.attempt() + 1, items);
     }
 
 
@@ -346,20 +318,20 @@ public class ManagementTaskServiceImpl implements ManagementTaskService {
      */
     @Transactional
     public boolean updateStage(Long managementTaskId, TaskStage stage, Integer progress) {
-        ManagementTask task = persistencePort.findTask(managementTaskId);
+        TaskSnapshot task = persistencePort.findTask(managementTaskId);
         if (task == null) {
             return false;
         }
-        if (task.isTerminal()) {
+        if (task.status().isTerminal()) {
             log.info("任务已终态 {}，忽略阶段更新: taskId={}, stage={}",
-                    task.getStatus(), managementTaskId, stage);
+                    task.status(), managementTaskId, stage);
             return false;
         }
 
         LocalDateTime updateTime = LocalDateTime.now();
-        boolean startTask = task.getStatus() == ManagementTaskStatus.QUEUED;
+        boolean startTask = task.status() == ManagementTaskStatus.QUEUED;
         persistencePort.updateStage(managementTaskId, stage == null ? null : stage.name(), progress,
-                startTask, startTask && task.getStartedAt() == null ? updateTime : null, updateTime);
+                startTask, startTask && task.startedAt() == null ? updateTime : null, updateTime);
         return true;
     }
 
@@ -390,29 +362,29 @@ public class ManagementTaskServiceImpl implements ManagementTaskService {
                                                         String resultRefType,
                                                         Long resultRefId,
                                                         int attempt) {
-        ManagementTaskItem item = persistencePort.findItem(itemId);
+        ItemSnapshot item = persistencePort.findItem(itemId);
         if (item == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "任务项不存在: " + itemId);
         }
 
         // 旧 attempt 结果：不覆盖当前 attempt 状态
-        if (attempt > 0 && item.getAttempt() != null && !item.getAttempt().equals(attempt)) {
+        if (attempt > 0 && item.attempt() != null && !item.attempt().equals(attempt)) {
             log.info("item {} attempt={} 与结果事件 attempt={} 不匹配，忽略旧 attempt 结果 {}",
-                    itemId, item.getAttempt(), attempt, newStatus);
+                    itemId, item.attempt(), attempt, newStatus);
             return taskResponseAssembler.toItemResponse(item);
         }
 
         // 如果已经处于终态（同一 attempt），忽略迟到结果
-        if (item.getStatus().isTerminal()) {
+        if (item.status().isTerminal()) {
             log.info("item {} 已处于终态 {}（attempt={}），忽略迟到状态更新 {}",
-                    itemId, item.getStatus(), item.getAttempt(), newStatus);
+                    itemId, item.status(), item.attempt(), newStatus);
             return taskResponseAssembler.toItemResponse(item);
         }
 
-        Integer expectedAttempt = item.getAttempt();
-        boolean isFirstRunning = newStatus == ManagementTaskStatus.RUNNING && item.getStartedAt() == null;
+        Integer expectedAttempt = item.attempt();
+        boolean isFirstRunning = newStatus == ManagementTaskStatus.RUNNING && item.startedAt() == null;
         LocalDateTime updateTime = LocalDateTime.now();
-        LocalDateTime startedTime = isFirstRunning ? updateTime : item.getStartedAt();
+        LocalDateTime startedTime = isFirstRunning ? updateTime : item.startedAt();
 
         int affectedRows = persistencePort.updateItemStatus(itemId, expectedAttempt, newStatus.name(),
                 errorMessage, resultRefType, resultRefId, isFirstRunning ? startedTime : null,
@@ -424,7 +396,7 @@ public class ManagementTaskServiceImpl implements ManagementTaskService {
         }
 
         // 重新聚合主任务状态
-        taskAggregationService.aggregate(item.getTaskId());
+        taskAggregationService.aggregate(item.taskId());
 
         return taskResponseAssembler.toItemResponse(persistencePort.findItem(itemId));
     }
@@ -438,29 +410,29 @@ public class ManagementTaskServiceImpl implements ManagementTaskService {
      */
     @Transactional
     public boolean updateItemProgress(Long itemId, int attempt, int progress, String stage) {
-        ManagementTaskItem item = persistencePort.findItem(itemId);
+        ItemSnapshot item = persistencePort.findItem(itemId);
         if (item == null) {
             return false;
         }
-        if (attempt > 0 && item.getAttempt() != null && !item.getAttempt().equals(attempt)) {
+        if (attempt > 0 && item.attempt() != null && !item.attempt().equals(attempt)) {
             log.info("item {} attempt={} 与进度事件 attempt={} 不匹配，忽略旧进度",
-                    itemId, item.getAttempt(), attempt);
+                    itemId, item.attempt(), attempt);
             return false;
         }
-        if (item.getStatus().isTerminal()) {
+        if (item.status().isTerminal()) {
             return false;
         }
 
         LocalDateTime updateTime = LocalDateTime.now();
-        boolean isStarted = item.getStatus() == ManagementTaskStatus.QUEUED;
-        int affectedRows = persistencePort.updateItemProgress(itemId, item.getAttempt(), progress, isStarted,
-                isStarted && item.getStartedAt() == null ? updateTime : null, updateTime);
+        boolean isStarted = item.status() == ManagementTaskStatus.QUEUED;
+        int affectedRows = persistencePort.updateItemProgress(itemId, item.attempt(), progress, isStarted,
+                isStarted && item.startedAt() == null ? updateTime : null, updateTime);
         if (affectedRows == 0) {
             return false;
         }
 
         if (isStarted) {
-            taskAggregationService.aggregate(item.getTaskId());
+            taskAggregationService.aggregate(item.taskId());
         }
         return true;
     }

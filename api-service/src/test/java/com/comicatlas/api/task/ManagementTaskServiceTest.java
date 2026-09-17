@@ -41,6 +41,8 @@ import com.comicatlas.api.task.application.service.impl.ManagementTaskServiceImp
 import com.comicatlas.api.task.application.port.in.TaskQueryService;
 import com.comicatlas.api.task.application.port.out.TaskRetryPublisher;
 import com.comicatlas.api.task.application.port.out.TaskQueryPersistencePort;
+import com.comicatlas.api.task.application.port.out.TaskQueryPersistencePort.TaskSnapshot;
+import com.comicatlas.api.task.application.port.out.TaskQueryPersistencePort.ItemSnapshot;
 import com.comicatlas.api.metadata.application.service.MetadataRefreshTaskPolicy;
 import com.comicatlas.api.metadata.application.port.out.MetadataRefreshTaskPersistencePort;
 import com.comicatlas.api.task.application.service.impl.TaskAggregationServiceImpl;
@@ -109,27 +111,18 @@ class ManagementTaskServiceTest {
 
     @Test
     void retryTask_importTaskInconsistentState_throwsConflict() {
-        ManagementTask task = new ManagementTask();
-        task.setId(99L);
-        task.setTaskType(TaskType.IMPORT);
-        task.setStatus(ManagementTaskStatus.FAILED);
-        task.setAttempt(1);
+        TaskSnapshot task = taskSnapshot(99L, TaskType.IMPORT, ManagementTaskStatus.FAILED, 1);
         when(taskQueryPersistencePort.findTask(99L)).thenReturn(task);
 
-        ManagementTaskItem item = new ManagementTaskItem();
-        item.setId(1L);
-        item.setTaskId(99L);
-        item.setTargetType("COMIC");
-        item.setTargetId(10L);
-        item.setOperationType(TaskType.IMPORT);
-        item.setStatus(ManagementTaskStatus.FAILED);
+        ItemSnapshot item = itemSnapshot(1L, 99L, "COMIC", 10L, TaskType.IMPORT,
+                ManagementTaskStatus.FAILED, 1);
         when(taskQueryPersistencePort.findItemsByTaskId(99L)).thenReturn(List.of(item));
 
         // 导入任务非终态且非 PENDING：说明与管理任务状态不一致，重试入队应抛冲突回滚而非静默卡死
         org.mockito.Mockito.doThrow(new BusinessException(409, "导入任务非终态且未被重置"))
                 .when(taskRetryPublisher).publish(eq(99L), eq(new TaskRetryPublisher.RetryItem(
-                        item.getId(), item.getOperationType(), item.getResultRefType(), item.getResultRefId(),
-                        item.getTargetType(), item.getTargetId())), eq(2));
+                        item.id(), item.operationType(), item.resultRefType(), item.resultRefId(),
+                        item.targetType(), item.targetId())), eq(2));
 
         assertThrows(BusinessException.class, () -> service.retryTask(99L));
     }
@@ -147,7 +140,7 @@ class ManagementTaskServiceTest {
 
         service.createTask(request, null, "{}");
 
-        verify(taskQueryPersistencePort, times(2)).insertTaskItem(any(ManagementTaskItem.class));
+        verify(taskQueryPersistencePort, times(2)).insertTaskItem(any(TaskQueryPersistencePort.CreateItemCommand.class));
     }
 
     private static CreateManagementTaskRequest.TaskTarget chapterTarget(Long chapterId) {
@@ -160,10 +153,7 @@ class ManagementTaskServiceTest {
 
     @Test
     void retryTask_recoveryTask_throwsConflict() {
-        ManagementTask task = new ManagementTask();
-        task.setId(100L);
-        task.setTaskType(TaskType.RECOVERY);
-        task.setStatus(ManagementTaskStatus.FAILED);
+        TaskSnapshot task = taskSnapshot(100L, TaskType.RECOVERY, ManagementTaskStatus.FAILED, 1);
         when(taskQueryPersistencePort.findTask(100L)).thenReturn(task);
 
         assertThrows(BusinessException.class, () -> service.retryTask(100L));
@@ -172,10 +162,7 @@ class ManagementTaskServiceTest {
 
     @Test
     void retryTask_scanTask_throwsConflict() {
-        ManagementTask task = new ManagementTask();
-        task.setId(101L);
-        task.setTaskType(TaskType.DIRECTORY_SCAN);
-        task.setStatus(ManagementTaskStatus.FAILED);
+        TaskSnapshot task = taskSnapshot(101L, TaskType.DIRECTORY_SCAN, ManagementTaskStatus.FAILED, 1);
         when(taskQueryPersistencePort.findTask(101L)).thenReturn(task);
 
         assertThrows(BusinessException.class, () -> service.retryTask(101L));
@@ -184,20 +171,11 @@ class ManagementTaskServiceTest {
 
     @Test
     void resetTaskState_resetsTaskAndItems_withoutRepublish() {
-        ManagementTask task = new ManagementTask();
-        task.setId(201L);
-        task.setTaskType(TaskType.RECOVERY);
-        task.setStatus(ManagementTaskStatus.FAILED);
-        task.setAttempt(1);
+        TaskSnapshot task = taskSnapshot(201L, TaskType.RECOVERY, ManagementTaskStatus.FAILED, 1);
         when(taskQueryPersistencePort.findTask(201L)).thenReturn(task);
 
-        ManagementTaskItem item = new ManagementTaskItem();
-        item.setId(2L);
-        item.setTaskId(201L);
-        item.setTargetType("SYSTEM");
-        item.setTargetId(7L);
-        item.setOperationType(TaskType.RECOVERY);
-        item.setStatus(ManagementTaskStatus.FAILED);
+        ItemSnapshot item = itemSnapshot(2L, 201L, "SYSTEM", 7L, TaskType.RECOVERY,
+                ManagementTaskStatus.FAILED, 1);
         when(taskQueryPersistencePort.findItemsByTaskId(201L)).thenReturn(List.of(item));
 
         service.resetTaskState(201L);
@@ -210,11 +188,8 @@ class ManagementTaskServiceTest {
 
     @Test
     void updateItemStatus_failedItem_aggregatesErrorMessageToTask() {
-        ManagementTaskItem item = new ManagementTaskItem();
-        item.setId(3L);
-        item.setTaskId(301L);
-        item.setStatus(ManagementTaskStatus.RUNNING);
-        item.setAttempt(1);
+        ItemSnapshot item = itemSnapshot(3L, 301L, "MEDIA", 1L, TaskType.TRANSCODE,
+                ManagementTaskStatus.RUNNING, 1);
         when(taskQueryPersistencePort.findItem(3L)).thenReturn(item);
 
         when(aggregationRepository.findByTaskId(301L)).thenReturn(Optional.of(
@@ -233,11 +208,8 @@ class ManagementTaskServiceTest {
 
     @Test
     void updateItemStatus_success_clearsTaskErrorMessage() {
-        ManagementTaskItem item = new ManagementTaskItem();
-        item.setId(4L);
-        item.setTaskId(302L);
-        item.setStatus(ManagementTaskStatus.RUNNING);
-        item.setAttempt(1);
+        ItemSnapshot item = itemSnapshot(4L, 302L, "MEDIA", 1L, TaskType.TRANSCODE,
+                ManagementTaskStatus.RUNNING, 1);
         when(taskQueryPersistencePort.findItem(4L)).thenReturn(item);
 
         when(aggregationRepository.findByTaskId(302L)).thenReturn(Optional.of(
@@ -259,5 +231,19 @@ class ManagementTaskServiceTest {
                 ArgumentCaptor.forClass(ManagementTaskAggregationUpdate.class);
         verify(aggregationRepository).update(any(), captor.capture());
         return captor.getValue();
+    }
+
+    private static TaskSnapshot taskSnapshot(Long id, TaskType taskType,
+                                             ManagementTaskStatus status, Integer attempt) {
+        return new TaskSnapshot(id, taskType, "测试", "COMIC", null, false, status, null,
+                0, 1, 0, 0, 0, null, attempt, 1, null, null, null, null, null);
+    }
+
+    private static ItemSnapshot itemSnapshot(Long id, Long taskId, String targetType, Long targetId,
+                                             TaskType operationType, ManagementTaskStatus status,
+                                             Integer attempt) {
+        return new ItemSnapshot(id, taskId, targetType, targetId, operationType, status, attempt, 0,
+                targetType + ":" + targetId + ":" + operationType.name(), null, null, null, 1,
+                null, null, null, null);
     }
 }

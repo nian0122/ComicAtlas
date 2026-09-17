@@ -20,14 +20,13 @@ public class TaskInternalQueryServiceImpl implements TaskInternalQueryService {
             return null;
         }
         var task = persistencePort.findByIdempotencyKey(idempotencyKey);
-        return task == null ? null : new TaskSnapshot(task.getId(), task.getIdempotencyPayloadHash());
+        return task == null ? null : new TaskSnapshot(task.id(), task.idempotencyPayloadHash());
     }
 
     /** 查询目标当前活跃任务项。 */
     public ItemSnapshot findActiveItem(String targetType, Long targetId, TaskType operationType) {
         var item = persistencePort.findActiveItem(targetType, targetId, operationType);
-        return item == null ? null : new ItemSnapshot(item.getId(), item.getTaskId(), item.getTargetType(),
-                item.getTargetId());
+        return item == null ? null : new ItemSnapshot(item.id(), item.taskId(), item.targetType(), item.targetId());
     }
 
     /** 统计任务下尚未结束的任务项数量。 */
