@@ -1,6 +1,7 @@
 package com.comicatlas.api.metadata.application.service.impl;
 
 import com.comicatlas.api.catalog.infrastructure.cache.CacheEvictor;
+import com.comicatlas.api.metadata.application.port.out.TagPersistencePort;
 import com.comicatlas.contract.comic.dto.TagDTO;
 import com.comicatlas.persistence.comic.entity.ComicTag;
 import com.comicatlas.persistence.comic.entity.Tag;
@@ -32,17 +33,15 @@ class TagServiceTest {
 
     @Test
     void listTagsSortsNumericNamesNaturally() {
-        when(tagMapper.selectList(null)).thenReturn(java.util.List.of(
-                createTag(1L, "系列10"), createTag(2L, "系列2")));
+        when(persistencePort.findAll()).thenReturn(java.util.List.of(
+                new TagPersistencePort.TagSnapshot(1L, "系列10"),
+                new TagPersistencePort.TagSnapshot(2L, "系列2")));
         assertEquals(java.util.List.of("系列2", "系列10"),
                 service.listTags().stream().map(TagDTO::getName).toList());
     }
 
     @Mock
-    private TagMapper tagMapper;
-
-    @Mock
-    private ComicTagMapper comicTagMapper;
+    private TagPersistencePort persistencePort;
 
     @Mock
     private CacheEvictor cacheEvictor;
@@ -50,23 +49,21 @@ class TagServiceTest {
     @InjectMocks
     private TagManagementServiceImpl service;
 
-    @Captor
-    private ArgumentCaptor<Tag> tagCaptor;
-
     @Test
     void createTag_shouldReturnDto_whenNameIsUnique() {
-        when(tagMapper.countByName("new tag")).thenReturn(0L);
+        when(persistencePort.countByName("new tag")).thenReturn(0L);
+        when(persistencePort.insert("new tag"))
+                .thenReturn(new TagPersistencePort.TagSnapshot(1L, "new tag"));
 
         TagDTO result = service.createTag("new tag");
 
         assertEquals("new tag", result.getName());
-        verify(tagMapper).insert(tagCaptor.capture());
-        assertEquals("new tag", tagCaptor.getValue().getName());
+        verify(persistencePort).insert("new tag");
     }
 
     @Test
     void createTag_shouldThrow409_whenNameExists() {
-        when(tagMapper.countByName("existing tag")).thenReturn(1L);
+        when(persistencePort.countByName("existing tag")).thenReturn(1L);
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> service.createTag("existing tag"));
@@ -76,18 +73,18 @@ class TagServiceTest {
 
     @Test
     void deleteTag_shouldSucceed_whenTagNotBound() {
-        Tag tag = createTag(1L, "tag");
-        when(tagMapper.selectById(1L)).thenReturn(tag);
-        when(comicTagMapper.countByTagId(1L)).thenReturn(0L);
+        when(persistencePort.findById(1L)).thenReturn(
+                java.util.Optional.of(new TagPersistencePort.TagSnapshot(1L, "tag")));
+        when(persistencePort.countComicBindings(1L)).thenReturn(0L);
 
         service.deleteTag(1L);
 
-        verify(tagMapper).deleteById(1L);
+        verify(persistencePort).deleteById(1L);
     }
 
     @Test
     void deleteTag_shouldThrow404_whenTagNotFound() {
-        when(tagMapper.selectById(99L)).thenReturn(null);
+        when(persistencePort.findById(99L)).thenReturn(java.util.Optional.empty());
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> service.deleteTag(99L));
@@ -97,8 +94,9 @@ class TagServiceTest {
 
     @Test
     void deleteTag_shouldThrow409_whenTagIsBound() {
-        when(tagMapper.selectById(1L)).thenReturn(createTag(1L, "bound tag"));
-        when(comicTagMapper.countByTagId(1L)).thenReturn(3L);
+        when(persistencePort.findById(1L)).thenReturn(
+                java.util.Optional.of(new TagPersistencePort.TagSnapshot(1L, "bound tag")));
+        when(persistencePort.countComicBindings(1L)).thenReturn(3L);
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> service.deleteTag(1L));
@@ -106,10 +104,4 @@ class TagServiceTest {
         assertTrue(ex.getMessage().contains("已被漫画使用"));
     }
 
-    private static Tag createTag(Long id, String name) {
-        Tag tag = new Tag();
-        tag.setId(id);
-        tag.setName(name);
-        return tag;
-    }
 }
