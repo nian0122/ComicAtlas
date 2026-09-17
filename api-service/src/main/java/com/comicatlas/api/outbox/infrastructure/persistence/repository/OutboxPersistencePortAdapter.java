@@ -16,18 +16,29 @@ public class OutboxPersistencePortAdapter implements OutboxPersistencePort {
     private final InboxReceiptMapper inboxReceiptMapper;
 
     @Override
-    public void insertOutbox(OutboxMessage outboxMessage) {
-        outboxMessageMapper.insert(outboxMessage);
+    public void insertOutbox(OutboxPersistencePort.OutboxCommand command) {
+        OutboxMessage message = new OutboxMessage()
+                .setEventId(command.eventId()).setTaskId(command.taskId()).setItemId(command.itemId())
+                .setAttempt(command.attempt()).setExchange(command.exchange()).setRoutingKey(command.routingKey())
+                .setEventType(command.eventType()).setVersion(command.version()).setPayload(command.payload())
+                .setPublishAttempts(command.publishAttempts()).setStatus(command.status());
+        outboxMessageMapper.insert(message);
     }
 
     @Override
-    public InboxReceipt findInbox(String eventId) {
-        return inboxReceiptMapper.selectById(eventId);
+    public OutboxPersistencePort.InboxSnapshot findInbox(String eventId) {
+        InboxReceipt receipt = inboxReceiptMapper.selectById(eventId);
+        return receipt == null ? null : new OutboxPersistencePort.InboxSnapshot(receipt.getEventId(),
+                receipt.getPayloadHash(), receipt.getTaskId(), receipt.getItemId(), receipt.getAttempt(),
+                receipt.getProcessedAt(), receipt.getCreatedAt());
     }
 
     @Override
-    public void insertInbox(InboxReceipt inboxReceipt) {
-        inboxReceiptMapper.insert(inboxReceipt);
+    public void insertInbox(OutboxPersistencePort.InboxCommand command) {
+        InboxReceipt receipt = new InboxReceipt().setEventId(command.eventId()).setPayloadHash(command.payloadHash())
+                .setTaskId(command.taskId()).setItemId(command.itemId()).setAttempt(command.attempt())
+                .setProcessedAt(command.processedAt()).setCreatedAt(command.createdAt());
+        inboxReceiptMapper.insert(receipt);
     }
 
     @Override

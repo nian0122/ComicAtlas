@@ -1,6 +1,5 @@
 package com.comicatlas.api.outbox.application.service.impl;
 
-import com.comicatlas.api.outbox.infrastructure.persistence.entity.OutboxMessage;
 import com.comicatlas.api.outbox.domain.model.OutboxMessageStatus;
 import com.comicatlas.api.outbox.application.port.in.OutboxService;
 import com.comicatlas.api.outbox.application.port.out.OutboxPersistencePort;
@@ -51,21 +50,10 @@ public class OutboxServiceImpl implements OutboxService {
             throw new BusinessException("Outbox 序列化失败: " + event.eventId(), exception);
         }
 
-        OutboxMessage outboxMessage = new OutboxMessage()
-                .setEventId(event.eventId().toString())
-                .setTaskId(taskId)
-                .setItemId(itemId)
-                .setAttempt(attempt)
-                .setExchange(exchange)
-                .setRoutingKey(routingKey)
-                .setEventType(event.getClass().getSimpleName())
-                .setVersion(event.version())
-                .setPayload(payload)
-                .setPublishAttempts(INITIAL_PUBLISH_ATTEMPTS)
-                // 交由 MySQL CURRENT_TIMESTAMP 默认值，避免多实例 JVM 时钟偏差。
-                .setStatus(OutboxMessageStatus.PENDING.name());
-
-        outboxPersistencePort.insertOutbox(outboxMessage);
+        outboxPersistencePort.insertOutbox(new OutboxPersistencePort.OutboxCommand(
+                event.eventId().toString(), taskId, itemId, attempt, exchange, routingKey,
+                event.getClass().getSimpleName(), event.version(), payload, INITIAL_PUBLISH_ATTEMPTS,
+                OutboxMessageStatus.PENDING.name()));
         log.debug("Outbox 写入: eventId={}, exchange={}, routingKey={}", event.eventId(), exchange, routingKey);
     }
 

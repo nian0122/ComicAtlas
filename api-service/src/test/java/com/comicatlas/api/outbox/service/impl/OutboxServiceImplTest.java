@@ -1,6 +1,5 @@
 package com.comicatlas.api.outbox.application.service.impl;
 
-import com.comicatlas.api.outbox.infrastructure.persistence.entity.OutboxMessage;
 import com.comicatlas.api.outbox.application.port.out.OutboxPersistencePort;
 import com.comicatlas.common.event.ImportTaskCreatedEvent;
 import com.comicatlas.contract.common.exception.BusinessException;
@@ -41,15 +40,16 @@ class OutboxServiceImplTest {
 
         outboxService.enqueue(event, "comic.import", "task.created", 3L, 4L, 2);
 
-        ArgumentCaptor<OutboxMessage> messageCaptor = ArgumentCaptor.forClass(OutboxMessage.class);
+        ArgumentCaptor<OutboxPersistencePort.OutboxCommand> messageCaptor =
+                ArgumentCaptor.forClass(OutboxPersistencePort.OutboxCommand.class);
         verify(outboxPersistencePort).insertOutbox(messageCaptor.capture());
-        OutboxMessage message = messageCaptor.getValue();
-        assertThat(message.getEventId()).isEqualTo(event.eventId().toString());
-        assertThat(message.getStatus()).isEqualTo("PENDING");
-        assertThat(message.getPayload()).contains("ImportTaskCreatedEvent");
-        assertThat(message.getTaskId()).isEqualTo(3L);
-        assertThat(message.getItemId()).isEqualTo(4L);
-        assertThat(message.getAttempt()).isEqualTo(2);
+        OutboxPersistencePort.OutboxCommand message = messageCaptor.getValue();
+        assertThat(message.eventId()).isEqualTo(event.eventId().toString());
+        assertThat(message.status()).isEqualTo("PENDING");
+        assertThat(message.payload()).contains("ImportTaskCreatedEvent");
+        assertThat(message.taskId()).isEqualTo(3L);
+        assertThat(message.itemId()).isEqualTo(4L);
+        assertThat(message.attempt()).isEqualTo(2);
     }
 
     @Test
