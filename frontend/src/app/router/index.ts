@@ -11,22 +11,22 @@ const router = createRouter({
         {
           path: '',
           name: 'home',
-          component: () => import('@/pages/reading/home/index'),
+          component: () => import('@/pages/reading/home/index').then(({ HomePage }) => HomePage),
         },
         {
           path: 'library',
           name: 'library',
-          component: () => import('@/pages/reading/library/index'),
+          component: () => import('@/pages/reading/library/index').then(({ LibraryPage }) => LibraryPage),
         },
         {
           path: 'history',
           name: 'history',
-          component: () => import('@/pages/reading/history/index'),
+          component: () => import('@/pages/reading/history/index').then(({ HistoryPage }) => HistoryPage),
         },
         {
           path: 'comic/:id',
           name: 'comic-detail',
-          component: () => import('@/pages/reading/detail/index'),
+          component: () => import('@/pages/reading/detail/index').then(({ DetailPage }) => DetailPage),
           props: true,
         },
       ],
@@ -38,7 +38,7 @@ const router = createRouter({
         {
           path: '',
           name: 'reader',
-          component: () => import('@/pages/reader/index'),
+          component: () => import('@/pages/reader/index').then(({ ReaderPage }) => ReaderPage),
           props: true,
         },
       ],
@@ -46,7 +46,7 @@ const router = createRouter({
     {
       path: '/manage/intercept',
       name: 'manage-intercept',
-      component: () => import('@/pages/management/intercept/index'),
+    component: () => import('@/pages/management/intercept/index').then(({ InterceptPage }) => InterceptPage),
     },
     {
       path: '/manage',
@@ -55,7 +55,7 @@ const router = createRouter({
         {
           path: '',
           name: 'manage-home',
-          component: () => import('@/pages/management/home/index'),
+          component: () => import('@/pages/management/home/index').then(({ ManagementHomePage }) => ManagementHomePage),
         },
         {
           path: 'workbench',
@@ -75,27 +75,27 @@ const router = createRouter({
         {
           path: 'trash',
           name: 'manage-trash',
-          component: () => import('@/pages/management/trash/index'),
+          component: () => import('@/pages/management/trash/index').then(({ TrashPage }) => TrashPage),
         },
         {
           path: 'tasks',
           name: 'manage-tasks',
-          component: () => import('@/pages/management/tasks/index'),
+          component: () => import('@/pages/management/tasks/index').then(({ ManagementTasksPage }) => ManagementTasksPage),
         },
         {
           path: 'upload',
           name: 'manage-upload',
-          component: () => import('@/pages/management/upload/index'),
+          component: () => import('@/pages/management/upload/index').then(({ MediaUploadPage }) => MediaUploadPage),
         },
         {
           path: 'comics',
           name: 'manage-comics',
-          component: () => import('@/pages/management/comics/index'),
+          component: () => import('@/pages/management/comics/index').then(({ ComicListPage }) => ComicListPage),
         },
         {
           path: 'comics/:id',
           name: 'manage-comic-workspace',
-          component: () => import('@/pages/management/comic-workspace/index'),
+          component: () => import('@/pages/management/comic-workspace/index').then(({ ComicWorkspacePage }) => ComicWorkspacePage),
           props: true,
         },
         {
@@ -110,7 +110,7 @@ const router = createRouter({
         {
           path: 'import',
           name: 'manage-import',
-          component: () => import('@/pages/management/import/index'),
+          component: () => import('@/pages/management/import/index').then(({ ImportPage }) => ImportPage),
         },
         {
           // 兼容旧书签：旧任务页已删除，只跳转到统一任务中心。
@@ -120,7 +120,7 @@ const router = createRouter({
         {
           path: 'storage',
           name: 'manage-storage',
-          component: () => import('@/pages/management/storage/index'),
+          component: () => import('@/pages/management/storage/index').then(({ StoragePage }) => StoragePage),
         },
         {
           path: 'storage/:id',
@@ -134,17 +134,17 @@ const router = createRouter({
         {
           path: 'metadata',
           name: 'manage-metadata',
-          component: () => import('@/pages/management/metadata/index'),
+          component: () => import('@/pages/management/metadata/index').then(({ MetadataPage }) => MetadataPage),
         },
         {
           path: 'dlq',
           name: 'manage-dlq',
-          component: () => import('@/pages/management/dlq/index'),
+          component: () => import('@/pages/management/dlq/index').then(({ DeadLetterPage }) => DeadLetterPage),
         },
         {
           path: 'settings',
           name: 'manage-settings',
-          component: () => import('@/pages/management/settings/index'),
+          component: () => import('@/pages/management/settings/index').then(({ SettingsPage }) => SettingsPage),
         },
       ],
     },
