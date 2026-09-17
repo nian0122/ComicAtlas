@@ -1,5 +1,5 @@
-import { StorageOperationType } from '@/entities/storage/model/types'
-import type { StorageOperationType as StorageOperationTypeValue } from '@/entities/storage/model/types'
+import { StorageOperationType } from '@/entities/storage'
+import type { StorageOperationType as StorageOperationTypeValue } from '@/entities/storage'
 import { useStorageStore } from '@/features/storage/store'
 
 interface PollEntry {

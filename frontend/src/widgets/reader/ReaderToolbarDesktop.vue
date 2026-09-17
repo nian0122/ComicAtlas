@@ -93,7 +93,7 @@ import { AppButton } from '@/shared/ui/button'
 import { ref, watch } from 'vue'
 import { ArrowLeft, Setting } from '@element-plus/icons-vue'
 import { ElSelect, ElOption, ElPopover, ElInputNumber, ElButton } from 'element-plus'
-import { useReaderSettingsStore } from '@/features/reader-settings/model/settings-store'
+import { useReaderSettingsStore } from '@/features/reader-settings'
 
 interface Props {
   title: string

@@ -3,9 +3,9 @@ import { AppButton } from '@/shared/ui/button'
 import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElSelect, ElOption, ElInput, ElButton } from 'element-plus'
-import type { FilterState, SortState } from '@/features/storage/composables/useStorageFilter'
-import { useCategoryStore } from '@/features/category/store'
-import { useTagStore } from '@/features/tag/store'
+import type { FilterState, SortState } from '@/features/storage'
+import { useCategoryStore } from '@/features/category'
+import { useTagStore } from '@/features/tag'
 
 const props = defineProps<{
   filter: FilterState

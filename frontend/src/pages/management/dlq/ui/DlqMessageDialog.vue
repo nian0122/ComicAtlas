@@ -25,7 +25,7 @@
 </template>
 
 <script setup lang="ts">
-import type { DlqMessageVO } from '@/entities/dlq/model-types'
+import type { DlqMessageVO } from '@/entities/dlq'
 
 defineProps<{
   readonly visible: boolean

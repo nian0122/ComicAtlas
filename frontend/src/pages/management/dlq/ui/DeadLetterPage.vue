@@ -87,8 +87,8 @@ import { PageHeader } from '@/shared/ui/page-header'
 import { ContentState } from '@/shared/ui/content-state'
 import { computed, ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { dlqApi } from '@/entities/dlq/api/dlq-api'
-import type { DlqMessageVO, DlqQueueVO } from '@/entities/dlq/model-types'
+import { dlqApi } from '@/entities/dlq'
+import type { DlqMessageVO, DlqQueueVO } from '@/entities/dlq'
 import DlqMessageDialog from './DlqMessageDialog.vue'
 
 const queues = ref<readonly DlqQueueVO[]>([])

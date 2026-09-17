@@ -1,9 +1,9 @@
 import { defineStore } from 'pinia'
 import { reactive, toRefs } from 'vue'
-import type { QualityMode } from '@/entities/media/model/types'
+import type { QualityMode } from '@/entities/media'
 
 /** 画质模式：省流(LQ) / 智能(LQ→HQ渐进) / 原图(HQ) */
-export type { QualityMode } from '@/entities/media/model/types'
+export type { QualityMode } from '@/entities/media'
 export type FitMode = 'AUTO' | 'WIDTH' | 'HEIGHT' | 'ORIGINAL'
 export type ReadingDirection = 'ltr' | 'rtl' | 'vertical' | 'horizontal'
 

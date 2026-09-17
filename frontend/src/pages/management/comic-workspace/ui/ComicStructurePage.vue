@@ -674,11 +674,10 @@ import {
   managementCatalogApi,
   managementChapterApi,
   mediaManagementApi,
-} from '@/entities/comic/api/management-api'
-import { hqApi } from '@/entities/storage/api'
-import { uploadApi as trackedUploadApi } from '@/features/upload/model/api'
-import { storageAdminApi } from '@/entities/storage/api'
-import { storageService } from '@/features/storage/service'
+} from '@/entities/comic'
+import { hqApi, storageAdminApi } from '@/entities/storage'
+import { uploadApi as trackedUploadApi } from '@/features/upload'
+import { storageService } from '@/features/storage'
 import {
   CATALOG_ACTIONS,
   CHAPTER_ACTIONS,
@@ -687,14 +686,13 @@ import {
   findStructureRow,
   flattenCatalogOptions,
   toStructureRows,
-} from '@/entities/comic/model/structure'
-import type { CatalogAction, ChapterAction, StructureRow } from '@/entities/comic/model/structure'
-import StorageStatusTag from '@/entities/storage/ui/StorageStatusTag.vue'
-import type { CatalogNode } from '@/entities/comic/model/types'
-import type { MediaItemInfo } from '@/entities/media/types'
-import type { ChapterStorageItem } from '@/entities/storage/model/types'
-import { StorageOperationType as StorageOperation } from '@/entities/storage/model/types'
-import type { CreateUploadSessionRequest, UploadFileManifest } from '@/features/upload/model/types'
+} from '@/entities/comic'
+import type { CatalogAction, ChapterAction, StructureRow, CatalogNode } from '@/entities/comic'
+import { StorageStatusTag } from '@/entities/storage/ui'
+import type { MediaItemInfo } from '@/entities/media'
+import type { ChapterStorageItem } from '@/entities/storage'
+import { StorageOperationType as StorageOperation } from '@/entities/storage'
+import type { CreateUploadSessionRequest, UploadFileManifest } from '@/features/upload'
 import { useMediaOrder } from '../model/useMediaOrder'
 
 const route = useRoute()

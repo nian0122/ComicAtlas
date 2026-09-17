@@ -3,7 +3,7 @@ import { StatGrid } from '@/shared/ui/management-panel'
 import { StatCard } from '@/shared/ui/management-panel'
 import { formatBytes as formatSize } from '@/shared/lib/format/bytes'
 import { computed } from 'vue'
-import type { StorageStats } from '@/entities/storage/model/types'
+import type { StorageStats } from '@/entities/storage'
 
 const props = defineProps<{
   stats: StorageStats | null

@@ -33,12 +33,11 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
-import { useReaderSettingsStore } from '@/features/reader-settings/model/settings-store'
-import { isReaderInteractiveTarget } from '@/features/reader-interaction/model/useReaderGesture'
-import ProgressiveImage from '@/entities/media/ui/ProgressiveImage.vue'
-import VideoPlayer from '@/entities/media/ui/VideoPlayer.vue'
-import type { MediaItemInfo } from '@/entities/media/types'
-import { isVideoMedia } from '@/entities/media/guards'
+import { useReaderSettingsStore } from '@/features/reader-settings'
+import { isReaderInteractiveTarget } from '@/features/reader-interaction'
+import { ProgressiveImage, VideoPlayer } from '@/entities/media/ui'
+import type { MediaItemInfo } from '@/entities/media'
+import { isVideoMedia } from '@/entities/media'
 
 interface Props {
   pages: MediaItemInfo[]

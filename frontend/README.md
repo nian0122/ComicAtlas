@@ -16,9 +16,9 @@ pnpm check
 
 单独执行 `pnpm format:check` 会检查整个前端源码树，并自动兼容仓库现有的 LF/CRLF 换行风格；`node_modules`、构建产物和测试产物由 `.prettierignore` 排除。需要自动修复格式时执行 `pnpm format`。
 
-## 当前目录与 FSD 改造
+## FSD 目录
 
-> **TODO FSD-20**：本节记录的是迁移前的当前结构，不是最终目标。所有待调整位置、目标目录、依赖边界和验证条件以[前端 Feature-Sliced Design 改造 TODO](../docs/frontend/fsd-refactoring-todo.md)为准；迁移完成后，本节必须替换为 FSD 六层目录说明。
+前端采用六层 Feature-Sliced Design，依赖方向只能由上层指向下层。所有切片通过 `index.ts` 暴露 public API，跨切片不得深层引用内部 `model`、`api`、`ui` 文件。
 
 [样式目录规范](src/styles/README.md) · [公共组件归属](src/components/README.md)
 
@@ -26,15 +26,12 @@ pnpm check
 
 ```text
 src/
-├── entities/       # 漫画、媒体、标签等稳定领域模型与实体 API
-├── features/       # 按业务能力组织的 API、Store、Composables 和类型
-├── components/     # 跨业务共用的品牌、导航、管理布局和状态展示组件
-├── views/          # 路由页面与页面编排
-├── layouts/        # 阅读端、管理端布局
-├── router/         # 路由配置
-├── shared/         # 与业务无关的基础工具、响应式工具和通用类型
-├── services/       # HTTP 客户端等基础设施
-└── styles/         # 全局样式与设计令牌
+├── app/            # 入口、providers、router、根组件、全局样式
+├── pages/          # 路由页面及页面私有编排
+├── widgets/        # 阅读/管理布局、导航、阅读器等大块 UI
+├── features/       # 导入、上传、回收、阅读设置等用户能力
+├── entities/       # comic、chapter、media、tag、category 等稳定实体
+└── shared/         # API 基础设施、通用 UI、工具与资产
 ```
 
 业务代码优先从 `entities` 或 `features` 直接引用；新增类型、API 和状态不再集中放入全局聚合文件。

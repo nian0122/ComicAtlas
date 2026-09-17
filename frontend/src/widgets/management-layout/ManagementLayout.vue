@@ -103,7 +103,7 @@ import {
   QuestionFilled,
   InfoFilled,
 } from '@element-plus/icons-vue'
-import { useImportStore } from '@/features/import/model/store'
+import { useImportStore } from '@/features/import'
 import { ComicAtlasLogo } from '@/shared/ui/logo'
 
 const importStore = useImportStore()

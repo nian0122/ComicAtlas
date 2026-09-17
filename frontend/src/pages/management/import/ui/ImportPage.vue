@@ -222,10 +222,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getApiErrorMessage } from '@/shared/api/http'
-import { useImportStore } from '@/features/import/model/store'
-import { useImportScan } from '@/features/import/model/useImportScan'
-import PreviewNode from '@/features/import/ui/PreviewNode.vue'
-import { useImportPageForm } from '@/pages/management/comic-workspace/model/useImportPageForm'
+import { useImportStore, useImportScan, useImportPageForm, PreviewNode } from '@/features/import'
 
 const router = useRouter()
 const store = useImportStore()

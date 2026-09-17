@@ -1,5 +1,5 @@
 import { ref, computed, watch } from 'vue'
-import type { ComicStorageItem, ComicStorageQuery } from '@/entities/storage/model/types'
+import type { ComicStorageItem, ComicStorageQuery } from '@/entities/storage'
 
 export type HqStatusFilter = 'ALL' | 'HAS_HQ' | 'NO_HQ'
 export type LqStatusFilter = 'ALL' | 'NEEDS_LQ' | 'READY'

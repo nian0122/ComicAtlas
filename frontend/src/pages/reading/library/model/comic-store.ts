@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { comicApi } from '@/entities/comic/api/reading-api'
+import { comicApi } from '@/entities/comic'
 import { useComicListState } from '@/pages/reading/library/model/useComicListState'
 
 export type { ComicListState } from '@/pages/reading/library/model/useComicListState'

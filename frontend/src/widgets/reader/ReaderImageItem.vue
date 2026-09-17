@@ -40,12 +40,10 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useReaderSettingsStore } from '@/features/reader-settings/model/settings-store'
-import ProgressiveImage from '@/entities/media/ui/ProgressiveImage.vue'
-import VideoPlayer from '@/entities/media/ui/VideoPlayer.vue'
-import type { MediaItemInfo } from '@/entities/media/types'
-import { DEFAULT_ASPECT_RATIO } from '@/entities/media/constants'
-import { isVideoMedia } from '@/entities/media/guards'
+import { useReaderSettingsStore } from '@/features/reader-settings'
+import { ProgressiveImage, VideoPlayer } from '@/entities/media/ui'
+import type { MediaItemInfo } from '@/entities/media'
+import { DEFAULT_ASPECT_RATIO, isVideoMedia } from '@/entities/media'
 
 interface Props {
   item: MediaItemInfo

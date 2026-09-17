@@ -27,12 +27,6 @@ export interface ComicListQuery {
   size?: number
 }
 
-export interface CategoryDTO {
-  id: number
-  name: string
-  sortOrder: number
-}
-
 export interface ComicListVO {
   id: number
   title: string

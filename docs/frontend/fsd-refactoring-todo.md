@@ -120,6 +120,6 @@ src/
 
 ## 本次实施记录
 
-- 已完成 FSD-01～FSD-20 的目录迁移、入口收口、实体/feature/widget 分层、public API 骨架、alias 与 ESLint 层级检查。
-- 兼容措施：保留必要的类型与 API re-export 入口，未删除任何 TODO 条目；运行时接口语义与路由名称保持不变。
-- 自检命令：pnpm typecheck、pnpm lint、pnpm test:unit、pnpm build、git diff --check。
+- 本阶段完成实体与能力切片 public API 的第一批收口，拆出 `entities/category/model/types.ts`，并将任务状态组件改为从 feature public API 引用。
+- 已完成目录迁移的项目仍需继续清理跨切片深层引用；本文件的条目只有在代码、验证和文档同时完成后才可勾选。
+- 本阶段验证：`pnpm typecheck`、`pnpm lint`、`pnpm test:unit`、`git diff --check`。

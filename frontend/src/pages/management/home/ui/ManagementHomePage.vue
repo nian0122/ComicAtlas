@@ -110,8 +110,8 @@
 <script setup lang="ts">
 import { ManagementPanel } from '@/shared/ui/management-panel'
 import { StatGrid } from '@/shared/ui/management-panel'
-import ComicStatusTag from '@/entities/comic/ui/ComicStatusTag.vue'
-import TaskStatusTag from '@/features/task/components/TaskStatusTag.vue'
+import { ComicStatusTag } from '@/entities/comic/ui'
+import { TaskStatusTag } from '@/features/task'
 import { StatCard } from '@/shared/ui/management-panel'
 import { PanelHeader } from '@/shared/ui/management-panel'
 import { EmptyState } from '@/shared/ui/management-panel'
@@ -129,14 +129,14 @@ import {
   UploadFilled,
   Warning,
 } from '@element-plus/icons-vue'
-import { managementComicApi } from '@/entities/comic/api/management-api'
-import { managementTaskApi } from '@/entities/task/api/task-api'
-import { storageService } from '@/features/storage/service'
+import { managementComicApi } from '@/entities/comic'
+import { managementTaskApi } from '@/entities/task'
+import { storageService } from '@/features/storage'
 import { getApiErrorMessage } from '@/shared/api/http'
-import { managementTaskTypeLabel } from '@/entities/task/model/labels'
-import type { ComicListVO } from '@/entities/comic/model/types'
-import type { ManagementTaskType, ManagementTaskVO } from '@/entities/task/model/types'
-import type { StorageStats } from '@/entities/storage/model/types'
+import { managementTaskTypeLabel } from '@/entities/task'
+import type { ComicListVO } from '@/entities/comic'
+import type { ManagementTaskType, ManagementTaskVO } from '@/entities/task'
+import type { StorageStats } from '@/entities/storage'
 
 const quickActions = [
   { to: '/manage/import', label: '导入漫画', icon: UploadFilled },

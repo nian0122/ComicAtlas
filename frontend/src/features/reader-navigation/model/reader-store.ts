@@ -1,10 +1,10 @@
 import { defineStore } from 'pinia'
 import { reactive, computed, toRefs } from 'vue'
 import { getApiErrorMessage } from '@/shared/api/http'
-import { readerApi } from '@/entities/chapter/api/reader-api'
-import { historyApi } from '@/entities/history/api/history-api'
-import { useHistoryStore } from '@/features/history/store'
-import type { MediaItemInfo } from '@/entities/media/types'
+import { readerApi } from '@/entities/chapter'
+import { historyApi } from '@/entities/history'
+import { useHistoryStore } from '@/features/history'
+import type { MediaItemInfo } from '@/entities/media'
 import { clientLogger } from '@/shared/lib/logger'
 
 export interface ReaderState {

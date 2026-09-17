@@ -174,8 +174,8 @@
 <script setup lang="ts">
 import { AppButton } from '@/shared/ui/button'
 import { ref, watch } from 'vue'
-import { useReaderSettingsStore, ZOOM_LEVELS } from '@/features/reader-settings/model/settings-store'
-import type { FitMode, QualityMode, ReadingDirection } from '@/features/reader-settings/model/settings-store'
+import { useReaderSettingsStore, ZOOM_LEVELS } from '@/features/reader-settings'
+import type { FitMode, QualityMode, ReadingDirection } from '@/features/reader-settings'
 
 // 本组件是唯一允许接触 reader-settings-store 的移动端阅读组件：
 // 所有选项直接写 store、即时生效，无「保存」按钮。

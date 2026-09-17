@@ -1,11 +1,13 @@
 import { defineStore } from 'pinia'
-import { managementComicApi } from '@/entities/comic/api/management-api'
-import { useComicListState } from '@/pages/reading/library/model/useComicListState'
+import { managementComicApi } from '@/entities/comic'
+import type { ComicListQuery, ComicListVO } from '@/entities/comic'
+import { usePaginatedListState } from '@/shared/lib/composables/usePaginatedListState'
 
-export type { ComicListState as ManagementComicState } from '@/pages/reading/library/model/useComicListState'
+export type ManagementComicState = ReturnType<typeof usePaginatedListState<ComicListVO, ComicListQuery>>
 
 export const useManagementComicStore = defineStore('management-comic', () =>
-  useComicListState({
+  usePaginatedListState<ComicListVO, ComicListQuery>({
+    defaultQuery: { page: 1, size: 24, sort: 'createdAt' },
     fetchPage: async (query) => (await managementComicApi.list(query)).data,
   }),
 )

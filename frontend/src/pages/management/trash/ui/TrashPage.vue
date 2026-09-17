@@ -113,8 +113,8 @@ import { PanelHeader } from '@/shared/ui/management-panel'
 import { PageHeader } from '@/shared/ui/page-header'
 import { onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import type { TrashContentVO } from '@/features/trash/model/types'
-import { trashApi } from '@/features/trash/model/api'
+import type { TrashContentVO } from '@/features/trash'
+import { trashApi } from '@/features/trash'
 
 const STATUS_OPTIONS = [
   { value: 'TRASHED', label: '已回收' },

@@ -14,7 +14,7 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import HeroBanner from './HeroBanner.vue'
-import type { HistoryVO } from '@/entities/history/model/types'
+import type { HistoryVO } from '@/entities/history'
 
 interface HomeHeroProps {
   historyItem?: HistoryVO

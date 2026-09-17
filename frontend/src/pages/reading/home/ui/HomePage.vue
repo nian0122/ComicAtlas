@@ -29,18 +29,16 @@
 
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
-import HomeHero from '@/widgets/home/HomeHero.vue'
-import HomeRow from '@/widgets/home/HomeRow.vue'
-import HomeActionGrid from '@/widgets/home/HomeActionGrid.vue'
-import { useHistoryStore } from '@/features/history/store'
-import { useComicStore } from '@/pages/reading/library/model/comic-store'
-import { useInteractionMode } from '@/features/reader-interaction/model/useInteractionMode'
-import type { HomeRowItem } from '@/widgets/home/HomeRow.vue'
-import type { ComicListVO } from '@/entities/comic/model/types'
-import type { HistoryVO } from '@/entities/history/model/types'
+import { HomeHero, HomeRow, HomeActionGrid } from '@/widgets/home'
+import { useHistoryStore } from '@/features/history'
+import { useHomeComicStore } from '@/pages/reading/home/model/home-comic-store'
+import { useInteractionMode } from '@/features/reader-interaction'
+import type { HomeRowItem } from '@/widgets/home'
+import type { ComicListVO } from '@/entities/comic'
+import type { HistoryVO } from '@/entities/history'
 
 const historyStore = useHistoryStore()
-const comicStore = useComicStore()
+const comicStore = useHomeComicStore()
 
 // 交互模式检测：mobile 时给根容器加 is-mobile 类，驱动下方移动端布局
 const { mode } = useInteractionMode()

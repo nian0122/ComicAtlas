@@ -54,7 +54,7 @@ import { AppButton } from '@/shared/ui/button'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
-import ComicPoster from '@/entities/comic/ui/ComicPoster.vue'
+import { ComicPoster } from '@/entities/comic/ui'
 
 export interface HomeRowItem {
   id: string | number
