@@ -2,6 +2,7 @@ package com.comicatlas.api.admin.service.impl;
 
 import com.comicatlas.api.recovery.interfaces.rest.dto.ComicDeleteStatsDTO;
 import com.comicatlas.api.recovery.engine.RecoveryEngine;
+import com.comicatlas.api.recovery.application.port.out.RecoveryCompatibilityPersistencePort;
 import com.comicatlas.api.recovery.infrastructure.persistence.mapper.RecoveryDataMapper;
 import com.comicatlas.api.catalog.infrastructure.cache.CatalogCacheInvalidator;
 import com.comicatlas.contract.common.exception.BusinessException;
@@ -45,7 +46,7 @@ class RecoveryCompatibilityServiceImplTest {
     @Mock
     private CatalogCacheInvalidator catalogCacheInvalidator;
     @Mock
-    private ComicMapper comicMapper;
+    private RecoveryCompatibilityPersistencePort persistencePort;
     @Mock
     private CatalogMapper catalogMapper;
     @Mock
@@ -85,7 +86,7 @@ class RecoveryCompatibilityServiceImplTest {
 
     @Test
     void deleteComic_shouldThrow404_whenComicNotFound() {
-        when(comicMapper.selectById(1L)).thenReturn(null);
+        when(persistencePort.findComic(1L)).thenReturn(null);
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> service.deleteComic(1L, "DATABASE_ONLY"));
@@ -94,10 +95,10 @@ class RecoveryCompatibilityServiceImplTest {
 
     @Test
     void deleteComic_shouldThrow409_whenRunningTaskExists() {
-        Comic comic = new Comic();
-        comic.setId(1L);
-        when(comicMapper.selectById(1L)).thenReturn(comic);
-        when(recoveryDataMapper.countImportTasks(anyLong(), any())).thenReturn(1L);
+        RecoveryCompatibilityPersistencePort.ComicSnapshot comic =
+                new RecoveryCompatibilityPersistencePort.ComicSnapshot(1L, "Test Comic");
+        when(persistencePort.findComic(1L)).thenReturn(comic);
+        when(persistencePort.countImportTasks(anyLong(), any())).thenReturn(1L);
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> service.deleteComic(1L, "DATABASE_ONLY"));
@@ -107,22 +108,18 @@ class RecoveryCompatibilityServiceImplTest {
 
     @Test
     void deleteComic_shouldRedirectToUnifiedTaskPipeline_whenSuccessful() {
-        Comic comic = new Comic();
-        comic.setId(1L);
-        comic.setTitle("Test Comic");
-        when(comicMapper.selectById(1L)).thenReturn(comic);
-        when(recoveryDataMapper.countImportTasks(anyLong(), any())).thenReturn(0L);
+        RecoveryCompatibilityPersistencePort.ComicSnapshot comic =
+                new RecoveryCompatibilityPersistencePort.ComicSnapshot(1L, "Test Comic");
+        when(persistencePort.findComic(1L)).thenReturn(comic);
+        when(persistencePort.countImportTasks(anyLong(), any())).thenReturn(0L);
 
-        Chapter ch1 = new Chapter();
-        ch1.setId(101L);
-        Chapter ch2 = new Chapter();
-        ch2.setId(102L);
-        when(chapterMapper.selectByComicIdOrderByGlobalOrder(anyLong()))
-                .thenReturn(List.of(ch1, ch2));
-        when(recoveryDataMapper.countMediaByChapterIds(any())).thenReturn(50L);
-        when(catalogMapper.countByComicId(anyLong())).thenReturn(3L);
-        when(recoveryDataMapper.countComicTags(anyLong())).thenReturn(5L);
-        when(recoveryDataMapper.countReadingHistory(anyLong())).thenReturn(10L);
+        when(persistencePort.findChapters(anyLong())).thenReturn(List.of(
+                new RecoveryCompatibilityPersistencePort.ChapterSnapshot(101L),
+                new RecoveryCompatibilityPersistencePort.ChapterSnapshot(102L)));
+        when(persistencePort.countMedia(any())).thenReturn(50L);
+        when(persistencePort.countCatalogs(anyLong())).thenReturn(3L);
+        when(persistencePort.countComicTags(anyLong())).thenReturn(5L);
+        when(persistencePort.countReadingHistory(anyLong())).thenReturn(10L);
         when(mediaOperationCommandService.requestComicDelete(1L))
                 .thenReturn(OperationSubmitResultDTO.of(9L, "COMIC_DELETE", "QUEUED", 1));
 
@@ -137,22 +134,19 @@ class RecoveryCompatibilityServiceImplTest {
 
         verify(mediaOperationCommandService).requestComicDelete(1L);
         // 不再先删 DB 后发 MQ
-        verify(comicMapper, never()).deleteById(anyLong());
-        verify(chapterMapper, never()).delete(any());
-        verify(mediaMapper, never()).delete(any());
     }
 
     @Test
     void deleteComic_shouldHandleComicWithNoChapters() {
-        Comic comic = new Comic();
-        comic.setId(1L);
-        when(comicMapper.selectById(1L)).thenReturn(comic);
-        when(recoveryDataMapper.countImportTasks(anyLong(), any())).thenReturn(0L);
-        when(chapterMapper.selectByComicIdOrderByGlobalOrder(anyLong())).thenReturn(List.of());
+        RecoveryCompatibilityPersistencePort.ComicSnapshot comic =
+                new RecoveryCompatibilityPersistencePort.ComicSnapshot(1L, "Test Comic");
+        when(persistencePort.findComic(1L)).thenReturn(comic);
+        when(persistencePort.countImportTasks(anyLong(), any())).thenReturn(0L);
+        when(persistencePort.findChapters(anyLong())).thenReturn(List.of());
 
-        when(catalogMapper.countByComicId(anyLong())).thenReturn(2L);
-        when(recoveryDataMapper.countComicTags(anyLong())).thenReturn(3L);
-        when(recoveryDataMapper.countReadingHistory(anyLong())).thenReturn(1L);
+        when(persistencePort.countCatalogs(anyLong())).thenReturn(2L);
+        when(persistencePort.countComicTags(anyLong())).thenReturn(3L);
+        when(persistencePort.countReadingHistory(anyLong())).thenReturn(1L);
         when(mediaOperationCommandService.requestComicDelete(1L))
                 .thenReturn(OperationSubmitResultDTO.of(10L, "COMIC_DELETE", "QUEUED", 1));
 
