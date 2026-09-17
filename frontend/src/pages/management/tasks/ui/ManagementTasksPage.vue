@@ -1,8 +1,8 @@
 <template>
   <div class="management-tasks-page">
-    <ManagementPageHeader title="任务中心" description="自动刷新，统一查看存储、回收、上传、导出和元数据任务。">
+    <PageHeader title="任务中心" description="自动刷新，统一查看存储、回收、上传、导出和元数据任务。">
       <el-button :loading="loading" @click="loadTasks">立即刷新</el-button>
-    </ManagementPageHeader>
+    </PageHeader>
 
     <StatGrid class="summary-grid" aria-label="当前查询统计" :columns="4">
       <StatCard label="匹配任务" :value="total" description="全部分页结果" />
@@ -219,11 +219,11 @@
 </template>
 
 <script setup lang="ts">
-import StatGrid from '@/shared/ui/management-panel/StatGrid.vue'
+import { StatGrid } from '@/shared/ui/management-panel'
 import TaskStatusTag from '@/features/task/components/TaskStatusTag.vue'
-import EmptyState from '@/shared/ui/management-panel/EmptyState.vue'
-import StatCard from '@/shared/ui/management-panel/StatCard.vue'
-import ManagementPageHeader from '@/shared/ui/management-panel/ManagementPageHeader.vue'
+import { EmptyState } from '@/shared/ui/management-panel'
+import { StatCard } from '@/shared/ui/management-panel'
+import { PageHeader } from '@/shared/ui/page-header'
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'

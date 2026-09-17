@@ -1,11 +1,11 @@
 <template>
   <div class="manage-comic-list-page">
-    <ManagementPageHeader spaced title="漫画管理" eyebrow="CATALOG / CONTROL">
+    <PageHeader spaced title="漫画管理" eyebrow="CATALOG / CONTROL">
       <template #description>共 {{ store.total }} 部漫画</template>
       <div class="header-actions">
-        <button class="primary-btn" @click="router.push('/manage/import')">+ 导入漫画</button>
+        <AppButton variant="primary" @click="router.push('/manage/import')">+ 导入漫画</AppButton>
       </div>
-    </ManagementPageHeader>
+    </PageHeader>
 
     <StatGrid spaced class="repository-stats" aria-label="仓库统计" :columns="3">
       <StatCard label="已索引漫画" :value="store.total.toLocaleString()" description="来自当前漫画目录" />
@@ -78,22 +78,15 @@
       <el-button type="primary" @click="showBatchDialog = true"> 批量编辑 </el-button>
     </div>
 
-    <div v-if="store.loading && store.list.length === 0" class="state loading">
-      <div class="spinner" />
-      <span>加载中...</span>
-    </div>
+    <ContentState v-if="store.loading && store.list.length === 0" state="loading" message="加载中..." />
 
-    <div v-else-if="store.error" class="state error">
-      <el-icon :size="32"><WarningFilled /></el-icon>
-      <span>{{ store.error }}</span>
-      <button class="ghost-btn" @click="store.fetchList()">重试</button>
-    </div>
+    <ContentState v-else-if="store.error" state="error" :message="store.error">
+      <AppButton @click="store.fetchList()">重试</AppButton>
+    </ContentState>
 
-    <div v-else-if="store.list.length === 0" class="state empty">
-      <el-icon :size="48"><PictureFilled /></el-icon>
-      <span>暂无漫画</span>
-      <button class="primary-btn" @click="router.push('/manage/import')">导入漫画</button>
-    </div>
+    <ContentState v-else-if="store.list.length === 0" state="empty" message="暂无漫画">
+      <AppButton variant="primary" @click="router.push('/manage/import')">导入漫画</AppButton>
+    </ContentState>
 
     <section v-else class="comic-table-section">
       <div class="comic-grid">
@@ -132,9 +125,9 @@
 
     <div v-if="storageSummaryError" class="inline-error" role="alert">
       <span>{{ storageSummaryError }}</span>
-      <button class="ghost-btn" :disabled="storageSummaryLoading" @click="loadStorageSummary">
+      <AppButton :disabled="storageSummaryLoading" @click="loadStorageSummary">
         {{ storageSummaryLoading ? '重试中...' : '重试' }}
-      </button>
+      </AppButton>
     </div>
 
     <BatchEditDialog v-model:visible="showBatchDialog" :comic-ids="selectedIds" @saved="onBatchSaved" />
@@ -142,12 +135,13 @@
 </template>
 
 <script setup lang="ts">
-import StatGrid from '@/shared/ui/management-panel/StatGrid.vue'
-import StatCard from '@/shared/ui/management-panel/StatCard.vue'
-import ManagementPageHeader from '@/shared/ui/management-panel/ManagementPageHeader.vue'
+import { AppButton } from '@/shared/ui/button'
+import { ContentState } from '@/shared/ui/content-state'
+import { StatGrid } from '@/shared/ui/management-panel'
+import { StatCard } from '@/shared/ui/management-panel'
+import { PageHeader } from '@/shared/ui/page-header'
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { PictureFilled, WarningFilled } from '@element-plus/icons-vue'
 import { useManagementComicStore } from '@/pages/management/comics/model/management-comic-store'
 import { useCategoryStore } from '@/features/category/store'
 import { useTagStore } from '@/features/tag/store'
@@ -280,39 +274,6 @@ function formatBytes(bytes: number | undefined): string {
 .header-actions {
   display: flex;
   gap: var(--space-sm);
-}
-
-.primary-btn {
-  padding: 8px 16px;
-  background: var(--accent);
-  color: var(--text-primary);
-  border: none;
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background var(--transition-fast);
-}
-
-.primary-btn:hover {
-  background: var(--accent-hover);
-}
-
-.ghost-btn {
-  padding: 8px 16px;
-  background: transparent;
-  color: var(--text-primary);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.ghost-btn:hover {
-  background: var(--bg-surface);
-  border-color: var(--text-muted);
 }
 
 .filter-toolbar {
@@ -479,20 +440,5 @@ function formatBytes(bytes: number | undefined): string {
 
 .state.empty {
   color: var(--text-muted);
-}
-
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid var(--border-strong);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 </style>

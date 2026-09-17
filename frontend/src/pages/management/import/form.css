@@ -122,35 +122,6 @@
   margin-top: var(--space-lg);
 }
 
-.primary-btn {
-  padding: 8px 16px;
-  background: var(--accent);
-  color: var(--text-primary);
-  border: none;
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 150ms ease;
-}
-
-.primary-btn:hover {
-  background: var(--accent-hover);
-}
-
-.primary-btn.large {
-  font-size: 15px;
-  padding: 12px 28px;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.primary-btn:disabled {
-  background: var(--text-muted);
-  cursor: not-allowed;
-}
-
 .spinner-sm {
   width: 14px;
   height: 14px;

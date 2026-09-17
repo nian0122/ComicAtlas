@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import StatusBadge from '@/shared/ui/status-badge/StatusBadge.vue'
+import { StatusBadge } from '@/shared/ui/status-badge'
 import type { ComicStatus } from '@/entities/comic/model/types'
 import { comicStatusMeta } from '@/entities/comic/model/status'
 

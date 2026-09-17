@@ -1,16 +1,18 @@
 <template>
   <header class="reader-toolbar" :class="{ 'toolbar-hidden': !settings.showToolbar }">
     <div class="toolbar-left">
-      <button class="tool-btn" @click="emit('back')">
+      <AppButton class="tool-btn" icon-only aria-label="返回上一页" @click="emit('back')">
         <el-icon :size="20"><ArrowLeft /></el-icon>
-      </button>
+      </AppButton>
       <span class="toolbar-title">{{ title }}</span>
     </div>
 
     <div class="toolbar-center">
       <el-popover v-model:visible="jumpVisible" placement="bottom" :width="220" trigger="click">
         <template #reference>
-          <button class="tool-btn page-indicator" title="点击跳转页码">{{ currentPage }} / {{ totalPages }}</button>
+          <AppButton class="tool-btn page-indicator" title="点击跳转页码"
+            >{{ currentPage }} / {{ totalPages }}</AppButton
+          >
         </template>
         <div class="jump-panel">
           <el-input-number
@@ -28,14 +30,16 @@
 
     <div class="toolbar-right">
       <!-- Chapter nav -->
-      <button v-if="prevChapterId" class="tool-btn chapter-btn" @click="emit('prevChapter')">上一章</button>
-      <button v-if="nextChapterId" class="tool-btn chapter-btn primary" @click="emit('nextChapter')">下一章</button>
+      <AppButton v-if="prevChapterId" class="tool-btn chapter-btn" @click="emit('prevChapter')">上一章</AppButton>
+      <AppButton v-if="nextChapterId" class="tool-btn chapter-btn primary" @click="emit('nextChapter')"
+        >下一章</AppButton
+      >
 
       <el-popover v-model:visible="settingsVisible" placement="bottom-end" :width="280" trigger="click">
         <template #reference>
-          <button class="tool-btn" aria-label="阅读设置" title="阅读设置">
+          <AppButton class="tool-btn" aria-label="阅读设置" title="阅读设置">
             <el-icon :size="18"><Setting /></el-icon>
-          </button>
+          </AppButton>
         </template>
         <div class="desktop-settings-panel">
           <div class="settings-panel-title">阅读设置</div>
@@ -66,17 +70,17 @@
           <div class="settings-field settings-zoom-field">
             <span>缩放 {{ settings.zoom }}%</span>
             <div class="zoom-group">
-              <button class="tool-btn zoom-btn" @click="settings.zoomOut">−</button>
+              <AppButton class="tool-btn zoom-btn" icon-only aria-label="缩小" @click="settings.zoomOut">−</AppButton>
               <span class="zoom-value">{{ settings.zoom }}%</span>
-              <button class="tool-btn zoom-btn" @click="settings.zoomIn">＋</button>
+              <AppButton class="tool-btn zoom-btn" icon-only aria-label="放大" @click="settings.zoomIn">＋</AppButton>
             </div>
           </div>
           <div class="settings-panel-actions">
-            <button class="panel-action" @click="settings.togglePreload()">
+            <AppButton class="panel-action" @click="settings.togglePreload()">
               {{ settings.enablePreload ? '关闭预加载' : '开启预加载' }}
-            </button>
-            <button class="panel-action" @click="settings.resetZoom()">重置缩放</button>
-            <button class="panel-action" @click="hideToolbar">隐藏工具栏</button>
+            </AppButton>
+            <AppButton class="panel-action" @click="settings.resetZoom()">重置缩放</AppButton>
+            <AppButton class="panel-action" @click="hideToolbar">隐藏工具栏</AppButton>
           </div>
         </div>
       </el-popover>
@@ -85,6 +89,7 @@
 </template>
 
 <script setup lang="ts">
+import { AppButton } from '@/shared/ui/button'
 import { ref, watch } from 'vue'
 import { ArrowLeft, Setting } from '@element-plus/icons-vue'
 import { ElSelect, ElOption, ElPopover, ElInputNumber, ElButton } from 'element-plus'

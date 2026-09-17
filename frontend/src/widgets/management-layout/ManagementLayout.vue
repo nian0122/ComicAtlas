@@ -104,7 +104,7 @@ import {
   InfoFilled,
 } from '@element-plus/icons-vue'
 import { useImportStore } from '@/features/import/model/store'
-import ComicAtlasLogo from '@/shared/ui/logo/ComicAtlasLogo.vue'
+import { ComicAtlasLogo } from '@/shared/ui/logo'
 
 const importStore = useImportStore()
 
@@ -504,26 +504,6 @@ onMounted(() => {
   border-color: var(--border);
   border-radius: var(--radius-sm);
   background: var(--bg-surface);
-}
-
-/* Element Plus 按钮由路由子页渲染，精确命中其根类；:deep 仅用于跨 router-view 的壳层主题适配。 */
-.management-content :deep(.el-button.el-button--primary),
-.management-content :deep(.primary-btn) {
-  min-height: 40px;
-  padding-inline: var(--space-4);
-  border: 1px solid var(--color-brand);
-  border-radius: var(--control-radius);
-  background: var(--color-brand);
-  color: var(--color-on-brand);
-  font-weight: 700;
-  line-height: 1;
-  box-shadow: none;
-}
-
-.management-content :deep(.el-button.el-button--primary:focus-visible),
-.management-content :deep(.primary-btn:focus-visible) {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--accent-bg);
 }
 
 @media (max-width: 900px) {

@@ -1,12 +1,12 @@
 <template>
   <div class="comic-operations-page">
-    <ManagementPageHeader title="漫画操作台" description="触发存储与生命周期操作，并实时观察漫画和任务状态变化。">
+    <PageHeader title="漫画操作台" description="触发存储与生命周期操作，并实时观察漫画和任务状态变化。">
       <div class="target-input">
         <el-input-number v-model="comicId" :min="1" :controls="false" /><el-button type="primary" @click="selectComic"
           >加载漫画</el-button
         >
       </div>
-    </ManagementPageHeader>
+    </PageHeader>
 
     <el-alert v-if="error" :title="error" type="error" show-icon />
     <section v-if="comic" class="current-state">
@@ -147,11 +147,11 @@
 </template>
 
 <script setup lang="ts">
-import StatGrid from '@/shared/ui/management-panel/StatGrid.vue'
-import PanelHeader from '@/shared/ui/management-panel/PanelHeader.vue'
-import EmptyState from '@/shared/ui/management-panel/EmptyState.vue'
-import StatCard from '@/shared/ui/management-panel/StatCard.vue'
-import ManagementPageHeader from '@/shared/ui/management-panel/ManagementPageHeader.vue'
+import { StatGrid } from '@/shared/ui/management-panel'
+import { PanelHeader } from '@/shared/ui/management-panel'
+import { EmptyState } from '@/shared/ui/management-panel'
+import { StatCard } from '@/shared/ui/management-panel'
+import { PageHeader } from '@/shared/ui/page-header'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'

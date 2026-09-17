@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import StatusBadge from '@/shared/ui/status-badge/StatusBadge.vue'
+import { StatusBadge } from '@/shared/ui/status-badge'
 
 const props = defineProps<{
   status: string

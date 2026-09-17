@@ -121,6 +121,15 @@
   --control-focus-ring: rgb(170 169 162 / 16%);
   --control-error-border: #e8777d;
   --control-error-ring: rgb(232 119 125 / 14%);
+  --button-height-sm: 36px;
+  --button-height-default: var(--control-height);
+  --button-height-lg: 48px;
+  --button-padding-inline: var(--space-4);
+  --button-focus-ring: 0 0 0 3px var(--control-focus-ring);
+  --page-header-gap: var(--space-6);
+  --page-header-action-gap: var(--space-3);
+  --content-state-padding: var(--space-8);
+  --content-state-spinner-size: 28px;
   --status-dot-size: 8px;
   --disabled-opacity: 0.55;
   --sidebar-width: 232px;

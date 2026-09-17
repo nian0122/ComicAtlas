@@ -8,9 +8,15 @@
           :style="{ paddingLeft: item.depth * 16 + 12 + 'px' }"
           @click="toggleExpanded(item.nodePath)"
         >
-          <button type="button" class="expand-btn" :class="{ expanded: isExpanded(item.nodePath) }">
+          <AppButton
+            type="button"
+            class="expand-btn"
+            icon-only
+            :aria-label="isExpanded(item.nodePath) ? `收起${item.title}` : `展开${item.title}`"
+            :class="{ expanded: isExpanded(item.nodePath) }"
+          >
             <el-icon :size="12"><ArrowRight /></el-icon>
-          </button>
+          </AppButton>
           <span class="node-title">{{ item.title }}</span>
           <span v-if="item.count > 0" class="node-count">{{ item.count }} 话</span>
         </div>
@@ -28,6 +34,7 @@
 </template>
 
 <script setup lang="ts">
+import { AppButton } from '@/shared/ui/button'
 import { computed, provide, ref, watch } from 'vue'
 import { RecycleScroller } from 'vue-virtual-scroller'
 import { ArrowRight } from '@element-plus/icons-vue'

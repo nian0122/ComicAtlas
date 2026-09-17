@@ -17,10 +17,10 @@
             <span v-for="tag in comic.tags" :key="tag.name">{{ tag.name }}</span>
           </div>
         </header>
-        <button type="button" class="read-button" :disabled="!canRead" @click="$emit('read')">
+        <AppButton type="button" class="read-button" :disabled="!canRead" @click="$emit('read')">
           <el-icon :size="21"><VideoPlay /></el-icon>
           {{ readLabel }}
-        </button>
+        </AppButton>
       </div>
     </section>
 
@@ -74,7 +74,7 @@
         />
         <div v-else-if="isSearching" class="empty-catalog">
           <p>没有找到匹配章节</p>
-          <button type="button" class="clear-search-button" @click="$emit('clear-search')">清空搜索</button>
+          <AppButton type="button" class="clear-search-button" @click="$emit('clear-search')">清空搜索</AppButton>
         </div>
         <p v-else class="empty-catalog">暂无章节</p>
       </section>
@@ -83,6 +83,7 @@
 </template>
 
 <script setup lang="ts">
+import { AppButton } from '@/shared/ui/button'
 import { computed } from 'vue'
 import { VideoPlay } from '@element-plus/icons-vue'
 import CatalogTree from '@/entities/comic/ui/CatalogTree.vue'

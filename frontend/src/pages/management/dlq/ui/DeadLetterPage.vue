@@ -1,12 +1,8 @@
 <template>
   <div class="dlq-page">
-    <ManagementPageHeader
-      title="死信队列"
-      description="检查失败消息，并重放到原始业务路由。"
-      eyebrow="MESSAGE RECOVERY"
-    >
+    <PageHeader title="死信队列" description="检查失败消息，并重放到原始业务路由。" eyebrow="MESSAGE RECOVERY">
       <el-button :loading="loading" @click="loadQueues">刷新</el-button>
-    </ManagementPageHeader>
+    </PageHeader>
 
     <StatGrid v-if="queues.length > 0" class="summary-grid" aria-label="死信队列摘要" :columns="3">
       <StatCard label="受监控队列" :value="queues.length" />
@@ -19,7 +15,7 @@
         <el-button :loading="loading" @click="loadQueues">刷新</el-button>
       </PanelHeader>
 
-      <div v-if="error" class="state error">{{ error }}</div>
+      <ContentState v-if="error" state="error" :message="error" />
 
       <div v-else-if="queues.length > 0" class="table-scroll">
         <el-table :data="queues" class="queue-table" empty-text="没有可用的死信队列">
@@ -70,7 +66,7 @@
           </el-table-column>
         </el-table>
       </div>
-      <div v-else-if="!loading" class="state empty">没有可用的死信队列</div>
+      <ContentState v-else-if="!loading" state="empty" message="没有可用的死信队列" />
     </ManagementPanel>
 
     <DlqMessageDialog
@@ -83,11 +79,12 @@
 </template>
 
 <script setup lang="ts">
-import ManagementPanel from '@/shared/ui/management-panel/ManagementPanel.vue'
-import StatGrid from '@/shared/ui/management-panel/StatGrid.vue'
-import PanelHeader from '@/shared/ui/management-panel/PanelHeader.vue'
-import StatCard from '@/shared/ui/management-panel/StatCard.vue'
-import ManagementPageHeader from '@/shared/ui/management-panel/ManagementPageHeader.vue'
+import { ManagementPanel } from '@/shared/ui/management-panel'
+import { StatGrid } from '@/shared/ui/management-panel'
+import { PanelHeader } from '@/shared/ui/management-panel'
+import { StatCard } from '@/shared/ui/management-panel'
+import { PageHeader } from '@/shared/ui/page-header'
+import { ContentState } from '@/shared/ui/content-state'
 import { computed, ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { dlqApi } from '@/entities/dlq/api/dlq-api'

@@ -1,8 +1,8 @@
 <template>
   <div class="management-home-page">
-    <ManagementPageHeader title="仓库控制台" description="本地漫画仓库的最近活动与运行状态。">
+    <PageHeader title="仓库控制台" description="本地漫画仓库的最近活动与运行状态。">
       <span class="page-updated">{{ updatedAt ? `更新于 ${updatedAt}` : '正在加载' }}</span>
-    </ManagementPageHeader>
+    </PageHeader>
 
     <el-alert v-if="error" :title="error" type="warning" show-icon />
 
@@ -108,14 +108,14 @@
 </template>
 
 <script setup lang="ts">
-import ManagementPanel from '@/shared/ui/management-panel/ManagementPanel.vue'
-import StatGrid from '@/shared/ui/management-panel/StatGrid.vue'
+import { ManagementPanel } from '@/shared/ui/management-panel'
+import { StatGrid } from '@/shared/ui/management-panel'
 import ComicStatusTag from '@/entities/comic/ui/ComicStatusTag.vue'
 import TaskStatusTag from '@/features/task/components/TaskStatusTag.vue'
-import StatCard from '@/shared/ui/management-panel/StatCard.vue'
-import PanelHeader from '@/shared/ui/management-panel/PanelHeader.vue'
-import EmptyState from '@/shared/ui/management-panel/EmptyState.vue'
-import ManagementPageHeader from '@/shared/ui/management-panel/ManagementPageHeader.vue'
+import { StatCard } from '@/shared/ui/management-panel'
+import { PanelHeader } from '@/shared/ui/management-panel'
+import { EmptyState } from '@/shared/ui/management-panel'
+import { PageHeader } from '@/shared/ui/page-header'
 import { onMounted, ref } from 'vue'
 import {
   CircleCheck,

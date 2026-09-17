@@ -44,10 +44,6 @@
   flex: 1;
 }
 
-.scan-input-row .primary-btn {
-  flex-shrink: 0;
-}
-
 /* Scan result area */
 .scan-result-area {
   margin-top: var(--space-xl);

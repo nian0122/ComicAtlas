@@ -1,15 +1,10 @@
 <template>
   <div class="comic-detail-page fade-in" :class="{ 'is-mobile': mode === 'mobile' }">
-    <div v-if="loading" class="state loading">
-      <div class="spinner" />
-      <span>加载中...</span>
-    </div>
+    <ContentState v-if="loading" state="loading" message="加载中..." />
 
-    <div v-else-if="error" class="state error">
-      <el-icon :size="48"><WarningFilled /></el-icon>
-      <span>{{ error }}</span>
-      <button class="hero-btn hero-btn--primary" @click="loadData">重试</button>
-    </div>
+    <ContentState v-else-if="error" state="error" :message="error">
+      <AppButton variant="primary" @click="loadData">重试</AppButton>
+    </ContentState>
 
     <template v-else-if="comic">
       <MobileComicDetail
@@ -131,31 +126,30 @@
               :expanded-node-paths="expandedNodePaths"
               @select="goReader"
             />
-            <div v-else-if="isSearching" class="state empty small">
-              <el-icon :size="32"><Search /></el-icon>
-              <span>没有找到匹配章节</span>
-              <button type="button" class="clear-search-button" @click="clearSearch">清空搜索</button>
-            </div>
-            <div v-else class="state empty small">
-              <el-icon :size="32"><PictureFilled /></el-icon>
-              <span>暂无章节</span>
-            </div>
+            <ContentState v-else-if="isSearching" state="empty" message="没有找到匹配章节">
+              <template #icon><Search /></template>
+              <AppButton variant="ghost" type="button" @click="clearSearch">清空搜索</AppButton>
+            </ContentState>
+            <ContentState v-else state="empty" message="暂无章节">
+              <template #icon><PictureFilled /></template>
+            </ContentState>
           </div>
         </section>
       </template>
     </template>
 
-    <div v-else class="state empty">
-      <el-icon :size="48"><PictureFilled /></el-icon>
-      <span>漫画不存在</span>
-    </div>
+    <ContentState v-else state="empty" message="漫画不存在">
+      <template #icon><PictureFilled /></template>
+    </ContentState>
   </div>
 </template>
 
 <script setup lang="ts">
+import { AppButton } from '@/shared/ui/button'
+import { ContentState } from '@/shared/ui/content-state'
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { PictureFilled, Search, WarningFilled } from '@element-plus/icons-vue'
+import { PictureFilled, Search } from '@element-plus/icons-vue'
 import { comicApi, catalogApi } from '@/entities/comic/api/reading-api'
 import { getApiErrorMessage } from '@/shared/api/http'
 import { formatBytes as formatFileBytes } from '@/shared/lib/format/bytes'
@@ -307,44 +301,6 @@ onMounted(loadData)
 }
 
 /* Hero action buttons (slotted, so styles live here) */
-.hero-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-xs);
-  padding: 10px 22px;
-  border: none;
-  border-radius: var(--radius-sm);
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1;
-  cursor: pointer;
-  transition:
-    transform var(--transition-fast),
-    background-color var(--transition-fast);
-}
-
-.hero-btn:hover {
-  transform: translateY(-1px);
-}
-
-.hero-btn--primary {
-  background: var(--accent);
-  color: var(--text-primary);
-}
-
-.hero-btn--primary:hover {
-  background: var(--accent-hover);
-}
-
-.hero-btn--secondary {
-  background: var(--color-overlay-soft);
-  color: var(--text-primary);
-}
-
-.hero-btn--secondary:hover {
-  background: var(--color-overlay-hover);
-}
 
 /* Progress */
 .progress-block {
@@ -578,21 +534,6 @@ onMounted(loadData)
   color: var(--accent);
 }
 
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid var(--color-progress-track);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 /* Responsive */
 @media (max-width: 1024px) {
   .info-grid {
@@ -654,12 +595,6 @@ onMounted(loadData)
 /* 单一主操作按钮：全宽、触控高度 ≥ 48px（次按钮已在 secondaryAction 中按 mode 置空） */
 .comic-detail-page.is-mobile > .detail-hero :deep(.hero-actions) {
   width: 100%;
-}
-
-.comic-detail-page.is-mobile > .detail-hero :deep(.hero-btn--primary) {
-  width: 100%;
-  min-height: 48px;
-  font-size: 16px;
 }
 
 /* 信息网格单列：与上方平板媒体查询结果一致，两机制不冲突 */

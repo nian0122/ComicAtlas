@@ -2,9 +2,15 @@
   <div class="catalog-node">
     <!-- 折叠标题行 -->
     <div v-if="node.title" class="node-header" :style="{ paddingLeft: depth * 16 + 12 + 'px' }">
-      <button class="expand-btn" :class="{ expanded: isNodeExpanded }" @click="toggle">
+      <AppButton
+        class="expand-btn"
+        icon-only
+        :aria-label="isNodeExpanded ? `收起${node.title}` : `展开${node.title}`"
+        :class="{ expanded: isNodeExpanded }"
+        @click="toggle"
+      >
         <el-icon :size="12"><ArrowRight /></el-icon>
-      </button>
+      </AppButton>
       <span class="node-title">{{ node.title }}</span>
       <span v-if="node.chapters?.length" class="node-count"> {{ node.chapters.length }} 话 </span>
     </div>
@@ -32,6 +38,7 @@
 </template>
 
 <script setup lang="ts">
+import { AppButton } from '@/shared/ui/button'
 import { computed, inject, onMounted, type Ref } from 'vue'
 import { ArrowRight } from '@element-plus/icons-vue'
 import type { CatalogNode } from '@/entities/comic/model/types'

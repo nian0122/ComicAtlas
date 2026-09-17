@@ -30,24 +30,14 @@
 
         <div v-if="hasActions" class="hero-actions">
           <slot name="actions">
-            <button
-              v-if="primaryAction"
-              type="button"
-              class="hero-btn hero-btn--primary btn-hover"
-              @click="primaryAction.onClick"
-            >
+            <AppButton v-if="primaryAction" type="button" @click="primaryAction.onClick">
               <el-icon :size="20"><VideoPlay /></el-icon>
               {{ primaryAction.label }}
-            </button>
-            <button
-              v-if="secondaryAction"
-              type="button"
-              class="hero-btn hero-btn--secondary"
-              @click="secondaryAction.onClick"
-            >
+            </AppButton>
+            <AppButton v-if="secondaryAction" type="button" @click="secondaryAction.onClick">
               <el-icon :size="20"><InfoFilled /></el-icon>
               {{ secondaryAction.label }}
-            </button>
+            </AppButton>
           </slot>
         </div>
       </div>
@@ -56,6 +46,7 @@
 </template>
 
 <script setup lang="ts">
+import { AppButton } from '@/shared/ui/button'
 import { computed, useSlots } from 'vue'
 import { InfoFilled, VideoPlay } from '@element-plus/icons-vue'
 
@@ -297,46 +288,6 @@ const hasActions = computed(
   margin-top: var(--space-base);
 }
 
-.hero-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  min-height: var(--control-min-size);
-  padding: 0 var(--space-5);
-  border: none;
-  border-radius: var(--radius-xs);
-  font-family: inherit;
-  font-size: var(--text-sm);
-  font-weight: 700;
-  line-height: 1;
-  cursor: pointer;
-  transition:
-    transform var(--transition-fast),
-    background-color var(--transition-fast);
-}
-
-.hero-btn--primary {
-  background: var(--accent);
-  color: var(--color-on-brand);
-}
-
-.hero-btn--primary:hover {
-  background: var(--accent-hover);
-  transform: translateY(-2px);
-}
-
-.hero-btn--secondary {
-  border: 1px solid var(--accent-border);
-  background: var(--accent-bg);
-  color: var(--text-primary);
-}
-
-.hero-btn--secondary:hover {
-  background: var(--color-overlay-hover);
-  transform: translateY(-2px);
-}
-
 @media (max-width: 1024px) {
   .hero-banner {
     min-height: 0;
@@ -398,11 +349,6 @@ const hasActions = computed(
     grid-template-columns: repeat(2, minmax(0, 1fr));
     width: 100%;
     margin-top: var(--space-3);
-  }
-
-  .hero-btn {
-    width: 100%;
-    padding-inline: var(--space-3);
   }
 }
 

@@ -1,12 +1,12 @@
 <template>
   <div class="trash-page">
-    <ManagementPageHeader
+    <PageHeader
       title="回收站"
       description="统一查看已回收的漫画、章节和媒体，并在保留期内恢复或永久清理。"
       eyebrow="LIFECYCLE / TRASH"
     >
       <el-button :loading="loading" @click="loadItems">刷新</el-button>
-    </ManagementPageHeader>
+    </PageHeader>
 
     <section class="filter-toolbar" aria-label="回收站筛选">
       <el-input
@@ -108,9 +108,9 @@
 </template>
 
 <script setup lang="ts">
-import ManagementPanel from '@/shared/ui/management-panel/ManagementPanel.vue'
-import PanelHeader from '@/shared/ui/management-panel/PanelHeader.vue'
-import ManagementPageHeader from '@/shared/ui/management-panel/ManagementPageHeader.vue'
+import { ManagementPanel } from '@/shared/ui/management-panel'
+import { PanelHeader } from '@/shared/ui/management-panel'
+import { PageHeader } from '@/shared/ui/page-header'
 import { onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { TrashContentVO } from '@/features/trash/model/types'

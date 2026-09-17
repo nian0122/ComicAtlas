@@ -115,6 +115,8 @@ src/
 
 本次审计的结论是：当前 `features` 目录中并非所有内容都是 FSD feature，当前 `components`、`layouts`、`views`、`services` 也不应作为最终顶层目录继续扩张。
 
+跨页面按钮、状态、标题、空态和面板的重复实现，另见[前端公共 UI 收敛 TODO](ui-consolidation-todo.md)；该清单以 `UI-xx` 编号记录具体组件和替换范围。
+
 
 ## 本次实施记录
 
