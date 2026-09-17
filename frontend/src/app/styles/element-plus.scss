@@ -4,13 +4,14 @@
 
 :root {
   /* Primary brand palette */
-  --el-color-primary: var(--accent);
-  --el-color-primary-light-3: var(--accent-hover);
-  --el-color-primary-light-5: var(--accent-hover);
-  --el-color-primary-light-7: var(--accent-bg);
-  --el-color-primary-light-8: var(--accent-bg);
-  --el-color-primary-light-9: var(--accent-bg);
-  --el-color-primary-dark-2: var(--accent);
+  --el-color-primary-rgb: 229, 9, 20 !important;
+  --el-color-primary: var(--accent) !important;
+  --el-color-primary-light-3: var(--accent-hover) !important;
+  --el-color-primary-light-5: var(--accent-hover) !important;
+  --el-color-primary-light-7: var(--accent-bg) !important;
+  --el-color-primary-light-8: var(--accent-bg) !important;
+  --el-color-primary-light-9: var(--accent-bg) !important;
+  --el-color-primary-dark-2: var(--accent) !important;
   --el-bg-color: var(--bg-surface);
   --el-bg-color-page: var(--bg-primary);
   --el-bg-color-overlay: var(--surface-highlight);
@@ -115,15 +116,15 @@
   --el-button-disabled-text-color: var(--text-secondary);
 
   color: var(--color-on-brand);
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
   box-shadow: none;
   outline-color: var(--accent);
 
   &:hover:not(:disabled) {
     color: var(--color-on-brand);
-    background: var(--accent-hover);
-    border-color: var(--accent-hover);
+    background: var(--accent-hover) !important;
+    border-color: var(--accent-hover) !important;
   }
 
   &:active:not(:disabled) {

@@ -23,7 +23,7 @@
             class="jump-input"
             @keyup.enter="confirmJump"
           />
-          <el-button type="primary" size="small" @click="confirmJump">跳转</el-button>
+          <AppButton variant="primary" size="sm" @click="confirmJump">跳转</AppButton>
         </div>
       </el-popover>
     </div>
@@ -92,7 +92,7 @@
 import { AppButton } from '@/shared/ui/button'
 import { ref, watch } from 'vue'
 import { ArrowLeft, Setting } from '@element-plus/icons-vue'
-import { ElSelect, ElOption, ElPopover, ElInputNumber, ElButton } from 'element-plus'
+import { ElSelect, ElOption, ElPopover, ElInputNumber } from 'element-plus'
 import { useReaderSettingsStore } from '@/features/reader-settings'
 
 interface Props {

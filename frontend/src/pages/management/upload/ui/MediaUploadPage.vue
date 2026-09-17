@@ -95,22 +95,17 @@
           </div>
         </div>
         <div class="upload-actions">
-          <el-button class="upload-action-button" :disabled="!selectedFiles.length || uploading" @click="clearFiles"
-            >清空</el-button
-          ><el-button
-            v-if="sessionId && uploading"
+          <AppButton class="upload-action-button" :disabled="!selectedFiles.length || uploading" @click="clearFiles"
+            >清空</AppButton
+          ><AppButton v-if="sessionId && uploading" class="upload-action-button" variant="danger" @click="cancelUpload"
+            >取消上传</AppButton
+          ><AppButton
             class="upload-action-button"
-            type="danger"
-            plain
-            @click="cancelUpload"
-            >取消上传</el-button
-          ><el-button
-            class="upload-action-button"
-            type="primary"
+            variant="primary"
             :loading="uploading"
             :disabled="!canStart"
             @click="startUpload"
-            >{{ uploading ? uploadStatus : '开始上传' }}</el-button
+            >{{ uploading ? uploadStatus : '开始上传' }}</AppButton
           >
         </div>
         <div v-if="sessionId" class="session-note">
@@ -134,6 +129,7 @@
 </template>
 
 <script setup lang="ts">
+import { AppButton } from '@/shared/ui/button'
 import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import axios from 'axios'

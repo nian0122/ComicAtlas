@@ -55,7 +55,7 @@
   gap: 5px;
   margin-top: auto;
 }
-.feature-button-row .el-button {
+.feature-button-row .app-button {
   width: 100%;
   min-height: 40px;
   margin: 0;
@@ -256,7 +256,7 @@
   color: var(--text-primary);
   font-size: 13px;
 }
-.chapter-action-toolbar .el-button {
+.chapter-action-toolbar .app-button {
   margin: 0;
 }
 .create-chapter-button {
@@ -447,7 +447,7 @@
 .action-form :deep(.el-input-number .el-input__wrapper) {
   width: 100%;
 }
-.action-form .el-button--block {
+.action-form .app-button--block {
   width: 100%;
 }
 .action-form :deep(.el-form-item__content) {
@@ -578,7 +578,7 @@
 .media-order-status > span {
   color: var(--warning);
 }
-.media-order-status .el-button {
+.media-order-status .app-button {
   flex: 0 0 auto;
   margin: 0;
 }
@@ -596,7 +596,7 @@
   margin: var(--space-2) 0;
   font-size: 10px;
 }
-.advanced-order .el-button {
+.advanced-order .app-button {
   margin-top: var(--space-1);
   padding: 0;
 }
@@ -606,7 +606,7 @@
   justify-content: space-between;
   gap: var(--space-3);
 }
-.media-action-footer .el-button {
+.media-action-footer .app-button {
   flex: 0 0 auto;
 }
 .storage-action {
@@ -637,7 +637,7 @@
   display: grid;
   gap: var(--space-2);
 }
-.storage-action-buttons .el-button {
+.storage-action-buttons .app-button {
   width: 100%;
   margin: 0;
 }
@@ -674,7 +674,7 @@
   display: grid;
   gap: var(--space-2);
 }
-.media-action-buttons .el-button {
+.media-action-buttons .app-button {
   width: 100%;
   margin: 0;
 }

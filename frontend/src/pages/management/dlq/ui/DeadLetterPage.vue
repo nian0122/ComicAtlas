@@ -1,7 +1,7 @@
 <template>
   <div class="dlq-page">
     <PageHeader title="死信队列" description="检查失败消息，并重放到原始业务路由。" eyebrow="MESSAGE RECOVERY">
-      <el-button :loading="loading" @click="loadQueues">刷新</el-button>
+      <AppButton :loading="loading" @click="loadQueues">刷新</AppButton>
     </PageHeader>
 
     <StatGrid v-if="queues.length > 0" class="summary-grid" aria-label="死信队列摘要" :columns="3">
@@ -12,7 +12,7 @@
 
     <ManagementPanel v-loading="loading" flush class="queue-panel">
       <PanelHeader class="queue-heading" title="队列账册" description="查看操作为只读预览；重放每批最多处理 100 条。">
-        <el-button :loading="loading" @click="loadQueues">刷新</el-button>
+        <AppButton :loading="loading" @click="loadQueues">刷新</AppButton>
       </PanelHeader>
 
       <ContentState v-if="error" state="error" :message="error" />
@@ -45,21 +45,20 @@
           <el-table-column label="操作" width="220" align="right">
             <template #default="{ row }">
               <div class="row-actions">
-                <el-button :disabled="row.messages === 0" text @click="showMessages(row)">预览</el-button>
-                <el-button
+                <AppButton :disabled="row.messages === 0" variant="text" @click="showMessages(row)">预览</AppButton>
+                <AppButton
                   :disabled="row.messages === 0"
                   :loading="replaying === row.name"
-                  type="primary"
+                  variant="primary"
                   @click="replayQueue(row)"
-                  >重放</el-button
+                  >重放</AppButton
                 >
-                <el-button
+                <AppButton
                   :disabled="row.messages === 0"
                   :loading="purging === row.name"
-                  type="danger"
-                  plain
+                  variant="danger"
                   @click="purgeQueue(row)"
-                  >清空</el-button
+                  >清空</AppButton
                 >
               </div>
             </template>
@@ -79,6 +78,7 @@
 </template>
 
 <script setup lang="ts">
+import { AppButton } from '@/shared/ui/button'
 import { ManagementPanel } from '@/shared/ui/management-panel'
 import { StatGrid } from '@/shared/ui/management-panel'
 import { PanelHeader } from '@/shared/ui/management-panel'

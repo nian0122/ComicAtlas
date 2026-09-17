@@ -8,7 +8,7 @@
     >
       <div class="page-actions">
         <span class="comic-count">{{ store.serverTotal }} 本漫画</span>
-        <el-button :loading="store.loading" @click="reload">刷新统计</el-button>
+        <AppButton :loading="store.loading" @click="reload">刷新统计</AppButton>
       </div>
     </PageHeader>
 
@@ -30,6 +30,7 @@
 </template>
 
 <script setup lang="ts">
+import { AppButton } from '@/shared/ui/button'
 import { PageHeader } from '@/shared/ui/page-header'
 import { watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'

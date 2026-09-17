@@ -393,7 +393,7 @@
   align-items: center;
   gap: 4px;
 }
-.media-selection-toolbar .el-button {
+.media-selection-toolbar .app-button {
   margin: 0;
   padding: 3px 6px;
   font-size: 10px;

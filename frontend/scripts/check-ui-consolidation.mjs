@@ -4,6 +4,7 @@ import { join, relative } from 'node:path'
 const sourceRoot = join(process.cwd(), 'src')
 const forbiddenPageClasses = /\.(primary-btn|ghost-btn|poster-btn|overlay-btn|hero-btn|status-badge|spinner)\b/
 const deepSharedImport = /@\/shared\/ui\/[^'"\n]+\/[^'"\n]+\.vue/
+const legacyButtonMarkup = /<(?:el-)?button\b/i
 const violations = []
 
 async function collectFiles(directory) {
@@ -17,11 +18,16 @@ async function collectFiles(directory) {
   return files
 }
 
-for (const filePath of await collectFiles(join(sourceRoot, 'pages'))) {
-  const source = await readFile(filePath, 'utf8')
-  const relativePath = relative(process.cwd(), filePath)
-  if (forbiddenPageClasses.test(source)) violations.push(`${relativePath}: 禁止重复定义公共 UI 类名`)
-  if (deepSharedImport.test(source)) violations.push(`${relativePath}: 必须通过 shared/ui public API 引用组件`)
+const publicUiDirectories = ['pages', 'widgets', 'features', 'entities']
+for (const directoryName of publicUiDirectories) {
+  const directoryPath = join(sourceRoot, directoryName)
+  for (const filePath of await collectFiles(directoryPath)) {
+    const source = await readFile(filePath, 'utf8')
+    const relativePath = relative(process.cwd(), filePath)
+    if (forbiddenPageClasses.test(source)) violations.push(`${relativePath}: 禁止重复定义公共 UI 类名`)
+    if (deepSharedImport.test(source)) violations.push(`${relativePath}: 必须通过 shared/ui public API 引用组件`)
+    if (legacyButtonMarkup.test(source)) violations.push(`${relativePath}: 业务 UI 必须使用 shared/ui/button/AppButton`)
+  }
 }
 
 if (violations.length > 0) {

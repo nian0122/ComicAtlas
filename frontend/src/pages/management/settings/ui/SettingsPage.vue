@@ -33,7 +33,7 @@
       </div>
 
       <div class="setting-actions">
-        <el-button type="primary" :loading="saving" @click="handleSave">保存设置</el-button>
+        <AppButton variant="primary" :loading="saving" @click="handleSave">保存设置</AppButton>
       </div>
     </section>
 
@@ -53,6 +53,7 @@
 </template>
 
 <script setup lang="ts">
+import { AppButton } from '@/shared/ui/button'
 import { PageHeader } from '@/shared/ui/page-header'
 import { reactive, ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'

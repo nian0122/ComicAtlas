@@ -22,15 +22,15 @@
             class="metadata-input"
             @keyup.enter="onCreateCategory"
           />
-          <el-button type="primary" :loading="categoryStore.loading" @click="onCreateCategory"> 添加分类 </el-button>
+          <AppButton variant="primary" :loading="categoryStore.loading" @click="onCreateCategory">添加分类</AppButton>
         </div>
 
         <el-table v-loading="categoryStore.loading" :data="categoryStore.list" style="width: 100%">
           <el-table-column prop="name" label="名称" />
           <el-table-column label="操作" width="180">
             <template #default="{ row }">
-              <el-button link type="primary" @click="startEditCategory(row)">编辑</el-button>
-              <el-button link type="danger" @click="onDeleteCategory(row.id)">删除</el-button>
+              <AppButton variant="text" @click="startEditCategory(row)">编辑</AppButton>
+              <AppButton variant="text" @click="onDeleteCategory(row.id)">删除</AppButton>
             </template>
           </el-table-column>
         </el-table>
@@ -39,7 +39,7 @@
       <el-tab-pane label="标签" name="tag">
         <div class="tab-toolbar">
           <el-input v-model="newTagName" placeholder="新标签名称" class="metadata-input" @keyup.enter="onCreateTag" />
-          <el-button type="primary" :loading="tagStore.loading" @click="onCreateTag"> 添加标签 </el-button>
+          <AppButton variant="primary" :loading="tagStore.loading" @click="onCreateTag">添加标签</AppButton>
         </div>
 
         <div class="tag-list">
@@ -59,14 +59,15 @@
     <el-dialog v-model="categoryEditVisible" title="编辑分类" width="400px">
       <el-input v-model="editCategoryName" placeholder="分类名称" />
       <template #footer>
-        <el-button @click="categoryEditVisible = false">取消</el-button>
-        <el-button type="primary" @click="onUpdateCategory">保存</el-button>
+        <AppButton variant="secondary" @click="categoryEditVisible = false">取消</AppButton>
+        <AppButton variant="primary" @click="onUpdateCategory">保存</AppButton>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
+import { AppButton } from '@/shared/ui/button'
 import { StatGrid } from '@/shared/ui/management-panel'
 import { StatCard } from '@/shared/ui/management-panel'
 import { PageHeader } from '@/shared/ui/page-header'
