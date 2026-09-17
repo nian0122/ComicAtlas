@@ -1,6 +1,5 @@
 package com.comicatlas.api.metadata.application.service.impl;
 
-import com.comicatlas.persistence.comic.assembler.ComicDetailAssembler;
 import com.comicatlas.api.catalog.infrastructure.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.metadata.application.port.in.ComicManagementService;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
@@ -34,6 +33,7 @@ import com.comicatlas.persistence.comic.entity.Category;
 import com.comicatlas.persistence.comic.entity.ComicTag;
 import com.comicatlas.persistence.comic.entity.Tag;
 import com.comicatlas.api.metadata.application.port.out.ComicManagementPersistencePort;
+import com.comicatlas.api.metadata.application.port.out.ComicDetailQueryPort;
 
 @Slf4j
 @Service
@@ -41,7 +41,7 @@ import com.comicatlas.api.metadata.application.port.out.ComicManagementPersisten
 public class ComicManagementServiceImpl implements ComicManagementService {
 
     private final ComicManagementPersistencePort persistencePort;
-    private final ComicDetailAssembler comicDetailAssembler;
+    private final ComicDetailQueryPort comicDetailQueryPort;
     private final ManagementTaskService managementTaskService;
     private final TrashLifecycleService trashLifecycleService;
     private final CatalogCacheInvalidator catalogCacheInvalidator;
@@ -87,7 +87,7 @@ public class ComicManagementServiceImpl implements ComicManagementService {
             }
         }
 
-        return comicDetailAssembler.assemble(comic);
+        return comicDetailQueryPort.assemble(comic.getId());
     }
 
     @Override
@@ -127,7 +127,7 @@ public class ComicManagementServiceImpl implements ComicManagementService {
             throw new ConflictException("漫画已被其他操作修改，请刷新后重试");
         }
         catalogCacheInvalidator.evict(id);
-        return comicDetailAssembler.assemble(persistencePort.findComic(id));
+        return comicDetailQueryPort.assemble(id);
     }
 
     @Override
