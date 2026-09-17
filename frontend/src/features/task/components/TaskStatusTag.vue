@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import StatusBadge from '@/components/status/StatusBadge.vue'
-import { managementTaskStatusLabel, managementTaskStatusTone } from '@/features/task/labels'
-import type { ManagementTaskStatus } from '@/features/task/types'
+import StatusBadge from '@/shared/ui/status-badge/StatusBadge.vue'
+import { managementTaskStatusLabel, managementTaskStatusTone } from '@/entities/task/model/labels'
+import type { ManagementTaskStatus } from '@/entities/task/model/types'
 
 const props = withDefaults(
   defineProps<{

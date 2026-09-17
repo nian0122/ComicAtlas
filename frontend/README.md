@@ -2,7 +2,7 @@
 
 基于 Vue 3、TypeScript、Vite、Pinia 和 Element Plus 的漫画阅读与管理前端。
 
-[设计系统](../docs/frontend/design-system.md) · [前端文档导航](../docs/frontend/README.md) · [测试目录说明](../e2e/README.md)
+[设计系统](../docs/frontend/design-system.md) · [前端文档导航](../docs/frontend/README.md) · [Feature-Sliced Design 改造 TODO](../docs/frontend/fsd-refactoring-todo.md) · [测试目录说明](../e2e/README.md)
 
 ## 开发命令
 
@@ -16,7 +16,9 @@ pnpm check
 
 单独执行 `pnpm format:check` 会检查整个前端源码树，并自动兼容仓库现有的 LF/CRLF 换行风格；`node_modules`、构建产物和测试产物由 `.prettierignore` 排除。需要自动修复格式时执行 `pnpm format`。
 
-## 目录约定
+## 当前目录与 FSD 改造
+
+> **TODO FSD-20**：本节记录的是迁移前的当前结构，不是最终目标。所有待调整位置、目标目录、依赖边界和验证条件以[前端 Feature-Sliced Design 改造 TODO](../docs/frontend/fsd-refactoring-todo.md)为准；迁移完成后，本节必须替换为 FSD 六层目录说明。
 
 [样式目录规范](src/styles/README.md) · [公共组件归属](src/components/README.md)
 

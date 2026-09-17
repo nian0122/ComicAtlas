@@ -1,5 +1,5 @@
 import { ref, computed } from 'vue'
-import type { ComicStorageItem } from '@/features/storage/types'
+import type { ComicStorageItem } from '@/entities/storage/model/types'
 
 export function useStorageSelection(getFilteredList: () => ComicStorageItem[]) {
   const selectedIds = ref<number[]>([])

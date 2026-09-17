@@ -1,5 +1,5 @@
-import { StorageOperationType } from '@/features/storage/types'
-import type { StorageOperationType as StorageOperationTypeValue } from '@/features/storage/types'
+import { StorageOperationType } from '@/entities/storage/model/types'
+import type { StorageOperationType as StorageOperationTypeValue } from '@/entities/storage/model/types'
 import { useStorageStore } from '@/features/storage/store'
 
 interface PollEntry {
@@ -25,7 +25,7 @@ export function useStoragePolling(store: ReturnType<typeof useStorageStore>) {
     activePolls.delete(comicId)
   }
 
-function start(comicId: number, type: StorageOperationTypeValue) {
+  function start(comicId: number, type: StorageOperationTypeValue) {
     store.setBusy(comicId, true)
 
     const entry: PollEntry = { timer: null, type, retries: 0 }
@@ -47,7 +47,12 @@ function start(comicId: number, type: StorageOperationTypeValue) {
           shouldStop = true
         }
       } else if (type === StorageOperationType.TranscodeVideos) {
-        if (comic && (comic.transcodeStatus === 'DONE' || comic.transcodeStatus === 'NOT_NEEDED' || comic.transcodeStatus === 'FAILED')) {
+        if (
+          comic &&
+          (comic.transcodeStatus === 'DONE' ||
+            comic.transcodeStatus === 'NOT_NEEDED' ||
+            comic.transcodeStatus === 'FAILED')
+        ) {
           shouldStop = true
         }
       }
