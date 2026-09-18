@@ -8,7 +8,13 @@
     </div>
 
     <div class="toolbar-center">
-      <el-popover v-model:visible="jumpVisible" placement="bottom" :width="220" trigger="click">
+      <el-popover
+        v-model:visible="jumpVisible"
+        placement="bottom"
+        :width="264"
+        trigger="click"
+        popper-class="reader-jump-popover"
+      >
         <template #reference>
           <AppButton class="tool-btn page-indicator" title="点击跳转页码"
             >{{ currentPage }} / {{ totalPages }}</AppButton
@@ -23,7 +29,7 @@
             class="jump-input"
             @keyup.enter="confirmJump"
           />
-          <AppButton variant="primary" size="sm" @click="confirmJump">跳转</AppButton>
+          <AppButton variant="primary" size="sm" class="jump-confirm" @click="confirmJump">跳转</AppButton>
         </div>
       </el-popover>
     </div>
@@ -35,7 +41,13 @@
         >下一章</AppButton
       >
 
-      <el-popover v-model:visible="settingsVisible" placement="bottom-end" :width="280" trigger="click">
+      <el-popover
+        v-model:visible="settingsVisible"
+        placement="bottom-end"
+        :width="300"
+        trigger="click"
+        popper-class="reader-settings-popover"
+      >
         <template #reference>
           <AppButton class="tool-btn" aria-label="阅读设置" title="阅读设置">
             <el-icon :size="18"><Setting /></el-icon>
@@ -201,13 +213,19 @@ function hideToolbar() {
 .jump-panel {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-3);
+  padding: var(--space-3);
 }
 
 .jump-panel .jump-input {
   flex: 1;
   width: auto;
   min-width: 0;
+}
+
+.jump-confirm {
+  min-width: 58px;
+  min-height: 38px;
 }
 
 .zoom-group {
@@ -223,7 +241,7 @@ function hideToolbar() {
   min-width: 44px;
   text-align: center;
   font-size: 13px;
-  color: var(--text-primary);
+  color: rgb(255 255 255 / 88%);
   font-variant-numeric: tabular-nums;
 }
 
@@ -234,15 +252,18 @@ function hideToolbar() {
 
 .desktop-settings-panel {
   display: grid;
-  gap: var(--space-3);
-  color: var(--text-primary);
+  gap: var(--space-4);
+  padding: var(--space-4);
+  color: rgb(255 255 255 / 94%);
 }
 
 .settings-panel-title {
-  padding-bottom: var(--space-2);
-  border-bottom: 1px solid var(--border);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid rgb(255 255 255 / 12%);
   font-size: 14px;
   font-weight: 700;
+  letter-spacing: 0.02em;
+  color: rgb(255 255 255 / 94%);
 }
 
 .settings-field {
@@ -250,7 +271,7 @@ function hideToolbar() {
   grid-template-columns: 72px minmax(0, 1fr);
   align-items: center;
   gap: var(--space-3);
-  color: var(--text-secondary);
+  color: rgb(255 255 255 / 62%);
   font-size: 12px;
 }
 
@@ -263,28 +284,85 @@ function hideToolbar() {
 }
 
 .settings-panel-actions {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-2);
-  padding-top: var(--space-2);
-  border-top: 1px solid var(--border);
+  padding-top: var(--space-3);
+  border-top: 1px solid rgb(255 255 255 / 12%);
 }
 
 .panel-action {
   flex: 1;
-  min-height: 32px;
+  min-height: 34px;
   padding: 0 var(--space-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg-surface);
-  color: var(--text-secondary);
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 6px;
+  background: rgb(255 255 255 / 5%);
+  color: rgb(255 255 255 / 78%);
   font: inherit;
   font-size: 12px;
   cursor: pointer;
 }
 
 .panel-action:hover {
-  border-color: var(--accent);
+  border-color: rgb(255 255 255 / 32%);
+  background: rgb(255 255 255 / 10%);
   color: var(--text-primary);
+}
+
+/* Popover 会 Teleport 到 body，必须用全局选择器修正默认白色外壳。 */
+:global(.reader-settings-popover.el-popper),
+:global(.reader-jump-popover.el-popper) {
+  --el-text-color-primary: rgb(255 255 255 / 94%);
+  --el-text-color-regular: rgb(255 255 255 / 86%);
+  --el-text-color-placeholder: rgb(255 255 255 / 48%);
+  --el-fill-color-blank: rgb(18 18 18 / 96%);
+  --el-bg-color-overlay: rgb(18 18 18 / 96%);
+  padding: 0;
+  overflow: visible;
+  color: rgb(255 255 255 / 94%);
+  background: rgb(18 18 18 / 96%);
+  border: 1px solid rgb(255 255 255 / 16%);
+  border-radius: 10px;
+  box-shadow: 0 16px 40px rgb(0 0 0 / 42%);
+  backdrop-filter: blur(18px);
+}
+
+:global(.reader-settings-popover.el-popper .el-popper__arrow::before),
+:global(.reader-jump-popover.el-popper .el-popper__arrow::before) {
+  background: rgb(18 18 18 / 96%);
+  border-color: rgb(255 255 255 / 16%);
+}
+
+:global(.reader-settings-popover .el-select__wrapper),
+:global(.reader-jump-popover .el-input__wrapper) {
+  min-height: 34px;
+  background: rgb(0 0 0 / 48%);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 16%) inset;
+}
+
+:global(.reader-settings-popover .el-select__selected-item),
+:global(.reader-jump-popover .el-input__inner) {
+  color: rgb(255 255 255 / 90%) !important;
+}
+
+:global(.reader-jump-popover .el-input-number) {
+  width: 100%;
+}
+
+:global(.reader-jump-popover .el-input-number__decrease),
+:global(.reader-jump-popover .el-input-number__increase) {
+  width: 34px;
+  color: rgb(255 255 255 / 72%);
+  background: transparent;
+  border-color: rgb(255 255 255 / 14%);
+}
+
+:global(.reader-jump-popover .jump-confirm) {
+  --button-bg: var(--accent);
+  --button-border: var(--accent);
+  --button-color: #fff;
+  color: #fff;
 }
 
 .tool-btn {

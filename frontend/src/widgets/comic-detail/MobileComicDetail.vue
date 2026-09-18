@@ -18,7 +18,7 @@
           </div>
         </header>
         <AppButton type="button" class="read-button" :disabled="!canRead" @click="$emit('read')">
-          <el-icon :size="21"><VideoPlay /></el-icon>
+          <el-icon :size="17"><VideoPlay /></el-icon>
           {{ readLabel }}
         </AppButton>
       </div>
@@ -149,10 +149,11 @@ const hqSize = computed(() => {
 .cover-backdrop {
   position: absolute;
   inset: 0;
-  background-position: center top;
+  background-position: center 28%;
   background-color: var(--mobile-canvas);
   background-repeat: no-repeat;
-  background-size: 100% auto;
+  /* 横向封面也必须完整填满阅读舞台，避免按原比例渲染后在标题前留下黑区。 */
+  background-size: cover;
   filter: brightness(0.68) saturate(0.92);
   transform: scale(1.02);
 }
@@ -259,6 +260,30 @@ const hqSize = computed(() => {
   font: inherit;
   font-weight: 800;
   box-shadow: 0 10px 24px rgb(0 0 0 / 28%);
+}
+
+/* AppButton 的插槽由内部 span 包裹；将该层改为 flex，避免图标按文字基线漂移。 */
+.read-button :deep(.app-button__content) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: 100%;
+  line-height: 1;
+}
+
+.read-button :deep(.el-icon) {
+  display: inline-flex;
+  flex: 0 0 17px;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  line-height: 1;
+}
+
+.read-button :deep(.el-icon svg) {
+  display: block;
 }
 
 .read-button:disabled {

@@ -15,8 +15,8 @@
     <div id="app"></div>
     <script type="module">
       import { createApp, h, ref } from 'vue'
-      import VideoPlayer from '/src/features/reader/components/VideoPlayer.vue'
-      import { useReaderGesture } from '/src/features/reader/composables/useReaderGesture.ts'
+      import VideoPlayer from '/src/entities/media/ui/VideoPlayer.vue'
+      import { useReaderGesture } from '/src/features/reader-interaction/model/useReaderGesture.ts'
       createApp({
         components: { VideoPlayer },
         setup() {

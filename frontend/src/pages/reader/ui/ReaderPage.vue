@@ -79,10 +79,7 @@
       />
       <ReaderSettingsDrawer
         :visible="isSettings"
-        :current-page="store.currentPage"
-        :total-pages="store.totalPages"
         @close="dispatch(ReaderAction.CloseSettings)"
-        @jump-to-page="onPageChange"
       />
     </template>
   </div>

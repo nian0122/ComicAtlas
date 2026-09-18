@@ -21,7 +21,7 @@
           <span class="hero-kicker-dot" aria-hidden="true" />
           {{ kicker || (backgroundUrl ? 'CONTINUE YOUR SCREENING' : 'PRIVATE COMIC ARCHIVE') }}
         </p>
-        <h1 class="hero-title">{{ title }}</h1>
+        <h1 class="hero-title" :title="titleTooltip || title">{{ title }}</h1>
         <p v-if="subtitle" class="hero-subtitle">{{ subtitle }}</p>
 
         <div v-if="hasDescription" class="hero-description">
@@ -30,12 +30,27 @@
 
         <div v-if="hasActions" class="hero-actions">
           <slot name="actions">
-            <AppButton v-if="primaryAction" type="button" @click="primaryAction.onClick">
-              <el-icon :size="20"><VideoPlay /></el-icon>
+            <AppButton
+              v-if="primaryAction"
+              variant="primary"
+              type="button"
+              class="hero-action hero-action--primary"
+              @click="primaryAction.onClick"
+            >
+              <el-icon :size="16"><VideoPlay /></el-icon>
               {{ primaryAction.label }}
             </AppButton>
-            <AppButton v-if="secondaryAction" type="button" @click="secondaryAction.onClick">
-              <el-icon :size="20"><InfoFilled /></el-icon>
+            <AppButton
+              v-if="secondaryAction"
+              variant="overlay"
+              type="button"
+              class="hero-action hero-action--secondary"
+              @click="secondaryAction.onClick"
+            >
+              <el-icon :size="16">
+                <VideoPlay v-if="secondaryAction.icon === 'play'" />
+                <InfoFilled v-else />
+              </el-icon>
               {{ secondaryAction.label }}
             </AppButton>
           </slot>
@@ -53,6 +68,7 @@ import { InfoFilled, VideoPlay } from '@element-plus/icons-vue'
 interface HeroAction {
   label: string
   onClick: () => void
+  icon?: 'info' | 'play'
 }
 
 interface HeroBannerProps {
@@ -61,6 +77,7 @@ interface HeroBannerProps {
   variant?: 'default' | 'detail'
   kicker?: string
   title: string
+  titleTooltip?: string
   subtitle?: string
   description?: string
   primaryAction?: HeroAction
@@ -97,20 +114,21 @@ const hasActions = computed(
 
 /* 详情页专属沉浸式 Hero：首页 Hero 保持原有节奏，避免样式相互影响。 */
 .hero-banner--detail {
+  --detail-hero-copy-width: min(100%, 48rem);
   min-height: clamp(420px, 54vh, 620px);
   background: var(--bg-primary);
 }
 
 .hero-banner--detail .hero-background {
   background-position: center 24%;
-  filter: saturate(0.78) brightness(0.46);
+  filter: saturate(0.88) brightness(0.62) contrast(1.02);
   transform: translateX(-50%) scale(1.07);
 }
 
 .hero-banner--detail .hero-overlay {
   background:
-    linear-gradient(90deg, rgb(0 0 0 / 70%) 0%, rgb(0 0 0 / 34%) 62%, rgb(0 0 0 / 12%) 100%),
-    linear-gradient(0deg, var(--bg-primary) 0%, rgb(0 0 0 / 78%) 22%, transparent 68%);
+    linear-gradient(90deg, rgb(0 0 0 / 76%) 0%, rgb(0 0 0 / 42%) 56%, rgb(0 0 0 / 10%) 100%),
+    linear-gradient(0deg, rgb(8 8 8 / 72%) 0%, rgb(0 0 0 / 48%) 20%, transparent 66%);
 }
 
 .hero-banner--detail .hero-content {
@@ -135,7 +153,8 @@ const hasActions = computed(
 }
 
 .hero-banner--detail .hero-title {
-  max-width: min(100%, 48rem);
+  width: var(--detail-hero-copy-width);
+  max-width: var(--detail-hero-copy-width);
   font-size: clamp(2.4rem, 5vw, 4.8rem);
   text-wrap: balance;
   overflow-wrap: break-word;
@@ -164,6 +183,18 @@ const hasActions = computed(
   filter: saturate(0.78) brightness(0.38);
   transform: translateX(-50%) scale(1.02);
   z-index: 0;
+}
+
+/* 首页封面应当参与视觉叙事，只在文字列保留必要的暗角。 */
+.hero-banner--default .hero-background {
+  filter: saturate(0.9) brightness(0.62) contrast(1.02);
+}
+
+.hero-banner--default .hero-overlay {
+  background:
+    linear-gradient(to right, rgb(6 6 6 / 80%) 0%, rgb(6 6 6 / 48%) 46%, rgb(6 6 6 / 12%) 100%),
+    linear-gradient(to top, rgb(8 8 8 / 70%) 0%, transparent 56%),
+    linear-gradient(to bottom, rgb(8 8 8 / 14%) 0%, transparent 32%);
 }
 
 .hero-background--empty {
@@ -288,6 +319,66 @@ const hasActions = computed(
   margin-top: var(--space-base);
 }
 
+/* 标题、进度与操作共享同一阅读列，避免进度条显得像孤立的短横线。 */
+.hero-banner--detail .hero-description {
+  width: var(--detail-hero-copy-width);
+  max-width: var(--detail-hero-copy-width);
+}
+
+/* Hero 操作保持电影海报般的克制：清楚的主操作与安静的辅助操作，不再做卡片化装饰。 */
+.hero-actions :deep(.hero-action) {
+  min-width: 132px;
+  min-height: 44px;
+  padding-inline: var(--space-4);
+  border-radius: 6px;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.hero-actions :deep(.hero-action .app-button__content) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: 100%;
+  line-height: 1;
+}
+
+.hero-actions :deep(.hero-action .el-icon) {
+  display: inline-flex;
+  flex: 0 0 16px;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  line-height: 1;
+}
+
+.hero-actions :deep(.hero-action .el-icon svg) {
+  display: block;
+}
+
+.hero-actions :deep(.hero-action--primary) {
+  box-shadow: 0 8px 20px rgb(229 9 20 / 22%);
+}
+
+.hero-actions :deep(.hero-action--primary:hover:not(:disabled)) {
+  transform: translateY(-1px);
+}
+
+.hero-actions :deep(.hero-action--secondary) {
+  color: rgb(255 255 255 / 90%);
+  background: rgb(5 5 5 / 38%);
+  border-color: rgb(255 255 255 / 30%);
+}
+
+.hero-actions :deep(.hero-action--secondary:hover:not(:disabled)) {
+  background: rgb(255 255 255 / 12%);
+  border-color: rgb(255 255 255 / 54%);
+  transform: translateY(-1px);
+}
+
 @media (max-width: 1024px) {
   .hero-banner {
     min-height: 0;
@@ -350,12 +441,21 @@ const hasActions = computed(
     width: 100%;
     margin-top: var(--space-3);
   }
+
+  .hero-actions:has(.hero-action:only-child) {
+    grid-template-columns: minmax(172px, max-content);
+  }
 }
 
 @media (min-width: 600px) and (max-width: 1024px) {
   .hero-banner {
     aspect-ratio: 16 / 10;
     max-height: var(--tablet-hero-max-height);
+  }
+
+  /* 平板断点同样显示底部导航，Hero 的最后一个操作不能被它遮住。 */
+  .hero-banner--detail .hero-content {
+    padding-bottom: calc(var(--mobile-tabbar-height) + var(--space-8));
   }
 }
 </style>

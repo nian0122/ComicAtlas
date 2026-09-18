@@ -34,7 +34,8 @@
           :poster-url="comic.coverUrl"
           variant="detail"
           kicker="漫画详情"
-          :title="comic.title"
+          :title="heroTitle"
+          :title-tooltip="comic.title"
           :primary-action="primaryAction"
           :secondary-action="secondaryAction"
         >
@@ -202,15 +203,19 @@ const totalChapters = computed(() => {
   return count
 })
 
+/** Hero 只承载可扫读的作品主标题；完整导入标题保留在 title 提示与目录中。 */
+const heroTitle = computed(() => {
+  const comicTitle = comic.value?.title ?? ''
+  const titleWithoutStatus = comicTitle.replace(/\s+(?:\[[^[\]]+\]\s*)+$/u, '').trim()
+  const titleParts = titleWithoutStatus.split(/\s+︱\s+/u)
+  const conciseTitle = titleParts.slice(0, 2).join(' ︱ ')
+  return conciseTitle.length > 34 ? (titleParts[0] ?? titleWithoutStatus) : conciseTitle
+})
+
 const progressMetaText = computed(() => {
   if (!comic.value) return ''
-  const ch = lastReadChapter.value
-  const progressText = `进度 ${comic.value.lastReadPage || 1} / ${comic.value.pageCount || 0}`
-  if (ch) {
-    const chapterLabel = ch.title || `第${ch.chapterNo}话`
-    return `${chapterLabel} · ${progressText}`
-  }
-  return progressText
+  const chapterLabel = lastReadChapter.value ? `第 ${lastReadChapter.value.chapterNo} 章 · ` : ''
+  return `${chapterLabel}${comic.value.lastReadPage || 1} / ${comic.value.pageCount || 0} 页`
 })
 
 const progressScale = computed(() => Math.min(100, Math.max(0, comic.value?.progressPercent || 0)) / 100)
@@ -223,8 +228,8 @@ const primaryAction = computed(() => {
       onClick: continueRead,
     }
   }
-  // 移动端同时只显示一个主按钮：无历史时把"开始阅读"提升为主按钮
-  if (mode.value === 'mobile' && firstChapter.value) {
+  // 没有阅读历史时，开始阅读仍是详情页唯一的核心操作。
+  if (firstChapter.value) {
     return {
       label: '开始阅读',
       onClick: startRead,
@@ -234,12 +239,12 @@ const primaryAction = computed(() => {
 })
 
 const secondaryAction = computed(() => {
-  // 移动端只保留一个主操作按钮，不渲染次按钮
-  if (mode.value === 'mobile') return undefined
-  if (!firstChapter.value || !comic.value) return undefined
+  // 仅在可继续阅读时提供“从头开始”的辅助入口。
+  if (mode.value === 'mobile' || !comic.value?.lastReadChapterId || !firstChapter.value) return undefined
   return {
-    label: '开始阅读',
+    label: '从头开始',
     onClick: startRead,
+    icon: 'play' as const,
   }
 })
 
@@ -299,8 +304,6 @@ onMounted(loadData)
   background: var(--bg-primary);
   color: var(--text-primary);
 }
-
-/* Hero action buttons (slotted, so styles live here) */
 
 /* Progress */
 .progress-block {
