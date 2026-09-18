@@ -25,8 +25,9 @@ public class FileUrlResolver {
 
     public String resolve(String root, String path) {
         if (root == null || path == null) { return null; }
-        if (!EXPOSED_ROOTS.contains(root.toLowerCase())) { return null; }
-        return urlPrefix + "/" + root.toLowerCase() + "/" + path.replace('\\', '/');
+        String normalizedRoot = root.toLowerCase();
+        if (!EXPOSED_ROOTS.contains(normalizedRoot)) { return null; }
+        return urlPrefix + "/" + normalizedRoot + "/" + path.replace('\\', '/');
     }
 
     public String resolveCover(Long comicId) {
