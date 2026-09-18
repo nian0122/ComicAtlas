@@ -23,10 +23,14 @@ public class FileUrlResolver {
     }
 
     public String resolveLq(Media media) {
-        if (media.getLqRoot() == null || media.getLqPath() == null) { return null; }
-        if (!EXPOSED_ROOTS.contains(media.getLqRoot().toLowerCase())) { return null; }
-        return urlPrefix + "/" + media.getLqRoot().toLowerCase()
-            + "/" + media.getLqPath().replace('\\', '/');
+        return resolve(media.getLqRoot(), media.getLqPath());
+    }
+
+    public String resolve(String root, String path) {
+        if (root == null || path == null) { return null; }
+        String normalizedRoot = root.toLowerCase();
+        if (!EXPOSED_ROOTS.contains(normalizedRoot)) { return null; }
+        return urlPrefix + "/" + normalizedRoot + "/" + path.replace('\\', '/');
     }
 
     public String resolveCover(Long comicId) {
