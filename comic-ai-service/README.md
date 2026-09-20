@@ -21,10 +21,10 @@ docker compose --env-file .env -f docker-compose.yml up -d --build comic-ai-serv
 POST /api/analysis/tasks
 Content-Type: application/json
 
-{"sourcePath":"某本漫画"}
+{"comicId":123}
 ```
 
-返回 `202` 和 `taskId`。后台任务会递归扫描 JPEG、PNG、WEBP，按文件名顺序从整本漫画中均匀抽取默认 10 页，调用一次视觉模型，再将 JSON 结果写入任务记录。
+返回 `202` 和 `taskId`。服务会根据漫画库记录定位共享挂载目录，不接受宿主机路径。后台任务会递归扫描 JPEG、PNG、WEBP，按文件名顺序从整本漫画中均匀抽取默认 10 页，调用一次视觉模型，再将 JSON 结果写入任务记录。
 
 - `GET /api/analysis/tasks/{taskId}`：查询状态、进度和结果。
 - `POST /api/analysis/tasks/{taskId}/cancel`：请求取消排队或运行中的任务。

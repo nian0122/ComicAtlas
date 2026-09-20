@@ -17,8 +17,8 @@ export interface AiAnalysisTask {
 }
 
 export const aiAnalysisApi = {
-  async create(sourcePath: string): Promise<{ taskId: number; status: AiTaskStatus }> {
-    const response = await api.post('/ai/analysis/tasks', { sourcePath })
+  async create(comicId: number): Promise<{ taskId: number; status: AiTaskStatus }> {
+    const response = await api.post('/ai/analysis/tasks', { comicId })
     return response.data
   },
   async get(taskId: number): Promise<AiAnalysisTask> {

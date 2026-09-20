@@ -16,13 +16,17 @@
 
     <section class="analysis-grid">
       <div class="analysis-panel request-panel">
-        <div class="panel-heading"><span>01</span><div><h3>提交目录</h3><p>填写挂载根目录下的相对路径</p></div></div>
+        <div class="panel-heading"><span>01</span><div><h3>选择漫画</h3><p>从已导入的漫画库中搜索作品</p></div></div>
         <el-form @submit.prevent="submitTask">
-          <el-form-item label="漫画目录" label-position="top">
-            <el-input v-model="sourcePath" size="large" placeholder="例如：作者 / 作品名 / 第一卷" clearable @keyup.enter="submitTask" />
+          <el-form-item label="漫画" label-position="top">
+            <el-select v-model="selectedComicId" class="comic-select" size="large" filterable remote clearable :remote-method="searchComics" :loading="searchingComics" placeholder="搜索漫画标题或作者" @focus="loadInitialComics">
+              <el-option v-for="comic in comics" :key="comic.id" :label="`${comic.title} · ${comic.author || '作者未知'}`" :value="comic.id">
+                <div class="comic-option"><strong>{{ comic.title }}</strong><span>{{ comic.author || '作者未知' }} · {{ comic.pageCount }} 页</span></div>
+              </el-option>
+            </el-select>
           </el-form-item>
-          <p class="field-hint">不要填写宿主机绝对路径。路径必须位于 AI 服务的 <code>/manga</code> 根目录内。</p>
-          <AppButton variant="primary" size="lg" :loading="submitting" :disabled="!sourcePath.trim()" @click="submitTask">
+          <p class="field-hint">仅显示已完成导入的漫画。任务会根据漫画 ID 定位 AI 服务的只读挂载目录。</p>
+          <AppButton variant="primary" size="lg" :loading="submitting" :disabled="selectedComicId == null" @click="submitTask">
             开始分析 <span aria-hidden="true">↗</span>
           </AppButton>
         </el-form>
@@ -32,7 +36,7 @@
         <div class="panel-heading"><span>02</span><div><h3>任务状态</h3><p>任务会在后台持续运行</p></div></div>
         <ContentState v-if="!task" state="empty" message="提交目录后，这里会显示分析进度" />
         <template v-else>
-          <div class="task-identity"><span>#{{ task.id }}</span><strong>{{ task.sourcePath }}</strong></div>
+          <div class="task-identity"><span>#{{ task.id }}</span><strong>{{ selectedComic?.title || task.sourcePath }}</strong></div>
           <el-progress :percentage="task.progress" :status="progressStatus" :stroke-width="8" />
           <div class="task-meta"><span>{{ statusLabel }}</span><span>{{ task.attempts }} 次执行</span></div>
           <p v-if="task.errorMessage" class="task-error">{{ task.errorMessage }}</p>
@@ -64,9 +68,14 @@ import { AppButton } from '@/shared/ui/button'
 import { ContentState } from '@/shared/ui/content-state'
 import { PageHeader } from '@/shared/ui/page-header'
 import { aiAnalysisApi, type AiAnalysisTask } from '@/features/ai-analysis/api'
+import { comicApi } from '@/entities/comic/api/reading-api'
+import type { ComicListVO } from '@/entities/comic/model/types'
 
 interface AnalysisResult { titleCandidate?: string | null; authorCandidate?: string | null; tags?: string[]; description?: string; warnings?: string[] }
-const sourcePath = ref('')
+const selectedComicId = ref<number | null>(null)
+const comics = ref<ComicListVO[]>([])
+const searchingComics = ref(false)
+const selectedComic = computed(() => comics.value.find((comic) => comic.id === selectedComicId.value) ?? null)
 const task = ref<AiAnalysisTask | null>(null)
 const result = ref<AnalysisResult | null>(null)
 const submitting = ref(false)
@@ -78,16 +87,30 @@ const statusLabel = computed(() => ({ QUEUED: '排队中', RUNNING: '分析中',
 const progressStatus = computed(() => task.value?.status === 'FAILED' ? 'exception' : task.value?.status === 'SUCCEEDED' ? 'success' : undefined)
 
 async function submitTask(): Promise<void> {
-  if (!sourcePath.value.trim()) return
+  if (selectedComicId.value == null) return
   submitting.value = true; result.value = null
   try {
-    const created = await aiAnalysisApi.create(sourcePath.value.trim())
+    const created = await aiAnalysisApi.create(selectedComicId.value)
     task.value = await aiAnalysisApi.get(created.taskId)
     schedulePoll()
     ElMessage.success(`分析任务 #${created.taskId} 已提交`)
   } catch (error) { ElMessage.error(error instanceof Error ? error.message : 'AI 服务不可用')
   } finally { submitting.value = false }
 }
+let lastSearchRequest = 0
+async function searchComics(keyword: string): Promise<void> {
+  const requestId = ++lastSearchRequest
+  searchingComics.value = true
+  try {
+    const response = await comicApi.list({ keyword: keyword.trim() || undefined, status: 'READY', page: 1, size: 20, sort: 'updatedAt', order: 'desc' })
+    if (requestId === lastSearchRequest) comics.value = response.data.records.filter((comic) => comic.pageCount >= 300)
+  } catch {
+    if (requestId === lastSearchRequest) comics.value = []
+  } finally {
+    if (requestId === lastSearchRequest) searchingComics.value = false
+  }
+}
+function loadInitialComics(): void { if (!comics.value.length) void searchComics('') }
 function schedulePoll(): void { window.clearTimeout(pollTimer); pollTimer = window.setTimeout(refreshTask, 1500) }
 async function refreshTask(): Promise<void> {
   if (!task.value) return
@@ -115,6 +138,7 @@ onBeforeUnmount(() => window.clearTimeout(pollTimer))
 .analysis-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; } .analysis-panel { padding:26px; border:1px solid var(--color-border-faint); background:var(--color-canvas); }
 .panel-heading { display:flex; gap:14px; align-items:flex-start; margin-bottom:24px; } .panel-heading > span { color:#67a47a; font:800 12px/1 var(--font-ui); } .panel-heading h3 { margin:0; color:var(--text-primary); font-size:18px; } .panel-heading p { margin:5px 0 0; color:var(--text-muted); font-size:13px; }
 .field-hint { margin: -8px 0 22px; color:var(--text-muted); font-size:12px; line-height:1.6; } code { color:#3c8150; } .task-identity { display:flex; flex-direction:column; gap:8px; margin-bottom:24px; } .task-identity span { color:var(--text-muted); font-size:12px; } .task-identity strong { overflow:hidden; color:var(--text-primary); text-overflow:ellipsis; white-space:nowrap; } .task-meta { display:flex; justify-content:space-between; margin:12px 0 22px; color:var(--text-muted); font-size:12px; } .task-error { padding:12px; color:#a34137; background:#fff2ef; font-size:13px; }
+.comic-select { width:100%; } .comic-option { display:flex; flex-direction:column; gap:3px; line-height:1.35; } .comic-option span { color:var(--text-muted); font-size:12px; }
 .result-panel { margin-top:20px; } .result-layout { display:grid; grid-template-columns:260px 1fr; gap:20px; } .identity-card,.description-card { padding:20px; background:#f3f7ef; } .identity-card strong,.identity-card small { display:block; margin-top:12px; } .identity-card strong { font-size:22px; } .identity-card small { color:var(--text-muted); } .description-card p { margin:14px 0 0; line-height:1.8; color:var(--text-secondary); } .tags-row { display:flex; gap:18px; align-items:flex-start; margin-top:24px; } .tags-row > div { display:flex; flex-wrap:wrap; gap:8px; } .muted { color:var(--text-muted); font-size:13px; }
 @media (max-width: 800px) { .analysis-grid,.result-layout { grid-template-columns:1fr; } .analysis-hero { align-items:flex-start; flex-wrap:wrap; } .hero-status { width:100%; } }
 </style>

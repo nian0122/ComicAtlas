@@ -17,6 +17,10 @@ public class TaskRepository {
         jdbcTemplate.update("INSERT INTO ai_analysis_task(source_path,status) VALUES (?,?)", sourcePath, TaskStatus.QUEUED.name());
         return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
     }
+    public Optional<String> findComicSourcePath(long comicId) {
+        return jdbcTemplate.query("SELECT id FROM comic WHERE id=? AND status='READY'", (resultSet, row) -> resultSet.getLong("id"), comicId)
+                .stream().findFirst().map(id -> "hq/" + id);
+    }
     public Optional<TaskRecord> find(long id) {
         return jdbcTemplate.query("SELECT id,source_path,status,progress,result_json,error_code,error_message,attempts,created_at,started_at,finished_at FROM ai_analysis_task WHERE id=?", this::map, id).stream().findFirst();
     }
