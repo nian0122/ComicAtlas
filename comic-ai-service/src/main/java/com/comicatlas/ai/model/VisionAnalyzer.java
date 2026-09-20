@@ -12,16 +12,23 @@ import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.openai.OpenAiChatModel;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+import javax.imageio.ImageIO;
 import org.springframework.stereotype.Service;
 
 /** LangChain4j 视觉模型适配器。业务层只接收 JSON 文本。 */
 @Service
 public class VisionAnalyzer {
+    private static final int MAX_IMAGE_EDGE = 1600;
+    private static final float JPEG_QUALITY = 0.78f;
     private final AiProperties properties;
     private final ObjectMapper objectMapper;
     public VisionAnalyzer(AiProperties properties, ObjectMapper objectMapper) { this.properties = properties; this.objectMapper = objectMapper; }
@@ -33,13 +40,30 @@ public class VisionAnalyzer {
         List<Content> contents = new ArrayList<>();
         contents.add(TextContent.from("请分析这些漫画抽样页面。只输出 JSON：{\"titleCandidate\":null,\"authorCandidate\":null,\"tags\":[],\"description\":\"\",\"warnings\":[]}。标签自由生成；作品名和作者只能作为候选，不确定就填 null。简介只描述所给抽样页面，不要声称总结了全书。不要输出 Markdown。"));
         for (SamplePage page : pages) {
-            byte[] bytes = Files.readAllBytes(page.path());
-            String mimeType = Files.probeContentType(page.path());
-            contents.add(ImageContent.from(Image.builder().base64Data(Base64.getEncoder().encodeToString(bytes)).mimeType(mimeType == null ? "image/jpeg" : mimeType).build()));
+            byte[] bytes = optimizedImage(page.path());
+            contents.add(ImageContent.from(Image.builder().base64Data(Base64.getEncoder().encodeToString(bytes)).mimeType("image/jpeg").build()));
         }
         ChatResponse response = model.chat(UserMessage.from(contents));
         String text = response.aiMessage().text();
         JsonNode json = objectMapper.readTree(text);
         return objectMapper.writeValueAsString(json);
+    }
+    private byte[] optimizedImage(java.nio.file.Path path) throws IOException {
+        BufferedImage original = ImageIO.read(path.toFile());
+        if (original == null) {
+            return Files.readAllBytes(path);
+        }
+        int longestEdge = Math.max(original.getWidth(), original.getHeight());
+        double scale = longestEdge > MAX_IMAGE_EDGE ? (double) MAX_IMAGE_EDGE / longestEdge : 1.0;
+        int width = Math.max(1, (int) Math.round(original.getWidth() * scale));
+        int height = Math.max(1, (int) Math.round(original.getHeight() * scale));
+        BufferedImage resized = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        Graphics2D graphics = resized.createGraphics();
+        graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        graphics.drawImage(original, 0, 0, width, height, null);
+        graphics.dispose();
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ImageIO.write(resized, "jpg", output);
+        return output.toByteArray();
     }
 }
