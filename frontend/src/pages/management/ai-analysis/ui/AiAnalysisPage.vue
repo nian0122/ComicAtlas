@@ -25,7 +25,7 @@
               </el-option>
             </el-select>
           </el-form-item>
-          <p class="field-hint">仅显示已完成导入的漫画。任务会根据漫画 ID 定位 AI 服务的只读挂载目录。</p>
+          <p class="field-hint">显示所有已完成导入的漫画。任务会根据漫画 ID 定位 AI 服务的只读挂载目录。</p>
           <AppButton variant="primary" size="lg" :loading="submitting" :disabled="selectedComicId == null" @click="submitTask">
             开始分析 <span aria-hidden="true">↗</span>
           </AppButton>
@@ -103,7 +103,7 @@ async function searchComics(keyword: string): Promise<void> {
   searchingComics.value = true
   try {
     const response = await comicApi.list({ keyword: keyword.trim() || undefined, status: 'READY', page: 1, size: 20, sort: 'updatedAt', order: 'desc' })
-    if (requestId === lastSearchRequest) comics.value = response.data.records.filter((comic) => comic.pageCount >= 300)
+    if (requestId === lastSearchRequest) comics.value = response.data.records
   } catch {
     if (requestId === lastSearchRequest) comics.value = []
   } finally {
