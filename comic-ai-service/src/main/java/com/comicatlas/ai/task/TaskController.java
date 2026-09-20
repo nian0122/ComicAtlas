@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.*;
 
 /** 异步任务 API。 */
 @RestController
-@RequestMapping("/api/analysis/tasks")
+@RequestMapping("/api/ai/analysis/tasks")
 public class TaskController {
     private final TaskRepository repository;
     private final AnalysisWorker worker;

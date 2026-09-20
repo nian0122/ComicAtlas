@@ -32,13 +32,11 @@ spring:
           uri: lb://comic-api-service
           predicates:
             - Path=/api/manage/**
-        # AI 分析路由：/api/ai/** → AI 单体；去掉 /ai 前缀后保留服务的 /api 前缀
+        # AI 分析路由：/api/ai/** → AI 单体
         - id: ai-service
           uri: http://comic-ai-service:8020
           predicates:
             - Path=/api/ai/**
-          filters:
-            - RewritePath=/api/ai/(?<remaining>.*), /api/${remaining}
         # 阅读端路由：/api/** → 阅读服务（只读为主 + 阅读进度保存）
         - id: reading-service
           uri: lb://comic-reading-service
