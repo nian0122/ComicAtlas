@@ -165,6 +165,7 @@ services:
       AI_BASE_URL: ${AI_BASE_URL:?请在 .env 中设置 AI_BASE_URL}
       AI_API_KEY: ${AI_API_KEY:?请在 .env 中设置 AI_API_KEY}
       AI_MODEL: ${AI_MODEL:?请在 .env 中设置 AI_MODEL}
+      AI_CORS_ORIGINS: ${AI_CORS_ORIGINS:-http://localhost,http://localhost:80,http://127.0.0.1}
       AI_MANGA_ROOT: /manga
       AI_SAMPLE_COUNT: ${AI_SAMPLE_COUNT:-10}
       AI_MAX_CONCURRENT_TASKS: ${AI_MAX_CONCURRENT_TASKS:-1}
