@@ -140,6 +140,7 @@ import type { StorageStats } from '@/entities/storage'
 
 const quickActions = [
   { to: '/manage/import', label: '导入漫画', icon: UploadFilled },
+  { to: '/manage/ai-analysis', label: 'AI 漫画分析', icon: Coin },
   { to: '/manage/workbench?tab=status', label: '扫描更新', icon: Refresh },
   { to: '/manage/tasks', label: '任务中心', icon: List },
   { to: '/manage/workbench?tab=storage', label: '存储管理', icon: Coin },

@@ -42,6 +42,10 @@
             <el-icon :size="18"><List /></el-icon>
             <span>任务中心</span>
           </router-link>
+          <router-link to="/manage/ai-analysis" class="sidenav-link" active-class="active">
+            <el-icon :size="18"><MagicStick /></el-icon>
+            <span>AI 漫画分析</span>
+          </router-link>
           <router-link to="/manage/upload" class="sidenav-link" active-class="active">
             <el-icon :size="18"><UploadFilled /></el-icon>
             <span>媒体上传</span>
@@ -102,6 +106,7 @@ import {
   User,
   QuestionFilled,
   InfoFilled,
+  MagicStick,
 } from '@element-plus/icons-vue'
 import { useImportStore } from '@/features/import'
 import { ComicAtlasLogo } from '@/shared/ui/logo'

@@ -83,6 +83,11 @@ const router = createRouter({
           component: () => import('@/pages/management/tasks/index').then(({ ManagementTasksPage }) => ManagementTasksPage),
         },
         {
+          path: 'ai-analysis',
+          name: 'manage-ai-analysis',
+          component: () => import('@/pages/management/ai-analysis/index').then(({ AiAnalysisPage }) => AiAnalysisPage),
+        },
+        {
           path: 'upload',
           name: 'manage-upload',
           component: () => import('@/pages/management/upload/index').then(({ MediaUploadPage }) => MediaUploadPage),

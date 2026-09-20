@@ -145,6 +145,31 @@ services:
       # 整个 MANGA_ROOT 共享，既保证导入源路径可见，也覆盖 HQ/LQ/临时/回收站/导出目录。
       - ${MANGA_ROOT:-./manga}:/storage
 
+  comic-ai-service:
+    build:
+      context: .
+      dockerfile: comic-ai-service/Dockerfile
+    mem_limit: 768m
+    container_name: comic-ai-service
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      AI_DB_HOST: ${REMOTE_INFRA_HOST:?请设置 REMOTE_INFRA_HOST}
+      AI_DB_PORT: ${REMOTE_MYSQL_PORT:?请设置 REMOTE_MYSQL_PORT}
+      AI_DB_NAME: ${AI_DB_NAME:-comic_atlas}
+      AI_DB_USER: ${AI_DB_USER:-${API_MYSQL_USER}}
+      AI_DB_PASSWORD: ${AI_DB_PASSWORD:-${API_MYSQL_PASSWORD}}
+      AI_BASE_URL: ${AI_BASE_URL:?请在 .env 中设置 AI_BASE_URL}
+      AI_API_KEY: ${AI_API_KEY:?请在 .env 中设置 AI_API_KEY}
+      AI_MODEL: ${AI_MODEL:?请在 .env 中设置 AI_MODEL}
+      AI_MANGA_ROOT: /manga
+      AI_SAMPLE_COUNT: ${AI_SAMPLE_COUNT:-10}
+      AI_MAX_CONCURRENT_TASKS: ${AI_MAX_CONCURRENT_TASKS:-1}
+      AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS:-120}
+    volumes:
+      - ${MANGA_ROOT:?请在 .env 中设置 MANGA_ROOT}:/manga:ro
+
   nginx:
     build: ./frontend
     mem_limit: 128m
