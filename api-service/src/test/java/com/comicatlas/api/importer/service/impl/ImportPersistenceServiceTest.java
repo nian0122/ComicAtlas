@@ -117,6 +117,7 @@ class ImportPersistenceServiceTest {
         ReflectionTestUtils.setField(service, "importFinalizationService", importFinalizationService);
         mediaBatchSnapshots.clear();
         ReflectionTestUtils.setField(service, "mangaRoot", "F:/manga");
+        ReflectionTestUtils.setField(importFinalizationService, "mangaRoot", "F:/manga");
         ApiStorageRoot hqRoot = new ApiStorageRoot();
         hqRoot.setPath(Path.of("F:/manga/hq"));
         // lenient：applyFinalizeFailed 等用例不触达 HQ 根

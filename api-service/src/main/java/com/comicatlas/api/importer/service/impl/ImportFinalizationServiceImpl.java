@@ -54,7 +54,8 @@ public class ImportFinalizationServiceImpl implements com.comicatlas.api.importe
     private final CatalogCacheInvalidator catalogCacheInvalidator;
     private final MetadataUpdateCoordinator metadataUpdateCoordinator;
     private final ApiStorageProperties storageProperties;
-    @Value("${storage.roots.HQ.path:}")
+    /** 用于计算 targetDir 相对 HQ 根的前缀；不能注入 HQ 根本身。 */
+    @Value("${MANGA_ROOT:}")
     private String mangaRoot;
 
     public void applyCompleted(ImportStorageFinalizeCompletedEvent event) {
