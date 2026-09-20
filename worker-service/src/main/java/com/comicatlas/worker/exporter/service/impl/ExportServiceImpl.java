@@ -15,6 +15,7 @@ import com.comicatlas.common.constant.StorageRootKeys;
 import com.comicatlas.common.constant.ExportFormats;
 import com.comicatlas.worker.shared.common.ComicTitleSanitizer;
 import com.comicatlas.worker.config.WorkerConfig;
+import com.comicatlas.worker.persistence.record.CatalogRecord;
 import com.comicatlas.worker.persistence.record.ChapterRecord;
 import com.comicatlas.worker.persistence.record.MediaRecord;
 import com.comicatlas.worker.storage.StorageProperties;
@@ -35,6 +36,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -64,8 +66,6 @@ public class ExportServiceImpl implements ExportService {
     private static final String ERROR_CODE_EXPORT = "EXPORT_ERROR";
     /** staging 目录名前缀（任务发布前的临时目录）。 */
     private static final String STAGING_DIR_PREFIX = ".staging-";
-    /** 无标题章节的目录名兜底前缀。 */
-    private static final String CHAPTER_DIR_PREFIX = "chapter_";
     /** ZIP/CBZ 产物扩展名。 */
     private static final String ZIP_EXTENSION = ".zip";
     private static final String CBZ_EXTENSION = ".cbz";
@@ -165,8 +165,9 @@ public class ExportServiceImpl implements ExportService {
      * 与全部媒体未压缩总量使用 {@link Math#addExact} 累加，超过 maxEntrySize/maxTotalSize
      * 时在调用 ZipBuilder 之前失败。
      *
-     * <p>章节目录名会做去重处理。异常消息只携带 comicId/mediaId 与相对 targetPath，
-     * 不输出宿主机绝对路径。
+     * <p>目录层级由 catalog.parentId 与 chapter.catalogId 还原；章节目录名不再为了
+     * 避免冲突而改写，以确保导出结果保留导入时的目录名。异常消息只携带
+     * comicId/mediaId 与相对 targetPath，不输出宿主机绝对路径。
      */
     private ExportManifest buildManifest(ExportCollectResult result) {
         Long comicId = result.comic().getId();
@@ -176,26 +177,13 @@ public class ExportServiceImpl implements ExportService {
         Map<Long, List<MediaRecord>> mediaByChapter = result.allMedia().stream()
                 .collect(Collectors.groupingBy(MediaRecord::getChapterId));
 
-        // 构建章节标题映射
-        Map<Long, String> chapterTitles = result.chapters().stream()
-                .collect(Collectors.toMap(ChapterRecord::getId, chapter ->
-                        chapter.getTitle() != null && !chapter.getTitle().isBlank()
-                                ? ComicTitleSanitizer.sanitize(chapter.getTitle())
-                                : CHAPTER_DIR_PREFIX + chapter.getId()));
+        Map<Long, String> catalogPaths = buildCatalogPaths(result.catalogs(), comicId);
 
-        // 构建文件条目：按章节分组，去重目录名，并做目标路径冲突与容量预检
-        Set<String> usedChapterDirs = new HashSet<>();
+        // 构建文件条目：按目录树分组，并做目标路径冲突与容量预检。
         Set<String> usedTargetPaths = new HashSet<>();
         long mediaTotalSize = 0L;
         for (ChapterRecord chapter : result.chapters()) {
-            String chapterDir = chapterTitles.getOrDefault(chapter.getId(), CHAPTER_DIR_PREFIX + chapter.getId());
-            String uniqueDir = chapterDir;
-            int counter = 1;
-            while (usedChapterDirs.contains(uniqueDir)) {
-                uniqueDir = chapterDir + "(" + counter + ")";
-                counter++;
-            }
-            usedChapterDirs.add(uniqueDir);
+            String chapterDirectory = buildChapterDirectory(chapter, catalogPaths, comicId);
 
             List<MediaRecord> chapterMedia = mediaByChapter.getOrDefault(chapter.getId(), List.of());
             List<MediaRecord> sortedMedia = chapterMedia.stream()
@@ -204,7 +192,7 @@ public class ExportServiceImpl implements ExportService {
                     .toList();
 
             for (MediaRecord media : sortedMedia) {
-                ExportManifest.Entry entry = buildEntry(comicId, media, uniqueDir, usedTargetPaths);
+                ExportManifest.Entry entry = buildEntry(comicId, media, chapterDirectory, usedTargetPaths);
                 entries.add(entry);
                 mediaTotalSize = addSizes(comicId, media.getId(), mediaTotalSize, entry.sourceSize());
             }
@@ -232,6 +220,75 @@ public class ExportServiceImpl implements ExportService {
                             + exportBytesWithComicInfo + " 字节 > maxTotalSize=" + maxTotalSize());
         }
         return new ExportManifest(rootDirName, metadataJson, comicInfoXml, entries);
+    }
+
+    /** 根据 catalog 的父子关系构建每个目录的 ZIP 相对路径。 */
+    private Map<Long, String> buildCatalogPaths(List<CatalogRecord> catalogs, Long comicId) {
+        Map<Long, CatalogRecord> catalogsById = new HashMap<>(catalogs.size());
+        for (CatalogRecord catalog : catalogs) {
+            if (catalog.getId() == null || catalogsById.put(catalog.getId(), catalog) != null) {
+                throw new ExportManifestBuildException("导出清单构建失败：comicId=" + comicId + ", 目录 ID 重复或缺失");
+            }
+        }
+        Map<Long, String> paths = new HashMap<>(catalogs.size());
+        for (CatalogRecord catalog : catalogs) {
+            resolveCatalogPath(catalog, catalogsById, paths, new HashSet<>(), comicId);
+        }
+        return paths;
+    }
+
+    private String resolveCatalogPath(CatalogRecord catalog, Map<Long, CatalogRecord> catalogsById,
+                                      Map<Long, String> paths, Set<Long> visitingCatalogIds, Long comicId) {
+        String cachedPath = paths.get(catalog.getId());
+        if (cachedPath != null) {
+            return cachedPath;
+        }
+        if (!visitingCatalogIds.add(catalog.getId())) {
+            throw new ExportManifestBuildException("导出清单构建失败：comicId=" + comicId + ", 目录层级存在循环");
+        }
+        String directoryName = requireDirectoryName(catalog.getTitle(), "目录", catalog.getId(), comicId);
+        String path = directoryName;
+        if (catalog.getParentId() != null) {
+            CatalogRecord parent = catalogsById.get(catalog.getParentId());
+            if (parent == null) {
+                throw new ExportManifestBuildException("导出清单构建失败：comicId=" + comicId
+                        + ", 目录父节点不存在: catalogId=" + catalog.getId());
+            }
+            path = resolveCatalogPath(parent, catalogsById, paths, visitingCatalogIds, comicId) + "/" + directoryName;
+        }
+        visitingCatalogIds.remove(catalog.getId());
+        paths.put(catalog.getId(), path);
+        return path;
+    }
+
+    /**
+     * 章节作为目录树的叶子。混合目录（自身有媒体且有子目录）在导入时会同时
+     * 创建同名 Catalog 和 Chapter；此处不重复追加章节名，令媒体回到该目录本身。
+     */
+    private String buildChapterDirectory(ChapterRecord chapter, Map<Long, String> catalogPaths, Long comicId) {
+        String chapterDirectory = requireDirectoryName(chapter.getTitle(), "章节", chapter.getId(), comicId);
+        if (chapter.getCatalogId() == null) {
+            return chapterDirectory;
+        }
+        String catalogPath = catalogPaths.get(chapter.getCatalogId());
+        if (catalogPath == null) {
+            throw new ExportManifestBuildException("导出清单构建失败：comicId=" + comicId
+                    + ", 章节关联目录不存在: chapterId=" + chapter.getId());
+        }
+        String catalogName = catalogPath.substring(catalogPath.lastIndexOf('/') + 1);
+        if (catalogName.equals(chapterDirectory)) {
+            return catalogPath;
+        }
+        return catalogPath + "/" + chapterDirectory;
+    }
+
+    private String requireDirectoryName(String name, String type, Long id, Long comicId) {
+        if (name == null || name.isBlank() || ".".equals(name) || "..".equals(name)
+                || name.indexOf('/') >= 0 || name.indexOf('\\') >= 0 || name.indexOf(':') >= 0 || name.indexOf('\0') >= 0) {
+            throw new ExportManifestBuildException("导出清单构建失败：comicId=" + comicId
+                    + ", " + type + "名称非法: id=" + id);
+        }
+        return name;
     }
 
     /**

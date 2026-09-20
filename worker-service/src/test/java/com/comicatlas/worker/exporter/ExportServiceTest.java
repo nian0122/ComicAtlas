@@ -13,6 +13,7 @@ import com.comicatlas.worker.exporter.collector.ExportCollector;
 import com.comicatlas.worker.exporter.resolver.ExportFileResolver;
 import com.comicatlas.worker.config.WorkerConfig;
 import com.comicatlas.worker.persistence.record.ChapterRecord;
+import com.comicatlas.worker.persistence.record.CatalogRecord;
 import com.comicatlas.worker.persistence.record.ComicRecord;
 import com.comicatlas.worker.persistence.record.MediaRecord;
 import com.comicatlas.worker.storage.StorageProperties;
@@ -29,6 +30,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.zip.ZipFile;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -177,6 +179,14 @@ class ExportServiceTest {
         return ch;
     }
 
+    private CatalogRecord catalog(Long id, Long parentId, String title) {
+        CatalogRecord catalog = new CatalogRecord();
+        catalog.setId(id);
+        catalog.setParentId(parentId);
+        catalog.setTitle(title);
+        return catalog;
+    }
+
     private MediaRecord media(Long id, Long chapterId, String hqPath, Integer pageNumber) {
         MediaRecord m = new MediaRecord();
         m.setId(id);
@@ -191,6 +201,11 @@ class ExportServiceTest {
 
     private ExportCollectResult result(ComicRecord comic, List<ChapterRecord> chapters, List<MediaRecord> media) {
         return new ExportCollectResult(comic, chapters, List.of(), media, null);
+    }
+
+    private ExportCollectResult result(ComicRecord comic, List<ChapterRecord> chapters,
+                                       List<CatalogRecord> catalogs, List<MediaRecord> media) {
+        return new ExportCollectResult(comic, chapters, catalogs, media, null);
     }
 
     private void writeFile(String relative, String content) throws IOException {
@@ -371,7 +386,7 @@ class ExportServiceTest {
     }
 
     @Test
-    void export_deduplicatesChapterDirs() throws Exception {
+    void export_rejectsDuplicateChapterPathsInsteadOfRenamingDirectories() throws Exception {
         MediaRecord m1 = media(1L, 10L, "1/10/001.jpg", 1);
         MediaRecord m2 = media(2L, 11L, "1/11/001.jpg", 1);
         when(exportCollector.collect(1L)).thenReturn(result(comic(1L, "标题"),
@@ -382,17 +397,74 @@ class ExportServiceTest {
         writeFile("hq/1/10/001.jpg", "a");
         writeFile("hq/1/11/001.jpg", "b");
         stubResolverToRoot();
+        assertThrows(ExportManifestBuildException.class, () -> service.export(1L, 99L),
+                "相同目录与文件名不能通过改写目录名掩盖，否则无法恢复原始结构");
+        verify(zipBuilder, never()).build(any(), any());
+    }
+
+    @Test
+    void export_restoresNestedCatalogAndChapterDirectoryNames() throws Exception {
+        MediaRecord nestedMedia = media(1L, 10L, "1/10/原始文件.jpg", 1);
+        MediaRecord siblingMedia = media(2L, 11L, "1/11/封面.png", 1);
+        MediaRecord mixedDirectoryMedia = media(3L, 12L, "1/12/扉页.jpg", 1);
+        ChapterRecord nestedChapter = chapter(10L, "第01话", 1);
+        nestedChapter.setCatalogId(101L);
+        ChapterRecord siblingChapter = chapter(11L, "第02话", 2);
+        siblingChapter.setCatalogId(102L);
+        ChapterRecord mixedDirectoryChapter = chapter(12L, "附录", 3);
+        mixedDirectoryChapter.setCatalogId(101L);
+        ExportCollectResult collected = result(comic(1L, "测试标题"),
+                List.of(nestedChapter, siblingChapter, mixedDirectoryChapter),
+                List.of(catalog(100L, null, "第一卷"), catalog(101L, 100L, "附录"),
+                        catalog(102L, 100L, "正篇")),
+                List.of(nestedMedia, siblingMedia, mixedDirectoryMedia));
+        when(exportCollector.collect(1L)).thenReturn(collected);
+        when(metadataJsonExporter.exportJson(collected)).thenReturn("{}");
+        when(exportFileResolver.resolve(nestedMedia)).thenReturn(new StorageRef("HQ", "1/10/原始文件.jpg"));
+        when(exportFileResolver.resolve(siblingMedia)).thenReturn(new StorageRef("HQ", "1/11/封面.png"));
+        when(exportFileResolver.resolve(mixedDirectoryMedia)).thenReturn(new StorageRef("HQ", "1/12/扉页.jpg"));
+        writeFile("hq/1/10/原始文件.jpg", "a");
+        writeFile("hq/1/11/封面.png", "b");
+        writeFile("hq/1/12/扉页.jpg", "c");
+        stubResolverToRoot();
         when(zipBuilder.build(any(), any())).thenReturn(
-                new ZipBuilder.ZipBuildResult(tempDir.resolve("out.zip"), List.of(tempDir.resolve("out.zip")), 10L));
+                new ZipBuilder.ZipBuildResult(tempDir.resolve("out.zip"), List.of(tempDir.resolve("out.zip")), 3L));
 
         service.export(1L, 99L);
 
         ArgumentCaptor<ExportManifest> manifestCaptor = ArgumentCaptor.forClass(ExportManifest.class);
         verify(zipBuilder).build(manifestCaptor.capture(), any());
-        assertEquals(2, manifestCaptor.getValue().entries().size());
-        assertEquals("同名章/001.jpg", manifestCaptor.getValue().entries().get(0).targetPath());
-        assertEquals("同名章(1)/001.jpg", manifestCaptor.getValue().entries().get(1).targetPath(),
-                "同名章节目录应去重为 同名章(1)");
+        assertEquals(List.of("第一卷/附录/第01话/原始文件.jpg", "第一卷/正篇/第02话/封面.png",
+                        "第一卷/附录/扉页.jpg"),
+                manifestCaptor.getValue().entries().stream().map(ExportManifest.Entry::targetPath).toList(),
+                "导出应依据 catalog 父子关系与章节名称恢复原始层级，且不改写文件名");
+    }
+
+    @Test
+    void export_writesRestoredHierarchyIntoZipArchive() throws Exception {
+        MediaRecord media = media(1L, 10L, "1/10/原始文件.jpg", 1);
+        ChapterRecord chapter = chapter(10L, "第01话", 1);
+        chapter.setCatalogId(101L);
+        ExportCollectResult collected = result(comic(1L, "测试标题"), List.of(chapter),
+                List.of(catalog(100L, null, "第一卷"), catalog(101L, 100L, "附录")), List.of(media));
+        when(exportCollector.collect(1L)).thenReturn(collected);
+        when(metadataJsonExporter.exportJson(collected)).thenReturn("{}");
+        when(exportFileResolver.resolve(media)).thenReturn(new StorageRef("HQ", "1/10/原始文件.jpg"));
+        writeFile("hq/1/10/原始文件.jpg", "image-content");
+        stubResolverToRoot();
+        ZipBuilder realZipBuilder = new ZipBuilder(workerConfig);
+        ExportService realService = new ExportServiceImpl(exportCollector, exportFileResolver, realZipBuilder,
+                metadataJsonExporter, storageProperties, workerConfig, new ExportArchivePublisher(realZipBuilder));
+
+        ExportService.ExportOutput output = realService.export(1L, 100L);
+
+        Path archive = storageProperties.getRoots().get("EXPORT").getPath().resolve(output.fileName());
+        try (ZipFile zipFile = new ZipFile(archive.toFile())) {
+            assertNotNull(zipFile.getEntry("测试标题/第一卷/附录/第01话/原始文件.jpg"),
+                    "压缩包中的媒体条目必须带有恢复后的完整层级");
+            assertNotNull(zipFile.getEntry("测试标题/metadata.json"));
+            assertNotNull(zipFile.getEntry("测试标题/ComicInfo.xml"));
+        }
     }
 
     @Test
