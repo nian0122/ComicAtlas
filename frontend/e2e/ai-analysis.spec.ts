@@ -2,13 +2,13 @@ import { expect, test } from '@playwright/test'
 
 test('AI 漫画分析入口可以提交任务并展示结果', async ({ page }) => {
   let statusRequests = 0
-  await page.route('**/analysis/tasks', (route) => {
+  await page.route('**/api/ai/analysis/tasks', (route) => {
     if (route.request().method() === 'POST') {
       return route.fulfill({ status: 202, contentType: 'application/json', body: JSON.stringify({ taskId: 77, status: 'QUEUED' }) })
     }
     return route.continue()
   })
-  await page.route('**/analysis/tasks/77', (route) => {
+  await page.route('**/api/ai/analysis/tasks/77', (route) => {
     statusRequests += 1
     const task = statusRequests === 1
       ? { id: 77, sourcePath: '作者/作品名', status: 'RUNNING', progress: 35, resultJson: null, errorCode: null, errorMessage: null, attempts: 1, createdAt: '2026-09-20T10:00:00Z', startedAt: '2026-09-20T10:00:01Z', finishedAt: null }

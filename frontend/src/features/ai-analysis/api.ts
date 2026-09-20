@@ -1,4 +1,4 @@
-import axios from 'axios'
+import { api } from '@/shared/api/http'
 
 export type AiTaskStatus = 'QUEUED' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'CANCEL_REQUESTED' | 'CANCELLED'
 
@@ -16,21 +16,16 @@ export interface AiAnalysisTask {
   readonly finishedAt: string | null
 }
 
-const aiApi = axios.create({
-  baseURL: import.meta.env.VITE_AI_API_BASE_URL || 'http://localhost:8020/api',
-  timeout: 15_000,
-})
-
 export const aiAnalysisApi = {
   async create(sourcePath: string): Promise<{ taskId: number; status: AiTaskStatus }> {
-    const response = await aiApi.post('/analysis/tasks', { sourcePath })
+    const response = await api.post('/ai/analysis/tasks', { sourcePath })
     return response.data
   },
   async get(taskId: number): Promise<AiAnalysisTask> {
-    const response = await aiApi.get(`/analysis/tasks/${taskId}`)
+    const response = await api.get(`/ai/analysis/tasks/${taskId}`)
     return response.data
   },
   async cancel(taskId: number): Promise<void> {
-    await aiApi.post(`/analysis/tasks/${taskId}/cancel`)
+    await api.post(`/ai/analysis/tasks/${taskId}/cancel`)
   },
 }
