@@ -9,7 +9,6 @@ spring:
     hikari.maximum-pool-size: ${AI_DB_POOL_SIZE:5}
   sql.init.mode: always
 comic-ai:
-  cors-origins: ${AI_CORS_ORIGINS:http://localhost,http://localhost:80,http://127.0.0.1}
   manga-root: ${AI_MANGA_ROOT:/manga}
   work-root: ${AI_WORK_ROOT:/var/lib/comic-ai/work}
   sample-count: ${AI_SAMPLE_COUNT:10}
