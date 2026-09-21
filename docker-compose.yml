@@ -196,14 +196,13 @@ services:
       - --dtype
       - float16
       - --session-len
-      - "4096"
+      - "2048"
       - --max-batch-size
       - "1"
       - --max-concurrent-requests
       - "1"
       - --cache-max-entry-count
-      - "0.05"
-      - --trust-remote-code
+      - "0.02"
     volumes:
       - ${AI_MODEL_DIR:-./.runtime/models/InternVL3_5-2B}:/models/InternVL3_5-2B:ro
 
