@@ -8,12 +8,12 @@
 mvn -f comic-ai-service/pom.xml clean package
 $env:MANGA_ROOT = 'F:\\manga'
 $env:AI_DB_PASSWORD = '...'
-$env:AI_API_KEY = '...'
-$env:AI_MODEL = '你的视觉模型'
+$env:AI_API_KEY = 'local'
+$env:AI_MODEL = 'OpenGVLab/InternVL3_5-2B'
 docker compose --env-file .env -f docker-compose.yml up -d --build comic-ai-service
 ```
 
-当前配置使用阿里云百炼北京地域的 `qwen3-vl-flash`。`AI_BASE_URL` 使用业务空间专属的 OpenAI 兼容 v1 根地址：`https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/compatible-mode/v1`；`{WorkspaceId}` 必须替换为你的百炼业务空间 ID。任务接口接收容器内挂载根目录下的相对路径，禁止绝对路径、`..` 和越界符号链接。
+默认配置使用 Compose 内网的本地 OpenAI 兼容服务：`http://comic-model-service:23333/v1`。若只启动 AI 单体而不启动本地模型容器，可通过环境变量切换到其他 OpenAI 兼容服务。任务接口接收容器内挂载根目录下的相对路径，禁止绝对路径、`..` 和越界符号链接。
 
 ## API
 
@@ -28,6 +28,24 @@ Content-Type: application/json
 
 - `GET /api/ai/analysis/tasks/{taskId}`：查询状态、进度和结果。
 - `POST /api/ai/analysis/tasks/{taskId}/cancel`：请求取消排队或运行中的任务。
+
+## 本地模型 Docker 部署
+
+项目根目录的 Compose 已包含 `comic-model-service`。它使用 LMDeploy 加载 InternVL3.5-2B，模型服务只在 Compose 内网监听，AI 单体通过 `http://comic-model-service:23333/v1` 调用。
+
+首次部署前准备模型目录并确认权重文件完整，然后执行：
+
+```powershell
+pwsh -File scripts/dev/download-internvl.ps1
+docker compose --profile local-ai up -d comic-model-service comic-ai-service
+docker compose logs -f comic-model-service
+```
+
+模型目录至少应包含 `config.json`、`model.safetensors` 和 InternVL 的自定义代码文件；权重文件大小约为 4.7 GB。模型服务镜像首次启动还会占用约 5 GB Docker 磁盘空间。
+
+`AI_MODEL_IMAGE` 用于指定模型运行镜像，默认由项目 Dockerfile 基于 NVIDIA CUDA 镜像构建。使用阿里云 ACR、Harbor 等私有仓库中的预构建镜像时，将它替换为仓库中的完整镜像地址即可；此时仍建议保留 `build` 配置以便没有预构建镜像时回退构建。
+
+模型权重目录由 `AI_MODEL_DIR` 控制，默认是 `.runtime/models/InternVL3_5-2B`。当前配置为单并发、4096 上下文和单请求，适合 6GB 显存显卡；修改参数前先观察显存峰值。
 
 任务状态包括 `QUEUED`、`RUNNING`、`SUCCEEDED`、`FAILED`、`CANCEL_REQUESTED`、`CANCELLED`。应用重启后，任务记录仍保留；当前版本只自动执行本次进程内提交的任务，生产部署时应补充启动恢复扫描（将遗留 RUNNING 任务转回 QUEUED）。
 
