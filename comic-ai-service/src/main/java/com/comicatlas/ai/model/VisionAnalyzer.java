@@ -45,8 +45,28 @@ public class VisionAnalyzer {
         }
         ChatResponse response = model.chat(UserMessage.from(contents));
         String text = response.aiMessage().text();
-        JsonNode json = objectMapper.readTree(text);
+        JsonNode json = objectMapper.readTree(normalizeJson(text));
         return objectMapper.writeValueAsString(json);
+    }
+
+    static String normalizeJson(String modelText) {
+        if (modelText == null || modelText.isBlank()) {
+            throw new IllegalArgumentException("AI 返回内容为空");
+        }
+        String normalized = modelText.trim();
+        if (normalized.startsWith("```")) {
+            int firstLineEnd = normalized.indexOf('\n');
+            int closingFence = normalized.lastIndexOf("```");
+            if (firstLineEnd > 0 && closingFence > firstLineEnd) {
+                normalized = normalized.substring(firstLineEnd + 1, closingFence).trim();
+            }
+        }
+        int objectStart = normalized.indexOf('{');
+        int objectEnd = normalized.lastIndexOf('}');
+        if (objectStart >= 0 && objectEnd > objectStart) {
+            normalized = normalized.substring(objectStart, objectEnd + 1);
+        }
+        return normalized;
     }
     private byte[] optimizedImage(java.nio.file.Path path) throws IOException {
         BufferedImage original = ImageIO.read(path.toFile());
