@@ -24,7 +24,7 @@ public class AnalysisWorker {
             List<SamplePage> pages = sampler.sample(taskRepository.find(taskId).orElseThrow().sourcePath());
             taskRepository.progress(taskId, 25);
             if (taskRepository.cancellationRequested(taskId)) { taskRepository.cancelled(taskId); return; }
-            String result = analyzer.analyze(pages);
+            String result = analyzer.analyze(pages, taskRepository.findExistingTagNames());
             taskRepository.progress(taskId, 90);
             taskRepository.succeed(taskId, result);
         } catch (Exception exception) {
