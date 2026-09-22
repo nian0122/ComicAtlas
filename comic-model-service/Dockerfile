@@ -17,4 +17,11 @@ RUN python3 -m pip install --break-system-packages \
             lmdeploy==0.12.3 transformers==4.52.4 timm einops pillow==11.3.0 \
             openai_harmony aiohttp prometheus_client pybase64 xgrammar partial_json_parser
 
+RUN python3 -m pip install --break-system-packages \
+        --index-url https://pypi.tuna.tsinghua.edu.cn/simple \
+        --trusted-host pypi.tuna.tsinghua.edu.cn \
+        bitsandbytes
+
+COPY comic-model-service/server.py /app/server.py
+
 EXPOSE 23333

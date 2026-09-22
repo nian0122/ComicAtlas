@@ -181,28 +181,8 @@ services:
     gpus: all
     shm_size: 2gb
     command:
-      - lmdeploy
-      - serve
-      - api_server
-      - /models/InternVL3_5-2B
-      - --server-name
-      - 0.0.0.0
-      - --server-port
-      - "23333"
-      - --backend
-      - pytorch
-      - --tp
-      - "1"
-      - --dtype
-      - float16
-      - --session-len
-      - "2048"
-      - --max-batch-size
-      - "1"
-      - --max-concurrent-requests
-      - "1"
-      - --cache-max-entry-count
-      - "0.02"
+      - python3
+      - /app/server.py
     volumes:
       - ${AI_MODEL_DIR:-./.runtime/models/InternVL3_5-2B}:/models/InternVL3_5-2B:ro
 
