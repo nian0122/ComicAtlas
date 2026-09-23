@@ -1,124 +1,41 @@
 package com.comicatlas.common.dto;
 
 import com.comicatlas.common.storage.RelativePathValidator;
-
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
-/**
- * 元数据扫盘刷新快照：Worker 重读 HQ 目录后生成的 DB 结构快照数据载体。
- * <p>
- * 用途：作为「DB → JSON」结构指纹的输入，供 {@code MetadataSnapshotRevision}
- * 计算确定性摘要（databaseRevision）。快照不承载文件内容，只承载结构：
- * 章节/媒体 ID 与版本、相对路径、状态与视频元数据，用于与重扫结果比对。
- * <p>
- * 契约约束：
- * <ul>
- *   <li>{@code generatedAt} 为扫描时刻时间戳，仅供审计/日志，<b>不得参与</b>结构摘要；</li>
- *   <li>{@code databaseRevision} 为确定性结构摘要（十六进制），由摘要工具计算后回填；</li>
- *   <li>{@link MediaSnapshot#hqPath()} 必须是 HQ 中真实相对路径（正斜杠，如 {@code 1/42/001.jpg}），
- *       已登记媒体与未登记发现项均使用该路径；构建时经 {@link RelativePathValidator} 校验，非法路径抛
- *       {@code InvalidRelativePathException}。</li>
- * </ul>
- */
-public record MetadataRefreshSnapshotDTO(
-        int schemaVersion,
-        Long comicId,
-        Instant generatedAt,
-        String databaseRevision,
-        List<ChapterSnapshot> chapters) {
+/** 元数据扫盘刷新快照契约。 */
+@JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
+public final class MetadataRefreshSnapshotDTO {
+    private final int schemaVersion; private final Long comicId; private final Instant generatedAt;
+    private final String databaseRevision; private final List<ChapterSnapshot> chapters;
+    @JsonCreator
+    public MetadataRefreshSnapshotDTO(@JsonProperty("schemaVersion") int schemaVersion, @JsonProperty("comicId") Long comicId,
+                                      @JsonProperty("generatedAt") Instant generatedAt, @JsonProperty("databaseRevision") String databaseRevision,
+                                      @JsonProperty("chapters") List<ChapterSnapshot> chapters) { this.schemaVersion=schemaVersion; this.comicId=comicId; this.generatedAt=generatedAt; this.databaseRevision=databaseRevision; this.chapters=chapters; }
+    public int schemaVersion(){return schemaVersion;} public Long comicId(){return comicId;} public Instant generatedAt(){return generatedAt;} public String databaseRevision(){return databaseRevision;} public List<ChapterSnapshot> chapters(){return chapters;}
 
-    /**
-     * 章节快照：chapterId 与 chapterVersion（乐观锁）为结构标识，
-     * mediaItems 为该章媒体列表，warnings 为该章扫描告警（可为 null）。
-     * <p>
-     * {@code legacyDirKey} 为旧布局升级信号（可为 null）：Worker 发现该章文件存放于
-     * {@code hq/{comicId}/{legacyDirKey}}（旧暂存键目录）并已成功移动至
-     * {@code hq/{comicId}/{chapterId}} 时填充；API 据此将该章 page 行
-     * {@code hq_path}/{@code lq_path} 前缀重写为新布局。非 null 即表示文件已迁移完成。
-     */
-    public record ChapterSnapshot(
-            Long chapterId,
-            int chapterVersion,
-            List<MediaSnapshot> mediaItems,
-            List<String> warnings,
-            String legacyDirKey) {
-
-        /** 旧布局升级前的构造器形态：未升级（legacyDirKey=null）。 */
-        public ChapterSnapshot(Long chapterId, int chapterVersion,
-                               List<MediaSnapshot> mediaItems, List<String> warnings) {
-            this(chapterId, chapterVersion, mediaItems, warnings, null);
-        }
+    @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
+    public static final class ChapterSnapshot {
+        private final Long chapterId; private final int chapterVersion; private final List<MediaSnapshot> mediaItems; private final List<String> warnings; private final String legacyDirKey;
+        @JsonCreator
+        public ChapterSnapshot(@JsonProperty("chapterId") Long chapterId, @JsonProperty("chapterVersion") int chapterVersion, @JsonProperty("mediaItems") List<MediaSnapshot> mediaItems, @JsonProperty("warnings") List<String> warnings, @JsonProperty("legacyDirKey") String legacyDirKey) { this.chapterId=chapterId; this.chapterVersion=chapterVersion; this.mediaItems=mediaItems; this.warnings=warnings; this.legacyDirKey=legacyDirKey; }
+        public ChapterSnapshot(Long chapterId,int chapterVersion,List<MediaSnapshot> mediaItems,List<String> warnings){this(chapterId,chapterVersion,mediaItems,warnings,null);}
+        public Long chapterId(){return chapterId;} public int chapterVersion(){return chapterVersion;} public List<MediaSnapshot> mediaItems(){return mediaItems;} public List<String> warnings(){return warnings;} public String legacyDirKey(){return legacyDirKey;}
     }
 
-    /**
-     * 媒体快照：媒体行结构字段。{@code mediaId=null} 表示 HQ 扫描发现但数据库尚未登记的媒体，
-     * 由后续独立新增流程处理。
-     * <p>
-     * width/height/duration/container/videoCodec/audioCodec 为可空视频元数据（图片媒体为 null）。
-     * hqPath 为必填相对路径，构建边界校验契约（见 {@link RelativePathValidator}）。
-     * lqStatus/lqSize 为 LQ 文件事实（Worker 扫 LQ 目录实测）：lqStatus 取值
-     * READY（文件存在）/NOT_GENERATED（不存在），lqSize 为 LQ 文件字节数（未生成为 0）。
-     * lqPath 为实际 LQ WebP 产物相对路径。
-     */
-    public record MediaSnapshot(
-            Long mediaId,
-            int mediaVersion,
-            String hqPath,
-            String hqStatus,
-            String lifecycleStatus,
-            int pageNumber,
-            long fileSize,
-            String mediaType,
-            Integer width,
-            Integer height,
-            BigDecimal duration,
-            String container,
-            String videoCodec,
-            String audioCodec,
-            String lqStatus,
-            long lqSize,
-            String lqPath) {
-
-        public MediaSnapshot {
-            RelativePathValidator.requireRelativeForwardSlash(hqPath);
-            if (lqPath != null) {
-                RelativePathValidator.requireRelativeForwardSlash(lqPath);
-            }
-        }
-
-        public MediaSnapshot(Long mediaId, int mediaVersion, String hqPath, String hqStatus,
-                             String lifecycleStatus, int pageNumber, long fileSize, String mediaType,
-                             Integer width, Integer height, BigDecimal duration, String container,
-                             String videoCodec, String audioCodec, String lqStatus, long lqSize) {
-            this(mediaId, mediaVersion, hqPath, hqStatus, lifecycleStatus, pageNumber, fileSize,
-                    mediaType, width, height, duration, container, videoCodec, audioCodec,
-                    lqStatus, lqSize, null);
-        }
-
-        /** 旧构造入口（无 LQ 事实，lqStatus=NOT_GENERATED、lqSize=0），保持向后兼容。 */
-        public MediaSnapshot(
-                Long mediaId,
-                int mediaVersion,
-                String hqPath,
-                String hqStatus,
-                String lifecycleStatus,
-                int pageNumber,
-                long fileSize,
-                String mediaType,
-                Integer width,
-                Integer height,
-                BigDecimal duration,
-                String container,
-                String videoCodec,
-                String audioCodec) {
-            this(mediaId, mediaVersion, hqPath, hqStatus, lifecycleStatus, pageNumber, fileSize,
-                    mediaType, width, height, duration, container, videoCodec, audioCodec,
-                    LQ_STATUS_NOT_GENERATED, 0L, null);
-        }
-
-        /** LQ 未生成状态名（与 LqStatus 枚举一致）。 */
-        private static final String LQ_STATUS_NOT_GENERATED = "NOT_GENERATED";
+    @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
+    public static final class MediaSnapshot {
+        private static final String LQ_STATUS_NOT_GENERATED="NOT_GENERATED";
+        private final Long mediaId; private final int mediaVersion; private final String hqPath; private final String hqStatus; private final String lifecycleStatus; private final int pageNumber; private final long fileSize; private final String mediaType; private final Integer width; private final Integer height; private final BigDecimal duration; private final String container; private final String videoCodec; private final String audioCodec; private final String lqStatus; private final long lqSize; private final String lqPath;
+        @JsonCreator
+        public MediaSnapshot(@JsonProperty("mediaId") Long mediaId,@JsonProperty("mediaVersion") int mediaVersion,@JsonProperty("hqPath") String hqPath,@JsonProperty("hqStatus") String hqStatus,@JsonProperty("lifecycleStatus") String lifecycleStatus,@JsonProperty("pageNumber") int pageNumber,@JsonProperty("fileSize") long fileSize,@JsonProperty("mediaType") String mediaType,@JsonProperty("width") Integer width,@JsonProperty("height") Integer height,@JsonProperty("duration") BigDecimal duration,@JsonProperty("container") String container,@JsonProperty("videoCodec") String videoCodec,@JsonProperty("audioCodec") String audioCodec,@JsonProperty("lqStatus") String lqStatus,@JsonProperty("lqSize") long lqSize,@JsonProperty("lqPath") String lqPath) { RelativePathValidator.requireRelativeForwardSlash(hqPath); if(lqPath!=null){RelativePathValidator.requireRelativeForwardSlash(lqPath);} this.mediaId=mediaId;this.mediaVersion=mediaVersion;this.hqPath=hqPath;this.hqStatus=hqStatus;this.lifecycleStatus=lifecycleStatus;this.pageNumber=pageNumber;this.fileSize=fileSize;this.mediaType=mediaType;this.width=width;this.height=height;this.duration=duration;this.container=container;this.videoCodec=videoCodec;this.audioCodec=audioCodec;this.lqStatus=lqStatus;this.lqSize=lqSize;this.lqPath=lqPath; }
+        public MediaSnapshot(Long id,int version,String path,String hs,String lifecycle,int page,long size,String type,Integer width,Integer height,BigDecimal duration,String container,String video,String audio,String lq,long lqSize){this(id,version,path,hs,lifecycle,page,size,type,width,height,duration,container,video,audio,lq,lqSize,null);}
+        public MediaSnapshot(Long id,int version,String path,String hs,String lifecycle,int page,long size,String type,Integer width,Integer height,BigDecimal duration,String container,String video,String audio){this(id,version,path,hs,lifecycle,page,size,type,width,height,duration,container,video,audio,LQ_STATUS_NOT_GENERATED,0L,null);}
+        public Long mediaId(){return mediaId;} public int mediaVersion(){return mediaVersion;} public String hqPath(){return hqPath;} public String hqStatus(){return hqStatus;} public String lifecycleStatus(){return lifecycleStatus;} public int pageNumber(){return pageNumber;} public long fileSize(){return fileSize;} public String mediaType(){return mediaType;} public Integer width(){return width;} public Integer height(){return height;} public BigDecimal duration(){return duration;} public String container(){return container;} public String videoCodec(){return videoCodec;} public String audioCodec(){return audioCodec;} public String lqStatus(){return lqStatus;} public long lqSize(){return lqSize;} public String lqPath(){return lqPath;}
     }
 }
