@@ -12,6 +12,17 @@ public class AiProperties {
     private int maxConcurrentTasks;
     private Model model;
 
+    public AiProperties() {
+    }
+
+    public AiProperties(Path mangaRoot, Path workRoot, int sampleCount, int maxConcurrentTasks, Model model) {
+        this.mangaRoot = mangaRoot;
+        this.workRoot = workRoot;
+        this.sampleCount = sampleCount;
+        this.maxConcurrentTasks = maxConcurrentTasks;
+        this.model = model;
+    }
+
     public Path mangaRoot() { return mangaRoot; }
     public Path workRoot() { return workRoot; }
     public int sampleCount() { return sampleCount; }
@@ -29,6 +40,16 @@ public class AiProperties {
         private String baseUrl;
         private String modelName;
         private int timeoutSeconds;
+
+        public Model() {
+        }
+
+        public Model(String apiKey, String baseUrl, String modelName, int timeoutSeconds) {
+            this.apiKey = apiKey;
+            this.baseUrl = baseUrl;
+            this.modelName = modelName;
+            this.timeoutSeconds = timeoutSeconds;
+        }
 
         public String apiKey() { return apiKey; }
         public String baseUrl() { return baseUrl; }
