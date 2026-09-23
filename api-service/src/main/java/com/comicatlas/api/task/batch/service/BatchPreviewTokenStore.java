@@ -23,6 +23,7 @@ import java.util.concurrent.ConcurrentMap;
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@lombok.Getter
 public class BatchPreviewTokenStore {
 
     private static final SecureRandom RANDOM = new SecureRandom();
@@ -30,7 +31,28 @@ public class BatchPreviewTokenStore {
     private final ConcurrentMap<String, Entry> store = new ConcurrentHashMap<>();
     private final DigestService digestService;
 
-    private record Entry(String fingerprint, long expiresAtEpochMillis) {
+    @lombok.Getter
+
+    private static class Entry {
+        private final String fingerprint;
+        private final long expiresAtEpochMillis;
+        public Entry(String fingerprint, long expiresAtEpochMillis) {
+            this.fingerprint = fingerprint;
+            this.expiresAtEpochMillis = expiresAtEpochMillis;
+        }
+        public String fingerprint() { return fingerprint; }
+        public long expiresAtEpochMillis() { return expiresAtEpochMillis; }
+        @Override
+        public boolean equals(Object other) {
+            if (this == other) { return true; }
+            if (!(other instanceof Entry)) { return false; }
+            Entry that = (Entry) other;
+            return java.util.Objects.equals(fingerprint, that.fingerprint) && java.util.Objects.equals(expiresAtEpochMillis, that.expiresAtEpochMillis);
+        }
+        @Override
+        public int hashCode() { return java.util.Objects.hash(fingerprint, expiresAtEpochMillis); }
+        @Override
+        public String toString() { return "Entry[" + "fingerprint=" + fingerprint + ", " + "expiresAtEpochMillis=" + expiresAtEpochMillis + "]"; }
     }
 
     /**

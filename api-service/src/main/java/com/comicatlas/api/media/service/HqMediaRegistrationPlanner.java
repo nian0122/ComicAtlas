@@ -23,6 +23,7 @@ import java.util.stream.Collectors;
 
 /** HQ 登记规则和媒体实体装配器，不执行数据库写入。 */
 @Component
+@lombok.Getter
 public class HqMediaRegistrationPlanner {
     private static final String READY = "READY";
     private static final String IMAGE = "IMAGE";
@@ -117,5 +118,29 @@ public class HqMediaRegistrationPlanner {
     private String basename(String path) { int index = path.lastIndexOf('/'); return index >= 0 ? path.substring(index + 1) : path; }
     private String statusName(MediaLifecycleStatus status) { return status == null ? "" : status.name(); }
 
-    public record RegistrationPlan(List<Media> media, int skippedExisting, int skippedInvalid) { }
+    @lombok.Getter
+
+    public static class RegistrationPlan {
+        private final List<Media> media;
+        private final int skippedExisting;
+        private final int skippedInvalid;
+        public RegistrationPlan(List<Media> media, int skippedExisting, int skippedInvalid) {
+            this.media = media;
+            this.skippedExisting = skippedExisting;
+            this.skippedInvalid = skippedInvalid;
+        }
+        public List<Media> media() { return media; }
+        public int skippedExisting() { return skippedExisting; }
+        public int skippedInvalid() { return skippedInvalid; }
+        @Override
+        public boolean equals(Object other) {
+            if (this == other) { return true; }
+            if (!(other instanceof RegistrationPlan)) { return false; }
+            RegistrationPlan that = (RegistrationPlan) other;
+            return java.util.Objects.equals(media, that.media) && java.util.Objects.equals(skippedExisting, that.skippedExisting) && java.util.Objects.equals(skippedInvalid, that.skippedInvalid);
+        }
+        @Override
+        public int hashCode() { return java.util.Objects.hash(media, skippedExisting, skippedInvalid); }
+        @Override
+        public String toString() { return "RegistrationPlan[" + "media=" + media + ", " + "skippedExisting=" + skippedExisting + ", " + "skippedInvalid=" + skippedInvalid + "]"; } }
 }

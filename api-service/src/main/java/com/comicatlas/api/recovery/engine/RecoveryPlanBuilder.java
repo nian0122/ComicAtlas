@@ -11,6 +11,7 @@ import java.util.Map;
 /** 解析并校验恢复元数据，生成不含数据库写操作的恢复计划。 */
 @Component
 @RequiredArgsConstructor
+@lombok.Getter
 public class RecoveryPlanBuilder {
     private final RecoveryMediaResolver recoveryMediaResolver;
 
@@ -70,9 +71,35 @@ public class RecoveryPlanBuilder {
         return result;
     }
 
-    public record RecoveryPlan(Map<String, Object> comicData,
-                               List<Map<String, Object>> catalogs,
-                               List<Map<String, Object>> chapters,
-                               List<List<ResolvedMediaItem>> resolvedMedia,
-                               RestoreContext context) { }
+    @lombok.Getter
+
+    public class RecoveryPlan {
+        private final Map<String, Object> comicData;
+        private final List<Map<String, Object>> catalogs;
+        private final List<Map<String, Object>> chapters;
+        private final List<List<ResolvedMediaItem>> resolvedMedia;
+        private final RestoreContext context;
+        public RecoveryPlan(Map<String, Object> comicData, List<Map<String, Object>> catalogs, List<Map<String, Object>> chapters, List<List<ResolvedMediaItem>> resolvedMedia, RestoreContext context) {
+            this.comicData = comicData;
+            this.catalogs = catalogs;
+            this.chapters = chapters;
+            this.resolvedMedia = resolvedMedia;
+            this.context = context;
+        }
+        public Map<String, Object> comicData() { return comicData; }
+        public List<Map<String, Object>> catalogs() { return catalogs; }
+        public List<Map<String, Object>> chapters() { return chapters; }
+        public List<List<ResolvedMediaItem>> resolvedMedia() { return resolvedMedia; }
+        public RestoreContext context() { return context; }
+        @Override
+        public boolean equals(Object other) {
+            if (this == other) { return true; }
+            if (!(other instanceof RecoveryPlan)) { return false; }
+            RecoveryPlan that = (RecoveryPlan) other;
+            return java.util.Objects.equals(comicData, that.comicData) && java.util.Objects.equals(catalogs, that.catalogs) && java.util.Objects.equals(chapters, that.chapters) && java.util.Objects.equals(resolvedMedia, that.resolvedMedia) && java.util.Objects.equals(context, that.context);
+        }
+        @Override
+        public int hashCode() { return java.util.Objects.hash(comicData, catalogs, chapters, resolvedMedia, context); }
+        @Override
+        public String toString() { return "RecoveryPlan[" + "comicData=" + comicData + ", " + "catalogs=" + catalogs + ", " + "chapters=" + chapters + ", " + "resolvedMedia=" + resolvedMedia + ", " + "context=" + context + "]"; } }
 }

@@ -32,6 +32,7 @@ import java.util.stream.Stream;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@lombok.Getter
 public class ImportRetryStorageServiceImpl implements com.comicatlas.api.importer.service.ImportRetryStorageService {
     // 导入重试契约由应用服务公开，具体实现保持在导入业务包内。
 
@@ -171,6 +172,30 @@ public class ImportRetryStorageServiceImpl implements com.comicatlas.api.importe
         Files.move(tempPath, target, StandardCopyOption.REPLACE_EXISTING);
     }
 
-    private record ManifestFileEntry(String source, String target, long size) {
+    @lombok.Getter
+
+    private static class ManifestFileEntry {
+        private final String source;
+        private final String target;
+        private final long size;
+        public ManifestFileEntry(String source, String target, long size) {
+            this.source = source;
+            this.target = target;
+            this.size = size;
+        }
+        public String source() { return source; }
+        public String target() { return target; }
+        public long size() { return size; }
+        @Override
+        public boolean equals(Object other) {
+            if (this == other) { return true; }
+            if (!(other instanceof ManifestFileEntry)) { return false; }
+            ManifestFileEntry that = (ManifestFileEntry) other;
+            return java.util.Objects.equals(source, that.source) && java.util.Objects.equals(target, that.target) && java.util.Objects.equals(size, that.size);
+        }
+        @Override
+        public int hashCode() { return java.util.Objects.hash(source, target, size); }
+        @Override
+        public String toString() { return "ManifestFileEntry[" + "source=" + source + ", " + "target=" + target + ", " + "size=" + size + "]"; }
     }
 }

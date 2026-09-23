@@ -59,6 +59,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@lombok.Getter
 public class MetadataRefreshServiceImpl implements MetadataRefreshService {
     // 元数据刷新契约由应用服务公开，具体实现保持在元数据业务包内。
 
@@ -490,7 +491,30 @@ public class MetadataRefreshServiceImpl implements MetadataRefreshService {
     }
 
     /** 合并计划载体。 */
-    private record MergePlan(List<Media> updated, List<MediaSnapshot> discovered, List<Media> missing) {
+    @lombok.Getter
+    private static class MergePlan {
+        private final List<Media> updated;
+        private final List<MediaSnapshot> discovered;
+        private final List<Media> missing;
+        public MergePlan(List<Media> updated, List<MediaSnapshot> discovered, List<Media> missing) {
+            this.updated = updated;
+            this.discovered = discovered;
+            this.missing = missing;
+        }
+        public List<Media> updated() { return updated; }
+        public List<MediaSnapshot> discovered() { return discovered; }
+        public List<Media> missing() { return missing; }
+        @Override
+        public boolean equals(Object other) {
+            if (this == other) { return true; }
+            if (!(other instanceof MergePlan)) { return false; }
+            MergePlan that = (MergePlan) other;
+            return java.util.Objects.equals(updated, that.updated) && java.util.Objects.equals(discovered, that.discovered) && java.util.Objects.equals(missing, that.missing);
+        }
+        @Override
+        public int hashCode() { return java.util.Objects.hash(updated, discovered, missing); }
+        @Override
+        public String toString() { return "MergePlan[" + "updated=" + updated + ", " + "discovered=" + discovered + ", " + "missing=" + missing + "]"; }
         private int updatedCount() {
             return updated.size() - missing.size();
         }

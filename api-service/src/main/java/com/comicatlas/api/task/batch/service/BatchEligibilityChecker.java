@@ -23,6 +23,7 @@ import java.util.Set;
  */
 @Component
 @RequiredArgsConstructor
+@lombok.Getter
 public class BatchEligibilityChecker {
 
     private final ComicMapper comicMapper;
@@ -93,6 +94,27 @@ public class BatchEligibilityChecker {
         };
     }
 
-    public record Result(List<Long> eligible, List<BlockedBatchItem> blocked) {
+    @lombok.Getter
+
+    public static class Result {
+        private final List<Long> eligible;
+        private final List<BlockedBatchItem> blocked;
+        public Result(List<Long> eligible, List<BlockedBatchItem> blocked) {
+            this.eligible = eligible;
+            this.blocked = blocked;
+        }
+        public List<Long> eligible() { return eligible; }
+        public List<BlockedBatchItem> blocked() { return blocked; }
+        @Override
+        public boolean equals(Object other) {
+            if (this == other) { return true; }
+            if (!(other instanceof Result)) { return false; }
+            Result that = (Result) other;
+            return java.util.Objects.equals(eligible, that.eligible) && java.util.Objects.equals(blocked, that.blocked);
+        }
+        @Override
+        public int hashCode() { return java.util.Objects.hash(eligible, blocked); }
+        @Override
+        public String toString() { return "Result[" + "eligible=" + eligible + ", " + "blocked=" + blocked + "]"; }
     }
 }

@@ -17,16 +17,38 @@ import java.util.List;
  */
 @Component
 @RequiredArgsConstructor
+@lombok.Getter
 public class RabbitManagementClient {
 
     /** 队列快照：仅请求统计所需列，避免拉取完整大响应。 */
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record QueueSnapshot(
-        String name,
-        long messages,
-        @JsonProperty("messages_ready") long messagesReady,
-        int consumers
-    ) {
+    @lombok.Getter
+    public static class QueueSnapshot {
+        private final String name;
+        private final long messages;
+        @JsonProperty("messages_ready") private final long messagesReady;
+        private final int consumers;
+        public QueueSnapshot(String name, long messages, long messagesReady, int consumers) {
+            this.name = name;
+            this.messages = messages;
+            this.messagesReady = messagesReady;
+            this.consumers = consumers;
+        }
+        public String name() { return name; }
+        public long messages() { return messages; }
+        public long messagesReady() { return messagesReady; }
+        public int consumers() { return consumers; }
+        @Override
+        public boolean equals(Object other) {
+            if (this == other) { return true; }
+            if (!(other instanceof QueueSnapshot)) { return false; }
+            QueueSnapshot that = (QueueSnapshot) other;
+            return java.util.Objects.equals(name, that.name) && java.util.Objects.equals(messages, that.messages) && java.util.Objects.equals(messagesReady, that.messagesReady) && java.util.Objects.equals(consumers, that.consumers);
+        }
+        @Override
+        public int hashCode() { return java.util.Objects.hash(name, messages, messagesReady, consumers); }
+        @Override
+        public String toString() { return "QueueSnapshot[" + "name=" + name + ", " + "messages=" + messages + ", " + "messagesReady=" + messagesReady + ", " + "consumers=" + consumers + "]"; }
     }
 
     private final RestTemplate rabbitManagementRestTemplate;

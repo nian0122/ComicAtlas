@@ -27,15 +27,42 @@ public interface ImportPersistenceService {
     /**
      * 单个章节的存储最终化请求描述（sourceDir/targetDir 均为相对 MANGA_ROOT 的路径）。
      */
-    record FinalizeRequest(
-            Long taskId,
-            Long comicId,
-            Integer globalOrder,
-            Long chapterId,
-            String sourceDir,
-            String targetDir,
-            List<FinalizeMediaMapping> mediaMappings
-    ) {
+   @lombok.Getter
+    class FinalizeRequest {
+        private final Long taskId;
+        private final Long comicId;
+        private final Integer globalOrder;
+        private final Long chapterId;
+        private final String sourceDir;
+        private final String targetDir;
+        private final List<FinalizeMediaMapping> mediaMappings;
+        public FinalizeRequest(Long taskId, Long comicId, Integer globalOrder, Long chapterId, String sourceDir, String targetDir, List<FinalizeMediaMapping> mediaMappings) {
+            this.taskId = taskId;
+            this.comicId = comicId;
+            this.globalOrder = globalOrder;
+            this.chapterId = chapterId;
+            this.sourceDir = sourceDir;
+            this.targetDir = targetDir;
+            this.mediaMappings = mediaMappings;
+        }
+        public Long taskId() { return taskId; }
+        public Long comicId() { return comicId; }
+        public Integer globalOrder() { return globalOrder; }
+        public Long chapterId() { return chapterId; }
+        public String sourceDir() { return sourceDir; }
+        public String targetDir() { return targetDir; }
+        public List<FinalizeMediaMapping> mediaMappings() { return mediaMappings; }
+        @Override
+        public boolean equals(Object other) {
+            if (this == other) { return true; }
+            if (!(other instanceof FinalizeRequest)) { return false; }
+            FinalizeRequest that = (FinalizeRequest) other;
+            return java.util.Objects.equals(taskId, that.taskId) && java.util.Objects.equals(comicId, that.comicId) && java.util.Objects.equals(globalOrder, that.globalOrder) && java.util.Objects.equals(chapterId, that.chapterId) && java.util.Objects.equals(sourceDir, that.sourceDir) && java.util.Objects.equals(targetDir, that.targetDir) && java.util.Objects.equals(mediaMappings, that.mediaMappings);
+        }
+        @Override
+        public int hashCode() { return java.util.Objects.hash(taskId, comicId, globalOrder, chapterId, sourceDir, targetDir, mediaMappings); }
+        @Override
+        public String toString() { return "FinalizeRequest[" + "taskId=" + taskId + ", " + "comicId=" + comicId + ", " + "globalOrder=" + globalOrder + ", " + "chapterId=" + chapterId + ", " + "sourceDir=" + sourceDir + ", " + "targetDir=" + targetDir + ", " + "mediaMappings=" + mediaMappings + "]"; }
     }
 
     /**

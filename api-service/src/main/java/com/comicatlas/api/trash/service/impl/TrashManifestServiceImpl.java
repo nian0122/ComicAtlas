@@ -53,24 +53,24 @@ public class TrashManifestServiceImpl implements TrashManifestService {
 
     /** 写入不可变 manifest 到 DB（幂等：同 taskId 覆盖为同一内容由调用方保证） */
     public TrashManifestDTO writeManifest(TrashManifestDTO manifest) {
-        TrashManifestRecord record = new TrashManifestRecord();
-        record.setTaskId(manifest.taskId());
-        record.setTargetType(manifest.targetType());
-        record.setTargetId(manifest.targetId());
-        record.setManifestJson(toJson(manifest));
-        trashManifestMapper.insert(record);
+        TrashManifestRecord manifestRecord = new TrashManifestRecord();
+        manifestRecord.setTaskId(manifest.taskId());
+        manifestRecord.setTargetType(manifest.targetType());
+        manifestRecord.setTargetId(manifest.targetId());
+        manifestRecord.setManifestJson(toJson(manifest));
+        trashManifestMapper.insert(manifestRecord);
         log.info("写入 TRASH 清单(DB): taskId={}", manifest.taskId());
         return manifest;
     }
 
     /** 从 DB 读 manifest（不存在返回 null） */
     public TrashManifestDTO readManifest(String targetType, Long targetId, Long taskId) {
-        TrashManifestRecord record = trashManifestMapper.selectById(taskId);
-        if (record == null) {
+        TrashManifestRecord manifestRecord = trashManifestMapper.selectById(taskId);
+        if (manifestRecord == null) {
             return null;
         }
         try {
-            return objectMapper.readValue(record.getManifestJson(), TrashManifestDTO.class);
+            return objectMapper.readValue(manifestRecord.getManifestJson(), TrashManifestDTO.class);
         } catch (IOException e) {
             log.warn("读取 TRASH 清单(DB)失败: taskId={}", taskId, e);
             return null;
@@ -79,12 +79,12 @@ public class TrashManifestServiceImpl implements TrashManifestService {
 
     /** 从 DB 读指定目标最近一次清单（对账/恢复定位用，不存在返回 null） */
     public TrashManifestDTO readLatestManifest(String targetType, Long targetId) {
-        TrashManifestRecord record = trashManifestMapper.selectLatest(targetType, targetId);
-        if (record == null) {
+        TrashManifestRecord manifestRecord = trashManifestMapper.selectLatest(targetType, targetId);
+        if (manifestRecord == null) {
             return null;
         }
         try {
-            return objectMapper.readValue(record.getManifestJson(), TrashManifestDTO.class);
+            return objectMapper.readValue(manifestRecord.getManifestJson(), TrashManifestDTO.class);
         } catch (IOException e) {
             log.warn("读取 TRASH 清单(DB)失败: targetType={}, targetId={}", targetType, targetId, e);
             return null;

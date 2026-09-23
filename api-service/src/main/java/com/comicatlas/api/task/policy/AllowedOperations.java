@@ -11,10 +11,27 @@ import java.util.Set;
  * <p>
  * 前端不得自算操作权限，必须由此服务返回。
  */
-public record AllowedOperations(
-    Set<String> allowed,           // 允许的操作名集合
-    Map<String, String> blockedReasons  // 被阻止的操作名 → 原因
-) {
+@lombok.Getter
+public class AllowedOperations {
+        private final Set<String> allowed;
+        private final Map<String, String> blockedReasons;
+        public AllowedOperations(Set<String> allowed, Map<String, String> blockedReasons) {
+            this.allowed = allowed;
+            this.blockedReasons = blockedReasons;
+        }
+        public Set<String> allowed() { return allowed; }
+        public Map<String, String> blockedReasons() { return blockedReasons; }
+        @Override
+        public boolean equals(Object other) {
+            if (this == other) { return true; }
+            if (!(other instanceof AllowedOperations)) { return false; }
+            AllowedOperations that = (AllowedOperations) other;
+            return java.util.Objects.equals(allowed, that.allowed) && java.util.Objects.equals(blockedReasons, that.blockedReasons);
+        }
+        @Override
+        public int hashCode() { return java.util.Objects.hash(allowed, blockedReasons); }
+        @Override
+        public String toString() { return "AllowedOperations[" + "allowed=" + allowed + ", " + "blockedReasons=" + blockedReasons + "]"; }
     public static AllowedOperations of(Set<String> allowed, Map<String, String> blockedReasons) {
         return new AllowedOperations(
             Collections.unmodifiableSet(new LinkedHashSet<>(allowed)),

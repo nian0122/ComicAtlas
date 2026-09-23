@@ -17,6 +17,7 @@ import java.util.Set;
  * 分类只从现有分类词条中选择，自动标签只使用本类明确声明的关键词，
  * 因此不会改变用户维护的分类体系，也不会因外部服务波动导致导入结果变化。</p>
  */
+@lombok.Getter
 public final class AutomaticMetadataClassifier {
 
     private static final String AUTO_TAG_TYPE = "AUTO";
@@ -106,6 +107,29 @@ public final class AutomaticMetadataClassifier {
     }
 
     /** 推断结果；分类为空表示没有可靠匹配。 */
-    public record Enrichment(Category category, List<String> inferredTags, String inferredTagType) {
+    @lombok.Getter
+    public static class Enrichment {
+        private final Category category;
+        private final List<String> inferredTags;
+        private final String inferredTagType;
+        public Enrichment(Category category, List<String> inferredTags, String inferredTagType) {
+            this.category = category;
+            this.inferredTags = inferredTags;
+            this.inferredTagType = inferredTagType;
+        }
+        public Category category() { return category; }
+        public List<String> inferredTags() { return inferredTags; }
+        public String inferredTagType() { return inferredTagType; }
+        @Override
+        public boolean equals(Object other) {
+            if (this == other) { return true; }
+            if (!(other instanceof Enrichment)) { return false; }
+            Enrichment that = (Enrichment) other;
+            return java.util.Objects.equals(category, that.category) && java.util.Objects.equals(inferredTags, that.inferredTags) && java.util.Objects.equals(inferredTagType, that.inferredTagType);
+        }
+        @Override
+        public int hashCode() { return java.util.Objects.hash(category, inferredTags, inferredTagType); }
+        @Override
+        public String toString() { return "Enrichment[" + "category=" + category + ", " + "inferredTags=" + inferredTags + ", " + "inferredTagType=" + inferredTagType + "]"; }
     }
 }

@@ -17,13 +17,37 @@ import java.util.Set;
  * 不接受客户端路径：仅从文件名提取扩展名，文件内容以魔数为准。
  */
 @Component
+@lombok.Getter
 public class MediaTypeDetector {
 
     private static final Set<String> IMAGE_EXT = Set.of("jpg", "jpeg", "png", "gif", "webp", "bmp", "avif");
     private static final Set<String> VIDEO_EXT = Set.of("mp4", "webm", "mkv", "mov", "avi");
 
     /** 检测结果 */
-    public record Detection(String mediaType, String ext, String container) {}
+    @lombok.Getter
+    public static class Detection {
+        private final String mediaType;
+        private final String ext;
+        private final String container;
+        public Detection(String mediaType, String ext, String container) {
+            this.mediaType = mediaType;
+            this.ext = ext;
+            this.container = container;
+        }
+        public String mediaType() { return mediaType; }
+        public String ext() { return ext; }
+        public String container() { return container; }
+        @Override
+        public boolean equals(Object other) {
+            if (this == other) { return true; }
+            if (!(other instanceof Detection)) { return false; }
+            Detection that = (Detection) other;
+            return java.util.Objects.equals(mediaType, that.mediaType) && java.util.Objects.equals(ext, that.ext) && java.util.Objects.equals(container, that.container);
+        }
+        @Override
+        public int hashCode() { return java.util.Objects.hash(mediaType, ext, container); }
+        @Override
+        public String toString() { return "Detection[" + "mediaType=" + mediaType + ", " + "ext=" + ext + ", " + "container=" + container + "]"; }}
 
     /**
      * 校验客户端文件名并返回规范化扩展名（不含点，小写）。

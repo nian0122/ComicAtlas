@@ -38,6 +38,7 @@ import javax.imageio.stream.ImageInputStream;
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@lombok.Getter
 public class RecoveryMediaResolver {
 
     /** 视频文件扩展名 */
@@ -262,7 +263,30 @@ public class RecoveryMediaResolver {
     }
 
     /** LQ 文件事实：状态 + 字节数（未生成时 status=NOT_GENERATED、size=0）。 */
-    private record LqFileFact(String status, long size, String path) {
+    @lombok.Getter
+    private static class LqFileFact {
+        private final String status;
+        private final long size;
+        private final String path;
+        public LqFileFact(String status, long size, String path) {
+            this.status = status;
+            this.size = size;
+            this.path = path;
+        }
+        public String status() { return status; }
+        public long size() { return size; }
+        public String path() { return path; }
+        @Override
+        public boolean equals(Object other) {
+            if (this == other) { return true; }
+            if (!(other instanceof LqFileFact)) { return false; }
+            LqFileFact that = (LqFileFact) other;
+            return java.util.Objects.equals(status, that.status) && java.util.Objects.equals(size, that.size) && java.util.Objects.equals(path, that.path);
+        }
+        @Override
+        public int hashCode() { return java.util.Objects.hash(status, size, path); }
+        @Override
+        public String toString() { return "LqFileFact[" + "status=" + status + ", " + "size=" + size + ", " + "path=" + path + "]"; }
     }
 
     /**

@@ -89,6 +89,7 @@ import java.util.UUID;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@lombok.Getter
 public class ImportPersistenceServiceImpl implements ImportPersistenceService {
 
     /** 终态集合：到达这些状态后不可回退到非终态（含 CANCELLED 真正终态）。 */
@@ -797,9 +798,36 @@ public class ImportPersistenceServiceImpl implements ImportPersistenceService {
     }
 
     /** 单章插入结果：章节实体 + 页数/尺寸汇总 + 最终化映射 + 待批量落库媒体。 */
-    private record ChapterInsertResult(Chapter chapter, int pages, long size,
-                                       List<FinalizeMediaMapping> mappings,
-                                       List<Media> mediaList) {
+    @lombok.Getter
+    private class ChapterInsertResult {
+        private final Chapter chapter;
+        private final int pages;
+        private final long size;
+        private final List<FinalizeMediaMapping> mappings;
+        private final List<Media> mediaList;
+        public ChapterInsertResult(Chapter chapter, int pages, long size, List<FinalizeMediaMapping> mappings, List<Media> mediaList) {
+            this.chapter = chapter;
+            this.pages = pages;
+            this.size = size;
+            this.mappings = mappings;
+            this.mediaList = mediaList;
+        }
+        public Chapter chapter() { return chapter; }
+        public int pages() { return pages; }
+        public long size() { return size; }
+        public List<FinalizeMediaMapping> mappings() { return mappings; }
+        public List<Media> mediaList() { return mediaList; }
+        @Override
+        public boolean equals(Object other) {
+            if (this == other) { return true; }
+            if (!(other instanceof ChapterInsertResult)) { return false; }
+            ChapterInsertResult that = (ChapterInsertResult) other;
+            return java.util.Objects.equals(chapter, that.chapter) && java.util.Objects.equals(pages, that.pages) && java.util.Objects.equals(size, that.size) && java.util.Objects.equals(mappings, that.mappings) && java.util.Objects.equals(mediaList, that.mediaList);
+        }
+        @Override
+        public int hashCode() { return java.util.Objects.hash(chapter, pages, size, mappings, mediaList); }
+        @Override
+        public String toString() { return "ChapterInsertResult[" + "chapter=" + chapter + ", " + "pages=" + pages + ", " + "size=" + size + ", " + "mappings=" + mappings + ", " + "mediaList=" + mediaList + "]"; }
     }
 
     /**
