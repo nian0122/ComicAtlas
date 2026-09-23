@@ -28,6 +28,6 @@ public final class ImportTaskCompletedEvent implements ComicEvent {
                                     @JsonProperty("metadataPath") String metadataPath) {
         this.eventId=eventId; this.occurredAt=occurredAt; this.taskId=taskId; this.comicId=comicId; this.metadataPath=metadataPath;
     }
-    public UUID eventId(){return eventId;} public Instant occurredAt(){return occurredAt;} public Long taskId(){return taskId;}
-    public Long comicId(){return comicId;} public String metadataPath(){return metadataPath;}
+    public UUID eventId(){return eventId; } public Instant occurredAt(){return occurredAt; } public Long taskId(){return taskId; }
+    public Long comicId(){return comicId; } public String metadataPath(){return metadataPath; }
 }

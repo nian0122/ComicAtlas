@@ -29,5 +29,10 @@ public class TaskController {
     public ResponseEntity<?> get(@PathVariable long taskId) { return repository.find(taskId).map(record -> ResponseEntity.ok(record)).orElseGet(() -> ResponseEntity.notFound().build()); }
     @PostMapping("/{taskId}/cancel")
     public ResponseEntity<Map<String, String>> cancel(@PathVariable long taskId) { repository.cancel(taskId); return ResponseEntity.accepted().body(Map.of("status", TaskStatus.CANCEL_REQUESTED.name())); }
-    public record CreateTaskRequest(Long comicId) { }
+    public static final class CreateTaskRequest {
+        private Long comicId;
+
+        public Long comicId() { return comicId; }
+        public void setComicId(Long comicId) { this.comicId = comicId; }
+    }
 }

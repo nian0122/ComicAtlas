@@ -15,5 +15,5 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 public final class RecoveryScanCompletedEvent implements ComicEvent {
     private final UUID eventId; private final Instant occurredAt; private final Long taskId; private final List<Long> comicIds;
     @JsonCreator public RecoveryScanCompletedEvent(@JsonProperty("eventId") UUID eventId, @JsonProperty("occurredAt") Instant occurredAt, @JsonProperty("taskId") Long taskId, @JsonProperty("comicIds") List<Long> comicIds) { this.eventId=eventId; this.occurredAt=occurredAt; this.taskId=taskId; this.comicIds=comicIds; }
-    public UUID eventId(){return eventId;} public Instant occurredAt(){return occurredAt;} public Long taskId(){return taskId;} public List<Long> comicIds(){return comicIds;}
+    public UUID eventId(){return eventId; } public Instant occurredAt(){return occurredAt; } public Long taskId(){return taskId; } public List<Long> comicIds(){return comicIds; }
 }

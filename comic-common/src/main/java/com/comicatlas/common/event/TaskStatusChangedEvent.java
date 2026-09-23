@@ -33,6 +33,6 @@ public final class TaskStatusChangedEvent implements ComicEvent {
         this.eventId=eventId; this.occurredAt=occurredAt; this.taskId=taskId; this.status=status; this.progress=progress;
         this.downloadMethod=downloadMethod; this.speedBytesPerSec=speedBytesPerSec; this.etaSeconds=etaSeconds; this.errorMessage=errorMessage;
     }
-    public UUID eventId(){return eventId;} public Instant occurredAt(){return occurredAt;} public Long taskId(){return taskId;} public String status(){return status;}
-    public int progress(){return progress;} public String downloadMethod(){return downloadMethod;} public long speedBytesPerSec(){return speedBytesPerSec;} public int etaSeconds(){return etaSeconds;} public String errorMessage(){return errorMessage;}
+    public UUID eventId(){return eventId; } public Instant occurredAt(){return occurredAt; } public Long taskId(){return taskId; } public String status(){return status; }
+    public int progress(){return progress; } public String downloadMethod(){return downloadMethod; } public long speedBytesPerSec(){return speedBytesPerSec; } public int etaSeconds(){return etaSeconds; } public String errorMessage(){return errorMessage; }
 }

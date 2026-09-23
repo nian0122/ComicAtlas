@@ -27,7 +27,7 @@ public final class ImportStorageFinalizeCompletedEvent implements ComicEvent {
         this.eventId=eventId; this.occurredAt=occurredAt; this.taskId=taskId; this.comicId=comicId; this.globalOrder=globalOrder;
         this.chapterId=chapterId; this.targetDir=targetDir; this.mediaCount=mediaCount;
     }
-    public UUID eventId(){return eventId;} public Instant occurredAt(){return occurredAt;} public Long taskId(){return taskId;}
-    public Long comicId(){return comicId;} public Integer globalOrder(){return globalOrder;} public Long chapterId(){return chapterId;}
-    public String targetDir(){return targetDir;} public int mediaCount(){return mediaCount;}
+    public UUID eventId(){return eventId; } public Instant occurredAt(){return occurredAt; } public Long taskId(){return taskId; }
+    public Long comicId(){return comicId; } public Integer globalOrder(){return globalOrder; } public Long chapterId(){return chapterId; }
+    public String targetDir(){return targetDir; } public int mediaCount(){return mediaCount; }
 }

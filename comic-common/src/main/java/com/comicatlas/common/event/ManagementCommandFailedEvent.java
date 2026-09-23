@@ -28,7 +28,7 @@ public final class ManagementCommandFailedEvent implements ComicEvent {
         this(eventId, occurredAt, version, taskId, itemId, attempt,
                 operationType, targetType, targetId, errorMessage, null);
     }
-    public UUID eventId(){return eventId;} public Instant occurredAt(){return occurredAt;} public Long taskId(){return taskId;} public Long itemId(){return itemId;} public int attempt(){return attempt;} public String operationType(){return operationType;} public String targetType(){return targetType;} public Long targetId(){return targetId;} public String errorMessage(){return errorMessage;} public List<LqSizeResult> lqSizes(){return lqSizes;}
+    public UUID eventId(){return eventId; } public Instant occurredAt(){return occurredAt; } public Long taskId(){return taskId; } public Long itemId(){return itemId; } public int attempt(){return attempt; } public String operationType(){return operationType; } public String targetType(){return targetType; } public Long targetId(){return targetId; } public String errorMessage(){return errorMessage; } public List<LqSizeResult> lqSizes(){return lqSizes; }
 
     @Override
     public int version() {

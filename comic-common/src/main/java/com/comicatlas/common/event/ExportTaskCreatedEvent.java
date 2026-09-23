@@ -29,6 +29,6 @@ public final class ExportTaskCreatedEvent implements ComicEvent {
     public ExportTaskCreatedEvent(UUID eventId, Instant occurredAt, Long taskId, Long comicId) {
         this(eventId, occurredAt, taskId, comicId, ExportFormats.ZIP);
     }
-    public UUID eventId(){return eventId;} public Instant occurredAt(){return occurredAt;} public Long taskId(){return taskId;}
-    public Long comicId(){return comicId;} public String format(){return format;}
+    public UUID eventId(){return eventId; } public Instant occurredAt(){return occurredAt; } public Long taskId(){return taskId; }
+    public Long comicId(){return comicId; } public String format(){return format; }
 }

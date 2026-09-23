@@ -42,9 +42,9 @@ public final class MetadataRefreshScanCompletedEvent implements ComicEvent {
         this.operationType=operationType; this.targetType=targetType; this.targetId=targetId; this.snapshotRef=snapshotRef;
         this.snapshotSha256=snapshotSha256; this.snapshotBytes=snapshotBytes; this.schemaVersion=schemaVersion;
     }
-    public UUID eventId(){return eventId;} public Instant occurredAt(){return occurredAt;} public Long taskId(){return taskId;} public Long itemId(){return itemId;}
-    public int attempt(){return attempt;} public String operationType(){return operationType;} public String targetType(){return targetType;} public Long targetId(){return targetId;}
-    public String snapshotRef(){return snapshotRef;} public String snapshotSha256(){return snapshotSha256;} public long snapshotBytes(){return snapshotBytes;} public int schemaVersion(){return schemaVersion;}
+    public UUID eventId(){return eventId; } public Instant occurredAt(){return occurredAt; } public Long taskId(){return taskId; } public Long itemId(){return itemId; }
+    public int attempt(){return attempt; } public String operationType(){return operationType; } public String targetType(){return targetType; } public Long targetId(){return targetId; }
+    public String snapshotRef(){return snapshotRef; } public String snapshotSha256(){return snapshotSha256; } public long snapshotBytes(){return snapshotBytes; } public int schemaVersion(){return schemaVersion; }
 
     @Override
     public int version() {

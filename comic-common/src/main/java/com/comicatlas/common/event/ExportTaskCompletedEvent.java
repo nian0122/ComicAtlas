@@ -29,6 +29,6 @@ public final class ExportTaskCompletedEvent implements ComicEvent {
         this.eventId=eventId; this.occurredAt=occurredAt; this.taskId=taskId; this.comicId=comicId; this.outputRoot=outputRoot;
         this.outputPath=outputPath; this.outputSize=outputSize;
     }
-    public UUID eventId(){return eventId;} public Instant occurredAt(){return occurredAt;} public Long taskId(){return taskId;} public Long comicId(){return comicId;}
-    public String outputRoot(){return outputRoot;} public String outputPath(){return outputPath;} public Long outputSize(){return outputSize;}
+    public UUID eventId(){return eventId; } public Instant occurredAt(){return occurredAt; } public Long taskId(){return taskId; } public Long comicId(){return comicId; }
+    public String outputRoot(){return outputRoot; } public String outputPath(){return outputPath; } public Long outputSize(){return outputSize; }
 }

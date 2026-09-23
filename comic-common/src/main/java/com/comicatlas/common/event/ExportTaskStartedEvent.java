@@ -22,5 +22,5 @@ public final class ExportTaskStartedEvent implements ComicEvent {
                                   @JsonProperty("taskId") Long taskId, @JsonProperty("comicId") Long comicId) {
         this.eventId=eventId; this.occurredAt=occurredAt; this.taskId=taskId; this.comicId=comicId;
     }
-    public UUID eventId(){return eventId;} public Instant occurredAt(){return occurredAt;} public Long taskId(){return taskId;} public Long comicId(){return comicId;}
+    public UUID eventId(){return eventId; } public Instant occurredAt(){return occurredAt; } public Long taskId(){return taskId; } public Long comicId(){return comicId; }
 }

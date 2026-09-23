@@ -24,5 +24,5 @@ public final class MetadataRefreshEvent implements ComicEvent {
         this.occurredAt = occurredAt == null ? Instant.now() : occurredAt;
         this.comicId = comicId;
     }
-    public UUID eventId(){return eventId;} public Instant occurredAt(){return occurredAt;} public Long comicId(){return comicId;}
+    public UUID eventId(){return eventId; } public Instant occurredAt(){return occurredAt; } public Long comicId(){return comicId; }
 }

@@ -47,7 +47,7 @@ public final class ManagementCommandRequestedEvent implements ComicEvent {
             Long targetId) {
         this(eventId, occurredAt, version, taskId, itemId, attempt, operationType, targetType, targetId, null);
     }
-    public UUID eventId(){return eventId;} public Instant occurredAt(){return occurredAt;} public Long taskId(){return taskId;} public Long itemId(){return itemId;} public int attempt(){return attempt;} public String operationType(){return operationType;} public String targetType(){return targetType;} public Long targetId(){return targetId;} public Long manifestTaskId(){return manifestTaskId;}
+    public UUID eventId(){return eventId; } public Instant occurredAt(){return occurredAt; } public Long taskId(){return taskId; } public Long itemId(){return itemId; } public int attempt(){return attempt; } public String operationType(){return operationType; } public String targetType(){return targetType; } public Long targetId(){return targetId; } public Long manifestTaskId(){return manifestTaskId; }
 
     @Override
     public int version() {

@@ -38,8 +38,8 @@ public final class ImportStorageFinalizeRequestedEvent implements ComicEvent {
         this.eventId=eventId; this.occurredAt=occurredAt; this.taskId=taskId; this.comicId=comicId; this.globalOrder=globalOrder;
         this.chapterId=chapterId; this.sourceDir=sourceDir; this.targetDir=targetDir; this.mediaMappings=mediaMappings;
     }
-    public UUID eventId(){return eventId;} public Instant occurredAt(){return occurredAt;} public Long taskId(){return taskId;}
-    public Long comicId(){return comicId;} public Integer globalOrder(){return globalOrder;} public Long chapterId(){return chapterId;}
-    public String sourceDir(){return sourceDir;} public String targetDir(){return targetDir;}
-    public List<FinalizeMediaMapping> mediaMappings(){return mediaMappings;}
+    public UUID eventId(){return eventId; } public Instant occurredAt(){return occurredAt; } public Long taskId(){return taskId; }
+    public Long comicId(){return comicId; } public Integer globalOrder(){return globalOrder; } public Long chapterId(){return chapterId; }
+    public String sourceDir(){return sourceDir; } public String targetDir(){return targetDir; }
+    public List<FinalizeMediaMapping> mediaMappings(){return mediaMappings; }
 }

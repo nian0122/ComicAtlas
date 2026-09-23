@@ -30,5 +30,5 @@ public final class VideoMetadataFixCompletedEvent implements ComicEvent {
         this.comicId = comicId;
         this.results = results == null ? Collections.emptyList() : results;
     }
-    public UUID eventId(){return eventId;} public Instant occurredAt(){return occurredAt;} public Long comicId(){return comicId;} public List<VideoMetadataFixResult> results(){return results;}
+    public UUID eventId(){return eventId; } public Instant occurredAt(){return occurredAt; } public Long comicId(){return comicId; } public List<VideoMetadataFixResult> results(){return results; }
 }

@@ -26,7 +26,7 @@ public final class ImportStorageFinalizeFailedEvent implements ComicEvent {
         this.eventId=eventId; this.occurredAt=occurredAt; this.taskId=taskId; this.comicId=comicId; this.globalOrder=globalOrder;
         this.chapterId=chapterId; this.errorCode=errorCode; this.errorMessage=errorMessage;
     }
-    public UUID eventId(){return eventId;} public Instant occurredAt(){return occurredAt;} public Long taskId(){return taskId;}
-    public Long comicId(){return comicId;} public Integer globalOrder(){return globalOrder;} public Long chapterId(){return chapterId;}
-    public String errorCode(){return errorCode;} public String errorMessage(){return errorMessage;}
+    public UUID eventId(){return eventId; } public Instant occurredAt(){return occurredAt; } public Long taskId(){return taskId; }
+    public Long comicId(){return comicId; } public Integer globalOrder(){return globalOrder; } public Long chapterId(){return chapterId; }
+    public String errorCode(){return errorCode; } public String errorMessage(){return errorMessage; }
 }

@@ -26,6 +26,6 @@ public final class ExportTaskFailedEvent implements ComicEvent {
                                  @JsonProperty("errorCode") String errorCode, @JsonProperty("errorMessage") String errorMessage) {
         this.eventId=eventId; this.occurredAt=occurredAt; this.taskId=taskId; this.comicId=comicId; this.errorCode=errorCode; this.errorMessage=errorMessage;
     }
-    public UUID eventId(){return eventId;} public Instant occurredAt(){return occurredAt;} public Long taskId(){return taskId;} public Long comicId(){return comicId;}
-    public String errorCode(){return errorCode;} public String errorMessage(){return errorMessage;}
+    public UUID eventId(){return eventId; } public Instant occurredAt(){return occurredAt; } public Long taskId(){return taskId; } public Long comicId(){return comicId; }
+    public String errorCode(){return errorCode; } public String errorMessage(){return errorMessage; }
 }
