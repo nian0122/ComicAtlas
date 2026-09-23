@@ -21,6 +21,9 @@ public class TaskRepository {
         return jdbcTemplate.query("SELECT id FROM comic WHERE id=? AND status='READY'", (resultSet, row) -> resultSet.getLong("id"), comicId)
                 .stream().findFirst().map(id -> "hq/" + id);
     }
+    public List<String> findExistingTagNames() {
+        return jdbcTemplate.query("SELECT name FROM tag WHERE name IS NOT NULL AND name <> '' ORDER BY name", (resultSet, row) -> resultSet.getString("name"));
+    }
     public Optional<TaskRecord> find(long id) {
         return jdbcTemplate.query("SELECT id,source_path,status,progress,result_json,error_code,error_message,attempts,created_at,started_at,finished_at FROM ai_analysis_task WHERE id=?", this::map, id).stream().findFirst();
     }

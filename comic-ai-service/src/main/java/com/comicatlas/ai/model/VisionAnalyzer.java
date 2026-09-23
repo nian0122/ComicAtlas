@@ -32,21 +32,111 @@ public class VisionAnalyzer {
     private final AiProperties properties;
     private final ObjectMapper objectMapper;
     public VisionAnalyzer(AiProperties properties, ObjectMapper objectMapper) { this.properties = properties; this.objectMapper = objectMapper; }
-    public String analyze(List<SamplePage> pages) throws IOException {
+    private static final int BATCH_SIZE = 6;
+    public String analyze(List<SamplePage> pages, List<String> existingTags) throws IOException {
         if (properties.model().apiKey() == null || properties.model().apiKey().isBlank() || properties.model().modelName() == null || properties.model().modelName().isBlank()) {
             throw new IllegalStateException("AI_API_KEY 和 AI_MODEL 必须配置");
         }
         ChatModel model = OpenAiChatModel.builder().apiKey(properties.model().apiKey()).baseUrl(properties.model().baseUrl()).modelName(properties.model().modelName()).timeout(java.time.Duration.ofSeconds(properties.model().timeoutSeconds())).maxRetries(0).build();
+        List<String> batchResults = new ArrayList<>();
+        for (int start = 0; start < pages.size(); start += BATCH_SIZE) {
+            int end = Math.min(start + BATCH_SIZE, pages.size());
+            batchResults.add(analyzeBatch(model, pages.subList(start, end), existingTags));
+        }
+        String text = summarize(model, batchResults, existingTags);
+        JsonNode json = parseModelJson(model, text);
+        return objectMapper.writeValueAsString(json);
+    }
+
+    private String analyzeBatch(ChatModel model, List<SamplePage> pages, List<String> existingTags) throws IOException {
         List<Content> contents = new ArrayList<>();
-        contents.add(TextContent.from("请分析这些漫画抽样页面。只输出 JSON：{\"titleCandidate\":null,\"authorCandidate\":null,\"tags\":[],\"description\":\"\",\"warnings\":[]}。标签自由生成；作品名和作者只能作为候选，不确定就填 null。简介只描述所给抽样页面，不要声称总结了全书。不要输出 Markdown。"));
+        contents.add(TextContent.from(batchPrompt(existingTags)));
         for (SamplePage page : pages) {
             byte[] bytes = optimizedImage(page.path());
             contents.add(ImageContent.from(Image.builder().base64Data(Base64.getEncoder().encodeToString(bytes)).mimeType("image/jpeg").build()));
         }
         ChatResponse response = model.chat(UserMessage.from(contents));
-        String text = response.aiMessage().text();
-        JsonNode json = objectMapper.readTree(text);
-        return objectMapper.writeValueAsString(json);
+        return objectMapper.writeValueAsString(parseModelJson(model, response.aiMessage().text()));
+    }
+
+    private String summarize(ChatModel model, List<String> batchResults, List<String> existingTags) {
+        String prompt = "请根据以下漫画分批分析结果，生成最终分类结果。只输出 JSON："
+                + "{\"titleCandidate\":null,\"authorCandidate\":null,\"tags\":[],\"description\":\"\",\"warnings\":[]}。"
+                + "标签优先从现有标签列表中选择，必须保持现有标签原文；只有没有语义匹配时才允许新增标签。"
+                + "合并同义词、删除重复标签；标签必须是简短名词或短语。只保留至少在两个批次出现，或在一个批次中有明确证据的标签。"
+                + "标题和作者不确定时填 null，简介只能概括抽样结果，不要臆测全书。响应第一个字符必须是 {，最后一个字符必须是 }，不要输出 Markdown 或任何说明文字。"
+                + "现有标签：" + formatTags(existingTags) + "。分批结果：" + String.join("\n", batchResults);
+        return model.chat(UserMessage.from(TextContent.from(prompt))).aiMessage().text();
+    }
+
+    private String batchPrompt(List<String> existingTags) {
+        return "请分析这些漫画抽样页面，只输出 JSON：{\"tags\":[],\"pageEvidence\":{},\"pageSummary\":\"\"}。"
+                + "只根据图片中明确可见内容判断，不确定不要猜测。标签优先使用现有标签原文，没有匹配时才提出新标签。"
+                + "pageEvidence 用标签到页码数组的映射，pageSummary 只描述本批页面。不要输出 Markdown。"
+                + "现有标签：" + formatTags(existingTags);
+    }
+
+    private String formatTags(List<String> tags) {
+        if (tags == null || tags.isEmpty()) {
+            return "[]";
+        }
+        return objectMapper.valueToTree(tags).toString();
+    }
+
+    static String normalizeJson(String modelText) {
+        if (modelText == null || modelText.isBlank()) {
+            throw new IllegalArgumentException("AI 返回内容为空");
+        }
+        String normalized = modelText.trim();
+        if (normalized.startsWith("```")) {
+            int firstLineEnd = normalized.indexOf('\n');
+            int closingFence = normalized.lastIndexOf("```");
+            if (firstLineEnd > 0 && closingFence > firstLineEnd) {
+                normalized = normalized.substring(firstLineEnd + 1, closingFence).trim();
+            }
+        }
+        int objectStart = normalized.indexOf('{');
+        if (objectStart >= 0) {
+            int depth = 0;
+            boolean insideString = false;
+            boolean escaped = false;
+            for (int index = objectStart; index < normalized.length(); index++) {
+                char current = normalized.charAt(index);
+                if (insideString) {
+                    if (escaped) {
+                        escaped = false;
+                    } else if (current == '\\') {
+                        escaped = true;
+                    } else if (current == '"') {
+                        insideString = false;
+                    }
+                } else if (current == '"') {
+                    insideString = true;
+                } else if (current == '{') {
+                    depth++;
+                } else if (current == '}' && --depth == 0) {
+                    return normalized.substring(objectStart, index + 1).trim();
+                }
+            }
+        }
+        return normalized;
+    }
+
+    private JsonNode parseModelJson(ChatModel model, String modelText) throws IOException {
+        String normalized = normalizeJson(modelText);
+        try {
+            return objectMapper.readTree(normalized);
+        } catch (IOException parseException) {
+            String repairPrompt = "请把下面模型输出修复为合法 JSON 对象。只输出 JSON，不要解释，不要 Markdown。"
+                    + "必须包含对象结构，保留原有信息；无法确认的值使用 null 或空数组。原始输出：" + modelText;
+            String repaired = model.chat(UserMessage.from(TextContent.from(repairPrompt))).aiMessage().text();
+            try {
+                return objectMapper.readTree(normalizeJson(repaired));
+            } catch (IOException repairException) {
+                repairException.addSuppressed(parseException);
+                throw repairException;
+            }
+        }
     }
     private byte[] optimizedImage(java.nio.file.Path path) throws IOException {
         BufferedImage original = ImageIO.read(path.toFile());

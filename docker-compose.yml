@@ -160,15 +160,31 @@ services:
       AI_DB_NAME: ${AI_DB_NAME:-comic_atlas}
       AI_DB_USER: ${AI_DB_USER:-${API_MYSQL_USER}}
       AI_DB_PASSWORD: ${AI_DB_PASSWORD:-${API_MYSQL_PASSWORD}}
-      AI_BASE_URL: ${AI_BASE_URL:?请在 .env 中设置 AI_BASE_URL}
-      AI_API_KEY: ${AI_API_KEY:?请在 .env 中设置 AI_API_KEY}
-      AI_MODEL: ${AI_MODEL:?请在 .env 中设置 AI_MODEL}
+      AI_BASE_URL: ${AI_BASE_URL:-http://comic-model-service:23333/v1}
+      AI_API_KEY: ${AI_API_KEY:-local}
+      AI_MODEL: ${AI_MODEL:-OpenGVLab/InternVL3_5-2B}
       AI_MANGA_ROOT: /manga
       AI_SAMPLE_COUNT: ${AI_SAMPLE_COUNT:-10}
       AI_MAX_CONCURRENT_TASKS: ${AI_MAX_CONCURRENT_TASKS:-1}
       AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS:-120}
     volumes:
       - ${MANGA_ROOT:?请在 .env 中设置 MANGA_ROOT}:/manga:ro
+
+  comic-model-service:
+    image: ${AI_MODEL_IMAGE:-comicatlas-lmdeploy:local}
+    build:
+      context: .
+      dockerfile: comic-model-service/Dockerfile
+    profiles: ["local-ai"]
+    container_name: comic-model-service
+    restart: unless-stopped
+    gpus: all
+    shm_size: 2gb
+    command:
+      - python3
+      - /app/server.py
+    volumes:
+      - ${AI_MODEL_DIR:-./.runtime/models/InternVL3_5-2B}:/models/InternVL3_5-2B:ro
 
   nginx:
     build: ./frontend
