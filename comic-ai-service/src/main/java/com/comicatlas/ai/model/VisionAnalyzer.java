@@ -73,9 +73,10 @@ public class VisionAnalyzer {
     }
 
     private String summarizeDescription(ChatModel model, List<String> batchResults) {
-        String prompt = "请根据以下漫画分批分析结果生成客观的中文漫画简介。只输出 JSON：{\"description\":\"\"}。"
-                + "简介控制在 80 到 200 字，只概括抽样页面中反复或明确出现的内容。"
-                + "不要臆测整本剧情、标题、作者、人物身份或抽样页之外的信息，不要罗列标签，不要输出 Markdown 或说明文字。"
+        String prompt = "请根据以下漫画分批分析结果，写一段自然、简洁、像书目简介一样的中文简介。只输出 JSON：{\"description\":\"\"}。"
+                + "简介控制在 60 到 160 字，使用 1 到 3 句完整句子，概括作品的题材、人物关系和主要情节氛围。"
+                + "不要使用‘该页面’‘这些页面’‘抽样’‘图片中’‘展示了’等分析报告用语，不要逐页罗列，不要描述画面构图、对话框或识图过程。"
+                + "只能根据结果中明确出现的内容概括，不要臆测整本剧情、标题、作者或人物身份；不确定时使用保守的概括。不要罗列标签，不要输出 Markdown 或说明文字。"
                 + "响应第一个字符必须是 {，最后一个字符必须是 }。分批结果：" + String.join("\n", batchResults);
         return model.chat(UserMessage.from(TextContent.from(prompt))).aiMessage().text();
     }
