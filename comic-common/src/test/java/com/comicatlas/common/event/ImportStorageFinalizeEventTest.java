@@ -8,7 +8,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.RecordComponent;
+import java.lang.reflect.Field;
 import java.lang.reflect.Type;
 import java.time.Instant;
 import java.util.List;
@@ -253,19 +253,22 @@ class ImportStorageFinalizeEventTest {
     }
 
     private static void assertAllowedPayloadTypes(Class<?> eventClass) {
-        for (RecordComponent component : eventClass.getRecordComponents()) {
+        for (Field component : eventClass.getDeclaredFields()) {
+            if (java.lang.reflect.Modifier.isStatic(component.getModifiers())) {
+                continue;
+            }
             Class<?> type = component.getType();
             boolean allowedPrimitive = type == UUID.class || type == Instant.class
                     || type == Long.class || type == Integer.class
                     || type == String.class || type == int.class;
             boolean allowedMappingList = type == List.class && listElementIsFinalizeMediaMapping(component);
             assertTrue(allowedPrimitive || allowedMappingList,
-                    eventClass.getSimpleName() + " 组件 " + component.getName()
+                    eventClass.getSimpleName() + " 字段 " + component.getName()
                             + " 类型 " + type + " 不在冻结白名单内（禁止 Channel/数据库实体/绝对路径载体）");
         }
     }
 
-    private static boolean listElementIsFinalizeMediaMapping(RecordComponent component) {
+    private static boolean listElementIsFinalizeMediaMapping(Field component) {
         Type genericType = component.getGenericType();
         if (genericType instanceof ParameterizedType parameterizedType) {
             Type[] arguments = parameterizedType.getActualTypeArguments();

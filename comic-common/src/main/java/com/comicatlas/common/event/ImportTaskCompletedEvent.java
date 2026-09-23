@@ -2,6 +2,9 @@ package com.comicatlas.common.event;
 
 import java.time.Instant;
 import java.util.UUID;
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * 导入任务阶段完成事件（Worker → API，routing key: comic.import.task.completed）。
@@ -15,10 +18,16 @@ import java.util.UUID;
  * 最终化失败由 {@link ImportStorageFinalizeFailedEvent} 表示且保持可重试。消费者不得仅凭本事件
  * 进入最终态。
  */
-public record ImportTaskCompletedEvent(
-    UUID eventId,
-    Instant occurredAt,
-    Long taskId,
-    Long comicId,
-    String metadataPath
-) implements ComicEvent {}
+@JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
+public final class ImportTaskCompletedEvent implements ComicEvent {
+    private final UUID eventId; private final Instant occurredAt; private final Long taskId;
+    private final Long comicId; private final String metadataPath;
+    @JsonCreator
+    public ImportTaskCompletedEvent(@JsonProperty("eventId") UUID eventId, @JsonProperty("occurredAt") Instant occurredAt,
+                                    @JsonProperty("taskId") Long taskId, @JsonProperty("comicId") Long comicId,
+                                    @JsonProperty("metadataPath") String metadataPath) {
+        this.eventId=eventId; this.occurredAt=occurredAt; this.taskId=taskId; this.comicId=comicId; this.metadataPath=metadataPath;
+    }
+    public UUID eventId(){return eventId;} public Instant occurredAt(){return occurredAt;} public Long taskId(){return taskId;}
+    public Long comicId(){return comicId;} public String metadataPath(){return metadataPath;}
+}
