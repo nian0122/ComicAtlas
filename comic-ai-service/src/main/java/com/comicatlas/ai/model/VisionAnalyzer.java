@@ -44,7 +44,7 @@ public class VisionAnalyzer {
             batchResults.add(analyzeBatch(model, pages.subList(start, end), existingTags));
         }
         String text = summarize(model, batchResults, existingTags);
-        JsonNode json = objectMapper.readTree(normalizeJson(text));
+        JsonNode json = parseModelJson(model, text);
         return objectMapper.writeValueAsString(json);
     }
 
@@ -56,7 +56,7 @@ public class VisionAnalyzer {
             contents.add(ImageContent.from(Image.builder().base64Data(Base64.getEncoder().encodeToString(bytes)).mimeType("image/jpeg").build()));
         }
         ChatResponse response = model.chat(UserMessage.from(contents));
-        return normalizeJson(response.aiMessage().text());
+        return objectMapper.writeValueAsString(parseModelJson(model, response.aiMessage().text()));
     }
 
     private String summarize(ChatModel model, List<String> batchResults, List<String> existingTags) {
@@ -64,7 +64,7 @@ public class VisionAnalyzer {
                 + "{\"titleCandidate\":null,\"authorCandidate\":null,\"tags\":[],\"description\":\"\",\"warnings\":[]}。"
                 + "标签优先从现有标签列表中选择，必须保持现有标签原文；只有没有语义匹配时才允许新增标签。"
                 + "合并同义词、删除重复标签；标签必须是简短名词或短语。只保留至少在两个批次出现，或在一个批次中有明确证据的标签。"
-                + "标题和作者不确定时填 null，简介只能概括抽样结果，不要臆测全书。不要输出 Markdown。"
+                + "标题和作者不确定时填 null，简介只能概括抽样结果，不要臆测全书。响应第一个字符必须是 {，最后一个字符必须是 }，不要输出 Markdown 或任何说明文字。"
                 + "现有标签：" + formatTags(existingTags) + "。分批结果：" + String.join("\n", batchResults);
         return model.chat(UserMessage.from(TextContent.from(prompt))).aiMessage().text();
     }
@@ -96,11 +96,47 @@ public class VisionAnalyzer {
             }
         }
         int objectStart = normalized.indexOf('{');
-        int objectEnd = normalized.lastIndexOf('}');
-        if (objectStart >= 0 && objectEnd > objectStart) {
-            normalized = normalized.substring(objectStart, objectEnd + 1);
+        if (objectStart >= 0) {
+            int depth = 0;
+            boolean insideString = false;
+            boolean escaped = false;
+            for (int index = objectStart; index < normalized.length(); index++) {
+                char current = normalized.charAt(index);
+                if (insideString) {
+                    if (escaped) {
+                        escaped = false;
+                    } else if (current == '\\') {
+                        escaped = true;
+                    } else if (current == '"') {
+                        insideString = false;
+                    }
+                } else if (current == '"') {
+                    insideString = true;
+                } else if (current == '{') {
+                    depth++;
+                } else if (current == '}' && --depth == 0) {
+                    return normalized.substring(objectStart, index + 1).trim();
+                }
+            }
         }
         return normalized;
+    }
+
+    private JsonNode parseModelJson(ChatModel model, String modelText) throws IOException {
+        String normalized = normalizeJson(modelText);
+        try {
+            return objectMapper.readTree(normalized);
+        } catch (IOException parseException) {
+            String repairPrompt = "请把下面模型输出修复为合法 JSON 对象。只输出 JSON，不要解释，不要 Markdown。"
+                    + "必须包含对象结构，保留原有信息；无法确认的值使用 null 或空数组。原始输出：" + modelText;
+            String repaired = model.chat(UserMessage.from(TextContent.from(repairPrompt))).aiMessage().text();
+            try {
+                return objectMapper.readTree(normalizeJson(repaired));
+            } catch (IOException repairException) {
+                repairException.addSuppressed(parseException);
+                throw repairException;
+            }
+        }
     }
     private byte[] optimizedImage(java.nio.file.Path path) throws IOException {
         BufferedImage original = ImageIO.read(path.toFile());
