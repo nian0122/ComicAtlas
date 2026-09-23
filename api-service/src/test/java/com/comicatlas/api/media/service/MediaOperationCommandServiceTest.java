@@ -61,7 +61,7 @@ class MediaOperationCommandServiceTest {
 
     @BeforeAll
     static void initMybatisLambdaCache() {
-        // 单元测试无 Spring 上下文，需注册 Media 的 TableInfo 以支持 LambdaQueryWrapper 解析
+        // 单元测试无 Spring 上下文，需注册 Media 的 TableInfo 以支持 QueryWrapper 解析
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), Media.class);
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), Chapter.class);
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), Comic.class);

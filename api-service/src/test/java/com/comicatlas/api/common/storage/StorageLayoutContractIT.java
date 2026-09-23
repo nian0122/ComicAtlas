@@ -1,6 +1,6 @@
 package com.comicatlas.api.common.storage;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.comicatlas.api.storage.config.ApiStorageProperties;
 import com.comicatlas.api.storage.ApiStorageRoot;
 import com.comicatlas.api.storage.PathTraversalException;
@@ -199,9 +199,9 @@ class StorageLayoutContractIT {
 
     @AfterEach
     void tearDown() {
-        if (mediaMapper != null) { mediaMapper.delete(new LambdaQueryWrapper<>()); }
-        if (chapterMapper != null) { chapterMapper.delete(new LambdaQueryWrapper<>()); }
-        if (comicMapper != null) { comicMapper.delete(new LambdaQueryWrapper<>()); }
+        if (mediaMapper != null) { mediaMapper.delete(new QueryWrapper<>()); }
+        if (chapterMapper != null) { chapterMapper.delete(new QueryWrapper<>()); }
+        if (comicMapper != null) { comicMapper.delete(new QueryWrapper<>()); }
     }
 
     // ==================== 布局解析测试 ====================

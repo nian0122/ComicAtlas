@@ -1,6 +1,6 @@
 package com.comicatlas.api.task;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
@@ -147,14 +147,14 @@ class UnifiedTaskCompatibilityIT {
 
     @AfterEach
     void tearDown() {
-        if (outboxMessageMapper != null) { outboxMessageMapper.delete(new LambdaQueryWrapper<>()); }
-        if (inboxReceiptMapper != null) { inboxReceiptMapper.delete(new LambdaQueryWrapper<>()); }
-        if (importTaskMapper != null) { importTaskMapper.delete(new LambdaQueryWrapper<>()); }
-        if (recoveryTaskMapper != null) { recoveryTaskMapper.delete(new LambdaQueryWrapper<>()); }
-        if (exportTaskMapper != null) { exportTaskMapper.delete(new LambdaQueryWrapper<>()); }
-        if (directoryScanTaskMapper != null) { directoryScanTaskMapper.delete(new LambdaQueryWrapper<>()); }
-        if (managementTaskMapper != null) { managementTaskMapper.delete(new LambdaQueryWrapper<>()); }
-        if (comicMapper != null) { comicMapper.delete(new LambdaQueryWrapper<>()); }
+        if (outboxMessageMapper != null) { outboxMessageMapper.delete(new QueryWrapper<>()); }
+        if (inboxReceiptMapper != null) { inboxReceiptMapper.delete(new QueryWrapper<>()); }
+        if (importTaskMapper != null) { importTaskMapper.delete(new QueryWrapper<>()); }
+        if (recoveryTaskMapper != null) { recoveryTaskMapper.delete(new QueryWrapper<>()); }
+        if (exportTaskMapper != null) { exportTaskMapper.delete(new QueryWrapper<>()); }
+        if (directoryScanTaskMapper != null) { directoryScanTaskMapper.delete(new QueryWrapper<>()); }
+        if (managementTaskMapper != null) { managementTaskMapper.delete(new QueryWrapper<>()); }
+        if (comicMapper != null) { comicMapper.delete(new QueryWrapper<>()); }
     }
 
     private static boolean checkDockerAvailable() {
@@ -307,9 +307,9 @@ class UnifiedTaskCompatibilityIT {
         assertThat(comicAfter.getStatus()).isEqualTo(ComicStatus.IMPORTING);
 
         Long commandCount = outboxMessageMapper.selectCount(
-                new LambdaQueryWrapper<OutboxMessage>()
-                        .eq(OutboxMessage::getEventType, "ImportTaskCreatedEvent")
-                        .eq(OutboxMessage::getRoutingKey, "task.created"));
+                new QueryWrapper<OutboxMessage>()
+                        .eq("event_type", "ImportTaskCreatedEvent")
+                        .eq("routing_key", "task.created"));
         assertThat(commandCount).isGreaterThanOrEqualTo(1);
     }
 
@@ -360,9 +360,9 @@ class UnifiedTaskCompatibilityIT {
         assertThat(after.getStatus()).isEqualTo(ExportTaskStatus.PENDING);
 
         Long commandCount = outboxMessageMapper.selectCount(
-                new LambdaQueryWrapper<OutboxMessage>()
-                        .eq(OutboxMessage::getEventType, "ExportTaskCreatedEvent")
-                        .eq(OutboxMessage::getRoutingKey, "task.created"));
+                new QueryWrapper<OutboxMessage>()
+                        .eq("event_type", "ExportTaskCreatedEvent")
+                        .eq("routing_key", "task.created"));
         assertThat(commandCount).isGreaterThanOrEqualTo(1);
     }
 
@@ -451,8 +451,8 @@ class UnifiedTaskCompatibilityIT {
         assertThat(exportTaskMapper.selectById(et.getId()).getManagementTaskId()).isNotNull();
         assertThat(directoryScanTaskMapper.selectById(st.getId()).getManagementTaskId()).isNotNull();
 
-        long total = managementTaskMapper.selectCount(new LambdaQueryWrapper<ManagementTask>()
-                .in(ManagementTask::getTaskType,
+        long total = managementTaskMapper.selectCount(new QueryWrapper<ManagementTask>()
+                .in("task_type",
                         TaskType.IMPORT, TaskType.RECOVERY, TaskType.EXPORT, TaskType.DIRECTORY_SCAN));
         assertThat(total).isEqualTo(4);
 
@@ -474,8 +474,8 @@ class UnifiedTaskCompatibilityIT {
         ImportTask updated = importTaskMapper.selectById(importTask.getId());
         ManagementTask managementTask = managementTaskMapper.selectById(updated.getManagementTaskId());
         ManagementTaskItem item = managementTaskItemMapper.selectOne(
-                new LambdaQueryWrapper<ManagementTaskItem>()
-                        .eq(ManagementTaskItem::getTaskId, managementTask.getId()));
+                new QueryWrapper<ManagementTaskItem>()
+                        .eq("task_id", managementTask.getId()));
         assertThat(managementTask.getTargetType()).isEqualTo("IMPORT_TASK");
         assertThat(item.getTargetType()).isEqualTo("IMPORT_TASK");
         assertThat(item.getTargetId()).isEqualTo(importTask.getId());

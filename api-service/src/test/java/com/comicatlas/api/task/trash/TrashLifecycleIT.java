@@ -2,7 +2,7 @@ package com.comicatlas.api.recovery.trash;
 
 import com.comicatlas.api.trash.persistence.entity.TrashManifestRecord;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.entity.Media;
@@ -186,13 +186,13 @@ class TrashLifecycleIT {
 
     @AfterEach
     void tearDown() throws Exception {
-        if (itemMapper != null) { itemMapper.delete(new LambdaQueryWrapper<>()); }
-        if (taskMapper != null) { taskMapper.delete(new LambdaQueryWrapper<>()); }
-        if (historyMapper != null) { historyMapper.delete(new LambdaQueryWrapper<>()); }
-        if (mediaMapper != null) { mediaMapper.delete(new LambdaQueryWrapper<>()); }
-        if (chapterMapper != null) { chapterMapper.delete(new LambdaQueryWrapper<>()); }
-        if (comicMapper != null) { comicMapper.delete(new LambdaQueryWrapper<>()); }
-        if (trashManifestMapper != null) { trashManifestMapper.delete(new LambdaQueryWrapper<>()); }
+        if (itemMapper != null) { itemMapper.delete(new QueryWrapper<>()); }
+        if (taskMapper != null) { taskMapper.delete(new QueryWrapper<>()); }
+        if (historyMapper != null) { historyMapper.delete(new QueryWrapper<>()); }
+        if (mediaMapper != null) { mediaMapper.delete(new QueryWrapper<>()); }
+        if (chapterMapper != null) { chapterMapper.delete(new QueryWrapper<>()); }
+        if (comicMapper != null) { comicMapper.delete(new QueryWrapper<>()); }
+        if (trashManifestMapper != null) { trashManifestMapper.delete(new QueryWrapper<>()); }
         cleanDir(MANGA_ROOT.resolve("hq"));
         cleanDir(MANGA_ROOT.resolve("lq"));
         cleanDir(MANGA_ROOT.resolve("thumbs"));
@@ -401,16 +401,16 @@ class TrashLifecycleIT {
         assertThat(Files.exists(MANGA_ROOT.resolve("trash").resolve("comic/" + comicId + "/" + trashTaskId + "/thumbs/" + comicId))).isTrue();
         assertThat(Files.exists(MANGA_ROOT.resolve("trash").resolve("comic/" + comicId + "/" + trashTaskId + "/metadata/" + comicId + ".json"))).isTrue();
         // reading_history 保留
-        assertThat(historyMapper.selectCount(new LambdaQueryWrapper<ReadingHistory>()
-                .eq(ReadingHistory::getComicId, comicId))).isEqualTo(1);
+        assertThat(historyMapper.selectCount(new QueryWrapper<ReadingHistory>()
+                .eq("comic_id", comicId))).isEqualTo(1);
 
         // 恢复
         long restoreTaskId = restore("COMIC", comicId, TaskType.COMIC_RESTORE);
         runRestore(comicId, trashTaskId, TaskType.COMIC_RESTORE);
         awaitStatus("COMIC", comicId, "READY");
         assertThat(Files.exists(MANGA_ROOT.resolve("hq").resolve(rel + "/001.jpg"))).isTrue();
-        assertThat(historyMapper.selectCount(new LambdaQueryWrapper<ReadingHistory>()
-                .eq(ReadingHistory::getComicId, comicId))).isEqualTo(1);
+        assertThat(historyMapper.selectCount(new QueryWrapper<ReadingHistory>()
+                .eq("comic_id", comicId))).isEqualTo(1);
 
         // 到期清理
         long secondTrash = trashComic(comicId);
@@ -422,8 +422,8 @@ class TrashLifecycleIT {
         runPurge(comicId, secondTrash, TaskType.COMIC_PURGE);
         awaitStatus("COMIC", comicId, "DELETED");
         assertThat(chapterMapper.selectById(chapterId)).isNull();
-        assertThat(historyMapper.selectCount(new LambdaQueryWrapper<ReadingHistory>()
-                .eq(ReadingHistory::getComicId, comicId))).isZero();
+        assertThat(historyMapper.selectCount(new QueryWrapper<ReadingHistory>()
+                .eq("comic_id", comicId))).isZero();
     }
 
     @Test
@@ -582,11 +582,11 @@ class TrashLifecycleIT {
     }
 
     private ManagementTaskItem latestItem(Long targetId, TaskType op) {
-        return itemMapper.selectOne(new LambdaQueryWrapper<ManagementTaskItem>()
-                .eq(ManagementTaskItem::getTargetType, targetTypeOf(op))
-                .eq(ManagementTaskItem::getTargetId, targetId)
-                .eq(ManagementTaskItem::getOperationType, op)
-                .orderByDesc(ManagementTaskItem::getId)
+        return itemMapper.selectOne(new QueryWrapper<ManagementTaskItem>()
+                .eq("target_type", targetTypeOf(op))
+                .eq("target_id", targetId)
+                .eq("operation_type", op)
+                .orderByDesc("id")
                 .last("LIMIT 1"));
     }
 
@@ -746,10 +746,10 @@ class TrashLifecycleIT {
     }
 
     private List<Media> listMediaPages(Long chapterId) {
-        return mediaMapper.selectList(new LambdaQueryWrapper<Media>()
-                .eq(Media::getChapterId, chapterId)
-                .eq(Media::getStatus, "READY")
-                .orderByAsc(Media::getPageNumber));
+        return mediaMapper.selectList(new QueryWrapper<Media>()
+                .eq("chapter_id", chapterId)
+                .eq("status", "READY")
+                .orderByAsc("page_number"));
     }
 
     private List<Long> catalogChapterIds(Long comicId) throws Exception {

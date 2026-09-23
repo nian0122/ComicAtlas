@@ -1,6 +1,6 @@
 package com.comicatlas.api.task.batch;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.contract.common.enums.ComicStatus;
@@ -118,9 +118,9 @@ class BatchSnapshotIT {
 
     @AfterEach
     void tearDown() {
-        if (itemMapper != null) { itemMapper.delete(new LambdaQueryWrapper<>()); }
-        if (taskMapper != null) { taskMapper.delete(new LambdaQueryWrapper<>()); }
-        if (comicMapper != null) { comicMapper.delete(new LambdaQueryWrapper<>()); }
+        if (itemMapper != null) { itemMapper.delete(new QueryWrapper<>()); }
+        if (taskMapper != null) { taskMapper.delete(new QueryWrapper<>()); }
+        if (comicMapper != null) { comicMapper.delete(new QueryWrapper<>()); }
     }
 
     private static boolean checkDockerAvailable() {
@@ -147,10 +147,10 @@ class BatchSnapshotIT {
             insertComics(257);
 
             // 预览：选出全部 257 本，排除其中 2 本
-            long excludeA = comicMapper.selectList(new LambdaQueryWrapper<Comic>()
-                    .eq(Comic::getTitle, filterPrefix + "0")).get(0).getId();
-            long excludeB = comicMapper.selectList(new LambdaQueryWrapper<Comic>()
-                    .eq(Comic::getTitle, filterPrefix + "1")).get(0).getId();
+            long excludeA = comicMapper.selectList(new QueryWrapper<Comic>()
+                    .eq("title", filterPrefix + "0")).get(0).getId();
+            long excludeB = comicMapper.selectList(new QueryWrapper<Comic>()
+                    .eq("title", filterPrefix + "1")).get(0).getId();
 
             String previewBody = """
                 {"operation":"METADATA_UPDATE",
@@ -204,9 +204,9 @@ class BatchSnapshotIT {
             List<ManagementTaskItemResponse> after = getTaskItems(taskId);
             assertThat(after).hasSize(255);
             List<Long> afterIds = after.stream().map(ManagementTaskItemResponse::getTargetId).toList();
-            List<Long> newIds = comicMapper.selectList(new LambdaQueryWrapper<Comic>()
-                    .likeRight(Comic::getTitle, filterPrefix)
-                    .orderByDesc(Comic::getId)
+            List<Long> newIds = comicMapper.selectList(new QueryWrapper<Comic>()
+                    .likeRight("title", filterPrefix)
+                    .orderByDesc("id")
                     .last("LIMIT 3")).stream().map(Comic::getId).toList();
             assertThat(newIds).noneMatch(afterIds::contains);
         }
@@ -260,9 +260,9 @@ class BatchSnapshotIT {
         @DisplayName("IDS 显式列表精确物化，稳定排序")
         void idsSelection_materializesExactItems() throws Exception {
             insertComics(5);
-            List<Long> all = comicMapper.selectList(new LambdaQueryWrapper<Comic>()
-                    .likeRight(Comic::getTitle, filterPrefix)
-                    .orderByAsc(Comic::getId))
+            List<Long> all = comicMapper.selectList(new QueryWrapper<Comic>()
+                    .likeRight("title", filterPrefix)
+                    .orderByAsc("id"))
                     .stream().map(Comic::getId).collect(Collectors.toList());
             List<Long> chosen = List.of(all.get(4), all.get(0), all.get(2));
 
@@ -313,8 +313,8 @@ class BatchSnapshotIT {
             long taskId1 = objectMapper.readTree(first.getResponse().getContentAsString())
                     .path("data").path("task").path("id").asLong();
 
-            long itemCount = itemMapper.selectCount(new LambdaQueryWrapper<ManagementTaskItem>()
-                    .eq(ManagementTaskItem::getTaskId, taskId1));
+            long itemCount = itemMapper.selectCount(new QueryWrapper<ManagementTaskItem>()
+                    .eq("task_id", taskId1));
 
             MvcResult second = mockMvc.perform(post("/api/management/batch")
                             .header("Idempotency-Key", "batch-replay-1")
@@ -326,8 +326,8 @@ class BatchSnapshotIT {
                     .path("data").path("task").path("id").asLong();
 
             assertThat(taskId2).isEqualTo(taskId1);
-            assertThat(itemMapper.selectCount(new LambdaQueryWrapper<ManagementTaskItem>()
-                    .eq(ManagementTaskItem::getTaskId, taskId1))).isEqualTo(itemCount);
+            assertThat(itemMapper.selectCount(new QueryWrapper<ManagementTaskItem>()
+                    .eq("task_id", taskId1))).isEqualTo(itemCount);
         }
 
         @Test

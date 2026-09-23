@@ -1,6 +1,6 @@
 package com.comicatlas.api.task;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.comicatlas.api.shared.exception.ConflictException;
@@ -125,11 +125,11 @@ class ManagementTaskServiceIT {
 
     @AfterEach
     void tearDown() {
-        if (itemMapper != null) { itemMapper.delete(new LambdaQueryWrapper<>()); }
-        if (taskMapper != null) { taskMapper.delete(new LambdaQueryWrapper<>()); }
-        if (mediaMapper != null) { mediaMapper.delete(new LambdaQueryWrapper<>()); }
-        if (chapterMapper != null) { chapterMapper.delete(new LambdaQueryWrapper<>()); }
-        if (comicMapper != null) { comicMapper.delete(new LambdaQueryWrapper<>()); }
+        if (itemMapper != null) { itemMapper.delete(new QueryWrapper<>()); }
+        if (taskMapper != null) { taskMapper.delete(new QueryWrapper<>()); }
+        if (mediaMapper != null) { mediaMapper.delete(new QueryWrapper<>()); }
+        if (chapterMapper != null) { chapterMapper.delete(new QueryWrapper<>()); }
+        if (comicMapper != null) { comicMapper.delete(new QueryWrapper<>()); }
     }
 
     private static boolean checkDockerAvailable() {
@@ -288,8 +288,8 @@ class ManagementTaskServiceIT {
             // 验证 DB 中只有一个活跃 item
             Long createdTaskId = taskIds.peek();
             List<ManagementTaskItem> items = itemMapper.selectList(
-                    new LambdaQueryWrapper<ManagementTaskItem>()
-                            .eq(ManagementTaskItem::getTaskId, createdTaskId));
+                    new QueryWrapper<ManagementTaskItem>()
+                            .eq("task_id", createdTaskId));
             assertThat(items).hasSize(1);
             assertThat(items.get(0).getLockKey()).isNotNull();
         }
@@ -632,8 +632,8 @@ class ManagementTaskServiceIT {
 
             assertThatThrownBy(() -> service.createTask(metadataRefreshRequest(comic.getId()), null, null))
                     .isInstanceOf(ConflictException.class);
-            assertThat(taskMapper.selectCount(new LambdaQueryWrapper<>())).isZero();
-            assertThat(itemMapper.selectCount(new LambdaQueryWrapper<>())).isZero();
+            assertThat(taskMapper.selectCount(new QueryWrapper<>())).isZero();
+            assertThat(itemMapper.selectCount(new QueryWrapper<>())).isZero();
         }
 
         @Test

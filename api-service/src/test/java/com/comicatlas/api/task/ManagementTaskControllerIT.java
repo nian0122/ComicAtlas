@@ -1,6 +1,6 @@
 package com.comicatlas.api.task;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.comicatlas.api.task.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.task.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.task.dto.ManagementTaskResponse;
@@ -109,8 +109,8 @@ class ManagementTaskControllerIT {
 
     @AfterEach
     void tearDown() {
-        if (itemMapper != null) { itemMapper.delete(new LambdaQueryWrapper<>()); }
-        if (taskMapper != null) { taskMapper.delete(new LambdaQueryWrapper<>()); }
+        if (itemMapper != null) { itemMapper.delete(new QueryWrapper<>()); }
+        if (taskMapper != null) { taskMapper.delete(new QueryWrapper<>()); }
     }
 
     private static boolean checkDockerAvailable() {

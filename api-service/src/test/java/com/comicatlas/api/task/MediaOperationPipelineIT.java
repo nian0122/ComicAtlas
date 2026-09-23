@@ -1,6 +1,6 @@
 package com.comicatlas.api.task;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Comic;
@@ -199,13 +199,13 @@ class MediaOperationPipelineIT {
 
     private void cleanup() {
         try {
-            if (taskItemMapper != null) { taskItemMapper.delete(new LambdaQueryWrapper<>()); }
-            if (taskMapper != null) { taskMapper.delete(new LambdaQueryWrapper<>()); }
-            if (inboxMapper != null) { inboxMapper.delete(new LambdaQueryWrapper<>()); }
-            if (outboxMapper != null) { outboxMapper.delete(new LambdaQueryWrapper<>()); }
-            if (mediaMapper != null) { mediaMapper.delete(new LambdaQueryWrapper<>()); }
-            if (chapterMapper != null) { chapterMapper.delete(new LambdaQueryWrapper<>()); }
-            if (comicMapper != null) { comicMapper.delete(new LambdaQueryWrapper<>()); }
+            if (taskItemMapper != null) { taskItemMapper.delete(new QueryWrapper<>()); }
+            if (taskMapper != null) { taskMapper.delete(new QueryWrapper<>()); }
+            if (inboxMapper != null) { inboxMapper.delete(new QueryWrapper<>()); }
+            if (outboxMapper != null) { outboxMapper.delete(new QueryWrapper<>()); }
+            if (mediaMapper != null) { mediaMapper.delete(new QueryWrapper<>()); }
+            if (chapterMapper != null) { chapterMapper.delete(new QueryWrapper<>()); }
+            if (comicMapper != null) { comicMapper.delete(new QueryWrapper<>()); }
         } catch (Exception ignored) {
         }
     }
@@ -252,8 +252,8 @@ class MediaOperationPipelineIT {
         Thread.sleep(800);
         assertThat(lqStatuses(chapter1.getId())).containsExactly("READY", "READY");
         // 该完成事件只有 1 条 receipt（重复投递被幂等跳过）
-        assertThat(inboxMapper.selectCount(new LambdaQueryWrapper<com.comicatlas.api.outbox.persistence.entity.InboxReceipt>()
-                .eq(com.comicatlas.api.outbox.persistence.entity.InboxReceipt::getEventId, completed.eventId().toString())))
+        assertThat(inboxMapper.selectCount(new QueryWrapper<com.comicatlas.api.outbox.persistence.entity.InboxReceipt>()
+                .eq("event_id", completed.eventId().toString())))
                 .isEqualTo(1);
     }
 
@@ -328,8 +328,8 @@ class MediaOperationPipelineIT {
         // retry → attempt=2，命令重新入 outbox
         ManagementTaskResponse retried = managementTaskService.retryTask(cmd.taskId());
         assertThat(retried.getAttempt()).isEqualTo(2);
-        await(() -> outboxMapper.selectCount(new LambdaQueryWrapper<OutboxMessage>()
-                .eq(OutboxMessage::getTaskId, cmd.taskId())) == 2, "retry 重新发布命令");
+        await(() -> outboxMapper.selectCount(new QueryWrapper<OutboxMessage>()
+                .eq("task_id", cmd.taskId())) == 2, "retry 重新发布命令");
 
         // 旧 attempt=1 的完成结果 → 忽略，业务不生效
         rabbitTemplate.convertAndSend("comic.management", "command.completed",
@@ -386,7 +386,7 @@ class MediaOperationPipelineIT {
 
         // chapter1 的页面 hq_path 已清空
         List<Media> ch1Pages = mediaMapper.selectList(
-                new LambdaQueryWrapper<Media>().eq(Media::getChapterId, chapter1.getId()));
+                new QueryWrapper<Media>().eq("chapter_id", chapter1.getId()));
         assertThat(ch1Pages).allSatisfy(p -> {
             assertThat(p.getHqPath()).isNull();
             assertThat(p.getHqRoot()).isNull();
@@ -426,7 +426,7 @@ class MediaOperationPipelineIT {
         assertThat(errors.peek()).isInstanceOf(ConflictException.class);
 
         // 只产生一条命令
-        assertThat(outboxMapper.selectCount(new LambdaQueryWrapper<>())).isEqualTo(1);
+        assertThat(outboxMapper.selectCount(new QueryWrapper<>())).isEqualTo(1);
     }
 
     // ======================== 转码命令 ========================
@@ -434,8 +434,8 @@ class MediaOperationPipelineIT {
     @Test
     @DisplayName("转码命令：逐视频页 item，完成置 READY 且 hqPath 更新为 mp4")
     void transcodeCommand_updatesVideo() throws Exception {
-        Media video = mediaMapper.selectList(new LambdaQueryWrapper<Media>()
-                .eq(Media::getMediaType, "VIDEO")).get(0);
+        Media video = mediaMapper.selectList(new QueryWrapper<Media>()
+                .eq("media_type", "VIDEO")).get(0);
 
         OperationSubmitResultDTO result = commandService.requestTranscodeForComic(comic.getId());
         assertThat(result.getTaskId()).isNotNull();
@@ -464,8 +464,8 @@ class MediaOperationPipelineIT {
     @Test
     @DisplayName("转码完成事件携带防撞 newHqPath：hq_path 精确落库（回归：API 重算 {base}.mp4 导致 basename 冲突）")
     void transcodeCompleted_carriedCollisionNewHqPath_winsOverDerive() throws Exception {
-        Media video = mediaMapper.selectList(new LambdaQueryWrapper<Media>()
-                .eq(Media::getMediaType, "VIDEO")).get(0);
+        Media video = mediaMapper.selectList(new QueryWrapper<Media>()
+                .eq("media_type", "VIDEO")).get(0);
 
         OperationSubmitResultDTO result = commandService.requestTranscodeForComic(comic.getId());
         assertThat(result.getTaskId()).isNotNull();
@@ -517,8 +517,8 @@ class MediaOperationPipelineIT {
 
         assertThatThrownBy(() -> commandService.requestMetadataRefresh(comic.getId()))
                 .isInstanceOf(ConflictException.class);
-        assertThat(taskMapper.selectCount(new LambdaQueryWrapper<>())).isZero();
-        assertThat(outboxMapper.selectCount(new LambdaQueryWrapper<>())).isZero();
+        assertThat(taskMapper.selectCount(new QueryWrapper<>())).isZero();
+        assertThat(outboxMapper.selectCount(new QueryWrapper<>())).isZero();
     }
 
     @Test
@@ -548,7 +548,7 @@ class MediaOperationPipelineIT {
         assertThat(errors.peek()).isInstanceOf(ConflictException.class);
 
         // 只产生一条命令
-        assertThat(outboxMapper.selectCount(new LambdaQueryWrapper<>())).isEqualTo(1);
+        assertThat(outboxMapper.selectCount(new QueryWrapper<>())).isEqualTo(1);
     }
 
     // ======================== 元数据刷新完成事件专用流程 ========================
@@ -560,7 +560,7 @@ class MediaOperationPipelineIT {
         comicMapper.update(null, new LambdaUpdateWrapper<Comic>()
                 .eq(Comic::getId, comic.getId()).set(Comic::getStatus, ComicStatus.REFRESHING));
         // 使媒体 hqPath 匹配真实 comicId/chapterId（快照结构校验要求 {comicId}/{chapterId}/{fileName}）
-        for (Media m : mediaMapper.selectList(new LambdaQueryWrapper<>())) {
+        for (Media m : mediaMapper.selectList(new QueryWrapper<>())) {
             String fileName = m.getHqPath().substring(m.getHqPath().lastIndexOf('/') + 1);
             m.setHqPath(comic.getId() + "/" + m.getChapterId() + "/" + fileName);
             mediaMapper.updateById(m);
@@ -594,8 +594,8 @@ class MediaOperationPipelineIT {
         assertThat(comicMapper.selectById(comic.getId()).getStatus()).isEqualTo(ComicStatus.READY);
 
         // metadata 重导出走 Outbox（MetadataRefreshEvent 入箱，relay 后发 MQ）
-        OutboxMessage msg = outboxMapper.selectOne(new LambdaQueryWrapper<OutboxMessage>()
-                .eq(OutboxMessage::getEventType, "MetadataRefreshEvent"));
+        OutboxMessage msg = outboxMapper.selectOne(new QueryWrapper<OutboxMessage>()
+                .eq("event_type", "MetadataRefreshEvent"));
         assertThat(msg).isNotNull();
         assertThat(msg.getExchange()).isEqualTo("comic.export");
         assertThat(msg.getRoutingKey()).isEqualTo("metadata.refresh.requested");
@@ -632,8 +632,8 @@ class MediaOperationPipelineIT {
         await(() -> rabbitTemplate.receive("management.result.dlq", 500) != null, "事件进入 DLQ");
         assertThat(taskItemMapper.selectById(item.getId()).getStatus()).isEqualTo(ManagementTaskStatus.RUNNING);
         assertThat(comicMapper.selectById(comic.getId()).getStatus()).isEqualTo(ComicStatus.REFRESHING);
-        assertThat(outboxMapper.selectCount(new LambdaQueryWrapper<OutboxMessage>()
-                .eq(OutboxMessage::getEventType, "MetadataRefreshEvent"))).isZero();
+        assertThat(outboxMapper.selectCount(new QueryWrapper<OutboxMessage>()
+                .eq("event_type", "MetadataRefreshEvent"))).isZero();
     }
 
     private ManagementTask metadataRefreshTask() {
@@ -662,11 +662,11 @@ class MediaOperationPipelineIT {
     /** 从 DB 真实章节/媒体行构建快照（版本与 hqPath 取自 DB，保证 revision 一致）。 */
     private MetadataRefreshSnapshotDTO buildSnapshot(Long comicId) {
         List<Chapter> chapters = chapterMapper.selectList(
-                new LambdaQueryWrapper<Chapter>().eq(Chapter::getComicId, comicId));
+                new QueryWrapper<Chapter>().eq("comic_id", comicId));
         List<ChapterSnapshot> chapterSnapshots = new ArrayList<>();
         for (Chapter ch : chapters) {
             List<Media> mediaItems = mediaMapper.selectList(
-                    new LambdaQueryWrapper<Media>().eq(Media::getChapterId, ch.getId()));
+                    new QueryWrapper<Media>().eq("chapter_id", ch.getId()));
             List<MediaSnapshot> mediaSnapshots = mediaItems.stream().map(m -> new MediaSnapshot(
                     m.getId(),
                     m.getVersion() == null ? 0 : m.getVersion(),
@@ -727,8 +727,8 @@ class MediaOperationPipelineIT {
         assertThat(after.isAllowed(OperationPolicyService.OP_LQ_REGENERATE)).isTrue();
 
         // 视频页 TRANSCODE 可用
-        Media video = mediaMapper.selectList(new LambdaQueryWrapper<Media>()
-                .eq(Media::getMediaType, "VIDEO")).get(0);
+        Media video = mediaMapper.selectList(new QueryWrapper<Media>()
+                .eq("media_type", "VIDEO")).get(0);
         assertThat(eligibilityService.forMedia(video.getId()).isAllowed(OperationPolicyService.OP_TRANSCODE)).isTrue();
 
         AllowedOperations comicOps = eligibilityService.forComic(comic.getId());
@@ -746,23 +746,23 @@ class MediaOperationPipelineIT {
 
     private ManagementCommandRequestedEvent readSingleCommand(Long taskId) throws Exception {
         List<OutboxMessage> rows = outboxMapper.selectList(
-                new LambdaQueryWrapper<OutboxMessage>().eq(OutboxMessage::getTaskId, taskId));
+                new QueryWrapper<OutboxMessage>().eq("task_id", taskId));
         assertThat(rows).hasSize(1);
         return objectMapper.readValue(rows.get(0).getPayload(), ManagementCommandRequestedEvent.class);
     }
 
     private List<String> lqStatuses(Long chapterId) {
-        return mediaMapper.selectList(new LambdaQueryWrapper<Media>()
-                        .eq(Media::getChapterId, chapterId)
-                        .eq(Media::getMediaType, "IMAGE"))
+        return mediaMapper.selectList(new QueryWrapper<Media>()
+                        .eq("chapter_id", chapterId)
+                        .eq("media_type", "IMAGE"))
                 .stream().map(m -> m.getLqStatus() == null ? null : m.getLqStatus().name()).toList();
     }
 
     private List<Media> imagePages(Long chapterId) {
-        return mediaMapper.selectList(new LambdaQueryWrapper<Media>()
-                        .eq(Media::getChapterId, chapterId)
-                        .eq(Media::getMediaType, "IMAGE")
-                        .orderByAsc(Media::getPageNumber));
+        return mediaMapper.selectList(new QueryWrapper<Media>()
+                        .eq("chapter_id", chapterId)
+                        .eq("media_type", "IMAGE")
+                        .orderByAsc("page_number"));
     }
 
     private List<LqSizeResult> lqResults(Long chapterId) {
@@ -772,16 +772,16 @@ class MediaOperationPipelineIT {
     }
 
     private List<String> hqStatuses(Long chapterId) {
-        return mediaMapper.selectList(new LambdaQueryWrapper<Media>()
-                        .eq(Media::getChapterId, chapterId)
-                        .eq(Media::getMediaType, "IMAGE"))
+        return mediaMapper.selectList(new QueryWrapper<Media>()
+                        .eq("chapter_id", chapterId)
+                        .eq("media_type", "IMAGE"))
                 .stream().map(m -> m.getHqStatus() == null ? null : m.getHqStatus().name()).toList();
     }
 
     private void setLqReady(Long chapterId) {
-        List<Media> pages = mediaMapper.selectList(new LambdaQueryWrapper<Media>()
-                .eq(Media::getChapterId, chapterId)
-                .eq(Media::getMediaType, "IMAGE"));
+        List<Media> pages = mediaMapper.selectList(new QueryWrapper<Media>()
+                .eq("chapter_id", chapterId)
+                .eq("media_type", "IMAGE"));
         for (Media p : pages) {
             p.setLqStatus(LqStatus.READY);
             mediaMapper.updateById(p);

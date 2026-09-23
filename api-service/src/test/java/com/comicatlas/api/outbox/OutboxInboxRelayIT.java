@@ -1,6 +1,6 @@
 package com.comicatlas.api.outbox;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.comicatlas.api.outbox.persistence.entity.InboxReceipt;
 import com.comicatlas.api.outbox.persistence.entity.OutboxMessage;
 import com.comicatlas.api.outbox.persistence.mapper.InboxReceiptMapper;
@@ -78,8 +78,8 @@ class OutboxInboxRelayIT {
     @Autowired private InboxReceiptMapper inboxMapper;
 
     @BeforeEach void setUp() {
-        inboxMapper.delete(new LambdaQueryWrapper<>());
-        outboxMapper.delete(new LambdaQueryWrapper<>());
+        inboxMapper.delete(new QueryWrapper<>());
+        outboxMapper.delete(new QueryWrapper<>());
     }
 
     private static boolean checkDockerAvailable() {
@@ -116,7 +116,7 @@ class OutboxInboxRelayIT {
         void dedup_processedOnce() {
             String eid = UUID.randomUUID().toString(); String h = sha256("{\"id\":1}");
             for (int i=0; i<3; i++) { if (!inboxService.isProcessed(eid, h)) { inboxService.markProcessed(eid, h); } }
-            assertThat(inboxMapper.selectCount(new LambdaQueryWrapper<InboxReceipt>().eq(InboxReceipt::getEventId, eid))).isEqualTo(1);
+            assertThat(inboxMapper.selectCount(new QueryWrapper<InboxReceipt>().eq("event_id", eid))).isEqualTo(1);
         }
 
         @Test @DisplayName("同 eventId 不同 payload → 隔离")
@@ -134,7 +134,7 @@ class OutboxInboxRelayIT {
             assertThat(inboxService.isProcessed(eid, h)).isFalse();
             inboxService.markProcessed(eid, h);
             assertThat(inboxService.isProcessed(eid, h)).isTrue();
-            assertThat(inboxMapper.selectCount(new LambdaQueryWrapper<InboxReceipt>().eq(InboxReceipt::getEventId, eid))).isEqualTo(1);
+            assertThat(inboxMapper.selectCount(new QueryWrapper<InboxReceipt>().eq("event_id", eid))).isEqualTo(1);
         }
     }
 

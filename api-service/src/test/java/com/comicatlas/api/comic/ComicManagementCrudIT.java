@@ -1,6 +1,6 @@
 package com.comicatlas.api.comic;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.contract.common.enums.ComicStatus;
@@ -136,10 +136,10 @@ class ComicManagementCrudIT {
 
     @AfterEach
     void tearDown() {
-        if (managementTaskItemMapper != null) { managementTaskItemMapper.delete(new LambdaQueryWrapper<>()); }
-        if (managementTaskMapper != null) { managementTaskMapper.delete(new LambdaQueryWrapper<>()); }
-        if (importTaskMapper != null) { importTaskMapper.delete(new LambdaQueryWrapper<>()); }
-        if (comicMapper != null) { comicMapper.delete(new LambdaQueryWrapper<>()); }
+        if (managementTaskItemMapper != null) { managementTaskItemMapper.delete(new QueryWrapper<>()); }
+        if (managementTaskMapper != null) { managementTaskMapper.delete(new QueryWrapper<>()); }
+        if (importTaskMapper != null) { importTaskMapper.delete(new QueryWrapper<>()); }
+        if (comicMapper != null) { comicMapper.delete(new QueryWrapper<>()); }
     }
 
     private static boolean checkDockerAvailable() {
@@ -201,8 +201,8 @@ class ComicManagementCrudIT {
                     .andExpect(jsonPath("$.data.allowedOperations.allowed", hasItem("DELETE")));
 
             // DB 断言：确实落库为 DRAFT
-            assertThat(comicMapper.selectCount(new LambdaQueryWrapper<Comic>()
-                    .eq(Comic::getTitle, "新漫画"))).isEqualTo(1);
+            assertThat(comicMapper.selectCount(new QueryWrapper<Comic>()
+                    .eq("title", "新漫画"))).isEqualTo(1);
         }
 
         @Test
@@ -373,8 +373,8 @@ class ComicManagementCrudIT {
             // 回收任务存在且关联 comic
             ManagementTask task = managementTaskMapper.selectById(taskId);
             assertThat(task).isNotNull();
-            ManagementTaskItem item = managementTaskItemMapper.selectOne(new LambdaQueryWrapper<ManagementTaskItem>()
-                    .eq(ManagementTaskItem::getTaskId, taskId));
+            ManagementTaskItem item = managementTaskItemMapper.selectOne(new QueryWrapper<ManagementTaskItem>()
+                    .eq("task_id", taskId));
             assertThat(item).isNotNull();
             assertThat(item.getTargetId()).isEqualTo(id);
             assertThat(item.getOperationType()).isEqualTo(TaskType.COMIC_DELETE);
@@ -412,8 +412,8 @@ class ComicManagementCrudIT {
                     .path("data").path("id").asLong();
 
             assertThat(secondTaskId).isEqualTo(firstTaskId);
-            long taskCount = managementTaskMapper.selectCount(new LambdaQueryWrapper<ManagementTask>()
-                    .eq(ManagementTask::getTaskType, TaskType.COMIC_DELETE));
+            long taskCount = managementTaskMapper.selectCount(new QueryWrapper<ManagementTask>()
+                    .eq("task_type", TaskType.COMIC_DELETE));
             assertThat(taskCount).isEqualTo(1);
         }
     }
@@ -434,7 +434,7 @@ class ComicManagementCrudIT {
             insertComic("LIST-EXCL-READY", ComicStatus.READY);
 
             List<Comic> readable = comicMapper.selectList(
-                    new LambdaQueryWrapper<Comic>().eq(Comic::getStatus, ComicStatus.READY));
+                    new QueryWrapper<Comic>().eq("status", ComicStatus.READY));
             assertThat(readable).hasSize(1);
             assertThat(readable.get(0).getTitle()).isEqualTo("LIST-EXCL-READY");
         }
@@ -499,10 +499,10 @@ class ComicManagementCrudIT {
             assertThat(importTask.getStatus()).isEqualTo(ImportTaskStatus.SUCCESS);
 
             // management task item 终态 SUCCEEDED
-            ManagementTaskItem item = managementTaskItemMapper.selectOne(new LambdaQueryWrapper<ManagementTaskItem>()
-                    .eq(ManagementTaskItem::getTargetType, "COMIC")
-                    .eq(ManagementTaskItem::getTargetId, comicId)
-                    .eq(ManagementTaskItem::getOperationType, TaskType.IMPORT));
+            ManagementTaskItem item = managementTaskItemMapper.selectOne(new QueryWrapper<ManagementTaskItem>()
+                    .eq("target_type", "COMIC")
+                    .eq("target_id", comicId)
+                    .eq("operation_type", TaskType.IMPORT));
             assertThat(item).isNotNull();
             assertThat(item.getStatus()).isEqualTo(ManagementTaskStatus.SUCCEEDED);
         }
@@ -524,10 +524,10 @@ class ComicManagementCrudIT {
             ImportTask importTask = importTaskMapper.selectById(taskId);
             assertThat(importTask.getStatus()).isEqualTo(ImportTaskStatus.FAILED);
 
-            ManagementTaskItem item = managementTaskItemMapper.selectOne(new LambdaQueryWrapper<ManagementTaskItem>()
-                    .eq(ManagementTaskItem::getTargetType, "COMIC")
-                    .eq(ManagementTaskItem::getTargetId, comicId)
-                    .eq(ManagementTaskItem::getOperationType, TaskType.IMPORT));
+            ManagementTaskItem item = managementTaskItemMapper.selectOne(new QueryWrapper<ManagementTaskItem>()
+                    .eq("target_type", "COMIC")
+                    .eq("target_id", comicId)
+                    .eq("operation_type", TaskType.IMPORT));
             assertThat(item).isNotNull();
             assertThat(item.getStatus()).isEqualTo(ManagementTaskStatus.FAILED);
         }

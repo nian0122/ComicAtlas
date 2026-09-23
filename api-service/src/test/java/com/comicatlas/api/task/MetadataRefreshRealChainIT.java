@@ -1,6 +1,6 @@
 package com.comicatlas.api.task;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Comic;
@@ -248,25 +248,25 @@ class MetadataRefreshRealChainIT {
     private void cleanup() {
         try {
             if (taskItemMapper != null) {
-                taskItemMapper.delete(new LambdaQueryWrapper<>());
+                taskItemMapper.delete(new QueryWrapper<>());
             }
             if (taskMapper != null) {
-                taskMapper.delete(new LambdaQueryWrapper<>());
+                taskMapper.delete(new QueryWrapper<>());
             }
             if (inboxMapper != null) {
-                inboxMapper.delete(new LambdaQueryWrapper<>());
+                inboxMapper.delete(new QueryWrapper<>());
             }
             if (outboxMapper != null) {
-                outboxMapper.delete(new LambdaQueryWrapper<>());
+                outboxMapper.delete(new QueryWrapper<>());
             }
             if (mediaMapper != null) {
-                mediaMapper.delete(new LambdaQueryWrapper<>());
+                mediaMapper.delete(new QueryWrapper<>());
             }
             if (chapterMapper != null) {
-                chapterMapper.delete(new LambdaQueryWrapper<>());
+                chapterMapper.delete(new QueryWrapper<>());
             }
             if (comicMapper != null) {
-                comicMapper.delete(new LambdaQueryWrapper<>());
+                comicMapper.delete(new QueryWrapper<>());
             }
         } catch (Exception ignored) {
         }
@@ -353,21 +353,21 @@ class MetadataRefreshRealChainIT {
         assertThat(m103.getHqSize()).isZero();
 
         // 新增图片 004.jpg：刷新完成时登记 page 行
-        Media new004 = mediaMapper.selectOne(new LambdaQueryWrapper<Media>()
-                .eq(Media::getChapterId, 42L).eq(Media::getHqPath, "1/42/004.jpg"));
+        Media new004 = mediaMapper.selectOne(new QueryWrapper<Media>()
+                .eq("chapter_id", 42L).eq("hq_path", "1/42/004.jpg"));
         assertThat(new004).isNotNull();
         assertThat(new004.getHqStatus()).isEqualTo(HqStatus.READY);
         assertThat(new004.getHqSize()).isEqualTo(8888L);
         assertThat(new004.getLqStatus()).isEqualTo(LqStatus.NOT_GENERATED);
 
         // TRASHED/DELETED 同名行不复活
-        assertThat(mediaMapper.selectCount(new LambdaQueryWrapper<Media>()
-                .eq(Media::getHqPath, "1/42/005.jpg"))).isZero();
+        assertThat(mediaMapper.selectCount(new QueryWrapper<Media>()
+                .eq("hq_path", "1/42/005.jpg"))).isZero();
         Media m106 = mediaMapper.selectById(106L);
         assertThat(m106.getStatus()).isEqualTo(MediaLifecycleStatus.DELETED);
         assertThat(m106.getHqPath()).isEqualTo("1/42/006.jpg");
-        assertThat(mediaMapper.selectCount(new LambdaQueryWrapper<Media>()
-                .eq(Media::getHqPath, "1/42/006.jpg"))).isEqualTo(1);
+        assertThat(mediaMapper.selectCount(new QueryWrapper<Media>()
+                .eq("hq_path", "1/42/006.jpg"))).isEqualTo(1);
 
         // 章节页数与漫画统计
         assertThat(chapterMapper.selectById(41L).getPageCount()).isEqualTo(1);
@@ -377,8 +377,8 @@ class MetadataRefreshRealChainIT {
         assertThat(reloaded.getHqSize()).isEqualTo(18388L);
 
         // Outbox：metadata 重导出事件入箱（exchange/routingKey 契约）
-        OutboxMessage msg = outboxMapper.selectOne(new LambdaQueryWrapper<OutboxMessage>()
-                .eq(OutboxMessage::getEventType, "MetadataRefreshEvent"));
+        OutboxMessage msg = outboxMapper.selectOne(new QueryWrapper<OutboxMessage>()
+                .eq("event_type", "MetadataRefreshEvent"));
         assertThat(msg).isNotNull();
         assertThat(msg.getExchange()).isEqualTo("comic.export");
         assertThat(msg.getRoutingKey()).isEqualTo("metadata.refresh.requested");
@@ -415,10 +415,10 @@ class MetadataRefreshRealChainIT {
         assertThat(comicMapper.selectById(comic.getId()).getStatus()).isEqualTo(ComicStatus.READY);
         // 零提交
         assertThat(mediaMapper.selectById(101L).getHqSize()).isEqualTo(1000L);
-        assertThat(mediaMapper.selectCount(new LambdaQueryWrapper<Media>()
-                .eq(Media::getHqPath, "1/42/004.jpg"))).isZero();
-        assertThat(outboxMapper.selectCount(new LambdaQueryWrapper<OutboxMessage>()
-                .eq(OutboxMessage::getEventType, "MetadataRefreshEvent"))).isZero();
+        assertThat(mediaMapper.selectCount(new QueryWrapper<Media>()
+                .eq("hq_path", "1/42/004.jpg"))).isZero();
+        assertThat(outboxMapper.selectCount(new QueryWrapper<OutboxMessage>()
+                .eq("event_type", "MetadataRefreshEvent"))).isZero();
         // 快照保留供重试/排查
         assertThat(Files.exists(STAGING_TMP.resolve(snapshotRef(task.getId(), item.getId(), 1)))).isTrue();
     }
@@ -445,8 +445,8 @@ class MetadataRefreshRealChainIT {
         await(() -> taskItemMapper.selectById(item.getId()).getStatus() == ManagementTaskStatus.FAILED,
                 "item FAILED");
         assertThat(mediaMapper.selectById(101L).getHqSize()).isEqualTo(1000L);
-        assertThat(mediaMapper.selectCount(new LambdaQueryWrapper<Media>()
-                .eq(Media::getChapterId, 999L))).isZero();
+        assertThat(mediaMapper.selectCount(new QueryWrapper<Media>()
+                .eq("chapter_id", 999L))).isZero();
     }
 
     // ======================== 失败：revision 并发漂移 ========================
@@ -471,8 +471,8 @@ class MetadataRefreshRealChainIT {
         await(() -> taskItemMapper.selectById(item.getId()).getStatus() == ManagementTaskStatus.FAILED,
                 "item FAILED");
         assertThat(mediaMapper.selectById(101L).getHqSize()).isEqualTo(1000L);
-        assertThat(mediaMapper.selectCount(new LambdaQueryWrapper<Media>()
-                .eq(Media::getHqPath, "1/42/004.jpg"))).isZero();
+        assertThat(mediaMapper.selectCount(new QueryWrapper<Media>()
+                .eq("hq_path", "1/42/004.jpg"))).isZero();
     }
 
     // ======================== 幂等：重复事件 ========================
@@ -494,16 +494,16 @@ class MetadataRefreshRealChainIT {
 
         // 重放同一事件（同 eventId）
         rabbitTemplate.convertAndSend("comic.management", "command.completed", completed);
-        await(() -> inboxMapper.selectCount(new LambdaQueryWrapper<com.comicatlas.api.outbox.persistence.entity.InboxReceipt>()
-                .eq(com.comicatlas.api.outbox.persistence.entity.InboxReceipt::getEventId,
+        await(() -> inboxMapper.selectCount(new QueryWrapper<com.comicatlas.api.outbox.persistence.entity.InboxReceipt>()
+                .eq("event_id",
                         completed.eventId().toString())) == 1, "Inbox 记录");
         Thread.sleep(800);
         // 不二次 apply：新增 004.jpg 仍只有 1 行、101 尺寸不被覆盖
-        assertThat(mediaMapper.selectCount(new LambdaQueryWrapper<Media>()
-                .eq(Media::getHqPath, "1/42/004.jpg"))).isEqualTo(1);
+        assertThat(mediaMapper.selectCount(new QueryWrapper<Media>()
+                .eq("hq_path", "1/42/004.jpg"))).isEqualTo(1);
         assertThat(mediaMapper.selectById(101L).getHqSize()).isEqualTo(2500L);
-        assertThat(outboxMapper.selectCount(new LambdaQueryWrapper<OutboxMessage>()
-                .eq(OutboxMessage::getEventType, "MetadataRefreshEvent"))).isEqualTo(1);
+        assertThat(outboxMapper.selectCount(new QueryWrapper<OutboxMessage>()
+                .eq("event_type", "MetadataRefreshEvent"))).isEqualTo(1);
     }
 
     // ======================== 幂等：旧 attempt 忽略 ========================
@@ -553,8 +553,8 @@ class MetadataRefreshRealChainIT {
         await(() -> rabbitTemplate.receive("management.result.dlq", 500) != null, "事件进入 DLQ");
         assertThat(taskItemMapper.selectById(item.getId()).getStatus()).isEqualTo(ManagementTaskStatus.RUNNING);
         assertThat(comicMapper.selectById(comic.getId()).getStatus()).isEqualTo(ComicStatus.REFRESHING);
-        assertThat(outboxMapper.selectCount(new LambdaQueryWrapper<OutboxMessage>()
-                .eq(OutboxMessage::getEventType, "MetadataRefreshEvent"))).isZero();
+        assertThat(outboxMapper.selectCount(new QueryWrapper<OutboxMessage>()
+                .eq("event_type", "MetadataRefreshEvent"))).isZero();
     }
 
     // ======================== retry ========================
@@ -577,8 +577,8 @@ class MetadataRefreshRealChainIT {
 
         // retry → attempt=2，命令重新入 outbox，comic 回到 REFRESHING
         assertThat(managementTaskService.retryTask(cmd.taskId()).getAttempt()).isEqualTo(2);
-        await(() -> outboxMapper.selectCount(new LambdaQueryWrapper<OutboxMessage>()
-                .eq(OutboxMessage::getTaskId, cmd.taskId())) == 2, "retry 重新发布命令");
+        await(() -> outboxMapper.selectCount(new QueryWrapper<OutboxMessage>()
+                .eq("task_id", cmd.taskId())) == 2, "retry 重新发布命令");
         assertThat(comicMapper.selectById(comic.getId()).getStatus()).isEqualTo(ComicStatus.REFRESHING);
 
         // 第二次：attempt=2 有效快照 → SUCCEEDED
@@ -593,8 +593,8 @@ class MetadataRefreshRealChainIT {
         assertThat(taskMapper.selectById(cmd.taskId()).getAttempt()).isEqualTo(2);
         assertThat(comicMapper.selectById(comic.getId()).getStatus()).isEqualTo(ComicStatus.READY);
         assertThat(mediaMapper.selectById(101L).getHqSize()).isEqualTo(2500L);
-        assertThat(mediaMapper.selectCount(new LambdaQueryWrapper<Media>()
-                .eq(Media::getHqPath, "1/42/004.jpg"))).isEqualTo(1);
+        assertThat(mediaMapper.selectCount(new QueryWrapper<Media>()
+                .eq("hq_path", "1/42/004.jpg"))).isEqualTo(1);
     }
 
     // ======================== 辅助 ========================
@@ -707,7 +707,7 @@ class MetadataRefreshRealChainIT {
 
     private ManagementCommandRequestedEvent readSingleCommand(Long taskId) throws Exception {
         List<OutboxMessage> rows = outboxMapper.selectList(
-                new LambdaQueryWrapper<OutboxMessage>().eq(OutboxMessage::getTaskId, taskId));
+                new QueryWrapper<OutboxMessage>().eq("task_id", taskId));
         assertThat(rows).hasSize(1);
         return objectMapper.readValue(rows.get(0).getPayload(), ManagementCommandRequestedEvent.class);
     }

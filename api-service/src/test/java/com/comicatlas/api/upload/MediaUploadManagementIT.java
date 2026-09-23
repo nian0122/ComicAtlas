@@ -2,7 +2,7 @@ package com.comicatlas.api.upload;
 
 import com.comicatlas.api.upload.service.UploadSessionService;
 import com.comicatlas.api.upload.support.DiskSpaceChecker;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.comicatlas.persistence.comic.entity.Media;
 import com.comicatlas.persistence.comic.mapper.MediaMapper;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;
@@ -200,15 +200,15 @@ class MediaUploadManagementIT {
 
     @AfterEach
     void tearDown() throws Exception {
-        uploadFileMapper.delete(new LambdaQueryWrapper<>());
-        uploadSessionMapper.delete(new LambdaQueryWrapper<>());
-        mediaMapper.delete(new LambdaQueryWrapper<>());
-        managementTaskItemMapper.delete(new LambdaQueryWrapper<>());
-        managementTaskMapper.delete(new LambdaQueryWrapper<>());
-        outboxMessageMapper.delete(new LambdaQueryWrapper<>());
-        inboxReceiptMapper.delete(new LambdaQueryWrapper<>());
-        chapterMapper.delete(new LambdaQueryWrapper<>());
-        comicMapper.delete(new LambdaQueryWrapper<>());
+        uploadFileMapper.delete(new QueryWrapper<>());
+        uploadSessionMapper.delete(new QueryWrapper<>());
+        mediaMapper.delete(new QueryWrapper<>());
+        managementTaskItemMapper.delete(new QueryWrapper<>());
+        managementTaskMapper.delete(new QueryWrapper<>());
+        outboxMessageMapper.delete(new QueryWrapper<>());
+        inboxReceiptMapper.delete(new QueryWrapper<>());
+        chapterMapper.delete(new QueryWrapper<>());
+        comicMapper.delete(new QueryWrapper<>());
         cleanDir(MANGA_ROOT.resolve("staging"));
         cleanDir(MANGA_ROOT.resolve("trash"));
         cleanDir(MANGA_ROOT.resolve("hq"));
@@ -443,8 +443,8 @@ class MediaUploadManagementIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(400));
 
-        long staging = mediaMapper.selectCount(new LambdaQueryWrapper<Media>()
-                .eq(Media::getChapterId, chapterId));
+        long staging = mediaMapper.selectCount(new QueryWrapper<Media>()
+                .eq("chapter_id", chapterId));
         assertThat(staging).isZero();
     }
 
@@ -464,8 +464,8 @@ class MediaUploadManagementIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(400));
 
-        long staging = mediaMapper.selectCount(new LambdaQueryWrapper<Media>()
-                .eq(Media::getChapterId, chapterId));
+        long staging = mediaMapper.selectCount(new QueryWrapper<Media>()
+                .eq("chapter_id", chapterId));
         assertThat(staging).isZero();
     }
 
@@ -505,9 +505,9 @@ class MediaUploadManagementIT {
         runUploadWorker(ctx.sessionId, "MEDIA_UPLOAD");
         awaitProcessed(chapterId, 2);
 
-        List<Media> media = mediaMapper.selectList(new LambdaQueryWrapper<Media>()
-                .eq(Media::getChapterId, chapterId)
-                .orderByAsc(Media::getPageNumber));
+        List<Media> media = mediaMapper.selectList(new QueryWrapper<Media>()
+                .eq("chapter_id", chapterId)
+                .orderByAsc("page_number"));
         assertThat(media).hasSize(2);
 
         Media img = media.get(0);
@@ -562,7 +562,7 @@ class MediaUploadManagementIT {
         assertThat(Files.exists(stagingDir)).isTrue();
 
         UploadSession session = uploadSessionMapper.selectOne(
-                new LambdaQueryWrapper<UploadSession>().eq(UploadSession::getSessionId, ctx.sessionId));
+                new QueryWrapper<UploadSession>().eq("session_id", ctx.sessionId));
         session.setExpiresAt(LocalDateTime.now().minusMinutes(1));
         uploadSessionMapper.updateById(session);
 
@@ -593,8 +593,8 @@ class MediaUploadManagementIT {
         runUploadWorker(ctx.sessionId, "MEDIA_UPLOAD");
         awaitProcessed(chapterId, 3);
 
-        List<Media> before = mediaMapper.selectList(new LambdaQueryWrapper<Media>()
-                .eq(Media::getChapterId, chapterId).orderByAsc(Media::getPageNumber));
+        List<Media> before = mediaMapper.selectList(new QueryWrapper<Media>()
+                .eq("chapter_id", chapterId).orderByAsc("page_number"));
         List<Long> reversed = new ArrayList<>();
         before.forEach(m -> reversed.add(0, m.getId()));
 
@@ -610,8 +610,8 @@ class MediaUploadManagementIT {
             assertThat(items.get(i).get("pageNumber").asInt()).isEqualTo(i + 1);
         }
 
-        List<Media> after = mediaMapper.selectList(new LambdaQueryWrapper<Media>()
-                .eq(Media::getChapterId, chapterId).orderByAsc(Media::getPageNumber));
+        List<Media> after = mediaMapper.selectList(new QueryWrapper<Media>()
+                .eq("chapter_id", chapterId).orderByAsc("page_number"));
         assertThat(after).hasSize(3);
         for (int i = 0; i < 3; i++) {
             assertThat(after.get(i).getPageNumber()).isEqualTo(i + 1);
@@ -635,8 +635,8 @@ class MediaUploadManagementIT {
         runUploadWorker(ctx1.sessionId, "MEDIA_UPLOAD");
         awaitProcessed(chapterId, 1);
 
-        Media original = mediaMapper.selectOne(new LambdaQueryWrapper<Media>()
-                .eq(Media::getChapterId, chapterId));
+        Media original = mediaMapper.selectOne(new QueryWrapper<Media>()
+                .eq("chapter_id", chapterId));
         Long mediaId = original.getId();
         Integer pageNumber = original.getPageNumber();
         String oldPath = original.getHqPath();
@@ -686,8 +686,8 @@ class MediaUploadManagementIT {
         runUploadWorker(ctx.sessionId, "MEDIA_UPLOAD");
         awaitProcessed(chapterId, 1);
 
-        Media media = mediaMapper.selectOne(new LambdaQueryWrapper<Media>()
-                .eq(Media::getChapterId, chapterId));
+        Media media = mediaMapper.selectOne(new QueryWrapper<Media>()
+                .eq("chapter_id", chapterId));
         Long mediaId = media.getId();
 
         mockMvc.perform(delete("/api/media/{id}", mediaId))
@@ -732,8 +732,8 @@ class MediaUploadManagementIT {
         runUploadWorker(ctx.sessionId, "MEDIA_UPLOAD");
         awaitSessionStatus(ctx.sessionId, "FAILED", 30000);
 
-        List<Media> media = mediaMapper.selectList(new LambdaQueryWrapper<Media>()
-                .eq(Media::getChapterId, chapterId));
+        List<Media> media = mediaMapper.selectList(new QueryWrapper<Media>()
+                .eq("chapter_id", chapterId));
         assertThat(media).isNotEmpty();
         for (Media m : media) {
             assertThat(m.getStatus()).isNotEqualTo(MediaLifecycleStatus.READY);
@@ -848,9 +848,9 @@ class MediaUploadManagementIT {
     }
 
     private void awaitProcessed(Long chapterId, int expectedReady) {
-        awaitTrue(() -> mediaMapper.selectCount(new LambdaQueryWrapper<Media>()
-                .eq(Media::getChapterId, chapterId)
-                .eq(Media::getStatus, MediaLifecycleStatus.READY)) >= expectedReady, 30000);
+        awaitTrue(() -> mediaMapper.selectCount(new QueryWrapper<Media>()
+                .eq("chapter_id", chapterId)
+                .eq("status", MediaLifecycleStatus.READY)) >= expectedReady, 30000);
     }
 
     private void awaitMediaStatus(Long mediaId, String status, long timeoutMs) {
@@ -863,19 +863,19 @@ class MediaUploadManagementIT {
     private void awaitSessionStatus(String sessionId, String status, long timeoutMs) {
         awaitTrue(() -> {
             UploadSession s = uploadSessionMapper.selectOne(
-                    new LambdaQueryWrapper<UploadSession>().eq(UploadSession::getSessionId, sessionId));
+                    new QueryWrapper<UploadSession>().eq("session_id", sessionId));
             return s != null && status.equals(s.getStatus() == null ? null : s.getStatus().name());
         }, timeoutMs);
     }
 
     private void runUploadWorker(String sessionId, String op) {
         UploadSession session = uploadSessionMapper.selectOne(
-                new LambdaQueryWrapper<UploadSession>().eq(UploadSession::getSessionId, sessionId));
-        ManagementTaskItem item = managementTaskItemMapper.selectOne(new LambdaQueryWrapper<ManagementTaskItem>()
-                .eq(ManagementTaskItem::getTargetType, "UPLOAD_SESSION")
-                .eq(ManagementTaskItem::getTargetId, session.getId())
-                .eq(ManagementTaskItem::getOperationType, op)
-                .orderByDesc(ManagementTaskItem::getId)
+                new QueryWrapper<UploadSession>().eq("session_id", sessionId));
+        ManagementTaskItem item = managementTaskItemMapper.selectOne(new QueryWrapper<ManagementTaskItem>()
+                .eq("target_type", "UPLOAD_SESSION")
+                .eq("target_id", session.getId())
+                .eq("operation_type", op)
+                .orderByDesc("id")
                 .last("LIMIT 1"));
         ManagementCommandRequestedEvent cmd = new ManagementCommandRequestedEvent(
                 java.util.UUID.randomUUID(), java.time.Instant.now(), 1,
@@ -885,11 +885,11 @@ class MediaUploadManagementIT {
     }
 
     private void runTrashWorker(Long mediaId) {
-        ManagementTaskItem item = managementTaskItemMapper.selectOne(new LambdaQueryWrapper<ManagementTaskItem>()
-                .eq(ManagementTaskItem::getTargetType, "MEDIA")
-                .eq(ManagementTaskItem::getTargetId, mediaId)
-                .eq(ManagementTaskItem::getOperationType, TaskType.MEDIA_TRASH.name())
-                .orderByDesc(ManagementTaskItem::getId)
+        ManagementTaskItem item = managementTaskItemMapper.selectOne(new QueryWrapper<ManagementTaskItem>()
+                .eq("target_type", "MEDIA")
+                .eq("target_id", mediaId)
+                .eq("operation_type", TaskType.MEDIA_TRASH.name())
+                .orderByDesc("id")
                 .last("LIMIT 1"));
         ManagementCommandRequestedEvent cmd = new ManagementCommandRequestedEvent(
                 java.util.UUID.randomUUID(), java.time.Instant.now(), 1,

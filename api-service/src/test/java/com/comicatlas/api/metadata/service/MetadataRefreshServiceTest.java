@@ -79,7 +79,7 @@ class MetadataRefreshServiceTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        // 单元测试无 Spring 上下文，需注册实体 TableInfo 以支持 LambdaQueryWrapper/LambdaUpdateWrapper 解析
+        // 单元测试无 Spring 上下文，需注册实体 TableInfo 以支持 QueryWrapper/LambdaUpdateWrapper 解析
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), Media.class);
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), Chapter.class);
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), Comic.class);
