@@ -5,7 +5,9 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.List;
+import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Repository;
 
 /** 分析任务持久化。状态更新使用条件更新避免重复领取。 */
@@ -23,6 +25,26 @@ public class TaskRepository {
     }
     public List<String> findExistingTagNames() {
         return jdbcTemplate.query("SELECT name FROM tag WHERE name IS NOT NULL AND name <> '' ORDER BY name", (resultSet, row) -> resultSet.getString("name"));
+    }
+    @Transactional
+    public void persistAnalysisTags(long comicId, JsonNode result) {
+        JsonNode tags = result == null ? null : result.get("tags");
+        if (tags == null || !tags.isArray()) {
+            return;
+        }
+        for (JsonNode tagValue : tags) {
+            if (!tagValue.isTextual() || tagValue.asText().isBlank()) {
+                continue;
+            }
+            String tagName = tagValue.asText().trim();
+            Long tagId = jdbcTemplate.query("SELECT id FROM tag WHERE name = ? ORDER BY CASE WHEN type = 'AI' THEN 0 ELSE 1 END, id LIMIT 1",
+                    (resultSet, row) -> resultSet.getLong("id"), tagName).stream().findFirst().orElse(null);
+            if (tagId == null) {
+                jdbcTemplate.update("INSERT IGNORE INTO tag(name, type) VALUES (?, 'AI')", tagName);
+                tagId = jdbcTemplate.queryForObject("SELECT id FROM tag WHERE name = ? AND type = 'AI' LIMIT 1", Long.class, tagName);
+            }
+            jdbcTemplate.update("INSERT IGNORE INTO comic_tag(comic_id, tag_id) VALUES (?, ?)", comicId, tagId);
+        }
     }
     public Optional<TaskRecord> find(long id) {
         return jdbcTemplate.query("SELECT id,source_path,status,progress,result_json,error_code,error_message,attempts,created_at,started_at,finished_at FROM ai_analysis_task WHERE id=?", this::map, id).stream().findFirst();

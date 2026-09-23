@@ -3,6 +3,7 @@ package com.comicatlas.ai.analysis;
 import com.comicatlas.ai.model.VisionAnalyzer;
 import com.comicatlas.ai.task.TaskRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 import java.nio.file.Files;
 import java.util.List;
 import java.util.concurrent.Executor;
@@ -26,10 +27,24 @@ public class AnalysisWorker {
             if (taskRepository.cancellationRequested(taskId)) { taskRepository.cancelled(taskId); return; }
             String result = analyzer.analyze(pages, taskRepository.findExistingTagNames());
             taskRepository.progress(taskId, 90);
+            JsonNode resultJson = objectMapper.readTree(result);
+            taskRepository.persistAnalysisTags(comicIdFromSourcePath(taskRepository.find(taskId).orElseThrow().sourcePath()), resultJson);
+            taskRepository.progress(taskId, 95);
             taskRepository.succeed(taskId, result);
         } catch (Exception exception) {
             taskRepository.fail(taskId, "ANALYSIS_FAILED", safeMessage(exception));
         }
     }
     private String safeMessage(Exception exception) { String message = exception.getMessage(); return message == null ? exception.getClass().getSimpleName() : message.substring(0, Math.min(1000, message.length())); }
+    private long comicIdFromSourcePath(String sourcePath) {
+        String prefix = "hq/";
+        if (sourcePath == null || !sourcePath.startsWith(prefix)) {
+            throw new IllegalArgumentException("分析任务来源路径缺少漫画 ID");
+        }
+        try {
+            return Long.parseLong(sourcePath.substring(prefix.length()).split("/", 2)[0]);
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException("分析任务来源路径中的漫画 ID 无效", exception);
+        }
+    }
 }
