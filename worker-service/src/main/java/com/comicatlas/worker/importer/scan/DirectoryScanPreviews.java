@@ -260,11 +260,31 @@ public class DirectoryScanPreviews {
     }
 
     /** 未被 parser 收录的条目分类结果。 */
-    private record Leftovers(List<String> unsupported, List<String> symlinks) {
+    private static final class Leftovers {
+        private final List<String> unsupported;
+        private final List<String> symlinks;
+
+        private Leftovers(List<String> unsupported, List<String> symlinks) {
+            this.unsupported = unsupported;
+            this.symlinks = symlinks;
+        }
+
+        private List<String> unsupported() { return unsupported; }
+        private List<String> symlinks() { return symlinks; }
     }
 
     /** 单个候选的扫描结果：条目 + 预览根节点。 */
-    private record PreviewOutcome(ScanItemDTO item, ScanPreviewNodeDTO preview) {
+    private static final class PreviewOutcome {
+        private final ScanItemDTO item;
+        private final ScanPreviewNodeDTO preview;
+
+        private PreviewOutcome(ScanItemDTO item, ScanPreviewNodeDTO preview) {
+            this.item = item;
+            this.preview = preview;
+        }
+
+        private ScanItemDTO item() { return item; }
+        private ScanPreviewNodeDTO preview() { return preview; }
 
         static PreviewOutcome of(ScanItemDTO item, ScanPreviewNodeDTO preview) {
             return new PreviewOutcome(item, preview);

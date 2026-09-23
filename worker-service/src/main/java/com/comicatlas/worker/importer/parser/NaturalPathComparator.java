@@ -74,7 +74,14 @@ public final class NaturalPathComparator implements Comparator<Path> {
     }
 
     /** 一段数字或一段非数字原文。 */
-    private record Segment(boolean numeric, String raw) implements Comparable<Segment> {
+    private static final class Segment implements Comparable<Segment> {
+        private final boolean numeric;
+        private final String raw;
+
+        private Segment(boolean numeric, String raw) {
+            this.numeric = numeric;
+            this.raw = raw;
+        }
 
         @Override
         public int compareTo(Segment other) {
