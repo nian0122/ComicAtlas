@@ -19,7 +19,7 @@ import java.util.List;
 /**
  * 为无 Spring 上下文的单元测试注册 MyBatis-Plus 实体元数据（TableInfo）。
  * <p>
- * {@link LambdaQueryWrapper} 的列解析（select/eq 等方法引用 → 列名）依赖
+ * MyBatis-Plus 函数式查询包装器的列解析（select/eq 等方法引用 → 列名）依赖
  * {@link TableInfoHelper} 注册的实体元数据；纯 Mockito 单测或 mock-bean 装配的
  * {@code @SpringJUnitConfig} 上下文不会触发 MyBatis-Plus 自动注册。本扩展在
  * 首个使用它的测试类前完成注册，同一 JVM 内静态缓存后续测试共享。
