@@ -122,7 +122,28 @@ class SemanticNamingContractTest {
             List.of("comic-common", "api-service", "worker-service", "gateway");
 
     /** 一条固定禁用声明：类型 + 变量名 + 建议命名。 */
-    private record BannedPattern(String type, String variable, String expected) {
+    private static final class BannedPattern {
+        private final String type;
+        private final String variable;
+        private final String expected;
+
+        private BannedPattern(String type, String variable, String expected) {
+            this.type = type;
+            this.variable = variable;
+            this.expected = expected;
+        }
+
+        String type() {
+            return type;
+        }
+
+        String variable() {
+            return variable;
+        }
+
+        String expected() {
+            return expected;
+        }
 
         /**
          * 生成声明匹配正则：类型基名（单词边界）+ 可选泛型实参 + 空白 + 短名。
@@ -166,7 +187,40 @@ class SemanticNamingContractTest {
     }
 
     /** 一次违规记录：文件、行号、类型、变量名、建议命名。 */
-    private record Violation(String file, int line, String type, String variable, String expected) {
+    private static final class Violation {
+        private final String file;
+        private final int line;
+        private final String type;
+        private final String variable;
+        private final String expected;
+
+        private Violation(String file, int line, String type, String variable, String expected) {
+            this.file = file;
+            this.line = line;
+            this.type = type;
+            this.variable = variable;
+            this.expected = expected;
+        }
+
+        String file() {
+            return file;
+        }
+
+        int line() {
+            return line;
+        }
+
+        String type() {
+            return type;
+        }
+
+        String variable() {
+            return variable;
+        }
+
+        String expected() {
+            return expected;
+        }
 
         @Override
         public String toString() {
