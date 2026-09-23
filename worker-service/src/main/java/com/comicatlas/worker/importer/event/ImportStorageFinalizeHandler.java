@@ -359,12 +359,44 @@ public class ImportStorageFinalizeHandler {
     }
 
     /** 最终化上下文：解析校验后的根路径、源/目标目录与媒体搬运对。 */
-    private record FinalizeContext(Path mangaRoot, Path hqRoot, Path sourceDir, Path targetDir,
-                                   List<MediaMove> moves) {
+    private static final class FinalizeContext {
+        private final Path mangaRoot;
+        private final Path hqRoot;
+        private final Path sourceDir;
+        private final Path targetDir;
+        private final List<MediaMove> moves;
+
+        private FinalizeContext(Path mangaRoot, Path hqRoot, Path sourceDir, Path targetDir,
+                                List<MediaMove> moves) {
+            this.mangaRoot = mangaRoot;
+            this.hqRoot = hqRoot;
+            this.sourceDir = sourceDir;
+            this.targetDir = targetDir;
+            this.moves = moves;
+        }
+
+        private Path mangaRoot() { return mangaRoot; }
+        private Path hqRoot() { return hqRoot; }
+        private Path sourceDir() { return sourceDir; }
+        private Path targetDir() { return targetDir; }
+        private List<MediaMove> moves() { return moves; }
     }
 
     /** 媒体搬运对：解析并校验后的源/目标绝对路径 + 用于清单尺寸核对的源文件名。 */
-    private record MediaMove(Path source, Path target, String fileName) {
+    private static final class MediaMove {
+        private final Path source;
+        private final Path target;
+        private final String fileName;
+
+        private MediaMove(Path source, Path target, String fileName) {
+            this.source = source;
+            this.target = target;
+            this.fileName = fileName;
+        }
+
+        private Path source() { return source; }
+        private Path target() { return target; }
+        private String fileName() { return fileName; }
     }
 
     /** 业务失败异常：携带冻结错误码，消息只含相对引用（已脱敏）。 */
