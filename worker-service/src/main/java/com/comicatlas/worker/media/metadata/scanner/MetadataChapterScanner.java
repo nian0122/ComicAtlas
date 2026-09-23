@@ -150,6 +150,19 @@ public class MetadataChapterScanner {
         }
     }
 
-    public record ScanResult(List<MediaSnapshot> mediaItems, List<String> warnings, String legacyDirKey) {
+    public static final class ScanResult {
+        private final List<MediaSnapshot> mediaItems;
+        private final List<String> warnings;
+        private final String legacyDirKey;
+
+        public ScanResult(List<MediaSnapshot> mediaItems, List<String> warnings, String legacyDirKey) {
+            this.mediaItems = mediaItems;
+            this.warnings = warnings;
+            this.legacyDirKey = legacyDirKey;
+        }
+
+        public List<MediaSnapshot> mediaItems() { return mediaItems; }
+        public List<String> warnings() { return warnings; }
+        public String legacyDirKey() { return legacyDirKey; }
     }
 }

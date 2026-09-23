@@ -319,12 +319,38 @@ public class MetadataRefreshCommandHandler {
         throw new IllegalArgumentException("元数据扫盘刷新不支持目标类型: " + command.targetType());
     }
 
-    private record TargetScanContext(Long comicId, List<ChapterRecord> chapters,
-                                     Map<Long, List<MediaRecord>> mediaByChapter) {
+    private static final class TargetScanContext {
+        private final Long comicId;
+        private final List<ChapterRecord> chapters;
+        private final Map<Long, List<MediaRecord>> mediaByChapter;
+
+        private TargetScanContext(Long comicId, List<ChapterRecord> chapters,
+                                  Map<Long, List<MediaRecord>> mediaByChapter) {
+            this.comicId = comicId;
+            this.chapters = chapters;
+            this.mediaByChapter = mediaByChapter;
+        }
+
+        private Long comicId() { return comicId; }
+        private List<ChapterRecord> chapters() { return chapters; }
+        private Map<Long, List<MediaRecord>> mediaByChapter() { return mediaByChapter; }
     }
 
     /** 单章扫描结果：媒体快照列表 + 结构化 warning 列表 + 旧布局升级信号（已移动成功时为旧目录键，否则 null）。 */
-    private record ChapterScanResult(List<MediaSnapshot> mediaItems, List<String> warnings, String legacyDirKey) {
+    private static final class ChapterScanResult {
+        private final List<MediaSnapshot> mediaItems;
+        private final List<String> warnings;
+        private final String legacyDirKey;
+
+        private ChapterScanResult(List<MediaSnapshot> mediaItems, List<String> warnings, String legacyDirKey) {
+            this.mediaItems = mediaItems;
+            this.warnings = warnings;
+            this.legacyDirKey = legacyDirKey;
+        }
+
+        private List<MediaSnapshot> mediaItems() { return mediaItems; }
+        private List<String> warnings() { return warnings; }
+        private String legacyDirKey() { return legacyDirKey; }
     }
 
     /**
@@ -599,7 +625,20 @@ public class MetadataRefreshCommandHandler {
     }
 
     /** LQ 文件事实：状态、字节数和实际相对路径。 */
-    private record LqFileFact(String status, long size, String path) {
+    private static final class LqFileFact {
+        private final String status;
+        private final long size;
+        private final String path;
+
+        private LqFileFact(String status, long size, String path) {
+            this.status = status;
+            this.size = size;
+            this.path = path;
+        }
+
+        private String status() { return status; }
+        private long size() { return size; }
+        private String path() { return path; }
     }
 
     private static String sha256Hex(byte[] bytes) {

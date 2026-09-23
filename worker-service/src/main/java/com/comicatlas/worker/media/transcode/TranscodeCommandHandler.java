@@ -259,6 +259,16 @@ public class TranscodeCommandHandler {
     }
 
     /** 单页转码结果：error 为 null 表示成功；transcode 为成功时的实测元数据（可能为 null）。 */
-    private record TranscodeResult(String error, TranscodeMediaInfo transcode) {
+    private static final class TranscodeResult {
+        private final String error;
+        private final TranscodeMediaInfo transcode;
+
+        private TranscodeResult(String error, TranscodeMediaInfo transcode) {
+            this.error = error;
+            this.transcode = transcode;
+        }
+
+        private String error() { return error; }
+        private TranscodeMediaInfo transcode() { return transcode; }
     }
 }
