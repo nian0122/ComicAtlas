@@ -22,27 +22,8 @@ import com.fasterxml.jackson.annotation.JsonAutoDetect;
  * @param queues 有积压的队列明细
  */
 @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
-public final class MqStatsDTO {
-    private final boolean available;
-    private final long dlqTotal;
-    private final int dlqQueues;
-    private final long queuedTotal;
-    private final List<MqQueueStat> queues;
-
-    public MqStatsDTO(boolean available, long dlqTotal, int dlqQueues, long queuedTotal,
-                      List<MqQueueStat> queues) {
-        this.available = available;
-        this.dlqTotal = dlqTotal;
-        this.dlqQueues = dlqQueues;
-        this.queuedTotal = queuedTotal;
-        this.queues = queues;
-    }
-
-    public boolean available() { return available; }
-    public long dlqTotal() { return dlqTotal; }
-    public int dlqQueues() { return dlqQueues; }
-    public long queuedTotal() { return queuedTotal; }
-    public List<MqQueueStat> queues() { return queues; }
+public record MqStatsDTO(boolean available, long dlqTotal, int dlqQueues, long queuedTotal,
+        List<MqQueueStat> queues) {
     /**
      * 单队列积压快照。
      *
@@ -52,24 +33,7 @@ public final class MqStatsDTO {
      * @param dlq 是否死信队列
      */
     @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
-    public static final class MqQueueStat {
-        private final String name;
-        private final long messages;
-        private final long consumers;
-        private final boolean dlq;
-
-        public MqQueueStat(String name, long messages, long consumers, boolean dlq) {
-            this.name = name;
-            this.messages = messages;
-            this.consumers = consumers;
-            this.dlq = dlq;
-        }
-
-        public String name() { return name; }
-        public long messages() { return messages; }
-        public long consumers() { return consumers; }
-        public boolean dlq() { return dlq; }
-    }
+    public record MqQueueStat(String name, long messages, long consumers, boolean dlq) { }
 
     /** Management API 不可用时返回的降级统计。 */
     public static MqStatsDTO unavailable() {
