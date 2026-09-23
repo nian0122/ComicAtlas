@@ -2,6 +2,9 @@ package com.comicatlas.common.event;
 
 import java.time.Instant;
 import java.util.UUID;
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * 管理任务取消请求，由用户取消任务时发布，通知 Worker 设置取消标记并尽快停止处理。
@@ -12,9 +15,26 @@ import java.util.UUID;
  * @param taskId 待取消的任务 ID
  * @param comicId 任务关联的漫画 ID，可为空
  */
-public record CancelTaskEvent(
-    UUID eventId,
-    Instant occurredAt,
-    Long taskId,
-    Long comicId
-) implements ComicEvent {}
+@JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
+public final class CancelTaskEvent implements ComicEvent {
+    private final UUID eventId;
+    private final Instant occurredAt;
+    private final Long taskId;
+    private final Long comicId;
+
+    @JsonCreator
+    public CancelTaskEvent(@JsonProperty("eventId") UUID eventId,
+                           @JsonProperty("occurredAt") Instant occurredAt,
+                           @JsonProperty("taskId") Long taskId,
+                           @JsonProperty("comicId") Long comicId) {
+        this.eventId = eventId;
+        this.occurredAt = occurredAt;
+        this.taskId = taskId;
+        this.comicId = comicId;
+    }
+
+    public UUID eventId() { return eventId; }
+    public Instant occurredAt() { return occurredAt; }
+    public Long taskId() { return taskId; }
+    public Long comicId() { return comicId; }
+}
