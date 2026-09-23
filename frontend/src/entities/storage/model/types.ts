@@ -75,7 +75,7 @@ export interface ExportArtifactVO {
 export interface ExportTaskVO {
   id: number
   comicId: number
-  format?: 'ZIP' | 'CBZ'
+  format?: 'ZIP' | 'CBZ' | 'DIRECTORY'
   status: string
   progress: number
   outputRoot?: string

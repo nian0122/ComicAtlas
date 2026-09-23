@@ -128,7 +128,8 @@ public class ExportServiceImpl implements ExportService {
     private static String normalizeFormat(String format) {
         String normalized = format == null || format.isBlank()
                 ? ExportFormats.ZIP : format.trim().toUpperCase(Locale.ROOT);
-        if (!ExportFormats.ZIP.equals(normalized) && !ExportFormats.CBZ.equals(normalized)) {
+        if (!ExportFormats.ZIP.equals(normalized) && !ExportFormats.CBZ.equals(normalized)
+                && !ExportFormats.DIRECTORY.equals(normalized)) {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "不支持的导出格式: " + format);
         }
         return normalized;

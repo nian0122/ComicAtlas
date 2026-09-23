@@ -8,7 +8,7 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 /**
- * 导出任务（将漫画导出为 ZIP 产物）。
+ * 导出任务（将漫画导出为归档或文件夹产物）。
  * <p>
  * 数据库实体（DO），禁止直接暴露给接口；对外使用 {@code dto/} 包对应 DTO/VO。
  */
@@ -22,7 +22,7 @@ public class ExportTask {
     private Long managementTaskId;
     /** 被导出的漫画 ID */
     private Long comicId;
-    /** 导出格式：ZIP（默认）或 CBZ。 */
+    /** 导出格式：ZIP（默认）、CBZ 或 DIRECTORY。 */
     private String format;
     /** 任务状态：PENDING/RUNNING/SUCCESS/FAILED */
     private ExportTaskStatus status;      // PENDING, RUNNING, SUCCESS, FAILED
@@ -30,7 +30,7 @@ public class ExportTask {
     private Integer progress;   // 0-100, -1 on FAILED
     /** 输出根路径（默认取配置的导出目录） */
     private String outputRoot;
-    /** 输出文件相对路径（worker 回填，如 {标题}_{comicId}_{时间戳}.zip） */
+    /** 输出产物相对路径（worker 回填，可为 ZIP 文件或漫画根目录） */
     private String outputPath;
     /** 导出产物大小（字节） */
     private Long outputSize;

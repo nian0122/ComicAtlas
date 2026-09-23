@@ -57,9 +57,11 @@ public class ExportTaskHandler {
 
         ExportService.ExportOutput output;
         try {
-            output = ExportFormats.CBZ.equalsIgnoreCase(event.format())
-                    ? exportService.export(event.comicId(), event.taskId(), ExportFormats.CBZ)
-                    : exportService.export(event.comicId(), event.taskId());
+            output = ExportFormats.DIRECTORY.equalsIgnoreCase(event.format())
+                    ? exportService.export(event.comicId(), event.taskId(), ExportFormats.DIRECTORY)
+                    : ExportFormats.CBZ.equalsIgnoreCase(event.format())
+                            ? exportService.export(event.comicId(), event.taskId(), ExportFormats.CBZ)
+                            : exportService.export(event.comicId(), event.taskId());
         } catch (java.io.IOException | RuntimeException failure) {
             if (failure instanceof InterruptedIOException || failure instanceof ClosedByInterruptException
                     || failure instanceof InterruptedException || Thread.currentThread().isInterrupted()) {

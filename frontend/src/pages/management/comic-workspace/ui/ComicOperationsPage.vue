@@ -51,8 +51,11 @@
               <el-select v-model="exportFormat" style="width: 120px" aria-label="导出格式">
                 <el-option label="ZIP" value="ZIP" />
                 <el-option label="CBZ" value="CBZ" />
+                <el-option label="文件夹" value="DIRECTORY" />
               </el-select>
-              <AppButton @click="createExport">导出漫画</AppButton>
+              <AppButton @click="createExport">
+                {{ exportFormat === 'DIRECTORY' ? '导出漫画文件夹' : '导出漫画压缩包' }}
+              </AppButton>
             </div>
           </div>
           <el-table
@@ -192,7 +195,7 @@ const polling = ref(true)
 const loading = ref(false)
 const error = ref('')
 const activeTab = ref('operations')
-const exportFormat = ref<'ZIP' | 'CBZ'>('ZIP')
+const exportFormat = ref<'ZIP' | 'CBZ' | 'DIRECTORY'>('ZIP')
 let timer: ReturnType<typeof setInterval> | undefined
 
 const statusMeta = computed(() => (comic.value ? comicStatusMeta(comic.value.status) : comicStatusMeta('DRAFT')))
@@ -267,7 +270,8 @@ function refreshMetadata(): void {
   void runAction('刷新元数据', () => storageService.requestMetadataRefresh(comicId.value))
 }
 function createExport(): void {
-  void runAction(`${exportFormat.value} 导出`, () => exportApi.createExport(comicId.value, exportFormat.value))
+  const label = exportFormat.value === 'DIRECTORY' ? '导出漫画文件夹' : `${exportFormat.value} 导出`
+  void runAction(label, () => exportApi.createExport(comicId.value, exportFormat.value))
 }
 async function trashComic(): Promise<void> {
   await ElMessageBox.confirm('漫画将移入回收站，可在需要时恢复。', '确认回收', { type: 'warning' })

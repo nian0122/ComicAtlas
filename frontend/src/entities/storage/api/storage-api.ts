@@ -38,7 +38,7 @@ export const storageAdminApi = {
 }
 
 export const exportApi = {
-  createExport: (comicId: number, format: 'ZIP' | 'CBZ' = 'ZIP') =>
+  createExport: (comicId: number, format: 'ZIP' | 'CBZ' | 'DIRECTORY' = 'ZIP') =>
     api.post<ExportTaskVO>(`/manage/storage/export/comics/${comicId}?format=${format}`),
   listExports: (comicId: number) => api.get<ExportTaskVO[]>(`/manage/storage/export/comics/${comicId}/tasks`),
   listAllExports: () => api.get<ExportTaskVO[]>('/manage/storage/export/tasks'),

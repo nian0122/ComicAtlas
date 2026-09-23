@@ -32,6 +32,8 @@ import java.io.InterruptedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -47,7 +49,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
-/** 导出编排：收集 → 构建清单 → 打包 ZIP → 原子发布任务目录。 */
+/** 导出编排：收集 → 构建清单 → 打包归档或写出文件夹 → 原子发布任务目录。 */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -114,6 +116,10 @@ public class ExportServiceImpl implements ExportService {
             throw new IllegalStateException("EXPORT 存储根未配置或路径不存在");
         }
 
+        if (ExportFormats.DIRECTORY.equalsIgnoreCase(format)) {
+            return exportDirectory(taskId, comicId, manifest, exportRoot);
+        }
+
         String baseFileName = buildOutputFileName(comicId, result.comic().getTitle(), format);
         Path stagingDir = exportRoot.resolve(STAGING_DIR_PREFIX + taskId);
         Path finalDir = exportRoot.resolve(String.valueOf(taskId));
@@ -135,6 +141,67 @@ public class ExportServiceImpl implements ExportService {
             // 覆盖打包、校验与发布失败；最终目录始终由发布器单独管理。
             ExportStagingCleanup.afterFailure(stagingDir, exception);
             throw exception;
+        }
+    }
+
+    /**
+     * 将清单物化为普通目录。所有文件先写入 staging，再原子移动为 {@code EXPORT/{taskId}}，
+     * 因此浏览目录时不会看到半成品。
+     */
+    private ExportOutput exportDirectory(Long taskId, Long comicId, ExportManifest manifest, StorageRoot exportRoot)
+            throws IOException {
+        Path stagingDir = exportRoot.resolve(STAGING_DIR_PREFIX + taskId);
+        Path finalDir = exportRoot.resolve(String.valueOf(taskId));
+        String rootDirectoryName = manifest.rootDirName();
+        Path finalRoot = finalDir.resolve(rootDirectoryName);
+        if (Files.exists(finalDir)) {
+            if (!Files.isDirectory(finalRoot)) {
+                throw new IOException("文件夹导出发布冲突：既有任务目录结构不匹配 taskId=" + taskId);
+            }
+            return new ExportOutput(taskId, comicId, taskId + "/" + rootDirectoryName, directorySize(finalDir));
+        }
+
+        ExportStagingCleanup.delete(stagingDir);
+        try {
+            Path stagingRoot = stagingDir.resolve(rootDirectoryName);
+            Files.createDirectories(stagingRoot);
+            writeDirectoryEntry(stagingRoot.resolve("metadata.json"), manifest.metadataJson().getBytes(StandardCharsets.UTF_8));
+            if (manifest.comicInfoXml() != null && !manifest.comicInfoXml().isBlank()) {
+                writeDirectoryEntry(stagingRoot.resolve("ComicInfo.xml"),
+                        manifest.comicInfoXml().getBytes(StandardCharsets.UTF_8));
+            }
+            for (ExportManifest.Entry entry : manifest.entries()) {
+                Path target = stagingRoot.resolve(entry.targetPath()).normalize();
+                if (!target.startsWith(stagingRoot)) {
+                    throw new IOException("文件夹导出路径非法: " + entry.targetPath());
+                }
+                Files.createDirectories(target.getParent());
+                Files.copy(entry.sourceFile(), target, StandardCopyOption.COPY_ATTRIBUTES);
+            }
+            try {
+                Files.move(stagingDir, finalDir, StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException exception) {
+                throw new IOException("文件夹导出发布失败：文件系统不支持原子移动", exception);
+            }
+            return new ExportOutput(taskId, comicId, taskId + "/" + rootDirectoryName, directorySize(finalDir));
+        } catch (IOException | RuntimeException exception) {
+            ExportStagingCleanup.afterFailure(stagingDir, exception);
+            throw exception;
+        }
+    }
+
+    private void writeDirectoryEntry(Path target, byte[] content) throws IOException {
+        Files.createDirectories(target.getParent());
+        Files.write(target, content);
+    }
+
+    private long directorySize(Path directory) throws IOException {
+        try (var paths = Files.walk(directory)) {
+            long size = 0L;
+            for (Path path : paths.filter(Files::isRegularFile).toList()) {
+                size = Math.addExact(size, Files.size(path));
+            }
+            return size;
         }
     }
 

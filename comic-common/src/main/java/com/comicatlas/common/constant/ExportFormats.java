@@ -5,6 +5,7 @@ public final class ExportFormats {
 
     public static final String ZIP = "ZIP";
     public static final String CBZ = "CBZ";
+    public static final String DIRECTORY = "DIRECTORY";
 
     private ExportFormats() {
     }

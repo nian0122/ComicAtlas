@@ -3,6 +3,7 @@ package com.comicatlas.api.exporter.service.impl;
 import com.comicatlas.api.exporter.dto.ExportTaskVO;
 import com.comicatlas.api.exporter.model.ExportDirectoryOpenResult;
 import com.comicatlas.api.exporter.service.ExportOperationService;
+import com.comicatlas.common.constant.ExportFormats;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -26,7 +27,8 @@ public class ExportDirectoryServiceImpl implements com.comicatlas.api.exporter.s
         if (physicalPath == null) {
             return new ExportDirectoryOpenResult(ExportDirectoryOpenResult.Status.NOT_FOUND, null);
         }
-        Path directory = Path.of(physicalPath.replace("/", java.io.File.separator)).getParent();
+        Path output = Path.of(physicalPath.replace("/", java.io.File.separator));
+        Path directory = ExportFormats.DIRECTORY.equalsIgnoreCase(task.getFormat()) ? output : output.getParent();
         if (directory == null || !Files.exists(directory)) {
             return new ExportDirectoryOpenResult(ExportDirectoryOpenResult.Status.NOT_FOUND, null);
         }

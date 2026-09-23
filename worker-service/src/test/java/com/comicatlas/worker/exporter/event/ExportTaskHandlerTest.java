@@ -2,6 +2,7 @@ package com.comicatlas.worker.exporter.event;
 
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
+import com.comicatlas.common.constant.ExportFormats;
 import com.comicatlas.common.event.ExportTaskCompletedEvent;
 import com.comicatlas.common.event.ExportTaskCreatedEvent;
 import com.comicatlas.common.event.ExportTaskFailedEvent;
@@ -115,6 +116,20 @@ class ExportTaskHandlerTest {
         verify(channel, never()).basicReject(anyLong(), anyBoolean());
         verify(rabbitTemplate, never()).convertAndSend(eq(MqExchanges.EXPORT),
                 eq(MqRoutingKeys.TASK_FAILED), (Object) any());
+    }
+
+    @Test
+    @DisplayName("文件夹导出：将 DIRECTORY 格式透传给导出服务")
+    void directoryExport_passesDirectoryFormatToService() throws Exception {
+        ExportTaskCreatedEvent directoryEvent = new ExportTaskCreatedEvent(UUID.randomUUID(), Instant.now(),
+                99L, 1L, ExportFormats.DIRECTORY);
+        when(exportService.export(1L, 99L, ExportFormats.DIRECTORY))
+                .thenReturn(output(99L, 1L, "99/标题", 1234L));
+
+        handler.handle(directoryEvent, channel, 5L);
+
+        verify(exportService).export(1L, 99L, ExportFormats.DIRECTORY);
+        verify(channel).basicAck(5L, false);
     }
 
     @Test

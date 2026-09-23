@@ -468,6 +468,36 @@ class ExportServiceTest {
     }
 
     @Test
+    void export_directoryWritesRestoredHierarchyWithoutArchive() throws Exception {
+        MediaRecord media = media(1L, 10L, "1/10/原始文件.jpg", 1);
+        ChapterRecord chapter = chapter(10L, "第01话", 1);
+        chapter.setCatalogId(101L);
+        ExportCollectResult collected = result(comic(1L, "测试标题"), List.of(chapter),
+                List.of(catalog(100L, null, "第一卷"), catalog(101L, 100L, "附录")), List.of(media));
+        when(exportCollector.collect(1L)).thenReturn(collected);
+        when(metadataJsonExporter.exportJson(collected)).thenReturn("{}");
+        when(exportFileResolver.resolve(media)).thenReturn(new StorageRef("HQ", "1/10/原始文件.jpg"));
+        writeFile("hq/1/10/原始文件.jpg", "image-content");
+        stubResolverToRoot();
+        ZipBuilder realZipBuilder = new ZipBuilder(workerConfig);
+        ExportService realService = new ExportServiceImpl(exportCollector, exportFileResolver, realZipBuilder,
+                metadataJsonExporter, storageProperties, workerConfig, new ExportArchivePublisher(realZipBuilder));
+
+        ExportService.ExportOutput output = realService.export(1L, 101L, "DIRECTORY");
+
+        Path exportRoot = storageProperties.getRoots().get("EXPORT").getPath();
+        Path comicRoot = exportRoot.resolve(output.fileName());
+        assertEquals("101/测试标题", output.fileName());
+        assertTrue(Files.isDirectory(comicRoot));
+        assertEquals("image-content", Files.readString(comicRoot.resolve("第一卷/附录/第01话/原始文件.jpg")));
+        assertTrue(Files.isRegularFile(comicRoot.resolve("metadata.json")));
+        try (var files = Files.list(exportRoot.resolve("101"))) {
+            assertTrue(files.noneMatch(path -> path.getFileName().toString().endsWith(".zip")),
+                    "文件夹导出不应生成 ZIP 文件");
+        }
+    }
+
+    @Test
     void export_publishesTaskDirectoryAtomically_noStagingLeak() throws Exception {
         WorkerConfig realConfig = new WorkerConfig();
         ZipBuilder realBuilder = new ZipBuilder(realConfig);
