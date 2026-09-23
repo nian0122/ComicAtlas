@@ -132,6 +132,16 @@ public class ExportArchivePublisher {
     }
 
     /** 发布结果 — fileName 为 EXPORT 根相对路径，size 为全部卷总大小。 */
-    public record PublishResult(String fileName, long size) {
+    public static final class PublishResult {
+        private final String fileName;
+        private final long size;
+
+        public PublishResult(String fileName, long size) {
+            this.fileName = fileName;
+            this.size = size;
+        }
+
+        public String fileName() { return fileName; }
+        public long size() { return size; }
     }
 }

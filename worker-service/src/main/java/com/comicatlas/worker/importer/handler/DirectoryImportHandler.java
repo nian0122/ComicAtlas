@@ -149,5 +149,16 @@ public class DirectoryImportHandler {
         return new ManifestBuildResult(files, nameMap);
     }
 
-    private record ManifestBuildResult(List<ImportManifest.ImportFile> files, Map<String, String> nameMap) { }
+    private static final class ManifestBuildResult {
+        private final List<ImportManifest.ImportFile> files;
+        private final Map<String, String> nameMap;
+
+        private ManifestBuildResult(List<ImportManifest.ImportFile> files, Map<String, String> nameMap) {
+            this.files = files;
+            this.nameMap = nameMap;
+        }
+
+        private List<ImportManifest.ImportFile> files() { return files; }
+        private Map<String, String> nameMap() { return nameMap; }
+    }
 }

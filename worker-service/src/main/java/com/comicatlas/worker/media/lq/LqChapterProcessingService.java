@@ -98,5 +98,16 @@ public class LqChapterProcessingService {
                 : directory.replace('\\', '/') + "/" + fileName.replace('\\', '/');
     }
 
-    public record ChapterProcessResult(List<Integer> failedPages, List<LqSizeResult> lqSizes) { }
+    public static final class ChapterProcessResult {
+        private final List<Integer> failedPages;
+        private final List<LqSizeResult> lqSizes;
+
+        public ChapterProcessResult(List<Integer> failedPages, List<LqSizeResult> lqSizes) {
+            this.failedPages = failedPages;
+            this.lqSizes = lqSizes;
+        }
+
+        public List<Integer> failedPages() { return failedPages; }
+        public List<LqSizeResult> lqSizes() { return lqSizes; }
+    }
 }

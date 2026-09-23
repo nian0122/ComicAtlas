@@ -32,7 +32,20 @@ import java.util.zip.Deflater;
 public class ZipBuilder {
 
     /** 构建结果 — 主 .zip、有序分卷（分卷为 .z01..zNN 后接主 .zip，单卷仅主 .zip）、全部卷总大小。 */
-    public record ZipBuildResult(Path mainZip, List<Path> orderedVolumes, long totalSize) {
+    public static final class ZipBuildResult {
+        private final Path mainZip;
+        private final List<Path> orderedVolumes;
+        private final long totalSize;
+
+        public ZipBuildResult(Path mainZip, List<Path> orderedVolumes, long totalSize) {
+            this.mainZip = mainZip;
+            this.orderedVolumes = orderedVolumes;
+            this.totalSize = totalSize;
+        }
+
+        public Path mainZip() { return mainZip; }
+        public List<Path> orderedVolumes() { return orderedVolumes; }
+        public long totalSize() { return totalSize; }
     }
 
     private static final String METADATA_FILE = "metadata.json";
