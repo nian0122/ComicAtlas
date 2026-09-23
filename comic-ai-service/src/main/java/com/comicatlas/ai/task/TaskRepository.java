@@ -40,45 +40,7 @@ public class TaskRepository {
     public int requeueInterruptedTasks() { return jdbcTemplate.update("UPDATE ai_analysis_task SET status=?,error_code=NULL,error_message=NULL WHERE status=?", TaskStatus.QUEUED.name(), TaskStatus.RUNNING.name()); }
     private TaskRecord map(ResultSet resultSet, int row) throws SQLException { return new TaskRecord(resultSet.getLong("id"), resultSet.getString("source_path"), TaskStatus.valueOf(resultSet.getString("status")), resultSet.getInt("progress"), resultSet.getString("result_json"), resultSet.getString("error_code"), resultSet.getString("error_message"), resultSet.getInt("attempts"), resultSet.getTimestamp("created_at").toInstant(), optionalInstant(resultSet, "started_at"), optionalInstant(resultSet, "finished_at")); }
     private Instant optionalInstant(ResultSet resultSet, String column) throws SQLException { var value = resultSet.getTimestamp(column); return value == null ? null : value.toInstant(); }
-    public static final class TaskRecord {
-        private final long id;
-        private final String sourcePath;
-        private final TaskStatus status;
-        private final int progress;
-        private final String resultJson;
-        private final String errorCode;
-        private final String errorMessage;
-        private final int attempts;
-        private final Instant createdAt;
-        private final Instant startedAt;
-        private final Instant finishedAt;
-
-        public TaskRecord(long id, String sourcePath, TaskStatus status, int progress, String resultJson,
-                String errorCode, String errorMessage, int attempts, Instant createdAt, Instant startedAt,
-                Instant finishedAt) {
-            this.id = id;
-            this.sourcePath = sourcePath;
-            this.status = status;
-            this.progress = progress;
-            this.resultJson = resultJson;
-            this.errorCode = errorCode;
-            this.errorMessage = errorMessage;
-            this.attempts = attempts;
-            this.createdAt = createdAt;
-            this.startedAt = startedAt;
-            this.finishedAt = finishedAt;
-        }
-
-        public long id() { return id; }
-        public String sourcePath() { return sourcePath; }
-        public TaskStatus status() { return status; }
-        public int progress() { return progress; }
-        public String resultJson() { return resultJson; }
-        public String errorCode() { return errorCode; }
-        public String errorMessage() { return errorMessage; }
-        public int attempts() { return attempts; }
-        public Instant createdAt() { return createdAt; }
-        public Instant startedAt() { return startedAt; }
-        public Instant finishedAt() { return finishedAt; }
-    }
+    public record TaskRecord(long id, String sourcePath, TaskStatus status, int progress, String resultJson,
+            String errorCode, String errorMessage, int attempts, Instant createdAt, Instant startedAt,
+            Instant finishedAt) { }
 }
