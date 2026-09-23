@@ -2,6 +2,9 @@ package com.comicatlas.common.event;
 
 import java.time.Instant;
 import java.util.UUID;
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * 管理命令请求事件（API → Worker）。
@@ -16,18 +19,15 @@ import java.util.UUID;
  * manifestTaskId：TRASH 清单任务 ID（TRASH/{targetType}/{targetId}/{manifestTaskId}/）。
  * TRASH 操作时为空（用自身 taskId）；RESTORE/PURGE 操作时必须指向发起回收的任务。
  */
-public record ManagementCommandRequestedEvent(
-    UUID eventId,
-    Instant occurredAt,
-    int version,
-    Long taskId,
-    Long itemId,
-    int attempt,
-    String operationType,
-    String targetType,
-    Long targetId,
-    Long manifestTaskId
-) implements ComicEvent {
+@JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
+public final class ManagementCommandRequestedEvent implements ComicEvent {
+    private final UUID eventId; private final Instant occurredAt; private final int version; private final Long taskId; private final Long itemId; private final int attempt;
+    private final String operationType; private final String targetType; private final Long targetId; private final Long manifestTaskId;
+    @JsonCreator
+    public ManagementCommandRequestedEvent(@JsonProperty("eventId") UUID eventId, @JsonProperty("occurredAt") Instant occurredAt, @JsonProperty("version") int version,
+                                           @JsonProperty("taskId") Long taskId, @JsonProperty("itemId") Long itemId, @JsonProperty("attempt") int attempt,
+                                           @JsonProperty("operationType") String operationType, @JsonProperty("targetType") String targetType, @JsonProperty("targetId") Long targetId,
+                                           @JsonProperty("manifestTaskId") Long manifestTaskId) { this.eventId=eventId; this.occurredAt=occurredAt; this.version=version; this.taskId=taskId; this.itemId=itemId; this.attempt=attempt; this.operationType=operationType; this.targetType=targetType; this.targetId=targetId; this.manifestTaskId=manifestTaskId; }
 
     /**
      * 兼容便捷构造器：TRASH/普通媒体操作不携带 manifestTaskId。
@@ -47,6 +47,7 @@ public record ManagementCommandRequestedEvent(
             Long targetId) {
         this(eventId, occurredAt, version, taskId, itemId, attempt, operationType, targetType, targetId, null);
     }
+    public UUID eventId(){return eventId;} public Instant occurredAt(){return occurredAt;} public Long taskId(){return taskId;} public Long itemId(){return itemId;} public int attempt(){return attempt;} public String operationType(){return operationType;} public String targetType(){return targetType;} public Long targetId(){return targetId;} public Long manifestTaskId(){return manifestTaskId;}
 
     @Override
     public int version() {
