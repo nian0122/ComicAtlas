@@ -6,21 +6,53 @@ import java.util.Map;
 /**
  * E-Hentai API 返回的 Gallery 元数据
  */
-public record GalleryMetadata(
-    long gid,
-    String token,
-    String title,
-    String titleJpn,
-    String category,
-    String thumb,
-    String uploader,
-    int fileCount,
-    long fileSize,
-    double rating,
-    List<String> tags,
-    List<TorrentInfo> torrents,
-    String archiverKey
-) {
+public final class GalleryMetadata {
+    private final long gid;
+    private final String token;
+    private final String title;
+    private final String titleJpn;
+    private final String category;
+    private final String thumb;
+    private final String uploader;
+    private final int fileCount;
+    private final long fileSize;
+    private final double rating;
+    private final List<String> tags;
+    private final List<TorrentInfo> torrents;
+    private final String archiverKey;
+
+    public GalleryMetadata(long gid, String token, String title, String titleJpn, String category,
+                           String thumb, String uploader, int fileCount, long fileSize, double rating,
+                           List<String> tags, List<TorrentInfo> torrents, String archiverKey) {
+        this.gid = gid;
+        this.token = token;
+        this.title = title;
+        this.titleJpn = titleJpn;
+        this.category = category;
+        this.thumb = thumb;
+        this.uploader = uploader;
+        this.fileCount = fileCount;
+        this.fileSize = fileSize;
+        this.rating = rating;
+        this.tags = tags;
+        this.torrents = torrents;
+        this.archiverKey = archiverKey;
+    }
+
+    public long gid() { return gid; }
+    public String token() { return token; }
+    public String title() { return title; }
+    public String titleJpn() { return titleJpn; }
+    public String category() { return category; }
+    public String thumb() { return thumb; }
+    public String uploader() { return uploader; }
+    public int fileCount() { return fileCount; }
+    public long fileSize() { return fileSize; }
+    public double rating() { return rating; }
+    public List<String> tags() { return tags; }
+    public List<TorrentInfo> torrents() { return torrents; }
+    public String archiverKey() { return archiverKey; }
+
     public String magnetUri(TorrentInfo t) {
         // 构建磁力链接: magnet:?xt=urn:btih:{hash}&dn={name}
         return String.format("magnet:?xt=urn:btih:%s&dn=%s",
@@ -31,13 +63,27 @@ public record GalleryMetadata(
         return java.net.URLEncoder.encode(s, java.nio.charset.StandardCharsets.UTF_8).replace("+", "%20");
     }
 
-    public record TorrentInfo(
-        String hash,
-        String added,
-        String name,
-        String tsize,
-        long fsize
-    ) {}
+    public static final class TorrentInfo {
+        private final String hash;
+        private final String added;
+        private final String name;
+        private final String tsize;
+        private final long fsize;
+
+        public TorrentInfo(String hash, String added, String name, String tsize, long fsize) {
+            this.hash = hash;
+            this.added = added;
+            this.name = name;
+            this.tsize = tsize;
+            this.fsize = fsize;
+        }
+
+        public String hash() { return hash; }
+        public String added() { return added; }
+        public String name() { return name; }
+        public String tsize() { return tsize; }
+        public long fsize() { return fsize; }
+    }
 
     private static long toLong(Object v) {
         if (v instanceof Number n) { return n.longValue(); }
