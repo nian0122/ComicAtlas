@@ -34,7 +34,7 @@ public class VisionAnalyzer {
     private final ObjectMapper objectMapper;
     public VisionAnalyzer(AiProperties properties, ObjectMapper objectMapper) { this.properties = properties; this.objectMapper = objectMapper; }
     private static final int BATCH_SIZE = 6;
-    public String analyze(List<SamplePage> pages, List<String> existingTags) throws IOException {
+    public String analyze(List<SamplePage> pages, List<String> existingTags, List<String> existingCategories) throws IOException {
         if (properties.model().apiKey() == null || properties.model().apiKey().isBlank() || properties.model().modelName() == null || properties.model().modelName().isBlank()) {
             throw new IllegalStateException("AI_API_KEY 和 AI_MODEL 必须配置");
         }
@@ -44,7 +44,7 @@ public class VisionAnalyzer {
             int end = Math.min(start + BATCH_SIZE, pages.size());
             batchResults.add(analyzeBatch(model, pages.subList(start, end), existingTags));
         }
-        JsonNode tagResult = parseModelJson(model, summarizeTags(model, batchResults, existingTags));
+        JsonNode tagResult = parseModelJson(model, summarizeTags(model, batchResults, existingTags, existingCategories));
         JsonNode descriptionResult = parseModelJson(model, summarizeDescription(model, batchResults));
         ObjectNode result = tagResult.isObject() ? (ObjectNode) tagResult : objectMapper.createObjectNode();
         result.put("description", descriptionResult.path("description").asText(""));
@@ -62,13 +62,14 @@ public class VisionAnalyzer {
         return objectMapper.writeValueAsString(parseModelJson(model, response.aiMessage().text()));
     }
 
-    private String summarizeTags(ChatModel model, List<String> batchResults, List<String> existingTags) {
+    private String summarizeTags(ChatModel model, List<String> batchResults, List<String> existingTags, List<String> existingCategories) {
         String prompt = "请根据以下漫画分批分析结果，生成最终标签分类。只输出 JSON："
-                + "{\"titleCandidate\":null,\"authorCandidate\":null,\"tags\":[],\"warnings\":[]}。"
+                + "{\"titleCandidate\":null,\"authorCandidate\":null,\"categoryCandidate\":null,\"tags\":[],\"warnings\":[]}。"
                 + "标签优先从现有标签列表中选择，必须保持现有标签原文；只有没有语义匹配时才允许新增标签。"
+                + "categoryCandidate 只能从现有分类列表中选择一个原文，不能新增分类；没有可靠匹配时填 null。"
                 + "合并同义词、删除重复标签；标签必须是简短名词或短语。只保留至少在两个批次出现，或在一个批次中有明确证据的标签。"
                 + "标题和作者不确定时填 null。响应第一个字符必须是 {，最后一个字符必须是 }，不要输出 Markdown 或任何说明文字。"
-                + "现有标签：" + formatTags(existingTags) + "。分批结果：" + String.join("\n", batchResults);
+                + "现有标签：" + formatTags(existingTags) + "。现有分类：" + formatTags(existingCategories) + "。分批结果：" + String.join("\n", batchResults);
         return model.chat(UserMessage.from(TextContent.from(prompt))).aiMessage().text();
     }
 

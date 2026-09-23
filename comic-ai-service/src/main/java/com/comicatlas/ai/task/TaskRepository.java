@@ -26,6 +26,9 @@ public class TaskRepository {
     public List<String> findExistingTagNames() {
         return jdbcTemplate.query("SELECT name FROM tag WHERE name IS NOT NULL AND name <> '' ORDER BY name", (resultSet, row) -> resultSet.getString("name"));
     }
+    public List<String> findExistingCategoryNames() {
+        return jdbcTemplate.query("SELECT name FROM category WHERE name IS NOT NULL AND name <> '' ORDER BY sort_order, id", (resultSet, row) -> resultSet.getString("name"));
+    }
     @Transactional
     public void persistAnalysisTags(long comicId, JsonNode result) {
         JsonNode tags = result == null ? null : result.get("tags");
@@ -52,6 +55,17 @@ public class TaskRepository {
         }
         jdbcTemplate.update("UPDATE comic SET description = ? WHERE id = ? AND (description IS NULL OR TRIM(description) = '')",
                 description.trim(), comicId);
+    }
+    public void persistAnalysisCategory(long comicId, JsonNode result) {
+        String categoryName = result == null ? "" : result.path("categoryCandidate").asText("").trim();
+        if (categoryName.isBlank()) {
+            return;
+        }
+        Long categoryId = jdbcTemplate.query("SELECT id FROM category WHERE name = ? LIMIT 1",
+                (resultSet, row) -> resultSet.getLong("id"), categoryName).stream().findFirst().orElse(null);
+        if (categoryId != null) {
+            jdbcTemplate.update("UPDATE comic SET category_id = ? WHERE id = ?", categoryId, comicId);
+        }
     }
     public Optional<TaskRecord> find(long id) {
         return jdbcTemplate.query("SELECT id,source_path,status,progress,result_json,error_code,error_message,attempts,created_at,started_at,finished_at FROM ai_analysis_task WHERE id=?", this::map, id).stream().findFirst();

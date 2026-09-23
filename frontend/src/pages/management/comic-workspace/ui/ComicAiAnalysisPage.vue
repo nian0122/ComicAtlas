@@ -36,6 +36,7 @@
         <div v-if="!result" class="empty-copy">完成分析后，这里会显示结果</div>
         <template v-else>
           <div class="description"><span>简介</span><p>{{ result.description || '未生成简介' }}</p></div>
+          <div class="category"><span>分类</span><strong>{{ result.categoryCandidate || '未匹配现有分类' }}</strong></div>
           <div class="tags"><span>标签</span><div><el-tag v-for="tag in result.tags || []" :key="tag" effect="plain">{{ tag }}</el-tag><small v-if="!result.tags?.length">暂无标签</small></div></div>
         </template>
       </div>
@@ -53,7 +54,7 @@ import { aiAnalysisApi, type AiAnalysisTask } from '@/features/ai-analysis/api'
 import type { ComicDetailVO } from '@/entities/comic'
 
 const props = defineProps<{ comicId: number }>()
-interface AnalysisResult { readonly tags?: readonly string[]; readonly description?: string }
+interface AnalysisResult { readonly categoryCandidate?: string | null; readonly tags?: readonly string[]; readonly description?: string }
 const comic = ref<ComicDetailVO | null>(null)
 const task = ref<AiAnalysisTask | null>(null)
 const result = ref<AnalysisResult | null>(null)
@@ -137,6 +138,9 @@ onBeforeUnmount(() => window.clearTimeout(pollTimer))
 .description span, .tags > span { color: var(--text-muted); font-size: 12px; font-weight: 700; }
 .description p { margin: 10px 0 0; color: var(--text-secondary); line-height: 1.8; }
 .tags { display: grid; gap: 10px; padding-top: 16px; border-top: 1px solid var(--border); }
+.category { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 0; border-top: 1px solid var(--border); }
+.category span { color: var(--text-muted); font-size: 12px; font-weight: 700; }
+.category strong { color: var(--text-primary); font-size: 14px; }
 .tags > div { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .tags small { color: var(--text-muted); }
 @media (max-width: 800px) { .ai-grid { grid-template-columns: 1fr; } .ai-hero { align-items: flex-start; } }
