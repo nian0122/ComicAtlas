@@ -14,6 +14,7 @@
       <el-tab-pane name="operations" label="概览与操作" lazy><ComicOperationsPage /></el-tab-pane>
       <el-tab-pane name="edit" label="信息编辑" lazy><ComicEditPage /></el-tab-pane>
       <el-tab-pane name="content" label="目录与存储" lazy><ComicContentWorkspacePage /></el-tab-pane>
+      <el-tab-pane name="ai" label="AI 分析" lazy><ComicAiAnalysisPage :comic-id="comicId" /></el-tab-pane>
     </el-tabs>
   </div>
 </template>
@@ -24,12 +25,13 @@ import { useRoute, useRouter } from 'vue-router'
 import ComicOperationsPage from './ComicOperationsPage.vue'
 import ComicEditPage from './ComicEditPage.vue'
 import ComicContentWorkspacePage from './ComicContentWorkspacePage.vue'
+import ComicAiAnalysisPage from './ComicAiAnalysisPage.vue'
 
-type WorkspaceTab = 'operations' | 'edit' | 'content'
+type WorkspaceTab = 'operations' | 'edit' | 'content' | 'ai'
 const route = useRoute()
 const router = useRouter()
 const comicId = Number(route.params.id)
-const tabs: readonly WorkspaceTab[] = ['operations', 'edit', 'content']
+const tabs: readonly WorkspaceTab[] = ['operations', 'edit', 'content', 'ai']
 
 function normalizeTab(value: unknown): WorkspaceTab {
   if (value === 'structure' || value === 'storage') return 'content'

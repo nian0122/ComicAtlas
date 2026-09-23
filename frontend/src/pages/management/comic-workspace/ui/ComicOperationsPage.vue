@@ -24,31 +24,6 @@
       </div>
     </section>
 
-    <section v-if="comic" class="ai-analysis-card">
-      <div class="ai-analysis-copy">
-        <span class="group-label">AI / ENRICHMENT</span>
-        <h2>分析这本漫画</h2>
-        <p>从当前漫画直接提取标签和简介，结果会自动写回漫画资料。</p>
-      </div>
-      <div class="ai-analysis-action">
-        <div v-if="aiTask" class="ai-task-state">
-          <strong>{{ aiStatusLabel }}</strong>
-          <el-progress :percentage="aiTask.progress" :status="aiProgressStatus" :stroke-width="7" />
-          <small v-if="aiTask.status === 'SUCCEEDED' && aiResult">已生成 {{ aiResult.tags?.length ?? 0 }} 个标签</small>
-          <small v-else-if="aiTask.errorMessage" class="ai-error">{{ aiTask.errorMessage }}</small>
-        </div>
-        <AppButton
-          v-if="!aiTask || ['SUCCEEDED', 'FAILED', 'CANCELLED'].includes(aiTask.status)"
-          variant="primary"
-          :loading="aiSubmitting"
-          @click="startAiAnalysis"
-        >
-          {{ aiTask?.status === 'SUCCEEDED' ? '重新分析' : '开始 AI 分析' }}
-        </AppButton>
-        <AppButton v-else variant="secondary" :loading="aiCancelling" @click="cancelAiAnalysis">取消分析</AppButton>
-      </div>
-    </section>
-
     <el-tabs v-if="comic" v-model="activeTab">
       <el-tab-pane label="可执行操作" name="operations">
         <section class="panel">
@@ -189,7 +164,6 @@ import { trashApi } from '@/features/trash'
 import { comicStatusMeta } from '@/entities/comic'
 import { ComicStatusTag } from '@/entities/comic/ui'
 import { managementTaskStatusLabel, managementTaskTypeLabel } from '@/entities/task'
-import { aiAnalysisApi, type AiAnalysisTask } from '@/features/ai-analysis/api'
 import type { ComicDetailVO, ComicStatus } from '@/entities/comic'
 import type { ManagementTaskVO } from '@/entities/task'
 import type { MediaOperationResult, MqStats, OutboxStats } from '@/entities/management-task'
@@ -197,7 +171,6 @@ import type { ReconcileResult } from '@/features/trash'
 
 type StatusEvent = { readonly status: ComicStatus; readonly at: string }
 type BlockedRow = { readonly operation: string; readonly reason: string }
-type AiAnalysisResult = { readonly tags?: readonly string[]; readonly description?: string }
 const route = useRoute()
 const initialId = Number(route.query['comicId'] ?? route.params['id'])
 const comicId = ref(Number.isSafeInteger(initialId) && initialId > 0 ? initialId : 1)
@@ -216,11 +189,6 @@ const error = ref('')
 const activeTab = ref('operations')
 const exportFormat = ref<'ZIP' | 'CBZ' | 'DIRECTORY'>('ZIP')
 let timer: ReturnType<typeof setInterval> | undefined
-let aiTimer: number | undefined
-const aiTask = ref<AiAnalysisTask | null>(null)
-const aiResult = ref<AiAnalysisResult | null>(null)
-const aiSubmitting = ref(false)
-const aiCancelling = ref(false)
 
 const statusMeta = computed(() => (comic.value ? comicStatusMeta(comic.value.status) : comicStatusMeta('DRAFT')))
 const blockedRows = computed<readonly BlockedRow[]>(() =>
@@ -229,8 +197,6 @@ const blockedRows = computed<readonly BlockedRow[]>(() =>
 const relatedActive = computed(
   () => relatedTasks.value.filter((task) => ['QUEUED', 'RUNNING', 'CANCELLING'].includes(task.status)).length,
 )
-const aiStatusLabel = computed(() => ({ QUEUED: '排队中', RUNNING: '分析中', SUCCEEDED: '分析完成', FAILED: '分析失败', CANCEL_REQUESTED: '取消中', CANCELLED: '已取消' })[aiTask.value?.status ?? 'QUEUED'])
-const aiProgressStatus = computed(() => aiTask.value?.status === 'FAILED' ? 'exception' : aiTask.value?.status === 'SUCCEEDED' ? 'success' : undefined)
 function errorMessage(reason: unknown): string {
   if (axios.isAxiosError<{ message?: string }>(reason)) return reason.response?.data?.message ?? reason.message
   return reason instanceof Error ? reason.message : '未知错误'
@@ -276,52 +242,6 @@ async function runAction(label: string, action: () => Promise<unknown>): Promise
     ElMessage.error(errorMessage(reason))
   } finally {
     loading.value = false
-  }
-}
-async function startAiAnalysis(): Promise<void> {
-  if (!comic.value || aiSubmitting.value) return
-  aiSubmitting.value = true
-  aiResult.value = null
-  try {
-    const created = await aiAnalysisApi.create(comic.value.id)
-    aiTask.value = await aiAnalysisApi.get(created.taskId)
-    scheduleAiPoll()
-    ElMessage.success(`AI 分析任务 #${created.taskId} 已提交`)
-  } catch (reason: unknown) {
-    ElMessage.error(errorMessage(reason))
-  } finally {
-    aiSubmitting.value = false
-  }
-}
-function scheduleAiPoll(): void {
-  window.clearTimeout(aiTimer)
-  aiTimer = window.setTimeout(refreshAiTask, 1500)
-}
-async function refreshAiTask(): Promise<void> {
-  if (!aiTask.value) return
-  try {
-    aiTask.value = await aiAnalysisApi.get(aiTask.value.id)
-    if (aiTask.value.status === 'SUCCEEDED') {
-      aiResult.value = aiTask.value.resultJson ? JSON.parse(aiTask.value.resultJson) : null
-      await loadState(true)
-      return
-    }
-    if (['FAILED', 'CANCELLED'].includes(aiTask.value.status)) return
-    scheduleAiPoll()
-  } catch {
-    scheduleAiPoll()
-  }
-}
-async function cancelAiAnalysis(): Promise<void> {
-  if (!aiTask.value) return
-  aiCancelling.value = true
-  try {
-    await aiAnalysisApi.cancel(aiTask.value.id)
-    await refreshAiTask()
-  } catch (reason: unknown) {
-    ElMessage.error(errorMessage(reason))
-  } finally {
-    aiCancelling.value = false
   }
 }
 function generateLq(regenerate: boolean): void {
@@ -371,7 +291,6 @@ onMounted(() => {
 })
 onBeforeUnmount(() => {
   if (timer !== undefined) clearInterval(timer)
-  window.clearTimeout(aiTimer)
 })
 </script>
 
@@ -420,23 +339,6 @@ onBeforeUnmount(() => {
   justify-self: start;
   width: auto;
 }
-.ai-analysis-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-5);
-  padding: var(--space-5);
-  border: 1px solid #aac9aa;
-  background: linear-gradient(115deg, #eef7ed, #f8fbf4);
-}
-.ai-analysis-copy { display: grid; gap: 6px; }
-.ai-analysis-copy h2 { margin: 0; color: #17312d; font-size: 1.25rem; }
-.ai-analysis-copy p { margin: 0; color: var(--text-muted); font-size: 13px; }
-.ai-analysis-action { display: flex; align-items: center; gap: var(--space-4); min-width: 280px; justify-content: flex-end; }
-.ai-task-state { display: grid; gap: 6px; min-width: 190px; }
-.ai-task-state strong { color: var(--text-primary); font-size: 13px; }
-.ai-task-state small { color: var(--text-muted); font-size: 11px; }
-.ai-error { color: #a34137 !important; }
 .panel {
   margin-bottom: var(--space-4);
 }
@@ -487,8 +389,6 @@ onBeforeUnmount(() => {
   .current-state {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .ai-analysis-card { align-items: flex-start; flex-direction: column; }
-  .ai-analysis-action { width: 100%; justify-content: flex-start; }
 }
 @media (max-width: 480px) {
   .current-state {
