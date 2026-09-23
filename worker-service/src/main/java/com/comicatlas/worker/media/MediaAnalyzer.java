@@ -264,7 +264,17 @@ public class MediaAnalyzer {
         return lastDotIndex >= 0 ? name.substring(lastDotIndex) : "";
     }
 
-    private record ImageDimensions(Integer width, Integer height) {
+    private static final class ImageDimensions {
+        private final Integer width;
+        private final Integer height;
+
+        private ImageDimensions(Integer width, Integer height) {
+            this.width = width;
+            this.height = height;
+        }
+
+        private Integer width() { return width; }
+        private Integer height() { return height; }
     }
 
     private ImageDimensions readImageDims(Path path) {
