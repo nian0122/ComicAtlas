@@ -1,6 +1,7 @@
 package com.comicatlas.common.dto;
 
 import java.util.List;
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
 
 /**
  * MQ 积压与死信统计 — 管理 API 返回。
@@ -20,13 +21,28 @@ import java.util.List;
  * @param queuedTotal 主队列 ready 消息总数
  * @param queues 有积压的队列明细
  */
-public record MqStatsDTO(
-    boolean available,
-    long dlqTotal,
-    int dlqQueues,
-    long queuedTotal,
-    List<MqQueueStat> queues
-) {
+@JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
+public final class MqStatsDTO {
+    private final boolean available;
+    private final long dlqTotal;
+    private final int dlqQueues;
+    private final long queuedTotal;
+    private final List<MqQueueStat> queues;
+
+    public MqStatsDTO(boolean available, long dlqTotal, int dlqQueues, long queuedTotal,
+                      List<MqQueueStat> queues) {
+        this.available = available;
+        this.dlqTotal = dlqTotal;
+        this.dlqQueues = dlqQueues;
+        this.queuedTotal = queuedTotal;
+        this.queues = queues;
+    }
+
+    public boolean available() { return available; }
+    public long dlqTotal() { return dlqTotal; }
+    public int dlqQueues() { return dlqQueues; }
+    public long queuedTotal() { return queuedTotal; }
+    public List<MqQueueStat> queues() { return queues; }
     /**
      * 单队列积压快照。
      *
@@ -35,7 +51,24 @@ public record MqStatsDTO(
      * @param consumers 当前消费者数（0 表示无消费者，消息可能永久堆积）
      * @param dlq 是否死信队列
      */
-    public record MqQueueStat(String name, long messages, long consumers, boolean dlq) {
+    @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
+    public static final class MqQueueStat {
+        private final String name;
+        private final long messages;
+        private final long consumers;
+        private final boolean dlq;
+
+        public MqQueueStat(String name, long messages, long consumers, boolean dlq) {
+            this.name = name;
+            this.messages = messages;
+            this.consumers = consumers;
+            this.dlq = dlq;
+        }
+
+        public String name() { return name; }
+        public long messages() { return messages; }
+        public long consumers() { return consumers; }
+        public boolean dlq() { return dlq; }
     }
 
     /** Management API 不可用时返回的降级统计。 */
