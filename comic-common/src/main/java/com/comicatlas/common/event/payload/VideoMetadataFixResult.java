@@ -1,6 +1,9 @@
 package com.comicatlas.common.event.payload;
 
 import java.math.BigDecimal;
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * 单个视频的 ffprobe 分析结果，由视频元数据修复事件携带并用于更新 page 媒体属性。
@@ -14,13 +17,36 @@ import java.math.BigDecimal;
  * @param videoCodec 视频编码名称
  * @param audioCodec 音频编码名称
  */
-public record VideoMetadataFixResult(
-    Long pageId,
-    Integer width,
-    Integer height,
-    BigDecimal duration,
-    String container,
-    String videoCodec,
-    String audioCodec
-) {
+@JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
+public final class VideoMetadataFixResult {
+    private final Long pageId;
+    private final Integer width;
+    private final Integer height;
+    private final BigDecimal duration;
+    private final String container;
+    private final String videoCodec;
+    private final String audioCodec;
+
+    @JsonCreator
+    public VideoMetadataFixResult(@JsonProperty("pageId") Long pageId, @JsonProperty("width") Integer width,
+                                  @JsonProperty("height") Integer height, @JsonProperty("duration") BigDecimal duration,
+                                  @JsonProperty("container") String container,
+                                  @JsonProperty("videoCodec") String videoCodec,
+                                  @JsonProperty("audioCodec") String audioCodec) {
+        this.pageId = pageId;
+        this.width = width;
+        this.height = height;
+        this.duration = duration;
+        this.container = container;
+        this.videoCodec = videoCodec;
+        this.audioCodec = audioCodec;
+    }
+
+    public Long pageId() { return pageId; }
+    public Integer width() { return width; }
+    public Integer height() { return height; }
+    public BigDecimal duration() { return duration; }
+    public String container() { return container; }
+    public String videoCodec() { return videoCodec; }
+    public String audioCodec() { return audioCodec; }
 }

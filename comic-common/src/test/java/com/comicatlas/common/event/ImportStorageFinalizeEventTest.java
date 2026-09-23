@@ -164,9 +164,15 @@ class ImportStorageFinalizeEventTest {
         assertAllowedPayloadTypes(ImportStorageFinalizeCompletedEvent.class);
         assertAllowedPayloadTypes(ImportStorageFinalizeFailedEvent.class);
 
-        for (RecordComponent component : FinalizeMediaMapping.class.getRecordComponents()) {
-            assertTrue(component.getType() == String.class,
-                    "FinalizeMediaMapping 组件 " + component.getName() + " 必须为 String");
+        assertEquals(String.class, methodReturnType("sourcePath"));
+        assertEquals(String.class, methodReturnType("targetPath"));
+    }
+
+    private static Class<?> methodReturnType(String methodName) {
+        try {
+            return FinalizeMediaMapping.class.getMethod(methodName).getReturnType();
+        } catch (NoSuchMethodException exception) {
+            throw new AssertionError("FinalizeMediaMapping 缺少组件访问器: " + methodName, exception);
         }
     }
 

@@ -1,6 +1,9 @@
 package com.comicatlas.common.event.payload;
 
 import java.math.BigDecimal;
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * 转码完成后回传的新视频文件元数据（ffprobe 实测）。
@@ -14,14 +17,37 @@ import java.math.BigDecimal;
  * <p>
  * 为保持事件契约向后兼容，老消息缺少字段时 Jackson 反序列化为 null。
  */
-public record TranscodeMediaInfo(
-    BigDecimal duration,
-    String container,
-    String videoCodec,
-    String audioCodec,
-    Long fileSize,
-    String newHqPath
-) {
+@JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
+public final class TranscodeMediaInfo {
+    private final BigDecimal duration;
+    private final String container;
+    private final String videoCodec;
+    private final String audioCodec;
+    private final Long fileSize;
+    private final String newHqPath;
+
+    @JsonCreator
+    public TranscodeMediaInfo(@JsonProperty("duration") BigDecimal duration,
+                              @JsonProperty("container") String container,
+                              @JsonProperty("videoCodec") String videoCodec,
+                              @JsonProperty("audioCodec") String audioCodec,
+                              @JsonProperty("fileSize") Long fileSize,
+                              @JsonProperty("newHqPath") String newHqPath) {
+        this.duration = duration;
+        this.container = container;
+        this.videoCodec = videoCodec;
+        this.audioCodec = audioCodec;
+        this.fileSize = fileSize;
+        this.newHqPath = newHqPath;
+    }
+
+    public BigDecimal duration() { return duration; }
+    public String container() { return container; }
+    public String videoCodec() { return videoCodec; }
+    public String audioCodec() { return audioCodec; }
+    public Long fileSize() { return fileSize; }
+    public String newHqPath() { return newHqPath; }
+
     /**
      * 兼容旧构造调用（不含 newHqPath）：视为未知新路径，API 侧回退 {@code deriveTranscodedPath}。
      */
