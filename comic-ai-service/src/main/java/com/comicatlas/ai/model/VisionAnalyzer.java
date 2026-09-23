@@ -4,6 +4,7 @@ import com.comicatlas.ai.analysis.SamplePage;
 import com.comicatlas.ai.config.AiProperties;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.langchain4j.data.image.Image;
 import dev.langchain4j.data.message.Content;
 import dev.langchain4j.data.message.ImageContent;
@@ -43,9 +44,11 @@ public class VisionAnalyzer {
             int end = Math.min(start + BATCH_SIZE, pages.size());
             batchResults.add(analyzeBatch(model, pages.subList(start, end), existingTags));
         }
-        String text = summarize(model, batchResults, existingTags);
-        JsonNode json = parseModelJson(model, text);
-        return objectMapper.writeValueAsString(json);
+        JsonNode tagResult = parseModelJson(model, summarizeTags(model, batchResults, existingTags));
+        JsonNode descriptionResult = parseModelJson(model, summarizeDescription(model, batchResults));
+        ObjectNode result = tagResult.isObject() ? (ObjectNode) tagResult : objectMapper.createObjectNode();
+        result.put("description", descriptionResult.path("description").asText(""));
+        return objectMapper.writeValueAsString(result);
     }
 
     private String analyzeBatch(ChatModel model, List<SamplePage> pages, List<String> existingTags) throws IOException {
@@ -59,13 +62,21 @@ public class VisionAnalyzer {
         return objectMapper.writeValueAsString(parseModelJson(model, response.aiMessage().text()));
     }
 
-    private String summarize(ChatModel model, List<String> batchResults, List<String> existingTags) {
-        String prompt = "请根据以下漫画分批分析结果，生成最终分类结果。只输出 JSON："
-                + "{\"titleCandidate\":null,\"authorCandidate\":null,\"tags\":[],\"description\":\"\",\"warnings\":[]}。"
+    private String summarizeTags(ChatModel model, List<String> batchResults, List<String> existingTags) {
+        String prompt = "请根据以下漫画分批分析结果，生成最终标签分类。只输出 JSON："
+                + "{\"titleCandidate\":null,\"authorCandidate\":null,\"tags\":[],\"warnings\":[]}。"
                 + "标签优先从现有标签列表中选择，必须保持现有标签原文；只有没有语义匹配时才允许新增标签。"
                 + "合并同义词、删除重复标签；标签必须是简短名词或短语。只保留至少在两个批次出现，或在一个批次中有明确证据的标签。"
-                + "标题和作者不确定时填 null，简介只能概括抽样结果，不要臆测全书。响应第一个字符必须是 {，最后一个字符必须是 }，不要输出 Markdown 或任何说明文字。"
+                + "标题和作者不确定时填 null。响应第一个字符必须是 {，最后一个字符必须是 }，不要输出 Markdown 或任何说明文字。"
                 + "现有标签：" + formatTags(existingTags) + "。分批结果：" + String.join("\n", batchResults);
+        return model.chat(UserMessage.from(TextContent.from(prompt))).aiMessage().text();
+    }
+
+    private String summarizeDescription(ChatModel model, List<String> batchResults) {
+        String prompt = "请根据以下漫画分批分析结果生成客观的中文漫画简介。只输出 JSON：{\"description\":\"\"}。"
+                + "简介控制在 80 到 200 字，只概括抽样页面中反复或明确出现的内容。"
+                + "不要臆测整本剧情、标题、作者、人物身份或抽样页之外的信息，不要罗列标签，不要输出 Markdown 或说明文字。"
+                + "响应第一个字符必须是 {，最后一个字符必须是 }。分批结果：" + String.join("\n", batchResults);
         return model.chat(UserMessage.from(TextContent.from(prompt))).aiMessage().text();
     }
 

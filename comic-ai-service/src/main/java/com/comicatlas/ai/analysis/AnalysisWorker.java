@@ -28,7 +28,9 @@ public class AnalysisWorker {
             String result = analyzer.analyze(pages, taskRepository.findExistingTagNames());
             taskRepository.progress(taskId, 90);
             JsonNode resultJson = objectMapper.readTree(result);
-            taskRepository.persistAnalysisTags(comicIdFromSourcePath(taskRepository.find(taskId).orElseThrow().sourcePath()), resultJson);
+            long comicId = comicIdFromSourcePath(taskRepository.find(taskId).orElseThrow().sourcePath());
+            taskRepository.persistAnalysisTags(comicId, resultJson);
+            taskRepository.persistAnalysisDescription(comicId, resultJson.path("description").asText(""));
             taskRepository.progress(taskId, 95);
             taskRepository.succeed(taskId, result);
         } catch (Exception exception) {

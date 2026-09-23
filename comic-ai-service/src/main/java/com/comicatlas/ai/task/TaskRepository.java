@@ -46,6 +46,13 @@ public class TaskRepository {
             jdbcTemplate.update("INSERT IGNORE INTO comic_tag(comic_id, tag_id) VALUES (?, ?)", comicId, tagId);
         }
     }
+    public void persistAnalysisDescription(long comicId, String description) {
+        if (description == null || description.isBlank()) {
+            return;
+        }
+        jdbcTemplate.update("UPDATE comic SET description = ? WHERE id = ? AND (description IS NULL OR TRIM(description) = '')",
+                description.trim(), comicId);
+    }
     public Optional<TaskRecord> find(long id) {
         return jdbcTemplate.query("SELECT id,source_path,status,progress,result_json,error_code,error_message,attempts,created_at,started_at,finished_at FROM ai_analysis_task WHERE id=?", this::map, id).stream().findFirst();
     }
