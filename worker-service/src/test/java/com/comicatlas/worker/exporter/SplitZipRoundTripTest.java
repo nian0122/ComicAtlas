@@ -87,12 +87,17 @@ class SplitZipRoundTripTest {
     private static final String ROOT_DIR = "测试漫画";
 
     /** 导出清单条目 — 目标章节目录 + 文件名 + 媒体类型 + 未压缩字节数。 */
-    private record SourceFile(String chapterDir, String fileName, String mediaType, int size) {
+    private static final class SourceFile {
+        private final String chapterDir; private final String fileName; private final String mediaType; private final int size;
+        private SourceFile(String chapterDir, String fileName, String mediaType, int size) { this.chapterDir=chapterDir; this.fileName=fileName; this.mediaType=mediaType; this.size=size; }
+        private String chapterDir(){return chapterDir;} private String fileName(){return fileName;} private String mediaType(){return mediaType;} private int size(){return size;}
     }
 
     /** 导出夹具 — 章节、媒体记录与「ZIP 内相对条目 → 原始字节」映射。 */
-    private record ExportFixture(List<ChapterRecord> chapters, List<MediaRecord> media,
-                                 Map<String, byte[]> expectedByZipRelative) {
+    private static final class ExportFixture {
+        private final List<ChapterRecord> chapters; private final List<MediaRecord> media; private final Map<String, byte[]> expectedByZipRelative;
+        private ExportFixture(List<ChapterRecord> chapters, List<MediaRecord> media, Map<String, byte[]> expectedByZipRelative) { this.chapters=chapters; this.media=media; this.expectedByZipRelative=expectedByZipRelative; }
+        private List<ChapterRecord> chapters(){return chapters;} private List<MediaRecord> media(){return media;} private Map<String, byte[]> expectedByZipRelative(){return expectedByZipRelative;}
     }
 
     @TempDir
