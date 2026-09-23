@@ -34,7 +34,18 @@ public class ExternalProcessRunner {
     private final ThreadPoolTaskExecutor processIoExecutor;
 
     /** 外部进程执行结果：退出码 + 已消费的 stdout 内容。 */
-    public record ExternalProcessResult(int exitCode, String stdout) {}
+    public static final class ExternalProcessResult {
+        private final int exitCode;
+        private final String stdout;
+
+        public ExternalProcessResult(int exitCode, String stdout) {
+            this.exitCode = exitCode;
+            this.stdout = stdout;
+        }
+
+        public int exitCode() { return exitCode; }
+        public String stdout() { return stdout; }
+    }
 
     /** 进程超时异常（内部异常，由调用方决定如何呈现）。 */
     public static class ProcessTimeoutException extends RuntimeException {

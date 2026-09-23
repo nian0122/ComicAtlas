@@ -56,28 +56,65 @@ public final class CoverCandidateSelector {
      * @param fileName    文件名
      * @param hqPath      HQ 存储相对路径句柄（透传，选择器不校验）
      */
-    public record MediaCandidate(
-            String mediaType,
-            int globalOrder,
-            int pageNumber,
-            String sourceDir,
-            String fileName,
-            String hqPath
-    ) {}
+    public static final class MediaCandidate {
+        private final String mediaType;
+        private final int globalOrder;
+        private final int pageNumber;
+        private final String sourceDir;
+        private final String fileName;
+        private final String hqPath;
+
+        public MediaCandidate(String mediaType, int globalOrder, int pageNumber,
+                              String sourceDir, String fileName, String hqPath) {
+            this.mediaType = mediaType;
+            this.globalOrder = globalOrder;
+            this.pageNumber = pageNumber;
+            this.sourceDir = sourceDir;
+            this.fileName = fileName;
+            this.hqPath = hqPath;
+        }
+
+        public String mediaType() { return mediaType; }
+        public int globalOrder() { return globalOrder; }
+        public int pageNumber() { return pageNumber; }
+        public String sourceDir() { return sourceDir; }
+        public String fileName() { return fileName; }
+        public String hqPath() { return hqPath; }
+    }
 
     /**
      * 排序后的封面候选：优先级越靠前越先尝试。
      */
-    public record CoverCandidate(
-            String mediaType,
-            int priority,
-            int depth,
-            String naturalPath,
-            int globalOrder,
-            int pageNumber,
-            String fileName,
-            String hqPath
-    ) implements Comparable<CoverCandidate> {
+    public static final class CoverCandidate implements Comparable<CoverCandidate> {
+        private final String mediaType;
+        private final int priority;
+        private final int depth;
+        private final String naturalPath;
+        private final int globalOrder;
+        private final int pageNumber;
+        private final String fileName;
+        private final String hqPath;
+
+        public CoverCandidate(String mediaType, int priority, int depth, String naturalPath,
+                              int globalOrder, int pageNumber, String fileName, String hqPath) {
+            this.mediaType = mediaType;
+            this.priority = priority;
+            this.depth = depth;
+            this.naturalPath = naturalPath;
+            this.globalOrder = globalOrder;
+            this.pageNumber = pageNumber;
+            this.fileName = fileName;
+            this.hqPath = hqPath;
+        }
+
+        public String mediaType() { return mediaType; }
+        public int priority() { return priority; }
+        public int depth() { return depth; }
+        public String naturalPath() { return naturalPath; }
+        public int globalOrder() { return globalOrder; }
+        public int pageNumber() { return pageNumber; }
+        public String fileName() { return fileName; }
+        public String hqPath() { return hqPath; }
 
         @Override
         public int compareTo(CoverCandidate other) {
