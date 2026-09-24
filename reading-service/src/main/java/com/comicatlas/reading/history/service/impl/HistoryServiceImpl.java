@@ -41,32 +41,6 @@ public class HistoryServiceImpl implements HistoryService {
     private final FileUrlResolver fileUrlResolver;
 
     @Override
-    public List<HistoryVO> listHistory() {
-        List<ReadingHistory> histories = readingHistoryMapper.selectRecentHistory();
-        if (histories.isEmpty()) {
-            return List.of();
-        }
-
-        List<Long> comicIds = histories.stream()
-                .map(ReadingHistory::getComicId).distinct().toList();
-        Map<Long, Comic> comicMap = comicMapper.selectHistoryComicsByIds(comicIds)
-                .stream()
-                .collect(Collectors.toMap(Comic::getId, Function.identity(), (first, duplicate) -> first));
-
-        List<Long> chapterIds = histories.stream()
-                .map(ReadingHistory::getChapterId).filter(Objects::nonNull).distinct().toList();
-        Map<Long, Chapter> chapterMap = chapterIds.isEmpty()
-                ? Map.of()
-                : chapterMapper.selectHistoryChaptersByIds(chapterIds)
-                    .stream()
-                    .collect(Collectors.toMap(Chapter::getId, Function.identity(), (first, duplicate) -> first));
-
-        return histories.stream()
-                .map(history -> buildVO(history, comicMap, chapterMap))
-                .toList();
-    }
-
-    @Override
     public HistoryPageVO pageHistory(long page, long size) {
         long currentPage = Math.max(page, 1);
         long pageSize = Math.min(Math.max(size, 1), 50);

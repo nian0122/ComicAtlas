@@ -27,7 +27,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -49,61 +48,6 @@ class HistoryServiceTest {
 
     @InjectMocks
     private HistoryServiceImpl service;
-
-    @Test
-    void listHistory_shouldBatchLoadComicsAndChapters_notPerRow() {
-        ReadingHistory h1 = history(1L, 10L, 100L);
-        ReadingHistory h2 = history(2L, 20L, 200L);
-        when(historyMapper.selectRecentHistory()).thenReturn(List.of(h1, h2));
-
-        Comic comic1 = comic(10L, "火影");
-        Comic comic2 = comic(20L, "海贼");
-        when(comicMapper.selectHistoryComicsByIds(any())).thenReturn(List.of(comic1, comic2));
-
-        Chapter ch1 = chapter(100L, "1");
-        Chapter ch2 = chapter(200L, "2");
-        when(chapterMapper.selectHistoryChaptersByIds(any())).thenReturn(List.of(ch1, ch2));
-
-        List<HistoryVO> result = service.listHistory();
-
-        assertEquals(2, result.size());
-        assertEquals("火影", result.get(0).getComicTitle());
-        assertEquals("1", result.get(0).getChapterNo());
-        assertEquals("海贼", result.get(1).getComicTitle());
-        assertEquals("2", result.get(1).getChapterNo());
-
-        verify(comicMapper).selectHistoryComicsByIds(any());
-        verify(comicMapper, never()).selectById(any());
-        verify(chapterMapper).selectHistoryChaptersByIds(any());
-        verify(chapterMapper, never()).selectById(any());
-    }
-
-    @Test
-    void listHistory_shouldHandleMissingComicOrChapter() {
-        ReadingHistory h = history(1L, 99L, 999L);
-        when(historyMapper.selectRecentHistory()).thenReturn(List.of(h));
-        when(comicMapper.selectHistoryComicsByIds(any())).thenReturn(List.of());
-        when(chapterMapper.selectHistoryChaptersByIds(any())).thenReturn(List.of());
-
-        List<HistoryVO> result = service.listHistory();
-
-        assertEquals(1, result.size());
-        assertNull(result.get(0).getComicTitle());
-        assertNull(result.get(0).getChapterNo());
-    }
-
-    @Test
-    void listHistory_shouldSkipChapterBatch_whenNoChapterIds() {
-        ReadingHistory h = history(1L, 10L, null);
-        when(historyMapper.selectRecentHistory()).thenReturn(List.of(h));
-        when(comicMapper.selectHistoryComicsByIds(any())).thenReturn(List.of(comic(10L, "火影")));
-
-        List<HistoryVO> result = service.listHistory();
-
-        assertEquals(1, result.size());
-        assertEquals("火影", result.get(0).getComicTitle());
-        verify(chapterMapper, never()).selectHistoryChaptersByIds(any());
-    }
 
     @Test
     void pageHistory_shouldReturnPagedRecordsAndMetadata() {
@@ -128,13 +72,16 @@ class HistoryServiceTest {
     void historyVO_shouldCalculateProgressByCurrentChapterPageCount() {
         ReadingHistory history = history(1L, 10L, 100L);
         history.setPageNumber(8);
-        when(historyMapper.selectRecentHistory()).thenReturn(List.of(history));
+        Page<ReadingHistory> page = new Page<>(1, 20);
+        page.setRecords(List.of(history));
+        page.setTotal(1);
+        when(historyMapper.selectRecentHistoryPage(any())).thenReturn(page);
         when(comicMapper.selectHistoryComicsByIds(any())).thenReturn(List.of(comic(10L, "火影")));
         Chapter chapter = chapter(100L, "1");
         chapter.setPageCount(20);
         when(chapterMapper.selectHistoryChaptersByIds(any())).thenReturn(List.of(chapter));
 
-        HistoryVO result = service.listHistory().get(0);
+        HistoryVO result = service.pageHistory(1, 20).getRecords().get(0);
 
         assertEquals(20, result.getTotalPages());
         assertEquals(40, result.getProgressPercent());

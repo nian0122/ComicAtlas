@@ -19,10 +19,6 @@ public interface ReadingHistoryMapper extends BaseMapper<ReadingHistory> {
 
     @Select("SELECT comic_id, chapter_id, page_number, updated_at FROM reading_history "
             + "ORDER BY updated_at DESC")
-    List<ReadingHistory> selectRecentHistory();
-
-    @Select("SELECT comic_id, chapter_id, page_number, updated_at FROM reading_history "
-            + "ORDER BY updated_at DESC")
     IPage<ReadingHistory> selectRecentHistoryPage(Page<ReadingHistory> page);
 
     @Select("<script>SELECT comic_id, chapter_id, page_number FROM reading_history WHERE comic_id IN "

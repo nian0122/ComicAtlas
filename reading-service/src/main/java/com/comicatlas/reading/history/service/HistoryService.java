@@ -13,8 +13,6 @@ import java.util.List;
  */
 public interface HistoryService {
 
-    List<HistoryVO> listHistory();
-
     HistoryPageVO pageHistory(long page, long size);
 
     HistoryVO getHistory(Long comicId);
