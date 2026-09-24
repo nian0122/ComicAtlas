@@ -54,28 +54,4 @@ class ComicSearchControllerTest {
                 .andExpect(jsonPath("$.data.records[0].title").value("Test Comic"));
     }
 
-    @Test
-    void autocompleteTitles_shouldReturnSuggestions() throws Exception {
-        when(comicQueryService.autocompleteTitles("Test")).thenReturn(List.of("Test Comic", "Test Book"));
-
-        mockMvc.perform(get("/api/comics/autocomplete")
-                        .param("keyword", "Test")
-                        .accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.data[0]").value("Test Comic"))
-                .andExpect(jsonPath("$.data[1]").value("Test Book"));
-    }
-
-    @Test
-    void autocompleteTitles_shouldReturnEmpty_whenKeywordBlank() throws Exception {
-        when(comicQueryService.autocompleteTitles("")).thenReturn(List.of());
-
-        mockMvc.perform(get("/api/comics/autocomplete")
-                        .param("keyword", "")
-                        .accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.data").isEmpty());
-    }
 }

@@ -4,8 +4,6 @@ import com.comicatlas.reading.history.dto.HistoryUpdateRequest;
 import com.comicatlas.reading.history.dto.HistoryPageVO;
 import com.comicatlas.reading.history.dto.HistoryVO;
 
-import java.util.List;
-
 /**
  * 阅读历史接口（阅读域）。
  * <p>

@@ -5,8 +5,6 @@ import type { CatalogNode, ComicDetailVO, ComicListQuery, ComicListVO } from '@/
 export const comicApi = {
   list: (params?: ComicListQuery) => api.get<PageResult<ComicListVO>>('/comics', { params }),
   detail: (id: number) => api.get<ComicDetailVO>(`/comics/${id}`),
-  getMetadata: (id: number) => api.get(`/comics/${id}/metadata`),
-  getTags: (id: number) => api.get(`/comics/${id}/tags`),
 }
 
 export const catalogApi = {

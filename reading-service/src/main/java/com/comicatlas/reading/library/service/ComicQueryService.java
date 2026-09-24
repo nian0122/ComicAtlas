@@ -1,9 +1,6 @@
 package com.comicatlas.reading.library.service;
 
 import com.comicatlas.contract.comic.dto.ComicDetailVO;
-import com.comicatlas.contract.comic.dto.ComicMetadataDTO;
-
-import java.util.List;
 
 /**
  * 漫画查询接口（阅读域）。
@@ -14,10 +11,4 @@ import java.util.List;
 public interface ComicQueryService {
 
     ComicDetailVO getComicDetail(Long id);
-
-    ComicMetadataDTO getMetadata(Long id);
-
-    List<Long> getComicTags(Long comicId);
-
-    List<String> autocompleteTitles(String keyword);
 }
