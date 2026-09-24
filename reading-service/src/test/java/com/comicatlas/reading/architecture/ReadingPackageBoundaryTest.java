@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -14,7 +15,7 @@ class ReadingPackageBoundaryTest {
     @Test
     void controllersMustNotDependOnPersistenceMappers() throws IOException {
         Path root = sourceRoot().resolve("reading");
-        try (var files = Files.walk(root)) {
+        try (Stream<Path> files = Files.walk(root)) {
             files.filter(path -> path.toString().endsWith("Controller.java"))
                     .forEach(path -> assertNoMapperImport(path));
         }
@@ -23,7 +24,7 @@ class ReadingPackageBoundaryTest {
     @Test
     void servicesMustNotDependOnControllers() throws IOException {
         Path root = sourceRoot().resolve("reading");
-        try (var files = Files.walk(root)) {
+        try (Stream<Path> files = Files.walk(root)) {
             files.filter(path -> path.toString().endsWith("Service.java"))
                     .forEach(path -> {
                         try {

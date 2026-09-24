@@ -5,6 +5,7 @@ import com.comicatlas.reading.library.service.impl.ComicListQueryServiceImpl;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.contract.comic.dto.ComicListQuery;
 import com.comicatlas.reading.library.dto.ComicListVO;
+import com.comicatlas.reading.library.dto.ComicListPage;
 import com.comicatlas.persistence.comic.entity.Category;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.mapper.CategoryMapper;
@@ -68,7 +69,7 @@ class ComicListServiceTest {
         when(categoryMapper.selectBatchIds(List.of(10L))).thenReturn(List.of(category));
         when(historyMapper.selectByComicIds(List.of(1L, 2L))).thenReturn(List.of(history));
 
-        var result = service.listComics(query);
+        ComicListPage result = service.listComics(query);
 
         List<ComicListVO> records = result.getRecords();
         assertEquals(2, records.size());
@@ -92,7 +93,7 @@ class ComicListServiceTest {
         Page<Comic> comicPage = new Page<>(1, 20, 0);
         when(comicMapper.selectPage(any(Page.class), same(query))).thenReturn(comicPage);
 
-        var result = service.listComics(query);
+        ComicListPage result = service.listComics(query);
 
         assertEquals(0, result.getRecords().size());
         verifyNoInteractions(categoryMapper, historyMapper);

@@ -1,12 +1,13 @@
 package com.comicatlas.reading.library.controller;
 
-import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.comicatlas.contract.common.Result;
 import com.comicatlas.contract.common.dto.PageResponse;
 import com.comicatlas.contract.comic.dto.ComicDetailVO;
 import com.comicatlas.contract.comic.dto.ComicListQuery;
 import com.comicatlas.reading.library.dto.ComicListVO;
 import com.comicatlas.contract.comic.dto.ComicMetadataDTO;
+import com.comicatlas.reading.library.dto.ComicListPage;
+import com.comicatlas.reading.library.service.ComicListQueryService;
 import com.comicatlas.reading.library.service.ComicQueryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,6 +30,7 @@ import java.util.List;
 public class ReadingComicController {
 
     private final ComicQueryService comicQueryService;
+    private final ComicListQueryService comicListQueryService;
 
     /**
      * 分页查询漫画列表。
@@ -38,7 +40,7 @@ public class ReadingComicController {
      */
     @GetMapping("/comics")
     public Result<PageResponse<ComicListVO>> listComics(ComicListQuery query) {
-        IPage<ComicListVO> comicPage = comicQueryService.listComics(query);
+        ComicListPage comicPage = comicListQueryService.listComics(query);
         return Result.ok(PageResponse.of(comicPage.getRecords(), comicPage.getTotal(),
                 comicPage.getCurrent(), comicPage.getSize()));
     }

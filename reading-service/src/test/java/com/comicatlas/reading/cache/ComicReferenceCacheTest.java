@@ -22,15 +22,18 @@ import com.comicatlas.reading.library.service.impl.CategoryQueryServiceImpl;
 import com.comicatlas.reading.library.service.impl.ComicListQueryServiceImpl;
 import com.comicatlas.reading.library.service.impl.TagQueryServiceImpl;
 import com.comicatlas.reading.testutil.MybatisPlusLambdaCacheExtension;
+import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 
 import java.util.List;
@@ -83,7 +86,7 @@ class ComicReferenceCacheTest {
                 ComicReferenceCache.CATEGORIES,
                 ComicReferenceCache.TAGS,
                 ComicReferenceCache.COMIC_LIST)) {
-            var cache = cacheManager.getCache(name);
+            Cache cache = cacheManager.getCache(name);
             if (cache != null) {
                 cache.clear();
             }
@@ -135,8 +138,8 @@ class ComicReferenceCacheTest {
         comicPage.setRecords(List.of(comic(1L)));
         when(comicMapper.selectPage(any(Page.class), same(query))).thenReturn(comicPage);
 
-        comicListService.loadPage(query);
-        comicListService.loadPage(query);
+        comicListService.listComics(query);
+        comicListService.listComics(query);
 
         verify(comicMapper).selectPage(any(Page.class), same(query));
     }
@@ -177,8 +180,8 @@ class ComicReferenceCacheTest {
         comicPage.setRecords(List.of());
         when(comicMapper.selectPage(any(Page.class), same(query))).thenReturn(comicPage);
 
-        comicListService.loadPage(query);
-        comicListService.loadPage(query);
+        comicListService.listComics(query);
+        comicListService.listComics(query);
 
         verify(comicMapper, times(2)).selectPage(any(Page.class), same(query));
     }
@@ -190,14 +193,14 @@ class ComicReferenceCacheTest {
         vo.setTitle("测试");
         vo.setCreatedAt(java.time.LocalDateTime.of(2026, 8, 1, 10, 30));
 
-        var ptv = com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator.builder()
+        BasicPolymorphicTypeValidator typeValidator = BasicPolymorphicTypeValidator.builder()
                 .allowIfSubType("com.comicatlas.")
                 .allowIfSubType("java.util.")
                 .build();
-        var serializer = new org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer(
+        GenericJackson2JsonRedisSerializer serializer = new GenericJackson2JsonRedisSerializer(
                 com.fasterxml.jackson.databind.json.JsonMapper.builder()
                         .addModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
-                        .activateDefaultTyping(ptv, com.fasterxml.jackson.databind.ObjectMapper.DefaultTyping.NON_FINAL)
+                        .activateDefaultTyping(typeValidator, com.fasterxml.jackson.databind.ObjectMapper.DefaultTyping.NON_FINAL)
                         .build());
 
         ComicListPage page = new ComicListPage();
@@ -227,14 +230,14 @@ class ComicReferenceCacheTest {
         page.setCurrent(1);
         page.setSize(20);
 
-        var ptv = com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator.builder()
+        BasicPolymorphicTypeValidator typeValidator = BasicPolymorphicTypeValidator.builder()
                 .allowIfSubType("com.comicatlas.")
                 .allowIfSubType("java.util.")
                 .build();
-        var serializer = new org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer(
+        GenericJackson2JsonRedisSerializer serializer = new GenericJackson2JsonRedisSerializer(
                 com.fasterxml.jackson.databind.json.JsonMapper.builder()
                         .addModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
-                        .activateDefaultTyping(ptv, com.fasterxml.jackson.databind.ObjectMapper.DefaultTyping.NON_FINAL)
+                        .activateDefaultTyping(typeValidator, com.fasterxml.jackson.databind.ObjectMapper.DefaultTyping.NON_FINAL)
                         .build());
 
         Object restored = serializer.deserialize(serializer.serialize(page));

@@ -1,11 +1,6 @@
 package com.comicatlas.reading.library.service.impl;
 
-import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.contract.comic.dto.ComicDetailVO;
-import com.comicatlas.reading.library.dto.ComicListPage;
-import com.comicatlas.contract.comic.dto.ComicListQuery;
-import com.comicatlas.reading.library.dto.ComicListVO;
 import com.comicatlas.contract.comic.dto.ComicMetadataDTO;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.exception.BusinessException;
@@ -13,8 +8,6 @@ import com.comicatlas.persistence.comic.assembler.ComicDetailAssembler;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.persistence.comic.mapper.ComicTagMapper;
-import com.comicatlas.reading.library.service.ComicListQueryService;
-import com.comicatlas.reading.library.support.ComicListQueryNormalizer;
 import com.comicatlas.reading.library.service.ComicQueryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -29,20 +22,8 @@ public class ComicQueryServiceImpl implements ComicQueryService {
     private static final int AUTOCOMPLETE_LIMIT = 10;
 
     private final ComicMapper comicMapper;
-    private final ComicListQueryService comicListQueryService;
     private final ComicTagMapper comicTagMapper;
     private final ComicDetailAssembler comicDetailAssembler;
-
-    @Override
-    public IPage<ComicListVO> listComics(ComicListQuery query) {
-        ComicListQueryNormalizer.normalize(query);
-        // 直接调用 loadPage（走代理，触发 @Cacheable），再组装为 IPage 返回
-        ComicListPage comicListPage = comicListQueryService.loadPage(query);
-        Page<ComicListVO> page = new Page<>(
-                comicListPage.getCurrent(), comicListPage.getSize(), comicListPage.getTotal());
-        page.setRecords(comicListPage.getRecords());
-        return page;
-    }
 
     @Override
     public ComicDetailVO getComicDetail(Long id) {
@@ -60,12 +41,12 @@ public class ComicQueryServiceImpl implements ComicQueryService {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在");
         }
 
-        ComicMetadataDTO metadataDto = new ComicMetadataDTO();
-        metadataDto.setTitle(comic.getTitle());
-        metadataDto.setAuthor(comic.getAuthor());
-        metadataDto.setDescription(comic.getDescription());
-        metadataDto.setCategoryId(comic.getCategoryId());
-        return metadataDto;
+        ComicMetadataDTO metadata = new ComicMetadataDTO();
+        metadata.setTitle(comic.getTitle());
+        metadata.setAuthor(comic.getAuthor());
+        metadata.setDescription(comic.getDescription());
+        metadata.setCategoryId(comic.getCategoryId());
+        return metadata;
     }
 
     @Override

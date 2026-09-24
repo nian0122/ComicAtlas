@@ -3,10 +3,13 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
-        <groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.3.0</version><relativePath/>
+        <groupId>com.comicatlas</groupId>
+        <artifactId>comic-atlas</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
     </parent>
-    <groupId>com.comicatlas</groupId><artifactId>comic-ai-service</artifactId><version>0.1.0-SNAPSHOT</version>
+    <artifactId>comic-ai-service</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
     <properties><java.version>21</java.version><langchain4j.version>1.20.0</langchain4j.version></properties>
     <dependencies>
         <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-web</artifactId></dependency>
@@ -15,5 +18,4 @@
         <dependency><groupId>dev.langchain4j</groupId><artifactId>langchain4j-open-ai</artifactId><version>${langchain4j.version}</version></dependency>
         <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-test</artifactId><scope>test</scope></dependency>
     </dependencies>
-    <build><plugins><plugin><groupId>org.springframework.boot</groupId><artifactId>spring-boot-maven-plugin</artifactId></plugin></plugins></build>
 </project>

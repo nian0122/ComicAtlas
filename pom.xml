@@ -20,6 +20,7 @@
 
     <modules>
         <module>comic-common</module>
+        <module>comic-ai-service</module>
         <module>comic-shared</module>
         <module>api-service</module>
         <module>reading-service</module>

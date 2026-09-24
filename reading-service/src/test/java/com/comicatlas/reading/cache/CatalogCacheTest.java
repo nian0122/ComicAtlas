@@ -13,6 +13,7 @@ import com.comicatlas.reading.catalog.controller.CatalogController;
 import com.comicatlas.reading.catalog.service.CatalogService;
 import com.comicatlas.reading.catalog.service.impl.CatalogServiceImpl;
 import com.comicatlas.reading.testutil.MybatisPlusLambdaCacheExtension;
+import org.springframework.cache.Cache;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -74,7 +75,7 @@ class CatalogCacheTest {
         comic.setId(1L);
         comic.setStatus(ComicStatus.READY);
         when(comicMapper.selectStatusById(1L)).thenReturn(comic);
-        var cache = cacheManager.getCache(ComicReferenceCache.CATALOG);
+        Cache cache = cacheManager.getCache(ComicReferenceCache.CATALOG);
         if (cache != null) {
             cache.clear();
         }
@@ -143,7 +144,7 @@ class CatalogCacheTest {
 
     @Test
     void catalogDto_shouldSupportRedisJsonRoundTrip() {
-        var serializer = new GenericJackson2JsonRedisSerializer();
+        GenericJackson2JsonRedisSerializer serializer = new GenericJackson2JsonRedisSerializer();
         List<CatalogNode> original = new ArrayList<>();
         original.add(new CatalogNode(1L, "目录"));
 

@@ -1,20 +1,16 @@
 package com.comicatlas.reading.library.service;
 
-import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.comicatlas.reading.library.dto.ComicListPage;
 import com.comicatlas.contract.comic.dto.ComicListQuery;
-import com.comicatlas.reading.library.dto.ComicListVO;
 
 /**
  * 漫画列表分页查询接口（阅读域）。
  * <p>
- * 独立的缓存入口（{@code loadPage} 走代理触发 @Cacheable），供列表页高效分页查询。
+ * 列表方法本身作为缓存入口，避免通过同类自调用绕过 Spring 缓存代理。
  */
 public interface ComicListQueryService {
 
-    IPage<ComicListVO> listComics(ComicListQuery query);
-
-    ComicListPage loadPage(ComicListQuery query);
+    ComicListPage listComics(ComicListQuery query);
 
     String cacheKey(ComicListQuery query);
 }

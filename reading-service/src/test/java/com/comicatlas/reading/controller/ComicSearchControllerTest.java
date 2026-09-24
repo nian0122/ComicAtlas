@@ -1,10 +1,10 @@
 package com.comicatlas.reading.controller;
 
 import com.comicatlas.reading.library.controller.ReadingComicController;
-import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.contract.comic.dto.ComicListQuery;
+import com.comicatlas.reading.library.dto.ComicListPage;
 import com.comicatlas.reading.library.dto.ComicListVO;
+import com.comicatlas.reading.library.service.ComicListQueryService;
 import com.comicatlas.reading.library.service.ComicQueryService;
 import com.comicatlas.web.exception.GlobalExceptionHandler;
 import org.junit.jupiter.api.Test;
@@ -33,15 +33,16 @@ class ComicSearchControllerTest {
     @MockBean
     private ComicQueryService comicQueryService;
 
+    @MockBean
+    private ComicListQueryService comicListQueryService;
+
     @Test
     void listComics_shouldReturn200_withTagFilters() throws Exception {
         ComicListVO vo = new ComicListVO();
         vo.setId(1L);
         vo.setTitle("Test Comic");
-        IPage<ComicListVO> page = new Page<>();
-        page.setRecords(List.of(vo));
-        page.setTotal(1);
-        when(comicQueryService.listComics(any(ComicListQuery.class))).thenReturn(page);
+        ComicListPage page = ComicListPage.of(List.of(vo), 1, 1, 20);
+        when(comicListQueryService.listComics(any(ComicListQuery.class))).thenReturn(page);
 
         mockMvc.perform(get("/api/comics")
                         .param("tags", "冒险", "奇幻")

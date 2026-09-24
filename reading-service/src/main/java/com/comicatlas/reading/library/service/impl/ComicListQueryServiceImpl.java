@@ -38,17 +38,6 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
     private final ReadingHistoryMapper historyMapper;
     private final FileUrlResolver fileUrlResolver;
 
-    @Override
-    public IPage<ComicListVO> listComics(ComicListQuery query) {
-        ComicListQueryNormalizer.normalize(query);
-        // 直接委托 loadPage（缓存方法）。注意：本方法内部调用不触发 @Cacheable（自调用绕过代理），
-        // 缓存生效路径由 ComicQueryServiceImpl 通过代理调用 loadPage 触发。
-        ComicListPage comicListPage = loadPage(query);
-        Page<ComicListVO> page = new Page<>(comicListPage.getCurrent(), comicListPage.getSize(), comicListPage.getTotal());
-        page.setRecords(comicListPage.getRecords());
-        return page;
-    }
-
     /**
      * 查询一页漫画并缓存纯数据 DTO。
      * <p>
@@ -59,7 +48,7 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
         cacheNames = ComicReferenceCache.COMIC_LIST,
         key = "#root.target.cacheKey(#query)",
         unless = "#result == null || #result.getRecords().isEmpty()")
-    public ComicListPage loadPage(ComicListQuery query) {
+    public ComicListPage listComics(ComicListQuery query) {
         ComicListQueryNormalizer.normalize(query);
         Page<Comic> page = new Page<>(query.getPage(), query.getSize());
         IPage<Comic> result = comicMapper.selectPage(page, query);
@@ -91,41 +80,42 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
         List<Long> comicIds = comics.stream().map(Comic::getId).toList();
         Map<Long, ReadingHistory> histories = historyMapper.selectByComicIds(comicIds)
                 .stream()
-                .collect(Collectors.toMap(ReadingHistory::getComicId, history -> history));
+                .collect(Collectors.toMap(ReadingHistory::getComicId, readingHistory -> readingHistory));
 
-        IPage<ComicListVO> voPage = result.convert(
+        IPage<ComicListVO> comicListPage = result.convert(
                 comic -> toListVO(comic, categoryNames, histories));
-        return ComicListPage.of(voPage.getRecords(), voPage.getTotal(), voPage.getCurrent(), voPage.getSize());
+        return ComicListPage.of(comicListPage.getRecords(), comicListPage.getTotal(),
+                comicListPage.getCurrent(), comicListPage.getSize());
     }
 
     /**
      * 生成查询缓存键：规范化全部查询条件后取 MD5 摘要，避免超长 key。
-     * 同条件同键、不同条件不同键；loadPage 的 @Cacheable 引用此方法。
+     * 同条件同键、不同条件不同键；listComics 的 @Cacheable 引用此方法。
      */
     public String cacheKey(ComicListQuery query) {
-        String raw = "v5|" + String.join("|",
-                nz(query.getKeyword()),
-                nz(query.getTag()),
+        String cacheKeySource = "v5|" + String.join("|",
+                normalizeCacheValue(query.getKeyword()),
+                normalizeCacheValue(query.getTag()),
                 query.getTags() == null ? "" : String.join(",", query.getTags()),
-                nz(query.getTagMode()),
-                nz(query.getStatus()),
-                nz(query.getCategory()),
-                nz(query.getSourceType()),
-                nz(query.getSort()),
-                nz(query.getOrder()),
+                normalizeCacheValue(query.getTagMode()),
+                normalizeCacheValue(query.getStatus()),
+                normalizeCacheValue(query.getCategory()),
+                normalizeCacheValue(query.getSourceType()),
+                normalizeCacheValue(query.getSort()),
+                normalizeCacheValue(query.getOrder()),
                 String.valueOf(query.getPage()),
                 String.valueOf(query.getSize()));
-        return md5(raw);
+        return calculateMd5(cacheKeySource);
     }
 
-    private static String nz(String s) {
-        return s == null ? "" : s.trim();
+    private static String normalizeCacheValue(String value) {
+        return value == null ? "" : value.trim();
     }
 
-    private static String md5(String input) {
+    private static String calculateMd5(String cacheKeySource) {
         try {
             MessageDigest digest = MessageDigest.getInstance("MD5");
-            byte[] bytes = digest.digest(input.getBytes(StandardCharsets.UTF_8));
+            byte[] bytes = digest.digest(cacheKeySource.getBytes(StandardCharsets.UTF_8));
             StringBuilder hexBuilder = new StringBuilder(bytes.length * 2);
             for (byte digestByte : bytes) {
                 hexBuilder.append(Character.forDigit((digestByte >> 4) & 0xF, 16));
