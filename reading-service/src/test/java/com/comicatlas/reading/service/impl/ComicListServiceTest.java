@@ -1,6 +1,7 @@
 package com.comicatlas.reading.library.impl;
 
 import com.comicatlas.reading.library.service.impl.ComicListQueryServiceImpl;
+import com.comicatlas.reading.library.cache.ComicListCacheService;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.contract.comic.dto.ComicListQuery;
@@ -44,6 +45,8 @@ class ComicListServiceTest {
     private ReadingHistoryMapper historyMapper;
     @Mock
     private FileUrlResolver fileUrlResolver;
+    @Mock
+    private ComicListCacheService comicListCacheService;
 
     @InjectMocks
     private ComicListQueryServiceImpl service;
@@ -97,6 +100,30 @@ class ComicListServiceTest {
 
         assertEquals(0, result.getRecords().size());
         verifyNoInteractions(categoryMapper, historyMapper);
+    }
+
+    @Test
+    void listComics_shouldLoadLatestHistory_whenBasePageIsCached() {
+        ComicListQuery query = new ComicListQuery();
+        ComicListVO cachedView = new ComicListVO();
+        cachedView.setId(1L);
+        cachedView.setPageCount(100);
+        ComicListPage cachedPage = ComicListPage.of(List.of(cachedView), 1, 1, 20);
+        ReadingHistory history = new ReadingHistory();
+        history.setComicId(1L);
+        history.setChapterId(101L);
+        history.setPageNumber(25);
+
+        when(comicListCacheService.buildKey(query)).thenReturn("cached-key");
+        when(comicListCacheService.get("cached-key")).thenReturn(cachedPage);
+        when(historyMapper.selectByComicIds(List.of(1L))).thenReturn(List.of(history));
+
+        ComicListPage result = service.listComics(query);
+
+        assertEquals(25, result.getRecords().get(0).getProgressPercent());
+        assertEquals(101L, result.getRecords().get(0).getLastReadChapterId());
+        verify(comicMapper, never()).selectPage(any(Page.class), same(query));
+        verify(historyMapper).selectByComicIds(List.of(1L));
     }
 
     private Comic comic(Long id, Long categoryId, Integer totalPages) {

@@ -20,6 +20,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import com.comicatlas.api.storage.service.impl.ComicStatsServiceImpl;
+import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 
 import java.util.List;
 
@@ -35,6 +36,7 @@ class ComicStatsServiceTest {
     @Mock private MediaMapper mediaMapper;
     @Mock private ChapterMapper chapterMapper;
     @Mock private ComicMapper comicMapper;
+    @Mock private CatalogCacheInvalidator catalogCacheInvalidator;
     @InjectMocks private ComicStatsServiceImpl service;
 
     @BeforeAll

@@ -17,6 +17,9 @@ public final class ComicReferenceCache {
     /** 标签列表缓存（全量快照，key="all"）。 */
     public static final String TAGS = "comicTagsNaturalV1";
 
+    /** 漫画列表基础数据缓存（key 为规范化查询条件）。 */
+    public static final String COMIC_LIST = "comicListBaseV1";
+
     /** 存储统计缓存（含文件系统扫描的 thumb 大小，短 TTL）。 */
     public static final String STORAGE_STATS = "storageStatsV2";
 

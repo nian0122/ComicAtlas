@@ -44,6 +44,7 @@ public class TagManagementServiceImpl implements TagManagementService {
         tag.setName(name);
         tagMapper.insert(tag);
         cacheEvictor.evict(ComicReferenceCache.TAGS, ComicReferenceCache.ALL_KEY);
+        cacheEvictor.clear(ComicReferenceCache.COMIC_LIST);
         return toDTO(tag);
     }
 
@@ -63,6 +64,7 @@ public class TagManagementServiceImpl implements TagManagementService {
 
         tagMapper.deleteById(id);
         cacheEvictor.evict(ComicReferenceCache.TAGS, ComicReferenceCache.ALL_KEY);
+        cacheEvictor.clear(ComicReferenceCache.COMIC_LIST);
     }
 
     private TagDTO toDTO(Tag tag) {

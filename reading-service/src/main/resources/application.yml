@@ -79,3 +79,4 @@ storage:
 comic:
   cache:
     catalog-ttl: ${CATALOG_CACHE_TTL:30m}
+    list-ttl: ${COMIC_LIST_CACHE_TTL:1m}

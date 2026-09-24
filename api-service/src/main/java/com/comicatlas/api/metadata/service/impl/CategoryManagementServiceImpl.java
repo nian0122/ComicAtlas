@@ -42,6 +42,7 @@ public class CategoryManagementServiceImpl implements CategoryManagementService 
         category.setSortOrder((int) (categoryMapper.countAll() + 1));
         categoryMapper.insert(category);
         cacheEvictor.evict(ComicReferenceCache.CATEGORIES, ComicReferenceCache.ALL_KEY);
+        cacheEvictor.clear(ComicReferenceCache.COMIC_LIST);
         return toDTO(category);
     }
 
@@ -63,6 +64,7 @@ public class CategoryManagementServiceImpl implements CategoryManagementService 
         category.setName(trimmed);
         categoryMapper.updateById(category);
         cacheEvictor.evict(ComicReferenceCache.CATEGORIES, ComicReferenceCache.ALL_KEY);
+        cacheEvictor.clear(ComicReferenceCache.COMIC_LIST);
         return toDTO(category);
     }
 
@@ -75,6 +77,7 @@ public class CategoryManagementServiceImpl implements CategoryManagementService 
         }
         categoryMapper.deleteById(id);
         cacheEvictor.evict(ComicReferenceCache.CATEGORIES, ComicReferenceCache.ALL_KEY);
+        cacheEvictor.clear(ComicReferenceCache.COMIC_LIST);
     }
 
     private CategoryDTO toDTO(Category category) {

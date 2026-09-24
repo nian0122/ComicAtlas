@@ -37,6 +37,7 @@ public final class ComicListQueryNormalizer {
             query.setTagMode("OR");
         }
         query.setSort(SORT_FIELDS.contains(query.getSort()) ? query.getSort() : "createdAt");
+        query.setOrder("asc".equalsIgnoreCase(query.getOrder()) ? "asc" : "desc");
         query.setPage(query.getPage() == null ? MIN_PAGE : Math.max(MIN_PAGE, query.getPage()));
         query.setSize(query.getSize() == null
                 ? DEFAULT_PAGE_SIZE

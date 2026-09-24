@@ -28,6 +28,14 @@ public class CatalogCacheInvalidator {
                     log.warn("目录缓存失效失败，继续使用数据库结果: comicId={}", comicId, e);
                 }
             }
+            Cache comicListCache = cacheManager.getCache(ComicReferenceCache.COMIC_LIST);
+            if (comicListCache != null) {
+                try {
+                    comicListCache.clear();
+                } catch (IllegalStateException e) {
+                    log.warn("漫画列表缓存清空失败，继续使用数据库结果", e);
+                }
+            }
         };
 
         if (TransactionSynchronizationManager.isSynchronizationActive()) {

@@ -1,5 +1,6 @@
 package com.comicatlas.api.storage.service.impl;
 
+import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.contract.common.enums.HqStatus;
 import com.comicatlas.contract.common.enums.LqStatus;
 import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
@@ -41,6 +42,7 @@ public class ComicStatsServiceImpl implements ComicStatsService {
     private final MediaMapper mediaMapper;
     private final ChapterMapper chapterMapper;
     private final ComicMapper comicMapper;
+    private final CatalogCacheInvalidator catalogCacheInvalidator;
 
     /** 单章变更后刷新：章节页数 + 整本统计（hqSize + lqSize + totalPages）。 */
     public void refreshByChapter(Long chapterId) {
@@ -59,6 +61,7 @@ public class ComicStatsServiceImpl implements ComicStatsService {
         }
         recomputeComicStats(comic.getId());
         refreshTotalPages(comic.getId());
+        catalogCacheInvalidator.evict(comic.getId());
     }
 
     /** 整本一次性刷新：一次预取媒体，批量更新各章节页数与整本统计。 */
@@ -69,6 +72,7 @@ public class ComicStatsServiceImpl implements ComicStatsService {
         List<Chapter> chapters = chapterMapper.selectByComicIdOrderByGlobalOrder(comicId);
         if (chapters.isEmpty()) {
             updateComicStats(comicId, 0, 0L, 0L);
+            catalogCacheInvalidator.evict(comicId);
             return;
         }
         List<Long> chapterIds = chapters.stream().map(Chapter::getId).toList();
@@ -87,6 +91,7 @@ public class ComicStatsServiceImpl implements ComicStatsService {
         long hqSize = calculateHqSize(mediaItems);
         long lqSize = calculateLqSize(mediaItems);
         updateComicStats(comicId, totalPages, hqSize, lqSize);
+        catalogCacheInvalidator.evict(comicId);
         log.debug("批量重算 comic 统计: comicId={}, chapters={}, hqSize={}, lqSize={}",
                 comicId, chapters.size(), hqSize, lqSize);
     }

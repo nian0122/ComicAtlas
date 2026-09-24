@@ -1,5 +1,6 @@
 package com.comicatlas.api.catalog.cache;
 
+import com.comicatlas.contract.comic.cache.ComicReferenceCache;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.CacheManager;
@@ -96,7 +97,9 @@ class CatalogCacheInvalidatorTest {
 
         @Bean
         CacheManager cacheManager() {
-            return new ConcurrentMapCacheManager(CatalogCacheInvalidator.CACHE_NAME);
+            return new ConcurrentMapCacheManager(
+                    CatalogCacheInvalidator.CACHE_NAME,
+                    ComicReferenceCache.COMIC_LIST);
         }
 
         @Bean
