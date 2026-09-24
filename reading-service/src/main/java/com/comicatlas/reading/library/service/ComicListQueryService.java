@@ -12,5 +12,4 @@ public interface ComicListQueryService {
 
     ComicListPage listComics(ComicListQuery query);
 
-    String cacheKey(ComicListQuery query);
 }

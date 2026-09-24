@@ -80,8 +80,7 @@ public class RedisConfig implements CachingConfigurer {
     public CacheManager cacheManager(
             RedisConnectionFactory factory,
             @Value("${comic.cache.catalog-ttl:30m}") Duration catalogTtl,
-            @Value("${comic.cache.reference-ttl:30m}") Duration referenceTtl,
-            @Value("${comic.cache.list-ttl:60s}") Duration listTtl) {
+            @Value("${comic.cache.reference-ttl:30m}") Duration referenceTtl) {
         RedisCacheConfiguration baseConfig = RedisCacheConfiguration.defaultCacheConfig()
                 .disableCachingNullValues()
                 .serializeKeysWith(RedisSerializationContext.SerializationPair
@@ -100,7 +99,6 @@ public class RedisConfig implements CachingConfigurer {
                                 .fromSerializer(CATALOG_VALUE_SERIALIZER)));
         cacheConfigs.put(ComicReferenceCache.CATEGORIES, baseConfig.entryTtl(referenceTtl));
         cacheConfigs.put(ComicReferenceCache.TAGS, baseConfig.entryTtl(referenceTtl));
-        cacheConfigs.put(ComicReferenceCache.COMIC_LIST, baseConfig.entryTtl(listTtl));
 
         return RedisCacheManager.builder(factory)
                 .withInitialCacheConfigurations(cacheConfigs)

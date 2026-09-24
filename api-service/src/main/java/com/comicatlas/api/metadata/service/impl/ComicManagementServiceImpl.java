@@ -283,7 +283,6 @@ public class ComicManagementServiceImpl implements ComicManagementService {
         result.setSucceeded(succeeded);
         result.setFailed(failed.isEmpty() ? List.of() : failed);
         if (succeeded > 0) {
-            catalogCacheInvalidator.evictComicList();
         }
         return result;
     }

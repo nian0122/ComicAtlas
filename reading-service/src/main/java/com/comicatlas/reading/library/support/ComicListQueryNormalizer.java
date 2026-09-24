@@ -28,7 +28,14 @@ public final class ComicListQueryNormalizer {
         query.setCategory(trimToNull(query.getCategory()));
         query.setSourceType(trimToNull(query.getSourceType()));
         query.setStatus(trimToNull(query.getStatus()));
-        query.setTagMode("AND".equalsIgnoreCase(query.getTagMode()) ? "AND" : "OR");
+        String tagMode = query.getTagMode();
+        if ("AND".equalsIgnoreCase(tagMode)) {
+            query.setTagMode("AND");
+        } else if ("NOT".equalsIgnoreCase(tagMode)) {
+            query.setTagMode("NOT");
+        } else {
+            query.setTagMode("OR");
+        }
         query.setSort(SORT_FIELDS.contains(query.getSort()) ? query.getSort() : "createdAt");
         query.setPage(query.getPage() == null ? MIN_PAGE : Math.max(MIN_PAGE, query.getPage()));
         query.setSize(query.getSize() == null

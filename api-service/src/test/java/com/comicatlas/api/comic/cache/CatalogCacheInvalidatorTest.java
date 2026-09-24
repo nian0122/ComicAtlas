@@ -1,6 +1,5 @@
 package com.comicatlas.api.catalog.cache;
 
-import com.comicatlas.contract.comic.cache.ComicReferenceCache;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.CacheManager;
@@ -46,24 +45,6 @@ class CatalogCacheInvalidatorTest {
 
         assertNull(cache.get(1L));
         assertInstanceOf(List.class, cache.get(2L).get());
-    }
-
-    @Test
-    void evict_shouldClearComicListCache() {
-        var catalogCache = cacheManager.getCache(CatalogCacheInvalidator.CACHE_NAME);
-        var comicListCache = cacheManager.getCache(ComicReferenceCache.COMIC_LIST);
-        if (catalogCache == null || comicListCache == null) {
-            throw new AssertionError("缓存未创建");
-        }
-        catalogCache.put(1L, List.of("目录"));
-        comicListCache.put("筛选条件一", "页面一");
-        comicListCache.put("筛选条件二", "页面二");
-
-        cacheInvalidator.evict(1L);
-
-        assertNull(catalogCache.get(1L));
-        assertNull(comicListCache.get("筛选条件一"));
-        assertNull(comicListCache.get("筛选条件二"));
     }
 
     @Test
@@ -115,8 +96,7 @@ class CatalogCacheInvalidatorTest {
 
         @Bean
         CacheManager cacheManager() {
-            return new ConcurrentMapCacheManager(
-                    CatalogCacheInvalidator.CACHE_NAME, ComicReferenceCache.COMIC_LIST);
+            return new ConcurrentMapCacheManager(CatalogCacheInvalidator.CACHE_NAME);
         }
 
         @Bean
