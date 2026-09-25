@@ -62,6 +62,10 @@ $env:MYSQL_PASS = Get-EnvValue "WORKER_MYSQL_PASSWORD"
 Write-Host "=== 环境变量注入完成（FRP 隧道 localhost 直连远端基础设施）===" -ForegroundColor DarkGray
 Write-Host "    MYSQL=$env:MYSQL_HOST`:$env:MYSQL_PORT REDIS=$env:REDIS_HOST`:$env:REDIS_PORT" -ForegroundColor DarkGray
 
+# API 的跨服务集成测试（MediaUploadManagementIT / TrashLifecycleIT 等）
+# 需要显式启用 Worker 测试依赖；该属性只在 api-service profile 中生效。
+$MavenArgs += "-Dwith-worker-integration-tests=true"
+
 # 透传参数执行 Maven 测试（当前进程退出码透传）
 & (Join-Path $repoRoot "mvnw.cmd") @MavenArgs
 exit $LASTEXITCODE

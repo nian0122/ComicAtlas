@@ -167,13 +167,26 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- Worker 作为测试依赖：MediaUploadManagementIT 在同一 JVM 启动 Worker 上下文，
-             验证 STAGING→HQ 搬移与分析结果回传 -->
-        <dependency>
-            <groupId>com.comicatlas</groupId>
-            <artifactId>worker-service</artifactId>
-            <version>${project.version}</version>
-            <scope>test</scope>
-        </dependency>
     </dependencies>
+
+    <profiles>
+        <!-- 跨服务集成测试才需要在同一测试类路径中装配 Worker。生产构建默认不解析该模块。 -->
+        <profile>
+            <id>worker-integration-tests</id>
+            <activation>
+                <property>
+                    <name>with-worker-integration-tests</name>
+                    <value>true</value>
+                </property>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>com.comicatlas</groupId>
+                    <artifactId>worker-service</artifactId>
+                    <version>${project.version}</version>
+                    <scope>test</scope>
+                </dependency>
+            </dependencies>
+        </profile>
+    </profiles>
 </project>
