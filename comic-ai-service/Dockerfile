@@ -1,5 +1,6 @@
 FROM maven:3.9-eclipse-temurin-21-alpine AS builder
 WORKDIR /build
+COPY config/maven/settings.xml /root/.m2/settings.xml
 COPY pom.xml .
 COPY comic-ai-service/pom.xml comic-ai-service/pom.xml
 COPY comic-ai-service/src comic-ai-service/src
