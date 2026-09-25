@@ -96,7 +96,7 @@ public class VisionAnalyzer {
         return objectMapper.valueToTree(tags).toString();
     }
 
-    static String normalizeJson(String modelText) {
+    public static String normalizeJson(String modelText) {
         if (modelText == null || modelText.isBlank()) {
             throw new IllegalArgumentException("AI 返回内容为空");
         }

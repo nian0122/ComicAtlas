@@ -27,7 +27,7 @@ public class AnalysisWorker {
             if (taskRepository.cancellationRequested(taskId)) { taskRepository.cancelled(taskId); return; }
             String result = analyzer.analyze(pages, taskRepository.findExistingTagNames(), taskRepository.findExistingCategoryNames());
             taskRepository.progress(taskId, 90);
-            JsonNode resultJson = objectMapper.readTree(result);
+            JsonNode resultJson = objectMapper.readTree(VisionAnalyzer.normalizeJson(result));
             long comicId = comicIdFromSourcePath(taskRepository.find(taskId).orElseThrow().sourcePath());
             taskRepository.persistAnalysisTags(comicId, resultJson);
             taskRepository.persistAnalysisDescription(comicId, resultJson.path("description").asText(""));
