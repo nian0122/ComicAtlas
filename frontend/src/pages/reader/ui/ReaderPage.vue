@@ -21,8 +21,8 @@
       :prev-chapter-id="store.prevChapterId"
       :next-chapter-id="store.nextChapterId"
       @back="nav.goBack"
-      @prev-chapter="goChapter(store.prevChapterId!)"
-      @next-chapter="goChapter(store.nextChapterId!)"
+      @prev-chapter="nav.goPrevChapter()"
+      @next-chapter="nav.goNextChapter()"
       @jump-to-page="onPageChange"
     />
 
@@ -227,11 +227,6 @@ const { onKeydown, onWheel, onDblClick } = useReaderShortcuts({
   forceHqPages,
   onPageRequest,
 })
-
-// 桌面端返回/章节跳转：保留迁移前实现（含 /library 兜底），移动端走 nav.*
-function goChapter(chId: number) {
-  router.push(`/reader/${chId}?page=1`)
-}
 
 async function reload() {
   if (saveDebounceTimer.value) {

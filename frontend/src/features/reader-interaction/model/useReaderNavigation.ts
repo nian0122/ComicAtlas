@@ -34,7 +34,8 @@ export function useReaderNavigation() {
   function goChapter(chapterId: number | null, page: number | 'last' = 1) {
     // null/undefined 守卫：无相邻章节时静默不跳转
     if (chapterId == null) return
-    router.push({ name: 'reader', params: { chapterId }, query: { page: String(page) } })
+    // 切章仍属于同一次阅读；复用当前历史项，返回时才不会落回旧章节。
+    router.replace({ name: 'reader', params: { chapterId }, query: { page: String(page) } })
   }
 
   /** 上一章；prevChapterId 为 null 时静默不跳转；page 缺省落到第 1 页 */

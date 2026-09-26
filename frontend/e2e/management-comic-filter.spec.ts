@@ -55,7 +55,29 @@ test('管理页状态筛选使用后端枚举并清空旧批量选择', async ({
   await page.getByRole('option', { name: '导入失败' }).click()
 
   await expect.poll(() => comicUrls.at(-1)?.searchParams.get('status')).toBe('IMPORT_FAILED')
-  await expect(page.locator('.batch-toolbar')).toHaveCount(0)
+  await expect(page.locator('.batch-toolbar')).toContainText('全选本页 (0 / 1)')
+  await expect(page.locator('.batch-toolbar').getByRole('button', { name: '批量编辑' })).toBeDisabled()
+})
+
+test('管理页未选择漫画时可直接全选本页', async ({ page }) => {
+  const comicUrls: URL[] = []
+  await mockManagementPage(page, comicUrls)
+  await page.goto('/manage/comics')
+  await expect(page.locator('.comic-row').first()).toBeVisible()
+
+  const batchToolbar = page.locator('.batch-toolbar')
+  const batchEditButton = batchToolbar.getByRole('button', { name: '批量编辑' })
+  await expect(batchToolbar).toContainText('全选本页 (0 / 1)')
+  await expect(batchEditButton).toBeDisabled()
+
+  await batchToolbar.locator('.el-checkbox').click()
+  await expect(batchToolbar).toContainText('全选本页 (1 / 1)')
+  await expect(page.locator('.comic-row .el-checkbox')).toHaveClass(/is-checked/)
+  await expect(batchEditButton).toBeEnabled()
+
+  await batchToolbar.locator('.el-checkbox').click()
+  await expect(batchToolbar).toContainText('全选本页 (0 / 1)')
+  await expect(batchEditButton).toBeDisabled()
 })
 
 test('管理页选择无标签时请求不会混入其他标签', async ({ page }) => {
