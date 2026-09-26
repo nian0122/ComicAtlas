@@ -81,19 +81,9 @@
           </svg>
         </AppButton>
         <div v-if="currentIsVideo" class="video-controls" :class="{ 'is-seeking': isSeeking }">
-          <div class="video-control-row">
-            <AppButton
-              class="video-toggle"
-              type="button"
-              :aria-label="isPlaying ? '暂停视频' : '播放视频'"
-              @click.stop="togglePlayback"
-            >
-              {{ isPlaying ? 'Ⅱ' : '▶' }}
-            </AppButton>
-            <div class="video-time" aria-live="polite">
-              {{ formatTime(isSeeking && seekPreviewTime != null ? seekPreviewTime : currentTime) }} /
-              {{ formatTime(duration) }}
-            </div>
+          <div class="video-time" aria-live="polite">
+            {{ formatTime(isSeeking && seekPreviewTime != null ? seekPreviewTime : currentTime) }} /
+            {{ formatTime(duration) }}
           </div>
           <div
             ref="progressBarRef"
@@ -821,26 +811,6 @@ onBeforeUnmount(() => {
 
 .video-controls.is-seeking .video-time {
   opacity: 1;
-}
-
-.video-control-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.video-toggle {
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 28px;
-  padding: 0;
-  border: 0;
-  border-radius: 8px;
-  background: #0007;
-  color: #fff;
-  font-size: 13px;
-  font-weight: 800;
 }
 
 .video-progress {
