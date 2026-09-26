@@ -116,6 +116,8 @@ worker:
     split-size: ${ZIP_SPLIT_SIZE:2147483648}
     max-entry-size: ${ZIP_MAX_ENTRY_SIZE:32212254720}
     max-total-size: ${ZIP_MAX_TOTAL_SIZE:32212254720}
+  directory-export:
+    minimum-free-space-bytes: ${DIRECTORY_EXPORT_MINIMUM_FREE_SPACE_BYTES:1073741824}
   ehentai:
     api-url: ${EHENTAI_API_URL:https://api.e-hentai.org/api.php}
     site-url: ${EHENTAI_SITE_URL:https://e-hentai.org}

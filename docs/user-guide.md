@@ -265,9 +265,12 @@ MANGA_ROOT/lq/{comicId}/{chapterId}/文件名
 - 上传先进入 `staging`，完成后由后台分析并搬入 HQ；视频会保留元数据用于阅读器混排。
 - 上传完成后可通过 `POST /chapters/{id}/media/reorder` 重排、通过媒体回收接口管理。
 
-### 导出漫画（ZIP/CBZ 分卷）
+### 导出漫画（文件夹、ZIP 或 CBZ）
 
-管理后台的存储管理可对漫画发起导出（`POST /api/manage/storage/export/comics/{id}`），并选择 ZIP 或 CBZ 格式。导出是**异步打包**：任务完成后，产物以**标准分卷压缩包**落在宿主机本地目录：
+管理后台的存储管理可对漫画发起导出（`POST /api/manage/storage/export/comics/{id}`），并选择文件夹、ZIP 或 CBZ 格式。导出是异步任务，产物保存在宿主机本地 `MANGA_ROOT/export/{taskId}/`：
+
+- 选择**文件夹**时，媒体会按漫画目录层级复制到独立目录，同时写出 `metadata.json` 和 `ComicInfo.xml`。导出前检查目标卷可用空间，默认额外保留 1 GiB；可通过 `DIRECTORY_EXPORT_MINIMUM_FREE_SPACE_BYTES` 配置余量。文件夹导出不受 ZIP/CBZ 的总量上限限制，目标空间不足时会在复制前失败。
+- 选择 **ZIP/CBZ** 时生成标准分卷压缩包：
 
 ```text
 MANGA_ROOT/export/{taskId}/{书名}_{id}_{时间戳}.z01
@@ -276,8 +279,8 @@ MANGA_ROOT/export/{taskId}/{书名}_{id}_{时间戳}.z02
 MANGA_ROOT/export/{taskId}/{书名}_{id}_{时间戳}.zip   ← 主文件（最后卷）
 ```
 
-- 单卷默认上限 **2 GiB**，内容超过即自动分卷（`.z01..zNN` + 主 `.zip`）；总量与单条目默认上限 **30 GiB**。
-- 导出**不提供 HTTP 下载**：任务接口只返回任务状态与各卷的本地物理路径（元数据），文件字节全部在宿主机本地，不经过网络传输。任务中心/导出卡片可查看每卷路径，也可在宿主机直接打开导出目录。
+- 单卷默认上限 **2 GiB**，内容超过即自动分卷（`.z01..zNN` + 主 `.zip`）；ZIP/CBZ 总量与单条目默认上限 **30 GiB**。
+- 导出**不提供 HTTP 下载**：任务接口只返回任务状态与本地文件/文件夹路径（元数据），文件字节全部在宿主机本地，不经过网络传输。任务中心/导出卡片可查看产物路径，也可在宿主机直接打开导出目录。
 - 分卷文件需**同目录、同 basename**。ZIP 的主文件是 `.zip`，CBZ 的主文件是 `.cbz`；若需把这批分卷重新导入，把对应主文件路径填到相应来源的 `sourcePath` 即可（缺任一卷会失败，补回后重试；`.z01` 不可作为入口）。
 - 导出 CBZ 时会在压缩包根目录写入 `ComicInfo.xml`，便于兼容支持 ComicInfo 的阅读器和管理工具；再次导入时会自动读取该文件。
 

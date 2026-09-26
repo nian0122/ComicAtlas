@@ -107,7 +107,8 @@ public class ExportServiceImpl implements ExportService {
     private ExportOutput exportExclusive(Long comicId, Long taskId, String format) throws IOException {
         long started = System.nanoTime();
         ExportCollectResult result = exportCollector.collect(comicId);
-        ExportManifest manifest = buildManifest(result);
+        boolean isDirectoryExport = ExportFormats.DIRECTORY.equalsIgnoreCase(format);
+        ExportManifest manifest = buildManifest(result, isDirectoryExport);
         log.info("导出清单就绪：taskId={}, comicId={}, entries={}, collectMs={}", taskId, comicId,
                 manifest.entries().size(), TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
 
@@ -116,7 +117,7 @@ public class ExportServiceImpl implements ExportService {
             throw new IllegalStateException("EXPORT 存储根未配置或路径不存在");
         }
 
-        if (ExportFormats.DIRECTORY.equalsIgnoreCase(format)) {
+        if (isDirectoryExport) {
             return exportDirectory(taskId, comicId, manifest, exportRoot);
         }
 
@@ -163,6 +164,23 @@ public class ExportServiceImpl implements ExportService {
 
         ExportStagingCleanup.delete(stagingDir);
         try {
+            long requiredBytes = manifest.entries().stream()
+                    .mapToLong(ExportManifest.Entry::sourceSize)
+                    .reduce(0L, Math::addExact);
+            requiredBytes = Math.addExact(requiredBytes,
+                    manifest.metadataJson().getBytes(StandardCharsets.UTF_8).length);
+            if (manifest.comicInfoXml() != null && !manifest.comicInfoXml().isBlank()) {
+                requiredBytes = Math.addExact(requiredBytes,
+                        manifest.comicInfoXml().getBytes(StandardCharsets.UTF_8).length);
+            }
+            long availableBytes = Files.getFileStore(exportRoot.getPath()).getUsableSpace();
+            long requiredWithReserve = Math.addExact(requiredBytes,
+                    workerConfig.getDirectoryExport().getMinimumFreeSpaceBytes());
+            if (availableBytes < requiredWithReserve) {
+                throw new IOException("文件夹导出空间不足：预计需要 " + requiredBytes
+                        + " 字节，安全余量 " + workerConfig.getDirectoryExport().getMinimumFreeSpaceBytes()
+                        + " 字节，当前可用 " + availableBytes + " 字节");
+            }
             Path stagingRoot = stagingDir.resolve(rootDirectoryName);
             Files.createDirectories(stagingRoot);
             writeDirectoryEntry(stagingRoot.resolve("metadata.json"), manifest.metadataJson().getBytes(StandardCharsets.UTF_8));
@@ -175,15 +193,21 @@ public class ExportServiceImpl implements ExportService {
                 if (!target.startsWith(stagingRoot)) {
                     throw new IOException("文件夹导出路径非法: " + entry.targetPath());
                 }
+                if (Files.size(entry.sourceFile()) != entry.sourceSize()) {
+                    throw new IOException("文件夹导出源文件在预检后发生变化: " + entry.targetPath());
+                }
                 Files.createDirectories(target.getParent());
                 Files.copy(entry.sourceFile(), target, StandardCopyOption.COPY_ATTRIBUTES);
+                if (Files.size(target) != entry.sourceSize()) {
+                    throw new IOException("文件夹导出复制结果大小校验失败: " + entry.targetPath());
+                }
             }
             try {
                 Files.move(stagingDir, finalDir, StandardCopyOption.ATOMIC_MOVE);
             } catch (AtomicMoveNotSupportedException exception) {
                 throw new IOException("文件夹导出发布失败：文件系统不支持原子移动", exception);
             }
-            return new ExportOutput(taskId, comicId, taskId + "/" + rootDirectoryName, directorySize(finalDir));
+            return new ExportOutput(taskId, comicId, taskId + "/" + rootDirectoryName, requiredBytes);
         } catch (IOException | RuntimeException exception) {
             ExportStagingCleanup.afterFailure(stagingDir, exception);
             throw exception;
@@ -228,15 +252,14 @@ public class ExportServiceImpl implements ExportService {
      *
      * <p>清单是严格契约：任一数据库媒体没有可用且可读的普通文件（缺失、目录冒充、
      * 不可读、读取大小失败）立即抛 {@link ExportManifestBuildException} 使整个导出失败，
-     * 不跳过、不告警。重复或大小写折叠后冲突的 ZIP 目标路径同样拒绝；metadata UTF-8 字节
-     * 与全部媒体未压缩总量使用 {@link Math#addExact} 累加，超过 maxEntrySize/maxTotalSize
-     * 时在调用 ZipBuilder 之前失败。
+     * 不跳过、不告警。重复或大小写折叠后冲突的目标路径同样拒绝；单文件限制适用于所有格式，
+     * 归档总量限制仅用于 ZIP/CBZ，文件夹导出在写入前按目标卷空间预检。
      *
      * <p>目录层级由 catalog.parentId 与 chapter.catalogId 还原；章节目录名不再为了
      * 避免冲突而改写，以确保导出结果保留导入时的目录名。异常消息只携带
      * comicId/mediaId 与相对 targetPath，不输出宿主机绝对路径。
      */
-    private ExportManifest buildManifest(ExportCollectResult result) {
+    private ExportManifest buildManifest(ExportCollectResult result, boolean isDirectoryExport) {
         Long comicId = result.comic().getId();
         String rootDirName = ComicTitleSanitizer.sanitize(result.comic().getTitle());
 
@@ -273,7 +296,7 @@ public class ExportServiceImpl implements ExportService {
         String metadataJson = metadataJsonExporter.exportJson(result);
         long metadataBytes = metadataJson.getBytes(StandardCharsets.UTF_8).length;
         long totalBytes = addSizes(comicId, null, mediaTotalSize, metadataBytes);
-        if (totalBytes > maxTotalSize()) {
+        if (!isDirectoryExport && totalBytes > maxTotalSize()) {
             throw new ExportManifestBuildException(
                     "导出清单构建失败：comicId=" + comicId + ", 导出总量超限: " + totalBytes
                             + " 字节 > maxTotalSize=" + maxTotalSize());
@@ -281,7 +304,7 @@ public class ExportServiceImpl implements ExportService {
         String comicInfoXml = ComicInfoXmlBuilder.build(result.comic(), result.chapters());
         long comicInfoBytes = comicInfoXml.getBytes(StandardCharsets.UTF_8).length;
         long exportBytesWithComicInfo = addSizes(comicId, null, totalBytes, comicInfoBytes);
-        if (exportBytesWithComicInfo > maxTotalSize()) {
+        if (!isDirectoryExport && exportBytesWithComicInfo > maxTotalSize()) {
             throw new ExportManifestBuildException(
                     "导出清单构建失败：comicId=" + comicId + ", ComicInfo.xml 加入后导出总量超限: "
                             + exportBytesWithComicInfo + " 字节 > maxTotalSize=" + maxTotalSize());

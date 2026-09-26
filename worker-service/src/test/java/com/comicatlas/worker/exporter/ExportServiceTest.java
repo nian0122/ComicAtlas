@@ -376,6 +376,43 @@ class ExportServiceTest {
     }
 
     @Test
+    void directoryExport_usesAvailableSpaceInsteadOfZipTotalLimit() throws Exception {
+        workerConfig.getZip().setMaxTotalSize(4L);
+        workerConfig.getDirectoryExport().setMinimumFreeSpaceBytes(0L);
+        MediaRecord media = media(1L, 10L, "1/10/001.jpg", 1);
+        when(exportCollector.collect(1L)).thenReturn(result(comic(1L, "标题"),
+                List.of(chapter(10L, "第一章", 1)), List.of(media)));
+        when(metadataJsonExporter.exportJson(any(ExportCollectResult.class))).thenReturn("{}");
+        when(exportFileResolver.resolve(media)).thenReturn(new StorageRef("HQ", "1/10/001.jpg"));
+        writeFile("hq/1/10/001.jpg", "media-content-larger-than-zip-cap");
+        stubResolverToRoot();
+
+        ExportService.ExportOutput output = service.export(1L, 99L, "DIRECTORY");
+
+        assertTrue(Files.isRegularFile(storageProperties.getRoots().get("EXPORT").getPath()
+                .resolve(output.fileName()).resolve("第一章/001.jpg")));
+        assertFalse(Files.exists(storageProperties.getRoots().get("EXPORT").getPath().resolve(".staging-99")));
+    }
+
+    @Test
+    void directoryExport_failsBeforeCopyWhenVolumeSpaceIsInsufficient() throws Exception {
+        workerConfig.getDirectoryExport().setMinimumFreeSpaceBytes(Long.MAX_VALUE / 2);
+        MediaRecord media = media(1L, 10L, "1/10/001.jpg", 1);
+        when(exportCollector.collect(1L)).thenReturn(result(comic(1L, "标题"),
+                List.of(chapter(10L, "第一章", 1)), List.of(media)));
+        when(metadataJsonExporter.exportJson(any(ExportCollectResult.class))).thenReturn("{}");
+        when(exportFileResolver.resolve(media)).thenReturn(new StorageRef("HQ", "1/10/001.jpg"));
+        writeFile("hq/1/10/001.jpg", "media-content");
+        stubResolverToRoot();
+
+        IOException exception = assertThrows(IOException.class, () -> service.export(1L, 100L, "DIRECTORY"));
+
+        assertTrue(exception.getMessage().contains("文件夹导出空间不足"));
+        assertFalse(Files.exists(storageProperties.getRoots().get("EXPORT").getPath().resolve(".staging-100")));
+        assertFalse(Files.exists(storageProperties.getRoots().get("EXPORT").getPath().resolve("100")));
+    }
+
+    @Test
     void export_wrapsResolverFailurePreservingCause() throws Exception {
         MediaRecord m1 = media(1L, 10L, "1/10/001.jpg", 1);
         when(exportCollector.collect(1L)).thenReturn(result(comic(1L, "标题"), List.of(chapter(10L, "第一章", 1)), List.of(m1)));
