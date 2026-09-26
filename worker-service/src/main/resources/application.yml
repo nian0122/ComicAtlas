@@ -10,9 +10,6 @@ spring:
         server-addr: ${NACOS_ADDR}
         username: ${NACOS_USER}
         password: ${NACOS_PASS}
-      config:
-        import-check:
-          enabled: false
   rabbitmq:
     host: ${RABBITMQ_HOST}
     port: ${RABBITMQ_PORT}
@@ -128,24 +125,16 @@ worker:
 storage:
   roots:
     HQ:
-      type: FILESYSTEM
       path: ${MANGA_ROOT:F:/manga}/hq
     LQ:
-      type: FILESYSTEM
       path: ${MANGA_ROOT:F:/manga}/lq
     THUMBS:
-      type: FILESYSTEM
       path: ${MANGA_ROOT:F:/manga}/thumbs
     METADATA:
-      type: FILESYSTEM
       path: ${MANGA_ROOT:F:/manga}/metadata
     STAGING:
-      type: FILESYSTEM
       path: ${MANGA_ROOT:F:/manga}/staging
-      readOnly: false
     TRASH:
-      type: FILESYSTEM
       path: ${MANGA_ROOT:F:/manga}/trash
     EXPORT:
-      type: FILESYSTEM
       path: ${MANGA_ROOT:F:/manga}/export

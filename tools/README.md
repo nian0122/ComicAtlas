@@ -3,7 +3,6 @@
 | 入口 | 用途 |
 | --- | --- |
 | [maintenance/manage-remote-infra-frp.ps1](maintenance/manage-remote-infra-frp.ps1) | 管理远端基础设施 FRP 连接 |
-| [maintenance/start-remote-infra-tunnel.ps1](maintenance/start-remote-infra-tunnel.ps1) | 启动远端基础设施隧道 |
 | [maintenance/backup-remote-mysql.ps1](maintenance/backup-remote-mysql.ps1) | 远端 MySQL 备份 |
 | [vendor/README.md](vendor/README.md) | 第三方工具目录说明 |
 

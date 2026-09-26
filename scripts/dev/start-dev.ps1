@@ -16,30 +16,9 @@ if (Test-Path $frpScript) {
     Write-Host "WARN: 未找到 FRP 脚本 tools\maintenance\manage-remote-infra-frp.ps1" -ForegroundColor Yellow
 }
 
-# 2. 从 .env 加载远端中间件凭证
-$envFile = Join-Path $repoRoot ".env"
-if (Test-Path $envFile) {
-    Get-Content $envFile | Where-Object { $_ -match '^\s*([^#].+?)\s*=\s*(.+)$' } | ForEach-Object {
-        $key, $val = $Matches[1], $Matches[2]
-        [Environment]::SetEnvironmentVariable($key, $val, "Process")
-    }
-}
-
-# 3. 映射 .env 变量到 app 期望的变量名
-$env:RABBITMQ_HOST = "localhost"
-$env:RABBITMQ_PORT = $env:REMOTE_RABBITMQ_PORT
-$env:RABBITMQ_USER = $env:REMOTE_RABBITMQ_USER
-$env:RABBITMQ_PASS = $env:REMOTE_RABBITMQ_PASSWORD
-$env:NACOS_ADDR    = "localhost:$env:REMOTE_NACOS_HTTP_PORT"
-$env:NACOS_USER    = $env:REMOTE_NACOS_USER
-$env:NACOS_PASS    = $env:REMOTE_NACOS_PASSWORD
-$env:REDIS_HOST    = "localhost"
-$env:REDIS_PORT    = $env:REMOTE_REDIS_PORT
-$env:REDIS_PASS    = $env:REMOTE_REDIS_PASSWORD
-$env:MYSQL_HOST    = "localhost"
-$env:MYSQL_PORT    = $env:REMOTE_MYSQL_PORT
-$env:MYSQL_USER    = $env:WORKER_MYSQL_USER
-$env:MYSQL_PASS    = $env:WORKER_MYSQL_PASSWORD
+# 2. 加载并映射基础设施连接变量。
+. (Join-Path $PSScriptRoot 'load-infrastructure-env.ps1')
+Import-InfrastructureEnvironment -RepositoryRoot $repoRoot
 $env:MANGA_ROOT    = if ($env:MANGA_ROOT) { $env:MANGA_ROOT } else { "F:/manga" }
 $localJpegTurboDirectory = Join-Path $repoRoot "worker-service\tools\image-optimizer\.runtime\libjpeg-turbo\bin"
 $localDjpegPath = Join-Path $localJpegTurboDirectory "djpeg.exe"
@@ -49,26 +28,6 @@ if ((Test-Path $localDjpegPath) -and (Test-Path $localCjpegPath)) {
     $env:IMAGE_CJPEG_PATH = $localCjpegPath
 } else {
     Write-Host "WARN: 未找到项目本地 libjpeg-turbo，超大 JPEG 将无法生成 LQ。运行 scripts/dev/setup-image-optimizer.ps1 安装。" -ForegroundColor Yellow
-}
-
-$requiredSettings = @(
-    "WORKER_MYSQL_USER",
-    "WORKER_MYSQL_PASSWORD",
-    "REMOTE_MYSQL_PORT",
-    "REMOTE_REDIS_PORT",
-    "REMOTE_RABBITMQ_PORT",
-    "REMOTE_RABBITMQ_USER",
-    "REMOTE_RABBITMQ_PASSWORD",
-    "REMOTE_NACOS_HTTP_PORT",
-    "REMOTE_NACOS_USER",
-    "REMOTE_NACOS_PASSWORD",
-    "REMOTE_REDIS_PASSWORD"
-)
-$missingSettings = @($requiredSettings | Where-Object {
-    [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($_, "Process"))
-})
-if ($missingSettings) {
-    throw "Worker 环境变量未配置：$($missingSettings -join ', ')"
 }
 
 # 4. 确保存储目录存在（HQ/LQ/EXPORT/thumb）

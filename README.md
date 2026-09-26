@@ -62,12 +62,6 @@ ComicAtlas 是一个面向个人收藏的本地漫画仓库平台。它把 ZIP �
    API_MYSQL_PASSWORD=请设置强密码
    WORKER_MYSQL_USER=comicatlas_ro
    WORKER_MYSQL_PASSWORD=请设置另一组强密码
-   REMOTE_MYSQL_PORT=3306
-   REMOTE_REDIS_PORT=6379
-   REMOTE_RABBITMQ_PORT=5672
-   REMOTE_RABBITMQ_MANAGEMENT_PORT=15672
-   REMOTE_NACOS_HTTP_PORT=8848
-   REMOTE_NACOS_GRPC_PORT=9848
    REMOTE_NACOS_USER=nacos
    REMOTE_NACOS_PASSWORD=nacos
    REMOTE_REDIS_PASSWORD=
@@ -79,6 +73,7 @@ ComicAtlas 是一个面向个人收藏的本地漫画仓库平台。它把 ZIP �
    ```
 
    > 仓库级 `.env` 使用 `API_MYSQL_*` 和 `WORKER_MYSQL_*` 区分写账号与只读账号。启动脚本或 Compose 会在进程边界映射为 Spring 使用的 `MYSQL_USER` / `MYSQL_PASS`；Worker 账号仅授予 `SELECT`，详见[部署运维](docs/operations/management.md)的"数据库账号"小节。
+   > 基础设施默认使用 MySQL 3306、Redis 6379、RabbitMQ 5672/15672、Nacos 8848/9848；端口不同时再设置对应的 `REMOTE_*_PORT`。
 
 2. 确认 `MANGA_ROOT` 下存在 `hq`、`lq`、`thumbs`、`metadata`、`staging`、`trash` 和 `export` 目录。
 
@@ -160,7 +155,7 @@ ComicAtlas 面向单机个人仓库，管理端接口（回收站、永久清理
 
 - 仅部署在可信本机环境；基础服务（`docker-compose.infra.yml`）只绑定 `127.0.0.1` 回环地址。
 - 不要把 Gateway 或 `.env` 中的数据库、管理台、注册中心端口直接暴露到公网；FRP 只开放 `FRP_SERVER_PORT`。
-- 在宿主机或防火墙层限制对管理后台 `/manage` 的访问，需要远程访问时使用 SSH 隧道。
+- 在宿主机或防火墙层限制对管理后台 `/manage` 的访问，需要远程访问时使用受控的私有网络连接。
 
 ## 文档
 
