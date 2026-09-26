@@ -122,28 +122,7 @@ class SemanticNamingContractTest {
             List.of("comic-common", "api-service", "worker-service", "gateway");
 
     /** 一条固定禁用声明：类型 + 变量名 + 建议命名。 */
-    private static final class BannedPattern {
-        private final String type;
-        private final String variable;
-        private final String expected;
-
-        private BannedPattern(String type, String variable, String expected) {
-            this.type = type;
-            this.variable = variable;
-            this.expected = expected;
-        }
-
-        String type() {
-            return type;
-        }
-
-        String variable() {
-            return variable;
-        }
-
-        String expected() {
-            return expected;
-        }
+    private record BannedPattern(String type, String variable, String expected) {
 
         /**
          * 生成声明匹配正则：类型基名（单词边界）+ 可选泛型实参 + 空白 + 短名。

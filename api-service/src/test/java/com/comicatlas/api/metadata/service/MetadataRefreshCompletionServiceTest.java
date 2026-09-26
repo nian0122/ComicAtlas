@@ -234,12 +234,13 @@ class MetadataRefreshCompletionServiceTest {
         chapter.setId(42L);
         chapter.setComicId(1L);
         when(chapterMapper.selectById(42L)).thenReturn(chapter);
-        when(metadataRefreshService.loadAndValidate(any())).thenReturn(chapterSnapshot());
+        MetadataRefreshSnapshotDTO validatedSnapshot = chapterSnapshot();
+        when(metadataRefreshService.loadAndValidate(any())).thenReturn(validatedSnapshot);
         when(managementTaskService.countActiveMetadataItems(10L, 1L)).thenReturn(1L);
 
         service.handleCompleted(chapterCompletedEvent());
 
-        verify(metadataRefreshService).applyValidatedSnapshot(chapterSnapshot());
+        verify(metadataRefreshService).applyValidatedSnapshot(validatedSnapshot);
         verify(comicStatsService, never()).refreshByComic(any());
         verify(comicMapper, never()).markRefreshCompleted(any());
         verify(outboxService, never()).enqueue(any(), anyString(), anyString());

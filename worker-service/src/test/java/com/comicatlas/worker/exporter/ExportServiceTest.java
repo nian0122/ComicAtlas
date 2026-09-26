@@ -99,7 +99,10 @@ class ExportServiceTest {
         stubResolverToRoot();
         ExportService.ExportOutput first = realService.export(1L, 99L);
         ExportService.ExportOutput repeated = realService.export(1L, 99L);
-        assertEquals(first, repeated);
+        assertEquals(first.taskId(), repeated.taskId());
+        assertEquals(first.comicId(), repeated.comicId());
+        assertEquals(first.fileName(), repeated.fileName());
+        assertEquals(first.size(), repeated.size());
         verify(realBuilder, times(1)).build(any(), any());
         verify(realBuilder, times(1)).verify(any(), any());
         verify(exportCollector, times(2)).collect(1L);
