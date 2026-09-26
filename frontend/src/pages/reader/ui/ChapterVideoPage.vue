@@ -2,7 +2,6 @@
   <main class="short-video-page" @touchstart.passive="onTouchStart" @touchend="onTouchEnd" @wheel.prevent="onWheel">
     <header class="video-header">
       <AppButton class="video-back" type="button" aria-label="返回漫画详情" @click="goBack">←</AppButton>
-      <strong class="video-title">短视频阅读</strong>
       <span v-if="items.length" class="video-count"
         >{{ currentIndex + 1 }} <span>/ {{ items.length }}</span></span
       >
@@ -552,12 +551,6 @@ onBeforeUnmount(() => {
   background: transparent;
   color: #fff;
   font-size: 25px;
-}
-
-.video-title {
-  font-size: 17px;
-  font-weight: 700;
-  text-align: center;
 }
 
 .video-count {
