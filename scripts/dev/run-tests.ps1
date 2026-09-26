@@ -17,49 +17,11 @@ if ($MavenArgs.Count -eq 0) {
 
 # 仓库根目录 = 脚本所在 scripts/dev/ 向上两级
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$envFile = Join-Path $repoRoot ".env"
-if (-not (Test-Path -LiteralPath $envFile)) {
-    Write-Host "ERROR: 未找到 .env（$envFile），无法注入基础设施连接变量" -ForegroundColor Red
-    exit 1
-}
+# 基础设施经 FRP visitor 从 localhost 访问远端；与开发启动共用映射。
+. (Join-Path $PSScriptRoot 'load-infrastructure-env.ps1')
+Import-InfrastructureEnvironment -RepositoryRoot $repoRoot
 
-# 解析 .env（仅读取 KEY=VALUE 行，忽略注释）
-$envValues = @{}
-Get-Content -LiteralPath $envFile | ForEach-Object {
-    $line = $_.Trim()
-    if ($line -and -not $line.StartsWith('#') -and $line.Contains('=')) {
-        $parts = $line -split '=', 2
-        $envValues[$parts[0]] = $parts[1]
-    }
-}
-
-function Get-EnvValue([string]$key) {
-    if (-not $envValues.ContainsKey($key)) {
-        Write-Host "WARN: .env 缺少 $key，对应占位符可能无法解析" -ForegroundColor Yellow
-        return ""
-    }
-    return $envValues[$key]
-}
-
-# 注入测试所需变量（映射与 start-dev.ps1 / docker-compose.yml 保持一致：
-# 基础设施经 FRP 隧道从 localhost 访问远端）
-$env:REDIS_HOST = "localhost"
-$env:REDIS_PORT = Get-EnvValue "REMOTE_REDIS_PORT"
-$env:REDIS_PASS = Get-EnvValue "REMOTE_REDIS_PASSWORD"
-$env:RABBITMQ_HOST = "localhost"
-$env:RABBITMQ_PORT = Get-EnvValue "REMOTE_RABBITMQ_PORT"
-$env:RABBITMQ_USER = Get-EnvValue "REMOTE_RABBITMQ_USER"
-$env:RABBITMQ_PASS = Get-EnvValue "REMOTE_RABBITMQ_PASSWORD"
-$env:RABBITMQ_MANAGEMENT_PORT = Get-EnvValue "REMOTE_RABBITMQ_MANAGEMENT_PORT"
-$env:NACOS_ADDR = "localhost:" + (Get-EnvValue "REMOTE_NACOS_HTTP_PORT")
-$env:NACOS_USER = Get-EnvValue "REMOTE_NACOS_USER"
-$env:NACOS_PASS = Get-EnvValue "REMOTE_NACOS_PASSWORD"
-$env:MYSQL_HOST = "localhost"
-$env:MYSQL_PORT = Get-EnvValue "REMOTE_MYSQL_PORT"
-$env:MYSQL_USER = Get-EnvValue "WORKER_MYSQL_USER"
-$env:MYSQL_PASS = Get-EnvValue "WORKER_MYSQL_PASSWORD"
-
-Write-Host "=== 环境变量注入完成（FRP 隧道 localhost 直连远端基础设施）===" -ForegroundColor DarkGray
+Write-Host "=== 环境变量注入完成（FRP visitor localhost 访问远端基础设施）===" -ForegroundColor DarkGray
 Write-Host "    MYSQL=$env:MYSQL_HOST`:$env:MYSQL_PORT REDIS=$env:REDIS_HOST`:$env:REDIS_PORT" -ForegroundColor DarkGray
 
 # API 的跨服务集成测试（MediaUploadManagementIT / TrashLifecycleIT 等）

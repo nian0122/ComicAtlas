@@ -61,7 +61,10 @@ class ExportArchivePipelineTest {
         assertEquals(archive, result.mainZip());
         assertTrue(result.orderedVolumes().size() > 1);
         assertEquals("book.z01", result.orderedVolumes().getFirst().getFileName().toString());
-        assertEquals(result, builder.verify(archive, manifest));
+        ZipBuilder.ZipBuildResult verified = builder.verify(archive, manifest);
+        assertEquals(result.mainZip(), verified.mainZip());
+        assertEquals(result.orderedVolumes(), verified.orderedVolumes());
+        assertEquals(result.totalSize(), verified.totalSize());
     }
 
     @Test

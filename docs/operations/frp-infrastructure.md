@@ -24,12 +24,6 @@ pwsh -File tools/maintenance/manage-remote-infra-frp.ps1 -Action Initialize
 FRP_SERVER_ADDR=远端服务器地址
 FRP_SERVER_PORT=7000
 FRP_DASHBOARD_PORT=7500
-REMOTE_MYSQL_PORT=3306
-REMOTE_REDIS_PORT=6379
-REMOTE_RABBITMQ_PORT=5672
-REMOTE_RABBITMQ_MANAGEMENT_PORT=15672
-REMOTE_NACOS_HTTP_PORT=8848
-REMOTE_NACOS_GRPC_PORT=9848
 FRP_AUTH_TOKEN=自动生成
 FRP_STCP_SECRET=自动生成
 FRP_VISITOR_BIND_ADDR=0.0.0.0
@@ -37,6 +31,8 @@ FRP_PROVIDER_USER=comicatlas-infra
 FRP_DASHBOARD_USER=admin
 FRP_DASHBOARD_PASSWORD=自动生成
 ```
+
+基础设施端口默认使用 MySQL 3306、Redis 6379、RabbitMQ 5672/15672、Nacos 8848/9848；只有端口不同时才需在 `.env` 中设置对应的 `REMOTE_*_PORT`。
 
 `FRP_SERVER_ADDR` 是唯一的远端服务器公网地址，同时供 FRP 连接和 MySQL 备份脚本使用；`REMOTE_INFRA_HOST` 则是项目容器访问本机 FRP visitor 的入口，两者职责不同。`FRP_AUTH_TOKEN` 用于 frpc/frps 身份验证，`FRP_STCP_SECRET` 用于限制 visitor 访问。Provider 的每个 STCP proxy 还通过 `allowUsers = ["comicatlas-local"]` 只允许本项目 visitor 用户访问。Dashboard 用户名和随机密码也只保存在 `.env` 与远端权限为 `0600` 的环境文件中，禁止提交或复制到文档、日志。
 
@@ -70,13 +66,13 @@ sudo systemctl status frps.service frpc-provider.service
 
 ## 三、安装本地 visitor
 
-先关闭旧 SSH 隧道并安装登录自启动任务：
+安装 FRP visitor 登录自启动任务：
 
 ```powershell
-pwsh -File tools/maintenance/manage-remote-infra-frp.ps1 -Action InstallTask -ReplaceSshTunnel
+pwsh -File tools/maintenance/manage-remote-infra-frp.ps1 -Action InstallTask
 ```
 
-`-ReplaceSshTunnel` 会停止并禁用旧计划任务 `ComicAtlas Remote Infra Tunnel`。如果旧 SSH 隧道是手动启动的，脚本会报告端口占用，需要先手动结束该进程。旧脚本仍保留，可以随时恢复。
+如端口已被其他进程占用，脚本会报告占用端口；清理冲突后重新执行安装命令。
 
 常用命令：
 
@@ -96,7 +92,7 @@ pwsh -File tools/maintenance/manage-remote-infra-frp.ps1 -Action RemoveTask
 
 - `.runtime/`、`tools/vendor/frp/` 和 `.env` 均已加入 Git 忽略规则。
 - `FRP_VISITOR_BIND_ADDR=0.0.0.0` 是为了让 Docker Desktop 通过 `host.docker.internal` 访问端口；Windows 防火墙仍应阻止局域网入站访问这六个端口。
-- FRP Dashboard 只监听远端回环地址，并通过需要 STCP secret 的 visitor 提供给本机 `127.0.0.1:${FRP_DASHBOARD_PORT}`；不开放公网 Dashboard、HTTP vhost 或 SSH Tunnel Gateway。
+- FRP Dashboard 只监听远端回环地址，并通过需要 STCP secret 的 visitor 提供给本机 `127.0.0.1:${FRP_DASHBOARD_PORT}`；不开放公网 Dashboard 或 HTTP vhost。
 - 升级时先更新远端 `frps`，再更新 provider 和本地 visitor。
 
 ## 五、部署日志
@@ -119,5 +115,5 @@ pwsh -File tools/maintenance/manage-remote-infra-frp.ps1 -Action RemoveTask
 - 通过 STCP 提供 MySQL、Redis、RabbitMQ、RabbitMQ Management、Nacos HTTP、Nacos gRPC 和 FRPS Dashboard 共七个代理。
 - Dashboard 仅监听远端 `127.0.0.1:7500`，本地通过 visitor 的 `127.0.0.1:7500` 访问；公网仍只开放 `7000/TCP`。
 - 为跨用户 STCP 显式配置 `allowUsers = ["comicatlas-local"]`，避免 visitor 端口已监听但实际连接被拒绝。
-- 本地安装 `ComicAtlas Remote Infra FRP` 登录自启动任务，并禁用旧 SSH Tunnel 任务。
+- 本地安装 `ComicAtlas Remote Infra FRP` 登录自启动任务。
 - 验证结果：七个代理健康检查通过，Dashboard 使用真实 Chromium 访问返回 HTTP 200，页面显示 FRP `v0.70.1`。

@@ -18,9 +18,6 @@ spring:
         server-addr: ${NACOS_ADDR}
         username: ${NACOS_USER}
         password: ${NACOS_PASS}
-      config:
-        import-check:
-          enabled: false
     gateway:
       # 统一由网关处理跨域；生产环境可通过 CORS_ALLOWED_ORIGINS 覆盖允许的前端来源。
       globalcors:

@@ -9,7 +9,6 @@ import com.comicatlas.worker.importer.metadata.MetadataAssembler;
 import com.comicatlas.worker.importer.manifest.ImportManifestManager;
 import com.comicatlas.worker.task.command.CancelHandler;
 import com.comicatlas.worker.task.publisher.TaskStatusPublisher;
-import com.comicatlas.worker.task.model.TaskStatusUpdate;
 import com.comicatlas.common.event.ImportTaskCreatedEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.worker.config.WorkerConfig;
@@ -32,6 +31,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.io.IOException;
 
@@ -39,6 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
@@ -130,7 +131,7 @@ class ImportTaskHandlerTest {
         verify(directoryHandler).handle(ctx.capture(), eq(7L), eq(11L), eq(Path.of("F:/manga")));
         assertEquals("EHENTAI", ctx.getValue().sourceType(), "EHENTAI 保留来源类型供 parser 剥离包装目录");
         assertEquals(downloaded, ctx.getValue().sourcePath(), "委托的是下载后的本地源目录");
-        verify(publisher).publishStatus(eq(new TaskStatusUpdate(7L, "PARSING", 0, null, 0, 0, null)));
+        verifyStatus(7L, "PARSING", null);
         verify(publisher).publishImported(7L, 11L);
         // EHENTAI 不直接进 ZIP 解压路径
         verify(zipHandler, never()).importZip(any(), anyLong(), anyLong(), any());
@@ -161,8 +162,7 @@ class ImportTaskHandlerTest {
 
         handler.handle(event(8L, 12L, "DIRECTORY", "D:/comics/ComicA"), channel, 1L);
 
-        verify(publisher).publishStatus(eq(new TaskStatusUpdate(8L, "FAILED", 0, null, 0, 0,
-                "源文件缺失: D:/comics/ComicA/001.jpg")));
+        verifyStatus(8L, "FAILED", "源文件缺失: D:/comics/ComicA/001.jpg");
     }
 
     @Test
@@ -172,8 +172,7 @@ class ImportTaskHandlerTest {
 
         handler.handle(event(8L, 12L, "DIRECTORY", "D:/comics/ComicA"), channel, 1L);
 
-        verify(publisher).publishStatus(eq(new TaskStatusUpdate(8L, "FAILED", 0, null, 0, 0,
-                "解析失败  压缩包损坏 第 3 行")));
+        verifyStatus(8L, "FAILED", "解析失败  压缩包损坏 第 3 行");
     }
 
     @Test
@@ -193,5 +192,15 @@ class ImportTaskHandlerTest {
 
         verify(zipHandler).importZip(any(ImportContext.class), eq(9L), eq(13L), eq(Path.of("F:/manga")));
         verify(ehentaiDownloadService, never()).downloadToSourceDir(anyLong(), anyString());
+    }
+
+    private void verifyStatus(Long taskId, String status, String errorMessage) {
+        verify(publisher).publishStatus(argThat(update -> taskId.equals(update.taskId())
+                && status.equals(update.status())
+                && update.progress() == 0
+                && update.downloadMethod() == null
+                && update.speedBytesPerSec() == 0
+                && update.etaSeconds() == 0
+                && Objects.equals(errorMessage, update.errorMessage())));
     }
 }

@@ -4,9 +4,7 @@ import com.comicatlas.ai.model.VisionAnalyzer;
 import com.comicatlas.ai.task.TaskRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
-import java.nio.file.Files;
 import java.util.List;
-import java.util.concurrent.Executor;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
