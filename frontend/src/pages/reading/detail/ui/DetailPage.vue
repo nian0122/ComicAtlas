@@ -15,6 +15,7 @@
         :total-chapters="totalChapters"
         :progress-text="progressMetaText"
         :progress-scale="progressScale"
+        :read-label="primaryAction?.label || '开始阅读'"
         :can-read="Boolean(primaryAction)"
         :filtered-catalog-tree="filteredCatalogTree"
         :is-searching="isSearching"
@@ -22,7 +23,6 @@
         :expanded-node-paths="expandedNodePaths"
         @clear-search="clearSearch"
         @read="readComic"
-        @read-immersive="readImmersive"
         @select="goReader"
       />
 
@@ -37,7 +37,6 @@
           :title="heroTitle"
           :title-tooltip="comic.title"
           :primary-action="primaryAction"
-          :secondary-action="secondaryAction"
         >
           <template #description>
             <div class="progress-block">
@@ -221,29 +220,19 @@ const progressMetaText = computed(() => {
 const progressScale = computed(() => Math.min(100, Math.max(0, comic.value?.progressPercent || 0)) / 100)
 
 const primaryAction = computed(() => {
-  // 两种模式共用阅读历史，入口名称始终表达阅读方式。
   if (comic.value?.lastReadChapterId) {
     return {
-      label: '漫画阅读',
+      label: '继续阅读',
       onClick: continueRead,
     }
   }
   if (firstChapter.value) {
     return {
-      label: '漫画阅读',
+      label: '开始阅读',
       onClick: startRead,
     }
   }
   return undefined
-})
-
-const secondaryAction = computed(() => {
-  if (!firstChapter.value) return undefined
-  return {
-    label: '短视频阅读',
-    onClick: readImmersive,
-    icon: 'play' as const,
-  }
 })
 
 function formatDate(s: string): string {
@@ -267,16 +256,6 @@ function startRead() {
 
 function readComic() {
   primaryAction.value?.onClick()
-}
-
-function readImmersive() {
-  const chapterId = comic.value?.lastReadChapterId || firstChapter.value?.id
-  if (!chapterId) return
-  void router.push({
-    name: 'chapter-videos',
-    params: { chapterId },
-    query: { page: comic.value?.lastReadChapterId ? comic.value.lastReadPage || 1 : 1 },
-  })
 }
 
 function goReader(chapterId: number) {

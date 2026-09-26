@@ -13,10 +13,12 @@
       :total-pages="store.totalPages"
       :prev-chapter-id="store.prevChapterId"
       :next-chapter-id="store.nextChapterId"
+      :chapter-id="store.chapterId"
       @back="nav.goBack"
       @prev-chapter="nav.goPrevChapter()"
       @next-chapter="nav.goNextChapter()"
       @jump-to-page="onPageChange"
+      @open-immersive="openImmersive"
     />
 
     <!-- Loading -->
@@ -63,8 +65,10 @@
         v-if="toolbarVisible"
         :mode="mode"
         :title="toolbarTitle"
+        :chapter-id="store.chapterId"
         @back="nav.goBack"
         @open-settings="dispatch(ReaderAction.OpenSettings)"
+        @open-immersive="openImmersive"
       />
       <ReaderBottomNav
         v-if="toolbarVisible"
@@ -77,10 +81,7 @@
         @next-chapter="nav.goNextChapter"
         @jump-to-page="onPageChange"
       />
-      <ReaderSettingsDrawer
-        :visible="isSettings"
-        @close="dispatch(ReaderAction.CloseSettings)"
-      />
+      <ReaderSettingsDrawer :visible="isSettings" @close="dispatch(ReaderAction.CloseSettings)" />
     </template>
   </div>
 </template>
@@ -196,6 +197,15 @@ const toolbarTitle = computed(() => {
   if (mode.value === 'mobile') return chapterTitle
   return `${fallbackTitle} · ${chapterTitle}`
 })
+
+function openImmersive() {
+  if (!store.chapterId) return
+  void router.push({
+    name: 'chapter-videos',
+    params: { chapterId: store.chapterId },
+    query: { page: store.currentPage },
+  })
+}
 const saveDebounceTimer = ref<number | null>(null)
 /** 存在未确认落库的进度：翻页置位，saveProgress 成功才清除；卸载兜底据此决定是否重发 */
 const progressDirty = ref(false)

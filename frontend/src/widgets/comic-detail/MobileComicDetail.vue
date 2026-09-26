@@ -17,21 +17,10 @@
             <span v-for="tag in comic.tags" :key="tag.name">{{ tag.name }}</span>
           </div>
         </header>
-        <div class="reading-modes" role="group" aria-label="阅读模式">
-          <AppButton type="button" class="read-button" :disabled="!canRead" @click="$emit('read')">
-            <span class="mode-label">漫画阅读</span>
-            <span class="mode-hint">连续翻页</span>
-          </AppButton>
-          <AppButton
-            type="button"
-            class="read-button read-button--immersive"
-            :disabled="!canRead"
-            @click="$emit('read-immersive')"
-          >
-            <span class="mode-label">短视频阅读</span>
-            <span class="mode-hint">上滑浏览图文与视频</span>
-          </AppButton>
-        </div>
+        <AppButton type="button" class="read-button" :disabled="!canRead" @click="$emit('read')">
+          <el-icon :size="17"><VideoPlay /></el-icon>
+          {{ readLabel }}
+        </AppButton>
       </div>
     </section>
 
@@ -107,6 +96,7 @@ interface Props {
   totalChapters: number
   progressText: string
   progressScale: number
+  readLabel: string
   canRead: boolean
   searchKeyword: string
   filteredCatalogTree: CatalogNode[]
@@ -119,7 +109,6 @@ const props = defineProps<Props>()
 
 defineEmits<{
   read: []
-  'read-immersive': []
   select: [chapterId: number]
   'update:searchKeyword': [keyword: string]
   'clear-search': []
@@ -256,20 +245,14 @@ const hqSize = computed(() => {
   font-size: 12px;
 }
 
-.reading-modes {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: var(--space-5);
-}
-
 .read-button {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
   width: 100%;
-  min-height: 70px;
+  min-height: 48px;
+  margin-top: var(--space-5);
   border: 1px solid rgb(255 255 255 / 12%);
   border-radius: var(--radius-sm);
   background: var(--accent);
@@ -279,33 +262,14 @@ const hqSize = computed(() => {
   box-shadow: 0 10px 24px rgb(0 0 0 / 28%);
 }
 
-.read-button--immersive {
-  border-color: rgb(255 255 255 / 35%);
-  background: rgb(10 12 16 / 50%);
-  color: #fff;
-  backdrop-filter: blur(10px);
-}
-
 /* AppButton 的插槽由内部 span 包裹；将该层改为 flex，避免图标按文字基线漂移。 */
 .read-button :deep(.app-button__content) {
   display: inline-flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: var(--space-2);
   height: 100%;
   line-height: 1;
-}
-
-.mode-label {
-  font-size: 15px;
-  font-weight: 800;
-}
-
-.mode-hint {
-  font-size: 11px;
-  font-weight: 500;
-  opacity: 0.78;
 }
 
 .read-button:disabled {

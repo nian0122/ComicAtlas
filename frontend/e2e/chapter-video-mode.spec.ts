@@ -133,11 +133,15 @@ test.beforeEach(async ({ page }) => {
   )
 })
 
-test('详情页提供两种阅读模式，沉浸模式按原顺序展示图片和视频', async ({ page }) => {
+test('详情页进入普通阅读器，再从工具栏切换混排短视频模式', async ({ page }) => {
   await page.goto('/comic/7')
-  await expect(page.getByRole('group', { name: '阅读模式' })).toBeVisible()
-  await expect(page.getByRole('button', { name: /漫画阅读/ })).toBeVisible()
-  await page.getByRole('button', { name: /短视频阅读/ }).click()
+  await expect(page.getByRole('button', { name: /开始阅读|继续阅读/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /短视频阅读/ })).toHaveCount(0)
+  await page.getByRole('button', { name: /开始阅读|继续阅读/ }).click()
+  await expect(page).toHaveURL(/\/reader\/1/)
+  await page.locator('.reader-page').click({ position: { x: 195, y: 400 } })
+  await expect(page.getByRole('button', { name: '短视频阅读' })).toBeVisible()
+  await page.getByRole('button', { name: '短视频阅读' }).click()
   await expect(page).toHaveURL(/\/videos\/1\?page=1/)
   await expect(page.locator('.media-image')).toHaveAttribute('src', '/files/hq/first.jpg')
 
@@ -163,6 +167,6 @@ test('详情页提供两种阅读模式，沉浸模式按原顺序展示图片�
 
 test('漫画阅读入口进入连续阅读器', async ({ page }) => {
   await page.goto('/comic/7')
-  await page.getByRole('button', { name: /漫画阅读/ }).click()
+  await page.getByRole('button', { name: /开始阅读|继续阅读/ }).click()
   await expect(page).toHaveURL(/\/reader\/1/)
 })

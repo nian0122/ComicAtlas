@@ -29,6 +29,9 @@
         <circle cx="19" cy="12" r="2" />
       </svg>
     </AppButton>
+    <AppButton class="toolbar-btn immersive-btn" type="button" aria-label="短视频阅读" @click="emit('openImmersive')">
+      <span aria-hidden="true">▶</span>
+    </AppButton>
   </header>
 </template>
 
@@ -46,6 +49,7 @@ defineProps<Props>()
 const emit = defineEmits<{
   (e: 'back'): void
   (e: 'openSettings'): void
+  (e: 'openImmersive'): void
 }>()
 </script>
 

@@ -40,6 +40,7 @@
       <AppButton v-if="nextChapterId" class="tool-btn chapter-btn primary" @click="emit('nextChapter')"
         >下一章</AppButton
       >
+      <AppButton v-if="chapterId" class="tool-btn immersive-btn" @click="emit('openImmersive')">短视频</AppButton>
 
       <el-popover
         v-model:visible="settingsVisible"
@@ -113,6 +114,7 @@ interface Props {
   totalPages: number
   prevChapterId: number | null
   nextChapterId: number | null
+  chapterId?: number | null
 }
 
 const props = defineProps<Props>()
@@ -121,6 +123,7 @@ const emit = defineEmits<{
   (e: 'prevChapter'): void
   (e: 'nextChapter'): void
   (e: 'jumpToPage', page: number): void
+  (e: 'openImmersive'): void
 }>()
 
 const settings = useReaderSettingsStore()
