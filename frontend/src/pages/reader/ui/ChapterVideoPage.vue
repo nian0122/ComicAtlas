@@ -95,54 +95,29 @@
             <path v-else d="M15 9a4 4 0 0 1 0 6m3-9a8 8 0 0 1 0 12" />
           </svg>
         </AppButton>
-        <div v-if="isSpeedSheetOpen" class="video-speed-sheet" @click.self="closeSpeedSheet">
-          <section class="video-speed-panel" role="dialog" aria-modal="true" aria-label="播放速度">
-            <div class="video-speed-handle" aria-hidden="true" />
-            <h2>播放速度</h2>
-            <div class="video-speed-options" role="listbox" aria-label="选择播放速度">
-              <AppButton
-                v-for="speed in playbackRates"
-                :key="speed"
-                class="video-speed-option"
-                type="button"
-                role="option"
-                :aria-selected="playbackRate === speed"
-                @click.stop="selectPlaybackRate(speed)"
-              >
-                {{ formatPlaybackRate(speed) }}×
-              </AppButton>
-            </div>
-            <AppButton class="video-speed-close" type="button" @click="closeSpeedSheet">完成</AppButton>
-          </section>
-        </div>
-        <div v-if="currentIsVideo" class="video-controls" :class="{ 'is-seeking': isSeeking }">
-          <div class="video-time" aria-live="polite">
-            {{ formatTime(isSeeking && seekPreviewTime != null ? seekPreviewTime : currentTime) }} /
-            {{ formatTime(duration) }}
-          </div>
-          <div
-            ref="progressBarRef"
-            class="video-progress"
-            :class="{ 'is-long-press': isLongPressSeeking }"
-            role="slider"
-            tabindex="0"
-            :aria-valuenow="Math.round(isSeeking && seekPreviewTime != null ? seekPreviewTime : currentTime)"
-            aria-valuemin="0"
-            :aria-valuemax="duration"
-            aria-label="播放进度，可拖动调整"
-            @pointerdown.stop.prevent="onProgressPointerDown"
-            @pointermove.stop.prevent="onProgressPointerMove"
-            @pointerup.stop.prevent="onProgressPointerUp"
-            @pointercancel.stop.prevent="onProgressPointerUp"
-            @touchstart.stop.prevent="onProgressTouchStart"
-            @touchmove.stop.prevent="onProgressTouchMove"
-            @touchend.stop.prevent="onProgressTouchEnd"
-            @keydown="onProgressKeydown"
-          >
-            <span class="video-progress-fill" :style="{ width: `${displayedProgress * 100}%` }" />
-            <i class="video-progress-thumb" :style="{ left: `${displayedProgress * 100}%` }" aria-hidden="true" />
-          </div>
-        </div>
+        <VideoSpeedSheet
+          v-if="isSpeedSheetOpen"
+          :current-rate="playbackRate"
+          :rates="playbackRates"
+          @close="closeSpeedSheet"
+          @select="selectPlaybackRate"
+        />
+        <VideoProgressControl
+          v-if="currentIsVideo"
+          ref="progressControlRef"
+          :display-time="isSeeking && seekPreviewTime != null ? seekPreviewTime : currentTime"
+          :duration="duration"
+          :progress="displayedProgress"
+          :is-seeking="isSeeking"
+          :is-long-press="isLongPressSeeking"
+          @pointer-down="onProgressPointerDown"
+          @pointer-move="onProgressPointerMove"
+          @pointer-up="onProgressPointerUp"
+          @touch-start="onProgressTouchStart"
+          @touch-move="onProgressTouchMove"
+          @touch-end="onProgressTouchEnd"
+          @keydown="onProgressKeydown"
+        />
       </section>
       <div class="video-nav">
         <AppButton type="button" aria-label="上一项" :disabled="!hasPrevious" @click="move(-1)">↑</AppButton>
@@ -173,6 +148,7 @@ import { readerApi, type ReaderDTO } from '@/entities/chapter'
 import { historyApi } from '@/entities/history'
 import { isVideoMedia, type MediaItemInfo } from '@/entities/media'
 import { clientLogger } from '@/shared/lib/logger'
+import { VideoProgressControl, VideoSpeedSheet } from './components'
 
 const route = useRoute()
 const router = useRouter()
@@ -181,7 +157,7 @@ const nextChapter = shallowRef<ReaderDTO | null>(null)
 const previousChapter = shallowRef<ReaderDTO | null>(null)
 const currentIndex = ref(0)
 const videoRef = ref<HTMLVideoElement | null>(null)
-const progressBarRef = ref<HTMLElement | null>(null)
+const progressControlRef = ref<InstanceType<typeof VideoProgressControl> | null>(null)
 const loading = ref(true)
 const loadError = ref('')
 const mediaError = ref('')
@@ -499,11 +475,7 @@ function toggleMute(): void {
   if (videoRef.value) videoRef.value.muted = muted.value
 }
 
-function formatPlaybackRate(rate: number): string {
-  return Number.isInteger(rate) ? String(rate) : rate.toFixed(2).replace(/0$/u, '')
-}
-
-function selectPlaybackRate(rate: (typeof playbackRates)[number]): void {
+function selectPlaybackRate(rate: number): void {
   playbackRate.value = rate
   isSpeedSheetOpen.value = false
   if (videoRef.value) videoRef.value.playbackRate = rate
@@ -590,17 +562,9 @@ function onLoadedMetadata(): void {
   currentTime.value = video.currentTime
 }
 
-function formatTime(value: number): string {
-  if (!Number.isFinite(value) || value < 0) return '00:00'
-  const totalSeconds = Math.floor(value)
-  const minutes = Math.floor(totalSeconds / 60)
-  const seconds = totalSeconds % 60
-  return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
-}
-
 function seekFromClientX(clientX: number, commit: boolean): void {
   const video = videoRef.value
-  const progressBar = progressBarRef.value
+  const progressBar = progressControlRef.value?.getElement()
   if (!video || !progressBar || duration.value <= 0) return
   const bounds = progressBar.getBoundingClientRect()
   const ratio = Math.min(1, Math.max(0, (clientX - bounds.left) / bounds.width))
@@ -650,7 +614,7 @@ function finishSeeking(clientX?: number): void {
 }
 
 function onProgressPointerDown(event: PointerEvent): void {
-  progressBarRef.value?.setPointerCapture?.(event.pointerId)
+  progressControlRef.value?.getElement()?.setPointerCapture?.(event.pointerId)
   beginSeeking(event.clientX, event.pointerId)
 }
 
@@ -960,178 +924,6 @@ onBeforeUnmount(() => {
   height: 23px;
 }
 
-.video-speed-sheet {
-  position: absolute;
-  inset: 0;
-  z-index: 4;
-  display: flex;
-  align-items: flex-end;
-  background: rgb(0 0 0 / 35%);
-}
-
-.video-speed-panel {
-  width: 100%;
-  padding: 14px 18px calc(env(safe-area-inset-bottom) + 16px);
-  border-radius: 20px 20px 0 0;
-  background: rgb(22 22 24 / 98%);
-  box-shadow: 0 10px 30px rgb(0 0 0 / 35%);
-  backdrop-filter: blur(12px);
-}
-
-.video-speed-handle {
-  width: 36px;
-  height: 4px;
-  margin: 0 auto 12px;
-  border-radius: 999px;
-  background: rgb(255 255 255 / 32%);
-}
-
-.video-speed-panel h2 {
-  margin: 0 0 14px;
-  color: #fff;
-  font-size: 16px;
-  text-align: center;
-}
-
-.video-speed-options {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.video-speed-option {
-  min-height: 42px;
-  padding: 0 6px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: #fffc;
-  font-size: 12px;
-}
-
-.video-speed-option[aria-selected='true'] {
-  background: #fff;
-  color: #111;
-}
-
-.video-speed-close {
-  width: 100%;
-  min-height: 42px;
-  margin-top: 12px;
-  border: 0;
-  border-radius: 10px;
-  background: rgb(255 255 255 / 10%);
-  color: #fff;
-}
-
-.video-controls {
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  left: 0;
-  z-index: 2;
-  display: grid;
-  gap: 0;
-  padding: 0 18px calc(env(safe-area-inset-bottom) + 3px);
-  background: linear-gradient(transparent, rgb(0 0 0 / 42%));
-  transition: transform 160ms ease;
-}
-
-.video-controls.is-seeking {
-  transform: translateY(-4px);
-}
-
-.video-time {
-  color: #fffd;
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-  text-shadow: 0 1px 8px #000;
-  opacity: 0;
-  transition: opacity 160ms ease;
-}
-
-.video-controls.is-seeking .video-time {
-  opacity: 1;
-}
-
-.video-progress {
-  position: relative;
-  width: 100%;
-  height: 18px;
-  cursor: pointer;
-  touch-action: none;
-}
-
-.video-progress::before {
-  position: absolute;
-  bottom: 3px;
-  right: 0;
-  left: 0;
-  height: 2px;
-  border-radius: 999px;
-  background: #fff5;
-  content: '';
-}
-
-.video-progress-fill {
-  position: absolute;
-  bottom: 3px;
-  left: 0;
-  display: block;
-  height: 2px;
-  border-radius: 999px;
-  background: #fff;
-  transition:
-    width 0.15s linear,
-    height 160ms ease;
-}
-
-.video-progress-thumb {
-  position: absolute;
-  bottom: -1px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  transform: translateX(-50%) scale(0.75);
-  background: #fff;
-  box-shadow: 0 1px 8px #0008;
-  opacity: 0;
-  transition:
-    transform 160ms ease,
-    opacity 160ms ease,
-    width 160ms ease,
-    height 160ms ease;
-}
-
-.video-progress:hover::before,
-.video-progress:focus-visible::before,
-.video-progress.is-long-press::before,
-.video-controls.is-seeking .video-progress::before {
-  bottom: 2px;
-  height: 4px;
-  background: rgb(255 255 255 / 72%);
-}
-
-.video-progress:hover .video-progress-fill,
-.video-progress:focus-visible .video-progress-fill,
-.video-progress.is-long-press .video-progress-fill,
-.video-controls.is-seeking .video-progress-fill {
-  bottom: 2px;
-  height: 4px;
-}
-
-.video-progress:hover .video-progress-thumb,
-.video-progress:focus-visible .video-progress-thumb,
-.video-progress.is-long-press .video-progress-thumb,
-.video-controls.is-seeking .video-progress-thumb {
-  bottom: 0;
-  width: 12px;
-  height: 12px;
-  transform: translateX(-50%) scale(1);
-  opacity: 1;
-}
-
 .video-play-button {
   position: absolute;
   top: 50%;
@@ -1228,8 +1020,7 @@ onBeforeUnmount(() => {
   .media-slide-up-enter-active,
   .media-slide-up-leave-active,
   .media-slide-down-enter-active,
-  .media-slide-down-leave-active,
-  .video-progress span {
+  .media-slide-down-leave-active {
     transition: none;
   }
 }
