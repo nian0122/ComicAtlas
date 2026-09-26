@@ -4,13 +4,6 @@
       <span>阅读进度暂未保存：{{ store.progressSaveError }}</span>
       <AppButton variant="ghost" @click="retryProgressSave">重试保存</AppButton>
     </div>
-    <router-link
-      v-if="!store.loading && !store.error && playableVideos.length > 0"
-      class="video-mode-link"
-      :to="{ name: 'chapter-videos', params: { chapterId: store.chapterId }, query: { page: store.currentPage } }"
-    >
-      <span aria-hidden="true">▶</span> 短视频播放
-    </router-link>
     <!-- 桌面工具栏：迁移前行为 100% 保留（常驻渲染，隐藏由 settings.showToolbar 的 CSS 类控制，不进移动端状态机） -->
     <ReaderToolbar
       v-if="mode === 'desktop'"
@@ -123,9 +116,6 @@ import { isVideoMedia } from '@/entities/media'
 const route = useRoute()
 const router = useRouter()
 const store = useReaderStore()
-const playableVideos = computed(() =>
-  store.pages.filter((page) => isVideoMedia(page) && page.hqUrl && (!page.hqStatus || page.hqStatus === 'READY')),
-)
 const settings = useReaderSettingsStore()
 
 // ── 移动端交互系统（设计规范 §3/§9）────────────────────────────
@@ -519,28 +509,6 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.video-mode-link {
-  position: fixed;
-  z-index: 25;
-  top: calc(var(--nav-height, 72px) + 12px);
-  right: 16px;
-  padding: 10px 16px;
-  border: 1px solid rgb(255 255 255 / 20%);
-  border-radius: 999px;
-  background: rgb(17 20 26 / 88%);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 700;
-  text-decoration: none;
-  box-shadow: 0 8px 28px rgb(0 0 0 / 24%);
-}
-
-@media (max-width: 1024px) {
-  .video-mode-link {
-    top: calc(env(safe-area-inset-top) + 12px);
-  }
-}
-
 .reader-page {
   width: 100%;
   height: 100vh;
