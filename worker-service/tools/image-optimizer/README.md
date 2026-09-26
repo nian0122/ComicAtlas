@@ -13,7 +13,7 @@ go build -o image-optimizer.exe .
 
 **注意**：本项目依赖 `github.com/chai2010/webp`，其底层使用 CGO 绑定 libwebp。Windows 编译需要 MinGW-w64 环境。
 
-JPEG 低内存缩放需要 libjpeg-turbo 运行时。Docker 镜像内置 `libjpeg-turbo-progs`。Windows 本地开发执行 `pwsh -NoProfile -File scripts/dev/setup-image-optimizer.ps1`，工具会下载到项目 `.runtime` 目录；`scripts/dev/start-dev.ps1` 会自动传入 `IMAGE_DJPEG_PATH`，不会修改系统 `Path`。未安装时工具仍可回退到 Go 解码，但超大图片的峰值内存会明显增加。
+JPEG 低内存缩放需要 libjpeg-turbo 运行时。Docker 镜像内置 `libjpeg-turbo-progs`。Windows 本地开发如已在 `worker-service/tools/image-optimizer/.runtime/libjpeg-turbo/bin` 安装 `djpeg.exe` 与 `cjpeg.exe`，`scripts/dev/start-dev.ps1` 会自动传入 `IMAGE_DJPEG_PATH` 和 `IMAGE_CJPEG_PATH`。未安装时工具仍可回退到 Go 解码，但超大图片的峰值内存会明显增加。
 
 ## 使用
 

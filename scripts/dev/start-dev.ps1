@@ -27,7 +27,7 @@ if ((Test-Path $localDjpegPath) -and (Test-Path $localCjpegPath)) {
     $env:IMAGE_DJPEG_PATH = $localDjpegPath
     $env:IMAGE_CJPEG_PATH = $localCjpegPath
 } else {
-    Write-Host "WARN: 未找到项目本地 libjpeg-turbo，超大 JPEG 将无法生成 LQ。运行 scripts/dev/setup-image-optimizer.ps1 安装。" -ForegroundColor Yellow
+    Write-Host "WARN: 未找到项目本地 libjpeg-turbo，将回退到 Go 解码；超大 JPEG 的峰值内存可能增加。" -ForegroundColor Yellow
 }
 
 # 4. 确保存储目录存在（HQ/LQ/EXPORT/thumb）
