@@ -44,7 +44,7 @@ test('只播放本章可用视频，切换时释放上一条并可返回原章�
   })
   await expect(page.locator('.video-count')).toHaveText('2 / 2')
   await expect(page.locator('.video-media')).toHaveJSProperty('src', '/files/hq/second.mp4')
-  await expect(page.getByRole('button', { name: '下一个视频' })).toBeDisabled()
+  await expect(page.locator('.video-nav')).toBeHidden()
 
   await page.getByRole('button', { name: '返回章节阅读' }).click()
   await expect(page).toHaveURL(/\/reader\/1\?page=4/)
