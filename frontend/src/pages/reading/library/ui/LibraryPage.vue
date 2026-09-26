@@ -234,10 +234,12 @@
       <div class="pagination-wrapper">
         <el-pagination
           v-model:current-page="store.query.page"
+          class="library-pagination"
           :page-size="store.query.size"
           :total="store.total"
           layout="prev, pager, next"
-          small
+          :pager-count="5"
+          background
           hide-on-single-page
           :disabled="store.loading"
           @current-change="onPageChange"
