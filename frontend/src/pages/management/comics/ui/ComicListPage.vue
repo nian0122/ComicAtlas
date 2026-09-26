@@ -71,11 +71,13 @@
       <AppButton variant="text" @click="resetFilters">重置</AppButton>
     </div>
 
-    <div v-if="selectedIds.length > 0" class="batch-toolbar">
-      <el-checkbox v-model="selectAll" :indeterminate="isIndeterminate" @change="handleSelectAll">
-        全选 ({{ selectedIds.length }} / {{ store.list.length }})
+    <div v-if="store.list.length > 0" class="batch-toolbar">
+      <el-checkbox :model-value="selectAll" :indeterminate="isIndeterminate" @change="handleSelectAll">
+        全选本页 ({{ selectedIds.length }} / {{ store.list.length }})
       </el-checkbox>
-      <AppButton variant="primary" @click="showBatchDialog = true"> 批量编辑 </AppButton>
+      <AppButton variant="primary" :disabled="selectedIds.length === 0" @click="showBatchDialog = true">
+        批量编辑
+      </AppButton>
     </div>
 
     <ContentState v-if="store.loading && store.list.length === 0" state="loading" message="加载中..." />
