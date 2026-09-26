@@ -58,8 +58,10 @@
               @timeupdate="onTimeUpdate"
               @loadstart="onVideoLoadStart"
               @waiting="onVideoWaiting"
-              @stalled="onVideoWaiting"
+              @loadeddata="clearBufferingIndicator"
               @canplay="onVideoCanPlay"
+              @canplaythrough="clearBufferingIndicator"
+              @seeked="clearBufferingIndicator"
               @playing="onVideoPlaying"
               @play="onVideoPlay"
               @pause="onVideoPause"
@@ -286,7 +288,10 @@ let speedPressStartY = 0
 let suppressVideoClick = false
 let slideUnlockTimer: number | null = null
 let chapterCueTimer: number | null = null
+let bufferingConfirmTimer: number | null = null
 const playbackRates = [0.5, 1, 1.25, 1.5, 2] as const
+const BUFFERING_CONFIRM_DELAY = 160
+const PLAYABLE_READY_STATE = 3
 
 function imageUrl(page: MediaItemInfo): string {
   if ((!page.hqStatus || page.hqStatus === 'READY') && page.hqUrl) return page.hqUrl
@@ -545,6 +550,7 @@ function resetMediaState(): void {
   isSeeking.value = false
   isLongPressSeeking.value = false
   isSpeedSheetOpen.value = false
+  clearBufferingIndicator()
   isBuffering.value = currentIsVideo.value
   clearSpeedPressTimer()
   imageReloadKey.value = 0
@@ -648,6 +654,7 @@ function retryPlayback(): void {
 function onTimeUpdate(): void {
   const video = videoRef.value
   if (!video) return
+  clearBufferingIndicator()
   if (Number.isFinite(video.duration) && video.duration > 0) duration.value = video.duration
   currentTime.value = video.currentTime
   progress.value = duration.value > 0 ? video.currentTime / duration.value : 0
@@ -754,7 +761,7 @@ function onProgressKeydown(event: KeyboardEvent): void {
 
 function onVideoError(event: Event): void {
   if (event.currentTarget === videoRef.value) {
-    isBuffering.value = false
+    clearBufferingIndicator()
     mediaError.value = '视频无法播放，请重试'
     showControls(false)
   }
@@ -764,16 +771,32 @@ function onImageError(): void {
   mediaError.value = '图片无法显示，请重试'
 }
 
-function onVideoLoadStart(): void {
+function clearBufferingIndicator(): void {
+  if (bufferingConfirmTimer != null) window.clearTimeout(bufferingConfirmTimer)
+  bufferingConfirmTimer = null
+  isBuffering.value = false
+}
+
+function onVideoLoadStart(event: Event): void {
+  if (event.currentTarget !== videoRef.value) return
+  clearBufferingIndicator()
   isBuffering.value = true
 }
 
-function onVideoWaiting(): void {
-  isBuffering.value = true
+function onVideoWaiting(event: Event): void {
+  const waitingVideo = event.currentTarget
+  if (!(waitingVideo instanceof HTMLVideoElement) || waitingVideo !== videoRef.value) return
+  if (bufferingConfirmTimer != null) window.clearTimeout(bufferingConfirmTimer)
+  bufferingConfirmTimer = window.setTimeout(() => {
+    bufferingConfirmTimer = null
+    if (waitingVideo === videoRef.value && !waitingVideo.paused && waitingVideo.readyState < PLAYABLE_READY_STATE) {
+      isBuffering.value = true
+    }
+  }, BUFFERING_CONFIRM_DELAY)
 }
 
 function onVideoCanPlay(): void {
-  isBuffering.value = false
+  clearBufferingIndicator()
 }
 
 function onVideoPlay(): void {
@@ -783,13 +806,13 @@ function onVideoPlay(): void {
 
 function onVideoPlaying(): void {
   isPlaying.value = true
-  isBuffering.value = false
+  clearBufferingIndicator()
   scheduleControlsHide()
 }
 
 function onVideoPause(): void {
   isPlaying.value = false
-  isBuffering.value = false
+  clearBufferingIndicator()
   showControls(false)
 }
 
@@ -891,6 +914,7 @@ onBeforeUnmount(() => {
   clearSpeedPressTimer()
   if (slideUnlockTimer != null) window.clearTimeout(slideUnlockTimer)
   if (chapterCueTimer != null) window.clearTimeout(chapterCueTimer)
+  clearBufferingIndicator()
   disposeSwipe()
   disposeControls()
   queueProgressSave()
