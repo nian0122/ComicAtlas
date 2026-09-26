@@ -15,6 +15,7 @@ async function swipeUp(page: Page): Promise<void> {
     element.dispatchEvent(new TouchEvent('touchstart', { changedTouches: [start], bubbles: true }))
     element.dispatchEvent(new TouchEvent('touchend', { changedTouches: [end], bubbles: true }))
   })
+  await page.waitForTimeout(380)
 }
 
 async function swipeDown(page: Page): Promise<void> {
@@ -24,6 +25,7 @@ async function swipeDown(page: Page): Promise<void> {
     element.dispatchEvent(new TouchEvent('touchstart', { changedTouches: [start], bubbles: true }))
     element.dispatchEvent(new TouchEvent('touchend', { changedTouches: [end], bubbles: true }))
   })
+  await page.waitForTimeout(380)
 }
 
 test.beforeEach(async ({ page }) => {
@@ -153,15 +155,14 @@ test('详情页进入普通阅读器，再从工具栏切换混排短视频模�
   await progressSlider.focus()
   await progressSlider.press('ArrowRight')
   await expect(page.locator('video.video-media')).toHaveJSProperty('currentTime', 5)
-  const videoBounds = await page.locator('video.video-media').boundingBox()
-  if (!videoBounds) throw new Error('视频区域不可用')
-  await page.mouse.move(videoBounds.x + videoBounds.width / 2, videoBounds.y + videoBounds.height / 2)
-  await page.mouse.down()
+  await page.locator('.video-stage').evaluate((element) => {
+    const touch = new Touch({ identifier: 2, target: element, clientX: 180, clientY: 420 })
+    element.dispatchEvent(new TouchEvent('touchstart', { changedTouches: [touch], bubbles: true }))
+  })
   await page.waitForTimeout(500)
   await expect(page.getByRole('dialog', { name: '播放速度' })).toBeVisible()
   await page.getByRole('option', { name: '1.5×' }).click()
   await expect(page.locator('video.video-media')).toHaveJSProperty('playbackRate', 1.5)
-  await page.mouse.up()
   await expect(page.locator('video.video-media')).toHaveJSProperty('playbackRate', 1.5)
   await page.getByRole('button', { name: '开启声音' }).click()
   await expect(page.locator('video.video-media')).toHaveJSProperty('muted', false)

@@ -14,40 +14,49 @@
     </div>
     <div v-else-if="items.length === 0" class="video-state">暂无可阅读内容</div>
     <template v-else>
-      <section class="video-stage" aria-label="短视频阅读内容">
-        <video
-          v-if="currentIsVideo"
-          :key="currentItem.id"
-          ref="videoRef"
-          class="video-media"
-          :src="currentItem.hqUrl"
-          :muted="muted"
-          playsinline
-          webkit-playsinline
-          preload="auto"
-          loop
-          @click="togglePlayback"
-          @pointerdown="onVideoPointerDown"
-          @pointermove="onVideoPointerMove"
-          @pointerup="onVideoPointerUp"
-          @pointercancel="onVideoPointerUp"
-          @mousedown="onVideoPointerDown"
-          @mouseup="onVideoPointerUp"
-          @loadedmetadata="onLoadedMetadata"
-          @timeupdate="onTimeUpdate"
-          @play="isPlaying = true"
-          @pause="isPlaying = false"
-          @error="onVideoError"
-        />
-        <img
-          v-else
-          :key="`${currentItem.id}-${imageReloadKey}`"
-          class="video-media media-image"
-          :src="imageUrl(currentItem)"
-          :alt="`${chapterTitle} 第 ${currentItem.pageNumber} 页`"
-          draggable="false"
-          @error="onImageError"
-        />
+      <section
+        class="video-stage"
+        aria-label="短视频阅读内容"
+        @pointerdown="onVideoPointerDown"
+        @pointermove="onVideoPointerMove"
+        @pointerup="onVideoPointerUp"
+        @pointercancel="onVideoPointerUp"
+        @mousedown="onVideoPointerDown"
+        @mouseup="onVideoPointerUp"
+        @touchstart="onVideoTouchStart"
+        @touchmove="onVideoTouchMove"
+        @touchend="onVideoTouchEnd"
+      >
+        <Transition :name="slideTransitionName" @after-enter="finishSlide">
+          <div :key="`${currentItem.id}-${imageReloadKey}`" class="video-media-frame">
+            <video
+              v-if="currentIsVideo"
+              :ref="setVideoRef"
+              class="video-media"
+              :src="currentItem.hqUrl"
+              :muted="muted"
+              playsinline
+              webkit-playsinline
+              preload="auto"
+              loop
+              draggable="false"
+              @click="togglePlayback"
+              @loadedmetadata="onLoadedMetadata"
+              @timeupdate="onTimeUpdate"
+              @play="isPlaying = true"
+              @pause="isPlaying = false"
+              @error="onVideoError"
+            />
+            <img
+              v-else
+              class="video-media media-image"
+              :src="imageUrl(currentItem)"
+              :alt="`${chapterTitle} 第 ${currentItem.pageNumber} 页`"
+              draggable="false"
+              @error="onImageError"
+            />
+          </div>
+        </Transition>
         <div class="video-shade" aria-hidden="true" />
         <div v-if="mediaError" class="video-play-error">
           <span>{{ mediaError }}</span>
@@ -187,6 +196,8 @@ const isSeeking = ref(false)
 const isLongPressSeeking = ref(false)
 const playbackRate = ref(1)
 const isSpeedSheetOpen = ref(false)
+const slideDirection = ref<'up' | 'down'>('up')
+const isSliding = ref(false)
 const imageReloadKey = ref(0)
 const chapterTitle = computed(() => chapter.value?.chapterTitle ?? '')
 const items = computed(() => playableItems(chapter.value?.pages ?? []))
@@ -198,6 +209,7 @@ const displayedProgress = computed(() =>
     ? seekPreviewTime.value / duration.value
     : progress.value,
 )
+const slideTransitionName = computed(() => `media-slide-${slideDirection.value}`)
 const hasPrevious = computed(() => currentIndex.value > 0 || chapter.value?.prevChapterId != null)
 const hasNext = computed(() => currentIndex.value < items.value.length - 1 || chapter.value?.nextChapterId != null)
 const MAX_CACHED_CHAPTERS = 8
@@ -220,6 +232,7 @@ let speedPressTimer: number | null = null
 let speedPressStartX = 0
 let speedPressStartY = 0
 let suppressVideoClick = false
+let slideUnlockTimer: number | null = null
 const playbackRates = [0.5, 1, 1.25, 1.5, 2] as const
 
 function imageUrl(page: MediaItemInfo): string {
@@ -349,6 +362,27 @@ function updateRoute(): void {
   })
 }
 
+function setVideoRef(element: unknown): void {
+  if (element instanceof HTMLVideoElement) {
+    videoRef.value = element
+    return
+  }
+  if (videoRef.value && !videoRef.value.isConnected) videoRef.value = null
+}
+
+function beginSlide(direction: number): void {
+  slideDirection.value = direction > 0 ? 'up' : 'down'
+  isSliding.value = true
+  if (slideUnlockTimer != null) window.clearTimeout(slideUnlockTimer)
+  slideUnlockTimer = window.setTimeout(finishSlide, 500)
+}
+
+function finishSlide(): void {
+  isSliding.value = false
+  if (slideUnlockTimer != null) window.clearTimeout(slideUnlockTimer)
+  slideUnlockTimer = null
+}
+
 async function playCurrent(): Promise<void> {
   if (!currentIsVideo.value) return
   const video = videoRef.value
@@ -374,6 +408,10 @@ function stopCurrent(): void {
   video.load()
 }
 
+function pauseCurrent(): void {
+  videoRef.value?.pause()
+}
+
 function showEdgeError(message: string): void {
   edgeError.value = message
   if (errorTimer != null) window.clearTimeout(errorTimer)
@@ -383,11 +421,12 @@ function showEdgeError(message: string): void {
 }
 
 async function move(direction: number): Promise<void> {
-  if (switchingChapter || !chapter.value) return
+  if (switchingChapter || isSliding.value || !chapter.value || isSpeedSheetOpen.value) return
   const nextIndex = currentIndex.value + direction
   if (nextIndex >= 0 && nextIndex < items.value.length) {
     const sequence = ++playbackSequence
-    stopCurrent()
+    beginSlide(direction)
+    pauseCurrent()
     currentIndex.value = nextIndex
     resetMediaState()
     updateRoute()
@@ -407,7 +446,8 @@ async function move(direction: number): Promise<void> {
       prefetched ?? (await findPlayableChapter(adjacentId, direction > 0 ? 'next' : 'previous', activeChapter.comicId))
     if (!target || chapter.value?.chapterId !== activeChapter.chapterId) return
     ++playbackSequence
-    stopCurrent()
+    beginSlide(direction)
+    pauseCurrent()
     chapter.value = target
     currentIndex.value = direction > 0 ? 0 : playableItems(target.pages).length - 1
     resetMediaState()
@@ -486,10 +526,33 @@ function openSpeedSheet(): void {
 
 function onVideoPointerDown(event: PointerEvent | MouseEvent): void {
   if (!currentIsVideo.value || event.button > 0) return
+  if (event.target instanceof Element && event.target.closest('button, [role="slider"], .video-speed-sheet')) return
   speedPressStartX = event.clientX
   speedPressStartY = event.clientY
   clearSpeedPressTimer()
   speedPressTimer = window.setTimeout(openSpeedSheet, 420)
+}
+
+function onVideoTouchStart(event: TouchEvent): void {
+  if (!currentIsVideo.value) return
+  if (event.target instanceof Element && event.target.closest('button, [role="slider"], .video-speed-sheet')) return
+  const touch = event.changedTouches[0]
+  if (!touch) return
+  speedPressStartX = touch.clientX
+  speedPressStartY = touch.clientY
+  clearSpeedPressTimer()
+  speedPressTimer = window.setTimeout(openSpeedSheet, 420)
+}
+
+function onVideoTouchMove(event: TouchEvent): void {
+  const touch = event.changedTouches[0]
+  if (touch && Math.hypot(touch.clientX - speedPressStartX, touch.clientY - speedPressStartY) > 12) {
+    clearSpeedPressTimer()
+  }
+}
+
+function onVideoTouchEnd(): void {
+  clearSpeedPressTimer()
 }
 
 function onVideoPointerMove(event: PointerEvent): void {
@@ -740,6 +803,8 @@ onBeforeUnmount(() => {
   if (progressTimer != null) window.clearTimeout(progressTimer)
   if (errorTimer != null) window.clearTimeout(errorTimer)
   if (seekPressTimer != null) window.clearTimeout(seekPressTimer)
+  clearSpeedPressTimer()
+  if (slideUnlockTimer != null) window.clearTimeout(slideUnlockTimer)
   queueProgressSave()
   stopCurrent()
   document.body.style.overflow = previousOverflow
@@ -797,7 +862,18 @@ onBeforeUnmount(() => {
   width: min(100%, 520px);
   height: 100%;
   margin: 0 auto;
+  overflow: hidden;
   background: #000;
+}
+
+.video-media-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: #000;
+  backface-visibility: hidden;
+  will-change: transform;
 }
 
 .video-media {
@@ -806,6 +882,25 @@ onBeforeUnmount(() => {
   height: 100%;
   object-fit: contain;
   cursor: pointer;
+}
+
+.media-slide-up-enter-active,
+.media-slide-up-leave-active,
+.media-slide-down-enter-active,
+.media-slide-down-leave-active {
+  position: absolute;
+  inset: 0;
+  transition: transform 340ms cubic-bezier(0.22, 0.72, 0.24, 1);
+}
+
+.media-slide-up-enter-from,
+.media-slide-down-leave-to {
+  transform: translate3d(0, 100%, 0);
+}
+
+.media-slide-up-leave-to,
+.media-slide-down-enter-from {
+  transform: translate3d(0, -100%, 0);
 }
 
 .media-image {
@@ -1130,6 +1225,10 @@ onBeforeUnmount(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .media-slide-up-enter-active,
+  .media-slide-up-leave-active,
+  .media-slide-down-enter-active,
+  .media-slide-down-leave-active,
   .video-progress span {
     transition: none;
   }
