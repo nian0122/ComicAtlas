@@ -27,6 +27,12 @@
           preload="auto"
           loop
           @click="togglePlayback"
+          @pointerdown="onVideoPointerDown"
+          @pointermove="onVideoPointerMove"
+          @pointerup="onVideoPointerUp"
+          @pointercancel="onVideoPointerUp"
+          @mousedown="onVideoPointerDown"
+          @mouseup="onVideoPointerUp"
           @loadedmetadata="onLoadedMetadata"
           @timeupdate="onTimeUpdate"
           @play="isPlaying = true"
@@ -47,6 +53,7 @@
           <span>{{ mediaError }}</span>
           <AppButton type="button" @click="retryPlayback">重试</AppButton>
         </div>
+        <div v-if="isSpeedBoosting" class="video-speed-toast" role="status">2× 加速播放</div>
         <AppButton
           v-else-if="currentIsVideo && !isPlaying"
           class="video-play-button"
@@ -80,6 +87,28 @@
             <path v-else d="M15 9a4 4 0 0 1 0 6m3-9a8 8 0 0 1 0 12" />
           </svg>
         </AppButton>
+        <AppButton
+          v-if="currentIsVideo"
+          class="video-speed"
+          type="button"
+          aria-label="播放速度"
+          @click.stop="speedMenuOpen = !speedMenuOpen"
+        >
+          {{ formatPlaybackRate(playbackRate) }}×
+        </AppButton>
+        <div v-if="currentIsVideo && speedMenuOpen" class="video-speed-menu" role="listbox" aria-label="选择播放速度">
+          <AppButton
+            v-for="speed in playbackRates"
+            :key="speed"
+            class="video-speed-option"
+            type="button"
+            role="option"
+            :aria-selected="playbackRate === speed"
+            @click.stop="selectPlaybackRate(speed)"
+          >
+            {{ formatPlaybackRate(speed) }}×
+          </AppButton>
+        </div>
         <div v-if="currentIsVideo" class="video-controls" :class="{ 'is-seeking': isSeeking }">
           <div class="video-time" aria-live="polite">
             {{ formatTime(isSeeking && seekPreviewTime != null ? seekPreviewTime : currentTime) }} /
@@ -159,6 +188,9 @@ const duration = ref(0)
 const seekPreviewTime = ref<number | null>(null)
 const isSeeking = ref(false)
 const isLongPressSeeking = ref(false)
+const playbackRate = ref(1)
+const speedMenuOpen = ref(false)
+const isSpeedBoosting = ref(false)
 const imageReloadKey = ref(0)
 const chapterTitle = computed(() => chapter.value?.chapterTitle ?? '')
 const items = computed(() => playableItems(chapter.value?.pages ?? []))
@@ -188,6 +220,12 @@ let progressSavePromise: Promise<void> | null = null
 let seekPressTimer: number | null = null
 let resumeAfterSeek = false
 let seekPointerId: number | null = null
+let speedPressTimer: number | null = null
+let speedPressStartX = 0
+let speedPressStartY = 0
+let suppressVideoClick = false
+let startedForSpeedBoost = false
+const playbackRates = [0.5, 1, 1.25, 1.5, 2] as const
 
 function imageUrl(page: MediaItemInfo): string {
   if ((!page.hqStatus || page.hqStatus === 'READY') && page.hqUrl) return page.hqUrl
@@ -320,6 +358,7 @@ async function playCurrent(): Promise<void> {
   if (!currentIsVideo.value) return
   const video = videoRef.value
   if (!video) return
+  video.playbackRate = playbackRate.value
   mediaError.value = ''
   try {
     await video.play()
@@ -335,6 +374,7 @@ function stopCurrent(): void {
   const video = videoRef.value
   if (!video) return
   video.pause()
+  video.playbackRate = playbackRate.value
   video.removeAttribute('src')
   video.load()
 }
@@ -402,11 +442,19 @@ function resetMediaState(): void {
   seekPreviewTime.value = null
   isSeeking.value = false
   isLongPressSeeking.value = false
+  speedMenuOpen.value = false
+  isSpeedBoosting.value = false
+  startedForSpeedBoost = false
+  clearSpeedPressTimer()
   imageReloadKey.value = 0
 }
 
 function togglePlayback(): void {
   if (!currentIsVideo.value) return
+  if (suppressVideoClick) {
+    suppressVideoClick = false
+    return
+  }
   const video = videoRef.value
   if (!video) return
   if (video.paused) void playCurrent()
@@ -416,6 +464,59 @@ function togglePlayback(): void {
 function toggleMute(): void {
   muted.value = !muted.value
   if (videoRef.value) videoRef.value.muted = muted.value
+}
+
+function formatPlaybackRate(rate: number): string {
+  return Number.isInteger(rate) ? String(rate) : rate.toFixed(2).replace(/0$/u, '')
+}
+
+function selectPlaybackRate(rate: (typeof playbackRates)[number]): void {
+  playbackRate.value = rate
+  speedMenuOpen.value = false
+  if (videoRef.value) videoRef.value.playbackRate = rate
+}
+
+function clearSpeedPressTimer(): void {
+  if (speedPressTimer != null) window.clearTimeout(speedPressTimer)
+  speedPressTimer = null
+}
+
+function startSpeedBoost(): void {
+  if (!currentIsVideo.value || !videoRef.value) return
+  isSpeedBoosting.value = true
+  suppressVideoClick = true
+  videoRef.value.playbackRate = 2
+  startedForSpeedBoost = videoRef.value.paused
+  if (startedForSpeedBoost) void playCurrent()
+}
+
+function endSpeedBoost(): void {
+  clearSpeedPressTimer()
+  if (!isSpeedBoosting.value) return
+  const video = videoRef.value
+  isSpeedBoosting.value = false
+  if (video) {
+    video.playbackRate = playbackRate.value
+    if (startedForSpeedBoost) video.pause()
+  }
+  startedForSpeedBoost = false
+}
+
+function onVideoPointerDown(event: PointerEvent | MouseEvent): void {
+  if (!currentIsVideo.value || event.button > 0) return
+  speedPressStartX = event.clientX
+  speedPressStartY = event.clientY
+  clearSpeedPressTimer()
+  speedPressTimer = window.setTimeout(startSpeedBoost, 420)
+}
+
+function onVideoPointerMove(event: PointerEvent): void {
+  if (isSpeedBoosting.value) return
+  if (Math.hypot(event.clientX - speedPressStartX, event.clientY - speedPressStartY) > 12) clearSpeedPressTimer()
+}
+
+function onVideoPointerUp(): void {
+  endSpeedBoost()
 }
 
 function retryPlayback(): void {
@@ -476,6 +577,7 @@ function beginSeeking(clientX: number, pointerId: number | null = null): void {
   if (resumeAfterSeek) videoRef.value?.pause()
   isSeeking.value = true
   seekFromClientX(clientX, false)
+  clearSpeedPressTimer()
   if (seekPressTimer != null) window.clearTimeout(seekPressTimer)
   seekPressTimer = window.setTimeout(() => {
     isLongPressSeeking.value = true
@@ -780,6 +882,70 @@ onBeforeUnmount(() => {
 .video-sound svg {
   width: 23px;
   height: 23px;
+}
+
+.video-speed {
+  position: absolute;
+  right: 18px;
+  bottom: calc(env(safe-area-inset-bottom) + 132px);
+  min-width: 46px;
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid rgb(255 255 255 / 24%);
+  border-radius: 999px;
+  background: #0008;
+  color: #fff;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.video-speed-menu {
+  position: absolute;
+  right: 18px;
+  bottom: calc(env(safe-area-inset-bottom) + 174px);
+  z-index: 4;
+  display: grid;
+  gap: 4px;
+  min-width: 78px;
+  padding: 6px;
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 12px;
+  background: rgb(12 12 14 / 94%);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 35%);
+  backdrop-filter: blur(12px);
+}
+
+.video-speed-option {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #fffc;
+  font-size: 12px;
+}
+
+.video-speed-option[aria-selected='true'] {
+  background: rgb(255 255 255 / 16%);
+  color: #fff;
+}
+
+.video-speed-toast {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 3;
+  padding: 10px 16px;
+  border: 1px solid rgb(255 255 255 / 24%);
+  border-radius: 999px;
+  transform: translate(-50%, -50%);
+  background: rgb(0 0 0 / 64%);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  pointer-events: none;
 }
 
 .video-controls {
