@@ -53,7 +53,6 @@
           <span>{{ mediaError }}</span>
           <AppButton type="button" @click="retryPlayback">重试</AppButton>
         </div>
-        <div v-if="isSpeedBoosting" class="video-speed-toast" role="status">2× 加速播放</div>
         <AppButton
           v-else-if="currentIsVideo && !isPlaying"
           class="video-play-button"
@@ -87,27 +86,25 @@
             <path v-else d="M15 9a4 4 0 0 1 0 6m3-9a8 8 0 0 1 0 12" />
           </svg>
         </AppButton>
-        <AppButton
-          v-if="currentIsVideo"
-          class="video-speed"
-          type="button"
-          aria-label="播放速度"
-          @click.stop="speedMenuOpen = !speedMenuOpen"
-        >
-          {{ formatPlaybackRate(playbackRate) }}×
-        </AppButton>
-        <div v-if="currentIsVideo && speedMenuOpen" class="video-speed-menu" role="listbox" aria-label="选择播放速度">
-          <AppButton
-            v-for="speed in playbackRates"
-            :key="speed"
-            class="video-speed-option"
-            type="button"
-            role="option"
-            :aria-selected="playbackRate === speed"
-            @click.stop="selectPlaybackRate(speed)"
-          >
-            {{ formatPlaybackRate(speed) }}×
-          </AppButton>
+        <div v-if="isSpeedSheetOpen" class="video-speed-sheet" @click.self="closeSpeedSheet">
+          <section class="video-speed-panel" role="dialog" aria-modal="true" aria-label="播放速度">
+            <div class="video-speed-handle" aria-hidden="true" />
+            <h2>播放速度</h2>
+            <div class="video-speed-options" role="listbox" aria-label="选择播放速度">
+              <AppButton
+                v-for="speed in playbackRates"
+                :key="speed"
+                class="video-speed-option"
+                type="button"
+                role="option"
+                :aria-selected="playbackRate === speed"
+                @click.stop="selectPlaybackRate(speed)"
+              >
+                {{ formatPlaybackRate(speed) }}×
+              </AppButton>
+            </div>
+            <AppButton class="video-speed-close" type="button" @click="closeSpeedSheet">完成</AppButton>
+          </section>
         </div>
         <div v-if="currentIsVideo" class="video-controls" :class="{ 'is-seeking': isSeeking }">
           <div class="video-time" aria-live="polite">
@@ -189,8 +186,7 @@ const seekPreviewTime = ref<number | null>(null)
 const isSeeking = ref(false)
 const isLongPressSeeking = ref(false)
 const playbackRate = ref(1)
-const speedMenuOpen = ref(false)
-const isSpeedBoosting = ref(false)
+const isSpeedSheetOpen = ref(false)
 const imageReloadKey = ref(0)
 const chapterTitle = computed(() => chapter.value?.chapterTitle ?? '')
 const items = computed(() => playableItems(chapter.value?.pages ?? []))
@@ -224,7 +220,6 @@ let speedPressTimer: number | null = null
 let speedPressStartX = 0
 let speedPressStartY = 0
 let suppressVideoClick = false
-let startedForSpeedBoost = false
 const playbackRates = [0.5, 1, 1.25, 1.5, 2] as const
 
 function imageUrl(page: MediaItemInfo): string {
@@ -442,9 +437,7 @@ function resetMediaState(): void {
   seekPreviewTime.value = null
   isSeeking.value = false
   isLongPressSeeking.value = false
-  speedMenuOpen.value = false
-  isSpeedBoosting.value = false
-  startedForSpeedBoost = false
+  isSpeedSheetOpen.value = false
   clearSpeedPressTimer()
   imageReloadKey.value = 0
 }
@@ -472,8 +465,12 @@ function formatPlaybackRate(rate: number): string {
 
 function selectPlaybackRate(rate: (typeof playbackRates)[number]): void {
   playbackRate.value = rate
-  speedMenuOpen.value = false
+  isSpeedSheetOpen.value = false
   if (videoRef.value) videoRef.value.playbackRate = rate
+}
+
+function closeSpeedSheet(): void {
+  isSpeedSheetOpen.value = false
 }
 
 function clearSpeedPressTimer(): void {
@@ -481,25 +478,10 @@ function clearSpeedPressTimer(): void {
   speedPressTimer = null
 }
 
-function startSpeedBoost(): void {
+function openSpeedSheet(): void {
   if (!currentIsVideo.value || !videoRef.value) return
-  isSpeedBoosting.value = true
+  isSpeedSheetOpen.value = true
   suppressVideoClick = true
-  videoRef.value.playbackRate = 2
-  startedForSpeedBoost = videoRef.value.paused
-  if (startedForSpeedBoost) void playCurrent()
-}
-
-function endSpeedBoost(): void {
-  clearSpeedPressTimer()
-  if (!isSpeedBoosting.value) return
-  const video = videoRef.value
-  isSpeedBoosting.value = false
-  if (video) {
-    video.playbackRate = playbackRate.value
-    if (startedForSpeedBoost) video.pause()
-  }
-  startedForSpeedBoost = false
 }
 
 function onVideoPointerDown(event: PointerEvent | MouseEvent): void {
@@ -507,16 +489,15 @@ function onVideoPointerDown(event: PointerEvent | MouseEvent): void {
   speedPressStartX = event.clientX
   speedPressStartY = event.clientY
   clearSpeedPressTimer()
-  speedPressTimer = window.setTimeout(startSpeedBoost, 420)
+  speedPressTimer = window.setTimeout(openSpeedSheet, 420)
 }
 
 function onVideoPointerMove(event: PointerEvent): void {
-  if (isSpeedBoosting.value) return
   if (Math.hypot(event.clientX - speedPressStartX, event.clientY - speedPressStartY) > 12) clearSpeedPressTimer()
 }
 
 function onVideoPointerUp(): void {
-  endSpeedBoost()
+  clearSpeedPressTimer()
 }
 
 function retryPlayback(): void {
@@ -884,41 +865,48 @@ onBeforeUnmount(() => {
   height: 23px;
 }
 
-.video-speed {
+.video-speed-sheet {
   position: absolute;
-  right: 18px;
-  bottom: calc(env(safe-area-inset-bottom) + 132px);
-  min-width: 46px;
-  height: 34px;
-  padding: 0 8px;
-  border: 1px solid rgb(255 255 255 / 24%);
-  border-radius: 999px;
-  background: #0008;
-  color: #fff;
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-  font-weight: 700;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  align-items: flex-end;
+  background: rgb(0 0 0 / 35%);
 }
 
-.video-speed-menu {
-  position: absolute;
-  right: 18px;
-  bottom: calc(env(safe-area-inset-bottom) + 174px);
-  z-index: 4;
-  display: grid;
-  gap: 4px;
-  min-width: 78px;
-  padding: 6px;
-  border: 1px solid rgb(255 255 255 / 14%);
-  border-radius: 12px;
-  background: rgb(12 12 14 / 94%);
+.video-speed-panel {
+  width: 100%;
+  padding: 14px 18px calc(env(safe-area-inset-bottom) + 16px);
+  border-radius: 20px 20px 0 0;
+  background: rgb(22 22 24 / 98%);
   box-shadow: 0 10px 30px rgb(0 0 0 / 35%);
   backdrop-filter: blur(12px);
 }
 
+.video-speed-handle {
+  width: 36px;
+  height: 4px;
+  margin: 0 auto 12px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 32%);
+}
+
+.video-speed-panel h2 {
+  margin: 0 0 14px;
+  color: #fff;
+  font-size: 16px;
+  text-align: center;
+}
+
+.video-speed-options {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
 .video-speed-option {
-  min-height: 32px;
-  padding: 0 10px;
+  min-height: 42px;
+  padding: 0 6px;
   border: 0;
   border-radius: 8px;
   background: transparent;
@@ -927,25 +915,18 @@ onBeforeUnmount(() => {
 }
 
 .video-speed-option[aria-selected='true'] {
-  background: rgb(255 255 255 / 16%);
-  color: #fff;
+  background: #fff;
+  color: #111;
 }
 
-.video-speed-toast {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  z-index: 3;
-  padding: 10px 16px;
-  border: 1px solid rgb(255 255 255 / 24%);
-  border-radius: 999px;
-  transform: translate(-50%, -50%);
-  background: rgb(0 0 0 / 64%);
+.video-speed-close {
+  width: 100%;
+  min-height: 42px;
+  margin-top: 12px;
+  border: 0;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 10%);
   color: #fff;
-  font-size: 14px;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  pointer-events: none;
 }
 
 .video-controls {
