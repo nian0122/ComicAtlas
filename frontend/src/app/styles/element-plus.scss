@@ -788,7 +788,8 @@ input.el-select__input {
   --el-dialog-bg-color: var(--bg-secondary);
   --el-dialog-box-shadow: var(--card-shadow-hover);
 
-  background-color: var(--bg-secondary);
+  /* Element Plus 的背景简写可能在按需样式中后加载，需覆盖完整背景属性。 */
+  background: var(--bg-secondary) !important;
   border: 1px solid var(--border);
   border-radius: var(--card-radius);
 
