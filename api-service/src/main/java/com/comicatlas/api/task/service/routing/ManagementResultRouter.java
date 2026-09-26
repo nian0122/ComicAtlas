@@ -26,6 +26,7 @@ public class ManagementResultRouter {
     private static final Set<String> LQ_OPERATIONS = Set.of("LQ_GENERATE", "LQ_REGENERATE");
     private static final String COMIC_TARGET = "COMIC";
     private static final String METADATA_REFRESH = "METADATA_REFRESH";
+    private static final String COMIC_DELETE = "COMIC_DELETE";
 
     private final MediaOperationCompletionService mediaCompletionService;
     private final TrashLifecycleCompletionService trashCompletionService;
@@ -51,7 +52,7 @@ public class ManagementResultRouter {
                 }
                 mediaCompletionService.maybeNotifyTranscodeTaskCompleted(event);
             }
-            case "COMIC_DELETE" -> trashCompletionService.applyComicTrashCompleted(event.targetId());
+            case COMIC_DELETE -> trashCompletionService.applyComicTrashCompleted(event.targetId());
             case "CHAPTER_TRASH" -> trashCompletionService.applyChapterTrashCompleted(event.targetId());
             case "MEDIA_TRASH" -> trashCompletionService.applyMediaTrashCompleted(event);
             case "COMIC_RESTORE" -> trashCompletionService.applyComicRestoreCompleted(event.targetId());
@@ -63,7 +64,8 @@ public class ManagementResultRouter {
             case METADATA_REFRESH -> log.warn("通用 completed 事件携带元数据刷新: comicId={}", event.targetId());
             default -> log.warn("未知 completed 操作类型: {}", event.operationType());
         }
-        if (!METADATA_REFRESH.equals(event.operationType())) {
+        // 漫画回收会把 metadata.json 一起移入 TRASH，完成后不能再重建原路径文件，否则恢复会冲突。
+        if (!METADATA_REFRESH.equals(event.operationType()) && !COMIC_DELETE.equals(event.operationType())) {
             metadataUpdateCoordinator.requestSyncForTarget(event.targetType(), event.targetId(),
                     event.taskId(), "命令完成: " + event.operationType());
         }
