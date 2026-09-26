@@ -27,6 +27,7 @@
           preload="auto"
           loop
           @click="togglePlayback"
+          @loadedmetadata="onLoadedMetadata"
           @timeupdate="onTimeUpdate"
           @play="isPlaying = true"
           @pause="isPlaying = false"
@@ -79,16 +80,43 @@
             <path v-else d="M15 9a4 4 0 0 1 0 6m3-9a8 8 0 0 1 0 12" />
           </svg>
         </AppButton>
-        <div
-          v-if="currentIsVideo"
-          class="video-progress"
-          role="progressbar"
-          :aria-valuenow="Math.round(progress * 100)"
-          aria-valuemin="0"
-          aria-valuemax="100"
-          aria-label="播放进度"
-        >
-          <span :style="{ width: `${progress * 100}%` }" />
+        <div v-if="currentIsVideo" class="video-controls" :class="{ 'is-seeking': isSeeking }">
+          <div class="video-control-row">
+            <AppButton
+              class="video-toggle"
+              type="button"
+              :aria-label="isPlaying ? '暂停视频' : '播放视频'"
+              @click.stop="togglePlayback"
+            >
+              {{ isPlaying ? 'Ⅱ' : '▶' }}
+            </AppButton>
+            <div class="video-time" aria-live="polite">
+              {{ formatTime(isSeeking && seekPreviewTime != null ? seekPreviewTime : currentTime) }} /
+              {{ formatTime(duration) }}
+            </div>
+          </div>
+          <div
+            ref="progressBarRef"
+            class="video-progress"
+            :class="{ 'is-long-press': isLongPressSeeking }"
+            role="slider"
+            tabindex="0"
+            :aria-valuenow="Math.round(isSeeking && seekPreviewTime != null ? seekPreviewTime : currentTime)"
+            aria-valuemin="0"
+            :aria-valuemax="duration"
+            aria-label="播放进度，可拖动调整"
+            @pointerdown.stop.prevent="onProgressPointerDown"
+            @pointermove.stop.prevent="onProgressPointerMove"
+            @pointerup.stop.prevent="onProgressPointerUp"
+            @pointercancel.stop.prevent="onProgressPointerUp"
+            @touchstart.stop.prevent="onProgressTouchStart"
+            @touchmove.stop.prevent="onProgressTouchMove"
+            @touchend.stop.prevent="onProgressTouchEnd"
+            @keydown="onProgressKeydown"
+          >
+            <span class="video-progress-fill" :style="{ width: `${displayedProgress * 100}%` }" />
+            <i class="video-progress-thumb" :style="{ left: `${displayedProgress * 100}%` }" aria-hidden="true" />
+          </div>
         </div>
       </section>
       <div class="video-nav">
@@ -128,6 +156,7 @@ const nextChapter = shallowRef<ReaderDTO | null>(null)
 const previousChapter = shallowRef<ReaderDTO | null>(null)
 const currentIndex = ref(0)
 const videoRef = ref<HTMLVideoElement | null>(null)
+const progressBarRef = ref<HTMLElement | null>(null)
 const loading = ref(true)
 const loadError = ref('')
 const mediaError = ref('')
@@ -135,12 +164,22 @@ const edgeError = ref('')
 const isPlaying = ref(false)
 const muted = ref(true)
 const progress = ref(0)
+const currentTime = ref(0)
+const duration = ref(0)
+const seekPreviewTime = ref<number | null>(null)
+const isSeeking = ref(false)
+const isLongPressSeeking = ref(false)
 const imageReloadKey = ref(0)
 const chapterTitle = computed(() => chapter.value?.chapterTitle ?? '')
 const items = computed(() => playableItems(chapter.value?.pages ?? []))
 const currentItem = computed(() => items.value[currentIndex.value]!)
 const currentIsVideo = computed(() => currentItem.value != null && isVideoMedia(currentItem.value))
 const nextItem = computed(() => items.value[currentIndex.value + 1] ?? playableItems(nextChapter.value?.pages ?? [])[0])
+const displayedProgress = computed(() =>
+  isSeeking.value && seekPreviewTime.value != null && duration.value > 0
+    ? seekPreviewTime.value / duration.value
+    : progress.value,
+)
 const hasPrevious = computed(() => currentIndex.value > 0 || chapter.value?.prevChapterId != null)
 const hasNext = computed(() => currentIndex.value < items.value.length - 1 || chapter.value?.nextChapterId != null)
 const MAX_CACHED_CHAPTERS = 8
@@ -156,6 +195,9 @@ let progressTimer: number | null = null
 let errorTimer: number | null = null
 let pendingProgress: { comicId: number; chapterId: number; pageNumber: number } | null = null
 let progressSavePromise: Promise<void> | null = null
+let seekPressTimer: number | null = null
+let resumeAfterSeek = false
+let seekPointerId: number | null = null
 
 function imageUrl(page: MediaItemInfo): string {
   if ((!page.hqStatus || page.hqStatus === 'READY') && page.hqUrl) return page.hqUrl
@@ -365,6 +407,11 @@ function resetMediaState(): void {
   isPlaying.value = false
   mediaError.value = ''
   progress.value = 0
+  currentTime.value = 0
+  duration.value = 0
+  seekPreviewTime.value = null
+  isSeeking.value = false
+  isLongPressSeeking.value = false
   imageReloadKey.value = 0
 }
 
@@ -395,8 +442,116 @@ function retryPlayback(): void {
 
 function onTimeUpdate(): void {
   const video = videoRef.value
-  progress.value =
-    video && Number.isFinite(video.duration) && video.duration > 0 ? video.currentTime / video.duration : 0
+  if (!video) return
+  if (Number.isFinite(video.duration) && video.duration > 0) duration.value = video.duration
+  currentTime.value = video.currentTime
+  progress.value = duration.value > 0 ? video.currentTime / duration.value : 0
+}
+
+function onLoadedMetadata(): void {
+  const video = videoRef.value
+  if (!video || !Number.isFinite(video.duration)) return
+  duration.value = video.duration
+  currentTime.value = video.currentTime
+}
+
+function formatTime(value: number): string {
+  if (!Number.isFinite(value) || value < 0) return '00:00'
+  const totalSeconds = Math.floor(value)
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+}
+
+function seekFromClientX(clientX: number, commit: boolean): void {
+  const video = videoRef.value
+  const progressBar = progressBarRef.value
+  if (!video || !progressBar || duration.value <= 0) return
+  const bounds = progressBar.getBoundingClientRect()
+  const ratio = Math.min(1, Math.max(0, (clientX - bounds.left) / bounds.width))
+  const targetTime = ratio * duration.value
+  seekPreviewTime.value = targetTime
+  if (commit) {
+    video.currentTime = targetTime
+    currentTime.value = targetTime
+    progress.value = ratio
+    seekPreviewTime.value = null
+  }
+}
+
+function beginSeeking(clientX: number, pointerId: number | null = null): void {
+  if (!currentIsVideo.value || duration.value <= 0) return
+  seekPointerId = pointerId
+  resumeAfterSeek = isPlaying.value
+  if (resumeAfterSeek) videoRef.value?.pause()
+  isSeeking.value = true
+  seekFromClientX(clientX, false)
+  if (seekPressTimer != null) window.clearTimeout(seekPressTimer)
+  seekPressTimer = window.setTimeout(() => {
+    isLongPressSeeking.value = true
+  }, 180)
+}
+
+function finishSeeking(clientX?: number): void {
+  if (!isSeeking.value) return
+  if (clientX != null) seekFromClientX(clientX, false)
+  // 使用预览值提交，避免最后一次触摸事件落在轨道外时跳回起点。
+  const video = videoRef.value
+  const targetTime = seekPreviewTime.value
+  if (video && targetTime != null) {
+    video.currentTime = targetTime
+    currentTime.value = targetTime
+    progress.value = duration.value > 0 ? targetTime / duration.value : 0
+  }
+  seekPreviewTime.value = null
+  isSeeking.value = false
+  isLongPressSeeking.value = false
+  seekPointerId = null
+  if (seekPressTimer != null) window.clearTimeout(seekPressTimer)
+  seekPressTimer = null
+  if (resumeAfterSeek) void playCurrent()
+  resumeAfterSeek = false
+}
+
+function onProgressPointerDown(event: PointerEvent): void {
+  progressBarRef.value?.setPointerCapture?.(event.pointerId)
+  beginSeeking(event.clientX, event.pointerId)
+}
+
+function onProgressPointerMove(event: PointerEvent): void {
+  if (seekPointerId === event.pointerId && isSeeking.value) seekFromClientX(event.clientX, false)
+}
+
+function onProgressPointerUp(event: PointerEvent): void {
+  if (seekPointerId === event.pointerId) finishSeeking(event.clientX)
+}
+
+function onProgressTouchStart(event: TouchEvent): void {
+  if (seekPointerId != null) return
+  const touch = event.changedTouches[0]
+  if (touch) beginSeeking(touch.clientX)
+}
+
+function onProgressTouchMove(event: TouchEvent): void {
+  const touch = event.changedTouches[0]
+  if (touch && seekPointerId == null && isSeeking.value) seekFromClientX(touch.clientX, false)
+}
+
+function onProgressTouchEnd(event: TouchEvent): void {
+  if (seekPointerId == null) finishSeeking(event.changedTouches[0]?.clientX)
+}
+
+function onProgressKeydown(event: KeyboardEvent): void {
+  if (duration.value <= 0) return
+  const step = event.shiftKey ? 10 : 5
+  if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+    event.preventDefault()
+    const direction = event.key === 'ArrowLeft' ? -1 : 1
+    const video = videoRef.value
+    if (!video) return
+    video.currentTime = Math.min(duration.value, Math.max(0, video.currentTime + direction * step))
+    onTimeUpdate()
+  }
 }
 
 function onVideoError(event: Event): void {
@@ -511,6 +666,7 @@ onBeforeUnmount(() => {
   ++playbackSequence
   if (progressTimer != null) window.clearTimeout(progressTimer)
   if (errorTimer != null) window.clearTimeout(errorTimer)
+  if (seekPressTimer != null) window.clearTimeout(seekPressTimer)
   queueProgressSave()
   stopCurrent()
   document.body.style.overflow = previousOverflow
@@ -594,7 +750,7 @@ onBeforeUnmount(() => {
 .video-meta {
   position: absolute;
   right: 86px;
-  bottom: calc(env(safe-area-inset-bottom) + 30px);
+  bottom: calc(env(safe-area-inset-bottom) + 82px);
   left: 20px;
   display: flex;
   flex-direction: column;
@@ -619,7 +775,7 @@ onBeforeUnmount(() => {
 .video-sound {
   position: absolute;
   right: 18px;
-  bottom: calc(env(safe-area-inset-bottom) + 27px);
+  bottom: calc(env(safe-area-inset-bottom) + 76px);
   display: grid;
   place-items: center;
   width: 46px;
@@ -636,20 +792,100 @@ onBeforeUnmount(() => {
   height: 23px;
 }
 
-.video-progress {
+.video-controls {
   position: absolute;
+  bottom: calc(env(safe-area-inset-bottom) + 18px);
   right: 0;
-  bottom: 0;
   left: 0;
-  height: 2px;
-  background: #fff5;
+  z-index: 2;
+  display: grid;
+  gap: 5px;
+  padding: 0 18px;
+  transition: transform 160ms ease;
 }
 
-.video-progress span {
+.video-controls.is-seeking {
+  transform: translateY(-4px);
+}
+
+.video-time {
+  color: #fffd;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  text-shadow: 0 1px 8px #000;
+}
+
+.video-control-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.video-toggle {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: #0007;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.video-progress {
+  position: relative;
+  width: 100%;
+  height: 24px;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.video-progress::before {
+  position: absolute;
+  top: 10px;
+  right: 0;
+  left: 0;
+  height: 4px;
+  border-radius: 999px;
+  background: #fff5;
+  content: '';
+}
+
+.video-progress-fill {
+  position: absolute;
+  top: 10px;
+  left: 0;
   display: block;
-  height: 100%;
+  height: 4px;
+  border-radius: 999px;
   background: #fff;
   transition: width 0.15s linear;
+}
+
+.video-progress-thumb {
+  position: absolute;
+  top: 5px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  transform: translateX(-50%) scale(0.75);
+  background: #fff;
+  box-shadow: 0 1px 8px #0008;
+  opacity: 0;
+  transition:
+    transform 160ms ease,
+    opacity 160ms ease;
+}
+
+.video-progress:hover .video-progress-thumb,
+.video-progress:focus-visible .video-progress-thumb,
+.video-progress.is-long-press .video-progress-thumb {
+  transform: translateX(-50%) scale(1);
+  opacity: 1;
 }
 
 .video-play-button {

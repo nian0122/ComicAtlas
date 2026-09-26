@@ -4,6 +4,7 @@ export async function registerVideoPlayerBrowserMocks(page: Page): Promise<void>
   await page.addInitScript(() => {
     const pausedState = new WeakMap<HTMLMediaElement, boolean>()
     const currentTimeState = new WeakMap<HTMLMediaElement, number>()
+    const durationState = new WeakMap<HTMLMediaElement, number>()
     const sourceState = new WeakMap<HTMLMediaElement, string>()
     Object.defineProperty(HTMLMediaElement.prototype, 'src', {
       configurable: true,
@@ -23,6 +24,10 @@ export async function registerVideoPlayerBrowserMocks(page: Page): Promise<void>
     Object.defineProperty(HTMLMediaElement.prototype, 'play', {
       configurable: true,
       value: function play(this: HTMLMediaElement): Promise<void> {
+        if (!durationState.has(this)) {
+          durationState.set(this, 120)
+          this.dispatchEvent(new Event('loadedmetadata'))
+        }
         pausedState.set(this, false)
         this.dispatchEvent(new Event('play'))
         return Promise.resolve()
@@ -46,6 +51,12 @@ export async function registerVideoPlayerBrowserMocks(page: Page): Promise<void>
         currentTimeState.set(this, value)
       },
     })
+    Object.defineProperty(HTMLMediaElement.prototype, 'duration', {
+      configurable: true,
+      get() {
+        return durationState.get(this) ?? 120
+      },
+    })
 
     type Observation = {
       readonly target: Element
@@ -66,11 +77,7 @@ export async function registerVideoPlayerBrowserMocks(page: Page): Promise<void>
       }
 
       disconnect(): void {
-        observations.splice(
-          0,
-          observations.length,
-          ...observations.filter((item) => item.observer !== this),
-        )
+        observations.splice(0, observations.length, ...observations.filter((item) => item.observer !== this))
       }
 
       observe(target: Element): void {
@@ -82,9 +89,7 @@ export async function registerVideoPlayerBrowserMocks(page: Page): Promise<void>
       }
 
       unobserve(target: Element): void {
-        const index = observations.findIndex(
-          (item) => item.observer === this && item.target === target,
-        )
+        const index = observations.findIndex((item) => item.observer === this && item.target === target)
         if (index >= 0) observations.splice(index, 1)
       }
     }
