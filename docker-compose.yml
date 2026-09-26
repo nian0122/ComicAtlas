@@ -36,7 +36,7 @@ services:
       - "host.docker.internal:host-gateway"
       - "nacos.docker.gateway:host-gateway"
     environment:
-      JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m -Djava.net.preferIPv4Stack=true -Djava.net.preferIPv4Addresses=true"
+      JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m -Duser.timezone=UTC -Djava.net.preferIPv4Stack=true -Djava.net.preferIPv4Addresses=true"
       NACOS_ADDR: nacos.docker.gateway:${REMOTE_NACOS_HTTP_PORT:-8848}
       NACOS_USER: ${REMOTE_NACOS_USER:?请设置 REMOTE_NACOS_USER}
       NACOS_PASS: ${REMOTE_NACOS_PASSWORD:?请设置 REMOTE_NACOS_PASSWORD}
