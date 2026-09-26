@@ -1,13 +1,8 @@
 <template>
   <main class="short-video-page" @touchstart.passive="onTouchStart" @touchend="onTouchEnd" @wheel.prevent="onWheel">
-    <div class="video-atmosphere" aria-hidden="true" />
-
     <header class="video-header">
       <AppButton class="video-back" type="button" aria-label="返回章节阅读" @click="goBack">←</AppButton>
-      <div class="video-heading">
-        <span class="video-eyebrow">COMICATLAS / VIDEO</span>
-        <strong>{{ chapterTitle || '短视频播放' }}</strong>
-      </div>
+      <strong class="video-title">{{ chapterTitle || '短视频播放' }}</strong>
       <span v-if="videos.length" class="video-count"
         >{{ currentIndex + 1 }} <span>/ {{ videos.length }}</span></span
       >
@@ -51,17 +46,10 @@
           @click="togglePlayback"
           >▶</AppButton
         >
-        <div class="video-caption">
-          <span class="video-sequence">本章视频 {{ String(currentIndex + 1).padStart(2, '0') }}</span>
-          <strong>{{ chapterTitle }}</strong>
+        <div class="video-footer">
           <span>第 {{ currentVideo.pageNumber }} 页</span>
-        </div>
-        <div class="video-controls">
-          <AppButton type="button" :aria-label="muted ? '开启声音' : '静音'" @click="toggleMute">
-            {{ muted ? '静音 · 点击开声' : '声音已开启' }}
-          </AppButton>
-          <AppButton type="button" :aria-label="isPlaying ? '暂停视频' : '播放视频'" @click="togglePlayback">
-            {{ isPlaying ? '暂停' : '播放' }}
+          <AppButton class="video-sound" type="button" :aria-label="muted ? '开启声音' : '静音'" @click="toggleMute">
+            {{ muted ? '开启声音' : '静音' }}
           </AppButton>
         </div>
         <div
@@ -301,82 +289,63 @@ onBeforeUnmount(() => {
   inset: 0;
   z-index: 100;
   overflow: hidden;
-  background: #090b0d;
-  color: #f7f5f0;
+  background: #000;
+  color: #fff;
   touch-action: pan-x;
-  font-family: 'Noto Sans SC', sans-serif;
 }
-.video-atmosphere {
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(ellipse at 50% 65%, #252b30 0%, #090b0d 65%);
-  pointer-events: none;
-}
+
 .video-header {
   position: absolute;
-  z-index: 4;
+  z-index: 2;
   top: 0;
   right: 0;
   left: 0;
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: calc(env(safe-area-inset-top) + 18px) 24px 18px;
-  background: linear-gradient(#090b0dc9, transparent);
+  gap: 14px;
+  min-height: 56px;
+  padding: calc(env(safe-area-inset-top) + 12px) 18px 22px;
+  background: linear-gradient(#0009, transparent);
 }
-.video-back,
-.video-nav :deep(button),
-.video-controls :deep(button) {
-  background: #ffffff18;
-  border: 1px solid #ffffff2e;
-  color: #fff;
-  backdrop-filter: blur(12px);
-}
+
 .video-back {
-  width: 42px;
-  height: 42px;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border: 0;
   border-radius: 50%;
+  background: #0006;
+  color: #fff;
   font-size: 22px;
 }
-.video-heading {
-  display: flex;
+
+.video-title {
   flex: 1;
-  flex-direction: column;
-  min-width: 0;
-  gap: 3px;
-}
-.video-heading strong {
   overflow: hidden;
   font-size: 15px;
-  font-weight: 650;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.video-eyebrow,
-.video-sequence {
-  color: #e7b977;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.18em;
-}
+
 .video-count {
-  font-size: 16px;
-  font-weight: 800;
+  flex: none;
+  font-size: 14px;
   font-variant-numeric: tabular-nums;
 }
+
 .video-count span {
-  color: #ffffff83;
-  font-size: 12px;
+  color: #fffa;
 }
+
 .video-stage {
   position: relative;
   width: min(100%, 520px);
   height: 100%;
   margin: 0 auto;
-  overflow: hidden;
   background: #000;
-  box-shadow: 0 0 110px #0009;
 }
+
 .video-media {
   display: block;
   width: 100%;
@@ -384,71 +353,67 @@ onBeforeUnmount(() => {
   object-fit: contain;
   cursor: pointer;
 }
+
 .video-shade {
   position: absolute;
-  inset: 60% 0 0;
-  background: linear-gradient(transparent, #000b);
+  inset: 75% 0 0;
+  background: linear-gradient(transparent, #0008);
   pointer-events: none;
 }
-.video-caption {
-  position: absolute;
-  right: 20px;
-  bottom: calc(env(safe-area-inset-bottom) + 82px);
-  left: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  pointer-events: none;
-  text-shadow: 0 2px 10px #000;
-}
-.video-caption strong {
-  font-size: 21px;
-  line-height: 1.25;
-}
-.video-caption > span:last-child {
-  color: #fff9;
-  font-size: 13px;
-}
-.video-controls {
+
+.video-footer {
   position: absolute;
   right: 18px;
-  bottom: calc(env(safe-area-inset-bottom) + 30px);
+  bottom: calc(env(safe-area-inset-bottom) + 24px);
   left: 18px;
   display: flex;
+  align-items: center;
   justify-content: space-between;
+  color: #fffc;
+  font-size: 13px;
+  text-shadow: 0 1px 8px #000;
 }
-.video-controls :deep(button) {
+
+.video-sound {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid #fff4;
   border-radius: 999px;
-  padding: 8px 14px;
+  background: #0006;
+  color: #fff;
   font-size: 12px;
 }
+
 .video-progress {
   position: absolute;
   right: 0;
   bottom: 0;
   left: 0;
-  height: 3px;
-  background: #ffffff4a;
+  height: 2px;
+  background: #fff5;
 }
+
 .video-progress span {
   display: block;
   height: 100%;
-  background: #e7b977;
+  background: #fff;
   transition: width 0.15s linear;
 }
+
 .video-play-button {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 70px;
-  height: 70px;
+  width: 64px;
+  height: 64px;
+  border: 0;
   border-radius: 50%;
   transform: translate(-50%, -50%);
-  background: #ffffffd9;
-  color: #111;
-  font-size: 28px;
-  box-shadow: 0 10px 35px #0008;
+  background: #0008;
+  color: #fff;
+  font-size: 27px;
 }
+
 .video-play-error {
   position: absolute;
   top: 50%;
@@ -460,23 +425,30 @@ onBeforeUnmount(() => {
   transform: translate(-50%, -50%);
   text-align: center;
 }
+
 .video-nav {
   position: absolute;
   top: 50%;
-  right: max(22px, calc((100vw - 600px) / 2));
+  right: max(20px, calc((100vw - 610px) / 2));
   display: grid;
-  gap: 10px;
+  gap: 8px;
   transform: translateY(-50%);
 }
+
 .video-nav :deep(button) {
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
+  border: 1px solid #fff4;
   border-radius: 50%;
-  font-size: 21px;
+  background: #0006;
+  color: #fff;
+  font-size: 19px;
 }
+
 .video-nav :deep(button:disabled) {
-  opacity: 0.3;
+  opacity: 0.35;
 }
+
 .video-state {
   position: absolute;
   inset: 0;
@@ -488,6 +460,7 @@ onBeforeUnmount(() => {
   padding: 24px;
   text-align: center;
 }
+
 .video-preload {
   position: absolute;
   width: 1px;
@@ -495,24 +468,16 @@ onBeforeUnmount(() => {
   opacity: 0;
   pointer-events: none;
 }
+
 @media (max-width: 680px) {
-  .video-header {
-    padding-inline: 14px;
+  .video-stage {
+    width: 100%;
   }
   .video-nav {
-    top: auto;
-    right: 16px;
-    bottom: calc(env(safe-area-inset-bottom) + 115px);
-    transform: none;
-  }
-  .video-nav :deep(button) {
-    width: 38px;
-    height: 38px;
-  }
-  .video-caption {
-    right: 65px;
+    display: none;
   }
 }
+
 @media (prefers-reduced-motion: reduce) {
   .video-progress span {
     transition: none;
