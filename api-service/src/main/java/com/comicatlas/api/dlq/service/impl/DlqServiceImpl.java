@@ -32,7 +32,9 @@ public class DlqServiceImpl implements DlqService {
         entry(MqQueues.IMPORT_FAILED_DLQ, new DlqRoute(MqExchanges.IMPORT, MqRoutingKeys.TASK_FAILED)),
         entry(MqQueues.EXPORT_STARTED_RESULT_DLQ, new DlqRoute(MqExchanges.EXPORT, MqRoutingKeys.TASK_STARTED)),
         entry(MqQueues.EXPORT_COMPLETED_RESULT_DLQ, new DlqRoute(MqExchanges.EXPORT, MqRoutingKeys.TASK_COMPLETED)),
-        entry(MqQueues.EXPORT_FAILED_RESULT_DLQ, new DlqRoute(MqExchanges.EXPORT, MqRoutingKeys.TASK_FAILED))
+        entry(MqQueues.EXPORT_FAILED_RESULT_DLQ, new DlqRoute(MqExchanges.EXPORT, MqRoutingKeys.TASK_FAILED)),
+        entry(MqQueues.MANAGEMENT_RESULT_DLQ,
+            new DlqRoute(MqExchanges.MANAGEMENT, MqRoutingKeys.COMMAND_COMPLETED))
     );
 
     private final DlqBrokerClient brokerClient;

@@ -64,7 +64,7 @@ public interface MediaMapper extends BaseMapper<Media> {
     @Select({"<script>",
             "SELECT id, chapter_id, page_number, hq_root, hq_path, lq_root, lq_path, hq_status, lq_status,",
             "transcode_status, status, lq_size, width, height, hq_size, media_type, duration, container,",
-            "video_codec, audio_codec FROM page WHERE chapter_id IN",
+            "video_codec, audio_codec, version FROM page WHERE chapter_id IN",
             "<foreach collection='chapterIds' item='chapterId' open='(' separator=',' close=')'>#{chapterId}</foreach>",
             "AND status NOT IN",
             "<foreach collection='inactiveStatuses' item='status' open='(' separator=',' close=')'>#{status}</foreach>",
@@ -84,7 +84,7 @@ public interface MediaMapper extends BaseMapper<Media> {
     List<Media> selectImagesByChapterId(@Param("chapterId") Long chapterId);
 
     @Select("<script>SELECT id, chapter_id, page_number, hq_root, hq_path, lq_root, lq_path, hq_status, lq_status, "
-            + "transcode_status, status, lq_size, width, height, hq_size, media_type, duration, container, video_codec, audio_codec "
+            + "transcode_status, status, lq_size, width, height, hq_size, media_type, duration, container, video_codec, audio_codec, version "
             + "FROM page WHERE chapter_id IN <foreach collection='chapterIds' item='chapterId' open='(' separator=',' close=')'>#{chapterId}</foreach> "
             + "ORDER BY chapter_id, page_number</script>")
     List<Media> selectByChapterIds(@Param("chapterIds") List<Long> chapterIds);

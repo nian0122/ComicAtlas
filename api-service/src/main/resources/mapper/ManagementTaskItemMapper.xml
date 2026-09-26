@@ -1,6 +1,20 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.comicatlas.api.task.persistence.mapper.ManagementTaskItemMapper">
+    <select id="countActiveMetadataItems" resultType="long">
+        SELECT COUNT(*)
+        FROM management_task_item item
+        LEFT JOIN chapter target_chapter
+            ON item.target_type = 'CHAPTER' AND target_chapter.id = item.target_id
+        WHERE item.task_id = #{taskId}
+          AND item.operation_type = 'METADATA_REFRESH'
+          AND item.status IN ('QUEUED', 'RUNNING', 'CANCELLING')
+          AND (
+              (item.target_type = 'COMIC' AND item.target_id = #{comicId})
+              OR (item.target_type = 'CHAPTER' AND target_chapter.comic_id = #{comicId})
+          )
+    </select>
+
     <select id="selectTaskIdsByComicId" resultType="java.lang.Long">
         SELECT DISTINCT item.task_id
         FROM management_task_item item

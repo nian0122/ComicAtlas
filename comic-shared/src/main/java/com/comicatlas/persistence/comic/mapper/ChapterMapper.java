@@ -12,7 +12,7 @@ import java.util.List;
 @Mapper
 public interface ChapterMapper extends BaseMapper<Chapter> {
 
-    @Select("SELECT id, comic_id, catalog_id, chapter_no, title, status, page_count, sort_order, global_order FROM chapter WHERE comic_id = #{comicId} ORDER BY global_order ASC")
+    @Select("SELECT id, comic_id, catalog_id, chapter_no, title, status, page_count, sort_order, global_order, version FROM chapter WHERE comic_id = #{comicId} ORDER BY global_order ASC")
     List<Chapter> selectByComicIdOrderByGlobalOrder(@Param("comicId") Long comicId);
 
     @Select("SELECT id, comic_id, catalog_id, chapter_no, title, status, page_count, sort_order, global_order FROM chapter WHERE comic_id = #{comicId} AND catalog_id = #{catalogId} ORDER BY sort_order DESC, id DESC LIMIT 1")
@@ -62,7 +62,7 @@ public interface ChapterMapper extends BaseMapper<Chapter> {
             + "FROM chapter WHERE comic_id = #{comicId} AND status = 'READY' ORDER BY chapter_no ASC")
     List<Chapter> selectReadyByComicIdOrderByChapterNo(@Param("comicId") Long comicId);
 
-    @Select("SELECT id, comic_id, catalog_id, chapter_no, title, global_order, page_count, status "
+    @Select("SELECT id, comic_id, catalog_id, chapter_no, title, global_order, page_count, status, version "
             + "FROM chapter WHERE comic_id = #{comicId}")
     List<Chapter> selectByComicId(@Param("comicId") Long comicId);
 
