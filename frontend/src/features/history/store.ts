@@ -34,11 +34,11 @@ export const useHistoryStore = defineStore('history', () => {
     state.error = null
     state.loadMoreError = null
     try {
-      const res = await historyApi.page(1, 1)
+      const res = await historyApi.page(1, state.pageSize)
       state.list = res.data.records
       state.total = res.data.total || 0
       state.page = res.data.current || 1
-      state.hasMore = false
+      state.hasMore = state.list.length < state.total
     } catch (err: unknown) {
       state.error = getApiErrorMessage(err, '加载阅读历史失败')
       state.list = []
