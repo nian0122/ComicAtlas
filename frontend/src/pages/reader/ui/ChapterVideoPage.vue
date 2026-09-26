@@ -794,13 +794,14 @@ onBeforeUnmount(() => {
 
 .video-controls {
   position: absolute;
-  bottom: calc(env(safe-area-inset-bottom) + 18px);
+  bottom: 0;
   right: 0;
   left: 0;
   z-index: 2;
   display: grid;
-  gap: 5px;
-  padding: 0 18px;
+  gap: 0;
+  padding: 0 18px calc(env(safe-area-inset-bottom) + 3px);
+  background: linear-gradient(transparent, rgb(0 0 0 / 42%));
   transition: transform 160ms ease;
 }
 
@@ -814,6 +815,12 @@ onBeforeUnmount(() => {
   font-variant-numeric: tabular-nums;
   text-align: right;
   text-shadow: 0 1px 8px #000;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.video-controls.is-seeking .video-time {
+  opacity: 1;
 }
 
 .video-control-row {
@@ -839,17 +846,17 @@ onBeforeUnmount(() => {
 .video-progress {
   position: relative;
   width: 100%;
-  height: 24px;
+  height: 18px;
   cursor: pointer;
   touch-action: none;
 }
 
 .video-progress::before {
   position: absolute;
-  top: 10px;
+  bottom: 3px;
   right: 0;
   left: 0;
-  height: 4px;
+  height: 2px;
   border-radius: 999px;
   background: #fff5;
   content: '';
@@ -857,20 +864,22 @@ onBeforeUnmount(() => {
 
 .video-progress-fill {
   position: absolute;
-  top: 10px;
+  bottom: 3px;
   left: 0;
   display: block;
-  height: 4px;
+  height: 2px;
   border-radius: 999px;
   background: #fff;
-  transition: width 0.15s linear;
+  transition:
+    width 0.15s linear,
+    height 160ms ease;
 }
 
 .video-progress-thumb {
   position: absolute;
-  top: 5px;
-  width: 14px;
-  height: 14px;
+  bottom: -1px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   transform: translateX(-50%) scale(0.75);
   background: #fff;
@@ -878,12 +887,35 @@ onBeforeUnmount(() => {
   opacity: 0;
   transition:
     transform 160ms ease,
-    opacity 160ms ease;
+    opacity 160ms ease,
+    width 160ms ease,
+    height 160ms ease;
+}
+
+.video-progress:hover::before,
+.video-progress:focus-visible::before,
+.video-progress.is-long-press::before,
+.video-controls.is-seeking .video-progress::before {
+  bottom: 2px;
+  height: 4px;
+  background: rgb(255 255 255 / 72%);
+}
+
+.video-progress:hover .video-progress-fill,
+.video-progress:focus-visible .video-progress-fill,
+.video-progress.is-long-press .video-progress-fill,
+.video-controls.is-seeking .video-progress-fill {
+  bottom: 2px;
+  height: 4px;
 }
 
 .video-progress:hover .video-progress-thumb,
 .video-progress:focus-visible .video-progress-thumb,
-.video-progress.is-long-press .video-progress-thumb {
+.video-progress.is-long-press .video-progress-thumb,
+.video-controls.is-seeking .video-progress-thumb {
+  bottom: 0;
+  width: 12px;
+  height: 12px;
   transform: translateX(-50%) scale(1);
   opacity: 1;
 }
