@@ -44,6 +44,12 @@ const router = createRouter({
       ],
     },
     {
+      path: '/videos/:chapterId',
+      name: 'chapter-videos',
+      component: () => import('@/pages/reader/index').then(({ ChapterVideoPage }) => ChapterVideoPage),
+      props: true,
+    },
+    {
       path: '/manage/intercept',
       name: 'manage-intercept',
     component: () => import('@/pages/management/intercept/index').then(({ InterceptPage }) => InterceptPage),
