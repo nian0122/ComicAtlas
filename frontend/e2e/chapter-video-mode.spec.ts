@@ -11,8 +11,10 @@ const imageBody = Buffer.from(
 async function swipeUp(page: Page): Promise<void> {
   await page.locator('.short-video-page').evaluate((element) => {
     const start = new Touch({ identifier: 1, target: element, clientX: 180, clientY: 680 })
+    const moving = new Touch({ identifier: 1, target: element, clientX: 180, clientY: 470 })
     const end = new Touch({ identifier: 1, target: element, clientX: 180, clientY: 280 })
     element.dispatchEvent(new TouchEvent('touchstart', { changedTouches: [start], bubbles: true }))
+    element.dispatchEvent(new TouchEvent('touchmove', { changedTouches: [moving], bubbles: true, cancelable: true }))
     element.dispatchEvent(new TouchEvent('touchend', { changedTouches: [end], bubbles: true }))
   })
   await page.waitForTimeout(380)
@@ -21,8 +23,10 @@ async function swipeUp(page: Page): Promise<void> {
 async function swipeDown(page: Page): Promise<void> {
   await page.locator('.short-video-page').evaluate((element) => {
     const start = new Touch({ identifier: 1, target: element, clientX: 180, clientY: 280 })
+    const moving = new Touch({ identifier: 1, target: element, clientX: 180, clientY: 490 })
     const end = new Touch({ identifier: 1, target: element, clientX: 180, clientY: 680 })
     element.dispatchEvent(new TouchEvent('touchstart', { changedTouches: [start], bubbles: true }))
+    element.dispatchEvent(new TouchEvent('touchmove', { changedTouches: [moving], bubbles: true, cancelable: true }))
     element.dispatchEvent(new TouchEvent('touchend', { changedTouches: [end], bubbles: true }))
   })
   await page.waitForTimeout(380)
@@ -147,9 +151,26 @@ test('详情页进入普通阅读器，再从工具栏切换混排短视频模�
   await expect(page).toHaveURL(/\/videos\/1\?page=1/)
   await expect(page.locator('.media-image')).toHaveAttribute('src', '/files/hq/first.jpg')
 
-  await swipeUp(page)
+  const stage = page.locator('.short-video-page')
+  await stage.evaluate((element) => {
+    const start = new Touch({ identifier: 8, target: element, clientX: 180, clientY: 680 })
+    const moving = new Touch({ identifier: 8, target: element, clientX: 180, clientY: 470 })
+    element.dispatchEvent(new TouchEvent('touchstart', { changedTouches: [start], bubbles: true }))
+    element.dispatchEvent(new TouchEvent('touchmove', { changedTouches: [moving], bubbles: true, cancelable: true }))
+  })
+  await expect(page.locator('.video-media-frame').first()).toHaveAttribute('style', /-210px/)
+  await expect(page.locator('.video-media-preview video')).toHaveJSProperty('src', '/files/hq/clip.mp4')
+  await stage.evaluate((element) => {
+    const end = new Touch({ identifier: 8, target: element, clientX: 180, clientY: 280 })
+    element.dispatchEvent(new TouchEvent('touchend', { changedTouches: [end], bubbles: true }))
+  })
+  await page.waitForTimeout(380)
   await expect(page.locator('video.video-media')).toHaveJSProperty('src', '/files/hq/clip.mp4')
   await expect(page.locator('video.video-media')).toHaveJSProperty('paused', false)
+  await page.locator('video.video-media').dispatchEvent('waiting')
+  await expect(page.getByRole('status', { name: '视频缓冲中' })).toBeVisible()
+  await page.locator('video.video-media').dispatchEvent('canplay')
+  await expect(page.getByRole('status', { name: '视频缓冲中' })).toHaveCount(0)
   const progressSlider = page.getByRole('slider', { name: '播放进度，可拖动调整' })
   await expect(progressSlider).toBeVisible()
   await progressSlider.focus()
@@ -177,8 +198,8 @@ test('详情页进入普通阅读器，再从工具栏切换混排短视频模�
   await swipeDown(page)
   await expect(page).toHaveURL(/\/videos\/1\?page=3/)
   await expect(page.locator('.media-image')).toHaveAttribute('src', '/files/hq/last.jpg')
-  await page.getByRole('button', { name: '返回漫画详情' }).click()
-  await expect(page).toHaveURL(/\/comic\/7/)
+  await page.getByRole('button', { name: '返回漫画阅读' }).click()
+  await expect(page).toHaveURL(/\/reader\/1\?page=3/)
 })
 
 test('漫画阅读入口进入连续阅读器', async ({ page }) => {

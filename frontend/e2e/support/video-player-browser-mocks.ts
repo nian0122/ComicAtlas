@@ -30,6 +30,7 @@ export async function registerVideoPlayerBrowserMocks(page: Page): Promise<void>
         }
         pausedState.set(this, false)
         this.dispatchEvent(new Event('play'))
+        this.dispatchEvent(new Event('playing'))
         return Promise.resolve()
       },
     })

@@ -1,7 +1,15 @@
 <template>
-  <main class="short-video-page" @touchstart.passive="onTouchStart" @touchend="onTouchEnd" @wheel.prevent="onWheel">
+  <main
+    class="short-video-page"
+    :class="{ 'controls-hidden': !controlsVisible }"
+    @touchstart="onTouchStart"
+    @touchmove.prevent="onTouchMove"
+    @touchend="onTouchEnd"
+    @touchcancel="cancelTouchGesture"
+    @wheel.prevent="onWheel"
+  >
     <header class="video-header">
-      <AppButton class="video-back" type="button" aria-label="返回漫画详情" @click="goBack">←</AppButton>
+      <AppButton class="video-back" type="button" aria-label="返回漫画阅读" @click="goBack">←</AppButton>
       <span v-if="items.length" class="video-count"
         >{{ currentIndex + 1 }} <span>/ {{ items.length }}</span></span
       >
@@ -27,8 +35,13 @@
         @touchmove="onVideoTouchMove"
         @touchend="onVideoTouchEnd"
       >
-        <Transition :name="slideTransitionName" @after-enter="finishSlide">
-          <div :key="`${currentItem.id}-${imageReloadKey}`" class="video-media-frame">
+        <Transition :name="mediaTransitionName" :css="!skipMediaTransition" @after-enter="finishSlide">
+          <div
+            :key="`${currentItem.id}-${imageReloadKey}`"
+            class="video-media-frame"
+            :class="{ 'is-touch-dragging': isTouchDragging, 'is-touch-settling': isTouchSettling }"
+            :style="currentFrameStyle"
+          >
             <video
               v-if="currentIsVideo"
               :ref="setVideoRef"
@@ -43,8 +56,13 @@
               @click="togglePlayback"
               @loadedmetadata="onLoadedMetadata"
               @timeupdate="onTimeUpdate"
-              @play="isPlaying = true"
-              @pause="isPlaying = false"
+              @loadstart="onVideoLoadStart"
+              @waiting="onVideoWaiting"
+              @stalled="onVideoWaiting"
+              @canplay="onVideoCanPlay"
+              @playing="onVideoPlaying"
+              @play="onVideoPlay"
+              @pause="onVideoPause"
               @error="onVideoError"
             />
             <img
@@ -57,7 +75,34 @@
             />
           </div>
         </Transition>
+        <div
+          v-if="gesturePreviewItem"
+          class="video-media-frame video-media-preview"
+          :class="{ 'is-touch-dragging': isTouchDragging, 'is-touch-settling': isTouchSettling }"
+          :style="previewFrameStyle"
+          aria-hidden="true"
+        >
+          <video
+            v-if="isVideoMedia(gesturePreviewItem)"
+            class="video-media"
+            :src="gesturePreviewItem.hqUrl"
+            muted
+            playsinline
+            webkit-playsinline
+            preload="auto"
+            draggable="false"
+          />
+          <img v-else class="video-media media-image" :src="imageUrl(gesturePreviewItem)" alt="" draggable="false" />
+        </div>
         <div class="video-shade" aria-hidden="true" />
+        <div
+          v-if="currentIsVideo && isBuffering && !mediaError"
+          class="video-buffering"
+          role="status"
+          aria-label="视频缓冲中"
+        >
+          <span aria-hidden="true" />
+        </div>
         <div v-if="mediaError" class="video-play-error">
           <span>{{ mediaError }}</span>
           <AppButton type="button" @click="retryPlayback">重试</AppButton>
@@ -130,11 +175,12 @@
         :src="nextItem.hqUrl"
         muted
         playsinline
-        preload="metadata"
+        preload="auto"
         aria-hidden="true"
       />
       <img v-else-if="nextItem" class="video-preload" :src="imageUrl(nextItem)" alt="" aria-hidden="true" />
       <div v-if="edgeError" class="video-edge-error" role="alert">{{ edgeError }}</div>
+      <div v-if="chapterCue" class="chapter-cue" aria-live="polite">{{ chapterCue }}</div>
     </template>
   </main>
 </template>
@@ -149,6 +195,8 @@ import { historyApi } from '@/entities/history'
 import { isVideoMedia, type MediaItemInfo } from '@/entities/media'
 import { clientLogger } from '@/shared/lib/logger'
 import { VideoProgressControl, VideoSpeedSheet } from './components'
+import { useAutoHideControls } from './composables/useAutoHideControls'
+import { useImmersiveSwipe } from './composables/useImmersiveSwipe'
 
 const route = useRoute()
 const router = useRouter()
@@ -174,27 +222,55 @@ const playbackRate = ref(1)
 const isSpeedSheetOpen = ref(false)
 const slideDirection = ref<'up' | 'down'>('up')
 const isSliding = ref(false)
+const isBuffering = ref(false)
+const chapterCue = ref('')
 const imageReloadKey = ref(0)
 const chapterTitle = computed(() => chapter.value?.chapterTitle ?? '')
 const items = computed(() => playableItems(chapter.value?.pages ?? []))
 const currentItem = computed(() => items.value[currentIndex.value]!)
 const currentIsVideo = computed(() => currentItem.value != null && isVideoMedia(currentItem.value))
 const nextItem = computed(() => items.value[currentIndex.value + 1] ?? playableItems(nextChapter.value?.pages ?? [])[0])
+const previousItem = computed(
+  () => items.value[currentIndex.value - 1] ?? playableItems(previousChapter.value?.pages ?? []).at(-1),
+)
 const displayedProgress = computed(() =>
   isSeeking.value && seekPreviewTime.value != null && duration.value > 0
     ? seekPreviewTime.value / duration.value
     : progress.value,
 )
-const slideTransitionName = computed(() => `media-slide-${slideDirection.value}`)
+const mediaTransitionName = computed(() => (skipMediaTransition.value ? '' : `media-slide-${slideDirection.value}`))
 const hasPrevious = computed(() => currentIndex.value > 0 || chapter.value?.prevChapterId != null)
 const hasNext = computed(() => currentIndex.value < items.value.length - 1 || chapter.value?.nextChapterId != null)
+const { controlsVisible, scheduleControlsHide, showControls, disposeControls } = useAutoHideControls(
+  () => !isSeeking.value && !isSpeedSheetOpen.value && (!currentIsVideo.value || isPlaying.value),
+)
+const {
+  isTouchDragging,
+  isTouchSettling,
+  skipMediaTransition,
+  gesturePreviewItem,
+  currentFrameStyle,
+  previewFrameStyle,
+  onTouchStart,
+  onTouchMove,
+  onTouchEnd,
+  cancelTouchGesture,
+  disposeSwipe,
+} = useImmersiveSwipe<MediaItemInfo>({
+  hasPrevious,
+  hasNext,
+  previousItem,
+  nextItem,
+  canStart: () => !isSliding.value && !switchingChapter,
+  move: (direction) => move(direction, false),
+  onTap: () => showControls(),
+  cancelLongPress: clearSpeedPressTimer,
+})
 const MAX_CACHED_CHAPTERS = 8
 const chapterRequests = new Map<number, Promise<ReaderDTO>>()
 let loadSequence = 0
 let playbackSequence = 0
 let switchingChapter = false
-let touchStartY = 0
-let touchStartX = 0
 let lastWheelTime = 0
 let previousOverflow = ''
 let progressTimer: number | null = null
@@ -209,6 +285,7 @@ let speedPressStartX = 0
 let speedPressStartY = 0
 let suppressVideoClick = false
 let slideUnlockTimer: number | null = null
+let chapterCueTimer: number | null = null
 const playbackRates = [0.5, 1, 1.25, 1.5, 2] as const
 
 function imageUrl(page: MediaItemInfo): string {
@@ -319,6 +396,7 @@ async function loadChapter(): Promise<void> {
     await nextTick()
     if (sequence === loadSequence) {
       void playCurrent()
+      scheduleControlsHide()
       scheduleProgressSave()
       if (response.chapterId !== chapterId) updateRoute()
     }
@@ -351,6 +429,14 @@ function beginSlide(direction: number): void {
   isSliding.value = true
   if (slideUnlockTimer != null) window.clearTimeout(slideUnlockTimer)
   slideUnlockTimer = window.setTimeout(finishSlide, 500)
+}
+
+function showChapterCue(title: string): void {
+  chapterCue.value = title ? `已进入 ${title}` : '已进入下一章'
+  if (chapterCueTimer != null) window.clearTimeout(chapterCueTimer)
+  chapterCueTimer = window.setTimeout(() => {
+    chapterCue.value = ''
+  }, 1400)
 }
 
 function finishSlide(): void {
@@ -396,19 +482,22 @@ function showEdgeError(message: string): void {
   }, 2500)
 }
 
-async function move(direction: number): Promise<void> {
+async function move(direction: number, animate = true): Promise<void> {
   if (switchingChapter || isSliding.value || !chapter.value || isSpeedSheetOpen.value) return
   const nextIndex = currentIndex.value + direction
   if (nextIndex >= 0 && nextIndex < items.value.length) {
     const sequence = ++playbackSequence
-    beginSlide(direction)
+    if (animate) beginSlide(direction)
     pauseCurrent()
     currentIndex.value = nextIndex
     resetMediaState()
     updateRoute()
     scheduleProgressSave()
     await nextTick()
-    if (sequence === playbackSequence) void playCurrent()
+    if (sequence === playbackSequence) {
+      void playCurrent()
+      scheduleControlsHide()
+    }
     return
   }
 
@@ -422,7 +511,7 @@ async function move(direction: number): Promise<void> {
       prefetched ?? (await findPlayableChapter(adjacentId, direction > 0 ? 'next' : 'previous', activeChapter.comicId))
     if (!target || chapter.value?.chapterId !== activeChapter.chapterId) return
     ++playbackSequence
-    beginSlide(direction)
+    if (animate) beginSlide(direction)
     pauseCurrent()
     chapter.value = target
     currentIndex.value = direction > 0 ? 0 : playableItems(target.pages).length - 1
@@ -432,6 +521,8 @@ async function move(direction: number): Promise<void> {
     scheduleProgressSave()
     await nextTick()
     void playCurrent()
+    scheduleControlsHide()
+    showChapterCue(target.chapterTitle)
   } catch (error: unknown) {
     clientLogger.error('相邻章节加载失败', {
       operation: 'immersive.chapter',
@@ -454,6 +545,7 @@ function resetMediaState(): void {
   isSeeking.value = false
   isLongPressSeeking.value = false
   isSpeedSheetOpen.value = false
+  isBuffering.value = currentIsVideo.value
   clearSpeedPressTimer()
   imageReloadKey.value = 0
 }
@@ -464,6 +556,7 @@ function togglePlayback(): void {
     suppressVideoClick = false
     return
   }
+  showControls(false)
   const video = videoRef.value
   if (!video) return
   if (video.paused) void playCurrent()
@@ -471,6 +564,7 @@ function togglePlayback(): void {
 }
 
 function toggleMute(): void {
+  showControls()
   muted.value = !muted.value
   if (videoRef.value) videoRef.value.muted = muted.value
 }
@@ -479,10 +573,12 @@ function selectPlaybackRate(rate: number): void {
   playbackRate.value = rate
   isSpeedSheetOpen.value = false
   if (videoRef.value) videoRef.value.playbackRate = rate
+  scheduleControlsHide()
 }
 
 function closeSpeedSheet(): void {
   isSpeedSheetOpen.value = false
+  scheduleControlsHide()
 }
 
 function clearSpeedPressTimer(): void {
@@ -493,12 +589,14 @@ function clearSpeedPressTimer(): void {
 function openSpeedSheet(): void {
   if (!currentIsVideo.value || !videoRef.value) return
   isSpeedSheetOpen.value = true
+  showControls(false)
   suppressVideoClick = true
 }
 
 function onVideoPointerDown(event: PointerEvent | MouseEvent): void {
   if (!currentIsVideo.value || event.button > 0) return
   if (event.target instanceof Element && event.target.closest('button, [role="slider"], .video-speed-sheet')) return
+  if (!(event instanceof PointerEvent) || event.pointerType !== 'touch') showControls()
   speedPressStartX = event.clientX
   speedPressStartY = event.clientY
   clearSpeedPressTimer()
@@ -655,25 +753,44 @@ function onProgressKeydown(event: KeyboardEvent): void {
 }
 
 function onVideoError(event: Event): void {
-  if (event.currentTarget === videoRef.value) mediaError.value = '视频无法播放，请重试'
+  if (event.currentTarget === videoRef.value) {
+    isBuffering.value = false
+    mediaError.value = '视频无法播放，请重试'
+    showControls(false)
+  }
 }
 
 function onImageError(): void {
   mediaError.value = '图片无法显示，请重试'
 }
 
-function onTouchStart(event: TouchEvent): void {
-  touchStartY = event.changedTouches[0]?.clientY ?? 0
-  touchStartX = event.changedTouches[0]?.clientX ?? 0
+function onVideoLoadStart(): void {
+  isBuffering.value = true
 }
 
-function onTouchEnd(event: TouchEvent): void {
-  const endY = event.changedTouches[0]?.clientY ?? touchStartY
-  const endX = event.changedTouches[0]?.clientX ?? touchStartX
-  const distance = touchStartY - endY
-  if (Math.abs(distance) >= 60 && Math.abs(distance) > Math.abs(touchStartX - endX)) {
-    void move(distance > 0 ? 1 : -1)
-  }
+function onVideoWaiting(): void {
+  isBuffering.value = true
+}
+
+function onVideoCanPlay(): void {
+  isBuffering.value = false
+}
+
+function onVideoPlay(): void {
+  isPlaying.value = true
+  scheduleControlsHide()
+}
+
+function onVideoPlaying(): void {
+  isPlaying.value = true
+  isBuffering.value = false
+  scheduleControlsHide()
+}
+
+function onVideoPause(): void {
+  isPlaying.value = false
+  isBuffering.value = false
+  showControls(false)
 }
 
 function onWheel(event: WheelEvent): void {
@@ -737,8 +854,12 @@ function scheduleProgressSave(): void {
 }
 
 function goBack(): void {
-  if (chapter.value) {
-    void router.push({ name: 'comic-detail', params: { id: chapter.value.comicId } })
+  if (chapter.value && currentItem.value) {
+    void router.push({
+      name: 'reader',
+      params: { chapterId: chapter.value.chapterId },
+      query: { page: currentItem.value.pageNumber },
+    })
   } else {
     router.back()
   }
@@ -769,6 +890,9 @@ onBeforeUnmount(() => {
   if (seekPressTimer != null) window.clearTimeout(seekPressTimer)
   clearSpeedPressTimer()
   if (slideUnlockTimer != null) window.clearTimeout(slideUnlockTimer)
+  if (chapterCueTimer != null) window.clearTimeout(chapterCueTimer)
+  disposeSwipe()
+  disposeControls()
   queueProgressSave()
   stopCurrent()
   document.body.style.overflow = previousOverflow
@@ -799,6 +923,9 @@ onBeforeUnmount(() => {
   min-height: 56px;
   padding: calc(env(safe-area-inset-top) + 12px) 18px 22px;
   background: linear-gradient(#0009, transparent);
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
 }
 
 .video-back {
@@ -838,6 +965,18 @@ onBeforeUnmount(() => {
   background: #000;
   backface-visibility: hidden;
   will-change: transform;
+}
+
+.video-media-frame.is-touch-dragging {
+  transition: none;
+}
+
+.video-media-frame.is-touch-settling {
+  transition: transform 220ms cubic-bezier(0.22, 0.72, 0.24, 1);
+}
+
+.video-media-preview {
+  pointer-events: none;
 }
 
 .video-media {
@@ -888,6 +1027,9 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 6px;
   text-shadow: 0 2px 12px #000b;
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
 }
 
 .video-meta strong {
@@ -917,6 +1059,9 @@ onBeforeUnmount(() => {
   border-radius: 50%;
   background: #0007;
   color: #fff;
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
 }
 
 .video-sound svg {
@@ -938,6 +1083,27 @@ onBeforeUnmount(() => {
   font-size: 27px;
 }
 
+.video-buffering {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  transform: translate(-50%, -50%);
+}
+
+.video-buffering span {
+  width: 26px;
+  height: 26px;
+  border: 2px solid rgb(255 255 255 / 28%);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: video-buffering-spin 720ms linear infinite;
+}
+
 .video-play-error {
   position: absolute;
   top: 50%;
@@ -957,6 +1123,7 @@ onBeforeUnmount(() => {
   display: grid;
   gap: 8px;
   transform: translateY(-50%);
+  transition: opacity 180ms ease;
 }
 
 .video-nav :deep(button) {
@@ -999,6 +1166,46 @@ onBeforeUnmount(() => {
   text-align: center;
 }
 
+.chapter-cue {
+  position: absolute;
+  z-index: 3;
+  top: calc(env(safe-area-inset-top) + 72px);
+  left: 50%;
+  max-width: min(82vw, 360px);
+  padding: 8px 14px;
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 999px;
+  transform: translateX(-50%);
+  background: rgb(20 20 20 / 72%);
+  box-shadow: 0 8px 28px rgb(0 0 0 / 24%);
+  color: rgb(255 255 255 / 92%);
+  font-size: 12px;
+  text-align: center;
+  backdrop-filter: blur(12px);
+}
+
+.controls-hidden .video-header {
+  transform: translateY(-12px);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.controls-hidden .video-meta {
+  transform: translateY(8px);
+  opacity: 0;
+}
+
+.controls-hidden .video-sound {
+  transform: scale(0.92);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.controls-hidden .video-nav {
+  opacity: 0;
+  pointer-events: none;
+}
+
 .video-preload {
   position: absolute;
   width: 1px;
@@ -1022,6 +1229,20 @@ onBeforeUnmount(() => {
   .media-slide-down-enter-active,
   .media-slide-down-leave-active {
     transition: none;
+  }
+
+  .video-media-frame.is-touch-settling,
+  .video-header,
+  .video-meta,
+  .video-sound,
+  .video-nav {
+    transition: none;
+  }
+}
+
+@keyframes video-buffering-spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 </style>
