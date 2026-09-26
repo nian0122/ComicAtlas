@@ -2,7 +2,7 @@
   <main class="short-video-page" @touchstart.passive="onTouchStart" @touchend="onTouchEnd" @wheel.prevent="onWheel">
     <header class="video-header">
       <AppButton class="video-back" type="button" aria-label="返回章节阅读" @click="goBack">←</AppButton>
-      <strong class="video-title">{{ chapterTitle || '短视频播放' }}</strong>
+      <strong class="video-title">短视频</strong>
       <span v-if="videos.length" class="video-count"
         >{{ currentIndex + 1 }} <span>/ {{ videos.length }}</span></span
       >
@@ -46,12 +46,25 @@
           @click="togglePlayback"
           >▶</AppButton
         >
-        <div class="video-footer">
+        <div class="video-meta">
+          <strong>{{ chapterTitle || '本章视频' }}</strong>
           <span>第 {{ currentVideo.pageNumber }} 页</span>
-          <AppButton class="video-sound" type="button" :aria-label="muted ? '开启声音' : '静音'" @click="toggleMute">
-            {{ muted ? '开启声音' : '静音' }}
-          </AppButton>
         </div>
+        <AppButton class="video-sound" type="button" :aria-label="muted ? '开启声音' : '静音'" @click="toggleMute">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="1.8"
+            aria-hidden="true"
+          >
+            <path d="M11 5 6.5 9H3v6h3.5l4.5 4V5Z" />
+            <path v-if="muted" d="m16 9 5 6m0-6-5 6" />
+            <path v-else d="M15 9a4 4 0 0 1 0 6m3-9a8 8 0 0 1 0 12" />
+          </svg>
+        </AppButton>
         <div
           class="video-progress"
           role="progressbar"
@@ -300,38 +313,34 @@ onBeforeUnmount(() => {
   top: 0;
   right: 0;
   left: 0;
-  display: flex;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 48px;
   align-items: center;
-  gap: 14px;
   min-height: 56px;
   padding: calc(env(safe-area-inset-top) + 12px) 18px 22px;
   background: linear-gradient(#0009, transparent);
 }
 
 .video-back {
-  flex: none;
   width: 40px;
   height: 40px;
   border: 0;
   border-radius: 50%;
-  background: #0006;
+  background: transparent;
   color: #fff;
-  font-size: 22px;
+  font-size: 25px;
 }
 
 .video-title {
-  flex: 1;
-  overflow: hidden;
-  font-size: 15px;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 17px;
+  font-weight: 700;
+  text-align: center;
 }
 
 .video-count {
-  flex: none;
-  font-size: 14px;
+  font-size: 13px;
   font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 
 .video-count span {
@@ -356,32 +365,54 @@ onBeforeUnmount(() => {
 
 .video-shade {
   position: absolute;
-  inset: 75% 0 0;
-  background: linear-gradient(transparent, #0008);
+  inset: 62% 0 0;
+  background: linear-gradient(transparent, #000b);
   pointer-events: none;
 }
 
-.video-footer {
+.video-meta {
   position: absolute;
-  right: 18px;
-  bottom: calc(env(safe-area-inset-bottom) + 24px);
-  left: 18px;
+  right: 86px;
+  bottom: calc(env(safe-area-inset-bottom) + 30px);
+  left: 20px;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  color: #fffc;
-  font-size: 13px;
-  text-shadow: 0 1px 8px #000;
+  flex-direction: column;
+  gap: 6px;
+  text-shadow: 0 2px 12px #000b;
+}
+
+.video-meta strong {
+  overflow: hidden;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.video-meta span {
+  color: #fffd;
+  font-size: 12px;
 }
 
 .video-sound {
-  min-height: 40px;
-  padding: 0 12px;
-  border: 1px solid #fff4;
-  border-radius: 999px;
-  background: #0006;
+  position: absolute;
+  right: 18px;
+  bottom: calc(env(safe-area-inset-bottom) + 27px);
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #0007;
   color: #fff;
-  font-size: 12px;
+}
+
+.video-sound svg {
+  width: 23px;
+  height: 23px;
 }
 
 .video-progress {
