@@ -52,7 +52,7 @@ const router = createRouter({
     {
       path: '/manage/intercept',
       name: 'manage-intercept',
-    component: () => import('@/pages/management/intercept/index').then(({ InterceptPage }) => InterceptPage),
+      component: () => import('@/pages/management/intercept/index').then(({ InterceptPage }) => InterceptPage),
     },
     {
       path: '/manage',
@@ -86,7 +86,8 @@ const router = createRouter({
         {
           path: 'tasks',
           name: 'manage-tasks',
-          component: () => import('@/pages/management/tasks/index').then(({ ManagementTasksPage }) => ManagementTasksPage),
+          component: () =>
+            import('@/pages/management/tasks/index').then(({ ManagementTasksPage }) => ManagementTasksPage),
         },
         {
           path: 'ai-analysis',
@@ -106,7 +107,8 @@ const router = createRouter({
         {
           path: 'comics/:id',
           name: 'manage-comic-workspace',
-          component: () => import('@/pages/management/comic-workspace/index').then(({ ComicWorkspacePage }) => ComicWorkspacePage),
+          component: () =>
+            import('@/pages/management/comic-workspace/index').then(({ ComicWorkspacePage }) => ComicWorkspacePage),
           props: true,
         },
         {
@@ -132,6 +134,12 @@ const router = createRouter({
           path: 'storage',
           name: 'manage-storage',
           component: () => import('@/pages/management/storage/index').then(({ StoragePage }) => StoragePage),
+        },
+        {
+          path: 'media-reactions',
+          name: 'manage-media-reactions',
+          component: () =>
+            import('@/pages/management/media-reactions').then(({ MediaReactionsPage }) => MediaReactionsPage),
         },
         {
           path: 'storage/:id',

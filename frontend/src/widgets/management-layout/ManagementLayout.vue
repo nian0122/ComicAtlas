@@ -54,6 +54,10 @@
             <el-icon :size="18"><Coin /></el-icon>
             <span>存储统计</span>
           </router-link>
+          <router-link to="/manage/media-reactions" class="sidenav-link" active-class="active">
+            <el-icon :size="18"><Star /></el-icon>
+            <span>媒体标记</span>
+          </router-link>
           <router-link to="/manage/trash" class="sidenav-link" active-class="active">
             <el-icon :size="18"><Delete /></el-icon>
             <span>回收站</span>
@@ -99,6 +103,7 @@ import {
   HomeFilled,
   List,
   Setting,
+  Star,
   Tickets,
   UploadFilled,
   WarningFilled,
