@@ -162,7 +162,8 @@
               aria-hidden="true"
             >
               <path
-                d="M7 10v10H4a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1h3Zm0 10h9.2a2 2 0 0 0 1.9-1.4l2.2-6.5A1.6 1.6 0 0 0 18.8 10H14l.8-4.1A2.4 2.4 0 0 0 12.4 3L7 10v10Z"
+                class="reaction-heart"
+                d="M12 20.2 4.7 13a4.8 4.8 0 0 1 6.8-6.8L12 6.7l.5-.5A4.8 4.8 0 0 1 19.3 13L12 20.2Z"
               />
             </svg>
           </AppButton>
@@ -184,7 +185,7 @@
               aria-hidden="true"
             >
               <path
-                d="M7 14V4H4a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h3Zm0-10h9.2a2 2 0 0 1 1.9 1.4l2.2 6.5A1.6 1.6 0 0 1 18.8 14H14l.8 4.1a2.4 2.4 0 0 1-2.4 2.9L7 14V4Z"
+                d="M7 14V4H4a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h3Zm0-10h8.7a2.4 2.4 0 0 1 2.3 1.8l1.6 6.1a1.7 1.7 0 0 1-1.6 2.1H14l.8 3.8a2.3 2.3 0 0 1-2.2 2.8L7 14V4Z"
               />
             </svg>
           </AppButton>
@@ -1213,7 +1214,7 @@ onBeforeUnmount(() => {
   bottom: calc(env(safe-area-inset-bottom) + 132px);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   transition:
     opacity 180ms ease,
     transform 180ms ease;
@@ -1222,17 +1223,22 @@ onBeforeUnmount(() => {
 .video-reaction {
   display: grid;
   place-items: center;
-  width: 46px;
-  height: 46px;
+  width: 48px;
+  height: 48px;
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: #0007;
-  color: #fff;
+  background: rgb(15 15 20 / 46%);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 18%),
+    0 8px 22px rgb(0 0 0 / 18%);
+  color: rgb(255 255 255 / 92%);
+  backdrop-filter: blur(12px);
   transition:
-    transform 160ms ease,
-    background 160ms ease,
-    color 160ms ease;
+    transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    background 180ms ease,
+    color 180ms ease,
+    box-shadow 180ms ease;
 }
 
 .video-reaction svg {
@@ -1241,14 +1247,37 @@ onBeforeUnmount(() => {
 }
 
 .video-reaction.is-active {
-  background: rgb(255 255 255 / 94%);
-  color: #17151d;
-  transform: scale(1.08);
+  background: rgb(255 255 255 / 92%);
+  color: #f04468;
+  box-shadow:
+    0 8px 26px rgb(240 68 104 / 28%),
+    inset 0 0 0 1px rgb(255 255 255 / 80%);
+  transform: scale(1.1);
 }
 
 .video-reaction.is-active.is-dislike {
-  background: #ff5577;
-  color: #fff;
+  background: rgb(225 236 255 / 94%);
+  box-shadow:
+    0 8px 26px rgb(116 155 211 / 26%),
+    inset 0 0 0 1px rgb(255 255 255 / 80%);
+  color: #41658f;
+}
+
+.video-reaction:active {
+  transform: scale(0.94);
+}
+
+.video-reaction.is-active:active {
+  transform: scale(1.02);
+}
+
+.video-reaction .reaction-heart {
+  fill: transparent;
+  transition: fill 180ms ease;
+}
+
+.video-reaction.is-active .reaction-heart {
+  fill: currentColor;
 }
 
 .video-play-button {
