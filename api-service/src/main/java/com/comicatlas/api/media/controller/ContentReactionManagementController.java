@@ -2,6 +2,7 @@ package com.comicatlas.api.media.controller;
 
 import com.comicatlas.api.media.dto.ContentReactionBatchRequest;
 import com.comicatlas.api.media.dto.ContentReactionVO;
+import com.comicatlas.api.media.dto.ContentReactionTrashBatchRequest;
 import com.comicatlas.api.media.service.ContentReactionManagementService;
 import com.comicatlas.api.task.dto.OperationSubmitResultDTO;
 import com.comicatlas.contract.common.Result;
@@ -41,7 +42,7 @@ public class ContentReactionManagementController {
 
     @PostMapping("/batch/trash")
     public Result<List<OperationSubmitResultDTO>> trashBatch(
-            @RequestParam String targetType, @Valid @RequestBody ContentReactionBatchRequest request) {
+            @RequestParam String targetType, @Valid @RequestBody ContentReactionTrashBatchRequest request) {
         return Result.ok(service.trashBatch(targetType, request.getIds()));
     }
 }
