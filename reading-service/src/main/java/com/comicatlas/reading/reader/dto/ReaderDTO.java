@@ -43,6 +43,6 @@ public class ReaderDTO {
         private String videoCodec;
         private String audioCodec;
         private String reaction;
-        private LocalDateTime reactionAt;
+        private java.time.Instant reactionAt;
     }
 }

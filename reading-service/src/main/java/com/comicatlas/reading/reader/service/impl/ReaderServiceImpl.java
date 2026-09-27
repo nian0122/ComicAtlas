@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import com.comicatlas.contract.common.enums.MediaReaction;
 
 @Service
@@ -60,10 +61,11 @@ public class ReaderServiceImpl implements ReaderService {
         if (media == null || media.getStatus() != com.comicatlas.contract.common.enums.MediaLifecycleStatus.READY) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "媒体不存在或不可标记");
         }
-        LocalDateTime reactionAt = reaction == MediaReaction.NONE ? null : LocalDateTime.now();
+        LocalDateTime reactionAt = reaction == MediaReaction.NONE ? null : LocalDateTime.now(ZoneOffset.UTC);
         if (mediaMapper.updateReaction(mediaId, reaction, reactionAt) != 1) {
             throw new BusinessException(HttpStatusCodes.CONFLICT, "媒体标记状态已变化，请重试");
         }
-        return new MediaReactionDTO(mediaId, reaction, reactionAt);
+        return new MediaReactionDTO(mediaId, reaction,
+                reactionAt == null ? null : reactionAt.toInstant(ZoneOffset.UTC));
     }
 }

@@ -85,6 +85,6 @@ public interface ManagementStructureQueryService {
         private String videoCodec;
         private String audioCodec;
         private String reaction;
-        private java.time.LocalDateTime reactionAt;
+        private java.time.Instant reactionAt;
     }
 }

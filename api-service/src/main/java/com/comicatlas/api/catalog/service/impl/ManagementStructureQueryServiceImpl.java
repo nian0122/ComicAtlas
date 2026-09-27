@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.time.ZoneOffset;
 
 /** 管理域目录与媒体查询，避免管理端调用阅读器接口。 */
 @Service
@@ -85,7 +86,7 @@ public class ManagementStructureQueryServiceImpl implements ManagementStructureQ
         data.setHqSize(media.getHqSize()); data.setLqSize(media.getLqSize()); data.setMediaType(media.getMediaType()); data.setDuration(media.getDuration());
         data.setContainer(media.getContainer()); data.setVideoCodec(media.getVideoCodec()); data.setAudioCodec(media.getAudioCodec());
         data.setReaction(media.getReaction() == null ? "NONE" : media.getReaction().name());
-        data.setReactionAt(media.getReactionAt());
+        data.setReactionAt(media.getReactionAt() == null ? null : media.getReactionAt().toInstant(ZoneOffset.UTC));
         data.setTranscodeStatus(media.getTranscodeStatus() == null ? null : media.getTranscodeStatus().name()); return data;
     }
     private String fileName(String path) {

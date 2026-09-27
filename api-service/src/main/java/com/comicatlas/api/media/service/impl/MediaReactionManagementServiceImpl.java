@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 /** 管理端媒体标记业务实现。 */
@@ -37,7 +38,8 @@ public class MediaReactionManagementServiceImpl implements MediaReactionManageme
     @Transactional
     public int updateBatch(MediaReactionBatchRequest request) {
         validateBatch(request.getMediaIds());
-        LocalDateTime reactionAt = request.getReaction() == MediaReaction.NONE ? null : LocalDateTime.now();
+        LocalDateTime reactionAt = request.getReaction() == MediaReaction.NONE
+                ? null : LocalDateTime.now(ZoneOffset.UTC);
         return mediaMapper.updateReactionBatch(request.getMediaIds(), request.getReaction(), reactionAt);
     }
 
@@ -61,7 +63,8 @@ public class MediaReactionManagementServiceImpl implements MediaReactionManageme
         view.setPageNumber(media.getPageNumber());
         view.setMediaType(media.getMediaType());
         view.setReaction(media.getReaction());
-        view.setReactionAt(media.getReactionAt());
+        view.setReactionAt(media.getReactionAt() == null
+                ? null : media.getReactionAt().toInstant(ZoneOffset.UTC));
         view.setStatus(media.getStatus() == null ? null : media.getStatus().name());
         return view;
     }

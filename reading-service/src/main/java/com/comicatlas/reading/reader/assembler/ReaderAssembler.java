@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.time.ZoneOffset;
 
 /** 阅读器响应装配器，集中处理媒体 URL、状态和文件名回退规则。 */
 @Component
@@ -43,7 +44,7 @@ public class ReaderAssembler {
         item.setVideoCodec(media.getVideoCodec());
         item.setAudioCodec(media.getAudioCodec());
         item.setReaction(media.getReaction() == null ? "NONE" : media.getReaction().name());
-        item.setReactionAt(media.getReactionAt());
+        item.setReactionAt(media.getReactionAt() == null ? null : media.getReactionAt().toInstant(ZoneOffset.UTC));
         if (MEDIA_TYPE_VIDEO.equals(media.getMediaType())) {
             item.setLqUrl(null);
             item.setLqStatus(LQ_STATUS_NOT_APPLICABLE);

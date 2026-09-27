@@ -3,7 +3,7 @@ package com.comicatlas.api.media.dto;
 import com.comicatlas.contract.common.enums.MediaReaction;
 import lombok.Data;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 /** 管理端媒体标记视图。 */
 @Data
@@ -13,6 +13,6 @@ public class MediaReactionVO {
     private Integer pageNumber;
     private String mediaType;
     private MediaReaction reaction;
-    private LocalDateTime reactionAt;
+    private Instant reactionAt;
     private String status;
 }
