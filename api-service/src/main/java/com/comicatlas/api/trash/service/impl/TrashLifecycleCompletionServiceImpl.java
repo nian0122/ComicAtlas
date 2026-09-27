@@ -7,6 +7,7 @@ import com.comicatlas.common.dto.TrashManifestItemDTO;
 import com.comicatlas.common.event.ManagementCommandCompletedEvent;
 import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.contract.common.enums.ComicStatus;
+import com.comicatlas.contract.common.enums.MediaReaction;
 import com.comicatlas.contract.common.enums.MediaLifecycleStatus;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Comic;
@@ -177,6 +178,8 @@ public class TrashLifecycleCompletionServiceImpl implements TrashLifecycleComple
         if (comic != null && comic.getStatus() == ComicStatus.PURGING) {
             comic.setStatus(ComicStatus.DELETED);
             comic.setDeletedAt(LocalDateTime.now());
+            comic.setReaction(MediaReaction.NONE);
+            comic.setReactionAt(null);
             comicMapper.updateById(comic);
         }
         catalogCacheInvalidator.evict(comicId);
@@ -189,6 +192,8 @@ public class TrashLifecycleCompletionServiceImpl implements TrashLifecycleComple
         Chapter chapter = chapterMapper.selectById(chapterId);
         if (chapter != null && chapter.getStatus() == ChapterLifecycleStatus.PURGING) {
             chapter.setStatus(ChapterLifecycleStatus.DELETED);
+            chapter.setReaction(MediaReaction.NONE);
+            chapter.setReactionAt(null);
             chapterMapper.updateById(chapter);
             catalogCacheInvalidator.evict(chapter.getComicId());
         }
