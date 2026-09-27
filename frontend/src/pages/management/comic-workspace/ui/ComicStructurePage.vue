@@ -308,9 +308,11 @@
               </div>
             </div>
             <div class="media-operation-note">
-              HQ 删除和 LQ 生成属于章节级操作。当前媒体面板只执行针对这一份文件的操作。
+              替换、转码和回收只针对当前媒体；追加文件会加入当前章节。
             </div>
             <div class="media-action-buttons">
+              <AppButton variant="primary" block @click="openUploadDialog()">追加到本章</AppButton>
+              <AppButton block @click="openReplaceSelectedMedia">替换此媒体</AppButton>
               <AppButton
                 v-if="selectedMedia.mediaType === 'VIDEO'"
                 variant="warning"
@@ -452,10 +454,9 @@
                 <span class="panel-kicker">MEDIA INTAKE</span><span class="feature-mark">＋</span>
               </div>
               <strong>补充媒体</strong>
-              <p>追加图片或替换当前媒体</p>
+              <p>向当前章节追加图片或视频</p>
               <div class="feature-button-row">
-                <AppButton variant="primary" block @click="openUploadDialog()">上传媒体</AppButton
-                ><AppButton v-if="selectedMedia" block @click="openReplaceSelectedMedia">替换</AppButton>
+                <AppButton variant="primary" block @click="openUploadDialog()">上传媒体</AppButton>
               </div>
             </section>
           </div>

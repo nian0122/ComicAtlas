@@ -601,7 +601,7 @@ POST  /api/manage/trash/{targetType}/{targetId}/reconcile          # 对账并�
 
 原始字节流上传（**非 multipart**），无 `spring.servlet.multipart` 配置。限制见 `storage.upload.*`。
 
-> **管理端能力**：媒体上传/替换（`MEDIA_UPLOAD` / `MEDIA_REPLACE`）后端接口已实现，前端入口为 `/manage/upload`；该能力独立于漫画导入主流程。
+> **管理端能力**：媒体上传/替换（`MEDIA_UPLOAD` / `MEDIA_REPLACE`）后端接口已实现，前端入口位于单本漫画工作区的“目录与存储”章节媒体操作中。
 
 ```
 POST   /api/manage/uploads/sessions                     # 创建会话

@@ -100,3 +100,49 @@ test('工作区可提交元数据刷新并展示任务反馈', async ({ page }) 
   await page.getByRole('button', { name: '刷新元数据' }).click()
   await expect(page.getByText('刷新元数据已提交')).toBeVisible()
 })
+
+test('媒体上传在漫画工作区按章节操作，选中媒体后可替换', async ({ page }) => {
+  await page.route('**/api/manage/comics/7/catalog', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: resultBody([
+        {
+          id: null,
+          title: null,
+          children: [],
+          chapters: [{ id: 9, chapterNo: '01', title: '第一章', globalOrder: 1, pageCount: 1 }],
+        },
+      ]),
+    }),
+  )
+  await page.route('**/api/manage/chapters/9', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: resultBody({
+        pages: [
+          {
+            id: 11,
+            pageNumber: 1,
+            fileName: '001.jpg',
+            mediaType: 'IMAGE',
+            hqStatus: 'READY',
+            lqStatus: 'NOT_GENERATED',
+          },
+        ],
+      }),
+    }),
+  )
+
+  await page.goto('/manage/comics/7?tab=content&chapterId=9')
+  await expect(page.getByRole('navigation', { name: '管理导航' }).getByText('媒体上传')).toHaveCount(0)
+  await page.locator('.chapter-workspace-tabs').getByRole('button', { name: /媒体/ }).click()
+  await page.getByRole('button', { name: '上传媒体' }).click()
+  await expect(page.getByRole('heading', { name: '上传章节媒体' })).toBeVisible()
+  await page.getByRole('button', { name: '关闭' }).click()
+
+  await page.getByRole('row', { name: /001.jpg/ }).click()
+  await page.getByRole('button', { name: '替换此媒体' }).click()
+  await expect(page.getByRole('heading', { name: '替换章节媒体' })).toBeVisible()
+})

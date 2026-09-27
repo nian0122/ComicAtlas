@@ -714,17 +714,30 @@ input.el-select__input {
  * Pagination
  * ------------------------------------------------------------------------- */
 .el-pagination {
-  --el-pagination-bg-color: transparent;
-  --el-pagination-text-color: var(--text-secondary);
-  --el-pagination-button-color: var(--text-secondary);
-  --el-pagination-button-bg-color: var(--bg-surface);
-  --el-pagination-button-disabled-color: var(--text-muted);
-  --el-pagination-button-disabled-bg-color: var(--bg-secondary);
-  --el-pagination-hover-color: var(--text-primary);
+  --el-pagination-button-width: var(--control-min-size) !important;
+  --el-pagination-button-height: var(--control-min-size) !important;
+  --el-pagination-bg-color: transparent !important;
+  --el-pagination-text-color: var(--text-secondary) !important;
+  --el-pagination-button-color: var(--text-secondary) !important;
+  --el-pagination-button-bg-color: var(--bg-surface) !important;
+  --el-pagination-button-disabled-color: var(--text-muted) !important;
+  --el-pagination-button-disabled-bg-color: var(--bg-secondary) !important;
+  --el-pagination-hover-color: var(--text-primary) !important;
+
+  min-height: var(--control-min-size);
+  gap: var(--space-2);
+
+  .el-pager {
+    gap: var(--space-2);
+  }
 
   .btn-prev,
   .btn-next,
   .el-pager li {
+    min-width: var(--control-min-size);
+    height: var(--control-min-size);
+    margin: 0;
+    font-size: var(--text-sm);
     background-color: var(--bg-surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
@@ -743,7 +756,7 @@ input.el-select__input {
     &.is-active {
       background-color: var(--accent);
       border-color: var(--accent);
-      color: var(--text-primary);
+      color: var(--color-on-brand);
     }
 
     &:disabled,
@@ -757,25 +770,27 @@ input.el-select__input {
     .btn-prev,
     .btn-next,
     .el-pager li {
-      background-color: var(--bg-surface);
-      color: var(--text-secondary);
+      background-color: var(--bg-surface) !important;
+      border: 1px solid var(--border) !important;
+      border-radius: var(--radius-sm) !important;
+      color: var(--text-secondary) !important;
 
       &:hover:not(:disabled):not(.disabled) {
-        background-color: var(--surface-highlight);
-        color: var(--text-primary);
+        background-color: var(--surface-highlight) !important;
+        color: var(--text-primary) !important;
       }
 
       &.is-active,
       &.active {
-        background-color: var(--accent);
-        color: var(--text-primary);
+        background-color: var(--accent) !important;
+        color: var(--color-on-brand) !important;
       }
 
       &:disabled,
       &.disabled,
       &.is-disabled {
-        background-color: var(--bg-secondary);
-        color: var(--text-muted);
+        background-color: var(--bg-secondary) !important;
+        color: var(--text-muted) !important;
       }
     }
   }
@@ -1076,17 +1091,17 @@ input.el-select__input {
   }
 }
 
-/* Element Plus 默认 loading 遮罩为浅色，统一为影院黑场并使用品牌红加载环。 */
+/* 按需注入的 loading 样式可能后加载，需强制维持项目的暗色遮罩和品牌红加载环。 */
 .el-loading-mask {
-  background-color: var(--color-overlay-loading);
+  background-color: var(--color-overlay-loading) !important;
 }
 
 .el-loading-spinner .path {
-  stroke: var(--accent);
+  stroke: var(--accent) !important;
 }
 
 .el-loading-spinner .el-loading-text {
-  color: var(--text-secondary);
+  color: var(--text-secondary) !important;
 }
 
 .el-select,

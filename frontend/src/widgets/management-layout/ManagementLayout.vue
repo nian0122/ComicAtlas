@@ -46,10 +46,6 @@
             <el-icon :size="18"><MagicStick /></el-icon>
             <span>AI 漫画分析</span>
           </router-link>
-          <router-link to="/manage/upload" class="sidenav-link" active-class="active">
-            <el-icon :size="18"><UploadFilled /></el-icon>
-            <span>媒体上传</span>
-          </router-link>
           <router-link to="/manage/storage" class="sidenav-link" active-class="active">
             <el-icon :size="18"><Coin /></el-icon>
             <span>存储统计</span>
