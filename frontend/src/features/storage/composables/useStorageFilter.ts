@@ -24,22 +24,26 @@ export interface PaginationState {
   total: number
 }
 
-export function useStorageFilter(getComicList: () => ComicStorageItem[], getServerTotal: () => number) {
+export function useStorageFilter(
+  getComicList: () => ComicStorageItem[],
+  getServerTotal: () => number,
+  initialQuery: ComicStorageQuery = {},
+) {
   const filter = ref<FilterState>({
-    hqStatus: 'ALL',
-    lqStatus: 'ALL',
-    keyword: '',
-    category: '',
-    tag: '',
+    hqStatus: initialQuery.hqStatus ?? 'ALL',
+    lqStatus: initialQuery.lqStatus ?? 'ALL',
+    keyword: initialQuery.keyword ?? '',
+    category: initialQuery.category ?? '',
+    tag: initialQuery.tag ?? '',
   })
 
   const sort = ref<SortState>({
-    field: 'totalSize',
-    order: 'desc',
+    field: initialQuery.sort ?? 'totalSize',
+    order: initialQuery.order ?? 'desc',
   })
 
-  const page = ref(1)
-  const pageSize = ref(20)
+  const page = ref(initialQuery.page ?? 1)
+  const pageSize = ref(initialQuery.size ?? 20)
 
   watch(
     [
