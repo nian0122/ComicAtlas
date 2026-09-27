@@ -5,6 +5,7 @@ import com.comicatlas.worker.exporter.resolver.ExportFileResolver;
 import com.comicatlas.worker.exporter.publisher.ExportArchivePublisher;
 import com.comicatlas.worker.exporter.archive.ZipBuilder;
 import com.comicatlas.worker.exporter.archive.ExportStagingCleanup;
+import com.comicatlas.worker.exporter.archive.DirectoryExportStaging;
 import com.comicatlas.worker.exporter.exception.ExportFileNotFoundException;
 import com.comicatlas.worker.exporter.exception.ExportManifestBuildException;
 import com.comicatlas.worker.exporter.model.ExportCollectResult;
@@ -159,58 +160,102 @@ public class ExportServiceImpl implements ExportService {
             if (!Files.isDirectory(finalRoot)) {
                 throw new IOException("文件夹导出发布冲突：既有任务目录结构不匹配 taskId=" + taskId);
             }
+            cleanupDirectoryExportMarker(stagingDir);
             return new ExportOutput(taskId, comicId, taskId + "/" + rootDirectoryName, directorySize(finalDir));
         }
 
-        ExportStagingCleanup.delete(stagingDir);
-        try {
-            long requiredBytes = manifest.entries().stream()
-                    .mapToLong(ExportManifest.Entry::sourceSize)
-                    .reduce(0L, Math::addExact);
+        Path stagingMarker = DirectoryExportStaging.markerPath(stagingDir);
+        boolean canReuseStaging = DirectoryExportStaging.matches(stagingDir, manifest);
+        if (!canReuseStaging) {
+            ExportStagingCleanup.delete(stagingDir);
+            Files.deleteIfExists(stagingMarker);
+        }
+        long requiredBytes = manifest.entries().stream()
+                .mapToLong(ExportManifest.Entry::sourceSize)
+                .reduce(0L, Math::addExact);
+        requiredBytes = Math.addExact(requiredBytes,
+                manifest.metadataJson().getBytes(StandardCharsets.UTF_8).length);
+        if (manifest.comicInfoXml() != null && !manifest.comicInfoXml().isBlank()) {
             requiredBytes = Math.addExact(requiredBytes,
-                    manifest.metadataJson().getBytes(StandardCharsets.UTF_8).length);
-            if (manifest.comicInfoXml() != null && !manifest.comicInfoXml().isBlank()) {
-                requiredBytes = Math.addExact(requiredBytes,
-                        manifest.comicInfoXml().getBytes(StandardCharsets.UTF_8).length);
-            }
-            long availableBytes = Files.getFileStore(exportRoot.getPath()).getUsableSpace();
-            long requiredWithReserve = Math.addExact(requiredBytes,
-                    workerConfig.getDirectoryExport().getMinimumFreeSpaceBytes());
-            if (availableBytes < requiredWithReserve) {
-                throw new IOException("文件夹导出空间不足：预计需要 " + requiredBytes
-                        + " 字节，安全余量 " + workerConfig.getDirectoryExport().getMinimumFreeSpaceBytes()
-                        + " 字节，当前可用 " + availableBytes + " 字节");
-            }
-            Path stagingRoot = stagingDir.resolve(rootDirectoryName);
-            Files.createDirectories(stagingRoot);
-            writeDirectoryEntry(stagingRoot.resolve("metadata.json"), manifest.metadataJson().getBytes(StandardCharsets.UTF_8));
-            if (manifest.comicInfoXml() != null && !manifest.comicInfoXml().isBlank()) {
-                writeDirectoryEntry(stagingRoot.resolve("ComicInfo.xml"),
-                        manifest.comicInfoXml().getBytes(StandardCharsets.UTF_8));
-            }
-            for (ExportManifest.Entry entry : manifest.entries()) {
-                Path target = stagingRoot.resolve(entry.targetPath()).normalize();
-                if (!target.startsWith(stagingRoot)) {
-                    throw new IOException("文件夹导出路径非法: " + entry.targetPath());
+                    manifest.comicInfoXml().getBytes(StandardCharsets.UTF_8).length);
+        }
+        try {
+            if (!canReuseStaging) {
+                long availableBytes = Files.getFileStore(exportRoot.getPath()).getUsableSpace();
+                long requiredWithReserve = Math.addExact(requiredBytes,
+                        workerConfig.getDirectoryExport().getMinimumFreeSpaceBytes());
+                if (availableBytes < requiredWithReserve) {
+                    throw new IOException("文件夹导出空间不足：预计需要 " + requiredBytes
+                            + " 字节，安全余量 " + workerConfig.getDirectoryExport().getMinimumFreeSpaceBytes()
+                            + " 字节，当前可用 " + availableBytes + " 字节");
                 }
-                if (Files.size(entry.sourceFile()) != entry.sourceSize()) {
-                    throw new IOException("文件夹导出源文件在预检后发生变化: " + entry.targetPath());
+                Path stagingRoot = stagingDir.resolve(rootDirectoryName);
+                Files.createDirectories(stagingRoot);
+                writeDirectoryEntry(stagingRoot.resolve("metadata.json"),
+                        manifest.metadataJson().getBytes(StandardCharsets.UTF_8));
+                if (manifest.comicInfoXml() != null && !manifest.comicInfoXml().isBlank()) {
+                    writeDirectoryEntry(stagingRoot.resolve("ComicInfo.xml"),
+                            manifest.comicInfoXml().getBytes(StandardCharsets.UTF_8));
                 }
-                Files.createDirectories(target.getParent());
-                Files.copy(entry.sourceFile(), target, StandardCopyOption.COPY_ATTRIBUTES);
-                if (Files.size(target) != entry.sourceSize()) {
-                    throw new IOException("文件夹导出复制结果大小校验失败: " + entry.targetPath());
+                for (ExportManifest.Entry entry : manifest.entries()) {
+                    Path target = stagingRoot.resolve(entry.targetPath()).normalize();
+                    if (!target.startsWith(stagingRoot)) {
+                        throw new IOException("文件夹导出路径非法: " + entry.targetPath());
+                    }
+                    if (Files.size(entry.sourceFile()) != entry.sourceSize()) {
+                        throw new IOException("文件夹导出源文件在预检后发生变化: " + entry.targetPath());
+                    }
+                    Files.createDirectories(target.getParent());
+                    Files.copy(entry.sourceFile(), target, StandardCopyOption.COPY_ATTRIBUTES);
+                    if (Files.size(target) != entry.sourceSize()) {
+                        throw new IOException("文件夹导出复制结果大小校验失败: " + entry.targetPath());
+                    }
                 }
+                DirectoryExportStaging.markComplete(stagingDir, manifest);
+            } else {
+                log.info("复用已完成的文件夹导出 staging: taskId={}", taskId);
             }
-            try {
-                Files.move(stagingDir, finalDir, StandardCopyOption.ATOMIC_MOVE);
-            } catch (AtomicMoveNotSupportedException exception) {
-                throw new IOException("文件夹导出发布失败：文件系统不支持原子移动", exception);
-            }
-            return new ExportOutput(taskId, comicId, taskId + "/" + rootDirectoryName, requiredBytes);
         } catch (IOException | RuntimeException exception) {
             ExportStagingCleanup.afterFailure(stagingDir, exception);
+            deleteDirectoryExportMarker(stagingMarker, exception);
             throw exception;
+        }
+
+        try {
+            Files.move(stagingDir, finalDir, StandardCopyOption.ATOMIC_MOVE);
+        } catch (AtomicMoveNotSupportedException exception) {
+            throw new IOException("文件夹导出内容已完成，但文件系统不支持原子发布；临时产物已保留供重试 taskId="
+                    + taskId, exception);
+        } catch (IOException exception) {
+            throw new IOException("文件夹导出内容已完成，但发布失败；临时产物已保留供重试 taskId="
+                    + taskId, exception);
+        }
+        deleteDirectoryExportMarker(stagingMarker);
+        return new ExportOutput(taskId, comicId, taskId + "/" + rootDirectoryName, requiredBytes);
+    }
+
+    private void cleanupDirectoryExportMarker(Path stagingDir) {
+        try {
+            ExportStagingCleanup.delete(stagingDir);
+            Files.deleteIfExists(DirectoryExportStaging.markerPath(stagingDir));
+        } catch (IOException exception) {
+            log.warn("清理已发布导出任务的 staging 标记失败: taskId={}", stagingDir.getFileName(), exception);
+        }
+    }
+
+    private void deleteDirectoryExportMarker(Path stagingMarker) {
+        try {
+            Files.deleteIfExists(stagingMarker);
+        } catch (IOException exception) {
+            log.warn("清理文件夹导出 staging 标记失败: marker={}", stagingMarker.getFileName(), exception);
+        }
+    }
+
+    private void deleteDirectoryExportMarker(Path stagingMarker, Throwable failure) {
+        try {
+            Files.deleteIfExists(stagingMarker);
+        } catch (IOException cleanupFailure) {
+            failure.addSuppressed(cleanupFailure);
         }
     }
 
