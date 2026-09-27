@@ -28,6 +28,8 @@ public class ReaderAssembler {
         response.setTotal(mediaItems.size());
         response.setPrevChapterId(previousChapterId);
         response.setNextChapterId(nextChapterId);
+        response.setReaction(chapter.getReaction() == null ? "NONE" : chapter.getReaction().name());
+        response.setReactionAt(chapter.getReactionAt() == null ? null : chapter.getReactionAt().toInstant(ZoneOffset.UTC));
         return response;
     }
 

@@ -5,6 +5,7 @@
         <el-icon :size="20"><ArrowLeft /></el-icon>
       </AppButton>
       <span class="toolbar-title">{{ title }}</span>
+      <MediaReactionButtons :reaction="reaction" compact @toggle="emit('toggleReaction', $event)" />
     </div>
 
     <div class="toolbar-center">
@@ -107,6 +108,7 @@ import { ref, watch } from 'vue'
 import { ArrowLeft, Setting } from '@element-plus/icons-vue'
 import { ElSelect, ElOption, ElPopover, ElInputNumber } from 'element-plus'
 import { useReaderSettingsStore } from '@/features/reader-settings'
+import { MediaReactionButtons } from '@/entities/media'
 
 interface Props {
   title: string
@@ -115,6 +117,7 @@ interface Props {
   prevChapterId: number | null
   nextChapterId: number | null
   chapterId?: number | null
+  reaction: 'NONE' | 'LIKE' | 'DISLIKE'
 }
 
 const props = defineProps<Props>()
@@ -124,6 +127,7 @@ const emit = defineEmits<{
   (e: 'nextChapter'): void
   (e: 'jumpToPage', page: number): void
   (e: 'openImmersive'): void
+  (e: 'toggleReaction', reaction: 'NONE' | 'LIKE' | 'DISLIKE'): void
 }>()
 
 const settings = useReaderSettingsStore()

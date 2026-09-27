@@ -8,4 +8,8 @@ export const readerApi = {
       `/pages/${pageId}/reaction`,
       { reaction },
     ),
+  updateComicReaction: (comicId: number, reaction: 'NONE' | 'LIKE' | 'DISLIKE') =>
+    api.put(`/comics/${comicId}/reaction`, { reaction }),
+  updateChapterReaction: (chapterId: number, reaction: 'NONE' | 'LIKE' | 'DISLIKE') =>
+    api.put(`/chapters/${chapterId}/reaction`, { reaction }),
 }

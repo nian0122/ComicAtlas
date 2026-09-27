@@ -15,18 +15,22 @@
     :prev-chapter-id="prevChapterId"
     :next-chapter-id="nextChapterId"
     :chapter-id="chapterId"
+    :reaction="reaction"
     @back="emit('back')"
     @prev-chapter="emit('prevChapter')"
     @next-chapter="emit('nextChapter')"
     @jump-to-page="emit('jumpToPage', $event)"
     @open-immersive="emit('openImmersive')"
+    @toggle-reaction="emit('toggleReaction', $event)"
   />
   <ReaderToolbarMobile
     v-else
     :title="title"
+    :reaction="reaction"
     @back="emit('back')"
     @open-settings="emit('openSettings')"
     @open-immersive="emit('openImmersive')"
+    @toggle-reaction="emit('toggleReaction', $event)"
   />
 </template>
 
@@ -50,6 +54,7 @@ interface Props {
   /** 下一章 id——仅桌面变体使用（null 时隐藏按钮） */
   nextChapterId?: number | null
   chapterId?: number | null
+  reaction?: 'NONE' | 'LIKE' | 'DISLIKE'
 }
 
 withDefaults(defineProps<Props>(), {
@@ -58,6 +63,7 @@ withDefaults(defineProps<Props>(), {
   prevChapterId: null,
   nextChapterId: null,
   chapterId: null,
+  reaction: 'NONE',
 })
 
 const emit = defineEmits<{
@@ -72,5 +78,6 @@ const emit = defineEmits<{
   /** 页码跳转——桌面变体发出 */
   (e: 'jumpToPage', page: number): void
   (e: 'openImmersive'): void
+  (e: 'toggleReaction', reaction: 'NONE' | 'LIKE' | 'DISLIKE'): void
 }>()
 </script>

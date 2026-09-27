@@ -8,11 +8,13 @@ import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
 import java.util.List;
+import java.time.LocalDateTime;
+import com.comicatlas.contract.common.enums.MediaReaction;
 
 @Mapper
 public interface ChapterMapper extends BaseMapper<Chapter> {
 
-    @Select("SELECT id, comic_id, catalog_id, chapter_no, title, status, page_count, sort_order, global_order, version FROM chapter WHERE comic_id = #{comicId} ORDER BY global_order ASC")
+    @Select("SELECT id, comic_id, catalog_id, chapter_no, title, status, page_count, sort_order, global_order, version, reaction, reaction_at FROM chapter WHERE comic_id = #{comicId} ORDER BY global_order ASC")
     List<Chapter> selectByComicIdOrderByGlobalOrder(@Param("comicId") Long comicId);
 
     @Select("SELECT id, comic_id, catalog_id, chapter_no, title, status, page_count, sort_order, global_order FROM chapter WHERE comic_id = #{comicId} AND catalog_id = #{catalogId} ORDER BY sort_order DESC, id DESC LIMIT 1")
@@ -33,7 +35,7 @@ public interface ChapterMapper extends BaseMapper<Chapter> {
     @org.apache.ibatis.annotations.Delete("DELETE FROM chapter WHERE comic_id = #{comicId}")
     int deleteByComicId(@Param("comicId") Long comicId);
 
-    @Select("SELECT id, comic_id, title, status, global_order FROM chapter WHERE id = #{chapterId}")
+    @Select("SELECT id, comic_id, title, status, global_order, reaction, reaction_at FROM chapter WHERE id = #{chapterId}")
     Chapter selectReaderChapter(@Param("chapterId") Long chapterId);
 
     @Select("SELECT id, comic_id, page_count, status FROM chapter WHERE id = #{chapterId}")
@@ -59,8 +61,12 @@ public interface ChapterMapper extends BaseMapper<Chapter> {
     Long selectNextReadyChapterId(@Param("comicId") Long comicId, @Param("globalOrder") Integer globalOrder);
 
     @Select("SELECT id, comic_id, catalog_id, title, chapter_no, page_count, global_order, status "
-            + "FROM chapter WHERE comic_id = #{comicId} AND status = 'READY' ORDER BY chapter_no ASC")
+            + ", reaction, reaction_at FROM chapter WHERE comic_id = #{comicId} AND status = 'READY' ORDER BY chapter_no ASC")
     List<Chapter> selectReadyByComicIdOrderByChapterNo(@Param("comicId") Long comicId);
+
+    @Update("UPDATE chapter SET reaction = #{reaction}, reaction_at = #{reactionAt} WHERE id = #{chapterId} AND status = 'READY'")
+    int updateReaction(@Param("chapterId") Long chapterId, @Param("reaction") MediaReaction reaction,
+                       @Param("reactionAt") LocalDateTime reactionAt);
 
     @Select("SELECT id, comic_id, catalog_id, chapter_no, title, global_order, page_count, status, version "
             + "FROM chapter WHERE comic_id = #{comicId}")

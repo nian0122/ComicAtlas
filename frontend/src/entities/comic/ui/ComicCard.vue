@@ -27,6 +27,7 @@
         <span>{{ comic.author || '未知作者' }}</span>
         <span v-if="comic.pageCount > 0">· {{ comic.pageCount }} 页</span>
       </p>
+      <MediaReactionButtons :reaction="reaction" compact @click.stop @toggle="toggleReaction" />
     </div>
   </div>
 </template>
@@ -37,6 +38,10 @@ import ComicStatusTag from './ComicStatusTag.vue'
 import { computed } from 'vue'
 import { PictureFilled } from '@element-plus/icons-vue'
 import type { ComicListVO } from '@/entities/comic/model/types'
+import { MediaReactionButtons } from '@/entities/media'
+import type { MediaReaction } from '@/entities/media'
+import { comicApi } from '@/entities/comic/api/reading-api'
+import { ref } from 'vue'
 
 const props = defineProps<{
   comic: ComicListVO
@@ -50,6 +55,17 @@ const emit = defineEmits<{
 const showProgress = computed(() => props.comic.progressPercent > 0 && props.comic.progressPercent < 100)
 
 const canContinue = computed(() => props.comic.lastReadChapterId && props.comic.lastReadChapterId > 0)
+const reaction = ref<MediaReaction>(props.comic.reaction || 'NONE')
+
+async function toggleReaction(next: MediaReaction) {
+  const target = reaction.value === next ? 'NONE' : next
+  reaction.value = target
+  try {
+    await comicApi.updateReaction(props.comic.id, target)
+  } catch {
+    reaction.value = props.comic.reaction || 'NONE'
+  }
+}
 </script>
 
 <style scoped>

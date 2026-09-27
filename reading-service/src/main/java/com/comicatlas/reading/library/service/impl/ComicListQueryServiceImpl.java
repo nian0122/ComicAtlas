@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.time.ZoneOffset;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -111,6 +112,8 @@ public class ComicListQueryServiceImpl implements ComicListQueryService {
         comicListView.setCategoryName(categoryNames.get(comic.getCategoryId()));
         comicListView.setStatus(toStatus(comic.getStatus() == null ? null : comic.getStatus().name()));
         comicListView.setCreatedAt(comic.getCreatedAt());
+        comicListView.setReaction(comic.getReaction());
+        comicListView.setReactionAt(comic.getReactionAt() == null ? null : comic.getReactionAt().toInstant(ZoneOffset.UTC));
         return comicListView;
     }
 

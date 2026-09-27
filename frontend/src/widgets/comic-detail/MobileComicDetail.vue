@@ -16,6 +16,7 @@
           <div v-if="comic.tags && comic.tags.length" class="tags" aria-label="漫画标签">
             <span v-for="tag in comic.tags" :key="tag.name">{{ tag.name }}</span>
           </div>
+          <MediaReactionButtons :reaction="comicReaction" compact @toggle="$emit('toggle-reaction', $event)" />
         </header>
         <AppButton type="button" class="read-button" :disabled="!canRead" @click="$emit('read')">
           <el-icon :size="17"><VideoPlay /></el-icon>
@@ -89,6 +90,8 @@ import { VideoPlay } from '@element-plus/icons-vue'
 import { CatalogTree } from '@/entities/comic/ui'
 import { ChapterSearchBox } from '@/features/chapter-search'
 import type { CatalogNode, ComicDetailVO } from '@/entities/comic'
+import { MediaReactionButtons } from '@/entities/media'
+import type { MediaReaction } from '@/entities/media'
 
 interface Props {
   comic: ComicDetailVO
@@ -103,6 +106,7 @@ interface Props {
   isSearching: boolean
   resultCount: number
   expandedNodePaths: readonly string[]
+  comicReaction: MediaReaction
 }
 
 const props = defineProps<Props>()
@@ -112,6 +116,7 @@ defineEmits<{
   select: [chapterId: number]
   'update:searchKeyword': [keyword: string]
   'clear-search': []
+  'toggle-reaction': [reaction: MediaReaction]
 }>()
 
 const year = computed(() => props.comic.createdAt?.slice(0, 4) || '未知年份')

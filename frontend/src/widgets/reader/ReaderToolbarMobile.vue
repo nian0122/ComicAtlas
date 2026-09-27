@@ -20,6 +20,7 @@
 
     <!-- 漫画标题（超长省略） -->
     <span class="toolbar-title">{{ title }}</span>
+    <MediaReactionButtons :reaction="reaction" compact @toggle="emit('toggleReaction', $event)" />
 
     <!-- 更多入口 ⋯（打开设置抽屉） -->
     <AppButton class="toolbar-btn" type="button" aria-label="阅读设置" @click="emit('openSettings')">
@@ -37,11 +38,13 @@
 
 <script setup lang="ts">
 import { AppButton } from '@/shared/ui/button'
+import { MediaReactionButtons } from '@/entities/media'
 // 哑组件：props 进、emits 出，不接触任何 store / composable。
 // 显示与隐藏由父级（ReaderPage）通过 v-if 控制。
 interface Props {
   /** 漫画名（移动端不展示长章节标题） */
   title: string
+  reaction: 'NONE' | 'LIKE' | 'DISLIKE'
 }
 
 defineProps<Props>()
@@ -50,6 +53,7 @@ const emit = defineEmits<{
   (e: 'back'): void
   (e: 'openSettings'): void
   (e: 'openImmersive'): void
+  (e: 'toggleReaction', reaction: 'NONE' | 'LIKE' | 'DISLIKE'): void
 }>()
 </script>
 

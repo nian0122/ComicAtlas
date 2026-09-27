@@ -1,4 +1,6 @@
 /** 漫画生命周期状态。 */
+import type { MediaReaction } from '@/entities/media'
+
 export type ComicStatus =
   | 'DRAFT'
   | 'IMPORTING'
@@ -40,6 +42,8 @@ export interface ComicListVO {
   lastReadChapterId: number
   lastReadPage: number
   createdAt: string
+  reaction?: MediaReaction
+  reactionAt?: string | null
 }
 
 export interface ComicDetailVO {
@@ -64,6 +68,8 @@ export interface ComicDetailVO {
   comicInfo?: ComicInfoVO
   createdAt: string
   updatedAt: string
+  reaction?: MediaReaction
+  reactionAt?: string | null
 }
 
 export interface ChapterVO {
@@ -71,6 +77,8 @@ export interface ChapterVO {
   chapterNo: number
   title: string
   pageCount: number
+  reaction?: MediaReaction
+  reactionAt?: string | null
 }
 
 export interface TagRef {

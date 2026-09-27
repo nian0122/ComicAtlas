@@ -12,6 +12,7 @@ import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.reading.reader.dto.ReaderDTO;
 import com.comicatlas.reading.reader.dto.MediaReactionDTO;
+import com.comicatlas.reading.reader.dto.ReactionDTO;
 import com.comicatlas.reading.reader.assembler.ReaderAssembler;
 import com.comicatlas.reading.reader.service.ReaderService;
 import lombok.RequiredArgsConstructor;
@@ -67,5 +68,31 @@ public class ReaderServiceImpl implements ReaderService {
         }
         return new MediaReactionDTO(mediaId, reaction,
                 reactionAt == null ? null : reactionAt.toInstant(ZoneOffset.UTC));
+    }
+
+    @Override
+    public ReactionDTO updateComicReaction(Long comicId, MediaReaction reaction) {
+        Comic comic = comicMapper.selectById(comicId);
+        if (comic == null || comic.getStatus() != ComicStatus.READY) {
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在或不可标记");
+        }
+        LocalDateTime reactionAt = reaction == MediaReaction.NONE ? null : LocalDateTime.now(ZoneOffset.UTC);
+        if (comicMapper.updateReaction(comicId, reaction, reactionAt) != 1) {
+            throw new BusinessException(HttpStatusCodes.CONFLICT, "漫画标记状态已变化，请重试");
+        }
+        return new ReactionDTO(comicId, reaction, reactionAt == null ? null : reactionAt.toInstant(ZoneOffset.UTC));
+    }
+
+    @Override
+    public ReactionDTO updateChapterReaction(Long chapterId, MediaReaction reaction) {
+        Chapter chapter = chapterMapper.selectById(chapterId);
+        if (chapter == null || chapter.getStatus() != ChapterLifecycleStatus.READY) {
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在或不可标记");
+        }
+        LocalDateTime reactionAt = reaction == MediaReaction.NONE ? null : LocalDateTime.now(ZoneOffset.UTC);
+        if (chapterMapper.updateReaction(chapterId, reaction, reactionAt) != 1) {
+            throw new BusinessException(HttpStatusCodes.CONFLICT, "章节标记状态已变化，请重试");
+        }
+        return new ReactionDTO(chapterId, reaction, reactionAt == null ? null : reactionAt.toInstant(ZoneOffset.UTC));
     }
 }

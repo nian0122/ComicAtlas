@@ -11,6 +11,8 @@ import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
 import java.util.List;
+import java.time.LocalDateTime;
+import com.comicatlas.contract.common.enums.MediaReaction;
 
 @Mapper
 public interface ComicMapper extends BaseMapper<Comic> {
@@ -61,7 +63,7 @@ public interface ComicMapper extends BaseMapper<Comic> {
 
     @Select("""
         <script>
-        SELECT c.id, c.title, c.author, c.total_pages, c.category_id, c.status, c.created_at, c.hq_size FROM comic c
+        SELECT c.id, c.title, c.author, c.total_pages, c.category_id, c.status, c.created_at, c.hq_size, c.reaction, c.reaction_at FROM comic c
         <where>
             <choose>
                 <when test='query.status != null and query.status != ""'>
@@ -144,6 +146,10 @@ public interface ComicMapper extends BaseMapper<Comic> {
         </script>
     """)
     IPage<Comic> selectPage(Page<Comic> page, @Param("query") ComicListQuery query);
+
+    @Update("UPDATE comic SET reaction = #{reaction}, reaction_at = #{reactionAt} WHERE id = #{comicId} AND status = 'READY'")
+    int updateReaction(@Param("comicId") Long comicId, @Param("reaction") MediaReaction reaction,
+                       @Param("reactionAt") LocalDateTime reactionAt);
 
     /** 数据库按 ICU 排序键去重和截取，禁止在应用层全量读取后排序。 */
     @Select("""

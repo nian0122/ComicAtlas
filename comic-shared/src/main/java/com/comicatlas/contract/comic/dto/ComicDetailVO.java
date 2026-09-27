@@ -1,6 +1,7 @@
 package com.comicatlas.contract.comic.dto;
 
 import com.comicatlas.contract.common.enums.ComicStatus;
+import com.comicatlas.contract.common.enums.MediaReaction;
 import lombok.Data;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -38,6 +39,8 @@ public class ComicDetailVO {
     private ComicInfoVO comicInfo;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private MediaReaction reaction;
+    private java.time.Instant reactionAt;
 
     @Data
     public static class ChapterVO {
@@ -45,6 +48,8 @@ public class ComicDetailVO {
         private Integer chapterNo;
         private String title;
         private Integer pageCount;
+        private MediaReaction reaction;
+        private java.time.Instant reactionAt;
     }
 
     @Data

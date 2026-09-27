@@ -14,11 +14,13 @@
       :prev-chapter-id="store.prevChapterId"
       :next-chapter-id="store.nextChapterId"
       :chapter-id="store.chapterId"
+      :reaction="store.reaction"
       @back="nav.goBack"
       @prev-chapter="nav.goPrevChapter()"
       @next-chapter="nav.goNextChapter()"
       @jump-to-page="onPageChange"
       @open-immersive="openImmersive"
+      @toggle-reaction="toggleChapterReaction"
     />
 
     <!-- Loading -->
@@ -66,9 +68,11 @@
         :mode="mode"
         :title="toolbarTitle"
         :chapter-id="store.chapterId"
+        :reaction="store.reaction"
         @back="nav.goBack"
         @open-settings="dispatch(ReaderAction.OpenSettings)"
         @open-immersive="openImmersive"
+        @toggle-reaction="toggleChapterReaction"
       />
       <ReaderBottomNav
         v-if="toolbarVisible"
@@ -111,8 +115,11 @@ import {
   useReaderToolbar,
 } from '@/features/reader-interaction'
 import { comicApi } from '@/entities/comic'
+import { readerApi } from '@/entities/chapter'
+import { getApiErrorMessage } from '@/shared/api/http'
 import { preloadEngine } from '@/widgets/reader'
 import { isVideoMedia } from '@/entities/media'
+import type { MediaReaction } from '@/entities/media'
 
 const route = useRoute()
 const router = useRouter()
@@ -205,6 +212,19 @@ function openImmersive() {
     params: { chapterId: store.chapterId },
     query: { page: store.currentPage },
   })
+}
+
+async function toggleChapterReaction(next: MediaReaction) {
+  if (!store.chapterId) return
+  const target: MediaReaction = store.reaction === next ? 'NONE' : next
+  const previous = store.reaction
+  store.reaction = target
+  try {
+    await readerApi.updateChapterReaction(store.chapterId, target)
+  } catch (reason: unknown) {
+    store.reaction = previous
+    ElMessage.error(getApiErrorMessage(reason, '保存章节标记失败'))
+  }
 }
 const saveDebounceTimer = ref<number | null>(null)
 /** 存在未确认落库的进度：翻页置位，saveProgress 成功才清除；卸载兜底据此决定是否重发 */

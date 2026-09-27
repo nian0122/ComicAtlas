@@ -5,6 +5,7 @@ import { readerApi } from '@/entities/chapter'
 import { historyApi } from '@/entities/history'
 import { useHistoryStore } from '@/features/history'
 import type { MediaItemInfo } from '@/entities/media'
+import type { MediaReaction } from '@/entities/media'
 import { clientLogger } from '@/shared/lib/logger'
 
 export interface ReaderState {
@@ -14,6 +15,7 @@ export interface ReaderState {
   currentPage: number
   prevChapterId: number | null
   nextChapterId: number | null
+  reaction: MediaReaction
   comicId: number
   loading: boolean
   error: string | null
@@ -28,6 +30,7 @@ export const useReaderStore = defineStore('reader', () => {
     currentPage: 1,
     prevChapterId: null,
     nextChapterId: null,
+    reaction: 'NONE',
     comicId: 0,
     loading: false,
     error: null,
@@ -48,6 +51,7 @@ export const useReaderStore = defineStore('reader', () => {
     state.currentPage = 1
     state.prevChapterId = null
     state.nextChapterId = null
+    state.reaction = 'NONE'
     state.loading = false
     state.error = null
     state.progressSaveError = null
@@ -78,6 +82,7 @@ export const useReaderStore = defineStore('reader', () => {
       state.pages = data.pages
       state.prevChapterId = data.prevChapterId
       state.nextChapterId = data.nextChapterId
+      state.reaction = data.reaction || 'NONE'
     } catch (err: unknown) {
       if (seq !== loadSeq) return
       state.error = getApiErrorMessage(err, '加载章节失败')

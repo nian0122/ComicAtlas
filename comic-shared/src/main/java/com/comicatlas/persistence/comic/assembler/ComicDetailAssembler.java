@@ -19,6 +19,7 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.time.ZoneOffset;
 
 /**
  * 漫画详情 VO 装配器（共享层）。
@@ -62,6 +63,8 @@ public class ComicDetailAssembler {
         detailVO.setVersion(comic.getVersion());
         detailVO.setCreatedAt(comic.getCreatedAt());
         detailVO.setUpdatedAt(comic.getUpdatedAt());
+        detailVO.setReaction(comic.getReaction());
+        detailVO.setReactionAt(comic.getReactionAt() == null ? null : comic.getReactionAt().toInstant(ZoneOffset.UTC));
 
         List<ComicDetailVO.ChapterVO> chapters = resolveChapters(comic.getId());
         List<ComicDetailVO.TagRef> tags = resolveTags(comic.getId());
@@ -99,6 +102,8 @@ public class ComicDetailAssembler {
         chapterVO.setChapterNo(parseChapterNo(chapter.getChapterNo()));
         chapterVO.setTitle(chapter.getTitle());
         chapterVO.setPageCount(chapter.getPageCount());
+        chapterVO.setReaction(chapter.getReaction());
+        chapterVO.setReactionAt(chapter.getReactionAt() == null ? null : chapter.getReactionAt().toInstant(ZoneOffset.UTC));
         return chapterVO;
     }
 

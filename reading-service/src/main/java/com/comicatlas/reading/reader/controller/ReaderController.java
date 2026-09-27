@@ -4,6 +4,8 @@ import com.comicatlas.contract.common.Result;
 import com.comicatlas.reading.reader.dto.ReaderDTO;
 import com.comicatlas.reading.reader.dto.MediaReactionDTO;
 import com.comicatlas.reading.reader.dto.MediaReactionRequest;
+import com.comicatlas.reading.reader.dto.ReactionDTO;
+import com.comicatlas.contract.common.enums.MediaReaction;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -43,5 +45,17 @@ public class ReaderController {
     public Result<MediaReactionDTO> updateReaction(@PathVariable Long id,
                                                    @Valid @RequestBody MediaReactionRequest request) {
         return Result.ok(readerService.updateReaction(id, request.getReaction()));
+    }
+
+    @PutMapping("/comics/{id}/reaction")
+    public Result<ReactionDTO> updateComicReaction(@PathVariable Long id,
+                                                   @Valid @RequestBody MediaReactionRequest request) {
+        return Result.ok(readerService.updateComicReaction(id, request.getReaction()));
+    }
+
+    @PutMapping("/chapters/{id}/reaction")
+    public Result<ReactionDTO> updateChapterReaction(@PathVariable Long id,
+                                                     @Valid @RequestBody MediaReactionRequest request) {
+        return Result.ok(readerService.updateChapterReaction(id, request.getReaction()));
     }
 }

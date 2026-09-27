@@ -1,6 +1,7 @@
 package com.comicatlas.persistence.comic.entity;
 
 import com.comicatlas.contract.common.enums.ComicStatus;
+import com.comicatlas.contract.common.enums.MediaReaction;
 import com.comicatlas.contract.common.enums.SourceType;
 import com.comicatlas.contract.common.util.NaturalNameOrder;
 import lombok.Data;
@@ -68,6 +69,8 @@ public class Comic {
     private LocalDateTime deletedAt;
     /** 进入 TRASHED 的时间（7 天保留期起点） */
     private LocalDateTime trashedAt;
+    private MediaReaction reaction;
+    private LocalDateTime reactionAt;
 
     /** 乐观锁版本号 */
     @Version

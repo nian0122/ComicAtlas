@@ -19,9 +19,11 @@
         :can-read="Boolean(primaryAction)"
         :filtered-catalog-tree="filteredCatalogTree"
         :is-searching="isSearching"
+        :comic-reaction="comicReaction"
         :result-count="resultCount"
         :expanded-node-paths="expandedNodePaths"
         @clear-search="clearSearch"
+        @toggle-reaction="toggleComicReaction"
         @read="readComic"
         @select="goReader"
       />
@@ -57,6 +59,7 @@
           <div class="section-inner">
             <div class="info-section-header">
               <h2 class="section-title">作品信息</h2>
+              <MediaReactionButtons :reaction="comicReaction" @toggle="toggleComicReaction" />
             </div>
             <div class="info-grid">
               <div class="info-item">
@@ -161,6 +164,8 @@ import { sourceTypeLabel } from '@/entities/comic'
 import { HeroBanner } from '@/widgets/home'
 import { useInteractionMode } from '@/features/reader-interaction'
 import { ChapterSearchBox, useChapterSearch } from '@/features/chapter-search'
+import { MediaReactionButtons } from '@/entities/media'
+import type { MediaReaction } from '@/entities/media'
 import { chapterOrder, collectChapters, countChapters, findChapterById } from '@/entities/comic'
 
 const route = useRoute()
@@ -173,6 +178,7 @@ const comic = ref<ComicDetailVO | null>(null)
 const catalogTree = ref<CatalogNode[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
+const comicReaction = ref<MediaReaction>('NONE')
 
 const {
   keyword: searchKeyword,
@@ -273,11 +279,25 @@ async function loadData() {
   try {
     const [detailRes, catalogRes] = await Promise.all([comicApi.detail(id), catalogApi.tree(id)])
     comic.value = detailRes.data
+    comicReaction.value = detailRes.data.reaction || 'NONE'
     catalogTree.value = [...catalogRes.data]
   } catch (err: unknown) {
     error.value = getApiErrorMessage(err, '加载漫画详情失败')
   } finally {
     loading.value = false
+  }
+}
+
+async function toggleComicReaction(next: MediaReaction) {
+  if (!comic.value) return
+  const target = comicReaction.value === next ? 'NONE' : next
+  const previous = comicReaction.value
+  comicReaction.value = target
+  try {
+    await comicApi.updateReaction(comic.value.id, target)
+  } catch (reason: unknown) {
+    comicReaction.value = previous
+    error.value = getApiErrorMessage(reason, '保存漫画标记失败')
   }
 }
 
