@@ -177,12 +177,21 @@ async function updateSelected(reaction: MediaReaction): Promise<void> {
 async function trashSelected(): Promise<void> {
   if (!selectedIds.value.length || !window.confirm(`确认将选中的 ${selectedIds.value.length} 个媒体送入回收站吗？`))
     return
+  const trashedIds = new Set(selectedIds.value)
   batchLoading.value = true
   errorMessage.value = ''
   try {
-    await mediaReactionApi.trashBatch(selectedIds.value)
-    await loadItems()
     selectedIds.value = []
+    await mediaReactionApi.trashBatch([...trashedIds])
+    // 回收任务经 MQ 异步落库，先从当前视图移除，稍后再用服务端状态校正。
+    if (!includeTrashed.value) {
+      items.value = items.value.filter((item) => !trashedIds.has(item.id))
+    } else {
+      items.value = items.value.map((item) => (trashedIds.has(item.id) ? { ...item, status: 'TRASHED' } : item))
+    }
+    window.setTimeout(() => {
+      void loadItems()
+    }, 900)
   } catch (error: unknown) {
     errorMessage.value = getApiErrorMessage(error, '批量回收媒体失败')
   } finally {
