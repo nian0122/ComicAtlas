@@ -1,9 +1,16 @@
 <template>
   <div class="media-reactions-page">
-    <PageHeader title="媒体标记" description="集中查看短视频阅读中的喜欢与不喜欢媒体。" eyebrow="MEDIA / REACTIONS">
+    <PageHeader :title="scope === 'MEDIA' ? '媒体标记' : scope === 'COMIC' ? '漫画标记' : '章节标记'" description="集中查看喜欢与不喜欢标记，并支持批量维护。" eyebrow="MEDIA / REACTIONS">
       <AppButton :loading="loading" @click="loadItems">刷新列表</AppButton>
     </PageHeader>
 
+    <div class="scope-switch" role="tablist" aria-label="标记类型">
+      <button v-for="option in scopeOptions" :key="option.value" type="button" :class="{ active: scope === option.value }" @click="scope = option.value">{{ option.label }}</button>
+    </div>
+
+    <ContentReactionsPanel v-if="scope !== 'MEDIA'" :target-type="scope === 'MEDIA' ? 'COMIC' : scope" />
+
+    <template v-else>
     <ManagementPanel class="filter-panel">
       <div class="filter-row">
         <div class="filter-group">
@@ -102,6 +109,7 @@
         </table>
       </div>
     </ManagementPanel>
+    </template>
   </div>
 </template>
 
@@ -112,7 +120,15 @@ import { ContentState } from '@/shared/ui/content-state'
 import { ManagementPanel } from '@/shared/ui/management-panel'
 import { PageHeader } from '@/shared/ui/page-header'
 import { getApiErrorMessage } from '@/shared/api/http'
-import { mediaReactionApi, type MediaReaction, type MediaReactionVO } from '@/entities/media'
+import { ContentReactionsPanel, mediaReactionApi, type MediaReaction, type MediaReactionVO } from '@/entities/media'
+
+type ReactionScope = 'MEDIA' | 'COMIC' | 'CHAPTER'
+const scope = ref<ReactionScope>('MEDIA')
+const scopeOptions = [
+  { value: 'MEDIA' as const, label: '媒体' },
+  { value: 'COMIC' as const, label: '漫画' },
+  { value: 'CHAPTER' as const, label: '章节' },
+]
 
 const reactionFilter = ref<'' | 'LIKE' | 'DISLIKE'>('')
 const mediaTypeFilter = ref<'' | 'IMAGE' | 'VIDEO'>('')
@@ -220,6 +236,30 @@ onMounted(loadItems)
 .media-reactions-page {
   display: grid;
   gap: 18px;
+}
+.scope-switch {
+  display: inline-flex;
+  width: fit-content;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-muted);
+}
+.scope-switch button {
+  padding: 7px 16px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+}
+.scope-switch button.active {
+  background: var(--surface);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-sm);
 }
 .filter-panel,
 .list-panel {
