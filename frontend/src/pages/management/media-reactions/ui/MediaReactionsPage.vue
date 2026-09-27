@@ -8,7 +8,7 @@
       <button v-for="option in scopeOptions" :key="option.value" type="button" :class="{ active: scope === option.value }" @click="scope = option.value">{{ option.label }}</button>
     </div>
 
-    <ContentReactionsPanel v-if="scope !== 'MEDIA'" :target-type="scope === 'MEDIA' ? 'COMIC' : scope" />
+    <ContentReactionsPanel v-if="scope !== 'MEDIA'" :target-type="contentTargetType" />
 
     <template v-else>
     <ManagementPanel class="filter-panel">
@@ -129,6 +129,7 @@ const scopeOptions = [
   { value: 'COMIC' as const, label: '漫画' },
   { value: 'CHAPTER' as const, label: '章节' },
 ]
+const contentTargetType = computed<'COMIC' | 'CHAPTER'>(() => (scope.value === 'MEDIA' ? 'COMIC' : scope.value))
 
 const reactionFilter = ref<'' | 'LIKE' | 'DISLIKE'>('')
 const mediaTypeFilter = ref<'' | 'IMAGE' | 'VIDEO'>('')
