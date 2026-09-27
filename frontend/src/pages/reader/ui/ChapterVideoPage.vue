@@ -65,6 +65,7 @@
               @playing="onVideoPlaying"
               @play="onVideoPlay"
               @pause="onVideoPause"
+              @ended="onVideoEnded"
               @error="onVideoError"
             />
             <img
@@ -289,9 +290,12 @@ let suppressVideoClick = false
 let slideUnlockTimer: number | null = null
 let chapterCueTimer: number | null = null
 let bufferingConfirmTimer: number | null = null
+let autoPlayRetryTimer: number | null = null
+let autoPlayToken = 0
 const playbackRates = [0.5, 1, 1.25, 1.5, 2] as const
 const BUFFERING_CONFIRM_DELAY = 160
 const PLAYABLE_READY_STATE = 3
+const AUTO_PLAY_RETRY_DELAYS = [120, 360] as const
 
 function imageUrl(page: MediaItemInfo): string {
   if ((!page.hqStatus || page.hqStatus === 'READY') && page.hqUrl) return page.hqUrl
@@ -450,23 +454,47 @@ function finishSlide(): void {
   slideUnlockTimer = null
 }
 
-async function playCurrent(): Promise<void> {
+function clearAutoPlayRetry(): void {
+  if (autoPlayRetryTimer != null) window.clearTimeout(autoPlayRetryTimer)
+  autoPlayRetryTimer = null
+}
+
+function scheduleAutoPlayRetry(video: HTMLVideoElement, token: number, attempt: number): void {
+  if (attempt >= AUTO_PLAY_RETRY_DELAYS.length) return
+  clearAutoPlayRetry()
+  autoPlayRetryTimer = window.setTimeout(() => {
+    autoPlayRetryTimer = null
+    if (token !== autoPlayToken || video !== videoRef.value || !video.paused) return
+    void playCurrent(token, attempt + 1)
+  }, AUTO_PLAY_RETRY_DELAYS[attempt])
+}
+
+async function playCurrent(requestToken = ++autoPlayToken, attempt = 0): Promise<void> {
   if (!currentIsVideo.value) return
   const video = videoRef.value
   if (!video) return
+  clearAutoPlayRetry()
+  video.muted = muted.value
   video.playbackRate = playbackRate.value
   mediaError.value = ''
   try {
     await video.play()
   } catch (error: unknown) {
-    if (video !== videoRef.value) return
+    if (requestToken !== autoPlayToken || video !== videoRef.value) return
     // 浏览器禁止自动播放时保留手动入口。
     if (error instanceof DOMException && error.name === 'NotAllowedError') return
-    mediaError.value = '视频无法播放，请重试'
+    scheduleAutoPlayRetry(video, requestToken, attempt)
+    if (attempt >= AUTO_PLAY_RETRY_DELAYS.length - 1) mediaError.value = '视频无法播放，请重试'
+    return
+  }
+  if (requestToken === autoPlayToken && video === videoRef.value && video.paused) {
+    scheduleAutoPlayRetry(video, requestToken, attempt)
   }
 }
 
 function stopCurrent(): void {
+  ++autoPlayToken
+  clearAutoPlayRetry()
   const video = videoRef.value
   if (!video) return
   video.pause()
@@ -476,6 +504,8 @@ function stopCurrent(): void {
 }
 
 function pauseCurrent(): void {
+  ++autoPlayToken
+  clearAutoPlayRetry()
   videoRef.value?.pause()
 }
 
@@ -566,7 +596,11 @@ function togglePlayback(): void {
   const video = videoRef.value
   if (!video) return
   if (video.paused) void playCurrent()
-  else video.pause()
+  else {
+    ++autoPlayToken
+    clearAutoPlayRetry()
+    video.pause()
+  }
 }
 
 function toggleMute(): void {
@@ -799,21 +833,29 @@ function onVideoCanPlay(): void {
   clearBufferingIndicator()
 }
 
-function onVideoPlay(): void {
+function onVideoPlay(event: Event): void {
+  if (event.currentTarget !== videoRef.value) return
   isPlaying.value = true
   scheduleControlsHide()
 }
 
-function onVideoPlaying(): void {
+function onVideoPlaying(event: Event): void {
+  if (event.currentTarget !== videoRef.value) return
   isPlaying.value = true
   clearBufferingIndicator()
   scheduleControlsHide()
 }
 
-function onVideoPause(): void {
+function onVideoPause(event: Event): void {
+  if (event.currentTarget !== videoRef.value) return
   isPlaying.value = false
   clearBufferingIndicator()
   showControls(false)
+}
+
+function onVideoEnded(event: Event): void {
+  if (event.currentTarget !== videoRef.value || !currentIsVideo.value) return
+  void playCurrent()
 }
 
 function onWheel(event: WheelEvent): void {
@@ -915,6 +957,7 @@ onBeforeUnmount(() => {
   if (slideUnlockTimer != null) window.clearTimeout(slideUnlockTimer)
   if (chapterCueTimer != null) window.clearTimeout(chapterCueTimer)
   clearBufferingIndicator()
+  clearAutoPlayRetry()
   disposeSwipe()
   disposeControls()
   queueProgressSave()
