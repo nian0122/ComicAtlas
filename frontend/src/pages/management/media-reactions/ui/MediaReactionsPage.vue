@@ -55,7 +55,7 @@
           <AppButton :disabled="!selectedIds.length || batchLoading" @click="updateSelected('NONE')"
             >取消标记</AppButton
           >
-          <AppButton class="danger-button" :disabled="!selectedIds.length || batchLoading" @click="trashSelected">
+          <AppButton variant="danger" :disabled="!selectedIds.length || batchLoading" @click="trashSelected">
             送入回收站
           </AppButton>
         </div>
@@ -242,7 +242,7 @@ onMounted(loadItems)
   flex-wrap: wrap;
 }
 .filter-label {
-  color: var(--text-muted, #7c7b86);
+  color: var(--text-muted);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -250,54 +250,51 @@ onMounted(loadItems)
 }
 .filter-chip {
   padding: 7px 12px;
-  border: 1px solid var(--border-subtle, #e7e5ec);
+  border: 1px solid var(--border);
   border-radius: 999px;
   background: transparent;
-  color: var(--text-secondary, #65636f);
+  color: var(--text-secondary);
   cursor: pointer;
   font: inherit;
   font-size: 13px;
   transition: 0.18s ease;
 }
 .filter-chip:hover {
-  border-color: var(--accent, #7462e8);
-  color: var(--accent, #7462e8);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 .filter-chip.active {
-  border-color: var(--accent, #7462e8);
-  background: var(--accent-soft, #f0edff);
-  color: var(--accent, #5c4acc);
+  border-color: var(--accent);
+  background: var(--accent-bg);
+  color: var(--accent);
   font-weight: 700;
 }
 .trash-toggle {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: var(--text-secondary, #65636f);
+  color: var(--text-secondary);
   font-size: 13px;
   cursor: pointer;
 }
 .trash-toggle input,
 .check-cell input {
-  accent-color: var(--accent, #7462e8);
+  accent-color: var(--accent);
 }
 .list-toolbar {
   justify-content: space-between;
   gap: 18px;
   flex-wrap: wrap;
   padding-bottom: 16px;
-  border-bottom: 1px solid var(--border-subtle, #eceaf0);
+  border-bottom: 1px solid var(--color-border-faint);
 }
 .list-toolbar strong {
   font-size: 15px;
 }
 .selected-count {
   margin-left: 10px;
-  color: var(--accent, #5c4acc);
+  color: var(--accent);
   font-size: 13px;
-}
-.danger-button {
-  color: #c53b57;
 }
 .reaction-table-wrap {
   overflow-x: auto;
@@ -310,12 +307,12 @@ onMounted(loadItems)
 .reaction-table th,
 .reaction-table td {
   padding: 14px 10px;
-  border-bottom: 1px solid var(--border-subtle, #efedf2);
+  border-bottom: 1px solid var(--color-border-faint);
   text-align: left;
   font-size: 13px;
 }
 .reaction-table th {
-  color: var(--text-muted, #85828e);
+  color: var(--text-muted);
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -328,15 +325,15 @@ onMounted(loadItems)
   display: flex;
   flex-direction: column;
   gap: 3px;
-  color: var(--text-secondary, #65636f);
+  color: var(--text-secondary);
 }
 .media-id {
-  color: var(--text-primary, #272532);
+  color: var(--text-primary);
   font-weight: 700;
 }
 .type-badge,
 .status-text {
-  color: var(--text-muted, #777481);
+  color: var(--text-muted);
 }
 .reaction-badge {
   display: inline-flex;
@@ -348,32 +345,32 @@ onMounted(loadItems)
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #aaa;
+  background: var(--text-muted);
 }
 .reaction-badge.like {
-  color: #db4966;
+  color: var(--color-brand);
 }
 .reaction-badge.like .reaction-dot {
-  background: #e95170;
-  box-shadow: 0 0 0 4px rgb(233 81 112 / 12%);
+  background: var(--color-brand);
+  box-shadow: 0 0 0 4px var(--color-brand-soft);
 }
 .reaction-badge.dislike {
-  color: #5579a9;
+  color: var(--text-secondary);
 }
 .reaction-badge.dislike .reaction-dot {
-  background: #668ab8;
-  box-shadow: 0 0 0 4px rgb(102 138 184 / 12%);
+  background: var(--text-muted);
+  box-shadow: 0 0 0 4px var(--color-border-faint);
 }
 .date-cell {
-  color: var(--text-secondary, #65636f);
+  color: var(--text-secondary);
   white-space: nowrap;
 }
 .error-banner {
   margin: 14px 0;
   padding: 10px 12px;
   border-radius: 10px;
-  background: #fff0f2;
-  color: #b7334f;
+  background: color-mix(in srgb, var(--danger) 12%, var(--bg-surface));
+  color: var(--danger);
   font-size: 13px;
 }
 @media (max-width: 760px) {
