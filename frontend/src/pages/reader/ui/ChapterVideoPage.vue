@@ -143,6 +143,52 @@
             <path v-else d="M15 9a4 4 0 0 1 0 6m3-9a8 8 0 0 1 0 12" />
           </svg>
         </AppButton>
+        <div class="video-reactions" aria-label="媒体偏好">
+          <AppButton
+            class="video-reaction"
+            :class="{ 'is-active': currentReaction === 'LIKE' }"
+            type="button"
+            aria-label="喜欢"
+            :disabled="reactionPending"
+            @click="toggleReaction('LIKE')"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="1.8"
+              aria-hidden="true"
+            >
+              <path
+                d="M7 10v10H4a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1h3Zm0 10h9.2a2 2 0 0 0 1.9-1.4l2.2-6.5A1.6 1.6 0 0 0 18.8 10H14l.8-4.1A2.4 2.4 0 0 0 12.4 3L7 10v10Z"
+              />
+            </svg>
+          </AppButton>
+          <AppButton
+            class="video-reaction"
+            :class="{ 'is-active is-dislike': currentReaction === 'DISLIKE' }"
+            type="button"
+            aria-label="不喜欢"
+            :disabled="reactionPending"
+            @click="toggleReaction('DISLIKE')"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="1.8"
+              aria-hidden="true"
+            >
+              <path
+                d="M7 14V4H4a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h3Zm0-10h9.2a2 2 0 0 1 1.9 1.4l2.2 6.5A1.6 1.6 0 0 1 18.8 14H14l.8 4.1a2.4 2.4 0 0 1-2.4 2.9L7 14V4Z"
+              />
+            </svg>
+          </AppButton>
+        </div>
         <VideoSpeedSheet
           v-if="isSpeedSheetOpen"
           :current-rate="playbackRate"
@@ -195,7 +241,7 @@ import { AppButton } from '@/shared/ui/button'
 import { getApiErrorMessage } from '@/shared/api/http'
 import { readerApi, type ReaderDTO } from '@/entities/chapter'
 import { historyApi } from '@/entities/history'
-import { isVideoMedia, type MediaItemInfo } from '@/entities/media'
+import { isVideoMedia, type MediaItemInfo, type MediaReaction } from '@/entities/media'
 import { clientLogger } from '@/shared/lib/logger'
 import { VideoProgressControl, VideoSpeedSheet } from './components'
 import { useAutoHideControls } from './composables/useAutoHideControls'
@@ -228,10 +274,16 @@ const isSliding = ref(false)
 const isBuffering = ref(false)
 const chapterCue = ref('')
 const imageReloadKey = ref(0)
+const reactionOverrides = ref<Record<number, MediaReaction>>({})
+const reactionPending = ref(false)
 const chapterTitle = computed(() => chapter.value?.chapterTitle ?? '')
 const items = computed(() => playableItems(chapter.value?.pages ?? []))
 const currentItem = computed(() => items.value[currentIndex.value]!)
 const currentIsVideo = computed(() => currentItem.value != null && isVideoMedia(currentItem.value))
+const currentReaction = computed<MediaReaction>(() => {
+  const item = currentItem.value
+  return item ? (reactionOverrides.value[item.id] ?? item.reaction ?? 'NONE') : 'NONE'
+})
 const nextItem = computed(() => items.value[currentIndex.value + 1] ?? playableItems(nextChapter.value?.pages ?? [])[0])
 const previousItem = computed(
   () => items.value[currentIndex.value - 1] ?? playableItems(previousChapter.value?.pages ?? []).at(-1),
@@ -300,6 +352,25 @@ const AUTO_PLAY_RETRY_DELAYS = [120, 360] as const
 function imageUrl(page: MediaItemInfo): string {
   if ((!page.hqStatus || page.hqStatus === 'READY') && page.hqUrl) return page.hqUrl
   return page.lqUrl || ''
+}
+
+async function toggleReaction(reaction: Exclude<MediaReaction, 'NONE'>): Promise<void> {
+  const item = currentItem.value
+  if (!item || reactionPending.value) return
+  const nextReaction: MediaReaction = currentReaction.value === reaction ? 'NONE' : reaction
+  reactionPending.value = true
+  const previousReaction = currentReaction.value
+  reactionOverrides.value = { ...reactionOverrides.value, [item.id]: nextReaction }
+  try {
+    const response = await readerApi.updateReaction(item.id, nextReaction)
+    reactionOverrides.value = { ...reactionOverrides.value, [item.id]: response.data.reaction }
+    showControls()
+  } catch (error: unknown) {
+    reactionOverrides.value = { ...reactionOverrides.value, [item.id]: previousReaction }
+    edgeError.value = getApiErrorMessage(error, '保存媒体标记失败')
+  } finally {
+    reactionPending.value = false
+  }
 }
 
 function playableItems(pages: MediaItemInfo[]): MediaItemInfo[] {
@@ -1136,6 +1207,50 @@ onBeforeUnmount(() => {
   height: 23px;
 }
 
+.video-reactions {
+  position: absolute;
+  right: 18px;
+  bottom: calc(env(safe-area-inset-bottom) + 132px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.video-reaction {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #0007;
+  color: #fff;
+  transition:
+    transform 160ms ease,
+    background 160ms ease,
+    color 160ms ease;
+}
+
+.video-reaction svg {
+  width: 23px;
+  height: 23px;
+}
+
+.video-reaction.is-active {
+  background: rgb(255 255 255 / 94%);
+  color: #17151d;
+  transform: scale(1.08);
+}
+
+.video-reaction.is-active.is-dislike {
+  background: #ff5577;
+  color: #fff;
+}
+
 .video-play-button {
   position: absolute;
   top: 50%;
@@ -1268,6 +1383,12 @@ onBeforeUnmount(() => {
   pointer-events: none;
 }
 
+.controls-hidden .video-reactions {
+  transform: translateY(8px) scale(0.92);
+  opacity: 0;
+  pointer-events: none;
+}
+
 .controls-hidden .video-nav {
   opacity: 0;
   pointer-events: none;
@@ -1302,6 +1423,7 @@ onBeforeUnmount(() => {
   .video-header,
   .video-meta,
   .video-sound,
+  .video-reactions,
   .video-nav {
     transition: none;
   }

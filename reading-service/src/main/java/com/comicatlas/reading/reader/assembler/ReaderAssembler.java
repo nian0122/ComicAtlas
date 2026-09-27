@@ -42,6 +42,8 @@ public class ReaderAssembler {
         item.setContainer(media.getContainer());
         item.setVideoCodec(media.getVideoCodec());
         item.setAudioCodec(media.getAudioCodec());
+        item.setReaction(media.getReaction() == null ? "NONE" : media.getReaction().name());
+        item.setReactionAt(media.getReactionAt());
         if (MEDIA_TYPE_VIDEO.equals(media.getMediaType())) {
             item.setLqUrl(null);
             item.setLqStatus(LQ_STATUS_NOT_APPLICABLE);

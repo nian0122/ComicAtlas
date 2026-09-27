@@ -1,5 +1,6 @@
 /** 媒体类型：图片或视频。 */
 export type MediaType = 'IMAGE' | 'VIDEO'
+export type MediaReaction = 'NONE' | 'LIKE' | 'DISLIKE'
 
 export interface MediaItemInfo {
   id: number
@@ -27,4 +28,6 @@ export interface MediaItemInfo {
   videoCodec?: string
   /** 音频编码，如 aac/opus。 */
   audioCodec?: string
+  reaction?: MediaReaction
+  reactionAt?: string | null
 }

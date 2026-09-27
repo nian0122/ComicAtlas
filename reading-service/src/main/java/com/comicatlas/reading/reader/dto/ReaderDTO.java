@@ -2,6 +2,7 @@ package com.comicatlas.reading.reader.dto;
 
 import lombok.Data;
 
+import java.time.LocalDateTime;
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -41,5 +42,7 @@ public class ReaderDTO {
         private String container;
         private String videoCodec;
         private String audioCodec;
+        private String reaction;
+        private LocalDateTime reactionAt;
     }
 }

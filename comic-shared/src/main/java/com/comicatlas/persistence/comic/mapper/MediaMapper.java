@@ -10,6 +10,7 @@ import org.apache.ibatis.annotations.Update;
 import java.util.List;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import com.comicatlas.contract.common.enums.MediaReaction;
 
 /**
  * 媒体页 Mapper。
@@ -23,7 +24,7 @@ public interface MediaMapper extends BaseMapper<Media> {
     @Select("SELECT id, chapter_id, page_number FROM page WHERE chapter_id = #{chapterId} ORDER BY page_number ASC")
     List<Media> selectPageNumbersByChapterId(@Param("chapterId") Long chapterId);
 
-    @Select("SELECT id, chapter_id, page_number, hq_root, hq_path, lq_root, lq_path, hq_status, lq_status, status, lq_size, width, height, hq_size, media_type, duration, container, video_codec, audio_codec FROM page WHERE chapter_id = #{chapterId} AND status = 'READY' ORDER BY page_number ASC")
+    @Select("SELECT id, chapter_id, page_number, hq_root, hq_path, lq_root, lq_path, hq_status, lq_status, status, lq_size, width, height, hq_size, media_type, duration, container, video_codec, audio_codec, reaction, reaction_at FROM page WHERE chapter_id = #{chapterId} AND status = 'READY' ORDER BY page_number ASC")
     List<Media> selectReadyByChapterIdForManagement(@Param("chapterId") Long chapterId);
 
     @Select("<script>SELECT COUNT(*) FROM page WHERE chapter_id IN <foreach collection='chapterIds' item='chapterId' open='(' separator=',' close=')'>#{chapterId}</foreach></script>")
@@ -41,9 +42,34 @@ public interface MediaMapper extends BaseMapper<Media> {
 
     @Select("SELECT id, chapter_id, page_number, hq_root, hq_path, lq_root, lq_path, hq_status, lq_status, "
             + "transcode_status, status, lq_size, width, height, hq_size, media_type, duration, container, "
-            + "video_codec, audio_codec FROM page WHERE chapter_id = #{chapterId} AND status = 'READY' "
+            + "video_codec, audio_codec, reaction, reaction_at FROM page WHERE chapter_id = #{chapterId} AND status = 'READY' "
             + "ORDER BY page_number ASC")
     List<Media> selectReadyByChapterId(@Param("chapterId") Long chapterId);
+
+    @Update("UPDATE page SET reaction = #{reaction}, reaction_at = #{reactionAt} WHERE id = #{mediaId} AND status = 'READY'")
+    int updateReaction(@Param("mediaId") Long mediaId,
+                       @Param("reaction") MediaReaction reaction,
+                       @Param("reactionAt") LocalDateTime reactionAt);
+
+    @Select({"<script>",
+            "SELECT id, chapter_id, page_number, media_type, hq_root, hq_path, lq_root, lq_path,",
+            "hq_status, lq_status, status, reaction, reaction_at, width, height, duration",
+            "FROM page WHERE reaction IN ('LIKE', 'DISLIKE')",
+            "<if test='reaction != null'> AND reaction = #{reaction}</if>",
+            "<if test='mediaType != null'> AND media_type = #{mediaType}</if>",
+            "<if test='includeTrashed == false'> AND status NOT IN ('TRASHED', 'DELETED')</if>",
+            "ORDER BY reaction_at DESC, id DESC",
+            "</script>"})
+    List<Media> selectReacted(@Param("reaction") MediaReaction reaction,
+                              @Param("mediaType") String mediaType,
+                              @Param("includeTrashed") boolean includeTrashed);
+
+    @Update({"<script>", "UPDATE page SET reaction = #{reaction}, reaction_at = #{reactionAt} WHERE id IN",
+            "<foreach collection='mediaIds' item='mediaId' open='(' separator=',' close=')'>#{mediaId}</foreach>",
+            "</script>"})
+    int updateReactionBatch(@Param("mediaIds") List<Long> mediaIds,
+                            @Param("reaction") MediaReaction reaction,
+                            @Param("reactionAt") LocalDateTime reactionAt);
 
     @Select({"<script>",
             "SELECT COUNT(*) FROM page WHERE chapter_id IN",

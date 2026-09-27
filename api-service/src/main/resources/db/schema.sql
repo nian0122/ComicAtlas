@@ -83,12 +83,15 @@ CREATE TABLE IF NOT EXISTS page (
     container VARCHAR(32) DEFAULT NULL,
     video_codec VARCHAR(32) DEFAULT NULL,
     audio_codec VARCHAR(32) DEFAULT NULL,
+    reaction VARCHAR(16) NOT NULL DEFAULT 'NONE',
+    reaction_at DATETIME DEFAULT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     status VARCHAR(16) NOT NULL DEFAULT 'READY',
     trashed_at DATETIME COMMENT '进入 TRASHED 的时间（7 天保留期起点）',
     version INT NOT NULL DEFAULT 1,
     UNIQUE INDEX uk_chapter_page (chapter_id, page_number),
     INDEX idx_media_type (media_type),
+    INDEX idx_page_reaction_time (reaction, reaction_at),
     FOREIGN KEY (chapter_id) REFERENCES chapter(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

@@ -2,6 +2,11 @@ package com.comicatlas.reading.reader.controller;
 
 import com.comicatlas.contract.common.Result;
 import com.comicatlas.reading.reader.dto.ReaderDTO;
+import com.comicatlas.reading.reader.dto.MediaReactionDTO;
+import com.comicatlas.reading.reader.dto.MediaReactionRequest;
+import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import com.comicatlas.reading.reader.service.ReaderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -31,5 +36,12 @@ public class ReaderController {
     @GetMapping("/chapters/{id}")
     public Result<ReaderDTO> getChapter(@PathVariable Long id) {
         return Result.ok(readerService.getChapter(id));
+    }
+
+    /** 更新当前媒体的喜欢/不喜欢标记。 */
+    @PutMapping("/pages/{id}/reaction")
+    public Result<MediaReactionDTO> updateReaction(@PathVariable Long id,
+                                                   @Valid @RequestBody MediaReactionRequest request) {
+        return Result.ok(readerService.updateReaction(id, request.getReaction()));
     }
 }

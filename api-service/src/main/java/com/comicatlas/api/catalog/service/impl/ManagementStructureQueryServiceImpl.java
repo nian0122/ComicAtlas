@@ -84,6 +84,8 @@ public class ManagementStructureQueryServiceImpl implements ManagementStructureQ
         data.setLqStatus(media.getLqStatus() == null ? null : media.getLqStatus().name()); data.setWidth(media.getWidth()); data.setHeight(media.getHeight());
         data.setHqSize(media.getHqSize()); data.setLqSize(media.getLqSize()); data.setMediaType(media.getMediaType()); data.setDuration(media.getDuration());
         data.setContainer(media.getContainer()); data.setVideoCodec(media.getVideoCodec()); data.setAudioCodec(media.getAudioCodec());
+        data.setReaction(media.getReaction() == null ? "NONE" : media.getReaction().name());
+        data.setReactionAt(media.getReactionAt());
         data.setTranscodeStatus(media.getTranscodeStatus() == null ? null : media.getTranscodeStatus().name()); return data;
     }
     private String fileName(String path) {

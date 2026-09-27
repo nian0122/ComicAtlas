@@ -11,12 +11,15 @@ import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.contract.common.enums.ComicStatus;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.reading.reader.dto.ReaderDTO;
+import com.comicatlas.reading.reader.dto.MediaReactionDTO;
 import com.comicatlas.reading.reader.assembler.ReaderAssembler;
 import com.comicatlas.reading.reader.service.ReaderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.time.LocalDateTime;
+import com.comicatlas.contract.common.enums.MediaReaction;
 
 @Service
 @RequiredArgsConstructor
@@ -49,5 +52,18 @@ public class ReaderServiceImpl implements ReaderService {
         Long nextChapterId = chapterMapper.selectNextReadyChapterId(
                 chapter.getComicId(), chapter.getGlobalOrder());
         return readerAssembler.assemble(chapter, mediaItems, previousChapterId, nextChapterId);
+    }
+
+    @Override
+    public MediaReactionDTO updateReaction(Long mediaId, MediaReaction reaction) {
+        Media media = mediaMapper.selectById(mediaId);
+        if (media == null || media.getStatus() != com.comicatlas.contract.common.enums.MediaLifecycleStatus.READY) {
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "媒体不存在或不可标记");
+        }
+        LocalDateTime reactionAt = reaction == MediaReaction.NONE ? null : LocalDateTime.now();
+        if (mediaMapper.updateReaction(mediaId, reaction, reactionAt) != 1) {
+            throw new BusinessException(HttpStatusCodes.CONFLICT, "媒体标记状态已变化，请重试");
+        }
+        return new MediaReactionDTO(mediaId, reaction, reactionAt);
     }
 }
