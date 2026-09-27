@@ -62,12 +62,14 @@ public class ContentReactionManagementServiceImpl implements ContentReactionMana
         if (COMIC.equals(targetType)) {
             LambdaUpdateWrapper<Comic> update = new LambdaUpdateWrapper<Comic>()
                     .in(Comic::getId, request.getIds())
+                    .ne(Comic::getStatus, ComicStatus.DELETED)
                     .set(Comic::getReaction, request.getReaction())
                     .set(Comic::getReactionAt, reactionAt);
             return comicMapper.update(null, update);
         }
         LambdaUpdateWrapper<Chapter> update = new LambdaUpdateWrapper<Chapter>()
                 .in(Chapter::getId, request.getIds())
+                .ne(Chapter::getStatus, ChapterLifecycleStatus.DELETED)
                 .set(Chapter::getReaction, request.getReaction())
                 .set(Chapter::getReactionAt, reactionAt);
         return chapterMapper.update(null, update);
