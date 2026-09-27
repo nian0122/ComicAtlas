@@ -5,6 +5,8 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.api.media.dto.ContentReactionBatchRequest;
 import com.comicatlas.api.media.dto.ContentReactionVO;
 import com.comicatlas.api.media.service.ContentReactionManagementService;
+import com.comicatlas.api.trash.service.TrashLifecycleService;
+import com.comicatlas.api.task.dto.OperationSubmitResultDTO;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
 import com.comicatlas.contract.common.enums.ComicStatus;
@@ -32,6 +34,7 @@ public class ContentReactionManagementServiceImpl implements ContentReactionMana
 
     private final ComicMapper comicMapper;
     private final ChapterMapper chapterMapper;
+    private final TrashLifecycleService trashLifecycleService;
 
     @Override
     public List<ContentReactionVO> list(String targetType, MediaReaction reaction, boolean includeTrashed) {
@@ -73,6 +76,22 @@ public class ContentReactionManagementServiceImpl implements ContentReactionMana
                 .set(Chapter::getReaction, request.getReaction())
                 .set(Chapter::getReactionAt, reactionAt);
         return chapterMapper.update(null, update);
+    }
+
+    @Override
+    public List<OperationSubmitResultDTO> trashBatch(String targetType, List<Long> ids) {
+        validateTargetType(targetType);
+        validateIds(ids);
+        if (COMIC.equals(targetType)) {
+            return ids.stream().map(id -> trashLifecycleService.trashComic(id, null)).toList();
+        }
+        return ids.stream().map(id -> {
+            Chapter chapter = chapterMapper.selectById(id);
+            if (chapter == null) {
+                throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在: " + id);
+            }
+            return trashLifecycleService.trashChapter(chapter.getComicId(), id);
+        }).toList();
     }
 
     private void validateTargetType(String targetType) {

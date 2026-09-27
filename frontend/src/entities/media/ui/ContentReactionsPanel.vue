@@ -16,6 +16,7 @@
         <AppButton :disabled="!selectedIds.length || loading" @click="updateSelected('LIKE')">设为喜欢</AppButton>
         <AppButton :disabled="!selectedIds.length || loading" @click="updateSelected('DISLIKE')">设为不喜欢</AppButton>
         <AppButton :disabled="!selectedIds.length || loading" @click="updateSelected('NONE')">取消标记</AppButton>
+        <AppButton variant="danger" :disabled="!selectedIds.length || loading" @click="trashSelected">送入回收站</AppButton>
       </div>
     </div>
     <div v-if="errorMessage" class="error-banner" role="alert">{{ errorMessage }}</div>
@@ -57,6 +58,17 @@ async function updateSelected(reaction: MediaReaction): Promise<void> {
   loading.value = true
   try { await contentReactionApi.updateBatch(props.targetType, selectedIds.value, reaction); await loadItems() }
   catch (error: unknown) { errorMessage.value = getApiErrorMessage(error, '批量更新标记失败') }
+  finally { loading.value = false }
+}
+async function trashSelected(): Promise<void> {
+  if (!selectedIds.value.length || !window.confirm(`确认将选中的 ${selectedIds.value.length} 个${props.targetType === 'COMIC' ? '漫画' : '章节'}送入回收站吗？`)) return
+  const ids = [...selectedIds.value]
+  loading.value = true
+  try {
+    await contentReactionApi.trashBatch(props.targetType, ids)
+    items.value = items.value.filter((item) => !ids.includes(item.id))
+    selectedIds.value = []
+  } catch (error: unknown) { errorMessage.value = getApiErrorMessage(error, '批量回收失败') }
   finally { loading.value = false }
 }
 function reactionLabel(reaction: MediaReaction): string { return reaction === 'LIKE' ? '喜欢' : '不喜欢' }
