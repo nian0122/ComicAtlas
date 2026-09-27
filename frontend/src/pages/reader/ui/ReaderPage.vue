@@ -120,6 +120,7 @@ import { getApiErrorMessage } from '@/shared/api/http'
 import { preloadEngine } from '@/widgets/reader'
 import { isVideoMedia } from '@/entities/media'
 import type { MediaReaction } from '@/entities/media'
+import { useReaderProgress } from './composables/useReaderProgress'
 
 const route = useRoute()
 const router = useRouter()
@@ -195,8 +196,15 @@ gesture.onSwipe((direction) => {
   dispatch(direction === 'up' ? ReaderAction.SwipeUp : ReaderAction.SwipeDown)
 })
 
-const lastSyncedPage = ref(1)
 const comicTitle = ref('')
+const {
+  lastSyncedPage,
+  chapterLoading,
+  prepareProgressForReload,
+  retryProgressSave,
+  saveVideoProgress,
+  prepareProgressForChapterChange,
+} = useReaderProgress()
 const toolbarTitle = computed(() => {
   const chapterTitle = store.chapterTitle?.trim()
   const fallbackTitle = comicTitle.value || `漫画 #${store.comicId}`
@@ -226,11 +234,6 @@ async function toggleChapterReaction(next: MediaReaction) {
     ElMessage.error(getApiErrorMessage(reason, '保存章节标记失败'))
   }
 }
-const saveDebounceTimer = ref<number | null>(null)
-/** 存在未确认落库的进度：翻页置位，saveProgress 成功才清除；卸载兜底据此决定是否重发 */
-const progressDirty = ref(false)
-/** 章节请求期间禁止把 store 的临时初始页码写入阅读历史。 */
-const chapterLoading = ref(false)
 let chapterLoadToken = 0
 /** 被双击切到 HQ 的页面索引（0-based），使用 reactive Set 保持响应性 */
 const forceHqPages = reactive(new Set<number>())
@@ -249,24 +252,8 @@ const { onKeydown, onWheel, onDblClick } = useReaderShortcuts({
 })
 
 async function reload() {
-  if (saveDebounceTimer.value) {
-    clearTimeout(saveDebounceTimer.value)
-    saveDebounceTimer.value = null
-  }
-
   // 重载会暂时把 currentPage 重置为 1，先确认当前进度，避免重载覆盖历史。
-  let canRestoreProgress = !progressDirty.value
-  if (progressDirty.value && store.comicId > 0 && store.chapterId > 0) {
-    const chapterId = store.chapterId
-    const pageNumber = store.currentPage
-    const saved = await store.saveProgress()
-    if (saved && store.chapterId === chapterId && store.currentPage === pageNumber) {
-      lastSyncedPage.value = pageNumber
-      progressDirty.value = false
-      canRestoreProgress = true
-    }
-  }
-
+  const canRestoreProgress = await prepareProgressForReload()
   await loadCurrentChapter(true, canRestoreProgress)
 }
 
@@ -383,24 +370,7 @@ function onVideoStarted(page: number) {
   }
   if (store.comicId <= 0 || store.chapterId <= 0) return
 
-  progressDirty.value = true
-  store.saveProgress().then((ok) => {
-    if (ok && store.currentPage === pageNumber) {
-      lastSyncedPage.value = pageNumber
-      progressDirty.value = false
-    }
-  })
-}
-
-async function retryProgressSave(): Promise<void> {
-  const chapterId = store.chapterId
-  const pageNumber = store.currentPage
-  progressDirty.value = true
-  const saved = await store.saveProgress()
-  if (saved && store.chapterId === chapterId && store.currentPage === pageNumber) {
-    lastSyncedPage.value = pageNumber
-    progressDirty.value = false
-  }
+  saveVideoProgress(pageNumber)
 }
 
 /** 以真实滚动方向控制阅读端工具栏，避免依赖会被浏览器取消的 pointer swipe。 */
@@ -417,30 +387,6 @@ function onViewportScrollDirection(direction: 'up' | 'down') {
   }
 }
 
-/**
- * 页面隐藏/卸载兜底保存：清除挂起 debounce，立即用 keepalive 发送最终进度。
- * 覆盖直接关闭标签页、刷新、移动端切后台（visibilitychange）等
- * onBeforeUnmount 不触发、且 debounce 未到点的场景。
- * 仅在 progressDirty 置位（存在未确认保存）时发送，axios 成功路径已清位，天然防重复。
- */
-function flushProgressOnPageHide() {
-  if (saveDebounceTimer.value) {
-    clearTimeout(saveDebounceTimer.value)
-    saveDebounceTimer.value = null
-  }
-  if (store.comicId > 0 && progressDirty.value) {
-    lastSyncedPage.value = store.currentPage
-    progressDirty.value = false
-    store.saveProgressKeepalive()
-  }
-}
-
-function onVisibilityChange() {
-  if (document.visibilityState === 'hidden') {
-    flushProgressOnPageHide()
-  }
-}
-
 onMounted(async () => {
   // 全局页面为导航使用 smooth，但阅读器页码跳转必须即时定位，
   // 否则移动端窗口滚动会与自然滑动、工具栏显隐叠加造成位置抢占。
@@ -454,37 +400,7 @@ onMounted(async () => {
     document.addEventListener('dblclick', onDblClick)
   }
 
-  // 页面卸载兜底：关闭标签页/刷新/切后台时 onBeforeUnmount 不触发，
-  // 但 debounce 也可能尚未到点，必须在此强制落库（keepalive 请求）。
-  document.addEventListener('pagehide', flushProgressOnPageHide)
-  document.addEventListener('visibilitychange', onVisibilityChange)
-
   await loadCurrentChapter()
-
-  watch(
-    () => store.currentPage,
-    (newPage) => {
-      if (
-        !chapterLoading.value &&
-        store.comicId > 0 &&
-        store.chapterId > 0 &&
-        store.pages.length > 0 &&
-        newPage !== lastSyncedPage.value
-      ) {
-        progressDirty.value = true
-        if (saveDebounceTimer.value) clearTimeout(saveDebounceTimer.value)
-        saveDebounceTimer.value = window.setTimeout(() => {
-          // 保存成功才清 dirty：期间若页面卸载，keepalive 兜底重发仍未确认的进度
-          store.saveProgress().then((ok) => {
-            if (ok && store.currentPage === newPage) {
-              lastSyncedPage.value = newPage
-              progressDirty.value = false
-            }
-          })
-        }, 300)
-      }
-    },
-  )
 })
 
 // 同名路由仅换参数时 Vue Router 复用组件实例,onMounted 不会重跑——
@@ -493,22 +409,8 @@ watch(
   () => route.params.chapterId,
   (newId, oldId) => {
     if (!newId || newId === oldId) return
-    // 清掉挂起的进度 debounce,防其在新章加载后用旧章页码写脏数据;
-    // 再同步落袋旧章进度(payload 同步构造,读到的仍是旧 chapterId)
-    if (saveDebounceTimer.value) {
-      clearTimeout(saveDebounceTimer.value)
-      saveDebounceTimer.value = null
-    }
-    if (store.comicId > 0 && store.currentPage !== lastSyncedPage.value) {
-      const chapterId = store.chapterId
-      const pageNumber = store.currentPage
-      store.saveProgress().then((ok) => {
-        if (ok && store.chapterId === chapterId && store.currentPage === pageNumber) {
-          lastSyncedPage.value = pageNumber
-          progressDirty.value = false
-        }
-      })
-    }
+    // 清除防抖并提交旧章进度，避免新章加载后用旧页码写入阅读历史。
+    prepareProgressForChapterChange()
     loadCurrentChapter()
   },
 )
@@ -519,21 +421,6 @@ onBeforeUnmount(() => {
   document.removeEventListener('keydown', onKeydown)
   document.removeEventListener('wheel', onWheel)
   document.removeEventListener('dblclick', onDblClick)
-  document.removeEventListener('pagehide', flushProgressOnPageHide)
-  document.removeEventListener('visibilitychange', onVisibilityChange)
-  if (saveDebounceTimer.value) {
-    clearTimeout(saveDebounceTimer.value)
-  }
-  if (store.comicId > 0 && store.currentPage !== lastSyncedPage.value) {
-    const chapterId = store.chapterId
-    const pageNumber = store.currentPage
-    store.saveProgress().then((ok) => {
-      if (ok && store.chapterId === chapterId && store.currentPage === pageNumber) {
-        lastSyncedPage.value = pageNumber
-        progressDirty.value = false
-      }
-    })
-  }
   preloadEngine.destroy()
 })
 </script>
