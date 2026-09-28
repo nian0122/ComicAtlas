@@ -222,6 +222,10 @@
                   transcode_status = 'NOT_NEEDED'
             </if>
         WHERE id = #{media.id}
+          AND status = <choose>
+              <when test="replace">'READY'</when>
+              <otherwise>'STAGING'</otherwise>
+          </choose>
     </update>
 
 </mapper>
