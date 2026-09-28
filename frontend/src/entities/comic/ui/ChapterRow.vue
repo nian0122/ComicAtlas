@@ -4,7 +4,6 @@
     :class="{ active: active }"
     :style="{
       paddingLeft: (indent ?? 0) + 12 + 'px',
-      '--chapter-guide-left': (indent ?? 0) + 28 + 'px',
     }"
     @click="emit('click')"
   >
@@ -64,7 +63,7 @@ function splitText(text: string): TextSegment[] {
 }
 
 const chapterNumberSegments = computed(() =>
-  splitText(`顺序 ${props.chapter.globalOrder}`),
+  splitText(`#${props.chapter.globalOrder}`),
 )
 const titleSegments = computed(() => splitText(props.chapter.title || ''))
 </script>
