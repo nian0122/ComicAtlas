@@ -1,6 +1,13 @@
 <template>
-  <div class="catalog-tree">
-    <RecycleScroller class="catalog-scroller" :items="flatItems" :item-size="40" key-field="flatKey" :buffer="100">
+  <div class="catalog-tree" :class="{ 'catalog-tree--page-mode': pageMode }">
+    <RecycleScroller
+      class="catalog-scroller"
+      :items="flatItems"
+      :item-size="40"
+      key-field="flatKey"
+      :buffer="100"
+      :page-mode="pageMode"
+    >
       <template #default="{ item }">
         <div
           v-if="item.type === 'header'"
@@ -72,6 +79,7 @@ const props = defineProps<{
   activeChapterId?: number | null
   highlightKeyword?: string
   expandedNodePaths?: readonly string[]
+  pageMode?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -202,6 +210,14 @@ const flatItems = computed<FlatItem[]>(() => {
 
 .catalog-scroller {
   max-height: min(calc(100vh - 96px), 720px);
+}
+
+.catalog-tree--page-mode {
+  overflow: visible;
+}
+
+.catalog-tree--page-mode .catalog-scroller {
+  max-height: none;
 }
 
 .node-header {
