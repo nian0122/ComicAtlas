@@ -234,6 +234,25 @@ class MediaUploadManagementIT {
     }
 
     @Test
+    @DisplayName("替换媒体会话只允许一个文件")
+    void createSession_replacementRequiresSingleFile() throws Exception {
+        Long comicId = createComic("替换数量校验");
+        Long chapterId = createChapter(comicId, "第 1 话");
+        byte[] jpg = jpegBytes();
+        String sha256 = sha256Hex(jpg);
+
+        mockMvc.perform(post("/api/uploads/sessions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json("""
+                                {"comicId":%d,"chapterId":%d,"replaceMediaId":1,"files":[
+                                {"fileId":"f1","name":"a.jpg","contentType":"image/jpeg","size":%d,"sha256":"%s"},
+                                {"fileId":"f2","name":"b.jpg","contentType":"image/jpeg","size":%d,"sha256":"%s"}]}
+                                """, comicId, chapterId, jpg.length, sha256, jpg.length, sha256)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(400));
+    }
+
+    @Test
     @DisplayName("创建会话拒绝超限单文件")
     void createSession_rejectsOversizeFile() throws Exception {
         Long comicId = createComic("超限测试");

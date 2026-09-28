@@ -60,6 +60,8 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -91,6 +93,8 @@ public class UploadSessionServiceImpl implements UploadSessionService {
     private static final String SHA256_PATTERN = "^[0-9a-fA-F]{64}$";
     /** Content-Range 头的字节范围单位前缀。 */
     private static final String CONTENT_RANGE_PREFIX = "bytes ";
+    /** RFC 风格 Content-Range 的闭区间字节范围。 */
+    private static final Pattern CONTENT_RANGE_PATTERN = Pattern.compile("^([0-9]+)-([0-9]+)/([0-9]+)$");
     /** 乐观锁初始版本。 */
     private static final int INITIAL_VERSION = 1;
     /** 禁止上传媒体的漫画终态集合（复用避免每次构造）。 */
@@ -117,6 +121,9 @@ public class UploadSessionServiceImpl implements UploadSessionService {
     public CreateUploadSessionResponse create(CreateUploadSessionRequest request) {
         Long comicId = request.getComicId();
         Long chapterId = request.getChapterId();
+        if (request.getReplaceMediaId() != null && request.getFiles().size() != 1) {
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "替换媒体会话必须且只能包含一个文件");
+        }
         long totalBytes = validateManifest(request.getFiles());
         validateTarget(comicId, chapterId, request.getReplaceMediaId());
         validateStorageNames(chapterId, request.getReplaceMediaId(), request.getFiles());
@@ -330,14 +337,14 @@ public class UploadSessionServiceImpl implements UploadSessionService {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "缺少或非法 Content-Range 头: " + contentRange);
         }
         String rangeSpec = contentRange.substring(CONTENT_RANGE_PREFIX.length()).trim();
-        int slashIndex = rangeSpec.indexOf('/');
-        if (slashIndex <= 0) {
+        Matcher rangeMatcher = CONTENT_RANGE_PATTERN.matcher(rangeSpec);
+        if (!rangeMatcher.matches()) {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "非法 Content-Range 头: " + contentRange);
         }
         try {
-            long start = Long.parseLong(rangeSpec.substring(0, slashIndex).split("-")[0]);
-            long end = Long.parseLong(rangeSpec.substring(0, slashIndex).split("-")[1]);
-            long total = Long.parseLong(rangeSpec.substring(slashIndex + 1));
+            long start = Long.parseLong(rangeMatcher.group(1));
+            long end = Long.parseLong(rangeMatcher.group(2));
+            long total = Long.parseLong(rangeMatcher.group(3));
             if (total != declaredSize) {
                 throw new BusinessException(HttpStatusCodes.BAD_REQUEST,
                         "Content-Range 总大小与清单不符: " + total + " != " + declaredSize);

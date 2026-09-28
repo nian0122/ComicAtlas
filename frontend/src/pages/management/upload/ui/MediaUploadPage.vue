@@ -97,8 +97,12 @@
         <div class="upload-actions">
           <AppButton class="upload-action-button" :disabled="!selectedFiles.length || uploading" @click="clearFiles"
             >清空</AppButton
-          ><AppButton v-if="sessionId && uploading" class="upload-action-button" variant="danger" @click="cancelUpload"
-            >取消上传</AppButton
+          ><AppButton
+            v-if="sessionId && !taskId && (uploading || uploadStatus === '失败')"
+            class="upload-action-button"
+            variant="danger"
+            @click="cancelUpload"
+            >{{ uploading ? '取消上传' : '清理失败上传' }}</AppButton
           ><AppButton
             class="upload-action-button"
             variant="primary"
@@ -136,6 +140,7 @@ import axios from 'axios'
 import { PageHeader } from '@/shared/ui/page-header'
 import { managementCatalogApi, managementChapterApi, managementComicApi } from '@/entities/comic'
 import { uploadApi } from '@/features/upload'
+import { formatUploadContentRange } from '@/features/upload'
 import type { CreateUploadSessionRequest, UploadFileManifest } from '@/features/upload'
 import type { CatalogNode, ChapterRef, ComicListVO } from '@/entities/comic'
 import type { MediaItemInfo } from '@/entities/media'
@@ -220,7 +225,7 @@ async function uploadRow(row: UploadRow, chunkSize: number): Promise<void> {
       sessionId: sessionId.value,
       fileId: row.id,
       chunk: row.file.slice(offset, end),
-      contentRange: `bytes=${offset}-${end - 1}/${row.file.size}`,
+      contentRange: formatUploadContentRange(offset, end, row.file.size),
       signal: abortController?.signal,
     })
     offset = end
@@ -254,6 +259,7 @@ async function startUpload(): Promise<void> {
   uploading.value = true
   errorMessage.value = ''
   abortController = new AbortController()
+  let createdSessionId = ''
   try {
     const request: CreateUploadSessionRequest = {
       comicId: selectedComicId.value,
@@ -262,6 +268,7 @@ async function startUpload(): Promise<void> {
       files: await createManifest(),
     }
     const created = (await uploadApi.createSession(request)).data
+    createdSessionId = created.sessionId
     sessionId.value = created.sessionId
     uploadStatus.value = '上传中'
     for (const row of selectedFiles.value) await uploadRow(row, created.chunkSize)
@@ -273,6 +280,14 @@ async function startUpload(): Promise<void> {
     await onChapterChanged(selectedChapterId.value)
   } catch (reason: unknown) {
     if (!axios.isCancel(reason)) {
+      if (createdSessionId && !taskId.value) {
+        try {
+          await uploadApi.cancelSession(createdSessionId)
+          sessionId.value = ''
+        } catch {
+          // complete 已被服务端接受时会拒绝取消；保留会话 ID 供后续排查。
+        }
+      }
       errorMessage.value = getApiErrorMessage(reason, '媒体上传失败')
       uploadStatus.value = '失败'
     }

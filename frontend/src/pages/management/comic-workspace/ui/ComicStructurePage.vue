@@ -669,6 +669,7 @@ import {
 } from '@/entities/comic'
 import { hqApi, storageAdminApi } from '@/entities/storage'
 import { uploadApi as trackedUploadApi } from '@/features/upload'
+import { formatUploadContentRange } from '@/features/upload'
 import { storageService } from '@/features/storage'
 import {
   CATALOG_ACTIONS,
@@ -1116,7 +1117,7 @@ async function uploadFile(row: UploadRow, chunkSize: number): Promise<void> {
       sessionId: uploadSessionId.value,
       fileId: row.id,
       chunk: row.file.slice(offset, endExclusive),
-      contentRange: `bytes=${offset}-${endExclusive - 1}/${row.file.size}`,
+      contentRange: formatUploadContentRange(offset, endExclusive, row.file.size),
       signal: uploadAbortController?.signal,
     })
     offset = endExclusive
@@ -1128,6 +1129,7 @@ async function startUpload(): Promise<void> {
   if (!selectedRow.value || selectedRow.value.kind !== 'CHAPTER') return
   uploadRunning.value = true
   uploadAbortController = new AbortController()
+  let createdSessionId = ''
   try {
     const files = await hashUploadFiles()
     const request: CreateUploadSessionRequest = {
@@ -1137,6 +1139,7 @@ async function startUpload(): Promise<void> {
       files,
     }
     const created = (await trackedUploadApi.createSession(request)).data
+    createdSessionId = created.sessionId
     uploadSessionId.value = created.sessionId
     uploadStatus.value = '上传中'
     for (const row of uploadRows.value) await uploadFile(row, created.chunkSize)
@@ -1149,6 +1152,14 @@ async function startUpload(): Promise<void> {
     await refreshStorage()
   } catch (reason: unknown) {
     if (!axios.isCancel(reason)) {
+      if (createdSessionId && !uploadTaskId.value) {
+        try {
+          await trackedUploadApi.cancelSession(createdSessionId)
+          uploadSessionId.value = ''
+        } catch {
+          // complete 已被服务端接受时会拒绝取消；保留会话 ID 供后续排查。
+        }
+      }
       uploadStatus.value = '失败'
       ElMessage.error(errorMessage(reason))
     }
