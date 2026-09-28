@@ -53,6 +53,7 @@
           ><span class="node-count">{{ structureRows.length }} 个根节点</span></PanelHeader
         >
         <el-input v-model="structureKeyword" clearable placeholder="搜索目录或章节" class="tree-search" />
+        <p class="tree-sort-hint">拖动目录可调整同级顺序；章节顺序随目录锚点排列。</p>
         <el-table
           v-loading="loading"
           class="structure-table"
@@ -66,9 +67,18 @@
         >
           <el-table-column prop="title" min-width="0"
             ><template #default="{ row }"
-              ><div class="tree-title">
-                <span class="tree-icon">{{ row.kind === 'CATALOG' ? '▰' : '▱' }}</span
-                ><span>{{ row.title }}</span>
+              ><div
+                class="tree-title"
+                :class="treeRowDragClass(row)"
+                :draggable="canDragCatalog(row)"
+                @dragstart="startCatalogDrag(row, $event)"
+                @dragover.prevent="updateCatalogDrop(row, $event)"
+                @drop.prevent.stop="dropCatalog(row, $event)"
+                @dragend="clearCatalogDrag"
+              >
+                <span class="tree-icon">{{ row.kind === 'CATALOG' ? '▰' : '▱' }}</span>
+                <span v-if="row.kind === 'CATALOG'" class="catalog-drag-handle" aria-hidden="true">⠿</span>
+                <span>{{ row.title }}</span>
               </div></template
             ></el-table-column
           >
@@ -221,9 +231,6 @@
                 :controls="false"
                 placeholder="留空为根级"
                 clearable
-            /></el-form-item>
-            <el-form-item v-if="catalogForm.action === 'reorder'" label="目标顺序"
-              ><el-input-number v-model="catalogForm.order" :min="1" :controls="false"
             /></el-form-item>
             <el-form-item v-if="catalogForm.action === 'delete'" label="重挂目标 ID"
               ><el-input-number v-model="catalogForm.reparentTo" :min="1" :controls="false" clearable
@@ -428,7 +435,7 @@
                     :min="1"
                     :controls="true"
                     placeholder="输入新位置" /></el-form-item
-                ><small>按全书阅读顺序调整，目标位置不能与当前位置相同。</small>
+                ><small>调整全书阅读位置，不改变章节所属目录。</small>
               </div>
               <AppButton
                 class="action-submit"
@@ -741,7 +748,6 @@ const catalogForm = reactive<{
   id?: number
   title: string
   parentId?: number
-  order?: number
   reparentTo?: number
 }>({ action: 'create', title: '' })
 const chapterForm = reactive<{
@@ -752,7 +758,7 @@ const chapterForm = reactive<{
   catalogId?: number
   order?: number
 }>({ action: 'create', title: '', chapterNo: '' })
-const structureRows = computed<readonly StructureRow[]>(() => tree.value.flatMap(toStructureRows))
+const structureRows = computed<readonly StructureRow[]>(() => tree.value.flatMap((node) => toStructureRows(node)))
 const filteredStructureRows = computed<readonly StructureRow[]>(() =>
   filterStructureRows(structureRows.value, structureKeyword.value.trim().toLowerCase()),
 )
@@ -793,9 +799,100 @@ const emptyStateText = computed(
       error: '目录加载失败，请重试',
     })[treeState.value],
 )
+const draggedCatalogId = ref<number | null>(null)
+const catalogDropTarget = ref<{ readonly id: number; readonly position: 'before' | 'after' } | null>(null)
 
 function rowClassName({ row }: { row: StructureRow }): string {
   return row.kind === 'CATALOG' ? 'structure-row--catalog' : 'structure-row--chapter'
+}
+function canDragCatalog(row: StructureRow): boolean {
+  return row.kind === 'CATALOG' && !loading.value && !structureKeyword.value.trim()
+}
+function treeRowDragClass(row: StructureRow): Record<string, boolean> {
+  const target = catalogDropTarget.value
+  return {
+    'tree-title--draggable': canDragCatalog(row),
+    'tree-title--dragging': row.kind === 'CATALOG' && row.id === draggedCatalogId.value,
+    'tree-title--drop-before': row.kind === 'CATALOG' && target?.id === row.id && target.position === 'before',
+    'tree-title--drop-after': row.kind === 'CATALOG' && target?.id === row.id && target.position === 'after',
+  }
+}
+function findCatalogSiblings(parentCatalogId: number | null): readonly StructureRow[] {
+  if (parentCatalogId === null) {
+    return structureRows.value.filter((row) => row.kind === 'CATALOG' && row.parentCatalogId === null)
+  }
+  for (const row of structureRows.value) {
+    const match = findCatalogParent(row, parentCatalogId)
+    if (match) return match
+  }
+  return []
+}
+function findCatalogParent(row: StructureRow, parentCatalogId: number): readonly StructureRow[] | null {
+  if (row.kind === 'CATALOG' && row.id === parentCatalogId) {
+    return (row.children ?? []).filter((child) => child.kind === 'CATALOG')
+  }
+  for (const child of row.children ?? []) {
+    const match = findCatalogParent(child, parentCatalogId)
+    if (match) return match
+  }
+  return null
+}
+function startCatalogDrag(row: StructureRow, event: DragEvent): void {
+  if (!canDragCatalog(row) || !event.dataTransfer) {
+    event.preventDefault()
+    return
+  }
+  draggedCatalogId.value = row.id
+  event.dataTransfer.effectAllowed = 'move'
+  event.dataTransfer.setData('text/plain', String(row.id))
+}
+function updateCatalogDrop(row: StructureRow, event: DragEvent): void {
+  const draggedRow = structureRows.value
+    .flatMap(flattenStructureRows)
+    .find((item) => item.kind === 'CATALOG' && item.id === draggedCatalogId.value)
+  if (
+    row.kind !== 'CATALOG' ||
+    !draggedRow ||
+    draggedRow.kind !== 'CATALOG' ||
+    draggedRow.id === row.id ||
+    draggedRow.parentCatalogId !== row.parentCatalogId
+  ) {
+    catalogDropTarget.value = null
+    return
+  }
+  const rowElement = event.currentTarget as HTMLElement
+  const position = event.clientY < rowElement.getBoundingClientRect().top + rowElement.offsetHeight / 2 ? 'before' : 'after'
+  catalogDropTarget.value = { id: row.id, position }
+  if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
+}
+function clearCatalogDrag(): void {
+  draggedCatalogId.value = null
+  catalogDropTarget.value = null
+}
+async function dropCatalog(targetRow: StructureRow, event: DragEvent): Promise<void> {
+  const sourceCatalogId = draggedCatalogId.value
+  const rowElement = event.currentTarget as HTMLElement
+  const dropPosition =
+    event.clientY < rowElement.getBoundingClientRect().top + rowElement.offsetHeight / 2 ? 'before' : 'after'
+  clearCatalogDrag()
+  if (targetRow.kind !== 'CATALOG' || sourceCatalogId === null) return
+  const siblings = findCatalogSiblings(targetRow.parentCatalogId ?? null)
+  const remainingSiblings = siblings.filter((row) => row.id !== sourceCatalogId)
+  const targetIndex = remainingSiblings.findIndex((row) => row.id === targetRow.id)
+  if (targetIndex < 0) return
+  const destinationIndex = targetIndex + (dropPosition === 'after' ? 1 : 0)
+  const sourceIndex = siblings.findIndex((row) => row.id === sourceCatalogId)
+  if (sourceIndex < 0 || sourceIndex === destinationIndex) return
+  try {
+    await catalogManagementApi.reorder(comicId.value, sourceCatalogId, { sortOrder: destinationIndex + 1 })
+    ElMessage.success('同级目录顺序已更新')
+    await loadTree()
+  } catch (reason: unknown) {
+    ElMessage.error(errorMessage(reason))
+  }
+}
+function flattenStructureRows(row: StructureRow): readonly StructureRow[] {
+  return [row, ...(row.children ?? []).flatMap(flattenStructureRows)]
 }
 function selectStructureRow(row: StructureRow): void {
   selectedMedia.value = null
@@ -888,7 +985,7 @@ function chapterActionDescription(action: ChapterAction): string {
     create: '在当前漫画中新建一个章节',
     rename: '修改章节标题或原始编号',
     move: '将章节移动到其他目录',
-    reorder: '调整章节在全书中的阅读顺序',
+    reorder: '调整当前章节在全书中的阅读位置，不改变目录归属',
     trash: '将当前章节移入回收站',
   }
   return descriptions[action]
@@ -902,7 +999,7 @@ function chapterActionTagline(action: ChapterAction): string {
       create: '创建新章节',
       rename: '标题与编号',
       move: '调整目录归属',
-      reorder: '改变阅读顺序',
+      reorder: '移动阅读位置',
       trash: '移入回收站',
     } as const
   )[action]
@@ -1118,9 +1215,6 @@ async function submitCatalog(): Promise<void> {
         break
       case 'move':
         await catalogManagementApi.move(comicId.value, id, { parentId: catalogForm.parentId ?? null })
-        break
-      case 'reorder':
-        await catalogManagementApi.reorder(comicId.value, id, { sortOrder: catalogForm.order })
         break
       case 'delete':
         await ElMessageBox.confirm('删除目录前请确认重挂目标。', '确认删除', { type: 'warning' })

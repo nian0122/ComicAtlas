@@ -3,6 +3,7 @@ package com.comicatlas.api.catalog.service;
 import com.comicatlas.api.catalog.dto.ChapterVO;
 import com.comicatlas.api.catalog.dto.ChapterCreateRequest;
 import com.comicatlas.api.catalog.dto.ChapterRenameRequest;
+import com.comicatlas.api.catalog.dto.ChapterBatchReorderRequest;
 
 /**
  * 章节管理服务：create / rename / move / reorder / trash。
@@ -27,6 +28,9 @@ public interface ChapterManagementService {
 
     /** @param targetGlobalOrder 全书目标位置（1 基） */
     ChapterVO reorderChapter(Long comicId, Long chapterId, int targetGlobalOrder);
+
+    /** 按完整章节 ID 顺序一次性重排全书。 */
+    void reorderChapters(Long comicId, ChapterBatchReorderRequest request);
 
     /** 回收：status → TRASHING（写入清单），Worker 移入 TRASH 后 → TRASHED */
     void trashChapter(Long comicId, Long chapterId);

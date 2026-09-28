@@ -49,6 +49,7 @@ public interface ManagementStructureQueryService {
     class CatalogNode {
         private Long id;
         private String title;
+        private Integer globalOrder;
         private List<CatalogNode> children = new ArrayList<>();
         private List<ChapterRef> chapters = new ArrayList<>();
         public CatalogNode(Long id, String title) { this.id = id; this.title = title; }

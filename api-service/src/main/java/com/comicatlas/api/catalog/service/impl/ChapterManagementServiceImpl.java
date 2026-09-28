@@ -5,11 +5,14 @@ import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.catalog.dto.ChapterCreateRequest;
 import com.comicatlas.api.catalog.dto.ChapterRenameRequest;
 import com.comicatlas.api.catalog.dto.ChapterVO;
+import com.comicatlas.api.catalog.dto.ChapterBatchReorderRequest;
 import com.comicatlas.persistence.comic.entity.Catalog;
 import com.comicatlas.persistence.comic.entity.Chapter;
 import com.comicatlas.persistence.comic.entity.Comic;
 import com.comicatlas.persistence.comic.mapper.CatalogMapper;
+import com.comicatlas.persistence.comic.mapper.CatalogOrderUpdate;
 import com.comicatlas.persistence.comic.mapper.ChapterMapper;
+import com.comicatlas.persistence.comic.mapper.ChapterOrderUpdate;
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
 import com.comicatlas.api.catalog.service.ChapterManagementService;
 import com.comicatlas.api.task.state.ManagementStateMachine;
@@ -25,6 +28,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -164,6 +168,96 @@ public class ChapterManagementServiceImpl implements ChapterManagementService {
         catalogCacheInvalidator.evict(comicId);
         log.info("重排章节: comicId={}, chapterId={}, targetGlobalOrder={}", comicId, chapterId, targetGlobalOrder);
         return toChapterVO(target);
+    }
+
+    @Override
+    @Transactional
+    public void reorderChapters(Long comicId, ChapterBatchReorderRequest request) {
+        List<Chapter> currentChapters = chapterMapper.selectByComicIdOrderByGlobalOrderForUpdate(comicId);
+        List<Catalog> catalogs = catalogMapper.selectByComicIdOrderBySortOrderForUpdate(comicId);
+        List<Long> requestedIds = request.getChapterIds();
+        if (requestedIds.size() != currentChapters.size()
+                || new java.util.HashSet<>(requestedIds).size() != requestedIds.size()) {
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "章节 ID 必须完整且不能重复");
+        }
+        Map<Long, Chapter> chaptersById = new HashMap<>(currentChapters.size());
+        for (Chapter chapter : currentChapters) {
+            chaptersById.put(chapter.getId(), chapter);
+        }
+        Map<Long, Integer> sortCounter = new HashMap<>();
+        Map<Long, Integer> firstChapterOrderByCatalogId = new HashMap<>();
+        List<ChapterOrderUpdate> orderUpdates = new ArrayList<>(requestedIds.size());
+        for (int index = 0; index < requestedIds.size(); index++) {
+            Long chapterId = requestedIds.get(index);
+            Chapter chapter = chaptersById.get(chapterId);
+            if (chapter == null) {
+                throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "章节 ID 不属于该漫画: " + chapterId);
+            }
+            int sortOrder = sortCounter.merge(chapter.getCatalogId(), 1, Integer::sum);
+            orderUpdates.add(new ChapterOrderUpdate(chapterId, index + 1, sortOrder));
+            if (chapter.getCatalogId() != null) {
+                firstChapterOrderByCatalogId.merge(chapter.getCatalogId(), index + 1, Math::min);
+            }
+        }
+        if (!orderUpdates.isEmpty()) {
+            chapterMapper.updateGlobalOrderToTemporaryNegative(comicId);
+            int affectedRows = chapterMapper.updateOrdersBatch(comicId, orderUpdates);
+            if (affectedRows != currentChapters.size()) {
+                throw new ConflictException("批量重排期间章节集合已变化，请重试");
+            }
+        }
+        reorderCatalogSiblingsByChapterOrder(comicId, catalogs, firstChapterOrderByCatalogId);
+        catalogCacheInvalidator.evict(comicId);
+        log.info("批量重排章节: comicId={}, chapterCount={}", comicId, orderUpdates.size());
+    }
+
+    private void reorderCatalogSiblingsByChapterOrder(Long comicId, List<Catalog> catalogs,
+                                                       Map<Long, Integer> firstChapterOrderByCatalogId) {
+        if (catalogs.isEmpty()) {
+            return;
+        }
+        Map<Long, List<Catalog>> childrenByParentId = new HashMap<>();
+        for (Catalog catalog : catalogs) {
+            List<Catalog> siblings = childrenByParentId.get(catalog.getParentId());
+            if (siblings == null) {
+                siblings = new ArrayList<>();
+                childrenByParentId.put(catalog.getParentId(), siblings);
+            }
+            siblings.add(catalog);
+        }
+        Map<Long, Integer> earliestChapterOrderByCatalogId = new HashMap<>(catalogs.size());
+        List<CatalogOrderUpdate> catalogOrderUpdates = new ArrayList<>(catalogs.size());
+        for (List<Catalog> siblings : childrenByParentId.values()) {
+            siblings.sort(Comparator
+                    .comparingInt((Catalog catalog) -> findEarliestChapterOrder(catalog.getId(),
+                            childrenByParentId, firstChapterOrderByCatalogId, earliestChapterOrderByCatalogId))
+                    .thenComparing(Catalog::getSortOrder, Comparator.nullsLast(Integer::compareTo))
+                    .thenComparing(Catalog::getId));
+            for (int index = 0; index < siblings.size(); index++) {
+                catalogOrderUpdates.add(new CatalogOrderUpdate(siblings.get(index).getId(), index + 1));
+            }
+        }
+        int affectedRows = catalogMapper.updateSortOrdersBatch(comicId, catalogOrderUpdates);
+        if (affectedRows != catalogs.size()) {
+            throw new ConflictException("批量重排期间目录集合已变化，请重试");
+        }
+    }
+
+    private int findEarliestChapterOrder(Long catalogId, Map<Long, List<Catalog>> childrenByParentId,
+                                         Map<Long, Integer> firstChapterOrderByCatalogId,
+                                         Map<Long, Integer> earliestChapterOrderByCatalogId) {
+        Integer cachedOrder = earliestChapterOrderByCatalogId.get(catalogId);
+        if (cachedOrder != null) {
+            return cachedOrder;
+        }
+        int earliestChapterOrder = firstChapterOrderByCatalogId.getOrDefault(catalogId, Integer.MAX_VALUE);
+        for (Catalog child : childrenByParentId.getOrDefault(catalogId, List.of())) {
+            earliestChapterOrder = Math.min(earliestChapterOrder,
+                    findEarliestChapterOrder(child.getId(), childrenByParentId,
+                            firstChapterOrderByCatalogId, earliestChapterOrderByCatalogId));
+        }
+        earliestChapterOrderByCatalogId.put(catalogId, earliestChapterOrder);
+        return earliestChapterOrder;
     }
 
     // ======================== 回收（软删除） ========================

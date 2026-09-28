@@ -214,6 +214,31 @@
   min-width: 0;
   color: var(--text-primary);
 }
+.tree-sort-hint {
+  margin: -4px 0 var(--space-3);
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.tree-title--draggable {
+  cursor: grab;
+}
+.tree-title--draggable:active {
+  cursor: grabbing;
+}
+.tree-title--dragging {
+  opacity: 0.42;
+}
+.tree-title--drop-before {
+  box-shadow: inset 0 2px var(--accent);
+}
+.tree-title--drop-after {
+  box-shadow: inset 0 -2px var(--accent);
+}
+.catalog-drag-handle {
+  color: var(--text-muted);
+  font-size: 15px;
+  line-height: 1;
+}
 .tree-title > span:last-child {
   overflow: hidden;
   text-overflow: ellipsis;

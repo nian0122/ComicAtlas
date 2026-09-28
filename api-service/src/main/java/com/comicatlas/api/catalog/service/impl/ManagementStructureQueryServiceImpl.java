@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,6 +25,9 @@ import java.time.ZoneOffset;
 @Service
 @RequiredArgsConstructor
 public class ManagementStructureQueryServiceImpl implements ManagementStructureQueryService {
+    private static final Comparator<CatalogNode> BY_GLOBAL_ORDER = Comparator
+            .comparing(CatalogNode::getGlobalOrder, Comparator.nullsLast(Comparator.naturalOrder()));
+
     // 查询契约由 Controller/DTO 固定，服务实现保持在业务包内。
     private final ComicMapper comicMapper;
     private final CatalogMapper catalogMapper;
@@ -61,8 +65,32 @@ public class ManagementStructureQueryServiceImpl implements ManagementStructureQ
                 root.getChapters().add(ref);
             }
         }
+        for (CatalogNode rootNode : roots) {
+            computeGlobalOrderAnchor(rootNode);
+        }
+        roots.sort(BY_GLOBAL_ORDER);
         root.getChildren().addAll(roots);
+        computeGlobalOrderAnchor(root);
         return root.getChapters().isEmpty() && root.getChildren().size() == 1 ? root.getChildren() : List.of(root);
+    }
+
+    private Integer computeGlobalOrderAnchor(CatalogNode node) {
+        Integer earliestGlobalOrder = null;
+        node.getChapters().sort(Comparator.comparingInt(ChapterRef::getGlobalOrder));
+        for (ChapterRef chapter : node.getChapters()) {
+            earliestGlobalOrder = earliestGlobalOrder == null ? chapter.getGlobalOrder()
+                    : Math.min(earliestGlobalOrder, chapter.getGlobalOrder());
+        }
+        for (CatalogNode child : node.getChildren()) {
+            Integer childAnchor = computeGlobalOrderAnchor(child);
+            if (childAnchor != null) {
+                earliestGlobalOrder = earliestGlobalOrder == null ? childAnchor
+                        : Math.min(earliestGlobalOrder, childAnchor);
+            }
+        }
+        node.setGlobalOrder(earliestGlobalOrder);
+        node.getChildren().sort(BY_GLOBAL_ORDER);
+        return earliestGlobalOrder;
     }
 
     public ReaderData chapter(Long chapterId) {

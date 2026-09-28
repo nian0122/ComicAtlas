@@ -23,7 +23,9 @@ describe('漫画结构工具', () => {
     const rows = toStructureRows(catalogNode)
     expect(rows).toHaveLength(1)
     expect(rows[0].kind).toBe('CATALOG')
+    expect(rows[0].parentCatalogId).toBeNull()
     expect(rows[0].children?.map((row) => row.kind)).toEqual(['CHAPTER', 'CATALOG'])
+    expect(rows[0].children?.[1].parentCatalogId).toBe(1)
     expect(flattenCatalogOptions(rows)).toEqual([
       { id: 1, title: '卷一' },
       { id: 3, title: '番外' },

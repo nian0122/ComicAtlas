@@ -1,6 +1,6 @@
 import type { CatalogNode } from '@/entities/comic/model/types'
 
-export type CatalogAction = 'create' | 'rename' | 'move' | 'reorder' | 'delete'
+export type CatalogAction = 'create' | 'rename' | 'move' | 'delete'
 export type ChapterAction = 'create' | 'rename' | 'move' | 'reorder' | 'trash'
 
 export interface StructureRow {
@@ -11,6 +11,7 @@ export interface StructureRow {
   readonly chapterNo?: string
   readonly order: number | null
   readonly status: string | null
+  readonly parentCatalogId?: number | null
   readonly children?: readonly StructureRow[]
 }
 
@@ -18,14 +19,13 @@ export const CATALOG_ACTIONS = [
   { value: 'create', label: '新建目录' },
   { value: 'rename', label: '重命名目录' },
   { value: 'move', label: '移动目录' },
-  { value: 'reorder', label: '目录重排' },
   { value: 'delete', label: '删除目录' },
 ] as const
 
 export const CHAPTER_ACTIONS = [
   { value: 'rename', label: '重命名章节' },
   { value: 'move', label: '移动章节' },
-  { value: 'reorder', label: '章节重排' },
+  { value: 'reorder', label: '调整阅读顺序' },
   { value: 'trash', label: '回收章节' },
 ] as const
 
@@ -36,7 +36,7 @@ export function countRows(rows: readonly StructureRow[], kind: StructureRow['kin
   )
 }
 
-export function toStructureRows(node: CatalogNode): readonly StructureRow[] {
+export function toStructureRows(node: CatalogNode, parentCatalogId: number | null = null): readonly StructureRow[] {
   const children = [
     ...node.chapters.map((chapter) => ({
       key: `chapter-${chapter.id}`,
@@ -47,7 +47,7 @@ export function toStructureRows(node: CatalogNode): readonly StructureRow[] {
       order: chapter.globalOrder,
       status: chapter.status ?? null,
     })),
-    ...node.children.flatMap(toStructureRows),
+    ...node.children.flatMap((child) => toStructureRows(child, node.id)),
   ].sort((left, right) => (left.order ?? Number.MAX_SAFE_INTEGER) - (right.order ?? Number.MAX_SAFE_INTEGER))
 
   if (node.id === null) return children
@@ -59,6 +59,7 @@ export function toStructureRows(node: CatalogNode): readonly StructureRow[] {
       title: node.title ?? '未命名目录',
       order: node.globalOrder ?? null,
       status: null,
+      parentCatalogId,
       children,
     },
   ]

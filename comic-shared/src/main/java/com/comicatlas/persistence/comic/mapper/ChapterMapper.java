@@ -17,6 +17,10 @@ public interface ChapterMapper extends BaseMapper<Chapter> {
     @Select("SELECT id, comic_id, catalog_id, chapter_no, title, status, page_count, sort_order, global_order, version, reaction, reaction_at FROM chapter WHERE comic_id = #{comicId} ORDER BY global_order ASC")
     List<Chapter> selectByComicIdOrderByGlobalOrder(@Param("comicId") Long comicId);
 
+    @Select("SELECT id, comic_id, catalog_id, chapter_no, title, status, page_count, sort_order, global_order, version, reaction, reaction_at "
+            + "FROM chapter WHERE comic_id = #{comicId} ORDER BY global_order ASC FOR UPDATE")
+    List<Chapter> selectByComicIdOrderByGlobalOrderForUpdate(@Param("comicId") Long comicId);
+
     @Select("SELECT id, comic_id, catalog_id, chapter_no, title, status, page_count, sort_order, global_order FROM chapter WHERE comic_id = #{comicId} AND catalog_id = #{catalogId} ORDER BY sort_order DESC, id DESC LIMIT 1")
     Chapter selectLastByComicIdAndCatalogId(@Param("comicId") Long comicId, @Param("catalogId") Long catalogId);
 
@@ -80,6 +84,15 @@ public interface ChapterMapper extends BaseMapper<Chapter> {
      */
     @Update("UPDATE chapter SET global_order = -id WHERE comic_id = #{comicId}")
     int updateGlobalOrderToTemporaryNegative(@Param("comicId") Long comicId);
+
+    @Update("<script>UPDATE chapter SET "
+            + "global_order = CASE id <foreach collection='orderUpdates' item='orderUpdate'> "
+            + "WHEN #{orderUpdate.chapterId} THEN #{orderUpdate.globalOrder} </foreach> ELSE global_order END, "
+            + "sort_order = CASE id <foreach collection='orderUpdates' item='orderUpdate'> "
+            + "WHEN #{orderUpdate.chapterId} THEN #{orderUpdate.sortOrder} </foreach> ELSE sort_order END, "
+            + "version = version + 1 WHERE comic_id = #{comicId}</script>")
+    int updateOrdersBatch(@Param("comicId") Long comicId,
+                          @Param("orderUpdates") List<ChapterOrderUpdate> orderUpdates);
 
     @Update("UPDATE chapter SET page_count = #{pageCount} WHERE id = #{chapterId}")
     int updatePageCount(@Param("chapterId") Long chapterId, @Param("pageCount") int pageCount);
