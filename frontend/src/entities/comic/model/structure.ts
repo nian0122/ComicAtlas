@@ -1,7 +1,7 @@
 import type { CatalogNode } from '@/entities/comic/model/types'
 
 export type CatalogAction = 'create' | 'rename' | 'move' | 'delete'
-export type ChapterAction = 'create' | 'rename' | 'move' | 'reorder' | 'trash'
+export type ChapterAction = 'create' | 'rename' | 'move' | 'trash'
 
 export interface StructureRow {
   readonly key: string
@@ -25,7 +25,6 @@ export const CATALOG_ACTIONS = [
 export const CHAPTER_ACTIONS = [
   { value: 'rename', label: '重命名章节' },
   { value: 'move', label: '移动章节' },
-  { value: 'reorder', label: '调整阅读顺序' },
   { value: 'trash', label: '回收章节' },
 ] as const
 
@@ -37,18 +36,20 @@ export function countRows(rows: readonly StructureRow[], kind: StructureRow['kin
 }
 
 export function toStructureRows(node: CatalogNode, parentCatalogId: number | null = null): readonly StructureRow[] {
-  const children = [
-    ...node.chapters.map((chapter) => ({
-      key: `chapter-${chapter.id}`,
-      kind: 'CHAPTER' as const,
-      id: chapter.id,
-      title: chapter.title,
-      chapterNo: chapter.chapterNo,
-      order: chapter.globalOrder,
-      status: chapter.status ?? null,
-    })),
-    ...node.children.flatMap((child) => toStructureRows(child, node.id)),
-  ].sort((left, right) => (left.order ?? Number.MAX_SAFE_INTEGER) - (right.order ?? Number.MAX_SAFE_INTEGER))
+  const childCatalogRows = node.children.map((child) => toStructureRows(child, node.id)[0])
+  const chapterRows = node.chapters.map((chapter) => ({
+    key: `chapter-${chapter.id}`,
+    kind: 'CHAPTER' as const,
+    id: chapter.id,
+    title: chapter.title,
+    chapterNo: chapter.chapterNo,
+    order: chapter.sortOrder,
+    status: chapter.status ?? null,
+    parentCatalogId: node.id,
+  }))
+  const children = [...childCatalogRows, ...chapterRows].sort(
+    (left, right) => (left.order ?? Number.MAX_SAFE_INTEGER) - (right.order ?? Number.MAX_SAFE_INTEGER),
+  )
 
   if (node.id === null) return children
   return [
@@ -57,7 +58,7 @@ export function toStructureRows(node: CatalogNode, parentCatalogId: number | nul
       kind: 'CATALOG',
       id: node.id,
       title: node.title ?? '未命名目录',
-      order: node.globalOrder ?? null,
+      order: node.sortOrder ?? null,
       status: null,
       parentCatalogId,
       children,

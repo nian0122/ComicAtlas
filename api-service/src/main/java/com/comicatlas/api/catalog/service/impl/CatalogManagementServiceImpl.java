@@ -20,7 +20,6 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -112,29 +111,6 @@ public class CatalogManagementServiceImpl implements CatalogManagementService {
         catalogCacheInvalidator.evict(comicId);
         log.info("移动目录: comicId={}, catalogId={}, newParentId={}", comicId, catalogId, newParentId);
         return toCatalogVO(cat);
-    }
-
-    // ======================== 重排 ========================
-
-    @Override
-    @Transactional
-    public void reorderCatalog(Long comicId, Long catalogId, int newSortOrder) {
-        Catalog cat = requireCatalogInComic(comicId, catalogId);
-        List<Catalog> siblings = selectSiblings(comicId, cat.getParentId());
-        List<Catalog> reordered = new ArrayList<>(siblings.size());
-        for (Catalog sib : siblings) {
-            if (!sib.getId().equals(catalogId)) {
-                reordered.add(sib);
-            }
-        }
-        int pos = Math.max(0, Math.min(newSortOrder - 1, reordered.size()));
-        reordered.add(pos, cat);
-        for (int i = 0; i < reordered.size(); i++) {
-            Catalog sib = reordered.get(i);
-            sib.setSortOrder(i + 1);
-            catalogMapper.updateById(sib);
-        }
-        catalogCacheInvalidator.evict(comicId);
     }
 
     // ======================== 删除 ========================

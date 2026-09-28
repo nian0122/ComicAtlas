@@ -100,7 +100,9 @@ export interface CatalogNode {
   title: string | null
   children: CatalogNode[]
   chapters: ChapterRef[]
-  /** 目录在阅读顺序中的锚点（= 其下最小子项 globalOrder），用于与章节混合排布。 */
+  /** 目录在同级目录中的持久顺序。 */
+  sortOrder?: number | null
+  /** 目录在全书阅读顺序中的锚点，供旧客户端兼容。 */
   globalOrder?: number | null
 }
 
@@ -109,6 +111,7 @@ export interface ChapterRef {
   chapterNo: string
   title: string
   globalOrder: number
+  sortOrder: number
   pageCount: number
   status?: string
 }

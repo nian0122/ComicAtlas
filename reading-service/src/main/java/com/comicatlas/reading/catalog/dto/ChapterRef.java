@@ -13,6 +13,7 @@ public class ChapterRef {
     private String chapterNo;
     private String title;
     private int globalOrder;
+    private Integer sortOrder;
     private int pageCount;
     private String status;
 }

@@ -25,9 +25,6 @@ import java.time.ZoneOffset;
 @Service
 @RequiredArgsConstructor
 public class ManagementStructureQueryServiceImpl implements ManagementStructureQueryService {
-    private static final Comparator<CatalogNode> BY_GLOBAL_ORDER = Comparator
-            .comparing(CatalogNode::getGlobalOrder, Comparator.nullsLast(Comparator.naturalOrder()));
-
     // 查询契约由 Controller/DTO 固定，服务实现保持在业务包内。
     private final ComicMapper comicMapper;
     private final CatalogMapper catalogMapper;
@@ -43,7 +40,9 @@ public class ManagementStructureQueryServiceImpl implements ManagementStructureQ
         List<Chapter> chapters = chapterMapper.selectReadyCatalogChapters(comicId);
         Map<Long, CatalogNode> nodes = new HashMap<>();
         for (Catalog catalog : catalogs) {
-            nodes.put(catalog.getId(), new CatalogNode(catalog.getId(), catalog.getTitle()));
+            CatalogNode node = new CatalogNode(catalog.getId(), catalog.getTitle());
+            node.setSortOrder(catalog.getSortOrder());
+            nodes.put(catalog.getId(), node);
         }
         List<CatalogNode> roots = new ArrayList<>();
         for (Catalog catalog : catalogs) {
@@ -57,7 +56,7 @@ public class ManagementStructureQueryServiceImpl implements ManagementStructureQ
         CatalogNode root = new CatalogNode(null, null);
         for (Chapter chapter : chapters) {
             ChapterRef ref = new ChapterRef(chapter.getId(), chapter.getChapterNo(), chapter.getTitle(),
-                    chapter.getGlobalOrder(), chapter.getPageCount(),
+                    chapter.getGlobalOrder(), chapter.getSortOrder(), chapter.getPageCount(),
                     chapter.getStatus() == null ? null : chapter.getStatus().name());
             if (chapter.getCatalogId() != null && nodes.containsKey(chapter.getCatalogId())) {
                 nodes.get(chapter.getCatalogId()).getChapters().add(ref);
@@ -68,7 +67,6 @@ public class ManagementStructureQueryServiceImpl implements ManagementStructureQ
         for (CatalogNode rootNode : roots) {
             computeGlobalOrderAnchor(rootNode);
         }
-        roots.sort(BY_GLOBAL_ORDER);
         root.getChildren().addAll(roots);
         computeGlobalOrderAnchor(root);
         return root.getChapters().isEmpty() && root.getChildren().size() == 1 ? root.getChildren() : List.of(root);
@@ -89,7 +87,6 @@ public class ManagementStructureQueryServiceImpl implements ManagementStructureQ
             }
         }
         node.setGlobalOrder(earliestGlobalOrder);
-        node.getChildren().sort(BY_GLOBAL_ORDER);
         return earliestGlobalOrder;
     }
 

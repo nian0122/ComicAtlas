@@ -32,10 +32,6 @@ public class CatalogServiceImpl implements CatalogService {
     private final ChapterMapper chapterMapper;
     private final ComicMapper comicMapper;
 
-    /** 节点锚点排序：null（无内容）排在最后，非空按锚点升序；稳定排序保留同级 sortOrder 顺序。 */
-    private static final Comparator<CatalogNode> BY_ANCHOR = Comparator
-            .comparing(CatalogNode::getGlobalOrder, Comparator.nullsLast(Comparator.naturalOrder()));
-
     @Override
     @Cacheable(
         cacheNames = ComicReferenceCache.CATALOG,
@@ -59,14 +55,16 @@ public class CatalogServiceImpl implements CatalogService {
             return List.of(new CatalogNode(null, null, new ArrayList<>(), refs));
         }
 
-        // 同级目录先按 sortOrder、再按稳定 ID 排序，保证结果确定，不依赖 DB 返回顺序。
+        // 同级目录按持久 sortOrder 排列，保证目录拖拽顺序在阅读树中生效。
         catalogs.sort(Comparator
                 .comparing(Catalog::getSortOrder, Comparator.nullsLast(Comparator.naturalOrder()))
                 .thenComparing(Catalog::getId));
 
         Map<Long, CatalogNode> nodeMap = new HashMap<>();
         for (Catalog cat : catalogs) {
-            nodeMap.put(cat.getId(), new CatalogNode(cat.getId(), cat.getTitle(), new ArrayList<>(), new ArrayList<>()));
+            CatalogNode node = new CatalogNode(cat.getId(), cat.getTitle(), new ArrayList<>(), new ArrayList<>());
+            node.setSortOrder(cat.getSortOrder());
+            nodeMap.put(cat.getId(), node);
         }
 
         // 章节归属目录；孤儿章节（catalogId 为 null 或指向不存在的目录）归入根级，绝不静默丢弃。
@@ -91,12 +89,10 @@ public class CatalogServiceImpl implements CatalogService {
             }
         }
 
-        // 递归后序：先算子节点锚点，父节点锚点 = 所有后代 READY 章节的最小 globalOrder，再按锚点稳定排序子节点。
+        // 递归后序计算锚点；锚点仅表达章节阅读位置，不覆盖目录 sortOrder。
         for (CatalogNode root : roots) {
-            computeAnchorAndSort(root);
+            computeGlobalOrderAnchor(root);
         }
-        roots.sort(BY_ANCHOR);
-
         // 混合形态：根级章节与顶层目录并存时包一层匿名根，保证根级章节不丢失。
         if (!rootRefs.isEmpty()) {
             rootRefs.sort(Comparator.comparingInt(ChapterRef::getGlobalOrder));
@@ -108,7 +104,7 @@ public class CatalogServiceImpl implements CatalogService {
     private static ChapterRef toRef(Chapter chapter) {
         return new ChapterRef(
             chapter.getId(), chapter.getChapterNo(), chapter.getTitle(),
-            chapter.getGlobalOrder(), chapter.getPageCount(), null
+            chapter.getGlobalOrder(), chapter.getSortOrder(), chapter.getPageCount(), null
         );
     }
 
@@ -117,24 +113,23 @@ public class CatalogServiceImpl implements CatalogService {
     }
 
     /**
-     * 递归后序计算节点锚点并稳定排序子节点。
+     * 递归后序计算节点阅读锚点；目录节点顺序由 sortOrder 决定。
      *
      * @return 本子树锚点（无任何 READY 后代时返回 null）
      */
-    private static Integer computeAnchorAndSort(CatalogNode node) {
+    private static Integer computeGlobalOrderAnchor(CatalogNode node) {
         Integer min = null;
         node.getChapters().sort(Comparator.comparingInt(ChapterRef::getGlobalOrder));
         for (ChapterRef ref : node.getChapters()) {
             min = min == null ? ref.getGlobalOrder() : Math.min(min, ref.getGlobalOrder());
         }
         for (CatalogNode child : node.getChildren()) {
-            Integer childAnchor = computeAnchorAndSort(child);
+            Integer childAnchor = computeGlobalOrderAnchor(child);
             if (childAnchor != null) {
                 min = min == null ? childAnchor : Math.min(min, childAnchor);
             }
         }
         node.setGlobalOrder(min);
-        node.getChildren().sort(BY_ANCHOR);
         return min;
     }
 }

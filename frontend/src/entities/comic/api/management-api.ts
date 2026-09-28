@@ -12,6 +12,7 @@ import type {
   ComicMetadataUpdateDTO,
   MediaReorderRequest,
   MediaReorderResult,
+  StructureOrderRequest,
 } from '@/entities/comic/model/management-types'
 
 export const managementChapterApi = {
@@ -40,8 +41,6 @@ export const catalogManagementApi = {
     api.patch<CatalogVO>(`/manage/comics/${comicId}/catalogs/${catalogId}`, data),
   move: (comicId: number, catalogId: number, data: CatalogManagementRequest) =>
     api.put<CatalogVO>(`/manage/comics/${comicId}/catalogs/${catalogId}/move`, data),
-  reorder: (comicId: number, catalogId: number, data: CatalogManagementRequest) =>
-    api.put(`/manage/comics/${comicId}/catalogs/${catalogId}/reorder`, data),
   delete: (comicId: number, catalogId: number, reparentTo?: number) =>
     api.delete(`/manage/comics/${comicId}/catalogs/${catalogId}`, { params: { reparentTo } }),
 }
@@ -53,9 +52,12 @@ export const chapterManagementApi = {
     api.patch<ChapterManagementVO>(`/manage/comics/${comicId}/chapters/${chapterId}`, data),
   move: (comicId: number, chapterId: number, data: ChapterManagementRequest) =>
     api.put<ChapterManagementVO>(`/manage/comics/${comicId}/chapters/${chapterId}/move`, data),
-  reorder: (comicId: number, chapterId: number, data: ChapterManagementRequest) =>
-    api.put<ChapterManagementVO>(`/manage/comics/${comicId}/chapters/${chapterId}/reorder`, data),
   trash: (comicId: number, chapterId: number) => api.delete(`/manage/comics/${comicId}/chapters/${chapterId}`),
+}
+
+export const structureOrderingApi = {
+  reorder: (comicId: number, data: StructureOrderRequest) =>
+    api.put(`/manage/comics/${comicId}/structure/reorder`, data),
 }
 
 export const mediaManagementApi = {

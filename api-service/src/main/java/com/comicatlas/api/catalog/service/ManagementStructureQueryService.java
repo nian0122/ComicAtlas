@@ -16,13 +16,16 @@ public interface ManagementStructureQueryService {
         private final String chapterNo;
         private final String title;
         private final Integer globalOrder;
+        private final Integer sortOrder;
         private final Integer pageCount;
         private final String status;
-        public ChapterRef(Long id, String chapterNo, String title, Integer globalOrder, Integer pageCount, String status) {
+        public ChapterRef(Long id, String chapterNo, String title, Integer globalOrder, Integer sortOrder,
+                          Integer pageCount, String status) {
             this.id = id;
             this.chapterNo = chapterNo;
             this.title = title;
             this.globalOrder = globalOrder;
+            this.sortOrder = sortOrder;
             this.pageCount = pageCount;
             this.status = status;
         }
@@ -30,6 +33,7 @@ public interface ManagementStructureQueryService {
         public String chapterNo() { return chapterNo; }
         public String title() { return title; }
         public Integer globalOrder() { return globalOrder; }
+        public Integer sortOrder() { return sortOrder; }
         public Integer pageCount() { return pageCount; }
         public String status() { return status; }
         @Override
@@ -37,18 +41,19 @@ public interface ManagementStructureQueryService {
             if (this == other) { return true; }
             if (!(other instanceof ChapterRef)) { return false; }
             ChapterRef that = (ChapterRef) other;
-            return java.util.Objects.equals(id, that.id) && java.util.Objects.equals(chapterNo, that.chapterNo) && java.util.Objects.equals(title, that.title) && java.util.Objects.equals(globalOrder, that.globalOrder) && java.util.Objects.equals(pageCount, that.pageCount) && java.util.Objects.equals(status, that.status);
+            return java.util.Objects.equals(id, that.id) && java.util.Objects.equals(chapterNo, that.chapterNo) && java.util.Objects.equals(title, that.title) && java.util.Objects.equals(globalOrder, that.globalOrder) && java.util.Objects.equals(sortOrder, that.sortOrder) && java.util.Objects.equals(pageCount, that.pageCount) && java.util.Objects.equals(status, that.status);
         }
         @Override
-        public int hashCode() { return java.util.Objects.hash(id, chapterNo, title, globalOrder, pageCount, status); }
+        public int hashCode() { return java.util.Objects.hash(id, chapterNo, title, globalOrder, sortOrder, pageCount, status); }
         @Override
-        public String toString() { return "ChapterRef[" + "id=" + id + ", " + "chapterNo=" + chapterNo + ", " + "title=" + title + ", " + "globalOrder=" + globalOrder + ", " + "pageCount=" + pageCount + ", " + "status=" + status + "]"; } }
+        public String toString() { return "ChapterRef[" + "id=" + id + ", " + "chapterNo=" + chapterNo + ", " + "title=" + title + ", " + "globalOrder=" + globalOrder + ", " + "sortOrder=" + sortOrder + ", " + "pageCount=" + pageCount + ", " + "status=" + status + "]"; } }
 
     @lombok.Data
    @lombok.Getter
     class CatalogNode {
         private Long id;
         private String title;
+        private Integer sortOrder;
         private Integer globalOrder;
         private List<CatalogNode> children = new ArrayList<>();
         private List<ChapterRef> chapters = new ArrayList<>();

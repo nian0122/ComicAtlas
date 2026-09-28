@@ -53,7 +53,7 @@
           ><span class="node-count">{{ structureRows.length }} 个根节点</span></PanelHeader
         >
         <el-input v-model="structureKeyword" clearable placeholder="搜索目录或章节" class="tree-search" />
-        <p class="tree-sort-hint">拖动目录可调整同级顺序；章节顺序随目录锚点排列。</p>
+        <p class="tree-sort-hint">拖动目录或章节可调整同级顺序；阅读顺序按目录树同步更新。</p>
         <el-table
           v-loading="loading"
           class="structure-table"
@@ -70,14 +70,14 @@
               ><div
                 class="tree-title"
                 :class="treeRowDragClass(row)"
-                :draggable="canDragCatalog(row)"
-                @dragstart="startCatalogDrag(row, $event)"
-                @dragover.prevent="updateCatalogDrop(row, $event)"
-                @drop.prevent.stop="dropCatalog(row, $event)"
-                @dragend="clearCatalogDrag"
+                :draggable="canDragStructureRow()"
+                @dragstart="startStructureDrag(row, $event)"
+                @dragover.prevent="updateStructureDrop(row, $event)"
+                @drop.prevent.stop="dropStructureRow(row, $event)"
+                @dragend="clearStructureDrag"
               >
                 <span class="tree-icon">{{ row.kind === 'CATALOG' ? '▰' : '▱' }}</span>
-                <span v-if="row.kind === 'CATALOG'" class="catalog-drag-handle" aria-hidden="true">⠿</span>
+                <span class="catalog-drag-handle" aria-hidden="true">⠿</span>
                 <span>{{ row.title }}</span>
               </div></template
             ></el-table-column
@@ -314,9 +314,7 @@
                 }}</strong>
               </div>
             </div>
-            <div class="media-operation-note">
-              替换、转码和回收只针对当前媒体；追加文件会加入当前章节。
-            </div>
+            <div class="media-operation-note">替换、转码和回收只针对当前媒体；追加文件会加入当前章节。</div>
             <div class="media-action-buttons">
               <AppButton variant="primary" block @click="openUploadDialog()">追加到本章</AppButton>
               <AppButton block @click="openReplaceSelectedMedia">替换此媒体</AppButton>
@@ -353,7 +351,7 @@
                 :class="{ 'is-active': chapterWorkspaceTab === 'chapter' }"
                 @click="chapterWorkspaceTab = 'chapter'"
               >
-                <span>▱</span><strong>章节</strong><small>编辑与排序</small></AppButton
+                <span>▱</span><strong>章节</strong><small>编辑</small></AppButton
               ><AppButton
                 type="button"
                 :class="{ 'is-active': chapterWorkspaceTab === 'media' }"
@@ -424,19 +422,6 @@
                     :label="catalog.title"
                     :value="catalog.id" /></el-select
               ></el-form-item>
-              <div v-if="chapterForm.action === 'reorder'" class="chapter-reorder-box">
-                <div class="chapter-position">
-                  <span>当前位置</span><strong>{{ selectedRow?.order ?? '—' }}</strong>
-                </div>
-                <span class="position-arrow">→</span
-                ><el-form-item label="移动到第几位"
-                  ><el-input-number
-                    v-model="chapterForm.order"
-                    :min="1"
-                    :controls="true"
-                    placeholder="输入新位置" /></el-form-item
-                ><small>调整全书阅读位置，不改变章节所属目录。</small>
-              </div>
               <AppButton
                 class="action-submit"
                 :variant="chapterForm.action === 'trash' ? 'danger' : 'primary'"
@@ -680,6 +665,7 @@ import {
   managementCatalogApi,
   managementChapterApi,
   mediaManagementApi,
+  structureOrderingApi,
 } from '@/entities/comic'
 import { hqApi, storageAdminApi } from '@/entities/storage'
 import { uploadApi as trackedUploadApi } from '@/features/upload'
@@ -756,7 +742,6 @@ const chapterForm = reactive<{
   title: string
   chapterNo: string
   catalogId?: number
-  order?: number
 }>({ action: 'create', title: '', chapterNo: '' })
 const structureRows = computed<readonly StructureRow[]>(() => tree.value.flatMap((node) => toStructureRows(node)))
 const filteredStructureRows = computed<readonly StructureRow[]>(() =>
@@ -799,93 +784,103 @@ const emptyStateText = computed(
       error: '目录加载失败，请重试',
     })[treeState.value],
 )
-const draggedCatalogId = ref<number | null>(null)
-const catalogDropTarget = ref<{ readonly id: number; readonly position: 'before' | 'after' } | null>(null)
+const draggedStructureNode = ref<{ readonly kind: StructureRow['kind']; readonly id: number } | null>(null)
+const structureDropTarget = ref<{
+  readonly kind: StructureRow['kind']
+  readonly id: number
+  readonly position: 'before' | 'after'
+} | null>(null)
 
 function rowClassName({ row }: { row: StructureRow }): string {
   return row.kind === 'CATALOG' ? 'structure-row--catalog' : 'structure-row--chapter'
 }
-function canDragCatalog(row: StructureRow): boolean {
-  return row.kind === 'CATALOG' && !loading.value && !structureKeyword.value.trim()
+function canDragStructureRow(): boolean {
+  return !loading.value && !structureKeyword.value.trim()
 }
 function treeRowDragClass(row: StructureRow): Record<string, boolean> {
-  const target = catalogDropTarget.value
+  const target = structureDropTarget.value
+  const isDragged = draggedStructureNode.value?.kind === row.kind && draggedStructureNode.value.id === row.id
+  const isDropTarget = target?.kind === row.kind && target.id === row.id
   return {
-    'tree-title--draggable': canDragCatalog(row),
-    'tree-title--dragging': row.kind === 'CATALOG' && row.id === draggedCatalogId.value,
-    'tree-title--drop-before': row.kind === 'CATALOG' && target?.id === row.id && target.position === 'before',
-    'tree-title--drop-after': row.kind === 'CATALOG' && target?.id === row.id && target.position === 'after',
+    'tree-title--draggable': canDragStructureRow(),
+    'tree-title--dragging': isDragged,
+    'tree-title--drop-before': isDropTarget && target?.position === 'before',
+    'tree-title--drop-after': isDropTarget && target?.position === 'after',
   }
 }
-function findCatalogSiblings(parentCatalogId: number | null): readonly StructureRow[] {
-  if (parentCatalogId === null) {
-    return structureRows.value.filter((row) => row.kind === 'CATALOG' && row.parentCatalogId === null)
+function findStructureSiblings(parentCatalogId: number | null): readonly StructureRow[] {
+  if (parentCatalogId === null) return structureRows.value.filter((row) => row.parentCatalogId === null)
+  const findParent = (rows: readonly StructureRow[]): readonly StructureRow[] | null => {
+    for (const row of rows) {
+      if (row.kind === 'CATALOG' && row.id === parentCatalogId) return row.children ?? []
+      const nestedMatch = findParent(row.children ?? [])
+      if (nestedMatch) return nestedMatch
+    }
+    return null
   }
-  for (const row of structureRows.value) {
-    const match = findCatalogParent(row, parentCatalogId)
-    if (match) return match
-  }
-  return []
+  return findParent(structureRows.value) ?? []
 }
-function findCatalogParent(row: StructureRow, parentCatalogId: number): readonly StructureRow[] | null {
-  if (row.kind === 'CATALOG' && row.id === parentCatalogId) {
-    return (row.children ?? []).filter((child) => child.kind === 'CATALOG')
-  }
-  for (const child of row.children ?? []) {
-    const match = findCatalogParent(child, parentCatalogId)
-    if (match) return match
-  }
-  return null
-}
-function startCatalogDrag(row: StructureRow, event: DragEvent): void {
-  if (!canDragCatalog(row) || !event.dataTransfer) {
+function startStructureDrag(row: StructureRow, event: DragEvent): void {
+  if (!canDragStructureRow() || !event.dataTransfer) {
     event.preventDefault()
     return
   }
-  draggedCatalogId.value = row.id
+  draggedStructureNode.value = { kind: row.kind, id: row.id }
   event.dataTransfer.effectAllowed = 'move'
-  event.dataTransfer.setData('text/plain', String(row.id))
+  event.dataTransfer.setData('text/plain', `${row.kind}:${row.id}`)
 }
-function updateCatalogDrop(row: StructureRow, event: DragEvent): void {
-  const draggedRow = structureRows.value
-    .flatMap(flattenStructureRows)
-    .find((item) => item.kind === 'CATALOG' && item.id === draggedCatalogId.value)
+function updateStructureDrop(row: StructureRow, event: DragEvent): void {
+  const draggedNode = draggedStructureNode.value
+  const draggedRow = draggedNode
+    ? structureRows.value
+        .flatMap(flattenStructureRows)
+        .find((item) => item.kind === draggedNode.kind && item.id === draggedNode.id)
+    : undefined
   if (
-    row.kind !== 'CATALOG' ||
     !draggedRow ||
-    draggedRow.kind !== 'CATALOG' ||
-    draggedRow.id === row.id ||
+    (draggedRow.kind === row.kind && draggedRow.id === row.id) ||
     draggedRow.parentCatalogId !== row.parentCatalogId
   ) {
-    catalogDropTarget.value = null
+    structureDropTarget.value = null
     return
   }
   const rowElement = event.currentTarget as HTMLElement
-  const position = event.clientY < rowElement.getBoundingClientRect().top + rowElement.offsetHeight / 2 ? 'before' : 'after'
-  catalogDropTarget.value = { id: row.id, position }
+  const position =
+    event.clientY < rowElement.getBoundingClientRect().top + rowElement.offsetHeight / 2 ? 'before' : 'after'
+  structureDropTarget.value = { kind: row.kind, id: row.id, position }
   if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
 }
-function clearCatalogDrag(): void {
-  draggedCatalogId.value = null
-  catalogDropTarget.value = null
+function clearStructureDrag(): void {
+  draggedStructureNode.value = null
+  structureDropTarget.value = null
 }
-async function dropCatalog(targetRow: StructureRow, event: DragEvent): Promise<void> {
-  const sourceCatalogId = draggedCatalogId.value
+async function dropStructureRow(targetRow: StructureRow, event: DragEvent): Promise<void> {
+  const draggedNode = draggedStructureNode.value
   const rowElement = event.currentTarget as HTMLElement
   const dropPosition =
     event.clientY < rowElement.getBoundingClientRect().top + rowElement.offsetHeight / 2 ? 'before' : 'after'
-  clearCatalogDrag()
-  if (targetRow.kind !== 'CATALOG' || sourceCatalogId === null) return
-  const siblings = findCatalogSiblings(targetRow.parentCatalogId ?? null)
-  const remainingSiblings = siblings.filter((row) => row.id !== sourceCatalogId)
+  clearStructureDrag()
+  if (!draggedNode || (draggedNode.kind === targetRow.kind && draggedNode.id === targetRow.id)) return
+  const siblings = findStructureSiblings(targetRow.parentCatalogId ?? null)
+  const remainingSiblings = siblings.filter((row) => row.kind !== draggedNode.kind || row.id !== draggedNode.id)
   const targetIndex = remainingSiblings.findIndex((row) => row.id === targetRow.id)
   if (targetIndex < 0) return
   const destinationIndex = targetIndex + (dropPosition === 'after' ? 1 : 0)
-  const sourceIndex = siblings.findIndex((row) => row.id === sourceCatalogId)
-  if (sourceIndex < 0 || sourceIndex === destinationIndex) return
+  const sourceIndex = siblings.findIndex((row) => row.kind === draggedNode.kind && row.id === draggedNode.id)
+  if (
+    sourceIndex < 0 ||
+    (sourceIndex === destinationIndex && dropPosition === 'before') ||
+    (sourceIndex + 1 === destinationIndex && dropPosition === 'after')
+  )
+    return
+  const orderedSiblings = [...remainingSiblings]
+  orderedSiblings.splice(destinationIndex, 0, siblings[sourceIndex])
   try {
-    await catalogManagementApi.reorder(comicId.value, sourceCatalogId, { sortOrder: destinationIndex + 1 })
-    ElMessage.success('同级目录顺序已更新')
+    await structureOrderingApi.reorder(comicId.value, {
+      parentCatalogId: targetRow.parentCatalogId ?? null,
+      items: orderedSiblings.map((row) => ({ type: row.kind, id: row.id })),
+    })
+    ElMessage.success('同级目录与章节顺序已更新')
     await loadTree()
   } catch (reason: unknown) {
     ElMessage.error(errorMessage(reason))
@@ -907,7 +902,6 @@ function selectStructureRow(row: StructureRow): void {
   chapterForm.action = 'rename'
   chapterForm.title = row.title
   chapterForm.chapterNo = row.chapterNo ?? ''
-  chapterForm.order = undefined
   mediaChapterId.value = row.id
   void loadMedia()
 }
@@ -985,13 +979,12 @@ function chapterActionDescription(action: ChapterAction): string {
     create: '在当前漫画中新建一个章节',
     rename: '修改章节标题或原始编号',
     move: '将章节移动到其他目录',
-    reorder: '调整当前章节在全书中的阅读位置，不改变目录归属',
     trash: '将当前章节移入回收站',
   }
   return descriptions[action]
 }
 function chapterActionIcon(action: ChapterAction): string {
-  return ({ create: '＋', rename: '✎', move: '⇄', reorder: '≡', trash: '⌫' } as const)[action]
+  return ({ create: '＋', rename: '✎', move: '⇄', trash: '⌫' } as const)[action]
 }
 function chapterActionTagline(action: ChapterAction): string {
   return (
@@ -999,14 +992,12 @@ function chapterActionTagline(action: ChapterAction): string {
       create: '创建新章节',
       rename: '标题与编号',
       move: '调整目录归属',
-      reorder: '移动阅读位置',
       trash: '移入回收站',
     } as const
   )[action]
 }
 function selectChapterAction(action: ChapterAction): void {
   chapterForm.action = action
-  if (action === 'reorder') chapterForm.order = undefined
 }
 function toggleCreateChapter(): void {
   if (chapterForm.action === 'create') {
@@ -1248,17 +1239,6 @@ async function submitChapter(): Promise<void> {
         break
       case 'move':
         await chapterManagementApi.move(comicId.value, id, { catalogId: chapterForm.catalogId ?? null })
-        break
-      case 'reorder':
-        if (!chapterForm.order) {
-          ElMessage.warning('请输入目标顺序')
-          return
-        }
-        if (chapterForm.order === selectedRow.value?.order) {
-          ElMessage.info('目标顺序与当前位置相同，无需提交')
-          return
-        }
-        await chapterManagementApi.reorder(comicId.value, id, { targetGlobalOrder: chapterForm.order })
         break
       case 'trash':
         await ElMessageBox.confirm('章节将进入回收站。', '确认回收', { type: 'warning' })

@@ -125,8 +125,7 @@ watch(
  * 递归扁平化目录树：
  * - 有标题的节点输出 header 行，仅在展开时输出其章节与子节点
  * - 无标题的节点（匿名根）不输出 header，章节与子节点始终可见
- * 同级章节与子目录按 globalOrder 混合排布（目录锚点 = 其下最小子项 globalOrder，
- * null 锚点排最后），保持与源目录文件名顺序一致。
+ * 同级目录与章节按共享 sortOrder 混排；章节 globalOrder 由此树顺序派生，仅用于阅读器翻章。
  */
 function walkNode(node: CatalogNode, depth: number, path: string, out: FlatItem[], index: number) {
   const nodePath = `${path}/${keySegmentOf(node, index)}`
@@ -147,14 +146,18 @@ function walkNode(node: CatalogNode, depth: number, path: string, out: FlatItem[
     const chapters = node.chapters ?? []
     const children = node.children ?? []
     const items = [
-      ...chapters.map((ch) => ({ kind: 'chapter' as const, order: ch.globalOrder, chapter: ch })),
-      ...children.map((child, childIndex) => ({
+      ...children.map((node, childIndex) => ({
         kind: 'catalog' as const,
-        order: child.globalOrder ?? Number.MAX_SAFE_INTEGER,
-        node: child,
+        order: node.sortOrder ?? Number.MAX_SAFE_INTEGER,
+        node,
         childIndex,
       })),
-    ].sort((a, b) => a.order - b.order || a.kind.localeCompare(b.kind))
+      ...chapters.map((chapter) => ({
+        kind: 'chapter' as const,
+        order: chapter.sortOrder ?? Number.MAX_SAFE_INTEGER,
+        chapter,
+      })),
+    ].sort((left, right) => left.order - right.order || left.kind.localeCompare(right.kind))
 
     for (const item of items) {
       if (item.kind === 'chapter') {

@@ -5,7 +5,6 @@ import com.comicatlas.persistence.comic.entity.Catalog;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
-import org.apache.ibatis.annotations.Update;
 
 import java.util.List;
 
@@ -14,17 +13,6 @@ public interface CatalogMapper extends BaseMapper<Catalog> {
 
     @Select("SELECT id, comic_id, parent_id, title, sort_order FROM catalog WHERE comic_id = #{comicId} ORDER BY sort_order ASC, id ASC")
     List<Catalog> selectByComicIdOrderBySortOrder(@Param("comicId") Long comicId);
-
-    @Select("SELECT id, comic_id, parent_id, title, sort_order FROM catalog WHERE comic_id = #{comicId} "
-            + "ORDER BY sort_order ASC, id ASC FOR UPDATE")
-    List<Catalog> selectByComicIdOrderBySortOrderForUpdate(@Param("comicId") Long comicId);
-
-    @Update("<script>UPDATE catalog SET sort_order = CASE id "
-            + "<foreach collection='orderUpdates' item='orderUpdate'>"
-            + "WHEN #{orderUpdate.catalogId} THEN #{orderUpdate.sortOrder} </foreach>"
-            + "ELSE sort_order END WHERE comic_id = #{comicId}</script>")
-    int updateSortOrdersBatch(@Param("comicId") Long comicId,
-                              @Param("orderUpdates") List<CatalogOrderUpdate> orderUpdates);
 
     @Select("SELECT id, comic_id, parent_id, title, sort_order FROM catalog WHERE comic_id = #{comicId} AND parent_id = #{parentId} ORDER BY sort_order ASC, id ASC")
     List<Catalog> selectChildrenByComicIdAndParentId(@Param("comicId") Long comicId, @Param("parentId") Long parentId);
@@ -41,5 +29,14 @@ public interface CatalogMapper extends BaseMapper<Catalog> {
     @Select("SELECT id, parent_id, title, sort_order FROM catalog WHERE comic_id = #{comicId} "
             + "ORDER BY sort_order ASC")
     List<Catalog> selectTreeNodesByComicId(@Param("comicId") Long comicId);
+
+    @Select("SELECT id, comic_id, parent_id, title, sort_order FROM catalog WHERE comic_id = #{comicId} "
+            + "ORDER BY id ASC FOR UPDATE")
+    List<Catalog> selectAllByComicIdForUpdate(@Param("comicId") Long comicId);
+
+    @org.apache.ibatis.annotations.Update("UPDATE catalog SET sort_order = #{sortOrder} "
+            + "WHERE comic_id = #{comicId} AND id = #{catalogId}")
+    int updateSortOrder(@Param("comicId") Long comicId, @Param("catalogId") Long catalogId,
+                        @Param("sortOrder") int sortOrder);
 
 }

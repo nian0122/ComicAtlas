@@ -39,7 +39,12 @@ export interface ChapterManagementRequest {
   readonly title?: string
   readonly chapterNo?: string
   readonly catalogId?: number | null
-  readonly targetGlobalOrder?: number
+}
+
+/** 同一父目录下目录与章节的完整顺序。 */
+export interface StructureOrderRequest {
+  readonly parentCatalogId: number | null
+  readonly items: readonly { readonly type: 'CATALOG' | 'CHAPTER'; readonly id: number }[]
 }
 
 /** 章节管理视图。 */

@@ -5,12 +5,14 @@ import type { CatalogNode } from '@/entities/comic/model/types'
 const catalogNode: CatalogNode = {
   id: 1,
   title: '卷一',
+  sortOrder: 1,
   globalOrder: 1,
-  chapters: [{ id: 2, chapterNo: '1', title: '第一话', globalOrder: 1, pageCount: 20 }],
+  chapters: [{ id: 2, chapterNo: '1', title: '第一话', sortOrder: 2, globalOrder: 1, pageCount: 20 }],
   children: [
     {
       id: 3,
       title: '番外',
+      sortOrder: 1,
       globalOrder: 2,
       chapters: [],
       children: [],
@@ -24,8 +26,8 @@ describe('漫画结构工具', () => {
     expect(rows).toHaveLength(1)
     expect(rows[0].kind).toBe('CATALOG')
     expect(rows[0].parentCatalogId).toBeNull()
-    expect(rows[0].children?.map((row) => row.kind)).toEqual(['CHAPTER', 'CATALOG'])
-    expect(rows[0].children?.[1].parentCatalogId).toBe(1)
+    expect(rows[0].children?.map((row) => row.kind)).toEqual(['CATALOG', 'CHAPTER'])
+    expect(rows[0].children?.[0].parentCatalogId).toBe(1)
     expect(flattenCatalogOptions(rows)).toEqual([
       { id: 1, title: '卷一' },
       { id: 3, title: '番外' },

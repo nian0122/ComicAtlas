@@ -483,7 +483,6 @@ GET    /api/comics/{id}/catalog                   # 目录树（只读）
 POST   /api/manage/comics/{comicId}/catalogs             # 创建 { title, parentId?, sortOrder? }
 PATCH  /api/manage/comics/{comicId}/catalogs/{catalogId} # 重命名 { title }
 PUT    /api/manage/comics/{comicId}/catalogs/{catalogId}/move    # 移动 { parentId? }（body 可空）
-PUT    /api/manage/comics/{comicId}/catalogs/{catalogId}/reorder # 排序 { sortOrder }
 DELETE /api/manage/comics/{comicId}/catalogs/{catalogId}?reparentTo={catalogId}  # 删除（可重挂子级）
 ```
 
@@ -493,8 +492,22 @@ DELETE /api/manage/comics/{comicId}/catalogs/{catalogId}?reparentTo={catalogId} 
 POST   /api/manage/comics/{comicId}/chapters             # 创建 { title, chapterNo?, catalogId? }
 PATCH  /api/manage/comics/{comicId}/chapters/{chapterId} # 重命名 { title?, chapterNo? }
 PUT    /api/manage/comics/{comicId}/chapters/{chapterId}/move    # 移动 { catalogId? }（body 可空）
-PUT    /api/manage/comics/{comicId}/chapters/{chapterId}/reorder # 排序 { targetGlobalOrder }
 DELETE /api/manage/comics/{comicId}/chapters/{chapterId} # 回收章节（创建 CHAPTER_TRASH 任务）
+```
+
+目录和章节的同级展示顺序使用同一个接口。请求必须提交该父目录下完整的目录／可阅读章节顺序；`parentCatalogId: null` 表示漫画根层。服务更新节点的 `sort_order`，并按目录树遍历结果重算章节 `global_order`，阅读器上一章／下一章据此导航。
+
+```http
+PUT /api/manage/comics/{comicId}/structure/reorder
+Content-Type: application/json
+
+{
+  "parentCatalogId": 12,
+  "items": [
+    { "type": "CATALOG", "id": 21 },
+    { "type": "CHAPTER", "id": 34 }
+  ]
+}
 ```
 
 ### 13.4 允许操作查询（按钮权限唯一来源）

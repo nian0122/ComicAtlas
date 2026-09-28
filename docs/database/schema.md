@@ -194,7 +194,7 @@ erDiagram
 
 ### chapter
 
-章节表。排序仅依赖 `global_order`，`chapter_no` 为原始编号不参与排序。
+章节表。`sort_order` 表示章节在同级目录／章节中的展示位置；`global_order` 是按目录树顺序派生的全书阅读位置。`chapter_no` 为原始编号，不参与排序。
 
 | 字段 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
@@ -204,8 +204,8 @@ erDiagram
 | `title` | VARCHAR(255) | NULL | 章节标题 |
 | `chapter_no` | VARCHAR(32) | `1` | 原始编号 (不参与排序) |
 | `page_count` | INT | `0` | 页数 |
-| `sort_order` | INT | `0` | 目录内排序 |
-| `global_order` | INT | `0` | 全书阅读顺序 |
+| `sort_order` | INT | `0` | 同级目录与章节共享的展示顺序 |
+| `global_order` | INT | `0` | 按目录树遍历派生的全书阅读顺序 |
 | `created_at` | DATETIME | `CURRENT_TIMESTAMP` | 创建时间 |
 | `status` | VARCHAR(16) | `READY` | 章节生命周期状态，见 [MediaLifecycleStatus](#medialifecyclestatus) |
 | `trashed_at` | DATETIME | NULL | 进入 TRASHED 的时间（保留期起点，期限由 `trash.retention-days` 配置） |

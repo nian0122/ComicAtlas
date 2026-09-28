@@ -5,7 +5,6 @@ import com.comicatlas.api.catalog.dto.CatalogVO;
 import com.comicatlas.api.catalog.dto.CatalogCreateRequest;
 import com.comicatlas.api.catalog.dto.CatalogMoveRequest;
 import com.comicatlas.api.catalog.dto.CatalogRenameRequest;
-import com.comicatlas.api.catalog.dto.CatalogReorderRequest;
 import com.comicatlas.api.catalog.service.CatalogManagementService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -71,21 +70,6 @@ public class CatalogManagementController {
             @RequestBody(required = false) CatalogMoveRequest request) {
         Long parentId = request != null ? request.getParentId() : null;
         return Result.ok(catalogManagementService.moveCatalog(comicId, catalogId, parentId));
-    }
-
-    /**
-     * 同级目录重排（结果保持连续 1..N）。
-     *
-     * @param request 目标 sortOrder（1 基）
-     * @return 空结果
-     */
-    @PutMapping("/{catalogId}/reorder")
-    public Result<Void> reorder(
-            @PathVariable Long comicId,
-            @PathVariable Long catalogId,
-            @Valid @RequestBody CatalogReorderRequest request) {
-        catalogManagementService.reorderCatalog(comicId, catalogId, request.getSortOrder());
-        return Result.ok();
     }
 
     /**

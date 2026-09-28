@@ -6,6 +6,7 @@ const chapter = (id: number, globalOrder: number) => ({
   id,
   chapterNo: String(id),
   title: `章节 ${id}`,
+  sortOrder: id,
   globalOrder,
   pageCount: 10,
 })

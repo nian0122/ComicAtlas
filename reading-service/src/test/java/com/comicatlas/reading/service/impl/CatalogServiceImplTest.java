@@ -30,7 +30,7 @@ import static org.mockito.Mockito.when;
  * 目录树构建单元测试（TDD）。
  *
  * <p>覆盖 buildTree 的三种兼容形态（纯平铺/纯目录/根混合）、递归后序锚点、
- * 孤儿章节归根、确定性排序与 READY 状态过滤。
+ * 同级目录 sortOrder、孤儿章节归根与 READY 状态过滤。
  */
 @ExtendWith(MybatisPlusLambdaCacheExtension.class)
 class CatalogServiceImplTest {
@@ -185,26 +185,26 @@ class CatalogServiceImplTest {
     }
 
     @Test
-    @DisplayName("乱序 ID：锚点决定顶层顺序，空目录锚点 null 排最后")
-    void buildTree_unorderedIds_sortedByAnchorThenStableId() {
+    @DisplayName("乱序 ID：同级目录保持 sortOrder 顺序，不被章节锚点覆盖")
+    void buildTree_unorderedIds_sortedBySortOrder() {
         stubTree(List.of(
-                cat(1L, null, "空目录", 3),
-                cat(2L, null, "早目录", 1),
-                cat(3L, null, "晚目录", 2)), List.of(
+                cat(1L, null, "空目录", 2),
+                cat(2L, null, "早目录", 3),
+                cat(3L, null, "晚目录", 1)), List.of(
                 chapter(1L, 2L, 1, ChapterLifecycleStatus.READY),
                 chapter(2L, 3L, 2, ChapterLifecycleStatus.READY)));
 
         List<CatalogNode> roots = service.buildTree(COMIC_ID);
 
-        assertEquals(List.of(2L, 3L, 1L), nodeIds(roots));
-        assertEquals(1, roots.get(0).getGlobalOrder());
-        assertEquals(2, roots.get(1).getGlobalOrder());
-        assertNull(roots.get(2).getGlobalOrder());
+        assertEquals(List.of(3L, 1L, 2L), nodeIds(roots));
+        assertEquals(2, roots.get(0).getGlobalOrder());
+        assertNull(roots.get(1).getGlobalOrder());
+        assertEquals(1, roots.get(2).getGlobalOrder());
     }
 
     @Test
-    @DisplayName("空目录：锚点 null 排在有内容节点之后，不触发空值比较异常")
-    void buildTree_emptyCatalog_anchorNullSortedAfter() {
+    @DisplayName("空目录：顺序由 sortOrder 决定，不受空阅读锚点影响")
+    void buildTree_emptyCatalog_keepsSortOrder() {
         stubTree(List.of(
                 cat(1L, null, "有内容", 1),
                 cat(2L, null, "空目录", 2)), List.of(

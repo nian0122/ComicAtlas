@@ -21,8 +21,8 @@ import static org.mockito.Mockito.when;
 class ManagementStructureQueryServiceImplTest {
 
     @Test
-    @DisplayName("目录锚点按子树最早章节顺序排列并与根章节混排")
-    void tree_sortsCatalogsByEarliestChapterAndSetsAnchors() {
+    @DisplayName("管理目录树按同级 sortOrder 排序并保留阅读锚点")
+    void tree_sortsCatalogsBySortOrderAndSetsAnchors() {
         ComicMapper comicMapper = mock(ComicMapper.class);
         CatalogMapper catalogMapper = mock(CatalogMapper.class);
         ChapterMapper chapterMapper = mock(ChapterMapper.class);
@@ -41,9 +41,11 @@ class ManagementStructureQueryServiceImplTest {
         assertThat(tree.get(0).getGlobalOrder()).isEqualTo(1);
         assertThat(tree.get(0).getChapters()).extracting("globalOrder").containsExactly(1);
         assertThat(tree.get(0).getChildren()).extracting(CatalogNode::getTitle)
-                .containsExactly("VOL 3", "VOL 12");
+                .containsExactly("VOL 12", "VOL 3");
         assertThat(tree.get(0).getChildren()).extracting(CatalogNode::getGlobalOrder)
-                .containsExactly(3, 12);
+                .containsExactly(12, 3);
+        assertThat(tree.get(0).getChildren()).extracting(CatalogNode::getSortOrder)
+                .containsExactly(1, 2);
     }
 
     private Catalog catalog(Long catalogId, String title, int sortOrder) {
