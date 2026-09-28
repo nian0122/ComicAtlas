@@ -14,6 +14,7 @@ import com.comicatlas.api.catalog.service.CatalogManagementService;
 import com.comicatlas.contract.common.constant.HttpStatusCodes;
 import com.comicatlas.contract.common.exception.BusinessException;
 import com.comicatlas.api.shared.exception.ConflictException;
+import com.comicatlas.contract.common.enums.ChapterLifecycleStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -121,6 +122,7 @@ public class CatalogManagementServiceImpl implements CatalogManagementService {
         Catalog cat = requireCatalogInComic(comicId, catalogId);
         List<Catalog> children = catalogMapper.selectChildrenByComicIdAndParentId(comicId, catalogId);
         List<Chapter> chapters = chapterMapper.selectByComicIdAndCatalogId(comicId, catalogId);
+        chapters.removeIf(chapter -> chapter.getStatus() == ChapterLifecycleStatus.DELETED);
 
         if (children.isEmpty() && chapters.isEmpty()) {
             catalogMapper.deleteById(catalogId);
