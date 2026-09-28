@@ -60,6 +60,7 @@
           :data="filteredStructureRows"
           row-key="key"
           :tree-props="{ children: 'children' }"
+          :expand-row-keys="isStructureSearching ? expandedSearchRowKeys : undefined"
           :row-class-name="rowClassName"
           :empty-text="emptyStateText"
           highlight-current-row
@@ -70,6 +71,7 @@
               ><div
                 class="tree-title"
                 :class="treeRowDragClass(row)"
+                :title="row.title"
                 :draggable="canDragStructureRow()"
                 @dragstart="startStructureDrag(row, $event)"
                 @dragover.prevent="updateStructureDrop(row, $event)"
@@ -78,13 +80,11 @@
               >
                 <span class="tree-icon">{{ row.kind === 'CATALOG' ? '▰' : '▱' }}</span>
                 <span class="catalog-drag-handle" aria-hidden="true">⠿</span>
-                <span>{{ row.title }}</span>
+                <span class="tree-title__text">{{ row.title }}</span>
+                <span class="tree-kind" :class="row.kind === 'CATALOG' ? 'is-catalog' : 'is-chapter'">{{
+                  row.kind === 'CATALOG' ? '目录' : '章节'
+                }}</span>
               </div></template
-            ></el-table-column
-          >
-          <el-table-column width="72"
-            ><template #default="{ row }"
-              ><span class="tree-kind">{{ row.kind === 'CATALOG' ? '目录' : '章节' }}</span></template
             ></el-table-column
           >
         </el-table>
@@ -368,7 +368,7 @@
             </nav>
             <el-form v-if="chapterWorkspaceTab === 'chapter'" label-position="top" class="action-form">
               <div class="chapter-action-toolbar">
-                <div><span class="panel-kicker">COMMAND DECK</span><strong>章节命令面板</strong></div>
+                <div><span class="panel-kicker">CHAPTER ACTIONS</span><strong>修改当前章节</strong></div>
                 <AppButton class="create-chapter-button" variant="primary" @click="toggleCreateChapter"
                   ><span class="create-chapter-icon">＋</span
                   >{{ chapterForm.action === 'create' ? '返回当前章节' : '新建章节' }}</AppButton
@@ -384,11 +384,10 @@
                     :class="{ 'is-active': chapterForm.action === item.value, 'is-danger': item.value === 'trash' }"
                     @click="selectChapterAction(item.value)"
                   >
-                    <span class="chapter-choice-icon">{{ chapterActionIcon(item.value) }}</span
-                    ><span class="chapter-choice-copy"
-                      ><strong>{{ item.label }}</strong
-                      ><small>{{ chapterActionTagline(item.value) }}</small></span
-                    ><span class="chapter-choice-arrow">→</span>
+                    <span class="chapter-choice-option">
+                      <span class="chapter-choice-icon">{{ chapterActionIcon(item.value) }}</span>
+                      <strong>{{ item.label.replace('章节', '') }}</strong>
+                    </span>
                   </AppButton>
                 </div>
                 <div class="chapter-choice-help">
@@ -540,7 +539,11 @@
     </div>
     <template #footer
       ><AppButton @click="uploadDialogVisible = false">关闭</AppButton
-      ><AppButton v-if="uploadSessionId && uploadRunning" variant="danger" @click="cancelUpload">取消上传</AppButton
+      ><AppButton
+        v-if="uploadSessionId && !uploadTaskId && (uploadRunning || uploadStatus === '失败')"
+        variant="danger"
+        @click="cancelUpload"
+        >{{ uploadRunning ? '取消上传' : '清理失败上传' }}</AppButton
       ><AppButton
         variant="primary"
         :loading="uploadRunning"
@@ -748,6 +751,13 @@ const structureRows = computed<readonly StructureRow[]>(() => tree.value.flatMap
 const filteredStructureRows = computed<readonly StructureRow[]>(() =>
   filterStructureRows(structureRows.value, structureKeyword.value.trim().toLowerCase()),
 )
+const isStructureSearching = computed(() => Boolean(structureKeyword.value.trim()))
+const expandedSearchRowKeys = computed(() =>
+  filteredStructureRows.value
+    .flatMap(flattenStructureRows)
+    .filter((row) => row.kind === 'CATALOG' && Boolean(row.children?.length))
+    .map((row) => row.key),
+)
 const catalogOptions = computed(() => flattenCatalogOptions(structureRows.value))
 const catalogCount = computed(() => countRows(structureRows.value, 'CATALOG'))
 const chapterCount = computed(() => countRows(structureRows.value, 'CHAPTER'))
@@ -891,19 +901,22 @@ function flattenStructureRows(row: StructureRow): readonly StructureRow[] {
   return [row, ...(row.children ?? []).flatMap(flattenStructureRows)]
 }
 function selectStructureRow(row: StructureRow): void {
+  const selectedNode = structureRows.value
+    .flatMap(flattenStructureRows)
+    .find((candidate) => candidate.kind === row.kind && candidate.id === row.id) ?? row
   selectedMedia.value = null
-  selectedRow.value = row
-  if (row.kind === 'CHAPTER') chapterWorkspaceTab.value = 'chapter'
-  if (row.kind === 'CATALOG') {
-    catalogForm.id = row.id
-    catalogForm.parentId = row.id
+  selectedRow.value = selectedNode
+  if (selectedNode.kind === 'CHAPTER') chapterWorkspaceTab.value = 'chapter'
+  if (selectedNode.kind === 'CATALOG') {
+    catalogForm.id = selectedNode.id
+    catalogForm.parentId = selectedNode.id
     return
   }
-  chapterForm.id = row.id
+  chapterForm.id = selectedNode.id
   chapterForm.action = 'rename'
-  chapterForm.title = row.title
-  chapterForm.chapterNo = row.chapterNo ?? ''
-  mediaChapterId.value = row.id
+  chapterForm.title = selectedNode.title
+  chapterForm.chapterNo = selectedNode.chapterNo ?? ''
+  mediaChapterId.value = selectedNode.id
   void loadMedia()
 }
 function locateChapter(chapterId: number): void {
@@ -986,16 +999,6 @@ function chapterActionDescription(action: ChapterAction): string {
 }
 function chapterActionIcon(action: ChapterAction): string {
   return ({ create: '＋', rename: '✎', move: '⇄', trash: '⌫' } as const)[action]
-}
-function chapterActionTagline(action: ChapterAction): string {
-  return (
-    {
-      create: '创建新章节',
-      rename: '标题与编号',
-      move: '调整目录归属',
-      trash: '移入回收站',
-    } as const
-  )[action]
 }
 function selectChapterAction(action: ChapterAction): void {
   chapterForm.action = action
