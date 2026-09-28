@@ -92,7 +92,7 @@
             muted
             playsinline
             webkit-playsinline
-            preload="auto"
+            preload="none"
             draggable="false"
           />
           <img v-else class="video-media media-image" :src="imageUrl(gesturePreviewItem)" alt="" draggable="false" />
@@ -221,11 +221,13 @@
       <video
         v-if="nextItem && isVideoMedia(nextItem)"
         :key="nextItem.id"
+        :ref="setPreloadVideoRef"
         class="video-preload"
         :src="nextItem.hqUrl"
         muted
         playsinline
-        preload="auto"
+        preload="metadata"
+        fetchpriority="low"
         aria-hidden="true"
       />
       <img v-else-if="nextItem" class="video-preload" :src="imageUrl(nextItem)" alt="" aria-hidden="true" />
@@ -255,6 +257,7 @@ const nextChapter = shallowRef<ReaderDTO | null>(null)
 const previousChapter = shallowRef<ReaderDTO | null>(null)
 const currentIndex = ref(0)
 const videoRef = ref<HTMLVideoElement | null>(null)
+const nextPreloadVideoRef = ref<HTMLVideoElement | null>(null)
 const progressControlRef = ref<InstanceType<typeof VideoProgressControl> | null>(null)
 const loading = ref(true)
 const loadError = ref('')
@@ -503,6 +506,21 @@ function setVideoRef(element: unknown): void {
     return
   }
   if (videoRef.value && !videoRef.value.isConnected) videoRef.value = null
+}
+
+/** 预热视频只读取元数据；节点移除时释放连接，避免章节/下一项切换后遗留下载。 */
+function setPreloadVideoRef(element: unknown): void {
+  if (element instanceof HTMLVideoElement) {
+    nextPreloadVideoRef.value = element
+    return
+  }
+
+  const video = nextPreloadVideoRef.value
+  if (!video) return
+  video.pause()
+  video.removeAttribute('src')
+  video.load()
+  nextPreloadVideoRef.value = null
 }
 
 function beginSlide(direction: number): void {
