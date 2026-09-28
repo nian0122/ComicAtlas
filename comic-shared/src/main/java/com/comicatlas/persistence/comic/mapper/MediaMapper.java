@@ -103,6 +103,11 @@ public interface MediaMapper extends BaseMapper<Media> {
             + "video_codec, audio_codec FROM page WHERE chapter_id = #{chapterId} ORDER BY page_number ASC")
     List<Media> selectByChapterId(@Param("chapterId") Long chapterId);
 
+    @Select("SELECT hq_path FROM page WHERE chapter_id = #{chapterId} AND hq_path IS NOT NULL "
+            + "AND status <> 'DELETED' AND (#{excludedMediaId} IS NULL OR id <> #{excludedMediaId})")
+    List<String> selectReservedHqPathsByChapterId(@Param("chapterId") Long chapterId,
+                                                   @Param("excludedMediaId") Long excludedMediaId);
+
     @Select("SELECT id, chapter_id, page_number, hq_root, hq_path, lq_root, lq_path, hq_status, lq_status, "
             + "transcode_status, status, lq_size, width, height, hq_size, media_type, duration, container, "
             + "video_codec, audio_codec FROM page WHERE chapter_id = #{chapterId} AND media_type = 'IMAGE' "

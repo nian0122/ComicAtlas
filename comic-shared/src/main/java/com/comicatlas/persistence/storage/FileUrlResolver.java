@@ -5,6 +5,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.Set;
+import java.nio.charset.StandardCharsets;
+import org.springframework.web.util.UriUtils;
 
 @Component
 public class FileUrlResolver {
@@ -19,7 +21,7 @@ public class FileUrlResolver {
         if (media.getHqRoot() == null || media.getHqPath() == null) { return null; }
         if (!EXPOSED_ROOTS.contains(media.getHqRoot().toLowerCase())) { return null; }
         return urlPrefix + "/" + media.getHqRoot().toLowerCase()
-            + "/" + media.getHqPath().replace('\\', '/');
+            + "/" + encodePath(media.getHqPath());
     }
 
     public String resolveLq(Media media) {
@@ -30,7 +32,11 @@ public class FileUrlResolver {
         if (root == null || path == null) { return null; }
         String normalizedRoot = root.toLowerCase();
         if (!EXPOSED_ROOTS.contains(normalizedRoot)) { return null; }
-        return urlPrefix + "/" + normalizedRoot + "/" + path.replace('\\', '/');
+        return urlPrefix + "/" + normalizedRoot + "/" + encodePath(path);
+    }
+
+    private String encodePath(String path) {
+        return UriUtils.encodePath(path.replace('\\', '/'), StandardCharsets.UTF_8);
     }
 
     public String resolveCover(Long comicId) {

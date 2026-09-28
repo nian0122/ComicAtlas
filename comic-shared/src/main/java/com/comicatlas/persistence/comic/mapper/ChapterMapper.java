@@ -14,6 +14,9 @@ import com.comicatlas.contract.common.enums.MediaReaction;
 @Mapper
 public interface ChapterMapper extends BaseMapper<Chapter> {
 
+    @Select("SELECT id, comic_id, catalog_id, chapter_no, title, status, page_count, sort_order, global_order, version, reaction, reaction_at FROM chapter WHERE id = #{chapterId} FOR UPDATE")
+    Chapter selectByIdForUpdate(@Param("chapterId") Long chapterId);
+
     @Select("SELECT id, comic_id, catalog_id, chapter_no, title, status, page_count, sort_order, global_order, version, reaction, reaction_at FROM chapter WHERE comic_id = #{comicId} ORDER BY global_order ASC")
     List<Chapter> selectByComicIdOrderByGlobalOrder(@Param("comicId") Long comicId);
 

@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 /**
  * 上传会话中的单个文件（upload_file 表）。
  * <p>
- * fileId 为客户端 opaque 标识；storageName 为服务端生成的 UUID+扩展名，
+ * fileId 为客户端 opaque 标识；storageName 为服务端校验后的原始文件名，
  * 绝不使用客户端路径拼文件。receivedRanges 记录已接收区间（如 0-65535;131072-196607）。
  * <p>
  * 数据库实体（DO），禁止直接暴露给接口；对外使用 {@code dto/} 包对应 DTO/VO。

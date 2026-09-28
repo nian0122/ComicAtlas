@@ -15,6 +15,10 @@ public interface UploadFileMapper extends BaseMapper<UploadFile> {
     @Select("SELECT id, session_id, file_id, original_name, content_type, size_bytes, sha256, storage_name, received_bytes, received_ranges, media_id, created_at, updated_at FROM upload_file WHERE session_id = #{sessionId} ORDER BY id")
     List<UploadFile> selectBySessionId(@Param("sessionId") Long sessionId);
 
+    @Select("SELECT uf.storage_name FROM upload_file uf JOIN upload_session us ON us.id = uf.session_id "
+            + "WHERE us.chapter_id = #{chapterId} AND us.status IN ('ACTIVE', 'VERIFYING')")
+    List<String> selectReservedStorageNamesByChapterId(@Param("chapterId") Long chapterId);
+
     @Select("SELECT id, session_id, file_id, original_name, content_type, size_bytes, sha256, storage_name, received_bytes, received_ranges, media_id, created_at, updated_at FROM upload_file WHERE session_id = #{sessionId} AND file_id = #{fileId}")
     UploadFile selectBySessionIdAndFileId(@Param("sessionId") Long sessionId, @Param("fileId") String fileId);
 

@@ -57,6 +57,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -116,9 +117,9 @@ public class UploadSessionServiceImpl implements UploadSessionService {
     public CreateUploadSessionResponse create(CreateUploadSessionRequest request) {
         Long comicId = request.getComicId();
         Long chapterId = request.getChapterId();
-        validateTarget(comicId, chapterId, request.getReplaceMediaId());
-
         long totalBytes = validateManifest(request.getFiles());
+        validateTarget(comicId, chapterId, request.getReplaceMediaId());
+        validateStorageNames(chapterId, request.getReplaceMediaId(), request.getFiles());
         storageService.ensureEnoughFreeSpace(totalBytes);
 
         UploadSession session = new UploadSession();
@@ -179,7 +180,7 @@ public class UploadSessionServiceImpl implements UploadSessionService {
                                                  List<CreateUploadSessionRequest.FileManifest> manifest) {
         List<UploadFileResponse> fileResponses = new ArrayList<>(manifest.size());
         for (CreateUploadSessionRequest.FileManifest fileManifest : manifest) {
-            String ext = mediaTypeDetector.validateAndExtractExtension(fileManifest.getName());
+            mediaTypeDetector.validateAndExtractExtension(fileManifest.getName());
             UploadFile uploadFile = new UploadFile();
             uploadFile.setSessionId(session.getId());
             uploadFile.setFileId(fileManifest.getFileId());
@@ -187,7 +188,7 @@ public class UploadSessionServiceImpl implements UploadSessionService {
             uploadFile.setContentType(fileManifest.getContentType());
             uploadFile.setSizeBytes(fileManifest.getSize());
             uploadFile.setSha256(fileManifest.getSha256().toLowerCase(Locale.ROOT));
-            uploadFile.setStorageName(UUID.randomUUID().toString() + "." + ext);
+            uploadFile.setStorageName(fileManifest.getName());
             uploadFile.setReceivedBytes(0L);
             uploadFile.setReceivedRanges(null);
             fileMapper.insert(uploadFile);
@@ -203,6 +204,35 @@ public class UploadSessionServiceImpl implements UploadSessionService {
         return fileResponses;
     }
 
+    /** 保留原始文件名，并拒绝章节中已存在或正在上传的同名媒体。 */
+    private void validateStorageNames(Long chapterId, Long excludedMediaId,
+                                      List<CreateUploadSessionRequest.FileManifest> manifest) {
+        Set<String> requestedNames = new HashSet<>();
+        for (CreateUploadSessionRequest.FileManifest fileManifest : manifest) {
+            String normalizedName = fileManifest.getName().toLowerCase(Locale.ROOT);
+            if (!requestedNames.add(normalizedName)) {
+                throw new BusinessException(HttpStatusCodes.CONFLICT,
+                        "上传清单中存在重名文件: " + fileManifest.getName());
+            }
+        }
+
+        Set<String> reservedNames = new HashSet<>();
+        for (String hqPath : mediaMapper.selectReservedHqPathsByChapterId(chapterId, excludedMediaId)) {
+            String normalizedPath = hqPath.replace('\\', '/');
+            int separatorIndex = normalizedPath.lastIndexOf('/');
+            reservedNames.add(normalizedPath.substring(separatorIndex + 1).toLowerCase(Locale.ROOT));
+        }
+        for (String storageName : fileMapper.selectReservedStorageNamesByChapterId(chapterId)) {
+            reservedNames.add(storageName.toLowerCase(Locale.ROOT));
+        }
+        for (CreateUploadSessionRequest.FileManifest fileManifest : manifest) {
+            if (reservedNames.contains(fileManifest.getName().toLowerCase(Locale.ROOT))) {
+                throw new BusinessException(HttpStatusCodes.CONFLICT,
+                        "该章节已存在同名媒体文件: " + fileManifest.getName());
+            }
+        }
+    }
+
     private Chapter validateTarget(Long comicId, Long chapterId, Long replaceMediaId) {
         Comic comic = comicMapper.selectById(comicId);
         if (comic == null) {
@@ -211,7 +241,7 @@ public class UploadSessionServiceImpl implements UploadSessionService {
         if (NON_UPLOADABLE_STATUSES.contains(comic.getStatus())) {
             throw new BusinessException(HttpStatusCodes.CONFLICT, "漫画状态 " + comic.getStatus() + " 不允许上传媒体");
         }
-        Chapter chapter = chapterMapper.selectById(chapterId);
+        Chapter chapter = chapterMapper.selectByIdForUpdate(chapterId);
         if (chapter == null || !chapter.getComicId().equals(comicId)) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "章节不存在或不属于该漫画: " + chapterId);
         }

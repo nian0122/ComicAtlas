@@ -29,7 +29,7 @@ CREATE TABLE upload_file (
     content_type    VARCHAR(128) NOT NULL COMMENT '客户端声明 Content-Type',
     size_bytes      BIGINT       NOT NULL COMMENT '声明文件大小',
     sha256          VARCHAR(64)  NOT NULL COMMENT '声明文件总 SHA-256',
-    storage_name    VARCHAR(255) NOT NULL COMMENT '服务端生成文件名 uuid.ext',
+    storage_name    VARCHAR(255) NOT NULL COMMENT '校验后的原始文件名',
     received_bytes  BIGINT       NOT NULL DEFAULT 0 COMMENT '已接收最大末端字节',
     received_ranges TEXT         NULL     COMMENT '已接收区间串 0-65535;131072-196607',
     media_id        BIGINT       NULL     COMMENT 'complete 预建 STAGING media row id',

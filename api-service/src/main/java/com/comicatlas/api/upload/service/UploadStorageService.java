@@ -35,7 +35,7 @@ import java.util.stream.Stream;
 /**
  * 分片上传存储服务 — 流式写入 STAGING/{sessionId}/{fileId}.part。
  * <p>
- * 不跟随客户端文件名拼路径（storageName 服务端生成）；乱序/重复分片通过
+ * 仅使用服务端校验过的原始文件基名拼接会话内路径；乱序/重复分片通过
  * 区间合并处理；每个文件独立锁避免并发丢失区间更新。
  */
 @Slf4j
@@ -105,7 +105,7 @@ public class UploadStorageService {
      * 流式写入一个分片。返回合并后的已接收区间串。
      *
      * @param session     会话
-     * @param file        目标文件（storageName 服务端生成）
+     * @param file        目标文件（storageName 为校验后的原始文件名）
      * @param start       分片起始偏移（含）
      * @param end         分片结束偏移（含）
      * @param total       文件声明总大小

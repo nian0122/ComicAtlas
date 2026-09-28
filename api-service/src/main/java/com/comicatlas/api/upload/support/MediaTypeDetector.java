@@ -22,6 +22,9 @@ public class MediaTypeDetector {
 
     private static final Set<String> IMAGE_EXT = Set.of("jpg", "jpeg", "png", "gif", "webp", "bmp", "avif");
     private static final Set<String> VIDEO_EXT = Set.of("mp4", "webm", "mkv", "mov", "avi");
+    private static final Set<String> WINDOWS_DEVICE_NAMES = Set.of(
+            "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8",
+            "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9");
 
     /** 检测结果 */
     @lombok.Getter
@@ -57,15 +60,21 @@ public class MediaTypeDetector {
         if (name == null || name.isBlank()) {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "文件名不能为空");
         }
-        String base = name.replace('\\', '/');
-        if (base.contains("/") || base.contains("..") || base.indexOf('\0') >= 0) {
+        if (name.length() > 255 || name.contains("/") || name.contains("\\") || name.contains("..")
+                || name.endsWith(".") || name.endsWith(" ") || name.indexOf('\0') >= 0
+                || name.chars().anyMatch(Character::isISOControl)
+                || name.chars().anyMatch(character -> "<>:\"|?*".indexOf(character) >= 0)) {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "非法文件名: " + name);
         }
-        int dot = base.lastIndexOf('.');
-        if (dot < 0 || dot == base.length() - 1) {
+        int dot = name.lastIndexOf('.');
+        if (dot <= 0 || dot == name.length() - 1) {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "文件缺少扩展名: " + name);
         }
-        String ext = base.substring(dot + 1).toLowerCase(Locale.ROOT);
+        String deviceName = name.substring(0, dot).toUpperCase(Locale.ROOT);
+        if (WINDOWS_DEVICE_NAMES.contains(deviceName)) {
+            throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "非法文件名: " + name);
+        }
+        String ext = name.substring(dot + 1).toLowerCase(Locale.ROOT);
         if (!IMAGE_EXT.contains(ext) && !VIDEO_EXT.contains(ext)) {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "不支持的扩展名: ." + ext);
         }
