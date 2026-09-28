@@ -86,3 +86,5 @@ frontend/screenshots/
 
 # ffmpeg -encoders 探测在测试工作目录的误产物
 worker-service/-encoders
+puremedia_product_names.csv
+puremedia_missing_products.csv
