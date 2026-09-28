@@ -306,24 +306,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.tree-icon {
-  display: inline-grid;
-  place-items: center;
-  flex: 0 0 auto;
-  width: 16px;
-  height: 17px;
-  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
-  color: var(--accent);
-  font-size: 9px;
-  line-height: 1;
-}
-.structure-table :deep(.structure-row--chapter .tree-icon) {
-  border-color: color-mix(in srgb, var(--text-muted) 25%, transparent);
-  background: color-mix(in srgb, var(--text-muted) 8%, transparent);
-  color: var(--text-secondary);
-}
 .tree-kind {
   flex: 0 0 auto;
   padding: 3px 6px;

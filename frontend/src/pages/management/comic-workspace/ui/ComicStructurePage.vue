@@ -78,7 +78,6 @@
                 @drop.prevent.stop="dropStructureRow(row, $event)"
                 @dragend="clearStructureDrag"
               >
-                <span class="tree-icon">{{ row.kind === 'CATALOG' ? '▰' : '▱' }}</span>
                 <span class="catalog-drag-handle" aria-hidden="true">⠿</span>
                 <span class="tree-title__text">{{ row.title }}</span>
                 <span class="tree-kind" :class="row.kind === 'CATALOG' ? 'is-catalog' : 'is-chapter'">{{
