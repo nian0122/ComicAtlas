@@ -38,6 +38,9 @@ public class ZipImportHandler {
     private final DirectoryImportHandler directoryHandler;
 
     public Path importZip(ImportContext importContext, Long taskId, Long comicId, Path mangaRoot) throws Exception {
+        if (directoryHandler.hasRecoveryPoint(mangaRoot, taskId)) {
+            return resumeExisting(taskId, comicId, mangaRoot);
+        }
         Path zipFile = importContext.sourcePath();
         if (!Files.exists(zipFile)) {
             throw new IllegalArgumentException("ZIP 文件不存在: " + zipFile.getFileName());
@@ -46,8 +49,10 @@ public class ZipImportHandler {
         // 任务唯一临时目录：temp/{taskId}/extracted，互不干扰
         Path tempRoot = config.resolveTempDir().resolve(taskId.toString());
         Path extractDir = tempRoot.resolve(EXTRACT_DIR_NAME);
+        deleteRecursively(tempRoot);
         Files.createDirectories(extractDir);
 
+        boolean importPrepared = false;
         try {
             zipExtractor.extract(zipFile, extractDir);
             log.info("ZIP 解压完成: archive={}", zipFile.getFileName());
@@ -60,10 +65,22 @@ public class ZipImportHandler {
             ImportContext extractionContext = new ImportContext(
                 importContext.sourceType(), extractDir, importContext.generateLq(), importContext.overwrite(), titleHint
             );
-            return directoryHandler.handle(extractionContext, taskId, comicId, mangaRoot);
+            Path metadataPath = directoryHandler.handle(extractionContext, taskId, comicId, mangaRoot);
+            importPrepared = true;
+            return metadataPath;
         } finally {
-            deleteRecursively(tempRoot);
+            if (importPrepared) {
+                deleteRecursively(tempRoot);
+            } else {
+                log.info("导入未完成，保留解压恢复现场: taskId={}", taskId);
+            }
         }
+    }
+
+    public Path resumeExisting(Long taskId, Long comicId, Path mangaRoot) throws IOException {
+        Path metadataPath = directoryHandler.resumeExisting(taskId, comicId, mangaRoot);
+        deleteRecursively(config.resolveTempDir().resolve(taskId.toString()));
+        return metadataPath;
     }
 
     /**

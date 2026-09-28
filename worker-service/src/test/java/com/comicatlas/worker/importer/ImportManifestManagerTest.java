@@ -1,6 +1,8 @@
 package com.comicatlas.worker.importer;
 
 import com.comicatlas.worker.importer.model.ImportManifest;
+import com.comicatlas.worker.importer.model.ImportNormalizationManifest;
+import com.comicatlas.worker.media.ComicMetadata;
 import com.comicatlas.worker.importer.manifest.ImportManifestManager;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -92,6 +94,25 @@ class ImportManifestManagerTest {
 
         assertFalse(manager.exists(mangaRoot, 9L));
         assertFalse(Files.exists(manager.manifestPath(mangaRoot, 9L).getParent()));
+    }
+
+    @Test
+    void normalizationCheckpoint_roundTripsStructureBeforeSourceMoves() throws Exception {
+        ComicMetadata plannedMetadata = new ComicMetadata("series", "author", null,
+                List.of(), "description", List.of(new ComicMetadata.CatalogInfo("volume", 0, null)),
+                List.of(new ComicMetadata.ChapterInfo("chapter", "1", 0, 1, 0, "volume/chapter",
+                        List.of(new ComicMetadata.MediaInfo("001.jpg", 1, "READY", "NOT_GENERATED",
+                                123L, null, null)))));
+        ImportNormalizationManifest original = new ImportNormalizationManifest(
+                1, 77L, "DIRECTORY", "D:/source", "F:/manga/hq/.staging/77/10", plannedMetadata);
+
+        manager.writeNormalization(mangaRoot, 77L, original);
+        ImportNormalizationManifest restored = manager.readNormalization(mangaRoot, 77L);
+
+        assertEquals("D:/source", restored.sourceRoot());
+        assertEquals("volume", restored.plannedMetadata().catalogs().get(0).title());
+        assertEquals("volume/chapter", restored.plannedMetadata().chapters().get(0).sourceDir());
+        assertEquals("001.jpg", restored.plannedMetadata().chapters().get(0).pages().get(0).fileName());
     }
 
     private ImportManifest sampleManifest() throws Exception {

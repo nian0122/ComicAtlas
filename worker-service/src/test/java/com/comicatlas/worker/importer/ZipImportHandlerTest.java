@@ -109,8 +109,8 @@ class ZipImportHandlerTest {
     }
 
     @Test
-    @DisplayName("失败（伪造 size 超限）：主异常原样保留、临时目录清理、日志不含完整源路径")
-    void failure_propagatesCause_andCleansTempRoot_logWithoutSourcePath() throws Exception {
+    @DisplayName("失败（解压失败）：主异常原样保留、临时目录保留用于恢复、日志不含完整源路径")
+    void failure_propagatesCause_andKeepsTempRootForRecovery_logWithoutSourcePath() throws Exception {
         Path mangaRoot = tempRoot.resolve("manga2");
         Path zip = mangaRoot.resolve("私人下载/绝密漫画.zip");
         Files.createDirectories(zip.getParent());
@@ -125,8 +125,8 @@ class ZipImportHandlerTest {
                         TASK_ID, COMIC_ID, mangaRoot));
 
         assertSame(cause, thrown, "主异常必须原样保留（含 cause 链）");
-        assertFalse(Files.exists(mangaRoot.resolve("temp").resolve(String.valueOf(TASK_ID))),
-                "失败后临时目录必须清理");
+        assertTrue(Files.exists(mangaRoot.resolve("temp").resolve(String.valueOf(TASK_ID))),
+                "失败后临时目录必须保留以便整理阶段续做");
 
         List<String> messages = loggedMessages();
         assertTrue(messages.stream().noneMatch(m -> m.contains("私人下载")),

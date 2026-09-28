@@ -2,6 +2,8 @@ package com.comicatlas.worker.media;
 
 import com.comicatlas.common.constant.MediaTypes;
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -16,8 +18,12 @@ public final class ComicMetadata {
     private final List<CatalogInfo> catalogs;
     private final List<ChapterInfo> chapters;
 
-    public ComicMetadata(String title, String author, String category, List<String> tags,
-                         String description, List<CatalogInfo> catalogs, List<ChapterInfo> chapters) {
+    @JsonCreator
+    public ComicMetadata(@JsonProperty("title") String title, @JsonProperty("author") String author,
+                         @JsonProperty("category") String category, @JsonProperty("tags") List<String> tags,
+                         @JsonProperty("description") String description,
+                         @JsonProperty("catalogs") List<CatalogInfo> catalogs,
+                         @JsonProperty("chapters") List<ChapterInfo> chapters) {
         this.title = title;
         this.author = author;
         this.category = category;
@@ -46,7 +52,10 @@ public final class ComicMetadata {
         private final int sortOrder;
         private final Integer parentIndex;
 
-        public CatalogInfo(String title, int sortOrder, Integer parentIndex) {
+        @JsonCreator
+        public CatalogInfo(@JsonProperty("title") String title,
+                           @JsonProperty("sortOrder") int sortOrder,
+                           @JsonProperty("parentIndex") Integer parentIndex) {
             this.title = title;
             this.sortOrder = sortOrder;
             this.parentIndex = parentIndex;
@@ -67,8 +76,14 @@ public final class ComicMetadata {
         private final String sourceDir;
         private final List<MediaInfo> pages;
 
-        public ChapterInfo(String title, String chapterNo, int sortOrder, int globalOrder,
-                           Integer catalogIndex, String sourceDir, List<MediaInfo> pages) {
+        @JsonCreator
+        public ChapterInfo(@JsonProperty("title") String title,
+                           @JsonProperty("chapterNo") String chapterNo,
+                           @JsonProperty("sortOrder") int sortOrder,
+                           @JsonProperty("globalOrder") int globalOrder,
+                           @JsonProperty("catalogIndex") Integer catalogIndex,
+                           @JsonProperty("sourceDir") String sourceDir,
+                           @JsonProperty("pages") List<MediaInfo> pages) {
             this.title = title;
             this.chapterNo = chapterNo;
             this.sortOrder = sortOrder;
@@ -112,11 +127,24 @@ public final class ComicMetadata {
         private final String conversionStatus;
         private final String conversionError;
 
-        public MediaInfo(String fileName, int pageNumber, String hqStatus, String lqStatus,
-                         long fileSize, Integer width, Integer height, String mediaType,
-                         BigDecimal duration, String container, String videoCodec, String audioCodec,
-                         String format, Boolean decodable, Boolean needsConversion,
-                         String conversionStatus, String conversionError) {
+        @JsonCreator
+        public MediaInfo(@JsonProperty("fileName") String fileName,
+                         @JsonProperty("pageNumber") int pageNumber,
+                         @JsonProperty("hqStatus") String hqStatus,
+                         @JsonProperty("lqStatus") String lqStatus,
+                         @JsonProperty("fileSize") long fileSize,
+                         @JsonProperty("width") Integer width,
+                         @JsonProperty("height") Integer height,
+                         @JsonProperty("mediaType") String mediaType,
+                         @JsonProperty("duration") BigDecimal duration,
+                         @JsonProperty("container") String container,
+                         @JsonProperty("videoCodec") String videoCodec,
+                         @JsonProperty("audioCodec") String audioCodec,
+                         @JsonProperty("format") String format,
+                         @JsonProperty("decodable") Boolean decodable,
+                         @JsonProperty("needsConversion") Boolean needsConversion,
+                         @JsonProperty("conversionStatus") String conversionStatus,
+                         @JsonProperty("conversionError") String conversionError) {
             this.fileName = fileName;
             this.pageNumber = pageNumber;
             this.hqStatus = hqStatus;

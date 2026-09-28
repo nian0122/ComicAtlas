@@ -73,6 +73,23 @@ class DirectoryParserTest {
     }
 
     @Test
+    void directoryWithReservedName_isIncludedUnlessItHasQuarantineMarker() throws Exception {
+        Path reservedNameDirectory = dirWithMedia(tempDir, "__comic_atlas_non_imported__");
+
+        DirectoryTree userDirectoryTree = parser.parse(tempDir, "DIRECTORY");
+        assertEquals(List.of("__comic_atlas_non_imported__"), childNames(userDirectoryTree),
+                "同名的用户目录不能被解析器静默忽略");
+
+        Files.writeString(reservedNameDirectory.resolve(".comic-atlas-non-imported"),
+                "ComicAtlas non-imported files\n");
+        Files.createDirectories(tempDir.resolve("chapter"));
+        Files.writeString(tempDir.resolve("chapter/001.jpg"), "chapter");
+        DirectoryTree generatedQuarantineTree = parser.parse(tempDir, "DIRECTORY");
+        assertEquals(List.of("chapter"), childNames(generatedQuarantineTree),
+                "只有带标记的隔离目录才从漫画结构中排除");
+    }
+
+    @Test
     void naturalSort_paddedNumbers() throws Exception {
         // 1 < 01 < 001（数字相等时按数字串长度，短串优先）
         dirWithMedia(tempDir, "1");

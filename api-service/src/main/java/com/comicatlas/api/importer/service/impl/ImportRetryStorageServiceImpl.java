@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
@@ -44,11 +45,11 @@ public class ImportRetryStorageServiceImpl implements com.comicatlas.api.importe
 
     private final ApiStorageProperties storageProperties;
 
-    /** 将旧正式章节目录中的文件恢复到当前任务隔离暂存目录。 */
+    /** 将旧正式章节目录整体恢复到当前任务隔离暂存目录。 */
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void restoreFinalizedToStaging(Long taskId, Long comicId, List<Chapter> chapters) {
         Path hqRoot = storageProperties.root(StorageRootKeys.HQ).getPath();
-        int restored = 0;
+        int restoredChapters = 0;
         for (Chapter chapter : chapters) {
             if (chapter.getGlobalOrder() == null) {
                 continue;
@@ -57,22 +58,34 @@ public class ImportRetryStorageServiceImpl implements com.comicatlas.api.importe
                     .resolve(String.valueOf(chapter.getId()));
             Path stagingDir = hqRoot.resolve(ImportStagingPath.chapterRelativeToHq(
                     comicId, taskId, chapter.getGlobalOrder()));
-            if (!Files.isDirectory(chapterDir)) {
+            if (!Files.exists(chapterDir, LinkOption.NOFOLLOW_LINKS)) {
                 continue;
             }
-            try (Stream<Path> stream = Files.list(chapterDir)) {
-                List<Path> files = stream.filter(Files::isRegularFile).toList();
-                for (Path file : files) {
-                    if (restoreFile(file, stagingDir)) {
-                        restored++;
+            try {
+                if (Files.isSymbolicLink(chapterDir)
+                        || !Files.isDirectory(chapterDir, LinkOption.NOFOLLOW_LINKS)) {
+                    throw new IOException("正式章节路径不是安全目录");
+                }
+                if (Files.exists(stagingDir, LinkOption.NOFOLLOW_LINKS)) {
+                    if (Files.isSymbolicLink(stagingDir)
+                            || !Files.isDirectory(stagingDir, LinkOption.NOFOLLOW_LINKS)
+                            || !areChapterDirectoriesIdentical(chapterDir, stagingDir)) {
+                        throw new IOException("正式章节目录与暂存目录冲突，保留两边文件");
                     }
+                    deleteDirectoryTree(chapterDir);
+                } else {
+                    Files.createDirectories(stagingDir.getParent());
+                    Files.move(chapterDir, stagingDir);
+                    restoredChapters++;
                 }
             } catch (IOException ex) {
-                log.warn("重试反最终化目录扫描失败（非关键）: dir={}", chapterDir, ex);
+                // 反最终化失败时不能继续删旧章节数据库记录，否则提交后的孤儿清理会丢失原文件。
+                throw new IllegalStateException("重试反最终化失败，已停止重试以保留文件: chapterId="
+                        + chapter.getId(), ex);
             }
         }
-        log.info("重试反最终化完成: comicId={}, restoredFiles={}, chapters={}",
-                comicId, restored, chapters.size());
+        log.info("重试反最终化完成: comicId={}, restoredChapters={}, chapters={}",
+                comicId, restoredChapters, chapters.size());
     }
 
     /** 根据漫画元数据和当前任务暂存目录重建完整导入清单。 */
@@ -119,24 +132,42 @@ public class ImportRetryStorageServiceImpl implements com.comicatlas.api.importe
         }
     }
 
-    private boolean restoreFile(Path chapterFile, Path stagingDir) {
-        try {
-            Path stagingTarget = stagingDir.resolve(chapterFile.getFileName());
-            if (Files.exists(stagingTarget)) {
-                long stagingSize = Files.size(stagingTarget);
-                long chapterSize = Files.size(chapterFile);
-                if (stagingSize != chapterSize) {
-                    log.warn("重试反最终化: 暂存与章节目录文件大小不一致，保留暂存版本: file={}", stagingTarget);
-                }
-                Files.deleteIfExists(chapterFile);
+    /** 仅在两个副本的相对文件集合和字节内容完全一致时，允许清除重复正式目录。 */
+    private boolean areChapterDirectoriesIdentical(Path chapterDirectory, Path stagingDirectory)
+            throws IOException {
+        List<Path> chapterFiles = listSafeChapterFiles(chapterDirectory);
+        List<Path> stagingFiles = listSafeChapterFiles(stagingDirectory);
+        if (chapterFiles.size() != stagingFiles.size()) {
+            return false;
+        }
+        for (int fileIndex = 0; fileIndex < chapterFiles.size(); fileIndex++) {
+            Path chapterFile = chapterFiles.get(fileIndex);
+            Path stagingFile = stagingFiles.get(fileIndex);
+            if (!chapterDirectory.relativize(chapterFile).equals(stagingDirectory.relativize(stagingFile))
+                    || Files.mismatch(chapterFile, stagingFile) != -1L) {
                 return false;
             }
-            Files.createDirectories(stagingDir);
-            Files.move(chapterFile, stagingTarget);
-            return true;
-        } catch (IOException ex) {
-            log.warn("重试反最终化单文件失败（非关键）: file={}", chapterFile, ex);
-            return false;
+        }
+        return true;
+    }
+
+    /** 列出平铺章节目录中的普通文件；拒绝链接、子目录和特殊文件。 */
+    private List<Path> listSafeChapterFiles(Path chapterDirectory) throws IOException {
+        try (Stream<Path> entries = Files.list(chapterDirectory)) {
+            List<Path> files = entries.toList();
+            if (files.stream().anyMatch(path -> Files.isSymbolicLink(path)
+                    || !Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS))) {
+                throw new IOException("章节目录包含链接、子目录或特殊文件");
+            }
+            return files.stream().sorted(Comparator.comparing(path -> path.getFileName().toString())).toList();
+        }
+    }
+
+    private void deleteDirectoryTree(Path directory) throws IOException {
+        try (Stream<Path> entries = Files.walk(directory)) {
+            for (Path entry : entries.sorted(Comparator.reverseOrder()).toList()) {
+                Files.delete(entry);
+            }
         }
     }
 

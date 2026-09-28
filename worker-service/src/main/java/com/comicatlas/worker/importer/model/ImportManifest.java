@@ -9,8 +9,9 @@ import java.util.List;
 
 /**
  * 导入清单（恢复点）。
- * files[].source 为相对 sourceRoot 的相对路径；files[].target 为 HQ 相对路径（comicId/chapterGlobalOrder/fileName）。
- * metadata 为完整 v3 metadata（含 MediaAnalyzer 提取的文件元信息），恢复时零依赖源文件。
+ * files[].source 为相对暂存漫画目录的章节/文件路径；files[].target 为 HQ 相对路径
+ *（.staging/taskId/comicId/chapterGlobalOrder/fileName）。metadata 为完整 v3 metadata，
+ * 恢复时只依赖平铺暂存区，不依赖原始来源目录。
  */
 @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
 public final class ImportManifest {

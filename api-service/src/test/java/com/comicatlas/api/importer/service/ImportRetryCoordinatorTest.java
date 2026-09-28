@@ -35,6 +35,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -196,7 +197,7 @@ class ImportRetryCoordinatorTest {
     }
 
     @Test
-    void retry_reverseFinalize_keepsStagingVersion_whenSizeMatches() throws Exception {
+    void retry_reverseFinalize_deduplicatesOnlyWhenFileContentsMatch() throws Exception {
         ImportTask task = failedTask(7L, 61L, SourceType.DIRECTORY);
         Chapter ch1 = new Chapter();
         ch1.setId(7002L);
@@ -208,15 +209,39 @@ class ImportRetryCoordinatorTest {
 
         Path stagingFile = Path.of("target/test-tmp/hq/.staging/7/61/6/001.jpg");
         Files.createDirectories(stagingFile.getParent());
-        Files.writeString(stagingFile, "staging");
+        Files.writeString(stagingFile, "identical");
         Path chapterDir = Path.of("target/test-tmp/hq/61/7002");
         Files.createDirectories(chapterDir);
-        Files.writeString(chapterDir.resolve("001.jpg"), "chapter");
+        Files.writeString(chapterDir.resolve("001.jpg"), "identical");
 
         coordinator.retry(task);
 
-        assertEquals("staging", Files.readString(stagingFile), "暂存已有同大小文件时保留暂存版本");
+        assertEquals("identical", Files.readString(stagingFile), "暂存副本保留");
         assertFalse(Files.exists(chapterDir.resolve("001.jpg")), "章节目录副本应被去重删除");
+    }
+
+    @Test
+    void retry_reverseFinalize_stopsAndPreservesBothDirectories_whenSameSizeContentsDiffer() throws Exception {
+        ImportTask task = failedTask(10L, 62L, SourceType.DIRECTORY);
+        Chapter chapter = new Chapter();
+        chapter.setId(7003L);
+        chapter.setComicId(62L);
+        chapter.setGlobalOrder(7);
+        when(importTaskMapper.update(eq(null), any(Wrapper.class))).thenReturn(1);
+        when(chapterMapper.selectByComicId(anyLong())).thenReturn(List.of(chapter));
+
+        Path stagingFile = Path.of("target/test-tmp/hq/.staging/10/62/7/001.jpg");
+        Files.createDirectories(stagingFile.getParent());
+        Files.writeString(stagingFile, "staging");
+        Path chapterFile = Path.of("target/test-tmp/hq/62/7003/001.jpg");
+        Files.createDirectories(chapterFile.getParent());
+        Files.writeString(chapterFile, "chapter");
+
+        assertThrows(IllegalStateException.class, () -> coordinator.retry(task));
+
+        assertEquals("staging", Files.readString(stagingFile), "暂存副本必须保留");
+        assertEquals("chapter", Files.readString(chapterFile), "冲突副本必须保留");
+        verify(mediaMapper, never()).deleteByChapterIds(any());
     }
 
     @Test

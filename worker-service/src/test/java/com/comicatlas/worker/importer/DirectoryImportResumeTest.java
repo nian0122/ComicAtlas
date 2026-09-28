@@ -3,13 +3,17 @@ package com.comicatlas.worker.importer;
 import com.comicatlas.worker.importer.model.DirectoryTree;
 import com.comicatlas.worker.importer.model.ImportContext;
 import com.comicatlas.worker.importer.model.ImportManifest;
+import com.comicatlas.worker.importer.model.ImportNormalizationManifest;
 import com.comicatlas.worker.importer.handler.DirectoryImportHandler;
 import com.comicatlas.worker.importer.parser.DirectoryParser;
 import com.comicatlas.worker.importer.metadata.MetadataAssembler;
 import com.comicatlas.worker.importer.metadata.CoverCandidateSelector;
+import com.comicatlas.worker.importer.metadata.ImportCoverService;
+import com.comicatlas.worker.importer.metadata.ImportMetadataArtifactService;
 import com.comicatlas.worker.importer.manifest.ImportManifestManager;
 import com.comicatlas.worker.task.command.CancelHandler;
 import com.comicatlas.worker.media.ComicMetadata;
+import com.comicatlas.worker.media.MediaAnalyzer;
 import com.comicatlas.worker.storage.SafeMoveStrategy;
 import com.comicatlas.worker.storage.StorageProperties;
 import com.comicatlas.worker.storage.StorageRoot;
@@ -32,7 +36,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -48,6 +54,7 @@ class DirectoryImportResumeTest {
     private Path sourceRoot;
     private DirectoryImportHandler handler;
     private CancelHandler cancelHandler;
+    private MetadataAssembler metadataAssembler;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -117,6 +124,74 @@ class DirectoryImportResumeTest {
     }
 
     @Test
+    void freshImport_movesChapterDirectoryAndKeepsNonTargetInSourceTree() throws Exception {
+        Files.writeString(sourceRoot.resolve("vol1/ch1/001.jpg"), "content-1");
+        Files.writeString(sourceRoot.resolve("vol1/ch1/002.jpg"), "content-2");
+        Files.writeString(sourceRoot.resolve("vol1/ch1/readme.txt"), "keep beside source");
+        stubParseAndAssemble();
+
+        handler.handle(new ImportContext("DIRECTORY", sourceRoot, false, false), 301L, 31L, mangaRoot);
+
+        Path stagingChapter = mangaRoot.resolve("hq/.staging/301/31/1");
+        assertTrue(Files.exists(stagingChapter.resolve("001.jpg")));
+        assertFalse(Files.exists(stagingChapter.resolve("readme.txt")));
+        assertTrue(Files.exists(sourceRoot.resolve("__comic_atlas_non_imported__/301/vol1/ch1/readme.txt")));
+        verify(metadataAssembler).analyzePlannedFromStaging(any(ComicMetadata.class),
+                eq(mangaRoot.resolve("hq/.staging/301/31")));
+    }
+
+    @Test
+    void freshImport_analyzesFromFlatStagingAndPreservesLogicalCatalogTree() throws Exception {
+        Files.writeString(sourceRoot.resolve("vol1/ch1/001.jpg"), "image bytes");
+        Files.writeString(sourceRoot.resolve("vol1/ch1/readme.txt"), "leave in source");
+        MediaAnalyzer mediaAnalyzer = mock(MediaAnalyzer.class);
+        when(mediaAnalyzer.analyze(any(Path.class))).thenAnswer(invocation -> {
+            Path stagedMedia = invocation.getArgument(0);
+            return new ComicMetadata.MediaInfo(stagedMedia.getFileName().toString(), 0,
+                    "READY", "NOT_GENERATED", Files.size(stagedMedia), 800, 1200,
+                    "IMAGE", null, null, null, null);
+        });
+        MetadataAssembler realAssembler = new MetadataAssembler(mediaAnalyzer);
+        var coverGenerator = mock(com.comicatlas.worker.media.image.CoverGenerator.class);
+        ImportCoverService coverService = new ImportCoverService(
+                coverGenerator, new CoverCandidateSelector(), transferService);
+        handler = new DirectoryImportHandler(new DirectoryParser(), realAssembler, transferService,
+                new ImportMetadataArtifactService(objectMapper), coverService, cancelHandler, manifestManager);
+
+        handler.handle(new ImportContext("DIRECTORY", sourceRoot, false, false), 401L, 41L, mangaRoot);
+
+        Path stagedMedia = mangaRoot.resolve("hq/.staging/401/41/1/001.jpg");
+        verify(mediaAnalyzer).analyze(eq(stagedMedia));
+        assertTrue(Files.exists(sourceRoot.resolve("__comic_atlas_non_imported__/401/vol1/ch1/readme.txt")));
+        JsonNode metadata = objectMapper.readTree(mangaRoot.resolve("metadata/401.json").toFile());
+        assertEquals("vol1", metadata.path("catalogs").get(0).path("title").asText());
+        assertEquals(0, metadata.path("chapters").get(0).path("catalogIndex").asInt());
+        assertEquals("1", metadata.path("chapters").get(0).path("sourceDir").asText());
+    }
+
+    @Test
+    void interruptedNormalization_resumesRemainingFilesFromSavedStructurePlan() throws Exception {
+        Files.writeString(sourceRoot.resolve("vol1/ch1/001.jpg"), "content-1");
+        Files.writeString(sourceRoot.resolve("vol1/ch1/002.jpg"), "content-2");
+        stubParseAndAssemble();
+        ComicMetadata plannedMetadata = sampleMetadata();
+        Path stagingComicRoot = mangaRoot.resolve("hq/.staging/501/51");
+        Path stagingChapter = stagingComicRoot.resolve("1");
+        Files.createDirectories(stagingChapter);
+        Files.move(sourceRoot.resolve("vol1/ch1/001.jpg"), stagingChapter.resolve("001.jpg"));
+        manifestManager.writeNormalization(mangaRoot, 501L, new ImportNormalizationManifest(
+                1, 501L, "DIRECTORY", sourceRoot.toString(), stagingComicRoot.toString(), plannedMetadata));
+
+        handler.handle(new ImportContext("DIRECTORY", sourceRoot, false, false), 501L, 51L, mangaRoot);
+
+        assertTrue(Files.exists(stagingChapter.resolve("001.jpg")));
+        assertTrue(Files.exists(stagingChapter.resolve("002.jpg")));
+        assertFalse(Files.exists(sourceRoot.resolve("vol1/ch1/002.jpg")));
+        assertTrue(manifestManager.exists(mangaRoot, 501L));
+        assertFalse(manifestManager.normalizationExists(mangaRoot, 501L));
+    }
+
+    @Test
     void resumeImport_skipsAlreadyMovedFiles() throws Exception {
         Files.writeString(sourceRoot.resolve("vol1/ch1/001.jpg"), "content-1");
         Files.writeString(sourceRoot.resolve("vol1/ch1/002.jpg"), "content-2");
@@ -154,6 +229,7 @@ class DirectoryImportResumeTest {
         Files.deleteIfExists(mangaRoot.resolve("metadata/200.json"));
 
         // 重新创建源文件
+        Files.createDirectories(sourceRoot.resolve("vol1/ch1"));
         Files.writeString(sourceRoot.resolve("vol1/ch1/001.jpg"), "content-1");
         Files.writeString(sourceRoot.resolve("vol1/ch1/002.jpg"), "content-2");
 
@@ -245,10 +321,14 @@ class DirectoryImportResumeTest {
     private void stubParseAndAssemble() throws Exception {
         DirectoryParser parser = mock(DirectoryParser.class);
         MetadataAssembler assembler = mock(MetadataAssembler.class);
+        metadataAssembler = assembler;
         when(parser.parse(any(Path.class), any(String.class))).thenReturn(
                 new DirectoryTree(sourceRoot, "src", List.of(), List.of()));
-        when(assembler.assemble(any(DirectoryTree.class), any(ImportContext.class)))
-                .thenReturn(sampleMetadata());
+        ComicMetadata plannedMetadata = sampleMetadata();
+        when(assembler.planStructure(any(DirectoryTree.class), any(ImportContext.class), any()))
+                .thenReturn(plannedMetadata);
+        when(assembler.analyzePlannedFromStaging(any(ComicMetadata.class), any(Path.class)))
+                .thenReturn(plannedMetadata);
         // 重新装配 handler（@RequiredArgsConstructor 无 setter，用新实例）
         com.comicatlas.worker.media.image.CoverGenerator coverGen = mock(com.comicatlas.worker.media.image.CoverGenerator.class);
         handler = new DirectoryImportHandler(parser, assembler, transferService, objectMapper,

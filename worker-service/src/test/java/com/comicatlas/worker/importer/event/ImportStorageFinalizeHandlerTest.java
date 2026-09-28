@@ -1,7 +1,5 @@
 package com.comicatlas.worker.importer.event;
 
-import com.comicatlas.worker.importer.model.ImportManifest;
-import com.comicatlas.worker.importer.manifest.ImportManifestManager;
 import com.comicatlas.common.constant.MqExchanges;
 import com.comicatlas.common.constant.MqRoutingKeys;
 import com.comicatlas.common.constant.StorageFinalizeErrorCode;
@@ -46,7 +44,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -500,32 +497,22 @@ class ImportStorageFinalizeHandlerTest {
     }
 
     @Test
-    @DisplayName("InterruptedException：恢复中断标志、不 ACK/不 Reject、不发布失败事件")
-    void finalize_interrupted_restoresFlagAndTerminatesSilently() throws Exception {
+    @DisplayName("正常最终化按章节目录移动，不调用逐文件存储搬运")
+    void finalize_movesChapterDirectoryWithoutPerFileTransfers() throws Exception {
         writeStaging(1, "001.jpg", "aaa");
         writeManifest(Map.of(1, List.of("001.jpg")), 3);
 
-        StorageService throwingStorage = mock(StorageService.class);
-        doAnswer(inv -> {
-            throw new InterruptedException("mock interrupt");
-        }).when(throwingStorage).transfer(any(), any(), any());
+        StorageService unusedStorage = mock(StorageService.class);
         WorkerConfig config = new WorkerConfig();
         config.setMangaRoot(mangaRoot.toString());
-        ImportStorageFinalizeHandler interruptHandler = new ImportStorageFinalizeHandler(
-                config, throwingStorage, storageProperties, manifestManager, exportChapterMapper,
+        ImportStorageFinalizeHandler directoryMoveHandler = new ImportStorageFinalizeHandler(
+                config, unusedStorage, storageProperties, manifestManager, exportChapterMapper,
                 new ImportStorageFinalizeEventPublisher(rabbitTemplate), new MqConsumerSupport());
 
-        try {
-            interruptHandler.handle(event(1, 100L, "001.jpg"), channel, 1L);
-        } finally {
-            // MqConsumerSupport 恢复中断标志；本线程测试后清理标志
-            assertTrue(Thread.interrupted(), "中断标志应被恢复");
-        }
+        directoryMoveHandler.handle(event(1, 100L, "001.jpg"), channel, 1L);
 
-        // 不 ACK、不 Reject，不发布任何事件（不得误报普通业务失败）
-        verify(channel, never()).basicAck(anyLong(), eq(false));
-        verify(channel, never()).basicReject(anyLong(), eq(false));
-        verifyNoInteractions(rabbitTemplate);
+        assertEquals("aaa", Files.readString(chapterFile(100L, "001.jpg")));
+        verifyNoInteractions(unusedStorage);
     }
 
     // ======================== 辅助 ========================

@@ -41,6 +41,10 @@ public class DirectoryParser {
     // 视频扩展名
     private static final Set<String> VIDEO_EXT = Set.of(".mp4", ".webm", ".mkv", ".mov", ".avi");
 
+    /** 整理阶段隔离的非目标文件目录，不作为漫画目录树输入。 */
+    private static final String NON_IMPORTED_DIRECTORY_NAME = "__comic_atlas_non_imported__";
+    private static final String NON_IMPORTED_MARKER_NAME = ".comic-atlas-non-imported";
+
     // 媒体扩展名 = 图片 + 视频
     private static final Set<String> MEDIA_EXT;
     static {
@@ -219,6 +223,10 @@ public class DirectoryParser {
                             "拒绝跟随符号链接目录: " + safeName(entry));
                 }
                 if (Files.isDirectory(entry, LinkOption.NOFOLLOW_LINKS)) {
+                    if (NON_IMPORTED_DIRECTORY_NAME.equals(entry.getFileName().toString())
+                            && isGeneratedNonImportedDirectory(entry)) {
+                        continue;
+                    }
                     paths.add(entry);
                 }
             }
@@ -228,6 +236,11 @@ public class DirectoryParser {
         }
         paths.sort(NaturalPathComparator.INSTANCE);
         return paths;
+    }
+
+    private boolean isGeneratedNonImportedDirectory(Path directory) {
+        Path marker = directory.resolve(NON_IMPORTED_MARKER_NAME);
+        return !Files.isSymbolicLink(marker) && Files.isRegularFile(marker, LinkOption.NOFOLLOW_LINKS);
     }
 
     public boolean hasMedia(Path dir) {

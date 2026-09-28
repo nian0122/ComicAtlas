@@ -272,7 +272,10 @@ class DirectoryImportHandlerSmokeTest {
         when(parser.parse(any(Path.class), any(String.class)))
                 .thenReturn(new DirectoryTree(sourceRoot, "src", List.of(), List.of()));
         MetadataAssembler assembler = mock(MetadataAssembler.class);
-        when(assembler.assemble(any(DirectoryTree.class), any(ImportContext.class))).thenReturn(metadata);
+        when(assembler.planStructure(any(DirectoryTree.class), any(ImportContext.class), any()))
+                .thenReturn(metadata);
+        when(assembler.analyzePlannedFromStaging(any(ComicMetadata.class), any(Path.class)))
+                .thenReturn(metadata);
         return new DirectoryImportHandler(parser, assembler, transferService, objectMapper,
                 coverGen, new CoverCandidateSelector(), cancelHandler, manifestManager);
     }
