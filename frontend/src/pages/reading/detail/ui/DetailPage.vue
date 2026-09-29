@@ -529,25 +529,6 @@ onMounted(loadData)
   color: var(--text-muted);
 }
 
-/* States */
-.state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-base);
-  padding: var(--space-3xl) 0;
-  color: var(--text-secondary);
-}
-
-.state.small {
-  padding: var(--space-xl) 0;
-}
-
-.state.error {
-  color: var(--accent);
-}
-
 /* Responsive */
 @media (max-width: 1024px) {
   .info-grid {

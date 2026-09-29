@@ -2,7 +2,7 @@ import { readdir, readFile } from 'node:fs/promises'
 import { join, relative } from 'node:path'
 
 const sourceRoot = join(process.cwd(), 'src')
-const forbiddenPageClasses = /\.(primary-btn|ghost-btn|poster-btn|overlay-btn|hero-btn|status-badge|spinner)\b/
+const forbiddenPageClasses = /(?:^|[\s,{])\.(primary-btn|ghost-btn|poster-btn|overlay-btn|hero-btn|status-badge|spinner|state|empty-title|empty-desc)\b/
 const deepSharedImport = /@\/shared\/ui\/[^'"\n]+\/[^'"\n]+\.vue/
 const legacyButtonMarkup = /<(?:el-)?button\b/i
 const violations = []

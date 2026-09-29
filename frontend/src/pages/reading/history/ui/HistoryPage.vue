@@ -1,16 +1,14 @@
 <template>
   <div class="history-page">
-    <header class="page-header">
-      <div class="header-left">
-        <p class="page-eyebrow">LEDGER / HISTORY</p>
-        <h1 class="page-title">阅读历史</h1>
-        <p v-if="recentCount > 0" class="page-subtitle">最近阅读 {{ recentCount }} 部漫画</p>
-      </div>
-      <div class="header-actions">
-        <AppButton variant="ghost" :disabled="store.loading" @click="store.fetchFirstPage">刷新</AppButton>
-        <AppButton variant="primary" @click="router.push('/library')">去漫画库</AppButton>
-      </div>
-    </header>
+    <PageHeader
+      class="history-page-header"
+      eyebrow="LEDGER / HISTORY"
+      title="阅读历史"
+      :description="recentCount > 0 ? `最近阅读 ${recentCount} 部漫画` : undefined"
+    >
+      <AppButton variant="ghost" :disabled="store.loading" @click="store.fetchFirstPage">刷新</AppButton>
+      <AppButton variant="primary" @click="router.push('/library')">去漫画库</AppButton>
+    </PageHeader>
 
     <!-- 加载 -->
     <ContentState v-if="store.loading && store.list.length === 0" state="loading" message="加载中..." />
@@ -88,6 +86,7 @@
 <script setup lang="ts">
 import { AppButton } from '@/shared/ui/button'
 import { ContentState } from '@/shared/ui/content-state'
+import { PageHeader } from '@/shared/ui/page-header'
 import { computed, onBeforeUnmount, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { RecycleScroller } from 'vue-virtual-scroller'
@@ -164,52 +163,6 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  padding: var(--space-2) 0 var(--space-3);
-  margin-bottom: var(--space-2);
-  gap: var(--space-base);
-  flex-wrap: wrap;
-  background: linear-gradient(to bottom, var(--bg-primary) 86%, transparent);
-  border-bottom: 1px solid var(--border);
-}
-
-.header-left {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-}
-
-.page-eyebrow {
-  margin-bottom: var(--space-1);
-  color: var(--accent);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-}
-
-.page-title {
-  margin: 0;
-  color: var(--text-primary);
-  font-size: var(--text-page);
-  font-weight: 700;
-  line-height: 1.2;
-  letter-spacing: -0.02em;
-}
-
-.page-subtitle {
-  font-size: 14px;
-  color: var(--text-secondary);
-  margin: 0;
-}
-
-.header-actions {
-  display: flex;
-  gap: var(--space-sm);
 }
 
 /* 虚拟列表容器：必须有确定高度，RecycleScroller 才能计算可视区 */
@@ -368,45 +321,6 @@ onBeforeUnmount(() => {
   letter-spacing: 0.24em;
 }
 
-/* States */
-.state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-base);
-  padding: var(--space-3xl) 0;
-  text-align: center;
-}
-
-.state.loading {
-  color: var(--text-secondary);
-}
-
-.state.error {
-  color: var(--danger);
-  background: var(--bg-surface);
-  border-radius: var(--card-radius);
-  padding: var(--space-xl);
-}
-
-.state.empty {
-  color: var(--text-muted);
-}
-
-.empty-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0;
-}
-
-.empty-desc {
-  font-size: 13px;
-  color: var(--text-secondary);
-  margin: 0;
-}
-
 /* Buttons */
 
 @media (max-width: 1024px) {
@@ -421,12 +335,7 @@ onBeforeUnmount(() => {
     overflow: visible;
   }
 
-  .page-header {
-    display: none;
-  }
-
-  .header-left,
-  .header-actions {
+  .history-page :deep(.history-page-header) {
     display: none;
   }
 

@@ -251,17 +251,4 @@ onMounted(loadQueues)
   white-space: nowrap;
 }
 
-.state {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-3xl) var(--space-6);
-  font-size: var(--text-sm);
-}
-.state.error {
-  color: var(--danger);
-}
-.state.empty {
-  color: var(--text-muted);
-}
 </style>

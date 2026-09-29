@@ -409,16 +409,6 @@ function formatBytes(bytes: number | undefined): string {
   padding: var(--space-lg) 0;
 }
 
-.state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-base);
-  padding: var(--space-3xl) 0;
-  text-align: center;
-}
-
 .inline-error {
   display: flex;
   align-items: center;
@@ -432,15 +422,4 @@ function formatBytes(bytes: number | undefined): string {
   border-radius: var(--radius-sm);
 }
 
-.state.loading {
-  color: var(--text-secondary);
-}
-
-.state.error {
-  color: var(--danger);
-}
-
-.state.empty {
-  color: var(--text-muted);
-}
 </style>
