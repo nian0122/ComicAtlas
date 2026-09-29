@@ -8,17 +8,14 @@
 
 .import-tab {
   padding: 10px 24px;
-  font-size: 14px;
+  font-size: var(--text-sm);
   font-weight: 600;
-  color: var(--text-secondary);
-  cursor: pointer;
   border-bottom: 2px solid transparent;
   margin-bottom: -2px;
-  transition: all 150ms ease;
 }
 
-.import-tab:hover {
-  color: var(--text-primary);
+.import-tab:not(.active) {
+  color: var(--text-secondary);
 }
 
 .import-tab.active {
@@ -214,24 +211,6 @@
 
 .preview-toggle {
   align-self: flex-start;
-  padding: 0;
-  background: none;
-  border: none;
-  color: var(--accent);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: color 150ms ease;
-}
-
-.preview-toggle:hover {
-  color: var(--accent-hover);
-}
-
-.preview-toggle:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 2px;
-  border-radius: var(--radius-xs);
 }
 
 .preview-tree {

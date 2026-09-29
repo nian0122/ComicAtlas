@@ -3,9 +3,25 @@
     <PageHeader spaced title="导入漫画" description="选择来源类型并输入路径，开始你的导入流程" />
 
     <!-- 导入模式切换 -->
-    <div class="import-tabs">
-      <div class="import-tab" :class="{ active: activeTab === 'single' }" @click="activeTab = 'single'">单个导入</div>
-      <div class="import-tab" :class="{ active: activeTab === 'batch' }" @click="activeTab = 'batch'">批量导入</div>
+    <div class="import-tabs" role="group" aria-label="导入模式">
+      <AppButton
+        variant="text"
+        class="import-tab"
+        :class="{ active: activeTab === 'single' }"
+        :aria-pressed="activeTab === 'single'"
+        @click="activeTab = 'single'"
+      >
+        单个导入
+      </AppButton>
+      <AppButton
+        variant="text"
+        class="import-tab"
+        :class="{ active: activeTab === 'batch' }"
+        :aria-pressed="activeTab === 'batch'"
+        @click="activeTab = 'batch'"
+      >
+        批量导入
+      </AppButton>
     </div>
 
     <!-- 单个导入 -->
@@ -164,6 +180,8 @@
                 </div>
                 <div v-if="row.preview" class="scan-item-preview">
                   <AppButton
+                    variant="text"
+                    size="sm"
                     class="preview-toggle"
                     :aria-expanded="previewExpanded.has(row.item.path)"
                     @click.stop="togglePreview(row.item.path)"
