@@ -9,13 +9,11 @@
 | [用户流程](03-user-flow.md) | 使用路径 |
 | [页面说明](04-pages.md) | 页面职责 |
 | [交互约定](05-interaction.md) | 交互规则 |
-| [组件设计基线](06-design-system.md) | 早期组件样式说明；视觉值以现行设计系统为准 |
 | [组件说明](07-components.md) | 组件职责 |
 | [前端架构](08-frontend-architecture.md) | 分层与目录约定 |
 | [公共 UI 收敛记录](ui-consolidation-todo.md) | 公共 UI 归属与迁移记录；现行规则以架构文档为准 |
-| [开发计划](09-development-plan.md) | 规划背景，完成情况以代码和测试为准 |
 | [早期视觉方案](archive/legacy-design-system.md) | 历史归档 |
 
-设计系统正文统一保存在本目录，避免源码目录和文档目录各自维护一份。
+设计系统正文统一保存在本目录，避免源码目录和文档目录各自维护一份。早期组件基线和未完成的开发计划已从现行文档移除，历史内容可在 Git 中查看。
 
 FSD 迁移清单已完成并转为历史记录：[fsd-refactoring-todo.md](fsd-refactoring-todo.md)。

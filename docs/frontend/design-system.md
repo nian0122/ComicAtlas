@@ -25,7 +25,7 @@ ComicAtlas 是一座“私人放映馆”：打开应用先看到作品，而不
 
 ### Palette（Netflix 深色基调）
 
-全局视觉基调采用 Netflix 式深色影院界面：以近黑色画布承载封面内容，以分层深灰组织界面，以 Netflix Red（`#E50914`）强调主要动作、当前状态和阅读进度。组件不得直接写颜色值，所有颜色必须从 `frontend/src/styles/tokens.css` 的 token 读取。
+全局视觉基调采用 Netflix 式深色影院界面：以近黑色画布承载封面内容，以分层深灰组织界面，以 Netflix Red（`#E50914`）强调主要动作、当前状态和阅读进度。组件不得直接写颜色值，所有颜色必须从 `frontend/src/app/styles/tokens.css` 的 token 读取。
 
 | Role | Token | Value | Usage |
 |---|---|---:|---|

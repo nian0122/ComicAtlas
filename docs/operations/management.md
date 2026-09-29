@@ -160,7 +160,7 @@ foreach ($volumeName in @('hq', 'lq', 'thumbs', 'metadata')) {
 # 1. 拉取新版本
 git pull origin main
 
-# 2. 重新构建并滚动重启（Flyway 自动执行 V10+ 迁移）
+# 2. 重新构建并滚动重启（Flyway 自动执行尚未应用的迁移）
 docker compose -f docker-compose.yml up -d --build
 
 # 3. 观察迁移与健康状态
@@ -168,7 +168,7 @@ docker compose -f docker-compose.yml ps
 docker compose logs -f api-service reading-service gateway
 ```
 
-Flyway 会按版本号顺序执行 `api-service/src/main/resources/db/flyway/V*.sql`（生效迁移目录，见 `db/README.md`）。当前生效迁移包括 V1、V2、V10–V24，其中 V17 将 `REGISTER` 存量数据迁移为 `DIRECTORY`，V23 分离 HQ/LQ 大小，V24 新增导出格式（ZIP/CBZ）；V3–V9 等历史迁移已归档到 `db/migration-archive/`，不参与执行。迁移失败时 Flyway 会停在失败版本，需要修复后重试。
+Flyway 会按版本号顺序执行 `api-service/src/main/resources/db/flyway/` 中的 SQL 迁移，以及 `api-service/src/main/java/db/flyway/` 中的 Java 迁移。当前迁移已到 V32；V26 是标题自然排序键回填的 Java 迁移，部署时必须携带应用代码与 ICU 依赖，不能只运行 SQL。`db/migration-archive/` 不参与执行；具体目录职责见 [数据库迁移说明](../../api-service/src/main/resources/db/README.md)。迁移失败时 Flyway 会停在失败版本，需要修复后重试。
 
 ### 升级后的检查清单
 

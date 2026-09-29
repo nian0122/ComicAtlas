@@ -456,7 +456,7 @@ PENDING ──► RUNNING ──► SUCCESS
 
 ## 13. 管理控制台
 
-管理端使用独立的显式边界客户端 `frontend/src/services/management/http.ts`，响应解析在 `frontend/src/types/management/`。所有枚举字段在前端经 `parseEnum` 边界解析，未知枚举值降级为“未知状态”而不崩溃。
+管理端与阅读端共用 `frontend/src/shared/api/http.ts` 中的 HTTP 客户端；管理请求由 `features/*/api.ts` 与 `entities/*/api/` 按业务域封装，协议类型位于对应切片及 `shared/api/types.ts`。管理接口仍统一使用 `/api/manage/**`。
 
 ### 13.1 漫画工作区（列表 / 详情 / 更新 / 回收）
 

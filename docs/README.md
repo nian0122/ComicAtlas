@@ -2,23 +2,21 @@
 
 | 入口 | 说明 |
 |------|------|
-| `api.md` | HTTP 接口与事件状态 |
-| `user-guide.md` | 用户指南 |
-| `development-guide.md` | 开发流程 |
-| [`frontend/design-system.md`](frontend/design-system.md) | 前端视觉设计规范；实现令牌位于 `frontend/src/styles/tokens.css` |
+| [API 文档](api.md) | HTTP 接口与事件状态 |
+| [用户指南](user-guide.md) | 安装、导入、阅读和管理 |
+| [开发流程](development-guide.md) | 分支、提交和发布 |
+| [前端设计系统](frontend/design-system.md) | 视觉规范；实现令牌位于 `frontend/src/app/styles/tokens.css` |
 | [`architecture/README.md`](architecture/README.md) | 当前架构总览；专题设计与 ADR 位于 `architecture/` |
-| `architecture/shared-module-boundaries.md` | 跨服务契约与持久化模块边界 |
+| [共享模块边界](architecture/shared-module-boundaries.md) | 跨服务契约与持久化模块边界 |
 | [后端代码分类](architecture/backend-package-organization.md) | 业务域、框架职责与文件归属 |
-| [后端文件分类 TODO](architecture/backend-classification-todo.md) | 按业务与框架角色记录待调整文件、目标归属及兼容约束；未实施 |
 | [后端待解耦清单](architecture/backend-decoupling.md) | 源码标记、拆分约束与回归要求 |
 | [后端三层架构检查](architecture/backend-layer-audit.md) | 接口层越界、持久化框架类型泄漏和处理约束 |
 | [后端实现问题标记](architecture/backend-implementation-issues.md) | 状态并发、事务、计算与异常处理问题 |
-| `operations/` | 部署运维 |
-| `releases/` | 发布说明（当前稳定版 v2.1.0，历史版本归档） |
-| `development/` | 开发约定（java-naming） |
+| [部署运维](operations/management.md) | 部署、升级与故障处理 |
+| [发布说明](releases/v2.1.0.md) | 当前稳定版 v2.1.0；旧版本见 `releases/` |
+| [Java 命名规范](development/java-naming.md) | 开发约定 |
 | [`development/export-performance.md`](development/export-performance.md) | 导出压缩策略、完整性校验与性能基准 |
 | [`development/project-layout.md`](development/project-layout.md) | 项目目录用途、配置位置和本地产物边界 |
-| `issues/` | 当前待办 |
 | [`database/schema.md`](database/schema.md) | 数据库结构 |
 | [`frontend/README.md`](frontend/README.md) | 前端文档与设计规范导航 |
 | [`../scripts/README.md`](../scripts/README.md) | 开发、测试与发布脚本入口 |

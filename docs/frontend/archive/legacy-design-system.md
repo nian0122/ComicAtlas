@@ -2,7 +2,7 @@
 
 **状态**: 历史归档（早期视觉方案）
 
-> 保留早期设计背景；现行视觉契约见 [设计系统](../design-system.md)，具体令牌以 `frontend/src/styles/tokens.css` 为准。
+> 保留早期设计背景；现行视觉契约见 [设计系统](../design-system.md)，具体令牌以 `frontend/src/app/styles/tokens.css` 为准。
 
 ---
 

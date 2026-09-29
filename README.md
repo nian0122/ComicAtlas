@@ -166,7 +166,7 @@ ComicAtlas 面向单机个人仓库，管理端接口（回收站、永久清理
 - [开发流程](docs/development-guide.md)：分支、提交、合并、推送与发布
 - [API 文档](docs/api.md)：HTTP 接口与事件状态
 - [发布说明](docs/releases/v2.1.0.md)：2.1 功能范围、升级说明与已知限制（历史版本见 [v2.0.0](docs/releases/v2.0.0.md)）
-- [架构总览](docs/architecture/README.md)：当前系统边界、数据流与扩展规则（专题索引见 [00-index.md](docs/architecture/00-index.md)）
+- [架构总览](docs/architecture/README.md)：当前系统边界、数据流与扩展规则
 
 ## 分支约定
 

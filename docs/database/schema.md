@@ -1,7 +1,7 @@
 # 数据库 Schema 文档
 
-> 基于 `api-service/src/main/resources/db/schema.sql`、生效 Flyway V1..V24 及 Java 实体/枚举生成。`schema.sql` 描述空库基线；已有数据库升级必须由 Flyway 执行。
-> 最后更新: 2026-09-04
+> 本文基于 `api-service/src/main/resources/db/schema.sql`、Flyway 迁移及 Java 实体/枚举整理。`schema.sql` 是测试容器的空库基线；已有数据库升级由 Flyway 执行。迁移范围以 `api-service/src/main/resources/db/flyway/` 和 Java 迁移源码为准。
+> 最后核对迁移目录：2026-09-29；表字段内容仍需随新增迁移逐项核对。
 
 ---
 
@@ -140,6 +140,7 @@ erDiagram
 |------|------|--------|------|
 | `id` | BIGINT | AUTO_INCREMENT | 主键 |
 | `title` | VARCHAR(255) | NOT NULL | 漫画标题 |
+| `title_sort_key` | VARBINARY(16384) | 由迁移回填 | ICU 中文数字自然排序键（V25–V27） |
 | `title_jpn` | VARCHAR(255) | NULL | 日文标题 |
 | `author` | VARCHAR(255) | NULL | 作者 |
 | `description` | TEXT | NULL | 简介 |
@@ -159,6 +160,8 @@ erDiagram
 | `trashed_at` | DATETIME | NULL | 进入 TRASHED 的时间（保留期起点，期限由 `trash.retention-days` 配置） |
 | `created_at` | DATETIME | `CURRENT_TIMESTAMP` | 创建时间 |
 | `updated_at` | DATETIME | `CURRENT_TIMESTAMP` ON UPDATE | 更新时间 |
+| `reaction` | VARCHAR(16) | `NONE` | 漫画反馈状态（V32） |
+| `reaction_at` | DATETIME | NULL | 漫画反馈时间（V32） |
 | `version` | INT | `1` | 乐观锁版本号 |
 
 **索引**:
@@ -166,6 +169,7 @@ erDiagram
 - `INDEX idx_status (status)`
 - `INDEX idx_category_id (category_id)`
 - `INDEX idx_created_at (created_at)`
+- `INDEX idx_comic_reaction_time (reaction, reaction_at)`
 
 ---
 
@@ -209,6 +213,8 @@ erDiagram
 | `created_at` | DATETIME | `CURRENT_TIMESTAMP` | 创建时间 |
 | `status` | VARCHAR(16) | `READY` | 章节生命周期状态，见 [MediaLifecycleStatus](#medialifecyclestatus) |
 | `trashed_at` | DATETIME | NULL | 进入 TRASHED 的时间（保留期起点，期限由 `trash.retention-days` 配置） |
+| `reaction` | VARCHAR(16) | `NONE` | 章节反馈状态（V32） |
+| `reaction_at` | DATETIME | NULL | 章节反馈时间（V32） |
 | `version` | INT | `1` | 乐观锁版本号 |
 
 **索引**:
@@ -216,6 +222,7 @@ erDiagram
 - `UNIQUE uk_catalog_chapter (comic_id, catalog_id, chapter_no)`
 - `UNIQUE uk_comic_global (comic_id, global_order)`
 - `INDEX idx_comic_global (comic_id, global_order)`
+- `INDEX idx_chapter_reaction_time (reaction, reaction_at)`
 
 **外键**:
 - `chapter_ibfk_1`: comic_id → comic(id) ON DELETE CASCADE
@@ -249,6 +256,8 @@ erDiagram
 | `container` | VARCHAR(32) | NULL | 视频容器格式 (mp4/webm/mkv 等) |
 | `video_codec` | VARCHAR(32) | NULL | 视频编码 |
 | `audio_codec` | VARCHAR(32) | NULL | 音频编码 |
+| `reaction` | VARCHAR(16) | `NONE` | 媒体反馈状态（V31） |
+| `reaction_at` | DATETIME | NULL | 媒体反馈时间（V31） |
 | `created_at` | DATETIME | `CURRENT_TIMESTAMP` | 创建时间 |
 | `status` | VARCHAR(16) | `READY` | 媒体生命周期状态，见 [MediaLifecycleStatus](#medialifecyclestatus) |
 | `trashed_at` | DATETIME | NULL | 进入 TRASHED 的时间（保留期起点，期限由 `trash.retention-days` 配置） |
@@ -257,6 +266,7 @@ erDiagram
 **索引**:
 - `UNIQUE uk_chapter_page (chapter_id, page_number)`
 - `INDEX idx_media_type (media_type)`
+- `INDEX idx_page_reaction_time (reaction, reaction_at)`
 
 **外键**:
 - `page_ibfk_1`: chapter_id → chapter(id) ON DELETE CASCADE
@@ -404,14 +414,14 @@ erDiagram
 
 ### export_task
 
-导出任务表。记录分卷 ZIP 导出任务。
+导出任务表。记录 ZIP、CBZ 或目录导出任务。
 
 | 字段 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `id` | BIGINT | AUTO_INCREMENT | 主键 |
 | `management_task_id` | BIGINT | NULL | 关联 management_task.id 一对一扩展 |
 | `comic_id` | BIGINT | NOT NULL | 导出漫画 |
-| `format` | VARCHAR(8) | `ZIP` | 导出格式：`ZIP` 或 `CBZ`（V24 新增） |
+| `format` | VARCHAR(16) | `ZIP` | 导出格式：`ZIP`、`CBZ` 或 `DIRECTORY`（V30 扩容） |
 | `status` | VARCHAR(20) | `PENDING` | 任务状态 |
 | `progress` | SMALLINT | `0` | 进度 0-100 |
 | `output_root` | VARCHAR(20) | NULL | 输出存储根键 |
@@ -589,7 +599,7 @@ erDiagram
 | `comic_id` | BIGINT | NOT NULL | 目标漫画 |
 | `chapter_id` | BIGINT | NOT NULL | 目标章节 |
 | `replace_media_id` | BIGINT | NULL | 替换目标媒体 ID（replace 流程） |
-| `status` | VARCHAR(16) | `ACTIVE` | ACTIVE/COMPLETED/CANCELLED/EXPIRED/FAILED |
+| `status` | VARCHAR(16) | `ACTIVE` | ACTIVE/VERIFYING/COMPLETED/CANCELLED/EXPIRED/FAILED |
 | `total_bytes` | BIGINT | `0` | 会话总字节数 |
 | `total_files` | INT | `0` | 文件数 |
 | `expires_at` | DATETIME | NOT NULL | 未完成过期时间 |

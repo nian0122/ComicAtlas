@@ -1,7 +1,7 @@
 # ComicAtlas 当前架构总览
 
 **适用版本**：2.1+
-**最后更新**：2026-09-04
+**最后更新**：2026-09-29
 **文档状态**：现行架构基线
 
 本文是 ComicAtlas 架构的统一入口，面向需要理解系统边界、数据流和扩展方式的开发者。接口、数据库字段和 MQ 路由的具体细节，分别以 [API 文档](../api.md)、[数据库 Schema](../database/schema.md) 和 [导入流水线](./02-import-pipeline.md) 为准。
@@ -242,7 +242,7 @@ MQ 契约集中在 `comic-common` 的常量类和事件 DTO 中。主要消息�
 
 - 阅读域：首页、漫画库、详情、目录、阅读器、阅读历史。
 - 管理域：漫画工作区、导入、任务中心、存储管理、回收站、DLQ 和设置。
-- API 调用集中在 `frontend/src/services/`，状态集中在 `frontend/src/stores/`。
+- HTTP 客户端位于 `frontend/src/shared/api/http.ts`；领域 API 位于 `features/*/api.ts` 和 `entities/*/api/`，页面私有状态位于 `pages/*/model/`，共享实体状态位于 `entities/*/model/`。
 - 阅读器按媒体类型渲染图片和视频，文件 URL 由后端返回，不在前端拼接物理路径。
 - 管理端按钮应以允许操作查询和任务状态为准，不能只根据页面展示状态自行推断权限。
 
