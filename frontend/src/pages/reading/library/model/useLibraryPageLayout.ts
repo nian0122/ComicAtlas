@@ -9,6 +9,7 @@ const FILTER_SCROLL_DELTA = 8
 export function useLibraryPageLayout(pageHeaderRef: Ref<HTMLElement | null>) {
   const viewportWidth = useBreakpoint()
   const posterSize = computed<'sm' | 'md' | 'lg'>(() => (viewportWidth.value <= BREAKPOINTS.tablet ? 'sm' : 'lg'))
+  const isMobileViewport = computed(() => viewportWidth.value <= BREAKPOINTS.tablet)
   const isDesktopFilterHidden = ref(false)
   let lastWindowScrollY = 0
   let scrollAnimationFrame: number | null = null
@@ -51,5 +52,5 @@ export function useLibraryPageLayout(pageHeaderRef: Ref<HTMLElement | null>) {
     if (scrollAnimationFrame !== null) window.cancelAnimationFrame(scrollAnimationFrame)
   })
 
-  return { posterSize, isDesktopFilterHidden }
+  return { posterSize, isDesktopFilterHidden, isMobileViewport }
 }

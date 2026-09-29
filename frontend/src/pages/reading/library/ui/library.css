@@ -413,6 +413,10 @@
   overflow-x: auto;
 }
 
+.mobile-load-more {
+  display: none;
+}
+
 /* ===== 移动阅读端（手机与平板，≤1024px）===== */
 @media (max-width: 1024px) {
   .comic-list-page {
@@ -648,5 +652,25 @@
   /* 固定底部导航不应遮住最后一排卡片和分页。 */
   .comic-section {
     padding-bottom: calc(var(--mobile-tabbar-height) + var(--space-8) + env(safe-area-inset-bottom));
+  }
+
+  .mobile-load-more {
+    display: flex;
+    min-height: 52px;
+    align-items: center;
+    justify-content: center;
+    margin-top: calc(var(--space-3) * -1);
+    color: var(--text-muted);
+    font-size: 12px;
+  }
+
+  .mobile-load-more button {
+    min-height: 40px;
+    padding-inline: 18px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--bg-surface);
+    color: var(--text-secondary);
+    font-size: 12px;
   }
 }

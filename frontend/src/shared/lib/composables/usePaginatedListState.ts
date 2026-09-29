@@ -76,5 +76,33 @@ export function usePaginatedListState<TItem, TQuery extends object>(options: Pag
     await fetchList()
   }
 
-  return { ...toRefs(state), hasMore, updateQuery, resetQuery, fetchList, search, nextPage }
+  async function appendNextPage() {
+    if (state.loading || state.list.length >= state.total || !('page' in state.query)) return
+
+    const requestId = ++requestSequence
+    const currentPage = state.query as TQuery & { page?: number }
+    const requestedPage = (currentPage.page || 1) + 1
+    const query = { ...state.query, page: requestedPage } as TQuery
+    const queryWithTags = query as TQuery & { tags?: unknown }
+    if (Array.isArray(queryWithTags.tags)) queryWithTags.tags = [...queryWithTags.tags]
+
+    state.loading = true
+    state.error = null
+    try {
+      const page = await options.fetchPage(query)
+      if (requestId !== requestSequence) return
+      state.list = [...state.list, ...(page.records || [])] as TItem[]
+      state.total = page.total || 0
+      if (options.syncCurrentPage && 'current' in page) {
+        currentPage.page = Math.max(1, Number(page.current) || requestedPage)
+      }
+    } catch (error: unknown) {
+      if (requestId !== requestSequence) return
+      state.error = getApiErrorMessage(error, '加载列表失败')
+    } finally {
+      if (requestId === requestSequence) state.loading = false
+    }
+  }
+
+  return { ...toRefs(state), hasMore, updateQuery, resetQuery, fetchList, search, nextPage, appendNextPage }
 }

@@ -222,7 +222,7 @@
     </header>
 
     <ContentState v-if="store.loading && store.list.length === 0" state="loading" message="加载中..." />
-    <ContentState v-else-if="store.error" state="error" :message="store.error">
+    <ContentState v-else-if="store.error && store.list.length === 0" state="error" :message="store.error">
       <AppButton variant="primary" @click="store.fetchList()">重试</AppButton>
     </ContentState>
     <ContentState v-else-if="store.list.length === 0" state="empty" message="暂无漫画" />
@@ -245,7 +245,7 @@
         />
       </div>
 
-      <div class="pagination-wrapper">
+      <div v-if="!isMobileViewport" class="pagination-wrapper">
         <el-pagination
           v-model:current-page="store.query.page"
           :page-size="store.query.size"
@@ -258,6 +258,15 @@
           @current-change="onPageChange"
         />
       </div>
+
+      <div v-if="isMobileViewport" ref="loadMoreSentinelRef" class="mobile-load-more" role="status" aria-live="polite">
+        <span v-if="store.loading">正在加载更多漫画…</span>
+        <AppButton v-else-if="store.error" type="button" @click="loadMoreFromScroll(true)">
+          加载失败，点击重试
+        </AppButton>
+        <span v-else-if="store.hasMore">继续下滑加载更多</span>
+        <span v-else>已加载全部 {{ store.list.length }} 本</span>
+      </div>
     </section>
   </div>
 </template>
@@ -265,7 +274,7 @@
 <script setup lang="ts">
 import { AppButton } from '@/shared/ui/button'
 import { ContentState } from '@/shared/ui/content-state'
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { nextTick, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Search, CircleClose, Sort } from '@element-plus/icons-vue'
 import { useComicStore } from '@/pages/reading/library/model/comic-store'
@@ -307,7 +316,9 @@ const {
 const allTags = ref<TagDTO[]>([])
 const allCategories = ref<CategoryDTO[]>([])
 const pageHeaderRef = ref<HTMLElement | null>(null)
-const { posterSize, isDesktopFilterHidden } = useLibraryPageLayout(pageHeaderRef)
+const { posterSize, isDesktopFilterHidden, isMobileViewport } = useLibraryPageLayout(pageHeaderRef)
+const loadMoreSentinelRef = ref<HTMLElement | null>(null)
+let loadMoreObserver: IntersectionObserver | null = null
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -407,9 +418,8 @@ function restoreFiltersFromStore() {
     tagMode: selectedTags.value.length > 1 ? tagMode.value : undefined,
     sort: sort.value,
     order: order.value,
-    // URL 优先保证刷新可恢复；无 URL 时保留 Pinia 状态，
-    // 从详情页返回漫画库也不会跳回第一页。
-    page: routePage ?? store.query.page ?? 1,
+    // 桌面端从详情页返回时保留当前页；移动端始终从第一页构建滚动列表。
+    page: isMobileViewport.value ? 1 : (routePage ?? store.query.page ?? 1),
   })
 }
 
@@ -423,7 +433,7 @@ function persistFiltersToRoute() {
       tagMode: selectedTags.value.length > 1 ? tagMode.value : undefined,
       sort: sort.value || undefined,
       order: order.value === 'asc' ? 'asc' : undefined,
-      page: (store.query.page || 1) > 1 ? store.query.page : undefined,
+      page: !isMobileViewport.value && (store.query.page || 1) > 1 ? store.query.page : undefined,
     },
   })
 }
@@ -443,6 +453,30 @@ function posterSubtitle(comic: ComicListVO): string {
   return `${comic.pageCount} 页`
 }
 
+async function loadMoreFromScroll(isRetry = false) {
+  const sentinel = loadMoreSentinelRef.value
+  if (
+    !isMobileViewport.value ||
+    !sentinel ||
+    store.loading ||
+    !store.hasMore ||
+    (store.error && !isRetry) ||
+    sentinel.getBoundingClientRect().top > window.innerHeight + 600
+  ) {
+    return
+  }
+
+  const previousCount = store.list.length
+  await store.appendNextPage()
+  if (store.error || store.list.length <= previousCount) return
+
+  await nextTick()
+  const nextSentinel = loadMoreSentinelRef.value
+  if (nextSentinel && nextSentinel.getBoundingClientRect().top <= window.innerHeight + 600) {
+    void loadMoreFromScroll()
+  }
+}
+
 onMounted(() => {
   // 返回漫画库时恢复 Store 中的筛选条件，避免控件与实际查询状态不一致。
   restoreFiltersFromStore()
@@ -451,7 +485,29 @@ onMounted(() => {
   store.fetchList()
 })
 
+watch(
+  [loadMoreSentinelRef, isMobileViewport],
+  ([sentinel, isMobile]) => {
+    loadMoreObserver?.disconnect()
+    loadMoreObserver = null
+    if (!sentinel || !isMobile || typeof IntersectionObserver === 'undefined') return
+
+    loadMoreObserver = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          void loadMoreFromScroll()
+        }
+      },
+      { rootMargin: '600px 0px' },
+    )
+    loadMoreObserver.observe(sentinel)
+  },
+  { flush: 'post' },
+)
+
 onBeforeUnmount(() => {
+  loadMoreObserver?.disconnect()
+  loadMoreObserver = null
   if (debounceTimer !== null) {
     clearTimeout(debounceTimer)
     debounceTimer = null
