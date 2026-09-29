@@ -2,7 +2,7 @@
 
 更新日期：2026-09-29。本清单记录公共 UI 的归属和迁移结果，现行 FSD 约束以[前端架构文档](08-frontend-architecture.md)为准。按钮、状态、页面状态和基础容器已收敛到公共入口；业务组件中的原生操作按钮使用 `AppButton`。新增 UI 应复用现有 public API。
 
-**状态：** UI-01～UI-12 已完成。按钮门禁要求业务交互使用 `shared/ui/button` 的 `AppButton`；筛选与选项按钮应暴露当前选中状态；加载动效统一由 `shared/ui/spinner` 提供。
+**状态：** UI-01～UI-13 已完成。按钮门禁要求业务交互使用 `shared/ui/button` 的 `AppButton`；筛选与选项按钮应暴露当前选中状态；加载动效统一由 `shared/ui/spinner` 提供。
 
 ## 收敛规则
 
@@ -84,3 +84,9 @@
 - [x] **TODO UI-12**：抽取 `shared/ui/spinner/Spinner.vue`，统一 inline/small/medium/large 尺寸、强调色/继承色与旋转动画。
 - [x] **TODO UI-12**：`AppButton`、`ContentState`、导入页扫描和漫画库共用 Spinner，删除对应重复边框动画和页面级 spinner 样式。
 - [x] **TODO UI-12**：公共 UI 检查器扫描 CSS 文件，防止页面目录重新定义 `.spinner` 等公共类。
+
+### UI-13：收敛面板和面板标题
+
+- [x] **TODO UI-13**：`ManagementPanel` 提供 compact/default/spacious 公共间距，漫画操作台和 AI 分析页不再重复定义面板基础背景、边框和间距。
+- [x] **TODO UI-13**：两个 AI 分析页面统一使用 `PanelHeader` 表达编号、标题和说明，页面仅保留面板间距等编排样式。
+- [x] **TODO UI-13**：公共 UI 检查器扫描 CSS 和 Vue 样式，禁止页面重新定义 `.panel-heading`。

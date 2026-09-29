@@ -14,8 +14,10 @@
     </section>
 
     <section class="ai-grid">
-      <div class="ai-panel task-panel">
-        <div class="panel-heading"><span>01</span><div><h3>分析任务</h3><p>任务在后台运行，可以随时取消。</p></div></div>
+      <ManagementPanel class="ai-panel task-panel">
+        <PanelHeader class="ai-panel-heading" title="分析任务" description="任务在后台运行，可以随时取消。" level="h3">
+          <template #leading>01</template>
+        </PanelHeader>
         <div v-if="!task" class="empty-copy">还没有分析任务</div>
         <template v-else>
           <div class="task-meta"><span>#{{ task.id }}</span><strong>{{ statusLabel }}</strong></div>
@@ -29,17 +31,19 @@
           </div>
         </template>
         <AppButton v-if="!task" variant="primary" :loading="submitting" @click="startTask">开始 AI 分析</AppButton>
-      </div>
+      </ManagementPanel>
 
-      <div class="ai-panel result-panel">
-        <div class="panel-heading"><span>02</span><div><h3>分析结果</h3><p>标签和简介会同步写入漫画资料。</p></div></div>
+      <ManagementPanel class="ai-panel result-panel">
+        <PanelHeader class="ai-panel-heading" title="分析结果" description="标签和简介会同步写入漫画资料。" level="h3">
+          <template #leading>02</template>
+        </PanelHeader>
         <div v-if="!result" class="empty-copy">完成分析后，这里会显示结果</div>
         <template v-else>
           <div class="description"><span>简介</span><p>{{ result.description || '未生成简介' }}</p></div>
           <div class="category"><span>分类</span><strong>{{ result.categoryCandidate || '未匹配现有分类' }}</strong></div>
           <div class="tags"><span>标签</span><div><el-tag v-for="tag in result.tags || []" :key="tag" effect="plain">{{ tag }}</el-tag><small v-if="!result.tags?.length">暂无标签</small></div></div>
         </template>
-      </div>
+      </ManagementPanel>
     </section>
   </div>
 </template>
@@ -49,6 +53,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { AppButton } from '@/shared/ui/button'
 import { PageHeader } from '@/shared/ui/page-header'
+import { ManagementPanel, PanelHeader } from '@/shared/ui/management-panel'
 import { managementComicApi } from '@/entities/comic'
 import { aiAnalysisApi, type AiAnalysisTask } from '@/features/ai-analysis'
 import type { ComicDetailVO } from '@/entities/comic'
@@ -125,11 +130,8 @@ onBeforeUnmount(() => window.clearTimeout(pollTimer))
 .ai-hero p { margin: 0; color: #4d685a; font-size: 13px; }
 .eyebrow { color: #438054; font-size: 11px; font-weight: 800; letter-spacing: .14em; }
 .ai-grid { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: var(--space-4); }
-.ai-panel { display: grid; gap: var(--space-4); padding: var(--space-5); border: 1px solid var(--border); background: var(--bg-surface); }
-.panel-heading { display: flex; gap: 14px; align-items: flex-start; }
-.panel-heading > span { color: var(--accent); font: 800 12px var(--mono); }
-.panel-heading h3 { margin: 0; color: var(--text-primary); font-size: 18px; }
-.panel-heading p { margin: 5px 0 0; color: var(--text-muted); font-size: 13px; }
+.ai-panel { display: grid; gap: var(--space-4); }
+.ai-panel-heading { margin-bottom: var(--space-2); }
 .empty-copy { padding: 28px 0; color: var(--text-muted); font-size: 13px; }
 .task-meta { display: flex; justify-content: space-between; color: var(--text-muted); font-size: 13px; }
 .task-meta strong { color: var(--text-primary); }

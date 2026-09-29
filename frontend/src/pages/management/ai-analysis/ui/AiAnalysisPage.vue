@@ -15,8 +15,10 @@
     </section>
 
     <section class="analysis-grid">
-      <div class="analysis-panel request-panel">
-        <div class="panel-heading"><span>01</span><div><h3>选择漫画</h3><p>从已导入的漫画库中搜索作品</p></div></div>
+      <ManagementPanel class="analysis-panel request-panel">
+        <PanelHeader class="analysis-panel-heading" title="选择漫画" description="从已导入的漫画库中搜索作品" level="h3">
+          <template #leading>01</template>
+        </PanelHeader>
         <el-form @submit.prevent="submitTask">
           <el-form-item label="漫画" label-position="top">
             <el-select v-model="selectedComicId" class="comic-select" size="large" filterable remote clearable :remote-method="searchComics" :loading="searchingComics" placeholder="搜索漫画标题或作者" @focus="loadInitialComics">
@@ -30,10 +32,12 @@
             开始分析 <span aria-hidden="true">↗</span>
           </AppButton>
         </el-form>
-      </div>
+      </ManagementPanel>
 
-      <div class="analysis-panel task-panel">
-        <div class="panel-heading"><span>02</span><div><h3>任务状态</h3><p>任务会在后台持续运行</p></div></div>
+      <ManagementPanel class="analysis-panel task-panel">
+        <PanelHeader class="analysis-panel-heading" title="任务状态" description="任务会在后台持续运行" level="h3">
+          <template #leading>02</template>
+        </PanelHeader>
         <ContentState v-if="!task" state="empty" message="提交目录后，这里会显示分析进度" />
         <template v-else>
           <div class="task-identity"><span>#{{ task.id }}</span><strong>{{ selectedComic?.title || task.sourcePath }}</strong></div>
@@ -42,11 +46,18 @@
           <p v-if="task.errorMessage" class="task-error">{{ task.errorMessage }}</p>
           <AppButton v-if="canCancel" variant="secondary" :loading="cancelling" @click="cancelTask">取消任务</AppButton>
         </template>
-      </div>
+      </ManagementPanel>
     </section>
 
-    <section v-if="result" class="analysis-panel result-panel">
-      <div class="panel-heading"><span>03</span><div><h3>分析结果</h3><p>结果需要人工确认后再写回漫画资料</p></div></div>
+    <ManagementPanel v-if="result" class="analysis-panel result-panel">
+      <PanelHeader
+        class="analysis-panel-heading"
+        title="分析结果"
+        description="结果需要人工确认后再写回漫画资料"
+        level="h3"
+      >
+        <template #leading>03</template>
+      </PanelHeader>
       <div class="result-layout">
         <div class="identity-card">
           <span class="result-label">作品候选</span>
@@ -57,7 +68,7 @@
       </div>
       <div class="tags-row"><span class="result-label">自由标签</span><div><el-tag v-for="tag in result.tags || []" :key="tag" effect="plain">{{ tag }}</el-tag><span v-if="!result.tags?.length" class="muted">暂无标签</span></div></div>
       <el-alert v-if="result.warnings?.length" :title="result.warnings.join('；')" type="info" :closable="false" show-icon />
-    </section>
+    </ManagementPanel>
   </div>
 </template>
 
@@ -67,6 +78,7 @@ import { ElMessage } from 'element-plus'
 import { AppButton } from '@/shared/ui/button'
 import { ContentState } from '@/shared/ui/content-state'
 import { PageHeader } from '@/shared/ui/page-header'
+import { ManagementPanel, PanelHeader } from '@/shared/ui/management-panel'
 import { aiAnalysisApi, type AiAnalysisTask } from '@/features/ai-analysis'
 import { comicApi } from '@/entities/comic'
 import type { ComicListVO } from '@/entities/comic'
@@ -135,8 +147,8 @@ onBeforeUnmount(() => window.clearTimeout(pollTimer))
 .hero-mark { display:grid; place-items:center; width:68px; height:68px; border:1px solid #a6d9b0; color:#b8efc2; font:900 20px/1 var(--font-ui); letter-spacing:.08em; }
 .hero-copy { flex:1; } .hero-copy h2 { margin:4px 0 8px; font:700 26px/1.2 var(--font-display); } .hero-copy p { max-width:680px; margin:0; color:#bbcbc0; line-height:1.65; }
 .eyebrow,.result-label { color:#91cba0; font-size:11px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; } .hero-status { align-self:flex-start; color:#b8efc2; font-size:12px; white-space:nowrap; } .status-dot { display:inline-block; width:7px;height:7px;margin-right:7px;border-radius:50%;background:#9ce4aa;box-shadow:0 0 0 4px #2d5d46; }
-.analysis-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; } .analysis-panel { padding:26px; border:1px solid var(--color-border-faint); background:var(--color-canvas); }
-.panel-heading { display:flex; gap:14px; align-items:flex-start; margin-bottom:24px; } .panel-heading > span { color:#67a47a; font:800 12px/1 var(--font-ui); } .panel-heading h3 { margin:0; color:var(--text-primary); font-size:18px; } .panel-heading p { margin:5px 0 0; color:var(--text-muted); font-size:13px; }
+.analysis-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; } .analysis-panel { display:grid; gap:var(--space-4); }
+.analysis-panel-heading { margin-bottom:var(--space-2); }
 .field-hint { margin: -8px 0 22px; color:var(--text-muted); font-size:12px; line-height:1.6; } code { color:#3c8150; } .task-identity { display:flex; flex-direction:column; gap:8px; margin-bottom:24px; } .task-identity span { color:var(--text-muted); font-size:12px; } .task-identity strong { overflow:hidden; color:var(--text-primary); text-overflow:ellipsis; white-space:nowrap; } .task-meta { display:flex; justify-content:space-between; margin:12px 0 22px; color:var(--text-muted); font-size:12px; } .task-error { padding:12px; color:#a34137; background:#fff2ef; font-size:13px; }
 .comic-select { width:100%; } .comic-option { display:flex; flex-direction:column; gap:3px; line-height:1.35; } .comic-option span { color:var(--text-muted); font-size:12px; }
 .result-panel { margin-top:20px; } .result-layout { display:grid; grid-template-columns:260px 1fr; gap:20px; } .identity-card,.description-card { padding:20px; background:#f3f7ef; } .identity-card strong,.identity-card small { display:block; margin-top:12px; } .identity-card strong { font-size:22px; } .identity-card small { color:var(--text-muted); } .description-card p { margin:14px 0 0; line-height:1.8; color:var(--text-secondary); } .tags-row { display:flex; gap:18px; align-items:flex-start; margin-top:24px; } .tags-row > div { display:flex; flex-wrap:wrap; gap:8px; } .muted { color:var(--text-muted); font-size:13px; }
