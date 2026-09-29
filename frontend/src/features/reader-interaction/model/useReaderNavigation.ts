@@ -4,11 +4,12 @@
  * 封装阅读器内所有路由跳转：返回详情页、上/下一章、跳转目录。
  * 统一使用命名路由（禁止手拼路径字符串），并对空 id 做静默守卫。
  */
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useReaderStore } from '@/features/reader-navigation'
 
 export function useReaderNavigation() {
   const router = useRouter()
+  const route = useRoute()
   const store = useReaderStore()
 
   /** 返回漫画详情页；无法识别漫画时退回漫画库 */
@@ -35,7 +36,11 @@ export function useReaderNavigation() {
     // null/undefined 守卫：无相邻章节时静默不跳转
     if (chapterId == null) return
     // 切章仍属于同一次阅读；复用当前历史项，返回时才不会落回旧章节。
-    router.replace({ name: 'reader', params: { chapterId }, query: { page: String(page) } })
+    router.replace({
+      name: 'reader',
+      params: { chapterId },
+      query: { ...route.query, page: String(page) },
+    })
   }
 
   /** 上一章；prevChapterId 为 null 时静默不跳转；page 缺省落到第 1 页 */

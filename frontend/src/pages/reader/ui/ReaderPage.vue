@@ -114,7 +114,9 @@ import {
   useReaderShortcuts,
   useReaderToolbar,
 } from '@/features/reader-interaction'
-import { comicApi } from '@/entities/comic'
+import { catalogApi, comicApi } from '@/entities/comic'
+import type { CatalogNode } from '@/entities/comic'
+import { searchCatalogChapters } from '@/features/chapter-search'
 import { readerApi } from '@/entities/chapter'
 import { getApiErrorMessage } from '@/shared/api/http'
 import { preloadEngine } from '@/widgets/reader'
@@ -218,7 +220,7 @@ function openImmersive() {
   void router.push({
     name: 'chapter-videos',
     params: { chapterId: store.chapterId },
-    query: { page: store.currentPage },
+    query: { ...route.query, page: store.currentPage },
   })
 }
 
@@ -237,6 +239,30 @@ async function toggleChapterReaction(next: MediaReaction) {
 let chapterLoadToken = 0
 /** 被双击切到 HQ 的页面索引（0-based），使用 reactive Set 保持响应性 */
 const forceHqPages = reactive(new Set<number>())
+const catalogTreeCache = new Map<number, CatalogNode[]>()
+
+async function applySearchChapterNavigation(chapterId: number, loadToken: number) {
+  const searchKeyword = route.query.search
+  if (typeof searchKeyword !== 'string' || !searchKeyword.trim()) return
+
+  try {
+    let catalogTree = catalogTreeCache.get(store.comicId)
+    if (!catalogTree) {
+      const response = await catalogApi.tree(store.comicId)
+      catalogTree = [...response.data]
+      catalogTreeCache.set(store.comicId, catalogTree)
+    }
+    if (loadToken !== chapterLoadToken || Number(route.params.chapterId) !== chapterId) return
+
+    const matchingChapters = searchCatalogChapters(catalogTree, searchKeyword)
+    const currentIndex = matchingChapters.findIndex((item) => item.chapter.id === chapterId)
+    if (currentIndex < 0) return
+    store.prevChapterId = matchingChapters[currentIndex - 1]?.chapter.id ?? null
+    store.nextChapterId = matchingChapters[currentIndex + 1]?.chapter.id ?? null
+  } catch {
+    // 搜索上下文不可用时保留阅读 API 返回的全书相邻章节。
+  }
+}
 
 // 移动端不依赖浏览器 dblclick：触控双击同一图片后，幂等加载当前页 HQ。
 gesture.onDoubleTap(() => {
@@ -279,6 +305,9 @@ async function loadCurrentChapter(preservePage = false, restoreProgress = true) 
       ElMessage.error(store.error)
       return
     }
+
+    await applySearchChapterNavigation(chapterId, loadToken)
+    if (loadToken !== chapterLoadToken || Number(route.params.chapterId) !== chapterId) return
 
     forceHqPages.clear()
     preloadEngine.reset(store.totalPages)

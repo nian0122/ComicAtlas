@@ -265,7 +265,11 @@ function readComic() {
 }
 
 function goReader(chapterId: number) {
-  router.push(`/reader/${chapterId}?page=1`)
+  router.push({
+    name: 'reader',
+    params: { chapterId },
+    query: { page: '1', ...(isSearching.value ? { search: searchKeyword.value.trim() } : {}) },
+  })
 }
 
 async function loadData() {

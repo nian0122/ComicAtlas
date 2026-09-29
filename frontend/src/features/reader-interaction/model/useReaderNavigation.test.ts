@@ -58,4 +58,16 @@ describe('阅读器返回路径', () => {
     router.back()
     await vi.waitFor(() => expect(router.currentRoute.value.fullPath).toBe('/history'))
   })
+
+  it('搜索结果阅读时切章保留搜索关键词', async () => {
+    const { router, readerStore, navigation } = createNavigationScenario()
+    await router.push('/reader/311?page=1&search=番外')
+    readerStore.comicId = 296
+    readerStore.nextChapterId = 312
+
+    navigation.goNextChapter()
+    await vi.waitFor(() =>
+      expect(router.currentRoute.value.fullPath).toBe('/reader/312?page=1&search=%E7%95%AA%E5%A4%96'),
+    )
+  })
 })

@@ -243,8 +243,10 @@ import { useRoute, useRouter } from 'vue-router'
 import { AppButton } from '@/shared/ui/button'
 import { getApiErrorMessage } from '@/shared/api/http'
 import { readerApi, type ReaderDTO } from '@/entities/chapter'
+import { catalogApi, type CatalogNode } from '@/entities/comic'
 import { historyApi } from '@/entities/history'
 import { isVideoMedia, type MediaItemInfo, type MediaReaction } from '@/entities/media'
+import { searchCatalogChapters } from '@/features/chapter-search'
 import { clientLogger } from '@/shared/lib/logger'
 import { VideoProgressControl, VideoSpeedSheet } from './components'
 import { useAutoHideControls } from './composables/useAutoHideControls'
@@ -253,6 +255,7 @@ import { useImmersiveSwipe } from './composables/useImmersiveSwipe'
 const route = useRoute()
 const router = useRouter()
 const chapter = shallowRef<ReaderDTO | null>(null)
+const catalogTreeCache = new Map<number, CatalogNode[]>()
 const nextChapter = shallowRef<ReaderDTO | null>(null)
 const previousChapter = shallowRef<ReaderDTO | null>(null)
 const currentIndex = ref(0)
@@ -407,11 +410,51 @@ function requestChapter(chapterId: number): Promise<ReaderDTO> {
 }
 
 /** 空章节继续沿阅读顺序查找，避免在章节边界停留于空画面。 */
+async function getScopedSearchChapterIds(comicId: number): Promise<number[] | undefined> {
+  const searchKeyword = route.query.search
+  if (typeof searchKeyword !== 'string' || !searchKeyword.trim()) return undefined
+  try {
+    let catalogTree = catalogTreeCache.get(comicId)
+    if (!catalogTree) {
+      const response = await catalogApi.tree(comicId)
+      catalogTree = [...response.data]
+      catalogTreeCache.set(comicId, catalogTree)
+    }
+    return searchCatalogChapters(catalogTree, searchKeyword).map((item) => item.chapter.id)
+  } catch {
+    return undefined
+  }
+}
+
 async function findPlayableChapter(
   chapterId: number | null,
   direction: 'next' | 'previous',
   comicId: number,
+  scopedChapterIds?: readonly number[],
 ): Promise<ReaderDTO | null> {
+  if (scopedChapterIds) {
+    const startIndex = scopedChapterIds.indexOf(chapterId ?? -1)
+    if (startIndex < 0) return null
+    for (
+      let candidateIndex = startIndex;
+      candidateIndex >= 0 && candidateIndex < scopedChapterIds.length;
+      candidateIndex += direction === 'next' ? 1 : -1
+    ) {
+      const scopedChapterId = scopedChapterIds[candidateIndex]
+      if (scopedChapterId == null) continue
+      const candidate = await requestChapter(scopedChapterId)
+      if (candidate.comicId !== comicId) return null
+      if (playableItems(candidate.pages).length > 0) {
+        return {
+          ...candidate,
+          prevChapterId: scopedChapterIds[candidateIndex - 1] ?? null,
+          nextChapterId: scopedChapterIds[candidateIndex + 1] ?? null,
+        }
+      }
+    }
+    return null
+  }
+
   const visited = new Set<number>()
   let candidateId = chapterId
   while (candidateId != null && !visited.has(candidateId)) {
@@ -431,7 +474,8 @@ function prefetchAdjacent(): void {
   previousChapter.value = null
   const chapterId = activeChapter.chapterId
   if (activeChapter.nextChapterId != null) {
-    void findPlayableChapter(activeChapter.nextChapterId, 'next', activeChapter.comicId)
+    void getScopedSearchChapterIds(activeChapter.comicId)
+      .then((chapterIds) => findPlayableChapter(activeChapter.nextChapterId, 'next', activeChapter.comicId, chapterIds))
       .then((candidate) => {
         if (chapter.value?.chapterId === chapterId) nextChapter.value = candidate
       })
@@ -440,7 +484,10 @@ function prefetchAdjacent(): void {
       })
   }
   if (activeChapter.prevChapterId != null) {
-    void findPlayableChapter(activeChapter.prevChapterId, 'previous', activeChapter.comicId)
+    void getScopedSearchChapterIds(activeChapter.comicId)
+      .then((chapterIds) =>
+        findPlayableChapter(activeChapter.prevChapterId, 'previous', activeChapter.comicId, chapterIds),
+      )
       .then((candidate) => {
         if (chapter.value?.chapterId === chapterId) previousChapter.value = candidate
       })
@@ -462,8 +509,22 @@ async function loadChapter(): Promise<void> {
   loadError.value = ''
   try {
     let response = await requestChapter(chapterId)
+    let scopedChapterIds = await getScopedSearchChapterIds(response.comicId)
+    if (scopedChapterIds) {
+      const currentSearchIndex = scopedChapterIds.indexOf(response.chapterId)
+      if (currentSearchIndex >= 0) {
+        response = {
+          ...response,
+          prevChapterId: scopedChapterIds[currentSearchIndex - 1] ?? null,
+          nextChapterId: scopedChapterIds[currentSearchIndex + 1] ?? null,
+        }
+      } else {
+        scopedChapterIds = undefined
+      }
+    }
     if (playableItems(response.pages).length === 0) {
-      response = (await findPlayableChapter(response.nextChapterId, 'next', response.comicId)) ?? response
+      response =
+        (await findPlayableChapter(response.nextChapterId, 'next', response.comicId, scopedChapterIds)) ?? response
     }
     if (sequence !== loadSequence) return
     chapter.value = response
@@ -496,7 +557,7 @@ function updateRoute(): void {
   void router.replace({
     name: 'chapter-videos',
     params: { chapterId: chapter.value.chapterId },
-    query: { page: currentItem.value.pageNumber },
+    query: { ...route.query, page: currentItem.value.pageNumber },
   })
 }
 
@@ -633,7 +694,13 @@ async function move(direction: number, animate = true): Promise<void> {
   try {
     const prefetched = direction > 0 ? nextChapter.value : previousChapter.value
     const target =
-      prefetched ?? (await findPlayableChapter(adjacentId, direction > 0 ? 'next' : 'previous', activeChapter.comicId))
+      prefetched ??
+      (await findPlayableChapter(
+        adjacentId,
+        direction > 0 ? 'next' : 'previous',
+        activeChapter.comicId,
+        await getScopedSearchChapterIds(activeChapter.comicId),
+      ))
     if (!target || chapter.value?.chapterId !== activeChapter.chapterId) return
     ++playbackSequence
     if (animate) beginSlide(direction)
@@ -1013,7 +1080,7 @@ function goBack(): void {
     void router.push({
       name: 'reader',
       params: { chapterId: chapter.value.chapterId },
-      query: { page: currentItem.value.pageNumber },
+      query: { ...route.query, page: currentItem.value.pageNumber },
     })
   } else {
     router.back()
