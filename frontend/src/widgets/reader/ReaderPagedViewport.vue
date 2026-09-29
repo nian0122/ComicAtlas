@@ -1,33 +1,35 @@
 <template>
   <div ref="viewportRef" class="paged-viewport" @wheel="onWheel" @scroll="onScroll">
-    <div v-if="page" class="paged-page" :style="pageStyle">
-      <VideoPlayer
-        v-if="isVideo"
-        :key="page.id"
-        :media-id="page.id"
-        :hq-url="page.hqUrl"
-        :media-type="page.mediaType ?? 'VIDEO'"
-        :width="page.width"
-        :height="page.height"
-        :duration="page.duration"
-        :container="page.container"
-        :video-codec="page.videoCodec"
-        :audio-codec="page.audioCodec"
-        :active="true"
-        :scroller-root="viewportRef"
-        @started="emit('video-started', props.currentPage - 1)"
-      />
-      <ProgressiveImage
-        v-else
-        :key="page.id"
-        :lq="page.lqUrl"
-        :hq="page.hqUrl"
-        :mode="settings.qualityMode"
-        :aspect-ratio="aspectRatio"
-        :lq-status="page.lqStatus"
-        :force-hq="forceHq"
-      />
-    </div>
+    <Transition :name="pageTransition" mode="out-in">
+      <div v-if="page" :key="page.id" class="paged-page" :style="pageStyle">
+        <VideoPlayer
+          v-if="isVideo"
+          :key="page.id"
+          :media-id="page.id"
+          :hq-url="page.hqUrl"
+          :media-type="page.mediaType ?? 'VIDEO'"
+          :width="page.width"
+          :height="page.height"
+          :duration="page.duration"
+          :container="page.container"
+          :video-codec="page.videoCodec"
+          :audio-codec="page.audioCodec"
+          :active="true"
+          :scroller-root="viewportRef"
+          @started="emit('video-started', props.currentPage - 1)"
+        />
+        <ProgressiveImage
+          v-else
+          :key="page.id"
+          :lq="page.lqUrl"
+          :hq="page.hqUrl"
+          :mode="settings.qualityMode"
+          :aspect-ratio="aspectRatio"
+          :lq-status="page.lqStatus"
+          :force-hq="forceHq"
+        />
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -58,6 +60,7 @@ const settings = useReaderSettingsStore()
 const viewportRef = ref<HTMLElement | null>(null)
 const containerWidth = ref(0)
 const containerHeight = ref(0)
+const pageTransition = ref('page-next')
 
 const WHEEL_PAGE_COOLDOWN_MS = 300
 let lastWheelPageTime = 0
@@ -152,9 +155,13 @@ onBeforeUnmount(() => {
 
 watch(
   () => [props.currentPage, props.pages.length] as const,
-  () => {
+  ([currentPage], previousValue) => {
     const total = props.pages.length
     if (total === 0) return
+    const previousPage = previousValue?.[0]
+    if (previousPage !== undefined && currentPage !== previousPage) {
+      pageTransition.value = currentPage > previousPage ? 'page-next' : 'page-prev'
+    }
     const idx = Math.min(Math.max(props.currentPage - 1, 0), total - 1)
     emit('visible-range', { start: idx, end: idx, total })
     if (viewportRef.value) {
@@ -173,7 +180,9 @@ watch(
   min-height: 0;
   overflow: auto;
   display: flex;
-  touch-action: manipulation;
+  perspective: 1200px;
+  /* 让横向 pointer swipe 由阅读器处理，同时保留长页纵向平移与双指缩放。 */
+  touch-action: pan-y pinch-zoom;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
 }
@@ -181,5 +190,25 @@ watch(
 .paged-page {
   margin: auto;
   flex-shrink: 0;
+}
+
+.page-next-enter-active,
+.page-next-leave-active,
+.page-prev-enter-active,
+.page-prev-leave-active {
+  transition: opacity 220ms ease, transform 220ms cubic-bezier(0.22, 0.68, 0, 1);
+  backface-visibility: hidden;
+}
+
+.page-next-enter-from { opacity: 0; transform: translateX(7%) rotateY(-5deg); }
+.page-next-leave-to { opacity: 0; transform: translateX(-4%) rotateY(3deg); }
+.page-prev-enter-from { opacity: 0; transform: translateX(-7%) rotateY(5deg); }
+.page-prev-leave-to { opacity: 0; transform: translateX(4%) rotateY(-3deg); }
+
+@media (prefers-reduced-motion: reduce) {
+  .page-next-enter-active,
+  .page-next-leave-active,
+  .page-prev-enter-active,
+  .page-prev-leave-active { transition-duration: 1ms; }
 }
 </style>
