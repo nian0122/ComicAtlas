@@ -518,15 +518,58 @@ onMounted(() => {
   }
 
   .management-body {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
   }
 
   .management-sidenav {
+    min-width: 0;
+    padding: var(--space-2) var(--space-4);
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sidenav-brand,
+  .new-import-link,
+  .sidenav-footer {
     display: none;
+  }
+
+  .sidenav-menu {
+    flex-direction: row;
+    gap: var(--space-2);
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+  }
+
+  .sidenav-link {
+    flex: 0 0 auto;
+    gap: var(--space-2);
+    min-height: 44px;
+    padding-inline: var(--space-3);
+    white-space: nowrap;
+  }
+
+  .sidenav-link::before {
+    top: auto;
+    right: var(--space-3);
+    bottom: 0;
+    left: var(--space-3);
+    width: auto;
+    height: 2px;
+  }
+
+  .management-content {
+    padding: var(--space-8) var(--content-gutter);
   }
 }
 
 @media (max-width: 480px) {
+  .management-layout {
+    grid-template-rows: 64px minmax(0, 1fr);
+  }
+
   .management-header {
     padding-inline: var(--space-5);
   }
