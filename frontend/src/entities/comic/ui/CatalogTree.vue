@@ -1,6 +1,13 @@
 <template>
-  <div class="catalog-tree">
-    <RecycleScroller class="catalog-scroller" :items="flatItems" :item-size="40" key-field="flatKey" :buffer="100">
+  <div class="catalog-tree" :class="{ 'catalog-tree--page-mode': pageMode }">
+    <RecycleScroller
+      class="catalog-scroller"
+      :items="flatItems"
+      :item-size="40"
+      key-field="flatKey"
+      :buffer="100"
+      :page-mode="pageMode"
+    >
       <template #default="{ item }">
         <div
           v-if="item.type === 'header'"
@@ -11,6 +18,8 @@
           <AppButton
             type="button"
             class="expand-btn"
+            variant="ghost"
+            size="sm"
             icon-only
             :aria-label="isExpanded(item.nodePath) ? `收起${item.title}` : `展开${item.title}`"
             :class="{ expanded: isExpanded(item.nodePath) }"
@@ -72,6 +81,7 @@ const props = defineProps<{
   activeChapterId?: number | null
   highlightKeyword?: string
   expandedNodePaths?: readonly string[]
+  pageMode?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -204,37 +214,60 @@ const flatItems = computed<FlatItem[]>(() => {
   max-height: min(calc(100vh - 96px), 720px);
 }
 
+.catalog-tree--page-mode {
+  overflow: visible;
+}
+
+.catalog-tree--page-mode .catalog-scroller {
+  max-height: none;
+}
+
 .node-header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   height: 40px;
   box-sizing: border-box;
   padding: 0 12px;
-  margin-top: 14px;
-  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
-  border-left: 2px solid color-mix(in srgb, var(--accent) 72%, var(--border));
-  background: linear-gradient(90deg, color-mix(in srgb, var(--bg-surface) 82%, transparent), transparent 82%);
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+  border-left: 2px solid color-mix(in srgb, var(--accent) 58%, var(--border));
+  background: color-mix(in srgb, var(--bg-surface) 38%, transparent);
   cursor: pointer;
   user-select: none;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast);
 }
 
-.node-header:first-child {
-  margin-top: 0;
+.node-header:hover {
+  border-bottom-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+  background: color-mix(in srgb, var(--bg-surface) 78%, transparent);
 }
 
 .expand-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  flex: 0 0 28px;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  transition: transform var(--transition-fast);
+  transition:
+    color var(--transition-fast),
+    background-color var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.node-header:hover .expand-btn {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--bg-elevated) 80%, transparent);
 }
 
 .expand-btn.expanded {

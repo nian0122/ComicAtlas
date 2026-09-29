@@ -68,6 +68,7 @@
         <CatalogTree
           v-if="filteredCatalogTree.length"
           :tree="filteredCatalogTree"
+          page-mode
           :active-chapter-id="comic.lastReadChapterId"
           :highlight-keyword="searchKeyword"
           :expanded-node-paths="expandedNodePaths"

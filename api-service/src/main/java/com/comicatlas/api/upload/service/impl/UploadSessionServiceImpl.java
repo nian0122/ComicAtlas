@@ -126,6 +126,7 @@ public class UploadSessionServiceImpl implements UploadSessionService {
         }
         long totalBytes = validateManifest(request.getFiles());
         validateTarget(comicId, chapterId, request.getReplaceMediaId());
+        cleanupStaleNameReservations(chapterId, request.getFiles());
         validateStorageNames(chapterId, request.getReplaceMediaId(), request.getFiles());
         storageService.ensureEnoughFreeSpace(totalBytes);
 
@@ -237,6 +238,26 @@ public class UploadSessionServiceImpl implements UploadSessionService {
                 throw new BusinessException(HttpStatusCodes.CONFLICT,
                         "该章节已存在同名媒体文件: " + fileManifest.getName());
             }
+        }
+    }
+
+    /** 自动释放超时且从未收到分片的同名会话，避免遗留文件清单阻塞重试。 */
+    private void cleanupStaleNameReservations(Long chapterId,
+                                              List<CreateUploadSessionRequest.FileManifest> manifest) {
+        List<String> requestedNames = manifest.stream()
+                .map(fileManifest -> fileManifest.getName().toLowerCase(Locale.ROOT))
+                .distinct()
+                .toList();
+        LocalDateTime staleBefore = LocalDateTime.now().minus(uploadProperties.getStaleSessionTtl());
+        List<UploadSession> staleSessions = sessionMapper.selectStaleEmptyActiveByNames(
+                chapterId, requestedNames, staleBefore);
+        for (UploadSession staleSession : staleSessions) {
+            storageService.deleteStagingDir(staleSession);
+            fileMapper.deleteBySessionId(staleSession.getId());
+            staleSession.setStatus(UploadSessionStatus.CANCELLED);
+            sessionMapper.updateById(staleSession);
+            log.info("清理超时的零字节同名上传会话: sessionId={}, chapterId={}",
+                    staleSession.getSessionId(), chapterId);
         }
     }
 
@@ -516,7 +537,7 @@ public class UploadSessionServiceImpl implements UploadSessionService {
                 .map(Media::getPageNumber)
                 .filter(pageNumber -> pageNumber != null)
                 .max(Comparator.naturalOrder())
-                .orElse(0);
+                .orElse(0) + 1;
     }
 
     private String computeSha256(Path file) {

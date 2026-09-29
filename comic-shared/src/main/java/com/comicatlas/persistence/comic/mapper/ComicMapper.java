@@ -151,6 +151,15 @@ public interface ComicMapper extends BaseMapper<Comic> {
     int updateReaction(@Param("comicId") Long comicId, @Param("reaction") MediaReaction reaction,
                        @Param("reactionAt") LocalDateTime reactionAt);
 
+    @Update({"<script>",
+            "UPDATE comic SET reaction = #{reaction}, reaction_at = #{reactionAt} ",
+            "WHERE status != 'DELETED' AND id IN ",
+            "<foreach collection='comicIds' item='comicId' open='(' separator=',' close=')'>#{comicId}</foreach>",
+            "</script>"})
+    int updateReactionBatch(@Param("comicIds") List<Long> comicIds,
+                            @Param("reaction") MediaReaction reaction,
+                            @Param("reactionAt") LocalDateTime reactionAt);
+
     /** 数据库按 ICU 排序键去重和截取，禁止在应用层全量读取后排序。 */
     @Select("""
         SELECT MIN(title) AS title FROM comic

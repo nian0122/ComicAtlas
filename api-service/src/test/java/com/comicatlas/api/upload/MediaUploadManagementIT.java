@@ -1,6 +1,7 @@
 package com.comicatlas.api.upload;
 
 import com.comicatlas.api.upload.service.UploadSessionService;
+import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.upload.support.DiskSpaceChecker;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.comicatlas.persistence.comic.entity.Media;
@@ -147,6 +148,9 @@ class MediaUploadManagementIT {
     @MockBean
     DiskSpaceChecker diskSpaceChecker;
 
+    @MockBean
+    CatalogCacheInvalidator catalogCacheInvalidator;
+
     @DynamicPropertySource
     static void configureProperties(org.springframework.test.context.DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", mysql::getJdbcUrl);
@@ -223,7 +227,7 @@ class MediaUploadManagementIT {
         Long chapterId = createChapter(comicId, "第 1 话");
         byte[] jpg = jpegBytes();
 
-        mockMvc.perform(post("/api/uploads/sessions")
+        mockMvc.perform(post("/api/manage/uploads/sessions")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json("""
                                 {"comicId":%d,"chapterId":%d,"files":[{"fileId":"f1","name":"../evil.jpg",
@@ -241,7 +245,7 @@ class MediaUploadManagementIT {
         byte[] jpg = jpegBytes();
         String sha256 = sha256Hex(jpg);
 
-        mockMvc.perform(post("/api/uploads/sessions")
+        mockMvc.perform(post("/api/manage/uploads/sessions")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json("""
                                 {"comicId":%d,"chapterId":%d,"replaceMediaId":1,"files":[
@@ -260,7 +264,7 @@ class MediaUploadManagementIT {
         byte[] jpg = jpegBytes();
         long oversize = 3L * 1024 * 1024;
 
-        mockMvc.perform(post("/api/uploads/sessions")
+        mockMvc.perform(post("/api/manage/uploads/sessions")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json("""
                                 {"comicId":%d,"chapterId":%d,"files":[{"fileId":"f1","name":"big.jpg",
@@ -287,7 +291,7 @@ class MediaUploadManagementIT {
         }
         sb.append("]}");
 
-        mockMvc.perform(post("/api/uploads/sessions")
+        mockMvc.perform(post("/api/manage/uploads/sessions")
                         .contentType(MediaType.APPLICATION_JSON).content(sb.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(400));
@@ -300,7 +304,7 @@ class MediaUploadManagementIT {
         Long chapterId = createChapter(comicId, "第 1 话");
         byte[] jpg = jpegBytes();
 
-        mockMvc.perform(post("/api/uploads/sessions")
+        mockMvc.perform(post("/api/manage/uploads/sessions")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json("""
                                 {"comicId":%d,"chapterId":%d,"files":[{"fileId":"f1","name":"a.jpg",
@@ -318,7 +322,7 @@ class MediaUploadManagementIT {
         Long chapterId = createChapter(comicId, "第 1 话");
         byte[] jpg = jpegBytes();
 
-        mockMvc.perform(post("/api/uploads/sessions")
+        mockMvc.perform(post("/api/manage/uploads/sessions")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json("""
                                 {"comicId":%d,"chapterId":%d,"files":[{"fileId":"f1","name":"a.jpg",
@@ -329,13 +333,13 @@ class MediaUploadManagementIT {
     }
 
     @Test
-    @DisplayName("创建会话返回 opaque sessionId 与服务端文件名")
+    @DisplayName("创建会话返回 opaque sessionId 并保留媒体文件名")
     void createSession_returnsOpaqueSessionId() throws Exception {
         Long comicId = createComic("正常创建");
         Long chapterId = createChapter(comicId, "第 1 话");
         byte[] jpg = jpegBytes();
 
-        MvcResult result = mockMvc.perform(post("/api/uploads/sessions")
+        MvcResult result = mockMvc.perform(post("/api/manage/uploads/sessions")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json("""
                                 {"comicId":%d,"chapterId":%d,"files":[{"fileId":"f1","name":"page1.jpg",
@@ -349,8 +353,31 @@ class MediaUploadManagementIT {
         assertThat(data.get("sessionId").asText()).isNotBlank();
         assertThat(data.get("chunkSize").asLong()).isEqualTo(CHUNK);
         String storageName = data.get("files").get(0).get("storageName").asText();
-        assertThat(storageName).matches("[0-9a-f]{8}-[0-9a-f-]{27}\\.jpg");
+        assertThat(storageName).isEqualTo("page1.jpg");
         assertThat(data.get("files").get(0).get("fileId").asText()).isEqualTo("f1");
+    }
+
+    @Test
+    @DisplayName("超时零字节会话不会阻止同名文件重新上传")
+    void createSession_reclaimsStaleEmptyNameReservation() throws Exception {
+        Long comicId = createComic("同名重试");
+        Long chapterId = createChapter(comicId, "第 1 话");
+        byte[] jpg = jpegBytes();
+        SessionContext staleContext = createOneFileSession(comicId, chapterId,
+                "stale", "retry.jpg", "image/jpeg", jpg);
+
+        UploadSession staleSession = uploadSessionMapper.selectBySessionId(staleContext.sessionId);
+        staleSession.setCreatedAt(LocalDateTime.now().minusMinutes(20));
+        uploadSessionMapper.updateById(staleSession);
+
+        SessionContext retryContext = createOneFileSession(comicId, chapterId,
+                "retry", "retry.jpg", "image/jpeg", jpg);
+
+        assertThat(uploadSessionMapper.selectBySessionId(staleContext.sessionId).getStatus())
+                .isEqualTo(UploadSessionStatus.CANCELLED);
+        assertThat(uploadFileMapper.selectBySessionId(staleSession.getId())).isEmpty();
+        assertThat(uploadSessionMapper.selectBySessionId(retryContext.sessionId).getStatus())
+                .isEqualTo(UploadSessionStatus.ACTIVE);
     }
 
     // ======================== 分片上传 ========================
@@ -386,7 +413,7 @@ class MediaUploadManagementIT {
         int mid = data.length / 2;
         uploadChunk(ctx.sessionId, "f1", data, 0, mid - 1, data.length);
 
-        MvcResult st = mockMvc.perform(get("/api/uploads/sessions/{id}", ctx.sessionId))
+        MvcResult st = mockMvc.perform(get("/api/manage/uploads/sessions/{id}", ctx.sessionId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andReturn();
@@ -406,7 +433,7 @@ class MediaUploadManagementIT {
         byte[] data = ctx.fileBytes;
         int end = Math.min(data.length, CHUNK) - 1;
         byte[] chunk = Arrays.copyOfRange(data, 0, end + 1);
-        mockMvc.perform(put("/api/uploads/sessions/{sid}/files/{fid}", ctx.sessionId, "f1")
+        mockMvc.perform(put("/api/manage/uploads/sessions/{sid}/files/{fid}", ctx.sessionId, "f1")
                         .contentType(MediaType.APPLICATION_OCTET_STREAM)
                         .content(chunk)
                         .header("Content-Range", "bytes 0-" + end + "/" + data.length)
@@ -422,7 +449,7 @@ class MediaUploadManagementIT {
         SessionContext ctx = createOneFileSession("超限分片", "big.jpg", big);
         int end = CHUNK * 2 - 1;
         byte[] chunk = Arrays.copyOfRange(big, 0, end + 1);
-        mockMvc.perform(put("/api/uploads/sessions/{sid}/files/{fid}", ctx.sessionId, "f1")
+        mockMvc.perform(put("/api/manage/uploads/sessions/{sid}/files/{fid}", ctx.sessionId, "f1")
                         .contentType(MediaType.APPLICATION_OCTET_STREAM)
                         .content(chunk)
                         .header("Content-Range", "bytes 0-" + end + "/" + big.length)
@@ -437,7 +464,7 @@ class MediaUploadManagementIT {
         SessionContext ctx = createOneFileSession("坏区间", "page1.jpg", jpegBytes());
         byte[] data = ctx.fileBytes;
         byte[] chunk = Arrays.copyOfRange(data, 0, 10);
-        mockMvc.perform(put("/api/uploads/sessions/{sid}/files/{fid}", ctx.sessionId, "f1")
+        mockMvc.perform(put("/api/manage/uploads/sessions/{sid}/files/{fid}", ctx.sessionId, "f1")
                         .contentType(MediaType.APPLICATION_OCTET_STREAM)
                         .content(chunk)
                         .header("Content-Range", "bytes 0-9/999999")
@@ -458,7 +485,7 @@ class MediaUploadManagementIT {
                 List.of(fileManifest("f1", "page1.jpg", "image/jpeg", jpg.length, "0".repeat(64))));
         uploadAll(ctx.sessionId, "f1", jpg);
 
-        mockMvc.perform(post("/api/uploads/sessions/{id}/complete", ctx.sessionId))
+        mockMvc.perform(post("/api/manage/uploads/sessions/{id}/complete", ctx.sessionId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(400));
 
@@ -479,7 +506,7 @@ class MediaUploadManagementIT {
                 List.of(fileManifest("f1", "fake.jpg", "image/jpeg", exe.length, sha256Hex(exe))));
         uploadAll(ctx.sessionId, "f1", exe);
 
-        mockMvc.perform(post("/api/uploads/sessions/{id}/complete", ctx.sessionId))
+        mockMvc.perform(post("/api/manage/uploads/sessions/{id}/complete", ctx.sessionId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(400));
 
@@ -495,7 +522,7 @@ class MediaUploadManagementIT {
         byte[] data = ctx.fileBytes;
         uploadChunk(ctx.sessionId, "f1", data, 0, data.length / 2 - 1, data.length);
 
-        mockMvc.perform(post("/api/uploads/sessions/{id}/complete", ctx.sessionId))
+        mockMvc.perform(post("/api/manage/uploads/sessions/{id}/complete", ctx.sessionId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(400));
     }
@@ -513,7 +540,7 @@ class MediaUploadManagementIT {
         uploadAll(ctx.sessionId, "img1", jpg);
         uploadAll(ctx.sessionId, "vid1", mp4);
 
-        MvcResult comp = mockMvc.perform(post("/api/uploads/sessions/{id}/complete", ctx.sessionId))
+        MvcResult comp = mockMvc.perform(post("/api/manage/uploads/sessions/{id}/complete", ctx.sessionId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andReturn();
@@ -528,6 +555,7 @@ class MediaUploadManagementIT {
                 .eq("chapter_id", chapterId)
                 .orderByAsc("page_number"));
         assertThat(media).hasSize(2);
+        assertThat(media).extracting(Media::getPageNumber).containsExactly(1, 2);
 
         Media img = media.get(0);
         assertThat(img.getStatus()).isEqualTo(MediaLifecycleStatus.READY);
@@ -561,12 +589,12 @@ class MediaUploadManagementIT {
         Path stagingDir = MANGA_ROOT.resolve("staging").resolve(ctx.sessionId);
         assertThat(Files.exists(stagingDir)).isTrue();
 
-        mockMvc.perform(delete("/api/uploads/sessions/{id}", ctx.sessionId))
+        mockMvc.perform(delete("/api/manage/uploads/sessions/{id}", ctx.sessionId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200));
 
         assertThat(Files.exists(stagingDir)).isFalse();
-        MvcResult st = mockMvc.perform(get("/api/uploads/sessions/{id}", ctx.sessionId))
+        MvcResult st = mockMvc.perform(get("/api/manage/uploads/sessions/{id}", ctx.sessionId))
                 .andExpect(status().isOk()).andReturn();
         assertThat(readData(st).get("status").asText()).isEqualTo("CANCELLED");
     }
@@ -617,7 +645,7 @@ class MediaUploadManagementIT {
         List<Long> reversed = new ArrayList<>();
         before.forEach(m -> reversed.add(0, m.getId()));
 
-        MvcResult reorder = mockMvc.perform(post("/api/chapters/{cid}/media/reorder", chapterId)
+        MvcResult reorder = mockMvc.perform(post("/api/manage/chapters/{cid}/media/reorder", chapterId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"mediaIds\":" + reversed + "}"))
                 .andExpect(status().isOk())
@@ -709,7 +737,7 @@ class MediaUploadManagementIT {
                 .eq("chapter_id", chapterId));
         Long mediaId = media.getId();
 
-        mockMvc.perform(delete("/api/media/{id}", mediaId))
+        mockMvc.perform(delete("/api/manage/media/{id}", mediaId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200));
 
@@ -762,7 +790,7 @@ class MediaUploadManagementIT {
     // ======================== 工具 ========================
 
     private Long createComic(String title) throws Exception {
-        MvcResult r = mockMvc.perform(post("/api/comics")
+        MvcResult r = mockMvc.perform(post("/api/manage/comics")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"title\":\"" + title + "\"}"))
                 .andExpect(status().isOk())
@@ -772,7 +800,7 @@ class MediaUploadManagementIT {
     }
 
     private Long createChapter(Long comicId, String title) throws Exception {
-        MvcResult r = mockMvc.perform(post("/api/comics/{cid}/chapters", comicId)
+        MvcResult r = mockMvc.perform(post("/api/manage/comics/{cid}/chapters", comicId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"title\":\"" + title + "\"}"))
                 .andExpect(status().isOk())
@@ -811,7 +839,7 @@ class MediaUploadManagementIT {
             body.put("replaceMediaId", replaceMediaId);
         }
         body.put("files", files);
-        MvcResult r = mockMvc.perform(post("/api/uploads/sessions")
+        MvcResult r = mockMvc.perform(post("/api/manage/uploads/sessions")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isOk())
@@ -849,7 +877,7 @@ class MediaUploadManagementIT {
     private void uploadChunk(String sessionId, String fileId, byte[] data,
                              int start, int end, int total) throws Exception {
         byte[] chunk = Arrays.copyOfRange(data, start, end + 1);
-        mockMvc.perform(put("/api/uploads/sessions/{sid}/files/{fid}", sessionId, fileId)
+        mockMvc.perform(put("/api/manage/uploads/sessions/{sid}/files/{fid}", sessionId, fileId)
                         .contentType(MediaType.APPLICATION_OCTET_STREAM)
                         .content(chunk)
                         .header("Content-Range", "bytes " + start + "-" + end + "/" + total)
@@ -859,7 +887,7 @@ class MediaUploadManagementIT {
     }
 
     private boolean completeSession(String sessionId) throws Exception {
-        MvcResult r = mockMvc.perform(post("/api/uploads/sessions/{id}/complete", sessionId))
+        MvcResult r = mockMvc.perform(post("/api/manage/uploads/sessions/{id}/complete", sessionId))
                 .andExpect(status().isOk())
                 .andReturn();
         JsonNode root = objectMapper.readTree(r.getResponse().getContentAsString());

@@ -4,11 +4,10 @@
     :class="{ active: active }"
     :style="{
       paddingLeft: (indent ?? 0) + 12 + 'px',
-      '--chapter-guide-left': (indent ?? 0) + 28 + 'px',
     }"
     @click="emit('click')"
   >
-    <span class="chapter-no">
+    <span class="chapter-no" :title="`原始话数：${chapter.chapterNo || '未知'}`">
       <template v-for="(segment, index) in chapterNumberSegments" :key="`number-${index}`">
         <mark v-if="segment.matched">{{ segment.text }}</mark>
         <template v-else>{{ segment.text }}</template>
@@ -64,7 +63,7 @@ function splitText(text: string): TextSegment[] {
 }
 
 const chapterNumberSegments = computed(() =>
-  splitText(props.chapter.chapterNo ? `第${props.chapter.chapterNo}话` : '未知'),
+  splitText(`#${props.chapter.globalOrder}`),
 )
 const titleSegments = computed(() => splitText(props.chapter.title || ''))
 </script>
@@ -84,16 +83,6 @@ const titleSegments = computed(() => splitText(props.chapter.title || ''))
   transition:
     background 150ms ease,
     color 150ms ease;
-}
-
-.chapter-row::before {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: var(--chapter-guide-left, 28px);
-  width: 1px;
-  background: color-mix(in srgb, var(--border) 72%, transparent);
-  content: '';
 }
 
 .chapter-row:hover {
