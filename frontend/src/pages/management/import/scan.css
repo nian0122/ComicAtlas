@@ -23,12 +23,7 @@
   border-bottom-color: var(--accent);
 }
 
-/* ——— Batch panel ——— */
 .batch-panel {
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: var(--space-xl);
   margin-bottom: var(--space-2xl);
 }
 

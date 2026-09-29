@@ -7,12 +7,7 @@
   min-height: 100%;
 }
 
-/* Form card */
 .import-form-card {
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: var(--space-xl);
   margin-bottom: var(--space-2xl);
 }
 

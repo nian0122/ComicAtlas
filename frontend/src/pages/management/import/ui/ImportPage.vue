@@ -25,7 +25,7 @@
     </div>
 
     <!-- 单个导入 -->
-    <section v-if="activeTab === 'single'" class="import-form-card">
+    <ManagementPanel v-if="activeTab === 'single'" class="import-form-card">
       <!-- 来源类型选择 -->
       <div class="form-group">
         <label class="form-label">来源类型</label>
@@ -65,10 +65,10 @@
         </AppButton>
         <router-link to="/manage/tasks" class="ghost-link">查看任务中心 →</router-link>
       </div>
-    </section>
+    </ManagementPanel>
 
     <!-- 批量导入 -->
-    <section v-if="activeTab === 'batch'" class="batch-panel">
+    <ManagementPanel v-if="activeTab === 'batch'" class="batch-panel">
       <!-- 漫画集根目录输入 -->
       <div class="form-group">
         <label class="form-label">漫画集根目录</label>
@@ -207,7 +207,7 @@
           </div>
         </div>
       </div>
-    </section>
+    </ManagementPanel>
 
     <!-- 简易近期任务预览（最多 3 条进行中） -->
     <section v-if="store.activeTasks.length > 0" class="recent-section">
@@ -233,6 +233,7 @@
 <script setup lang="ts">
 import { AppButton } from '@/shared/ui/button'
 import { Spinner } from '@/shared/ui/spinner'
+import { ManagementPanel } from '@/shared/ui/management-panel'
 import { PageHeader } from '@/shared/ui/page-header'
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
