@@ -1,7 +1,5 @@
 .action-card {
   min-width: 0;
-  padding: var(--space-4);
-  border: 1px solid var(--border);
   background: var(--bg-secondary);
 }
 .chapter-feature-grid {
@@ -15,8 +13,6 @@
   align-content: start;
   gap: 7px;
   min-width: 0;
-  padding: var(--space-4);
-  border: 1px solid var(--border);
   background: var(--bg-secondary);
 }
 .chapter-feature-card:hover {

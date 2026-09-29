@@ -238,7 +238,7 @@
           </el-form>
         </template>
         <template v-else-if="selectedMediaIds.length">
-          <div class="action-card action-card--media-batch">
+          <ManagementPanel class="action-card action-card--media-batch" padding="compact">
             <div class="action-card-head">
               <div>
                 <span class="panel-kicker">BATCH MEDIA MAINTENANCE</span>
@@ -253,10 +253,10 @@
             </div>
             <AppButton variant="danger" block @click="trashSelectedMediaBatch">回收选中媒体</AppButton>
             <AppButton block @click="clearMediaSelection">取消选择</AppButton>
-          </div>
+          </ManagementPanel>
         </template>
         <template v-else-if="selectedMedia">
-          <div class="action-card action-card--media">
+          <ManagementPanel class="action-card action-card--media" padding="compact">
             <div class="action-card-head">
               <div>
                 <span class="panel-kicker">MEDIA MAINTENANCE</span>
@@ -325,10 +325,10 @@
                 >转码此视频</AppButton
               ><AppButton variant="danger" block @click="trashSelectedMedia">回收此媒体</AppButton>
             </div>
-          </div>
+          </ManagementPanel>
         </template>
         <template v-else-if="selectedRow?.kind === 'CHAPTER'">
-          <div class="action-card action-card--chapter">
+          <ManagementPanel class="action-card action-card--chapter" padding="compact">
             <div class="action-card-head">
               <div>
                 <span class="panel-kicker">CHAPTER MAINTENANCE</span>
@@ -428,9 +428,9 @@
                 >{{ chapterForm.action === 'trash' ? '回收当前章节' : '执行章节操作' }}</AppButton
               >
             </el-form>
-          </div>
+          </ManagementPanel>
           <div v-if="chapterWorkspaceTab === 'media'" class="chapter-feature-grid">
-            <section class="chapter-feature-card feature-order">
+            <ManagementPanel class="chapter-feature-card feature-order" padding="compact">
               <div class="feature-card-top">
                 <span class="panel-kicker">MEDIA ORDER</span
                 ><span class="feature-count">{{ mediaOrderItems.length }} 项</span>
@@ -438,8 +438,8 @@
               <strong>媒体顺序</strong>
               <p>调整本章阅读顺序</p>
               <AppButton block @click="mediaOrderDialogVisible = true">打开排序面板</AppButton>
-            </section>
-            <section class="chapter-feature-card feature-intake">
+            </ManagementPanel>
+            <ManagementPanel class="chapter-feature-card feature-intake" padding="compact">
               <div class="feature-card-top">
                 <span class="panel-kicker">MEDIA INTAKE</span><span class="feature-mark">＋</span>
               </div>
@@ -448,10 +448,10 @@
               <div class="feature-button-row">
                 <AppButton variant="primary" block @click="openUploadDialog()">上传媒体</AppButton>
               </div>
-            </section>
+            </ManagementPanel>
           </div>
           <div v-else-if="chapterWorkspaceTab === 'storage'" class="chapter-feature-grid">
-            <section class="chapter-feature-card feature-storage feature-storage--focus">
+            <ManagementPanel class="chapter-feature-card feature-storage feature-storage--focus" padding="compact">
               <div class="feature-card-top">
                 <span class="panel-kicker">STORAGE / CHAPTER</span
                 ><StorageStatusTag v-if="selectedStorageChapter" :status="selectedStorageChapter.hqStatus" type="hq" />
@@ -481,7 +481,7 @@
                   >转码视频</AppButton
                 >
               </div>
-            </section>
+            </ManagementPanel>
           </div>
         </template>
         <div v-else class="action-empty">
