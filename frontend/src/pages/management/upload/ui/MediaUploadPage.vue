@@ -6,7 +6,7 @@
 
     <el-alert v-if="errorMessage" :title="errorMessage" type="error" show-icon closable @close="errorMessage = ''" />
     <section class="upload-workbench">
-      <div class="upload-form-card">
+      <ManagementPanel class="upload-form-card" padding="spacious">
         <div class="section-heading">
           <span class="panel-kicker">TARGET</span>
           <h2>选择目标章节</h2>
@@ -65,9 +65,9 @@
             </el-select>
           </el-form-item>
         </el-form>
-      </div>
+      </ManagementPanel>
 
-      <div class="upload-file-card">
+      <ManagementPanel class="upload-file-card" padding="spacious">
         <div class="section-heading">
           <span class="panel-kicker">PAYLOAD</span>
           <h2>选择文件</h2>
@@ -115,10 +115,10 @@
         <div v-if="sessionId" class="session-note">
           会话 {{ sessionId }} · {{ uploadStatus }}<span v-if="taskId"> · 任务 #{{ taskId }}</span>
         </div>
-      </div>
+      </ManagementPanel>
     </section>
 
-    <section class="upload-guide">
+    <ManagementPanel class="upload-guide" padding="spacious">
       <div>
         <span class="panel-kicker">HOW IT WORKS</span>
         <h2>安全的异步媒体管线</h2>
@@ -128,7 +128,7 @@
         <li><strong>分片</strong><span>大文件按服务端分片大小上传，可观察每个文件进度。</span></li>
         <li><strong>入库</strong><span>完成后生成管理任务，Worker 负责搬运并更新媒体状态。</span></li>
       </ol>
-    </section>
+    </ManagementPanel>
   </div>
 </template>
 
@@ -138,6 +138,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import axios from 'axios'
 import { PageHeader } from '@/shared/ui/page-header'
+import { ManagementPanel } from '@/shared/ui/management-panel'
 import { managementCatalogApi, managementChapterApi, managementComicApi } from '@/entities/comic'
 import { uploadApi } from '@/features/upload'
 import { formatUploadContentRange } from '@/features/upload'
@@ -368,10 +369,6 @@ onMounted(async () => {
 .upload-guide {
   display: grid;
   gap: var(--space-6);
-  padding: clamp(22px, 3vw, 36px);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg-surface);
 }
 .section-heading {
   display: grid;
