@@ -30,6 +30,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.lessThanOrEqualTo;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -256,6 +257,16 @@ class ManagementTaskControllerIT {
                             .param("size", "1"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.records.length()").value(lessThanOrEqualTo(1)));
+        }
+
+        @Test
+        @DisplayName("状态统计返回完整匹配数量且不受列表分页影响")
+        void statusCounts_returnsAllQueuedTasks() throws Exception {
+            mockMvc.perform(get("/api/manage/tasks/status-counts")
+                            .param("type", "IMPORT"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data[?(@.status == 'QUEUED')].taskCount")
+                            .value(hasItem(1)));
         }
     }
 

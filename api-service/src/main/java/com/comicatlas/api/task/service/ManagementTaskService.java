@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.comicatlas.api.task.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.task.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.task.dto.ManagementTaskResponse;
+import com.comicatlas.api.task.dto.ManagementTaskStatusCountResponse;
 import com.comicatlas.api.task.enums.ManagementTaskStatus;
 import com.comicatlas.api.task.enums.TaskStage;
 import com.comicatlas.api.task.enums.TaskType;
@@ -16,6 +17,8 @@ public interface ManagementTaskService {
     ManagementTaskResponse createTask(CreateManagementTaskRequest request, String idempotencyKey, String payload);
     IPage<ManagementTaskResponse> listTasks(int page, int size, TaskType type, ManagementTaskStatus status,
                                             String batchId, String targetType, Long targetId);
+    List<ManagementTaskStatusCountResponse> getTaskStatusCounts(TaskType type, String batchId,
+                                                                 String targetType, Long targetId);
     ManagementTaskResponse getTask(Long taskId);
     List<ManagementTaskItemResponse> getTaskItems(Long taskId);
     ManagementTaskResponse cancelTask(Long taskId);

@@ -36,6 +36,13 @@ export interface ManagementTaskQuery {
   readonly targetId?: number
 }
 
+export type ManagementTaskStatusCountsQuery = Omit<ManagementTaskQuery, 'page' | 'size' | 'status'>
+
+export interface ManagementTaskStatusCountVO {
+  readonly status: ManagementTaskStatus
+  readonly taskCount: number
+}
+
 export interface ManagementTaskVO {
   readonly id: number
   readonly taskType: ManagementTaskType

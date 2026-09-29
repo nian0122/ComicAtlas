@@ -184,22 +184,23 @@ function taskTypeLabel(type: ManagementTaskType): string {
 
 onMounted(async () => {
   try {
-    const [comicSummary, comics, tasks, storageSummary] = await Promise.all([
+    const [comicSummary, comics, tasks, taskStatusCounts, storageSummary] = await Promise.all([
       managementComicApi.list({ page: 1, size: 1 }),
       managementComicApi.list({ page: 1, size: 5, sort: 'updatedAt' }),
       managementTaskApi.list({ page: 1, size: 50 }),
+      managementTaskApi.statusCounts(),
       storageService.fetchSummary(),
     ])
     comicTotal.value = comicSummary.data.total
     recentComics.value = comics.data.records
     recentTasks.value = tasks.data.records.slice(0, 5)
     taskTotal.value = tasks.data.total
-    failedTaskCount.value = tasks.data.records.filter((task) =>
-      ['FAILED', 'PARTIALLY_SUCCEEDED'].includes(task.status),
-    ).length
-    activeTaskCount.value = tasks.data.records.filter((task) =>
-      ['QUEUED', 'RUNNING', 'CANCELLING'].includes(task.status),
-    ).length
+    const countByStatus = new Map(taskStatusCounts.data.map(({ status, taskCount }) => [status, taskCount]))
+    failedTaskCount.value = (countByStatus.get('FAILED') ?? 0) + (countByStatus.get('PARTIALLY_SUCCEEDED') ?? 0)
+    activeTaskCount.value =
+      (countByStatus.get('QUEUED') ?? 0) +
+      (countByStatus.get('RUNNING') ?? 0) +
+      (countByStatus.get('CANCELLING') ?? 0)
     storage.value = storageSummary
     updatedAt.value = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
   } catch (reason: unknown) {

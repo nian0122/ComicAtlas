@@ -6,9 +6,9 @@
 
     <StatGrid class="summary-grid" aria-label="当前查询统计" :columns="4">
       <StatCard label="匹配任务" :value="total" description="全部分页结果" />
-      <StatCard label="运行中" :value="activeCount" description="当前页" />
-      <StatCard label="成功" :value="successCount" description="当前页" />
-      <StatCard label="失败/部分失败" :value="failureCount" description="当前页" />
+      <StatCard label="运行中" :value="activeCount" description="全部筛选结果" />
+      <StatCard label="成功" :value="successCount" description="全部筛选结果" />
+      <StatCard label="失败/部分失败" :value="failureCount" description="全部筛选结果" />
     </StatGrid>
 
     <div class="filters">
@@ -232,7 +232,14 @@ import { managementComicApi } from '@/entities/comic'
 import { ElMessage } from 'element-plus'
 import { managementTaskApi } from '@/entities/task'
 import { MANAGEMENT_TASK_TYPES, managementTaskStatusLabel, managementTaskTypeLabel } from '@/entities/task'
-import type { ManagementTaskItemVO, ManagementTaskStatus, ManagementTaskType, ManagementTaskVO } from '@/entities/task'
+import type {
+  ManagementTaskItemVO,
+  ManagementTaskStatus,
+  ManagementTaskStatusCountVO,
+  ManagementTaskStatusCountsQuery,
+  ManagementTaskType,
+  ManagementTaskVO,
+} from '@/entities/task'
 
 const TASK_STATUSES = [
   'QUEUED',
@@ -258,6 +265,7 @@ const query = reactive<{
   ...(Number.isSafeInteger(routeTargetId) && routeTargetId > 0 ? { targetId: routeTargetId } : {}),
 })
 const tasks = ref<readonly ManagementTaskVO[]>([])
+const statusCounts = ref<readonly ManagementTaskStatusCountVO[]>([])
 const taskItems = ref<readonly ManagementTaskItemVO[]>([])
 const selectedTask = ref<ManagementTaskVO | null>(null)
 const targetIdInput = ref(query.targetId ? String(query.targetId) : '')
@@ -269,12 +277,16 @@ const autoRefresh = ref(true)
 const updatedAt = ref('')
 let timer: ReturnType<typeof setInterval> | undefined
 
+const taskCountsByStatus = computed(() => new Map(statusCounts.value.map(({ status, taskCount }) => [status, taskCount])))
 const activeCount = computed(
-  () => tasks.value.filter((task) => ['QUEUED', 'RUNNING', 'CANCELLING'].includes(task.status)).length,
+  () =>
+    (taskCountsByStatus.value.get('QUEUED') ?? 0) +
+    (taskCountsByStatus.value.get('RUNNING') ?? 0) +
+    (taskCountsByStatus.value.get('CANCELLING') ?? 0),
 )
-const successCount = computed(() => tasks.value.filter((task) => task.status === 'SUCCEEDED').length)
+const successCount = computed(() => taskCountsByStatus.value.get('SUCCEEDED') ?? 0)
 const failureCount = computed(
-  () => tasks.value.filter((task) => ['FAILED', 'PARTIALLY_SUCCEEDED'].includes(task.status)).length,
+  () => (taskCountsByStatus.value.get('FAILED') ?? 0) + (taskCountsByStatus.value.get('PARTIALLY_SUCCEEDED') ?? 0),
 )
 const groupedTasks = computed(() =>
   MANAGEMENT_TASK_TYPES.map((type) => ({
@@ -327,9 +339,17 @@ async function loadTasks(silent = false): Promise<void> {
   if (!silent) loading.value = true
   error.value = ''
   try {
-    const response = await managementTaskApi.list(query)
+    const countQuery: ManagementTaskStatusCountsQuery = {
+      type: query.type,
+      targetId: query.targetId,
+    }
+    const [response, statusCountResponse] = await Promise.all([
+      managementTaskApi.list(query),
+      managementTaskApi.statusCounts(countQuery),
+    ])
     tasks.value = response.data.records
     total.value = response.data.total
+    statusCounts.value = statusCountResponse.data
     updatedAt.value = new Date().toLocaleTimeString()
     void loadImportNames(response.data.records)
   } catch (reason: unknown) {

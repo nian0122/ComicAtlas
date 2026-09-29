@@ -6,6 +6,7 @@ import com.comicatlas.contract.common.dto.PageResponse;
 import com.comicatlas.api.task.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.task.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.task.dto.ManagementTaskResponse;
+import com.comicatlas.api.task.dto.ManagementTaskStatusCountResponse;
 import com.comicatlas.api.task.service.ManagementTaskService;
 import com.comicatlas.api.task.enums.ManagementTaskStatus;
 import com.comicatlas.api.task.enums.TaskType;
@@ -34,6 +35,16 @@ import org.springframework.web.bind.annotation.RequestParam;
 public class ManagementTaskController {
 
     private final ManagementTaskService managementTaskService;
+
+    /** 查询任务状态全量统计，支持与任务列表相同的非状态筛选条件。 */
+    @GetMapping("/status-counts")
+    public Result<List<ManagementTaskStatusCountResponse>> getTaskStatusCounts(
+            @RequestParam(required = false) TaskType type,
+            @RequestParam(required = false) String batchId,
+            @RequestParam(required = false) String targetType,
+            @RequestParam(required = false) Long targetId) {
+        return Result.ok(managementTaskService.getTaskStatusCounts(type, batchId, targetType, targetId));
+    }
 
     /**
      * 分页查询任务列表。

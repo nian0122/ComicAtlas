@@ -533,6 +533,7 @@ GET /api/manage/operations/media/{mediaId}
 
 ```
 GET    /api/manage/tasks                     # 分页列表
+GET    /api/manage/tasks/status-counts        # 按任务状态返回全量数量（不分页、不受 status 参数影响）
 GET    /api/manage/tasks/{id}                # 详情
 GET    /api/manage/tasks/{id}/items          # 逐目标项
 POST   /api/manage/tasks                     # 创建异步命令（需 Idempotency-Key）
@@ -540,7 +541,7 @@ POST   /api/manage/tasks/{id}/cancel         # 取消
 POST   /api/manage/tasks/{id}/retry          # 重试（仅终态）
 ```
 
-列表查询参数：`page`（默认 1）、`size`（默认 20）、`type`、`status`、`batchId`、`targetType`、`targetId`。
+列表查询参数：`page`（默认 1）、`size`（默认 20）、`type`、`status`、`batchId`、`targetType`、`targetId`。状态统计接口接受 `type`、`batchId`、`targetType`、`targetId`，返回这些筛选条件下各状态的任务总数；统计忽略 `status` 筛选，供状态卡片同时展示完整分布。
 
 创建请求 `CreateManagementTaskRequest`：
 

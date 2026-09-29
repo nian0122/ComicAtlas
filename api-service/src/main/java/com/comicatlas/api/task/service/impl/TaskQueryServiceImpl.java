@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.comicatlas.api.task.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.task.dto.ManagementTaskResponse;
+import com.comicatlas.api.task.dto.ManagementTaskStatusCountResponse;
 import com.comicatlas.api.task.persistence.entity.ManagementTask;
 import com.comicatlas.api.task.persistence.entity.ManagementTaskItem;
 import com.comicatlas.api.task.enums.ManagementTaskStatus;
@@ -66,6 +67,21 @@ public class TaskQueryServiceImpl implements TaskQueryService {
         responsePage.setTotal(taskPage.getTotal());
         responsePage.setRecords(responses);
         return responsePage;
+    }
+
+    /** 查询筛选范围内所有管理任务的状态数量，不受列表分页影响。 */
+    @Override
+    public List<ManagementTaskStatusCountResponse> getStatusCounts(TaskType type, String batchId,
+                                                                    String targetType, Long targetId) {
+        List<Long> targetTaskIds = null;
+        if (targetId != null) {
+            targetTaskIds = itemMapper.selectTaskIdsByComicId(targetId);
+            if (targetTaskIds.isEmpty()) {
+                return List.of();
+            }
+        }
+        return taskMapper.selectStatusCountsByCondition(type == null ? null : type.name(), batchId,
+                targetType, targetTaskIds);
     }
 
     /** 查询任务详情。 */

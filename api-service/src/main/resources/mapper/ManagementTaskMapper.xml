@@ -18,6 +18,20 @@
         </where>
         ORDER BY created_at DESC
     </select>
+    <select id="selectStatusCountsByCondition"
+            resultType="com.comicatlas.api.task.dto.ManagementTaskStatusCountResponse">
+        SELECT status, COUNT(*) AS task_count
+        FROM management_task
+        <where>
+            <if test="taskType != null and taskType != ''">AND task_type = #{taskType}</if>
+            <if test="batchId != null and batchId != ''">AND batch_id = #{batchId}</if>
+            <if test="targetType != null and targetType != ''">AND target_type = #{targetType}</if>
+            <if test="taskIds != null and !taskIds.isEmpty()">
+                AND id IN <foreach collection="taskIds" item="taskId" open="(" separator="," close=")">#{taskId}</foreach>
+            </if>
+        </where>
+        GROUP BY status
+    </select>
     <update id="updateStage">
         UPDATE management_task
         SET stage = #{stage}, updated_at = #{updatedAt}

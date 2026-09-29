@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.comicatlas.api.task.dto.CreateManagementTaskRequest;
 import com.comicatlas.api.task.dto.ManagementTaskItemResponse;
 import com.comicatlas.api.task.dto.ManagementTaskResponse;
+import com.comicatlas.api.task.dto.ManagementTaskStatusCountResponse;
 import com.comicatlas.api.task.persistence.entity.ManagementTask;
 import com.comicatlas.api.task.persistence.entity.ManagementTaskItem;
 import com.comicatlas.api.task.persistence.mapper.ManagementTaskItemMapper;
@@ -177,6 +178,12 @@ public class ManagementTaskServiceImpl implements ManagementTaskService {
                                                     ManagementTaskStatus status, String batchId,
                                                     String targetType, Long targetId) {
         return taskQueryService.listTasks(page, size, type, status, batchId, targetType, targetId);
+    }
+
+    @Override
+    public List<ManagementTaskStatusCountResponse> getTaskStatusCounts(TaskType type, String batchId,
+                                                                        String targetType, Long targetId) {
+        return taskQueryService.getStatusCounts(type, batchId, targetType, targetId);
     }
 
     /** 查询任务详情。 */
