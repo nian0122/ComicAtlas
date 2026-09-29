@@ -1,91 +1,69 @@
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { ref, watch } from 'vue'
 import { useReaderStore } from '@/features/reader-navigation'
+import { getApiErrorMessage } from '@/shared/api/http'
+import { clientLogger } from '@/shared/lib/logger'
+import { useReadingProgressPersistence } from './useReadingProgressPersistence'
 
-/** 管理阅读进度的防抖保存、章节切换保存与页面离开兜底。 */
+/** 普通阅读器的进度触发条件；持久化队列和离页处理由共享 composable 负责。 */
 export function useReaderProgress() {
   const store = useReaderStore()
   const lastSyncedPage = ref(1)
   const progressDirty = ref(false)
   const chapterLoading = ref(false)
-  const saveDebounceTimer = ref<number | null>(null)
-
-  function clearSaveDebounce(): void {
-    if (saveDebounceTimer.value) {
-      clearTimeout(saveDebounceTimer.value)
-      saveDebounceTimer.value = null
-    }
-  }
+  const persistence = useReadingProgressPersistence(
+    () => {
+      if (store.comicId <= 0 || store.chapterId <= 0 || store.pages.length === 0) return null
+      return {
+        comicId: store.comicId,
+        chapterId: store.chapterId,
+        pageNumber: store.currentPage,
+        totalPages: store.pages.length,
+      }
+    },
+    300,
+    {
+      onSaved: (progress) => {
+        store.progressSaveError = null
+        if (store.chapterId !== progress.chapterId || store.currentPage !== progress.pageNumber) return
+        lastSyncedPage.value = progress.pageNumber
+        progressDirty.value = false
+      },
+      onError: (progress, error) => {
+        progressDirty.value = true
+        store.progressSaveError = getApiErrorMessage(error, '阅读进度保存失败')
+        clientLogger.error('阅读进度保存失败', {
+          operation: 'history.update',
+          comicId: progress.comicId,
+          chapterId: progress.chapterId,
+        })
+      },
+    },
+  )
 
   async function prepareProgressForReload(): Promise<boolean> {
-    clearSaveDebounce()
-
     const canRestoreProgress = !progressDirty.value
-    if (!progressDirty.value || store.comicId <= 0 || store.chapterId <= 0) {
-      return canRestoreProgress
-    }
+    if (!progressDirty.value || store.comicId <= 0 || store.chapterId <= 0) return canRestoreProgress
 
     const chapterId = store.chapterId
     const pageNumber = store.currentPage
-    const saved = await store.saveProgress()
-    if (!saved || store.chapterId !== chapterId || store.currentPage !== pageNumber) {
-      return false
-    }
-
-    lastSyncedPage.value = pageNumber
-    progressDirty.value = false
-    return true
+    const isSaved = await persistence.saveNow()
+    return isSaved && store.chapterId === chapterId && store.currentPage === pageNumber
   }
 
   function retryProgressSave(): Promise<boolean> {
-    const chapterId = store.chapterId
-    const pageNumber = store.currentPage
     progressDirty.value = true
-    return store.saveProgress().then((saved) => {
-      if (saved && store.chapterId === chapterId && store.currentPage === pageNumber) {
-        lastSyncedPage.value = pageNumber
-        progressDirty.value = false
-        return true
-      }
-      return false
-    })
+    return persistence.saveNow()
   }
 
   function saveVideoProgress(pageNumber: number): void {
     progressDirty.value = true
-    void store.saveProgress().then((saved) => {
-      if (saved && store.currentPage === pageNumber) {
-        lastSyncedPage.value = pageNumber
-        progressDirty.value = false
-      }
-    })
+    if (store.currentPage === pageNumber) void persistence.saveNow()
   }
 
   function prepareProgressForChapterChange(): void {
-    clearSaveDebounce()
-    if (store.comicId <= 0 || store.currentPage === lastSyncedPage.value) return
-
-    const chapterId = store.chapterId
-    const pageNumber = store.currentPage
-    void store.saveProgress().then((saved) => {
-      if (saved && store.chapterId === chapterId && store.currentPage === pageNumber) {
-        lastSyncedPage.value = pageNumber
-        progressDirty.value = false
-      }
-    })
-  }
-
-  function flushProgressOnPageHide(): void {
-    clearSaveDebounce()
-    if (store.comicId <= 0 || !progressDirty.value) return
-
-    lastSyncedPage.value = store.currentPage
-    progressDirty.value = false
-    store.saveProgressKeepalive()
-  }
-
-  function onVisibilityChange(): void {
-    if (document.visibilityState === 'hidden') {
-      flushProgressOnPageHide()
+    if (store.comicId > 0 && store.currentPage !== lastSyncedPage.value) {
+      progressDirty.value = true
+      void persistence.saveNow()
     }
   }
 
@@ -103,39 +81,9 @@ export function useReaderProgress() {
       }
 
       progressDirty.value = true
-      clearSaveDebounce()
-      saveDebounceTimer.value = window.setTimeout(() => {
-        void store.saveProgress().then((saved) => {
-          if (saved && store.currentPage === pageNumber) {
-            lastSyncedPage.value = pageNumber
-            progressDirty.value = false
-          }
-        })
-      }, 300)
+      persistence.scheduleSave()
     },
   )
-
-  onMounted(() => {
-    window.addEventListener('pagehide', flushProgressOnPageHide)
-    document.addEventListener('visibilitychange', onVisibilityChange)
-  })
-
-  onBeforeUnmount(() => {
-    window.removeEventListener('pagehide', flushProgressOnPageHide)
-    document.removeEventListener('visibilitychange', onVisibilityChange)
-    clearSaveDebounce()
-
-    if (store.comicId <= 0 || store.currentPage === lastSyncedPage.value) return
-
-    const chapterId = store.chapterId
-    const pageNumber = store.currentPage
-    void store.saveProgress().then((saved) => {
-      if (saved && store.chapterId === chapterId && store.currentPage === pageNumber) {
-        lastSyncedPage.value = pageNumber
-        progressDirty.value = false
-      }
-    })
-  })
 
   return {
     lastSyncedPage,

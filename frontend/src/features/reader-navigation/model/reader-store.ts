@@ -3,10 +3,8 @@ import { reactive, computed, toRefs } from 'vue'
 import { getApiErrorMessage } from '@/shared/api/http'
 import { readerApi } from '@/entities/chapter'
 import { historyApi } from '@/entities/history'
-import { useHistoryStore } from '@/entities/history'
 import type { MediaItemInfo } from '@/entities/media'
 import type { MediaReaction } from '@/entities/media'
-import { clientLogger } from '@/shared/lib/logger'
 
 export interface ReaderState {
   chapterId: number
@@ -58,10 +56,6 @@ export const useReaderStore = defineStore('reader', () => {
   }
 
   let loadSeq = 0
-  type ProgressPayload = { comicId: number; chapterId: number; pageNumber: number; totalPages: number }
-  let pendingProgress: ProgressPayload | null = null
-  let progressSavePromise: Promise<boolean> | null = null
-
   async function loadChapter(chId: number, preservePage = false) {
     // 请求序号闸:快速连续切章时 HTTP 响应可能乱序返回,
     // 只允许最新一次请求写入 state,过期响应直接丢弃
@@ -119,85 +113,6 @@ export const useReaderStore = defineStore('reader', () => {
     }
   }
 
-  /**
-   * 同步阅读进度到后端（upsert）。
-   *
-   * @return 保存是否成功；调用方可据此清除本地的 dirty 标志，
-   *         以便页面卸载兜底时只重发未确认的进度
-   */
-  async function saveProgress(): Promise<boolean> {
-    if (!state.comicId || !state.chapterId) return false
-    pendingProgress = {
-      comicId: state.comicId,
-      chapterId: state.chapterId,
-      pageNumber: state.currentPage,
-      totalPages: state.pages.length,
-    }
-    if (progressSavePromise) return progressSavePromise
-    progressSavePromise = flushProgress()
-    return progressSavePromise
-  }
-
-  async function flushProgress(): Promise<boolean> {
-    let saved = true
-    let failedPayload: ProgressPayload | null = null
-    try {
-      while (pendingProgress) {
-        const payload = pendingProgress
-        failedPayload = payload
-        pendingProgress = null
-        await useHistoryStore().recordProgress(
-          payload.comicId,
-          payload.chapterId,
-          payload.pageNumber,
-          payload.totalPages,
-        )
-        state.progressSaveError = null
-        failedPayload = null
-      }
-    } catch (error: unknown) {
-      saved = false
-      // 进度保存不应阻断翻页，但必须保留错误状态供页面恢复，并留下可检索诊断信息。
-      state.progressSaveError = getApiErrorMessage(error, '阅读进度保存失败')
-      clientLogger.error('阅读进度保存失败', {
-        operation: 'history.update',
-        comicId: failedPayload?.comicId,
-        chapterId: failedPayload?.chapterId,
-      })
-    } finally {
-      progressSavePromise = null
-    }
-    return saved
-  }
-
-  /**
-   * 页面卸载兜底保存（fire-and-forget）。
-   * <p>
-   * 普通 axios XHR 在页面关闭/刷新卸载时可能被浏览器中止，而阅读进度
-   * 的 300ms debounce 也可能尚未触发。此方法用 fetch keepalive 发送，
-   * 确保关闭标签页/刷新/切后台时最终进度仍能送达后端。
-   * 载荷远小于 keepalive 64KB 上限，不解析响应。
-   */
-  function saveProgressKeepalive() {
-    if (!state.comicId || !state.chapterId) return
-    fetch(`/api/history/${state.comicId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chapterId: state.chapterId,
-        pageNumber: state.currentPage,
-      }),
-      keepalive: true,
-    }).catch((error: unknown) => {
-      clientLogger.error('页面卸载时阅读进度上报失败', {
-        operation: 'history.update.keepalive',
-        comicId: state.comicId,
-        chapterId: state.chapterId,
-        reason: error instanceof Error ? error.name : 'unknown',
-      })
-    })
-  }
-
   function nextPage() {
     if (state.currentPage < state.pages.length) state.currentPage++
   }
@@ -219,8 +134,6 @@ export const useReaderStore = defineStore('reader', () => {
     reset,
     loadChapter,
     restoreProgress,
-    saveProgress,
-    saveProgressKeepalive,
     nextPage,
     prevPage,
     goToPage,

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { reactive, toRefs } from 'vue'
 import { getApiErrorMessage } from '@/shared/api/http'
+import { clientLogger } from '@/shared/lib/logger'
 import { historyApi } from '../api'
 import type { HistoryVO } from './types'
 
@@ -103,10 +104,28 @@ export const useHistoryStore = defineStore('history', () => {
     updateEntry(comicId, chapterId, pageNumber, totalPages)
   }
 
+  /** 页面离开时使用 keepalive 请求，避免浏览器卸载中断普通 XHR。 */
+  function recordProgressKeepalive(progress: { comicId: number; chapterId: number; pageNumber: number }): void {
+    fetch(`/api/history/${progress.comicId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chapterId: progress.chapterId, pageNumber: progress.pageNumber }),
+      keepalive: true,
+    }).catch((error: unknown) => {
+      clientLogger.error('页面离开时阅读进度上报失败', {
+        operation: 'history.update.keepalive',
+        comicId: progress.comicId,
+        chapterId: progress.chapterId,
+        reason: error instanceof Error ? error.name : 'unknown',
+      })
+    })
+  }
+
   return {
     ...toRefs(state),
     fetchFirstPage,
     fetchNextPage,
     recordProgress,
+    recordProgressKeepalive,
   }
 })

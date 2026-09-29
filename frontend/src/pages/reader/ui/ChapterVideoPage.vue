@@ -244,13 +244,13 @@ import { AppButton } from '@/shared/ui/button'
 import { getApiErrorMessage } from '@/shared/api/http'
 import { readerApi, type ReaderDTO } from '@/entities/chapter'
 import { catalogApi, type CatalogNode } from '@/entities/comic'
-import { useHistoryStore } from '@/entities/history'
 import { isVideoMedia, type MediaItemInfo, type MediaReaction } from '@/entities/media'
 import { searchCatalogChapters } from '@/features/chapter-search'
 import { clientLogger } from '@/shared/lib/logger'
 import { VideoProgressControl, VideoSpeedSheet } from './components'
 import { useAutoHideControls } from './composables/useAutoHideControls'
 import { useImmersiveSwipe } from './composables/useImmersiveSwipe'
+import { useReadingProgressPersistence, type ReadingProgressPayload } from './composables/useReadingProgressPersistence'
 
 const route = useRoute()
 const router = useRouter()
@@ -335,10 +335,7 @@ let playbackSequence = 0
 let switchingChapter = false
 let lastWheelTime = 0
 let previousOverflow = ''
-let progressTimer: number | null = null
 let errorTimer: number | null = null
-let pendingProgress: { comicId: number; chapterId: number; pageNumber: number; totalPages: number } | null = null
-let progressSavePromise: Promise<void> | null = null
 let seekPressTimer: number | null = null
 let resumeAfterSeek = false
 let seekPointerId: number | null = null
@@ -1036,7 +1033,7 @@ function onKeydown(event: KeyboardEvent): void {
   }
 }
 
-function currentProgress(): { comicId: number; chapterId: number; pageNumber: number; totalPages: number } | null {
+function currentProgress(): ReadingProgressPayload | null {
   if (!chapter.value || !currentItem.value) return null
   return {
     comicId: chapter.value.comicId,
@@ -1046,36 +1043,19 @@ function currentProgress(): { comicId: number; chapterId: number; pageNumber: nu
   }
 }
 
-async function flushProgress(): Promise<void> {
-  while (pendingProgress) {
-    const progressToSave = pendingProgress
-    pendingProgress = null
-    try {
-      await useHistoryStore().recordProgress(
-        progressToSave.comicId,
-        progressToSave.chapterId,
-        progressToSave.pageNumber,
-        progressToSave.totalPages,
-      )
-    } catch (error: unknown) {
-      clientLogger.error('沉浸阅读进度保存失败', {
-        operation: 'immersive.history',
-        chapterId: progressToSave.chapterId,
-        reason: error instanceof Error ? error.name : 'unknown',
-      })
-    }
-  }
-  progressSavePromise = null
-}
-
-function queueProgressSave(): void {
-  pendingProgress = currentProgress()
-  if (pendingProgress && !progressSavePromise) progressSavePromise = flushProgress()
-}
+const progressPersistence = useReadingProgressPersistence(currentProgress, 350, {
+  onError: (progressToSave, error) => {
+    clientLogger.error('沉浸阅读进度保存失败', {
+      operation: 'immersive.history',
+      comicId: progressToSave.comicId,
+      chapterId: progressToSave.chapterId,
+      reason: error instanceof Error ? error.name : 'unknown',
+    })
+  },
+})
 
 function scheduleProgressSave(): void {
-  if (progressTimer != null) window.clearTimeout(progressTimer)
-  progressTimer = window.setTimeout(queueProgressSave, 350)
+  progressPersistence.scheduleSave()
 }
 
 function goBack(): void {
@@ -1110,7 +1090,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
   ++loadSequence
   ++playbackSequence
-  if (progressTimer != null) window.clearTimeout(progressTimer)
   if (errorTimer != null) window.clearTimeout(errorTimer)
   if (seekPressTimer != null) window.clearTimeout(seekPressTimer)
   clearSpeedPressTimer()
@@ -1120,7 +1099,6 @@ onBeforeUnmount(() => {
   clearAutoPlayRetry()
   disposeSwipe()
   disposeControls()
-  queueProgressSave()
   stopCurrent()
   document.body.style.overflow = previousOverflow
   document.removeEventListener('keydown', onKeydown)
