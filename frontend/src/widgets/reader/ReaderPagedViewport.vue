@@ -196,14 +196,14 @@ watch(
 .page-next-leave-active,
 .page-prev-enter-active,
 .page-prev-leave-active {
-  transition: opacity 220ms ease, transform 220ms cubic-bezier(0.22, 0.68, 0, 1);
+  transition: transform 220ms cubic-bezier(0.22, 0.68, 0, 1);
   backface-visibility: hidden;
 }
 
-.page-next-enter-from { opacity: 0; transform: translateX(7%) rotateY(-5deg); }
-.page-next-leave-to { opacity: 0; transform: translateX(-4%) rotateY(3deg); }
-.page-prev-enter-from { opacity: 0; transform: translateX(-7%) rotateY(5deg); }
-.page-prev-leave-to { opacity: 0; transform: translateX(4%) rotateY(-3deg); }
+.page-next-enter-from { transform: translateX(7%); }
+.page-next-leave-to { transform: translateX(-4%); }
+.page-prev-enter-from { transform: translateX(-7%); }
+.page-prev-leave-to { transform: translateX(4%); }
 
 @media (prefers-reduced-motion: reduce) {
   .page-next-enter-active,
