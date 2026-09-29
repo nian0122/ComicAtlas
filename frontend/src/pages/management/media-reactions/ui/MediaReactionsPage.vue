@@ -5,7 +5,16 @@
     </PageHeader>
 
     <div class="scope-switch" role="tablist" aria-label="标记类型">
-      <button v-for="option in scopeOptions" :key="option.value" type="button" :class="{ active: scope === option.value }" @click="scope = option.value">{{ option.label }}</button>
+      <AppButton
+        v-for="option in scopeOptions"
+        :key="option.value"
+        role="tab"
+        size="sm"
+        :class="{ active: scope === option.value }"
+        :variant="scope === option.value ? 'primary' : 'ghost'"
+        :aria-selected="scope === option.value"
+        @click="scope = option.value"
+      >{{ option.label }}</AppButton>
     </div>
 
     <ContentReactionsPanel v-if="scope !== 'MEDIA'" :target-type="contentTargetType" />
@@ -15,29 +24,29 @@
       <div class="filter-row">
         <div class="filter-group">
           <span class="filter-label">标记</span>
-          <button
+          <AppButton
             v-for="option in reactionOptions"
             :key="option.value || 'all'"
-            type="button"
-            class="filter-chip"
-            :class="{ active: reactionFilter === option.value }"
+            size="sm"
+            :variant="reactionFilter === option.value ? 'primary' : 'ghost'"
+            :aria-pressed="reactionFilter === option.value"
             @click="reactionFilter = option.value"
           >
             {{ option.label }}
-          </button>
+          </AppButton>
         </div>
         <div class="filter-group">
           <span class="filter-label">类型</span>
-          <button
+          <AppButton
             v-for="option in mediaTypeOptions"
             :key="option.value || 'all'"
-            type="button"
-            class="filter-chip"
-            :class="{ active: mediaTypeFilter === option.value }"
+            size="sm"
+            :variant="mediaTypeFilter === option.value ? 'primary' : 'ghost'"
+            :aria-pressed="mediaTypeFilter === option.value"
             @click="mediaTypeFilter = option.value"
           >
             {{ option.label }}
-          </button>
+          </AppButton>
         </div>
         <label class="trash-toggle">
           <input v-model="includeTrashed" type="checkbox" />
@@ -288,27 +297,6 @@ onMounted(loadItems)
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-}
-.filter-chip {
-  padding: 7px 12px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-  font: inherit;
-  font-size: 13px;
-  transition: 0.18s ease;
-}
-.filter-chip:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-.filter-chip.active {
-  border-color: var(--accent);
-  background: var(--accent-bg);
-  color: var(--accent);
-  font-weight: 700;
 }
 .trash-toggle {
   display: inline-flex;

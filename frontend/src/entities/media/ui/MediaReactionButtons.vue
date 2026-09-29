@@ -1,21 +1,38 @@
 <template>
   <div class="reaction-buttons" :class="{ compact }" role="group" aria-label="内容标记">
-    <button type="button" :class="{ active: reaction === 'LIKE' }" aria-label="喜欢" @click="toggle('LIKE')">
+    <AppButton
+      variant="ghost"
+      size="sm"
+      icon-only
+      :class="{ active: reaction === 'LIKE' }"
+      :aria-pressed="reaction === 'LIKE'"
+      aria-label="喜欢"
+      @click="toggle('LIKE')"
+    >
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M12 20.2 4.7 13a4.8 4.8 0 0 1 6.8-6.8L12 6.7l.5-.5A4.8 4.8 0 0 1 19.3 13L12 20.2Z" />
       </svg>
-    </button>
-    <button type="button" :class="{ active: reaction === 'DISLIKE' }" aria-label="不喜欢" @click="toggle('DISLIKE')">
+    </AppButton>
+    <AppButton
+      variant="ghost"
+      size="sm"
+      icon-only
+      :class="{ active: reaction === 'DISLIKE' }"
+      :aria-pressed="reaction === 'DISLIKE'"
+      aria-label="不喜欢"
+      @click="toggle('DISLIKE')"
+    >
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path
           d="M7 14V4H4a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h3Zm0-10h8.7a2.4 2.4 0 0 1 2.3 1.8l1.6 6.1a1.7 1.7 0 0 1-1.6 2.1H14l.8 3.8a2.3 2.3 0 0 1-2.2 2.8L7 14V4Z"
         />
       </svg>
-    </button>
+    </AppButton>
   </div>
 </template>
 <script setup lang="ts">
 import type { MediaReaction } from '../types'
+import { AppButton } from '@/shared/ui/button'
 withDefaults(defineProps<{ reaction: MediaReaction; compact?: boolean }>(), { compact: false })
 const emit = defineEmits<{ toggle: [reaction: MediaReaction] }>()
 function toggle(next: Exclude<MediaReaction, 'NONE'>) {
@@ -28,7 +45,7 @@ function toggle(next: Exclude<MediaReaction, 'NONE'>) {
   align-items: center;
   gap: var(--space-2);
 }
-.reaction-buttons button {
+.reaction-buttons .app-button {
   display: grid;
   place-items: center;
   width: 42px;
@@ -45,17 +62,17 @@ function toggle(next: Exclude<MediaReaction, 'NONE'>) {
     background var(--transition-fast),
     border-color var(--transition-fast);
 }
-.reaction-buttons button:hover {
+.reaction-buttons .app-button:hover {
   border-color: var(--accent);
   color: var(--accent);
   transform: translateY(-1px);
 }
-.reaction-buttons button.active {
+.reaction-buttons .app-button.active {
   border-color: var(--accent);
   background: var(--accent-bg);
   color: var(--accent);
 }
-.reaction-buttons button:last-child.active {
+.reaction-buttons .app-button:last-child.active {
   border-color: var(--text-muted);
   background: var(--surface-highlight);
   color: var(--text-primary);
@@ -65,7 +82,7 @@ function toggle(next: Exclude<MediaReaction, 'NONE'>) {
   height: 19px;
   fill: currentColor;
 }
-.reaction-buttons.compact button {
+.reaction-buttons.compact .app-button {
   width: 32px;
   height: 32px;
 }

@@ -3,9 +3,16 @@
     <div class="filter-row">
       <div class="filter-group">
         <span class="filter-label">标记</span>
-        <button v-for="option in reactionOptions" :key="option.value || 'all'" type="button" class="filter-chip" :class="{ active: reactionFilter === option.value }" @click="reactionFilter = option.value">
+        <AppButton
+          v-for="option in reactionOptions"
+          :key="option.value || 'all'"
+          size="sm"
+          :variant="reactionFilter === option.value ? 'primary' : 'ghost'"
+          :aria-pressed="reactionFilter === option.value"
+          @click="reactionFilter = option.value"
+        >
           {{ option.label }}
-        </button>
+        </AppButton>
       </div>
       <label class="trash-toggle"><input v-model="includeTrashed" type="checkbox" /><span>包含回收站</span></label>
     </div>
@@ -85,8 +92,6 @@ onMounted(loadItems)
 .filter-row, .list-toolbar { justify-content: space-between; flex-wrap: wrap; }
 .filter-group { flex-wrap: wrap; }
 .filter-label { color: var(--text-muted); font-size: 12px; font-weight: 700; letter-spacing: .08em; }
-.filter-chip { padding: 7px 12px; border: 1px solid var(--border); border-radius: 999px; background: transparent; color: var(--text-secondary); cursor: pointer; font: inherit; font-size: 13px; }
-.filter-chip.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-strong); }
 .reaction-table-wrap { overflow-x: auto; }
 .reaction-table { width: 100%; border-collapse: collapse; min-width: 680px; }
 .reaction-table th, .reaction-table td { padding: 13px 10px; border-bottom: 1px solid var(--border); text-align: left; }

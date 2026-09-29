@@ -1,6 +1,8 @@
 # 前端公共 UI 收敛 TODO
 
-更新日期：2026-09-17。本清单以当前 `frontend/src` 为准，目标是把跨页面重复的 UI 外观和交互抽到 FSD 的 `shared/ui`，使每一种按钮、状态、页面状态和基础容器只有一个实现。当前统一 UI 基础层已完成，后续新增页面必须复用现有 public API。
+更新日期：2026-09-29。本清单记录公共 UI 的归属和迁移结果，现行 FSD 约束以[前端架构文档](08-frontend-architecture.md)为准。按钮、状态、页面状态和基础容器已收敛到公共入口；业务组件中的原生操作按钮使用 `AppButton`。新增 UI 应复用现有 public API。
+
+**状态：** UI-01～UI-11 已完成。按钮门禁要求业务交互使用 `shared/ui/button` 的 `AppButton`；筛选与选项按钮应暴露当前选中状态。
 
 ## 收敛规则
 
@@ -75,4 +77,4 @@
 
 `shared/ui/status-badge/StatusBadge.vue`、`shared/ui/management-panel/*`、`shared/ui/icon/MaterialSymbolIcon.vue`、`shared/ui/logo/ComicAtlasLogo.vue` 已具备公共 UI 候选资格。后续迁移应优先增强这些组件或在其相邻切片补充新原语，不能重新在页面目录创建平行基础组件。
 
-本清单与 [FSD 改造 TODO](fsd-refactoring-todo.md) 互补：前者解决层级和切片边界，本文解决跨页面的 UI 原语重复。完成 UI 收敛不意味着把所有视觉结构抽成全局组件；只抽取已被多个页面重复实现且不会携带业务语义的部分。
+本清单补充[前端架构](08-frontend-architecture.md)中的 UI 归属规则，记录跨页面重复原语的收敛范围。完成 UI 收敛不意味着把所有视觉结构抽成全局组件；只抽取已被多个页面重复实现且不会携带业务语义的部分。
