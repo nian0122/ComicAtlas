@@ -13,7 +13,7 @@
 
     <el-form ref="formRef" :model="form" :rules="rules" label-position="top" class="edit-form">
       <div class="edit-main-column">
-        <section class="edit-panel edit-panel--primary">
+        <ManagementPanel class="edit-panel edit-panel--primary" padding="spacious">
           <PanelHeader
             class="edit-panel-heading"
             level="h3"
@@ -44,9 +44,9 @@
               show-word-limit
             />
           </el-form-item>
-        </section>
+        </ManagementPanel>
 
-        <section class="edit-panel archive-panel">
+        <ManagementPanel class="edit-panel archive-panel" padding="spacious">
           <PanelHeader
             class="edit-panel-heading"
             level="h3"
@@ -95,11 +95,11 @@
               >
             </div>
           </el-form-item>
-        </section>
+        </ManagementPanel>
       </div>
 
       <aside class="edit-side-column">
-        <section class="edit-panel source-panel">
+        <ManagementPanel class="edit-panel source-panel" padding="spacious">
           <PanelHeader
             class="edit-panel-heading"
             level="h3"
@@ -112,9 +112,9 @@
             <span v-if="sourceRef" class="source-ref">{{ sourceRef }}</span>
             <span v-if="!sourceType && !sourceRef" class="source-empty">暂无来源记录</span>
           </div>
-        </section>
+        </ManagementPanel>
 
-        <section v-if="comicInfo" class="edit-panel comicinfo-panel">
+        <ManagementPanel v-if="comicInfo" class="edit-panel comicinfo-panel" padding="spacious">
           <PanelHeader
             class="edit-panel-heading"
             level="h3"
@@ -140,7 +140,7 @@
           <div v-if="comicInfo.tags.length" class="comicinfo-tags">
             <span v-for="tag in comicInfo.tags" :key="tag">{{ tag }}</span>
           </div>
-        </section>
+        </ManagementPanel>
       </aside>
 
       <div class="form-actions">
@@ -152,7 +152,7 @@
 </template>
 
 <script setup lang="ts">
-import { PanelHeader } from '@/shared/ui/management-panel'
+import { ManagementPanel, PanelHeader } from '@/shared/ui/management-panel'
 import { AppButton } from '@/shared/ui/button'
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'

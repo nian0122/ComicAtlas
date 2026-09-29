@@ -88,5 +88,6 @@
 ### UI-13：收敛面板和面板标题
 
 - [x] **TODO UI-13**：`ManagementPanel` 提供 compact/default/spacious 公共间距，漫画操作台和 AI 分析页不再重复定义面板基础背景、边框和间距。
+- [x] **TODO UI-13**：设置页与漫画信息编辑页也统一使用 `ManagementPanel`；本地 class 只控制分区间距与表单布局。
 - [x] **TODO UI-13**：两个 AI 分析页面统一使用 `PanelHeader` 表达编号、标题和说明，页面仅保留面板间距等编排样式。
 - [x] **TODO UI-13**：公共 UI 检查器扫描 CSS 和 Vue 样式，禁止页面重新定义 `.panel-heading`。

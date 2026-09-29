@@ -74,12 +74,6 @@
   gap: var(--space-4);
   min-width: 0;
 }
-.edit-panel {
-  padding: clamp(var(--space-5), 4vw, var(--space-8));
-  border: 1px solid var(--border);
-  background: var(--bg-surface);
-  box-shadow: none;
-}
 .field-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

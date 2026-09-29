@@ -2,8 +2,8 @@
   <div class="settings-page">
     <PageHeader spaced title="设置" />
 
-    <section class="settings-card">
-      <h2 class="section-title">阅读默认设置</h2>
+    <ManagementPanel class="settings-card" padding="spacious">
+      <PanelHeader title="阅读默认设置" />
 
       <div class="setting-row">
         <label class="setting-label">默认画质</label>
@@ -35,11 +35,10 @@
       <div class="setting-actions">
         <AppButton variant="primary" :loading="saving" @click="handleSave">保存设置</AppButton>
       </div>
-    </section>
+    </ManagementPanel>
 
-    <section class="settings-card">
-      <h2 class="section-title">阅读增强</h2>
-      <p class="section-desc">即时生效，与阅读器内设置同步</p>
+    <ManagementPanel class="settings-card" padding="spacious">
+      <PanelHeader title="阅读增强" description="即时生效，与阅读器内设置同步" />
 
       <div class="setting-row">
         <div class="setting-info">
@@ -48,13 +47,14 @@
         </div>
         <el-switch v-model="readerSettings.enablePreload" />
       </div>
-    </section>
+    </ManagementPanel>
   </div>
 </template>
 
 <script setup lang="ts">
 import { AppButton } from '@/shared/ui/button'
 import { PageHeader } from '@/shared/ui/page-header'
+import { ManagementPanel, PanelHeader } from '@/shared/ui/management-panel'
 import { reactive, ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { settingsApi, type ManagementSettings } from '@/entities/system-settings'
@@ -101,32 +101,8 @@ onMounted(loadSettings)
   max-width: 1120px;
 }
 
-.settings-card {
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: var(--space-xl);
-}
-
-.settings-card:first-of-type {
-  max-width: 100%;
-}
-
 .settings-card + .settings-card {
   margin-top: var(--space-lg);
-}
-
-.section-title {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0 0 var(--space-lg);
-}
-
-.section-desc {
-  font-size: 12px;
-  color: var(--text-tertiary);
-  margin: calc(-1 * var(--space-base)) 0 var(--space-lg);
 }
 
 .setting-row {

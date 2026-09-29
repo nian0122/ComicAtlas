@@ -9,7 +9,7 @@
 - `content-state/`：加载、错误、空态的通用容器。
 - `spinner/`：统一尺寸、色彩和动效的加载指示器；按钮、状态容器和页面加载反馈共用此原语。
 - `status-badge/`：无领域状态外观；领域切片只提供状态到 `label/tone` 的映射。
-- `management-panel/`：面板、标题和统计卡基础组件；面板提供 compact/default/spacious 间距，扩展时保持无业务语义。
+- `management-panel/`：面板、标题和统计卡基础组件；面板通过 `padding="compact|default|spacious"` 提供统一间距，扩展时保持无业务语义。
 - `icon/`、`logo/`：应用通用图标与品牌展示。
 
 消费方必须经各切片的 `index.ts` public API 引用。若某个组件需要业务 Store、接口或业务状态机，它不属于 `shared/ui`。
