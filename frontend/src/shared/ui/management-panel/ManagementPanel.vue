@@ -1,9 +1,11 @@
 <script setup lang="ts">
-defineProps<{ flush?: boolean }>()
+withDefaults(defineProps<{ flush?: boolean; padding?: 'compact' | 'default' | 'spacious' }>(), { padding: 'default' })
 </script>
 
 <template>
-  <section class="management-panel" :class="{ 'management-panel--flush': flush }"><slot /></section>
+  <section class="management-panel" :class="[`management-panel--${padding}`, { 'management-panel--flush': flush }]">
+    <slot />
+  </section>
 </template>
 
 <style scoped>
@@ -14,6 +16,12 @@ defineProps<{ flush?: boolean }>()
   border-radius: var(--card-radius);
   background: var(--bg-surface);
   box-shadow: var(--shadow-sm);
+}
+.management-panel--compact {
+  padding: var(--space-4);
+}
+.management-panel--spacious {
+  padding: var(--space-8);
 }
 .management-panel--flush {
   padding: 0;

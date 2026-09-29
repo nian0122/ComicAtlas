@@ -26,7 +26,7 @@
 
     <el-tabs v-if="comic" v-model="activeTab">
       <el-tab-pane label="可执行操作" name="operations">
-        <section class="panel">
+        <ManagementPanel class="operation-panel" padding="compact">
           <PanelHeader title="存储与媒体" description="只显示当前漫画允许执行的操作。" eyebrow="COMMANDS" />
           <div class="operation-group">
             <span class="group-label">媒体处理</span>
@@ -61,8 +61,8 @@
             <el-table-column prop="reason" label="后端判定原因" />
           </el-table>
           <ContentState v-else state="empty" message="当前没有被阻止的操作" bordered />
-        </section>
-        <section class="panel danger-panel">
+        </ManagementPanel>
+        <ManagementPanel class="operation-panel danger-panel" padding="compact">
           <PanelHeader
             title="回收站生命周期"
             description="删除是可恢复的回收操作，永久清理需要确认。"
@@ -90,11 +90,11 @@
               reconcileResult.consistent ? '一致' : '存在差异'
             }}</el-descriptions-item>
           </el-descriptions>
-        </section>
+        </ManagementPanel>
       </el-tab-pane>
 
       <el-tab-pane label="状态变化" name="history">
-        <section class="panel">
+        <ManagementPanel class="operation-panel" padding="compact">
           <PanelHeader title="状态变化" description="记录本次打开页面后的生命周期变化。" eyebrow="ACTIVITY" />
           <ContentState v-if="!statusEvents.length" state="empty" message="暂时没有新的状态变化" bordered />
           <el-timeline>
@@ -102,7 +102,7 @@
               <ComicStatusTag :status="event.status" />
             </el-timeline-item>
           </el-timeline>
-        </section>
+        </ManagementPanel>
       </el-tab-pane>
 
       <el-tab-pane label="相关任务与统计" name="tasks">
@@ -146,10 +146,8 @@
 
 <script setup lang="ts">
 import { AppButton } from '@/shared/ui/button'
-import { StatGrid } from '@/shared/ui/management-panel'
-import { PanelHeader } from '@/shared/ui/management-panel'
+import { ManagementPanel, PanelHeader, StatCard, StatGrid } from '@/shared/ui/management-panel'
 import { ContentState } from '@/shared/ui/content-state'
-import { StatCard } from '@/shared/ui/management-panel'
 import { PageHeader } from '@/shared/ui/page-header'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
@@ -306,10 +304,6 @@ onBeforeUnmount(() => {
   gap: var(--space-3);
   flex-wrap: wrap;
 }
-.panel h2 {
-  margin: 0;
-  color: var(--text-primary);
-}
 .current-state span,
 .current-state small {
   color: var(--text-muted);
@@ -339,7 +333,7 @@ onBeforeUnmount(() => {
   justify-self: start;
   width: auto;
 }
-.panel {
+.operation-panel {
   margin-bottom: var(--space-4);
 }
 .operation-group {
