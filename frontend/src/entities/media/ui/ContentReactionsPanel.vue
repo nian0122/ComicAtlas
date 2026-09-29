@@ -35,7 +35,8 @@ import { AppButton } from '@/shared/ui/button'
 import { ContentState } from '@/shared/ui/content-state'
 import { ManagementPanel } from '@/shared/ui/management-panel'
 import { getApiErrorMessage } from '@/shared/api/http'
-import { contentReactionApi, type ContentReactionTarget, type ContentReactionVO, type MediaReaction } from '@/entities/media'
+import { contentReactionApi, type ContentReactionTarget, type ContentReactionVO } from '../api/content-reaction-api'
+import type { MediaReaction } from '../types'
 
 const props = defineProps<{ targetType: ContentReactionTarget }>()
 const reactionFilter = ref<'' | 'LIKE' | 'DISLIKE'>('')

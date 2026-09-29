@@ -30,7 +30,7 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { HomeHero, HomeRow, HomeActionGrid } from '@/widgets/home'
-import { useHistoryStore } from '@/features/history'
+import { useHistoryStore } from '@/entities/history'
 import { useHomeComicStore } from '@/pages/reading/home/model/home-comic-store'
 import { useInteractionMode } from '@/features/reader-interaction'
 import type { HomeRowItem } from '@/widgets/home'

@@ -1,7 +1,7 @@
 import type { Ref } from 'vue'
 import type { useReaderSettingsStore } from '@/features/reader-settings'
 import type { useReaderStore } from '@/features/reader-navigation'
-import { isReaderInteractiveTarget } from '@/features/reader-interaction/model/useReaderGesture'
+import { isReaderInteractiveTarget } from '@/features/reader-interaction'
 
 type ReaderStore = ReturnType<typeof useReaderStore>
 type ReaderSettingsStore = ReturnType<typeof useReaderSettingsStore>

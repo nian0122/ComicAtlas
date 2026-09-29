@@ -105,15 +105,10 @@ import {
   ReaderToolbar,
   ReaderBottomNav,
   ReaderSettingsDrawer,
-} from '@/widgets/reader'
-import {
-  ReaderAction,
-  useInteractionMode,
-  useReaderGesture,
   useReaderNavigation,
   useReaderShortcuts,
-  useReaderToolbar,
-} from '@/features/reader-interaction'
+} from '@/widgets/reader'
+import { ReaderAction, useInteractionMode, useReaderGesture, useReaderToolbar } from '@/features/reader-interaction'
 import { catalogApi, comicApi } from '@/entities/comic'
 import type { CatalogNode } from '@/entities/comic'
 import { searchCatalogChapters } from '@/features/chapter-search'

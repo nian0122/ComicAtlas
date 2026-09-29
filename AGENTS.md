@@ -58,7 +58,7 @@ comic-atlas/
 | 统计聚合 | `api-service/.../storage/service/ComicStatsService.java` | 派生数据单一收口：hqSize/lqSize/totalPages/pageCount 从 media/chapter 行重算 |
 | 回收站/永久清理 | `api-service/.../trash/controller/TrashLifecycleController.java` | POST /api/trash/... restore/purge/reconcile（删除=回收，永久删除=purge） |
 | 目录扫描 | `api-service/.../importer/controller/DirectoryScanTaskController.java` | POST /api/tasks/directory-scan，漫画集根目录批量发现（直接子目录=候选漫画） |
-| 媒体上传 | `api-service/.../upload/`、`frontend/src/views/management/MediaUploadPage.vue` | 分块上传/替换接口与 `/manage/upload` 页面 |
+| 媒体上传 | `api-service/.../upload/`、`frontend/src/pages/management/upload/ui/MediaUploadPage.vue` | 分块上传/替换接口与 `/manage/upload` 页面 |
 | 恢复任务 API | `api-service/.../recovery/controller/RecoveryTaskController.java` | POST /api/tasks/recovery |
 | 恢复任务 Service | `api-service/.../recovery/service/impl/RecoveryTaskServiceImpl.java` | 创建/重试/列表 |
 | 恢复事件发布 | `worker-service/.../recovery/event/RecoveryEventPublisher.java` | 发送恢复事件到 MQ |
@@ -99,13 +99,13 @@ comic-atlas/
 | 命令执行器 | `worker-service/.../{media,trash,task}/` | TranscodeCommandHandler/TrashCommandHandler 等 8 个（ManagementCommandDispatcher 路由） |
 | 存储管理 API | `api-service/.../storage/controller/AdminStorageController.java` | stats/comics/chapters |
 | 存储查询 | `api-service/.../storage/service/StorageQueryService.java` | 聚合 HQ/LQ 大小+状态 |
-| 前端路由 | `frontend/src/router/index.ts` | 14 routes（reading 6 + management 8） |
-<!-- 前端位置说明已同步至 frontend/src/features、entities、shared 与 services/http.ts 分层。 -->
-| Pinia Store | `frontend/src/features/*/store.ts` | 按领域拆分 comic/reader/import/history/tag/storage/category/task/recovery |
-| API 服务 | `frontend/src/features/*/api.ts`、`frontend/src/services/http.ts` | 按领域封装 API，http.ts 统一请求与错误处理 |
+| 前端路由 | `frontend/src/app/router/index.ts` | 路由仅从 pages/widgets 根 public API 装配 |
+<!-- 前端位置说明遵循 app/pages/widgets/features/entities/shared 六层 FSD。 -->
+| Pinia Store | `frontend/src/{pages,features,entities}/**/model/` | 页面私有状态归 pages，实体共享状态归 entities，动作状态归 features |
+| API 服务 | `frontend/src/features/*/api.ts`、`frontend/src/shared/api/http.ts` | 按领域封装 API，http.ts 统一请求与错误处理 |
 | 存储服务 | `frontend/src/features/storage/service.ts` | 存储查询、操作与转码编排 |
 | 类型定义 | `frontend/src/entities/*`、`frontend/src/features/*/types.ts`、`frontend/src/shared/api/types.ts` | 按实体、领域和共享协议分层 |
-| 视频播放器 | `frontend/src/views/reading/reader/components/VideoPlayer.vue` | VIDEO 类型播放 |
+| 视频播放器 | `frontend/src/entities/media/ui/VideoPlayer.vue` | VIDEO 类型播放 |
 
 ## IMPORT FLOW
 ```
@@ -261,6 +261,16 @@ URL 统一由 `FileUrlResolver.resolve(page)` 生成，不手拼。
 - 新增表：`management_task`/`management_task_item`（管理任务）、`outbox_message`/`inbox_receipt`（Outbox 发件箱）、`upload_session`/`upload_file`（分块上传）、`recovery_task`、`directory_scan_task`、`export_task`（回收清单以 TrashManifest DTO + resultRef 存储，非表）
 - comic/chapter/page 均含 `version` 乐观锁列（管理端编辑）
 - **已清理死字段**：comic(root_key, relative_path, lq_status)、catalog(path, level)、import_task(current_page, downloaded_bytes)
+
+## 前端架构（强制）
+
+前端固定使用 Feature-Sliced Design（FSD），唯一层级为 `app → pages → widgets → features → entities → shared`。禁止恢复顶层 `views/components/layouts/services/stores/utils` 或另建架构体系。
+
+- 跨切片依赖只允许向下，禁止同层互引；实体的稳定关系仅通过 `entities/<提供方>/@x/<消费方>.ts` 显式声明。
+- 切片外只从根 `index.ts` 引用；不得通过内部 `api/ui/model/index.ts` 绕过边界。相对路径、类型导入、动态导入、重导出与测试同样受约束。
+- `pages/reading`、`pages/management` 只是无代码分组；`pages/reader` 是直属切片。页面样式归该页面 `ui/`，应用装配与全局样式归 `app/`。
+- 新增及迁移前端代码必须执行 `pnpm check`；`lint` 与 `build` 已强制执行 `check:fsd`，不得跳过或添加整层豁免。
+- 详细职责见 [前端架构](docs/frontend/08-frontend-architecture.md)，前端工作规则见 [frontend/AGENTS.md](frontend/AGENTS.md)。
 
 ## CONVENTIONS
 - Java: Lombok, NIO Path/Files, MyBatis Plus LambdaQueryWrapper

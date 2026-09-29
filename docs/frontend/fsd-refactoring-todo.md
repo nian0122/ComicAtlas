@@ -1,10 +1,10 @@
 # 前端 Feature-Sliced Design 改造 TODO
 
-更新日期：2026-09-17。本文是对 `frontend/src` 当前全部生产源码目录的结构审计清单，**只标记，不迁移**。`FSD-xx` 是后续改造的唯一编号；完成一个编号时，必须同步更新本文件和受影响切片的 public API。
+历史审计日期：2026-09-17；架构冻结日期：2026-09-29。本文保留原迁移条目与当时的定位，不再作为当前目录规则。现行强制约束以 [前端 FSD 架构](08-frontend-architecture.md) 和 [前端工作规则](../../frontend/AGENTS.md) 为准。历史完成标记不等于所有职责问题都已消除。
 
 ## 目标边界
 
-目标目录采用 FSD 的六层：`app`、`pages`、`widgets`、`features`、`entities`、`shared`。依赖只能由上层指向下层；同层切片不得通过内部文件互相引用，必须经各自 `index.ts` 的 public API。`app` 是唯一允许装配路由、Pinia、全局样式和第三方插件的层；`pages` 仅编排页面；`widgets` 组合跨页面的大块 UI；`features` 表达可由用户触发的业务能力；`entities` 保存稳定业务实体模型；`shared` 不得认识漫画、章节、任务等业务概念。
+目标目录采用 FSD 的六层：`app`、`pages`、`widgets`、`features`、`entities`、`shared`。依赖只能由上层指向下层；同层切片禁止互引，不能通过 public API 绕过；实体的必要关系仅使用具名 `@x` 入口。`app` 是唯一允许装配路由、Pinia、全局样式和第三方插件的层；`pages` 仅编排页面；`widgets` 组合跨页面的大块 UI；`features` 表达可由用户触发的业务能力；`entities` 保存稳定业务实体模型；`shared` 不得认识漫画、章节、任务等业务概念。
 
 建议目标骨架：
 
@@ -113,7 +113,7 @@ src/
 
 建议先完成 FSD-01、02、03、04、05、06、07、17、18，再以实体（FSD-08～10）为地基拆 feature（FSD-11～16）。一次提交只迁移一个可闭合的切片；不得在同一提交夹带视觉改版或接口语义变更。迁移期间允许临时兼容 re-export，但必须写明移除批次，且不得让旧目录继续新增代码。
 
-本次审计的结论是：当前 `features` 目录中并非所有内容都是 FSD feature，当前 `components`、`layouts`、`views`、`services` 也不应作为最终顶层目录继续扩张。
+原审计时的结论是：当时 `features` 目录中并非所有内容都是 FSD feature，当前 `components`、`layouts`、`views`、`services` 也不应作为最终顶层目录继续扩张。
 
 跨页面按钮、状态、标题、空态和面板的重复实现，另见[前端公共 UI 收敛 TODO](ui-consolidation-todo.md)；该清单以 `UI-xx` 编号记录具体组件和替换范围。
 
@@ -123,3 +123,12 @@ src/
 - 本阶段完成实体与能力切片 public API 的第一批收口，拆出 `entities/category/model/types.ts`，并将任务状态组件改为从 feature public API 引用。
 - 已完成目录迁移的项目仍需继续清理跨切片深层引用；本文件的条目只有在代码、验证和文档同时完成后才可勾选。
 - 本阶段验证：`pnpm typecheck`、`pnpm lint`、`pnpm test:unit`、`git diff --check`。
+
+## 架构冻结实施记录（2026-09-29）
+
+- 固定六层与切片根入口；reading/management 仅作为 pages 分组，reader 为直属切片。
+- 分类、标签、历史的共享状态归 entities/model；阅读导航和快捷键的跨 feature 编排归 widgets/reader/model；导航归 reading-layout 切片内部。
+- 页面样式全部归所属页面，移除遗留顶层 components 文档目录。
+- 实体关系通过限定消费者的 @x 导出；补齐 AI 分析入口，消除外部对实体 api/ui 内部 barrel 的依赖。
+- 使用 TypeScript/Vue 语法解析检查静态依赖，覆盖相对路径、类型、动态字面量导入、测试和样式；lint/build 均前置 check:fsd，不保留整层豁免。
+- 新增 test:architecture 规则回归；验证结果见本次任务报告。源码保持现有路由与 API 协议，无兼容旧路径的 re-export。

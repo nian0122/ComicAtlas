@@ -260,7 +260,7 @@ import { tagApi } from '@/entities/tag'
 import { useLibraryFilters } from '@/pages/reading/library/model/useLibraryFilters'
 import { useLibraryPageLayout } from '../model/useLibraryPageLayout'
 import { toPosterStatus } from '@/entities/comic'
-import { ComicPoster } from '@/entities/comic/ui'
+import { ComicPoster } from '@/entities/comic'
 import type { ComicListQuery, ComicListVO } from '@/entities/comic'
 import type { CategoryDTO } from '@/entities/category'
 import type { TagDTO } from '@/entities/tag'
@@ -445,4 +445,4 @@ onBeforeUnmount(() => {
 })
 </script>
 
-<style scoped src="@/pages/reading/library.css"></style>
+<style scoped src="@/pages/reading/library/ui/library.css"></style>

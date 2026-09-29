@@ -6,3 +6,7 @@ export { default as ReaderPagedViewport } from './ReaderPagedViewport.vue'
 export { default as ReaderToolbar } from './ReaderToolbar.vue'
 export { default as ReaderBottomNav } from './ReaderBottomNav.vue'
 export { default as ReaderSettingsDrawer } from './ReaderSettingsDrawer.vue'
+
+export { useReaderNavigation } from './model/useReaderNavigation'
+
+export { useReaderShortcuts } from './model/useReaderShortcuts'

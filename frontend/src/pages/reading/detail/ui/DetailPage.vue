@@ -158,7 +158,7 @@ import { getApiErrorMessage } from '@/shared/api/http'
 import { formatBytes as formatFileBytes } from '@/shared/lib/format/bytes'
 
 import type { ComicDetailVO, CatalogNode, ChapterRef } from '@/entities/comic'
-import { CatalogTree } from '@/entities/comic/ui'
+import { CatalogTree } from '@/entities/comic'
 import { MobileComicDetail } from '@/widgets/comic-detail'
 import { sourceTypeLabel } from '@/entities/comic'
 import { HeroBanner } from '@/widgets/home'

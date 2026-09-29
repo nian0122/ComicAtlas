@@ -35,7 +35,7 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useReaderSettingsStore } from '@/features/reader-settings'
 import { isReaderInteractiveTarget } from '@/features/reader-interaction'
-import { ProgressiveImage, VideoPlayer } from '@/entities/media/ui'
+import { ProgressiveImage, VideoPlayer } from '@/entities/media'
 import type { MediaItemInfo } from '@/entities/media'
 import { isVideoMedia } from '@/entities/media'
 

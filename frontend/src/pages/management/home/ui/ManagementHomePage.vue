@@ -110,7 +110,7 @@
 <script setup lang="ts">
 import { ManagementPanel } from '@/shared/ui/management-panel'
 import { StatGrid } from '@/shared/ui/management-panel'
-import { ComicStatusTag } from '@/entities/comic/ui'
+import { ComicStatusTag } from '@/entities/comic'
 import { TaskStatusTag } from '@/features/task'
 import { StatCard } from '@/shared/ui/management-panel'
 import { PanelHeader } from '@/shared/ui/management-panel'

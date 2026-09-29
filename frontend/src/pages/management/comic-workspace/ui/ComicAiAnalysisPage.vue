@@ -50,7 +50,7 @@ import { ElMessage } from 'element-plus'
 import { AppButton } from '@/shared/ui/button'
 import { PageHeader } from '@/shared/ui/page-header'
 import { managementComicApi } from '@/entities/comic'
-import { aiAnalysisApi, type AiAnalysisTask } from '@/features/ai-analysis/api'
+import { aiAnalysisApi, type AiAnalysisTask } from '@/features/ai-analysis'
 import type { ComicDetailVO } from '@/entities/comic'
 
 const props = defineProps<{ comicId: number }>()

@@ -4,8 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { comicApi, managementComicApi } from '@/entities/comic'
 import type { ComicListVO } from '@/entities/comic'
 import type { PageResult } from '@/shared/api/types'
-import { useComicStore } from './comic-store'
-import { useManagementComicStore } from '@/pages/management/comics/model/management-comic-store'
+import { useComicStore } from '@/pages/reading/library'
+import { useManagementComicStore } from '@/pages/management/comics'
 
 function pageResponse(total = 0, current = 1): AxiosResponse<PageResult<ComicListVO>> {
   return {

@@ -1,5 +1,5 @@
 /** 漫画生命周期状态。 */
-import type { MediaReaction } from '@/entities/media'
+import type { MediaReaction } from '@/entities/media/@x/comic'
 
 export type ComicStatus =
   | 'DRAFT'

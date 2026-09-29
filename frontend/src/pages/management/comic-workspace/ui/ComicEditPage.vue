@@ -161,7 +161,7 @@ import { Search } from '@element-plus/icons-vue'
 import { getApiErrorMessage } from '@/shared/api/http'
 import { managementComicApi } from '@/entities/comic'
 import { managementTagApi } from '@/entities/tag'
-import { useCategoryStore } from '@/features/category'
+import { useCategoryStore } from '@/entities/category'
 import { sourceTypeLabel } from '@/entities/comic'
 import type { ComicInfoVO, ComicMetadataUpdateDTO } from '@/entities/comic'
 import type { ComicTagUpdateDTO } from '@/entities/tag'
@@ -279,4 +279,4 @@ function goBack() {
 onMounted(loadData)
 </script>
 
-<style scoped src="@/pages/management/comic-edit.css"></style>
+<style scoped src="@/pages/management/comic-workspace/ui/comic-edit.css"></style>

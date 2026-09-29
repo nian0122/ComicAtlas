@@ -7,3 +7,13 @@ export * from './model/status'
 export * from './model/source-format'
 export * from './model/poster-status'
 export * from './api'
+
+export {
+  ComicCard,
+  ComicPoster,
+  ComicStatusTag,
+  ChapterRow,
+  CatalogTree,
+  CatalogTreeNode,
+  CatalogChapterRow,
+} from './ui'

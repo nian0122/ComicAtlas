@@ -1,4 +1,4 @@
-import type { MediaItemInfo } from '@/entities/media'
+import type { MediaItemInfo } from '@/entities/media/@x/chapter'
 
 export interface ReaderDTO {
   chapterId: number

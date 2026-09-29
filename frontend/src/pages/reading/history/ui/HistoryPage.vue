@@ -94,7 +94,7 @@ import { RecycleScroller } from 'vue-virtual-scroller'
 import { PictureFilled } from '@element-plus/icons-vue'
 import { MaterialSymbolIcon } from '@/shared/ui/icon'
 import { BREAKPOINTS, useBreakpoint } from '@/shared/lib/composables/useBreakpoint'
-import { useHistoryStore } from '@/features/history'
+import { useHistoryStore } from '@/entities/history'
 import type { HistoryVO } from '@/entities/history'
 
 const router = useRouter()

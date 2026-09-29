@@ -1,196 +1,66 @@
-# 08 — 前端技术架构
+# 08 — 前端 FSD 架构
 
-**更新日期：** 2026-09-16
-**状态：** 与 v2.1 源码结构同步
-**维护者：** ComicAtlas 前端组
+更新日期：2026-09-29。本文为当前架构约束；[原迁移清单](fsd-refactoring-todo.md)仅作为历史记录。
 
-> Vue3 项目的技术层设计：Router、Pinia、API、Types、组件层级、目录结构。
+ComicAtlas 前端固定采用 Feature-Sliced Design 六层。不得恢复 `views`、`components`、`layouts`、`services` 等顶层目录。规范依据：[FSD 层级依赖](https://fsd.how/docs/reference/layers/)、[public API 与实体交叉入口](https://fsd.how/docs/reference/public-api/)。
 
-前端当前按 Feature-Sliced Design 六层组织；迁移遗留与边界收口以 [Feature-Sliced Design 改造 TODO](fsd-refactoring-todo.md) 为准。
+## 层级与职责
 
----
+| 层 | 职责 | 当前示例 |
+| --- | --- | --- |
+| app | 启动、插件、路由、全局样式、跨页面集成测试 | `app/main.ts`、`app/providers`、`app/router`、`app/styles` |
+| pages | 路由页面、页面私有模型与样式 | `pages/reading/library`、`pages/management/comic-workspace`、`pages/reader` |
+| widgets | 大块 UI、多个 feature 的组合与协调 | `widgets/reader`、`widgets/reading-layout`、`widgets/management-layout` |
+| features | 用户动作和能力 | `features/import`、`features/comic-batch-edit`、`features/reader-settings` |
+| entities | 稳定实体、基础 API、共享实体状态与展示 | `entities/comic`、`entities/media`、`entities/history` |
+| shared | 无业务含义的基础设施、工具和 UI | `shared/api/http.ts`、`shared/lib`、`shared/ui` |
 
-## 目录结构
+依赖方向为 `app → pages → widgets → features → entities → shared`，可以跳层向下依赖。禁止向上依赖和同层跨切片依赖。app/shared 没有业务切片，层内按职责分段。
 
-样式与公共组件的归属以 [前端目录约定](../../frontend/README.md)、[样式目录规范](../../frontend/src/styles/README.md) 和 [公共组件规范](../../frontend/src/components/README.md) 为准。保留业务模块聚合；全局样式从 `styles/index.scss` 加载，抽离的页面样式集中在 `styles/pages/`，仍由页面通过 `scoped src` 按需引用。
+pages 的 reading、management 是无代码的组织分组，不构成切片；分组下的每个页面相互独立。pages/reader 是直属切片。新切片使用 `ui/model/api/lib/config` 等职责分段，避免 components/composables/services 桶目录。
 
-```
-frontend/src/
-├── App.vue                  # 根组件
-├── main.ts                  # 入口
-├── styles/index.scss        # 全局样式唯一入口
-├── styles/                  # index.scss 统一入口、tokens/base/theme/animation 和 pages 页面样式
-├── router/
-│   └── index.ts             # 路由定义（阅读端 6 + 管理端 8 主路由）
-├── layouts/                 # 布局
-│   ├── ReadingLayout.vue    # 阅读端（Home/Library/Detail/History）
-│   ├── ReaderLayout.vue     # 阅读器（全屏）
-│   └── ManagementLayout.vue # 管理端（TopNav + <router-view>）
-├── entities/                # 跨页面共享实体类型与 API（comic / media / tag）
-├── features/                # 按业务能力组织 store、API、composable 与组件
-│   ├── comic/、import/、reader/、storage/
-│   └── task/、trash/、recovery/、upload/、category/、tag/
-├── shared/                  # HTTP 类型、格式化、设备与通用组合逻辑
-│   ├── api/types.ts、composables/、format/
-├── services/                # 跨领域服务
-│   ├── http.ts              # axios 实例、响应解包与统一错误处理
-│   └── media-url.ts         # 媒体 URL 解析
-├── components/              # 可复用组件
-│   ├── layout/TopNav.vue    # 全局导航
-│   ├── reading/             # 阅读端组件（home / comic / HeroBanner）
-│   ├── management/task/     # TaskCard / ExportTaskCard / RecoveryTaskCard
-│   ├── history/             # 阅读记录组件
-│   └── icons/               # MaterialSymbolIcon
-├── views/                   # 页面（路由级组件）
-│   ├── reading/             # HomePage / LibraryPage / DetailPage / HistoryPage / ReaderPage / PosterTestPage
-│   │   └── composables/     # 页面级布局与生命周期编排
-│   │   └── reader/components/  # ReaderViewport / ProgressiveImage / VideoPlayer 等
-│   └── management/          # ComicListPage / ComicEditPage / ImportPage / ComicStructurePage / TaskPage /
-│       └── composables/     # 页面级表单、媒体排序与工作区状态
-│                            # storage/ / dlq/ / MetadataPage / SettingsPage / InterceptPage
-└── utils/
-    ├── device.ts            # 移动阅读设备判定（isMobileReadingDevice）
-    └── preload-engine.ts    # 阅读器预加载引擎
-```
+## 公开入口
 
----
-
-## Router
-
-路由定义在 `frontend/src/router/index.ts`，共 14 条主页面路由（阅读端 6 + 管理端 8），另含管理端移动拦截页 `/manage/intercept` 与存储详情子页 `/manage/storage/:id`：
+切片必须有根 `index.ts`，只导出外部需要的能力。切片外禁止导入内部文件，包括内部 `model/index.ts`、`ui/index.ts` 和 `api/index.ts`。内部依赖直接引用实现，不从自己的根 barrel 绕回。
 
 ```typescript
-// 阅读端
-{ path: '/',              name: 'home',            ReadingLayout  }
-{ path: '/library',       name: 'library',         ReadingLayout  }
-{ path: '/history',       name: 'history',         ReadingLayout  }
-{ path: '/comic/:id',     name: 'comic-detail',    ReadingLayout  }
-{ path: '/reader/:chapterId', name: 'reader',      ReaderLayout   }
-{ path: '/poster-test',   name: 'poster-test' }        // 测试页
-// 管理端
-{ path: '/manage/intercept', name: 'manage-intercept' }  // 移动端拦截
-{ path: '/manage',        ManagementLayout
-  ├── /manage/comics           manage-comics
-  ├── /manage/comics/:id/edit  manage-comic-edit
-  ├── /manage/import           manage-import
-  ├── /manage/tasks            manage-tasks
-  ├── /manage/storage          manage-storage
-  ├── /manage/storage/:id      manage-storage-detail
-  ├── /manage/metadata         manage-metadata
-  ├── /manage/dlq              manage-dlq
-  └── /manage/settings         manage-settings }
+import { ComicCard, comicApi } from '@/entities/comic'
+import { useReaderSettingsStore } from '@/features/reader-settings'
 ```
 
-移动端守卫：`router.beforeEach` 对 `/manage/*` 前缀做移动阅读设备判定（`isMobileReadingDevice`），命中则重定向到 `/manage/intercept`；DEV 下可带 `?force-desktop=1` 旁路。
+实体之间确有稳定业务关系时，提供限定消费者的 `entities/<提供方>/@x/<消费方>.ts`，说明原因并最小化导出。当前关系包括章节载荷的媒体信息、漫画的反馈和标签类型、任务的漫画查询条件。其他层没有同层互引例外。
 
----
+shared 的组件经 `shared/ui` 或具体组件目录的 index 引用。单文件 HTTP、格式化、日志等模块本身可以作为公开入口，无需建立聚合整个 shared 的 barrel。
 
-## Pinia Stores
+## 状态与业务编排
 
-| Store | 文件 | 职责 |
-|-------|------|------|
-| `comic` | `features/comic/store.ts` | 漫画列表、搜索、筛选、分页 |
-| `reader` | `features/reader/store.ts` | 当前章节、页码、prev/next |
-| `reader-settings` | `features/reader/settings-store.ts` | 阅读偏好（画质/适配/缩放/方向/预加载） |
-| `history` | `features/history/store.ts` | 阅读记录 |
-| `tag` | `features/tag/store.ts` | 标签 |
-| `management-comic` | `features/comic/management-store.ts` | 漫画工作区（列表/编辑/批量） |
-| `import` | `features/import/store.ts` | 导入任务 |
-| `storage` | `features/storage/store.ts` | 存储管理 |
-| `category` | `features/category/store.ts` | 分类 |
-| `recovery` | `features/recovery/store.ts` | 恢复任务 |
+- 阅读库、管理漫画列表与首页的查询状态属于各自 pages/model，实例独立。
+- 分类、标签、历史 Store 属于 entities/model，用于维护共享实体数据；reader-navigation 保存进度后通过历史实体同步已加载记录。
+- reader-settings 与 reader-navigation 是独立能力。路由导航和快捷键需要协调两者，因此放在 widgets/reader/model；纯手势与交互模式保留在 reader-interaction。
+- 批量编辑依赖 category/tag/comic 实体，不能通过另一个 feature 获取实体状态。
+- 导入、上传、恢复等业务动作在 features 中封装，页面负责路由与组合。
 
-页面级复杂交互下沉到 `views/**/composables` 或对应 feature composable；页面仅保留路由、数据加载编排和模板组合。当前页面组合逻辑包括 `useLibraryPageLayout`（筛选栏滚动与海报断点）、`useComicEditTags`（标签选择/创建）、`useImportPageForm`（导入表单派生状态）和 `useMediaOrder`（章节媒体排序）。
+## 路由、API 与样式
 
----
+路由唯一装配点为 `src/app/router/index.ts`，懒加载引用 pages/widgets 根入口；移动端管理拦截继续由路由守卫执行。页面移动不得改变现有路径或跳转行为。
 
-## API 服务层
+`shared/api/http.ts` 提供 Axios 客户端与错误解包，阅读接口使用 `/api/**`，管理接口使用 `/api/manage/**`；目录调整不改变端点和数据协议。
 
-`services/http.ts` 创建 axios 实例（`baseURL: '/api'`，响应拦截器统一解包 `{ code, data }`），领域 API 位于 `entities/*/api.ts` 和 `features/*/api.ts`：
+全局样式只从 `app/styles/index.scss` 装配。页面 CSS 放在所属切片 ui 下，通过 `<style scoped src="…">` 引入，不允许在 pages 分组下散落共用样式。组件私有样式就近维护，设计值使用全局令牌。
 
-| API 对象 | 接口域 |
-|----------|--------|
-| `comicApi` | `/comics`（list/detail/delete/metadata/tags/batch） |
-| `catalogApi` | `/comics/{id}/catalog` |
-| `readerApi` | `/chapters/{id}` |
-| `importApi` | `/tasks/import`（create/list/detail/status/cancel/retry/batch） |
-| `directoryScanApi` | `/tasks/directory-scan` |
-| `historyApi` | `/history` |
-| `tagApi` | `/tags` |
-| `categoryApi` | `/categories` |
-| `lqApi` | `/storage/lq/*`（generateComic / generateChapter） |
-| `hqApi` | `/storage/delete-hq/*`（deleteComic / deleteChapter） |
-| `exportApi` | `/storage/export/*`（create/list/get/download/open） |
-| `adminApi` | `/storage/stats`、`/admin/storage/*`、`/storage/transcode/*`、`/admin/dlq/*` |
-| `settingsApi` | `/settings` |
+## 自动门禁
 
-存储域封装在 `services/storage.ts`：`storageService`（fetchComics / fetchSummary / fetchComic / fetchChapters / executeOperation / transcodeVideos）+ `exportService`。恢复任务在 `services/recovery.ts`（`recoveryApi`）。`services/reading.ts` 与 `services/management.ts` 分别为阅读端、管理端 API barrel。
+- `pnpm check:fsd`：检查六层目录、切片入口、上下层及同层依赖、根 public API、具名实体 @x 和无法解析的本地导入。
+- 检查范围包含 TS/JS/Vue、测试、CSS/SCSS；支持静态导入、重导出、类型导入、字面量动态导入、require、Vue 脚本和外置样式。使用语法树避免把注释和普通字符串当作导入。
+- `pnpm test:architecture`：用违规夹具验证规则，防止放宽检查器导致架构回退。
+- `pnpm lint` 和 `pnpm build` 强制前置 FSD 检查；`pnpm check` 包括规则回归、类型、格式、单元测试、E2E 和构建。
 
----
+自动检查确保静态依赖边界；业务职责、动态计算的模块路径和样式语义仍需评审。不得使用动态拼接导入绕过边界，也不得用整层忽略或迁移白名单消除错误。
 
-## Types
+## 本次冻结验证（2026-09-29）
 
-类型按实体、领域和共享协议拆分到 `entities/*`、`features/*/types.ts` 与 `shared/api/types.ts`，不再集中于 `types/index.ts`：
-
-```typescript
-// 阅读端
-ComicListQuery, ComicListVO, ComicDetailVO, ChapterVO, TagRef
-CatalogNode, ChapterRef, MediaType('IMAGE'|'VIDEO'), MediaItemInfo
-ReaderDTO, ChapterPageVO
-HistoryVO
-// 导入/任务
-ImportTaskVO, ImportStatusVO, ScanItemVO, ScanResultVO, BatchImportRequest, BatchImportResultVO
-// 管理端
-ComicMetadataDTO, ComicMetadataUpdateDTO, TagDTO, TagCreateDTO, ComicTagUpdateDTO
-BatchComicUpdateDTO, BatchUpdateResultVO, FailedItem
-// 存储域
-HqStatus, LqStatus, ComicStorageItem, ChapterStorageItem, StorageStats, ComicStorageQuery
-StorageOperationType, StorageOperation, ExportTaskVO, OperationSubmitResult
-RecoveryTaskVO, DirectoryScanTaskVO
-// 展示辅助
-STATUS_COLOR_MAP, EXPORT_STATUS_COLOR_MAP, DEFAULT_ASPECT_RATIO
-```
-
----
-
-## 组件层级
-
-```
-ReadingLayout
-├── HomePage（HomeHero / HomeRow / HomeActionGrid）
-├── LibraryPage（ComicCard[] / ComicPoster）
-├── HistoryPage
-└── DetailPage（CatalogTree → CatalogTreeNode[]，ChapterRow，MobileComicDetail）
-
-ReaderLayout
-└── ReaderPage
-    ├── ReaderViewport / ReaderPagedViewport
-    │   ├── ReaderImageItem → ProgressiveImage
-    │   └── VideoPlayer（VIDEO 类型）
-    ├── ReaderToolbar（Desktop/Mobile 变体）
-    └── ReaderSettingsDrawer / ReaderBottomNav
-
-ManagementLayout
-├── ComicListPage → features/comic/components/BatchEditDialog.vue
-├── ComicEditPage（useComicEditTags）
-├── ImportPage（useImportPageForm + useImportScan + PreviewNode） → TaskPage
-├── ComicStructurePage（目录结构 + 媒体工作区 + useMediaOrder + 上传对话框）
-├── StoragePage / StorageDetailPage（storage/ 子组件）
-├── MetadataPage
-├── DeadLetterPage（dlq/ 子组件）
-└── SettingsPage
-```
-
----
-
-## 技术栈
-
-| 层 | 技术 |
-|----|------|
-| 框架 | Vue 3 + Composition API（`<script setup lang="ts">`） |
-| 构建 | Vite |
-| 路由 | Vue Router 4 |
-| 状态 | Pinia |
-| UI 库 | Element Plus |
-| HTTP | Axios |
-| 语言 | TypeScript strict |
+- 通过：`pnpm check:fsd`、`pnpm test:architecture`（7 项）、`pnpm typecheck`、`pnpm lint`、`pnpm test:unit`（53 项）、`pnpm build`、`git diff --check`。
+- 完整开发服务 E2E 执行 42 项，36 项通过、6 项失败。随后修正视频用例对一次性 page 参数的时序断言；导入测试拦截器限定实际 `/api/` 请求，避免拦截 FSD 源模块。
+- 生产构建预览对导入与视频阅读 7 项专项回归全部通过。开发服务下批量导入跳转仍遇到 Vite 动态模块加载/重载错误，不报告完整 E2E 全绿。
+- 其余 4 项失败（桌面/移动目录树、管理任务空态、回收站按钮颜色）在迁移前的 `develop` 基线 `a95d148c` 独立检出后同样复现，保留为已有回归问题。
+- `check:ui` 的 3 处原生按钮违规在基线中已存在；全库格式检查也仍有存量问题。因此 `pnpm check` 整体尚不能通过，未执行合并或发布。

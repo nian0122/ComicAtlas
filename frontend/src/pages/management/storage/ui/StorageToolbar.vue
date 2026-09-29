@@ -4,8 +4,8 @@ import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElSelect, ElOption, ElInput } from 'element-plus'
 import type { FilterState, SortState } from '@/features/storage'
-import { useCategoryStore } from '@/features/category'
-import { useTagStore } from '@/features/tag'
+import { useCategoryStore } from '@/entities/category'
+import { useTagStore } from '@/entities/tag'
 
 const props = defineProps<{
   filter: FilterState

@@ -202,7 +202,10 @@ test('详情页进入普通阅读器，再从工具栏切换混排短视频模�
   await expect(page).toHaveURL(/\/videos\/1\?page=3/)
   await expect(page.locator('.media-image')).toHaveAttribute('src', '/files/hq/last.jpg')
   await page.getByRole('button', { name: '返回漫画阅读' }).click()
-  await expect(page).toHaveURL(/\/reader\/1\?page=3/)
+  // 页码是一次性导航参数，阅读器消费后会清理 URL；验证恢复后的实际进度。
+  await expect(page).toHaveURL(/\/reader\/1(?:\?|$)/)
+  await page.locator('.reader-page').click({ position: { x: 195, y: 400 } })
+  await expect(page.getByRole('button', { name: '第 3 / 3 页' })).toBeVisible()
 })
 
 test('漫画阅读入口进入连续阅读器', async ({ page }) => {

@@ -67,9 +67,9 @@ import { ElMessage } from 'element-plus'
 import { AppButton } from '@/shared/ui/button'
 import { ContentState } from '@/shared/ui/content-state'
 import { PageHeader } from '@/shared/ui/page-header'
-import { aiAnalysisApi, type AiAnalysisTask } from '@/features/ai-analysis/api'
-import { comicApi } from '@/entities/comic/api/reading-api'
-import type { ComicListVO } from '@/entities/comic/model/types'
+import { aiAnalysisApi, type AiAnalysisTask } from '@/features/ai-analysis'
+import { comicApi } from '@/entities/comic'
+import type { ComicListVO } from '@/entities/comic'
 
 interface AnalysisResult { titleCandidate?: string | null; authorCandidate?: string | null; tags?: string[]; description?: string; warnings?: string[] }
 const selectedComicId = ref<number | null>(null)

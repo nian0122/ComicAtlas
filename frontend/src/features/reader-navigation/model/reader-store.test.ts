@@ -7,7 +7,8 @@ import { readerApi } from '@/entities/chapter'
 import type { ReaderDTO } from '@/entities/chapter'
 import { useReaderStore } from './reader-store'
 
-vi.mock('@/entities/history', () => ({
+vi.mock('@/entities/history', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/entities/history')>()),
   historyApi: {
     get: vi.fn(),
     update: vi.fn(),

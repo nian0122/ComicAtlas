@@ -1,6 +1,6 @@
 # 前端文档导航
 
-日常开发从 [前端开发入口](../../frontend/README.md) 开始。视觉实现遵循 [设计系统](design-system.md)，颜色、间距等实际值以 [设计令牌](../../frontend/src/styles/tokens.css) 为准。
+日常开发从 [前端开发入口](../../frontend/README.md) 开始。视觉实现遵循 [设计系统](design-system.md)，颜色、间距等实际值以 [设计令牌](../../frontend/src/app/styles/tokens.css) 为准。
 
 | 文档 | 用途 |
 | --- | --- |

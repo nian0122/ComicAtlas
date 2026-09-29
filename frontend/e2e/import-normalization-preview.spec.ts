@@ -293,7 +293,11 @@ async function openBatchPanel(page: Page) {
 
 async function setScanMode(page: Page, mode: ScanMode) {
   scanMode = mode
-  await page.route('**/api/**', (route: Route) => handleApi(route))
+  // 仅拦截业务请求，避免误把 FSD 切片内的 /src/**/api/ 源模块当成接口。
+  await page.route(
+    (url) => url.pathname.startsWith('/api/'),
+    (route: Route) => handleApi(route),
+  )
 }
 
 async function handleApi(route: Route) {

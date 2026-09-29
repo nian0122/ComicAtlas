@@ -7,3 +7,5 @@ export * from './api/media-reaction-api'
 export * from './api/content-reaction-api'
 export { default as MediaReactionButtons } from './ui/MediaReactionButtons.vue'
 export { default as ContentReactionsPanel } from './ui/ContentReactionsPanel.vue'
+
+export { ProgressiveImage, VideoPlayer } from './ui'

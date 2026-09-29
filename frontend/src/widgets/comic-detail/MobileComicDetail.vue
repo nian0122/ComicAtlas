@@ -88,7 +88,7 @@
 import { AppButton } from '@/shared/ui/button'
 import { computed } from 'vue'
 import { VideoPlay } from '@element-plus/icons-vue'
-import { CatalogTree } from '@/entities/comic/ui'
+import { CatalogTree } from '@/entities/comic'
 import { ChapterSearchBox } from '@/features/chapter-search'
 import type { CatalogNode, ComicDetailVO } from '@/entities/comic'
 import { MediaReactionButtons } from '@/entities/media'

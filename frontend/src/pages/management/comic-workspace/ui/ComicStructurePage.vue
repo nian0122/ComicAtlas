@@ -683,7 +683,7 @@ import {
   toStructureRows,
 } from '@/entities/comic'
 import type { CatalogAction, ChapterAction, StructureRow, CatalogNode } from '@/entities/comic'
-import { StorageStatusTag } from '@/entities/storage/ui'
+import { StorageStatusTag } from '@/entities/storage'
 import type { MediaItemInfo } from '@/entities/media'
 import type { ChapterStorageItem } from '@/entities/storage'
 import { StorageOperationType as StorageOperation } from '@/entities/storage'
@@ -1389,6 +1389,6 @@ onMounted(() => {
 })
 </script>
 
-<style scoped src="@/pages/management/comic-structure/intake.css"></style>
-<style scoped src="@/pages/management/comic-structure/browser.css"></style>
-<style scoped src="@/pages/management/comic-structure/actions.css"></style>
+<style scoped src="@/pages/management/comic-workspace/ui/intake.css"></style>
+<style scoped src="@/pages/management/comic-workspace/ui/browser.css"></style>
+<style scoped src="@/pages/management/comic-workspace/ui/actions.css"></style>
