@@ -269,7 +269,7 @@ MANGA_ROOT/lq/{comicId}/{chapterId}/文件名
 
 管理后台的存储管理可对漫画发起导出（`POST /api/manage/storage/export/comics/{id}`），并选择文件夹、ZIP 或 CBZ 格式。导出是异步任务，产物保存在宿主机本地 `MANGA_ROOT/export/{taskId}/`：
 
-- 选择**文件夹**时，媒体会按漫画目录层级复制到独立目录，同时写出 `metadata.json` 和 `ComicInfo.xml`。导出前检查目标卷可用空间，默认额外保留 1 GiB；可通过 `DIRECTORY_EXPORT_MINIMUM_FREE_SPACE_BYTES` 配置余量。文件夹导出不受 ZIP/CBZ 的总量上限限制，目标空间不足时会在复制前失败。
+- 选择**文件夹**时，这是“移出原件并取消系统管理”操作：系统根据数据库目录树生成 `metadata.json` 和 `ComicInfo.xml`，然后按章节直接移动目录，不逐个遍历或复制媒体文件。整本 HQ 漫画目录为空时改用 LQ 章节目录；LQ 不能提供完整媒体（例如漫画含视频）时会在移动前失败，不混用 HQ/LQ。来源目录与 EXPORT 必须同卷；章节目录移动中断时保留检查点并重试，完成前漫画保持“移出管理中”。完成后漫画从资料库脱管，不能在本系统阅读或恢复，请先确认导出目录可用。
 - 选择 **ZIP/CBZ** 时生成标准分卷压缩包：
 
 ```text

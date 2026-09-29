@@ -12,6 +12,8 @@ public enum ComicStatus {
     IMPORTING,
     IMPORT_FAILED,
     READY,
+    /** 文件夹移出导出中；操作完成后漫画数据将从系统目录脱管。 */
+    EXPORTING,
     RECOVERY_REQUIRED,
     /** 元数据刷新中（AdminServiceImpl CAS 锁中间态；仅管理后台内部使用，不出现在对外生命周期） */
     REFRESHING,

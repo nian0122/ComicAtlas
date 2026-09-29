@@ -1,12 +1,23 @@
 package com.comicatlas.api.exporter.service.impl;
 
+import com.comicatlas.api.catalog.cache.CatalogCacheInvalidator;
 import com.comicatlas.api.exporter.enums.ExportTaskStatus;
 import com.comicatlas.api.exporter.persistence.entity.ExportTask;
 import com.comicatlas.api.exporter.persistence.mapper.ExportTaskMapper;
-import com.comicatlas.api.task.enums.TaskType;
 import com.comicatlas.api.task.enums.ManagementTaskStatus;
+import com.comicatlas.api.task.enums.TaskType;
 import com.comicatlas.api.task.persistence.entity.ManagementTaskItem;
 import com.comicatlas.api.task.service.ManagementTaskService;
+import com.comicatlas.api.trash.persistence.mapper.TrashDataMapper;
+import com.comicatlas.common.constant.ExportFormats;
+import com.comicatlas.contract.common.enums.ComicStatus;
+import com.comicatlas.contract.common.enums.MediaReaction;
+import com.comicatlas.persistence.comic.entity.Chapter;
+import com.comicatlas.persistence.comic.entity.Comic;
+import com.comicatlas.persistence.comic.mapper.CatalogMapper;
+import com.comicatlas.persistence.comic.mapper.ChapterMapper;
+import com.comicatlas.persistence.comic.mapper.ComicMapper;
+import com.comicatlas.persistence.comic.mapper.MediaMapper;
 import com.comicatlas.common.event.ExportTaskCompletedEvent;
 import com.comicatlas.common.event.ExportTaskFailedEvent;
 import com.comicatlas.common.event.ExportTaskStartedEvent;
@@ -15,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /** 导出结果应用服务，统一处理导出表与管理任务项的状态联动。 */
 @Service
@@ -25,6 +37,12 @@ public class ExportResultServiceImpl implements com.comicatlas.api.exporter.serv
     private static final String RESULT_REF_TYPE = "EXPORT_TASK";
     private final ExportTaskMapper exportTaskMapper;
     private final ManagementTaskService managementTaskService;
+    private final ComicMapper comicMapper;
+    private final ChapterMapper chapterMapper;
+    private final MediaMapper mediaMapper;
+    private final CatalogMapper catalogMapper;
+    private final TrashDataMapper trashDataMapper;
+    private final CatalogCacheInvalidator catalogCacheInvalidator;
 
     @Transactional
     public void applyStarted(ExportTaskStartedEvent event) {
@@ -55,6 +73,9 @@ public class ExportResultServiceImpl implements com.comicatlas.api.exporter.serv
             task.setCompletedAt(LocalDateTime.now());
             exportTaskMapper.updateById(task);
         }
+        if (ExportFormats.DIRECTORY.equalsIgnoreCase(task.getFormat())) {
+            detachExportedComic(event.comicId());
+        }
         updateItem(event.comicId(), ManagementTaskStatus.SUCCEEDED, null, event.taskId());
     }
 
@@ -70,8 +91,42 @@ public class ExportResultServiceImpl implements com.comicatlas.api.exporter.serv
             task.setProgress(-1);
             exportTaskMapper.updateById(task);
         }
+        if (ExportFormats.DIRECTORY.equalsIgnoreCase(task.getFormat())) {
+            Comic comic = comicMapper.selectByIdForUpdate(event.comicId());
+            if (comic != null && comic.getStatus() == ComicStatus.EXPORTING) {
+                comic.setStatus(ComicStatus.READY);
+                comicMapper.updateById(comic);
+            }
+        }
         updateItem(event.comicId(), ManagementTaskStatus.FAILED, event.errorMessage(), event.taskId());
-}
+    }
+
+    /** 文件夹导出已原子发布后，删除系统目录树记录并保留漫画 tombstone。 */
+    private void detachExportedComic(Long comicId) {
+        Comic comic = comicMapper.selectByIdForUpdate(comicId);
+        if (comic == null || comic.getStatus() == ComicStatus.DELETED) {
+            return;
+        }
+        if (comic.getStatus() != ComicStatus.EXPORTING) {
+            return;
+        }
+        List<Chapter> chapters = chapterMapper.selectByComicIdOrderByGlobalOrder(comicId);
+        List<Long> chapterIds = chapters.stream().map(Chapter::getId).toList();
+        if (!chapterIds.isEmpty()) {
+            mediaMapper.deleteByChapterIds(chapterIds);
+        }
+        trashDataMapper.deleteReadingHistoryByComicId(comicId);
+        chapterMapper.deleteByComicId(comicId);
+        catalogMapper.deleteByComicId(comicId);
+        trashDataMapper.deleteComicTagsByComicId(comicId);
+        comic.setStatus(ComicStatus.DELETED);
+        comic.setDeletedAt(LocalDateTime.now());
+        comic.setReaction(MediaReaction.NONE);
+        comic.setReactionAt(null);
+        comicMapper.updateById(comic);
+        catalogCacheInvalidator.evict(comicId);
+    }
+
     private void updateItem(Long comicId, ManagementTaskStatus status, String errorMessage, Long exportTaskId) {
         ManagementTaskItem item = managementTaskService.findActiveItem(TARGET_TYPE_COMIC, comicId, TaskType.EXPORT);
         if (item != null) {

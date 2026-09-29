@@ -12,6 +12,7 @@ export const COMIC_STATUSES = [
   'IMPORTING',
   'IMPORT_FAILED',
   'READY',
+  'EXPORTING',
   'RECOVERY_REQUIRED',
   'REFRESHING',
   'DELETING',
@@ -32,6 +33,7 @@ export const COMIC_STATUS_META: Readonly<Record<ComicStatus, ComicStatusMeta>> =
     transient: false,
   },
   READY: { label: '可阅读', description: '漫画与章节均已就绪', tone: 'success', transient: false },
+  EXPORTING: { label: '移出管理中', description: '正在导出原件并取消系统管理', tone: 'warning', transient: true },
   RECOVERY_REQUIRED: {
     label: '需要恢复',
     description: '存储存在，但数据库记录需要恢复',

@@ -11,6 +11,7 @@ import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.worker.exporter.service.ExportService;
 import com.comicatlas.worker.exporter.publisher.ExportEventPublisher;
 import com.comicatlas.worker.exporter.exception.ExportManifestBuildException;
+import com.comicatlas.worker.exporter.exception.ExportMoveOutException;
 import com.rabbitmq.client.Channel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -21,6 +22,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
+import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -130,6 +132,22 @@ class ExportTaskHandlerTest {
 
         verify(exportService).export(1L, 99L, ExportFormats.DIRECTORY);
         verify(channel).basicAck(5L, false);
+    }
+
+    @Test
+    @DisplayName("章节目录移动中断：保留漫画移出状态并重投，不发布普通失败")
+    void directoryMoveInterrupted_requeuesWithoutFailedEvent() throws Exception {
+        ExportTaskCreatedEvent directoryEvent = new ExportTaskCreatedEvent(UUID.randomUUID(), Instant.now(),
+                99L, 1L, ExportFormats.DIRECTORY);
+        when(exportService.export(1L, 99L, ExportFormats.DIRECTORY))
+                .thenThrow(new ExportMoveOutException("章节目录部分移动", new IOException("磁盘繁忙")));
+
+        handler.handle(directoryEvent, channel, 5L);
+
+        verify(channel).basicReject(5L, true);
+        verify(channel, never()).basicAck(anyLong(), anyBoolean());
+        verify(rabbitTemplate, never()).convertAndSend(eq(MqExchanges.EXPORT),
+                eq(MqRoutingKeys.TASK_FAILED), (Object) any());
     }
 
     @Test

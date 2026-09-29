@@ -6,6 +6,7 @@ export type ComicStatus =
   | 'IMPORTING'
   | 'IMPORT_FAILED'
   | 'READY'
+  | 'EXPORTING'
   | 'RECOVERY_REQUIRED'
   | 'REFRESHING'
   | 'DELETING'

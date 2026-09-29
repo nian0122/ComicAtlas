@@ -2,7 +2,6 @@ package com.comicatlas.worker.exporter;
 
 import com.comicatlas.worker.exporter.publisher.ExportArchivePublisher;
 import com.comicatlas.worker.exporter.archive.ZipBuilder;
-import com.comicatlas.worker.exporter.archive.DirectoryExportStaging;
 import com.comicatlas.worker.exporter.exception.ExportFileNotFoundException;
 import com.comicatlas.worker.exporter.exception.ExportManifestBuildException;
 import com.comicatlas.worker.exporter.model.ExportCollectResult;
@@ -158,7 +157,10 @@ class ExportServiceTest {
         StorageRoot exportRoot = new StorageRoot();
         exportRoot.setPath(tempDir.resolve("export"));
         Files.createDirectories(exportRoot.getPath());
-        storageProperties.setRoots(Map.of("EXPORT", exportRoot));
+        StorageRoot hqRoot = new StorageRoot();
+        hqRoot.setPath(tempDir.resolve("hq"));
+        Files.createDirectories(hqRoot.getPath());
+        storageProperties.setRoots(Map.of("EXPORT", exportRoot, "HQ", hqRoot));
 
         workerConfig = new WorkerConfig();
         when(archivePublisher.publish(anyLong(), any(), any(), any()))
@@ -384,7 +386,7 @@ class ExportServiceTest {
         MediaRecord media = media(1L, 10L, "1/10/001.jpg", 1);
         when(exportCollector.collect(1L)).thenReturn(result(comic(1L, "标题"),
                 List.of(chapter(10L, "第一章", 1)), List.of(media)));
-        when(metadataJsonExporter.exportJson(any(ExportCollectResult.class))).thenReturn("{}");
+        when(metadataJsonExporter.exportDirectoryJson(any(ExportCollectResult.class), anyMap())).thenReturn("{}");
         when(exportFileResolver.resolve(media)).thenReturn(new StorageRef("HQ", "1/10/001.jpg"));
         writeFile("hq/1/10/001.jpg", "media-content-larger-than-zip-cap");
         stubResolverToRoot();
@@ -394,6 +396,8 @@ class ExportServiceTest {
         assertTrue(Files.isRegularFile(storageProperties.getRoots().get("EXPORT").getPath()
                 .resolve(output.fileName()).resolve("第一章/001.jpg")));
         assertFalse(Files.exists(storageProperties.getRoots().get("EXPORT").getPath().resolve(".staging-99")));
+        assertFalse(Files.exists(storageProperties.getRoots().get("HQ").getPath().resolve("1")),
+                "文件夹导出成功后 HQ 原件应从系统管理中移出");
     }
 
     @Test
@@ -402,7 +406,7 @@ class ExportServiceTest {
         ExportCollectResult collected = result(comic(1L, "标题"),
                 List.of(chapter(10L, "第一章", 1)), List.of(media));
         when(exportCollector.collect(1L)).thenReturn(collected);
-        when(metadataJsonExporter.exportJson(collected)).thenReturn("{}");
+        when(metadataJsonExporter.exportDirectoryJson(eq(collected), anyMap())).thenReturn("{}");
         when(exportFileResolver.resolve(media)).thenReturn(new StorageRef("HQ", "1/10/001.jpg"));
         Path sourceFile = writeFile("hq/1/10/001.jpg", "media-content");
         stubResolverToRoot();
@@ -412,8 +416,6 @@ class ExportServiceTest {
         Path stagingDir = exportRoot.resolve(".staging-99");
         Path finalDir = exportRoot.resolve("99");
         java.util.concurrent.atomic.AtomicBoolean failFirstPublish = new java.util.concurrent.atomic.AtomicBoolean(true);
-        java.util.concurrent.atomic.AtomicInteger sourceCopyCount = new java.util.concurrent.atomic.AtomicInteger();
-
         try (MockedStatic<Files> mockedFiles = mockStatic(Files.class,
                 withSettings().defaultAnswer(invocation -> {
                     if ("move".equals(invocation.getMethod().getName())
@@ -422,24 +424,21 @@ class ExportServiceTest {
                             && failFirstPublish.compareAndSet(true, false)) {
                         throw new IOException("Windows 暂时拒绝目录移动");
                     }
-                    if ("copy".equals(invocation.getMethod().getName())
-                            && sourceFile.equals(invocation.getArgument(0))) {
-                        sourceCopyCount.incrementAndGet();
-                    }
                     return invocation.callRealMethod();
                 }))) {
             IOException failure = assertThrows(IOException.class,
                     () -> realService.export(1L, 99L, "DIRECTORY"));
 
-            assertTrue(failure.getMessage().contains("临时产物已保留供重试"));
-            assertTrue(Files.isRegularFile(stagingDir.resolve("标题/第一章/001.jpg")));
-            assertTrue(Files.isRegularFile(DirectoryExportStaging.markerPath(stagingDir)));
+            assertTrue(failure.getMessage().contains("保留 staging 供重试"));
+            assertTrue(Files.isDirectory(stagingDir.resolve("标题/第一章")));
+            assertTrue(Files.isRegularFile(exportRoot.resolve(".moveout-99.checkpoint")));
 
             ExportService.ExportOutput retriedOutput = realService.export(1L, 99L, "DIRECTORY");
 
             assertTrue(Files.isRegularFile(exportRoot.resolve(retriedOutput.fileName()).resolve("第一章/001.jpg")));
-            assertEquals(1, sourceCopyCount.get(), "重试应复用 staging，不得重复复制源文件");
-            assertFalse(Files.exists(DirectoryExportStaging.markerPath(stagingDir)));
+            assertFalse(Files.exists(sourceFile.getParent()), "章节目录应直接移动出 HQ");
+            assertFalse(Files.exists(tempDir.resolve("hq/1/10")), "章节目录应直接移动出 HQ");
+            assertTrue(Files.isRegularFile(exportRoot.resolve(".moveout-99.checkpoint")));
         }
     }
 
@@ -449,7 +448,7 @@ class ExportServiceTest {
         MediaRecord media = media(1L, 10L, "1/10/001.jpg", 1);
         when(exportCollector.collect(1L)).thenReturn(result(comic(1L, "标题"),
                 List.of(chapter(10L, "第一章", 1)), List.of(media)));
-        when(metadataJsonExporter.exportJson(any(ExportCollectResult.class))).thenReturn("{}");
+        when(metadataJsonExporter.exportDirectoryJson(any(ExportCollectResult.class), anyMap())).thenReturn("{}");
         when(exportFileResolver.resolve(media)).thenReturn(new StorageRef("HQ", "1/10/001.jpg"));
         writeFile("hq/1/10/001.jpg", "media-content");
         stubResolverToRoot();
@@ -564,7 +563,7 @@ class ExportServiceTest {
         ExportCollectResult collected = result(comic(1L, "测试标题"), List.of(chapter),
                 List.of(catalog(100L, null, "第一卷"), catalog(101L, 100L, "附录")), List.of(media));
         when(exportCollector.collect(1L)).thenReturn(collected);
-        when(metadataJsonExporter.exportJson(collected)).thenReturn("{}");
+        when(metadataJsonExporter.exportDirectoryJson(eq(collected), anyMap())).thenReturn("{}");
         when(exportFileResolver.resolve(media)).thenReturn(new StorageRef("HQ", "1/10/原始文件.jpg"));
         writeFile("hq/1/10/原始文件.jpg", "image-content");
         stubResolverToRoot();

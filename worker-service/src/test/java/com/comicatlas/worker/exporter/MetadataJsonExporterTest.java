@@ -7,6 +7,7 @@ import com.comicatlas.worker.exporter.metadata.MetadataJsonExporter;
 import com.comicatlas.worker.exporter.metadata.MetadataModelMapper;
 import com.comicatlas.worker.exporter.model.ExportCollectResult;
 import org.junit.jupiter.api.Test;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
@@ -31,5 +32,23 @@ class MetadataJsonExporterTest {
         when(collector.collect(7L)).thenReturn(collected);
         assertEquals("{\"version\":3}", exporter.exportJson(7L));
         verify(collector).collect(7L);
+    }
+
+    @Test
+    void directoryExportUsesPortableMediaPaths() {
+        ExportCollector collector = mock(ExportCollector.class);
+        MetadataModelMapper mapper = mock(MetadataModelMapper.class);
+        MetadataJsonBuilder builder = mock(MetadataJsonBuilder.class);
+        ExportCollectResult collected = mock(ExportCollectResult.class);
+        MetadataV3 metadata = mock(MetadataV3.class);
+        Map<Long, String> mediaPaths = Map.of(8L, "第一卷/第01话/001.jpg");
+        when(mapper.toV3(collected, mediaPaths)).thenReturn(metadata);
+        when(builder.build(metadata)).thenReturn("portable-metadata");
+
+        MetadataJsonExporter exporter = new MetadataJsonExporter(collector, mapper, builder);
+
+        assertEquals("portable-metadata", exporter.exportDirectoryJson(collected, mediaPaths));
+        verify(mapper).toV3(collected, mediaPaths);
+        verifyNoInteractions(collector);
     }
 }

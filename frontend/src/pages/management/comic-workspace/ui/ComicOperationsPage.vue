@@ -1,7 +1,6 @@
 <template>
   <div class="comic-operations-page">
-    <PageHeader title="漫画操作台" description="触发存储与生命周期操作，并实时观察漫画和任务状态变化。">
-    </PageHeader>
+    <PageHeader title="漫画操作台" description="触发存储与生命周期操作，并实时观察漫画和任务状态变化。"> </PageHeader>
 
     <el-alert v-if="error" :title="error" type="error" show-icon />
     <section v-if="comic" class="current-state">
@@ -256,6 +255,18 @@ function refreshMetadata(): void {
 }
 function createExport(): void {
   const label = exportFormat.value === 'DIRECTORY' ? '导出漫画文件夹' : `${exportFormat.value} 导出`
+  if (exportFormat.value === 'DIRECTORY') {
+    void ElMessageBox.confirm(
+      '文件夹导出会把漫画原件移出系统管理。完成后漫画将从资料库移除，之后不能在本系统阅读或恢复；请确认导出目录已妥善保管。',
+      '确认移出原件并取消管理',
+      { type: 'warning', confirmButtonText: '移出并导出', cancelButtonText: '取消' },
+    )
+      .then(() => runAction(label, () => exportApi.createExport(comicId.value, exportFormat.value)))
+      .catch((reason: unknown) => {
+        if (reason !== 'cancel' && reason !== 'close') ElMessage.error(errorMessage(reason))
+      })
+    return
+  }
   void runAction(label, () => exportApi.createExport(comicId.value, exportFormat.value))
 }
 async function trashComic(): Promise<void> {

@@ -57,10 +57,10 @@ public class ExportServiceImpl implements ExportService {
     @Override
     @Transactional
     public ExportTaskVO createExportTask(Long comicId, String format) {
-        requireExportableComic(comicId);
+        String normalizedFormat = normalizeFormat(format);
+        Comic comic = requireExportableComic(comicId);
         rejectDuplicateActiveTask(comicId);
 
-        String normalizedFormat = normalizeFormat(format);
         ExportTask task = createExportTaskRecord(comicId, normalizedFormat);
 
         Long taskId = task.getId();
@@ -68,6 +68,11 @@ public class ExportServiceImpl implements ExportService {
         outboxService.enqueue(new ExportTaskCreatedEvent(UUID.randomUUID(), Instant.now(), taskId, comicId,
                         normalizedFormat),
                 MqExchanges.EXPORT, MqRoutingKeys.TASK_CREATED);
+
+        if (ExportFormats.DIRECTORY.equals(normalizedFormat)) {
+            comic.setStatus(ComicStatus.EXPORTING);
+            comicMapper.updateById(comic);
+        }
 
         log.info("导出任务创建: taskId={}, comicId={}", taskId, comicId);
         return toVO(task);
@@ -94,14 +99,15 @@ public class ExportServiceImpl implements ExportService {
         return toVO(task);
     }
 
-    private void requireExportableComic(Long comicId) {
-        Comic comic = comicMapper.selectById(comicId);
+    private Comic requireExportableComic(Long comicId) {
+        Comic comic = comicMapper.selectByIdForUpdate(comicId);
         if (comic == null) {
             throw new BusinessException(HttpStatusCodes.NOT_FOUND, "漫画不存在");
         }
         if (comic.getStatus() != ComicStatus.READY) {
             throw new BusinessException(HttpStatusCodes.BAD_REQUEST, "漫画状态不允许导出，当前状态: " + comic.getStatus());
         }
+        return comic;
     }
 
     private void rejectDuplicateActiveTask(Long comicId) {

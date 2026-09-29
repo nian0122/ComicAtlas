@@ -6,6 +6,7 @@ import com.comicatlas.common.event.ExportTaskCreatedEvent;
 import com.comicatlas.common.mq.MqConsumerSupport;
 import com.comicatlas.worker.exporter.service.ExportService;
 import com.comicatlas.worker.exporter.publisher.ExportEventPublisher;
+import com.comicatlas.worker.exporter.exception.ExportMoveOutException;
 import com.rabbitmq.client.Channel;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -63,6 +64,9 @@ public class ExportTaskHandler {
                             ? exportService.export(event.comicId(), event.taskId(), ExportFormats.CBZ)
                             : exportService.export(event.comicId(), event.taskId());
         } catch (java.io.IOException | RuntimeException failure) {
+            if (failure instanceof ExportMoveOutException) {
+                throw failure;
+            }
             if (failure instanceof InterruptedIOException || failure instanceof ClosedByInterruptException
                     || failure instanceof InterruptedException || Thread.currentThread().isInterrupted()) {
                 Thread.currentThread().interrupt();

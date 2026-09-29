@@ -1,6 +1,10 @@
 package com.comicatlas.api.exporter.service.impl;
 
 import com.comicatlas.persistence.comic.mapper.ComicMapper;
+import com.comicatlas.persistence.comic.entity.Comic;
+import com.comicatlas.contract.common.enums.ComicStatus;
+import com.comicatlas.api.task.dto.ManagementTaskResponse;
+import com.comicatlas.common.constant.ExportFormats;
 import com.comicatlas.api.exporter.enums.ExportTaskStatus;
 import com.comicatlas.api.storage.config.ApiStorageProperties;
 import com.comicatlas.api.storage.ApiStorageRoot;
@@ -20,6 +24,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 
 /**
  * 导出服务测试 — 重点锁定 toVO 的物理路径解析：不再把逻辑 EXPORT 根当物理目录拼接，
@@ -29,6 +36,60 @@ class ExportServiceImplTest {
 
     @TempDir
     Path tempDir;
+
+    @Test
+    void createDirectoryExportTask_locksComicUntilMoveOutCompletes() {
+        Comic comic = new Comic();
+        comic.setId(42L);
+        comic.setStatus(ComicStatus.READY);
+        ComicMapper comicMapper = mock(ComicMapper.class);
+        when(comicMapper.selectByIdForUpdate(42L)).thenReturn(comic);
+        ExportTaskMapper taskMapper = mock(ExportTaskMapper.class);
+        doAnswer(invocation -> {
+            ((ExportTask) invocation.getArgument(0)).setId(71L);
+            return 1;
+        }).when(taskMapper).insert(any(ExportTask.class));
+        ManagementTaskService managementTaskService = mock(ManagementTaskService.class);
+        ManagementTaskResponse managementTask = new ManagementTaskResponse();
+        managementTask.setId(81L);
+        when(managementTaskService.createTask(any(), any(), any())).thenReturn(managementTask);
+        ApiStorageProperties props = new ApiStorageProperties();
+        props.setRoots(Map.of());
+        ExportServiceImpl exportService = new ExportServiceImpl(comicMapper, taskMapper,
+                mock(OutboxService.class), managementTaskService, props);
+
+        exportService.createExportTask(42L, ExportFormats.DIRECTORY);
+
+        assertThat(comic.getStatus()).isEqualTo(ComicStatus.EXPORTING);
+        verify(comicMapper).updateById(comic);
+    }
+
+    @Test
+    void createZipExportTask_doesNotLockComicForMoveOut() {
+        Comic comic = new Comic();
+        comic.setId(42L);
+        comic.setStatus(ComicStatus.READY);
+        ComicMapper comicMapper = mock(ComicMapper.class);
+        when(comicMapper.selectByIdForUpdate(42L)).thenReturn(comic);
+        ExportTaskMapper taskMapper = mock(ExportTaskMapper.class);
+        doAnswer(invocation -> {
+            ((ExportTask) invocation.getArgument(0)).setId(72L);
+            return 1;
+        }).when(taskMapper).insert(any(ExportTask.class));
+        ManagementTaskService managementTaskService = mock(ManagementTaskService.class);
+        ManagementTaskResponse managementTask = new ManagementTaskResponse();
+        managementTask.setId(82L);
+        when(managementTaskService.createTask(any(), any(), any())).thenReturn(managementTask);
+        ApiStorageProperties props = new ApiStorageProperties();
+        props.setRoots(Map.of());
+        ExportServiceImpl exportService = new ExportServiceImpl(comicMapper, taskMapper,
+                mock(OutboxService.class), managementTaskService, props);
+
+        exportService.createExportTask(42L, ExportFormats.ZIP);
+
+        assertThat(comic.getStatus()).isEqualTo(ComicStatus.READY);
+        verify(comicMapper, never()).updateById(comic);
+    }
 
     private ExportServiceImpl service(ExportTask task) {
         ExportTaskMapper taskMapper = mock(ExportTaskMapper.class);
