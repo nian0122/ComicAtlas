@@ -115,10 +115,12 @@
         <el-pagination
           v-model:current-page="store.query.page"
           :page-size="store.query.size"
+          :page-sizes="[10, 20, 50, 100]"
           :total="store.total"
-          layout="prev, pager, next"
+          layout="total, sizes, prev, pager, next, jumper"
           background
           @current-change="onPageChange"
+          @update:page-size="onPageSizeChange"
         />
       </div>
     </section>
@@ -233,6 +235,12 @@ function goEdit(id: number) {
 function onPageChange(page: number) {
   selectedIds.value = []
   store.updateQuery({ page })
+  store.fetchList()
+}
+
+function onPageSizeChange(size: number) {
+  selectedIds.value = []
+  store.updateQuery({ page: 1, size })
   store.fetchList()
 }
 
@@ -414,5 +422,4 @@ function formatBytes(bytes: number | undefined): string {
   border: 1px solid var(--danger);
   border-radius: var(--radius-sm);
 }
-
 </style>

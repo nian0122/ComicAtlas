@@ -33,9 +33,9 @@ beforeEach(() => {
 })
 
 describe.each([
-  { name: '阅读列表', useStore: useComicStore, endpoint: comicApi },
-  { name: '管理列表', useStore: useManagementComicStore, endpoint: managementComicApi },
-])('$name 共享行为', ({ useStore, endpoint }) => {
+  { name: '阅读列表', useStore: useComicStore, endpoint: comicApi, defaultSize: 24 },
+  { name: '管理列表', useStore: useManagementComicStore, endpoint: managementComicApi, defaultSize: 20 },
+])('$name 共享行为', ({ useStore, endpoint, defaultSize }) => {
   it('搜索回到第一页并固定在途请求的标签', async () => {
     const request = vi.spyOn(endpoint, 'list').mockResolvedValue(pageResponse(50))
     const store = useStore()
@@ -52,7 +52,7 @@ describe.each([
     await store.nextPage()
     expect(request.mock.calls[1]?.[0]?.page).toBe(2)
     store.resetQuery()
-    expect(store.query).toEqual({ page: 1, size: 24, sort: 'createdAt' })
+    expect(store.query).toEqual({ page: 1, size: defaultSize, sort: 'createdAt' })
   })
 
   it('旧成功响应不能覆盖新结果', async () => {

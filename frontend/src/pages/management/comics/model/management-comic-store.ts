@@ -7,7 +7,7 @@ export type ManagementComicState = ReturnType<typeof usePaginatedListState<Comic
 
 export const useManagementComicStore = defineStore('management-comic', () =>
   usePaginatedListState<ComicListVO, ComicListQuery>({
-    defaultQuery: { page: 1, size: 24, sort: 'createdAt' },
+    defaultQuery: { page: 1, size: 20, sort: 'createdAt' },
     fetchPage: async (query) => (await managementComicApi.list(query)).data,
   }),
 )
