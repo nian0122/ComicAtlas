@@ -91,6 +91,7 @@ storage:
     max-session-size: ${UPLOAD_MAX_SESSION_SIZE:107374182400}
     max-files: ${UPLOAD_MAX_FILES:10000}
     session-ttl: ${UPLOAD_SESSION_TTL:24h}
+    stale-session-ttl: ${UPLOAD_STALE_SESSION_TTL:10m}
     free-space-min-bytes: ${UPLOAD_FREE_SPACE_MIN_BYTES:5368709120}
     free-space-min-ratio: ${UPLOAD_FREE_SPACE_MIN_RATIO:0.10}
     cleanup-interval-ms: ${UPLOAD_CLEANUP_INTERVAL_MS:3600000}

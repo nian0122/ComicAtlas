@@ -32,6 +32,9 @@ public class UploadProperties {
     /** 会话未完成过期时长（默认 24h） */
     private Duration sessionTtl = Duration.ofHours(24);
 
+    /** 零字节活动会话占用同名文件的最长宽限期（默认 10 分钟） */
+    private Duration staleSessionTtl = Duration.ofMinutes(10);
+
     /** 空闲空间绝对下限（默认 5GiB） */
     private long freeSpaceMinBytes = 5L * 1024 * 1024 * 1024;
 
