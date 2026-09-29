@@ -8,21 +8,21 @@
 
 - `shared/ui` 只提供无领域语义的外观和基础交互，不请求 API、不读 Store、不认识漫画、任务、存储等业务状态。
 - `entities/*/ui` 负责实体特有展示与状态映射；`features/*/ui` 负责一个用户动作；`widgets` 与 `pages` 只组合公共 UI，不能复制其基础 CSS。
-- 保留 Element Plus 作为表单、弹框、表格的底层实现。禁止在同一语义上混用 `<button>` 自定义样式与 `el-button`；完成迁移后，以 `AppButton` 为统一业务按钮入口，只有 Element Plus 专有能力才可直接使用 `el-button`。
+- 保留 Element Plus 作为表单、弹框、表格的底层实现。业务页面不得直接写 `<button>` 或 `<el-button>`；统一通过 `AppButton` 使用原生 button 语义和公共样式。
 - 所有公共组件必须暴露 `index.ts`；业务页只从 `@/shared/ui/<slice>` 的 public API 引用，不导入其内部 Vue 文件。
 
 ## 待办清单
 
 ### UI-01：建立唯一按钮组件
 
-- [x] **TODO UI-01**：新增 `shared/ui/button/`，以 Element Plus 为基础实现 `AppButton`，统一 `primary`、`secondary`、`ghost`、`danger`、`text`、`overlay` 六种 variant，以及 `sm/default/lg` 尺寸、loading、disabled、icon-only 和键盘焦点样式。
+- [x] **TODO UI-01**：新增 `shared/ui/button/`，以原生 button 为基础实现 `AppButton`，统一 `primary`、`secondary`、`ghost`、`danger`、`warning`、`text`、`overlay` 七种 variant，以及 `sm/default/lg` 尺寸、loading、disabled、icon-only 和键盘焦点样式。
 - 替换范围：`pages/management/comics/ui/ComicListPage.vue`、`pages/reading/history/ui/HistoryPage.vue` 中重复的 `.primary-btn/.ghost-btn`；`pages/management/import/ui/ImportPage.vue`、`widgets/home/HeroBanner.vue`、`entities/comic/ui/{ComicCard,ComicPoster}.vue` 的同类原生按钮。
 - 约束：导航仍使用 `RouterLink`；必要时由 `AppButton` 提供 `as`/`to` 适配，不能用点击回调模拟链接。卡片整块点击和列表行点击保持其实体交互，不强行替换为按钮。
 - 验证：`rg -n '(^|[\\s{])\\.(primary-btn|ghost-btn|poster-btn|overlay-btn|hero-btn)' frontend/src` 不再发现可替换的通用按钮实现；hover、disabled、焦点和移动端触控尺寸一致。
 
 ### UI-02：收口图标按钮与文字操作
 
-- [x] **TODO UI-02**：在 `shared/ui/button/` 为图标按钮和文字操作定义 `icon`、`text` variant，统一可访问名称、最小点击区、danger/warning 色阶与 loading 行为。
+- [x] **TODO UI-02**：在 `shared/ui/button/` 通过 `iconOnly` 属性和 `text` variant 统一图标按钮与文字操作的可访问名称、最小点击区、danger/warning 色阶与 loading 行为。
 - 替换范围：`pages/reading/history/ui/HistoryPage.vue` 的 `history-play/history-end-retry`，`features/chapter-search/ui/ChapterSearchBox.vue` 的清空按钮，以及各管理页对“刷新、重试、清空、编辑、删除”的本地按钮实现。
 - 约束：表格行内的 Element Plus `link` 可以由 `AppButton variant="text"` 适配，但不能改变确认对话框、禁用条件或事件传播语义。
 - 验证：所有无文字图标操作都有 `aria-label`；没有为同一操作保留两套颜色、圆角或 hover 规则。
@@ -84,7 +84,7 @@
 
 - [x] **TODO UI-12**：抽取 `shared/ui/spinner/Spinner.vue`，统一 inline/small/medium/large 尺寸、强调色/继承色与旋转动画。
 - [x] **TODO UI-12**：`AppButton`、`ContentState`、导入页扫描和漫画库共用 Spinner，删除对应重复边框动画和页面级 spinner 样式。
-- [x] **TODO UI-12**：公共 UI 检查器扫描 CSS 文件，防止页面目录重新定义 `.spinner` 等公共类。
+- [x] **TODO UI-12**：公共 UI 检查器扫描 CSS、SCSS、Sass 和 Less 文件，防止页面目录重新定义 `.spinner` 等公共类。
 
 ### UI-13：收敛面板和面板标题
 
