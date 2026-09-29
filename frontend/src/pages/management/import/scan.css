@@ -72,16 +72,6 @@
   font-size: 13px;
 }
 
-.link {
-  color: var(--accent);
-  cursor: pointer;
-  text-decoration: none;
-}
-
-.link:hover {
-  text-decoration: underline;
-}
-
 .link-sep {
   color: var(--text-muted);
   margin: 0 2px;

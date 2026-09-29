@@ -64,7 +64,17 @@
               @input="onKeywordInput"
               @keyup.enter="onSearch"
             />
-            <el-icon v-if="keyword" :size="16" class="clear-icon" @click="clearKeyword"><CircleClose /></el-icon>
+            <AppButton
+              v-if="keyword"
+              variant="text"
+              size="sm"
+              icon-only
+              class="clear-icon"
+              aria-label="清除搜索"
+              @click="clearKeyword"
+            >
+              <el-icon :size="16"><CircleClose /></el-icon>
+            </AppButton>
           </div>
 
           <div class="desktop-sort-group">

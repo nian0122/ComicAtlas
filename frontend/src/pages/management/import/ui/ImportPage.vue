@@ -108,9 +108,9 @@
         <div v-else class="scan-results">
           <div class="scan-results-header">
             <span class="check-all-links">
-              <a class="link" @click="selectAll">全选</a>
+              <AppButton variant="text" size="sm" @click="selectAll">全选</AppButton>
               <span class="link-sep">/</span>
-              <a class="link" @click="deselectAll">取消全选</a>
+              <AppButton variant="text" size="sm" @click="deselectAll">取消全选</AppButton>
             </span>
             <span class="scan-count">已选 {{ selectedPaths.length }} / {{ importableCount }} 个可导入</span>
           </div>

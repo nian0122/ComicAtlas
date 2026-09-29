@@ -66,6 +66,7 @@
 
 - [x] **TODO UI-09**：将按钮、状态、容器、标题、空态所需的尺寸、边框、过渡、焦点 token 集中到 `app/styles/tokens.css`；公共组件只能消费 token，页面不能硬编码同类视觉值。
 - [x] **TODO UI-10**：在 ESLint/Stylelint（若引入）或自定义 CI 检查中禁止 `pages/**` 定义 `.primary-btn`、`.ghost-btn`、`.status-badge`、`.spinner` 等公共类名，并禁止 pages 深层导入 `shared/ui/**/<Component>.vue`。
+- [x] **TODO UI-10**：自定义检查器阻止无 `href` 的点击链接和可点击 `el-icon`；业务动作使用 `AppButton`，导航使用真实链接。
 - 验证：新增页面只能组合 `shared/ui`、entities、features、widgets；PR 检查能阻止相同按钮出现第二份 CSS。
 
 ### UI-11：公共 UI 的迁移顺序与回归门禁

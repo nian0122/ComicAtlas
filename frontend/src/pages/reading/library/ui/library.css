@@ -126,16 +126,6 @@
   color: var(--text-muted);
 }
 
-.clear-icon {
-  cursor: pointer;
-  color: var(--text-muted);
-  transition: color var(--transition-fast);
-}
-
-.clear-icon:hover {
-  color: var(--text-primary);
-}
-
 .filter-select :deep(.el-select) {
   width: 100%;
 }

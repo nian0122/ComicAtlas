@@ -5,6 +5,7 @@ const sourceRoot = join(process.cwd(), 'src')
 const forbiddenPageClasses = /(?:^|[\s,{])\.(primary-btn|ghost-btn|poster-btn|overlay-btn|hero-btn|status-badge|spinner|state|empty-title|empty-desc|panel-heading)\b/
 const deepSharedImport = /@\/shared\/ui\/[^'"\n]+\/[^'"\n]+\.vue/
 const legacyButtonMarkup = /<(?:el-)?button\b/i
+const nonSemanticAction = /<a\b(?=[^>]*@click\b)(?![^>]*\bhref\s*=)[^>]*>|<el-icon\b(?=[^>]*@click\b)/i
 const violations = []
 
 async function collectFiles(directory) {
@@ -27,6 +28,7 @@ for (const directoryName of publicUiDirectories) {
     if (forbiddenPageClasses.test(source)) violations.push(`${relativePath}: 禁止重复定义公共 UI 类名`)
     if (deepSharedImport.test(source)) violations.push(`${relativePath}: 必须通过 shared/ui public API 引用组件`)
     if (legacyButtonMarkup.test(source)) violations.push(`${relativePath}: 业务 UI 必须使用 shared/ui/button/AppButton`)
+    if (nonSemanticAction.test(source)) violations.push(`${relativePath}: 点击操作必须使用有语义的链接或 shared/ui/button/AppButton`)
   }
 }
 
