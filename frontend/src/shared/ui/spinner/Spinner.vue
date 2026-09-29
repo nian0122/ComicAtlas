@@ -6,11 +6,7 @@ withDefaults(defineProps<{ size?: 'inline' | 'small' | 'medium' | 'large'; color
 </script>
 
 <template>
-  <span
-    class="app-spinner"
-    :class="[`app-spinner--${size}`, `app-spinner--${color}`]"
-    aria-hidden="true"
-  />
+  <span class="app-spinner" :class="[`app-spinner--${size}`, `app-spinner--${color}`]" aria-hidden="true" />
 </template>
 
 <style scoped>
