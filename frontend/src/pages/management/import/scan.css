@@ -58,15 +58,6 @@
   font-size: 14px;
 }
 
-.spinner {
-  width: 18px;
-  height: 18px;
-  border: 2px solid var(--border);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
 /* Scan results header */
 .scan-results-header {
   display: flex;
@@ -286,13 +277,6 @@
   display: flex;
   gap: var(--space-lg);
   align-items: center;
-}
-
-/* Shared */
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 @media (max-width: 640px) {

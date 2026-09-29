@@ -10,6 +10,7 @@ describe('ContentState 公共契约', () => {
     expect(componentSource).toContain("'loading' | 'error' | 'empty'")
     expect(componentSource).toContain('$slots.icon')
     expect(componentSource).toContain('$slots.default')
-    expect(componentSource).toContain('content-state__spinner')
+    expect(componentSource).toContain("import { Spinner } from '@/shared/ui/spinner'")
+    expect(componentSource).toContain('<Spinner v-if="state === \'loading\'" size="large" />')
   })
 })

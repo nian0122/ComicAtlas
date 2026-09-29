@@ -423,35 +423,6 @@
   overflow-x: auto;
 }
 
-.state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-base);
-  padding: var(--space-3xl) 0;
-  color: var(--text-secondary);
-}
-
-.state.error {
-  color: var(--danger);
-}
-
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid var(--border-strong);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 /* ===== 移动阅读端（手机与平板，≤1024px）===== */
 @media (max-width: 1024px) {
   .comic-list-page {

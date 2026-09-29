@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { Spinner } from '@/shared/ui/spinner'
+
 withDefaults(defineProps<{ state: 'loading' | 'error' | 'empty'; message?: string; bordered?: boolean }>(), {
   message: undefined,
   bordered: false,
@@ -12,7 +14,7 @@ withDefaults(defineProps<{ state: 'loading' | 'error' | 'empty'; message?: strin
     :aria-busy="state === 'loading' || undefined"
     :role="state === 'error' ? 'alert' : 'status'"
   >
-    <span v-if="state === 'loading'" class="content-state__spinner" aria-hidden="true" />
+    <Spinner v-if="state === 'loading'" size="large" />
     <span v-else-if="$slots.icon" class="content-state__icon" aria-hidden="true"><slot name="icon" /></span>
     <p v-if="message">{{ message }}</p>
     <div v-if="$slots.default" class="content-state__actions"><slot /></div>
@@ -42,20 +44,7 @@ withDefaults(defineProps<{ state: 'loading' | 'error' | 'empty'; message?: strin
   justify-content: center;
   gap: var(--space-3);
 }
-.content-state__spinner {
-  width: var(--content-state-spinner-size);
-  height: var(--content-state-spinner-size);
-  border: 2px solid var(--border-strong);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: content-state-spin 700ms linear infinite;
-}
 .content-state__icon {
   font-size: var(--text-section);
-}
-@keyframes content-state-spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 </style>

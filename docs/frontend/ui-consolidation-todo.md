@@ -2,7 +2,7 @@
 
 更新日期：2026-09-29。本清单记录公共 UI 的归属和迁移结果，现行 FSD 约束以[前端架构文档](08-frontend-architecture.md)为准。按钮、状态、页面状态和基础容器已收敛到公共入口；业务组件中的原生操作按钮使用 `AppButton`。新增 UI 应复用现有 public API。
 
-**状态：** UI-01～UI-11 已完成。按钮门禁要求业务交互使用 `shared/ui/button` 的 `AppButton`；筛选与选项按钮应暴露当前选中状态。
+**状态：** UI-01～UI-12 已完成。按钮门禁要求业务交互使用 `shared/ui/button` 的 `AppButton`；筛选与选项按钮应暴露当前选中状态；加载动效统一由 `shared/ui/spinner` 提供。
 
 ## 收敛规则
 
@@ -36,7 +36,7 @@
 
 ### UI-04：统一加载、错误与空态
 
-- [x] **TODO UI-04**：统一使用 `shared/ui/content-state/ContentState.vue`，提供 `loading`、`error`、`empty` 三种语义状态及 action/icon 插槽；spinner 由该切片唯一实现，原 `management-panel/EmptyState.vue` 已删除。
+- [x] **TODO UI-04**：统一使用 `shared/ui/content-state/ContentState.vue`，提供 `loading`、`error`、`empty` 三种语义状态及 action/icon 插槽；加载指示器复用 `shared/ui/spinner`，原 `management-panel/EmptyState.vue` 已删除。
 - 替换范围：`pages/management/comics/ui/ComicListPage.vue`、`pages/reading/history/ui/HistoryPage.vue`、`pages/reading/library/ui/LibraryPage.vue`、`pages/management/dlq/ui/DeadLetterPage.vue` 及其余含 `.state/.spinner/.empty-*` 的页面。
 - 约束：空态文案、图标和重试动作属于调用方；公共组件不吞掉错误信息，也不发起重试请求。
 - 验证：`rg -n '\\.(state|spinner|empty-title|empty-desc)' frontend/src/pages` 只保留页面布局特例，不再保留重复的状态容器和旋转动画。
@@ -78,3 +78,9 @@
 `shared/ui/status-badge/StatusBadge.vue`、`shared/ui/management-panel/*`、`shared/ui/icon/MaterialSymbolIcon.vue`、`shared/ui/logo/ComicAtlasLogo.vue` 已具备公共 UI 候选资格。后续迁移应优先增强这些组件或在其相邻切片补充新原语，不能重新在页面目录创建平行基础组件。
 
 本清单补充[前端架构](08-frontend-architecture.md)中的 UI 归属规则，记录跨页面重复原语的收敛范围。完成 UI 收敛不意味着把所有视觉结构抽成全局组件；只抽取已被多个页面重复实现且不会携带业务语义的部分。
+
+### UI-12：统一加载指示器
+
+- [x] **TODO UI-12**：抽取 `shared/ui/spinner/Spinner.vue`，统一 inline/small/medium/large 尺寸、强调色/继承色与旋转动画。
+- [x] **TODO UI-12**：`AppButton`、`ContentState`、导入页扫描和漫画库共用 Spinner，删除对应重复边框动画和页面级 spinner 样式。
+- [x] **TODO UI-12**：公共 UI 检查器扫描 CSS 文件，防止页面目录重新定义 `.spinner` 等公共类。

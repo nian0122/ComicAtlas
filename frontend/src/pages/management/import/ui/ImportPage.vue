@@ -44,8 +44,7 @@
 
       <!-- 提交 -->
       <div class="form-actions">
-        <AppButton :disabled="!canSubmit || creating" @click="doImport">
-          <span v-if="creating" class="spinner-sm" />
+        <AppButton :disabled="!canSubmit" :loading="creating" @click="doImport">
           <span>{{ creating ? '创建中...' : '开始导入' }}</span>
         </AppButton>
         <router-link to="/manage/tasks" class="ghost-link">查看任务中心 →</router-link>
@@ -65,8 +64,7 @@
             placeholder="F:/games/comics/..."
             @keyup.enter="doScan"
           />
-          <AppButton :disabled="!batchParentPath.trim() || scanning" @click="doScan">
-            <span v-if="scanning" class="spinner-sm" />
+          <AppButton :disabled="!batchParentPath.trim()" :loading="scanning" @click="doScan">
             <span>{{ scanning ? '扫描中...' : '扫描' }}</span>
           </AppButton>
         </div>
@@ -77,7 +75,7 @@
       <div v-if="scanning || scanResult || scanError" class="scan-result-area">
         <!-- 加载 -->
         <div v-if="scanning" class="scan-loading">
-          <span class="spinner" />
+          <Spinner size="medium" />
           <span>正在扫描...</span>
         </div>
 
@@ -186,7 +184,6 @@
 
           <div class="scan-actions">
             <AppButton :disabled="selectedPaths.length === 0" :loading="batchCreating" @click="doBatchImport">
-              <span v-if="batchCreating" class="spinner-sm" />
               <span>{{ batchCreating ? '导入中...' : `确认导入 ${selectedPaths.length} 项` }}</span>
             </AppButton>
           </div>
@@ -217,6 +214,7 @@
 
 <script setup lang="ts">
 import { AppButton } from '@/shared/ui/button'
+import { Spinner } from '@/shared/ui/spinner'
 import { PageHeader } from '@/shared/ui/page-header'
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'

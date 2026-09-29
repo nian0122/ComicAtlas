@@ -13,7 +13,7 @@ async function collectFiles(directory) {
   for (const entry of entries) {
     const entryPath = join(directory, entry.name)
     if (entry.isDirectory()) files.push(...(await collectFiles(entryPath)))
-    else if (/\.(vue|ts|js|mjs)$/.test(entry.name)) files.push(entryPath)
+    else if (/\.(vue|ts|js|mjs|css)$/.test(entry.name)) files.push(entryPath)
   }
   return files
 }

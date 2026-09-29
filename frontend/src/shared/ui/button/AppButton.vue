@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { Spinner } from '@/shared/ui/spinner'
+
 withDefaults(
   defineProps<{
     variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'warning' | 'text' | 'overlay'
@@ -25,7 +27,7 @@ withDefaults(
     :disabled="disabled || loading"
     :aria-busy="loading || undefined"
   >
-    <span v-if="loading" class="app-button__spinner" aria-hidden="true" />
+    <Spinner v-if="loading" size="inline" color="current" />
     <span :class="{ 'app-button__content--loading': loading }"><slot /></span>
   </button>
 </template>
@@ -123,20 +125,7 @@ withDefaults(
 .app-button--block {
   width: 100%;
 }
-.app-button__spinner {
-  width: 1em;
-  height: 1em;
-  border: 2px solid currentColor;
-  border-right-color: transparent;
-  border-radius: 50%;
-  animation: app-button-spin 700ms linear infinite;
-}
 .app-button__content--loading {
   opacity: 0.72;
-}
-@keyframes app-button-spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 </style>
