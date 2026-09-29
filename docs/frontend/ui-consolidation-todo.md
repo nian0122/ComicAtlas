@@ -92,5 +92,6 @@
 - [x] **TODO UI-13**：设置页与漫画信息编辑页也统一使用 `ManagementPanel`；本地 class 只控制分区间距与表单布局。
 - [x] **TODO UI-13**：导入单项和批量表单容器复用 `ManagementPanel`，页面 CSS 只保留表单区之间的间距。
 - [x] **TODO UI-13**：媒体上传页面的表单、文件区和指南容器也复用 `ManagementPanel`，布局仍由页面控制。
+- [x] **TODO UI-13**：漫画结构工作台三栏仍保留 `aside/main/aside` 语义和专属布局，但面板边框、背景、圆角和内距复用 `ManagementPanel`。
 - [x] **TODO UI-13**：两个 AI 分析页面统一使用 `PanelHeader` 表达编号、标题和说明，页面仅保留面板间距等编排样式。
 - [x] **TODO UI-13**：公共 UI 检查器扫描 CSS 和 Vue 样式，禁止页面重新定义 `.panel-heading`。

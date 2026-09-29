@@ -16,4 +16,10 @@ describe('ManagementPanel 公共契约', () => {
 
     expect(renderedMarkup).toContain('management-panel--default')
   })
+
+  it('允许保留主内容和侧栏语义', async () => {
+    const renderedMarkup = await renderToString(createSSRApp(ManagementPanel, { as: 'aside' }))
+
+    expect(renderedMarkup).toMatch(/^<aside\b/)
+  })
 })

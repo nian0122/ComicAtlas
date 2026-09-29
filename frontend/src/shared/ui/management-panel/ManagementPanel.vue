@@ -1,11 +1,22 @@
 <script setup lang="ts">
-withDefaults(defineProps<{ flush?: boolean; padding?: 'compact' | 'default' | 'spacious' }>(), { padding: 'default' })
+withDefaults(
+  defineProps<{
+    as?: 'section' | 'aside' | 'main'
+    flush?: boolean
+    padding?: 'compact' | 'default' | 'spacious'
+  }>(),
+  { as: 'section', padding: 'default' },
+)
 </script>
 
 <template>
-  <section class="management-panel" :class="[`management-panel--${padding}`, { 'management-panel--flush': flush }]">
+  <component
+    :is="as"
+    class="management-panel"
+    :class="[`management-panel--${padding}`, { 'management-panel--flush': flush }]"
+  >
     <slot />
-  </section>
+  </component>
 </template>
 
 <style scoped>

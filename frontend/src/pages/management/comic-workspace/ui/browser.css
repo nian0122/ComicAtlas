@@ -87,15 +87,12 @@
 .detail-panel,
 .action-panel {
   min-width: 0;
-  border: 1px solid var(--border);
-  background: var(--bg-surface);
 }
 .tree-panel,
 .action-panel {
   align-self: stretch;
   min-height: 0;
   overflow: hidden;
-  padding: var(--space-4);
 }
 .action-panel {
   overflow-y: auto;
@@ -114,7 +111,6 @@
   min-height: 0;
   flex-direction: column;
   overflow: hidden;
-  padding: clamp(var(--space-5), 3vw, var(--space-8));
 }
 .selected-header,
 .media-heading {

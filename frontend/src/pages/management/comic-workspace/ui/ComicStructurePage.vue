@@ -48,7 +48,7 @@
     </section>
 
     <section class="structure-browser">
-      <aside class="tree-panel">
+      <ManagementPanel as="aside" class="tree-panel" padding="compact">
         <PanelHeader title="目录树" eyebrow="NAVIGATOR"
           ><span class="node-count">{{ structureRows.length }} 个根节点</span></PanelHeader
         >
@@ -87,9 +87,9 @@
             ></el-table-column
           >
         </el-table>
-      </aside>
+      </ManagementPanel>
 
-      <main class="detail-panel">
+      <ManagementPanel as="main" class="detail-panel" padding="spacious">
         <template v-if="selectedRow">
           <div class="selected-header">
             <div>
@@ -206,9 +206,9 @@
           <h2>选择一个目录或章节</h2>
           <p>左侧目录树用于导航，选中节点后这里会显示详细内容。</p>
         </div>
-      </main>
+      </ManagementPanel>
 
-      <aside class="action-panel">
+      <ManagementPanel as="aside" class="action-panel" padding="compact">
         <template v-if="selectedRow?.kind === 'CATALOG'">
           <PanelHeader title="目录操作" eyebrow="MAINTENANCE" />
           <el-form label-position="top" class="action-form">
@@ -488,7 +488,7 @@
           <span class="empty-mark">＋</span>
           <p>选择节点后显示可用操作。</p>
         </div>
-      </aside>
+      </ManagementPanel>
     </section>
   </div>
 
@@ -652,9 +652,7 @@
 
 <script setup lang="ts">
 import { AppButton } from '@/shared/ui/button'
-import { StatGrid } from '@/shared/ui/management-panel'
-import { PanelHeader } from '@/shared/ui/management-panel'
-import { StatCard } from '@/shared/ui/management-panel'
+import { ManagementPanel, PanelHeader, StatCard, StatGrid } from '@/shared/ui/management-panel'
 import { PageHeader } from '@/shared/ui/page-header'
 import { formatBytes as formatSize } from '@/shared/lib/format/bytes'
 import { computed, onMounted, reactive, ref } from 'vue'
