@@ -32,7 +32,7 @@
             class="mobile-header-action"
             :disabled="historyStore.loading"
             aria-label="刷新阅读历史"
-            @click="historyStore.refresh()"
+            @click="historyStore.fetchFirstPage()"
           >
             <MaterialSymbolIcon
               name="refresh"

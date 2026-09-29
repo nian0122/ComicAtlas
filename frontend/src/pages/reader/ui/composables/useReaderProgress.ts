@@ -116,12 +116,12 @@ export function useReaderProgress() {
   )
 
   onMounted(() => {
-    document.addEventListener('pagehide', flushProgressOnPageHide)
+    window.addEventListener('pagehide', flushProgressOnPageHide)
     document.addEventListener('visibilitychange', onVisibilityChange)
   })
 
   onBeforeUnmount(() => {
-    document.removeEventListener('pagehide', flushProgressOnPageHide)
+    window.removeEventListener('pagehide', flushProgressOnPageHide)
     document.removeEventListener('visibilitychange', onVisibilityChange)
     clearSaveDebounce()
 

@@ -13,6 +13,10 @@ vi.mock('@/entities/history', async (importOriginal) => ({
     get: vi.fn(),
     update: vi.fn(),
   },
+  useHistoryStore: () => ({
+    recordProgress: (comicId: number, chapterId: number, pageNumber: number) =>
+      historyApi.update(comicId, { chapterId, pageNumber }),
+  }),
 }))
 
 vi.mock('@/entities/chapter', () => ({

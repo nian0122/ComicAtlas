@@ -29,26 +29,6 @@ export const useHistoryStore = defineStore('history', () => {
     loadMoreError: null,
   })
 
-  async function fetchList(): Promise<void> {
-    state.loading = true
-    state.error = null
-    state.loadMoreError = null
-    try {
-      const res = await historyApi.page(1, state.pageSize)
-      state.list = res.data.records
-      state.total = res.data.total || 0
-      state.page = res.data.current || 1
-      state.hasMore = state.list.length < state.total
-    } catch (err: unknown) {
-      state.error = getApiErrorMessage(err, '加载阅读历史失败')
-      state.list = []
-      state.total = 0
-      state.hasMore = false
-    } finally {
-      state.loading = false
-    }
-  }
-
   async function fetchFirstPage(): Promise<void> {
     if (state.loading || state.loadingMore) return
     state.loading = true
@@ -93,7 +73,7 @@ export const useHistoryStore = defineStore('history', () => {
   }
 
   /** 只更新当前已加载的历史项，避免每次翻页都重新请求整页数据。 */
-  function updateEntry(comicId: number, chapterId: number, pageNumber: number): void {
+  function updateEntry(comicId: number, chapterId: number, pageNumber: number, totalPages?: number): void {
     const index = state.list.findIndex((item) => item.comicId === comicId)
     if (index < 0) return
     const item = state.list[index]
@@ -101,7 +81,11 @@ export const useHistoryStore = defineStore('history', () => {
       ...item,
       chapterId,
       pageNumber,
-      progressPercent: item.totalPages > 0 ? Math.round((pageNumber / item.totalPages) * 100) : item.progressPercent,
+      totalPages: totalPages ?? item.totalPages,
+      progressPercent:
+        (totalPages ?? item.totalPages) > 0
+          ? Math.min(100, Math.round((pageNumber / (totalPages ?? item.totalPages)) * 100))
+          : item.progressPercent,
       updatedAt: new Date().toISOString(),
     }
     state.list.splice(index, 1)
@@ -109,21 +93,20 @@ export const useHistoryStore = defineStore('history', () => {
   }
 
   /** 阅读器保存成功后同步已加载的本地项，不触发全量刷新。 */
-  async function recordProgress(comicId: number, chapterId: number, pageNumber: number): Promise<void> {
+  async function recordProgress(
+    comicId: number,
+    chapterId: number,
+    pageNumber: number,
+    totalPages?: number,
+  ): Promise<void> {
     await historyApi.update(comicId, { chapterId, pageNumber })
-    updateEntry(comicId, chapterId, pageNumber)
+    updateEntry(comicId, chapterId, pageNumber, totalPages)
   }
-
-  /** 刷新历史页首屏，避免刷新时再次拉取全部记录。 */
-  const refresh = fetchFirstPage
 
   return {
     ...toRefs(state),
-    fetchList,
     fetchFirstPage,
     fetchNextPage,
-    updateEntry,
-    refresh,
     recordProgress,
   }
 })

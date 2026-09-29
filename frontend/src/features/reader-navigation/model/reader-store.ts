@@ -58,7 +58,7 @@ export const useReaderStore = defineStore('reader', () => {
   }
 
   let loadSeq = 0
-  type ProgressPayload = { comicId: number; chapterId: number; pageNumber: number }
+  type ProgressPayload = { comicId: number; chapterId: number; pageNumber: number; totalPages: number }
   let pendingProgress: ProgressPayload | null = null
   let progressSavePromise: Promise<boolean> | null = null
 
@@ -131,6 +131,7 @@ export const useReaderStore = defineStore('reader', () => {
       comicId: state.comicId,
       chapterId: state.chapterId,
       pageNumber: state.currentPage,
+      totalPages: state.pages.length,
     }
     if (progressSavePromise) return progressSavePromise
     progressSavePromise = flushProgress()
@@ -145,11 +146,12 @@ export const useReaderStore = defineStore('reader', () => {
         const payload = pendingProgress
         failedPayload = payload
         pendingProgress = null
-        await historyApi.update(payload.comicId, {
-          chapterId: payload.chapterId,
-          pageNumber: payload.pageNumber,
-        })
-        useHistoryStore().updateEntry(payload.comicId, payload.chapterId, payload.pageNumber)
+        await useHistoryStore().recordProgress(
+          payload.comicId,
+          payload.chapterId,
+          payload.pageNumber,
+          payload.totalPages,
+        )
         state.progressSaveError = null
         failedPayload = null
       }

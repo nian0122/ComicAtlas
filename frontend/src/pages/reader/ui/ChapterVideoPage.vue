@@ -244,7 +244,7 @@ import { AppButton } from '@/shared/ui/button'
 import { getApiErrorMessage } from '@/shared/api/http'
 import { readerApi, type ReaderDTO } from '@/entities/chapter'
 import { catalogApi, type CatalogNode } from '@/entities/comic'
-import { historyApi } from '@/entities/history'
+import { useHistoryStore } from '@/entities/history'
 import { isVideoMedia, type MediaItemInfo, type MediaReaction } from '@/entities/media'
 import { searchCatalogChapters } from '@/features/chapter-search'
 import { clientLogger } from '@/shared/lib/logger'
@@ -337,7 +337,7 @@ let lastWheelTime = 0
 let previousOverflow = ''
 let progressTimer: number | null = null
 let errorTimer: number | null = null
-let pendingProgress: { comicId: number; chapterId: number; pageNumber: number } | null = null
+let pendingProgress: { comicId: number; chapterId: number; pageNumber: number; totalPages: number } | null = null
 let progressSavePromise: Promise<void> | null = null
 let seekPressTimer: number | null = null
 let resumeAfterSeek = false
@@ -1036,12 +1036,13 @@ function onKeydown(event: KeyboardEvent): void {
   }
 }
 
-function currentProgress(): { comicId: number; chapterId: number; pageNumber: number } | null {
+function currentProgress(): { comicId: number; chapterId: number; pageNumber: number; totalPages: number } | null {
   if (!chapter.value || !currentItem.value) return null
   return {
     comicId: chapter.value.comicId,
     chapterId: chapter.value.chapterId,
     pageNumber: currentItem.value.pageNumber,
+    totalPages: chapter.value.pages.length,
   }
 }
 
@@ -1050,10 +1051,12 @@ async function flushProgress(): Promise<void> {
     const progressToSave = pendingProgress
     pendingProgress = null
     try {
-      await historyApi.update(progressToSave.comicId, {
-        chapterId: progressToSave.chapterId,
-        pageNumber: progressToSave.pageNumber,
-      })
+      await useHistoryStore().recordProgress(
+        progressToSave.comicId,
+        progressToSave.chapterId,
+        progressToSave.pageNumber,
+        progressToSave.totalPages,
+      )
     } catch (error: unknown) {
       clientLogger.error('沉浸阅读进度保存失败', {
         operation: 'immersive.history',
