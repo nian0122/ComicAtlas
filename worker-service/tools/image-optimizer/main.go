@@ -17,7 +17,7 @@ import (
 const (
 	defaultQuality           = 70
 	defaultMaxLongEdge       = 3840
-	defaultMaxInflightPixels = 80_000_000
+	defaultMaxInflightPixels = 160_000_000
 	defaultExtensions        = ".jpg,.jpeg,.png,.webp,.gif"
 )
 

@@ -52,8 +52,8 @@ image-optimizer.exe \
 | `-chapter-no` | 否 | - | 章节编号（JSON 输出用）|
 | `-quality` | 否 | 70 | WebP 质量 1-100 |
 | `-max-long-edge` | 否 | 3840 | LQ 最大长边，保持宽高比且不放大小图 |
-| `-workers` | 否 | CPU核心数 | 并发数 |
-| `-max-inflight-pixels` | 否 | 80000000 | 所有 worker 的解码像素预算 |
+| `-workers` | 否 | CPU核心数 | 并发数；Worker 默认配置为 8，可用 `LQ_WORKERS` 调整 |
+| `-max-inflight-pixels` | 否 | 160000000 | 所有 worker 的解码像素预算；Worker 可用 `LQ_MAX_INFLIGHT_PIXELS` 调整 |
 | `-force` | 否 | false | 强制重新处理 |
 | `-quiet` | 否 | false | 安静模式 |
 | `-json` | 否 | false | JSON 输出模式 |

@@ -66,7 +66,7 @@ public class WorkerConfig {
     /** LQ 图片质量参数。 */
     private int lqQuality = 70;
     /** LQ 图片处理并发数。 */
-    private int lqWorkers = 4;
+    private int lqWorkers = 8;
     /** HQ 删除超时时间（秒）。 */
     private int hqDeleteTimeoutSeconds = 60;
     /** 是否启用 ffprobe 视频元数据分析。 */
@@ -205,7 +205,7 @@ public class WorkerConfig {
         /** LQ 输出图片的最大长边，保持宽高比且不放大。 */
         private int maxLongEdge = 3840;
         /** 所有图片 worker 同时处于解码/编码阶段的总像素预算。 */
-        private long maxInflightPixels = 80_000_000L;
+        private long maxInflightPixels = 160_000_000L;
     }
 
     /** 媒体分析配置。 */
