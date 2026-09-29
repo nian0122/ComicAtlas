@@ -43,10 +43,19 @@ export const useTagStore = defineStore('tag', () => {
     state.list = state.list.filter((t) => t && t.id !== id)
   }
 
+  async function update(id: number, name: string) {
+    const res = await managementTagApi.update(id, { name })
+    const updatedTag = res.data
+    const tagIndex = state.list.findIndex((tag) => tag.id === id)
+    if (updatedTag && tagIndex !== -1) state.list[tagIndex] = updatedTag
+    return updatedTag
+  }
+
   return {
     ...toRefs(state),
     fetchList,
     create,
+    update,
     delete: deleteTag,
   }
 })

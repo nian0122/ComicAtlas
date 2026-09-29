@@ -43,14 +43,14 @@
         </div>
 
         <div class="tag-list">
-          <el-tag
-            v-for="tag in tagStore.list"
-            :key="tag?.id ?? Math.random()"
-            closable
-            class="tag-item"
-            @close="onDeleteTag(tag)"
-          >
+          <el-tag v-for="tag in tagStore.list" :key="tag.id" class="tag-item">
             {{ tag.name }}
+            <AppButton variant="text" class="tag-action" :aria-label="`编辑标签 ${tag.name}`" @click="startEditTag(tag)"
+              >编辑</AppButton
+            >
+            <AppButton variant="text" class="tag-action" :aria-label="`删除标签 ${tag.name}`" @click="onDeleteTag(tag)"
+              >删除</AppButton
+            >
           </el-tag>
         </div>
       </el-tab-pane>
@@ -61,6 +61,14 @@
       <template #footer>
         <AppButton variant="secondary" @click="categoryEditVisible = false">取消</AppButton>
         <AppButton variant="primary" @click="onUpdateCategory">保存</AppButton>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="tagEditVisible" title="编辑标签" width="400px">
+      <el-input v-model="editTagName" placeholder="标签名称" @keyup.enter="onUpdateTag" />
+      <template #footer>
+        <AppButton variant="secondary" @click="tagEditVisible = false">取消</AppButton>
+        <AppButton variant="primary" :loading="tagStore.loading" @click="onUpdateTag">保存</AppButton>
       </template>
     </el-dialog>
   </div>
@@ -89,6 +97,9 @@ const editCategoryId = ref<number | null>(null)
 const editCategoryName = ref('')
 
 const newTagName = ref('')
+const tagEditVisible = ref(false)
+const editTagId = ref<number | null>(null)
+const editTagName = ref('')
 const metadataHealthy = computed(() => !categoryStore.error && !tagStore.error)
 const metadataStatusLabel = computed(() => (metadataHealthy.value ? '正常' : '接口异常'))
 const metadataStatusHint = computed(() => {
@@ -168,6 +179,25 @@ async function onDeleteTag(tag: TagDTO | null | undefined) {
     ElMessage.error(getApiErrorMessage(err, '删除标签失败'))
   }
 }
+
+function startEditTag(tag: TagDTO) {
+  editTagId.value = tag.id
+  editTagName.value = tag.name
+  tagEditVisible.value = true
+}
+
+async function onUpdateTag() {
+  if (editTagId.value == null) return
+  const name = editTagName.value.trim()
+  if (!name) return
+  try {
+    await tagStore.update(editTagId.value, name)
+    ElMessage.success('标签已更新')
+    tagEditVisible.value = false
+  } catch (err: unknown) {
+    ElMessage.error(getApiErrorMessage(err, '更新标签失败'))
+  }
+}
 </script>
 
 <style scoped>
@@ -225,6 +255,11 @@ async function onDeleteTag(tag: TagDTO | null | undefined) {
 .tag-item {
   font-size: 13px;
   padding: 4px 9px;
+}
+
+.tag-action {
+  margin-left: 4px;
+  padding: 0 3px;
 }
 
 @media (max-width: 560px) {

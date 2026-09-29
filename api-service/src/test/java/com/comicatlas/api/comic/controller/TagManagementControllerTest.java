@@ -20,6 +20,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -86,6 +87,38 @@ class TagManagementControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(409))
                 .andExpect(jsonPath("$.message").value("标签已存在: existing"));
+    }
+
+    @Test
+    void updateTag_shouldReturn200_whenNameIsValid() throws Exception {
+        TagDTO dto = new TagDTO();
+        dto.setId(1L);
+        dto.setName("renamed");
+        when(tagManagementService.updateTag(1L, "renamed")).thenReturn(dto);
+
+        CreateTagRequest body = new CreateTagRequest();
+        body.setName(" renamed ");
+        mockMvc.perform(put("/api/manage/tags/{id}", 1L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body))
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.name").value("renamed"));
+    }
+
+    @Test
+    void updateTag_shouldReturn409_whenNameDuplicate() throws Exception {
+        when(tagManagementService.updateTag(1L, "existing"))
+                .thenThrow(new BusinessException(409, "标签已存在: existing"));
+        CreateTagRequest body = new CreateTagRequest();
+        body.setName("existing");
+        mockMvc.perform(put("/api/manage/tags/{id}", 1L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body))
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(409));
     }
 
     @Test

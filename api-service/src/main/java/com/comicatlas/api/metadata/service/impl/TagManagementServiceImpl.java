@@ -50,6 +50,23 @@ public class TagManagementServiceImpl implements TagManagementService {
 
     @Override
     @Transactional
+    public TagDTO updateTag(Long id, String name) {
+        Tag tag = tagMapper.selectById(id);
+        if (tag == null) {
+            throw new BusinessException(HttpStatusCodes.NOT_FOUND, "标签不存在");
+        }
+        if (!name.equals(tag.getName()) && tagMapper.countByName(name) > 0) {
+            throw new BusinessException(HttpStatusCodes.CONFLICT, "标签已存在: " + name);
+        }
+        tag.setName(name);
+        tagMapper.updateById(tag);
+        cacheEvictor.evict(ComicReferenceCache.TAGS, ComicReferenceCache.ALL_KEY);
+        cacheEvictor.clear(ComicReferenceCache.COMIC_LIST);
+        return toDTO(tag);
+    }
+
+    @Override
+    @Transactional
     public void deleteTag(Long id) {
         Tag tag = tagMapper.selectById(id);
         if (tag == null) {

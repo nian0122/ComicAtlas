@@ -14,6 +14,9 @@ public interface TagManagementService {
     /** 创建标签（名称唯一，重复返回 409） */
     TagDTO createTag(String name);
 
+    /** 更新标签名称（名称唯一，重复返回 409） */
+    TagDTO updateTag(Long id, String name);
+
     /** 删除标签；已被漫画引用时返回 409 */
     void deleteTag(Long id);
 }
