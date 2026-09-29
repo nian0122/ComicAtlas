@@ -38,23 +38,34 @@
       </el-select>
       <el-select
         v-model="filters.lqStatus"
-        placeholder="LQ 生成状态"
+        placeholder="LQ 状态"
         clearable
         class="filter-select"
         @change="applyFilters"
       >
-        <el-option label="全部已生成 LQ" value="READY" />
-        <el-option label="需要生成 LQ" value="NEEDS_LQ" />
+        <el-option label="有 LQ" value="HAS_LQ" />
+        <el-option label="无 LQ" value="NO_LQ" />
+        <el-option label="未生成" value="NOT_GENERATED" />
+        <el-option label="排队中" value="QUEUED" />
+        <el-option label="生成中" value="GENERATING" />
+        <el-option label="缺失" value="MISSING" />
+        <el-option label="失败" value="FAILED" />
       </el-select>
       <el-select
         v-model="filters.hqStatus"
-        placeholder="HQ 删除状态"
+        placeholder="HQ 状态"
         clearable
         class="filter-select"
         @change="applyFilters"
       >
-        <el-option label="还有 HQ" value="HAS_HQ" />
-        <el-option label="含 HQ 已删除" value="NO_HQ" />
+        <el-option label="有 HQ" value="HAS_HQ" />
+        <el-option label="无 HQ" value="NO_HQ" />
+        <el-option label="待处理" value="PENDING" />
+        <el-option label="删除排队中" value="DELETE_QUEUED" />
+        <el-option label="删除中" value="DELETING" />
+        <el-option label="已删除" value="DELETED" />
+        <el-option label="缺失" value="MISSING" />
+        <el-option label="失败" value="FAILED" />
       </el-select>
       <el-select
         v-model="filters.tags"

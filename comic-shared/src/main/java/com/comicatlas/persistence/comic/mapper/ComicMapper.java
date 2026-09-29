@@ -136,31 +136,41 @@ public interface ComicMapper extends BaseMapper<Comic> {
                 )
             </if>
             <if test='query.hqStatus == "NO_HQ"'>
-                AND EXISTS (
-                    SELECT 1 FROM chapter deleted_hq_chapter
-                    JOIN page deleted_hq_page ON deleted_hq_page.chapter_id = deleted_hq_chapter.id
-                    WHERE deleted_hq_chapter.comic_id = c.id AND deleted_hq_page.hq_status = 'DELETED'
-                )
-            </if>
-            <if test='query.lqStatus == "READY"'>
-                AND EXISTS (
-                    SELECT 1 FROM chapter lq_chapter
-                    JOIN page image_page ON image_page.chapter_id = lq_chapter.id
-                    WHERE lq_chapter.comic_id = c.id AND image_page.media_type = 'IMAGE'
-                )
                 AND NOT EXISTS (
-                    SELECT 1 FROM chapter unready_lq_chapter
-                    JOIN page unready_image_page ON unready_image_page.chapter_id = unready_lq_chapter.id
-                    WHERE unready_lq_chapter.comic_id = c.id AND unready_image_page.media_type = 'IMAGE'
-                      AND (unready_image_page.lq_status IS NULL OR unready_image_page.lq_status != 'READY')
+                    SELECT 1 FROM chapter no_hq_chapter
+                    JOIN page no_hq_page ON no_hq_page.chapter_id = no_hq_chapter.id
+                    WHERE no_hq_chapter.comic_id = c.id AND no_hq_page.hq_status = 'READY'
                 )
             </if>
-            <if test='query.lqStatus == "NEEDS_LQ"'>
+            <if test='query.hqStatus != null and query.hqStatus != "" and query.hqStatus != "HAS_HQ" and query.hqStatus != "NO_HQ"'>
                 AND EXISTS (
-                    SELECT 1 FROM chapter needs_lq_chapter
-                    JOIN page needs_lq_page ON needs_lq_page.chapter_id = needs_lq_chapter.id
-                    WHERE needs_lq_chapter.comic_id = c.id AND needs_lq_page.media_type = 'IMAGE'
-                      AND (needs_lq_page.lq_status IS NULL OR needs_lq_page.lq_status != 'READY')
+                    SELECT 1 FROM chapter status_hq_chapter
+                    JOIN page status_hq_page ON status_hq_page.chapter_id = status_hq_chapter.id
+                    WHERE status_hq_chapter.comic_id = c.id AND status_hq_page.hq_status = #{query.hqStatus}
+                )
+            </if>
+            <if test='query.lqStatus == "HAS_LQ"'>
+                AND EXISTS (
+                    SELECT 1 FROM chapter has_lq_chapter
+                    JOIN page has_lq_page ON has_lq_page.chapter_id = has_lq_chapter.id
+                    WHERE has_lq_chapter.comic_id = c.id AND has_lq_page.media_type = 'IMAGE'
+                      AND has_lq_page.lq_status = 'READY'
+                )
+            </if>
+            <if test='query.lqStatus != null and query.lqStatus != "" and query.lqStatus != "HAS_LQ" and query.lqStatus != "NO_LQ"'>
+                AND EXISTS (
+                    SELECT 1 FROM chapter status_lq_chapter
+                    JOIN page status_lq_page ON status_lq_page.chapter_id = status_lq_chapter.id
+                    WHERE status_lq_chapter.comic_id = c.id AND status_lq_page.media_type = 'IMAGE'
+                      AND status_lq_page.lq_status = #{query.lqStatus}
+                )
+            </if>
+            <if test='query.lqStatus == "NO_LQ"'>
+                AND NOT EXISTS (
+                    SELECT 1 FROM chapter no_lq_chapter
+                    JOIN page no_lq_page ON no_lq_page.chapter_id = no_lq_chapter.id
+                    WHERE no_lq_chapter.comic_id = c.id AND no_lq_page.media_type = 'IMAGE'
+                      AND no_lq_page.lq_status = 'READY'
                 )
             </if>
         </where>

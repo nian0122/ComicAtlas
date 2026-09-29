@@ -24,8 +24,8 @@ export interface ComicListQuery {
   status?: string
   category?: string
   sourceType?: string
-  hqStatus?: 'HAS_HQ' | 'NO_HQ'
-  lqStatus?: 'NEEDS_LQ' | 'READY'
+  hqStatus?: 'HAS_HQ' | 'NO_HQ' | 'PENDING' | 'MISSING' | 'DELETE_QUEUED' | 'DELETING' | 'DELETED' | 'FAILED'
+  lqStatus?: 'HAS_LQ' | 'NO_LQ' | 'NOT_GENERATED' | 'QUEUED' | 'GENERATING' | 'MISSING' | 'FAILED'
   sort?: 'createdAt' | 'updatedAt' | 'title' | 'pageCount' | 'lastReadTime' | 'fileSize'
   order?: 'asc' | 'desc'
   page?: number
