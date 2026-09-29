@@ -73,9 +73,19 @@
       <el-checkbox :model-value="selectAll" :indeterminate="isIndeterminate" @change="handleSelectAll">
         全选本页 ({{ selectedIds.length }} / {{ store.list.length }})
       </el-checkbox>
-      <AppButton variant="primary" :disabled="selectedIds.length === 0" @click="showBatchDialog = true">
-        批量编辑
-      </AppButton>
+      <div class="batch-actions">
+        <el-select v-model="selectedBatchOperation" :disabled="selectedIds.length === 0" class="batch-operation-select">
+          <el-option label="批量生成低清图" value="LQ_GENERATE" />
+          <el-option label="批量刷新元数据" value="METADATA_REFRESH" />
+          <el-option label="批量回收到回收站" value="COMIC_DELETE" />
+        </el-select>
+        <AppButton variant="primary" :disabled="selectedIds.length === 0" @click="showBatchOperationDialog = true">
+          执行操作
+        </AppButton>
+        <AppButton variant="secondary" :disabled="selectedIds.length === 0" @click="showBatchDialog = true">
+          批量编辑
+        </AppButton>
+      </div>
     </div>
 
     <ContentState v-if="store.loading && store.list.length === 0" state="loading" message="加载中..." />
@@ -133,6 +143,12 @@
     </div>
 
     <BatchEditDialog v-model:visible="showBatchDialog" :comic-ids="selectedIds" @saved="onBatchSaved" />
+    <BatchComicOperationDialog
+      v-model:visible="showBatchOperationDialog"
+      :comic-ids="selectedIds"
+      :operation="selectedBatchOperation"
+      @completed="onBatchOperationCompleted"
+    />
   </div>
 </template>
 
@@ -148,10 +164,14 @@ import { useManagementComicStore } from '@/pages/management/comics/model/managem
 import { useCategoryStore } from '@/entities/category'
 import { useTagStore } from '@/entities/tag'
 import { BatchEditDialog } from '@/features/comic-batch-edit'
+import { BatchComicOperationDialog } from '@/features/comic-batch-operations'
 import type { StorageStats } from '@/entities/storage'
 import { storageService } from '@/features/storage'
 import { COMIC_STATUSES, comicStatusMeta } from '@/entities/comic'
+import type { ManagementTaskType } from '@/entities/task'
 import { useManagementComicFilters } from '@/pages/management/comics/model/useManagementComicFilters'
+
+type ComicBatchOperation = Extract<ManagementTaskType, 'LQ_GENERATE' | 'METADATA_REFRESH' | 'COMIC_DELETE'>
 
 const router = useRouter()
 const store = useManagementComicStore()
@@ -185,6 +205,8 @@ const SORT_OPTIONS = [
 
 const selectedIds = ref<number[]>([])
 const showBatchDialog = ref(false)
+const showBatchOperationDialog = ref(false)
+const selectedBatchOperation = ref<ComicBatchOperation>('LQ_GENERATE')
 
 const {
   filters,
@@ -220,6 +242,12 @@ function handleSelectAll(val: string | number | boolean) {
 function onBatchSaved() {
   selectedIds.value = []
   showBatchDialog.value = false
+  store.fetchList()
+}
+
+function onBatchOperationCompleted() {
+  selectedIds.value = []
+  showBatchOperationDialog.value = false
   store.fetchList()
 }
 
@@ -307,6 +335,34 @@ function formatBytes(bytes: number | undefined): string {
 .filter-toolbar > :deep(.filter-select .el-select__wrapper),
 .filter-toolbar > :deep(.filter-select--wide .el-select__wrapper),
 .filter-toolbar > :deep(.filter-select--mini .el-select__wrapper) {
+  min-height: 36px;
+  border-radius: var(--radius-sm);
+}
+
+.batch-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+  padding: var(--space-md) var(--space-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+}
+
+.batch-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+}
+
+.batch-operation-select {
+  width: 190px;
+}
+
+.batch-toolbar :deep(.el-select__wrapper) {
   min-height: 36px;
   border-radius: var(--radius-sm);
 }
@@ -421,5 +477,22 @@ function formatBytes(bytes: number | undefined): string {
   background: var(--bg-surface);
   border: 1px solid var(--danger);
   border-radius: var(--radius-sm);
+}
+
+@media (max-width: 680px) {
+  .batch-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .batch-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .batch-operation-select {
+    flex: 1 1 100%;
+    width: 100%;
+  }
 }
 </style>

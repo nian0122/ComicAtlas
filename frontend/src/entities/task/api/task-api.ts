@@ -25,5 +25,8 @@ export const managementTaskApi = {
 
 export const batchApi = {
   preview: (data: BatchSubmitRequest) => api.post<BatchPreviewResult>('/manage/batch/preview', data),
-  submit: (data: BatchSubmitRequest) => api.post<BatchCreateResult>('/manage/batch', data),
+  submit: (data: BatchSubmitRequest, idempotencyKey?: string) =>
+    api.post<BatchCreateResult>('/manage/batch', data, {
+      headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
+    }),
 }
