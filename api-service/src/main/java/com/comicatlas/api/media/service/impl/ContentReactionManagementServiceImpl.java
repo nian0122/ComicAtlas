@@ -1,7 +1,6 @@
 package com.comicatlas.api.media.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.comicatlas.api.media.dto.ContentReactionBatchRequest;
 import com.comicatlas.api.media.dto.ContentReactionVO;
 import com.comicatlas.api.media.service.ContentReactionManagementService;
@@ -63,19 +62,9 @@ public class ContentReactionManagementServiceImpl implements ContentReactionMana
         LocalDateTime reactionAt = request.getReaction() == MediaReaction.NONE
                 ? null : LocalDateTime.now(ZoneOffset.UTC);
         if (COMIC.equals(targetType)) {
-            LambdaUpdateWrapper<Comic> update = new LambdaUpdateWrapper<Comic>()
-                    .in(Comic::getId, request.getIds())
-                    .ne(Comic::getStatus, ComicStatus.DELETED)
-                    .set(Comic::getReaction, request.getReaction())
-                    .set(Comic::getReactionAt, reactionAt);
-            return comicMapper.update(null, update);
+            return comicMapper.updateReactionBatch(request.getIds(), request.getReaction(), reactionAt);
         }
-        LambdaUpdateWrapper<Chapter> update = new LambdaUpdateWrapper<Chapter>()
-                .in(Chapter::getId, request.getIds())
-                .ne(Chapter::getStatus, ChapterLifecycleStatus.DELETED)
-                .set(Chapter::getReaction, request.getReaction())
-                .set(Chapter::getReactionAt, reactionAt);
-        return chapterMapper.update(null, update);
+        return chapterMapper.updateReactionBatch(request.getIds(), request.getReaction(), reactionAt);
     }
 
     @Override

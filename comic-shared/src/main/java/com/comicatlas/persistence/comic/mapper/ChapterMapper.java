@@ -75,6 +75,15 @@ public interface ChapterMapper extends BaseMapper<Chapter> {
     int updateReaction(@Param("chapterId") Long chapterId, @Param("reaction") MediaReaction reaction,
                        @Param("reactionAt") LocalDateTime reactionAt);
 
+    @Update({"<script>",
+            "UPDATE chapter SET reaction = #{reaction}, reaction_at = #{reactionAt} ",
+            "WHERE status != 'DELETED' AND id IN ",
+            "<foreach collection='chapterIds' item='chapterId' open='(' separator=',' close=')'>#{chapterId}</foreach>",
+            "</script>"})
+    int updateReactionBatch(@Param("chapterIds") List<Long> chapterIds,
+                            @Param("reaction") MediaReaction reaction,
+                            @Param("reactionAt") LocalDateTime reactionAt);
+
     @Select("SELECT id, comic_id, catalog_id, chapter_no, title, global_order, page_count, status, version "
             + "FROM chapter WHERE comic_id = #{comicId}")
     List<Chapter> selectByComicId(@Param("comicId") Long comicId);
