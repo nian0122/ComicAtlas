@@ -1,6 +1,6 @@
 <template>
   <div ref="viewportRef" class="paged-viewport" @wheel="onWheel" @scroll="onScroll">
-    <Transition :name="pageTransition" mode="out-in">
+    <Transition :name="pageTransition">
       <div v-if="page" :key="page.id" class="paged-page" :style="pageStyle">
         <VideoPlayer
           v-if="isVideo"
@@ -179,15 +179,20 @@ watch(
   flex: 1;
   min-height: 0;
   overflow: auto;
-  display: flex;
-  perspective: 1200px;
-  /* 让横向 pointer swipe 由阅读器处理，同时保留长页纵向平移与双指缩放。 */
-  touch-action: pan-y pinch-zoom;
+  display: grid;
+  grid-template-areas: 'page';
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  align-items: center;
+  justify-items: center;
+  /* 禁止浏览器单指平移图片；左右翻页由阅读器处理，双指缩放仍交给浏览器。 */
+  touch-action: pinch-zoom;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
 }
 
 .paged-page {
+  grid-area: page;
   margin: auto;
   flex-shrink: 0;
 }
@@ -196,19 +201,30 @@ watch(
 .page-next-leave-active,
 .page-prev-enter-active,
 .page-prev-leave-active {
-  transition: transform 220ms cubic-bezier(0.22, 0.68, 0, 1);
+  transition: transform 340ms cubic-bezier(0.22, 0.72, 0.24, 1);
   backface-visibility: hidden;
+  will-change: transform;
 }
 
-.page-next-enter-from { transform: translateX(7%); }
-.page-next-leave-to { transform: translateX(-4%); }
-.page-prev-enter-from { transform: translateX(-7%); }
-.page-prev-leave-to { transform: translateX(4%); }
+.page-next-enter-from {
+  transform: translate3d(100vw, 0, 0);
+}
+.page-next-leave-to {
+  transform: translate3d(-100vw, 0, 0);
+}
+.page-prev-enter-from {
+  transform: translate3d(-100vw, 0, 0);
+}
+.page-prev-leave-to {
+  transform: translate3d(100vw, 0, 0);
+}
 
 @media (prefers-reduced-motion: reduce) {
   .page-next-enter-active,
   .page-next-leave-active,
   .page-prev-enter-active,
-  .page-prev-leave-active { transition-duration: 1ms; }
+  .page-prev-leave-active {
+    transition-duration: 1ms;
+  }
 }
 </style>
