@@ -10,6 +10,8 @@ export function useManagementComicFilters(comicStore: ManagementComicStore, onAp
     keyword: '',
     category: '',
     status: '',
+    hqStatus: '' as '' | 'HAS_HQ' | 'NO_HQ',
+    lqStatus: '' as '' | 'NEEDS_LQ' | 'READY',
     tags: [] as string[],
     tagMode: 'OR' as 'AND' | 'OR' | 'NOT',
     sort: 'createdAt',
@@ -39,6 +41,8 @@ export function useManagementComicFilters(comicStore: ManagementComicStore, onAp
       keyword: filters.keyword || undefined,
       category: filters.category || undefined,
       status: filters.status || undefined,
+      hqStatus: filters.hqStatus || undefined,
+      lqStatus: filters.lqStatus || undefined,
       tags: normalizedTags.length > 0 ? normalizedTags : undefined,
       tagMode: normalizedTags.length === 0 || normalizedTags.includes('_NONE') ? 'OR' : filters.tagMode,
       sort: filters.sort as ComicListQuery['sort'],
@@ -73,6 +77,8 @@ export function useManagementComicFilters(comicStore: ManagementComicStore, onAp
     filters.keyword = ''
     filters.category = ''
     filters.status = ''
+    filters.hqStatus = ''
+    filters.lqStatus = ''
     filters.tags = []
     filters.tagMode = 'OR'
     filters.sort = 'createdAt'
@@ -86,6 +92,8 @@ export function useManagementComicFilters(comicStore: ManagementComicStore, onAp
     filters.keyword = comicStore.query.keyword || ''
     filters.category = comicStore.query.category || ''
     filters.status = comicStore.query.status || ''
+    filters.hqStatus = comicStore.query.hqStatus || ''
+    filters.lqStatus = comicStore.query.lqStatus || ''
     filters.tags = [...(comicStore.query.tags || [])]
     filters.tagMode =
       comicStore.query.tagMode === 'AND' || comicStore.query.tagMode === 'NOT' ? comicStore.query.tagMode : 'OR'

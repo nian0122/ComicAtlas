@@ -37,6 +37,26 @@
         <el-option v-for="s in STATUS_OPTIONS" :key="s.value" :label="s.label" :value="s.value" />
       </el-select>
       <el-select
+        v-model="filters.lqStatus"
+        placeholder="LQ 生成状态"
+        clearable
+        class="filter-select"
+        @change="applyFilters"
+      >
+        <el-option label="全部已生成 LQ" value="READY" />
+        <el-option label="需要生成 LQ" value="NEEDS_LQ" />
+      </el-select>
+      <el-select
+        v-model="filters.hqStatus"
+        placeholder="HQ 删除状态"
+        clearable
+        class="filter-select"
+        @change="applyFilters"
+      >
+        <el-option label="还有 HQ" value="HAS_HQ" />
+        <el-option label="含 HQ 已删除" value="NO_HQ" />
+      </el-select>
+      <el-select
         v-model="filters.tags"
         multiple
         collapse-tags

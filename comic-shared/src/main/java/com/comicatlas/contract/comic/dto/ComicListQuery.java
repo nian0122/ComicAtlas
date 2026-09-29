@@ -14,6 +14,10 @@ public class ComicListQuery {
     private String status;
     private String category;
     private String sourceType;
+    /** 漫画 HQ 聚合筛选：HAS_HQ=至少仍有 HQ，NO_HQ=包含已删除 HQ。 */
+    private String hqStatus;
+    /** 漫画 LQ 聚合筛选：READY=所有图片均已生成，NEEDS_LQ=仍有图片需要生成。 */
+    private String lqStatus;
     private String sort = "createdAt";
     private String order = "desc";
     private Integer page = 1;

@@ -128,6 +128,41 @@ public interface ComicMapper extends BaseMapper<Comic> {
             <if test='query.sourceType != null and query.sourceType != ""'>
                 AND c.source_type = #{query.sourceType}
             </if>
+            <if test='query.hqStatus == "HAS_HQ"'>
+                AND EXISTS (
+                    SELECT 1 FROM chapter hq_chapter
+                    JOIN page hq_page ON hq_page.chapter_id = hq_chapter.id
+                    WHERE hq_chapter.comic_id = c.id AND hq_page.hq_status = 'READY'
+                )
+            </if>
+            <if test='query.hqStatus == "NO_HQ"'>
+                AND EXISTS (
+                    SELECT 1 FROM chapter deleted_hq_chapter
+                    JOIN page deleted_hq_page ON deleted_hq_page.chapter_id = deleted_hq_chapter.id
+                    WHERE deleted_hq_chapter.comic_id = c.id AND deleted_hq_page.hq_status = 'DELETED'
+                )
+            </if>
+            <if test='query.lqStatus == "READY"'>
+                AND EXISTS (
+                    SELECT 1 FROM chapter lq_chapter
+                    JOIN page image_page ON image_page.chapter_id = lq_chapter.id
+                    WHERE lq_chapter.comic_id = c.id AND image_page.media_type = 'IMAGE'
+                )
+                AND NOT EXISTS (
+                    SELECT 1 FROM chapter unready_lq_chapter
+                    JOIN page unready_image_page ON unready_image_page.chapter_id = unready_lq_chapter.id
+                    WHERE unready_lq_chapter.comic_id = c.id AND unready_image_page.media_type = 'IMAGE'
+                      AND (unready_image_page.lq_status IS NULL OR unready_image_page.lq_status != 'READY')
+                )
+            </if>
+            <if test='query.lqStatus == "NEEDS_LQ"'>
+                AND EXISTS (
+                    SELECT 1 FROM chapter needs_lq_chapter
+                    JOIN page needs_lq_page ON needs_lq_page.chapter_id = needs_lq_chapter.id
+                    WHERE needs_lq_chapter.comic_id = c.id AND needs_lq_page.media_type = 'IMAGE'
+                      AND (needs_lq_page.lq_status IS NULL OR needs_lq_page.lq_status != 'READY')
+                )
+            </if>
         </where>
         ORDER BY
         <choose>
