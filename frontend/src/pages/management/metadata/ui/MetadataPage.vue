@@ -37,22 +37,53 @@
       </el-tab-pane>
 
       <el-tab-pane label="标签" name="tag">
-        <div class="tab-toolbar">
-          <el-input v-model="newTagName" placeholder="新标签名称" class="metadata-input" @keyup.enter="onCreateTag" />
-          <AppButton variant="primary" :loading="tagStore.loading" @click="onCreateTag">添加标签</AppButton>
-        </div>
+        <section class="tag-workspace" aria-label="标签词库管理">
+          <div class="tag-toolbar">
+            <div class="tag-total" aria-label="标签总数">
+              <strong>{{ tagStore.list.length }}</strong>
+              <span>个标签</span>
+            </div>
 
-        <div class="tag-list">
-          <el-tag v-for="tag in tagStore.list" :key="tag.id" class="tag-item">
-            {{ tag.name }}
-            <AppButton variant="text" class="tag-action" :aria-label="`编辑标签 ${tag.name}`" @click="startEditTag(tag)"
-              >编辑</AppButton
-            >
-            <AppButton variant="text" class="tag-action" :aria-label="`删除标签 ${tag.name}`" @click="onDeleteTag(tag)"
-              >删除</AppButton
-            >
-          </el-tag>
-        </div>
+            <form class="tag-create" @submit.prevent="onCreateTag">
+              <el-input v-model="newTagName" placeholder="输入标签名称" class="metadata-input" />
+              <AppButton type="submit" variant="primary" :loading="tagStore.loading">添加标签</AppButton>
+            </form>
+          </div>
+
+          <div class="tag-tools">
+            <el-input v-model="tagSearch" clearable placeholder="搜索标签" class="tag-search" aria-label="搜索标签" />
+          </div>
+
+          <div v-if="filteredTags.length" class="tag-list">
+            <article v-for="tag in filteredTags" :key="tag.id" class="tag-card">
+              <span class="tag-card__name" :title="tag.name">{{ tag.name }}</span>
+              <div class="tag-card__actions">
+                <button
+                  type="button"
+                  class="tag-action"
+                  :aria-label="`编辑标签 ${tag.name}`"
+                  @click="startEditTag(tag)"
+                >
+                  编辑
+                </button>
+                <span class="tag-card__divider" aria-hidden="true"></span>
+                <button
+                  type="button"
+                  class="tag-action tag-action--delete"
+                  :aria-label="`删除标签 ${tag.name}`"
+                  @click="onDeleteTag(tag)"
+                >
+                  删除
+                </button>
+              </div>
+            </article>
+          </div>
+          <div v-else class="tag-empty">
+            <span class="tag-empty__mark" aria-hidden="true">#</span>
+            <strong>{{ tagSearch ? '没有找到匹配的标签' : '还没有标签' }}</strong>
+            <span>{{ tagSearch ? '试试其他关键词' : '添加标签后，会显示在这里' }}</span>
+          </div>
+        </section>
       </el-tab-pane>
     </el-tabs>
 
@@ -97,6 +128,7 @@ const editCategoryId = ref<number | null>(null)
 const editCategoryName = ref('')
 
 const newTagName = ref('')
+const tagSearch = ref('')
 const tagEditVisible = ref(false)
 const editTagId = ref<number | null>(null)
 const editTagName = ref('')
@@ -105,6 +137,11 @@ const metadataStatusLabel = computed(() => (metadataHealthy.value ? '正常' : '
 const metadataStatusHint = computed(() => {
   if (metadataHealthy.value) return '接口同步可用'
   return categoryStore.error || tagStore.error || '请稍后重试'
+})
+const filteredTags = computed(() => {
+  const keyword = tagSearch.value.trim().toLocaleLowerCase()
+  if (!keyword) return tagStore.list
+  return tagStore.list.filter((tag) => tag.name.toLocaleLowerCase().includes(keyword))
 })
 
 onMounted(() => {
@@ -247,25 +284,195 @@ async function onUpdateTag() {
 }
 
 .tag-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-sm);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr));
+  gap: 10px;
 }
 
-.tag-item {
+.tag-workspace {
+  padding: clamp(18px, 3vw, 30px);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background:
+    radial-gradient(ellipse at 8% 0%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 36%),
+    var(--surface-raised, var(--bg-secondary));
+}
+
+.tag-toolbar,
+.tag-heading__title-row,
+.tag-tools,
+.tag-create,
+.tag-card,
+.tag-card__actions {
+  display: flex;
+  align-items: center;
+}
+
+.tag-toolbar {
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tag-total {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--text-muted);
   font-size: 13px;
-  padding: 4px 9px;
+}
+
+.tag-total strong {
+  color: var(--text-primary);
+  font-size: 30px;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.06em;
+  line-height: 1;
+}
+
+.tag-create {
+  gap: 9px;
+}
+
+.tag-create .metadata-input {
+  width: min(260px, 32vw);
+}
+
+.tag-tools {
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 0 14px;
+}
+
+.tag-search {
+  width: min(240px, 48%);
+}
+
+.tag-card {
+  min-width: 0;
+  min-height: 46px;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 12px 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-primary);
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.tag-card:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--accent) 46%, var(--border));
+  background: color-mix(in srgb, var(--accent) 4%, var(--bg-primary));
+}
+
+.tag-card__name {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 560;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tag-card__actions {
+  flex: 0 0 auto;
+  gap: 8px;
 }
 
 .tag-action {
-  margin-left: 4px;
-  padding: 0 3px;
+  padding: 4px 0;
+  border: 0;
+  color: var(--text-muted);
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  transition: color 140ms ease;
+}
+
+.tag-action:hover,
+.tag-action:focus-visible {
+  color: var(--accent);
+}
+
+.tag-action:focus-visible {
+  outline: 2px solid var(--control-focus-border);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.tag-action--delete:hover,
+.tag-action--delete:focus-visible {
+  color: var(--danger);
+}
+
+.tag-card__divider {
+  width: 1px;
+  height: 13px;
+  background: var(--border);
+}
+
+.tag-empty {
+  display: grid;
+  min-height: 180px;
+  justify-items: center;
+  align-content: center;
+  gap: 7px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 12px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.tag-empty strong {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.tag-empty__mark {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  margin-bottom: 3px;
+  place-items: center;
+  border-radius: 10px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  font-size: 20px;
+  font-weight: 700;
 }
 
 @media (max-width: 560px) {
   .metadata-input {
     flex-basis: 100%;
     width: 100%;
+  }
+
+  .tag-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .tag-create .metadata-input {
+    width: auto;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .tag-workspace {
+    padding: 16px;
+  }
+
+  .tag-list {
+    display: grid;
+    grid-template-columns: 1fr;
   }
 }
 </style>
