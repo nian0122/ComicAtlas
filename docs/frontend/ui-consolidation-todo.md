@@ -30,7 +30,7 @@
 ### UI-03：统一页面标题栏
 
 - [x] **TODO UI-03**：在 `shared/ui/page-header/` 提供由标题、eyebrow、description、actions 插槽组成的无业务 `PageHeader`；`ManagementPageHeader` 改为薄包装或删除。
-- 替换范围：`pages/reading/history/ui/HistoryPage.vue`、`pages/reading/library/ui/LibraryPage.vue` 的 `.page-header`，以及所有使用 `ManagementPageHeader` 或本地 `.workspace-header/.structure-header` 的管理页。
+- 替换范围：`pages/reading/history/ui/HistoryPage.vue`、所有使用 `ManagementPageHeader` 或本地标题栏的管理页。`LibraryPage.vue` 的 sticky 容器承载搜索、排序和筛选工具栏，不属于标题栏，保留为页面专用 `library-filter-header`。
 - 约束：阅读端移动端隐藏标题栏的策略留在页面或 widget；组件只负责桌面基础布局和插槽，不绑定路由或断点。
 - 验证：标题字号、下边框、actions 间距和窄屏换行由组件单点定义；页面不再复制 `.header-actions` 等基础规则。
 

@@ -1,6 +1,10 @@
 <template>
   <div class="comic-list-page">
-    <header ref="pageHeaderRef" class="page-header" :class="{ 'desktop-filter-hidden': isDesktopFilterHidden }">
+    <header
+      ref="pageHeaderRef"
+      class="library-filter-header"
+      :class="{ 'desktop-filter-hidden': isDesktopFilterHidden }"
+    >
       <div class="title-block">
         <div class="title-row">
           <h1 class="page-title">

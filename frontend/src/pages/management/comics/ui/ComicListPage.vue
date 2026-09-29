@@ -2,9 +2,7 @@
   <div class="manage-comic-list-page">
     <PageHeader spaced title="漫画管理" eyebrow="CATALOG / CONTROL">
       <template #description>共 {{ store.total }} 部漫画</template>
-      <div class="header-actions">
-        <AppButton variant="primary" @click="router.push('/manage/import')">+ 导入漫画</AppButton>
-      </div>
+      <AppButton variant="primary" @click="router.push('/manage/import')">+ 导入漫画</AppButton>
     </PageHeader>
 
     <StatGrid spaced class="repository-stats" aria-label="仓库统计" :columns="3">
@@ -271,11 +269,6 @@ function formatBytes(bytes: number | undefined): string {
 .manage-comic-list-page {
   width: 100%;
   max-width: none;
-}
-
-.header-actions {
-  display: flex;
-  gap: var(--space-sm);
 }
 
 .filter-toolbar {

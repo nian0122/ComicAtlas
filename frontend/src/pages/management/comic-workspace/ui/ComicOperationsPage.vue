@@ -5,23 +5,23 @@
 
     <el-alert v-if="error" :title="error" type="error" show-icon />
     <section v-if="comic" class="current-state">
-      <div>
+      <ManagementPanel class="current-state-card" padding="compact">
         <span>漫画</span><strong>{{ comic.title }}</strong
         ><small>ID {{ comic.id }}</small>
-      </div>
-      <div>
+      </ManagementPanel>
+      <ManagementPanel class="current-state-card" padding="compact">
         <span>当前生命周期</span><ComicStatusTag class="current-status-tag" :status="comic.status" /><small>{{
           statusMeta.description
         }}</small>
-      </div>
-      <div>
+      </ManagementPanel>
+      <ManagementPanel class="current-state-card" padding="compact">
         <span>页数</span><strong>{{ comic.pageCount }}</strong
         ><small>{{ comic.categoryName || '未分类' }}</small>
-      </div>
-      <div>
+      </ManagementPanel>
+      <ManagementPanel class="current-state-card" padding="compact">
         <span>自动观察</span><strong>{{ polling ? '开启' : '关闭' }}</strong
         ><el-switch v-model="polling" />
-      </div>
+      </ManagementPanel>
     </section>
 
     <el-tabs v-if="comic" v-model="activeTab">
@@ -313,15 +313,9 @@ onBeforeUnmount(() => {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--space-3);
 }
-.current-state > div,
-.panel {
+.current-state-card {
   display: grid;
   gap: var(--space-2);
-  padding: var(--space-4);
-  border: 1px solid var(--border);
-  background: var(--bg-surface);
-}
-.current-state > div {
   min-height: 102px;
   align-content: space-between;
 }
