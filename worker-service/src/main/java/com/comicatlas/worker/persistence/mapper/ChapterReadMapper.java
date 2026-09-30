@@ -10,8 +10,10 @@ import java.util.List;
 @Mapper
 public interface ChapterReadMapper {
 
-    @Select("SELECT id, comic_id, catalog_id, title, chapter_no, global_order FROM chapter WHERE comic_id = #{comicId} ORDER BY global_order ASC")
-    List<ChapterRecord> selectByComicIdOrderByGlobalOrder(Long comicId);
+    /** 导出只包含可用章节，避免已删除章节占用或冲突于导出目录。 */
+    @Select("SELECT id, comic_id, catalog_id, title, chapter_no, global_order FROM chapter "
+            + "WHERE comic_id = #{comicId} AND status = 'READY' ORDER BY global_order ASC")
+    List<ChapterRecord> selectReadyByComicIdOrderByGlobalOrder(Long comicId);
 
     /**
      * 元数据扫盘刷新专用只读查询：额外取章节乐观锁 version 作为快照基线。
