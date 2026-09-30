@@ -182,8 +182,10 @@ public class ExportServiceImpl implements ExportService {
                         new IOException("检查点漫画列表不匹配"));
             }
             validateBatchDirectoryPlans(plans, stagingDir);
-            for (DirectoryExportPlan plan : plans) {
-                requireSameFileStore(exportRoot, plan.sourceRootKey(), plan.comicId(), true);
+            if (!Files.exists(finalDir, LinkOption.NOFOLLOW_LINKS)) {
+                for (DirectoryExportPlan plan : plans) {
+                    requireSameFileStore(exportRoot, plan.sourceRootKey(), plan.comicId(), true);
+                }
             }
         } else {
             plans = buildBatchDirectoryPlans(comicIds);
@@ -611,7 +613,7 @@ public class ExportServiceImpl implements ExportService {
             if (sourceRoot == null) {
                 throw new IOException("原件存储根不可用");
             }
-            Files.deleteIfExists(sourceRoot.resolve(String.valueOf(comicId)));
+            detachRemainingSourceDirectory(sourceRoot, comicId, taskId);
             detachGeneratedDirectory(StorageRootKeys.HQ, comicId, taskId, sourceRootKey);
             detachGeneratedDirectory(StorageRootKeys.LQ, comicId, taskId, sourceRootKey);
             detachGeneratedDirectory(StorageRootKeys.THUMBS, comicId, taskId, sourceRootKey);
@@ -621,6 +623,34 @@ public class ExportServiceImpl implements ExportService {
             }
         } catch (IOException | RuntimeException exception) {
             throw new ExportMoveOutException("原件目录移出未完成，保留导出产物并等待重试 comicId=" + comicId, exception);
+        }
+    }
+
+    /** 未进入导出计划的残留数据（例如已删除章节）保留在脱管区，避免阻断已发布导出收尾。 */
+    private void detachRemainingSourceDirectory(StorageRoot sourceRoot, Long comicId, Long taskId)
+            throws IOException {
+        Path source = sourceRoot.resolve(String.valueOf(comicId));
+        if (!Files.exists(source, LinkOption.NOFOLLOW_LINKS)) {
+            return;
+        }
+        if (!Files.isDirectory(source, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(source)) {
+            throw new IOException("原件漫画路径不是普通目录: comicId=" + comicId);
+        }
+        if (!hasDirectoryEntries(source)) {
+            Files.delete(source);
+            return;
+        }
+
+        Path detachedParent = sourceRoot.resolve(".detached");
+        Path detachedTarget = detachedParent.resolve(taskId + "-" + comicId);
+        if (Files.exists(detachedTarget, LinkOption.NOFOLLOW_LINKS)) {
+            throw new IOException("原件残留脱管目录已存在: comicId=" + comicId);
+        }
+        Files.createDirectories(detachedParent);
+        try {
+            Files.move(source, detachedTarget, StandardCopyOption.ATOMIC_MOVE);
+        } catch (AtomicMoveNotSupportedException exception) {
+            Files.move(source, detachedTarget);
         }
     }
 

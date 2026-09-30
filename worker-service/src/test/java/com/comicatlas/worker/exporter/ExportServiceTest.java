@@ -509,6 +509,33 @@ class ExportServiceTest {
     }
 
     @Test
+    void batchDirectoryExport_detachesUnexportedResidualSourceDataAndCanRetry() throws Exception {
+        MediaRecord media = media(1L, 10L, "1/10/original.jpg", 1);
+        when(exportCollector.collect(1L)).thenReturn(result(comic(1L, "残留数据漫画"),
+                List.of(chapter(10L, "第一章", 1)), List.of(media)));
+        writeFile("hq/1/10/original.jpg", "exported-media");
+        Path residualFile = writeFile("hq/1/1931/deleted-chapter.jpg", "preserved-residual");
+        stubResolverToRoot();
+        ZipBuilder realZipBuilder = new ZipBuilder(workerConfig);
+        ExportService realService = new ExportServiceImpl(exportCollector, exportFileResolver, realZipBuilder,
+                metadataJsonExporter, storageProperties, workerConfig, new ExportArchivePublisher(realZipBuilder));
+
+        ExportService.ExportOutput output = realService.exportBatchDirectory(List.of(1L), 105L);
+        Path taskDirectory = storageProperties.getRoots().get("EXPORT").getPath().resolve(output.fileName());
+        Path detachedResidualFile = storageProperties.getRoots().get("HQ").getPath()
+                .resolve(".detached/105-1/1931/deleted-chapter.jpg");
+
+        assertTrue(Files.isRegularFile(taskDirectory.resolve("残留数据漫画/第一章/original.jpg")));
+        assertTrue(Files.isRegularFile(detachedResidualFile), "未导出的残留源数据必须保留在脱管目录");
+        assertFalse(Files.exists(residualFile));
+
+        ExportService.ExportOutput retryOutput = realService.exportBatchDirectory(List.of(1L), 105L);
+
+        assertEquals(output.fileName(), retryOutput.fileName());
+        assertTrue(Files.isRegularFile(detachedResidualFile), "已完成脱管的目录必须支持安全重试");
+    }
+
+    @Test
     void batchDirectoryExport_usesRegisteredLegacyMediaDirectoryWhenItDiffersFromChapterId() throws Exception {
         MediaRecord legacyMedia = media(11277L, 125L, "125/0/000.jpg", 1);
         ChapterRecord legacyChapter = chapter(125L, "第一章", 1);
