@@ -69,6 +69,7 @@ import { AppButton } from '@/shared/ui/button'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { VideoPlay } from '@element-plus/icons-vue'
 import { activateSession, releaseSession, getPosition, savePosition } from '@/shared/lib/video/videoPlaybackCoordinator'
+import { useScreenWakeLock } from '@/shared/lib/device/useScreenWakeLock'
 import { clientLogger } from '@/shared/lib/logger'
 
 // ---------------------------------------------------------------------------
@@ -106,6 +107,7 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   (event: 'started'): void
 }>()
+const { setPlaybackActive } = useScreenWakeLock()
 
 // ---------------------------------------------------------------------------
 // Reactive state — drives the 5-state machine
@@ -224,6 +226,7 @@ async function handleActivate(): Promise<void> {
 // ---------------------------------------------------------------------------
 
 function unloadVideo(reason: string, mediaIdToSave?: number): void {
+  setPlaybackActive(false)
   clientLogger.debug('视频播放器释放', { operation: 'video.unload', reason, mediaId: props.mediaId })
   const id = mediaIdToSave ?? props.mediaId ?? 0
   const video = videoRef.value
@@ -353,6 +356,7 @@ function onMetadata(event: Event): void {
 
 function onPlay(event: Event): void {
   if (!(event.currentTarget instanceof HTMLVideoElement)) return
+  setPlaybackActive(true)
   activateSession(props.mediaId ?? 0, event.currentTarget)
   playerState.value = 'playing'
   emit('started')
@@ -360,12 +364,14 @@ function onPlay(event: Event): void {
 
 function onPause(event: Event): void {
   if (!(event.currentTarget instanceof HTMLVideoElement)) return
+  setPlaybackActive(false)
   savePosition(props.mediaId ?? 0, event.currentTarget.currentTime)
   playerState.value = 'paused'
 }
 
 function onEnded(event: Event): void {
   if (!(event.currentTarget instanceof HTMLVideoElement)) return
+  setPlaybackActive(false)
   savePosition(props.mediaId ?? 0, event.currentTarget.currentTime)
   playerState.value = 'paused'
 }

@@ -247,6 +247,7 @@ import { catalogApi, type CatalogNode } from '@/entities/comic'
 import { isVideoMedia, type MediaItemInfo, type MediaReaction } from '@/entities/media'
 import { searchCatalogChapters } from '@/features/chapter-search'
 import { clientLogger } from '@/shared/lib/logger'
+import { useScreenWakeLock } from '@/shared/lib/device/useScreenWakeLock'
 import { VideoProgressControl, VideoSpeedSheet } from './components'
 import { useAutoHideControls } from './composables/useAutoHideControls'
 import { useImmersiveSwipe } from './composables/useImmersiveSwipe'
@@ -262,6 +263,7 @@ const currentIndex = ref(0)
 const videoRef = ref<HTMLVideoElement | null>(null)
 const nextPreloadVideoRef = ref<HTMLVideoElement | null>(null)
 const progressControlRef = ref<InstanceType<typeof VideoProgressControl> | null>(null)
+const { setPlaybackActive } = useScreenWakeLock()
 const loading = ref(true)
 const loadError = ref('')
 const mediaError = ref('')
@@ -641,6 +643,7 @@ async function playCurrent(requestToken = ++autoPlayToken, attempt = 0): Promise
 }
 
 function stopCurrent(): void {
+  setPlaybackActive(false)
   ++autoPlayToken
   clearAutoPlayRetry()
   const video = videoRef.value
@@ -652,6 +655,7 @@ function stopCurrent(): void {
 }
 
 function pauseCurrent(): void {
+  setPlaybackActive(false)
   ++autoPlayToken
   clearAutoPlayRetry()
   videoRef.value?.pause()
@@ -989,12 +993,14 @@ function onVideoCanPlay(): void {
 
 function onVideoPlay(event: Event): void {
   if (event.currentTarget !== videoRef.value) return
+  setPlaybackActive(true)
   isPlaying.value = true
   scheduleControlsHide()
 }
 
 function onVideoPlaying(event: Event): void {
   if (event.currentTarget !== videoRef.value) return
+  setPlaybackActive(true)
   isPlaying.value = true
   clearBufferingIndicator()
   scheduleControlsHide()
@@ -1002,6 +1008,7 @@ function onVideoPlaying(event: Event): void {
 
 function onVideoPause(event: Event): void {
   if (event.currentTarget !== videoRef.value) return
+  setPlaybackActive(false)
   isPlaying.value = false
   clearBufferingIndicator()
   showControls(false)
@@ -1009,6 +1016,7 @@ function onVideoPause(event: Event): void {
 
 function onVideoEnded(event: Event): void {
   if (event.currentTarget !== videoRef.value || !currentIsVideo.value) return
+  setPlaybackActive(false)
   void playCurrent()
 }
 
