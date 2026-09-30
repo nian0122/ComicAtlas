@@ -509,6 +509,26 @@ class ExportServiceTest {
     }
 
     @Test
+    void batchDirectoryExport_usesRegisteredLegacyMediaDirectoryWhenItDiffersFromChapterId() throws Exception {
+        MediaRecord legacyMedia = media(11277L, 125L, "125/0/000.jpg", 1);
+        ChapterRecord legacyChapter = chapter(125L, "第一章", 1);
+        when(exportCollector.collect(125L)).thenReturn(result(comic(125L, "历史目录漫画"),
+                List.of(legacyChapter), List.of(legacyMedia)));
+        Path sourceMediaFile = writeFile("hq/125/0/000.jpg", "legacy-image-content");
+        stubResolverToRoot();
+        ZipBuilder realZipBuilder = new ZipBuilder(workerConfig);
+        ExportService realService = new ExportServiceImpl(exportCollector, exportFileResolver, realZipBuilder,
+                metadataJsonExporter, storageProperties, workerConfig, new ExportArchivePublisher(realZipBuilder));
+
+        ExportService.ExportOutput output = realService.exportBatchDirectory(List.of(125L), 103L);
+
+        Path outputDirectory = storageProperties.getRoots().get("EXPORT").getPath().resolve(output.fileName());
+        assertTrue(Files.isRegularFile(outputDirectory.resolve("历史目录漫画/第一章/000.jpg")));
+        assertFalse(Files.exists(sourceMediaFile), "应移动实际登记的源目录而不是按章节 ID 猜源路径");
+        assertFalse(Files.exists(storageProperties.getRoots().get("HQ").getPath().resolve("125")));
+    }
+
+    @Test
     void batchDirectoryExport_preflightsEveryComicBeforeMovingAnyDirectory() throws Exception {
         MediaRecord firstMedia = media(1L, 10L, "1/10/original.jpg", 1);
         MediaRecord secondMedia = media(2L, 20L, "2/20/clip.mp4", 1);
